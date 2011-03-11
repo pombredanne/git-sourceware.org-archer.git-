@@ -167,7 +167,7 @@
    word) to be written back to the now initialized PLT entry thus
    destroying a portion of the initialization that had occurred only a
    short time ago.  When execution continued, the zero word would be
-   executed as an instruction an an illegal instruction trap was
+   executed as an instruction an illegal instruction trap was
    generated instead.  (0 is not a legal instruction.)
 
    The fix for this problem was fairly straightforward.  The function
@@ -1509,7 +1509,7 @@ ppc_linux_init_abi (struct gdbarch_info info,
       /* Until November 2001, gcc did not comply with the 32 bit SysV
 	 R4 ABI requirement that structures less than or equal to 8
 	 bytes should be returned in registers.  Instead GCC was using
-	 the the AIX/PowerOpen ABI - everything returned in memory
+	 the AIX/PowerOpen ABI - everything returned in memory
 	 (well ignoring vectors that is).  When this was corrected, it
 	 wasn't fixed for GNU/Linux native platform.  Use the
 	 PowerOpen struct convention.  */

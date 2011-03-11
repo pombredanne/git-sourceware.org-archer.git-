@@ -471,6 +471,7 @@ extern struct value *value_from_pointer (struct type *type, CORE_ADDR addr);
 extern struct value *value_from_double (struct type *type, DOUBLEST num);
 extern struct value *value_from_decfloat (struct type *type,
 					  const gdb_byte *decbytes);
+extern struct value *value_from_history_ref (char *, char **);
 
 extern struct value *value_at (struct type *type, CORE_ADDR addr);
 extern struct value *value_at_lazy (struct type *type, CORE_ADDR addr);
@@ -660,8 +661,6 @@ extern struct value *parse_to_comma_and_eval (char **expp);
 extern struct type *parse_and_eval_type (char *p, int length);
 
 extern CORE_ADDR parse_and_eval_address (char *exp);
-
-extern CORE_ADDR parse_and_eval_address_1 (char **expptr);
 
 extern LONGEST parse_and_eval_long (char *exp);
 

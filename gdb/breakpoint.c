@@ -133,7 +133,8 @@ static void breakpoints_info (char *, int);
 
 static void watchpoints_info (char *, int);
 
-static int breakpoint_1 (int, int, int (*) (const struct breakpoint *));
+static int breakpoint_1 (char *, int, 
+			 int (*) (const struct breakpoint *));
 
 static int breakpoint_cond_eval (void *);
 
@@ -1988,7 +1989,7 @@ reattach_breakpoints (int pid)
   struct cleanup *old_chain;
   struct bp_location *bl, **blp_tmp;
   int val;
-  struct ui_file *tmp_error_stream = mem_fileopen ();
+  struct ui_file *tmp_error_stream;
   int dummy1 = 0, dummy2 = 0;
   struct inferior *inf;
   struct thread_info *tp;
@@ -2002,6 +2003,7 @@ reattach_breakpoints (int pid)
 
   inferior_ptid = tp->ptid;
 
+  tmp_error_stream = mem_fileopen ();
   make_cleanup_ui_file_delete (tmp_error_stream);
 
   ALL_BP_LOCATIONS (bl, blp_tmp)
@@ -3307,11 +3309,6 @@ print_it_typical (bpstat bs)
   int bp_temp = 0;
   enum print_stop_action result;
 
-  /* bs->breakpoint_at can be NULL if it was a momentary breakpoint
-     which has since been deleted.  */
-  if (bs->breakpoint_at == NULL)
-    return PRINT_UNKNOWN;
-
   gdb_assert (bs->bp_location_at != NULL);
 
   bl = bs->bp_location_at;
@@ -3517,10 +3514,14 @@ print_bp_stop_message (bpstat bs)
       {
 	struct breakpoint *b = bs->breakpoint_at;
 
+	/* bs->breakpoint_at can be NULL if it was a momentary breakpoint
+	   which has since been deleted.  */
+	if (b == NULL)
+	  return PRINT_UNKNOWN;
+
 	/* Normal case.  Call the breakpoint's print_it method, or
 	   print_it_typical.  */
-	/* FIXME: how breakpoint can ever be NULL here?  */
-	if (b != NULL && b->ops != NULL && b->ops->print_it != NULL)
+	if (b->ops != NULL && b->ops->print_it != NULL)
 	  return b->ops->print_it (b);
 	else
 	  return print_it_typical (bs);
@@ -4563,12 +4564,40 @@ bpstat_causes_stop (bpstat bs)
 
 
 
+/* Compute a string of spaces suitable to indent the next line
+   so it starts at the position corresponding to the table column
+   named COL_NAME in the currently active table of UIOUT.  */
+
+static char *
+wrap_indent_at_field (struct ui_out *uiout, const char *col_name)
+{
+  static char wrap_indent[80];
+  int i, total_width, width, align;
+  char *text;
+
+  total_width = 0;
+  for (i = 1; ui_out_query_field (uiout, i, &width, &align, &text); i++)
+    {
+      if (strcmp (text, col_name) == 0)
+	{
+	  gdb_assert (total_width < sizeof wrap_indent);
+	  memset (wrap_indent, ' ', total_width);
+	  wrap_indent[total_width] = 0;
+
+	  return wrap_indent;
+	}
+
+      total_width += width + 1;
+    }
+
+  return NULL;
+}
+
 /* Print the LOC location out of the list of B->LOC locations.  */
 
-static void print_breakpoint_location (struct breakpoint *b,
-				       struct bp_location *loc,
-				       char *wrap_indent,
-				       struct ui_stream *stb)
+static void
+print_breakpoint_location (struct breakpoint *b,
+			   struct bp_location *loc)
 {
   struct cleanup *old_chain = save_current_program_space ();
 
@@ -4587,8 +4616,9 @@ static void print_breakpoint_location (struct breakpoint *b,
 	  ui_out_text (uiout, "in ");
 	  ui_out_field_string (uiout, "func",
 			       SYMBOL_PRINT_NAME (sym));
-	  ui_out_wrap_hint (uiout, wrap_indent);
-	  ui_out_text (uiout, " at ");
+	  ui_out_text (uiout, " ");
+	  ui_out_wrap_hint (uiout, wrap_indent_at_field (uiout, "what"));
+	  ui_out_text (uiout, "at ");
 	}
       ui_out_field_string (uiout, "file", b->source_file);
       ui_out_text (uiout, ":");
@@ -4606,9 +4636,14 @@ static void print_breakpoint_location (struct breakpoint *b,
     }
   else if (loc)
     {
+      struct ui_stream *stb = ui_out_stream_new (uiout);
+      struct cleanup *stb_chain = make_cleanup_ui_out_stream_delete (stb);
+
       print_address_symbolic (loc->gdbarch, loc->address, stb->stream,
 			      demangle, "");
       ui_out_field_stream (uiout, "at", stb);
+
+      do_cleanups (stb_chain);
     }
   else
     ui_out_field_string (uiout, "pending", b->addr_string);
@@ -4672,14 +4707,10 @@ print_one_breakpoint_location (struct breakpoint *b,
 			       struct bp_location *loc,
 			       int loc_number,
 			       struct bp_location **last_loc,
-			       int print_address_bits,
 			       int allflag)
 {
   struct command_line *l;
   static char bpenables[] = "nynny";
-  char wrap_indent[80];
-  struct ui_stream *stb = ui_out_stream_new (uiout);
-  struct cleanup *old_chain = make_cleanup_ui_out_stream_delete (stb);
   struct cleanup *bkpt_chain;
 
   int header_of_multiple = 0;
@@ -4741,15 +4772,6 @@ print_one_breakpoint_location (struct breakpoint *b,
 
   
   /* 5 and 6 */
-  strcpy (wrap_indent, "                           ");
-  if (opts.addressprint)
-    {
-      if (print_address_bits <= 32)
-	strcat (wrap_indent, "           ");
-      else
-	strcat (wrap_indent, "                   ");
-    }
-
   if (b->ops != NULL && b->ops->print_one != NULL)
     {
       /* Although the print_one can possibly print all locations,
@@ -4814,7 +4836,7 @@ print_one_breakpoint_location (struct breakpoint *b,
 	  }
 	annotate_field (5);
 	if (!header_of_multiple)
-	  print_breakpoint_location (b, loc, wrap_indent, stb);
+	  print_breakpoint_location (b, loc);
 	if (b->loc)
 	  *last_loc = b->loc;
 	break;
@@ -4970,17 +4992,14 @@ print_one_breakpoint_location (struct breakpoint *b,
     }
 	
   do_cleanups (bkpt_chain);
-  do_cleanups (old_chain);
 }
 
 static void
 print_one_breakpoint (struct breakpoint *b,
 		      struct bp_location **last_loc, 
-		      int print_address_bits,
 		      int allflag)
 {
-  print_one_breakpoint_location (b, NULL, 0, last_loc,
-				 print_address_bits, allflag);
+  print_one_breakpoint_location (b, NULL, 0, last_loc, allflag);
 
   /* If this breakpoint has custom print function,
      it's already printed.  Otherwise, print individual
@@ -5002,8 +5021,7 @@ print_one_breakpoint (struct breakpoint *b,
 	  struct bp_location *loc;
 	  int n = 1;
 	  for (loc = b->loc; loc; loc = loc->next, ++n)
-	    print_one_breakpoint_location (b, loc, n, last_loc,
-					   print_address_bits, allflag);
+	    print_one_breakpoint_location (b, loc, n, last_loc, allflag);
 	}
     }
 }
@@ -5047,9 +5065,7 @@ do_captured_breakpoint_query (struct ui_out *uiout, void *data)
     {
       if (args->bnum == b->number)
 	{
-	  int print_address_bits = breakpoint_address_bits (b);
-
-	  print_one_breakpoint (b, &dummy_loc, print_address_bits, 0);
+	  print_one_breakpoint (b, &dummy_loc, 0);
 	  return GDB_RC_OK;
 	}
     }
@@ -5102,7 +5118,7 @@ user_breakpoint_p (struct breakpoint *b)
    breakpoints listed.  */
 
 static int
-breakpoint_1 (int bnum, int allflag, 
+breakpoint_1 (char *args, int allflag, 
 	      int (*filter) (const struct breakpoint *))
 {
   struct breakpoint *b;
@@ -5119,28 +5135,36 @@ breakpoint_1 (int bnum, int allflag,
      required for address fields.  */
   nr_printable_breakpoints = 0;
   ALL_BREAKPOINTS (b)
-    if (bnum == -1
-	|| bnum == b->number)
-      {
-	/* If we have a filter, only list the breakpoints it accepts.  */
-	if (filter && !filter (b))
-	  continue;
-	
-	if (allflag || user_breakpoint_p (b))
-	  {
-	    int addr_bit, type_len;
+    {
+      /* If we have a filter, only list the breakpoints it accepts.  */
+      if (filter && !filter (b))
+	continue;
 
-	    addr_bit = breakpoint_address_bits (b);
-	    if (addr_bit > print_address_bits)
-	      print_address_bits = addr_bit;
+      /* If we have an "args" string, it is a list of breakpoints to 
+	 accept.  Skip the others.  */
+      if (args != NULL && *args != '\0')
+	{
+	  if (allflag && parse_and_eval_long (args) != b->number)
+	    continue;
+	  if (!allflag && !number_is_in_list (args, b->number))
+	    continue;
+	}
 
-	    type_len = strlen (bptype_string (b->type));
-	    if (type_len > print_type_col_width)
-	      print_type_col_width = type_len;
+      if (allflag || user_breakpoint_p (b))
+	{
+	  int addr_bit, type_len;
 
-	    nr_printable_breakpoints++;
-	  }
-      }
+	  addr_bit = breakpoint_address_bits (b);
+	  if (addr_bit > print_address_bits)
+	    print_address_bits = addr_bit;
+
+	  type_len = strlen (bptype_string (b->type));
+	  if (type_len > print_type_col_width)
+	    print_type_col_width = type_len;
+
+	  nr_printable_breakpoints++;
+	}
+    }
 
   if (opts.addressprint)
     bkpttbl_chain 
@@ -5169,16 +5193,16 @@ breakpoint_1 (int bnum, int allflag,
     annotate_field (3);
   ui_out_table_header (uiout, 3, ui_left, "enabled", "Enb");	/* 4 */
   if (opts.addressprint)
-	{
-	  if (nr_printable_breakpoints > 0)
-	    annotate_field (4);
-	  if (print_address_bits <= 32)
-	    ui_out_table_header (uiout, 10, ui_left, 
-				 "addr", "Address");		/* 5 */
-	  else
-	    ui_out_table_header (uiout, 18, ui_left, 
-				 "addr", "Address");		/* 5 */
-	}
+    {
+      if (nr_printable_breakpoints > 0)
+	annotate_field (4);
+      if (print_address_bits <= 32)
+	ui_out_table_header (uiout, 10, ui_left, 
+			     "addr", "Address");		/* 5 */
+      else
+	ui_out_table_header (uiout, 18, ui_left, 
+			     "addr", "Address");		/* 5 */
+    }
   if (nr_printable_breakpoints > 0)
     annotate_field (5);
   ui_out_table_header (uiout, 40, ui_noalign, "what", "What");	/* 6 */
@@ -5187,22 +5211,34 @@ breakpoint_1 (int bnum, int allflag,
     annotate_breakpoints_table ();
 
   ALL_BREAKPOINTS (b)
-  {
-    QUIT;
-    if (bnum == -1
-	|| bnum == b->number)
-      {
-	/* If we have a filter, only list the breakpoints it accepts.  */
-	if (filter && !filter (b))
-	  continue;
-	
-	/* We only print out user settable breakpoints unless the
-	   allflag is set.  */
-	if (allflag || user_breakpoint_p (b))
-	  print_one_breakpoint (b, &last_loc, print_address_bits, allflag);
-      }
-  }
-  
+    {
+      QUIT;
+      /* If we have a filter, only list the breakpoints it accepts.  */
+      if (filter && !filter (b))
+	continue;
+
+      /* If we have an "args" string, it is a list of breakpoints to 
+	 accept.  Skip the others.  */
+
+      if (args != NULL && *args != '\0')
+	{
+	  if (allflag)	/* maintenance info breakpoint */
+	    {
+	      if (parse_and_eval_long (args) != b->number)
+		continue;
+	    }
+	  else		/* all others */
+	    {
+	      if (!number_is_in_list (args, b->number))
+		continue;
+	    }
+	}
+      /* We only print out user settable breakpoints unless the
+	 allflag is set.  */
+      if (allflag || user_breakpoint_p (b))
+	print_one_breakpoint (b, &last_loc, allflag);
+    }
+
   do_cleanups (bkpttbl_chain);
 
   if (nr_printable_breakpoints == 0)
@@ -5211,12 +5247,12 @@ breakpoint_1 (int bnum, int allflag,
 	 empty list.  */
       if (!filter)
 	{
-	  if (bnum == -1)
+	  if (args == NULL || *args == '\0')
 	    ui_out_message (uiout, 0, "No breakpoints or watchpoints.\n");
 	  else
 	    ui_out_message (uiout, 0, 
-			    "No breakpoint or watchpoint number %d.\n",
-			    bnum);
+			    "No breakpoint or watchpoint matching '%s'.\n",
+			    args);
 	}
     }
   else
@@ -5252,46 +5288,31 @@ default_collect_info (void)
 }
   
 static void
-breakpoints_info (char *bnum_exp, int from_tty)
+breakpoints_info (char *args, int from_tty)
 {
-  int bnum = -1;
-
-  if (bnum_exp)
-    bnum = parse_and_eval_long (bnum_exp);
-
-  breakpoint_1 (bnum, 0, NULL);
+  breakpoint_1 (args, 0, NULL);
 
   default_collect_info ();
 }
 
 static void
-watchpoints_info (char *wpnum_exp, int from_tty)
+watchpoints_info (char *args, int from_tty)
 {
-  int wpnum = -1, num_printed;
-
-  if (wpnum_exp)
-    wpnum = parse_and_eval_long (wpnum_exp);
-
-  num_printed = breakpoint_1 (wpnum, 0, is_watchpoint);
+  int num_printed = breakpoint_1 (args, 0, is_watchpoint);
 
   if (num_printed == 0)
     {
-      if (wpnum == -1)
+      if (args == NULL || *args == '\0')
 	ui_out_message (uiout, 0, "No watchpoints.\n");
       else
-	ui_out_message (uiout, 0, "No watchpoint number %d.\n", wpnum);
+	ui_out_message (uiout, 0, "No watchpoint matching '%s'.\n", args);
     }
 }
 
 static void
-maintenance_info_breakpoints (char *bnum_exp, int from_tty)
+maintenance_info_breakpoints (char *args, int from_tty)
 {
-  int bnum = -1;
-
-  if (bnum_exp)
-    bnum = parse_and_eval_long (bnum_exp);
-
-  breakpoint_1 (bnum, 1, NULL);
+  breakpoint_1 (args, 1, NULL);
 
   default_collect_info ();
 }
@@ -5482,8 +5503,10 @@ static void
 breakpoint_adjustment_warning (CORE_ADDR from_addr, CORE_ADDR to_addr,
                                int bnum, int have_bnum)
 {
-  char astr1[40];
-  char astr2[40];
+  /* The longest string possibly returned by hex_string_custom
+     is 50 chars.  These must be at least that big for safety.  */
+  char astr1[64];
+  char astr2[64];
 
   strcpy (astr1, hex_string_custom ((unsigned long) from_addr, 8));
   strcpy (astr2, hex_string_custom ((unsigned long) to_addr, 8));
@@ -7819,6 +7842,7 @@ create_breakpoint (struct gdbarch *gdbarch,
 	default:
 	  throw_exception (e);
 	}
+      break;
     default:
       if (!sals.nelts)
 	return 0;
@@ -10905,7 +10929,7 @@ disable_command (char *args, int from_tty)
       case bp_none:
 	warning (_("attempted to disable apparently deleted breakpoint #%d?"),
 		 bpt->number);
-	continue;
+	break;
       case bp_breakpoint:
       case bp_tracepoint:
       case bp_fast_tracepoint:
@@ -10917,8 +10941,9 @@ disable_command (char *args, int from_tty)
       case bp_read_watchpoint:
       case bp_access_watchpoint:
 	disable_breakpoint (bpt);
+	break;
       default:
-	continue;
+	break;
       }
   else if (strchr (args, '.'))
     {
@@ -11006,7 +11031,7 @@ enable_command (char *args, int from_tty)
       case bp_none:
 	warning (_("attempted to enable apparently deleted breakpoint #%d?"),
 		 bpt->number);
-	continue;
+	break;
       case bp_breakpoint:
       case bp_tracepoint:
       case bp_fast_tracepoint:
@@ -11018,8 +11043,9 @@ enable_command (char *args, int from_tty)
       case bp_read_watchpoint:
       case bp_access_watchpoint:
 	enable_breakpoint (bpt);
+	break;
       default:
-	continue;
+	break;
       }
   else if (strchr (args, '.'))
     {
@@ -11338,8 +11364,11 @@ catch_syscall_completer (struct cmd_list_element *cmd,
                          char *text, char *word)
 {
   const char **list = get_syscall_names ();
+  char **retlist
+    = (list == NULL) ? NULL : complete_on_enum (list, text, word);
 
-  return (list == NULL) ? NULL : complete_on_enum (list, text, word);
+  xfree (list);
+  return retlist;
 }
 
 /* Tracepoint-specific operations.  */
@@ -11510,21 +11539,18 @@ create_tracepoint_from_upload (struct uploaded_tp *utp)
    omitted.  */
 
 static void
-tracepoints_info (char *tpnum_exp, int from_tty)
+tracepoints_info (char *args, int from_tty)
 {
-  int tpnum = -1, num_printed;
+  int num_printed;
 
-  if (tpnum_exp)
-    tpnum = parse_and_eval_long (tpnum_exp);
-
-  num_printed = breakpoint_1 (tpnum, 0, is_tracepoint);
+  num_printed = breakpoint_1 (args, 0, is_tracepoint);
 
   if (num_printed == 0)
     {
-      if (tpnum == -1)
+      if (args == NULL || *args == '\0')
 	ui_out_message (uiout, 0, "No tracepoints.\n");
       else
-	ui_out_message (uiout, 0, "No tracepoint number %d.\n", tpnum);
+	ui_out_message (uiout, 0, "No tracepoint matching '%s'.\n", args);
     }
 
   default_collect_info ();
@@ -12214,7 +12240,7 @@ breakpoint set."));
     }
 
   add_info ("breakpoints", breakpoints_info, _("\
-Status of user-settable breakpoints, or breakpoint number NUMBER.\n\
+Status of specified breakpoints (all user-settable breakpoints if no argument).\n\
 The \"Type\" column indicates one of:\n\
 \tbreakpoint     - normal breakpoint\n\
 \twatchpoint     - watchpoint\n\
@@ -12362,9 +12388,7 @@ the memory to which it refers."));
   set_cmd_completer (c, expression_completer);
 
   add_info ("watchpoints", watchpoints_info, _("\
-Status of watchpoints, or watchpoint number NUMBER."));
-
-
+Status of specified watchpoints (all watchpoints if no argument)."));
 
   /* XXX: cagney/2005-02-23: This should be a boolean, and should
      respond to changes - contrary to the description.  */
@@ -12430,7 +12454,7 @@ Do \"help tracepoints\" for info on other tracepoint commands."));
   set_cmd_completer (c, location_completer);
 
   add_info ("tracepoints", tracepoints_info, _("\
-Status of tracepoints, or tracepoint number NUMBER.\n\
+Status of specified tracepoints (all tracepoints if no argument).\n\
 Convenience variable \"$tpnum\" contains the number of the\n\
 last tracepoint set."));
 

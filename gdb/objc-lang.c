@@ -720,6 +720,9 @@ selectors_info (char *regexp, int from_tty)
 	strcpy(myregexp, ".*]");
       else
 	{
+	  /* Allow a few extra bytes because of the strcat below.  */
+	  if (sizeof (myregexp) < strlen (regexp) + 4)
+	    error (_("Regexp is too long: %s"), regexp);
 	  strcpy(myregexp, regexp);
 	  if (myregexp[strlen(myregexp) - 1] == '$') /* end of selector */
 	    myregexp[strlen(myregexp) - 1] = ']';    /* end of method name */
@@ -740,19 +743,19 @@ selectors_info (char *regexp, int from_tty)
     {
       QUIT;
       name = SYMBOL_NATURAL_NAME (msymbol);
-      if (name &&
-	 (name[0] == '-' || name[0] == '+') &&
-	  name[1] == '[')		/* Got a method name.  */
+      if (name
+          && (name[0] == '-' || name[0] == '+')
+	  && name[1] == '[')		/* Got a method name.  */
 	{
 	  /* Filter for class/instance methods.  */
 	  if (plusminus && name[0] != plusminus)
 	    continue;
 	  /* Find selector part.  */
-	  name = (char *) strchr(name+2, ' ');
+	  name = (char *) strchr (name+2, ' ');
 	  if (regexp == NULL || re_exec(++name) != 0)
 	    { 
 	      char *mystart = name;
-	      char *myend   = (char *) strchr(mystart, ']');
+	      char *myend   = (char *) strchr (mystart, ']');
 	      
 	      if (myend && (myend - mystart > maxlen))
 		maxlen = myend - mystart;	/* Get longest selector.  */
@@ -861,6 +864,9 @@ classes_info (char *regexp, int from_tty)
     strcpy(myregexp, ".* ");	/* Null input: match all objc classes.  */
   else
     {
+      /* Allow a few extra bytes because of the strcat below.  */
+      if (sizeof (myregexp) < strlen (regexp) + 4)
+	error (_("Regexp is too long: %s"), regexp);
       strcpy(myregexp, regexp);
       if (myregexp[strlen(myregexp) - 1] == '$')
 	/* In the method name, the end of the class name is marked by ' '.  */

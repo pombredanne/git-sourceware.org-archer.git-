@@ -1923,8 +1923,8 @@ record_core_remove_breakpoint (struct gdbarch *gdbarch,
 
 /* "to_has_execution" method for prec over corefile.  */
 
-int
-record_core_has_execution (struct target_ops *ops)
+static int
+record_core_has_execution (struct target_ops *ops, ptid_t the_ptid)
 {
   return 1;
 }
@@ -2214,12 +2214,12 @@ record_restore (void)
 
   /* Now need to find our special note section.  */
   osec = bfd_get_section_by_name (core_bfd, "null0");
-  osec_size = bfd_section_size (core_bfd, osec);
   if (record_debug)
     fprintf_unfiltered (gdb_stdlog, "Find precord section %s.\n",
 			osec ? "succeeded" : "failed");
   if (osec == NULL)
     return;
+  osec_size = bfd_section_size (core_bfd, osec);
   if (record_debug)
     fprintf_unfiltered (gdb_stdlog, "%s", bfd_section_name (core_bfd, osec));
 

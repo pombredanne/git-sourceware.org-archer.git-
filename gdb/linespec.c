@@ -748,9 +748,9 @@ decode_line_1 (char **argptr, int funfirstline, struct symtab *default_symtab,
   if (**argptr == '*')
     return decode_indirect (argptr);
 
-  is_quoted = (*argptr
-	       && strchr (get_gdb_completer_quote_characters (),
-			  **argptr) != NULL);
+  is_quoted = (strchr (get_gdb_completer_quote_characters (),
+		       **argptr) != NULL);
+
   if (is_quoted)
     end_quote = skip_quoted (*argptr);
 
@@ -980,7 +980,7 @@ decode_indirect (char **argptr)
   CORE_ADDR pc;
   
   (*argptr)++;
-  pc = parse_and_eval_address_1 (argptr);
+  pc = value_as_address (parse_to_comma_and_eval (argptr));
 
   values.sals = (struct symtab_and_line *)
     xmalloc (sizeof (struct symtab_and_line));
@@ -1122,7 +1122,6 @@ decode_objc (char **argptr, int funfirstline, struct symtab *file_symtab,
   struct symtabs_and_lines values;
   struct symbol **sym_arr = NULL;
   struct symbol *sym = NULL;
-  char *copy = NULL;
   struct block *block = NULL;
   unsigned i1 = 0;
   unsigned i2 = 0;
@@ -1143,7 +1142,7 @@ decode_objc (char **argptr, int funfirstline, struct symtab *file_symtab,
       set_language (save_language);
     }
 
-  copy = find_imps (file_symtab, block, *argptr, NULL, &i1, &i2); 
+  find_imps (file_symtab, block, *argptr, NULL, &i1, &i2); 
     
   if (i1 > 0)
     {
@@ -1151,8 +1150,7 @@ decode_objc (char **argptr, int funfirstline, struct symtab *file_symtab,
 	alloca ((i1 + 1) * sizeof (struct symbol *));
       sym_arr[i1] = NULL;
 
-      copy = find_imps (file_symtab, block, *argptr, sym_arr, &i1, &i2); 
-      *argptr = copy;
+      *argptr = find_imps (file_symtab, block, *argptr, sym_arr, &i1, &i2);
     }
 
   /* i1 now represents the TOTAL number of matches found.

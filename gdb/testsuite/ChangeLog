@@ -1,3 +1,282 @@
+2011-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.ada/catch_ex.exp: Use explicit gdb_test rather than
+	gdb_continue_to_end.
+
+2011-03-09  Mark Kettenis  <kettenis@gnu.org>
+
+	* gdb.base/memattr.exp: Adjust regexps to accept spaces as well as
+	tabs.
+
+2011-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* lib/gdb.exp (inferior_exited_re): Match. leading `['.  Wrap in
+	parentheses.
+	(gdb_continue_to_end): Add "allow_extra" parameter.  Use
+	$command.
+	* gdb.threads/thread-unwindonsignal.exp: Pass "allow_extra"
+	argument to gdb_continue_to_end.
+	* gdb.threads/interrupted-hand-call.exp: Pass "allow_extra"
+	argument to gdb_continue_to_end.
+	* gdb.cp/annota3.exp: Fix regex.
+	* gdb.cp/annota2.exp: Fix regex.
+	* gdb.base/shlib-call.exp: Pass "allow_extra" argument to
+	gdb_continue_to_end.
+	* gdb.base/call-signal-resume.exp: Revert earlier patch.
+	* gdb.ada/tasks.exp: Pass "allow_extra" argument to
+	gdb_continue_to_end.
+
+2011-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.server/ext-run.exp
+	(load new file without any gdbserver inferior): New test.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (TAGS): Rewrite.
+
+2011-03-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.trace/report.exp (12.1: trace report #1): New match for the
+	initial commands echo.  New match for `Found trace'.  Anchor all the
+	other matches.  Anchor and match for `No trace frame found' the final
+	match.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (TAGS): New target.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* lib/opencl.exp (skip_opencl_tests): Update for exit message
+	change.
+	* lib/mi-support.exp (mi_gdb_test): Update for exit message
+	change.
+	* lib/gdb.exp (gdb_test_multiple): Update comment.  Update for
+	exit message change.
+	(skip_altivec_tests): Update for exit message change.
+	(skip_vsx_tests): Likewise.
+	(gdb_continue_to_end): Likewise.  Add 'command' argument.
+	* lib/cell.exp (skip_cell_tests): Update for exit message change.
+	* gdb.threads/tls.exp: Update for exit message change.
+	* gdb.threads/thread-unwindonsignal.exp: Use
+	gdb_continue_to_end.
+	* gdb.threads/step.exp (step_it): Update for exit message change.
+	(continue_all): Likewise.
+	* gdb.threads/print-threads.exp (test_all_threads): Update for
+	exit message change.
+	* gdb.threads/interrupted-hand-call.exp: Use
+	gdb_continue_to_end.
+	* gdb.threads/execl.exp: Use gdb_continue_to_end.
+	* gdb.python/py-prettyprint.exp (run_lang_tests): Use
+	gdb_continue_to_end.
+	* gdb.hp/gdb.objdbg/objdbg02.exp: Use gdb_continue_to_end.
+	* gdb.hp/gdb.objdbg/objdbg01.exp: Use gdb_continue_to_end.
+	* gdb.hp/gdb.defects/solib-d.exp: Update for exit message change.
+	* gdb.cp/method.exp: Update for exit message change.
+	* gdb.cp/mb-templates.exp: Update for exit message change.
+	* gdb.cp/mb-inline.exp: Use gdb_continue_to_end.
+	* gdb.cp/annota3.exp: Update for exit message change.
+	* gdb.cp/annota2.exp: Update for exit message change.
+	* gdb.cell/fork.exp: Use gdb_continue_to_end.
+	* gdb.base/term.exp: Update for exit message change.
+	* gdb.base/step-test.exp (test_i): Update for exit message change.
+	* gdb.base/sigstep.exp (advance): Update for exit message change.
+	(advancei): Likewise.
+	* gdb.base/siginfo.exp: Update for exit message change.
+	* gdb.base/shlib-call.exp: Use gdb_continue_to_end.
+	* gdb.base/reread.exp: Use gdb_continue_to_end.
+	* gdb.base/langs.exp: Use gdb_continue_to_end.
+	* gdb.base/interrupt.exp: Update for exit message change.
+	* gdb.base/gdb1555.exp: Update for exit message change.
+	* gdb.base/exe-lock.exp: Use gdb_continue_to_end.
+	* gdb.base/ending-run.exp: Update for exit message change.
+	* gdb.base/chng-syms.exp: Update for exit message change.
+	* gdb.base/checkpoint.exp: Update for exit message change.
+	* gdb.base/catch-syscall.exp (check_for_program_end): Use
+	gdb_continue_to_end.
+	(test_catch_syscall_with_wrong_args): Likewise.
+	* gdb.base/call-signal-resume.exp: Use gdb_continue_to_end.
+	* gdb.base/break-interp.exp (test_ld): Update for exit message
+	change.
+	* gdb.base/bang.exp: Update for exit message change.
+	* gdb.base/attach.exp (do_attach_tests): Use gdb_continue_to_end.
+	(do_call_attach_tests): Likewise.
+	* gdb.base/a2-run.exp: Update for exit message change.
+	* gdb.arch/ppc-dfp.exp: Update for exit message change.
+	* gdb.ada/tasks.exp: Use gdb_continue_to_end.
+	* gdb.ada/catch_ex.exp: Use gdb_continue_to_end.
+
+2011-03-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/help.exp (help thread find): Fix one forgotten quote.
+
+2011-03-03  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.hp/gdb.aCC/Makefile.in (Makefile): Remove.
+	* gdb.hp/gdb.aCC/configure (Makefile): Remove.
+	* gdb.hp/gdb.aCC/configure.ac: Remove.
+	* gdb.hp/gdb.base-hp/Makefile.in (Makefile): Remove.
+	* gdb.hp/gdb.base-hp/configure (Makefile): Remove.
+	* gdb.hp/gdb.base-hp/configure.ac: Remove.
+	* gdb.hp/gdb.compat/Makefile.in (Makefile): Remove.
+	* gdb.hp/gdb.compat/configure (Makefile): Remove.
+	* gdb.hp/gdb.compat/configure.ac: Remove.
+	* gdb.hp/gdb.defects/Makefile.in (Makefile): Remove.
+	* gdb.hp/gdb.defects/configure (Makefile): Remove.
+	* gdb.hp/gdb.defects/configure.ac: Remove.
+	* gdb.hp/gdb.objdbg/Makefile.in (Makefile): Remove.
+	* gdb.hp/gdb.objdbg/configure (Makefile): Remove.
+	* gdb.hp/gdb.objdbg/configure.ac: Remove.
+	* gdb.hp/configure.ac: Remove.
+	* gdb.hp/configure: Remove.
+	* gdb.hp/Makefile.in (SUBDIRS): No longer a configure
+	substitution.
+	(Makefile): Remove rule.
+	* gdb.cell/configure.ac: Remove.
+	* gdb.cell/configure: Remove.
+	* gdb.stabs/Makefile.in (Makefile): Remove.
+	(distclean): Don't remove config.status or config.log.
+	* gdb.stabs/configure (Makefile): Remove.
+	* gdb.stabs/configure.ac: Remove.
+	* configure: Rebuild.
+	* configure.ac: Don't AC_CONFIG_SUBDIRS in gdb.hp or gdb.stabs.
+	Remove stabs- and cell-specific logic.  Test for existence of
+	../gdbtk before configuring gdb.gdbtk.  Build Makefiles in gdb.hp
+	subdirectories, gdb.cell, and and gdb.stabs.
+	* Makefile.in (ALL_SUBDIRS): Add gdb.hp and gdb.stabs.
+
+2011-03-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.python/py-inferior.exp: Avoid searching pattern beyond
+	end of buffer.
+
+2011-03-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.python/py-inferior.exp: Use gdb_test_no_output instead of
+	gdb_test when running a test where we expected no output back.
+
+2011-02-28  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.cp/overload.cc: Change initializer value to integer.
+
+2011-02-27  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.multi/base.exp: Add test for remove-inferiors.
+
+2011-02-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.python/py-frame.exp: Simplify the initialization phase
+	using prepare_for_testing.
+
+2011-02-25  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.multi/base.exp: Add tests for info inferiors with args.
+
+2011-02-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-ranges.S: Rename to ...
+	* gdb.dwarf2/dw2-ranges.c: ... here, convert it to C.
+	* gdb.dwarf2/dw2-ranges.exp: Skip the testcase on !$gcc_compiled.
+	Rename srcfile, srcfile2 and srcfile3, new asmfile, asmfile2 and
+	asmfile3.  Comment the STABS (#3) file compilation.  Compile
+	everything through assembler.  Provide KFAIL for symtab/12497.
+	* gdb.dwarf2/dw2-ranges2.S: Rename to ...
+	* gdb.dwarf2/dw2-ranges2.c: ... here, convert it to C.
+	* gdb.dwarf2/dw2-ranges3.S: Rename to ...
+	* gdb.dwarf2/dw2-ranges3.c: ... here, convert it to C.
+
+2011-02-24  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.base/break.exp: Add tests for delete breakpoints using
+	convenience variables and value history references.
+
+2011-02-24  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.base/break.exp: Remove debugging 'printf' accidentally
+	left behind in previous check-in.
+
+2011-02-23  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.base/break.exp: Add tests for "info break" with arguments.
+	* gdb.trace/infotrace.exp: Update patterns for error and help.
+	* gdb.base/completion.exp: Update pattern.
+	* gdb.base/ena-dis-br.exp: Update pattern.
+	* gdb.base/help.exp: Update patterns.
+
+2011-02-23  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.base/memattr.exp: New test.
+	* gdb.base/memattr.c: Test load for memattr.exp.
+
+2011-02-22  Doug Evans  <dje@google.com>
+
+	* gdb.python/py-symbol.exp: Test lookup_global_symbol.
+
+2011-02-22  Michael Snyder  <msnyder@vmware.com>
+
+	* Makefile.in: Make more clean.
+	* gdb.ada/Makefile.in: Ditto.
+	* gdb.arch/Makefile.in: Ditto.
+	* gdb.asm/Makefile.in: Ditto.
+	* gdb.base/Makefile.in: Ditto.
+	* gdb.cp/Makefile.in: Ditto.
+	* gdb.dwarf2/Makefile.in: Ditto.
+	* gdb.java/Makefile.in: Ditto.
+	* gdb.mi/Makefile.in: Ditto.
+	* gdb.modula2/Makefile.in: Ditto.
+	* gdb.python/Makefile.in: Ditto.
+	* gdb.server/Makefile.in: Ditto.
+	* gdb.stabs/Makefile.in: Ditto.
+	* gdb.threads/Makefile.in: Ditto.
+	* gdb.trace/Makefile.in: Ditto.
+
+2011-02-22  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.threads/thread-find.exp: Add tests for bad input to 
+	info threads.
+
+2011-02-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.python/py-breakpoint.exp: Fix the expected output of
+	one of the "maint info breakpoints" tests to accept the output
+	generated on platforms that do not have hardware watchpoints.
+
+2011-02-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.python/py-breakpoint.exp: Remove unnecessary call to
+	clean_restart.  Be a little stricter in the expected output
+	for one of the tests.  Fix a typo in one of the comments.
+
+2011-02-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.python/py-block.exp: Simplify using prepare_for_testing.
+	Delete variable binfile, no longer use.  Add or modify test
+	comments to make them unique.
+
+2011-02-21  Michael Snyder  <msnyder@vmware.com>
+
+	* Makefile.in: Update for make clean.
+	* gdb.ada/Makefile.in: Ditto.
+	* gdb.arch/Makefile.in: Ditto.
+	* gdb.asm/Makefile.in: Ditto.
+	* gdb.base/Makefile.in: Ditto.
+	* gdb.cp/Makefile.in: Ditto.
+	* gdb.dwarf2/Makefile.in: Ditto.
+	* gdb.java/Makefile.in: Ditto.
+	* gdb.mi/Makefile.in: Ditto.
+	* gdb.modula2/Makefile.in: Ditto.
+	* gdb.python/Makefile.in: Ditto.
+	* gdb.server/Makefile.in: Ditto.
+	* gdb.stabs/Makefile.in: Ditto.
+	* gdb.threads/Makefile.in: Ditto.
+	* gdb.trace/Makefile.in: Ditto.
+
+2011-02-21  Michael Snyder  <msnyder@vmware.com>
+
+	* gdb.threads/thread-find.exp: Update patterns for changes in
+	output of "info threads" command.
+
 2011-02-21  Matthew Gretton-Dann <matthew.gretton-dann@arm.com>
 	    Ulrich Weigand  <uweigand@de.ibm.com>
 
