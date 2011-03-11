@@ -34,7 +34,7 @@
 #include "elf-bfd.h"
 #include "fbsd-nat.h"
 
-/* Return a the name of file that can be opened to get the symbols for
+/* Return the name of a file that can be opened to get the symbols for
    the child process identified by PID.  */
 
 char *
@@ -202,7 +202,7 @@ fbsd_make_corefile_notes (bfd *obfd, int *note_size)
 
   if (get_exec_file (0))
     {
-      char *fname = strrchr (get_exec_file (0), '/') + 1;
+      char *fname = lbasename (get_exec_file (0));
       char *psargs = xstrdup (fname);
 
       if (get_inferior_args ())

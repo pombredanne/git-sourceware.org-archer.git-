@@ -1,3 +1,832 @@
+2011-03-09  Michael Snyder  <msnyder@vmware.com>
+
+	* mi-cmd-disas.c (mi_cmd_disassemble): Fix memory leak.
+
+2011-03-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* nto-tdep.c (nto_find_and_open_solib): Constify local `base'.
+
+2011-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* thread.c (restore_selected_frame): Handle frame_level == -1.
+	(make_cleanup_restore_current_thread): Use
+	get_selected_frame_if_set.
+	* frame.h (get_selected_frame_if_set): Declare.
+	* frame.c (get_selected_frame_if_set): New function.
+
+2011-03-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* cli/cli-cmds.c (shell_escape): Use lbasename.
+	* coffread.c (coff_start_symtab): Constify parameter.
+	(complete_symtab): Constify `name' parameter.
+	(coff_symtab_read): Constify `filestring' local.
+	(coff_getfilename): Constify return and `result' local.
+	Use lbasename.
+	* fbsd-nat.c (fbsd_make_corefile_notes): Use lbasename.
+	* linux-fork.c (info_checkpoints_command): Use lbasename.
+	* linux-nat.c (linux_nat_make_corefile_notes): Use lbasename.
+	* minsyms.c (lookup_minimal_symbol): Use lbasename.
+	* nto-tdep.c (nto_find_and_open_solib): Use lbasename.
+	* procfs.c (procfs_make_note_section): Use lbasename.
+	* tui/tui-io.c (printable_part): Constity return and parameter.
+	Use lbasename.
+	(print_filename): Constify parameters, and local `s'.
+	(tui_rl_display_match_list): Constify local `temp'.
+
+2011-03-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Revert:
+	2011-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	Fix DWARF-3+ DW_AT_accessibility default assumption.
+	* dwarf2read.c (dwarf2_add_field): Fix new_field->accessibility for
+	cu->header.version >= 3.
+
+2011-03-09  Yao Qi  <yao@codesourcery.com>
+
+	* common/Makefile.in: Remove.
+	* common/configure: Remove.
+	* common/configure.ac: Remove.
+
+2011-03-09  Yao Qi  <yao@codesourcery.com>
+
+	Revert:
+	2011-02-11  Yao Qi  <yao@codesourcery.com>
+
+	* common/Makefile.in: Add copyright header.
+
+	2011-02-11  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in: Remove signals.o from COMMON_OBS.  Link
+	libcommon.a.
+	* configure.ac: Add common to sub dir.
+	* configure: Regenerate.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (call0_ret): New function.
+	(xtensa_skip_prologue): Speed up analysis.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (xtensa_register_reggroup_p): Count in all registers
+	while executing MI command -data-list-changed-registers.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (xtensa_read_register): New function.
+	(xtensa_write_register): New function.
+	(xtensa_find_register_by_name): New function.
+	(xtensa_windowed_frame_cache): Update comments in type description.
+	(xtensa_frame_cache): Likewise.
+	(xtensa_window_interrupt_insn): New function.
+	(xtensa_frame_cache): Add analysis for Xtensa Window Exception frames.
+	(xtensa_insn_kind): Add new instructions.
+	(rwx_special_register): New function.
+	(call0_classify_opcode): Add new instructions to the analysis.
+	(a0_saved, a7_saved, a11_saved): New variables.
+	(a0_was_saved, a7_was_saved, a11_was_saved): New variables.
+	(execute_l32e): New function.
+	(execute_s32e): New function.
+	(xtensa_exception_handler_t): New type.
+	(execute_code): New function.
+	(xtensa_window_interrupt_frame_cache): New function to conduct frame
+	analysis for Xtensa Window Exception handlers.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (TX_PS): New.
+	(windowing_enabled): Update to count for Call0 ABI.
+	(xtensa_hextochar): New.
+	(xtensa_init_reggroups): Make algorithm generic.
+	(xtensa_frame_cache): Use TX_PS on Tiny Xtensa.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.h (XTENSA_MAX_COPROCESSOR): Update.
+
+2011-03-08  Michael Snyder  <msnyder@vmware.com>
+
+	* i386-tdep.c (i386_follow_jump): Check return value of
+	target_read_memory.
+	(i386_analyze_struct_return): Ditto.
+	(i386_skip_probe): Ditto.
+	(i386_match_insn): Ditto.
+	(i386_skip_noop): Ditto.
+	(i386_analyze_frame_setup): Ditto.
+	(i386_analyze_register_saves): Ditto.
+	(i386_skip_prologue): Ditto.
+	(i386_skip_main_prologue): Ditto.
+
+	* target.c (read_whatever_is_readable): Fix memory leak.
+
+	* i386-tdep.c (i386_process_record): Document fall through.
+
+2011-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix DWARF-3+ DW_AT_accessibility default assumption.
+	* dwarf2read.c (dwarf2_add_field): Fix new_field->accessibility for
+	cu->header.version >= 3.
+
+2011-03-08  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_check_symbols): Skip if the target has no
+	execution.
+
+2011-03-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* target.c (read_whatever_is_readable): Reformat comment,
+	with a minor typo fix. Minor reformatting of the code.
+
+2011-03-08  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c: Remove prototype declaration displaced_in_arm_mode.
+	(displaced_read_reg): Add `dsc' parameter, remove `from' parameter.
+	Use cached result instead of calling displaced_in_arm_mode again.
+	(branch_write_pc, alu_write_pc, load_write_pc): Add `dsc' parameter.
+	(displaced_write_reg, copy_preload, copy_preload_reg): Callers update.
+	(cleanup_copro_load_store, copy_copro_load_store): Likewise.
+	(cleanup_branch, copy_bx_blx_reg, copy_alu_imm): Likewise.
+	(cleanup_alu_reg, copy_alu_reg, cleanup_alu_shifted_reg): Likewise.
+	(copy_alu_shifted_reg, cleanup_load, cleanup_store): Likewise.
+	(copy_extra_ld_st, copy_ldr_str_ldrb_strb): Likewise.
+	(cleanup_block_load_all, cleanup_block_store_pc): Likewise.
+	(cleanup_block_load_pc, copy_block_xfer): Likewise.
+	* arm-linux-tdep.c (arm_linux_copy_svc): Callers update.
+	(arm_catch_kernel_helper_return): Likewise.
+	* gdb/arm-tdep.h : Update function declarations.
+
+2011-03-07  Michael Snyder  <msnyder@vmware.com>
+
+	* dwarf2loc.c (indirect_pieced_value): Assert 'piece' not null.
+
+	* ser-unix.c (hardwire_get_tty_state): Stop memory leak.
+
+	* mi/mi-cmd-env.c (_initialize_mi_cmd_env): Free environment.
+
+	* elfread.c (elf_symtab_read): Stop memory leak.
+
+	* main.c (captured_main): Fix memory leak.
+
+2011-03-07  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* ada-lang.c (compare_names): Call is_name_suffix with string1
+	instead of string2.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* xcoffread.c (xcoff_sym_fns): Update.
+	* symfile.h (struct sym_fns) <sym_read_psymbols>: New field.
+	(enum symfile_add_flags) <SYMFILE_NO_READ>: New constant.
+	* symfile.c (syms_from_objfile): Handle SYMFILE_NO_READ.
+	(symbol_file_add_with_addrs_or_offsets): Likewise.
+	(reread_symbols): Handle OBJF_PSYMTABS_READ.
+	* somread.c (som_sym_fns): Update.
+	* psymtab.h (require_partial_symbols): Declare.
+	* psymtab.c (require_partial_symbols): New function.
+	(ALL_OBJFILE_PSYMTABS_REQUIRED): New macro.
+	(ALL_OBJFILE_PSYMTABS): Undef.
+	(ALL_PSYMTABS): Move from psympriv.h.
+	(lookup_partial_symtab, find_pc_sect_psymtab)
+	(lookup_symbol_aux_psymtabs, relocate_psymtabs)
+	(find_last_source_symtab_from_partial)
+	(forget_cached_source_info_partial)
+	(print_psymtab_stats_for_objfile, read_symtabs_for_function)
+	(expand_partial_symbol_tables, read_psymtabs_with_filename)
+	(map_symbol_names_psymtab, map_symbol_filenames_psymtab)
+	(find_symbol_file_from_partial, map_matching_symbols_psymtab)
+	(expand_symtabs_matching_via_partial, maintenance_info_psymtabs):
+	Use ALL_OBJFILE_PSYMTABS_REQUIRED.
+	* psympriv.h (ALL_PSYMTABS): Move to psymtab.c.
+	* objfiles.h (OBJF_PSYMTABS_READ): New macro.
+	* objfiles.c (objfile_has_partial_symbols): Handle lazily-read
+	psymtabs.
+	* mipsread.c (ecoff_sym_fns): Update.
+	* machoread.c (macho_sym_fns): Update.
+	* elfread.c (elf_symfile_read): Set up for lazy psymtab reading.
+	(read_psyms): New function.
+	(elf_sym_fns, elf_sym_fns_gdb_index): Update.
+	(elf_sym_fns_lazy_psyms): New global.
+	* dwarf2read.c (dwarf2_initialize_objfile): Don't call
+	dwarf2_build_psymtabs.
+	* dbxread.c (aout_sym_fns): Update.
+	* coffread.c (coff_sym_fns): Update.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* infrun.c (print_exited_reason): Include inferior id and pid in
+	message.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* target.h (struct target_ops) <to_has_execution>: Add ptid_t
+	parameter.
+	(target_has_execution_1): Update.
+	(target_has_execution_current): Declare.
+	(target_has_execution): Call target_has_execution_current.
+	(default_child_has_execution): Update.
+	* target.c (default_child_has_execution): Add 'the_ptid'
+	parameter.
+	(target_has_execution_1): Likewise.
+	(target_has_execution_current): New function.
+	(add_target): Update.
+	(init_dummy_target): Update.
+	* remote-m32r-sdi.c (m32r_has_execution): New function.
+	(init_m32r_ops): Use it.
+	* record.c (record_core_has_execution): Now static.  Add
+	'the_ptid' parameter.
+	* inferior.c (have_live_inferiors): Don't save current thread.
+	Use target_has_execution_1.
+
+2011-03-07  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (aclocal_m4_deps): Remove gnulib/m4/memcmp.m4.
+
+2011-03-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* elfread.c (elf_symtab_read): Minor reformatting.
+
+2011-03-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* objc-lang.c (selectors_info): Minor reformatting.
+
+2011-03-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (compare_names): Add FALLTHROUGH comment.
+
+2011-03-07  Joel Brobecker  <brobecker@adacore.com>
+	    Michael Snyder  <msnyder@vmware.com>
+
+	* ada-valprint.c (ada_val_print_array): Move the declaration of
+	"byte_order" and "elttype" inside the block where these variables
+	are actually used.  Remove some special handling for the case
+	where "elttype" and "eltlen" are null.  Replace by a comment
+	and a couple of assertion checks.
+
+2011-03-05  Michael Snyder  <msnyder@vmware.com>
+
+	* source.c (add_path): Replace semicolon at end of block.
+	* dwarf2expr.c (execute_stack_op): Ditto.
+
+2011-03-05  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-tdep.c: Include sim-regno.h and gdb/sim-bfin.h.
+	* configure.tgt (bfin-*-*linux*): Define gdb_sim.
+	(bfin-*-*): Likewise.
+
+2011-03-05  Michael Snyder  <msnyder@vmware.com>
+
+	* dwarf2expr.c (execute_stack_op): Delete superfluous semicolon.
+	* mdebugread.c (parse_symbol): Ditto.
+	* parse.c (parse_exp_in_context): Ditto.
+	* source.c (add_path): Ditto.
+	* utils.c (gnu_debuglink_crc32): Ditto.
+	* varobj.c (variable_language): Ditto.
+
+	* linux-tdep.c (linux_get_siginfo_type): Stop memory leak.
+
+2011-03-04  Michael Snyder  <msnyder@vmware.com>
+
+	* linux-fork.c (inferior_call_waitptid): Fix copy/paste error.
+
+	* symfile.c (simple_overlay_update): Check for null return value
+	from lookup_minimal_symbol.
+
+	* gdbserver/server.c (queue_stop_reply): Call xmalloc not malloc.
+
+	* xml-syscall.c (syscall_start_syscall): Assert name is non null.
+
+2011-03-04  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* eval.c (parse_and_eval_address_1): Remove function.
+	* linespec.c (decode_indirect): Call parse_to_comma_and_eval
+	instead of parse_and_eval_address_1.
+	* value.h (parse_and_eval_address_1): Remove prototype.
+
+2011-03-04  Michael Snyder  <msnyder@vmware.com>
+
+	* remote.c (putpkt_binary): Document that case stmt falls through.
+
+2011-03-04  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpointc (print_it_typical): Move NULL check from here...
+	(print_bp_stop_message): ... to here.
+
+2011-03-04  Michael Snyder  <msnyder@msnyder-server.eng.vmware.com>
+
+	* breakpoint.c (enable_command): Use break instead of continue,
+	and fill in a missing break.
+	(disable_command): Ditto.
+
+2011-03-04  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* inflow.c (terminal_init_inferior_with_pgrp): Copy ttystate.
+	(terminal_save_ours): Remove misleading comment.
+	(inflow_inferior_data_cleanup): Free ttystate.
+	(inflow_inferior_exit): Likewise.
+	(copy_terminal_info): Copy ttystate.
+
+	* serial.c (serial_copy_tty_state): New function.
+	* serial.h (serial_copy_tty_state): Add prototype.
+	(struct serial_ops): Add copy_tty_state callback.
+	* ser-base.c (ser_base_copy_tty_state): New function.
+	* ser-base.h (ser_base_copy_tty_state): Add prototype.
+	* ser-go32.c (dos_copy_tty_state): New function.
+	(dos_ops): Install copy_tty_state callback.
+	* ser-mingw.c (_initialize_ser_windows): Likewise.
+	* ser-pipe.c (_initialize_ser_pipe): Likewise.
+	* ser-unix.c (hardwire_copy_tty_state): New function.
+	(_initialize_ser_hardwire): Install it.
+
+2011-03-04  Michael Snyder  <msnyder@vmware.com>
+
+	* breakpoint.c (create_breakpoint): Add missing break statement.
+
+	Reverting this patch:
+	* infcall.c (call_function_by_hand): Add break statements for lint.
+
+	Reverting this patch:
+	* cli/cli-script.c (script_from_file): Add break for lint.
+
+2011-03-04  Michael Snyder  <msnyder@vmware.com>
+
+	* solib.c (reload_shared_libraries_1): Close memory leak.
+
+2011-03-03  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/12538:
+	* dwarf2read.c (process_psymtab_comp_unit): Handle case where
+	DW_STRING is NULL.
+
+2011-03-03  Michael Snyder  <msnyder@vmware.com>
+
+	* remote-fileio.c (remote_fileio_func_fstat): Initialize all
+	fields of struct 'st' to zero.
+
+	* tui/tui-winsource.c (tui_update_source_window_as_is): Initialize
+	sal.pspace before calling set_current_source_symtab_and_line.
+
+2011-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (configure-common): Remove.  Let Makefile
+	in dir common to rebuild itself.
+	(common/Makefile): Likewise.
+
+2011-03-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* utils.c (parse_escape): Add i18n markup in error message.
+
+2011-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* gdb/arm-tdep.c (shifted_reg_val): Replace magic number 15 with
+	ARM_PC_REGNUM.
+	(thumb_get_next_pc_raw, arm_get_next_pc_raw): Likewise.
+	(displaced_write_reg, displaced_read_reg): Likewise.
+	(copy_ldr_str_ldrb_strb, cleanup_block_load_all): Likewise.
+	(cleanup_block_load_pc, copy_block_xfer): Likewise.
+	(cleanup_branch): Replace magic number 14 and 15 with
+	ARM_LR_REGNUM and ARM_PC_REGNUM respectively.
+
+2011-03-02  Michael Snyder  <msnyder@vmware.com>
+
+	* maint.c (maintenance_do_deprecate): No need to check for NULL.
+
+	* cli/cli-script.c (script_from_file): Add break for lint.
+
+	* mdebugread.c (parse_partial_symbols): Fix indent.
+
+	* gdbserver/linux-arm-low.c (arm_arch_setup): Replace malloc 
+	with xmalloc.
+
+	* target-descriptions.c (tdesc_gdb_type): No need to call
+	xstrdup, callee saves a copy.
+
+	* printcmd.c (print_scalar_formatted): Use strncpy for safety.
+
+	* infcall.c (call_function_by_hand): Add break statements for lint.
+
+	* utils.c (parse_escape): Escape the escape char.
+
+	* python/py-inferior.c (build_inferior_list): Error out if 
+	PyList_Append fails.
+	(gdbpy_inferiors): Error out if build_inferior_list fails.
+
+	* linux-nat.c (linux_nat_xfer_partial): Preserve errno around
+	a function call.
+
+	* record.c (record_restore): Move printf to before error return.
+
+2011-03-02  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.h (struct displaced_step_closure): Add two new fields
+	is_thumb and insn_size.
+	* arm-tdep.c (displaced_read_reg): Adjust correct pipeline offset
+	on both ARM and Thumb mode.
+	(arm_process_displaced_insn): Set is_thumb and insn_size.
+	(arm_displaced_init_closure): Handle both 16-bit and 32-bit.
+	(arm_displaced_step_fixup): Likewise.
+
+2011-03-01  Michael Snyder  <msnyder@vmware.com>
+
+	* cli/cli-dump.c (dump_bfd_file): Check error return and warn.
+
+	* jv-lang.c (evaluate_subexp_java): Conditional can't be true.
+
+	* dwarf2read.c (dwarf2_compute_name): NAME cannot be null here.
+
+	* cli/cli-dump.c (restore_binary_file): Validate ftell return value.
+
+	* ada-lang.c (ada_make_symbol_completion_list): Replace malloc
+	with xmalloc.
+
+	* ada-lang.c (aggregate_assign_others): Rename inner scope variable
+	which shadows function parameter.
+
+	* tracepoint.c (create_tsv_from_upload): Superfluous call
+	to xstrdup.  Callee already calls xstrdup.
+
+	* linespec.c (decode_line_1): Remove unnecessary null check.
+
+	* tracepoint.c (scope_info): Fix mem leak, remove underused
+	variable.
+
+	* python/py-prettyprint.c (apply_val_pretty_printer): Remove
+	superfluous null check.
+
+	* std-regs.c (value_of_builtin_frame_pc_reg): Frame can't be null.
+	(value_of_builtin_frame_fp_reg): Ditto.
+
+	* event-top.c (display_gdb_prompt): Remove superfluous null check.
+
+	* python/py-prettyprint.c (apply_val_pretty_printer): VAL may
+	be null.
+
+	* linespec.c (decode_line_1): Check for null before dereference.
+
+	* reverse.c (record_restore): Move null-check to before pointer
+	dereference.
+
+	* python/py-utils.c (gdbpy_obj_to_string): Delete unused variable.
+
+	* objc-lang.c (selectors_info): Add explanitory comment.
+	(classes_info): Ditto.
+
+2011-03-01  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-linux-tdep.c (ARM_LDR_PC_SP_4): Add define.
+	(arm_linux_restart_syscall_init): Handle both on-stack and in-kernel
+	versions of the trampoline.  Handle Thumb vs. ARM addresses.
+	(arm_kernel_linux_restart_syscall_tramp_frame): New global.
+	(arm_linux_init_abi): Install it.
+	* arm-tdep.c (arm_psr_thumb_bit): Make global.
+	* arm-tdep.c (arm_psr_thumb_bit): Add prototype.
+
+2011-02-28  Michael Snyder  <msnyder@vmware.com>
+
+	* ui-out.c (ui_out_field_core_addr): Make local char buffer
+	a little bigger, to avoid possibility of an overflow.
+
+	* breakpoint.c (breakpoint_adjustment_warning): Make local char
+	buffers a little bigger, to avoid possibility of an overflow.
+
+	* coffread.c (coff_getfilename): Add check to avoid overflow.
+
+	* objc-lang.c (selectors_info): Add a small safety margin to 
+	avoid overflow.
+	(classes_info): Error out on too long REGEXP.
+
+	* infrun.c (handle_inferior_event): Remove unused function call.
+
+	* fork-child.c (fork_inferior): Remove ifdef'd code and
+	unused variable.
+
+	* linux-thread-db.c (attach_thread): Discard unused value.
+
+	* linux-nat.c (linux_handle_extended_wait): Delete unused variable.
+
+	* remote.c (remote_get_noisy_reply): Discard unused value.
+	(remote_vcont_resume): Ditto.
+	(remote_stop_ns): Ditto.
+
+	* linespec.c (decode_objc): Delete unused variable.
+
+	* tui/tui-regs.c (tui_register_format): Delete unused variable.
+
+	* dwarf2read.c (add_partial_symbol): Discard unused values.
+	(read_base_type): Delete unused variable.
+
+	* dbxread.c (read_dbx_symtab): Discard unused value.
+
+	* eval.c (evaluate_subexp_standard): Delete unused variable,
+	and discard unused values.
+
+	* infcmd.c (_initialize_infcmd): Discard unused values.
+
+	* stabsread.c (rs6000_builtin_type): Missing break statement.
+
+	* dbxread.c (process_one_symbol): Discard unused value.
+
+	* coffread.c (coff_end_symtab): Delete unused variable.
+
+	* dwarf2read.c (dw2_get_file_names): Discard unused value.
+	(dwarf2_add_typedef): Delete unused variable.
+	(read_namespace): Ditto.
+	(dwarf_decode_macros): Ditto.
+
+	* m2-lang.c (evaluate_subexp_modula2): Discard unused variable.
+
+	* opencl-lang.c (evaluate_subexp_opencl): Discard unused value.
+
+	* p-valprint.c (pascal_val_print): Discard unused value.
+
+	* utils.c (nquery): Call va_end before return;
+	(yquery): Ditto.
+	(query): Ditto.
+
+	* proc-service.c (ps_plog): Call va_end before return.
+
+2011-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_value_cst): New global.
+	(_initialize_python): Initialize it.
+	* python/python-internal.h (gdbpy_value_cst): Declare.
+	* python/py-value.c (convert_value_from_python): Use
+	gdbpy_value_cst.
+
+2011-02-28  Michael Snyder  <msnyder@vmware.com>
+
+	* python/py-cmd.c (cmdpy_init): Fix memory leak.
+
+	* breakpoint.c (catch_syscall_completer): Free malloced list.
+
+	* jv-lang.c (java_primitive_type_from_name): Add missing break.
+
+	* opencl-lang.c (lval_func_check_validity): Rename inner variables.
+	(lval_func_check_synthetic_pointer): Ditto.
+	(lval_func_free_closure): Fix use-after-free.
+
+2011-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* psymtab.c (expand_partial_symbol_tables): Use
+	ALL_OBJFILE_PSYMTABS.
+
+2011-02-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* objc-lang.c (selectors_info): Error on too long REGEXP.
+
+2011-02-28  Michael Snyder  <msnyder@vmware.com>
+
+	* python/py-param.c (set_parameter_value): Add missing
+	break statement.
+
+	* linux-record.c (record_linux_system_call): Add missing
+	break statement.
+
+2011-02-28  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* breakpoint.c (print_one_breakpoint_location): Remove unused
+	argument PRINT_ADDRESS_BITS.  Update callers.
+	(print_one_breakpoint): Likewise.
+
+2011-02-28  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* breakpoint.c (wrap_indent_at_field): New function.
+	(print_breakpoint_location): Use it instead of WRAP_INDENT argument.
+	Allocate ui_stream locally instead of using STB argument.
+	(print_one_breakpoint_location): Update call.
+	* ui-out.c (ui_out_query_field): New function.
+	* ui-out.h (ui_out_query_field): Add prototype.
+
+2011-02-28  Joel Brobecker  <brobecker@adacore.com>
+
+	From Michael Snyder  <msnyder@vmware.com>
+	* ada-exp.y (write_object_renaming): Add FALLTHROUGH comment.
+
+2011-02-27  Michael Snyder  <msnyder@vmware.com>
+
+	* objc-lang.c (selectors_info): Prevent string overrun.
+
+	* tui/tui-stack.c (tui_get_function_from_frame): Fix off by one
+	error in strncpy.
+
+	* symtab.c (rbreak_command): Move variable 'file_name' to 
+	outer scope.
+
+	* d-valprint.c (dynamic_array_type): Avoid shadowing a function
+	param with a local variable of the same name.
+
+2011-02-27  Michael Snyder  <msnyder@vmware.com>
+
+	* value.c (value_from_history_ref): New function.
+	* value.h (value_from_history_ref): Export.
+	* cli/cli-utils.c (get_number_trailer): Use value_from_history_ref
+	to parse value history references.
+	* cli/cli-utils.h (get_number_trailer): Update comment.
+
+2011-02-27  Michael Snyder  <msnyder@vmware.com>
+
+	* inferior.c (detach_inferior_command): Use get_number_or_range.
+	(kill_inferior_command): Ditto.
+	(remove_inferior_command): Ditto.
+	(initialize_inferiors): Make command names plural.
+	Update help strings.
+
+2011-02-27  Michael Snyder  <msnyder@vmware.com>
+
+	* darwin-nat-info.c: Fix comment typo.
+	* dwarf2expr.h: Ditto.
+	* fbsd-nat.c: Ditto.
+	* fbsd-nat.h: Ditto.
+	* frame-unwind.h: Ditto.
+	* frame.h: Ditto.
+	* hppa-hpux-tdep.c: Ditto.
+	* i386-linux-nat.c: Ditto.
+	* linux-nat.c: Ditto.
+	* nbsd-nat.c: Ditto.
+	* nbsd-nat.h: Ditto.
+	* ppc-linux-tdep.c: Ditto.
+	* serial.c: Ditto.
+	* ui-file.h: Ditto.
+	* tui/tui-winsource.c: Ditto.
+
+2011-02-26  Michael Snyder  <msnyder@vmware.com>
+
+	* breakpoint.c (reattach_breakpoints): Avoid resource leak (ui_file).
+
+	* maint.c (maintenance_do_deprecate): Plug a memory leak.
+
+	* dwarf2loc.c (insert_bits): Avoid shadowing a function param
+	with a local variable of the same name.
+
+	* i387-tdep.c (i387_supply_fxsave): Avoid shadowing a function
+	param with a local variable of the same name.
+	(i387_supply_xsave): Ditto.
+
+	* linux-low.c (linux_nat_xfer_osdata): Rename local variable so
+	that it does not shadow a function parameter.
+
+	* i386-nat.c (i386_length_and_rw_bits): Document that case
+	statement is meant to fall through.
+
+	* expprint.c (dump_subexp_body_standard): Document that case
+	statement is meant to fall through.
+
+	* amd64-linux-tdep.c (amd64_linux_syscall_record): Delete
+	dead if statement.  Condition can't be false.
+
+2011-02-25  Michael Snyder  <msnyder@vmware.com>
+
+	* arm-tdep.c: Fix typos in comments.
+	* bsd-uthread.c: Ditto.
+	* completer.c: Ditto.
+	* corelow.c: Ditto.
+	* cp-namespace.c: Ditto.
+	* cp-support.c: Ditto.
+	* cris-tdep.c: Ditto.
+	* dbxread.c: Ditto.
+	* dwarf2read.c: Ditto.
+	* frame.h: Ditto.
+	* gdbtypes.h: Ditto.
+	* inferior.h: Ditto.
+	* mdebugread.c: Ditto.
+	* mips-tdep.c: Ditto.
+	* ppc-linux-nat.c: Ditto.
+	* ppc-linux-tdep.c: Ditto.
+	* printcmd.c: Ditto.
+	* sol-thread.c: Ditto.
+	* solib-frv.c: Ditto.
+	* solist.h: Ditto.
+	* sparc64-tdep.c: Ditto.
+	* spu-tdep.c: Ditto.
+	* stabsread.c: Ditto.
+	* symfile.c: Ditto.
+	* valops.c: Ditto.
+	* varobj.c: Ditto.
+	* vax-nat.c: Ditto.
+	* python/py-block.c: Ditto.
+	* python/py-symbol.c: Ditto.
+	* python/py-symtab.c: Ditto.
+	* python/py-value.c: Ditto.
+	* tui/tui-win.c: Ditto.
+
+2011-02-25  Michael Snyder  <msnyder@vmware.com>
+
+	* inferior.c (print_inferior): Accept a string instead of an int
+	for requested_inferiors, and use get_number_or_range to parse it.
+	(info_inferiors_command): Pass args string to print_inferior.
+	(initialize_inferiors): Change help string for info inferiors.
+	* inferior.h (print_inferior): Export prototype change.
+
+2011-02-25  Tom Tromey  <tromey@redhat.com>
+
+	* common/ax.def (invalid2): Set to 0x31.
+
+2011-02-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2loc.c (disassemble_dwarf_expression) <DW_OP_breg[0-9]+>: Use
+	L and plongest.
+	(disassemble_dwarf_expression) <DW_OP_bregx>: Drop variable offset,
+	use L and plongest.
+	(disassemble_dwarf_expression) <DW_OP_fbreg>: Use L and plongest.
+
+2011-02-24  Michael Snyder  <msnyder@vmware.com>
+
+	* Makefile.in (clean): Make clean should remove generated files
+	observer.h and observer.inc.
+
+2011-02-24  Joel Brobecker  <brobecker@adacore.com>
+
+	Revert the following patch (not approved yet):
+	2011-02-21  Hui Zhu  <teawater@gmail.com>
+	* Makefile.in (HFILES_NO_SRCDIR): Add printcmd.h.
+	* ax-gdb.c (gen_printf_expr_callback): New function.
+	* ax-gdb.h (gen_printf_expr_callback): Forward declare.
+	* ax-general.c (ax_memcpy): New function.
+	(ax_print): Handle "printf".
+	(ax_reqs): Ditto.
+	* ax.h (ax_memcpy): Forward declare.
+	* common/ax.def (invalid2): Removed.
+	(printf): New entry.
+	* printcmd.c (printcmd.h): New include.
+	(string_printf): New function.
+	(ui_printf): Removed.
+	(printf_command): Remove static.  Call string_printf.
+	(eval_command): Call string_printf.
+	* printcmd.h: New file.
+	* tracepoint.c (validate_actionline,
+	encode_actions_1): handle printf_command.
+
+2011-02-23  Tom Tromey  <tromey@redhat.com>
+
+	* ax-general.c (ax_pick): Add missing newline.
+
+2011-02-23  Michael Snyder  <msnyder@vmware.com>
+
+	* breakpoint.c (breakpoint_1): Change first argument from an int
+	to a char pointer, so that the function now accepts a list of
+	breakpoints rather than just one.  Use new function 
+	'number_is_in_list' to implement.
+	(breakpoints_info): Pass char * instead of int to breakpoint_1.
+	(watchpoints_info): Ditto.
+	(tracepoints_info): Ditto.
+	(maintenance_info_breakpoints): Ditto.
+	(_initialize_breakpoint): Update help strings to reflect the fact
+	that these functions can now take more than one argument.
+	* cli/cli-utils.c (number_is_in_list): New function.
+	* cli/cli-utils.h (number_is_in_list): Export.
+
+2011-02-23  Michael Snyder  <msnyder@vmware.com>
+
+	* memattr.c (mem_enable_command): Use get_number_or_range.
+	(mem_disable_command): Ditto.
+	(mem_delete_command): Ditto.
+	(_initialize_mem): Tweak usage message to reflect multiple
+	arguments.
+
+2011-02-22  Doug Evans  <dje@google.com>
+
+	Add gdb.lookup_global_symbol python function.
+	* NEWS: Add entry.
+	* python/py-symbol.c (gdbpy_lookup_global_symbol): New function.
+	* python/python-internal.h (gdbpy_lookup_global_symbol): Declare it.
+	* python/python.c (GdbMethods): Add entry for lookup_global_symbol.
+
+2011-02-22  Tom Tromey  <tromey@redhat.com>
+
+	* language.c (language_class_name_from_physname): Rename
+	'curr_language' argument to 'lang'; use in body.
+
+2011-02-22  Michael Snyder  <msnyder@vmware.com>
+
+	* cli/cli-utils.c (number_is_in_list): Check for zero return.
+
+2011-02-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* frame-unwind.h: Fix comment to mention the this frame, not the
+	next.
+
+2011-02-22  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (auto_solib_limit): Remove.
+	* symfile.h (auto_solib_limit): Remove.
+
+2011-02-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* Makefile.in (INSTALLED_LIBS): Delete.  Update comment.
+
+2011-02-21  Michael Snyder  <msnyder@vmware.com>
+
+	* gdbthread.h (print_thread_info): Change prototype.
+	* thread.c (print_thread_info): Accept char* instead of int for
+	requested_threads argument.  Use new function number_is_in_list
+	to determine which threads to list.
+	(info_threads_command): Pass char* to print_thread_info.
+	* cli/cli-utils.c (number_is_in_list): New function.
+	* cli/cli-utils.h (number_is_in_list): Export.
+	* mi/mi-main.c (mi_cmd_thread_info): Pass char* to 
+	print_thread_info.
+	(print_one_inferior): Ditto.
+	(mi_cmd_list_thread_groups): Ditto.
+
 2011-02-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* common/Makefile.in (CFLAGS): New.

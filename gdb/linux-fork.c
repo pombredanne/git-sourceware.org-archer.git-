@@ -443,7 +443,7 @@ inferior_call_waitpid (ptid_t pptid, int pid)
       oldfp = find_fork_ptid (inferior_ptid);
       gdb_assert (oldfp != NULL);
       newfp = find_fork_ptid (pptid);
-      gdb_assert (oldfp != NULL);
+      gdb_assert (newfp != NULL);
       fork_save_infrun_state (oldfp, 1);
       remove_breakpoints ();
       fork_load_infrun_state (newfp);
@@ -584,14 +584,7 @@ info_checkpoints_command (char *arg, int from_tty)
 
       sal = find_pc_line (pc, 0);
       if (sal.symtab)
-	{
-	  char *tmp = strrchr (sal.symtab->filename, '/');
-
-	  if (tmp)
-	    printf_filtered (_(", file %s"), tmp + 1);
-	  else
-	    printf_filtered (_(", file %s"), sal.symtab->filename);
-	}
+	printf_filtered (_(", file %s"), lbasename (sal.symtab->filename));
       if (sal.line)
 	printf_filtered (_(", line %d"), sal.line);
       if (!sal.symtab && !sal.line)

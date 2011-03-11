@@ -136,6 +136,8 @@ PyObject *gdbpy_history (PyObject *self, PyObject *args);
 PyObject *gdbpy_breakpoints (PyObject *, PyObject *);
 PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
 PyObject *gdbpy_lookup_symbol (PyObject *self, PyObject *args, PyObject *kw);
+PyObject *gdbpy_lookup_global_symbol (PyObject *self, PyObject *args,
+				      PyObject *kw);
 PyObject *gdbpy_newest_frame (PyObject *self, PyObject *args);
 PyObject *gdbpy_selected_frame (PyObject *self, PyObject *args);
 PyObject *gdbpy_block_for_pc (PyObject *self, PyObject *args);
@@ -269,6 +271,7 @@ extern PyObject *gdbpy_children_cst;
 extern PyObject *gdbpy_to_string_cst;
 extern PyObject *gdbpy_display_hint_cst;
 extern PyObject *gdbpy_enabled_cst;
+extern PyObject *gdbpy_value_cst;
 
 /* Exception types.  */
 extern PyObject *gdbpy_gdb_error;

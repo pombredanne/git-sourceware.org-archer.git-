@@ -88,8 +88,6 @@ DEPMODE = @CCDEPMODE@
 DEPDIR = @DEPDIR@
 depcomp = $(SHELL) $(srcdir)/../depcomp
 
-PWD_COMMAND = $${PWDCMD-pwd}
-
 # Note that these are overridden by GNU make-specific code below if
 # GNU make is used.  The overrides implement dependency tracking.
 COMPILE.pre = $(CC)
@@ -141,10 +139,6 @@ LIBDECNUMBER_DIR = ../libdecnumber
 LIBDECNUMBER = $(LIBDECNUMBER_DIR)/libdecnumber.a
 LIBDECNUMBER_SRC = $(srcdir)/$(LIBDECNUMBER_DIR)
 LIBDECNUMBER_CFLAGS = -I$(LIBDECNUMBER_DIR) -I$(LIBDECNUMBER_SRC)
-
-LIBCOMMON_DIR = common
-LIBCOMMON = $(LIBCOMMON_DIR)/libcommon.a
-LIBCOMMON_SRC = $(srcdir)/$(LIBCOMMON_DIR)
 
 # Where is the READLINE library?  Typically in ../readline.
 READLINE_DIR = ../readline
@@ -468,20 +462,14 @@ INTERNAL_LDFLAGS = $(CFLAGS) $(GLOBAL_CFLAGS) $(MH_LDFLAGS) $(LDFLAGS) $(CONFIG_
 # it doesn't work, then refer to libiberty.
 
 # Libraries and corresponding dependencies for compiling gdb.
-# {X,T}M_CLIBS, defined in *config files, have host- and target-dependent libs.
+# XM_CLIBS, defined in *config files, have host-dependent libs.
 # LIBIBERTY appears twice on purpose.
-# If you have the Cygnus libraries installed,
-# you can use 'CLIBS=$(INSTALLED_LIBS)' 'CDEPS='
-INSTALLED_LIBS=-lbfd -lreadline -lopcodes -liberty -ldecnumber \
-	$(XM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ @PYTHON_LIBS@ \
-	-lintl -liberty $(LIBGNU)
 CLIBS = $(SIM) $(READLINE) $(OPCODES) $(BFD) $(INTL) $(LIBIBERTY) $(LIBDECNUMBER) \
 	$(XM_CLIBS) $(NAT_CLIBS) $(GDBTKLIBS) @LIBS@ @PYTHON_LIBS@ \
 	$(LIBEXPAT) \
-	$(LIBIBERTY) $(WIN32LIBS) $(LIBGNU) $(LIBCOMMON)
+	$(LIBIBERTY) $(WIN32LIBS) $(LIBGNU)
 CDEPS = $(XM_CDEPS) $(NAT_CDEPS) $(SIM) $(BFD) $(READLINE_DEPS) \
-	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS) $(LIBGNU) \
-        $(LIBCOMMON)
+	$(OPCODES) $(INTL_DEPS) $(LIBIBERTY) $(CONFIG_DEPS) $(LIBGNU)
 
 ADD_FILES = $(XM_ADD_FILES) $(TM_ADD_FILES) $(NAT_ADD_FILES)
 ADD_DEPS = $(XM_ADD_FILES) $(TM_ADD_FILES) $(NAT_ADD_FILES)
@@ -813,7 +801,7 @@ annotate.h sim-regno.h dictionary.h dfp.h main.h frame-unwind.h	\
 remote-fileio.h i386-linux-tdep.h vax-tdep.h objc-lang.h \
 sentinel-frame.h bcache.h symfile.h windows-tdep.h linux-tdep.h \
 gdb_usleep.h jit.h xml-syscall.h microblaze-tdep.h \
-psymtab.h psympriv.h progspace.h bfin-tdep.h ia64-hpux-tdep.h printcmd.h
+psymtab.h psympriv.h progspace.h bfin-tdep.h ia64-hpux-tdep.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -866,6 +854,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	memattr.o mem-break.o target.o parse.o language.o buildsym.o \
 	findcmd.o \
 	std-regs.o \
+	signals.o \
 	exec.o reverse.o \
 	bcache.o objfiles.o observer.o minsyms.o maint.o demangle.o \
 	dbxread.o coffread.o coff-pe-read.o \
@@ -908,7 +897,7 @@ CLEANDIRS = $(SUBDIRS) gnulib
 # This is used to force build failures in existing trees when
 # a new directory is added.
 # The format here is for the `case' shell command.
-REQUIRED_SUBDIRS = doc | testsuite | gnulib | data-directory | common
+REQUIRED_SUBDIRS = doc | testsuite | gnulib | data-directory
 
 # For now, shortcut the "configure GDB for fewer languages" stuff.
 YYFILES = c-exp.c \
@@ -1175,26 +1164,6 @@ all-lib: gnulib/Makefile
 	@$(MAKE) $(FLAGS_TO_PASS) DO=all DODIRS=gnulib subdir_do
 .PHONY: all-lib
 
-# 
-$(LIBCOMMON): $(LIBCOMMON_DIR)/Makefile
-	@$(MAKE) $(FLAGS_TO_PASS) DO=all DODIRS=common subdir_do
-
-configure-common: 
-	@: $(MAKE); $(unstage)
-	@r=`${PWD_COMMAND}`; export r; \
-	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
-        test ! -f common/Makefile || exit 0; \
-        $(SHELL) $(srcdir)/../mkinstalldirs common ; \
-        $(HOST_EXPORTS)  \
-        echo Configuring in common; \
-        cd "common" || exit 1; \
-        commondir="$$s/common"; \
-        srcdiroption="--srcdir=$${commondir}"; \
-	$(SHELL) $${commondir}/configure --enable-gdbserver=no \
-          $(HOST_CONFIGARGS) --build=${build_alias} --host=${host_alias} \
-          --target=${target_alias} $${srcdiroption}  \
-          || exit 1
-
 # Convenience rule to handle recursion.
 .PHONY: all-data-directory
 all-data-directory: data-directory/Makefile
@@ -1242,7 +1211,7 @@ tags: TAGS
 clean mostlyclean: $(CONFIG_CLEAN)
 	@$(MAKE) $(FLAGS_TO_PASS) DO=clean "DODIRS=$(CLEANDIRS)" subdir_do
 	rm -f *.o *.a $(ADD_FILES) *~ init.c-tmp init.l-tmp version.c-tmp
-	rm -f init.c version.c
+	rm -f init.c version.c observer.h observer.inc
 	rm -f gdb$(EXEEXT) core make.log
 	rm -f gdb[0-9]$(EXEEXT)
 	rm -f test-cp-name-parser$(EXEEXT)
@@ -1330,13 +1299,6 @@ data-directory/Makefile: data-directory/Makefile.in config.status @frags@
 	  CONFIG_LINKS= \
 	  $(SHELL) config.status
 
-common/Makefile: configure-common common/Makefile.in config.status @frags@
-        CONFIG_FILES="common/Makefile" \
-          CONFIG_COMMANDS="depfiles" \
-          CONFIG_HEADERS= \
-          CONFIG_LINKS= \
-          $(SHELL) config.status
-
 config.h: stamp-h ; @true
 stamp-h: $(srcdir)/config.in config.status
 	CONFIG_HEADERS=config.h:config.in \
@@ -1358,7 +1320,6 @@ aclocal_m4_deps = \
 	gnulib/m4/include_next.m4 \
 	gnulib/m4/longlong.m4 \
 	gnulib/m4/memchr.m4 \
-	gnulib/m4/memcmp.m4 \
 	gnulib/m4/memmem.m4 \
 	gnulib/m4/onceonly_2_57.m4 \
 	gnulib/m4/stdint.m4 \
@@ -1939,6 +1900,15 @@ mi-symbol-cmds.o: $(srcdir)/mi/mi-symbol-cmds.c
 
 mi-common.o: $(srcdir)/mi/mi-common.c
 	$(COMPILE) $(srcdir)/mi/mi-common.c
+	$(POSTCOMPILE)
+
+# gdb/common/ dependencies
+#
+# Need to explicitly specify the compile rule as make will do nothing
+# or try to compile the object file into the sub-directory.
+
+signals.o: $(srcdir)/common/signals.c
+	$(COMPILE) $(srcdir)/common/signals.c
 	$(POSTCOMPILE)
 
 #

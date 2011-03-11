@@ -21,14 +21,15 @@
 #include "cli/cli-utils.h"
 #include "gdb_string.h"
 #include "value.h"
+#include "gdb_assert.h"
 
 #include <ctype.h>
 
 /* *PP is a string denoting a number.  Get the number of the.  Advance
    *PP after the string and any trailing whitespace.
 
-   Currently the string can either be a number or "$" followed by the
-   name of a convenience variable.
+   Currently the string can either be a number, or "$" followed by the
+   name of a convenience variable, or ("$" or "$$") followed by digits.
 
    TRAILER is a character which can be found after the number; most
    commonly this is `-'.  If you don't want a trailer, use \0.  */
@@ -41,24 +42,39 @@ get_number_trailer (char **pp, int trailer)
 
   if (*p == '$')
     {
-      /* Make a copy of the name, so we can null-terminate it
-         to pass to lookup_internalvar().  */
-      char *varname;
-      char *start = ++p;
-      LONGEST val;
+      struct value *val = value_from_history_ref (p, &p);
 
-      while (isalnum (*p) || *p == '_')
-	p++;
-      varname = (char *) alloca (p - start + 1);
-      strncpy (varname, start, p - start);
-      varname[p - start] = '\0';
-      if (get_internalvar_integer (lookup_internalvar (varname), &val))
-	retval = (int) val;
-      else
+      if (val)	/* Value history reference */
 	{
-	  printf_filtered (_("Convenience variable must "
-			     "have integer value.\n"));
-	  retval = 0;
+	  if (TYPE_CODE (value_type (val)) == TYPE_CODE_INT)
+	    retval = value_as_long (val);
+	  else
+	    {
+	      printf_filtered (_("History value must have integer type."));
+	      retval = 0;
+	    }
+	}
+      else	/* Convenience variable */
+	{
+	  /* Internal variable.  Make a copy of the name, so we can
+	     null-terminate it to pass to lookup_internalvar().  */
+	  char *varname;
+	  char *start = ++p;
+	  LONGEST val;
+
+	  while (isalnum (*p) || *p == '_')
+	    p++;
+	  varname = (char *) alloca (p - start + 1);
+	  strncpy (varname, start, p - start);
+	  varname[p - start] = '\0';
+	  if (get_internalvar_integer (lookup_internalvar (varname), &val))
+	    retval = (int) val;
+	  else
+	    {
+	      printf_filtered (_("Convenience variable must "
+				 "have integer value.\n"));
+	      retval = 0;
+	    }
 	}
     }
   else
@@ -159,6 +175,32 @@ get_number_or_range (char **pp)
 	}
     }
   return last_retval;
+}
+
+/* Accept a number and a string-form list of numbers such as is 
+   accepted by get_number_or_range.  Return TRUE if the number is
+   in the list.
+
+   By definition, an empty list includes all numbers.  This is to 
+   be interpreted as typing a command such as "delete break" with 
+   no arguments.  */
+
+int
+number_is_in_list (char *list, int number)
+{
+  if (list == NULL || *list == '\0')
+    return 1;
+
+  while (*list != '\0')
+    {
+      int gotnum = get_number_or_range (&list);
+
+      if (gotnum == 0)
+	error (_("Args must be numbers or '$' variables."));
+      if (gotnum == number)
+	return 1;
+    }
+  return 0;
 }
 
 /* See documentation in cli-utils.h.  */

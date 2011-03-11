@@ -4680,7 +4680,6 @@ process_event_stop_test:
 	struct symtab_and_line tmp_sal;
 
 	tmp_sal = find_pc_line (ecs->stop_func_start, 0);
-	tmp_sal.pspace = get_frame_program_space (frame);
 	if (tmp_sal.line != 0)
 	  {
 	    if (execution_direction == EXEC_REVERSE)
@@ -5488,22 +5487,33 @@ print_signal_exited_reason (enum target_signal siggnal)
 static void
 print_exited_reason (int exitstatus)
 {
+  struct inferior *inf = current_inferior ();
+  const char *pidstr = target_pid_to_str (pid_to_ptid (inf->pid));
+
   annotate_exited (exitstatus);
   if (exitstatus)
     {
       if (ui_out_is_mi_like_p (uiout))
 	ui_out_field_string (uiout, "reason", 
 			     async_reason_lookup (EXEC_ASYNC_EXITED));
-      ui_out_text (uiout, "\nProgram exited with code ");
+      ui_out_text (uiout, "[Inferior ");
+      ui_out_text (uiout, plongest (inf->num));
+      ui_out_text (uiout, " (");
+      ui_out_text (uiout, pidstr);
+      ui_out_text (uiout, ") exited with code ");
       ui_out_field_fmt (uiout, "exit-code", "0%o", (unsigned int) exitstatus);
-      ui_out_text (uiout, ".\n");
+      ui_out_text (uiout, "]\n");
     }
   else
     {
       if (ui_out_is_mi_like_p (uiout))
 	ui_out_field_string
 	  (uiout, "reason", async_reason_lookup (EXEC_ASYNC_EXITED_NORMALLY));
-      ui_out_text (uiout, "\nProgram exited normally.\n");
+      ui_out_text (uiout, "[Inferior ");
+      ui_out_text (uiout, plongest (inf->num));
+      ui_out_text (uiout, " (");
+      ui_out_text (uiout, pidstr);
+      ui_out_text (uiout, ") exited normally]\n");
     }
   /* Support the --return-child-result option.  */
   return_child_result_value = exitstatus;

@@ -262,6 +262,17 @@ struct displaced_step_closure
 			  struct displaced_step_closure *dsc);
     } svc;
   } u;
+
+  /* The size of original instruction, 2 or 4.  */
+  unsigned int insn_size;
+  /* True if the original insn (and thus all replacement insns) are Thumb
+     instead of ARM.   */
+  unsigned int is_thumb;
+
+  /* The slots in the array is used in this way below,
+     - ARM instruction occupies one slot,
+     - Thumb 16 bit instruction occupies one slot,
+     - Thumb 32-bit instruction occupies *two* slots, one part for each.  */
   unsigned long modinsn[DISPLACED_MODIFIED_INSNS];
   int numinsns;
   CORE_ADDR insn_addr;
@@ -291,7 +302,8 @@ extern void
   arm_displaced_init_closure (struct gdbarch *gdbarch, CORE_ADDR from,
 			      CORE_ADDR to, struct displaced_step_closure *dsc);
 extern ULONGEST
-  displaced_read_reg (struct regcache *regs, CORE_ADDR from, int regno);
+  displaced_read_reg (struct regcache *regs, struct displaced_step_closure *dsc,
+		      int regno);
 extern void
   displaced_write_reg (struct regcache *regs,
 		       struct displaced_step_closure *dsc, int regno,
@@ -308,6 +320,9 @@ extern struct displaced_step_closure *
 extern void arm_displaced_step_fixup (struct gdbarch *,
 				      struct displaced_step_closure *,
 				      CORE_ADDR, CORE_ADDR, struct regcache *);
+
+/* Return the bit mask in ARM_PS_REGNUM that indicates Thumb mode.  */
+extern int arm_psr_thumb_bit (struct gdbarch *);
 
 /* Is the instruction at the given memory address a Thumb or ARM
    instruction?  */

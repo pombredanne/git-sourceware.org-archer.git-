@@ -142,7 +142,7 @@ gdb_test "continue" \
          "continuing to unhandled exception"
 
 gdb_test "continue" \
-         "Continuing\..*Program exited.*" \
+         "Continuing\..*$inferior_exited_re.*" \
          "continuing to program completion"
 
 

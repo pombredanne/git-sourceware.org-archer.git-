@@ -176,16 +176,6 @@ show_symbol_reloading (struct ui_file *file, int from_tty,
    report all the functions that are actually present.  */
 
 int auto_solib_add = 1;
-
-/* For systems that support it, a threshold size in megabytes.  If
-   automatically adding a new library's symbol table to those already
-   known to the debugger would cause the total shared library symbol
-   size to exceed this threshhold, then the shlib's symbols are not
-   added.  The threshold is ignored if the user explicitly asks for a
-   shlib to be added, such as when using the "sharedlibrary"
-   command.  */
-
-int auto_solib_limit;
 
 
 /* Make a null terminated copy of the string at PTR with SIZE characters in
@@ -1029,6 +1019,9 @@ syms_from_objfile (struct objfile *objfile,
 
   (*objfile->sf->sym_read) (objfile, add_flags);
 
+  if ((add_flags & SYMFILE_NO_READ) == 0)
+    require_partial_symbols (objfile, 0);
+
   /* Discard cleanups as symbol reading was successful.  */
 
   discard_cleanups (old_chain);
@@ -1089,9 +1082,15 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
   struct cleanup *my_cleanups;
   const char *name = bfd_get_filename (abfd);
   const int from_tty = add_flags & SYMFILE_VERBOSE;
+  const int should_print = ((from_tty || info_verbose)
+			    && (readnow_symbol_files
+				|| (add_flags & SYMFILE_NO_READ) == 0));
 
   if (readnow_symbol_files)
-    flags |= OBJF_READNOW;
+    {
+      flags |= OBJF_READNOW;
+      add_flags &= ~SYMFILE_NO_READ;
+    }
 
   my_cleanups = make_cleanup_bfd_close (abfd);
 
@@ -1110,7 +1109,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
   /* We either created a new mapped symbol table, mapped an existing
      symbol table file which has not had initial symbol reading
      performed, or need to read an unmapped symbol table.  */
-  if (from_tty || info_verbose)
+  if (should_print)
     {
       if (deprecated_pre_add_symbol_hook)
 	deprecated_pre_add_symbol_hook (name);
@@ -1131,7 +1130,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
 
   if ((flags & OBJF_READNOW))
     {
-      if (from_tty || info_verbose)
+      if (should_print)
 	{
 	  printf_unfiltered (_("expanding to full symbols..."));
 	  wrap_here ("");
@@ -1142,15 +1141,14 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
 	objfile->sf->qf->expand_all_symtabs (objfile);
     }
 
-  if ((from_tty || info_verbose)
-      && !objfile_has_symbols (objfile))
+  if (should_print && !objfile_has_symbols (objfile))
     {
       wrap_here ("");
       printf_unfiltered (_("(no debugging symbols found)..."));
       wrap_here ("");
     }
 
-  if (from_tty || info_verbose)
+  if (should_print)
     {
       if (deprecated_post_add_symbol_hook)
 	deprecated_post_add_symbol_hook ();
@@ -1707,8 +1705,7 @@ get_section_index (struct objfile *objfile, char *section_name)
 
 /* Link SF into the global symtab_fns list.  Called on startup by the
    _initialize routine in each object file format reader, to register
-   information about each format the the reader is prepared to
-   handle.  */
+   information about each format the reader is prepared to handle.  */
 
 void
 add_symtab_fns (const struct sym_fns *sf)
@@ -2508,6 +2505,12 @@ reread_symbols (void)
 	  /* Do not set flags as this is safe and we don't want to be
              verbose.  */
 	  (*objfile->sf->sym_read) (objfile, 0);
+	  if ((objfile->flags & OBJF_PSYMTABS_READ) != 0)
+	    {
+	      objfile->flags &= ~OBJF_PSYMTABS_READ;
+	      require_partial_symbols (objfile, 0);
+	    }
+
 	  if (!objfile_has_symbols (objfile))
 	    {
 	      wrap_here ("");
@@ -3443,15 +3446,24 @@ simple_overlay_update (struct obj_section *osect)
   if (osect)
     /* Have we got a cached copy of the target's overlay table?  */
     if (cache_ovly_table != NULL)
-      /* Does its cached location match what's currently in the symtab?  */
-      if (cache_ovly_table_base ==
-	  SYMBOL_VALUE_ADDRESS (lookup_minimal_symbol ("_ovly_table",
-						       NULL, NULL)))
-	/* Then go ahead and try to look up this single section in the
-	   cache.  */
-	if (simple_overlay_update_1 (osect))
-	  /* Found it!  We're done.  */
-	  return;
+      {
+	/* Does its cached location match what's currently in the
+	   symtab?  */
+	struct minimal_symbol *minsym
+	  = lookup_minimal_symbol ("_ovly_table", NULL, NULL);
+
+	if (minsym == NULL)
+	  error (_("Error reading inferior's overlay table: couldn't "
+		   "find `_ovly_table' array\n"
+		   "in inferior.  Use `overlay manual' mode."));
+	
+	if (cache_ovly_table_base == SYMBOL_VALUE_ADDRESS (minsym))
+	  /* Then go ahead and try to look up this single section in
+	     the cache.  */
+	  if (simple_overlay_update_1 (osect))
+	    /* Found it!  We're done.  */
+	    return;
+      }
 
   /* Cached table no good: need to read the entire table anew.
      Or else we want all the sections, in which case it's actually

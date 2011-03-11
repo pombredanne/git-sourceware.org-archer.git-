@@ -422,7 +422,7 @@ insert_bits (unsigned int datum,
 {
   unsigned int mask;
 
-  gdb_assert (dest_offset_bits >= 0 && dest_offset_bits + nbits <= 8);
+  gdb_assert (dest_offset_bits + nbits <= 8);
 
   mask = (1 << nbits) - 1;
   if (bits_big_endian)
@@ -976,6 +976,7 @@ indirect_pieced_value (struct value *value)
   frame = get_selected_frame (_("No frame selected."));
   byte_offset = value_as_address (value);
 
+  gdb_assert (piece);
   baton = dwarf2_fetch_die_location_block (piece->v.ptr.die, c->per_cu,
 					   get_frame_address_in_block_wrapper,
 					   frame);
@@ -1159,7 +1160,7 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
 	case DWARF_VALUE_LITERAL:
 	  {
 	    bfd_byte *contents;
-	    const bfd_byte *data;
+	    const bfd_byte *ldata;
 	    size_t n = ctx->len;
 
 	    if (byte_offset + TYPE_LENGTH (type) > n)
@@ -1168,12 +1169,12 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
 	    retval = allocate_value (type);
 	    contents = value_contents_raw (retval);
 
-	    data = ctx->data + byte_offset;
+	    ldata = ctx->data + byte_offset;
 	    n -= byte_offset;
 
 	    if (n > TYPE_LENGTH (type))
 	      n = TYPE_LENGTH (type);
-	    memcpy (contents, data, n);
+	    memcpy (contents, ldata, n);
 	  }
 	  break;
 
@@ -2430,27 +2431,23 @@ disassemble_dwarf_expression (struct ui_file *stream,
 	case DW_OP_breg29:
 	case DW_OP_breg30:
 	case DW_OP_breg31:
-	  data = read_sleb128 (data, end, &ul);
-	  fprintf_filtered (stream, " %s [$%s]", pulongest (ul),
+	  data = read_sleb128 (data, end, &l);
+	  fprintf_filtered (stream, " %s [$%s]", plongest (l),
 			    gdbarch_register_name (arch, op - DW_OP_breg0));
 	  break;
 
 	case DW_OP_bregx:
-	  {
-	    ULONGEST offset;
-
-	    data = read_uleb128 (data, end, &ul);
-	    data = read_sleb128 (data, end, &offset);
-	    fprintf_filtered (stream, " register %s [$%s] offset %s",
-			      pulongest (ul),
-			      gdbarch_register_name (arch, (int) ul),
-			      pulongest (offset));
-	  }
+	  data = read_uleb128 (data, end, &ul);
+	  data = read_sleb128 (data, end, &l);
+	  fprintf_filtered (stream, " register %s [$%s] offset %s",
+			    pulongest (ul),
+			    gdbarch_register_name (arch, (int) ul),
+			    plongest (l));
 	  break;
 
 	case DW_OP_fbreg:
-	  data = read_sleb128 (data, end, &ul);
-	  fprintf_filtered (stream, " %s", pulongest (ul));
+	  data = read_sleb128 (data, end, &l);
+	  fprintf_filtered (stream, " %s", plongest (l));
 	  break;
 
 	case DW_OP_xderef_size:
