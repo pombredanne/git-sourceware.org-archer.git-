@@ -73,7 +73,7 @@ gdb_windows_conv_path (conv_type oper, const void *from,
 
   switch (oper)
     {
-    case WINDOWS_NATIVE_W_TO_POSIX: 
+    case WINDOWS_NATIVE_W_TO_POSIX:
       op = CCP_WIN_W_TO_POSIX;
       break;
 
@@ -162,7 +162,7 @@ gdb_windows_conv_path_list (conv_type oper, const void *from,
 
   switch (oper)
     {
-    case WINDOWS_NATIVE_W_TO_POSIX: 
+    case WINDOWS_NATIVE_W_TO_POSIX:
       op = CCP_WIN_W_TO_POSIX;
       break;
 

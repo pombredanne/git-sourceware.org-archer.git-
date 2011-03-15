@@ -209,7 +209,7 @@ typedef struct process_info_struct
 process_info;
 
 static process_info process_head;
-  
+
 /* The process and thread handles for the above context.  */
 
 static DEBUG_EVENT current_event;	/* The current debug event from
@@ -503,7 +503,7 @@ windows_delete_process (DWORD pid)
 	delete_inferior (pid);
       else
 	exit_inferior (pid);
-    }	
+    }
 }
 
 
@@ -700,7 +700,7 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
      inferior.  */
   DEBUG_EVENTS (("get_module_name for handle 0x%x\n",
 		 (unsigned int) (uintptr_t) current_process_handle));
- 
+
   if (!EnumProcessModules (current_process_handle, DllHandle,
 			   sizeof (HMODULE), &cbNeeded) || !cbNeeded)
     {
@@ -1828,7 +1828,7 @@ get_windows_debug_event (struct target_ops *ops,
 	  ourstatus->value.execd_pathname = pi->name;
 	  pi->debugging = 1;
 	}
-	
+
       /* Only delete main_thread_id if it really belongs to the
 	 same process.  */
       if (main_thread_id && main_process_id == current_event.dwProcessId)
@@ -2330,7 +2330,7 @@ typedef struct struct_win_env {
     char *name;
     int in_index;
     void *in_orig_val;
-    int is_list; 
+    int is_list;
 } win_env;
 
 /* This list is extracted from cygwin/environ.cc source,
@@ -2364,7 +2364,7 @@ static win_env conv_envvars[] =
 #else
   HANDLE tty;
   char ashell [__PMAX];
-  char msys_exec_file [__PMAX]; 
+  char msys_exec_file [__PMAX];
 #endif
   PROCESS_INFORMATION pi;
   BOOL ret;
@@ -2387,7 +2387,7 @@ static win_env conv_envvars[] =
     {
       if (debug_children)
 	flags |= DEBUG_PROCESS;
-      else 
+      else
 	flags |= DEBUG_ONLY_THIS_PROCESS;
       if (gdb_windows_conv_path (WINDOWS_POSIX_TO_NATIVE, exec_file, real_path,
 				 __PMAX * sizeof (windows_buf_t)) < 0)
@@ -2719,7 +2719,7 @@ windows_wait_all_exited ()
 	     (unsigned) current_event.dwThreadId,
 	     (unsigned) current_event.dwProcessId));
 	}
-      else 
+      else
 	{
 	  DEBUG_EVENTS (("gdb: kernel event for pid=%d tid=%x type=%d)\n",
 			(unsigned) current_event.dwProcessId,
@@ -3284,7 +3284,7 @@ bad_GetConsoleFontSize (HANDLE w, DWORD nFont)
   size.Y = 12;
   return size;
 }
- 
+
 /* Load any functions which may not be available in ancient versions
    of Windows.  */
 void
@@ -3301,9 +3301,9 @@ _initialize_loadable (void)
 	GetProcAddress (hm, "DebugBreakProcess");
       DebugSetProcessKillOnExit = (void *)
 	GetProcAddress (hm, "DebugSetProcessKillOnExit");
-      GetConsoleFontSize = (void *) 
+      GetConsoleFontSize = (void *)
 	GetProcAddress (hm, "GetConsoleFontSize");
-      GetCurrentConsoleFont = (void *) 
+      GetCurrentConsoleFont = (void *)
 	GetProcAddress (hm, "GetCurrentConsoleFont");
       EnumProcessModules = (void *)
 	GetProcAddress (hm, "K32EnumProcessModules");

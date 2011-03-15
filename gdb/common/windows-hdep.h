@@ -17,7 +17,7 @@
 
 /* The primary purpose of this file is to separate out
    conversion between POSIX style and Windows NATIVE style
-   path and path lists.  
+   path and path lists.
    For this purpose, generic replacement of the two cygwin function
    cygwin_conv_path and cygwin_conv_path_list are created.  */
 
