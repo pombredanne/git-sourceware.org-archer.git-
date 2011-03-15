@@ -1,3 +1,104 @@
+2011-03-15  Michael Snyder  <msnyder@vmware.com>
+
+	* frame.c (find_frame_sal): Assert sym is not null.
+
+	* dbxread.c (process_one_symbol): Assert 'name' is not null.
+
+	* objc-lang.c (selectors_info): Check strchr for null result.
+
+	* stabsread.c (define_symbol): Guard against bad stabstring input.
+
+2011-03-15  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Remove trailing spaces and tabulations from pascal language
+	support sources.
+	p-exp.y: Ditto.
+	p-lang.c: Ditto.
+	p-lang.h: Ditto.
+	p-valprint.c: Ditto.
+
+2011-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dwarf2_get_pc_bounds): Require HIGH strictly higher
+	than LOW.  Comment it.
+	(read_partial_die): Call complaint for inappropriate zero LOWPC or
+	HIGHPC not strictly higher than LOWPC.
+
+2011-03-15  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix formatting of function declarations returning a pointer in
+	previous commit.
+	* varobj.c (varobj_add_child): Ditto.
+	* hppa-tdep.h (hppa_init_objfile_priv_data): Ditto.
+	* inferior.h (get_displaced_step_closure_by_addr): Ditto.
+
+2011-03-15  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ppc-sysv-tdep.c (ppc64_sysv_abi_push_dummy_call): Add support
+	for the "generic" vector ABI used with GCC 4.3 and later.
+	(ppc64_sysv_abi_return_value): Likewise.
+
+2011-03-15  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* infcall.c (call_function_by_hand): Function return value is
+	always a non_lval, even when using struct_return.
+
+2011-03-15  Pedro Alves  <pedro@codesourcery.com>
+
+	* printcmd.c (ALL_DISPLAYS_SAFE): New.
+	(map_display_numbers): New.
+	(do_delete_display): New.
+	(undisplay_command): Use map_display_numbers.
+	(do_enable_disable_display): New.
+	(enable_disable_display_command): New function.
+	(enable_display): Delete.
+	(enable_display_command): New.
+	(disable_display_command): Reimplement.
+	(_initialize_printcmd): Adjust "enable display" command to use
+	`enable_display_command' as callback.
+
+2011-03-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* NEWS: Add Python breakpoint 'stop' operation.
+
+2011-03-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* NEWS: Delete duplicate entry. Fix typo.
+
+2011-03-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix ARI warning about function names in first column.
+	Put prototype declaration on same line as return type.
+	* objc-exp.y: Ditto.
+	* p-exp.y: Ditto.
+	* python/py-stopevent.h: Ditto.
+	For long function names, split parameters to
+	allow function name on same line as return type.
+	* solib-pa64.c: Ditto.
+	* varobj.c: Ditto.
+	* varobj.h: Ditto.
+	For long function declaration, use single line.
+	* hppa-tdep.h: Ditto.
+	* inferior.h: Ditto.
+
+2011-03-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/python.h: Declare gdbpy_should_stop and
+	gdbpy_breakpoint_has_py_cond.
+	* python/python.c: Add python.h to includes.  Remove python.h from
+	HAVE_PYTHON definition
+	(gdbpy_should_stop): New dummy function.
+	(gdbpy_breakpoint_has_py_cond): New dummy function.
+	* python/py-breakpoint.c (bppy_init): Rewrite to allow
+	sub-classing capabilities.
+	(gdbpy_should_stop): New function.
+	(gdbpy_breakpoint_has_py_cond): New function.
+	(local_setattro): New function.
+	* breakpoint.c (condition_command): Add check for Python 'stop'
+	operation.
+	(bpstat_check_breakpoint_conditions): Execute Python 'stop'
+	operation function as part of stop/continue tests.
+
 2011-03-14  Tom Tromey  <tromey@redhat.com>
 
 	PR gdb/12576:
@@ -88,12 +189,6 @@
 	(cmd_qtframe): Ditto.
 	(cmd_qtbuffer): Ditto.
 	(cmd_bigqtbuffer): Ditto.
-
-	* gdbserver/tracepoint.c (tracepoint_finish_step): Fix
-	loop variable.
-
-	* gdbserver/server.c (handle_v_run): Free alloced buffer on early
-	return.
 
 2011-03-10  Tom Tromey  <tromey@redhat.com>
 
@@ -442,8 +537,6 @@
 	* symfile.c (simple_overlay_update): Check for null return value
 	from lookup_minimal_symbol.
 
-	* gdbserver/server.c (queue_stop_reply): Call xmalloc not malloc.
-
 	* xml-syscall.c (syscall_start_syscall): Assert name is non null.
 
 2011-03-04  Thiago Jung Bauermann  <bauerman@br.ibm.com>
@@ -544,9 +637,6 @@
 	* cli/cli-script.c (script_from_file): Add break for lint.
 
 	* mdebugread.c (parse_partial_symbols): Fix indent.
-
-	* gdbserver/linux-arm-low.c (arm_arch_setup): Replace malloc
-	with xmalloc.
 
 	* target-descriptions.c (tdesc_gdb_type): No need to call
 	xstrdup, callee saves a copy.
