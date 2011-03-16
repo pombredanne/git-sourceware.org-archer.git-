@@ -53,7 +53,8 @@ struct bfin_ppi
 #define mmr_base()      offsetof(struct bfin_ppi, control)
 #define mmr_offset(mmr) (offsetof(struct bfin_ppi, mmr) - mmr_base())
 
-static const char * const mmr_names[] = {
+static const char * const mmr_names[] =
+{
   "PPI_CONTROL", "PPI_STATUS", "PPI_COUNT", "PPI_DELAY", "PPI_FRAME",
 };
 #define mmr_name(off) mmr_names[(off) / 4]
@@ -167,7 +168,8 @@ bfin_ppi_dma_write_buffer (struct hw *me, const void *source,
   return bfin_gui_update (ppi->gui_state, source, nr_bytes);
 }
 
-static const struct hw_port_descriptor bfin_ppi_ports[] = {
+static const struct hw_port_descriptor bfin_ppi_ports[] =
+{
   { "stat", 0, 0, output_port, },
   { NULL, 0, 0, 0, },
 };
@@ -225,7 +227,8 @@ bfin_ppi_finish (struct hw *me)
   ppi->color = bfin_gui_color (color);
 }
 
-const struct hw_descriptor dv_bfin_ppi_descriptor[] = {
+const struct hw_descriptor dv_bfin_ppi_descriptor[] =
+{
   {"bfin_ppi", bfin_ppi_finish,},
   {NULL, NULL},
 };
