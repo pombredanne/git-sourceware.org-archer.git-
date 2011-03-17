@@ -70,8 +70,6 @@
 extern int hex2bin (const char *hex, gdb_byte *bin, int count);
 extern int bin2hex (const gdb_byte *bin, char *hex, int count);
 
-extern void stop_tracing ();
-
 /* Maximum length of an agent aexpression.
    This accounts for the fact that packets are limited to 400 bytes
    (which includes everything -- including the checksum), and assumes
@@ -1124,7 +1122,7 @@ add_local_symbols (struct collection_list *collect,
       block = block_for_pc (pc);
       if (block == NULL)
 	{
-	  warning (_("Can't collect args; no symbol table info available.\n"));
+	  warning (_("Can't collect args; no symbol table info available."));
 	  return;
 	}
 
