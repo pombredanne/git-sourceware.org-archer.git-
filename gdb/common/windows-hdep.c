@@ -204,7 +204,7 @@ gdb_windows_conv_path_list (conv_type oper, const void *from,
       break;
     };
   return -1;
- #endif /* USE_OLD_CYGWIN_CONV */
+#endif /* USE_OLD_CYGWIN_CONV */
 }
 
 #ifdef NEED_SLEEP_SUBSTITUTE
