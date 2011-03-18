@@ -112,13 +112,13 @@ typedef enum
    Returns size of converted string in characters or
    -1 if there was an error.  */
 
-extern int gdb_windows_conv_path (conv_type oper, const void *from,
-				  void * to, int size);
+extern int gdb_win_conv_path (conv_type oper, const void *from,
+			      void * to, int size);
 
 /* Analogeous function for PATH style lists.  */
 
-extern int gdb_windows_conv_path_list (conv_type oper, const void *from,
-				       void * to, int size);
+extern int gdb_win_conv_path_list (conv_type oper, const void *from,
+				   void * to, int size);
 
 #ifdef NEED_SLEEP_SUBSTITUTE
 extern int sleep (int);

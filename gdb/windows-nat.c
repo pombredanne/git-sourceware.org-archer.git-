@@ -750,8 +750,8 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
 	  if (len == 0)
 	    error (_("Error getting dll name: %lu."), GetLastError ());
 	  /* Cygwin prefers that the path be in /x/y/z format.  */
-	  if (gdb_windows_conv_path (WINDOWS_NATIVE_TO_POSIX, pathbuf,
-				     dll_name_ret, __PMAX) < 0)
+	  if (gdb_win_conv_path (WINDOWS_NATIVE_TO_POSIX, pathbuf,
+				 dll_name_ret, __PMAX) < 0)
 	    error (_("Error converting dll name to POSIX: %d."), errno);
 	  return 1;	/* success */
 	}
@@ -891,8 +891,8 @@ windows_make_so (const char *name, LPVOID load_addr)
   strcpy (so->so_name, buf);
 #else
   if (buf[0])
-    gdb_windows_conv_path (WINDOWS_NATIVE_TO_POSIX, buf, so->so_name,
-			   SO_NAME_MAX_PATH_SIZE);
+    gdb_win_conv_path (WINDOWS_NATIVE_TO_POSIX, buf, so->so_name,
+		       SO_NAME_MAX_PATH_SIZE);
   else
     {
       char *rname = realpath (name, NULL);
@@ -2389,8 +2389,8 @@ static win_env conv_envvars[] =
 	flags |= DEBUG_PROCESS;
       else
 	flags |= DEBUG_ONLY_THIS_PROCESS;
-      if (gdb_windows_conv_path (WINDOWS_POSIX_TO_NATIVE, exec_file, real_path,
-				 __PMAX * sizeof (windows_buf_t)) < 0)
+      if (gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE, exec_file, real_path,
+			     __PMAX * sizeof (windows_buf_t)) < 0)
 	error (_("Error starting executable: %d"), errno);
       toexec = real_path;
 #ifdef USE_WIDE_WINAPI
@@ -2411,7 +2411,7 @@ static win_env conv_envvars[] =
 #ifdef __CYGWIN__
       if (!sh)
 	sh = "/bin/sh";
-      if (gdb_windows_conv_path (WINDOWS_POSIX_TO_NATIVE, sh, shell, __PMAX)
+      if (gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE, sh, shell, __PMAX)
 	    < 0)
       	error (_("Error starting executable via shell: %d"), errno);
 #else
@@ -2432,7 +2432,7 @@ static win_env conv_envvars[] =
       if (!sh || sh[0] == '\0')
 	error (_("Impossible to find a valid shell"));
       if (!use_windows_shell)
-	gdb_windows_conv_path (WINDOWS_NATIVE_TO_MSYS, exec_file,
+	gdb_win_conv_path (WINDOWS_NATIVE_TO_MSYS, exec_file,
 			       msys_exec_file, __PMAX);
       exec_file = msys_exec_file;
 # ifdef USE_WIDE_WINAPI
@@ -2488,21 +2488,19 @@ static win_env conv_envvars[] =
 	      conv_envvars[j].in_orig_val = in_env[i];
 	      if (conv_envvars[j].is_list)
 		{
-		  len = gdb_windows_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
-						    &in_env[i][nlen], NULL, 0);
+		  len = gdb_win_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
+						&in_env[i][nlen], NULL, 0);
 		  conv = (char *) alloca (len + nlen + 1);
 		  strcpy (conv, name);
-		  gdb_windows_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
-					      &in_env[i][nlen],
-					      &conv[nlen], len);
+		  gdb_win_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
+					  &in_env[i][nlen], &conv[nlen], len);
 		}
 	      else
 		{
 		  conv = (char *) alloca (__PMAX + nlen);
 		  strcpy (conv, name);
-		  gdb_windows_conv_path (WINDOWS_POSIX_TO_NATIVE_A,
-					 &in_env[i][nlen], &conv[nlen],
-					 __PMAX);
+		  gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE_A,
+				     &in_env[i][nlen], &conv[nlen], __PMAX);
 		}
 	      in_env[i] = conv;
 	    }

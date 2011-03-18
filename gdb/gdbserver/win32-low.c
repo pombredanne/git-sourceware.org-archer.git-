@@ -537,17 +537,17 @@ win32_create_inferior (char *program, char **program_args)
   path_ptr = getenv ("PATH");
   if (path_ptr)
     {
-      int len = gdb_windows_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
-					    path_ptr, NULL, 0);
+      int len = gdb_win_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
+					path_ptr, NULL, 0);
       orig_path = alloca (strlen (path_ptr) + 1);
       new_path = alloca (len);
       strcpy (orig_path, path_ptr);
-      gdb_windows_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A, path_ptr,
-				  new_path, len);
+      gdb_win_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A, path_ptr,
+			      new_path, len);
       setenv ("PATH", new_path, 1);
     }
-  gdb_windows_conv_path (WINDOWS_POSIX_TO_NATIVE_A, program, real_path,
-			 MAXPATHLEN);
+  gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE_A, program, real_path,
+		     MAXPATHLEN);
   program = real_path;
 #endif
 
@@ -929,7 +929,7 @@ win32_add_one_solib (const char *name, CORE_ADDR load_addr)
     }
 #endif
 
-  gdb_windows_conv_path (WINDOWS_NATIVE_A_TO_POSIX, buf, buf2, MAX_PATH + 1);
+  gdb_win_conv_path (WINDOWS_NATIVE_A_TO_POSIX, buf, buf2, MAX_PATH + 1);
 
   loaded_dll (buf2, load_addr);
 }
