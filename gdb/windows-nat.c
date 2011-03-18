@@ -693,7 +693,7 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
   DWORD cbNeeded;
 /* Temporary storage prior to converting to posix form.  __PMAX is always
    enough as long as SO_NAME_MAX_PATH_SIZE is defined as 512.  */
-  windows_buf_t pathbuf[__PMAX];
+  win_buf_t pathbuf[__PMAX];
 
   cbNeeded = 0;
   /* Find size of buffer needed to handle list of modules loaded in
@@ -871,14 +871,14 @@ windows_make_so (const char *name, LPVOID load_addr)
       strcat (buf, "\\ntdll.dll");
     }
 #else
-  windows_buf_t buf[__PMAX];
+  win_buf_t buf[__PMAX];
 
   buf[0] = 0;
   if (access (name, F_OK) != 0)
     {
       if (strcasecmp (name, "ntdll.dll") == 0)
 	{
-	  GetSystemDirectory (buf, sizeof (buf) / sizeof (windows_buf_t));
+	  GetSystemDirectory (buf, sizeof (buf) / sizeof (win_buf_t));
 	  gdb_windows_strcat (buf, _G("\\ntdll.dll"));
 	}
     }
@@ -2348,14 +2348,14 @@ static win_env conv_envvars[] =
 #endif
 
   STARTUPINFO si;
-  windows_buf_t real_path[__PMAX];
-  windows_buf_t shell[__PMAX]; /* Path to shell */
+  win_buf_t real_path[__PMAX];
+  win_buf_t shell[__PMAX]; /* Path to shell */
   const char *sh;
   char *entry_exec_file = exec_file;
-  windows_buf_t *toexec;
-  windows_buf_t *cygallargs;
-  windows_buf_t *args;
-  windows_buf_t *out_env;
+  win_buf_t *toexec;
+  win_buf_t *cygallargs;
+  win_buf_t *args;
+  win_buf_t *out_env;
   size_t len;
   int env_size, i, j;
 #ifdef __CYGWIN__
@@ -2390,7 +2390,7 @@ static win_env conv_envvars[] =
       else
 	flags |= DEBUG_ONLY_THIS_PROCESS;
       if (gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE, exec_file, real_path,
-			     __PMAX * sizeof (windows_buf_t)) < 0)
+			     __PMAX * sizeof (win_buf_t)) < 0)
 	error (_("Error starting executable: %d"), errno);
       toexec = real_path;
 #ifdef USE_WIDE_WINAPI
@@ -2509,8 +2509,8 @@ static win_env conv_envvars[] =
 #endif
 
 #ifdef USE_WIDE_WINAPI
-  args = (windows_buf_t *) alloca ((wcslen (toexec) + wcslen (cygallargs) + 2)
-				  * sizeof (wchar_t));
+  args = (win_buf_t *) alloca ((wcslen (toexec) + wcslen (cygallargs) + 2)
+			       * sizeof (wchar_t));
   wcscpy (args, toexec);
   wcscat (args, L" ");
   wcscat (args, cygallargs);
@@ -2519,7 +2519,7 @@ static win_env conv_envvars[] =
     {
       env_size += mbstowcs (NULL, in_env[i], 0) + 1;
     }
-  out_env = (windows_buf_t *) alloca (env_size * sizeof (windows_buf_t *));
+  out_env = (win_buf_t *) alloca (env_size * sizeof (win_buf_t *));
   env_size = 0;
   for (i = 0; in_env[i]; i++)
     {
@@ -2530,7 +2530,7 @@ static win_env conv_envvars[] =
   out_env[env_size] = L'\0';
   flags |= CREATE_UNICODE_ENVIRONMENT;
 #else
-  args = (windows_buf_t *) alloca (strlen (toexec) + strlen (cygallargs) + 2);
+  args = (win_buf_t *) alloca (strlen (toexec) + strlen (cygallargs) + 2);
   strcpy (args, toexec);
   strcat (args, " ");
   strcat (args, cygallargs);
@@ -2539,7 +2539,7 @@ static win_env conv_envvars[] =
     {
       env_size += strlen(in_env[i]) + 1;
     }
-  out_env = (windows_buf_t *) alloca (env_size * sizeof (windows_buf_t *));
+  out_env = (win_buf_t *) alloca (env_size * sizeof (win_buf_t *));
   env_size = 0;
   for (i = 0; in_env[i]; i++)
     {

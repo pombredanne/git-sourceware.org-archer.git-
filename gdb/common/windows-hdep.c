@@ -1,4 +1,24 @@
+/* Copyright 2011 Free Software Foundation, Inc.
 
+   This file is part of GDB.
+
+   This program is free software; you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation; either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+
+/* The primary purpose of this file is to implement conversion between
+   POSIX style and Windows NATIVE style path and path lists.
+   For this purpose, generic replacement of the two cygwin function
+   cygwin_conv_path and cygwin_conv_path_list are created.  */
 
 #include <winsock2.h>
 #include <windows.h>
@@ -14,9 +34,7 @@
 #include "windows-hdep.h"
 
 int
-gdb_win_conv_path (conv_type oper, const void *from,
-		   void * to, int size)
-
+gdb_win_conv_path (conv_type oper, const void *from, void * to, int size)
 {
 #ifdef USE_MINGW_CONV
   if (size == 0)
@@ -128,9 +146,7 @@ gdb_win_conv_path (conv_type oper, const void *from,
 /* Analogeous function for PATH style lists.  */
 
 int
-gdb_win_conv_path_list (conv_type oper, const void *from,
-			void * to, int size)
-
+gdb_win_conv_path_list (conv_type oper, const void *from, void * to, int size)
 {
 #ifdef USE_MINGW_CONV
 #ifdef USE_WIDE_WINAPI
@@ -207,6 +223,8 @@ gdb_win_conv_path_list (conv_type oper, const void *from,
 #endif /* USE_OLD_CYGWIN_CONV */
 }
 
+/* sleep function does not exist in mingw32 libraries. This is a
+   simple substitute function.  */
 #ifdef NEED_SLEEP_SUBSTITUTE
 int
 sleep (int t)

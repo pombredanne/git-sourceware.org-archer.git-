@@ -24,12 +24,19 @@
 #ifndef WINDOWS_HDEP_H
 #define WINDOWS_HDEP_H
 
-/* The following macros are redefined below depend on the use of wide
+/* The following macros are redefined below depending on the use of wide
    chars or not.  */
 #undef STARTUPINFO
 #undef CreateProcess
 #undef GetModuleFileNameEx
 #undef GetSystemDirectory
+/* Macro _G(text) either expands to simply text or to L##text depending
+   on use of wide chars or not.
+   Although this is similar to _T macro inside winnt.h header,
+   its value is set according to USE_WIDE_API macro, allowing to compile
+   GDB with wide char use even on systems for which the default is to
+   use ASCII chars.  */
+#undef _G
 
 #ifdef __CYGWIN__
 #ifdef PATH_MAX
@@ -59,14 +66,13 @@
 # define __PMAX	(MAX_PATH + 1)
 # define USE_MINGW_CONV
 # define NEED_SLEEP_SUBSTITUTE
-#endif
+#endif /* not __CYGWIN__ */
 
-#undef _G
 #ifdef USE_WIDE_WINAPI
 # define _G(text) L##text
 # define WINDOWS_POSIX_TO_NATIVE WINDOWS_POSIX_TO_NATIVE_W
 # define WINDOWS_NATIVE_TO_POSIX WINDOWS_NATIVE_W_TO_POSIX
-  typedef wchar_t windows_buf_t;
+  typedef wchar_t win_buf_t;
 # define STARTUPINFO STARTUPINFOW
 # define CreateProcess CreateProcessW
 # define GetSystemDirectory GetSystemDirectoryW
@@ -82,7 +88,7 @@
 # define _G(text) text
 # define WINDOWS_POSIX_TO_NATIVE WINDOWS_POSIX_TO_NATIVE_A
 # define WINDOWS_NATIVE_TO_POSIX WINDOWS_NATIVE_A_TO_POSIX
-  typedef char windows_buf_t;
+  typedef char win_buf_t;
 # define STARTUPINFO STARTUPINFOA
 # define CreateProcess CreateProcessA
 # define GetSystemDirectory GetSystemDirectoryA
