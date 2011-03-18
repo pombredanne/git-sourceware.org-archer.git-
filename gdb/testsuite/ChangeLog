@@ -1,3 +1,64 @@
+2010-03-17  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/Makefile.in: Add py-objfile.
+	* gdb.python/py-objfile.exp: New file.
+	* gdb.python/py-objfile.c: New file.
+	* gdb.python/py-block.exp: Add is_valid tests.
+	* gdb.python/py-inferior.exp: Ditto.
+	* gdb.python/py-infthread.exp: Ditto.
+	* gdb.python/py-symbol.exp: Ditto.
+	* gdb.python/py-symtab.exp: Ditto.
+
+2011-03-16  Keith Seitz  <keiths@redhat.com>
+
+	PR c++/12273
+	* gdb.cp/cmpd-minsyms.exp: New test.
+	* gdb.cp/cmpd-minsyms.cc: New file.
+
+	PR c++/11734
+	* gdb.cp/ovsrch.exp: New test.
+	* gdb.cp/ovsrch.h: New file.
+	* gdb.cp/ovsrch1.cc: New file.
+	* gdb.cp/ovsrch2.cc: New file.
+	* gdb.cp/ovsrch3.cc: New file.
+	* gdb.cp/ovsrch4.cc: New file.
+
+2011-03-16  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/12528
+	* gdb.base/Makefile.in: Adjust EXECUTABLES.
+	* gdb.base/break-on-linker-gcd-function.exp: New test.
+	* gdb.base/break-on-linker-gcd-function.cc: New file.
+
+2011-03-15  Andreas Tobler  <andreast@fgznet.ch>
+
+	* gdb.base/jit-main.c: Define ElfW for non glibc elf targets.
+
+2011-03-15  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* lib/gdb.exp (gdb_unload): Add another termination case.
+
+2011-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-empty-pc-range.S: New file.
+	* gdb.dwarf2/dw2-empty-pc-range.exp: New file.
+	* gdb.dwarf2/pr11465.S: New .text labels text_start and text_end.
+	Provide a stub byte there.
+	(DW_TAG_compile_unit): Set DW_AT_low_pc, DW_AT_high_pc and
+	DW_AT_entry_pc.
+	(dieb4, dieda): Set DW_AT_high_pc higher than DW_AT_low_pc.
+
+2011-03-15  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.arch/altivec-abi.exp: Skip "generic" tests on 64-bit when
+	using a GCC 4.1 or 4.2 compiler.  Add an additional test variant
+	"generic ABI, auto".
+	(altivec_abi_tests): Accept vectors returned by reference.
+
+2010-03-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-breakpoint.exp: Add Python stop operations tests.
+
 2011-03-13  Ulrich Weigand  <uweigand@de.ibm.com>
 
 	* gdb.python/py-section-script.exp: Skip test if no Python support.

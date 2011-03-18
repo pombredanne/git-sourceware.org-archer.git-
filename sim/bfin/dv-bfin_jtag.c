@@ -39,7 +39,8 @@ struct bfin_jtag
 #define mmr_base()      offsetof(struct bfin_jtag, dspid)
 #define mmr_offset(mmr) (offsetof(struct bfin_jtag, mmr) - mmr_base())
 
-static const char * const mmr_names[] = {
+static const char * const mmr_names[] =
+{
   "DSPID", NULL, "DBGSTAT",
 };
 #define mmr_name(off) (mmr_names[(off) / 4] ? : "<INV>")
@@ -151,7 +152,8 @@ bfin_jtag_finish (struct hw *me)
   jtag->dspid = bfin_model_get_dspid (hw_system (me));
 }
 
-const struct hw_descriptor dv_bfin_jtag_descriptor[] = {
+const struct hw_descriptor dv_bfin_jtag_descriptor[] =
+{
   {"bfin_jtag", bfin_jtag_finish,},
   {NULL, NULL},
 };

@@ -1,0 +1,97 @@
+2011-03-15  Mike Frysinger  <vapier@gentoo.org>
+
+	* Makefile.in (dv-bfin_gpio.o): New target.
+	* configure.ac (SIM_AC_OPTION_HARDWARE): Add bfin_gpio.
+	* configure: Regenerate.
+	* dv-bfin_gpio.c, dv-bfin_gpio.h: New files.
+	* machs.c: Include dv-bfin_gpio.h.
+	(bf50x_mem, bf51x_mem, bf52x_mem, bf531_mem, bf532_mem, bf533_mem,
+	bf534_mem, bf536_mem, bf537_mem, bf538_mem, bf561_mem, bf592_mem):
+	Delete GPIO memory stubs.
+	(bf50x_dev, bf512_dev, bf516_dev, bf522_dev, bf526_dev, bf533_dev,
+	bf534_dev, bf537_dev, bf538_dev, bf561_dev, bf592_dev): Add GPIO
+	peripheral devices.
+	(bfin_model_hw_tree_init): Hook up GPIO interrupts to SIC.
+
+2011-03-15  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfroms/bf50x-0.0.h, bfroms/bf51x-0.0.h, bfroms/bf51x-0.1.h,
+	bfroms/bf51x-0.2.h, bfroms/bf526-0.0.h, bfroms/bf526-0.1.h,
+	bfroms/bf527-0.0.h, bfroms/bf527-0.1.h, bfroms/bf527-0.2.h,
+	bfroms/bf533-0.1.h, bfroms/bf533-0.2.h, bfroms/bf533-0.3.h,
+	bfroms/bf537-0.0.h, bfroms/bf537-0.1.h, bfroms/bf537-0.3.h,
+	bfroms/bf538-0.0.h, bfroms/bf54x-0.0.h, bfroms/bf54x-0.1.h,
+	bfroms/bf54x-0.2.h, bfroms/bf54x_l1-0.0.h, bfroms/bf54x_l1-0.1.h,
+	bfroms/bf54x_l1-0.2.h, bfroms/bf561-0.5.h, bfroms/bf59x-0.0.h,
+	bfroms/bf59x_l1-0.1.h, dv-bfin_cec.c, dv-bfin_ctimer.c,
+	dv-bfin_dma.c, dv-bfin_dmac.c, dv-bfin_ebiu_amc.c,
+	dv-bfin_ebiu_ddrc.c, dv-bfin_ebiu_sdc.c, dv-bfin_emac.c,
+	dv-bfin_eppi.c, dv-bfin_evt.c, dv-bfin_gptimer.c, dv-bfin_jtag.c,
+	dv-bfin_mmu.c, dv-bfin_nfc.c, dv-bfin_otp.c, dv-bfin_pll.c,
+	dv-bfin_ppi.c, dv-bfin_rtc.c, dv-bfin_sic.c, dv-bfin_spi.c,
+	dv-bfin_trace.c, dv-bfin_twi.c, dv-bfin_uart.c, dv-bfin_uart2.c,
+	dv-bfin_wdog.c, dv-bfin_wp.c, dv-eth_phy.c, gui.c,
+	linux-fixed-code.h, linux-targ-map.h, machs.c, Makefile.in: Fix style.
+
+2011-03-15  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-sim.c (decode_dsp32alu_0): Set AZ based on val for 16bit adds
+	and subs.
+
+2011-03-15  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-sim.c (decode_macfunc): Move acc STOREs behind op != 3 check.
+
+2011-03-15  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-sim.c (decode_macfunc): New neg parameter.  Set when the
+	high bit is set after extract_mult.
+	(decode_dsp32mac_0): Declare n_1 and n_0.  Pass to the decode_macfunc
+	functions.  Use these to update the AN bit.
+
+2011-03-15  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-sim.c (decode_dsp32mult_0): Declare v_i0 and v_i1.  Pass to
+	the extract_mult functions.  Include these when updating the V, VS,
+	and V_COPY bits.
+
+2011-03-15  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-sim.c (astat_names): New global bit array.
+	(decode_CC2stat_0): Delete local astat_name and astat_names.
+	(decode_psedodbg_assert_0): Move hardcoded offset into a variable.
+	Print out ASTAT bit values when checking an ASTAT register.
+
+2010-03-15  Robin Getz  <robin.getz@analog.com>
+
+	* bfin-sim.c (extract_mult): Handle M_IU.
+
+2011-03-05  Mike Frysinger  <vapier@gentoo.org>
+
+	* Makefile.in, TODO, aclocal.m4, bfin-sim.c, bfin-sim.h,
+	bfroms/all.h, bfroms/bf50x-0.0.h, bfroms/bf51x-0.0.h,
+	bfroms/bf51x-0.1.h, bfroms/bf51x-0.2.h, bfroms/bf526-0.0.h,
+	bfroms/bf526-0.1.h, bfroms/bf527-0.0.h, bfroms/bf527-0.1.h,
+	bfroms/bf527-0.2.h, bfroms/bf533-0.1.h, bfroms/bf533-0.2.h,
+	bfroms/bf533-0.3.h, bfroms/bf537-0.0.h, bfroms/bf537-0.1.h,
+	bfroms/bf537-0.3.h, bfroms/bf538-0.0.h, bfroms/bf54x-0.0.h,
+	bfroms/bf54x-0.1.h, bfroms/bf54x-0.2.h, bfroms/bf54x_l1-0.0.h,
+	bfroms/bf54x_l1-0.1.h, bfroms/bf54x_l1-0.2.h, bfroms/bf561-0.5.h,
+	bfroms/bf59x-0.0.h, bfroms/bf59x_l1-0.1.h, config.in, configure,
+	configure.ac, devices.c, devices.h, dv-bfin_cec.c, dv-bfin_cec.h,
+	dv-bfin_ctimer.c, dv-bfin_ctimer.h, dv-bfin_dma.c, dv-bfin_dma.h,
+	dv-bfin_dmac.c, dv-bfin_dmac.h, dv-bfin_ebiu_amc.c, dv-bfin_ebiu_amc.h,
+	dv-bfin_ebiu_ddrc.c, dv-bfin_ebiu_ddrc.h, dv-bfin_ebiu_sdc.c,
+	dv-bfin_ebiu_sdc.h, dv-bfin_emac.c, dv-bfin_emac.h, dv-bfin_eppi.c,
+	dv-bfin_eppi.h, dv-bfin_evt.c, dv-bfin_evt.h, dv-bfin_gptimer.c,
+	dv-bfin_gptimer.h, dv-bfin_jtag.c, dv-bfin_jtag.h, dv-bfin_mmu.c,
+	dv-bfin_mmu.h, dv-bfin_nfc.c, dv-bfin_nfc.h, dv-bfin_otp.c,
+	dv-bfin_otp.h, dv-bfin_pll.c, dv-bfin_pll.h, dv-bfin_ppi.c,
+	dv-bfin_ppi.h, dv-bfin_rtc.c, dv-bfin_rtc.h, dv-bfin_sic.c,
+	dv-bfin_sic.h, dv-bfin_spi.c, dv-bfin_spi.h, dv-bfin_trace.c,
+	dv-bfin_trace.h, dv-bfin_twi.c, dv-bfin_twi.h, dv-bfin_uart.c,
+	dv-bfin_uart.h, dv-bfin_uart2.c, dv-bfin_uart2.h, dv-bfin_wdog.c,
+	dv-bfin_wdog.h, dv-bfin_wp.c, dv-bfin_wp.h, dv-eth_phy.c, gui.c,
+	gui.h, insn_list.def, interp.c, linux-fixed-code.h, linux-fixed-code.s,
+	linux-targ-map.h, machs.c, machs.h, proc_list.def, sim-main.h,
+	tconfig.in: New Blackfin port.
