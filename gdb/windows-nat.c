@@ -103,12 +103,7 @@ static BOOL WINAPI (*OpenProcessToken)(HANDLE, DWORD, PHANDLE);
 static BOOL WINAPI (*GetCurrentConsoleFont) (HANDLE, BOOL,
 					     CONSOLE_FONT_INFO *);
 static COORD WINAPI (*GetConsoleFontSize) (HANDLE, DWORD);
-#ifdef USE_WIDE_WINAPI
-  static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE,
-					      LPWSTR, DWORD);
-#else
-  static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE, LPSTR, DWORD);
-#endif
+static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE, LPGSTR, DWORD);
 static BOOL WINAPI (*GetFileInformationByHandleEx) (HANDLE, DWORD,
 						    LPVOID, DWORD);
 
@@ -3235,19 +3230,11 @@ bad_EnumProcessModules (HANDLE w, HMODULE *x, DWORD y, LPDWORD z)
   return FALSE;
 }
 
-#ifdef USE_WIDE_WINAPI
 static DWORD WINAPI
-bad_GetModuleFileNameExW (HANDLE w, HMODULE x, LPWSTR y, DWORD z)
+bad_GetModuleFileNameEx (HANDLE w, HMODULE x, LPGSTR y, DWORD z)
 {
   return 0;
 }
-#else
-static DWORD WINAPI
-bad_GetModuleFileNameExA (HANDLE w, HMODULE x, LPSTR y, DWORD z)
-{
-  return 0;
-}
-#endif
 
 static BOOL WINAPI
 bad_GetModuleInformation (HANDLE w, HMODULE x, LPMODULEINFO y, DWORD z)
@@ -3334,7 +3321,7 @@ _initialize_loadable (void)
       GetModuleInformation = (void *)
 	GetProcAddress (hm, "GetModuleInformation");
       GetModuleFileNameEx = (void *)
-	GetProcAddress (hm, GetModuleFileNameEx_name);
+	GetProcAddress (hm, _G_SUFFIX ("GetModuleFileNameEx"));
     }
 
   if (!EnumProcessModules || !GetModuleInformation || !GetModuleFileNameEx)

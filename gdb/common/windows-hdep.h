@@ -70,14 +70,14 @@
 
 #ifdef USE_WIDE_WINAPI
 # define _G(text) L##text
+# define _G_SUFFIX(text) (text "W")
+# define LPGSTR LPWSTR
 # define WINDOWS_POSIX_TO_NATIVE WINDOWS_POSIX_TO_NATIVE_W
 # define WINDOWS_NATIVE_TO_POSIX WINDOWS_NATIVE_W_TO_POSIX
   typedef wchar_t win_buf_t;
 # define STARTUPINFO STARTUPINFOW
 # define CreateProcess CreateProcessW
 # define GetSystemDirectory GetSystemDirectoryW
-# define GetModuleFileNameEx_name "GetModuleFileNameExW"
-# define bad_GetModuleFileNameEx bad_GetModuleFileNameExW
 # define gdb_windows_strlen wstrlen
 # define gdb_windows_strcat wcscat
 /* Mingw has a special swprintf function without length argument.  */
@@ -86,14 +86,14 @@
 #endif
 #else /* not USE_WIDE_WINAPI */
 # define _G(text) text
+# define _G_SUFFIX(text) (text "A")
+# define LPGSTR LPSTR
 # define WINDOWS_POSIX_TO_NATIVE WINDOWS_POSIX_TO_NATIVE_A
 # define WINDOWS_NATIVE_TO_POSIX WINDOWS_NATIVE_A_TO_POSIX
   typedef char win_buf_t;
 # define STARTUPINFO STARTUPINFOA
 # define CreateProcess CreateProcessA
 # define GetSystemDirectory GetSystemDirectoryA
-# define GetModuleFileNameEx_name "GetModuleFileNameExA"
-# define bad_GetModuleFileNameEx bad_GetModuleFileNameExA
 # define gdb_windows_strlen strlen
 # define gdb_windows_strcat strcat
 #endif /* not USE_WIDE_WINAPI */
