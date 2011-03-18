@@ -1914,7 +1914,7 @@ signals.o: $(srcdir)/common/signals.c
 
 windows-hdep.o: $(srcdir)/common/windows-hdep.c
 	$(COMPILE) $(srcdir)/common/windows-hdep.c
-
+	$(POSTCOMPILE)
 
 #
 # gdb/tui/ dependencies
