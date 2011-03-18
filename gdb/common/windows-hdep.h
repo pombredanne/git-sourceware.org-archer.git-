@@ -61,9 +61,9 @@
 # define NEED_SLEEP_SUBSTITUTE
 #endif
 
-#undef _GDB_T
+#undef _G
 #ifdef USE_WIDE_WINAPI
-# define _GDB_T(text) L##text
+# define _G(text) L##text
 # define WINDOWS_POSIX_TO_NATIVE WINDOWS_POSIX_TO_NATIVE_W
 # define WINDOWS_NATIVE_TO_POSIX WINDOWS_NATIVE_W_TO_POSIX
   typedef wchar_t windows_buf_t;
@@ -79,7 +79,7 @@
 #  define swprintf _snwprintf
 #endif
 #else /* not USE_WIDE_WINAPI */
-# define _GDB_T(text) text
+# define _G(text) text
 # define WINDOWS_POSIX_TO_NATIVE WINDOWS_POSIX_TO_NATIVE_A
 # define WINDOWS_NATIVE_TO_POSIX WINDOWS_NATIVE_A_TO_POSIX
   typedef char windows_buf_t;

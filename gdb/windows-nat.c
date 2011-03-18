@@ -879,7 +879,7 @@ windows_make_so (const char *name, LPVOID load_addr)
       if (strcasecmp (name, "ntdll.dll") == 0)
 	{
 	  GetSystemDirectory (buf, sizeof (buf) / sizeof (windows_buf_t));
-	  gdb_windows_strcat (buf, _GDB_T("\\ntdll.dll"));
+	  gdb_windows_strcat (buf, _G("\\ntdll.dll"));
 	}
     }
 #endif
