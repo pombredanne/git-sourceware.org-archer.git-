@@ -239,21 +239,28 @@ alpha_convert_register_p (struct gdbarch *gdbarch, int regno,
 	  && TYPE_LENGTH (type) != 8);
 }
 
-static void
+static int
 alpha_register_to_value (struct frame_info *frame, int regnum,
-			 struct type *valtype, gdb_byte *out)
+			 struct type *valtype, gdb_byte *out,
+			int *optimizedp, int *unavailablep)
 {
+  struct gdbarch *gdbarch = get_frame_arch (frame);
   gdb_byte in[MAX_REGISTER_SIZE];
 
-  frame_register_read (frame, regnum, in);
-  switch (TYPE_LENGTH (valtype))
+  /* Convert to TYPE.  */
+  if (!get_frame_register_bytes (frame, regnum, 0,
+				 register_size (gdbarch, regnum),
+				 in, optimizedp, unavailablep))
+    return 0;
+
+  if (TYPE_LENGTH (valtype) == 4)
     {
-    case 4:
-      alpha_sts (get_frame_arch (frame), out, in);
-      break;
-    default:
-      error (_("Cannot retrieve value from floating point register"));
+      alpha_sts (gdbarch, out, in);
+      *optimizedp = *unavailablep = 0;
+      return 1;
     }
+
+  error (_("Cannot retrieve value from floating point register"));
 }
 
 static void
@@ -929,6 +936,7 @@ alpha_sigtramp_frame_sniffer (const struct frame_unwind *self,
 
 static const struct frame_unwind alpha_sigtramp_frame_unwind = {
   SIGTRAMP_FRAME,
+  default_frame_unwind_stop_reason,
   alpha_sigtramp_frame_this_id,
   alpha_sigtramp_frame_prev_register,
   NULL,
@@ -1344,6 +1352,7 @@ alpha_heuristic_frame_prev_register (struct frame_info *this_frame,
 
 static const struct frame_unwind alpha_heuristic_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   alpha_heuristic_frame_this_id,
   alpha_heuristic_frame_prev_register,
   NULL,
