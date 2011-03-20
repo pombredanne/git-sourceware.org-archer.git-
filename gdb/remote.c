@@ -1876,7 +1876,7 @@ read_ptid (char *buf, char **obuf)
       /* Multi-process ptid.  */
       pp = unpack_varlen_hex (p + 1, &pid);
       if (*pp != '.')
-	error (_("invalid remote ptid: %s\n"), p);
+	error (_("invalid remote ptid: %s"), p);
 
       p = pp;
       pp = unpack_varlen_hex (p + 1, &tid);
@@ -3112,7 +3112,7 @@ struct start_remote_args
 
 /* Send interrupt_sequence to remote target.  */
 static void
-send_interrupt_sequence ()
+send_interrupt_sequence (void)
 {
   if (interrupt_sequence_mode == interrupt_sequence_control_c)
     serial_write (remote_desc, "\x03", 1);
@@ -3435,10 +3435,19 @@ remote_check_symbols (struct objfile *objfile)
   struct minimal_symbol *sym;
   int end;
 
+  /* The remote side has no concept of inferiors that aren't running
+     yet, it only knows about running processes.  If we're connected
+     but our current inferior is not running, we should not invite the
+     remote target to request symbol lookups related to its
+     (unrelated) current process.  */
+  if (!target_has_execution)
+    return;
+
   if (remote_protocol_packets[PACKET_qSymbol].support == PACKET_DISABLE)
     return;
 
-  /* Make sure the remote is pointing at the right process.  */
+  /* Make sure the remote is pointing at the right process.  Note
+     there's no way to select "no process".  */
   set_general_process ();
 
   /* Allocate a message buffer.  We can't reuse the input buffer in RS,
@@ -3528,7 +3537,7 @@ remote_set_permissions (void)
   /* If the target didn't like the packet, warn the user.  Do not try
      to undo the user's settings, that would just be maddening.  */
   if (strcmp (rs->buf, "OK") != 0)
-    warning ("Remote refused setting permissions with: %s", rs->buf);
+    warning (_("Remote refused setting permissions with: %s"), rs->buf);
 }
 
 /* This type describes each known response to the qSupported
@@ -4540,7 +4549,7 @@ remote_resume (struct target_ops *ops,
     {
       /* We don't pass signals to the target in reverse exec mode.  */
       if (info_verbose && siggnal != TARGET_SIGNAL_0)
-	warning (" - Can't pass signal %d to target in reverse: ignored.\n",
+	warning (_(" - Can't pass signal %d to target in reverse: ignored."),
 		 siggnal);
 
       if (step 

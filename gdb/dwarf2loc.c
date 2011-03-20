@@ -295,8 +295,8 @@ dwarf_expr_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
 {
   struct dwarf_expr_baton *debaton = ctx->baton;
 
-  return per_cu_dwarf_call (ctx, die_offset, debaton->per_cu,
-			    ctx->get_frame_pc, ctx->baton);
+  per_cu_dwarf_call (ctx, die_offset, debaton->per_cu,
+		     ctx->get_frame_pc, ctx->baton);
 }
 
 static CORE_ADDR
@@ -361,6 +361,7 @@ dwarf_expr_prep_ctx (struct frame_info *frame, const gdb_byte *data,
   struct dwarf_expr_context *ctx;
   struct dwarf_expr_baton baton;
   struct objfile *objfile = dwarf2_per_cu_objfile (per_cu);
+  volatile struct gdb_exception ex;
 
   baton.frame = frame;
   baton.per_cu = per_cu;
@@ -382,7 +383,17 @@ dwarf_expr_prep_ctx (struct frame_info *frame, const gdb_byte *data,
   ctx->dwarf_call = dwarf_expr_dwarf_call;
   ctx->get_object_address = dwarf_expr_object_address;
 
-  dwarf_expr_eval (ctx, data, size);
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      dwarf_expr_eval (ctx, data, size);
+    }
+  if (ex.reason < 0)
+    {
+      if (ex.error == NOT_AVAILABLE_ERROR)
+	return NULL;
+      else
+	throw_exception (ex);
+    }
 
   /* It was used only during dwarf_expr_eval.  */
   ctx->baton = NULL;
@@ -402,6 +413,8 @@ dwarf_locexpr_baton_eval (struct dwarf2_locexpr_baton *dlbaton)
 
   ctx = dwarf_expr_prep_ctx (get_selected_frame (NULL), dlbaton->data,
 			     dlbaton->size, dlbaton->per_cu);
+  if (ctx == NULL)
+    throw_error (NOT_AVAILABLE_ERROR, _("Value not available"));
   if (ctx->num_pieces > 0)
     error (_("DW_OP_*piece is unsupported for DW_FORM_block"));
 
@@ -757,8 +770,20 @@ read_pieced_value (struct value *v)
 
 	    if (gdb_regnum != -1)
 	      {
-		get_frame_register_bytes (frame, gdb_regnum, reg_offset, 
-					  this_size, buffer);
+		int optim, unavail;
+
+		if (!get_frame_register_bytes (frame, gdb_regnum, reg_offset,
+					       this_size, buffer,
+					       &optim, &unavail))
+		  {
+		    /* Just so garbage doesn't ever shine through.  */
+		    memset (buffer, 0, this_size);
+
+		    if (optim)
+		      set_value_optimized_out (v, 1);
+		    if (unavail)
+		      mark_value_bytes_unavailable (v, offset, this_size);
+		  }
 	      }
 	    else
 	      {
@@ -942,8 +967,22 @@ write_pieced_value (struct value *to, struct value *from)
 	      {
 		if (need_bitwise)
 		  {
-		    get_frame_register_bytes (frame, gdb_regnum, reg_offset,
-					      this_size, buffer);
+		    int optim, unavail;
+
+		    if (!get_frame_register_bytes (frame, gdb_regnum, reg_offset,
+						   this_size, buffer,
+						   &optim, &unavail))
+		      {
+			if (optim)
+			  error (_("Can't do read-modify-write to "
+				   "update bitfield; containing word has been "
+				   "optimized out"));
+			if (unavail)
+			  throw_error (NOT_AVAILABLE_ERROR,
+				       _("Can't do read-modify-write to update "
+					 "bitfield; containing word "
+					 "is unavailable"));
+		      }
 		    copy_bitwise (buffer, dest_offset_bits,
 				  contents, source_offset_bits,
 				  this_size_bits,
@@ -1142,6 +1181,7 @@ indirect_pieced_value (struct value *value)
   frame = get_selected_frame (_("No frame selected."));
   byte_offset = value_as_address (value);
 
+  gdb_assert (piece);
   baton = dwarf2_fetch_die_location_block (piece->v.ptr.die, c->per_cu,
 					   get_frame_address_in_block_wrapper,
 					   frame);
@@ -1228,6 +1268,12 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
   old_chain = make_cleanup (null_cleanup, 0);
 
   ctx = dwarf_expr_prep_ctx (frame, data, size, per_cu);
+  if (ctx == NULL)
+    {
+      retval = allocate_value (type);
+      mark_value_bytes_unavailable (retval, 0, TYPE_LENGTH (type));
+      return retval;
+    }
 
   if (ctx->num_pieces > 0)
     {
@@ -1431,8 +1477,8 @@ needs_frame_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
 {
   struct needs_frame_baton *nf_baton = ctx->baton;
 
-  return per_cu_dwarf_call (ctx, die_offset, nf_baton->per_cu,
-			    ctx->get_frame_pc, ctx->baton);
+  per_cu_dwarf_call (ctx, die_offset, nf_baton->per_cu,
+		     ctx->get_frame_pc, ctx->baton);
 }
 
 /* Return non-zero iff the location expression at DATA (length SIZE)

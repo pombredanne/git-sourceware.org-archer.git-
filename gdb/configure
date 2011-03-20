@@ -993,7 +993,6 @@ YACC
 YFLAGS
 XMKMF'
 ac_subdirs_all='testsuite
-common
 gdbtk
 multi-ice
 gdbserver'
@@ -7889,8 +7888,6 @@ fi
 
 subdirs="$subdirs testsuite"
 
-subdirs="$subdirs common"
-
 
 # Check whether to support alternative target configurations
 # Check whether --enable-targets was given.
@@ -14490,6 +14487,22 @@ $as_echo "$gdb_cv_have_aix_thread_debug" >&6; }
          CONFIG_SRCS="${CONFIG_SRCS} aix-thread.c"
          CONFIG_OBS="${CONFIG_OBS} aix-thread.o"
          CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -lpthdebug"
+
+         # Older versions of AIX do not provide the declaration for
+         # the getthrds function (it appears that it was introduced
+         # with AIX 6.x).
+         ac_fn_c_check_decl "$LINENO" "getthrds" "ac_cv_have_decl_getthrds" "#include <procinfo.h>
+"
+if test "x$ac_cv_have_decl_getthrds" = x""yes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_GETTHRDS $ac_have_decl
+_ACEOF
+
       fi
       ;;
    esac

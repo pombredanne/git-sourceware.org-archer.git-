@@ -1,3 +1,50 @@
+2011-03-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdbserver/server.h (Macro _): Define it if not available.
+
+2011-03-14  Michael Snyder  <msnyder@vmware.com>
+
+	* hostio.c (handle_close): Remove unnecessary null test.
+
+2011-03-10  Joel Brobecker  <brobecker@adacore.com>
+
+	* Makefile.in (maintainer-clean realclean distclean): Remove
+	"make ...  subdir_do" command.
+
+2011-03-10  Michael Snyder  <msnyder@vmware.com>
+
+	* tracepoint.c (tracepoint_finish_step): Fix loop variable.
+
+	* server.c (handle_v_run): Free alloced buffer on early return.
+
+2011-03-09  Yao Qi  <yao@codesourcery.com>
+
+	Revert:
+	2011-03-04  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in: Remove GNU make feature --directory.
+
+	2011-03-05  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (CLEANDIRS, REQUIRED_SUBDIRS): New variable.
+	(subdir_do): New make target.  Copied from gdb/Makefile.
+	(maintainer-clean, realclean, distclean, clean): Call corresponding
+	make targets in common/Makefile.
+
+	2011-02-11  Yao Qi  <yao@codesourcery.com>
+
+	* configure.ac: Call AC_PROG_RANLIB.
+	* Makefile.in: Remove signals.o from OBS.  Link libcommon.a.
+	* configure: Regenerate.
+
+2011-03-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* remote-utils.c (putpkt_binary_1): Calculate BUF2 size dynamically.
+
+2011-03-06  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (REQUIRED_SUBDIRS): Remove $(LIBCOMMON_DIR).
+
 2011-03-05  Yao Qi  <yao@codesourcery.com>
 
 	* Makefile.in (CLEANDIRS, REQUIRED_SUBDIRS): New variable.
@@ -9,7 +56,20 @@
 
 	* Makefile.in: Remove GNU make feature --directory.
 
+2011-03-04  Michael Snyder  <msnyder@vmware.com>
+
+	* server.c (queue_stop_reply): Call xmalloc not malloc.
+
+2011-03-02  Michael Snyder  <msnyder@vmware.com>
+
+	* linux-arm-low.c (arm_arch_setup): Replace malloc with xmalloc.
+
 2011-02-28  Michael Snyder  <msnyder@vmware.com>
+
+	* tracepoint.c (cmd_qtv): Discard unused value 'packet'.
+	(cmd_qtframe): Ditto.
+	(cmd_qtbuffer): Ditto.
+	(cmd_bigqtbuffer): Ditto.
 
 	* utils.c (decimal2str): Initialize 'width' to nine, then
 	don't mess with it.

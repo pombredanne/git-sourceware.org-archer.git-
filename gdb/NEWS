@@ -38,6 +38,19 @@
 
 * Python scripting
 
+  ** Parameters can now be be sub-classed in Python, and in particular
+     you may implement the get_set_doc and get_show_doc functions.
+     This improves how Parameter set/show documentation is processed
+     and allows for more dynamic content.
+
+  ** Symbols, Symbol Table, Symbol Table and Line, Object Files,
+     Inferior, Inferior Thread, Blocks, and Block Iterator APIs now
+     have an is_valid method.
+
+  ** Breakpoints can now be sub-classed in Python, and in particular
+     you may implement a 'stop' function that is executed each time
+     the inferior reaches that breakpoint.   
+
   ** New function gdb.lookup_global_symbol looks up a global symbol.
 
   ** GDB values in Python are now callable if the value represents a
@@ -70,15 +83,7 @@
 
   ** Python Support for Inferior events.
      Python scripts can add observers to be notified of events
-     occurring the in process being debugged.
-     The following events are currently supported:
-     - gdb.events.cont Continue event.
-     - gdb.events.exited Inferior exited event.
-     - gdb.events.stop Signal received, and Breakpoint hit events.
-
-  ** Python Support for Inferior events.
-     Python scripts can add observers to be notified of events
-     occurring the in process being debugged.
+     occurring in the process being debugged.
      The following events are currently supported:
      - gdb.events.cont Continue event.
      - gdb.events.exited Inferior exited event.

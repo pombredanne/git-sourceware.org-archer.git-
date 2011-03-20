@@ -479,7 +479,6 @@ struct target_ops
     void (*to_terminal_info) (char *, int);
     void (*to_kill) (struct target_ops *);
     void (*to_load) (char *, int);
-    int (*to_lookup_symbol) (char *, CORE_ADDR *);
     void (*to_create_inferior) (struct target_ops *, 
 				char *, char *, char **, int);
     void (*to_post_startup_inferior) (ptid_t);
@@ -510,7 +509,7 @@ struct target_ops
     int (*to_has_memory) (struct target_ops *);
     int (*to_has_stack) (struct target_ops *);
     int (*to_has_registers) (struct target_ops *);
-    int (*to_has_execution) (struct target_ops *);
+    int (*to_has_execution) (struct target_ops *, ptid_t);
     int to_has_thread_control;	/* control thread execution */
     int to_attach_no_wait;
     /* ASYNC target controls */
@@ -1016,17 +1015,6 @@ extern void target_kill (void);
 
 extern void target_load (char *arg, int from_tty);
 
-/* Look up a symbol in the target's symbol table.  NAME is the symbol
-   name.  ADDRP is a CORE_ADDR * pointing to where the value of the
-   symbol should be returned.  The result is 0 if successful, nonzero
-   if the symbol does not exist in the target environment.  This
-   function should not call error() if communication with the target
-   is interrupted, since it is called from symbol reading, but should
-   return nonzero, possibly doing a complain().  */
-
-#define target_lookup_symbol(name, addrp) \
-     (*current_target.to_lookup_symbol) (name, addrp)
-
 /* Start an inferior process and set inferior_ptid to its pid.
    EXEC_FILE is the file to run.
    ALLARGS is a string containing the arguments to the program.
@@ -1189,8 +1177,13 @@ extern int target_has_registers_1 (void);
    case this will become true after target_create_inferior or
    target_attach.  */
 
-extern int target_has_execution_1 (void);
-#define target_has_execution target_has_execution_1 ()
+extern int target_has_execution_1 (ptid_t);
+
+/* Like target_has_execution_1, but always passes inferior_ptid.  */
+
+extern int target_has_execution_current (void);
+
+#define target_has_execution target_has_execution_current ()
 
 /* Default implementations for process_stratum targets.  Return true
    if there's a selected inferior, false otherwise.  */
@@ -1199,7 +1192,8 @@ extern int default_child_has_all_memory (struct target_ops *ops);
 extern int default_child_has_memory (struct target_ops *ops);
 extern int default_child_has_stack (struct target_ops *ops);
 extern int default_child_has_registers (struct target_ops *ops);
-extern int default_child_has_execution (struct target_ops *ops);
+extern int default_child_has_execution (struct target_ops *ops,
+					ptid_t the_ptid);
 
 /* Can the target support the debugger control of thread execution?
    Can it lock the thread scheduler?  */

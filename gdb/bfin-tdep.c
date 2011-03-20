@@ -32,6 +32,8 @@
 #include "trad-frame.h"
 #include "dis-asm.h"
 #include "gdb_assert.h"
+#include "sim-regno.h"
+#include "gdb/sim-bfin.h"
 #include "dwarf2-frame.h"
 #include "symtab.h"
 #include "elf-bfd.h"
@@ -374,6 +376,7 @@ bfin_frame_prev_register (struct frame_info *this_frame,
 static const struct frame_unwind bfin_frame_unwind =
 {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   bfin_frame_this_id,
   bfin_frame_prev_register,
   NULL,
@@ -687,20 +690,25 @@ bfin_register_name (struct gdbarch *gdbarch, int i)
   return bfin_register_name_strings[i];
 }
 
-static void
+static enum register_status
 bfin_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
 			   int regnum, gdb_byte *buffer)
 {
   gdb_byte *buf = (gdb_byte *) alloca (MAX_REGISTER_SIZE);
+  enum register_status status;
 
   if (regnum != BFIN_CC_REGNUM)
     internal_error (__FILE__, __LINE__,
 		    _("invalid register number %d"), regnum);
 
   /* Extract the CC bit from the ASTAT register.  */
-  regcache_raw_read (regcache, BFIN_ASTAT_REGNUM, buf);
-  buffer[1] = buffer[2] = buffer[3] = 0;
-  buffer[0] = !!(buf[0] & ASTAT_CC);
+  status = regcache_raw_read (regcache, BFIN_ASTAT_REGNUM, buf);
+  if (status == REG_VALID)
+    {
+      buffer[1] = buffer[2] = buffer[3] = 0;
+      buffer[0] = !!(buf[0] & ASTAT_CC);
+    }
+  return status;
 }
 
 static void

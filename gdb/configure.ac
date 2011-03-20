@@ -109,7 +109,6 @@ AS_HELP_STRING([--with-relocated-sources=PATH], [automatically relocate this pat
 ])
 
 AC_CONFIG_SUBDIRS(testsuite)
-AC_CONFIG_SUBDIRS(common)
 
 # Check whether to support alternative target configurations
 AC_ARG_ENABLE(targets,
@@ -1594,6 +1593,11 @@ if test ${build} = ${host} -a ${host} = ${target} ; then
          CONFIG_SRCS="${CONFIG_SRCS} aix-thread.c"
          CONFIG_OBS="${CONFIG_OBS} aix-thread.o"
          CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -lpthdebug"
+
+         # Older versions of AIX do not provide the declaration for
+         # the getthrds function (it appears that it was introduced
+         # with AIX 6.x).
+         AC_CHECK_DECLS(getthrds, [], [], [[#include <procinfo.h>]])
       fi
       ;;
    esac

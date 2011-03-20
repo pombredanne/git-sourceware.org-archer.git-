@@ -7647,7 +7647,11 @@ is a common name for the program counter; @pxref{Registers, ,Registers}).
 @kindex undisplay
 @item undisplay @var{dnums}@dots{}
 @itemx delete display @var{dnums}@dots{}
-Remove item numbers @var{dnums} from the list of expressions to display.
+Remove items from the list of expressions to display.  Specify the
+numbers of the displays that you want affected with the command
+argument @var{dnums}.  It can be a single display number, one of the
+numbers shown in the first field of the @samp{info display} display;
+or it could be a range of display numbers, as in @code{2-4}.
 
 @code{undisplay} does not repeat if you press @key{RET} after using it.
 (Otherwise you would just get the error @samp{No display number @dots{}}.)
@@ -7656,12 +7660,20 @@ Remove item numbers @var{dnums} from the list of expressions to display.
 @item disable display @var{dnums}@dots{}
 Disable the display of item numbers @var{dnums}.  A disabled display
 item is not printed automatically, but is not forgotten.  It may be
-enabled again later.
+enabled again later.  Specify the numbers of the displays that you
+want affected with the command argument @var{dnums}.  It can be a
+single display number, one of the numbers shown in the first field of
+the @samp{info display} display; or it could be a range of display
+numbers, as in @code{2-4}.
 
 @kindex enable display
 @item enable display @var{dnums}@dots{}
 Enable display of item numbers @var{dnums}.  It becomes effective once
 again in auto display of its expression, until you specify otherwise.
+Specify the numbers of the displays that you want affected with the
+command argument @var{dnums}.  It can be a single display number, one
+of the numbers shown in the first field of the @samp{info display}
+display; or it could be a range of display numbers, as in @code{2-4}.
 
 @item display
 Display the current values of the expressions on the list, just as is
@@ -20865,18 +20877,64 @@ this.  For example:
 @end smallexample
 @end defun
 
-@findex gdb.write
-@defun write string
-Print a string to @value{GDBN}'s paginated standard output stream.
+@findex gdb.write 
+@defun write string @r{[}stream{]} 
+Print a string to @value{GDBN}'s paginated output stream.  The
+optional @var{stream} determines the stream to print to.  The default
+stream is @value{GDBN}'s standard output stream.  Possible stream
+values are:
+
+@table @code
+@findex STDOUT
+@findex gdb.STDOUT
+@item STDOUT
+@value{GDBN}'s standard output stream.
+
+@findex STDERR
+@findex gdb.STDERR
+@item STDERR
+@value{GDBN}'s standard error stream.
+
+@findex STDLOG
+@findex gdb.STDLOG
+@item STDLOG
+@value{GDBN}'s log stream (@pxref{Logging Output}).
+@end table
+
 Writing to @code{sys.stdout} or @code{sys.stderr} will automatically
-call this function.
+call this function and will automatically direct the output to the
+relevant stream.
 @end defun
 
 @findex gdb.flush
 @defun flush
-Flush @value{GDBN}'s paginated standard output stream.  Flushing
-@code{sys.stdout} or @code{sys.stderr} will automatically call this
-function.
+Flush the buffer of a @value{GDBN} paginated stream so that the
+contents are displayed immediately.  @value{GDBN} will flush the
+contents of a stream automatically when it encounters a newline in the
+buffer.  The optional @var{stream} determines the stream to flush.  The
+default stream is @value{GDBN}'s standard output stream.  Possible
+stream values are: 
+
+@table @code
+@findex STDOUT
+@findex gdb.STDOUT
+@item STDOUT
+@value{GDBN}'s standard output stream.
+
+@findex STDERR
+@findex gdb.STDERR
+@item STDERR
+@value{GDBN}'s standard error stream.
+
+@findex STDLOG
+@findex gdb.STDLOG
+@item STDLOG
+@value{GDBN}'s log stream (@pxref{Logging Output}).
+
+@end table
+
+Flushing @code{sys.stdout} or @code{sys.stderr} will automatically
+call this function for the relevant stream.
 @end defun
 
 @findex gdb.target_charset
@@ -21858,6 +21916,14 @@ started by @value{GDBN} itself.
 A @code{gdb.Inferior} object has the following methods:
 
 @table @code
+@defmethod Inferior is_valid
+Returns @code{True} if the @code{gdb.Inferior} object is valid,
+@code{False} if not.  A @code{gdb.Inferior} object will become invalid
+if the inferior no longer exists within @value{GDBN}.  All other
+@code{gdb.Inferior} methods will throw an exception if it is invalid
+at the time the method is called.
+@end defmethod
+
 @defmethod Inferior threads
 This method returns a tuple holding all the threads which are valid
 when it is called.  If there are no valid threads, the method will
@@ -22057,6 +22123,14 @@ does not  use that identifier.
 A @code{gdb.InferiorThread} object has the following methods:
 
 @table @code
+@defmethod InferiorThread is_valid
+Returns @code{True} if the @code{gdb.InferiorThread} object is valid,
+@code{False} if not.  A @code{gdb.InferiorThread} object will become
+invalid if the thread exits, or the inferior that the thread belongs
+is deleted.  All other @code{gdb.InferiorThread} methods will throw an
+exception if it is invalid at the time the method is called.
+@end defmethod
+
 @defmethod InferiorThread switch
 This changes @value{GDBN}'s currently selected thread to the one represented
 by this object.
@@ -22418,6 +22492,22 @@ parameter.  It can be read and assigned to just as any other
 attribute.  @value{GDBN} does validation when assignments are made.
 @end defivar
 
+There are two methods that should be implemented in any
+@code{Parameter} class.  These are:
+
+@defop Operation {parameter} get_set_string self
+@value{GDBN} will call this method when a @var{parameter}'s value has
+been changed via the @code{set} API (for example, @kbd{set foo off}).
+The @code{value} attribute has already been populated with the new
+value and may be used in output.  This method must return a string.
+@end defop
+
+@defop Operation {parameter} get_show_string self svalue
+@value{GDBN} will call this method when a @var{parameter}'s
+@code{show} API has been invoked (for example, @kbd{show foo}).  The
+argument @code{svalue} receives the string representation of the
+current value.  This method must return a string.
+@end defop
 
 When a new parameter is defined, its type must be specified.  The
 available types are represented by constants defined in the @code{gdb}
@@ -22634,6 +22724,16 @@ which is used to format the value.  @xref{Pretty Printing API}, for more
 information.
 @end defivar
 
+A @code{gdb.Objfile} object has the following methods:
+
+@defmethod Objfile is_valid
+Returns @code{True} if the @code{gdb.Objfile} object is valid,
+@code{False} if not.  A @code{gdb.Objfile} object can become invalid
+if the object file it refers to is not loaded in @value{GDBN} any
+longer.  All other @code{gdb.Objfile} methods will throw an exception
+if it is invalid at the time the method is called.
+@end defmethod
+
 @node Frames In Python
 @subsubsection Accessing inferior stack frames from Python.
 
@@ -22785,6 +22885,20 @@ block cannot be found for the @var{pc} value specified, the function
 will return @code{None}.
 @end defun
 
+A @code{gdb.Block} object has the following methods:
+
+@table @code
+@defmethod Block is_valid
+Returns @code{True} if the @code{gdb.Block} object is valid,
+@code{False} if not.  A block object can become invalid if the block it
+refers to doesn't exist anymore in the inferior.  All other
+@code{gdb.Block} methods will throw an exception if it is invalid at
+the time the method is called.  This method is also made available to
+the Python iterator object that @code{gdb.Block} provides in an iteration
+context and via the Python @code{iter} built-in function.
+@end defmethod
+@end table
+
 A @code{gdb.Block} object has the following attributes:
 
 @table @code
@@ -22905,6 +23019,18 @@ of a symbol.  Each address class is a constant defined in the
 @defivar Symbol is_variable
 @code{True} if the symbol is a variable.
 @end defivar
+@end table
+
+A @code{gdb.Symbol} object has the following methods:
+
+@table @code
+@defmethod Symbol is_valid
+Returns @code{True} if the @code{gdb.Symbol} object is valid,
+@code{False} if not.  A @code{gdb.Symbol} object can become invalid if
+the symbol it refers to does not exist in @value{GDBN} any longer.
+All other @code{gdb.Symbol} methods will throw an exception if it is
+invalid at the time the method is called.
+@end defmethod
 @end table
 
 The available domain categories in @code{gdb.Symbol} are represented
@@ -23051,6 +23177,19 @@ attribute is not writable.
 @end defivar
 @end table
 
+A @code{gdb.Symtab_and_line} object has the following methods:
+
+@table @code
+@defmethod Symtab_and_line is_valid
+Returns @code{True} if the @code{gdb.Symtab_and_line} object is valid,
+@code{False} if not.  A @code{gdb.Symtab_and_line} object can become
+invalid if the Symbol table and line object it refers to does not
+exist in @value{GDBN} any longer.  All other
+@code{gdb.Symtab_and_line} methods will throw an exception if it is
+invalid at the time the method is called.
+@end defmethod
+@end table
+
 A @code{gdb.Symtab} object has the following attributes:
 
 @table @code
@@ -23064,9 +23203,17 @@ This attribute is not writable.
 @end defivar
 @end table
 
-The following methods are provided:
+A @code{gdb.Symtab} object has the following methods:
 
 @table @code
+@defmethod Symtab is_valid
+Returns @code{True} if the @code{gdb.Symtab} object is valid,
+@code{False} if not.  A @code{gdb.Symtab} object can become invalid if
+the symbol table it refers to does not exist in @value{GDBN} any
+longer.  All other @code{gdb.Symtab} methods will throw an exception
+if it is invalid at the time the method is called.
+@end defmethod
+
 @defmethod Symtab fullname
 Return the symbol table's source absolute file name.
 @end defmethod
@@ -23098,6 +23245,34 @@ argument defines the class of watchpoint to create, if @var{type} is
 @code{BP_WATCHPOINT}.  If a watchpoint class is not provided, it is
 assumed to be a @var{WP_WRITE} class.
 @end defmethod
+
+@defop Operation {gdb.Breakpoint} stop (self)
+The @code{gdb.Breakpoint} class can be sub-classed and, in
+particular, you may choose to implement the @code{stop} method.
+If this method is defined as a sub-class of @code{gdb.Breakpoint},
+it will be called when the inferior reaches any location of a
+breakpoint which instantiates that sub-class.  If the method returns
+@code{True}, the inferior will be stopped at the location of the
+breakpoint, otherwise the inferior will continue.
+
+If there are multiple breakpoints at the same location with a
+@code{stop} method, each one will be called regardless of the
+return status of the previous.  This ensures that all @code{stop}
+methods have a chance to execute at that location.  In this scenario
+if one of the methods returns @code{True} but the others return
+@code{False}, the inferior will still be stopped.
+
+Example @code{stop} implementation:
+
+@smallexample
+class MyBreakpoint (gdb.Breakpoint):
+      def stop (self):
+        inf_val = gdb.parse_and_eval("foo")
+        if inf_val == 3:
+          return True
+        return False
+@end smallexample
+@end defop
 
 The available watchpoint types represented by constants are defined in the
 @code{gdb} module:

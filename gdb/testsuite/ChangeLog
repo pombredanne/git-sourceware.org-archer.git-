@@ -1,3 +1,213 @@
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/unavailable.cc (args_test_func, local_test_func)
+	(reglocal_test_func, statlocal_test_func): New functions.
+	(globals_test_func): Call new functions.
+	* gdb.trace/unavailable.exp (gdb_collect_args_test)
+	(gdb_collect_locals_test): New procedure.
+	(gdb_trace_collection_test): Call new procedures.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/unavailable.exp (fpreg, spreg, pcreg): Define.
+	(test_register, test_register_unavailable): New procedures.
+	(gdb_unavailable_registers_test): New procedure.
+	(gdb_trace_collection_test): Call it.
+
+2011-03-18  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12149
+
+	* gdb.python/python.exp: Add gdb.write tests.
+
+2010-03-17  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/Makefile.in: Add py-objfile.
+	* gdb.python/py-objfile.exp: New file.
+	* gdb.python/py-objfile.c: New file.
+	* gdb.python/py-block.exp: Add is_valid tests.
+	* gdb.python/py-inferior.exp: Ditto.
+	* gdb.python/py-infthread.exp: Ditto.
+	* gdb.python/py-symbol.exp: Ditto.
+	* gdb.python/py-symtab.exp: Ditto.
+
+2011-03-16  Keith Seitz  <keiths@redhat.com>
+
+	PR c++/12273
+	* gdb.cp/cmpd-minsyms.exp: New test.
+	* gdb.cp/cmpd-minsyms.cc: New file.
+
+	PR c++/11734
+	* gdb.cp/ovsrch.exp: New test.
+	* gdb.cp/ovsrch.h: New file.
+	* gdb.cp/ovsrch1.cc: New file.
+	* gdb.cp/ovsrch2.cc: New file.
+	* gdb.cp/ovsrch3.cc: New file.
+	* gdb.cp/ovsrch4.cc: New file.
+
+2011-03-16  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/12528
+	* gdb.base/Makefile.in: Adjust EXECUTABLES.
+	* gdb.base/break-on-linker-gcd-function.exp: New test.
+	* gdb.base/break-on-linker-gcd-function.cc: New file.
+
+2011-03-15  Andreas Tobler  <andreast@fgznet.ch>
+
+	* gdb.base/jit-main.c: Define ElfW for non glibc elf targets.
+
+2011-03-15  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* lib/gdb.exp (gdb_unload): Add another termination case.
+
+2011-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-empty-pc-range.S: New file.
+	* gdb.dwarf2/dw2-empty-pc-range.exp: New file.
+	* gdb.dwarf2/pr11465.S: New .text labels text_start and text_end.
+	Provide a stub byte there.
+	(DW_TAG_compile_unit): Set DW_AT_low_pc, DW_AT_high_pc and
+	DW_AT_entry_pc.
+	(dieb4, dieda): Set DW_AT_high_pc higher than DW_AT_low_pc.
+
+2011-03-15  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.arch/altivec-abi.exp: Skip "generic" tests on 64-bit when
+	using a GCC 4.1 or 4.2 compiler.  Add an additional test variant
+	"generic ABI, auto".
+	(altivec_abi_tests): Accept vectors returned by reference.
+
+2010-03-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-breakpoint.exp: Add Python stop operations tests.
+
+2011-03-13  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.python/py-section-script.exp: Skip test if no Python support.
+
+2011-03-12  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.base/solib-weak.exp: Allow "." prefix for ppc64.
+
+2011-03-10  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-parameter.exp: Update tests to the new Python
+	parameter API. Add "no documentation" test.  Add deprecated API
+	backward compatibility test.
+
+2011-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.ada/catch_ex.exp: Use explicit gdb_test rather than
+	gdb_continue_to_end.
+
+2011-03-09  Mark Kettenis  <kettenis@gnu.org>
+
+	* gdb.base/memattr.exp: Adjust regexps to accept spaces as well as
+	tabs.
+
+2011-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* lib/gdb.exp (inferior_exited_re): Match. leading `['.  Wrap in
+	parentheses.
+	(gdb_continue_to_end): Add "allow_extra" parameter.  Use
+	$command.
+	* gdb.threads/thread-unwindonsignal.exp: Pass "allow_extra"
+	argument to gdb_continue_to_end.
+	* gdb.threads/interrupted-hand-call.exp: Pass "allow_extra"
+	argument to gdb_continue_to_end.
+	* gdb.cp/annota3.exp: Fix regex.
+	* gdb.cp/annota2.exp: Fix regex.
+	* gdb.base/shlib-call.exp: Pass "allow_extra" argument to
+	gdb_continue_to_end.
+	* gdb.base/call-signal-resume.exp: Revert earlier patch.
+	* gdb.ada/tasks.exp: Pass "allow_extra" argument to
+	gdb_continue_to_end.
+
+2011-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.server/ext-run.exp
+	(load new file without any gdbserver inferior): New test.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (TAGS): Rewrite.
+
+2011-03-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.trace/report.exp (12.1: trace report #1): New match for the
+	initial commands echo.  New match for `Found trace'.  Anchor all the
+	other matches.  Anchor and match for `No trace frame found' the final
+	match.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (TAGS): New target.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* lib/opencl.exp (skip_opencl_tests): Update for exit message
+	change.
+	* lib/mi-support.exp (mi_gdb_test): Update for exit message
+	change.
+	* lib/gdb.exp (gdb_test_multiple): Update comment.  Update for
+	exit message change.
+	(skip_altivec_tests): Update for exit message change.
+	(skip_vsx_tests): Likewise.
+	(gdb_continue_to_end): Likewise.  Add 'command' argument.
+	* lib/cell.exp (skip_cell_tests): Update for exit message change.
+	* gdb.threads/tls.exp: Update for exit message change.
+	* gdb.threads/thread-unwindonsignal.exp: Use
+	gdb_continue_to_end.
+	* gdb.threads/step.exp (step_it): Update for exit message change.
+	(continue_all): Likewise.
+	* gdb.threads/print-threads.exp (test_all_threads): Update for
+	exit message change.
+	* gdb.threads/interrupted-hand-call.exp: Use
+	gdb_continue_to_end.
+	* gdb.threads/execl.exp: Use gdb_continue_to_end.
+	* gdb.python/py-prettyprint.exp (run_lang_tests): Use
+	gdb_continue_to_end.
+	* gdb.hp/gdb.objdbg/objdbg02.exp: Use gdb_continue_to_end.
+	* gdb.hp/gdb.objdbg/objdbg01.exp: Use gdb_continue_to_end.
+	* gdb.hp/gdb.defects/solib-d.exp: Update for exit message change.
+	* gdb.cp/method.exp: Update for exit message change.
+	* gdb.cp/mb-templates.exp: Update for exit message change.
+	* gdb.cp/mb-inline.exp: Use gdb_continue_to_end.
+	* gdb.cp/annota3.exp: Update for exit message change.
+	* gdb.cp/annota2.exp: Update for exit message change.
+	* gdb.cell/fork.exp: Use gdb_continue_to_end.
+	* gdb.base/term.exp: Update for exit message change.
+	* gdb.base/step-test.exp (test_i): Update for exit message change.
+	* gdb.base/sigstep.exp (advance): Update for exit message change.
+	(advancei): Likewise.
+	* gdb.base/siginfo.exp: Update for exit message change.
+	* gdb.base/shlib-call.exp: Use gdb_continue_to_end.
+	* gdb.base/reread.exp: Use gdb_continue_to_end.
+	* gdb.base/langs.exp: Use gdb_continue_to_end.
+	* gdb.base/interrupt.exp: Update for exit message change.
+	* gdb.base/gdb1555.exp: Update for exit message change.
+	* gdb.base/exe-lock.exp: Use gdb_continue_to_end.
+	* gdb.base/ending-run.exp: Update for exit message change.
+	* gdb.base/chng-syms.exp: Update for exit message change.
+	* gdb.base/checkpoint.exp: Update for exit message change.
+	* gdb.base/catch-syscall.exp (check_for_program_end): Use
+	gdb_continue_to_end.
+	(test_catch_syscall_with_wrong_args): Likewise.
+	* gdb.base/call-signal-resume.exp: Use gdb_continue_to_end.
+	* gdb.base/break-interp.exp (test_ld): Update for exit message
+	change.
+	* gdb.base/bang.exp: Update for exit message change.
+	* gdb.base/attach.exp (do_attach_tests): Use gdb_continue_to_end.
+	(do_call_attach_tests): Likewise.
+	* gdb.base/a2-run.exp: Update for exit message change.
+	* gdb.arch/ppc-dfp.exp: Update for exit message change.
+	* gdb.ada/tasks.exp: Use gdb_continue_to_end.
+	* gdb.ada/catch_ex.exp: Use gdb_continue_to_end.
+
+2011-03-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/help.exp (help thread find): Fix one forgotten quote.
+
 2011-03-03  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.hp/gdb.aCC/Makefile.in (Makefile): Remove.

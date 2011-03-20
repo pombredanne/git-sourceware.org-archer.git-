@@ -296,8 +296,9 @@ static int is_root_p (struct varobj *var);
 
 #if HAVE_PYTHON
 
-static struct varobj *
-varobj_add_child (struct varobj *var, const char *name, struct value *value);
+static struct varobj *varobj_add_child (struct varobj *var,
+					const char *name,
+					struct value *value);
 
 #endif /* HAVE_PYTHON */
 
@@ -2358,7 +2359,7 @@ variable_language (struct varobj *var)
 static int
 number_of_children (struct varobj *var)
 {
-  return (*var->root->lang->number_of_children) (var);;
+  return (*var->root->lang->number_of_children) (var);
 }
 
 /* What is the expression for the root varobj VAR? Returns a malloc'd

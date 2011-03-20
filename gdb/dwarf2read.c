@@ -2776,7 +2776,6 @@ dwarf2_initialize_objfile (struct objfile *objfile)
   if (dwarf2_read_index (objfile))
     return 1;
 
-  dwarf2_build_psymtabs (objfile);
   return 0;
 }
 
@@ -5992,7 +5991,8 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
 	}
     }
 
-  if (high < low)
+  /* read_partial_die has also the strict LOW < HIGH requirement.  */
+  if (high <= low)
     return 0;
 
   /* When using the GNU linker, .gnu.linkonce. sections are used to
@@ -9336,19 +9336,41 @@ read_partial_die (struct partial_die_info *part_die,
 	}
     }
 
-  /* When using the GNU linker, .gnu.linkonce. sections are used to
-     eliminate duplicate copies of functions and vtables and such.
-     The linker will arbitrarily choose one and discard the others.
-     The AT_*_pc values for such functions refer to local labels in
-     these sections.  If the section from that file was discarded, the
-     labels are not in the output, so the relocs get a value of 0.
-     If this is a discarded function, mark the pc bounds as invalid,
-     so that GDB will ignore it.  */
-  if (has_low_pc_attr && has_high_pc_attr
-      && part_die->lowpc < part_die->highpc
-      && (part_die->lowpc != 0
-	  || dwarf2_per_objfile->has_section_at_zero))
-    part_die->has_pc_info = 1;
+  if (has_low_pc_attr && has_high_pc_attr)
+    {
+      /* When using the GNU linker, .gnu.linkonce. sections are used to
+	 eliminate duplicate copies of functions and vtables and such.
+	 The linker will arbitrarily choose one and discard the others.
+	 The AT_*_pc values for such functions refer to local labels in
+	 these sections.  If the section from that file was discarded, the
+	 labels are not in the output, so the relocs get a value of 0.
+	 If this is a discarded function, mark the pc bounds as invalid,
+	 so that GDB will ignore it.  */
+      if (part_die->lowpc == 0 && !dwarf2_per_objfile->has_section_at_zero)
+	{
+	  struct gdbarch *gdbarch = get_objfile_arch (cu->objfile);
+
+	  complaint (&symfile_complaints,
+		     _("DW_AT_low_pc %s is zero "
+		       "for DIE at 0x%x [in module %s]"),
+		     paddress (gdbarch, part_die->lowpc),
+		     part_die->offset, cu->objfile->name);
+	}
+      /* dwarf2_get_pc_bounds has also the strict low < high requirement.  */
+      else if (part_die->lowpc >= part_die->highpc)
+	{
+	  struct gdbarch *gdbarch = get_objfile_arch (cu->objfile);
+
+	  complaint (&symfile_complaints,
+		     _("DW_AT_low_pc %s is not < DW_AT_high_pc %s "
+		       "for DIE at 0x%x [in module %s]"),
+		     paddress (gdbarch, part_die->lowpc),
+		     paddress (gdbarch, part_die->highpc),
+		     part_die->offset, cu->objfile->name);
+	}
+      else
+	part_die->has_pc_info = 1;
+    }
 
   return info_ptr;
 }
@@ -10550,6 +10572,14 @@ psymtab_include_file_name (const struct line_header *lh, int file_index,
   return include_name;
 }
 
+/* Ignore this record_line request.  */
+
+static void
+noop_record_line (struct subfile *subfile, int line, CORE_ADDR pc)
+{
+  return;
+}
+
 /* Decode the Line Number Program (LNP) for the given line_header
    structure and CU.  The actual information extracted and the type
    of structures created from the LNP depends on the value of PST.
@@ -10585,6 +10615,8 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   const int decode_for_pst_p = (pst != NULL);
   struct subfile *last_subfile = NULL, *first_subfile = current_subfile;
+  void (*p_record_line) (struct subfile *subfile, int line, CORE_ADDR pc)
+    = record_line;
 
   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
@@ -10654,13 +10686,13 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
 			{
 			  addr = gdbarch_addr_bits_remove (gdbarch, address);
 			  if (last_subfile)
-			    record_line (last_subfile, 0, addr);
+			    (*p_record_line) (last_subfile, 0, addr);
 			  last_subfile = current_subfile;
 			}
 		      /* Append row to matrix using current values.  */
 		      addr = check_cu_functions (address, cu);
 		      addr = gdbarch_addr_bits_remove (gdbarch, addr);
-		      record_line (current_subfile, line, addr);
+		      (*p_record_line) (current_subfile, line, addr);
 		    }
 		}
 	      basic_block = 0;
@@ -10677,10 +10709,27 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
 	      switch (extended_op)
 		{
 		case DW_LNE_end_sequence:
+		  p_record_line = record_line;
 		  end_sequence = 1;
 		  break;
 		case DW_LNE_set_address:
 		  address = read_address (abfd, line_ptr, cu, &bytes_read);
+
+		  if (address == 0 && !dwarf2_per_objfile->has_section_at_zero)
+		    {
+		      /* This line table is for a function which has been
+			 GCd by the linker.  Ignore it.  PR gdb/12528 */
+
+		      long line_offset
+			= line_ptr - dwarf2_per_objfile->line.buffer;
+
+		      complaint (&symfile_complaints,
+				 _(".debug_line address at offset 0x%lx is 0 "
+				   "[in module %s]"),
+				 line_offset, cu->objfile->name);
+		      p_record_line = noop_record_line;
+		    }
+
 		  op_index = 0;
 		  line_ptr += bytes_read;
 		  address += baseaddr;
@@ -10737,12 +10786,12 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
 			{
 			  addr = gdbarch_addr_bits_remove (gdbarch, address);
 			  if (last_subfile)
-			    record_line (last_subfile, 0, addr);
+			    (*p_record_line) (last_subfile, 0, addr);
 			  last_subfile = current_subfile;
 			}
 		      addr = check_cu_functions (address, cu);
 		      addr = gdbarch_addr_bits_remove (gdbarch, addr);
-		      record_line (current_subfile, line, addr);
+		      (*p_record_line) (current_subfile, line, addr);
 		    }
 		}
 	      basic_block = 0;
@@ -10841,7 +10890,7 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
           if (!decode_for_pst_p)
 	    {
 	      addr = gdbarch_addr_bits_remove (gdbarch, address);
-	      record_line (current_subfile, 0, addr);
+	      (*p_record_line) (current_subfile, 0, addr);
 	    }
         }
     }
