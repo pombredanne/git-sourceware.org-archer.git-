@@ -335,6 +335,8 @@ server_h = $(srcdir)/server.h $(regcache_h) config.h $(srcdir)/target.h \
 		$(srcdir)/mem-break.h $(srcdir)/../common/gdb_signals.h \
 		$(signals_h)
 
+windows_hdep_h = $(srcdir)/../common/windows-hdep.h
+
 linux_low_h = $(srcdir)/linux-low.h
 
 lynx_low_h = $(srcdir)/lynx-low.h $(srcdir)/server.h
@@ -382,8 +384,13 @@ tracepoint.o: tracepoint.c $(server_h) $(srcdir)/../common/ax.def
 utils.o: utils.c $(server_h)
 gdbreplay.o: gdbreplay.c config.h
 
+# gdb/common/ dependencies
+
 signals.o: ../common/signals.c $(server_h) $(signals_def)
 	$(CC) -c $(CPPFLAGS) $(INTERNAL_CFLAGS) $< -DGDBSERVER
+
+windows-hdep.o: $(srcdir)/../common/windows-hdep.c $(windows_hdep_h)
+	${CC} -o windows-hdep.o -c -DGDBSERVER ${INTERNAL_CFLAGS} $<
 
 # We build memmem.c without -Werror because this file is not under
 # our control.  On LynxOS, the compiler generates some warnings
