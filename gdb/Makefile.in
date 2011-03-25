@@ -1120,6 +1120,7 @@ init.c: $(INIT_FILES)
 	    -e '/[a-z0-9A-Z_]*-exp.tab.[co]$$/d' \
 	    -e 's/\.[co]$$/.c/' \
 	    -e 's,signals\.c,common/signals\.c,' \
+	    -e 's,windows-hdep\.c,common/windows-hdep\.c,' \
 	    -e 's|^\([^  /][^     ]*\)|$(srcdir)/\1|g' | \
 	while read f; do \
 	    sed -n -e 's/^_initialize_\([a-z_0-9A-Z]*\).*/\1/p' $$f 2>/dev/null; \
@@ -1909,6 +1910,10 @@ mi-common.o: $(srcdir)/mi/mi-common.c
 
 signals.o: $(srcdir)/common/signals.c
 	$(COMPILE) $(srcdir)/common/signals.c
+	$(POSTCOMPILE)
+
+windows-hdep.o: $(srcdir)/common/windows-hdep.c
+	$(COMPILE) $(srcdir)/common/windows-hdep.c
 	$(POSTCOMPILE)
 
 #
