@@ -62,6 +62,7 @@
 #include "i386-tdep.h"
 #include "i387-tdep.h"
 
+#include "common/windows-hdep.h"
 #include "windows-tdep.h"
 #include "windows-nat.h"
 #include "i386-nat.h"
@@ -92,49 +93,14 @@ static BOOL WINAPI (*OpenProcessToken)(HANDLE, DWORD, PHANDLE);
 static BOOL WINAPI (*GetCurrentConsoleFont) (HANDLE, BOOL,
 					     CONSOLE_FONT_INFO *);
 static COORD WINAPI (*GetConsoleFontSize) (HANDLE, DWORD);
+static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE, LPGSTR, DWORD);
 
 static struct target_ops windows_ops;
 
-#undef STARTUPINFO
-#undef CreateProcess
-#undef GetModuleFileNameEx
-
-#ifndef __CYGWIN__
-# define __PMAX	(MAX_PATH + 1)
-  static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE, LPSTR, DWORD);
-# define STARTUPINFO STARTUPINFOA
-# define CreateProcess CreateProcessA
-# define GetModuleFileNameEx_name "GetModuleFileNameExA"
-# define bad_GetModuleFileNameEx bad_GetModuleFileNameExA
-#else
-# define __PMAX	PATH_MAX
+#ifdef __CYGWIN__
 /* The starting and ending address of the cygwin1.dll text segment.  */
   static CORE_ADDR cygwin_load_start;
   static CORE_ADDR cygwin_load_end;
-# if CYGWIN_VERSION_DLL_MAKE_COMBINED(CYGWIN_VERSION_API_MAJOR,CYGWIN_VERSION_API_MINOR) >= 181
-#   define __USEWIDE
-    typedef wchar_t cygwin_buf_t;
-    static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE,
-						LPWSTR, DWORD);
-#   define STARTUPINFO STARTUPINFOW
-#   define CreateProcess CreateProcessW
-#   define GetModuleFileNameEx_name "GetModuleFileNameExW"
-#   define bad_GetModuleFileNameEx bad_GetModuleFileNameExW
-# else
-#   define CCP_POSIX_TO_WIN_W 1
-#   define CCP_WIN_W_TO_POSIX 3
-#   define cygwin_conv_path(op, from, to, size)  \
-         (op == CCP_WIN_W_TO_POSIX) ? \
-         cygwin_conv_to_full_posix_path (from, to) : \
-         cygwin_conv_to_win32_path (from, to)
-    typedef char cygwin_buf_t;
-    static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE, LPSTR, DWORD);
-#   define STARTUPINFO STARTUPINFOA
-#   define CreateProcess CreateProcessA
-#   define GetModuleFileNameEx_name "GetModuleFileNameExA"
-#   define bad_GetModuleFileNameEx bad_GetModuleFileNameExA
-#   define CW_SET_DOS_FILE_WARNING -1	/* no-op this for older Cygwin */
-# endif
 #endif
 
 static int have_saved_context;	/* True if we've saved context from a
@@ -529,16 +495,16 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
   HMODULE *DllHandle = dh_buf;	/* Set to temporary storage for
 				   initial query.  */
   DWORD cbNeeded;
-#ifdef __CYGWIN__
-  cygwin_buf_t pathbuf[__PMAX];	/* Temporary storage prior to converting to
-				   posix form.  __PMAX is always enough
-				   as long as SO_NAME_MAX_PATH_SIZE is defined
-				   as 512.  */
-#endif
+/* Temporary storage prior to converting to posix form.  __PMAX is always
+   enough as long as SO_NAME_MAX_PATH_SIZE is defined as 512.  */
+  win_buf_t pathbuf[__PMAX];
 
   cbNeeded = 0;
   /* Find size of buffer needed to handle list of modules loaded in
      inferior.  */
+  DEBUG_EVENTS (("get_module_name for handle 0x%x\n",
+		 (unsigned int) (uintptr_t) current_process_handle));
+
   if (!EnumProcessModules (current_process_handle, DllHandle,
 			   sizeof (HMODULE), &cbNeeded) || !cbNeeded)
     goto failed;
@@ -563,22 +529,14 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
       if (!base_address || mi.lpBaseOfDll == base_address)
 	{
 	  /* Try to find the name of the given module.  */
-#ifdef __CYGWIN__
-	  /* Cygwin prefers that the path be in /x/y/z format.  */
 	  len = GetModuleFileNameEx (current_process_handle,
 				      DllHandle[i], pathbuf, __PMAX);
 	  if (len == 0)
 	    error (_("Error getting dll name: %lu."), GetLastError ());
-	  if (cygwin_conv_path (CCP_WIN_W_TO_POSIX, pathbuf, dll_name_ret,
-				__PMAX) < 0)
+	  /* Cygwin prefers that the path be in /x/y/z format.  */
+	  if (gdb_win_conv_path (WINDOWS_NATIVE_TO_POSIX, pathbuf,
+				 dll_name_ret, __PMAX) < 0)
 	    error (_("Error converting dll name to POSIX: %d."), errno);
-#else
-	  len = GetModuleFileNameEx (current_process_handle,
-				      DllHandle[i], dll_name_ret, __PMAX);
-	  if (len == 0)
-	    error (_("Error getting dll name: %u."),
-		   (unsigned) GetLastError ());
-#endif
 	  return 1;	/* success */
 	}
     }
@@ -693,27 +651,20 @@ windows_make_so (const char *name, LPVOID load_addr)
     }
   if (strcasecmp (buf, "ntdll.dll") == 0)
     {
-      GetSystemDirectory (buf, sizeof (buf));
+      GetSystemDirectoryA (buf, sizeof (buf));
       strcat (buf, "\\ntdll.dll");
     }
 #else
-  cygwin_buf_t buf[__PMAX];
+  win_buf_t buf[__PMAX];
 
   buf[0] = 0;
   if (access (name, F_OK) != 0)
     {
       if (strcasecmp (name, "ntdll.dll") == 0)
-#ifdef __USEWIDE
 	{
-	  GetSystemDirectoryW (buf, sizeof (buf) / sizeof (wchar_t));
-	  wcscat (buf, L"\\ntdll.dll");
+	  GetSystemDirectory (buf, sizeof (buf) / sizeof (win_buf_t));
+	  gdb_win_strcat (buf, _G("\\ntdll.dll"));
 	}
-#else
-	{
-	  GetSystemDirectoryA (buf, sizeof (buf) / sizeof (wchar_t));
-	  strcat (buf, "\\ntdll.dll");
-	}
-#endif
     }
 #endif
   so = XZALLOC (struct so_list);
@@ -724,8 +675,8 @@ windows_make_so (const char *name, LPVOID load_addr)
   strcpy (so->so_name, buf);
 #else
   if (buf[0])
-    cygwin_conv_path (CCP_WIN_W_TO_POSIX, buf, so->so_name,
-		      SO_NAME_MAX_PATH_SIZE);
+    gdb_win_conv_path (WINDOWS_NATIVE_TO_POSIX, buf, so->so_name,
+		       SO_NAME_MAX_PATH_SIZE);
   else
     {
       char *rname = realpath (name, NULL);
@@ -1976,23 +1927,52 @@ static void
 windows_create_inferior (struct target_ops *ops, char *exec_file,
 		       char *allargs, char **in_env, int from_tty)
 {
-  STARTUPINFO si;
 #ifdef __CYGWIN__
-  cygwin_buf_t real_path[__PMAX];
-  cygwin_buf_t shell[__PMAX]; /* Path to shell */
+/* List of names which are converted from dos to unix
+   on the way in and back again on the way out.
+
+   PATH needs to be here because CreateProcess uses it and gdb uses
+   CreateProcess.  HOME is here because most shells use it and would be
+   confused by Windows style path names.  */
+typedef struct struct_win_env {
+    char *name;
+    int in_index;
+    void *in_orig_val;
+    int is_list;
+} win_env;
+
+/* This list is extracted from cygwin/environ.cc source,
+   list from January 2011.  */
+static win_env conv_envvars[] =
+  {
+    {"PATH=", -1, NULL, 1},
+    {"HOME=", -1, NULL, 0},
+    {"LD_LIBRARY_PATH=", -1, NULL, 1},
+    {"TMPDIR=", -1, NULL, 0},
+    {"TMP=", -1, NULL, 0},
+    {"TEMP=", -1, NULL, 0},
+    {NULL, -1, NULL, 0}
+  };
+#endif
+
+  STARTUPINFO si;
+  win_buf_t real_path[__PMAX];
+  win_buf_t shell[__PMAX]; /* Path to shell */
   const char *sh;
-  cygwin_buf_t *toexec;
-  cygwin_buf_t *cygallargs;
-  cygwin_buf_t *args;
+  char *entry_exec_file = exec_file;
+  win_buf_t *toexec;
+  win_buf_t *cygallargs;
+  win_buf_t *args;
+  win_buf_t *out_env;
   size_t len;
+  int env_size, i, j;
+#ifdef __CYGWIN__
   int tty;
   int ostdin, ostdout, ostderr;
 #else
-  char real_path[__PMAX];
-  char shell[__PMAX]; /* Path to shell */
-  char *toexec;
-  char *args;
   HANDLE tty;
+  char ashell [__PMAX];
+  char msys_exec_file [__PMAX];
 #endif
   PROCESS_INFORMATION pi;
   BOOL ret;
@@ -2011,15 +1991,14 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
   if (new_console)
     windows_set_console_info (&si, &flags);
 
-#ifdef __CYGWIN__
   if (!useshell)
     {
       flags |= DEBUG_ONLY_THIS_PROCESS;
-      if (cygwin_conv_path (CCP_POSIX_TO_WIN_W, exec_file, real_path,
-			    __PMAX * sizeof (cygwin_buf_t)) < 0)
+      if (gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE, exec_file, real_path,
+			     __PMAX * sizeof (win_buf_t)) < 0)
 	error (_("Error starting executable: %d"), errno);
       toexec = real_path;
-#ifdef __USEWIDE
+#ifdef USE_WIDE_WINAPI
       len = mbstowcs (NULL, allargs, 0) + 1;
       if (len == (size_t) -1)
 	error (_("Error starting executable: %d"), errno);
@@ -2031,40 +2010,157 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
     }
   else
     {
+      int use_windows_shell = 0;
+
       sh = getenv ("SHELL");
+#ifdef __CYGWIN__
       if (!sh)
 	sh = "/bin/sh";
-      if (cygwin_conv_path (CCP_POSIX_TO_WIN_W, sh, shell, __PMAX) < 0)
+      if (gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE, sh, shell, __PMAX)
+	    < 0)
       	error (_("Error starting executable via shell: %d"), errno);
-#ifdef __USEWIDE
+#else
+      if (!sh)
+	sh = getenv ("MSYSCON");
+      if (!sh)
+	{
+	  sh = getenv ("COMSPEC");
+	  if (sh)
+	    use_windows_shell = 1;
+	}
+      if (sh)
+	{
+	  SearchPathA (getenv ("PATH"), sh, ".exe", __PMAX, ashell, NULL);
+	  sh = ashell;
+	}
+
+      if (!sh || sh[0] == '\0')
+	error (_("Impossible to find a valid shell"));
+      if (!use_windows_shell)
+	gdb_win_conv_path (WINDOWS_NATIVE_TO_MSYS, exec_file,
+			       msys_exec_file, __PMAX);
+      exec_file = msys_exec_file;
+# ifdef USE_WIDE_WINAPI
+      MultiByteToWideChar (CP_ACP, 0, sh, strlen(sh) + 1, shell, __PMAX);
+# else
+      strncpy (shell, sh, strlen(sh) + 1);
+# endif
+#endif
+#ifdef USE_WIDE_WINAPI
       len = sizeof (L" -c 'exec  '") + mbstowcs (NULL, exec_file, 0)
 	    + mbstowcs (NULL, allargs, 0) + 2;
       cygallargs = (wchar_t *) alloca (len * sizeof (wchar_t));
+# ifdef __CYGWIN__
       swprintf (cygallargs, len, L" -c 'exec %s %s'", exec_file, allargs);
+# else /* not __CYGWIN__ */
+      /* exec_file and all_args are Ansi strings, thus we should use
+	 %S instead of %s format specifier.  */
+      if (use_windows_shell)
+	swprintf (cygallargs, len, L" /C %S %S", exec_file, allargs);
+      else
+	swprintf (cygallargs, len, L" -c 'exec %S %S'", exec_file, allargs);
+# endif /* not __CYGWIN__ */
 #else
       cygallargs = (char *)
 	alloca (sizeof (" -c 'exec  '") + strlen (exec_file)
 				    + strlen (allargs) + 2);
-      sprintf (cygallargs, " -c 'exec %s %s'", exec_file, allargs);
+      if (use_windows_shell)
+	sprintf (cygallargs, " /C %s %s", exec_file, allargs);
+      else
+	sprintf (cygallargs, " -c 'exec %s %s'", exec_file, allargs);
 #endif
       toexec = shell;
       flags |= DEBUG_PROCESS;
     }
 
-#ifdef __USEWIDE
-  args = (cygwin_buf_t *) alloca ((wcslen (toexec) + wcslen (cygallargs) + 2)
-				  * sizeof (wchar_t));
+#ifdef __CYGWIN__
+  /* Check to see if we need to convert environment variables back to
+     win32 format.  */
+  for (i = 0; in_env[i]; i++)
+    {
+      for (j = 0; conv_envvars[j].name; j++)
+	{
+	  char *name = conv_envvars[j].name;
+	  int nlen = strlen(name);
+
+	  if (strncmp (in_env[i], name, nlen) == 0)
+	    {
+	      char *conv;
+	      int len;
+
+	      /* We found this environment variable that we need to convert.  */
+	      conv_envvars[j].in_index = i;
+	      conv_envvars[j].in_orig_val = in_env[i];
+	      if (conv_envvars[j].is_list)
+		{
+		  len = gdb_win_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
+						&in_env[i][nlen], NULL, 0);
+		  conv = (char *) alloca (len + nlen + 1);
+		  strcpy (conv, name);
+		  gdb_win_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
+					  &in_env[i][nlen], &conv[nlen], len);
+		}
+	      else
+		{
+		  conv = (char *) alloca (__PMAX + nlen);
+		  strcpy (conv, name);
+		  gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE_A,
+				     &in_env[i][nlen], &conv[nlen], __PMAX);
+		}
+	      in_env[i] = conv;
+	    }
+	}
+    }
+#endif
+
+#ifdef USE_WIDE_WINAPI
+  args = (win_buf_t *) alloca ((wcslen (toexec) + wcslen (cygallargs) + 2)
+			       * sizeof (wchar_t));
   wcscpy (args, toexec);
   wcscat (args, L" ");
   wcscat (args, cygallargs);
+  env_size = 1;
+  for (i = 0; in_env[i]; i++)
+    {
+      env_size += mbstowcs (NULL, in_env[i], 0) + 1;
+    }
+  out_env = (win_buf_t *) alloca (env_size * sizeof (win_buf_t *));
+  env_size = 0;
+  for (i = 0; in_env[i]; i++)
+    {
+      int len = mbstowcs (NULL, in_env[i], 0) + 1;
+      mbstowcs (&out_env[env_size], in_env[i], len);
+      env_size += len;
+    }
+  out_env[env_size] = L'\0';
+  flags |= CREATE_UNICODE_ENVIRONMENT;
 #else
-  args = (cygwin_buf_t *) alloca (strlen (toexec) + strlen (cygallargs) + 2);
+  args = (win_buf_t *) alloca (strlen (toexec) + strlen (cygallargs) + 2);
   strcpy (args, toexec);
   strcat (args, " ");
   strcat (args, cygallargs);
+  env_size = 1;
+  for (i = 0; in_env[i]; i++)
+    {
+      env_size += strlen(in_env[i]) + 1;
+    }
+  out_env = (win_buf_t *) alloca (env_size * sizeof (win_buf_t *));
+  env_size = 0;
+  for (i = 0; in_env[i]; i++)
+    {
+      int len = strlen(in_env[i]) + 1;
+      strcpy (&out_env[env_size], in_env[i]);
+      env_size += len;
+    }
+  out_env[env_size] = '\0';
 #endif
 
-  /* Prepare the environment vars for CreateProcess.  */
+#ifdef __CYGWIN__
+  /* Restore in_env to its original value.  */
+  for (j = 0; conv_envvars[j].name; j++)
+    if (conv_envvars[j].in_index != -1)
+      in_env[conv_envvars[j].in_index] = conv_envvars[j].in_orig_val;
+
   cygwin_internal (CW_SYNC_WINENV);
 
   if (!inferior_io_terminal)
@@ -2087,37 +2183,7 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
 	  dup2 (tty, 2);
 	}
     }
-
-  windows_init_thread_list ();
-  ret = CreateProcess (0,
-		       args,	/* command line */
-		       NULL,	/* Security */
-		       NULL,	/* thread */
-		       TRUE,	/* inherit handles */
-		       flags,	/* start flags */
-		       NULL,	/* environment */
-		       NULL,	/* current directory */
-		       &si,
-		       &pi);
-  if (tty >= 0)
-    {
-      close (tty);
-      dup2 (ostdin, 0);
-      dup2 (ostdout, 1);
-      dup2 (ostderr, 2);
-      close (ostdin);
-      close (ostdout);
-      close (ostderr);
-    }
 #else
-  toexec = exec_file;
-  args = alloca (strlen (toexec) + strlen (allargs) + 2);
-  strcpy (args, toexec);
-  strcat (args, " ");
-  strcat (args, allargs);
-
-  flags |= DEBUG_ONLY_THIS_PROCESS;
-
   if (!inferior_io_terminal)
     tty = INVALID_HANDLE_VALUE;
   else
@@ -2139,22 +2205,34 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
 	  si.dwFlags |= STARTF_USESTDHANDLES;
 	}
     }
+#endif
 
   windows_init_thread_list ();
-  ret = CreateProcessA (0,
-			args,	/* command line */
-			NULL,	/* Security */
-			NULL,	/* thread */
-			TRUE,	/* inherit handles */
-			flags,	/* start flags */
-			NULL,	/* environment */
-			NULL,	/* current directory */
-			&si,
-			&pi);
+  ret = CreateProcess (0,
+		       args,	/* command line */
+		       NULL,	/* Security */
+		       NULL,	/* thread */
+		       TRUE,	/* inherit handles */
+		       flags,	/* start flags */
+		       out_env,	/* environment */
+		       NULL,	/* current directory */
+		       &si,
+		       &pi);
+#ifdef __CYGWIN__
+  if (tty >= 0)
+    {
+      close (tty);
+      dup2 (ostdin, 0);
+      dup2 (ostdout, 1);
+      dup2 (ostderr, 2);
+      close (ostdin);
+      close (ostdout);
+      close (ostderr);
+    }
+#else
   if (tty != INVALID_HANDLE_VALUE)
     CloseHandle (tty);
 #endif
-
   if (!ret)
     error (_("Error creating process %s, (error %d)."),
 	   exec_file, (unsigned) GetLastError ());
@@ -2623,19 +2701,11 @@ bad_EnumProcessModules (HANDLE w, HMODULE *x, DWORD y, LPDWORD z)
   return FALSE;
 }
 
-#ifdef __USEWIDE
 static DWORD WINAPI
-bad_GetModuleFileNameExW (HANDLE w, HMODULE x, LPWSTR y, DWORD z)
+bad_GetModuleFileNameEx (HANDLE w, HMODULE x, LPGSTR y, DWORD z)
 {
   return 0;
 }
-#else
-static DWORD WINAPI
-bad_GetModuleFileNameExA (HANDLE w, HMODULE x, LPSTR y, DWORD z)
-{
-  return 0;
-}
-#endif
 
 static BOOL WINAPI
 bad_GetModuleInformation (HANDLE w, HMODULE x, LPMODULEINFO y, DWORD z)
@@ -2680,10 +2750,12 @@ _initialize_loadable (void)
 	GetProcAddress (hm, "DebugBreakProcess");
       DebugSetProcessKillOnExit = (void *)
 	GetProcAddress (hm, "DebugSetProcessKillOnExit");
-      GetConsoleFontSize = (void *) 
+      GetConsoleFontSize = (void *)
 	GetProcAddress (hm, "GetConsoleFontSize");
-      GetCurrentConsoleFont = (void *) 
+      GetCurrentConsoleFont = (void *)
 	GetProcAddress (hm, "GetCurrentConsoleFont");
+      EnumProcessModules = (void *)
+	GetProcAddress (hm, "K32EnumProcessModules");
     }
 
   /* Set variables to dummy versions of these processes if the function
@@ -2705,12 +2777,13 @@ _initialize_loadable (void)
   hm = LoadLibrary ("psapi.dll");
   if (hm)
     {
-      EnumProcessModules = (void *)
-	GetProcAddress (hm, "EnumProcessModules");
+      if (!EnumProcessModules)
+	EnumProcessModules = (void *)
+	  GetProcAddress (hm, "EnumProcessModules");
       GetModuleInformation = (void *)
 	GetProcAddress (hm, "GetModuleInformation");
       GetModuleFileNameEx = (void *)
-	GetProcAddress (hm, GetModuleFileNameEx_name);
+	GetProcAddress (hm, _G_SUFFIX ("GetModuleFileNameEx"));
     }
 
   if (!EnumProcessModules || !GetModuleInformation || !GetModuleFileNameEx)
