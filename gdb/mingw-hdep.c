@@ -27,6 +27,7 @@
 #include "gdb_string.h"
 #include "readline/readline.h"
 
+#include <stdio.h>
 #include <windows.h>
 
 /* This event is signalled whenever an asynchronous SIGINT handler
@@ -256,4 +257,8 @@ void
 _initialize_mingw_hdep (void)
 {
   sigint_event = CreateEvent (0, FALSE, FALSE, 0);
+  SetErrorMode (SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX
+		| SEM_NOOPENFILEERRORBOX);
+  setvbuf (stdout, NULL, _IONBF, BUFSIZ);
+  setvbuf (stderr, NULL, _IONBF, BUFSIZ);
 }
