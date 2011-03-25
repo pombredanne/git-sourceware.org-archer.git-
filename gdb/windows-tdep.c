@@ -90,8 +90,13 @@ static const int MAX_TIB32 =
   sizeof (thread_information_32) / sizeof (uint32_t);
 static const int MAX_TIB64 =
   sizeof (thread_information_64) / sizeof (uint64_t);
-static const int FULL_TIB_SIZE = 0x1000;
+static const int MAX_NAME =
+  sizeof (TIB_NAME) / sizeof (TIB_NAME [0]);
+static const int FULL_TIB32_SIZE = 0x1000;
+static const int FULL_TIB64_SIZE = 0x2000;
 
+/* Index of linear_address_tib, used to check consistency.  */
+#define LIN_ADDR_TIB 6
 static int maint_display_all_tib = 0;
 
 /* Define Thread Local Base pointer type.  */
@@ -110,7 +115,7 @@ windows_get_tlb_type (struct gdbarch *gdbarch)
   /* Do not rebuild type if same gdbarch as last time.  */
   if (last_tlb_type && last_gdbarch == gdbarch)
     return last_tlb_type;
-  
+
   dword_ptr_type = arch_integer_type (gdbarch, gdbarch_ptr_bit (gdbarch),
 				 1, "DWORD_PTR");
   dword32_type = arch_integer_type (gdbarch, 32,
@@ -286,33 +291,41 @@ static int
 display_one_tib (ptid_t ptid)
 {
   gdb_byte *tib = NULL;
+  int use_64bit;
+  int invalid_tib_addr = 0;
   gdb_byte *index;
   CORE_ADDR thread_local_base;
   ULONGEST i, val, max, max_name, size, tib_size;
   ULONGEST sizeof_ptr = gdbarch_ptr_bit (target_gdbarch);
   enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
 
-  if (sizeof_ptr == 64)
+  /* 64-bit GDB seems to get a 64-bit TIB even for 32-bit processes.  */
+  if (sizeof_ptr == 64 || sizeof(void *) == 8)
     {
+      use_64bit = 1;
       size = sizeof (uint64_t);
       tib_size = sizeof (thread_information_64);
       max = MAX_TIB64;
     }
   else
     {
+      use_64bit = 0;
       size = sizeof (uint32_t);
       tib_size = sizeof (thread_information_32);
       max = MAX_TIB32;
     }
 
-  max_name = max;
+  max_name = MAX_NAME;
 
   if (maint_display_all_tib)
     {
-      tib_size = FULL_TIB_SIZE;
+      if (use_64bit)
+	tib_size = FULL_TIB64_SIZE;
+      else
+	tib_size = FULL_TIB32_SIZE;
       max = tib_size / size;
     }
-  
+
   tib = alloca (tib_size);
 
   if (target_get_tib_address (ptid, &thread_local_base) == 0)
@@ -327,7 +340,7 @@ display_one_tib (ptid_t ptid)
     {
       printf_filtered (_("Unable to read thread information "
 			 "block for %s at address %s\n"),
-	target_pid_to_str (ptid), 
+	target_pid_to_str (ptid),
 	paddress (target_gdbarch, thread_local_base));
       return -1;
     }
@@ -338,7 +351,7 @@ display_one_tib (ptid_t ptid)
 
   index = (gdb_byte *) tib;
 
-  /* All fields have the size of a pointer, this allows to iterate 
+  /* All fields have the size of a pointer, this allows to iterate
      using the same for loop for both layouts.  */
   for (i = 0; i < max; i++)
     {
@@ -348,9 +361,14 @@ display_one_tib (ptid_t ptid)
       else if (val != 0)
 	printf_filtered (_("TIB[0x%s] is 0x%s\n"), phex (i * size, 2),
 			 phex (val, size));
+      if (i == LIN_ADDR_TIB && val != thread_local_base)
+	invalid_tib_addr = 1;
       index += size;
-    } 
-  return 1;  
+    }
+
+  if (invalid_tib_addr)
+    warning (_("linear_address_tib field does not match recieved TIB address"));
+  return 1;
 }
 
 /* Display thread information block of a thread specified by ARGS.
