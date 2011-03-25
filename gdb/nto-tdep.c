@@ -39,6 +39,7 @@
 
 #ifdef __CYGWIN__
 #include <sys/cygwin.h>
+#include "windows-hdep.h"
 #endif
 
 #ifdef __CYGWIN__
@@ -59,9 +60,10 @@ nto_target (void)
 #ifdef __CYGWIN__
   static char buf[PATH_MAX];
   if (p)
-    cygwin_conv_to_posix_path (p, buf);
+    gdb_win_conv_path (WINDOWS_NATIVE_A_TO_POSIX, p, buf, PATH_MAX);
   else
-    cygwin_conv_to_posix_path (default_nto_target, buf);
+    gdb_win_conv_path (WINDOWS_NATIVE_A_TO_POSIX, default_nto_target, buf,
+		       PATH_MAX);
   return buf;
 #else
   return p ? p : default_nto_target;
