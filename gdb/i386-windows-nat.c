@@ -73,6 +73,17 @@ static const int mappings[] =
 void
 _initialize_i386_windows_nat (void)
 {
+  HMODULE h = LoadLibrary ("kernel32.dll");
+
+  if (h != INVALID_HANDLE_VALUE)
+    {
+      GdbSuspendThread = (void *) GetProcAddress (h, "SuspendThread");
+      GdbGetThreadContext = (void *) GetProcAddress (h, "GetThreadContext");
+      GdbSetThreadContext = (void *) GetProcAddress (h, "SetThreadContext");
+      GdbGetThreadSelectorEntry = (void *) GetProcAddress (h,
+				    "GetThreadSelectorEntry");
+      CloseHandle (h);
+    }
   windows_set_context_register_offsets (mappings);
   i386_set_debug_register_length (4);
 }

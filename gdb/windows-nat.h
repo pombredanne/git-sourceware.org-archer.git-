@@ -17,8 +17,16 @@
 
 #ifndef WINDOWS_NAT_H
 #define WINDOWS_NAT_H
-
+#include <windows.h>
 extern void windows_set_context_register_offsets (const int *offsets);
+
+extern DWORD context_all_registers;
+extern DWORD context_debug_registers_only;
+
+extern DWORD WINAPI (*GdbSuspendThread) (HANDLE);
+extern BOOL WINAPI (*GdbGetThreadContext) (HANDLE, void *);
+extern BOOL WINAPI (*GdbSetThreadContext) (HANDLE, void *);
+extern BOOL WINAPI (*GdbGetThreadSelectorEntry) (HANDLE, DWORD, void *);
 
 #endif
 

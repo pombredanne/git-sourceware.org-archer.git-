@@ -95,6 +95,11 @@ static BOOL WINAPI (*GetCurrentConsoleFont) (HANDLE, BOOL,
 static COORD WINAPI (*GetConsoleFontSize) (HANDLE, DWORD);
 static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE, LPGSTR, DWORD);
 
+DWORD WINAPI (*GdbSuspendThread) (HANDLE);
+BOOL WINAPI (*GdbGetThreadContext) (HANDLE, void *);
+BOOL WINAPI (*GdbSetThreadContext) (HANDLE, void *);
+BOOL WINAPI (*GdbGetThreadSelectorEntry) (HANDLE, DWORD, void *);
+
 static struct target_ops windows_ops;
 
 #ifdef __CYGWIN__
@@ -119,6 +124,21 @@ enum
   };
 #endif
 
+#ifndef EXCEPTION_DLL_NOT_FOUND
+#define EXCEPTION_DLL_NOT_FOUND 0xC0000135
+#endif
+#ifndef EXCEPTION_ENTRY_POINT_NOT_FOUND
+#define EXCEPTION_ENTRY_POINT_NOT_FOUND 0xC0000139
+#endif
+#ifdef _WIN64
+#ifndef STATUS_WX86_BREAKPOINT
+#define STATUS_WX86_BREAKPOINT 0x4000001F
+#endif
+#ifndef STATUS_WX86_SINGLE_STEP
+#define STATUS_WX86_SINGLE_STEP 0x4000001E
+#endif
+#endif
+
 #ifndef CONTEXT_EXTENDED_REGISTERS
 /* This macro is only defined on ia32.  It only makes sense on this target,
    so define it as zero if not already defined.  */
@@ -127,6 +147,9 @@ enum
 
 #define CONTEXT_DEBUGGER_DR CONTEXT_DEBUGGER | CONTEXT_DEBUG_REGISTERS \
 	| CONTEXT_EXTENDED_REGISTERS
+
+DWORD context_all_registers = CONTEXT_DEBUGGER_DR;
+DWORD context_debug_registers_only = CONTEXT_DEBUG_REGISTERS;
 
 static uintptr_t dr[8];
 static int debug_registers_changed;
@@ -239,6 +262,12 @@ static const struct xlate_exception
   {EXCEPTION_BREAKPOINT, TARGET_SIGNAL_TRAP},
   {DBG_CONTROL_C, TARGET_SIGNAL_INT},
   {EXCEPTION_SINGLE_STEP, TARGET_SIGNAL_TRAP},
+#ifdef STATUS_WX86_BREAKPOINT
+  {STATUS_WX86_BREAKPOINT, TARGET_SIGNAL_TRAP},
+#endif
+#ifdef STATUS_WX86_SINGLE_STEP
+  {STATUS_WX86_SINGLE_STEP, TARGET_SIGNAL_TRAP},
+#endif
   {STATUS_FLOAT_DIVIDE_BY_ZERO, TARGET_SIGNAL_FPE},
   {-1, -1}};
 
@@ -274,7 +303,7 @@ thread_rec (DWORD id, int get_context)
 	  {
 	    if (get_context > 0 && id != current_event.dwThreadId)
 	      {
-		if (SuspendThread (th->h) == (DWORD) -1)
+		if (GdbSuspendThread (th->h) == (DWORD) -1)
 		  {
 		    DWORD err = GetLastError ();
 		    warning (_("SuspendThread failed. (winerr %d)"),
@@ -318,15 +347,15 @@ windows_add_thread (ptid_t ptid, HANDLE h, void *tlb)
   if (debug_registers_used)
     {
       /* Only change the value of the debug registers.  */
-      th->context.ContextFlags = CONTEXT_DEBUG_REGISTERS;
-      CHECK (GetThreadContext (th->h, &th->context));
+      th->context.ContextFlags = context_debug_registers_only;
+      CHECK (GdbGetThreadContext (th->h, &th->context));
       th->context.Dr0 = dr[0];
       th->context.Dr1 = dr[1];
       th->context.Dr2 = dr[2];
       th->context.Dr3 = dr[3];
       th->context.Dr6 = DR6_CLEAR_VALUE;
       th->context.Dr7 = dr[7];
-      CHECK (SetThreadContext (th->h, &th->context));
+      CHECK (GdbSetThreadContext (th->h, &th->context));
       th->context.ContextFlags = 0;
     }
   return th;
@@ -407,8 +436,8 @@ do_windows_fetch_inferior_registers (struct regcache *regcache, int r)
 #endif
 	{
 	  thread_info *th = current_thread;
-	  th->context.ContextFlags = CONTEXT_DEBUGGER_DR;
-	  GetThreadContext (th->h, &th->context);
+	  th->context.ContextFlags = context_all_registers;
+	  GdbGetThreadContext (th->h, &th->context);
 	  /* Copy dr values from that thread.
 	     But only if there were not modified since last stop.
 	     PR gdb/2388 */
@@ -507,7 +536,18 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
 
   if (!EnumProcessModules (current_process_handle, DllHandle,
 			   sizeof (HMODULE), &cbNeeded) || !cbNeeded)
-    goto failed;
+    {
+      DWORD error = GetLastError ();
+      /* ERROR_PARTIAL_COPY is OK for 32-bit processes running on
+	 Windows 64-bit OS.  */
+      if (error != ERROR_PARTIAL_COPY)
+	{
+	  DEBUG_EVENTS (("Call to EnumProcessModules 0x%x failed, error=%d\n",
+			(unsigned int) (uintptr_t) current_process_handle,
+			(int) error));
+	  goto failed;
+	}
+    }
 
   /* Allocate correct amount of space for module list.  */
   DllHandle = (HMODULE *) alloca (cbNeeded);
@@ -517,7 +557,16 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
   /* Get the list of modules.  */
   if (!EnumProcessModules (current_process_handle, DllHandle, cbNeeded,
 				 &cbNeeded))
-    goto failed;
+    {
+      DWORD error = GetLastError ();
+      if (error != ERROR_PARTIAL_COPY)
+	{
+	  DEBUG_EVENTS (("Call to EnumProcessModules 0x%x failed, error=%d\n",
+			(unsigned int) (uintptr_t) current_process_handle,
+			(int) error));
+	  goto failed;
+	}
+    }
 
   for (i = 0; i < (int) (cbNeeded / sizeof (HMODULE)); i++)
     {
@@ -940,7 +989,7 @@ static int
 display_selector (HANDLE thread, DWORD sel)
 {
   LDT_ENTRY info;
-  if (GetThreadSelectorEntry (thread, sel, &info))
+  if (GdbGetThreadSelectorEntry (thread, sel, &info))
     {
       int base, limit;
       printf_filtered ("0x%03lx: ", sel);
@@ -1143,6 +1192,12 @@ handle_exception (struct target_waitstatus *ourstatus)
       DEBUG_EXCEPTION_SIMPLE ("EXCEPTION_BREAKPOINT");
       ourstatus->value.sig = TARGET_SIGNAL_TRAP;
       break;
+#ifdef  STATUS_WX86_BREAKPOINT
+    case STATUS_WX86_BREAKPOINT:
+      DEBUG_EXCEPTION_SIMPLE ("STATUS_WX86_BREAKPOINT");
+      ourstatus->value.sig = TARGET_SIGNAL_TRAP;
+      break;
+#endif
     case DBG_CONTROL_C:
       DEBUG_EXCEPTION_SIMPLE ("DBG_CONTROL_C");
       ourstatus->value.sig = TARGET_SIGNAL_INT;
@@ -1155,6 +1210,12 @@ handle_exception (struct target_waitstatus *ourstatus)
       DEBUG_EXCEPTION_SIMPLE ("EXCEPTION_SINGLE_STEP");
       ourstatus->value.sig = TARGET_SIGNAL_TRAP;
       break;
+#ifdef STATUS_WX86_SINGLE_STEP
+    case STATUS_WX86_SINGLE_STEP:
+      DEBUG_EXCEPTION_SIMPLE ("STATUS_WX86_SINGLE_STEP");
+      ourstatus->value.sig = TARGET_SIGNAL_TRAP;
+      break;
+#endif
     case EXCEPTION_ILLEGAL_INSTRUCTION:
       DEBUG_EXCEPTION_SIMPLE ("EXCEPTION_ILLEGAL_INSTRUCTION");
       ourstatus->value.sig = TARGET_SIGNAL_ILL;
@@ -1167,10 +1228,26 @@ handle_exception (struct target_waitstatus *ourstatus)
       DEBUG_EXCEPTION_SIMPLE ("EXCEPTION_NONCONTINUABLE_EXCEPTION");
       ourstatus->value.sig = TARGET_SIGNAL_ILL;
       break;
+    case EXCEPTION_ENTRY_POINT_NOT_FOUND:
+      DEBUG_EXCEPTION_SIMPLE ("EXCEPTION_ENTRY_POINT_NOT_FOUND");
+      ourstatus->value.sig = TARGET_SIGNAL_ABRT;
+      break;
+    case EXCEPTION_DLL_NOT_FOUND:
+      DEBUG_EXCEPTION_SIMPLE ("EXCEPTION_DLL_NOT_FOUND");
+      ourstatus->value.sig = TARGET_SIGNAL_ABRT;
+      break;
+    case STATUS_INVALID_HANDLE:
+      DEBUG_EXCEPTION_SIMPLE ("STATUS_INVALID_HANDLE");
+      ourstatus->value.sig = TARGET_SIGNAL_TRAP;
+      break;
     default:
       /* Treat unhandled first chance exceptions specially.  */
       if (current_event.u.Exception.dwFirstChance)
-	return -1;
+	{
+          DEBUG_EXCEPTION_SIMPLE (phex (
+	    current_event.u.Exception.ExceptionRecord.ExceptionCode, 8));
+	  return -1;
+	}
       printf_unfiltered ("gdb: unknown target exception 0x%08lx at %s\n",
 	current_event.u.Exception.ExceptionRecord.ExceptionCode,
 	host_address_to_string (
@@ -1203,7 +1280,7 @@ windows_continue (DWORD continue_status, int id)
       {
 	if (debug_registers_changed)
 	  {
-	    th->context.ContextFlags |= CONTEXT_DEBUG_REGISTERS;
+	    th->context.ContextFlags |= context_debug_registers_only;
 	    th->context.Dr0 = dr[0];
 	    th->context.Dr1 = dr[1];
 	    th->context.Dr2 = dr[2];
@@ -1213,7 +1290,7 @@ windows_continue (DWORD continue_status, int id)
 	  }
 	if (th->context.ContextFlags)
 	  {
-	    CHECK (SetThreadContext (th->h, &th->context));
+	    CHECK (GdbSetThreadContext (th->h, &th->context));
 	    th->context.ContextFlags = 0;
 	  }
 	if (th->suspended > 0)

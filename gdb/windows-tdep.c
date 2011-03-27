@@ -116,11 +116,19 @@ windows_get_tlb_type (struct gdbarch *gdbarch)
   if (last_tlb_type && last_gdbarch == gdbarch)
     return last_tlb_type;
 
-  dword_ptr_type = arch_integer_type (gdbarch, gdbarch_ptr_bit (gdbarch),
-				 1, "DWORD_PTR");
-  dword32_type = arch_integer_type (gdbarch, 32,
-				 1, "DWORD32");
-  void_ptr_type = lookup_pointer_type (builtin_type (gdbarch)->builtin_void);
+  if (sizeof (void *) == 8)
+    dword_ptr_type = arch_integer_type (gdbarch, 64, 1, "DWORD_PTR");
+  else
+    dword_ptr_type = arch_integer_type (gdbarch, gdbarch_ptr_bit (gdbarch),
+					1, "DWORD_PTR");
+  dword32_type = arch_integer_type (gdbarch, 32, 1, "DWORD32");
+  if (sizeof (void *) == 8)
+    {
+      void_ptr_type = arch_type (gdbarch, TYPE_CODE_PTR, 8, "VOID_PTR");
+      TYPE_TARGET_TYPE (void_ptr_type) = builtin_type (gdbarch)->builtin_void;
+    }
+  else
+    void_ptr_type = lookup_pointer_type (builtin_type (gdbarch)->builtin_void);
 
   /* list entry */
 
