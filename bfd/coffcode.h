@@ -1860,12 +1860,14 @@ coff_set_alignment_hook (bfd * abfd ATTRIBUTE_UNUSED,
       file_ptr oldpos = bfd_tell (abfd);
       bfd_size_type relsz = bfd_coff_relsz (abfd);
 
-      bfd_seek (abfd, (file_ptr) hdr->s_relptr, 0);
+      if (bfd_seek (abfd, (file_ptr) hdr->s_relptr, 0) != 0)
+	return;
       if (bfd_bread (& dst, relsz, abfd) != relsz)
 	return;
 
       coff_swap_reloc_in (abfd, &dst, &n);
-      bfd_seek (abfd, oldpos, 0);
+      if (bfd_seek (abfd, oldpos, 0) != 0)
+	return;
       section->reloc_count = hdr->s_nreloc = n.r_vaddr - 1;
       section->rel_filepos += relsz;
     }

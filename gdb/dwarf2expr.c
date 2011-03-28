@@ -904,6 +904,13 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	  op_ptr += 4;
 	  ctx->dwarf_call (ctx, result);
 	  goto no_push;
+	
+	case DW_OP_GNU_entry_value:
+	  /* This operation is not yet supported by GDB.  */
+	  ctx->location = DWARF_VALUE_OPTIMIZED_OUT;
+	  ctx->stack_len = 0;
+	  ctx->num_pieces = 0;
+	  goto abort_expression;
 
 	case DW_OP_push_object_address:
 	  if (ctx->get_object_address == NULL)
@@ -928,6 +935,7 @@ execute_stack_op (struct dwarf_expr_context *ctx,
   if (ctx->location == DWARF_VALUE_IMPLICIT_POINTER)
     add_piece (ctx, 8 * ctx->addr_size, 0);
 
+abort_expression:
   ctx->recursion_depth--;
   gdb_assert (ctx->recursion_depth >= 0);
 #undef sign_ext

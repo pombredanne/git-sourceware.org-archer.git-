@@ -4009,7 +4009,12 @@ decode_dsp32alu_0 (SIM_CPU *cpu, bu16 iw0, bu16 iw1)
 
       /* If subtract, just invert and add one.  */
       if (aop & 0x1)
-	val1 = ~val1 + 1;
+	{
+	  if (val1 == 0x80000000)
+	    val1 = 0x7FFFFFFF;
+	  else
+	    val1 = ~val1 + 1;
+	}
 
       /* Get the sign bits, since we need them later.  */
       sBit1 = !!(val0 & 0x80000000);
@@ -4122,6 +4127,9 @@ decode_dsp32alu_0 (SIM_CPU *cpu, bu16 iw0, bu16 iw1)
 
       SET_ASTATREG (ac0, ac0_i);
       SET_ASTATREG (v, v_i);
+      if (v_i)
+	SET_ASTATREG (vs, v_i);
+
       if (HL)
 	SET_DREG_H (dst0, val << 16);
       else
@@ -4184,9 +4192,6 @@ decode_dsp32alu_0 (SIM_CPU *cpu, bu16 iw0, bu16 iw1)
       TRACE_INSN (cpu, "R%i = BYTEOP2P (R%i:%i, R%i:%i) (%s%s);", dst0,
 		  src0 + 1, src0, src1 + 1, src1, opts[HL + (aop << 1)],
 		  s ? ", r" : "");
-
-      if (src0 == src1)
-	illegal_instruction_combination (cpu);
 
       s0L = DREG (src0);
       s0H = DREG (src0 + 1);
@@ -4305,9 +4310,6 @@ decode_dsp32alu_0 (SIM_CPU *cpu, bu16 iw0, bu16 iw1)
       TRACE_INSN (cpu, "R%i = BYTEOP3P (R%i:%i, R%i:%i) (%s%s);", dst0,
 		  src0 + 1, src0, src1 + 1, src1, HL ? "HI" : "LO",
 		  s ? ", R" : "");
-
-      if (src0 == src1)
-	illegal_instruction_combination (cpu);
 
       s0L = DREG (src0);
       s0H = DREG (src0 + 1);
@@ -4437,24 +4439,26 @@ decode_dsp32alu_0 (SIM_CPU *cpu, bu16 iw0, bu16 iw1)
   else if ((aop == 0 || aop == 1) && (HL == 0 || HL == 1) && aopcde == 14)
     {
       bs40 src_acc = get_extended_acc (cpu, aop);
+      int v = 0;
 
       TRACE_INSN (cpu, "A%i = - A%i;", HL, aop);
 
-      SET_AREG (HL, saturate_s40 (-src_acc));
+      SET_AREG (HL, saturate_s40_astat (-src_acc, &v));
 
       SET_ASTATREG (az, AWREG (HL) == 0 && AXREG (HL) == 0);
       SET_ASTATREG (an, AXREG (HL) >> 7);
-      SET_ASTATREG (ac0, src_acc == 0);
       if (HL == 0)
 	{
-	  SET_ASTATREG (av0, src_acc < 0);
-	  if (ASTATREG (av0))
+	  SET_ASTATREG (ac0, !src_acc);
+	  SET_ASTATREG (av0, v);
+	  if (v)
 	    SET_ASTATREG (av0s, 1);
 	}
       else
 	{
-	  SET_ASTATREG (av1, src_acc < 0);
-	  if (ASTATREG (av1))
+	  SET_ASTATREG (ac1, !src_acc);
+	  SET_ASTATREG (av1, v);
+	  if (v)
 	    SET_ASTATREG (av1s, 1);
 	}
     }
@@ -4796,9 +4800,6 @@ decode_dsp32alu_0 (SIM_CPU *cpu, bu16 iw0, bu16 iw1)
       TRACE_INSN (cpu, "R%i = BYTEOP1P (R%i:%i, R%i:%i)%s;", dst0,
 		  src0 + 1, src0, src1 + 1, src1, opts[s + (aop << 1)]);
 
-      if (src0 == src1)
-	illegal_instruction_combination (cpu);
-
       s0L = DREG (src0);
       s0H = DREG (src0 + 1);
       s1L = DREG (src1);
@@ -5048,11 +5049,16 @@ decode_dsp32alu_0 (SIM_CPU *cpu, bu16 iw0, bu16 iw1)
 	  SET_AREG (1, src_hi);
 	  SET_DREG (dst1, PREG (0));
 	}
+      else
+	SET_AREG (1, a1_lo);
+
       if (up_lo)
 	{
 	  SET_AREG (0, src_lo);
 	  SET_DREG (dst0, PREG (0));
 	}
+      else
+	SET_AREG (0, a0_lo);
     }
   else
     illegal_instruction (cpu);
@@ -5427,7 +5433,7 @@ decode_dsp32shift_0 (SIM_CPU *cpu, bu16 iw0, bu16 iw1)
     }
   else if ((sop == 0 || sop == 1) && sopcde == 9)
     {
-      bs40 acc0 = get_extended_acc (cpu, 0);
+      bs40 acc0 = get_unextended_acc (cpu, 0);
       bs16 sL, sH, out;
 
       TRACE_INSN (cpu, "R%i.L = VIT_MAX (R%i) (AS%c);",
@@ -5437,7 +5443,7 @@ decode_dsp32shift_0 (SIM_CPU *cpu, bu16 iw0, bu16 iw1)
       sH = DREG (src1) >> 16;
 
       if (sop & 1)
-	acc0 >>= 1;
+	acc0 = (acc0 & 0xfeffffffffull) >> 1;
       else
 	acc0 <<= 1;
 

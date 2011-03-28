@@ -1,3 +1,27 @@
+2011-03-25  Andrew Burgess  <aburgess@broadcom.com>
+
+	* lib/gdb.exp (default_gdb_start,gdb_init): Clear the GREP_OPTIONS
+	environment variable to make grep output more predictable. Move
+	all the environment setup into gdb_init so it's done once per test
+	case rather than each time we start gdb.
+
+2011-03-24  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/label.exp: Use `main:there' linespec.  Add re-running
+	test.
+
+2011-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-entry-value-main.c: New file.
+	* gdb.dwarf2/dw2-entry-value.S: New file.
+	* gdb.dwarf2/dw2-entry-value.exp: New file.
+
+2011-03-22  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12183
+
+	* gdb.python/py-function.exp: Add GdbError tests.
+
 2011-03-18  Pedro Alves  <pedro@codesourcery.com>
 
 	* gdb.trace/unavailable.cc (args_test_func, local_test_func)
