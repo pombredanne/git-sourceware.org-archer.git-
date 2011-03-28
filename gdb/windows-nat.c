@@ -2004,34 +2004,6 @@ static void
 windows_create_inferior (struct target_ops *ops, char *exec_file,
 		       char *allargs, char **in_env, int from_tty)
 {
-#ifdef __CYGWIN__
-/* List of names which are converted from dos to unix
-   on the way in and back again on the way out.
-
-   PATH needs to be here because CreateProcess uses it and gdb uses
-   CreateProcess.  HOME is here because most shells use it and would be
-   confused by Windows style path names.  */
-typedef struct struct_win_env {
-    char *name;
-    int in_index;
-    void *in_orig_val;
-    int is_list;
-} win_env;
-
-/* This list is extracted from cygwin/environ.cc source,
-   list from January 2011.  */
-static win_env conv_envvars[] =
-  {
-    {"PATH=", -1, NULL, 1},
-    {"HOME=", -1, NULL, 0},
-    {"LD_LIBRARY_PATH=", -1, NULL, 1},
-    {"TMPDIR=", -1, NULL, 0},
-    {"TMP=", -1, NULL, 0},
-    {"TEMP=", -1, NULL, 0},
-    {NULL, -1, NULL, 0}
-  };
-#endif
-
   STARTUPINFO si;
   win_buf_t real_path[__PMAX];
   win_buf_t shell[__PMAX]; /* Path to shell */
@@ -2040,9 +2012,8 @@ static win_env conv_envvars[] =
   win_buf_t *toexec;
   win_buf_t *cygallargs;
   win_buf_t *args;
-  win_buf_t *out_env;
   size_t len;
-  int env_size, i, j;
+  int i, j;
 #ifdef __CYGWIN__
   int tty;
   int ostdin, ostdout, ostderr;
@@ -2085,58 +2056,20 @@ static win_env conv_envvars[] =
       cygallargs = allargs;
 #endif
     }
+#ifdef __CYGWIN__
   else
     {
-      int use_windows_shell = 0;
-
       sh = getenv ("SHELL");
-#ifdef __CYGWIN__
       if (!sh)
 	sh = "/bin/sh";
       if (gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE, sh, shell, __PMAX)
 	    < 0)
       	error (_("Error starting executable via shell: %d"), errno);
-#else
-      if (!sh)
-	sh = getenv ("MSYSCON");
-      if (!sh)
-	{
-	  sh = getenv ("COMSPEC");
-	  if (sh)
-	    use_windows_shell = 1;
-	}
-      if (sh)
-	{
-	  SearchPathA (getenv ("PATH"), sh, ".exe", __PMAX, ashell, NULL);
-	  sh = ashell;
-	}
-
-      if (!sh || sh[0] == '\0')
-	error (_("Impossible to find a valid shell"));
-      if (!use_windows_shell)
-	gdb_win_conv_path (WINDOWS_NATIVE_TO_MSYS, exec_file,
-			       msys_exec_file, __PMAX);
-      exec_file = msys_exec_file;
-# ifdef USE_WIDE_WINAPI
-      MultiByteToWideChar (CP_ACP, 0, sh, strlen(sh) + 1, shell, __PMAX);
-# else
-      strncpy (shell, sh, strlen(sh) + 1);
-# endif
-#endif
 #ifdef USE_WIDE_WINAPI
       len = sizeof (L" -c 'exec  '") + mbstowcs (NULL, exec_file, 0)
 	    + mbstowcs (NULL, allargs, 0) + 2;
       cygallargs = (wchar_t *) alloca (len * sizeof (wchar_t));
-# ifdef __CYGWIN__
       swprintf (cygallargs, len, L" -c 'exec %s %s'", exec_file, allargs);
-# else /* not __CYGWIN__ */
-      /* exec_file and all_args are Ansi strings, thus we should use
-	 %S instead of %s format specifier.  */
-      if (use_windows_shell)
-	swprintf (cygallargs, len, L" /C %S %S", exec_file, allargs);
-      else
-	swprintf (cygallargs, len, L" -c 'exec %S %S'", exec_file, allargs);
-# endif /* not __CYGWIN__ */
 #else
       cygallargs = (char *)
 	alloca (sizeof (" -c 'exec  '") + strlen (exec_file)
@@ -2149,45 +2082,6 @@ static win_env conv_envvars[] =
       toexec = shell;
       flags |= DEBUG_PROCESS;
     }
-
-#ifdef __CYGWIN__
-  /* Check to see if we need to convert environment variables back to
-     win32 format.  */
-  for (i = 0; in_env[i]; i++)
-    {
-      for (j = 0; conv_envvars[j].name; j++)
-	{
-	  char *name = conv_envvars[j].name;
-	  int nlen = strlen(name);
-
-	  if (strncmp (in_env[i], name, nlen) == 0)
-	    {
-	      char *conv;
-	      int len;
-
-	      /* We found this environment variable that we need to convert.  */
-	      conv_envvars[j].in_index = i;
-	      conv_envvars[j].in_orig_val = in_env[i];
-	      if (conv_envvars[j].is_list)
-		{
-		  len = gdb_win_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
-						&in_env[i][nlen], NULL, 0);
-		  conv = (char *) alloca (len + nlen + 1);
-		  strcpy (conv, name);
-		  gdb_win_conv_path_list (WINDOWS_POSIX_TO_NATIVE_A,
-					  &in_env[i][nlen], &conv[nlen], len);
-		}
-	      else
-		{
-		  conv = (char *) alloca (__PMAX + nlen);
-		  strcpy (conv, name);
-		  gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE_A,
-				     &in_env[i][nlen], &conv[nlen], __PMAX);
-		}
-	      in_env[i] = conv;
-	    }
-	}
-    }
 #endif
 
 #ifdef USE_WIDE_WINAPI
@@ -2196,48 +2090,14 @@ static win_env conv_envvars[] =
   wcscpy (args, toexec);
   wcscat (args, L" ");
   wcscat (args, cygallargs);
-  env_size = 1;
-  for (i = 0; in_env[i]; i++)
-    {
-      env_size += mbstowcs (NULL, in_env[i], 0) + 1;
-    }
-  out_env = (win_buf_t *) alloca (env_size * sizeof (win_buf_t *));
-  env_size = 0;
-  for (i = 0; in_env[i]; i++)
-    {
-      int len = mbstowcs (NULL, in_env[i], 0) + 1;
-      mbstowcs (&out_env[env_size], in_env[i], len);
-      env_size += len;
-    }
-  out_env[env_size] = L'\0';
-  flags |= CREATE_UNICODE_ENVIRONMENT;
 #else
   args = (win_buf_t *) alloca (strlen (toexec) + strlen (cygallargs) + 2);
   strcpy (args, toexec);
   strcat (args, " ");
   strcat (args, cygallargs);
-  env_size = 1;
-  for (i = 0; in_env[i]; i++)
-    {
-      env_size += strlen(in_env[i]) + 1;
-    }
-  out_env = (win_buf_t *) alloca (env_size * sizeof (win_buf_t *));
-  env_size = 0;
-  for (i = 0; in_env[i]; i++)
-    {
-      int len = strlen(in_env[i]) + 1;
-      strcpy (&out_env[env_size], in_env[i]);
-      env_size += len;
-    }
-  out_env[env_size] = '\0';
 #endif
 
 #ifdef __CYGWIN__
-  /* Restore in_env to its original value.  */
-  for (j = 0; conv_envvars[j].name; j++)
-    if (conv_envvars[j].in_index != -1)
-      in_env[conv_envvars[j].in_index] = conv_envvars[j].in_orig_val;
-
   cygwin_internal (CW_SYNC_WINENV);
 
   if (!inferior_io_terminal)
@@ -2291,7 +2151,7 @@ static win_env conv_envvars[] =
 		       NULL,	/* thread */
 		       TRUE,	/* inherit handles */
 		       flags,	/* start flags */
-		       out_env,	/* environment */
+		       NULL,	/* environment */
 		       NULL,	/* current directory */
 		       &si,
 		       &pi);
