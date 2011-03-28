@@ -2071,13 +2071,10 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
       cygallargs = (wchar_t *) alloca (len * sizeof (wchar_t));
       swprintf (cygallargs, len, L" -c 'exec %s %s'", exec_file, allargs);
 #else
-      cygallargs = (char *)
-	alloca (sizeof (" -c 'exec  '") + strlen (exec_file)
+      cygallargs = (char *) alloca (sizeof (" -c 'exec  '")
+				    + strlen (exec_file)
 				    + strlen (allargs) + 2);
-      if (use_windows_shell)
-	sprintf (cygallargs, " /C %s %s", exec_file, allargs);
-      else
-	sprintf (cygallargs, " -c 'exec %s %s'", exec_file, allargs);
+      sprintf (cygallargs, " -c 'exec %s %s'", exec_file, allargs);
 #endif
       toexec = shell;
       flags |= DEBUG_PROCESS;
