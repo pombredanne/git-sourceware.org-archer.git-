@@ -1,9 +1,6 @@
-/* Blackfin Two Wire Interface (TWI) model
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright (C) 2010-2011 Free Software Foundation, Inc.
-   Contributed by Analog Devices, Inc.
-
-   This file is part of simulators.
+   Copyright 2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,21 +15,23 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef DV_BFIN_TWI_H
-#define DV_BFIN_TWI_H
+asm (".globl f_start");
+asm ("f_start:");
 
-/* XXX: This should be pushed into the model data.  */
-#define BFIN_MMR_TWI_SIZE	0x90
+volatile int v;
 
-/* TWI_MASTER_STAT Masks */
-#define MPROG		(1 << 0)
-#define LOSTARB		(1 << 1)
-#define ANAK		(1 << 2)
-#define DNAK		(1 << 3)
-#define BUFRDERR	(1 << 4)
-#define BUFWRERR	(1 << 5)
-#define SDASEN		(1 << 6)
-#define SCLSEN		(1 << 7)
-#define BUSBUSY		(1 << 8)
+void
+f (int x)
+{
+  v++;
+}
 
-#endif
+asm (".globl f_end");
+asm ("f_end:");
+
+int
+main (void)
+{
+  f (1);
+  return 0;
+}

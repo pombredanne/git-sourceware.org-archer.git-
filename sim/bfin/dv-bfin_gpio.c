@@ -92,16 +92,22 @@ bfin_gpio_io_write_buffer (struct hw *me, const void *source, int space,
     case mmr_offset(clear):
     case mmr_offset(maska_clear):
     case mmr_offset(maskb_clear):
-      dv_w1c_2 (valuep, value, 0);
+      /* We want to clear the related data MMR.  */
+      valuep -= 2;
+      dv_w1c_2 (valuep, value, -1);
       break;
     case mmr_offset(set):
     case mmr_offset(maska_set):
     case mmr_offset(maskb_set):
+      /* We want to set the related data MMR.  */
+      valuep -= 4;
       *valuep |= value;
       break;
     case mmr_offset(toggle):
     case mmr_offset(maska_toggle):
     case mmr_offset(maskb_toggle):
+      /* We want to toggle the related data MMR.  */
+      valuep -= 6;
       *valuep ^= value;
       break;
     default:
@@ -192,15 +198,27 @@ bfin_gpio_port_event (struct hw *me, int my_port, struct hw *source,
   bool olvl, nlvl;
   bu32 bit = (1 << my_port);
 
-  /* Only screw with state if this pin is set as an input.  */
-  if (!(port->dir & port->inen & bit))
-    return;
+  /* Normalize the level value.  A simulated device can send any value
+     it likes to us, but in reality we only care about 0 and 1.  This
+     lets us assume only those two values below.  */
+  level = !!level;
+
+  HW_TRACE ((me, "pin %i set to %i", my_port, level));
+
+  /* Only screw with state if this pin is set as an input, and the
+     input is actually enabled.  */
+  if ((port->dir & bit) || !(port->inen & bit))
+    {
+      HW_TRACE ((me, "ignoring level/int due to DIR=%i INEN=%i",
+		 !!(port->dir & bit), !!(port->inen & bit)));
+      return;
+    }
 
   /* Get the old pin state for calculating an interrupt.  */
   olvl = !!(port->data & bit);
 
   /* Update the new pin state.  */
-  port->data = (port->data & ~bit) | (level << bit);
+  port->data = (port->data & ~bit) | (level << my_port);
 
   /* See if this state transition will generate an interrupt.  */
   nlvl = !!(port->data & bit);
@@ -208,32 +226,52 @@ bfin_gpio_port_event (struct hw *me, int my_port, struct hw *source,
   if (port->edge & bit)
     {
       /* Pin is edge triggered.  */
-      if (!(port->both & bit))
+      if (port->both & bit)
 	{
 	  /* Both edges.  */
 	  if (olvl == nlvl)
-	    return;
+	    {
+	      HW_TRACE ((me, "ignoring int due to EDGE=%i BOTH=%i lvl=%i->%i",
+			 !!(port->edge & bit), !!(port->both & bit),
+			 olvl, nlvl));
+	      return;
+	    }
 	}
       else
 	{
 	  /* Just one edge.  */
 	  if (!(((port->polar & bit) && olvl > nlvl)
 		|| (!(port->polar & bit) && olvl < nlvl)))
-	    return;
+	    {
+	      HW_TRACE ((me, "ignoring int due to EDGE=%i POLAR=%i lvl=%i->%i",
+			 !!(port->edge & bit), !!(port->polar & bit),
+			 olvl, nlvl));
+	      return;
+	    }
 	}
     }
   else
     {
       /* Pin is level triggered.  */
       if (nlvl == !!(port->polar & bit))
-	return;
+	{
+	  HW_TRACE ((me, "ignoring int due to EDGE=%i POLAR=%i lvl=%i",
+		     !!(port->edge & bit), !!(port->polar & bit), nlvl));
+	  return;
+	}
     }
 
   /* If the masks allow it, push the interrupt even higher.  */
   if (port->maska & bit)
-    hw_port_event (me, 0, 1);
+    {
+      HW_TRACE ((me, "pin %i triggered an int via mask a", my_port));
+      hw_port_event (me, 0, 1);
+    }
   if (port->maskb & bit)
-    hw_port_event (me, 1, 1);
+    {
+      HW_TRACE ((me, "pin %i triggered an int via mask b", my_port));
+      hw_port_event (me, 1, 1);
+    }
 }
 
 static void

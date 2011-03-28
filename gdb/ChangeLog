@@ -1,3 +1,191 @@
+2011-03-25  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (arm_elf_make_msymbol_special): Use ARM_SYM_BRANCH_TYPE
+	instead of checking for STT_ARM_TFUNC symbol type.
+
+2011-03-25  Tom Tromey  <tromey@redhat.com>
+
+	* linespec.c (symbol_found): Restore line-based result for
+	non-LOC_LABEL symbols.
+
+2011-03-25  Kai Tietz  <ktietz@redhat.com>
+
+	* tui/tui-source.c (tui_set_source_content): Use filename_cmp
+	instead of strcmp for comparison.
+	(tui_source_is_displayed): Likewise.
+	* tui/tui-winsource.c (tui_update_breakpoint_info): Likewise.
+
+2011-03-24  Mark Wielaard  <mjw@redhat.com>
+
+        * dwarf2read.c (lookup_signatured_type): Use DW_FORM_ref_sig8 in
+        complaint.
+        (skip_one_die): Use DW_FORM_ref_sig8, not DW_FORM_sig8.
+        (find_partial_die_in_comp_unit): Likewise in comment.
+        (read_attribute_value): Likewise.
+        (lookup_die_type): Likewise.
+        (dwarf_form_name): Likewise.
+        (dump_die_shallow): Likewise.
+        (follow_die_ref_or_sig): Likewise.
+
+2011-03-24  Tom Tromey  <tromey@redhat.com>
+
+	PR breakpoints/11816:
+	* linespec.c (decode_line_1): Parse `function:label' linespecs.
+	(decode_compound): Update.
+	(find_function_symbol): New function.
+	(decode_dollar): Update.
+	(decode_label): Add 'function_symbol' parameter.  Handle
+	function-relative labels.
+	(decode_variable): Update.
+	(symbol_found): Add 'function_symbol' parameter.  Use label's PC,
+	not its line.  Set `special_display' and canonical name for
+	labels.
+
+2011-03-24  Tom Tromey  <tromey@redhat.com>
+
+	* linespec.h (struct linespec_result) <special_display>: New
+	field.
+	* breakpoint.h (struct breakpoint) <display_canonical>: New
+	field.
+	* breakpoint.c (print_breakpoint_location): Respect
+	display_canonical.
+	(create_breakpoint_sal): Add 'display_canonical' parameter.
+	(create_breakpoints_sal): Update.
+	(create_breakpoint): Update.
+
+2011-03-24  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (decode_line_spec): Update.
+	* linespec.c (build_canonical_line_spec): Change type of
+	'canonical'.
+	(decode_line_2, decode_line_1, decode_objc, decode_compound)
+	(find_method, decode_all_digits, decode_dollar, decode_label)
+	(symbol_found): Likewise.
+	(init_linespec_result): New function.
+	* breakpoint.c (struct captured_parse_breakpoint_args)
+	<canonical_p>: New field, replaces addr_string_p.
+	(create_breakpoints_sal): Add 'canonical' parameter, replacing
+	'addr_string'.
+	(parse_breakpoint_sals): Likewise.
+	(do_captured_parse_breakpoint): Update.
+	(create_breakpoint): Use struct linespec_result.
+	(until_break_command): Update.
+	(breakpoint_re_set_one): Update.
+	(decode_line_spec_1): Update.
+	* linespec.h (struct linespec_result): New.
+	(init_linespec_result): Declare.
+
+2011-03-23  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.c (regcache_raw_read): If the target didn't supply a
+	given raw register, mark it as unavailable.
+
+2011-03-23  Kai Tietz  <ktietz@redhat.com>
+
+	* breakpoint.c (clear_command): Use filename_cmp
+	instead of strcmp for comparison.
+	* buildsym.c (watch_main_source_file_lossage): Likewise.
+	(patch_subfile_names): Use IS_DIR_SEPARATOR instead of
+	checking just for slash.
+	* dbxread.c (read_dbx_symtab): Use lbasename instead of
+	strrchr and filename_cmp instead of strcmp for filenames.
+	(add_old_header_file): Use filename_cmp
+	instead of strcmp for comparison.
+	* exec.c (exec_set_section_address): Likewise.
+	* macrotab.c (macro_lookup_inclusion): Likewise.
+	(macro_lookup_inclusion): Likewise.
+	* elfread.c (_initialize_elfread): Likewise.
+	(elfstab_offset_sections): Likewise.
+	(elfstab_offset_sections): Use lbasename instead of
+	strrchr.
+	* mdebugread.c (parse_partial_symbols): Likewise.
+	(arse_partial_symbols): Use filename_(n)cmp instead of
+	str(n)cmp for comparison.
+	* minsyms.c (lookup_minimal_symbol): Likewise.
+	* psymtab.c (read_psymtabs_with_filename): Likewise.
+	* solib.c (solib_read_symbols): Likewise.
+	(reload_shared_libraries_1): Likewise.
+	* symmisc.c (maintenance_print_symbols): Likewise.
+	* symfile.c (separate_debug_file_exists): Likewise.
+	(reread_symbols): Likewise.
+	(find_separate_debug_file_by_debuglink): Likewise.
+	* remote-fileio.c (remote_fileio_func_rename): Likewise.
+	* source.c (add_path): Likewise.
+	* symtab.c (filename_seen): Likewise.
+	(file_matches): Likewise.
+	(print_symbol_info): Likewise.
+	(maybe_add_partial_symtab_filename): Likewise.
+	(make_source_files_completion_list): Likewise.
+	* xml-syscall.c (init_sysinfo): Likewise.
+	* windows-nat.c (_initialize_check_for_gdb_ini): Use
+	IS_DIR_SEPARATOR for checking for trailing path separator.
+
+2011-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2expr.c (execute_stack_op): Handle DW_OP_GNU_entry_value.  New
+	label abort_expression.
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc_full): Handle
+	DWARF_VALUE_OPTIMIZED_OUT.
+
+2011-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* c-typeprint.c (c_type_print_args): Change parameter show_artificial
+	to linkage_name.  Invert its value.  Update the function comment.
+	(c_type_print_varspec_suffix): Invert it at the caller.
+	* dwarf2read.c (dwarf2_compute_name): Invert it at the caller.
+
+2011-03-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* infcmd.c (post_create_inferior): Ignore NOT_AVAILABLE_ERROR
+	errors when reading the `stop_pc'.
+	* printcmd.c (pc_prefix): Use get_frame_pc_if_available instead of
+	get_frame_pc.
+
+2011-03-22  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* NEWS: Document gdb.Write stream keyword.
+
+2011-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Revert:
+	2011-03-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	* dwarf2read.c (producer_is_gxx_lt_4_6): New function.
+	(dwarf2_add_field): Fix new_field->accessibility for
+	cu->header.version >= 3 while verifying also producer_is_gxx_lt_4_6.
+
+2011-03-22  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12183
+
+	* python/py-function.c (fnpy_call): Treat GdbErrors differently to
+	other error classes.  Do not print stack trace.
+
+2011-03-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (producer_is_gxx_lt_4_6): New function.
+	(dwarf2_add_field): Fix new_field->accessibility for
+	cu->header.version >= 3 while verifying also producer_is_gxx_lt_4_6.
+
+2011-03-21  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (arm_analyze_prologue): Do not abort parsing when
+	encountering a load via a non-SP register.
+
+2011-03-21  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* tramp-frame.c (tramp_frame_prepend_unwinder): Set stop_reason
+	field in returned unwinder.
+
+2012-03-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* ada-lang.c (replace_operator_with_call): Copy also GDBARCH.
+
+2012-03-21  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (replace_operator_with_call): Use xzalloc instead
+	of xmalloc.
+
 2012-03-18  Pedro Alves  <pedro@codesourcery.com>
 
 	* frame.c (frame_unwind_register): Throw an error if unwinding the
