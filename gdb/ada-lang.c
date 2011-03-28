@@ -3655,12 +3655,13 @@ replace_operator_with_call (struct expression **expp, int pc, int nargs,
   /* A new expression, with 6 more elements (3 for funcall, 4 for function
      symbol, -oplen for operator being replaced).  */
   struct expression *newexp = (struct expression *)
-    xmalloc (sizeof (struct expression)
+    xzalloc (sizeof (struct expression)
              + EXP_ELEM_TO_BYTES ((*expp)->nelts + 7 - oplen));
   struct expression *exp = *expp;
 
   newexp->nelts = exp->nelts + 7 - oplen;
   newexp->language_defn = exp->language_defn;
+  newexp->gdbarch = exp->gdbarch;
   memcpy (newexp->elts, exp->elts, EXP_ELEM_TO_BYTES (pc));
   memcpy (newexp->elts + pc + 7, exp->elts + pc + oplen,
           EXP_ELEM_TO_BYTES (exp->nelts - pc - oplen));
@@ -4757,11 +4758,12 @@ compare_names (const char *string1, const char *string2)
     case '_':
       if (*string2 == '\0')
 	{
-	  if (is_name_suffix (string2))
+	  if (is_name_suffix (string1))
 	    return 0;
 	  else
 	    return -1;
 	}
+      /* FALLTHROUGH */
     default:
       if (*string2 == '(')
 	return strcmp_iw_ordered (string1, string2);

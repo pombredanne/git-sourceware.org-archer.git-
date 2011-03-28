@@ -79,12 +79,13 @@ static bfd_vma opd_entry_value
 
 #define bfd_elf64_mkobject		      ppc64_elf_mkobject
 #define bfd_elf64_bfd_reloc_type_lookup	      ppc64_elf_reloc_type_lookup
-#define bfd_elf64_bfd_reloc_name_lookup ppc64_elf_reloc_name_lookup
+#define bfd_elf64_bfd_reloc_name_lookup	      ppc64_elf_reloc_name_lookup
 #define bfd_elf64_bfd_merge_private_bfd_data  ppc64_elf_merge_private_bfd_data
 #define bfd_elf64_new_section_hook	      ppc64_elf_new_section_hook
 #define bfd_elf64_bfd_link_hash_table_create  ppc64_elf_link_hash_table_create
 #define bfd_elf64_bfd_link_hash_table_free    ppc64_elf_link_hash_table_free
 #define bfd_elf64_get_synthetic_symtab	      ppc64_elf_get_synthetic_symtab
+#define bfd_elf64_bfd_link_just_syms	      ppc64_elf_link_just_syms
 
 #define elf_backend_object_p		      ppc64_elf_object_p
 #define elf_backend_grok_prstatus	      ppc64_elf_grok_prstatus
@@ -4745,6 +4746,25 @@ ppc64_elf_as_needed_cleanup (bfd *ibfd ATTRIBUTE_UNUSED,
   return TRUE;
 }
 
+/* If --just-symbols against a final linked binary, then assume we need
+   toc adjusting stubs when calling functions defined there.  */
+
+static void
+ppc64_elf_link_just_syms (asection *sec, struct bfd_link_info *info)
+{
+  if ((sec->flags & SEC_CODE) != 0
+      && (sec->owner->flags & (EXEC_P | DYNAMIC)) != 0
+      && is_ppc64_elf (sec->owner))
+    {
+      asection *got = bfd_get_section_by_name (sec->owner, ".got");
+      if (got != NULL
+	  && got->size >= elf_backend_got_header_size
+	  && bfd_get_section_by_name (sec->owner, ".opd") != NULL)
+	sec->has_toc_reloc = 1;
+    }
+  _bfd_elf_link_just_syms (sec, info);
+}
+
 static struct plt_entry **
 update_local_sym_info (bfd *abfd, Elf_Internal_Shdr *symtab_hdr,
 		       unsigned long r_symndx, bfd_vma r_addend, int tls_type)
@@ -5465,9 +5485,12 @@ opd_entry_value (asection *opd_sec,
   /* No relocs implies we are linking a --just-symbols object.  */
   if (opd_sec->reloc_count == 0)
     {
-      if (!bfd_get_section_contents (opd_bfd, opd_sec, &val, offset, 8))
+      char buf[8];
+
+      if (!bfd_get_section_contents (opd_bfd, opd_sec, buf, offset, 8))
 	return (bfd_vma) -1;
 
+      val = bfd_get_64 (opd_bfd, buf);
       if (code_sec != NULL)
 	{
 	  asection *sec, *likely = NULL;
@@ -7450,6 +7473,7 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
   bfd *ibfd;
   asection *sec;
   struct ppc_link_hash_table *htab;
+  unsigned char *toc_ref;
   int pass;
 
   if (info->relocatable || !info->executable)
@@ -7459,23 +7483,25 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
   if (htab == NULL)
     return FALSE;
 
-  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
-    {
-      Elf_Internal_Sym *locsyms = NULL;
-      asection *toc = bfd_get_section_by_name (ibfd, ".toc");
-      unsigned char *toc_ref = NULL;
+  /* Make two passes over the relocs.  On the first pass, mark toc
+     entries involved with tls relocs, and check that tls relocs
+     involved in setting up a tls_get_addr call are indeed followed by
+     such a call.  If they are not, we can't do any tls optimization.
+     On the second pass twiddle tls_mask flags to notify
+     relocate_section that optimization can be done, and adjust got
+     and plt refcounts.  */
+  toc_ref = NULL;
+  for (pass = 0; pass < 2; ++pass)
+    for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+      {
+	Elf_Internal_Sym *locsyms = NULL;
+	asection *toc = bfd_get_section_by_name (ibfd, ".toc");
 
-      /* Look at all the sections for this file.  Make two passes over
-	 the relocs.  On the first pass, mark toc entries involved
-	 with tls relocs, and check that tls relocs involved in
-	 setting up a tls_get_addr call are indeed followed by such a
-	 call.  If they are not, exclude them from the optimizations
-	 done on the second pass.  */
-      for (pass = 0; pass < 2; ++pass)
 	for (sec = ibfd->sections; sec != NULL; sec = sec->next)
 	  if (sec->has_tls_reloc && !bfd_is_abs_section (sec->output_section))
 	    {
 	      Elf_Internal_Rela *relstart, *rel, *relend;
+	      bfd_boolean found_tls_get_addr_arg = 0;
 
 	      /* Read the relocations.  */
 	      relstart = _bfd_elf_link_read_relocs (ibfd, sec, NULL, NULL,
@@ -7497,6 +7523,7 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 		  bfd_boolean ok_tprel, is_local;
 		  long toc_ref_index = 0;
 		  int expecting_tls_get_addr = 0;
+		  bfd_boolean ret = FALSE;
 
 		  r_symndx = ELF64_R_SYM (rel->r_info);
 		  if (!get_sym_h (&h, &sym, &sym_sec, &tls_mask, &locsyms,
@@ -7511,7 +7538,7 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 			  && (elf_symtab_hdr (ibfd).contents
 			      != (unsigned char *) locsyms))
 			free (locsyms);
-		      return FALSE;
+		      return ret;
 		    }
 
 		  if (h != NULL)
@@ -7522,7 +7549,10 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 		      else if (h->root.type == bfd_link_hash_undefweak)
 			value = 0;
 		      else
-			continue;
+			{
+			  found_tls_get_addr_arg = 0;
+			  continue;
+			}
 		    }
 		  else
 		    /* Symbols referenced by TLS relocs must be of type
@@ -7549,11 +7579,34 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 		    }
 
 		  r_type = ELF64_R_TYPE (rel->r_info);
+		  /* If this section has old-style __tls_get_addr calls
+		     without marker relocs, then check that each
+		     __tls_get_addr call reloc is preceded by a reloc
+		     that conceivably belongs to the __tls_get_addr arg
+		     setup insn.  If we don't find matching arg setup
+		     relocs, don't do any tls optimization.  */
+		  if (pass == 0
+		      && sec->has_tls_get_addr_call
+		      && h != NULL
+		      && (h == &htab->tls_get_addr->elf
+			  || h == &htab->tls_get_addr_fd->elf)
+		      && !found_tls_get_addr_arg
+		      && is_branch_reloc (r_type))
+		    {
+		      info->callbacks->minfo (_("%C __tls_get_addr lost arg, "
+						"TLS optimization disabled\n"),
+					      ibfd, sec, rel->r_offset);
+		      ret = TRUE;
+		      goto err_free_rel;
+		    }
+
+		  found_tls_get_addr_arg = 0;
 		  switch (r_type)
 		    {
 		    case R_PPC64_GOT_TLSLD16:
 		    case R_PPC64_GOT_TLSLD16_LO:
 		      expecting_tls_get_addr = 1;
+		      found_tls_get_addr_arg = 1;
 		      /* Fall thru */
 
 		    case R_PPC64_GOT_TLSLD16_HI:
@@ -7573,6 +7626,7 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 		    case R_PPC64_GOT_TLSGD16:
 		    case R_PPC64_GOT_TLSGD16_LO:
 		      expecting_tls_get_addr = 1;
+		      found_tls_get_addr_arg = 1;
 		      /* Fall thru */
 
 		    case R_PPC64_GOT_TLSGD16_HI:
@@ -7601,11 +7655,14 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 			}
 		      continue;
 
-		    case R_PPC64_TOC16:
-		    case R_PPC64_TOC16_LO:
-		    case R_PPC64_TLS:
 		    case R_PPC64_TLSGD:
 		    case R_PPC64_TLSLD:
+		      found_tls_get_addr_arg = 1;
+		      /* Fall thru */
+
+		    case R_PPC64_TLS:
+		    case R_PPC64_TOC16:
+		    case R_PPC64_TOC16_LO:
 		      if (sym_sec == NULL || sym_sec != toc)
 			continue;
 
@@ -7614,18 +7671,17 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 			 case of R_PPC64_TLS, and after checking for
 			 tls_get_addr for the TOC16 relocs.  */
 		      if (toc_ref == NULL)
-			{
-			  toc_ref = bfd_zmalloc (toc->size / 8);
-			  if (toc_ref == NULL)
-			    goto err_free_rel;
-			}
+			toc_ref = bfd_zmalloc (toc->output_section->rawsize / 8);
+		      if (toc_ref == NULL)
+			goto err_free_rel;
+
 		      if (h != NULL)
 			value = h->root.u.def.value;
 		      else
 			value = sym->st_value;
 		      value += rel->r_addend;
 		      BFD_ASSERT (value < toc->size && value % 8 == 0);
-		      toc_ref_index = value / 8;
+		      toc_ref_index = (value + toc->output_offset) / 8;
 		      if (r_type == R_PPC64_TLS
 			  || r_type == R_PPC64_TLSGD
 			  || r_type == R_PPC64_TLSLD)
@@ -7646,7 +7702,7 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 		      if (pass == 0
 			  || sec != toc
 			  || toc_ref == NULL
-			  || !toc_ref[rel->r_offset / 8])
+			  || !toc_ref[(rel->r_offset + toc->output_offset) / 8])
 			continue;
 		      if (ok_tprel)
 			{
@@ -7661,7 +7717,7 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 		      if (pass == 0
 			  || sec != toc
 			  || toc_ref == NULL
-			  || !toc_ref[rel->r_offset / 8])
+			  || !toc_ref[(rel->r_offset + toc->output_offset) / 8])
 			continue;
 		      if (rel + 1 < relend
 			  && (rel[1].r_info
@@ -7713,8 +7769,13 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 						     rel, ibfd);
 			      if (retval == 0)
 				goto err_free_rel;
-			      if (retval > 1 && toc_tls != NULL)
-				toc_ref[toc_ref_index] = 1;
+			      if (toc_tls != NULL)
+				{
+				  if ((*toc_tls & (TLS_GD | TLS_LD)) != 0)
+				    found_tls_get_addr_arg = 1;
+				  if (retval > 1)
+				    toc_ref[toc_ref_index] = 1;
+				}
 			    }
 			  continue;
 			}
@@ -7725,9 +7786,12 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 		      /* Uh oh, we didn't find the expected call.  We
 			 could just mark this symbol to exclude it
 			 from tls optimization but it's safer to skip
-			 the entire section.  */
-		      sec->has_tls_reloc = 0;
-		      break;
+			 the entire optimization.  */
+		      info->callbacks->minfo (_("%C arg lost __tls_get_addr, "
+						"TLS optimization disabled\n"),
+					      ibfd, sec, rel->r_offset);
+		      ret = TRUE;
+		      goto err_free_rel;
 		    }
 
 		  if (expecting_tls_get_addr && htab->tls_get_addr != NULL)
@@ -7813,18 +7877,18 @@ ppc64_elf_tls_optimize (struct bfd_link_info *info)
 		free (relstart);
 	    }
 
-      if (toc_ref != NULL)
-	free (toc_ref);
+	if (locsyms != NULL
+	    && (elf_symtab_hdr (ibfd).contents != (unsigned char *) locsyms))
+	  {
+	    if (!info->keep_memory)
+	      free (locsyms);
+	    else
+	      elf_symtab_hdr (ibfd).contents = (unsigned char *) locsyms;
+	  }
+      }
 
-      if (locsyms != NULL
-	  && (elf_symtab_hdr (ibfd).contents != (unsigned char *) locsyms))
-	{
-	  if (!info->keep_memory)
-	    free (locsyms);
-	  else
-	    elf_symtab_hdr (ibfd).contents = (unsigned char *) locsyms;
-	}
-    }
+  if (toc_ref != NULL)
+    free (toc_ref);
   return TRUE;
 }
 
@@ -9401,6 +9465,37 @@ get_relocs (asection *sec, int count)
   return relocs;
 }
 
+static bfd_vma
+get_r2off (struct ppc_link_hash_table *htab,
+	   struct ppc_stub_hash_entry *stub_entry)
+{
+  bfd_vma r2off = htab->stub_group[stub_entry->target_section->id].toc_off;
+
+  if (r2off == 0)
+    {
+      /* Support linking -R objects.  Get the toc pointer from the
+	 opd entry.  */
+      char buf[8];
+      asection *opd = stub_entry->h->elf.root.u.def.section;
+      bfd_vma opd_off = stub_entry->h->elf.root.u.def.value;
+
+      if (strcmp (opd->name, ".opd") != 0
+	  || opd->reloc_count != 0)
+	{
+	  (*_bfd_error_handler) (_("cannot find opd entry toc for %s"),
+				 stub_entry->h->elf.root.root.string);
+	  bfd_set_error (bfd_error_bad_value);
+	  return 0;
+	}
+      if (!bfd_get_section_contents (opd->owner, opd, buf, opd_off + 8, 8))
+	return 0;
+      r2off = bfd_get_64 (opd->owner, buf);
+      r2off -= elf_gp (stub_entry->id_sec->output_section->owner);
+    }
+  r2off -= htab->stub_group[stub_entry->id_sec->id].toc_off;
+  return r2off;
+}
+
 static bfd_boolean
 ppc_build_one_stub (struct bfd_hash_entry *gen_entry, void *in_arg)
 {
@@ -9445,10 +9540,13 @@ ppc_build_one_stub (struct bfd_hash_entry *gen_entry, void *in_arg)
       size = 4;
       if (stub_entry->stub_type == ppc_stub_long_branch_r2off)
 	{
-	  bfd_vma r2off;
+	  bfd_vma r2off = get_r2off (htab, stub_entry);
 
-	  r2off = (htab->stub_group[stub_entry->target_section->id].toc_off
-		   - htab->stub_group[stub_entry->id_sec->id].toc_off);
+	  if (r2off == 0)
+	    {
+	      htab->stub_error = TRUE;
+	      return FALSE;
+	    }
 	  bfd_put_32 (htab->stub_bfd, STD_R2_40R1, loc);
 	  loc += 4;
 	  size = 12;
@@ -9632,10 +9730,14 @@ ppc_build_one_stub (struct bfd_hash_entry *gen_entry, void *in_arg)
 	}
       else
 	{
-	  bfd_vma r2off;
+	  bfd_vma r2off = get_r2off (htab, stub_entry);
 
-	  r2off = (htab->stub_group[stub_entry->target_section->id].toc_off
-		   - htab->stub_group[stub_entry->id_sec->id].toc_off);
+	  if (r2off == 0)
+	    {
+	      htab->stub_error = TRUE;
+	      return FALSE;
+	    }
+
 	  bfd_put_32 (htab->stub_bfd, STD_R2_40R1, loc);
 	  loc += 4;
 	  size = 20;
@@ -9875,8 +9977,12 @@ ppc_size_one_stub (struct bfd_hash_entry *gen_entry, void *in_arg)
       size = 4;
       if (stub_entry->stub_type == ppc_stub_long_branch_r2off)
 	{
-	  r2off = (htab->stub_group[stub_entry->target_section->id].toc_off
-		   - htab->stub_group[stub_entry->id_sec->id].toc_off);
+	  r2off = get_r2off (htab, stub_entry);
+	  if (r2off == 0)
+	    {
+	      htab->stub_error = TRUE;
+	      return FALSE;
+	    }
 	  size = 12;
 	  if (PPC_HA (r2off) != 0)
 	    size = 16;
@@ -11590,7 +11696,7 @@ ppc64_elf_relocate_section (bfd *output_bfd,
       bfd_boolean unresolved_reloc;
       bfd_boolean warned;
       unsigned int insn;
-      bfd_vma mask;
+      unsigned int mask;
       struct ppc_stub_hash_entry *stub_entry;
       bfd_vma max_br_offset;
       bfd_vma from;
@@ -13126,8 +13232,8 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 	  if (((relocation + addend) & mask) != 0)
 	    {
 	      (*_bfd_error_handler)
-		(_("%B: error: relocation %s not a multiple of %d"),
-		 input_bfd,
+		(_("%B(%A+0x%lx): error: %s not a multiple of %u"),
+		 input_bfd, input_section, (long) rel->r_offset,
 		 ppc64_elf_howto_table[r_type]->name,
 		 mask + 1);
 	      bfd_set_error (bfd_error_bad_value);

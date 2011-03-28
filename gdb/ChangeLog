@@ -1,3 +1,1254 @@
+2011-03-25  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (arm_elf_make_msymbol_special): Use ARM_SYM_BRANCH_TYPE
+	instead of checking for STT_ARM_TFUNC symbol type.
+
+2011-03-25  Tom Tromey  <tromey@redhat.com>
+
+	* linespec.c (symbol_found): Restore line-based result for
+	non-LOC_LABEL symbols.
+
+2011-03-25  Kai Tietz  <ktietz@redhat.com>
+
+	* tui/tui-source.c (tui_set_source_content): Use filename_cmp
+	instead of strcmp for comparison.
+	(tui_source_is_displayed): Likewise.
+	* tui/tui-winsource.c (tui_update_breakpoint_info): Likewise.
+
+2011-03-24  Mark Wielaard  <mjw@redhat.com>
+
+        * dwarf2read.c (lookup_signatured_type): Use DW_FORM_ref_sig8 in
+        complaint.
+        (skip_one_die): Use DW_FORM_ref_sig8, not DW_FORM_sig8.
+        (find_partial_die_in_comp_unit): Likewise in comment.
+        (read_attribute_value): Likewise.
+        (lookup_die_type): Likewise.
+        (dwarf_form_name): Likewise.
+        (dump_die_shallow): Likewise.
+        (follow_die_ref_or_sig): Likewise.
+
+2011-03-24  Tom Tromey  <tromey@redhat.com>
+
+	PR breakpoints/11816:
+	* linespec.c (decode_line_1): Parse `function:label' linespecs.
+	(decode_compound): Update.
+	(find_function_symbol): New function.
+	(decode_dollar): Update.
+	(decode_label): Add 'function_symbol' parameter.  Handle
+	function-relative labels.
+	(decode_variable): Update.
+	(symbol_found): Add 'function_symbol' parameter.  Use label's PC,
+	not its line.  Set `special_display' and canonical name for
+	labels.
+
+2011-03-24  Tom Tromey  <tromey@redhat.com>
+
+	* linespec.h (struct linespec_result) <special_display>: New
+	field.
+	* breakpoint.h (struct breakpoint) <display_canonical>: New
+	field.
+	* breakpoint.c (print_breakpoint_location): Respect
+	display_canonical.
+	(create_breakpoint_sal): Add 'display_canonical' parameter.
+	(create_breakpoints_sal): Update.
+	(create_breakpoint): Update.
+
+2011-03-24  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (decode_line_spec): Update.
+	* linespec.c (build_canonical_line_spec): Change type of
+	'canonical'.
+	(decode_line_2, decode_line_1, decode_objc, decode_compound)
+	(find_method, decode_all_digits, decode_dollar, decode_label)
+	(symbol_found): Likewise.
+	(init_linespec_result): New function.
+	* breakpoint.c (struct captured_parse_breakpoint_args)
+	<canonical_p>: New field, replaces addr_string_p.
+	(create_breakpoints_sal): Add 'canonical' parameter, replacing
+	'addr_string'.
+	(parse_breakpoint_sals): Likewise.
+	(do_captured_parse_breakpoint): Update.
+	(create_breakpoint): Use struct linespec_result.
+	(until_break_command): Update.
+	(breakpoint_re_set_one): Update.
+	(decode_line_spec_1): Update.
+	* linespec.h (struct linespec_result): New.
+	(init_linespec_result): Declare.
+
+2011-03-23  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.c (regcache_raw_read): If the target didn't supply a
+	given raw register, mark it as unavailable.
+
+2011-03-23  Kai Tietz  <ktietz@redhat.com>
+
+	* breakpoint.c (clear_command): Use filename_cmp
+	instead of strcmp for comparison.
+	* buildsym.c (watch_main_source_file_lossage): Likewise.
+	(patch_subfile_names): Use IS_DIR_SEPARATOR instead of
+	checking just for slash.
+	* dbxread.c (read_dbx_symtab): Use lbasename instead of
+	strrchr and filename_cmp instead of strcmp for filenames.
+	(add_old_header_file): Use filename_cmp
+	instead of strcmp for comparison.
+	* exec.c (exec_set_section_address): Likewise.
+	* macrotab.c (macro_lookup_inclusion): Likewise.
+	(macro_lookup_inclusion): Likewise.
+	* elfread.c (_initialize_elfread): Likewise.
+	(elfstab_offset_sections): Likewise.
+	(elfstab_offset_sections): Use lbasename instead of
+	strrchr.
+	* mdebugread.c (parse_partial_symbols): Likewise.
+	(arse_partial_symbols): Use filename_(n)cmp instead of
+	str(n)cmp for comparison.
+	* minsyms.c (lookup_minimal_symbol): Likewise.
+	* psymtab.c (read_psymtabs_with_filename): Likewise.
+	* solib.c (solib_read_symbols): Likewise.
+	(reload_shared_libraries_1): Likewise.
+	* symmisc.c (maintenance_print_symbols): Likewise.
+	* symfile.c (separate_debug_file_exists): Likewise.
+	(reread_symbols): Likewise.
+	(find_separate_debug_file_by_debuglink): Likewise.
+	* remote-fileio.c (remote_fileio_func_rename): Likewise.
+	* source.c (add_path): Likewise.
+	* symtab.c (filename_seen): Likewise.
+	(file_matches): Likewise.
+	(print_symbol_info): Likewise.
+	(maybe_add_partial_symtab_filename): Likewise.
+	(make_source_files_completion_list): Likewise.
+	* xml-syscall.c (init_sysinfo): Likewise.
+	* windows-nat.c (_initialize_check_for_gdb_ini): Use
+	IS_DIR_SEPARATOR for checking for trailing path separator.
+
+2011-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2expr.c (execute_stack_op): Handle DW_OP_GNU_entry_value.  New
+	label abort_expression.
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc_full): Handle
+	DWARF_VALUE_OPTIMIZED_OUT.
+
+2011-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* c-typeprint.c (c_type_print_args): Change parameter show_artificial
+	to linkage_name.  Invert its value.  Update the function comment.
+	(c_type_print_varspec_suffix): Invert it at the caller.
+	* dwarf2read.c (dwarf2_compute_name): Invert it at the caller.
+
+2011-03-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* infcmd.c (post_create_inferior): Ignore NOT_AVAILABLE_ERROR
+	errors when reading the `stop_pc'.
+	* printcmd.c (pc_prefix): Use get_frame_pc_if_available instead of
+	get_frame_pc.
+
+2011-03-22  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* NEWS: Document gdb.Write stream keyword.
+
+2011-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Revert:
+	2011-03-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	* dwarf2read.c (producer_is_gxx_lt_4_6): New function.
+	(dwarf2_add_field): Fix new_field->accessibility for
+	cu->header.version >= 3 while verifying also producer_is_gxx_lt_4_6.
+
+2011-03-22  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12183
+
+	* python/py-function.c (fnpy_call): Treat GdbErrors differently to
+	other error classes.  Do not print stack trace.
+
+2011-03-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (producer_is_gxx_lt_4_6): New function.
+	(dwarf2_add_field): Fix new_field->accessibility for
+	cu->header.version >= 3 while verifying also producer_is_gxx_lt_4_6.
+
+2011-03-21  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-tdep.c (arm_analyze_prologue): Do not abort parsing when
+	encountering a load via a non-SP register.
+
+2011-03-21  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* tramp-frame.c (tramp_frame_prepend_unwinder): Set stop_reason
+	field in returned unwinder.
+
+2012-03-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* ada-lang.c (replace_operator_with_call): Copy also GDBARCH.
+
+2012-03-21  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (replace_operator_with_call): Use xzalloc instead
+	of xmalloc.
+
+2012-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* frame.c (frame_unwind_register): Throw an error if unwinding the
+	register failed.
+	* get_prev_frame_1 (get_prev_frame_1): Ask the unwinder if there's
+	an unwind stop reason.
+	(frame_stop_reason_string): Handle UNWIND_UNAVAILABLE.
+	* frame.h (enum unwind_stop_reason) <UNWIND_OUTERMOST,
+	UNWIND_UNAVAILABLE>: New.
+	* inline-frame.c (inline_frame_unwind): Install
+	default_frame_unwind_stop_reason.
+	* frame-unwind.c: Include "exceptions.h".
+	(frame_unwind_find_by_frame): Swallow NOT_AVAILABLE_ERROR errors.
+	(default_frame_unwind_stop_reason): New.
+	* frame-unwind.h (frame_unwind_stop_reason_ftype): New typedef.
+	(default_frame_unwind_stop_reason): Declare.
+	(struct frame_unwind) <stop_reason>: New function pointer.
+
+	* dummy-frame.c: Install default_frame_unwind_stop_reason.
+	* dwarf2-frame.c: Include exceptions.h.
+	(struct dwarf2_frame_cache) <unavailable_retaddr>: New field.
+	(dwarf2_frame_cache): Swallow NOT_AVAILABLE_ERROR errors when
+	computing the CFA.  If such an error was thrown, set
+	unavailable_retaddr.
+	(dwarf2_frame_unwind_stop_reason): New.
+	(dwarf2_frame_this_id): Don't build a frame id if the CFA was
+	unavailable.
+	(dwarf2_frame_unwind): Install dwarf2_frame_unwind_stop_reason.
+	(dwarf2_signal_frame_unwind): Ditto.
+
+	* amd64-tdep.c: Include "exceptions.h".
+	(struct amd64_frame_cache): New field "base_p".
+	(amd64_init_frame_cache): Clear it.
+	(amd64_frame_cache_1): New, factored out from amd64_frame_cache.
+	Avoid reading registers with functions that throw if the register
+	is not necessary to compute the frame base.
+	(amd64_frame_cache): Reimplement wrapping amd64_frame_cache_1, and
+	swallowing NOT_AVAILABLE_ERROR.
+	(amd64_frame_unwind_stop_reason): New.
+	(amd64_frame_this_id): Don't build a frame id if the frame base
+	was unavailable.
+	(amd64_frame_unwind): Install amd64_frame_unwind_stop_reason.
+	(amd64_sigtramp_frame_cache): Swallow NOT_AVAILABLE_ERROR, and set
+	base_p if the frame base was computable.
+	(amd64_sigtramp_frame_unwind_stop_reason): New.
+	(amd64_sigtramp_frame_this_id): Don't build a frame id if the
+	frame base was unavailable.
+	(amd64_sigtramp_frame_unwind): Install
+	amd64_sigtramp_frame_unwind_stop_reason.
+	(amd64_epilogue_frame_cache): Swallow NOT_AVAILABLE_ERROR, and set
+	base_p if the frame base was computable.
+	(amd64_epilogue_frame_unwind_stop_reason): New.
+	(amd64_epilogue_frame_this_id): Don't build a frame id if the
+	frame base was unavailable.
+	(amd64_epilogue_frame_unwind): Install
+	amd64_epilogue_frame_unwind_stop_reason.
+	* i386-tdep.c: Include "exceptions.h".
+	(struct i386_frame_cache): New field "base_p".
+	(i386_init_frame_cache): Clear it.
+	(i386_frame_cache_1): New, factored out from amd64_frame_cache.
+	Avoid reading registers with functions that throw if the register
+	is not necessary to compute the frame base.
+	(i386_frame_cache): Reimplement wrapping amd64_frame_cache_1, and
+	swallowing NOT_AVAILABLE_ERROR.
+	(i386_frame_unwind_stop_reason): New.
+	(i386_frame_this_id): Don't build a frame id if the frame base was
+	unavailable.
+	(i386_frame_prev_register): Handle unavailable SP.
+	(i386_frame_unwind): Install i386_frame_unwind_stop_reason.
+	(i386_epilogue_frame_cache): Swallow NOT_AVAILABLE_ERROR, and set
+	base_p if the frame base was computable.
+	(i386_epilogue_frame_unwind_stop_reason): New.
+	(i386_epilogue_frame_this_id): Don't build a frame id if the frame
+	base was unavailable.
+	(i386_epilogue_frame_unwind): Install
+	i386_epilogue_frame_unwind_stop_reason.
+	(i386_sigtramp_frame_cache): Swallow NOT_AVAILABLE_ERROR, and set
+	base_p if the frame base was computable.
+	(i386_sigtramp_frame_unwind_stop_reason): New.
+	(i386_sigtramp_frame_this_id): Don't build a frame id if the frame
+	base was unavailable.
+	(i386_sigtramp_frame_unwind): Install
+	i386_sigtramp_frame_unwind_stop_reason.
+	* sentinel-frame.c (sentinel_frame_prev_register): Use the value
+	type's size, not the register's.
+	(sentinel_frame_unwind): Install default_frame_unwind_stop_reason.
+
+	* alpha-mdebug-tdep.c (alpha_mdebug_frame_unwind): Install
+	default_frame_unwind_stop_reason.
+	* alpha-tdep.c (alpha_sigtramp_frame_unwind)
+	(alpha_heuristic_frame_unwind): Ditto.
+	* amd64obsd-tdep.c (amd64obsd_trapframe_unwind): Ditto.
+	* arm-tdep.c (arm_prologue_unwind, arm_stub_unwind): Ditto.
+	* avr-tdep.c (avr_frame_unwind): Ditto.
+	* cris-tdep.c (cris_sigtramp_frame_unwind, cris_frame_unwind):
+	Ditto.
+	* frv-linux-tdep.c (frv_linux_sigtramp_frame_unwind): Ditto.
+	* frv-tdep.c (frv_frame_unwind): Ditto.
+	* h8300-tdep.c (h8300_frame_unwind): Ditto.
+	* hppa-hpux-tdep.c (hppa_hpux_sigtramp_frame_unwind): Ditto.
+	* hppa-linux-tdep.c (hppa_linux_sigtramp_frame_unwind): Ditto.
+	* hppa-tdep.c (hppa_frame_unwind, hppa_fallback_frame_unwind)
+	(hppa_stub_frame_unwind): Ditto.
+	* i386obsd-tdep.c (i386obsd_trapframe_unwind): Ditto.
+	* ia64-tdep.c (ia64_frame_unwind, ia64_sigtramp_frame_unwind)
+	(ia64_libunwind_frame_unwind)
+	(ia64_libunwind_sigtramp_frame_unwind): Ditto.
+	* iq2000-tdep.c (iq2000_frame_unwind): Ditto.
+	* lm32-tdep.c (lm32_frame_unwind): Ditto.
+	* m32c-tdep.c (m32c_unwind): Ditto.
+	* m32r-linux-tdep.c (m32r_linux_sigtramp_frame_unwind): Ditto.
+	* m32r-tdep.c (m32r_frame_unwind): Ditto.
+	* m68hc11-tdep.c (m68hc11_frame_unwind): Ditto.
+	* m68k-tdep.c (m68k_frame_unwind): Ditto.
+	* m68klinux-tdep.c (m68k_linux_sigtramp_frame_unwind): Ditto.
+	* m88k-tdep.c (m88k_frame_unwind): Ditto.
+	* mep-tdep.c (mep_frame_unwind): Ditto.
+	* microblaze-tdep.c (microblaze_frame_unwind): Ditto.
+	* mips-tdep.c (mips_insn16_frame_unwind, mips_insn32_frame_unwind)
+	(mips_stub_frame_unwind): Ditto.
+	* mn10300-tdep.c (mn10300_frame_unwind): Ditto.
+	* moxie-tdep.c (moxie_frame_unwind): Ditto.
+	* mt-tdep.c (mt_frame_unwind): Ditto.
+	* ppc-linux-tdep.c (ppu2spu_unwind): Ditto.
+	* ppcobsd-tdep.c (ppcobsd_sigtramp_frame_unwind): Ditto.
+	* rs6000-tdep.c (rs6000_frame_unwind): Ditto.
+	* s390-tdep.c (s390_frame_unwind, s390_stub_frame_unwind)
+	(s390_sigtramp_frame_unwind): Ditto.
+	* score-tdep.c (score_prologue_unwind): Ditto.
+	* sh-tdep.c (sh_frame_unwind): Ditto.
+	* sh64-tdep.c (sh64_frame_unwind): Ditto.
+	* sparc-sol2-tdep.c (sparc32_sol2_sigtramp_frame_unwind): Ditto.
+	* sparc-tdep.c (sparc32_frame_unwind): Ditto.
+	* sparc64-sol2-tdep.c (sparc64_sol2_sigtramp_frame_unwind): Ditto.
+	* sparc64-tdep.c (sparc64_frame_unwind): Ditto.
+	* sparc64fbsd-tdep.c (sparc64fbsd_sigtramp_frame_unwind): Ditto.
+	* sparc64nbsd-tdep.c (sparc64nbsd_sigcontext_frame_unwind): Ditto.
+	* sparc64obsd-tdep.c (sparc64obsd_frame_unwind)
+	(sparc64obsd_trapframe_unwind): Ditto.
+	* sparcnbsd-tdep.c (sparc32nbsd_sigcontext_frame_unwind): Ditto.
+	* sparcobsd-tdep.c (sparc32obsd_sigtramp_frame_unwind): Ditto.
+	* spu-tdep.c (spu_frame_unwind, spu2ppu_unwind): Ditto.
+	* v850-tdep.c (v850_frame_unwind): Ditto.
+	* vax-tdep.c (vax_frame_unwind): Ditto.
+	* vaxobsd-tdep.c (vaxobsd_sigtramp_frame_unwind): Ditto.
+	* xstormy16-tdep.c (frame_unwind xstormy16_frame_unwind): Ditto.
+	* xtensa-tdep.c (xtensa_unwind): Ditto.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* tui/tui-hooks.c (tui_selected_frame_level_changed_hook): Assume
+	there's always a frame.  Use get_frame_pc_if_available instead of
+	get_frame_pc, and if there's no PC available, don't look up a
+	symtab.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* stack.c (print_frame_local_vars, print_frame_arg_vars): Handle
+	unavailable PC.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* tracepoint.c (set_traceframe_context): Handle unavailable PC
+	gracefully.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* frame.h (frame_unwind_caller_pc_if_available): Declare.
+	* frame.c (frame_unwind_caller_pc_if_available): New.
+	* stack.c (frame_info): Handle unavailable PC.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* frame.c (frame_unwind_pc): Rename to ...
+	(frame_unwind_pc_if_available): ... this.  New `pc' output
+	parameter.  Change return type to int.  Gracefully handle
+	gdbarch_unwind_pc throwing NOT_AVAILABLE_ERROR.  Return 0 if that
+	happened, or 1 otherwise.
+	(frame_unwind_pc): Reimplement on top of
+	frame_unwind_pc_if_available.
+	(get_frame_func): Rename to ...
+	(get_frame_func_if_available): New `pc' output parameter.  Change
+	return type to int.  Gracefully handle the PC not being available.
+	(get_frame_func): Reimplement on top of
+	get_frame_func_if_available.
+	(select_frame): Handle the PC being unavailable.
+	(get_prev_frame): Handle the PC being unavailable.
+	(get_frame_pc_if_available): New.
+	(get_frame_address_in_block_if_available): New.
+	(find_frame_sal): Handle the frame PC not being available.
+	* frame.h (get_frame_pc_if_available): Declare.
+	(get_frame_address_in_block_if_available): Declare.
+	(get_frame_func_if_available): Declare.
+	* stack.c (print_frame_info): Handle the PC being unavailable.
+	(find_frame_funname): Ditto.
+	(print_frame): Handle the PC being unavailable.
+	(get_frame_language): Ditto.
+	* blockframe.c (get_frame_block): Ditto.
+	* macroscope.c (default_macro_scope): Ditto.
+	* tui/tui-stack.c (tui_show_frame_info): Ditto.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc): Catch
+	NOT_AVAILABLE_ERROR when evaluating the location expression.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* dwarf2loc.c (read_pieced_value): Handle get_frame_register_bytes
+	returning that the register piece is unavailable/optimized out.
+	(write_pieced_value): Handle get_frame_register_bytes returning
+	that the register piece is unavailable/optimized out when doing a
+	read-modify write of a bitfield.
+	* findvar.c (value_from_register): Handle get_frame_register_bytes
+	returning that the register piece is unavailable/optimized out.
+	* frame.c (get_frame_register_bytes): New parameters `optimizedp'
+	and `unavailablep'.  Throw error on bad debug info.  Use
+	frame_register instead of frame_register_read, to fill in the new
+	arguments.
+	* frame.h (get_frame_register_bytes): New parameters `optimizedp'
+	and `unavailablep'.
+	* valops.c: (value_assign): Adjust, and handle
+	get_frame_register_bytes failing.
+	* spu-tdep.c: Include exceptions.h.
+	(spu_software_single_step): Adjust, and handle
+	get_frame_register_bytes failing.
+	(spu_get_longjmp_target): Ditto.
+	* gdbarch.sh (register_to_value): Change to return int.  New
+	parameters `optimizedp' and `unavailablep'.
+	* gdbarch.h, gdbarch.c: Regenerate.
+	* i386-tdep.c (i386_register_to_value): Adjust to new
+	gdbarch_register_to_value interface.
+	* i387-tdep.c (i387_register_to_value): Ditto.
+	* i387-tdep.h (i387_register_to_value): Ditto.
+	* alpha-tdep.c (alpha_register_to_value): Ditto.
+	* ia64-tdep.c (ia64_register_to_value): Ditto.
+	* m68k-tdep.c (m68k_register_to_value): Ditto.
+	* mips-tdep.c (mips_register_to_value): Ditto.
+	* rs6000-tdep.c (rs6000_register_to_value): Ditto.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* findvar.c (value_of_register): Mark the value as unavailable, if
+	the register is unavailable.
+	* frame.h (frame_register_unwind): New `unavailablep' parameter.
+	(frame_register): New `unavailablep' parameter.
+	(frame_register_read): Update comment.
+	* frame.c (frame_register_unwind): New `unavailablep' parameter.
+	Set it if the register is unavailable.  If the register is
+	unavailable, clear the output buffer.
+	(frame_register): New `unavailablep' parameter.  Pass it down.
+	(frame_unwind_register): Adjust.
+	(put_frame_register): Adjust.
+	(frame_register_read): Adjust.  Also return false if the register
+	is not available.
+	(frame_register_unwind_location): Adjust.
+	* sentinel-frame.c (sentinel_frame_prev_register): If the register
+	is unavailable, mark the value accordingly.
+	* stack.c (frame_info): Handle unavailable registers.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* mi/mi-main.c (register_changed_p): Handle REG_UNAVAILABLE, and
+	simplify, using regcache_cooked_read.
+
+2011-03-18  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.h (regcache_raw_read, regcache_raw_read_signed)
+	(regcache_raw_read_unsigned, regcache_raw_read_signed)
+	(regcache_raw_read_unsigned, regcache_raw_read_part)
+	(regcache_cooked_read, regcache_cooked_read_signed)
+	(regcache_cooked_read_unsigned, regcache_cooked_read_part)
+	(regcache_cooked_read_ftype): Change return to enum
+	register_status.
+	* regcache.c: Include exceptions.h
+	(regcache_save): Adjust to handle REG_UNAVAILABLE registers.
+	(do_cooked_read): Change return to enum register_status.  Always
+	forward to regcache_cooked_read.
+	(regcache_raw_read): Change return to enum register_status.  If
+	the register is not REG_VALID, memset the buffer.  Return the
+	register's status.
+	(regcache_raw_read_signed): Handle non-REG_VALID registers and
+	return the register's status.
+	(regcache_raw_read_unsigned): Ditto.
+	(regcache_cooked_read): Change return to enum register_status.
+	Assert that with read-only regcaches, the register's status must
+	be known.  If the regcache is read-only, and the register is not
+	REG_VALID, memset the buffer.  Return the register's status.
+	(regcache_cooked_read_signed): Change return to enum
+	register_status.  Handle non-REG_VALID registers and return the
+	register's status.
+	(regcache_cooked_read_unsigned): Change return to enum
+	register_status.  Handle non-REG_VALID registers and return the
+	register's status.
+	(regcache_xfer_part, regcache_raw_read_part)
+	(regcache_cooked_read_part): Change return to enum
+	register_status.  Return the register's status.
+	(regcache_read_pc): Throw NOT_AVAILABLE_ERROR if the register is
+	unavailable.
+	(regcache_dump): Handle unavailable cooked registers.
+	* frame.c (do_frame_register_read): Adjust interface to match
+	regcache_cooked_read_ftype.
+	* gdbarch.sh (pseudo_register_read): Change return to enum
+	register_status.
+	* gdbarch.h, gdbarch.c: Regenerate.
+
+	* i386-tdep.h (i386_pseudo_register_read): Change return to enum
+	register_status.
+	* i386-tdep.c (i386_pseudo_register_read): Change return to enum
+	register_status.  If reading a raw register indicates the raw
+	register is not valid, return the raw register's status,
+	otherwise, return REG_VALID.
+	* amd64-tdep.c (amd64_pseudo_register_read): Change return to enum
+	register_status.  Handle non-REG_VALID raw registers and return
+	the register's status.
+	* arm-tdep.c (arm_neon_quad_read)
+	(arm_pseudo_read): Change return to enum register_status.  Handle
+	non-REG_VALID raw registers and return the register's status.
+	* avr-tdep.c (avr_pseudo_register_read): Ditto.
+	* frv-tdep.c (frv_pseudo_register_read): Ditto.
+	* h8300-tdep.c (h8300_pseudo_register_read): Ditto.
+	* hppa-tdep.c (hppa_pseudo_register_read): Ditto.
+	* m32c-tdep.c (m32c_move_reg_t): Change return to enum
+	register_status.
+	(m32c_raw_read, m32c_raw_write, m32c_banked_read)
+	(m32c_banked_write, m32c_sb_read, m32c_sb_write, m32c_part_read)
+	(m32c_part_write, m32c_cat_read, m32c_cat_write)
+	(m32c_r3r2r1r0_read, m32c_r3r2r1r0_write)
+	(m32c_pseudo_register_read): Change return to enum
+	register_status.  Adjust.
+	* m68hc11-tdep.c (m68hc11_pseudo_register_read): Change return to
+	enum register_status.  Return the register's status.
+	* mep-tdep.c (mep_pseudo_cr32_read): Change return to enum
+	register_status.  Return the register's status.
+	(mep_pseudo_cr64_read, mep_pseudo_register_read): Ditto.
+	* mips-tdep.c (mips_pseudo_register_read): Ditto.
+	* mt-tdep.c (mt_pseudo_register_read): Ditto.
+	* rs6000-tdep.c (move_ev_register_func): New typedef.
+	(e500_move_ev_register): Use it.  Change return to enum
+	register_status.  Return the register's status.
+	(do_regcache_raw_read): New function.
+	(do_regcache_raw_write): New function.
+	(e500_pseudo_register_read): Change return to enum
+	register_status.  Return the register's status.  Use
+	do_regcache_raw_read.
+	(e500_pseudo_register_write): Adjust.  Use do_regcache_raw_write.
+	(dfp_pseudo_register_read): Change return to enum register_status.
+	Return the register's status.
+	(vsx_pseudo_register_read): Ditto.
+	(efpr_pseudo_register_read): Ditto.
+	(rs6000_pseudo_register_read): Ditto.
+	* s390-tdep.c (s390_pseudo_register_read): Change return to enum
+	register_status.  Return the register's status.
+	* sh64-tdep.c (pseudo_register_read_portions): New function.
+	(sh64_pseudo_register_read): Change return to enum
+	register_status.  Use pseudo_register_read_portions.  Return the
+	register's status.
+	* ia64-tdep.c (ia64_pseudo_register_read): Change return to enum
+	register_status.  Return the register's status.
+	* sh-tdep.c (pseudo_register_read_portions): New function.
+	(sh_pseudo_register_read): Change return to enum register_status.
+	Use pseudo_register_read_portions.  Return the register's status.
+	* sparc-tdep.c (sparc32_pseudo_register_read): Change return to
+	enum register_status.  Return the register's status.
+	* sparc64-tdep.c (sparc64_pseudo_register_read): Ditto.
+	* spu-tdep.c (spu_pseudo_register_read_spu)
+	(spu_pseudo_register_read): Ditto.
+	* xtensa-tdep.c (xtensa_register_read_masked)
+	(xtensa_pseudo_register_read): Ditto.
+	* bfin-tdep.c (bfin_pseudo_register_read): Ditto.
+
+2011-03-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* python/py-value.c (valpy_getitem): Fix formatting of error function
+	call.
+
+2011-03-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fixes: Add missing internationalization markups throughout
+	C source files.
+	* darwin-nat-info.c: Ditto.
+	* record.c: Ditto.
+	* remote.c: Ditto.
+	* mi/mi-main.c: Ditto.
+
+2011-03-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fixes: Add missing internationalization markups throughout
+	yacc files.
+	* c-exp.y: Ditto.
+	* cp-name-parser.y: Ditto.
+	* f-exp.y: Ditto.
+	* m2-exp.y: Ditto.
+	* objc-exp.y: Ditto.
+	* p-exp.y: Ditto.
+
+2011-03-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fixes: Messages should have no trailing new lines.
+	* darwin-nat.c (mach_check_error): Remove trailing new line from
+	warning function call message.
+	* record.c (bfdcore_read): Idem for error call.
+
+2011-03-18  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* common/signals.c (target_signal_from_host): Add _ markup to error
+	function call message.
+	(target_signal_to_host): Add _ markup and remove trailing new line
+	from warning call message.
+	(target_signal_from_command): Add _ markup to error function call
+	message.
+
+2011-03-18  Phil Muldoon  <pmuldoon@redhat.com>
+
+        PR python/12149
+
+	* python/python.c (gdbpy_write): Accept a stream argument and
+	operate to the appropriate stream.
+	(gdbpy_flush): Likewise.
+	(_initialize_python): Add stream constants.
+	(finish_python_initialization): Add GdbOutputErrorFile class.
+
+2011-03-18  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* MAINTAINERS: Add myself as a write-after-approval maintainer.
+
+2011-03-18  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* amd64-tdep.c (amd64_relocate_instruction): Fix ordering of arguments
+        to store_signed_integer.  Add debug message when relocating CALL
+        instructions.  Fix formatting of debug message.
+        * i386-tdep.c (i386_relocate_instruction): Ditto.
+
+2011-03-17  Joel Brobecker  <brobecker@gnat.com>
+
+	* target.h (struct target_ops): Remove to_lookup_symbol field.
+	(target_lookup_symbol): Delete macro.
+	* target.c (nosymbol, debug_to_lookup_symbol): Delete.
+	(update_current_target, setup_target_debug): Remove handling
+	of to_lookup_symbol target_ops field.
+	* ada-tasks.c (get_known_tasks_addr): Remove use of
+	target_lookup_symbol.
+	* coffread.c (coff_symtab_read): Likewise.
+	* dbxread.c (read_dbx_symtab): Ditto.
+
+2011-03-17  Joel Brobecker  <brobecker@gnat.com>
+
+	PR gdb/12116:
+	* configure.ac: Add getthrds declaration check.
+	* configure, config.in: Regenerate.
+	* aix-thread.c (getthrds): Declare only if not already declared
+	in procinfo.h.  More declaration out of get_signaled_thread to
+	global scope.
+
+2011-03-17  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/py-symtab.c: Populate symtab_object_methods,
+	sal_object_methods.
+	(stpy_is_valid): New function.
+	(salpy_is_valid): Ditto.
+	* python/py-symbol.c: Declare symbol_object_methods.  Populate.
+	(sympy_is_valid): New function.
+	* python/py-objfile.c: Declare objfile_object_methods.  Populate.
+	(objfpy_is_valid): New function.
+	* python/py-inferior.c: Populate inferior_object_methods.
+	(infpy_is_valid): New function.
+	* python/py-infthread.c: Populate thread_object_methods.
+	(thpy_is_valid): New function.
+	* python/py-block.c: Declare block_object_methods.  Populate.  Declare
+	block_iterator_object_methods.  Populate.
+	(blpy_is_valid): New function.
+	(blpy_iter_is_valid): Ditto.
+
+2011-03-16  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (find_methods): Canonicalize NAME before looking
+	up the symbol.
+	(name_end): New function.
+	(keep_name_info): New function.
+	(decode_line_1): Use keep_name_info.
+	(decode_compound): Likewise.
+	* cli/cli-utils.h (remove_trailing_whitespace): New function.
+	* cli/cli-utils.c (remove_trailing_whitespace): Likewise.
+
+	PR c++/12273
+	* linespec.c (locate_first_half): Keep overload information, too.
+	(decode_compound): Use a string to represent break characters
+	to escape the loop.
+	If P points to a break character, do not increment it.
+	For C++ and Java, keep overload information and relevant keywords.
+	If we cannot find a symbol, search the minimal symbols.
+
+	PR c++/11734
+	* linespec.c (decode_compound): Rename SAVED_ARG to
+	THE_REAL_SAVED_ARG.
+	Make a copy of THE_REAL_SAVED_ARG in SAVED_ARG and strip
+	single-quotes.
+	Pass a valid block to lookup_symbol.
+	(lookup_prefix_sym): Likewise.
+	(find_method): Construct search name based on SYM_CLASS instead
+	of SAVED_ARG.
+	* psymtab.c (lookup_partial_symbol): Add language parameter.
+	(lookup_symbol_aux_psymtabs): Likewise.
+	Don't assume that the psymtab we found was the right one. Search
+	for the desired symbol in the symtab to be certain.
+	(psymtab_search_name): New function.
+	(lookup_partial_symbol): Use psymtab_search_name.
+	Add language parameter.
+	(read_symtabs_for_function): Add language parameter and pass to
+	lookup_partial_symbol.
+	(find_symbol_file_from_partial): Likewise.
+
+2011-03-16  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/12528
+	* dwarf2read.c (noop_record_line): New function.
+	(dwarf_decode_lines): Ignore line tables for GCd functions.
+
+2011-03-16  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix ARI warnings about new lines at the end of messages, which
+	are unneeded as there is a new line added at the end of the message
+	automatically.
+	* darwin-nat.c (darwin_stop_inferior): Ditto.
+	* dec-thread.c (dec_thread_get_ada_task_ptid): Ditto.
+	* dfp.c (decimal_to_number): Ditto.
+	* exec.c (print_section_info): Ditto.
+	* i386-darwin-nat.c (darwin_set_sstep): Ditto.
+	* osdata.c (get_osdata): Ditto.
+	* record.c (bfdcore_write): Ditto.
+	* remote-mips.c (mips_readchar): Ditto.
+	* remote.c (read_ptid): Ditto.
+	* ser-mingw.c (ser_windows_raw): Ditto.
+	* tracepoint.c (add_local_symbols): Ditto.
+	* windows-nat.c (fake_create_process): Ditto.
+
+2011-03-16  Tom Tromey  <tromey@redhat.com>
+
+	* tracepoint.c (stop_tracing): Don't declare.
+	* event-top.c (after_char_processing_hook): Add `(void)'.
+
+2011-03-16  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* NEWS: Add Parameter sub-classing description.
+
+2011-03-16  Kai Tietz  <ktietz@redhat.com>
+
+	* MAINTAINERS: Update my e-mail address.
+
+2011-03-15  Andreas Tobler  <andreast@fgznet.ch>
+
+	* MAINTAINERS: Add myself for write after approval privileges.
+
+2011-03-15  Michael Snyder  <msnyder@vmware.com>
+
+	* frame.c (find_frame_sal): Assert sym is not null.
+
+	* dbxread.c (process_one_symbol): Assert 'name' is not null.
+
+	* objc-lang.c (selectors_info): Check strchr for null result.
+
+	* stabsread.c (define_symbol): Guard against bad stabstring input.
+
+2011-03-15  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Remove trailing spaces and tabulations from pascal language
+	support sources.
+	p-exp.y: Ditto.
+	p-lang.c: Ditto.
+	p-lang.h: Ditto.
+	p-valprint.c: Ditto.
+
+2011-03-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dwarf2_get_pc_bounds): Require HIGH strictly higher
+	than LOW.  Comment it.
+	(read_partial_die): Call complaint for inappropriate zero LOWPC or
+	HIGHPC not strictly higher than LOWPC.
+
+2011-03-15  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix formatting of function declarations returning a pointer in
+	previous commit.
+	* varobj.c (varobj_add_child): Ditto.
+	* hppa-tdep.h (hppa_init_objfile_priv_data): Ditto.
+	* inferior.h (get_displaced_step_closure_by_addr): Ditto.
+
+2011-03-15  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ppc-sysv-tdep.c (ppc64_sysv_abi_push_dummy_call): Add support
+	for the "generic" vector ABI used with GCC 4.3 and later.
+	(ppc64_sysv_abi_return_value): Likewise.
+
+2011-03-15  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* infcall.c (call_function_by_hand): Function return value is
+	always a non_lval, even when using struct_return.
+
+2011-03-15  Pedro Alves  <pedro@codesourcery.com>
+
+	* printcmd.c (ALL_DISPLAYS_SAFE): New.
+	(map_display_numbers): New.
+	(do_delete_display): New.
+	(undisplay_command): Use map_display_numbers.
+	(do_enable_disable_display): New.
+	(enable_disable_display_command): New function.
+	(enable_display): Delete.
+	(enable_display_command): New.
+	(disable_display_command): Reimplement.
+	(_initialize_printcmd): Adjust "enable display" command to use
+	`enable_display_command' as callback.
+
+2011-03-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* NEWS: Add Python breakpoint 'stop' operation.
+
+2011-03-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* NEWS: Delete duplicate entry. Fix typo.
+
+2011-03-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix ARI warning about function names in first column.
+	Put prototype declaration on same line as return type.
+	* objc-exp.y: Ditto.
+	* p-exp.y: Ditto.
+	* python/py-stopevent.h: Ditto.
+	For long function names, split parameters to
+	allow function name on same line as return type.
+	* solib-pa64.c: Ditto.
+	* varobj.c: Ditto.
+	* varobj.h: Ditto.
+	For long function declaration, use single line.
+	* hppa-tdep.h: Ditto.
+	* inferior.h: Ditto.
+
+2011-03-14  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/python.h: Declare gdbpy_should_stop and
+	gdbpy_breakpoint_has_py_cond.
+	* python/python.c: Add python.h to includes.  Remove python.h from
+	HAVE_PYTHON definition
+	(gdbpy_should_stop): New dummy function.
+	(gdbpy_breakpoint_has_py_cond): New dummy function.
+	* python/py-breakpoint.c (bppy_init): Rewrite to allow
+	sub-classing capabilities.
+	(gdbpy_should_stop): New function.
+	(gdbpy_breakpoint_has_py_cond): New function.
+	(local_setattro): New function.
+	* breakpoint.c (condition_command): Add check for Python 'stop'
+	operation.
+	(bpstat_check_breakpoint_conditions): Execute Python 'stop'
+	operation function as part of stop/continue tests.
+
+2011-03-14  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/12576:
+	* dwarf2loc.c (dwarf_expr_dwarf_call): Remove 'return'.
+	(needs_frame_dwarf_call): Likewise.
+
+2011-03-14  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix ARI warning about functions without parameters that do not
+	use (void).
+	* breakpoint.c (all_tracepoints): Replace () by (void).
+	* f-exp.y (match_string_literal): Ditto.
+	(yylex): Ditto.
+	* m2-exp.y (yylex): Ditto.
+	* mep-tdep.c (current_me_module): Ditto.
+	(current_options): Ditto.
+	(current_cop_data_bus_width): Ditto.
+	(current_cr_names): Ditto.
+	(current_cr_is_float): Ditto.
+	(current_ccr_names): Ditto.
+	* objc-exp.y (yylex): Ditto.
+	* p-exp.y (yylex): Ditto.
+	* remote.c (send_interrupt_sequence): Ditto.
+	* tracepoint.c (current_trace_status): Ditto.
+	* python/py-evts.c (gdbpy_initialize_py_events): Ditto.
+	* python/py-prettyprint.c (push_dummy_python_frame): Ditto.
+
+2011-03-11  Michael Snyder  <msnyder@vmware.com>
+
+	* cli/cli-decode.h (CMD_LIST_AMBIGUOUS): Define.
+	* cli/cli-decode.c (lookup_cmd_1): Use CMD_LIST_AMBIGUOUS.
+	(lookup_cmd): Test for CMD_LIST_AMBIGUOUS.
+	* completer.c (complete_line_internal): Use CMD_LIST_AMBIGUOUS.
+	* top.c (set_verbose): Use CMD_LIST_AMBIGUOUS.
+
+	* event-loop-c (delete_async_signal_handler): Assert prev_ptr.
+	(delete_async_event_handler): Ditto.
+
+	* python/py-breakpoint.c (bppy_set_condition): Stop memory leak.
+
+	* python/py-breakpoint.c (bppy_get_commands): Fix memory leak.
+
+	* top.c (set_verbose): Assert showcmd was found.
+
+2011-03-11  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (warning_once): Correct style issues.
+
+2011-03-11  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c (copy_ldr_str_ldrb_strb): Remove redundant statements.
+
+2011-03-11  Andreas Schwab  <schwab@redhat.com>
+
+	* common/aclocal.m4: Remove.
+
+2011-03-10  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (windowing_enabled): Remove inline attribute.
+	(xtensa_write_register, xtensa_read_register): Likewise.
+	(xtensa_hextochar): Removed.
+	(xtensa_init_reggroups): Replace xtensa_hextochar () by explicit code.
+
+2011-03-10  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (xtensa_c0reg_t): Update comments.
+	(xtensa_call0_frame_cache_t): Update comments.  New fields added.
+	(xtensa_alloc_frame_cache): Add initialization for new fields.
+	(xtensa_frame_cache): Change the way how call0_frame_cache () is called.
+	(warning_once): New function.
+	(xtensa_insn_kind): New item c0opc_and.
+	(call0_classify_opcode): Add the case for AND instruction.
+	(call0_track_op): Change arguments.  New local variable litbase.
+	Add the case to handle c0opc_and.  Update algorithms for c0opc_mov,
+	c0opc_l32r, c0opc_s32i to take into account dynamic stack adjustments
+	in the prologue.
+	Add cases for c0opc_l32e, c0opc_s32e, c0opc_rfwo, c0opc_rfwu.
+	(call0_analyze_prologue): Update the comments.  Change arguments.
+	Add the variety of updates to handle extended prologues, which now can
+	conduct dynamic stack adjustments.
+	(call0_frame_cache): Likewise.
+	(xtensa_skip_prologue): Update call0_analyze_prologue () function call.
+	(xtensa_gdbarch_init): Initialize xtensa_session_once_reported.
+
+2011-03-10  Michael Snyder  <msnyder@vmware.com>
+
+	* tracepoint.c (cmd_qtv): Discard unused value 'packet'.
+	(cmd_qtframe): Ditto.
+	(cmd_qtbuffer): Ditto.
+	(cmd_bigqtbuffer): Ditto.
+
+2011-03-10  Tom Tromey  <tromey@redhat.com>
+
+	* tracepoint.c (trace_actions_command): Update.
+	* thread.c (thread_apply_command): Update.
+	* reverse.c (delete_bookmark_command): Update.
+	(bookmarks_info): Update.
+	* printcmd.c (undisplay_command): Update.
+	* memattr.c (mem_enable_command): Update.
+	(mem_disable_command): Update.
+	(mem_delete_command): Update.
+	* inferior.c (detach_inferior_command): Update.
+	(kill_inferior_command): Update.
+	(remove_inferior_command): Update.
+	* cli/cli-utils.h (struct get_number_or_range_state): New.
+	(init_number_or_range): Declare.
+	(get_number_or_range): Update.
+	* cli/cli-utils.c (init_number_or_range): New function.
+	(get_number_or_range): Change 'pp' parameter to 'state'.  Remove
+	static variables.
+	(number_is_in_list): Update.
+	* breakpoint.h (get_tracepoint_by_number): Update.
+	* breakpoint.c (map_breakpoint_numbers): Update for change to
+	get_number_or_range.
+	(find_location_by_number): Use get_number, not
+	get_number_or_range.
+	(trace_pass_set_count): New function.
+	(trace_pass_command): Update for change to get_number_or_range.
+	Rework loop logic.
+	(get_tracepoint_by_number): Remove 'multi_p' parameter; add
+	'state' parameter.
+
+2011-03-10  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* python/py-param.c (add_setshow_generic): Add set/show callback
+	parameters.  Register Python object context.
+	(get_show_value): New function.
+	(get_set_value): New function.
+	(call_doc_function): New function.
+	(get_doc_string): Move behind get_show_value/get_set_value.
+
+2011-03-10  Andreas Tobler  <andreast-list@fgznet.ch>
+
+	* fbsd-nat.c (fbsd_make_corefile_notes): Constify local `fname'.
+
+2011-03-09  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (xtensa_read_register): Add comment.
+	(xtensa_write_register): Likewise.
+	(xtensa_hextochar): Add comment and update to match coding conventions.
+	(xtensa_frame_cache, xtensa_return_value): Follow coding conventions.
+	(execute_l32e, execute_s32e, execute_code): Update comments.
+	(xtensa_exception_handler_t): Update to match coding conventions.
+	(xtensa_insn_kind): Likewise.
+
+2011-03-09  Michael Snyder  <msnyder@vmware.com>
+
+	* mi-cmd-disas.c (mi_cmd_disassemble): Fix memory leak.
+
+2011-03-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* nto-tdep.c (nto_find_and_open_solib): Constify local `base'.
+
+2011-03-09  Tom Tromey  <tromey@redhat.com>
+
+	* thread.c (restore_selected_frame): Handle frame_level == -1.
+	(make_cleanup_restore_current_thread): Use
+	get_selected_frame_if_set.
+	* frame.h (get_selected_frame_if_set): Declare.
+	* frame.c (get_selected_frame_if_set): New function.
+
+2011-03-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* cli/cli-cmds.c (shell_escape): Use lbasename.
+	* coffread.c (coff_start_symtab): Constify parameter.
+	(complete_symtab): Constify `name' parameter.
+	(coff_symtab_read): Constify `filestring' local.
+	(coff_getfilename): Constify return and `result' local.
+	Use lbasename.
+	* fbsd-nat.c (fbsd_make_corefile_notes): Use lbasename.
+	* linux-fork.c (info_checkpoints_command): Use lbasename.
+	* linux-nat.c (linux_nat_make_corefile_notes): Use lbasename.
+	* minsyms.c (lookup_minimal_symbol): Use lbasename.
+	* nto-tdep.c (nto_find_and_open_solib): Use lbasename.
+	* procfs.c (procfs_make_note_section): Use lbasename.
+	* tui/tui-io.c (printable_part): Constity return and parameter.
+	Use lbasename.
+	(print_filename): Constify parameters, and local `s'.
+	(tui_rl_display_match_list): Constify local `temp'.
+
+2011-03-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Revert:
+	2011-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	Fix DWARF-3+ DW_AT_accessibility default assumption.
+	* dwarf2read.c (dwarf2_add_field): Fix new_field->accessibility for
+	cu->header.version >= 3.
+
+2011-03-09  Yao Qi  <yao@codesourcery.com>
+
+	* common/Makefile.in: Remove.
+	* common/configure: Remove.
+	* common/configure.ac: Remove.
+
+2011-03-09  Yao Qi  <yao@codesourcery.com>
+
+	Revert:
+	2011-02-11  Yao Qi  <yao@codesourcery.com>
+
+	* common/Makefile.in: Add copyright header.
+
+	2011-02-11  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in: Remove signals.o from COMMON_OBS.  Link
+	libcommon.a.
+	* configure.ac: Add common to sub dir.
+	* configure: Regenerate.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (call0_ret): New function.
+	(xtensa_skip_prologue): Speed up analysis.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (xtensa_register_reggroup_p): Count in all registers
+	while executing MI command -data-list-changed-registers.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (xtensa_read_register): New function.
+	(xtensa_write_register): New function.
+	(xtensa_find_register_by_name): New function.
+	(xtensa_windowed_frame_cache): Update comments in type description.
+	(xtensa_frame_cache): Likewise.
+	(xtensa_window_interrupt_insn): New function.
+	(xtensa_frame_cache): Add analysis for Xtensa Window Exception frames.
+	(xtensa_insn_kind): Add new instructions.
+	(rwx_special_register): New function.
+	(call0_classify_opcode): Add new instructions to the analysis.
+	(a0_saved, a7_saved, a11_saved): New variables.
+	(a0_was_saved, a7_was_saved, a11_was_saved): New variables.
+	(execute_l32e): New function.
+	(execute_s32e): New function.
+	(xtensa_exception_handler_t): New type.
+	(execute_code): New function.
+	(xtensa_window_interrupt_frame_cache): New function to conduct frame
+	analysis for Xtensa Window Exception handlers.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.c (TX_PS): New.
+	(windowing_enabled): Update to count for Call0 ABI.
+	(xtensa_hextochar): New.
+	(xtensa_init_reggroups): Make algorithm generic.
+	(xtensa_frame_cache): Use TX_PS on Tiny Xtensa.
+
+2011-03-08  Maxim Grigoriev  <maxim2405@gmail.com>
+
+	* xtensa-tdep.h (XTENSA_MAX_COPROCESSOR): Update.
+
+2011-03-08  Michael Snyder  <msnyder@vmware.com>
+
+	* i386-tdep.c (i386_follow_jump): Check return value of
+	target_read_memory.
+	(i386_analyze_struct_return): Ditto.
+	(i386_skip_probe): Ditto.
+	(i386_match_insn): Ditto.
+	(i386_skip_noop): Ditto.
+	(i386_analyze_frame_setup): Ditto.
+	(i386_analyze_register_saves): Ditto.
+	(i386_skip_prologue): Ditto.
+	(i386_skip_main_prologue): Ditto.
+
+	* target.c (read_whatever_is_readable): Fix memory leak.
+
+	* i386-tdep.c (i386_process_record): Document fall through.
+
+2011-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix DWARF-3+ DW_AT_accessibility default assumption.
+	* dwarf2read.c (dwarf2_add_field): Fix new_field->accessibility for
+	cu->header.version >= 3.
+
+2011-03-08  Pedro Alves  <pedro@codesourcery.com>
+
+	* remote.c (remote_check_symbols): Skip if the target has no
+	execution.
+
+2011-03-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* target.c (read_whatever_is_readable): Reformat comment,
+	with a minor typo fix. Minor reformatting of the code.
+
+2011-03-08  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c: Remove prototype declaration displaced_in_arm_mode.
+	(displaced_read_reg): Add `dsc' parameter, remove `from' parameter.
+	Use cached result instead of calling displaced_in_arm_mode again.
+	(branch_write_pc, alu_write_pc, load_write_pc): Add `dsc' parameter.
+	(displaced_write_reg, copy_preload, copy_preload_reg): Callers update.
+	(cleanup_copro_load_store, copy_copro_load_store): Likewise.
+	(cleanup_branch, copy_bx_blx_reg, copy_alu_imm): Likewise.
+	(cleanup_alu_reg, copy_alu_reg, cleanup_alu_shifted_reg): Likewise.
+	(copy_alu_shifted_reg, cleanup_load, cleanup_store): Likewise.
+	(copy_extra_ld_st, copy_ldr_str_ldrb_strb): Likewise.
+	(cleanup_block_load_all, cleanup_block_store_pc): Likewise.
+	(cleanup_block_load_pc, copy_block_xfer): Likewise.
+	* arm-linux-tdep.c (arm_linux_copy_svc): Callers update.
+	(arm_catch_kernel_helper_return): Likewise.
+	* gdb/arm-tdep.h : Update function declarations.
+
+2011-03-07  Michael Snyder  <msnyder@vmware.com>
+
+	* dwarf2loc.c (indirect_pieced_value): Assert 'piece' not null.
+
+	* ser-unix.c (hardwire_get_tty_state): Stop memory leak.
+
+	* mi/mi-cmd-env.c (_initialize_mi_cmd_env): Free environment.
+
+	* elfread.c (elf_symtab_read): Stop memory leak.
+
+	* main.c (captured_main): Fix memory leak.
+
+2011-03-07  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* ada-lang.c (compare_names): Call is_name_suffix with string1
+	instead of string2.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* xcoffread.c (xcoff_sym_fns): Update.
+	* symfile.h (struct sym_fns) <sym_read_psymbols>: New field.
+	(enum symfile_add_flags) <SYMFILE_NO_READ>: New constant.
+	* symfile.c (syms_from_objfile): Handle SYMFILE_NO_READ.
+	(symbol_file_add_with_addrs_or_offsets): Likewise.
+	(reread_symbols): Handle OBJF_PSYMTABS_READ.
+	* somread.c (som_sym_fns): Update.
+	* psymtab.h (require_partial_symbols): Declare.
+	* psymtab.c (require_partial_symbols): New function.
+	(ALL_OBJFILE_PSYMTABS_REQUIRED): New macro.
+	(ALL_OBJFILE_PSYMTABS): Undef.
+	(ALL_PSYMTABS): Move from psympriv.h.
+	(lookup_partial_symtab, find_pc_sect_psymtab)
+	(lookup_symbol_aux_psymtabs, relocate_psymtabs)
+	(find_last_source_symtab_from_partial)
+	(forget_cached_source_info_partial)
+	(print_psymtab_stats_for_objfile, read_symtabs_for_function)
+	(expand_partial_symbol_tables, read_psymtabs_with_filename)
+	(map_symbol_names_psymtab, map_symbol_filenames_psymtab)
+	(find_symbol_file_from_partial, map_matching_symbols_psymtab)
+	(expand_symtabs_matching_via_partial, maintenance_info_psymtabs):
+	Use ALL_OBJFILE_PSYMTABS_REQUIRED.
+	* psympriv.h (ALL_PSYMTABS): Move to psymtab.c.
+	* objfiles.h (OBJF_PSYMTABS_READ): New macro.
+	* objfiles.c (objfile_has_partial_symbols): Handle lazily-read
+	psymtabs.
+	* mipsread.c (ecoff_sym_fns): Update.
+	* machoread.c (macho_sym_fns): Update.
+	* elfread.c (elf_symfile_read): Set up for lazy psymtab reading.
+	(read_psyms): New function.
+	(elf_sym_fns, elf_sym_fns_gdb_index): Update.
+	(elf_sym_fns_lazy_psyms): New global.
+	* dwarf2read.c (dwarf2_initialize_objfile): Don't call
+	dwarf2_build_psymtabs.
+	* dbxread.c (aout_sym_fns): Update.
+	* coffread.c (coff_sym_fns): Update.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* infrun.c (print_exited_reason): Include inferior id and pid in
+	message.
+
+2011-03-07  Tom Tromey  <tromey@redhat.com>
+
+	* target.h (struct target_ops) <to_has_execution>: Add ptid_t
+	parameter.
+	(target_has_execution_1): Update.
+	(target_has_execution_current): Declare.
+	(target_has_execution): Call target_has_execution_current.
+	(default_child_has_execution): Update.
+	* target.c (default_child_has_execution): Add 'the_ptid'
+	parameter.
+	(target_has_execution_1): Likewise.
+	(target_has_execution_current): New function.
+	(add_target): Update.
+	(init_dummy_target): Update.
+	* remote-m32r-sdi.c (m32r_has_execution): New function.
+	(init_m32r_ops): Use it.
+	* record.c (record_core_has_execution): Now static.  Add
+	'the_ptid' parameter.
+	* inferior.c (have_live_inferiors): Don't save current thread.
+	Use target_has_execution_1.
+
+2011-03-07  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (aclocal_m4_deps): Remove gnulib/m4/memcmp.m4.
+
+2011-03-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* elfread.c (elf_symtab_read): Minor reformatting.
+
+2011-03-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* objc-lang.c (selectors_info): Minor reformatting.
+
+2011-03-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (compare_names): Add FALLTHROUGH comment.
+
+2011-03-07  Joel Brobecker  <brobecker@adacore.com>
+	    Michael Snyder  <msnyder@vmware.com>
+
+	* ada-valprint.c (ada_val_print_array): Move the declaration of
+	"byte_order" and "elttype" inside the block where these variables
+	are actually used.  Remove some special handling for the case
+	where "elttype" and "eltlen" are null.  Replace by a comment
+	and a couple of assertion checks.
+
 2011-03-05  Michael Snyder  <msnyder@vmware.com>
 
 	* source.c (add_path): Replace semicolon at end of block.
@@ -26,8 +1277,6 @@
 
 	* symfile.c (simple_overlay_update): Check for null return value
 	from lookup_minimal_symbol.
-
-	* gdbserver/server.c (queue_stop_reply): Call xmalloc not malloc.
 
 	* xml-syscall.c (syscall_start_syscall): Assert name is non null.
 
@@ -130,9 +1379,6 @@
 
 	* mdebugread.c (parse_partial_symbols): Fix indent.
 
-	* gdbserver/linux-arm-low.c (arm_arch_setup): Replace malloc 
-	with xmalloc.
-
 	* target-descriptions.c (tdesc_gdb_type): No need to call
 	xstrdup, callee saves a copy.
 
@@ -142,7 +1388,7 @@
 
 	* utils.c (parse_escape): Escape the escape char.
 
-	* python/py-inferior.c (build_inferior_list): Error out if 
+	* python/py-inferior.c (build_inferior_list): Error out if
 	PyList_Append fails.
 	(gdbpy_inferiors): Error out if build_inferior_list fails.
 
@@ -226,7 +1472,7 @@
 
 	* coffread.c (coff_getfilename): Add check to avoid overflow.
 
-	* objc-lang.c (selectors_info): Add a small safety margin to 
+	* objc-lang.c (selectors_info): Add a small safety margin to
 	avoid overflow.
 	(classes_info): Error out on too long REGEXP.
 
@@ -344,7 +1590,7 @@
 	* tui/tui-stack.c (tui_get_function_from_frame): Fix off by one
 	error in strncpy.
 
-	* symtab.c (rbreak_command): Move variable 'file_name' to 
+	* symtab.c (rbreak_command): Move variable 'file_name' to
 	outer scope.
 
 	* d-valprint.c (dynamic_array_type): Avoid shadowing a function
@@ -499,7 +1745,7 @@
 
 	* breakpoint.c (breakpoint_1): Change first argument from an int
 	to a char pointer, so that the function now accepts a list of
-	breakpoints rather than just one.  Use new function 
+	breakpoints rather than just one.  Use new function
 	'number_is_in_list' to implement.
 	(breakpoints_info): Pass char * instead of int to breakpoint_1.
 	(watchpoints_info): Ditto.
@@ -558,7 +1804,7 @@
 	(info_threads_command): Pass char* to print_thread_info.
 	* cli/cli-utils.c (number_is_in_list): New function.
 	* cli/cli-utils.h (number_is_in_list): Export.
-	* mi/mi-main.c (mi_cmd_thread_info): Pass char* to 
+	* mi/mi-main.c (mi_cmd_thread_info): Pass char* to
 	print_thread_info.
 	(print_one_inferior): Ditto.
 	(mi_cmd_list_thread_groups): Ditto.
@@ -702,7 +1948,7 @@
 
 2011-02-18  Michael Snyder  <msnyder@vmware.com>
 
-	* thread.c (info_threads_command): Re-implement using 
+	* thread.c (info_threads_command): Re-implement using
 	get_number_or_range.
 	(thread_apply_command): Ditto.
 
@@ -2045,7 +3291,7 @@
 	(DEFAULT_HPUX_MAJOR_RELEASE): New macro.
 	(hpux_major_release): Make global, change default value to
 	DEFAULT_HPUX_MAJOR_RELEASE.
-	(get_hpux_major_release): Simply return HPUX_MAJOR_RELEASE. 
+	(get_hpux_major_release): Simply return HPUX_MAJOR_RELEASE.
 	* hppa-hpux-nat.c: Add <sys/utsname.h> include.
 	Add "solib-som.h" header.
 	(set_hpux_major_release): New function.
@@ -2261,11 +3507,11 @@
 	Make value allocations more lazy.
 	* ada-lang.c (coerce_unspec_val_to_type): Use allocate_value_lazy
 	instead of allocate_value and set_value_lazy when possible.
-	* dwarf2loc.c (dwarf2_evaluate_loc_desc_full): Use allocate_value_lazy 
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc_full): Use allocate_value_lazy
 	instead of allocate_value and set_value_lazy.
 	* findvar.c (value_of_register_lazy): Likewise.
 	(read_var_value): Remove V preallocation, call just check_typedef in
-	advance.  Move allocate_value to LOC_CONST, LOC_LABEL, 
+	advance.  Move allocate_value to LOC_CONST, LOC_LABEL,
 	LOC_CONST_BYTES.  Use allocate_value_lazy in LOC_STATIC, LOC_ARG,
 	LOC_REF_ARG, LOC_LOCAL, LOC_BLOCK.  Set ADDR instead of
 	set_value_address and break in LOC_BLOCK.  Use allocate_value_lazy and
@@ -2397,7 +3643,7 @@
 	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
 
 	Implement support for PowerPC BookE ranged watchpoints.
-	* breakpoint.h 
+	* breakpoint.h
 	(struct breakpoint_ops) <resources_needed>: New method.
 	Initialize to NULL in all existing breakpoint_ops instances.
 	(struct breakpoint) <exact>: New field.
@@ -2447,7 +3693,7 @@
 	<insert_location>: ... this.  Return int instead of void.
 	Accept pointer to struct bp_location instead of pointer to
 	struct breakpoint.  Adapt all implementations.
-	(breakpoint_ops) <remove>: Rename to... 
+	(breakpoint_ops) <remove>: Rename to...
 	<remove_location>: ... this.  Accept pointer to struct bp_location
 	instead of pointer to struct breakpoint.  Adapt all implementations.
 	* breakpoint.c (insert_catchpoint): Delete function.
@@ -2704,7 +3950,7 @@
 
 	* mi/mi-cmd-disas.c (mi_cmd_disassemble): Mark up error message
 	for i18n.
-	* tui/tui-layout.c (tui_set_layout_for_display_command): 
+	* tui/tui-layout.c (tui_set_layout_for_display_command):
 	Split line so that operator goes to beginning of line.
 	* tui/tui-winsource.c (tui_horizontal_source_scroll): Move
 	assignment out of if statement.

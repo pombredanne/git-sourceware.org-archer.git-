@@ -178,7 +178,7 @@ static int init_lineno (bfd *, long, int);
 
 static char *getsymname (struct internal_syment *);
 
-static char *coff_getfilename (union internal_auxent *);
+static const char *coff_getfilename (union internal_auxent *);
 
 static void free_stringtab (void);
 
@@ -366,7 +366,7 @@ coff_alloc_type (int index)
    it indicates the start of data for one original source file.  */
 
 static void
-coff_start_symtab (char *name)
+coff_start_symtab (const char *name)
 {
   start_symtab (
   /* We fill in the filename later.  start_symtab puts this pointer
@@ -388,7 +388,7 @@ coff_start_symtab (char *name)
    text.  */
 
 static void
-complete_symtab (char *name, CORE_ADDR start_addr, unsigned int size)
+complete_symtab (const char *name, CORE_ADDR start_addr, unsigned int size)
 {
   if (last_source_file != NULL)
     xfree (last_source_file);
@@ -713,7 +713,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
   int in_source_file = 0;
   int next_file_symnum = -1;
   /* Name of the current file.  */
-  char *filestring = "";
+  const char *filestring = "";
   int depth = 0;
   int fcn_first_line = 0;
   CORE_ADDR fcn_first_line_addr = 0;
@@ -902,22 +902,14 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 
 	    if (cs->c_secnum == N_UNDEF)
 	      {
-		/* This is a common symbol.  See if the target
-		   environment knows where it has been relocated to.  */
-		CORE_ADDR reladdr;
-
-		if (target_lookup_symbol (cs->c_name, &reladdr))
-		  {
-		    /* Error in lookup; ignore symbol.  */
-		    break;
-		  }
-		tmpaddr = reladdr;
-		/* The address has already been relocated; make sure that
-		   objfile_relocate doesn't relocate it again.  */
-		sec = -2;
-		ms_type = cs->c_sclass == C_EXT
-		  || cs->c_sclass == C_THUMBEXT ?
-		  mst_bss : mst_file_bss;
+		/* This is a common symbol.  We used to rely on
+		   the target to tell us whether it knows where
+		   the symbol has been relocated to, but none of
+		   the target implementations actually provided
+		   that operation.  So we just ignore the symbol,
+		   the same way we would do if we had a target-side
+		   symbol lookup which returned no match.  */
+		break;
 	      }
  	    else if (cs->c_secnum == N_ABS)
  	      {
@@ -1308,12 +1300,12 @@ getsymname (struct internal_syment *symbol_entry)
    Return only the last component of the name.  Result is in static
    storage and is only good for temporary use.  */
 
-static char *
+static const char *
 coff_getfilename (union internal_auxent *aux_entry)
 {
   static char buffer[BUFSIZ];
   char *temp;
-  char *result;
+  const char *result;
 
   if (aux_entry->x_file.x_n.x_zeroes == 0)
     {
@@ -1331,8 +1323,7 @@ coff_getfilename (union internal_auxent *aux_entry)
   /* FIXME: We should not be throwing away the information about what
      directory.  It should go into dirname of the symtab, or some such
      place.  */
-  if ((temp = strrchr (result, '/')) != NULL)
-    result = temp + 1;
+  result = lbasename (result);
   return (result);
 }
 
@@ -2191,6 +2182,7 @@ static const struct sym_fns coff_sym_fns =
 				   for sym_read() */
   coff_symfile_read,		/* sym_read: read a symbol file into
 				   symtab */
+  NULL,				/* sym_read_psymbols */
   coff_symfile_finish,		/* sym_finish: finished with file,
 				   cleanup */
   default_symfile_offsets,	/* sym_offsets: xlate external to

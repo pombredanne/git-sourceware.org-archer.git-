@@ -54,8 +54,6 @@ static int default_watchpoint_addr_within_range (struct target_ops *,
 
 static int default_region_ok_for_hw_watchpoint (CORE_ADDR, int);
 
-static int nosymbol (char *, CORE_ADDR *);
-
 static void tcomplain (void) ATTRIBUTE_NORETURN;
 
 static int nomemory (CORE_ADDR, char *, int, int, struct target_ops *);
@@ -148,8 +146,6 @@ static void debug_to_terminal_ours (void);
 static void debug_to_terminal_info (char *, int);
 
 static void debug_to_load (char *, int);
-
-static int debug_to_lookup_symbol (char *, CORE_ADDR *);
 
 static int debug_to_can_run (void);
 
@@ -314,11 +310,11 @@ default_child_has_registers (struct target_ops *ops)
 }
 
 int
-default_child_has_execution (struct target_ops *ops)
+default_child_has_execution (struct target_ops *ops, ptid_t the_ptid)
 {
   /* If there's no thread selected, then we can't make it run through
      hoops.  */
-  if (ptid_equal (inferior_ptid, null_ptid))
+  if (ptid_equal (the_ptid, null_ptid))
     return 0;
 
   return 1;
@@ -374,15 +370,21 @@ target_has_registers_1 (void)
 }
 
 int
-target_has_execution_1 (void)
+target_has_execution_1 (ptid_t the_ptid)
 {
   struct target_ops *t;
 
   for (t = current_target.beneath; t != NULL; t = t->beneath)
-    if (t->to_has_execution (t))
+    if (t->to_has_execution (t, the_ptid))
       return 1;
 
   return 0;
+}
+
+int
+target_has_execution_current (void)
+{
+  return target_has_execution_1 (inferior_ptid);
 }
 
 /* Add a possible target architecture to the list.  */
@@ -407,7 +409,7 @@ add_target (struct target_ops *t)
     t->to_has_registers = (int (*) (struct target_ops *)) return_zero;
 
   if (t->to_has_execution == NULL)
-    t->to_has_execution = (int (*) (struct target_ops *)) return_zero;
+    t->to_has_execution = (int (*) (struct target_ops *, ptid_t)) return_zero;
 
   if (!target_structs)
     {
@@ -526,12 +528,6 @@ noprocess (void)
   error (_("You can't do that without a process to debug."));
 }
 
-static int
-nosymbol (char *name, CORE_ADDR *addrp)
-{
-  return 1;			/* Symbol does not exist in target env.  */
-}
-
 static void
 default_terminal_info (char *args, int from_tty)
 {
@@ -615,7 +611,6 @@ update_current_target (void)
       INHERIT (to_terminal_info, t);
       /* Do not inherit to_kill.  */
       INHERIT (to_load, t);
-      INHERIT (to_lookup_symbol, t);
       /* Do no inherit to_create_inferior.  */
       INHERIT (to_post_startup_inferior, t);
       INHERIT (to_insert_fork_catchpoint, t);
@@ -768,9 +763,6 @@ update_current_target (void)
   de_fault (to_load,
 	    (void (*) (char *, int))
 	    tcomplain);
-  de_fault (to_lookup_symbol,
-	    (int (*) (char *, CORE_ADDR *))
-	    nosymbol);
   de_fault (to_post_startup_inferior,
 	    (void (*) (ptid_t))
 	    target_ignore);
@@ -1928,33 +1920,33 @@ target_read (struct target_ops *ops,
   return len;
 }
 
-/** Assuming that the entire [begin, end) range of memory cannot be read,
-    try to read whatever subrange is possible to read.
+/* Assuming that the entire [begin, end) range of memory cannot be
+   read, try to read whatever subrange is possible to read.
 
-    The function results, in RESULT, either zero or one memory block.
-    If there's a readable subrange at the beginning, it is completely
-    read and returned.  Any further readable subrange will not be read.
-    Otherwise, if there's a readable subrange at the end, it will be
-    completely read and returned.  Any readable subranges before it (obviously,
-    not starting at the beginning), will be ignored.  In other cases --
-    either no readable subrange, or readable subrange (s) that is neither
-    at the beginning, or end, nothing is returned.
+   The function returns, in RESULT, either zero or one memory block.
+   If there's a readable subrange at the beginning, it is completely
+   read and returned.  Any further readable subrange will not be read.
+   Otherwise, if there's a readable subrange at the end, it will be
+   completely read and returned.  Any readable subranges before it
+   (obviously, not starting at the beginning), will be ignored.  In
+   other cases -- either no readable subrange, or readable subrange(s)
+   that is neither at the beginning, or end, nothing is returned.
 
-    The purpose of this function is to handle a read across a boundary of
-    accessible memory in a case when memory map is not available.  The above
-    restrictions are fine for this case, but will give incorrect results if
-    the memory is 'patchy'.  However, supporting 'patchy' memory would require
-    trying to read every single byte, and it seems unacceptable solution.
-    Explicit memory map is recommended for this case -- and
-    target_read_memory_robust will take care of reading multiple ranges
-    then.  */
+   The purpose of this function is to handle a read across a boundary
+   of accessible memory in a case when memory map is not available.
+   The above restrictions are fine for this case, but will give
+   incorrect results if the memory is 'patchy'.  However, supporting
+   'patchy' memory would require trying to read every single byte,
+   and it seems unacceptable solution.  Explicit memory map is
+   recommended for this case -- and target_read_memory_robust will
+   take care of reading multiple ranges then.  */
 
 static void
 read_whatever_is_readable (struct target_ops *ops,
 			   ULONGEST begin, ULONGEST end,
 			   VEC(memory_read_result_s) **result)
 {
-  gdb_byte *buf = xmalloc (end-begin);
+  gdb_byte *buf = xmalloc (end - begin);
   ULONGEST current_begin = begin;
   ULONGEST current_end = end;
   int forward;
@@ -1962,7 +1954,10 @@ read_whatever_is_readable (struct target_ops *ops,
 
   /* If we previously failed to read 1 byte, nothing can be done here.  */
   if (end - begin <= 1)
-    return;
+    {
+      xfree (buf);
+      return;
+    }
 
   /* Check that either first or the last byte is readable, and give up
      if not.  This heuristic is meant to permit reading accessible memory
@@ -1981,6 +1976,7 @@ read_whatever_is_readable (struct target_ops *ops,
     }
   else
     {
+      xfree (buf);
       return;
     }
 
@@ -1994,8 +1990,8 @@ read_whatever_is_readable (struct target_ops *ops,
       ULONGEST first_half_begin, first_half_end;
       ULONGEST second_half_begin, second_half_end;
       LONGEST xfer;
-
       ULONGEST middle = current_begin + (current_end - current_begin)/2;
+
       if (forward)
 	{
 	  first_half_begin = current_begin;
@@ -2047,6 +2043,7 @@ read_whatever_is_readable (struct target_ops *ops,
     {
       /* The [current_end, end) range has been read.  */
       LONGEST rlen = end - current_end;
+
       r.data = xmalloc (rlen);
       memcpy (r.data, buf + current_end - begin, rlen);
       r.begin = current_end;
@@ -3218,7 +3215,8 @@ init_dummy_target (void)
   dummy_target.to_has_memory = (int (*) (struct target_ops *)) return_zero;
   dummy_target.to_has_stack = (int (*) (struct target_ops *)) return_zero;
   dummy_target.to_has_registers = (int (*) (struct target_ops *)) return_zero;
-  dummy_target.to_has_execution = (int (*) (struct target_ops *)) return_zero;
+  dummy_target.to_has_execution
+    = (int (*) (struct target_ops *, ptid_t)) return_zero;
   dummy_target.to_stopped_by_watchpoint = return_zero;
   dummy_target.to_stopped_data_address =
     (int (*) (struct target_ops *, CORE_ADDR *)) return_zero;
@@ -3788,18 +3786,6 @@ debug_to_load (char *args, int from_tty)
   fprintf_unfiltered (gdb_stdlog, "target_load (%s, %d)\n", args, from_tty);
 }
 
-static int
-debug_to_lookup_symbol (char *name, CORE_ADDR *addrp)
-{
-  int retval;
-
-  retval = debug_target.to_lookup_symbol (name, addrp);
-
-  fprintf_unfiltered (gdb_stdlog, "target_lookup_symbol (%s, xxx)\n", name);
-
-  return retval;
-}
-
 static void
 debug_to_post_startup_inferior (ptid_t ptid)
 {
@@ -3999,7 +3985,6 @@ setup_target_debug (void)
   current_target.to_terminal_save_ours = debug_to_terminal_save_ours;
   current_target.to_terminal_info = debug_to_terminal_info;
   current_target.to_load = debug_to_load;
-  current_target.to_lookup_symbol = debug_to_lookup_symbol;
   current_target.to_post_startup_inferior = debug_to_post_startup_inferior;
   current_target.to_insert_fork_catchpoint = debug_to_insert_fork_catchpoint;
   current_target.to_remove_fork_catchpoint = debug_to_remove_fork_catchpoint;

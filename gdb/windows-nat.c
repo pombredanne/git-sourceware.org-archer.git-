@@ -46,6 +46,7 @@
 #include <signal.h>
 
 #include "buildsym.h"
+#include "filenames.h"
 #include "symfile.h"
 #include "objfiles.h"
 #include "gdb_obstack.h"
@@ -1289,7 +1290,7 @@ fake_create_process (void)
     open_process_used = 1;
   else
     {
-      error (_("OpenProcess call failed, GetLastError = %lud\n"),
+      error (_("OpenProcess call failed, GetLastError = %lud"),
        GetLastError ());
       /*  We can not debug anything in that case.  */
     }
@@ -2586,7 +2587,7 @@ _initialize_check_for_gdb_ini (void)
 				      sizeof ("/gdb.ini"));
       strcpy (oldini, homedir);
       p = strchr (oldini, '\0');
-      if (p > oldini && p[-1] != '/')
+      if (p > oldini && !IS_DIR_SEPARATOR (p[-1]))
 	*p++ = '/';
       strcpy (p, "gdb.ini");
       if (access (oldini, 0) == 0)

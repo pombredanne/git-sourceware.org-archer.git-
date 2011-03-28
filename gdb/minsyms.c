@@ -43,6 +43,7 @@
 #include "gdb_string.h"
 #include "symtab.h"
 #include "bfd.h"
+#include "filenames.h"
 #include "symfile.h"
 #include "objfiles.h"
 #include "demangle.h"
@@ -198,12 +199,7 @@ lookup_minimal_symbol (const char *name, const char *sfile,
   const char *modified_name;
 
   if (sfile != NULL)
-    {
-      char *p = strrchr (sfile, '/');
-
-      if (p != NULL)
-	sfile = p + 1;
-    }
+    sfile = lbasename (sfile);
 
   /* For C++, canonicalize the input name.  */
   modified_name = name;
@@ -260,7 +256,7 @@ lookup_minimal_symbol (const char *name, const char *sfile,
                       case mst_file_data:
                       case mst_file_bss:
                         if (sfile == NULL
-			    || strcmp (msymbol->filename, sfile) == 0)
+			    || filename_cmp (msymbol->filename, sfile) == 0)
                           found_file_symbol = msymbol;
                         break;
 

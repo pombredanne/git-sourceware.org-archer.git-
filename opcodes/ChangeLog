@@ -1,3 +1,24 @@
+2011-03-24  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-dis.c (decode_dsp32mac_0): Move MM zeroing down to MAC0 logic.
+
+2011-03-22  Eric B. Weddington  <eric.weddington@atmel.com>
+
+	* avr-dis.c (avr_operand): Add opcode_str parameter. Check for
+	post-increment to support LPM Z+ instruction. Add support for 'E'
+	constraint for DES instruction.
+	(print_insn_avr): Adjust calls to avr_operand. Rename variable.
+
+2011-03-14  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* arm-dis.c (get_sym_code_type): Treat STT_GNU_IFUNCs as code.
+
+2011-03-14  Richard Sandiford  <richard.sandiford@linaro.org>
+
+	* arm-dis.c (get_sym_code_type): Don't check for STT_ARM_TFUNC.
+	Use branch types instead.
+	(print_insn): Likewise.
+
 2011-02-28  Maciej W. Rozycki  <macro@codesourcery.com>
 
 	* mips-opc.c (mips_builtin_opcodes): Correct register use

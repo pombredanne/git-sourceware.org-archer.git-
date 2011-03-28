@@ -2767,7 +2767,6 @@ dwarf2_initialize_objfile (struct objfile *objfile)
   if (dwarf2_read_index (objfile))
     return 1;
 
-  dwarf2_build_psymtabs (objfile);
   return 0;
 }
 
@@ -3106,7 +3105,7 @@ lookup_signatured_type (struct objfile *objfile, ULONGEST sig)
   if (dwarf2_per_objfile->signatured_types == NULL)
     {
       complaint (&symfile_complaints,
-		 _("missing `.debug_types' section for DW_FORM_sig8 die"));
+		 _("missing `.debug_types' section for DW_FORM_ref_sig8 die"));
       return 0;
     }
 
@@ -4218,7 +4217,7 @@ skip_one_die (gdb_byte *buffer, gdb_byte *info_ptr,
 	  break;
 	case DW_FORM_data8:
 	case DW_FORM_ref8:
-	case DW_FORM_sig8:
+	case DW_FORM_ref_sig8:
 	  info_ptr += 8;
 	  break;
 	case DW_FORM_string:
@@ -4991,7 +4990,7 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 	    {
 	      struct type *type = read_type_die (die, cu);
 
-	      c_type_print_args (type, buf, 0, cu->language);
+	      c_type_print_args (type, buf, 1, cu->language);
 
 	      if (cu->language == language_java)
 		{
@@ -5983,7 +5982,8 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
 	}
     }
 
-  if (high < low)
+  /* read_partial_die has also the strict LOW < HIGH requirement.  */
+  if (high <= low)
     return 0;
 
   /* When using the GNU linker, .gnu.linkonce. sections are used to
@@ -9128,19 +9128,41 @@ read_partial_die (struct partial_die_info *part_die,
 	}
     }
 
-  /* When using the GNU linker, .gnu.linkonce. sections are used to
-     eliminate duplicate copies of functions and vtables and such.
-     The linker will arbitrarily choose one and discard the others.
-     The AT_*_pc values for such functions refer to local labels in
-     these sections.  If the section from that file was discarded, the
-     labels are not in the output, so the relocs get a value of 0.
-     If this is a discarded function, mark the pc bounds as invalid,
-     so that GDB will ignore it.  */
-  if (has_low_pc_attr && has_high_pc_attr
-      && part_die->lowpc < part_die->highpc
-      && (part_die->lowpc != 0
-	  || dwarf2_per_objfile->has_section_at_zero))
-    part_die->has_pc_info = 1;
+  if (has_low_pc_attr && has_high_pc_attr)
+    {
+      /* When using the GNU linker, .gnu.linkonce. sections are used to
+	 eliminate duplicate copies of functions and vtables and such.
+	 The linker will arbitrarily choose one and discard the others.
+	 The AT_*_pc values for such functions refer to local labels in
+	 these sections.  If the section from that file was discarded, the
+	 labels are not in the output, so the relocs get a value of 0.
+	 If this is a discarded function, mark the pc bounds as invalid,
+	 so that GDB will ignore it.  */
+      if (part_die->lowpc == 0 && !dwarf2_per_objfile->has_section_at_zero)
+	{
+	  struct gdbarch *gdbarch = get_objfile_arch (cu->objfile);
+
+	  complaint (&symfile_complaints,
+		     _("DW_AT_low_pc %s is zero "
+		       "for DIE at 0x%x [in module %s]"),
+		     paddress (gdbarch, part_die->lowpc),
+		     part_die->offset, cu->objfile->name);
+	}
+      /* dwarf2_get_pc_bounds has also the strict low < high requirement.  */
+      else if (part_die->lowpc >= part_die->highpc)
+	{
+	  struct gdbarch *gdbarch = get_objfile_arch (cu->objfile);
+
+	  complaint (&symfile_complaints,
+		     _("DW_AT_low_pc %s is not < DW_AT_high_pc %s "
+		       "for DIE at 0x%x [in module %s]"),
+		     paddress (gdbarch, part_die->lowpc),
+		     paddress (gdbarch, part_die->highpc),
+		     part_die->offset, cu->objfile->name);
+	}
+      else
+	part_die->has_pc_info = 1;
+    }
 
   return info_ptr;
 }
@@ -9162,7 +9184,7 @@ find_partial_die_in_comp_unit (unsigned int offset, struct dwarf2_cu *cu)
 /* Find a partial DIE at OFFSET, which may or may not be in CU,
    except in the case of .debug_types DIEs which do not reference
    outside their CU (they do however referencing other types via
-   DW_FORM_sig8).  */
+   DW_FORM_ref_sig8).  */
 
 static struct partial_die_info *
 find_partial_die (unsigned int offset, struct dwarf2_cu *cu)
@@ -9465,7 +9487,7 @@ read_attribute_value (struct attribute *attr, unsigned form,
       DW_ADDR (attr) = cu->header.offset + read_8_bytes (abfd, info_ptr);
       info_ptr += 8;
       break;
-    case DW_FORM_sig8:
+    case DW_FORM_ref_sig8:
       /* Convert the signature to something we can record in DW_UNSND
 	 for later lookup.
          NOTE: This is NULL if the type wasn't found.  */
@@ -10342,6 +10364,14 @@ psymtab_include_file_name (const struct line_header *lh, int file_index,
   return include_name;
 }
 
+/* Ignore this record_line request.  */
+
+static void
+noop_record_line (struct subfile *subfile, int line, CORE_ADDR pc)
+{
+  return;
+}
+
 /* Decode the Line Number Program (LNP) for the given line_header
    structure and CU.  The actual information extracted and the type
    of structures created from the LNP depends on the value of PST.
@@ -10377,6 +10407,8 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   const int decode_for_pst_p = (pst != NULL);
   struct subfile *last_subfile = NULL, *first_subfile = current_subfile;
+  void (*p_record_line) (struct subfile *subfile, int line, CORE_ADDR pc)
+    = record_line;
 
   baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
@@ -10446,13 +10478,13 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
 			{
 			  addr = gdbarch_addr_bits_remove (gdbarch, address);
 			  if (last_subfile)
-			    record_line (last_subfile, 0, addr);
+			    (*p_record_line) (last_subfile, 0, addr);
 			  last_subfile = current_subfile;
 			}
 		      /* Append row to matrix using current values.  */
 		      addr = check_cu_functions (address, cu);
 		      addr = gdbarch_addr_bits_remove (gdbarch, addr);
-		      record_line (current_subfile, line, addr);
+		      (*p_record_line) (current_subfile, line, addr);
 		    }
 		}
 	      basic_block = 0;
@@ -10469,10 +10501,27 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
 	      switch (extended_op)
 		{
 		case DW_LNE_end_sequence:
+		  p_record_line = record_line;
 		  end_sequence = 1;
 		  break;
 		case DW_LNE_set_address:
 		  address = read_address (abfd, line_ptr, cu, &bytes_read);
+
+		  if (address == 0 && !dwarf2_per_objfile->has_section_at_zero)
+		    {
+		      /* This line table is for a function which has been
+			 GCd by the linker.  Ignore it.  PR gdb/12528 */
+
+		      long line_offset
+			= line_ptr - dwarf2_per_objfile->line.buffer;
+
+		      complaint (&symfile_complaints,
+				 _(".debug_line address at offset 0x%lx is 0 "
+				   "[in module %s]"),
+				 line_offset, cu->objfile->name);
+		      p_record_line = noop_record_line;
+		    }
+
 		  op_index = 0;
 		  line_ptr += bytes_read;
 		  address += baseaddr;
@@ -10529,12 +10578,12 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
 			{
 			  addr = gdbarch_addr_bits_remove (gdbarch, address);
 			  if (last_subfile)
-			    record_line (last_subfile, 0, addr);
+			    (*p_record_line) (last_subfile, 0, addr);
 			  last_subfile = current_subfile;
 			}
 		      addr = check_cu_functions (address, cu);
 		      addr = gdbarch_addr_bits_remove (gdbarch, addr);
-		      record_line (current_subfile, line, addr);
+		      (*p_record_line) (current_subfile, line, addr);
 		    }
 		}
 	      basic_block = 0;
@@ -10633,7 +10682,7 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
           if (!decode_for_pst_p)
 	    {
 	      addr = gdbarch_addr_bits_remove (gdbarch, address);
-	      record_line (current_subfile, 0, addr);
+	      (*p_record_line) (current_subfile, 0, addr);
 	    }
         }
     }
@@ -11448,7 +11497,7 @@ lookup_die_type (struct die_info *die, struct attribute *attr,
 
       this_type = get_die_type_at_offset (offset, cu->per_cu);
     }
-  else if (attr->form == DW_FORM_sig8)
+  else if (attr->form == DW_FORM_ref_sig8)
     {
       struct signatured_type *sig_type = DW_SIGNATURED_TYPE (attr);
       struct dwarf2_cu *sig_cu;
@@ -12488,8 +12537,8 @@ dwarf_form_name (unsigned form)
       return "DW_FORM_exprloc";
     case DW_FORM_flag_present:
       return "DW_FORM_flag_present";
-    case DW_FORM_sig8:
-      return "DW_FORM_sig8";
+    case DW_FORM_ref_sig8:
+      return "DW_FORM_ref_sig8";
     default:
       return "DW_FORM_<unknown>";
     }
@@ -13040,7 +13089,7 @@ dump_die_shallow (struct ui_file *f, int indent, struct die_info *die)
 	  fprintf_unfiltered (f, "section offset: %s",
 			      pulongest (DW_UNSND (&die->attrs[i])));
 	  break;
-	case DW_FORM_sig8:
+	case DW_FORM_ref_sig8:
 	  if (DW_SIGNATURED_TYPE (&die->attrs[i]) != NULL)
 	    fprintf_unfiltered (f, "signatured type, offset: 0x%x",
 				DW_SIGNATURED_TYPE (&die->attrs[i])->offset);
@@ -13242,7 +13291,7 @@ follow_die_ref_or_sig (struct die_info *src_die, struct attribute *attr,
 
   if (is_ref_attr (attr))
     die = follow_die_ref (src_die, attr, ref_cu);
-  else if (attr->form == DW_FORM_sig8)
+  else if (attr->form == DW_FORM_ref_sig8)
     die = follow_die_sig (src_die, attr, ref_cu);
   else
     {
@@ -13273,7 +13322,7 @@ follow_die_offset (unsigned int offset, struct dwarf2_cu **ref_cu)
     {
       /* .debug_types CUs cannot reference anything outside their CU.
 	 If they need to, they have to reference a signatured type via
-	 DW_FORM_sig8.  */
+	 DW_FORM_ref_sig8.  */
       if (! offset_in_cu_p (&cu->header, offset))
 	return NULL;
     }

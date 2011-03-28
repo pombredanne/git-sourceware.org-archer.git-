@@ -37,11 +37,13 @@
 #include "complaints.h"
 #include "demangle.h"
 #include "psympriv.h"
+#include "filenames.h"
 
 extern void _initialize_elfread (void);
 
-/* Forward declaration.  */
+/* Forward declarations.  */
 static const struct sym_fns elf_sym_fns_gdb_index;
+static const struct sym_fns elf_sym_fns_lazy_psyms;
 
 /* The struct elfinfo is available only during ELF symbol table and
    psymtab reading.  It is destroyed at the completion of psymtab-reading.
@@ -242,6 +244,7 @@ elf_symtab_read (struct objfile *objfile, int type,
   char *filesymname = "";
   struct dbx_symfile_info *dbx = objfile->deprecated_sym_stab_info;
   int stripped = (bfd_get_symcount (objfile->obfd) == 0);
+  struct cleanup *back_to = make_cleanup (null_cleanup, NULL);
 
   for (i = 0; i < number_of_symbols; i++)
     {
@@ -460,10 +463,10 @@ elf_symtab_read (struct objfile *objfile, int type,
 			     need to allocate max_index aadditional
 			     elements.  */
 			  size = (sizeof (struct stab_section_info) 
-				  + (sizeof (CORE_ADDR)
-				     * max_index));
+				  + (sizeof (CORE_ADDR) * max_index));
 			  sectinfo = (struct stab_section_info *)
 			    xmalloc (size);
+			  make_cleanup (xfree, sectinfo);
 			  memset (sectinfo, 0, size);
 			  sectinfo->num_sections = max_index;
 			  if (filesym == NULL)
@@ -572,6 +575,7 @@ elf_symtab_read (struct objfile *objfile, int type,
 	    }
 	}
     }
+  do_cleanups (back_to);
 }
 
 struct build_id
@@ -704,7 +708,8 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
       build_id_name = build_id_to_debug_filename (build_id);
       xfree (build_id);
       /* Prevent looping on a stripped .debug file.  */
-      if (build_id_name != NULL && strcmp (build_id_name, objfile->name) == 0)
+      if (build_id_name != NULL
+	  && filename_cmp (build_id_name, objfile->name) == 0)
         {
 	  warning (_("\"%s\": separate debug info file has no debug info"),
 		   build_id_name);
@@ -888,14 +893,24 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
 				bfd_section_size (abfd, str_sect));
     }
 
-  if (dwarf2_has_info (objfile) && dwarf2_initialize_objfile (objfile))
-    objfile->sf = &elf_sym_fns_gdb_index;
-
+  if (dwarf2_has_info (objfile))
+    {
+      if (dwarf2_initialize_objfile (objfile))
+	objfile->sf = &elf_sym_fns_gdb_index;
+      else
+	{
+	  /* It is ok to do this even if the stabs reader made some
+	     partial symbols, because OBJF_PSYMTABS_READ has not been
+	     set, and so our lazy reader function will still be called
+	     when needed.  */
+	  objfile->sf = &elf_sym_fns_lazy_psyms;
+	}
+    }
   /* If the file has its own symbol tables it has no separate debug
      info.  `.dynsym'/`.symtab' go to MSYMBOLS, `.debug_info' goes to
      SYMTABS/PSYMTABS.  `.gnu_debuglink' may no longer be present with
      `.note.gnu.build-id'.  */
-  if (!objfile_has_partial_symbols (objfile))
+  else if (!objfile_has_partial_symbols (objfile))
     {
       char *debugfile;
 
@@ -912,6 +927,15 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
 	  xfree (debugfile);
 	}
     }
+}
+
+/* Callback to lazily read psymtabs.  */
+
+static void
+read_psyms (struct objfile *objfile)
+{
+  if (dwarf2_has_info (objfile))
+    dwarf2_build_psymtabs (objfile);
 }
 
 /* This cleans up the objfile's deprecated_sym_stab_info pointer, and
@@ -1001,12 +1025,10 @@ elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
   struct stab_section_info *maybe = dbx->stab_section_info;
   struct stab_section_info *questionable = 0;
   int i;
-  char *p;
 
   /* The ELF symbol info doesn't include path names, so strip the path
      (if any) from the psymtab filename.  */
-  while (0 != (p = strchr (filename, '/')))
-    filename = p + 1;
+  filename = lbasename (filename);
 
   /* FIXME:  This linear search could speed up significantly
      if it was chained in the right order to match how we search it,
@@ -1014,7 +1036,7 @@ elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
   for (; maybe; maybe = maybe->next)
     {
       if (filename[0] == maybe->filename[0]
-	  && strcmp (filename, maybe->filename) == 0)
+	  && filename_cmp (filename, maybe->filename) == 0)
 	{
 	  /* We found a match.  But there might be several source files
 	     (from different directories) with the same name.  */
@@ -1058,6 +1080,25 @@ static const struct sym_fns elf_sym_fns =
   elf_new_init,			/* init anything gbl to entire symtab */
   elf_symfile_init,		/* read initial info, setup for sym_read() */
   elf_symfile_read,		/* read a symbol file into symtab */
+  NULL,				/* sym_read_psymbols */
+  elf_symfile_finish,		/* finished with file, cleanup */
+  default_symfile_offsets,	/* Translate ext. to int. relocation */
+  elf_symfile_segments,		/* Get segment information from a file.  */
+  NULL,
+  default_symfile_relocate,	/* Relocate a debug section.  */
+  &psym_functions
+};
+
+/* The same as elf_sym_fns, but not registered and lazily reads
+   psymbols.  */
+
+static const struct sym_fns elf_sym_fns_lazy_psyms =
+{
+  bfd_target_elf_flavour,
+  elf_new_init,			/* init anything gbl to entire symtab */
+  elf_symfile_init,		/* read initial info, setup for sym_read() */
+  elf_symfile_read,		/* read a symbol file into symtab */
+  read_psyms,			/* sym_read_psymbols */
   elf_symfile_finish,		/* finished with file, cleanup */
   default_symfile_offsets,	/* Translate ext. to int. relocation */
   elf_symfile_segments,		/* Get segment information from a file.  */
@@ -1074,6 +1115,7 @@ static const struct sym_fns elf_sym_fns_gdb_index =
   elf_new_init,			/* init anything gbl to entire symab */
   elf_symfile_init,		/* read initial info, setup for sym_red() */
   elf_symfile_read,		/* read a symbol file into symtab */
+  NULL,				/* sym_read_psymbols */
   elf_symfile_finish,		/* finished with file, cleanup */
   default_symfile_offsets,	/* Translate ext. to int. relocatin */
   elf_symfile_segments,		/* Get segment information from a file.  */

@@ -1019,6 +1019,9 @@ syms_from_objfile (struct objfile *objfile,
 
   (*objfile->sf->sym_read) (objfile, add_flags);
 
+  if ((add_flags & SYMFILE_NO_READ) == 0)
+    require_partial_symbols (objfile, 0);
+
   /* Discard cleanups as symbol reading was successful.  */
 
   discard_cleanups (old_chain);
@@ -1079,9 +1082,15 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
   struct cleanup *my_cleanups;
   const char *name = bfd_get_filename (abfd);
   const int from_tty = add_flags & SYMFILE_VERBOSE;
+  const int should_print = ((from_tty || info_verbose)
+			    && (readnow_symbol_files
+				|| (add_flags & SYMFILE_NO_READ) == 0));
 
   if (readnow_symbol_files)
-    flags |= OBJF_READNOW;
+    {
+      flags |= OBJF_READNOW;
+      add_flags &= ~SYMFILE_NO_READ;
+    }
 
   my_cleanups = make_cleanup_bfd_close (abfd);
 
@@ -1100,7 +1109,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
   /* We either created a new mapped symbol table, mapped an existing
      symbol table file which has not had initial symbol reading
      performed, or need to read an unmapped symbol table.  */
-  if (from_tty || info_verbose)
+  if (should_print)
     {
       if (deprecated_pre_add_symbol_hook)
 	deprecated_pre_add_symbol_hook (name);
@@ -1121,7 +1130,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
 
   if ((flags & OBJF_READNOW))
     {
-      if (from_tty || info_verbose)
+      if (should_print)
 	{
 	  printf_unfiltered (_("expanding to full symbols..."));
 	  wrap_here ("");
@@ -1132,15 +1141,14 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
 	objfile->sf->qf->expand_all_symtabs (objfile);
     }
 
-  if ((from_tty || info_verbose)
-      && !objfile_has_symbols (objfile))
+  if (should_print && !objfile_has_symbols (objfile))
     {
       wrap_here ("");
       printf_unfiltered (_("(no debugging symbols found)..."));
       wrap_here ("");
     }
 
-  if (from_tty || info_verbose)
+  if (should_print)
     {
       if (deprecated_post_add_symbol_hook)
 	deprecated_post_add_symbol_hook ();
@@ -1317,7 +1325,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
      ".debug" suffix as "/usr/lib/debug/path/to/file" is a separate tree where
      the separate debug infos with the same basename can exist.  */
 
-  if (strcmp (name, parent_objfile->name) == 0)
+  if (filename_cmp (name, parent_objfile->name) == 0)
     return 0;
 
   abfd = bfd_open_maybe_remote (name);
@@ -1325,7 +1333,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
   if (!abfd)
     return 0;
 
-  /* Verify symlinks were not the cause of strcmp name difference above.
+  /* Verify symlinks were not the cause of filename_cmp name difference above.
 
      Some operating systems, e.g. Windows, do not provide a meaningful
      st_ino; they always set it to zero.  (Windows does provide a
@@ -1463,7 +1471,8 @@ find_separate_debug_file_by_debuglink (struct objfile *objfile)
       /* If the file is in the sysroot, try using its base path in the
 	 global debugfile directory.  */
       if (canon_name
-	  && strncmp (canon_name, gdb_sysroot, strlen (gdb_sysroot)) == 0
+	  && filename_ncmp (canon_name, gdb_sysroot,
+			    strlen (gdb_sysroot)) == 0
 	  && IS_DIR_SEPARATOR (canon_name[strlen (gdb_sysroot)]))
 	{
 	  memcpy (debugfile, debugdir, debugdir_end - debugdir);
@@ -2367,8 +2376,9 @@ reread_symbols (void)
 	  /* We need to do this whenever any symbols go away.  */
 	  make_cleanup (clear_symtab_users_cleanup, 0 /*ignore*/);
 
-	  if (exec_bfd != NULL && strcmp (bfd_get_filename (objfile->obfd),
-					  bfd_get_filename (exec_bfd)) == 0)
+	  if (exec_bfd != NULL
+	      && filename_cmp (bfd_get_filename (objfile->obfd),
+			       bfd_get_filename (exec_bfd)) == 0)
 	    {
 	      /* Reload EXEC_BFD without asking anything.  */
 
@@ -2497,6 +2507,12 @@ reread_symbols (void)
 	  /* Do not set flags as this is safe and we don't want to be
              verbose.  */
 	  (*objfile->sf->sym_read) (objfile, 0);
+	  if ((objfile->flags & OBJF_PSYMTABS_READ) != 0)
+	    {
+	      objfile->flags &= ~OBJF_PSYMTABS_READ;
+	      require_partial_symbols (objfile, 0);
+	    }
+
 	  if (!objfile_has_symbols (objfile))
 	    {
 	      wrap_here ("");
