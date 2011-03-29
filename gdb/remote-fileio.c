@@ -31,6 +31,7 @@
 #include "remote-fileio.h"
 #include "event-loop.h"
 #include "target.h"
+#include "filenames.h"
 
 #include <fcntl.h>
 #include <sys/time.h>
@@ -1013,8 +1014,8 @@ remote_fileio_func_rename (char *buf)
 		  gdb_win_conv_path (WINDOWS_NATIVE_A_TO_POSIX, newpath,
 				     newfullpath, PATH_MAX);
 		  len = strlen (oldfullpath);
-		  if (newfullpath[len] == '/'
-		      && !strncmp (oldfullpath, newfullpath, len))
+		  if (IS_DIR_SEPARATOR (newfullpath[len])
+		      && !filename_ncmp (oldfullpath, newfullpath, len))
 		    errno = EINVAL;
 		  else
 		    errno = EEXIST;
