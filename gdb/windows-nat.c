@@ -2047,15 +2047,11 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
 			     __PMAX * sizeof (win_buf_t)) < 0)
 	error (_("Error starting executable: %d"), errno);
       toexec = real_path;
-#ifdef USE_WIDE_WINAPI
-      len = mbstowcs (NULL, allargs, 0) + 1;
+      len = (size_t) (windows_a_to_g_strlen (allargs)) + 1;
       if (len == (size_t) -1)
 	error (_("Error starting executable: %d"), errno);
-      cygallargs = (wchar_t *) alloca (len * sizeof (wchar_t));
-      mbstowcs (cygallargs, allargs, len);
-#else
-      cygallargs = allargs;
-#endif
+      cygallargs = (win_buf_t *) alloca (len * sizeof (win_buf_t));
+      windows_a_to_g_strncpy (cygallargs, allargs, len);
     }
 #ifdef __CYGWIN__
   else
@@ -2066,15 +2062,16 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
       if (windows_conv_path (WINDOWS_POSIX_TO_NATIVE, sh, shell, __PMAX)
 	    < 0)
       	error (_("Error starting executable via shell: %d"), errno);
+      len = sizeof (_G(" -c 'exec  '")) + windows_a_to_g_strlen (exec_file)
+	    + windows_a_to_g_strlen (allargs) + 2;
+      cygallargs = (win_buf_t *) alloca (len * sizeof (win_buf_t));
+
 #ifdef USE_WIDE_WINAPI
-      len = sizeof (L" -c 'exec  '") + mbstowcs (NULL, exec_file, 0)
-	    + mbstowcs (NULL, allargs, 0) + 2;
-      cygallargs = (wchar_t *) alloca (len * sizeof (wchar_t));
+      /* To use ascii char strings in wide strings, we should
+	 use "%S" instead of "%s" in the format string, but Cygwin doesn't
+	 seem to honor this.  */
       swprintf (cygallargs, len, L" -c 'exec %s %s'", exec_file, allargs);
 #else
-      cygallargs = (char *) alloca (sizeof (" -c 'exec  '")
-				    + strlen (exec_file)
-				    + strlen (allargs) + 2);
       sprintf (cygallargs, " -c 'exec %s %s'", exec_file, allargs);
 #endif
       toexec = shell;
@@ -2082,19 +2079,12 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
     }
 #endif
 
-#ifdef USE_WIDE_WINAPI
-  args = (win_buf_t *) alloca ((wcslen (toexec) + wcslen (cygallargs) + 2)
-			       * sizeof (wchar_t));
-  wcscpy (args, toexec);
-  wcscat (args, L" ");
-  wcscat (args, cygallargs);
-#else
-  args = (win_buf_t *) alloca (strlen (toexec) + strlen (cygallargs) + 2);
-  strcpy (args, toexec);
-  strcat (args, " ");
-  strcat (args, cygallargs);
-#endif
-
+  args = (win_buf_t *) alloca ((windows_strlen (toexec)
+				+ windows_strlen (cygallargs) + 2)
+			       * sizeof (win_buf_t));
+  windows_strcpy (args, toexec);
+  windows_strcat (args, _G(" "));
+  windows_strcat (args, cygallargs);
 #ifdef __CYGWIN__
   cygwin_internal (CW_SYNC_WINENV);
 

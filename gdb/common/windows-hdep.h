@@ -51,7 +51,7 @@
    of the macro USE_WIDE_WINAPI.
 
    For Cygwin compiler, the default is wide API for the newer cygwin
-   version 1.7.X and above; and ascii API for older 1.5.X versions.  
+   version 1.7.X and above; and ascii API for older 1.5.X versions.
 
    Otherwise mingw compiler is assumed, which defaults to use of ascii
    WINAPI for now (this may change later).
@@ -109,8 +109,12 @@
 # define STARTUPINFO STARTUPINFOW
 # define CreateProcess CreateProcessW
 # define GetSystemDirectory GetSystemDirectoryW
-# define windows_strlen wstrlen
+# define windows_strlen wcslen
+# define windows_a_to_g_strlen(ascii_str) mbstowcs (NULL, ascii_str, 0)
+# define windows_a_to_g_strncpy(gdb_str, ascii_str, len) \
+				mbstowcs (gdb_str, ascii_str, len)
 # define windows_strcat wcscat
+# define windows_strcpy wcscpy
 /* Mingw has a special swprintf function without length argument.  */
 # ifndef __CYGWIN__
 #  define swprintf _snwprintf
@@ -127,7 +131,11 @@
 # define CreateProcess CreateProcessA
 # define GetSystemDirectory GetSystemDirectoryA
 # define windows_strlen strlen
+# define windows_a_to_g_strlen(ascii_str) strlen (ascii_str)
+# define windows_a_to_g_strncpy(gdb_str, ascii_str, len) \
+				strncpy (gdb_str, ascii_str, len)
 # define windows_strcat strcat
+# define windows_strcpy strcpy
 #endif /* not USE_WIDE_WINAPI */
 
 
