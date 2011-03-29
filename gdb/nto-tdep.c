@@ -60,9 +60,9 @@ nto_target (void)
 #ifdef __CYGWIN__
   static char buf[PATH_MAX];
   if (p)
-    gdb_win_conv_path (WINDOWS_NATIVE_A_TO_POSIX, p, buf, PATH_MAX);
+    windows_conv_path (WINDOWS_NATIVE_A_TO_POSIX, p, buf, PATH_MAX);
   else
-    gdb_win_conv_path (WINDOWS_NATIVE_A_TO_POSIX, default_nto_target, buf,
+    windows_conv_path (WINDOWS_NATIVE_A_TO_POSIX, default_nto_target, buf,
 		       PATH_MAX);
   return buf;
 #else

@@ -1009,9 +1009,9 @@ remote_fileio_func_rename (char *buf)
 		  char newfullpath[PATH_MAX];
 		  int len;
 
-		  gdb_win_conv_path (WINDOWS_NATIVE_A_TO_POSIX, oldpath,
+		  windows_conv_path (WINDOWS_NATIVE_A_TO_POSIX, oldpath,
 				     oldfullpath, PATH_MAX);
-		  gdb_win_conv_path (WINDOWS_NATIVE_A_TO_POSIX, newpath,
+		  windows_conv_path (WINDOWS_NATIVE_A_TO_POSIX, newpath,
 				     newfullpath, PATH_MAX);
 		  len = strlen (oldfullpath);
 		  if (IS_DIR_SEPARATOR (newfullpath[len])

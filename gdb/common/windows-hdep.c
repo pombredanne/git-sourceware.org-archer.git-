@@ -34,7 +34,7 @@
 #include "windows-hdep.h"
 
 int
-gdb_win_conv_path (conv_type oper, const void *from, void *to, int size)
+windows_conv_path (conv_type oper, const void *from, void *to, int size)
 {
 #ifdef USE_MINGW_CONV
   if (size == 0)
@@ -149,7 +149,7 @@ gdb_win_conv_path (conv_type oper, const void *from, void *to, int size)
 /* Analogeous function for PATH style lists.  */
 
 int
-gdb_win_conv_path_list (conv_type oper, const void *from, void *to, int size)
+windows_conv_path_list (conv_type oper, const void *from, void *to, int size)
 {
 #ifdef USE_MINGW_CONV
 #ifdef USE_WIDE_WINAPI

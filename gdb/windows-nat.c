@@ -584,7 +584,7 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
 	  if (len == 0)
 	    error (_("Error getting dll name: %lu."), GetLastError ());
 	  /* Cygwin prefers that the path be in /x/y/z format.  */
-	  if (gdb_win_conv_path (WINDOWS_NATIVE_TO_POSIX, pathbuf,
+	  if (windows_conv_path (WINDOWS_NATIVE_TO_POSIX, pathbuf,
 				 dll_name_ret, __PMAX) < 0)
 	    error (_("Error converting dll name to POSIX: %d."), errno);
 	  return 1;	/* success */
@@ -713,7 +713,7 @@ windows_make_so (const char *name, LPVOID load_addr)
       if (strcasecmp (name, "ntdll.dll") == 0)
 	{
 	  GetSystemDirectory (buf, sizeof (buf) / sizeof (win_buf_t));
-	  gdb_win_strcat (buf, _G("\\ntdll.dll"));
+	  windows_strcat (buf, _G("\\ntdll.dll"));
 	}
     }
 #endif
@@ -725,7 +725,7 @@ windows_make_so (const char *name, LPVOID load_addr)
   strcpy (so->so_name, buf);
 #else
   if (buf[0])
-    gdb_win_conv_path (WINDOWS_NATIVE_TO_POSIX, buf, so->so_name,
+    windows_conv_path (WINDOWS_NATIVE_TO_POSIX, buf, so->so_name,
 		       SO_NAME_MAX_PATH_SIZE);
   else
     {
@@ -2043,7 +2043,7 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
   if (!useshell)
     {
       flags |= DEBUG_ONLY_THIS_PROCESS;
-      if (gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE, exec_file, real_path,
+      if (windows_conv_path (WINDOWS_POSIX_TO_NATIVE, exec_file, real_path,
 			     __PMAX * sizeof (win_buf_t)) < 0)
 	error (_("Error starting executable: %d"), errno);
       toexec = real_path;
@@ -2063,7 +2063,7 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
       sh = getenv ("SHELL");
       if (!sh)
 	sh = "/bin/sh";
-      if (gdb_win_conv_path (WINDOWS_POSIX_TO_NATIVE, sh, shell, __PMAX)
+      if (windows_conv_path (WINDOWS_POSIX_TO_NATIVE, sh, shell, __PMAX)
 	    < 0)
       	error (_("Error starting executable via shell: %d"), errno);
 #ifdef USE_WIDE_WINAPI

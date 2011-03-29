@@ -109,8 +109,8 @@
 # define STARTUPINFO STARTUPINFOW
 # define CreateProcess CreateProcessW
 # define GetSystemDirectory GetSystemDirectoryW
-# define gdb_win_strlen wstrlen
-# define gdb_win_strcat wcscat
+# define windows_strlen wstrlen
+# define windows_strcat wcscat
 /* Mingw has a special swprintf function without length argument.  */
 # ifndef __CYGWIN__
 #  define swprintf _snwprintf
@@ -126,8 +126,8 @@
 # define STARTUPINFO STARTUPINFOA
 # define CreateProcess CreateProcessA
 # define GetSystemDirectory GetSystemDirectoryA
-# define gdb_win_strlen strlen
-# define gdb_win_strcat strcat
+# define windows_strlen strlen
+# define windows_strcat strcat
 #endif /* not USE_WIDE_WINAPI */
 
 
@@ -150,12 +150,12 @@ typedef enum
    Returns size of converted string in characters or
    -1 if there was an error.  */
 
-extern int gdb_win_conv_path (conv_type oper, const void *from,
+extern int windows_conv_path (conv_type oper, const void *from,
 			      void *to, int size);
 
 /* Analogeous function for PATH style lists.  */
 
-extern int gdb_win_conv_path_list (conv_type oper, const void *from,
+extern int windows_conv_path_list (conv_type oper, const void *from,
 				   void *to, int size);
 
 #ifdef NEED_SLEEP_SUBSTITUTE
