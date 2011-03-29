@@ -82,7 +82,7 @@ _initialize_i386_windows_nat (void)
       GdbSetThreadContext = (void *) GetProcAddress (h, "SetThreadContext");
       GdbGetThreadSelectorEntry = (void *) GetProcAddress (h,
 				    "GetThreadSelectorEntry");
-      CloseHandle (h);
+      FreeLibrary (h);
     }
   windows_set_context_register_offsets (mappings);
   i386_set_debug_register_length (4);

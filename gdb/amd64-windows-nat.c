@@ -381,7 +381,7 @@ _initialize_amd64_windows_nat (void)
       Win32GetThreadSelectorEntry = (void *) GetProcAddress (h,
 				      "Wow64GetThreadSelectorEntry");
       Win32SuspendThread = (void *) GetProcAddress (h, "Wow64SuspendThread");
-      CloseHandle (h);
+      FreeLibrary (h);
     }
   setup_amd64_windows_nat ();
   observer_attach_architecture_changed (windows_notify_architecture_changed);
