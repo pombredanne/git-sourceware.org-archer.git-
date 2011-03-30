@@ -1,3 +1,171 @@
+2011-03-29  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* Makefile.in (SFILES): Add missing C sources.
+	(HFILES_NO_SRCDIR): Remove gdbserver subdirectory headers.
+	Add missing headers.
+
+2011-03-29  Mike Frysinger  <vapier@gentoo.org>
+
+	* .gitignore: New file.
+
+2011-03-29  Mike Frysinger  <vapier@gentoo.org>
+
+	* NEWS: Mention new cfi device simulation.
+
+2011-03-29  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (fixup_partial_die): Handle linkage name on
+	otherwise anonymous types.
+	(dwarf2_name): Likewise.
+	* valops.c (value_struct_elt_for_reference): Refine artificial
+	type logic.  Call error if j==-1.
+
+2011-03-29  Andreas Tobler  <andreast-list@fgznet.ch>
+
+	Fix false GCC warning.
+	* infcall.c (find_function_addr): Initialize funaddr.
+
+2011-03-29  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Fix mingw compilation with --enable-targets=all.
+	* remote-mips.c (gdb_usleep.h): Include header.
+	(mips_enter_debug): Use gdb_usleep instead of sleep.
+
+2011-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Support resolution of STT_GNU_IFUNC via breakpoints.
+	* breakpoint.c (print_it_typical): Support bp_gnu_ifunc_resolver and
+	bp_gnu_ifunc_resolver_return.
+	(bpstat_what): Rename parameter to bs_head, new variable bs, adjust
+	the loop.  Support bp_gnu_ifunc_resolver and
+	bp_gnu_ifunc_resolver_return.  New comment after the loop.  New loop
+	for bp_gnu_ifunc_resolver and bp_gnu_ifunc_resolver_return
+	breakpoints.
+	(bptype_string, print_one_breakpoint_location): Support
+	bp_gnu_ifunc_resolver and bp_gnu_ifunc_resolver_return.
+	(user_settable_breakpoint): Return true also for
+	bp_gnu_ifunc_resolver.
+	(allocate_bp_location): Support bp_gnu_ifunc_resolver and
+	bp_gnu_ifunc_resolver_return.
+	(set_breakpoint_location_function): New parameter explicit_loc,
+	describe it.  Call find_pc_partial_function_gnu_ifunc with new
+	variable IS_GNU_IFUNC and adjust the address for STT_GNU_IFUNC if
+	EXPLICIT_LOC is not set.
+	(set_raw_breakpoint): Set EXPLICIT_LOC for
+	set_breakpoint_location_function.
+	(clone_momentary_breakpoint): Use true for EXPLICIT_LOC of
+	set_breakpoint_location_function.
+	(mention): Support bp_gnu_ifunc_resolver and
+	bp_gnu_ifunc_resolver_return.
+	(add_location_to_breakpoint): Set EXPLICIT_LOC for
+	set_breakpoint_location_function.
+	(update_breakpoint_locations): Remove static.
+	(breakpoint_re_set_one): Support bp_gnu_ifunc_resolver and
+	bp_gnu_ifunc_resolver_return.
+	* breakpoint.h (enum bptype): New fields bp_gnu_ifunc_resolver and
+	bp_gnu_ifunc_resolver_return.
+	(update_breakpoint_locations): New declaration.
+	* elfread.c: Include gdbthread.h and regcache.h.
+	(elf_gnu_ifunc_resolver_stop, elf_gnu_ifunc_resolver_return_stop): New
+	functions.
+	(elf_gnu_ifunc_fns): Install them.
+	* minsyms.c (stub_gnu_ifunc_resolver_stop)
+	(stub_gnu_ifunc_resolver_return_stop): New functions.
+	(stub_gnu_ifunc_fns): Install them.
+	* symtab.h (struct gnu_ifunc_fns): New fields gnu_ifunc_resolver_stop
+	and gnu_ifunc_resolver_return_stop.
+	(gnu_ifunc_resolver_stop, gnu_ifunc_resolver_return_stop): New.
+
+2011-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	STT_GNU_IFUNC reader implementation.
+	* elfread.c: Include gdbtypes.h, value.h and infcall.h.
+	(SYMBOL_GOT_PLT_SUFFIX, elf_rel_plt_read)
+	(elf_objfile_gnu_ifunc_cache_data, struct elf_gnu_ifunc_cache)
+	(elf_gnu_ifunc_cache_hash, elf_gnu_ifunc_cache_eq)
+	(elf_gnu_ifunc_record_cache, elf_gnu_ifunc_resolve_by_cache)
+	(elf_gnu_ifunc_resolve_by_got, elf_gnu_ifunc_resolve_name)
+	(elf_gnu_ifunc_resolve_addr): New.
+	(elf_symfile_read): Call elf_rel_plt_read.
+	(elf_gnu_ifunc_fns): New.
+	(_initialize_elfread): Initialize elf_objfile_gnu_ifunc_cache_data.
+	Install elf_gnu_ifunc_fns.
+	* infcall.c (find_function_return_type): New function.
+	(find_function_addr): Resolve TYPE_GNU_IFUNC functions, if possible.
+	* minsyms.c (stub_gnu_ifunc_resolve_addr)
+	(stub_gnu_ifunc_resolve_name): New functions.
+	(stub_gnu_ifunc_fns, gnu_ifunc_fns_p): New variables.
+	* symtab.h (struct gnu_ifunc_fns, gnu_ifunc_resolve_addr)
+	(gnu_ifunc_resolve_name, gnu_ifunc_fns_p): New.
+
+2011-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup for later STT_GNU_IFUNC support.
+	* infcall.c (find_function_addr): Remove variable code, use explicit
+	dereferences for it.  Move VALUE_TYPE initialization later.
+
+2011-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	GDB find_pc_partial_function support for STT_GNU_IFUNC.
+	* blockframe.c (cache_pc_function_is_gnu_ifunc): New variable.
+	(clear_pc_function_cache): Clear it.
+	(find_pc_partial_function): Rename to ...
+	(find_pc_partial_function_gnu_ifunc): ... this function.  New
+	parameter is_gnu_ifunc_p, describe it.  Set *IS_GNU_IFUNC_P.
+	(find_pc_partial_function): New wrapper for this function.
+	* symtab.h (find_pc_partial_function_gnu_ifunc): New declaration.
+
+2011-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	GDB internal type support for STT_GNU_IFUNC.
+	* elfread.c (record_minimal_symbol): Support mst_text_gnu_ifunc.
+	(elf_symtab_read): Set mst_text_gnu_ifunc for
+	BSF_GNU_INDIRECT_FUNCTION.
+	* eval.c (evaluate_subexp_standard): Support TYPE_GNU_IFUNC.
+	* gdbtypes.c (init_type): Support TYPE_FLAG_GNU_IFUNC,
+	builtin_func_func, nodebug_text_gnu_ifunc_symbol and
+	nodebug_got_plt_symbol.
+	* gdbtypes.h (enum type_flag_value): New entry TYPE_FLAG_GNU_IFUNC.
+	(TYPE_GNU_IFUNC): New.
+	(struct main_type): New field flag_gnu_ifunc.
+	(struct builtin_type): New field builtin_func_func.
+	(struct objfile_type): New fields nodebug_text_gnu_ifunc_symbol and
+	nodebug_got_plt_symbol.
+	* minsyms.c (lookup_minimal_symbol_text): Support mst_text_gnu_ifunc.
+	(in_gnu_ifunc_stub): New.
+	(prim_record_minimal_symbol, find_solib_trampoline_target): Support
+	mst_text_gnu_ifunc.
+	* parse.c (write_exp_msymbol): New variable ifunc_msym.  Detect and
+	support mst_text_gnu_ifunc.  Support mst_slot_got_plt.
+	* solib-svr4.c (svr4_in_dynsym_resolve_code): Return true also for
+	in_gnu_ifunc_stub.
+	* symmisc.c (dump_msymbols): Support mst_text_gnu_ifunc.
+	* symtab.c (search_symbols): Likewise.
+	* symtab.h (enum minimal_symbol_type): New fields mst_text_gnu_ifunc
+	and mst_slot_got_plt.
+	(in_gnu_ifunc_stub): New declaration.
+
+2011-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Support a ring of related breakpoints.
+	* breakpoint.c (watchpoint_del_at_next_stop): New, move here code from
+	other functions, add gdb_assert.
+	(update_watchpoint, watchpoint_check): Add gdb_assert.  Use
+	watchpoint_del_at_next_stop.
+	(bpstat_check_watchpoint): Use watchpoint_del_at_next_stop.
+	(bpstat_stop_status): Handle ring in related_breakpoint.
+	(set_raw_breakpoint_without_location): Initialize ring in
+	related_breakpoint.
+	(delete_breakpoint): Handle ring in related_breakpoint, use
+	watchpoint_del_at_next_stop.
+	(map_breakpoint_numbers): Handle ring in related_breakpoint.
+
+2011-03-28  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/12441:
+	* dwarf2read.c (prepare_one_comp_unit): Don't call set_cu_language
+	with `language_minimal'.
+
 2011-03-25  Ulrich Weigand  <ulrich.weigand@linaro.org>
 
 	* arm-tdep.c (arm_elf_make_msymbol_special): Use ARM_SYM_BRANCH_TYPE
