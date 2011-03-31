@@ -1,3 +1,36 @@
+2011-03-29  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/anon-struct.cc: New file.
+	* gdb.cp/anon-struct.exp: New file.
+
+2011-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Test STT_GNU_IFUNC support.
+	* gdb.base/gnu-ifunc-lib.c: New file.
+	* gdb.base/gnu-ifunc.c: New file.
+	* gdb.base/gnu-ifunc.exp: New file.
+
+2011-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Support a ring of related breakpoints.
+	* gdb.base/watchpoint-delete.c: New file.
+	* gdb.base/watchpoint-delete.exp: New file.
+
+2011-03-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.ada/arrayparam.exp (print first after function call): Use
+	explicit package name.  Add a comment
+	(print lasta after function call): Rename ...
+	(print last after function call): ... it and use explicit package
+	name.
+	(print length after function call): Use explicit package name.
+	* gdb.ada/str_ref_cmp.exp (operator = works for strings): New test.
+	* gdb.ada/sym_print_name.exp: Change `i' to `integervar'.
+	(multiple matches for symbol i): Rename ...
+	(multiple matches for symbol integervar): ... it.
+	* gdb.ada/sym_print_name/foo.adb (Foo): Change `I' to `IntegerVar'.
+	* gdb.ada/sym_print_name/pck.ads (Pck): Likewise.
+
 2011-03-25  Andrew Burgess  <aburgess@broadcom.com>
 
 	* lib/gdb.exp (default_gdb_start,gdb_init): Clear the GREP_OPTIONS

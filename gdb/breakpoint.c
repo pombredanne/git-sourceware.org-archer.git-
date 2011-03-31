@@ -1159,6 +1159,25 @@ watchpoint_in_thread_scope (struct breakpoint *b)
 	      && !is_executing (inferior_ptid)));
 }
 
+/* Set watchpoint B to disp_del_at_next_stop, even including its possible
+   associated bp_watchpoint_scope breakpoint.  */
+
+static void
+watchpoint_del_at_next_stop (struct breakpoint *b)
+{
+  gdb_assert (is_watchpoint (b));
+
+  if (b->related_breakpoint != b)
+    {
+      gdb_assert (b->related_breakpoint->type == bp_watchpoint_scope);
+      gdb_assert (b->related_breakpoint->related_breakpoint == b);
+      b->related_breakpoint->disposition = disp_del_at_next_stop;
+      b->related_breakpoint->related_breakpoint = b->related_breakpoint;
+      b->related_breakpoint = b;
+    }
+  b->disposition = disp_del_at_next_stop;
+}
+
 /* Assuming that B is a watchpoint:
    - Reparse watchpoint expression, if REPARSE is non-zero
    - Evaluate expression and store the result in B->val
@@ -1217,6 +1236,8 @@ update_watchpoint (struct breakpoint *b, int reparse)
   int within_current_scope;
   struct frame_id saved_frame_id;
   int frame_saved;
+
+  gdb_assert (is_watchpoint (b));
 
   /* If this is a local watchpoint, we only want to check if the
      watchpoint frame is in scope if the current thread is the thread
@@ -1453,13 +1474,7 @@ update_watchpoint (struct breakpoint *b, int reparse)
 Watchpoint %d deleted because the program has left the block\n\
 in which its expression is valid.\n"),
 		       b->number);
-      if (b->related_breakpoint)
-	{
-	  b->related_breakpoint->disposition = disp_del_at_next_stop;
-	  b->related_breakpoint->related_breakpoint = NULL;
-	  b->related_breakpoint= NULL;
-	}
-      b->disposition = disp_del_at_next_stop;
+      watchpoint_del_at_next_stop (b);
     }
 
   /* Restore the selected frame.  */
@@ -3489,6 +3504,8 @@ print_it_typical (bpstat bs)
     case bp_tracepoint:
     case bp_fast_tracepoint:
     case bp_jit_event:
+    case bp_gnu_ifunc_resolver:
+    case bp_gnu_ifunc_resolver_return:
     default:
       result = PRINT_UNKNOWN;
       break;
@@ -3714,6 +3731,8 @@ watchpoint_check (void *p)
   gdb_assert (bs->breakpoint_at != NULL);
   b = bs->breakpoint_at;
 
+  gdb_assert (is_watchpoint (b));
+
   /* If this is a local watchpoint, we only want to check if the
      watchpoint frame is in scope if the current thread is the thread
      that was used to create the watchpoint.  */
@@ -3823,13 +3842,7 @@ watchpoint_check (void *p)
 		   " deleted because the program has left the block in\n\
 which its expression is valid.\n");     
 
-      if (b->related_breakpoint)
-	{
-	  b->related_breakpoint->disposition = disp_del_at_next_stop;
-	  b->related_breakpoint->related_breakpoint = NULL;
-	  b->related_breakpoint = NULL;
-	}
-      b->disposition = disp_del_at_next_stop;
+      watchpoint_del_at_next_stop (b);
 
       return WP_DELETED;
     }
@@ -4034,9 +4047,7 @@ bpstat_check_watchpoint (bpstat bs)
 	    case 0:
 	      /* Error from catch_errors.  */
 	      printf_filtered (_("Watchpoint %d deleted.\n"), b->number);
-	      if (b->related_breakpoint)
-		b->related_breakpoint->disposition = disp_del_at_next_stop;
-	      b->disposition = disp_del_at_next_stop;
+	      watchpoint_del_at_next_stop (b);
 	      /* We've already printed what needs to be printed.  */
 	      bs->print_it = print_it_done;
 	      break;
@@ -4247,7 +4258,7 @@ bpstat_stop_status (struct address_space *aspace,
 	     watchpoint as triggered so that we will handle the
 	     out-of-scope event.  We'll get to the watchpoint next
 	     iteration.  */
-	  if (b->type == bp_watchpoint_scope)
+	  if (b->type == bp_watchpoint_scope && b->related_breakpoint != b)
 	    b->related_breakpoint->watchpoint_triggered = watch_triggered_yes;
 	}
     }
@@ -4369,7 +4380,7 @@ handle_jit_event (void)
 /* Decide what infrun needs to do with this bpstat.  */
 
 struct bpstat_what
-bpstat_what (bpstat bs)
+bpstat_what (bpstat bs_head)
 {
   struct bpstat_what retval;
   /* We need to defer calling `solib_add', as adding new symbols
@@ -4377,12 +4388,13 @@ bpstat_what (bpstat bs)
      and hence may clear unprocessed entries in the BS chain.  */
   int shlib_event = 0;
   int jit_event = 0;
+  bpstat bs;
 
   retval.main_action = BPSTAT_WHAT_KEEP_CHECKING;
   retval.call_dummy = STOP_NONE;
   retval.is_longjmp = 0;
 
-  for (; bs != NULL; bs = bs->next)
+  for (bs = bs_head; bs != NULL; bs = bs->next)
     {
       /* Extract this BS's action.  After processing each BS, we check
 	 if its action overrides all we've seem so far.  */
@@ -4512,6 +4524,16 @@ bpstat_what (bpstat bs)
 	     out already.  */
 	  internal_error (__FILE__, __LINE__,
 			  _("bpstat_what: tracepoint encountered"));
+	  break;
+	case bp_gnu_ifunc_resolver:
+	  /* Step over it (and insert bp_gnu_ifunc_resolver_return).  */
+	  this_action = BPSTAT_WHAT_SINGLE;
+	  break;
+	case bp_gnu_ifunc_resolver_return:
+	  /* The breakpoint will be removed, execution will restart from the
+	     PC of the former breakpoint.  */
+	  this_action = BPSTAT_WHAT_KEEP_CHECKING;
+	  break;
 	default:
 	  internal_error (__FILE__, __LINE__,
 			  _("bpstat_what: unhandled bptype %d"), (int) bptype);
@@ -4519,6 +4541,9 @@ bpstat_what (bpstat bs)
 
       retval.main_action = max (retval.main_action, this_action);
     }
+
+  /* These operations may affect the bs->breakpoint_at state so they are
+     delayed after MAIN_ACTION is decided above.  */
 
   if (shlib_event)
     {
@@ -4547,6 +4572,23 @@ bpstat_what (bpstat bs)
 	fprintf_unfiltered (gdb_stdlog, "bpstat_what: bp_jit_event\n");
 
       handle_jit_event ();
+    }
+
+  for (bs = bs_head; bs != NULL; bs = bs->next)
+    {
+      struct breakpoint *b = bs->breakpoint_at;
+
+      if (b == NULL)
+	continue;
+      switch (b->type)
+	{
+	case bp_gnu_ifunc_resolver:
+	  gnu_ifunc_resolver_stop (b);
+	  break;
+	case bp_gnu_ifunc_resolver_return:
+	  gnu_ifunc_resolver_return_stop (b);
+	  break;
+	}
     }
 
   return retval;
@@ -4706,6 +4748,8 @@ bptype_string (enum bptype type)
     {bp_fast_tracepoint, "fast tracepoint"},
     {bp_static_tracepoint, "static tracepoint"},
     {bp_jit_event, "jit events"},
+    {bp_gnu_ifunc_resolver, "STT_GNU_IFUNC resolver"},
+    {bp_gnu_ifunc_resolver_return, "STT_GNU_IFUNC resolver return"},
   };
 
   if (((int) type >= (sizeof (bptypes) / sizeof (bptypes[0])))
@@ -4840,6 +4884,8 @@ print_one_breakpoint_location (struct breakpoint *b,
       case bp_fast_tracepoint:
       case bp_static_tracepoint:
       case bp_jit_event:
+      case bp_gnu_ifunc_resolver:
+      case bp_gnu_ifunc_resolver_return:
 	if (opts.addressprint)
 	  {
 	    annotate_field (4);
@@ -5115,7 +5161,8 @@ user_settable_breakpoint (const struct breakpoint *b)
 	  || b->type == bp_catchpoint
 	  || b->type == bp_hardware_breakpoint
 	  || is_tracepoint (b)
-	  || is_watchpoint (b));
+	  || is_watchpoint (b)
+	  || b->type == bp_gnu_ifunc_resolver);
 }
 
 /* Return true if this breakpoint was set by the user, false if it is
@@ -5611,6 +5658,8 @@ allocate_bp_location (struct breakpoint *bpt)
     case bp_longjmp_master:
     case bp_std_terminate_master:
     case bp_exception_master:
+    case bp_gnu_ifunc_resolver:
+    case bp_gnu_ifunc_resolver_return:
       loc->loc_type = bp_loc_software_breakpoint;
       break;
     case bp_hardware_breakpoint:
@@ -5700,6 +5749,7 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
   b->ops = NULL;
   b->condition_not_parsed = 0;
   b->py_bp_object = NULL;
+  b->related_breakpoint = b;
 
   /* Add this breakpoint to the end of the chain so that a list of
      breakpoints will come out in order of increasing numbers.  */
@@ -5716,9 +5766,12 @@ set_raw_breakpoint_without_location (struct gdbarch *gdbarch,
   return b;
 }
 
-/* Initialize loc->function_name.  */
+/* Initialize loc->function_name.  EXPLICIT_LOC says no indirect function
+   resolutions should be made as the user specified the location explicitly
+   enough.  */
+
 static void
-set_breakpoint_location_function (struct bp_location *loc)
+set_breakpoint_location_function (struct bp_location *loc, int explicit_loc)
 {
   gdb_assert (loc->owner != NULL);
 
@@ -5726,8 +5779,33 @@ set_breakpoint_location_function (struct bp_location *loc)
       || loc->owner->type == bp_hardware_breakpoint
       || is_tracepoint (loc->owner))
     {
-      find_pc_partial_function (loc->address, &(loc->function_name), 
-				NULL, NULL);
+      int is_gnu_ifunc;
+
+      find_pc_partial_function_gnu_ifunc (loc->address, &loc->function_name,
+					  NULL, NULL, &is_gnu_ifunc);
+
+      if (is_gnu_ifunc && !explicit_loc)
+	{
+	  struct breakpoint *b = loc->owner;
+
+	  gdb_assert (loc->pspace == current_program_space);
+	  if (gnu_ifunc_resolve_name (loc->function_name,
+				      &loc->requested_address))
+	    {
+	      /* Recalculate ADDRESS based on new REQUESTED_ADDRESS.  */
+	      loc->address = adjust_breakpoint_address (loc->gdbarch,
+							loc->requested_address,
+							b->type);
+	    }
+	  else if (b->type == bp_breakpoint && b->loc == loc
+	           && loc->next == NULL && b->related_breakpoint == b)
+	    {
+	      /* Create only the whole new breakpoint of this type but do not
+		 mess more complicated breakpoints with multiple locations.  */
+	      b->type = bp_gnu_ifunc_resolver;
+	    }
+	}
+
       if (loc->function_name)
 	loc->function_name = xstrdup (loc->function_name);
     }
@@ -5802,7 +5880,8 @@ set_raw_breakpoint (struct gdbarch *gdbarch,
   b->loc->section = sal.section;
   b->line_number = sal.line;
 
-  set_breakpoint_location_function (b->loc);
+  set_breakpoint_location_function (b->loc,
+				    sal.explicit_pc || sal.explicit_line);
 
   breakpoints_changed ();
 
@@ -6919,7 +6998,7 @@ clone_momentary_breakpoint (struct breakpoint *orig)
 
   copy = set_raw_breakpoint_without_location (orig->gdbarch, orig->type);
   copy->loc = allocate_bp_location (copy);
-  set_breakpoint_location_function (copy->loc);
+  set_breakpoint_location_function (copy->loc, 1);
 
   copy->loc->gdbarch = orig->loc->gdbarch;
   copy->loc->requested_address = orig->loc->requested_address;
@@ -7019,6 +7098,7 @@ mention (struct breakpoint *b)
 	do_cleanups (ui_out_chain);
 	break;
       case bp_breakpoint:
+      case bp_gnu_ifunc_resolver:
 	if (ui_out_is_mi_like_p (uiout))
 	  {
 	    say_where = 0;
@@ -7029,6 +7109,8 @@ mention (struct breakpoint *b)
 	else
 	  printf_filtered (_("Breakpoint"));
 	printf_filtered (_(" %d"), b->number);
+	if (b->type == bp_gnu_ifunc_resolver)
+	  printf_filtered (_(" at gnu-indirect-function resolver"));
 	say_where = 1;
 	break;
       case bp_hardware_breakpoint:
@@ -7088,6 +7170,7 @@ mention (struct breakpoint *b)
       case bp_longjmp_master:
       case bp_std_terminate_master:
       case bp_exception_master:
+      case bp_gnu_ifunc_resolver_return:
 	break;
       }
 
@@ -7148,7 +7231,8 @@ add_location_to_breakpoint (struct breakpoint *b,
   gdb_assert (loc->pspace != NULL);
   loc->section = sal->section;
 
-  set_breakpoint_location_function (loc);
+  set_breakpoint_location_function (loc,
+				    sal->explicit_pc || sal->explicit_line);
   return loc;
 }
 
@@ -10063,12 +10147,20 @@ delete_breakpoint (struct breakpoint *bpt)
 
   /* At least avoid this stale reference until the reference counting
      of breakpoints gets resolved.  */
-  if (bpt->related_breakpoint != NULL)
+  if (bpt->related_breakpoint != bpt)
     {
-      gdb_assert (bpt->related_breakpoint->related_breakpoint == bpt);
-      bpt->related_breakpoint->disposition = disp_del_at_next_stop;
-      bpt->related_breakpoint->related_breakpoint = NULL;
-      bpt->related_breakpoint = NULL;
+      struct breakpoint *related;
+
+      if (bpt->type == bp_watchpoint_scope)
+	watchpoint_del_at_next_stop (bpt->related_breakpoint);
+      else if (bpt->related_breakpoint->type == bp_watchpoint_scope)
+	watchpoint_del_at_next_stop (bpt);
+
+      /* Unlink bpt from the bpt->related_breakpoint ring.  */
+      for (related = bpt; related->related_breakpoint != bpt;
+	   related = related->related_breakpoint);
+      related->related_breakpoint = bpt->related_breakpoint;
+      bpt->related_breakpoint = bpt;
     }
 
   observer_notify_breakpoint_deleted (bpt->number);
@@ -10381,7 +10473,7 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
   return sal;
 }
 
-static void
+void
 update_breakpoint_locations (struct breakpoint *b,
 			     struct symtabs_and_lines sals)
 {
@@ -10513,6 +10605,7 @@ breakpoint_re_set_one (void *bint)
     case bp_tracepoint:
     case bp_fast_tracepoint:
     case bp_static_tracepoint:
+    case bp_gnu_ifunc_resolver:
       /* Do not attempt to re-set breakpoints disabled during startup.  */
       if (b->enable_state == bp_startup_disabled)
 	return 0;
@@ -10683,6 +10776,7 @@ breakpoint_re_set_one (void *bint)
     case bp_exception:
     case bp_exception_resume:
     case bp_jit_event:
+    case bp_gnu_ifunc_resolver_return:
       break;
     }
 
@@ -10849,11 +10943,25 @@ map_breakpoint_numbers (char *args, void (*function) (struct breakpoint *,
 	  ALL_BREAKPOINTS_SAFE (b, tmp)
 	    if (b->number == num)
 	      {
-		struct breakpoint *related_breakpoint = b->related_breakpoint;
+		struct breakpoint *related_breakpoint;
+
 		match = 1;
-		function (b, data);
-		if (related_breakpoint)
-		  function (related_breakpoint, data);
+		related_breakpoint = b;
+		do
+		  {
+		    struct breakpoint *next_related_b;
+
+		    /* FUNCTION can be also delete_breakpoint.  */
+		    next_related_b = related_breakpoint->related_breakpoint;
+		    function (related_breakpoint, data);
+
+		    /* For delete_breakpoint of the last entry of the ring we
+		       were traversing we would never get back to B.  */
+		    if (next_related_b == related_breakpoint)
+		      break;
+		    related_breakpoint = next_related_b;
+		  }
+		while (related_breakpoint != b);
 		break;
 	      }
 	  if (match == 0)

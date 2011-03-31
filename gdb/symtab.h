@@ -290,6 +290,9 @@ enum minimal_symbol_type
 {
   mst_unknown = 0,		/* Unknown type, the default */
   mst_text,			/* Generally executable instructions */
+  mst_text_gnu_ifunc,		/* Executable code returning address
+				   of executable code */
+  mst_slot_got_plt,		/* GOT entries for .plt sections */
   mst_data,			/* Generally initialized data */
   mst_bss,			/* Generally uninitialized data */
   mst_abs,			/* Generally absolute (nonrelocatable) */
@@ -953,6 +956,11 @@ extern struct symbol *find_pc_function (CORE_ADDR);
 
 extern struct symbol *find_pc_sect_function (CORE_ADDR, struct obj_section *);
 
+extern int find_pc_partial_function_gnu_ifunc (CORE_ADDR pc, char **name,
+					       CORE_ADDR *address,
+					       CORE_ADDR *endaddr,
+					       int *is_gnu_ifunc_p);
+
 /* lookup function from address, return name, start addr and end addr.  */
 
 extern int find_pc_partial_function (CORE_ADDR, char **, CORE_ADDR *,
@@ -1033,6 +1041,35 @@ extern struct minimal_symbol *lookup_minimal_symbol_by_pc_name
 				(CORE_ADDR, const char *, struct objfile *);
 
 extern struct minimal_symbol *lookup_minimal_symbol_by_pc (CORE_ADDR);
+
+extern int in_gnu_ifunc_stub (CORE_ADDR pc);
+
+/* Functions for resolving STT_GNU_IFUNC symbols which are implemented only
+   for ELF symbol files.  */
+
+struct gnu_ifunc_fns
+{
+  /* See elf_gnu_ifunc_resolve_addr for its real implementation.  */
+  CORE_ADDR (*gnu_ifunc_resolve_addr) (struct gdbarch *gdbarch, CORE_ADDR pc);
+
+  /* See elf_gnu_ifunc_resolve_name for its real implementation.  */
+  int (*gnu_ifunc_resolve_name) (const char *function_name,
+				 CORE_ADDR *function_address_p);
+
+  /* See elf_gnu_ifunc_resolver_stop for its real implementation.  */
+  void (*gnu_ifunc_resolver_stop) (struct breakpoint *b);
+
+  /* See elf_gnu_ifunc_resolver_return_stop for its real implementation.  */
+  void (*gnu_ifunc_resolver_return_stop) (struct breakpoint *b);
+};
+
+#define gnu_ifunc_resolve_addr gnu_ifunc_fns_p->gnu_ifunc_resolve_addr
+#define gnu_ifunc_resolve_name gnu_ifunc_fns_p->gnu_ifunc_resolve_name
+#define gnu_ifunc_resolver_stop gnu_ifunc_fns_p->gnu_ifunc_resolver_stop
+#define gnu_ifunc_resolver_return_stop \
+  gnu_ifunc_fns_p->gnu_ifunc_resolver_return_stop
+
+extern const struct gnu_ifunc_fns *gnu_ifunc_fns_p;
 
 extern struct minimal_symbol *
     lookup_minimal_symbol_and_objfile (const char *,
