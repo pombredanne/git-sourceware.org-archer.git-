@@ -1962,11 +1962,11 @@ create_addrmap_from_index (struct objfile *objfile, struct mapped_index *index)
   do_cleanups (cleanup);
 }
 
-/* The hash function for strings in the mapped index.  This is the
-   same as the hashtab.c hash function, but we keep a separate copy to
-   maintain control over the implementation.  This is necessary
-   because the hash function is tied to the format of the mapped index
-   file.  */
+/* The hash function for strings in the mapped index.  This is the same as
+   SYMBOL_HASH_NEXT, but we keep a separate copy to maintain control over the
+   implementation.  This is necessary because the hash function is tied to the
+   format of the mapped index file.  The hash values do not have to match with
+   SYMBOL_HASH_NEXT.  */
 
 static hashval_t
 mapped_index_string_hash (const void *p)
@@ -1989,9 +1989,32 @@ static int
 find_slot_in_mapped_hash (struct mapped_index *index, const char *name,
 			  offset_type **vec_out)
 {
-  offset_type hash = mapped_index_string_hash (name);
+  struct cleanup *back_to = make_cleanup (null_cleanup, 0);
+  offset_type hash;
   offset_type slot, step;
 
+  if (current_language->la_language == language_cplus
+      || current_language->la_language == language_java
+      || current_language->la_language == language_fortran)
+    {
+      /* NAME is already canonical.  Drop any qualifiers as .gdb_index does
+	 not contain any.  */
+      const char *paren = strchr (name, '(');
+
+      if (paren)
+	{
+	  char *dup;
+
+	  dup = xmalloc (paren - name + 1);
+	  memcpy (dup, name, paren - name);
+	  dup[paren - name] = 0;
+
+	  make_cleanup (xfree, dup);
+	  name = dup;
+	}
+    }
+
+  hash = mapped_index_string_hash (name);
   slot = hash & (index->symbol_table_slots - 1);
   step = ((hash * 17) & (index->symbol_table_slots - 1)) | 1;
 
@@ -2001,13 +2024,17 @@ find_slot_in_mapped_hash (struct mapped_index *index, const char *name,
       offset_type i = 2 * slot;
       const char *str;
       if (index->symbol_table[i] == 0 && index->symbol_table[i + 1] == 0)
-	return 0;
+	{
+	  do_cleanups (back_to);
+	  return 0;
+	}
 
       str = index->constant_pool + MAYBE_SWAP (index->symbol_table[i]);
       if (!strcmp (name, str))
 	{
 	  *vec_out = (offset_type *) (index->constant_pool
 				      + MAYBE_SWAP (index->symbol_table[i + 1]));
+	  do_cleanups (back_to);
 	  return 1;
 	}
 
@@ -2045,7 +2072,7 @@ dwarf2_read_index (struct objfile *objfile)
   /* Version check.  */
   version = MAYBE_SWAP (*(offset_type *) addr);
   /* Versions earlier than 3 emitted every copy of a psymbol.  This
-     causes the index to behave very poorly for certain requests.  Version 4
+     causes the index to behave very poorly for certain requests.  Version 3
      contained incomplete addrmap.  So, it seems better to just ignore such
      indices.  */
   if (version < 4)
@@ -2399,7 +2426,7 @@ dw2_do_expand_symtabs_matching (struct objfile *objfile, const char *name)
 
 static void
 dw2_pre_expand_symtabs_matching (struct objfile *objfile,
-				 int kind, const char *name,
+				 enum block_enum block_kind, const char *name,
 				 domain_enum domain)
 {
   dw2_do_expand_symtabs_matching (objfile, name);
@@ -2545,7 +2572,7 @@ static void
 dw2_expand_symtabs_matching (struct objfile *objfile,
 			     int (*file_matcher) (const char *, void *),
 			     int (*name_matcher) (const char *, void *),
-			     domain_enum kind,
+			     enum search_domain kind,
 			     void *data)
 {
   int i;
@@ -12043,7 +12070,7 @@ dwarf2_name (struct die_info *die, struct dwarf2_cu *cu)
 	 http://gcc.gnu.org/bugzilla/show_bug.cgi?id=47510.  */
       if (!attr || DW_STRING (attr) == NULL)
 	{
-	  char *demangled;
+	  char *demangled = NULL;
 
 	  attr = dwarf2_attr (die, DW_AT_linkage_name, cu);
 	  if (attr == NULL)
@@ -12052,7 +12079,10 @@ dwarf2_name (struct die_info *die, struct dwarf2_cu *cu)
 	  if (attr == NULL || DW_STRING (attr) == NULL)
 	    return NULL;
 
-	  demangled = cplus_demangle (DW_STRING (attr), DMGL_TYPES);
+	  /* Avoid demangling DW_STRING (attr) the second time on a second
+	     call for the same DIE.  */
+	  if (!DW_STRING_IS_CANONICAL (attr))
+	    demangled = cplus_demangle (DW_STRING (attr), DMGL_TYPES);
 
 	  if (demangled)
 	    {
