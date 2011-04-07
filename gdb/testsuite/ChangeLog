@@ -1,3 +1,34 @@
+2011-04-04  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/maint.exp (test_help): Update.
+	(test_namespace): Likewise.
+
+2011-04-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/arrayptr/foo.adb: Add access to constrained array.
+	* gdb.ada/arrayptr.exp: Add new tests.
+
+2011-04-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/mi_catch_ex: New testcase.
+
+2011-04-01  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.cp/cpexprs.exp (Overloaded methods): No longer try the
+	base::overload(void) method without specifying "const".
+
+2011-04-01  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.arch/thumb-singlestep.S: New file.
+	* gdb.arch/thumb-singlestep.exp: Likewise.
+
+2011-03-31  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-prettyprint.py (exception_flag): New global.
+	(NoStringContainerPrinter._iterator.next): Check it.
+	* gdb.python/py-prettyprint.c (main): New variable nstype2.
+	* gdb.python/py-mi.exp: Set exception_flag and do more tests.
+
 2011-03-29  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.cp/anon-struct.cc: New file.
