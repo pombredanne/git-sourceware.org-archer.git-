@@ -41,7 +41,6 @@
 #include <psapi.h>
 #ifdef __CYGWIN__
 #include <sys/cygwin.h>
-#include <cygwin/version.h>
 #endif
 #include <signal.h>
 
