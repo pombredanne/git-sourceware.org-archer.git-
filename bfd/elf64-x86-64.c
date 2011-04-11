@@ -1,6 +1,7 @@
 /* X86-64 specific support for ELF
    Copyright 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
-   2010  Free Software Foundation, Inc.
+   2010, 2011
+   Free Software Foundation, Inc.
    Contributed by Jan Hubicka <jh@suse.cz>.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -3411,7 +3412,11 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 
 	      sreloc = elf_section_data (input_section)->sreloc;
 
-	      BFD_ASSERT (sreloc != NULL && sreloc->contents != NULL);
+	      if (sreloc == NULL || sreloc->contents == NULL)
+		{
+		  r = bfd_reloc_notsupported;
+		  goto check_relocation_error;
+		}
 
 	      elf_append_rela (output_bfd, sreloc, &outrel);
 
@@ -3868,6 +3873,7 @@ do_relocation:
 				    contents, rel->r_offset,
 				    relocation, rel->r_addend);
 
+check_relocation_error:
       if (r != bfd_reloc_ok)
 	{
 	  const char *name;
@@ -4451,8 +4457,9 @@ elf_x86_64_add_symbol_hook (bfd *abfd,
     }
 
   if ((abfd->flags & DYNAMIC) == 0
-      && ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC)
-    elf_tdata (info->output_bfd)->has_ifunc_symbols = TRUE;
+      && (ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC
+	  || ELF_ST_BIND (sym->st_info) == STB_GNU_UNIQUE))
+    elf_tdata (info->output_bfd)->has_gnu_symbols = TRUE;
 
   return TRUE;
 }

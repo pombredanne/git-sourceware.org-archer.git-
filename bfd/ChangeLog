@@ -1,9 +1,82 @@
+2011-04-11  Mark Wielaard  <mjw@redhat.com>
+
+	PR 10549
+	* elf-bfd.h (has_ifunc_symbols): Renamed to has_gnu_symbols.
+	(has_gnu_symbols): Renamed from has_ifunc_symbols.
+	* elf.c (_bfd_elf_set_osabi): Use new has_gnu_symbols name.
+	* elf32-arm.c (elf32_arm_add_symbol_hook): Set has_gnu_symbols
+	also if STB_GNU_UNIQUE symbol binding was seen.
+	* elf32-i386.c (elf_i386_add_symbol_hook): Likewise.
+	* elf32-ppc.c (ppc_elf_add_symbol_hook): Likewise.
+	* elf32-sparc.c (elf32_sparc_add_symbol_hook): Likewise.
+	* elf64-ppc.c (ppc64_elf_add_symbol_hook): Likewise.
+	* elf64-sparc.c (elf64_sparc_add_symbol_hook): Likewise.
+	* elf64-x86-64.c (elf_x86_64_add_symbol_hook): Likewise.
+
+2011-04-11  Alan Modra  <amodra@gmail.com>
+
+	* bfd-in.h (bfd_get_section_limit): Don't use rawsize with output
+	sections.
+	* libbfd.c (_bfd_generic_get_section_contents): Likewise.
+	(_bfd_generic_get_section_contents_in_window): Likewise.
+	* section.c (bfd_get_section_contents): Likewise.
+	* compress.c (bfd_get_full_section_contents): Likewise.
+	* elf32-rx.c (rx_final_link): Ignore rawsize.
+	* elf32-microblaze.c (microblaze_elf_relocate_section): Use correct
+	bfd with bfd_get_section_limit.
+	* elfxx-ia64.c (elfNN_ia64_choose_gp): Add "final" parameter.  Use
+	os->size during final link.  Update callers.
+	* bfd-in2.h: Regenerate.
+
+2011-04-10  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	PR ld/12637
+	* elfxx-mips.c (mips_elf_merge_got_with): Use arg->global_count
+	as the number of global entries when merging with the primary GOT.
+
+2011-04-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c: Update copyright year.
+	* elf64-x86-64.c: Likewise.
+
+2011-04-09  Kai Tietz  <ktietz@redhat.com>
+
+	* peXXigen.c (_bfd_XXi_final_link_postscripte): Sort pdata in temporary
+	buffer and use rawsize for sorting.
+	* coffcode.h (coff_compute_section_file_positions): Set rawsize
+	before doing alignment.
+
+2011-04-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_relocate_section): Return relocation
+	error on unsupported relocation.
+	* elf64-x86-64.c (elf_x86_64_relocate_section): Likewise.
+
+2011-04-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR binutils/12657
+	* hosts/x86-64linux.h (elf_prstatus32): Replace __pid_t with
+	pid_t.
+
+2011-04-08  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/12654
+	* elf32-i386.c (elf_i386_relocate_section): Check !executable
+	instead of shared for R_386_TLS_LDO_32.
+
+2011-04-08  Tristan Gingold  <gingold@adacore.com>
+
+	* Makefile.am (SOURCE_HFILES): Remove xcoff-target.h
+	* coff-pmac: Remove
+	* xcoff-target.h: Remove
+	* Makefile.in: Regenerate.
+
 2011-04-07  Cary Coutant  <ccoutant@google.com>
 
 	* dwarf2.c (scan_unit_for_symbols): Check for DW_AT_specification.
 
 2011-04-07  Paul Brook  <paul@codesourcery.com>
- 
+
 	* elf32-tic6x.c (elf32_tic6x_howto_table): R_C6000_PREL31 is
 	pc-relative.
 	(elf32_tic6x_howto_table_rel): Ditto.
