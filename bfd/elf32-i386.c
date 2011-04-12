@@ -1,6 +1,7 @@
 /* Intel 80386/80486-specific support for 32-bit ELF
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+   Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -3451,7 +3452,11 @@ elf_i386_relocate_section (bfd *output_bfd,
 
 	      sreloc = elf_section_data (input_section)->sreloc;
 
-	      BFD_ASSERT (sreloc != NULL && sreloc->contents != NULL);
+	      if (sreloc == NULL || sreloc->contents == NULL)
+		{
+		  r = bfd_reloc_notsupported;
+		  goto check_relocation_error;
+		}
 
 	      loc = sreloc->contents;
 	      loc += sreloc->reloc_count++ * sizeof (Elf32_External_Rel);
@@ -4025,7 +4030,7 @@ elf_i386_relocate_section (bfd *output_bfd,
 	  break;
 
 	case R_386_TLS_LDO_32:
-	  if (info->shared || (input_section->flags & SEC_CODE) == 0)
+	  if (!info->executable || (input_section->flags & SEC_CODE) == 0)
 	    relocation -= elf_i386_dtpoff_base (info);
 	  else
 	    /* When converting LDO to LE, we must negate.  */
@@ -4096,6 +4101,7 @@ do_relocation:
 				    contents, rel->r_offset,
 				    relocation, 0);
 
+check_relocation_error:
       if (r != bfd_reloc_ok)
 	{
 	  const char *name;
@@ -4699,8 +4705,9 @@ elf_i386_add_symbol_hook (bfd * abfd,
 			  bfd_vma * valp ATTRIBUTE_UNUSED)
 {
   if ((abfd->flags & DYNAMIC) == 0
-      && ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC)
-    elf_tdata (info->output_bfd)->has_ifunc_symbols = TRUE;
+      && (ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC
+	  || ELF_ST_BIND (sym->st_info) == STB_GNU_UNIQUE))
+    elf_tdata (info->output_bfd)->has_gnu_symbols = TRUE;
 
   return TRUE;
 }

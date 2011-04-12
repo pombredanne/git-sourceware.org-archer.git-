@@ -1,3 +1,49 @@
+2011-04-11  Gary Benson  <gbenson@redhat.com>
+
+	Fix failure with --enable-maintainer-mode.
+	* Makefile.in (aclocal_m4_deps): Updated gnulib dependencies.
+
+2011-04-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* symtab.c (search_symbols): Reorder the KIND description in the
+	function comment.  Remove the unused 4th element of types, types2,
+	types3 and types4.  New gdb_assert on KIND.
+	(symtab_symbol_info): Remove the unused 4th element of classnames.
+	New gdb_assert on KIND.
+	* symtab.h (enum search_domain): New warning in the enum comment.
+	Assign numbers to the elements VARIABLES_DOMAIN, FUNCTIONS_DOMAIN and
+	TYPES_DOMAIN.
+
+2011-04-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash of gdb save-index on a STABS file.
+	* dwarf2read.c (write_psymtabs_to_index): Return also on no
+	PSYMTABS_ADDRMAP.
+
+2011-04-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix DW_AT_accessibility compatibility with gcc-4.6+.
+	* dwarf2read.c: Include ctype.h.
+	(producer_is_gxx_lt_4_6, dwarf2_default_access_attribute): New
+	functions.
+	(dwarf2_add_field): Fix new_field->accessibility by calling
+	dwarf2_default_access_attribute.  Restructure setting accessibility
+	vs. virtuality.
+	(dwarf2_add_member_fn): New variable accessibility.  Fix fnp
+	is_private and is_protected by calling
+	dwarf2_default_access_attribute.
+
+2011-04-08  Kevin Buettner  <kevinb@redhat.com>
+
+	* rx-tdep.c (rx_frame_unwind): Add default_frame_unwind_stop_reason
+	to the initialization.
+
+2011-04-08  Steve Ellcey  <sje@cup.hp.com>
+
+	* Add default_frame_unwind_stop_reason value to libunwind_frame_unwind
+	initalization.
+
 2011-04-07  Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	Remove support for old Cygwin 1.5 versions.
