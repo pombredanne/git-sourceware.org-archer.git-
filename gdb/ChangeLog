@@ -1,3 +1,40 @@
+2011-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (add_index_entry): Use VEC_last, not VEC_length.
+
+2011-04-15  Gary Benson  <gbenson@redhat.com>
+
+	* MAINTAINERS: Add myself to write-after-approval section.
+
+2011-04-14  Mike Frysinger  <vapier@gentoo.org>
+
+	* remote-sim.c (sim_command_completer): New function.
+	(_initialize_remote_sim): Set completer to sim_command_completer.
+
+2011-04-13  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpoint.c (print_exception_catchpoint): Rename to ...
+	(print_it_exception_catchpoint): ... this.
+	(gnu_v3_exception_catchpoint_ops): Update with new name
+	for print_it_exception_catchpoint.
+
+2011-04-13  Edjunior Machado  <emachado@linux.vnet.ibm.com>
+
+	* MAINTAINERS: Add myself for write after approval privileges.
+
+2011-04-13  Marek Polacek  <mpolacek@redhat.com>
+
+	* MAINTAINERS: Add myself as a write-after-approval maintainer.
+
+2011-04-13  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpoint.c (watch_command_1): Remove colon from exp_string.
+
+2011-04-13  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpoint.c (save_breakpoints): Verify whether
+	breakpoint_ops.print_recreate is defined before calling it.
+
 2011-04-11  Gary Benson  <gbenson@redhat.com>
 
 	Fix failure with --enable-maintainer-mode.
