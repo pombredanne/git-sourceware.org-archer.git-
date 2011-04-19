@@ -1336,6 +1336,7 @@ static const struct opcode16 thumb_opcodes[] =
        %H		print a 16-bit immediate from hw2[3:0],hw1[11:0]
        %S		print a possibly-shifted Rm
 
+       %L		print address for a ldrd/strd instruction
        %a		print the address of a plain load/store
        %w		print the width and signedness of a core load/store
        %m		print register mask for ldm/stm
@@ -1564,10 +1565,10 @@ static const struct opcode32 thumb32_opcodes[] =
   {ARM_EXT_V6T2, 0xe9100000, 0xffd00000, "ldmdb%c\t%16-19r%21'!, %m"},
   {ARM_EXT_V6T2, 0xe9c00000, 0xffd000ff, "strd%c\t%12-15r, %8-11r, [%16-19r]"},
   {ARM_EXT_V6T2, 0xe9d00000, 0xffd000ff, "ldrd%c\t%12-15r, %8-11r, [%16-19r]"},
-  {ARM_EXT_V6T2, 0xe9400000, 0xff500000, "strd%c\t%12-15r, %8-11r, [%16-19r, #%23`-%0-7W]%21'!"},
-  {ARM_EXT_V6T2, 0xe9500000, 0xff500000, "ldrd%c\t%12-15r, %8-11r, [%16-19r, #%23`-%0-7W]%21'!"},
-  {ARM_EXT_V6T2, 0xe8600000, 0xff700000, "strd%c\t%12-15r, %8-11r, [%16-19r], #%23`-%0-7W"},
-  {ARM_EXT_V6T2, 0xe8700000, 0xff700000, "ldrd%c\t%12-15r, %8-11r, [%16-19r], #%23`-%0-7W"},
+  {ARM_EXT_V6T2, 0xe9400000, 0xff500000, "strd%c\t%12-15r, %8-11r, [%16-19r, #%23`-%0-7W]%21'!%L"},
+  {ARM_EXT_V6T2, 0xe9500000, 0xff500000, "ldrd%c\t%12-15r, %8-11r, [%16-19r, #%23`-%0-7W]%21'!%L"},
+  {ARM_EXT_V6T2, 0xe8600000, 0xff700000, "strd%c\t%12-15r, %8-11r, [%16-19r], #%23`-%0-7W%L"},
+  {ARM_EXT_V6T2, 0xe8700000, 0xff700000, "ldrd%c\t%12-15r, %8-11r, [%16-19r], #%23`-%0-7W%L"},
   {ARM_EXT_V6T2, 0xf8000000, 0xff100000, "str%w%c.w\t%12-15r, %a"},
   {ARM_EXT_V6T2, 0xf8100000, 0xfe100000, "ldr%w%c.w\t%12-15r, %a"},
 
@@ -3721,7 +3722,7 @@ psr_name (int regno)
     case 9: return "PSP";
     case 16: return "PRIMASK";
     case 17: return "BASEPRI";
-    case 18: return "BASEPRI_MASK";
+    case 18: return "BASEPRI_MAX";
     case 19: return "FAULTMASK";
     case 20: return "CONTROL";
     default: return "<unknown>";
@@ -4191,6 +4192,15 @@ print_insn_thumb32 (bfd_vma pc, struct disassemble_info *info, long given)
 		    else
 		      func (stream, "(UNDEF: %lu)", sysm);
 		  }
+		else if ((given & 0xff) <= 3)
+		  {
+		    func (stream, "%s_", psr_name (given & 0xff));
+		    
+		    if (given & 0x800)
+		      func (stream, "nzcvq");
+		    if (given & 0x400)
+		      func (stream, "g");
+		  }
 		else
 		  {
 		    func (stream, psr_name (given & 0xff));
@@ -4274,6 +4284,21 @@ print_insn_thumb32 (bfd_vma pc, struct disassemble_info *info, long given)
 		      abort ();
 		    }
 		}
+		break;
+
+	      case 'L':
+		/* PR binutils/12534
+		   If we have a PC relative offset in an LDRD or STRD
+		   instructions then display the decoded address.  */
+		if (((given >> 16) & 0xf) == 0xf)
+		  {
+		    bfd_vma offset = (given & 0xff) * 4;
+
+		    if ((given & (1 << 23)) == 0)
+		      offset = - offset;
+		    func (stream, "\t; ");
+		    info->print_address_func ((pc & ~3) + 4 + offset, info);
+		  }
 		break;
 
 	      default:

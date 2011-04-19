@@ -9019,7 +9019,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
 					  core_addr_to_string (addr));
       xfree (name);
 
-      b->exp_string = xstrprintf ("-location: %.*s",
+      b->exp_string = xstrprintf ("-location %.*s",
 				  (int) (exp_end - exp_start), exp_start);
 
       /* The above expression is in C.  */
@@ -9472,7 +9472,7 @@ catch_exec_command_1 (char *arg, int from_tty,
 }
 
 static enum print_stop_action
-print_exception_catchpoint (struct breakpoint *b)
+print_it_exception_catchpoint (struct breakpoint *b)
 {
   int bp_temp, bp_throw;
 
@@ -9563,7 +9563,7 @@ static struct breakpoint_ops gnu_v3_exception_catchpoint_ops = {
   NULL, /* remove */
   NULL, /* breakpoint_hit */
   NULL, /* resources_needed */
-  print_exception_catchpoint,
+  print_it_exception_catchpoint,
   print_one_exception_catchpoint,
   NULL, /* print_one_detail */
   print_mention_exception_catchpoint,
@@ -12337,7 +12337,7 @@ save_breakpoints (char *filename, int from_tty,
     if (filter && !filter (tp))
       continue;
 
-    if (tp->ops != NULL)
+    if (tp->ops != NULL && tp->ops->print_recreate != NULL)
       (tp->ops->print_recreate) (tp, fp);
     else
       {
