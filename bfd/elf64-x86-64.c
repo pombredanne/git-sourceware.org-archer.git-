@@ -2299,6 +2299,10 @@ elf_x86_64_readonly_dynrelocs (struct elf_link_hash_entry *h,
   if (h->root.type == bfd_link_hash_warning)
     h = (struct elf_link_hash_entry *) h->root.u.i.link;
 
+  /* Skip local IFUNC symbols. */
+  if (h->forced_local && h->type == STT_GNU_IFUNC)
+    return TRUE;
+
   eh = (struct elf_x86_64_link_hash_entry *) h;
   for (p = eh->dyn_relocs; p != NULL; p = p->next)
     {
@@ -2309,6 +2313,11 @@ elf_x86_64_readonly_dynrelocs (struct elf_link_hash_entry *h,
 	  struct bfd_link_info *info = (struct bfd_link_info *) inf;
 
 	  info->flags |= DF_TEXTREL;
+
+	  if (info->warn_shared_textrel && info->shared)
+	    info->callbacks->einfo (_("%P: %B: warning: relocation against `%s' in readonly section `%A'.\n"),
+				    p->sec->owner, h->root.root.string,
+				    p->sec);
 
 	  /* Not an error, just cut short the traversal.  */
 	  return FALSE;
@@ -2389,7 +2398,13 @@ elf_x86_64_size_dynamic_sections (bfd *output_bfd,
 		  srel = elf_section_data (p->sec)->sreloc;
 		  srel->size += p->count * bed->s->sizeof_rela;
 		  if ((p->sec->output_section->flags & SEC_READONLY) != 0)
-		    info->flags |= DF_TEXTREL;
+		    {
+		      info->flags |= DF_TEXTREL;
+		      if (info->warn_shared_textrel && info->shared)
+			info->callbacks->einfo (_("%P: %B: warning: relocation in readonly section `%A'.\n"),
+						p->sec->owner, p->sec);
+		      break;
+		    }
 		}
 	    }
 	}
@@ -3961,7 +3976,7 @@ elf_x86_64_finish_dynamic_symbol (bfd *output_bfd,
 	  || plt == NULL
 	  || gotplt == NULL
 	  || relplt == NULL)
-	abort ();
+	return FALSE;
 
       /* Get the index in the procedure linkage table which
 	 corresponds to this symbol.  This is the index of this symbol

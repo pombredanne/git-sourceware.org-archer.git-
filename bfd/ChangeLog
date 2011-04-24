@@ -1,3 +1,100 @@
+2011-04-24  Alan Modra  <amodra@gmail.com>
+
+	PR ld/12365
+	PR ld/12696
+	* coff-aux.c (coff_m68k_aux_link_add_one_symbol): Update "notice" call.
+	* linker.c (_bfd_link_hash_newfunc): Clear bitfields.
+	(_bfd_generic_link_add_one_symbol): Update "notice" call.
+	* elflink.c (_bfd_elf_merge_symbol): Don't skip weak redefs when
+	it is a redef of an IR symbol in a real BFD.
+
+2011-04-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_readonly_dynrelocs): Warn relocation
+	in readonly section in a shared object.
+	(elf_i386_size_dynamic_sections): Likewise.
+	* elf64-x86-64.c (elf_x86_64_readonly_dynrelocs): Likewise.
+	(elf_x86_64_size_dynamic_sections): Likewise.
+
+2011-04-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/12694
+	* elf32-i386.c (elf_i386_readonly_dynrelocs): Skip local IFUNC
+	symbols.
+	* elf64-x86-64.c (elf_x86_64_readonly_dynrelocs): Likewise.
+
+2011-04-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_finish_dynamic_symbol): Return false
+	on dynamic symbol error.
+	* elf64-x86-64.c (elf_x86_64_finish_dynamic_symbol): Likewise.
+
+2011-04-20  Tristan Gingold  <gingold@adacore.com>
+
+	* config.bfd (alpha*-*-*vms*, ia64*-*-*vms*): Define targ_selvecs.
+
+2011-04-20  Alan Modra  <amodra@gmail.com>
+
+	* hash.c (bfd_default_hash_table_size): Make it an unsigned long.
+	(bfd_hash_table_init_n): Overflow checking.
+	(bfd_hash_set_default_size): Return current size.  Take unsigned long
+	arg.  Add 65537 to hash_size primes.
+	* bfd-in.h (bfd_hash_set_default_size): Update prototype.
+	* bfd-in2.h: Regenerate.
+
+2011-04-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* elf-bfd.h (RELOC_AGAINST_DISCARDED_SECTION): Fix +1 overrun of
+	memmove elements.
+
+2011-04-20  Alan Modra  <amodra@gmail.com>
+
+	* libbfd.c (bfd_log2): Do return rounded up value.
+	* elflink.c (bfd_elf_size_dynsym_hash_dynstr): Replace bfd_log2
+	call with expanded old round down version of the function.
+
+	* archive.c (_bfd_get_elt_at_filepos): Don't release n_nfd.
+	* elflink.c (elf_link_add_object_symbols): Delete redundant code.
+
+2011-04-20  Alan Modra  <amodra@gmail.com>
+
+	PR ld/12365
+	* elfcode.h (elf_slurp_symbol_table): Put common plugin IR symbols
+	in their own common section.
+	* elflink.c (elf_link_add_object_symbols): Likewise.
+	* linker.c (generic_link_check_archive_element): Don't lose flags
+	if common section is pre-existing.
+	(_bfd_generic_link_add_one_symbol): Likewise.
+
+2011-04-20  Alan Modra  <amodra@gmail.com>
+
+	PR ld/12365
+	* elflink.c (_bfd_elf_merge_symbol): Update multiple_common calls.
+	* linker.c (_bfd_generic_link_add_one_symbol): Likewise.  Call
+	multiple_definition regardless of allow_multiple_definition.
+	* simple.c (simple_dummy_multiple_definition): Update.
+	* xcofflink.c (xcoff_link_add_symbols): Update multiple_definition
+	calls.
+
+2011-04-18  Tristan Gingold  <gingold@adacore.com>
+
+	* coff-rs6000.c: Convert to ISO-C.  Remove PARAMS macro.
+
+2011-04-18  Alan Modra  <amodra@gmail.com>
+
+	PR ld/12365
+	PR ld/12672
+	* bfd.c (BFD_PLUGIN): Define.
+	(BFD_FLAGS_SAVED, BFD_FLAGS_FOR_BFD_USE_MASK): Add BFD_PLUGIN.
+	* bfd-in2.h: Regenerate.
+	* elflink.c (elf_link_output_extsym): Strip undefined plugin syms.
+	* opncls.c (bfd_make_readable): Don't lose original bfd flags.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* elf64-ppc.c (ppc64_elf_get_synthetic_symtab): Do not check for
+	SEC_LOAD.
+
 2011-04-15  Sergio Durigan Junior  <sergiodj@redhat.com>
 
 	* elf-bfd.h (struct sdt_note): New struct.

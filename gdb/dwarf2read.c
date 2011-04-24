@@ -2587,30 +2587,31 @@ dw2_expand_symtabs_matching (struct objfile *objfile,
     return;
   index = dwarf2_per_objfile->index_table;
 
-  for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		   + dwarf2_per_objfile->n_type_comp_units); ++i)
-    {
-      int j;
-      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
-      struct quick_file_names *file_data;
+  if (file_matcher != NULL)
+    for (i = 0; i < (dwarf2_per_objfile->n_comp_units
+		     + dwarf2_per_objfile->n_type_comp_units); ++i)
+      {
+	int j;
+	struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
+	struct quick_file_names *file_data;
 
-      per_cu->v.quick->mark = 0;
-      if (per_cu->v.quick->symtab)
-	continue;
+	per_cu->v.quick->mark = 0;
+	if (per_cu->v.quick->symtab)
+	  continue;
 
-      file_data = dw2_get_file_names (objfile, per_cu);
-      if (file_data == NULL)
-	continue;
+	file_data = dw2_get_file_names (objfile, per_cu);
+	if (file_data == NULL)
+	  continue;
 
-      for (j = 0; j < file_data->num_file_names; ++j)
-	{
-	  if (file_matcher (file_data->file_names[j], data))
-	    {
-	      per_cu->v.quick->mark = 1;
-	      break;
-	    }
-	}
-    }
+	for (j = 0; j < file_data->num_file_names; ++j)
+	  {
+	    if (file_matcher (file_data->file_names[j], data))
+	      {
+		per_cu->v.quick->mark = 1;
+		break;
+	      }
+	  }
+      }
 
   for (iter = 0; iter < index->symbol_table_slots; ++iter)
     {
@@ -2636,7 +2637,7 @@ dw2_expand_symtabs_matching (struct objfile *objfile,
 	  struct dwarf2_per_cu_data *per_cu;
 
 	  per_cu = dw2_get_cu (MAYBE_SWAP (vec[vec_idx + 1]));
-	  if (per_cu->v.quick->mark)
+	  if (file_matcher == NULL || per_cu->v.quick->mark)
 	    dw2_instantiate_symtab (objfile, per_cu);
 	}
     }
@@ -2665,36 +2666,6 @@ dw2_find_pc_sect_symtab (struct objfile *objfile,
 	     paddress (get_objfile_arch (objfile), pc));
 
   return dw2_instantiate_symtab (objfile, data);
-}
-
-static void
-dw2_map_symbol_names (struct objfile *objfile,
-		      void (*fun) (const char *, void *),
-		      void *data)
-{
-  offset_type iter;
-  struct mapped_index *index;
-
-  dw2_setup (objfile);
-
-  /* index_table is NULL if OBJF_READNOW.  */
-  if (!dwarf2_per_objfile->index_table)
-    return;
-  index = dwarf2_per_objfile->index_table;
-
-  for (iter = 0; iter < index->symbol_table_slots; ++iter)
-    {
-      offset_type idx = 2 * iter;
-      const char *name;
-      offset_type *vec, vec_len, vec_idx;
-
-      if (index->symbol_table[idx] == 0 && index->symbol_table[idx + 1] == 0)
-	continue;
-
-      name = (index->constant_pool + MAYBE_SWAP (index->symbol_table[idx]));
-
-      (*fun) (name, data);
-    }
 }
 
 static void
@@ -2753,7 +2724,6 @@ const struct quick_symbol_functions dwarf2_gdb_index_functions =
   dw2_map_matching_symbols,
   dw2_expand_symtabs_matching,
   dw2_find_pc_sect_symtab,
-  dw2_map_symbol_names,
   dw2_map_symbol_filenames
 };
 
@@ -16005,75 +15975,10 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
   do_cleanups (cleanup);
 }
 
-/* The mapped index file format is designed to be directly mmap()able
-   on any architecture.  In most cases, a datum is represented using a
-   little-endian 32-bit integer value, called an offset_type.  Big
-   endian machines must byte-swap the values before using them.
-   Exceptions to this rule are noted.  The data is laid out such that
-   alignment is always respected.
-
-   A mapped index consists of several sections.
-
-   1. The file header.  This is a sequence of values, of offset_type
-   unless otherwise noted:
-
-   [0] The version number, currently 4.  Versions 1, 2 and 3 are
-   obsolete.
-   [1] The offset, from the start of the file, of the CU list.
-   [2] The offset, from the start of the file, of the types CU list.
-   Note that this section can be empty, in which case this offset will
-   be equal to the next offset.
-   [3] The offset, from the start of the file, of the address section.
-   [4] The offset, from the start of the file, of the symbol table.
-   [5] The offset, from the start of the file, of the constant pool.
-
-   2. The CU list.  This is a sequence of pairs of 64-bit
-   little-endian values, sorted by the CU offset.  The first element
-   in each pair is the offset of a CU in the .debug_info section.  The
-   second element in each pair is the length of that CU.  References
-   to a CU elsewhere in the map are done using a CU index, which is
-   just the 0-based index into this table.  Note that if there are
-   type CUs, then conceptually CUs and type CUs form a single list for
-   the purposes of CU indices.
-
-   3. The types CU list.  This is a sequence of triplets of 64-bit
-   little-endian values.  In a triplet, the first value is the CU
-   offset, the second value is the type offset in the CU, and the
-   third value is the type signature.  The types CU list is not
-   sorted.
-
-   4. The address section.  The address section consists of a sequence
-   of address entries.  Each address entry has three elements.
-   [0] The low address.  This is a 64-bit little-endian value.
-   [1] The high address.  This is a 64-bit little-endian value.
-       Like DW_AT_high_pc, the value is one byte beyond the end.
-   [2] The CU index.  This is an offset_type value.
-
-   5. The symbol table.  This is a hash table.  The size of the hash
-   table is always a power of 2.  The initial hash and the step are
-   currently defined by the `find_slot' function.
-
-   Each slot in the hash table consists of a pair of offset_type
-   values.  The first value is the offset of the symbol's name in the
-   constant pool.  The second value is the offset of the CU vector in
-   the constant pool.
-
-   If both values are 0, then this slot in the hash table is empty.
-   This is ok because while 0 is a valid constant pool index, it
-   cannot be a valid index for both a string and a CU vector.
-
-   A string in the constant pool is stored as a \0-terminated string,
-   as you'd expect.
-
-   A CU vector in the constant pool is a sequence of offset_type
-   values.  The first value is the number of CU indices in the vector.
-   Each subsequent value is the index of a CU in the CU list.  This
-   element in the hash table is used to indicate which CUs define the
-   symbol.
-
-   6. The constant pool.  This is simply a bunch of bytes.  It is
-   organized so that alignment is correct: CU vectors are stored
-   first, followed by strings.  */
+/* Implementation of the `save gdb-index' command.
+   
+   Note that the file format used by this command is documented in the
+   GDB manual.  Any changes here must be documented there.  */
 
 static void
 save_gdb_index_command (char *arg, int from_tty)

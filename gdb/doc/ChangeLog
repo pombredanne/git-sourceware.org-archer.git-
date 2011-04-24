@@ -1,3 +1,39 @@
+2011-04-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Starting and Stopping Trace Experiments): New anchor
+	for disconnected tracing.
+	(Multi-Process Mode for @code{gdbserver}): Mention --multi and
+	extended-remote relationship.  Mention --once.
+	(TCP port allocation lifecycle of @code{gdbserver}): New.
+
+2011-04-23  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (Server): Improve indexing.  Index all optional
+	switches to gdbserver.
+
+2011-04-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Index Section Format): New node.
+	(Top): Add new node to menu.
+
+2011-04-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Maintenance Commands): Document `maint print
+	remote-registers'.
+
+2011-04-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Trace File Format): Move node later.
+
+2011-04-19  Tom Tromey  <tromey@redhat.com>
+
+	* gdbint.texinfo (Register Information Functions): Remove
+	duplicate "the".
+	* gdb.texinfo (Emacs): Remove duplicate "to".
+	(GDB/MI Variable Objects): Remove duplicate "the".
+	(General Query Packets): Likewise.
+
 2011-04-02  Joel Brobecker  <brobecker@adacore.com>
 
 	* gdb.texinfo (GDB/MI Output Records): Fix menu entry for

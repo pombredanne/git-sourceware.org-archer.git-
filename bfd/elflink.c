@@ -1,6 +1,6 @@
 /* ELF linking support for BFD.
    Copyright 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009, 2010
+   2005, 2006, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -1361,8 +1361,7 @@ _bfd_elf_merge_symbol (bfd *abfd,
 	 symbols defined in dynamic objects.  */
 
       if (! ((*info->callbacks->multiple_common)
-	     (info, h->root.root.string, oldbfd, bfd_link_hash_common,
-	      h->size, abfd, bfd_link_hash_common, sym->st_size)))
+	     (info, &h->root, abfd, bfd_link_hash_common, sym->st_size)))
 	return FALSE;
 
       if (sym->st_size > h->size)
@@ -1428,7 +1427,10 @@ _bfd_elf_merge_symbol (bfd *abfd,
   /* Skip weak definitions of symbols that are already defined.  */
   if (newdef && olddef && newweak)
     {
-      *skip = TRUE;
+      /* Don't skip new non-IR weak syms.  */
+      if (!((oldbfd->flags & BFD_PLUGIN) != 0
+	    && (abfd->flags & BFD_PLUGIN) == 0))
+	*skip = TRUE;
 
       /* Merge st_other.  If the symbol already has a dynamic index,
 	 but visibility says it should not be visible, turn it into a
@@ -1513,8 +1515,7 @@ _bfd_elf_merge_symbol (bfd *abfd,
 	 common symbol, but we don't know what to use for the section
 	 or the alignment.  */
       if (! ((*info->callbacks->multiple_common)
-	     (info, h->root.root.string, oldbfd, bfd_link_hash_common,
-	      h->size, abfd, bfd_link_hash_common, sym->st_size)))
+	     (info, &h->root, abfd, bfd_link_hash_common, sym->st_size)))
 	return FALSE;
 
       /* If the presumed common symbol in the dynamic object is
@@ -3939,18 +3940,31 @@ error_free_dyn:
 	goto error_free_vers;
 
       if (isym->st_shndx == SHN_COMMON
-	  && ELF_ST_TYPE (isym->st_info) == STT_TLS
-	  && !info->relocatable)
+	  && (abfd->flags & BFD_PLUGIN) != 0)
+	{
+	  asection *xc = bfd_get_section_by_name (abfd, "COMMON");
+
+	  if (xc == NULL)
+	    {
+	      flagword sflags = (SEC_ALLOC | SEC_IS_COMMON | SEC_KEEP
+				 | SEC_EXCLUDE);
+	      xc = bfd_make_section_with_flags (abfd, "COMMON", sflags);
+	      if (xc == NULL)
+		goto error_free_vers;
+	    }
+	  sec = xc;
+	}
+      else if (isym->st_shndx == SHN_COMMON
+	       && ELF_ST_TYPE (isym->st_info) == STT_TLS
+	       && !info->relocatable)
 	{
 	  asection *tcomm = bfd_get_section_by_name (abfd, ".tcommon");
 
 	  if (tcomm == NULL)
 	    {
-	      tcomm = bfd_make_section_with_flags (abfd, ".tcommon",
-						   (SEC_ALLOC
-						    | SEC_IS_COMMON
-						    | SEC_LINKER_CREATED
-						    | SEC_THREAD_LOCAL));
+	      flagword sflags = (SEC_ALLOC | SEC_THREAD_LOCAL | SEC_IS_COMMON
+				 | SEC_LINKER_CREATED);
+	      tcomm = bfd_make_section_with_flags (abfd, ".tcommon", sflags);
 	      if (tcomm == NULL)
 		goto error_free_vers;
 	    }
@@ -4226,10 +4240,7 @@ error_free_dyn:
 		 We need to get the alignment from the section.  */
 	      align = new_sec->alignment_power;
 	    }
-	  if (align > old_alignment
-	      /* Permit an alignment power of zero if an alignment of one
-		 is specified and no other alignments have been specified.  */
-	      || (isym->st_value == 1 && old_alignment == 0))
+	  if (align > old_alignment)
 	    h->root.u.c.p->alignment_power = align;
 	  else
 	    h->root.u.c.p->alignment_power = old_alignment;
@@ -6529,10 +6540,13 @@ bfd_elf_size_dynsym_hash_dynstr (bfd *output_bfd, struct bfd_link_info *info)
 	    }
 	  else
 	    {
-	      unsigned long int maskwords, maskbitslog2;
+	      unsigned long int maskwords, maskbitslog2, x;
 	      BFD_ASSERT (cinfo.min_dynindx != -1);
 
-	      maskbitslog2 = bfd_log2 (cinfo.nsyms) + 1;
+	      x = cinfo.nsyms;
+	      maskbitslog2 = 1;
+	      while ((x >>= 1) != 0)
+		++maskbitslog2;
 	      if (maskbitslog2 < 3)
 		maskbitslog2 = 5;
 	      else if ((1 << (maskbitslog2 - 2)) & cinfo.nsyms)
@@ -8703,6 +8717,11 @@ elf_link_output_extsym (struct elf_link_hash_entry *h, void *data)
 	   && (h->root.type == bfd_link_hash_defined
 	       || h->root.type == bfd_link_hash_defweak)
 	   && elf_discarded_section (h->root.u.def.section))
+    strip = TRUE;
+  else if ((h->root.type == bfd_link_hash_undefined
+	    || h->root.type == bfd_link_hash_undefweak)
+	   && h->root.u.undef.abfd != NULL
+	   && (h->root.u.undef.abfd->flags & BFD_PLUGIN) != 0)
     strip = TRUE;
   else
     strip = FALSE;

@@ -1,6 +1,6 @@
-/* This testcase is part of GDB, the GNU debugger.
+/* Copyright 2011 Free Software Foundation, Inc.
 
-   Copyright 2009, 2011 Free Software Foundation, Inc.
+   This file is part of GDB.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,30 +15,20 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include <signal.h>
-#include <unistd.h>
-#include <assert.h>
-#include <stdio.h>
-
-/* Force REL->RELA conversion on i386, see "Prelink", March 4, 2004.  */
-volatile int v[2];
-volatile int *vptr = &v[1];
-
-void
-libfunc (const char *action)
+int
+func (void)
 {
-  assert (action != NULL);
+  return 1;
+}
 
-  if (strcmp (action, "segv") == 0)
-    raise (SIGSEGV);
+int
+callfunc (int (*funcp) (void))
+{
+  return funcp () * 2;
+}
 
-  if (strcmp (action, "sleep") == 0)
-    {
-      puts ("sleeping");
-      fflush (stdout);
-
-      sleep (60);
-    }
-
-  assert (0);
+int
+main (void)
+{
+  return callfunc (func);
 }

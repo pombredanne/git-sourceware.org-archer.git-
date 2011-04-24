@@ -1,3 +1,81 @@
+2011-04-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/py-value.exp (test_objfiles): Name the first test
+	`py-value in file.filename'.
+
+2011-04-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/solib-disc.exp: Set gdbserver_reconnect_p.
+	* lib/gdb.exp (gdb_init): Clear gdbserver_reconnect_p.
+	* lib/gdbserver-support.exp (gdbserver_start): Add `--once' if
+	!gdbserver_reconnect_p..
+	(gdbserver_reconnect): Call error if !gdbserver_reconnect_p..
+
+2011-04-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/cpcompletion.exp (complete class methods)
+	(complete class methods beginning with F): Move them above runto.  New
+	comment about the runto delimiter.
+
+2011-04-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/maint.exp: Test that "maint print registers" works
+	without a running program.
+
+2011-04-20  Marek Polacek  <mpolacek@redhat.com>
+
+	* gdb.base/setshow.exp: Fix racy tests.
+	($old_gdb_prompt): New variable.
+
+2011-04-19  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.mi/mi-nsmoribund.exp:
+	* gdb.hp/gdb.objdbg/objdbg01.exp:
+	* gdb.base/structs.exp (test_struct_returns):
+	* gdb.base/call-sc.exp (test_scalar_returns):
+	* gdb.base/bigcore.exp: Remove duplicate words.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-interp-lib.c (v, vptr): New variables.
+	* gdb.base/break-interp.exp (test_attach): New comment.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/gcore-thread.exp ($core0file): New variable.
+	(clear __stack_user.next, clear stack_used.next)
+	(save a zeroed-threads corefile): New test.
+	Call core_load for $core0file.
+	(zeroed-threads cannot be listed): New test.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/gcore-thread.exp ($testfile): Match it the .exp
+	filename.
+	($srcfile): Preserve the original value.
+	($testfile): Match it the .exp filename.
+	($corefile): New variable.  Substitute it around.
+	Use clean_restart.
+	($prev_timeout): Remove.
+	(load_core): Move core loading into this proc.
+	Fix restore of $timeout if load_core fails.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/eu-strip-infcall.c: New file.
+	* gdb.base/eu-strip-infcall.exp: New file.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/callfuncs.c (Lcallfunc, callfunc): New functions.
+	* gdb.base/callfuncs.exp (print callfunc (Lcallfunc, 5)): New test.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix Python access to inlined frames.
+	* gdb.python/py-frame-inline.c: New file.
+	* gdb.python/py-frame-inline.exp: New file.
+
 2011-04-13  Edjunior Machado  <emachado@linux.vnet.ibm.com>
 
 	* gdb.base/gdb1090.exp: Change breakpoint location to read the

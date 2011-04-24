@@ -4192,15 +4192,6 @@ print_insn_thumb32 (bfd_vma pc, struct disassemble_info *info, long given)
 		    else
 		      func (stream, "(UNDEF: %lu)", sysm);
 		  }
-		else if ((given & 0xff) <= 3)
-		  {
-		    func (stream, "%s_", psr_name (given & 0xff));
-		    
-		    if (given & 0x800)
-		      func (stream, "nzcvq");
-		    if (given & 0x400)
-		      func (stream, "g");
-		  }
 		else
 		  {
 		    func (stream, psr_name (given & 0xff));

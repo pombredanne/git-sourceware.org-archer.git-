@@ -1,3 +1,231 @@
+2011-04-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	* NEWS: Document the new gdbserver --once option.
+
+2011-04-21  Jie Zhang  <jzhang918@gmail.com>
+
+	* MAINTAINERS: Update my email address.
+
+2011-04-21  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* gdb_wchar.h (USE_INTERMEDIATE_ENCODING_FUNCTION): New macro.
+	(INTERMEDIATE_ENCODING): Change value to intermediate_encoding
+	function call if __STDC_ISO_10646__ macro is defined.
+	(intermediate_encoding): New prototype.
+	* charset.c (your_gdb_wchar_t_is_bogus): New extern test variable
+	to generate compile time error for unsupported gdb_wchar_t size.
+	(ENDIAN_SUFFIX): New macro.
+	(intermediate_encoding): New function.
+
+2011-04-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* ada-lang.c (struct add_partial_datum): Update the comment for
+	expand_partial_symbol_name.
+	(ada_add_partial_symbol_completions): Rename to ...
+	(ada_expand_partial_symbol_name): ... here, change return type, update
+	function comment, call symbol_completion_match instead of
+	symbol_completion_add.
+	(ada_make_symbol_completion_list): Use now expand_partial_symbol_names
+	and ada_expand_partial_symbol_name.
+	* dwarf2read.c (dw2_expand_symtabs_matching): Support NULL
+	FILE_MATCHER.
+	(dw2_map_symbol_names): Remove.
+	(dwarf2_gdb_index_functions): Unlist dw2_map_symbol_names.
+	* psymtab.c (map_symbol_names_psymtab): Remove.
+	(expand_symtabs_matching_via_partial): Support NULL FILE_MATCHER.
+	Support KIND == ALL_DOMAIN.  Exchange the NAME_MATCHER and KIND check
+	order.
+	(psym_functions): Unlist map_symbol_names_psymtab.
+	(map_partial_symbol_names): Rename to ...
+	(expand_partial_symbol_names): ... here, change the FUN type, call
+	expand_symtabs_matching with ALL_DOMAIN and NULL FILE_MATCHER now.
+	* psymtab.h (map_partial_symbol_names): Rename to ...
+	(expand_partial_symbol_names): ... here, change the FUN type.
+	* symfile.h (struct quick_symbol_functions): Update the description of
+	expand_symtabs_matching.  Remove map_symbol_names.
+	* symtab.c (search_symbols): Add ALL_DOMAIN to the function comment.
+	(struct add_name_data): Update the comment for
+	expand_partial_symbol_name.
+	(add_partial_symbol_name): Rename to ...
+	(expand_partial_symbol_name): ... here.  Replace
+	completion_list_add_name call by strncmp.
+	(default_make_symbol_completion_list_break_on): Use now
+	expand_partial_symbol_names and expand_partial_symbol_name.
+	* symtab.h (enum search_domain): New element ALL_DOMAIN.
+
+2011-04-20  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (save_gdb_index_command): Replace format
+	documentation with a pointer to the manual.
+
+2011-04-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.c: Include remote.h.
+	(enum regcache_dump_what) <regcache_dump_remote>: New enum value.
+	(regcache_dump): Handle regcache_dump_remote.
+	(maintenance_print_remote_registers): New function.
+	(_initialize_regcache): Install "maint print remote-registers"
+	command.
+	* remote.c (map_regcache_remote_table): New function, factored out
+	from ...
+	(init_remote_state): ... here.
+	(remote_register_number_and_offset): New.
+	* remote.h (remote_register_number_and_offset): Declare.
+
+2011-04-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* regcache.c (get_thread_arch_regcache): If creating a regcache for
+	null_ptid, assume and allow a NULL address space, instead of
+	asking the target for the ptid's address space.
+	* infrun.c (ptid_is_pid): Remove assertion.
+
+2011-04-19  Tom Tromey  <tromey@redhat.com>
+
+	* windows-tdep.c (windows_xfer_shared_library):
+	* windows-nat.c (get_module_name, windows_make_so):
+	* v850-tdep.c (v850_handle_pushm):
+	* utils.c (null_cleanup, gdb_realpath):
+	* ui-out.c (get_next_header):
+	* tracepoint.c (clear_traceframe_info):
+	* symtab.c (lookup_symtab):
+	* serial.h (struct serial_ops):
+	* mipsread.c (read_alphacoff_dynamic_symtab):
+	* infcmd.c (print_return_value):
+	* ia64-linux-tdep.c (ia64_linux_sigcontext_register_address):
+	* f-exp.y (parse_number):
+	* exceptions.c (catch_exceptions):
+	* dummy-frame.c (dummy_frame_this_id):
+	* defs.h (struct cleanup):
+	* breakpoint.c (disable_breakpoints_in_unloaded_shlib):
+	* arm-tdep.c (arm_push_dummy_call):
+	* amd64-tdep.h (amd64_collect_xsave):
+	* amd64-tdep.c (amd64_collect_xsave):
+	* alpha-tdep.c (alpha_heuristic_frame_unwind_cache):
+	* README (typing): Remove duplicate words.
+	* cli/cli-decode.c (lookup_cmd_composition): Add comma.
+	* infrun.c (siginfo_value_read): Fix typo.
+	* solib-frv.c (frv_fdpic_find_global_pointer): Likewise.
+	* top.c (source_line_number): Add comma.
+
+2011-04-19  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* thread.c (any_live_thread_of_process): Prioritize threads
+	that are not executing.
+	* gdbthread.h (any_live_thread_of_process): Update comment
+	as per above change.
+
+2011-04-19  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* xcoffread.c (process_xcoff_symbol): Remove useless cast.
+	(scan_xcoff_symtab): Likewise.
+
+2011-04-19  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* xcoffread.c (process_xcoff_symbol): ARI fix: Avoid assignment
+	inside if clause.
+
+2011-04-19  Pierre Muller  <muller@ics.u-strasbg.fr>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* xstormy16-tdep.c (xstormy16_push_dummy_call): Add local
+	variables to simplify code and avoid == operator at end of
+	line as this is against GNU coding standards.
+
+2011-04-19  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* solib-svr4.c (svr4_keep_data_in_core): Rename local variable
+	lm_name to name_lm to avoid conflict with lm_name function.
+
+2011-04-19  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI fixes: Use only lowercase function name for static functions.
+	* nto-tdep.c (LM_ADDR): Rename to...
+	(lm_addr): New function name.
+	(nto_relocate_section_addresses): Adapt to change above.
+	* solib-sunos.c (LM_ADDR): Rename to...
+	(lm_addr): New function name.
+	(LM_NEXT): Rename to...
+	(lm_next): New function name.
+	(sunos_current_sos, sunos_relocate_section_addresses): Adapt to
+	function name changes above.
+	* solib-svr4.c (LM_ADDR_FROM_LINK_MAP): Rename to...
+	(lm_addr_from_link_map): New function name.
+	(HAS_LM_DYNAMIC_FROM_LINK_MAP): Rename to...
+	(has_lm_dynamic_from_link_map): New function name.
+	(LM_DYNAMIC_FROM_LINK_MAP): Rename to...
+	(lm_dynamic_from_link_map): New function name.
+	(LM_ADDR_CHECK): Rename to...
+	(lm_addr_check): New function name.
+	(LM_NEXT): Rename to...
+	(lm_next): New function name.
+	(LM_PREV): Rename to...
+	(lm_prev): New function name.
+	(LM_NAME): Rename to...
+	(lm_name): New function name.
+	(IGNORE_FIRST_LINK_MAP_ENTRY): Rename to...
+	(ignore_first_link_map_entry): New function name.
+	(svr4_keep_data_in_core): Adapt to function name changes above.
+	(svr4_current_sos): Likewise.
+	(enable_break): Likewise.
+	(svr4_relocate_section_addresses): Likewise.
+
+2011-04-19  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	ARI cleanup.
+	* xtensa-tdep.c (xtensa_register_type): Use xstrprintf instead of
+	sprintf. Simplify code and avoid loosing memory.
+	(xtensa_register_reggroup_p): Extract assignment out of IF clause.
+	(call0_frame_cache): Remove && operator from end of line.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix libraries displacement if they change whether they were prelinked.
+	* solib-svr4.c (LM_ADDR_CHECK): Set L_ADDR even if the DYNAMIC pointer
+	does not match.  Comment why.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* corelow.c: Include wrapper.h.
+	(core_open): Call now gdb_target_find_new_threads.
+	* wrapper.c: Include target.h.
+	(gdb_target_find_new_threads): New.
+	* wrapper.h (gdb_target_find_new_threads): New declaration.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-thread-db.c (find_new_threads_callback): Exit on zero TI_TID
+	even if !TARGET_HAS_EXECUTION.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix convert_code_addr_to_desc_addr for ppc64 files after eu-strip.
+	* elfread.c (elf_symfile_read): New variable synth_abfd, pass it to
+	bfd_get_synthetic_symtab.
+	* jit.c (jit_register_code): Pass NULL to the new parameter parent.
+	* machoread.c (macho_add_oso_symfile): Pass main_objfile to the new
+	parameter parent, remove the call to add_separate_debug_objfile.
+	* solib.c (solib_read_symbols): Pass NULL to the new parameter parent.
+	* symfile-mem.c (symbol_file_add_from_memory): Likewise.
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): New parameter
+	parent, new comment for it, call add_separate_debug_objfile for it.
+	(symbol_file_add_separate): Pass objfile as the parameter parent,
+	remove the call to add_separate_debug_objfile.
+	(symbol_file_add_from_bfd): New parameter parent, pass it.
+	(symbol_file_add): Pass NULL to the new parameter parent.
+	* symfile.h (symbol_file_add_from_bfd): New parameter parent.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* elfread.c (elf_symtab_read): Do not ignore .L symbols if they are
+	BSF_SYNTHETIC.
+
+2011-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix Python access to inlined frames.
+	* python/py-frame.c (frapy_read_var): Find BLOCK using get_frame_block.
+	* python/py-symbol.c (gdbpy_lookup_symbol): Likewise.
+
 2011-04-15  Tom Tromey  <tromey@redhat.com>
 
 	* dwarf2read.c (add_index_entry): Use VEC_last, not VEC_length.

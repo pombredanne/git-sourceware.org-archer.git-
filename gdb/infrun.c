@@ -6196,7 +6196,7 @@ signals_info (char *signum_exp, int from_tty)
 
 /* The $_siginfo convenience variable is a bit special.  We don't know
    for sure the type of the value until we actually have a chance to
-   fetch the data.  The type can change depending on gdbarch, so it it
+   fetch the data.  The type can change depending on gdbarch, so it is
    also dependent on which thread you have selected.
 
      1. making $_siginfo be an internalvar that creates a new value on
@@ -6696,11 +6696,6 @@ ptid_is_pid (ptid_t ptid)
 int
 ptid_match (ptid_t ptid, ptid_t filter)
 {
-  /* Since both parameters have the same type, prevent easy mistakes
-     from happening.  */
-  gdb_assert (!ptid_equal (ptid, minus_one_ptid)
-	      && !ptid_equal (ptid, null_ptid));
-
   if (ptid_equal (filter, minus_one_ptid))
     return 1;
   if (ptid_is_pid (filter)

@@ -1,6 +1,6 @@
-/* This testcase is part of GDB, the GNU debugger.
+/* This test is part of GDB, the GNU debugger.
 
-   Copyright 2009, 2011 Free Software Foundation, Inc.
+   Copyright 2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,30 +15,29 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include <signal.h>
-#include <unistd.h>
-#include <assert.h>
-#include <stdio.h>
+volatile int v = 42;
 
-/* Force REL->RELA conversion on i386, see "Prelink", March 4, 2004.  */
-volatile int v[2];
-volatile int *vptr = &v[1];
-
-void
-libfunc (const char *action)
+__attribute__((__always_inline__)) static int
+f (void)
 {
-  assert (action != NULL);
+  /* Provide first stub line so that GDB understand the PC is already inside
+     the inlined function and does not expect a step into it.  */
+  v++;
+  v++;		/* break-here */
 
-  if (strcmp (action, "segv") == 0)
-    raise (SIGSEGV);
+  return v;
+}
 
-  if (strcmp (action, "sleep") == 0)
-    {
-      puts ("sleeping");
-      fflush (stdout);
+__attribute__((__noinline__)) static int
+g (void)
+{
+  volatile int l = v;
 
-      sleep (60);
-    }
+  return f ();
+}
 
-  assert (0);
+int
+main (void)
+{
+  return g ();
 }
