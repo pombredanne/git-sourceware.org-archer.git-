@@ -1,3 +1,58 @@
+2011-04-29  Phil Muldoon  <pmuldoon@redhat.com>
+
+	PR mi/12531
+
+	* gdb.python/py-mi.exp: Add CPLUS_FAKE_CHILD tests and a C++
+	compile target.
+	* gdb.python/py-prettyprint.exp: Add C++ object for
+	CPLUS_FAKE_CHILD test.
+
+2011-04-28  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.base/signest.exp: New file.
+	* gdb.base/signest.c: Likewise.
+
+2011-04-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/mi-support.exp (mi_expect_stop) <stopped at wrong place>: Accept
+	thread and breakpoint notifications.
+
+2011-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/fortran-sym-case.c: New file.
+	* gdb.base/fortran-sym-case.exp: New file.
+	* gdb.dwarf2/dw2-case-insensitive-debug.S: New file.
+	* gdb.dwarf2/dw2-case-insensitive.c: New file.
+	* gdb.dwarf2/dw2-case-insensitive.exp: New file.
+
+2011-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/gdb.exp (gdb_test_multiple): Eror on newline in $message.
+	* gdb.base/ifelse.exp: Give names to the "" tests as `if true else
+	false #1', `if true else false #2' and `if true else false #3'.
+
+2011-04-27  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.base/annota1.exp: Accept breakpoints-invalid annotation
+	while delivering signal.
+
+2011-04-27  Vladimir Prus  <vladimir@codesourcery.com>
+
+	MI breakpoint notifications.
+
+	* testsuite/gdb.mi/mi-cli.exp: Adust.
+        * testsuite/gdb.mi/mi2-cli.exp: Adust.
+        * testsuite/gdb.mi/mi-watch.exp: Adust.
+        * testsuite/gdb.mi/mi2-watch.exp: Adust.
+        * testsuite/lib/mi-support.exp (mi_expect_stop): Accept breakpoint
+        notifications.
+
+2011-04-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/gdbindex-stabs-dwarf.c: New file.
+	* gdb.base/gdbindex-stabs.c: New file.
+	* gdb.base/gdbindex-stabs.exp: New file.
+
 2011-04-25  Yao Qi  <yao@codesourcery.com>
 
 	* gdb.dwarf2/dw2-double-set-die-type.S: Replace comment char `#'

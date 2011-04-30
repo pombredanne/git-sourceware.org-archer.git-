@@ -1,3 +1,32 @@
+2011-04-27  Mike Frysinger  <vapier@gentoo.org>
+
+	* dv-bfin_dmac.c (bfin_dmac): Constify pmap array.
+	(bfin_dmac_50x_pmap, bfin_dmac_51x_pmap, bfin_dmac_52x_pmap,
+	bfin_dmac_533_pmap, bfin_dmac_537_pmap, bfin_dmac0_538_pmap,
+	bfin_dmac1_538_pmap, bfin_dmac0_54x_pmap, bfin_dmac1_54x_pmap,
+	bfin_dmac0_561_pmap, bfin_dmac1_561_pmap, bfin_dmac_59x_pmap):
+	Likewise.
+
+2011-04-26  Mike Frysinger  <vapier@gentoo.org>
+
+	* dv-bfin_gpio.c (bfin_gpio_forward_ouput): New function.
+	(bfin_gpio_io_write_buffer): Store the current port state into
+	"data", and call bfin_gpio_forward_ouput when the data or dir
+	MMRs are updated.
+	(bfin_gpio_ports): Change p0..p15 to bidirect_port.
+
+2011-04-26  Mike Frysinger  <vapier@gentoo.org>
+
+	* dv-bfin_gpio.c (bfin_gpio): Add "int_state" member.
+	(bfin_gpio_forward_int, bfin_gpio_forward_ints): New functions.
+	(bfin_gpio_io_write_buffer): Call bfin_gpio_forward_int when the
+	mask a or mask b MMRs are written.
+	(bfin_gpio_port_event): When handling edge gpios, set the bit in
+	int_state, call bfin_gpio_forward_ints, and then clear the bit.
+	When handling level gpios, clear/set the bit in int_state rather
+	than returning immediately.  Call bfin_gpio_forward_ints instead
+	of checking mask[ab] and calling HW_TRACE/hw_port_event directly.
+
 2011-04-16  Mike Frysinger  <vapier@gentoo.org>
 
 	* bfin-sim.c (decode_dsp32alu_0): Call STORE instead of SET_DREG for

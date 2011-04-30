@@ -1,9 +1,6 @@
-/* MI Internal Functions for GDB, the GNU debugger.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright (C) 2003, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2011 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -18,22 +15,24 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef MI_MAIN_H
-#define MI_MAIN_H
+/* Use DW_LANG_Fortran90 for case insensitive DWARF.  */
 
-extern void mi_load_progress (const char *section_name,
-			      unsigned long sent_so_far,
-			      unsigned long total_section,
-			      unsigned long total_sent,
-			      unsigned long grand_total);
+void
+FUNC_lang (void)
+{
+}
 
-extern void mi_print_timing_maybe (void);
+/* Symbol is present only in ELF .symtab.  */
 
-extern char *current_token;
+void
+FUNC_symtab (void)
+{
+}
 
-extern int running_result_record_printed;
-extern int mi_proceeded;
-extern int mi_suppress_breakpoint_notifications;
-
-#endif
-
+int
+main (void)
+{
+  FUNC_lang ();
+  FUNC_symtab ();
+  return 0;
+}

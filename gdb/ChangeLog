@@ -1,3 +1,320 @@
+2011-04-26  Andrew Gontarek  <andrewg@cray.com>
+
+       * valprint.c (val_print_array_elements): Fixed poor performance
+       of printing very large arrays with repeat_count_threshold set
+       to unlimited.  New comment.
+
+2011-04-29  Tom Tromey  <tromey@redhat.com>
+
+	* mi/mi-parse.c (mi_parse): Remove incorrect sizeof.
+	(mi_parse): Likewise.
+	* breakpoint.c (break_range_command): Use sizeof char*, not
+	char**.
+	(create_breakpoint): Likewise.
+	(parse_breakpoint_sals): Likewise.
+
+2011-04-29  Pedro Alves  <pedro@codesourcery.com>
+
+	* linux-nat.c (linux_child_remove_fork_catchpoint)
+	(linux_child_remove_vfork_catchpoint)
+	(linux_child_remove_exec_catchpoint): New functions.
+	(linux_target_install_ops): Install them.
+
+2011-04-29  Phil Muldoon  <pmuldoon@redhat.com>
+
+	PR mi/12531
+
+	* varobj.c (install_default_visualizer): Do not install a
+	visualizer if the varobj is CPLUS_FAKE_CHILD.
+	(construct_visualizer): Likewise.
+
+2011-04-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.c (expand_partial_symbol_name): New variable NCMP.  Support
+	case insensitive comparison.
+
+2011-04-28  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* infrun.c (proceed): Revert previous change.
+	(resume): Instead, handle the case of signal delivery while stepping
+	off a breakpoint location here, and only if software single-stepping
+	is used.  Handle nested signals.
+
+2011-04-28  Yao Qi  <yao@codesourcery.com>
+
+	* arm-tdep.c (copy_unmodified): Rename to ...
+	(arm_copy_unmodified): .. this.  New.
+	(copy_preload): Move common part to ...
+	(install_preload): .. this.  New.
+	(arm_copy_preload): New.
+	(copy_preload_reg): Move common part to ...
+	(install_preload_reg): ... this.  New.
+	(arm_copy_preload_reg): New.
+	(copy_b_bl_blx): Move common part to ...
+	(install_b_bl_blx): .. this.  New.
+	(arm_copy_b_bl_blx): New.
+	(copy_bx_blx_reg): Move common part to ...
+	(install_bx_blx_reg): ... this. New.
+	(arm_copy_bx_blx_reg): New.
+	(copy_alu_reg): Move common part to ...
+	(install_alu_reg): ... this.  New.
+	(arm_copy_alu_reg): New.
+	(copy_alu_shifted_reg): Move common part to ...
+	(install_alu_shifted_reg): ... this.  New.
+	(copy_ldr_str_ldrb_strb): Move common part to ...
+	(install_ldr_str_ldrb_strb): ... this.  New.
+	(arm_copy_ldr_str_ldrb_strb): New.
+	(copy_copro_load_store): Move some common part to ...
+	(install_copy_copro_load_store): ... this.  New.
+	(arm_copy_copro_load_store): New.
+	(copy_svc): Delete.
+	(arm_copy_svc): Renamed from copy_svc.
+	(copy_undef): Delete.
+	(arm_copy_undef): Renamed from copy_undef.
+	(decode_ext_reg_ld_st): Delete.
+	(arm_decode_ext_reg_ld_st): Renamed from decode_ext_reg_ld_st.
+	(decode_svc_copro): Delete.
+	(arm_decode_svc_copro): Renamed from decode_svc_copro.
+	(copy_copro_load_store, copy_alu_imm): update callers.
+	(copy_extra_ld_st, copy_block_xfer): Likewise.
+	(decode_misc_memhint_neon, decode_unconditional): Likewise.
+	(decode_miscellaneous, decode_dp_misc): Likewise.
+	(decode_ld_st_word_ubyte, decode_media): Likewise.
+	(decode_b_bl_ldmstm, decode_ext_reg_ld_st): Likewise.
+	(decode_svc_copro, decode_misc_memhint_neon): Likewise.
+	(decode_unconditional, decode_miscellaneous): Likewise.
+	(decode_media, decode_b_bl_ldmstm): Likewise.
+	(arm_process_displaced_insn): Likewise..
+	(decode_misc_memhint_neon): Delete.
+	(arm_decode_misc_memhint_neon): Renamed from decode_misc_memhint_neon.
+	(decode_miscellaneous): Delete.
+	(arm_decode_miscellaneous): Renamed from decode_miscellaneous.
+	(decode_dp_misc): Delete.
+	(arm_decode_dp_misc): Renamed from decode_dp_misc.
+	(decode_ld_st_word_ubyte): Delete.
+	(arm_decode_ld_st_word_ubyte): Renamed from decode_ld_st_word_ubyte.
+	(decode_media): Delete.
+	(arm_decode_media): Renamed from decode_media.
+	(decode_b_bl_ldmstm): Delete.
+	(arm_decode_b_bl_ldmstm): Renamed from decode_b_bl_ldmstm.
+	(decode_ext_reg_ld_st): Delete.
+	(arm_decode_ext_reg_ld_st): Renamed from decode_ext_reg_ld_st.
+	(decode_unconditional): Delete.
+	(arm_decode_unconditional): Renamed from decode_unconditional.
+
+2011-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Case insensitive lookups implementation.
+	* dwarf2read.c: Include ctype.h.
+	(struct mapped_index): New field version.
+	(mapped_index_string_hash): New parameter index_version.  New comment
+	for it.  Call tolower appropriately.
+	(find_slot_in_mapped_hash): New variable cmp, initialize it, use it.
+	Choose the right index version for mapped_index_string_hash.
+	(dwarf2_read_index): Support also the index version 5.  Initialize the
+	new struct mapped_index field version.
+	(hash_strtab_entry): Pass INT_MAX for the new parameter, explain why.
+	(find_slot): Explain the version needs.  Pass INT_MAX for the new
+	parameter.
+	(write_psymtabs_to_index): Produce version 5.
+	* minsyms.c (lookup_minimal_symbol): New variable cmp, initialize it,
+	use it.  New comment for SYMBOL_MATCHES_SEARCH_NAME.
+	* psymtab.c (lookup_partial_symbol): Find the
+	SYMBOL_MATCHES_SEARCH_NAME start of the found block of matching
+	entries.
+	* symtab.c (lookup_symbol_in_language): Remove the case_sensitive_off
+	NAME lowercasing.
+	(search_symbols): Pass REG_ICASE to regcomp for case_sensitive_off.
+	(completion_list_add_name): New variable ncmp, initialize it, use it.
+	* symtab.h (SYMBOL_HASH_NEXT): Always call tolower.
+	* utils.c (strcmp_iw): Support case_sensitive_off.
+	(strcmp_iw_ordered): Sort in a way compatible with case_sensitive_off.
+	New function comment part.  New variables saved_string1,
+	saved_string2 and case_pass.  Add a proper second pass.
+
+2011-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Replace re_comp/re_exec by regcomp/regexec.
+	* symtab.c (struct search_symbols_data): New fields preg, preg_p.
+	(search_symbols_name_matches): Use them, use regexec.
+	(search_symbols): New variable retval_chain, adjust the use of
+	old_chain against it.  Replace re_comp by regcomp.  Use the new struct
+	search_symbols_data fields, use regexec instead of re_exec.
+
+2011-04-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Format the code for the next patch.
+	* dwarf2read.c (struct mapped_index): Include delimiting newlines.
+	* utils.c (strcmp_iw_ordered): Reformat the code for the next patch.
+	New variables c1 and c2.
+
+2011-04-27  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* infrun.c (proceed): Do not single-step into signal delivery
+	when stepping off a breakpoint location.
+	(insert_step_resume_breakpoint_at_frame): Move prototype earlier.
+	(insert_step_resume_breakpoint_at_caller): Likewise.
+	(insert_step_resume_breakpoint_at_sal): Likewise.
+	(insert_longjmp_resume_breakpoint): Likewise.
+
+2011-04-27  Yao Qi  <yao@codesourcery.com>
+
+	* common/linux-ptrace.h: Remove include <sys/wait.h>.
+
+2011-04-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* procfs.c (procfs_pass_signals): Fix advance declaration.
+
+2011-04-27  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* target.h (struct target_ops): Remove to_notice_signals;
+	add to_pass_signals.
+	(target_notice_signals): Remove.
+	(target_pass_signals): Add prototype.
+	* target.c (update_current_target): Remove to_notice_signals;
+	mention to_pass_signals.
+	(target_pass_signals): New function.
+	(debug_to_notice_signals): Remove.
+	(setup_target_debug): Do not install debug_to_notice_signals.
+
+	* infrun.c (signal_pass): New global.
+	(resume): Call target_pass_signals.
+	(handle_inferior_event): Report all signals while stepping over
+	non-steppable watchpoint.  Reset trap_expected to ensure breakpoints
+	are re-inserted when stepping over a signal handler.
+	(signal_cache_update): New function.
+	(signal_stop_update): Call it.
+	(signal_print_update): Likewise.
+	(signal_pass_update): Likewise.
+	(handle_command): Call signal_cache_update and target_pass_signals
+	instead of target_notice_signals.
+	(_initialize_infrun): Initialize signal_pass.
+
+	* linux-nat.c (pass_mask): New global.
+	(linux_nat_pass_signals): New function.
+	(linux_nat_create_inferior): Report all signals initially.
+	(linux_nat_attach): Likewise.
+	(linux_nat_resume): Use pass_mask to decide whether to directly
+	handle an inferior signal.
+	(linux_nat_wait_1): Likewise.
+	(linux_nat_add_target): Install to_pass_signals callback.
+
+	* nto-procfs.c (notice_signals): Remove.
+	(procfs_resume): Do not call notice_signals.
+	(procfs_notice_signals): Remove.
+	(procfs_pass_signals): New function.
+	(init_procfs_ops): Install to_pass_signals callback instead of
+	to_notice_signals callback.
+	(_initialize_procfs): Report all signals initially.
+
+	* procfs.c (procfs_notice_signals): Remove.
+	(procfs_pass_signals): New function.
+	(procfs_target): Install to_pass_signals callback instead of
+	to_notice_signals callback.
+	(register_gdb_signals): Remove.
+	(procfs_debug_inferior): Report all signals initially.
+	(procfs_init_inferior): Remove redundant register_gdb_signals call.
+
+	* remote.c (remote_pass_signals): Add numsigs and pass_signals
+	parameters; use them instead of calling signal_..._state routines.
+	(remote_notice_signals): Remove.
+	(remote_start_remote): Report all signals initially.
+	(remote_resume): Do not call remote_pass_signals.
+	(_initialize_remote): Install to_pass_signals callback instead of
+	to_notice_signals callback.
+
+2011-04-27  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (user_settable_breakpoint): Delete.
+	(user_breakpoint_p): Remove check on user_settable_breakpoint.
+	(delete_command): Check user_breakpoint_p instead of looking at
+	the breakpoint's type.
+	(disable_command): Ditto.
+	(enable_command): Ditto.
+	(delete_trace_command): Use user_breakpoint_p instead of looking
+	at the breakpoint number directly.  When checking if there are
+	user visible tracepoints, in order to know whether to ask the user
+	for confirmation, check whether the breakpoint is actually a
+	tracepoint.
+
+2011-04-27  Vladimir Prus  <vladimir@codesourcery.com>
+
+	* python/py-breakpoint.c (gdbpy_breakpoint_created): Fix
+	compilation.
+
+2011-04-27  Vladimir Prus  <vladimir@codesourcery.com>
+
+	MI breakpoint notifications.
+
+        * annotate.c (breakpoint_changed): Adjust parameter type.
+        * breakpoint.c (set_breakpoint_condition): Adjust to change
+        in breakpoint_modified type.
+        (breakpoint_set_commands): Likewise.
+        (do_map_commands_command): Likewise.
+        (bpstat_check_breakpoint_conditions): Notify that breakpoint has
+        changed after bumping hit count.
+        (bpstat_stop_status): Likewise.
+        (print_one_breakpoint_location): Don't wrap in tuple here.
+        (print_one_breakpoint): Always print individual locations.
+        For locations, use unnamed tuple.
+        (disable_breakpoints_in_unloaded_shlib): Notify that breakpoint
+        has changed.
+        (create_catchpoint, create_syscall_event_catchpoint): Call
+        breakpoint_created obsever.
+        (mention): Don't call breakpoint_created observer.
+        (create_breakpoint_sal): Call breakpoint_created observer.
+        (create_breakpoint, watch_command_1): Likewise.
+        (create_ada_exception_breakpoint): Likewise.
+        (delete_breakpoint): Call breakpoint_deleted breakpoint.
+        (locations_are_equal): New.
+        (update_breakpoint_locations): If locations were changed, notify.
+        (set_ignore_count, disable_breakpoint, do_enable_breakpoint):
+        Call breakpoint_modified observer.
+
+        * mi/mi-cmd-break.c (breakpoint_notify): Adjust.
+        (mi_cmd_break_insert): Don't set observers for modify and delete.
+        * mi/mi-interp.c (mi_suppress_breakpoint_notifications): New.
+        (mi_breakpoint_created, mi_breakpoint_deleted)
+        (mi_breakpoint_modified): New.
+        (mi_interpreter_init): Hook the above.
+        * mi/mi-main.c (mi_cmd_execute): Disable breakpoint notifications
+        while -break-* commands are executing.
+        * mi/mi-main.h (mi_suppress_breakpoint_notifications): New.
+        * mi/mi-out.c (struct ui_out_data): New field original_buffer.
+        (mi_redirect): New.
+        (mi_ui_out_impl): Hook in mi_redirect.
+        (mi_field_skip): True to the name, skip the field, don't output
+        a field with an empty value.
+
+        * python/py-breakpoint.c (gdbpy_breakpoint_created)
+        (gdbpy_breakpoint_deleted): Adjust.
+        * tui/tui-hooks.c (tui_event_create_breakpoint)
+        (tui_event_delete_breakpoint, tui_event_modify_breakpoint): Adjust.
+
+2011-04-26  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* nto-procfs.c (procfs_insert_hw_watchpoint): Fix prototype.
+	(procfs_remove_hw_watchpoint): Likewise.
+
+2011-04-26  Michael Walle  <michael@walle.cc>
+
+	* remote.c (remote_start_remote): Ack packet after sending the
+	interrupt sequence.
+
+2011-04-26  Yao Qi  <yao@codesourcery.com>
+
+        * linux-nat.c: Move common macros to ...
+        Include linux-ptrace.h.
+        * common/linux-ptrace.h: ... here.  New.
+
+2011-04-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* elfread.c (elf_symfile_read): Protect dwarf2_initialize_objfile by
+	!objfile_has_partial_symbols.  New comment.
+	* objfiles.c (objfile_has_partial_symbols): Call HAS_SYMBOLS if
+	SYM_READ_PSYMBOLS is not present. Extend the comment.
+	* symfile.h (struct sym_fns): Extend the sym_read_psymbols comment.
+
 2011-04-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* defs.h (ENUM_BITFIELD): Remove.
