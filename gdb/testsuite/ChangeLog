@@ -1,3 +1,34 @@
+2011-05-04  Joseph Myers  <joseph@codesourcery.com>
+
+	* gdb.base/a2-run.exp (strongarm-*-coff): Don't handle target.
+	* gdb.base/float.exp (xscale*-*-*, strongarm*-*-*): Don't handle
+	targets.
+	* gdb.base/long_long.exp (xscale*-*-*, strongarm*-*-*): Don't
+	handle targets.
+
+2011-05-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/completion.exp (complete help info wat): Rename to ...
+	(complete 'help info wat'): ... here.
+	Remove all `-re ".*' and `-re "^.*' redundant regexes.
+	(complete 'p 'arg', complete (2) 'p 'arg'): Remove redundant backslash.
+
+2011-05-04  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/completion.exp: Use gdb_test_multiple instead of
+	gdb_test and explicit $gdb_prompt/timeout matches.
+
+2011-05-04  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.arch/arm-disp-step.S: Fix usage of macros __thumb__
+	and __thumb2__.
+
+2011-05-03  Marek Polacek  <mpolacek@redhat.com>
+
+	* gdb.base/pr10179.exp: Get rid of races using `delete_breakpoints'
+	in place of `gdb_test "delete breakpoints"'.  This eliminates two
+	testcases.
+
 2011-05-02  Pedro Alves  <pedro@codesourcery.com>
 
 	PR testsuite/12649

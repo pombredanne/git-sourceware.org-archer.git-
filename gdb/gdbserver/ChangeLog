@@ -1,3 +1,16 @@
+2011-05-04  Doug Evans  <dje@google.com>
+
+	* linux-low.c (linux_join): Skip process lookup.
+	* spu-low.c (spu_join): Ditto.
+	* server.c (join_inferiors_callback): Delete.
+	(process_serial_event): For 'D' packet (detach) call join_inferior
+	directly.
+
+2011-05-04  Joseph Myers  <joseph@codesourcery.com>
+
+	* README: Don't mention xscale*-*-linux*.
+	* configure.srv (xscale*-*-linux*): Don't handle target.
+
 2011-04-27  Nathan Froyd  <froydnj@codesourcery.com>
 
 	* linux-x86-low.c (amd64_emit_const): Call memcpy instead of

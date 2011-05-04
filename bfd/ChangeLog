@@ -1,3 +1,16 @@
+2011-04-28  Tristan Gingold  <gingold@adacore.com>
+
+	* coff-rs6000.c (_bfd_xcoff_swap_aux_in): Adjust for x_file.
+	(bfd_xcoff_swap_aux_out): Ditto.
+	* coff64-rs6000.c (_bfd_xcoff64_swap_aux_in): Ditto.
+	(bfd_xcoff64_swap_aux_out): Ditto.
+
+2011-05-04  Alan Modra  <amodra@gmail.com>
+
+	PR ld/12727
+	* elf64-ppc.c (ppc_build_one_stub <ppc_sub_plt_call>): Clear
+	was_undefined on dot-symbols.
+
 2011-05-03  Paul Brook  <paul@codesourcery.com>
 
 

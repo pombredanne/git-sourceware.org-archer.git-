@@ -1,3 +1,19 @@
+2011-05-04  Joseph Myers  <joseph@codesourcery.com>
+
+	* configure.host (xscale*): Don't handle target.
+	* configure.tgt (thumb*-*-* | strongarm*-*-* | xscale-*-*): Don't
+	handle targets.
+
+2011-05-04  Yao Qi  <yao@codesourcery.com>
+
+	* gdb_wait.h: remove WAITTYPE and WCOREDUMP.
+
+2011-05-03  Joel Brobecker <brobecker@adacore.com>
+
+        Revert:
+	| 2011-03-07  Michael Snyder  <msnyder@vmware.com>
+	| * elfread.c (elf_symtab_read): Stop memory leak.
+
 2011-05-03  Pierre Muller  <muller@ics.u-strasbg.fr>
 
 	* nto-tdep.c (nto_target): Replace deprecated call to

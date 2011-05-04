@@ -1,3 +1,15 @@
+2011-05-04  Tristan Gingold  <gingold@adacore.com>
+
+	* rs6000.h (union external_auxent): Add x_ftype field.
+	* rs6k64.h: (struct external_auxent): Remap x_file field.
+
+2011-05-04  Tristan Gingold  <gingold@adacore.com>
+
+	* rs6000.h (struct external_exceptab): New struct.
+	(EXCEPTSZ): New macro.
+	* rs6k64.h: (struct external_exceptab): New struct.
+	(EXCEPTSZ): New macro.
+
 2011-05-03  Tristan Gingold  <gingold@adacore.com>
 
 	* rs6000.h (struct external_ldsym): Use E_SYMNMLEN instead of
