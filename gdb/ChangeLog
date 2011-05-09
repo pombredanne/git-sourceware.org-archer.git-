@@ -1,3 +1,141 @@
+2011-05-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* inferior.h (wait_for_inferior): Remove `thread_exec_as_sigtrap'
+	parameter.
+	* infrun.c (proceed, start_remote): Adjust.
+	(wait_for_inferior): Remove `thread_exec_as_sigtrap' parameter,
+	and adjust to not handle it.
+	* solib-irix.c (irix_solib_create_inferior_hook): Adjust.
+	* solib-osf.c (osf_solib_create_inferior_hook): Adjust.
+	* solib-sunos.c (sunos_solib_create_inferior_hook): Adjust.
+	* solib-svr4.c (svr4_solib_create_inferior_hook): Adjust.
+	* windows-nat.c (do_initial_windows_stuff): Adjust.
+	* infcmd.c (attach_command): Adjust.
+	(notice_new_inferior): Adjust.
+
+2011-05-06  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* ppc-linux-tdep.c (ppu2spu_prev_register): Handle pseudo registers.
+	(ppu2spu_unwind_register): Mark pseudo registers unavailable.
+	* spu-tdep.c (op_selb): Use correct value.
+
+2011-05-06  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* spu-linux-nat.c (spu_symbol_file_add_from_memory): Add NULL
+	"parent" parameter to symbol_file_add_from_bfd call.
+
+2011-05-06  Sergio Durigan Junior  <sergiodj@linux.vnet.ibm.com>
+	    Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Implement support for PowerPC BookE masked watchpoints.
+	* NEWS: Mention masked watchpoint support.  Create "Changed commands"
+	section.
+	* breakpoint.h (struct breakpoint_ops) <works_in_software_mode>: New
+	method.  Initialize to NULL in all existing breakpoint_ops instances.
+	(struct breakpoint) <hw_wp_mask>: New field.
+	* breakpoint.c (is_masked_watchpoint): Add prototype.
+	(update_watchpoint): Don't set b->val for masked watchpoints.  Call
+	breakpoint's breakpoint_ops.works_in_software_mode if available.
+	(watchpoints_triggered): Handle the case of a hardware masked
+	watchpoint trigger.
+	(watchpoint_check): Likewise.
+	(works_in_software_mode_watchpoint): New function.
+	(insert_masked_watchpoint, remove_masked_watchpoint)
+	(resources_needed_masked_watchpoint)
+	(works_in_software_mode_masked_watchpoint, print_it_masked_watchpoint)
+	(print_one_detail_masked_watchpoint, print_mention_masked_watchpoint)
+	(print_recreate_masked_watchpoint, is_masked_watchpoint): New
+	functions.
+	(masked_watchpoint_breakpoint_ops): New structure.
+	(watch_command_1): Check for the existence of the `mask' parameter.
+	Set b->ops according to the type of hardware watchpoint being created.
+	* ppc-linux-nat.c (ppc_linux_insert_mask_watchpoint)
+	(ppc_linux_remove_mask_watchpoint)
+	(ppc_linux_masked_watch_num_registers): New functions.
+	(_initialize_ppc_linux_nat): Initialize to_insert_mask_watchpoint,
+	to_remove_mask_watchpoint and to_masked_watch_num_registers.
+	* target.c (update_current_target): Mention to_insert_mask_watchpoint,
+	to_remove_mask_watchpoint, and to_masked_watch_num_registers.
+	(target_insert_mask_watchpoint, target_remove_mask_watchpoint)
+	(target_masked_watch_num_registers): New functions.
+	* target.h (struct target_ops) <to_insert_mask_watchpoint>,
+	<to_remove_mask_watchpoint>, <to_masked_watch_num_registers>: New
+	methods.
+	(target_insert_mask_watchpoint, target_remove_mask_watchpoint)
+	(target_masked_watch_num_registers): Add prototypes.
+
+2011-05-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 12573
+	* dwarf2read.c (struct dwarf2_cu): New field has_loclist.
+	(producer_is_gcc_ge_4_0): New function.
+	(process_full_comp_unit): Set also symtab->locations_valid.  Move the
+	symtab->language code.
+	(var_decode_location): Set cu->has_loclist.
+	* symtab.c (skip_prologue_sal): New variables saved_pc, force_skip and
+	skip.  Intialize force_skip from locations_valid.  Move the prologue
+	skipping code into two passes.
+	* symtab.h (struct symtab): Make the primary field a bitfield.  New
+	field locations_valid.
+
+2011-05-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* c-exp.y (qualified_name): Call destructor_name_p with $1.type.
+	(classify_inner_name): Call cp_lookup_nested_type with
+	yylval.tsym.type.
+	* cp-namespace.c (cp_lookup_nested_type): New variable
+	saved_parent_type.  Call CHECK_TYPEDEF for parent_type.  Call
+	type_name_no_tag_or_error with saved_parent_type.
+	* dwarf2read.c (load_partial_dies): Read in any children of
+	DW_TAG_typedef with complaint in such case.
+	* gdbtypes.c (type_name_no_tag_or_error): New function.
+	* gdbtypes.h (type_name_no_tag_or_error): New prototype.
+	* valops.c (destructor_name_p): New comment for parameter type.  Remove
+	type const.  Make dname and cp const.  Call type_name_no_tag_or_error.
+	* value.h (destructor_name_p): Remove type const.
+
+2011-05-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.c (compare_symbol_name): New function.
+	(completion_list_add_name, expand_partial_symbol_name): Call it,
+	remove the variable ncmp.
+	(default_make_symbol_completion_list_break_on): Reduce SYM_TEXT_LEN,
+	gdb_assert it.
+
+2011-05-05  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Demote to sw watchpoint only in update_watchpoint.
+	* breakpoint.c (update_watchpoint): Change between software and
+	hardware watchpoint for all kinds of watchpoints, not just
+	read/write ones.  Determine b->exact value here instead of
+	in watch_command_1.  Error out if there are not enough resources
+	for a read or access hardware watchpoint.
+	(watch_command_1): Remove logic of checking whether there are
+	enough resources available, since update_watchpoint will do that
+	work now.  Don't set b->exact here.  Catch exceptions thrown by
+	update_watchpoint and delete the watchpoint.
+	(can_use_hardware_watchpoint): Remove exact_watchpoints argument.
+	Use target_exact_watchpoints instead.
+	(delete_breakpoint): Notify observers only if deleted watchpoint
+	has a breakpoint number assigned to it.
+
+2011-05-05  Janis Johnson  <janisjo@codesourcery.com>
+
+	* MAINTAINERS: Add myself as a write-after-approval maintainer.
+
+2011-05-05  Jerome Guitton  <guitton@adacore.com>
+
+	* i386-tdep.c (i386_in_stack_tramp_p, i386_stack_tramp_frame_sniffer):
+	New functions.
+	(i386_stack_tramp_frame_unwind): New static global.
+	(i386_match_pattern): New function, extracted from i386_match_insn.
+	(i386_match_insn): Use i386_match_pattern.
+	(i386_match_insn_block): New function.
+	(i386_tramp_chain_in_reg_insns)
+	(i386_tramp_chain_on_stack_insns): New static variables.
+	(i386_gdbarch_init): Add i386_stack_tramp_frame_unwind to list
+	of unwinders.
+
 2011-05-04  Joseph Myers  <joseph@codesourcery.com>
 
 	* configure.host (xscale*): Don't handle target.

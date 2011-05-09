@@ -919,6 +919,10 @@ extern bfd_boolean elf32_arm_build_stubs
 extern bfd_boolean elf32_arm_fix_exidx_coverage
 (struct bfd_section **, unsigned int, struct bfd_link_info *, bfd_boolean);
 
+/* C6x unwind section editing support.  */
+extern bfd_boolean elf32_tic6x_fix_exidx_coverage
+(struct bfd_section **, unsigned int, struct bfd_link_info *, bfd_boolean);
+
 /* PowerPC @tls opcode transform/validate.  */
 extern unsigned int _bfd_elf_ppc_at_tls_transform
   (unsigned int, unsigned int);
@@ -1029,9 +1033,9 @@ bfd_boolean bfd_fill_in_gnu_debuglink_section
 #define bfd_put_signed_8 \
   bfd_put_8
 #define bfd_get_8(abfd, ptr) \
-  (*(unsigned char *) (ptr) & 0xff)
+  (*(const unsigned char *) (ptr) & 0xff)
 #define bfd_get_signed_8(abfd, ptr) \
-  (((*(unsigned char *) (ptr) & 0xff) ^ 0x80) - 0x80)
+  (((*(const unsigned char *) (ptr) & 0xff) ^ 0x80) - 0x80)
 
 #define bfd_put_16(abfd, val, ptr) \
   BFD_SEND (abfd, bfd_putx16, ((val),(ptr)))
@@ -1319,6 +1323,11 @@ typedef struct bfd_section
      allow the back end to control what the linker does with
      sections.  */
 #define SEC_COFF_SHARED_LIBRARY 0x4000000
+
+  /* This input section should be copied to output in reverse order
+     as an array of pointers.  This is for ELF linker internal use
+     only.  */
+#define SEC_ELF_REVERSE_COPY 0x4000000
 
   /* This section contains data which may be shared with other
      executables or shared objects. This is for COFF only.  */

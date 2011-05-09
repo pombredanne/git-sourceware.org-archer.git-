@@ -101,7 +101,7 @@ static void clear_command (char *, int);
 
 static void catch_command (char *, int);
 
-static int can_use_hardware_watchpoint (struct value *, int);
+static int can_use_hardware_watchpoint (struct value *);
 
 static void break_command_1 (char *, int, int);
 
@@ -223,6 +223,8 @@ static void enable_trace_command (char *, int);
 static void disable_trace_command (char *, int);
 
 static void trace_pass_command (char *, int);
+
+static int is_masked_watchpoint (const struct breakpoint *b);
 
 /* Assuming we're creating a static tracepoint, does S look like a
    static tracepoint marker spec ("-m MARKER_ID")?  */
@@ -1345,8 +1347,10 @@ update_watchpoint (struct breakpoint *b, int reparse)
       /* Avoid setting b->val if it's already set.  The meaning of
 	 b->val is 'the last value' user saw, and we should update
 	 it only if we reported that last value to user.  As it
-	 happens, the code that reports it updates b->val directly.  */
-      if (!b->val_valid)
+	 happens, the code that reports it updates b->val directly.
+	 We don't keep track of the memory value for masked
+	 watchpoints.  */
+      if (!b->val_valid && !is_masked_watchpoint (b))
 	{
 	  b->val = v;
 	  b->val_valid = 1;
@@ -1404,18 +1408,21 @@ update_watchpoint (struct breakpoint *b, int reparse)
 	 an ordinary watchpoint depending on the hardware support
 	 and free hardware slots.  REPARSE is set when the inferior
 	 is started.  */
-      if ((b->type == bp_watchpoint || b->type == bp_hardware_watchpoint)
-	  && reparse)
+      if (reparse)
 	{
 	  int reg_cnt;
 	  enum bp_loc_type loc_type;
 	  struct bp_location *bl;
 
-	  reg_cnt = can_use_hardware_watchpoint (val_chain, b->exact);
+	  reg_cnt = can_use_hardware_watchpoint (val_chain);
 
 	  if (reg_cnt)
 	    {
 	      int i, target_resources_ok, other_type_used;
+
+	      /* Use an exact watchpoint when there's only one memory region to be
+		 watched, and only one debug register is needed to watch it.  */
+	      b->exact = target_exact_watchpoints && reg_cnt == 1;
 
 	      /* We need to determine how many resources are already
 		 used for all other hardware watchpoints plus this one
@@ -1424,16 +1431,33 @@ update_watchpoint (struct breakpoint *b, int reparse)
 		 hw_watchpoint_used_count call below counts this
 		 watchpoint, make sure that it is marked as a hardware
 		 watchpoint.  */
-	      b->type = bp_hardware_watchpoint;
+	      if (b->type == bp_watchpoint)
+		b->type = bp_hardware_watchpoint;
 
-	      i = hw_watchpoint_used_count (bp_hardware_watchpoint,
-					    &other_type_used);
-
+	      i = hw_watchpoint_used_count (b->type, &other_type_used);
 	      target_resources_ok = target_can_use_hardware_watchpoint
-		    (bp_hardware_watchpoint, i, other_type_used);
+		    (b->type, i, other_type_used);
 	      if (target_resources_ok <= 0)
-		b->type = bp_watchpoint;
+		{
+		  /* If there's no works_in_software_mode method, we
+		     assume that the watchpoint works in software mode.  */
+		  int sw_mode = (!b->ops || !b->ops->works_in_software_mode
+				 || b->ops->works_in_software_mode (b));
+
+		  if (target_resources_ok == 0 && !sw_mode)
+		    error (_("Target does not support this type of "
+			     "hardware watchpoint."));
+		  else if (target_resources_ok < 0 && !sw_mode)
+		    error (_("There are not enough available hardware "
+			     "resources for this watchpoint."));
+		  else
+		    b->type = bp_watchpoint;
+		}
 	    }
+	  else if (b->ops && b->ops->works_in_software_mode
+		   && !b->ops->works_in_software_mode (b))
+	    error (_("Expression cannot be implemented with "
+		     "read/access watchpoint."));
 	  else
 	    b->type = bp_watchpoint;
 
@@ -3678,15 +3702,27 @@ watchpoints_triggered (struct target_waitstatus *ws)
 
 	b->watchpoint_triggered = watch_triggered_no;
 	for (loc = b->loc; loc; loc = loc->next)
-	  /* Exact match not required.  Within range is
-	     sufficient.  */
-	  if (target_watchpoint_addr_within_range (&current_target,
-						   addr, loc->address,
-						   loc->length))
-	    {
-	      b->watchpoint_triggered = watch_triggered_yes;
-	      break;
-	    }
+	  {
+	    if (is_masked_watchpoint (loc->owner))
+	      {
+		CORE_ADDR newaddr = addr & loc->owner->hw_wp_mask;
+		CORE_ADDR start = loc->address & loc->owner->hw_wp_mask;
+
+		if (newaddr == start)
+		  {
+		    b->watchpoint_triggered = watch_triggered_yes;
+		    break;
+		  }
+	      }
+	    /* Exact match not required.  Within range is sufficient.  */
+	    else if (target_watchpoint_addr_within_range (&current_target,
+							 addr, loc->address,
+							 loc->length))
+	      {
+		b->watchpoint_triggered = watch_triggered_yes;
+		break;
+	      }
+	  }
       }
 
   return 1;
@@ -3783,9 +3819,16 @@ watchpoint_check (void *p)
          might be in the middle of evaluating a function call.  */
 
       int pc = 0;
-      struct value *mark = value_mark ();
+      struct value *mark;
       struct value *new_val;
 
+      if (is_masked_watchpoint (b))
+	/* Since we don't know the exact trigger address (from
+	   stopped_data_address), just tell the user we've triggered
+	   a mask watchpoint.  */
+	return WP_VALUE_CHANGED;
+
+      mark = value_mark ();
       fetch_subexp_value (b->exp, &pc, &new_val, NULL, NULL);
 
       /* We use value_equal_contents instead of value_equal because
@@ -6287,6 +6330,7 @@ static struct breakpoint_ops catch_fork_breakpoint_ops =
   remove_catch_fork,
   breakpoint_hit_catch_fork,
   NULL, /* resources_needed */
+  NULL, /* works_in_software_mode */
   print_it_catch_fork,
   print_one_catch_fork,
   NULL, /* print_one_detail */
@@ -6385,6 +6429,7 @@ static struct breakpoint_ops catch_vfork_breakpoint_ops =
   remove_catch_vfork,
   breakpoint_hit_catch_vfork,
   NULL, /* resources_needed */
+  NULL, /* works_in_software_mode */
   print_it_catch_vfork,
   print_one_catch_vfork,
   NULL, /* print_one_detail */
@@ -6672,6 +6717,7 @@ static struct breakpoint_ops catch_syscall_breakpoint_ops =
   remove_catch_syscall,
   breakpoint_hit_catch_syscall,
   NULL, /* resources_needed */
+  NULL, /* works_in_software_mode */
   print_it_catch_syscall,
   print_one_catch_syscall,
   NULL, /* print_one_detail */
@@ -6829,6 +6875,7 @@ static struct breakpoint_ops catch_exec_breakpoint_ops =
   remove_catch_exec,
   breakpoint_hit_catch_exec,
   NULL, /* resources_needed */
+  NULL, /* works_in_software_mode */
   print_it_catch_exec,
   print_one_catch_exec,
   NULL, /* print_one_detail */
@@ -8454,6 +8501,7 @@ static struct breakpoint_ops ranged_breakpoint_ops =
   NULL, /* remove */
   breakpoint_hit_ranged_breakpoint,
   resources_needed_ranged_breakpoint,
+  NULL, /* works_in_software_mode */
   print_it_ranged_breakpoint,
   print_one_ranged_breakpoint,
   print_one_detail_ranged_breakpoint,
@@ -8761,6 +8809,15 @@ resources_needed_watchpoint (const struct bp_location *bl)
   return target_region_ok_for_hw_watchpoint (bl->address, length);
 }
 
+/* Implement the "works_in_software_mode" breakpoint_ops method for
+   hardware watchpoints.  */
+
+int
+works_in_software_mode_watchpoint (const struct breakpoint *b)
+{
+  return b->type == bp_hardware_watchpoint;
+}
+
 /* The breakpoint_ops structure to be used in hardware watchpoints.  */
 
 static struct breakpoint_ops watchpoint_breakpoint_ops =
@@ -8769,12 +8826,199 @@ static struct breakpoint_ops watchpoint_breakpoint_ops =
   remove_watchpoint,
   NULL, /* breakpoint_hit */
   resources_needed_watchpoint,
+  works_in_software_mode_watchpoint,
   NULL, /* print_it */
   NULL, /* print_one */
   NULL, /* print_one_detail */
   NULL, /* print_mention */
   NULL  /* print_recreate */
 };
+
+/* Implement the "insert" breakpoint_ops method for
+   masked hardware watchpoints.  */
+
+static int
+insert_masked_watchpoint (struct bp_location *bl)
+{
+  return target_insert_mask_watchpoint (bl->address, bl->owner->hw_wp_mask,
+					bl->watchpoint_type);
+}
+
+/* Implement the "remove" breakpoint_ops method for
+   masked hardware watchpoints.  */
+
+static int
+remove_masked_watchpoint (struct bp_location *bl)
+{
+  return target_remove_mask_watchpoint (bl->address, bl->owner->hw_wp_mask,
+				        bl->watchpoint_type);
+}
+
+/* Implement the "resources_needed" breakpoint_ops method for
+   masked hardware watchpoints.  */
+
+static int
+resources_needed_masked_watchpoint (const struct bp_location *bl)
+{
+  return target_masked_watch_num_registers (bl->address,
+					    bl->owner->hw_wp_mask);
+}
+
+/* Implement the "works_in_software_mode" breakpoint_ops method for
+   masked hardware watchpoints.  */
+
+static int
+works_in_software_mode_masked_watchpoint (const struct breakpoint *b)
+{
+  return 0;
+}
+
+/* Implement the "print_it" breakpoint_ops method for
+   masked hardware watchpoints.  */
+
+static enum print_stop_action
+print_it_masked_watchpoint (struct breakpoint *b)
+{
+  /* Masked watchpoints have only one location.  */
+  gdb_assert (b->loc && b->loc->next == NULL);
+
+  switch (b->type)
+    {
+    case bp_hardware_watchpoint:
+      annotate_watchpoint (b->number);
+      if (ui_out_is_mi_like_p (uiout))
+	ui_out_field_string
+	  (uiout, "reason",
+	   async_reason_lookup (EXEC_ASYNC_WATCHPOINT_TRIGGER));
+      break;
+
+    case bp_read_watchpoint:
+      if (ui_out_is_mi_like_p (uiout))
+	ui_out_field_string
+	  (uiout, "reason",
+	   async_reason_lookup (EXEC_ASYNC_READ_WATCHPOINT_TRIGGER));
+      break;
+
+    case bp_access_watchpoint:
+      if (ui_out_is_mi_like_p (uiout))
+	ui_out_field_string
+	  (uiout, "reason",
+	   async_reason_lookup (EXEC_ASYNC_ACCESS_WATCHPOINT_TRIGGER));
+      break;
+    default:
+      internal_error (__FILE__, __LINE__,
+		      _("Invalid hardware watchpoint type."));
+    }
+
+  mention (b);
+  ui_out_text (uiout, _("\n\
+Check the underlying instruction at PC for the memory\n\
+address and value which triggered this watchpoint.\n"));
+  ui_out_text (uiout, "\n");
+
+  /* More than one watchpoint may have been triggered.  */
+  return PRINT_UNKNOWN;
+}
+
+/* Implement the "print_one_detail" breakpoint_ops method for
+   masked hardware watchpoints.  */
+
+static void
+print_one_detail_masked_watchpoint (const struct breakpoint *b,
+				    struct ui_out *uiout)
+{
+  /* Masked watchpoints have only one location.  */
+  gdb_assert (b->loc && b->loc->next == NULL);
+
+  ui_out_text (uiout, "\tmask ");
+  ui_out_field_core_addr (uiout, "mask", b->loc->gdbarch, b->hw_wp_mask);
+  ui_out_text (uiout, "\n");
+}
+
+/* Implement the "print_mention" breakpoint_ops method for
+   masked hardware watchpoints.  */
+
+static void
+print_mention_masked_watchpoint (struct breakpoint *b)
+{
+  struct cleanup *ui_out_chain;
+
+  switch (b->type)
+    {
+    case bp_hardware_watchpoint:
+      ui_out_text (uiout, "Masked hardware watchpoint ");
+      ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "wpt");
+      break;
+    case bp_read_watchpoint:
+      ui_out_text (uiout, "Masked hardware read watchpoint ");
+      ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "hw-rwpt");
+      break;
+    case bp_access_watchpoint:
+      ui_out_text (uiout, "Masked hardware access (read/write) watchpoint ");
+      ui_out_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "hw-awpt");
+      break;
+    default:
+      internal_error (__FILE__, __LINE__,
+		      _("Invalid hardware watchpoint type."));
+    }
+
+  ui_out_field_int (uiout, "number", b->number);
+  ui_out_text (uiout, ": ");
+  ui_out_field_string (uiout, "exp", b->exp_string);
+  do_cleanups (ui_out_chain);
+}
+
+/* Implement the "print_recreate" breakpoint_ops method for
+   masked hardware watchpoints.  */
+
+static void
+print_recreate_masked_watchpoint (struct breakpoint *b, struct ui_file *fp)
+{
+  char tmp[40];
+
+  switch (b->type)
+    {
+    case bp_hardware_watchpoint:
+      fprintf_unfiltered (fp, "watch");
+      break;
+    case bp_read_watchpoint:
+      fprintf_unfiltered (fp, "rwatch");
+      break;
+    case bp_access_watchpoint:
+      fprintf_unfiltered (fp, "awatch");
+      break;
+    default:
+      internal_error (__FILE__, __LINE__,
+		      _("Invalid hardware watchpoint type."));
+    }
+
+  sprintf_vma (tmp, b->hw_wp_mask);
+  fprintf_unfiltered (fp, " %s mask 0x%s", b->exp_string, tmp);
+}
+
+/* The breakpoint_ops structure to be used in masked hardware watchpoints.  */
+
+static struct breakpoint_ops masked_watchpoint_breakpoint_ops =
+{
+  insert_masked_watchpoint,
+  remove_masked_watchpoint,
+  NULL, /* breakpoint_hit */
+  resources_needed_masked_watchpoint,
+  works_in_software_mode_masked_watchpoint,
+  print_it_masked_watchpoint,
+  NULL, /* print_one */
+  print_one_detail_masked_watchpoint,
+  print_mention_masked_watchpoint,
+  print_recreate_masked_watchpoint
+};
+
+/* Tell whether the given watchpoint is a masked hardware watchpoint.  */
+
+static int
+is_masked_watchpoint (const struct breakpoint *b)
+{
+  return b->ops == &masked_watchpoint_breakpoint_ops;
+}
 
 /* accessflag:  hw_write:  watch write, 
                 hw_read:   watch read, 
@@ -8783,6 +9027,7 @@ static void
 watch_command_1 (char *arg, int accessflag, int from_tty,
 		 int just_location, int internal)
 {
+  volatile struct gdb_exception e;
   struct breakpoint *b, *scope_breakpoint = NULL;
   struct expression *exp;
   struct block *exp_valid_block = NULL, *cond_exp_valid_block = NULL;
@@ -8790,75 +9035,97 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   struct frame_info *frame;
   char *exp_start = NULL;
   char *exp_end = NULL;
-  char *tok, *id_tok_start, *end_tok;
-  int toklen;
+  char *tok, *end_tok;
+  int toklen = -1;
   char *cond_start = NULL;
   char *cond_end = NULL;
-  int i, other_type_used, target_resources_ok = 0;
   enum bptype bp_type;
-  int reg_cnt = 0;
   int thread = -1;
   int pc = 0;
+  /* Flag to indicate whether we are going to use masks for
+     the hardware watchpoint.  */
+  int use_mask = 0;
+  CORE_ADDR mask = 0;
 
   /* Make sure that we actually have parameters to parse.  */
   if (arg != NULL && arg[0] != '\0')
     {
-      toklen = strlen (arg); /* Size of argument list.  */
+      char *value_start;
 
-      /* Points tok to the end of the argument list.  */
-      tok = arg + toklen - 1;
+      /* Look for "parameter value" pairs at the end
+	 of the arguments string.  */
+      for (tok = arg + strlen (arg) - 1; tok > arg; tok--)
+	{
+	  /* Skip whitespace at the end of the argument list.  */
+	  while (tok > arg && (*tok == ' ' || *tok == '\t'))
+	    tok--;
 
-      /* Go backwards in the parameters list.  Skip the last
-         parameter.  If we're expecting a 'thread <thread_num>'
-         parameter, this should be the thread identifier.  */
-      while (tok > arg && (*tok == ' ' || *tok == '\t'))
-        tok--;
-      while (tok > arg && (*tok != ' ' && *tok != '\t'))
-        tok--;
+	  /* Find the beginning of the last token.
+	     This is the value of the parameter.  */
+	  while (tok > arg && (*tok != ' ' && *tok != '\t'))
+	    tok--;
+	  value_start = tok + 1;
 
-      /* Points end_tok to the beginning of the last token.  */
-      id_tok_start = tok + 1;
+	  /* Skip whitespace.  */
+	  while (tok > arg && (*tok == ' ' || *tok == '\t'))
+	    tok--;
 
-      /* Go backwards in the parameters list.  Skip one more
-         parameter.  If we're expecting a 'thread <thread_num>'
-         parameter, we should reach a "thread" token.  */
-      while (tok > arg && (*tok == ' ' || *tok == '\t'))
-        tok--;
+	  end_tok = tok;
 
-      end_tok = tok;
+	  /* Find the beginning of the second to last token.
+	     This is the parameter itself.  */
+	  while (tok > arg && (*tok != ' ' && *tok != '\t'))
+	    tok--;
+	  tok++;
+	  toklen = end_tok - tok + 1;
 
-      while (tok > arg && (*tok != ' ' && *tok != '\t'))
-        tok--;
+	  if (toklen == 6 && !strncmp (tok, "thread", 6))
+	    {
+	      /* At this point we've found a "thread" token, which means
+		 the user is trying to set a watchpoint that triggers
+		 only in a specific thread.  */
+	      char *endp;
 
-      /* Move the pointer forward to skip the whitespace and
-         calculate the length of the token.  */
-      tok++;
-      toklen = end_tok - tok;
+	      if (thread != -1)
+		error(_("You can specify only one thread."));
 
-      if (toklen >= 1 && strncmp (tok, "thread", toklen) == 0)
-        {
-          /* At this point we've found a "thread" token, which means
-             the user is trying to set a watchpoint that triggers
-             only in a specific thread.  */
-          char *endp;
+	      /* Extract the thread ID from the next token.  */
+	      thread = strtol (value_start, &endp, 0);
 
-          /* Extract the thread ID from the next token.  */
-          thread = strtol (id_tok_start, &endp, 0);
+	      /* Check if the user provided a valid numeric value for the
+		 thread ID.  */
+	      if (*endp != ' ' && *endp != '\t' && *endp != '\0')
+		error (_("Invalid thread ID specification %s."), value_start);
 
-          /* Check if the user provided a valid numeric value for the
-             thread ID.  */
-          if (*endp != ' ' && *endp != '\t' && *endp != '\0')
-            error (_("Invalid thread ID specification %s."), id_tok_start);
+	      /* Check if the thread actually exists.  */
+	      if (!valid_thread_id (thread))
+		error (_("Unknown thread %d."), thread);
+	    }
+	  else if (toklen == 4 && !strncmp (tok, "mask", 4))
+	    {
+	      /* We've found a "mask" token, which means the user wants to
+		 create a hardware watchpoint that is going to have the mask
+		 facility.  */
+	      struct value *mask_value, *mark;
 
-          /* Check if the thread actually exists.  */
-          if (!valid_thread_id (thread))
-            error (_("Unknown thread %d."), thread);
+	      if (use_mask)
+		error(_("You can specify only one mask."));
 
-          /* Truncate the string and get rid of the thread <thread_num>
-             parameter before the parameter list is parsed by the
-             evaluate_expression() function.  */
-          *tok = '\0';
-        }
+	      use_mask = just_location = 1;
+
+	      mark = value_mark ();
+	      mask_value = parse_to_comma_and_eval (&value_start);
+	      mask = value_as_address (mask_value);
+	      value_free_to_mark (mark);
+	    }
+	  else
+	    /* We didn't recognize what we found.  We should stop here.  */
+	    break;
+
+	  /* Truncate the string and get rid of the "parameter value" pair before
+	     the arguments string is parsed by the parse_exp_1 function.  */
+	  *tok = '\0';
+	}
     }
 
   /* Parse the rest of the arguments.  */
@@ -8889,10 +9156,22 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
 
   if (just_location)
     {
+      int ret;
+
       exp_valid_block = NULL;
       val = value_addr (result);
       release_value (val);
       value_free_to_mark (mark);
+
+      if (use_mask)
+	{
+	  ret = target_masked_watch_num_registers (value_as_address (val),
+						   mask);
+	  if (ret == -1)
+	    error (_("This target does not support masked watchpoints."));
+	  else if (ret == -2)
+	    error (_("Invalid mask or memory region."));
+	}
     }
   else if (val != NULL)
     release_value (val);
@@ -8925,28 +9204,6 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
     bp_type = bp_access_watchpoint;
   else
     bp_type = bp_hardware_watchpoint;
-
-  reg_cnt = can_use_hardware_watchpoint (val, target_exact_watchpoints);
-  if (reg_cnt == 0 && bp_type != bp_hardware_watchpoint)
-    error (_("Expression cannot be implemented with read/access watchpoint."));
-  if (reg_cnt != 0)
-    {
-      i = hw_watchpoint_used_count (bp_type, &other_type_used);
-      target_resources_ok = 
-	target_can_use_hardware_watchpoint (bp_type, i + reg_cnt,
-					    other_type_used);
-      if (target_resources_ok == 0 && bp_type != bp_hardware_watchpoint)
-	error (_("Target does not support this type of hardware watchpoint."));
-
-      if (target_resources_ok < 0 && bp_type != bp_hardware_watchpoint)
-	error (_("Target can only support one kind "
-		 "of HW watchpoint at a time."));
-    }
-
-  /* Change the type of breakpoint to an ordinary watchpoint if a
-     hardware watchpoint could not be set.  */
-  if (!reg_cnt || target_resources_ok <= 0)
-    bp_type = bp_watchpoint;
 
   frame = block_innermost_frame (exp_valid_block);
 
@@ -8985,7 +9242,6 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
 
   /* Now set up the breakpoint.  */
   b = set_raw_breakpoint_without_location (NULL, bp_type);
-  set_breakpoint_number (internal, b);
   b->thread = thread;
   b->disposition = disp_donttouch;
   b->exp = exp;
@@ -9012,13 +9268,18 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
     }
   else
     b->exp_string = savestring (exp_start, exp_end - exp_start);
-  b->val = val;
-  b->val_valid = 1;
-  b->ops = &watchpoint_breakpoint_ops;
 
-  /* Use an exact watchpoint when there's only one memory region to be
-     watched, and only one debug register is needed to watch it.  */
-  b->exact = target_exact_watchpoints && reg_cnt == 1;
+  if (use_mask)
+    {
+      b->hw_wp_mask = mask;
+      b->ops = &masked_watchpoint_breakpoint_ops;
+    }
+  else
+    {
+      b->val = val;
+      b->val_valid = 1;
+      b->ops = &watchpoint_breakpoint_ops;
+    }
 
   if (cond_start)
     b->cond_string = savestring (cond_start, cond_end - cond_start);
@@ -9047,12 +9308,22 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   if (!just_location)
     value_free_to_mark (mark);
 
-  /* Finally update the new watchpoint.  This creates the locations
-     that should be inserted.  */
-  update_watchpoint (b, 1);
+  TRY_CATCH (e, RETURN_MASK_ALL)
+    {
+      /* Finally update the new watchpoint.  This creates the locations
+	 that should be inserted.  */
+      update_watchpoint (b, 1);
+    }
+  if (e.reason < 0)
+    {
+      delete_breakpoint (b);
+      throw_exception (e);
+    }
+
+  set_breakpoint_number (internal, b);
 
   /* Do not mention breakpoints with a negative number, but do
-       notify observers.  */
+     notify observers.  */
   if (!internal)
     mention (b);
   observer_notify_breakpoint_created (b);
@@ -9061,14 +9332,10 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
 }
 
 /* Return count of debug registers needed to watch the given expression.
-   If EXACT_WATCHPOINTS is 1, then consider that only the address of
-   the start of the watched region will be monitored (i.e., all accesses
-   will be aligned).  This uses less debug registers on some targets.
-
    If the watchpoint cannot be handled in hardware return zero.  */
 
 static int
-can_use_hardware_watchpoint (struct value *v, int exact_watchpoints)
+can_use_hardware_watchpoint (struct value *v)
 {
   int found_memory_cnt = 0;
   struct value *head = v;
@@ -9124,7 +9391,7 @@ can_use_hardware_watchpoint (struct value *v, int exact_watchpoints)
 		  int len;
 		  int num_regs;
 
-		  len = (exact_watchpoints
+		  len = (target_exact_watchpoints
 			 && is_scalar_type_recursive (vtype))?
 		    1 : TYPE_LENGTH (value_type (v));
 
@@ -9549,6 +9816,7 @@ static struct breakpoint_ops gnu_v3_exception_catchpoint_ops = {
   NULL, /* remove */
   NULL, /* breakpoint_hit */
   NULL, /* resources_needed */
+  NULL, /* works_in_software_mode */
   print_it_exception_catchpoint,
   print_one_exception_catchpoint,
   NULL, /* print_one_detail */
@@ -10483,7 +10751,12 @@ delete_breakpoint (struct breakpoint *bpt)
       bpt->related_breakpoint = bpt;
     }
 
-  observer_notify_breakpoint_deleted (bpt);
+  /* watch_command_1 creates a watchpoint but only sets its number if
+     update_watchpoint succeeds in creating its bp_locations.  If there's
+     a problem in that process, we'll be asked to delete the half-created
+     watchpoint.  In that case, don't announce the deletion.  */
+  if (bpt->number)
+    observer_notify_breakpoint_deleted (bpt);
 
   if (breakpoint_chain == bpt)
     breakpoint_chain = bpt->next;

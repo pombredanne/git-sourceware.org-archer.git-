@@ -2441,12 +2441,13 @@ skip_prologue_sal (struct symtab_and_line *sal)
   struct symbol *sym;
   struct symtab_and_line start_sal;
   struct cleanup *old_chain;
-  CORE_ADDR pc;
+  CORE_ADDR pc, saved_pc;
   struct obj_section *section;
   const char *name;
   struct objfile *objfile;
   struct gdbarch *gdbarch;
   struct block *b, *function_block;
+  int force_skip, skip;
 
   /* Do not change the SAL is PC was specified explicitly.  */
   if (sal->explicit_pc)
@@ -2484,46 +2485,69 @@ skip_prologue_sal (struct symtab_and_line *sal)
 
   gdbarch = get_objfile_arch (objfile);
 
-  /* If the function is in an unmapped overlay, use its unmapped LMA address,
-     so that gdbarch_skip_prologue has something unique to work on.  */
-  if (section_is_overlay (section) && !section_is_mapped (section))
-    pc = overlay_unmapped_address (pc, section);
+  /* Process the prologue in two passes.  In the first pass try to skip the
+     prologue (SKIP is true) and verify there is a real need for it (indicated
+     by FORCE_SKIP).  If no such reason was found run a second pass where the
+     prologue is not skipped (SKIP is false).  */
 
-  /* Skip "first line" of function (which is actually its prologue).  */
-  pc += gdbarch_deprecated_function_start_offset (gdbarch);
-  pc = gdbarch_skip_prologue (gdbarch, pc);
+  skip = 1;
+  force_skip = 1;
 
-  /* For overlays, map pc back into its mapped VMA range.  */
-  pc = overlay_mapped_address (pc, section);
+  /* Be conservative - allow direct PC (without skipping prologue) only if we
+     have proven the CU (Compilation Unit) supports it.  sal->SYMTAB does not
+     have to be set by the caller so we use SYM instead.  */
+  if (sym && SYMBOL_SYMTAB (sym)->locations_valid)
+    force_skip = 0;
 
-  /* Calculate line number.  */
-  start_sal = find_pc_sect_line (pc, section, 0);
-
-  /* Check if gdbarch_skip_prologue left us in mid-line, and the next
-     line is still part of the same function.  */
-  if (start_sal.pc != pc
-      && (sym? (BLOCK_START (SYMBOL_BLOCK_VALUE (sym)) <= start_sal.end
-	        && start_sal.end < BLOCK_END (SYMBOL_BLOCK_VALUE (sym)))
-          : (lookup_minimal_symbol_by_pc_section (start_sal.end, section)
-             == lookup_minimal_symbol_by_pc_section (pc, section))))
+  saved_pc = pc;
+  do
     {
-      /* First pc of next line */
-      pc = start_sal.end;
-      /* Recalculate the line number (might not be N+1).  */
-      start_sal = find_pc_sect_line (pc, section, 0);
-    }
+      pc = saved_pc;
 
-  /* On targets with executable formats that don't have a concept of
-     constructors (ELF with .init has, PE doesn't), gcc emits a call
-     to `__main' in `main' between the prologue and before user
-     code.  */
-  if (gdbarch_skip_main_prologue_p (gdbarch)
-      && name && strcmp (name, "main") == 0)
-    {
-      pc = gdbarch_skip_main_prologue (gdbarch, pc);
-      /* Recalculate the line number (might not be N+1).  */
+      /* If the function is in an unmapped overlay, use its unmapped LMA address,
+	 so that gdbarch_skip_prologue has something unique to work on.  */
+      if (section_is_overlay (section) && !section_is_mapped (section))
+	pc = overlay_unmapped_address (pc, section);
+
+      /* Skip "first line" of function (which is actually its prologue).  */
+      pc += gdbarch_deprecated_function_start_offset (gdbarch);
+      if (skip)
+	pc = gdbarch_skip_prologue (gdbarch, pc);
+
+      /* For overlays, map pc back into its mapped VMA range.  */
+      pc = overlay_mapped_address (pc, section);
+
+      /* Calculate line number.  */
       start_sal = find_pc_sect_line (pc, section, 0);
+
+      /* Check if gdbarch_skip_prologue left us in mid-line, and the next
+	 line is still part of the same function.  */
+      if (skip && start_sal.pc != pc
+	  && (sym? (BLOCK_START (SYMBOL_BLOCK_VALUE (sym)) <= start_sal.end
+		    && start_sal.end < BLOCK_END (SYMBOL_BLOCK_VALUE (sym)))
+	      : (lookup_minimal_symbol_by_pc_section (start_sal.end, section)
+		 == lookup_minimal_symbol_by_pc_section (pc, section))))
+	{
+	  /* First pc of next line */
+	  pc = start_sal.end;
+	  /* Recalculate the line number (might not be N+1).  */
+	  start_sal = find_pc_sect_line (pc, section, 0);
+	}
+
+      /* On targets with executable formats that don't have a concept of
+	 constructors (ELF with .init has, PE doesn't), gcc emits a call
+	 to `__main' in `main' between the prologue and before user
+	 code.  */
+      if (gdbarch_skip_main_prologue_p (gdbarch)
+	  && name && strcmp (name, "main") == 0)
+	{
+	  pc = gdbarch_skip_main_prologue (gdbarch, pc);
+	  /* Recalculate the line number (might not be N+1).  */
+	  start_sal = find_pc_sect_line (pc, section, 0);
+	  force_skip = 1;
+	}
     }
+  while (!force_skip && skip--);
 
   /* If we still don't have a valid source line, try to find the first
      PC in the lineinfo table that belongs to the same function.  This
@@ -2533,7 +2557,7 @@ skip_prologue_sal (struct symtab_and_line *sal)
      the case with the DJGPP target using "gcc -gcoff" when the
      compiler inserted code after the prologue to make sure the stack
      is aligned.  */
-  if (sym && start_sal.symtab == NULL)
+  if (!force_skip && sym && start_sal.symtab == NULL)
     {
       pc = skip_prologue_using_lineinfo (pc, SYMBOL_SYMTAB (sym));
       /* Recalculate the line number.  */
@@ -3489,6 +3513,40 @@ rbreak_command (char *regexp, int from_tty)
 }
 
 
+/* Evaluate if NAME matches SYM_TEXT and SYM_TEXT_LEN.
+
+   Either sym_text[sym_text_len] != '(' and then we search for any
+   symbol starting with SYM_TEXT text.
+
+   Otherwise sym_text[sym_text_len] == '(' and then we require symbol name to
+   be terminated at that point.  Partial symbol tables do not have parameters
+   information.  */
+
+static int
+compare_symbol_name (const char *name, const char *sym_text, int sym_text_len)
+{
+  int (*ncmp) (const char *, const char *, size_t);
+
+  ncmp = (case_sensitivity == case_sensitive_on ? strncmp : strncasecmp);
+
+  if (ncmp (name, sym_text, sym_text_len) != 0)
+    return 0;
+
+  if (sym_text[sym_text_len] == '(')
+    {
+      /* User searches for `name(someth...'.  Require NAME to be terminated.
+	 Normally psymtabs and gdbindex have no parameter types so '\0' will be
+	 present but accept even parameters presence.  In this case this
+	 function is in fact strcmp_iw but whitespace skipping is not supported
+	 for tab completion.  */
+
+      if (name[sym_text_len] != '\0' && name[sym_text_len] != '(')
+	return 0;
+    }
+
+  return 1;
+}
+
 /* Helper routine for make_symbol_completion_list.  */
 
 static int return_val_size;
@@ -3508,16 +3566,10 @@ completion_list_add_name (char *symname, char *sym_text, int sym_text_len,
 			  char *text, char *word)
 {
   int newsize;
-  int (*ncmp) (const char *, const char *, size_t);
-
-  ncmp = (case_sensitivity == case_sensitive_on ? strncmp : strncasecmp);
 
   /* Clip symbols that cannot match.  */
-
-  if (ncmp (symname, sym_text, sym_text_len) != 0)
-    {
-      return;
-    }
+  if (!compare_symbol_name (symname, sym_text, sym_text_len))
+    return;
 
   /* We have a match for a completion, so add SYMNAME to the current list
      of matches.  Note that the name is moved to freshly malloc'd space.  */
@@ -3707,11 +3759,8 @@ static int
 expand_partial_symbol_name (const char *name, void *user_data)
 {
   struct add_name_data *datum = (struct add_name_data *) user_data;
-  int (*ncmp) (const char *, const char *, size_t);
 
-  ncmp = (case_sensitivity == case_sensitive_on ? strncmp : strncasecmp);
-
-  return ncmp (name, datum->sym_text, datum->sym_text_len) == 0;
+  return compare_symbol_name (name, datum->sym_text, datum->sym_text_len);
 }
 
 char **
@@ -3789,6 +3838,22 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
   }
 
   sym_text_len = strlen (sym_text);
+
+  /* Prepare SYM_TEXT_LEN for compare_symbol_name.  */
+
+  if (current_language->la_language == language_cplus
+      || current_language->la_language == language_java
+      || current_language->la_language == language_fortran)
+    {
+      /* These languages may have parameters entered by user but they are never
+	 present in the partial symbol tables.  */
+
+      const char *cs = memchr (sym_text, '(', sym_text_len);
+
+      if (cs)
+	sym_text_len = cs - sym_text;
+    }
+  gdb_assert (sym_text[sym_text_len] == '\0' || sym_text[sym_text_len] == '(');
 
   return_val_size = 100;
   return_val_index = 0;

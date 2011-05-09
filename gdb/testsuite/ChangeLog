@@ -1,3 +1,51 @@
+2011-05-06  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.cell/bt.exp: Delete breakpoints before running to signal
+	to avoid race condition.
+	* gdb.cell/coremaker.c: Use small stack size.
+	* gdb.cell/ea-standalone.exp: Use file name without path as
+	argument to c_to.
+	* gdb.cell/fork.exp: Allow other output when continuing to end.
+
+2011-05-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/corethreads.c: New file.
+	* gdb.threads/corethreads.exp: New file.
+
+2011-05-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/gcore-thread.exp (objfile, opts): New variables.
+	Try to compile the test using -Wl,-z,norelro first.
+	(load_core): New variable libthread_db_seen, initialize it.
+	(zeroed-threads cannot be listed): Protect it by XFAIL on
+	!$libthread_db_seen.
+
+2011-05-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 12573
+	* gdb.dwarf2/dw2-skip-prologue.S: New file.
+	* gdb.dwarf2/dw2-skip-prologue.c: New file.
+	* gdb.dwarf2/dw2-skip-prologue.exp: New file.
+
+2011-05-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/psymtab-parameter.cc: New file.
+	* gdb.cp/psymtab-parameter.exp: New file.
+
+2011-05-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix a race.
+	* gdb.cp/static-print-quit.exp (print c): Split to ...
+	(print c - <return>, print c - q <return>, print c - to quit):
+	... these.  Make the testfile untested on gdb-7.1.
+
+2011-5-05  Janis Johnson  <janisjo@codesourcery.com>
+
+	* lib/gdb.exp (exec_target_file, exec_symbol_file,
+	gdb_rename_execfile, gdb_touch_execfile): New.
+	* gdb.base/reread.exp: Use new procs to handle multiple
+	exec files.
+
 2011-05-05  Yao Qi  <yao@codesourcery.com>
 
 	* gdb.arch/arm-disp-step.S(test_ldr_literal): New.
