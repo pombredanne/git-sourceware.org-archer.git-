@@ -1,3 +1,35 @@
+2011-05-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Make addrs->SECTINDEX always defined.
+	* symfile.c (relative_addr_info_to_section_offsets): Check for
+	SECTINDEX -1, not for zero ADDR.
+	(addrs_section_compar): Remove checking for invalid SECTINDEX.
+	(addr_info_make_relative): Set SECTINDEX to -1 for unmatched entries.
+	* symfile.h (struct section_addr_info) <sectindex>: Update the comment
+	on its validity.
+
+2011-05-10  Doug Evans  <dje@google.com>
+
+	* linux-thread-db.c: Whitespace cleanup.
+	(try_thread_db_load_1): Fix comment.
+
+	* linux-thread-db.c (set_libthread_db_search_path): New function.
+	(_initialize_thread_db): Add setter for libthread-db-search-path.
+
+2011-05-09  Doug Evans  <dje@google.com>
+
+	* NEWS: Mention --with-iconv-bin.
+	* configure.ac: New option --with-iconv-bin.
+	* configure: Regenerate.
+	* config.in: Regenerate.
+	* defs.h (relocate_gdb_directory): Declare.
+	* main.c (relocate_gdb_directory): Renamed from relocate_directory,
+	removed progname parameter, and exported.  All callers updated.
+	* charset.c (find_charset_names): Use --with-iconv-bin if specified.
+
+	* linux-nat.c (lin_lwp_attach_lwp): For !WIPSTOPPED case,
+	adding missing call to restore_child_signals_mask.
+
 2011-05-09  Pedro Alves  <pedro@codesourcery.com>
 
 	* inferior.h (wait_for_inferior): Remove `thread_exec_as_sigtrap'
