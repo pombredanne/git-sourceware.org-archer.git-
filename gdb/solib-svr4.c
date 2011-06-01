@@ -2433,6 +2433,29 @@ elf_lookup_lib_symbol (const struct objfile *objfile,
   return lookup_global_symbol_from_objfile (objfile, name, domain);
 }
 
+/* Given PC, try to match a so_list which contains it.
+   See match_pc_solist in solist.h.  */
+
+static struct so_list *
+svr4_match_pc_solist (CORE_ADDR pc, struct so_list *so)
+{
+  struct so_list *iter, *res = NULL;
+  CORE_ADDR cur = CORE_ADDR_MAX;
+
+  for (iter = so; iter; iter = iter->next)
+    {
+      CORE_ADDR addr = lm_dynamic_from_link_map (iter);
+
+      if (addr >= pc && addr < cur)
+	{
+	  cur = addr;
+	  res = iter;
+	}
+    }
+
+  return res;
+}
+
 extern initialize_file_ftype _initialize_svr4_solib; /* -Wmissing-prototypes */
 
 void
@@ -2454,4 +2477,5 @@ _initialize_svr4_solib (void)
   svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
   svr4_so_ops.same = svr4_same;
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
+  svr4_so_ops.match_pc_solist = svr4_match_pc_solist;
 }

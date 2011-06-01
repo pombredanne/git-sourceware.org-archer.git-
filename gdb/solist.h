@@ -110,6 +110,10 @@ struct target_so_ops
        the run time loader.  */
     int (*in_dynsym_resolve_code) (CORE_ADDR pc);
 
+    /* Given PC and the current shared objects' list SO, iterate over SO
+       and return the so_list which contains PC, or NULL otherwise.  */
+    struct so_list *(*match_pc_solist) (CORE_ADDR pc, struct so_list *so);
+
     /* Find and open shared library binary file.  */
     bfd *(*bfd_open) (char *pathname);
 
@@ -153,6 +157,10 @@ extern bfd *solib_bfd_fopen (char *pathname, int fd);
 
 /* Find solib binary file and open it.  */
 extern bfd *solib_bfd_open (char *in_pathname);
+
+/* Iterate over current shared objects' list, and return the so_list
+   which contains PC, or NULL otherwise.  */
+extern struct so_list *solib_match_pc_solist (CORE_ADDR pc);
 
 /* FIXME: gdbarch needs to control this variable.  */
 extern struct target_so_ops *current_target_so_ops;
