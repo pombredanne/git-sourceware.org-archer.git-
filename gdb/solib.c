@@ -965,8 +965,8 @@ solib_add (char *pattern, int from_tty,
     if (from_tty && pattern && ! any_matches)
       printf_unfiltered
 	("No loaded shared libraries match the pattern `%s'.\n", pattern);
-
-    if (loaded_any_symbols)
+#if 0
+    if (0 && loaded_any_symbols)
       {
 	struct target_so_ops *ops = solib_ops (target_gdbarch);
 
@@ -976,6 +976,7 @@ solib_add (char *pattern, int from_tty,
 
 	ops->special_symbol_handling ();
       }
+#endif
   }
 }
 
@@ -1262,6 +1263,28 @@ in_solib_dynsym_resolve_code (CORE_ADDR pc)
   struct target_so_ops *ops = solib_ops (target_gdbarch);
 
   return ops->in_dynsym_resolve_code (pc);
+}
+
+/* GLOBAL FUNCTION
+
+   solib_match_pc_solist -- check to see to which so_list PC belongs.
+
+   SYNOPSIS
+
+   struct so_list *solib_match_pc_solist (CORE_ADDR pc)
+
+   DESCRIPTION
+
+   Determine to which so_list the given PC belongs.  Returns the
+   so_list if found, NULL otherwise.
+*/
+
+struct so_list *
+solib_match_pc_solist (CORE_ADDR pc)
+{
+  struct target_so_ops *ops = solib_ops (target_gdbarch);
+
+  return ops->match_pc_solist (pc, so_list_head);
 }
 
 /*

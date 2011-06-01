@@ -167,15 +167,12 @@ show_symbol_reloading (struct ui_file *file, int from_tty,
 
 /* If non-zero, shared library symbols will be added automatically
    when the inferior is created, new libraries are loaded, or when
-   attaching to the inferior.  This is almost always what users will
-   want to have happen; but for very large programs, the startup time
-   will be excessive, and so if this is a problem, the user can clear
-   this flag and then add the shared library symbols as needed.  Note
-   that there is a potential for confusion, since if the shared
-   library symbols are not loaded, commands like "info fun" will *not*
-   report all the functions that are actually present.  */
+   attaching to the inferior.  Because of the on-demand loading
+   feature, we set this variable to zero always.  The user can override
+   this value if she wants, and GDB will automatically load shared
+   library symbols from the beginning.  */
 
-int auto_solib_add = 1;
+int auto_solib_add = 0;
 
 
 /* Make a null terminated copy of the string at PTR with SIZE characters in
