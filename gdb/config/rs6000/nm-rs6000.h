@@ -29,7 +29,7 @@
 /* When a target process or core-file has been attached, we sneak in
    and figure out where the shared libraries have got to.  */
 
-#define	SOLIB_ADD(a, b, c, d)	\
+#define	SOLIB_ADD(a, b, c, d, e)	\
   if (PIDGET (inferior_ptid))	\
     /* Attach to process.  */  \
     xcoff_relocate_symtab (PIDGET (inferior_ptid)); \

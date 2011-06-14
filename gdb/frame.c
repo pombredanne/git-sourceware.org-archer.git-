@@ -685,7 +685,8 @@ frame_unwind_pc_if_available (struct frame_info *this_frame, CORE_ADDR *pc)
 	  /* On-demand loading of shared libraries' debuginfo.  */
 	  solib = solib_match_pc_solist (pc);
 	  if (solib && !solib->symbols_loaded)
-	    solib_add (solib->so_name, 1, &current_target, 1);
+	    solib_add (solib->so_name, 1, &current_target, 1,
+		       /*lazy_read=*/1);
 	}
       else
 	internal_error (__FILE__, __LINE__, _("No unwind_pc method"));

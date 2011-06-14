@@ -894,7 +894,7 @@ libpthread_solib_p (struct so_list *so)
    SYNOPSIS
 
    void solib_add (char *pattern, int from_tty, struct target_ops
-   *TARGET, int readsyms)
+   *TARGET, int readsyms, int lazy_read)
 
    DESCRIPTION
 
@@ -905,11 +905,15 @@ libpthread_solib_p (struct so_list *so)
    If READSYMS is 0, defer reading symbolic information until later
    but still do any needed low level processing.
 
+   If LAZY_READ is 1, it means we are lazily reading debuginfo files
+   and should not reinit the frame cache.
+
    FROM_TTY and TARGET are as described for update_solib_list, above.  */
 
 void
 solib_add (char *pattern, int from_tty,
-	   struct target_ops *target, int readsyms)
+	   struct target_ops *target, int readsyms,
+	   int lazy_read)
 {
   struct so_list *gdb;
 
@@ -965,8 +969,8 @@ solib_add (char *pattern, int from_tty,
     if (from_tty && pattern && ! any_matches)
       printf_unfiltered
 	("No loaded shared libraries match the pattern `%s'.\n", pattern);
-#if 0
-    if (0 && loaded_any_symbols)
+
+    if (loaded_any_symbols && !lazy_read)
       {
 	struct target_so_ops *ops = solib_ops (target_gdbarch);
 
@@ -976,7 +980,6 @@ solib_add (char *pattern, int from_tty,
 
 	ops->special_symbol_handling ();
       }
-#endif
   }
 }
 
@@ -1305,7 +1308,7 @@ static void
 sharedlibrary_command (char *args, int from_tty)
 {
   dont_repeat ();
-  solib_add (args, from_tty, (struct target_ops *) 0, 1);
+  solib_add (args, from_tty, (struct target_ops *) 0, 1, /*lazy_read=*/0);
 }
 
 /* LOCAL FUNCTION
@@ -1438,7 +1441,7 @@ reload_shared_libraries (char *ignored, int from_tty,
      removed.  Call it only after the solib target has been initialized by
      solib_create_inferior_hook.  */
 
-  solib_add (NULL, 0, NULL, auto_solib_add);
+  solib_add (NULL, 0, NULL, auto_solib_add, /*lazy_read=*/0);
 
   breakpoint_re_set ();
 

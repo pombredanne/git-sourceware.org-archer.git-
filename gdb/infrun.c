@@ -3247,9 +3247,9 @@ handle_inferior_event (struct execution_control_state *ecs)
 	     require the table to contain all sections (including
 	     those found in shared libraries).  */
 #ifdef SOLIB_ADD
-	  SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
+	  SOLIB_ADD (NULL, 0, &current_target, auto_solib_add, /*lazy_read=*/0);
 #else
-	  solib_add (NULL, 0, &current_target, auto_solib_add);
+	  solib_add (NULL, 0, &current_target, auto_solib_add, /*lazy_read=*/0);
 #endif
 	  target_terminal_inferior ();
 
