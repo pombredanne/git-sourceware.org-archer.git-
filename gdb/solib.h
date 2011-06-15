@@ -26,6 +26,7 @@ struct so_list;
 struct target_ops;
 struct target_so_ops;
 struct program_space;
+enum solib_add_opt;
 
 /* Called when we free all symtabs, to free the shared library information
    as well.  */
@@ -34,7 +35,8 @@ extern void clear_solib (void);
 
 /* Called to add symbols from a shared library to gdb's symbol table.  */
 
-extern void solib_add (char *, int, struct target_ops *, int, int);
+extern void solib_add (char *, int, struct target_ops *,
+		       enum solib_add_opt, int);
 extern int solib_read_symbols (struct so_list *, int);
 
 /* Function to be called when the inferior starts up, to discover the

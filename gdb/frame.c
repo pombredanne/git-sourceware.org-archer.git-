@@ -682,11 +682,14 @@ frame_unwind_pc_if_available (struct frame_info *this_frame, CORE_ADDR *pc)
 				    hex_string (this_frame->prev_pc.value));
 	    }
 
-	  /* On-demand loading of shared libraries' debuginfo.  */
-	  solib = solib_match_pc_solist (pc);
-	  if (solib && !solib->symbols_loaded)
-	    solib_add (solib->so_name, 1, &current_target, 1,
-		       /*lazy_read=*/1);
+	  if (auto_solib_add == SOLIB_ADD_LAZY)
+	    {
+	      /* On-demand loading of shared libraries' debuginfo.  */
+	      solib = solib_match_pc_solist (pc);
+	      if (solib && !solib->symbols_loaded)
+		solib_add (solib->so_name, 1, &current_target, 1,
+			   /*lazy_read=*/1);
+	    }
 	}
       else
 	internal_error (__FILE__, __LINE__, _("No unwind_pc method"));

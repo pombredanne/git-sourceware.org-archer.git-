@@ -469,6 +469,18 @@ extern char *obconcat (struct obstack *obstackp, ...) ATTRIBUTE_SENTINEL;
 
 			/*   Variables   */
 
+enum solib_add_opt
+  {
+    /* Disable auto-loading of debuginfo from shared libraries.  */
+    SOLIB_ADD_OFF = 0,
+
+    /* Enable auto-loading of debuginfo from shared libraries.  */
+    SOLIB_ADD_ON,
+
+    /* Lazily (on-demand) read debuginfo from shared libraries.  */
+    SOLIB_ADD_LAZY,
+  };
+
 /* If non-zero, shared library symbols will be added automatically
    when the inferior is created, new libraries are loaded, or when
    attaching to the inferior.  This is almost always what users will
@@ -479,7 +491,8 @@ extern char *obconcat (struct obstack *obstackp, ...) ATTRIBUTE_SENTINEL;
    library symbols are not loaded, commands like "info fun" will *not*
    report all the functions that are actually present.  */
 
-extern int auto_solib_add;
+extern enum solib_add_opt auto_solib_add;
+//extern int auto_solib_add;
 
 /* From symfile.c */
 

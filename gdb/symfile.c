@@ -172,7 +172,7 @@ show_symbol_reloading (struct ui_file *file, int from_tty,
    this value if she wants, and GDB will automatically load shared
    library symbols from the beginning.  */
 
-int auto_solib_add = 0;
+enum solib_add_opt auto_solib_add = SOLIB_ADD_ON;
 
 
 /* Make a null terminated copy of the string at PTR with SIZE characters in
