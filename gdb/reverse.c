@@ -50,9 +50,6 @@ exec_reverse_once (char *cmd, char *args, int from_tty)
   enum exec_direction_kind dir = execution_direction;
   struct cleanup *old_chain;
 
-  if (dir == EXEC_ERROR)
-    error (_("Target %s does not support this command."), target_shortname);
-
   if (dir == EXEC_REVERSE)
     error (_("Already in reverse mode.  Use '%s' or 'set exec-dir forward'."),
 	   cmd);
@@ -187,7 +184,7 @@ delete_one_bookmark (int num)
   if (b == bookmark_chain)
     bookmark_chain = b->next;
 
-  /* Find bookmark preceeding "marked" one, so we can unlink.  */
+  /* Find bookmark preceding "marked" one, so we can unlink.  */
   if (b)
     {
       ALL_BOOKMARKS (b1)

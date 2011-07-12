@@ -1,3 +1,45 @@
+2011-07-11  Catherine Moore  <clm@codesourcery.com>
+
+	* bfdlink.h (flag_type): New enumeration.
+	(flag_info_list): New structure.
+	(flag_info): New structure.
+
+2011-07-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/12942
+	* bfdlink.h (bfd_link_info): Add loading_lto_outputs.
+
+2011-07-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* filenames.h (HAVE_CASE_INSENSITIVE_FILE_SYSTEM): Define
+	on Darwin, as well as on the systems that use a DOS-like
+	filesystem.
+
+2011-06-22  Jakub Jelinek  <jakub@redhat.com>
+
+	PR debug/47858
+	* dwarf2.h (enum dwarf_location_atom): Add DW_OP_GNU_parameter_ref.
+
+2011-06-22  Jakub Jelinek  <jakub@redhat.com>
+
+	* dwarf2.h (enum dwarf_location_atom): Add DW_OP_GNU_parameter_ref.
+
+2011-06-20  Jakub Jelinek  <jakub@redhat.com>
+
+	PR ld/12570
+	* bfdlink.h (struct bfd_link_info): Add no_ld_generated_unwind_info
+	option.
+
+2011-06-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* demangle.h (DMGL_RET_POSTFIX): Extend the comment.
+	(DMGL_RET_DROP): New.
+
+2011-06-13  Walter Lee  <walt@tilera.com>
+
+	* dis-asm.h (print_insn_tilegx): Declare.
+	(print_insn_tilepro): Likewise.
+
 2011-05-17  Alan Modra  <amodra@gmail.com>
 
 	PR ld/12760
@@ -87,19 +129,10 @@
 
 	* dwarf2.h: Update value for DW_AT_hi_user.
 
-2010-11-25  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
-
-	* opcode/s390.h (enum s390_opcode_cpu_val): Add S390_OPCODE_MAXCPU.
-
 2010-11-16  Ian Lance Taylor  <iant@google.com>
 
 	* simple-object.h (simple_object_attributes_merge): Declare,
 	replacing simple_object_attributes_compare.
-
-2010-11-16  Jie Zhang  <jie.zhang@analog.com>
-
-	* elf/bfin.h (EF_BFIN_CODE_IN_L1): Define.
-	(EF_BFIN_DATA_IN_L1): Define.
 
 2010-11-04  Ian Lance Taylor  <iant@google.com>
 

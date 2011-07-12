@@ -27,6 +27,8 @@
 
 #include "symtab.h"
 
+#include "vec.h"
+
 /* Opaque declarations.  */
 
 struct symbol;
@@ -35,6 +37,14 @@ struct block;
 struct objfile;
 struct type;
 struct demangle_component;
+
+/* A string representing the name of the anonymous namespace used in GDB.  */
+
+#define CP_ANONYMOUS_NAMESPACE_STR "(anonymous namespace)"
+
+/* The length of the string representing the anonymous namespace.  */
+
+#define CP_ANONYMOUS_NAMESPACE_LEN 21
 
 /* This struct is designed to store data from using directives.  It
    says that names from namespace IMPORT_SRC should be visible within
@@ -52,6 +62,7 @@ struct demangle_component;
    import_dest = local scope of the import statement even such as ""
    alias = NULL
    declaration = NULL
+   excludes = NULL
 
    C++:      using A::x;
    Fortran:  use A, only: x
@@ -59,7 +70,24 @@ struct demangle_component;
    import_dest = local scope of the import statement even such as ""
    alias = NULL
    declaration = "x"
+   excludes = NULL
    The declaration will get imported as import_dest::x.
+
+   C++ has no way to import all names except those listed ones.
+   Fortran:  use A, localname => x
+   import_src = "A"
+   import_dest = local scope of the import statement even such as ""
+   alias = "localname"
+   declaration = "x"
+   excludes = NULL
+   +
+   import_src = "A"
+   import_dest = local scope of the import statement even such as ""
+   alias = NULL
+   declaration = NULL
+   excludes = ["x"]
+   All the entries of A get imported except of "x".  "x" gets imported as
+   "localname".  "x" is not defined as a local name by this statement.
 
    C++:      namespace LOCALNS = A;
    Fortran has no way to address non-local namespace/module.
@@ -67,6 +95,7 @@ struct demangle_component;
    import_dest = local scope of the import statement even such as ""
    alias = "LOCALNS"
    declaration = NULL
+   excludes = NULL
    The namespace will get imported as the import_dest::LOCALNS
    namespace.
 
@@ -77,6 +106,7 @@ struct demangle_component;
    import_dest = local scope of the import statement even such as ""
    alias = "localname"
    declaration = "x"
+   excludes = NULL
    The declaration will get imported as localname or
    `import_dest`localname.  */
 
@@ -93,6 +123,10 @@ struct using_direct
   /* Used during import search to temporarily mark this node as
      searched.  */
   int searched;
+
+  /* USING_DIRECT has variable allocation size according to the number of
+     EXCLUDES entries, the last entry is NULL.  */
+  const char *excludes[1];
 };
 
 
@@ -128,10 +162,13 @@ extern int cp_validate_operator (const char *input);
 
 extern int cp_is_anonymous (const char *namespace);
 
+DEF_VEC_P (const_char_ptr);
+
 extern void cp_add_using_directive (const char *dest,
                                     const char *src,
                                     const char *alias,
 				    const char *declaration,
+				    VEC (const_char_ptr) *excludes,
                                     struct obstack *obstack);
 
 extern void cp_initialize_namespace (void);

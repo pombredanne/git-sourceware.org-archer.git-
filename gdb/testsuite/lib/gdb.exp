@@ -1486,6 +1486,47 @@ proc skip_shlib_tests {} {
     return 1
 }
 
+# Return 1 if _Complex types are supported, otherwise, return 0.
+
+proc support_complex_tests {} {
+    global support_complex_tests_saved
+
+    # Use the cached value, if it exists.
+    if [info exists support_complex_tests_saved] {
+        verbose "returning saved $support_complex_tests_saved" 2
+        return $support_complex_tests_saved
+    }
+
+    # Set up, compile, and execute a test program containing _Complex types.
+    # Include the current process ID in the file names to prevent conflicts
+    # with invocations for multiple testsuites.
+    set src complex[pid].c
+    set exe complex[pid].x
+
+    set f [open $src "w"]
+    puts $f "int main() {"
+    puts $f "_Complex float cf;"
+    puts $f "_Complex double cd;"
+    puts $f "_Complex long double cld;"
+    puts $f "  return 0; }"
+    close $f
+
+    verbose "compiling testfile $src" 2
+    set compile_flags {debug nowarnings quiet}
+    set lines [gdb_compile $src $exe executable $compile_flags]
+    file delete $src
+    file delete $exe
+
+    if ![string match "" $lines] then {
+        verbose "testfile compilation failed, returning 0" 2
+        set support_complex_tests_saved 0
+    } else {
+	set support_complex_tests_saved 1
+    }
+
+    return $support_complex_tests_saved
+}
+
 # Return 1 if target is ILP32.
 # This cannot be decided simply from looking at the target string,
 # as it might depend on externally passed compiler options like -m64.
@@ -1572,6 +1613,18 @@ proc is_x86_like_target {} {
 	return 0
     }
     return [is_ilp32_target]
+}
+
+# Return 1 if displaced stepping is supported on target, otherwise, return 0.
+proc support_displaced_stepping {} {
+
+    if { [istarget "x86_64-*-linux*"] || [istarget "i\[34567\]86-*-linux*"]
+	 || [istarget "arm*-*-linux*"] || [istarget "powerpc-*-linux*"]
+	 || [istarget "powerpc64-*-linux*"] || [istarget "s390*-*-*"] } {
+	return 1
+    }
+
+    return 0
 }
 
 # Run a test on the target to see if it supports vmx hardware.  Return 0 if so, 
@@ -2955,6 +3008,14 @@ proc setup_xfail_format { format } {
     return $ret;
 }
 
+# Like setup_kfail, but only call setup_kfail conditionally if
+# istarget[TARGET] returns true.
+proc setup_kfail_for_target { PR target } {
+    if { [istarget $target] } {
+	setup_kfail $PR $target
+    }
+}
+
 proc gdb_step_for_stub { } {
     global gdb_prompt;
 
@@ -3545,6 +3606,33 @@ proc get_sizeof { type default } {
     return [get_integer_valueof "sizeof (${type})" $default]
 }
 
+# Get the current value for remotetimeout and return it.
+proc get_remotetimeout { } {
+    global gdb_prompt
+    global decimal
+
+    gdb_test_multiple "show remotetimeout" "" {
+	-re "Timeout limit to wait for target to respond is ($decimal).*$gdb_prompt $" {
+	    return $expect_out(1,string);
+	}
+    }
+
+    # Pick the default that gdb uses
+    warning "Unable to read remotetimeout"
+    return 300
+}
+
+# Set the remotetimeout to the specified timeout.  Nothing is returned.
+proc set_remotetimeout { timeout } {
+    global gdb_prompt
+
+    gdb_test_multiple "set remotetimeout $timeout" "" {
+	-re "$gdb_prompt $" {
+	    verbose "Set remotetimeout to $timeout\n"
+	}
+    }
+}
+
 # Log gdb command line and script if requested.
 if {[info exists TRANSCRIPT]} {
   rename send_gdb real_send_gdb
@@ -3658,3 +3746,21 @@ proc core_find {binfile {deletefiles {}} {arg ""}} {
     }
     return $destcore
 }
+
+# gdb_target_symbol_prefix_flags returns a string that can be added
+# to gdb_compile options to define SYMBOL_PREFIX macro value
+# symbol_prefix_flags returns a string that can be added
+# for targets that use underscore as symbol prefix.
+# TODO: find out automatically if the target needs this.
+
+proc gdb_target_symbol_prefix_flags {} {
+    if { [istarget "*-*-cygwin*"] || [istarget "i?86-*-mingw*"]
+	 || [istarget "*-*-msdosdjgpp*"] || [istarget "*-*-go32*"] } {
+	return "additional_flags=-DSYMBOL_PREFIX=\"_\""
+    } else {
+	return ""
+    }
+}
+
+# Always load compatibility stuff.
+load_lib future.exp

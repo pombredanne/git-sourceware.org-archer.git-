@@ -229,6 +229,28 @@ get_unsigned_type (struct gdbarch *gdbarch, struct type *type)
     }
 }
 
+/* Return the signed form of TYPE.  TYPE is necessarily an integral
+   type.  */
+
+static struct type *
+get_signed_type (struct gdbarch *gdbarch, struct type *type)
+{
+  switch (TYPE_LENGTH (type))
+    {
+    case 1:
+      return builtin_type (gdbarch)->builtin_int8;
+    case 2:
+      return builtin_type (gdbarch)->builtin_int16;
+    case 4:
+      return builtin_type (gdbarch)->builtin_int32;
+    case 8:
+      return builtin_type (gdbarch)->builtin_int64;
+    default:
+      error (_("no signed variant found for type, while evaluating "
+	       "DWARF expression"));
+    }
+}
+
 /* Retrieve the N'th item on CTX's stack, converted to an address.  */
 
 CORE_ADDR
@@ -396,7 +418,7 @@ read_sleb128 (const gdb_byte *buf, const gdb_byte *buf_end, LONGEST * r)
 	break;
     }
   if (shift < (sizeof (*r) * 8) && (byte & 0x40) != 0)
-    result |= -(1 << shift);
+    result |= -(((LONGEST) 1) << shift);
 
   *r = result;
   return buf;
@@ -415,7 +437,7 @@ dwarf_expr_require_composition (const gdb_byte *op_ptr, const gdb_byte *op_end,
      checked at the other place that this function is called.  */
   if (op_ptr != op_end && *op_ptr != DW_OP_piece && *op_ptr != DW_OP_bit_piece)
     error (_("DWARF-2 expression error: `%s' operations must be "
-	     "used either alone or in conjuction with DW_OP_piece "
+	     "used either alone or in conjunction with DW_OP_piece "
 	     "or DW_OP_bit_piece."),
 	   op_name);
 }
@@ -498,6 +520,10 @@ execute_stack_op (struct dwarf_expr_context *ctx,
       ULONGEST uoffset, reg;
       LONGEST offset;
       struct value *result_val = NULL;
+
+      /* The DWARF expression might have a bug causing an infinite
+	 loop.  In that case, quitting is the only way out.  */
+      QUIT;
 
       switch (op)
 	{
@@ -640,7 +666,7 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	      && *op_ptr != DW_OP_bit_piece
 	      && *op_ptr != DW_OP_GNU_uninit)
 	    error (_("DWARF-2 expression error: DW_OP_reg operations must be "
-		     "used either alone or in conjuction with DW_OP_piece "
+		     "used either alone or in conjunction with DW_OP_piece "
 		     "or DW_OP_bit_piece."));
 
 	  result = op - DW_OP_reg0;
@@ -855,6 +881,19 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	      type = address_type;
 
 	    (ctx->read_mem) (ctx->baton, buf, addr, addr_size);
+
+	    /* If the size of the object read from memory is different
+	       from the type length, we need to zero-extend it.  */
+	    if (TYPE_LENGTH (type) != addr_size)
+	      {
+		ULONGEST result =
+		  extract_unsigned_integer (buf, addr_size, byte_order);
+
+		buf = alloca (TYPE_LENGTH (type));
+		store_unsigned_integer (buf, TYPE_LENGTH (type),
+					byte_order, result);
+	      }
+
 	    result_val = value_from_contents_and_address (type, buf, addr);
 	    break;
 	  }
@@ -996,7 +1035,19 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	      case DW_OP_shra:
 		dwarf_require_integral (value_type (first));
 		dwarf_require_integral (value_type (second));
+		if (TYPE_UNSIGNED (value_type (first)))
+		  {
+		    struct type *stype
+		      = get_signed_type (ctx->gdbarch, value_type (first));
+
+		    first = value_cast (stype, first);
+		  }
+
 		result_val = value_binop (first, second, BINOP_RSH);
+		/* Make sure we wind up with the same type we started
+		   with.  */
+		if (value_type (result_val) != value_type (second))
+		  result_val = value_cast (value_type (second), result_val);
 		break;
 	      case DW_OP_xor:
 		dwarf_require_integral (value_type (first));
@@ -1182,7 +1233,10 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 
 	    op_ptr = read_uleb128 (op_ptr, op_end, &type_die);
 
-	    type = dwarf_get_base_type (ctx, type_die, 0);
+	    if (type_die == 0)
+	      type = address_type;
+	    else
+	      type = dwarf_get_base_type (ctx, type_die, 0);
 
 	    result_val = dwarf_expr_fetch (ctx, 0);
 	    dwarf_expr_pop (ctx);

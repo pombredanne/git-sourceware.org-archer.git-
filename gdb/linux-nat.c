@@ -250,14 +250,10 @@ static int linux_supports_tracesysgood_flag = -1;
 
 static int linux_supports_tracevforkdone_flag = -1;
 
-/* Async mode support.  */
-
-/* Zero if the async mode, although enabled, is masked, which means
-   linux_nat_wait should behave as if async mode was off.  */
-static int linux_nat_async_mask_value = 1;
-
 /* Stores the current used ptrace() options.  */
 static int current_ptrace_options = 0;
+
+/* Async mode support.  */
 
 /* The read/write ends of the pipe registered as waitable file in the
    event loop.  */
@@ -306,7 +302,6 @@ static void linux_nat_async (void (*callback)
 			     (enum inferior_event_type event_type,
 			      void *context),
 			     void *context);
-static int linux_nat_async_mask (int mask);
 static int kill_lwp (int lwpid, int signo);
 
 static int stop_callback (struct lwp_info *lp, void *data);
@@ -2356,6 +2351,33 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 		  _("unknown ptrace event %d"), event);
 }
 
+/* Return non-zero if LWP is a zombie.  */
+
+static int
+linux_lwp_is_zombie (long lwp)
+{
+  char buffer[MAXPATHLEN];
+  FILE *procfile;
+  int retval = 0;
+
+  xsnprintf (buffer, sizeof (buffer), "/proc/%ld/status", lwp);
+  procfile = fopen (buffer, "r");
+  if (procfile == NULL)
+    {
+      warning (_("unable to open /proc file '%s'"), buffer);
+      return 0;
+    }
+  while (fgets (buffer, sizeof (buffer), procfile) != NULL)
+    if (strcmp (buffer, "State:\tZ (zombie)\n") == 0)
+      {
+	retval = 1;
+	break;
+      }
+  fclose (procfile);
+
+  return retval;
+}
+
 /* Wait for LP to stop.  Returns the wait status, or 0 if the LWP has
    exited.  */
 
@@ -2363,28 +2385,76 @@ static int
 wait_lwp (struct lwp_info *lp)
 {
   pid_t pid;
-  int status;
+  int status = 0;
   int thread_dead = 0;
+  sigset_t prev_mask;
 
   gdb_assert (!lp->stopped);
   gdb_assert (lp->status == 0);
 
-  pid = my_waitpid (GET_LWP (lp->ptid), &status, 0);
-  if (pid == -1 && errno == ECHILD)
+  /* Make sure SIGCHLD is blocked for sigsuspend avoiding a race below.  */
+  block_child_signals (&prev_mask);
+
+  for (;;)
     {
-      pid = my_waitpid (GET_LWP (lp->ptid), &status, __WCLONE);
+      /* If my_waitpid returns 0 it means the __WCLONE vs. non-__WCLONE kind
+	 was right and we should just call sigsuspend.  */
+
+      pid = my_waitpid (GET_LWP (lp->ptid), &status, WNOHANG);
       if (pid == -1 && errno == ECHILD)
+	pid = my_waitpid (GET_LWP (lp->ptid), &status, __WCLONE | WNOHANG);
+      if (pid != 0)
+	break;
+
+      /* Bugs 10970, 12702.
+	 Thread group leader may have exited in which case we'll lock up in
+	 waitpid if there are other threads, even if they are all zombies too.
+	 Basically, we're not supposed to use waitpid this way.
+	 __WCLONE is not applicable for the leader so we can't use that.
+	 LINUX_NAT_THREAD_ALIVE cannot be used here as it requires a STOPPED
+	 process; it gets ESRCH both for the zombie and for running processes.
+
+	 As a workaround, check if we're waiting for the thread group leader and
+	 if it's a zombie, and avoid calling waitpid if it is.
+
+	 This is racy, what if the tgl becomes a zombie right after we check?
+	 Therefore always use WNOHANG with sigsuspend - it is equivalent to
+	 waiting waitpid but the linux_lwp_is_zombie is safe this way.  */
+
+      if (GET_PID (lp->ptid) == GET_LWP (lp->ptid)
+	  && linux_lwp_is_zombie (GET_LWP (lp->ptid)))
 	{
-	  /* The thread has previously exited.  We need to delete it
-	     now because, for some vendor 2.4 kernels with NPTL
-	     support backported, there won't be an exit event unless
-	     it is the main thread.  2.6 kernels will report an exit
-	     event for each thread that exits, as expected.  */
 	  thread_dead = 1;
 	  if (debug_linux_nat)
-	    fprintf_unfiltered (gdb_stdlog, "WL: %s vanished.\n",
+	    fprintf_unfiltered (gdb_stdlog,
+				"WL: Thread group leader %s vanished.\n",
 				target_pid_to_str (lp->ptid));
+	  break;
 	}
+
+      /* Wait for next SIGCHLD and try again.  This may let SIGCHLD handlers
+	 get invoked despite our caller had them intentionally blocked by
+	 block_child_signals.  This is sensitive only to the loop of
+	 linux_nat_wait_1 and there if we get called my_waitpid gets called
+	 again before it gets to sigsuspend so we can safely let the handlers
+	 get executed here.  */
+
+      sigsuspend (&suspend_mask);
+    }
+
+  restore_child_signals_mask (&prev_mask);
+
+  if (pid == -1 && errno == ECHILD)
+    {
+      /* The thread has previously exited.  We need to delete it
+	 now because, for some vendor 2.4 kernels with NPTL
+	 support backported, there won't be an exit event unless
+	 it is the main thread.  2.6 kernels will report an exit
+	 event for each thread that exits, as expected.  */
+      thread_dead = 1;
+      if (debug_linux_nat)
+	fprintf_unfiltered (gdb_stdlog, "WL: %s vanished.\n",
+			    target_pid_to_str (lp->ptid));
     }
 
   if (!thread_dead)
@@ -5284,11 +5354,7 @@ linux_nat_is_async_p (void)
   /* NOTE: palves 2008-03-21: We're only async when the user requests
      it explicitly with the "set target-async" command.
      Someday, linux will always be async.  */
-  if (!target_async_permitted)
-    return 0;
-
-  /* See target.h/target_async_mask.  */
-  return linux_nat_async_mask_value;
+  return target_async_permitted;
 }
 
 /* target_can_async_p implementation.  */
@@ -5299,11 +5365,7 @@ linux_nat_can_async_p (void)
   /* NOTE: palves 2008-03-21: We're only async when the user requests
      it explicitly with the "set target-async" command.
      Someday, linux will always be async.  */
-  if (!target_async_permitted)
-    return 0;
-
-  /* See target.h/target_async_mask.  */
-  return linux_nat_async_mask_value;
+  return target_async_permitted;
 }
 
 static int
@@ -5321,37 +5383,6 @@ static int
 linux_nat_supports_multi_process (void)
 {
   return linux_multi_process;
-}
-
-/* target_async_mask implementation.  */
-
-static int
-linux_nat_async_mask (int new_mask)
-{
-  int curr_mask = linux_nat_async_mask_value;
-
-  if (curr_mask != new_mask)
-    {
-      if (new_mask == 0)
-	{
-	  linux_nat_async (NULL, 0);
-	  linux_nat_async_mask_value = new_mask;
-	}
-      else
-	{
-	  linux_nat_async_mask_value = new_mask;
-
-	  /* If we're going out of async-mask in all-stop, then the
-	     inferior is stopped.  The next resume will call
-	     target_async.  In non-stop, the target event source
-	     should be always registered in the event loop.  Do so
-	     now.  */
-	  if (non_stop)
-	    linux_nat_async (inferior_event_handler, 0);
-	}
-    }
-
-  return curr_mask;
 }
 
 static int async_terminal_is_ours = 1;
@@ -5480,10 +5511,6 @@ static void
 linux_nat_async (void (*callback) (enum inferior_event_type event_type,
 				   void *context), void *context)
 {
-  if (linux_nat_async_mask_value == 0 || !target_async_permitted)
-    internal_error (__FILE__, __LINE__,
-		    "Calling target_async when async is masked");
-
   if (callback != NULL)
     {
       async_client_callback = callback;
@@ -5575,9 +5602,6 @@ linux_nat_close (int quitting)
   /* Unregister from the event loop.  */
   if (target_is_async_p ())
     target_async (NULL, 0);
-
-  /* Reset the async_masking.  */
-  linux_nat_async_mask_value = 1;
 
   if (linux_ops->to_close)
     linux_ops->to_close (quitting);
@@ -5725,7 +5749,6 @@ linux_nat_add_target (struct target_ops *t)
   t->to_is_async_p = linux_nat_is_async_p;
   t->to_supports_non_stop = linux_nat_supports_non_stop;
   t->to_async = linux_nat_async;
-  t->to_async_mask = linux_nat_async_mask;
   t->to_terminal_inferior = linux_nat_terminal_inferior;
   t->to_terminal_ours = linux_nat_terminal_ours;
   t->to_close = linux_nat_close;

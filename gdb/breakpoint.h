@@ -29,6 +29,9 @@ struct value;
 struct block;
 struct breakpoint_object;
 struct get_number_or_range_state;
+struct thread_info;
+struct bpstats;
+struct bp_location;
 
 /* This is the maximum number of bytes a breakpoint instruction can
    take.  Feel free to increase it.  It's just used in a few places to
@@ -68,9 +71,12 @@ enum bptype
     bp_exception_resume,
 
     /* Used by wait_for_inferior for stepping over subroutine calls,
-       for stepping over signal handlers, and for skipping
-       prologues.  */
+       and for skipping prologues.  */
     bp_step_resume,
+
+    /* Used by wait_for_inferior for stepping over signal
+       handlers.  */
+    bp_hp_step_resume,
 
     /* Used to detect when a watchpoint expression has gone out of
        scope.  These breakpoints are usually not visible to the user.
@@ -274,11 +280,25 @@ enum bp_loc_type
   bp_loc_other			/* Miscellaneous...  */
 };
 
+/* This structure is a collection of function pointers that, if
+   available, will be called instead of performing the default action
+   for this bp_loc_type.  */
+
+struct bp_location_ops
+{
+  /* Destructor.  Releases everything from SELF (but not SELF
+     itself).  */
+  void (*dtor) (struct bp_location *self);
+};
+
 struct bp_location
 {
   /* Chain pointer to the next breakpoint location for
      the same parent breakpoint.  */
   struct bp_location *next;
+
+  /* Methods associated with this location.  */
+  const struct bp_location_ops *ops;
 
   /* The reference count.  */
   int refc;
@@ -389,6 +409,18 @@ struct bp_location
 
 struct breakpoint_ops
 {
+  /* Destructor.  Releases everything from SELF (but not SELF
+     itself).  */
+  void (*dtor) (struct breakpoint *self);
+
+  /* Allocate a location for this breakpoint.  */
+  struct bp_location * (*allocate_location) (struct breakpoint *);
+
+  /* Reevaluate a breakpoint.  This is necessary after symbols change
+     (e.g., an executable or DSO was loaded, or the inferior just
+     started).  */
+  void (*re_set) (struct breakpoint *self);
+
   /* Insert the breakpoint or watchpoint or activate the catchpoint.
      Return 0 for success, 1 if the breakpoint, watchpoint or catchpoint
      type is not supported, -1 for failure.  */
@@ -400,10 +432,15 @@ struct breakpoint_ops
      -1 for failure.  */
   int (*remove_location) (struct bp_location *);
 
-  /* Return non-zero if the debugger should tell the user that this
-     breakpoint was hit.  */
-  int (*breakpoint_hit) (const struct bp_location *, struct address_space *,
+  /* Return true if it the target has stopped due to hitting
+     breakpoint location BL.  This function does not check if we
+     should stop, only if BL explains the stop.  */
+  int (*breakpoint_hit) (const struct bp_location *bl, struct address_space *,
 			 CORE_ADDR);
+
+  /* Check internal conditions of the breakpoint referred to by BS.
+     If we should not stop for this breakpoint, set BS->stop to 0.  */
+  void (*check_status) (struct bpstats *bs);
 
   /* Tell how many hardware resources (debug registers) are needed
      for this breakpoint.  If this function is not provided, then
@@ -600,22 +637,6 @@ struct breakpoint
        aborting, so you can back up to just before the abort.  */
     int hit_count;
 
-    /* Process id of a child process whose forking triggered this
-       catchpoint.  This field is only valid immediately after this
-       catchpoint has triggered.  */
-    ptid_t forked_inferior_pid;
-
-    /* Filename of a program whose exec triggered this catchpoint.
-       This field is only valid immediately after this catchpoint has
-       triggered.  */
-    char *exec_pathname;
-
-    /* Syscall numbers used for the 'catch syscall' feature.  If no
-       syscall has been specified for filtering, its value is NULL.
-       Otherwise, it holds a list of all syscalls to be caught.  The
-       list elements are allocated with xmalloc.  */
-    VEC(int) *syscalls_to_be_caught;
-
     /* Methods associated with this breakpoint.  */
     struct breakpoint_ops *ops;
 
@@ -721,6 +742,9 @@ enum bpstat_what_main_action
        BPSTAT_WHAT_KEEP_CHECKING.  */
     BPSTAT_WHAT_CLEAR_LONGJMP_RESUME,
 
+    /* Clear step resume breakpoint, and keep checking.  */
+    BPSTAT_WHAT_STEP_RESUME,
+
     /* Rather than distinguish between noisy and silent stops here, it
        might be cleaner to have bpstat_print make that decision (also
        taking into account stop_print_frame and source_only).  But the
@@ -733,8 +757,14 @@ enum bpstat_what_main_action
     /* Stop and print.  */
     BPSTAT_WHAT_STOP_NOISY,
 
-    /* Clear step resume breakpoint, and keep checking.  */
-    BPSTAT_WHAT_STEP_RESUME,
+    /* Clear step resume breakpoint, and keep checking.  High-priority
+       step-resume breakpoints are used when even if there's a user
+       breakpoint at the current PC when we set the step-resume
+       breakpoint, we don't want to re-handle any breakpoint other
+       than the step-resume when it's hit; instead we want to move
+       past the breakpoint.  This is used in the case of skipping
+       signal handlers.  */
+    BPSTAT_WHAT_HP_STEP_RESUME,
   };
 
 /* An enum indicating the kind of "stack dummy" stop.  This is a bit
@@ -936,6 +966,12 @@ extern int breakpoint_thread_match (struct address_space *,
 
 extern void until_break_command (char *, int, int);
 
+/* Initialize a struct bp_location.  */
+
+extern void init_bp_location (struct bp_location *loc,
+			      const struct bp_location_ops *ops,
+			      struct breakpoint *owner);
+
 extern void update_breakpoint_locations (struct breakpoint *b,
 					 struct symtabs_and_lines sals,
 					 struct symtabs_and_lines sals_end);
@@ -943,6 +979,12 @@ extern void update_breakpoint_locations (struct breakpoint *b,
 extern void breakpoint_re_set (void);
 
 extern void breakpoint_re_set_thread (struct breakpoint *);
+
+/* The default re_set method, for typical hardware or software
+   breakpoints.  Reevaluate the breakpoint and recreate its
+   locations.  */
+
+extern void breakpoint_re_set_default (struct breakpoint *);
 
 extern struct breakpoint *set_momentary_breakpoint
   (struct gdbarch *, struct symtab_and_line, struct frame_id, enum bptype);
@@ -982,6 +1024,39 @@ extern void watch_command_wrapper (char *, int, int);
 extern void awatch_command_wrapper (char *, int, int);
 extern void rwatch_command_wrapper (char *, int, int);
 extern void tbreak_command (char *, int);
+
+/* Arguments to pass as context to some catch command handlers.  */
+#define CATCH_PERMANENT ((void *) (uintptr_t) 0)
+#define CATCH_TEMPORARY ((void *) (uintptr_t) 1)
+
+/* Like add_cmd, but add the command to both the "catch" and "tcatch"
+   lists, and pass some additional user data to the command
+   function.  */
+
+extern void
+  add_catch_command (char *name, char *docstring,
+		     void (*sfunc) (char *args, int from_tty,
+				    struct cmd_list_element *command),
+		     char **(*completer) (struct cmd_list_element *cmd,
+					  char *text, char *word),
+		     void *user_data_catch,
+		     void *user_data_tcatch);
+
+/* Initialize a breakpoint struct for Ada exception catchpoints.  */
+
+extern void
+  init_ada_exception_breakpoint (struct breakpoint *b,
+				 struct gdbarch *gdbarch,
+				 struct symtab_and_line sal,
+				 char *addr_string,
+				 struct breakpoint_ops *ops,
+				 int tempflag,
+				 int from_tty);
+
+/* Add breakpoint B on the breakpoint list, and notify the user, the
+   target and breakpoint_created observers of its existence.  */
+
+extern void install_breakpoint (struct breakpoint *b);
 
 extern int create_breakpoint (struct gdbarch *gdbarch, char *arg,
 			      char *cond_string, int thread,
@@ -1052,7 +1127,7 @@ extern void delete_std_terminate_breakpoint (void);
 
 /* These functions respectively disable or reenable all currently
    enabled watchpoints.  When disabled, the watchpoints are marked
-   call_disabled.  When reenabled, they are marked enabled.
+   call_disabled.  When re-enabled, they are marked enabled.
 
    The intended client of these functions is call_function_by_hand.
 
@@ -1066,7 +1141,7 @@ extern void delete_std_terminate_breakpoint (void);
    and that can cause execution control to become very confused.
 
    Note that if a user sets breakpoints in an interactively called
-   function, the call_disabled watchpoints will have been reenabled
+   function, the call_disabled watchpoints will have been re-enabled
    when the first such breakpoint is reached.  However, on targets
    that are unable to unwind through the call dummy frame, watches
    of stack-based storage may then be deleted, because gdb will
@@ -1150,10 +1225,6 @@ extern int ep_is_catchpoint (struct breakpoint *);
 /* Enable breakpoints and delete when hit.  Called with ARG == NULL
    deletes all breakpoints.  */
 extern void delete_command (char *arg, int from_tty);
-
-/* Pull all H/W watchpoints from the target.  Return non-zero if the
-   remove fails.  */
-extern int remove_hw_watchpoints (void);
 
 /* Manage a software single step breakpoint (or two).  Insert may be
    called twice before remove is called.  */

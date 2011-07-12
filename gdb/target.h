@@ -201,13 +201,9 @@ extern char *target_waitstatus_to_string (const struct target_waitstatus *);
    deal with.  */
 enum inferior_event_type
   {
-    /* There is a request to quit the inferior, abandon it.  */
-    INF_QUIT_REQ,
     /* Process a normal inferior event which will result in target_wait
        being called.  */
     INF_REG_EVENT,
-    /* Deal with an error on the inferior.  */
-    INF_ERROR,
     /* We are called because a timer went off.  */
     INF_TIMER,
     /* We are called to do stuff after the inferior stops.  */
@@ -528,7 +524,6 @@ struct target_ops
     int (*to_can_async_p) (void);
     int (*to_is_async_p) (void);
     void (*to_async) (void (*) (enum inferior_event_type, void *), void *);
-    int (*to_async_mask) (int);
     int (*to_supports_non_stop) (void);
     /* find_memory_regions support method for gcore */
     int (*to_find_memory_regions) (find_memory_region_ftype func, void *data);
@@ -640,6 +635,11 @@ struct target_ops
 
     /* Can target execute in reverse?  */
     int (*to_can_execute_reverse) (void);
+
+    /* The direction the target is currently executing.  Must be
+       implemented on targets that support reverse execution and async
+       mode.  The default simply returns forward execution.  */
+    enum exec_direction_kind (*to_execution_direction) (void);
 
     /* Does this target support debugging multiple processes
        simultaneously?  */
@@ -1254,22 +1254,8 @@ int target_supports_non_stop (void);
 #define target_async(CALLBACK,CONTEXT) \
      (current_target.to_async ((CALLBACK), (CONTEXT)))
 
-/* This is to be used ONLY within call_function_by_hand().  It provides
-   a workaround, to have inferior function calls done in sychronous
-   mode, even though the target is asynchronous.  After
-   target_async_mask(0) is called, calls to target_can_async_p() will
-   return FALSE , so that target_resume() will not try to start the
-   target asynchronously.  After the inferior stops, we IMMEDIATELY
-   restore the previous nature of the target, by calling
-   target_async_mask(1).  After that, target_can_async_p() will return
-   TRUE.  ANY OTHER USE OF THIS FEATURE IS DEPRECATED.
-
-   FIXME ezannoni 1999-12-13: we won't need this once we move
-   the turning async on and off to the single execution commands,
-   from where it is done currently, in remote_resume().  */
-
-#define target_async_mask(MASK)	\
-  (current_target.to_async_mask (MASK))
+#define target_execution_direction() \
+  (current_target.to_execution_direction ())
 
 /* Converts a process id to a string.  Usually, the string just contains
    `process xyz', but on some systems it may contain

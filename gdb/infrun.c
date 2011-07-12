@@ -54,6 +54,7 @@
 #include "inline-frame.h"
 #include "jit.h"
 #include "tracepoint.h"
+#include "continuations.h"
 
 /* Prototypes for local functions */
 
@@ -99,13 +100,9 @@ void _initialize_infrun (void);
 
 void nullify_last_target_wait_ptid (void);
 
-static void insert_step_resume_breakpoint_at_frame (struct frame_info *);
+static void insert_hp_step_resume_breakpoint_at_frame (struct frame_info *);
 
 static void insert_step_resume_breakpoint_at_caller (struct frame_info *);
-
-static void insert_step_resume_breakpoint_at_sal (struct gdbarch *,
-						  struct symtab_and_line ,
-						  struct frame_id);
 
 static void insert_longjmp_resume_breakpoint (struct gdbarch *, CORE_ADDR);
 
@@ -1604,9 +1601,9 @@ maybe_software_singlestep (struct gdbarch *gdbarch, CORE_ADDR pc)
 /* Return a ptid representing the set of threads that we will proceed,
    in the perspective of the user/frontend.  We may actually resume
    fewer threads at first, e.g., if a thread is stopped at a
-   breakpoint that needs stepping-off, but that should be visible to
-   the user/frontend, and neither should the frontend/user be allowed
-   to proceed any of the threads that happen to be stopped at for
+   breakpoint that needs stepping-off, but that should not be visible
+   to the user/frontend, and neither should the frontend/user be
+   allowed to proceed any of the threads that happen to be stopped for
    internal run control handling, if a previous command wanted them
    resumed.  */
 
@@ -1778,7 +1775,7 @@ a command like `return' or `jump' to continue execution."));
 	 original breakpoint is hit.  */
       if (tp->control.step_resume_breakpoint == NULL)
 	{
-	  insert_step_resume_breakpoint_at_frame (get_current_frame ());
+	  insert_hp_step_resume_breakpoint_at_frame (get_current_frame ());
 	  tp->step_after_step_resume_breakpoint = 1;
 	}
 
@@ -2249,7 +2246,6 @@ start_remote (int from_tty)
 {
   struct inferior *inferior;
 
-  init_wait_for_inferior ();
   inferior = current_inferior ();
   inferior->control.stop_soon = STOP_QUIETLY_REMOTE;
 
@@ -2396,12 +2392,10 @@ infrun_thread_stop_requested_callback (struct thread_info *info, void *arg)
 
 	  normal_stop ();
 
-	  /* Finish off the continuations.  The continations
-	     themselves are responsible for realising the thread
-	     didn't finish what it was supposed to do.  */
+	  /* Finish off the continuations.  */
 	  tp = inferior_thread ();
-	  do_all_intermediate_continuations_thread (tp);
-	  do_all_continuations_thread (tp);
+	  do_all_intermediate_continuations_thread (tp, 1);
+	  do_all_continuations_thread (tp, 1);
 	}
 
       do_cleanups (old_chain);
@@ -2744,7 +2738,19 @@ fetch_inferior_event (void *client_data)
      status mechanism.  */
 
   overlay_cache_invalid = 1;
-  registers_changed ();
+
+  /* But don't do it if the current thread is already stopped (hence
+     this is either a delayed event that will result in
+     TARGET_WAITKIND_IGNORE, or it's an event for another thread (and
+     we always clear the register and frame caches when the user
+     switches threads anyway).  If we didn't do this, a spurious
+     delayed event in all-stop mode would make the user lose the
+     selected frame.  */
+  if (non_stop || is_executing (inferior_ptid))
+    registers_changed ();
+
+  make_cleanup_restore_integer (&execution_direction);
+  execution_direction = target_execution_direction ();
 
   if (deprecated_target_wait_hook)
     ecs->ptid =
@@ -3083,7 +3089,6 @@ handle_inferior_event (struct execution_control_state *ecs)
 {
   struct frame_info *frame;
   struct gdbarch *gdbarch;
-  int sw_single_step_trap_p = 0;
   int stopped_by_watchpoint;
   int stepped_after_stopped_by_watchpoint = 0;
   struct symtab_and_line stop_pc_sal;
@@ -3310,6 +3315,11 @@ handle_inferior_event (struct execution_control_state *ecs)
          that the user can inspect this again later.  */
       set_internalvar_integer (lookup_internalvar ("_exitcode"),
 			       (LONGEST) ecs->ws.value.integer);
+
+      /* Also record this in the inferior itself.  */
+      current_inferior ()->has_exit_code = 1;
+      current_inferior ()->exit_code = (LONGEST) ecs->ws.value.integer;
+
       gdb_flush (gdb_stdout);
       target_mourn_inferior ();
       singlestep_breakpoints_inserted_p = 0;
@@ -3833,7 +3843,6 @@ handle_inferior_event (struct execution_control_state *ecs)
 	}
       else if (singlestep_breakpoints_inserted_p)
 	{
-	  sw_single_step_trap_p = 1;
 	  ecs->random_signal = 0;
 	}
     }
@@ -4173,7 +4182,7 @@ process_event_stop_test:
                                 "infrun: signal arrived while stepping over "
                                 "breakpoint\n");
 
-	  insert_step_resume_breakpoint_at_frame (frame);
+	  insert_hp_step_resume_breakpoint_at_frame (frame);
 	  ecs->event_thread->step_after_step_resume_breakpoint = 1;
 	  /* Reset trap_expected to ensure breakpoints are re-inserted.  */
 	  ecs->event_thread->control.trap_expected = 0;
@@ -4203,7 +4212,7 @@ process_event_stop_test:
                                 "infrun: signal may take us out of "
                                 "single-step range\n");
 
-	  insert_step_resume_breakpoint_at_frame (frame);
+	  insert_hp_step_resume_breakpoint_at_frame (frame);
 	  /* Reset trap_expected to ensure breakpoints are re-inserted.  */
 	  ecs->event_thread->control.trap_expected = 0;
 	  keep_going (ecs);
@@ -4349,6 +4358,38 @@ process_event_stop_test:
 	   where we are stepping and step out of the right range.  */
 	break;
 
+      case BPSTAT_WHAT_STEP_RESUME:
+        if (debug_infrun)
+	  fprintf_unfiltered (gdb_stdlog, "infrun: BPSTAT_WHAT_STEP_RESUME\n");
+
+	delete_step_resume_breakpoint (ecs->event_thread);
+	if (ecs->event_thread->control.proceed_to_finish
+	    && execution_direction == EXEC_REVERSE)
+	  {
+	    struct thread_info *tp = ecs->event_thread;
+
+	    /* We are finishing a function in reverse, and just hit
+	       the step-resume breakpoint at the start address of the
+	       function, and we're almost there -- just need to back
+	       up by one more single-step, which should take us back
+	       to the function call.  */
+	    tp->control.step_range_start = tp->control.step_range_end = 1;
+	    keep_going (ecs);
+	    return;
+	  }
+	if (stop_pc == ecs->stop_func_start
+	    && execution_direction == EXEC_REVERSE)
+	  {
+	    /* We are stepping over a function call in reverse, and
+	       just hit the step-resume breakpoint at the start
+	       address of the function.  Go back to single-stepping,
+	       which should take us back to the function call.  */
+	    ecs->event_thread->stepping_over_breakpoint = 1;
+	    keep_going (ecs);
+	    return;
+	  }
+	break;
+
       case BPSTAT_WHAT_STOP_NOISY:
         if (debug_infrun)
 	  fprintf_unfiltered (gdb_stdlog, "infrun: BPSTAT_WHAT_STOP_NOISY\n");
@@ -4371,9 +4412,9 @@ process_event_stop_test:
 	stop_stepping (ecs);
 	return;
 
-      case BPSTAT_WHAT_STEP_RESUME:
+      case BPSTAT_WHAT_HP_STEP_RESUME:
         if (debug_infrun)
-	  fprintf_unfiltered (gdb_stdlog, "infrun: BPSTAT_WHAT_STEP_RESUME\n");
+	  fprintf_unfiltered (gdb_stdlog, "infrun: BPSTAT_WHAT_HP_STEP_RESUME\n");
 
 	delete_step_resume_breakpoint (ecs->event_thread);
 	if (ecs->event_thread->step_after_step_resume_breakpoint)
@@ -4382,17 +4423,6 @@ process_event_stop_test:
 	       were trying to single-step off a breakpoint.  Go back
 	       to doing that.  */
 	    ecs->event_thread->step_after_step_resume_breakpoint = 0;
-	    ecs->event_thread->stepping_over_breakpoint = 1;
-	    keep_going (ecs);
-	    return;
-	  }
-	if (stop_pc == ecs->stop_func_start
-	    && execution_direction == EXEC_REVERSE)
-	  {
-	    /* We are stepping over a function call in reverse, and
-	       just hit the step-resume breakpoint at the start
-	       address of the function.  Go back to single-stepping,
-	       which should take us back to the function call.  */
 	    ecs->event_thread->stepping_over_breakpoint = 1;
 	    keep_going (ecs);
 	    return;
@@ -5208,14 +5238,16 @@ handle_step_into_function_backward (struct gdbarch *gdbarch,
    This is used to both functions and to skip over code.  */
 
 static void
-insert_step_resume_breakpoint_at_sal (struct gdbarch *gdbarch,
-				      struct symtab_and_line sr_sal,
-				      struct frame_id sr_id)
+insert_step_resume_breakpoint_at_sal_1 (struct gdbarch *gdbarch,
+					struct symtab_and_line sr_sal,
+					struct frame_id sr_id,
+					enum bptype sr_type)
 {
   /* There should never be more than one step-resume or longjmp-resume
      breakpoint per thread, so we should never be setting a new
      step_resume_breakpoint when one is already active.  */
   gdb_assert (inferior_thread ()->control.step_resume_breakpoint == NULL);
+  gdb_assert (sr_type == bp_step_resume || sr_type == bp_hp_step_resume);
 
   if (debug_infrun)
     fprintf_unfiltered (gdb_stdlog,
@@ -5223,18 +5255,28 @@ insert_step_resume_breakpoint_at_sal (struct gdbarch *gdbarch,
 			paddress (gdbarch, sr_sal.pc));
 
   inferior_thread ()->control.step_resume_breakpoint
-    = set_momentary_breakpoint (gdbarch, sr_sal, sr_id, bp_step_resume);
+    = set_momentary_breakpoint (gdbarch, sr_sal, sr_id, sr_type);
 }
 
-/* Insert a "step-resume breakpoint" at RETURN_FRAME.pc.  This is used
-   to skip a potential signal handler.
+void
+insert_step_resume_breakpoint_at_sal (struct gdbarch *gdbarch,
+				      struct symtab_and_line sr_sal,
+				      struct frame_id sr_id)
+{
+  insert_step_resume_breakpoint_at_sal_1 (gdbarch,
+					  sr_sal, sr_id,
+					  bp_step_resume);
+}
+
+/* Insert a "high-priority step-resume breakpoint" at RETURN_FRAME.pc.
+   This is used to skip a potential signal handler.
 
    This is called with the interrupted function's frame.  The signal
    handler, when it returns, will resume the interrupted function at
    RETURN_FRAME.pc.  */
 
 static void
-insert_step_resume_breakpoint_at_frame (struct frame_info *return_frame)
+insert_hp_step_resume_breakpoint_at_frame (struct frame_info *return_frame)
 {
   struct symtab_and_line sr_sal;
   struct gdbarch *gdbarch;
@@ -5247,14 +5289,14 @@ insert_step_resume_breakpoint_at_frame (struct frame_info *return_frame)
   sr_sal.section = find_pc_overlay (sr_sal.pc);
   sr_sal.pspace = get_frame_program_space (return_frame);
 
-  insert_step_resume_breakpoint_at_sal (gdbarch, sr_sal,
-					get_stack_frame_id (return_frame));
+  insert_step_resume_breakpoint_at_sal_1 (gdbarch, sr_sal,
+					  get_stack_frame_id (return_frame),
+					  bp_hp_step_resume);
 }
 
-/* Similar to insert_step_resume_breakpoint_at_frame, except
-   but a breakpoint at the previous frame's PC.  This is used to
-   skip a function after stepping into it (for "next" or if the called
-   function has no debugging information).
+/* Insert a "step-resume breakpoint" at the previous frame's PC.  This
+   is used to skip a function after stepping into it (for "next" or if
+   the called function has no debugging information).
 
    The current function has almost always been reached by single
    stepping a call or return instruction.  NEXT_FRAME belongs to the
@@ -5262,7 +5304,7 @@ insert_step_resume_breakpoint_at_frame (struct frame_info *return_frame)
    resume address.
 
    This is a separate function rather than reusing
-   insert_step_resume_breakpoint_at_frame in order to avoid
+   insert_hp_step_resume_breakpoint_at_frame in order to avoid
    get_prev_frame, which may stop prematurely (see the implementation
    of frame_unwind_caller_id for an example).  */
 
@@ -5840,7 +5882,8 @@ normal_stop (void)
 
   /* Save the function value return registers, if we care.
      We might be about to restore their previous contents.  */
-  if (inferior_thread ()->control.proceed_to_finish)
+  if (inferior_thread ()->control.proceed_to_finish
+      && execution_direction != EXEC_REVERSE)
     {
       /* This should not be necessary.  */
       if (stop_registers)
@@ -6848,7 +6891,7 @@ save_inferior_ptid (void)
    Set exec-direction / show exec-direction commands
    (returns error unless target implements to_set_exec_direction method).  */
 
-enum exec_direction_kind execution_direction = EXEC_FORWARD;
+int execution_direction = EXEC_FORWARD;
 static const char exec_forward[] = "forward";
 static const char exec_reverse[] = "reverse";
 static const char *exec_direction = exec_forward;
@@ -6887,12 +6930,10 @@ show_exec_direction_func (struct ui_file *out, int from_tty,
   case EXEC_REVERSE:
     fprintf_filtered (out, _("Reverse.\n"));
     break;
-  case EXEC_ERROR:
   default:
-    fprintf_filtered (out, _("Forward (target `%s' does not "
-			     "support exec-direction).\n"),
-		      target_shortname);
-    break;
+    internal_error (__FILE__, __LINE__,
+		    _("bogus execution_direction value: %d"),
+		    (int) execution_direction);
   }
 }
 

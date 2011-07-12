@@ -137,8 +137,8 @@ int xgdb_verbose;
 /* Buffer used for reading command lines, and the size
    allocated for it so far.  */
 
-char *line;
-int linesize = 100;
+char *saved_command_line;
+int saved_command_line_size = 100;
 
 /* Nonzero if the current command is modified by "server ".  This
    affects things like recording into the command history, commands
@@ -378,7 +378,10 @@ execute_command (char *p, int from_tty)
 
   /* This can happen when command_line_input hits end of file.  */
   if (p == NULL)
-    return;
+    {
+      do_cleanups (cleanup);
+      return;
+    }
 
   target_log_command (p);
 
@@ -542,7 +545,10 @@ command_loop (void)
 				    get_prompt () : (char *) NULL,
 				    instream == stdin, "prompt");
       if (command == 0)
-	return;
+	{
+	  do_cleanups (old_chain);
+	  return;
+	}
 
       make_command_stats_cleanup (1);
 
@@ -572,7 +578,7 @@ dont_repeat (void)
      thing read from stdin in line and don't want to delete it.  Null
      lines won't repeat here in any case.  */
   if (instream == stdin)
-    *line = 0;
+    *saved_command_line = 0;
 }
 
 /* Prevent dont_repeat from working, and return a cleanup that
@@ -1034,10 +1040,10 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
   /* If we just got an empty line, and that is supposed to repeat the
      previous command, return the value in the global buffer.  */
   if (repeat && p == linebuffer)
-    return line;
+    return saved_command_line;
   for (p1 = linebuffer; *p1 == ' ' || *p1 == '\t'; p1++);
   if (repeat && !*p1)
-    return line;
+    return saved_command_line;
 
   *p = 0;
 
@@ -1058,13 +1064,13 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
   /* Save into global buffer if appropriate.  */
   if (repeat)
     {
-      if (linelength > linesize)
+      if (linelength > saved_command_line_size)
 	{
-	  line = xrealloc (line, linelength);
-	  linesize = linelength;
+	  saved_command_line = xrealloc (saved_command_line, linelength);
+	  saved_command_line_size = linelength;
 	}
-      strcpy (line, linebuffer);
-      return line;
+      strcpy (saved_command_line, linebuffer);
+      return saved_command_line;
     }
 
   return linebuffer;
@@ -1314,8 +1320,9 @@ input_from_terminal_p (void)
 static void
 dont_repeat_command (char *ignored, int from_tty)
 {
-  *line = 0;			/* Can't call dont_repeat here because we're 
-				   not necessarily reading from stdin.  */
+  /* Can't call dont_repeat here because we're not necessarily reading
+     from stdin.  */
+  *saved_command_line = 0;
 }
 
 /* Functions to manipulate command line editing control variables.  */

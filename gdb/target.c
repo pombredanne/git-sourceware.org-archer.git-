@@ -544,6 +544,18 @@ default_get_ada_task_ptid (long lwp, long tid)
   return ptid_build (ptid_get_pid (inferior_ptid), lwp, tid);
 }
 
+static enum exec_direction_kind
+default_execution_direction (void)
+{
+  if (!target_can_execute_reverse)
+    return EXEC_FORWARD;
+  else if (!target_can_async_p ())
+    return EXEC_FORWARD;
+  else
+    gdb_assert_not_reached ("\
+to_execution_direction must be implemented for reverse async");
+}
+
 /* Go through the target stack from top to bottom, copying over zero
    entries in current_target, then filling in still empty entries.  In
    effect, we are doing class inheritance through the pushed target
@@ -647,13 +659,13 @@ update_current_target (void)
       INHERIT (to_can_async_p, t);
       INHERIT (to_is_async_p, t);
       INHERIT (to_async, t);
-      INHERIT (to_async_mask, t);
       INHERIT (to_find_memory_regions, t);
       INHERIT (to_make_corefile_notes, t);
       INHERIT (to_get_bookmark, t);
       INHERIT (to_goto_bookmark, t);
       /* Do not inherit to_get_thread_local_address.  */
       INHERIT (to_can_execute_reverse, t);
+      INHERIT (to_execution_direction, t);
       INHERIT (to_thread_architecture, t);
       /* Do not inherit to_read_description.  */
       INHERIT (to_get_ada_task_ptid, t);
@@ -816,9 +828,6 @@ update_current_target (void)
   de_fault (to_async,
 	    (void (*) (void (*) (enum inferior_event_type, void*), void*))
 	    tcomplain);
-  de_fault (to_async_mask,
-	    (int (*) (int))
-	    return_one);
   de_fault (to_thread_architecture,
 	    default_thread_architecture);
   current_target.to_read_description = NULL;
@@ -897,6 +906,8 @@ update_current_target (void)
   de_fault (to_traceframe_info,
 	    (struct traceframe_info * (*) (void))
 	    tcomplain);
+  de_fault (to_execution_direction, default_execution_direction);
+
 #undef de_fault
 
   /* Finally, position the target-stack beneath the squashed
