@@ -80,4 +80,8 @@ extern void set_solib_ops (struct gdbarch *gdbarch,
 
 extern int libpthread_name_p (const char *name);
 
+/* On-demand loading of shared libraries.  */
+
+extern void solib_on_demand_load (CORE_ADDR pc);
+
 #endif /* SOLIB_H */

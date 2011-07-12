@@ -624,8 +624,6 @@ frame_find_by_id (struct frame_id id)
 static int
 frame_unwind_pc_if_available (struct frame_info *this_frame, CORE_ADDR *pc)
 {
-  struct so_list *solib;
-
   if (!this_frame->prev_pc.p)
     {
       if (gdbarch_unwind_pc_p (frame_unwind_arch (this_frame)))
@@ -683,13 +681,7 @@ frame_unwind_pc_if_available (struct frame_info *this_frame, CORE_ADDR *pc)
 	    }
 
 	  if (auto_solib_add == SOLIB_ADD_LAZY)
-	    {
-	      /* On-demand loading of shared libraries' debuginfo.  */
-	      solib = solib_match_pc_solist (pc);
-	      if (solib && !solib->symbols_loaded)
-		solib_add (solib->so_name, 1, &current_target, 1,
-			   /*lazy_read=*/1);
-	    }
+	    solib_on_demand_load (pc);
 	}
       else
 	internal_error (__FILE__, __LINE__, _("No unwind_pc method"));

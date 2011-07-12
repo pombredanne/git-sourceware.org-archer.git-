@@ -899,6 +899,19 @@ libpthread_solib_p (struct so_list *so)
   return libpthread_name_p (so->so_name);
 }
 
+void
+solib_on_demand_load (CORE_ADDR pc)
+{
+  struct so_list *solib;
+
+  /* On-demand loading of shared libraries' debuginfo.  */
+  solib = solib_match_pc_solist (pc);
+
+  if (solib && !solib->symbols_loaded)
+    solib_add (solib->so_name, 0, &current_target, 1,
+	       /*lazy_read=*/1);
+}
+
 /* GLOBAL FUNCTION
 
    solib_add -- read in symbol info for newly added shared libraries
