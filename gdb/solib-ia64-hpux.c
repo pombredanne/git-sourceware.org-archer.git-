@@ -257,7 +257,7 @@ ia64_hpux_handle_dld_breakpoint_1 (ptid_t ptid)
 	break;
       case BREAK_DE_LIB_LOADED:
 	ia64_hpux_handle_load_event (regcache);
-	solib_add (NULL, 0, &current_target, auto_solib_add, /*lazy_read=*/0);
+	solib_add (NULL, 0, &current_target, solib_add_opt, /*lazy_read=*/0);
 	break;
       case BREAK_DE_LIB_UNLOADED:
       case BREAK_DE_LOAD_COMPLETE:
@@ -567,7 +567,7 @@ chatr +dbg enable a.out"));
       break;  /* End of list.  */
 
   /* Resync the library list at the core level.  */
-  solib_add (NULL, 1, &current_target, auto_solib_add, /*lazy_read=*/0);
+  solib_add (NULL, 1, &current_target, solib_add_opt, /*lazy_read=*/0);
 }
 
 /* The "create_inferior_hook" target_so_ops routine for ia64-hpux.  */

@@ -14943,19 +14943,23 @@ commands:
 @table @code
 @kindex set auto-solib-add
 @item set auto-solib-add @var{mode}
-If @var{mode} is @code{on}, symbols from all shared object libraries
+If @var{mode} is @code{auto}, symbols from all shared object libraries
 will be loaded automatically when the inferior begins execution, you
 attach to an independently started inferior, or when the dynamic linker
 informs @value{GDBN} that a new library has been loaded.  If @var{mode}
 is @code{off}, symbols must be loaded manually, using the
-@code{sharedlibrary} command.  The default value is @code{on}.
+@code{sharedlibrary} command.  If @var{mode} is @code{lazy}, then
+@value{GDBN} will lazily load symbols from shared libraries, i.e., it
+will load symbols on-demand.  The default value is @code{auto}.
+
+This command is now deprecated.  Use @code{set solib-add} instead.
 
 @cindex memory used for symbol tables
 If your program uses lots of shared libraries with debug info that
 takes large amounts of memory, you can decrease the @value{GDBN}
 memory footprint by preventing it from automatically loading the
 symbols from shared libraries.  To that end, type @kbd{set
-auto-solib-add off} before running the inferior, then load each
+solib-add off} before running the inferior, then load each
 library whose debug symbols you do need with @kbd{sharedlibrary
 @var{regexp}}, where @var{regexp} is a regular expression that matches
 the libraries whose symbols you want to be loaded.
@@ -14963,6 +14967,8 @@ the libraries whose symbols you want to be loaded.
 @kindex show auto-solib-add
 @item show auto-solib-add
 Display the current autoloading mode.
+
+This command is now deprecated.  Use @code{show solib-add} instead.
 @end table
 
 @cindex load shared library

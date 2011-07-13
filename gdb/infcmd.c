@@ -442,9 +442,9 @@ post_create_inferior (struct target_ops *target, int from_tty)
 	 solib_create_inferior_hook.  */
 
 #ifdef SOLIB_ADD
-      SOLIB_ADD (NULL, 0, target, auto_solib_add, /*lazy_read=*/0);
+      SOLIB_ADD (NULL, 0, target, solib_add_opt, /*lazy_read=*/0);
 #else
-      solib_add (NULL, 0, target, auto_solib_add, /*lazy_read=*/0);
+      solib_add (NULL, 0, target, solib_add_opt, /*lazy_read=*/0);
 #endif
     }
 

@@ -166,16 +166,18 @@ _initialize_xcoffsolib (void)
   add_info ("sharedlibrary", solib_info,
 	    _("Status of loaded shared object libraries"));
 
-  add_setshow_boolean_cmd ("auto-solib-add", class_support,
-			   &auto_solib_add, _("\
+  add_setshow_enum_cmd ("solib-add", class_support,
+			solib_add_options,
+			&solib_add_choice, _("\
 Set autoloading of shared library symbols."), _("\
 Show autoloading of shared library symbols."), _("\
 If \"on\", symbols from all shared object libraries will be loaded\n\
 automatically when the inferior begins execution, when the dynamic linker\n\
 informs gdb that a new library has been loaded, or when attaching to the\n\
-inferior.  Otherwise, symbols must be loaded manually, using \
+inferior.  If \"lazy\", symbols from shared object libraries will be loaded\n\
+only when necessary.  If \"off\", symbols must be loaded manually, using\n\
 `sharedlibrary'."),
-			   NULL,
-			   NULL, /* FIXME: i18n: */
-			   &setlist, &showlist);
+			set_solib_add,
+			show_solib_add,
+			&setlist, &showlist);
 }

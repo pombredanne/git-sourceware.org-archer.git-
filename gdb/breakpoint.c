@@ -4593,9 +4593,9 @@ bpstat_what (bpstat bs_head)
       target_terminal_ours_for_output ();
 
 #ifdef SOLIB_ADD
-      SOLIB_ADD (NULL, 0, &current_target, auto_solib_add, /*lazy_read=*/0);
+      SOLIB_ADD (NULL, 0, &current_target, solib_add_opt, /*lazy_read=*/0);
 #else
-      solib_add (NULL, 0, &current_target, auto_solib_add, /*lazy_read=*/0);
+      solib_add (NULL, 0, &current_target, solib_add_opt, /*lazy_read=*/0);
 #endif
 
       target_terminal_inferior ();

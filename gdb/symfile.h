@@ -484,18 +484,19 @@ enum solib_add_opt
     SOLIB_ADD_LAZY,
   };
 
-/* If non-zero, shared library symbols will be added automatically
+/* If `ON', shared library symbols will be added automatically
    when the inferior is created, new libraries are loaded, or when
    attaching to the inferior.  This is almost always what users will
    want to have happen; but for very large programs, the startup time
-   will be excessive, and so if this is a problem, the user can clear
-   this flag and then add the shared library symbols as needed.  Note
+   will be excessive, and so if this is a problem, the user can set this
+   flag to `OFF' and then add the shared library symbols as needed.  Note
    that there is a potential for confusion, since if the shared
    library symbols are not loaded, commands like "info fun" will *not*
-   report all the functions that are actually present.  */
+   report all the functions that are actually present.  The user also has
+   the option to set this flag to `AUTO'; this will make GDB load shared
+   library symbols on-demand.  */
 
-extern enum solib_add_opt auto_solib_add;
-//extern int auto_solib_add;
+extern enum solib_add_opt solib_add_opt;
 
 /* From symfile.c */
 

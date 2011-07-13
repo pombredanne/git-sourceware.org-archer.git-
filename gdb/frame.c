@@ -680,7 +680,7 @@ frame_unwind_pc_if_available (struct frame_info *this_frame, CORE_ADDR *pc)
 				    hex_string (this_frame->prev_pc.value));
 	    }
 
-	  if (auto_solib_add == SOLIB_ADD_LAZY)
+	  if (solib_add_opt == SOLIB_ADD_LAZY)
 	    solib_on_demand_load (pc);
 	}
       else

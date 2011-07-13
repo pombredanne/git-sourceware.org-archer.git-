@@ -495,7 +495,7 @@ irix_solib_create_inferior_hook (int from_tty)
      and will put out an annoying warning.
      Delaying the resetting of stop_soon until after symbol loading
      suppresses the warning.  */
-  solib_add ((char *) 0, 0, (struct target_ops *) 0, auto_solib_add,
+  solib_add ((char *) 0, 0, (struct target_ops *) 0, solib_add_opt,
 	     /*lazy_read=*/0);
   inf->control.stop_soon = NO_STOP_QUIETLY;
 }

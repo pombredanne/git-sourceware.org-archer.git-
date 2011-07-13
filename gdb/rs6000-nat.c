@@ -801,7 +801,7 @@ add_vmap (LdInfo *ldi)
   vp->objfile = obj;
 
   /* Always add symbols for the main objfile.  */
-  if (vp == vmap || auto_solib_add == SOLIB_ADD_ON)
+  if (vp == vmap || solib_add_opt == SOLIB_ADD_ON)
     vmap_add_symbols (vp);
   return vp;
 }

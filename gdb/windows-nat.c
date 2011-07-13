@@ -862,7 +862,7 @@ handle_unload_dll (void *dummy)
 	DEBUG_EVENTS (("gdb: Unloading dll \"%s\".\n", sodel->so_name));
 
 	windows_free_so (sodel);
-	solib_add (NULL, 0, NULL, auto_solib_add, /*lazy_read=*/0);
+	solib_add (NULL, 0, NULL, solib_add_opt, /*lazy_read=*/0);
 	return 1;
       }
 

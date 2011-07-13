@@ -56,9 +56,9 @@ static struct gdbarch_data *solib_data;
 
 /* Used to store the user-defined setting for `auto-solib-add'.  */
 
-static const char *auto_solib_add_choice = "on";
+static const char *solib_add_choice = "on";
 
-static const char *auto_solib_add_options[] =
+static const char *solib_add_options[] =
   {
     "on",
     "off",
@@ -1415,7 +1415,7 @@ reload_shared_libraries_1 (int from_tty)
 	    exception_fprintf (gdb_stderr, e,
 			       _("Error while mapping "
 				 "shared library sections:\n"));
-	  else if (auto_solib_add == SOLIB_ADD_ON
+	  else if (solib_add_opt == SOLIB_ADD_ON
 		   || was_loaded || libpthread_solib_p (so))
 	    solib_read_symbols (so, flags);
 	}
@@ -1468,7 +1468,7 @@ reload_shared_libraries (char *ignored, int from_tty,
      removed.  Call it only after the solib target has been initialized by
      solib_create_inferior_hook.  */
 
-  solib_add (NULL, 0, NULL, auto_solib_add, /*lazy_read=*/0);
+  solib_add (NULL, 0, NULL, solib_add_opt, /*lazy_read=*/0);
 
   breakpoint_re_set ();
 
@@ -1483,24 +1483,24 @@ reload_shared_libraries (char *ignored, int from_tty,
 }
 
 static void
-set_auto_solib_add (char *ignore_args, int from_tty,
+set_solib_add (char *ignore_args, int from_tty,
 		    struct cmd_list_element *c)
 {
-  if (strcmp (auto_solib_add_choice, "on") == 0)
-    auto_solib_add = SOLIB_ADD_ON;
-  else if (strcmp (auto_solib_add_choice, "off") == 0)
-    auto_solib_add = SOLIB_ADD_OFF;
-  else if (strcmp (auto_solib_add_choice, "lazy") == 0)
-    auto_solib_add = SOLIB_ADD_LAZY;
+  if (strcmp (solib_add_choice, "on") == 0)
+    solib_add_opt = SOLIB_ADD_ON;
+  else if (strcmp (solib_add_choice, "off") == 0)
+    solib_add_opt = SOLIB_ADD_OFF;
+  else if (strcmp (solib_add_choice, "lazy") == 0)
+    solib_add_opt = SOLIB_ADD_LAZY;
 }
 
 static void
-show_auto_solib_add (struct ui_file *file, int from_tty,
+show_solib_add (struct ui_file *file, int from_tty,
 		     struct cmd_list_element *c, const char *value)
 {
   fprintf_filtered (file,
 		    _("Autoloading of shared library symbols is `%s'.\n"),
-		    auto_solib_add_choice);
+		    solib_add_choice);
 }
 
 
@@ -1525,6 +1525,10 @@ extern initialize_file_ftype _initialize_solib; /* -Wmissing-prototypes */
 void
 _initialize_solib (void)
 {
+  /* Used to deprecate `auto-solib-add' command.  */
+  struct cmd_list_element *c;
+  char *cmd_name, *old_cmdname;
+
   solib_data = gdbarch_data_register_pre_init (solib_init);
 
   add_com ("sharedlibrary", class_files, sharedlibrary_command,
@@ -1535,18 +1539,47 @@ _initialize_solib (void)
 	   _("Unload all shared object library symbols."));
 
   add_setshow_enum_cmd ("auto-solib-add", class_support,
-			auto_solib_add_options,
-			&auto_solib_add_choice, _("\
+			solib_add_options,
+			&solib_add_choice, _("\
 Set autoloading of shared library symbols."), _("\
 Show autoloading of shared library symbols."), _("\
 If \"on\", symbols from all shared object libraries will be loaded\n\
 automatically when the inferior begins execution, when the dynamic linker\n\
 informs gdb that a new library has been loaded, or when attaching to the\n\
 inferior.  If \"lazy\", symbols from shared object libraries will be loaded\n\
-only when necessary.  Otherwise, symbols must be loaded manually, using\n\
+only when necessary.  If \"off\", symbols must be loaded manually, using\n\
 `sharedlibrary'."),
-			set_auto_solib_add,
-			show_auto_solib_add,
+			set_solib_add,
+			show_solib_add,
+			&setlist, &showlist);
+
+  /* Deprecate the command `auto-solib-add'.  We use `solib-add' now.  */
+  cmd_name = xstrdup ("auto-solib-add");
+  old_cmdname = cmd_name;
+
+  c = lookup_cmd (&cmd_name, setlist, "", -1, 0);
+  deprecate_cmd (c, "set solib-add");
+
+  /* Reset the command name.  */
+  cmd_name = old_cmdname;
+
+  c = lookup_cmd (&cmd_name, showlist, "", -1, 0);
+  deprecate_cmd (c, "show solib-add");
+  xfree (old_cmdname);
+
+  add_setshow_enum_cmd ("solib-add", class_support,
+			solib_add_options,
+			&solib_add_choice, _("\
+Set autoloading of shared library symbols."), _("\
+Show autoloading of shared library symbols."), _("\
+If \"on\", symbols from all shared object libraries will be loaded\n\
+automatically when the inferior begins execution, when the dynamic linker\n\
+informs gdb that a new library has been loaded, or when attaching to the\n\
+inferior.  If \"lazy\", symbols from shared object libraries will be loaded\n\
+only when necessary.  If \"off\", symbols must be loaded manually, using\n\
+`sharedlibrary'."),
+			set_solib_add,
+			show_solib_add,
 			&setlist, &showlist);
 
   add_setshow_filename_cmd ("sysroot", class_support,
