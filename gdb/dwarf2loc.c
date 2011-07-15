@@ -296,7 +296,7 @@ dwarf_expr_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
   struct dwarf_expr_baton *debaton = ctx->baton;
 
   per_cu_dwarf_call (ctx, die_offset, debaton->per_cu,
-		     ctx->get_frame_pc, ctx->baton);
+		     ctx->funcs->get_frame_pc, ctx->baton);
 }
 
 static CORE_ADDR
@@ -388,6 +388,21 @@ dwarf_expr_get_base_type (struct dwarf_expr_context *ctx, size_t die_offset)
   return dwarf2_get_die_type (die_offset, debaton->per_cu);
 }
 
+/* Virtual method table for dwarf2_evaluate_loc_desc_full below.  */
+
+static const struct dwarf_expr_context_funcs dwarf_expr_ctx_funcs =
+{
+  dwarf_expr_read_reg,
+  dwarf_expr_read_mem,
+  dwarf_expr_frame_base,
+  dwarf_expr_frame_cfa,
+  dwarf_expr_frame_pc,
+  dwarf_expr_tls_address,
+  dwarf_expr_dwarf_call,
+  dwarf_expr_get_base_type,
+  dwarf_expr_object_address
+};
+
 /* Evaluate DWARF expression at DATA ... DATA + SIZE with its result readable
    by dwarf_expr_fetch (RETVAL, 0).  FRAME parameter can be NULL to call
    get_selected_frame to find it.  Returned dwarf_expr_context freeing is
@@ -410,15 +425,7 @@ dwarf_expr_prep_ctx (struct dwarf_expr_context *ctx, struct frame_info *frame,
   ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
   ctx->offset = dwarf2_per_cu_text_offset (per_cu);
   ctx->baton = &baton;
-  ctx->read_reg = dwarf_expr_read_reg;
-  ctx->read_mem = dwarf_expr_read_mem;
-  ctx->get_frame_base = dwarf_expr_frame_base;
-  ctx->get_frame_cfa = dwarf_expr_frame_cfa;
-  ctx->get_frame_pc = dwarf_expr_frame_pc;
-  ctx->get_tls_address = dwarf_expr_tls_address;
-  ctx->dwarf_call = dwarf_expr_dwarf_call;
-  ctx->get_base_type = dwarf_expr_get_base_type;
-  ctx->get_object_address = dwarf_expr_object_address;
+  ctx->funcs = &dwarf_expr_ctx_funcs;
 
   dwarf_expr_eval (ctx, data, size);
 }
@@ -1496,8 +1503,22 @@ needs_frame_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset)
   struct needs_frame_baton *nf_baton = ctx->baton;
 
   per_cu_dwarf_call (ctx, die_offset, nf_baton->per_cu,
-		     ctx->get_frame_pc, ctx->baton);
+		     ctx->funcs->get_frame_pc, ctx->baton);
 }
+
+/* Virtual method table for dwarf2_loc_desc_needs_frame below.  */
+
+static const struct dwarf_expr_context_funcs needs_frame_ctx_funcs =
+{
+  needs_frame_read_reg,
+  needs_frame_read_mem,
+  needs_frame_frame_base,
+  needs_frame_frame_cfa,
+  needs_frame_frame_cfa,	/* get_frame_pc */
+  needs_frame_tls_address,
+  needs_frame_dwarf_call,
+  NULL				/* get_base_type */
+};
 
 /* Return non-zero iff the location expression at DATA (length SIZE)
    requires a frame to evaluate.  */
@@ -1523,13 +1544,7 @@ dwarf2_loc_desc_needs_frame (const gdb_byte *data, unsigned short size,
   ctx->addr_size = dwarf2_per_cu_addr_size (per_cu);
   ctx->offset = dwarf2_per_cu_text_offset (per_cu);
   ctx->baton = &baton;
-  ctx->read_reg = needs_frame_read_reg;
-  ctx->read_mem = needs_frame_read_mem;
-  ctx->get_frame_base = needs_frame_frame_base;
-  ctx->get_frame_cfa = needs_frame_frame_cfa;
-  ctx->get_frame_pc = needs_frame_frame_cfa;
-  ctx->get_tls_address = needs_frame_tls_address;
-  ctx->dwarf_call = needs_frame_dwarf_call;
+  ctx->funcs = &needs_frame_ctx_funcs;
 
   dwarf_expr_eval (ctx, data, size);
 
