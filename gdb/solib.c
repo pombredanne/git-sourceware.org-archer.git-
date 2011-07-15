@@ -932,7 +932,17 @@ solib_on_demand_load (CORE_ADDR pc)
    but still do any needed low level processing.
 
    If LAZY_READ is 1, it means we are lazily reading debuginfo files
-   and should not reinit the frame cache.
+   and should not reinit the frame cache.  reinit_frame_cache invalidates
+   all the frames and reinitializes the cache (obviously), so if the user
+   is doing normal shared library loading (without LAZY_READ set), we
+   can safely call reinit_frame_cache because GDB will not be performing
+   any action other than load the shared library.  However, if the user
+   has set LAZY_READ, it means we will be loading debuginfo from shared
+   libraries on-demand, i.e., the user will ask for something (like a
+   backtrace), and GDB will load the debuginfo *while* executing the
+   backtrace command.  In this scenario, we cannot reinitialize the frame
+   cache otherwise it will invalidate all the frames and GDB will lose
+   necessary information to reconstruct the backtrace.
 
    FROM_TTY and TARGET are as described for update_solib_list, above.  */
 
