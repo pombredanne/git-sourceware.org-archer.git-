@@ -1500,7 +1500,7 @@ deprecated_cmd_warning (char **text)
    
    If LINE refers to an alias, *alias will point to that alias.
    
-   If LINE is a postfix command (i.e. one that is preceeded by a prefix
+   If LINE is a postfix command (i.e. one that is preceded by a prefix
    command) set *prefix_cmd.
    
    Set *cmd to point to the command LINE indicates.
@@ -1528,7 +1528,7 @@ lookup_cmd_composition (char *text,
   
   while (1)
     { 
-      /* Go through as many command lists as we need to 
+      /* Go through as many command lists as we need to,
 	 to find the command TEXT refers to.  */
       
       prev_cmd = *cmd;

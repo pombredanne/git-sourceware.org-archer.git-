@@ -176,6 +176,10 @@ DESCRIPTION
 .
 .{* Forward declaration.  *}
 .typedef struct bfd_link_info _bfd_link_info;
+.struct already_linked;
+.
+.{* Forward declaration.  *}
+.typedef struct flag_info flag_info;
 .
 .typedef struct bfd_target
 .{
@@ -208,7 +212,11 @@ DESCRIPTION
 .  char ar_pad_char;
 .
 .  {* The maximum number of characters in an archive header.  *}
-.  unsigned short ar_max_namelen;
+.  unsigned char ar_max_namelen;
+.
+.  {* How well this target matches, used to select between various
+.     possible targets when more than one target matches.  *}
+.  unsigned char match_priority;
 .
 .  {* Entries for byte swapping for data. These are different from the
 .     other entry points, since they don't take a BFD as the first argument.
@@ -444,6 +452,7 @@ BFD_JUMP_TABLE macros.
 .  NAME##_bfd_final_link, \
 .  NAME##_bfd_link_split_section, \
 .  NAME##_bfd_gc_sections, \
+.  NAME##_bfd_lookup_section_flags, \
 .  NAME##_bfd_merge_sections, \
 .  NAME##_bfd_is_group_section, \
 .  NAME##_bfd_discard_group, \
@@ -488,6 +497,10 @@ BFD_JUMP_TABLE macros.
 .  {* Remove sections that are not referenced from the output.  *}
 .  bfd_boolean (*_bfd_gc_sections) (bfd *, struct bfd_link_info *);
 .
+.  {* Sets the bitmask of allowed and disallowed section flags.  *}
+.  void (*_bfd_lookup_section_flags) (struct bfd_link_info *,
+.				      struct flag_info *);
+.
 .  {* Attempt to merge SEC_MERGE sections.  *}
 .  bfd_boolean (*_bfd_merge_sections) (bfd *, struct bfd_link_info *);
 .
@@ -499,7 +512,7 @@ BFD_JUMP_TABLE macros.
 .
 .  {* Check if SEC has been already linked during a reloceatable or
 .     final link.  *}
-.  void (*_section_already_linked) (bfd *, struct bfd_section *,
+.  void (*_section_already_linked) (bfd *, struct already_linked *,
 .				    struct bfd_link_info *);
 .
 .  {* Define a common symbol.  *}
@@ -657,6 +670,7 @@ extern const bfd_target bfd_elf32_powerpcle_vec;
 extern const bfd_target bfd_elf32_powerpc_vxworks_vec;
 extern const bfd_target bfd_elf32_rx_le_vec;
 extern const bfd_target bfd_elf32_rx_be_vec;
+extern const bfd_target bfd_elf32_rx_be_ns_vec;
 extern const bfd_target bfd_elf32_s390_vec;
 extern const bfd_target bfd_elf32_bigscore_vec;
 extern const bfd_target bfd_elf32_littlescore_vec;
@@ -683,6 +697,12 @@ extern const bfd_target bfd_elf32_sparc_vxworks_vec;
 extern const bfd_target bfd_elf32_spu_vec;
 extern const bfd_target bfd_elf32_tic6x_be_vec;
 extern const bfd_target bfd_elf32_tic6x_le_vec;
+extern const bfd_target bfd_elf32_tic6x_elf_be_vec;
+extern const bfd_target bfd_elf32_tic6x_elf_le_vec;
+extern const bfd_target bfd_elf32_tic6x_linux_be_vec;
+extern const bfd_target bfd_elf32_tic6x_linux_le_vec;
+extern const bfd_target bfd_elf32_tilegx_vec;
+extern const bfd_target bfd_elf32_tilepro_vec;
 extern const bfd_target bfd_elf32_tradbigmips_vec;
 extern const bfd_target bfd_elf32_tradlittlemips_vec;
 extern const bfd_target bfd_elf32_tradbigmips_freebsd_vec;
@@ -719,6 +739,7 @@ extern const bfd_target bfd_elf64_sh64nbsd_vec;
 extern const bfd_target bfd_elf64_sparc_vec;
 extern const bfd_target bfd_elf64_sparc_freebsd_vec;
 extern const bfd_target bfd_elf64_sparc_sol2_vec;
+extern const bfd_target bfd_elf64_tilegx_vec;
 extern const bfd_target bfd_elf64_tradbigmips_vec;
 extern const bfd_target bfd_elf64_tradlittlemips_vec;
 extern const bfd_target bfd_elf64_tradbigmips_freebsd_vec;
@@ -1010,6 +1031,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_powerpc_vxworks_vec,
 	&bfd_elf32_powerpcle_vec,
 	&bfd_elf32_rx_be_vec,
+	&bfd_elf32_rx_be_ns_vec,
 	&bfd_elf32_rx_le_vec,
 	&bfd_elf32_s390_vec,
 #ifdef BFD64
@@ -1041,6 +1063,8 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_spu_vec,
 	&bfd_elf32_tic6x_be_vec,
 	&bfd_elf32_tic6x_le_vec,
+	&bfd_elf32_tilegx_vec,
+	&bfd_elf32_tilepro_vec,
 	&bfd_elf32_tradbigmips_vec,
 	&bfd_elf32_tradlittlemips_vec,
 	&bfd_elf32_tradbigmips_freebsd_vec,
@@ -1078,6 +1102,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf64_sparc_vec,
 	&bfd_elf64_sparc_freebsd_vec,
 	&bfd_elf64_sparc_sol2_vec,
+	&bfd_elf64_tilegx_vec,
 	&bfd_elf64_tradbigmips_vec,
 	&bfd_elf64_tradlittlemips_vec,
 	&bfd_elf64_tradbigmips_freebsd_vec,

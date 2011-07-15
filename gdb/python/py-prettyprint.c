@@ -288,7 +288,7 @@ print_stack_unless_memory_error (struct ui_file *stream)
       make_cleanup (xfree, msg);
 
       if (msg == NULL || *msg == '\0')
-	fprintf_filtered (stream, _("<error reading variable"));
+	fprintf_filtered (stream, _("<error reading variable>"));
       else
 	fprintf_filtered (stream, _("<error reading variable: %s>"), msg);
 
@@ -526,7 +526,7 @@ print_children (PyObject *printer, const char *hint,
   for (i = 0; i < options->print_max; ++i)
     {
       PyObject *py_v, *item = PyIter_Next (iter);
-      char *name;
+      const char *name;
       struct cleanup *inner_cleanup;
 
       if (! item)

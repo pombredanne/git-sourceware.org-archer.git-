@@ -195,8 +195,11 @@ struct value
        for them to use.  */
     struct
     {
-      struct lval_funcs *funcs; /* Functions to call.  */
-      void *closure;            /* Closure for those functions to use.  */
+      /* Functions to call.  */
+      const struct lval_funcs *funcs;
+
+      /* Closure for those functions to use.  */
+      void *closure;
     } computed;
   } location;
 
@@ -717,7 +720,7 @@ allocate_repeat_value (struct type *type, int count)
 
 struct value *
 allocate_computed_value (struct type *type,
-                         struct lval_funcs *funcs,
+                         const struct lval_funcs *funcs,
                          void *closure)
 {
   struct value *v = allocate_value_lazy (type);
@@ -727,6 +730,18 @@ allocate_computed_value (struct type *type,
   v->location.computed.closure = closure;
 
   return v;
+}
+
+/* Allocate NOT_LVAL value for type TYPE being OPTIMIZED_OUT.  */
+
+struct value *
+allocate_optimized_out_value (struct type *type)
+{
+  struct value *retval = allocate_value_lazy (type);
+
+  set_value_optimized_out (retval, 1);
+
+  return retval;
 }
 
 /* Accessor methods.  */
@@ -1048,7 +1063,7 @@ set_value_pointed_to_offset (struct value *value, int val)
   value->pointed_to_offset = val;
 }
 
-struct lval_funcs *
+const struct lval_funcs *
 value_computed_funcs (struct value *v)
 {
   gdb_assert (VALUE_LVAL (v) == lval_computed);
@@ -1164,7 +1179,7 @@ value_free (struct value *val)
 
       if (VALUE_LVAL (val) == lval_computed)
 	{
-	  struct lval_funcs *funcs = val->location.computed.funcs;
+	  const struct lval_funcs *funcs = val->location.computed.funcs;
 
 	  if (funcs->free_closure)
 	    funcs->free_closure (val);
@@ -1308,7 +1323,7 @@ value_copy (struct value *arg)
     value_incref (val->parent);
   if (VALUE_LVAL (val) == lval_computed)
     {
-      struct lval_funcs *funcs = val->location.computed.funcs;
+      const struct lval_funcs *funcs = val->location.computed.funcs;
 
       if (funcs->copy_closure)
         val->location.computed.closure = funcs->copy_closure (val);
@@ -1351,7 +1366,7 @@ set_value_component_location (struct value *component,
 
   if (whole->lval == lval_computed)
     {
-      struct lval_funcs *funcs = whole->location.computed.funcs;
+      const struct lval_funcs *funcs = whole->location.computed.funcs;
 
       if (funcs->copy_closure)
         component->location.computed.closure = funcs->copy_closure (whole);
@@ -2454,7 +2469,7 @@ value_static_field (struct type *type, int fieldno)
       break;
     case FIELD_LOC_KIND_PHYSNAME:
     {
-      char *phys_name = TYPE_FIELD_STATIC_PHYSNAME (type, fieldno);
+      const char *phys_name = TYPE_FIELD_STATIC_PHYSNAME (type, fieldno);
       /* TYPE_FIELD_NAME (type, fieldno); */
       struct symbol *sym = lookup_symbol (phys_name, 0, VAR_DOMAIN, 0);
 
@@ -2625,7 +2640,7 @@ value_fn_field (struct value **arg1p, struct fn_field *f,
 {
   struct value *v;
   struct type *ftype = TYPE_FN_FIELD_TYPE (f, j);
-  char *physname = TYPE_FN_FIELD_PHYSNAME (f, j);
+  const char *physname = TYPE_FN_FIELD_PHYSNAME (f, j);
   struct symbol *sym;
   struct minimal_symbol *msym;
 
@@ -3029,6 +3044,19 @@ value_from_contents_and_address (struct type *type,
   set_value_address (v, address);
   VALUE_LVAL (v) = lval_memory;
   return v;
+}
+
+/* Create a value of type TYPE holding the contents CONTENTS.
+   The new value is `not_lval'.  */
+
+struct value *
+value_from_contents (struct type *type, const gdb_byte *contents)
+{
+  struct value *result;
+
+  result = allocate_value (type);
+  memcpy (value_contents_raw (result), contents, TYPE_LENGTH (type));
+  return result;
 }
 
 struct value *

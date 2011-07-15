@@ -431,6 +431,39 @@ make_cleanup_restore_ui_file (struct ui_file **variable)
   return make_cleanup_dtor (do_restore_ui_file, (void *) c, xfree);
 }
 
+/* Helper for make_cleanup_value_free_to_mark.  */
+
+static void
+do_value_free_to_mark (void *value)
+{
+  value_free_to_mark ((struct value *) value);
+}
+
+/* Free all values allocated since MARK was obtained by value_mark
+   (except for those released) when the cleanup is run.  */
+
+struct cleanup *
+make_cleanup_value_free_to_mark (struct value *mark)
+{
+  return make_my_cleanup (&cleanup_chain, do_value_free_to_mark, mark);
+}
+
+/* Helper for make_cleanup_value_free.  */
+
+static void
+do_value_free (void *value)
+{
+  value_free (value);
+}
+
+/* Free VALUE.  */
+
+struct cleanup *
+make_cleanup_value_free (struct value *value)
+{
+  return make_my_cleanup (&cleanup_chain, do_value_free, value);
+}
+
 struct cleanup *
 make_my_cleanup2 (struct cleanup **pmy_chain, make_cleanup_ftype *function,
 		  void *arg,  void (*free_arg) (void *))
@@ -581,7 +614,7 @@ free_current_contents (void *ptr)
 }
 
 /* Provide a known function that does nothing, to use as a base for
-   for a possibly long chain of cleanups.  This is useful where we
+   a possibly long chain of cleanups.  This is useful where we
    use the cleanup chain for handling normal cleanups as well as dealing
    with cleanups that need to be done as a result of a call to error().
    In such cases, we may not be certain where the first cleanup is, unless
@@ -657,10 +690,10 @@ report_command_stats (void *arg)
       long space_diff = space_now - start_stats->start_space;
 
       printf_unfiltered (msg_type == 0
-			 ? _("Space used: %ld (%c%ld during startup)\n")
-			 : _("Space used: %ld (%c%ld for this command)\n"),
+			 ? _("Space used: %ld (%s%ld during startup)\n")
+			 : _("Space used: %ld (%s%ld for this command)\n"),
 			 space_now,
-			 (space_diff >= 0 ? '+' : '-'),
+			 (space_diff >= 0 ? "+" : ""),
 			 space_diff);
 #endif
     }
@@ -684,268 +717,6 @@ make_command_stats_cleanup (int msg_type)
   new_stat->start_time = get_run_time ();
 
   return make_cleanup_dtor (report_command_stats, new_stat, xfree);
-}
-
-/* Continuations are implemented as cleanups internally.  Inherit from
-   cleanups.  */
-struct continuation
-{
-  struct cleanup base;
-};
-
-/* Add a continuation to the continuation list of THREAD.  The new
-   continuation will be added at the front.  */
-void
-add_continuation (struct thread_info *thread,
-		  void (*continuation_hook) (void *), void *args,
-		  void (*continuation_free_args) (void *))
-{
-  struct cleanup *as_cleanup = &thread->continuations->base;
-  make_cleanup_ftype *continuation_hook_fn = continuation_hook;
-
-  make_my_cleanup2 (&as_cleanup,
-		    continuation_hook_fn,
-		    args,
-		    continuation_free_args);
-
-  thread->continuations = (struct continuation *) as_cleanup;
-}
-
-/* Add a continuation to the continuation list of INFERIOR.  The new
-   continuation will be added at the front.  */
-
-void
-add_inferior_continuation (void (*continuation_hook) (void *), void *args,
-			   void (*continuation_free_args) (void *))
-{
-  struct inferior *inf = current_inferior ();
-  struct cleanup *as_cleanup = &inf->continuations->base;
-  make_cleanup_ftype *continuation_hook_fn = continuation_hook;
-
-  make_my_cleanup2 (&as_cleanup,
-		    continuation_hook_fn,
-		    args,
-		    continuation_free_args);
-
-  inf->continuations = (struct continuation *) as_cleanup;
-}
-
-/* Do all continuations of the current inferior.  */
-
-void
-do_all_inferior_continuations (void)
-{
-  struct cleanup *as_cleanup;
-  struct inferior *inf = current_inferior ();
-
-  if (inf->continuations == NULL)
-    return;
-
-  /* Copy the list header into another pointer, and set the global
-     list header to null, so that the global list can change as a side
-     effect of invoking the continuations and the processing of the
-     preexisting continuations will not be affected.  */
-
-  as_cleanup = &inf->continuations->base;
-  inf->continuations = NULL;
-
-  /* Work now on the list we have set aside.  */
-  do_my_cleanups (&as_cleanup, NULL);
-}
-
-/* Get rid of all the inferior-wide continuations of INF.  */
-
-void
-discard_all_inferior_continuations (struct inferior *inf)
-{
-  struct cleanup *continuation_ptr = &inf->continuations->base;
-
-  discard_my_cleanups (&continuation_ptr, NULL);
-  inf->continuations = NULL;
-}
-
-static void
-restore_thread_cleanup (void *arg)
-{
-  ptid_t *ptid_p = arg;
-
-  switch_to_thread (*ptid_p);
-}
-
-/* Walk down the continuation list of PTID, and execute all the
-   continuations.  There is a problem though.  In some cases new
-   continuations may be added while we are in the middle of this loop.
-   If this happens they will be added in the front, and done before we
-   have a chance of exhausting those that were already there.  We need
-   to then save the beginning of the list in a pointer and do the
-   continuations from there on, instead of using the global beginning
-   of list as our iteration pointer.  */
-static void
-do_all_continuations_ptid (ptid_t ptid,
-			   struct continuation **continuations_p)
-{
-  struct cleanup *old_chain;
-  ptid_t current_thread;
-  struct cleanup *as_cleanup;
-
-  if (*continuations_p == NULL)
-    return;
-
-  current_thread = inferior_ptid;
-
-  /* Restore selected thread on exit.  Don't try to restore the frame
-     as well, because:
-
-    - When running continuations, the selected frame is always #0.
-
-    - The continuations may trigger symbol file loads, which may
-      change the frame layout (frame ids change), which would trigger
-      a warning if we used make_cleanup_restore_current_thread.  */
-
-  old_chain = make_cleanup (restore_thread_cleanup, &current_thread);
-
-  /* Let the continuation see this thread as selected.  */
-  switch_to_thread (ptid);
-
-  /* Copy the list header into another pointer, and set the global
-     list header to null, so that the global list can change as a side
-     effect of invoking the continuations and the processing of the
-     preexisting continuations will not be affected.  */
-
-  as_cleanup = &(*continuations_p)->base;
-  *continuations_p = NULL;
-
-  /* Work now on the list we have set aside.  */
-  do_my_cleanups (&as_cleanup, NULL);
-
-  do_cleanups (old_chain);
-}
-
-/* Callback for iterate over threads.  */
-static int
-do_all_continuations_thread_callback (struct thread_info *thread, void *data)
-{
-  do_all_continuations_ptid (thread->ptid, &thread->continuations);
-  return 0;
-}
-
-/* Do all continuations of thread THREAD.  */
-void
-do_all_continuations_thread (struct thread_info *thread)
-{
-  do_all_continuations_thread_callback (thread, NULL);
-}
-
-/* Do all continuations of all threads.  */
-void
-do_all_continuations (void)
-{
-  iterate_over_threads (do_all_continuations_thread_callback, NULL);
-}
-
-/* Callback for iterate over threads.  */
-static int
-discard_all_continuations_thread_callback (struct thread_info *thread,
-					   void *data)
-{
-  struct cleanup *continuation_ptr = &thread->continuations->base;
-
-  discard_my_cleanups (&continuation_ptr, NULL);
-  thread->continuations = NULL;
-  return 0;
-}
-
-/* Get rid of all the continuations of THREAD.  */
-void
-discard_all_continuations_thread (struct thread_info *thread)
-{
-  discard_all_continuations_thread_callback (thread, NULL);
-}
-
-/* Get rid of all the continuations of all threads.  */
-void
-discard_all_continuations (void)
-{
-  iterate_over_threads (discard_all_continuations_thread_callback, NULL);
-}
-
-
-/* Add a continuation to the intermediate continuation list of THREAD.
-   The new continuation will be added at the front.  */
-void
-add_intermediate_continuation (struct thread_info *thread,
-			       void (*continuation_hook)
-			       (void *), void *args,
-			       void (*continuation_free_args) (void *))
-{
-  struct cleanup *as_cleanup = &thread->intermediate_continuations->base;
-  make_cleanup_ftype *continuation_hook_fn = continuation_hook;
-
-  make_my_cleanup2 (&as_cleanup,
-		    continuation_hook_fn,
-		    args,
-		    continuation_free_args);
-
-  thread->intermediate_continuations = (struct continuation *) as_cleanup;
-}
-
-/* Walk down the cmd_continuation list, and execute all the
-   continuations.  There is a problem though.  In some cases new
-   continuations may be added while we are in the middle of this
-   loop.  If this happens they will be added in the front, and done
-   before we have a chance of exhausting those that were already
-   there.  We need to then save the beginning of the list in a pointer
-   and do the continuations from there on, instead of using the
-   global beginning of list as our iteration pointer.  */
-static int
-do_all_intermediate_continuations_thread_callback (struct thread_info *thread,
-						   void *data)
-{
-  do_all_continuations_ptid (thread->ptid,
-			     &thread->intermediate_continuations);
-  return 0;
-}
-
-/* Do all intermediate continuations of thread THREAD.  */
-void
-do_all_intermediate_continuations_thread (struct thread_info *thread)
-{
-  do_all_intermediate_continuations_thread_callback (thread, NULL);
-}
-
-/* Do all intermediate continuations of all threads.  */
-void
-do_all_intermediate_continuations (void)
-{
-  iterate_over_threads (do_all_intermediate_continuations_thread_callback,
-			NULL);
-}
-
-/* Callback for iterate over threads.  */
-static int
-discard_all_intermediate_continuations_thread_callback (struct thread_info *thread,
-							void *data)
-{
-  struct cleanup *continuation_ptr = &thread->intermediate_continuations->base;
-
-  discard_my_cleanups (&continuation_ptr, NULL);
-  thread->intermediate_continuations = NULL;
-  return 0;
-}
-
-/* Get rid of all the intermediate continuations of THREAD.  */
-void
-discard_all_intermediate_continuations_thread (struct thread_info *thread)
-{
-  discard_all_intermediate_continuations_thread_callback (thread, NULL);
-}
-
-/* Get rid of all the intermediate continuations of all threads.  */
-void
-discard_all_intermediate_continuations (void)
-{
-  iterate_over_threads (discard_all_intermediate_continuations_thread_callback,
-			NULL);
 }
 
 
@@ -3004,10 +2775,12 @@ strcmp_iw (const char *string1, const char *string2)
 	{
 	  string2++;
 	}
-      if (*string1 != *string2)
-	{
-	  break;
-	}
+      if (case_sensitivity == case_sensitive_on && *string1 != *string2)
+	break;
+      if (case_sensitivity == case_sensitive_off
+	  && (tolower ((unsigned char) *string1)
+	      != tolower ((unsigned char) *string2)))
+	break;
       if (*string1 != '\0')
 	{
 	  string1++;
@@ -3027,6 +2800,10 @@ strcmp_iw (const char *string1, const char *string2)
    find names in the list that match some fixed NAME according to
    strcmp_iw(LIST_ELT, NAME), then the place to start looking is right
    where this function would put NAME.
+
+   This function must be neutral to the CASE_SENSITIVITY setting as the user
+   may choose it during later lookup.  Therefore this function always sorts
+   primarily case-insensitively and secondarily case-sensitively.
 
    Here are some examples of why using strcmp to sort is a bad idea:
 
@@ -3053,47 +2830,78 @@ strcmp_iw (const char *string1, const char *string2)
 int
 strcmp_iw_ordered (const char *string1, const char *string2)
 {
-  while ((*string1 != '\0') && (*string2 != '\0'))
-    {
-      while (isspace (*string1))
-	{
-	  string1++;
-	}
-      while (isspace (*string2))
-	{
-	  string2++;
-	}
-      if (*string1 != *string2)
-	{
-	  break;
-	}
-      if (*string1 != '\0')
-	{
-	  string1++;
-	  string2++;
-	}
-    }
+  const char *saved_string1 = string1, *saved_string2 = string2;
+  enum case_sensitivity case_pass = case_sensitive_off;
 
-  switch (*string1)
+  for (;;)
     {
-      /* Characters are non-equal unless they're both '\0'; we want to
-	 make sure we get the comparison right according to our
-	 comparison in the cases where one of them is '\0' or '('.  */
-    case '\0':
-      if (*string2 == '\0')
+      /* C1 and C2 are valid only if *string1 != '\0' && *string2 != '\0'.
+	 Provide stub characters if we are already at the end of one of the
+	 strings.  */
+      char c1 = 'X', c2 = 'X';
+
+      while (*string1 != '\0' && *string2 != '\0')
+	{
+	  while (isspace (*string1))
+	    string1++;
+	  while (isspace (*string2))
+	    string2++;
+
+	  switch (case_pass)
+	  {
+	    case case_sensitive_off:
+	      c1 = tolower ((unsigned char) *string1);
+	      c2 = tolower ((unsigned char) *string2);
+	      break;
+	    case case_sensitive_on:
+	      c1 = *string1;
+	      c2 = *string2;
+	      break;
+	  }
+	  if (c1 != c2)
+	    break;
+
+	  if (*string1 != '\0')
+	    {
+	      string1++;
+	      string2++;
+	    }
+	}
+
+      switch (*string1)
+	{
+	  /* Characters are non-equal unless they're both '\0'; we want to
+	     make sure we get the comparison right according to our
+	     comparison in the cases where one of them is '\0' or '('.  */
+	case '\0':
+	  if (*string2 == '\0')
+	    break;
+	  else
+	    return -1;
+	case '(':
+	  if (*string2 == '\0')
+	    return 1;
+	  else
+	    return -1;
+	default:
+	  if (*string2 == '\0' || *string2 == '(')
+	    return 1;
+	  else if (c1 > c2)
+	    return 1;
+	  else if (c1 < c2)
+	    return -1;
+	  /* PASSTHRU */
+	}
+
+      if (case_pass == case_sensitive_on)
 	return 0;
-      else
-	return -1;
-    case '(':
-      if (*string2 == '\0')
-	return 1;
-      else
-	return -1;
-    default:
-      if (*string2 == '(')
-	return 1;
-      else
-	return *string1 - *string2;
+      
+      /* Otherwise the strings were equal in case insensitive way, make
+	 a more fine grained comparison in a case sensitive way.  */
+
+      case_pass = case_sensitive_on;
+      string1 = saved_string1;
+      string2 = saved_string2;
     }
 }
 
@@ -3252,6 +3060,25 @@ paddress (struct gdbarch *gdbarch, CORE_ADDR addr)
   if (addr_bit < (sizeof (CORE_ADDR) * HOST_CHAR_BIT))
     addr &= ((CORE_ADDR) 1 << addr_bit) - 1;
   return hex_string (addr);
+}
+
+/* This function is described in "defs.h".  */
+
+const char *
+print_core_address (struct gdbarch *gdbarch, CORE_ADDR address)
+{
+  int addr_bit = gdbarch_addr_bit (gdbarch);
+
+  if (addr_bit < (sizeof (CORE_ADDR) * HOST_CHAR_BIT))
+    address &= ((CORE_ADDR) 1 << addr_bit) - 1;
+
+  /* FIXME: cagney/2002-05-03: Need local_address_string() function
+     that returns the language localized string formatted to a width
+     based on gdbarch_addr_bit.  */
+  if (addr_bit <= 32)
+    return hex_string_custom (address, 8);
+  else
+    return hex_string_custom (address, 16);
 }
 
 static char *
@@ -3616,7 +3443,7 @@ gdb_realpath (const char *filename)
   /* FIXME: cagney/2002-11-13:
 
      Method 2a: Use realpath() with a NULL buffer.  Some systems, due
-     to the problems described in in method 3, have modified their
+     to the problems described in method 3, have modified their
      realpath() implementation so that it will allocate a buffer when
      NULL is passed in.  Before this can be used, though, some sort of
      configure time test would need to be added.  Otherwize the code

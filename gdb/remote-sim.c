@@ -684,6 +684,7 @@ gdbsim_open (char *args, int from_tty)
   len = (7 + 1			/* gdbsim */
 	 + strlen (" -E little")
 	 + strlen (" --architecture=xxxxxxxxxx")
+	 + strlen (" --sysroot=") + strlen (gdb_sysroot) +
 	 + (args ? strlen (args) : 0)
 	 + 50) /* slack */ ;
   arg_buf = (char *) alloca (len);
@@ -708,6 +709,9 @@ gdbsim_open (char *args, int from_tty)
       strcat (arg_buf, " --architecture=");
       strcat (arg_buf, selected_architecture_name ());
     }
+  /* Pass along gdb's concept of the sysroot.  */
+  strcat (arg_buf, " --sysroot=");
+  strcat (arg_buf, gdb_sysroot);
   /* finally, any explicit args */
   if (args)
     {
@@ -1193,6 +1197,18 @@ simulator_command (char *args, int from_tty)
   registers_changed ();
 }
 
+static char **
+sim_command_completer (struct cmd_list_element *ignore, char *text, char *word)
+{
+  struct sim_inferior_data *sim_data;
+
+  sim_data = inferior_data (current_inferior (), sim_inferior_data_key);
+  if (sim_data == NULL || sim_data->gdbsim_desc == NULL)
+    return NULL;
+
+  return sim_complete_command (sim_data->gdbsim_desc, text, word);
+}
+
 /* Check to see if a thread is still alive.  */
 
 static int
@@ -1287,11 +1303,14 @@ init_gdbsim_ops (void)
 void
 _initialize_remote_sim (void)
 {
+  struct cmd_list_element *c;
+
   init_gdbsim_ops ();
   add_target (&gdbsim_ops);
 
-  add_com ("sim", class_obscure, simulator_command,
-	   _("Send a command to the simulator."));
+  c = add_com ("sim", class_obscure, simulator_command,
+	       _("Send a command to the simulator."));
+  set_cmd_completer (c, sim_command_completer);
 
   sim_inferior_data_key
     = register_inferior_data_with_cleanup (sim_inferior_data_cleanup);

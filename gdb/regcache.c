@@ -30,6 +30,7 @@
 #include "gdbcmd.h"		/* For maintenanceprintlist.  */
 #include "observer.h"
 #include "exceptions.h"
+#include "remote.h"
 
 /*
  * DATA STRUCTURE
@@ -66,7 +67,7 @@ struct regcache_descr
   long sizeof_cooked_registers;
   long sizeof_cooked_register_status;
 
-  /* Offset and size (in 8 bit bytes), of reach register in the
+  /* Offset and size (in 8 bit bytes), of each register in the
      register cache.  All registers (including those in the range
      [NR_RAW_REGISTERS .. NR_COOKED_REGISTERS) are given an
      offset.  */
@@ -453,16 +454,25 @@ get_thread_arch_regcache (ptid_t ptid, struct gdbarch *gdbarch)
 {
   struct regcache_list *list;
   struct regcache *new_regcache;
+  struct address_space *aspace;
 
   for (list = current_regcache; list; list = list->next)
     if (ptid_equal (list->regcache->ptid, ptid)
 	&& get_regcache_arch (list->regcache) == gdbarch)
       return list->regcache;
 
-  new_regcache = regcache_xmalloc_1 (gdbarch,
-				     target_thread_address_space (ptid), 0);
+  /* For the benefit of "maint print registers" & co when debugging an
+     executable, allow dumping the regcache even when there is no
+     thread selected (target_thread_address_space internal-errors if
+     no address space is found).  Note that normal user commands will
+     fail higher up on the call stack due to no
+     target_has_registers.  */
+  aspace = (ptid_equal (null_ptid, ptid)
+	    ? NULL
+	    : target_thread_address_space (ptid));
+
+  new_regcache = regcache_xmalloc_1 (gdbarch, aspace, 0);
   new_regcache->ptid = ptid;
-  gdb_assert (new_regcache->aspace != NULL);
 
   list = xmalloc (sizeof (struct regcache_list));
   list->regcache = new_regcache;
@@ -1044,7 +1054,8 @@ dump_endian_bytes (struct ui_file *file, enum bfd_endian endian,
 enum regcache_dump_what
 {
   regcache_dump_none, regcache_dump_raw,
-  regcache_dump_cooked, regcache_dump_groups
+  regcache_dump_cooked, regcache_dump_groups,
+  regcache_dump_remote
 };
 
 static void
@@ -1242,6 +1253,23 @@ regcache_dump (struct regcache *regcache, struct ui_file *file,
 	    }
 	}
 
+      /* Remote packet configuration.  */
+      if (what_to_dump == regcache_dump_remote)
+	{
+	  if (regnum < 0)
+	    {
+	      fprintf_unfiltered (file, "Rmt Nr  g/G Offset");
+	    }
+	  else if (regnum < regcache->descr->nr_raw_registers)
+	    {
+	      int pnum, poffset;
+
+	      if (remote_register_number_and_offset (get_regcache_arch (regcache), regnum,
+						     &pnum, &poffset))
+		fprintf_unfiltered (file, "%7d %11d", pnum, poffset);
+	    }
+	}
+
       fprintf_unfiltered (file, "\n");
     }
 
@@ -1300,6 +1328,12 @@ maintenance_print_register_groups (char *args, int from_tty)
   regcache_print (args, regcache_dump_groups);
 }
 
+static void
+maintenance_print_remote_registers (char *args, int from_tty)
+{
+  regcache_print (args, regcache_dump_remote);
+}
+
 extern initialize_file_ftype _initialize_regcache; /* -Wmissing-prototype */
 
 void
@@ -1332,6 +1366,12 @@ _initialize_regcache (void)
 	   _("Print the internal register configuration "
 	     "including each register's group.\n"
 	     "Takes an optional file parameter."),
+	   &maintenanceprintlist);
+  add_cmd ("remote-registers", class_maintenance,
+	   maintenance_print_remote_registers, _("\
+Print the internal register configuration including each register's\n\
+remote register number and buffer offset in the g/G packets.\n\
+Takes an optional file parameter."),
 	   &maintenanceprintlist);
 
 }

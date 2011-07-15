@@ -285,9 +285,6 @@ exec_reverse_continue (char **argv, int argc)
   enum exec_direction_kind dir = execution_direction;
   struct cleanup *old_chain;
 
-  if (dir == EXEC_ERROR)
-    error (_("Target %s does not support this command."), target_shortname);
-
   if (dir == EXEC_REVERSE)
     error (_("Already in reverse mode."));
 
@@ -1553,7 +1550,7 @@ mi_cmd_data_read_memory_bytes (char *command, char **argv, int argc)
 
 /* DATA-MEMORY-WRITE:
 
-   COLUMN_OFFSET: optional argument. Must be preceeded by '-o'. The
+   COLUMN_OFFSET: optional argument. Must be preceded by '-o'. The
    offset from the beginning of the memory grid row where the cell to
    be written is.
    ADDR: start address of the row in the memory grid where the memory
@@ -1711,6 +1708,7 @@ mi_cmd_list_features (char *command, char **argv, int argc)
       ui_out_field_string (uiout, NULL, "pending-breakpoints");
       ui_out_field_string (uiout, NULL, "thread-info");
       ui_out_field_string (uiout, NULL, "data-read-memory-bytes");
+      ui_out_field_string (uiout, NULL, "breakpoint-notifications");
       
 #if HAVE_PYTHON
       ui_out_field_string (uiout, NULL, "python");
@@ -1816,10 +1814,9 @@ mi_cmd_remove_inferior (char *command, char **argv, int argc)
    prompt, display error). */
 
 static void
-captured_mi_execute_command (struct ui_out *uiout, void *data)
+captured_mi_execute_command (struct ui_out *uiout, struct mi_parse *context)
 {
   struct cleanup *cleanup;
-  struct mi_parse *context = (struct mi_parse *) data;
 
   if (do_timings)
     current_command_ts = context->cmd_start;
@@ -1947,7 +1944,7 @@ mi_execute_command (char *cmd, int from_tty)
     }
   else
     {
-      struct gdb_exception result;
+      volatile struct gdb_exception result;
       ptid_t previous_ptid = inferior_ptid;
 
       command->token = token;
@@ -1959,8 +1956,10 @@ mi_execute_command (char *cmd, int from_tty)
 	  timestamp (command->cmd_start);
 	}
 
-      result = catch_exception (uiout, captured_mi_execute_command, command,
-				RETURN_MASK_ALL);
+      TRY_CATCH (result, RETURN_MASK_ALL)
+	{
+	  captured_mi_execute_command (uiout, command);
+	}
       if (result.reason < 0)
 	{
 	  /* The command execution failed and error() was called
@@ -2024,9 +2023,7 @@ mi_cmd_execute (struct mi_parse *parse)
 {
   struct cleanup *cleanup;
 
-  prepare_execute_command ();
-
-  cleanup = make_cleanup (null_cleanup, NULL);
+  cleanup = prepare_execute_command ();
 
   if (parse->all && parse->thread_group != -1)
     error (_("Cannot specify --thread-group together with --all"));
@@ -2087,8 +2084,16 @@ mi_cmd_execute (struct mi_parse *parse)
 
   current_context = parse;
 
+  if (strncmp (parse->command, "break-", sizeof ("break-") - 1 ) == 0)
+    {
+      make_cleanup_restore_integer (&mi_suppress_breakpoint_notifications);
+      mi_suppress_breakpoint_notifications = 1;
+    }
+
   if (parse->cmd->argv_func != NULL)
-    parse->cmd->argv_func (parse->command, parse->argv, parse->argc);
+    {
+      parse->cmd->argv_func (parse->command, parse->argv, parse->argc);
+    }
   else if (parse->cmd->cli.cmd != 0)
     {
       /* FIXME: DELETE THIS. */
@@ -2155,18 +2160,9 @@ mi_execute_async_cli_command (char *cli_command, char **argv, int argc)
 
   execute_command ( /*ui */ run, 0 /*from_tty */ );
 
-  if (target_can_async_p ())
-    {
-      /* If we're not executing, an exception should have been throw.  */
-      gdb_assert (is_running (inferior_ptid));
-      do_cleanups (old_cleanups);
-    }
-  else
-    {
-      /* Do this before doing any printing.  It would appear that some
-         print code leaves garbage around in the buffer.  */
-      do_cleanups (old_cleanups);
-    }
+  /* Do this before doing any printing.  It would appear that some
+     print code leaves garbage around in the buffer.  */
+  do_cleanups (old_cleanups);
 }
 
 void
