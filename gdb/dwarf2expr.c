@@ -1263,6 +1263,7 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 	    error (_("DWARF-2 expression error: DW_OP_push_object_address must "
 	           "have a value to push."));
 	  result = (ctx->funcs->get_object_address) (ctx->baton);
+	  result_val = value_from_ulongest (address_type, result);
 	  break;
 
 	default:
