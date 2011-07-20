@@ -1,6 +1,7 @@
 /* Target definitions for NN-bit ELF
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+   Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -142,7 +143,7 @@
 #define elf_backend_gc_mark_hook	_bfd_elf_gc_mark_hook
 #endif
 #ifndef elf_backend_gc_mark_extra_sections
-#define elf_backend_gc_mark_extra_sections	NULL
+#define elf_backend_gc_mark_extra_sections _bfd_elf_gc_mark_extra_sections
 #endif
 #ifndef elf_backend_gc_sweep_hook
 #define elf_backend_gc_sweep_hook	NULL
@@ -171,6 +172,10 @@
 
 #ifndef bfd_elfNN_bfd_define_common_symbol
 #define bfd_elfNN_bfd_define_common_symbol bfd_generic_define_common_symbol
+#endif
+
+#ifndef bfd_elfNN_bfd_lookup_section_flags
+#define bfd_elfNN_bfd_lookup_section_flags bfd_elf_lookup_section_flags
 #endif
 
 #ifndef bfd_elfNN_bfd_make_debug_symbol
@@ -528,6 +533,9 @@
 #ifndef elf_backend_write_core_note
 #define elf_backend_write_core_note		NULL
 #endif
+#ifndef elf_backend_lookup_section_flags_hook
+#define elf_backend_lookup_section_flags_hook	NULL
+#endif
 #ifndef elf_backend_reloc_type_class
 #define elf_backend_reloc_type_class		_bfd_elf_reloc_type_class
 #endif
@@ -643,6 +651,11 @@
 #define elf_backend_is_function_type _bfd_elf_is_function_type
 #endif
 
+#ifndef elf_match_priority
+#define elf_match_priority \
+  (ELF_ARCH == bfd_arch_unknown ? 2 : ELF_OSABI == ELFOSABI_NONE ? 1 : 0)
+#endif
+
 extern const struct elf_size_info _bfd_elfNN_size_info;
 
 static struct elf_backend_data elfNN_bed =
@@ -711,6 +724,7 @@ static struct elf_backend_data elfNN_bed =
   elf_backend_grok_prstatus,
   elf_backend_grok_psinfo,
   elf_backend_write_core_note,
+  elf_backend_lookup_section_flags_hook,
   elf_backend_reloc_type_class,
   elf_backend_discard_info,
   elf_backend_ignore_discarded_relocs,
@@ -811,6 +825,8 @@ const bfd_target TARGET_BIG_SYM =
      Chapter 7 (Formats & Protocols), Archive section sets this as 15.  */
   15,
 
+  elf_match_priority,
+
   /* Routines to byte-swap various sized integers from the data sections */
   bfd_getb64, bfd_getb_signed_64, bfd_putb64,
     bfd_getb32, bfd_getb_signed_32, bfd_putb32,
@@ -906,6 +922,8 @@ const bfd_target TARGET_LITTLE_SYM =
      of the archiver and should be independently tunable.  The System V ABI,
      Chapter 7 (Formats & Protocols), Archive section sets this as 15.  */
   15,
+
+  elf_match_priority,
 
   /* Routines to byte-swap various sized integers from the data sections */
   bfd_getl64, bfd_getl_signed_64, bfd_putl64,

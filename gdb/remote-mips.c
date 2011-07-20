@@ -33,6 +33,7 @@
 #include "exceptions.h"
 #include "gdb_string.h"
 #include "gdb_stat.h"
+#include "gdb_usleep.h"
 #include "regcache.h"
 #include <ctype.h>
 #include "mips-tdep.h"
@@ -1350,7 +1351,7 @@ mips_enter_debug (void)
   else				/* Assume IDT monitor by default.  */
     mips_send_command ("db tty0\r", 0);
 
-  sleep (1);
+  gdb_usleep (1000000);
   serial_write (mips_desc, "\r", sizeof "\r" - 1);
 
   /* We don't need to absorb any spurious characters here, since the
@@ -3342,7 +3343,13 @@ static void
 pmon_download (char *buffer, int length)
 {
   if (tftp_in_use)
-    fwrite (buffer, 1, length, tftp_file);
+    {
+      size_t written;
+
+      written = fwrite (buffer, 1, length, tftp_file);
+      if (written < length)
+	perror_with_name (tftp_localname);
+    }
   else
     serial_write (udp_in_use ? udp_desc : mips_desc, buffer, length);
 }

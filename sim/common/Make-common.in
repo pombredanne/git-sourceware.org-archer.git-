@@ -162,6 +162,7 @@ SIM_COMMON_HW_OBJS = \
 SIM_NEW_COMMON_OBJS = \
 	sim-arange.o \
 	sim-bits.o \
+	sim-command.o \
 	sim-config.o \
 	sim-core.o \
 	sim-endian.o \
@@ -425,6 +426,9 @@ sim-bits.o: $(srccom)/sim-bits.c $(sim-bits_h) $(sim-n-bits_h) \
 	  $(SIM_EXTRA_DEPS)
 	$(CC) -c $(srccom)/sim-bits.c $(ALL_CFLAGS)
 
+sim-command.o: $(srccom)/sim-command.c $(sim_main_headers)
+	$(CC) -c $(srccom)/sim-command.c $(ALL_CFLAGS)
+
 sim-config.o: $(srccom)/sim-config.c $(sim-config_h) sim-main.h \
 	  $(SIM_EXTRA_DEPS)
 	$(CC) -c $(srccom)/sim-config.c $(ALL_CFLAGS)
@@ -574,6 +578,9 @@ hw-tree.o: $(srccom)/hw-tree.c $(hw_main_headers) $(hw-tree_h)
 	$(CC) -c $(srccom)/hw-tree.c $(ALL_CFLAGS)
 
 # Devices.
+
+dv-cfi.o: $(srccom)/dv-cfi.c $(hw_main_headers) $(sim_main_headers)
+	$(CC) -c $(srccom)/dv-cfi.c $(ALL_CFLAGS)
 
 dv-core.o: $(srccom)/dv-core.c $(hw_main_headers) $(sim_main_headers)
 	$(CC) -c $(srccom)/dv-core.c $(ALL_CFLAGS)

@@ -588,7 +588,8 @@ match_partial_symbol (struct partial_symtab *pst, int global,
 
 static void
 pre_expand_symtabs_matching_psymtabs (struct objfile *objfile,
-				      int kind, const char *name,
+				      enum block_enum block_kind,
+				      const char *name,
 				      domain_enum domain)
 {
   /* Nothing.  */
@@ -690,8 +691,15 @@ lookup_partial_symbol (struct partial_symtab *pst, const char *name,
 	internal_error (__FILE__, __LINE__,
 			_("failed internal consistency check"));
 
-      while (top <= real_top
-	     && SYMBOL_MATCHES_SEARCH_NAME (*top, search_name))
+      /* For `case_sensitivity == case_sensitive_off' strcmp_iw_ordered will
+	 search more exactly than what matches SYMBOL_MATCHES_SEARCH_NAME.  */
+      while (top >= start && SYMBOL_MATCHES_SEARCH_NAME (*top, search_name))
+	top--;
+
+      /* Fixup to have a symbol which matches SYMBOL_MATCHES_SEARCH_NAME.  */
+      top++;
+
+      while (top <= real_top && SYMBOL_MATCHES_SEARCH_NAME (*top, search_name))
 	{
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (*top),
 				     SYMBOL_DOMAIN (*top), domain))
@@ -1073,46 +1081,8 @@ read_psymtabs_with_filename (struct objfile *objfile, const char *filename)
 }
 
 static void
-map_symbol_names_psymtab (struct objfile *objfile,
-			  void (*fun) (const char *, void *), void *data)
-{
-  struct partial_symtab *ps;
-
-  ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, ps)
-    {
-      struct partial_symbol **psym;
-
-      /* If the psymtab's been read in we'll get it when we search
-	 through the blockvector.  */
-      if (ps->readin)
-	continue;
-
-      for (psym = objfile->global_psymbols.list + ps->globals_offset;
-	   psym < (objfile->global_psymbols.list + ps->globals_offset
-		   + ps->n_global_syms);
-	   psym++)
-	{
-	  /* If interrupted, then quit.  */
-	  QUIT;
-	  (*fun) (SYMBOL_NATURAL_NAME (*psym), data);
-	}
-
-      for (psym = objfile->static_psymbols.list + ps->statics_offset;
-	   psym < (objfile->static_psymbols.list + ps->statics_offset
-		   + ps->n_static_syms);
-	   psym++)
-	{
-	  QUIT;
-	  (*fun) (SYMBOL_NATURAL_NAME (*psym), data);
-	}
-    }
-}
-
-static void
 map_symbol_filenames_psymtab (struct objfile *objfile,
-			      void (*fun) (const char *, const char *,
-					   void *),
-			      void *data)
+			      symbol_filename_ftype *fun, void *data)
 {
   struct partial_symtab *ps;
 
@@ -1244,7 +1214,7 @@ expand_symtabs_matching_via_partial (struct objfile *objfile,
 							  void *),
 				     int (*name_matcher) (const char *,
 							  void *),
-				     domain_enum kind,
+				     enum search_domain kind,
 				     void *data)
 {
   struct partial_symtab *ps;
@@ -1258,7 +1228,7 @@ expand_symtabs_matching_via_partial (struct objfile *objfile,
       if (ps->readin)
 	continue;
 
-      if (! (*file_matcher) (ps->filename, data))
+      if (file_matcher && ! (*file_matcher) (ps->filename, data))
 	continue;
 
       gbound = objfile->global_psymbols.list
@@ -1287,14 +1257,15 @@ expand_symtabs_matching_via_partial (struct objfile *objfile,
 	    {
 	      QUIT;
 
-	      if ((*name_matcher) (SYMBOL_NATURAL_NAME (*psym), data)
-		  && ((kind == VARIABLES_DOMAIN
+	      if ((kind == ALL_DOMAIN
+		   || (kind == VARIABLES_DOMAIN
 		       && SYMBOL_CLASS (*psym) != LOC_TYPEDEF
 		       && SYMBOL_CLASS (*psym) != LOC_BLOCK)
-		      || (kind == FUNCTIONS_DOMAIN
-			  && SYMBOL_CLASS (*psym) == LOC_BLOCK)
-		      || (kind == TYPES_DOMAIN
-			  && SYMBOL_CLASS (*psym) == LOC_TYPEDEF)))
+		   || (kind == FUNCTIONS_DOMAIN
+		       && SYMBOL_CLASS (*psym) == LOC_BLOCK)
+		   || (kind == TYPES_DOMAIN
+		       && SYMBOL_CLASS (*psym) == LOC_TYPEDEF))
+		  && (*name_matcher) (SYMBOL_NATURAL_NAME (*psym), data))
 		{
 		  PSYMTAB_TO_SYMTAB (ps);
 		  keep_going = 0;
@@ -1329,7 +1300,6 @@ const struct quick_symbol_functions psym_functions =
   map_matching_symbols_psymtab,
   expand_symtabs_matching_via_partial,
   find_pc_sect_symtab_from_partial,
-  map_symbol_names_psymtab,
   map_symbol_filenames_psymtab
 };
 
@@ -1932,21 +1902,20 @@ maintenance_check_symtabs (char *ignore, int from_tty)
 
 
 void
-map_partial_symbol_names (void (*fun) (const char *, void *), void *data)
+expand_partial_symbol_names (int (*fun) (const char *, void *), void *data)
 {
   struct objfile *objfile;
 
   ALL_OBJFILES (objfile)
   {
     if (objfile->sf)
-      objfile->sf->qf->map_symbol_names (objfile, fun, data);
+      objfile->sf->qf->expand_symtabs_matching (objfile, NULL, fun,
+						ALL_DOMAIN, data);
   }
 }
 
 void
-map_partial_symbol_filenames (void (*fun) (const char *, const char *,
-					   void *),
-			      void *data)
+map_partial_symbol_filenames (symbol_filename_ftype *fun, void *data)
 {
   struct objfile *objfile;
 

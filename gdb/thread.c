@@ -45,6 +45,7 @@
 #include "cli/cli-decode.h"
 #include "gdb_regex.h"
 #include "cli/cli-utils.h"
+#include "continuations.h"
 
 /* Definition of struct thread_info exported to gdbthread.h.  */
 
@@ -124,8 +125,8 @@ clear_thread_inferior_resources (struct thread_info *tp)
 
   bpstat_clear (&tp->control.stop_bpstat);
 
-  discard_all_intermediate_continuations_thread (tp);
-  discard_all_continuations_thread (tp);
+  do_all_intermediate_continuations_thread (tp, 1);
+  do_all_continuations_thread (tp, 1);
 
   delete_longjmp_breakpoint (tp->num);
 }
@@ -133,8 +134,6 @@ clear_thread_inferior_resources (struct thread_info *tp)
 static void
 free_thread (struct thread_info *tp)
 {
-  clear_thread_inferior_resources (tp);
-
   if (tp->private)
     {
       if (tp->private_dtor)
@@ -296,14 +295,18 @@ delete_thread_1 (ptid_t ptid, int silent)
        return;
      }
 
+  /* Notify thread exit, but only if we haven't already.  */
+  if (tp->state_ != THREAD_EXITED)
+    observer_notify_thread_exit (tp, silent);
+
+  /* Tag it as exited.  */
+  tp->state_ = THREAD_EXITED;
+  clear_thread_inferior_resources (tp);
+
   if (tpprev)
     tpprev->next = tp->next;
   else
     thread_list = tp->next;
-
-  /* Notify thread exit, but only if we haven't already.  */
-  if (tp->state_ != THREAD_EXITED)
-    observer_notify_thread_exit (tp, silent);
 
   free_thread (tp);
 }
@@ -470,18 +473,18 @@ struct thread_info *
 any_live_thread_of_process (int pid)
 {
   struct thread_info *tp;
-  struct thread_info *tp_running = NULL;
+  struct thread_info *tp_executing = NULL;
 
   for (tp = thread_list; tp; tp = tp->next)
-    if (ptid_get_pid (tp->ptid) == pid)
+    if (tp->state_ != THREAD_EXITED && ptid_get_pid (tp->ptid) == pid)
       {
-	if (tp->state_ == THREAD_STOPPED)
+	if (tp->executing_)
+	  tp_executing = tp;
+	else
 	  return tp;
-	else if (tp->state_ == THREAD_RUNNING)
-	  tp_running = tp;
       }
 
-  return tp_running;
+  return tp_executing;
 }
 
 /* Print a list of thread ids currently known, and the total number of

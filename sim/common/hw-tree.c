@@ -43,7 +43,8 @@
 
 /* manipulate/lookup device names */
 
-typedef struct _name_specifier {
+typedef struct _name_specifier
+{
 
   /* components in the full length name */
   char *path;
@@ -95,14 +96,14 @@ split_device_specifier (struct hw *current,
 	{
 	  alias[len] = device_specifier[len];
 	  len++;
-	  if (len >= sizeof(alias))
+	  if (len >= sizeof (alias))
 	    hw_abort (NULL, "split_device_specifier: buffer overflow");
 	}
       alias[len] = '\0';
       if (aliases != NULL
 	  && hw_find_property (aliases, alias))
 	{
-	  strcpy (spec->buf, hw_find_string_property(aliases, alias));
+	  strcpy (spec->buf, hw_find_string_property (aliases, alias));
 	  strcat (spec->buf, device_specifier + len);
 	}
       else
@@ -112,23 +113,23 @@ split_device_specifier (struct hw *current,
     }
   else
     {
-      strcpy(spec->buf, device_specifier);
+      strcpy (spec->buf, device_specifier);
     }
 
   /* check no overflow */
-  if (strlen(spec->buf) >= sizeof(spec->buf))
+  if (strlen (spec->buf) >= sizeof (spec->buf))
     hw_abort (NULL, "split_device_specifier: buffer overflow\n");
 
   /* strip leading spaces */
   chp = spec->buf;
-  while (*chp != '\0' && isspace(*chp))
+  while (*chp != '\0' && isspace (*chp))
     chp++;
   if (*chp == '\0')
     return 0;
 
   /* find the path and terminate it with null */
   spec->path = chp;
-  while (*chp != '\0' && !isspace(*chp))
+  while (*chp != '\0' && !isspace (*chp))
     chp++;
   if (*chp != '\0')
     {
@@ -137,7 +138,7 @@ split_device_specifier (struct hw *current,
     }
 
   /* and any value */
-  while (*chp != '\0' && isspace(*chp))
+  while (*chp != '\0' && isspace (*chp))
     chp++;
   spec->value = chp;
 
@@ -153,18 +154,20 @@ split_device_specifier (struct hw *current,
       /* an interrupt spec */
       spec->property = NULL;
     }
-  else {
-    chp = strrchr(spec->path, '/');
-    if (chp == NULL)
-      {
-	spec->property = spec->path;
-	spec->path = strchr(spec->property, '\0');
-      }
-    else {
-      *chp = '\0';
-      spec->property = chp+1;
+  else
+    {
+      chp = strrchr (spec->path, '/');
+      if (chp == NULL)
+	{
+	  spec->property = spec->path;
+	  spec->path = strchr (spec->property, '\0');
+	}
+      else
+	{
+	  *chp = '\0';
+	  spec->property = chp+1;
+	}
     }
-  }
 
   /* and mark the rest as invalid */
   spec->name = NULL;
@@ -247,7 +250,7 @@ split_device_name (name_specifier *spec)
   /* break out the base */
   if (spec->name[0] == '(')
     {
-      chp = strchr(spec->name, ')');
+      chp = strchr (spec->name, ')');
       if (chp == NULL)
 	{
 	  spec->family = spec->name;
@@ -264,7 +267,7 @@ split_device_name (name_specifier *spec)
       spec->family = spec->name;
     }
   /* now break out the unit */
-  chp = strchr(spec->name, '@');
+  chp = strchr (spec->name, '@');
   if (chp == NULL)
     {
       spec->unit = NULL;
@@ -277,7 +280,7 @@ split_device_name (name_specifier *spec)
       spec->unit = chp;
     }
   /* finally any args */
-  chp = strchr(chp, ':');
+  chp = strchr (chp, ':');
   if (chp == NULL)
     spec->args = NULL;
   else
@@ -439,11 +442,11 @@ split_fill_path (struct hw *current,
 /* <non-white-space> */
 
 static const char *
-skip_token(const char *chp)
+skip_token (const char *chp)
 {
-  while (!isspace(*chp) && *chp != '\0')
+  while (!isspace (*chp) && *chp != '\0')
     chp++;
-  while (isspace(*chp) && *chp != '\0')
+  while (isspace (*chp) && *chp != '\0')
     chp++;
   return chp;
 }
@@ -499,7 +502,7 @@ parse_size (struct hw *current,
   int i;
   int nr;
   const char *curr = chp;
-  memset(size, 0, sizeof(*size));
+  memset (size, 0, sizeof (*size));
   /* parse the numeric list */
   size->nr_cells = hw_unit_nr_size_cells (bus);
   nr = 0;
@@ -551,9 +554,9 @@ parse_reg_property (struct hw *current,
   chp = property_value;
   for (reg_nr = 0; reg_nr < nr_regs; reg_nr++)
     {
-      chp = parse_address (current, hw_parent(current),
+      chp = parse_address (current, hw_parent (current),
 			   chp, &regs[reg_nr].address);
-      chp = parse_size (current, hw_parent(current),
+      chp = parse_size (current, hw_parent (current),
 			chp, &regs[reg_nr].size);
     }
 
@@ -581,7 +584,7 @@ parse_ranges_property (struct hw *current,
   nr_ranges = count_entries (current, property_name, property_value, 3);
 
   /* create a property of that size */
-  ranges = zalloc (nr_ranges * sizeof(*ranges));
+  ranges = zalloc (nr_ranges * sizeof (*ranges));
 
   /* fill it in */
   chp = property_value;
@@ -589,7 +592,7 @@ parse_ranges_property (struct hw *current,
     {
       chp = parse_address (current, current,
 			   chp, &ranges[range_nr].child_address);
-      chp = parse_address (current, hw_parent(current),
+      chp = parse_address (current, hw_parent (current),
 			   chp, &ranges[range_nr].parent_address);
       chp = parse_size (current, current,
 			chp, &ranges[range_nr].size);
@@ -638,7 +641,7 @@ parse_integer_property (struct hw *current,
 	}
       /* perhaps integer array property is better */
       hw_add_array_property (current, property_name, words,
-			     sizeof(words[0]) * nr_entries);
+			     sizeof (words[0]) * nr_entries);
     }
 }
 
@@ -666,7 +669,7 @@ parse_string_property (struct hw *current,
   approx_nr_strings = (approx_nr_strings) / 2;
 
   /* create a string buffer for that many (plus a null) */
-  strings = (char**) zalloc ((approx_nr_strings + 1) * sizeof(char*));
+  strings = (char**) zalloc ((approx_nr_strings + 1) * sizeof (char*));
 
   /* now find all the strings */
   chp = property_value;
@@ -700,11 +703,12 @@ parse_string_property (struct hw *current,
 	  pos = 0;
 	  while (*chp != '\0' && *chp != '"')
 	    {
-	      if (*chp == '\\' && *(chp+1) != '\0') {
-		strings[nr_strings][pos] = *(chp+1);
-		chp += 2;
-		pos++;
-	      }
+	      if (*chp == '\\' && *(chp+1) != '\0')
+		{
+		  strings[nr_strings][pos] = *(chp+1);
+		  chp += 2;
+		  pos++;
+		}
 	      else
 		{
 		  strings[nr_strings][pos] = *chp;
@@ -720,10 +724,10 @@ parse_string_property (struct hw *current,
 	{
 	  /* copy over a single unquoted token */
 	  int len = 0;
-	  while (chp[len] != '\0' && !isspace(chp[len]))
+	  while (chp[len] != '\0' && !isspace (chp[len]))
 	    len++;
-	  strings[nr_strings] = zalloc(len + 1);
-	  strncpy(strings[nr_strings], chp, len);
+	  strings[nr_strings] = zalloc (len + 1);
+	  strncpy (strings[nr_strings], chp, len);
 	  strings[nr_strings][len] = '\0';
 	  chp += len;
 	}
@@ -752,7 +756,7 @@ parse_string_property (struct hw *current,
       nr_strings--;
       free (strings[nr_strings]);
     }
-  free(strings);
+  free (strings);
 }
 
 
@@ -897,7 +901,7 @@ hw_tree_vparse (struct hw *current,
 		    nr_words += 1;
 		  }
 		hw_add_array_property (current, spec.property,
-				       words, sizeof(words[0]) * nr_words);
+				       words, sizeof (words[0]) * nr_words);
 		break;
 	      }
 	    case '"':
@@ -928,14 +932,14 @@ hw_tree_vparse (struct hw *current,
 		  {
 		    parse_ranges_property (current, spec.property, spec.value);
 		  }
-		else if (isdigit(spec.value[0])
-			 || (spec.value[0] == '-' && isdigit(spec.value[1]))
-			 || (spec.value[0] == '+' && isdigit(spec.value[1])))
+		else if (isdigit (spec.value[0])
+			 || (spec.value[0] == '-' && isdigit (spec.value[1]))
+			 || (spec.value[0] == '+' && isdigit (spec.value[1])))
 		  {
-		    parse_integer_property(current, spec.property, spec.value);
+		    parse_integer_property (current, spec.property, spec.value);
 		  }
 		else
-		  parse_string_property(current, spec.property, spec.value);
+		  parse_string_property (current, spec.property, spec.value);
 		break;
 	      }
 	    }
@@ -982,7 +986,8 @@ hw_tree_traverse (struct hw *root,
 
 
 
-struct printer {
+struct printer
+{
   hw_tree_print_callback *print;
   void *file;
 };
@@ -993,7 +998,7 @@ print_address (struct hw *bus,
 	       struct printer *p)
 {
   char unit[32];
-  hw_unit_encode (bus, phys, unit, sizeof(unit));
+  hw_unit_encode (bus, phys, unit, sizeof (unit));
   p->print (p->file, " %s", unit);
 }
 
@@ -1006,12 +1011,13 @@ print_size (struct hw *bus,
   for (i = 0; i < size->nr_cells; i++)
     if (size->cells[i] != 0)
       break;
-  if (i < size->nr_cells) {
-    p->print (p->file, " 0x%lx", (unsigned long) size->cells[i]);
-    i++;
-    for (; i < size->nr_cells; i++)
-      p->print (p->file, ",0x%lx", (unsigned long) size->cells[i]);
-  }
+  if (i < size->nr_cells)
+    {
+      p->print (p->file, " 0x%lx", (unsigned long) size->cells[i]);
+      i++;
+      for (; i < size->nr_cells; i++)
+	p->print (p->file, ",0x%lx", (unsigned long) size->cells[i]);
+    }
   else
     p->print (p->file, " 0");
 }
@@ -1025,10 +1031,11 @@ print_reg_property (struct hw *me,
   reg_property_spec reg;
   for (reg_nr = 0;
        hw_find_reg_array_property (me, property->name, reg_nr, &reg);
-       reg_nr++) {
-    print_address (hw_parent (me), &reg.address, p);
-    print_size (me, &reg.size, p);
-  }
+       reg_nr++)
+    {
+      print_address (hw_parent (me), &reg.address, p);
+      print_size (me, &reg.size, p);
+    }
 }
 
 static void
@@ -1054,20 +1061,22 @@ print_string (struct hw *me,
 	      struct printer *p)
 {
   p->print (p->file, " \"");
-  while (*string != '\0') {
-    switch (*string) {
-    case '"':
-      p->print (p->file, "\\\"");
-      break;
-    case '\\':
-      p->print (p->file, "\\\\");
-      break;
-    default:
-      p->print (p->file, "%c", *string);
-      break;
+  while (*string != '\0')
+    {
+      switch (*string)
+	{
+	case '"':
+	  p->print (p->file, "\\\"");
+	  break;
+	case '\\':
+	  p->print (p->file, "\\\\");
+	  break;
+	default:
+	  p->print (p->file, "%c", *string);
+	  break;
+	}
+      string++;
     }
-    string++;
-  }
   p->print (p->file, "\"");
 }
 
@@ -1127,16 +1136,17 @@ print_properties (struct hw *me,
 		  {
 		    unsigned8 *w = (unsigned8*)property->array;
 		    p->print (p->file, " [");
-		    while ((char*)w - (char*)property->array < property->sizeof_array) {
-		      p->print (p->file, " 0x%2x", BE2H_1 (*w));
-		      w++;
-		    }
+		    while ((char*)w - (char*)property->array < property->sizeof_array)
+		      {
+			p->print (p->file, " 0x%2x", BE2H_1 (*w));
+			w++;
+		      }
 		  }
 		break;
 	      }
 	    case boolean_property:
 	      {
-		int b = hw_find_boolean_property(me, property->name);
+		int b = hw_find_boolean_property (me, property->name);
 		p->print (p->file, " %s", b ? "true"  : "false");
 		break;
 	      }
@@ -1146,7 +1156,7 @@ print_properties (struct hw *me,
 		if (property->array != NULL)
 		  {
 		    device_instance *instance = hw_find_ihandle_property (me, property->name);
-		    p->print (p->file, " *%s", device_instance_path(instance));
+		    p->print (p->file, " *%s", device_instance_path (instance));
 		  }
 		else
 		  {
@@ -1201,8 +1211,8 @@ print_interrupts (struct hw *me,
   struct printer *p = data;
   char src[32];
   char dst[32];
-  hw_port_encode (me, my_port, src, sizeof(src), output_port);
-  hw_port_encode (dest, dest_port, dst, sizeof(dst), input_port);
+  hw_port_encode (me, my_port, src, sizeof (src), output_port);
+  hw_port_encode (dest, dest_port, dst, sizeof (dst), input_port);
   p->print (p->file,
 	    "%s > %s %s %s\n",
 	    hw_path (me),
@@ -1237,19 +1247,19 @@ hw_tree_print (struct hw *root,
 
 #if NOT_YET
 device_instance *
-tree_instance(struct hw *root,
-	      const char *device_specifier)
+tree_instance (struct hw *root,
+	       const char *device_specifier)
 {
   /* find the device node */
   struct hw *me;
   name_specifier spec;
-  if (!split_device_specifier(root, device_specifier, &spec))
+  if (!split_device_specifier (root, device_specifier, &spec))
     return NULL;
-  me = split_find_device(root, &spec);
+  me = split_find_device (root, &spec);
   if (spec.name != NULL)
     return NULL;
   /* create the instance */
-  return device_create_instance(me, device_specifier, spec.last_args);
+  return device_create_instance (me, device_specifier, spec.last_args);
 }
 #endif
 

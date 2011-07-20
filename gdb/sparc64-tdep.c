@@ -520,7 +520,8 @@ sparc64_frame_prev_register (struct frame_info *this_frame, void **this_cache,
     {
       CORE_ADDR pc = (regnum == SPARC64_NPC_REGNUM) ? 4 : 0;
 
-      regnum = cache->frameless_p ? SPARC_O7_REGNUM : SPARC_I7_REGNUM;
+      regnum =
+	(cache->copied_regs_mask & 0x80) ? SPARC_I7_REGNUM : SPARC_O7_REGNUM;
       pc += get_frame_register_unsigned (this_frame, regnum) + 8;
       return frame_unwind_got_constant (this_frame, regnum, pc);
     }
@@ -540,20 +541,20 @@ sparc64_frame_prev_register (struct frame_info *this_frame, void **this_cache,
       }
   }
 
-  /* The previous frame's `local' and `in' registers have been saved
+  /* The previous frame's `local' and `in' registers may have been saved
      in the register save area.  */
-  if (!cache->frameless_p
-      && regnum >= SPARC_L0_REGNUM && regnum <= SPARC_I7_REGNUM)
+  if (regnum >= SPARC_L0_REGNUM && regnum <= SPARC_I7_REGNUM
+      && (cache->saved_regs_mask & (1 << (regnum - SPARC_L0_REGNUM))))
     {
       CORE_ADDR addr = cache->base + (regnum - SPARC_L0_REGNUM) * 8;
 
       return frame_unwind_got_memory (this_frame, regnum, addr);
     }
 
-  /* The previous frame's `out' registers are accessable as the
-     current frame's `in' registers.  */
-  if (!cache->frameless_p
-      && regnum >= SPARC_O0_REGNUM && regnum <= SPARC_O7_REGNUM)
+  /* The previous frame's `out' registers may be accessible as the current
+     frame's `in' registers.  */
+  if (regnum >= SPARC_O0_REGNUM && regnum <= SPARC_O7_REGNUM
+      && (cache->copied_regs_mask & (1 << (regnum - SPARC_O0_REGNUM))))
     regnum += (SPARC_I0_REGNUM - SPARC_O0_REGNUM);
 
   return frame_unwind_got_register (this_frame, regnum, regnum);
@@ -1206,6 +1207,7 @@ sparc64_supply_gregset (const struct sparc_gregset *gregset,
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   int sparc32 = (gdbarch_ptr_bit (gdbarch) == 32);
   const gdb_byte *regs = gregs;
+  gdb_byte zero[8] = { 0 };
   int i;
 
   if (sparc32)
@@ -1268,7 +1270,7 @@ sparc64_supply_gregset (const struct sparc_gregset *gregset,
     }
 
   if (regnum == SPARC_G0_REGNUM || regnum == -1)
-    regcache_raw_supply (regcache, SPARC_G0_REGNUM, NULL);
+    regcache_raw_supply (regcache, SPARC_G0_REGNUM, &zero);
 
   if ((regnum >= SPARC_G1_REGNUM && regnum <= SPARC_O7_REGNUM) || regnum == -1)
     {

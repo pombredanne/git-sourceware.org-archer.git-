@@ -40,6 +40,8 @@ static const char *const jit_descriptor_name = "__jit_debug_descriptor";
 
 static const struct inferior_data *jit_inferior_data = NULL;
 
+static void jit_inferior_init (struct gdbarch *gdbarch);
+
 /* Non-zero if we want to see trace of jit level stuff.  */
 
 static int jit_debug = 0;
@@ -296,7 +298,7 @@ JITed symbol file is not an object file, ignoring it.\n"));
       }
 
   /* This call takes ownership of sai.  */
-  objfile = symbol_file_add_from_bfd (nbfd, 0, sai, OBJF_SHARED);
+  objfile = symbol_file_add_from_bfd (nbfd, 0, sai, OBJF_SHARED, NULL);
 
   /* Remember a mapping from entry_addr to objfile.  */
   entry_addr_ptr = xmalloc (sizeof (CORE_ADDR));
@@ -351,6 +353,11 @@ jit_breakpoint_re_set_internal (struct gdbarch *gdbarch,
       inf_data->breakpoint_addr = SYMBOL_VALUE_ADDRESS (reg_symbol);
       if (inf_data->breakpoint_addr == 0)
 	return 2;
+
+      /* If we have not read the jit descriptor yet (e.g. because the JITer
+	 itself is in a shared library which just got loaded), do so now.  */
+      if (inf_data->descriptor_addr == 0)
+	jit_inferior_init (gdbarch);
     }
   else
     return 0;

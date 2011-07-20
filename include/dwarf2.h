@@ -556,6 +556,15 @@ enum dwarf_location_atom
     /* The GNU entry value extension.
        See http://www.dwarfstd.org/ShowIssue.php?issue=100909.1&type=open .  */
     DW_OP_GNU_entry_value = 0xf3,
+    /* The GNU typed stack extension.
+       See http://www.dwarfstd.org/doc/040408.1.html .  */
+    DW_OP_GNU_const_type = 0xf4,
+    DW_OP_GNU_regval_type = 0xf5,
+    DW_OP_GNU_deref_type = 0xf6,
+    DW_OP_GNU_convert = 0xf7,
+    DW_OP_GNU_reinterpret = 0xf9,
+    /* The GNU parameter ref extension.  */
+    DW_OP_GNU_parameter_ref = 0xfa,
     /* HP extensions.  */
     DW_OP_HP_unknown     = 0xe0, /* Ouch, the same as GNU_push_tls_address.  */
     DW_OP_HP_is_value    = 0xe1,
@@ -755,6 +764,14 @@ enum dwarf_line_number_x_ops
 
     DW_LNE_lo_user = 0x80,
     DW_LNE_hi_user = 0xff
+  };
+
+/* Sub-opcodes for DW_LNE_HP_source_file_correlation.  */
+enum dwarf_line_number_hp_sfc_ops
+  {
+    DW_LNE_HP_SFC_formfeed = 1,
+    DW_LNE_HP_SFC_set_listing_line = 2,
+    DW_LNE_HP_SFC_associate = 3
   };
 
 /* Call frame information.  */

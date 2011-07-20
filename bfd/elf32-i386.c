@@ -1,6 +1,7 @@
 /* Intel 80386/80486-specific support for 32-bit ELF
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+   Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -28,6 +29,7 @@
 #include "bfd_stdint.h"
 #include "objalloc.h"
 #include "hashtab.h"
+#include "dwarf2.h"
 
 /* 386 uses REL relocations instead of RELA.  */
 #define USE_REL	1
@@ -323,7 +325,7 @@ elf_i386_reloc_type_lookup (bfd *abfd ATTRIBUTE_UNUSED,
 
     case BFD_RELOC_386_IRELATIVE:
       TRACE ("BFD_RELOC_386_IRELATIVE");
-      return &elf_howto_table[R_386_IRELATIVE];
+      return &elf_howto_table[R_386_IRELATIVE - R_386_tls_offset];
 
     case BFD_RELOC_VTABLE_INHERIT:
       TRACE ("BFD_RELOC_VTABLE_INHERIT");
@@ -573,6 +575,45 @@ static const bfd_byte elf_i386_pic_plt_entry[PLT_ENTRY_SIZE] =
   0, 0, 0, 0	/* replaced with offset to start of .plt.  */
 };
 
+/* .eh_frame covering the .plt section.  */
+
+static const bfd_byte elf_i386_eh_frame_plt[] =
+{
+#define PLT_CIE_LENGTH		20
+#define PLT_FDE_LENGTH		36
+#define PLT_FDE_START_OFFSET	4 + PLT_CIE_LENGTH + 8
+#define PLT_FDE_LEN_OFFSET	4 + PLT_CIE_LENGTH + 12
+  PLT_CIE_LENGTH, 0, 0, 0,	/* CIE length */
+  0, 0, 0, 0,			/* CIE ID */
+  1,				/* CIE version */
+  'z', 'R', 0,			/* Augmentation string */
+  1,				/* Code alignment factor */
+  0x7c,				/* Data alignment factor */
+  8,				/* Return address column */
+  1,				/* Augmentation size */
+  DW_EH_PE_pcrel | DW_EH_PE_sdata4, /* FDE encoding */
+  DW_CFA_def_cfa, 4, 4,		/* DW_CFA_def_cfa: r4 (esp) ofs 4 */
+  DW_CFA_offset + 8, 1,		/* DW_CFA_offset: r8 (eip) at cfa-4 */
+  DW_CFA_nop, DW_CFA_nop,
+
+  PLT_FDE_LENGTH, 0, 0, 0,	/* FDE length */
+  PLT_CIE_LENGTH + 8, 0, 0, 0,	/* CIE pointer */
+  0, 0, 0, 0,			/* R_386_PC32 .plt goes here */
+  0, 0, 0, 0,			/* .plt size goes here */
+  0,				/* Augmentation size */
+  DW_CFA_def_cfa_offset, 8,	/* DW_CFA_def_cfa_offset: 8 */
+  DW_CFA_advance_loc + 6,	/* DW_CFA_advance_loc: 6 to __PLT__+6 */
+  DW_CFA_def_cfa_offset, 12,	/* DW_CFA_def_cfa_offset: 12 */
+  DW_CFA_advance_loc + 10,	/* DW_CFA_advance_loc: 10 to __PLT__+16 */
+  DW_CFA_def_cfa_expression,	/* DW_CFA_def_cfa_expression */
+  11,				/* Block length */
+  DW_OP_breg4, 4,		/* DW_OP_breg4 (esp): 4 */
+  DW_OP_breg8, 0,		/* DW_OP_breg8 (eip): 0 */
+  DW_OP_lit15, DW_OP_and, DW_OP_lit11, DW_OP_ge,
+  DW_OP_lit2, DW_OP_shl, DW_OP_plus,
+  DW_CFA_nop, DW_CFA_nop, DW_CFA_nop, DW_CFA_nop
+};
+
 /* On VxWorks, the .rel.plt.unloaded section has absolute relocations
    for the PLTResolve stub and then for each PLT entry.  */
 #define PLTRESOLVE_RELOCS_SHLIB 0
@@ -654,6 +695,7 @@ struct elf_i386_link_hash_table
   /* Short-cuts to get to dynamic linker sections.  */
   asection *sdynbss;
   asection *srelbss;
+  asection *plt_eh_frame;
 
   union
   {
@@ -819,6 +861,7 @@ elf_i386_link_hash_table_create (bfd *abfd)
 
   ret->sdynbss = NULL;
   ret->srelbss = NULL;
+  ret->plt_eh_frame = NULL;
   ret->tls_ldm_got.refcount = 0;
   ret->next_tls_desc_index = 0;
   ret->sgotplt_jump_table_size = 0;
@@ -885,6 +928,25 @@ elf_i386_create_dynamic_sections (bfd *dynobj, struct bfd_link_info *info)
       && !elf_vxworks_create_dynamic_sections (dynobj, info,
 					       &htab->srelplt2))
     return FALSE;
+
+  if (!info->no_ld_generated_unwind_info
+      && bfd_get_section_by_name (dynobj, ".eh_frame") == NULL
+      && htab->elf.splt != NULL)
+    {
+      flagword flags = get_elf_backend_data (dynobj)->dynamic_sec_flags;
+      htab->plt_eh_frame
+	= bfd_make_section_with_flags (dynobj, ".eh_frame",
+				       flags | SEC_READONLY);
+      if (htab->plt_eh_frame == NULL
+	  || !bfd_set_section_alignment (dynobj, htab->plt_eh_frame, 2))
+	return FALSE;
+
+      htab->plt_eh_frame->size = sizeof (elf_i386_eh_frame_plt);
+      htab->plt_eh_frame->contents
+	= bfd_alloc (dynobj, htab->plt_eh_frame->size);
+      memcpy (htab->plt_eh_frame->contents, elf_i386_eh_frame_plt,
+	      sizeof (elf_i386_eh_frame_plt));
+    }
 
   return TRUE;
 }
@@ -1375,7 +1437,9 @@ elf_i386_check_relocs (bfd *abfd,
 	    case R_386_PLT32:
 	    case R_386_GOT32:
 	    case R_386_GOTOFF:
-	      if (!_bfd_elf_create_ifunc_sections (abfd, info))
+	      if (htab->elf.dynobj == NULL)
+		htab->elf.dynobj = abfd;
+	      if (!_bfd_elf_create_ifunc_sections (htab->elf.dynobj, info))
 		return FALSE;
 	      break;
 	    }
@@ -2080,11 +2144,6 @@ elf_i386_allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
   if (h->root.type == bfd_link_hash_indirect)
     return TRUE;
 
-  if (h->root.type == bfd_link_hash_warning)
-    /* When warning symbols are created, they **replace** the "real"
-       entry in the hash table, thus we never get to see the real
-       symbol in a hash traversal.  So look at it now.  */
-    h = (struct elf_link_hash_entry *) h->root.u.i.link;
   eh = (struct elf_i386_link_hash_entry *) h;
 
   info = (struct bfd_link_info *) inf;
@@ -2380,8 +2439,9 @@ elf_i386_readonly_dynrelocs (struct elf_link_hash_entry *h, void *inf)
   struct elf_i386_link_hash_entry *eh;
   struct elf_dyn_relocs *p;
 
-  if (h->root.type == bfd_link_hash_warning)
-    h = (struct elf_link_hash_entry *) h->root.u.i.link;
+  /* Skip local IFUNC symbols. */
+  if (h->forced_local && h->type == STT_GNU_IFUNC)
+    return TRUE;
 
   eh = (struct elf_i386_link_hash_entry *) h;
   for (p = eh->dyn_relocs; p != NULL; p = p->next)
@@ -2393,6 +2453,11 @@ elf_i386_readonly_dynrelocs (struct elf_link_hash_entry *h, void *inf)
 	  struct bfd_link_info *info = (struct bfd_link_info *) inf;
 
 	  info->flags |= DF_TEXTREL;
+
+	  if (info->warn_shared_textrel && info->shared)
+	    info->callbacks->einfo (_("%P: %B: warning: relocation against `%s' in readonly section `%A'.\n"),
+				    p->sec->owner, h->root.root.string,
+				    p->sec);
 
 	  /* Not an error, just cut short the traversal.  */
 	  return FALSE;
@@ -2476,8 +2541,14 @@ elf_i386_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
 		{
 		  srel = elf_section_data (p->sec)->sreloc;
 		  srel->size += p->count * sizeof (Elf32_External_Rel);
-		  if ((p->sec->output_section->flags & SEC_READONLY) != 0)
-		    info->flags |= DF_TEXTREL;
+		  if ((p->sec->output_section->flags & SEC_READONLY) != 0
+		      && (info->flags & DF_TEXTREL) == 0)
+		    {
+		      info->flags |= DF_TEXTREL;
+		      if (info->warn_shared_textrel && info->shared)
+			info->callbacks->einfo (_("%P: %B: warning: relocation in readonly section `%A'.\n"),
+						p->sec->owner, p->sec);
+		    }
 		}
 	    }
 	}
@@ -2656,6 +2727,13 @@ elf_i386_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
       if (s->contents == NULL)
 	return FALSE;
     }
+
+  if (htab->plt_eh_frame != NULL
+      && htab->elf.splt != NULL
+      && htab->elf.splt->size != 0
+      && (htab->elf.splt->flags & SEC_EXCLUDE) == 0)
+    bfd_put_32 (dynobj, htab->elf.splt->size,
+		htab->plt_eh_frame->contents + PLT_FDE_LEN_OFFSET);
 
   if (htab->elf.dynamic_sections_created)
     {
@@ -3451,7 +3529,11 @@ elf_i386_relocate_section (bfd *output_bfd,
 
 	      sreloc = elf_section_data (input_section)->sreloc;
 
-	      BFD_ASSERT (sreloc != NULL && sreloc->contents != NULL);
+	      if (sreloc == NULL || sreloc->contents == NULL)
+		{
+		  r = bfd_reloc_notsupported;
+		  goto check_relocation_error;
+		}
 
 	      loc = sreloc->contents;
 	      loc += sreloc->reloc_count++ * sizeof (Elf32_External_Rel);
@@ -4025,7 +4107,7 @@ elf_i386_relocate_section (bfd *output_bfd,
 	  break;
 
 	case R_386_TLS_LDO_32:
-	  if (info->shared || (input_section->flags & SEC_CODE) == 0)
+	  if (!info->executable || (input_section->flags & SEC_CODE) == 0)
 	    relocation -= elf_i386_dtpoff_base (info);
 	  else
 	    /* When converting LDO to LE, we must negate.  */
@@ -4096,6 +4178,7 @@ do_relocation:
 				    contents, rel->r_offset,
 				    relocation, 0);
 
+check_relocation_error:
       if (r != bfd_reloc_ok)
 	{
 	  const char *name;
@@ -4183,7 +4266,7 @@ elf_i386_finish_dynamic_symbol (bfd *output_bfd,
 	  || plt == NULL
 	  || gotplt == NULL
 	  || relplt == NULL)
-	abort ();
+	return FALSE;
 
       /* Get the index in the procedure linkage table which
 	 corresponds to this symbol.  This is the index of this symbol
@@ -4652,6 +4735,33 @@ elf_i386_finish_dynamic_sections (bfd *output_bfd,
       elf_section_data (htab->elf.sgotplt->output_section)->this_hdr.sh_entsize = 4;
     }
 
+  /* Adjust .eh_frame for .plt section.  */
+  if (htab->plt_eh_frame != NULL)
+    {
+      if (htab->elf.splt != NULL
+	  && htab->elf.splt->size != 0
+	  && (htab->elf.splt->flags & SEC_EXCLUDE) == 0
+	  && htab->elf.splt->output_section != NULL
+	  && htab->plt_eh_frame->output_section != NULL)
+	{
+	  bfd_vma plt_start = htab->elf.splt->output_section->vma;
+	  bfd_vma eh_frame_start = htab->plt_eh_frame->output_section->vma
+				   + htab->plt_eh_frame->output_offset
+				   + PLT_FDE_START_OFFSET;
+	  bfd_put_signed_32 (dynobj, plt_start - eh_frame_start,
+			     htab->plt_eh_frame->contents
+			     + PLT_FDE_START_OFFSET);
+	}
+      if (htab->plt_eh_frame->sec_info_type
+	  == ELF_INFO_TYPE_EH_FRAME)
+	{
+	  if (! _bfd_elf_write_section_eh_frame (output_bfd, info,
+						 htab->plt_eh_frame,
+						 htab->plt_eh_frame->contents))
+	    return FALSE;
+	}
+    }
+
   if (htab->elf.sgot && htab->elf.sgot->size > 0)
     elf_section_data (htab->elf.sgot->output_section)->this_hdr.sh_entsize = 4;
 
@@ -4699,8 +4809,9 @@ elf_i386_add_symbol_hook (bfd * abfd,
 			  bfd_vma * valp ATTRIBUTE_UNUSED)
 {
   if ((abfd->flags & DYNAMIC) == 0
-      && ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC)
-    elf_tdata (info->output_bfd)->has_ifunc_symbols = TRUE;
+      && (ELF_ST_TYPE (sym->st_info) == STT_GNU_IFUNC
+	  || ELF_ST_BIND (sym->st_info) == STB_GNU_UNIQUE))
+    elf_tdata (info->output_bfd)->has_gnu_symbols = TRUE;
 
   return TRUE;
 }
@@ -4718,6 +4829,7 @@ elf_i386_add_symbol_hook (bfd * abfd,
 #define elf_backend_plt_readonly	1
 #define elf_backend_want_plt_sym	0
 #define elf_backend_got_header_size	12
+#define elf_backend_plt_alignment	4
 
 /* Support RELA for objdump of prelink objects.  */
 #define elf_info_to_howto		      elf_i386_info_to_howto_rel

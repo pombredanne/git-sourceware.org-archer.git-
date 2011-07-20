@@ -1,6 +1,7 @@
 /* MIPS-specific support for ELF
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010 Free Software Foundation, Inc.
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+   Free Software Foundation, Inc.
 
    Most of the information added by Ian Lance Taylor, Cygnus Support,
    <ian@cygnus.com>.
@@ -1718,14 +1719,16 @@ mips_elf_check_symbols (struct mips_elf_link_hash_entry *h, void *data)
   struct mips_htab_traverse_info *hti;
 
   hti = (struct mips_htab_traverse_info *) data;
-  if (h->root.root.type == bfd_link_hash_warning)
-    h = (struct mips_elf_link_hash_entry *) h->root.root.u.i.link;
-
   if (!hti->info->relocatable)
     mips_elf_check_mips16_stubs (hti->info, h);
 
   if (mips_elf_local_pic_function_p (h))
     {
+      /* PR 12845: If H is in a section that has been garbage
+	 collected it will have its output section set to *ABS*.  */
+      if (bfd_is_abs_section (h->root.root.u.def.section->output_section))
+	return TRUE;
+
       /* H is a function that might need $25 to be valid on entry.
 	 If we're creating a non-PIC relocatable object, mark H as
 	 being PIC.  If we're creating a non-relocatable object with
@@ -2402,9 +2405,6 @@ mips_elf_output_extsym (struct mips_elf_link_hash_entry *h, void *data)
   struct extsym_info *einfo = data;
   bfd_boolean strip;
   asection *sec, *output_section;
-
-  if (h->root.root.type == bfd_link_hash_warning)
-    h = (struct mips_elf_link_hash_entry *) h->root.root.u.i.link;
 
   if (h->root.indx == -2)
     strip = FALSE;
@@ -3431,9 +3431,6 @@ mips_elf_sort_hash_table_f (struct mips_elf_link_hash_entry *h, void *data)
 {
   struct mips_elf_hash_sort_data *hsd = data;
 
-  if (h->root.root.type == bfd_link_hash_warning)
-    h = (struct mips_elf_link_hash_entry *) h->root.root.u.i.link;
-
   /* Symbols without dynamic symbol table entries aren't interesting
      at all.  */
   if (h->root.dynindx == -1)
@@ -4080,14 +4077,18 @@ mips_elf_merge_got_with (struct mips_elf_bfd2got_hash *bfd2got,
   if (estimate >= from->page_gotno + to->page_gotno)
     estimate = from->page_gotno + to->page_gotno;
 
-  /* And conservatively estimate how many local, global and TLS entries
+  /* And conservatively estimate how many local and TLS entries
      would be needed.  */
-  estimate += (from->local_gotno
-	       + from->global_gotno
-	       + from->tls_gotno
-	       + to->local_gotno
-	       + to->global_gotno
-	       + to->tls_gotno);
+  estimate += from->local_gotno + to->local_gotno;
+  estimate += from->tls_gotno + to->tls_gotno;
+
+  /* If we're merging with the primary got, we will always have
+     the full set of global entries.  Otherwise estimate those
+     conservatively as well.  */
+  if (to == arg->primary)
+    estimate += arg->global_count;
+  else
+    estimate += from->global_gotno + to->global_gotno;
 
   /* Bail out if the combined GOT might be too big.  */
   if (estimate > arg->max_count)
@@ -7739,7 +7740,6 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	      if (!mips_elf_record_got_page_entry (info, abfd, r_symndx,
 						   addend))
 		return FALSE;
-	      break;
 	    }
 	  /* Fall through.  */
 
@@ -8138,10 +8138,9 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
   if (htab->is_vxworks && !info->shared)
     return TRUE;
 
-  /* Ignore indirect and warning symbols.  All relocations against
-     such symbols will be redirected to the target symbol.  */
-  if (h->root.type == bfd_link_hash_indirect
-      || h->root.type == bfd_link_hash_warning)
+  /* Ignore indirect symbols.  All relocations against such symbols
+     will be redirected to the target symbol.  */
+  if (h->root.type == bfd_link_hash_indirect)
     return TRUE;
 
   /* If this symbol is defined in a dynamic object, or we are creating
@@ -12522,7 +12521,7 @@ _bfd_mips_elf_merge_private_bfd_data (bfd *ibfd, bfd *obfd)
   bfd_boolean null_input_bfd = TRUE;
   asection *sec;
 
-  /* Check if we have the same endianess */
+  /* Check if we have the same endianness.  */
   if (! _bfd_generic_verify_endian_match (ibfd, obfd))
     {
       (*_bfd_error_handler)

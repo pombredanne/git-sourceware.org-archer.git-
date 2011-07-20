@@ -361,6 +361,25 @@ static struct type *java_type_of_child (struct varobj *parent, int index);
 static char *java_value_of_variable (struct varobj *var,
 				     enum varobj_display_formats format);
 
+/* Ada implementation */
+
+static int ada_number_of_children (struct varobj *var);
+
+static char *ada_name_of_variable (struct varobj *parent);
+
+static char *ada_name_of_child (struct varobj *parent, int index);
+
+static char *ada_path_expr_of_child (struct varobj *child);
+
+static struct value *ada_value_of_root (struct varobj **var_handle);
+
+static struct value *ada_value_of_child (struct varobj *parent, int index);
+
+static struct type *ada_type_of_child (struct varobj *parent, int index);
+
+static char *ada_value_of_variable (struct varobj *var,
+				    enum varobj_display_formats format);
+
 /* The language specific vector */
 
 struct language_specific
@@ -444,7 +463,18 @@ static struct language_specific languages[vlang_end] = {
    java_value_of_root,
    java_value_of_child,
    java_type_of_child,
-   java_value_of_variable}
+   java_value_of_variable},
+  /* Ada */
+  {
+   vlang_ada,
+   ada_number_of_children,
+   ada_name_of_variable,
+   ada_name_of_child,
+   ada_path_expr_of_child,
+   ada_value_of_root,
+   ada_value_of_child,
+   ada_type_of_child,
+   ada_value_of_variable}
 };
 
 /* A little convenience enum for dealing with C++/Java.  */
@@ -580,6 +610,7 @@ varobj_create (char *objname,
          return a sensible error.  */
       if (!gdb_parse_exp_1 (&p, block, 0, &var->root->exp))
 	{
+	  do_cleanups (old_chain);
 	  return NULL;
 	}
 
@@ -785,7 +816,6 @@ instantiate_pretty_printer (PyObject *constructor, struct value *value)
   printer = PyObject_CallFunctionObjArgs (constructor, val_obj, NULL);
   Py_DECREF (val_obj);
   return printer;
-  return NULL;
 }
 
 #endif
@@ -1027,6 +1057,7 @@ update_dynamic_varobj_children (struct varobj *var,
   for (; to < 0 || i < to + 1; ++i)
     {
       PyObject *item;
+      int force_done = 0;
 
       /* See if there was a leftover from last time.  */
       if (var->saved_item)
@@ -1038,13 +1069,54 @@ update_dynamic_varobj_children (struct varobj *var,
 	item = PyIter_Next (var->child_iter);
 
       if (!item)
-	break;
+	{
+	  /* Normal end of iteration.  */
+	  if (!PyErr_Occurred ())
+	    break;
+
+	  /* If we got a memory error, just use the text as the
+	     item.  */
+	  if (PyErr_ExceptionMatches (gdbpy_gdb_memory_error))
+	    {
+	      PyObject *type, *value, *trace;
+	      char *name_str, *value_str;
+
+	      PyErr_Fetch (&type, &value, &trace);
+	      value_str = gdbpy_exception_to_string (type, value);
+	      Py_XDECREF (type);
+	      Py_XDECREF (value);
+	      Py_XDECREF (trace);
+	      if (!value_str)
+		{
+		  gdbpy_print_stack ();
+		  break;
+		}
+
+	      name_str = xstrprintf ("<error at %d>", i);
+	      item = Py_BuildValue ("(ss)", name_str, value_str);
+	      xfree (name_str);
+	      xfree (value_str);
+	      if (!item)
+		{
+		  gdbpy_print_stack ();
+		  break;
+		}
+
+	      force_done = 1;
+	    }
+	  else
+	    {
+	      /* Any other kind of error.  */
+	      gdbpy_print_stack ();
+	      break;
+	    }
+	}
 
       /* We don't want to push the extra child on any report list.  */
       if (to < 0 || i < to)
 	{
 	  PyObject *py_v;
-	  char *name;
+	  const char *name;
 	  struct value *v;
 	  struct cleanup *inner;
 	  int can_mention = from < 0 || i >= from;
@@ -1052,7 +1124,10 @@ update_dynamic_varobj_children (struct varobj *var,
 	  inner = make_cleanup_py_decref (item);
 
 	  if (!PyArg_ParseTuple (item, "sO", &name, &py_v))
-	    error (_("Invalid item from the child list"));
+	    {
+	      gdbpy_print_stack ();
+	      error (_("Invalid item from the child list"));
+	    }
 
 	  v = convert_value_from_python (py_v);
 	  if (v == NULL)
@@ -1072,6 +1147,9 @@ update_dynamic_varobj_children (struct varobj *var,
 	     element.  */
 	  break;
 	}
+
+      if (force_done)
+	break;
     }
 
   if (i < VEC_length (varobj_p, var->children))
@@ -1350,6 +1428,10 @@ install_visualizer (struct varobj *var, PyObject *constructor,
 static void
 install_default_visualizer (struct varobj *var)
 {
+  /* Do not install a visualizer on a CPLUS_FAKE_CHILD.  */
+  if (CPLUS_FAKE_CHILD (var))
+    return;
+
   if (pretty_printing)
     {
       PyObject *pretty_printer = NULL;
@@ -1381,6 +1463,10 @@ static void
 construct_visualizer (struct varobj *var, PyObject *constructor)
 {
   PyObject *pretty_printer;
+
+  /* Do not install a visualizer on a CPLUS_FAKE_CHILD.  */
+  if (CPLUS_FAKE_CHILD (var))
+    return;
 
   Py_INCREF (constructor);
   if (constructor == Py_None)
@@ -2345,6 +2431,9 @@ variable_language (struct varobj *var)
       break;
     case language_java:
       lang = vlang_java;
+      break;
+    case language_ada:
+      lang = vlang_ada;
       break;
     }
 
@@ -3527,6 +3616,56 @@ static char *
 java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
 {
   return cplus_value_of_variable (var, format);
+}
+
+/* Ada specific callbacks for VAROBJs.  */
+
+static int
+ada_number_of_children (struct varobj *var)
+{
+  return c_number_of_children (var);
+}
+
+static char *
+ada_name_of_variable (struct varobj *parent)
+{
+  return c_name_of_variable (parent);
+}
+
+static char *
+ada_name_of_child (struct varobj *parent, int index)
+{
+  return c_name_of_child (parent, index);
+}
+
+static char*
+ada_path_expr_of_child (struct varobj *child)
+{
+  return c_path_expr_of_child (child);
+}
+
+static struct value *
+ada_value_of_root (struct varobj **var_handle)
+{
+  return c_value_of_root (var_handle);
+}
+
+static struct value *
+ada_value_of_child (struct varobj *parent, int index)
+{
+  return c_value_of_child (parent, index);
+}
+
+static struct type *
+ada_type_of_child (struct varobj *parent, int index)
+{
+  return c_type_of_child (parent, index);
+}
+
+static char *
+ada_value_of_variable (struct varobj *var, enum varobj_display_formats format)
+{
+  return c_value_of_variable (var, format);
 }
 
 /* Iterate all the existing _root_ VAROBJs and call the FUNC callback for them

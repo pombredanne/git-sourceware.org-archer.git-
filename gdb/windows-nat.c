@@ -41,7 +41,6 @@
 #include <psapi.h>
 #ifdef __CYGWIN__
 #include <sys/cygwin.h>
-#include <cygwin/version.h>
 #endif
 #include <signal.h>
 
@@ -112,7 +111,6 @@ static struct target_ops windows_ops;
 /* The starting and ending address of the cygwin1.dll text segment.  */
   static CORE_ADDR cygwin_load_start;
   static CORE_ADDR cygwin_load_end;
-# if CYGWIN_VERSION_DLL_MAKE_COMBINED(CYGWIN_VERSION_API_MAJOR,CYGWIN_VERSION_API_MINOR) >= 181
 #   define __USEWIDE
     typedef wchar_t cygwin_buf_t;
     static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE,
@@ -121,21 +119,6 @@ static struct target_ops windows_ops;
 #   define CreateProcess CreateProcessW
 #   define GetModuleFileNameEx_name "GetModuleFileNameExW"
 #   define bad_GetModuleFileNameEx bad_GetModuleFileNameExW
-# else
-#   define CCP_POSIX_TO_WIN_W 1
-#   define CCP_WIN_W_TO_POSIX 3
-#   define cygwin_conv_path(op, from, to, size)  \
-         (op == CCP_WIN_W_TO_POSIX) ? \
-         cygwin_conv_to_full_posix_path (from, to) : \
-         cygwin_conv_to_win32_path (from, to)
-    typedef char cygwin_buf_t;
-    static DWORD WINAPI (*GetModuleFileNameEx) (HANDLE, HMODULE, LPSTR, DWORD);
-#   define STARTUPINFO STARTUPINFOA
-#   define CreateProcess CreateProcessA
-#   define GetModuleFileNameEx_name "GetModuleFileNameExA"
-#   define bad_GetModuleFileNameEx bad_GetModuleFileNameExA
-#   define CW_SET_DOS_FILE_WARNING -1	/* no-op this for older Cygwin */
-# endif
 #endif
 
 static int have_saved_context;	/* True if we've saved context from a
@@ -517,7 +500,7 @@ windows_store_inferior_registers (struct target_ops *ops,
     do_windows_store_inferior_registers (regcache, r);
 }
 
-/* Get the name of a given module at at given base address.  If base_address
+/* Get the name of a given module at given base address.  If base_address
    is zero return the first loaded module (which is always the name of the
    executable).  */
 static int
@@ -760,7 +743,7 @@ windows_make_so (const char *name, LPVOID load_addr)
 	  return so;
 	}
 
-      /* The symbols in a dll are offset by 0x1000, which is the the
+      /* The symbols in a dll are offset by 0x1000, which is the
 	 offset from 0 of the first byte in an image - because of the
 	 file header and the section alignment.  */
       cygwin_load_start = (CORE_ADDR) (uintptr_t) ((char *)
@@ -1731,7 +1714,7 @@ do_initial_windows_stuff (struct target_ops *ops, DWORD pid, int attaching)
   while (1)
     {
       stop_after_trap = 1;
-      wait_for_inferior (0);
+      wait_for_inferior ();
       tp = inferior_thread ();
       if (tp->suspend.stop_signal != TARGET_SIGNAL_TRAP)
 	resume (0, tp->suspend.stop_signal);

@@ -317,12 +317,12 @@ execute_user_command (struct cmd_list_element *c, char *args)
   static int user_call_depth = 0;
   extern int max_user_call_depth;
 
-  old_chain = setup_user_args (args);
-
   cmdlines = c->user_commands;
   if (cmdlines == 0)
     /* Null command */
     return;
+
+  old_chain = setup_user_args (args);
 
   if (++user_call_depth > max_user_call_depth)
     error (_("Max user call depth exceeded -- command aborted."));
@@ -1589,19 +1589,6 @@ source_cleanup_lines (void *args)
   source_file_name = p->old_file;
 }
 
-struct wrapped_read_command_file_args
-{
-  FILE *stream;
-};
-
-static void
-wrapped_read_command_file (struct ui_out *uiout, void *data)
-{
-  struct wrapped_read_command_file_args *args = data;
-
-  read_command_file (args->stream);
-}
-
 /* Used to implement source_command.  */
 
 void
@@ -1625,12 +1612,12 @@ script_from_file (FILE *stream, const char *file)
   error_pre_print = "";
 
   {
-    struct gdb_exception e;
-    struct wrapped_read_command_file_args args;
+    volatile struct gdb_exception e;
 
-    args.stream = stream;
-    e = catch_exception (uiout, wrapped_read_command_file, &args,
-			 RETURN_MASK_ERROR);
+    TRY_CATCH (e, RETURN_MASK_ERROR)
+      {
+	read_command_file (stream);
+      }
     switch (e.reason)
       {
       case 0:

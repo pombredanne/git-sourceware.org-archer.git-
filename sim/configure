@@ -3623,7 +3623,7 @@ sim_common=yes
 sim_igen=no
 sim_arch=
 case "${target}" in
-   arm*-*-* | thumb*-*-* | strongarm*-*-* | xscale-*-*)
+   arm*-*-*)
 
   sim_arch=arm
 
@@ -3646,6 +3646,7 @@ subdirs="$subdirs arm"
   subdirs="$subdirs bfin"
 
 
+       sim_testsuite=yes
        ;;
    cr16*-*-*)
 

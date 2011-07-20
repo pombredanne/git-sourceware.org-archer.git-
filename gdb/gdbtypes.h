@@ -170,6 +170,7 @@ enum type_flag_value
   TYPE_FLAG_VECTOR = (1 << 15),
   TYPE_FLAG_FIXED_INSTANCE = (1 << 16),
   TYPE_FLAG_STUB_SUPPORTED = (1 << 17),
+  TYPE_FLAG_GNU_IFUNC = (1 << 18),
 
   /* Used for error-checking.  */
   TYPE_FLAG_MIN = TYPE_FLAG_UNSIGNED
@@ -270,6 +271,12 @@ enum type_instance_flag_value
    characters (or elements of strings) unless this flag is set.  */
 
 #define TYPE_NOTTEXT(t)	(TYPE_INSTANCE_FLAGS (t) & TYPE_INSTANCE_FLAG_NOTTEXT)
+
+/* Used only for TYPE_CODE_FUNC where it specifies the real function
+   address is returned by this function call.  TYPE_TARGET_TYPE determines the
+   final returned function type to be presented to user.  */
+
+#define TYPE_GNU_IFUNC(t)	(TYPE_MAIN_TYPE (t)->flag_gnu_ifunc)
 
 /* Type owner.  If TYPE_OBJFILE_OWNED is true, the type is owned by
    the objfile retrieved as TYPE_OBJFILE.  Otherweise, the type is
@@ -387,6 +394,7 @@ struct main_type
   unsigned int flag_varargs : 1;
   unsigned int flag_vector : 1;
   unsigned int flag_stub_supported : 1;
+  unsigned int flag_gnu_ifunc : 1;
   unsigned int flag_fixed_instance : 1;
   unsigned int flag_objfile_owned : 1;
   /* True if this type was declared with "class" rather than
@@ -501,7 +509,7 @@ struct main_type
 	   Otherwise, physname is the mangled label of the static field.  */
 
 	CORE_ADDR physaddr;
-	char *physname;
+	const char *physname;
       }
       loc;
 
@@ -697,6 +705,9 @@ struct cplus_struct_type
        dynamic.  Zero if not yet computed.  */
     int is_dynamic : 2;
 
+    /* Non-zero if this type came from a Java CU.  */
+    unsigned int is_java : 1;
+
     /* For derived classes, the number of base classes is given by
        n_baseclasses and virtual_field_bits is a bit vector containing
        one bit per base class.  If the base class is virtual, the
@@ -765,7 +776,7 @@ struct cplus_struct_type
 	       arguments.  See gdb_mangle_name for the conversion from this
 	       format to the one used if is_stub is clear.  */
 
-	    char *physname;
+	    const char *physname;
 
 	    /* The function type for the method.
 	       (This comment used to say "The return value of the method",
@@ -983,6 +994,7 @@ extern void allocate_gnat_aux_type (struct type *);
 #define BASETYPE_VIA_PUBLIC(thistype, index) \
   ((!TYPE_FIELD_PRIVATE(thistype, index)) && (!TYPE_FIELD_PROTECTED(thistype, index)))
 #define TYPE_CPLUS_DYNAMIC(thistype) TYPE_CPLUS_SPECIFIC (thistype)->is_dynamic
+#define TYPE_CPLUS_REALLY_JAVA(thistype) TYPE_CPLUS_SPECIFIC (thistype)->is_java
 
 #define BASETYPE_VIA_VIRTUAL(thistype, index) \
   (TYPE_CPLUS_SPECIFIC(thistype)->virtual_field_bits == NULL ? 0 \
@@ -1178,6 +1190,10 @@ struct builtin_type
      (*) () can server as a generic function pointer.  */
   struct type *builtin_func_ptr;
 
+  /* `function returning pointer to function (returning void)' type.
+     The final void return type is not significant for it.  */
+  struct type *builtin_func_func;
+
 
   /* Special-purpose types.  */
 
@@ -1218,6 +1234,8 @@ struct objfile_type
 
   /* Types used for symbols with no debug information.  */
   struct type *nodebug_text_symbol;
+  struct type *nodebug_text_gnu_ifunc_symbol;
+  struct type *nodebug_got_plt_symbol;
   struct type *nodebug_data_symbol;
   struct type *nodebug_unknown_symbol;
   struct type *nodebug_tls_symbol;
@@ -1348,6 +1366,8 @@ extern struct type *allocate_stub_method (struct type *);
 
 extern char *type_name_no_tag (const struct type *);
 
+extern const char *type_name_no_tag_or_error (struct type *type);
+
 extern struct type *lookup_struct_elt_type (struct type *, char *, int);
 
 extern struct type *make_pointer_type (struct type *, struct type **);
@@ -1389,7 +1409,7 @@ extern void check_stub_method_group (struct type *, int);
 extern char *gdb_mangle_name (struct type *, int, int);
 
 extern struct type *lookup_typename (const struct language_defn *,
-				     struct gdbarch *, char *,
+				     struct gdbarch *, const char *,
 				     const struct block *, int);
 
 extern struct type *lookup_template_type (char *, struct type *,
