@@ -1,6 +1,6 @@
 /* BFD library support routines for architectures.
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
    Hacked by John Gilmore and Steve Chamberlain of Cygnus Support.
 
@@ -437,6 +437,10 @@ DESCRIPTION
 .  bfd_arch_lm32,      {* Lattice Mico32 *}
 .#define bfd_mach_lm32      1
 .  bfd_arch_microblaze,{* Xilinx MicroBlaze. *}
+.  bfd_arch_tilepro,   {* Tilera TILEPro *}
+.  bfd_arch_tilegx, {* Tilera TILE-Gx *}
+.#define bfd_mach_tilepro   1
+.#define bfd_mach_tilegx    1
 .  bfd_arch_last
 .  };
 */
@@ -537,6 +541,8 @@ extern const bfd_arch_info_type bfd_tic4x_arch;
 extern const bfd_arch_info_type bfd_tic54x_arch;
 extern const bfd_arch_info_type bfd_tic6x_arch;
 extern const bfd_arch_info_type bfd_tic80_arch;
+extern const bfd_arch_info_type bfd_tilegx_arch;
+extern const bfd_arch_info_type bfd_tilepro_arch;
 extern const bfd_arch_info_type bfd_v850_arch;
 extern const bfd_arch_info_type bfd_vax_arch;
 extern const bfd_arch_info_type bfd_w65_arch;
@@ -611,6 +617,8 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
     &bfd_tic54x_arch,
     &bfd_tic6x_arch,
     &bfd_tic80_arch,
+    &bfd_tilegx_arch,
+    &bfd_tilepro_arch,
     &bfd_v850_arch,
     &bfd_vax_arch,
     &bfd_w65_arch,
@@ -748,25 +756,26 @@ bfd_arch_get_compatible (const bfd *abfd,
 			 const bfd *bbfd,
 			 bfd_boolean accept_unknowns)
 {
-  const bfd * ubfd = NULL;
+  const bfd *ubfd, *kbfd;
 
   /* Look for an unknown architecture.  */
-  if (((ubfd = abfd) && ubfd->arch_info->arch == bfd_arch_unknown)
-      || ((ubfd = bbfd) && ubfd->arch_info->arch == bfd_arch_unknown))
-    {
-      /* We can allow an unknown architecture if accept_unknowns
-	 is true, or if the target is the "binary" format, which
-	 has an unknown architecture.  Since the binary format can
-	 only be set by explicit request from the user, it is safe
-	 to assume that they know what they are doing.  */
-      if (accept_unknowns
-	  || strcmp (bfd_get_target (ubfd), "binary") == 0)
-	return ubfd->arch_info;
-      return NULL;
-    }
+  if (abfd->arch_info->arch == bfd_arch_unknown)
+    ubfd = abfd, kbfd = bbfd;
+  else if (bbfd->arch_info->arch == bfd_arch_unknown)
+    ubfd = bbfd, kbfd = abfd;
+  else
+    /* Otherwise architecture-specific code has to decide.  */
+    return abfd->arch_info->compatible (abfd->arch_info, bbfd->arch_info);
 
-  /* Otherwise architecture-specific code has to decide.  */
-  return abfd->arch_info->compatible (abfd->arch_info, bbfd->arch_info);
+  /* We can allow an unknown architecture if accept_unknowns
+     is true, or if the target is the "binary" format, which
+     has an unknown architecture.  Since the binary format can
+     only be set by explicit request from the user, it is safe
+     to assume that they know what they are doing.  */
+  if (accept_unknowns
+      || strcmp (bfd_get_target (ubfd), "binary") == 0)
+    return kbfd->arch_info;
+  return NULL;
 }
 
 /*

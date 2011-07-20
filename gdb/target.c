@@ -544,6 +544,18 @@ default_get_ada_task_ptid (long lwp, long tid)
   return ptid_build (ptid_get_pid (inferior_ptid), lwp, tid);
 }
 
+static enum exec_direction_kind
+default_execution_direction (void)
+{
+  if (!target_can_execute_reverse)
+    return EXEC_FORWARD;
+  else if (!target_can_async_p ())
+    return EXEC_FORWARD;
+  else
+    gdb_assert_not_reached ("\
+to_execution_direction must be implemented for reverse async");
+}
+
 /* Go through the target stack from top to bottom, copying over zero
    entries in current_target, then filling in still empty entries.  In
    effect, we are doing class inheritance through the pushed target
@@ -647,21 +659,24 @@ update_current_target (void)
       INHERIT (to_can_async_p, t);
       INHERIT (to_is_async_p, t);
       INHERIT (to_async, t);
-      INHERIT (to_async_mask, t);
       INHERIT (to_find_memory_regions, t);
       INHERIT (to_make_corefile_notes, t);
       INHERIT (to_get_bookmark, t);
       INHERIT (to_goto_bookmark, t);
       /* Do not inherit to_get_thread_local_address.  */
       INHERIT (to_can_execute_reverse, t);
+      INHERIT (to_execution_direction, t);
       INHERIT (to_thread_architecture, t);
       /* Do not inherit to_read_description.  */
       INHERIT (to_get_ada_task_ptid, t);
       /* Do not inherit to_search_memory.  */
       INHERIT (to_supports_multi_process, t);
+      INHERIT (to_supports_enable_disable_tracepoint, t);
       INHERIT (to_trace_init, t);
       INHERIT (to_download_tracepoint, t);
       INHERIT (to_download_trace_state_variable, t);
+      INHERIT (to_enable_tracepoint, t);
+      INHERIT (to_disable_tracepoint, t);
       INHERIT (to_trace_set_readonly_regions, t);
       INHERIT (to_trace_start, t);
       INHERIT (to_get_trace_status, t);
@@ -813,9 +828,6 @@ update_current_target (void)
   de_fault (to_async,
 	    (void (*) (void (*) (enum inferior_event_type, void*), void*))
 	    tcomplain);
-  de_fault (to_async_mask,
-	    (int (*) (int))
-	    return_one);
   de_fault (to_thread_architecture,
 	    default_thread_architecture);
   current_target.to_read_description = NULL;
@@ -823,6 +835,9 @@ update_current_target (void)
             (ptid_t (*) (long, long))
             default_get_ada_task_ptid);
   de_fault (to_supports_multi_process,
+	    (int (*) (void))
+	    return_zero);
+  de_fault (to_supports_enable_disable_tracepoint,
 	    (int (*) (void))
 	    return_zero);
   de_fault (to_trace_init,
@@ -833,6 +848,12 @@ update_current_target (void)
 	    tcomplain);
   de_fault (to_download_trace_state_variable,
 	    (void (*) (struct trace_state_variable *))
+	    tcomplain);
+  de_fault (to_enable_tracepoint,
+	    (void (*) (struct bp_location *))
+	    tcomplain);
+  de_fault (to_disable_tracepoint,
+	    (void (*) (struct bp_location *))
 	    tcomplain);
   de_fault (to_trace_set_readonly_regions,
 	    (void (*) (void))
@@ -885,6 +906,8 @@ update_current_target (void)
   de_fault (to_traceframe_info,
 	    (struct traceframe_info * (*) (void))
 	    tcomplain);
+  de_fault (to_execution_direction, default_execution_direction);
+
 #undef de_fault
 
   /* Finally, position the target-stack beneath the squashed

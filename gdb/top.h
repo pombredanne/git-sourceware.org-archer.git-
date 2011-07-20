@@ -23,8 +23,8 @@
 #define TOP_H
 
 /* From top.c.  */
-extern char *line;
-extern int linesize;
+extern char *saved_command_line;
+extern int saved_command_line_size;
 extern FILE *instream;
 extern int in_user_command;
 extern int caution;
@@ -38,9 +38,6 @@ extern void print_gdb_version (struct ui_file *);
 extern void read_command_file (FILE *);
 extern void init_history (void);
 extern void command_loop (void);
-extern void simplified_command_loop (char *(*read_input_func) (char *),
-				     void (*execute_command_func) (char *,
-								   int));
 extern int quit_confirm (void);
 extern void quit_force (char *, int);
 extern void quit_command (char *, int);
@@ -48,8 +45,9 @@ extern int quit_cover (void *);
 extern void execute_command (char *, int);
 
 /* Prepare for execution of a command.
-   Call this before every command, CLI or MI.  */
-extern void prepare_execute_command (void);
+   Call this before every command, CLI or MI.
+   Returns a cleanup to be run after the command is completed.  */
+extern struct cleanup *prepare_execute_command (void);
 
 /* This function returns a pointer to the string that is used
    by gdb for its command prompt.  */

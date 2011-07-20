@@ -1592,8 +1592,10 @@ left-hand-side:
 
 @smallexample
 (@value{GDBP}) p gdb_stdout.@kbd{M-?}
-magic      to_delete  to_fputs   to_put     to_rewind  
-to_data    to_flush   to_isatty  to_read    to_write   
+magic                to_fputs             to_rewind
+to_data              to_isatty            to_write
+to_delete            to_put               to_write_async_safe
+to_flush             to_read
 @end smallexample
 
 @noindent
@@ -1607,6 +1609,7 @@ struct ui_file
    int *magic;
    ui_file_flush_ftype *to_flush;
    ui_file_write_ftype *to_write;
+   ui_file_write_async_safe_ftype *to_write_async_safe;
    ui_file_fputs_ftype *to_fputs;
    ui_file_read_ftype *to_read;
    ui_file_delete_ftype *to_delete;
@@ -2855,14 +2858,22 @@ watchpoints in programs with multiple threads.
 If this variable is set, @var{path} is a colon-separated list of
 directories @value{GDBN} will use to search for @code{libthread_db}.
 If you omit @var{path}, @samp{libthread-db-search-path} will be reset to
-its default value.
+its default value (@code{$sdir:$pdir} on @sc{gnu}/Linux and Solaris systems).
+Internally, the default value comes from the @code{LIBTHREAD_DB_SEARCH_PATH}
+macro.
 
 On @sc{gnu}/Linux and Solaris systems, @value{GDBN} uses a ``helper''
 @code{libthread_db} library to obtain information about threads in the
 inferior process.  @value{GDBN} will use @samp{libthread-db-search-path}
-to find @code{libthread_db}.  If that fails, @value{GDBN} will continue
-with default system shared library directories, and finally the directory
-from which @code{libpthread} was loaded in the inferior process.
+to find @code{libthread_db}.
+
+A special entry @samp{$sdir} for @samp{libthread-db-search-path}
+refers to the default system directories that are
+normally searched for loading shared libraries.
+
+A special entry @samp{$pdir} for @samp{libthread-db-search-path}
+refers to the directory from which @code{libpthread}
+was loaded in the inferior process.
 
 For any @code{libthread_db} library @value{GDBN} finds in above directories,
 @value{GDBN} attempts to initialize it with the current inferior process.
@@ -10026,14 +10037,20 @@ These commands are deprecated; they are equivalent to plain @code{disable} and @
 @item disable tracepoint @r{[}@var{num}@r{]}
 Disable tracepoint @var{num}, or all tracepoints if no argument
 @var{num} is given.  A disabled tracepoint will have no effect during
-the next trace experiment, but it is not forgotten.  You can re-enable
+a trace experiment, but it is not forgotten.  You can re-enable
 a disabled tracepoint using the @code{enable tracepoint} command.
+If the command is issued during a trace experiment and the debug target
+has support for disabling tracepoints during a trace experiment, then the
+change will be effective immediately.  Otherwise, it will be applied to the
+next trace experiment.
 
 @kindex enable tracepoint
 @item enable tracepoint @r{[}@var{num}@r{]}
-Enable tracepoint @var{num}, or all tracepoints.  The enabled
-tracepoints will become effective the next time a trace experiment is
-run.
+Enable tracepoint @var{num}, or all tracepoints.  If this command is
+issued during a trace experiment and the debug target supports enabling
+tracepoints during a trace experiment, then the enabled tracepoints will
+become effective immediately.  Otherwise, they will become effective the
+next time a trace experiment is run.
 @end table
 
 @node Tracepoint Passcounts
@@ -16371,6 +16388,9 @@ directories to search for @code{libthread_db} (@pxref{Threads,,set
 libthread-db-search-path}).  If you omit @var{path},
 @samp{libthread-db-search-path} will be reset to its default value.
 
+The special entry @samp{$pdir} for @samp{libthread-db-search-path} is
+not supported in @code{gdbserver}.
+
 @item monitor exit
 Tell gdbserver to exit immediately.  This command should be followed by
 @code{disconnect} to close the debugging session.  @code{gdbserver} will
@@ -20007,6 +20027,16 @@ Display debugging messages about inner workings of the AIX thread
 module.
 @item show debug aix-thread
 Show the current state of AIX thread debugging info display.
+@item set debug check-physname
+@cindex physname
+Check the results of the ``physname'' computation.  When reading DWARF
+debugging information for C@t{++}, @value{GDBN} attempts to compute
+each entity's name.  @value{GDBN} can do this computation in two
+different ways, depending on exactly what information is present.
+When enabled, this setting causes @value{GDBN} to compute the names
+both ways and display any discrepancies.
+@item show debug check-physname
+Show the current state of ``physname'' checking.
 @item set debug dwarf2-die
 @cindex DWARF2 DIEs
 Dump DWARF2 DIEs after they are read in.
@@ -20065,12 +20095,6 @@ Displays the current state of @value{GDBN} JIT debugging.
 Turns on or off debugging messages from the Linux LWP debug support.
 @item show debug lin-lwp
 Show the current state of Linux LWP debugging messages.
-@item set debug lin-lwp-async
-@cindex @sc{gnu}/Linux LWP async debug messages
-@cindex Linux lightweight processes
-Turns on or off debugging messages from the Linux LWP async debug support.
-@item show debug lin-lwp-async
-Show the current state of Linux LWP async debugging messages.
 @item set debug observer
 @cindex observer debugging info
 Turns on or off display of @value{GDBN} observer debugging.  This
@@ -20777,10 +20801,15 @@ End with a line saying just "end".
 
 @kindex maint set python print-stack
 @item maint set python print-stack
-By default, @value{GDBN} will print a stack trace when an error occurs
-in a Python script.  This can be controlled using @code{maint set
-python print-stack}: if @code{on}, the default, then Python stack
-printing is enabled; if @code{off}, then Python stack printing is
+This command is now deprecated.  Instead use @code{set python
+print-stack} 
+
+@kindex set python print-stack
+@item set python print-stack
+By default, @value{GDBN} will not print a stack trace when an error
+occurs in a Python script.  This can be controlled using @code{set
+python print-stack}: if @code{on}, then Python stack printing is
+enabled; if @code{off}, the default, then Python stack printing is
 disabled.
 @end table
 
@@ -22113,7 +22142,9 @@ inherited attribute refer to @code{gdb.ThreadEvent} above.
 
 @item events.exited
 Emits @code{events.ExitedEvent} which indicates that the inferior has exited.
-@code{events.ExitedEvent} has one attribute:
+@code{events.ExitedEvent} has one optional attribute.  This attribute
+will exist only in the case that the inferior exited with some
+status.
 @table @code
 @defivar ExitedEvent exit_code
 An integer representing the exit code which the inferior has returned.
@@ -23572,7 +23603,8 @@ command, or because the inferior has loaded a shared library),
 The auto-loading feature is useful for supplying application-specific
 debugging commands and scripts.
 
-Auto-loading can be enabled or disabled.
+Auto-loading can be enabled or disabled,
+and the list of auto-loaded scripts can be printed.
 
 @table @code
 @kindex set auto-load-scripts
@@ -23582,6 +23614,30 @@ Enable or disable the auto-loading of Python scripts.
 @kindex show auto-load-scripts
 @item show auto-load-scripts
 Show whether auto-loading of Python scripts is enabled or disabled.
+
+@kindex info auto-load-scripts
+@cindex print list of auto-loaded scripts
+@item info auto-load-scripts [@var{regexp}]
+Print the list of all scripts that @value{GDBN} auto-loaded.
+
+Also printed is the list of scripts that were mentioned in
+the @code{.debug_gdb_scripts} section and were not found
+(@pxref{.debug_gdb_scripts section}).
+This is useful because their names are not printed when @value{GDBN}
+tries to load them and fails.  There may be many of them, and printing
+an error message for each one is problematic.
+
+If @var{regexp} is supplied only scripts with matching names are printed.
+
+Example:
+
+@smallexample
+(gdb) info auto-load-scripts
+Loaded  Script
+Yes     py-section-script.py
+        full name: /tmp/py-section-script.py
+Missing my-foo-pretty-printers.py
+@end smallexample
 @end table
 
 When reading an auto-loaded file, @value{GDBN} sets the
@@ -25160,11 +25216,12 @@ was attached to a program.  The @var{id} field contains the
 @value{GDBN} identifier of the thread group.  The @var{pid} field
 contains process identifier, specific to the operating system.
 
-@itemx =thread-group-exited,id="@var{id}"
+@item =thread-group-exited,id="@var{id}"[,exit-code="@var{code}"]
 A thread group is no longer associated with a running program,
 either because the program has exited, or because it was detached
 from.  The @var{id} field contains the @value{GDBN} identifier of the
-thread group.
+thread group.  @var{code} is the exit code of the inferior; it exists
+only when the inferior exited with some code.
 
 @item =thread-created,id="@var{id}",group-id="@var{gid}"
 @itemx =thread-exited,id="@var{id}",group-id="@var{gid}"
@@ -30024,6 +30081,9 @@ Indicates presence of the @code{-thread-info} command.
 @item data-read-memory-bytes
 Indicates presense of the @code{-data-read-memory-bytes} and the
 @code{-data-write-memory-bytes} commands.
+@item breakpoint-notifications
+Indicates that changes to breakpoints and breakpoints created via the
+CLI will be announced via async records.
 
 @end table
 
@@ -32156,9 +32216,12 @@ For any @var{command} not supported by the stub, an empty response
 protocol.  A newer @value{GDBN} can tell if a packet is supported based
 on that response.
 
-A stub is required to support the @samp{g}, @samp{G}, @samp{m}, @samp{M},
-@samp{c}, and @samp{s} @var{command}s.  All other @var{command}s are
-optional.
+At a minimum, a stub is required to support the @samp{g} and @samp{G}
+commands for register access, and the @samp{m} and @samp{M} commands
+for memory access.  Stubs that only control single-threaded targets
+can implement run control with the @samp{c} (continue), and @samp{s}
+(step) commands.  Stubs that support multi-threading targets should
+support the @samp{vCont} command.  All other commands are optional.
 
 @node Packets
 @section Packets
@@ -32295,6 +32358,9 @@ Reply:
 Continue.  @var{addr} is address to resume.  If @var{addr} is omitted,
 resume at current address.
 
+This packet is deprecated for multi-threading support.  @xref{vCont
+packet}.
+
 Reply:
 @xref{Stop Reply Packets}, for the reply specifications.
 
@@ -32302,6 +32368,9 @@ Reply:
 @cindex @samp{C} packet
 Continue with signal @var{sig} (hex signal number).  If
 @samp{;@var{addr}} is omitted, resume at same address.
+
+This packet is deprecated for multi-threading support.  @xref{vCont
+packet}.
 
 Reply:
 @xref{Stop Reply Packets}, for the reply specifications.
@@ -32385,13 +32454,15 @@ for success
 for an error
 @end table
 
-@item H @var{c} @var{thread-id}
+@item H @var{op} @var{thread-id}
 @cindex @samp{H} packet
 Set thread for subsequent operations (@samp{m}, @samp{M}, @samp{g},
-@samp{G}, et.al.).  @var{c} depends on the operation to be performed: it
-should be @samp{c} for step and continue operations, @samp{g} for other
-operations.  The thread designator @var{thread-id} has the format and
-interpretation described in @ref{thread-id syntax}.
+@samp{G}, et.al.).  @var{op} depends on the operation to be performed:
+it should be @samp{c} for step and continue operations (note that this
+is deprecated, supporting the @samp{vCont} command is a better
+option), @samp{g} for other operations.  The thread designator
+@var{thread-id} has the format and interpretation described in
+@ref{thread-id syntax}.
 
 Reply:
 @table @samp
@@ -32531,6 +32602,9 @@ The @samp{R} packet has no reply.
 Single step.  @var{addr} is the address at which to resume.  If
 @var{addr} is omitted, resume at same address.
 
+This packet is deprecated for multi-threading support.  @xref{vCont
+packet}.
+
 Reply:
 @xref{Stop Reply Packets}, for the reply specifications.
 
@@ -32539,6 +32613,9 @@ Reply:
 @cindex @samp{S} packet
 Step with signal.  This is analogous to the @samp{C} packet, but
 requests a single-step, rather than a normal resumption of execution.
+
+This packet is deprecated for multi-threading support.  @xref{vCont
+packet}.
 
 Reply:
 @xref{Stop Reply Packets}, for the reply specifications.
@@ -32596,6 +32673,7 @@ for success in non-stop mode (@pxref{Remote Non-Stop})
 
 @item vCont@r{[};@var{action}@r{[}:@var{thread-id}@r{]]}@dots{}
 @cindex @samp{vCont} packet
+@anchor{vCont packet}
 Resume the inferior, specifying different actions for each thread.
 If an action is specified with no @var{thread-id}, then it is applied to any
 threads that don't have a specific action specified; if no default action is
@@ -33627,6 +33705,11 @@ These are the currently defined stub features and their properties:
 @tab @samp{-}
 @tab No
 
+@item @samp{EnableDisableTracepoints}
+@tab No
+@tab @samp{-}
+@tab No
+
 @end multitable
 
 These are the currently defined stub features, in more detail:
@@ -33739,6 +33822,11 @@ The remote stub understands the @samp{QAllow} packet.
 @cindex static tracepoints, in remote protocol
 The remote stub supports static tracepoints.
 
+@item EnableDisableTracepoints
+The remote stub supports the @samp{QTEnable} (@pxref{QTEnable}) and
+@samp{QTDisable} (@pxref{QTDisable}) packets that allow tracepoints
+to be enabled and disabled while a trace experiment is running.
+
 @end table
 
 @item qSymbol::
@@ -33819,6 +33907,8 @@ packets.)
 @item qTsV
 @itemx QTStart    
 @itemx QTStop     
+@itemx QTEnable
+@itemx QTDisable
 @itemx QTinit     
 @itemx QTro       
 @itemx qTStatus   
@@ -34307,6 +34397,18 @@ instruction reply packet}).
 
 @item QTStop
 End the tracepoint experiment.  Stop collecting trace frames.
+
+@item QTEnable:@var{n}:@var{addr}
+@anchor{QTEnable}
+Enable tracepoint @var{n} at address @var{addr} in a started tracepoint
+experiment.  If the tracepoint was previously disabled, then collection
+of data from it will resume.
+
+@item QTDisable:@var{n}:@var{addr}
+@anchor{QTDisable}
+Disable tracepoint @var{n} at address @var{addr} in a started tracepoint
+experiment.  No more data will be collected from the tracepoint unless
+@samp{QTEnable:@var{n}:@var{addr}} is subsequently issued.
 
 @item QTinit
 Clear the table of tracepoints, and empty the trace frame buffer.
@@ -36284,10 +36386,6 @@ The formal DTD for the traceframe info format is given below:
 @appendix Target Descriptions
 @cindex target descriptions
 
-@strong{Warning:} target descriptions are still under active development,
-and the contents and format may change between @value{GDBN} releases.
-The format is expected to stabilize in the future.
-
 One of the challenges of using @value{GDBN} to debug embedded systems
 is that there are so many minor variants of each processor
 architecture in use.  It is common practice for vendors to start with
@@ -36622,7 +36720,7 @@ The register's size, in bits.
 @item regnum
 The register's number.  If omitted, a register's number is one greater
 than that of the previous register (either in the current feature or in
-a preceeding feature); the first register in the target description
+a preceding feature); the first register in the target description
 defaults to zero.  This register number is used to read or write
 the register; e.g.@: it is used in the remote @code{p} and @code{P}
 packets, and registers appear in the @code{g} and @code{G} packets

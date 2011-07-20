@@ -361,6 +361,25 @@ static struct type *java_type_of_child (struct varobj *parent, int index);
 static char *java_value_of_variable (struct varobj *var,
 				     enum varobj_display_formats format);
 
+/* Ada implementation */
+
+static int ada_number_of_children (struct varobj *var);
+
+static char *ada_name_of_variable (struct varobj *parent);
+
+static char *ada_name_of_child (struct varobj *parent, int index);
+
+static char *ada_path_expr_of_child (struct varobj *child);
+
+static struct value *ada_value_of_root (struct varobj **var_handle);
+
+static struct value *ada_value_of_child (struct varobj *parent, int index);
+
+static struct type *ada_type_of_child (struct varobj *parent, int index);
+
+static char *ada_value_of_variable (struct varobj *var,
+				    enum varobj_display_formats format);
+
 /* The language specific vector */
 
 struct language_specific
@@ -444,7 +463,18 @@ static struct language_specific languages[vlang_end] = {
    java_value_of_root,
    java_value_of_child,
    java_type_of_child,
-   java_value_of_variable}
+   java_value_of_variable},
+  /* Ada */
+  {
+   vlang_ada,
+   ada_number_of_children,
+   ada_name_of_variable,
+   ada_name_of_child,
+   ada_path_expr_of_child,
+   ada_value_of_root,
+   ada_value_of_child,
+   ada_type_of_child,
+   ada_value_of_variable}
 };
 
 /* A little convenience enum for dealing with C++/Java.  */
@@ -580,6 +610,7 @@ varobj_create (char *objname,
          return a sensible error.  */
       if (!gdb_parse_exp_1 (&p, block, 0, &var->root->exp))
 	{
+	  do_cleanups (old_chain);
 	  return NULL;
 	}
 
@@ -1085,7 +1116,7 @@ update_dynamic_varobj_children (struct varobj *var,
       if (to < 0 || i < to)
 	{
 	  PyObject *py_v;
-	  char *name;
+	  const char *name;
 	  struct value *v;
 	  struct cleanup *inner;
 	  int can_mention = from < 0 || i >= from;
@@ -2401,6 +2432,9 @@ variable_language (struct varobj *var)
     case language_java:
       lang = vlang_java;
       break;
+    case language_ada:
+      lang = vlang_ada;
+      break;
     }
 
   return lang;
@@ -3582,6 +3616,56 @@ static char *
 java_value_of_variable (struct varobj *var, enum varobj_display_formats format)
 {
   return cplus_value_of_variable (var, format);
+}
+
+/* Ada specific callbacks for VAROBJs.  */
+
+static int
+ada_number_of_children (struct varobj *var)
+{
+  return c_number_of_children (var);
+}
+
+static char *
+ada_name_of_variable (struct varobj *parent)
+{
+  return c_name_of_variable (parent);
+}
+
+static char *
+ada_name_of_child (struct varobj *parent, int index)
+{
+  return c_name_of_child (parent, index);
+}
+
+static char*
+ada_path_expr_of_child (struct varobj *child)
+{
+  return c_path_expr_of_child (child);
+}
+
+static struct value *
+ada_value_of_root (struct varobj **var_handle)
+{
+  return c_value_of_root (var_handle);
+}
+
+static struct value *
+ada_value_of_child (struct varobj *parent, int index)
+{
+  return c_value_of_child (parent, index);
+}
+
+static struct type *
+ada_type_of_child (struct varobj *parent, int index)
+{
+  return c_type_of_child (parent, index);
+}
+
+static char *
+ada_value_of_variable (struct varobj *var, enum varobj_display_formats format)
+{
+  return c_value_of_variable (var, format);
 }
 
 /* Iterate all the existing _root_ VAROBJs and call the FUNC callback for them

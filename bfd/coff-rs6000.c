@@ -1,6 +1,6 @@
 /* BFD back-end for IBM RS/6000 "XCOFF" files.
    Copyright 1990-1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009, 2010
+   2008, 2009, 2010, 2011
    Free Software Foundation, Inc.
    Written by Metin G. Ozisik, Mimi Phuong-Thao Vo, and John Gilmore.
    Archive support from Damon A. Permezel.
@@ -3862,6 +3862,18 @@ static unsigned long xcoff_glink_code[9] =
     0x00000000,	/* traceback table */
   };
 
+/* Table to convert DWARF flags to section names.  */
+
+const struct xcoff_dwsect_name xcoff_dwsect_names[] = {
+  { SSUBTYP_DWINFO,  ".dwinfo",   TRUE },
+  { SSUBTYP_DWLINE,  ".dwline",   TRUE },
+  { SSUBTYP_DWPBNMS, ".dwpbnms",  TRUE },
+  { SSUBTYP_DWPBTYP, ".dwpbtyp",  TRUE },
+  { SSUBTYP_DWARNGE, ".dwarnge",  TRUE },
+  { SSUBTYP_DWABREV, ".dwabrev",  FALSE },
+  { SSUBTYP_DWSTR,   ".dwstr",    TRUE },
+  { SSUBTYP_DWRNGES, ".dwrnges",  TRUE }
+};
 
 static const struct xcoff_backend_data_rec bfd_xcoff_backend_data =
   {
@@ -3974,6 +3986,7 @@ const bfd_target rs6000coff_vec =
     0,				/* leading char */
     '/',			/* ar_pad_char */
     15,				/* ar_max_namelen */
+    0,				/* match priority.  */
 
     /* data */
     bfd_getb64,
@@ -4089,6 +4102,7 @@ const bfd_target rs6000coff_vec =
     _bfd_xcoff_bfd_final_link,
     _bfd_generic_link_split_section,
     bfd_generic_gc_sections,
+    bfd_generic_lookup_section_flags,
     bfd_generic_merge_sections,
     bfd_generic_is_group_section,
     bfd_generic_discard_group,
@@ -4227,6 +4241,7 @@ const bfd_target pmac_xcoff_vec =
     0,				/* leading char */
     '/',			/* ar_pad_char */
     15,				/* ar_max_namelen */
+    0,				/* match priority.  */
 
     /* data */
     bfd_getb64,
@@ -4342,6 +4357,7 @@ const bfd_target pmac_xcoff_vec =
     _bfd_xcoff_bfd_final_link,
     _bfd_generic_link_split_section,
     bfd_generic_gc_sections,
+    bfd_generic_lookup_section_flags,
     bfd_generic_merge_sections,
     bfd_generic_is_group_section,
     bfd_generic_discard_group,

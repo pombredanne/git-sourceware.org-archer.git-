@@ -128,13 +128,13 @@ struct obj_section
 
 /* The memory address of section S (vma + offset).  */
 #define obj_section_addr(s)				      		\
-  (bfd_get_section_vma ((s)->objfile->abfd, s->the_bfd_section)		\
+  (bfd_get_section_vma ((s)->objfile->obfd, s->the_bfd_section)		\
    + obj_section_offset (s))
 
 /* The one-passed-the-end memory address of section S
    (vma + size + offset).  */
 #define obj_section_endaddr(s)						\
-  (bfd_get_section_vma ((s)->objfile->abfd, s->the_bfd_section)		\
+  (bfd_get_section_vma ((s)->objfile->obfd, s->the_bfd_section)		\
    + bfd_get_section_size ((s)->the_bfd_section)			\
    + obj_section_offset (s))
 
@@ -438,21 +438,6 @@ struct objfile
    for SunOS4.  Note that this objfile has no associated BFD.  */
 
 extern struct objfile *rt_common_objfile;
-
-/* When we need to allocate a new type, we need to know which objfile_obstack
-   to allocate the type on, since there is one for each objfile.  The places
-   where types are allocated are deeply buried in function call hierarchies
-   which know nothing about objfiles, so rather than trying to pass a
-   particular objfile down to them, we just do an end run around them and
-   set current_objfile to be whatever objfile we expect to be using at the
-   time types are being allocated.  For instance, when we start reading
-   symbols for a particular objfile, we set current_objfile to point to that
-   objfile, and when we are done, we set it back to NULL, to ensure that we
-   never put a type someplace other than where we are expecting to put it.
-   FIXME:  Maybe we should review the entire type handling system and
-   see if there is a better way to avoid this problem.  */
-
-extern struct objfile *current_objfile;
 
 /* Declarations for functions defined in objfiles.c */
 

@@ -285,9 +285,6 @@ exec_reverse_continue (char **argv, int argc)
   enum exec_direction_kind dir = execution_direction;
   struct cleanup *old_chain;
 
-  if (dir == EXEC_ERROR)
-    error (_("Target %s does not support this command."), target_shortname);
-
   if (dir == EXEC_REVERSE)
     error (_("Already in reverse mode."));
 
@@ -1553,7 +1550,7 @@ mi_cmd_data_read_memory_bytes (char *command, char **argv, int argc)
 
 /* DATA-MEMORY-WRITE:
 
-   COLUMN_OFFSET: optional argument. Must be preceeded by '-o'. The
+   COLUMN_OFFSET: optional argument. Must be preceded by '-o'. The
    offset from the beginning of the memory grid row where the cell to
    be written is.
    ADDR: start address of the row in the memory grid where the memory
@@ -1711,6 +1708,7 @@ mi_cmd_list_features (char *command, char **argv, int argc)
       ui_out_field_string (uiout, NULL, "pending-breakpoints");
       ui_out_field_string (uiout, NULL, "thread-info");
       ui_out_field_string (uiout, NULL, "data-read-memory-bytes");
+      ui_out_field_string (uiout, NULL, "breakpoint-notifications");
       
 #if HAVE_PYTHON
       ui_out_field_string (uiout, NULL, "python");
@@ -2025,9 +2023,7 @@ mi_cmd_execute (struct mi_parse *parse)
 {
   struct cleanup *cleanup;
 
-  prepare_execute_command ();
-
-  cleanup = make_cleanup (null_cleanup, NULL);
+  cleanup = prepare_execute_command ();
 
   if (parse->all && parse->thread_group != -1)
     error (_("Cannot specify --thread-group together with --all"));
@@ -2164,18 +2160,9 @@ mi_execute_async_cli_command (char *cli_command, char **argv, int argc)
 
   execute_command ( /*ui */ run, 0 /*from_tty */ );
 
-  if (target_can_async_p ())
-    {
-      /* If we're not executing, an exception should have been throw.  */
-      gdb_assert (is_running (inferior_ptid));
-      do_cleanups (old_cleanups);
-    }
-  else
-    {
-      /* Do this before doing any printing.  It would appear that some
-         print code leaves garbage around in the buffer.  */
-      do_cleanups (old_cleanups);
-    }
+  /* Do this before doing any printing.  It would appear that some
+     print code leaves garbage around in the buffer.  */
+  do_cleanups (old_cleanups);
 }
 
 void

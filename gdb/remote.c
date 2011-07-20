@@ -134,8 +134,6 @@ static int remote_is_async_p (void);
 static void remote_async (void (*callback) (enum inferior_event_type event_type,
 					    void *context), void *context);
 
-static int remote_async_mask (int new_mask);
-
 static void remote_detach (struct target_ops *ops, char *args, int from_tty);
 
 static void remote_interrupt (int signo);
@@ -328,6 +326,10 @@ struct remote_state
   /* True if the stub can continue running a trace while GDB is
      disconnected.  */
   int disconnected_tracing;
+
+  /* True if the stub reports support for enabling and disabling
+     tracepoints while a trace experiment is running.  */
+  int enable_disable_tracepoints;
 
   /* Nonzero if the user has pressed Ctrl-C, but the target hasn't
      responded to that.  */
@@ -716,8 +718,6 @@ static int remote_stopped_by_watchpoint_p;
 static struct target_ops remote_ops;
 
 static struct target_ops extended_remote_ops;
-
-static int remote_async_mask_value = 1;
 
 /* FIXME: cagney/1999-09-23: Even though getpkt was called with
    ``forever'' still use the normal timeout mechanism.  This is
@@ -3280,6 +3280,17 @@ remote_start_remote (int from_tty, struct target_ops *target, int extended_p)
       /* Always add the main thread.  */
       add_thread_silent (inferior_ptid);
 
+      /* init_wait_for_inferior should be called before get_offsets in order
+	 to manage `inserted' flag in bp loc in a correct state.
+	 breakpoint_init_inferior, called from init_wait_for_inferior, set
+	 `inserted' flag to 0, while before breakpoint_re_set, called from
+	 start_remote, set `inserted' flag to 1.  In the initialization of
+	 inferior, breakpoint_init_inferior should be called first, and then
+	 breakpoint_re_set can be called.  If this order is broken, state of
+	 `inserted' flag is wrong, and cause some problems on breakpoint
+	 manipulation.  */
+      init_wait_for_inferior ();
+
       get_offsets ();		/* Get text, data & bss offsets.  */
 
       /* If we could not find a description using qXfer, and we know
@@ -3689,6 +3700,16 @@ remote_disconnected_tracing_feature (const struct protocol_feature *feature,
   rs->disconnected_tracing = (support == PACKET_ENABLE);
 }
 
+static void
+remote_enable_disable_tracepoint_feature (const struct protocol_feature *feature,
+					  enum packet_support support,
+					  const char *value)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  rs->enable_disable_tracepoints = (support == PACKET_ENABLE);
+}
+
 static struct protocol_feature remote_protocol_features[] = {
   { "PacketSize", PACKET_DISABLE, remote_packet_size, -1 },
   { "qXfer:auxv:read", PACKET_DISABLE, remote_supported_packet,
@@ -3735,6 +3756,8 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_TracepointSource },
   { "QAllow", PACKET_DISABLE, remote_supported_packet,
     PACKET_QAllow },
+  { "EnableDisableTracepoints", PACKET_DISABLE,
+    remote_enable_disable_tracepoint_feature, -1 },
 };
 
 static char *remote_support_xml;
@@ -6213,7 +6236,7 @@ check_binary_download (CORE_ADDR addr)
 	  {
 	    if (remote_debug)
 	      fprintf_unfiltered (gdb_stdlog,
-				  "binary downloading suppported by target\n");
+				  "binary downloading supported by target\n");
 	    remote_protocol_packets[PACKET_X].support = PACKET_ENABLE;
 	  }
 	break;
@@ -9648,6 +9671,14 @@ remote_supports_static_tracepoints (void)
   return rs->static_tracepoints;
 }
 
+static int
+remote_supports_enable_disable_tracepoint (void)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  return rs->enable_disable_tracepoints;
+}
+
 static void
 remote_trace_init (void)
 {
@@ -9919,12 +9950,45 @@ remote_download_trace_state_variable (struct trace_state_variable *tsv)
 }
 
 static void
+remote_enable_tracepoint (struct bp_location *location)
+{
+  struct remote_state *rs = get_remote_state ();
+  char addr_buf[40];
+
+  sprintf_vma (addr_buf, location->address);
+  sprintf (rs->buf, "QTEnable:%x:%s", location->owner->number, addr_buf);
+  putpkt (rs->buf);
+  remote_get_noisy_reply (&rs->buf, &rs->buf_size);
+  if (*rs->buf == '\0')
+    error (_("Target does not support enabling tracepoints while a trace run is ongoing."));
+  if (strcmp (rs->buf, "OK") != 0)
+    error (_("Error on target while enabling tracepoint."));
+}
+
+static void
+remote_disable_tracepoint (struct bp_location *location)
+{
+  struct remote_state *rs = get_remote_state ();
+  char addr_buf[40];
+
+  sprintf_vma (addr_buf, location->address);
+  sprintf (rs->buf, "QTDisable:%x:%s", location->owner->number, addr_buf);
+  putpkt (rs->buf);
+  remote_get_noisy_reply (&rs->buf, &rs->buf_size);
+  if (*rs->buf == '\0')
+    error (_("Target does not support disabling tracepoints while a trace run is ongoing."));
+  if (strcmp (rs->buf, "OK") != 0)
+    error (_("Error on target while disabling tracepoint."));
+}
+
+static void
 remote_trace_set_readonly_regions (void)
 {
   asection *s;
   bfd_size_type size;
   bfd_vma vma;
   int anysecs = 0;
+  int offset = 0;
 
   if (!exec_bfd)
     return;			/* No information to give.  */
@@ -9933,6 +9997,7 @@ remote_trace_set_readonly_regions (void)
   for (s = exec_bfd->sections; s; s = s->next)
     {
       char tmp1[40], tmp2[40];
+      int sec_length;
 
       if ((s->flags & SEC_LOAD) == 0 ||
       /*  (s->flags & SEC_CODE) == 0 || */
@@ -9944,8 +10009,17 @@ remote_trace_set_readonly_regions (void)
       size = bfd_get_section_size (s);
       sprintf_vma (tmp1, vma);
       sprintf_vma (tmp2, vma + size);
-      sprintf (target_buf + strlen (target_buf), 
-	       ":%s,%s", tmp1, tmp2);
+      sec_length = 1 + strlen (tmp1) + 1 + strlen (tmp2);
+      if (offset + sec_length + 1 > target_buf_size)
+	{
+	  if (remote_protocol_packets[PACKET_qXfer_traceframe_info].support
+	      != PACKET_ENABLE)
+	    warning (_("\
+Too many sections for read-only sections definition packet."));
+	  break;
+	}
+      sprintf (target_buf + offset, ":%s,%s", tmp1, tmp2);
+      offset += sec_length;
     }
   if (anysecs)
     {
@@ -9968,14 +10042,25 @@ remote_trace_start (void)
 static int
 remote_get_trace_status (struct trace_status *ts)
 {
-  char *p;
+  /* Initialize it just to avoid a GCC false warning.  */
+  char *p = NULL;
   /* FIXME we need to get register block size some other way.  */
   extern int trace_regblock_size;
+  volatile struct gdb_exception ex;
 
   trace_regblock_size = get_remote_arch_state ()->sizeof_g_packet;
 
   putpkt ("qTStatus");
-  p = remote_get_noisy_reply (&target_buf, &target_buf_size);
+
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      p = remote_get_noisy_reply (&target_buf, &target_buf_size);
+    }
+  if (ex.reason < 0)
+    {
+      exception_fprintf (gdb_stderr, ex, "qTStatus: ");
+      return -1;
+    }
 
   /* If the remote target doesn't do tracing, flag it.  */
   if (*p == '\0')
@@ -10303,15 +10388,17 @@ Specify the serial device it is connected to\n\
   remote_ops.to_can_async_p = remote_can_async_p;
   remote_ops.to_is_async_p = remote_is_async_p;
   remote_ops.to_async = remote_async;
-  remote_ops.to_async_mask = remote_async_mask;
   remote_ops.to_terminal_inferior = remote_terminal_inferior;
   remote_ops.to_terminal_ours = remote_terminal_ours;
   remote_ops.to_supports_non_stop = remote_supports_non_stop;
   remote_ops.to_supports_multi_process = remote_supports_multi_process;
+  remote_ops.to_supports_enable_disable_tracepoint = remote_supports_enable_disable_tracepoint;
   remote_ops.to_trace_init = remote_trace_init;
   remote_ops.to_download_tracepoint = remote_download_tracepoint;
   remote_ops.to_download_trace_state_variable
     = remote_download_trace_state_variable;
+  remote_ops.to_enable_tracepoint = remote_enable_tracepoint;
+  remote_ops.to_disable_tracepoint = remote_disable_tracepoint;
   remote_ops.to_trace_set_readonly_regions = remote_trace_set_readonly_regions;
   remote_ops.to_trace_start = remote_trace_start;
   remote_ops.to_get_trace_status = remote_get_trace_status;
@@ -10367,7 +10454,7 @@ remote_can_async_p (void)
     return 0;
 
   /* We're async whenever the serial device is.  */
-  return remote_async_mask_value && serial_can_async_p (remote_desc);
+  return serial_can_async_p (remote_desc);
 }
 
 static int
@@ -10378,7 +10465,7 @@ remote_is_async_p (void)
     return 0;
 
   /* We're async whenever the serial device is.  */
-  return remote_async_mask_value && serial_is_async_p (remote_desc);
+  return serial_is_async_p (remote_desc);
 }
 
 /* Pass the SERIAL event on and up to the client.  One day this code
@@ -10414,10 +10501,6 @@ static void
 remote_async (void (*callback) (enum inferior_event_type event_type,
 				void *context), void *context)
 {
-  if (remote_async_mask_value == 0)
-    internal_error (__FILE__, __LINE__,
-		    _("Calling remote_async when async is masked"));
-
   if (callback != NULL)
     {
       serial_async (remote_desc, remote_async_serial_handler, NULL);
@@ -10426,15 +10509,6 @@ remote_async (void (*callback) (enum inferior_event_type event_type,
     }
   else
     serial_async (remote_desc, NULL, NULL);
-}
-
-static int
-remote_async_mask (int new_mask)
-{
-  int curr_mask = remote_async_mask_value;
-
-  remote_async_mask_value = new_mask;
-  return curr_mask;
 }
 
 static void
@@ -10568,7 +10642,7 @@ _initialize_remote (void)
   sigint_remote_token =
     create_async_signal_handler (async_remote_interrupt, NULL);
   sigint_remote_twice_token =
-    create_async_signal_handler (inferior_event_handler_wrapper, NULL);
+    create_async_signal_handler (async_remote_interrupt_twice, NULL);
 
 #if 0
   init_remote_threadtests ();

@@ -1,3 +1,39 @@
+2011-07-01  Eric B. Weddington  <eric.weddington@atmel.com>
+
+	* avr.h (AVR_ISA_AVR6): Remove AVR_ISA_SPMX as it was actually
+	a duplicate of AVR_ISA_SPM.
+
+2011-07-01  Nick Clifton  <nickc@redhat.com>
+
+	* avr.h (AVR_ISA_AVR6): Fix typo, adding AVR_ISA_SPMX.
+
+2011-06-18  Robin Getz  <robin.getz@analog.com>
+
+	* bfin.h (is_macmod_signed): New func
+
+2011-06-18  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin.h (is_macmod_pmove): Add missing space before func args.
+	(is_macmod_hmove): Likewise.
+
+2011-06-13  Walter Lee  <walt@tilera.com>
+
+	* tilegx.h: New file.
+	* tilepro.h: New file.
+
+2011-05-31  Paul Brook  <paul@codesourcery.com>
+
+	* arm.h (ARM_ARCH_V7R_IDIV): Define.
+
+2011-05-24  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* s390.h: Replace S390_OPERAND_REG_EVEN with
+	S390_OPERAND_REG_PAIR.
+
+2011-05-24  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* s390.h: Add S390_OPCODE_REG_EVEN flag.
+
 2011-04-18  Julian Brown  <julian@codesourcery.com>
 
 	* arm.h (ARM_AEXT_V7_ARM): Remove ARM_EXT_OS from bitmask.
@@ -52,6 +88,10 @@
 	* mips.h (OP_*_OFFSET_A, OP_*_OFFSET_B, OP_*_OFFSET_C)
 	(OP_*_RZ, OP_*_FZ, INSN2_M_FP_D, INSN2_WRITE_GPR_Z, INSN2_WRITE_FPR_Z)
 	(INSN2_READ_GPR_Z, INSN2_READ_FPR_Z, INSN2_READ_GPR_D): Define.
+
+2010-11-25  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* s390.h (enum s390_opcode_cpu_val): Add S390_OPCODE_MAXCPU.
 
 2010-11-23  Richard Sandiford  <rdsandiford@googlemail.com>
 
