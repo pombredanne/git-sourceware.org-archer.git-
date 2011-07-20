@@ -1,3 +1,36 @@
+2011-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash if referenced CU is aged out.
+	* gdb.dwarf2/dw2-op-call.exp (maintenance set dwarf2 max-cache-age 0):
+	New.
+	* gdb.dwarf2/implptr.exp: Likewise.
+
+2011-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/implptr.S: Rebuilt.
+	* gdb.dwarf2/implptr.c (intp, intpp, intppp): New typedefs.
+	(bar): Use them for j, k, l.
+	* gdb.dwarf2/implptr.exp: New variable opts.  Support runtest parameter
+	COMPILE.
+	(print j in implptr:bar): Update for the intp typedef.
+	(print p[0].x in implptr:foo): Use more exact regex.
+
+2011-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/static-method.exp: Add missing single quote.
+
+2011-07-18  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/async-shell.exp: Skip test if displaced stepping is not
+	supported.
+	* gdb.mi/mi-nonstop-exit.exp: Likewise.
+	* gdb.mi/mi-nonstop.exp: Likewise.
+	* gdb.mi/mi-ns-stale-regcache.exp: Likewise.
+	* gdb.mi/mi-nsintrall.exp: Likewise.
+	* gdb.mi/mi-nsmoribund.exp: Likewise.
+	* gdb.mi/mi-nsthrexec.exp: Likewise.
+	* gdb.python/py-evthreads.exp: Likewise.
+
 2011-07-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Code cleanup.

@@ -1,3 +1,93 @@
+2011-07-20  Matt Rice  <ratmice@gmail.com>
+
+	* bfin-tdep.c (bfin_extract_return_value): Fix swapped
+	arguments to store_unsigned_integer.
+
+2011-07-20  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (process_enumeration_scope): Do not call new_symbol
+	in some declaration-only cases.
+
+2011-07-18  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/12984:
+	* dwarf2read.c (dwarf2_section_info_def): New typedef.
+	(struct dwarf2_per_objfile) <types>: Change to a VEC.
+	(struct dwarf2_per_cu_data) <from_debug_types>: Remove.
+	<debug_type_section>: New field.
+	(dwarf2_locate_sections): Push .debug_types sections onto VEC.
+	(load_cu): Use appropriate section.
+	(create_signatured_type_table_from_index): Add 'section'
+	argument.
+	(dwarf2_read_index): Only allow a single .debug_types section.
+	(dw2_get_file_names): Use appropriate section.
+	(read_type_comp_unit_head): Add 'section' argument.
+	(create_debug_types_hash_table): Loop over all .debug_types
+	sections.
+	(init_cu_die_reader): Use appropriate section.
+	(process_psymtab_comp_unit, load_partial_comp_unit)
+	(load_full_comp_unit, read_die_and_children, find_partial_die)
+	(lookup_die_type, determine_prefix, follow_die_offset): Update.
+	(lookup_signatured_type_at_offset): Add 'section' argument.
+	(read_signatured_type_at_offset): Add 'sect' argument.
+	(read_signatured_type): Use appropriate section.
+	(set_die_type, get_die_type_at_offset): Update.
+	(dwarf2_per_objfile_free): Free all .debug_types sections, and
+	VEC.
+	(write_psymtabs_to_index): Don't allow index with more than one
+	.debug_types section.
+
+2011-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash if referenced CU is aged out.
+	* dwarf2loc.c (per_cu_dwarf_call): New variable back_to, use to for
+	xfree of block.data.
+	(indirect_pieced_value): New variable back_to, use to for xfree of
+	baton.data.
+	(dwarf2_compile_expr_to_ax): New variable back_to, use to for xfree of
+	block.data.
+	* dwarf2read.c (dwarf2_find_base_address): New prototype.
+	(load_cu): New function from ...
+	(dw2_do_instantiate_symtab): ... the code here ...
+	(process_full_comp_unit): ... and here.
+	(dwarf2_fetch_die_location_block): Call load_cu first.  Call xmemdup on
+	retval.data.
+
+2011-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2loc.c (indirect_pieced_value): Use check_typedef for VALUE's
+	type.
+
+2011-07-19  Gary Benson  <gbenson@redhat.com>
+
+	* infrun.c (struct execution_control_state): New member
+	stop_func_filled_in.
+	(clear_stop_func, fill_in_stop_func): New functions.
+	(handle_inferior_event): Call clear_stop_func rather than
+	manipulating the execution control state directly.
+	Call fill_in_stop_func lazily as required rather than
+	directly calling find_pc_partial_function in all cases.
+
+2011-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (read_subrange_type): Use attr_form_is_block when
+	checking for variable-sized array.
+
+2011-07-18  Jean-Charles Delay  <delay@adacore.com>
+
+	* varobj.h (varobj_languages): Add vlang_ada definition to the list
+	of supported languages.
+	* varobj.c: Add top definitions and basic implementation of the
+	following callbacks: ada_number_of_children, ada_name_of_variable,
+	ada_name_of_child, ada_path_expr_of_child, ada_value_of_root,
+	ada_value_of_child, ada_type_of_child, ada_value_of_variable.
+	(languages): Register Ada-specific callbacks.
+	(variable_language): Add the Ada case in the language setter switch.
+
+2011-07-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* remote-mips.c (pmon_download): Fix ignored return value GCC warning.
+
 2011-07-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Code cleanup.
