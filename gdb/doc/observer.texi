@@ -222,6 +222,11 @@ Bytes from @var{data} to @var{data} + @var{len} have been written
 to the current inferior at @var{addr}.
 @end deftypefun
 
+@deftypefun void before_prompt (const char *@var{current_prompt})
+Called before a top-level prompt is displayed.  @var{current_prompt} is
+the current top-level prompt.
+@end deftypefun
+
 @c @deftypefun void mark_used (void)
 @c Mark any possibly reclaimable objects as used during a mark-and-sweep garbage
 @c collector pass.  Currently only @code{type_mark_used} marker is supported.

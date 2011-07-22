@@ -1,3 +1,151 @@
+2011-07-22  Tom Tromey  <tromey@redhat.com>
+
+	* amd64-tdep.c (amd64_pseudo_register_read_value): Rename
+	from amd64_pseudo_register_read.  Change arguments.  Call
+	mark_value_bytes_unavailable when needed.
+	(amd64_init_abi): Use set_gdbarch_pseudo_register_read_value, not
+	set_gdbarch_pseudo_register_read.
+	* sentinel-frame.c (sentinel_frame_prev_register): Use
+	regcache_cooked_read_value.
+	* regcache.h (regcache_cooked_read_value): Declare.
+	* regcache.c (regcache_cooked_read_value): New function.
+	(regcache_cooked_read): Call
+	gdbarch_pseudo_register_read_value if available.
+	* i386-tdep.h (i386_pseudo_register_read_value): Declare.
+	(i386_pseudo_register_read): Remove.
+	* i386-tdep.c (i386_pseudo_register_read_into_value): Rename from
+	i386_pseudo_register_read.  Change arguments.  Call
+	mark_value_bytes_unavailable when needed.
+	(i386_pseudo_register_read_value): New function.
+	(i386_gdbarch_init): Call set_gdbarch_pseudo_register_read_value,
+	not set_gdbarch_pseudo_register_read.
+	* gdbarch.sh (pseudo_register_read_value): New method.
+	* gdbarch.c, gdbarch.h: Rebuild.
+	* findvar.c (value_from_register): Call get_frame_register_value.
+
+2011-07-22  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* event-top.c (cli_command_loop): Use get_prompt, get_suffix,
+	get_prefix.
+	(display_gdb_prompt): Likewise.
+	(change_annotation_level): Likewise.
+	(push_prompt): Likewise.
+	(pop_prompt): Likewise.
+	(handle_stop_sig): Use get_prompt with a level.
+	* top.c (command_loop): Use get_prompt with a level.
+	(set_async_annotation_level): Use set_prompt with a level.
+	(get_prefix): New function.
+	(set_prefix): Ditto.
+	(set_suffix): Ditto.
+	(get_suffix): Ditto.
+	(get_prompt): Accept a level argument.
+	(set_prompt): Accept a level argument.  Free old prompts.  Set
+	new_async_prompt if level is 0.
+	(init_main): Use set_prompt with a level.  Do not set
+	new_async_prompt.
+	* event-top.h (PROMPT, SUFFIX, PREFIX): Move to top.c
+	* top.h: Declare set_suffix, get_suffix, set_prefix, get_prefix.
+	Modify set_prompt, get_prompt to account for levels.
+	* tui/tui-interp.c (tui_command_loop): Use get_prompt with a
+	level.
+	* python/python.c (before_prompt_hook): Use set_prompt.
+	
+2011-07-22  Kwok Cheung Yeung  <kcy@codesourcery.com>
+
+	* defs.h: Add guard against inclusion in gdbserver.
+	(struct ptid, ptid_t): Move to common/ptid.h.
+	(xfree, xzalloc, xasprintf, xvasprintf, xstrprintf, xstrvprintf,
+	xsnprintf, internal_error): Move to common/common-utils.h.
+	(nomem): Delete.
+	* gdb_assert.h: Move into common/ sub-directory.
+	* gdb_locale.h: Ditto.
+	* gdb_dirent.h: Ditto.
+	* inferior.h (minus_one_ptid, null_ptid, ptid_build, pid_to_ptid,
+	ptid_get_pid, ptid_get_lwp, ptid_get_tid, ptid_equal, ptid_is_pid):
+	Move into common/ptid.h.
+	* xml-support.c (xml_escape_text): Move into common/xml-utils.c.
+	(gdb_xml_create_parser_and_cleanup_1, xml_fetch_context_from_file):
+	Change nomem to malloc_failure.
+	* xml-support.h (xml_escape_text): Move into common/xml-utils.h.
+	* utils.c (nomem): Rename to malloc_failure.
+	(xmalloc, xzalloc, xrealloc, xcalloc, xfree, xstrprintf, xasprintf,
+	xvasprintf, xstrvprintf, xsnprintf): Move to common/common-utils.c.
+	(gdb_buildargv): Change nomem to malloc_failure.
+	* infrun.c (null_ptid, minus_one_ptid, ptid_build, pid_to_ptid,
+	ptid_get_pid, ptid_get_lwp, ptid_get_tid, ptid_equal,
+	ptid_is_pid): Move into common/ptid.c.
+	(initialize_infrun): Delete initialization of null_ptid and
+	minus_one_ptid.
+	* linux-nat.c (linux_nat_xfer_osdata): Defer to
+	linux_common_xfer_osdata.
+	* Makefile.in (SFILES): Add common/common-utils.c, common/xml-utils.c,
+	common/ptid.c and common/buffer.c.
+	(HFILES_NO_SRCDIR): Add common/common-utils.h, common/xml-utils.h,
+	common/ptid.h, common/buffer.h and common/linux-osdata.h.
+	(COMMON_OBS): Add xml-utils.o, common-utils.o, buffer.o and ptid.o.
+	(common-utils.o, xml-utils.o, ptid.o, buffer.o, linux-osdata.o): New
+	rules.
+	* common/gdb_assert.h: New.
+	* common/gdb_dirent.h: New.
+	* common/gdb_locale.h: New.
+	* common/buffer.c: New.
+	* common/buffer.h: New.
+	* common/ptid.c: New.
+	* common/ptid.h: New.
+	* common/xml-utils.c: New.
+	* common/xml-utils.h: New.
+	* common/common-utils.c: New.
+	* common/common-utils.h: New.
+	* common/linux-osdata.c: New.
+	* common/linux-osdata.h: New.
+	* config/alpha/alpha-linux.mh (NATDEPFILES): Add linux-osdata.o.
+	* config/arm/linux.mh (NATDEPFILES): Ditto.
+	* config/i386/linux.mh (NATDEPFILES): Ditto.
+	* config/i386/linux64.mh (NATDEPFILES): Ditto.
+	* config/ia64/linux.mh (NATDEPFILES): Ditto.
+	* config/m32r/linux.mh (NATDEPFILES): Ditto.
+	* config/m68k/linux.mh (NATDEPFILES): Ditto.
+	* config/mips/linux.mh (NATDEPFILES): Ditto.
+	* config/pa/linux.mh (NATDEPFILES): Ditto.
+	* config/powerpc/linux.mh (NATDEPFILES): Ditto.
+	* config/powerpc/ppc64-linux.mh (NATDEPFILES): Ditto.
+	* config/s390/s390.mh (NATDEPFILES): Ditto.
+	* config/sparc/linux.mh (NATDEPFILES): Ditto.
+	* config/sparc/linux64.mh (NATDEPFILES): Ditto.
+	* config/xtensa/linux.mh (NATDEPFILES): Ditto.
+
+2011-07-21  Matt Rice  <ratmice@gmail.com>
+
+	* NEWS: Add info macros and info definitions commands.
+
+2011-07-21  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* NEWS: Document Python prompt substitution hook.
+
+2011-07-18  Matt Rice  <ratmice@gmail.com>
+
+	PR macros/12999
+	* macrotab.h (macro_callback_fn): Add new arguments to callback.
+	* macrotab.c (foreach_macro): Ditto.
+	(foreach_macro_in_scope): Ditto.
+	* macrocmd.c (print_macro_callback): New function.
+	(info_macro_command): Move some code to print_macro_definition.
+	(print_macro_definition): New function.
+	(print_one_macro): Add new arguments to callback.
+	(info_definitions_command): New function.
+	(info_macros_command): Ditto.
+	(_initialize_macrocmd): Add info macros and info definitions commands.
+	* symtab.c (add_macro_name): Add new arguments to callback.
+
+2011-07-21  Phil Muldoon  <pmuldoon@redhat.com>
+            Tom Tromey  <tromey@redhat.com>
+
+	* top.c (set_prompt): Rewrite to free previous prompt, free
+	asynch_new_prompt and set both on new prompts.
+	* event-top.c (display_gdb_prompt): Add prompt substitution
+	logic.
+	* python/python.c (before_prompt_hook): New function.
+
 2011-07-20  Matt Rice  <ratmice@gmail.com>
 
 	* bfin-tdep.c (bfin_extract_return_value): Fix swapped
