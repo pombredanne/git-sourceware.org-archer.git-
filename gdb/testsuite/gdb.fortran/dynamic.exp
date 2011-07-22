@@ -25,7 +25,7 @@ set testfile "dynamic"
 set srcfile ${testfile}.f90
 set binfile ${objdir}/${subdir}/${testfile}
 
-if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug f77 quiet}] != "" } {
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug f90 quiet}] != "" } {
     untested "Couldn't compile ${srcfile}"
     return -1
 }

@@ -21,8 +21,8 @@ set objfile2 ${objdir}/${subdir}/${testfile}-stub.o
 set executable ${testfile}
 set binfile ${objdir}/${subdir}/${executable}
 
-if { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${objfile2}" object {f77}] != ""
-     || [gdb_compile "${srcdir}/${subdir}/${srcfile1} ${objfile2}" "${binfile}" executable {debug f77}] != "" } {
+if { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${objfile2}" object {f90}] != ""
+     || [gdb_compile "${srcdir}/${subdir}/${srcfile1} ${objfile2}" "${binfile}" executable {debug f90}] != "" } {
     untested "Couldn't compile ${srcfile1} or ${srcfile2}"
     return -1
 }
