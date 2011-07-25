@@ -1,3 +1,78 @@
+2011-07-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix implicit pointer offsets.
+	* gdb.dwarf2/implptr.c (add): New marker baz breakpoint.
+	* gdb.dwarf2/implptr.exp (set baz breakpoint for implptr)
+	(continue to breakpoint: continue to baz breakpoint for implptr)
+	(sanity check element 0, sanity check element 1)
+	(enter the inlined function, check element 0 for the offset)
+	(check element 1 for the offset)
+	(continue to breakpoint: ignore the second baz breakpoint): New tests.
+	(set foo breakpoint for implptr): Update the breakpoint number.
+
+2011-07-22  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.python/py-mi.exp: Use different file names for different
+	versions of the executable under test.
+	* gdb.python/py-prettyprint.exp: Likewise.
+	* gdb.python/py-symbol.exp: Likewise.
+	* gdb.python/py-template.exp: Likewise.
+	* gdb.python/py-type.exp: Likewise.
+	* gdb.python/py-value.exp: Likewise.
+
+2011-07-22  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.python/py-breakpoint.exp: Re-set can-use-hw-watchpoints
+	flag after restarting GDB if necessary.
+
+2011-07-22  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.python/py-shared.exp: Call gdb_load_shlibs.
+
+2011-07-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.arch/i386-dr3-watch.exp: Test that the i386 watchpoints
+	backend doesn't leave used debug registers behind.
+
+2011-07-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/typeddwarf.c: XFAIL 'z' on x86-64.
+	* gdb.dwarf2/typeddwarf.exp (xfail-gdb-test): Add arch_pattern
+	argument.
+	* gdb.dwarf2/typeddwarf-amd64.S: New file.
+
+2011-07-21  Matt Rice  <ratmice@gmail.com>
+
+	* gdb.threads/Makefile.in: Avoid globbing corethreads.exp
+	in mostlyclean rule.  Add files ending in .core.
+
+2011-07-21  Matt Rice  <ratmice@gmail.com>
+
+	PR macros/12999
+	* gdb.base/info-macros.c: New test sources.
+	* gdb.base/info-macros.exp: New tests.
+
+2011-07-21  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/python.exp: Add prompt substitution tests.
+
+2011-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash if referenced CU is aged out.
+	* gdb.dwarf2/dw2-op-call.exp (maintenance set dwarf2 max-cache-age 0):
+	New.
+	* gdb.dwarf2/implptr.exp: Likewise.
+
+2011-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/implptr.S: Rebuilt.
+	* gdb.dwarf2/implptr.c (intp, intpp, intppp): New typedefs.
+	(bar): Use them for j, k, l.
+	* gdb.dwarf2/implptr.exp: New variable opts.  Support runtest parameter
+	COMPILE.
+	(print j in implptr:bar): Update for the intp typedef.
+	(print p[0].x in implptr:foo): Use more exact regex.
+
 2011-07-18  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.cp/static-method.exp: Add missing single quote.
