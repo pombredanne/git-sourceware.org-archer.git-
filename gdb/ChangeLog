@@ -1,3 +1,122 @@
+2011-07-28  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* varobj.c (value_get_print_value): Move hint check later into the
+	function.  Comment function.  Free thevalue before reusing it.
+
+2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* eval.c (evaluate_subexp_standard): Remove not_lval from all calls of
+	value_one.
+	* valops.c (value_one): Remove parameter lv.  Do not pass it to itself.
+	Assert the result kind.
+	* value.h (value_one): Remove parameter lv.
+
+2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash on lval_computed values.
+	* valops.c (value_zero): Use not_lval for lval_computed.
+
+2011-07-27  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (HFILES_NO_SRCDIR): Add 'common' prefix for
+	gdb_assert.h, gdb_locale.h, gdb_dirent.h.
+
+2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* typeprint.c (_initialize_typeprint): Extend the help of "whatis" and
+	"ptype" by their typedefs difference.
+
+2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2expr.c (ctx_no_read_reg): New function.
+	* dwarf2expr.h (ctx_no_read_reg): New declaration.
+	* dwarf2read.c (read_2_signed_bytes, read_4_signed_bytes): Remove.
+	(decode_locdesc_read_mem, decode_locdesc_ctx_funcs): New.
+	(decode_locdesc): Replace by a caller of dwarf_expr_eval.
+
+2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2-frame.c (no_get_frame_base, no_get_frame_cfa, no_get_frame_pc)
+	(no_get_tls_address, no_dwarf_call, no_base_type): Move to the other
+	file.
+	(dwarf2_frame_ctx_funcs): Reference the renamed functions.
+	* dwarf2expr.c (ctx_no_get_frame_base, ctx_no_get_frame_cfa)
+	(ctx_no_get_frame_pc, ctx_no_get_tls_address, ctx_no_dwarf_call)
+	(ctx_no_get_base_type): Move the functions here.
+	* dwarf2expr.h (ctx_no_get_frame_base, ctx_no_get_frame_cfa)
+	(ctx_no_get_frame_pc, ctx_no_get_tls_address, ctx_no_dwarf_call)
+	(ctx_no_get_base_type): New declarations.
+
+2011-07-27  Tom Tromey  <tromey@redhat.com>
+
+	* xcoffread.c (dwarf2_xcoff_names): Add 'macro' and 'sentinel'
+	entries.
+	* symfile.h (struct dwarf2_debug_sections) <sentinel>: New field.
+	* dwarf2read.c (dwarf2_elf_names): Add sentinel entry.
+
+2011-07-26  Sterling Augustine  <saugustine@google.com>
+
+	* cli/cli-dump.c (dump_binary_file): Change parameter type to
+	ULONGEST.
+	(dump_bfd_file): Likewise.
+
+2011-07-26  Philippe Waroquiers  <philippe.waroquiers@skynet.be>
+
+	* remote.c (remote_region_ok_for_hw_watchpoint): New function.
+	(remote_hw_watchpoint_length_limit): New variable.
+	(_initialize_remote) add set,show cmds for this new variable.
+	* gdb.texinfo: document these new commands.
+	* NEWS: Mention these new commands.
+
+2011-07-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* breakpoint.c (works_in_software_mode_watchpoint): Also return
+	true for software watchpoints.
+
+2011-07-26  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB 7.3 released.
+
+2011-07-26  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.h (struct dwarf2_debug_sections) <macro>: New field.
+	* dwarf2read.c (read_indirect_string_at_offset): New function.
+	(read_indirect_string): Use it.
+	(dwarf_decode_macro_bytes): New function, taken from
+	dwarf_decode_macros.  Handle DW_MACRO_GNU_*.
+	(dwarf_decode_macros): Use it.  handle DW_MACRO_GNU_*.
+	(dwarf_parse_macro_header, skip_form_bytes, skip_unknown_opcode):
+	New functions.
+	(struct dwarf2_per_objfile) <macro>: New field.
+	(dwarf2_elf_names): Add .debug_macro.
+	(dwarf2_macros_too_long_complaint): Add 'section' argument.
+	(dwarf2_locate_sections): Handle new section.
+	(read_file_scope): Handle DW_AT_GNU_macros.
+	(dwarf2_per_objfile_free): Unmap the .debug_macro section.
+
+2011-07-26  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* NEWS: Mention dcache configuration.
+	* dcache.c (dcache_set_list, dcache_show_list): New variables.
+	(dcache_size, dcache_line_size): New variables.
+	(LINE_SIZE_MASK, XFORM, MASK): Adjust.
+	(struct dcache_block): Make it expandable.
+	(struct dcache_struct): New field.
+	(dcache_invalidate): Discard freelist upon dcache_line_size changes.
+	(dcache_hit, dcache_alloc, dcache_peek_byte): Adjust.
+	(dcache_poke_byte, dcache_print_line): Adjust.
+	(set_dcache_size, set_dcache_line_size): New functions.
+	(set_dcache_command, show_dcache_command): New functions.
+	(_initialize_dcache): Add new commands.
+
+2011-07-26  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* progspace.h (struct program_space): Add solib_add_generation.
+	* infcmd.c (post_create_inferior): Only call solib_add if not
+	already done.
+	* solib.c (solib_add): Increment solib_add_generation.
+
 2011-07-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix implicit pointer offsets.
