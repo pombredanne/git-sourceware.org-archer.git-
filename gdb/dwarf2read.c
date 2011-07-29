@@ -11535,6 +11535,9 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
 
   SYMBOL_CLASS (sym) = LOC_COMPUTED;
   dwarf2_symbol_mark_computed (attr, sym, cu);
+
+  if (SYMBOL_COMPUTED_OPS (sym) == &dwarf2_loclist_funcs)
+    cu->has_loclist = 1;
 }
 
 /* Given a pointer to a DWARF information entry, figure out if we need
@@ -15452,7 +15455,6 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
     {
       SYMBOL_COMPUTED_OPS (sym) = &dwarf2_loclist_funcs;
       SYMBOL_LOCATION_BATON (sym) = loclist_baton;
-      cu->has_loclist = 1;
     }
   else if (attr_form_is_block (attr))
     {
