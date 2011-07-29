@@ -1183,6 +1183,8 @@ indirect_pieced_value (struct value *value)
     }
 
   frame = get_selected_frame (_("No frame selected."));
+
+  /* This is an offset requested by GDB, such as value subcripts.  */
   byte_offset = value_as_address (value);
 
   gdb_assert (piece);
@@ -1194,7 +1196,7 @@ indirect_pieced_value (struct value *value)
 
   result = dwarf2_evaluate_loc_desc_full (TYPE_TARGET_TYPE (type), frame,
 					  baton.data, baton.size, baton.per_cu,
-					  byte_offset);
+					  piece->v.ptr.offset + byte_offset);
 
   do_cleanups (back_to);
 

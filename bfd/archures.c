@@ -181,6 +181,7 @@ DESCRIPTION
 .#define bfd_mach_mipsisa32r2           33
 .#define bfd_mach_mipsisa64             64
 .#define bfd_mach_mipsisa64r2           65
+.#define bfd_mach_mips_micromips        96
 .  bfd_arch_i386,      {* Intel 386 *}
 .#define bfd_mach_i386_i386 1
 .#define bfd_mach_i386_i8086 2
@@ -192,6 +193,9 @@ DESCRIPTION
 .  bfd_arch_l1om,   {* Intel L1OM *}
 .#define bfd_mach_l1om 66
 .#define bfd_mach_l1om_intel_syntax 67
+.  bfd_arch_k1om,   {* Intel K1OM *}
+.#define bfd_mach_k1om 68
+.#define bfd_mach_k1om_intel_syntax 69
 .  bfd_arch_we32k,     {* AT&T WE32xxx *}
 .  bfd_arch_tahoe,     {* CCI/Harris Tahoe *}
 .  bfd_arch_i860,      {* Intel 860 *}
@@ -503,6 +507,7 @@ extern const bfd_arch_info_type bfd_i960_arch;
 extern const bfd_arch_info_type bfd_ia64_arch;
 extern const bfd_arch_info_type bfd_ip2k_arch;
 extern const bfd_arch_info_type bfd_iq2000_arch;
+extern const bfd_arch_info_type bfd_k1om_arch;
 extern const bfd_arch_info_type bfd_l1om_arch;
 extern const bfd_arch_info_type bfd_lm32_arch;
 extern const bfd_arch_info_type bfd_m32c_arch;
@@ -582,6 +587,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
     &bfd_ia64_arch,
     &bfd_ip2k_arch,
     &bfd_iq2000_arch,
+    &bfd_k1om_arch,
     &bfd_l1om_arch,
     &bfd_lm32_arch,
     &bfd_m32c_arch,
