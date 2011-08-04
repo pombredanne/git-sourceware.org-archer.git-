@@ -1,3 +1,122 @@
+2011-08-03  Tristan Gingold  <gingold@adacore.com>
+
+	* mach-o.c (bfd_mach_o_canonicalize_symtab): Handle no symbols case.
+	(bfd_mach_o_read_symtab_symbols): Return if no symbols.
+
+2011-08-02  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c (check_4byte_branch): Remove function.
+	(check_relocated_bzc): New function.
+	(_bfd_mips_elf_relax_section): Permit the relaxation of LUI
+	instructions that immediately follow a compact branch
+	instruction.
+
+2011-08-02  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (build_plt_stub): Correct emitted relocs when no
+	plt_static_chain.
+	(ppc_build_one_stub): Adjust get_relocs call to suit..
+	(ppc_size_one_stub): ..and reloc sizing.  Correct plt size corner case.
+
+2011-08-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/13048
+	* archures.c (bfd_mach_i386_intel_syntax): New.
+	(bfd_mach_i386_i8086): Updated.
+	(bfd_mach_i386_i386): Likewise.
+	(bfd_mach_x86_64): Likewise.
+	(bfd_mach_x64_32): Likewise.
+	(bfd_mach_i386_i386_intel_syntax): Likewise.
+	(bfd_mach_x86_64_intel_syntax): Likewise.
+	(bfd_mach_x64_32_intel_syntax): Likewise.
+	(bfd_mach_l1om): Likewise.
+	(bfd_mach_l1om_intel_syntax): Likewise.
+	(bfd_mach_k1om): Likewise.
+	(bfd_mach_k1om_intel_syntax): Likewise.
+
+	* bfd-in2.h: Regenerated.
+
+	* cpu-i386.c (bfd_i386_compatible): Check mach instead of
+	bits_per_address.
+	(bfd_x64_32_arch_intel_syntax): Set bits_per_address to 64.
+	(bfd_x64_32_arch): Likewise.
+
+	* elf64-x86-64.c: Include "libiberty.h".
+	(x86_64_elf_howto_table): Append x32 R_X86_64_32.
+	(elf_x86_64_rtype_to_howto): Support x32 R_X86_64_32.
+	(elf_x86_64_reloc_type_lookup): Likewise.
+	(elf_x86_64_reloc_name_lookup): Likewise.
+	(elf_x86_64_relocate_section): Likewise.
+	(elf_x86_64_check_relocs): Allow R_X86_64_64 relocations for x32.
+
+2011-07-29  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c (check_br32): Fix return type.
+
+2011-07-29  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c (bz_insn_16): Correct opcode mask.
+
+2011-07-29  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c: Adjust comments throughout.
+	(mips_elf_relax_delete_bytes): Reshape code.
+	(_bfd_mips_elf_relax_section): Remove check for
+	R_MICROMIPS_GPREL16 relocations.  Reshape code.
+
+2011-07-28  Roland McGrath  <mcgrathr@google.com>
+
+	* elf32-i386.c (NACL_PLT_ENTRY_SIZE, NACLMASK): New macros.
+	(elf_i386_nacl_plt0_entry): New variable.
+	(elf_i386_plt_entry): New variable.
+	(elf_i386_nacl_pic_plt0_entry): New variable.
+	(elf_i386_nacl_pic_plt_entry): New variable.
+	(elf_i386_nacl_plt, elf_i386_nacl_arch_bed): New variables.
+	(elf_backend_arch_data): New macro setting for elf_i386_nacl_vec stanza.
+	(elf_backend_plt_alignment): Likewise.
+
+	* config.bfd: Handle i[3-7]86-*-nacl*.
+	* elf32-i386.c (bfd_elf32_i386_nacl_vec): New backend vector stanza.
+	* targets.c: Support bfd_elf32_i386_nacl_vec.
+	* configure.in: Likewise.
+	* configure: Regenerated.
+
+	* elf32-i386.c (struct elf_i386_plt_layout): New type.
+	(GET_PLT_ENTRY_SIZE): New macro.
+	(elf_i386_plt): New variable.
+	(struct elf_i386_backend_data): New member `plt'.
+	(elf_i386_arch_bed): Add initializer for it.
+	(elf_i386_vxworks_arch_bed): Likewise.
+	(elf_i386_allocate_dynrelocs): Use GET_PLT_ENTRY_SIZE.
+	(elf_i386_plt_sym_val): Likewise.
+	(elf_i386_relocate_section): Likewise.
+	(elf_i386_finish_dynamic_symbol): Likewise.
+	Also use other elf_i386_plt_layout members for PLT details.
+	(elf_i386_finish_dynamic_sections): Likewise.
+
+	* elf32-i386.c (struct elf_i386_backend_data): New type.
+	(get_elf_i386_backend_data): New macro.
+	(elf_i386_arch_bed): New variable.
+	(elf_backend_arch_data): New macro.
+	(struct elf_i386_link_hash_table): Remove plt0_pad_byte and is_vxworks.
+	(elf_i386_link_hash_table_create): Don't initialize them.
+	(elf_i386_create_dynamic_sections): Find is_vxworks flags in
+	elf_i386_backend_data, not elf_i386_link_hash_table.
+	(elf_i386_adjust_dynamic_symbol): Likewise.
+	(elf_i386_allocate_dynrelocs): Likewise.
+	(elf_i386_readonly_dynrelocs): Likewise.
+	(elf_i386_size_dynamic_sections): Likewise.
+	(elf_i386_relocate_section): Likewise.
+	(elf_i386_finish_dynamic_symbol): Likewise.
+	(elf_i386_finish_dynamic_sections): Likewise.  Same for plt0_pad_byte.
+	(elf_i386_vxworks_link_hash_table_create): Function removed.
+	(elf_i386_vxworks_arch_bed): New variable.
+	(elf_backend_arch_data): New macro in elf32-i386-vxworks stanza.
+
+	* elf-bfd.h (elf_backend_data): New member arch_backend_data.
+	* elfxx-target.h (elf_backend_arch_data): New macro.
+	(elfNN_bed): Use it as initializer for the new member.
+
 2011-07-28  Mikulas Patocka  <mikulas@artax.karlin.mff.cuni.cz>
 
 	* elf64-hppa.c (elf_hppa_final_link_relocate): Fix handling of out

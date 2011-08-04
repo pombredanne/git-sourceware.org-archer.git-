@@ -11910,8 +11910,7 @@ mips_elf_relax_delete_bytes (bfd *abfd,
   symtab_hdr = &elf_tdata (abfd)->symtab_hdr;
   isym = (Elf_Internal_Sym *) symtab_hdr->contents;
   for (isymend = isym + symtab_hdr->sh_info; isym < isymend; isym++)
-    if (isym->st_shndx == sec_shndx
-	&& isym->st_value > addr)
+    if (isym->st_shndx == sec_shndx && isym->st_value > addr)
       isym->st_value -= count;
 
   /* Now adjust the global symbols defined in this section.  */
@@ -11928,9 +11927,8 @@ mips_elf_relax_delete_bytes (bfd *abfd,
 	   || sym_hash->root.type == bfd_link_hash_defweak)
 	  && sym_hash->root.u.def.section == sec)
 	{
-	  bfd_vma value;
+	  bfd_vma value = sym_hash->root.u.def.value;
 
-	  value = sym_hash->root.u.def.value;
 	  if (ELF_ST_IS_MICROMIPS (sym_hash->other))
 	    value &= MINUS_TWO;
 	  if (value > addr)
@@ -11989,7 +11987,7 @@ static const struct opcode_descriptor b_insn_16 =
   { /* "b",	"mD",		*/ 0xcc00,     0xfc00 };
 
 static const struct opcode_descriptor bz_insn_16 =
-  { /* "b(eq|ne)z", "md,mE",	*/ 0x8c00,     0xac00 };
+  { /* "b(eq|ne)z", "md,mE",	*/ 0x8c00,     0xdc00 };
 
 
 /* 32-bit and 16-bit branch EQ and NE zero.  */
@@ -12241,7 +12239,7 @@ check_br16 (bfd *abfd, bfd_byte *ptr, unsigned long reg)
 /* If PTR points to a 32-bit branch or jump that doesn't fiddle with REG,
    then return TRUE, otherwise FALSE.  */
 
-static int
+static bfd_boolean
 check_br32 (bfd *abfd, bfd_byte *ptr, unsigned long reg)
 {
   unsigned long opcode;
@@ -12266,32 +12264,37 @@ check_br32 (bfd *abfd, bfd_byte *ptr, unsigned long reg)
   return FALSE;
 }
 
+/* If the instruction encoding at PTR and relocations [INTERNAL_RELOCS,
+   IRELEND) at OFFSET indicate that there must be a compact branch there,
+   then return TRUE, otherwise FALSE.  */
+
+static bfd_boolean
+check_relocated_bzc (bfd *abfd, const bfd_byte *ptr, bfd_vma offset,
+		     const Elf_Internal_Rela *internal_relocs,
+		     const Elf_Internal_Rela *irelend)
+{
+  const Elf_Internal_Rela *irel;
+  unsigned long opcode;
+
+  opcode   = bfd_get_16 (abfd, ptr);
+  opcode <<= 16;
+  opcode  |= bfd_get_16 (abfd, ptr + 2);
+  if (find_match (opcode, bzc_insns_32) < 0)
+    return FALSE;
+
+  for (irel = internal_relocs; irel < irelend; irel++)
+    if (irel->r_offset == offset
+	&& ELF32_R_TYPE (irel->r_info) == R_MICROMIPS_PC16_S1)
+      return TRUE;
+
+  return FALSE;
+}
+
 /* Bitsize checking.  */
 #define IS_BITSIZE(val, N)						\
   (((((val) & ((1ULL << (N)) - 1)) ^ (1ULL << ((N) - 1)))		\
     - (1ULL << ((N) - 1))) == (val))
 
-/* See if relocations [INTERNAL_RELOCS, IRELEND) confirm that there
-   is a 4-byte branch at offset OFFSET.  */
-
-static bfd_boolean
-check_4byte_branch (Elf_Internal_Rela *internal_relocs,
-		    Elf_Internal_Rela *irelend, bfd_vma offset)
-{
-  Elf_Internal_Rela *irel;
-  unsigned long r_type;
-
-  for (irel = internal_relocs; irel < irelend; irel++)
-    if (irel->r_offset == offset)
-      {
-	r_type = ELF32_R_TYPE (irel->r_info);
-	if (r_type == R_MICROMIPS_26_S1
-	    || r_type == R_MICROMIPS_PC16_S1
-	    || r_type == R_MICROMIPS_JALR)
-	  return TRUE;
-      }
-  return FALSE;
-}
 
 bfd_boolean
 _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
@@ -12336,6 +12339,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
       unsigned long opcode;
       bfd_vma symval;
       bfd_vma pcrval;
+      bfd_byte *ptr;
       int fndopc;
 
       /* The number of bytes to delete for relaxation and from where
@@ -12347,8 +12351,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
          this reloc.  */
       if (r_type != R_MICROMIPS_HI16
 	  && r_type != R_MICROMIPS_PC16_S1
-	  && r_type != R_MICROMIPS_26_S1
-	  && r_type != R_MICROMIPS_GPREL16)
+	  && r_type != R_MICROMIPS_26_S1)
 	continue;
 
       /* Get the section contents if we haven't done so already.  */
@@ -12361,6 +12364,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 	  else if (!bfd_malloc_and_get_section (abfd, sec, &contents))
 	    goto error_return;
 	}
+      ptr = contents + irel->r_offset;
 
       /* Read this BFD's local symbols if we haven't done so already.  */
       if (isymbuf == NULL && symtab_hdr->sh_info != 0)
@@ -12432,8 +12436,8 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
       if (irel->r_offset + 4 > sec->size)
 	continue;
 
-      opcode  = bfd_get_16 (abfd, contents + irel->r_offset    ) << 16;
-      opcode |= bfd_get_16 (abfd, contents + irel->r_offset + 2);
+      opcode  = bfd_get_16 (abfd, ptr    ) << 16;
+      opcode |= bfd_get_16 (abfd, ptr + 2);
 
       /* This is the pc-relative distance from the instruction the
          relocation is applied to, to the symbol referred.  */
@@ -12452,6 +12456,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
          out the offset).  */
       if (r_type == R_MICROMIPS_HI16 && MATCH (opcode, lui_insn))
 	{
+	  bfd_boolean bzc = FALSE;
 	  unsigned long nextopc;
 	  unsigned long reg;
 	  bfd_vma offset;
@@ -12475,19 +12480,20 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 	      && ELF32_R_SYM (irel[2].r_info) == r_symndx)
 	    continue;
 
-	  /* See if the LUI instruction *might* be in a branch delay slot.  */
+	  /* See if the LUI instruction *might* be in a branch delay slot.
+	     We check whether what looks like a 16-bit branch or jump is
+	     actually an immediate argument to a compact branch, and let
+	     it through if so.  */
 	  if (irel->r_offset >= 2
-	      && check_br16_dslot (abfd, contents + irel->r_offset - 2) > 0
+	      && check_br16_dslot (abfd, ptr - 2)
 	      && !(irel->r_offset >= 4
-		   /* If the instruction is actually a 4-byte branch,
-		      the value of check_br16_dslot doesn't matter.
-		      We should use check_br32_dslot to check whether
-		      the branch has a delay slot.  */
-		   && check_4byte_branch (internal_relocs, irelend,
-					  irel->r_offset - 4)))
+		   && (bzc = check_relocated_bzc (abfd,
+						  ptr - 4, irel->r_offset - 4,
+						  internal_relocs, irelend))))
 	    continue;
 	  if (irel->r_offset >= 4
-	      && check_br32_dslot (abfd, contents + irel->r_offset - 4) > 0)
+	      && !bzc
+	      && check_br32_dslot (abfd, ptr - 4))
 	    continue;
 
 	  reg = OP32_SREG (opcode);
@@ -12502,11 +12508,11 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 	    case 0:
 	      break;
 	    case 2:
-	      if (check_br16 (abfd, contents + irel->r_offset + 4, reg))
+	      if (check_br16 (abfd, ptr + 4, reg))
 		break;
 	      continue;
 	    case 4:
-	      if (check_br32 (abfd, contents + irel->r_offset + 4, reg))
+	      if (check_br32 (abfd, ptr + 4, reg))
 		break;
 	      continue;
 	    default:
@@ -12581,8 +12587,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 	       && irel->r_offset + 5 < sec->size
 	       && ((fndopc = find_match (opcode, bz_rs_insns_32)) >= 0
 		   || (fndopc = find_match (opcode, bz_rt_insns_32)) >= 0)
-	       && MATCH (bfd_get_16 (abfd, contents + irel->r_offset + 4),
-			 nop_insn_16))
+	       && MATCH (bfd_get_16 (abfd, ptr + 4), nop_insn_16))
 	{
 	  unsigned long reg;
 
@@ -12593,10 +12598,8 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 		    | BZC32_REG_FIELD (reg)
 		    | (opcode & 0xffff));		/* Addend value.  */
 
-	  bfd_put_16 (abfd, (opcode >> 16) & 0xffff,
-		      contents + irel->r_offset);
-	  bfd_put_16 (abfd,  opcode        & 0xffff,
-		      contents + irel->r_offset + 2);
+	  bfd_put_16 (abfd, (opcode >> 16) & 0xffff, ptr);
+	  bfd_put_16 (abfd,  opcode        & 0xffff, ptr + 2);
 
 	  /* Delete the 16-bit delay slot NOP: two bytes from
 	     irel->offset + 4.  */
@@ -12617,7 +12620,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 	  bfd_put_16 (abfd,
 		      (b_insn_16.match
 		       | (opcode & 0x3ff)),		/* Addend value.  */
-		      contents + irel->r_offset);
+		      ptr);
 
 	  /* Delete 2 bytes from irel->r_offset + 2.  */
 	  delcnt = 2;
@@ -12645,7 +12648,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 		      (bz_insns_16[fndopc].match
 		       | BZ16_REG_FIELD (reg)
 		       | (opcode & 0x7f)),		/* Addend value.  */
-		      contents + irel->r_offset);
+		      ptr);
 
 	  /* Delete 2 bytes from irel->r_offset + 2.  */
 	  delcnt = 2;
@@ -12661,14 +12664,13 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 	  unsigned long n32opc;
 	  bfd_boolean relaxed = FALSE;
 
-	  n32opc  = bfd_get_16 (abfd, contents + irel->r_offset + 4) << 16;
-	  n32opc |= bfd_get_16 (abfd, contents + irel->r_offset + 6);
+	  n32opc  = bfd_get_16 (abfd, ptr + 4) << 16;
+	  n32opc |= bfd_get_16 (abfd, ptr + 6);
 
 	  if (MATCH (n32opc, nop_insn_32))
 	    {
 	      /* Replace delay slot 32-bit NOP with a 16-bit NOP.  */
-	      bfd_put_16 (abfd, nop_insn_16.match,
-			  contents + irel->r_offset + 4);
+	      bfd_put_16 (abfd, nop_insn_16.match, ptr + 4);
 
 	      relaxed = TRUE;
 	    }
@@ -12679,7 +12681,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 			  (move_insn_16.match
 			   | MOVE16_RD_FIELD (MOVE32_RD (n32opc))
 			   | MOVE16_RS_FIELD (MOVE32_RS (n32opc))),
-			  contents + irel->r_offset + 4);
+			  ptr + 4);
 
 	      relaxed = TRUE;
 	    }
@@ -12691,9 +12693,9 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 	      /* JAL with 32-bit delay slot that is changed to a JALS
 	         with 16-bit delay slot.  */
 	      bfd_put_16 (abfd, (jal_insn_32_bd16.match >> 16) & 0xffff,
-			  contents + irel->r_offset);
+			  ptr);
 	      bfd_put_16 (abfd,  jal_insn_32_bd16.match        & 0xffff,
-			  contents + irel->r_offset + 2);
+			  ptr + 2);
 
 	      /* Delete 2 bytes from irel->r_offset + 6.  */
 	      delcnt = 2;

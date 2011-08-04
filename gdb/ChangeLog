@@ -1,3 +1,87 @@
+2011-08-03  Philippe Waroquiers  <philippe.waroquiers@skynet.be>
+
+	* breakpoint.c (update_global_location_list): Ensure
+	invariant 'first loc marked not duplicated and inserted,
+	following locs marked duplicated/not inserted' is respected
+	for multiple locations at the same address.
+	(unduplicated_should_be_inserted) New function.
+	(swap_insertion) New function.
+
+2011-08-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* stack.c (print_frame_arguments_choices): Comment typo fix.
+
+2011-08-01  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	Revert:
+	2011-07-31  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+	* breakpoint.c (insert_bp_location): Remove disabled_breaks
+	argument.  Update callers.
+
+2011-08-01  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/13045
+	* doublest.c (convert_doublest_to_floatformat): Pass correct
+	mantissa length to put_field.
+
+2011-08-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* stack.c (do_gdb_disassembly): Use RETURN_MASK_ERROR, simplify the
+	exception_print code path.
+	(backtrace_command): Remove variable e.  Protect arg by make_cleanup in
+	advance.  Simplify memset.  Remove TRY_CATCH.  Remove explicit xfree.
+	(backtrace_full_command):  Remove variable e.  Remove TRY_CATCH.
+
+2011-08-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* stack.c (struct print_stack_frame_args, print_stack_frame_stub):
+	Remove, merge them into ...
+	(print_stack_frame): ... here with a TRY_CATCH.  New variable e, remove
+	variable args and its initialization.
+	(struct print_args_args, print_args_stub): Remove, merge them into
+	print_frame.
+	(struct gdb_disassembly_stub_args, gdb_disassembly_stub): Remove, merge
+	them into ...
+	(do_gdb_disassembly): ... here.  Remove variable args and its
+	initialization.
+	(print_frame): Remove variable args and its initialization, new
+	variable gdbarch and numargs (from print_args_stub), inline here
+	print_args_stub with a TRY_CATCH.
+	(struct backtrace_command_args, backtrace_command_stub): Remove, merge
+	them into ...
+	(backtrace_command, backtrace_full_command): ... here with a TRY_CATCH.
+	New variable e, remove variable btargs and its initialization.
+
+2011-08-01  Tristan Gingold  <gingold@adacore.com>
+
+	* darwin-nat.c (darwin_decode_exception_message): Adjust assertion.
+
+2011-07-31  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpoint.c (insert_bp_location): Document return value.
+	(insert_breakpoint_locations): Fix documentation.
+	(remove_breakpoints): Add documentation.
+
+2011-07-31  Thiago Jung Bauermann  <bauerman@br.ibm.com>
+
+	* breakpoint.c (insert_bp_location): Remove disabled_breaks
+	argument.  Update callers.
+
+2011-07-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* stack.c (print_frame_info): Comment typo fix.
+
+2011-07-29  Sterling Augustine  <saugustine@google.com>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list.
+
+2011-07-29  Tom Tromey  <tromey@redhat.com>
+
+	* solib-target.c: Use DEF_VEC_I, not DEF_VEC_O.
+	(library_list_start_segment): Update.
+	(library_list_start_section): Update.
+
 2011-07-28  Phil Muldoon  <pmuldoon@redhat.com>
 
 	* varobj.c (value_get_print_value): Move hint check later into the

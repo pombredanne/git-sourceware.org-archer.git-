@@ -1315,6 +1315,9 @@ extern int bfd_mips_num_opcodes;
 
 /* The following flags have the same value for the mips16 opcode
    table:
+
+   INSN_ISA3
+
    INSN_UNCOND_BRANCH_DELAY
    INSN_COND_BRANCH_DELAY
    INSN_COND_BRANCH_LIKELY (never used)
@@ -1323,19 +1326,16 @@ extern int bfd_mips_num_opcodes;
    INSN_WRITE_HI
    INSN_WRITE_LO
    INSN_TRAP
-   INSN_ISA3
+   FP_D (never used)
    */
 
 extern const struct mips_opcode mips16_opcodes[];
 extern const int bfd_mips16_num_opcodes;
 
-/* These are the bitmasks and shift counts used for the different
-   fields in the instruction formats.  Other than MAJOR, no masks are
-   provided for the fixed portions of an instruction, since they are
-   not needed.  */
+/* These are the bit masks and shift counts used for the different fields
+   in the microMIPS instruction formats.  No masks are provided for the
+   fixed portions of an instruction, since they are not needed.  */
 
-#define MICROMIPSOP_MASK_MAJOR		0x3f
-#define MICROMIPSOP_SH_MAJOR		26
 #define MICROMIPSOP_MASK_IMMEDIATE	0xffff
 #define MICROMIPSOP_SH_IMMEDIATE	0
 #define MICROMIPSOP_MASK_DELTA		0xffff
