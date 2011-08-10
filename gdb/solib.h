@@ -21,12 +21,17 @@
 #ifndef SOLIB_H
 #define SOLIB_H
 
+#include "vec.h"
+
 /* Forward decl's for prototypes */
 struct so_list;
 struct target_ops;
 struct target_so_ops;
 struct program_space;
 enum solib_add_opt;
+
+typedef struct so_list *so_list_p;
+DEF_VEC_P(so_list_p);
 
 /* Called when we free all symtabs, to free the shared library information
    as well.  */
@@ -35,7 +40,7 @@ extern void clear_solib (void);
 
 /* Called to add symbols from a shared library to gdb's symbol table.  */
 
-extern void solib_add (char *, int, struct target_ops *,
+extern void solib_add (VEC(so_list_p) *, int, struct target_ops *,
 		       enum solib_add_opt, int);
 extern int solib_read_symbols (struct so_list *, int);
 

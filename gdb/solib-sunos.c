@@ -701,7 +701,7 @@ sunos_solib_create_inferior_hook (int from_tty)
       warning (_("shared library handler failed to disable breakpoint"));
     }
 
-  solib_add ((char *) 0, 0, (struct target_ops *) 0, solib_add_opt,
+  solib_add (NULL, 0, (struct target_ops *) 0, solib_add_opt,
 	     /*lazy_read=*/0);
 }
 

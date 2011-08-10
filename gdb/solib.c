@@ -867,58 +867,31 @@ solib_on_demand_load (CORE_ADDR pc)
 {
   struct so_list *solib;
 
-  /* On-demand loading of shared libraries' debuginfo.  */
-//  for (solib = so_list_head; solib; solib = solib->next)
-//    if (solib_contains_address_p (solib, pc))
-//      break;
-
   solib = solib_match_pc_solist (pc);
 
   if (solib && !solib->symbols_loaded)
-    solib_add (solib->so_name, 0, &current_target, SOLIB_ADD_ON,
-	       /*lazy_read=*/1);
+    {
+      VEC(so_list_p) *l;
+      struct cleanup *c;
+
+      VEC_safe_push (so_list_p, l, solib);
+      c = make_cleanup (VEC_cleanup (so_list_p), &l);
+      solib_add (l, 0, &current_target, SOLIB_ADD_ON, 1);
+      do_cleanups (c);
+    }
 }
 
-/* Read in symbolic information for any shared objects whose names
-   match PATTERN.  (If we've already read a shared object's symbol
-   info, leave it alone.)  If PATTERN is zero, read them all.
+/* Helper function for `solib_add' below.  This function does all the
+   hard job described in `solib_add' comments, but does not call
+   `update_solib_list'.  */
 
-   If READSYMS is 0, defer reading symbolic information until later
-   but still do any needed low level processing.
-
-   If LAZY_READ is 1, it means we are lazily reading debuginfo files
-   and should not reinit the frame cache.  reinit_frame_cache invalidates
-   all the frames and reinitializes the cache (obviously), so if the user
-   is doing normal shared library loading (without LAZY_READ set), we
-   can safely call reinit_frame_cache because GDB will not be performing
-   any action other than load the shared library.  However, if the user
-   has set LAZY_READ, it means we will be loading debuginfo from shared
-   libraries on-demand, i.e., the user will ask for something (like a
-   backtrace), and GDB will load the debuginfo *while* executing the
-   backtrace command.  In this scenario, we cannot reinitialize the frame
-   cache otherwise it will invalidate all the frames and GDB will lose
-   necessary information to reconstruct the backtrace.
-
-   FROM_TTY and TARGET are as described for update_solib_list, above.  */
-
-void
-solib_add (char *pattern, int from_tty,
-	   struct target_ops *target, enum solib_add_opt readsyms,
-	   int lazy_read)
+static void
+solib_add_1 (VEC(so_list_p) *so_list, int from_tty,
+	   enum solib_add_opt readsyms, int lazy_read)
 {
   struct so_list *gdb;
 
   current_program_space->solib_add_generation++;
-
-  if (pattern)
-    {
-      char *re_err = re_comp (pattern);
-
-      if (re_err)
-	error (_("Invalid regexp: %s"), re_err);
-    }
-
-  update_solib_list (from_tty, target, readsyms, lazy_read);
 
   /* Walk the list of currently loaded shared libraries, and read
      symbols for any that match the pattern --- or any whose symbols
@@ -930,24 +903,43 @@ solib_add (char *pattern, int from_tty,
         SYMFILE_DEFER_BP_RESET | (from_tty ? SYMFILE_VERBOSE : 0);
 
     for (gdb = so_list_head; gdb; gdb = gdb->next)
-      if (! pattern || re_exec (gdb->so_name))
-	{
+      {
+	int add_this_solib;
+
+	if (so_list)
+	  {
+	    int iter, found = 0;
+	    struct so_list *cur_so;
+
+	    for (iter = 0;
+		 VEC_iterate (so_list_p, so_list, iter, cur_so);
+		 iter++)
+	      if (cur_so == gdb)
+		{
+		  found = 1;
+		  break;
+		}
+
+	    if (!found)
+	      /* We are not adding this shared library's symbols.  */
+	      continue;
+	  }
           /* Normally, we would read the symbols from that library
              only if READSYMS is set.  However, we're making a small
              exception for the pthread library, because we sometimes
              need the library symbols to be loaded in order to provide
              thread support (x86-linux for instance).  */
-          const int add_this_solib =
-            (readsyms == SOLIB_ADD_ON || libpthread_solib_p (gdb));
+          add_this_solib = (readsyms == SOLIB_ADD_ON
+			    || libpthread_solib_p (gdb));
 
 	  any_matches = 1;
 	  if (add_this_solib)
 	    {
 	      if (gdb->symbols_loaded)
 		{
-		  /* If no pattern was given, be quiet for shared
+		  /* If no so_list was given, be quiet for shared
 		     libraries we have already loaded.  */
-		  if (pattern && (from_tty || info_verbose))
+		  if (so_list && (from_tty || info_verbose))
 		    printf_unfiltered (_("Symbols already loaded for %s\n"),
 				       gdb->so_name);
 		}
@@ -979,10 +971,6 @@ solib_add (char *pattern, int from_tty,
     if (loaded_any_symbols)
       breakpoint_re_set ();
 
-    if (from_tty && pattern && ! any_matches)
-      printf_unfiltered
-	("No loaded shared libraries match the pattern `%s'.\n", pattern);
-
     if (loaded_any_symbols && !lazy_read)
       {
 	struct target_so_ops *ops = solib_ops (target_gdbarch);
@@ -994,6 +982,37 @@ solib_add (char *pattern, int from_tty,
 	ops->special_symbol_handling ();
       }
   }
+}
+
+/* Read in symbolic information for any shared objects whose names
+   match PATTERN.  (If we've already read a shared object's symbol
+   info, leave it alone.)  If PATTERN is zero, read them all.
+
+   If READSYMS is 0, defer reading symbolic information until later
+   but still do any needed low level processing.
+
+   If LAZY_READ is 1, it means we are lazily reading debuginfo files
+   and should not reinit the frame cache.  reinit_frame_cache invalidates
+   all the frames and reinitializes the cache (obviously), so if the user
+   is doing normal shared library loading (without LAZY_READ set), we
+   can safely call reinit_frame_cache because GDB will not be performing
+   any action other than load the shared library.  However, if the user
+   has set LAZY_READ, it means we will be loading debuginfo from shared
+   libraries on-demand, i.e., the user will ask for something (like a
+   backtrace), and GDB will load the debuginfo *while* executing the
+   backtrace command.  In this scenario, we cannot reinitialize the frame
+   cache otherwise it will invalidate all the frames and GDB will lose
+   necessary information to reconstruct the backtrace.
+
+   FROM_TTY and TARGET are as described for update_solib_list, above.  */
+
+void
+solib_add (VEC(so_list_p) *so_list, int from_tty,
+	   struct target_ops *target, enum solib_add_opt readsyms,
+	   int lazy_read)
+{
+  update_solib_list (from_tty, target, readsyms, lazy_read);
+  solib_add_1 (so_list, from_tty, readsyms, lazy_read);
 }
 
 /* Implement the "info sharedlibrary" command.  Walk through the
@@ -1235,11 +1254,49 @@ in_solib_dynsym_resolve_code (CORE_ADDR pc)
   return ops->in_dynsym_resolve_code (pc);
 }
 
+/* This function compiles a regex represented by PATTERN, and returns a list
+   of shared libraries matching it.  Returns NULL if PATTERN is NULL or if
+   no match was found.
+
+   This function calls `update_solib_list' in order to refresh shared the
+   shlib list.  If you are going to call `solib_add' after calling this
+   function, call `solib_add_1' instead, because this version does not
+   call `update_solib_list', thus saving time.  */
+
+static VEC(so_list_p) *
+solib_match_regex_solist (const char *pattern,
+			  struct target_ops *target, int from_tty)
+{
+  char *err;
+  struct so_list *iter;
+  VEC(so_list_p) *solist = NULL;
+  if (!pattern)
+    return NULL;
+
+  err = re_comp (pattern);
+
+  if (err)
+    error (_("Invalid regexp: `%s'"), err);
+
+  update_solib_list (from_tty, target, SOLIB_ADD_ON, 0);
+  for (iter = so_list_head; iter; iter = iter->next)
+    if (re_exec (iter->so_name))
+      VEC_safe_push (so_list_p, solist, iter);
+
+  return solist;
+}
+
+/* Return the shared library which contains the given PC, or NULL if
+   nothing has been matched.  */
+
 struct so_list *
 solib_match_pc_solist (CORE_ADDR pc)
 {
   struct target_so_ops *ops = solib_ops (target_gdbarch);
 
+  if (!ops->match_pc_solist)
+    return NULL;
+  
   return ops->match_pc_solist (pc, so_list_head);
 }
 
@@ -1248,8 +1305,19 @@ solib_match_pc_solist (CORE_ADDR pc)
 static void
 sharedlibrary_command (char *args, int from_tty)
 {
+  struct cleanup *c;
+  VEC(so_list_p) *solist;
+
   dont_repeat ();
-  solib_add (args, from_tty, (struct target_ops *) 0, 1, /*lazy_read=*/0);
+
+  solist = solib_match_regex_solist (args, (struct target_ops *) 0,
+				     from_tty);
+  if (!solist && from_tty && args)
+    error (_("No shared library matched the pattern `%s'."), args);
+
+  c = make_cleanup (VEC_cleanup (so_list_p), &solist);
+  solib_add_1 (solist, from_tty, 1, 0 /*lazy_read*/);
+  do_cleanups (c);
 }
 
 /* Implements the command "nosharedlibrary", which discards symbols
