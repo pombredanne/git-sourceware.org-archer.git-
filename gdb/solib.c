@@ -66,6 +66,8 @@ static const char *solib_add_options[] =
     NULL
   };
 
+static int libpthread_solib_p (struct so_list *so);
+
 static void *
 solib_init (struct obstack *obstack)
 {
@@ -713,7 +715,8 @@ solib_read_symbols (struct so_list *so, int flags)
    processes we've just attached to, so that's okay.  */
 
 static void
-update_solib_list (int from_tty, struct target_ops *target)
+update_solib_list (int from_tty, struct target_ops *target,
+		   enum solib_add_opt readsyms, int lazy_read)
 {
   struct target_so_ops *ops = solib_ops (target_gdbarch);
   struct so_list *inferior = ops->current_sos();
@@ -833,25 +836,28 @@ update_solib_list (int from_tty, struct target_ops *target)
       /* Fill in the rest of each of the `struct so_list' nodes.  */
       for (i = inferior; i; i = i->next)
 	{
-	  volatile struct gdb_exception e;
-
 	  i->pspace = current_program_space;
 
-	  TRY_CATCH (e, RETURN_MASK_ERROR)
+	  if (readsyms != SOLIB_ADD_LAZY || lazy_read)
 	    {
-	      /* Fill in the rest of the `struct so_list' node.  */
-	      if (!solib_map_sections (i))
-		{
-		  not_found++;
-		  if (not_found_filename == NULL)
-		    not_found_filename = i->so_original_name;
-		}
-	    }
+	      volatile struct gdb_exception e;
 
-	  if (e.reason < 0)
-	    exception_fprintf (gdb_stderr, e,
-			       _("Error while mapping shared "
-				 "library sections:\n"));
+	      TRY_CATCH (e, RETURN_MASK_ERROR)
+		{
+		  /* Fill in the rest of the `struct so_list' node.  */
+		  if (!solib_map_sections (i))
+		    {
+		      not_found++;
+		      if (not_found_filename == NULL)
+			not_found_filename = i->so_original_name;
+		    }
+		}
+
+	      if (e.reason < 0)
+		exception_fprintf (gdb_stderr, e,
+				   _("Error while mapping shared "
+				     "library sections:\n"));
+	    }
 
 	  /* Notify any observer that the shared object has been
 	     loaded now that we've added it to GDB's tables.  */
@@ -906,10 +912,14 @@ solib_on_demand_load (CORE_ADDR pc)
   struct so_list *solib;
 
   /* On-demand loading of shared libraries' debuginfo.  */
+//  for (solib = so_list_head; solib; solib = solib->next)
+//    if (solib_contains_address_p (solib, pc))
+//      break;
+
   solib = solib_match_pc_solist (pc);
 
   if (solib && !solib->symbols_loaded)
-    solib_add (solib->so_name, 0, &current_target, 1,
+    solib_add (solib->so_name, 0, &current_target, SOLIB_ADD_ON,
 	       /*lazy_read=*/1);
 }
 
@@ -963,7 +973,7 @@ solib_add (char *pattern, int from_tty,
 	error (_("Invalid regexp: %s"), re_err);
     }
 
-  update_solib_list (from_tty, target);
+  update_solib_list (from_tty, target, readsyms, lazy_read);
 
   /* Walk the list of currently loaded shared libraries, and read
      symbols for any that match the pattern --- or any whose symbols
@@ -996,8 +1006,28 @@ solib_add (char *pattern, int from_tty,
 		    printf_unfiltered (_("Symbols already loaded for %s\n"),
 				       gdb->so_name);
 		}
-	      else if (solib_read_symbols (gdb, flags))
-		loaded_any_symbols = 1;
+	      else
+		{
+		  if (lazy_read)
+		    {
+		      /* We are lazily reading the shlib debuginfo,
+			 so we need to map it and load its symbols here.  */
+		      volatile struct gdb_exception e;
+
+		      TRY_CATCH (e, RETURN_MASK_ERROR)
+			{
+			  solib_map_sections (gdb);
+			}
+
+		      if (e.reason < 0)
+			exception_fprintf (gdb_stderr, e,
+					   _("Error while mapping "
+					     "shared library sections:\n"));
+		    }
+
+		  if (solib_read_symbols (gdb, flags))
+		    loaded_any_symbols = 1;
+		}
 	    }
 	}
 
@@ -1060,7 +1090,7 @@ info_sharedlibrary_command (char *pattern, int from_tty)
   /* "0x", a little whitespace, and two hex digits per byte of pointers.  */
   addr_width = 4 + (gdbarch_ptr_bit (gdbarch) / 4);
 
-  update_solib_list (from_tty, 0);
+  update_solib_list (from_tty, 0, solib_add_opt, 0);
 
   /* make_cleanup_ui_out_table_begin_end needs to know the number of
      rows, so we need to make two passes over the libs.  */
