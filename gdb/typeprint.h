@@ -23,10 +23,20 @@
 enum language;
 struct ui_file;
 
+/* An enumeration for specifying the type of a computed symbol name.  */
+enum name_kind
+  {
+    NAME_KIND_FULL,	/* The fullname (methods do not
+			   contain any formal parameters).  */
+    NAME_KIND_PHYS,	/* The physname used to lookup symbols.  */
+    NAME_KIND_PRINT	/* The name used when printing the symbol.  */
+  };
+
 void print_type_scalar (struct type * type, LONGEST, struct ui_file *);
 
 void c_type_print_varspec_suffix (struct type *, struct ui_file *, int,
 				  int, int);
 
-void c_type_print_args (struct type *, struct ui_file *, int, enum language);
+void c_type_print_args (struct type *, struct ui_file *,
+			enum name_kind, enum language);
 #endif

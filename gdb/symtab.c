@@ -496,7 +496,7 @@ symbol_find_demangled_name (struct general_symbol_info *gsymbol,
       || gsymbol->language == language_auto)
     {
       demangled =
-        cplus_demangle (mangled, DMGL_PARAMS | DMGL_ANSI);
+        cplus_demangle (mangled, DMGL_PARAMS | DMGL_ANSI | DMGL_VERBOSE);
       if (demangled != NULL)
 	{
 	  gsymbol->language = language_cplus;
@@ -507,7 +507,7 @@ symbol_find_demangled_name (struct general_symbol_info *gsymbol,
     {
       demangled =
         cplus_demangle (mangled,
-                        DMGL_PARAMS | DMGL_ANSI | DMGL_JAVA);
+                        DMGL_PARAMS | DMGL_ANSI | DMGL_JAVA | DMGL_VERBOSE);
       if (demangled != NULL)
 	{
 	  gsymbol->language = language_java;
@@ -751,17 +751,21 @@ symbol_demangled_name (const struct general_symbol_info *gsymbol)
   return NULL;
 }
 
-/* Return the search name of a symbol---generally the demangled or
-   linkage name of the symbol, depending on how it will be searched for.
-   If there is no distinct demangled name, then returns the same value
-   (same pointer) as SYMBOL_LINKAGE_NAME.  */
+/* Return the SYMBOL_SEARCH_NAME of GSYMBOL.  */
+
 char *
 symbol_search_name (const struct general_symbol_info *gsymbol)
 {
   if (gsymbol->language == language_ada)
     return gsymbol->name;
   else
-    return symbol_natural_name (gsymbol);
+    {
+      if (gsymbol->flags & GSYMBOL_FLAG_MSYMBOL
+	  || gsymbol->language != language_cplus)
+	return symbol_natural_name (gsymbol);
+      else
+	return gsymbol->name;
+    }
 }
 
 /* Initialize the structure fields to zero values.  */
@@ -1029,7 +1033,8 @@ lookup_symbol_in_language (const char *name, const struct block *block,
      lookup, so we can always binary search.  */
   if (lang == language_cplus)
     {
-      demangled_name = cplus_demangle (name, DMGL_ANSI | DMGL_PARAMS);
+      demangled_name = cplus_demangle (name,
+				       DMGL_ANSI | DMGL_PARAMS | DMGL_VERBOSE);
       if (demangled_name)
 	{
 	  modified_name = demangled_name;
@@ -1050,7 +1055,8 @@ lookup_symbol_in_language (const char *name, const struct block *block,
   else if (lang == language_java)
     {
       demangled_name = cplus_demangle (name,
-		      		       DMGL_ANSI | DMGL_PARAMS | DMGL_JAVA);
+				       (DMGL_ANSI | DMGL_PARAMS
+					| DMGL_JAVA | DMGL_VERBOSE));
       if (demangled_name)
 	{
 	  modified_name = demangled_name;

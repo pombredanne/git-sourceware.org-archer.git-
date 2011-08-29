@@ -35,6 +35,14 @@ struct agent_expr;
 struct program_space;
 struct language_defn;
 
+/* A set of flags to describe a general symbol.  */
+
+enum gsymbol_flags
+{
+  /* This general symbol is a minimal symbol.  */
+  GSYMBOL_FLAG_MSYMBOL = (1 << 0)
+};
+
 /* Some of the structures in this file are space critical.
    The space-critical structures are:
 
@@ -148,6 +156,10 @@ struct general_symbol_info
 
   ENUM_BITFIELD(language) language : 8;
 
+  /* Flags for this symbol.  */
+
+  ENUM_BITFIELD(gsymbol_flags) flags : 1;
+
   /* Which section is this symbol in?  This is an index into
      section_offsets for this objfile.  Negative means that the symbol
      does not get relocated relative to a section.
@@ -185,6 +197,7 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 #define SYMBOL_LANGUAGE(symbol)		(symbol)->ginfo.language
 #define SYMBOL_SECTION(symbol)		(symbol)->ginfo.section
 #define SYMBOL_OBJ_SECTION(symbol)	(symbol)->ginfo.obj_section
+#define SYMBOL_FLAGS(symbol)            (symbol)->ginfo.flags
 
 /* Initializes the language dependent portion of a symbol
    depending upon the language for the symbol.  */

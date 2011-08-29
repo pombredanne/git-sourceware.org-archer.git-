@@ -4946,7 +4946,7 @@ do_ui_file_peek_last (void *object, const char *buffer, long length)
 
 static const char *
 dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
-		     int physname)
+		     enum name_kind kind)
 {
   if (name == NULL)
     name = dwarf2_name (die, cu);
@@ -4954,7 +4954,7 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
   /* For Fortran GDB prefers DW_AT_*linkage_name if present but otherwise
      compute it by typename_concat inside GDB.  */
   if (cu->language == language_ada
-      || (cu->language == language_fortran && physname))
+      || (cu->language == language_fortran && kind == NAME_KIND_PHYS))
     {
       /* For Ada unit, we prefer the linkage name over the name, as
 	 the former contains the exported name, which the user expects
@@ -4986,7 +4986,8 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 	  if (*prefix != '\0')
 	    {
 	      char *prefixed_name = typename_concat (NULL, prefix, name,
-						     physname, cu);
+						     (kind == NAME_KIND_PHYS),
+						     cu);
 
 	      fputs_unfiltered (prefixed_name, buf);
 	      xfree (prefixed_name);
@@ -5121,15 +5122,15 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
 	    }
 
 	  /* For Java and C++ methods, append formal parameter type
-	     information, if PHYSNAME.  */
+	     information, if computing physnames or print names.  */
 
-	  if (physname && die->tag == DW_TAG_subprogram
+	  if (kind != NAME_KIND_FULL && die->tag == DW_TAG_subprogram
 	      && (cu->language == language_cplus
 		  || cu->language == language_java))
 	    {
 	      struct type *type = read_type_die (die, cu);
 
-	      c_type_print_args (type, buf, 1, cu->language);
+	      c_type_print_args (type, buf, kind, cu->language);
 
 	      if (cu->language == language_java)
 		{
@@ -5232,6 +5233,7 @@ dwarf2_physname (char *name, struct die_info *die, struct dwarf2_cu *cu)
 	 */
 
       demangled = cplus_demangle (mangled, (DMGL_PARAMS | DMGL_ANSI
+					    | DMGL_VERBOSE
 					    | (cu->language == language_java
 					       ? DMGL_JAVA | DMGL_RET_POSTFIX
 					       : DMGL_RET_DROP)));
@@ -5283,6 +5285,15 @@ dwarf2_physname (char *name, struct die_info *die, struct dwarf2_cu *cu)
 
   do_cleanups (back_to);
   return retval;
+}
+
+/* Return the "print name" of DIE.  This is the name which will be displayed
+   to the user.  */
+
+static const char *
+dwarf2_print_name (char *name, struct die_info *die, struct dwarf2_cu *cu)
+{
+  return dwarf2_compute_name (name, die, cu, NAME_KIND_PRINT);
 }
 
 /* Read the import statement specified by the given die and record it.  */
@@ -11291,6 +11302,20 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
       SYMBOL_SET_LANGUAGE (sym, cu->language);
       linkagename = dwarf2_physname (name, die, cu);
       SYMBOL_SET_NAMES (sym, linkagename, strlen (linkagename), 0, objfile);
+
+      /* For C++ set the symbol's demangled name if it is different than
+	 the computed physname.  This can happen when the source defines
+	 a method with typedef'd parameters.  This is ultimately used by
+	 the type printer.  */
+      if (cu->language == language_cplus && die->tag == DW_TAG_subprogram)
+	{
+	  const char *print_name = dwarf2_print_name (name, die, cu);
+	  if (strcmp (print_name, linkagename))
+	    {
+	      symbol_set_demangled_name (&(sym->ginfo),
+					 (char *) print_name, NULL);
+	    }
+	}
 
       /* Fortran does not have mangling standard and the mangling does differ
 	 between gfortran, iFort etc.  */

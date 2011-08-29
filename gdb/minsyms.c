@@ -902,7 +902,7 @@ prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
   msymbol = &msym_bunch->contents[msym_bunch_index];
   SYMBOL_SET_LANGUAGE (msymbol, language_auto);
   SYMBOL_SET_NAMES (msymbol, name, name_len, copy_name, objfile);
-
+  SYMBOL_FLAGS (msymbol) |= GSYMBOL_FLAG_MSYMBOL;
   SYMBOL_VALUE_ADDRESS (msymbol) = address;
   SYMBOL_SECTION (msymbol) = section;
   SYMBOL_OBJ_SECTION (msymbol) = NULL;

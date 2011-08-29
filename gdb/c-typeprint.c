@@ -384,19 +384,28 @@ c_type_print_modifier (struct type *type, struct ui_file *stream,
     fprintf_filtered (stream, " ");
 }
 
-
 /* Print out the arguments of TYPE, which should have TYPE_CODE_METHOD
-   or TYPE_CODE_FUNC, to STREAM.  Artificial arguments, such as "this"
-   in non-static methods, are displayed if LINKAGE_NAME is zero.  If
-   LINKAGE_NAME is non-zero and LANGUAGE is language_cplus the topmost
-   parameter types get removed their possible const and volatile qualifiers to
+   or TYPE_CODE_FUNC, to STREAM.
+
+   KIND describes the type of symbol to print to the stream.  If KIND
+   is NAME_KIND_PHYS (the SYMBOL_LINKAGE_NAME of TYPE is being printed),
+   artifical parameters such as "this" in non-static methods are skipped
+   and all typedefs will be removed/expanded.
+
+   Additionally if LANGUAGE is language_cplus, topmost parameter types
+   may have any possible const and volatile qualifiers removed to
    match demangled linkage name parameters part of such function type.
+
+   If KIND is NAME_KIND_PRINT (when the SYMBOL_PRINT_NAME of TYPE is
+   being printed),  artificial parameters are skipped, but any typedef'd
+   parameter types are left intact.
+
    LANGUAGE is the language in which TYPE was defined.  This is a necessary
    evil since this code is used by the C, C++, and Java backends.  */
 
 void
 c_type_print_args (struct type *type, struct ui_file *stream,
-		   int linkage_name, enum language language)
+		   enum name_kind kind, enum language language)
 {
   int i, len;
   struct field *args;
@@ -410,7 +419,7 @@ c_type_print_args (struct type *type, struct ui_file *stream,
     {
       struct type *param_type;
 
-      if (TYPE_FIELD_ARTIFICIAL (type, i) && linkage_name)
+      if (TYPE_FIELD_ARTIFICIAL (type, i) && kind != NAME_KIND_FULL)
 	continue;
 
       if (printed_any)
@@ -421,7 +430,7 @@ c_type_print_args (struct type *type, struct ui_file *stream,
 
       param_type = TYPE_FIELD_TYPE (type, i);
 
-      if (language == language_cplus && linkage_name)
+      if (language == language_cplus && kind == NAME_KIND_PHYS)
 	{
 	  /* C++ standard, 13.1 Overloadable declarations, point 3, item:
 	     - Parameter declarations that differ only in the presence or
