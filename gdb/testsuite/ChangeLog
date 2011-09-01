@@ -1,3 +1,259 @@
+2011-09-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dw2-ifort-parameter-debug.S: Update copyright year.
+	* dw2-ifort-parameter.c: Update copyright year.
+	* dw2-ifort-parameter.exp: Update copyright year.
+
+	* dw2-ifort-parameter-debug.S: New file.
+	* dw2-ifort-parameter.c: New file.
+	* dw2-ifort-parameter.exp: New file.
+
+2011-08-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/commands.exp (error_clears_commands_left): New function.
+	(): Call it.
+
+2011-08-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.mi/mi-inheritance-syntax-error.cc (A): Make `a' public.
+	(C): Initialize `a'.
+	* gdb.mi/mi-inheritance-syntax-error.exp
+	(-data-evaluate-expression $path):  Expect `a' as 5.
+
+2011-08-26  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	PR mi/11912
+	* gdb.mi/mi-inheritance-syntax-error.cc: New file.
+	* gdb.mi/mi-inheritance-syntax-error.exp: New file.
+	* gdb.mi/mi-var-cp.cc: Updated for new 'class'
+	keyword in output of -var-info-path-expression.
+
+2011-08-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.trace/backtrace.exp: Use is_lp64_target to check 64bit target.
+	* gdb.trace/collection.exp: Likewise.
+	* gdb.trace/report.exp: Likewise.
+	* gdb.trace/unavailable.exp: Likewise.
+	* gdb.trace/while-dyn.exp: Likewise.
+
+2011-08-18  Keith Seitz  <keiths@redhat.com>
+
+	PR c++/12266
+	* gdb.cp/meth-typedefs.cc: New file.
+	* gdb.cp/meth-typedefs.exp: New file.
+
+2011-08-17  Phil Muldoon  <pmuldoon@redhat.com>
+
+        * gdb.python/python.exp: Add extended-prompt tests.
+
+2011-08-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.arch/i386-dr3-watch.exp
+	(watchpoint on gap1 does not fit debug registers)
+	(delete all watchpoints): Fix racy expect strings.
+
+2011-08-14  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/maint.exp: set data_section to ".neardata".
+	* gdb.base/savedregs.c (thrower): Trigger SIGILL on NO-MMU machine.
+	* gdb.base/savedregs.exp: Handle SIGILL.
+	* gdb.mi/mi-syn-frame.c (bar): Trigger SIGILL on NO-MMU machine.
+	* gdb.xml/tdesc-regs.exp: Set core-regs for tic6x-*-*.
+
+2011-08-12  Doug Evans  <dje@google.com>
+
+	* gdb.python/py-symbol.exp: Add test for symbol.type.
+
+2011-08-12  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.threads/pthreads.exp: Enable on non-native configurations.
+	* gdb.mi/mi-pthreads.exp: Likewise.
+	* gdb.mi/mi2-pthreads.exp: Likewise.
+	* gdb.mi/gdb669.exp.exp: Likewise.
+
+2011-08-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* lib/mi-support.exp (detect_async): Rename to...
+	(mi_detect_async): ... this.
+	* gdb.mi/mi-nonstop-exit.exp: Adjust.
+	* gdb.mi/mi-nonstop.exp: Adjust.
+	* gdb.mi/mi-ns-stale-regcache.exp: Adjust.
+	* gdb.mi/mi-nsintrall.exp: Adjust.
+	* gdb.mi/mi-nsmoribund.exp: Adjust.
+	* gdb.mi/mi-nsthrexec.exp: Adjust.
+
+2011-08-09  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/display.c (do_loops): New `p_i' local.
+	* gdb.base/display.exp: Test displaying a variable that is
+	temporarily at a bad address.
+
+2011-08-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-op-stack-value.S: New file.
+	* gdb.dwarf2/dw2-op-stack-value.exp: New file.
+
+2011-08-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-simple-locdesc.S: Replace .value by .2byte.
+	* gdb.dwarf2/dw2-case-insensitive.exp (regexp case-sensitive off)
+	(p fuNC_symtab): Permit also ppc64 leading dot.
+
+2011-08-05  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.trace/unavailable.exp (test_maybe_regvar_display): New
+	procedure.
+	(gdb_collect_args_test, gdb_collect_locals_test): Use it.
+
+2011-08-05  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/callfuncs.exp: Set language after main.
+	* gdb.cp/cplusfuncs.exp: Likewise.
+	* gdb.cp/inherit.exp: Likewise.
+
+2011-08-04  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.base/nostdlib.exp: Skip on gdb_stub targets.
+	* gdb.base/watch-vfork.exp: Skip on remote targets.
+
+2011-08-04  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.threads/thread-find.exp: Support remote targets.
+
+2011-08-04  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.base/jit.exp: Download solib_binfile to target.
+	* gdb.base/jit-so.exp:  Likewise.  Also, use gdb_load_shlibs
+	and call dlopen without full path name.
+	* gdb.cp/infcall-dlopen.exp: Use gdb_load_shlibs and call
+	dlopen without full path name.
+
+2011-08-03  Philippe Waroquiers  <philippe.waroquiers@skynet.be>
+
+	* gdb.base/break-always.exp: Complete the test
+	with duplicated breakpoints and enabling/disabling them.
+
+2011-08-02  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/11289:
+	* gdb.cp/overload.exp: Fix regexps.  Remove kfails.
+
+2011-08-01  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/13045
+	* gdb.base/float.exp: Add new test case for PR gdb/13045
+	* gdb.base/float.c: New file.
+
+2011-07-28  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-mi.exp: Test printers returning string hint, and
+	also not returning a value.
+	* gdb.python/py-prettyprint.c: Add testcase for above.
+	* gdb.python/py-prettyprint.py: Add test printer for above.
+
+2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-simple-locdesc.S: Change DWARF version to 3.
+	(.Ldie26, .Ldie41, .Ldie4a, .Ldie54, .Ldie5b): Remove.
+	(.Ldie30) Add as field "data4".
+	(.Ldie32) Rename field "b" to "shl".
+	(abbrev4) Change for the "data4" field.
+	(abbrev5, abbrev6) Remove.
+	* gdb.dwarf2/dw2-simple-locdesc.exp (p &s.b): Rename to ...
+	(p &s.shl): ... here.  Add comment.
+	(p &s.data4): New.
+
+2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash on lval_computed values.
+	* gdb.dwarf2/implptr.exp (print sizeof (j[0])): New test.
+
+2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/help.exp (help whatis): Update the expected string.
+
+2011-07-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-simple-locdesc.S: New file.
+	* gdb.dwarf2/dw2-simple-locdesc.exp: New file.
+	* gdb.dwarf2/dw2-stack-boundary.exp (check partial symtab errors):
+	Change the expected string.
+
+2011-07-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.base/watchpoint.exp
+	(test_disable_enable_software_watchpoint): New procedure.
+	(top level): Run it.
+
+2011-07-26  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.python/py-mi.exp: Avoid '+' in filenames.  Call C version of
+	executable file "${binfile}", C++ version "${binfile}-cxx".
+	* gdb.python/py-prettyprint.exp: Likewise.
+	* gdb.python/py-symbol.exp: Likewise.
+	* gdb.python/py-type.exp: Likewise.
+	* gdb.python/py-value.exp: Likewise.
+	* gdb.python/py-template.exp (test_template_arg): Pass full executable
+	file name instead of just suffix.
+
+2011-07-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix implicit pointer offsets.
+	* gdb.dwarf2/implptr.c (add): New marker baz breakpoint.
+	* gdb.dwarf2/implptr.exp (set baz breakpoint for implptr)
+	(continue to breakpoint: continue to baz breakpoint for implptr)
+	(sanity check element 0, sanity check element 1)
+	(enter the inlined function, check element 0 for the offset)
+	(check element 1 for the offset)
+	(continue to breakpoint: ignore the second baz breakpoint): New tests.
+	(set foo breakpoint for implptr): Update the breakpoint number.
+
+2011-07-22  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.python/py-mi.exp: Use different file names for different
+	versions of the executable under test.
+	* gdb.python/py-prettyprint.exp: Likewise.
+	* gdb.python/py-symbol.exp: Likewise.
+	* gdb.python/py-template.exp: Likewise.
+	* gdb.python/py-type.exp: Likewise.
+	* gdb.python/py-value.exp: Likewise.
+
+2011-07-22  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.python/py-breakpoint.exp: Re-set can-use-hw-watchpoints
+	flag after restarting GDB if necessary.
+
+2011-07-22  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.python/py-shared.exp: Call gdb_load_shlibs.
+
+2011-07-22  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.arch/i386-dr3-watch.exp: Test that the i386 watchpoints
+	backend doesn't leave used debug registers behind.
+
+2011-07-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/typeddwarf.c: XFAIL 'z' on x86-64.
+	* gdb.dwarf2/typeddwarf.exp (xfail-gdb-test): Add arch_pattern
+	argument.
+	* gdb.dwarf2/typeddwarf-amd64.S: New file.
+
+2011-07-21  Matt Rice  <ratmice@gmail.com>
+
+	* gdb.threads/Makefile.in: Avoid globbing corethreads.exp
+	in mostlyclean rule.  Add files ending in .core.
+
+2011-07-21  Matt Rice  <ratmice@gmail.com>
+
+	PR macros/12999
+	* gdb.base/info-macros.c: New test sources.
+	* gdb.base/info-macros.exp: New tests.
+
+2011-07-21  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/python.exp: Add prompt substitution tests.
+
 2011-07-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix crash if referenced CU is aged out.

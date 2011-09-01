@@ -8,7 +8,7 @@
 
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
-   2010
+   2010, 2011
    Free Software Foundation, Inc.
 
    Written by Cygnus Support.
@@ -486,8 +486,8 @@ extern bfd_boolean _bfd_generic_set_section_contents
 #define _bfd_nolink_bfd_link_split_section \
   ((bfd_boolean (*) (bfd *, struct bfd_section *)) bfd_false)
 #define _bfd_nolink_section_already_linked \
-  ((void (*) (bfd *, struct already_linked*, \
-	      struct bfd_link_info *)) bfd_void)
+  ((bfd_boolean (*) (bfd *, asection *, \
+		     struct bfd_link_info *)) bfd_false)
 #define _bfd_nolink_bfd_define_common_symbol \
   ((bfd_boolean (*) (bfd *, struct bfd_link_info *, \
 		     struct bfd_link_hash_entry *)) bfd_false)
@@ -607,8 +607,8 @@ extern bfd_boolean _bfd_generic_final_link
 extern bfd_boolean _bfd_generic_link_split_section
   (bfd *, struct bfd_section *);
 
-extern void _bfd_generic_section_already_linked
-  (bfd *, struct already_linked *, struct bfd_link_info *);
+extern bfd_boolean _bfd_generic_section_already_linked
+  (bfd *, asection *, struct bfd_link_info *);
 
 /* Generic reloc_link_order processing routine.  */
 extern bfd_boolean _bfd_generic_reloc_link_order
@@ -800,26 +800,16 @@ struct bfd_section_already_linked_hash_entry
   struct bfd_section_already_linked *entry;
 };
 
-struct already_linked
-{
-  const char *comdat_key;
-  union
-    {
-      asection *sec;
-      bfd *abfd;
-    } u;
-};
-
 struct bfd_section_already_linked
 {
   struct bfd_section_already_linked *next;
-  struct already_linked linked;
+  asection *sec;
 };
 
 extern struct bfd_section_already_linked_hash_entry *
   bfd_section_already_linked_table_lookup (const char *);
 extern bfd_boolean bfd_section_already_linked_table_insert
-  (struct bfd_section_already_linked_hash_entry *, struct already_linked *);
+  (struct bfd_section_already_linked_hash_entry *, asection *);
 extern void bfd_section_already_linked_table_traverse
   (bfd_boolean (*) (struct bfd_section_already_linked_hash_entry *,
 		    void *), void *);
@@ -1082,6 +1072,7 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_ALPHA_TPREL_LO16",
   "BFD_RELOC_ALPHA_TPREL16",
   "BFD_RELOC_MIPS_JMP",
+  "BFD_RELOC_MICROMIPS_JMP",
   "BFD_RELOC_MIPS16_JMP",
   "BFD_RELOC_MIPS16_GPREL",
   "BFD_RELOC_HI16",
@@ -1096,40 +1087,69 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_MIPS16_HI16_S",
   "BFD_RELOC_MIPS16_LO16",
   "BFD_RELOC_MIPS_LITERAL",
+  "BFD_RELOC_MICROMIPS_LITERAL",
+  "BFD_RELOC_MICROMIPS_7_PCREL_S1",
+  "BFD_RELOC_MICROMIPS_10_PCREL_S1",
+  "BFD_RELOC_MICROMIPS_16_PCREL_S1",
+  "BFD_RELOC_MICROMIPS_GPREL16",
+  "BFD_RELOC_MICROMIPS_HI16",
+  "BFD_RELOC_MICROMIPS_HI16_S",
+  "BFD_RELOC_MICROMIPS_LO16",
   "BFD_RELOC_MIPS_GOT16",
+  "BFD_RELOC_MICROMIPS_GOT16",
   "BFD_RELOC_MIPS_CALL16",
+  "BFD_RELOC_MICROMIPS_CALL16",
   "BFD_RELOC_MIPS_GOT_HI16",
+  "BFD_RELOC_MICROMIPS_GOT_HI16",
   "BFD_RELOC_MIPS_GOT_LO16",
+  "BFD_RELOC_MICROMIPS_GOT_LO16",
   "BFD_RELOC_MIPS_CALL_HI16",
+  "BFD_RELOC_MICROMIPS_CALL_HI16",
   "BFD_RELOC_MIPS_CALL_LO16",
+  "BFD_RELOC_MICROMIPS_CALL_LO16",
   "BFD_RELOC_MIPS_SUB",
+  "BFD_RELOC_MICROMIPS_SUB",
   "BFD_RELOC_MIPS_GOT_PAGE",
+  "BFD_RELOC_MICROMIPS_GOT_PAGE",
   "BFD_RELOC_MIPS_GOT_OFST",
+  "BFD_RELOC_MICROMIPS_GOT_OFST",
   "BFD_RELOC_MIPS_GOT_DISP",
+  "BFD_RELOC_MICROMIPS_GOT_DISP",
   "BFD_RELOC_MIPS_SHIFT5",
   "BFD_RELOC_MIPS_SHIFT6",
   "BFD_RELOC_MIPS_INSERT_A",
   "BFD_RELOC_MIPS_INSERT_B",
   "BFD_RELOC_MIPS_DELETE",
   "BFD_RELOC_MIPS_HIGHEST",
+  "BFD_RELOC_MICROMIPS_HIGHEST",
   "BFD_RELOC_MIPS_HIGHER",
+  "BFD_RELOC_MICROMIPS_HIGHER",
   "BFD_RELOC_MIPS_SCN_DISP",
+  "BFD_RELOC_MICROMIPS_SCN_DISP",
   "BFD_RELOC_MIPS_REL16",
   "BFD_RELOC_MIPS_RELGOT",
   "BFD_RELOC_MIPS_JALR",
+  "BFD_RELOC_MICROMIPS_JALR",
   "BFD_RELOC_MIPS_TLS_DTPMOD32",
   "BFD_RELOC_MIPS_TLS_DTPREL32",
   "BFD_RELOC_MIPS_TLS_DTPMOD64",
   "BFD_RELOC_MIPS_TLS_DTPREL64",
   "BFD_RELOC_MIPS_TLS_GD",
+  "BFD_RELOC_MICROMIPS_TLS_GD",
   "BFD_RELOC_MIPS_TLS_LDM",
+  "BFD_RELOC_MICROMIPS_TLS_LDM",
   "BFD_RELOC_MIPS_TLS_DTPREL_HI16",
+  "BFD_RELOC_MICROMIPS_TLS_DTPREL_HI16",
   "BFD_RELOC_MIPS_TLS_DTPREL_LO16",
+  "BFD_RELOC_MICROMIPS_TLS_DTPREL_LO16",
   "BFD_RELOC_MIPS_TLS_GOTTPREL",
+  "BFD_RELOC_MICROMIPS_TLS_GOTTPREL",
   "BFD_RELOC_MIPS_TLS_TPREL32",
   "BFD_RELOC_MIPS_TLS_TPREL64",
   "BFD_RELOC_MIPS_TLS_TPREL_HI16",
+  "BFD_RELOC_MICROMIPS_TLS_TPREL_HI16",
   "BFD_RELOC_MIPS_TLS_TPREL_LO16",
+  "BFD_RELOC_MICROMIPS_TLS_TPREL_LO16",
 
   "BFD_RELOC_MIPS_COPY",
   "BFD_RELOC_MIPS_JUMP_SLOT",

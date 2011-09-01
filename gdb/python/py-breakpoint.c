@@ -399,16 +399,16 @@ bppy_get_expression (PyObject *self, void *closure)
 {
   char *str;
   breakpoint_object *obj = (breakpoint_object *) self;
+  struct watchpoint *wp;
 
   BPPY_REQUIRE_VALID (obj);
 
-  if (obj->bp->type != bp_watchpoint
-      && obj->bp->type != bp_hardware_watchpoint  
-      && obj->bp->type != bp_read_watchpoint
-      && obj->bp->type != bp_access_watchpoint)
+  if (!is_watchpoint (obj->bp))
     Py_RETURN_NONE;
 
-  str = obj->bp->exp_string;
+  wp = (struct watchpoint *) obj->bp;
+
+  str = wp->exp_string;
   if (! str)
     str = "";
 
@@ -492,12 +492,12 @@ bppy_get_commands (PyObject *self, void *closure)
   string_file = mem_fileopen ();
   chain = make_cleanup_ui_file_delete (string_file);
 
-  ui_out_redirect (uiout, string_file);
+  ui_out_redirect (current_uiout, string_file);
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      print_command_lines (uiout, breakpoint_commands (bp), 0);
+      print_command_lines (current_uiout, breakpoint_commands (bp), 0);
     }
-  ui_out_redirect (uiout, NULL);
+  ui_out_redirect (current_uiout, NULL);
   GDB_PY_HANDLE_EXCEPTION (except);
 
   cmdstr = ui_file_xstrdup (string_file, &length);
@@ -636,7 +636,8 @@ bppy_init (PyObject *self, PyObject *args, PyObject *kwargs)
 			       0, bp_breakpoint,
 			       0,
 			       AUTO_BOOLEAN_TRUE,
-			       NULL, 0, 1, internal_bp);
+			       &bkpt_breakpoint_ops,
+			       0, 1, internal_bp);
 	    break;
 	  }
         case bp_watchpoint:
@@ -861,6 +862,7 @@ gdbpy_initialize_breakpoints (void)
 {
   int i;
 
+  breakpoint_object_type.tp_new = PyType_GenericNew;
   if (PyType_Ready (&breakpoint_object_type) < 0)
     return;
 
@@ -1015,5 +1017,4 @@ static PyTypeObject breakpoint_object_type =
   0,				  /* tp_dictoffset */
   bppy_init,			  /* tp_init */
   0,				  /* tp_alloc */
-  PyType_GenericNew		  /* tp_new */
 };

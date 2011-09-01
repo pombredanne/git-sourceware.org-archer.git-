@@ -31,6 +31,7 @@
 #include <sys/ptrace.h>
 #include "linux-nat.h"
 #include "linux-ptrace.h"
+#include "linux-procfs.h"
 #include "linux-fork.h"
 #include "gdbthread.h"
 #include "gdbcmd.h"
@@ -57,6 +58,7 @@
 #include "terminal.h"
 #include <sys/vfs.h>
 #include "solib.h"
+#include "linux-osdata.h"
 
 #ifndef SPUFS_MAGIC
 #define SPUFS_MAGIC 0x23c9b64e
@@ -694,7 +696,6 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 	  add_thread (inferior_ptid);
 	  child_lp = add_lwp (inferior_ptid);
 	  child_lp->stopped = 1;
-	  child_lp->resumed = 1;
 
 	  /* If this is a vfork child, then the address-space is
 	     shared with the parent.  */
@@ -736,7 +737,7 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 
       if (has_vforked)
 	{
-	  struct lwp_info *lp;
+	  struct lwp_info *parent_lp;
 	  struct inferior *parent_inf;
 
 	  parent_inf = current_inferior ();
@@ -751,17 +752,16 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 	  parent_inf->waiting_for_vfork_done = detach_fork;
 	  parent_inf->pspace->breakpoints_not_allowed = detach_fork;
 
-	  lp = find_lwp_pid (pid_to_ptid (parent_pid));
+	  parent_lp = find_lwp_pid (pid_to_ptid (parent_pid));
 	  gdb_assert (linux_supports_tracefork_flag >= 0);
+
 	  if (linux_supports_tracevforkdone (0))
 	    {
   	      if (debug_linux_nat)
   		fprintf_unfiltered (gdb_stdlog,
   				    "LCFF: waiting for VFORK_DONE on %d\n",
   				    parent_pid);
-
-	      lp->stopped = 1;
-	      lp->resumed = 1;
+	      parent_lp->stopped = 1;
 
 	      /* We'll handle the VFORK_DONE event like any other
 		 event, in target_wait.  */
@@ -810,10 +810,9 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 		 and leave it pending.  The next linux_nat_resume call
 		 will notice a pending event, and bypasses actually
 		 resuming the inferior.  */
-	      lp->status = 0;
-	      lp->waitstatus.kind = TARGET_WAITKIND_VFORK_DONE;
-	      lp->stopped = 0;
-	      lp->resumed = 1;
+	      parent_lp->status = 0;
+	      parent_lp->waitstatus.kind = TARGET_WAITKIND_VFORK_DONE;
+	      parent_lp->stopped = 1;
 
 	      /* If we're in async mode, need to tell the event loop
 		 there's something here to process.  */
@@ -825,7 +824,7 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
   else
     {
       struct inferior *parent_inf, *child_inf;
-      struct lwp_info *lp;
+      struct lwp_info *child_lp;
       struct program_space *parent_pspace;
 
       if (info_verbose || debug_linux_nat)
@@ -885,9 +884,8 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 
       inferior_ptid = ptid_build (child_pid, child_pid, 0);
       add_thread (inferior_ptid);
-      lp = add_lwp (inferior_ptid);
-      lp->stopped = 1;
-      lp->resumed = 1;
+      child_lp = add_lwp (inferior_ptid);
+      child_lp->stopped = 1;
 
       /* If this is a vfork child, then the address-space is shared
 	 with the parent.  If we detached from the parent, then we can
@@ -1282,34 +1280,6 @@ exit_lwp (struct lwp_info *lp)
     }
 
   delete_lwp (lp->ptid);
-}
-
-/* Return an lwp's tgid, found in `/proc/PID/status'.  */
-
-int
-linux_proc_get_tgid (int lwpid)
-{
-  FILE *status_file;
-  char buf[100];
-  int tgid = -1;
-
-  snprintf (buf, sizeof (buf), "/proc/%d/status", (int) lwpid);
-  status_file = fopen (buf, "r");
-  if (status_file != NULL)
-    {
-      while (fgets (buf, sizeof (buf), status_file))
-	{
-	  if (strncmp (buf, "Tgid:", 5) == 0)
-	    {
-	      tgid = strtoul (buf + strlen ("Tgid:"), NULL, 10);
-	      break;
-	    }
-	}
-
-      fclose (status_file);
-    }
-
-  return tgid;
 }
 
 /* Detect `T (stopped)' in `/proc/PID/status'.
@@ -2403,6 +2373,18 @@ wait_lwp (struct lwp_info *lp)
       pid = my_waitpid (GET_LWP (lp->ptid), &status, WNOHANG);
       if (pid == -1 && errno == ECHILD)
 	pid = my_waitpid (GET_LWP (lp->ptid), &status, __WCLONE | WNOHANG);
+      if (pid == -1 && errno == ECHILD)
+	{
+	  /* The thread has previously exited.  We need to delete it
+	     now because, for some vendor 2.4 kernels with NPTL
+	     support backported, there won't be an exit event unless
+	     it is the main thread.  2.6 kernels will report an exit
+	     event for each thread that exits, as expected.  */
+	  thread_dead = 1;
+	  if (debug_linux_nat)
+	    fprintf_unfiltered (gdb_stdlog, "WL: %s vanished.\n",
+				target_pid_to_str (lp->ptid));
+	}
       if (pid != 0)
 	break;
 
@@ -2444,19 +2426,6 @@ wait_lwp (struct lwp_info *lp)
 
   restore_child_signals_mask (&prev_mask);
 
-  if (pid == -1 && errno == ECHILD)
-    {
-      /* The thread has previously exited.  We need to delete it
-	 now because, for some vendor 2.4 kernels with NPTL
-	 support backported, there won't be an exit event unless
-	 it is the main thread.  2.6 kernels will report an exit
-	 event for each thread that exits, as expected.  */
-      thread_dead = 1;
-      if (debug_linux_nat)
-	fprintf_unfiltered (gdb_stdlog, "WL: %s vanished.\n",
-			    target_pid_to_str (lp->ptid));
-    }
-
   if (!thread_dead)
     {
       gdb_assert (pid == GET_LWP (lp->ptid));
@@ -2468,15 +2437,15 @@ wait_lwp (struct lwp_info *lp)
 			      target_pid_to_str (lp->ptid),
 			      status_to_str (status));
 	}
-    }
 
-  /* Check if the thread has exited.  */
-  if (WIFEXITED (status) || WIFSIGNALED (status))
-    {
-      thread_dead = 1;
-      if (debug_linux_nat)
-	fprintf_unfiltered (gdb_stdlog, "WL: %s exited.\n",
-			    target_pid_to_str (lp->ptid));
+      /* Check if the thread has exited.  */
+      if (WIFEXITED (status) || WIFSIGNALED (status))
+	{
+	  thread_dead = 1;
+	  if (debug_linux_nat)
+	    fprintf_unfiltered (gdb_stdlog, "WL: %s exited.\n",
+				target_pid_to_str (lp->ptid));
+	}
     }
 
   if (thread_dead)
@@ -5114,148 +5083,9 @@ linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
 		       const char *annex, gdb_byte *readbuf,
 		       const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
-  /* We make the process list snapshot when the object starts to be
-     read.  */
-  static const char *buf;
-  static LONGEST len_avail = -1;
-  static struct obstack obstack;
-
-  DIR *dirp;
-
   gdb_assert (object == TARGET_OBJECT_OSDATA);
 
-  if (!annex)
-    {
-      if (offset == 0)
-	{
-	  if (len_avail != -1 && len_avail != 0)
-	    obstack_free (&obstack, NULL);
-	  len_avail = 0;
-	  buf = NULL;
-	  obstack_init (&obstack);
-	  obstack_grow_str (&obstack, "<osdata type=\"types\">\n");
-
-	  obstack_xml_printf (&obstack,
-			      "<item>"
-			      "<column name=\"Type\">processes</column>"
-			      "<column name=\"Description\">"
-			      "Listing of all processes</column>"
-			      "</item>");
-
-	  obstack_grow_str0 (&obstack, "</osdata>\n");
-	  buf = obstack_finish (&obstack);
-	  len_avail = strlen (buf);
-	}
-
-      if (offset >= len_avail)
-	{
-	  /* Done.  Get rid of the obstack.  */
-	  obstack_free (&obstack, NULL);
-	  buf = NULL;
-	  len_avail = 0;
-	  return 0;
-	}
-
-      if (len > len_avail - offset)
-	len = len_avail - offset;
-      memcpy (readbuf, buf + offset, len);
-
-      return len;
-    }
-
-  if (strcmp (annex, "processes") != 0)
-    return 0;
-
-  gdb_assert (readbuf && !writebuf);
-
-  if (offset == 0)
-    {
-      if (len_avail != -1 && len_avail != 0)
-	obstack_free (&obstack, NULL);
-      len_avail = 0;
-      buf = NULL;
-      obstack_init (&obstack);
-      obstack_grow_str (&obstack, "<osdata type=\"processes\">\n");
-
-      dirp = opendir ("/proc");
-      if (dirp)
-	{
-	  struct dirent *dp;
-
-	  while ((dp = readdir (dirp)) != NULL)
-	    {
-	      struct stat statbuf;
-	      char procentry[sizeof ("/proc/4294967295")];
-
-	      if (!isdigit (dp->d_name[0])
-		  || NAMELEN (dp) > sizeof ("4294967295") - 1)
-		continue;
-
-	      sprintf (procentry, "/proc/%s", dp->d_name);
-	      if (stat (procentry, &statbuf) == 0
-		  && S_ISDIR (statbuf.st_mode))
-		{
-		  char *pathname;
-		  FILE *f;
-		  char cmd[MAXPATHLEN + 1];
-		  struct passwd *entry;
-
-		  pathname = xstrprintf ("/proc/%s/cmdline", dp->d_name);
-		  entry = getpwuid (statbuf.st_uid);
-
-		  if ((f = fopen (pathname, "r")) != NULL)
-		    {
-		      size_t length = fread (cmd, 1, sizeof (cmd) - 1, f);
-
-		      if (length > 0)
-			{
-			  int i;
-
-			  for (i = 0; i < length; i++)
-			    if (cmd[i] == '\0')
-			      cmd[i] = ' ';
-			  cmd[length] = '\0';
-
-			  obstack_xml_printf (
-			    &obstack,
-			    "<item>"
-			    "<column name=\"pid\">%s</column>"
-			    "<column name=\"user\">%s</column>"
-			    "<column name=\"command\">%s</column>"
-			    "</item>",
-			    dp->d_name,
-			    entry ? entry->pw_name : "?",
-			    cmd);
-			}
-		      fclose (f);
-		    }
-
-		  xfree (pathname);
-		}
-	    }
-
-	  closedir (dirp);
-	}
-
-      obstack_grow_str0 (&obstack, "</osdata>\n");
-      buf = obstack_finish (&obstack);
-      len_avail = strlen (buf);
-    }
-
-  if (offset >= len_avail)
-    {
-      /* Done.  Get rid of the obstack.  */
-      obstack_free (&obstack, NULL);
-      buf = NULL;
-      len_avail = 0;
-      return 0;
-    }
-
-  if (len > len_avail - offset)
-    len = len_avail - offset;
-  memcpy (readbuf, buf + offset, len);
-
-  return len;
+  return linux_common_xfer_osdata (annex, readbuf, offset, len);
 }
 
 static LONGEST

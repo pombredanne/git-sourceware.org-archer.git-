@@ -65,6 +65,10 @@
 #include "ui-out.h"
 #include "cli-out.h"
 
+#define PROMPT(X) the_prompts.prompt_stack[the_prompts.top + X].prompt
+#define PREFIX(X) the_prompts.prompt_stack[the_prompts.top + X].prefix
+#define SUFFIX(X) the_prompts.prompt_stack[the_prompts.top + X].suffix
+
 /* Default command line prompt.  This is overriden in some configs.  */
 
 #ifndef DEFAULT_PROMPT
@@ -364,12 +368,13 @@ prepare_execute_command (void)
 void
 execute_command (char *p, int from_tty)
 {
-  struct cleanup *cleanup;
+  struct cleanup *cleanup_if_error, *cleanup;
   struct cmd_list_element *c;
   enum language flang;
   static int warned = 0;
   char *line;
 
+  cleanup_if_error = make_bpstat_clear_actions_cleanup ();
   cleanup = prepare_execute_command ();
 
   /* Force cleanup of any alloca areas if using C alloca instead of
@@ -473,7 +478,8 @@ execute_command (char *p, int from_tty)
 	}
     }
 
-    do_cleanups (cleanup);
+  do_cleanups (cleanup);
+  discard_cleanups (cleanup_if_error);
 }
 
 /* Run execute_command for P and FROM_TTY.  Capture its output into the
@@ -500,10 +506,10 @@ execute_command_to_string (char *p, int from_tty)
   make_cleanup_restore_ui_file (&gdb_stdtarg);
   make_cleanup_restore_ui_file (&gdb_stdtargerr);
 
-  if (ui_out_redirect (uiout, str_file) < 0)
+  if (ui_out_redirect (current_uiout, str_file) < 0)
     warning (_("Current output protocol does not support redirection"));
   else
-    make_cleanup_ui_out_redirect_pop (uiout);
+    make_cleanup_ui_out_redirect_pop (current_uiout);
 
   gdb_stdout = str_file;
   gdb_stderr = str_file;
@@ -533,7 +539,7 @@ command_loop (void)
   while (instream && !feof (instream))
     {
       if (window_hook && instream == stdin)
-	(*window_hook) (instream, get_prompt ());
+	(*window_hook) (instream, get_prompt (0));
 
       quit_flag = 0;
       if (instream == stdin && stdin_is_tty)
@@ -542,7 +548,7 @@ command_loop (void)
 
       /* Get a command-line.  This calls the readline package.  */
       command = command_line_input (instream == stdin ?
-				    get_prompt () : (char *) NULL,
+				    get_prompt (0) : (char *) NULL,
 				    instream == stdin, "prompt");
       if (command == 0)
 	{
@@ -793,8 +799,7 @@ gdb_readline_wrapper (char *prompt)
     (*after_char_processing_hook) ();
   gdb_assert (after_char_processing_hook == NULL);
 
-  /* gdb_do_one_event argument is unused.  */
-  while (gdb_do_one_event (NULL) >= 0)
+  while (gdb_do_one_event () >= 0)
     if (gdb_readline_wrapper_done)
       break;
 
@@ -1124,23 +1129,98 @@ and \"show warranty\" for details.\n");
     }
 }
 
-/* get_prompt: access method for the GDB prompt string.  */
+
+/* get_prefix: access method for the GDB prefix string.  */
 
 char *
-get_prompt (void)
+get_prefix (int level)
 {
-  return PROMPT (0);
+  return PREFIX (level);
+}
+
+/* set_prefix: set method for the GDB prefix string.  */
+
+void
+set_prefix (const char *s, int level)
+{
+  /* If S is NULL, just free the PREFIX at level LEVEL and set to
+     NULL.  */
+  if (s == NULL)
+    {
+      xfree (PREFIX (level));
+      PREFIX (level) = NULL;
+    }
+  else
+    {
+      char *p = xstrdup (s);
+
+      xfree (PREFIX (level));
+      PREFIX (level) =  p;
+    }
+}
+
+/* get_suffix: access method for the GDB suffix string.  */
+
+char *
+get_suffix (int level)
+{
+  return SUFFIX (level);
+}
+
+/* set_suffix: set method for the GDB suffix string.  */
+
+void
+set_suffix (const char *s, int level)
+{
+  /* If S is NULL, just free the SUFFIX at level LEVEL and set to
+     NULL.  */
+  if (s == NULL)
+    {
+      xfree (SUFFIX (level));
+      SUFFIX (level) = NULL;
+    }
+  else
+    {
+      char *p = xstrdup (s);
+
+      xfree (SUFFIX (level));
+      SUFFIX (level) =  p;
+    }
+}
+
+ /* get_prompt: access method for the GDB prompt string.  */
+
+char *
+get_prompt (int level)
+{
+  return PROMPT (level);
 }
 
 void
-set_prompt (char *s)
+set_prompt (const char *s, int level)
 {
-/* ??rehrauer: I don't know why this fails, since it looks as though
-   assignments to prompt are wrapped in calls to xstrdup...
-   if (prompt != NULL)
-     xfree (prompt);
- */
-  PROMPT (0) = xstrdup (s);
+  /* If S is NULL, just free the PROMPT at level LEVEL and set to
+     NULL.  */
+  if (s == NULL)
+    {
+      xfree (PROMPT (level));
+      PROMPT (level) = NULL;
+    }
+  else
+    {
+      char *p = xstrdup (s);
+
+      xfree (PROMPT (0));
+      PROMPT (0) = p;
+
+      if (level == 0)
+	{
+	  /* Also, free and set new_async_prompt so prompt changes sync up
+	     with set/show prompt.  */
+	    xfree (new_async_prompt);
+	    new_async_prompt = xstrdup (PROMPT (0));
+	  }
+      }
 }
 
 
@@ -1531,13 +1611,11 @@ init_main (void)
      whatever the DEFAULT_PROMPT is.  */
   the_prompts.top = 0;
   PREFIX (0) = "";
-  PROMPT (0) = xstrdup (DEFAULT_PROMPT);
+  set_prompt (DEFAULT_PROMPT, 0);
   SUFFIX (0) = "";
   /* Set things up for annotation_level > 1, if the user ever decides
      to use it.  */
   async_annotation_suffix = "prompt";
-  /* Set the variable associated with the setshow prompt command.  */
-  new_async_prompt = xstrdup (PROMPT (0));
 
   /* If gdb was started with --annotate=2, this is equivalent to the
      user entering the command 'set annotate 2' at the gdb prompt, so

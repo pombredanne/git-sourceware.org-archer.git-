@@ -565,6 +565,7 @@ ALL_TARGET_OBS = \
 	sparc-linux-tdep.o sparcnbsd-tdep.o sparcobsd-tdep.o \
 	sparc-sol2-tdep.o sparc-tdep.o \
 	spu-tdep.o spu-multiarch.o solib-spu.o \
+	tic6x-tdep.o tic6x-linux-tdep.o \
 	v850-tdep.o \
 	vaxnbsd-tdep.o vaxobsd-tdep.o vax-tdep.o \
 	xstormy16-tdep.o \
@@ -574,7 +575,7 @@ ALL_TARGET_OBS = \
 	nbsd-tdep.o obsd-tdep.o \
 	sol2-tdep.o \
 	solib-frv.o solib-irix.o solib-svr4.o solib-target.o \
-	solib-som.o solib-pa64.o solib-darwin.o \
+	solib-som.o solib-pa64.o solib-darwin.o solib-dsbt.o \
 	dbug-rom.o dink32-rom.o ppcbug-rom.o m32r-rom.o dsrec.o monitor.o \
 	remote-m32r-sdi.o remote-mips.o \
 	xcoffread.o \
@@ -737,7 +738,9 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	jit.c \
 	xml-syscall.c \
 	annotate.c common/signals.c copying.c dfp.c gdb.c inf-child.c \
-	regset.c sol-thread.c windows-termcap.c
+	regset.c sol-thread.c windows-termcap.c \
+	common/common-utils.c common/xml-utils.c \
+	common/ptid.c common/buffer.c
 
 LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 
@@ -788,14 +791,14 @@ expression.h score-tdep.h gdb_select.h ser-tcp.h buildsym.h valprint.h \
 call-cmds.h typeprint.h mi/mi-getopt.h mi/mi-parse.h mi/mi-console.h \
 mi/mi-out.h mi/mi-main.h mi/mi-common.h mi/mi-cmds.h linux-nat.h \
 complaints.h gdb_proc_service.h gdb_regex.h xtensa-tdep.h inf-loop.h \
-gdb_wait.h gdb_assert.h solib.h ppc-tdep.h cp-support.h glibc-tdep.h \
+gdb_wait.h common/gdb_assert.h solib.h ppc-tdep.h cp-support.h glibc-tdep.h \
 interps.h auxv.h gdbcmd.h tramp-frame.h mipsnbsd-tdep.h	\
 amd64-linux-tdep.h linespec.h i387-tdep.h mn10300-tdep.h \
 sparc64-tdep.h monitor.h ppcobsd-tdep.h srec.h solib-pa64.h \
 coff-pe-read.h parser-defs.h gdb_ptrace.h mips-linux-tdep.h \
 m68k-tdep.h spu-tdep.h jv-lang.h environ.h solib-irix.h amd64-tdep.h \
 doublest.h regset.h hppa-tdep.h ppc-linux-tdep.h rs6000-tdep.h \
-gdb_locale.h gdb_dirent.h arch-utils.h trad-frame.h gnu-nat.h \
+common/gdb_locale.h common/gdb_dirent.h arch-utils.h trad-frame.h gnu-nat.h \
 language.h nbsd-tdep.h wrapper.h solib-svr4.h \
 macroexp.h ui-file.h regcache.h gdb_string.h tracepoint.h i386-tdep.h \
 inf-child.h p-lang.h event-top.h gdbtypes.h user-regs.h \
@@ -816,7 +819,9 @@ osdata.h procfs.h python/py-event.h python/py-events.h python/py-stopevent.h \
 python/python-internal.h python/python.h ravenscar-thread.h record.h \
 solib-darwin.h solib-ia64-hpux.h solib-spu.h windows-nat.h xcoffread.h \
 gnulib/extra/arg-nonnull.h gnulib/extra/c++defs.h gnulib/extra/warn-on-use.h \
-gnulib/stddef.in.h inline-frame.h
+gnulib/stddef.in.h inline-frame.h \
+common/common-utils.h common/xml-utils.h common/buffer.h common/ptid.h \
+common/linux-osdata.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -898,10 +903,12 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	trad-frame.o \
 	tramp-frame.o \
 	solib.o solib-target.o \
-	prologue-value.o memory-map.o memrange.o xml-support.o xml-syscall.o \
+	prologue-value.o memory-map.o memrange.o \
+	xml-support.o xml-syscall.o xml-utils.o \
 	target-descriptions.o target-memory.o xml-tdesc.o xml-builtin.o \
 	inferior.o osdata.o gdb_usleep.o record.o gcore.o \
-	jit.o progspace.o
+	jit.o progspace.o \
+	common-utils.o buffer.o ptid.o
 
 TSOBS = inflow.o
 
@@ -1931,6 +1938,30 @@ mi-common.o: $(srcdir)/mi/mi-common.c
 
 signals.o: $(srcdir)/common/signals.c
 	$(COMPILE) $(srcdir)/common/signals.c
+	$(POSTCOMPILE)
+
+common-utils.o: ${srcdir}/common/common-utils.c
+	$(COMPILE) $(srcdir)/common/common-utils.c
+	$(POSTCOMPILE)
+
+xml-utils.o: ${srcdir}/common/xml-utils.c
+	$(COMPILE) $(srcdir)/common/xml-utils.c
+	$(POSTCOMPILE)
+
+ptid.o: ${srcdir}/common/ptid.c
+	$(COMPILE) $(srcdir)/common/ptid.c
+	$(POSTCOMPILE)
+
+buffer.o: ${srcdir}/common/buffer.c
+	$(COMPILE) $(srcdir)/common/buffer.c
+	$(POSTCOMPILE)
+
+linux-osdata.o: ${srcdir}/common/linux-osdata.c
+	$(COMPILE) $(srcdir)/common/linux-osdata.c
+	$(POSTCOMPILE)
+
+linux-procfs.o: $(srcdir)/common/linux-procfs.c
+	$(COMPILE) $(srcdir)/common/linux-procfs.c
 	$(POSTCOMPILE)
 
 #

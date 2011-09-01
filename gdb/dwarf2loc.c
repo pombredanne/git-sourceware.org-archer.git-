@@ -1012,6 +1012,8 @@ indirect_pieced_value (struct value *value)
     }
 
   frame = get_selected_frame (_("No frame selected."));
+
+  /* This is an offset requested by GDB, such as value subcripts.  */
   byte_offset = value_as_address (value);
 
   gdb_assert (piece);
@@ -1023,7 +1025,7 @@ indirect_pieced_value (struct value *value)
 
   result = dwarf2_evaluate_loc_desc_full (TYPE_TARGET_TYPE (type), frame,
 					  baton.data, baton.size, baton.per_cu,
-					  byte_offset);
+					  piece->v.ptr.offset + byte_offset);
 
   do_cleanups (back_to);
 
@@ -1230,7 +1232,13 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
 	    retval = allocate_value (type);
 	    contents = value_contents_raw (retval);
 	    if (n > TYPE_LENGTH (type))
-	      n = TYPE_LENGTH (type);
+	      {
+		struct gdbarch *objfile_gdbarch = get_objfile_arch (objfile);
+
+		if (gdbarch_byte_order (objfile_gdbarch) == BFD_ENDIAN_BIG)
+		  val_bytes += n - TYPE_LENGTH (type);
+		n = TYPE_LENGTH (type);
+	      }
 	    memcpy (contents, val_bytes, n);
 	  }
 	  break;
@@ -1252,7 +1260,13 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
 	    n -= byte_offset;
 
 	    if (n > TYPE_LENGTH (type))
-	      n = TYPE_LENGTH (type);
+	      {
+		struct gdbarch *objfile_gdbarch = get_objfile_arch (objfile);
+
+		if (gdbarch_byte_order (objfile_gdbarch) == BFD_ENDIAN_BIG)
+		  ldata += n - TYPE_LENGTH (type);
+		n = TYPE_LENGTH (type);
+	      }
 	    memcpy (contents, ldata, n);
 	  }
 	  break;

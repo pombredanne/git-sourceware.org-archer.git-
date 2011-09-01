@@ -30,6 +30,7 @@
 #include "objalloc.h"
 #include "hashtab.h"
 #include "dwarf2.h"
+#include "libiberty.h"
 
 #include "elf/x86-64.h"
 
@@ -163,6 +164,9 @@ static reloc_howto_type x86_64_elf_howto_table[] =
   HOWTO(R_X86_64_IRELATIVE, 0, 4, 64, FALSE, 0, complain_overflow_bitfield,
 	bfd_elf_generic_reloc, "R_X86_64_IRELATIVE", FALSE, MINUS_ONE,
 	MINUS_ONE, FALSE),
+  HOWTO(R_X86_64_RELATIVE64, 0, 4, 64, FALSE, 0, complain_overflow_bitfield,
+	bfd_elf_generic_reloc, "R_X86_64_RELATIVE64", FALSE, MINUS_ONE,
+	MINUS_ONE, FALSE),
 
   /* We have a gap in the reloc numbers here.
      R_X86_64_standard counts the number up to this point, and
@@ -178,7 +182,12 @@ static reloc_howto_type x86_64_elf_howto_table[] =
 /* GNU extension to record C++ vtable member usage.  */
   HOWTO (R_X86_64_GNU_VTENTRY, 0, 4, 0, FALSE, 0, complain_overflow_dont,
 	 _bfd_elf_rel_vtable_reloc_fn, "R_X86_64_GNU_VTENTRY", FALSE, 0, 0,
-	 FALSE)
+	 FALSE),
+
+/* Use complain_overflow_bitfield on R_X86_64_32 for x32.  */
+  HOWTO(R_X86_64_32, 0, 2, 32, FALSE, 0, complain_overflow_bitfield,
+	bfd_elf_generic_reloc, "R_X86_64_32", FALSE, 0xffffffff, 0xffffffff,
+	FALSE)
 };
 
 #define IS_X86_64_PCREL_TYPE(TYPE)	\
@@ -241,8 +250,15 @@ elf_x86_64_rtype_to_howto (bfd *abfd, unsigned r_type)
 {
   unsigned i;
 
-  if (r_type < (unsigned int) R_X86_64_GNU_VTINHERIT
-      || r_type >= (unsigned int) R_X86_64_max)
+  if (r_type == (unsigned int) R_X86_64_32)
+    {
+      if (ABI_64_P (abfd))
+	i = r_type;
+      else
+	i = ARRAY_SIZE (x86_64_elf_howto_table) - 1;
+    }
+  else if (r_type < (unsigned int) R_X86_64_GNU_VTINHERIT
+	   || r_type >= (unsigned int) R_X86_64_max)
     {
       if (r_type >= (unsigned int) R_X86_64_standard)
 	{
@@ -276,15 +292,21 @@ elf_x86_64_reloc_type_lookup (bfd *abfd,
 }
 
 static reloc_howto_type *
-elf_x86_64_reloc_name_lookup (bfd *abfd ATTRIBUTE_UNUSED,
+elf_x86_64_reloc_name_lookup (bfd *abfd,
 			      const char *r_name)
 {
   unsigned int i;
 
-  for (i = 0;
-       i < (sizeof (x86_64_elf_howto_table)
-	    / sizeof (x86_64_elf_howto_table[0]));
-       i++)
+  if (!ABI_64_P (abfd) && strcasecmp (r_name, "R_X86_64_32") == 0)
+    {
+      /* Get x32 R_X86_64_32.  */
+      reloc_howto_type *reloc
+	= &x86_64_elf_howto_table[ARRAY_SIZE (x86_64_elf_howto_table) - 1];
+      BFD_ASSERT (reloc->type == (unsigned int) R_X86_64_32);
+      return reloc;
+    }
+
+  for (i = 0; i < ARRAY_SIZE (x86_64_elf_howto_table); i++)
     if (x86_64_elf_howto_table[i].name != NULL
 	&& strcasecmp (x86_64_elf_howto_table[i].name, r_name) == 0)
       return &x86_64_elf_howto_table[i];
@@ -1395,14 +1417,6 @@ elf_x86_64_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	  {
 	  default:
 	    break;
-
-	  case R_X86_64_64:
-	    /* Allow R_X86_64_64 relocations in SEC_DEBUGGING sections
-	       when building shared libraries.  */
-	    if (info->shared
-		&& !info->executable
-		&& (sec->flags & SEC_DEBUGGING) != 0)
-	      break;
 
 	  case R_X86_64_DTPOFF64:
 	  case R_X86_64_TPOFF64:
@@ -3022,7 +3036,12 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 	  return FALSE;
 	}
 
-      howto = x86_64_elf_howto_table + r_type;
+      if (r_type != (int) R_X86_64_32
+	  || ABI_64_P (output_bfd)) 
+	howto = x86_64_elf_howto_table + r_type;
+      else
+	howto = (x86_64_elf_howto_table
+		 + ARRAY_SIZE (x86_64_elf_howto_table) - 1);
       r_symndx = htab->r_sym (rel->r_info);
       h = NULL;
       sym = NULL;
@@ -3066,6 +3085,16 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 
       if (info->relocatable)
 	continue;
+
+      if (rel->r_addend == 0
+	  && r_type == R_X86_64_64
+	  && !ABI_64_P (output_bfd))
+	{
+	  /* For x32, treat R_X86_64_64 like R_X86_64_32 and zero-extend
+	     it to 64bit if addend is zero.  */
+	  r_type = R_X86_64_32;
+	  memset (contents + rel->r_offset + 4, 0, 4);
+	}
 
       /* Since STT_GNU_IFUNC symbol must go through PLT, we handle
 	 it here if it is defined in a non-shared object.  */
@@ -3579,6 +3608,14 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 		    {
 		      relocate = TRUE;
 		      outrel.r_info = htab->r_info (0, R_X86_64_RELATIVE);
+		      outrel.r_addend = relocation + rel->r_addend;
+		    }
+		  else if (r_type == R_X86_64_64
+			   && !ABI_64_P (output_bfd))
+		    {
+		      relocate = TRUE;
+		      outrel.r_info = htab->r_info (0,
+						    R_X86_64_RELATIVE64);
 		      outrel.r_addend = relocation + rel->r_addend;
 		    }
 		  else
@@ -5034,6 +5071,56 @@ elf64_l1om_elf_object_p (bfd *abfd)
 
 #undef  elf64_bed
 #define elf64_bed elf64_l1om_fbsd_bed
+
+#include "elf64-target.h"
+
+/* Intel K1OM support.  */
+
+static bfd_boolean
+elf64_k1om_elf_object_p (bfd *abfd)
+{
+  /* Set the right machine number for an K1OM elf64 file.  */
+  bfd_default_set_arch_mach (abfd, bfd_arch_k1om, bfd_mach_k1om);
+  return TRUE;
+}
+
+#undef  TARGET_LITTLE_SYM
+#define TARGET_LITTLE_SYM		    bfd_elf64_k1om_vec
+#undef  TARGET_LITTLE_NAME
+#define TARGET_LITTLE_NAME		    "elf64-k1om"
+#undef ELF_ARCH
+#define ELF_ARCH			    bfd_arch_k1om
+
+#undef	ELF_MACHINE_CODE
+#define ELF_MACHINE_CODE		    EM_K1OM
+
+#undef	ELF_OSABI
+
+#undef  elf64_bed
+#define elf64_bed elf64_k1om_bed
+
+#undef elf_backend_object_p
+#define elf_backend_object_p		    elf64_k1om_elf_object_p
+
+#undef  elf_backend_static_tls_alignment
+
+#undef elf_backend_want_plt_sym
+#define elf_backend_want_plt_sym	    0
+
+#include "elf64-target.h"
+
+/* FreeBSD K1OM support.  */
+
+#undef  TARGET_LITTLE_SYM
+#define TARGET_LITTLE_SYM		    bfd_elf64_k1om_freebsd_vec
+#undef  TARGET_LITTLE_NAME
+#define TARGET_LITTLE_NAME		    "elf64-k1om-freebsd"
+
+#undef	ELF_OSABI
+#define	ELF_OSABI			    ELFOSABI_FREEBSD
+
+#undef  elf64_bed
+#define elf64_bed elf64_k1om_fbsd_bed
 
 #include "elf64-target.h"
 
