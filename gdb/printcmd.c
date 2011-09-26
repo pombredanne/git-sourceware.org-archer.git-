@@ -1981,6 +1981,10 @@ print_variable_and_value (const char *name, struct symbol *var,
       struct value_print_options opts;
 
       val = read_var_value (var, frame);
+
+      make_cleanup_restore_selected_frame ();
+      select_frame (frame);
+
       get_user_print_options (&opts);
       common_val_print (val, stream, indent, &opts, current_language);
     }
