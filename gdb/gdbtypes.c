@@ -1527,7 +1527,7 @@ type_length_get (struct type *type, struct type *target_type, int full_span)
   /* It may happen for wrong DWARF annotations returning garbage data.  */
   if (count < 0)
     warning (_("Range for type %s has invalid bounds %s..%s"),
-	     TYPE_NAME (type), plongest (TYPE_LOW_BOUND (range_type)),
+	     TYPE_ERROR_NAME (type), plongest (TYPE_LOW_BOUND (range_type)),
 	     plongest (TYPE_HIGH_BOUND (range_type)));
   /* The code below does not handle count == 0 right.  */
   if (count <= 0)
