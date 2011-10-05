@@ -37,18 +37,30 @@ if ![runto_main ] then {
     return -1
 }
 
+gdb_test_no_output "set detach-on-fork off" ""
+
 gdb_test "Test_Events" "Event testers registered."
 
+gdb_breakpoint "first"
 gdb_breakpoint "first"
 
 # Test continue event and breakpoint stop event
 gdb_test "continue" ".*event type: continue.*
 .*event type: stop.*
 .*stop reason: breakpoint.*
+.*first breakpoint number: 2.*
 .*breakpoint number: 2.*
+.*breakpoint number: 3.*
 all threads stopped"
 
 #test exited event.
 gdb_test "continue" ".*event type: continue.*
 .*event type: exit.*
-.*exit code: 12.*"
+.*exit code: 12.*
+.*exit inf: 1.*" "Inferior 1 terminated."
+
+gdb_test "inferior 2" ".*Switching to inferior 2.*"
+gdb_test "continue" ".*event type: continue.*
+.*event type: exit.*
+.*exit code: 12.*
+.*exit inf: 2.*" "Inferior 2 terminated."

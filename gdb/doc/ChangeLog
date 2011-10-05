@@ -1,3 +1,59 @@
+2011-10-04  Kevin Pouget  <kevin.pouget@st.com>
+
+	PR python/12691: Add the inferior to Python exited event
+	* gdb.texinfo (Events In Python): Describe exited inferior attribute.
+
+2011-10-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (GDB/MI Miscellaneous Commands): Minor
+	rephasing.
+
+2011-10-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (GDB/MI Ada Tasking Commands): New node.
+	(GDB/MI Miscellaneous Commands): Add `ada-task-info'
+	as possible feature returned by the `-list-features'
+	command.
+
+2011-09-28  Paul Koning  <paul_koning@dell.com>
+
+	* gdb.texinfo (gdb.Type): Document field access by dictionary
+	key syntax.
+
+2011-09-28  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Files): Update options for `add-symbol-file'.
+	Add one space after option `-s'.  Remove @r{} markup.
+
+2011-09-27  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (Tracepoint Action Lists): Document $_ret.
+
+2011-09-16  Hui Zhu  <teawater@gmail.com>
+
+	* gdb.texinfo (Tracepoint Restrictions): Change *$esp@300
+	to *(unsigned char *)$esp@300.
+
+2011-09-15  Paul Koning  <paul_koning@dell.com>
+
+	* gdb.texinfo: Make style of Python functions and methods match
+	the syntax of Python.  Also put class and module names explicitly
+	on function, member, and variable names, matching Python
+	documentation conventions.
+	
+2011-09-15  Kevin Pouget  <kevin.pouget@st.com>
+
+	PR Python/12692 Add gdb.selected_inferior() to Python interface.
+	* gdb.texinfo (Inferiors In Python): Describe new
+	gdb.selected_inferior() function.
+
+2011-09-15  Kevin Pouget  <kevin.pouget@st.com>
+
+	Handle multiple breakpoint hits in Python interface:
+	* gdb.texinfo (Events In Python): New function documentation:
+	gdb.BreakpointEvent.breakpoints. Indicate that
+	gdb.BreakpointEvent.breakpoint is now deprecated.
+
 2011-09-04  Joel Brobecker  <brobecker@adacore.com>
 
 	* gdb.texinfo: Set EDITION to "Tenth" and change ISBN.

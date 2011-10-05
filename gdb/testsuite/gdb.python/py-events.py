@@ -31,7 +31,9 @@ def breakpoint_stop_handler (event):
         print "event type: stop"
     if (isinstance (event, gdb.BreakpointEvent)):
         print "stop reason: breakpoint"
-        print "breakpoint number: %s" % (event.breakpoint.number)
+        print "first breakpoint number: %s" % (event.breakpoint.number)
+        for bp in event.breakpoints:
+        	print "breakpoint number: %s" % (bp.number)
         if ( event.inferior_thread is not None) :
             print "thread num: %s" % (event.inferior_thread.num);
         else:
@@ -41,6 +43,7 @@ def exit_handler (event):
     if (isinstance (event, gdb.ExitedEvent)):
         print "event type: exit"
     print "exit code: %d" % (event.exit_code)
+    print "exit inf: %d" % (event.inferior.num)
 
 def continue_handler (event):
     if (isinstance (event, gdb.ContinueEvent)):

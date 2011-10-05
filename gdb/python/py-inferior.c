@@ -119,7 +119,7 @@ python_inferior_exit (struct inferior *inf)
   if (inf->has_exit_code)
     exit_code = &inf->exit_code;
 
-  if (emit_exited_event (exit_code) < 0)
+  if (emit_exited_event (exit_code, inf) < 0)
     gdbpy_print_stack ();
 
   do_cleanups (cleanup);
@@ -681,6 +681,20 @@ py_free_inferior (struct inferior *inf, void *datum)
 
   Py_DECREF ((PyObject *) inf_obj);
   do_cleanups (cleanup);
+}
+
+/* Implementation of gdb.selected_inferior() -> gdb.Inferior.
+   Returns the current inferior object.  */
+
+PyObject *
+gdbpy_selected_inferior (PyObject *self, PyObject *args)
+{
+  PyObject *inf_obj;
+
+  inf_obj = inferior_to_inferior_object (current_inferior ());
+  Py_INCREF (inf_obj);
+
+  return inf_obj;
 }
 
 void

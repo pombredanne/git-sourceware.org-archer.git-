@@ -1364,6 +1364,23 @@ write_memory_ptid (ptid_t ptid, CORE_ADDR memaddr,
   do_cleanups (ptid_cleanup);
 }
 
+/* Restore the contents of the copy area for thread PTID.  */
+
+static void
+displaced_step_restore (struct displaced_step_inferior_state *displaced,
+			ptid_t ptid)
+{
+  ULONGEST len = gdbarch_max_insn_length (displaced->step_gdbarch);
+
+  write_memory_ptid (ptid, displaced->step_copy,
+		     displaced->step_saved_copy, len);
+  if (debug_displaced)
+    fprintf_unfiltered (gdb_stdlog, "displaced: restored %s %s\n",
+			target_pid_to_str (ptid),
+			paddress (displaced->step_gdbarch,
+				  displaced->step_copy));
+}
+
 static void
 displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
 {
@@ -1382,17 +1399,7 @@ displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
 
   old_cleanups = make_cleanup (displaced_step_clear_cleanup, displaced);
 
-  /* Restore the contents of the copy area.  */
-  {
-    ULONGEST len = gdbarch_max_insn_length (displaced->step_gdbarch);
-
-    write_memory_ptid (displaced->step_ptid, displaced->step_copy,
-		       displaced->step_saved_copy, len);
-    if (debug_displaced)
-      fprintf_unfiltered (gdb_stdlog, "displaced: restored %s\n",
-                          paddress (displaced->step_gdbarch,
-				    displaced->step_copy));
-  }
+  displaced_step_restore (displaced, displaced->step_ptid);
 
   /* Did the instruction complete successfully?  */
   if (signal == TARGET_SIGNAL_TRAP)
@@ -2580,14 +2587,6 @@ prepare_for_detach (void)
 
       overlay_cache_invalid = 1;
 
-      /* We have to invalidate the registers BEFORE calling
-	 target_wait because they can be loaded from the target while
-	 in target_wait.  This makes remote debugging a bit more
-	 efficient for those targets that provide critical registers
-	 as part of their normal status mechanism.  */
-
-      registers_changed ();
-
       if (deprecated_target_wait_hook)
 	ecs->ptid = deprecated_target_wait_hook (pid_ptid, &ecs->ws, 0);
       else
@@ -2657,14 +2656,7 @@ wait_for_inferior (void)
     {
       struct cleanup *old_chain;
 
-      /* We have to invalidate the registers BEFORE calling target_wait
-	 because they can be loaded from the target while in target_wait.
-	 This makes remote debugging a bit more efficient for those
-	 targets that provide critical registers as part of their normal
-	 status mechanism.  */
-
       overlay_cache_invalid = 1;
-      registers_changed ();
 
       if (deprecated_target_wait_hook)
 	ecs->ptid = deprecated_target_wait_hook (waiton_ptid, &ecs->ws, 0);
@@ -2734,25 +2726,7 @@ fetch_inferior_event (void *client_data)
        running any breakpoint commands.  */
     make_cleanup_restore_current_thread ();
 
-  /* We have to invalidate the registers BEFORE calling target_wait
-     because they can be loaded from the target while in target_wait.
-     This makes remote debugging a bit more efficient for those
-     targets that provide critical registers as part of their normal
-     status mechanism.  */
-
   overlay_cache_invalid = 1;
-
-  /* But don't do it if the current thread is already stopped (hence
-     this is either a delayed event that will result in
-     TARGET_WAITKIND_IGNORE, or it's an event for another thread (and
-     we always clear the register and frame caches when the user
-     switches threads anyway).  If we didn't do this, a spurious
-     delayed event in all-stop mode would make the user lose the
-     selected frame.  */
-  if (non_stop
-      || (!ptid_equal (inferior_ptid, null_ptid)
-	  && is_executing (inferior_ptid)))
-    registers_changed ();
 
   make_cleanup_restore_integer (&execution_direction);
   execution_direction = target_execution_direction ();
@@ -2878,7 +2852,7 @@ nullify_last_target_wait_ptid (void)
 static void
 context_switch (ptid_t ptid)
 {
-  if (debug_infrun)
+  if (debug_infrun && !ptid_equal (ptid, inferior_ptid))
     {
       fprintf_unfiltered (gdb_stdlog, "infrun: Switching context from %s ",
 			  target_pid_to_str (inferior_ptid));
@@ -3405,6 +3379,60 @@ handle_inferior_event (struct execution_control_state *ecs)
     case TARGET_WAITKIND_VFORKED:
       if (debug_infrun)
         fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_FORKED\n");
+
+      /* Check whether the inferior is displaced stepping.  */
+      {
+	struct regcache *regcache = get_thread_regcache (ecs->ptid);
+	struct gdbarch *gdbarch = get_regcache_arch (regcache);
+	struct displaced_step_inferior_state *displaced
+	  = get_displaced_stepping_state (ptid_get_pid (ecs->ptid));
+
+	/* If checking displaced stepping is supported, and thread
+	   ecs->ptid is displaced stepping.  */
+	if (displaced && ptid_equal (displaced->step_ptid, ecs->ptid))
+	  {
+	    struct inferior *parent_inf
+	      = find_inferior_pid (ptid_get_pid (ecs->ptid));
+	    struct regcache *child_regcache;
+	    CORE_ADDR parent_pc;
+
+	    /* GDB has got TARGET_WAITKIND_FORKED or TARGET_WAITKIND_VFORKED,
+	       indicating that the displaced stepping of syscall instruction
+	       has been done.  Perform cleanup for parent process here.  Note
+	       that this operation also cleans up the child process for vfork,
+	       because their pages are shared.  */
+	    displaced_step_fixup (ecs->ptid, TARGET_SIGNAL_TRAP);
+
+	    if (ecs->ws.kind == TARGET_WAITKIND_FORKED)
+	      {
+		/* Restore scratch pad for child process.  */
+		displaced_step_restore (displaced, ecs->ws.value.related_pid);
+	      }
+
+	    /* Since the vfork/fork syscall instruction was executed in the scratchpad,
+	       the child's PC is also within the scratchpad.  Set the child's PC
+	       to the parent's PC value, which has already been fixed up.
+	       FIXME: we use the parent's aspace here, although we're touching
+	       the child, because the child hasn't been added to the inferior
+	       list yet at this point.  */
+
+	    child_regcache
+	      = get_thread_arch_aspace_regcache (ecs->ws.value.related_pid,
+						 gdbarch,
+						 parent_inf->aspace);
+	    /* Read PC value of parent process.  */
+	    parent_pc = regcache_read_pc (regcache);
+
+	    if (debug_displaced)
+	      fprintf_unfiltered (gdb_stdlog,
+				  "displaced: write child pc from %s to %s\n",
+				  paddress (gdbarch,
+					    regcache_read_pc (child_regcache)),
+				  paddress (gdbarch, parent_pc));
+
+	    regcache_write_pc (child_regcache, parent_pc);
+	  }
+      }
 
       if (!ptid_equal (ecs->ptid, inferior_ptid))
 	{
