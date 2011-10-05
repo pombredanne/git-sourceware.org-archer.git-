@@ -1057,12 +1057,16 @@ extern void break_command (char *, int);
 extern void hbreak_command_wrapper (char *, int);
 extern void thbreak_command_wrapper (char *, int);
 extern void rbreak_command_wrapper (char *, int);
-extern void watch_command_wrapper (char *, int, int);
-extern void awatch_command_wrapper (char *, int, int);
-extern void rwatch_command_wrapper (char *, int, int);
+extern void watch_command_wrapper (char *, int, int,
+				   struct breakpoint_object *);
+extern void awatch_command_wrapper (char *, int, int,
+				    struct breakpoint_object *);
+extern void rwatch_command_wrapper (char *, int, int,
+				    struct breakpoint_object *);
 extern void tbreak_command (char *, int);
 
 extern struct breakpoint_ops bkpt_breakpoint_ops;
+extern struct breakpoint_ops pyobj_breakpoint_ops;
 
 extern void initialize_breakpoint_ops (void);
 
@@ -1110,7 +1114,8 @@ extern int create_breakpoint (struct gdbarch *gdbarch, char *arg,
 			      const struct breakpoint_ops *ops,
 			      int from_tty,
 			      int enabled,
-			      int internal);
+			      int internal,
+			      struct breakpoint_object *py_obj);
 
 extern void insert_breakpoints (void);
 
@@ -1358,5 +1363,7 @@ extern struct breakpoint *iterate_over_breakpoints (int (*) (struct breakpoint *
 							     void *), void *);
 
 extern int user_breakpoint_p (struct breakpoint *);
-
+			 
+extern struct breakpoint_ops *alloc_pybp_ops (void);
+			 
 #endif /* !defined (BREAKPOINT_H) */

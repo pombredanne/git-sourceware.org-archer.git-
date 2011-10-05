@@ -301,3 +301,72 @@ gdb_py_test_silent_cmd  "python wp1 = wp_eval (\"result\", type=gdb.BP_WATCHPOIN
 gdb_test "continue" ".*\[Ww\]atchpoint.*result.*Old value =.*New value = 788.*" "Test watchpoint write"
 gdb_test "python print never_eval_bp1.count" "0" \
     "Check that this unrelated breakpoints eval function was never called."
+
+# Breakpoint operations.
+# Start with a fresh gdb.
+clean_restart ${testfile}
+
+if ![runto_main] then {
+    fail "Cannot run to main."
+    return 0
+}
+delete_breakpoints
+
+set bp_location [gdb_get_line_number "Break at multiply."]
+set bp_location2 [gdb_get_line_number "Break at add."]
+set bp_location3 [gdb_get_line_number "Break at end."]
+
+gdb_py_test_multiple "Breakpoint with operations" \
+  "python" "" \
+  "class bp_oper (gdb.Breakpoint):" "" \
+  "  def print_mention (self):" "" \
+  "    return \"Special Breakpoint \"+str(self.number)+\" at \"+str(self.location)" "" \
+  "  def print_stop_action (self):" "" \
+  "    return (\"Testcase Breakpoint, \",gdb.PRINT_SRC_AND_LOC)" "" \
+  "  def print_one (self, address):" "" \
+  "    return (address,\"Test-case breakpoint\")" "" \
+  "  def print_one_detail (self):" "" \
+  "    return \"TS breakpoint at \"+str(self.location)+\"\\n\"" "" \
+  "end" ""
+
+gdb_py_test_multiple "Breakpoint with operations" \
+  "python" "" \
+  "class bp_oper_source (bp_oper):" "" \
+  "  def print_stop_action (self):" "" \
+  "    return (\"Testcase Breakpoint, \",gdb.PRINT_SRC_ONLY)" "" \
+  "    return gdb.PRINT_SRC_ONLY" "" \
+  "end" ""
+
+gdb_py_test_multiple "Breakpoint with operations" \
+  "python" "" \
+  "class bp_oper_nothing (bp_oper):" "" \
+  "  def print_stop_action (self):" "" \
+  "    return (\"Print Nothing\\n\", gdb.PRINT_NOTHING)" "" \
+  "end" ""
+
+gdb_test "python foo = bp_oper(\"$bp_location\")" \
+    "Special Breakpoint.*at.*py-breakpoint\.c:41" \
+    "Test breakpoint ops mention"
+
+gdb_test "continue" ".*Testcase Breakpoint.*$srcfile:$bp_location.*" \
+    "Test PRINT_SRC_AND_LOC with preamble"
+delete_breakpoints
+
+gdb_test "python foo = bp_oper_source(\"$bp_location2\")" \
+    "Special Breakpoint.*at.*py-breakpoint\.c:42" \
+    "Test breakpoint ops mention"
+
+gdb_test "continue" ".*Testcase Breakpoint.*$bp_location2.*" \
+    "Test PRINT_SRC_ONLY with preamble"
+delete_breakpoints
+
+gdb_test "python nothing = bp_oper_nothing(\"$bp_location3\")" \
+    "Special Breakpoint.*at.*py-breakpoint\.c:45" \
+    "Test breakpoint ops mention"
+
+gdb_test "continue" ".*Print Nothing.*" \
+    "Test PRINT_NOTHING with preamble"
+
+gdb_test "info breakpoints" \
+    "breakpoint.*keep.*y.*$hex.*Test-case breakpoint.*TS breakpoint.*at.*py-breakpoint.*" \
+    "Check info breakpoints shows breakpoint op breakpoints"

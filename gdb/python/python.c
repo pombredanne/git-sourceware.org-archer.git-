@@ -231,6 +231,20 @@ eval_python_from_control_command (struct command_line *cmd)
   do_cleanups (cleanup);
 }
 
+/* Bind a breakpoint to a breakpoint object.  */
+
+void
+gdbpy_bind_breakpoint (struct breakpoint_object *obj,
+		       struct breakpoint *b)
+{
+  if (obj && b)
+    {
+      obj->bp = b;
+      obj->number = b->number;
+      b->py_bp_object = obj;
+    }
+}
+
 /* Implementation of the gdb "python" command.  */
 
 static void

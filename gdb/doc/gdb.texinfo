@@ -23536,14 +23536,24 @@ argument defines the class of watchpoint to create, if @var{type} is
 assumed to be a @code{gdb.WP_WRITE} class.
 @end defun
 
+<<<<<<< Updated upstream
 @defun Breakpoint.stop (self)
+||||||| merged common ancestors
+@defop Operation {gdb.Breakpoint} stop (self)
+=======
+>>>>>>> Stashed changes
 The @code{gdb.Breakpoint} class can be sub-classed and, in
-particular, you may choose to implement the @code{stop} method.
-If this method is defined as a sub-class of @code{gdb.Breakpoint},
-it will be called when the inferior reaches any location of a
-breakpoint which instantiates that sub-class.  If the method returns
-@code{True}, the inferior will be stopped at the location of the
-breakpoint, otherwise the inferior will continue.
+particular, you may choose to implement several different methods
+detailed below.  These methods influence how GDB operates with certain
+breakpoint operations.
+
+@defop Operation {gdb.Breakpoint} stop (self)
+The @code{stop} method may be implemented as part of a
+@code{gdb.Breakpoint}.  This method will be called when the inferior
+reaches any location of a breakpoint which instantiates that
+sub-class.  If the method returns @code{True}, the inferior will be
+stopped at the location of the breakpoint, otherwise the inferior will
+continue.
 
 If there are multiple breakpoints at the same location with a
 @code{stop} method, each one will be called regardless of the
@@ -23563,6 +23573,144 @@ class MyBreakpoint (gdb.Breakpoint):
         return False
 @end smallexample
 @end defun
+
+@defop Operation {gdb.Breakpoint} print_mention (self)
+
+The @code{print_mention} method may be implemented as part of a
+@code{gdb.Breakpoint}.  This method will be called when a breakpoint is
+created which instantiates that sub-class.  This method allows
+customization of the message that @value{GDBN} prints when a
+breakpoint is created.  This method must return a string.
+
+Example @code{print_mention} implementation:
+
+@smallexample
+class MyBreakpoint (gdb.Breakpoint):
+
+   def print_mention (self):
+     return "Our Breakpoint " + str(self.number) + " at " + str(self.location)
+@end smallexample
+
+When a user creates a breakpoint using this class, @value{GDBN} will
+print:
+
+@smallexample
+Our Breakpoint 2 at somewhere/some-file.c:10
+@end smallexample
+@end defop
+
+@defop Operation {gdb.Breakpoint} print_stop_action (self)
+
+The @code{print_stop_action} method may be implemented as part of a
+@code{gdb.Breakpoint}.  This method will be called when the inferior
+stops at a breakpoint that is instantiated by that sub-class.  This
+method allows customization of the message that @value{GDBN} prints
+when the inferior stops at that breakpoint.  This method must return a
+Python @code{Tuple}.  The first element of the tuple should be a
+string that defines the breakpoint prelude.  The prelude is printed
+before the breakpoint location information is printed.  If a prelude
+is not needed, Python @code{None} can be returned instead.  The second
+element should be one of the following constants defined in the
+@code{gdb} module:
+
+@table @code
+@findex PRINT_SRC_AND_LOC
+@findex gdb.PRINT_SRC_AND_LOC
+@item PRINT_SRC_AND_LOC
+Print the source line number and location information associated with
+this breakpoint.
+@findex PRINT_SRC_ONLY
+@findex gdb.PRINT_SRC_ONLY
+@item PRINT_SRC_ONLY
+Print the source line number information only.
+@findex PRINT_NOTHING
+@findex gdb.PRINT_NOTHING
+@item PRINT_NOTHING
+Do not print any breakpoint information.
+@end table
+
+Example @code{print_stop_action} implementation:
+
+@smallexample
+class MyBreakpoint (gdb.Breakpoint):
+
+    def print_stop_action (self):
+        return ("Our Breakpoint, ", gdb.PRINT_SRC_AND_LOC)
+@end smallexample
+
+When @value{GDBN} stops the inferior at a breakpoint defined by
+this class, @value{GDBN} will print:
+
+@smallexample
+Our Breakpoint, foofunc (argc=1, argv=0xff) somewhere/some-file.c:10
+@end smallexample
+@end defop
+
+@defop Operation {gdb.Breakpoint} print_one (self, address)
+@anchor{print_one}
+
+The @code{print_one} method may be implemented as part of a
+@code{gdb.Breakpoint}.  This method will be called when information is
+requested on a breakpoint (such as the @value {GDBN} command,
+@samp{info breakpoints}).  This method allows customization of the
+information that @value{GDBN} prints.  The @code{address} parameter
+contains the address where @value{GDBN} stopped the inferior.  This
+method must return a Python @code{Tuple}.  The first element of the
+tuple should be a Python @code{Long} that contains the address that is
+to be printed in the informational output, or @code{None}.  If
+@code{None} is returned, address information will not be printed.  The
+second element should be a Python string giving a very brief
+description of the breakpoint, or Python @code{None} if you do not
+want to print anything for that field.
+
+Example @code{print_one} implementation:
+
+@smallexample
+class MyBreakpoint (gdb.Breakpoint):
+
+      def print_one (self, address):
+        return (address,"Our Breakpoint")
+@end smallexample
+
+The output from @samp{info breakpoints} from the above example:
+
+@smallexample
+Num     Type           Disp Enb Address            What
+1       breakpoint     keep y   0x0000000000400532 Our Breakpoint
+@end smallexample
+@end defop
+
+@defop Operation {gdb.Breakpoint} print_one (self, address)
+
+The @code{print_one_detail} method may be implemented as part of a
+@code{gdb.Breakpoint}.  This method is a companion method to
+@samp{print_one} (@pxref{print_one}).  This method will be called when
+information is requested on a breakpoint (such as the @value {GDBN}
+command, @samp{info breakpoints}), and allows extra details to be
+printed about that breakpoint.  This method must return a Python
+string containing brief supplemental information on that breakpoint.
+
+Example @code{print_one_detail} implementation:
+
+@smallexample
+class MyBreakpoint (gdb.Breakpoint):
+
+      def print_one (self, address):
+        return (address,"Our Breakpoint")
+
+      def print_one_detail (self):
+        return "Our Breakpoint at " + str (self.location) + "\n"
+
+@end smallexample
+
+The output from @samp{info breakpoints} from the above example:
+
+@smallexample
+Num     Type           Disp Enb Address            What
+1       breakpoint     keep y   0x0000000000400532 Our Breakpoint
+Our Breakpoint at  somwhere/somefile.c:10
+@end smallexample
+@end defop
 
 The available watchpoint types represented by constants are defined in the
 @code{gdb} module:

@@ -30,6 +30,9 @@
 #include "ada-lang.h"
 #include "arch-utils.h"
 #include "language.h"
+#include "valprint.h"
+#include "annotate.h"
+#include "mi/mi-common.h"
 
 static PyTypeObject breakpoint_object_type;
 
@@ -42,18 +45,6 @@ static breakpoint_object *bppy_pending_object;
 
 /* Function that is called when a Python condition is evaluated.  */
 static char * const stop_func = "stop";
-
-struct breakpoint_object
-{
-  PyObject_HEAD
-
-  /* The breakpoint number according to gdb.  */
-  int number;
-
-  /* The gdb breakpoint object, or NULL if the breakpoint has been
-     deleted.  */
-  struct breakpoint *bp;
-};
 
 /* Require that BREAKPOINT be a valid breakpoint ID; throw a Python
    exception if it is invalid.  */
@@ -104,6 +95,16 @@ static struct pybp_code pybp_watch_types[] =
   { "WP_READ", hw_read},
   { "WP_WRITE", hw_write},
   { "WP_ACCESS", hw_access},
+  {NULL} /* Sentinel.  */
+};
+
+/* Entries related to the type of print action when a breakpoint is
+   hit.  */
+static struct pybp_code pybp_print_stop_actions[] =
+{
+  {"PRINT_SRC_AND_LOC", PRINT_SRC_AND_LOC},
+  {"PRINT_SRC_ONLY", PRINT_SRC_ONLY},
+  {"PRINT_NOTHING", PRINT_NOTHING},
   {NULL} /* Sentinel.  */
 };
 
@@ -594,6 +595,357 @@ bppy_get_ignore_count (PyObject *self, void *closure)
   return PyInt_FromLong (self_bp->bp->ignore_count);
 }
 
+/* Convenience function that given a breakpoint B, return (and cast
+   to PyObject) the corresponding Python object.  This function should
+   never be called on an breakpoint that you do not expect to have a
+   Python object.  */
+static PyObject *
+find_python_obj (const struct breakpoint *b)
+{
+  if (! b->py_bp_object)
+    internal_error (__FILE__, __LINE__,
+		    _("Cannot reference Python object in breakpoint."));
+
+  return (PyObject *) b->py_bp_object;
+}
+
+/* Implement the breakpoint_ops "print_one" function.  This function
+   calls the corresponding Python function and expects a Tuple in
+   return.  This Tuple must have two elements: a Long or None
+   representing the breakpoint address, and a String representing the
+   data printed in the "What" field of the breakpoint information
+   output.  */
+static void pybp_print_one (struct breakpoint *b,
+			    struct bp_location **bp_loc)
+{
+  PyObject *self;
+  PyObject *result = NULL;
+  PyObject *address;
+  PyObject *method = PyString_FromString ("print_one");
+  struct cleanup *cleanup;
+  struct gdbarch *garch = b->gdbarch ? b->gdbarch : get_current_arch ();
+  struct value_print_options opts;
+  PyObject *what_obj;
+  CORE_ADDR bp_addr;
+
+  self = find_python_obj (b);
+  cleanup = ensure_python_env (garch, current_language);
+  make_cleanup_py_decref (method);
+
+  /* Sometimes the bp_location is NULL.  Similar to
+     print_one_breakpoint_location if we cannot find a location here,
+     we access it from the breakpoint.  */
+  if (*bp_loc != NULL)
+    bp_addr = (*bp_loc)->address;
+  else
+    bp_addr = b->loc->address;
+
+  address = PyLong_FromUnsignedLong (bp_addr);
+
+  if (! address)
+    goto python_error;
+
+  result = PyObject_CallMethodObjArgs (self, method, address, NULL);
+  if (result)
+    {
+      if (! PyTuple_Check (result) || PyTuple_Size (result) != 2)
+	goto type_error;
+    }
+  else
+    goto python_error;
+
+  get_user_print_options (&opts);
+
+  /* Field 4, the address. */
+  if (opts.addressprint)
+    {
+      PyObject *addr_field =  PyTuple_GetItem (result, 0);
+
+      if (! addr_field)
+	goto python_error;
+
+      if (addr_field == Py_None)
+	ui_out_field_skip (current_uiout, "addr");
+      else
+	{
+	  CORE_ADDR addr_value;
+
+	  if (! PyLong_Check (addr_field))
+	    goto type_error;
+
+	  addr_value = PyLong_AsUnsignedLong (addr_field);
+	  
+	  /* Check for overflows.  */
+	  if (PyErr_Occurred ())
+	    goto python_error;
+
+	  annotate_field (4);
+	  ui_out_field_core_addr (current_uiout, "addr",
+				  garch, addr_value);
+	}
+    }
+
+  /* Field 5, 'What' output.  */
+  what_obj =  PyTuple_GetItem (result, 1);
+  if (! what_obj)
+    goto python_error;
+
+  if (what_obj == Py_None)
+      ui_out_field_skip (current_uiout, "what");
+  else
+    {
+      char *what_string = NULL;
+
+      if (! gdbpy_is_string (what_obj))
+	goto type_error;
+
+      what_string = gdbpy_obj_to_string (what_obj);
+      if (! what_string)
+	goto python_error;
+
+      annotate_field (5);
+      ui_out_field_string (current_uiout, "what", what_string);
+      xfree (what_string);
+    }
+  
+  Py_XDECREF (result);
+  do_cleanups (cleanup);
+  return;
+
+ type_error:
+  PyErr_SetString (PyExc_RuntimeError,
+		   _("Invalid information returned from Python " \
+		     "'print_one' function"));
+  gdbpy_print_stack ();
+  Py_XDECREF (result);
+  do_cleanups (cleanup);
+  return;
+
+ python_error:
+  gdbpy_print_stack ();
+  Py_XDECREF (result);
+  do_cleanups (cleanup);
+  return;
+}
+
+/* Implement the breakpoint_ops "print_one_detail" function.  This
+   function calls the corresponding Python function and expects a
+   String in return.  The returned string will be printed when
+   information on this breakpoint is requested, and the requesting
+   function prints the extra detail line (see info breakpoints).  */
+static void
+pybp_print_one_detail (const struct breakpoint *b,
+		       struct ui_out *uiout)
+{
+  PyObject *self;
+  PyObject *result = NULL;
+  struct cleanup *cleanup;
+  struct gdbarch *garch = b->gdbarch ? b->gdbarch : get_current_arch ();
+  char *detail_str = NULL;
+
+  self = find_python_obj (b);
+  cleanup = ensure_python_env (garch, current_language);
+  result = PyObject_CallMethod (self, "print_one_detail", NULL);
+
+  if (! result)
+    goto python_error;
+
+  if (! gdbpy_is_string (result))
+    goto type_error;
+
+  detail_str = gdbpy_obj_to_string (result);
+  if (! detail_str)
+    goto python_error;
+
+  ui_out_text (uiout, detail_str);
+  xfree (detail_str);
+  Py_XDECREF (result);
+  do_cleanups (cleanup);
+  return;
+
+ type_error:
+  PyErr_SetString (PyExc_RuntimeError,
+		   _("The Python function 'print_one_detail' must return " \
+		     "a string."));
+  gdbpy_print_stack ();
+  Py_XDECREF (result);
+  do_cleanups (cleanup);
+  return;
+
+ python_error:
+  gdbpy_print_stack ();
+  Py_XDECREF (result);
+  do_cleanups (cleanup);
+  return;
+}
+
+/* Implement the breakpoint_ops "print_mention" function.  This function
+   calls the corresponding Python function and expects a String in
+   return.  The returned string will be printed when the breakpoint is
+   created.  */
+static void
+pybp_print_mention (struct breakpoint *b)
+{
+  PyObject *self;
+  PyObject *result = NULL;
+  struct cleanup *cleanup;
+  struct gdbarch *garch = b->gdbarch ? b->gdbarch : get_current_arch ();
+  char *mention_str = NULL;
+
+  self = find_python_obj (b);
+  cleanup = ensure_python_env (garch, current_language);
+  result = PyObject_CallMethod (self, "print_mention", NULL);
+
+  if (! result)
+    goto python_error;
+
+  if (! gdbpy_is_string (result))
+    goto type_error;
+
+  mention_str = gdbpy_obj_to_string (result);
+  if (! mention_str)
+    goto python_error;
+
+  ui_out_text (current_uiout, mention_str);
+  xfree (mention_str);
+  Py_XDECREF (result);
+  do_cleanups (cleanup);
+  return;
+
+ type_error:
+  PyErr_SetString (PyExc_RuntimeError,
+		   _("The Python function 'print_mention' must return " \
+		     "a string."));
+  gdbpy_print_stack ();
+  Py_XDECREF (result);
+  do_cleanups (cleanup);
+  return;
+
+ python_error:
+  gdbpy_print_stack ();
+  Py_XDECREF (result);
+  do_cleanups (cleanup);
+  return;
+}
+
+/* Implement the breakpoint_ops "print_it" function.  This function
+   calls the corresponding Python function and expects a Tuple in
+   return.  This Tuple must have two elements: a String or None
+   representing the breakpoint prelude, and an enum from
+   pybp_print_stop_actions representing the print action of the
+   breakpoint.  */
+static enum print_stop_action
+pybp_print_it (bpstat bs)
+{
+  PyObject *self;
+  PyObject *result = NULL;
+  PyObject *py_str = NULL;
+  PyObject *code;
+  struct cleanup *cleanup;
+  struct breakpoint *b = bs->breakpoint_at;
+  struct gdbarch *garch = b->gdbarch ? b->gdbarch : get_current_arch ();
+  long action_code = 0;
+  char *desc = NULL;
+  int print_prelude = 1;
+  
+  self = find_python_obj (b);
+  cleanup = ensure_python_env (garch, current_language);
+  result = PyObject_CallMethod (self, "print_stop_action", NULL);
+
+  if (result)
+    {
+      make_cleanup_py_decref (result);
+      if (! PyTuple_Check (result) || PyTuple_Size (result) != 2)
+	goto type_error;
+    }
+  else
+    goto python_error;
+
+  py_str =  PyTuple_GetItem (result, 0);
+
+  if (! py_str)
+    goto python_error;
+
+  if (py_str == Py_None)
+    print_prelude = 0;
+  else
+    {
+      if (gdbpy_is_string (py_str))
+	{
+	  desc = gdbpy_obj_to_string (py_str);
+	  if (! desc)
+	    goto python_error;
+	  make_cleanup (xfree, desc);
+	}
+      else
+	goto type_error;
+    }
+
+  code =  PyTuple_GetItem (result, 1);
+  if (! code)
+    goto python_error;
+
+  if (! PyInt_Check (code))
+    goto type_error;
+
+  action_code = PyInt_AsLong (code);
+
+  /* The action_code might just be -1 'as normal' without a
+     Python error, so we have to check both.  */
+  if ((action_code == -1) && (PyErr_Occurred ()))
+    goto python_error;
+
+  if ((action_code != PRINT_SRC_AND_LOC)
+      && (action_code !=  PRINT_SRC_ONLY)
+      && (action_code !=  PRINT_NOTHING))
+    goto type_error;
+
+  if (print_prelude)
+    ui_out_text (current_uiout, desc);
+
+  if (ui_out_is_mi_like_p (current_uiout))
+    {
+      ui_out_field_string (current_uiout, "reason",
+			   async_reason_lookup (EXEC_ASYNC_BREAKPOINT_HIT));
+      ui_out_field_string (current_uiout, "disp", 
+			   bpdisp_text (b->disposition));
+
+    }
+
+  do_cleanups (cleanup);
+
+  return action_code;
+
+ type_error:
+  PyErr_SetString (PyExc_RuntimeError,
+		   _("Function print_stop_action has to return "	\
+		     "a tuple with two elements."));
+  gdbpy_print_stack ();
+  do_cleanups (cleanup);
+  return PRINT_UNKNOWN;
+
+ python_error:
+  gdbpy_print_stack ();
+  do_cleanups (cleanup);
+  return PRINT_UNKNOWN;
+}
+
+/* Build the breakpoint_ops structure.  Examine the contents of the
+   Python object and only add the specific functions that have been
+   implemented.  */
+static void
+bppy_build_ops (PyObject *self, struct breakpoint_ops *ops)
+{  
+  if (PyObject_HasAttrString (self, "print_stop_action"))
+    ops->print_it = pybp_print_it;
+  if (PyObject_HasAttrString (self, "print_mention"))
+    ops->print_mention = pybp_print_mention;
+  if (PyObject_HasAttrString (self, "print_one"))
+    ops->print_one = pybp_print_one;
+  if (PyObject_HasAttrString (self, "print_one_detail"))
+    ops->print_one_detail = pybp_print_one_detail;
+}
+
 /* Python function to create a new breakpoint.  */
 static int
 bppy_init (PyObject *self, PyObject *args, PyObject *kwargs)
@@ -601,6 +953,7 @@ bppy_init (PyObject *self, PyObject *args, PyObject *kwargs)
   static char *keywords[] = { "spec", "type", "wp_class", "internal", NULL };
   const char *spec;
   int type = bp_breakpoint;
+  struct breakpoint_ops *ops;
   int access_type = hw_write;
   PyObject *internal = NULL;
   int internal_bp = 0;
@@ -609,7 +962,9 @@ bppy_init (PyObject *self, PyObject *args, PyObject *kwargs)
   if (! PyArg_ParseTupleAndKeywords (args, kwargs, "s|iiO", keywords,
 				     &spec, &type, &access_type, &internal))
     return -1;
-
+  
+  ops = alloc_pybp_ops();
+  bppy_build_ops (self, ops);
   if (internal)
     {
       internal_bp = PyObject_IsTrue (internal);
@@ -636,18 +991,22 @@ bppy_init (PyObject *self, PyObject *args, PyObject *kwargs)
 			       0, bp_breakpoint,
 			       0,
 			       AUTO_BOOLEAN_TRUE,
-			       &bkpt_breakpoint_ops,
-			       0, 1, internal_bp);
+			       ops,
+			       0, 1, internal_bp,
+			       bppy_pending_object);
 	    break;
 	  }
         case bp_watchpoint:
 	  {
 	    if (access_type == hw_write)
-	      watch_command_wrapper (copy, 0, internal_bp);
+	      watch_command_wrapper (copy, 0, internal_bp,
+				     bppy_pending_object);
 	    else if (access_type == hw_access)
-	      awatch_command_wrapper (copy, 0, internal_bp);
+	      awatch_command_wrapper (copy, 0, internal_bp,
+				      bppy_pending_object);
 	    else if (access_type == hw_read)
-	      rwatch_command_wrapper (copy, 0, internal_bp);
+      	      rwatch_command_wrapper (copy, 0, internal_bp,
+				      bppy_pending_object);
 	    else
 	      error(_("Cannot understand watchpoint access type."));
 	    break;
@@ -766,7 +1125,7 @@ gdbpy_should_stop (struct breakpoint_object *bp_obj)
 int
 gdbpy_breakpoint_has_py_cond (struct breakpoint_object *bp_obj)
 {
-  int has_func = 0;
+ int has_func = 0;
   PyObject *py_bp = (PyObject *) bp_obj;
   struct gdbarch *garch = bp_obj->bp->gdbarch ? bp_obj->bp->gdbarch :
     get_current_arch ();
@@ -789,7 +1148,7 @@ gdbpy_breakpoint_has_py_cond (struct breakpoint_object *bp_obj)
 static void
 gdbpy_breakpoint_created (struct breakpoint *bp)
 {
-  breakpoint_object *newbp;
+  breakpoint_object *newbp = NULL;
   PyGILState_STATE state;
 
   if (bp->number < 0 && bppy_pending_object == NULL)
@@ -810,12 +1169,25 @@ gdbpy_breakpoint_created (struct breakpoint *bp)
       bppy_pending_object = NULL;
     }
   else
-    newbp = PyObject_New (breakpoint_object, &breakpoint_object_type);
+    {
+      /* This breakpoint was not created by a Python API so create a
+	 new object, and initialize the other storage elements.  */
+      newbp = PyObject_New (breakpoint_object,
+			    &breakpoint_object_type);
+      newbp->number = -1;
+      newbp->bp = NULL;
+    }
   if (newbp)
     {
       newbp->number = bp->number;
-      newbp->bp = bp;
-      newbp->bp->py_bp_object = newbp;
+
+      /* Sometimes the bindings between breakpoint, and breakpoint
+	 object are created early in create_breakpoint.  If this is
+	 the case do not overwrite.  */
+      if (! newbp->bp)
+	newbp->bp = bp;
+      if (! newbp->bp->py_bp_object)
+	newbp->bp->py_bp_object = newbp;
       Py_INCREF (newbp);
       ++bppy_live;
     }
@@ -893,6 +1265,15 @@ gdbpy_initialize_breakpoints (void)
 	return;
     }
 
+  /* Add print stop types constants.  */
+  for (i = 0; pybp_print_stop_actions[i].name; ++i)
+    {
+      if (PyModule_AddIntConstant (gdb_module,
+				   /* Cast needed for Python 2.4.  */
+				   (char *) pybp_print_stop_actions[i].name,
+				   pybp_print_stop_actions[i].code) < 0)
+	return;
+    }
 }
 
 

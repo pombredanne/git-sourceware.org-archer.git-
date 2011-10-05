@@ -254,6 +254,9 @@ static struct breakpoint_ops internal_breakpoint_ops;
 /* Momentary breakpoints class type.  */
 static struct breakpoint_ops momentary_breakpoint_ops;
 
+/* Python user breakpoints class type.  */
+struct breakpoint_ops pyobj_breakpoint_ops;
+
 /* The breakpoint_ops structure to be used in regular user created
    breakpoints.  */
 struct breakpoint_ops bkpt_breakpoint_ops;
@@ -6712,6 +6715,10 @@ install_breakpoint (int internal, struct breakpoint *b)
 {
   add_to_breakpoint_chain (b);
   set_breakpoint_number (internal, b);
+  /* Now that the breakpoint is created, bind the breakpoint with
+     the Python breakpoint object.  */
+  gdbpy_bind_breakpoint (b->py_bp_object, b);
+
   if (!internal)
     mention (b);
   observer_notify_breakpoint_created (b);
@@ -7188,7 +7195,8 @@ bp_loc_is_permanent (struct bp_location *loc)
 
 /* Create a breakpoint with SAL as location.  Use ADDR_STRING
    as textual description of the location, and COND_STRING
-   as condition expression.  */
+   as condition expression.  PY_OBJ is the Python object previously
+   created to be attached to the breakpoint; this can be NULL. */
 
 static void
 init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
@@ -7197,7 +7205,8 @@ init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
 		     enum bptype type, enum bpdisp disposition,
 		     int thread, int task, int ignore_count,
 		     const struct breakpoint_ops *ops, int from_tty,
-		     int enabled, int internal, int display_canonical)
+		     int enabled, int internal, int display_canonical,
+		     struct breakpoint_object *py_obj)
 {
   int i;
 
@@ -7304,6 +7313,9 @@ init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
               error (_("Garbage %s follows condition"), arg);
 	}
     }   
+  
+  /* Set Python object in breakpoint.  */
+  b->py_bp_object = py_obj;
 
   b->display_canonical = display_canonical;
   if (addr_string)
@@ -7322,7 +7334,8 @@ create_breakpoint_sal (struct gdbarch *gdbarch,
 		       enum bptype type, enum bpdisp disposition,
 		       int thread, int task, int ignore_count,
 		       const struct breakpoint_ops *ops, int from_tty,
-		       int enabled, int internal, int display_canonical)
+		       int enabled, int internal, int display_canonical,
+		       struct breakpoint_object *py_obj)
 {
   struct breakpoint *b;
   struct cleanup *old_chain;
@@ -7345,7 +7358,7 @@ create_breakpoint_sal (struct gdbarch *gdbarch,
 		       type, disposition,
 		       thread, task, ignore_count,
 		       ops, from_tty,
-		       enabled, internal, display_canonical);
+		       enabled, internal, display_canonical, py_obj);
   discard_cleanups (old_chain);
 
   install_breakpoint (internal, b);
@@ -7490,7 +7503,9 @@ expand_line_sal_maybe (struct symtab_and_line sal)
    SALS.nelts is not 1 is when we set a breakpoint on an overloaded
    function.  In that case, it's still not possible to specify
    separate conditions for different overloaded functions, so
-   we take just a single condition string.
+   we take just a single condition string.  PY_OBJ is the Python object
+   previously created to be attached to the breakpoint; this can be
+   NULL.
    
    NOTE: If the function succeeds, the caller is expected to cleanup
    the arrays ADDR_STRING, COND_STRING, and SALS (but not the
@@ -7506,7 +7521,8 @@ create_breakpoints_sal (struct gdbarch *gdbarch,
 			enum bptype type, enum bpdisp disposition,
 			int thread, int task, int ignore_count,
 			const struct breakpoint_ops *ops, int from_tty,
-			int enabled, int internal)
+			int enabled, int internal, 
+			struct breakpoint_object *py_obj)
 {
   int i;
 
@@ -7519,7 +7535,7 @@ create_breakpoints_sal (struct gdbarch *gdbarch,
 			     cond_string, type, disposition,
 			     thread, task, ignore_count, ops,
 			     from_tty, enabled, internal,
-			     canonical->special_display);
+			     canonical->special_display, py_obj);
     }
 }
 
@@ -7775,8 +7791,9 @@ decode_static_tracepoint_spec (char **arg_p)
    the location of breakpoint, with condition and thread specified by
    the COND_STRING and THREAD parameters.  If INTERNAL is non-zero,
    the breakpoint number will be allocated from the internal
-   breakpoint count.  Returns true if any breakpoint was created;
-   false otherwise.  */
+   breakpoint count.  PY_OBJ is the Python object previously created
+   to be attached to the breakpoint; this can be NULL.  Returns true
+   if any breakpoint was created; false otherwise.  */
 
 int
 create_breakpoint (struct gdbarch *gdbarch,
@@ -7786,7 +7803,8 @@ create_breakpoint (struct gdbarch *gdbarch,
 		   int ignore_count,
 		   enum auto_boolean pending_break_support,
 		   const struct breakpoint_ops *ops,
-		   int from_tty, int enabled, int internal)
+		   int from_tty, int enabled, int internal,
+		   struct breakpoint_object *py_obj)
 {
   volatile struct gdb_exception e;
   struct symtabs_and_lines sals;
@@ -7964,7 +7982,7 @@ create_breakpoint (struct gdbarch *gdbarch,
 				   tempflag ? disp_del : disp_donttouch,
 				   thread, task, ignore_count, ops,
 				   from_tty, enabled, internal,
-				   canonical.special_display);
+				   canonical.special_display, py_obj);
 	      /* Given that its possible to have multiple markers with
 		 the same string id, if the user is creating a static
 		 tracepoint by marker id ("strace -m MARKER_ID"), then
@@ -7983,7 +8001,7 @@ create_breakpoint (struct gdbarch *gdbarch,
 				type_wanted,
 				tempflag ? disp_del : disp_donttouch,
 				thread, task, ignore_count, ops, from_tty,
-				enabled, internal);
+				enabled, internal, py_obj);
     }
   else
     {
@@ -8001,12 +8019,19 @@ create_breakpoint (struct gdbarch *gdbarch,
       b->condition_not_parsed = 1;
       b->enable_state = enabled ? bp_enabled : bp_disabled;
       b->pspace = current_program_space;
-      b->py_bp_object = NULL;
+      
+      /* Now that the breakpoint is created, bind the breakpoint with
+	 the Python breakpoint object.  */
+      gdbpy_bind_breakpoint (py_obj, b);
 
       if (enabled && b->pspace->executing_startup
 	  && (b->type == bp_breakpoint
 	      || b->type == bp_hardware_breakpoint))
 	b->enable_state = bp_startup_disabled;
+
+      /* Now that the breakpoint is created, bind the breakpoint with the
+	 Python breakpoint object.  */
+      gdbpy_bind_breakpoint (py_obj, b);
 
       if (!internal)
         /* Do not mention breakpoints with a negative number, 
@@ -8058,7 +8083,8 @@ break_command_1 (char *arg, int flag, int from_tty)
 		     &bkpt_breakpoint_ops,
 		     from_tty,
 		     1 /* enabled */,
-		     0 /* internal */);
+		     0 /* internal */,
+		     NULL /* Python breakpoint object */);
 }
 
 /* Helper function for break_command_1 and disassemble_command.  */
@@ -9105,7 +9131,8 @@ is_masked_watchpoint (const struct breakpoint *b)
 		hw_access: watch access (read or write) */
 static void
 watch_command_1 (char *arg, int accessflag, int from_tty,
-		 int just_location, int internal)
+		 int just_location, int internal,
+		 struct breakpoint_object *py_obj)
 {
   volatile struct gdb_exception e;
   struct breakpoint *b, *scope_breakpoint = NULL;
@@ -9338,6 +9365,11 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   w->exp = exp;
   w->exp_valid_block = exp_valid_block;
   w->cond_exp_valid_block = cond_exp_valid_block;
+
+  /* Now that the breakpoint is created, bind the breakpoint with the
+     Python breakpoint object.  */
+  gdbpy_bind_breakpoint (py_obj, b);
+  
   if (just_location)
     {
       struct type *t = value_type (val);
@@ -9497,9 +9529,10 @@ can_use_hardware_watchpoint (struct value *v)
 }
 
 void
-watch_command_wrapper (char *arg, int from_tty, int internal)
+watch_command_wrapper (char *arg, int from_tty, int internal,
+		       struct breakpoint_object *py_obj)
 {
-  watch_command_1 (arg, hw_write, from_tty, 0, internal);
+  watch_command_1 (arg, hw_write, from_tty, 0, internal, py_obj);
 }
 
 /* A helper function that looks for an argument at the start of a
@@ -9535,7 +9568,7 @@ watch_maybe_just_location (char *arg, int accessflag, int from_tty)
       just_location = 1;
     }
 
-  watch_command_1 (arg, accessflag, from_tty, just_location, 0);
+  watch_command_1 (arg, accessflag, from_tty, just_location, 0, NULL);
 }
 
 static void
@@ -9545,9 +9578,10 @@ watch_command (char *arg, int from_tty)
 }
 
 void
-rwatch_command_wrapper (char *arg, int from_tty, int internal)
+rwatch_command_wrapper (char *arg, int from_tty, int internal,
+			struct breakpoint_object *py_obj)
 {
-  watch_command_1 (arg, hw_read, from_tty, 0, internal);
+  watch_command_1 (arg, hw_read, from_tty, 0, internal, py_obj);
 }
 
 static void
@@ -9557,9 +9591,10 @@ rwatch_command (char *arg, int from_tty)
 }
 
 void
-awatch_command_wrapper (char *arg, int from_tty, int internal)
+awatch_command_wrapper (char *arg, int from_tty, int internal,
+			struct breakpoint_object *py_obj)
 {
-  watch_command_1 (arg, hw_access, from_tty, 0, internal);
+  watch_command_1 (arg, hw_access, from_tty, 0, internal, py_obj);
 }
 
 static void
@@ -9921,7 +9956,8 @@ handle_gnu_v3_exceptions (int tempflag, char *cond_string,
 		     AUTO_BOOLEAN_TRUE /* pending */,
 		     &gnu_v3_exception_catchpoint_ops, from_tty,
 		     1 /* enabled */,
-		     0 /* internal */);
+		     0 /* internal */,
+		     NULL /* Python breakpoint object */);
 
   return 1;
 }
@@ -12710,7 +12746,8 @@ trace_command (char *arg, int from_tty)
 			 &tracepoint_breakpoint_ops,
 			 from_tty,
 			 1 /* enabled */,
-			 0 /* internal */))
+			 0 /* internal */,
+			 NULL /* Python breakpoint object */))
     set_tracepoint_count (breakpoint_count);
 }
 
@@ -12727,7 +12764,8 @@ ftrace_command (char *arg, int from_tty)
 			 &tracepoint_breakpoint_ops,
 			 from_tty,
 			 1 /* enabled */,
-			 0 /* internal */))
+			 0 /* internal */,
+			 NULL /* Python breakpoint object */))
     set_tracepoint_count (breakpoint_count);
 }
 
@@ -12746,7 +12784,8 @@ strace_command (char *arg, int from_tty)
 			 &tracepoint_breakpoint_ops,
 			 from_tty,
 			 1 /* enabled */,
-			 0 /* internal */))
+			 0 /* internal */,
+			 NULL /* Python breakpoint object */))
     set_tracepoint_count (breakpoint_count);
 }
 
@@ -12811,7 +12850,8 @@ create_tracepoint_from_upload (struct uploaded_tp *utp)
 			  &tracepoint_breakpoint_ops,
 			  0 /* from_tty */,
 			  utp->enabled /* enabled */,
-			  0 /* internal */))
+			  0 /* internal */,
+			  NULL /* Python breakpoint object */))
     return NULL;
 
   set_tracepoint_count (breakpoint_count);
@@ -13471,6 +13511,32 @@ initialize_breakpoint_ops (void)
   ops->print_one = print_one_catch_syscall;
   ops->print_mention = print_mention_catch_syscall;
   ops->print_recreate = print_recreate_catch_syscall;
+  
+  /* Python user breakpoint.  */
+  ops = &pyobj_breakpoint_ops;
+  *ops = bkpt_base_breakpoint_ops;
+  ops->re_set = bkpt_re_set;
+  ops->resources_needed = bkpt_resources_needed;
+  ops->print_it = bkpt_print_it;
+  ops->print_mention = bkpt_print_mention;
+  ops->print_recreate = bkpt_print_recreate;
+  
+}
+
+struct breakpoint_ops *
+alloc_pybp_ops (void)
+{
+  struct breakpoint_ops *ops
+    = xmalloc (sizeof (struct breakpoint_ops));
+
+  *ops = bkpt_base_breakpoint_ops;
+  ops->re_set = bkpt_re_set;
+  ops->resources_needed = bkpt_resources_needed;
+  ops->print_it = bkpt_print_it;
+  ops->print_mention = bkpt_print_mention;
+  ops->print_recreate = bkpt_print_recreate;
+  
+  return ops;
 }
 
 void

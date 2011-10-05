@@ -135,6 +135,18 @@ typedef struct
   PyObject *inf_obj;
 } thread_object;
 
+struct breakpoint_object
+{
+  PyObject_HEAD
+
+  /* The breakpoint number according to gdb.  */
+  int number;
+
+  /* The gdb breakpoint object, or NULL if the breakpoint has been
+     deleted.  */
+  struct breakpoint *bp;
+};
+
 extern struct cmd_list_element *set_python_list;
 extern struct cmd_list_element *show_python_list;
 

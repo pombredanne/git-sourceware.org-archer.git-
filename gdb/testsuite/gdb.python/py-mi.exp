@@ -17,6 +17,8 @@
 # pretty-printing for MI.
 
 load_lib mi-support.exp
+load_lib gdb-python.exp
+
 set MIFLAGS "-i=mi2"
 
 gdb_exit
@@ -28,6 +30,8 @@ set testfile "py-mi"
 set srcfile py-prettyprint.c
 set binfile ${objdir}/${subdir}/${testfile}
 set pyfile py-prettyprint.py
+set py_bpfile py-mi-bp.py
+
 if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug additional_flags=-DMI}] != "" } {
     untested ${testfile}.exp
     return -1
@@ -290,6 +294,32 @@ mi_create_varobj me me \
 mi_gdb_test "-var-evaluate-expression me" \
 	"\\^done,value=\"<error reading variable: Cannot access memory.>.*\"" \
 	"evaluate me varobj"
+
+# Test breakpoint ops
+gdb_exit
+if [mi_gdb_start] {
+    continue
+}
+
+mi_delete_breakpoints
+mi_gdb_reinitialize_dir $srcdir/$subdir
+mi_gdb_load ${binfile}
+mi_runto main
+set bp_location [gdb_get_line_number {MI breakpoint here} ${srcfile}]
+set remote_python_bp_file [remote_download host ${srcdir}/${subdir}/${py_bpfile}]
+mi_gdb_test "python execfile ('${remote_python_bp_file}')" ""
+
+mi_gdb_test "python mi_bp_i = mi_bp(\"$bp_location\")" \
+    ".*\"MI Testcase Breakpoint.*=breakpoint-created,bkpt=\{number=\".*\",type=\"breakpoint\",disp=\"keep\",enabled=\"y\",addr=\".*\",what=\"MI Testcase Breakpoint\",times=\"0\",original-location=\".*\"\}.*" \
+    "Test breakpoint ops mention"
+
+mi_gdb_test "continue" \
+    ".*breakpoint-modified,bkpt={number=\".*\",type=\"breakpoint\",disp=\"keep\",enabled=\"y\",addr=\".*\",what=\"MI Testcase Breakpoint\",times=\"1\",original-location=\".*py-prettyprint.c.*\".*MI Testcase Breakpoint, main.*at.*py-prettyprint.c.*" \
+    "Test print_one"
+
+mi_gdb_test "-break-list" \
+    ".*BreakpointTable=\{nr_rows=\"1\",nr_cols=\"6\",hdr=\\\[\{width=\"7\",alignment=\"-1\",col_name=\"number\",colhdr=\"Num\"\},\{width=\"14\",alignment=\"-1\",col_name=\"type\",colhdr=\"Type\"\},\{width=\"4\",alignment=\"-1\",col_name=\"disp\",colhdr=\"Disp\"\},\{width=\"3\",alignment=\"-1\",col_name=\"enabled\",colhdr=\"Enb\"\},\{width=\"18\",alignment=\"-1\",col_name=\"addr\",colhdr=\"Address\"\},\{width=\"40\",alignment=\"2\",col_name=\"what\",colhdr=\"What\"\}\\\],body=\\\[bkpt=\{number=\"2\",type=\"breakpoint\",disp=\"keep\",enabled=\"y\",addr=\".*\",what=\"MI Testcase Breakpoint\",times=\"1\",original-location=\".*py-prettyprint.c.*\"\}\\\]\}" \
+    "list of breakpoints"
 
 # C++ MI tests
 gdb_exit

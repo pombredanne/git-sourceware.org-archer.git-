@@ -169,7 +169,7 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
 		     temp_p, type_wanted,
 		     ignore_count,
 		     pending ? AUTO_BOOLEAN_TRUE : AUTO_BOOLEAN_FALSE,
-		     &bkpt_breakpoint_ops, 0, enabled, 0);
+		     &bkpt_breakpoint_ops, 0, enabled, 0, NULL);
   do_cleanups (back_to);
 
 }
@@ -259,13 +259,13 @@ mi_cmd_break_watch (char *command, char **argv, int argc)
   switch (type)
     {
     case REG_WP:
-      watch_command_wrapper (expr, FROM_TTY, 0);
+      watch_command_wrapper (expr, FROM_TTY, 0, NULL);
       break;
     case READ_WP:
-      rwatch_command_wrapper (expr, FROM_TTY, 0);
+      rwatch_command_wrapper (expr, FROM_TTY, 0, NULL);
       break;
     case ACCESS_WP:
-      awatch_command_wrapper (expr, FROM_TTY, 0);
+      awatch_command_wrapper (expr, FROM_TTY, 0, NULL);
       break;
     default:
       error (_("-break-watch: Unknown watchpoint type."));
