@@ -431,6 +431,8 @@ extern int parse_pid_to_attach (char *args);
 
 extern struct cleanup *make_bpstat_clear_actions_cleanup (void);
 
+extern char *find_toplevel_char (const char *s, char c);
+
 /* From demangle.c */
 
 extern void set_demangling_style (char *);

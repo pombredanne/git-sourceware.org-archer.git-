@@ -50,7 +50,7 @@ set min_syms [list \
 		  "GDB<int>::operator==(GDB<int> const&)" \
 		  "GDB<char>::harder(char)" \
 		  "GDB<int>::harder(int)" \
-		  {"int GDB<char>::even_harder<int>(char)"} \
+		  "int GDB<char>::even_harder<int>(char)" \
 		  "GDB<int>::simple()"]
 
 foreach sym $min_syms {

@@ -147,12 +147,8 @@ foreach test $methods {
     set result [lindex $test 1]
 
     gdb_test "list $func" $result
-    gdb_test "list '$func'" $result
     if {[gdb_breakpoint $func]} {
       pass "break $func"
-    }
-    if {[gdb_breakpoint '$func']} {
-      pass "break '$func'"
     }
 }
 

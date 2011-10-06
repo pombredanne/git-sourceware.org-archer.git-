@@ -3694,6 +3694,42 @@ make_bpstat_clear_actions_cleanup (void)
 /* Provide a prototype to silence -Wmissing-prototypes.  */
 extern initialize_file_ftype _initialize_utils;
 
+/* Find an instance of the character C in the string S that is outside
+   of all parenthesis pairs, single-quoted strings, and double-quoted
+   strings.  Also, ignore the char within a template name, like a ','
+   within foo<int, int>.  */
+
+char *
+find_toplevel_char (const char *s, char c)
+{
+  int quoted = 0;		/* zero if we're not in quotes;
+				   '"' if we're in a double-quoted string;
+				   '\'' if we're in a single-quoted string.  */
+  int depth = 0;		/* Number of unclosed parens we've seen.  */
+  const char *scan;
+
+  for (scan = s; *scan; scan++)
+    {
+      if (quoted)
+	{
+	  if (*scan == quoted)
+	    quoted = 0;
+	  else if (*scan == '\\' && *(scan + 1))
+	    scan++;
+	}
+      else if (*scan == c && ! quoted && depth == 0)
+	return (char *) scan;
+      else if (*scan == '"' || *scan == '\'')
+	quoted = *scan;
+      else if (*scan == '(' || *scan == '<')
+	depth++;
+      else if ((*scan == ')' || *scan == '>') && depth > 0)
+	depth--;
+    }
+
+  return 0;
+}
+
 void
 _initialize_utils (void)
 {

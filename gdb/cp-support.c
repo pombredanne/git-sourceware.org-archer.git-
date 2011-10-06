@@ -1535,6 +1535,27 @@ cp_validate_operator (const char *input)
 	  SKIP_SPACE (p);
 	}
 
+      /* Special case: function pointer conversion operators.  */
+      if (*p == '(')
+	{
+	  const char *q = p + 1;
+
+	  SKIP_SPACE (q);
+	  if (*q == '*')
+	    {
+	      q = find_toplevel_char (q, ')');
+	      if (q != NULL && *(++q) == '(')
+		{
+		  q = find_toplevel_char (q + 1, ')');
+		  /* The parser isn't currently capable of dealing with
+		     function pointers, so simply return what has been
+		     found without verifying that it is valid.  */
+		  if (q != NULL)
+		    return q + 1 - input;
+		}
+	    }
+	}
+
       /* Check for valid type.  [Remember: input starts with 
 	 "operator".]  */
       copy = savestring (input + 8, p - input - 8);
