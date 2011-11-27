@@ -50,6 +50,7 @@
 #include "charset.h"
 #include "arch-utils.h"
 #include "cli/cli-utils.h"
+#include "dwarf2loc.h"
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_active et al.   */
@@ -1067,6 +1068,9 @@ output_command (char *exp, int from_tty)
   old_chain = make_cleanup (free_current_contents, &expr);
 
   val = evaluate_expression (expr);
+
+  if (VALUE_LVAL (val) == lval_memory)
+    object_address_set (value_raw_address (val));
 
   annotate_value_begin (value_type (val));
 

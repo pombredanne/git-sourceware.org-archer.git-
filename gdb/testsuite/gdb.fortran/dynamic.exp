@@ -65,6 +65,13 @@ gdb_test "p varx(6, 15, 28)" "\\$\[0-9\]* = 9"
 gdb_test "p varv" "\\$\[0-9\]* = (<(object|the array) is not associated>|.*(Cannot access it|Unable to access the object) because the object is not associated.)" "p varv unassociated"
 gdb_test "ptype varv" "type = (<(object|the array) is not associated>|.*(Cannot access it|Unable to access the object) because the object is not associated.)" "ptype varv unassociated"
 
+set test "output varx"
+gdb_test_multiple $test $test {
+    -re "^output varx\r\n\[() ,6789.\]*$gdb_prompt $" {
+	pass $test
+    }
+}
+
 gdb_breakpoint [gdb_get_line_number "varv-associated"]
 gdb_continue_to_breakpoint "varv-associated"
 gdb_test "p varx(3, 7, 19)" "\\$\[0-9\]* = 6" "p varx(3, 7, 19) with varv associated"
