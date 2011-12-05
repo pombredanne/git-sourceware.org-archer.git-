@@ -28,6 +28,7 @@
 #include "inferior.h"
 #include "regcache.h"
 #include "gdbthread.h"
+#include "gdb_bfd.h"
 
 #include "gdb_assert.h"
 
@@ -333,7 +334,7 @@ darwin_solib_get_all_image_info_addr_at_init (void)
     return;
 
   /* Create a bfd for the interpreter.  */
-  dyld_bfd = bfd_openr (interp_name, gnutarget);
+  dyld_bfd = gdb_bfd_ref (bfd_openr (interp_name, gnutarget));
   if (dyld_bfd)
     {
       bfd *sub;
@@ -344,7 +345,7 @@ darwin_solib_get_all_image_info_addr_at_init (void)
 	dyld_bfd = sub;
       else
 	{
-	  bfd_close (dyld_bfd);
+	  gdb_bfd_unref (dyld_bfd);
 	  dyld_bfd = NULL;
 	}
     }
@@ -361,7 +362,7 @@ darwin_solib_get_all_image_info_addr_at_init (void)
   dyld_all_image_addr =
     lookup_symbol_from_bfd (dyld_bfd, "_dyld_all_image_infos");
 
-  bfd_close (dyld_bfd);
+  gdb_bfd_unref (dyld_bfd);
 
   if (dyld_all_image_addr == 0)
     return;
@@ -471,7 +472,7 @@ darwin_bfd_open (char *pathname)
 				gdbarch_bfd_arch_info (target_gdbarch));
   if (!res)
     {
-      bfd_close (abfd);
+      gdb_bfd_unref (abfd);
       make_cleanup (xfree, found_pathname);
       error (_("`%s': not a shared-library: %s"),
 	     found_pathname, bfd_errmsg (bfd_get_error ()));
