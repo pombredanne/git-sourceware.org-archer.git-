@@ -48,7 +48,15 @@ struct gdb_bfd_data
 
   /* The mtime of the BFD at the point the cache entry was made.  */
   time_t mtime;
+
+  /* The registry.  */
+  REGISTRY_FIELDS;
 };
+
+#define GDB_BFD_DATA_ACCESSOR(ABFD) \
+  ((struct gdb_bfd_data *) bfd_usrdata (ABFD))
+
+DEFINE_REGISTRY (bfd, GDB_BFD_DATA_ACCESSOR)
 
 /* A hash table storing all the BFDs maintained in the cache.  */
 
@@ -187,6 +195,8 @@ gdb_bfd_ref (struct bfd *abfd)
   gdata->mtime = bfd_get_mtime (abfd);
   bfd_usrdata (abfd) = gdata;
 
+  bfd_alloc_data (abfd);
+
   return abfd;
 }
 
@@ -223,6 +233,7 @@ gdb_bfd_unref (struct bfd *abfd)
 	htab_clear_slot (gdb_bfd_cache, slot);
     }
 
+  bfd_free_data (abfd);
   bfd_usrdata (abfd) = NULL;  /* Paranoia.  */
 
   gdb_bfd_close_or_warn (abfd);
