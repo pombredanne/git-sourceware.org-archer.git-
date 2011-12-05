@@ -605,7 +605,8 @@ void
 gdbpy_initialize_auto_load (void)
 {
   auto_load_pspace_data
-    = register_program_space_data_with_cleanup (auto_load_pspace_data_cleanup);
+    = register_program_space_data_with_cleanup (NULL,
+						auto_load_pspace_data_cleanup);
 
   observer_attach_new_objfile (auto_load_new_objfile);
 
