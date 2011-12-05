@@ -126,6 +126,7 @@ m32r_load (char *filename, int from_tty)
   asection *s;
   unsigned int i, data_count = 0;
   struct timeval start_time, end_time;
+  struct cleanup *cleanup;
 
   if (filename == NULL || filename[0] == 0)
     filename = get_exec_file (1);
@@ -133,6 +134,7 @@ m32r_load (char *filename, int from_tty)
   abfd = gdb_bfd_ref (bfd_openr (filename, 0));
   if (!abfd)
     error (_("Unable to open file %s."), filename);
+  cleanup = make_cleanup_bfd_close (abfd);
   if (bfd_check_format (abfd, bfd_object) == 0)
     error (_("File is not an object file."));
   gettimeofday (&start_time, NULL);
@@ -190,6 +192,7 @@ m32r_load (char *filename, int from_tty)
      confused...  */
 
   clear_symtab_users (0);
+  do_cleanups (cleanup);
 }
 
 static void
@@ -432,6 +435,7 @@ m32r_upload_command (char *args, int from_tty)
   char buf[1024];
   struct hostent *hostent;
   struct in_addr inet_addr;
+  struct cleanup *cleanup;
 
   /* First check to see if there's an ethernet port!  */
   monitor_printf ("ust\r");
@@ -523,6 +527,7 @@ m32r_upload_command (char *args, int from_tty)
 
   gettimeofday (&end_time, NULL);
   abfd = gdb_bfd_ref (bfd_openr (args, 0));
+  cleanup = make_cleanup_bfd_close (abfd);
   if (abfd != NULL)
     {		/* Download is done -- print section statistics.  */
       if (bfd_check_format (abfd, bfd_object) == 0)
@@ -564,6 +569,7 @@ m32r_upload_command (char *args, int from_tty)
      confused...  */
 
   clear_symtab_users (0);
+  do_cleanups (cleanup);
 }
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */
