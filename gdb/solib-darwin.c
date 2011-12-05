@@ -334,7 +334,7 @@ darwin_solib_get_all_image_info_addr_at_init (void)
     return;
 
   /* Create a bfd for the interpreter.  */
-  dyld_bfd = gdb_bfd_ref (bfd_openr (interp_name, gnutarget));
+  dyld_bfd = gdb_bfd_open (interp_name, gnutarget, -1);
   if (dyld_bfd)
     {
       bfd *sub;

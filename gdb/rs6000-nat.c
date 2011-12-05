@@ -747,10 +747,9 @@ add_vmap (LdInfo *ldi)
   if (fd < 0)
     /* Note that this opens it once for every member; a possible
        enhancement would be to only open it once for every object.  */
-    abfd = bfd_openr (objname, gnutarget);
+    abfd = gdb_bfd_open (objname, gnutarget, -1);
   else
-    abfd = bfd_fdopenr (objname, gnutarget, fd);
-  abfd = gdb_bfd_ref (abfd);
+    abfd = gdb_bfd_open (objname, gnutarget, fd);
   if (!abfd)
     {
       warning (_("Could not open `%s' as an executable file: %s"),

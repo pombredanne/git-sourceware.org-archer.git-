@@ -689,7 +689,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
             }
 
 	  /* Open the archive and check the format.  */
-	  archive_bfd = gdb_bfd_ref (bfd_openr (archive_name, gnutarget));
+	  archive_bfd = gdb_bfd_open (archive_name, gnutarget, -1);
 	  if (archive_bfd == NULL)
 	    {
 	      warning (_("Could not open OSO archive file \"%s\""),
@@ -764,7 +764,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
 	{
           bfd *abfd;
 
-	  abfd = gdb_bfd_ref (bfd_openr (oso->name, gnutarget));
+	  abfd = gdb_bfd_open (oso->name, gnutarget, -1);
 	  if (!abfd)
             warning (_("`%s': can't open to read symbols: %s."), oso->name,
                      bfd_errmsg (bfd_get_error ()));
@@ -820,7 +820,6 @@ macho_check_dsym (struct objfile *objfile)
       warning (_("can't open dsym file %s"), dsym_filename);
       return NULL;
     }
-  gdb_bfd_stash_filename (dsym_filename);
 
   if (!bfd_check_format (dsym_bfd, bfd_object))
     {

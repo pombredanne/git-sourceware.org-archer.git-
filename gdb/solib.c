@@ -373,11 +373,11 @@ solib_bfd_fopen (char *pathname, int fd)
   if (remote_filename_p (pathname))
     {
       gdb_assert (fd == -1);
-      abfd = remote_bfd_open (pathname, gnutarget);
+      abfd = gdb_bfd_ref (remote_bfd_open (pathname, gnutarget));
     }
   else
     {
-      abfd = bfd_fopen (pathname, gnutarget, FOPEN_RB, fd);
+      abfd = gdb_bfd_open (pathname, gnutarget, fd);
 
       if (abfd)
 	bfd_set_cacheable (abfd, 1);
@@ -392,7 +392,7 @@ solib_bfd_fopen (char *pathname, int fd)
 	     pathname, bfd_errmsg (bfd_get_error ()));
     }
 
-  return gdb_bfd_ref (abfd);
+  return abfd;
 }
 
 /* Find shared library PATHNAME and open a BFD for it.  */
