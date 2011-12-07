@@ -1305,9 +1305,9 @@ ada_decode_symbol (const struct general_symbol_info *gsymbol)
     {
       const char *decoded = ada_decode (gsymbol->name);
 
-      if (gsymbol->obj_section != NULL)
+      if (gsymbol->sinfo.obj_section != NULL)
         {
-	  struct objfile *objf = gsymbol->obj_section->objfile;
+	  struct objfile *objf = gsymbol->sinfo.obj_section->objfile;
 
 	  *resultp = obsavestring (decoded, strlen (decoded),
 				   &objf->objfile_obstack);

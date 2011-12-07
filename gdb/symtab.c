@@ -994,7 +994,7 @@ fixup_section (struct general_symbol_info *ginfo,
   msym = lookup_minimal_symbol_by_pc_name (addr, ginfo->name, objfile);
   if (msym)
     {
-      ginfo->obj_section = MSYMBOL_OBJ_SECTION (msym);
+      ginfo->sinfo.obj_section = MSYMBOL_OBJ_SECTION (msym);
       ginfo->section = MSYMBOL_SECTION (msym);
     }
   else
@@ -1045,7 +1045,7 @@ fixup_section (struct general_symbol_info *ginfo,
 	  if (obj_section_addr (s) - offset <= addr
 	      && addr < obj_section_endaddr (s) - offset)
 	    {
-	      ginfo->obj_section = s;
+	      ginfo->sinfo.obj_section = s;
 	      ginfo->section = idx;
 	      return;
 	    }

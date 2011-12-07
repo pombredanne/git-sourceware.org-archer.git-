@@ -158,9 +158,16 @@ struct general_symbol_info
 
   short section;
 
-  /* The section associated with this symbol.  It can be NULL.  */
+  union
+  {
+    /* The section associated with this symbol.  It can be NULL.  */
 
-  struct obj_section *obj_section;
+    struct obj_section *obj_section;
+
+    /* For minimal symbols, we instead record an index into the
+       objfile's 'sections' array.  */
+    unsigned int index;
+  } sinfo;
 };
 
 extern void symbol_set_demangled_name (struct general_symbol_info *, char *,
@@ -186,7 +193,7 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 #define SYMBOL_VALUE_CHAIN(symbol)	(symbol)->ginfo.value.chain
 #define SYMBOL_LANGUAGE(symbol)		(symbol)->ginfo.language
 #define SYMBOL_SECTION(symbol)		(symbol)->ginfo.section
-#define SYMBOL_OBJ_SECTION(symbol)	(symbol)->ginfo.obj_section
+#define SYMBOL_OBJ_SECTION(symbol)	(symbol)->ginfo.sinfo.obj_section
 
 /* Initializes the language dependent portion of a symbol
    depending upon the language for the symbol.  */
@@ -368,7 +375,7 @@ struct minimal_symbol
 #define MSYMBOL_VALUE_CHAIN(symbol)	(symbol)->mginfo.value.chain
 #define MSYMBOL_LANGUAGE(symbol)	(symbol)->mginfo.language
 #define MSYMBOL_SECTION(symbol)		(symbol)->mginfo.section
-#define MSYMBOL_OBJ_SECTION(symbol)	(symbol)->mginfo.obj_section
+#define MSYMBOL_OBJ_SECTION(symbol)	(symbol)->mginfo.sinfo.obj_section
 
 #define MSYMBOL_NATURAL_NAME(symbol) \
   (symbol_natural_name (&(symbol)->mginfo))
