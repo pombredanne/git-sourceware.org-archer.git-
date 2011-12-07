@@ -153,7 +153,7 @@ unsigned int msymbol_hash_iw (const char *);
    minimal symbols is held by some objfile; this will never return
    NULL.  */
 
-struct objfile *msymbol_objfile (struct minimal_symbol *sym);
+struct objfile *msymbol_objfile (const struct minimal_symbol *sym);
 
 
 
@@ -255,5 +255,10 @@ void iterate_over_minimal_symbols (struct objfile *objf,
 				   void (*callback) (struct minimal_symbol *,
 						     void *),
 				   void *user_data);
+
+/* Return the "cooked" address of MSYM.  This is the raw address with
+   any needed section offset added in.  */
+
+CORE_ADDR msymbol_address (const struct minimal_symbol *msym);
 
 #endif /* MINSYMS_H */
