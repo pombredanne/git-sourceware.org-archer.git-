@@ -1307,6 +1307,8 @@ ada_decode_symbol (const struct general_symbol_info *gsymbol)
 
       if (gsymbol->sinfo.obj_section != NULL)
         {
+	  /* Note that there is no path to this code for minimal
+	     symbols.  */
 	  struct objfile *objf = gsymbol->sinfo.obj_section->objfile;
 
 	  *resultp = obsavestring (decoded, strlen (decoded),
