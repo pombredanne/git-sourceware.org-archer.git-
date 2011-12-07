@@ -21,6 +21,12 @@
 #ifndef GDB_BFD_H
 #define GDB_BFD_H
 
+/* Make a copy ABFD's filename using bfd_alloc, and reassign it to the
+   BFD.  This ensures that the BFD's filename has the same lifetime as
+   the BFD itself.  */
+
+void gdb_bfd_stash_filename (struct bfd *abfd);
+
 /* Acquire a new reference to ABFD.  Returns ABFD for convenience.  */
 
 struct bfd *gdb_bfd_ref (struct bfd *abfd);

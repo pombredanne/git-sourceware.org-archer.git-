@@ -99,10 +99,8 @@ exec_close (void)
   if (exec_bfd)
     {
       bfd *abfd = exec_bfd;
-      char *name = bfd_get_filename (abfd);
 
       gdb_bfd_unref (abfd);
-      xfree (name);
 
       /* Removing target sections may close the exec_ops target.
 	 Clear exec_bfd before doing so to prevent recursion.  */
@@ -230,6 +228,9 @@ exec_file_attach (char *filename, int from_tty)
 	     &scratch_pathname);
 	}
 #endif
+
+      cleanups = make_cleanup (xfree, scratch_pathname);
+
       if (scratch_chan < 0)
 	perror_with_name (filename);
       exec_bfd = gdb_bfd_ref (bfd_fopen (scratch_pathname, gnutarget,
@@ -242,13 +243,6 @@ exec_file_attach (char *filename, int from_tty)
 	  error (_("\"%s\": could not open as an executable file: %s"),
 		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
 	}
-
-      /* At this point, scratch_pathname and exec_bfd->name both point to the
-         same malloc'd string.  However exec_close() will attempt to free it
-         via the exec_bfd->name pointer, so we need to make another copy and
-         leave exec_bfd as the new owner of the original copy.  */
-      scratch_pathname = xstrdup (scratch_pathname);
-      cleanups = make_cleanup (xfree, scratch_pathname);
 
       if (!bfd_check_format_matches (exec_bfd, bfd_object, &matching))
 	{
