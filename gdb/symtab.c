@@ -994,8 +994,8 @@ fixup_section (struct general_symbol_info *ginfo,
   msym = lookup_minimal_symbol_by_pc_name (addr, ginfo->name, objfile);
   if (msym)
     {
-      ginfo->obj_section = SYMBOL_OBJ_SECTION (msym);
-      ginfo->section = SYMBOL_SECTION (msym);
+      ginfo->obj_section = MSYMBOL_OBJ_SECTION (msym);
+      ginfo->section = MSYMBOL_SECTION (msym);
     }
   else
     {
@@ -2168,7 +2168,7 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
   if (msymbol != NULL)
     if (MSYMBOL_TYPE (msymbol) == mst_solib_trampoline)
       {
-	mfunsym = lookup_minimal_symbol_text (SYMBOL_LINKAGE_NAME (msymbol),
+	mfunsym = lookup_minimal_symbol_text (MSYMBOL_LINKAGE_NAME (msymbol),
 					      NULL);
 	if (mfunsym == NULL)
 	  /* I eliminated this warning since it is coming out
@@ -2184,8 +2184,8 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
 	     SYMBOL_LINKAGE_NAME (msymbol)); */
 	  ;
 	/* fall through */
-	else if (SYMBOL_VALUE_ADDRESS (mfunsym)
-		 == SYMBOL_VALUE_ADDRESS (msymbol))
+	else if (MSYMBOL_VALUE_ADDRESS (mfunsym)
+		 == MSYMBOL_VALUE_ADDRESS (msymbol))
 	  /* Avoid infinite recursion */
 	  /* See above comment about why warning is commented out.  */
 	  /* warning ("In stub for %s; unable to find real function/line info",
@@ -2193,7 +2193,7 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
 	  ;
 	/* fall through */
 	else
-	  return find_pc_line (SYMBOL_VALUE_ADDRESS (mfunsym), 0);
+	  return find_pc_line (MSYMBOL_VALUE_ADDRESS (mfunsym), 0);
       }
 
 
@@ -2714,9 +2714,9 @@ skip_prologue_sal (struct symtab_and_line *sal)
 	  return;
 	}
 
-      pc = SYMBOL_VALUE_ADDRESS (msymbol);
-      section = SYMBOL_OBJ_SECTION (msymbol);
-      name = SYMBOL_LINKAGE_NAME (msymbol);
+      pc = MSYMBOL_VALUE_ADDRESS (msymbol);
+      section = MSYMBOL_OBJ_SECTION (msymbol);
+      name = MSYMBOL_LINKAGE_NAME (msymbol);
       objfile = msymbol_objfile (msymbol);
     }
 
@@ -3383,10 +3383,10 @@ search_symbols (char *regexp, enum search_domain kind,
 	    MSYMBOL_TYPE (msymbol) == ourtype4)
 	  {
 	    if (!datum.preg_p
-		|| regexec (&datum.preg, SYMBOL_NATURAL_NAME (msymbol), 0,
+		|| regexec (&datum.preg, MSYMBOL_NATURAL_NAME (msymbol), 0,
 			    NULL, 0) == 0)
 	      {
-		if (0 == find_pc_symtab (SYMBOL_VALUE_ADDRESS (msymbol)))
+		if (0 == find_pc_symtab (MSYMBOL_VALUE_ADDRESS (msymbol)))
 		  {
 		    /* FIXME: carlton/2003-02-04: Given that the
 		       semantics of lookup_symbol keeps on changing
@@ -3395,7 +3395,7 @@ search_symbols (char *regexp, enum search_domain kind,
 		       symbol associated to a given minimal symbol (if
 		       any).  */
 		    if (kind == FUNCTIONS_DOMAIN
-			|| lookup_symbol (SYMBOL_LINKAGE_NAME (msymbol),
+			|| lookup_symbol (MSYMBOL_LINKAGE_NAME (msymbol),
 					  (struct block *) NULL,
 					  VAR_DOMAIN, 0)
 			== NULL)
@@ -3489,15 +3489,15 @@ search_symbols (char *regexp, enum search_domain kind,
 	    MSYMBOL_TYPE (msymbol) == ourtype4)
 	  {
 	    if (!datum.preg_p
-		|| regexec (&datum.preg, SYMBOL_NATURAL_NAME (msymbol), 0,
+		|| regexec (&datum.preg, MSYMBOL_NATURAL_NAME (msymbol), 0,
 			    NULL, 0) == 0)
 	      {
 		/* Functions:  Look up by address.  */
 		if (kind != FUNCTIONS_DOMAIN ||
-		    (0 == find_pc_symtab (SYMBOL_VALUE_ADDRESS (msymbol))))
+		    (0 == find_pc_symtab (MSYMBOL_VALUE_ADDRESS (msymbol))))
 		  {
 		    /* Variables/Absolutes:  Look up by name.  */
-		    if (lookup_symbol (SYMBOL_LINKAGE_NAME (msymbol),
+		    if (lookup_symbol (MSYMBOL_LINKAGE_NAME (msymbol),
 				       (struct block *) NULL, VAR_DOMAIN, 0)
 			 == NULL)
 		      {
@@ -3576,14 +3576,14 @@ print_msymbol_info (struct minimal_symbol *msymbol)
   char *tmp;
 
   if (gdbarch_addr_bit (gdbarch) <= 32)
-    tmp = hex_string_custom (SYMBOL_VALUE_ADDRESS (msymbol)
+    tmp = hex_string_custom (MSYMBOL_VALUE_ADDRESS (msymbol)
 			     & (CORE_ADDR) 0xffffffff,
 			     8);
   else
-    tmp = hex_string_custom (SYMBOL_VALUE_ADDRESS (msymbol),
+    tmp = hex_string_custom (MSYMBOL_VALUE_ADDRESS (msymbol),
 			     16);
   printf_filtered ("%s  %s\n",
-		   tmp, SYMBOL_PRINT_NAME (msymbol));
+		   tmp, MSYMBOL_PRINT_NAME (msymbol));
 }
 
 /* This is the guts of the commands "info functions", "info types", and
@@ -3739,7 +3739,7 @@ rbreak_command (char *regexp, int from_tty)
 	}
       else
 	{
-	  int newlen = (strlen (SYMBOL_LINKAGE_NAME (p->msymbol)) + 3);
+	  int newlen = (strlen (MSYMBOL_LINKAGE_NAME (p->msymbol)) + 3);
 
 	  if (newlen > len)
 	    {
@@ -3747,12 +3747,12 @@ rbreak_command (char *regexp, int from_tty)
 	      len = newlen;
 	    }
 	  strcpy (string, "'");
-	  strcat (string, SYMBOL_LINKAGE_NAME (p->msymbol));
+	  strcat (string, MSYMBOL_LINKAGE_NAME (p->msymbol));
 	  strcat (string, "'");
 
 	  break_command (string, from_tty);
 	  printf_filtered ("<function, no debug info> %s;\n",
-			   SYMBOL_PRINT_NAME (p->msymbol));
+			   MSYMBOL_PRINT_NAME (p->msymbol));
 	}
     }
 
@@ -3828,6 +3828,10 @@ static char **return_val;
       completion_list_add_name \
 	(SYMBOL_NATURAL_NAME (symbol), (sym_text), (len), (text), (word))
 
+#define MCOMPLETION_LIST_ADD_SYMBOL(symbol, sym_text, len, text, word) \
+      completion_list_add_name \
+	(MSYMBOL_NATURAL_NAME (symbol), (sym_text), (len), (text), (word))
+
 /*  Test to see if the symbol specified by SYMNAME (which is already
    demangled for C++ symbols) matches SYM_TEXT in the first SYM_TEXT_LEN
    characters.  If so, add it to the current completion list.  */
@@ -3893,7 +3897,7 @@ completion_list_objc_symbol (struct minimal_symbol *msymbol,
   const char *method, *category, *selector;
   char *tmp2 = NULL;
 
-  method = SYMBOL_NATURAL_NAME (msymbol);
+  method = MSYMBOL_NATURAL_NAME (msymbol);
 
   /* Is it a method?  */
   if ((method[0] != '-') && (method[0] != '+'))
@@ -4156,7 +4160,7 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
   ALL_MSYMBOLS (objfile, msymbol)
   {
     QUIT;
-    COMPLETION_LIST_ADD_SYMBOL (msymbol, sym_text, sym_text_len, text, word);
+    MCOMPLETION_LIST_ADD_SYMBOL (msymbol, sym_text, sym_text_len, text, word);
 
     completion_list_objc_symbol (msymbol, sym_text, sym_text_len, text, word);
   }

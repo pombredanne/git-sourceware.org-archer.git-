@@ -313,7 +313,7 @@ gnuv3_rtti_type (struct value *value,
      If we didn't like this approach, we could instead look in the
      type_info object itself to get the class name.  But this way
      should work just as well, and doesn't read target memory.  */
-  vtable_symbol_name = SYMBOL_DEMANGLED_NAME (vtable_symbol);
+  vtable_symbol_name = MSYMBOL_DEMANGLED_NAME (vtable_symbol);
   if (vtable_symbol_name == NULL
       || strncmp (vtable_symbol_name, "vtable for ", 11))
     {
@@ -750,7 +750,7 @@ gnuv3_skip_trampoline (struct frame_info *frame, CORE_ADDR stop_pc)
   /* The symbol's demangled name should be something like "virtual
      thunk to FUNCTION", where FUNCTION is the name of the function
      being thunked to.  */
-  thunk_name = SYMBOL_DEMANGLED_NAME (thunk_sym);
+  thunk_name = MSYMBOL_DEMANGLED_NAME (thunk_sym);
   if (thunk_name == NULL || strstr (thunk_name, " thunk to ") == NULL)
     return 0;
 
@@ -759,7 +759,7 @@ gnuv3_skip_trampoline (struct frame_info *frame, CORE_ADDR stop_pc)
   if (fn_sym == NULL)
     return 0;
 
-  method_stop_pc = SYMBOL_VALUE_ADDRESS (fn_sym);
+  method_stop_pc = MSYMBOL_VALUE_ADDRESS (fn_sym);
   real_stop_pc = gdbarch_skip_trampoline_code
 		   (gdbarch, frame, method_stop_pc);
   if (real_stop_pc == 0)

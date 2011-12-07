@@ -2538,8 +2538,8 @@ mips_stub_frame_sniffer (const struct frame_unwind *self,
      stub.  The stub for foo is named ".pic.foo".  */
   msym = lookup_minimal_symbol_by_pc (pc);
   if (msym != NULL
-      && SYMBOL_LINKAGE_NAME (msym) != NULL
-      && strncmp (SYMBOL_LINKAGE_NAME (msym), ".pic.", 5) == 0)
+      && MSYMBOL_LINKAGE_NAME (msym) != NULL
+      && strncmp (MSYMBOL_LINKAGE_NAME (msym), ".pic.", 5) == 0)
     return 1;
 
   return 0;
@@ -5736,9 +5736,9 @@ mips_skip_pic_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
      which jumps to foo.  */
   msym = lookup_minimal_symbol_by_pc (pc);
   if (msym == NULL
-      || SYMBOL_VALUE_ADDRESS (msym) != pc
-      || SYMBOL_LINKAGE_NAME (msym) == NULL
-      || strncmp (SYMBOL_LINKAGE_NAME (msym), ".pic.", 5) != 0)
+      || MSYMBOL_VALUE_ADDRESS (msym) != pc
+      || MSYMBOL_LINKAGE_NAME (msym) == NULL
+      || strncmp (MSYMBOL_LINKAGE_NAME (msym), ".pic.", 5) != 0)
     return 0;
 
   /* A two-instruction header.  */

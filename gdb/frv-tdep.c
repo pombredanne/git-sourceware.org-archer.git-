@@ -1083,8 +1083,8 @@ frv_skip_main_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
       s = lookup_minimal_symbol_by_pc (call_dest);
 
       if (s != NULL
-          && SYMBOL_LINKAGE_NAME (s) != NULL
-	  && strcmp (SYMBOL_LINKAGE_NAME (s), "__main") == 0)
+          && MSYMBOL_LINKAGE_NAME (s) != NULL
+	  && strcmp (MSYMBOL_LINKAGE_NAME (s), "__main") == 0)
 	{
 	  pc += 4;
 	  return pc;
@@ -1402,7 +1402,7 @@ frv_frame_this_id (struct frame_info *this_frame,
 
   /* Check if the stack is empty.  */
   msym_stack = lookup_minimal_symbol ("_stack", NULL, NULL);
-  if (msym_stack && info->base == SYMBOL_VALUE_ADDRESS (msym_stack))
+  if (msym_stack && info->base == MSYMBOL_VALUE_ADDRESS (msym_stack))
     return;
 
   /* Hopefully the prologue analysis either correctly determined the

@@ -744,7 +744,7 @@ selectors_info (char *regexp, int from_tty)
   ALL_MSYMBOLS (objfile, msymbol)
     {
       QUIT;
-      name = SYMBOL_NATURAL_NAME (msymbol);
+      name = MSYMBOL_NATURAL_NAME (msymbol);
       if (name
           && (name[0] == '-' || name[0] == '+')
 	  && name[1] == '[')		/* Got a method name.  */
@@ -758,7 +758,7 @@ selectors_info (char *regexp, int from_tty)
 	    {
 	      complaint (&symfile_complaints, 
 			 _("Bad method name '%s'"), 
-			 SYMBOL_NATURAL_NAME (msymbol));
+			 MSYMBOL_NATURAL_NAME (msymbol));
 	      continue;
 	    }
 	  if (regexp == NULL || re_exec(++name) != 0)
@@ -782,7 +782,7 @@ selectors_info (char *regexp, int from_tty)
       ALL_MSYMBOLS (objfile, msymbol)
 	{
 	  QUIT;
-	  name = SYMBOL_NATURAL_NAME (msymbol);
+	  name = MSYMBOL_NATURAL_NAME (msymbol);
 	  if (name &&
 	     (name[0] == '-' || name[0] == '+') &&
 	      name[1] == '[')		/* Got a method name.  */
@@ -895,7 +895,7 @@ classes_info (char *regexp, int from_tty)
   ALL_MSYMBOLS (objfile, msymbol)
     {
       QUIT;
-      name = SYMBOL_NATURAL_NAME (msymbol);
+      name = MSYMBOL_NATURAL_NAME (msymbol);
       if (name &&
 	 (name[0] == '-' || name[0] == '+') &&
 	  name[1] == '[')			/* Got a method name.  */
@@ -919,7 +919,7 @@ classes_info (char *regexp, int from_tty)
       ALL_MSYMBOLS (objfile, msymbol)
 	{
 	  QUIT;
-	  name = SYMBOL_NATURAL_NAME (msymbol);
+	  name = MSYMBOL_NATURAL_NAME (msymbol);
 	  if (name &&
 	     (name[0] == '-' || name[0] == '+') &&
 	      name[1] == '[')			/* Got a method name.  */
@@ -1157,7 +1157,7 @@ find_methods (char type, const char *class, const char *category,
 
 	  /* Check the symbol name first as this can be done entirely without
 	     sending any query to the target.  */
-	  symname = SYMBOL_NATURAL_NAME (msymbol);
+	  symname = MSYMBOL_NATURAL_NAME (msymbol);
 	  if (symname == NULL)
 	    continue;
 
@@ -1314,7 +1314,7 @@ find_imps (char *method, VEC (const_char_ptr) **symbol_names)
 
 	  if (msym != NULL) 
 	    VEC_safe_push (const_char_ptr, *symbol_names,
-			   SYMBOL_NATURAL_NAME (msym));
+			   MSYMBOL_NATURAL_NAME (msym));
 	}
     }
 
@@ -1433,9 +1433,9 @@ find_objc_msgsend (void)
 	  continue; 
 	}
 
-      methcalls[i].begin = SYMBOL_VALUE_ADDRESS (func);
+      methcalls[i].begin = MSYMBOL_VALUE_ADDRESS (func);
       do {
-	methcalls[i].end = SYMBOL_VALUE_ADDRESS (++func);
+	methcalls[i].end = MSYMBOL_VALUE_ADDRESS (++func);
       } while (methcalls[i].begin == methcalls[i].end);
     }
 }

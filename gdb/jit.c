@@ -338,7 +338,7 @@ jit_read_descriptor (struct gdbarch *gdbarch,
   if (jit_debug)
     fprintf_unfiltered (gdb_stdlog,
 			"jit_read_descriptor, descriptor_addr = %s\n",
-			paddress (gdbarch, SYMBOL_VALUE_ADDRESS (objf_data->descriptor)));
+			paddress (gdbarch, MSYMBOL_VALUE_ADDRESS (objf_data->descriptor)));
 
   /* Figure out how big the descriptor is on the remote and how to read it.  */
   ptr_type = builtin_type (gdbarch)->builtin_data_ptr;
@@ -347,7 +347,7 @@ jit_read_descriptor (struct gdbarch *gdbarch,
   desc_buf = alloca (desc_size);
 
   /* Read the descriptor.  */
-  err = target_read_memory (SYMBOL_VALUE_ADDRESS (objf_data->descriptor),
+  err = target_read_memory (MSYMBOL_VALUE_ADDRESS (objf_data->descriptor),
 			    desc_buf, desc_size);
   if (err)
     {
@@ -965,11 +965,11 @@ jit_breakpoint_re_set_internal (struct gdbarch *gdbarch,
   /* Lookup the registration symbol.  If it is missing, then we assume
      we are not attached to a JIT.  */
   reg_symbol = lookup_minimal_symbol_and_objfile (jit_break_name, &objf);
-  if (reg_symbol == NULL || SYMBOL_VALUE_ADDRESS (reg_symbol) == 0)
+  if (reg_symbol == NULL || MSYMBOL_VALUE_ADDRESS (reg_symbol) == 0)
     return 1;
 
   desc_symbol = lookup_minimal_symbol (jit_descriptor_name, NULL, objf);
-  if (desc_symbol == NULL || SYMBOL_VALUE_ADDRESS (desc_symbol) == 0)
+  if (desc_symbol == NULL || MSYMBOL_VALUE_ADDRESS (desc_symbol) == 0)
     return 1;
 
   objf_data = get_jit_objfile_data (objf);
@@ -984,10 +984,10 @@ jit_breakpoint_re_set_internal (struct gdbarch *gdbarch,
     fprintf_unfiltered (gdb_stdlog,
 			"jit_breakpoint_re_set_internal, "
 			"breakpoint_addr = %s\n",
-			paddress (gdbarch, SYMBOL_VALUE_ADDRESS (reg_symbol)));
+			paddress (gdbarch, MSYMBOL_VALUE_ADDRESS (reg_symbol)));
 
   /* Put a breakpoint in the registration symbol.  */
-  create_jit_event_breakpoint (gdbarch, SYMBOL_VALUE_ADDRESS (reg_symbol));
+  create_jit_event_breakpoint (gdbarch, MSYMBOL_VALUE_ADDRESS (reg_symbol));
 
   return 0;
 }

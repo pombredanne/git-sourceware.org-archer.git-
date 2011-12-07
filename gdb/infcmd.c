@@ -1312,7 +1312,7 @@ until_next_command (int from_tty)
       if (msymbol == NULL)
 	error (_("Execution is not within a known function."));
 
-      tp->control.step_range_start = SYMBOL_VALUE_ADDRESS (msymbol);
+      tp->control.step_range_start = MSYMBOL_VALUE_ADDRESS (msymbol);
       tp->control.step_range_end = pc;
     }
   else

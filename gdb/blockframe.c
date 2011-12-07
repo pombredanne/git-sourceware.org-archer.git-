@@ -105,7 +105,7 @@ get_pc_function_start (CORE_ADDR pc)
   msymbol = lookup_minimal_symbol_by_pc (pc);
   if (msymbol)
     {
-      CORE_ADDR fstart = SYMBOL_VALUE_ADDRESS (msymbol);
+      CORE_ADDR fstart = MSYMBOL_VALUE_ADDRESS (msymbol);
 
       if (find_pc_section (fstart))
 	return fstart;
@@ -236,7 +236,7 @@ find_pc_partial_function_gnu_ifunc (CORE_ADDR pc, const char **name,
       if (f != NULL
 	  && (msymbol == NULL
 	      || (BLOCK_START (SYMBOL_BLOCK_VALUE (f))
-		  >= SYMBOL_VALUE_ADDRESS (msymbol))))
+		  >= MSYMBOL_VALUE_ADDRESS (msymbol))))
 	{
 	  cache_pc_function_low = BLOCK_START (SYMBOL_BLOCK_VALUE (f));
 	  cache_pc_function_high = BLOCK_END (SYMBOL_BLOCK_VALUE (f));
@@ -270,8 +270,8 @@ find_pc_partial_function_gnu_ifunc (CORE_ADDR pc, const char **name,
       return 0;
     }
 
-  cache_pc_function_low = SYMBOL_VALUE_ADDRESS (msymbol);
-  cache_pc_function_name = SYMBOL_LINKAGE_NAME (msymbol);
+  cache_pc_function_low = MSYMBOL_VALUE_ADDRESS (msymbol);
+  cache_pc_function_name = MSYMBOL_LINKAGE_NAME (msymbol);
   cache_pc_function_section = section;
   cache_pc_function_is_gnu_ifunc = MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc;
 
@@ -288,19 +288,19 @@ find_pc_partial_function_gnu_ifunc (CORE_ADDR pc, const char **name,
 	 other sections, to find the next symbol in this section with
 	 a different address.  */
 
-      for (i = 1; SYMBOL_LINKAGE_NAME (msymbol + i) != NULL; i++)
+      for (i = 1; MSYMBOL_LINKAGE_NAME (msymbol + i) != NULL; i++)
 	{
-	  if (SYMBOL_VALUE_ADDRESS (msymbol + i)
-	      != SYMBOL_VALUE_ADDRESS (msymbol)
-	      && SYMBOL_OBJ_SECTION (msymbol + i)
-	      == SYMBOL_OBJ_SECTION (msymbol))
+	  if (MSYMBOL_VALUE_ADDRESS (msymbol + i)
+	      != MSYMBOL_VALUE_ADDRESS (msymbol)
+	      && MSYMBOL_OBJ_SECTION (msymbol + i)
+	      == MSYMBOL_OBJ_SECTION (msymbol))
 	    break;
 	}
 
-      if (SYMBOL_LINKAGE_NAME (msymbol + i) != NULL
-	  && SYMBOL_VALUE_ADDRESS (msymbol + i)
+      if (MSYMBOL_LINKAGE_NAME (msymbol + i) != NULL
+	  && MSYMBOL_VALUE_ADDRESS (msymbol + i)
 	  < obj_section_endaddr (section))
-	cache_pc_function_high = SYMBOL_VALUE_ADDRESS (msymbol + i);
+	cache_pc_function_high = MSYMBOL_VALUE_ADDRESS (msymbol + i);
       else
 	/* We got the start address from the last msymbol in the objfile.
 	   So the end address is the end of the section.  */

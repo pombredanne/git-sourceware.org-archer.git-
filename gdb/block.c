@@ -201,7 +201,7 @@ call_site_for_pc (struct gdbarch *gdbarch, CORE_ADDR pc)
 		   _("DW_OP_GNU_entry_value resolving cannot find "
 		     "DW_TAG_GNU_call_site %s in %s"),
 		   paddress (gdbarch, pc),
-		   msym == NULL ? "???" : SYMBOL_PRINT_NAME (msym));
+		   msym == NULL ? "???" : MSYMBOL_PRINT_NAME (msym));
     }
 
   return *slot;

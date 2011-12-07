@@ -641,8 +641,8 @@ powerpc_linux_in_dynsym_resolve_code (CORE_ADDR pc)
 
   /* Check if we are in the resolver.  */
   sym = lookup_minimal_symbol_by_pc (pc);
-  if ((strcmp (SYMBOL_LINKAGE_NAME (sym), "__glink") == 0)
-      || (strcmp (SYMBOL_LINKAGE_NAME (sym), "__glink_PLTresolve") == 0))
+  if ((strcmp (MSYMBOL_LINKAGE_NAME (sym), "__glink") == 0)
+      || (strcmp (MSYMBOL_LINKAGE_NAME (sym), "__glink_PLTresolve") == 0))
     return 1;
 
   return 0;
@@ -1309,7 +1309,7 @@ ppc_linux_spe_context_lookup (struct objfile *objfile)
     {
       spe_context_objfile = objfile;
       spe_context_lm_addr = svr4_fetch_objfile_link_map (objfile);
-      spe_context_offset = SYMBOL_VALUE_ADDRESS (sym);
+      spe_context_offset = MSYMBOL_VALUE_ADDRESS (sym);
       spe_context_cache_ptid = minus_one_ptid;
       spe_context_cache_address = 0;
       return;

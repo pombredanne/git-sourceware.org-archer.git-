@@ -362,7 +362,7 @@ call_site_to_target_addr (struct gdbarch *call_site_gdbarch,
 			 _("DW_AT_GNU_call_site_target is not specified "
 			   "at %s in %s"),
 			 paddress (call_site_gdbarch, call_site->pc),
-			 msym == NULL ? "???" : SYMBOL_PRINT_NAME (msym));
+			 msym == NULL ? "???" : MSYMBOL_PRINT_NAME (msym));
 			
 	  }
 	if (caller_frame == NULL)
@@ -375,7 +375,7 @@ call_site_to_target_addr (struct gdbarch *call_site_gdbarch,
 			   "requires known frame which is currently not "
 			   "available at %s in %s"),
 			 paddress (call_site_gdbarch, call_site->pc),
-			 msym == NULL ? "???" : SYMBOL_PRINT_NAME (msym));
+			 msym == NULL ? "???" : MSYMBOL_PRINT_NAME (msym));
 			
 	  }
 	caller_arch = get_frame_arch (caller_frame);
@@ -405,10 +405,10 @@ call_site_to_target_addr (struct gdbarch *call_site_gdbarch,
 			 _("Cannot find function \"%s\" for a call site target "
 			   "at %s in %s"),
 			 physname, paddress (call_site_gdbarch, call_site->pc),
-			 msym == NULL ? "???" : SYMBOL_PRINT_NAME (msym));
+			 msym == NULL ? "???" : MSYMBOL_PRINT_NAME (msym));
 			
 	  }
-	return SYMBOL_VALUE_ADDRESS (msym);
+	return MSYMBOL_VALUE_ADDRESS (msym);
       }
 
     case FIELD_LOC_KIND_PHYSADDR:
@@ -503,7 +503,7 @@ func_verify_no_selftailcall (struct gdbarch *gdbarch, CORE_ADDR verify_addr)
 			   _("DW_OP_GNU_entry_value resolving has found "
 			     "function \"%s\" at %s can call itself via tail "
 			     "calls"),
-			   msym == NULL ? "???" : SYMBOL_PRINT_NAME (msym),
+			   msym == NULL ? "???" : MSYMBOL_PRINT_NAME (msym),
 			   paddress (gdbarch, verify_addr));
 	    }
 
@@ -530,7 +530,7 @@ tailcall_dump (struct gdbarch *gdbarch, const struct call_site *call_site)
   struct minimal_symbol *msym = lookup_minimal_symbol_by_pc (addr - 1);
 
   fprintf_unfiltered (gdb_stdlog, " %s(%s)", paddress (gdbarch, addr),
-		      msym == NULL ? "???" : SYMBOL_PRINT_NAME (msym));
+		      msym == NULL ? "???" : MSYMBOL_PRINT_NAME (msym));
 
 }
 
@@ -769,10 +769,10 @@ call_site_find_chain_1 (struct gdbarch *gdbarch, CORE_ADDR caller_pc,
 		     "callers or callees between caller function \"%s\" at %s "
 		     "and callee function \"%s\" at %s"),
 		   (msym_caller == NULL
-		    ? "???" : SYMBOL_PRINT_NAME (msym_caller)),
+		    ? "???" : MSYMBOL_PRINT_NAME (msym_caller)),
 		   paddress (gdbarch, caller_pc),
 		   (msym_callee == NULL
-		    ? "???" : SYMBOL_PRINT_NAME (msym_callee)),
+		    ? "???" : MSYMBOL_PRINT_NAME (msym_callee)),
 		   paddress (gdbarch, callee_pc));
     }
 
@@ -846,7 +846,7 @@ dwarf_expr_reg_to_entry_parameter (struct frame_info *frame, int dwarf_reg,
 		     "(of %s (%s)) does not match caller gdbarch %s"),
 		   gdbarch_bfd_arch_info (gdbarch)->printable_name,
 		   paddress (gdbarch, func_addr),
-		   msym == NULL ? "???" : SYMBOL_PRINT_NAME (msym),
+		   msym == NULL ? "???" : MSYMBOL_PRINT_NAME (msym),
 		   gdbarch_bfd_arch_info (caller_gdbarch)->printable_name);
     }
 
@@ -857,7 +857,7 @@ dwarf_expr_reg_to_entry_parameter (struct frame_info *frame, int dwarf_reg,
       throw_error (NO_ENTRY_VALUE_ERROR, _("DW_OP_GNU_entry_value resolving "
 					   "requires caller of %s (%s)"),
 		   paddress (gdbarch, func_addr),
-		   msym == NULL ? "???" : SYMBOL_PRINT_NAME (msym));
+		   msym == NULL ? "???" : MSYMBOL_PRINT_NAME (msym));
     }
   caller_pc = get_frame_pc (caller_frame);
   call_site = call_site_for_pc (gdbarch, caller_pc);
@@ -873,9 +873,9 @@ dwarf_expr_reg_to_entry_parameter (struct frame_info *frame, int dwarf_reg,
 		   _("DW_OP_GNU_entry_value resolving expects callee %s at %s "
 		     "but the called frame is for %s at %s"),
 		   (target_msym == NULL ? "???"
-					: SYMBOL_PRINT_NAME (target_msym)),
+					: MSYMBOL_PRINT_NAME (target_msym)),
 		   paddress (gdbarch, target_addr),
-		   func_msym == NULL ? "???" : SYMBOL_PRINT_NAME (func_msym),
+		   func_msym == NULL ? "???" : MSYMBOL_PRINT_NAME (func_msym),
 		   paddress (gdbarch, func_addr));
     }
 
@@ -903,7 +903,7 @@ dwarf_expr_reg_to_entry_parameter (struct frame_info *frame, int dwarf_reg,
       throw_error (NO_ENTRY_VALUE_ERROR, _("Cannot find matching parameter "
 					   "at DW_TAG_GNU_call_site %s at %s"),
 		   paddress (gdbarch, caller_pc),
-		   msym == NULL ? "???" : SYMBOL_PRINT_NAME (msym)); 
+		   msym == NULL ? "???" : MSYMBOL_PRINT_NAME (msym)); 
     }
 
   *per_cu_return = call_site->per_cu;

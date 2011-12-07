@@ -3531,7 +3531,7 @@ remote_check_symbols (struct objfile *objfile)
       else
 	{
 	  int addr_size = gdbarch_addr_bit (target_gdbarch) / 8;
-	  CORE_ADDR sym_addr = SYMBOL_VALUE_ADDRESS (sym);
+	  CORE_ADDR sym_addr = MSYMBOL_VALUE_ADDRESS (sym);
 
 	  /* If this is a function address, return the start of code
 	     instead of any data function descriptor.  */

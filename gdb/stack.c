@@ -1045,14 +1045,14 @@ find_frame_funname (struct frame_info *frame, const char **funname,
 	  = lookup_minimal_symbol_by_pc (get_frame_address_in_block (frame));
 
       if (msymbol != NULL
-	  && (SYMBOL_VALUE_ADDRESS (msymbol)
+	  && (MSYMBOL_VALUE_ADDRESS (msymbol)
 	      > BLOCK_START (SYMBOL_BLOCK_VALUE (func))))
 	{
 	  /* We also don't know anything about the function besides
 	     its address and name.  */
 	  func = 0;
-	  *funname = SYMBOL_PRINT_NAME (msymbol);
-	  *funlang = SYMBOL_LANGUAGE (msymbol);
+	  *funname = MSYMBOL_PRINT_NAME (msymbol);
+	  *funlang = MSYMBOL_LANGUAGE (msymbol);
 	}
       else
 	{
@@ -1088,8 +1088,8 @@ find_frame_funname (struct frame_info *frame, const char **funname,
       msymbol = lookup_minimal_symbol_by_pc (pc);
       if (msymbol != NULL)
 	{
-	  *funname = SYMBOL_PRINT_NAME (msymbol);
-	  *funlang = SYMBOL_LANGUAGE (msymbol);
+	  *funname = MSYMBOL_PRINT_NAME (msymbol);
+	  *funlang = MSYMBOL_LANGUAGE (msymbol);
 	}
     }
 }
@@ -1427,8 +1427,8 @@ frame_info (char *addr_exp, int from_tty)
       msymbol = lookup_minimal_symbol_by_pc (frame_pc);
       if (msymbol != NULL)
 	{
-	  funname = SYMBOL_PRINT_NAME (msymbol);
-	  funlang = SYMBOL_LANGUAGE (msymbol);
+	  funname = MSYMBOL_PRINT_NAME (msymbol);
+	  funlang = MSYMBOL_LANGUAGE (msymbol);
 	}
     }
   calling_frame_info = get_prev_frame (fi);

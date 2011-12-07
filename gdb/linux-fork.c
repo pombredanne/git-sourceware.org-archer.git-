@@ -592,7 +592,7 @@ info_checkpoints_command (char *arg, int from_tty)
 
 	  msym = lookup_minimal_symbol_by_pc (pc);
 	  if (msym)
-	    printf_filtered (", <%s>", SYMBOL_LINKAGE_NAME (msym));
+	    printf_filtered (", <%s>", MSYMBOL_LINKAGE_NAME (msym));
 	}
 
       putchar_filtered ('\n');

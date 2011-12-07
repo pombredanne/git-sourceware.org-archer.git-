@@ -102,7 +102,7 @@ agent_look_up_symbols (void *arg)
 			       (struct objfile *) arg);
 
       if (sym != NULL)
-	*addrp = SYMBOL_VALUE_ADDRESS (sym);
+	*addrp = MSYMBOL_VALUE_ADDRESS (sym);
       else
 #endif
 	{

@@ -685,16 +685,16 @@ build_address_symbolic (struct gdbarch *gdbarch,
 
   if (msymbol != NULL)
     {
-      if (SYMBOL_VALUE_ADDRESS (msymbol) > name_location || symbol == NULL)
+      if (MSYMBOL_VALUE_ADDRESS (msymbol) > name_location || symbol == NULL)
 	{
 	  /* The msymbol is closer to the address than the symbol;
 	     use the msymbol instead.  */
 	  symbol = 0;
-	  name_location = SYMBOL_VALUE_ADDRESS (msymbol);
+	  name_location = MSYMBOL_VALUE_ADDRESS (msymbol);
 	  if (do_demangle || asm_demangle)
-	    name_temp = SYMBOL_PRINT_NAME (msymbol);
+	    name_temp = MSYMBOL_PRINT_NAME (msymbol);
 	  else
-	    name_temp = SYMBOL_LINKAGE_NAME (msymbol);
+	    name_temp = MSYMBOL_LINKAGE_NAME (msymbol);
 	}
     }
   if (symbol == NULL && msymbol == NULL)
@@ -1116,10 +1116,10 @@ sym_info (char *arg, int from_tty)
 	struct cleanup *old_chain;
 
 	matches = 1;
-	offset = sect_addr - SYMBOL_VALUE_ADDRESS (msymbol);
+	offset = sect_addr - MSYMBOL_VALUE_ADDRESS (msymbol);
 	mapped = section_is_mapped (osect) ? _("mapped") : _("unmapped");
 	sec_name = osect->the_bfd_section->name;
-	msym_name = SYMBOL_PRINT_NAME (msymbol);
+	msym_name = MSYMBOL_PRINT_NAME (msymbol);
 
 	/* Don't print the offset if it is zero.
 	   We assume there's no need to handle i18n of "sym + offset".  */
@@ -1214,7 +1214,7 @@ address_info (char *exp, int from_tty)
       if (msymbol != NULL)
 	{
 	  gdbarch = get_objfile_arch (msymbol_objfile (msymbol));
-	  load_addr = SYMBOL_VALUE_ADDRESS (msymbol);
+	  load_addr = MSYMBOL_VALUE_ADDRESS (msymbol);
 
 	  printf_filtered ("Symbol \"");
 	  fprintf_symbol_filtered (gdb_stdout, exp,
@@ -1222,7 +1222,7 @@ address_info (char *exp, int from_tty)
 	  printf_filtered ("\" is at ");
 	  fputs_filtered (paddress (gdbarch, load_addr), gdb_stdout);
 	  printf_filtered (" in a file compiled without debugging");
-	  section = SYMBOL_OBJ_SECTION (msymbol);
+	  section = MSYMBOL_OBJ_SECTION (msymbol);
 	  if (section_is_overlay (section))
 	    {
 	      load_addr = overlay_unmapped_address (load_addr, section);
@@ -1354,8 +1354,8 @@ address_info (char *exp, int from_tty)
 	  printf_filtered ("unresolved");
 	else
 	  {
-	    section = SYMBOL_OBJ_SECTION (msym);
-	    load_addr = SYMBOL_VALUE_ADDRESS (msym);
+	    section = MSYMBOL_OBJ_SECTION (msym);
+	    load_addr = MSYMBOL_VALUE_ADDRESS (msym);
 
 	    if (section
 		&& (section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)

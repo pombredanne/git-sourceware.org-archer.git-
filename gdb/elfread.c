@@ -745,11 +745,11 @@ elf_gnu_ifunc_record_cache (const char *name, CORE_ADDR addr)
   msym = lookup_minimal_symbol_by_pc (addr);
   if (msym == NULL)
     return 0;
-  if (SYMBOL_VALUE_ADDRESS (msym) != addr)
+  if (MSYMBOL_VALUE_ADDRESS (msym) != addr)
     return 0;
   /* minimal symbols have always SYMBOL_OBJ_SECTION non-NULL.  */
-  sect = SYMBOL_OBJ_SECTION (msym)->the_bfd_section;
-  objfile = SYMBOL_OBJ_SECTION (msym)->objfile;
+  sect = MSYMBOL_OBJ_SECTION (msym)->the_bfd_section;
+  objfile = MSYMBOL_OBJ_SECTION (msym)->objfile;
 
   /* If .plt jumps back to .plt the symbol is still deferred for later
      resolution and it has no use for GDB.  Besides ".text" this symbol can
@@ -871,7 +871,7 @@ elf_gnu_ifunc_resolve_by_got (const char *name, CORE_ADDR *addr_p)
 	continue;
       if (MSYMBOL_TYPE (msym) != mst_slot_got_plt)
 	continue;
-      pointer_address = SYMBOL_VALUE_ADDRESS (msym);
+      pointer_address = MSYMBOL_VALUE_ADDRESS (msym);
 
       plt = bfd_get_section_by_name (obfd, ".plt");
       if (plt == NULL)

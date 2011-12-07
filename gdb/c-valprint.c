@@ -290,10 +290,10 @@ c_val_print (struct type *type, const gdb_byte *valaddr,
 	      struct minimal_symbol *msymbol =
 	      lookup_minimal_symbol_by_pc (vt_address);
 	      if ((msymbol != NULL)
-		  && (vt_address == SYMBOL_VALUE_ADDRESS (msymbol)))
+		  && (vt_address == MSYMBOL_VALUE_ADDRESS (msymbol)))
 		{
 		  fputs_filtered (" <", stream);
-		  fputs_filtered (SYMBOL_PRINT_NAME (msymbol), stream);
+		  fputs_filtered (MSYMBOL_PRINT_NAME (msymbol), stream);
 		  fputs_filtered (">", stream);
 		}
 	      if (vt_address && options->vtblprint)
@@ -305,7 +305,7 @@ c_val_print (struct type *type, const gdb_byte *valaddr,
 		  int is_this_fld;
 
 		  if (msymbol != NULL)
-		    wsym = lookup_symbol (SYMBOL_LINKAGE_NAME (msymbol),
+		    wsym = lookup_symbol (MSYMBOL_LINKAGE_NAME (msymbol),
 					  block, VAR_DOMAIN,
 					  &is_this_fld);
 

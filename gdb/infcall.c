@@ -359,7 +359,7 @@ get_function_name (CORE_ADDR funaddr, char *buf, int buf_size)
     struct minimal_symbol *msymbol = lookup_minimal_symbol_by_pc (funaddr);
 
     if (msymbol)
-      return SYMBOL_PRINT_NAME (msymbol);
+      return MSYMBOL_PRINT_NAME (msymbol);
   }
 
   {
@@ -653,7 +653,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
 	real_pc = funaddr;
 	if (sym)
 	  {
-	    dummy_addr = SYMBOL_VALUE_ADDRESS (sym);
+	    dummy_addr = MSYMBOL_VALUE_ADDRESS (sym);
 	    /* Make certain that the address points at real code, and not
 	       a function descriptor.  */
 	    dummy_addr = gdbarch_convert_from_func_ptr_addr (gdbarch,

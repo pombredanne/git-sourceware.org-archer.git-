@@ -465,9 +465,9 @@ info_common_command (char *comname, int from_tty)
 	lookup_minimal_symbol_by_pc (get_frame_pc (fi));
 
       if (msymbol != NULL
-	  && (SYMBOL_VALUE_ADDRESS (msymbol)
+	  && (MSYMBOL_VALUE_ADDRESS (msymbol)
 	      > BLOCK_START (SYMBOL_BLOCK_VALUE (func))))
-	funname = SYMBOL_LINKAGE_NAME (msymbol);
+	funname = MSYMBOL_LINKAGE_NAME (msymbol);
       else
 	funname = SYMBOL_LINKAGE_NAME (func);
     }
@@ -477,7 +477,7 @@ info_common_command (char *comname, int from_tty)
 	lookup_minimal_symbol_by_pc (get_frame_pc (fi));
 
       if (msymbol != NULL)
-	funname = SYMBOL_LINKAGE_NAME (msymbol);
+	funname = MSYMBOL_LINKAGE_NAME (msymbol);
       else /* Got no 'funname', code below will fail.  */
 	error (_("No function found for frame."));
     }

@@ -172,8 +172,8 @@ extern const char *symbol_get_demangled_name
 extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 
 /* Note that all the following SYMBOL_* macros are used with the
-   SYMBOL argument being either a partial symbol, a minimal symbol or
-   a full symbol.  All three types have a ginfo field.  In particular
+   SYMBOL argument being either a partial symbol or
+   a full symbol.  Both types have a ginfo field.  In particular
    the SYMBOL_SET_LANGUAGE, SYMBOL_DEMANGLED_NAME, etc.
    macros cannot be entirely substituted by
    functions, unless the callers are changed to pass in the ginfo
@@ -326,7 +326,7 @@ struct minimal_symbol
      The SYMBOL_VALUE_ADDRESS contains the address that this symbol
      corresponds to.  */
 
-  struct general_symbol_info ginfo;
+  struct general_symbol_info mginfo;
 
   /* Size of this symbol.  end_psymtab in dbxread.c uses this
      information to calculate the end of the partial symtab based on the
@@ -360,6 +360,31 @@ struct minimal_symbol
 #define MSYMBOL_TARGET_FLAG_2(msymbol)  (msymbol)->target_flag_2
 #define MSYMBOL_SIZE(msymbol)		(msymbol)->size
 #define MSYMBOL_TYPE(msymbol)		(msymbol)->type
+
+#define MSYMBOL_VALUE(symbol)		(symbol)->mginfo.value.ivalue
+#define MSYMBOL_VALUE_ADDRESS(symbol)	(symbol)->mginfo.value.address
+#define MSYMBOL_VALUE_BYTES(symbol)	(symbol)->mginfo.value.bytes
+#define MSYMBOL_BLOCK_VALUE(symbol)	(symbol)->mginfo.value.block
+#define MSYMBOL_VALUE_CHAIN(symbol)	(symbol)->mginfo.value.chain
+#define MSYMBOL_LANGUAGE(symbol)	(symbol)->mginfo.language
+#define MSYMBOL_SECTION(symbol)		(symbol)->mginfo.section
+#define MSYMBOL_OBJ_SECTION(symbol)	(symbol)->mginfo.obj_section
+
+#define MSYMBOL_NATURAL_NAME(symbol) \
+  (symbol_natural_name (&(symbol)->mginfo))
+#define MSYMBOL_LINKAGE_NAME(symbol)	(symbol)->mginfo.name
+#define MSYMBOL_PRINT_NAME(symbol)					\
+  (demangle ? MSYMBOL_NATURAL_NAME (symbol) : MSYMBOL_LINKAGE_NAME (symbol))
+#define MSYMBOL_DEMANGLED_NAME(symbol) \
+  (symbol_demangled_name (&(symbol)->mginfo))
+#define MSYMBOL_SET_LANGUAGE(symbol,language) \
+  (symbol_set_language (&(symbol)->mginfo, (language)))
+#define MSYMBOL_SEARCH_NAME(symbol)					 \
+   (symbol_search_name (&(symbol)->mginfo))
+#define MSYMBOL_MATCHES_SEARCH_NAME(symbol, name)			\
+  (strcmp_iw (MSYMBOL_SEARCH_NAME (symbol), (name)) == 0)
+#define MSYMBOL_SET_NAMES(symbol,linkage_name,len,copy_name,objfile)	\
+  symbol_set_names (&(symbol)->mginfo, linkage_name, len, copy_name, objfile)
 
 #include "minsyms.h"
 

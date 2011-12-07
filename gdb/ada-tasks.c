@@ -641,7 +641,7 @@ read_atcb (CORE_ADDR task_id, struct ada_task_info *task_info)
 	  msym = lookup_minimal_symbol_by_pc (task_id);
 	  if (msym)
 	    {
-	      const char *full_name = SYMBOL_LINKAGE_NAME (msym);
+	      const char *full_name = MSYMBOL_LINKAGE_NAME (msym);
 	      const char *task_name = full_name;
 	      const char *p;
 
@@ -861,7 +861,7 @@ ada_tasks_inferior_data_sniffer (struct ada_tasks_inferior_data *data)
   if (msym != NULL)
     {
       data->known_tasks_kind = ADA_TASKS_ARRAY;
-      data->known_tasks_addr = SYMBOL_VALUE_ADDRESS (msym);
+      data->known_tasks_addr = MSYMBOL_VALUE_ADDRESS (msym);
 
       /* Try to get pointer type and array length from the symtab.  */
       sym = lookup_symbol_in_language (KNOWN_TASKS_NAME, NULL, VAR_DOMAIN,
@@ -906,7 +906,7 @@ ada_tasks_inferior_data_sniffer (struct ada_tasks_inferior_data *data)
   if (msym != NULL)
     {
       data->known_tasks_kind = ADA_TASKS_LIST;
-      data->known_tasks_addr = SYMBOL_VALUE_ADDRESS (msym);
+      data->known_tasks_addr = MSYMBOL_VALUE_ADDRESS (msym);
       data->known_tasks_length = 1;
 
       sym = lookup_symbol_in_language (KNOWN_TASKS_LIST, NULL, VAR_DOMAIN,

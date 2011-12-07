@@ -578,7 +578,7 @@ lm_base (void)
 
   if (got_sym != 0)
     {
-      addr = SYMBOL_VALUE_ADDRESS (got_sym);
+      addr = MSYMBOL_VALUE_ADDRESS (got_sym);
       if (solib_dsbt_debug)
 	fprintf_unfiltered (gdb_stdlog,
 			    "lm_base: get addr %x by _GLOBAL_OFFSET_TABLE_.\n",
@@ -1009,12 +1009,12 @@ enable_break (void)
     }
 
   create_solib_event_breakpoint (target_gdbarch,
-				 SYMBOL_VALUE_ADDRESS (start));
+				 MSYMBOL_VALUE_ADDRESS (start));
 
   if (solib_dsbt_debug)
     fprintf_unfiltered (gdb_stdlog,
 			"enable_break: solib event breakpoint placed at : %s\n",
-			hex_string_custom (SYMBOL_VALUE_ADDRESS (start), 8));
+			hex_string_custom (MSYMBOL_VALUE_ADDRESS (start), 8));
   return 1;
 }
 
