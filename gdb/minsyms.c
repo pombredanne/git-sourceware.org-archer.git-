@@ -964,7 +964,7 @@ prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
   MSYMBOL_SET_LANGUAGE (msymbol, language_auto);
   MSYMBOL_SET_NAMES (msymbol, name, name_len, copy_name, objfile);
 
-  MSYMBOL_VALUE_ADDRESS (msymbol) = address;
+  SET_MSYMBOL_VALUE_ADDRESS (msymbol, address);
   MSYMBOL_SECTION (msymbol) = section;
   MSYMBOL_SECTION_INDEX (msymbol) = 0;
 
@@ -1267,11 +1267,7 @@ install_minimal_symbols (struct objfile *objfile)
          symbol count does *not* include this null symbol, which is why it
          is indexed by mcount and not mcount-1.  */
 
-      MSYMBOL_LINKAGE_NAME (&msymbols[mcount]) = NULL;
-      MSYMBOL_VALUE_ADDRESS (&msymbols[mcount]) = 0;
-      MSYMBOL_TARGET_FLAG_1 (&msymbols[mcount]) = 0;
-      MSYMBOL_TARGET_FLAG_2 (&msymbols[mcount]) = 0;
-      MSYMBOL_SIZE (&msymbols[mcount]) = 0;
+      memset (&msymbols[mcount], 0, sizeof (struct minimal_symbol));
       MSYMBOL_TYPE (&msymbols[mcount]) = mst_unknown;
       MSYMBOL_SET_LANGUAGE (&msymbols[mcount], language_unknown);
 
