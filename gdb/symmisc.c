@@ -214,7 +214,7 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
   index = 0;
   ALL_OBJFILE_MSYMBOLS (objfile, msymbol)
     {
-      struct obj_section *section = MSYMBOL_OBJ_SECTION (msymbol);
+      struct obj_section *section = MSYMBOL_OBJ_SECTION (objfile, msymbol);
 
       switch (MSYMBOL_TYPE (msymbol))
 	{

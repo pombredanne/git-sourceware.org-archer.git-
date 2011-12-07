@@ -375,7 +375,10 @@ struct minimal_symbol
 #define MSYMBOL_VALUE_CHAIN(symbol)	(symbol)->mginfo.value.chain
 #define MSYMBOL_LANGUAGE(symbol)	(symbol)->mginfo.language
 #define MSYMBOL_SECTION(symbol)		(symbol)->mginfo.section
-#define MSYMBOL_OBJ_SECTION(symbol)	(symbol)->mginfo.sinfo.obj_section
+#define MSYMBOL_OBJ_SECTION(objfile, symbol) \
+  (&((objfile)->sections[(symbol)->mginfo.sinfo.index]))
+#define MSYMBOL_SECTION_INDEX(symbol) \
+  (symbol)->mginfo.sinfo.index
 
 #define MSYMBOL_NATURAL_NAME(symbol) \
   (symbol_natural_name (&(symbol)->mginfo))

@@ -994,7 +994,7 @@ fixup_section (struct general_symbol_info *ginfo,
   msym = lookup_minimal_symbol_by_pc_name (addr, ginfo->name, objfile);
   if (msym)
     {
-      ginfo->sinfo.obj_section = MSYMBOL_OBJ_SECTION (msym);
+      ginfo->sinfo.obj_section = MSYMBOL_OBJ_SECTION (objfile, msym);
       ginfo->section = MSYMBOL_SECTION (msym);
     }
   else
@@ -2715,9 +2715,9 @@ skip_prologue_sal (struct symtab_and_line *sal)
 	}
 
       pc = MSYMBOL_VALUE_ADDRESS (msymbol);
-      section = MSYMBOL_OBJ_SECTION (msymbol);
-      name = MSYMBOL_LINKAGE_NAME (msymbol);
       objfile = msymbol_objfile (msymbol);
+      section = MSYMBOL_OBJ_SECTION (objfile, msymbol);
+      name = MSYMBOL_LINKAGE_NAME (msymbol);
     }
 
   gdbarch = get_objfile_arch (objfile);

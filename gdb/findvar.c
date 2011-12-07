@@ -560,18 +560,20 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
     case LOC_UNRESOLVED:
       {
 	struct minimal_symbol *msym;
+	struct objfile *objf;
 	struct obj_section *obj_section;
 
-	msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (var), NULL, NULL);
+	msym = lookup_minimal_symbol_full (SYMBOL_LINKAGE_NAME (var),
+					   NULL, NULL, &objf);
 	if (msym == NULL)
 	  error (_("No global symbol \"%s\"."), SYMBOL_LINKAGE_NAME (var));
 	if (overlay_debugging)
 	  addr = symbol_overlayed_address (MSYMBOL_VALUE_ADDRESS (msym),
-					   MSYMBOL_OBJ_SECTION (msym));
+					   MSYMBOL_OBJ_SECTION (objf, msym));
 	else
 	  addr = MSYMBOL_VALUE_ADDRESS (msym);
 
-	obj_section = MSYMBOL_OBJ_SECTION (msym);
+	obj_section = MSYMBOL_OBJ_SECTION (objf, msym);
 	if (obj_section
 	    && (obj_section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
 	  addr = target_translate_tls_address (obj_section->objfile, addr);

@@ -8941,13 +8941,15 @@ resolve_sal_pc (struct symtab_and_line *sal)
 	         happen in assembly source).  */
 
 	      struct minimal_symbol *msym;
+	      struct objfile *objfile;
 	      struct cleanup *old_chain = save_current_space_and_thread ();
 
 	      switch_to_program_space_and_thread (sal->pspace);
 
-	      msym = lookup_minimal_symbol_by_pc (sal->pc);
+	      msym = lookup_minimal_symbol_and_objfile_by_pc (sal->pc,
+							      &objfile);
 	      if (msym)
-		sal->section = MSYMBOL_OBJ_SECTION (msym);
+		sal->section = MSYMBOL_OBJ_SECTION (objfile, msym);
 
 	      do_cleanups (old_chain);
 	    }

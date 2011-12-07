@@ -1213,7 +1213,9 @@ address_info (char *exp, int from_tty)
 
       if (msymbol != NULL)
 	{
-	  gdbarch = get_objfile_arch (msymbol_objfile (msymbol));
+	  struct objfile *objfile = msymbol_objfile (msymbol);
+
+	  gdbarch = get_objfile_arch (objfile);
 	  load_addr = MSYMBOL_VALUE_ADDRESS (msymbol);
 
 	  printf_filtered ("Symbol \"");
@@ -1222,7 +1224,7 @@ address_info (char *exp, int from_tty)
 	  printf_filtered ("\" is at ");
 	  fputs_filtered (paddress (gdbarch, load_addr), gdb_stdout);
 	  printf_filtered (" in a file compiled without debugging");
-	  section = MSYMBOL_OBJ_SECTION (msymbol);
+	  section = MSYMBOL_OBJ_SECTION (objfile, msymbol);
 	  if (section_is_overlay (section))
 	    {
 	      load_addr = overlay_unmapped_address (load_addr, section);
@@ -1354,7 +1356,9 @@ address_info (char *exp, int from_tty)
 	  printf_filtered ("unresolved");
 	else
 	  {
-	    section = MSYMBOL_OBJ_SECTION (msym);
+	    struct objfile *objfile = msymbol_objfile (msym);
+
+	    section = MSYMBOL_OBJ_SECTION (objfile, msym);
 	    load_addr = MSYMBOL_VALUE_ADDRESS (msym);
 
 	    if (section

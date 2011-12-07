@@ -292,8 +292,8 @@ find_pc_partial_function_gnu_ifunc (CORE_ADDR pc, const char **name,
 	{
 	  if (MSYMBOL_VALUE_ADDRESS (msymbol + i)
 	      != MSYMBOL_VALUE_ADDRESS (msymbol)
-	      && MSYMBOL_OBJ_SECTION (msymbol + i)
-	      == MSYMBOL_OBJ_SECTION (msymbol))
+	      && MSYMBOL_SECTION_INDEX (msymbol + i)
+	      == MSYMBOL_SECTION_INDEX (msymbol))
 	    break;
 	}
 

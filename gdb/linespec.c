@@ -2745,7 +2745,7 @@ minsym_found (struct linespec_state *self, struct objfile *objfile,
 
   sal = find_pc_sect_line (MSYMBOL_VALUE_ADDRESS (msymbol),
 			   (struct obj_section *) 0, 0);
-  sal.section = MSYMBOL_OBJ_SECTION (msymbol);
+  sal.section = MSYMBOL_OBJ_SECTION (objfile, msymbol);
 
   /* The minimal symbol might point to a function descriptor;
      resolve it to the actual code address instead.  */

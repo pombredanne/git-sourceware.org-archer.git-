@@ -178,12 +178,13 @@ hppa64_hpux_in_solib_call_trampoline (struct gdbarch *gdbarch,
   asection *sec;
   CORE_ADDR addr;
   int insn, i;
+  struct objfile *objf;
 
-  minsym = lookup_minimal_symbol_by_pc (pc);
+  minsym = lookup_minimal_symbol_and_objfile_by_pc (pc, &objf);
   if (! minsym)
     return 0;
 
-  sec = MSYMBOL_OBJ_SECTION (minsym)->the_bfd_section;
+  sec = MSYMBOL_OBJ_SECTION (objf, minsym)->the_bfd_section;
 
   if (bfd_get_section_vma (sec->owner, sec) <= pc
       && pc < (bfd_get_section_vma (sec->owner, sec)

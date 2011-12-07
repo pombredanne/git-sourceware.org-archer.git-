@@ -477,9 +477,12 @@ maintenance_translate_address (char *arg, int from_tty)
   address = parse_and_eval_address (p);
 
   if (sect)
-    sym = lookup_minimal_symbol_by_pc_section (address, sect);
+    {
+      sym = lookup_minimal_symbol_by_pc_section (address, sect);
+      objfile = sect->objfile;
+    }
   else
-    sym = lookup_minimal_symbol_by_pc (address);
+    sym = lookup_minimal_symbol_and_objfile_by_pc (address, &objfile);
 
   if (sym)
     {
@@ -487,7 +490,7 @@ maintenance_translate_address (char *arg, int from_tty)
       const char *symbol_offset
 	= pulongest (address - MSYMBOL_VALUE_ADDRESS (sym));
 
-      sect = MSYMBOL_OBJ_SECTION(sym);
+      sect = MSYMBOL_OBJ_SECTION (objfile, sym);
       if (sect != NULL)
 	{
 	  const char *section_name;

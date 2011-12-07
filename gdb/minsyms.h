@@ -183,6 +183,11 @@ struct minimal_symbol *lookup_minimal_symbol_and_objfile (const char *,
 
    This function only searches the mangled (linkage) names.  */
 
+struct minimal_symbol *lookup_minimal_symbol_full (const char *,
+						   const char *,
+						   struct objfile *,
+						   struct objfile **);
+
 struct minimal_symbol *lookup_minimal_symbol_text (const char *,
 						   struct objfile *);
 
@@ -215,6 +220,9 @@ struct minimal_symbol *lookup_minimal_symbol_by_pc_name
 
    Returns a pointer to the minimal symbol if such a symbol is found,
    or NULL if PC is not in a suitable range.  */
+
+struct minimal_symbol *lookup_minimal_symbol_and_objfile_by_pc
+    (CORE_ADDR pc, struct objfile **objf);
 
 struct minimal_symbol *lookup_minimal_symbol_by_pc_section
     (CORE_ADDR,
