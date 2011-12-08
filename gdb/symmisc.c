@@ -93,7 +93,9 @@ print_symbol_bcache_statistics (void)
     print_bcache_statistics (psymbol_bcache_get_bcache (objfile->psymbol_cache),
                              "partial symbol cache");
     print_bcache_statistics (objfile->macro_cache, "preprocessor macro cache");
-    print_bcache_statistics (objfile->filename_cache, "file name cache");
+    /* FIXME */
+    print_bcache_statistics (objfile->per_bfd->filename_cache,
+			     "file name cache");
   }
   immediate_quit--;
 }
@@ -153,8 +155,9 @@ print_objfile_statistics (void)
 		                          (objfile->psymbol_cache)));
     printf_filtered (_("  Total memory used for macro cache: %d\n"),
 		     bcache_memory_used (objfile->macro_cache));
+    /* FIXME */
     printf_filtered (_("  Total memory used for file name cache: %d\n"),
-		     bcache_memory_used (objfile->filename_cache));
+		     bcache_memory_used (objfile->per_bfd->filename_cache));
   }
   immediate_quit--;
 }
@@ -169,8 +172,9 @@ dump_objfile (struct objfile *objfile)
   gdb_print_host_address (objfile, gdb_stdout);
   printf_filtered (", bfd at ");
   gdb_print_host_address (objfile->obfd, gdb_stdout);
+  /* FIXME */
   printf_filtered (", %d minsyms\n\n",
-		   objfile->minimal_symbol_count);
+		   objfile->per_bfd->minimal_symbol_count);
 
   if (objfile->sf)
     objfile->sf->qf->dump (objfile);
@@ -206,7 +210,7 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
   char ms_type;
 
   fprintf_filtered (outfile, "\nObject file %s:\n\n", objfile->name);
-  if (objfile->minimal_symbol_count == 0)
+  if (objfile->per_bfd->minimal_symbol_count == 0)
     {
       fprintf_filtered (outfile, "No minimal symbols found.\n");
       return;
@@ -269,10 +273,10 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
       fputs_filtered ("\n", outfile);
       index++;
     }
-  if (objfile->minimal_symbol_count != index)
+  if (objfile->per_bfd->minimal_symbol_count != index)
     {
       warning (_("internal error:  minimal symbol count %d != %d"),
-	       objfile->minimal_symbol_count, index);
+	       objfile->per_bfd->minimal_symbol_count, index);
     }
   fprintf_filtered (outfile, "\n");
 }

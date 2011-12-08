@@ -931,7 +931,7 @@ syms_from_objfile (struct objfile *objfile,
 		   int add_flags)
 {
   struct section_addr_info *local_addr = NULL;
-  struct cleanup *old_chain;
+  struct cleanup *old_chain, *inner_cleanup;
   const int mainline = add_flags & SYMFILE_MAINLINE;
 
   gdb_assert (! (addrs && offsets));
@@ -1013,7 +1013,16 @@ syms_from_objfile (struct objfile *objfile,
       init_objfile_sect_indices (objfile);
     }
 
+  if (objfile->per_bfd->minsyms_read)
+    {
+      add_flags |= SYMFILE_MINSYMS_READ;
+      inner_cleanup = inhibit_minimal_symbol_registration (objfile);
+    }
+  else
+    inner_cleanup = make_cleanup (null_cleanup, NULL);
   (*objfile->sf->sym_read) (objfile, add_flags);
+  do_cleanups (inner_cleanup);
+  objfile->per_bfd->minsyms_read = 1;
 
   if ((add_flags & SYMFILE_NO_READ) == 0)
     require_partial_symbols (objfile, 0);
@@ -2471,9 +2480,9 @@ reread_symbols (void)
       new_modtime = new_statbuf.st_mtime;
       if (new_modtime != objfile->mtime)
 	{
-	  struct cleanup *old_cleanups;
+	  struct cleanup *old_cleanups, *inner_cleanup;
 	  struct section_offsets *offsets;
-	  int num_offsets;
+	  int num_offsets, add_flags;
 	  char *obfd_filename;
 
 	  printf_unfiltered (_("`%s' has changed; re-reading symbols.\n"),
@@ -2569,8 +2578,6 @@ reread_symbols (void)
 	  objfile->psymbol_cache = psymbol_bcache_init ();
 	  bcache_xfree (objfile->macro_cache);
 	  objfile->macro_cache = bcache_xmalloc (NULL, NULL);
-	  bcache_xfree (objfile->filename_cache);
-	  objfile->filename_cache = bcache_xmalloc (NULL,NULL);
 	  if (objfile->demangled_names_hash != NULL)
 	    {
 	      htab_delete (objfile->demangled_names_hash);
@@ -2583,13 +2590,10 @@ reread_symbols (void)
 	  objfile->psymtabs_addrmap = NULL;
 	  objfile->free_psymtabs = NULL;
 	  objfile->template_symbols = NULL;
-	  objfile->msymbols = NULL;
 	  objfile->deprecated_sym_private = NULL;
-	  objfile->minimal_symbol_count = 0;
-	  memset (&objfile->msymbol_hash, 0,
-		  sizeof (objfile->msymbol_hash));
-	  memset (&objfile->msymbol_demangled_hash, 0,
-		  sizeof (objfile->msymbol_demangled_hash));
+	  objfile->demangled_names_hash = NULL;
+
+	  set_objfile_per_bfd (objfile);
 
 	  /* obstack_init also initializes the obstack so it is
 	     empty.  We could use obstack_specify_allocation but
@@ -2617,9 +2621,23 @@ reread_symbols (void)
 
 	  (*objfile->sf->sym_init) (objfile);
 	  clear_complaints (&symfile_complaints, 1, 1);
+
+	  if (objfile->per_bfd->minsyms_read)
+	    {
+	      add_flags = SYMFILE_MINSYMS_READ;
+	      inner_cleanup = inhibit_minimal_symbol_registration (objfile);
+	    }
+	  else
+	    {
+	      add_flags = 0;
+	      inner_cleanup = make_cleanup (null_cleanup, NULL);
+	    }
 	  /* Do not set flags as this is safe and we don't want to be
              verbose.  */
-	  (*objfile->sf->sym_read) (objfile, 0);
+	  (*objfile->sf->sym_read) (objfile, add_flags);
+	  do_cleanups (inner_cleanup);
+	  objfile->per_bfd->minsyms_read = 1;
+
 	  if ((objfile->flags & OBJF_PSYMTABS_READ) != 0)
 	    {
 	      objfile->flags &= ~OBJF_PSYMTABS_READ;
@@ -2875,7 +2893,7 @@ allocate_symtab (const char *filename, struct objfile *objfile)
     obstack_alloc (&objfile->objfile_obstack, sizeof (struct symtab));
   memset (symtab, 0, sizeof (*symtab));
   symtab->filename = (char *) bcache (filename, strlen (filename) + 1,
-				      objfile->filename_cache);
+				      objfile->per_bfd->filename_cache);
   symtab->fullname = NULL;
   symtab->language = deduce_language_from_filename (filename);
   symtab->debugformat = "unknown";

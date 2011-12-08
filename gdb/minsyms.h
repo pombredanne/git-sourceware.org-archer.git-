@@ -123,12 +123,6 @@ void install_minimal_symbols (struct objfile *);
 
 void terminate_minimal_symbol_table (struct objfile *objfile);
 
-/* Sort all the minimal symbols in OBJFILE.  This should be only be
-   called after relocating symbols; it ensures that the minimal
-   symbols are properly sorted by address.  */
-
-void msymbols_sort (struct objfile *objfile);
-
 
 
 /* Compute a hash code for the string argument.  */
@@ -260,5 +254,15 @@ void iterate_over_minimal_symbols (struct objfile *objf,
    any needed section offset added in.  */
 
 CORE_ADDR msymbol_address (const struct minimal_symbol *msym);
+
+/* Inhibit minimal symbol registration for OBJFILE.  This is used when
+   reading minimal symbols from a BFD that has already been read.  It
+   is a hack to let us avoid updating all the symbol readers, which
+   tend to mix minimal- and partial-symbol reading.
+
+   This returns a cleanup which should be run to restore the previous
+   state.  */
+
+struct cleanup *inhibit_minimal_symbol_registration (struct objfile *);
 
 #endif /* MINSYMS_H */

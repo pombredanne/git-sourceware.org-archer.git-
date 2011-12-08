@@ -442,15 +442,15 @@ gdb_mangle_name (struct type *type, int method_id, int signature_id)
 
 static void
 symbol_init_cplus_specific (struct general_symbol_info *gsymbol,
-                           struct objfile *objfile)
+			    struct obstack *obstack)
 {
   /* A language_specific structure should not have been previously
      initialized.  */
   gdb_assert (gsymbol->language_specific.cplus_specific == NULL);
-  gdb_assert (objfile != NULL);
+  gdb_assert (obstack != NULL);
 
   gsymbol->language_specific.cplus_specific =
-      OBSTACK_ZALLOC (&objfile->objfile_obstack, struct cplus_specific);
+      OBSTACK_ZALLOC (obstack, struct cplus_specific);
 }
 
 /* Set the demangled name of GSYMBOL to NAME.  NAME must be already
@@ -461,12 +461,12 @@ symbol_init_cplus_specific (struct general_symbol_info *gsymbol,
 void
 symbol_set_demangled_name (struct general_symbol_info *gsymbol,
                            char *name,
-                           struct objfile *objfile)
+                           struct obstack *obstack)
 {
   if (gsymbol->language == language_cplus)
     {
       if (gsymbol->language_specific.cplus_specific == NULL)
-	symbol_init_cplus_specific (gsymbol, objfile);
+	symbol_init_cplus_specific (gsymbol, obstack);
 
       gsymbol->language_specific.cplus_specific->demangled_name = name;
     }
@@ -550,14 +550,14 @@ eq_demangled_name_entry (const void *a, const void *b)
    name.  The entry is hashed via just the mangled name.  */
 
 static void
-create_demangled_names_hash (struct objfile *objfile)
+create_demangled_names_hash (htab_t *demangled_names_hash)
 {
   /* Choose 256 as the starting size of the hash table, somewhat arbitrarily.
      The hash table code will round this up to the next prime number.
      Choosing a much larger table size wastes memory, and saves only about
      1% in symbol reading.  */
 
-  objfile->demangled_names_hash = htab_create_alloc
+  *demangled_names_hash = htab_create_alloc
     (256, hash_demangled_name_entry, eq_demangled_name_entry,
      NULL, xcalloc, xfree);
 }
@@ -661,7 +661,8 @@ symbol_find_demangled_name (struct general_symbol_info *gsymbol,
 void
 symbol_set_names (struct general_symbol_info *gsymbol,
 		  const char *linkage_name, int len, int copy_name,
-		  struct objfile *objfile)
+		  struct obstack *storage,
+		  htab_t *demangled_names_hash)
 {
   struct demangled_name_entry **slot;
   /* A 0-terminated copy of the linkage name.  */
@@ -687,7 +688,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	gsymbol->name = linkage_name;
       else
 	{
-	  char *name = obstack_alloc (&objfile->objfile_obstack, len + 1);
+	  char *name = obstack_alloc (storage, len + 1);
 
 	  memcpy (name, linkage_name, len);
 	  name[len] = '\0';
@@ -698,8 +699,8 @@ symbol_set_names (struct general_symbol_info *gsymbol,
       return;
     }
 
-  if (objfile->demangled_names_hash == NULL)
-    create_demangled_names_hash (objfile);
+  if (*demangled_names_hash == NULL)
+    create_demangled_names_hash (demangled_names_hash);
 
   /* The stabs reader generally provides names that are not
      NUL-terminated; most of the other readers don't do this, so we
@@ -738,7 +739,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 
   entry.mangled = (char *) lookup_name;
   slot = ((struct demangled_name_entry **)
-	  htab_find_slot (objfile->demangled_names_hash,
+	  htab_find_slot (*demangled_names_hash,
 			  &entry, INSERT));
 
   /* If this name is not in the hash table, add it.  */
@@ -759,7 +760,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	 us better bcache hit rates for partial symbols.  */
       if (!copy_name && lookup_name == linkage_name)
 	{
-	  *slot = obstack_alloc (&objfile->objfile_obstack,
+	  *slot = obstack_alloc (storage,
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + demangled_len + 1);
@@ -770,7 +771,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 	  /* If we must copy the mangled name, put it directly after
 	     the demangled name so we can have a single
 	     allocation.  */
-	  *slot = obstack_alloc (&objfile->objfile_obstack,
+	  *slot = obstack_alloc (storage,
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + lookup_len + demangled_len + 2);
@@ -789,9 +790,9 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 
   gsymbol->name = (*slot)->mangled + lookup_len - len;
   if ((*slot)->demangled[0] != '\0')
-    symbol_set_demangled_name (gsymbol, (*slot)->demangled, objfile);
+    symbol_set_demangled_name (gsymbol, (*slot)->demangled, storage);
   else
-    symbol_set_demangled_name (gsymbol, NULL, objfile);
+    symbol_set_demangled_name (gsymbol, NULL, storage);
 }
 
 /* Return the source code name of a symbol.  In languages where

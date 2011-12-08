@@ -420,7 +420,14 @@ enum symfile_add_flags
 
     /* Do not immediately read symbols for this file.  By default,
        symbols are read when the objfile is created.  */
-    SYMFILE_NO_READ = 1 << 4
+    SYMFILE_NO_READ = 1 << 4,
+
+    /* This can be passed to sym_read to indicate that the minimal
+       symbols for this objfile's BFD have already been read.  If set,
+       any minimal symbols created by sym_read will be ignored; see
+       inhibit_minimal_symbol_registration.  In this case, the reader
+       may opt to skip the work of reading minimal symbols.  */
+    SYMFILE_MINSYMS_READ = 1 << 5
   };
 
 extern void syms_from_objfile (struct objfile *,

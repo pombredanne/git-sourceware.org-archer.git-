@@ -171,7 +171,7 @@ struct general_symbol_info
 };
 
 extern void symbol_set_demangled_name (struct general_symbol_info *, char *,
-                                       struct objfile *);
+                                       struct obstack *);
 
 extern const char *symbol_get_demangled_name
   (const struct general_symbol_info *);
@@ -213,10 +213,13 @@ extern void symbol_set_language (struct general_symbol_info *symbol,
 /* Set the linkage and natural names of a symbol, by demangling
    the linkage name.  */
 #define SYMBOL_SET_NAMES(symbol,linkage_name,len,copy_name,objfile)	\
-  symbol_set_names (&(symbol)->ginfo, linkage_name, len, copy_name, objfile)
+  symbol_set_names (&(symbol)->ginfo, linkage_name, len, copy_name,	\
+		    &objfile->objfile_obstack, &objfile->demangled_names_hash)
+
 extern void symbol_set_names (struct general_symbol_info *symbol,
 			      const char *linkage_name, int len, int copy_name,
-			      struct objfile *objfile);
+			      struct obstack *symbol_obstack,
+			      htab_t *demangled_names_hash);
 
 /* Now come lots of name accessor macros.  Short version as to when to
    use which: Use SYMBOL_NATURAL_NAME to refer to the name of the
@@ -399,7 +402,9 @@ struct minimal_symbol
 #define MSYMBOL_MATCHES_SEARCH_NAME(symbol, name)			\
   (strcmp_iw (MSYMBOL_SEARCH_NAME (symbol), (name)) == 0)
 #define MSYMBOL_SET_NAMES(symbol,linkage_name,len,copy_name,objfile)	\
-  symbol_set_names (&(symbol)->mginfo, linkage_name, len, copy_name, objfile)
+  symbol_set_names (&(symbol)->mginfo, linkage_name, len, copy_name,	\
+		    &objfile->per_bfd->storage_obstack,			\
+		    &objfile->per_bfd->demangled_names_hash)
 
 #include "minsyms.h"
 
