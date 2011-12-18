@@ -87,6 +87,38 @@ PACKAGE=gdb
 AC_DEFINE_UNQUOTED(PACKAGE, "$PACKAGE", [Name of this package. ])
 AC_SUBST(PACKAGE)
 
+# Do we have a single-tree copy of texinfo?  Even if we do, we can't
+# rely on it - libiberty is built before texinfo.
+AC_CHECK_PROG(MAKEINFO, makeinfo, makeinfo, )
+if test "x$MAKEINFO" = "x"; then
+  AC_ERROR([makeinfo is required for compilation])
+else
+  case "$MAKEINFO" in
+    */missing\ makeinfo*)
+      AC_ERROR([makeinfo is required for compilation])
+      ;;
+  esac
+fi
+AC_SUBST(MAKEINFO)
+
+# --split-size=5000000 may be already in $MAKEINFO from parent configure.
+# Re-running configure in gdb/ would lose it so ensure it stays present.
+MAKEINFOFLAGS=${MAKEINFOFLAGS---split-size=5000000}
+AC_SUBST(MAKEINFOFLAGS)
+
+MAKEINFO_EXTRA_FLAGS=""
+AC_CACHE_CHECK([whether $MAKEINFO supports @click], gdb_cv_have_makeinfo_click,
+  [echo '@clicksequence{a @click{} b}' >conftest.texinfo
+  if eval "$MAKEINFO conftest.texinfo >&5 2>&5"; then
+    gdb_cv_have_makeinfo_click=yes
+  else
+    gdb_cv_have_makeinfo_click=no
+  fi])
+if test x"$gdb_cv_have_makeinfo_click" = xyes; then
+  MAKEINFO_EXTRA_FLAGS="$MAKEINFO_EXTRA_FLAGS -DHAVE_MAKEINFO_CLICK"
+fi
+AC_SUBST(MAKEINFO_EXTRA_FLAGS)
+
 # GDB does not use automake, but gnulib does.  This line lets us
 # generate its Makefile.in.
 AM_INIT_AUTOMAKE(gdb, UNUSED-VERSION, [no-define])
@@ -573,6 +605,34 @@ AC_SUBST(READLINE_DEPS)
 AC_SUBST(READLINE_CFLAGS)
 AC_SUBST(READLINE_TEXI_INCFLAG)
 
+# Generate jit-reader.h
+
+# This is typedeffed to GDB_CORE_ADDR in jit-reader.h
+TARGET_PTR=
+
+AC_CHECK_SIZEOF(unsigned long long)
+AC_CHECK_SIZEOF(unsigned long)
+AC_CHECK_SIZEOF(unsigned __int128)
+
+if test "x${ac_cv_sizeof_unsigned_long}" = "x8"; then
+  TARGET_PTR="unsigned long"
+elif test "x${ac_cv_sizeof_unsigned_long_long}" = "x8"; then
+  TARGET_PTR="unsigned long long"
+elif test "x${ac_cv_sizeof_unsigned___int128}" = "x16"; then
+  TARGET_PTR="unsigned __int128"
+else
+  TARGET_PTR="unsigned long"
+fi
+
+AC_SUBST(TARGET_PTR)
+AC_CONFIG_FILES([jit-reader.h:jit-reader.in])
+
+AC_SEARCH_LIBS(dlopen, dl)
+
+GDB_AC_WITH_DIR([JIT_READER_DIR], [jit-reader-dir],
+                [directory to load the JIT readers from],
+                [${libdir}/gdb])
+
 AC_ARG_WITH(expat,
   AS_HELP_STRING([--with-expat], [include expat support (auto/yes/no)]),
   [], [with_expat=auto])
@@ -923,7 +983,8 @@ AC_CHECK_HEADERS([nlist.h machine/reg.h poll.h sys/poll.h proc_service.h \
 		  sys/resource.h sys/procfs.h sys/ptrace.h ptrace.h \
 		  sys/reg.h sys/debugreg.h sys/select.h sys/syscall.h \
 		  sys/types.h sys/wait.h wait.h termios.h termio.h \
-		  sgtty.h unistd.h elf_hp.h ctype.h time.h locale.h])
+		  sgtty.h unistd.h elf_hp.h ctype.h time.h locale.h \
+		  dlfcn.h])
 AC_CHECK_HEADERS(link.h, [], [],
 [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>

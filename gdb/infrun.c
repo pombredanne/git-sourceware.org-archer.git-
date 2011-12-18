@@ -55,6 +55,8 @@
 #include "jit.h"
 #include "tracepoint.h"
 #include "continuations.h"
+#include "interps.h"
+#include "skip.h"
 
 /* Prototypes for local functions */
 
@@ -145,6 +147,37 @@ show_debug_infrun (struct ui_file *file, int from_tty,
 {
   fprintf_filtered (file, _("Inferior debugging is %s.\n"), value);
 }
+
+
+/* Support for disabling address space randomization.  */
+
+int disable_randomization = 1;
+
+static void
+show_disable_randomization (struct ui_file *file, int from_tty,
+			    struct cmd_list_element *c, const char *value)
+{
+  if (target_supports_disable_randomization ())
+    fprintf_filtered (file,
+		      _("Disabling randomization of debuggee's "
+			"virtual address space is %s.\n"),
+		      value);
+  else
+    fputs_filtered (_("Disabling randomization of debuggee's "
+		      "virtual address space is unsupported on\n"
+		      "this platform.\n"), file);
+}
+
+static void
+set_disable_randomization (char *args, int from_tty,
+			   struct cmd_list_element *c)
+{
+  if (!target_supports_disable_randomization ())
+    error (_("Disabling randomization of debuggee's "
+	     "virtual address space is unsupported on\n"
+	     "this platform."));
+}
+
 
 /* If the program uses ELF-style shared libraries, then calls to
    functions in shared libraries go through stubs, which live in a
@@ -1363,6 +1396,23 @@ write_memory_ptid (ptid_t ptid, CORE_ADDR memaddr,
   do_cleanups (ptid_cleanup);
 }
 
+/* Restore the contents of the copy area for thread PTID.  */
+
+static void
+displaced_step_restore (struct displaced_step_inferior_state *displaced,
+			ptid_t ptid)
+{
+  ULONGEST len = gdbarch_max_insn_length (displaced->step_gdbarch);
+
+  write_memory_ptid (ptid, displaced->step_copy,
+		     displaced->step_saved_copy, len);
+  if (debug_displaced)
+    fprintf_unfiltered (gdb_stdlog, "displaced: restored %s %s\n",
+			target_pid_to_str (ptid),
+			paddress (displaced->step_gdbarch,
+				  displaced->step_copy));
+}
+
 static void
 displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
 {
@@ -1381,17 +1431,7 @@ displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
 
   old_cleanups = make_cleanup (displaced_step_clear_cleanup, displaced);
 
-  /* Restore the contents of the copy area.  */
-  {
-    ULONGEST len = gdbarch_max_insn_length (displaced->step_gdbarch);
-
-    write_memory_ptid (displaced->step_ptid, displaced->step_copy,
-		       displaced->step_saved_copy, len);
-    if (debug_displaced)
-      fprintf_unfiltered (gdb_stdlog, "displaced: restored %s\n",
-                          paddress (displaced->step_gdbarch,
-				    displaced->step_copy));
-  }
+  displaced_step_restore (displaced, displaced->step_ptid);
 
   /* Did the instruction complete successfully?  */
   if (signal == TARGET_SIGNAL_TRAP)
@@ -2579,14 +2619,6 @@ prepare_for_detach (void)
 
       overlay_cache_invalid = 1;
 
-      /* We have to invalidate the registers BEFORE calling
-	 target_wait because they can be loaded from the target while
-	 in target_wait.  This makes remote debugging a bit more
-	 efficient for those targets that provide critical registers
-	 as part of their normal status mechanism.  */
-
-      registers_changed ();
-
       if (deprecated_target_wait_hook)
 	ecs->ptid = deprecated_target_wait_hook (pid_ptid, &ecs->ws, 0);
       else
@@ -2656,14 +2688,7 @@ wait_for_inferior (void)
     {
       struct cleanup *old_chain;
 
-      /* We have to invalidate the registers BEFORE calling target_wait
-	 because they can be loaded from the target while in target_wait.
-	 This makes remote debugging a bit more efficient for those
-	 targets that provide critical registers as part of their normal
-	 status mechanism.  */
-
       overlay_cache_invalid = 1;
-      registers_changed ();
 
       if (deprecated_target_wait_hook)
 	ecs->ptid = deprecated_target_wait_hook (waiton_ptid, &ecs->ws, 0);
@@ -2712,6 +2737,7 @@ fetch_inferior_event (void *client_data)
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
   struct cleanup *ts_old_chain;
   int was_sync = sync_execution;
+  int cmd_done = 0;
 
   memset (ecs, 0, sizeof (*ecs));
 
@@ -2732,23 +2758,7 @@ fetch_inferior_event (void *client_data)
        running any breakpoint commands.  */
     make_cleanup_restore_current_thread ();
 
-  /* We have to invalidate the registers BEFORE calling target_wait
-     because they can be loaded from the target while in target_wait.
-     This makes remote debugging a bit more efficient for those
-     targets that provide critical registers as part of their normal
-     status mechanism.  */
-
   overlay_cache_invalid = 1;
-
-  /* But don't do it if the current thread is already stopped (hence
-     this is either a delayed event that will result in
-     TARGET_WAITKIND_IGNORE, or it's an event for another thread (and
-     we always clear the register and frame caches when the user
-     switches threads anyway).  If we didn't do this, a spurious
-     delayed event in all-stop mode would make the user lose the
-     selected frame.  */
-  if (non_stop || is_executing (inferior_ptid))
-    registers_changed ();
 
   make_cleanup_restore_integer (&execution_direction);
   execution_direction = target_execution_direction ();
@@ -2764,6 +2774,7 @@ fetch_inferior_event (void *client_data)
 
   if (non_stop
       && ecs->ws.kind != TARGET_WAITKIND_IGNORE
+      && ecs->ws.kind != TARGET_WAITKIND_NO_RESUMED
       && ecs->ws.kind != TARGET_WAITKIND_EXITED
       && ecs->ws.kind != TARGET_WAITKIND_SIGNALLED)
     /* In non-stop mode, each thread is handled individually.  Switch
@@ -2779,6 +2790,10 @@ fetch_inferior_event (void *client_data)
   else
     ts_old_chain = make_cleanup (finish_thread_state_cleanup, &ecs->ptid);
 
+  /* Get executed before make_cleanup_restore_current_thread above to apply
+     still for the thread which has thrown the exception.  */
+  make_bpstat_clear_actions_cleanup ();
+
   /* Now figure out what to do with the result of the result.  */
   handle_inferior_event (ecs);
 
@@ -2793,13 +2808,17 @@ fetch_inferior_event (void *client_data)
 	normal_stop ();
 
       if (target_has_execution
+	  && ecs->ws.kind != TARGET_WAITKIND_NO_RESUMED
 	  && ecs->ws.kind != TARGET_WAITKIND_EXITED
 	  && ecs->ws.kind != TARGET_WAITKIND_SIGNALLED
 	  && ecs->event_thread->step_multi
 	  && ecs->event_thread->control.stop_step)
 	inferior_event_handler (INF_EXEC_CONTINUE, NULL);
       else
-	inferior_event_handler (INF_EXEC_COMPLETE, NULL);
+	{
+	  inferior_event_handler (INF_EXEC_COMPLETE, NULL);
+	  cmd_done = 1;
+	}
     }
 
   /* No error, don't finish the thread states yet.  */
@@ -2809,9 +2828,17 @@ fetch_inferior_event (void *client_data)
   do_cleanups (old_chain);
 
   /* If the inferior was in sync execution mode, and now isn't,
-     restore the prompt.  */
-  if (was_sync && !sync_execution)
+     restore the prompt (a synchronous execution command has finished,
+     and we're ready for input).  */
+  if (interpreter_async && was_sync && !sync_execution)
     display_gdb_prompt (0);
+
+  if (cmd_done
+      && !was_sync
+      && exec_done_display_p
+      && (ptid_equal (inferior_ptid, null_ptid)
+	  || !is_running (inferior_ptid)))
+    printf_unfiltered (_("completed.\n"));
 }
 
 /* Record the frame and location we're currently stepping through.  */
@@ -2834,8 +2861,6 @@ init_thread_stepping_state (struct thread_info *tss)
 {
   tss->stepping_over_breakpoint = 0;
   tss->step_after_step_resume_breakpoint = 0;
-  tss->stepping_through_solib_after_catch = 0;
-  tss->stepping_through_solib_catchpoints = NULL;
 }
 
 /* Return the cached copy of the last pid/waitstatus returned by
@@ -2861,7 +2886,7 @@ nullify_last_target_wait_ptid (void)
 static void
 context_switch (ptid_t ptid)
 {
-  if (debug_infrun)
+  if (debug_infrun && !ptid_equal (ptid, inferior_ptid))
     {
       fprintf_unfiltered (gdb_stdlog, "infrun: Switching context from %s ",
 			  target_pid_to_str (inferior_ptid));
@@ -3142,8 +3167,24 @@ handle_inferior_event (struct execution_control_state *ecs)
       return;
     }
 
+  if (ecs->ws.kind == TARGET_WAITKIND_NO_RESUMED
+      && target_can_async_p () && !sync_execution)
+    {
+      /* There were no unwaited-for children left in the target, but,
+	 we're not synchronously waiting for events either.  Just
+	 ignore.  Otherwise, if we were running a synchronous
+	 execution command, we need to cancel it and give the user
+	 back the terminal.  */
+      if (debug_infrun)
+	fprintf_unfiltered (gdb_stdlog,
+			    "infrun: TARGET_WAITKIND_NO_RESUMED (ignoring)\n");
+      prepare_to_wait (ecs);
+      return;
+    }
+
   if (ecs->ws.kind != TARGET_WAITKIND_EXITED
-      && ecs->ws.kind != TARGET_WAITKIND_SIGNALLED)
+      && ecs->ws.kind != TARGET_WAITKIND_SIGNALLED
+      && ecs->ws.kind != TARGET_WAITKIND_NO_RESUMED)
     {
       struct inferior *inf = find_inferior_pid (ptid_get_pid (ecs->ptid));
 
@@ -3159,6 +3200,18 @@ handle_inferior_event (struct execution_control_state *ecs)
 
   /* Always clear state belonging to the previous time we stopped.  */
   stop_stack_dummy = STOP_NONE;
+
+  if (ecs->ws.kind == TARGET_WAITKIND_NO_RESUMED)
+    {
+      /* No unwaited-for children left.  IOW, all resumed children
+	 have exited.  */
+      if (debug_infrun)
+	fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_NO_RESUMED\n");
+
+      stop_print_frame = 0;
+      stop_stepping (ecs);
+      return;
+    }
 
   /* If it's a new process, add it to the thread database.  */
 
@@ -3217,7 +3270,7 @@ handle_inferior_event (struct execution_control_state *ecs)
     set_executing (minus_one_ptid, 0);
   else if (ecs->ws.kind != TARGET_WAITKIND_SIGNALLED
 	   && ecs->ws.kind != TARGET_WAITKIND_EXITED)
-    set_executing (inferior_ptid, 0);
+    set_executing (ecs->ptid, 0);
 
   switch (infwait_state)
     {
@@ -3388,6 +3441,60 @@ handle_inferior_event (struct execution_control_state *ecs)
     case TARGET_WAITKIND_VFORKED:
       if (debug_infrun)
         fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_FORKED\n");
+
+      /* Check whether the inferior is displaced stepping.  */
+      {
+	struct regcache *regcache = get_thread_regcache (ecs->ptid);
+	struct gdbarch *gdbarch = get_regcache_arch (regcache);
+	struct displaced_step_inferior_state *displaced
+	  = get_displaced_stepping_state (ptid_get_pid (ecs->ptid));
+
+	/* If checking displaced stepping is supported, and thread
+	   ecs->ptid is displaced stepping.  */
+	if (displaced && ptid_equal (displaced->step_ptid, ecs->ptid))
+	  {
+	    struct inferior *parent_inf
+	      = find_inferior_pid (ptid_get_pid (ecs->ptid));
+	    struct regcache *child_regcache;
+	    CORE_ADDR parent_pc;
+
+	    /* GDB has got TARGET_WAITKIND_FORKED or TARGET_WAITKIND_VFORKED,
+	       indicating that the displaced stepping of syscall instruction
+	       has been done.  Perform cleanup for parent process here.  Note
+	       that this operation also cleans up the child process for vfork,
+	       because their pages are shared.  */
+	    displaced_step_fixup (ecs->ptid, TARGET_SIGNAL_TRAP);
+
+	    if (ecs->ws.kind == TARGET_WAITKIND_FORKED)
+	      {
+		/* Restore scratch pad for child process.  */
+		displaced_step_restore (displaced, ecs->ws.value.related_pid);
+	      }
+
+	    /* Since the vfork/fork syscall instruction was executed in the scratchpad,
+	       the child's PC is also within the scratchpad.  Set the child's PC
+	       to the parent's PC value, which has already been fixed up.
+	       FIXME: we use the parent's aspace here, although we're touching
+	       the child, because the child hasn't been added to the inferior
+	       list yet at this point.  */
+
+	    child_regcache
+	      = get_thread_arch_aspace_regcache (ecs->ws.value.related_pid,
+						 gdbarch,
+						 parent_inf->aspace);
+	    /* Read PC value of parent process.  */
+	    parent_pc = regcache_read_pc (regcache);
+
+	    if (debug_displaced)
+	      fprintf_unfiltered (gdb_stdlog,
+				  "displaced: write child pc from %s to %s\n",
+				  paddress (gdbarch,
+					    regcache_read_pc (child_regcache)),
+				  paddress (gdbarch, parent_pc));
+
+	    regcache_write_pc (child_regcache, parent_pc);
+	  }
+      }
 
       if (!ptid_equal (ecs->ptid, inferior_ptid))
 	{
@@ -3580,6 +3687,8 @@ handle_inferior_event (struct execution_control_state *ecs)
       break;
 
     case TARGET_WAITKIND_NO_HISTORY:
+      if (debug_infrun)
+        fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_NO_HISTORY\n");
       /* Reverse execution: target ran out of history info.  */
       stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
       print_no_history_reason ();
@@ -3968,7 +4077,32 @@ handle_inferior_event (struct execution_control_state *ecs)
      nexti.  After stepi and nexti, always show the innermost frame (not any
      inline function call sites).  */
   if (ecs->event_thread->control.step_range_end != 1)
-    skip_inline_frames (ecs->ptid);
+    {
+      struct address_space *aspace = 
+	get_regcache_aspace (get_thread_regcache (ecs->ptid));
+
+      /* skip_inline_frames is expensive, so we avoid it if we can
+	 determine that the address is one where functions cannot have
+	 been inlined.  This improves performance with inferiors that
+	 load a lot of shared libraries, because the solib event
+	 breakpoint is defined as the address of a function (i.e. not
+	 inline).  Note that we have to check the previous PC as well
+	 as the current one to catch cases when we have just
+	 single-stepped off a breakpoint prior to reinstating it.
+	 Note that we're assuming that the code we single-step to is
+	 not inline, but that's not definitive: there's nothing
+	 preventing the event breakpoint function from containing
+	 inlined code, and the single-step ending up there.  If the
+	 user had set a breakpoint on that inlined code, the missing
+	 skip_inline_frames call would break things.  Fortunately
+	 that's an extremely unlikely scenario.  */
+      if (!pc_at_non_inline_function (aspace, stop_pc)
+          && !(ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP
+               && ecs->event_thread->control.trap_expected
+               && pc_at_non_inline_function (aspace,
+                                             ecs->event_thread->prev_pc)))
+	skip_inline_frames (ecs->ptid);
+    }
 
   if (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP
       && ecs->event_thread->control.trap_expected
@@ -4534,37 +4668,6 @@ process_event_stop_test:
 	}
     }
 
-  /* Are we stepping to get the inferior out of the dynamic linker's
-     hook (and possibly the dld itself) after catching a shlib
-     event?  */
-  if (ecs->event_thread->stepping_through_solib_after_catch)
-    {
-#if defined(SOLIB_ADD)
-      /* Have we reached our destination?  If not, keep going.  */
-      if (SOLIB_IN_DYNAMIC_LINKER (PIDGET (ecs->ptid), stop_pc))
-	{
-          if (debug_infrun)
-	    fprintf_unfiltered (gdb_stdlog,
-				"infrun: stepping in dynamic linker\n");
-	  ecs->event_thread->stepping_over_breakpoint = 1;
-	  keep_going (ecs);
-	  return;
-	}
-#endif
-      if (debug_infrun)
-	 fprintf_unfiltered (gdb_stdlog, "infrun: step past dynamic linker\n");
-      /* Else, stop and report the catchpoint(s) whose triggering
-         caused us to begin stepping.  */
-      ecs->event_thread->stepping_through_solib_after_catch = 0;
-      bpstat_clear (&ecs->event_thread->control.stop_bpstat);
-      ecs->event_thread->control.stop_bpstat
-	= bpstat_copy (ecs->event_thread->stepping_through_solib_catchpoints);
-      bpstat_clear (&ecs->event_thread->stepping_through_solib_catchpoints);
-      stop_print_frame = 1;
-      stop_stepping (ecs);
-      return;
-    }
-
   if (ecs->event_thread->control.step_resume_breakpoint)
     {
       if (debug_infrun)
@@ -4815,7 +4918,8 @@ process_event_stop_test:
 	}
 
       /* If we have line number information for the function we are
-         thinking of stepping into, step into it.
+	 thinking of stepping into and the function isn't on the skip
+	 list, step into it.
 
          If there are several symtabs at that PC (e.g. with include
          files), just want to know whether *any* of them have line
@@ -4824,7 +4928,8 @@ process_event_stop_test:
 	struct symtab_and_line tmp_sal;
 
 	tmp_sal = find_pc_line (ecs->stop_func_start, 0);
-	if (tmp_sal.line != 0)
+	if (tmp_sal.line != 0
+	    && !function_pc_is_marked_for_skip (ecs->stop_func_start))
 	  {
 	    if (execution_direction == EXEC_REVERSE)
 	      handle_step_into_function_backward (gdbarch, ecs);
@@ -5124,7 +5229,6 @@ currently_stepping (struct thread_info *tp)
   return ((tp->control.step_range_end
 	   && tp->control.step_resume_breakpoint == NULL)
 	  || tp->control.trap_expected
-	  || tp->stepping_through_solib_after_catch
 	  || bpstat_should_step ());
 }
 
@@ -5138,8 +5242,7 @@ currently_stepping_or_nexting_callback (struct thread_info *tp, void *data)
     return 0;
 
   return (tp->control.step_range_end
- 	  || tp->control.trap_expected
- 	  || tp->stepping_through_solib_after_catch);
+ 	  || tp->control.trap_expected);
 }
 
 /* Inferior has stepped into a subroutine call with source code that
@@ -5614,8 +5717,8 @@ print_end_stepping_range_reason (void)
 {
   if ((!inferior_thread ()->step_multi
        || !inferior_thread ()->control.stop_step)
-      && ui_out_is_mi_like_p (uiout))
-    ui_out_field_string (uiout, "reason",
+      && ui_out_is_mi_like_p (current_uiout))
+    ui_out_field_string (current_uiout, "reason",
                          async_reason_lookup (EXEC_ASYNC_END_STEPPING_RANGE));
 }
 
@@ -5624,6 +5727,8 @@ print_end_stepping_range_reason (void)
 static void
 print_signal_exited_reason (enum target_signal siggnal)
 {
+  struct ui_out *uiout = current_uiout;
+
   annotate_signalled ();
   if (ui_out_is_mi_like_p (uiout))
     ui_out_field_string
@@ -5649,6 +5754,7 @@ print_exited_reason (int exitstatus)
 {
   struct inferior *inf = current_inferior ();
   const char *pidstr = target_pid_to_str (pid_to_ptid (inf->pid));
+  struct ui_out *uiout = current_uiout;
 
   annotate_exited (exitstatus);
   if (exitstatus)
@@ -5685,6 +5791,8 @@ print_exited_reason (int exitstatus)
 static void
 print_signal_received_reason (enum target_signal siggnal)
 {
+  struct ui_out *uiout = current_uiout;
+
   annotate_signal ();
 
   if (siggnal == TARGET_SIGNAL_0 && !ui_out_is_mi_like_p (uiout))
@@ -5722,7 +5830,7 @@ print_signal_received_reason (enum target_signal siggnal)
 static void
 print_no_history_reason (void)
 {
-  ui_out_text (uiout, "\nNo more reverse-execution history.\n");
+  ui_out_text (current_uiout, "\nNo more reverse-execution history.\n");
 }
 
 /* Here to return control to GDB when the inferior stops for real.
@@ -5749,7 +5857,8 @@ normal_stop (void)
   if (!non_stop)
     make_cleanup (finish_thread_state_cleanup, &minus_one_ptid);
   else if (last.kind != TARGET_WAITKIND_SIGNALLED
-	   && last.kind != TARGET_WAITKIND_EXITED)
+	   && last.kind != TARGET_WAITKIND_EXITED
+	   && last.kind != TARGET_WAITKIND_NO_RESUMED)
     make_cleanup (finish_thread_state_cleanup, &inferior_ptid);
 
   /* In non-stop mode, we don't want GDB to switch threads behind the
@@ -5768,13 +5877,22 @@ normal_stop (void)
       && !ptid_equal (previous_inferior_ptid, inferior_ptid)
       && target_has_execution
       && last.kind != TARGET_WAITKIND_SIGNALLED
-      && last.kind != TARGET_WAITKIND_EXITED)
+      && last.kind != TARGET_WAITKIND_EXITED
+      && last.kind != TARGET_WAITKIND_NO_RESUMED)
     {
       target_terminal_ours_for_output ();
       printf_filtered (_("[Switching to %s]\n"),
 		       target_pid_to_str (inferior_ptid));
       annotate_thread_changed ();
       previous_inferior_ptid = inferior_ptid;
+    }
+
+  if (last.kind == TARGET_WAITKIND_NO_RESUMED)
+    {
+      gdb_assert (sync_execution || !target_can_async_p ());
+
+      target_terminal_ours_for_output ();
+      printf_filtered (_("No unwaited-for children left.\n"));
     }
 
   if (!breakpoints_always_inserted_mode () && target_has_execution)
@@ -5804,6 +5922,7 @@ normal_stop (void)
     goto done;
 
   target_terminal_ours ();
+  async_enable_stdin ();
 
   /* Set the current source location.  This will also happen if we
      display the frame below, but the current SAL will be incorrect
@@ -5852,22 +5971,10 @@ normal_stop (void)
 	  int do_frame_printing = 1;
 	  struct thread_info *tp = inferior_thread ();
 
-	  bpstat_ret = bpstat_print (tp->control.stop_bpstat);
+	  bpstat_ret = bpstat_print (tp->control.stop_bpstat, last.kind);
 	  switch (bpstat_ret)
 	    {
 	    case PRINT_UNKNOWN:
-	      /* If we had hit a shared library event breakpoint,
-		 bpstat_print would print out this message.  If we hit
-		 an OS-level shared library event, do the same
-		 thing.  */
-	      if (last.kind == TARGET_WAITKIND_LOADED)
-		{
-		  printf_filtered (_("Stopped due to shared library event\n"));
-		  source_flag = SRC_LINE;	/* something bogus */
-		  do_frame_printing = 0;
-		  break;
-		}
-
 	      /* FIXME: cagney/2002-12-01: Given that a frame ID does
 	         (or should) carry around the function and does (or
 	         should) use that when doing a frame comparison.  */
@@ -5962,6 +6069,7 @@ done:
   if (!target_has_execution
       || last.kind == TARGET_WAITKIND_SIGNALLED
       || last.kind == TARGET_WAITKIND_EXITED
+      || last.kind == TARGET_WAITKIND_NO_RESUMED
       || (!inferior_thread ()->step_multi
 	  && !(inferior_thread ()->control.stop_bpstat
 	       && inferior_thread ()->control.proceed_to_finish)
@@ -6375,6 +6483,25 @@ signals_info (char *signum_exp, int from_tty)
 		     "to change these tables.\n"));
 }
 
+/* Check if it makes sense to read $_siginfo from the current thread
+   at this point.  If not, throw an error.  */
+
+static void
+validate_siginfo_access (void)
+{
+  /* No current inferior, no siginfo.  */
+  if (ptid_equal (inferior_ptid, null_ptid))
+    error (_("No thread selected."));
+
+  /* Don't try to read from a dead thread.  */
+  if (is_exited (inferior_ptid))
+    error (_("The current thread has terminated"));
+
+  /* ... or from a spinning thread.  */
+  if (is_running (inferior_ptid))
+    error (_("Selected thread is running."));
+}
+
 /* The $_siginfo convenience variable is a bit special.  We don't know
    for sure the type of the value until we actually have a chance to
    fetch the data.  The type can change depending on gdbarch, so it is
@@ -6392,6 +6519,8 @@ static void
 siginfo_value_read (struct value *v)
 {
   LONGEST transferred;
+
+  validate_siginfo_access ();
 
   transferred =
     target_read (&current_target, TARGET_OBJECT_SIGNAL_INFO,
@@ -6411,6 +6540,8 @@ static void
 siginfo_value_write (struct value *v, struct value *fromval)
 {
   LONGEST transferred;
+
+  validate_siginfo_access ();
 
   transferred = target_write (&current_target,
 			      TARGET_OBJECT_SIGNAL_INFO,
@@ -7190,6 +7321,19 @@ Set whether gdb will detach the child of a fork."), _("\
 Show whether gdb will detach the child of a fork."), _("\
 Tells gdb whether to detach the child of a fork."),
 			   NULL, NULL, &setlist, &showlist);
+
+  /* Set/show disable address space randomization mode.  */
+
+  add_setshow_boolean_cmd ("disable-randomization", class_support,
+			   &disable_randomization, _("\
+Set disabling of debuggee's virtual address space randomization."), _("\
+Show disabling of debuggee's virtual address space randomization."), _("\
+When this mode is on (which is the default), randomization of the virtual\n\
+address space is disabled.  Standalone programs run with the randomization\n\
+enabled by default on some platforms."),
+			   &set_disable_randomization,
+			   &show_disable_randomization,
+			   &setlist, &showlist);
 
   /* ptid initializations */
   inferior_ptid = null_ptid;

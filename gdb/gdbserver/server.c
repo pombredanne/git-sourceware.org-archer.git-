@@ -32,7 +32,6 @@
 
 ptid_t cont_thread;
 ptid_t general_thread;
-ptid_t step_thread;
 
 int server_waiting;
 
@@ -45,6 +44,10 @@ int run_once;
 
 int multi_process;
 int non_stop;
+
+/* Whether we should attempt to disable the operating system's address
+   space randomization feature before starting an inferior.  */
+int disable_randomization = 1;
 
 static char **program_argv, **wrapper_argv;
 
@@ -498,6 +501,27 @@ handle_general_set (char *own_buf)
       return;
     }
 
+  if (strncmp ("QDisableRandomization:", own_buf,
+	       strlen ("QDisableRandomization:")) == 0)
+    {
+      char *packet = own_buf + strlen ("QDisableRandomization:");
+      ULONGEST setting;
+
+      unpack_varlen_hex (packet, &setting);
+      disable_randomization = setting;
+
+      if (remote_debug)
+	{
+	  if (disable_randomization)
+	    fprintf (stderr, "[address space randomization disabled]\n");
+	  else
+	    fprintf (stderr, "[address space randomization enabled]\n");
+	}
+
+      write_ok (own_buf);
+      return;
+    }
+
   if (target_supports_tracepoints ()
       && handle_tracepoint_general_set (own_buf))
     return;
@@ -918,6 +942,10 @@ handle_qxfer_libraries (const char *annex,
   if (annex[0] != '\0' || !target_running ())
     return -1;
 
+  /* Do not confuse this packet with qXfer:libraries-svr4:read.  */
+  if (the_target->qxfer_libraries_svr4 != NULL)
+    return 0;
+
   /* Over-estimate the necessary memory.  Assume that every character
      in the library name must be escaped.  */
   total_len = 64;
@@ -966,6 +994,23 @@ handle_qxfer_libraries (const char *annex,
   memcpy (readbuf, document + offset, len);
   free (document);
   return len;
+}
+
+/* Handle qXfer:libraries-svr4:read.  */
+
+static int
+handle_qxfer_libraries_svr4 (const char *annex,
+			     gdb_byte *readbuf, const gdb_byte *writebuf,
+			     ULONGEST offset, LONGEST len)
+{
+  if (writebuf != NULL)
+    return -2;
+
+  if (annex[0] != '\0' || !target_running ()
+      || the_target->qxfer_libraries_svr4 == NULL)
+    return -1;
+
+  return the_target->qxfer_libraries_svr4 (annex, readbuf, writebuf, offset, len);
 }
 
 /* Handle qXfer:osadata:read.  */
@@ -1171,11 +1216,28 @@ handle_qxfer_traceframe_info (const char *annex,
   return len;
 }
 
+/* Handle qXfer:fdpic:read.  */
+
+static int
+handle_qxfer_fdpic (const char *annex, gdb_byte *readbuf,
+		    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
+{
+  if (the_target->read_loadmap == NULL)
+    return -2;
+
+  if (!target_running ())
+    return -1;
+
+  return (*the_target->read_loadmap) (annex, offset, readbuf, len);
+}
+
 static const struct qxfer qxfer_packets[] =
   {
     { "auxv", handle_qxfer_auxv },
+    { "fdpic", handle_qxfer_fdpic},
     { "features", handle_qxfer_features },
     { "libraries", handle_qxfer_libraries },
+    { "libraries-svr4", handle_qxfer_libraries_svr4 },
     { "osdata", handle_qxfer_osdata },
     { "siginfo", handle_qxfer_siginfo },
     { "spu", handle_qxfer_spu },
@@ -1496,9 +1558,14 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       sprintf (own_buf, "PacketSize=%x;QPassSignals+", PBUFSIZ - 1);
 
-      /* We do not have any hook to indicate whether the target backend
-	 supports qXfer:libraries:read, so always report it.  */
-      strcat (own_buf, ";qXfer:libraries:read+");
+      if (the_target->qxfer_libraries_svr4 != NULL)
+	strcat (own_buf, ";qXfer:libraries-svr4:read+");
+      else
+	{
+	  /* We do not have any hook to indicate whether the non-SVR4 target
+	     backend supports qXfer:libraries:read, so always report it.  */
+	  strcat (own_buf, ";qXfer:libraries:read+");
+	}
 
       if (the_target->read_auxv != NULL)
 	strcat (own_buf, ";qXfer:auxv:read+");
@@ -1508,6 +1575,9 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       if (the_target->qxfer_siginfo != NULL)
 	strcat (own_buf, ";qXfer:siginfo:read+;qXfer:siginfo:write+");
+
+      if (the_target->read_loadmap != NULL)
+	strcat (own_buf, ";qXfer:fdpic:read+");
 
       /* We always report qXfer:features:read, as targets may
 	 install XML files on a subsequent call to arch_setup.
@@ -1527,6 +1597,9 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       if (target_supports_non_stop ())
 	strcat (own_buf, ";QNonStop+");
 
+      if (target_supports_disable_randomization ())
+	strcat (own_buf, ";QDisableRandomization+");
+
       strcat (own_buf, ";qXfer:threads:read+");
 
       if (target_supports_tracepoints ())
@@ -1538,9 +1611,11 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	  if (gdb_supports_qRelocInsn && target_supports_fast_tracepoints ())
 	    strcat (own_buf, ";FastTracepoints+");
 	  strcat (own_buf, ";StaticTracepoints+");
+	  strcat (own_buf, ";InstallInTrace+");
 	  strcat (own_buf, ";qXfer:statictrace:read+");
 	  strcat (own_buf, ";qXfer:traceframe-info:read+");
 	  strcat (own_buf, ";EnableDisableTracepoints+");
+	  strcat (own_buf, ";tracenz+");
 	}
 
       return;
@@ -2531,6 +2606,17 @@ main (int argc, char *argv[])
 		}
 	    }
 	}
+      else if (strcmp (*next_arg, "-") == 0)
+	{
+	  /* "-" specifies a stdio connection and is a form of port
+	     specification.  */
+	  *next_arg = STDIO_CONNECTION_NAME;
+	  break;
+	}
+      else if (strcmp (*next_arg, "--disable-randomization") == 0)
+	disable_randomization = 1;
+      else if (strcmp (*next_arg, "--no-disable-randomization") == 0)
+	disable_randomization = 0;
       else if (strcmp (*next_arg, "--once") == 0)
 	run_once = 1;
       else
@@ -2556,6 +2642,12 @@ main (int argc, char *argv[])
       gdbserver_usage (stderr);
       exit (1);
     }
+
+  /* We need to know whether the remote connection is stdio before
+     starting the inferior.  Inferiors created in this scenario have
+     stdin,stdout redirected.  So do this here before we call
+     start_inferior.  */
+  remote_prepare (port);
 
   bad_attach = 0;
   pid = 0;
@@ -2643,8 +2735,6 @@ main (int argc, char *argv[])
       fprintf (stderr, "No program to debug.  GDBserver exiting.\n");
       exit (1);
     }
-
-  remote_prepare (port);
 
   while (1)
     {
@@ -2912,8 +3002,6 @@ process_serial_event (void)
 	    }
 	  else if (own_buf[1] == 'c')
 	    cont_thread = thread_id;
-	  else if (own_buf[1] == 's')
-	    step_thread = thread_id;
 
 	  write_ok (own_buf);
 	}

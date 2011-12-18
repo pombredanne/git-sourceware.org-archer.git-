@@ -296,9 +296,6 @@ source_section_scripts (struct objfile *objfile, const char *source_name,
       in_hash_table = maybe_add_script (pspace_info->loaded_scripts, file,
 					opened ? full_path : NULL);
 
-      if (opened)
-	free (full_path);
-
       if (! opened)
 	{
 	  /* We don't throw an error, the program is still debuggable.  */
@@ -310,12 +307,15 @@ Use `info auto-load-scripts [REGEXP]' to list them."),
 		       GDBPY_AUTO_SECTION_NAME, objfile->name);
 	      pspace_info->script_not_found_warning_printed = TRUE;
 	    }
-	  continue;
 	}
-
-      /* If this file is not currently loaded, load it.  */
-      if (! in_hash_table)
-	source_python_script_for_objfile (objfile, stream, file);
+      else
+	{
+	  /* If this file is not currently loaded, load it.  */
+	  if (! in_hash_table)
+	    source_python_script_for_objfile (objfile, full_path);
+	  fclose (stream);
+	  xfree (full_path);
+	}
     }
 }
 
@@ -431,7 +431,7 @@ auto_load_objfile_script (struct objfile *objfile, const char *suffix)
 	 It's highly unlikely that we'd ever load it twice,
 	 and these scripts are required to be idempotent under multiple
 	 loads anyway.  */
-      source_python_script_for_objfile (objfile, input, debugfile);
+      source_python_script_for_objfile (objfile, debugfile);
       fclose (input);
     }
 
@@ -494,6 +494,7 @@ collect_matching_scripts (void **slot, void *info)
 static void
 print_script (struct loaded_script *script)
 {
+  struct ui_out *uiout = current_uiout;
   struct cleanup *chain;
 
   chain = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
@@ -530,6 +531,7 @@ sort_scripts_by_name (const void *ap, const void *bp)
 static void
 info_auto_load_scripts (char *pattern, int from_tty)
 {
+  struct ui_out *uiout = current_uiout;
   struct auto_load_pspace_info *pspace_info;
   struct cleanup *script_chain;
   VEC (loaded_script_ptr) *scripts;

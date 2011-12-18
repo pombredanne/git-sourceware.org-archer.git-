@@ -52,8 +52,6 @@ if $tracelevel then {
         strace $tracelevel
         }
 
-global usestubs
-
 set testfile "break"
 set srcfile ${testfile}.c
 set srcfile1 ${testfile}1.c
@@ -394,6 +392,11 @@ gdb_test_multiple "maint info sections" "maint info sections" {
 	set data_section ER_RW
 	pass "maint info sections"
     }
+    -re "Exec file:\r\n.*break($EXEEXT)?., file type.*neardata.*$gdb_prompt $" {
+	# c6x doesn't have .data section.  It has .neardata and .fardata section.
+	set data_section ".neardata"
+	pass "maint info sections"
+    }
     -re "Exec file:\r\n.*break($EXEEXT)?., file type.*$gdb_prompt $" {
 	pass "maint info sections"
     }
@@ -426,9 +429,10 @@ gdb_test_multiple "maint info sections CODE" "maint info sections CODE" {
 # Test for new option: DATA section flag
 # If your text section is tagged DATA, xfail this test.
 #
-# The "maint info sections DATA" test is marked for XFAIL on Cygwin,
+# The "maint info sections DATA" test is marked for XFAIL on Windows,
 # because Windows has text sections marked DATA.
 setup_xfail "*-*-*cygwin*"
+setup_xfail "*-*-*mingw*"
 
 gdb_test_multiple "maint info sections DATA" "maint info sections DATA" {
     -re ".* $text_section .*$gdb_prompt $" { fail "maint info sections DATA" }

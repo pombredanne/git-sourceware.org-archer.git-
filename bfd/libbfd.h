@@ -8,7 +8,7 @@
 
    Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
    1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
-   2010
+   2010, 2011
    Free Software Foundation, Inc.
 
    Written by Cygnus Support.
@@ -486,8 +486,8 @@ extern bfd_boolean _bfd_generic_set_section_contents
 #define _bfd_nolink_bfd_link_split_section \
   ((bfd_boolean (*) (bfd *, struct bfd_section *)) bfd_false)
 #define _bfd_nolink_section_already_linked \
-  ((void (*) (bfd *, struct already_linked*, \
-	      struct bfd_link_info *)) bfd_void)
+  ((bfd_boolean (*) (bfd *, asection *, \
+		     struct bfd_link_info *)) bfd_false)
 #define _bfd_nolink_bfd_define_common_symbol \
   ((bfd_boolean (*) (bfd *, struct bfd_link_info *, \
 		     struct bfd_link_hash_entry *)) bfd_false)
@@ -526,10 +526,21 @@ extern bfd_boolean _bfd_dwarf1_find_nearest_line
   (bfd *, asection *, asymbol **, bfd_vma, const char **,
    const char **, unsigned int *);
 
+struct dwarf_debug_section
+{
+  const char *uncompressed_name;
+  const char *compressed_name;
+};
+
+/* Map of uncompressed DWARF debug section name to compressed one.  It
+   is terminated by NULL uncompressed_name.  */
+
+extern const struct dwarf_debug_section dwarf_debug_sections[];
+
 /* Find the nearest line using DWARF 2 debugging information.  */
 extern bfd_boolean _bfd_dwarf2_find_nearest_line
-  (bfd *, asection *, asymbol **, bfd_vma, const char **, const char **,
-   unsigned int *, unsigned int, void **);
+  (bfd *, const struct dwarf_debug_section *, asection *, asymbol **, bfd_vma,
+   const char **, const char **, unsigned int *, unsigned int, void **);
 
 /* Find the line using DWARF 2 debugging information.  */
 extern bfd_boolean _bfd_dwarf2_find_line
@@ -542,7 +553,11 @@ bfd_boolean _bfd_generic_find_line
 /* Find inliner info after calling bfd_find_nearest_line. */
 extern bfd_boolean _bfd_dwarf2_find_inliner_info
   (bfd *, const char **, const char **, unsigned int *, void **);
-  
+
+/* Clean up the data used to handle DWARF 2 debugging information. */
+extern void _bfd_dwarf2_cleanup_debug_info
+  (bfd *, void **);
+
 /* Create a new section entry.  */
 extern struct bfd_hash_entry *bfd_section_hash_newfunc
   (struct bfd_hash_entry *, struct bfd_hash_table *, const char *);
@@ -607,8 +622,8 @@ extern bfd_boolean _bfd_generic_final_link
 extern bfd_boolean _bfd_generic_link_split_section
   (bfd *, struct bfd_section *);
 
-extern void _bfd_generic_section_already_linked
-  (bfd *, struct already_linked *, struct bfd_link_info *);
+extern bfd_boolean _bfd_generic_section_already_linked
+  (bfd *, asection *, struct bfd_link_info *);
 
 /* Generic reloc_link_order processing routine.  */
 extern bfd_boolean _bfd_generic_reloc_link_order
@@ -800,43 +815,22 @@ struct bfd_section_already_linked_hash_entry
   struct bfd_section_already_linked *entry;
 };
 
-struct already_linked
-{
-  const char *comdat_key;
-  union
-    {
-      asection *sec;
-      bfd *abfd;
-    } u;
-};
-
 struct bfd_section_already_linked
 {
   struct bfd_section_already_linked *next;
-  struct already_linked linked;
+  asection *sec;
 };
 
 extern struct bfd_section_already_linked_hash_entry *
   bfd_section_already_linked_table_lookup (const char *);
 extern bfd_boolean bfd_section_already_linked_table_insert
-  (struct bfd_section_already_linked_hash_entry *, struct already_linked *);
+  (struct bfd_section_already_linked_hash_entry *, asection *);
 extern void bfd_section_already_linked_table_traverse
   (bfd_boolean (*) (struct bfd_section_already_linked_hash_entry *,
 		    void *), void *);
 
 extern bfd_vma read_unsigned_leb128 (bfd *, bfd_byte *, unsigned int *);
 extern bfd_signed_vma read_signed_leb128 (bfd *, bfd_byte *, unsigned int *);
-
-struct dwarf_debug_section
-{
-  const char *uncompressed_name;
-  const char *compressed_name;
-};
-
-/* Map of uncompressed DWARF debug section name to compressed one.  It
-   is terminated by NULL uncompressed_name.  */
-
-extern const struct dwarf_debug_section dwarf_debug_sections[];
 /* Extracted from init.c.  */
 /* Extracted from libbfd.c.  */
 bfd_boolean bfd_write_bigendian_4byte_int (bfd *, unsigned int);
@@ -1844,6 +1838,38 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_AVR_LDI",
   "BFD_RELOC_AVR_6",
   "BFD_RELOC_AVR_6_ADIW",
+  "BFD_RELOC_RL78_NEG8",
+  "BFD_RELOC_RL78_NEG16",
+  "BFD_RELOC_RL78_NEG24",
+  "BFD_RELOC_RL78_NEG32",
+  "BFD_RELOC_RL78_16_OP",
+  "BFD_RELOC_RL78_24_OP",
+  "BFD_RELOC_RL78_32_OP",
+  "BFD_RELOC_RL78_8U",
+  "BFD_RELOC_RL78_16U",
+  "BFD_RELOC_RL78_24U",
+  "BFD_RELOC_RL78_DIR3U_PCREL",
+  "BFD_RELOC_RL78_DIFF",
+  "BFD_RELOC_RL78_GPRELB",
+  "BFD_RELOC_RL78_GPRELW",
+  "BFD_RELOC_RL78_GPRELL",
+  "BFD_RELOC_RL78_SYM",
+  "BFD_RELOC_RL78_OP_SUBTRACT",
+  "BFD_RELOC_RL78_OP_NEG",
+  "BFD_RELOC_RL78_OP_AND",
+  "BFD_RELOC_RL78_OP_SHRA",
+  "BFD_RELOC_RL78_ABS8",
+  "BFD_RELOC_RL78_ABS16",
+  "BFD_RELOC_RL78_ABS16_REV",
+  "BFD_RELOC_RL78_ABS32",
+  "BFD_RELOC_RL78_ABS32_REV",
+  "BFD_RELOC_RL78_ABS16U",
+  "BFD_RELOC_RL78_ABS16UW",
+  "BFD_RELOC_RL78_ABS16UL",
+  "BFD_RELOC_RL78_RELAX",
+  "BFD_RELOC_RL78_HI16",
+  "BFD_RELOC_RL78_HI8",
+  "BFD_RELOC_RL78_LO16",
   "BFD_RELOC_RX_NEG8",
   "BFD_RELOC_RX_NEG16",
   "BFD_RELOC_RX_NEG24",
@@ -2486,6 +2512,13 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_TILEGX_TLS_DTPMOD32",
   "BFD_RELOC_TILEGX_TLS_DTPOFF32",
   "BFD_RELOC_TILEGX_TLS_TPOFF32",
+  "BFD_RELOC_EPIPHANY_SIMM8",
+  "BFD_RELOC_EPIPHANY_SIMM24",
+  "BFD_RELOC_EPIPHANY_HIGH",
+  "BFD_RELOC_EPIPHANY_LOW",
+  "BFD_RELOC_EPIPHANY_SIMM11",
+  "BFD_RELOC_EPIPHANY_IMM11",
+  "BFD_RELOC_EPIPHANY_IMM8",
  "@@overflow: BFD_RELOC_UNUSED@@",
 };
 #endif

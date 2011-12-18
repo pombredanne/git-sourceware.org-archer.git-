@@ -176,7 +176,6 @@ DESCRIPTION
 .
 .{* Forward declaration.  *}
 .typedef struct bfd_link_info _bfd_link_info;
-.struct already_linked;
 .
 .{* Forward declaration.  *}
 .typedef struct flag_info flag_info;
@@ -512,8 +511,8 @@ BFD_JUMP_TABLE macros.
 .
 .  {* Check if SEC has been already linked during a reloceatable or
 .     final link.  *}
-.  void (*_section_already_linked) (bfd *, struct already_linked *,
-.				    struct bfd_link_info *);
+.  bfd_boolean (*_section_already_linked) (bfd *, asection *,
+.					   struct bfd_link_info *);
 .
 .  {* Define a common symbol.  *}
 .  bfd_boolean (*_bfd_define_common_symbol) (bfd *, struct bfd_link_info *,
@@ -608,6 +607,7 @@ extern const bfd_target bfd_elf32_crx_vec;
 extern const bfd_target bfd_elf32_d10v_vec;
 extern const bfd_target bfd_elf32_d30v_vec;
 extern const bfd_target bfd_elf32_dlx_big_vec;
+extern const bfd_target bfd_elf32_epiphany_vec;
 extern const bfd_target bfd_elf32_fr30_vec;
 extern const bfd_target bfd_elf32_frv_vec;
 extern const bfd_target bfd_elf32_frvfdpic_vec;
@@ -668,7 +668,9 @@ extern const bfd_target bfd_elf32_pj_vec;
 extern const bfd_target bfd_elf32_pjl_vec;
 extern const bfd_target bfd_elf32_powerpc_vec;
 extern const bfd_target bfd_elf32_powerpcle_vec;
+extern const bfd_target bfd_elf32_powerpc_freebsd_vec;
 extern const bfd_target bfd_elf32_powerpc_vxworks_vec;
+extern const bfd_target bfd_elf32_rl78_vec;
 extern const bfd_target bfd_elf32_rx_le_vec;
 extern const bfd_target bfd_elf32_rx_be_vec;
 extern const bfd_target bfd_elf32_rx_be_ns_vec;
@@ -730,6 +732,7 @@ extern const bfd_target bfd_elf64_littlemips_vec;
 extern const bfd_target bfd_elf64_mmix_vec;
 extern const bfd_target bfd_elf64_powerpc_vec;
 extern const bfd_target bfd_elf64_powerpcle_vec;
+extern const bfd_target bfd_elf64_powerpc_freebsd_vec;
 extern const bfd_target bfd_elf64_s390_vec;
 extern const bfd_target bfd_elf64_sh64_vec;
 extern const bfd_target bfd_elf64_sh64l_vec;
@@ -969,6 +972,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_d10v_vec,
 	&bfd_elf32_d30v_vec,
 	&bfd_elf32_dlx_big_vec,
+	&bfd_elf32_epiphany_vec,
 	&bfd_elf32_fr30_vec,
 	&bfd_elf32_frv_vec,
 	&bfd_elf32_frvfdpic_vec,
@@ -1034,6 +1038,8 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_powerpc_vec,
 	&bfd_elf32_powerpc_vxworks_vec,
 	&bfd_elf32_powerpcle_vec,
+	&bfd_elf32_powerpc_freebsd_vec,
+	&bfd_elf32_rl78_vec,
 	&bfd_elf32_rx_be_vec,
 	&bfd_elf32_rx_be_ns_vec,
 	&bfd_elf32_rx_le_vec,
@@ -1096,6 +1102,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf64_mmix_vec,
 	&bfd_elf64_powerpc_vec,
 	&bfd_elf64_powerpcle_vec,
+	&bfd_elf64_powerpc_freebsd_vec,
 	&bfd_elf64_s390_vec,
 	&bfd_elf64_sh64_vec,
 	&bfd_elf64_sh64l_vec,

@@ -176,6 +176,8 @@ DESCRIPTION
 .#define bfd_mach_mips_loongson_3a      3003
 .#define bfd_mach_mips_sb1              12310201 {* octal 'SB', 01 *}
 .#define bfd_mach_mips_octeon		6501
+.#define bfd_mach_mips_octeonp		6601
+.#define bfd_mach_mips_octeon2		6502
 .#define bfd_mach_mips_xlr              887682   {* decimal 'XLR'  *}
 .#define bfd_mach_mipsisa32             32
 .#define bfd_mach_mipsisa32r2           33
@@ -183,19 +185,20 @@ DESCRIPTION
 .#define bfd_mach_mipsisa64r2           65
 .#define bfd_mach_mips_micromips        96
 .  bfd_arch_i386,      {* Intel 386 *}
-.#define bfd_mach_i386_i386 1
-.#define bfd_mach_i386_i8086 2
-.#define bfd_mach_i386_i386_intel_syntax 3
-.#define bfd_mach_x64_32 32
-.#define bfd_mach_x64_32_intel_syntax 33
-.#define bfd_mach_x86_64 64
-.#define bfd_mach_x86_64_intel_syntax 65
+.#define bfd_mach_i386_intel_syntax	(1 << 0)
+.#define bfd_mach_i386_i8086		(1 << 1)
+.#define bfd_mach_i386_i386		(1 << 2)
+.#define bfd_mach_x86_64		(1 << 3)
+.#define bfd_mach_x64_32		(1 << 4)
+.#define bfd_mach_i386_i386_intel_syntax (bfd_mach_i386_i386 | bfd_mach_i386_intel_syntax)
+.#define bfd_mach_x86_64_intel_syntax	(bfd_mach_x86_64 | bfd_mach_i386_intel_syntax)
+.#define bfd_mach_x64_32_intel_syntax	(bfd_mach_x64_32 | bfd_mach_i386_intel_syntax)
 .  bfd_arch_l1om,   {* Intel L1OM *}
-.#define bfd_mach_l1om 66
-.#define bfd_mach_l1om_intel_syntax 67
+.#define bfd_mach_l1om			(1 << 5)
+.#define bfd_mach_l1om_intel_syntax	(bfd_mach_l1om | bfd_mach_i386_intel_syntax)
 .  bfd_arch_k1om,   {* Intel K1OM *}
-.#define bfd_mach_k1om 68
-.#define bfd_mach_k1om_intel_syntax 69
+.#define bfd_mach_k1om			(1 << 6)
+.#define bfd_mach_k1om_intel_syntax	(bfd_mach_k1om | bfd_mach_i386_intel_syntax)
 .  bfd_arch_we32k,     {* AT&T WE32xxx *}
 .  bfd_arch_tahoe,     {* CCI/Harris Tahoe *}
 .  bfd_arch_i860,      {* Intel 860 *}
@@ -364,6 +367,9 @@ DESCRIPTION
 . bfd_arch_iq2000,     {* Vitesse IQ2000.  *}
 .#define bfd_mach_iq2000        1
 .#define bfd_mach_iq10          2
+.  bfd_arch_epiphany,	{* Adapteva EPIPHANY *}
+.#define bfd_mach_epiphany16	1
+.#define bfd_mach_epiphany32	2
 .  bfd_arch_mt,
 .#define bfd_mach_ms1           1
 .#define bfd_mach_mrisc2        2
@@ -399,6 +405,8 @@ DESCRIPTION
 .#define bfd_mach_cris_v0_v10	255
 .#define bfd_mach_cris_v32	32
 .#define bfd_mach_cris_v10_v32	1032
+.  bfd_arch_rl78,
+.#define bfd_mach_rl78	0x75
 .  bfd_arch_rx,        {* Renesas RX.  *}
 .#define bfd_mach_rx            0x75
 .  bfd_arch_s390,      {* IBM s390 *}
@@ -495,6 +503,7 @@ extern const bfd_arch_info_type bfd_crx_arch;
 extern const bfd_arch_info_type bfd_d10v_arch;
 extern const bfd_arch_info_type bfd_d30v_arch;
 extern const bfd_arch_info_type bfd_dlx_arch;
+extern const bfd_arch_info_type bfd_epiphany_arch;
 extern const bfd_arch_info_type bfd_fr30_arch;
 extern const bfd_arch_info_type bfd_frv_arch;
 extern const bfd_arch_info_type bfd_h8300_arch;
@@ -535,6 +544,7 @@ extern const bfd_arch_info_type bfd_plugin_arch;
 extern const bfd_arch_info_type bfd_powerpc_archs[];
 #define bfd_powerpc_arch bfd_powerpc_archs[0]
 extern const bfd_arch_info_type bfd_rs6000_arch;
+extern const bfd_arch_info_type bfd_rl78_arch;
 extern const bfd_arch_info_type bfd_rx_arch;
 extern const bfd_arch_info_type bfd_s390_arch;
 extern const bfd_arch_info_type bfd_score_arch;
@@ -575,6 +585,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
     &bfd_d10v_arch,
     &bfd_d30v_arch,
     &bfd_dlx_arch,
+    &bfd_epiphany_arch,
     &bfd_fr30_arch,
     &bfd_frv_arch,
     &bfd_h8300_arch,
@@ -612,6 +623,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
     &bfd_pdp11_arch,
     &bfd_powerpc_arch,
     &bfd_rs6000_arch,
+    &bfd_rl78_arch,
     &bfd_rx_arch,
     &bfd_s390_arch,
     &bfd_score_arch,

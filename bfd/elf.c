@@ -7476,7 +7476,8 @@ _bfd_elf_find_nearest_line (bfd *abfd,
       return TRUE;
     }
 
-  if (_bfd_dwarf2_find_nearest_line (abfd, section, symbols, offset,
+  if (_bfd_dwarf2_find_nearest_line (abfd, dwarf_debug_sections,
+                                     section, symbols, offset,
 				     filename_ptr, functionname_ptr,
 				     line_ptr, 0,
 				     &elf_tdata (abfd)->dwarf2_find_line_info))
@@ -7697,11 +7698,12 @@ _bfd_elf_validate_reloc (bfd *abfd, arelent *areloc)
 bfd_boolean
 _bfd_elf_close_and_cleanup (bfd *abfd)
 {
-  if (bfd_get_format (abfd) == bfd_object)
+  struct elf_obj_tdata *tdata = elf_tdata (abfd);
+  if (bfd_get_format (abfd) == bfd_object && tdata != NULL)
     {
-      if (elf_tdata (abfd) != NULL && elf_shstrtab (abfd) != NULL)
+      if (elf_shstrtab (abfd) != NULL)
 	_bfd_elf_strtab_free (elf_shstrtab (abfd));
-      _bfd_dwarf2_cleanup_debug_info (abfd);
+      _bfd_dwarf2_cleanup_debug_info (abfd, &tdata->dwarf2_find_line_info);
     }
 
   return _bfd_generic_close_and_cleanup (abfd);
@@ -7979,6 +7981,18 @@ static bfd_boolean
 elfcore_grok_s390_prefix (bfd *abfd, Elf_Internal_Note *note)
 {
   return elfcore_make_note_pseudosection (abfd, ".reg-s390-prefix", note);
+}
+
+static bfd_boolean
+elfcore_grok_s390_last_break (bfd *abfd, Elf_Internal_Note *note)
+{
+  return elfcore_make_note_pseudosection (abfd, ".reg-s390-last-break", note);
+}
+
+static bfd_boolean
+elfcore_grok_s390_system_call (bfd *abfd, Elf_Internal_Note *note)
+{
+  return elfcore_make_note_pseudosection (abfd, ".reg-s390-system-call", note);
 }
 
 static bfd_boolean
@@ -8403,6 +8417,20 @@ elfcore_grok_note (bfd *abfd, Elf_Internal_Note *note)
       if (note->namesz == 6
           && strcmp (note->namedata, "LINUX") == 0)
         return elfcore_grok_s390_prefix (abfd, note);
+      else
+        return TRUE;
+
+    case NT_S390_LAST_BREAK:
+      if (note->namesz == 6
+          && strcmp (note->namedata, "LINUX") == 0)
+        return elfcore_grok_s390_last_break (abfd, note);
+      else
+        return TRUE;
+
+    case NT_S390_SYSTEM_CALL:
+      if (note->namesz == 6
+          && strcmp (note->namedata, "LINUX") == 0)
+        return elfcore_grok_s390_system_call (abfd, note);
       else
         return TRUE;
 
@@ -9167,6 +9195,32 @@ elfcore_write_s390_prefix (bfd *abfd,
 }
 
 char *
+elfcore_write_s390_last_break (bfd *abfd,
+			       char *buf,
+			       int *bufsiz,
+			       const void *s390_last_break,
+			       int size)
+{
+  char *note_name = "LINUX";
+  return elfcore_write_note (abfd, buf, bufsiz,
+                             note_name, NT_S390_LAST_BREAK,
+			     s390_last_break, size);
+}
+
+char *
+elfcore_write_s390_system_call (bfd *abfd,
+				char *buf,
+				int *bufsiz,
+				const void *s390_system_call,
+				int size)
+{
+  char *note_name = "LINUX";
+  return elfcore_write_note (abfd, buf, bufsiz,
+                             note_name, NT_S390_SYSTEM_CALL,
+			     s390_system_call, size);
+}
+
+char *
 elfcore_write_arm_vfp (bfd *abfd,
 		       char *buf,
 		       int *bufsiz,
@@ -9208,6 +9262,10 @@ elfcore_write_register_note (bfd *abfd,
     return elfcore_write_s390_ctrs (abfd, buf, bufsiz, data, size);
   if (strcmp (section, ".reg-s390-prefix") == 0)
     return elfcore_write_s390_prefix (abfd, buf, bufsiz, data, size);
+  if (strcmp (section, ".reg-s390-last-break") == 0)
+    return elfcore_write_s390_last_break (abfd, buf, bufsiz, data, size);
+  if (strcmp (section, ".reg-s390-system-call") == 0)
+    return elfcore_write_s390_system_call (abfd, buf, bufsiz, data, size);
   if (strcmp (section, ".reg-arm-vfp") == 0)
     return elfcore_write_arm_vfp (abfd, buf, bufsiz, data, size);
   return NULL;

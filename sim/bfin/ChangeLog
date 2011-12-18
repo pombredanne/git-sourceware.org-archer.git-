@@ -1,3 +1,35 @@
+2011-12-03  Mike Frysinger  <vapier@gentoo.org>
+
+	* interp.c (bfin_syscall): Increase _tbuf storage.  Declare new local
+	tstr buffer.  Call cb_get_string on tstr when handling CB_SYS_stat64,
+	CB_SYS_lstat64, CB_SYS_open, CB_SYS_write, CB_SYS_unlink,
+	CB_SYS_truncate, CB_SYS_rename, CB_SYS_stat, CB_SYS_lstat.  Include
+	tstr in the tbuf output.
+
+2011-12-03  Mike Frysinger  <vapier@gentoo.org>
+
+	* Makefile.in: Delete all dependency rules.
+	* aclocal.m4, configure: Regenerate.
+
+2011-10-19  Mike Frysinger  <vapier@gentoo.org>
+
+	* configure: Regenerate after common/acinclude.m4 update.
+
+2011-10-17  Mike Frysinger  <vapier@gentoo.org>
+
+	* configure.ac: Change include to common/acinclude.m4.
+	* aclocal.m4, configure: Regenerate.
+
+2011-10-17  Mike Frysinger  <vapier@gentoo.org>
+
+	* configure.ac: Change AC_PREREQ to 2.64.  Delete AC_CONFIG_HEADER
+	call.  Replace common.m4 include with SIM_AC_COMMON.
+	* configure: Regenerate.
+
+2011-09-28  Mike Frysinger  <vapier@gentoo.org>
+
+	* bfin-sim.c (decode_dsp32shift_0): Use STORE() for VIT_MAX insns.
+
 2011-07-05  Mike Frysinger  <vapier@gentoo.org>
 
 	* interp.c (sim_do_command): Delete.

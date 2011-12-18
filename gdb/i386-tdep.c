@@ -60,6 +60,9 @@
 #include "features/i386/i386-avx.c"
 #include "features/i386/i386-mmx.c"
 
+#include "ax.h"
+#include "ax-gdb.h"
+
 /* Register names.  */
 
 static const char *i386_register_names[] =
@@ -2074,6 +2077,22 @@ static const struct frame_unwind i386_stack_tramp_frame_unwind =
   i386_stack_tramp_frame_sniffer
 };
 
+/* Generate a bytecode expression to get the value of the saved PC.  */
+
+static void
+i386_gen_return_address (struct gdbarch *gdbarch,
+			 struct agent_expr *ax, struct axs_value *value,
+			 CORE_ADDR scope)
+{
+  /* The following sequence assumes the traditional use of the base
+     register.  */
+  ax_reg (ax, I386_EBP_REGNUM);
+  ax_const_l (ax, 4);
+  ax_simple (ax, aop_add);
+  value->type = register_type (gdbarch, I386_EIP_REGNUM);
+  value->kind = axs_lvalue_memory;
+}
+
 
 /* Signal trampolines.  */
 
@@ -2227,6 +2246,15 @@ i386_dummy_id (struct gdbarch *gdbarch, struct frame_info *this_frame)
 
   /* See the end of i386_push_dummy_call.  */
   return frame_id_build (fp + 8, get_frame_pc (this_frame));
+}
+
+/* _Decimal128 function return values need 16-byte alignment on the
+   stack.  */
+
+static CORE_ADDR
+i386_frame_align (struct gdbarch *gdbarch, CORE_ADDR sp)
+{
+  return sp & -(CORE_ADDR)16;
 }
 
 
@@ -7081,10 +7109,12 @@ static const int i386_record_regmap[] =
 };
 
 /* Check that the given address appears suitable for a fast
-   tracepoint, which on x86 means that we need an instruction of at
+   tracepoint, which on x86-64 means that we need an instruction of at
    least 5 bytes, so that we can overwrite it with a 4-byte-offset
    jump and not have to worry about program jumps to an address in the
-   middle of the tracepoint jump.  Returns 1 if OK, and writes a size
+   middle of the tracepoint jump.  On x86, it may be possible to use
+   4-byte jumps with a 2-byte offset to a trampoline located in the
+   bottom 64 KiB of memory.  Returns 1 if OK, and writes a size
    of instruction to replace, and 0 if not, plus an explanatory
    string.  */
 
@@ -7095,10 +7125,26 @@ i386_fast_tracepoint_valid_at (struct gdbarch *gdbarch,
   int len, jumplen;
   static struct ui_file *gdb_null = NULL;
 
-  /* This is based on the target agent using a 4-byte relative jump.
-     Alternate future possibilities include 8-byte offset for x86-84,
-     or 3-byte jumps if the program has trampoline space close by.  */
-  jumplen = 5;
+  /*  Ask the target for the minimum instruction length supported.  */
+  jumplen = target_get_min_fast_tracepoint_insn_len ();
+
+  if (jumplen < 0)
+    {
+      /* If the target does not support the get_min_fast_tracepoint_insn_len
+	 operation, assume that fast tracepoints will always be implemented
+	 using 4-byte relative jumps on both x86 and x86-64.  */
+      jumplen = 5;
+    }
+  else if (jumplen == 0)
+    {
+      /* If the target does support get_min_fast_tracepoint_insn_len but
+	 returns zero, then the IPA has not loaded yet.  In this case,
+	 we optimistically assume that truncated 2-byte relative jumps
+	 will be available on x86, and compensate later if this assumption
+	 turns out to be incorrect.  On x86-64 architectures, 4-byte relative
+	 jumps will always be used.  */
+      jumplen = (register_size (gdbarch, 0) == 8) ? 5 : 4;
+    }
 
   /* Dummy file descriptor for the disassembler.  */
   if (!gdb_null)
@@ -7106,6 +7152,9 @@ i386_fast_tracepoint_valid_at (struct gdbarch *gdbarch,
 
   /* Check for fit.  */
   len = gdb_print_insn (gdbarch, addr, gdb_null, NULL);
+  if (isize)
+    *isize = len;
+
   if (len < jumplen)
     {
       /* Return a bit of target-specific detail to add to the caller's
@@ -7116,12 +7165,12 @@ i386_fast_tracepoint_valid_at (struct gdbarch *gdbarch,
 			   len, jumplen);
       return 0;
     }
-
-  if (isize)
-    *isize = len;
-  if (msg)
-    *msg = NULL;
-  return 1;
+  else
+    {
+      if (msg)
+	*msg = NULL;
+      return 1;
+    }
 }
 
 static int
@@ -7253,6 +7302,8 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   tdep->record_regmap = i386_record_regmap;
 
+  set_gdbarch_long_long_align_bit (gdbarch, 32);
+
   /* The format used for `long double' on almost all i386 targets is
      the i387 extended floating-point format.  In fact, of all targets
      in the GCC 2.95 tree, only OSF/1 does it different, and insists
@@ -7316,6 +7367,7 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   /* Call dummy code.  */
   set_gdbarch_push_dummy_call (gdbarch, i386_push_dummy_call);
+  set_gdbarch_frame_align (gdbarch, i386_frame_align);
 
   set_gdbarch_convert_register_p (gdbarch, i386_convert_register_p);
   set_gdbarch_register_to_value (gdbarch,  i386_register_to_value);
@@ -7399,6 +7451,8 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   tdesc_data = tdesc_data_alloc ();
 
   set_gdbarch_relocate_instruction (gdbarch, i386_relocate_instruction);
+
+  set_gdbarch_gen_return_address (gdbarch, i386_gen_return_address);
 
   /* Hook in ABI-specific overrides, if they have been registered.  */
   info.tdep_info = (void *) tdesc_data;

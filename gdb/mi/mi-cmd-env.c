@@ -69,6 +69,8 @@ env_execute_cli_command (const char *cmd, const char *args)
 void
 mi_cmd_env_pwd (char *command, char **argv, int argc)
 {
+  struct ui_out *uiout = current_uiout;
+
   if (argc > 0)
     error (_("-environment-pwd: No arguments required"));
           
@@ -112,17 +114,18 @@ env_mod_path (char *dirname, char **which_path)
 void
 mi_cmd_env_path (char *command, char **argv, int argc)
 {
+  struct ui_out *uiout = current_uiout;
   char *exec_path;
   char *env;
   int reset = 0;
-  int optind = 0;
+  int oind = 0;
   int i;
-  char *optarg;
+  char *oarg;
   enum opt
     {
       RESET_OPT
     };
-  static struct mi_opt opts[] =
+  static const struct mi_opt opts[] =
   {
     {"r", RESET_OPT, 0},
     { 0, 0, 0 }
@@ -141,7 +144,7 @@ mi_cmd_env_path (char *command, char **argv, int argc)
   while (1)
     {
       int opt = mi_getopt ("-environment-path", argc, argv, opts,
-                           &optind, &optarg);
+                           &oind, &oarg);
 
       if (opt < 0)
         break;
@@ -152,8 +155,8 @@ mi_cmd_env_path (char *command, char **argv, int argc)
           break;
         }
     }
-  argv += optind;
-  argc -= optind;
+  argv += oind;
+  argc -= oind;
 
 
   if (reset)
@@ -185,15 +188,16 @@ mi_cmd_env_path (char *command, char **argv, int argc)
 void
 mi_cmd_env_dir (char *command, char **argv, int argc)
 {
+  struct ui_out *uiout = current_uiout;
   int i;
-  int optind = 0;
+  int oind = 0;
   int reset = 0;
-  char *optarg;
+  char *oarg;
   enum opt
     {
       RESET_OPT
     };
-  static struct mi_opt opts[] =
+  static const struct mi_opt opts[] =
   {
     {"r", RESET_OPT, 0},
     { 0, 0, 0 }
@@ -212,7 +216,7 @@ mi_cmd_env_dir (char *command, char **argv, int argc)
   while (1)
     {
       int opt = mi_getopt ("-environment-directory", argc, argv, opts,
-                           &optind, &optarg);
+                           &oind, &oarg);
 
       if (opt < 0)
         break;
@@ -223,8 +227,8 @@ mi_cmd_env_dir (char *command, char **argv, int argc)
           break;
         }
     }
-  argv += optind;
-  argc -= optind;
+  argv += oind;
+  argc -= oind;
 
   if (reset)
     {
@@ -257,7 +261,8 @@ mi_cmd_inferior_tty_show (char *command, char **argv, int argc)
     error (_("-inferior-tty-show: Usage: No args"));
 
   if (inferior_io_terminal)
-    ui_out_field_string (uiout, "inferior_tty_terminal", inferior_io_terminal);
+    ui_out_field_string (current_uiout,
+			 "inferior_tty_terminal", inferior_io_terminal);
 }
 
 void 

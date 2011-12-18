@@ -57,6 +57,7 @@
 #include "tracepoint.h"
 #include "inf-loop.h"
 #include "continuations.h"
+#include "linespec.h"
 
 /* Functions exported for general use, in inferior.h: */
 
@@ -503,6 +504,7 @@ run_command_1 (char *args, int from_tty, int tbreak_at_main)
   char *exec_file;
   struct cleanup *old_chain;
   ptid_t ptid;
+  struct ui_out *uiout = current_uiout;
 
   dont_repeat ();
 
@@ -1115,7 +1117,7 @@ jump_command (char *arg, int from_tty)
   if (!arg)
     error_no_arg (_("starting address"));
 
-  sals = decode_line_spec_1 (arg, 1);
+  sals = decode_line_spec_1 (arg, DECODE_LINE_FUNFIRSTLINE);
   if (sals.nelts != 1)
     {
       error (_("Unreasonable jump request"));
@@ -1421,6 +1423,7 @@ print_return_value (struct type *func_type, struct type *value_type)
   struct cleanup *old_chain;
   struct ui_stream *stb;
   struct value *value;
+  struct ui_out *uiout = current_uiout;
 
   CHECK_TYPEDEF (value_type);
   gdb_assert (TYPE_CODE (value_type) != TYPE_CODE_VOID);
@@ -2677,6 +2680,7 @@ static void
 disconnect_command (char *args, int from_tty)
 {
   dont_repeat ();		/* Not for the faint of heart.  */
+  disconnect_tracing (from_tty);
   target_disconnect (args, from_tty);
   no_shared_libraries (NULL, from_tty);
   init_thread_list ();

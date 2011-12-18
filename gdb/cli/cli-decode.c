@@ -126,8 +126,8 @@ set_cmd_completer (struct cmd_list_element *cmd,
   cmd->completer = completer; /* Ok.  */
 }
 
-
 /* Add element named NAME.
+   Space for NAME and DOC must be allocated by the caller.
    CLASS is the top level category into which commands are broken down
    for "help" purposes.
    FUN should be the function to execute the command;
@@ -1018,7 +1018,7 @@ print_doc_line (struct ui_file *stream, char *str)
   line_buffer[p - str] = '\0';
   if (islower (line_buffer[0]))
     line_buffer[0] = toupper (line_buffer[0]);
-  ui_out_text (uiout, line_buffer);
+  ui_out_text (current_uiout, line_buffer);
 }
 
 /* Print one-line help for command C.
@@ -1127,14 +1127,47 @@ find_command_name_length (const char *text)
      Note that this is larger than the character set allowed when
      creating user-defined commands.  */
 
+  /* Recognize '!' as a single character command so that, e.g., "!ls"
+     works as expected.  */
+  if (*p == '!')
+    return 1;
+
   while (isalnum (*p) || *p == '-' || *p == '_'
 	 /* Characters used by TUI specific commands.  */
 	 || *p == '+' || *p == '<' || *p == '>' || *p == '$'
 	 /* Characters used for XDB compatibility.  */
-	 || (xdb_commands && (*p == '!' || *p == '/' || *p == '?')))
+	 || (xdb_commands && (*p == '/' || *p == '?')))
     p++;
 
   return p - text;
+}
+
+/* Return TRUE if NAME is a valid user-defined command name.
+   This is a stricter subset of all gdb commands,
+   see find_command_name_length.  */
+
+int
+valid_user_defined_cmd_name_p (const char *name)
+{
+  const char *p;
+
+  if (*name == '\0')
+    return FALSE;
+
+  /* Alas "42" is a legitimate user-defined command.
+     In the interests of not breaking anything we preserve that.  */
+
+  for (p = name; *p != '\0'; ++p)
+    {
+      if (isalnum (*p)
+	  || *p == '-'
+	  || *p == '_')
+	; /* Ok.  */
+      else
+	return FALSE;
+    }
+
+  return TRUE;
 }
 
 /* This routine takes a line of TEXT and a CLIST in which to start the

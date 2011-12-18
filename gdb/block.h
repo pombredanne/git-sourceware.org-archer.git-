@@ -131,6 +131,8 @@ struct blockvector
 
 extern struct symbol *block_linkage_function (const struct block *);
 
+extern struct symbol *block_containing_function (const struct block *);
+
 extern int block_inlined_p (const struct block *block);
 
 extern int contained_in (const struct block *, const struct block *);
@@ -141,6 +143,9 @@ extern struct blockvector *blockvector_for_pc_sect (CORE_ADDR,
 						    struct obj_section *,
 						    struct block **,
                                                     struct symtab *);
+
+extern struct call_site *call_site_for_pc (struct gdbarch *gdbarch,
+					   CORE_ADDR pc);
 
 extern struct block *block_for_pc (CORE_ADDR);
 

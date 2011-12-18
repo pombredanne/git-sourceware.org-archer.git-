@@ -1801,9 +1801,8 @@ extern bfd_boolean _bfd_elf_match_sections_by_type
   (bfd *, const asection *, bfd *, const asection *);
 extern bfd_boolean bfd_elf_is_group_section
   (bfd *, const struct bfd_section *);
-struct already_linked;
-extern void _bfd_elf_section_already_linked
-  (bfd *, struct already_linked *, struct bfd_link_info *);
+extern bfd_boolean _bfd_elf_section_already_linked
+  (bfd *, asection *, struct bfd_link_info *);
 extern void bfd_elf_set_group_contents
   (bfd *, asection *, void *);
 extern asection *_bfd_elf_check_kept_section
@@ -2133,9 +2132,6 @@ extern unsigned int _bfd_elf_common_section_index
 extern asection *_bfd_elf_common_section
   (asection *);
 
-extern void _bfd_dwarf2_cleanup_debug_info
-  (bfd *);
-
 extern bfd_vma _bfd_elf_default_got_elt_size
 (bfd *, struct bfd_link_info *, struct elf_link_hash_entry *, bfd *,
  unsigned long);
@@ -2237,6 +2233,10 @@ extern char *elfcore_write_s390_todpreg
 extern char *elfcore_write_s390_ctrs
   (bfd *, char *, int *, const void *, int);
 extern char *elfcore_write_s390_prefix
+  (bfd *, char *, int *, const void *, int);
+extern char *elfcore_write_s390_last_break
+  (bfd *, char *, int *, const void *, int);
+extern char *elfcore_write_s390_system_call
   (bfd *, char *, int *, const void *, int);
 extern char *elfcore_write_arm_vfp
   (bfd *, char *, int *, const void *, int);

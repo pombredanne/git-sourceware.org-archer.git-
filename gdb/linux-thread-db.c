@@ -40,6 +40,7 @@
 #include "gdbcore.h"
 #include "observer.h"
 #include "linux-nat.h"
+#include "linux-procfs.h"
 
 #include <signal.h>
 
@@ -1076,14 +1077,35 @@ check_for_thread_db (void)
     return;
 }
 
+/* This function is called via the new_objfile observer.  */
+
 static void
 thread_db_new_objfile (struct objfile *objfile)
 {
   /* This observer must always be called with inferior_ptid set
      correctly.  */
 
-  if (objfile != NULL)
+  if (objfile != NULL
+      /* Only check for thread_db if we loaded libpthread,
+	 or if this is the main symbol file.
+	 We need to check OBJF_MAINLINE to handle the case of debugging
+	 a statically linked executable AND the symbol file is specified AFTER
+	 the exec file is loaded (e.g., gdb -c core ; file foo).
+	 For dynamically linked executables, libpthread can be near the end
+	 of the list of shared libraries to load, and in an app of several
+	 thousand shared libraries, this can otherwise be painful.  */
+      && ((objfile->flags & OBJF_MAINLINE) != 0
+	  || libpthread_name_p (objfile->name)))
     check_for_thread_db ();
+}
+
+/* This function is called via the inferior_created observer.
+   This handles the case of debugging statically linked executables.  */
+
+static void
+thread_db_inferior_created (struct target_ops *target, int from_tty)
+{
+  check_for_thread_db ();
 }
 
 /* Attach to a new thread.  This function is called when we receive a
@@ -1139,9 +1161,25 @@ attach_thread (ptid_t ptid, const td_thrhandle_t *th_p,
 
   /* Under GNU/Linux, we have to attach to each and every thread.  */
   if (target_has_execution
-      && tp == NULL
-      && lin_lwp_attach_lwp (BUILD_LWP (ti_p->ti_lid, GET_PID (ptid))) < 0)
-    return 0;
+      && tp == NULL)
+    {
+      int res;
+
+      res = lin_lwp_attach_lwp (BUILD_LWP (ti_p->ti_lid, GET_PID (ptid)));
+      if (res < 0)
+	{
+	  /* Error, stop iterating.  */
+	  return 0;
+	}
+      else if (res > 0)
+	{
+	  /* Pretend this thread doesn't exist yet, and keep
+	     iterating.  */
+	  return 1;
+	}
+
+      /* Otherwise, we sucessfully attached to the thread.  */
+    }
 
   /* Construct the thread's private data.  */
   private = xmalloc (sizeof (struct private_thread_info));
@@ -1535,20 +1573,6 @@ thread_db_find_new_threads_2 (ptid_t ptid, int until_no_new)
   int pid = ptid_get_pid (ptid);
   int i, loop;
 
-  if (target_has_execution)
-    {
-      struct lwp_info *lp;
-
-      /* In linux, we can only read memory through a stopped lwp.  */
-      ALL_LWPS (lp, ptid)
-	if (lp->stopped && ptid_get_pid (lp->ptid) == pid)
-	  break;
-
-      if (!lp)
-	/* There is no stopped thread.  Bail out.  */
-	return;
-    }
-
   info = get_thread_db_info (GET_PID (ptid));
 
   /* Access an lwp we know is stopped.  */
@@ -1590,13 +1614,25 @@ static void
 thread_db_find_new_threads (struct target_ops *ops)
 {
   struct thread_db_info *info;
+  struct inferior *inf;
 
-  info = get_thread_db_info (GET_PID (inferior_ptid));
+  ALL_INFERIORS (inf)
+    {
+      struct thread_info *thread;
 
-  if (info == NULL)
-    return;
+      if (inf->pid == 0)
+	continue;
 
-  thread_db_find_new_threads_1 (inferior_ptid);
+      info = get_thread_db_info (inf->pid);
+      if (info == NULL)
+	continue;
+
+      thread = any_live_thread_of_process (inf->pid);
+      if (thread == NULL || thread->executing)
+	continue;
+
+      thread_db_find_new_threads_1 (thread->ptid);
+    }
 
   if (target_has_execution)
     iterate_over_lwps (minus_one_ptid /* iterate over all */,
@@ -1830,4 +1866,9 @@ When non-zero, libthread-db debugging is enabled."),
 
   /* Add ourselves to objfile event chain.  */
   observer_attach_new_objfile (thread_db_new_objfile);
+
+  /* Add ourselves to inferior_created event chain.
+     This is needed to handle debugging statically linked programs where
+     the new_objfile observer won't get called for libpthread.  */
+  observer_attach_inferior_created (thread_db_inferior_created);
 }

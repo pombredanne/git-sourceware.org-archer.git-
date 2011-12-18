@@ -1,3 +1,15 @@
+2011-12-18  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* acx.m4 (Test for GNAT): Update comment and add quotes in final test.
+
+2011-11-02  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* mh-interix (LIBGCC2_DEBUG_CFLAGS): Remove.
+
+2011-08-22  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
+
+	* picflag.m4: New file.
+
 2011-07-18  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
 
 	* elf.m4 (target_elf): Remove *-netware*.

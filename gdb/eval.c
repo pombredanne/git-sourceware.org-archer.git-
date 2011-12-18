@@ -1052,6 +1052,27 @@ evaluate_subexp_standard (struct type *expect_type,
 	return ret;
       }
 
+    case OP_VAR_ENTRY_VALUE:
+      (*pos) += 2;
+      if (noside == EVAL_SKIP)
+	goto nosideret;
+
+      {
+	struct symbol *sym = exp->elts[pc + 1].symbol;
+	struct frame_info *frame;
+
+	if (noside == EVAL_AVOID_SIDE_EFFECTS)
+	  return value_zero (SYMBOL_TYPE (sym), not_lval);
+
+	if (SYMBOL_CLASS (sym) != LOC_COMPUTED
+	    || SYMBOL_COMPUTED_OPS (sym)->read_variable_at_entry == NULL)
+	  error (_("Symbol \"%s\" does not have any specific entry value"),
+		 SYMBOL_PRINT_NAME (sym));
+
+	frame = get_selected_frame (NULL);
+	return SYMBOL_COMPUTED_OPS (sym)->read_variable_at_entry (sym, frame);
+      }
+
     case OP_LAST:
       (*pos) += 2;
       return
@@ -1845,13 +1866,7 @@ evaluate_subexp_standard (struct type *expect_type,
           func_name = (char *) alloca (name_len + 1);
           strcpy (func_name, &exp->elts[string_pc + 1].string);
 
-          /* Prepare list of argument types for overload resolution.  */
-          arg_types = (struct type **)
-	    alloca (nargs * (sizeof (struct type *)));
-          for (ix = 1; ix <= nargs; ix++)
-            arg_types[ix - 1] = value_type (argvec[ix]);
-
-          find_overload_match (arg_types, nargs, func_name,
+          find_overload_match (&argvec[1], nargs, func_name,
                                NON_METHOD, /* not method */
 			       0,          /* strict match */
                                NULL, NULL, /* pass NULL symbol since
@@ -1887,13 +1902,7 @@ evaluate_subexp_standard (struct type *expect_type,
 		 evaluation.  */
 	      struct value *valp = NULL;
 
-	      /* Prepare list of argument types for overload resolution.  */
-	      arg_types = (struct type **)
-		alloca (nargs * (sizeof (struct type *)));
-	      for (ix = 1; ix <= nargs; ix++)
-		arg_types[ix - 1] = value_type (argvec[ix]);
-
-	      (void) find_overload_match (arg_types, nargs, tstr,
+	      (void) find_overload_match (&argvec[1], nargs, tstr,
 	                                  METHOD, /* method */
 					  0,      /* strict match */
 					  &arg2,  /* the object */
@@ -1964,13 +1973,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	      if (op == OP_VAR_VALUE)
 		function = exp->elts[save_pos1+2].symbol;
 
-	      /* Prepare list of argument types for overload resolution.  */
-	      arg_types = (struct type **)
-		alloca (nargs * (sizeof (struct type *)));
-	      for (ix = 1; ix <= nargs; ix++)
-		arg_types[ix - 1] = value_type (argvec[ix]);
-
-	      (void) find_overload_match (arg_types, nargs,
+	      (void) find_overload_match (&argvec[1], nargs,
 					  NULL,        /* no need for name */
 	                                  NON_METHOD,  /* not method */
 					  0,           /* strict match */
@@ -2990,7 +2993,7 @@ evaluate_subexp_standard (struct type *expect_type,
 
     case OP_THIS:
       (*pos) += 1;
-      return value_of_this (exp->language_defn, 1);
+      return value_of_this (exp->language_defn);
 
     case OP_TYPE:
       /* The value is not supposed to be used.  This is here to make it

@@ -331,7 +331,7 @@ regcache_save (struct regcache *dst, regcache_cooked_read_ftype *cooked_read,
     }
 }
 
-void
+static void
 regcache_restore (struct regcache *dst,
 		  regcache_cooked_read_ftype *cooked_read,
 		  void *cooked_read_context)
@@ -351,9 +351,10 @@ regcache_restore (struct regcache *dst,
     {
       if (gdbarch_register_reggroup_p (gdbarch, regnum, restore_reggroup))
 	{
-	  int valid = cooked_read (cooked_read_context, regnum, buf);
+	  enum register_status status;
 
-	  if (valid)
+	  status = cooked_read (cooked_read_context, regnum, buf);
+	  if (status == REG_VALID)
 	    regcache_cooked_write (dst, regnum, buf);
 	}
     }
@@ -450,16 +451,32 @@ struct regcache_list
 static struct regcache_list *current_regcache;
 
 struct regcache *
-get_thread_arch_regcache (ptid_t ptid, struct gdbarch *gdbarch)
+get_thread_arch_aspace_regcache (ptid_t ptid, struct gdbarch *gdbarch,
+				 struct address_space *aspace)
 {
   struct regcache_list *list;
   struct regcache *new_regcache;
-  struct address_space *aspace;
 
   for (list = current_regcache; list; list = list->next)
     if (ptid_equal (list->regcache->ptid, ptid)
 	&& get_regcache_arch (list->regcache) == gdbarch)
       return list->regcache;
+
+  new_regcache = regcache_xmalloc_1 (gdbarch, aspace, 0);
+  new_regcache->ptid = ptid;
+
+  list = xmalloc (sizeof (struct regcache_list));
+  list->regcache = new_regcache;
+  list->next = current_regcache;
+  current_regcache = list;
+
+  return new_regcache;
+}
+
+struct regcache *
+get_thread_arch_regcache (ptid_t ptid, struct gdbarch *gdbarch)
+{
+  struct address_space *aspace;
 
   /* For the benefit of "maint print registers" & co when debugging an
      executable, allow dumping the regcache even when there is no
@@ -471,15 +488,7 @@ get_thread_arch_regcache (ptid_t ptid, struct gdbarch *gdbarch)
 	    ? NULL
 	    : target_thread_address_space (ptid));
 
-  new_regcache = regcache_xmalloc_1 (gdbarch, aspace, 0);
-  new_regcache->ptid = ptid;
-
-  list = xmalloc (sizeof (struct regcache_list));
-  list->regcache = new_regcache;
-  list->next = current_regcache;
-  current_regcache = list;
-
-  return new_regcache;
+  return get_thread_arch_aspace_regcache  (ptid, gdbarch, aspace);
 }
 
 static ptid_t current_thread_ptid;
@@ -539,7 +548,6 @@ void
 registers_changed_ptid (ptid_t ptid)
 {
   struct regcache_list *list, **list_link;
-  int wildcard = ptid_equal (ptid, minus_one_ptid);
 
   list = current_regcache;
   list_link = &current_regcache;
@@ -560,13 +568,13 @@ registers_changed_ptid (ptid_t ptid)
       list = *list_link;
     }
 
-  if (wildcard || ptid_equal (ptid, current_thread_ptid))
+  if (ptid_match (current_thread_ptid, ptid))
     {
       current_thread_ptid = null_ptid;
       current_thread_arch = NULL;
     }
 
-  if (wildcard || ptid_equal (ptid, inferior_ptid))
+  if (ptid_match (inferior_ptid, ptid))
     {
       /* We just deleted the regcache of the current thread.  Need to
 	 forget about any frames we have cached, too.  */
