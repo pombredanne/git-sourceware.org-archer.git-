@@ -220,9 +220,7 @@ static void
 dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
 			 const gdb_byte **start, size_t *length)
 {
-  if (SYMBOL_LOCATION_BATON (framefunc) == NULL)
-    *length = 0;
-  else if (SYMBOL_COMPUTED_OPS (framefunc) == &dwarf2_loclist_funcs)
+  if (SYMBOL_COMPUTED_OPS (framefunc) == &dwarf2_loclist_funcs)
     {
       struct dwarf2_loclist_baton *symbaton;
 
@@ -256,7 +254,7 @@ dwarf_expr_frame_base_1 (struct symbol *framefunc, CORE_ADDR pc,
 		    SYMBOL_COMPUTED_OPS (framefunc),
 		    SYMBOL_PRINT_NAME (framefunc));
 
-  if (*length == 0 && SYMBOL_COMPUTED_OPS (framefunc) != &dwarf2_missing_funcs)
+  if (*length == 0)
     error (_("Could not find the frame base for \"%s\"."),
 	   SYMBOL_PRINT_NAME (framefunc));
 }
