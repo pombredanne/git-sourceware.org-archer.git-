@@ -78,7 +78,7 @@ void
 type_print (struct type *type, char *varstring, struct ui_file *stream,
 	    int show)
 {
-  if (show >= 0)
+  if (show >= 0 && current_language->la_language != language_ada)
     type = check_typedef (type);
 
   LA_PRINT_TYPE (type, varstring, stream, show, 0);
