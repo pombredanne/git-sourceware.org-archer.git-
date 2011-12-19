@@ -1505,8 +1505,6 @@ add_psymbol_to_bcache (const char *name, int namelength, int copy_name,
     {
       SET_PSYMBOL_VALUE_ADDRESS (&psymbol, coreaddr);
     }
-  PSYMBOL_SECTION (&psymbol) = 0;
-  PSYMBOL_OBJ_SECTION (&psymbol) = NULL;
   PSYMBOL_SET_LANGUAGE (&psymbol, language);
   PSYMBOL_DOMAIN (&psymbol) = domain;
   PSYMBOL_CLASS (&psymbol) = class;
