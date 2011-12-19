@@ -30,7 +30,7 @@ extern void finish_python_initialization (void);
 
 void eval_python_from_control_command (struct command_line *);
 
-void source_python_script (FILE *stream, const char *file);
+void source_python_script (const char *file);
 
 void run_python_script (int argc, char **argv);
 

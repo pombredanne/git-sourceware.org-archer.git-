@@ -21,6 +21,9 @@ struct s
   int b;
 };
 
+typedef struct s TS;
+TS ts;
+
 #ifdef __cplusplus
 struct C
 {
@@ -43,6 +46,10 @@ Temargs<D, 23, &C::c> temvar;
 
 #endif
 
+enum E
+{ v1, v2, v3
+};
+
 int
 main ()
 {
@@ -56,9 +63,12 @@ main ()
   d.e = 3;
   d.f = 4;
 #endif
-
+  enum E e;
+  
   st.a = 3;
   st.b = 5;
 
+  e = v2;
+  
   return 0;      /* break to inspect struct and array.  */
 }

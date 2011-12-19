@@ -173,19 +173,9 @@ struct objfile
   {
 
     /* All struct objfile's are chained together by their next pointers.
-       The global variable "object_files" points to the first link in this
-       chain.
-
-       FIXME:  There is a problem here if the objfile is reusable, and if
-       multiple users are to be supported.  The problem is that the objfile
-       list is linked through a member of the objfile struct itself, which
-       is only valid for one gdb process.  The list implementation needs to
-       be changed to something like:
-
-       struct list {struct list *next; struct objfile *objfile};
-
-       where the list structure is completely maintained separately within
-       each gdb process.  */
+       The program space field "objfiles"  (frequently referenced via
+       the macro "object_files") points to the first link in this
+       chain.  */
 
     struct objfile *next;
 
@@ -196,7 +186,8 @@ struct objfile
 
     CORE_ADDR addr_low;
 
-    /* Some flag bits for this objfile.  */
+    /* Some flag bits for this objfile.
+       The values are defined by OBJF_*.  */
 
     unsigned short flags;
 
@@ -243,6 +234,11 @@ struct objfile
        we read its symbols.  */
 
     long mtime;
+
+    /* Cached 32-bit CRC as computed by gnu_debuglink_crc32.  CRC32 is valid
+       iff CRC32_P.  */
+    unsigned long crc32;
+    int crc32_p;
 
     /* Obstack to hold objects that should be freed when we load a new symbol
        table from this object file.  */
@@ -433,6 +429,11 @@ struct objfile
    This is used to allow lazy reading of partial symtabs.  */
 
 #define OBJF_PSYMTABS_READ (1 << 4)
+
+/* Set if this is the main symbol file
+   (as opposed to symbol file for dynamically loaded code).  */
+
+#define OBJF_MAINLINE (1 << 5)
 
 /* The object file that contains the runtime common minimal symbols
    for SunOS4.  Note that this objfile has no associated BFD.  */

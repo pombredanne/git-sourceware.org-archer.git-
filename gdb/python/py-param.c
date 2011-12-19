@@ -331,6 +331,7 @@ call_doc_function (PyObject *obj, PyObject *method, PyObject *arg)
   if (gdbpy_is_string (result))
     {
       data = python_string_to_host_string (result);
+      Py_DECREF (result);
       if (! data)
 	return NULL;
     }
@@ -338,6 +339,7 @@ call_doc_function (PyObject *obj, PyObject *method, PyObject *arg)
     {
       PyErr_SetString (PyExc_RuntimeError,
 		       _("Parameter must return a string value."));
+      Py_DECREF (result);
       return NULL;
     }
 
@@ -646,7 +648,6 @@ parmpy_init (PyObject *self, PyObject *args, PyObject *kwds)
 {
   parmpy_object *obj = (parmpy_object *) self;
   const char *name;
-  char *copy;
   char *set_doc, *show_doc, *doc;
   char *cmd_name;
   int parmclass, cmdtype;
@@ -697,21 +698,16 @@ parmpy_init (PyObject *self, PyObject *args, PyObject *kwds)
   obj->type = (enum var_types) parmclass;
   memset (&obj->value, 0, sizeof (obj->value));
 
-  copy = xstrdup (name);
-  cmd_name = gdbpy_parse_command_name (copy, &set_list,
+  cmd_name = gdbpy_parse_command_name (name, &set_list,
 				       &setlist);
 
   if (! cmd_name)
-    {
-      xfree (copy);
-      return -1;
-    }
+    return -1;
   xfree (cmd_name);
-  cmd_name = gdbpy_parse_command_name (copy, &show_list,
+  cmd_name = gdbpy_parse_command_name (name, &show_list,
 				       &showlist);
   if (! cmd_name)
     return -1;
-  xfree (copy);
 
   set_doc = get_doc_string (self, set_doc_cst);
   show_doc = get_doc_string (self, show_doc_cst);
@@ -749,6 +745,7 @@ gdbpy_initialize_parameters (void)
 {
   int i;
 
+  parmpy_object_type.tp_new = PyType_GenericNew;
   if (PyType_Ready (&parmpy_object_type) < 0)
     return;
 
@@ -814,5 +811,4 @@ static PyTypeObject parmpy_object_type =
   0,				  /* tp_dictoffset */
   parmpy_init,			  /* tp_init */
   0,				  /* tp_alloc */
-  PyType_GenericNew		  /* tp_new */
 };

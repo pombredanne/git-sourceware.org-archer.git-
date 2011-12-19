@@ -20,9 +20,11 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "dyn-string.h"
 #include "gdb_assert.h"
 #include <ctype.h>
 #include "gdb_string.h"
+#include "gdb_wait.h"
 #include "event-top.h"
 #include "exceptions.h"
 #include "gdbthread.h"
@@ -44,11 +46,12 @@
 #endif
 
 #include <signal.h>
+#include "timeval-utils.h"
 #include "gdbcmd.h"
 #include "serial.h"
 #include "bfd.h"
 #include "target.h"
-#include "demangle.h"
+#include "gdb-demangle.h"
 #include "expression.h"
 #include "language.h"
 #include "charset.h"
@@ -59,6 +62,7 @@
 #include "gdbcore.h"
 #include "top.h"
 #include "main.h"
+#include "solist.h"
 
 #include "inferior.h"		/* for signed_pointer_to_address */
 
@@ -135,35 +139,6 @@ int quit_flag;
 
 int immediate_quit;
 
-/* Nonzero means that encoded C++/ObjC names should be printed out in their
-   C++/ObjC form rather than raw.  */
-
-int demangle = 1;
-static void
-show_demangle (struct ui_file *file, int from_tty,
-	       struct cmd_list_element *c, const char *value)
-{
-  fprintf_filtered (file,
-		    _("Demangling of encoded C++/ObjC names "
-		      "when displaying symbols is %s.\n"),
-		    value);
-}
-
-/* Nonzero means that encoded C++/ObjC names should be printed out in their
-   C++/ObjC form even in assembler language displays.  If this is set, but
-   DEMANGLE is zero, names are printed raw, i.e. DEMANGLE controls.  */
-
-int asm_demangle = 0;
-static void
-show_asm_demangle (struct ui_file *file, int from_tty,
-		   struct cmd_list_element *c, const char *value)
-{
-  fprintf_filtered (file,
-		    _("Demangling of C++/ObjC names in "
-		      "disassembly listings is %s.\n"),
-		    value);
-}
-
 /* Nonzero means that strings with character values >0x7F should be printed
    as octal escapes.  Zero means just print the value (e.g. it's an
    international character, and the terminal or window can cope.)  */
@@ -235,6 +210,18 @@ struct cleanup *
 make_cleanup_freeargv (char **arg)
 {
   return make_my_cleanup (&cleanup_chain, do_freeargv, arg);
+}
+
+static void
+do_dyn_string_delete (void *arg)
+{
+  dyn_string_delete ((dyn_string_t) arg);
+}
+
+struct cleanup *
+make_cleanup_dyn_string_delete (dyn_string_t arg)
+{
+  return make_my_cleanup (&cleanup_chain, do_dyn_string_delete, arg);
 }
 
 static void
@@ -403,6 +390,24 @@ make_cleanup_unpush_target (struct target_ops *ops)
   return make_my_cleanup (&cleanup_chain, do_unpush_target, ops);
 }
 
+/* Helper for make_cleanup_htab_delete compile time checking the types.  */
+
+static void
+do_htab_delete_cleanup (void *htab_voidp)
+{
+  htab_t htab = htab_voidp;
+
+  htab_delete (htab);
+}
+
+/* Return a new cleanup that deletes HTAB.  */
+
+struct cleanup *
+make_cleanup_htab_delete (htab_t htab)
+{
+  return make_cleanup (do_htab_delete_cleanup, htab);
+}
+
 struct restore_ui_file_closure
 {
   struct ui_file **variable;
@@ -462,6 +467,24 @@ struct cleanup *
 make_cleanup_value_free (struct value *value)
 {
   return make_my_cleanup (&cleanup_chain, do_value_free, value);
+}
+
+/* Helper for make_cleanup_free_so.  */
+
+static void
+do_free_so (void *arg)
+{
+  struct so_list *so = arg;
+
+  free_so (so);
+}
+
+/* Make cleanup handler calling free_so for SO.  */
+
+struct cleanup *
+make_cleanup_free_so (struct so_list *so)
+{
+  return make_my_cleanup (&cleanup_chain, do_free_so, so);
 }
 
 struct cleanup *
@@ -641,7 +664,8 @@ static int display_space;
 struct cmd_stats 
 {
   int msg_type;
-  long start_time;
+  long start_cpu_time;
+  struct timeval start_wall_time;
   long start_space;
 };
 
@@ -673,12 +697,19 @@ report_command_stats (void *arg)
 
   if (display_time)
     {
-      long cmd_time = get_run_time () - start_stats->start_time;
+      long cmd_time = get_run_time () - start_stats->start_cpu_time;
+      struct timeval now_wall_time, delta_wall_time;
+
+      gettimeofday (&now_wall_time, NULL);
+      timeval_sub (&delta_wall_time,
+		   &now_wall_time, &start_stats->start_wall_time);
 
       printf_unfiltered (msg_type == 0
-			 ? _("Startup time: %ld.%06ld\n")
-			 : _("Command execution time: %ld.%06ld\n"),
-			 cmd_time / 1000000, cmd_time % 1000000);
+			 ? _("Startup time: %ld.%06ld (cpu), %ld.%06ld (wall)\n")
+			 : _("Command execution time: %ld.%06ld (cpu), %ld.%06ld (wall)\n"),
+			 cmd_time / 1000000, cmd_time % 1000000,
+			 (long) delta_wall_time.tv_sec,
+			 (long) delta_wall_time.tv_usec);
     }
 
   if (display_space)
@@ -714,7 +745,8 @@ make_command_stats_cleanup (int msg_type)
 #endif
 
   new_stat->msg_type = msg_type;
-  new_stat->start_time = get_run_time ();
+  new_stat->start_cpu_time = get_run_time ();
+  gettimeofday (&new_stat->start_wall_time, NULL);
 
   return make_cleanup_dtor (report_command_stats, new_stat, xfree);
 }
@@ -2131,8 +2163,8 @@ fputs_maybe_filtered (const char *linebuffer, struct ui_file *stream,
 
   /* Don't do any filtering if it is disabled.  */
   if (stream != gdb_stdout
-      || ! pagination_enabled
-      || ! input_from_terminal_p ()
+      || !pagination_enabled
+      || batch_flag
       || (lines_per_page == UINT_MAX && chars_per_line == UINT_MAX)
       || top_level_interpreter () == NULL
       || ui_out_is_mi_like_p (interp_ui_out (top_level_interpreter ())))
@@ -2805,13 +2837,6 @@ Show number of lines gdb thinks are in a page."), NULL,
 
   init_page_info ();
 
-  add_setshow_boolean_cmd ("demangle", class_support, &demangle, _("\
-Set demangling of encoded C++/ObjC names when displaying symbols."), _("\
-Show demangling of encoded C++/ObjC names when displaying symbols."), NULL,
-			   NULL,
-			   show_demangle,
-			   &setprintlist, &showprintlist);
-
   add_setshow_boolean_cmd ("pagination", class_support,
 			   &pagination_enabled, _("\
 Set state of pagination."), _("\
@@ -2834,13 +2859,6 @@ Set printing of 8-bit characters in strings as \\nnn."), _("\
 Show printing of 8-bit characters in strings as \\nnn."), NULL,
 			   NULL,
 			   show_sevenbit_strings,
-			   &setprintlist, &showprintlist);
-
-  add_setshow_boolean_cmd ("asm-demangle", class_support, &asm_demangle, _("\
-Set demangling of C++/ObjC names in disassembly listings."), _("\
-Show demangling of C++/ObjC names in disassembly listings."), NULL,
-			   NULL,
-			   show_asm_demangle,
 			   &setprintlist, &showprintlist);
 
   add_setshow_boolean_cmd ("timestamp", class_maintenance,
@@ -2909,6 +2927,27 @@ print_core_address (struct gdbarch *gdbarch, CORE_ADDR address)
     return hex_string_custom (address, 8);
   else
     return hex_string_custom (address, 16);
+}
+
+/* Callback hash_f for htab_create_alloc or htab_create_alloc_ex.  */
+
+hashval_t
+core_addr_hash (const void *ap)
+{
+  const CORE_ADDR *addrp = ap;
+
+  return *addrp;
+}
+
+/* Callback eq_f for htab_create_alloc or htab_create_alloc_ex.  */
+
+int
+core_addr_eq (const void *ap, const void *bp)
+{
+  const CORE_ADDR *addr_ap = ap;
+  const CORE_ADDR *addr_bp = bp;
+
+  return *addr_ap == *addr_bp;
 }
 
 static char *
@@ -3613,6 +3652,17 @@ compare_positive_ints (const void *ap, const void *bp)
   return * (int *) ap - * (int *) bp;
 }
 
+/* String compare function for qsort.  */
+
+int
+compare_strings (const void *arg1, const void *arg2)
+{
+  const char **s1 = (const char **) arg1;
+  const char **s2 = (const char **) arg2;
+
+  return strcmp (*s1, *s2);
+}
+
 #define AMBIGUOUS_MESS1	".\nMatching formats:"
 #define AMBIGUOUS_MESS2	\
   ".\nUse \"set gnutarget format-name\" to specify the format."
@@ -3673,6 +3723,139 @@ parse_pid_to_attach (char *args)
 
   return pid;
 }
+
+/* Helper for make_bpstat_clear_actions_cleanup.  */
+
+static void
+do_bpstat_clear_actions_cleanup (void *unused)
+{
+  bpstat_clear_actions ();
+}
+
+/* Call bpstat_clear_actions for the case an exception is throw.  You should
+   discard_cleanups if no exception is caught.  */
+
+struct cleanup *
+make_bpstat_clear_actions_cleanup (void)
+{
+  return make_cleanup (do_bpstat_clear_actions_cleanup, NULL);
+}
+
+/* Check for GCC >= 4.x according to the symtab->producer string.  Return minor
+   version (x) of 4.x in such case.  If it is not GCC or it is GCC older than
+   4.x return -1.  If it is GCC 5.x or higher return INT_MAX.  */
+
+int
+producer_is_gcc_ge_4 (const char *producer)
+{
+  const char *cs;
+  int major, minor;
+
+  if (producer == NULL)
+    {
+      /* For unknown compilers expect their behavior is not compliant.  For GCC
+	 this case can also happen for -gdwarf-4 type units supported since
+	 gcc-4.5.  */
+
+      return -1;
+    }
+
+  /* Skip any identifier after "GNU " - such as "C++" or "Java".  */
+
+  if (strncmp (producer, "GNU ", strlen ("GNU ")) != 0)
+    {
+      /* For non-GCC compilers expect their behavior is not compliant.  */
+
+      return -1;
+    }
+  cs = &producer[strlen ("GNU ")];
+  while (*cs && !isdigit (*cs))
+    cs++;
+  if (sscanf (cs, "%d.%d", &major, &minor) != 2)
+    {
+      /* Not recognized as GCC.  */
+
+      return -1;
+    }
+
+  if (major < 4)
+    return -1;
+  if (major > 4)
+    return INT_MAX;
+  return minor;
+}
+
+#ifdef HAVE_WAITPID
+
+#ifdef SIGALRM
+
+/* SIGALRM handler for waitpid_with_timeout.  */
+
+static void
+sigalrm_handler (int signo)
+{
+  /* Nothing to do.  */
+}
+
+#endif
+
+/* Wrapper to wait for child PID to die with TIMEOUT.
+   TIMEOUT is the time to stop waiting in seconds.
+   If TIMEOUT is zero, pass WNOHANG to waitpid.
+   Returns PID if it was successfully waited for, otherwise -1.
+
+   Timeouts are currently implemented with alarm and SIGALRM.
+   If the host does not support them, this waits "forever".
+   It would be odd though for a host to have waitpid and not SIGALRM.  */
+
+pid_t
+wait_to_die_with_timeout (pid_t pid, int *status, int timeout)
+{
+  pid_t waitpid_result;
+
+  gdb_assert (pid > 0);
+  gdb_assert (timeout >= 0);
+
+  if (timeout > 0)
+    {
+#ifdef SIGALRM
+#if defined (HAVE_SIGACTION) && defined (SA_RESTART)
+      struct sigaction sa, old_sa;
+
+      sa.sa_handler = sigalrm_handler;
+      sigemptyset (&sa.sa_mask);
+      sa.sa_flags = 0;
+      sigaction (SIGALRM, &sa, &old_sa);
+#else
+      void (*ofunc) ();
+
+      ofunc = (void (*)()) signal (SIGALRM, sigalrm_handler);
+#endif
+
+      alarm (timeout);
+#endif
+
+      waitpid_result = waitpid (pid, status, 0);
+
+#ifdef SIGALRM
+      alarm (0);
+#if defined (HAVE_SIGACTION) && defined (SA_RESTART)
+      sigaction (SIGALRM, &old_sa, NULL);
+#else
+      signal (SIGALRM, ofunc);
+#endif
+#endif
+    }
+  else
+    waitpid_result = waitpid (pid, status, WNOHANG);
+
+  if (waitpid_result == pid)
+    return pid;
+  else
+    return -1;
+}
+
+#endif /* HAVE_WAITPID */
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */
 extern initialize_file_ftype _initialize_utils;

@@ -114,17 +114,10 @@ show_solib_search_path (struct ui_file *file, int from_tty,
 #  define DOS_BASED_FILE_SYSTEM 0
 #endif
 
-/*
-
-   GLOBAL FUNCTION
-
-   solib_find -- Find a shared library file.
-
-   SYNOPSIS
-
-   char *solib_find (char *in_pathname, int *fd);
-
-   DESCRIPTION
+/* Returns the full pathname of the shared library file, or NULL if
+   not found.  (The pathname is malloc'ed; it needs to be freed by the
+   caller.)  *FD is set to either -1 or an open file handle for the
+   library.
 
    Global variable GDB_SYSROOT is used as a prefix directory
    to search for shared libraries if they have an absolute path.
@@ -146,12 +139,7 @@ show_solib_search_path (struct ui_file *file, int from_tty,
    *
    * The last check avoids doing this search when targetting remote
    * machines since gdb_sysroot will almost always be set.
-
-   RETURNS
-
-   Full pathname of the shared library file, or NULL if not found.
-   (The pathname is malloc'ed; it needs to be freed by the caller.)
-   *FD is set to either -1 or an open file handle for the library.  */
+*/
 
 char *
 solib_find (char *in_pathname, int *fd)
@@ -452,33 +440,17 @@ solib_bfd_open (char *pathname)
   return abfd;
 }
 
+/* Given a pointer to one of the shared objects in our list of mapped
+   objects, use the recorded name to open a bfd descriptor for the
+   object, build a section table, relocate all the section addresses
+   by the base address at which the shared object was mapped, and then
+   add the sections to the target's section table.
 
-/*
-
-   LOCAL FUNCTION
-
-   solib_map_sections -- open bfd and build sections for shared lib
-
-   SYNOPSIS
-
-   static int solib_map_sections (struct so_list *so)
-
-   DESCRIPTION
-
-   Given a pointer to one of the shared objects in our list
-   of mapped objects, use the recorded name to open a bfd
-   descriptor for the object, build a section table, and then
-   relocate all the section addresses by the base address at
-   which the shared object was mapped.
-
-   FIXMES
-
-   In most (all?) cases the shared object file name recorded in the
-   dynamic linkage tables will be a fully qualified pathname.  For
+   FIXME: In most (all?) cases the shared object file name recorded in
+   the dynamic linkage tables will be a fully qualified pathname.  For
    cases where it isn't, do we really mimic the systems search
    mechanism correctly in the below code (particularly the tilde
-   expansion stuff?).
- */
+   expansion stuff?).  */
 
 static int
 solib_map_sections (struct so_list *so)
@@ -570,17 +542,7 @@ free_so_symbols (struct so_list *so)
   strcpy (so->so_name, so->so_original_name);
 }
 
-/* LOCAL FUNCTION
-
-   free_so --- free a `struct so_list' object
-
-   SYNOPSIS
-
-   void free_so (struct so_list *so)
-
-   DESCRIPTION
-
-   Free the storage associated with the `struct so_list' object SO.
+/* Free the storage associated with the `struct so_list' object SO.
    If we have opened a BFD for SO, close it.
 
    The caller is responsible for removing SO from whatever list it is
@@ -671,13 +633,21 @@ solib_read_symbols (struct so_list *so, int flags)
   return 0;
 }
 
-/* LOCAL FUNCTION
+/* Return 1 if KNOWN->objfile is used by any other so_list object in the
+   SO_LIST_HEAD list.  Return 0 otherwise.  */
 
-   update_solib_list --- synchronize GDB's shared object list with inferior's
+static int
+solib_used (const struct so_list *const known)
+{
+  const struct so_list *pivot;
 
-   SYNOPSIS
+  for (pivot = so_list_head; pivot != NULL; pivot = pivot->next)
+    if (pivot != known && pivot->objfile == known->objfile)
+      return 1;
+  return 0;
+}
 
-   void update_solib_list (int from_tty, struct target_ops *TARGET)
+/* Synchronize GDB's shared object list with inferior's.
 
    Extract the list of currently loaded shared objects from the
    inferior, and compare it with the list of shared objects currently
@@ -793,7 +763,8 @@ update_solib_list (int from_tty, struct target_ops *target)
 	  *gdb_link = gdb->next;
 
 	  /* Unless the user loaded it explicitly, free SO's objfile.  */
-	  if (gdb->objfile && ! (gdb->objfile->flags & OBJF_USERLOADED))
+	  if (gdb->objfile && ! (gdb->objfile->flags & OBJF_USERLOADED)
+	      && !solib_used (gdb))
 	    free_objfile (gdb->objfile);
 
 	  /* Some targets' section tables might be referring to
@@ -888,18 +859,7 @@ libpthread_solib_p (struct so_list *so)
   return libpthread_name_p (so->so_name);
 }
 
-/* GLOBAL FUNCTION
-
-   solib_add -- read in symbol info for newly added shared libraries
-
-   SYNOPSIS
-
-   void solib_add (char *pattern, int from_tty, struct target_ops
-   *TARGET, int readsyms)
-
-   DESCRIPTION
-
-   Read in symbolic information for any shared objects whose names
+/* Read in symbolic information for any shared objects whose names
    match PATTERN.  (If we've already read a shared object's symbol
    info, leave it alone.)  If PATTERN is zero, read them all.
 
@@ -913,6 +873,8 @@ solib_add (char *pattern, int from_tty,
 	   struct target_ops *target, int readsyms)
 {
   struct so_list *gdb;
+
+  current_program_space->solib_add_generation++;
 
   if (pattern)
     {
@@ -980,23 +942,10 @@ solib_add (char *pattern, int from_tty,
   }
 }
 
-
-/*
-
-   LOCAL FUNCTION
-
-   info_sharedlibrary_command -- code for "info sharedlibrary"
-
-   SYNOPSIS
-
-   static void info_sharedlibrary_command ()
-
-   DESCRIPTION
-
-   Walk through the shared library list and print information
-   about each attached library matching PATTERN.  If PATTERN is elided,
-   print them all.
- */
+/* Implement the "info sharedlibrary" command.  Walk through the
+   shared library list and print information about each attached
+   library matching PATTERN.  If PATTERN is elided, print them
+   all.  */
 
 static void
 info_sharedlibrary_command (char *pattern, int from_tty)
@@ -1007,6 +956,7 @@ info_sharedlibrary_command (char *pattern, int from_tty)
   int nr_libs;
   struct cleanup *table_cleanup;
   struct gdbarch *gdbarch = target_gdbarch;
+  struct ui_out *uiout = current_uiout;
 
   if (pattern)
     {
@@ -1122,27 +1072,16 @@ solib_contains_address_p (const struct so_list *const solib,
   return 0;
 }
 
-/*
+/* If ADDRESS is in a shared lib in program space PSPACE, return its
+   name.
 
-   GLOBAL FUNCTION
-
-   solib_name_from_address -- if an address is in a shared lib, return
-   its name.
-
-   SYNOPSIS
-
-   char * solib_name_from_address (CORE_ADDR address)
-
-   DESCRIPTION
-
-   Provides a hook for other gdb routines to discover whether or
-   not a particular address is within the mapped address space of
-   a shared library.
+   Provides a hook for other gdb routines to discover whether or not a
+   particular address is within the mapped address space of a shared
+   library.
 
    For example, this routine is called at one point to disable
    breakpoints which are in shared libraries that are not currently
-   mapped in.
- */
+   mapped in.  */
 
 char *
 solib_name_from_address (struct program_space *pspace, CORE_ADDR address)
@@ -1218,20 +1157,10 @@ clear_solib (void)
   ops->clear_solib ();
 }
 
-/* GLOBAL FUNCTION
-
-   solib_create_inferior_hook -- shared library startup support
-
-   SYNOPSIS
-
-   void solib_create_inferior_hook (int from_tty)
-
-   DESCRIPTION
-
-   When gdb starts up the inferior, it nurses it along (through the
-   shell) until it is ready to execute it's first instruction.  At this
-   point, this function gets called via expansion of the macro
-   SOLIB_CREATE_INFERIOR_HOOK.  */
+/* Shared library startup support.  When GDB starts up the inferior,
+   it nurses it along (through the shell) until it is ready to execute
+   its first instruction.  At this point, this function gets
+   called.  */
 
 void
 solib_create_inferior_hook (int from_tty)
@@ -1241,21 +1170,8 @@ solib_create_inferior_hook (int from_tty)
   ops->solib_create_inferior_hook (from_tty);
 }
 
-/* GLOBAL FUNCTION
-
-   in_solib_dynsym_resolve_code -- check to see if an address is in
-                                   dynamic loader's dynamic symbol
-				   resolution code
-
-   SYNOPSIS
-
-   int in_solib_dynsym_resolve_code (CORE_ADDR pc)
-
-   DESCRIPTION
-
-   Determine if PC is in the dynamic linker's symbol resolution
-   code.  Return 1 if so, 0 otherwise.
-*/
+/* Check to see if an address is in the dynamic loader's dynamic
+   symbol resolution code.  Return 1 if so, 0 otherwise.  */
 
 int
 in_solib_dynsym_resolve_code (CORE_ADDR pc)
@@ -1265,19 +1181,7 @@ in_solib_dynsym_resolve_code (CORE_ADDR pc)
   return ops->in_dynsym_resolve_code (pc);
 }
 
-/*
-
-   LOCAL FUNCTION
-
-   sharedlibrary_command -- handle command to explicitly add library
-
-   SYNOPSIS
-
-   static void sharedlibrary_command (char *args, int from_tty)
-
-   DESCRIPTION
-
- */
+/* Implements the "sharedlibrary" command.  */
 
 static void
 sharedlibrary_command (char *args, int from_tty)
@@ -1286,14 +1190,7 @@ sharedlibrary_command (char *args, int from_tty)
   solib_add (args, from_tty, (struct target_ops *) 0, 1);
 }
 
-/* LOCAL FUNCTION
-
-   no_shared_libraries -- handle command to explicitly discard symbols
-   from shared libraries.
-
-   DESCRIPTION
-
-   Implements the command "nosharedlibrary", which discards symbols
+/* Implements the command "nosharedlibrary", which discards symbols
    that have been auto-loaded from shared libraries.  Symbols from
    shared libraries that were added by explicit request of the user
    are not discarded.  Also called from remote.c.  */
@@ -1343,7 +1240,8 @@ reload_shared_libraries_1 (int from_tty)
 	  || (found_pathname != NULL
 	      && filename_cmp (found_pathname, so->so_name) != 0))
 	{
-	  if (so->objfile && ! (so->objfile->flags & OBJF_USERLOADED))
+	  if (so->objfile && ! (so->objfile->flags & OBJF_USERLOADED)
+	      && !solib_used (so))
 	    free_objfile (so->objfile);
 	  remove_target_sections (so->abfd);
 	  free_so_symbols (so);
@@ -1454,6 +1352,102 @@ solib_global_lookup (const struct objfile *objfile,
   return NULL;
 }
 
+/* Lookup the value for a specific symbol from dynamic symbol table.  Look
+   up symbol from ABFD.  MATCH_SYM is a callback function to determine
+   whether to pick up a symbol.  DATA is the input of this callback
+   function.  Return NULL if symbol is not found.  */
+
+CORE_ADDR
+gdb_bfd_lookup_symbol_from_symtab (bfd *abfd,
+				   int (*match_sym) (asymbol *, void *),
+				   void *data)
+{
+  long storage_needed = bfd_get_symtab_upper_bound (abfd);
+  CORE_ADDR symaddr = 0;
+
+  if (storage_needed > 0)
+    {
+      unsigned int i;
+
+      asymbol **symbol_table = (asymbol **) xmalloc (storage_needed);
+      struct cleanup *back_to = make_cleanup (xfree, symbol_table);
+      unsigned int number_of_symbols =
+	bfd_canonicalize_symtab (abfd, symbol_table);
+
+      for (i = 0; i < number_of_symbols; i++)
+	{
+	  asymbol *sym  = *symbol_table++;
+
+	  if (match_sym (sym, data))
+	    {
+	      /* BFD symbols are section relative.  */
+	      symaddr = sym->value + sym->section->vma;
+	      break;
+	    }
+	}
+      do_cleanups (back_to);
+    }
+
+  return symaddr;
+}
+
+/* Lookup the value for a specific symbol from symbol table.  Look up symbol
+   from ABFD.  MATCH_SYM is a callback function to determine whether to pick
+   up a symbol.  DATA is the input of this callback function.  Return NULL
+   if symbol is not found.  */
+
+static CORE_ADDR
+bfd_lookup_symbol_from_dyn_symtab (bfd *abfd,
+				   int (*match_sym) (asymbol *, void *),
+				   void *data)
+{
+  long storage_needed = bfd_get_dynamic_symtab_upper_bound (abfd);
+  CORE_ADDR symaddr = 0;
+
+  if (storage_needed > 0)
+    {
+      unsigned int i;
+      asymbol **symbol_table = (asymbol **) xmalloc (storage_needed);
+      struct cleanup *back_to = make_cleanup (xfree, symbol_table);
+      unsigned int number_of_symbols =
+	bfd_canonicalize_dynamic_symtab (abfd, symbol_table);
+
+      for (i = 0; i < number_of_symbols; i++)
+	{
+	  asymbol *sym = *symbol_table++;
+
+	  if (match_sym (sym, data))
+	    {
+	      /* BFD symbols are section relative.  */
+	      symaddr = sym->value + sym->section->vma;
+	      break;
+	    }
+	}
+      do_cleanups (back_to);
+    }
+  return symaddr;
+}
+
+/* Lookup the value for a specific symbol from symbol table and dynamic
+   symbol table.  Look up symbol from ABFD.  MATCH_SYM is a callback
+   function to determine whether to pick up a symbol.  DATA is the
+   input of this callback function.  Return NULL if symbol is not
+   found.  */
+
+CORE_ADDR
+gdb_bfd_lookup_symbol (bfd *abfd,
+		       int (*match_sym) (asymbol *, void *),
+		       void *data)
+{
+  CORE_ADDR symaddr = gdb_bfd_lookup_symbol_from_symtab (abfd, match_sym, data);
+
+  /* On FreeBSD, the dynamic linker is stripped by default.  So we'll
+     have to check the dynamic string table too.  */
+  if (symaddr == 0)
+    symaddr = bfd_lookup_symbol_from_dyn_symtab (abfd, match_sym, data);
+
+  return symaddr;
+}
 
 extern initialize_file_ftype _initialize_solib; /* -Wmissing-prototypes */
 

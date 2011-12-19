@@ -26,6 +26,7 @@
 #include <sys/param.h>
 #include <sys/ptrace.h>
 #include "linux-ptrace.h"
+#include "linux-procfs.h"
 #include <signal.h>
 #include <sys/ioctl.h>
 #include <fcntl.h>
@@ -52,6 +53,13 @@
 
 #ifndef SPUFS_MAGIC
 #define SPUFS_MAGIC 0x23c9b64e
+#endif
+
+#ifdef HAVE_PERSONALITY
+# include <sys/personality.h>
+# if !HAVE_DECL_ADDR_NO_RANDOMIZE
+#  define ADDR_NO_RANDOMIZE 0x0040000
+# endif
 #endif
 
 #ifndef O_LARGEFILE
@@ -519,9 +527,29 @@ add_lwp (ptid_t ptid)
 static int
 linux_create_inferior (char *program, char **allargs)
 {
+#ifdef HAVE_PERSONALITY
+  int personality_orig = 0, personality_set = 0;
+#endif
   struct lwp_info *new_lwp;
   int pid;
   ptid_t ptid;
+
+#ifdef HAVE_PERSONALITY
+  if (disable_randomization)
+    {
+      errno = 0;
+      personality_orig = personality (0xffffffff);
+      if (errno == 0 && !(personality_orig & ADDR_NO_RANDOMIZE))
+	{
+	  personality_set = 1;
+	  personality (personality_orig | ADDR_NO_RANDOMIZE);
+	}
+      if (errno != 0 || (personality_set
+			 && !(personality (0xffffffff) & ADDR_NO_RANDOMIZE)))
+	warning ("Error disabling address space randomization: %s",
+		 strerror (errno));
+    }
+#endif
 
 #if defined(__UCLIBC__) && defined(HAS_NOMMU)
   pid = vfork ();
@@ -541,6 +569,19 @@ linux_create_inferior (char *program, char **allargs)
 
       setpgid (0, 0);
 
+      /* If gdbserver is connected to gdb via stdio, redirect the inferior's
+	 stdout to stderr so that inferior i/o doesn't corrupt the connection.
+	 Also, redirect stdin to /dev/null.  */
+      if (remote_connection_is_stdio ())
+	{
+	  close (0);
+	  open ("/dev/null", O_RDONLY);
+	  dup2 (2, 1);
+	  if (write (2, "stdin/stdout redirected\n",
+		     sizeof ("stdin/stdout redirected\n") - 1) < 0)
+	    /* Errors ignored.  */;
+	}
+
       execv (program, allargs);
       if (errno == ENOENT)
 	execvp (program, allargs);
@@ -550,6 +591,17 @@ linux_create_inferior (char *program, char **allargs)
       fflush (stderr);
       _exit (0177);
     }
+
+#ifdef HAVE_PERSONALITY
+  if (personality_set)
+    {
+      errno = 0;
+      personality (personality_orig);
+      if (errno != 0)
+	warning ("Error restoring address space randomization: %s",
+		 strerror (errno));
+    }
+#endif
 
   linux_add_process (pid, 0);
 
@@ -586,7 +638,9 @@ linux_attach_lwp_1 (unsigned long lwpid, int initial)
     }
 
   if (initial)
-    /* NOTE/FIXME: This lwp might have not been the tgid.  */
+    /* If lwp is the tgid, we handle adding existing threads later.
+       Otherwise we just add lwp without bothering about any other
+       threads.  */
     ptid = ptid_build (lwpid, lwpid, 0);
   else
     {
@@ -621,8 +675,10 @@ linux_attach_lwp_1 (unsigned long lwpid, int initial)
 	In this case we want the process thread to stop.
 	This is handled by having linux_attach set last_resume_kind ==
 	resume_stop after we return.
-	??? If the process already has several threads we leave the other
-	threads running.
+
+	If the pid we are attaching to is also the tgid, we attach to and
+	stop all the existing threads.  Otherwise, we attach to pid and
+	ignore any other threads in the same group as this pid.
 
      3) GDB is connecting to gdbserver and is requesting an enumeration of all
 	existing threads.
@@ -646,9 +702,14 @@ linux_attach_lwp (unsigned long lwpid)
   linux_attach_lwp_1 (lwpid, 0);
 }
 
+/* Attach to PID.  If PID is the tgid, attach to it and all
+   of its threads.  */
+
 int
 linux_attach (unsigned long pid)
 {
+  /* Attach to PID.  We will check for other threads
+     soon.  */
   linux_attach_lwp_1 (pid, 1);
   linux_add_process (pid, 1);
 
@@ -660,6 +721,65 @@ linux_attach (unsigned long pid)
 	process.  It will be collected by wait shortly.  */
       thread = find_thread_ptid (ptid_build (pid, pid, 0));
       thread->last_resume_kind = resume_stop;
+    }
+
+  if (linux_proc_get_tgid (pid) == pid)
+    {
+      DIR *dir;
+      char pathname[128];
+
+      sprintf (pathname, "/proc/%ld/task", pid);
+
+      dir = opendir (pathname);
+
+      if (!dir)
+	{
+	  fprintf (stderr, "Could not open /proc/%ld/task.\n", pid);
+	  fflush (stderr);
+	}
+      else
+	{
+	  /* At this point we attached to the tgid.  Scan the task for
+	     existing threads.  */
+	  unsigned long lwp;
+	  int new_threads_found;
+	  int iterations = 0;
+	  struct dirent *dp;
+
+	  while (iterations < 2)
+	    {
+	      new_threads_found = 0;
+	      /* Add all the other threads.  While we go through the
+		 threads, new threads may be spawned.  Cycle through
+		 the list of threads until we have done two iterations without
+		 finding new threads.  */
+	      while ((dp = readdir (dir)) != NULL)
+		{
+		  /* Fetch one lwp.  */
+		  lwp = strtoul (dp->d_name, NULL, 10);
+
+		  /* Is this a new thread?  */
+		  if (lwp
+		      && find_thread_ptid (ptid_build (pid, lwp, 0)) == NULL)
+		    {
+		      linux_attach_lwp_1 (lwp, 0);
+		      new_threads_found++;
+
+		      if (debug_threads)
+			fprintf (stderr, "\
+Found and attached to new lwp %ld\n", lwp);
+		    }
+		}
+
+	      if (!new_threads_found)
+		iterations++;
+	      else
+		iterations = 0;
+
+	      rewinddir (dir);
+	    }
+	  closedir (dir);
+	}
     }
 
   return 0;
@@ -755,17 +875,26 @@ linux_kill (int pid)
      thread in the list, so do so now.  */
   lwp = find_lwp_pid (pid_to_ptid (pid));
 
-  if (debug_threads)
-    fprintf (stderr, "lk_1: killing lwp %ld, for pid: %d\n",
-	     lwpid_of (lwp), pid);
-
-  do
+  if (lwp == NULL)
     {
-      ptrace (PTRACE_KILL, lwpid_of (lwp), 0, 0);
+      if (debug_threads)
+	fprintf (stderr, "lk_1: cannot find lwp %ld, for pid: %d\n",
+		 lwpid_of (lwp), pid);
+    }
+  else
+    {
+      if (debug_threads)
+	fprintf (stderr, "lk_1: killing lwp %ld, for pid: %d\n",
+		 lwpid_of (lwp), pid);
 
-      /* Make sure it died.  The loop is most likely unnecessary.  */
-      lwpid = linux_wait_for_event (lwp->head.id, &wstat, __WALL);
-    } while (lwpid > 0 && WIFSTOPPED (wstat));
+      do
+	{
+	  ptrace (PTRACE_KILL, lwpid_of (lwp), 0, 0);
+
+	  /* Make sure it died.  The loop is most likely unnecessary.  */
+	  lwpid = linux_wait_for_event (lwp->head.id, &wstat, __WALL);
+	} while (lwpid > 0 && WIFSTOPPED (wstat));
+    }
 
   the_target->mourn (process);
 
@@ -802,6 +931,8 @@ linux_detach_one_lwp (struct inferior_list_entry *entry, void *args)
 			   get_lwp_thread (lwp));
 
   /* Finally, let it resume.  */
+  if (the_low_target.prepare_to_resume != NULL)
+    the_low_target.prepare_to_resume (lwp);
   ptrace (PTRACE_DETACH, lwpid_of (lwp), 0, 0);
 
   delete_lwp (lwp);
@@ -3638,10 +3769,11 @@ fetch_register (struct regcache *regcache, int regno)
   if (regaddr == -1)
     return;
 
-  pid = lwpid_of (get_thread_lwp (current_inferior));
   size = ((register_size (regno) + sizeof (PTRACE_XFER_TYPE) - 1)
-	  & - sizeof (PTRACE_XFER_TYPE));
+	  & -sizeof (PTRACE_XFER_TYPE));
   buf = alloca (size);
+
+  pid = lwpid_of (get_thread_lwp (current_inferior));
   for (i = 0; i < size; i += sizeof (PTRACE_XFER_TYPE))
     {
       errno = 0;
@@ -3661,6 +3793,59 @@ fetch_register (struct regcache *regcache, int regno)
     supply_register (regcache, regno, buf);
 }
 
+/* Store one register.  */
+static void
+store_register (struct regcache *regcache, int regno)
+{
+  CORE_ADDR regaddr;
+  int i, size;
+  char *buf;
+  int pid;
+
+  if (regno >= the_low_target.num_regs)
+    return;
+  if ((*the_low_target.cannot_store_register) (regno))
+    return;
+
+  regaddr = register_addr (regno);
+  if (regaddr == -1)
+    return;
+
+  size = ((register_size (regno) + sizeof (PTRACE_XFER_TYPE) - 1)
+	  & -sizeof (PTRACE_XFER_TYPE));
+  buf = alloca (size);
+  memset (buf, 0, size);
+
+  if (the_low_target.collect_ptrace_register)
+    the_low_target.collect_ptrace_register (regcache, regno, buf);
+  else
+    collect_register (regcache, regno, buf);
+
+  pid = lwpid_of (get_thread_lwp (current_inferior));
+  for (i = 0; i < size; i += sizeof (PTRACE_XFER_TYPE))
+    {
+      errno = 0;
+      ptrace (PTRACE_POKEUSER, pid,
+	    /* Coerce to a uintptr_t first to avoid potential gcc warning
+	       about coercing an 8 byte integer to a 4 byte pointer.  */
+	      (PTRACE_ARG3_TYPE) (uintptr_t) regaddr,
+	      (PTRACE_ARG4_TYPE) *(PTRACE_XFER_TYPE *) (buf + i));
+      if (errno != 0)
+	{
+	  /* At this point, ESRCH should mean the process is
+	     already gone, in which case we simply ignore attempts
+	     to change its registers.  See also the related
+	     comment in linux_resume_one_lwp.  */
+	  if (errno == ESRCH)
+	    return;
+
+	  if ((*the_low_target.cannot_store_register) (regno) == 0)
+	    error ("writing register %d: %s", regno, strerror (errno));
+	}
+      regaddr += sizeof (PTRACE_XFER_TYPE);
+    }
+}
+
 /* Fetch all registers, or just one, from the child process.  */
 static void
 usr_fetch_inferior_registers (struct regcache *regcache, int regno)
@@ -3678,60 +3863,11 @@ usr_fetch_inferior_registers (struct regcache *regcache, int regno)
 static void
 usr_store_inferior_registers (struct regcache *regcache, int regno)
 {
-  CORE_ADDR regaddr;
-  int i, size;
-  char *buf;
-  int pid;
-
-  if (regno >= 0)
-    {
-      if (regno >= the_low_target.num_regs)
-	return;
-
-      if ((*the_low_target.cannot_store_register) (regno) == 1)
-	return;
-
-      regaddr = register_addr (regno);
-      if (regaddr == -1)
-	return;
-      errno = 0;
-      size = (register_size (regno) + sizeof (PTRACE_XFER_TYPE) - 1)
-	     & - sizeof (PTRACE_XFER_TYPE);
-      buf = alloca (size);
-      memset (buf, 0, size);
-
-      if (the_low_target.collect_ptrace_register)
-	the_low_target.collect_ptrace_register (regcache, regno, buf);
-      else
-	collect_register (regcache, regno, buf);
-
-      pid = lwpid_of (get_thread_lwp (current_inferior));
-      for (i = 0; i < size; i += sizeof (PTRACE_XFER_TYPE))
-	{
-	  errno = 0;
-	  ptrace (PTRACE_POKEUSER, pid,
-		/* Coerce to a uintptr_t first to avoid potential gcc warning
-		   about coercing an 8 byte integer to a 4 byte pointer.  */
-		  (PTRACE_ARG3_TYPE) (uintptr_t) regaddr,
-		  (PTRACE_ARG4_TYPE) *(PTRACE_XFER_TYPE *) (buf + i));
-	  if (errno != 0)
-	    {
-	      /* At this point, ESRCH should mean the process is
-		 already gone, in which case we simply ignore attempts
-		 to change its registers.  See also the related
-		 comment in linux_resume_one_lwp.  */
-	      if (errno == ESRCH)
-		return;
-
-	      if ((*the_low_target.cannot_store_register) (regno) == 0)
-		error ("writing register %d: %s", regno, strerror (errno));
-	    }
-	  regaddr += sizeof (PTRACE_XFER_TYPE);
-	}
-    }
-  else
+  if (regno == -1)
     for (regno = 0; regno < the_low_target.num_regs; regno++)
-      usr_store_inferior_registers (regcache, regno);
+      store_register (regcache, regno);
+  else
+    store_register (regcache, regno);
 }
 #endif /* HAVE_LINUX_USRREGS */
 
@@ -4347,6 +4483,10 @@ linux_stopped_data_address (void)
 #define PT_TEXT_ADDR 220
 #define PT_TEXT_END_ADDR 224
 #define PT_DATA_ADDR 228
+#elif defined(__TMS320C6X__)
+#define PT_TEXT_ADDR     (0x10000*4)
+#define PT_DATA_ADDR     (0x10004*4)
+#define PT_TEXT_END_ADDR (0x10008*4)
 #endif
 
 /* Under uClinux, programs are loaded at non-zero offsets, which we need
@@ -4560,6 +4700,15 @@ linux_supports_multi_process (void)
   return 1;
 }
 
+static int
+linux_supports_disable_randomization (void)
+{
+#ifdef HAVE_PERSONALITY
+  return 1;
+#else
+  return 0;
+#endif
+}
 
 /* Enumerate spufs IDs for process PID.  */
 static int
@@ -4654,6 +4803,84 @@ linux_qxfer_spu (const char *annex, unsigned char *readbuf,
   return ret;
 }
 
+#if defined PT_GETDSBT || defined PTRACE_GETFDPIC
+struct target_loadseg
+{
+  /* Core address to which the segment is mapped.  */
+  Elf32_Addr addr;
+  /* VMA recorded in the program header.  */
+  Elf32_Addr p_vaddr;
+  /* Size of this segment in memory.  */
+  Elf32_Word p_memsz;
+};
+
+# if defined PT_GETDSBT
+struct target_loadmap
+{
+  /* Protocol version number, must be zero.  */
+  Elf32_Word version;
+  /* Pointer to the DSBT table, its size, and the DSBT index.  */
+  unsigned *dsbt_table;
+  unsigned dsbt_size, dsbt_index;
+  /* Number of segments in this map.  */
+  Elf32_Word nsegs;
+  /* The actual memory map.  */
+  struct target_loadseg segs[/*nsegs*/];
+};
+#  define LINUX_LOADMAP		PT_GETDSBT
+#  define LINUX_LOADMAP_EXEC	PTRACE_GETDSBT_EXEC
+#  define LINUX_LOADMAP_INTERP	PTRACE_GETDSBT_INTERP
+# else
+struct target_loadmap
+{
+  /* Protocol version number, must be zero.  */
+  Elf32_Half version;
+  /* Number of segments in this map.  */
+  Elf32_Half nsegs;
+  /* The actual memory map.  */
+  struct target_loadseg segs[/*nsegs*/];
+};
+#  define LINUX_LOADMAP		PTRACE_GETFDPIC
+#  define LINUX_LOADMAP_EXEC	PTRACE_GETFDPIC_EXEC
+#  define LINUX_LOADMAP_INTERP	PTRACE_GETFDPIC_INTERP
+# endif
+
+static int
+linux_read_loadmap (const char *annex, CORE_ADDR offset,
+		    unsigned char *myaddr, unsigned int len)
+{
+  int pid = lwpid_of (get_thread_lwp (current_inferior));
+  int addr = -1;
+  struct target_loadmap *data = NULL;
+  unsigned int actual_length, copy_length;
+
+  if (strcmp (annex, "exec") == 0)
+    addr = (int) LINUX_LOADMAP_EXEC;
+  else if (strcmp (annex, "interp") == 0)
+    addr = (int) LINUX_LOADMAP_INTERP;
+  else
+    return -1;
+
+  if (ptrace (LINUX_LOADMAP, pid, addr, &data) != 0)
+    return -1;
+
+  if (data == NULL)
+    return -1;
+
+  actual_length = sizeof (struct target_loadmap)
+    + sizeof (struct target_loadseg) * data->nsegs;
+
+  if (offset < 0 || offset > actual_length)
+    return -1;
+
+  copy_length = actual_length - offset < len ? actual_length - offset : len;
+  memcpy (myaddr, (char *) data + offset, copy_length);
+  return copy_length;
+}
+#else
+# define linux_read_loadmap NULL
+#endif /* defined PT_GETDSBT || defined PTRACE_GETFDPIC */
+
 static void
 linux_process_qsupported (const char *query)
 {
@@ -4735,15 +4962,20 @@ linux_install_fast_tracepoint_jump_pad (CORE_ADDR tpoint, CORE_ADDR tpaddr,
 					CORE_ADDR lockaddr,
 					ULONGEST orig_size,
 					CORE_ADDR *jump_entry,
+					CORE_ADDR *trampoline,
+					ULONGEST *trampoline_size,
 					unsigned char *jjump_pad_insn,
 					ULONGEST *jjump_pad_insn_size,
 					CORE_ADDR *adjusted_insn_addr,
-					CORE_ADDR *adjusted_insn_addr_end)
+					CORE_ADDR *adjusted_insn_addr_end,
+					char *err)
 {
   return (*the_low_target.install_fast_tracepoint_jump_pad)
     (tpoint, tpaddr, collector, lockaddr, orig_size,
-     jump_entry, jjump_pad_insn, jjump_pad_insn_size,
-     adjusted_insn_addr, adjusted_insn_addr_end);
+     jump_entry, trampoline, trampoline_size,
+     jjump_pad_insn, jjump_pad_insn_size,
+     adjusted_insn_addr, adjusted_insn_addr_end,
+     err);
 }
 
 static struct emit_ops *
@@ -4753,6 +4985,388 @@ linux_emit_ops (void)
     return (*the_low_target.emit_ops) ();
   else
     return NULL;
+}
+
+static int
+linux_get_min_fast_tracepoint_insn_len (void)
+{
+  return (*the_low_target.get_min_fast_tracepoint_insn_len) ();
+}
+
+/* Extract &phdr and num_phdr in the inferior.  Return 0 on success.  */
+
+static int
+get_phdr_phnum_from_proc_auxv (const int pid, const int is_elf64,
+			       CORE_ADDR *phdr_memaddr, int *num_phdr)
+{
+  char filename[PATH_MAX];
+  int fd;
+  const int auxv_size = is_elf64
+    ? sizeof (Elf64_auxv_t) : sizeof (Elf32_auxv_t);
+  char buf[sizeof (Elf64_auxv_t)];  /* The larger of the two.  */
+
+  xsnprintf (filename, sizeof filename, "/proc/%d/auxv", pid);
+
+  fd = open (filename, O_RDONLY);
+  if (fd < 0)
+    return 1;
+
+  *phdr_memaddr = 0;
+  *num_phdr = 0;
+  while (read (fd, buf, auxv_size) == auxv_size
+	 && (*phdr_memaddr == 0 || *num_phdr == 0))
+    {
+      if (is_elf64)
+	{
+	  Elf64_auxv_t *const aux = (Elf64_auxv_t *) buf;
+
+	  switch (aux->a_type)
+	    {
+	    case AT_PHDR:
+	      *phdr_memaddr = aux->a_un.a_val;
+	      break;
+	    case AT_PHNUM:
+	      *num_phdr = aux->a_un.a_val;
+	      break;
+	    }
+	}
+      else
+	{
+	  Elf32_auxv_t *const aux = (Elf32_auxv_t *) buf;
+
+	  switch (aux->a_type)
+	    {
+	    case AT_PHDR:
+	      *phdr_memaddr = aux->a_un.a_val;
+	      break;
+	    case AT_PHNUM:
+	      *num_phdr = aux->a_un.a_val;
+	      break;
+	    }
+	}
+    }
+
+  close (fd);
+
+  if (*phdr_memaddr == 0 || *num_phdr == 0)
+    {
+      warning ("Unexpected missing AT_PHDR and/or AT_PHNUM: "
+	       "phdr_memaddr = %ld, phdr_num = %d",
+	       (long) *phdr_memaddr, *num_phdr);
+      return 2;
+    }
+
+  return 0;
+}
+
+/* Return &_DYNAMIC (via PT_DYNAMIC) in the inferior, or 0 if not present.  */
+
+static CORE_ADDR
+get_dynamic (const int pid, const int is_elf64)
+{
+  CORE_ADDR phdr_memaddr, relocation;
+  int num_phdr, i;
+  unsigned char *phdr_buf;
+  const int phdr_size = is_elf64 ? sizeof (Elf64_Phdr) : sizeof (Elf32_Phdr);
+
+  if (get_phdr_phnum_from_proc_auxv (pid, is_elf64, &phdr_memaddr, &num_phdr))
+    return 0;
+
+  gdb_assert (num_phdr < 100);  /* Basic sanity check.  */
+  phdr_buf = alloca (num_phdr * phdr_size);
+
+  if (linux_read_memory (phdr_memaddr, phdr_buf, num_phdr * phdr_size))
+    return 0;
+
+  /* Compute relocation: it is expected to be 0 for "regular" executables,
+     non-zero for PIE ones.  */
+  relocation = -1;
+  for (i = 0; relocation == -1 && i < num_phdr; i++)
+    if (is_elf64)
+      {
+	Elf64_Phdr *const p = (Elf64_Phdr *) (phdr_buf + i * phdr_size);
+
+	if (p->p_type == PT_PHDR)
+	  relocation = phdr_memaddr - p->p_vaddr;
+      }
+    else
+      {
+	Elf32_Phdr *const p = (Elf32_Phdr *) (phdr_buf + i * phdr_size);
+
+	if (p->p_type == PT_PHDR)
+	  relocation = phdr_memaddr - p->p_vaddr;
+      }
+
+  if (relocation == -1)
+    {
+      warning ("Unexpected missing PT_PHDR");
+      return 0;
+    }
+
+  for (i = 0; i < num_phdr; i++)
+    {
+      if (is_elf64)
+	{
+	  Elf64_Phdr *const p = (Elf64_Phdr *) (phdr_buf + i * phdr_size);
+
+	  if (p->p_type == PT_DYNAMIC)
+	    return p->p_vaddr + relocation;
+	}
+      else
+	{
+	  Elf32_Phdr *const p = (Elf32_Phdr *) (phdr_buf + i * phdr_size);
+
+	  if (p->p_type == PT_DYNAMIC)
+	    return p->p_vaddr + relocation;
+	}
+    }
+
+  return 0;
+}
+
+/* Return &_r_debug in the inferior, or -1 if not present.  Return value
+   can be 0 if the inferior does not yet have the library list initialized.  */
+
+static CORE_ADDR
+get_r_debug (const int pid, const int is_elf64)
+{
+  CORE_ADDR dynamic_memaddr;
+  const int dyn_size = is_elf64 ? sizeof (Elf64_Dyn) : sizeof (Elf32_Dyn);
+  unsigned char buf[sizeof (Elf64_Dyn)];  /* The larger of the two.  */
+
+  dynamic_memaddr = get_dynamic (pid, is_elf64);
+  if (dynamic_memaddr == 0)
+    return (CORE_ADDR) -1;
+
+  while (linux_read_memory (dynamic_memaddr, buf, dyn_size) == 0)
+    {
+      if (is_elf64)
+	{
+	  Elf64_Dyn *const dyn = (Elf64_Dyn *) buf;
+
+	  if (dyn->d_tag == DT_DEBUG)
+	    return dyn->d_un.d_val;
+
+	  if (dyn->d_tag == DT_NULL)
+	    break;
+	}
+      else
+	{
+	  Elf32_Dyn *const dyn = (Elf32_Dyn *) buf;
+
+	  if (dyn->d_tag == DT_DEBUG)
+	    return dyn->d_un.d_val;
+
+	  if (dyn->d_tag == DT_NULL)
+	    break;
+	}
+
+      dynamic_memaddr += dyn_size;
+    }
+
+  return (CORE_ADDR) -1;
+}
+
+/* Read one pointer from MEMADDR in the inferior.  */
+
+static int
+read_one_ptr (CORE_ADDR memaddr, CORE_ADDR *ptr, int ptr_size)
+{
+  *ptr = 0;
+  return linux_read_memory (memaddr, (unsigned char *) ptr, ptr_size);
+}
+
+struct link_map_offsets
+  {
+    /* Offset and size of r_debug.r_version.  */
+    int r_version_offset;
+
+    /* Offset and size of r_debug.r_map.  */
+    int r_map_offset;
+
+    /* Offset to l_addr field in struct link_map.  */
+    int l_addr_offset;
+
+    /* Offset to l_name field in struct link_map.  */
+    int l_name_offset;
+
+    /* Offset to l_ld field in struct link_map.  */
+    int l_ld_offset;
+
+    /* Offset to l_next field in struct link_map.  */
+    int l_next_offset;
+
+    /* Offset to l_prev field in struct link_map.  */
+    int l_prev_offset;
+  };
+
+/* Construct qXfer:libraries:read reply.  */
+
+static int
+linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
+			    unsigned const char *writebuf,
+			    CORE_ADDR offset, int len)
+{
+  char *document;
+  unsigned document_len;
+  struct process_info_private *const priv = current_process ()->private;
+  char filename[PATH_MAX];
+  int pid, is_elf64;
+
+  static const struct link_map_offsets lmo_32bit_offsets =
+    {
+      0,     /* r_version offset. */
+      4,     /* r_debug.r_map offset.  */
+      0,     /* l_addr offset in link_map.  */
+      4,     /* l_name offset in link_map.  */
+      8,     /* l_ld offset in link_map.  */
+      12,    /* l_next offset in link_map.  */
+      16     /* l_prev offset in link_map.  */
+    };
+
+  static const struct link_map_offsets lmo_64bit_offsets =
+    {
+      0,     /* r_version offset. */
+      8,     /* r_debug.r_map offset.  */
+      0,     /* l_addr offset in link_map.  */
+      8,     /* l_name offset in link_map.  */
+      16,    /* l_ld offset in link_map.  */
+      24,    /* l_next offset in link_map.  */
+      32     /* l_prev offset in link_map.  */
+    };
+  const struct link_map_offsets *lmo;
+
+  if (writebuf != NULL)
+    return -2;
+  if (readbuf == NULL)
+    return -1;
+
+  pid = lwpid_of (get_thread_lwp (current_inferior));
+  xsnprintf (filename, sizeof filename, "/proc/%d/exe", pid);
+  is_elf64 = elf_64_file_p (filename);
+  lmo = is_elf64 ? &lmo_64bit_offsets : &lmo_32bit_offsets;
+
+  if (priv->r_debug == 0)
+    priv->r_debug = get_r_debug (pid, is_elf64);
+
+  if (priv->r_debug == (CORE_ADDR) -1 || priv->r_debug == 0)
+    {
+      document = xstrdup ("<library-list-svr4 version=\"1.0\"/>\n");
+    }
+  else
+    {
+      int allocated = 1024;
+      char *p;
+      const int ptr_size = is_elf64 ? 8 : 4;
+      CORE_ADDR lm_addr, lm_prev, l_name, l_addr, l_ld, l_next, l_prev;
+      int r_version, header_done = 0;
+
+      document = xmalloc (allocated);
+      strcpy (document, "<library-list-svr4 version=\"1.0\"");
+      p = document + strlen (document);
+
+      r_version = 0;
+      if (linux_read_memory (priv->r_debug + lmo->r_version_offset,
+			     (unsigned char *) &r_version,
+			     sizeof (r_version)) != 0
+	  || r_version != 1)
+	{
+	  warning ("unexpected r_debug version %d", r_version);
+	  goto done;
+	}
+
+      if (read_one_ptr (priv->r_debug + lmo->r_map_offset,
+			&lm_addr, ptr_size) != 0)
+	{
+	  warning ("unable to read r_map from 0x%lx",
+		   (long) priv->r_debug + lmo->r_map_offset);
+	  goto done;
+	}
+
+      lm_prev = 0;
+      while (read_one_ptr (lm_addr + lmo->l_name_offset,
+			   &l_name, ptr_size) == 0
+	     && read_one_ptr (lm_addr + lmo->l_addr_offset,
+			      &l_addr, ptr_size) == 0
+	     && read_one_ptr (lm_addr + lmo->l_ld_offset,
+			      &l_ld, ptr_size) == 0
+	     && read_one_ptr (lm_addr + lmo->l_prev_offset,
+			      &l_prev, ptr_size) == 0
+	     && read_one_ptr (lm_addr + lmo->l_next_offset,
+			      &l_next, ptr_size) == 0)
+	{
+	  unsigned char libname[PATH_MAX];
+
+	  if (lm_prev != l_prev)
+	    {
+	      warning ("Corrupted shared library list: 0x%lx != 0x%lx",
+		       (long) lm_prev, (long) l_prev);
+	      break;
+	    }
+
+	  /* Not checking for error because reading may stop before
+	     we've got PATH_MAX worth of characters.  */
+	  libname[0] = '\0';
+	  linux_read_memory (l_name, libname, sizeof (libname) - 1);
+	  libname[sizeof (libname) - 1] = '\0';
+	  if (libname[0] != '\0')
+	    {
+	      /* 6x the size for xml_escape_text below.  */
+	      size_t len = 6 * strlen ((char *) libname);
+	      char *name;
+
+	      if (!header_done)
+		{
+		  /* Terminate `<library-list-svr4'.  */
+		  *p++ = '>';
+		  header_done = 1;
+		}
+
+	      while (allocated < p - document + len + 200)
+		{
+		  /* Expand to guarantee sufficient storage.  */
+		  uintptr_t document_len = p - document;
+
+		  document = xrealloc (document, 2 * allocated);
+		  allocated *= 2;
+		  p = document + document_len;
+		}
+
+	      name = xml_escape_text ((char *) libname);
+	      p += sprintf (p, "<library name=\"%s\" lm=\"0x%lx\" "
+			       "l_addr=\"0x%lx\" l_ld=\"0x%lx\"/>",
+			    name, (unsigned long) lm_addr,
+			    (unsigned long) l_addr, (unsigned long) l_ld);
+	      free (name);
+	    }
+	  else if (lm_prev == 0)
+	    {
+	      sprintf (p, " main-lm=\"0x%lx\"", (unsigned long) lm_addr);
+	      p = p + strlen (p);
+	    }
+
+	  if (l_next == 0)
+	    break;
+
+	  lm_prev = lm_addr;
+	  lm_addr = l_next;
+	}
+    done:
+      strcpy (p, "</library-list-svr4>");
+    }
+
+  document_len = strlen (document);
+  if (offset < document_len)
+    document_len -= offset;
+  else
+    document_len = 0;
+  if (len > document_len)
+    len = document_len;
+
+  memcpy (readbuf, document + offset, len);
+  xfree (document);
+
+  return len;
 }
 
 static struct target_ops linux_target_ops = {
@@ -4802,6 +5416,7 @@ static struct target_ops linux_target_ops = {
   NULL,
 #endif
   linux_common_core_of_thread,
+  linux_read_loadmap,
   linux_process_qsupported,
   linux_supports_tracepoints,
   linux_read_pc,
@@ -4813,7 +5428,10 @@ static struct target_ops linux_target_ops = {
   linux_cancel_breakpoints,
   linux_stabilize_threads,
   linux_install_fast_tracepoint_jump_pad,
-  linux_emit_ops
+  linux_emit_ops,
+  linux_supports_disable_randomization,
+  linux_get_min_fast_tracepoint_insn_len,
+  linux_qxfer_libraries_svr4,
 };
 
 static void

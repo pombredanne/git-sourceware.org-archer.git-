@@ -48,6 +48,7 @@
 #include "event-loop.h"
 #include "gdbthread.h"
 #include "python/python.h"
+#include "interps.h"
 
 /* readline include files.  */
 #include "readline/readline.h"
@@ -287,14 +288,13 @@ void (*deprecated_context_hook) (int id);
 /* NOTE 1999-04-29: This function will be static again, once we modify
    gdb to use the event loop as the default command loop and we merge
    event-top.c into this file, top.c.  */
-/* static */ int
-quit_cover (void *s)
+/* static */ void
+quit_cover (void)
 {
   caution = 0;			/* Throw caution to the wind -- we're exiting.
 				   This prevents asking the user dumb 
 				   questions.  */
   quit_command ((char *) 0, 0);
-  return 0;
 }
 #endif /* defined SIGHUP */
 
@@ -362,18 +362,58 @@ prepare_execute_command (void)
   return cleanup;
 }
 
+/* Tell the user if the language has changed (except first time) after
+   executing a command.  */
+
+void
+check_frame_language_change (void)
+{
+  static int warned = 0;
+
+  /* First make sure that a new frame has been selected, in case the
+     command or the hooks changed the program state.  */
+  deprecated_safe_get_selected_frame ();
+  if (current_language != expected_language)
+    {
+      if (language_mode == language_mode_auto && info_verbose)
+	{
+	  language_info (1);	/* Print what changed.  */
+	}
+      warned = 0;
+    }
+
+  /* Warn the user if the working language does not match the language
+     of the current frame.  Only warn the user if we are actually
+     running the program, i.e. there is a stack.  */
+  /* FIXME: This should be cacheing the frame and only running when
+     the frame changes.  */
+
+  if (has_stack_frames ())
+    {
+      enum language flang;
+
+      flang = get_frame_language ();
+      if (!warned
+	  && flang != language_unknown
+	  && flang != current_language->la_language)
+	{
+	  printf_filtered ("%s\n", lang_frame_mismatch_warn);
+	  warned = 1;
+	}
+    }
+}
+
 /* Execute the line P as a command, in the current user context.
    Pass FROM_TTY as second argument to the defining function.  */
 
 void
 execute_command (char *p, int from_tty)
 {
-  struct cleanup *cleanup;
+  struct cleanup *cleanup_if_error, *cleanup;
   struct cmd_list_element *c;
-  enum language flang;
-  static int warned = 0;
   char *line;
 
+  cleanup_if_error = make_bpstat_clear_actions_cleanup ();
   cleanup = prepare_execute_command ();
 
   /* Force cleanup of any alloca areas if using C alloca instead of
@@ -440,44 +480,27 @@ execute_command (char *p, int from_tty)
 	deprecated_call_command_hook (c, arg, from_tty & caution);
       else
 	cmd_func (c, arg, from_tty & caution);
-       
+
+      /* If the interpreter is in sync mode (we're running a user
+	 command's list, running command hooks or similars), and we
+	 just ran a synchronous command that started the target, wait
+	 for that command to end.  */
+      if (!interpreter_async && sync_execution)
+	{
+	  while (gdb_do_one_event () >= 0)
+	    if (!sync_execution)
+	      break;
+	}
+
       /* If this command has been post-hooked, run the hook last.  */
       execute_cmd_post_hook (c);
 
     }
 
-  /* Tell the user if the language has changed (except first time).
-     First make sure that a new frame has been selected, in case this
-     command or the hooks changed the program state.  */
-  deprecated_safe_get_selected_frame ();
-  if (current_language != expected_language)
-    {
-      if (language_mode == language_mode_auto && info_verbose)
-	{
-	  language_info (1);	/* Print what changed.  */
-	}
-      warned = 0;
-    }
+  check_frame_language_change ();
 
-  /* Warn the user if the working language does not match the
-     language of the current frame.  Only warn the user if we are
-     actually running the program, i.e. there is a stack.  */
-  /* FIXME:  This should be cacheing the frame and only running when
-     the frame changes.  */
-
-  if (has_stack_frames ())
-    {
-      flang = get_frame_language ();
-      if (!warned
-	  && flang != language_unknown
-	  && flang != current_language->la_language)
-	{
-	  printf_filtered ("%s\n", lang_frame_mismatch_warn);
-	  warned = 1;
-	}
-    }
-
-    do_cleanups (cleanup);
+  do_cleanups (cleanup);
+  discard_cleanups (cleanup_if_error);
 }
 
 /* Run execute_command for P and FROM_TTY.  Capture its output into the
@@ -495,6 +518,9 @@ execute_command_to_string (char *p, int from_tty)
      restoration callbacks.  */
   cleanup = set_batch_flag_and_make_cleanup_restore_page_info ();
 
+  make_cleanup_restore_integer (&interpreter_async);
+  interpreter_async = 0;
+
   str_file = mem_fileopen ();
 
   make_cleanup_ui_file_delete (str_file);
@@ -504,10 +530,10 @@ execute_command_to_string (char *p, int from_tty)
   make_cleanup_restore_ui_file (&gdb_stdtarg);
   make_cleanup_restore_ui_file (&gdb_stdtargerr);
 
-  if (ui_out_redirect (uiout, str_file) < 0)
+  if (ui_out_redirect (current_uiout, str_file) < 0)
     warning (_("Current output protocol does not support redirection"));
   else
-    make_cleanup_ui_out_redirect_pop (uiout);
+    make_cleanup_ui_out_redirect_pop (current_uiout);
 
   gdb_stdout = str_file;
   gdb_stderr = str_file;
@@ -537,7 +563,7 @@ command_loop (void)
   while (instream && !feof (instream))
     {
       if (window_hook && instream == stdin)
-	(*window_hook) (instream, get_prompt (0));
+	(*window_hook) (instream, get_prompt ());
 
       quit_flag = 0;
       if (instream == stdin && stdin_is_tty)
@@ -546,7 +572,7 @@ command_loop (void)
 
       /* Get a command-line.  This calls the readline package.  */
       command = command_line_input (instream == stdin ?
-				    get_prompt (0) : (char *) NULL,
+				    get_prompt () : (char *) NULL,
 				    instream == stdin, "prompt");
       if (command == 0)
 	{
@@ -797,8 +823,7 @@ gdb_readline_wrapper (char *prompt)
     (*after_char_processing_hook) ();
   gdb_assert (after_char_processing_hook == NULL);
 
-  /* gdb_do_one_event argument is unused.  */
-  while (gdb_do_one_event (NULL) >= 0)
+  while (gdb_do_one_event () >= 0)
     if (gdb_readline_wrapper_done)
       break;
 
@@ -1129,97 +1154,27 @@ and \"show warranty\" for details.\n");
 }
 
 
-/* get_prefix: access method for the GDB prefix string.  */
+/* The current top level prompt, settable with "set prompt", and/or
+   with the python `gdb.prompt_hook' hook.  */
+static char *top_prompt;
+
+/* Access method for the GDB prompt string.  */
 
 char *
-get_prefix (int level)
+get_prompt (void)
 {
-  return PREFIX (level);
+  return top_prompt;
 }
 
-/* set_prefix: set method for the GDB prefix string.  */
+/* Set method for the GDB prompt string.  */
 
 void
-set_prefix (const char *s, int level)
+set_prompt (const char *s)
 {
-  /* If S is NULL, just free the PREFIX at level LEVEL and set to
-     NULL.  */
-  if (s == NULL)
-    {
-      xfree (PREFIX (level));
-      PREFIX (level) = NULL;
-    }
-  else
-    {
-      char *p = xstrdup (s);
+  char *p = xstrdup (s);
 
-      xfree (PREFIX (level));
-      PREFIX (level) =  p;
-    }
-}
-
-/* get_suffix: access method for the GDB suffix string.  */
-
-char *
-get_suffix (int level)
-{
-  return SUFFIX (level);
-}
-
-/* set_suffix: set method for the GDB suffix string.  */
-
-void
-set_suffix (const char *s, int level)
-{
-  /* If S is NULL, just free the SUFFIX at level LEVEL and set to
-     NULL.  */
-  if (s == NULL)
-    {
-      xfree (SUFFIX (level));
-      SUFFIX (level) = NULL;
-    }
-  else
-    {
-      char *p = xstrdup (s);
-
-      xfree (SUFFIX (level));
-      SUFFIX (level) =  p;
-    }
-}
-
- /* get_prompt: access method for the GDB prompt string.  */
-
-char *
-get_prompt (int level)
-{
-  return PROMPT (level);
-}
-
-void
-set_prompt (const char *s, int level)
-{
-  /* If S is NULL, just free the PROMPT at level LEVEL and set to
-     NULL.  */
-  if (s == NULL)
-    {
-      xfree (PROMPT (level));
-      PROMPT (level) = NULL;
-    }
-  else
-    {
-      char *p = xstrdup (s);
-
-      xfree (PROMPT (0));
-      PROMPT (0) = p;
-
-      if (level == 0)
-	{
-	  /* Also, free and set new_async_prompt so prompt changes sync up
-	     with set/show prompt.  */
-	    xfree (new_async_prompt);
-	    new_async_prompt = xstrdup (PROMPT (0));
-	  }
-      }
+  xfree (top_prompt);
+  top_prompt = p;
 }
 
 
@@ -1573,8 +1528,8 @@ init_history (void)
 }
 
 static void
-show_new_async_prompt (struct ui_file *file, int from_tty,
-		       struct cmd_list_element *c, const char *value)
+show_prompt (struct ui_file *file, int from_tty,
+	     struct cmd_list_element *c, const char *value)
 {
   fprintf_filtered (file, _("Gdb's prompt is \"%s\".\n"), value);
 }
@@ -1606,21 +1561,13 @@ show_exec_done_display_p (struct ui_file *file, int from_tty,
 static void
 init_main (void)
 {
-  /* initialize the prompt stack to a simple "(gdb) " prompt or to
-     whatever the DEFAULT_PROMPT is.  */
-  the_prompts.top = 0;
-  PREFIX (0) = "";
-  set_prompt (DEFAULT_PROMPT, 0);
-  SUFFIX (0) = "";
+  /* Initialize the prompt to a simple "(gdb) " prompt or to whatever
+     the DEFAULT_PROMPT is.  */
+  set_prompt (DEFAULT_PROMPT);
+
   /* Set things up for annotation_level > 1, if the user ever decides
      to use it.  */
   async_annotation_suffix = "prompt";
-
-  /* If gdb was started with --annotate=2, this is equivalent to the
-     user entering the command 'set annotate 2' at the gdb prompt, so
-     we need to do extra processing.  */
-  if (annotation_level > 1)
-    set_async_annotation_level (NULL, 0, NULL);
 
   /* Set the important stuff up for command editing.  */
   command_editing_p = 1;
@@ -1640,11 +1587,11 @@ init_main (void)
   rl_add_defun ("operate-and-get-next", gdb_rl_operate_and_get_next, 15);
 
   add_setshow_string_cmd ("prompt", class_support,
-			  &new_async_prompt,
+			  &top_prompt,
 			  _("Set gdb's prompt"),
 			  _("Show gdb's prompt"),
-			  NULL, set_async_prompt,
-			  show_new_async_prompt,
+			  NULL, NULL,
+			  show_prompt,
 			  &setlist, &showlist);
 
   add_com ("dont-repeat", class_support, dont_repeat_command, _("\
@@ -1700,7 +1647,7 @@ Set annotation_level."), _("\
 Show annotation_level."), _("\
 0 == normal;     1 == fullname (for use when running under emacs)\n\
 2 == output annotated suitably for use by programs that control GDB."),
-			    set_async_annotation_level,
+			    NULL,
 			    show_annotation_level,
 			    &setlist, &showlist);
 

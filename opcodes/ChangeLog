@@ -1,3 +1,321 @@
+2011-12-15  Nick Clifton  <nickc@redhat.com>
+
+	* cgen-asm.c (cgen_parse_signed_integer): Add code to handle the
+	sign extension of negative values on a 64-bit host.
+	* frv-asm.c: Regenerate.
+
+2011-12-13  Alan Modra  <amodra@gmail.com>
+
+	* ppc-opc.c (ISA_V2): Define and use for relevant BO field tests.
+	(valid_bo_pre_v2, valid_bo_post_v2): New functions, extracted from..
+	(valid_bo): ..here.  When disassembling, accept either 'y' or 'at'
+	type encoding on second pass.
+	(powerpc_opcodes): Use ISA_V2 to enable branch insns rather than
+	POWER4.
+	* ppc-dis.c (print_insn_powerpc): Delete dialect_orig.  Instead
+	ignore deprecated on second pass.
+
+2011-12-08  Andrew Pinski  <apinski@cavium.com>
+
+	* mips-opc.c (mips_builtin_opcodes): Add "pause".
+
+2011-12-08  Andrew Pinski  <apinski@cavium.com>
+	    Adam Nemet  <anemet@caviumnetworks.com>
+
+	* mips-dis.c (mips_arch_choices): Add Octeon2.
+	For "octeon+", just include OcteonP for the insn.
+	* mips-opc.c (IOCT): Include Octeon2.
+	(IOCTP): Include Octeon2.
+	(IOCT2): New macro.
+	(mips_builtin_opcodes): Add "laa", "laad", "lac", "lacd", "lad",
+	"ladd", "lai", "laid", "las", "lasd", "law", "lawd".
+	Move "lbux", "ldx", "lhx", "lwx", and "lwux" up to where the standard
+	loads are, and add IOCT2 to them.
+	Add "lbx" and "lhux".
+	Add "qmac.00", "qmac.01", "qmac.02", "qmac.03", "qmacs.00",
+	"qmacs.01", "qmacs.01", "qmacs.02" and "qmacs.03".
+	Add "zcb" and "zcbt".
+
+2011-11-29  Andrew Pinski  <apinski@cavium.com>
+
+	* mips-dis.c (mips_arch_choices): Add Octeon+.
+	* mips-opc.c (IOCT): Include Octeon+.
+	(IOCTP): New macro.
+	(mips_builtin_opcodes): Add "saa" and "saad".
+
+2011-11-25  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* mips-dis.c (print_insn_micromips): Rename local variable iprintf
+	to infprintf to avoid shadow warning.
+
+2011-11-25  Nick Clifton  <nickc@redhat.com>
+
+	* po/it.po: Updated Italian translation.
+
+2011-11-16  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* micromips-opc.c (micromips_opcodes): Use NODS rather than TRAP
+	for "alnv.ps".
+
+2011-11-02  Nick Clifton  <nickc@redhat.com>
+
+	* po/it.po: New Italian translation.
+	* configure.in (ALL_LINGUAS): Add it.
+	* configure: Regenerate.
+	* po/opcodes.pot: Regenerate.
+
+2011-11-01  DJ Delorie  <dj@redhat.com>
+
+	* Makefile.am (TARGET_LIBOPCODES_CFILES): Add rl78-decode.c and
+	rl78-dis.c.
+	(MAINTAINERCLEANFILES): Add rl78-decode.c.
+	(rl78-decode.c): New rule, built from rl78-decode.opc and opc2c.
+	* Makefile.in: Regenerate.
+	* configure.in: Add bfd_rl78_arch case.
+	* configure: Regenerate.
+	* disassemble.c: Define ARCH_rl78.
+	(disassembler): Add ARCH_rl78 case.
+	* rl78-decode.c: New file.
+	* rl78-decode.opc: New file.
+	* rl78-dis.c: New file.
+
+2011-10-27  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c (powerpc_opcodes) <drrndq, drrndq., dtstexq, dctqpq,
+	dctqpq., dctfixq, dctfixq., dxexq, dxexq., dtstsfq, dcffixq, dcffixq.,
+	diexq, diexq.>: Use FRT, FRA, FRB and FRBp repsectively on DFP quad
+	instructions.
+
+2011-10-26  Nick Clifton  <nickc@redhat.com>
+
+	PR binutils/13348
+	* i386-dis.c (print_insn): Fix testing of array subscript.
+
+2011-10-26  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* disassemble.c (ARCH_epiphany): Move into alphasorted spot.
+	* epiphany-asm.c, epiphany-opc.h: Regenerate.
+
+2011-10-25  Joern Rennecke  <joern.rennecke@embecosm.com>
+
+	* Makefile.am (HFILES): Add epiphany-desc.h and epiphany-opc.h .
+	(TARGET_LIBOPCODES_CFILES): Add  epiphany-asm.c, epiphany-desc.c,
+	epiphany-dis.c, epiphany-ibld.c and epiphany-opc.c .
+	(CLEANFILES): Add stamp-epiphany.
+	(EPIPHANY_DEPS): Set.  Make CGEN-generated Epiphany files depend on it.
+	(stamp-epiphany): New rule.
+	* configure.in: Handle bfd_epiphany_arch.
+	* disassemble.c (ARCH_epiphany): Define.
+	(disassembler): Handle bfd_arch_epiphany.
+	* epiphany-asm.c: New file.
+	* epiphany-desc.c: New file.
+	* epiphany-desc.h: New file.
+	* epiphany-dis.c: New file.
+	* epiphany-ibld.c: New file.
+	* epiphany-opc.c: New file.
+	* epiphany-opc.h: New file.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+	* po/POTFILES.in: Regenerate.
+	* po/opcodes.pot: Regenerate.
+
+2011-10-24  Julian Brown  <julian@codesourcery.com>
+
+	* m68k-opc.c (m68k_opcodes): Fix entries for ColdFire moveml.
+
+2011-10-21  Jan Glauber  <jang@linux.vnet.ibm.com>
+
+	* s390-opc.txt: Add CPUMF instructions.
+
+2011-10-18  Jie Zhang  <jie@codesourcery.com>
+	    Julian Brown  <julian@codesourcery.com>
+
+	* arm-dis.c (print_insn_arm): Explicitly specify rotation if needed.
+
+2011-10-10  Nick Clifton  <nickc@redhat.com>
+
+	* po/es.po: Updated Spanish translation.
+	* po/fi.po: Updated Finnish translation.
+
+2011-09-28  Jan Beulich  <jbeulich@suse.com>
+
+	* ppc-opc.c (insert_nbi, insert_rbx, FRAp, FRBp, FRSp, FRTp, NBI, RAX,
+	RBX): New.
+	(insert_bo, insert_boe): Reject bcctr with bit 2 in bo unset.
+	(powerpc_opcodes): Use RAX for second and RBXC for third operand of
+	lswx. Use NBI for third operand of lswi. Use FRTp for first operand of
+	lfdp and lfdpx. Use FRSp for first operand of stfdp and stfdpx, and
+	mark them as invalid on POWER7. Use FRTp, FRAp, and FRBp repsectively
+	on DFP quad instructions.
+
+2011-09-27  David S. Miller  <davem@davemloft.net>
+
+	* sparc-opc.c (sparc_opcodes): Fix random instruction to write
+	to a float instead of an integer register.
+
+2011-09-26  David S. Miller  <davem@davemloft.net>
+
+	* sparc-opc.c (sparc_opcodes): Add integer multiply-add
+	instructions.
+
+2011-09-21  David S. Miller  <davem@davemloft.net>
+
+	* sparc-opc.c (sparc_opcodes): Annotate table with HWCAP flag
+	bits.  Fix "fchksm16" mnemonic.
+
+2011-09-08  Mark Fortescue <mark@mtfhpc.demon.co.uk>
+
+	The changes below bring 'mov' and 'ticc' instructions into line
+	with the V8 SPARC Architecture Manual.
+	* sparc-opc.c (sparc_opcodes): Add entry for 'ticc imm + regrs1'.
+	* sparc-opc.c (sparc_opcodes): Add alias entries for
+	'mov regrs2,%asrX'; 'mov regrs2,%y'; 'mov regrs2,%prs';
+	'mov regrs2,%wim' and 'mov regrs2,%tbr'.
+	* sparc-opc.c (sparc_opcodes): Move/Change entries for
+	'mov imm,%asrX'; 'mov imm,%y'; 'mov imm,%prs'; 'mov imm,%wim'
+	and 'mov imm,%tbr'.
+	* sparc-opc.c (sparc_opcodes): Add wr alias entries to match above
+	mov aliases.
+
+	* sparc-opc.c (sparc_opcodes): Add entry for 'save simm13,regrs1,regrd'
+	This has been reported as being accepted by the Sun assmebler.
+
+2011-09-08  David S. Miller  <davem@davemloft.net>
+
+	* sparc-opc.c (pdistn): Destination is integer not float register.
+
+2011-09-07  Andreas Schwab  <schwab@linux-m68k.org>
+
+	PR gas/13145
+	* m68k-opc.c: Use "y" in moveml pattern for mcfisa_a.
+
+2011-08-26  Nick Clifton  <nickc@redhat.com>
+
+	* po/es.po: Updated Spanish translation.
+
+2011-08-22  Nick Clifton  <nickc@redhat.com>
+
+	* Makefile.am (CPUDIR): Redfine to point to top level cpu
+	directory.
+	(stamp-frv): Use CPUDIR.
+	(stamp-iq2000): Likewise.
+	(stamp-lm32): Likewise.
+	(stamp-m32c): Likewise.
+	(stamp-mt): Likewise.
+	(stamp-xc16x): Likewise.
+	* Makefile.in: Regenerate.
+
+2011-08-09  Chao-ying Fu  <fu@mips.com>
+	    Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-dis.c (mips_arch_choices): Enable MCU for "mips32r2"
+	and "mips64r2".
+	(print_insn_args, print_insn_micromips): Handle MCU.
+	* micromips-opc.c (MC): New macro.
+	(micromips_opcodes): Add "aclr", "aset" and "iret".
+	* mips-opc.c (MC): New macro.
+	(mips_builtin_opcodes): Add "aclr", "aset" and "iret".
+
+2011-08-09  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* micromips-opc.c (MOD_mb, MOD_mc, MOD_md): Remove macros.
+	(MOD_me, MOD_mf, MOD_mg, MOD_mhi, MOD_mj, MOD_ml): Likewise.
+	(MOD_mm, MOD_mn, MOD_mp, MOD_mq, MOD_sp): Likewise.
+	(WR_mb, RD_mc, RD_md, WR_md, RD_me, RD_mf, WR_mf): New macros.
+	(RD_mg, WR_mhi, RD_mj, WR_mj, RD_ml, RD_mmn): Likewise.
+	(RD_mp, WR_mp, RD_mq, RD_sp, WR_sp): Likewise.
+	(WR_s): Update macro.
+	(micromips_opcodes): Update register use flags of: "addiu",
+	"addiupc", "addiur1sp", "addiur2", "addius5", "addiusp", "addu",
+	"and", "andi", "beq", "beqz", "bne", "bnez", "di", "ei", "j",
+	"jalr", "jalrs", "jr", "jraddiusp", "jrc", "lbu", "lhu", "li",
+	"lui", "lw", "lwm", "mfhi", "mflo", "move", "movep", "not",
+	"nor", "or", "ori", "sb", "sh", "sll", "srl", "subu", "sw",
+	"swm" and "xor" instructions.
+
+2011-08-05  David S. Miller  <davem@davemloft.net>
+
+	* sparc-dis.c (v9a_ast_reg_names): Add "cps".
+	(X_RS3): New macro.
+	(print_insn_sparc): Handle '4', '5', and '(' format codes.
+	Accept %asr numbers below 28.
+	* sparc-opc.c (sparc_opcodes): Add entries for HPC and VIS3
+	instructions.
+
+2011-08-02  Quentin Neill  <quentin.neill@amd.com>
+
+	* i386-dis.c (xop_table): Remove spurious bextr insn.
+
+2011-08-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/13048
+	* i386-dis.c (print_insn): Optimize info->mach check.
+
+2011-08-01  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR gas/13046
+	* i386-opc.tbl: Add Disp32S to 64bit call.
+	* i386-tbl.h: Regenerated.
+
+2011-07-24  Chao-ying Fu  <fu@mips.com>
+	    Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* micromips-opc.c: New file.
+	* mips-dis.c (micromips_to_32_reg_b_map): New array.
+	(micromips_to_32_reg_c_map, micromips_to_32_reg_d_map): Likewise.
+	(micromips_to_32_reg_e_map, micromips_to_32_reg_f_map): Likewise.
+	(micromips_to_32_reg_g_map, micromips_to_32_reg_l_map): Likewise.
+	(micromips_to_32_reg_q_map): Likewise.
+	(micromips_imm_b_map, micromips_imm_c_map): Likewise.
+	(micromips_ase): New variable.
+	(is_micromips): New function.
+	(set_default_mips_dis_options): Handle microMIPS ASE.
+	(print_insn_micromips): New function.
+	(is_compressed_mode_p): Likewise.
+	(_print_insn_mips): Handle microMIPS instructions.
+	* Makefile.am (CFILES): Add micromips-opc.c.
+	* configure.in (bfd_mips_arch): Add micromips-opc.lo.
+	* Makefile.in: Regenerate.
+	* configure: Regenerate.
+
+	* mips-dis.c (micromips_to_32_reg_h_map): New variable.
+	(micromips_to_32_reg_i_map): Likewise.
+	(micromips_to_32_reg_m_map): Likewise.
+	(micromips_to_32_reg_n_map): New macro.
+
+2011-07-24  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-opc.c (NODS): New macro.
+	(TRAP): Adjust for the rename of INSN_TRAP to INSN_NO_DELAY_SLOT.
+	(DSP_VOLA): Likewise.
+	(mips_builtin_opcodes): Add NODS annotation to "deret" and
+	"eret". Replace INSN_SYNC with NODS throughout.  Use NODS in
+	place of TRAP for "wait", "waiti" and "yield".
+	* mips16-opc.c (NODS): New macro.
+	(TRAP): Adjust for the rename of INSN_TRAP to INSN_NO_DELAY_SLOT.
+	(mips16_opcodes):  Use NODS in place of TRAP for "jalrc", "jrc",
+	"restore" and "save".
+
+2011-07-22  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* configure.in: Handle bfd_k1om_arch.
+	* configure: Regenerated.
+
+	* disassemble.c (disassembler): Handle bfd_k1om_arch.
+
+	* i386-dis.c (print_insn): Handle bfd_mach_k1om and
+	bfd_mach_k1om_intel_syntax.
+
+	* i386-gen.c (cpu_flag_init): Set CPU_UNKNOWN_FLAGS to
+	~(CpuL1OM|CpuK1OM).  Add CPU_K1OM_FLAGS.
+	(cpu_flags): Add CpuK1OM.
+
+	* i386-opc.h (CpuK1OM): New.
+	(i386_cpu_flags): Add cpuk1om.
+
+	* i386-init.h: Regenerated.
+	* i386-tbl.h: Likewise.
+
 2011-07-12  Nick Clifton  <nickc@redhat.com>
 
 	* arm-dis.c (print_insn_arm): Revert previous, undocumented,

@@ -2354,9 +2354,32 @@ static const insn_sequence elf32_arm_stub_a8_veneer_blx[] =
     ARM_REL_INSN(0xea000000, -8)	/* b original_branch_dest.  */
   };
 
-/* Section name for stubs is the associated section name plus this
-   string.  */
-#define STUB_SUFFIX ".stub"
+/* For each section group there can be a specially created linker section
+   to hold the stubs for that group.  The name of the stub section is based
+   upon the name of another section within that group with the suffix below
+   applied.
+
+   PR 13049: STUB_SUFFIX used to be ".stub", but this allowed the user to
+   create what appeared to be a linker stub section when it actually
+   contained user code/data.  For example, consider this fragment:
+   
+     const char * stubborn_problems[] = { "np" };
+
+   If this is compiled with "-fPIC -fdata-sections" then gcc produces a
+   section called:
+
+     .data.rel.local.stubborn_problems
+
+   This then causes problems in arm32_arm_build_stubs() as it triggers:
+
+      // Ignore non-stub sections.
+      if (!strstr (stub_sec->name, STUB_SUFFIX))
+	continue;
+
+   And so the section would be ignored instead of being processed.  Hence
+   the change in definition of STUB_SUFFIX to a name that cannot be a valid
+   C identifier.  */
+#define STUB_SUFFIX ".__stub"
 
 /* One entry per long/short branch stub defined above.  */
 #define DEF_STUBS \
@@ -2775,6 +2798,9 @@ struct elf32_arm_link_hash_table
 
   /* Whether we should fix the Cortex-A8 Thumb-2 branch/TLB erratum.  */
   int fix_cortex_a8;
+
+  /* Whether we should fix the ARM1176 BLX immediate issue.  */
+  int fix_arm1176;
 
   /* Nonzero if the ARM/Thumb BLX instructions are available for use.  */
   int use_blx;
@@ -3315,6 +3341,7 @@ elf32_arm_link_hash_table_create (bfd *abfd)
   ret->vfp11_erratum_glue_size = 0;
   ret->num_vfp11_fixes = 0;
   ret->fix_cortex_a8 = 0;
+  ret->fix_arm1176 = 0;
   ret->bfd_of_glue_owner = NULL;
   ret->byteswap_code = 0;
   ret->target1_is_rel = 0;
@@ -3553,7 +3580,7 @@ arm_type_of_stub (struct bfd_link_info *info,
 		  stub_type = (info->shared | globals->pic_veneer)
 		    /* PIC stubs.  */
 		    ? ((globals->use_blx
-			&& (r_type ==R_ARM_THM_CALL))
+			&& (r_type == R_ARM_THM_CALL))
 		       /* V5T and above. Stub starts with ARM code, so
 			  we must be able to switch mode before
 			  reaching it, which is only possible for 'bl'
@@ -3564,7 +3591,7 @@ arm_type_of_stub (struct bfd_link_info *info,
 
 		    /* non-PIC stubs.  */
 		    : ((globals->use_blx
-			&& (r_type ==R_ARM_THM_CALL))
+			&& (r_type == R_ARM_THM_CALL))
 		       /* V5T and above.  */
 		       ? arm_stub_long_branch_any_any
 		       /* V4T.  */
@@ -3793,7 +3820,9 @@ elf32_arm_create_or_find_stub_sec (asection **link_sec_p, asection *section,
   asection *stub_sec;
 
   link_sec = htab->stub_group[section->id].link_sec;
+  BFD_ASSERT (link_sec != NULL);
   stub_sec = htab->stub_group[section->id].stub_sec;
+
   if (stub_sec == NULL)
     {
       stub_sec = htab->stub_group[link_sec->id].stub_sec;
@@ -5930,9 +5959,21 @@ bfd_elf32_arm_get_bfd_for_interworking (bfd *abfd, struct bfd_link_info *info)
 static void
 check_use_blx (struct elf32_arm_link_hash_table *globals)
 {
-  if (bfd_elf_get_obj_attr_int (globals->obfd, OBJ_ATTR_PROC,
-				Tag_CPU_arch) > 2)
-    globals->use_blx = 1;
+  int cpu_arch;
+
+  cpu_arch = bfd_elf_get_obj_attr_int (globals->obfd, OBJ_ATTR_PROC, 
+				       Tag_CPU_arch);
+
+  if (globals->fix_arm1176)
+    {
+      if (cpu_arch == TAG_CPU_ARCH_V6T2 || cpu_arch > TAG_CPU_ARCH_V6K)
+	globals->use_blx = 1;
+    }
+  else
+    {
+      if (cpu_arch > TAG_CPU_ARCH_V4T)
+	globals->use_blx = 1;
+    }
 }
 
 bfd_boolean
@@ -6786,7 +6827,8 @@ bfd_elf32_arm_set_target_relocs (struct bfd *output_bfd,
 				 int use_blx,
                                  bfd_arm_vfp11_fix vfp11_fix,
 				 int no_enum_warn, int no_wchar_warn,
-				 int pic_veneer, int fix_cortex_a8)
+				 int pic_veneer, int fix_cortex_a8,
+				 int fix_arm1176)
 {
   struct elf32_arm_link_hash_table *globals;
 
@@ -6811,6 +6853,7 @@ bfd_elf32_arm_set_target_relocs (struct bfd *output_bfd,
   globals->vfp11_fix = vfp11_fix;
   globals->pic_veneer = pic_veneer;
   globals->fix_cortex_a8 = fix_cortex_a8;
+  globals->fix_arm1176 = fix_arm1176;
 
   BFD_ASSERT (is_arm_elf (output_bfd));
   elf_arm_tdata (output_bfd)->no_enum_size_warning = no_enum_warn;
@@ -6888,7 +6931,7 @@ elf32_thumb_to_arm_stub (struct bfd_link_info * info,
 	{
 	  (*_bfd_error_handler)
 	    (_("%B(%s): warning: interworking not enabled.\n"
-	       "  first occurrence: %B: thumb call to arm"),
+	       "  first occurrence: %B: Thumb call to ARM"),
 	     sym_sec->owner, input_bfd, name);
 
 	  return FALSE;
@@ -8202,15 +8245,19 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 		{
 		  /* The target is out of reach, so redirect the
 		     branch to the local stub for this function.  */
-
 		  stub_entry = elf32_arm_get_stub_entry (input_section,
 							 sym_sec, h,
 							 rel, globals,
 							 stub_type);
-		  if (stub_entry != NULL)
-		    value = (stub_entry->stub_offset
-			     + stub_entry->stub_sec->output_offset
-			     + stub_entry->stub_sec->output_section->vma);
+		  {
+		    if (stub_entry != NULL)
+		      value = (stub_entry->stub_offset
+			       + stub_entry->stub_sec->output_offset
+			       + stub_entry->stub_sec->output_section->vma);
+
+		    if (plt_offset != (bfd_vma) -1)
+		      *unresolved_reloc_p = FALSE;
+		  }
 		}
 	      else
 		{
@@ -8635,9 +8682,14 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 						       rel, globals,
 						       stub_type);
 		if (stub_entry != NULL)
-		  value = (stub_entry->stub_offset
-			   + stub_entry->stub_sec->output_offset
-			   + stub_entry->stub_sec->output_section->vma);
+		  {
+		    value = (stub_entry->stub_offset
+			     + stub_entry->stub_sec->output_offset
+			     + stub_entry->stub_sec->output_section->vma);
+
+		    if (plt_offset != (bfd_vma) -1)
+		      *unresolved_reloc_p = FALSE;
+		  }
 
 		/* If this call becomes a call to Arm, force BLX.  */
 		if (globals->use_blx && (r_type == R_ARM_THM_CALL))
@@ -10359,7 +10411,9 @@ elf32_arm_relocate_section (bfd *                  output_bfd,
 	 not process them.  */
       if (unresolved_reloc
           && !((input_section->flags & SEC_DEBUGGING) != 0
-               && h->def_dynamic))
+               && h->def_dynamic)
+	  && _bfd_elf_section_offset (output_bfd, info, input_section,
+				      rel->r_offset) != (bfd_vma) -1)
 	{
 	  (*_bfd_error_handler)
 	    (_("%B(%A+0x%lx): unresolvable %s relocation against symbol `%s'"),
@@ -11495,7 +11549,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 	case Tag_PCS_config:
 	  if (out_attr[i].i == 0)
 	    out_attr[i].i = in_attr[i].i;
-	  else if (in_attr[i].i != 0 && out_attr[i].i != 0)
+	  else if (in_attr[i].i != 0 && out_attr[i].i != in_attr[i].i)
 	    {
 	      /* It's sometimes ok to mix different configs, so this is only
 	         a warning.  */
@@ -12593,7 +12647,8 @@ elf32_arm_find_nearest_line (bfd *          abfd,
 
   /* We skip _bfd_dwarf1_find_nearest_line since no known ARM toolchain uses it.  */
 
-  if (_bfd_dwarf2_find_nearest_line (abfd, section, symbols, offset,
+  if (_bfd_dwarf2_find_nearest_line (abfd, dwarf_debug_sections,
+                                     section, symbols, offset,
 				     filename_ptr, functionname_ptr,
 				     line_ptr, 0,
 				     & elf_tdata (abfd)->dwarf2_find_line_info))
@@ -14488,7 +14543,8 @@ elf32_arm_output_arch_local_syms (bfd *output_bfd,
 		   == SEC_HAS_CONTENTS
 		&& get_arm_elf_section_data (osi.sec) != NULL
 		&& get_arm_elf_section_data (osi.sec)->mapcount == 0
-		&& osi.sec->size > 0)
+		&& osi.sec->size > 0
+		&& (osi.sec->flags & SEC_EXCLUDE) == 0)
 	      {
 		osi.sec_shndx = _bfd_elf_section_from_bfd_section
 		  (output_bfd, osi.sec->output_section);

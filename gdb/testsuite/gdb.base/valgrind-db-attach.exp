@@ -41,6 +41,11 @@ pass $test
 # Declare GDB now as running.
 set gdb_spawn_id -1
 
+# GDB spawned by `valgrind --db-attach=yes' stops already after the startup is
+# executed, like with non-extended gdbserver.  It is also not correct to
+# run/attach the inferior.
+set use_gdb_stub 1
+
 set test "valgrind started"
 # The trailing '.' differs for different memcheck versions.
 gdb_test_multiple "" $test {
@@ -83,3 +88,6 @@ gdb_test_no_output "set height 0"
 gdb_test_no_output "set width 0"
 
 gdb_test "bt" "in main \\(.*\\) at .*${srcfile}:$double_free"
+
+# Explicitly kill the program so it doesn't dump core when we quit->detach.
+gdb_test "kill" "" "kill program" "Kill the program being debugged.*y or n. $" "y"

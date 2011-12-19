@@ -282,7 +282,6 @@ void unloaded_dll (const char *name, CORE_ADDR base_addr);
 
 extern ptid_t cont_thread;
 extern ptid_t general_thread;
-extern ptid_t step_thread;
 
 extern int server_waiting;
 extern int debug_threads;
@@ -299,6 +298,8 @@ extern int disable_packet_qfThreadInfo;
 extern int run_once;
 extern int multi_process;
 extern int non_stop;
+
+extern int disable_randomization;
 
 #if USE_WIN32API
 #include <winsock2.h>
@@ -340,6 +341,9 @@ extern int noack_mode;
 extern int transport_is_reliable;
 
 int gdb_connected (void);
+
+#define STDIO_CONNECTION_NAME "stdio"
+int remote_connection_is_stdio (void);
 
 ptid_t read_ptid (char *buf, char **obuf);
 char *write_ptid (char *buf, ptid_t ptid);
@@ -428,6 +432,10 @@ char *pfildes (gdb_fildes_t fd);
 
 /* Functions from tracepoint.c */
 
+/* Size for a small buffer to report problems from the in-process
+   agent back to GDBserver.  */
+#define IPA_BUFSIZ 100
+
 int in_process_agent_loaded (void);
 
 void initialize_tracepoint (void);
@@ -493,8 +501,13 @@ void supply_fast_tracepoint_registers (struct regcache *regcache,
 void supply_static_tracepoint_registers (struct regcache *regcache,
 					 const unsigned char *regs,
 					 CORE_ADDR pc);
+void set_trampoline_buffer_space (CORE_ADDR begin, CORE_ADDR end,
+				  char *errmsg);
 #else
 void stop_tracing (void);
+
+int claim_trampoline_space (ULONGEST used, CORE_ADDR *trampoline);
+int have_fast_tracepoint_trampoline_buffer (char *msgbuf);
 #endif
 
 /* Bytecode compilation function vector.  */
@@ -539,6 +552,15 @@ struct emit_ops
      argument and a 64-bit int from the top of the stack, and returns
      nothing (for instance, tsv setter).  */
   void (*emit_void_call_2) (CORE_ADDR fn, int arg1);
+
+  /* Emit code specialized for common combinations of compare followed
+     by a goto.  */
+  void (*emit_eq_goto) (int *offset_p, int *size_p);
+  void (*emit_ne_goto) (int *offset_p, int *size_p);
+  void (*emit_lt_goto) (int *offset_p, int *size_p);
+  void (*emit_le_goto) (int *offset_p, int *size_p);
+  void (*emit_gt_goto) (int *offset_p, int *size_p);
+  void (*emit_ge_goto) (int *offset_p, int *size_p);
 };
 
 /* Returns the address of the get_raw_reg function in the IPA.  */

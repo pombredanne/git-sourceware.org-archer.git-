@@ -8,7 +8,7 @@ AC_CONFIG_SRCDIR([libbfd.c])
 AC_CANONICAL_TARGET
 AC_ISC_POSIX
 
-AM_INIT_AUTOMAKE(bfd, 2.21.53)
+AM_INIT_AUTOMAKE(bfd, 2.22.51)
 
 dnl These must be called before LT_INIT, because it may want
 dnl to call AC_CHECK_PROG.
@@ -698,6 +698,7 @@ do
     bfd_elf32_d10v_vec)		tb="$tb elf32-d10v.lo elf32.lo $elf" ;;
     bfd_elf32_d30v_vec)		tb="$tb elf32-d30v.lo elf32.lo $elf" ;;
     bfd_elf32_dlx_big_vec)	tb="$tb elf32-dlx.lo elf32.lo $elf" ;;
+    bfd_elf32_epiphany_vec)	tb="$tb elf32-epiphany.lo elf32.lo $elf" ;;
     bfd_elf32_fr30_vec)		tb="$tb elf32-fr30.lo elf32.lo $elf" ;;
     bfd_elf32_frv_vec)		tb="$tb elf32-frv.lo elf32.lo $elf" ;;
     bfd_elf32_frvfdpic_vec)	tb="$tb elf32-frv.lo elf32.lo $elf" ;;
@@ -709,6 +710,7 @@ do
     bfd_elf32_i370_vec)		tb="$tb elf32-i370.lo elf32.lo $elf" ;;
     bfd_elf32_i386_sol2_vec)	tb="$tb elf32-i386.lo elf-ifunc.lo elf-vxworks.lo elf32.lo $elf" ;;
     bfd_elf32_i386_freebsd_vec)	tb="$tb elf32-i386.lo elf-ifunc.lo elf-vxworks.lo elf32.lo $elf" ;;
+    bfd_elf32_i386_nacl_vec)	tb="$tb elf32-i386.lo elf-ifunc.lo elf-vxworks.lo elf32.lo $elf" ;;
     bfd_elf32_i386_vxworks_vec)	tb="$tb elf32-i386.lo elf-ifunc.lo elf-vxworks.lo elf32.lo $elf" ;;
     bfd_elf32_i386_vec)		tb="$tb elf32-i386.lo elf-ifunc.lo elf-vxworks.lo elf32.lo $elf" ;;
     bfd_elf32_i860_little_vec)	tb="$tb elf32-i860.lo elf32.lo $elf" ;;
@@ -760,7 +762,9 @@ do
     bfd_elf32_pjl_vec)          tb="$tb elf32-pj.lo elf32.lo $elf";;
     bfd_elf32_powerpc_vec)	tb="$tb elf32-ppc.lo elf-vxworks.lo elf32.lo $elf" ;;
     bfd_elf32_powerpcle_vec)	tb="$tb elf32-ppc.lo elf-vxworks.lo elf32.lo $elf" ;;
+    bfd_elf32_powerpc_freebsd_vec) tb="$tb elf32-ppc.lo elf-vxworks.lo elf32.lo $elf" ;;
     bfd_elf32_powerpc_vxworks_vec) tb="$tb elf32-ppc.lo elf-vxworks.lo elf32.lo $elf" ;;
+    bfd_elf32_rl78_vec)         tb="$tb elf32-rl78.lo $elf" ;;
     bfd_elf32_rx_le_vec)        tb="$tb elf32-rx.lo elf32.lo $elf" ;;
     bfd_elf32_rx_be_vec)        tb="$tb elf32-rx.lo elf32.lo $elf" ;;
     bfd_elf32_rx_be_ns_vec)     tb="$tb elf32-rx.lo elf32.lo $elf" ;;
@@ -825,6 +829,7 @@ do
     bfd_elf64_mmix_vec) 	tb="$tb elf64-mmix.lo elf64.lo $elf" target_size=64 ;;
     bfd_elf64_powerpc_vec)	tb="$tb elf64-ppc.lo elf64-gen.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf64_powerpcle_vec)	tb="$tb elf64-ppc.lo elf64-gen.lo elf64.lo $elf" target_size=64 ;;
+    bfd_elf64_powerpc_freebsd_vec) tb="$tb elf64-ppc.lo elf64-gen.lo elf64.lo $elf" target_size=64 ;;
     bfd_elf64_s390_vec)		tb="$tb elf64-s390.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf64_sh64_vec)		tb="$tb elf64-sh64.lo elf64.lo $elf" target_size=64 ;;
     bfd_elf64_sh64l_vec)	tb="$tb elf64-sh64.lo elf64.lo $elf" target_size=64 ;;
@@ -846,6 +851,8 @@ do
     bfd_elf32_x86_64_vec)	tb="$tb elf64-x86-64.lo elf-ifunc.lo elf64.lo elf32.lo $elf"; target_size=64 ;;
     bfd_elf64_l1om_vec)		tb="$tb elf64-x86-64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf64_l1om_freebsd_vec) tb="$tb elf64-x86-64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
+    bfd_elf64_k1om_vec)		tb="$tb elf64-x86-64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
+    bfd_elf64_k1om_freebsd_vec) tb="$tb elf64-x86-64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
     bfd_mmo_vec)		tb="$tb mmo.lo" target_size=64 ;;
     bfd_powerpc_pe_vec)         tb="$tb pe-ppc.lo peigen.lo cofflink.lo" ;;
     bfd_powerpc_pei_vec)        tb="$tb pei-ppc.lo peigen.lo cofflink.lo" ;;

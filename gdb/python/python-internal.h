@@ -104,6 +104,8 @@ typedef unsigned long gdb_py_ulongest;
 
 #include "exceptions.h"
 
+enum gdbpy_iter_kind { iter_keys, iter_values, iter_items };
+
 struct block;
 struct value;
 struct language_defn;
@@ -151,17 +153,19 @@ PyObject *gdbpy_create_lazy_string_object (CORE_ADDR address, long length,
 					   struct type *type);
 PyObject *gdbpy_inferiors (PyObject *unused, PyObject *unused2);
 PyObject *gdbpy_selected_thread (PyObject *self, PyObject *args);
+PyObject *gdbpy_selected_inferior (PyObject *self, PyObject *args);
 PyObject *gdbpy_string_to_argv (PyObject *self, PyObject *args);
 PyObject *gdbpy_parameter (PyObject *self, PyObject *args);
 PyObject *gdbpy_parameter_value (enum var_types type, void *var);
-char *gdbpy_parse_command_name (char *text,
+char *gdbpy_parse_command_name (const char *name,
 				struct cmd_list_element ***base_list,
 				struct cmd_list_element **start_list);
 
 PyObject *symtab_and_line_to_sal_object (struct symtab_and_line sal);
 PyObject *symtab_to_symtab_object (struct symtab *symtab);
 PyObject *symbol_to_symbol_object (struct symbol *sym);
-PyObject *block_to_block_object (struct block *block, struct objfile *objfile);
+PyObject *block_to_block_object (const struct block *block,
+				 struct objfile *objfile);
 PyObject *value_to_value_object (struct value *v);
 PyObject *type_to_type_object (struct type *);
 PyObject *frame_info_to_frame_object (struct frame_info *frame);
@@ -177,7 +181,7 @@ thread_object *find_thread_object (ptid_t ptid);
 PyObject *find_inferior_object (int pid);
 PyObject *inferior_to_inferior_object (struct inferior *inferior);
 
-struct block *block_object_to_block (PyObject *obj);
+const struct block *block_object_to_block (PyObject *obj);
 struct symbol *symbol_object_to_symbol (PyObject *obj);
 struct value *value_object_to_value (PyObject *self);
 struct value *convert_value_from_python (PyObject *obj);
@@ -211,6 +215,7 @@ void gdbpy_initialize_breakpoint_event (void);
 void gdbpy_initialize_continue_event (void);
 void gdbpy_initialize_exited_event (void);
 void gdbpy_initialize_thread_event (void);
+void gdbpy_initialize_new_objfile_event (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
 
@@ -242,7 +247,7 @@ extern const struct language_defn *python_language;
 void gdbpy_print_stack (void);
 
 void source_python_script_for_objfile (struct objfile *objfile,
-				       FILE *stream, const char *file);
+				       const char *file);
 
 PyObject *python_string_to_unicode (PyObject *obj);
 char *unicode_to_target_string (PyObject *unicode_str);

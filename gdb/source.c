@@ -245,7 +245,7 @@ select_source_symtab (struct symtab *s)
      if one exists.  */
   if (lookup_symbol (main_name (), 0, VAR_DOMAIN, 0))
     {
-      sals = decode_line_spec (main_name (), 1);
+      sals = decode_line_spec (main_name (), DECODE_LINE_FUNFIRSTLINE);
       sal = sals.sals[0];
       xfree (sals.sals);
       current_source_pspace = sal.pspace;
@@ -355,10 +355,10 @@ forget_cached_source_info_for_objfile (struct objfile *objfile)
 	  xfree (s->fullname);
 	  s->fullname = NULL;
 	}
-
-      if (objfile->sf)
-	objfile->sf->qf->forget_cached_source_info (objfile);
     }
+
+  if (objfile->sf)
+    objfile->sf->qf->forget_cached_source_info (objfile);
 }
 
 /* Forget what we learned about line positions in source files, and
@@ -369,7 +369,6 @@ void
 forget_cached_source_info (void)
 {
   struct program_space *pspace;
-  struct symtab *s;
   struct objfile *objfile;
 
   ALL_PSPACES (pspace)
@@ -1106,6 +1105,7 @@ open_source_file (struct symtab *s)
 
    If this function fails to find the file that this symtab represents,
    NULL will be returned and s->fullname will be set to NULL.  */
+
 char *
 symtab_to_fullname (struct symtab *s)
 {
@@ -1114,8 +1114,12 @@ symtab_to_fullname (struct symtab *s)
   if (!s)
     return NULL;
 
-  /* Don't check s->fullname here, the file could have been 
-     deleted/moved/..., look for it again.  */
+  /* Use cached copy if we have it.
+     We rely on forget_cached_source_info being called appropriately
+     to handle cases like the file being moved.  */
+  if (s->fullname)
+    return s->fullname;
+
   r = find_and_open_source (s->filename, s->dirname, &s->fullname);
 
   if (r >= 0)
@@ -1277,6 +1281,7 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
   FILE *stream;
   int nlines = stopline - line;
   struct cleanup *cleanup;
+  struct ui_out *uiout = current_uiout;
 
   /* Regardless of whether we can open the file, set current_source_symtab.  */
   current_source_symtab = s;
@@ -1317,10 +1322,12 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
 	  print_sys_errmsg (name, errno);
 	}
       else
-	ui_out_field_int (uiout, "line", line);
-      ui_out_text (uiout, "\tin ");
-      ui_out_field_string (uiout, "file", s->filename);
-      ui_out_text (uiout, "\n");
+	{
+	  ui_out_field_int (uiout, "line", line);
+	  ui_out_text (uiout, "\tin ");
+	  ui_out_field_string (uiout, "file", s->filename);
+	  ui_out_text (uiout, "\n");
+	}
 
       return;
     }
@@ -1408,12 +1415,14 @@ line_info (char *arg, int from_tty)
   struct symtab_and_line sal;
   CORE_ADDR start_pc, end_pc;
   int i;
+  struct cleanup *cleanups;
 
   init_sal (&sal);		/* initialize to zeroes */
 
   if (arg == 0)
     {
       sal.symtab = current_source_symtab;
+      sal.pspace = current_program_space;
       sal.line = last_line_listed;
       sals.nelts = 1;
       sals.sals = (struct symtab_and_line *)
@@ -1422,16 +1431,20 @@ line_info (char *arg, int from_tty)
     }
   else
     {
-      sals = decode_line_spec_1 (arg, 0);
+      sals = decode_line_spec_1 (arg, DECODE_LINE_LIST_MODE);
 
       dont_repeat ();
     }
+
+  cleanups = make_cleanup (xfree, sals.sals);
 
   /* C++  More than one line may have been specified, as when the user
      specifies an overloaded function name.  Print info on them all.  */
   for (i = 0; i < sals.nelts; i++)
     {
       sal = sals.sals[i];
+      if (sal.pspace != current_program_space)
+	continue;
 
       if (sal.symtab == 0)
 	{
@@ -1497,7 +1510,7 @@ line_info (char *arg, int from_tty)
 	printf_filtered (_("Line number %d is out of range for \"%s\".\n"),
 			 sal.line, sal.symtab->filename);
     }
-  xfree (sals.sals);
+  do_cleanups (cleanups);
 }
 
 /* Commands to search the source file for a regexp.  */
