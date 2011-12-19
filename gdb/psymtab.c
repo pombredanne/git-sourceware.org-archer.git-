@@ -802,8 +802,10 @@ relocate_psymtabs (struct objfile *objfile,
     {
       fixup_psymbol_section (*psym, objfile);
       if (PSYMBOL_SECTION (*psym) >= 0)
-	PSYMBOL_VALUE_ADDRESS (*psym) += ANOFFSET (delta,
-						   PSYMBOL_SECTION (*psym));
+	SET_PSYMBOL_VALUE_ADDRESS (*psym,
+				   PSYMBOL_VALUE_ADDRESS (*psym)
+				   + ANOFFSET (delta,
+					       PSYMBOL_SECTION (*psym)));
     }
   for (psym = objfile->static_psymbols.list;
        psym < objfile->static_psymbols.next;
@@ -811,8 +813,10 @@ relocate_psymtabs (struct objfile *objfile,
     {
       fixup_psymbol_section (*psym, objfile);
       if (PSYMBOL_SECTION (*psym) >= 0)
-	PSYMBOL_VALUE_ADDRESS (*psym) += ANOFFSET (delta,
-						   PSYMBOL_SECTION (*psym));
+	SET_PSYMBOL_VALUE_ADDRESS (*psym,
+				   PSYMBOL_VALUE_ADDRESS (*psym)
+				   + ANOFFSET (delta,
+					       PSYMBOL_SECTION (*psym)));
     }
 }
 
@@ -1499,7 +1503,7 @@ add_psymbol_to_bcache (const char *name, int namelength, int copy_name,
     }
   else
     {
-      PSYMBOL_VALUE_ADDRESS (&psymbol) = coreaddr;
+      SET_PSYMBOL_VALUE_ADDRESS (&psymbol, coreaddr);
     }
   PSYMBOL_SECTION (&psymbol) = 0;
   PSYMBOL_OBJ_SECTION (&psymbol) = NULL;

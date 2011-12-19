@@ -52,7 +52,10 @@ struct partial_symbol
 };
 
 #define PSYMBOL_VALUE(symbol)		(symbol)->pginfo.value.ivalue
-#define PSYMBOL_VALUE_ADDRESS(symbol)	(symbol)->pginfo.value.address
+#define PSYMBOL_VALUE_ADDRESS(symbol)	\
+  ((symbol)->pginfo.value.address + 0)
+#define SET_PSYMBOL_VALUE_ADDRESS(symbol, addr)	\
+  ((symbol)->pginfo.value.address = (addr))
 
 #define PSYMBOL_LANGUAGE(symbol)	(symbol)->pginfo.language
 #define PSYMBOL_SECTION(symbol)		(symbol)->pginfo.section
