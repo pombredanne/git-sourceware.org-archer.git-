@@ -16771,7 +16771,7 @@ write_psymbols (struct mapped_symtab *symtab,
     {
       void **slot, *lookup;
 
-      if (SYMBOL_LANGUAGE (*psymp) == language_ada)
+      if (PSYMBOL_LANGUAGE (*psymp) == language_ada)
 	error (_("Ada is not currently supported by the index"));
 
       /* We only want to add a given psymbol once.  However, we also
@@ -16791,7 +16791,7 @@ write_psymbols (struct mapped_symtab *symtab,
       if (!*slot)
 	{
 	  *slot = lookup;
-	  add_index_entry (symtab, SYMBOL_SEARCH_NAME (*psymp), cu_index);
+	  add_index_entry (symtab, PSYMBOL_SEARCH_NAME (*psymp), cu_index);
 	}
     }
 }

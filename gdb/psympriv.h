@@ -39,7 +39,7 @@ struct partial_symbol
 
   /* The general symbol info required for all types of symbols.  */
 
-  struct general_symbol_info ginfo;
+  struct general_symbol_info pginfo;
 
   /* Name space code.  */
 
@@ -50,6 +50,29 @@ struct partial_symbol
   ENUM_BITFIELD(address_class) aclass : 6;
 
 };
+
+#define PSYMBOL_VALUE(symbol)		(symbol)->pginfo.value.ivalue
+#define PSYMBOL_VALUE_ADDRESS(symbol)	(symbol)->pginfo.value.address
+
+#define PSYMBOL_LANGUAGE(symbol)	(symbol)->pginfo.language
+#define PSYMBOL_SECTION(symbol)		(symbol)->pginfo.section
+#define PSYMBOL_OBJ_SECTION(symbol)	(symbol)->pginfo.sinfo.obj_section
+
+#define PSYMBOL_NATURAL_NAME(symbol) \
+  (symbol_natural_name (&(symbol)->pginfo))
+#define PSYMBOL_LINKAGE_NAME(symbol)	(symbol)->pginfo.name
+#define PSYMBOL_DEMANGLED_NAME(symbol) \
+  (symbol_demangled_name (&(symbol)->pginfo))
+#define PSYMBOL_SET_LANGUAGE(symbol,language) \
+  (symbol_set_language (&(symbol)->pginfo, (language)))
+#define PSYMBOL_SEARCH_NAME(symbol)					 \
+   (symbol_search_name (&(symbol)->pginfo))
+#define PSYMBOL_MATCHES_SEARCH_NAME(symbol, name)			\
+  (strcmp_iw (PSYMBOL_SEARCH_NAME (symbol), (name)) == 0)
+#define PSYMBOL_SET_NAMES(symbol,linkage_name,len,copy_name,objfile)	\
+  symbol_set_names (&(symbol)->pginfo, linkage_name, len, copy_name,	\
+		    &objfile->per_bfd->storage_obstack,			\
+		    &objfile->per_bfd->demangled_names_hash)
 
 #define PSYMBOL_DOMAIN(psymbol)	(psymbol)->domain
 #define PSYMBOL_CLASS(psymbol)		(psymbol)->aclass
