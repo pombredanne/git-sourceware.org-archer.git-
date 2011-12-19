@@ -807,10 +807,6 @@ objfile_relocate1 (struct objfile *objfile,
       relocate_one_symbol (iter, objfile, delta);
   }
 
-  if (objfile->psymtabs_addrmap)
-    addrmap_relocate (objfile->psymtabs_addrmap,
-		      ANOFFSET (delta, SECT_OFF_TEXT (objfile)));
-
   if (objfile->sf)
     objfile->sf->qf->relocate (objfile, new_offsets, delta);
 

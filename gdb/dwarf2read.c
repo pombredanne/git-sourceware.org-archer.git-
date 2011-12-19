@@ -1954,7 +1954,6 @@ create_addrmap_from_index (struct objfile *objfile, struct mapped_index *index)
   struct obstack temp_obstack;
   struct addrmap *mutable_map;
   struct cleanup *cleanup;
-  CORE_ADDR baseaddr;
 
   obstack_init (&temp_obstack);
   cleanup = make_cleanup_obstack_free (&temp_obstack);
@@ -1962,8 +1961,6 @@ create_addrmap_from_index (struct objfile *objfile, struct mapped_index *index)
 
   iter = index->address_table;
   end = iter + index->address_table_size;
-
-  baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
   while (iter < end)
     {
@@ -1975,8 +1972,7 @@ create_addrmap_from_index (struct objfile *objfile, struct mapped_index *index)
       cu_index = extract_unsigned_integer (iter, 4, BFD_ENDIAN_LITTLE);
       iter += 4;
       
-      addrmap_set_empty (mutable_map, lo + baseaddr, hi + baseaddr - 1,
-			 dw2_get_cu (cu_index));
+      addrmap_set_empty (mutable_map, lo, hi - 1, dw2_get_cu (cu_index));
     }
 
   objfile->psymtabs_addrmap = addrmap_create_fixed (mutable_map,
@@ -3498,8 +3494,8 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
     /* Store the contiguous range if it is not empty; it can be empty for
        CUs with no code.  */
     addrmap_set_empty (objfile->psymtabs_addrmap,
-		       best_lowpc + baseaddr,
-		       best_highpc + baseaddr - 1, pst);
+		       best_lowpc,
+		       best_highpc - 1, pst);
 
   /* Check if comp unit has_children.
      If so, read the rest of the partial symbols from this comp unit.
@@ -4226,17 +4222,10 @@ add_partial_subprogram (struct partial_die_info *pdi,
           if (pdi->highpc > *highpc)
             *highpc = pdi->highpc;
 	  if (need_pc)
-	    {
-	      CORE_ADDR baseaddr;
-	      struct objfile *objfile = cu->objfile;
-
-	      baseaddr = ANOFFSET (objfile->section_offsets,
-				   SECT_OFF_TEXT (objfile));
-	      addrmap_set_empty (objfile->psymtabs_addrmap,
-				 pdi->lowpc + baseaddr,
-				 pdi->highpc - 1 + baseaddr,
-				 cu->per_cu->v.psymtab);
-	    }
+	    addrmap_set_empty (cu->objfile->psymtabs_addrmap,
+			       pdi->lowpc,
+			       pdi->highpc - 1,
+			       cu->per_cu->v.psymtab);
           if (!pdi->is_declaration)
 	    /* Ignore subprogram DIEs that do not have a name, they are
 	       illegal.  Do not emit a complaint at this point, we will
@@ -6428,7 +6417,6 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
   int low_set;
   CORE_ADDR low = 0;
   CORE_ADDR high = 0;
-  CORE_ADDR baseaddr;
 
   found_base = cu->base_known;
   base = cu->base_address;
@@ -6456,8 +6444,6 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
     }
 
   low_set = 0;
-
-  baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
 
   while (1)
     {
@@ -6512,8 +6498,8 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
 
       if (ranges_pst != NULL)
 	addrmap_set_empty (objfile->psymtabs_addrmap,
-			   range_beginning + baseaddr,
-			   range_end - 1 + baseaddr,
+			   range_beginning,
+			   range_end - 1,
 			   ranges_pst);
 
       /* FIXME: This is recording everything as a low-high
