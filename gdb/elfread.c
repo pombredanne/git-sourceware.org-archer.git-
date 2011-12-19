@@ -1261,87 +1261,95 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
      objfile->deprecated_sym_stab_info, which can later be used by
      elfstab_offset_sections.  */
 
-  storage_needed = bfd_get_symtab_upper_bound (objfile->obfd);
-  if (storage_needed < 0)
-    error (_("Can't read symbols from %s: %s"),
-	   bfd_get_filename (objfile->obfd),
-	   bfd_errmsg (bfd_get_error ()));
-
-  if (storage_needed > 0)
+  if ((symfile_flags & SYMFILE_MINSYMS_READ) == 0)
     {
-      symbol_table = (asymbol **) xmalloc (storage_needed);
-      make_cleanup (xfree, symbol_table);
-      symcount = bfd_canonicalize_symtab (objfile->obfd, symbol_table);
-
-      if (symcount < 0)
+      storage_needed = bfd_get_symtab_upper_bound (objfile->obfd);
+      if (storage_needed < 0)
 	error (_("Can't read symbols from %s: %s"),
 	       bfd_get_filename (objfile->obfd),
 	       bfd_errmsg (bfd_get_error ()));
 
-      elf_symtab_read (objfile, ST_REGULAR, symcount, symbol_table, 0);
-    }
+      if (storage_needed > 0)
+	{
+	  symbol_table = (asymbol **) xmalloc (storage_needed);
+	  make_cleanup (xfree, symbol_table);
+	  symcount = bfd_canonicalize_symtab (objfile->obfd, symbol_table);
 
-  /* Add the dynamic symbols.  */
+	  if (symcount < 0)
+	    error (_("Can't read symbols from %s: %s"),
+		   bfd_get_filename (objfile->obfd),
+		   bfd_errmsg (bfd_get_error ()));
 
-  storage_needed = bfd_get_dynamic_symtab_upper_bound (objfile->obfd);
+	  elf_symtab_read (objfile, ST_REGULAR, symcount, symbol_table, 0);
+	}
 
-  if (storage_needed > 0)
-    {
-      /* Memory gets permanently referenced from ABFD after
-	 bfd_get_synthetic_symtab so it must not get freed before ABFD gets.
-	 It happens only in the case when elf_slurp_reloc_table sees
-	 asection->relocation NULL.  Determining which section is asection is
-	 done by _bfd_elf_get_synthetic_symtab which is all a bfd
-	 implementation detail, though.  */
+      /* Add the dynamic symbols.  */
 
-      dyn_symbol_table = bfd_alloc (abfd, storage_needed);
-      dynsymcount = bfd_canonicalize_dynamic_symtab (objfile->obfd,
-						     dyn_symbol_table);
+      storage_needed = bfd_get_dynamic_symtab_upper_bound (objfile->obfd);
 
-      if (dynsymcount < 0)
-	error (_("Can't read symbols from %s: %s"),
-	       bfd_get_filename (objfile->obfd),
-	       bfd_errmsg (bfd_get_error ()));
+      if (storage_needed > 0)
+	{
+	  /* Memory gets permanently referenced from ABFD after
+	     bfd_get_synthetic_symtab so it must not get freed before
+	     ABFD gets.  It happens only in the case when
+	     elf_slurp_reloc_table sees asection->relocation NULL.
+	     Determining which section is asection is done by
+	     _bfd_elf_get_synthetic_symtab which is all a bfd
+	     implementation detail, though.  */
 
-      elf_symtab_read (objfile, ST_DYNAMIC, dynsymcount, dyn_symbol_table, 0);
+	  dyn_symbol_table = bfd_alloc (abfd, storage_needed);
+	  dynsymcount = bfd_canonicalize_dynamic_symtab (objfile->obfd,
+							 dyn_symbol_table);
 
-      elf_rel_plt_read (objfile, dyn_symbol_table);
-    }
+	  if (dynsymcount < 0)
+	    error (_("Can't read symbols from %s: %s"),
+		   bfd_get_filename (objfile->obfd),
+		   bfd_errmsg (bfd_get_error ()));
 
-  /* Contrary to binutils --strip-debug/--only-keep-debug the strip command from
-     elfutils (eu-strip) moves even the .symtab section into the .debug file.
+	  elf_symtab_read (objfile, ST_DYNAMIC, dynsymcount,
+			   dyn_symbol_table, 0);
 
-     bfd_get_synthetic_symtab on ppc64 for each function descriptor ELF symbol
-     'name' creates a new BSF_SYNTHETIC ELF symbol '.name' with its code
-     address.  But with eu-strip files bfd_get_synthetic_symtab would fail to
-     read the code address from .opd while it reads the .symtab section from
-     a separate debug info file as the .opd section is SHT_NOBITS there.
+	  elf_rel_plt_read (objfile, dyn_symbol_table);
+	}
 
-     With SYNTH_ABFD the .opd section will be read from the original
-     backlinked binary where it is valid.  */
+      /* Contrary to binutils --strip-debug/--only-keep-debug the
+	 strip command from elfutils (eu-strip) moves even the .symtab
+	 section into the .debug file.
 
-  if (objfile->separate_debug_objfile_backlink)
-    synth_abfd = objfile->separate_debug_objfile_backlink->obfd;
-  else
-    synth_abfd = abfd;
+	 bfd_get_synthetic_symtab on ppc64 for each function
+	 descriptor ELF symbol 'name' creates a new BSF_SYNTHETIC ELF
+	 symbol '.name' with its code address.  But with eu-strip
+	 files bfd_get_synthetic_symtab would fail to read the code
+	 address from .opd while it reads the .symtab section from a
+	 separate debug info file as the .opd section is SHT_NOBITS
+	 there.
 
-  /* Add synthetic symbols - for instance, names for any PLT entries.  */
+	 With SYNTH_ABFD the .opd section will be read from the original
+	 backlinked binary where it is valid.  */
 
-  synthcount = bfd_get_synthetic_symtab (synth_abfd, symcount, symbol_table,
-					 dynsymcount, dyn_symbol_table,
-					 &synthsyms);
-  if (synthcount > 0)
-    {
-      asymbol **synth_symbol_table;
-      long i;
+      if (objfile->separate_debug_objfile_backlink)
+	synth_abfd = objfile->separate_debug_objfile_backlink->obfd;
+      else
+	synth_abfd = abfd;
 
-      make_cleanup (xfree, synthsyms);
-      synth_symbol_table = xmalloc (sizeof (asymbol *) * synthcount);
-      for (i = 0; i < synthcount; i++)
-	synth_symbol_table[i] = synthsyms + i;
-      make_cleanup (xfree, synth_symbol_table);
-      elf_symtab_read (objfile, ST_SYNTHETIC, synthcount,
-		       synth_symbol_table, 1);
+      /* Add synthetic symbols - for instance, names for any PLT entries.  */
+
+      synthcount = bfd_get_synthetic_symtab (synth_abfd, symcount, symbol_table,
+					     dynsymcount, dyn_symbol_table,
+					     &synthsyms);
+      if (synthcount > 0)
+	{
+	  asymbol **synth_symbol_table;
+	  long i;
+
+	  make_cleanup (xfree, synthsyms);
+	  synth_symbol_table = xmalloc (sizeof (asymbol *) * synthcount);
+	  for (i = 0; i < synthcount; i++)
+	    synth_symbol_table[i] = synthsyms + i;
+	  make_cleanup (xfree, synth_symbol_table);
+	  elf_symtab_read (objfile, ST_SYNTHETIC, synthcount,
+			   synth_symbol_table, 1);
+	}
     }
 
   /* Install any minimal symbols that have been collected as the current
