@@ -57,7 +57,6 @@ PYTHON_FILES = \
 	gdb/__init__.py \
 	gdb/backtrace.py \
 	gdb/command/__init__.py \
-	gdb/command/alias.py \
 	gdb/command/backtrace.py \
 	gdb/command/ignore_errors.py \
 	gdb/command/pahole.py \
