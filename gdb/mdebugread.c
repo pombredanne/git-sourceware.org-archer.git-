@@ -1,8 +1,7 @@
 /* Read a symbol table in ECOFF format (Third-Eye).
 
-   Copyright (C) 1986, 1987, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-1987, 1989-2004, 2007-2012 Free Software
+   Foundation, Inc.
 
    Original version contributed by Alessandro Forin (af@cs.cmu.edu) at
    CMU.  Major work by Per Bothner, John Gilmore and Ian Lance Taylor
@@ -4714,7 +4713,7 @@ sort_blocks (struct symtab *s)
 {
   struct blockvector *bv = BLOCKVECTOR (s);
 
-  if (BLOCKVECTOR_NBLOCKS (bv) <= 2)
+  if (BLOCKVECTOR_NBLOCKS (bv) <= FIRST_LOCAL_BLOCK)
     {
       /* Cosmetic */
       if (BLOCK_END (BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK)) == 0)
@@ -4729,7 +4728,7 @@ sort_blocks (struct symtab *s)
    * are very different.  It would be nice to find a reliable test
    * to detect -O3 images in advance.
    */
-  if (BLOCKVECTOR_NBLOCKS (bv) > 3)
+  if (BLOCKVECTOR_NBLOCKS (bv) > FIRST_LOCAL_BLOCK + 1)
     qsort (&BLOCKVECTOR_BLOCK (bv, FIRST_LOCAL_BLOCK),
 	   BLOCKVECTOR_NBLOCKS (bv) - FIRST_LOCAL_BLOCK,
 	   sizeof (struct block *),

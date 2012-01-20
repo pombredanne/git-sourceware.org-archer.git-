@@ -1,7 +1,7 @@
-/* Ada language support routines for GDB, the GNU debugger.  Copyright (C)
+/* Ada language support routines for GDB, the GNU debugger.
 
-   1992, 1993, 1994, 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2007, 2008,
-   2009 Free Software Foundation, Inc.
+   Copyright (C) 1992-1994, 1997-2000, 2003-2005, 2007-2012 Free
+   Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -63,6 +63,7 @@
 #include "mi/mi-common.h"
 #include "arch-utils.h"
 #include "exceptions.h"
+#include "cli/cli-utils.h"
 
 /* Define whether or not the C operator '/' truncates towards zero for
    differently signed operands (truncation direction is undefined in C).
@@ -3611,8 +3612,7 @@ get_selections (int *choices, int n_choices, int max_results,
       char *args2;
       int choice, j;
 
-      while (isspace (*args))
-        args += 1;
+      args = skip_spaces (args);
       if (*args == '\0' && n_chosen == 0)
         error_no_arg (_("one or more choice numbers"));
       else if (*args == '\0')
@@ -10943,7 +10943,7 @@ static CORE_ADDR
 ada_exception_name_addr (enum exception_catchpoint_kind ex,
                          struct breakpoint *b)
 {
-  struct gdb_exception e;
+  volatile struct gdb_exception e;
   CORE_ADDR result = 0;
 
   TRY_CATCH (e, RETURN_MASK_ERROR)
@@ -11538,19 +11538,13 @@ ada_get_next_arg (char **argsp)
   char *end;
   char *result;
 
-  /* Skip any leading white space.  */
-
-  while (isspace (*args))
-    args++;
-
+  args = skip_spaces (args);
   if (args[0] == '\0')
     return NULL; /* No more arguments.  */
   
   /* Find the end of the current argument.  */
 
-  end = args;
-  while (*end != '\0' && !isspace (*end))
-    end++;
+  end = skip_to_space (args);
 
   /* Adjust ARGSP to point to the start of the next argument.  */
 
@@ -11584,8 +11578,7 @@ catch_ada_exception_command_split (char *args,
   /* Check that we do not have any more arguments.  Anything else
      is unexpected.  */
 
-  while (isspace (*args))
-    args++;
+  args = skip_spaces (args);
 
   if (args[0] != '\0')
     error (_("Junk at end of expression"));
@@ -11818,8 +11811,7 @@ ada_decode_assert_location (char *args, char **addr_string,
 
   if (args != NULL)
     {
-      while (isspace (*args))
-        args++;
+      args = skip_spaces (args);
       if (*args != '\0')
         error (_("Junk at end of arguments."));
     }

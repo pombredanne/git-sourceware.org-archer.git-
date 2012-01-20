@@ -1,9 +1,8 @@
 /* Variables that describe the inferior process running under GDB:
    Where it is, why it stopped, and how to step it.
 
-   Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1998, 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 1986, 1988-1996, 1998-2001, 2003-2012 Free Software
+   Foundation, Inc.
 
    This file is part of GDB.
 
@@ -154,8 +153,6 @@ extern void prepare_for_detach (void);
 extern void fetch_inferior_event (void *);
 
 extern void init_wait_for_inferior (void);
-
-extern void close_exec_file (void);
 
 extern void reopen_exec_file (void);
 
@@ -424,6 +421,8 @@ struct inferior
   /* Actual target inferior id, usually, a process id.  This matches
      the ptid_t.pid member of threads of this inferior.  */
   int pid;
+  /* True if the PID was actually faked by GDB.  */
+  int fake_pid_p;
 
   /* State of GDB control of inferior process execution.
      See `struct inferior_control_state'.  */

@@ -1,8 +1,6 @@
 /* Parser for linespec for the GNU debugger, GDB.
 
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008,
-   2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-2005, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -896,30 +894,42 @@ decode_line_internal (struct linespec_state *self, char **argptr)
   first_half = p = locate_first_half (argptr, &is_quote_enclosed);
 
   /* First things first: if ARGPTR starts with a filename, get its
-     symtab and strip the filename from ARGPTR.  */
-  TRY_CATCH (file_exception, RETURN_MASK_ERROR)
-    {
-      self->file_symtabs = symtabs_from_filename (argptr, p, is_quote_enclosed,
-						  &self->user_filename);
-    }
+     symtab and strip the filename from ARGPTR.
+     Avoid calling symtab_from_filename if we know can,
+     it can be expensive.  */
 
-  if (VEC_empty (symtab_p, self->file_symtabs))
+  if (*p != '\0')
+    {
+      TRY_CATCH (file_exception, RETURN_MASK_ERROR)
+	{
+	  self->file_symtabs = symtabs_from_filename (argptr, p,
+						      is_quote_enclosed,
+						      &self->user_filename);
+	}
+
+      if (file_exception.reason >= 0)
+	{
+	  /* Check for single quotes on the non-filename part.  */
+	  is_quoted = (**argptr
+		       && strchr (get_gdb_completer_quote_characters (),
+				  **argptr) != NULL);
+	  if (is_quoted)
+	    end_quote = skip_quoted (*argptr);
+
+	  /* Locate the next "half" of the linespec.  */
+	  first_half = p = locate_first_half (argptr, &is_quote_enclosed);
+	}
+
+      if (VEC_empty (symtab_p, self->file_symtabs))
+	{
+	  /* A NULL entry means to use GLOBAL_DEFAULT_SYMTAB.  */
+	  VEC_safe_push (symtab_p, self->file_symtabs, NULL);
+	}
+    }
+  else
     {
       /* A NULL entry means to use GLOBAL_DEFAULT_SYMTAB.  */
       VEC_safe_push (symtab_p, self->file_symtabs, NULL);
-    }
-
-  if (file_exception.reason >= 0)
-    {
-      /* Check for single quotes on the non-filename part.  */
-      is_quoted = (**argptr
-		   && strchr (get_gdb_completer_quote_characters (),
-			      **argptr) != NULL);
-      if (is_quoted)
-	end_quote = skip_quoted (*argptr);
-
-      /* Locate the next "half" of the linespec.  */
-      first_half = p = locate_first_half (argptr, &is_quote_enclosed);
     }
 
   /* Check if this is an Objective-C method (anything that starts with
@@ -953,33 +963,44 @@ decode_line_internal (struct linespec_state *self, char **argptr)
 	
       if (p[0] == '.' || p[1] == ':')
 	{
-	  struct symtabs_and_lines values;
-	  volatile struct gdb_exception ex;
-	  char *saved_argptr = *argptr;
-
-	  if (is_quote_enclosed)
-	    ++saved_arg;
-
-	  /* Initialize it just to avoid a GCC false warning.  */
-	  memset (&values, 0, sizeof (values));
-
-	  TRY_CATCH (ex, RETURN_MASK_ERROR)
+	 /* We only perform this check for the languages where it might
+	    make sense.  For instance, Ada does not use this type of
+	    syntax, and trying to apply this logic on an Ada linespec
+	    may trigger a spurious error (for instance, decode_compound
+	    does not like expressions such as `ops."<"', which is a
+	    valid function name in Ada).  */
+	  if (current_language->la_language == language_c
+	      || current_language->la_language == language_cplus
+	      || current_language->la_language == language_java)
 	    {
-	      values = decode_compound (self, argptr, saved_arg, p);
+	      struct symtabs_and_lines values;
+	      volatile struct gdb_exception ex;
+	      char *saved_argptr = *argptr;
+
+	      if (is_quote_enclosed)
+		++saved_arg;
+
+	      /* Initialize it just to avoid a GCC false warning.  */
+	      memset (&values, 0, sizeof (values));
+
+	      TRY_CATCH (ex, RETURN_MASK_ERROR)
+		{
+		  values = decode_compound (self, argptr, saved_arg, p);
+		}
+	      if ((is_quoted || is_squote_enclosed) && **argptr == '\'')
+		*argptr = *argptr + 1;
+
+	      if (ex.reason >= 0)
+		{
+		  do_cleanups (cleanup);
+		  return values;
+		}
+
+	      if (ex.error != NOT_FOUND_ERROR)
+		throw_exception (ex);
+
+	      *argptr = saved_argptr;
 	    }
-	  if ((is_quoted || is_squote_enclosed) && **argptr == '\'')
-	    *argptr = *argptr + 1;
-
-	  if (ex.reason >= 0)
-	    {
-	      do_cleanups (cleanup);
-	      return values;
-	    }
-
-	  if (ex.error != NOT_FOUND_ERROR)
-	    throw_exception (ex);
-
-	  *argptr = saved_argptr;
 	}
       else
 	{
@@ -2801,7 +2822,17 @@ add_minsym (struct minimal_symbol *minsym, void *d)
 	case mst_abs:
 	case mst_file_data:
 	case mst_file_bss:
-	return;
+	  {
+	    /* Make sure this minsym is not a function descriptor
+	       before we decide to discard it.  */
+	    struct gdbarch *gdbarch = info->objfile->gdbarch;
+	    CORE_ADDR addr = gdbarch_convert_from_func_ptr_addr
+			       (gdbarch, SYMBOL_VALUE_ADDRESS (minsym),
+				&current_target);
+
+	    if (addr == SYMBOL_VALUE_ADDRESS (minsym))
+	      return;
+	  }
       }
 
   mo.minsym = minsym;

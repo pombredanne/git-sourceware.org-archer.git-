@@ -1,5 +1,6 @@
 /* Mach-O support for BFD.
-   Copyright 1999, 2000, 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2011
+   Copyright 1999, 2000, 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2011,
+   2012
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -41,6 +42,18 @@ typedef struct bfd_mach_o_header
 }
 bfd_mach_o_header;
 
+typedef struct bfd_mach_o_asymbol
+{
+  /* The actual symbol which the rest of BFD works with.  */
+  asymbol symbol;
+
+  /* Mach-O symbol fields.  */
+  unsigned char n_type;
+  unsigned char n_sect;
+  unsigned short n_desc;
+}
+bfd_mach_o_asymbol;
+
 #define BFD_MACH_O_SEGNAME_SIZE 16
 #define BFD_MACH_O_SECTNAME_SIZE 16
 
@@ -62,6 +75,12 @@ typedef struct bfd_mach_o_section
 
   /* Corresponding bfd section.  */
   asection *bfdsection;
+
+  /* An array holding the indirect symbols for this section.
+     NULL values indicate local symbols.
+     The number of symbols is determined from the section size and type.  */
+
+  bfd_mach_o_asymbol **indirect_syms;
 
   /* Simply linked list.  */
   struct bfd_mach_o_section *next;
@@ -104,17 +123,14 @@ typedef struct bfd_mach_o_reloc_info
 }
 bfd_mach_o_reloc_info;
 
-typedef struct bfd_mach_o_asymbol
-{
-  /* The actual symbol which the rest of BFD works with.  */
-  asymbol symbol;
-
-  /* Fields from Mach-O symbol.  */
-  unsigned char n_type;
-  unsigned char n_sect;
-  unsigned short n_desc;
-}
-bfd_mach_o_asymbol;
+/* The symbol table is sorted like this:
+ (1) local.
+	(otherwise in order of generation)
+ (2) external defined
+	(sorted by name)
+ (3) external undefined / common
+	(sorted by name)
+*/
 
 typedef struct bfd_mach_o_symtab_command
 {
@@ -438,6 +454,16 @@ typedef struct bfd_mach_o_str_command
 }
 bfd_mach_o_str_command;
 
+typedef struct bfd_mach_o_fvmlib_command
+{
+  unsigned int name_offset;
+  unsigned int name_len;
+  char *name_str;
+  unsigned int minor_version;
+  unsigned int header_addr;
+}
+bfd_mach_o_fvmlib_command;
+
 typedef struct bfd_mach_o_dyld_info_command
 {
   /* File offset and size to rebase info.  */
@@ -471,6 +497,14 @@ typedef struct bfd_mach_o_version_min_command
 }
 bfd_mach_o_version_min_command;
 
+typedef struct bfd_mach_o_encryption_info_command
+{
+  unsigned int cryptoff;
+  unsigned int cryptsize;
+  unsigned int cryptid;
+}
+bfd_mach_o_encryption_info_command;
+
 typedef struct bfd_mach_o_load_command
 {
   bfd_mach_o_load_command_type type;
@@ -491,6 +525,8 @@ typedef struct bfd_mach_o_load_command
     bfd_mach_o_str_command str;
     bfd_mach_o_dyld_info_command dyld_info;
     bfd_mach_o_version_min_command version_min;
+    bfd_mach_o_encryption_info_command encryption_info;
+    bfd_mach_o_fvmlib_command fvmlib;
   }
   command;
 }
@@ -507,7 +543,7 @@ typedef struct mach_o_data_struct
   unsigned long nsects;
   bfd_mach_o_section **sections;
 
-  /* Used while writting: current length of the output file.  This is used
+  /* Used while writing: current length of the output file.  This is used
      to allocate space in the file.  */
   ufile_ptr filelen;
 
@@ -519,6 +555,9 @@ typedef struct mach_o_data_struct
 
   /* A place to stash dwarf2 info for this bfd.  */
   void *dwarf2_find_line_info;
+
+  /* BFD of .dSYM file. */
+  bfd *dsym_bfd;
 
   /* Cache of dynamic relocs. */
   arelent *dyn_reloc_cache;
@@ -600,6 +639,10 @@ unsigned int bfd_mach_o_section_get_entry_size (bfd *, bfd_mach_o_section *);
 bfd_boolean bfd_mach_o_read_symtab_symbols (bfd *);
 bfd_boolean bfd_mach_o_read_symtab_strtab (bfd *abfd);
 
+/* A placeholder in case we need to suppress emitting the dysymtab for some
+   reason (e.g. compatibility with older system versions).  */
+#define bfd_mach_o_should_emit_dysymtab(x) TRUE
+
 extern const bfd_mach_o_xlat_name bfd_mach_o_section_attribute_name[];
 extern const bfd_mach_o_xlat_name bfd_mach_o_section_type_name[];
 
@@ -639,5 +682,11 @@ typedef struct bfd_mach_o_backend_data
   bfd_boolean (*bfd_mach_o_section_type_valid_for_target) (unsigned long);
 }
 bfd_mach_o_backend_data;
+
+/* Values used in symbol.udata.i, to signal that the mach-o-specific data in the
+   symbol are not yet set, or need validation (where this is possible).  */
+
+#define SYM_MACHO_FIELDS_UNSET ((bfd_vma) -1)
+#define SYM_MACHO_FIELDS_NOT_VALIDATED ((bfd_vma) -2)
 
 #endif /* _BFD_MACH_O_H_ */

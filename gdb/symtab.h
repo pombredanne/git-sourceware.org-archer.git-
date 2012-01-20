@@ -1,8 +1,7 @@
 /* Symbol table definitions for GDB.
 
-   Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 1986, 1988-2004, 2007-2012 Free Software Foundation,
+   Inc.
 
    This file is part of GDB.
 
@@ -1239,6 +1238,10 @@ void fixup_section (struct general_symbol_info *ginfo,
 struct objfile *lookup_objfile_from_block (const struct block *block);
 
 extern int basenames_may_differ;
+
+int compare_filenames_for_search (const char *filename,
+				  const char *search_name,
+				  int search_len);
 
 int iterate_over_some_symtabs (const char *name,
 			       const char *full_path,

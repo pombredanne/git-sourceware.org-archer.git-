@@ -1,8 +1,6 @@
 /* Interface between GDB and target environments, including files and processes
 
-   Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1990-2012 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by John Gilmore.
 
@@ -683,6 +681,43 @@ struct target_ops
     struct address_space *(*to_thread_address_space) (struct target_ops *,
 						      ptid_t);
 
+    /* Target file operations.  */
+
+    /* Open FILENAME on the target, using FLAGS and MODE.  Return a
+       target file descriptor, or -1 if an error occurs (and set
+       *TARGET_ERRNO).  */
+    int (*to_fileio_open) (const char *filename, int flags, int mode,
+			   int *target_errno);
+
+    /* Write up to LEN bytes from WRITE_BUF to FD on the target.
+       Return the number of bytes written, or -1 if an error occurs
+       (and set *TARGET_ERRNO).  */
+    int (*to_fileio_pwrite) (int fd, const gdb_byte *write_buf, int len,
+			     ULONGEST offset, int *target_errno);
+
+    /* Read up to LEN bytes FD on the target into READ_BUF.
+       Return the number of bytes read, or -1 if an error occurs
+       (and set *TARGET_ERRNO).  */
+    int (*to_fileio_pread) (int fd, gdb_byte *read_buf, int len,
+			    ULONGEST offset, int *target_errno);
+
+    /* Close FD on the target.  Return 0, or -1 if an error occurs
+       (and set *TARGET_ERRNO).  */
+    int (*to_fileio_close) (int fd, int *target_errno);
+
+    /* Unlink FILENAME on the target.  Return 0, or -1 if an error
+       occurs (and set *TARGET_ERRNO).  */
+    int (*to_fileio_unlink) (const char *filename, int *target_errno);
+
+    /* Read value of symbolic link FILENAME on the target.  Return a
+       null-terminated string allocated via xmalloc, or NULL if an error
+       occurs (and set *TARGET_ERRNO).  */
+    char *(*to_fileio_readlink) (const char *filename, int *target_errno);
+
+
+    /* Implement the "info proc" command.  */
+    void (*to_info_proc) (struct target_ops *, char *, enum info_proc_what);
+
     /* Tracepoint-related operations.  */
 
     /* Prepare the target for a tracing run.  */
@@ -822,10 +857,10 @@ extern struct target_ops current_target;
    longer going to be calling.  QUITTING indicates that GDB is exiting
    and should not get hung on an error (otherwise it is important to
    perform clean termination, even if it takes a while).  This routine
-   is automatically always called when popping the target off the
-   target stack (to_beneath is undefined).  Closing file descriptors
-   and freeing all memory allocated memory are typical things it
-   should do.  */
+   is automatically always called after popping the target off the
+   target stack - the target's own methods are no longer available
+   through the target vector.  Closing file descriptors and freeing all
+   memory allocated memory are typical things it should do.  */
 
 void target_close (struct target_ops *targ, int quitting);
 
@@ -909,6 +944,10 @@ extern void target_store_registers (struct regcache *regcache, int regs);
 /* Determine current address space of thread PTID.  */
 
 struct address_space *target_thread_address_space (ptid_t);
+
+/* Implement the "info proc" command.  */
+
+void target_info_proc (char *, enum info_proc_what);
 
 /* Returns true if this target can debug multiple processes
    simultaneously.  */
@@ -1490,6 +1529,59 @@ extern int target_search_memory (CORE_ADDR start_addr,
                                  const gdb_byte *pattern,
                                  ULONGEST pattern_len,
                                  CORE_ADDR *found_addrp);
+
+/* Target file operations.  */
+
+/* Open FILENAME on the target, using FLAGS and MODE.  Return a
+   target file descriptor, or -1 if an error occurs (and set
+   *TARGET_ERRNO).  */
+extern int target_fileio_open (const char *filename, int flags, int mode,
+			       int *target_errno);
+
+/* Write up to LEN bytes from WRITE_BUF to FD on the target.
+   Return the number of bytes written, or -1 if an error occurs
+   (and set *TARGET_ERRNO).  */
+extern int target_fileio_pwrite (int fd, const gdb_byte *write_buf, int len,
+				 ULONGEST offset, int *target_errno);
+
+/* Read up to LEN bytes FD on the target into READ_BUF.
+   Return the number of bytes read, or -1 if an error occurs
+   (and set *TARGET_ERRNO).  */
+extern int target_fileio_pread (int fd, gdb_byte *read_buf, int len,
+				ULONGEST offset, int *target_errno);
+
+/* Close FD on the target.  Return 0, or -1 if an error occurs
+   (and set *TARGET_ERRNO).  */
+extern int target_fileio_close (int fd, int *target_errno);
+
+/* Unlink FILENAME on the target.  Return 0, or -1 if an error
+   occurs (and set *TARGET_ERRNO).  */
+extern int target_fileio_unlink (const char *filename, int *target_errno);
+
+/* Read value of symbolic link FILENAME on the target.  Return a
+   null-terminated string allocated via xmalloc, or NULL if an error
+   occurs (and set *TARGET_ERRNO).  */
+extern char *target_fileio_readlink (const char *filename, int *target_errno);
+
+/* Read target file FILENAME.  The return value will be -1 if the transfer
+   fails or is not supported; 0 if the object is empty; or the length
+   of the object otherwise.  If a positive value is returned, a
+   sufficiently large buffer will be allocated using xmalloc and
+   returned in *BUF_P containing the contents of the object.
+
+   This method should be used for objects sufficiently small to store
+   in a single xmalloc'd buffer, when no fixed bound on the object's
+   size is known in advance.  */
+extern LONGEST target_fileio_read_alloc (const char *filename,
+					 gdb_byte **buf_p);
+
+/* Read target file FILENAME.  The result is NUL-terminated and
+   returned as a string, allocated using xmalloc.  If an error occurs
+   or the transfer is unsupported, NULL is returned.  Empty objects
+   are returned as allocated but empty strings.  A warning is issued
+   if the result contains any embedded NUL bytes.  */
+extern char *target_fileio_read_stralloc (const char *filename);
+
 
 /* Tracepoint-related operations.  */
 

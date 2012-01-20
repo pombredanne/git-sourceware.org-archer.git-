@@ -1,7 +1,7 @@
 /* Java language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 1997, 1998, 1999, 2000, 2003, 2004, 2005, 2007, 2008, 2009,
-   2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1997-2000, 2003-2005, 2007-2012 Free Software
+   Foundation, Inc.
 
    This file is part of GDB.
 
@@ -501,7 +501,6 @@ java_link_class_type (struct gdbarch *gdbarch,
   temp = clas;
   nmethods = value_as_long (value_struct_elt (&temp, NULL, "method_count",
 					      NULL, "structure"));
-  TYPE_NFN_FIELDS_TOTAL (type) = nmethods;
   j = nmethods * sizeof (struct fn_field);
   fn_fields = (struct fn_field *)
     obstack_alloc (&objfile->objfile_obstack, j);

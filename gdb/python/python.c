@@ -1,6 +1,6 @@
 /* General python/gdb code
 
-   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 2008-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1366,6 +1366,9 @@ def GdbSetPythonDirectory (dir):\n\
 GdbSetPythonDirectory (gdb.PYTHONDIR)\n\
 # Default prompt hook does nothing.\n\
 prompt_hook = None\n\
+# Ensure that sys.argv is set to something.\n\
+# We do not use PySys_SetArgvEx because it did not appear until 2.6.6.\n\
+sys.argv = ['']\n\
 ");
 
   do_cleanups (cleanup);

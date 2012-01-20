@@ -1,7 +1,6 @@
 /* MI Interpreter Definitions and Commands for GDB, the GNU debugger.
 
-   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2002-2005, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -492,7 +491,7 @@ mi_breakpoint_created (struct breakpoint *b)
 {
   struct mi_interp *mi = top_level_interpreter_data ();
   struct ui_out *mi_uiout = interp_ui_out (top_level_interpreter ());
-  struct gdb_exception e;
+  volatile struct gdb_exception e;
 
   if (mi_suppress_breakpoint_notifications)
     return;
@@ -544,7 +543,7 @@ mi_breakpoint_modified (struct breakpoint *b)
 {
   struct mi_interp *mi = top_level_interpreter_data ();
   struct ui_out *mi_uiout = interp_ui_out (top_level_interpreter ());
-  struct gdb_exception e;
+  volatile struct gdb_exception e;
 
   if (mi_suppress_breakpoint_notifications)
     return;

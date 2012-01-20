@@ -1,8 +1,6 @@
 /* DWARF 2 debugging format support for GDB.
 
-   Copyright (C) 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-                 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-                 Free Software Foundation, Inc.
+   Copyright (C) 1994-2012 Free Software Foundation, Inc.
 
    Adapted by Gary Funck (gary@intrepid.com), Intrepid Technology,
    Inc.  with support from Florida State University (under contract
@@ -25,6 +23,10 @@
 
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+
+/* FIXME: Various die-reading functions need to be more careful with
+   reading off the end of the section.
+   E.g., load_partial_dies, read_partial_die.  */
 
 #include "defs.h"
 #include "bfd.h"
@@ -76,46 +78,6 @@
 
 typedef struct symbol *symbolp;
 DEF_VEC_P (symbolp);
-
-#if 0
-/* .debug_info header for a compilation unit
-   Because of alignment constraints, this structure has padding and cannot
-   be mapped directly onto the beginning of the .debug_info section.  */
-typedef struct comp_unit_header
-  {
-    unsigned int length;	/* length of the .debug_info
-				   contribution */
-    unsigned short version;	/* version number -- 2 for DWARF
-				   version 2 */
-    unsigned int abbrev_offset;	/* offset into .debug_abbrev section */
-    unsigned char addr_size;	/* byte size of an address -- 4 */
-  }
-_COMP_UNIT_HEADER;
-#define _ACTUAL_COMP_UNIT_HEADER_SIZE 11
-#endif
-
-/* .debug_line statement program prologue
-   Because of alignment constraints, this structure has padding and cannot
-   be mapped directly onto the beginning of the .debug_info section.  */
-typedef struct statement_prologue
-  {
-    unsigned int total_length;	/* byte length of the statement
-				   information */
-    unsigned short version;	/* version number -- 2 for DWARF
-				   version 2 */
-    unsigned int prologue_length;	/* # bytes between prologue &
-					   stmt program */
-    unsigned char minimum_instruction_length;	/* byte size of
-						   smallest instr */
-    unsigned char default_is_stmt;	/* initial value of is_stmt
-					   register */
-    char line_base;
-    unsigned char line_range;
-    unsigned char opcode_base;	/* number assigned to first special
-				   opcode */
-    unsigned char *standard_opcode_lengths;
-  }
-_STATEMENT_PROLOGUE;
 
 /* When non-zero, dump DIEs after they are read in.  */
 static int dwarf2_die_debug = 0;
@@ -203,7 +165,7 @@ struct dwarf2_per_objfile
   /* Back link.  */
   struct objfile *objfile;
 
-  /* A list of all the compilation units.  This is used to locate
+  /* Table of all the compilation units.  This is used to locate
      the target compilation unit of a particular reference.  */
   struct dwarf2_per_cu_data **all_comp_units;
 
@@ -211,10 +173,10 @@ struct dwarf2_per_objfile
   int n_comp_units;
 
   /* The number of .debug_types-related CUs.  */
-  int n_type_comp_units;
+  int n_type_units;
 
-  /* The .debug_types-related CUs.  */
-  struct dwarf2_per_cu_data **type_comp_units;
+  /* The .debug_types-related CUs (TUs).  */
+  struct dwarf2_per_cu_data **all_type_units;
 
   /* A chain of compilation units that are currently read in, so that
      they can be freed later.  */
@@ -435,9 +397,7 @@ struct dwarf2_cu
 
 /* Persistent data held for a compilation unit, even when not
    processing it.  We put a pointer to this structure in the
-   read_symtab_private field of the psymtab.  If we encounter
-   inter-compilation-unit references, we also maintain a sorted
-   list of all compilation units.  */
+   read_symtab_private field of the psymtab.  */
 
 struct dwarf2_per_cu_data
 {
@@ -928,7 +888,7 @@ static void dwarf2_psymtab_to_symtab (struct partial_symtab *);
 
 static void psymtab_to_symtab_1 (struct partial_symtab *);
 
-static void dwarf2_read_abbrevs (bfd *abfd, struct dwarf2_cu *cu);
+static void dwarf2_read_abbrevs (struct dwarf2_cu *cu);
 
 static void dwarf2_free_abbrev_table (void *);
 
@@ -1026,8 +986,9 @@ static struct line_header *(dwarf_decode_line_header
                             (unsigned int offset,
                              bfd *abfd, struct dwarf2_cu *cu));
 
-static void dwarf_decode_lines (struct line_header *, const char *, bfd *,
-				struct dwarf2_cu *, struct partial_symtab *);
+static void dwarf_decode_lines (struct line_header *, const char *,
+				struct dwarf2_cu *, struct partial_symtab *,
+				int);
 
 static void dwarf2_start_subfile (char *, const char *, const char *);
 
@@ -1221,9 +1182,7 @@ static struct signatured_type *lookup_signatured_type_at_offset
      struct dwarf2_section_info *section,
      unsigned int offset);
 
-static void read_signatured_type_at_offset (struct objfile *objfile,
-					    struct dwarf2_section_info *sect,
-					    unsigned int offset);
+static void load_full_type_unit (struct dwarf2_per_cu_data *per_cu);
 
 static void read_signatured_type (struct signatured_type *type_sig);
 
@@ -1270,11 +1229,8 @@ static int partial_die_eq (const void *item_lhs, const void *item_rhs);
 static struct dwarf2_per_cu_data *dwarf2_find_containing_comp_unit
   (unsigned int offset, struct objfile *objfile);
 
-static struct dwarf2_per_cu_data *dwarf2_find_comp_unit
-  (unsigned int offset, struct objfile *objfile);
-
 static void init_one_comp_unit (struct dwarf2_cu *cu,
-				struct objfile *objfile);
+				struct dwarf2_per_cu_data *per_cu);
 
 static void prepare_one_comp_unit (struct dwarf2_cu *cu,
 				   struct die_info *comp_unit_die);
@@ -1329,12 +1285,10 @@ static void find_file_and_directory (struct die_info *die,
 static char *file_full_name (int file, struct line_header *lh,
 			     const char *comp_dir);
 
-static gdb_byte *partial_read_comp_unit_head (struct comp_unit_head *header,
-					      gdb_byte *info_ptr,
-					      gdb_byte *buffer,
-					      unsigned int buffer_size,
-					      bfd *abfd,
-					      int is_debug_types_section);
+static gdb_byte *read_and_check_comp_unit_head
+  (struct comp_unit_head *header,
+   struct dwarf2_section_info *section, gdb_byte *info_ptr,
+   int is_debug_types_section);
 
 static void init_cu_die_reader (struct die_reader_specs *reader,
 				struct dwarf2_cu *cu);
@@ -1833,9 +1787,7 @@ static void
 load_cu (struct dwarf2_per_cu_data *per_cu)
 {
   if (per_cu->debug_types_section)
-    read_signatured_type_at_offset (per_cu->objfile,
-				    per_cu->debug_types_section,
-				    per_cu->offset);
+    load_full_type_unit (per_cu);
   else
     load_full_comp_unit (per_cu);
 
@@ -1891,7 +1843,7 @@ dw2_get_cu (int index)
   if (index >= dwarf2_per_objfile->n_comp_units)
     {
       index -= dwarf2_per_objfile->n_comp_units;
-      return dwarf2_per_objfile->type_comp_units[index];
+      return dwarf2_per_objfile->all_type_units[index];
     }
   return dwarf2_per_objfile->all_comp_units[index];
 }
@@ -1969,10 +1921,10 @@ create_signatured_type_table_from_index (struct objfile *objfile,
   offset_type i;
   htab_t sig_types_hash;
 
-  dwarf2_per_objfile->n_type_comp_units = elements / 3;
-  dwarf2_per_objfile->type_comp_units
+  dwarf2_per_objfile->n_type_units = elements / 3;
+  dwarf2_per_objfile->all_type_units
     = obstack_alloc (&objfile->objfile_obstack,
-		     dwarf2_per_objfile->n_type_comp_units
+		     dwarf2_per_objfile->n_type_units
 		     * sizeof (struct dwarf2_per_cu_data *));
 
   sig_types_hash = allocate_signatured_type_table (objfile);
@@ -2003,7 +1955,7 @@ create_signatured_type_table_from_index (struct objfile *objfile,
       slot = htab_find_slot (sig_types_hash, type_sig, INSERT);
       *slot = type_sig;
 
-      dwarf2_per_objfile->type_comp_units[i / 3] = &type_sig->per_cu;
+      dwarf2_per_objfile->all_type_units[i / 3] = &type_sig->per_cu;
     }
 
   dwarf2_per_objfile->signatured_types = sig_types_hash;
@@ -2272,10 +2224,10 @@ dw2_get_file_names (struct objfile *objfile,
   struct cleanup *cleanups;
   struct die_info *comp_unit_die;
   struct dwarf2_section_info* sec;
-  gdb_byte *info_ptr, *buffer;
+  gdb_byte *info_ptr;
   int has_children, i;
   struct dwarf2_cu cu;
-  unsigned int bytes_read, buffer_size;
+  unsigned int bytes_read;
   struct die_reader_specs reader_specs;
   char *name, *comp_dir;
   void **slot;
@@ -2288,7 +2240,7 @@ dw2_get_file_names (struct objfile *objfile,
   if (this_cu->v.quick->no_file_data)
     return NULL;
 
-  init_one_comp_unit (&cu, objfile);
+  init_one_comp_unit (&cu, this_cu);
   cleanups = make_cleanup (free_stack_comp_unit, &cu);
 
   if (this_cu->debug_types_section)
@@ -2296,27 +2248,20 @@ dw2_get_file_names (struct objfile *objfile,
   else
     sec = &dwarf2_per_objfile->info;
   dwarf2_read_section (objfile, sec);
-  buffer_size = sec->size;
-  buffer = sec->buffer;
-  info_ptr = buffer + this_cu->offset;
+  info_ptr = sec->buffer + this_cu->offset;
 
-  info_ptr = partial_read_comp_unit_head (&cu.header, info_ptr,
-					  buffer, buffer_size,
-					  abfd,
-					  this_cu->debug_types_section != NULL);
+  info_ptr = read_and_check_comp_unit_head (&cu.header, sec, info_ptr,
+					    this_cu->debug_types_section != NULL);
 
   /* Skip dummy compilation units.  */
-  if (info_ptr >= buffer + buffer_size
+  if (info_ptr >= (sec->buffer + sec->size)
       || peek_abbrev_code (abfd, info_ptr) == 0)
     {
       do_cleanups (cleanups);
       return NULL;
     }
 
-  this_cu->cu = &cu;
-  cu.per_cu = this_cu;
-
-  dwarf2_read_abbrevs (abfd, &cu);
+  dwarf2_read_abbrevs (&cu);
   make_cleanup (dwarf2_free_abbrev_table, &cu);
 
   init_cu_die_reader (&reader_specs, &cu);
@@ -2467,13 +2412,13 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 {
   int i;
   const char *name_basename = lbasename (name);
-  int check_basename = name_basename == name;
-  struct dwarf2_per_cu_data *base_cu = NULL;
+  int name_len = strlen (name);
+  int is_abs = IS_ABSOLUTE_PATH (name);
 
   dw2_setup (objfile);
 
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		   + dwarf2_per_objfile->n_type_comp_units); ++i)
+		   + dwarf2_per_objfile->n_type_units); ++i)
     {
       int j;
       struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
@@ -2491,7 +2436,9 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 	{
 	  const char *this_name = file_data->file_names[j];
 
-	  if (FILENAME_CMP (name, this_name) == 0)
+	  if (FILENAME_CMP (name, this_name) == 0
+	      || (!is_abs && compare_filenames_for_search (this_name,
+							   name, name_len)))
 	    {
 	      if (dw2_map_expand_apply (objfile, per_cu,
 					name, full_path, real_path,
@@ -2499,9 +2446,12 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 		return 1;
 	    }
 
-	  if (check_basename && ! base_cu
-	      && FILENAME_CMP (lbasename (this_name), name) == 0)
-	    base_cu = per_cu;
+	    {
+	      if (dw2_map_expand_apply (objfile, per_cu,
+					name, full_path, real_path,
+					callback, data))
+		return 1;
+	    }
 
 	  /* Before we invoke realpath, which can get expensive when many
 	     files are involved, do a quick comparison of the basenames.  */
@@ -2515,7 +2465,10 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      if (this_real_name != NULL
-		  && FILENAME_CMP (full_path, this_real_name) == 0)
+		  && (FILENAME_CMP (full_path, this_real_name) == 0
+		      || (!is_abs
+			  && compare_filenames_for_search (this_real_name,
+							   name, name_len))))
 		{
 		  if (dw2_map_expand_apply (objfile, per_cu,
 					    name, full_path, real_path,
@@ -2530,7 +2483,10 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      if (this_real_name != NULL
-		  && FILENAME_CMP (real_path, this_real_name) == 0)
+		  && (FILENAME_CMP (real_path, this_real_name) == 0
+		      || (!is_abs
+			  && compare_filenames_for_search (this_real_name,
+							   name, name_len))))
 		{
 		  if (dw2_map_expand_apply (objfile, per_cu,
 					    name, full_path, real_path,
@@ -2539,14 +2495,6 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 		}
 	    }
 	}
-    }
-
-  if (base_cu)
-    {
-      if (dw2_map_expand_apply (objfile, base_cu,
-				name, full_path, real_path,
-				callback, data))
-	return 1;
     }
 
   return 0;
@@ -2605,7 +2553,7 @@ dw2_print_stats (struct objfile *objfile)
   dw2_setup (objfile);
   count = 0;
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		   + dwarf2_per_objfile->n_type_comp_units); ++i)
+		   + dwarf2_per_objfile->n_type_units); ++i)
     {
       struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
@@ -2643,7 +2591,7 @@ dw2_expand_all_symtabs (struct objfile *objfile)
   dw2_setup (objfile);
 
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		   + dwarf2_per_objfile->n_type_comp_units); ++i)
+		   + dwarf2_per_objfile->n_type_units); ++i)
     {
       struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
@@ -2769,7 +2717,7 @@ dw2_expand_symtabs_matching
 
   if (file_matcher != NULL)
     for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		     + dwarf2_per_objfile->n_type_comp_units); ++i)
+		     + dwarf2_per_objfile->n_type_units); ++i)
       {
 	int j;
 	struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
@@ -2859,7 +2807,7 @@ dw2_map_symbol_filenames (struct objfile *objfile, symbol_filename_ftype *fun,
   dw2_setup (objfile);
 
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		   + dwarf2_per_objfile->n_type_comp_units); ++i)
+		   + dwarf2_per_objfile->n_type_units); ++i)
     {
       int j;
       struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
@@ -2934,7 +2882,7 @@ dwarf2_initialize_objfile (struct objfile *objfile)
 	create_quick_file_names_table (dwarf2_per_objfile->n_comp_units);
 
       for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		       + dwarf2_per_objfile->n_type_comp_units); ++i)
+		       + dwarf2_per_objfile->n_type_units); ++i)
 	{
 	  struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
@@ -3013,16 +2961,55 @@ read_comp_unit_head (struct comp_unit_head *cu_header,
   return info_ptr;
 }
 
-/* Read in a CU header and perform some basic error checking.  */
+/* Subroutine of read_and_check_comp_unit_head and
+   read_and_check_type_unit_head to simplify them.
+   Perform various error checking on the header.  */
+
+static void
+error_check_comp_unit_head (struct comp_unit_head *header,
+			    struct dwarf2_section_info *section)
+{
+  bfd *abfd = section->asection->owner;
+  const char *filename = bfd_get_filename (abfd);
+
+  if (header->version != 2 && header->version != 3 && header->version != 4)
+    error (_("Dwarf Error: wrong version in compilation unit header "
+	   "(is %d, should be 2, 3, or 4) [in module %s]"), header->version,
+	   filename);
+
+  if (header->abbrev_offset
+      >= dwarf2_section_size (dwarf2_per_objfile->objfile,
+			      &dwarf2_per_objfile->abbrev))
+    error (_("Dwarf Error: bad offset (0x%lx) in compilation unit header "
+	   "(offset 0x%lx + 6) [in module %s]"),
+	   (long) header->abbrev_offset, (long) header->offset,
+	   filename);
+
+  /* Cast to unsigned long to use 64-bit arithmetic when possible to
+     avoid potential 32-bit overflow.  */
+  if (((unsigned long) header->offset
+       + header->length + header->initial_length_size)
+      > section->size)
+    error (_("Dwarf Error: bad length (0x%lx) in compilation unit header "
+	   "(offset 0x%lx + 0) [in module %s]"),
+	   (long) header->length, (long) header->offset,
+	   filename);
+}
+
+/* Read in a CU/TU header and perform some basic error checking.
+   The contents of the header are stored in HEADER.
+   The result is a pointer to the start of the first DIE.  */
 
 static gdb_byte *
-partial_read_comp_unit_head (struct comp_unit_head *header, gdb_byte *info_ptr,
-			     gdb_byte *buffer, unsigned int buffer_size,
-			     bfd *abfd, int is_debug_types_section)
+read_and_check_comp_unit_head (struct comp_unit_head *header,
+			       struct dwarf2_section_info *section,
+			       gdb_byte *info_ptr,
+			       int is_debug_types_section)
 {
   gdb_byte *beg_of_comp_unit = info_ptr;
+  bfd *abfd = section->asection->owner;
 
-  header->offset = beg_of_comp_unit - buffer;
+  header->offset = beg_of_comp_unit - section->buffer;
 
   info_ptr = read_comp_unit_head (header, info_ptr, abfd);
 
@@ -3033,27 +3020,7 @@ partial_read_comp_unit_head (struct comp_unit_head *header, gdb_byte *info_ptr,
 
   header->first_die_offset = info_ptr - beg_of_comp_unit;
 
-  if (header->version != 2 && header->version != 3 && header->version != 4)
-    error (_("Dwarf Error: wrong version in compilation unit header "
-	   "(is %d, should be 2, 3, or 4) [in module %s]"), header->version,
-	   bfd_get_filename (abfd));
-
-  if (header->abbrev_offset
-      >= dwarf2_section_size (dwarf2_per_objfile->objfile,
-			      &dwarf2_per_objfile->abbrev))
-    error (_("Dwarf Error: bad offset (0x%lx) in compilation unit header "
-	   "(offset 0x%lx + 6) [in module %s]"),
-	   (long) header->abbrev_offset,
-	   (long) (beg_of_comp_unit - buffer),
-	   bfd_get_filename (abfd));
-
-  if (beg_of_comp_unit + header->length + header->initial_length_size
-      > buffer + buffer_size)
-    error (_("Dwarf Error: bad length (0x%lx) in compilation unit header "
-	   "(offset 0x%lx + 0) [in module %s]"),
-	   (long) header->length,
-	   (long) (beg_of_comp_unit - buffer),
-	   bfd_get_filename (abfd));
+  error_check_comp_unit_head (header, section);
 
   return info_ptr;
 }
@@ -3062,24 +3029,32 @@ partial_read_comp_unit_head (struct comp_unit_head *header, gdb_byte *info_ptr,
    types_ptr.  The result is a pointer to one past the end of the header.  */
 
 static gdb_byte *
-read_type_comp_unit_head (struct comp_unit_head *cu_header,
-			  struct dwarf2_section_info *section,
-			  ULONGEST *signature,
-			  gdb_byte *types_ptr, bfd *abfd)
+read_and_check_type_unit_head (struct comp_unit_head *header,
+			       struct dwarf2_section_info *section,
+			       gdb_byte *info_ptr,
+			       ULONGEST *signature, unsigned int *type_offset)
 {
-  gdb_byte *initial_types_ptr = types_ptr;
+  gdb_byte *beg_of_comp_unit = info_ptr;
+  bfd *abfd = section->asection->owner;
 
-  dwarf2_read_section (dwarf2_per_objfile->objfile, section);
-  cu_header->offset = types_ptr - section->buffer;
+  header->offset = beg_of_comp_unit - section->buffer;
 
-  types_ptr = read_comp_unit_head (cu_header, types_ptr, abfd);
+  info_ptr = read_comp_unit_head (header, info_ptr, abfd);
 
-  *signature = read_8_bytes (abfd, types_ptr);
-  types_ptr += 8;
-  types_ptr += cu_header->offset_size;
-  cu_header->first_die_offset = types_ptr - initial_types_ptr;
+  /* If we're reading a type unit, skip over the signature and
+     type_offset fields.  */
+  if (signature != NULL)
+    *signature = read_8_bytes (abfd, info_ptr);
+  info_ptr += 8;
+  if (type_offset != NULL)
+    *type_offset = read_offset_1 (abfd, info_ptr, header->offset_size);
+  info_ptr += header->offset_size;
 
-  return types_ptr;
+  header->first_die_offset = info_ptr - beg_of_comp_unit;
+
+  error_check_comp_unit_head (header, section);
+
+  return info_ptr;
 }
 
 /* Allocate a new partial symtab for file named NAME and mark this new
@@ -3140,7 +3115,7 @@ dwarf2_build_include_psymtabs (struct dwarf2_cu *cu,
     return;  /* No linetable, so no includes.  */
 
   /* NOTE: pst->dirname is DW_AT_comp_dir (if present).  */
-  dwarf_decode_lines (lh, pst->dirname, abfd, cu, pst);
+  dwarf_decode_lines (lh, pst->dirname, cu, pst, 1);
 
   free_line_header (lh);
 }
@@ -3177,10 +3152,10 @@ allocate_signatured_type_table (struct objfile *objfile)
 			       dummy_obstack_deallocate);
 }
 
-/* A helper function to add a signatured type CU to a list.  */
+/* A helper function to add a signatured type CU to a table.  */
 
 static int
-add_signatured_type_cu_to_list (void **slot, void *datum)
+add_signatured_type_cu_to_table (void **slot, void *datum)
 {
   struct signatured_type *sigt = *slot;
   struct dwarf2_per_cu_data ***datap = datum;
@@ -3191,7 +3166,7 @@ add_signatured_type_cu_to_list (void **slot, void *datum)
   return 1;
 }
 
-/* Create the hash table of all entries in the .debug_types section.
+/* Create the hash table of all entries in the .debug_types section(s).
    The result is zero if there is an error (e.g. missing .debug_types section),
    otherwise non-zero.	*/
 
@@ -3232,46 +3207,25 @@ create_debug_types_hash_table (struct objfile *objfile)
       while (info_ptr < end_ptr)
 	{
 	  unsigned int offset;
-	  unsigned int offset_size;
 	  unsigned int type_offset;
-	  unsigned int length, initial_length_size;
-	  unsigned short version;
 	  ULONGEST signature;
 	  struct signatured_type *type_sig;
 	  void **slot;
 	  gdb_byte *ptr = info_ptr;
+	  struct comp_unit_head header;
 
 	  offset = ptr - section->buffer;
 
 	  /* We need to read the type's signature in order to build the hash
-	     table, but we don't need to read anything else just yet.  */
+	     table, but we don't need anything else just yet.  */
 
-	  /* Sanity check to ensure entire cu is present.  */
-	  length = read_initial_length (objfile->obfd, ptr,
-					&initial_length_size);
-	  if (ptr + length + initial_length_size > end_ptr)
-	    {
-	      complaint (&symfile_complaints,
-			 _("debug type entry runs off end "
-			   "of `.debug_types' section, ignored"));
-	      break;
-	    }
-
-	  offset_size = initial_length_size == 4 ? 4 : 8;
-	  ptr += initial_length_size;
-	  version = bfd_get_16 (objfile->obfd, ptr);
-	  ptr += 2;
-	  ptr += offset_size; /* abbrev offset */
-	  ptr += 1; /* address size */
-	  signature = bfd_get_64 (objfile->obfd, ptr);
-	  ptr += 8;
-	  type_offset = read_offset_1 (objfile->obfd, ptr, offset_size);
-	  ptr += offset_size;
+	  ptr = read_and_check_type_unit_head (&header, section, ptr,
+					       &signature, &type_offset);
 
 	  /* Skip dummy type units.  */
 	  if (ptr >= end_ptr || peek_abbrev_code (objfile->obfd, ptr) == 0)
 	    {
-	      info_ptr = info_ptr + initial_length_size + length;
+	      info_ptr = info_ptr + header.initial_length_size + header.length;
 	      continue;
 	    }
 
@@ -3302,21 +3256,21 @@ create_debug_types_hash_table (struct objfile *objfile)
 	    fprintf_unfiltered (gdb_stdlog, "  offset 0x%x, signature 0x%s\n",
 				offset, phex (signature, sizeof (signature)));
 
-	  info_ptr = info_ptr + initial_length_size + length;
+	  info_ptr = info_ptr + header.initial_length_size + header.length;
 	}
     }
 
   dwarf2_per_objfile->signatured_types = types_htab;
 
-  dwarf2_per_objfile->n_type_comp_units = htab_elements (types_htab);
-  dwarf2_per_objfile->type_comp_units
+  dwarf2_per_objfile->n_type_units = htab_elements (types_htab);
+  dwarf2_per_objfile->all_type_units
     = obstack_alloc (&objfile->objfile_obstack,
-		     dwarf2_per_objfile->n_type_comp_units
+		     dwarf2_per_objfile->n_type_units
 		     * sizeof (struct dwarf2_per_cu_data *));
-  iter = &dwarf2_per_objfile->type_comp_units[0];
-  htab_traverse_noresize (types_htab, add_signatured_type_cu_to_list, &iter);
-  gdb_assert (iter - &dwarf2_per_objfile->type_comp_units[0]
-	      == dwarf2_per_objfile->n_type_comp_units);
+  iter = &dwarf2_per_objfile->all_type_units[0];
+  htab_traverse_noresize (types_htab, add_signatured_type_cu_to_table, &iter);
+  gdb_assert (iter - &dwarf2_per_objfile->all_type_units[0]
+	      == dwarf2_per_objfile->n_type_units);
 
   return 1;
 }
@@ -3394,19 +3348,20 @@ dwarf2_find_base_address (struct die_info *die, struct dwarf2_cu *cu)
 
 /* Subroutine of process_type_comp_unit and dwarf2_build_psymtabs_hard
    to combine the common parts.
-   Process a compilation unit for a psymtab.
-   BUFFER is a pointer to the beginning of the dwarf section buffer,
-   either .debug_info or debug_types.
-   INFO_PTR is a pointer to the start of the CU.
-   Returns a pointer to the next CU.  */
+   Process compilation unit THIS_CU for a psymtab.
+   SECTION is the section the CU/TU comes from,
+   either .debug_info or .debug_types.  */
 
-static gdb_byte *
+void
 process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
-			   gdb_byte *buffer, gdb_byte *info_ptr,
-			   unsigned int buffer_size)
+			   struct dwarf2_section_info *section,
+			   int is_debug_types_section)
 {
   struct objfile *objfile = this_cu->objfile;
   bfd *abfd = objfile->obfd;
+  gdb_byte *buffer = section->buffer;
+  gdb_byte *info_ptr = buffer + this_cu->offset;
+  unsigned int buffer_size = section->size;
   gdb_byte *beg_of_comp_unit = info_ptr;
   struct die_info *comp_unit_die;
   struct partial_symtab *pst;
@@ -3418,26 +3373,6 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
   CORE_ADDR best_lowpc = 0, best_highpc = 0;
   struct die_reader_specs reader_specs;
   const char *filename;
-
-  init_one_comp_unit (&cu, objfile);
-  back_to_inner = make_cleanup (free_stack_comp_unit, &cu);
-
-  info_ptr = partial_read_comp_unit_head (&cu.header, info_ptr,
-					  buffer, buffer_size,
-					  abfd,
-					  this_cu->debug_types_section != NULL);
-
-  /* Skip dummy compilation units.  */
-  if (info_ptr >= buffer + buffer_size
-      || peek_abbrev_code (abfd, info_ptr) == 0)
-    {
-      info_ptr = (beg_of_comp_unit + cu.header.length
-		  + cu.header.initial_length_size);
-      do_cleanups (back_to_inner);
-      return info_ptr;
-    }
-
-  cu.list_in_scope = &file_symbols;
 
   /* If this compilation unit was already read in, free the
      cached copy in order to read it in again.	This is
@@ -3452,11 +3387,24 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
      added to a global data structure.	It will be cleaned up
      in free_stack_comp_unit when we finish with this
      compilation unit.	*/
-  this_cu->cu = &cu;
-  cu.per_cu = this_cu;
+  init_one_comp_unit (&cu, this_cu);
+  back_to_inner = make_cleanup (free_stack_comp_unit, &cu);
+
+  info_ptr = read_and_check_comp_unit_head (&cu.header, section, info_ptr,
+					    is_debug_types_section);
+
+  /* Skip dummy compilation units.  */
+  if (info_ptr >= buffer + buffer_size
+      || peek_abbrev_code (abfd, info_ptr) == 0)
+    {
+      do_cleanups (back_to_inner);
+      return;
+    }
+
+  cu.list_in_scope = &file_symbols;
 
   /* Read the abbrevs for this compilation unit into a table.  */
-  dwarf2_read_abbrevs (abfd, &cu);
+  dwarf2_read_abbrevs (&cu);
   make_cleanup (dwarf2_free_abbrev_table, &cu);
 
   /* Read the compilation unit die.  */
@@ -3464,7 +3412,7 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
   info_ptr = read_full_die (&reader_specs, &comp_unit_die, info_ptr,
 			    &has_children);
 
-  if (this_cu->debug_types_section)
+  if (is_debug_types_section)
     {
       /* LENGTH has not been set yet for type units.  */
       gdb_assert (this_cu->offset == cu.header.offset);
@@ -3472,10 +3420,8 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
     }
   else if (comp_unit_die->tag == DW_TAG_partial_unit)
     {
-      info_ptr = (beg_of_comp_unit + cu.header.length
-		  + cu.header.initial_length_size);
       do_cleanups (back_to_inner);
-      return info_ptr;
+      return;
     }
 
   prepare_one_comp_unit (&cu, comp_unit_die);
@@ -3558,10 +3504,7 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
     (objfile->static_psymbols.list + pst->statics_offset);
   sort_pst_symbols (pst);
 
-  info_ptr = (beg_of_comp_unit + cu.header.length
-	      + cu.header.initial_length_size);
-
-  if (this_cu->debug_types_section)
+  if (is_debug_types_section)
     {
       /* It's not clear we want to do anything with stmt lists here.
 	 Waiting to see what gcc ultimately does.  */
@@ -3574,8 +3517,6 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
     }
 
   do_cleanups (back_to_inner);
-
-  return info_ptr;
 }
 
 /* Traversal function for htab_traverse_noresize.
@@ -3591,11 +3532,7 @@ process_type_comp_unit (void **slot, void *info)
   this_cu = &entry->per_cu;
 
   gdb_assert (this_cu->debug_types_section->readin);
-  process_psymtab_comp_unit (this_cu,
-			     this_cu->debug_types_section->buffer,
-			     (this_cu->debug_types_section->buffer
-			      + this_cu->offset),
-			     this_cu->debug_types_section->size);
+  process_psymtab_comp_unit (this_cu, this_cu->debug_types_section, 1);
 
   return 1;
 }
@@ -3629,14 +3566,13 @@ psymtabs_addrmap_cleanup (void *o)
 static void
 dwarf2_build_psymtabs_hard (struct objfile *objfile)
 {
-  gdb_byte *info_ptr;
   struct cleanup *back_to, *addrmap_cleanup;
   struct obstack temp_obstack;
+  int i;
 
   dwarf2_per_objfile->reading_partial_symbols = 1;
 
   dwarf2_read_section (objfile, &dwarf2_per_objfile->info);
-  info_ptr = dwarf2_per_objfile->info.buffer;
 
   /* Any cached compilation units will be linked by the per-objfile
      read_in_chain.  Make sure to free them when we're done.  */
@@ -3653,33 +3589,11 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
   objfile->psymtabs_addrmap = addrmap_create_mutable (&temp_obstack);
   addrmap_cleanup = make_cleanup (psymtabs_addrmap_cleanup, objfile);
 
-  /* Since the objects we're extracting from .debug_info vary in
-     length, only the individual functions to extract them (like
-     read_comp_unit_head and load_partial_die) can really know whether
-     the buffer is large enough to hold another complete object.
-
-     At the moment, they don't actually check that.  If .debug_info
-     holds just one extra byte after the last compilation unit's dies,
-     then read_comp_unit_head will happily read off the end of the
-     buffer.  read_partial_die is similarly casual.  Those functions
-     should be fixed.
-
-     For this loop condition, simply checking whether there's any data
-     left at all should be sufficient.  */
-
-  while (info_ptr < (dwarf2_per_objfile->info.buffer
-		     + dwarf2_per_objfile->info.size))
+  for (i = 0; i < dwarf2_per_objfile->n_comp_units; ++i)
     {
-      struct dwarf2_per_cu_data *this_cu;
+      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
-      this_cu = dwarf2_find_comp_unit (info_ptr
-				       - dwarf2_per_objfile->info.buffer,
-				       objfile);
-
-      info_ptr = process_psymtab_comp_unit (this_cu,
-					    dwarf2_per_objfile->info.buffer,
-					    info_ptr,
-					    dwarf2_per_objfile->info.size);
+      process_psymtab_comp_unit (per_cu, &dwarf2_per_objfile->info, 0);
     }
 
   objfile->psymtabs_addrmap = addrmap_create_fixed (objfile->psymtabs_addrmap,
@@ -3703,39 +3617,33 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu)
   int has_children;
   struct die_reader_specs reader_specs;
   int read_cu = 0;
+  struct dwarf2_section_info *section = &dwarf2_per_objfile->info;
 
   gdb_assert (! this_cu->debug_types_section);
 
-  gdb_assert (dwarf2_per_objfile->info.readin);
-  info_ptr = dwarf2_per_objfile->info.buffer + this_cu->offset;
+  gdb_assert (section->readin);
+  info_ptr = section->buffer + this_cu->offset;
 
   if (this_cu->cu == NULL)
     {
       cu = xmalloc (sizeof (*cu));
-      init_one_comp_unit (cu, objfile);
+      init_one_comp_unit (cu, this_cu);
 
       read_cu = 1;
 
       /* If an error occurs while loading, release our storage.  */
       free_cu_cleanup = make_cleanup (free_heap_comp_unit, cu);
 
-      info_ptr = partial_read_comp_unit_head (&cu->header, info_ptr,
-					      dwarf2_per_objfile->info.buffer,
-					      dwarf2_per_objfile->info.size,
-					      abfd, 0);
+      info_ptr = read_and_check_comp_unit_head (&cu->header, section, info_ptr,
+						0);
 
       /* Skip dummy compilation units.  */
-      if (info_ptr >= (dwarf2_per_objfile->info.buffer
-		       + dwarf2_per_objfile->info.size)
+      if (info_ptr >= (section->buffer + section->size)
 	  || peek_abbrev_code (abfd, info_ptr) == 0)
 	{
 	  do_cleanups (free_cu_cleanup);
 	  return;
 	}
-
-      /* Link this compilation unit into the compilation unit tree.  */
-      this_cu->cu = cu;
-      cu->per_cu = this_cu;
 
       /* Link this CU into read_in_chain.  */
       this_cu->cu->read_in_chain = dwarf2_per_objfile->read_in_chain;
@@ -3749,7 +3657,7 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu)
 
   /* Read the abbrevs for this compilation unit into a table.  */
   gdb_assert (cu->dwarf2_abbrevs == NULL);
-  dwarf2_read_abbrevs (abfd, cu);
+  dwarf2_read_abbrevs (cu);
   free_abbrevs_cleanup = make_cleanup (dwarf2_free_abbrev_table, cu);
 
   /* Read the compilation unit die.  */
@@ -3763,7 +3671,7 @@ load_partial_comp_unit (struct dwarf2_per_cu_data *this_cu)
      If so, read the rest of the partial symbols from this comp unit.
      If not, there's no more debug_info for this comp unit.  */
   if (has_children)
-    load_partial_dies (abfd, dwarf2_per_objfile->info.buffer, info_ptr, 0, cu);
+    load_partial_dies (abfd, section->buffer, info_ptr, 0, cu);
 
   do_cleanups (free_abbrevs_cleanup);
 
@@ -4729,7 +4637,7 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
   if (per_cu->cu == NULL)
     {
       cu = xmalloc (sizeof (*cu));
-      init_one_comp_unit (cu, objfile);
+      init_one_comp_unit (cu, per_cu);
 
       read_cu = 1;
 
@@ -4753,12 +4661,8 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
       cu->header.first_die_offset = info_ptr - beg_of_comp_unit;
 
       /* Read the abbrevs for this compilation unit.  */
-      dwarf2_read_abbrevs (abfd, cu);
+      dwarf2_read_abbrevs (cu);
       free_abbrevs_cleanup = make_cleanup (dwarf2_free_abbrev_table, cu);
-
-      /* Link this compilation unit into the compilation unit tree.  */
-      per_cu->cu = cu;
-      cu->per_cu = per_cu;
 
       /* Link this CU into read_in_chain.  */
       per_cu->cu->read_in_chain = dwarf2_per_objfile->read_in_chain;
@@ -5630,19 +5534,19 @@ find_file_and_directory (struct die_info *die, struct dwarf2_cu *cu,
     *name = "<unknown>";
 }
 
-/* Handle DW_AT_stmt_list for a compilation unit.  */
+/* Handle DW_AT_stmt_list for a compilation unit or type unit.
+   DIE is the DW_TAG_compile_unit or DW_TAG_type_unit die for CU.
+   COMP_DIR is the compilation directory.
+   WANT_LINE_INFO is non-zero if the pc/line-number mapping is needed.  */
 
 static void
 handle_DW_AT_stmt_list (struct die_info *die, struct dwarf2_cu *cu,
-			const char *comp_dir)
+			const char *comp_dir, int want_line_info)
 {
   struct attribute *attr;
   struct objfile *objfile = cu->objfile;
   bfd *abfd = objfile->obfd;
 
-  /* Decode line number information if present.  We do this before
-     processing child DIEs, so that the line header table is available
-     for DW_AT_decl_file.  */
   attr = dwarf2_attr (die, DW_AT_stmt_list, cu);
   if (attr)
     {
@@ -5654,7 +5558,7 @@ handle_DW_AT_stmt_list (struct die_info *die, struct dwarf2_cu *cu,
         {
           cu->line_header = line_header;
           make_cleanup (free_cu_line_header, cu);
-          dwarf_decode_lines (line_header, comp_dir, abfd, cu, NULL);
+	  dwarf_decode_lines (line_header, comp_dir, cu, NULL, want_line_info);
         }
     }
 }
@@ -5713,7 +5617,10 @@ read_file_scope (struct die_info *die, struct dwarf2_cu *cu)
   record_debugformat ("DWARF 2");
   record_producer (cu->producer);
 
-  handle_DW_AT_stmt_list (die, cu, comp_dir);
+  /* Decode line number information if present.  We do this before
+     processing child DIEs, so that the line header table is available
+     for DW_AT_decl_file.  */
+  handle_DW_AT_stmt_list (die, cu, comp_dir, 1);
 
   /* Process all dies in compilation unit.  */
   if (die->child != NULL)
@@ -5816,7 +5723,11 @@ read_type_unit_scope (struct die_info *die, struct dwarf2_cu *cu)
   record_debugformat ("DWARF 2");
   record_producer (cu->producer);
 
-  handle_DW_AT_stmt_list (die, cu, comp_dir);
+  /* Decode line number information if present.  We do this before
+     processing child DIEs, so that the line header table is available
+     for DW_AT_decl_file.
+     We don't need the pc/line-number mapping for type units.  */
+  handle_DW_AT_stmt_list (die, cu, comp_dir, 0);
 
   /* Process the dies in the type unit.  */
   if (die->child == NULL)
@@ -7513,7 +7424,6 @@ dwarf2_attach_fn_fields_to_type (struct field_info *fip, struct type *type,
 				 struct dwarf2_cu *cu)
 {
   struct fnfieldlist *flp;
-  int total_length = 0;
   int i;
 
   if (cu->language == language_ada)
@@ -7535,12 +7445,9 @@ dwarf2_attach_fn_fields_to_type (struct field_info *fip, struct type *type,
 	TYPE_ALLOC (type, sizeof (struct fn_field) * flp->length);
       for (k = flp->length; (k--, nfp); nfp = nfp->next)
 	fn_flp->fn_fields[k] = nfp->fnfield;
-
-      total_length += flp->length;
     }
 
   TYPE_NFN_FIELDS (type) = fip->nfnfields;
-  TYPE_NFN_FIELDS_TOTAL (type) = total_length;
 }
 
 /* Returns non-zero if NAME is the name of a vtable member in CU's
@@ -8018,6 +7925,8 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
       int num_fields = 0;
       int unsigned_enum = 1;
       char *name;
+      int flag_enum = 1;
+      ULONGEST mask = 0;
 
       child_die = die->child;
       while (child_die && child_die->tag)
@@ -8033,7 +7942,14 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
 		{
 		  sym = new_symbol (child_die, this_type, cu);
 		  if (SYMBOL_VALUE (sym) < 0)
-		    unsigned_enum = 0;
+		    {
+		      unsigned_enum = 0;
+		      flag_enum = 0;
+		    }
+		  else if ((mask & SYMBOL_VALUE (sym)) != 0)
+		    flag_enum = 0;
+		  else
+		    mask |= SYMBOL_VALUE (sym);
 
 		  if ((num_fields % DW_FIELD_ALLOC_CHUNK) == 0)
 		    {
@@ -8066,6 +7982,8 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
 	}
       if (unsigned_enum)
 	TYPE_UNSIGNED (this_type) = 1;
+      if (flag_enum)
+	TYPE_FLAG_ENUM (this_type) = 1;
     }
 
   /* If we are reading an enum from a .debug_types unit, and the enum
@@ -9361,7 +9279,7 @@ read_comp_unit (gdb_byte *info_ptr, struct dwarf2_cu *cu)
 
   if (cu->dwarf2_abbrevs == NULL)
     {
-      dwarf2_read_abbrevs (cu->objfile->obfd, cu);
+      dwarf2_read_abbrevs (cu);
       back_to = make_cleanup (dwarf2_free_abbrev_table, cu);
       read_abbrevs = 1;
     }
@@ -9540,8 +9458,9 @@ read_full_die (const struct die_reader_specs *reader,
    the data found in the abbrev table.  */
 
 static void
-dwarf2_read_abbrevs (bfd *abfd, struct dwarf2_cu *cu)
+dwarf2_read_abbrevs (struct dwarf2_cu *cu)
 {
+  bfd *abfd = cu->objfile->obfd;
   struct comp_unit_head *cu_header = &cu->header;
   gdb_byte *abbrev_ptr;
   struct abbrev_info *cur_abbrev;
@@ -10230,7 +10149,7 @@ find_partial_die (unsigned int offset, struct dwarf2_cu *cu)
       back_to = make_cleanup (null_cleanup, 0);
       if (per_cu->cu->dwarf2_abbrevs == NULL)
 	{
-	  dwarf2_read_abbrevs (objfile->obfd, per_cu->cu);
+	  dwarf2_read_abbrevs (per_cu->cu);
 	  make_cleanup (dwarf2_free_abbrev_table, per_cu->cu);
 	}
       info_ptr = (dwarf2_per_objfile->info.buffer
@@ -11357,31 +11276,12 @@ noop_record_line (struct subfile *subfile, int line, CORE_ADDR pc)
   return;
 }
 
-/* Decode the Line Number Program (LNP) for the given line_header
-   structure and CU.  The actual information extracted and the type
-   of structures created from the LNP depends on the value of PST.
-
-   1. If PST is NULL, then this procedure uses the data from the program
-      to create all necessary symbol tables, and their linetables.
-
-   2. If PST is not NULL, this procedure reads the program to determine
-      the list of files included by the unit represented by PST, and
-      builds all the associated partial symbol tables.
-
-   COMP_DIR is the compilation directory (DW_AT_comp_dir) or NULL if unknown.
-   It is used for relative paths in the line table.
-   NOTE: When processing partial symtabs (pst != NULL),
-   comp_dir == pst->dirname.
-
-   NOTE: It is important that psymtabs have the same file name (via strcmp)
-   as the corresponding symtab.  Since COMP_DIR is not used in the name of the
-   symtab we don't use it in the name of the psymtabs we create.
-   E.g. expand_line_sal requires this when finding psymtabs to expand.
-   A good testcase for this is mb-inline.exp.  */
+/* Subroutine of dwarf_decode_lines to simplify it.
+   Process the line number information in LH.  */
 
 static void
-dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
-		    struct dwarf2_cu *cu, struct partial_symtab *pst)
+dwarf_decode_lines_1 (struct line_header *lh, const char *comp_dir,
+		      struct dwarf2_cu *cu, struct partial_symtab *pst)
 {
   gdb_byte *line_ptr, *extended_end;
   gdb_byte *line_end;
@@ -11389,9 +11289,10 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
   unsigned char op_code, extended_op, adj_opcode;
   CORE_ADDR baseaddr;
   struct objfile *objfile = cu->objfile;
+  bfd *abfd = objfile->obfd;
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   const int decode_for_pst_p = (pst != NULL);
-  struct subfile *last_subfile = NULL, *first_subfile = current_subfile;
+  struct subfile *last_subfile = NULL;
   void (*p_record_line) (struct subfile *subfile, int line, CORE_ADDR pc)
     = record_line;
 
@@ -11669,6 +11570,41 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
 	    }
         }
     }
+}
+
+/* Decode the Line Number Program (LNP) for the given line_header
+   structure and CU.  The actual information extracted and the type
+   of structures created from the LNP depends on the value of PST.
+
+   1. If PST is NULL, then this procedure uses the data from the program
+      to create all necessary symbol tables, and their linetables.
+
+   2. If PST is not NULL, this procedure reads the program to determine
+      the list of files included by the unit represented by PST, and
+      builds all the associated partial symbol tables.
+
+   COMP_DIR is the compilation directory (DW_AT_comp_dir) or NULL if unknown.
+   It is used for relative paths in the line table.
+   NOTE: When processing partial symtabs (pst != NULL),
+   comp_dir == pst->dirname.
+
+   NOTE: It is important that psymtabs have the same file name (via strcmp)
+   as the corresponding symtab.  Since COMP_DIR is not used in the name of the
+   symtab we don't use it in the name of the psymtabs we create.
+   E.g. expand_line_sal requires this when finding psymtabs to expand.
+   A good testcase for this is mb-inline.exp.  */
+
+static void
+dwarf_decode_lines (struct line_header *lh, const char *comp_dir,
+		    struct dwarf2_cu *cu, struct partial_symtab *pst,
+		    int want_line_info)
+{
+  struct objfile *objfile = cu->objfile;
+  const int decode_for_pst_p = (pst != NULL);
+  struct subfile *first_subfile = current_subfile;
+
+  if (want_line_info)
+    dwarf_decode_lines_1 (lh, comp_dir, cu, pst);
 
   if (decode_for_pst_p)
     {
@@ -11690,13 +11626,12 @@ dwarf_decode_lines (struct line_header *lh, const char *comp_dir, bfd *abfd,
       /* Make sure a symtab is created for every file, even files
 	 which contain only variables (i.e. no code with associated
 	 line numbers).  */
-
       int i;
-      struct file_entry *fe;
 
       for (i = 0; i < lh->num_file_names; i++)
 	{
 	  char *dir = NULL;
+	  struct file_entry *fe;
 
 	  fe = &lh->file_names[i];
 	  if (fe->dir_index)
@@ -14600,19 +14535,24 @@ lookup_signatured_type_at_offset (struct objfile *objfile,
   return type_sig;
 }
 
-/* Read in signatured type at OFFSET and build its CU and die(s).  */
+/* Load the DIEs associated with type unit PER_CU into memory.  */
 
 static void
-read_signatured_type_at_offset (struct objfile *objfile,
-				struct dwarf2_section_info *sect,
-				unsigned int offset)
+load_full_type_unit (struct dwarf2_per_cu_data *per_cu)
 {
+  struct objfile *objfile = per_cu->objfile;
+  struct dwarf2_section_info *sect = per_cu->debug_types_section;
+  unsigned int offset = per_cu->offset;
   struct signatured_type *type_sig;
 
   dwarf2_read_section (objfile, sect);
 
   /* We have the section offset, but we need the signature to do the
-     hash table lookup.	 */
+     hash table lookup.  */
+  /* FIXME: This is sorta unnecessary, read_signatured_type only uses
+     the signature to assert we found the right one.
+     Ok, but it's a lot of work.  We should simplify things so any needed
+     assert doesn't require all this clumsiness.  */
   type_sig = lookup_signatured_type_at_offset (objfile, sect, offset);
 
   gdb_assert (type_sig->per_cu.cu == NULL);
@@ -14641,16 +14581,13 @@ read_signatured_type (struct signatured_type *type_sig)
   gdb_assert (type_sig->per_cu.cu == NULL);
 
   cu = xmalloc (sizeof (*cu));
-  init_one_comp_unit (cu, objfile);
-
-  type_sig->per_cu.cu = cu;
-  cu->per_cu = &type_sig->per_cu;
+  init_one_comp_unit (cu, &type_sig->per_cu);
 
   /* If an error occurs while loading, release our storage.  */
   free_cu_cleanup = make_cleanup (free_heap_comp_unit, cu);
 
-  types_ptr = read_type_comp_unit_head (&cu->header, section, &signature,
-					types_ptr, objfile->obfd);
+  types_ptr = read_and_check_type_unit_head (&cu->header, section, types_ptr,
+					     &signature, NULL);
   gdb_assert (signature == type_sig->signature);
 
   cu->die_hash
@@ -14662,7 +14599,7 @@ read_signatured_type (struct signatured_type *type_sig)
 			    hashtab_obstack_allocate,
 			    dummy_obstack_deallocate);
 
-  dwarf2_read_abbrevs (objfile->obfd, cu);
+  dwarf2_read_abbrevs (cu);
   back_to = make_cleanup (dwarf2_free_abbrev_table, cu);
 
   init_cu_die_reader (&reader_specs, cu);
@@ -16009,7 +15946,7 @@ per_cu_header_read_in (struct comp_unit_head *cu_headerp,
 
 /* Return the address size given in the compilation unit header for CU.  */
 
-CORE_ADDR
+int
 dwarf2_per_cu_addr_size (struct dwarf2_per_cu_data *per_cu)
 {
   struct comp_unit_head cu_header_local;
@@ -16105,27 +16042,15 @@ dwarf2_find_containing_comp_unit (unsigned int offset,
     }
 }
 
-/* Locate the compilation unit from OBJFILE which is located at exactly
-   OFFSET.  Raises an error on failure.  */
-
-static struct dwarf2_per_cu_data *
-dwarf2_find_comp_unit (unsigned int offset, struct objfile *objfile)
-{
-  struct dwarf2_per_cu_data *this_cu;
-
-  this_cu = dwarf2_find_containing_comp_unit (offset, objfile);
-  if (this_cu->offset != offset)
-    error (_("no compilation unit with offset %u."), offset);
-  return this_cu;
-}
-
-/* Initialize dwarf2_cu CU for OBJFILE in a pre-allocated space.  */
+/* Initialize dwarf2_cu CU, owned by PER_CU.  */
 
 static void
-init_one_comp_unit (struct dwarf2_cu *cu, struct objfile *objfile)
+init_one_comp_unit (struct dwarf2_cu *cu, struct dwarf2_per_cu_data *per_cu)
 {
   memset (cu, 0, sizeof (*cu));
-  cu->objfile = objfile;
+  per_cu->cu = cu;
+  cu->per_cu = per_cu;
+  cu->objfile = per_cu->objfile;
   obstack_init (&cu->comp_unit_obstack);
 }
 
@@ -16158,8 +16083,8 @@ free_heap_comp_unit (void *data)
 {
   struct dwarf2_cu *cu = data;
 
-  if (cu->per_cu != NULL)
-    cu->per_cu->cu = NULL;
+  gdb_assert (cu->per_cu != NULL);
+  cu->per_cu->cu = NULL;
   cu->per_cu = NULL;
 
   obstack_free (&cu->comp_unit_obstack, NULL);
@@ -16179,20 +16104,18 @@ free_stack_comp_unit (void *data)
 {
   struct dwarf2_cu *cu = data;
 
+  gdb_assert (cu->per_cu != NULL);
+  cu->per_cu->cu = NULL;
+  cu->per_cu = NULL;
+
   obstack_free (&cu->comp_unit_obstack, NULL);
   cu->partial_dies = NULL;
 
-  if (cu->per_cu != NULL)
-    {
-      /* This compilation unit is on the stack in our caller, so we
-	 should not xfree it.  Just unlink it.  */
-      cu->per_cu->cu = NULL;
-      cu->per_cu = NULL;
-
-      /* If we had a per-cu pointer, then we may have other compilation
-	 units loaded, so age them now.  */
-      age_cached_comp_units ();
-    }
+  /* The previous code only did this if per_cu != NULL.
+     But that would always succeed, so now we just unconditionally do
+     the aging.  This seems like the wrong place to do such aging,
+     but cleaning that up is left for later.  */
+  age_cached_comp_units ();
 }
 
 /* Free all cached compilation units.  */

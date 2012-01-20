@@ -1,3 +1,34 @@
+2012-01-20  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.texinfo (Remote Configuration): Document
+	"set remote hostio-readlink-packet" command.
+	(General Query Packets): Document vFile:readlink packet.
+
+2012-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Specify Location): Document relative file name
+	handling.
+
+2012-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (gdb.printing): Document FlagEnumerationPrinter.
+
+2012-01-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	* gdbint.texinfo (Coding Standards): Require braces for two lines of
+	code.
+
+2012-01-11  Paul Hilfinger  <hilfingr@adacore.com>
+
+	* gdb.texinfo (Variables): Document use of :: for non-static
+	variables.
+
+2012-01-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbint.texinfo (Start of New Year Procedure): Update
+	to replace use of copyright.sh by use of copyright.py.
+
 2012-01-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Remove the gdbtui binary.

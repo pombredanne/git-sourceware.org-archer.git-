@@ -1,9 +1,7 @@
 /* Target-struct-independent code to start (run) and stop an inferior
    process.
 
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -5496,7 +5494,7 @@ insert_exception_resume_breakpoint (struct thread_info *tp,
 				    struct frame_info *frame,
 				    struct symbol *sym)
 {
-  struct gdb_exception e;
+  volatile struct gdb_exception e;
 
   /* We want to ignore errors here.  */
   TRY_CATCH (e, RETURN_MASK_ERROR)
@@ -5534,7 +5532,7 @@ static void
 check_exception_resume (struct execution_control_state *ecs,
 			struct frame_info *frame, struct symbol *func)
 {
-  struct gdb_exception e;
+  volatile struct gdb_exception e;
 
   TRY_CATCH (e, RETURN_MASK_ERROR)
     {
@@ -5641,7 +5639,7 @@ keep_going (struct execution_control_state *ecs)
 	}
       else
 	{
-	  struct gdb_exception e;
+	  volatile struct gdb_exception e;
 
 	  /* Stop stepping when inserting breakpoints
 	     has failed.  */
@@ -6070,7 +6068,8 @@ done:
       || last.kind == TARGET_WAITKIND_SIGNALLED
       || last.kind == TARGET_WAITKIND_EXITED
       || last.kind == TARGET_WAITKIND_NO_RESUMED
-      || (!inferior_thread ()->step_multi
+      || (!(inferior_thread ()->step_multi
+	    && inferior_thread ()->control.stop_step)
 	  && !(inferior_thread ()->control.stop_bpstat
 	       && inferior_thread ()->control.proceed_to_finish)
 	  && !inferior_thread ()->control.in_infcall))

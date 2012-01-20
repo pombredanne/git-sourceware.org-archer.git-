@@ -1,7 +1,7 @@
 /* Source-language-related definitions for GDB.
 
-   Copyright (C) 1991, 1992, 1993, 1994, 1995, 1998, 1999, 2000, 2003, 2004,
-   2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1991-1995, 1998-2000, 2003-2004, 2007-2012 Free
+   Software Foundation, Inc.
 
    Contributed by the Department of Computer Science at the State University
    of New York at Buffalo.
@@ -473,25 +473,7 @@ extern enum language set_language (enum language);
 
 /* Type predicates */
 
-extern int simple_type (struct type *);
-
-extern int ordered_type (struct type *);
-
-extern int same_type (struct type *, struct type *);
-
-extern int integral_type (struct type *);
-
-extern int numeric_type (struct type *);
-
-extern int character_type (struct type *);
-
-extern int boolean_type (struct type *);
-
-extern int float_type (struct type *);
-
 extern int pointer_type (struct type *);
-
-extern int structured_type (struct type *);
 
 /* Checks Binary and Unary operations for semantic type correctness.  */
 /* FIXME:  Does not appear to be used.  */

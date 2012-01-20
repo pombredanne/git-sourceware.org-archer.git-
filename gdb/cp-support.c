@@ -1,6 +1,5 @@
 /* Helper routines for C++ support in GDB.
-   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2002-2005, 2007-2012 Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
 
@@ -528,6 +527,13 @@ cp_canonicalize_string (const char *string)
   estimated_len = strlen (string) * 2;
   ret = cp_comp_to_string (info->tree, estimated_len);
   cp_demangled_name_parse_free (info);
+
+  if (ret == NULL)
+    {
+      warning (_("internal error: string \"%s\" failed to be canonicalized"),
+	       string);
+      return NULL;
+    }
 
   if (strcmp (string, ret) == 0)
     {
@@ -1471,7 +1477,7 @@ cp_validate_operator (const char *input)
   const char *p;
   struct expression *expr;
   struct value *val;
-  struct gdb_exception except;
+  volatile struct gdb_exception except;
 
   p = input;
 

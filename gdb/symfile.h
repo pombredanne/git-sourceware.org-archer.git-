@@ -1,8 +1,6 @@
 /* Definitions for reading symbol files into GDB.
 
-   Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1990-2004, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -155,7 +153,7 @@ struct quick_symbol_functions
   /* Expand and iterate over each "partial" symbol table in OBJFILE
      where the source file is named NAME.
 
-     If there is no '/' in the name, a match after a '/' in the symbol
+     If NAME is not absolute, a match after a '/' in the symbol
      table's file name will also work.  FULL_PATH is the absolute file
      name, and REAL_PATH is the same, run through gdb_realpath.
 

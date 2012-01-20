@@ -1,3 +1,133 @@
+2012-01-20  Pedro Alves  <palves@redhat.com>
+
+	* gdb.python/py-finish-breakpoint.py: Fix typo.
+
+2012-01-20  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.base/info-proc.exp: Also run on remote targets.  Main
+	"info proc" command is now always present; whether target supports
+	actual info proc operation is detected when attempting to issue
+	the command.
+
+2012-01-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* .gdbinit: Remove.
+
+2012-01-19  Pedro Alves  <palves@redhat.com>
+
+	* gdb.java/jprint.exp: Don't rely on inferior output, but instead
+	look at the funtions' returns.
+	* gdb.java/jprint.java (jvclass.addprint, jprint.print(int))
+	(jprint.print(int, int)): Change return type to int.  Adjust.
+
+2012-01-18  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/9538
+	* gdb.base/sepdebug.exp: New test.
+
+2012-01-18  Pedro Alves  <palves@redhat.com>
+
+	* gdb.ada/mi_task_info.exp (-ada-task-info with no argument):
+	Allow output before ^done.
+
+2012-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.linespec/linespec.exp: Change some tests to use $decimal.
+	Add tests for relative directory.
+
+2012-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/printcmds.c (enum flag_enum): New.
+	(three): New global.
+	* gdb.base/printcmds.exp (test_print_enums): Add test for flag
+	enum printing.
+	* gdb.python/py-pp-maint.py (build_pretty_printer): Instantiate
+	FlagEnumerationPrinter.
+	* gdb.python/py-pp-maint.exp: Add tests for FlagEnumerationPrinter.
+	* gdb.python/py-pp-maint.c (enum flag_enum): New.
+	(fval): New global.
+
+2012-01-16  Pedro Alves  <palves@redhat.com>
+
+	* lib/gdb.exp (banned_procedures): New variable.
+	(banned_variables_traced): Rename to ...
+	(banned_traced): ... this.
+	(gdb_init): Also trace banned procedures.
+	(gdb_finish): Also untrace banned procedures.
+
+2012-01-16  Pedro Alves  <palves@redhat.com>
+
+	Remove all calls to strace.
+
+2012-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-namespaceless-anonymous.S: New file.
+	* gdb.dwarf2/dw2-namespaceless-anonymous.exp: New file.
+
+2012-01-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.base/attach-pie-misread.exp: Pass -pie only to the linker.
+	* gdb.base/pie-execl.exp: Likewise.
+
+2012-01-12  Keith Seitz  <keiths@redhat.com>
+
+	PR mi/10586
+	* gdb.mi/var-cmd.c (struct anonymous): New structure.
+	(do_anonymous_type_tests): New function.
+	(main): Call do_anonymous_type_tests.
+	* gdb.mi/mi2-var-child.exp: Add anonymous type tests.
+	(verify_everything): New procedure.
+	* gdb.mi/mi-var-cp.cc (class A): New class.
+	(anonymous_structs_and_unions): New function.
+	(main): Call anonymous_structs_and_unions.
+	* gdb.mi/mi-var-cp.exp: Add anonymous type tests.
+	(verify_everything): New procedure.
+
+2012-01-12  Keith Seitz  <keiths@redhat.com>
+
+	* lib/mi-support.exp: Expand comments about PATH_EXPR.
+	(varobj_tree::get_path_expr): Assume that all varobjs are
+	compound unless they are known simple types.
+	Adjust path expressions based on parent type, path parent type,
+	and tree language.
+	(varobj_tree::walk_tree): Add LANGUAGE parameter and save it into
+	the root varobj.
+	(mi_walk_varobj_tree): Add LANGUAGE parameter.
+
+2012-01-11  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/default.exp (core-file): Don't expect "GDB can't read
+	core files on this machine" anymore.
+
+2012-01-11  Paul Hilfinger  <hilfingr@adacore.com>
+
+	* gdb.base/watchpoint.c (recurser): Initialize local_x.
+	(main): Repeat recurser call.
+	* gdb.base/watchpoint.exp: Check that 'watch recurser::local_x' is
+	equivalent to 'local_x'.
+
+2012-01-11  Paul Hilfinger  <hilfingr@adacore.com>
+    	    Joel Brobecker <brobecker@adacore.com>
+
+	* gdb.base/recpar.c, gdb.base/recpar.exp: New files.
+
+2012-01-05  Pedro Alves  <alves.ped@gmail.com>
+
+	* gdb.mi/mi-stepn.c, gdb.mi/mi-stepn.exp: New files.
+	* gdb.python/py-events.c (first): Add bits for new "step N" test.
+	* gdb.python/py-events.exp: Test that "step N" tripping on a
+	breakpoint emits a breakpoint event.
+
+2012-01-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/auxv.exp: Reformat the copyright notice.
+
+2012-01-03  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/strace.exp (strace_trace_on_same_addr): New.
+	(strace_trace_on_diff_addr): New.
+	* gdb.trace/strace.c: (main): Add two local variables.
+
 2011-01-02  Ulrich Weigand  <uweigand@de.ibm.com>
 
 	* gdb.cell/fork.exp: Delete breakpoints after reaching main.
@@ -26282,7 +26412,6 @@ Sun Feb 21 10:55:55 1993  Mike Werner  (mtw@poseidon.cygnus.com)
 ;; version-control: never
 ;; End:
 
-    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-    2003, 2004, 2005 Free Software Foundation, Inc.
+    Copyright 1993-2005, 2012 Free Software Foundation, Inc.
   Copying and distribution of this file, with or without modification,
   are permitted provided the copyright notice and this notice are preserved.

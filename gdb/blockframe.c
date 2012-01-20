@@ -1,9 +1,7 @@
 /* Get info from stack frames; convert between frames, blocks,
    functions and pc values.
 
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
-   2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-2004, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -354,8 +352,9 @@ find_pc_partial_function (CORE_ADDR pc, char **name, CORE_ADDR *address,
   return find_pc_partial_function_gnu_ifunc (pc, name, address, endaddr, NULL);
 }
 
-/* Return the innermost stack frame executing inside of BLOCK, or NULL
-   if there is no such frame.  If BLOCK is NULL, just return NULL.  */
+/* Return the innermost stack frame that is executing inside of BLOCK and is
+   at least as old as the selected frame. Return NULL if there is no
+   such frame.  If BLOCK is NULL, just return NULL.  */
 
 struct frame_info *
 block_innermost_frame (const struct block *block)
@@ -370,7 +369,9 @@ block_innermost_frame (const struct block *block)
   start = BLOCK_START (block);
   end = BLOCK_END (block);
 
-  frame = get_current_frame ();
+  frame = get_selected_frame_if_set ();
+  if (frame == NULL)
+    frame = get_current_frame ();
   while (frame != NULL)
     {
       struct block *frame_block = get_frame_block (frame, NULL);

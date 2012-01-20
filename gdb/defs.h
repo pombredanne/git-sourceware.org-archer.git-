@@ -1,9 +1,8 @@
 /* *INDENT-OFF* */ /* ATTRIBUTE_PRINTF confuses indent, avoid running it
 		      for now.  */
 /* Basic, host-specific, and target-specific definitions for GDB.
-   Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009,
-   2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986, 1988-2005, 2007-2012 Free Software Foundation,
+   Inc.
 
    This file is part of GDB.
 
@@ -754,6 +753,35 @@ extern struct command_line *read_command_lines_1 (char * (*) (void), int,
 						  void *);
 
 extern void free_command_lines (struct command_line **);
+
+/* Parameters of the "info proc" command.  */
+
+enum info_proc_what
+  {
+    /* Display the default cmdline, cwd and exe outputs.  */
+    IP_MINIMAL,
+
+    /* Display `info proc mappings'.  */
+    IP_MAPPINGS,
+
+    /* Display `info proc status'.  */
+    IP_STATUS,
+
+    /* Display `info proc stat'.  */
+    IP_STAT,
+
+    /* Display `info proc cmdline'.  */
+    IP_CMDLINE,
+
+    /* Display `info proc exe'.  */
+    IP_EXE,
+
+    /* Display `info proc cwd'.  */
+    IP_CWD,
+
+    /* Display all of the above.  */
+    IP_ALL
+  };
 
 /* String containing the current directory (what getwd would return).  */
 
