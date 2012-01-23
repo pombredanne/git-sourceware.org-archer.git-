@@ -1,7 +1,5 @@
 \input texinfo      @c -*-texinfo-*-
-@c Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-@c 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
-@c 2010, 2011 Free Software Foundation, Inc.
+@c Copyright (C) 1988-1996, 1998-2012 Free Software Foundation, Inc.
 @c
 @c %**start of header
 @c makeinfo ignores cmds prev to setfilename, so its arg cannot make use
@@ -1191,10 +1189,9 @@ scripting support was enabled when @value{GDBN} was configured.
 Activate the @dfn{Text User Interface} when starting.  The Text User
 Interface manages several text windows on the terminal, showing
 source, assembly, registers and @value{GDBN} command outputs
-(@pxref{TUI, ,@value{GDBN} Text User Interface}).  Alternatively, the
-Text User Interface can be enabled by invoking the program
-@samp{@value{GDBTUI}}.  Do not use this option if you run @value{GDBN} from
-Emacs (@pxref{Emacs, ,Using @value{GDBN} under @sc{gnu} Emacs}).
+(@pxref{TUI, ,@value{GDBN} Text User Interface}).  Do not use this
+option if you run @value{GDBN} from Emacs (@pxref{Emacs, ,
+Using @value{GDBN} under @sc{gnu} Emacs}).
 
 @c @item -xdb
 @c @cindex @code{--xdb}
@@ -6505,6 +6502,11 @@ linespec.
 
 @item @var{filename}:@var{linenum}
 Specifies the line @var{linenum} in the source file @var{filename}.
+If @var{filename} is a relative file name, then it will match any
+source file name with the same trailing components.  For example, if
+@var{filename} is @samp{gcc/expr.c}, then it will match source file
+name of @file{/build/trunk/gcc/expr.c}, but not
+@file{/build/trunk/libcpp/expr.c} or @file{/build/trunk/gcc/x-expr.c}.
 
 @item @var{function}
 Specifies the line that begins the body of the function @var{function}.
@@ -7319,7 +7321,7 @@ scope is a single source file even if the current execution point is not
 in this file.  But it is possible to have more than one such variable or
 function with the same name (in different source files).  If that
 happens, referring to that name has unpredictable effects.  If you wish,
-you can specify a static variable in a particular function or file,
+you can specify a static variable in a particular function or file by
 using the colon-colon (@code{::}) notation:
 
 @cindex colon-colon, context for variables/functions
@@ -7342,8 +7344,49 @@ to print a global value of @code{x} defined in @file{f2.c}:
 (@value{GDBP}) p 'f2.c'::x
 @end smallexample
 
+The @code{::} notation is normally used for referring to
+static variables, since you typically disambiguate uses of local variables
+in functions by selecting the appropriate frame and using the
+simple name of the variable.  However, you may also use this notation
+to refer to local variables in frames enclosing the selected frame:
+
+@smallexample
+void
+foo (int a)
+@{
+  if (a < 10)
+    bar (a);
+  else
+    process (a);    /* Stop here */
+@}
+
+int
+bar (int a)
+@{
+  foo (a + 5);
+@}
+@end smallexample
+
+@noindent
+For example, if there is a breakpoint at the commented line,
+here is what you might see
+when the program stops after executing the call @code{bar(0)}:
+
+@smallexample
+(@value{GDBP}) p a
+$1 = 10
+(@value{GDBP}) p bar::a
+$2 = 5
+(@value{GDBP}) up 2
+#2  0x080483d0 in foo (a=5) at foobar.c:12
+(@value{GDBP}) p a
+$3 = 5
+(@value{GDBP}) p bar::a
+$4 = 0
+@end smallexample
+
 @cindex C@t{++} scope resolution
-This use of @samp{::} is very rarely in conflict with the very similar
+These uses of @samp{::} are very rarely in conflict with the very similar
 use of the same notation in C@t{++}.  @value{GDBN} also supports use of the C@t{++}
 scope resolution operator in @value{GDBN} expressions.
 @c FIXME: Um, so what happens in one of those rare cases where it's in
@@ -17422,6 +17465,10 @@ are:
 @tab @code{vFile:unlink}
 @tab @code{remote delete}
 
+@item @code{hostio-readlink-packet}
+@tab @code{vFile:readlink}
+@tab Host I/O
+
 @item @code{noack-packet}
 @tab @code{QStartNoAckMode}
 @tab Packet acknowledgment
@@ -21549,6 +21596,8 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Symbol Tables In Python::     Python representation of symbol tables.
 * Lazy Strings In Python::      Python representation of lazy strings.
 * Breakpoints In Python::       Manipulating breakpoints using Python.
+* Finish Breakpoints in Python:: Setting Breakpoints on function return
+                                using Python.
 @end menu
 
 @node Basic Python
@@ -24383,6 +24432,57 @@ commands, separated by newlines.  If there are no commands, this
 attribute is @code{None}.  This attribute is not writable.
 @end defvar
 
+@node Finish Breakpoints in Python
+@subsubsection Finish Breakpoints
+
+@cindex python finish breakpoints
+@tindex gdb.FinishBreakpoint
+
+A finish breakpoint is a temporary breakpoint set at the return address of
+a frame, based on the @code{finish} command.  @code{gdb.FinishBreakpoint}
+extends @code{gdb.Breakpoint}.  The underlying breakpoint will be disabled 
+and deleted when the execution will run out of the breakpoint scope (i.e.@: 
+@code{Breakpoint.stop} or @code{FinishBreakpoint.out_of_scope} triggered).
+Finish breakpoints are thread specific and must be create with the right 
+thread selected.  
+ 
+@defun FinishBreakpoint.__init__ (@r{[}frame@r{]} @r{[}, internal@r{]})
+Create a finish breakpoint at the return address of the @code{gdb.Frame}
+object @var{frame}.  If @var{frame} is not provided, this defaults to the
+newest frame.  The optional @var{internal} argument allows the breakpoint to
+become invisible to the user.  @xref{Breakpoints In Python}, for further 
+details about this argument.
+@end defun
+
+@defun FinishBreakpoint.out_of_scope (self)
+In some circumstances (e.g.@: @code{longjmp}, C@t{++} exceptions, @value{GDBN} 
+@code{return} command, @dots{}), a function may not properly terminate, and
+thus never hit the finish breakpoint.  When @value{GDBN} notices such a
+situation, the @code{out_of_scope} callback will be triggered.
+
+You may want to sub-class @code{gdb.FinishBreakpoint} and override this
+method:
+
+@smallexample
+class MyFinishBreakpoint (gdb.FinishBreakpoint)
+    def stop (self):
+        print "normal finish"
+        return True
+    
+    def out_of_scope ():
+        print "abnormal finish"
+@end smallexample 
+@end defun
+
+@defvar FinishBreakpoint.return_value
+When @value{GDBN} is stopped at a finish breakpoint and the frame 
+used to build the @code{gdb.FinishBreakpoint} object had debug symbols, this
+attribute will contain a @code{gdb.Value} object corresponding to the return
+value of the function.  The value will be @code{None} if the function return 
+type is @code{void} or if the return value was not computable.  This attribute
+is not writable.
+@end defvar
+
 @node Lazy Strings In Python
 @subsubsection Python representation of lazy strings.
 
@@ -24652,6 +24752,13 @@ corresponding API for the subprinters.
 Utility class for handling multiple printers, all recognized via
 regular expressions.
 @xref{Writing a Pretty-Printer}, for an example.
+
+@item FlagEnumerationPrinter (@var{name})
+A pretty-printer which handles printing of @code{enum} values.  Unlike
+@value{GDBN}'s built-in @code{enum} printing, this printer attempts to
+work properly when there is some overlap between the enumeration
+constants.  @var{name} is the name of the printer and also the name of
+the @code{enum} type to look up.
 
 @item register_pretty_printer (@var{obj}, @var{printer}, @var{replace}=False)
 Register @var{printer} with the pretty-printer list of @var{obj}.
@@ -24956,9 +25063,8 @@ commands in separate text windows.  The TUI mode is supported only
 on platforms where a suitable version of the @code{curses} library
 is available.
 
-@pindex @value{GDBTUI}
 The TUI mode is enabled by default when you invoke @value{GDBN} as
-either @samp{@value{GDBTUI}} or @samp{@value{GDBP} -tui}.
+@samp{@value{GDBP} -tui}.
 You can also switch in and out of TUI mode while @value{GDBN} runs by
 using various TUI commands and key bindings, such as @kbd{C-x C-a}. 
 @xref{TUI Keys, ,TUI Key Bindings}.
@@ -36126,6 +36232,16 @@ error occurred.
 @item vFile:unlink: @var{pathname}
 Delete the file at @var{pathname} on the target.  Return 0,
 or -1 if an error occurs.  @var{pathname} is a string.
+
+@item vFile:readlink: @var{filename}
+Read value of symbolic link @var{filename} on the target.  Return
+the number of bytes read, or -1 if an error occurs.
+
+The data read should be returned as a binary attachment on success.
+If zero bytes were read, the response should include an empty binary
+attachment (i.e.@: a trailing semicolon).  The return value is the
+number of target bytes read; the binary attachment may be longer if
+some characters were escaped.
 
 @end table
 

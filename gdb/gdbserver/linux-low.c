@@ -1,6 +1,5 @@
 /* Low level interface to ptrace, for the remote server for GDB.
-   Copyright (C) 1995, 1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
-   2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1995-1996, 1998-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1579,8 +1578,7 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
 
   /* Check for a lwp with a pending status.  */
 
-  if (ptid_equal (ptid, minus_one_ptid)
-      || ptid_equal (pid_to_ptid (ptid_get_pid (ptid)), ptid))
+  if (ptid_equal (ptid, minus_one_ptid) || ptid_is_pid (ptid))
     {
       event_child = (struct lwp_info *)
 	find_inferior (&all_lwps, status_pending_p_callback, &ptid);

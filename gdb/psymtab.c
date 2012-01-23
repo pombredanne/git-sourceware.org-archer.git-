@@ -1,6 +1,6 @@
 /* Partial symbol tables.
    
-   Copyright (C) 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 2009-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -164,10 +164,14 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 {
   struct partial_symtab *pst;
   const char *name_basename = lbasename (name);
+  int name_len = strlen (name);
+  int is_abs = IS_ABSOLUTE_PATH (name);
 
   ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, pst)
   {
-    if (FILENAME_CMP (name, pst->filename) == 0)
+    if (FILENAME_CMP (name, pst->filename) == 0
+	|| (!is_abs && compare_filenames_for_search (pst->filename,
+						     name, name_len)))
       {
 	if (partial_map_expand_apply (objfile, name, full_path, real_path,
 				      pst, callback, data))
@@ -186,7 +190,9 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
       {
 	psymtab_to_fullname (pst);
 	if (pst->fullname != NULL
-	    && FILENAME_CMP (full_path, pst->fullname) == 0)
+	    && (FILENAME_CMP (full_path, pst->fullname) == 0
+		|| (!is_abs && compare_filenames_for_search (pst->fullname,
+							     name, name_len))))
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
@@ -203,7 +209,10 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
             rp = gdb_realpath (pst->fullname);
             make_cleanup (xfree, rp);
           }
-	if (rp != NULL && FILENAME_CMP (real_path, rp) == 0)
+	if (rp != NULL
+	    && (FILENAME_CMP (real_path, rp) == 0
+		|| (!is_abs && compare_filenames_for_search (real_path,
+							     name, name_len))))
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
@@ -211,17 +220,6 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 	  }
       }
   }
-
-  /* Now, search for a matching tail (only if name doesn't have any dirs).  */
-
-  if (name_basename == name)
-    ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, pst)
-    {
-      if (FILENAME_CMP (lbasename (pst->filename), name) == 0)
-	if (partial_map_expand_apply (objfile, name, full_path, real_path, pst,
-				      callback, data))
-	  return 1;
-    }
 
   return 0;
 }
@@ -1305,7 +1303,7 @@ expand_symtabs_matching_via_partial
 		   || (kind == TYPES_DOMAIN
 		       && SYMBOL_CLASS (*psym) == LOC_TYPEDEF))
 		  && (*name_matcher) (current_language,
-				      SYMBOL_NATURAL_NAME (*psym), data))
+				      SYMBOL_SEARCH_NAME (*psym), data))
 		{
 		  PSYMTAB_TO_SYMTAB (ps);
 		  keep_going = 0;

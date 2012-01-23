@@ -1,5 +1,4 @@
-# Copyright 1992, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2007, 2008, 2009,
-# 2010, 2011 Free Software Foundation, Inc.
+# Copyright 1992, 1994-2000, 2007-2012 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,10 +14,6 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # This file was written by Fred Fish. (fnf@cygnus.com)
-
-if $tracelevel then {
-    strace $tracelevel
-}
 
 
 set testfile "watchpoint"
@@ -581,12 +576,26 @@ proc test_complex_watchpoint {} {
         #
         gdb_test "tbreak recurser" ".*breakpoint.*"
         gdb_test "cont" "Continuing.*recurser.*"
+        gdb_test "next" "if \\(x > 0.*" "next past local_x initialization"
         gdb_test "watch local_x" ".*\[Ww\]atchpoint \[0-9\]*: local_x" \
                  "set local watch in recursive call"
         gdb_test "cont" "Continuing.*\[Ww\]atchpoint .*: local_x.*New value = 2.*" \
                  "trigger local watch in recursive call"
         gdb_test "cont" "Continuing.*\[Ww\]atchpoint .* deleted because the program has left the block in.*which its expression is valid.*" \
                  "self-delete local watch in recursive call"
+
+        # Repeat the preceding test, but this time use "recurser::local_x" as
+        # the variable to track.
+        gdb_test "cont" "Continuing.*marker6.*"
+        gdb_test "tbreak recurser" ".*breakpoint.*"
+        gdb_test "cont" "Continuing.*recurser.*"
+        gdb_test "next" "if \\(x > 0.*" "next past local_x initialization"
+        gdb_test "watch recurser::local_x" ".*\[Ww\]atchpoint \[0-9\]*: recurser::local_x" \
+                 "set local watch in recursive call with explicit scope"
+        gdb_test "cont" "Continuing.*\[Ww\]atchpoint .*: recurser::local_x.*New value = 2.*" \
+                 "trigger local watch with explicit scope in recursive call"
+        gdb_test "cont" "Continuing.*\[Ww\]atchpoint .* deleted because the program has left the block in.*which its expression is valid.*" \
+                 "self-delete local watch with explicit scope in recursive call (2)"
 
 	# Disable everything so we can finish the program at full speed
 	gdb_test_no_output "disable" "disable in test_complex_watchpoint"

@@ -1,8 +1,6 @@
 /* Support routines for manipulating internal types for GDB.
 
-   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1992-1996, 1998-2012 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -35,11 +33,10 @@
 #include "demangle.h"
 #include "complaints.h"
 #include "gdbcmd.h"
-#include "wrapper.h"
 #include "cp-abi.h"
 #include "gdb_assert.h"
 #include "hashtab.h"
-
+#include "exceptions.h"
 
 /* Initialize BADNESS constants.  */
 
@@ -1677,14 +1674,20 @@ static struct type *
 safe_parse_type (struct gdbarch *gdbarch, char *p, int length)
 {
   struct ui_file *saved_gdb_stderr;
-  struct type *type;
+  struct type *type = NULL; /* Initialize to keep gcc happy.  */
+  volatile struct gdb_exception except;
 
   /* Suppress error messages.  */
   saved_gdb_stderr = gdb_stderr;
   gdb_stderr = ui_file_new ();
 
   /* Call parse_and_eval_type() without fear of longjmp()s.  */
-  if (!gdb_parse_and_eval_type (p, length, &type))
+  TRY_CATCH (except, RETURN_MASK_ERROR)
+    {
+      type = parse_and_eval_type (p, length);
+    }
+
+  if (except.reason < 0)
     type = builtin_type (gdbarch)->builtin_void;
 
   /* Stop suppressing error messages.  */
@@ -2897,8 +2900,6 @@ print_cplus_stuff (struct type *type, int spaces)
 		    TYPE_N_BASECLASSES (type));
   printfi_filtered (spaces, "nfn_fields %d\n",
 		    TYPE_NFN_FIELDS (type));
-  printfi_filtered (spaces, "nfn_fields_total %d\n",
-		    TYPE_NFN_FIELDS_TOTAL (type));
   if (TYPE_N_BASECLASSES (type) > 0)
     {
       printfi_filtered (spaces, "virtual_field_bits (%d bits at *",

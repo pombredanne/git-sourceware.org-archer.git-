@@ -1,7 +1,6 @@
 /* GDB CLI commands.
 
-   Copyright (C) 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 2000-2005, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -514,6 +513,17 @@ find_and_open_script (const char *script_file, int search_path,
   do_cleanups (old_cleanups);
 
   *streamp = fdopen (fd, FOPEN_RT);
+  if (*streamp == NULL)
+    {
+      int save_errno = errno;
+
+      close (fd);
+      if (full_pathp)
+	xfree (*full_pathp);
+      errno = save_errno;
+      return 0;
+    }
+
   return 1;
 }
 

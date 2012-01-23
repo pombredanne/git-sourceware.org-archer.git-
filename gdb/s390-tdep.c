@@ -1,7 +1,6 @@
 /* Target-dependent code for GDB, the GNU debugger.
 
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 2001-2012 Free Software Foundation, Inc.
 
    Contributed by D.J. Barrow (djbarrow@de.ibm.com,barrow_dj@yahoo.com)
    for IBM Deutschland Entwicklung GmbH, IBM Corporation.
@@ -2749,9 +2748,15 @@ s390_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
       }
   }
 
-  /* Store return address.  */
+  /* Store return PSWA.  In 31-bit mode, keep addressing mode bit.  */
+  if (word_size == 4)
+    {
+      ULONGEST pswa;
+      regcache_cooked_read_unsigned (regcache, S390_PSWA_REGNUM, &pswa);
+      bp_addr = (bp_addr & 0x7fffffff) | (pswa & 0x80000000);
+    }
   regcache_cooked_write_unsigned (regcache, S390_RETADDR_REGNUM, bp_addr);
-  
+
   /* Store updated stack pointer.  */
   regcache_cooked_write_unsigned (regcache, S390_SP_REGNUM, sp);
 

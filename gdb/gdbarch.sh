@@ -2,8 +2,7 @@
 
 # Architecture commands for GDB, the GNU debugger.
 #
-# Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-# 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+# Copyright (C) 1998-2012 Free Software Foundation, Inc.
 #
 # This file is part of GDB.
 #
@@ -632,6 +631,12 @@ M:const struct regset *:regset_from_core_section:const char *sect_name, size_t s
 # Supported register notes in a core file.
 v:struct core_regset_section *:core_regset_sections:const char *name, int len::::::host_address_to_string (gdbarch->core_regset_sections)
 
+# Create core file notes
+M:char *:make_corefile_notes:bfd *obfd, int *note_size:obfd, note_size
+
+# Find core file memory regions
+M:int:find_memory_regions:find_memory_region_ftype func, void *data:func, data
+
 # Read offset OFFSET of TARGET_OBJECT_LIBRARIES formatted shared libraries list from
 # core file into buffer READBUF with length LEN.
 M:LONGEST:core_xfer_shared_libraries:gdb_byte *readbuf, ULONGEST offset, LONGEST len:readbuf, offset, len
@@ -654,7 +659,7 @@ v:int:vbit_in_delta:::0:0::0
 # Advance PC to next instruction in order to skip a permanent breakpoint.
 F:void:skip_permanent_breakpoint:struct regcache *regcache:regcache
 
-# The maximum length of an instruction on this architecture.
+# The maximum length of an instruction on this architecture in bytes.
 V:ULONGEST:max_insn_length:::0:0
 
 # Copy the instruction at FROM to TO, and make any adjustments
@@ -830,6 +835,9 @@ v:int:has_dos_based_file_system:::0:0::0
 # typically this function will issue bytecodes for one or more likely
 # places that the return address may be found.
 m:void:gen_return_address:struct agent_expr *ax, struct axs_value *value, CORE_ADDR scope:ax, value, scope::default_gen_return_address::0
+
+# Implement the "info proc" command.
+M:void:info_proc:char *args, enum info_proc_what what:args, what
 
 EOF
 }

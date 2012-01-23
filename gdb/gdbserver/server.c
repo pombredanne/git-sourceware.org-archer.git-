@@ -1,7 +1,6 @@
 /* Main code for remote server for GDB.
-   Copyright (C) 1989, 1993, 1994, 1995, 1997, 1998, 1999, 2000, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1989, 1993-1995, 1997-2000, 2002-2012 Free Software
+   Foundation, Inc.
 
    This file is part of GDB.
 
@@ -285,7 +284,7 @@ start_inferior (char **argv)
       resume_info.kind = resume_continue;
       resume_info.sig = 0;
 
-      mywait (pid_to_ptid (signal_pid), &last_status, 0, 0);
+      last_ptid = mywait (pid_to_ptid (signal_pid), &last_status, 0, 0);
 
       if (last_status.kind != TARGET_WAITKIND_STOPPED)
 	return signal_pid;
@@ -294,7 +293,7 @@ start_inferior (char **argv)
 	{
 	  (*the_target->resume) (&resume_info, 1);
 
- 	  mywait (pid_to_ptid (signal_pid), &last_status, 0, 0);
+ 	  last_ptid = mywait (pid_to_ptid (signal_pid), &last_status, 0, 0);
 	  if (last_status.kind != TARGET_WAITKIND_STOPPED)
 	    return signal_pid;
 
@@ -338,6 +337,10 @@ attach_inferior (int pid)
      attach function, so that it can be the main thread instead of
      whichever we were told to attach to.  */
   signal_pid = pid;
+
+  /* Clear this so the backend doesn't get confused, thinking
+     CONT_THREAD died, and it needs to resume all threads.  */
+  cont_thread = null_ptid;
 
   if (!non_stop)
     {
@@ -2141,7 +2144,7 @@ handle_v_requests (char *own_buf, int packet_len, int *new_packet_len)
 
   if (strncmp (own_buf, "vAttach;", 8) == 0)
     {
-      if (!multi_process && target_running ())
+      if ((!extended_protocol || !multi_process) && target_running ())
 	{
 	  fprintf (stderr, "Already debugging a process\n");
 	  write_enn (own_buf);
@@ -2153,7 +2156,7 @@ handle_v_requests (char *own_buf, int packet_len, int *new_packet_len)
 
   if (strncmp (own_buf, "vRun;", 5) == 0)
     {
-      if (!multi_process && target_running ())
+      if ((!extended_protocol || !multi_process) && target_running ())
 	{
 	  fprintf (stderr, "Already debugging a process\n");
 	  write_enn (own_buf);
@@ -2370,7 +2373,7 @@ static void
 gdbserver_version (void)
 {
   printf ("GNU gdbserver %s%s\n"
-	  "Copyright (C) 2011 Free Software Foundation, Inc.\n"
+	  "Copyright (C) 2012 Free Software Foundation, Inc.\n"
 	  "gdbserver is free software, covered by the "
 	  "GNU General Public License.\n"
 	  "This gdbserver was configured as \"%s\"\n",
@@ -2720,7 +2723,14 @@ main (int argc, char *argv[])
 
   if (setjmp (toplevel))
     {
-      detach_or_kill_for_exit ();
+      /* If something fails and longjmps while detaching or killing
+	 inferiors, we'd end up here again, stuck in an infinite loop
+	 trap.  Be sure that if that happens, we exit immediately
+	 instead.  */
+      if (setjmp (toplevel) == 0)
+	detach_or_kill_for_exit ();
+      else
+	fprintf (stderr, "Detach or kill failed.  Exiting\n");
       exit (1);
     }
 
@@ -2766,8 +2776,20 @@ main (int argc, char *argv[])
 
       if (exit_requested || run_once)
 	{
-	  detach_or_kill_for_exit ();
-	  exit (0);
+	  /* If something fails and longjmps while detaching or
+	     killing inferiors, we'd end up here again, stuck in an
+	     infinite loop trap.  Be sure that if that happens, we
+	     exit immediately instead.  */
+	  if (setjmp (toplevel) == 0)
+	    {
+	      detach_or_kill_for_exit ();
+	      exit (0);
+	    }
+	  else
+	    {
+	      fprintf (stderr, "Detach or kill failed.  Exiting\n");
+	      exit (1);
+	    }
 	}
 
       fprintf (stderr,

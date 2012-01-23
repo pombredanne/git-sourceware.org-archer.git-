@@ -1,6 +1,6 @@
 /* Handle JIT code generation in the inferior for GDB, the GNU Debugger.
 
-   Copyright (C) 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 2009-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -694,9 +694,7 @@ jit_object_close_impl (struct gdb_symbol_callbacks *cb,
   objfile = allocate_objfile (NULL, 0);
   objfile->gdbarch = target_gdbarch;
 
-  objfile->msymbols = obstack_alloc (&objfile->objfile_obstack,
-                                     sizeof (struct minimal_symbol));
-  memset (objfile->msymbols, 0, sizeof (struct minimal_symbol));
+  terminate_minimal_symbol_table (objfile);
 
   xfree (objfile->name);
   objfile->name = xstrdup ("<< JIT compiled code >>");

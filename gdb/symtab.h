@@ -1,8 +1,7 @@
 /* Symbol table definitions for GDB.
 
-   Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 1986, 1988-2004, 2007-2012 Free Software Foundation,
+   Inc.
 
    This file is part of GDB.
 
@@ -347,7 +346,7 @@ struct minimal_symbol
   unsigned long size;
 
   /* Which source file is this symbol in?  Only relevant for mst_file_*.  */
-  char *filename;
+  const char *filename;
 
   /* Classification type for this minimal symbol.  */
 
@@ -372,6 +371,8 @@ struct minimal_symbol
 #define MSYMBOL_TARGET_FLAG_2(msymbol)  (msymbol)->target_flag_2
 #define MSYMBOL_SIZE(msymbol)		(msymbol)->size
 #define MSYMBOL_TYPE(msymbol)		(msymbol)->type
+
+#include "minsyms.h"
 
 
 
@@ -1008,62 +1009,6 @@ extern struct type *basic_lookup_transparent_type (const char *);
 #define GCC2_COMPILED_FLAG_SYMBOL "gcc2_compiled."
 #endif
 
-/* Functions for dealing with the minimal symbol table, really a misc
-   address<->symbol mapping for things we don't have debug symbols for.  */
-
-extern void prim_record_minimal_symbol (const char *, CORE_ADDR,
-					enum minimal_symbol_type,
-					struct objfile *);
-
-extern struct minimal_symbol *prim_record_minimal_symbol_full
-  (const char *, int, int, CORE_ADDR,
-   enum minimal_symbol_type,
-   int section, asection * bfd_section, struct objfile *);
-
-extern struct minimal_symbol *prim_record_minimal_symbol_and_info
-  (const char *, CORE_ADDR,
-   enum minimal_symbol_type,
-   int section, asection * bfd_section, struct objfile *);
-
-extern unsigned int msymbol_hash_iw (const char *);
-
-extern unsigned int msymbol_hash (const char *);
-
-/* Compute the next hash value from previous HASH and the character C.  This
-   is only a GDB in-memory computed value with no external files compatibility
-   requirements.  */
-
-#define SYMBOL_HASH_NEXT(hash, c) \
-  ((hash) * 67 + tolower ((unsigned char) (c)) - 113)
-
-extern struct objfile * msymbol_objfile (struct minimal_symbol *sym);
-
-extern void
-add_minsym_to_hash_table (struct minimal_symbol *sym,
-			  struct minimal_symbol **table);
-
-extern struct minimal_symbol *lookup_minimal_symbol (const char *,
-						     const char *,
-						     struct objfile *);
-
-extern struct minimal_symbol *lookup_minimal_symbol_text (const char *,
-							  struct objfile *);
-
-struct minimal_symbol *lookup_minimal_symbol_solib_trampoline (const char *,
-							       struct objfile
-							       *);
-
-extern struct minimal_symbol *lookup_minimal_symbol_by_pc_name
-				(CORE_ADDR, const char *, struct objfile *);
-
-extern struct minimal_symbol *lookup_minimal_symbol_by_pc (CORE_ADDR);
-
-extern void iterate_over_minimal_symbols (struct objfile *objf,
-					  const char *name,
-					  void (*callback) (struct minimal_symbol *,
-							    void *),
-					  void *user_data);
-
 extern int in_gnu_ifunc_stub (CORE_ADDR pc);
 
 /* Functions for resolving STT_GNU_IFUNC symbols which are implemented only
@@ -1093,27 +1038,7 @@ struct gnu_ifunc_fns
 
 extern const struct gnu_ifunc_fns *gnu_ifunc_fns_p;
 
-extern struct minimal_symbol *
-    lookup_minimal_symbol_and_objfile (const char *,
-				       struct objfile **);
-
-extern struct minimal_symbol
-  *lookup_minimal_symbol_by_pc_section (CORE_ADDR, struct obj_section *);
-
-extern struct minimal_symbol
-  *lookup_solib_trampoline_symbol_by_pc (CORE_ADDR);
-
 extern CORE_ADDR find_solib_trampoline_target (struct frame_info *, CORE_ADDR);
-
-extern void init_minimal_symbol_collection (void);
-
-extern struct cleanup *make_cleanup_discard_minimal_symbols (void);
-
-extern void install_minimal_symbols (struct objfile *);
-
-/* Sort all the minimal symbols in OBJFILE.  */
-
-extern void msymbols_sort (struct objfile *objfile);
 
 struct symtab_and_line
 {
@@ -1313,6 +1238,10 @@ void fixup_section (struct general_symbol_info *ginfo,
 struct objfile *lookup_objfile_from_block (const struct block *block);
 
 extern int basenames_may_differ;
+
+int compare_filenames_for_search (const char *filename,
+				  const char *search_name,
+				  int search_len);
 
 int iterate_over_some_symtabs (const char *name,
 			       const char *full_path,

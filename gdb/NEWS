@@ -3,8 +3,33 @@
 
 *** Changes since GDB 7.4
 
+* Python scripting
+
+  ** The "maint set python print-stack on|off" is now deleted.
+
+  ** A new class, gdb.printing.FlagEnumerationPrinter, can be used to
+     apply "flag enum"-style pretty-printing to any enum.
+
 * GDBserver now supports stdio connections.
   E.g. (gdb) target remote | ssh myhost gdbserver - hello
+
+* The binary "gdbtui" can no longer be built or installed.
+  Use "gdb -tui" instead.
+
+* GDB will now print "flag" enums specially.  A flag enum is one where
+  all the enumerator values have no bits in common when pairwise
+  "and"ed.  When printing a value whose type is a flag enum, GDB will
+  show all the constants, e.g., for enum E { ONE = 1, TWO = 2}:
+  (gdb) print (enum E) 3
+  $1 = (ONE | TWO)
+
+* The filename part of a linespec will now match trailing components
+  of a source file name.  For example, "break gcc/expr.c:1000" will
+  now set a breakpoint in build/gcc/expr.c, but not
+  build/libcpp/expr.c.
+
+* The "info proc" and "generate-core-file" commands will now also
+  work on remote targets connected to GDBserver on Linux.
 
 *** Changes in GDB 7.4
 
@@ -34,10 +59,11 @@
      existing one.
 
   ** The "maint set python print-stack on|off" command has been
-     removed.  A new command: "set python print-stack
-     none|full|message" has replaced it.  Additionally, the default
-     for "print-stack" is now "message", which just prints the error
-     message without the stack trace.
+     deprecated and will be deleted in GDB 7.5.
+     A new command: "set python print-stack none|full|message" has
+     replaced it.  Additionally, the default for "print-stack" is
+     now "message", which just prints the error message without
+     the stack trace.
    
   ** A prompt substitution hook (prompt_hook) is now available to the
      Python API.
@@ -62,6 +88,10 @@
 
   ** The "gdb.breakpoint" function has been deprecated in favor of
      "gdb.breakpoints".
+
+  ** A new class "gdb.FinishBreakpoint" is provided to catch the return
+     of a function.  This class is based on the "finish" command
+     available in the CLI. 
 
   ** Type objects for struct and union types now allow access to
      the fields using standard Python dictionary (mapping) methods.

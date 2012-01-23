@@ -1,3 +1,72 @@
+2012-01-23  Pedro Alves  <palves@redhat.com>
+
+	* server.c (main): Avoid yet another case of infinite loop while
+	detaching/killing after a longjmp.
+
+2012-01-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* linux-low.c (linux_wait_for_event_1): Use ptid_is_pid.
+
+2012-01-20  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* hostio.c (handle_readlink): New function.
+	(handle_vFile): Call it to handle "vFile:readlink" packets.
+
+2012-01-20  Pedro Alves  <palves@redhat.com>
+	    Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* server.c (handle_v_requests): Only support vAttach and vRun to
+	start multiple processes when in extended protocol mode.
+
+2012-01-17  Pedro Alves  <palves@redhat.com>
+
+	* tracepoint.c (initialize_tracepoint): Use mmap instead of
+	memalign plus mprotect to allocate the scratch buffer.
+
+2012-01-13  Pedro Alves  <palves@redhat.com>
+
+	* server.c (attach_inferior): Clear `cont_thread'.
+
+2012-01-13  Pedro Alves  <palves@redhat.com>
+
+	* server.c (main): Avoid infinite loop while detaching/killing
+	after a longjmp.
+
+2012-01-09  Doug Evans  <dje@google.com>
+
+	* server.c (start_inferior): Set last_ptid in --wrapper case.
+
+2012-01-06  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c [IN_PROCESS_AGENT] (debug_threads): Macro
+	defined.
+	[IN_PROCESS_AGENT] (debug_agent): New global variable.
+
+2012-01-04  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (cmd_qtdp): Print debug message
+	for static tracepoint.
+
+2012-01-04  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (trace_vdebug): Differentiate debug message
+	between gdbserver and IPA.
+
+2012-01-03  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (tracepoint_was_hit): Don't collect for
+	static tracepoint.
+
+2012-01-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* terminal.h: Reformat copyright header.
+
+2012-01-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* server.c (gdbserver_version): Update copyright year.
+	* gdbreplay.c (gdbreplay_version): Likewise.
+
 2011-12-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* linux-low.c (linux_create_inferior): Put empty if clause for write.

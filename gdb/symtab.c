@@ -1,8 +1,6 @@
 /* Symbol table lookup for the GNU debugger, GDB.
 
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
-   2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-2004, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -147,6 +145,35 @@ multiple_symbols_select_mode (void)
 
 const struct block *block_found;
 
+/* See whether FILENAME matches SEARCH_NAME using the rule that we
+   advertise to the user.  (The manual's description of linespecs
+   describes what we advertise).  SEARCH_LEN is the length of
+   SEARCH_NAME.  We assume that SEARCH_NAME is a relative path.
+   Returns true if they match, false otherwise.  */
+
+int
+compare_filenames_for_search (const char *filename, const char *search_name,
+			      int search_len)
+{
+  int len = strlen (filename);
+  int offset;
+
+  if (len < search_len)
+    return 0;
+
+  /* The tail of FILENAME must match.  */
+  if (FILENAME_CMP (filename + len - search_len, search_name) != 0)
+    return 0;
+
+  /* Either the names must completely match, or the character
+     preceding the trailing SEARCH_NAME segment of FILENAME must be a
+     directory separator.  */
+  return (len == search_len
+	  || IS_DIR_SEPARATOR (filename[len - search_len - 1])
+	  || (HAS_DRIVE_SPEC (filename)
+	      && STRIP_DRIVE_SPEC (filename) == &filename[len - search_len]));
+}
+
 /* Check for a symtab of a specific name by searching some symtabs.
    This is a helper function for callbacks of iterate_over_symtabs.
 
@@ -171,10 +198,19 @@ iterate_over_some_symtabs (const char *name,
   struct symtab *s = NULL;
   struct cleanup *cleanup;
   const char* base_name = lbasename (name);
+  int name_len = strlen (name);
+  int is_abs = IS_ABSOLUTE_PATH (name);
 
   for (s = first; s != NULL && s != after_last; s = s->next)
     {
+      /* Exact match is always ok.  */
       if (FILENAME_CMP (name, s->filename) == 0)
+	{
+	  if (callback (s, data))
+	    return 1;
+	}
+
+      if (!is_abs && compare_filenames_for_search (s->filename, name, name_len))
 	{
 	  if (callback (s, data))
 	    return 1;
@@ -198,6 +234,13 @@ iterate_over_some_symtabs (const char *name,
 	    if (callback (s, data))
 	      return 1;
           }
+
+	if (fp != NULL && !is_abs && compare_filenames_for_search (fp, name,
+								   name_len))
+	  {
+	    if (callback (s, data))
+	      return 1;
+	  }
       }
 
     if (real_path != NULL)
@@ -214,22 +257,14 @@ iterate_over_some_symtabs (const char *name,
 		if (callback (s, data))
 		  return 1;
 	      }
+
+	    if (!is_abs && compare_filenames_for_search (rp, name, name_len))
+	      {
+		if (callback (s, data))
+		  return 1;
+	      }
           }
       }
-    }
-
-  /* Now, search for a matching tail (only if name doesn't have any dirs).  */
-
-  if (lbasename (name) == name)
-    {
-      for (s = first; s != NULL && s != after_last; s = s->next)
-	{
-	  if (FILENAME_CMP (lbasename (s->filename), name) == 0)
-	    {
-	      if (callback (s, data))
-		return 1;
-	    }
-	}
     }
 
   return 0;

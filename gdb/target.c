@@ -1,8 +1,6 @@
 /* Select target systems and architectures at runtime for GDB.
 
-   Copyright (C) 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1990-2012 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
 
@@ -44,6 +42,7 @@
 #include "exec.h"
 #include "inline-frame.h"
 #include "tracepoint.h"
+#include "gdb/fileio.h"
 
 static void target_info (char *, int);
 
@@ -1012,16 +1011,10 @@ unpush_target (struct target_ops *t)
 	break;
     }
 
+  /* If we don't find target_ops, quit.  Only open targets should be
+     closed.  */
   if ((*cur) == NULL)
-    return 0;			/* Didn't find target_ops, quit now.  */
-
-  /* NOTE: cagney/2003-12-06: In '94 the close call was made
-     unconditional by moving it to before the above check that the
-     target was in the target stack (something about "Change the way
-     pushing and popping of targets work to support target overlays
-     and inheritance").  This doesn't make much sense - only open
-     targets should be closed.  */
-  target_close (t, 0);
+    return 0;			
 
   /* Unchain the target.  */
   tmp = (*cur);
@@ -1029,6 +1022,11 @@ unpush_target (struct target_ops *t)
   tmp->beneath = NULL;
 
   update_current_target ();
+
+  /* Finally close the target.  Note we do this after unchaining, so
+     any target method calls from within the target_close
+     implementation don't end up in T anymore.  */
+  target_close (t, 0);
 
   return 1;
 }
@@ -2347,7 +2345,7 @@ target_read_stralloc (struct target_ops *ops, enum target_object object,
 		      const char *annex)
 {
   gdb_byte *buffer;
-  LONGEST transferred;
+  LONGEST i, transferred;
 
   transferred = target_read_alloc_1 (ops, object, annex, &buffer, 1);
 
@@ -2358,10 +2356,16 @@ target_read_stralloc (struct target_ops *ops, enum target_object object,
     return xstrdup ("");
 
   buffer[transferred] = 0;
-  if (strlen (buffer) < transferred)
-    warning (_("target object %d, annex %s, "
-	       "contained unexpected null characters"),
-	     (int) object, annex ? annex : "(none)");
+
+  /* Check for embedded NUL bytes; but allow trailing NULs.  */
+  for (i = strlen (buffer); i < transferred; i++)
+    if (buffer[i] != 0)
+      {
+	warning (_("target object %d, annex %s, "
+		   "contained unexpected null characters"),
+		 (int) object, annex ? annex : "(none)");
+	break;
+      }
 
   return (char *) buffer;
 }
@@ -3083,6 +3087,38 @@ target_supports_non_stop (void)
   return 0;
 }
 
+/* Implement the "info proc" command.  */
+
+void
+target_info_proc (char *args, enum info_proc_what what)
+{
+  struct target_ops *t;
+
+  /* If we're already connected to something that can get us OS
+     related data, use it.  Otherwise, try using the native
+     target.  */
+  if (current_target.to_stratum >= process_stratum)
+    t = current_target.beneath;
+  else
+    t = find_default_run_target (NULL);
+
+  for (; t != NULL; t = t->beneath)
+    {
+      if (t->to_info_proc != NULL)
+	{
+	  t->to_info_proc (t, args, what);
+
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_info_proc (\"%s\", %d)\n", args, what);
+
+	  return;
+	}
+    }
+
+  error (_("Not supported on this target."));
+}
+
 static int
 find_default_supports_disable_randomization (void)
 {
@@ -3161,6 +3197,304 @@ target_thread_address_space (ptid_t ptid)
 
   return inf->aspace;
 }
+
+
+/* Target file operations.  */
+
+static struct target_ops *
+default_fileio_target (void)
+{
+  /* If we're already connected to something that can perform
+     file I/O, use it. Otherwise, try using the native target.  */
+  if (current_target.to_stratum >= process_stratum)
+    return current_target.beneath;
+  else
+    return find_default_run_target ("file I/O");
+}
+
+/* Open FILENAME on the target, using FLAGS and MODE.  Return a
+   target file descriptor, or -1 if an error occurs (and set
+   *TARGET_ERRNO).  */
+int
+target_fileio_open (const char *filename, int flags, int mode,
+		    int *target_errno)
+{
+  struct target_ops *t;
+
+  for (t = default_fileio_target (); t != NULL; t = t->beneath)
+    {
+      if (t->to_fileio_open != NULL)
+	{
+	  int fd = t->to_fileio_open (filename, flags, mode, target_errno);
+
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_fileio_open (%s,0x%x,0%o) = %d (%d)\n",
+				filename, flags, mode,
+				fd, fd != -1 ? 0 : *target_errno);
+	  return fd;
+	}
+    }
+
+  *target_errno = FILEIO_ENOSYS;
+  return -1;
+}
+
+/* Write up to LEN bytes from WRITE_BUF to FD on the target.
+   Return the number of bytes written, or -1 if an error occurs
+   (and set *TARGET_ERRNO).  */
+int
+target_fileio_pwrite (int fd, const gdb_byte *write_buf, int len,
+		      ULONGEST offset, int *target_errno)
+{
+  struct target_ops *t;
+
+  for (t = default_fileio_target (); t != NULL; t = t->beneath)
+    {
+      if (t->to_fileio_pwrite != NULL)
+	{
+	  int ret = t->to_fileio_pwrite (fd, write_buf, len, offset,
+					 target_errno);
+
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_fileio_pwrite (%d,...,%d,%s) "
+				"= %d (%d)\n",
+				fd, len, pulongest (offset),
+				ret, ret != -1 ? 0 : *target_errno);
+	  return ret;
+	}
+    }
+
+  *target_errno = FILEIO_ENOSYS;
+  return -1;
+}
+
+/* Read up to LEN bytes FD on the target into READ_BUF.
+   Return the number of bytes read, or -1 if an error occurs
+   (and set *TARGET_ERRNO).  */
+int
+target_fileio_pread (int fd, gdb_byte *read_buf, int len,
+		     ULONGEST offset, int *target_errno)
+{
+  struct target_ops *t;
+
+  for (t = default_fileio_target (); t != NULL; t = t->beneath)
+    {
+      if (t->to_fileio_pread != NULL)
+	{
+	  int ret = t->to_fileio_pread (fd, read_buf, len, offset,
+					target_errno);
+
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_fileio_pread (%d,...,%d,%s) "
+				"= %d (%d)\n",
+				fd, len, pulongest (offset),
+				ret, ret != -1 ? 0 : *target_errno);
+	  return ret;
+	}
+    }
+
+  *target_errno = FILEIO_ENOSYS;
+  return -1;
+}
+
+/* Close FD on the target.  Return 0, or -1 if an error occurs
+   (and set *TARGET_ERRNO).  */
+int
+target_fileio_close (int fd, int *target_errno)
+{
+  struct target_ops *t;
+
+  for (t = default_fileio_target (); t != NULL; t = t->beneath)
+    {
+      if (t->to_fileio_close != NULL)
+	{
+	  int ret = t->to_fileio_close (fd, target_errno);
+
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_fileio_close (%d) = %d (%d)\n",
+				fd, ret, ret != -1 ? 0 : *target_errno);
+	  return ret;
+	}
+    }
+
+  *target_errno = FILEIO_ENOSYS;
+  return -1;
+}
+
+/* Unlink FILENAME on the target.  Return 0, or -1 if an error
+   occurs (and set *TARGET_ERRNO).  */
+int
+target_fileio_unlink (const char *filename, int *target_errno)
+{
+  struct target_ops *t;
+
+  for (t = default_fileio_target (); t != NULL; t = t->beneath)
+    {
+      if (t->to_fileio_unlink != NULL)
+	{
+	  int ret = t->to_fileio_unlink (filename, target_errno);
+
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_fileio_unlink (%s) = %d (%d)\n",
+				filename, ret, ret != -1 ? 0 : *target_errno);
+	  return ret;
+	}
+    }
+
+  *target_errno = FILEIO_ENOSYS;
+  return -1;
+}
+
+/* Read value of symbolic link FILENAME on the target.  Return a
+   null-terminated string allocated via xmalloc, or NULL if an error
+   occurs (and set *TARGET_ERRNO).  */
+char *
+target_fileio_readlink (const char *filename, int *target_errno)
+{
+  struct target_ops *t;
+
+  for (t = default_fileio_target (); t != NULL; t = t->beneath)
+    {
+      if (t->to_fileio_readlink != NULL)
+	{
+	  char *ret = t->to_fileio_readlink (filename, target_errno);
+
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_fileio_readlink (%s) = %s (%d)\n",
+				filename, ret? ret : "(nil)",
+				ret? 0 : *target_errno);
+	  return ret;
+	}
+    }
+
+  *target_errno = FILEIO_ENOSYS;
+  return NULL;
+}
+
+static void
+target_fileio_close_cleanup (void *opaque)
+{
+  int fd = *(int *) opaque;
+  int target_errno;
+
+  target_fileio_close (fd, &target_errno);
+}
+
+/* Read target file FILENAME.  Store the result in *BUF_P and
+   return the size of the transferred data.  PADDING additional bytes are
+   available in *BUF_P.  This is a helper function for
+   target_fileio_read_alloc; see the declaration of that function for more
+   information.  */
+
+static LONGEST
+target_fileio_read_alloc_1 (const char *filename,
+			    gdb_byte **buf_p, int padding)
+{
+  struct cleanup *close_cleanup;
+  size_t buf_alloc, buf_pos;
+  gdb_byte *buf;
+  LONGEST n;
+  int fd;
+  int target_errno;
+
+  fd = target_fileio_open (filename, FILEIO_O_RDONLY, 0700, &target_errno);
+  if (fd == -1)
+    return -1;
+
+  close_cleanup = make_cleanup (target_fileio_close_cleanup, &fd);
+
+  /* Start by reading up to 4K at a time.  The target will throttle
+     this number down if necessary.  */
+  buf_alloc = 4096;
+  buf = xmalloc (buf_alloc);
+  buf_pos = 0;
+  while (1)
+    {
+      n = target_fileio_pread (fd, &buf[buf_pos],
+			       buf_alloc - buf_pos - padding, buf_pos,
+			       &target_errno);
+      if (n < 0)
+	{
+	  /* An error occurred.  */
+	  do_cleanups (close_cleanup);
+	  xfree (buf);
+	  return -1;
+	}
+      else if (n == 0)
+	{
+	  /* Read all there was.  */
+	  do_cleanups (close_cleanup);
+	  if (buf_pos == 0)
+	    xfree (buf);
+	  else
+	    *buf_p = buf;
+	  return buf_pos;
+	}
+
+      buf_pos += n;
+
+      /* If the buffer is filling up, expand it.  */
+      if (buf_alloc < buf_pos * 2)
+	{
+	  buf_alloc *= 2;
+	  buf = xrealloc (buf, buf_alloc);
+	}
+
+      QUIT;
+    }
+}
+
+/* Read target file FILENAME.  Store the result in *BUF_P and return
+   the size of the transferred data.  See the declaration in "target.h"
+   function for more information about the return value.  */
+
+LONGEST
+target_fileio_read_alloc (const char *filename, gdb_byte **buf_p)
+{
+  return target_fileio_read_alloc_1 (filename, buf_p, 0);
+}
+
+/* Read target file FILENAME.  The result is NUL-terminated and
+   returned as a string, allocated using xmalloc.  If an error occurs
+   or the transfer is unsupported, NULL is returned.  Empty objects
+   are returned as allocated but empty strings.  A warning is issued
+   if the result contains any embedded NUL bytes.  */
+
+char *
+target_fileio_read_stralloc (const char *filename)
+{
+  gdb_byte *buffer;
+  LONGEST i, transferred;
+
+  transferred = target_fileio_read_alloc_1 (filename, &buffer, 1);
+
+  if (transferred < 0)
+    return NULL;
+
+  if (transferred == 0)
+    return xstrdup ("");
+
+  buffer[transferred] = 0;
+
+  /* Check for embedded NUL bytes; but allow trailing NULs.  */
+  for (i = strlen (buffer); i < transferred; i++)
+    if (buffer[i] != 0)
+      {
+	warning (_("target file %s "
+		   "contained unexpected null characters"),
+		 filename);
+	break;
+      }
+
+  return (char *) buffer;
+}
+
 
 static int
 default_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)

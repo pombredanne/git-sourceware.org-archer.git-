@@ -1,5 +1,5 @@
 /* Tracepoint code for remote server for GDB.
-   Copyright (C) 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 2009-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -63,13 +63,21 @@ trace_vdebug (const char *fmt, ...)
 
   va_start (ap, fmt);
   vsprintf (buf, fmt, ap);
+#ifdef IN_PROCESS_AGENT
+  fprintf (stderr, "ipa/tracepoint: %s\n", buf);
+#else
   fprintf (stderr, "gdbserver/tracepoint: %s\n", buf);
+#endif
   va_end (ap);
 }
 
+#ifdef IN_PROCESS_AGENT
+#define debug_threads debug_agent
+#endif
+
 #define trace_debug_1(level, fmt, args...)	\
   do {						\
-    if (level <= debug_threads)			\
+    if (level <= debug_threads)		\
       trace_vdebug ((fmt), ##args);		\
   } while (0)
 
@@ -366,7 +374,7 @@ tracepoint_look_up_symbols (void)
    GDBserver side.  */
 
 #ifdef IN_PROCESS_AGENT
-int debug_threads = 0;
+int debug_agent = 0;
 
 int
 read_inferior_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
@@ -2423,7 +2431,7 @@ cmd_qtdp (char *own_buf)
       trace_debug ("Defined %stracepoint %d at 0x%s, "
 		   "enabled %d step %ld pass %ld",
 		   tpoint->type == fast_tracepoint ? "fast "
-		   : "",
+		   : tpoint->type == static_tracepoint ? "static " : "",
 		   tpoint->number, paddress (tpoint->address), tpoint->enabled,
 		   tpoint->step_count, tpoint->pass_count);
     }
@@ -4268,8 +4276,12 @@ tracepoint_was_hit (struct thread_info *tinfo, CORE_ADDR stop_pc)
     {
       /* Note that we collect fast tracepoints here as well.  We'll
 	 step over the fast tracepoint jump later, which avoids the
-	 double collect.  */
-      if (tpoint->enabled && stop_pc == tpoint->address)
+	 double collect.  However, we don't collect for static
+	 tracepoints here, because UST markers are compiled in program,
+	 and probes will be executed in program.  So static tracepoints
+	 are collected there.   */
+      if (tpoint->enabled && stop_pc == tpoint->address
+	  && tpoint->type != static_tracepoint)
 	{
 	  trace_debug ("Thread %s at address of tracepoint %d at 0x%s",
 		       target_pid_to_str (tinfo->entry.id),
@@ -8239,23 +8251,35 @@ initialize_tracepoint (void)
 
 #ifdef IN_PROCESS_AGENT
   {
+    uintptr_t addr;
     int pagesize;
+
     pagesize = sysconf (_SC_PAGE_SIZE);
     if (pagesize == -1)
       fatal ("sysconf");
 
     gdb_tp_heap_buffer = xmalloc (5 * 1024 * 1024);
 
-    /* Allocate scratch buffer aligned on a page boundary.  */
-    gdb_jump_pad_buffer = memalign (pagesize, pagesize * 20);
-    gdb_jump_pad_buffer_end = gdb_jump_pad_buffer + pagesize * 20;
+#define SCRATCH_BUFFER_NPAGES 20
 
-    /* Make it writable and executable.  */
-    if (mprotect (gdb_jump_pad_buffer, pagesize * 20,
-		  PROT_READ | PROT_WRITE | PROT_EXEC) != 0)
+    /* Allocate scratch buffer aligned on a page boundary, at a low
+       address (close to the main executable's code).  */
+    for (addr = pagesize; addr != 0; addr += pagesize)
+      {
+	gdb_jump_pad_buffer = mmap ((void *) addr, pagesize * SCRATCH_BUFFER_NPAGES,
+				    PROT_READ | PROT_WRITE | PROT_EXEC,
+				    MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED,
+				    -1, 0);
+	if (gdb_jump_pad_buffer != MAP_FAILED)
+	  break;
+      }
+
+    if (addr == 0)
       fatal ("\
-initialize_tracepoint: mprotect(%p, %d, PROT_READ|PROT_EXEC) failed with %s",
-	     gdb_jump_pad_buffer, pagesize * 20, strerror (errno));
+initialize_tracepoint: mmap'ing jump pad buffer failed with %s",
+	     strerror (errno));
+
+    gdb_jump_pad_buffer_end = gdb_jump_pad_buffer + pagesize * SCRATCH_BUFFER_NPAGES;
   }
 
   gdb_trampoline_buffer = gdb_trampoline_buffer_end = 0;

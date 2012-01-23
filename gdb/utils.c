@@ -1,8 +1,6 @@
 /* General utility routines for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986, 1988-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -972,7 +970,7 @@ internal_vproblem (struct internal_problem *problem,
       /* Default (yes/batch case) is to quit GDB.  When in batch mode
 	 this lessens the likelihood of GDB going into an infinite
 	 loop.  */
-      if (caution == 0)
+      if (!confirm)
         {
           /* Emit the message and quit.  */
           fputs_unfiltered (reason, gdb_stderr);
@@ -1386,7 +1384,7 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
 
   /* Automatically answer the default value if the user did not want
      prompts or the command was issued with the server prefix.  */
-  if (! caution || server_command)
+  if (!confirm || server_command)
     return def_value;
 
   /* If input isn't coming from the user directly, just say what
@@ -3338,6 +3336,25 @@ gdb_realpath (const char *filename)
 
 	return xstrdup (rp ? rp : filename);
       }
+  }
+#endif
+
+  /* The MS Windows method.  If we don't have realpath, we assume we
+     don't have symlinks and just canonicalize to a Windows absolute
+     path.  GetFullPath converts ../ and ./ in relative paths to
+     absolute paths, filling in current drive if one is not given
+     or using the current directory of a specified drive (eg, "E:foo").
+     It also converts all forward slashes to back slashes.  */
+  /* The file system is case-insensitive but case-preserving.
+     So we do not lowercase the path.  Otherwise, we might not
+     be able to display the original casing in a given path.  */
+#if defined (_WIN32)
+  {
+    char buf[MAX_PATH];
+    DWORD len = GetFullPathName (filename, MAX_PATH, buf, NULL);
+
+    if (len > 0 && len < MAX_PATH)
+      return xstrdup (buf);
   }
 #endif
 

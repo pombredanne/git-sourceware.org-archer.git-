@@ -1,3 +1,278 @@
+2012-01-23  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/call-signal-resume.exp: Allow output after "return".
+
+2012-01-20  Pedro Alves  <palves@redhat.com>
+
+	* gdb.python/py-finish-breakpoint.py: Fix typo.
+
+2012-01-20  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* gdb.base/info-proc.exp: Also run on remote targets.  Main
+	"info proc" command is now always present; whether target supports
+	actual info proc operation is detected when attempting to issue
+	the command.
+
+2012-01-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* .gdbinit: Remove.
+
+2012-01-19  Pedro Alves  <palves@redhat.com>
+
+	* gdb.java/jprint.exp: Don't rely on inferior output, but instead
+	look at the funtions' returns.
+	* gdb.java/jprint.java (jvclass.addprint, jprint.print(int))
+	(jprint.print(int, int)): Change return type to int.  Adjust.
+
+2012-01-18  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	PR gdb/9538
+	* gdb.base/sepdebug.exp: New test.
+
+2012-01-18  Pedro Alves  <palves@redhat.com>
+
+	* gdb.ada/mi_task_info.exp (-ada-task-info with no argument):
+	Allow output before ^done.
+
+2012-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.linespec/linespec.exp: Change some tests to use $decimal.
+	Add tests for relative directory.
+
+2012-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/printcmds.c (enum flag_enum): New.
+	(three): New global.
+	* gdb.base/printcmds.exp (test_print_enums): Add test for flag
+	enum printing.
+	* gdb.python/py-pp-maint.py (build_pretty_printer): Instantiate
+	FlagEnumerationPrinter.
+	* gdb.python/py-pp-maint.exp: Add tests for FlagEnumerationPrinter.
+	* gdb.python/py-pp-maint.c (enum flag_enum): New.
+	(fval): New global.
+
+2012-01-16  Pedro Alves  <palves@redhat.com>
+
+	* lib/gdb.exp (banned_procedures): New variable.
+	(banned_variables_traced): Rename to ...
+	(banned_traced): ... this.
+	(gdb_init): Also trace banned procedures.
+	(gdb_finish): Also untrace banned procedures.
+
+2012-01-16  Pedro Alves  <palves@redhat.com>
+
+	Remove all calls to strace.
+
+2012-01-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-namespaceless-anonymous.S: New file.
+	* gdb.dwarf2/dw2-namespaceless-anonymous.exp: New file.
+
+2012-01-13  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* gdb.base/attach-pie-misread.exp: Pass -pie only to the linker.
+	* gdb.base/pie-execl.exp: Likewise.
+
+2012-01-12  Keith Seitz  <keiths@redhat.com>
+
+	PR mi/10586
+	* gdb.mi/var-cmd.c (struct anonymous): New structure.
+	(do_anonymous_type_tests): New function.
+	(main): Call do_anonymous_type_tests.
+	* gdb.mi/mi2-var-child.exp: Add anonymous type tests.
+	(verify_everything): New procedure.
+	* gdb.mi/mi-var-cp.cc (class A): New class.
+	(anonymous_structs_and_unions): New function.
+	(main): Call anonymous_structs_and_unions.
+	* gdb.mi/mi-var-cp.exp: Add anonymous type tests.
+	(verify_everything): New procedure.
+
+2012-01-12  Keith Seitz  <keiths@redhat.com>
+
+	* lib/mi-support.exp: Expand comments about PATH_EXPR.
+	(varobj_tree::get_path_expr): Assume that all varobjs are
+	compound unless they are known simple types.
+	Adjust path expressions based on parent type, path parent type,
+	and tree language.
+	(varobj_tree::walk_tree): Add LANGUAGE parameter and save it into
+	the root varobj.
+	(mi_walk_varobj_tree): Add LANGUAGE parameter.
+
+2012-01-11  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/default.exp (core-file): Don't expect "GDB can't read
+	core files on this machine" anymore.
+
+2012-01-11  Paul Hilfinger  <hilfingr@adacore.com>
+
+	* gdb.base/watchpoint.c (recurser): Initialize local_x.
+	(main): Repeat recurser call.
+	* gdb.base/watchpoint.exp: Check that 'watch recurser::local_x' is
+	equivalent to 'local_x'.
+
+2012-01-11  Paul Hilfinger  <hilfingr@adacore.com>
+    	    Joel Brobecker <brobecker@adacore.com>
+
+	* gdb.base/recpar.c, gdb.base/recpar.exp: New files.
+
+2012-01-05  Pedro Alves  <alves.ped@gmail.com>
+
+	* gdb.mi/mi-stepn.c, gdb.mi/mi-stepn.exp: New files.
+	* gdb.python/py-events.c (first): Add bits for new "step N" test.
+	* gdb.python/py-events.exp: Test that "step N" tripping on a
+	breakpoint emits a breakpoint event.
+
+2012-01-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/auxv.exp: Reformat the copyright notice.
+
+2012-01-03  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/strace.exp (strace_trace_on_same_addr): New.
+	(strace_trace_on_diff_addr): New.
+	* gdb.trace/strace.c: (main): Add two local variables.
+
+2011-01-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.cell/fork.exp: Delete breakpoints after reaching main.
+	* gdb.cell/gcore.exp: Likewise.
+	* gdb.cell/solib-symbol.exp: Use "info symbol" instead of "break"
+	to verify the correct instance of main is selected.
+
+2012-01-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* dg-extract-results.sh, gdb.arch/gcore.c, gdb.arch/gdb1558.c,
+	gdb.arch/i386-gnu-cfi.c, gdb.base/complex.c, gdb.base/cvexpr.c,
+	gdb.base/gcore.c, gdb.base/gdb1555-main.c, gdb.base/gdb1555.c,
+	gdb.base/gdb1821.c, gdb.base/long_long.c, gdb.base/restore.c,
+	gdb.base/sepdebug.c, gdb.base/type-opaque-lib.c,
+	gdb.base/type-opaque-main.c, gdb.cp/maint.exp, gdb.cp/namespace1.cc,
+	gdb.cp/pr9631.cc, gdb.cp/psmang1.cc, gdb.cp/psmang2.cc,
+	gdb.cp/try_catch.cc, gdb.cp/virtfunc.cc, gdb.hp/gdb.base-hp/reg.exp,
+	gdb.mi/basics.c, gdb.mi/mi-stack.c, gdb.mi/mi-var-child.c,
+	gdb.mi/mi2-var-child.exp, gdb.mi/var-cmd.c,
+	gdb.threads/thread_check.c: Reformat copyright header.
+
+2011-12-30  Edjunior Machado  <emachado@linux.vnet.ibm.com>
+
+	* gdb.python/py-finish-breakpoint.exp: Add `.' prefix for ppc64.
+	* gdb.python/py-finish-breakpoint2.exp: Skip testcase if python support
+	is not enabled.
+
+2011-12-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/py-finish-breakpoint.c (test_exec_exit): Change the
+	parameter to self_exec, adjust the function.
+	(main): Check for argv[1] "exit".  Use argv[0] for test_exec_exit.
+	* gdb.python/py-finish-breakpoint.exp (set var self_exec = 0): New test.
+	(set var do_exit = 0): Remove test.
+	(newline at end of file): Add one.
+
+2011-12-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/dmsym.c, gdb.base/dmsym_main.c, gdb.base/dmsym.exp:
+	New files.
+
+2011-12-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix racy FAILs.
+	* gdb.threads/fork-thread-pending.c (barrier): New variable.
+	(thread_function, thread_forker): Call pthread_barrier_wait for it.
+	(main): Call pthread_barrier_init for it.
+
+2011-12-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix double send_gdb leading to racy FAILs.
+	* gdb.base/break.exp (set silent break bp_location1): Replace
+	3x send_gdb and gdb_expect by gdb_test.
+	* gdb.base/fileio.exp: Replace 2x send_gdb by gdb_exit and sleep.
+	* gdb.base/foll-vfork.exp (vfork_and_exec_child_follow_to_main_bp)
+	(vfork_and_exec_child_follow_through_step): Use gdb_test_no_output
+	instead of send_gdb.  Twice.
+	* gdb.base/sepdebug.exp (set silent break bp_location1): Replace
+	3x send_gdb and gdb_expect by gdb_test.
+	* gdb.mi/mi-nsmoribund.exp: Replace 3x send_gdb by mi_gdb_test.
+
+2011-12-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.linespec/linespec.exp: Compile using {c++}.
+
+2011-12-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/templates.exp (test_template_typedef): Import gdb_prompt.
+	(print destructor of template typedef): Extend it for gcc/51668 XFAIL.
+	(verify GCC PR debug/51668): New test.
+
+2011-12-23  Kevin Pouget  <kevin.pouget@st.com>
+
+	Introduce gdb.FinishBreakpoint in Python.
+	* Makefile.in (EXECUTABLES): Add py-finish-breakpoint and
+	py-finish-breakpoint2
+	(MISCALLANEOUS): Add py-events-shlib.so and py-events-shlib-nodebug.so
+	* gdb.python/py-breakpoint.exp (mult_line): Define and use variable
+	instead of line number.
+	* gdb.python/py-finish-breakpoint.c: New file.
+	* gdb.python/py-finish-breakpoint.exp: New file.
+	* gdb.python/py-finish-breakpoint.py: New file.
+	* gdb.python/py-finish-breakpoint2.cc: New file.
+	* gdb.python/py-finish-breakpoint2.exp: New file.
+	* gdb.python/py-finish-breakpoint2.py: New file.
+
+2011-12-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Partial fix of compatibility with gcc-4.7.
+	* gdb.cp/templates.exp (ptype T5<int>, ptype t5i): Turn all PASS cases
+	into XFAIL "new without size_t".  Permit size_t for the KFAIL case.
+	Add comment to add a PASS case in the future.
+
+	Fix compatibility with gcc-4.7.
+	* gdb.python/py-frame-inline.c (f): Use inline for __always_inline__.
+
+2011-12-21  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	PR tdep/12797
+	* gdb.base/callfuncs.exp: Remove KFAIL.
+
+2011-12-21  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/task_bp: New testcase.
+
+2011-12-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/reread.exp: If srcfile2 fails to build retry it with
+	-DNO_SECTIONS.
+	* gdb.base/reread2.c <!NO_SECTIONS>: New sections block.
+
+2011-12-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/ptype-cv-cp.exp (ptype v_volatile_const_my_int): Make
+	PR gcc/45997 XFAIL conditional for gcc <= 4.5.
+	* gdb.python/py-type.exp (python print ttype.template_argument(2)):
+	Change PR gcc/41736 to the more specific PR gcc/46955.  Make it
+	conditional for gcc <= 4.5.
+
+2011-12-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.cp/ptype-cv-cp.exp (ptype v_volatile_const_my_int): Replace KFAIL
+	by XFAIL.
+	* gdb.cp/static-method.exp (info addr A::func())
+	(list static-method.cc:xxx::(anonymous namespace)::A::func)
+	(list 'static-method.cc:xxx::(anonymous namespace)::A::func')
+	(list 'static-method.cc':'xxx::(anonymous namespace)::A::func')
+	(list static-method.cc:'xxx::(anonymous namespace)::A::func'): Likewise.
+	* gdb.cp/temargs.exp (test value of F in k2_m, test type of F in k3_m)
+	(test value of F in k3_m): Likewise.
+	* gdb.python/py-type.exp (python print ttype.template_argument(2)):
+	Likewise.
+
+2011-12-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/attach-stopped.exp (continue (*: attach2 continue))
+	(*: attach2 stop interrupt, *: attach2, exit leaves process sleeping):
+	Remove.
+	* gdb.threads/attachstop-mt.c: Remove.
+	* gdb.threads/attachstop-mt.exp: Remove.
+
 2011-12-17  Mark Kettenis  <kettenis@gnu.org>
 
 	* gdb.arch/amd64-i386-address.exp: Skip on *-*-openbsd*.
@@ -26141,7 +26416,6 @@ Sun Feb 21 10:55:55 1993  Mike Werner  (mtw@poseidon.cygnus.com)
 ;; version-control: never
 ;; End:
 
-    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-    2003, 2004, 2005 Free Software Foundation, Inc.
+    Copyright 1993-2005, 2012 Free Software Foundation, Inc.
   Copying and distribution of this file, with or without modification,
   are permitted provided the copyright notice and this notice are preserved.

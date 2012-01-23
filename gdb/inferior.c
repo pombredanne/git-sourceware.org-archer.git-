@@ -1,6 +1,6 @@
 /* Multi-process control for GDB, the GNU debugger.
 
-   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 2008-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -276,6 +276,7 @@ exit_inferior_1 (struct inferior *inftoex, int silent)
   observer_notify_inferior_exit (inf);
 
   inf->pid = 0;
+  inf->fake_pid_p = 0;
   if (inf->vfork_parent != NULL)
     {
       inf->vfork_parent->vfork_child = NULL;
