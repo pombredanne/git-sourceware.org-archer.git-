@@ -1,6 +1,6 @@
 /* Read HP PA/Risc object files for GDB.
-   Copyright (C) 1991, 1992, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2002,
-   2004, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1991-1992, 1994-1996, 1998-2002, 2004, 2007-2012 Free
+   Software Foundation, Inc.
    Written by Fred Fish at Cygnus Support.
 
    This file is part of GDB.
@@ -36,24 +36,12 @@
 
 #include "solib-som.h"
 
-/*
-
-   LOCAL FUNCTION
-
-   som_symtab_read -- read the symbol table of a SOM file
-
-   SYNOPSIS
-
-   void som_symtab_read (bfd *abfd, struct objfile *objfile,
-   struct section_offsets *section_offsets)
-
-   DESCRIPTION
+/* Read the symbol table of a SOM file.
 
    Given an open bfd, a base address to relocate symbols to, and a
    flag that specifies whether or not this bfd is for an executable
    or not (may be shared library for example), add all the global
-   function and data symbols to the minimal symbol table.
- */
+   function and data symbols to the minimal symbol table.  */
 
 static void
 som_symtab_read (bfd *abfd, struct objfile *objfile,
@@ -433,6 +421,7 @@ static const struct sym_fns som_sym_fns =
   som_new_init,			/* init anything gbl to entire symtab */
   som_symfile_init,		/* read initial info, setup for sym_read() */
   som_symfile_read,		/* read a symbol file into symtab */
+  NULL,				/* sym_read_psymbols */
   som_symfile_finish,		/* finished with file, cleanup */
   som_symfile_offsets,		/* Translate ext. to int. relocation */
   default_symfile_segments,	/* Get segment information from a file.  */

@@ -1,7 +1,6 @@
 /* Target-dependent code for HP-UX on PA-RISC.
 
-   Copyright (C) 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2002-2005, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -753,6 +752,7 @@ hppa_hpux_sigtramp_unwind_sniffer (const struct frame_unwind *self,
 
 static const struct frame_unwind hppa_hpux_sigtramp_frame_unwind = {
   SIGTRAMP_FRAME,
+  default_frame_unwind_stop_reason,
   hppa_hpux_sigtramp_frame_this_id,
   hppa_hpux_sigtramp_frame_prev_register,
   NULL,
@@ -956,7 +956,6 @@ hppa64_hpux_search_dummy_call_sequence (struct gdbarch *gdbarch, CORE_ADDR pc,
   struct hppa_objfile_private *priv;
   CORE_ADDR addr;
   struct minimal_symbol *msym;
-  int i;
 
   sec = find_pc_section (pc);
   obj = sec->objfile;
@@ -979,7 +978,7 @@ hppa64_hpux_search_dummy_call_sequence (struct gdbarch *gdbarch, CORE_ADDR pc,
      scheme; try to read in blocks of code, and look for a "bve,n (rp)" 
      instruction.  These are likely to occur at the end of functions, so
      we only look at the last two instructions of each function.  */
-  for (i = 0, msym = obj->msymbols; i < obj->minimal_symbol_count; i++, msym++)
+  ALL_OBJFILE_MSYMBOLS (obj, msym)
     {
       CORE_ADDR begin, end;
       char *name;
@@ -1087,7 +1086,6 @@ hppa_hpux_find_dummy_bpaddr (CORE_ADDR addr)
   struct unwind_table_entry *u;
   struct minimal_symbol *msym;
   CORE_ADDR func;
-  int i;
 
   sec = find_pc_section (addr);
   if (sec)
@@ -1107,9 +1105,7 @@ hppa_hpux_find_dummy_bpaddr (CORE_ADDR addr)
 	 work.  */
 
       find_pc_partial_function (addr, NULL, &func, NULL);
-      for (i = 0, msym = sec->objfile->msymbols;
-      	   i < sec->objfile->minimal_symbol_count;
-	   i++, msym++)
+      ALL_OBJFILE_MSYMBOLS (sec->objfile, msym)
 	{
 	  u = find_unwind_entry (SYMBOL_VALUE_ADDRESS (msym));
 	  if (func != SYMBOL_VALUE_ADDRESS (msym) 

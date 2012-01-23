@@ -1,6 +1,5 @@
 /* Hardware event manager.
-   Copyright (C) 1998, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1998, 2007-2012 Free Software Foundation, Inc.
    Contributed by Cygnus Support.
 
 This file is part of GDB, the GNU debugger.
@@ -27,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 /* The hw-events object is implemented using sim-events */
 
-struct hw_event {
+struct hw_event
+{
   void *data;
   struct hw *me;
   hw_event_callback *callback;
@@ -35,7 +35,8 @@ struct hw_event {
   struct hw_event_data *entry;
 };
 
-struct hw_event_data {
+struct hw_event_data
+{
   struct hw_event event;
   struct hw_event_data *next;
 };

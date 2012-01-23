@@ -1,7 +1,5 @@
 dnl Autoconf configure script for GDB, the GNU debugger.
-dnl Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-dnl 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-dnl Free Software Foundation, Inc.
+dnl Copyright (C) 1995-2012 Free Software Foundation, Inc.
 dnl
 dnl This file is part of GDB.
 dnl 
@@ -87,6 +85,38 @@ PACKAGE=gdb
 AC_DEFINE_UNQUOTED(PACKAGE, "$PACKAGE", [Name of this package. ])
 AC_SUBST(PACKAGE)
 
+# Do we have a single-tree copy of texinfo?  Even if we do, we can't
+# rely on it - libiberty is built before texinfo.
+AC_CHECK_PROG(MAKEINFO, makeinfo, makeinfo, )
+if test "x$MAKEINFO" = "x"; then
+  AC_ERROR([makeinfo is required for compilation])
+else
+  case "$MAKEINFO" in
+    */missing\ makeinfo*)
+      AC_ERROR([makeinfo is required for compilation])
+      ;;
+  esac
+fi
+AC_SUBST(MAKEINFO)
+
+# --split-size=5000000 may be already in $MAKEINFO from parent configure.
+# Re-running configure in gdb/ would lose it so ensure it stays present.
+MAKEINFOFLAGS=${MAKEINFOFLAGS---split-size=5000000}
+AC_SUBST(MAKEINFOFLAGS)
+
+MAKEINFO_EXTRA_FLAGS=""
+AC_CACHE_CHECK([whether $MAKEINFO supports @click], gdb_cv_have_makeinfo_click,
+  [echo '@clicksequence{a @click{} b}' >conftest.texinfo
+  if eval "$MAKEINFO conftest.texinfo >&5 2>&5"; then
+    gdb_cv_have_makeinfo_click=yes
+  else
+    gdb_cv_have_makeinfo_click=no
+  fi])
+if test x"$gdb_cv_have_makeinfo_click" = xyes; then
+  MAKEINFO_EXTRA_FLAGS="$MAKEINFO_EXTRA_FLAGS -DHAVE_MAKEINFO_CLICK"
+fi
+AC_SUBST(MAKEINFO_EXTRA_FLAGS)
+
 # GDB does not use automake, but gnulib does.  This line lets us
 # generate its Makefile.in.
 AM_INIT_AUTOMAKE(gdb, UNUSED-VERSION, [no-define])
@@ -94,6 +124,14 @@ AM_INIT_AUTOMAKE(gdb, UNUSED-VERSION, [no-define])
 GDB_AC_WITH_DIR(DEBUGDIR, separate-debug-dir,
     [look for global separate debug info in this path @<:@LIBDIR/debug@:>@],
     [${libdir}/debug])
+
+# We can't pass paths as command line arguments.
+# Mingw32 tries to be clever and will convert the paths for us.
+# For example -DBINDIR="/usr/local/bin" passed on the command line may get
+# converted to -DBINDIR="E:/msys/mingw32/msys/1.0/local/bin".
+# This breaks GDB's relocatable path conversions since paths passed in
+# config.h would not get so translated, the path prefixes no longer match.
+AC_DEFINE_DIR(BINDIR, bindir, [Directory of programs.])
 
 # GDB's datadir relocation
 
@@ -109,7 +147,6 @@ AS_HELP_STRING([--with-relocated-sources=PATH], [automatically relocate this pat
 ])
 
 AC_CONFIG_SUBDIRS(testsuite)
-AC_CONFIG_SUBDIRS(common)
 
 # Check whether to support alternative target configurations
 AC_ARG_ENABLE(targets,
@@ -434,6 +471,29 @@ AC_SEARCH_LIBS(dlgetmodinfo, [dl xpdl])
 
 AM_ICONV
 
+# GDB may fork/exec the iconv program to get the list of supported character
+# sets.  Allow the user to specify where to find it.
+# There are several factors affecting the choice of option name:
+# - There is already --with-libiconv-prefix but we can't use it, it specifies
+#   the build-time location of libiconv files.
+# - The program we need to find is iconv, which comes with glibc.  The user
+#   doesn't necessarily have libiconv installed.  Therefore naming this
+#   --with-libiconv-foo feels wrong.
+# - We want the path to be relocatable, but GDB_AC_DEFINE_RELOCATABLE is
+#   defined to work on directories not files (though it really doesn't know
+#   the difference).
+# - Calling this --with-iconv-prefix is perceived to cause too much confusion
+#   with --with-libiconv-prefix.
+# Putting these together is why the option name is --with-iconv-bin.
+
+AC_ARG_WITH(iconv-bin,
+AS_HELP_STRING([--with-iconv-bin=PATH], [specify where to find the iconv program]),
+[iconv_bin="${withval}"
+ AC_DEFINE_UNQUOTED([ICONV_BIN], ["${iconv_bin}"],
+                    [Path of directory of iconv program.])
+ GDB_AC_DEFINE_RELOCATABLE(ICONV_BIN, iconv, ${iconv_bin})
+])
+
 # On alpha-osf, it appears that libtermcap and libcurses are not compatible.
 # There is a very specific comment in /usr/include/curses.h explaining that
 # termcap routines built into libcurses must not be used.
@@ -491,10 +551,6 @@ if test x"$enable_tui" != xno; then
       CONFIG_DEPS="$CONFIG_DEPS \$(SUBDIR_TUI_DEPS)"
       CONFIG_SRCS="$CONFIG_SRCS \$(SUBDIR_TUI_SRCS)"
       ENABLE_CFLAGS="$ENABLE_CFLAGS \$(SUBDIR_TUI_CFLAGS)"
-      CONFIG_ALL="${CONFIG_ALL} all-tui"
-      CONFIG_CLEAN="${CONFIG_CLEAN} clean-tui"
-      CONFIG_INSTALL="${CONFIG_INSTALL} install-tui"
-      CONFIG_UNINSTALL="${CONFIG_UNINSTALL} uninstall-tui"
     else
       if test x"$enable_tui" = xyes; then
 	AC_MSG_ERROR([no enhanced curses library found; disable TUI])
@@ -540,21 +596,6 @@ if test "$with_system_readline" = yes; then
   READLINE_DEPS=
   READLINE_CFLAGS=
   READLINE_TEXI_INCFLAG=
-
-  # readline-6.0 started to use the name `_rl_echoing_p'.
-  # `$(READLINE_DIR)/' of bundled readline would not resolve in configure.
-
-  AC_MSG_CHECKING([for readline_echoing_p])
-  save_LIBS=$LIBS
-  LIBS="$LIBS $READLINE"
-  AC_LINK_IFELSE(AC_LANG_PROGRAM(,[[extern int readline_echoing_p;
-				    return readline_echoing_p;]]),
-		 [READLINE_ECHOING_P=yes],
-		 [READLINE_ECHOING_P=no
-		  AC_DEFINE([readline_echoing_p], [_rl_echoing_p],
-			    [readline-6.0 started to use different name.])])
-  LIBS="$save_LIBS"
-  AC_MSG_RESULT([$READLINE_ECHOING_P])
 else
   READLINE='$(READLINE_DIR)/libreadline.a'
   READLINE_DEPS='$(READLINE)'
@@ -565,6 +606,34 @@ AC_SUBST(READLINE)
 AC_SUBST(READLINE_DEPS)
 AC_SUBST(READLINE_CFLAGS)
 AC_SUBST(READLINE_TEXI_INCFLAG)
+
+# Generate jit-reader.h
+
+# This is typedeffed to GDB_CORE_ADDR in jit-reader.h
+TARGET_PTR=
+
+AC_CHECK_SIZEOF(unsigned long long)
+AC_CHECK_SIZEOF(unsigned long)
+AC_CHECK_SIZEOF(unsigned __int128)
+
+if test "x${ac_cv_sizeof_unsigned_long}" = "x8"; then
+  TARGET_PTR="unsigned long"
+elif test "x${ac_cv_sizeof_unsigned_long_long}" = "x8"; then
+  TARGET_PTR="unsigned long long"
+elif test "x${ac_cv_sizeof_unsigned___int128}" = "x16"; then
+  TARGET_PTR="unsigned __int128"
+else
+  TARGET_PTR="unsigned long"
+fi
+
+AC_SUBST(TARGET_PTR)
+AC_CONFIG_FILES([jit-reader.h:jit-reader.in])
+
+AC_SEARCH_LIBS(dlopen, dl)
+
+GDB_AC_WITH_DIR([JIT_READER_DIR], [jit-reader-dir],
+                [directory to load the JIT readers from],
+                [${libdir}/gdb])
 
 AC_ARG_WITH(expat,
   AS_HELP_STRING([--with-expat], [include expat support (auto/yes/no)]),
@@ -916,7 +985,8 @@ AC_CHECK_HEADERS([nlist.h machine/reg.h poll.h sys/poll.h proc_service.h \
 		  sys/resource.h sys/procfs.h sys/ptrace.h ptrace.h \
 		  sys/reg.h sys/debugreg.h sys/select.h sys/syscall.h \
 		  sys/types.h sys/wait.h wait.h termios.h termio.h \
-		  sgtty.h unistd.h elf_hp.h ctype.h time.h locale.h])
+		  sgtty.h unistd.h elf_hp.h ctype.h time.h locale.h \
+		  dlfcn.h])
 AC_CHECK_HEADERS(link.h, [], [],
 [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -993,11 +1063,12 @@ AC_C_BIGENDIAN
 AC_FUNC_ALLOCA
 AC_FUNC_MMAP
 AC_FUNC_VFORK
-AC_CHECK_FUNCS([canonicalize_file_name realpath getrusage getuid \
-		getgid pipe poll pread64 resize_term sbrk setpgid setpgrp setsid \
+AC_CHECK_FUNCS([canonicalize_file_name realpath getrusage getuid getgid \
+		pipe poll pread pread64 pwrite readlink resize_term \
+		sbrk setpgid setpgrp setsid \
 		sigaction sigprocmask sigsetmask socketpair syscall \
 		ttrace wborder wresize setlocale iconvlist libiconvlist btowc \
-		setrlimit getrlimit posix_madvise waitpid])
+		setrlimit getrlimit posix_madvise waitpid lstat])
 AM_LANGINFO_CODESET
 
 # Check the return and argument types of ptrace.  No canned test for
@@ -1594,6 +1665,11 @@ if test ${build} = ${host} -a ${host} = ${target} ; then
          CONFIG_SRCS="${CONFIG_SRCS} aix-thread.c"
          CONFIG_OBS="${CONFIG_OBS} aix-thread.o"
          CONFIG_LDFLAGS="${CONFIG_LDFLAGS} -lpthdebug"
+
+         # Older versions of AIX do not provide the declaration for
+         # the getthrds function (it appears that it was introduced
+         # with AIX 6.x).
+         AC_CHECK_DECLS(getthrds, [], [], [[#include <procinfo.h>]])
       fi
       ;;
    esac
@@ -1686,42 +1762,20 @@ fi
 
 dnl Handle optional features that can be enabled.
 
-target_sysroot_reloc=0
+# Support for --with-sysroot is a copy of GDB_AC_WITH_DIR,
+# except that the argument to --with-sysroot is optional.
+# --with-sysroot (or --with-sysroot=yes) sets the default sysroot path.
+if test "x$with_sysroot" = xyes; then
+  with_sysroot="${exec_prefix}/${target_alias}/sys-root"
+fi
 AC_ARG_WITH(sysroot,
-AS_HELP_STRING([--with-sysroot@<:@=DIR@:>@], [search for usr/lib et al within DIR]),
-[
- case ${with_sysroot} in
- yes) TARGET_SYSTEM_ROOT='${exec_prefix}/${target_alias}/sys-root' ;;
- *) TARGET_SYSTEM_ROOT=$with_sysroot ;;
- esac
-
- TARGET_SYSTEM_ROOT_DEFINE='-DTARGET_SYSTEM_ROOT=\"$(TARGET_SYSTEM_ROOT)\"'
-
- if test "x$prefix" = xNONE; then
-  test_prefix=/usr/local
- else
-  test_prefix=$prefix
- fi
- if test "x$exec_prefix" = xNONE || test "x$exec_prefix" = 'x${prefix}'; then
-  test_exec_prefix=$test_prefix
- else
-  test_exec_prefix=$exec_prefix
- fi
- case ${TARGET_SYSTEM_ROOT} in
- "${test_prefix}"|"${test_prefix}/"*|\
- "${test_exec_prefix}"|"${test_exec_prefix}/"*|\
- '${prefix}'|'${prefix}/'*|\
- '${exec_prefix}'|'${exec_prefix}/'*)
-   target_sysroot_reloc=1
-   ;;
- esac
-], [
- TARGET_SYSTEM_ROOT=
- TARGET_SYSTEM_ROOT_DEFINE='-DTARGET_SYSTEM_ROOT=\"\"'
-])
-TARGET_SYSTEM_ROOT_DEFINE="$TARGET_SYSTEM_ROOT_DEFINE -DTARGET_SYSTEM_ROOT_RELOCATABLE=$target_sysroot_reloc"
+  AS_HELP_STRING([--with-sysroot@<:@=DIR@:>@],
+                 [search for usr/lib et al within DIR]),
+  [TARGET_SYSTEM_ROOT=$withval], [TARGET_SYSTEM_ROOT=])
+AC_DEFINE_DIR(TARGET_SYSTEM_ROOT, TARGET_SYSTEM_ROOT,
+              [search for usr/lib et al within DIR])
 AC_SUBST(TARGET_SYSTEM_ROOT)
-AC_SUBST(TARGET_SYSTEM_ROOT_DEFINE)
+GDB_AC_DEFINE_RELOCATABLE(TARGET_SYSTEM_ROOT, sysroot, ${ac_define_dir})
 
 GDB_AC_WITH_DIR(SYSTEM_GDBINIT, system-gdbinit,
     [automatically load a system-wide gdbinit file],

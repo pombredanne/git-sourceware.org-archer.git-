@@ -1,7 +1,6 @@
 /* Target-dependent code for Atmel AVR, for GDB.
 
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
-   2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1996-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -354,19 +353,22 @@ avr_write_pc (struct regcache *regcache, CORE_ADDR val)
                                   avr_convert_iaddr_to_raw (val));
 }
 
-static void
+static enum register_status
 avr_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
                           int regnum, gdb_byte *buf)
 {
   ULONGEST val;
+  enum register_status status;
 
   switch (regnum)
     {
     case AVR_PSEUDO_PC_REGNUM:
-      regcache_raw_read_unsigned (regcache, AVR_PC_REGNUM, &val);
+      status = regcache_raw_read_unsigned (regcache, AVR_PC_REGNUM, &val);
+      if (status != REG_VALID)
+	return status;
       val >>= 1;
       store_unsigned_integer (buf, 4, gdbarch_byte_order (gdbarch), val);
-      break;
+      return status;
     default:
       internal_error (__FILE__, __LINE__, _("invalid regnum"));
     }
@@ -1128,6 +1130,7 @@ avr_frame_prev_register (struct frame_info *this_frame,
 
 static const struct frame_unwind avr_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   avr_frame_this_id,
   avr_frame_prev_register,
   NULL,

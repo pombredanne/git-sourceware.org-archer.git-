@@ -1,6 +1,5 @@
 /* Common hardware header file.
-   Copyright (C) 1998, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1998, 2007-2012 Free Software Foundation, Inc.
    Contributed by Andrew Cagney and Cygnus Support.
 
 This file is part of GDB, the GNU debugger.
@@ -39,7 +38,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 typedef void (hw_finish_method)
      (struct hw *me);
 
-struct hw_descriptor {
+struct hw_descriptor
+{
   const char *family;
   hw_finish_method *to_finish;
 };
@@ -55,7 +55,8 @@ void do_hw_attach_regs (struct hw *me);
    or a hw_io status code that indicates the reason for the read
    failure */
 
-enum {
+enum
+{
   HW_IO_EOF = -1, HW_IO_NOT_READY = -2, /* See: IEEE 1275 */
 };
 

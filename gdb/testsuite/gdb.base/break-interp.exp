@@ -1,4 +1,4 @@
-# Copyright 2010, 2011 Free Software Foundation, Inc.
+# Copyright 2010-2012 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -14,7 +14,8 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 # This test only works on GNU/Linux.
-if { ![isnative] || [is_remote host] || ![istarget *-linux*] || [skip_shlib_tests]} {
+if { ![isnative] || [is_remote host] || [target_info exists use_gdb_stub]
+     || ![istarget *-linux*] || [skip_shlib_tests]} {
     continue
 }
 
@@ -140,14 +141,14 @@ proc reach_1 {func command displacement} {
 	    }
 	    exp_continue
 	}
-	-re "Breakpoint \[0-9\]+, \\.?$func \\(.*\\) at .*:\[0-9\]+\r\n.*$gdb_prompt $" {
+	-re "Breakpoint \[0-9\]+, \\.?(__GI_)?$func \\(.*\\) at .*:\[0-9\]+\r\n.*$gdb_prompt $" {
 	    if {$func == "_dl_debug_state"} {
 		fail $test
 	    } else {
 		pass $test
 	    }
 	}
-	-re "Breakpoint \[0-9\]+, \[0-9xa-f\]+ in \\.?$func \\(\\).*\r\n$gdb_prompt $" {
+	-re "Breakpoint \[0-9\]+, \[0-9xa-f\]+ in \\.?(__GI_)?$func \\(\\).*\r\n$gdb_prompt $" {
 	    if {$func == "_dl_debug_state"} {
 		fail $test
 	    } else {
@@ -352,6 +353,14 @@ proc test_attach {file displacement {relink_args ""}} {
 	    # test simplicity, we merged this test and the test above by not
 	    # restoring $INTERP after $EXEC prelink.  $INTERP gets restored
 	    # later below.
+	    #
+	    # `(wrong library or version mismatch?)' messages are printed for
+	    # $binfile_lib on platforms converting REL->RELA relocations by
+	    # prelink (such as on i386).  There is no reliable way to verify
+	    # the library file matches the running library in such case but
+	    # GDB at least attempts to set the right displacement.  We test
+	    # `libfunc' is present in the backtrace and therefore the
+	    # displacement has been guessed right.
 
 	    if [prelink$relink $relink_args [file tail $exec]] {
 		# /proc/PID/exe cannot be loaded as it is "EXECNAME (deleted)".
@@ -365,7 +374,7 @@ proc test_attach {file displacement {relink_args ""}} {
 }
 
 proc test_ld {file ifmain trynosym displacement} {
-    global srcdir subdir gdb_prompt expect_out
+    global srcdir subdir gdb_prompt expect_out inferior_exited_re
 
     # First test normal `file'-command loaded $FILE with symbols.
 
@@ -395,7 +404,7 @@ proc test_ld {file ifmain trynosym displacement} {
 
     reach "_dl_debug_state" "run" $displacement
 
-    gdb_test "bt" "#0 +\[^\r\n\]*\\m_dl_debug_state\\M.*" "dl bt"
+    gdb_test "bt" "#0 +\[^\r\n\]*\\m(__GI_)?_dl_debug_state\\M.*" "dl bt"
 
     if $ifmain {
 	reach "main" continue "NONE"
@@ -494,7 +503,7 @@ proc test_ld {file ifmain trynosym displacement} {
 		}
 		exp_continue
 	    }
-	    -re "Program exited (normally|with code \[0-9\]+)\\.\r\n$gdb_prompt $" {
+	    -re "$inferior_exited_re (normally|with code \[0-9\]+).\r\n$gdb_prompt $" {
 		# Do not check the binary filename as it may be truncated.
 		pass $test
 	    }

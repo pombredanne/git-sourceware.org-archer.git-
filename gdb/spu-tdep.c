@@ -1,6 +1,5 @@
 /* SPU target-dependent code for GDB, the GNU debugger.
-   Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2006-2012 Free Software Foundation, Inc.
 
    Contributed by Ulrich Weigand <uweigand@de.ibm.com>.
    Based on a port by Sid Manning <sid@us.ibm.com>.
@@ -45,7 +44,7 @@
 #include "observer.h"
 #include "infcall.h"
 #include "dwarf2.h"
-
+#include "exceptions.h"
 #include "spu-tdep.h"
 
 
@@ -183,61 +182,66 @@ spu_register_type (struct gdbarch *gdbarch, int reg_nr)
 
 /* Pseudo registers for preferred slots - stack pointer.  */
 
-static void
+static enum register_status
 spu_pseudo_register_read_spu (struct regcache *regcache, const char *regname,
 			      gdb_byte *buf)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  enum register_status status;
   gdb_byte reg[32];
   char annex[32];
   ULONGEST id;
 
-  regcache_raw_read_unsigned (regcache, SPU_ID_REGNUM, &id);
+  status = regcache_raw_read_unsigned (regcache, SPU_ID_REGNUM, &id);
+  if (status != REG_VALID)
+    return status;
   xsnprintf (annex, sizeof annex, "%d/%s", (int) id, regname);
   memset (reg, 0, sizeof reg);
   target_read (&current_target, TARGET_OBJECT_SPU, annex,
 	       reg, 0, sizeof reg);
 
   store_unsigned_integer (buf, 4, byte_order, strtoulst (reg, NULL, 16));
+  return REG_VALID;
 }
 
-static void
+static enum register_status
 spu_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
                           int regnum, gdb_byte *buf)
 {
   gdb_byte reg[16];
   char annex[32];
   ULONGEST id;
+  enum register_status status;
 
   switch (regnum)
     {
     case SPU_SP_REGNUM:
-      regcache_raw_read (regcache, SPU_RAW_SP_REGNUM, reg);
+      status = regcache_raw_read (regcache, SPU_RAW_SP_REGNUM, reg);
+      if (status != REG_VALID)
+	return status;
       memcpy (buf, reg, 4);
-      break;
+      return status;
 
     case SPU_FPSCR_REGNUM:
-      regcache_raw_read_unsigned (regcache, SPU_ID_REGNUM, &id);
+      status = regcache_raw_read_unsigned (regcache, SPU_ID_REGNUM, &id);
+      if (status != REG_VALID)
+	return status;
       xsnprintf (annex, sizeof annex, "%d/fpcr", (int) id);
       target_read (&current_target, TARGET_OBJECT_SPU, annex, buf, 0, 16);
-      break;
+      return status;
 
     case SPU_SRR0_REGNUM:
-      spu_pseudo_register_read_spu (regcache, "srr0", buf);
-      break;
+      return spu_pseudo_register_read_spu (regcache, "srr0", buf);
 
     case SPU_LSLR_REGNUM:
-      spu_pseudo_register_read_spu (regcache, "lslr", buf);
-      break;
+      return spu_pseudo_register_read_spu (regcache, "lslr", buf);
 
     case SPU_DECR_REGNUM:
-      spu_pseudo_register_read_spu (regcache, "decr", buf);
-      break;
+      return spu_pseudo_register_read_spu (regcache, "decr", buf);
 
     case SPU_DECR_STATUS_REGNUM:
-      spu_pseudo_register_read_spu (regcache, "decr_status", buf);
-      break;
+      return spu_pseudo_register_read_spu (regcache, "decr_status", buf);
 
     default:
       internal_error (__FILE__, __LINE__, _("invalid regnum"));
@@ -451,7 +455,7 @@ enum
     op_a     = 0x0c0,
     op_ai    = 0x1c,
 
-    op_selb  = 0x4,
+    op_selb  = 0x8,
 
     op_br    = 0x64,
     op_bra   = 0x60,
@@ -1077,6 +1081,7 @@ spu_frame_prev_register (struct frame_info *this_frame,
 
 static const struct frame_unwind spu_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   spu_frame_this_id,
   spu_frame_prev_register,
   NULL,
@@ -1231,6 +1236,7 @@ spu2ppu_dealloc_cache (struct frame_info *self, void *this_cache)
 
 static const struct frame_unwind spu2ppu_unwind = {
   ARCH_FRAME,
+  default_frame_unwind_stop_reason,
   spu2ppu_this_id,
   spu2ppu_prev_register,
   NULL,
@@ -1451,11 +1457,19 @@ spu_return_value (struct gdbarch *gdbarch, struct type *func_type,
   enum return_value_convention rvc;
   int opencl_vector = 0;
 
-  if (func_type
-      && TYPE_CALLING_CONVENTION (func_type) == DW_CC_GDB_IBM_OpenCL
-      && TYPE_CODE (type) == TYPE_CODE_ARRAY
-      && TYPE_VECTOR (type))
-    opencl_vector = 1;
+  if (func_type)
+    {
+      func_type = check_typedef (func_type);
+
+      if (TYPE_CODE (func_type) == TYPE_CODE_PTR)
+	func_type = check_typedef (TYPE_TARGET_TYPE (func_type));
+
+      if (TYPE_CODE (func_type) == TYPE_CODE_FUNC
+	  && TYPE_CALLING_CONVENTION (func_type) == DW_CC_GDB_IBM_OpenCL
+	  && TYPE_CODE (type) == TYPE_CODE_ARRAY
+	  && TYPE_VECTOR (type))
+	opencl_vector = 1;
+    }
 
   if (TYPE_LENGTH (type) <= (SPU_ARGN_REGNUM - SPU_ARG1_REGNUM + 1) * 16)
     rvc = RETURN_VALUE_REGISTER_CONVENTION;
@@ -1589,8 +1603,21 @@ spu_software_single_step (struct frame_info *frame)
 	target += SPUADDR_ADDR (pc);
       else if (reg != -1)
 	{
-	  get_frame_register_bytes (frame, reg, 0, 4, buf);
-	  target += extract_unsigned_integer (buf, 4, byte_order) & -4;
+	  int optim, unavail;
+
+	  if (get_frame_register_bytes (frame, reg, 0, 4, buf,
+					 &optim, &unavail))
+	    target += extract_unsigned_integer (buf, 4, byte_order) & -4;
+	  else
+	    {
+	      if (optim)
+		error (_("Could not determine address of "
+			 "single-step breakpoint."));
+	      if (unavail)
+		throw_error (NOT_AVAILABLE_ERROR,
+			     _("Could not determine address of "
+			       "single-step breakpoint."));
+	    }
 	}
 
       target = target & lslr;
@@ -1613,9 +1640,13 @@ spu_get_longjmp_target (struct frame_info *frame, CORE_ADDR *pc)
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   gdb_byte buf[4];
   CORE_ADDR jb_addr;
+  int optim, unavail;
 
   /* Jump buffer is pointed to by the argument register $r3.  */
-  get_frame_register_bytes (frame, SPU_ARG1_REGNUM, 0, 4, buf);
+  if (!get_frame_register_bytes (frame, SPU_ARG1_REGNUM, 0, 4, buf,
+				 &optim, &unavail))
+    return 0;
+
   jb_addr = extract_unsigned_integer (buf, 4, byte_order);
   if (target_read_memory (SPUADDR (tdep->id, jb_addr), buf, 4))
     return 0;
@@ -1915,8 +1946,8 @@ spu_catch_start (struct objfile *objfile)
 		     bp_breakpoint /* type_wanted */,
 		     0 /* ignore_count */,
 		     AUTO_BOOLEAN_FALSE /* pending_break_support */,
-		     NULL /* ops */, 0 /* from_tty */, 1 /* enabled */,
-		     0 /* internal  */);
+		     &bkpt_breakpoint_ops /* ops */, 0 /* from_tty */,
+		     1 /* enabled */, 0 /* internal  */);
 }
 
 
@@ -2022,13 +2053,13 @@ info_spu_event_command (char *args, int from_tty)
   buf[len] = '\0';
   event_mask = strtoulst (buf, NULL, 16);
  
-  chain = make_cleanup_ui_out_tuple_begin_end (uiout, "SPUInfoEvent");
+  chain = make_cleanup_ui_out_tuple_begin_end (current_uiout, "SPUInfoEvent");
 
-  if (ui_out_is_mi_like_p (uiout))
+  if (ui_out_is_mi_like_p (current_uiout))
     {
-      ui_out_field_fmt (uiout, "event_status",
+      ui_out_field_fmt (current_uiout, "event_status",
 			"0x%s", phex_nz (event_status, 4));
-      ui_out_field_fmt (uiout, "event_mask",
+      ui_out_field_fmt (current_uiout, "event_mask",
 			"0x%s", phex_nz (event_mask, 4));
     }
   else
@@ -2099,16 +2130,16 @@ info_spu_signal_command (char *args, int from_tty)
   buf[len] = '\0';
   signal2_type = strtoulst (buf, NULL, 16);
 
-  chain = make_cleanup_ui_out_tuple_begin_end (uiout, "SPUInfoSignal");
+  chain = make_cleanup_ui_out_tuple_begin_end (current_uiout, "SPUInfoSignal");
 
-  if (ui_out_is_mi_like_p (uiout))
+  if (ui_out_is_mi_like_p (current_uiout))
     {
-      ui_out_field_int (uiout, "signal1_pending", signal1_pending);
-      ui_out_field_fmt (uiout, "signal1", "0x%s", phex_nz (signal1, 4));
-      ui_out_field_int (uiout, "signal1_type", signal1_type);
-      ui_out_field_int (uiout, "signal2_pending", signal2_pending);
-      ui_out_field_fmt (uiout, "signal2", "0x%s", phex_nz (signal2, 4));
-      ui_out_field_int (uiout, "signal2_type", signal2_type);
+      ui_out_field_int (current_uiout, "signal1_pending", signal1_pending);
+      ui_out_field_fmt (current_uiout, "signal1", "0x%s", phex_nz (signal1, 4));
+      ui_out_field_int (current_uiout, "signal1_type", signal1_type);
+      ui_out_field_int (current_uiout, "signal2_pending", signal2_pending);
+      ui_out_field_fmt (current_uiout, "signal2", "0x%s", phex_nz (signal2, 4));
+      ui_out_field_int (current_uiout, "signal2_type", signal2_type);
     }
   else
     {
@@ -2146,21 +2177,21 @@ info_spu_mailbox_list (gdb_byte *buf, int nr, enum bfd_endian byte_order,
   if (nr <= 0)
     return;
 
-  chain = make_cleanup_ui_out_table_begin_end (uiout, 1, nr, "mbox");
+  chain = make_cleanup_ui_out_table_begin_end (current_uiout, 1, nr, "mbox");
 
-  ui_out_table_header (uiout, 32, ui_left, field, msg);
-  ui_out_table_body (uiout);
+  ui_out_table_header (current_uiout, 32, ui_left, field, msg);
+  ui_out_table_body (current_uiout);
 
   for (i = 0; i < nr; i++)
     {
       struct cleanup *val_chain;
       ULONGEST val;
-      val_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "mbox");
+      val_chain = make_cleanup_ui_out_tuple_begin_end (current_uiout, "mbox");
       val = extract_unsigned_integer (buf + 4*i, 4, byte_order);
-      ui_out_field_fmt (uiout, field, "0x%s", phex (val, 4));
+      ui_out_field_fmt (current_uiout, field, "0x%s", phex (val, 4));
       do_cleanups (val_chain);
 
-      if (!ui_out_is_mi_like_p (uiout))
+      if (!ui_out_is_mi_like_p (current_uiout))
 	printf_filtered ("\n");
     }
 
@@ -2184,7 +2215,7 @@ info_spu_mailbox_command (char *args, int from_tty)
 
   id = get_frame_register_unsigned (frame, SPU_ID_REGNUM);
 
-  chain = make_cleanup_ui_out_tuple_begin_end (uiout, "SPUInfoMailbox");
+  chain = make_cleanup_ui_out_tuple_begin_end (current_uiout, "SPUInfoMailbox");
 
   xsnprintf (annex, sizeof annex, "%d/mbox_info", id);
   len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
@@ -2302,20 +2333,21 @@ info_spu_dma_cmdlist (gdb_byte *buf, int nr, enum bfd_endian byte_order)
   nr = i;
 
 
-  chain = make_cleanup_ui_out_table_begin_end (uiout, 10, nr, "dma_cmd");
+  chain = make_cleanup_ui_out_table_begin_end (current_uiout, 10, nr,
+					       "dma_cmd");
 
-  ui_out_table_header (uiout, 7, ui_left, "opcode", "Opcode");
-  ui_out_table_header (uiout, 3, ui_left, "tag", "Tag");
-  ui_out_table_header (uiout, 3, ui_left, "tid", "TId");
-  ui_out_table_header (uiout, 3, ui_left, "rid", "RId");
-  ui_out_table_header (uiout, 18, ui_left, "ea", "EA");
-  ui_out_table_header (uiout, 7, ui_left, "lsa", "LSA");
-  ui_out_table_header (uiout, 7, ui_left, "size", "Size");
-  ui_out_table_header (uiout, 7, ui_left, "lstaddr", "LstAddr");
-  ui_out_table_header (uiout, 7, ui_left, "lstsize", "LstSize");
-  ui_out_table_header (uiout, 1, ui_left, "error_p", "E");
+  ui_out_table_header (current_uiout, 7, ui_left, "opcode", "Opcode");
+  ui_out_table_header (current_uiout, 3, ui_left, "tag", "Tag");
+  ui_out_table_header (current_uiout, 3, ui_left, "tid", "TId");
+  ui_out_table_header (current_uiout, 3, ui_left, "rid", "RId");
+  ui_out_table_header (current_uiout, 18, ui_left, "ea", "EA");
+  ui_out_table_header (current_uiout, 7, ui_left, "lsa", "LSA");
+  ui_out_table_header (current_uiout, 7, ui_left, "size", "Size");
+  ui_out_table_header (current_uiout, 7, ui_left, "lstaddr", "LstAddr");
+  ui_out_table_header (current_uiout, 7, ui_left, "lstsize", "LstSize");
+  ui_out_table_header (current_uiout, 1, ui_left, "error_p", "E");
 
-  ui_out_table_body (uiout);
+  ui_out_table_body (current_uiout);
 
   for (i = 0; i < nr; i++)
     {
@@ -2356,47 +2388,47 @@ info_spu_dma_cmdlist (gdb_byte *buf, int nr, enum bfd_endian byte_order)
       ea_valid_p = spu_mfc_get_bitfield (mfc_cq_dw2, 39, 39);
       cmd_error_p = spu_mfc_get_bitfield (mfc_cq_dw2, 40, 40);
 
-      cmd_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "cmd");
+      cmd_chain = make_cleanup_ui_out_tuple_begin_end (current_uiout, "cmd");
 
       if (spu_mfc_opcode[mfc_cmd_opcode])
-	ui_out_field_string (uiout, "opcode", spu_mfc_opcode[mfc_cmd_opcode]);
+	ui_out_field_string (current_uiout, "opcode", spu_mfc_opcode[mfc_cmd_opcode]);
       else
-	ui_out_field_int (uiout, "opcode", mfc_cmd_opcode);
+	ui_out_field_int (current_uiout, "opcode", mfc_cmd_opcode);
 
-      ui_out_field_int (uiout, "tag", mfc_cmd_tag);
-      ui_out_field_int (uiout, "tid", tclass_id);
-      ui_out_field_int (uiout, "rid", rclass_id);
+      ui_out_field_int (current_uiout, "tag", mfc_cmd_tag);
+      ui_out_field_int (current_uiout, "tid", tclass_id);
+      ui_out_field_int (current_uiout, "rid", rclass_id);
 
       if (ea_valid_p)
-	ui_out_field_fmt (uiout, "ea", "0x%s", phex (mfc_ea, 8));
+	ui_out_field_fmt (current_uiout, "ea", "0x%s", phex (mfc_ea, 8));
       else
-	ui_out_field_skip (uiout, "ea");
+	ui_out_field_skip (current_uiout, "ea");
 
-      ui_out_field_fmt (uiout, "lsa", "0x%05x", mfc_lsa << 4);
+      ui_out_field_fmt (current_uiout, "lsa", "0x%05x", mfc_lsa << 4);
       if (qw_valid_p)
-	ui_out_field_fmt (uiout, "size", "0x%05x", mfc_size << 4);
+	ui_out_field_fmt (current_uiout, "size", "0x%05x", mfc_size << 4);
       else
-	ui_out_field_fmt (uiout, "size", "0x%05x", mfc_size);
+	ui_out_field_fmt (current_uiout, "size", "0x%05x", mfc_size);
 
       if (list_valid_p)
 	{
-	  ui_out_field_fmt (uiout, "lstaddr", "0x%05x", list_lsa << 3);
-	  ui_out_field_fmt (uiout, "lstsize", "0x%05x", list_size << 3);
+	  ui_out_field_fmt (current_uiout, "lstaddr", "0x%05x", list_lsa << 3);
+	  ui_out_field_fmt (current_uiout, "lstsize", "0x%05x", list_size << 3);
 	}
       else
 	{
-	  ui_out_field_skip (uiout, "lstaddr");
-	  ui_out_field_skip (uiout, "lstsize");
+	  ui_out_field_skip (current_uiout, "lstaddr");
+	  ui_out_field_skip (current_uiout, "lstsize");
 	}
 
       if (cmd_error_p)
-	ui_out_field_string (uiout, "error_p", "*");
+	ui_out_field_string (current_uiout, "error_p", "*");
       else
-	ui_out_field_skip (uiout, "error_p");
+	ui_out_field_skip (current_uiout, "error_p");
 
       do_cleanups (cmd_chain);
 
-      if (!ui_out_is_mi_like_p (uiout))
+      if (!ui_out_is_mi_like_p (current_uiout))
 	printf_filtered ("\n");
     }
 
@@ -2442,19 +2474,19 @@ info_spu_dma_command (char *args, int from_tty)
   dma_info_atomic_command_status
     = extract_unsigned_integer (buf + 32, 8, byte_order);
   
-  chain = make_cleanup_ui_out_tuple_begin_end (uiout, "SPUInfoDMA");
+  chain = make_cleanup_ui_out_tuple_begin_end (current_uiout, "SPUInfoDMA");
 
-  if (ui_out_is_mi_like_p (uiout))
+  if (ui_out_is_mi_like_p (current_uiout))
     {
-      ui_out_field_fmt (uiout, "dma_info_type", "0x%s",
+      ui_out_field_fmt (current_uiout, "dma_info_type", "0x%s",
 			phex_nz (dma_info_type, 4));
-      ui_out_field_fmt (uiout, "dma_info_mask", "0x%s",
+      ui_out_field_fmt (current_uiout, "dma_info_mask", "0x%s",
 			phex_nz (dma_info_mask, 4));
-      ui_out_field_fmt (uiout, "dma_info_status", "0x%s",
+      ui_out_field_fmt (current_uiout, "dma_info_status", "0x%s",
 			phex_nz (dma_info_status, 4));
-      ui_out_field_fmt (uiout, "dma_info_stall_and_notify", "0x%s",
+      ui_out_field_fmt (current_uiout, "dma_info_stall_and_notify", "0x%s",
 			phex_nz (dma_info_stall_and_notify, 4));
-      ui_out_field_fmt (uiout, "dma_info_atomic_command_status", "0x%s",
+      ui_out_field_fmt (current_uiout, "dma_info_atomic_command_status", "0x%s",
 			phex_nz (dma_info_atomic_command_status, 4));
     }
   else
@@ -2514,15 +2546,16 @@ info_spu_proxydma_command (char *args, int from_tty)
   dma_info_mask = extract_unsigned_integer (buf + 8, 8, byte_order);
   dma_info_status = extract_unsigned_integer (buf + 16, 8, byte_order);
   
-  chain = make_cleanup_ui_out_tuple_begin_end (uiout, "SPUInfoProxyDMA");
+  chain = make_cleanup_ui_out_tuple_begin_end (current_uiout,
+					       "SPUInfoProxyDMA");
 
-  if (ui_out_is_mi_like_p (uiout))
+  if (ui_out_is_mi_like_p (current_uiout))
     {
-      ui_out_field_fmt (uiout, "proxydma_info_type", "0x%s",
+      ui_out_field_fmt (current_uiout, "proxydma_info_type", "0x%s",
 			phex_nz (dma_info_type, 4));
-      ui_out_field_fmt (uiout, "proxydma_info_mask", "0x%s",
+      ui_out_field_fmt (current_uiout, "proxydma_info_mask", "0x%s",
 			phex_nz (dma_info_mask, 4));
-      ui_out_field_fmt (uiout, "proxydma_info_status", "0x%s",
+      ui_out_field_fmt (current_uiout, "proxydma_info_status", "0x%s",
 			phex_nz (dma_info_status, 4));
     }
   else

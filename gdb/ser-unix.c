@@ -1,7 +1,7 @@
 /* Serial interface for local (hardwired) serial ports on Un*x like systems
 
-   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001, 2003,
-   2004, 2005, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1992-1996, 1998-2001, 2003-2005, 2007-2012 Free
+   Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -183,7 +183,10 @@ hardwire_get_tty_state (struct serial *scb)
   state = (struct hardwire_ttystate *) xmalloc (sizeof *state);
 
   if (get_tty_state (scb, state))
-    return NULL;
+    {
+      xfree (state);
+      return NULL;
+    }
 
   return (serial_ttystate) state;
 }

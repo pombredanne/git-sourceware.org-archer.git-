@@ -1,8 +1,6 @@
 /* Print values for GNU debugger GDB.
 
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -32,6 +30,7 @@
 #include "target.h"
 #include "breakpoint.h"
 #include "demangle.h"
+#include "gdb-demangle.h"
 #include "valprint.h"
 #include "annotate.h"
 #include "symfile.h"		/* for overlay functions */
@@ -61,9 +60,6 @@
 #else
 # define USE_PRINTF_I64 0
 #endif
-
-extern int asm_demangle;	/* Whether to demangle syms in asm
-				   printouts.  */
 
 struct format_data
   {
@@ -129,7 +125,7 @@ show_print_symbol_filename (struct ui_file *file, int from_tty,
 }
 
 /* Number of auto-display expression currently being displayed.
-   So that we can disable it if we get an error or a signal within it.
+   So that we can disable it if we get a signal within it.
    -1 when not doing one.  */
 
 int current_display_number;
@@ -168,10 +164,17 @@ static struct display *display_chain;
 
 static int display_number;
 
-/* Walk the following statement or block through all displays.  */
+/* Walk the following statement or block through all displays.
+   ALL_DISPLAYS_SAFE does so even if the statement deletes the current
+   display.  */
 
 #define ALL_DISPLAYS(B)				\
   for (B = display_chain; B; B = B->next)
+
+#define ALL_DISPLAYS_SAFE(B,TMP)		\
+  for (B = display_chain;			\
+       B ? (TMP = B->next, 1): 0;		\
+       B = TMP)
 
 /* Prototypes for exported functions.  */
 
@@ -752,9 +755,7 @@ pc_prefix (CORE_ADDR addr)
       CORE_ADDR pc;
 
       frame = get_selected_frame (NULL);
-      pc = get_frame_pc (frame);
-
-      if (pc == addr)
+      if (get_frame_pc_if_available (frame, &pc) && pc == addr)
 	return "=> ";
     }
   return "   ";
@@ -1583,17 +1584,63 @@ delete_display (struct display *display)
   free_display (display);
 }
 
-/* Delete some values from the auto-display chain.
-   Specify the element numbers.  */
+/* Call FUNCTION on each of the displays whose numbers are given in
+   ARGS.  DATA is passed unmodified to FUNCTION.  */
+
+static void
+map_display_numbers (char *args,
+		     void (*function) (struct display *,
+				       void *),
+		     void *data)
+{
+  struct get_number_or_range_state state;
+  struct display *b, *tmp;
+  int num;
+
+  if (args == NULL)
+    error_no_arg (_("one or more display numbers"));
+
+  init_number_or_range (&state, args);
+
+  while (!state.finished)
+    {
+      char *p = state.string;
+
+      num = get_number_or_range (&state);
+      if (num == 0)
+	warning (_("bad display number at or near '%s'"), p);
+      else
+	{
+	  struct display *d, *tmp;
+
+	  ALL_DISPLAYS_SAFE (d, tmp)
+	    if (d->number == num)
+	      break;
+	  if (d == NULL)
+	    printf_unfiltered (_("No display number %d.\n"), num);
+	  else
+	    function (d, data);
+	}
+    }
+}
+
+/* Callback for map_display_numbers, that deletes a display.  */
+
+static void
+do_delete_display (struct display *d, void *data)
+{
+  delete_display (d);
+}
+
+/* "undisplay" command.  */
 
 static void
 undisplay_command (char *args, int from_tty)
 {
-  char *p = args;
-  char *p1;
   int num;
+  struct get_number_or_range_state state;
 
-  if (args == 0)
+  if (args == NULL)
     {
       if (query (_("Delete all auto-display expressions? ")))
 	clear_displays ();
@@ -1601,28 +1648,7 @@ undisplay_command (char *args, int from_tty)
       return;
     }
 
-  while (*p)
-    {
-      p1 = p;
-
-      num = get_number_or_range (&p1);
-      if (num == 0)
-	warning (_("bad display number at or near '%s'"), p);
-      else
-	{
-	  struct display *d;
-
-	  ALL_DISPLAYS (d)
-	    if (d->number == num)
-	      break;
-	  if (d == NULL)
-	    printf_unfiltered (_("No display number %d.\n"), num);
-	  else
-	    delete_display (d);
-	}
-
-      p = p1;
-    }
+  map_display_numbers (args, do_delete_display, NULL);
   dont_repeat ();
 }
 
@@ -1633,6 +1659,7 @@ undisplay_command (char *args, int from_tty)
 static void
 do_one_display (struct display *d)
 {
+  struct cleanup *old_chain;
   int within_current_scope;
 
   if (d->enabled_p == 0)
@@ -1684,6 +1711,7 @@ do_one_display (struct display *d)
   if (!within_current_scope)
     return;
 
+  old_chain = make_cleanup_restore_integer (&current_display_number);
   current_display_number = d->number;
 
   annotate_display_begin ();
@@ -1692,8 +1720,7 @@ do_one_display (struct display *d)
   printf_filtered (": ");
   if (d->format.size)
     {
-      CORE_ADDR addr;
-      struct value *val;
+      volatile struct gdb_exception ex;
 
       annotate_display_format ();
 
@@ -1715,18 +1742,26 @@ do_one_display (struct display *d)
       else
 	printf_filtered ("  ");
 
-      val = evaluate_expression (d->exp);
-      addr = value_as_address (val);
-      if (d->format.format == 'i')
-	addr = gdbarch_addr_bits_remove (d->exp->gdbarch, addr);
-
       annotate_display_value ();
 
-      do_examine (d->format, d->exp->gdbarch, addr);
+      TRY_CATCH (ex, RETURN_MASK_ERROR)
+        {
+	  struct value *val;
+	  CORE_ADDR addr;
+
+	  val = evaluate_expression (d->exp);
+	  addr = value_as_address (val);
+	  if (d->format.format == 'i')
+	    addr = gdbarch_addr_bits_remove (d->exp->gdbarch, addr);
+	  do_examine (d->format, d->exp->gdbarch, addr);
+	}
+      if (ex.reason < 0)
+	fprintf_filtered (gdb_stdout, _("<error: %s>\n"), ex.message);
     }
   else
     {
       struct value_print_options opts;
+      volatile struct gdb_exception ex;
 
       annotate_display_format ();
 
@@ -1744,15 +1779,23 @@ do_one_display (struct display *d)
 
       get_formatted_print_options (&opts, d->format.format);
       opts.raw = d->format.raw;
-      print_formatted (evaluate_expression (d->exp),
-		       d->format.size, &opts, gdb_stdout);
+
+      TRY_CATCH (ex, RETURN_MASK_ERROR)
+        {
+	  struct value *val;
+
+	  val = evaluate_expression (d->exp);
+	  print_formatted (val, d->format.size, &opts, gdb_stdout);
+	}
+      if (ex.reason < 0)
+	fprintf_filtered (gdb_stdout, _("<error: %s>"), ex.message);
       printf_filtered ("\n");
     }
 
   annotate_display_end ();
 
   gdb_flush (gdb_stdout);
-  current_display_number = -1;
+  do_cleanups (old_chain);
 }
 
 /* Display all of the values on the auto-display chain which can be
@@ -1825,71 +1868,47 @@ Num Enb Expression\n"));
     }
 }
 
+/* Callback fo map_display_numbers, that enables or disables the
+   passed in display D.  */
+
 static void
-enable_display (char *args, int from_tty)
+do_enable_disable_display (struct display *d, void *data)
 {
-  char *p = args;
-  char *p1;
-  int num;
-  struct display *d;
-
-  if (p == 0)
-    {
-      for (d = display_chain; d; d = d->next)
-	d->enabled_p = 1;
-    }
-  else
-    while (*p)
-      {
-	p1 = p;
-	while (*p1 >= '0' && *p1 <= '9')
-	  p1++;
-	if (*p1 && *p1 != ' ' && *p1 != '\t')
-	  error (_("Arguments must be display numbers."));
-
-	num = atoi (p);
-
-	for (d = display_chain; d; d = d->next)
-	  if (d->number == num)
-	    {
-	      d->enabled_p = 1;
-	      goto win;
-	    }
-	printf_unfiltered (_("No display number %d.\n"), num);
-      win:
-	p = p1;
-	while (*p == ' ' || *p == '\t')
-	  p++;
-      }
+  d->enabled_p = *(int *) data;
 }
+
+/* Implamentation of both the "disable display" and "enable display"
+   commands.  ENABLE decides what to do.  */
+
+static void
+enable_disable_display_command (char *args, int from_tty, int enable)
+{
+  if (args == NULL)
+    {
+      struct display *d;
+
+      ALL_DISPLAYS (d)
+	d->enabled_p = enable;
+      return;
+    }
+
+  map_display_numbers (args, do_enable_disable_display, &enable);
+}
+
+/* The "enable display" command.  */
+
+static void
+enable_display_command (char *args, int from_tty)
+{
+  enable_disable_display_command (args, from_tty, 1);
+}
+
+/* The "disable display" command.  */
 
 static void
 disable_display_command (char *args, int from_tty)
 {
-  char *p = args;
-  char *p1;
-  struct display *d;
-
-  if (p == 0)
-    {
-      for (d = display_chain; d; d = d->next)
-	d->enabled_p = 0;
-    }
-  else
-    while (*p)
-      {
-	p1 = p;
-	while (*p1 >= '0' && *p1 <= '9')
-	  p1++;
-	if (*p1 && *p1 != ' ' && *p1 != '\t')
-	  error (_("Arguments must be display numbers."));
-
-	disable_display (atoi (p));
-
-	p = p1;
-	while (*p == ' ' || *p == '\t')
-	  p++;
-      }
+  enable_disable_display_command (args, from_tty, 0);
 }
 
 /* display_chain items point to blocks and expressions.  Some expressions in
@@ -1953,6 +1972,7 @@ print_variable_and_value (const char *name, struct symbol *var,
 
       val = read_var_value (var, frame);
       get_user_print_options (&opts);
+      opts.deref_ref = 1;
       common_val_print (val, stream, indent, &opts, current_language);
     }
   if (except.reason < 0)
@@ -2751,7 +2771,7 @@ and examining is done as in the \"x\" command.\n\n\
 With no argument, display all currently requested auto-display expressions.\n\
 Use \"undisplay\" to cancel display requests previously made."));
 
-  add_cmd ("display", class_vars, enable_display, _("\
+  add_cmd ("display", class_vars, enable_display_command, _("\
 Enable some expressions to be displayed when program stops.\n\
 Arguments are the code numbers of the expressions to resume displaying.\n\
 No argument means enable all automatic-display expressions.\n\

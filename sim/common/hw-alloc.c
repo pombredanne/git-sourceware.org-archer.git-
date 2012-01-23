@@ -1,6 +1,5 @@
 /* Hardware memory allocator.
-   Copyright (C) 1998, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1998, 2007-2012 Free Software Foundation, Inc.
    Contributed by Cygnus Support.
 
 This file is part of GDB, the GNU debugger.
@@ -27,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 #include <stdlib.h>
 #endif
 
-struct hw_alloc_data {
+struct hw_alloc_data
+{
   void *alloc;
   struct hw_alloc_data *next;
 };

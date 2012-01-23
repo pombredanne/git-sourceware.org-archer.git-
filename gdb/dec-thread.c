@@ -1,4 +1,4 @@
-/* Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+/* Copyright (C) 2008-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -700,7 +700,7 @@ dec_thread_get_ada_task_ptid (long lwp, long thread)
     if (info->info.teb == (pthread_t) thread)
       return ptid_build_from_info (*info);
   
-  warning (_("Could not find thread id from THREAD = 0x%lx\n"), thread);
+  warning (_("Could not find thread id from THREAD = 0x%lx"), thread);
   return inferior_ptid;
 }
 

@@ -1,7 +1,6 @@
 /* Machine independent support for SVR4 /proc (process file system) for GDB.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2006, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 1999-2003, 2006-2012 Free Software Foundation, Inc.
 
    Written by Michael Snyder at Cygnus Solutions.
    Based on work by Fred Fish, Stu Grossman, Geoff Noer, and others.
@@ -120,7 +119,7 @@ static void procfs_fetch_registers (struct target_ops *,
 				    struct regcache *, int);
 static void procfs_store_registers (struct target_ops *,
 				    struct regcache *, int);
-static void procfs_notice_signals (ptid_t);
+static void procfs_pass_signals (int, unsigned char *);
 static void procfs_kill_inferior (struct target_ops *ops);
 static void procfs_mourn_inferior (struct target_ops *ops);
 static void procfs_create_inferior (struct target_ops *, char *,
@@ -151,6 +150,9 @@ static int proc_find_memory_regions (int (*) (CORE_ADDR,
 static char * procfs_make_note_section (bfd *, int *);
 
 static int procfs_can_use_hw_breakpoint (int, int, int);
+
+static void procfs_info_proc (struct target_ops *, char *,
+			      enum info_proc_what);
 
 #if defined (PR_MODEL_NATIVE) && (PR_MODEL_NATIVE == PR_MODEL_LP64)
 /* When GDB is built as 64-bit application on Solaris, the auxv data
@@ -201,7 +203,7 @@ procfs_target (void)
   t->to_store_registers = procfs_store_registers;
   t->to_xfer_partial = procfs_xfer_partial;
   t->deprecated_xfer_memory = procfs_xfer_memory;
-  t->to_notice_signals = procfs_notice_signals;
+  t->to_pass_signals = procfs_pass_signals;
   t->to_files_info = procfs_files_info;
   t->to_stop = procfs_stop;
 
@@ -212,6 +214,7 @@ procfs_target (void)
   t->to_has_thread_control = tc_schedlock;
   t->to_find_memory_regions = proc_find_memory_regions;
   t->to_make_corefile_notes = procfs_make_note_section;
+  t->to_info_proc = procfs_info_proc;
 
 #if defined(PR_MODEL_NATIVE) && (PR_MODEL_NATIVE == PR_MODEL_LP64)
   t->to_auxv_parse = procfs_auxv_parse;
@@ -605,7 +608,7 @@ open_procinfo_files (procinfo *pi, int which)
     else
       strcat (tmp, "/ctl");
     fd = open_with_retry (tmp, O_WRONLY);
-    if (fd <= 0)
+    if (fd < 0)
       return 0;		/* fail */
     pi->ctl_fd = fd;
     break;
@@ -614,7 +617,7 @@ open_procinfo_files (procinfo *pi, int which)
       return 0;		/* There is no 'as' file descriptor for an lwp.  */
     strcat (tmp, "/as");
     fd = open_with_retry (tmp, O_RDWR);
-    if (fd <= 0)
+    if (fd < 0)
       return 0;		/* fail */
     pi->as_fd = fd;
     break;
@@ -624,7 +627,7 @@ open_procinfo_files (procinfo *pi, int which)
     else
       strcat (tmp, "/status");
     fd = open_with_retry (tmp, O_RDONLY);
-    if (fd <= 0)
+    if (fd < 0)
       return 0;		/* fail */
     pi->status_fd = fd;
     break;
@@ -646,13 +649,13 @@ open_procinfo_files (procinfo *pi, int which)
 
 #ifdef PIOCTSTATUS	/* OSF */
   /* Only one FD; just open it.  */
-  if ((fd = open_with_retry (pi->pathname, O_RDWR)) == 0)
+  if ((fd = open_with_retry (pi->pathname, O_RDWR)) < 0)
     return 0;
 #else			/* Sol 2.5, Irix, other?  */
   if (pi->tid == 0)	/* Master procinfo for the process */
     {
       fd = open_with_retry (pi->pathname, O_RDWR);
-      if (fd <= 0)
+      if (fd < 0)
 	return 0;	/* fail */
     }
   else			/* LWP thread procinfo */
@@ -666,7 +669,7 @@ open_procinfo_files (procinfo *pi, int which)
 	return 0;	/* fail */
 
       /* Now obtain the file descriptor for the LWP.  */
-      if ((fd = ioctl (process->ctl_fd, PIOCOPENLWP, &lwpid)) <= 0)
+      if ((fd = ioctl (process->ctl_fd, PIOCOPENLWP, &lwpid)) < 0)
 	return 0;	/* fail */
 #else			/* Irix, other?  */
       return 0;		/* Don't know how to open threads.  */
@@ -878,6 +881,7 @@ load_syscalls (procinfo *pi)
   prsysent_t header;
   prsyscall_t *syscalls;
   int i, size, maxcall;
+  struct cleanup *cleanups;
 
   pi->num_syscalls = 0;
   pi->syscall_names = 0;
@@ -889,6 +893,7 @@ load_syscalls (procinfo *pi)
     {
       error (_("load_syscalls: Can't open /proc/%d/sysent"), pi->pid);
     }
+  cleanups = make_cleanup_close (sysent_fd);
 
   size = sizeof header - sizeof (prsyscall_t);
   if (read (sysent_fd, &header, size) != size)
@@ -904,12 +909,10 @@ load_syscalls (procinfo *pi)
 
   size = header.pr_nsyscalls * sizeof (prsyscall_t);
   syscalls = xmalloc (size);
+  make_cleanup (free_current_contents, &syscalls);
 
   if (read (sysent_fd, syscalls, size) != size)
-    {
-      xfree (syscalls);
-      error (_("load_syscalls: Error reading /proc/%d/sysent"), pi->pid);
-    }
+    error (_("load_syscalls: Error reading /proc/%d/sysent"), pi->pid);
 
   /* Find maximum syscall number.  This may not be the same as
      pr_nsyscalls since that value refers to the number of entries
@@ -963,8 +966,7 @@ load_syscalls (procinfo *pi)
       pi->syscall_names[callnum][size-1] = '\0';
     }
 
-  close (sysent_fd);
-  xfree (syscalls);
+  do_cleanups (cleanups);
 }
 
 /* Free the space allocated for the syscall names from the procinfo
@@ -3147,7 +3149,6 @@ proc_iterate_over_threads (procinfo *pi,
 
 static ptid_t do_attach (ptid_t ptid);
 static void do_detach (int signo);
-static int register_gdb_signals (procinfo *, gdb_sigset_t *);
 static void proc_trace_syscalls_1 (procinfo *pi, int syscallnum,
 				   int entry_or_exit, int mode, int from_tty);
 
@@ -3186,9 +3187,9 @@ procfs_debug_inferior (procinfo *pi)
   if (!proc_set_traced_faults  (pi, &traced_faults))
     return __LINE__;
 
-  /* Register to trace selected signals in the child.  */
-  premptyset (&traced_signals);
-  if (!register_gdb_signals (pi, &traced_signals))
+  /* Initially, register to trace all signals in the child.  */
+  prfillset (&traced_signals);
+  if (!proc_set_traced_signals (pi, &traced_signals))
     return __LINE__;
 
 
@@ -4464,40 +4465,26 @@ procfs_resume (struct target_ops *ops,
     }
 }
 
-/* Traverse the list of signals that GDB knows about (see "handle"
-   command), and arrange for the target to be stopped or not,
-   according to these settings.  Returns non-zero for success, zero
-   for failure.  */
-
-static int
-register_gdb_signals (procinfo *pi, gdb_sigset_t *signals)
-{
-  int signo;
-
-  for (signo = 0; signo < NSIG; signo ++)
-    if (signal_stop_state  (target_signal_from_host (signo)) == 0 &&
-	signal_print_state (target_signal_from_host (signo)) == 0 &&
-	signal_pass_state  (target_signal_from_host (signo)) == 1)
-      gdb_prdelset (signals, signo);
-    else
-      gdb_praddset (signals, signo);
-
-  return proc_set_traced_signals (pi, signals);
-}
-
 /* Set up to trace signals in the child process.  */
 
 static void
-procfs_notice_signals (ptid_t ptid)
+procfs_pass_signals (int numsigs, unsigned char *pass_signals)
 {
   gdb_sigset_t signals;
-  procinfo *pi = find_procinfo_or_die (PIDGET (ptid), 0);
+  procinfo *pi = find_procinfo_or_die (PIDGET (inferior_ptid), 0);
+  int signo;
 
-  if (proc_get_traced_signals (pi, &signals) &&
-      register_gdb_signals    (pi, &signals))
-    return;
-  else
-    proc_error (pi, "notice_signals", __LINE__);
+  prfillset (&signals);
+
+  for (signo = 0; signo < NSIG; signo++)
+    {
+      int target_signo = target_signal_from_host (signo);
+      if (target_signo < numsigs && pass_signals[target_signo])
+	gdb_prdelset (&signals, signo);
+    }
+
+  if (!proc_set_traced_signals (pi, &signals))
+    proc_error (pi, "pass_signals", __LINE__);
 }
 
 /* Print status information about the child process.  */
@@ -4678,11 +4665,6 @@ procfs_init_inferior (struct target_ops *ops, int pid)
     proc_error (pi, "init_inferior, get_traced_sysentry", __LINE__);
   if (!proc_get_traced_sysexit  (pi, pi->saved_exitset))
     proc_error (pi, "init_inferior, get_traced_sysexit", __LINE__);
-
-  /* Register to trace selected signals in the child.  */
-  prfillset (&signals);
-  if (!register_gdb_signals (pi, &signals))
-    proc_error (pi, "init_inferior, register_signals", __LINE__);
 
   if ((fail = procfs_debug_inferior (pi)) != 0)
     proc_error (pi, "init_inferior (procfs_debug_inferior)", fail);
@@ -4935,7 +4917,7 @@ procfs_create_inferior (struct target_ops *ops, char *exec_file,
     }
 
   pid = fork_inferior (exec_file, allargs, env, procfs_set_exec_trap,
-		       NULL, NULL, shell_file);
+		       NULL, NULL, shell_file, NULL);
 
   procfs_init_inferior (ops, pid);
 }
@@ -5237,6 +5219,7 @@ iterate_over_mappings (procinfo *pi, find_memory_region_ftype child_func,
   int funcstat;
   int map_fd;
   int nmap;
+  struct cleanup *cleanups = make_cleanup (null_cleanup, NULL);
 #ifdef NEW_PROC_API
   struct stat sbuf;
 #endif
@@ -5274,8 +5257,12 @@ iterate_over_mappings (procinfo *pi, find_memory_region_ftype child_func,
 
   for (prmap = prmaps; nmap > 0; prmap++, nmap--)
     if ((funcstat = (*func) (prmap, child_func, data)) != 0)
-      return funcstat;
+      {
+	do_cleanups (cleanups);
+        return funcstat;
+      }
 
+  do_cleanups (cleanups);
   return 0;
 }
 
@@ -5407,7 +5394,8 @@ info_proc_mappings (procinfo *pi, int summary)
 /* Implement the "info proc" command.  */
 
 static void
-info_proc_cmd (char *args, int from_tty)
+procfs_info_proc (struct target_ops *ops, char *args,
+		  enum info_proc_what what)
 {
   struct cleanup *old_chain;
   procinfo *process  = NULL;
@@ -5417,6 +5405,20 @@ info_proc_cmd (char *args, int from_tty)
   int       pid      = 0;
   int       tid      = 0;
   int       mappings = 0;
+
+  switch (what)
+    {
+    case IP_MINIMAL:
+      break;
+
+    case IP_MAPPINGS:
+    case IP_ALL:
+      mappings = 1;
+      break;
+
+    default:
+      error (_("Not supported on this target."));
+    }
 
   old_chain = make_cleanup (null_cleanup, 0);
   if (args)
@@ -5435,14 +5437,6 @@ info_proc_cmd (char *args, int from_tty)
       else if (argv[0][0] == '/')
 	{
 	  tid = strtoul (argv[0] + 1, NULL, 10);
-	}
-      else if (strncmp (argv[0], "mappings", strlen (argv[0])) == 0)
-	{
-	  mappings = 1;
-	}
-      else
-	{
-	  /* [...] */
 	}
       argv++;
     }
@@ -5584,10 +5578,6 @@ _initialize_procfs (void)
 {
   observer_attach_inferior_created (procfs_inferior_created);
 
-  add_info ("proc", info_proc_cmd, _("\
-Show /proc process information about any running process.\n\
-Specify process id, or use the program being debugged by default.\n\
-Specify keyword 'mappings' for detailed info on memory mappings."));
   add_com ("proc-trace-entry", no_class, proc_trace_sysentry_cmd,
 	   _("Give a trace of entries into the syscall."));
   add_com ("proc-trace-exit", no_class, proc_trace_sysexit_cmd,
@@ -5734,7 +5724,7 @@ procfs_make_note_section (bfd *obfd, int *note_size)
 
   if (get_exec_file (0))
     {
-      strncpy (fname, strrchr (get_exec_file (0), '/') + 1, sizeof (fname));
+      strncpy (fname, lbasename (get_exec_file (0)), sizeof (fname));
       strncpy (psargs, get_exec_file (0),
 	       sizeof (psargs));
 

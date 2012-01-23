@@ -1,7 +1,7 @@
 # This testcase is part of GDB, the GNU debugger.
 
-# Copyright 1997, 1998, 1999, 2000, 2002, 2001, 2003, 2004, 2007, 2008, 2009,
-# 2010, 2011 Free Software Foundation, Inc.
+# Copyright 1997-2000, 2002, 2001, 2003-2004, 2007-2012 Free Software
+# Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -16,10 +16,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 # step-test.exp -- Expect script to test stepping in gdb
-
-if $tracelevel then {
-    strace $tracelevel
-}
 
 set testfile step-test
 set srcfile ${testfile}.c
@@ -150,7 +146,7 @@ gdb_test_multiple "finish" "$test" {
     -re ".*${decimal}.*callee.*NEXTI.*$gdb_prompt $" {
 	pass "$test"
     }
-    -re ".*(Program received|Program exited).*$gdb_prompt $" {
+    -re ".*(Program received|$inferior_exited_re).*$gdb_prompt $" {
 	# Oops... We ran to the end of the program...  Better reset     
 	if {![runto_main]} then {
 	    fail "$test (Can't run to main)"

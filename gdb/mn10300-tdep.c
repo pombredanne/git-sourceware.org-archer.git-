@@ -1,7 +1,6 @@
 /* Target-dependent code for the Matsushita MN10300 for GDB, the GNU debugger.
 
-   Copyright (C) 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005,
-   2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1996-2005, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1174,6 +1173,7 @@ mn10300_frame_prev_register (struct frame_info *this_frame,
 
 static const struct frame_unwind mn10300_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   mn10300_frame_this_id, 
   mn10300_frame_prev_register,
   NULL,

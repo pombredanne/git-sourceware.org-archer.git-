@@ -1,5 +1,4 @@
-/* Copyright 1999, 2004, 2007, 2008, 2009, 2010, 2011
-Free Software Foundation, Inc.
+/* Copyright 1999, 2004, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -90,6 +89,24 @@ struct _struct_n_pointer {
   long ****long_ptr;
   struct _struct_n_pointer *ptrs[3];
   struct _struct_n_pointer *next;
+};
+
+struct anonymous {
+  int a;
+  struct {
+    int b;
+    char *c;
+    union {
+      int d;
+      void *e;
+      char f;
+      struct {
+	char g;
+	const char **h;
+	simpleton ***simple;
+      };
+    };
+  };
 };
 
 void do_locals_tests (void);
@@ -503,6 +520,38 @@ void do_bitfield_tests ()
   /*: END: bitfield :*/  
 }
 
+void
+do_anonymous_type_tests (void)
+{
+  struct anonymous *anon;
+  struct anonymous **ptr;
+  struct
+  {
+    int x;
+    struct
+    {
+      int a;
+    };
+    struct
+    {
+      int b;
+    };
+  } v = {1, {2}, {3}};
+
+  anon = malloc (sizeof (struct anonymous));
+  anon->a = 1;
+  anon->b = 2;
+  anon->c = (char *) 3;
+  anon->d = 4;
+  anon->g = '5';
+  anon->h = (const char **) 6;
+  anon->simple = (simpleton ***) 7;
+
+  ptr = &anon;
+  free (anon);
+  return; /* anonymous type tests breakpoint */
+}
+
 int
 main (int argc, char *argv [])
 {
@@ -513,6 +562,7 @@ main (int argc, char *argv [])
   do_frozen_tests ();
   do_at_tests ();
   do_bitfield_tests ();
+  do_anonymous_type_tests ();
   exit (0);
 }
 

@@ -1,7 +1,7 @@
 /* Target-dependent code for Renesas M32R, for GDB.
 
-   Copyright (C) 1996, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007,
-   2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1996, 1998-2005, 2007-2012 Free Software Foundation,
+   Inc.
 
    This file is part of GDB.
 
@@ -163,7 +163,7 @@ m32r_memory_remove_breakpoint (struct gdbarch *gdbarch,
     }
 
   /* Write contents.  */
-  val = target_write_memory (addr & 0xfffffffc, buf, 4);
+  val = target_write_raw_memory (addr & 0xfffffffc, buf, 4);
   return val;
 }
 
@@ -876,6 +876,7 @@ m32r_frame_prev_register (struct frame_info *this_frame,
 
 static const struct frame_unwind m32r_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   m32r_frame_this_id,
   m32r_frame_prev_register,
   NULL,

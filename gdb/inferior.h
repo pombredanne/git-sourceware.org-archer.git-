@@ -1,9 +1,8 @@
 /* Variables that describe the inferior process running under GDB:
    Where it is, why it stopped, and how to step it.
 
-   Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1998, 1999, 2000, 2001, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 1986, 1988-1996, 1998-2001, 2003-2012 Free Software
+   Foundation, Inc.
 
    This file is part of GDB.
 
@@ -31,6 +30,8 @@ struct gdbarch;
 struct regcache;
 struct ui_out;
 struct terminal_info;
+
+#include "ptid.h"
 
 /* For bpstat.  */
 #include "breakpoint.h"
@@ -62,36 +63,6 @@ extern void discard_infcall_control_state (struct infcall_control_state *);
 
 extern struct regcache *
   get_infcall_suspend_state_regcache (struct infcall_suspend_state *);
-
-/* The -1 ptid, often used to indicate either an error condition
-   or a "don't care" condition, i.e, "run all threads."  */
-extern ptid_t minus_one_ptid;
-
-/* The null or zero ptid, often used to indicate no process.  */
-extern ptid_t null_ptid;
-
-/* Attempt to find and return an existing ptid with the given PID, LWP,
-   and TID components.  If none exists, create a new one and return
-   that.  */
-ptid_t ptid_build (int pid, long lwp, long tid);
-
-/* Find/Create a ptid from just a pid.  */
-ptid_t pid_to_ptid (int pid);
-
-/* Fetch the pid (process id) component from a ptid.  */
-int ptid_get_pid (ptid_t ptid);
-
-/* Fetch the lwp (lightweight process) component from a ptid.  */
-long ptid_get_lwp (ptid_t ptid);
-
-/* Fetch the tid (thread id) component from a ptid.  */
-long ptid_get_tid (ptid_t ptid);
-
-/* Compare two ptids to see if they are equal.  */
-extern int ptid_equal (ptid_t p1, ptid_t p2);
-
-/* Return true if PTID represents a process id.  */
-extern int ptid_is_pid (ptid_t ptid);
 
 /* Returns true if PTID matches filter FILTER.  FILTER can be the wild
    card MINUS_ONE_PTID (all ptid match it); can be a ptid representing
@@ -152,6 +123,10 @@ extern int non_stop;
    detached depends on 'set follow-fork-mode' setting.  */
 extern int detach_fork;
 
+/* When set (default), the target should attempt to disable the operating
+   system's address space randomization feature when starting an inferior.  */
+extern int disable_randomization;
+
 extern void generic_mourn_inferior (void);
 
 extern void terminal_save_ours (void);
@@ -171,7 +146,7 @@ extern void address_to_signed_pointer (struct gdbarch *gdbarch,
 				       struct type *type, gdb_byte *buf,
 				       CORE_ADDR addr);
 
-extern void wait_for_inferior (int treat_exec_as_sigtrap);
+extern void wait_for_inferior (void);
 
 extern void prepare_for_detach (void);
 
@@ -179,14 +154,18 @@ extern void fetch_inferior_event (void *);
 
 extern void init_wait_for_inferior (void);
 
-extern void close_exec_file (void);
-
 extern void reopen_exec_file (void);
 
 /* The `resume' routine should only be called in special circumstances.
    Normally, use `proceed', which handles a lot of bookkeeping.  */
 
 extern void resume (int, enum target_signal);
+
+extern ptid_t user_visible_resume_ptid (int step);
+
+extern void insert_step_resume_breakpoint_at_sal (struct gdbarch *,
+						  struct symtab_and_line ,
+						  struct frame_id);
 
 /* From misc files */
 
@@ -211,7 +190,9 @@ extern void terminal_init_inferior_with_pgrp (int pgrp);
 
 extern int fork_inferior (char *, char *, char **,
 			  void (*)(void),
-			  void (*)(int), void (*)(void), char *);
+			  void (*)(int), void (*)(void), char *,
+                          void (*)(const char *,
+                                   char * const *, char * const *));
 
 
 extern void startup_inferior (int);
@@ -285,6 +266,9 @@ extern void detach_command (char *, int);
 
 extern void notice_new_inferior (ptid_t, int, int);
 
+extern struct value *get_return_value (struct type *func_type,
+                                       struct type *value_type);
+
 /* Address at which inferior stopped.  */
 
 extern CORE_ADDR stop_pc;
@@ -346,11 +330,13 @@ enum stop_kind
 enum exec_direction_kind
   {
     EXEC_FORWARD,
-    EXEC_REVERSE,
-    EXEC_ERROR
+    EXEC_REVERSE
   };
 
-extern enum exec_direction_kind execution_direction;
+/* The current execution direction.  This should only be set to enum
+   exec_direction_kind values.  It is only an int to make it
+   compatible with make_cleanup_restore_integer.  */
+extern int execution_direction;
 
 /* Save register contents here when executing a "finish" command or are
    about to pop a stack dummy frame, if-and-only-if proceed_to_finish is set.
@@ -366,8 +352,7 @@ extern int debug_displaced;
 void displaced_step_dump_bytes (struct ui_file *file,
                                 const gdb_byte *buf, size_t len);
 
-struct displaced_step_closure*
-get_displaced_step_closure_by_addr (CORE_ADDR addr);
+struct displaced_step_closure *get_displaced_step_closure_by_addr (CORE_ADDR addr);
 
 /* Possible values for gdbarch_call_dummy_location.  */
 #define ON_STACK 1
@@ -436,6 +421,8 @@ struct inferior
   /* Actual target inferior id, usually, a process id.  This matches
      the ptid_t.pid member of threads of this inferior.  */
   int pid;
+  /* True if the PID was actually faked by GDB.  */
+  int fake_pid_p;
 
   /* State of GDB control of inferior process execution.
      See `struct inferior_control_state'.  */
@@ -509,6 +496,11 @@ struct inferior
 
   /* Private data used by the target vector implementation.  */
   struct private_inferior *private;
+
+  /* HAS_EXIT_CODE is true if the inferior exited with an exit code.
+     In this case, the EXIT_CODE field is also valid.  */
+  int has_exit_code;
+  LONGEST exit_code;
 
   /* We keep a count of the number of times the user has requested a
      particular syscall to be tracked, and pass this information to the
@@ -630,6 +622,11 @@ extern struct inferior *current_inferior (void);
 extern void set_current_inferior (struct inferior *);
 
 extern struct cleanup *save_current_inferior (void);
+
+/* Traverse all inferiors.  */
+
+#define ALL_INFERIORS(I) \
+  for ((I) = inferior_list; (I); (I) = (I)->next)
 
 extern struct inferior *inferior_list;
 

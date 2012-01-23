@@ -1,7 +1,5 @@
 /* GDB routines for manipulating the minimal symbol tables.
-   Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1992-2004, 2007-2012 Free Software Foundation, Inc.
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
    This file is part of GDB.
@@ -43,6 +41,7 @@
 #include "gdb_string.h"
 #include "symtab.h"
 #include "bfd.h"
+#include "filenames.h"
 #include "symfile.h"
 #include "objfiles.h"
 #include "demangle.h"
@@ -77,7 +76,7 @@ static int msym_bunch_index;
 
 static int msym_count;
 
-/* Compute a hash code based using the same criteria as `strcmp_iw'.  */
+/* See minsyms.h.  */
 
 unsigned int
 msymbol_hash_iw (const char *string)
@@ -90,14 +89,14 @@ msymbol_hash_iw (const char *string)
 	++string;
       if (*string && *string != '(')
 	{
-	  hash = hash * 67 + *string - 113;
+	  hash = SYMBOL_HASH_NEXT (hash, *string);
 	  ++string;
 	}
     }
   return hash;
 }
 
-/* Compute a hash code for a string.  */
+/* See minsyms.h.  */
 
 unsigned int
 msymbol_hash (const char *string)
@@ -105,12 +104,12 @@ msymbol_hash (const char *string)
   unsigned int hash = 0;
 
   for (; *string; ++string)
-    hash = hash * 67 + *string - 113;
+    hash = SYMBOL_HASH_NEXT (hash, *string);
   return hash;
 }
 
 /* Add the minimal symbol SYM to an objfile's minsym hash table, TABLE.  */
-void
+static void
 add_minsym_to_hash_table (struct minimal_symbol *sym,
 			  struct minimal_symbol **table)
 {
@@ -140,8 +139,8 @@ add_minsym_to_demangled_hash_table (struct minimal_symbol *sym,
     }
 }
 
+/* See minsyms.h.  */
 
-/* Return OBJFILE where minimal symbol SYM is defined.  */
 struct objfile *
 msymbol_objfile (struct minimal_symbol *sym)
 {
@@ -198,12 +197,7 @@ lookup_minimal_symbol (const char *name, const char *sfile,
   const char *modified_name;
 
   if (sfile != NULL)
-    {
-      char *p = strrchr (sfile, '/');
-
-      if (p != NULL)
-	sfile = p + 1;
-    }
+    sfile = lbasename (sfile);
 
   /* For C++, canonicalize the input name.  */
   modified_name = name;
@@ -243,11 +237,16 @@ lookup_minimal_symbol (const char *name, const char *sfile,
 
 		  if (pass == 1)
 		    {
-		      match = strcmp (SYMBOL_LINKAGE_NAME (msymbol),
-				      modified_name) == 0;
+		      int (*cmp) (const char *, const char *);
+
+		      cmp = (case_sensitivity == case_sensitive_on
+		             ? strcmp : strcasecmp);
+		      match = cmp (SYMBOL_LINKAGE_NAME (msymbol),
+				   modified_name) == 0;
 		    }
 		  else
 		    {
+		      /* The function respects CASE_SENSITIVITY.  */
 		      match = SYMBOL_MATCHES_SEARCH_NAME (msymbol,
 							  modified_name);
 		    }
@@ -260,7 +259,7 @@ lookup_minimal_symbol (const char *name, const char *sfile,
                       case mst_file_data:
                       case mst_file_bss:
                         if (sfile == NULL
-			    || strcmp (msymbol->filename, sfile) == 0)
+			    || filename_cmp (msymbol->filename, sfile) == 0)
                           found_file_symbol = msymbol;
                         break;
 
@@ -309,12 +308,41 @@ lookup_minimal_symbol (const char *name, const char *sfile,
   return NULL;
 }
 
-/* Look through all the current minimal symbol tables and find the
-   first minimal symbol that matches NAME and has text type.  If OBJF
-   is non-NULL, limit the search to that objfile.  Returns a pointer
-   to the minimal symbol that matches, or NULL if no match is found.
+/* See minsyms.h.  */
 
-   This function only searches the mangled (linkage) names.  */
+void
+iterate_over_minimal_symbols (struct objfile *objf, const char *name,
+			      void (*callback) (struct minimal_symbol *,
+						void *),
+			      void *user_data)
+{
+  unsigned int hash;
+  struct minimal_symbol *iter;
+  int (*cmp) (const char *, const char *);
+
+  /* The first pass is over the ordinary hash table.  */
+  hash = msymbol_hash (name) % MINIMAL_SYMBOL_HASH_SIZE;
+  iter = objf->msymbol_hash[hash];
+  cmp = (case_sensitivity == case_sensitive_on ? strcmp : strcasecmp);
+  while (iter)
+    {
+      if (cmp (SYMBOL_LINKAGE_NAME (iter), name) == 0)
+	(*callback) (iter, user_data);
+      iter = iter->hash_next;
+    }
+
+  /* The second pass is over the demangled table.  */
+  hash = msymbol_hash_iw (name) % MINIMAL_SYMBOL_HASH_SIZE;
+  iter = objf->msymbol_demangled_hash[hash];
+  while (iter)
+    {
+      if (SYMBOL_MATCHES_SEARCH_NAME (iter, name))
+	(*callback) (iter, user_data);
+      iter = iter->demangled_hash_next;
+    }
+}
+
+/* See minsyms.h.  */
 
 struct minimal_symbol *
 lookup_minimal_symbol_text (const char *name, struct objfile *objf)
@@ -338,8 +366,9 @@ lookup_minimal_symbol_text (const char *name, struct objfile *objf)
 	       msymbol = msymbol->hash_next)
 	    {
 	      if (strcmp (SYMBOL_LINKAGE_NAME (msymbol), name) == 0 &&
-		  (MSYMBOL_TYPE (msymbol) == mst_text ||
-		   MSYMBOL_TYPE (msymbol) == mst_file_text))
+		  (MSYMBOL_TYPE (msymbol) == mst_text
+		   || MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc
+		   || MSYMBOL_TYPE (msymbol) == mst_file_text))
 		{
 		  switch (MSYMBOL_TYPE (msymbol))
 		    {
@@ -365,10 +394,7 @@ lookup_minimal_symbol_text (const char *name, struct objfile *objf)
   return NULL;
 }
 
-/* Look through all the current minimal symbol tables and find the
-   first minimal symbol that matches NAME and PC.  If OBJF is non-NULL,
-   limit the search to that objfile.  Returns a pointer to the minimal
-   symbol that matches, or NULL if no match is found.  */
+/* See minsyms.h.  */
 
 struct minimal_symbol *
 lookup_minimal_symbol_by_pc_name (CORE_ADDR pc, const char *name,
@@ -400,13 +426,7 @@ lookup_minimal_symbol_by_pc_name (CORE_ADDR pc, const char *name,
   return NULL;
 }
 
-/* Look through all the current minimal symbol tables and find the
-   first minimal symbol that matches NAME and is a solib trampoline.
-   If OBJF is non-NULL, limit the search to that objfile.  Returns a
-   pointer to the minimal symbol that matches, or NULL if no match is
-   found.
-
-   This function only searches the mangled (linkage) names.  */
+/* See minsyms.h.  */
 
 struct minimal_symbol *
 lookup_minimal_symbol_solib_trampoline (const char *name,
@@ -581,7 +601,7 @@ lookup_minimal_symbol_by_pc_section_1 (CORE_ADDR pc,
 
 		  /* If we are looking for a trampoline and this is a
 		     text symbol, or the other way around, check the
-		     preceeding symbol too.  If they are otherwise
+		     preceding symbol too.  If they are otherwise
 		     identical prefer that one.  */
 		  if (hi > 0
 		      && MSYMBOL_TYPE (&msymbol[hi]) == other_type
@@ -692,8 +712,7 @@ lookup_minimal_symbol_by_pc_section (CORE_ADDR pc, struct obj_section *section)
   return lookup_minimal_symbol_by_pc_section_1 (pc, section, 0);
 }
 
-/* Backward compatibility: search through the minimal symbol table 
-   for a matching PC (no section given).  */
+/* See minsyms.h.  */
 
 struct minimal_symbol *
 lookup_minimal_symbol_by_pc (CORE_ADDR pc)
@@ -701,10 +720,70 @@ lookup_minimal_symbol_by_pc (CORE_ADDR pc)
   return lookup_minimal_symbol_by_pc_section (pc, NULL);
 }
 
-/* Find the minimal symbol named NAME, and return both the minsym
-   struct and its objfile.  This only checks the linkage name.  Sets
-   *OBJFILE_P and returns the minimal symbol, if it is found.  If it
-   is not found, returns NULL.  */
+/* Return non-zero iff PC is in an STT_GNU_IFUNC function resolver.  */
+
+int
+in_gnu_ifunc_stub (CORE_ADDR pc)
+{
+  struct minimal_symbol *msymbol = lookup_minimal_symbol_by_pc (pc);
+
+  return msymbol && MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc;
+}
+
+/* See elf_gnu_ifunc_resolve_addr for its real implementation.  */
+
+static CORE_ADDR
+stub_gnu_ifunc_resolve_addr (struct gdbarch *gdbarch, CORE_ADDR pc)
+{
+  error (_("GDB cannot resolve STT_GNU_IFUNC symbol at address %s without "
+	   "the ELF support compiled in."),
+	 paddress (gdbarch, pc));
+}
+
+/* See elf_gnu_ifunc_resolve_name for its real implementation.  */
+
+static int
+stub_gnu_ifunc_resolve_name (const char *function_name,
+			     CORE_ADDR *function_address_p)
+{
+  error (_("GDB cannot resolve STT_GNU_IFUNC symbol \"%s\" without "
+	   "the ELF support compiled in."),
+	 function_name);
+}
+
+/* See elf_gnu_ifunc_resolver_stop for its real implementation.  */
+
+static void
+stub_gnu_ifunc_resolver_stop (struct breakpoint *b)
+{
+  internal_error (__FILE__, __LINE__,
+		  _("elf_gnu_ifunc_resolver_stop cannot be reached."));
+}
+
+/* See elf_gnu_ifunc_resolver_return_stop for its real implementation.  */
+
+static void
+stub_gnu_ifunc_resolver_return_stop (struct breakpoint *b)
+{
+  internal_error (__FILE__, __LINE__,
+		  _("elf_gnu_ifunc_resolver_return_stop cannot be reached."));
+}
+
+/* See elf_gnu_ifunc_fns for its real implementation.  */
+
+static const struct gnu_ifunc_fns stub_gnu_ifunc_fns =
+{
+  stub_gnu_ifunc_resolve_addr,
+  stub_gnu_ifunc_resolve_name,
+  stub_gnu_ifunc_resolver_stop,
+  stub_gnu_ifunc_resolver_return_stop,
+};
+
+/* A placeholder for &elf_gnu_ifunc_fns.  */
+
+const struct gnu_ifunc_fns *gnu_ifunc_fns_p = &stub_gnu_ifunc_fns;
+
+/* See minsyms.h.  */
 
 struct minimal_symbol *
 lookup_minimal_symbol_and_objfile (const char *name,
@@ -748,17 +827,20 @@ get_symbol_leading_char (bfd *abfd)
   return 0;
 }
 
-/* Prepare to start collecting minimal symbols.  Note that presetting
-   msym_bunch_index to BUNCH_SIZE causes the first call to save a minimal
-   symbol to allocate the memory for the first bunch.  */
+/* See minsyms.h.  */
 
 void
 init_minimal_symbol_collection (void)
 {
   msym_count = 0;
   msym_bunch = NULL;
+  /* Note that presetting msym_bunch_index to BUNCH_SIZE causes the
+     first call to save a minimal symbol to allocate the memory for
+     the first bunch.  */
   msym_bunch_index = BUNCH_SIZE;
 }
+
+/* See minsyms.h.  */
 
 void
 prim_record_minimal_symbol (const char *name, CORE_ADDR address,
@@ -770,6 +852,7 @@ prim_record_minimal_symbol (const char *name, CORE_ADDR address,
   switch (ms_type)
     {
     case mst_text:
+    case mst_text_gnu_ifunc:
     case mst_file_text:
     case mst_solib_trampoline:
       section = SECT_OFF_TEXT (objfile);
@@ -790,8 +873,7 @@ prim_record_minimal_symbol (const char *name, CORE_ADDR address,
 				       section, NULL, objfile);
 }
 
-/* Record a minimal symbol in the msym bunches.  Returns the symbol
-   newly created.  */
+/* See minsyms.h.  */
 
 struct minimal_symbol *
 prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
@@ -868,8 +950,7 @@ prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
   return msymbol;
 }
 
-/* Record a minimal symbol in the msym bunches.  Returns the symbol
-   newly created.  */
+/* See minsyms.h.  */
 
 struct minimal_symbol *
 prim_record_minimal_symbol_and_info (const char *name, CORE_ADDR address,
@@ -941,6 +1022,8 @@ do_discard_minimal_symbols_cleanup (void *arg)
       msym_bunch = next;
     }
 }
+
+/* See minsyms.h.  */
 
 struct cleanup *
 make_cleanup_discard_minimal_symbols (void)
@@ -1185,6 +1268,27 @@ install_minimal_symbols (struct objfile *objfile)
     }
 }
 
+/* See minsyms.h.  */
+
+void
+terminate_minimal_symbol_table (struct objfile *objfile)
+{
+  if (! objfile->msymbols)
+    objfile->msymbols = ((struct minimal_symbol *)
+                         obstack_alloc (&objfile->objfile_obstack,
+                                        sizeof (objfile->msymbols[0])));
+
+  {
+    struct minimal_symbol *m
+      = &objfile->msymbols[objfile->minimal_symbol_count];
+
+    memset (m, 0, sizeof (*m));
+    /* Don't rely on these enumeration values being 0's.  */
+    MSYMBOL_TYPE (m) = mst_unknown;
+    SYMBOL_SET_LANGUAGE (m, language_unknown);
+  }
+}
+
 /* Sort all the minimal symbols in OBJFILE.  */
 
 void
@@ -1195,9 +1299,7 @@ msymbols_sort (struct objfile *objfile)
   build_minimal_symbol_hash_tables (objfile);
 }
 
-/* Check if PC is in a shared library trampoline code stub.
-   Return minimal symbol for the trampoline entry or NULL if PC is not
-   in a trampoline code stub.  */
+/* See minsyms.h.  */
 
 struct minimal_symbol *
 lookup_solib_trampoline_symbol_by_pc (CORE_ADDR pc)
@@ -1235,7 +1337,8 @@ find_solib_trampoline_target (struct frame_info *frame, CORE_ADDR pc)
     {
       ALL_MSYMBOLS (objfile, msymbol)
       {
-	if (MSYMBOL_TYPE (msymbol) == mst_text
+	if ((MSYMBOL_TYPE (msymbol) == mst_text
+	    || MSYMBOL_TYPE (msymbol) == mst_text_gnu_ifunc)
 	    && strcmp (SYMBOL_LINKAGE_NAME (msymbol),
 		       SYMBOL_LINKAGE_NAME (tsymbol)) == 0)
 	  return SYMBOL_VALUE_ADDRESS (msymbol);

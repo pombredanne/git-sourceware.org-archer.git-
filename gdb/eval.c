@@ -1,8 +1,6 @@
 /* Evaluate expressions for GDB.
 
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2005, 2006, 2007, 2008,
-   2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-2003, 2005-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -43,7 +41,6 @@
 #include "gdb_obstack.h"
 #include "objfiles.h"
 #include "python/python.h"
-#include "wrapper.h"
 
 #include "gdb_assert.h"
 
@@ -236,9 +233,21 @@ fetch_subexp_value (struct expression *exp, int *pc, struct value **valp,
 
   /* Make sure it's not lazy, so that after the target stops again we
      have a non-lazy previous value to compare with.  */
-  if (result != NULL
-      && (!value_lazy (result) || gdb_value_fetch_lazy (result)))
-    *valp = result;
+  if (result != NULL)
+    {
+      if (!value_lazy (result))
+	*valp = result;
+      else
+	{
+	  volatile struct gdb_exception except;
+
+	  TRY_CATCH (except, RETURN_MASK_ERROR)
+	    {
+	      value_fetch_lazy (result);
+	      *valp = result;
+	    }
+	}
+    }
 
   if (val_chain)
     {
@@ -858,6 +867,27 @@ evaluate_subexp_standard (struct type *expect_type,
 	  }
 
 	return ret;
+      }
+
+    case OP_VAR_ENTRY_VALUE:
+      (*pos) += 2;
+      if (noside == EVAL_SKIP)
+	goto nosideret;
+
+      {
+	struct symbol *sym = exp->elts[pc + 1].symbol;
+	struct frame_info *frame;
+
+	if (noside == EVAL_AVOID_SIDE_EFFECTS)
+	  return value_zero (SYMBOL_TYPE (sym), not_lval);
+
+	if (SYMBOL_CLASS (sym) != LOC_COMPUTED
+	    || SYMBOL_COMPUTED_OPS (sym)->read_variable_at_entry == NULL)
+	  error (_("Symbol \"%s\" does not have any specific entry value"),
+		 SYMBOL_PRINT_NAME (sym));
+
+	frame = get_selected_frame (NULL);
+	return SYMBOL_COMPUTED_OPS (sym)->read_variable_at_entry (sym, frame);
       }
 
     case OP_LAST:
@@ -1653,13 +1683,7 @@ evaluate_subexp_standard (struct type *expect_type,
           func_name = (char *) alloca (name_len + 1);
           strcpy (func_name, &exp->elts[string_pc + 1].string);
 
-          /* Prepare list of argument types for overload resolution.  */
-          arg_types = (struct type **)
-	    alloca (nargs * (sizeof (struct type *)));
-          for (ix = 1; ix <= nargs; ix++)
-            arg_types[ix - 1] = value_type (argvec[ix]);
-
-          find_overload_match (arg_types, nargs, func_name,
+          find_overload_match (&argvec[1], nargs, func_name,
                                NON_METHOD, /* not method */
 			       0,          /* strict match */
                                NULL, NULL, /* pass NULL symbol since
@@ -1695,13 +1719,7 @@ evaluate_subexp_standard (struct type *expect_type,
 		 evaluation.  */
 	      struct value *valp = NULL;
 
-	      /* Prepare list of argument types for overload resolution.  */
-	      arg_types = (struct type **)
-		alloca (nargs * (sizeof (struct type *)));
-	      for (ix = 1; ix <= nargs; ix++)
-		arg_types[ix - 1] = value_type (argvec[ix]);
-
-	      (void) find_overload_match (arg_types, nargs, tstr,
+	      (void) find_overload_match (&argvec[1], nargs, tstr,
 	                                  METHOD, /* method */
 					  0,      /* strict match */
 					  &arg2,  /* the object */
@@ -1772,13 +1790,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	      if (op == OP_VAR_VALUE)
 		function = exp->elts[save_pos1+2].symbol;
 
-	      /* Prepare list of argument types for overload resolution.  */
-	      arg_types = (struct type **)
-		alloca (nargs * (sizeof (struct type *)));
-	      for (ix = 1; ix <= nargs; ix++)
-		arg_types[ix - 1] = value_type (argvec[ix]);
-
-	      (void) find_overload_match (arg_types, nargs,
+	      (void) find_overload_match (&argvec[1], nargs,
 					  NULL,        /* no need for name */
 	                                  NON_METHOD,  /* not method */
 					  0,           /* strict match */
@@ -1832,6 +1844,8 @@ evaluate_subexp_standard (struct type *expect_type,
 	      return value_zero (builtin_type (exp->gdbarch)->builtin_int,
 				 not_lval);
 	    }
+	  else if (TYPE_GNU_IFUNC (ftype))
+	    return allocate_value (TYPE_TARGET_TYPE (TYPE_TARGET_TYPE (ftype)));
 	  else if (TYPE_TARGET_TYPE (ftype))
 	    return allocate_value (TYPE_TARGET_TYPE (ftype));
 	  else
@@ -2196,7 +2210,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	    {
 	      struct value *v_one, *retval;
 
-	      v_one = value_one (value_type (arg2), not_lval);
+	      v_one = value_one (value_type (arg2));
 	      binop_promote (exp->language_defn, exp->gdbarch, &arg1, &v_one);
 	      retval = value_binop (arg1, v_one, op);
 	      return retval;
@@ -2740,7 +2754,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	    {
 	      struct value *tmp = arg1;
 
-	      arg2 = value_one (value_type (arg1), not_lval);
+	      arg2 = value_one (value_type (arg1));
 	      binop_promote (exp->language_defn, exp->gdbarch, &tmp, &arg2);
 	      arg2 = value_binop (tmp, arg2, BINOP_ADD);
 	    }
@@ -2764,7 +2778,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	    {
 	      struct value *tmp = arg1;
 
-	      arg2 = value_one (value_type (arg1), not_lval);
+	      arg2 = value_one (value_type (arg1));
 	      binop_promote (exp->language_defn, exp->gdbarch, &tmp, &arg2);
 	      arg2 = value_binop (tmp, arg2, BINOP_SUB);
 	    }
@@ -2790,7 +2804,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	    {
 	      struct value *tmp = arg1;
 
-	      arg2 = value_one (value_type (arg1), not_lval);
+	      arg2 = value_one (value_type (arg1));
 	      binop_promote (exp->language_defn, exp->gdbarch, &tmp, &arg2);
 	      arg2 = value_binop (tmp, arg2, BINOP_ADD);
 	    }
@@ -2817,7 +2831,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	    {
 	      struct value *tmp = arg1;
 
-	      arg2 = value_one (value_type (arg1), not_lval);
+	      arg2 = value_one (value_type (arg1));
 	      binop_promote (exp->language_defn, exp->gdbarch, &tmp, &arg2);
 	      arg2 = value_binop (tmp, arg2, BINOP_SUB);
 	    }
@@ -2828,11 +2842,7 @@ evaluate_subexp_standard (struct type *expect_type,
 
     case OP_THIS:
       (*pos) += 1;
-      return value_of_this (1);
-
-    case OP_OBJC_SELF:
-      (*pos) += 1;
-      return value_of_local ("self", 1);
+      return value_of_this (exp->language_defn);
 
     case OP_TYPE:
       /* The value is not supposed to be used.  This is here to make it

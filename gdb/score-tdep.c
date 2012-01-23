@@ -1,8 +1,7 @@
 /* Target-dependent code for the S+core architecture, for GDB,
    the GNU Debugger.
 
-   Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2006-2012 Free Software Foundation, Inc.
 
    Contributed by Qinwei (qinwei@sunnorth.com.cn)
    Contributed by Ching-Peng Lin (cplin@sunplus.com)
@@ -1369,6 +1368,7 @@ score_prologue_prev_register (struct frame_info *this_frame,
 static const struct frame_unwind score_prologue_unwind =
 {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   score_prologue_this_id,
   score_prologue_prev_register,
   NULL,

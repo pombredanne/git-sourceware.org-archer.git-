@@ -1,7 +1,6 @@
 /* TUI display source window.
 
-   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
-   2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1998-2004, 2007-2012 Free Software Foundation, Inc.
 
    Contributed by Hewlett-Packard Company.
 
@@ -28,6 +27,7 @@
 #include "source.h"
 #include "symtab.h"
 #include "objfiles.h"
+#include "filenames.h"
 
 #include "tui/tui.h"
 #include "tui/tui-data.h"
@@ -149,9 +149,9 @@ tui_set_source_content (struct symtab *s,
 		      element->which_element.source.line_or_addr.u.line_no =
 			cur_line_no;
 		      element->which_element.source.is_exec_point =
-			(strcmp (((struct tui_win_element *)
-				  locator->content[0])->which_element.locator.file_name,
-				 s->filename) == 0
+			(filename_cmp (((struct tui_win_element *)
+				       locator->content[0])->which_element.locator.file_name,
+				       s->filename) == 0
 			 && cur_line_no == ((struct tui_win_element *)
 					    locator->content[0])->which_element.locator.line_no);
 		      if (c != EOF)
@@ -335,10 +335,10 @@ int
 tui_source_is_displayed (char *fname)
 {
   return (TUI_SRC_WIN->generic.content_in_use 
-	  && (strcmp (((struct tui_win_element *)
-		       (tui_locator_win_info_ptr ())->
-		       content[0])->which_element.locator.file_name,
-		      fname) == 0));
+	  && (filename_cmp (((struct tui_win_element *)
+			     (tui_locator_win_info_ptr ())->
+			     content[0])->which_element.locator.file_name,
+			    fname) == 0));
 }
 
 

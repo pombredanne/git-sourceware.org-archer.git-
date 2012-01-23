@@ -1,7 +1,6 @@
 /* Target-dependent code for the HP PA-RISC architecture.
 
-   Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2003-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -240,8 +239,7 @@ extern struct minimal_symbol *
   hppa_lookup_stub_minimal_symbol (const char *name,
                                    enum unwind_stub_types stub_type);
 
-extern struct hppa_objfile_private *
-hppa_init_objfile_priv_data (struct objfile *objfile);
+extern struct hppa_objfile_private *hppa_init_objfile_priv_data (struct objfile *objfile);
 
 extern int hppa_in_solib_call_trampoline (struct gdbarch *gdbarch,
 					  CORE_ADDR pc, char *name);

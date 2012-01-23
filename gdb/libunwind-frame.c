@@ -1,7 +1,6 @@
 /* Frame unwinder for frames using the libunwind library.
 
-   Copyright (C) 2003, 2004, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2003-2004, 2006-2012 Free Software Foundation, Inc.
 
    Written by Jeff Johnston, contributed by Red Hat Inc.
 
@@ -237,6 +236,7 @@ libunwind_find_dyn_list (unw_addr_space_t as, unw_dyn_info_t *di, void *arg)
 static const struct frame_unwind libunwind_frame_unwind =
 {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   libunwind_frame_this_id,
   libunwind_frame_prev_register,
   NULL,

@@ -1,6 +1,5 @@
 /* Common target dependent code for GDB on ARM systems.
-   Copyright (C) 2002, 2003, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2002-2003, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -23,6 +22,7 @@
 /* Forward declarations.  */
 struct gdbarch;
 struct regset;
+struct address_space;
 
 /* Register numbers of various important registers.  */
 
@@ -190,7 +190,7 @@ struct gdbarch_tdep
   enum struct_return struct_return;
 
   /* Cached core file helpers.  */
-  struct regset *gregset, *fpregset;
+  struct regset *gregset, *fpregset, *vfpregset;
 
   /* ISA-specific data types.  */
   struct type *arm_ext_type;
@@ -257,8 +257,7 @@ struct displaced_step_closure
     {
       /* If non-NULL, override generic SVC handling (e.g. for a particular
          OS).  */
-      int (*copy_svc_os) (struct gdbarch *gdbarch, uint32_t insn, CORE_ADDR to,
-			  struct regcache *regs,
+      int (*copy_svc_os) (struct gdbarch *gdbarch, struct regcache *regs,
 			  struct displaced_step_closure *dsc);
     } svc;
   } u;
@@ -302,7 +301,8 @@ extern void
   arm_displaced_init_closure (struct gdbarch *gdbarch, CORE_ADDR from,
 			      CORE_ADDR to, struct displaced_step_closure *dsc);
 extern ULONGEST
-  displaced_read_reg (struct regcache *regs, CORE_ADDR from, int regno);
+  displaced_read_reg (struct regcache *regs, struct displaced_step_closure *dsc,
+		      int regno);
 extern void
   displaced_write_reg (struct regcache *regs,
 		       struct displaced_step_closure *dsc, int regno,
@@ -310,6 +310,9 @@ extern void
 
 CORE_ADDR arm_skip_stub (struct frame_info *, CORE_ADDR);
 CORE_ADDR arm_get_next_pc (struct frame_info *, CORE_ADDR);
+void arm_insert_single_step_breakpoint (struct gdbarch *,
+					struct address_space *, CORE_ADDR);
+int arm_deal_with_atomic_sequence (struct frame_info *);
 int arm_software_single_step (struct frame_info *);
 int arm_frame_is_thumb (struct frame_info *frame);
 
@@ -335,5 +338,12 @@ extern int arm_pc_is_thumb (struct gdbarch *, CORE_ADDR);
 extern const struct regset *
   armbsd_regset_from_core_section (struct gdbarch *gdbarch,
 				   const char *sect_name, size_t sect_size);
+
+/* Target descriptions.  */
+extern struct target_desc *tdesc_arm_with_m;
+extern struct target_desc *tdesc_arm_with_iwmmxt;
+extern struct target_desc *tdesc_arm_with_vfpv2;
+extern struct target_desc *tdesc_arm_with_vfpv3;
+extern struct target_desc *tdesc_arm_with_neon;
 
 #endif /* arm-tdep.h */

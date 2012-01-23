@@ -1,8 +1,6 @@
 /* Support routines for decoding "stabs" debugging information format.
 
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -41,6 +39,7 @@
 #include "buildsym.h"
 #include "complaints.h"
 #include "demangle.h"
+#include "gdb-demangle.h"
 #include "language.h"
 #include "doublest.h"
 #include "cp-abi.h"
@@ -636,6 +635,12 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
     {
       p += 2;
       p = strchr (p, ':');
+      if (p == NULL)
+	{
+	  complaint (&symfile_complaints, 
+		     _("Bad stabs string '%s'"), string);
+	  return NULL;
+	}
     }
 
   /* If a nameless stab entry, all we need is the type, not the symbol.
@@ -723,7 +728,7 @@ define_symbol (CORE_ADDR valu, char *string, int desc, int type,
 	SYMBOL_SET_NAMES (sym, string, p - string, 1, objfile);
 
       if (SYMBOL_LANGUAGE (sym) == language_cplus)
-	cp_scan_for_anonymous_namespaces (sym);
+	cp_scan_for_anonymous_namespaces (sym, objfile);
 
     }
   p++;
@@ -2230,7 +2235,7 @@ rs6000_builtin_type (int typenum, struct objfile *objfile)
 /* Replace *OLD_NAME with the method name portion of PHYSNAME.  */
 
 static void
-update_method_name_from_physname (char **old_name, char *physname)
+update_method_name_from_physname (char **old_name, const char *physname)
 {
   char *method_name;
 
@@ -2273,10 +2278,6 @@ read_member_functions (struct field_info *fip, char **pp, struct type *type,
 {
   int nfn_fields = 0;
   int length = 0;
-  /* Total number of member functions defined in this class.  If the class
-     defines two `f' functions, and one `g' function, then this will have
-     the value 3.  */
-  int total_length = 0;
   int i;
   struct next_fnfield
     {
@@ -2676,7 +2677,6 @@ read_member_functions (struct field_info *fip, char **pp, struct type *type,
 	      destr_fnlist->next = fip->fnlist;
 	      fip->fnlist = destr_fnlist;
 	      nfn_fields++;
-	      total_length += has_destructor;
 	      length -= has_destructor;
 	    }
 	  else if (is_v3)
@@ -2727,7 +2727,6 @@ read_member_functions (struct field_info *fip, char **pp, struct type *type,
 	  new_fnlist->next = fip->fnlist;
 	  fip->fnlist = new_fnlist;
 	  nfn_fields++;
-	  total_length += length;
 	}
     }
 
@@ -2739,7 +2738,6 @@ read_member_functions (struct field_info *fip, char **pp, struct type *type,
       memset (TYPE_FN_FIELDLISTS (type), 0,
 	      sizeof (struct fn_fieldlist) * nfn_fields);
       TYPE_NFN_FIELDS (type) = nfn_fields;
-      TYPE_NFN_FIELDS_TOTAL (type) = total_length;
     }
 
   return 1;

@@ -1,7 +1,6 @@
 /* Target-dependent code for UltraSPARC.
 
-   Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2003-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -94,6 +93,26 @@ sparc64_floating_p (const struct type *type)
       {
 	int len = TYPE_LENGTH (type);
 	gdb_assert (len == 4 || len == 8 || len == 16);
+      }
+      return 1;
+    default:
+      break;
+    }
+
+  return 0;
+}
+
+/* Check whether TYPE is "Complex Floating".  */
+
+static int
+sparc64_complex_floating_p (const struct type *type)
+{
+  switch (TYPE_CODE (type))
+    {
+    case TYPE_CODE_COMPLEX:
+      {
+	int len = TYPE_LENGTH (type);
+	gdb_assert (len == 8 || len == 16 || len == 32);
       }
       return 1;
     default:
@@ -320,38 +339,52 @@ sparc64_register_type (struct gdbarch *gdbarch, int regnum)
   internal_error (__FILE__, __LINE__, _("invalid regnum"));
 }
 
-static void
+static enum register_status
 sparc64_pseudo_register_read (struct gdbarch *gdbarch,
 			      struct regcache *regcache,
 			      int regnum, gdb_byte *buf)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  enum register_status status;
+
   gdb_assert (regnum >= SPARC64_NUM_REGS);
 
   if (regnum >= SPARC64_D0_REGNUM && regnum <= SPARC64_D30_REGNUM)
     {
       regnum = SPARC_F0_REGNUM + 2 * (regnum - SPARC64_D0_REGNUM);
-      regcache_raw_read (regcache, regnum, buf);
-      regcache_raw_read (regcache, regnum + 1, buf + 4);
+      status = regcache_raw_read (regcache, regnum, buf);
+      if (status == REG_VALID)
+	status = regcache_raw_read (regcache, regnum + 1, buf + 4);
+      return status;
     }
   else if (regnum >= SPARC64_D32_REGNUM && regnum <= SPARC64_D62_REGNUM)
     {
       regnum = SPARC64_F32_REGNUM + (regnum - SPARC64_D32_REGNUM);
-      regcache_raw_read (regcache, regnum, buf);
+      return regcache_raw_read (regcache, regnum, buf);
     }
   else if (regnum >= SPARC64_Q0_REGNUM && regnum <= SPARC64_Q28_REGNUM)
     {
       regnum = SPARC_F0_REGNUM + 4 * (regnum - SPARC64_Q0_REGNUM);
-      regcache_raw_read (regcache, regnum, buf);
-      regcache_raw_read (regcache, regnum + 1, buf + 4);
-      regcache_raw_read (regcache, regnum + 2, buf + 8);
-      regcache_raw_read (regcache, regnum + 3, buf + 12);
+
+      status = regcache_raw_read (regcache, regnum, buf);
+      if (status == REG_VALID)
+	status = regcache_raw_read (regcache, regnum + 1, buf + 4);
+      if (status == REG_VALID)
+	status = regcache_raw_read (regcache, regnum + 2, buf + 8);
+      if (status == REG_VALID)
+	status = regcache_raw_read (regcache, regnum + 3, buf + 12);
+
+      return status;
     }
   else if (regnum >= SPARC64_Q32_REGNUM && regnum <= SPARC64_Q60_REGNUM)
     {
       regnum = SPARC64_F32_REGNUM + 2 * (regnum - SPARC64_Q32_REGNUM);
-      regcache_raw_read (regcache, regnum, buf);
-      regcache_raw_read (regcache, regnum + 1, buf + 8);
+
+      status = regcache_raw_read (regcache, regnum, buf);
+      if (status == REG_VALID)
+	status = regcache_raw_read (regcache, regnum + 1, buf + 8);
+
+      return status;
     }
   else if (regnum == SPARC64_CWP_REGNUM
 	   || regnum == SPARC64_PSTATE_REGNUM
@@ -360,7 +393,10 @@ sparc64_pseudo_register_read (struct gdbarch *gdbarch,
     {
       ULONGEST state;
 
-      regcache_raw_read_unsigned (regcache, SPARC64_STATE_REGNUM, &state);
+      status = regcache_raw_read_unsigned (regcache, SPARC64_STATE_REGNUM, &state);
+      if (status != REG_VALID)
+	return status;
+
       switch (regnum)
 	{
 	case SPARC64_CWP_REGNUM:
@@ -378,6 +414,8 @@ sparc64_pseudo_register_read (struct gdbarch *gdbarch,
 	}
       store_unsigned_integer (buf, 8, byte_order, state);
     }
+
+  return REG_VALID;
 }
 
 static void
@@ -501,7 +539,8 @@ sparc64_frame_prev_register (struct frame_info *this_frame, void **this_cache,
     {
       CORE_ADDR pc = (regnum == SPARC64_NPC_REGNUM) ? 4 : 0;
 
-      regnum = cache->frameless_p ? SPARC_O7_REGNUM : SPARC_I7_REGNUM;
+      regnum =
+	(cache->copied_regs_mask & 0x80) ? SPARC_I7_REGNUM : SPARC_O7_REGNUM;
       pc += get_frame_register_unsigned (this_frame, regnum) + 8;
       return frame_unwind_got_constant (this_frame, regnum, pc);
     }
@@ -521,20 +560,20 @@ sparc64_frame_prev_register (struct frame_info *this_frame, void **this_cache,
       }
   }
 
-  /* The previous frame's `local' and `in' registers have been saved
+  /* The previous frame's `local' and `in' registers may have been saved
      in the register save area.  */
-  if (!cache->frameless_p
-      && regnum >= SPARC_L0_REGNUM && regnum <= SPARC_I7_REGNUM)
+  if (regnum >= SPARC_L0_REGNUM && regnum <= SPARC_I7_REGNUM
+      && (cache->saved_regs_mask & (1 << (regnum - SPARC_L0_REGNUM))))
     {
       CORE_ADDR addr = cache->base + (regnum - SPARC_L0_REGNUM) * 8;
 
       return frame_unwind_got_memory (this_frame, regnum, addr);
     }
 
-  /* The previous frame's `out' registers are accessable as the
-     current frame's `in' registers.  */
-  if (!cache->frameless_p
-      && regnum >= SPARC_O0_REGNUM && regnum <= SPARC_O7_REGNUM)
+  /* The previous frame's `out' registers may be accessible as the current
+     frame's `in' registers.  */
+  if (regnum >= SPARC_O0_REGNUM && regnum <= SPARC_O7_REGNUM
+      && (cache->copied_regs_mask & (1 << (regnum - SPARC_O0_REGNUM))))
     regnum += (SPARC_I0_REGNUM - SPARC_O0_REGNUM);
 
   return frame_unwind_got_register (this_frame, regnum, regnum);
@@ -543,6 +582,7 @@ sparc64_frame_prev_register (struct frame_info *this_frame, void **this_cache,
 static const struct frame_unwind sparc64_frame_unwind =
 {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   sparc64_frame_this_id,
   sparc64_frame_prev_register,
   NULL,
@@ -601,11 +641,13 @@ static void
 sparc64_store_floating_fields (struct regcache *regcache, struct type *type,
 			       const gdb_byte *valbuf, int element, int bitpos)
 {
+  int len = TYPE_LENGTH (type);
+
   gdb_assert (element < 16);
 
-  if (sparc64_floating_p (type))
+  if (sparc64_floating_p (type)
+      || (sparc64_complex_floating_p (type) && len <= 16))
     {
-      int len = TYPE_LENGTH (type);
       int regnum;
 
       if (len == 16)
@@ -865,7 +907,7 @@ sparc64_store_arguments (struct regcache *regcache, int nargs,
 	  if (element < 16)
 	    sparc64_store_floating_fields (regcache, type, valbuf, element, 0);
 	}
-      else if (sparc64_floating_p (type))
+      else if (sparc64_floating_p (type) || sparc64_complex_floating_p (type))
 	{
 	  /* Floating arguments.  */
 	  if (len == 16)
@@ -880,7 +922,7 @@ sparc64_store_arguments (struct regcache *regcache, int nargs,
 	      if (element < 16)
 		regnum = SPARC64_D0_REGNUM + element;
 	    }
-	  else
+	  else if (len == 4)
 	    {
 	      /* The psABI says "Each single-precision parameter value
                  will be assigned to one extended word in the
@@ -1046,7 +1088,7 @@ sparc64_store_return_value (struct type *type, struct regcache *regcache,
       if (TYPE_CODE (type) != TYPE_CODE_UNION)
 	sparc64_store_floating_fields (regcache, type, buf, 0, 0);
     }
-  else if (sparc64_floating_p (type))
+  else if (sparc64_floating_p (type) || sparc64_complex_floating_p (type))
     {
       /* Floating return values.  */
       memcpy (buf, valbuf, len);
@@ -1186,6 +1228,7 @@ sparc64_supply_gregset (const struct sparc_gregset *gregset,
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   int sparc32 = (gdbarch_ptr_bit (gdbarch) == 32);
   const gdb_byte *regs = gregs;
+  gdb_byte zero[8] = { 0 };
   int i;
 
   if (sparc32)
@@ -1248,7 +1291,7 @@ sparc64_supply_gregset (const struct sparc_gregset *gregset,
     }
 
   if (regnum == SPARC_G0_REGNUM || regnum == -1)
-    regcache_raw_supply (regcache, SPARC_G0_REGNUM, NULL);
+    regcache_raw_supply (regcache, SPARC_G0_REGNUM, &zero);
 
   if ((regnum >= SPARC_G1_REGNUM && regnum <= SPARC_O7_REGNUM) || regnum == -1)
     {

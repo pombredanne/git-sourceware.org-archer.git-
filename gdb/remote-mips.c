@@ -1,8 +1,6 @@
 /* Remote debugging interface for MIPS remote debugging protocol.
 
-   Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1993-2004, 2006-2012 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by Ian Lance Taylor
    <ian@cygnus.com>.
@@ -33,6 +31,7 @@
 #include "exceptions.h"
 #include "gdb_string.h"
 #include "gdb_stat.h"
+#include "gdb_usleep.h"
 #include "regcache.h"
 #include <ctype.h>
 #include "mips-tdep.h"
@@ -672,7 +671,7 @@ mips_readchar (int timeout)
   if (ch == SERIAL_TIMEOUT && timeout == -1)	/* Watchdog went off.  */
     {
       target_mourn_inferior ();
-      error (_("Watchdog has expired.  Target detached.\n"));
+      error (_("Watchdog has expired.  Target detached."));
     }
 
   if (ch == SERIAL_EOF)
@@ -1350,7 +1349,7 @@ mips_enter_debug (void)
   else				/* Assume IDT monitor by default.  */
     mips_send_command ("db tty0\r", 0);
 
-  sleep (1);
+  gdb_usleep (1000000);
   serial_write (mips_desc, "\r", sizeof "\r" - 1);
 
   /* We don't need to absorb any spurious characters here, since the
@@ -3342,7 +3341,13 @@ static void
 pmon_download (char *buffer, int length)
 {
   if (tftp_in_use)
-    fwrite (buffer, 1, length, tftp_file);
+    {
+      size_t written;
+
+      written = fwrite (buffer, 1, length, tftp_file);
+      if (written < length)
+	perror_with_name (tftp_localname);
+    }
   else
     serial_write (udp_in_use ? udp_desc : mips_desc, buffer, length);
 }

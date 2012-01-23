@@ -1,7 +1,7 @@
 /* Output generating routines for GDB.
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2004, 2005, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 1999-2002, 2004-2005, 2007-2012 Free Software
+   Foundation, Inc.
 
    Contributed by Cygnus Solutions.
    Written by Fernando Nasser for Cygnus.
@@ -222,7 +222,7 @@ struct ui_out def_uiout =
 /* FIXME: This should not be a global, but something passed down from main.c
    or top.c.  */
 
-struct ui_out *uiout = &def_uiout;
+struct ui_out *current_uiout = &def_uiout;
 
 /* These are the interfaces to implementation functions.  */
 
@@ -486,29 +486,16 @@ ui_out_field_fmt_int (struct ui_out *uiout,
   uo_field_int (uiout, fldno, input_width, input_align, fldname, value);
 }
 
+/* Documented in ui-out.h.  */
+
 void
 ui_out_field_core_addr (struct ui_out *uiout,
 			const char *fldname,
 			struct gdbarch *gdbarch,
 			CORE_ADDR address)
 {
-  /* Maximum size string returned by hex_string_custom is 50 chars.
-     This buffer must be bigger than that, for safety.  */
-  char addstr[64];
-  int addr_bit = gdbarch_addr_bit (gdbarch);
-
-  if (addr_bit < (sizeof (CORE_ADDR) * HOST_CHAR_BIT))
-    address &= ((CORE_ADDR) 1 << addr_bit) - 1;
-
-  /* FIXME: cagney/2002-05-03: Need local_address_string() function
-     that returns the language localized string formatted to a width
-     based on gdbarch_addr_bit.  */
-  if (addr_bit <= 32)
-    strcpy (addstr, hex_string_custom (address, 8));
-  else
-    strcpy (addstr, hex_string_custom (address, 16));
-
-  ui_out_field_string (uiout, fldname, addstr);
+  ui_out_field_string (uiout, fldname,
+		       print_core_address (gdbarch, address));
 }
 
 void
@@ -1063,7 +1050,7 @@ append_header_to_list (struct ui_out *uiout,
   uiout->table.header_next = uiout->table.header_last;
 }
 
-/* Extract the format information for the NEXT header and and advance
+/* Extract the format information for the NEXT header and advance
    the header pointer.  Return 0 if there was no next header.  */
 
 static int
@@ -1127,13 +1114,6 @@ specified after table_body and inside a list."));
     }
 }
 
-
-/* Access to ui_out format private members.  */
-
-void
-ui_out_get_field_separator (struct ui_out *uiout)
-{
-}
 
 /* Access to ui-out members data.  */
 

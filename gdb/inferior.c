@@ -1,6 +1,6 @@
 /* Multi-process control for GDB, the GNU debugger.
 
-   Copyright (C) 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 2008-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -31,6 +31,7 @@
 #include "symfile.h"
 #include "environ.h"
 #include "cli/cli-utils.h"
+#include "continuations.h"
 
 void _initialize_inferiors (void);
 
@@ -275,11 +276,15 @@ exit_inferior_1 (struct inferior *inftoex, int silent)
   observer_notify_inferior_exit (inf);
 
   inf->pid = 0;
+  inf->fake_pid_p = 0;
   if (inf->vfork_parent != NULL)
     {
       inf->vfork_parent->vfork_child = NULL;
       inf->vfork_parent = NULL;
     }
+
+  inf->has_exit_code = 0;
+  inf->exit_code = 0;
 }
 
 void
@@ -462,10 +467,7 @@ have_inferiors (void)
 int
 have_live_inferiors (void)
 {
-  struct cleanup *old_chain;
   struct inferior *inf;
-
-  old_chain = make_cleanup_restore_current_thread ();
 
   for (inf = inferior_list; inf; inf = inf->next)
     if (inf->pid != 0)
@@ -473,16 +475,9 @@ have_live_inferiors (void)
 	struct thread_info *tp;
 	
 	tp = any_thread_of_process (inf->pid);
-	if (tp)
-	  {
-	    switch_to_thread (tp->ptid);
-
-	    if (target_has_execution)
-	      break;
-	  }
+	if (tp && target_has_execution_1 (tp->ptid))
+	  break;
       }
-
-  do_cleanups (old_chain);
 
   return inf != NULL;
 }
@@ -622,13 +617,15 @@ detach_inferior_command (char *args, int from_tty)
 {
   int num, pid;
   struct thread_info *tp;
+  struct get_number_or_range_state state;
 
   if (!args || !*args)
     error (_("Requires argument (inferior id(s) to detach)"));
 
-  while (*args != '\0')
+  init_number_or_range (&state, args);
+  while (!state.finished)
     {
-      num = get_number_or_range (&args);
+      num = get_number_or_range (&state);
 
       if (!valid_gdb_inferior_id (num))
 	{
@@ -656,13 +653,15 @@ kill_inferior_command (char *args, int from_tty)
 {
   int num, pid;
   struct thread_info *tp;
+  struct get_number_or_range_state state;
 
   if (!args || !*args)
     error (_("Requires argument (inferior id(s) to kill)"));
 
-  while (*args != '\0')
+  init_number_or_range (&state, args);
+  while (!state.finished)
     {
-      num = get_number_or_range (&args);
+      num = get_number_or_range (&state);
 
       if (!valid_gdb_inferior_id (num))
 	{
@@ -734,10 +733,10 @@ inferior_command (char *args, int from_tty)
     }
 
   if (inf->pid != 0 && is_running (inferior_ptid))
-    ui_out_text (uiout, "(running)\n");
+    ui_out_text (current_uiout, "(running)\n");
   else if (inf->pid != 0)
     {
-      ui_out_text (uiout, "\n");
+      ui_out_text (current_uiout, "\n");
       print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
     }
 }
@@ -747,7 +746,7 @@ inferior_command (char *args, int from_tty)
 static void
 info_inferiors_command (char *args, int from_tty)
 {
-  print_inferior (uiout, args);
+  print_inferior (current_uiout, args);
 }
 
 /* remove-inferior ID */
@@ -757,13 +756,15 @@ remove_inferior_command (char *args, int from_tty)
 {
   int num;
   struct inferior *inf;
+  struct get_number_or_range_state state;
 
   if (args == NULL || *args == '\0')
     error (_("Requires an argument (inferior id(s) to remove)"));
 
-  while (*args != '\0')
+  init_number_or_range (&state, args);
+  while (!state.finished)
     {
-      num = get_number_or_range (&args);
+      num = get_number_or_range (&state);
       inf = find_inferior_id (num);
 
       if (inf == NULL)

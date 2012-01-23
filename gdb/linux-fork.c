@@ -1,7 +1,6 @@
 /* GNU/Linux native-dependent code for debugging multiple forks.
 
-   Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2005-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -584,14 +583,7 @@ info_checkpoints_command (char *arg, int from_tty)
 
       sal = find_pc_line (pc, 0);
       if (sal.symtab)
-	{
-	  char *tmp = strrchr (sal.symtab->filename, '/');
-
-	  if (tmp)
-	    printf_filtered (_(", file %s"), tmp + 1);
-	  else
-	    printf_filtered (_(", file %s"), sal.symtab->filename);
-	}
+	printf_filtered (_(", file %s"), lbasename (sal.symtab->filename));
       if (sal.line)
 	printf_filtered (_(", line %d"), sal.line);
       if (!sal.symtab && !sal.line)
@@ -623,6 +615,33 @@ linux_fork_checkpointing_p (int pid)
   return (checkpointing_pid == pid);
 }
 
+/* Callback for iterate over threads.  Used to check whether
+   the current inferior is multi-threaded.  Returns true as soon
+   as it sees the second thread of the current inferior.  */
+
+static int
+inf_has_multiple_thread_cb (struct thread_info *tp, void *data)
+{
+  int *count_p = (int *) data;
+  
+  if (current_inferior ()->pid == ptid_get_pid (tp->ptid))
+    (*count_p)++;
+  
+  /* Stop the iteration if multiple threads have been detected.  */
+  return *count_p > 1;
+}
+
+/* Return true if the current inferior is multi-threaded.  */
+
+static int
+inf_has_multiple_threads (void)
+{
+  int count = 0;
+
+  iterate_over_threads (inf_has_multiple_thread_cb, &count);
+  return (count > 1);
+}
+
 static void
 checkpoint_command (char *args, int from_tty)
 {
@@ -635,6 +654,14 @@ checkpoint_command (char *args, int from_tty)
   pid_t retpid;
   struct cleanup *old_chain;
 
+  if (!target_has_execution) 
+    error (_("The program is not being run."));
+
+  /* Ensure that the inferior is not multithreaded.  */
+  update_thread_list ();
+  if (inf_has_multiple_threads ())
+    error (_("checkpoint: can't checkpoint multiple threads."));
+  
   /* Make the inferior fork, record its (and gdb's) state.  */
 
   if (lookup_minimal_symbol ("fork", NULL, NULL) != NULL)

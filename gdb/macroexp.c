@@ -1,6 +1,5 @@
 /* C preprocessor macro expansion for GDB.
-   Copyright (C) 2002, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2002, 2007-2012 Free Software Foundation, Inc.
    Contributed by Red Hat, Inc.
 
    This file is part of GDB.
@@ -1183,7 +1182,7 @@ expand (const char *id,
       struct macro_buffer *argv = NULL;
       struct macro_buffer substituted;
       struct macro_buffer substituted_src;
-      struct macro_buffer va_arg_name;
+      struct macro_buffer va_arg_name = {0};
       int is_varargs = 0;
 
       if (def->argc >= 1)

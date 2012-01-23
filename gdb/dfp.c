@@ -1,6 +1,6 @@
 /* Decimal floating point support for GDB.
 
-   Copyright 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -134,7 +134,7 @@ decimal_to_number (const gdb_byte *from, int len, decNumber *to)
 	decimal128ToNumber ((decimal128 *) from, to);
 	break;
       default:
-	error (_("Unknown decimal floating point type.\n"));
+	error (_("Unknown decimal floating point type."));
 	break;
     }
 }

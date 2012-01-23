@@ -1,6 +1,5 @@
 /* Miscellaneous simulator utilities.
-   Copyright (C) 1997, 1998, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1997-1998, 2007-2012 Free Software Foundation, Inc.
    Contributed by Cygnus Support.
 
 This file is part of GDB, the GNU debugger.
@@ -235,13 +234,13 @@ sim_analyze_program (SIM_DESC sd, char *prog_name, bfd *prog_bfd)
   prog_bfd = bfd_openr (prog_name, STATE_TARGET (sd));
   if (prog_bfd == NULL)
     {
-      sim_io_eprintf (sd, "%s: can't open \"%s\": %s\n", 
+      sim_io_eprintf (sd, "%s: can't open \"%s\": %s\n",
 		      STATE_MY_NAME (sd),
 		      prog_name,
 		      bfd_errmsg (bfd_get_error ()));
       return SIM_RC_FAIL;
     }
-  if (!bfd_check_format (prog_bfd, bfd_object)) 
+  if (!bfd_check_format (prog_bfd, bfd_object))
     {
       sim_io_eprintf (sd, "%s: \"%s\" is not an object file: %s\n",
 		      STATE_MY_NAME (sd),
@@ -402,5 +401,3 @@ transfer_to_str (unsigned transfer)
     default: return "(error)";
     }
 }
-
-

@@ -1,7 +1,7 @@
 /* Blackfin Universal Asynchronous Receiver/Transmitter (UART) model.
    For "new style" UARTs on BF50x/BF54x parts.
 
-   Copyright (C) 2010-2011 Free Software Foundation, Inc.
+   Copyright (C) 2010-2012 Free Software Foundation, Inc.
    Contributed by Analog Devices, Inc.
 
    This file is part of simulators.
@@ -59,7 +59,8 @@ struct bfin_uart
 #define mmr_base()      offsetof(struct bfin_uart, dll)
 #define mmr_offset(mmr) (offsetof(struct bfin_uart, mmr) - mmr_base())
 
-static const char * const mmr_names[] = {
+static const char * const mmr_names[] =
+{
   "UART_DLL", "UART_DLH", "UART_GCTL", "UART_LCR", "UART_MCR", "UART_LSR",
   "UART_MSR", "UART_SCR", "UART_IER_SET", "UART_IER_CLEAR", "UART_THR",
   "UART_RBR",
@@ -88,7 +89,7 @@ bfin_uart_io_write_buffer (struct hw *me, const void *source,
   switch (mmr_off)
     {
     case mmr_offset(thr):
-      uart->thr = bfin_uart_write_byte (me, value);
+      uart->thr = bfin_uart_write_byte (me, value, uart->mcr);
       if (uart->ier & ETBEI)
 	hw_port_event (me, DV_PORT_TX, 1);
       break;
@@ -96,10 +97,10 @@ bfin_uart_io_write_buffer (struct hw *me, const void *source,
       uart->ier |= value;
       break;
     case mmr_offset(ier_clear):
-      dv_w1c_2 (&uart->ier, value, 0);
+      dv_w1c_2 (&uart->ier, value, -1);
       break;
     case mmr_offset(lsr):
-      dv_w1c_2 (valuep, value, TEMT | THRE | DR);
+      dv_w1c_2 (valuep, value, TFI | BI | FE | PE | OE);
       break;
     case mmr_offset(rbr):
       /* XXX: Writes are ignored ?  */
@@ -141,7 +142,7 @@ bfin_uart_io_read_buffer (struct hw *me, void *dest,
   switch (mmr_off)
     {
     case mmr_offset(rbr):
-      uart->rbr = bfin_uart_get_next_byte (me, uart->rbr, NULL);
+      uart->rbr = bfin_uart_get_next_byte (me, uart->rbr, uart->mcr, NULL);
       dv_store_2 (dest, uart->rbr);
       break;
     case mmr_offset(ier_set):
@@ -150,6 +151,7 @@ bfin_uart_io_read_buffer (struct hw *me, void *dest,
       bfin_uart_reschedule (me);
       break;
     case mmr_offset(lsr):
+      uart->lsr &= ~(DR | THRE | TEMT);
       uart->lsr |= bfin_uart_get_status (me);
     case mmr_offset(thr):
     case mmr_offset(msr):
@@ -196,7 +198,8 @@ bfin_uart_dma_write_buffer (struct hw *me, const void *source,
   return ret;
 }
 
-static const struct hw_port_descriptor bfin_uart_ports[] = {
+static const struct hw_port_descriptor bfin_uart_ports[] =
+{
   { "tx",   DV_PORT_TX,   0, output_port, },
   { "rx",   DV_PORT_RX,   0, output_port, },
   { "stat", DV_PORT_STAT, 0, output_port, },
@@ -252,7 +255,8 @@ bfin_uart_finish (struct hw *me)
   uart->lsr = 0x0060;
 }
 
-const struct hw_descriptor dv_bfin_uart2_descriptor[] = {
+const struct hw_descriptor dv_bfin_uart2_descriptor[] =
+{
   {"bfin_uart2", bfin_uart_finish,},
   {NULL, NULL},
 };

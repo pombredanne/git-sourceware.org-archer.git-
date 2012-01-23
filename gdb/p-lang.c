@@ -1,7 +1,7 @@
 /* Pascal language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 2000, 2002, 2003, 2004, 2005, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2000, 2002-2005, 2007-2012 Free Software Foundation,
+   Inc.
 
    This file is part of GDB.
 
@@ -31,7 +31,7 @@
 #include "valprint.h"
 #include "value.h"
 #include <ctype.h>
- 
+
 extern void _initialize_pascal_language (void);
 
 
@@ -107,7 +107,7 @@ is_pascal_string_type (struct type *type,int *length_pos,
       /* Two fields: length and st.  */
       if (TYPE_NFIELDS (type) == 2
 	  && TYPE_FIELD_NAME (type, 0)
-	  && strcmp (TYPE_FIELD_NAME (type, 0), "length") == 0 
+	  && strcmp (TYPE_FIELD_NAME (type, 0), "length") == 0
 	  && TYPE_FIELD_NAME (type, 1)
 	  && strcmp (TYPE_FIELD_NAME (type, 1), "st") == 0)
         {
@@ -268,7 +268,7 @@ pascal_printstr (struct ui_file *stream, struct type *type,
 
       rep1 = i + 1;
       reps = 1;
-      while (rep1 < length 
+      while (rep1 < length
 	     && extract_unsigned_integer (string + rep1 * width, width,
 					  byte_order) == current_char)
 	{
@@ -459,6 +459,8 @@ const struct language_defn pascal_language_defn =
   default_print_array_index,
   default_pass_by_reference,
   default_get_string,
+  strcmp_iw_ordered,
+  iterate_over_symbols,
   LANG_MAGIC
 };
 

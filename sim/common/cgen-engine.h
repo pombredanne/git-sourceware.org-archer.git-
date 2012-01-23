@@ -1,6 +1,5 @@
 /* Engine header for Cpu tools GENerated simulators.
-   Copyright (C) 1998, 1999, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1998-1999, 2007-2012 Free Software Foundation, Inc.
    Contributed by Cygnus Support.
 
 This file is part of GDB, the GNU debugger.
@@ -137,7 +136,7 @@ union sem {
 #ifdef __GNUC__
 #define SEM_SET_FULL_CODE(abuf, idesc) \
   do { (abuf)->semantic.sem_case = (idesc)->sem_full_lab; } while (0)
-#else 
+#else
 #define SEM_SET_FULL_CODE(abuf, idesc) \
   do { (abuf)->semantic.sem_case = (idesc)->num; } while (0)
 #endif
@@ -150,7 +149,7 @@ union sem {
 #ifdef __GNUC__
 #define SEM_SET_FAST_CODE(abuf, idesc) \
   do { (abuf)->semantic.sem_case = (idesc)->sem_fast_lab; } while (0)
-#else 
+#else
 #define SEM_SET_FAST_CODE(abuf, idesc) \
   do { (abuf)->semantic.sem_case = (idesc)->num; } while (0)
 #endif

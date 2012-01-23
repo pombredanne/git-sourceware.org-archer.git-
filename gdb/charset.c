@@ -1,7 +1,6 @@
 /* Character set conversion support for GDB.
 
-   Copyright (C) 2001, 2003, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2001, 2003, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -799,7 +798,9 @@ find_charset_names (void)
   char *args[3];
   int err, status;
   int fail = 1;
+  int flags;
   struct gdb_environ *iconv_env;
+  char *iconv_program;
 
   /* Older iconvs, e.g. 2.2.2, don't omit the intro text if stdout is
      not a tty.  We need to recognize it and ignore it.  This text is
@@ -811,12 +812,26 @@ find_charset_names (void)
 
   child = pex_init (PEX_USE_PIPES, "iconv", NULL);
 
-  args[0] = "iconv";
+#ifdef ICONV_BIN
+  {
+    char *iconv_dir = relocate_gdb_directory (ICONV_BIN,
+					      ICONV_BIN_RELOCATABLE);
+    iconv_program = concat (iconv_dir, SLASH_STRING, "iconv", NULL);
+    xfree (iconv_dir);
+  }
+#else
+  iconv_program = xstrdup ("iconv");
+#endif
+  args[0] = iconv_program;
   args[1] = "-l";
   args[2] = NULL;
+  flags = PEX_STDERR_TO_STDOUT;
+#ifndef ICONV_BIN
+  flags |= PEX_SEARCH;
+#endif
   /* Note that we simply ignore errors here.  */
-  if (!pex_run_in_environment (child, PEX_SEARCH | PEX_STDERR_TO_STDOUT,
-			       "iconv", args, environ_vector (iconv_env),
+  if (!pex_run_in_environment (child, flags,
+			       args[0], args, environ_vector (iconv_env),
 			       NULL, NULL, &err))
     {
       FILE *in = pex_read_output (child, 0);
@@ -888,6 +903,7 @@ find_charset_names (void)
 
     }
 
+  xfree (iconv_program);
   pex_free (child);
   free_environ (iconv_env);
 
@@ -921,6 +937,72 @@ default_auto_wide_charset (void)
 {
   return GDB_DEFAULT_TARGET_WIDE_CHARSET;
 }
+
+
+#ifdef USE_INTERMEDIATE_ENCODING_FUNCTION
+/* Macro used for UTF or UCS endianness suffix.  */
+#if WORDS_BIGENDIAN
+#define ENDIAN_SUFFIX "BE"
+#else
+#define ENDIAN_SUFFIX "LE"
+#endif
+
+/* The code below serves to generate a compile time error if
+   gdb_wchar_t type is not of size 2 nor 4, despite the fact that
+   macro __STDC_ISO_10646__ is defined.
+   This is better than a gdb_assert call, because GDB cannot handle
+   strings correctly if this size is different.  */
+
+extern char your_gdb_wchar_t_is_bogus[(sizeof (gdb_wchar_t) == 2
+				       || sizeof (gdb_wchar_t) == 4)
+				      ? 1 : -1];
+
+/* intermediate_encoding returns the charset unsed internally by
+   GDB to convert between target and host encodings. As the test above
+   compiled, sizeof (gdb_wchar_t) is either 2 or 4 bytes.
+   UTF-16/32 is tested first, UCS-2/4 is tested as a second option,
+   otherwise an error is generated.  */
+
+const char *
+intermediate_encoding (void)
+{
+  iconv_t desc;
+  static const char *stored_result = NULL;
+  char *result;
+  int i;
+
+  if (stored_result)
+    return stored_result;
+  result = xstrprintf ("UTF-%d%s", (int) (sizeof (gdb_wchar_t) * 8),
+		       ENDIAN_SUFFIX);
+  /* Check that the name is supported by iconv_open.  */
+  desc = iconv_open (result, host_charset ());
+  if (desc != (iconv_t) -1)
+    {
+      iconv_close (desc);
+      stored_result = result;
+      return result;
+    }
+  /* Not valid, free the allocated memory.  */
+  xfree (result);
+  /* Second try, with UCS-2 type.  */
+  result = xstrprintf ("UCS-%d%s", (int) sizeof (gdb_wchar_t),
+		       ENDIAN_SUFFIX);
+  /* Check that the name is supported by iconv_open.  */
+  desc = iconv_open (result, host_charset ());
+  if (desc != (iconv_t) -1)
+    {
+      iconv_close (desc);
+      stored_result = result;
+      return result;
+    }
+  /* Not valid, free the allocated memory.  */
+  xfree (result);
+  /* No valid charset found, generate error here.  */
+  error (_("Unable to find a vaild charset for string conversions"));
+}
+
+#endif /* USE_INTERMEDIATE_ENCODING_FUNCTION */
 
 void
 _initialize_charset (void)

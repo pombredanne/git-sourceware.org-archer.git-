@@ -1,7 +1,6 @@
 /* Target-dependent code for Solaris UltraSPARC.
 
-   Copyright (C) 2003, 2004, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2003-2004, 2006-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -67,7 +66,8 @@ sparc64_sol2_sigtramp_frame_cache (struct frame_info *this_frame,
   /* The third argument is a pointer to an instance of `ucontext_t',
      which has a member `uc_mcontext' that contains the saved
      registers.  */
-  regnum = (cache->frameless_p ? SPARC_O2_REGNUM : SPARC_I2_REGNUM);
+  regnum =
+    (cache->copied_regs_mask & 0x04) ? SPARC_I2_REGNUM : SPARC_O2_REGNUM;
   mcontext_addr = get_frame_register_unsigned (this_frame, regnum) + 64;
 
   cache->saved_regs[SPARC64_CCR_REGNUM].addr = mcontext_addr + 0 * 8;
@@ -141,6 +141,7 @@ sparc64_sol2_sigtramp_frame_sniffer (const struct frame_unwind *self,
 static const struct frame_unwind sparc64_sol2_sigtramp_frame_unwind =
 {
   SIGTRAMP_FRAME,
+  default_frame_unwind_stop_reason,
   sparc64_sol2_sigtramp_frame_this_id,
   sparc64_sol2_sigtramp_frame_prev_register,
   NULL,

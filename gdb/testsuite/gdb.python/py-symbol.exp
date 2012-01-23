@@ -1,4 +1,4 @@
-# Copyright (C) 2010, 2011 Free Software Foundation, Inc.
+# Copyright (C) 2010-2012 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,10 +15,6 @@
 
 # This file is part of the GDB testsuite.  It tests the mechanism
 # exposing values to Python.
-
-if $tracelevel then {
-    strace $tracelevel
-}
 
 load_lib gdb-python.exp
 
@@ -95,11 +91,16 @@ gdb_test "python print t\[0\].is_constant" "True" "Test t.is_constant"
 gdb_test "python print t\[0\].is_argument" "False" "Test t.is_argument"
 gdb_test "python print t\[0\].is_function" "False" "Test t.is_function"
 gdb_test "python print t\[0\].addr_class == gdb.SYMBOL_LOC_CONST" "True" "Test t.addr_class"
+
+# Test type attribute.
+gdb_test "python print t\[0\].type" "enum tag" "Get type"
+
+# Test symtab attribute.
 gdb_test "python print t\[0\].symtab" "gdb.python/py-symbol.c.*" "Get symtab"
 
 # C++ tests
 # Recompile binary.
- if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable "debug c++"] != "" } {
+ if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}-cxx" executable "debug c++"] != "" } {
      untested "Couldn't compile ${srcfile} in c++ mode"
      return -1
  }
@@ -108,7 +109,7 @@ gdb_test "python print t\[0\].symtab" "gdb.python/py-symbol.c.*" "Get symtab"
 gdb_exit
 gdb_start
 gdb_reinitialize_dir $srcdir/$subdir
-gdb_load ${binfile}
+gdb_load ${binfile}-cxx
 
 if ![runto_main] then {
     fail "Can't run to main"
@@ -128,3 +129,19 @@ gdb_test "python print cplusfunc.name" "SimpleClass::valueofi().*" "Test func.na
 gdb_test "python print cplusfunc.print_name" "SimpleClass::valueofi().*" "Test func.print_name"
 gdb_test "python print cplusfunc.linkage_name" "SimpleClass::valueofi().*" "Test func.linkage_name"
 gdb_test "python print cplusfunc.addr_class == gdb.SYMBOL_LOC_BLOCK" "True" "Test func.addr_class"
+
+# Test is_valid when the objfile is unloaded.  This must be the last
+# test as it unloads the object file in GDB.
+# Start with a fresh gdb.
+clean_restart ${testfile}
+if ![runto_main] then {
+    fail "Cannot run to main."
+    return 0
+}
+gdb_breakpoint [gdb_get_line_number "Break at end."]
+gdb_continue_to_breakpoint "Break at end."
+gdb_py_test_silent_cmd "python a = gdb.lookup_symbol(\'a\')" "Get variable a" 0
+gdb_test "python print a\[0\].is_valid()" "True" "Test symbol validity"
+delete_breakpoints
+gdb_unload
+gdb_test "python print a\[0\].is_valid()" "False" "Test symbol validity"

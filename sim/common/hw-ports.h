@@ -1,6 +1,5 @@
 /* Hardware ports.
-   Copyright (C) 1998, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1998, 2007-2012 Free Software Foundation, Inc.
    Contributed by Andrew Cagney and Cygnus Solutions.
 
 This file is part of GDB, the GNU debugger.
@@ -24,9 +23,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 /* Initialize a port */
 
-struct hw_port_descriptor {
+struct hw_port_descriptor
+{
   const char *name;
-  int number; 
+  int number;
   int nr_ports;
   port_direction direction;
 };
@@ -99,7 +99,7 @@ void hw_port_traverse
 (struct hw *me,
  hw_port_traverse_function *handler,
  void *data);
- 
+
 
 /* DESTINATION is attached (detached) to LINE of the device ME
 
@@ -124,6 +124,6 @@ int hw_port_encode
  char *buf,
  int sizeof_buf,
  port_direction direction);
- 
+
 
 #endif

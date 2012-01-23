@@ -1,6 +1,6 @@
 /* Python interface to inferior events.
 
-   Copyright (C) 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 2009-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -42,7 +42,7 @@ add_new_registry (eventregistry_object **registryp, char *name)
 }
 
 void
-gdbpy_initialize_py_events ()
+gdbpy_initialize_py_events (void)
 {
   gdb_py_events.module = Py_InitModule ("events", NULL);
 
@@ -56,6 +56,9 @@ gdbpy_initialize_py_events ()
     goto fail;
 
   if (add_new_registry (&gdb_py_events.exited, "exited") < 0)
+    goto fail;
+
+  if (add_new_registry (&gdb_py_events.new_objfile, "new_objfile") < 0)
     goto fail;
 
   Py_INCREF (gdb_py_events.module);

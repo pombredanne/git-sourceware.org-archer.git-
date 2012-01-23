@@ -1,7 +1,6 @@
 /* TUI support I/O functions.
 
-   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009,
-   2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1998-2004, 2007-2012 Free Software Foundation, Inc.
 
    Contributed by Hewlett-Packard Company.
 
@@ -133,7 +132,7 @@ static Function *tui_old_rl_getc_function;
 static VFunction *tui_old_rl_redisplay_function;
 static VFunction *tui_old_rl_prep_terminal;
 static VFunction *tui_old_rl_deprep_terminal;
-static int tui_old_readline_echoing_p;
+static int tui_old_rl_echoing_p;
 
 /* Readline output stream.
    Should be removed when readline is clean.  */
@@ -324,20 +323,10 @@ tui_readline_output (int error, gdb_client_data data)
    final slash.  Otherwise, we return what we were passed.
 
    Comes from readline/complete.c.  */
-static char *
-printable_part (char *pathname)
+static const char *
+printable_part (const char *pathname)
 {
-  char *temp;
-
-  temp = rl_filename_completion_desired
-    ? strrchr (pathname, '/') : (char *)NULL;
-#if defined (__MSDOS__)
-  if (rl_filename_completion_desired 
-      && temp == 0 && isalpha (pathname[0]) 
-      && pathname[1] == ':')
-    temp = pathname + 1;
-#endif
-  return (temp ? ++temp : pathname);
+  return rl_filename_completion_desired ? lbasename (pathname) : pathname;
 }
 
 /* Output TO_PRINT to rl_outstream.  If VISIBLE_STATS is defined and
@@ -366,10 +355,10 @@ printable_part (char *pathname)
     } while (0)
 
 static int
-print_filename (char *to_print, char *full_pathname)
+print_filename (const char *to_print, const char *full_pathname)
 {
   int printed_len = 0;
-  char *s;
+  const char *s;
 
   for (s = to_print; *s; s++)
     {
@@ -416,7 +405,7 @@ tui_rl_display_match_list (char **matches, int len, int max)
   
   int count, limit, printed_len;
   int i, j, k, l;
-  char *temp;
+  const char *temp;
 
   /* Screen dimension correspond to the TUI command window.  */
   int screenwidth = TUI_CMD_WIN->generic.width;
@@ -516,8 +505,8 @@ tui_rl_display_match_list (char **matches, int len, int max)
 void
 tui_setup_io (int mode)
 {
-  extern int readline_echoing_p;
- 
+  extern int _rl_echoing_p;
+
   if (mode)
     {
       /* Redirect readline to TUI.  */
@@ -526,12 +515,12 @@ tui_setup_io (int mode)
       tui_old_rl_prep_terminal = rl_prep_term_function;
       tui_old_rl_getc_function = rl_getc_function;
       tui_old_rl_outstream = rl_outstream;
-      tui_old_readline_echoing_p = readline_echoing_p;
+      tui_old_rl_echoing_p = _rl_echoing_p;
       rl_redisplay_function = tui_redisplay_readline;
       rl_deprep_term_function = tui_deprep_terminal;
       rl_prep_term_function = tui_prep_terminal;
       rl_getc_function = tui_getc;
-      readline_echoing_p = 0;
+      _rl_echoing_p = 0;
       rl_outstream = tui_rl_outstream;
       rl_prompt = 0;
       rl_completion_display_matches_hook = tui_rl_display_match_list;
@@ -540,7 +529,7 @@ tui_setup_io (int mode)
       /* Keep track of previous gdb output.  */
       tui_old_stdout = gdb_stdout;
       tui_old_stderr = gdb_stderr;
-      tui_old_uiout = uiout;
+      tui_old_uiout = current_uiout;
 
       /* Reconfigure gdb output.  */
       gdb_stdout = tui_stdout;
@@ -548,7 +537,7 @@ tui_setup_io (int mode)
       gdb_stdlog = gdb_stdout;	/* for moment */
       gdb_stdtarg = gdb_stderr;	/* for moment */
       gdb_stdtargerr = gdb_stderr;	/* for moment */
-      uiout = tui_out;
+      current_uiout = tui_out;
 
       /* Save tty for SIGCONT.  */
       savetty ();
@@ -561,7 +550,7 @@ tui_setup_io (int mode)
       gdb_stdlog = gdb_stdout;	/* for moment */
       gdb_stdtarg = gdb_stderr;	/* for moment */
       gdb_stdtargerr = gdb_stderr;	/* for moment */
-      uiout = tui_old_uiout;
+      current_uiout = tui_old_uiout;
 
       /* Restore readline.  */
       rl_redisplay_function = tui_old_rl_redisplay_function;
@@ -570,7 +559,7 @@ tui_setup_io (int mode)
       rl_getc_function = tui_old_rl_getc_function;
       rl_outstream = tui_old_rl_outstream;
       rl_completion_display_matches_hook = 0;
-      readline_echoing_p = tui_old_readline_echoing_p;
+      _rl_echoing_p = tui_old_rl_echoing_p;
       rl_already_prompted = 0;
 
       /* Save tty for SIGCONT.  */
@@ -617,7 +606,7 @@ tui_initialize_io (void)
 
   /* Create the default UI.  It is not created because we installed a
      deprecated_init_ui_hook.  */
-  tui_old_uiout = uiout = cli_out_new (gdb_stdout);
+  tui_old_uiout = cli_out_new (gdb_stdout);
 
 #ifdef TUI_USE_PIPE_FOR_READLINE
   /* Temporary solution for readline writing to stdout: redirect

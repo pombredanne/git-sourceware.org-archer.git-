@@ -1,6 +1,5 @@
 /* Target-dependent mdebug code for the ALPHA architecture.
-   Copyright (C) 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1993-2003, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -336,6 +335,7 @@ alpha_mdebug_frame_sniffer (const struct frame_unwind *self,
 
 static const struct frame_unwind alpha_mdebug_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   alpha_mdebug_frame_this_id,
   alpha_mdebug_frame_prev_register,
   NULL,

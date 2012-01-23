@@ -1,7 +1,6 @@
 /* Target-dependent code for OpenBSD/powerpc.
 
-   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2004-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -239,6 +238,7 @@ ppcobsd_sigtramp_frame_prev_register (struct frame_info *this_frame,
 
 static const struct frame_unwind ppcobsd_sigtramp_frame_unwind = {
   SIGTRAMP_FRAME,
+  default_frame_unwind_stop_reason,
   ppcobsd_sigtramp_frame_this_id,
   ppcobsd_sigtramp_frame_prev_register,
   NULL,

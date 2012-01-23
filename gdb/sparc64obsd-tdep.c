@@ -1,7 +1,6 @@
 /* Target-dependent code for OpenBSD/sparc64.
 
-   Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2004-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -142,7 +141,7 @@ sparc64obsd_frame_cache (struct frame_info *this_frame, void **this_cache)
 
       /* Since we couldn't find the frame's function, the cache was
          initialized under the assumption that we're frameless.  */
-      cache->frameless_p = 0;
+      sparc_record_save_insn (cache);
       addr = get_frame_register_unsigned (this_frame, SPARC_FP_REGNUM);
       if (addr & 1)
 	addr += BIAS;
@@ -195,6 +194,7 @@ sparc64obsd_sigtramp_frame_sniffer (const struct frame_unwind *self,
 static const struct frame_unwind sparc64obsd_frame_unwind =
 {
   SIGTRAMP_FRAME,
+  default_frame_unwind_stop_reason,
   sparc64obsd_frame_this_id,
   sparc64obsd_frame_prev_register,
   NULL,
@@ -277,6 +277,7 @@ sparc64obsd_trapframe_sniffer (const struct frame_unwind *self,
 static const struct frame_unwind sparc64obsd_trapframe_unwind =
 {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   sparc64obsd_trapframe_this_id,
   sparc64obsd_trapframe_prev_register,
   NULL,

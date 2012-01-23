@@ -1,6 +1,6 @@
 /* YACC grammar for Modula-2 expressions, for GDB.
-   Copyright (C) 1986, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1999,
-   2000, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986, 1989-1996, 1999-2000, 2007-2012 Free Software
+   Foundation, Inc.
    Generated from expread.y (now c-exp.y) and contributed by the Department
    of Computer Science at the State University of New York at Buffalo, 1991.
 
@@ -113,20 +113,10 @@ static int yylex (void);
 
 void yyerror (char *);
 
-#if 0
-static char *make_qualname (char *, char *);
-#endif
-
 static int parse_number (int);
 
 /* The sign of the number being parsed.  */
 static int number_sign = 1;
-
-/* The block that the module specified by the qualifer on an identifer is
-   contained in, */
-#if 0
-static struct block *modblock=0;
-#endif
 
 %}
 
@@ -329,21 +319,21 @@ exp	:	set
 	;
 
 exp	:	exp IN set
-			{ error("Sets are not implemented.");}
+			{ error (_("Sets are not implemented."));}
 	;
 
 exp	:	INCL '(' exp ',' exp ')'
-			{ error("Sets are not implemented.");}
+			{ error (_("Sets are not implemented."));}
 	;
 
 exp	:	EXCL '(' exp ',' exp ')'
-			{ error("Sets are not implemented.");}
+			{ error (_("Sets are not implemented."));}
 	;
 
 set	:	'{' arglist '}'
-			{ error("Sets are not implemented.");}
+			{ error (_("Sets are not implemented."));}
 	|	type '{' arglist '}'
-			{ error("Sets are not implemented.");}
+			{ error (_("Sets are not implemented."));}
 	;
 
 
@@ -562,7 +552,7 @@ fblock	:	block COLONCOLON BLOCKNAME
 			    = lookup_symbol (copy_name ($3), $1,
 					     VAR_DOMAIN, 0);
 			  if (!tem || SYMBOL_CLASS (tem) != LOC_BLOCK)
-			    error ("No function \"%s\" in specified context.",
+			    error (_("No function \"%s\" in specified context."),
 				   copy_name ($3));
 			  $$ = tem;
 			}
@@ -586,8 +576,15 @@ variable:	block COLONCOLON NAME
 			  sym = lookup_symbol (copy_name ($3), $1,
 					       VAR_DOMAIN, 0);
 			  if (sym == 0)
-			    error ("No symbol \"%s\" in specified context.",
+			    error (_("No symbol \"%s\" in specified context."),
 				   copy_name ($3));
+			  if (symbol_read_needs_frame (sym))
+			    {
+			      if (innermost_block == 0
+				  || contained_in (block_found,
+						   innermost_block))
+				innermost_block = block_found;
+			    }
 
 			  write_exp_elt_opcode (OP_VAR_VALUE);
 			  /* block_found is set by lookup_symbol.  */
@@ -633,9 +630,9 @@ variable:	NAME
 			      if (msymbol != NULL)
 				write_exp_msymbol (msymbol);
 			      else if (!have_full_symbols () && !have_partial_symbols ())
-				error ("No symbol table is loaded.  Use the \"symbol-file\" command.");
+				error (_("No symbol table is loaded.  Use the \"symbol-file\" command."));
 			      else
-				error ("No symbol \"%s\" in current context.",
+				error (_("No symbol \"%s\" in current context."),
 				       copy_name ($1));
 			    }
 			}
@@ -658,8 +655,7 @@ type
 /*** Needs some error checking for the float case ***/
 
 static int
-parse_number (olen)
-     int olen;
+parse_number (int olen)
 {
   char *p = lexptr;
   LONGEST n = 0;
@@ -692,9 +688,9 @@ parse_number (olen)
 	return FLOAT;
       }
     if (p[c] == '.' && base != 10)
-       error("Floating point numbers must be base 10.");
+       error (_("Floating point numbers must be base 10."));
     if (base == 10 && (p[c] < '0' || p[c] > '9'))
-       error("Invalid digit \'%c\' in number.",p[c]);
+       error (_("Invalid digit \'%c\' in number."),p[c]);
  }
 
   while (len-- > 0)
@@ -702,7 +698,7 @@ parse_number (olen)
       c = *p++;
       n *= base;
       if( base == 8 && (c == '8' || c == '9'))
-	 error("Invalid digit \'%c\' in octal number.",c);
+	 error (_("Invalid digit \'%c\' in octal number."),c);
       if (c >= '0' && c <= '9')
 	i = c - '0';
       else
@@ -723,7 +719,7 @@ parse_number (olen)
       {
 	 if((unsigned_p && (unsigned)prevn >= (unsigned)n) ||
 	    ((!unsigned_p && number_sign==-1) && -prevn <= -n))
-	    range_error("Overflow on numeric constant.");
+	    range_error (_("Overflow on numeric constant."));
       }
 	 prevn=n;
     }
@@ -743,7 +739,7 @@ parse_number (olen)
      return UINT;
   }
   else if((unsigned_p && (n<0))) {
-     range_error("Overflow on numeric constant -- number too large.");
+     range_error (_("Overflow on numeric constant -- number too large."));
      /* But, this can return if range_check == range_warn.  */
   }
   yylval.lval = n;
@@ -808,7 +804,7 @@ static struct keyword keytab[] =
    compatible  */
 
 static int
-yylex ()
+yylex (void)
 {
   int c;
   int namelen;
@@ -905,7 +901,7 @@ yylex ()
 	      }
 	  }
       if(c != quote)
-	 error("Unterminated string or character constant.");
+	 error (_("Unterminated string or character constant."));
       yylval.sval.ptr = tokstart + 1;
       yylval.sval.length = namelen - 1;
       lexptr += namelen + 1;
@@ -952,7 +948,7 @@ yylex ()
 
 	    memcpy (err_copy, tokstart, p - tokstart);
 	    err_copy[p - tokstart] = 0;
-	    error ("Invalid number \"%s\".", err_copy);
+	    error (_("Invalid number \"%s\"."), err_copy);
 	  }
 	lexptr = p;
 	return toktype;
@@ -961,7 +957,7 @@ yylex ()
   if (!(c == '_' || c == '$'
 	|| (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')))
     /* We must have come across a bad character (e.g. ';').  */
-    error ("Invalid character '%c' in expression.", c);
+    error (_("Invalid character '%c' in expression."), c);
 
   /* It's a name.  See how long it is.  */
   namelen = 0;
@@ -1038,14 +1034,14 @@ yylex ()
 	  return BLOCKNAME;
 
        case LOC_UNDEF:
-	  error("internal:  Undefined class in m2lex()");
+	  error (_("internal:  Undefined class in m2lex()"));
 
        case LOC_LABEL:
        case LOC_UNRESOLVED:
-	  error("internal:  Unforseen case in m2lex()");
+	  error (_("internal:  Unforseen case in m2lex()"));
 
        default:
-	  error ("unhandled token in m2lex()");
+	  error (_("unhandled token in m2lex()"));
 	  break;
        }
     }
@@ -1069,26 +1065,11 @@ yylex ()
  }
 }
 
-#if 0		/* Unused */
-static char *
-make_qualname(mod,ident)
-   char *mod, *ident;
-{
-   char *new = malloc(strlen(mod)+strlen(ident)+2);
-
-   strcpy(new,mod);
-   strcat(new,".");
-   strcat(new,ident);
-   return new;
-}
-#endif  /* 0 */
-
 void
-yyerror (msg)
-     char *msg;
+yyerror (char *msg)
 {
   if (prev_lexptr)
     lexptr = prev_lexptr;
 
-  error ("A %s in expression, near `%s'.", (msg ? msg : "error"), lexptr);
+  error (_("A %s in expression, near `%s'."), (msg ? msg : "error"), lexptr);
 }

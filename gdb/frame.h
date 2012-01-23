@@ -1,8 +1,7 @@
 /* Definitions for dealing with stack frames, for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1986, 1988-1994, 1996-2004, 2007-2012 Free Software
+   Foundation, Inc.
 
    This file is part of GDB.
 
@@ -206,6 +205,8 @@ enum frame_type
   /* A frame representing an inlined function, associated with an
      upcoming (prev, outer, older) NORMAL_FRAME.  */
   INLINE_FRAME,
+  /* A virtual frame of a tail call - see dwarf2_tailcall_frame_unwind.  */
+  TAILCALL_FRAME,
   /* In a signal handler, various OSs handle this in various ways.
      The main thing is that the frame may be far from normal.  */
   SIGTRAMP_FRAME,
@@ -260,6 +261,9 @@ extern void reinit_frame_cache (void);
    and then return that thread's previously selected frame.  */
 extern struct frame_info *get_selected_frame (const char *message);
 
+/* If there is a selected frame, return it.  Otherwise, return NULL.  */
+extern struct frame_info *get_selected_frame_if_set (void);
+
 /* Select a specific frame.  NULL, apparently implies re-select the
    inner most frame.  */
 extern void select_frame (struct frame_info *);
@@ -281,6 +285,12 @@ extern struct frame_info *frame_find_by_id (struct frame_id id);
    This replaced: frame->pc; */
 extern CORE_ADDR get_frame_pc (struct frame_info *);
 
+/* Same as get_frame_pc, but return a boolean indication of whether
+   the PC is actually available, instead of throwing an error.  */
+
+extern int get_frame_pc_if_available (struct frame_info *frame,
+				      CORE_ADDR *pc);
+
 /* An address (not necessarily aligned to an instruction boundary)
    that falls within THIS frame's code block.
 
@@ -296,6 +306,15 @@ extern CORE_ADDR get_frame_pc (struct frame_info *);
 
 extern CORE_ADDR get_frame_address_in_block (struct frame_info *this_frame);
 
+/* Same as get_frame_address_in_block, but returns a boolean
+   indication of whether the frame address is determinable (when the
+   PC is unavailable, it will not be), instead of possibly throwing an
+   error trying to read an unavailable PC.  */
+
+extern int
+  get_frame_address_in_block_if_available (struct frame_info *this_frame,
+					   CORE_ADDR *pc);
+
 /* The frame's inner-most bound.  AKA the stack-pointer.  Confusingly
    known as top-of-stack.  */
 
@@ -305,6 +324,13 @@ extern CORE_ADDR get_frame_sp (struct frame_info *);
    address of the function containing that resume address, or zero if
    that function isn't known.  */
 extern CORE_ADDR get_frame_func (struct frame_info *fi);
+
+/* Same as get_frame_func, but returns a boolean indication of whether
+   the frame function is determinable (when the PC is unavailable, it
+   will not be), instead of possibly throwing an error trying to read
+   an unavailable PC.  */
+
+extern int get_frame_func_if_available (struct frame_info *fi, CORE_ADDR *);
 
 /* Closely related to the resume address, various symbol table
    attributes that are determined by the PC.  Note that for a normal
@@ -419,40 +445,16 @@ extern struct address_space *get_frame_address_space (struct frame_info *);
 
 enum unwind_stop_reason
   {
-    /* No particular reason; either we haven't tried unwinding yet,
-       or we didn't fail.  */
-    UNWIND_NO_REASON,
+#define SET(name, description) name,
+#define FIRST_ENTRY(name) UNWIND_FIRST = name,
+#define LAST_ENTRY(name) UNWIND_LAST = name,
+#define FIRST_ERROR(name) UNWIND_FIRST_ERROR = name,
 
-    /* The previous frame's analyzer returns an invalid result
-       from this_id.
-
-       FIXME drow/2006-08-16: This is how GDB used to indicate end of
-       stack.  We should migrate to a model where frames always have a
-       valid ID, and this becomes not just an error but an internal
-       error.  But that's a project for another day.  */
-    UNWIND_NULL_ID,
-
-    /* All the conditions after this point are considered errors;
-       abnormal stack termination.  If a backtrace stops for one
-       of these reasons, we'll let the user know.  This marker
-       is not a valid stop reason.  */
-    UNWIND_FIRST_ERROR,
-
-    /* This frame ID looks like it ought to belong to a NEXT frame,
-       but we got it for a PREV frame.  Normally, this is a sign of
-       unwinder failure.  It could also indicate stack corruption.  */
-    UNWIND_INNER_ID,
-
-    /* This frame has the same ID as the previous one.  That means
-       that unwinding further would almost certainly give us another
-       frame with exactly the same ID, so break the chain.  Normally,
-       this is a sign of unwinder failure.  It could also indicate
-       stack corruption.  */
-    UNWIND_SAME_ID,
-
-    /* The frame unwinder didn't find any saved PC, but we needed
-       one to unwind further.  */
-    UNWIND_NO_SAVED_PC,
+#include "unwind_stop_reasons.def"
+#undef SET
+#undef FIRST_ENTRY
+#undef LAST_ENTRY
+#undef FIRST_ERROR
   };
 
 /* Return the reason why we can't unwind past this frame.  */
@@ -468,7 +470,8 @@ const char *frame_stop_reason_string (enum unwind_stop_reason);
    fetch/compute the value.  Instead just return the location of the
    value.  */
 extern void frame_register_unwind (struct frame_info *frame, int regnum,
-				   int *optimizedp, enum lval_type *lvalp,
+				   int *optimizedp, int *unavailablep,
+				   enum lval_type *lvalp,
 				   CORE_ADDR *addrp, int *realnump,
 				   gdb_byte *valuep);
 
@@ -504,7 +507,8 @@ extern ULONGEST get_frame_register_unsigned (struct frame_info *frame,
    VALUEP is NULL, the registers value is not fetched/computed.  */
 
 extern void frame_register (struct frame_info *frame, int regnum,
-			    int *optimizedp, enum lval_type *lvalp,
+			    int *optimizedp, int *unavailablep,
+			    enum lval_type *lvalp,
 			    CORE_ADDR *addrp, int *realnump,
 			    gdb_byte *valuep);
 
@@ -515,10 +519,13 @@ extern void put_frame_register (struct frame_info *frame, int regnum,
 				const gdb_byte *buf);
 
 /* Read LEN bytes from one or multiple registers starting with REGNUM
-   in frame FRAME, starting at OFFSET, into BUF.  */
+   in frame FRAME, starting at OFFSET, into BUF.  If the register
+   contents are optimized out or unavailable, set *OPTIMIZEDP,
+   *UNAVAILABLEP accordingly.  */
 extern int get_frame_register_bytes (struct frame_info *frame, int regnum,
 				     CORE_ADDR offset, int len,
-				     gdb_byte *myaddr);
+				     gdb_byte *myaddr,
+				     int *optimizedp, int *unavailablep);
 
 /* Write LEN bytes to one or multiple registers starting with REGNUM
    in frame FRAME, starting at OFFSET, into BUF.  */
@@ -531,6 +538,14 @@ extern void put_frame_register_bytes (struct frame_info *frame, int regnum,
    specific register.  */
 
 extern CORE_ADDR frame_unwind_caller_pc (struct frame_info *frame);
+
+/* Same as frame_unwind_caller_pc, but returns a boolean indication of
+   whether the caller PC is determinable (when the PC is unavailable,
+   it will not be), instead of possibly throwing an error trying to
+   read unavailable memory or registers.  */
+
+extern int frame_unwind_caller_pc_if_available (struct frame_info *this_frame,
+						CORE_ADDR *pc);
 
 /* Discard the specified frame.  Restoring the registers to the state
    of the caller.  */
@@ -644,24 +659,67 @@ extern void print_stack_frame (struct frame_info *, int print_level,
 extern void print_frame_info (struct frame_info *, int print_level,
 			      enum print_what print_what, int args);
 
-extern struct frame_info *block_innermost_frame (struct block *);
+extern struct frame_info *block_innermost_frame (const struct block *);
 
 extern int deprecated_pc_in_call_dummy (struct gdbarch *gdbarch, CORE_ADDR pc);
 
 /* FIXME: cagney/2003-02-02: Should be deprecated or replaced with a
    function called get_frame_register_p().  This slightly weird (and
    older) variant of get_frame_register() returns zero (indicating the
-   register is unavailable) if either: the register isn't cached; or
-   the register has been optimized out.  Problem is, neither check is
-   exactly correct.  A register can't be optimized out (it may not
-   have been saved as part of a function call); The fact that a
-   register isn't in the register cache doesn't mean that the register
-   isn't available (it could have been fetched from memory).  */
+   register value is unavailable/invalid) if either: the register
+   isn't cached; or the register has been optimized out; or the
+   register contents are unavailable (because they haven't been
+   collected in a traceframe).  Problem is, neither check is exactly
+   correct.  A register can't be optimized out (it may not have been
+   saved as part of a function call); The fact that a register isn't
+   in the register cache doesn't mean that the register isn't
+   available (it could have been fetched from memory).  */
 
 extern int frame_register_read (struct frame_info *frame, int regnum,
 				gdb_byte *buf);
 
 /* From stack.c.  */
+
+extern const char print_entry_values_no[];
+extern const char print_entry_values_only[];
+extern const char print_entry_values_preferred[];
+extern const char print_entry_values_if_needed[];
+extern const char print_entry_values_both[];
+extern const char print_entry_values_compact[];
+extern const char print_entry_values_default[];
+extern const char *print_entry_values;
+
+/* Inferior function parameter value read in from a frame.  */
+
+struct frame_arg
+{
+  /* Symbol for this parameter used for example for its name.  */
+  struct symbol *sym;
+
+  /* Value of the parameter.  It is NULL if ERROR is not NULL; if both VAL and
+     ERROR are NULL this parameter's value should not be printed.  */
+  struct value *val;
+
+  /* String containing the error message, it is more usually NULL indicating no
+     error occured reading this parameter.  */
+  char *error;
+
+  /* One of the print_entry_values_* entries as appropriate specifically for
+     this frame_arg.  It will be different from print_entry_values.  With
+     print_entry_values_no this frame_arg should be printed as a normal
+     parameter.  print_entry_values_only says it should be printed as entry
+     value parameter.  print_entry_values_compact says it should be printed as
+     both as a normal parameter and entry values parameter having the same
+     value - print_entry_values_compact is not permitted fi ui_out_is_mi_like_p
+     (in such case print_entry_values_no and print_entry_values_only is used
+     for each parameter kind specifically.  */
+  const char *entry_kind;
+};
+
+extern void read_frame_arg (struct symbol *sym, struct frame_info *frame,
+			    struct frame_arg *argp,
+			    struct frame_arg *entryargp);
+
 extern void args_info (char *, int);
 
 extern void locals_info (char *, int);

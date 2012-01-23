@@ -1,7 +1,5 @@
 /* Read coff symbol tables and convert to internal format, for GDB.
-   Copyright (C) 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009,
-   2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1987-2005, 2007-2012 Free Software Foundation, Inc.
    Contributed by David D. Johnson, Brown University (ddj@cs.brown.edu).
 
    This file is part of GDB.
@@ -48,6 +46,10 @@
 #include "psymtab.h"
 
 extern void _initialize_coffread (void);
+
+/* The objfile we are currently reading.  */
+
+static struct objfile *coffread_objfile;
 
 struct coff_symfile_info
   {
@@ -178,7 +180,7 @@ static int init_lineno (bfd *, long, int);
 
 static char *getsymname (struct internal_syment *);
 
-static char *coff_getfilename (union internal_auxent *);
+static const char *coff_getfilename (union internal_auxent *);
 
 static void free_stringtab (void);
 
@@ -355,7 +357,7 @@ coff_alloc_type (int index)
      We will fill it in later if we find out how.  */
   if (type == NULL)
     {
-      type = alloc_type (current_objfile);
+      type = alloc_type (coffread_objfile);
       *type_addr = type;
     }
   return type;
@@ -366,7 +368,7 @@ coff_alloc_type (int index)
    it indicates the start of data for one original source file.  */
 
 static void
-coff_start_symtab (char *name)
+coff_start_symtab (const char *name)
 {
   start_symtab (
   /* We fill in the filename later.  start_symtab puts this pointer
@@ -388,7 +390,7 @@ coff_start_symtab (char *name)
    text.  */
 
 static void
-complete_symtab (char *name, CORE_ADDR start_addr, unsigned int size)
+complete_symtab (const char *name, CORE_ADDR start_addr, unsigned int size)
 {
   if (last_source_file != NULL)
     xfree (last_source_file);
@@ -637,7 +639,7 @@ coff_symfile_read (struct objfile *objfile, int symfile_flags)
 			       info->stabsects,
 			       info->stabstrsect->filepos, stabstrsize);
     }
-  if (dwarf2_has_info (objfile))
+  if (dwarf2_has_info (objfile, NULL))
     {
       /* DWARF2 sections.  */
       dwarf2_build_psymtabs (objfile);
@@ -713,7 +715,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
   int in_source_file = 0;
   int next_file_symnum = -1;
   /* Name of the current file.  */
-  char *filestring = "";
+  const char *filestring = "";
   int depth = 0;
   int fcn_first_line = 0;
   CORE_ADDR fcn_first_line_addr = 0;
@@ -745,7 +747,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
   if (val < 0)
     perror_with_name (objfile->name);
 
-  current_objfile = objfile;
+  coffread_objfile = objfile;
   nlist_bfd_global = objfile->obfd;
   nlist_nsyms_global = nsyms;
   last_source_file = NULL;
@@ -902,22 +904,14 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 
 	    if (cs->c_secnum == N_UNDEF)
 	      {
-		/* This is a common symbol.  See if the target
-		   environment knows where it has been relocated to.  */
-		CORE_ADDR reladdr;
-
-		if (target_lookup_symbol (cs->c_name, &reladdr))
-		  {
-		    /* Error in lookup; ignore symbol.  */
-		    break;
-		  }
-		tmpaddr = reladdr;
-		/* The address has already been relocated; make sure that
-		   objfile_relocate doesn't relocate it again.  */
-		sec = -2;
-		ms_type = cs->c_sclass == C_EXT
-		  || cs->c_sclass == C_THUMBEXT ?
-		  mst_bss : mst_file_bss;
+		/* This is a common symbol.  We used to rely on
+		   the target to tell us whether it knows where
+		   the symbol has been relocated to, but none of
+		   the target implementations actually provided
+		   that operation.  So we just ignore the symbol,
+		   the same way we would do if we had a target-side
+		   symbol lookup which returned no match.  */
+		break;
 	      }
  	    else if (cs->c_secnum == N_ABS)
  	      {
@@ -1140,7 +1134,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
   ALL_OBJFILE_SYMTABS (objfile, s)
     patch_opaque_types (s);
 
-  current_objfile = NULL;
+  coffread_objfile = NULL;
 }
 
 /* Routines for reading headers and symbols from executable.  */
@@ -1161,14 +1155,14 @@ read_one_sym (struct coff_symbol *cs,
   cs->c_symnum = symnum;
   bytes = bfd_bread (temp_sym, local_symesz, nlist_bfd_global);
   if (bytes != local_symesz)
-    error (_("%s: error reading symbols"), current_objfile->name);
+    error (_("%s: error reading symbols"), coffread_objfile->name);
   bfd_coff_swap_sym_in (symfile_bfd, temp_sym, (char *) sym);
   cs->c_naux = sym->n_numaux & 0xff;
   if (cs->c_naux >= 1)
     {
       bytes  = bfd_bread (temp_aux, local_auxesz, nlist_bfd_global);
       if (bytes != local_auxesz)
-	error (_("%s: error reading symbols"), current_objfile->name);
+	error (_("%s: error reading symbols"), coffread_objfile->name);
       bfd_coff_swap_aux_in (symfile_bfd, temp_aux,
 			    sym->n_type, sym->n_sclass,
 			    0, cs->c_naux, (char *) aux);
@@ -1178,7 +1172,7 @@ read_one_sym (struct coff_symbol *cs,
 	{
 	  bytes = bfd_bread (temp_aux, local_auxesz, nlist_bfd_global);
 	  if (bytes != local_auxesz)
-	    error (_("%s: error reading symbols"), current_objfile->name);
+	    error (_("%s: error reading symbols"), coffread_objfile->name);
 	}
     }
   cs->c_name = getsymname (sym);
@@ -1308,12 +1302,12 @@ getsymname (struct internal_syment *symbol_entry)
    Return only the last component of the name.  Result is in static
    storage and is only good for temporary use.  */
 
-static char *
+static const char *
 coff_getfilename (union internal_auxent *aux_entry)
 {
   static char buffer[BUFSIZ];
   char *temp;
-  char *result;
+  const char *result;
 
   if (aux_entry->x_file.x_n.x_zeroes == 0)
     {
@@ -1331,8 +1325,7 @@ coff_getfilename (union internal_auxent *aux_entry)
   /* FIXME: We should not be throwing away the information about what
      directory.  It should go into dirname of the symtab, or some such
      place.  */
-  if ((temp = strrchr (result, '/')) != NULL)
-    result = temp + 1;
+  result = lbasename (result);
   return (result);
 }
 
@@ -2191,6 +2184,7 @@ static const struct sym_fns coff_sym_fns =
 				   for sym_read() */
   coff_symfile_read,		/* sym_read: read a symbol file into
 				   symtab */
+  NULL,				/* sym_read_psymbols */
   coff_symfile_finish,		/* sym_finish: finished with file,
 				   cleanup */
   default_symfile_offsets,	/* sym_offsets: xlate external to

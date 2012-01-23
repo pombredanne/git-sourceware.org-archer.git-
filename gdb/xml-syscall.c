@@ -1,7 +1,7 @@
 /* Functions that provide the mechanism to parse a syscall XML file
    and get its values.
 
-   Copyright (C) 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 2009-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -281,7 +281,7 @@ static void
 init_sysinfo (void)
 {
   /* Should we re-read the XML info for this target?  */
-  if (my_gdb_datadir && strcmp (my_gdb_datadir, gdb_datadir) != 0)
+  if (my_gdb_datadir && filename_cmp (my_gdb_datadir, gdb_datadir) != 0)
     {
       /* The data-directory changed from the last time we used it.
 	 It means that we have to re-read the XML info.  */

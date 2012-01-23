@@ -1,8 +1,6 @@
 /* Work with executable files, for GDB. 
 
-   Copyright (C) 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1988-2003, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -25,6 +23,7 @@
 #include "target.h"
 #include "gdbcmd.h"
 #include "language.h"
+#include "filenames.h"
 #include "symfile.h"
 #include "objfiles.h"
 #include "completer.h"
@@ -728,7 +727,7 @@ print_section_info (struct target_section_table *t, bfd *abfd)
 	    }
 	}
       if (p == t->sections_end)
-	warning (_("Cannot find section for the entry point of %s.\n"),
+	warning (_("Cannot find section for the entry point of %s."),
 		 bfd_get_filename (abfd));
 
       entry_point = gdbarch_addr_bits_remove (gdbarch, 
@@ -845,7 +844,7 @@ exec_set_section_address (const char *filename, int index, CORE_ADDR address)
   table = current_target_sections;
   for (p = table->sections; p < table->sections_end; p++)
     {
-      if (strcmp (filename, p->bfd->filename) == 0
+      if (filename_cmp (filename, p->bfd->filename) == 0
 	  && index == p->the_bfd_section->index)
 	{
 	  p->endaddr += address - p->addr;

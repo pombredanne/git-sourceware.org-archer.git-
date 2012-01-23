@@ -1,7 +1,6 @@
 /* GNU/Linux/x86-64 specific low level interface, for the remote server
    for GDB.
-   Copyright (C) 2002, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2002, 2004-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -42,6 +41,7 @@ void init_registers_amd64_avx_linux (void);
 void init_registers_i386_mmx_linux (void);
 
 static unsigned char jump_insn[] = { 0xe9, 0, 0, 0, 0 };
+static unsigned char small_jump_insn[] = { 0x66, 0xe9, 0, 0 };
 
 /* Backward compatibility for gdb without XML support.  */
 
@@ -508,7 +508,7 @@ i386_dr_low_get_addr (int regnum)
   ptid_t ptid = ptid_of (lwp);
 
   /* DR6 and DR7 are retrieved with some other way.  */
-  gdb_assert (DR_FIRSTADDR <= regnum && regnum < DR_LASTADDR);
+  gdb_assert (DR_FIRSTADDR <= regnum && regnum <= DR_LASTADDR);
 
   return x86_linux_dr_get (ptid, regnum);
 }
@@ -654,6 +654,7 @@ static void
 x86_linux_prepare_to_resume (struct lwp_info *lwp)
 {
   ptid_t ptid = ptid_of (lwp);
+  int clear_status = 0;
 
   if (lwp->arch_private->debug_registers_changed)
     {
@@ -664,14 +665,23 @@ x86_linux_prepare_to_resume (struct lwp_info *lwp)
 	= &proc->private->arch_private->debug_reg_state;
 
       for (i = DR_FIRSTADDR; i <= DR_LASTADDR; i++)
-	x86_linux_dr_set (ptid, i, state->dr_mirror[i]);
+	if (state->dr_ref_count[i] > 0)
+	  {
+	    x86_linux_dr_set (ptid, i, state->dr_mirror[i]);
+
+	    /* If we're setting a watchpoint, any change the inferior
+	       had done itself to the debug registers needs to be
+	       discarded, otherwise, i386_low_stopped_data_address can
+	       get confused.  */
+	    clear_status = 1;
+	  }
 
       x86_linux_dr_set (ptid, DR_CONTROL, state->dr_control_mirror);
 
       lwp->arch_private->debug_registers_changed = 0;
     }
 
-  if (lwp->stopped_by_watchpoint)
+  if (clear_status || lwp->stopped_by_watchpoint)
     x86_linux_dr_set (ptid, DR_STATUS, 0);
 }
 
@@ -1182,10 +1192,13 @@ amd64_install_fast_tracepoint_jump_pad (CORE_ADDR tpoint, CORE_ADDR tpaddr,
 					CORE_ADDR lockaddr,
 					ULONGEST orig_size,
 					CORE_ADDR *jump_entry,
+					CORE_ADDR *trampoline,
+					ULONGEST *trampoline_size,
 					unsigned char *jjump_pad_insn,
 					ULONGEST *jjump_pad_insn_size,
 					CORE_ADDR *adjusted_insn_addr,
-					CORE_ADDR *adjusted_insn_addr_end)
+					CORE_ADDR *adjusted_insn_addr_end,
+					char *err)
 {
   unsigned char buf[40];
   int i, offset;
@@ -1346,10 +1359,13 @@ i386_install_fast_tracepoint_jump_pad (CORE_ADDR tpoint, CORE_ADDR tpaddr,
 				       CORE_ADDR lockaddr,
 				       ULONGEST orig_size,
 				       CORE_ADDR *jump_entry,
+				       CORE_ADDR *trampoline,
+				       ULONGEST *trampoline_size,
 				       unsigned char *jjump_pad_insn,
 				       ULONGEST *jjump_pad_insn_size,
 				       CORE_ADDR *adjusted_insn_addr,
-				       CORE_ADDR *adjusted_insn_addr_end)
+				       CORE_ADDR *adjusted_insn_addr_end,
+				       char *err)
 {
   unsigned char buf[0x100];
   int i, offset;
@@ -1455,7 +1471,7 @@ i386_install_fast_tracepoint_jump_pad (CORE_ADDR tpoint, CORE_ADDR tpaddr,
   buf[i++] = 0x0f; /* pop %fs */
   buf[i++] = 0xa1;
   buf[i++] = 0x07; /* pop %es */
-  buf[i++] = 0x1f; /* pop %de */
+  buf[i++] = 0x1f; /* pop %ds */
   buf[i++] = 0x9d; /* popf */
   buf[i++] = 0x83; /* add $0x4,%esp (pop of tpaddr aka $pc) */
   buf[i++] = 0xc4;
@@ -1479,11 +1495,40 @@ i386_install_fast_tracepoint_jump_pad (CORE_ADDR tpoint, CORE_ADDR tpaddr,
      is always done last (by our caller actually), so that we can
      install fast tracepoints with threads running.  This relies on
      the agent's atomic write support.  */
-  offset = *jump_entry - (tpaddr + sizeof (jump_insn));
-  memcpy (buf, jump_insn, sizeof (jump_insn));
-  memcpy (buf + 1, &offset, 4);
-  memcpy (jjump_pad_insn, buf, sizeof (jump_insn));
-  *jjump_pad_insn_size = sizeof (jump_insn);
+  if (orig_size == 4)
+    {
+      /* Create a trampoline.  */
+      *trampoline_size = sizeof (jump_insn);
+      if (!claim_trampoline_space (*trampoline_size, trampoline))
+	{
+	  /* No trampoline space available.  */
+	  strcpy (err,
+		  "E.Cannot allocate trampoline space needed for fast "
+		  "tracepoints on 4-byte instructions.");
+	  return 1;
+	}
+
+      offset = *jump_entry - (*trampoline + sizeof (jump_insn));
+      memcpy (buf, jump_insn, sizeof (jump_insn));
+      memcpy (buf + 1, &offset, 4);
+      write_inferior_memory (*trampoline, buf, sizeof (jump_insn));
+
+      /* Use a 16-bit relative jump instruction to jump to the trampoline.  */
+      offset = (*trampoline - (tpaddr + sizeof (small_jump_insn))) & 0xffff;
+      memcpy (buf, small_jump_insn, sizeof (small_jump_insn));
+      memcpy (buf + 2, &offset, 2);
+      memcpy (jjump_pad_insn, buf, sizeof (small_jump_insn));
+      *jjump_pad_insn_size = sizeof (small_jump_insn);
+    }
+  else
+    {
+      /* Else use a 32-bit relative jump instruction.  */
+      offset = *jump_entry - (tpaddr + sizeof (jump_insn));
+      memcpy (buf, jump_insn, sizeof (jump_insn));
+      memcpy (buf + 1, &offset, 4);
+      memcpy (jjump_pad_insn, buf, sizeof (jump_insn));
+      *jjump_pad_insn_size = sizeof (jump_insn);
+    }
 
   /* Return the end address of our pad.  */
   *jump_entry = buildaddr;
@@ -1497,29 +1542,83 @@ x86_install_fast_tracepoint_jump_pad (CORE_ADDR tpoint, CORE_ADDR tpaddr,
 				      CORE_ADDR lockaddr,
 				      ULONGEST orig_size,
 				      CORE_ADDR *jump_entry,
+				      CORE_ADDR *trampoline,
+				      ULONGEST *trampoline_size,
 				      unsigned char *jjump_pad_insn,
 				      ULONGEST *jjump_pad_insn_size,
 				      CORE_ADDR *adjusted_insn_addr,
-				      CORE_ADDR *adjusted_insn_addr_end)
+				      CORE_ADDR *adjusted_insn_addr_end,
+				      char *err)
 {
 #ifdef __x86_64__
   if (register_size (0) == 8)
     return amd64_install_fast_tracepoint_jump_pad (tpoint, tpaddr,
 						   collector, lockaddr,
 						   orig_size, jump_entry,
+						   trampoline, trampoline_size,
 						   jjump_pad_insn,
 						   jjump_pad_insn_size,
 						   adjusted_insn_addr,
-						   adjusted_insn_addr_end);
+						   adjusted_insn_addr_end,
+						   err);
 #endif
 
   return i386_install_fast_tracepoint_jump_pad (tpoint, tpaddr,
 						collector, lockaddr,
 						orig_size, jump_entry,
+						trampoline, trampoline_size,
 						jjump_pad_insn,
 						jjump_pad_insn_size,
 						adjusted_insn_addr,
-						adjusted_insn_addr_end);
+						adjusted_insn_addr_end,
+						err);
+}
+
+/* Return the minimum instruction length for fast tracepoints on x86/x86-64
+   architectures.  */
+
+static int
+x86_get_min_fast_tracepoint_insn_len (void)
+{
+  static int warned_about_fast_tracepoints = 0;
+
+#ifdef __x86_64__
+  /*  On x86-64, 5-byte jump instructions with a 4-byte offset are always
+      used for fast tracepoints.  */
+  if (register_size (0) == 8)
+    return 5;
+#endif
+
+  if (in_process_agent_loaded ())
+    {
+      char errbuf[IPA_BUFSIZ];
+
+      errbuf[0] = '\0';
+
+      /* On x86, if trampolines are available, then 4-byte jump instructions
+	 with a 2-byte offset may be used, otherwise 5-byte jump instructions
+	 with a 4-byte offset are used instead.  */
+      if (have_fast_tracepoint_trampoline_buffer (errbuf))
+	return 4;
+      else
+	{
+	  /* GDB has no channel to explain to user why a shorter fast
+	     tracepoint is not possible, but at least make GDBserver
+	     mention that something has gone awry.  */
+	  if (!warned_about_fast_tracepoints)
+	    {
+	      warning ("4-byte fast tracepoints not available; %s\n", errbuf);
+	      warned_about_fast_tracepoints = 1;
+	    }
+	  return 5;
+	}
+    }
+  else
+    {
+      /* Indicate that the minimum length is currently unknown since the IPA
+	 has not loaded yet.  */
+      return 0;
+    }
 }
 
 static void
@@ -1819,7 +1918,7 @@ amd64_emit_const (LONGEST num)
 
   i = 0;
   buf[i++] = 0x48;  buf[i++] = 0xb8; /* mov $<n>,%rax */
-  *((LONGEST *) (&buf[i])) = num;
+  memcpy (&buf[i], &num, sizeof (num));
   i += 8;
   append_insns (&buildaddr, i, buf);
   current_insn_ptr = buildaddr;
@@ -1876,7 +1975,7 @@ amd64_emit_reg (int reg)
   buildaddr = current_insn_ptr;
   i = 0;
   buf[i++] = 0xbe; /* mov $<n>,%esi */
-  *((int *) (&buf[i])) = reg;
+  memcpy (&buf[i], &reg, sizeof (reg));
   i += 4;
   append_insns (&buildaddr, i, buf);
   current_insn_ptr = buildaddr;
@@ -1959,7 +2058,7 @@ amd64_emit_int_call_1 (CORE_ADDR fn, int arg1)
   buildaddr = current_insn_ptr;
   i = 0;
   buf[i++] = 0xbf; /* movl $<n>,%edi */
-  *((int *) (&buf[i])) = arg1;
+  memcpy (&buf[i], &arg1, sizeof (arg1));
   i += 4;
   append_insns (&buildaddr, i, buf);
   current_insn_ptr = buildaddr;
@@ -1978,7 +2077,7 @@ amd64_emit_void_call_2 (CORE_ADDR fn, int arg1)
   buildaddr = current_insn_ptr;
   i = 0;
   buf[i++] = 0xbf; /* movl $<n>,%edi */
-  *((int *) (&buf[i])) = arg1;
+  memcpy (&buf[i], &arg1, sizeof (arg1));
   i += 4;
   append_insns (&buildaddr, i, buf);
   current_insn_ptr = buildaddr;
@@ -1991,6 +2090,127 @@ amd64_emit_void_call_2 (CORE_ADDR fn, int arg1)
   EMIT_ASM (amd64_void_call_2_b,
 	    /* Restore the stack top, %rax may have been trashed.  */
 	    "pop %rax");
+}
+
+void
+amd64_emit_eq_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM (amd64_eq,
+	    "cmp %rax,(%rsp)\n\t"
+	    "jne .Lamd64_eq_fallthru\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax\n\t"
+	    /* jmp, but don't trust the assembler to choose the right jump */
+	    ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	    ".Lamd64_eq_fallthru:\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax");
+
+  if (offset_p)
+    *offset_p = 13;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+amd64_emit_ne_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM (amd64_ne,
+	    "cmp %rax,(%rsp)\n\t"
+	    "je .Lamd64_ne_fallthru\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax\n\t"
+	    /* jmp, but don't trust the assembler to choose the right jump */
+	    ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	    ".Lamd64_ne_fallthru:\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax");
+
+  if (offset_p)
+    *offset_p = 13;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+amd64_emit_lt_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM (amd64_lt,
+	    "cmp %rax,(%rsp)\n\t"
+	    "jnl .Lamd64_lt_fallthru\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax\n\t"
+	    /* jmp, but don't trust the assembler to choose the right jump */
+	    ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	    ".Lamd64_lt_fallthru:\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax");
+
+  if (offset_p)
+    *offset_p = 13;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+amd64_emit_le_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM (amd64_le,
+	    "cmp %rax,(%rsp)\n\t"
+	    "jnle .Lamd64_le_fallthru\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax\n\t"
+	    /* jmp, but don't trust the assembler to choose the right jump */
+	    ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	    ".Lamd64_le_fallthru:\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax");
+
+  if (offset_p)
+    *offset_p = 13;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+amd64_emit_gt_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM (amd64_gt,
+	    "cmp %rax,(%rsp)\n\t"
+	    "jng .Lamd64_gt_fallthru\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax\n\t"
+	    /* jmp, but don't trust the assembler to choose the right jump */
+	    ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	    ".Lamd64_gt_fallthru:\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax");
+
+  if (offset_p)
+    *offset_p = 13;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+amd64_emit_ge_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM (amd64_ge,
+	    "cmp %rax,(%rsp)\n\t"
+	    "jnge .Lamd64_ge_fallthru\n\t"
+	    ".Lamd64_ge_jump:\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax\n\t"
+	    /* jmp, but don't trust the assembler to choose the right jump */
+	    ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	    ".Lamd64_ge_fallthru:\n\t"
+	    "lea 0x8(%rsp),%rsp\n\t"
+	    "pop %rax");
+
+  if (offset_p)
+    *offset_p = 13;
+  if (size_p)
+    *size_p = 4;
 }
 
 struct emit_ops amd64_emit_ops =
@@ -2025,7 +2245,13 @@ struct emit_ops amd64_emit_ops =
     amd64_emit_swap,
     amd64_emit_stack_adjust,
     amd64_emit_int_call_1,
-    amd64_emit_void_call_2
+    amd64_emit_void_call_2,
+    amd64_emit_eq_goto,
+    amd64_emit_ne_goto,
+    amd64_emit_lt_goto,
+    amd64_emit_le_goto,
+    amd64_emit_gt_goto,
+    amd64_emit_ge_goto
   };
 
 #endif /* __x86_64__ */
@@ -2035,7 +2261,8 @@ i386_emit_prologue (void)
 {
   EMIT_ASM32 (i386_prologue,
 	    "push %ebp\n\t"
-	    "mov %esp,%ebp");
+	    "mov %esp,%ebp\n\t"
+	    "push %ebx");
   /* At this point, the raw regs base address is at 8(%ebp), and the
      value pointer is at 12(%ebp).  */
 }
@@ -2048,6 +2275,7 @@ i386_emit_epilogue (void)
 	    "mov %eax,(%ecx)\n\t"
 	    "mov %ebx,0x4(%ecx)\n\t"
 	    "xor %eax,%eax\n\t"
+	    "pop %ebx\n\t"
 	    "pop %ebp\n\t"
 	    "ret");
 }
@@ -2301,18 +2529,19 @@ static void
 i386_emit_const (LONGEST num)
 {
   unsigned char buf[16];
-  int i, hi;
+  int i, hi, lo;
   CORE_ADDR buildaddr = current_insn_ptr;
 
   i = 0;
   buf[i++] = 0xb8; /* mov $<n>,%eax */
-  *((int *) (&buf[i])) = (num & 0xffffffff);
+  lo = num & 0xffffffff;
+  memcpy (&buf[i], &lo, sizeof (lo));
   i += 4;
   hi = ((num >> 32) & 0xffffffff);
   if (hi)
     {
       buf[i++] = 0xbb; /* mov $<n>,%ebx */
-      *((int *) (&buf[i])) = hi;
+      memcpy (&buf[i], &hi, sizeof (hi));
       i += 4;
     }
   else
@@ -2351,7 +2580,7 @@ i386_emit_reg (int reg)
   buildaddr = current_insn_ptr;
   i = 0;
   buf[i++] = 0xb8; /* mov $<n>,%eax */
-  *((int *) (&buf[i])) = reg;
+  memcpy (&buf[i], &reg, sizeof (reg));
   i += 4;
   append_insns (&buildaddr, i, buf);
   current_insn_ptr = buildaddr;
@@ -2451,7 +2680,7 @@ i386_emit_int_call_1 (CORE_ADDR fn, int arg1)
   buf[i++] = 0xc7;  /* movl $<arg1>,(%esp) */
   buf[i++] = 0x04;
   buf[i++] = 0x24;
-  *((int *) (&buf[i])) = arg1;
+  memcpy (&buf[i], &arg1, sizeof (arg1));
   i += 4;
   append_insns (&buildaddr, i, buf);
   current_insn_ptr = buildaddr;
@@ -2486,7 +2715,7 @@ i386_emit_void_call_2 (CORE_ADDR fn, int arg1)
   buf[i++] = 0xc7;  /* movl $<arg1>,(%esp) */
   buf[i++] = 0x04;
   buf[i++] = 0x24;
-  *((int *) (&buf[i])) = arg1;
+  memcpy (&buf[i], &arg1, sizeof (arg1));
   i += 4;
   append_insns (&buildaddr, i, buf);
   current_insn_ptr = buildaddr;
@@ -2495,6 +2724,162 @@ i386_emit_void_call_2 (CORE_ADDR fn, int arg1)
 	    "lea 0x10(%esp),%esp\n\t"
 	    /* Restore original stack top.  */
 	    "pop %eax");
+}
+
+
+void
+i386_emit_eq_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM32 (eq,
+	      /* Check low half first, more likely to be decider  */
+	      "cmpl %eax,(%esp)\n\t"
+	      "jne .Leq_fallthru\n\t"
+	      "cmpl %ebx,4(%esp)\n\t"
+	      "jne .Leq_fallthru\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx\n\t"
+	      /* jmp, but don't trust the assembler to choose the right jump */
+	      ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	      ".Leq_fallthru:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx");
+
+  if (offset_p)
+    *offset_p = 18;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+i386_emit_ne_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM32 (ne,
+	      /* Check low half first, more likely to be decider  */
+	      "cmpl %eax,(%esp)\n\t"
+	      "jne .Lne_jump\n\t"
+	      "cmpl %ebx,4(%esp)\n\t"
+	      "je .Lne_fallthru\n\t"
+	      ".Lne_jump:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx\n\t"
+	      /* jmp, but don't trust the assembler to choose the right jump */
+	      ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	      ".Lne_fallthru:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx");
+
+  if (offset_p)
+    *offset_p = 18;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+i386_emit_lt_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM32 (lt,
+	      "cmpl %ebx,4(%esp)\n\t"
+	      "jl .Llt_jump\n\t"
+	      "jne .Llt_fallthru\n\t"
+	      "cmpl %eax,(%esp)\n\t"
+	      "jnl .Llt_fallthru\n\t"
+	      ".Llt_jump:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx\n\t"
+	      /* jmp, but don't trust the assembler to choose the right jump */
+	      ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	      ".Llt_fallthru:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx");
+
+  if (offset_p)
+    *offset_p = 20;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+i386_emit_le_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM32 (le,
+	      "cmpl %ebx,4(%esp)\n\t"
+	      "jle .Lle_jump\n\t"
+	      "jne .Lle_fallthru\n\t"
+	      "cmpl %eax,(%esp)\n\t"
+	      "jnle .Lle_fallthru\n\t"
+	      ".Lle_jump:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx\n\t"
+	      /* jmp, but don't trust the assembler to choose the right jump */
+	      ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	      ".Lle_fallthru:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx");
+
+  if (offset_p)
+    *offset_p = 20;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+i386_emit_gt_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM32 (gt,
+	      "cmpl %ebx,4(%esp)\n\t"
+	      "jg .Lgt_jump\n\t"
+	      "jne .Lgt_fallthru\n\t"
+	      "cmpl %eax,(%esp)\n\t"
+	      "jng .Lgt_fallthru\n\t"
+	      ".Lgt_jump:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx\n\t"
+	      /* jmp, but don't trust the assembler to choose the right jump */
+	      ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	      ".Lgt_fallthru:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx");
+
+  if (offset_p)
+    *offset_p = 20;
+  if (size_p)
+    *size_p = 4;
+}
+
+void
+i386_emit_ge_goto (int *offset_p, int *size_p)
+{
+  EMIT_ASM32 (ge,
+	      "cmpl %ebx,4(%esp)\n\t"
+	      "jge .Lge_jump\n\t"
+	      "jne .Lge_fallthru\n\t"
+	      "cmpl %eax,(%esp)\n\t"
+	      "jnge .Lge_fallthru\n\t"
+	      ".Lge_jump:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx\n\t"
+	      /* jmp, but don't trust the assembler to choose the right jump */
+	      ".byte 0xe9, 0x0, 0x0, 0x0, 0x0\n\t"
+	      ".Lge_fallthru:\n\t"
+	      "lea 0x8(%esp),%esp\n\t"
+	      "pop %eax\n\t"
+	      "pop %ebx");
+
+  if (offset_p)
+    *offset_p = 20;
+  if (size_p)
+    *size_p = 4;
 }
 
 struct emit_ops i386_emit_ops =
@@ -2529,7 +2914,13 @@ struct emit_ops i386_emit_ops =
     i386_emit_swap,
     i386_emit_stack_adjust,
     i386_emit_int_call_1,
-    i386_emit_void_call_2
+    i386_emit_void_call_2,
+    i386_emit_eq_goto,
+    i386_emit_ne_goto,
+    i386_emit_lt_goto,
+    i386_emit_le_goto,
+    i386_emit_gt_goto,
+    i386_emit_ge_goto
   };
 
 
@@ -2581,5 +2972,6 @@ struct linux_target_ops the_low_target =
   x86_supports_tracepoints,
   x86_get_thread_area,
   x86_install_fast_tracepoint_jump_pad,
-  x86_emit_ops
+  x86_emit_ops,
+  x86_get_min_fast_tracepoint_insn_len,
 };

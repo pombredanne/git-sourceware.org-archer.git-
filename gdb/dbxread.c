@@ -1,7 +1,5 @@
 /* Read dbx symbol tables and convert to internal format, for GDB.
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2008, 2009, 2010.
-   Free Software Foundation, Inc.
+   Copyright (C) 1986-2004, 2008-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -47,6 +45,7 @@
 #include "target.h"
 #include "gdbcore.h"		/* for bfd stuff */
 #include "libaout.h"		/* FIXME Secret internal BFD stuff for a.out */
+#include "filenames.h"
 #include "objfiles.h"
 #include "buildsym.h"
 #include "stabsread.h"
@@ -103,6 +102,10 @@ struct symloc
 #define STRING_OFFSET(p) (SYMLOC(p)->string_offset)
 #define FILE_STRING_OFFSET(p) (SYMLOC(p)->file_string_offset)
 
+
+/* The objfile we are currently reading.  */
+
+static struct objfile *dbxread_objfile;
 
 /* Remember what we deduced to be the source language of this psymtab.  */
 
@@ -342,11 +345,11 @@ add_this_object_header_file (int i)
 static void
 add_old_header_file (char *name, int instance)
 {
-  struct header_file *p = HEADER_FILES (current_objfile);
+  struct header_file *p = HEADER_FILES (dbxread_objfile);
   int i;
 
-  for (i = 0; i < N_HEADER_FILES (current_objfile); i++)
-    if (strcmp (p[i].name, name) == 0 && instance == p[i].instance)
+  for (i = 0; i < N_HEADER_FILES (dbxread_objfile); i++)
+    if (filename_cmp (p[i].name, name) == 0 && instance == p[i].instance)
       {
 	add_this_object_header_file (i);
 	return;
@@ -373,30 +376,30 @@ add_new_header_file (char *name, int instance)
 
   /* Make sure there is room for one more header file.  */
 
-  i = N_ALLOCATED_HEADER_FILES (current_objfile);
+  i = N_ALLOCATED_HEADER_FILES (dbxread_objfile);
 
-  if (N_HEADER_FILES (current_objfile) == i)
+  if (N_HEADER_FILES (dbxread_objfile) == i)
     {
       if (i == 0)
 	{
-	  N_ALLOCATED_HEADER_FILES (current_objfile) = 10;
-	  HEADER_FILES (current_objfile) = (struct header_file *)
+	  N_ALLOCATED_HEADER_FILES (dbxread_objfile) = 10;
+	  HEADER_FILES (dbxread_objfile) = (struct header_file *)
 	    xmalloc (10 * sizeof (struct header_file));
 	}
       else
 	{
 	  i *= 2;
-	  N_ALLOCATED_HEADER_FILES (current_objfile) = i;
-	  HEADER_FILES (current_objfile) = (struct header_file *)
-	    xrealloc ((char *) HEADER_FILES (current_objfile),
+	  N_ALLOCATED_HEADER_FILES (dbxread_objfile) = i;
+	  HEADER_FILES (dbxread_objfile) = (struct header_file *)
+	    xrealloc ((char *) HEADER_FILES (dbxread_objfile),
 		      (i * sizeof (struct header_file)));
 	}
     }
 
   /* Create an entry for this header file.  */
 
-  i = N_HEADER_FILES (current_objfile)++;
-  hfile = HEADER_FILES (current_objfile) + i;
+  i = N_HEADER_FILES (dbxread_objfile)++;
+  hfile = HEADER_FILES (dbxread_objfile) + i;
   hfile->name = xstrdup (name);
   hfile->instance = instance;
   hfile->length = 10;
@@ -411,7 +414,7 @@ add_new_header_file (char *name, int instance)
 static struct type **
 explicit_lookup_type (int real_filenum, int index)
 {
-  struct header_file *f = &HEADER_FILES (current_objfile)[real_filenum];
+  struct header_file *f = &HEADER_FILES (dbxread_objfile)[real_filenum];
 
   if (index >= f->length)
     {
@@ -1401,24 +1404,16 @@ read_dbx_symtab (struct objfile *objfile)
 	  goto record_it;
 
 	case N_UNDF | N_EXT:
-	  if (nlist.n_value != 0)
-	    {
-	      /* This is a "Fortran COMMON" symbol.  See if the target
-		 environment knows where it has been relocated to.  */
+	  /* The case (nlist.n_value != 0) is a "Fortran COMMON" symbol.
+	     We used to rely on the target to tell us whether it knows
+	     where the symbol has been relocated to, but none of the
+	     target implementations actually provided that operation.
+	     So we just ignore the symbol, the same way we would do if
+	     we had a target-side symbol lookup which returned no match.
 
-	      CORE_ADDR reladdr;
-
-	      namestring = set_namestring (objfile, &nlist);
-	      if (target_lookup_symbol (namestring, &reladdr))
-		{
-		  continue;	/* Error in lookup; ignore symbol for now.  */
-		}
-	      nlist.n_type ^= (N_BSS ^ N_UNDF);	/* Define it as a
-						   bss-symbol.  */
-	      nlist.n_value = reladdr;
-	      goto bss_ext_symbol;
-	    }
-	  continue;		/* Just undefined, not COMMON.  */
+	     All other symbols (with nlist.n_value == 0), are really
+	     undefined, and so we ignore them too.  */
+	  continue;
 
 	case N_UNDF:
 	  if (processing_acc_compilation && nlist.n_strx == 1)
@@ -1473,7 +1468,7 @@ read_dbx_symtab (struct objfile *objfile)
 	    CORE_ADDR valu;
 	    static int prev_so_symnum = -10;
 	    static int first_so_symnum;
-	    char *p;
+	    const char *p;
 	    static char *dirname_nso;
 	    int prev_textlow_not_set;
 
@@ -1530,8 +1525,8 @@ read_dbx_symtab (struct objfile *objfile)
 	       If pst exists, is empty, and has a filename ending in '/',
 	       we assume the previous N_SO was a directory name.  */
 
-	    p = strrchr (namestring, '/');
-	    if (p && *(p + 1) == '\000')
+	    p = lbasename (namestring);
+	    if (p != namestring && *p == '\000')
 	      {
 		/* Save the directory name SOs locally, then save it into
 		   the psymtab when it's created below.  */
@@ -1620,13 +1615,13 @@ read_dbx_symtab (struct objfile *objfile)
 	       things like "break c-exp.y:435" need to work (I
 	       suppose the psymtab_include_list could be hashed or put
 	       in a binary tree, if profiling shows this is a major hog).  */
-	    if (pst && strcmp (namestring, pst->filename) == 0)
+	    if (pst && filename_cmp (namestring, pst->filename) == 0)
 	      continue;
 	    {
 	      int i;
 
 	      for (i = 0; i < includes_used; i++)
-		if (strcmp (namestring, psymtab_include_list[i]) == 0)
+		if (filename_cmp (namestring, psymtab_include_list[i]) == 0)
 		  {
 		    i = -1;
 		    break;
@@ -2540,7 +2535,7 @@ read_ofile_symtab (struct partial_symtab *pst)
      objfile->section_offsets.  */ 
   section_offsets = pst->section_offsets;
 
-  current_objfile = objfile;
+  dbxread_objfile = objfile;
   subfile_stack = NULL;
 
   stringtab_global = DBX_STRINGTAB (objfile);
@@ -2705,7 +2700,7 @@ read_ofile_symtab (struct partial_symtab *pst)
 
   end_stabs ();
 
-  current_objfile = NULL;
+  dbxread_objfile = NULL;
 }
 
 
@@ -3289,6 +3284,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 
      Generally this is used so that an alias can refer to its main
      symbol.  */
+  gdb_assert (name);
   if (name[0] == '#')
     {
       /* Initialize symbol reference names and determine if this is a
@@ -3435,7 +3431,7 @@ elfstab_build_psymtabs (struct objfile *objfile, asection *stabsect,
   bfd *sym_bfd = objfile->obfd;
   char *name = bfd_get_filename (sym_bfd);
   struct dbx_symfile_info *info;
-  struct cleanup *back_to = NULL;
+  struct cleanup *back_to = make_cleanup (null_cleanup, NULL);
 
   /* There is already a dbx_symfile_info allocated by our caller.
      It might even contain some info from the ELF symtab to help us.  */
@@ -3479,7 +3475,7 @@ elfstab_build_psymtabs (struct objfile *objfile, asection *stabsect,
   symbuf_left = bfd_section_size (objfile->obfd, stabsect);
   stabs_data = symfile_relocate_debug_section (objfile, stabsect, NULL);
   if (stabs_data)
-    back_to = make_cleanup (free_current_contents, (void *) &stabs_data);
+    make_cleanup (free_current_contents, (void *) &stabs_data);
 
   /* In an elf file, we've already installed the minimal symbols that came
      from the elf (non-stab) symbol table, so always act like an
@@ -3489,8 +3485,7 @@ elfstab_build_psymtabs (struct objfile *objfile, asection *stabsect,
      case it does, it will install them itself.  */
   dbx_symfile_read (objfile, 0);
 
-  if (back_to)
-    do_cleanups (back_to);
+  do_cleanups (back_to);
 }
 
 /* Scan and build partial symbols for a file with special sections for stabs
@@ -3587,6 +3582,7 @@ static const struct sym_fns aout_sym_fns =
   dbx_new_init,			/* init anything gbl to entire symtab */
   dbx_symfile_init,		/* read initial info, setup for sym_read() */
   dbx_symfile_read,		/* read a symbol file into symtab */
+  NULL,				/* sym_read_psymbols */
   dbx_symfile_finish,		/* finished with file, cleanup */
   default_symfile_offsets, 	/* parse user's offsets to internal form */
   default_symfile_segments,	/* Get segment information from a file.  */

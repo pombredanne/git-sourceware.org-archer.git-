@@ -1,7 +1,7 @@
 /* Cache and manage the values of registers for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1987, 1989, 1991, 1994, 1995, 1996, 1998, 2000, 2001,
-   2002, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-1987, 1989, 1991, 1994-1996, 1998, 2000-2002,
+   2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -28,6 +28,9 @@ struct address_space;
 extern struct regcache *get_current_regcache (void);
 extern struct regcache *get_thread_regcache (ptid_t ptid);
 extern struct regcache *get_thread_arch_regcache (ptid_t, struct gdbarch *);
+extern struct regcache *get_thread_arch_aspace_regcache (ptid_t,
+							 struct gdbarch *,
+							 struct address_space *);
 
 void regcache_xfree (struct regcache *regcache);
 struct cleanup *make_cleanup_regcache_xfree (struct regcache *regcache);
@@ -64,49 +67,59 @@ enum register_status regcache_register_status (const struct regcache *regcache,
 					       int regnum);
 
 /* Transfer a raw register [0..NUM_REGS) between core-gdb and the
-   regcache.  */
+   regcache.  The read variants return the status of the register.  */
 
-void regcache_raw_read (struct regcache *regcache, int rawnum, gdb_byte *buf);
+enum register_status regcache_raw_read (struct regcache *regcache,
+					int rawnum, gdb_byte *buf);
 void regcache_raw_write (struct regcache *regcache, int rawnum,
 			 const gdb_byte *buf);
-extern void regcache_raw_read_signed (struct regcache *regcache,
-				      int regnum, LONGEST *val);
-extern void regcache_raw_read_unsigned (struct regcache *regcache,
-					int regnum, ULONGEST *val);
+extern enum register_status
+  regcache_raw_read_signed (struct regcache *regcache,
+			    int regnum, LONGEST *val);
+extern enum register_status
+  regcache_raw_read_unsigned (struct regcache *regcache,
+			      int regnum, ULONGEST *val);
 extern void regcache_raw_write_signed (struct regcache *regcache,
 				       int regnum, LONGEST val);
 extern void regcache_raw_write_unsigned (struct regcache *regcache,
 					 int regnum, ULONGEST val);
 
-/* Partial transfer of a raw registers.  These perform read, modify,
-   write style operations.  */
+/* Partial transfer of raw registers.  These perform read, modify,
+   write style operations.  The read variant returns the status of the
+   register.  */
 
-void regcache_raw_read_part (struct regcache *regcache, int regnum,
-			     int offset, int len, gdb_byte *buf);
+extern enum register_status
+  regcache_raw_read_part (struct regcache *regcache, int regnum,
+			  int offset, int len, gdb_byte *buf);
 void regcache_raw_write_part (struct regcache *regcache, int regnum,
 			      int offset, int len, const gdb_byte *buf);
 
 void regcache_invalidate (struct regcache *regcache, int regnum);
 
+/* Transfer of pseudo-registers.  The read variants return a register
+   status, as an indication of when a ``cooked'' register was
+   constructed from valid, invalid or unavailable ``raw''
+   registers.  */
+
 /* Transfer a cooked register [0..NUM_REGS+NUM_PSEUDO_REGS).  */
-void regcache_cooked_read (struct regcache *regcache, int rawnum,
-			   gdb_byte *buf);
+enum register_status regcache_cooked_read (struct regcache *regcache,
+					   int rawnum, gdb_byte *buf);
 void regcache_cooked_write (struct regcache *regcache, int rawnum,
 			    const gdb_byte *buf);
 
-/* NOTE: cagney/2002-08-13: At present GDB has no reliable mechanism
-   for indicating when a ``cooked'' register was constructed from
-   invalid or unavailable ``raw'' registers.  One fairly easy way of
-   adding such a mechanism would be for the cooked functions to return
-   a register valid indication.  Given the possibility of such a
-   change, the extract functions below use a reference parameter,
-   rather than a function result.  */
+/* Read register REGNUM from REGCACHE and return a new value.  This
+   will call mark_value_bytes_unavailable as appropriate.  */
+
+struct value *regcache_cooked_read_value (struct regcache *regcache,
+					  int regnum);
 
 /* Read a register as a signed/unsigned quantity.  */
-extern void regcache_cooked_read_signed (struct regcache *regcache,
-					 int regnum, LONGEST *val);
-extern void regcache_cooked_read_unsigned (struct regcache *regcache,
-					   int regnum, ULONGEST *val);
+extern enum register_status
+  regcache_cooked_read_signed (struct regcache *regcache,
+			       int regnum, LONGEST *val);
+extern enum register_status
+  regcache_cooked_read_unsigned (struct regcache *regcache,
+				 int regnum, ULONGEST *val);
 extern void regcache_cooked_write_signed (struct regcache *regcache,
 					  int regnum, LONGEST val);
 extern void regcache_cooked_write_unsigned (struct regcache *regcache,
@@ -115,8 +128,9 @@ extern void regcache_cooked_write_unsigned (struct regcache *regcache,
 /* Partial transfer of a cooked register.  These perform read, modify,
    write style operations.  */
 
-void regcache_cooked_read_part (struct regcache *regcache, int regnum,
-				int offset, int len, gdb_byte *buf);
+enum register_status regcache_cooked_read_part (struct regcache *regcache,
+						int regnum, int offset,
+						int len, gdb_byte *buf);
 void regcache_cooked_write_part (struct regcache *regcache, int regnum,
 				 int offset, int len, const gdb_byte *buf);
 
@@ -153,15 +167,13 @@ extern int register_size (struct gdbarch *gdbarch, int regnum);
    restore_reggroup respectively.  COOKED_READ returns zero iff the
    register's value can't be returned.  */
 
-typedef int (regcache_cooked_read_ftype) (void *src, int regnum,
-					  gdb_byte *buf);
+typedef enum register_status (regcache_cooked_read_ftype) (void *src,
+							   int regnum,
+							   gdb_byte *buf);
 
 extern void regcache_save (struct regcache *dst,
 			   regcache_cooked_read_ftype *cooked_read,
 			   void *cooked_read_context);
-extern void regcache_restore (struct regcache *dst,
-			      regcache_cooked_read_ftype *cooked_read,
-			      void *cooked_read_context);
 
 /* Copy/duplicate the contents of a register cache.  By default, the
    operation is pass-through.  Writes to DST and reads from SRC will

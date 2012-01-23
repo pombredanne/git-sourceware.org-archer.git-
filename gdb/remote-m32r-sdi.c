@@ -1,7 +1,6 @@
 /* Remote debugging interface for M32R/SDI.
 
-   Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2003-2012 Free Software Foundation, Inc.
 
    Contributed by Renesas Technology Co.
    Written by Kei Sakamoto <sakamoto.kei@renesas.com>.
@@ -1610,6 +1609,14 @@ m32r_return_one (struct target_ops *target)
   return 1;
 }
 
+/* Implementation of the to_has_execution method.  */
+
+static int
+m32r_has_execution (struct target_ops *target, ptid_t the_ptid)
+{
+  return 1;
+}
+
 /* Define the target subroutine names.  */
 
 struct target_ops m32r_ops;
@@ -1650,7 +1657,7 @@ init_m32r_ops (void)
   m32r_ops.to_has_memory = m32r_return_one;
   m32r_ops.to_has_stack = m32r_return_one;
   m32r_ops.to_has_registers = m32r_return_one;
-  m32r_ops.to_has_execution = m32r_return_one;
+  m32r_ops.to_has_execution = m32r_has_execution;
   m32r_ops.to_magic = OPS_MAGIC;
 };
 

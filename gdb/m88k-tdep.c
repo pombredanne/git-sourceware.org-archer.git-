@@ -1,7 +1,6 @@
 /* Target-dependent code for the Motorola 88000 series.
 
-   Copyright (C) 2004, 2005, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2004-2005, 2007-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -749,6 +748,7 @@ m88k_frame_prev_register (struct frame_info *this_frame,
 static const struct frame_unwind m88k_frame_unwind =
 {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   m88k_frame_this_id,
   m88k_frame_prev_register,
   NULL,

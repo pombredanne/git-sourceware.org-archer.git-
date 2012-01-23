@@ -1,7 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2002, 2003, 2004, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright 2002-2004, 2007-2012 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -184,6 +183,128 @@ end ()		/* called after everything else */
 {
 }
 
+/* Test (not) collecting args.  */
+
+int
+args_test_func (char   argc,
+		int    argi,
+		float  argf,
+		double argd,
+		test_struct argstruct,
+		int argarray[4])
+{
+  int i;
+
+  i =  (int) argc + argi + argf + argd + argstruct.memberi + argarray[1];
+
+  return i;
+}
+
+/* Test (not) collecting array args.  */
+
+/* Test (not) collecting locals.  */
+
+int
+local_test_func ()
+{
+  char        locc  = 11;
+  int         loci  = 12;
+  float       locf  = 13.3;
+  double      locd  = 14.4;
+  test_struct locst;
+  int         locar[4];
+  int         i;
+  struct localstruct {} locdefst;
+
+  locst.memberc  = 15;
+  locst.memberi  = 16;
+  locst.memberf  = 17.7;
+  locst.memberd  = 18.8;
+  locar[0] = 121;
+  locar[1] = 122;
+  locar[2] = 123;
+  locar[3] = 124;
+
+  i = /* set local_test_func tracepoint here */
+    (int) locc + loci + locf + locd + locst.memberi + locar[1];
+
+  return i;
+}
+
+/* Test collecting register locals.  */
+
+int
+reglocal_test_func ()
+{
+  register char        locc = 11;
+  register int         loci = 12;
+  register float       locf = 13.3;
+  register double      locd = 14.4;
+  register test_struct locst;
+  register int         locar[4];
+  int                  i;
+
+  locst.memberc  = 15;
+  locst.memberi  = 16;
+  locst.memberf  = 17.7;
+  locst.memberd  = 18.8;
+  locar[0] = 121;
+  locar[1] = 122;
+  locar[2] = 123;
+  locar[3] = 124;
+
+  i = /* set reglocal_test_func tracepoint here */
+    (int) locc + loci + locf + locd + locst.memberi + locar[1];
+
+  return i;
+}
+
+/* Test collecting static locals.  */
+
+int
+statlocal_test_func ()
+{
+  static   char        locc;
+  static   int         loci;
+  static   float       locf;
+  static   double      locd;
+  static   test_struct locst;
+  static   int         locar[4];
+  int                  i;
+
+  locc = 11;
+  loci = 12;
+  locf = 13.3;
+  locd = 14.4;
+  locst.memberc = 15;
+  locst.memberi = 16;
+  locst.memberf = 17.7;
+  locst.memberd = 18.8;
+  locar[0] = 121;
+  locar[1] = 122;
+  locar[2] = 123;
+  locar[3] = 124;
+
+  i = /* set statlocal_test_func tracepoint here */
+    (int) locc + loci + locf + locd + locst.memberi + locar[1];
+
+  /* Set static locals back to zero so collected values are clearly special. */
+  locc = 0;
+  loci = 0;
+  locf = 0;
+  locd = 0;
+  locst.memberc = 0;
+  locst.memberi = 0;
+  locst.memberf = 0;
+  locst.memberd = 0;
+  locar[0] = 0;
+  locar[1] = 0;
+  locar[2] = 0;
+  locar[3] = 0;
+
+  return i;
+}
+
 int
 globals_test_func ()
 {
@@ -239,6 +360,10 @@ main (int argc, char **argv, char **envp)
 
   /* Call test functions, so they can be traced and data collected.  */
   i = 0;
+  i += args_test_func (1, 2, 3.3, 4.4, mystruct, myarray);
+  i += local_test_func ();
+  i += reglocal_test_func ();
+  i += statlocal_test_func ();
   i += globals_test_func ();
 
   /* Set 'em back to zero, so that the collected values will be

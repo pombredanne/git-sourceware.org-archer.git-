@@ -1,6 +1,6 @@
 /* Target-dependent code for Moxie.
 
-   Copyright (C) 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 2009-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -461,6 +461,7 @@ moxie_frame_prev_register (struct frame_info *this_frame,
 
 static const struct frame_unwind moxie_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   moxie_frame_this_id,
   moxie_frame_prev_register,
   NULL,

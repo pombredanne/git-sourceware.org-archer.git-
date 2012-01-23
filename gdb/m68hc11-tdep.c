@@ -1,7 +1,6 @@
 /* Target-dependent code for Motorola 68HC11 & 68HC12
 
-   Copyright (C) 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007, 2008, 2009,
-   2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1999-2005, 2007-2012 Free Software Foundation, Inc.
 
    Contributed by Stephane Carrez, stcarrez@nerim.fr
 
@@ -279,7 +278,7 @@ m68hc11_which_soft_register (CORE_ADDR addr)
 /* Fetch a pseudo register.  The 68hc11 soft registers are treated like
    pseudo registers.  They are located in memory.  Translate the register
    fetch into a memory read.  */
-static void
+static enum register_status
 m68hc11_pseudo_register_read (struct gdbarch *gdbarch,
 			      struct regcache *regcache,
 			      int regno, gdb_byte *buf)
@@ -292,8 +291,11 @@ m68hc11_pseudo_register_read (struct gdbarch *gdbarch,
     {
       ULONGEST pc;
       const int regsize = 4;
+      enum register_status status;
 
-      regcache_cooked_read_unsigned (regcache, HARD_PC_REGNUM, &pc);
+      status = regcache_cooked_read_unsigned (regcache, HARD_PC_REGNUM, &pc);
+      if (status != REG_VALID)
+	return status;
       if (pc >= 0x8000 && pc < 0xc000)
         {
           ULONGEST page;
@@ -304,7 +306,7 @@ m68hc11_pseudo_register_read (struct gdbarch *gdbarch,
           pc += 0x1000000;
         }
       store_unsigned_integer (buf, regsize, byte_order, pc);
-      return;
+      return REG_VALID;
     }
 
   m68hc11_initialize_register_info ();
@@ -318,6 +320,8 @@ m68hc11_pseudo_register_read (struct gdbarch *gdbarch,
     {
       memset (buf, 0, 2);
     }
+
+  return REG_VALID;
 }
 
 /* Store a pseudo register.  Translate the register store
@@ -944,6 +948,7 @@ m68hc11_frame_prev_register (struct frame_info *this_frame,
 
 static const struct frame_unwind m68hc11_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   m68hc11_frame_this_id,
   m68hc11_frame_prev_register,
   NULL,

@@ -1,6 +1,5 @@
 /* Darwin support for GDB, the GNU debugger.
-   Copyright 1997, 1998, 1999, 2000, 2001, 2002, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright 1997-2002, 2008-2012 Free Software Foundation, Inc.
 
    Contributed by Apple Computer, Inc.
 
@@ -51,7 +50,7 @@
 
 #define CHECK_ARGS(what, args) do { \
   if ((NULL == args) || ((args[0] != '0') && (args[1] != 'x'))) \
-    error("%s must be specified with 0x...", what);		\
+    error(_("%s must be specified with 0x..."), what);		\
 } while (0)
 
 #define PRINT_FIELD(structure, field) \
@@ -620,6 +619,7 @@ darwin_debug_regions_recurse (task_t task)
   kern_return_t kret;
   int ret;
   struct cleanup *table_chain;
+  struct ui_out *uiout = current_uiout;
 
   table_chain = make_cleanup_ui_out_table_begin_end (uiout, 9, -1, "regions");
 

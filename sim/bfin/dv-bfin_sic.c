@@ -1,6 +1,6 @@
 /* Blackfin System Interrupt Controller (SIC) model.
 
-   Copyright (C) 2010-2011 Free Software Foundation, Inc.
+   Copyright (C) 2010-2012 Free Software Foundation, Inc.
    Contributed by Analog Devices, Inc.
 
    This file is part of simulators.
@@ -70,24 +70,28 @@ struct bfin_sic
 #define mmr_offset(mmr) (offsetof(struct bfin_sic, mmr) - mmr_base())
 #define mmr_idx(mmr)    (mmr_offset (mmr) / 4)
 
-static const char * const bf52x_mmr_names[] = {
+static const char * const bf52x_mmr_names[] =
+{
   "SWRST", "SYSCR", "SIC_RVECT", "SIC_IMASK0", "SIC_IAR0", "SIC_IAR1",
   "SIC_IAR2", "SIC_IAR3", "SIC_ISR0", "SIC_IWR0",
   [mmr_idx (bf52x.imask1)] = "SIC_IMASK1", "SIC_IAR4", "SIC_IAR5",
   "SIC_IAR6", "SIC_IAR7", "SIC_ISR1", "SIC_IWR1",
 };
-static const char * const bf537_mmr_names[] = {
+static const char * const bf537_mmr_names[] =
+{
   "SWRST", "SYSCR", "SIC_RVECT", "SIC_IMASK", "SIC_IAR0", "SIC_IAR1",
   "SIC_IAR2", "SIC_IAR3", "SIC_ISR", "SIC_IWR",
 };
-static const char * const bf54x_mmr_names[] = {
+static const char * const bf54x_mmr_names[] =
+{
   "SWRST", "SYSCR", "SIC_RVECT", "SIC_IMASK0", "SIC_IMASK1", "SIC_IMASK2",
   "SIC_ISR0", "SIC_ISR1", "SIC_ISR2", "SIC_IWR0", "SIC_IWR1", "SIC_IWR2",
   "SIC_IAR0", "SIC_IAR1", "SIC_IAR2", "SIC_IAR3",
   "SIC_IAR4", "SIC_IAR5", "SIC_IAR6", "SIC_IAR7",
   "SIC_IAR8", "SIC_IAR9", "SIC_IAR10", "SIC_IAR11",
 };
-static const char * const bf561_mmr_names[] = {
+static const char * const bf561_mmr_names[] =
+{
   "SWRST", "SYSCR", "SIC_RVECT", "SIC_IMASK0", "SIC_IMASK1",
   "SIC_IAR0", "SIC_IAR1", "SIC_IAR2", "SIC_IAR3",
   "SIC_IAR4", "SIC_IAR5", "SIC_IAR6", "SIC_IAR7",
@@ -123,6 +127,7 @@ bfin_sic_forward_interrupts (struct hw *me, bu32 *isr, bu32 *imask, bu32 *iar)
       iar_idx = my_port / 8;
       iar_off = (my_port % 8) * 4;
       iar_val = (iar[iar_idx] & (0xf << iar_off)) >> iar_off;
+      HW_TRACE ((me, "forwarding int %i to CEC", IVG7 + iar_val));
       hw_port_event (me, IVG7 + iar_val, 1);
     }
 }
@@ -545,7 +550,17 @@ bfin_sic_561_io_read_buffer (struct hw *me, void *dest, int space,
   return nr_bytes;
 }
 
-/* XXX: This doesn't handle DMA<->peripheral mappings.  */
+/* Give each SIC its own base to make it easier to extract the pin at
+   runtime.  The pin is used as its bit position in the SIC MMRs.  */
+#define ENC(sic, pin) (((sic) << 8) + (pin))
+#define DEC_PIN(pin) ((pin) % 0x100)
+#define DEC_SIC(pin) ((pin) >> 8)
+
+/* It would be nice to declare just one set of input_ports, and then
+   have the device tree instantiate multiple SICs, but the MMR layout
+   on the BF54x/BF561 makes this pretty hard to pull off since their
+   regs are interwoven in the address space.  */
+
 #define BFIN_SIC_TO_CEC_PORTS \
   { "ivg7",  IVG7,  0, output_port, }, \
   { "ivg8",  IVG8,  0, output_port, }, \
@@ -557,206 +572,100 @@ bfin_sic_561_io_read_buffer (struct hw *me, void *dest, int space,
   { "ivg14", IVG14, 0, output_port, }, \
   { "ivg15", IVG15, 0, output_port, },
 
-static const struct hw_port_descriptor bfin_sic_50x_ports[] = {
+#define SIC_PORTS(n) \
+  { "int0@"#n,   ENC(n,  0), 0, input_port, }, \
+  { "int1@"#n,   ENC(n,  1), 0, input_port, }, \
+  { "int2@"#n,   ENC(n,  2), 0, input_port, }, \
+  { "int3@"#n,   ENC(n,  3), 0, input_port, }, \
+  { "int4@"#n,   ENC(n,  4), 0, input_port, }, \
+  { "int5@"#n,   ENC(n,  5), 0, input_port, }, \
+  { "int6@"#n,   ENC(n,  6), 0, input_port, }, \
+  { "int7@"#n,   ENC(n,  7), 0, input_port, }, \
+  { "int8@"#n,   ENC(n,  8), 0, input_port, }, \
+  { "int9@"#n,   ENC(n,  9), 0, input_port, }, \
+  { "int10@"#n,  ENC(n, 10), 0, input_port, }, \
+  { "int11@"#n,  ENC(n, 11), 0, input_port, }, \
+  { "int12@"#n,  ENC(n, 12), 0, input_port, }, \
+  { "int13@"#n,  ENC(n, 13), 0, input_port, }, \
+  { "int14@"#n,  ENC(n, 14), 0, input_port, }, \
+  { "int15@"#n,  ENC(n, 15), 0, input_port, }, \
+  { "int16@"#n,  ENC(n, 16), 0, input_port, }, \
+  { "int17@"#n,  ENC(n, 17), 0, input_port, }, \
+  { "int18@"#n,  ENC(n, 18), 0, input_port, }, \
+  { "int19@"#n,  ENC(n, 19), 0, input_port, }, \
+  { "int20@"#n,  ENC(n, 20), 0, input_port, }, \
+  { "int21@"#n,  ENC(n, 21), 0, input_port, }, \
+  { "int22@"#n,  ENC(n, 22), 0, input_port, }, \
+  { "int23@"#n,  ENC(n, 23), 0, input_port, }, \
+  { "int24@"#n,  ENC(n, 24), 0, input_port, }, \
+  { "int25@"#n,  ENC(n, 25), 0, input_port, }, \
+  { "int26@"#n,  ENC(n, 26), 0, input_port, }, \
+  { "int27@"#n,  ENC(n, 27), 0, input_port, }, \
+  { "int28@"#n,  ENC(n, 28), 0, input_port, }, \
+  { "int29@"#n,  ENC(n, 29), 0, input_port, }, \
+  { "int30@"#n,  ENC(n, 30), 0, input_port, }, \
+  { "int31@"#n,  ENC(n, 31), 0, input_port, },
+
+static const struct hw_port_descriptor bfin_sic1_ports[] =
+{
   BFIN_SIC_TO_CEC_PORTS
-  /* SIC0 */
-  { "pll",            0, 0, input_port, },
-  { "dma_stat",       1, 0, input_port, },
-  { "ppi@0",          2, 0, input_port, },
-  { "sport@0_stat",   3, 0, input_port, },
-  { "sport@1_stat",   4, 0, input_port, },
-  { "uart2@0_stat",   5, 0, input_port, },
-  { "uart2@1_stat",   6, 0, input_port, },
-  { "spi@0",          7, 0, input_port, },
-  { "spi@1",          8, 0, input_port, },
-  { "can_stat",       9, 0, input_port, },
-  { "rsi_int0",      10, 0, input_port, },
-/*{ "reserved",      11, 0, input_port, },*/
-  { "counter@0",     12, 0, input_port, },
-  { "counter@1",     13, 0, input_port, },
-  { "dma@0",         14, 0, input_port, },
-  { "dma@1",         15, 0, input_port, },
-  { "dma@2",         16, 0, input_port, },
-  { "dma@3",         17, 0, input_port, },
-  { "dma@4",         18, 0, input_port, },
-  { "dma@5",         19, 0, input_port, },
-  { "dma@6",         20, 0, input_port, },
-  { "dma@7",         21, 0, input_port, },
-  { "dma@8",         22, 0, input_port, },
-  { "dma@9",         23, 0, input_port, },
-  { "dma@10",        24, 0, input_port, },
-  { "dma@11",        25, 0, input_port, },
-  { "can_rx",        26, 0, input_port, },
-  { "can_tx",        27, 0, input_port, },
-  { "twi@0",         28, 0, input_port, },
-  { "portf_irq_a",   29, 0, input_port, },
-  { "portf_irq_b",   30, 0, input_port, },
-/*{ "reserved",      31, 0, input_port, },*/
-  /* SIC1 */
-  { "gptimer@0",    100, 0, input_port, },
-  { "gptimer@1",    101, 0, input_port, },
-  { "gptimer@2",    102, 0, input_port, },
-  { "gptimer@3",    103, 0, input_port, },
-  { "gptimer@4",    104, 0, input_port, },
-  { "gptimer@5",    105, 0, input_port, },
-  { "gptimer@6",    106, 0, input_port, },
-  { "gptimer@7",    107, 0, input_port, },
-  { "portg_irq_a",  108, 0, input_port, },
-  { "portg_irq_b",  109, 0, input_port, },
-  { "mdma@0",       110, 0, input_port, },
-  { "mdma@1",       111, 0, input_port, },
-  { "wdog",         112, 0, input_port, },
-  { "porth_irq_a",  113, 0, input_port, },
-  { "porth_irq_b",  114, 0, input_port, },
-  { "acm_stat",     115, 0, input_port, },
-  { "acm_int",      116, 0, input_port, },
-/*{ "reserved",     117, 0, input_port, },*/
-/*{ "reserved",     118, 0, input_port, },*/
-  { "pwm@0_trip",   119, 0, input_port, },
-  { "pwm@0_sync",   120, 0, input_port, },
-  { "pwm@1_trip",   121, 0, input_port, },
-  { "pwm@1_sync",   122, 0, input_port, },
-  { "rsi_int1",     123, 0, input_port, },
+  SIC_PORTS(0)
   { NULL, 0, 0, 0, },
 };
 
-static const struct hw_port_descriptor bfin_sic_51x_ports[] = {
+static const struct hw_port_descriptor bfin_sic2_ports[] =
+{
   BFIN_SIC_TO_CEC_PORTS
-  /* SIC0 */
-  { "pll",            0, 0, input_port, },
-  { "dma_stat",       1, 0, input_port, },
-  { "dmar0_block",    2, 0, input_port, },
-  { "dmar1_block",    3, 0, input_port, },
-  { "dmar0_over",     4, 0, input_port, },
-  { "dmar1_over",     5, 0, input_port, },
-  { "ppi@0",          6, 0, input_port, },
-  { "emac_stat",      7, 0, input_port, },
-  { "sport@0_stat",   8, 0, input_port, },
-  { "sport@1_stat",   9, 0, input_port, },
-  { "ptp_err",       10, 0, input_port, },
-/*{ "reserved",      11, 0, input_port, },*/
-  { "uart@0_stat",   12, 0, input_port, },
-  { "uart@1_stat",   13, 0, input_port, },
-  { "rtc",           14, 0, input_port, },
-  { "dma@0",         15, 0, input_port, },
-  { "dma@3",         16, 0, input_port, },
-  { "dma@4",         17, 0, input_port, },
-  { "dma@5",         18, 0, input_port, },
-  { "dma@6",         19, 0, input_port, },
-  { "twi@0",         20, 0, input_port, },
-  { "dma@7",         21, 0, input_port, },
-  { "dma@8",         22, 0, input_port, },
-  { "dma@9",         23, 0, input_port, },
-  { "dma@10",        24, 0, input_port, },
-  { "dma@11",        25, 0, input_port, },
-  { "otp",           26, 0, input_port, },
-  { "counter",       27, 0, input_port, },
-  { "dma@1",         28, 0, input_port, },
-  { "porth_irq_a",   29, 0, input_port, },
-  { "dma@2",         30, 0, input_port, },
-  { "porth_irq_b",   31, 0, input_port, },
-  /* SIC1 */
-  { "gptimer@0",    100, 0, input_port, },
-  { "gptimer@1",    101, 0, input_port, },
-  { "gptimer@2",    102, 0, input_port, },
-  { "gptimer@3",    103, 0, input_port, },
-  { "gptimer@4",    104, 0, input_port, },
-  { "gptimer@5",    105, 0, input_port, },
-  { "gptimer@6",    106, 0, input_port, },
-  { "gptimer@7",    107, 0, input_port, },
-  { "portg_irq_a",  108, 0, input_port, },
-  { "portg_irq_b",  109, 0, input_port, },
-  { "mdma@0",       110, 0, input_port, },
-  { "mdma@1",       111, 0, input_port, },
-  { "wdog",         112, 0, input_port, },
-  { "portf_irq_a",  113, 0, input_port, },
-  { "portf_irq_b",  114, 0, input_port, },
-  { "spi@0",        115, 0, input_port, },
-  { "spi@1",        116, 0, input_port, },
-/*{ "reserved",     117, 0, input_port, },*/
-/*{ "reserved",     118, 0, input_port, },*/
-  { "rsi_int0",     119, 0, input_port, },
-  { "rsi_int1",     120, 0, input_port, },
-  { "pwm_trip",     121, 0, input_port, },
-  { "pwm_sync",     122, 0, input_port, },
-  { "ptp_stat",     123, 0, input_port, },
+  SIC_PORTS(0)
+  SIC_PORTS(1)
   { NULL, 0, 0, 0, },
 };
 
-static const struct hw_port_descriptor bfin_sic_52x_ports[] = {
+static const struct hw_port_descriptor bfin_sic3_ports[] =
+{
   BFIN_SIC_TO_CEC_PORTS
-  /* SIC0 */
-  { "pll",            0, 0, input_port, },
-  { "dma_stat",       1, 0, input_port, },
-  { "dmar0_block",    2, 0, input_port, },
-  { "dmar1_block",    3, 0, input_port, },
-  { "dmar0_over",     4, 0, input_port, },
-  { "dmar1_over",     5, 0, input_port, },
-  { "ppi@0",          6, 0, input_port, },
-  { "emac_stat",      7, 0, input_port, },
-  { "sport@0_stat",   8, 0, input_port, },
-  { "sport@1_stat",   9, 0, input_port, },
-/*{ "reserved",      10, 0, input_port, },*/
-/*{ "reserved",      11, 0, input_port, },*/
-  { "uart@0_stat",   12, 0, input_port, },
-  { "uart@1_stat",   13, 0, input_port, },
-  { "rtc",           14, 0, input_port, },
-  { "dma@0",         15, 0, input_port, },
-  { "dma@3",         16, 0, input_port, },
-  { "dma@4",         17, 0, input_port, },
-  { "dma@5",         18, 0, input_port, },
-  { "dma@6",         19, 0, input_port, },
-  { "twi@0",         20, 0, input_port, },
-  { "dma@7",         21, 0, input_port, },
-  { "dma@8",         22, 0, input_port, },
-  { "dma@9",         23, 0, input_port, },
-  { "dma@10",        24, 0, input_port, },
-  { "dma@11",        25, 0, input_port, },
-  { "otp",           26, 0, input_port, },
-  { "counter",       27, 0, input_port, },
-  { "dma@1",         28, 0, input_port, },
-  { "porth_irq_a",   29, 0, input_port, },
-  { "dma@2",         30, 0, input_port, },
-  { "porth_irq_b",   31, 0, input_port, },
-  /* SIC1 */
-  { "gptimer@0",    100, 0, input_port, },
-  { "gptimer@1",    101, 0, input_port, },
-  { "gptimer@2",    102, 0, input_port, },
-  { "gptimer@3",    103, 0, input_port, },
-  { "gptimer@4",    104, 0, input_port, },
-  { "gptimer@5",    105, 0, input_port, },
-  { "gptimer@6",    106, 0, input_port, },
-  { "gptimer@7",    107, 0, input_port, },
-  { "portg_irq_a",  108, 0, input_port, },
-  { "portg_irq_b",  109, 0, input_port, },
-  { "mdma@0",       110, 0, input_port, },
-  { "mdma@1",       111, 0, input_port, },
-  { "wdog",         112, 0, input_port, },
-  { "portf_irq_a",  113, 0, input_port, },
-  { "portf_irq_b",  114, 0, input_port, },
-  { "spi@0",        115, 0, input_port, },
-  { "nfc_stat",     116, 0, input_port, },
-  { "hostdp_stat",  117, 0, input_port, },
-  { "hostdp_done",  118, 0, input_port, },
-  { "usb_int0",     120, 0, input_port, },
-  { "usb_int1",     121, 0, input_port, },
-  { "usb_int2",     122, 0, input_port, },
+  SIC_PORTS(0)
+  SIC_PORTS(1)
+  SIC_PORTS(2)
   { NULL, 0, 0, 0, },
 };
+
+static const struct hw_port_descriptor bfin_sic_561_ports[] =
+{
+  { "sup_irq@0", 0, 0, output_port, },
+  { "sup_irq@1", 1, 0, output_port, },
+  BFIN_SIC_TO_CEC_PORTS
+  SIC_PORTS(0)
+  SIC_PORTS(1)
+  { NULL, 0, 0, 0, },
+};
+
+static void
+bfin_sic_port_event (struct hw *me, bu32 *isr, bu32 bit, int level)
+{
+  if (level)
+    *isr |= bit;
+  else
+    *isr &= ~bit;
+}
 
 static void
 bfin_sic_52x_port_event (struct hw *me, int my_port, struct hw *source,
 			 int source_port, int level)
 {
   struct bfin_sic *sic = hw_data (me);
-  bu32 idx = my_port / 100;
-  bu32 bit = (1 << (my_port & 0x1f));
+  bu32 idx = DEC_SIC (my_port);
+  bu32 pin = DEC_PIN (my_port);
+  bu32 bit = 1 << pin;
+
+  HW_TRACE ((me, "processing level %i from port %i (SIC %u pin %u)",
+	     level, my_port, idx, pin));
 
   /* SIC only exists to forward interrupts from the system to the CEC.  */
   switch (idx)
     {
-    case 0: sic->bf52x.isr0 |= bit; break;
-    case 1: sic->bf52x.isr1 |= bit; break;
+    case 0: bfin_sic_port_event (me, &sic->bf52x.isr0, bit, level); break;
+    case 1: bfin_sic_port_event (me, &sic->bf52x.isr1, bit, level); break;
     }
 
   /* XXX: Handle SIC wakeup source ?
@@ -769,114 +678,20 @@ bfin_sic_52x_port_event (struct hw *me, int my_port, struct hw *source,
   bfin_sic_52x_forward_interrupts (me, sic);
 }
 
-static const struct hw_port_descriptor bfin_sic_533_ports[] = {
-  BFIN_SIC_TO_CEC_PORTS
-  { "pll",            0, 0, input_port, },
-  { "dma_stat",       1, 0, input_port, },
-  { "ppi@0",          2, 0, input_port, },
-  { "sport@0_stat",   3, 0, input_port, },
-  { "sport@1_stat",   4, 0, input_port, },
-  { "spi@0",          5, 0, input_port, },
-  { "uart@0_stat",    6, 0, input_port, },
-  { "rtc",            7, 0, input_port, },
-  { "dma@0",          8, 0, input_port, },
-  { "dma@1",          9, 0, input_port, },
-  { "dma@2",         10, 0, input_port, },
-  { "dma@3",         11, 0, input_port, },
-  { "dma@4",         12, 0, input_port, },
-  { "dma@5",         13, 0, input_port, },
-  { "dma@6",         14, 0, input_port, },
-  { "dma@7",         15, 0, input_port, },
-  { "gptimer@0",     16, 0, input_port, },
-  { "gptimer@1",     17, 0, input_port, },
-  { "gptimer@2",     18, 0, input_port, },
-  { "portf_irq_a",   19, 0, input_port, },
-  { "portf_irq_b",   20, 0, input_port, },
-  { "mdma@0",        21, 0, input_port, },
-  { "mdma@1",        22, 0, input_port, },
-  { "wdog",          23, 0, input_port, },
-  { NULL, 0, 0, 0, },
-};
-
-static void
-bfin_sic_533_port_event (struct hw *me, int my_port, struct hw *source,
-			 int source_port, int level)
-{
-  struct bfin_sic *sic = hw_data (me);
-  bu32 bit = (1 << my_port);
-
-  /* SIC only exists to forward interrupts from the system to the CEC.  */
-  sic->bf537.isr |= bit;
-
-  /* XXX: Handle SIC wakeup source ?
-  if (sic->bf537.iwr & bit)
-    What to do ?;
-   */
-
-  bfin_sic_537_forward_interrupts (me, sic);
-}
-
-static const struct hw_port_descriptor bfin_sic_537_ports[] = {
-  BFIN_SIC_TO_CEC_PORTS
-  { "pll",            0, 0, input_port, },
-  { "dma_stat",      10, 0, input_port, },
-  { "dmar0_block",   11, 0, input_port, },
-  { "dmar1_block",   12, 0, input_port, },
-  { "dmar0_over",    13, 0, input_port, },
-  { "dmar1_over",    14, 0, input_port, },
-  { "can_stat",      20, 0, input_port, },
-  { "emac_stat",     21, 0, input_port, },
-  { "sport@0_stat",  22, 0, input_port, },
-  { "sport@1_stat",  23, 0, input_port, },
-  { "ppi@0",         24, 0, input_port, },
-  { "spi@0",         25, 0, input_port, },
-  { "uart@0_stat",   26, 0, input_port, },
-  { "uart@1_stat",   27, 0, input_port, },
-  { "rtc",           30, 0, input_port, },
-  { "dma@0",         40, 0, input_port, },
-  { "dma@3",         50, 0, input_port, },
-  { "dma@4",         60, 0, input_port, },
-  { "dma@5",         70, 0, input_port, },
-  { "dma@6",         80, 0, input_port, },
-  { "twi@0",         90, 0, input_port, },
-  { "dma@7",        100, 0, input_port, },
-  { "dma@8",        110, 0, input_port, },
-  { "dma@9",        120, 0, input_port, },
-  { "dma@10",       130, 0, input_port, },
-  { "dma@11",       140, 0, input_port, },
-  { "can_rx",       150, 0, input_port, },
-  { "can_tx",       160, 0, input_port, },
-  { "dma@1",        170, 0, input_port, },
-  { "porth_irq_a",  171, 0, input_port, },
-  { "dma@2",        180, 0, input_port, },
-  { "porth_irq_b",  181, 0, input_port, },
-  { "gptimer@0",    190, 0, input_port, },
-  { "gptimer@1",    200, 0, input_port, },
-  { "gptimer@2",    210, 0, input_port, },
-  { "gptimer@3",    220, 0, input_port, },
-  { "gptimer@4",    230, 0, input_port, },
-  { "gptimer@5",    240, 0, input_port, },
-  { "gptimer@6",    250, 0, input_port, },
-  { "gptimer@7",    260, 0, input_port, },
-  { "portf_irq_a",  270, 0, input_port, },
-  { "portg_irq_a",  271, 0, input_port, },
-  { "portg_irq_b",  280, 0, input_port, },
-  { "mdma@0",       290, 0, input_port, },
-  { "mdma@1",       300, 0, input_port, },
-  { "wdog",         310, 0, input_port, },
-  { "portf_irq_b",  311, 0, input_port, },
-  { NULL, 0, 0, 0, },
-};
-
 static void
 bfin_sic_537_port_event (struct hw *me, int my_port, struct hw *source,
 			 int source_port, int level)
 {
   struct bfin_sic *sic = hw_data (me);
-  bu32 bit = (1 << (my_port / 10));
+  bu32 idx = DEC_SIC (my_port);
+  bu32 pin = DEC_PIN (my_port);
+  bu32 bit = 1 << pin;
+
+  HW_TRACE ((me, "processing level %i from port %i (SIC %u pin %u)",
+	     level, my_port, idx, pin));
 
   /* SIC only exists to forward interrupts from the system to the CEC.  */
-  sic->bf537.isr |= bit;
+  bfin_sic_port_event (me, &sic->bf537.isr, bit, level);
 
   /* XXX: Handle SIC wakeup source ?
   if (sic->bf537.iwr & bit)
@@ -885,183 +700,25 @@ bfin_sic_537_port_event (struct hw *me, int my_port, struct hw *source,
 
   bfin_sic_537_forward_interrupts (me, sic);
 }
-
-static const struct hw_port_descriptor bfin_sic_538_ports[] = {
-  BFIN_SIC_TO_CEC_PORTS
-  /* SIC0 */
-  { "pll",            0, 0, input_port, },
-  { "dmac@0_stat",    1, 0, input_port, },
-  { "ppi@0",          2, 0, input_port, },
-  { "sport@0_stat",   3, 0, input_port, },
-  { "sport@1_stat",   4, 0, input_port, },
-  { "spi@0",          5, 0, input_port, },
-  { "uart@0_stat",    6, 0, input_port, },
-  { "rtc",            7, 0, input_port, },
-  { "dma@0",          8, 0, input_port, },
-  { "dma@1",          9, 0, input_port, },
-  { "dma@2",         10, 0, input_port, },
-  { "dma@3",         11, 0, input_port, },
-  { "dma@4",         12, 0, input_port, },
-  { "dma@5",         13, 0, input_port, },
-  { "dma@6",         14, 0, input_port, },
-  { "dma@7",         15, 0, input_port, },
-  { "gptimer@0",     16, 0, input_port, },
-  { "gptimer@1",     17, 0, input_port, },
-  { "gptimer@2",     18, 0, input_port, },
-  { "portf_irq_a",   19, 0, input_port, },
-  { "portf_irq_b",   20, 0, input_port, },
-  { "mdma@0",        21, 0, input_port, },
-  { "mdma@1",        22, 0, input_port, },
-  { "wdog",          23, 0, input_port, },
-  { "dmac@1_stat",   24, 0, input_port, },
-  { "sport@2_stat",  25, 0, input_port, },
-  { "sport@3_stat",  26, 0, input_port, },
-/*{ "reserved",      27, 0, input_port, },*/
-  { "spi@1",         28, 0, input_port, },
-  { "spi@2",         29, 0, input_port, },
-  { "uart@1_stat",   30, 0, input_port, },
-  { "uart@2_stat",   31, 0, input_port, },
-  /* SIC1 */
-  { "can_stat",     100, 0, input_port, },
-  { "dma@8",        101, 0, input_port, },
-  { "dma@9",        102, 0, input_port, },
-  { "dma@10",       103, 0, input_port, },
-  { "dma@11",       104, 0, input_port, },
-  { "dma@12",       105, 0, input_port, },
-  { "dma@13",       106, 0, input_port, },
-  { "dma@14",       107, 0, input_port, },
-  { "dma@15",       108, 0, input_port, },
-  { "dma@16",       109, 0, input_port, },
-  { "dma@17",       110, 0, input_port, },
-  { "dma@18",       111, 0, input_port, },
-  { "dma@19",       112, 0, input_port, },
-  { "twi@0",        113, 0, input_port, },
-  { "twi@1",        114, 0, input_port, },
-  { "can_rx",       115, 0, input_port, },
-  { "can_tx",       116, 0, input_port, },
-  { "mdma@2",       117, 0, input_port, },
-  { "mdma@3",       118, 0, input_port, },
-  { NULL, 0, 0, 0, },
-};
-
-static const struct hw_port_descriptor bfin_sic_54x_ports[] = {
-  BFIN_SIC_TO_CEC_PORTS
-  /* SIC0 */
-  { "pll",            0, 0, input_port, },
-  { "dmac@0_stat",    1, 0, input_port, },
-  { "eppi@0",         2, 0, input_port, },
-  { "sport@0_stat",   3, 0, input_port, },
-  { "sport@1_stat",   4, 0, input_port, },
-  { "spi@0",          5, 0, input_port, },
-  { "uart2@0_stat",   6, 0, input_port, },
-  { "rtc",            7, 0, input_port, },
-  { "dma@12",         8, 0, input_port, },
-  { "dma@0",          9, 0, input_port, },
-  { "dma@1",         10, 0, input_port, },
-  { "dma@2",         11, 0, input_port, },
-  { "dma@3",         12, 0, input_port, },
-  { "dma@4",         13, 0, input_port, },
-  { "dma@6",         14, 0, input_port, },
-  { "dma@7",         15, 0, input_port, },
-  { "gptimer@8",     16, 0, input_port, },
-  { "gptimer@9",     17, 0, input_port, },
-  { "gptimer@10",    18, 0, input_port, },
-  { "pint@0",        19, 0, input_port, },
-  { "pint@1",        20, 0, input_port, },
-  { "mdma@0",        21, 0, input_port, },
-  { "mdma@1",        22, 0, input_port, },
-  { "wdog",          23, 0, input_port, },
-  { "dmac@1_stat",   24, 0, input_port, },
-  { "sport@2_stat",  25, 0, input_port, },
-  { "sport@3_stat",  26, 0, input_port, },
-  { "mxvr",          27, 0, input_port, },
-  { "spi@1",         28, 0, input_port, },
-  { "spi@2",         29, 0, input_port, },
-  { "uart2@1_stat",  30, 0, input_port, },
-  { "uart2@2_stat",  31, 0, input_port, },
-  /* SIC1 */
-  { "can@0_stat",    32, 0, input_port, },
-  { "dma@18",        33, 0, input_port, },
-  { "dma@19",        34, 0, input_port, },
-  { "dma@20",        35, 0, input_port, },
-  { "dma@21",        36, 0, input_port, },
-  { "dma@13",        37, 0, input_port, },
-  { "dma@14",        38, 0, input_port, },
-  { "dma@5",         39, 0, input_port, },
-  { "dma@23",        40, 0, input_port, },
-  { "dma@8",         41, 0, input_port, },
-  { "dma@9",         42, 0, input_port, },
-  { "dma@10",        43, 0, input_port, },
-  { "dma@11",        44, 0, input_port, },
-  { "twi@0",         45, 0, input_port, },
-  { "twi@1",         46, 0, input_port, },
-  { "can@0_rx",      47, 0, input_port, },
-  { "can@0_tx",      48, 0, input_port, },
-  { "mdma@2",        49, 0, input_port, },
-  { "mdma@3",        50, 0, input_port, },
-  { "mxvr_stat",     51, 0, input_port, },
-  { "mxvr_message",  52, 0, input_port, },
-  { "mxvr_packet",   53, 0, input_port, },
-  { "eppi@1",        54, 0, input_port, },
-  { "eppi@2",        55, 0, input_port, },
-  { "uart2@3_stat",  56, 0, input_port, },
-  { "hostdp",        57, 0, input_port, },
-/*{ "reserved",      58, 0, input_port, },*/
-  { "pixc_stat",     59, 0, input_port, },
-  { "nfc",           60, 0, input_port, },
-  { "atapi",         61, 0, input_port, },
-  { "can@1_stat",    62, 0, input_port, },
-  { "dmar",          63, 0, input_port, },
-  /* SIC2 */
-  { "dma@15",        64, 0, input_port, },
-  { "dma@16",        65, 0, input_port, },
-  { "dma@17",        66, 0, input_port, },
-  { "dma@22",        67, 0, input_port, },
-  { "counter",       68, 0, input_port, },
-  { "key",           69, 0, input_port, },
-  { "can@1_rx",      70, 0, input_port, },
-  { "can@1_tx",      71, 0, input_port, },
-  { "sdh_mask0",     72, 0, input_port, },
-  { "sdh_mask1",     73, 0, input_port, },
-/*{ "reserved",      74, 0, input_port, },*/
-  { "usb_int0",      75, 0, input_port, },
-  { "usb_int1",      76, 0, input_port, },
-  { "usb_int2",      77, 0, input_port, },
-  { "usb_dma",       78, 0, input_port, },
-  { "otpsec",        79, 0, input_port, },
-/*{ "reserved",      80, 0, input_port, },*/
-/*{ "reserved",      81, 0, input_port, },*/
-/*{ "reserved",      82, 0, input_port, },*/
-/*{ "reserved",      83, 0, input_port, },*/
-/*{ "reserved",      84, 0, input_port, },*/
-/*{ "reserved",      85, 0, input_port, },*/
-  { "gptimer@0",     86, 0, input_port, },
-  { "gptimer@1",     87, 0, input_port, },
-  { "gptimer@2",     88, 0, input_port, },
-  { "gptimer@3",     89, 0, input_port, },
-  { "gptimer@4",     90, 0, input_port, },
-  { "gptimer@5",     91, 0, input_port, },
-  { "gptimer@6",     92, 0, input_port, },
-  { "gptimer@7",     93, 0, input_port, },
-  { "pint2",         94, 0, input_port, },
-  { "pint3",         95, 0, input_port, },
-  { NULL, 0, 0, 0, },
-};
 
 static void
 bfin_sic_54x_port_event (struct hw *me, int my_port, struct hw *source,
 			 int source_port, int level)
 {
   struct bfin_sic *sic = hw_data (me);
-  bu32 idx = my_port / 100;
-  bu32 bit = (1 << (my_port & 0x1f));
+  bu32 idx = DEC_SIC (my_port);
+  bu32 pin = DEC_PIN (my_port);
+  bu32 bit = 1 << pin;
+
+  HW_TRACE ((me, "processing level %i from port %i (SIC %u pin %u)",
+	     level, my_port, idx, pin));
 
   /* SIC only exists to forward interrupts from the system to the CEC.  */
   switch (idx)
     {
-    case 0: sic->bf54x.isr0 |= bit; break;
-    case 1: sic->bf54x.isr1 |= bit; break;
-    case 2: sic->bf54x.isr2 |= bit; break;
+    case 0: bfin_sic_port_event (me, &sic->bf54x.isr0, bit, level); break;
+    case 1: bfin_sic_port_event (me, &sic->bf54x.isr0, bit, level); break;
+    case 2: bfin_sic_port_event (me, &sic->bf54x.isr0, bit, level); break;
     }
 
   /* XXX: Handle SIC wakeup source ?
@@ -1076,90 +733,23 @@ bfin_sic_54x_port_event (struct hw *me, int my_port, struct hw *source,
   bfin_sic_54x_forward_interrupts (me, sic);
 }
 
-static const struct hw_port_descriptor bfin_sic_561_ports[] = {
-  BFIN_SIC_TO_CEC_PORTS
-  /* SIC0 */
-  { "pll",            0, 0, input_port, },
-  { "dmac@0_stat",    1, 0, input_port, },
-  { "dmac@1_stat",    2, 0, input_port, },
-  { "imdma_stat",     3, 0, input_port, },
-  { "ppi@0",          4, 0, input_port, },
-  { "ppi@1",          5, 0, input_port, },
-  { "sport@0_stat",   6, 0, input_port, },
-  { "sport@1_stat",   7, 0, input_port, },
-  { "spi@0",          8, 0, input_port, },
-  { "uart@0_stat",    9, 0, input_port, },
-/*{ "reserved",      10, 0, input_port, },*/
-  { "dma@12",        11, 0, input_port, },
-  { "dma@13",        12, 0, input_port, },
-  { "dma@14",        13, 0, input_port, },
-  { "dma@15",        14, 0, input_port, },
-  { "dma@16",        15, 0, input_port, },
-  { "dma@17",        16, 0, input_port, },
-  { "dma@18",        17, 0, input_port, },
-  { "dma@19",        18, 0, input_port, },
-  { "dma@20",        19, 0, input_port, },
-  { "dma@21",        20, 0, input_port, },
-  { "dma@22",        21, 0, input_port, },
-  { "dma@23",        22, 0, input_port, },
-  { "dma@0",         23, 0, input_port, },
-  { "dma@1",         24, 0, input_port, },
-  { "dma@2",         25, 0, input_port, },
-  { "dma@3",         26, 0, input_port, },
-  { "dma@4",         27, 0, input_port, },
-  { "dma@5",         28, 0, input_port, },
-  { "dma@6",         29, 0, input_port, },
-  { "dma@7",         30, 0, input_port, },
-  { "dma@8",         31, 0, input_port, },
-  /* SIC1 */
-  { "dma@9",        100, 0, input_port, },
-  { "dma@10",       101, 0, input_port, },
-  { "dma@11",       102, 0, input_port, },
-  { "gptimer@0",    103, 0, input_port, },
-  { "gptimer@1",    104, 0, input_port, },
-  { "gptimer@2",    105, 0, input_port, },
-  { "gptimer@3",    106, 0, input_port, },
-  { "gptimer@4",    107, 0, input_port, },
-  { "gptimer@5",    108, 0, input_port, },
-  { "gptimer@6",    109, 0, input_port, },
-  { "gptimer@7",    110, 0, input_port, },
-  { "gptimer@8",    111, 0, input_port, },
-  { "gptimer@9",    112, 0, input_port, },
-  { "gptimer@10",   113, 0, input_port, },
-  { "gptimer@11",   114, 0, input_port, },
-  { "portf_irq_a",  115, 0, input_port, },
-  { "portf_irq_b",  116, 0, input_port, },
-  { "portg_irq_a",  117, 0, input_port, },
-  { "portg_irq_b",  118, 0, input_port, },
-  { "porth_irq_a",  119, 0, input_port, },
-  { "porth_irq_b",  120, 0, input_port, },
-  { "mdma@0",       121, 0, input_port, },
-  { "mdma@1",       122, 0, input_port, },
-  { "mdma@2",       123, 0, input_port, },
-  { "mdma@3",       124, 0, input_port, },
-  { "imdma@0",      125, 0, input_port, },
-  { "imdma@1",      126, 0, input_port, },
-  { "wdog",         127, 0, input_port, },
-/*{ "reserved",     128, 0, input_port, },*/
-/*{ "reserved",     129, 0, input_port, },*/
-  { "sup_irq_0",    130, 0, input_port, },
-  { "sup_irq_1",    131, 0, input_port, },
-  { NULL, 0, 0, 0, },
-};
-
 static void
 bfin_sic_561_port_event (struct hw *me, int my_port, struct hw *source,
 			 int source_port, int level)
 {
   struct bfin_sic *sic = hw_data (me);
-  bu32 idx = my_port / 100;
-  bu32 bit = (1 << (my_port & 0x1f));
+  bu32 idx = DEC_SIC (my_port);
+  bu32 pin = DEC_PIN (my_port);
+  bu32 bit = 1 << pin;
+
+  HW_TRACE ((me, "processing level %i from port %i (SIC %u pin %u)",
+	     level, my_port, idx, pin));
 
   /* SIC only exists to forward interrupts from the system to the CEC.  */
   switch (idx)
     {
-    case 0: sic->bf561.isr0 |= bit; break;
-    case 1: sic->bf561.isr1 |= bit; break;
+    case 0: bfin_sic_port_event (me, &sic->bf561.isr0, bit, level); break;
+    case 1: bfin_sic_port_event (me, &sic->bf561.isr1, bit, level); break;
     }
 
   /* XXX: Handle SIC wakeup source ?
@@ -1171,48 +761,6 @@ bfin_sic_561_port_event (struct hw *me, int my_port, struct hw *source,
 
   bfin_sic_561_forward_interrupts (me, sic);
 }
-
-static const struct hw_port_descriptor bfin_sic_59x_ports[] = {
-  BFIN_SIC_TO_CEC_PORTS
-  { "pll",            0, 0, input_port, },
-  { "dma_stat",       1, 0, input_port, },
-  { "ppi@0",          2, 0, input_port, },
-  { "sport@0_stat",   3, 0, input_port, },
-  { "sport@1_stat",   4, 0, input_port, },
-  { "spi@0",          5, 0, input_port, },
-  { "spi@1",          6, 0, input_port, },
-  { "uart@0_stat",    7, 0, input_port, },
-  { "dma@0",          8, 0, input_port, },
-  { "dma@1",          9, 0, input_port, },
-  { "dma@2",         10, 0, input_port, },
-  { "dma@3",         11, 0, input_port, },
-  { "dma@4",         12, 0, input_port, },
-  { "dma@5",         13, 0, input_port, },
-  { "dma@6",         14, 0, input_port, },
-  { "dma@7",         15, 0, input_port, },
-  { "dma@8",         16, 0, input_port, },
-  { "portf_irq_a",   17, 0, input_port, },
-  { "portf_irq_b",   18, 0, input_port, },
-  { "gptimer@0",     19, 0, input_port, },
-  { "gptimer@1",     20, 0, input_port, },
-  { "gptimer@2",     21, 0, input_port, },
-  { "portg_irq_a",   22, 0, input_port, },
-  { "portg_irq_b",   23, 0, input_port, },
-  { "twi@0",         24, 0, input_port, },
-/* XXX: 25 - 28 are supposed to be reserved; see comment in machs.c:bf592_dmac[]  */
-  { "dma@9",         25, 0, input_port, },
-  { "dma@10",        26, 0, input_port, },
-  { "dma@11",        27, 0, input_port, },
-  { "dma@12",        28, 0, input_port, },
-/*{ "reserved",      25, 0, input_port, },*/
-/*{ "reserved",      26, 0, input_port, },*/
-/*{ "reserved",      27, 0, input_port, },*/
-/*{ "reserved",      28, 0, input_port, },*/
-  { "mdma@0",        29, 0, input_port, },
-  { "mdma@1",        30, 0, input_port, },
-  { "wdog",          31, 0, input_port, },
-  { NULL, 0, 0, 0, },
-};
 
 static void
 attach_bfin_sic_regs (struct hw *me, struct bfin_sic *sic)
@@ -1257,7 +805,7 @@ bfin_sic_finish (struct hw *me)
     case 500 ... 509:
       set_hw_io_read_buffer (me, bfin_sic_52x_io_read_buffer);
       set_hw_io_write_buffer (me, bfin_sic_52x_io_write_buffer);
-      set_hw_ports (me, bfin_sic_50x_ports);
+      set_hw_ports (me, bfin_sic2_ports);
       set_hw_port_event (me, bfin_sic_52x_port_event);
       mmr_names = bf52x_mmr_names;
 
@@ -1277,7 +825,7 @@ bfin_sic_finish (struct hw *me)
     case 510 ... 519:
       set_hw_io_read_buffer (me, bfin_sic_52x_io_read_buffer);
       set_hw_io_write_buffer (me, bfin_sic_52x_io_write_buffer);
-      set_hw_ports (me, bfin_sic_51x_ports);
+      set_hw_ports (me, bfin_sic2_ports);
       set_hw_port_event (me, bfin_sic_52x_port_event);
       mmr_names = bf52x_mmr_names;
 
@@ -1297,7 +845,7 @@ bfin_sic_finish (struct hw *me)
     case 522 ... 527:
       set_hw_io_read_buffer (me, bfin_sic_52x_io_read_buffer);
       set_hw_io_write_buffer (me, bfin_sic_52x_io_write_buffer);
-      set_hw_ports (me, bfin_sic_52x_ports);
+      set_hw_ports (me, bfin_sic2_ports);
       set_hw_port_event (me, bfin_sic_52x_port_event);
       mmr_names = bf52x_mmr_names;
 
@@ -1317,8 +865,8 @@ bfin_sic_finish (struct hw *me)
     case 531 ... 533:
       set_hw_io_read_buffer (me, bfin_sic_537_io_read_buffer);
       set_hw_io_write_buffer (me, bfin_sic_537_io_write_buffer);
-      set_hw_ports (me, bfin_sic_533_ports);
-      set_hw_port_event (me, bfin_sic_533_port_event);
+      set_hw_ports (me, bfin_sic1_ports);
+      set_hw_port_event (me, bfin_sic_537_port_event);
       mmr_names = bf537_mmr_names;
 
       /* Initialize the SIC.  */
@@ -1335,7 +883,7 @@ bfin_sic_finish (struct hw *me)
     case 537:
       set_hw_io_read_buffer (me, bfin_sic_537_io_read_buffer);
       set_hw_io_write_buffer (me, bfin_sic_537_io_write_buffer);
-      set_hw_ports (me, bfin_sic_537_ports);
+      set_hw_ports (me, bfin_sic1_ports);
       set_hw_port_event (me, bfin_sic_537_port_event);
       mmr_names = bf537_mmr_names;
 
@@ -1351,7 +899,7 @@ bfin_sic_finish (struct hw *me)
     case 538 ... 539:
       set_hw_io_read_buffer (me, bfin_sic_52x_io_read_buffer);
       set_hw_io_write_buffer (me, bfin_sic_52x_io_write_buffer);
-      set_hw_ports (me, bfin_sic_538_ports);
+      set_hw_ports (me, bfin_sic2_ports);
       set_hw_port_event (me, bfin_sic_52x_port_event);
       mmr_names = bf52x_mmr_names;
 
@@ -1371,7 +919,7 @@ bfin_sic_finish (struct hw *me)
     case 540 ... 549:
       set_hw_io_read_buffer (me, bfin_sic_54x_io_read_buffer);
       set_hw_io_write_buffer (me, bfin_sic_54x_io_write_buffer);
-      set_hw_ports (me, bfin_sic_54x_ports);
+      set_hw_ports (me, bfin_sic3_ports);
       set_hw_port_event (me, bfin_sic_54x_port_event);
       mmr_names = bf54x_mmr_names;
 
@@ -1415,8 +963,8 @@ bfin_sic_finish (struct hw *me)
     case 590 ... 599:
       set_hw_io_read_buffer (me, bfin_sic_537_io_read_buffer);
       set_hw_io_write_buffer (me, bfin_sic_537_io_write_buffer);
-      set_hw_ports (me, bfin_sic_59x_ports);
-      set_hw_port_event (me, bfin_sic_533_port_event);
+      set_hw_ports (me, bfin_sic1_ports);
+      set_hw_port_event (me, bfin_sic_537_port_event);
       mmr_names = bf537_mmr_names;
 
       /* Initialize the SIC.  */
@@ -1433,7 +981,8 @@ bfin_sic_finish (struct hw *me)
     }
 }
 
-const struct hw_descriptor dv_bfin_sic_descriptor[] = {
+const struct hw_descriptor dv_bfin_sic_descriptor[] =
+{
   {"bfin_sic", bfin_sic_finish,},
   {NULL, NULL},
 };

@@ -1,7 +1,6 @@
 /* Read a symbol table in MIPS' format (Third-Eye).
 
-   Copyright (C) 1986, 1987, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-   1998, 1999, 2000, 2001, 2003, 2004, 2007, 2008, 2009, 2010, 2011
+   Copyright (C) 1986-1987, 1989-1996, 1998-2001, 2003-2004, 2007-2012
    Free Software Foundation, Inc.
 
    Contributed by Alessandro Forin (af@cs.cmu.edu) at CMU.  Major work
@@ -240,7 +239,7 @@ read_alphacoff_dynamic_symtab (struct section_offsets *section_offsets,
 				 (file_ptr) 0, got_secsize))
     return;
 
-  /* Find the number of local GOT entries and the index for the the
+  /* Find the number of local GOT entries and the index for the
      first dynamic symbol in the GOT.  */
   for (dyninfo_p = dyninfo_secptr, dyninfo_end = dyninfo_p + dyninfo_secsize;
        dyninfo_p < dyninfo_end;
@@ -396,6 +395,7 @@ static const struct sym_fns ecoff_sym_fns =
   mipscoff_new_init,		/* init anything gbl to entire symtab */
   mipscoff_symfile_init,	/* read initial info, setup for sym_read() */
   mipscoff_symfile_read,	/* read a symbol file into symtab */
+  NULL,				/* sym_read_psymbols */
   mipscoff_symfile_finish,	/* finished with file, cleanup */
   default_symfile_offsets,	/* dummy FIXME til implem sym reloc */
   default_symfile_segments,	/* Get segment information from a file.  */

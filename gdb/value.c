@@ -1,8 +1,6 @@
 /* Low level packing and unpacking of values for GDB, the GNU Debugger.
 
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2002, 2003, 2004, 2005, 2006, 2007, 2008,
-   2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-2000, 2002-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -169,6 +167,9 @@ ranges_contain (VEC(range_s) *ranges, int offset, int length)
 
 static struct cmd_list_element *functionlist;
 
+/* Note that the fields in this structure are arranged to save a bit
+   of memory.  */
+
 struct value
 {
   /* Type of value; either not an lval, or one of the various
@@ -176,7 +177,37 @@ struct value
   enum lval_type lval;
 
   /* Is it modifiable?  Only relevant if lval != not_lval.  */
-  int modifiable;
+  unsigned int modifiable : 1;
+
+  /* If zero, contents of this value are in the contents field.  If
+     nonzero, contents are in inferior.  If the lval field is lval_memory,
+     the contents are in inferior memory at location.address plus offset.
+     The lval field may also be lval_register.
+
+     WARNING: This field is used by the code which handles watchpoints
+     (see breakpoint.c) to decide whether a particular value can be
+     watched by hardware watchpoints.  If the lazy flag is set for
+     some member of a value chain, it is assumed that this member of
+     the chain doesn't need to be watched as part of watching the
+     value itself.  This is how GDB avoids watching the entire struct
+     or array when the user wants to watch a single struct member or
+     array element.  If you ever change the way lazy flag is set and
+     reset, be sure to consider this use as well!  */
+  unsigned int lazy : 1;
+
+  /* If nonzero, this is the value of a variable which does not
+     actually exist in the program.  */
+  unsigned int optimized_out : 1;
+
+  /* If value is a variable, is it initialized or not.  */
+  unsigned int initialized : 1;
+
+  /* If value is from the stack.  If this is set, read_stack will be
+     used instead of read_memory to enable extra caching.  */
+  unsigned int stack : 1;
+
+  /* If the value has been released.  */
+  unsigned int released : 1;
 
   /* Location of value (if lval).  */
   union
@@ -194,8 +225,11 @@ struct value
        for them to use.  */
     struct
     {
-      struct lval_funcs *funcs; /* Functions to call.  */
-      void *closure;            /* Closure for those functions to use.  */
+      /* Functions to call.  */
+      const struct lval_funcs *funcs;
+
+      /* Closure for those functions to use.  */
+      void *closure;
     } computed;
   } location;
 
@@ -213,6 +247,13 @@ struct value
      gdbarch_bits_big_endian=0 targets, it is the position of the LSB.  For
      gdbarch_bits_big_endian=1 targets, it is the position of the MSB.  */
   int bitpos;
+
+  /* The number of references to this value.  When a value is created,
+     the value chain holds a reference, so REFERENCE_COUNT is 1.  If
+     release_value is called, this value is removed from the chain but
+     the caller of release_value now has a reference to this value.
+     The caller must arrange for a call to value_free later.  */
+  int reference_count;
 
   /* Only used for bitfields; the containing value.  This allows a
      single read from the target when displaying multiple
@@ -279,33 +320,6 @@ struct value
   /* Register number if the value is from a register.  */
   short regnum;
 
-  /* If zero, contents of this value are in the contents field.  If
-     nonzero, contents are in inferior.  If the lval field is lval_memory,
-     the contents are in inferior memory at location.address plus offset.
-     The lval field may also be lval_register.
-
-     WARNING: This field is used by the code which handles watchpoints
-     (see breakpoint.c) to decide whether a particular value can be
-     watched by hardware watchpoints.  If the lazy flag is set for
-     some member of a value chain, it is assumed that this member of
-     the chain doesn't need to be watched as part of watching the
-     value itself.  This is how GDB avoids watching the entire struct
-     or array when the user wants to watch a single struct member or
-     array element.  If you ever change the way lazy flag is set and
-     reset, be sure to consider this use as well!  */
-  char lazy;
-
-  /* If nonzero, this is the value of a variable which does not
-     actually exist in the program.  */
-  char optimized_out;
-
-  /* If value is a variable, is it initialized or not.  */
-  int initialized;
-
-  /* If value is from the stack.  If this is set, read_stack will be
-     used instead of read_memory to enable extra caching.  */
-  int stack;
-
   /* Actual contents of the value.  Target byte-order.  NULL or not
      valid if lazy is nonzero.  */
   gdb_byte *contents;
@@ -314,13 +328,6 @@ struct value
      rather than available, since the common and default case is for a
      value to be available.  This is filled in at value read time.  */
   VEC(range_s) *unavailable;
-
-  /* The number of references to this value.  When a value is created,
-     the value chain holds a reference, so REFERENCE_COUNT is 1.  If
-     release_value is called, this value is removed from the chain but
-     the caller of release_value now has a reference to this value.
-     The caller must arrange for a call to value_free later.  */
-  int reference_count;
 };
 
 int
@@ -716,7 +723,7 @@ allocate_repeat_value (struct type *type, int count)
 
 struct value *
 allocate_computed_value (struct type *type,
-                         struct lval_funcs *funcs,
+                         const struct lval_funcs *funcs,
                          void *closure)
 {
   struct value *v = allocate_value_lazy (type);
@@ -726,6 +733,18 @@ allocate_computed_value (struct type *type,
   v->location.computed.closure = closure;
 
   return v;
+}
+
+/* Allocate NOT_LVAL value for type TYPE being OPTIMIZED_OUT.  */
+
+struct value *
+allocate_optimized_out_value (struct type *type)
+{
+  struct value *retval = allocate_value_lazy (type);
+
+  set_value_optimized_out (retval, 1);
+
+  return retval;
 }
 
 /* Accessor methods.  */
@@ -1047,10 +1066,10 @@ set_value_pointed_to_offset (struct value *value, int val)
   value->pointed_to_offset = val;
 }
 
-struct lval_funcs *
-value_computed_funcs (struct value *v)
+const struct lval_funcs *
+value_computed_funcs (const struct value *v)
 {
-  gdb_assert (VALUE_LVAL (v) == lval_computed);
+  gdb_assert (value_lval_const (v) == lval_computed);
 
   return v->location.computed.funcs;
 }
@@ -1067,6 +1086,12 @@ enum lval_type *
 deprecated_value_lval_hack (struct value *value)
 {
   return &value->lval;
+}
+
+enum lval_type
+value_lval_const (const struct value *value)
+{
+  return value->lval;
 }
 
 CORE_ADDR
@@ -1163,7 +1188,7 @@ value_free (struct value *val)
 
       if (VALUE_LVAL (val) == lval_computed)
 	{
-	  struct lval_funcs *funcs = val->location.computed.funcs;
+	  const struct lval_funcs *funcs = val->location.computed.funcs;
 
 	  if (funcs->free_closure)
 	    funcs->free_closure (val);
@@ -1186,6 +1211,7 @@ value_free_to_mark (struct value *mark)
   for (val = all_values; val && val != mark; val = next)
     {
       next = val->next;
+      val->released = 1;
       value_free (val);
     }
   all_values = val;
@@ -1204,6 +1230,7 @@ free_all_values (void)
   for (val = all_values; val; val = next)
     {
       next = val->next;
+      val->released = 1;
       value_free (val);
     }
 
@@ -1236,6 +1263,7 @@ release_value (struct value *val)
     {
       all_values = val->next;
       val->next = NULL;
+      val->released = 1;
       return;
     }
 
@@ -1245,9 +1273,24 @@ release_value (struct value *val)
 	{
 	  v->next = val->next;
 	  val->next = NULL;
+	  val->released = 1;
 	  break;
 	}
     }
+}
+
+/* If the value is not already released, release it.
+   If the value is already released, increment its reference count.
+   That is, this function ensures that the value is released from the
+   value chain and that the caller owns a reference to it.  */
+
+void
+release_value_or_incref (struct value *val)
+{
+  if (val->released)
+    value_incref (val);
+  else
+    release_value (val);
 }
 
 /* Release all values up to mark  */
@@ -1258,12 +1301,15 @@ value_release_to_mark (struct value *mark)
   struct value *next;
 
   for (val = next = all_values; next; next = next->next)
-    if (next->next == mark)
-      {
-	all_values = next->next;
-	next->next = NULL;
-	return val;
-      }
+    {
+      if (next->next == mark)
+	{
+	  all_values = next->next;
+	  next->next = NULL;
+	  return val;
+	}
+      next->released = 1;
+    }
   all_values = 0;
   return val;
 }
@@ -1307,7 +1353,7 @@ value_copy (struct value *arg)
     value_incref (val->parent);
   if (VALUE_LVAL (val) == lval_computed)
     {
-      struct lval_funcs *funcs = val->location.computed.funcs;
+      const struct lval_funcs *funcs = val->location.computed.funcs;
 
       if (funcs->copy_closure)
         val->location.computed.closure = funcs->copy_closure (val);
@@ -1347,7 +1393,7 @@ set_value_component_location (struct value *component,
   component->location = whole->location;
   if (whole->lval == lval_computed)
     {
-      struct lval_funcs *funcs = whole->location.computed.funcs;
+      const struct lval_funcs *funcs = whole->location.computed.funcs;
 
       if (funcs->copy_closure)
         component->location.computed.closure = funcs->copy_closure (whole);
@@ -2080,13 +2126,23 @@ show_convenience (char *ignore, int from_tty)
   get_user_print_options (&opts);
   for (var = internalvars; var; var = var->next)
     {
+      volatile struct gdb_exception ex;
+
       if (!varseen)
 	{
 	  varseen = 1;
 	}
       printf_filtered (("$%s = "), var->name);
-      value_print (value_of_internalvar (gdbarch, var), gdb_stdout,
-		   &opts);
+
+      TRY_CATCH (ex, RETURN_MASK_ERROR)
+	{
+	  struct value *val;
+
+	  val = value_of_internalvar (gdbarch, var);
+	  value_print (val, gdb_stdout, &opts);
+	}
+      if (ex.reason < 0)
+	fprintf_filtered (gdb_stdout, _("<error: %s>"), ex.message);
       printf_filtered (("\n"));
     }
   if (!varseen)
@@ -2388,7 +2444,7 @@ value_static_field (struct type *type, int fieldno)
       break;
     case FIELD_LOC_KIND_PHYSNAME:
     {
-      char *phys_name = TYPE_FIELD_STATIC_PHYSNAME (type, fieldno);
+      const char *phys_name = TYPE_FIELD_STATIC_PHYSNAME (type, fieldno);
       /* TYPE_FIELD_NAME (type, fieldno); */
       struct symbol *sym = lookup_symbol (phys_name, 0, VAR_DOMAIN, 0);
 
@@ -2457,16 +2513,19 @@ value_primitive_field (struct value *arg1, int offset,
      description correctly.  */
   check_typedef (type);
 
-  /* Handle packed fields */
-
-  if (TYPE_FIELD_BITSIZE (arg_type, fieldno))
+  if (value_optimized_out (arg1))
+    v = allocate_optimized_out_value (type);
+  else if (TYPE_FIELD_BITSIZE (arg_type, fieldno))
     {
-      /* Create a new value for the bitfield, with bitpos and bitsize
+      /* Handle packed fields.
+
+	 Create a new value for the bitfield, with bitpos and bitsize
 	 set.  If possible, arrange offset and bitpos so that we can
 	 do a single aligned read of the size of the containing type.
 	 Otherwise, adjust offset to the byte containing the first
 	 bit.  Assume that the address, offset, and embedded offset
 	 are sufficiently aligned.  */
+
       int bitpos = TYPE_FIELD_BITPOS (arg_type, fieldno);
       int container_bitsize = TYPE_LENGTH (type) * 8;
 
@@ -2559,7 +2618,7 @@ value_fn_field (struct value **arg1p, struct fn_field *f,
 {
   struct value *v;
   struct type *ftype = TYPE_FN_FIELD_TYPE (f, j);
-  char *physname = TYPE_FN_FIELD_PHYSNAME (f, j);
+  const char *physname = TYPE_FN_FIELD_PHYSNAME (f, j);
   struct symbol *sym;
   struct minimal_symbol *msym;
 
@@ -2965,6 +3024,19 @@ value_from_contents_and_address (struct type *type,
   return v;
 }
 
+/* Create a value of type TYPE holding the contents CONTENTS.
+   The new value is `not_lval'.  */
+
+struct value *
+value_from_contents (struct type *type, const gdb_byte *contents)
+{
+  struct value *result;
+
+  result = allocate_value (type);
+  memcpy (value_contents_raw (result), contents, TYPE_LENGTH (type));
+  return result;
+}
+
 struct value *
 value_from_double (struct type *type, DOUBLEST num)
 {
@@ -3045,15 +3117,39 @@ value_from_history_ref (char *h, char **endp)
 }
 
 struct value *
+coerce_ref_if_computed (const struct value *arg)
+{
+  const struct lval_funcs *funcs;
+
+  if (TYPE_CODE (check_typedef (value_type (arg))) != TYPE_CODE_REF)
+    return NULL;
+
+  if (value_lval_const (arg) != lval_computed)
+    return NULL;
+
+  funcs = value_computed_funcs (arg);
+  if (funcs->coerce_ref == NULL)
+    return NULL;
+
+  return funcs->coerce_ref (arg);
+}
+
+struct value *
 coerce_ref (struct value *arg)
 {
   struct type *value_type_arg_tmp = check_typedef (value_type (arg));
+  struct value *retval;
 
-  if (TYPE_CODE (value_type_arg_tmp) == TYPE_CODE_REF)
-    arg = value_at_lazy (TYPE_TARGET_TYPE (value_type_arg_tmp),
-			 unpack_pointer (value_type (arg),		
-					 value_contents (arg)));
-  return arg;
+  retval = coerce_ref_if_computed (arg);
+  if (retval)
+    return retval;
+
+  if (TYPE_CODE (value_type_arg_tmp) != TYPE_CODE_REF)
+    return arg;
+
+  return value_at_lazy (TYPE_TARGET_TYPE (value_type_arg_tmp),
+			unpack_pointer (value_type (arg),
+					value_contents (arg)));
 }
 
 struct value *

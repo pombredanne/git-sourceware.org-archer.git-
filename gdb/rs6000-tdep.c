@@ -1,8 +1,7 @@
 /* Target-dependent code for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1987, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
-   2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-1987, 1989, 1991-2012 Free Software Foundation,
+   Inc.
 
    This file is part of GDB.
 
@@ -1116,8 +1115,8 @@ ppc_deal_with_atomic_sequence (struct frame_info *frame)
          its destination address.  */
       if ((insn & BRANCH_MASK) == BC_INSN)
         {
-          int immediate = ((insn & ~3) << 16) >> 16;
-          int absolute = ((insn >> 1) & 1);
+          int immediate = ((insn & 0xfffc) ^ 0x8000) - 0x8000;
+          int absolute = insn & 2;
 
           if (bc_insn_count >= 1)
             return 0; /* More than one conditional branch found, fallback 
@@ -1126,7 +1125,7 @@ ppc_deal_with_atomic_sequence (struct frame_info *frame)
 	  if (absolute)
 	    breaks[1] = immediate;
 	  else
-	    breaks[1] = pc + immediate;
+	    breaks[1] = loc + immediate;
 
 	  bc_insn_count++;
 	  last_breakpoint++;
@@ -1150,11 +1149,10 @@ ppc_deal_with_atomic_sequence (struct frame_info *frame)
   breaks[0] = loc;
 
   /* Check for duplicated breakpoints.  Check also for a breakpoint
-     placed (branch instruction's destination) at the stwcx/stdcx 
-     instruction, this resets the reservation and take us back to the 
-     lwarx/ldarx instruction at the beginning of the atomic sequence.  */
-  if (last_breakpoint && ((breaks[1] == breaks[0]) 
-      || (breaks[1] == closing_insn)))
+     placed (branch instruction's destination) anywhere in sequence.  */
+  if (last_breakpoint
+      && (breaks[1] == breaks[0]
+	  || (breaks[1] >= pc && breaks[1] <= closing_insn)))
     last_breakpoint = 0;
 
   /* Effectively inserts the breakpoints.  */
@@ -2504,20 +2502,27 @@ rs6000_convert_register_p (struct gdbarch *gdbarch, int regnum,
 	     != TYPE_LENGTH (builtin_type (gdbarch)->builtin_double));
 }
 
-static void
+static int
 rs6000_register_to_value (struct frame_info *frame,
                           int regnum,
                           struct type *type,
-                          gdb_byte *to)
+                          gdb_byte *to,
+			  int *optimizedp, int *unavailablep)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   gdb_byte from[MAX_REGISTER_SIZE];
   
   gdb_assert (TYPE_CODE (type) == TYPE_CODE_FLT);
 
-  get_frame_register (frame, regnum, from);
+  if (!get_frame_register_bytes (frame, regnum, 0,
+				 register_size (gdbarch, regnum),
+				 from, optimizedp, unavailablep))
+    return 0;
+
   convert_typed_floating (from, builtin_type (gdbarch)->builtin_double,
 			  to, type);
+  *optimizedp = *unavailablep = 0;
+  return 1;
 }
 
 static void
@@ -2535,6 +2540,11 @@ rs6000_value_to_register (struct frame_info *frame,
 			  to, builtin_type (gdbarch)->builtin_double);
   put_frame_register (frame, regnum, to);
 }
+
+ /* The type of a function that moves the value of REG between CACHE
+    or BUF --- in either direction.  */
+typedef enum register_status (*move_ev_register_func) (struct regcache *,
+						       int, void *);
 
 /* Move SPE vector register values between a 64-bit buffer and the two
    32-bit raw register halves in a regcache.  This function handles
@@ -2559,16 +2569,16 @@ rs6000_value_to_register (struct frame_info *frame,
    MOVE, since this function can't tell at compile-time which of
    REGCACHE or BUFFER is acting as the source of the data.  If C had
    co-variant type qualifiers, ...  */
-static void
-e500_move_ev_register (void (*move) (struct regcache *regcache,
-                                     int regnum, gdb_byte *buf),
-                       struct regcache *regcache, int ev_reg,
-                       gdb_byte *buffer)
+
+static enum register_status
+e500_move_ev_register (move_ev_register_func move,
+		       struct regcache *regcache, int ev_reg, void *buffer)
 {
   struct gdbarch *arch = get_regcache_arch (regcache);
   struct gdbarch_tdep *tdep = gdbarch_tdep (arch); 
   int reg_index;
   gdb_byte *byte_buffer = buffer;
+  enum register_status status;
 
   gdb_assert (IS_SPE_PSEUDOREG (tdep, ev_reg));
 
@@ -2576,55 +2586,80 @@ e500_move_ev_register (void (*move) (struct regcache *regcache,
 
   if (gdbarch_byte_order (arch) == BFD_ENDIAN_BIG)
     {
-      move (regcache, tdep->ppc_ev0_upper_regnum + reg_index, byte_buffer);
-      move (regcache, tdep->ppc_gp0_regnum + reg_index, byte_buffer + 4);
+      status = move (regcache, tdep->ppc_ev0_upper_regnum + reg_index,
+		     byte_buffer);
+      if (status == REG_VALID)
+	status = move (regcache, tdep->ppc_gp0_regnum + reg_index,
+		       byte_buffer + 4);
     }
   else
     {
-      move (regcache, tdep->ppc_gp0_regnum + reg_index, byte_buffer);
-      move (regcache, tdep->ppc_ev0_upper_regnum + reg_index, byte_buffer + 4);
+      status = move (regcache, tdep->ppc_gp0_regnum + reg_index, byte_buffer);
+      if (status == REG_VALID)
+	status = move (regcache, tdep->ppc_ev0_upper_regnum + reg_index,
+		       byte_buffer + 4);
     }
+
+  return status;
 }
 
-static void
+static enum register_status
+do_regcache_raw_read (struct regcache *regcache, int regnum, void *buffer)
+{
+  return regcache_raw_read (regcache, regnum, buffer);
+}
+
+static enum register_status
+do_regcache_raw_write (struct regcache *regcache, int regnum, void *buffer)
+{
+  regcache_raw_write (regcache, regnum, buffer);
+
+  return REG_VALID;
+}
+
+static enum register_status
 e500_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
 			   int reg_nr, gdb_byte *buffer)
 {
-  e500_move_ev_register (regcache_raw_read, regcache, reg_nr, buffer);
+  return e500_move_ev_register (do_regcache_raw_read, regcache, reg_nr, buffer);
 }
 
 static void
 e500_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
 			    int reg_nr, const gdb_byte *buffer)
 {
-  e500_move_ev_register ((void (*) (struct regcache *, int, gdb_byte *))
-			 regcache_raw_write,
-			 regcache, reg_nr, (gdb_byte *) buffer);
+  e500_move_ev_register (do_regcache_raw_write, regcache,
+			 reg_nr, (void *) buffer);
 }
 
 /* Read method for DFP pseudo-registers.  */
-static void
+static enum register_status
 dfp_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
 			   int reg_nr, gdb_byte *buffer)
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   int reg_index = reg_nr - tdep->ppc_dl0_regnum;
+  enum register_status status;
 
   if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
     {
       /* Read two FP registers to form a whole dl register.  */
-      regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
-			 2 * reg_index, buffer);
-      regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
-			 2 * reg_index + 1, buffer + 8);
+      status = regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
+				  2 * reg_index, buffer);
+      if (status == REG_VALID)
+	status = regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
+				    2 * reg_index + 1, buffer + 8);
     }
   else
     {
-      regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
-			 2 * reg_index + 1, buffer + 8);
-      regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
-			 2 * reg_index, buffer);
+      status = regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
+				  2 * reg_index + 1, buffer + 8);
+      if (status == REG_VALID)
+	status = regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
+				    2 * reg_index, buffer);
     }
+
+  return status;
 }
 
 /* Write method for DFP pseudo-registers.  */
@@ -2654,33 +2689,38 @@ dfp_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
 }
 
 /* Read method for POWER7 VSX pseudo-registers.  */
-static void
+static enum register_status
 vsx_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
 			   int reg_nr, gdb_byte *buffer)
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   int reg_index = reg_nr - tdep->ppc_vsr0_regnum;
+  enum register_status status;
 
   /* Read the portion that overlaps the VMX registers.  */
   if (reg_index > 31)
-    regcache_raw_read (regcache, tdep->ppc_vr0_regnum +
-			reg_index - 32, buffer);
+    status = regcache_raw_read (regcache, tdep->ppc_vr0_regnum +
+				reg_index - 32, buffer);
   else
     /* Read the portion that overlaps the FPR registers.  */
     if (gdbarch_byte_order (gdbarch) == BFD_ENDIAN_BIG)
       {
-	regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
-			reg_index, buffer);
-	regcache_raw_read (regcache, tdep->ppc_vsr0_upper_regnum +
-			reg_index, buffer + 8);
+	status = regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
+				    reg_index, buffer);
+	if (status == REG_VALID)
+	  status = regcache_raw_read (regcache, tdep->ppc_vsr0_upper_regnum +
+				      reg_index, buffer + 8);
       }
     else
       {
-	regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
-			reg_index, buffer + 8);
-	regcache_raw_read (regcache, tdep->ppc_vsr0_upper_regnum +
-			reg_index, buffer);
+	status = regcache_raw_read (regcache, tdep->ppc_fp0_regnum +
+				    reg_index, buffer + 8);
+	if (status == REG_VALID)
+	  status = regcache_raw_read (regcache, tdep->ppc_vsr0_upper_regnum +
+				      reg_index, buffer);
       }
+
+  return status;
 }
 
 /* Write method for POWER7 VSX pseudo-registers.  */
@@ -2714,7 +2754,7 @@ vsx_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
 }
 
 /* Read method for POWER7 Extended FP pseudo-registers.  */
-static void
+static enum register_status
 efpr_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
 			   int reg_nr, gdb_byte *buffer)
 {
@@ -2722,8 +2762,8 @@ efpr_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
   int reg_index = reg_nr - tdep->ppc_efpr0_regnum;
 
   /* Read the portion that overlaps the VMX register.  */
-  regcache_raw_read_part (regcache, tdep->ppc_vr0_regnum + reg_index, 0,
-			  register_size (gdbarch, reg_nr), buffer);
+  return regcache_raw_read_part (regcache, tdep->ppc_vr0_regnum + reg_index, 0,
+				 register_size (gdbarch, reg_nr), buffer);
 }
 
 /* Write method for POWER7 Extended FP pseudo-registers.  */
@@ -2739,7 +2779,7 @@ efpr_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
 			   register_size (gdbarch, reg_nr), buffer);
 }
 
-static void
+static enum register_status
 rs6000_pseudo_register_read (struct gdbarch *gdbarch,
 			     struct regcache *regcache,
 			     int reg_nr, gdb_byte *buffer)
@@ -2750,13 +2790,13 @@ rs6000_pseudo_register_read (struct gdbarch *gdbarch,
   gdb_assert (regcache_arch == gdbarch);
 
   if (IS_SPE_PSEUDOREG (tdep, reg_nr))
-    e500_pseudo_register_read (gdbarch, regcache, reg_nr, buffer);
+    return e500_pseudo_register_read (gdbarch, regcache, reg_nr, buffer);
   else if (IS_DFP_PSEUDOREG (tdep, reg_nr))
-    dfp_pseudo_register_read (gdbarch, regcache, reg_nr, buffer);
+    return dfp_pseudo_register_read (gdbarch, regcache, reg_nr, buffer);
   else if (IS_VSX_PSEUDOREG (tdep, reg_nr))
-    vsx_pseudo_register_read (gdbarch, regcache, reg_nr, buffer);
+    return vsx_pseudo_register_read (gdbarch, regcache, reg_nr, buffer);
   else if (IS_EFP_PSEUDOREG (tdep, reg_nr))
-    efpr_pseudo_register_read (gdbarch, regcache, reg_nr, buffer);
+    return efpr_pseudo_register_read (gdbarch, regcache, reg_nr, buffer);
   else
     internal_error (__FILE__, __LINE__,
 		    _("rs6000_pseudo_register_read: "
@@ -3277,6 +3317,7 @@ rs6000_frame_prev_register (struct frame_info *this_frame,
 static const struct frame_unwind rs6000_frame_unwind =
 {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   rs6000_frame_this_id,
   rs6000_frame_prev_register,
   NULL,

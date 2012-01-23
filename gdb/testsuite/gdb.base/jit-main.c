@@ -1,6 +1,6 @@
 /* This test program is part of GDB, the GNU debugger.
 
-   Copyright 2011 Free Software Foundation, Inc.
+   Copyright 2011-2012 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -28,6 +28,19 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
+
+/* ElfW is coming from linux. On other platforms it does not exist.
+   Let us define it here. */
+#ifndef ElfW
+# if (defined  (_LP64) || defined (__LP64__)) 
+#   define WORDSIZE 64
+# else
+#   define WORDSIZE 32
+# endif /* _LP64 || __LP64__  */
+#define ElfW(type)      _ElfW (Elf, WORDSIZE, type)
+#define _ElfW(e,w,t)    _ElfW_1 (e, w, _##t)
+#define _ElfW_1(e,w,t)  e##w##t
+#endif /* !ElfW  */
 
 typedef enum
 {
@@ -104,8 +117,12 @@ update_locations (const void *const addr, int idx)
     }
 }
 
+#ifndef MAIN
+#define MAIN main
+#endif
+
 int
-main (int argc, char *argv[])
+MAIN (int argc, char *argv[])
 {
   /* These variables are here so they can easily be set from jit.exp.  */
   const char *libname = NULL;

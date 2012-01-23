@@ -1,4 +1,4 @@
-/* Copyright 2006, 2007, 2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+/* Copyright 2006-2012 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -157,7 +157,7 @@ int path_expression ()
        {DP.Base2 Base2 1 Base2}                         \
        {DP.public public 1}} "list children of DP"
       mi_gdb_test "-var-info-path-expression DP.Base1" \
-          "\\^done,path_expr=\"\\(\\*\\(Base1\\*\\) dp\\)\"" \
+          "\\^done,path_expr=\"\\(\\*\\(class Base1\\*\\) dp\\)\"" \
 	  "-var-info-path-expression DP.Base1"       
       mi_list_varobj_children DP.public {               \
         {DP.public.i i 0 int}                           \
@@ -172,7 +172,7 @@ int path_expression ()
         {DP.Base1.public.i i 0 int}                           \
       } "list children of DP.Base1.public"
       mi_gdb_test "-var-info-path-expression DP.Base1.public.i" \
-          "\\^done,path_expr=\"\\(\\(\\(\\*\\(Base1\\*\\) dp\\)\\).i\\)\"" \
+          "\\^done,path_expr=\"\\(\\(\\(\\*\\(class Base1\\*\\) dp\\)\\).i\\)\"" \
 	  "-var-info-path-expression DP.Base1.public.i"
 
       mi_gdb_test "-var-info-path-expression DP.public" \
@@ -185,7 +185,7 @@ int path_expression ()
        {D.Base2 Base2 1 Base2}                         \
        {D.public public 1}} "list children of D"
       mi_gdb_test "-var-info-path-expression D.Base1" \
-          "\\^done,path_expr=\"\\(\\(Base1\\) d\\)\"" \
+          "\\^done,path_expr=\"\\(\\(class Base1\\) d\\)\"" \
 	  "-var-info-path-expression D.Base1"
   :*/
   int array[4] = {1,2,3};
@@ -205,6 +205,51 @@ int path_expression ()
   /*: END: path_expression :*/
 }
 
+class Anonymous
+{
+public:
+  struct { /* index: 0 */
+    int b;
+  };
+  struct { /* index: 1 */
+    int c;
+  };
+  struct { /* index: 2 */
+    int d;
+    struct { /* index: 1 */
+      int e;
+      struct { /* index: 0 */
+        int f;
+        union { /* index: 0 */
+          int g;
+          char h;
+        };
+      };
+      union { /* index: 0 */
+        int i;
+        char j;
+      };
+    };
+  };
+};
+
+/* Test anonymous structs and unions.  */
+int
+anonymous_structs_and_unions (void)
+{
+  Anonymous a;
+  a.b = 1;
+  a.c = 2;
+  a.d = 3;
+  a.e = 4;
+  a.f = 5;
+  a.g = 6;
+  a.h = '7';
+  a.i = 8;
+  a.j = '8';
+  return 0;  /* anonymous_structs_and_unions */
+}
+
 int main ()
 {
   reference_update_tests ();
@@ -212,5 +257,6 @@ int main ()
   reference_to_pointer ();
   reference_to_struct ();
   path_expression ();
+  anonymous_structs_and_unions ();
   return 0;
 }

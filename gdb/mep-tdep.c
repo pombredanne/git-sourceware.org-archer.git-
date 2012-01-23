@@ -1,7 +1,6 @@
 /* Target-dependent code for the Toshiba MeP for GDB, the GNU debugger.
 
-   Copyright (C) 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010,
-   2011 Free Software Foundation, Inc.
+   Copyright (C) 2001-2012 Free Software Foundation, Inc.
 
    Contributed by Red Hat, Inc.
 
@@ -845,7 +844,7 @@ mep_pseudo_cr_index (int pseudo)
    from the ELF header's e_flags field of the current executable
    file.  */
 static CONFIG_ATTR
-current_me_module ()
+current_me_module (void)
 {
   if (target_has_registers)
     {
@@ -868,7 +867,7 @@ current_me_module ()
    then use the 'module_opt' field we computed when we build the
    gdbarch object for this module.  */
 static unsigned int
-current_options ()
+current_options (void)
 {
   if (target_has_registers)
     {
@@ -885,7 +884,7 @@ current_options ()
 /* Return the width of the current me_module's coprocessor data bus,
    in bits.  This is either 32 or 64.  */
 static int
-current_cop_data_bus_width ()
+current_cop_data_bus_width (void)
 {
   return me_module_cop_data_bus_width (current_me_module ());
 }
@@ -894,7 +893,7 @@ current_cop_data_bus_width ()
 /* Return the keyword table of coprocessor general-purpose register
    names appropriate for the me_module we're dealing with.  */
 static CGEN_KEYWORD *
-current_cr_names ()
+current_cr_names (void)
 {
   const CGEN_HW_ENTRY *hw
     = me_module_register_set (current_me_module (), "h-cr-", HW_H_CR);
@@ -906,7 +905,7 @@ current_cr_names ()
 /* Return non-zero if the coprocessor general-purpose registers are
    floating-point values, zero otherwise.  */
 static int
-current_cr_is_float ()
+current_cr_is_float (void)
 {
   const CGEN_HW_ENTRY *hw
     = me_module_register_set (current_me_module (), "h-cr-", HW_H_CR);
@@ -918,7 +917,7 @@ current_cr_is_float ()
 /* Return the keyword table of coprocessor control register names
    appropriate for the me_module we're dealing with.  */
 static CGEN_KEYWORD *
-current_ccr_names ()
+current_ccr_names (void)
 {
   const CGEN_HW_ENTRY *hw
     = me_module_register_set (current_me_module (), "h-ccr-", HW_H_CCR);
@@ -1133,12 +1132,13 @@ mep_write_pc (struct regcache *regcache, CORE_ADDR pc)
 }
 
 
-static void
+static enum register_status
 mep_pseudo_cr32_read (struct gdbarch *gdbarch,
                       struct regcache *regcache,
                       int cookednum,
                       void *buf)
 {
+  enum register_status status;
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   /* Read the raw register into a 64-bit buffer, and then return the
      appropriate end of that buffer.  */
@@ -1147,24 +1147,28 @@ mep_pseudo_cr32_read (struct gdbarch *gdbarch,
 
   gdb_assert (TYPE_LENGTH (register_type (gdbarch, rawnum)) == sizeof (buf64));
   gdb_assert (TYPE_LENGTH (register_type (gdbarch, cookednum)) == 4);
-  regcache_raw_read (regcache, rawnum, buf64);
-  /* Slow, but legible.  */
-  store_unsigned_integer (buf, 4, byte_order,
-			  extract_unsigned_integer (buf64, 8, byte_order));
+  status = regcache_raw_read (regcache, rawnum, buf64);
+  if (status == REG_VALID)
+    {
+      /* Slow, but legible.  */
+      store_unsigned_integer (buf, 4, byte_order,
+			      extract_unsigned_integer (buf64, 8, byte_order));
+    }
+  return status;
 }
 
 
-static void
+static enum register_status
 mep_pseudo_cr64_read (struct gdbarch *gdbarch,
                       struct regcache *regcache,
                       int cookednum,
                       void *buf)
 {
-  regcache_raw_read (regcache, mep_pseudo_to_raw[cookednum], buf);
+  return regcache_raw_read (regcache, mep_pseudo_to_raw[cookednum], buf);
 }
 
 
-static void
+static enum register_status
 mep_pseudo_register_read (struct gdbarch *gdbarch,
                           struct regcache *regcache,
                           int cookednum,
@@ -1172,13 +1176,13 @@ mep_pseudo_register_read (struct gdbarch *gdbarch,
 {
   if (IS_CSR_REGNUM (cookednum)
       || IS_CCR_REGNUM (cookednum))
-    regcache_raw_read (regcache, mep_pseudo_to_raw[cookednum], buf);
+    return regcache_raw_read (regcache, mep_pseudo_to_raw[cookednum], buf);
   else if (IS_CR32_REGNUM (cookednum)
            || IS_FP_CR32_REGNUM (cookednum))
-    mep_pseudo_cr32_read (gdbarch, regcache, cookednum, buf);
+    return mep_pseudo_cr32_read (gdbarch, regcache, cookednum, buf);
   else if (IS_CR64_REGNUM (cookednum)
            || IS_FP_CR64_REGNUM (cookednum))
-    mep_pseudo_cr64_read (gdbarch, regcache, cookednum, buf);
+    return mep_pseudo_cr64_read (gdbarch, regcache, cookednum, buf);
   else
     gdb_assert_not_reached ("unexpected pseudo register");
 }
@@ -2089,6 +2093,7 @@ mep_frame_prev_register (struct frame_info *this_frame,
 
 static const struct frame_unwind mep_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   mep_frame_this_id,
   mep_frame_prev_register,
   NULL,

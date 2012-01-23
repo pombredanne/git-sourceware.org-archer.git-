@@ -1,8 +1,6 @@
 /* Perform an inferior function call, for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1987, 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995,
-   1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007,
-   2008, 2009, 2010, 2011 Free Software Foundation, Inc.
+   Copyright (C) 1986-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -228,6 +226,21 @@ value_arg_coerce (struct gdbarch *gdbarch, struct value *arg,
   return value_cast (type, arg);
 }
 
+/* Return the return type of a function with its first instruction exactly at
+   the PC address.  Return NULL otherwise.  */
+
+static struct type *
+find_function_return_type (CORE_ADDR pc)
+{
+  struct symbol *sym = find_pc_function (pc);
+
+  if (sym != NULL && BLOCK_START (SYMBOL_BLOCK_VALUE (sym)) == pc
+      && SYMBOL_TYPE (sym) != NULL)
+    return TYPE_TARGET_TYPE (SYMBOL_TYPE (sym));
+
+  return NULL;
+}
+
 /* Determine a function's address and its return type from its value.
    Calls error() if the function is not valid for calling.  */
 
@@ -236,32 +249,42 @@ find_function_addr (struct value *function, struct type **retval_type)
 {
   struct type *ftype = check_typedef (value_type (function));
   struct gdbarch *gdbarch = get_type_arch (ftype);
-  enum type_code code = TYPE_CODE (ftype);
   struct type *value_type = NULL;
-  CORE_ADDR funaddr;
+  /* Initialize it just to avoid a GCC false warning.  */
+  CORE_ADDR funaddr = 0;
 
   /* If it's a member function, just look at the function
      part of it.  */
 
   /* Determine address to call.  */
-  if (code == TYPE_CODE_FUNC || code == TYPE_CODE_METHOD)
-    {
-      funaddr = value_address (function);
-      value_type = TYPE_TARGET_TYPE (ftype);
-    }
-  else if (code == TYPE_CODE_PTR)
+  if (TYPE_CODE (ftype) == TYPE_CODE_FUNC
+      || TYPE_CODE (ftype) == TYPE_CODE_METHOD)
+    funaddr = value_address (function);
+  else if (TYPE_CODE (ftype) == TYPE_CODE_PTR)
     {
       funaddr = value_as_address (function);
       ftype = check_typedef (TYPE_TARGET_TYPE (ftype));
       if (TYPE_CODE (ftype) == TYPE_CODE_FUNC
 	  || TYPE_CODE (ftype) == TYPE_CODE_METHOD)
+	funaddr = gdbarch_convert_from_func_ptr_addr (gdbarch, funaddr,
+						      &current_target);
+    }
+  if (TYPE_CODE (ftype) == TYPE_CODE_FUNC
+      || TYPE_CODE (ftype) == TYPE_CODE_METHOD)
+    {
+      value_type = TYPE_TARGET_TYPE (ftype);
+
+      if (TYPE_GNU_IFUNC (ftype))
 	{
-	  funaddr = gdbarch_convert_from_func_ptr_addr (gdbarch, funaddr,
-							&current_target);
-	  value_type = TYPE_TARGET_TYPE (ftype);
+	  funaddr = gnu_ifunc_resolve_addr (gdbarch, funaddr);
+
+	  /* Skip querying the function symbol if no RETVAL_TYPE has been
+	     asked for.  */
+	  if (retval_type)
+	    value_type = find_function_return_type (funaddr);
 	}
     }
-  else if (code == TYPE_CODE_INT)
+  else if (TYPE_CODE (ftype) == TYPE_CODE_INT)
     {
       /* Handle the case of functions lacking debugging info.
          Their values are characters since their addresses are char.  */
@@ -362,10 +385,8 @@ static struct gdb_exception
 run_inferior_call (struct thread_info *call_thread, CORE_ADDR real_pc)
 {
   volatile struct gdb_exception e;
-  int saved_async = 0;
   int saved_in_infcall = call_thread->control.in_infcall;
   ptid_t call_thread_ptid = call_thread->ptid;
-  char *saved_target_shortname = xstrdup (target_shortname);
 
   call_thread->control.in_infcall = 1;
 
@@ -376,21 +397,23 @@ run_inferior_call (struct thread_info *call_thread, CORE_ADDR real_pc)
   /* We want stop_registers, please...  */
   call_thread->control.proceed_to_finish = 1;
 
-  if (target_can_async_p ())
-    saved_async = target_async_mask (0);
-
   TRY_CATCH (e, RETURN_MASK_ALL)
-    proceed (real_pc, TARGET_SIGNAL_0, 0);
+    {
+      proceed (real_pc, TARGET_SIGNAL_0, 0);
+
+      /* Inferior function calls are always synchronous, even if the
+	 target supports asynchronous execution.  Do here what
+	 `proceed' itself does in sync mode.  */
+      if (target_can_async_p () && is_running (inferior_ptid))
+	{
+	  wait_for_inferior ();
+	  normal_stop ();
+	}
+    }
 
   /* At this point the current thread may have changed.  Refresh
      CALL_THREAD as it could be invalid if its thread has exited.  */
   call_thread = find_thread_ptid (call_thread_ptid);
-
-  /* Don't restore the async mask if the target has changed,
-     saved_async is for the original target.  */
-  if (saved_async
-      && strcmp (saved_target_shortname, target_shortname) == 0)
-    target_async_mask (saved_async);
 
   enable_watchpoints_after_interactive_call_stop ();
 
@@ -407,8 +430,6 @@ run_inferior_call (struct thread_info *call_thread, CORE_ADDR real_pc)
 
   if (call_thread != NULL)
     call_thread->control.in_infcall = saved_in_infcall;
-
-  xfree (saved_target_shortname);
 
   return e;
 }
@@ -469,6 +490,9 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
 
   if (get_traceframe_number () >= 0)
     error (_("May not call functions while looking at trace frames."));
+
+  if (execution_direction == EXEC_REVERSE)
+    error (_("Cannot call functions in reverse mode."));
 
   frame = get_current_frame ();
   gdbarch = get_frame_arch (frame);
@@ -1010,29 +1034,29 @@ When the function is done executing, GDB will silently stop."),
     restore_infcall_control_state (inf_status);
 
     /* Figure out the value returned by the function.  */
+    retval = allocate_value (values_type);
 
     if (lang_struct_return)
-      retval = value_at (values_type, struct_addr);
-    else if (TYPE_CODE (target_values_type) == TYPE_CODE_VOID)
+      read_value_memory (retval, 0, 1, struct_addr,
+			 value_contents_raw (retval),
+			 TYPE_LENGTH (values_type));
+    else if (TYPE_CODE (target_values_type) != TYPE_CODE_VOID)
       {
 	/* If the function returns void, don't bother fetching the
 	   return value.  */
-	retval = allocate_value (values_type);
-      }
-    else
-      {
 	switch (gdbarch_return_value (gdbarch, value_type (function),
 				      target_values_type, NULL, NULL, NULL))
 	  {
 	  case RETURN_VALUE_REGISTER_CONVENTION:
 	  case RETURN_VALUE_ABI_RETURNS_ADDRESS:
 	  case RETURN_VALUE_ABI_PRESERVES_ADDRESS:
-	    retval = allocate_value (values_type);
 	    gdbarch_return_value (gdbarch, value_type (function), values_type,
 				  retbuf, value_contents_raw (retval), NULL);
 	    break;
 	  case RETURN_VALUE_STRUCT_CONVENTION:
-	    retval = value_at (values_type, struct_addr);
+	    read_value_memory (retval, 0, 1, struct_addr,
+			       value_contents_raw (retval),
+			       TYPE_LENGTH (values_type));
 	    break;
 	  }
       }

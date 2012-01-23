@@ -1,8 +1,7 @@
 /* Target-machine dependent code for Renesas H8/300, for GDB.
 
-   Copyright (C) 1988, 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1998, 1999,
-   2000, 2001, 2002, 2003, 2005, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 1988, 1990-1996, 1998-2003, 2005, 2007-2012 Free
+   Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -526,6 +525,7 @@ h8300_frame_prev_register (struct frame_info *this_frame, void **this_cache,
 
 static const struct frame_unwind h8300_frame_unwind = {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   h8300_frame_this_id,
   h8300_frame_prev_register,
   NULL,
@@ -1149,17 +1149,17 @@ h8300_register_type (struct gdbarch *gdbarch, int regno)
     }
 }
 
-static void
+static enum register_status
 h8300_pseudo_register_read (struct gdbarch *gdbarch,
 			    struct regcache *regcache, int regno,
 			    gdb_byte *buf)
 {
   if (regno == E_PSEUDO_CCR_REGNUM (gdbarch))
-    regcache_raw_read (regcache, E_CCR_REGNUM, buf);
+    return regcache_raw_read (regcache, E_CCR_REGNUM, buf);
   else if (regno == E_PSEUDO_EXR_REGNUM (gdbarch))
-    regcache_raw_read (regcache, E_EXR_REGNUM, buf);
+    return regcache_raw_read (regcache, E_EXR_REGNUM, buf);
   else
-    regcache_raw_read (regcache, regno, buf);
+    return regcache_raw_read (regcache, regno, buf);
 }
 
 static void

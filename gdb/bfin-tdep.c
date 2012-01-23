@@ -1,7 +1,6 @@
 /* Target-dependent code for Analog Devices Blackfin processor, for GDB.
 
-   Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2005-2012 Free Software Foundation, Inc.
 
    Contributed by Analog Devices, Inc.
 
@@ -376,6 +375,7 @@ bfin_frame_prev_register (struct frame_info *this_frame,
 static const struct frame_unwind bfin_frame_unwind =
 {
   NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
   bfin_frame_this_id,
   bfin_frame_prev_register,
   NULL,
@@ -622,7 +622,7 @@ bfin_extract_return_value (struct type *type,
   while (len > 0)
     {
       regcache_cooked_read_unsigned (regs, regno++, &tmp);
-      store_unsigned_integer (valbuf, (len > 4 ? 4 : len), tmp, byte_order);
+      store_unsigned_integer (valbuf, (len > 4 ? 4 : len), byte_order, tmp);
       len -= 4;
       valbuf += 4;
     }
@@ -689,20 +689,25 @@ bfin_register_name (struct gdbarch *gdbarch, int i)
   return bfin_register_name_strings[i];
 }
 
-static void
+static enum register_status
 bfin_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
 			   int regnum, gdb_byte *buffer)
 {
   gdb_byte *buf = (gdb_byte *) alloca (MAX_REGISTER_SIZE);
+  enum register_status status;
 
   if (regnum != BFIN_CC_REGNUM)
     internal_error (__FILE__, __LINE__,
 		    _("invalid register number %d"), regnum);
 
   /* Extract the CC bit from the ASTAT register.  */
-  regcache_raw_read (regcache, BFIN_ASTAT_REGNUM, buf);
-  buffer[1] = buffer[2] = buffer[3] = 0;
-  buffer[0] = !!(buf[0] & ASTAT_CC);
+  status = regcache_raw_read (regcache, BFIN_ASTAT_REGNUM, buf);
+  if (status == REG_VALID)
+    {
+      buffer[1] = buffer[2] = buffer[3] = 0;
+      buffer[0] = !!(buf[0] & ASTAT_CC);
+    }
+  return status;
 }
 
 static void

@@ -1,7 +1,6 @@
 /* Serial interface for local (hardwired) serial ports on Windows systems
 
-   Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright (C) 2006-2012 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -172,7 +171,7 @@ ser_windows_raw (struct serial *scb)
   scb->current_timeout = 0;
 
   if (SetCommState (h, &state) == 0)
-    warning (_("SetCommState failed\n"));
+    warning (_("SetCommState failed"));
 }
 
 static int
