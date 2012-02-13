@@ -82,7 +82,7 @@ enum
 
 static const char *mips_abi_string;
 
-static const char *mips_abi_strings[] = {
+static const char *const mips_abi_strings[] = {
   "auto",
   "n32",
   "o32",
@@ -5313,7 +5313,7 @@ static CORE_ADDR
 mips_skip_mips16_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
-  char *name;
+  const char *name;
   CORE_ADDR start_addr;
 
   /* Find the starting address and name of the function containing the PC.  */

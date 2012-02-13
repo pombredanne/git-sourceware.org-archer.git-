@@ -886,7 +886,7 @@ can_dump_core (const char *reason)
 const char internal_problem_ask[] = "ask";
 const char internal_problem_yes[] = "yes";
 const char internal_problem_no[] = "no";
-static const char *internal_problem_modes[] =
+static const char *const internal_problem_modes[] =
 {
   internal_problem_ask,
   internal_problem_yes,
@@ -970,7 +970,7 @@ internal_vproblem (struct internal_problem *problem,
       /* Default (yes/batch case) is to quit GDB.  When in batch mode
 	 this lessens the likelihood of GDB going into an infinite
 	 loop.  */
-      if (caution == 0)
+      if (!confirm)
         {
           /* Emit the message and quit.  */
           fputs_unfiltered (reason, gdb_stderr);
@@ -1384,7 +1384,7 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
 
   /* Automatically answer the default value if the user did not want
      prompts or the command was issued with the server prefix.  */
-  if (! caution || server_command)
+  if (!confirm || server_command)
     return def_value;
 
   /* If input isn't coming from the user directly, just say what
@@ -2589,7 +2589,7 @@ print_spaces_filtered (int n, struct ui_file *stream)
    demangling is off, the name is printed in its "raw" form.  */
 
 void
-fprintf_symbol_filtered (struct ui_file *stream, char *name,
+fprintf_symbol_filtered (struct ui_file *stream, const char *name,
 			 enum language lang, int arg_mode)
 {
   char *demangled;

@@ -4113,6 +4113,12 @@ and @sc{gnu}/Linux.
 A call to @code{vfork}.  This is currently only available for HP-UX
 and @sc{gnu}/Linux.
 
+@item load @r{[}regexp@r{]}
+@itemx unload @r{[}regexp@r{]}
+The loading or unloading of a shared library.  If @var{regexp} is
+given, then the catchpoint will stop only if the regular expression
+matches one of the affected libraries.
+
 @end table
 
 @item tcatch @var{event}
@@ -6338,16 +6344,6 @@ Print the arguments of the selected frame, each on a separate line.
 Print the local variables of the selected frame, each on a separate
 line.  These are all variables (declared either static or automatic)
 accessible at the point of execution of the selected frame.
-
-@kindex info catch
-@cindex catch exceptions, list active handlers
-@cindex exception handlers, how to list
-@item info catch
-Print a list of all the exception handlers that are active in the
-current stack frame at the current point of execution.  To see other
-exception handlers, visit the associated frame (using the @code{up},
-@code{down}, or @code{frame} commands); then type @code{info catch}.
-@xref{Set Catchpoints, , Setting Catchpoints}.
 
 @end table
 
@@ -15598,8 +15594,14 @@ discarded.
 @end table
 
 Sometimes you may wish that @value{GDBN} stops and gives you control
-when any of shared library events happen.  Use the @code{set
-stop-on-solib-events} command for this:
+when any of shared library events happen.  The best way to do this is
+to use @code{catch load} and @code{catch unload} (@pxref{Set
+Catchpoints}).
+
+@value{GDBN} also supports the the @code{set stop-on-solib-events}
+command for this.  This command exists for historical reasons.  It is
+less useful than setting a catchpoint, because it does not allow for
+conditions or commands as a catchpoint does.
 
 @table @code
 @item set stop-on-solib-events
@@ -23965,6 +23967,11 @@ represented as a @code{gdb.Symtab} object.  @xref{Symbol Tables In
 Python}.  This attribute is not writable.
 @end defvar
 
+@defvar Symbol.line
+The line number in the source code at which the symbol was defined.
+This is an integer.
+@end defvar
+
 @defvar Symbol.name
 The name of the symbol as a string.  This attribute is not writable.
 @end defvar
@@ -23984,6 +23991,12 @@ asked @value{GDBN} to display demangled or mangled names.
 The address class of the symbol.  This classifies how to find the value
 of a symbol.  Each address class is a constant defined in the
 @code{gdb} module and described later in this chapter.
+@end defvar
+
+@defvar Symbol.needs_frame
+This is @code{True} if evaluating this symbol's value requires a frame
+(@pxref{Frames In Python}) and @code{False} otherwise.  Typically,
+local variables will require a frame, but other symbols will not.
 @end defvar
 
 @defvar Symbol.is_argument
@@ -24012,6 +24025,15 @@ Returns @code{True} if the @code{gdb.Symbol} object is valid,
 the symbol it refers to does not exist in @value{GDBN} any longer.
 All other @code{gdb.Symbol} methods will throw an exception if it is
 invalid at the time the method is called.
+@end defun
+
+@defun Symbol.value (@r{[}frame@r{]})
+Compute the value of the symbol, as a @code{gdb.Value}.  For
+functions, this computes the address of the function, cast to the
+appropriate type.  If the symbol requires a frame in order to compute
+its value, then @var{frame} must be given.  If @var{frame} is not
+given, or if @var{frame} is invalid, then this method will throw an
+exception.
 @end defun
 @end table
 
@@ -26303,8 +26325,9 @@ The inferior exited normally.
 A signal was received by the inferior.
 @item solib-event
 The inferior has stopped due to a library being loaded or unloaded.
-This can only happen when @code{stop-on-solib-events} (@pxref{Files})
-is set.
+This can happen when @code{stop-on-solib-events} (@pxref{Files}) is
+set or when a @code{catch load} or @code{catch unload} catchpoint is
+in use (@pxref{Set Catchpoints}).
 @item fork
 The inferior has forked.  This is reported when @code{catch fork}
 (@pxref{Set Catchpoints}) has been used.
@@ -34043,6 +34066,12 @@ the corresponding stop reply should indicate that the thread has stopped with
 signal @samp{0}, regardless of whether the target uses some other signal
 as an implementation detail.
 
+The stub must support @samp{vCont} if it reports support for
+multiprocess extensions (@pxref{multiprocess extensions}).  Note that in
+this case @samp{vCont} actions can be specified to apply to all threads
+in a process by using the @samp{p@var{pid}.-1} form of the
+@var{thread-id}.
+
 Reply:
 @xref{Stop Reply Packets}, for the reply specifications.
 
@@ -34074,12 +34103,6 @@ Format}).  @value{GDBN} groups flash memory programming operations
 together, and sends a @samp{vFlashDone} request after each group; the
 stub is allowed to delay erase operation until the @samp{vFlashDone}
 packet is received.
-
-The stub must support @samp{vCont} if it reports support for
-multiprocess extensions (@pxref{multiprocess extensions}).  Note that in
-this case @samp{vCont} actions can be specified to apply to all threads
-in a process by using the @samp{p@var{pid}.-1} form of the
-@var{thread-id}.
 
 Reply:
 @table @samp

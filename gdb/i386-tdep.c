@@ -376,7 +376,7 @@ i386_svr4_reg_to_regnum (struct gdbarch *gdbarch, int reg)
    its legitimate values.  */
 static const char att_flavor[] = "att";
 static const char intel_flavor[] = "intel";
-static const char *valid_flavors[] =
+static const char *const valid_flavors[] =
 {
   att_flavor,
   intel_flavor,
@@ -2036,7 +2036,7 @@ static int
 i386_in_stack_tramp_p (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
   gdb_byte insn;
-  char *name;
+  const char *name;
 
   /* A stack trampoline is detected if no name is associated
     to the current pc and if it points inside a trampoline
@@ -2545,7 +2545,7 @@ i386_store_return_value (struct gdbarch *gdbarch, struct type *type,
 static const char default_struct_convention[] = "default";
 static const char pcc_struct_convention[] = "pcc";
 static const char reg_struct_convention[] = "reg";
-static const char *valid_conventions[] =
+static const char *const valid_conventions[] =
 {
   default_struct_convention,
   pcc_struct_convention,
@@ -3273,7 +3273,7 @@ i386_pe_skip_trampoline_code (struct frame_info *frame,
 	read_memory_unsigned_integer (pc + 2, 4, byte_order);
       struct minimal_symbol *indsym =
 	indirect ? lookup_minimal_symbol_by_pc (indirect) : 0;
-      char *symname = indsym ? SYMBOL_LINKAGE_NAME (indsym) : 0;
+      const char *symname = indsym ? SYMBOL_LINKAGE_NAME (indsym) : 0;
 
       if (symname)
 	{
@@ -3294,7 +3294,7 @@ int
 i386_sigtramp_p (struct frame_info *this_frame)
 {
   CORE_ADDR pc = get_frame_pc (this_frame);
-  char *name;
+  const char *name;
 
   find_pc_partial_function (pc, &name, NULL, NULL);
   return (name && strcmp ("_sigtramp", name) == 0);
@@ -3332,7 +3332,7 @@ static int
 i386_svr4_sigtramp_p (struct frame_info *this_frame)
 {
   CORE_ADDR pc = get_frame_pc (this_frame);
-  char *name;
+  const char *name;
 
   /* UnixWare uses _sigacthandler.  The origin of the other symbols is
      currently unknown.  */

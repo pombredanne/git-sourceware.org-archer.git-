@@ -57,6 +57,7 @@
 #include "observer.h"
 #include "vec.h"
 #include "stack.h"
+#include "gdb_vecs.h"
 
 #include "psymtab.h"
 #include "value.h"
@@ -222,7 +223,7 @@ static struct value *ada_search_struct_field (char *, struct value *, int,
 static struct value *ada_value_primitive_field (struct value *, int, int,
                                                 struct type *);
 
-static int find_struct_field (char *, struct type *, int,
+static int find_struct_field (const char *, struct type *, int,
                               struct type **, int *, int *, int *, int *);
 
 static struct value *ada_to_fixed_value_create (struct type *, CORE_ADDR,
@@ -1369,7 +1370,7 @@ ada_fixup_array_indexes_type (struct type *index_desc_type)
   /* Fixup each field of INDEX_DESC_TYPE.  */
   for (i = 0; i < TYPE_NFIELDS (index_desc_type); i++)
    {
-     char *name = TYPE_FIELD_NAME (index_desc_type, i);
+     const char *name = TYPE_FIELD_NAME (index_desc_type, i);
      struct type *raw_type = ada_check_typedef (ada_find_any_type (name));
 
      if (raw_type)
@@ -1961,8 +1962,8 @@ ada_is_unconstrained_packed_array_type (struct type *type)
 static long
 decode_packed_array_bitsize (struct type *type)
 {
-  char *raw_name;
-  char *tail;
+  const char *raw_name;
+  const char *tail;
   long bits;
 
   /* Access to arrays implemented as fat pointers are encoded as a typedef
@@ -2041,9 +2042,9 @@ constrained_packed_array_type (struct type *type, long *elt_bits)
 static struct type *
 decode_constrained_packed_array_type (struct type *type)
 {
-  char *raw_name = ada_type_name (ada_check_typedef (type));
+  const char *raw_name = ada_type_name (ada_check_typedef (type));
   char *name;
-  char *tail;
+  const char *tail;
   struct type *shadow_type;
   long bits;
 
@@ -3056,7 +3057,7 @@ resolve_subexp (struct expression **expp, int *pos, int deprocedure_p,
             ada_lookup_symbol_list (SYMBOL_LINKAGE_NAME
                                     (exp->elts[pc + 2].symbol),
                                     exp->elts[pc + 1].block, VAR_DOMAIN,
-                                    &candidates);
+                                    &candidates, 1);
 
           if (n_candidates > 1)
             {
@@ -3148,7 +3149,7 @@ resolve_subexp (struct expression **expp, int *pos, int deprocedure_p,
               ada_lookup_symbol_list (SYMBOL_LINKAGE_NAME
                                       (exp->elts[pc + 5].symbol),
                                       exp->elts[pc + 4].block, VAR_DOMAIN,
-                                      &candidates);
+                                      &candidates, 1);
             if (n_candidates == 1)
               i = 0;
             else
@@ -3200,7 +3201,7 @@ resolve_subexp (struct expression **expp, int *pos, int deprocedure_p,
           n_candidates =
             ada_lookup_symbol_list (ada_encode (ada_decoded_op_name (op)),
                                     (struct block *) NULL, VAR_DOMAIN,
-                                    &candidates);
+                                    &candidates, 1);
           i = ada_resolve_function (candidates, n_candidates, argvec, nargs,
                                     ada_decoded_op_name (op), NULL);
           if (i < 0)
@@ -3406,7 +3407,7 @@ ada_resolve_function (struct ada_symbol_info syms[],
    such symbols by their trailing number (__N  or $N).  */
 
 static int
-encoded_ordered_before (char *N0, char *N1)
+encoded_ordered_before (const char *N0, const char *N1)
 {
   if (N1 == NULL)
     return 0;
@@ -4247,8 +4248,8 @@ lesseq_defined_than (struct symbol *sym0, struct symbol *sym1)
       {
         struct type *type0 = SYMBOL_TYPE (sym0);
         struct type *type1 = SYMBOL_TYPE (sym1);
-        char *name0 = SYMBOL_LINKAGE_NAME (sym0);
-        char *name1 = SYMBOL_LINKAGE_NAME (sym1);
+        const char *name0 = SYMBOL_LINKAGE_NAME (sym0);
+        const char *name1 = SYMBOL_LINKAGE_NAME (sym1);
         int len0 = strlen (name0);
 
         return
@@ -4379,7 +4380,7 @@ add_symbols_from_enclosing_procs (struct obstack *obstackp,
 static int
 is_nondebugging_type (struct type *type)
 {
-  char *name = ada_type_name (type);
+  const char *name = ada_type_name (type);
 
   return (name != NULL && strcmp (name, "<variable, no debug info>") == 0);
 }
@@ -4410,8 +4411,8 @@ ada_identical_enum_types_p (struct type *type1, struct type *type2)
      suffix).  */
   for (i = 0; i < TYPE_NFIELDS (type1); i++)
     {
-      char *name_1 = TYPE_FIELD_NAME (type1, i);
-      char *name_2 = TYPE_FIELD_NAME (type2, i);
+      const char *name_1 = TYPE_FIELD_NAME (type1, i);
+      const char *name_2 = TYPE_FIELD_NAME (type2, i);
       int len_1 = strlen (name_1);
       int len_2 = strlen (name_2);
 
@@ -4646,7 +4647,7 @@ is_package_name (const char *name)
    not visible from FUNCTION_NAME.  */
 
 static int
-old_renaming_is_invisible (const struct symbol *sym, char *function_name)
+old_renaming_is_invisible (const struct symbol *sym, const char *function_name)
 {
   char *scope;
 
@@ -4716,7 +4717,7 @@ remove_irrelevant_renamings (struct ada_symbol_info *syms,
 			     int nsyms, const struct block *current_block)
 {
   struct symbol *current_function;
-  char *current_function_name;
+  const char *current_function_name;
   int i;
   int is_new_style_renaming;
 
@@ -4978,16 +4979,18 @@ add_nonlocal_symbols (struct obstack *obstackp, const char *name,
    the next call of ada_lookup_symbol_list.  Any non-function/non-enumeral 
    symbol match within the nest of blocks whose innermost member is BLOCK0,
    is the one match returned (no other matches in that or
-     enclosing blocks is returned).  If there are any matches in or
-   surrounding BLOCK0, then these alone are returned.  Otherwise, the
-   search extends to global and file-scope (static) symbol tables.
+   enclosing blocks is returned).  If there are any matches in or
+   surrounding BLOCK0, then these alone are returned.  Otherwise, if
+   FULL_SEARCH is non-zero, then the search extends to global and
+   file-scope (static) symbol tables.
    Names prefixed with "standard__" are handled specially: "standard__" 
    is first stripped off, and only static and global symbols are searched.  */
 
 int
 ada_lookup_symbol_list (const char *name0, const struct block *block0,
-                        domain_enum namespace,
-                        struct ada_symbol_info **results)
+			domain_enum namespace,
+			struct ada_symbol_info **results,
+			int full_search)
 {
   struct symbol *sym;
   struct block *block;
@@ -5025,7 +5028,7 @@ ada_lookup_symbol_list (const char *name0, const struct block *block0,
 
   ada_add_local_symbols (&symbol_list_obstack, name, block, namespace,
                          wild_match);
-  if (num_defns_collected (&symbol_list_obstack) > 0)
+  if (num_defns_collected (&symbol_list_obstack) > 0 || !full_search)
     goto done;
 
   /* No non-global symbols found.  Check our cache to see if we have
@@ -5099,13 +5102,13 @@ ada_name_for_lookup (const char *name)
 static void
 ada_iterate_over_symbols (const struct block *block,
 			  const char *name, domain_enum domain,
-			  int (*callback) (struct symbol *, void *),
+			  symbol_found_callback_ftype *callback,
 			  void *data)
 {
   int ndefs, i;
   struct ada_symbol_info *results;
 
-  ndefs = ada_lookup_symbol_list (name, block, domain, &results);
+  ndefs = ada_lookup_symbol_list (name, block, domain, &results, 0);
   for (i = 0; i < ndefs; ++i)
     {
       if (! (*callback) (results[i].sym, data))
@@ -5120,7 +5123,8 @@ ada_lookup_encoded_symbol (const char *name, const struct block *block0,
   struct ada_symbol_info *candidates;
   int n_candidates;
 
-  n_candidates = ada_lookup_symbol_list (name, block0, namespace, &candidates);
+  n_candidates = ada_lookup_symbol_list (name, block0, namespace, &candidates,
+					 1);
 
   if (n_candidates == 0)
     return NULL;
@@ -5628,8 +5632,6 @@ symbol_completion_match (const char *sym_name,
   return sym_name;
 }
 
-DEF_VEC_P (char_ptr);
-
 /* A companion function to ada_make_symbol_completion_list().
    Check if SYM_NAME represents a symbol which name would be suitable
    to complete TEXT (TEXT_LEN is the length of TEXT), in which case
@@ -5700,8 +5702,7 @@ struct add_partial_datum
 
 /* A callback for expand_partial_symbol_names.  */
 static int
-ada_expand_partial_symbol_name (const struct language_defn *language,
-				const char *name, void *user_data)
+ada_expand_partial_symbol_name (const char *name, void *user_data)
 {
   struct add_partial_datum *data = user_data;
   
@@ -5853,7 +5854,7 @@ ada_make_symbol_completion_list (char *text0, char *word)
 static int
 ada_is_dispatch_table_ptr_type (struct type *type)
 {
-  char *name;
+  const char *name;
 
   if (TYPE_CODE (type) != TYPE_CODE_PTR)
     return 0;
@@ -6366,7 +6367,7 @@ ada_value_primitive_field (struct value *arg1, int offset, int fieldno,
    Returns 1 if found, 0 otherwise.  */
 
 static int
-find_struct_field (char *name, struct type *type, int offset,
+find_struct_field (const char *name, struct type *type, int offset,
                    struct type **field_type_p,
                    int *byte_offset_p, int *bit_offset_p, int *bit_size_p,
 		   int *index_p)
@@ -6388,7 +6389,7 @@ find_struct_field (char *name, struct type *type, int offset,
     {
       int bit_pos = TYPE_FIELD_BITPOS (type, i);
       int fld_offset = offset + bit_pos / 8;
-      char *t_field_name = TYPE_FIELD_NAME (type, i);
+      const char *t_field_name = TYPE_FIELD_NAME (type, i);
 
       if (t_field_name == NULL)
         continue;
@@ -6465,7 +6466,7 @@ ada_search_struct_field (char *name, struct value *arg, int offset,
   type = ada_check_typedef (type);
   for (i = 0; i < TYPE_NFIELDS (type); i += 1)
     {
-      char *t_field_name = TYPE_FIELD_NAME (type, i);
+      const char *t_field_name = TYPE_FIELD_NAME (type, i);
 
       if (t_field_name == NULL)
         continue;
@@ -6724,7 +6725,7 @@ ada_lookup_struct_elt_type (struct type *type, char *name, int refok,
 
   for (i = 0; i < TYPE_NFIELDS (type); i += 1)
     {
-      char *t_field_name = TYPE_FIELD_NAME (type, i);
+      const char *t_field_name = TYPE_FIELD_NAME (type, i);
       struct type *t;
       int disp;
 
@@ -6763,7 +6764,7 @@ ada_lookup_struct_elt_type (struct type *type, char *name, int refok,
 	         NOT wrapped in a struct, since the compiler sometimes
 		 generates these for unchecked variant types.  Revisit
 	         if the compiler changes this practice.  */
-	      char *v_field_name = TYPE_FIELD_NAME (field_type, j);
+	      const char *v_field_name = TYPE_FIELD_NAME (field_type, j);
               disp = 0;
 	      if (v_field_name != NULL 
 		  && field_name_match (v_field_name, name))
@@ -7029,7 +7030,7 @@ find_old_style_renaming_symbol (const char *name, struct block *block)
          qualified.  This means we need to prepend the function name
          as well as adding the ``___XR'' suffix to build the name of
          the associated renaming symbol.  */
-      char *function_name = SYMBOL_LINKAGE_NAME (function_sym);
+      const char *function_name = SYMBOL_LINKAGE_NAME (function_sym);
       /* Function names sometimes contain suffixes used
          for instance to qualify nested subprograms.  When building
          the XR type name, we need to make sure that this suffix is
@@ -7109,7 +7110,7 @@ ada_prefer_type (struct type *type0, struct type *type1)
 /* The name of TYPE, which is either its TYPE_NAME, or, if that is
    null, its TYPE_TAG_NAME.  Null if TYPE is null.  */
 
-char *
+const char *
 ada_type_name (struct type *type)
 {
   if (type == NULL)
@@ -7136,7 +7137,7 @@ find_parallel_type_by_descriptive_type (struct type *type, const char *name)
   result = TYPE_DESCRIPTIVE_TYPE (type);
   while (result != NULL)
     {
-      char *result_name = ada_type_name (result);
+      const char *result_name = ada_type_name (result);
 
       if (result_name == NULL)
         {
@@ -7188,7 +7189,8 @@ ada_find_parallel_type_with_name (struct type *type, const char *name)
 struct type *
 ada_find_parallel_type (struct type *type, const char *suffix)
 {
-  char *name, *typename = ada_type_name (type);
+  char *name;
+  const char *typename = ada_type_name (type);
   int len;
 
   if (typename == NULL)
@@ -7894,7 +7896,7 @@ ada_to_fixed_type_1 (struct type *type, const gdb_byte *valaddr,
            If there is, then it provides the actual size of our type.  */
         else if (ada_type_name (fixed_record_type) != NULL)
           {
-            char *name = ada_type_name (fixed_record_type);
+            const char *name = ada_type_name (fixed_record_type);
             char *xvz_name = alloca (strlen (name) + 7 /* "___XVZ\0" */);
             int xvz_found = 0;
             LONGEST size;
@@ -8089,7 +8091,7 @@ ada_check_typedef (struct type *type)
     return type;
   else
     {
-      char *name = TYPE_TAG_NAME (type);
+      const char *name = TYPE_TAG_NAME (type);
       struct type *type1 = ada_find_any_type (name);
 
       if (type1 == NULL)
@@ -8869,7 +8871,7 @@ aggregate_assign_from_choices (struct value *container,
       else
 	{
 	  int ind;
-	  char *name;
+	  const char *name;
 
 	  switch (op)
 	    {
@@ -9878,7 +9880,7 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
         else if (discrete_type_p (type_arg))
           {
             struct type *range_type;
-            char *name = ada_type_name (type_arg);
+            const char *name = ada_type_name (type_arg);
 
             range_type = NULL;
             if (name != NULL && TYPE_CODE (type_arg) != TYPE_CODE_ENUM)
@@ -10361,7 +10363,7 @@ get_var_value (char *name, char *err_msg)
   int nsyms;
 
   nsyms = ada_lookup_symbol_list (name, get_selected_block (0), VAR_DOMAIN,
-                                  &syms);
+                                  &syms, 1);
 
   if (nsyms != 1)
     {
@@ -10410,7 +10412,7 @@ get_int_var_value (char *name, int *flag)
 static struct type *
 to_fixed_range_type (struct type *raw_type, struct value *dval)
 {
-  char *name;
+  const char *name;
   struct type *base_type;
   char *subtype_info;
 
@@ -10533,8 +10535,8 @@ ada_is_modular_type (struct type *type)
 int
 ada_modulus_from_name (struct type *type, ULONGEST *modulus)
 {
-  char *name = ada_type_name (type);
-  char *suffix;
+  const char *name = ada_type_name (type);
+  const char *suffix;
   int k;
   LONGEST U;
 
@@ -10780,7 +10782,7 @@ static int
 is_known_support_routine (struct frame_info *frame)
 {
   struct symtab_and_line sal;
-  char *func_name;
+  const char *func_name;
   enum language func_lang;
   int i;
 
@@ -10883,7 +10885,7 @@ ada_unhandled_exception_name_addr_from_raise (void)
 
   while (fi != NULL)
     {
-      char *func_name;
+      const char *func_name;
       enum language func_lang;
 
       find_frame_funname (fi, &func_name, &func_lang, NULL);
@@ -12320,6 +12322,18 @@ static const struct exp_descriptor ada_exp_descriptor = {
   ada_evaluate_subexp
 };
 
+/* Implement the "la_get_symbol_name_cmp" language_defn method
+   for Ada.  */
+
+static symbol_name_cmp_ftype
+ada_get_symbol_name_cmp (const char *lookup_name)
+{
+  if (should_use_wild_match (lookup_name))
+    return wild_match;
+  else
+    return compare_names;
+}
+
 const struct language_defn ada_language_defn = {
   "ada",                        /* Language name */
   language_ada,
@@ -12356,7 +12370,7 @@ const struct language_defn ada_language_defn = {
   ada_print_array_index,
   default_pass_by_reference,
   c_get_string,
-  compare_names,
+  ada_get_symbol_name_cmp,	/* la_get_symbol_name_cmp */
   ada_iterate_over_symbols,
   LANG_MAGIC
 };

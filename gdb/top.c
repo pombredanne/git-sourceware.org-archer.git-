@@ -98,11 +98,13 @@ int use_windows = 0;
 
 extern char lang_frame_mismatch_warn[];		/* language.c */
 
-/* Flag for whether we want all the "from_tty" gubbish printed.  */
+/* Flag for whether we want to confirm potentially dangerous
+   operations.  Default is yes.  */
 
-int caution = 1;		/* Default is yes, sigh.  */
+int confirm = 1;
+
 static void
-show_caution (struct ui_file *file, int from_tty,
+show_confirm (struct ui_file *file, int from_tty,
 	      struct cmd_list_element *c, const char *value)
 {
   fprintf_filtered (file, _("Whether to confirm potentially "
@@ -289,9 +291,9 @@ void (*deprecated_context_hook) (int id);
 /* static */ void
 quit_cover (void)
 {
-  caution = 0;			/* Throw caution to the wind -- we're exiting.
-				   This prevents asking the user dumb 
-				   questions.  */
+  /* Stop asking user for confirmation --- we're exiting.  This
+     prevents asking the user dumb questions.  */
+  confirm = 0;
   quit_command ((char *) 0, 0);
 }
 #endif /* defined SIGHUP */
@@ -471,13 +473,13 @@ execute_command (char *p, int from_tty)
       if (c->class == class_user)
 	execute_user_command (c, arg);
       else if (c->type == set_cmd || c->type == show_cmd)
-	do_setshow_command (arg, from_tty & caution, c);
+	do_setshow_command (arg, from_tty, c);
       else if (!cmd_func_p (c))
 	error (_("That is not a command, just a help topic."));
       else if (deprecated_call_command_hook)
-	deprecated_call_command_hook (c, arg, from_tty & caution);
+	deprecated_call_command_hook (c, arg, from_tty);
       else
-	cmd_func (c, arg, from_tty & caution);
+	cmd_func (c, arg, from_tty);
 
       /* If the interpreter is in sync mode (we're running a user
 	 command's list, running command hooks or similars), and we
@@ -1633,11 +1635,11 @@ Show the filename in which to record the command history"), _("\
 			    show_history_filename,
 			    &sethistlist, &showhistlist);
 
-  add_setshow_boolean_cmd ("confirm", class_support, &caution, _("\
+  add_setshow_boolean_cmd ("confirm", class_support, &confirm, _("\
 Set whether to confirm potentially dangerous operations."), _("\
 Show whether to confirm potentially dangerous operations."), NULL,
 			   NULL,
-			   show_caution,
+			   show_confirm,
 			   &setlist, &showlist);
 
   add_setshow_zinteger_cmd ("annotate", class_obscure, &annotation_level, _("\

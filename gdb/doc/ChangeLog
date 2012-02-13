@@ -1,3 +1,32 @@
+2012-02-09  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Symbols In Python): Add missing `@end defvar'.
+
+2012-02-07  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Symbols In Python): Document Symbol.needs_frame and
+	Symbol.value.
+
+2012-02-07  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Symbols In Python): Document Symbol.line.
+
+2012-01-27  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gdb.textinfo (Packets): Move vCont paragraph to the correct place.
+
+2012-01-24  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Set Catchpoints): Document "catch load" and "catch
+	unload".
+	(Files): Mention new catch commands.
+	(GDB/MI Async Records): Likewise.
+
+2012-01-24  Gary Benson  <gbenson@redhat.com>
+
+	Delete #if 0'd out code.
+	* gdb.texinfo (Frame Info): Remove "info catch".
+
 2012-01-20  Ulrich Weigand  <ulrich.weigand@linaro.org>
 
 	* gdb.texinfo (Remote Configuration): Document

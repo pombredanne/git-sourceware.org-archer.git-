@@ -1,3 +1,203 @@
+2012-02-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.server/server-exec-info.exp: New file.
+
+2012-02-10  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/break-interp.exp (test_attach_gdb): Assume $file is
+	always non-empty.
+	(test_attach): Always pass $exec to test_attach_gdb.
+
+2012-02-08  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-symbol.exp: Use lookup_global_symbol for tests
+	before inferior is started.
+
+2012-02-07  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-symbol.exp: Test Symbol.needs_frame and
+	Symbol.value.
+	* gdb.python/py-symbol.c (qq): Set default value.
+
+2012-02-07  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-symbol.c (qq): New global.
+	* gdb.python/py-symbol.exp: Add test for frame-less
+	lookup_symbol.
+	* gdb.python/py-symtab.exp: Fix line number.
+
+2012-02-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/mi_task_arg: New testcase.
+
+2012-02-02  Pedro Alves  <palves@redhat.com>
+
+	* gdb.reverse/until-precsave.exp: Also put "record save" under the
+	extended timeout.
+
+2012-02-02  Pedro Alves  <palves@redhat.com>
+
+	* gdb.gdb/complaints.exp: Skip if gdb,noinferiorio is set.
+	* gdb.gdb/selftest.exp (test_with_self): Handle gdb,noinferiorio.
+
+2012-02-02  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/term.exp: Rewrite.
+	* gdb.base/term.c: New.
+
+2012-02-02  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/default.exp (run "r" abbreviation, run): Add
+	extended-remote expected output.
+
+2012-02-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/dispcxx.exp: New file.
+	* gdb.cp/dispcxx.cc: New file.
+
+2012-02-01  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/jit-simple.exp: New file.
+	* gdb.base/jit-simple.c: New file.
+
+2012-01-30  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/skip.exp: Make test result unique.
+
+2012-01-30  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/valgrind-db-attach.exp (attach to debugger): Fix
+	compatibility with valgrind-3.7.0.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp (no_hw): New global.
+	(maybe_clean_restart, maybe_reinitialize): If no_hw is set,
+	disable hw watchpoints.
+	(test_wide_location_1, test_wide_location_2): If no_hw is set,
+	don't expect hw watchpoints.
+	(no_hw_watchpoints): Always clean restart.
+	(do_tests): New procedure, factored out from the top level.
+	(top level): Run tests twice.  Once with hw watchpoints enabled,
+	another time with hw watchpoints disabled.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp (test_no_hw_watchpoints): New, factored
+	out from the top level.
+	(top level): Call it instead.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp (top level): Re-enable hardware
+	watchpoints sooner.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp (top level): Delete watch ival3.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp (test_watchpoint_in_big_blob): Expect
+	"You may have requested too many hardware
+	breakpoints/watchpoints".
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp (maybe_clean_restart)
+	(maybe_reinitialize): New.
+	(test_disabling_watchpoints): Call maybe_reinitialize.  Don't
+	expect "hit N times".
+	(test_disabling_watchpoints, test_complex_watchpoint)
+	(test_watchpoint_and_breakpoint, test_inaccessible_watchpoint):
+	Call maybe_clean_restart.
+	(top level): Use clean_restart.  Remove "mips-idt-*"
+	reinitialization.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp: Always run test_complex_watchpoint.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp: Clean restart after tests that don't
+	require `initialize' anymore.  Remove unnecessary `initialize'
+	calls.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp (wp_set): Delete.
+	(initialize, test_simple_watchpoint, top level): Remove dead code.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp (test_inaccessible_watchpoint): Fix
+	typo.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* config/extended-gdbserver.exp: New file.
+	* lib/gdbserver-support.exp (gdbserver_start_extended): Extend
+	comment.
+	(gdbserver_start_multi, mi_gdbserver_start_multi): New.
+	* boards/native-extended-gdbserver.exp: New file.
+
+2012-01-26  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/watchpoint.exp: Replace send_gdb/gdb_expect by gdb_test
+	and gdb_test_multiple.
+
+2012-01-26  Pedro Alves  <palves@redhat.com>
+
+	Make test messages unique, and more identifiable.
+	* gdb.multi/watchpoint-multi.exp: Change test messages.
+
+2012-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/solib-disc.exp: Fix regexps.
+
+2012-01-24  Tom Tromey  <tromey@redhat.com>
+
+	* lib/mi-support.exp (mi_expect_stop): Add special case for
+	solib-event.
+	* gdb.base/catch-load-so.c: New file.
+	* gdb.base/catch-load.exp: New file.
+	* gdb.base/catch-load.c: New file.
+	* gdb.base/break-interp.exp (reach_1): Update regexp.
+
+2012-01-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix fuzzy results.
+	* gdb.mi/var-cmd.c (do_locals_tests): Initialize variables lsimple,
+	lpsimple and func.
+
+2012-01-24  Gary Benson  <gbenson@redhat.com>
+
+	Delete #if 0'd out code.
+	* gdb.base/default.exp (info catch): Remove.
+	* gdb.base/gdb_history (info catch): Likewise.
+	* gdb.base/help.exp (info catch): Likewise.
+
+2012-01-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix watchpoints to be specific for each inferior.
+	* gdb.multi/watchpoint-multi.c: New file.
+	* gdb.multi/watchpoint-multi.exp: New file.
+
+2012-01-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix watchpoints across inferior fork.
+	* gdb.threads/watchpoint-fork-child.c: New file.
+	* gdb.threads/watchpoint-fork-mt.c: New file.
+	* gdb.threads/watchpoint-fork-parent.c: New file.
+	* gdb.threads/watchpoint-fork-st.c: New file.
+	* gdb.threads/watchpoint-fork.exp: New file.
+	* gdb.threads/watchpoint-fork.h: New file.
+
+2012-01-23  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/call-signal-resume.exp: Allow output after "return".
+
 2012-01-20  Pedro Alves  <palves@redhat.com>
 
 	* gdb.python/py-finish-breakpoint.py: Fix typo.

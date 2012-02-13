@@ -65,6 +65,7 @@
 #include "stack.h"
 #include "skip.h"
 #include "record.h"
+#include "gdb_regex.h"
 
 /* readline include files */
 #include "readline/readline.h"
@@ -259,6 +260,11 @@ static int is_masked_watchpoint (const struct breakpoint *b);
 
 static int strace_marker_p (struct breakpoint *b);
 
+static void init_catchpoint (struct breakpoint *b,
+			     struct gdbarch *gdbarch, int tempflag,
+			     char *cond_string,
+			     const struct breakpoint_ops *ops);
+
 /* The abstract base class all breakpoint_ops structures inherit
    from.  */
 static struct breakpoint_ops base_breakpoint_ops;
@@ -367,7 +373,7 @@ show_automatic_hardware_breakpoints (struct ui_file *file, int from_tty,
 static const char always_inserted_auto[] = "auto";
 static const char always_inserted_on[] = "on";
 static const char always_inserted_off[] = "off";
-static const char *always_inserted_enums[] = {
+static const char *const always_inserted_enums[] = {
   always_inserted_auto,
   always_inserted_off,
   always_inserted_on,
@@ -1239,9 +1245,10 @@ is_watchpoint (const struct breakpoint *bpt)
 static int
 watchpoint_in_thread_scope (struct watchpoint *b)
 {
-  return (ptid_equal (b->watchpoint_thread, null_ptid)
-	  || (ptid_equal (inferior_ptid, b->watchpoint_thread)
-	      && !is_executing (inferior_ptid)));
+  return (b->base.pspace == current_program_space
+	  && (ptid_equal (b->watchpoint_thread, null_ptid)
+	      || (ptid_equal (inferior_ptid, b->watchpoint_thread)
+		  && !is_executing (inferior_ptid))));
 }
 
 /* Set watchpoint B to disp_del_at_next_stop, even including its possible
@@ -3489,6 +3496,78 @@ print_bp_stop_message (bpstat bs)
     }
 }
 
+/* A helper function that prints a shared library stopped event.  */
+
+static void
+print_solib_event (int is_catchpoint)
+{
+  int any_deleted
+    = !VEC_empty (char_ptr, current_program_space->deleted_solibs);
+  int any_added
+    = !VEC_empty (so_list_ptr, current_program_space->added_solibs);
+
+  if (!is_catchpoint)
+    {
+      if (any_added || any_deleted)
+	ui_out_text (current_uiout,
+		     _("Stopped due to shared library event:\n"));
+      else
+	ui_out_text (current_uiout,
+		     _("Stopped due to shared library event (no "
+		       "libraries added or removed)\n"));
+    }
+
+  if (ui_out_is_mi_like_p (current_uiout))
+    ui_out_field_string (current_uiout, "reason",
+			 async_reason_lookup (EXEC_ASYNC_SOLIB_EVENT));
+
+  if (any_deleted)
+    {
+      struct cleanup *cleanup;
+      char *name;
+      int ix;
+
+      ui_out_text (current_uiout, _("  Inferior unloaded "));
+      cleanup = make_cleanup_ui_out_list_begin_end (current_uiout,
+						    "removed");
+      for (ix = 0;
+	   VEC_iterate (char_ptr, current_program_space->deleted_solibs,
+			ix, name);
+	   ++ix)
+	{
+	  if (ix > 0)
+	    ui_out_text (current_uiout, "    ");
+	  ui_out_field_string (current_uiout, "library", name);
+	  ui_out_text (current_uiout, "\n");
+	}
+
+      do_cleanups (cleanup);
+    }
+
+  if (any_added)
+    {
+      struct so_list *iter;
+      int ix;
+      struct cleanup *cleanup;
+
+      ui_out_text (current_uiout, _("  Inferior loaded "));
+      cleanup = make_cleanup_ui_out_list_begin_end (current_uiout,
+						    "added");
+      for (ix = 0;
+	   VEC_iterate (so_list_ptr, current_program_space->added_solibs,
+			ix, iter);
+	   ++ix)
+	{
+	  if (ix > 0)
+	    ui_out_text (current_uiout, "    ");
+	  ui_out_field_string (current_uiout, "library", iter->so_name);
+	  ui_out_text (current_uiout, "\n");
+	}
+
+      do_cleanups (cleanup);
+    }
+}
+
 /* Print a message indicating what happened.  This is called from
    normal_stop().  The input to this routine is the head of the bpstat
    list - a list of the eventpoints that caused this stop.  KIND is
@@ -3533,10 +3612,7 @@ bpstat_print (bpstat bs, int kind)
      OS-level shared library event, do the same thing.  */
   if (kind == TARGET_WAITKIND_LOADED)
     {
-      ui_out_text (current_uiout, _("Stopped due to shared library event\n"));
-      if (ui_out_is_mi_like_p (current_uiout))
-	ui_out_field_string (current_uiout, "reason",
-			     async_reason_lookup (EXEC_ASYNC_SOLIB_EVENT));
+      print_solib_event (0);
       return PRINT_NOTHING;
     }
 
@@ -3824,14 +3900,15 @@ which its expression is valid.\n");
 
 static int
 bpstat_check_location (const struct bp_location *bl,
-		       struct address_space *aspace, CORE_ADDR bp_addr)
+		       struct address_space *aspace, CORE_ADDR bp_addr,
+		       const struct target_waitstatus *ws)
 {
   struct breakpoint *b = bl->owner;
 
   /* BL is from an existing breakpoint.  */
   gdb_assert (b != NULL);
 
-  return b->ops->breakpoint_hit (bl, aspace, bp_addr);
+  return b->ops->breakpoint_hit (bl, aspace, bp_addr, ws);
 }
 
 /* Determine if the watched values have actually changed, and we
@@ -4141,7 +4218,8 @@ bpstat_check_breakpoint_conditions (bpstat bs, ptid_t ptid)
 
 bpstat
 bpstat_stop_status (struct address_space *aspace,
-		    CORE_ADDR bp_addr, ptid_t ptid)
+		    CORE_ADDR bp_addr, ptid_t ptid,
+		    const struct target_waitstatus *ws)
 {
   struct breakpoint *b = NULL;
   struct bp_location *bl;
@@ -4179,7 +4257,7 @@ bpstat_stop_status (struct address_space *aspace,
 	  if (bl->shlib_disabled)
 	    continue;
 
-	  if (!bpstat_check_location (bl, aspace, bp_addr))
+	  if (!bpstat_check_location (bl, aspace, bp_addr, ws))
 	    continue;
 
 	  /* Come here if it's a watchpoint, or if the break address
@@ -4216,6 +4294,19 @@ bpstat_stop_status (struct address_space *aspace,
 	  bs->stop = 0;
 	  bs->print = 0;
 	  bs->print_it = print_it_noop;
+	}
+    }
+
+  /* A bit of special processing for shlib breakpoints.  We need to
+     process solib loading here, so that the lists of loaded and
+     unloaded libraries are correct before we handle "catch load" and
+     "catch unload".  */
+  for (bs = bs_head; bs != NULL; bs = bs->next)
+    {
+      if (bs->breakpoint_at && bs->breakpoint_at->type == bp_shlib_event)
+	{
+	  handle_solib_event ();
+	  break;
 	}
     }
 
@@ -4257,10 +4348,12 @@ bpstat_stop_status (struct address_space *aspace,
 		bs->print = 0;
 	    }
 
-	  /* Print nothing for this entry if we don't stop or don't print.  */
-	  if (bs->stop == 0 || bs->print == 0)
-	    bs->print_it = print_it_noop;
 	}
+
+      /* Print nothing for this entry if we don't stop or don't
+	 print.  */
+      if (!bs->stop || !bs->print)
+	bs->print_it = print_it_noop;
     }
 
   /* If we aren't stopping, the value of some hardware watchpoint may
@@ -4306,6 +4399,25 @@ handle_jit_event (void)
   target_terminal_inferior ();
 }
 
+/* Handle an solib event by calling solib_add.  */
+
+void
+handle_solib_event (void)
+{
+  clear_program_space_solib_cache (current_inferior ()->pspace);
+
+  /* Check for any newly added shared libraries if we're supposed to
+     be adding them automatically.  Switch terminal for any messages
+     produced by breakpoint_re_set.  */
+  target_terminal_ours_for_output ();
+#ifdef SOLIB_ADD
+  SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
+#else
+  solib_add (NULL, 0, &current_target, auto_solib_add);
+#endif
+  target_terminal_inferior ();
+}
+
 /* Prepare WHAT final decision for infrun.  */
 
 /* Decide what infrun needs to do with this bpstat.  */
@@ -4314,10 +4426,6 @@ struct bpstat_what
 bpstat_what (bpstat bs_head)
 {
   struct bpstat_what retval;
-  /* We need to defer calling `solib_add', as adding new symbols
-     resets breakpoints, which in turn deletes breakpoint locations,
-     and hence may clear unprocessed entries in the BS chain.  */
-  int shlib_event = 0;
   int jit_event = 0;
   bpstat bs;
 
@@ -4349,6 +4457,7 @@ bpstat_what (bpstat bs_head)
 	case bp_hardware_breakpoint:
 	case bp_until:
 	case bp_finish:
+	case bp_shlib_event:
 	  if (bs->stop)
 	    {
 	      if (bs->print)
@@ -4426,18 +4535,6 @@ bpstat_what (bpstat bs_head)
 		 This requires no further action.  */
 	    }
 	  break;
-	case bp_shlib_event:
-	  shlib_event = 1;
-
-	  /* If requested, stop when the dynamic linker notifies GDB
-	     of events.  This allows the user to get control and place
-	     breakpoints in initializer routines for dynamically
-	     loaded objects (among other things).  */
-	  if (stop_on_solib_events)
-	    this_action = BPSTAT_WHAT_STOP_NOISY;
-	  else
-	    this_action = BPSTAT_WHAT_SINGLE;
-	  break;
 	case bp_jit_event:
 	  jit_event = 1;
 	  this_action = BPSTAT_WHAT_SINGLE;
@@ -4482,27 +4579,6 @@ bpstat_what (bpstat bs_head)
 
   /* These operations may affect the bs->breakpoint_at state so they are
      delayed after MAIN_ACTION is decided above.  */
-
-  if (shlib_event)
-    {
-      if (debug_infrun)
-	fprintf_unfiltered (gdb_stdlog, "bpstat_what: bp_shlib_event\n");
-
-      /* Check for any newly added shared libraries if we're supposed
-	 to be adding them automatically.  */
-
-      /* Switch terminal for any messages produced by
-	 breakpoint_re_set.  */
-      target_terminal_ours_for_output ();
-
-#ifdef SOLIB_ADD
-      SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
-#else
-      solib_add (NULL, 0, &current_target, auto_solib_add);
-#endif
-
-      target_terminal_inferior ();
-    }
 
   if (jit_event)
     {
@@ -5798,8 +5874,9 @@ set_breakpoint_location_function (struct bp_location *loc, int explicit_loc)
       || is_tracepoint (loc->owner))
     {
       int is_gnu_ifunc;
+      const char *function_name;
 
-      find_pc_partial_function_gnu_ifunc (loc->address, &loc->function_name,
+      find_pc_partial_function_gnu_ifunc (loc->address, &function_name,
 					  NULL, NULL, &is_gnu_ifunc);
 
       if (is_gnu_ifunc && !explicit_loc)
@@ -5807,7 +5884,7 @@ set_breakpoint_location_function (struct bp_location *loc, int explicit_loc)
 	  struct breakpoint *b = loc->owner;
 
 	  gdb_assert (loc->pspace == current_program_space);
-	  if (gnu_ifunc_resolve_name (loc->function_name,
+	  if (gnu_ifunc_resolve_name (function_name,
 				      &loc->requested_address))
 	    {
 	      /* Recalculate ADDRESS based on new REQUESTED_ADDRESS.  */
@@ -5824,8 +5901,8 @@ set_breakpoint_location_function (struct bp_location *loc, int explicit_loc)
 	    }
 	}
 
-      if (loc->function_name)
-	loc->function_name = xstrdup (loc->function_name);
+      if (function_name)
+	loc->function_name = xstrdup (function_name);
     }
 }
 
@@ -6230,11 +6307,16 @@ remove_catch_fork (struct bp_location *bl)
 
 static int
 breakpoint_hit_catch_fork (const struct bp_location *bl,
-			   struct address_space *aspace, CORE_ADDR bp_addr)
+			   struct address_space *aspace, CORE_ADDR bp_addr,
+			   const struct target_waitstatus *ws)
 {
   struct fork_catchpoint *c = (struct fork_catchpoint *) bl->owner;
 
-  return inferior_has_forked (inferior_ptid, &c->forked_inferior_pid);
+  if (ws->kind != TARGET_WAITKIND_FORKED)
+    return 0;
+
+  c->forked_inferior_pid = ws->value.related_pid;
+  return 1;
 }
 
 /* Implement the "print_it" breakpoint_ops method for fork
@@ -6339,11 +6421,16 @@ remove_catch_vfork (struct bp_location *bl)
 
 static int
 breakpoint_hit_catch_vfork (const struct bp_location *bl,
-			    struct address_space *aspace, CORE_ADDR bp_addr)
+			    struct address_space *aspace, CORE_ADDR bp_addr,
+			    const struct target_waitstatus *ws)
 {
   struct fork_catchpoint *c = (struct fork_catchpoint *) bl->owner;
 
-  return inferior_has_vforked (inferior_ptid, &c->forked_inferior_pid);
+  if (ws->kind != TARGET_WAITKIND_VFORKED)
+    return 0;
+
+  c->forked_inferior_pid = ws->value.related_pid;
+  return 1;
 }
 
 /* Implement the "print_it" breakpoint_ops method for vfork
@@ -6423,6 +6510,264 @@ print_recreate_catch_vfork (struct breakpoint *b, struct ui_file *fp)
 /* The breakpoint_ops structure to be used in vfork catchpoints.  */
 
 static struct breakpoint_ops catch_vfork_breakpoint_ops;
+
+/* An instance of this type is used to represent an solib catchpoint.
+   It includes a "struct breakpoint" as a kind of base class; users
+   downcast to "struct breakpoint *" when needed.  A breakpoint is
+   really of this type iff its ops pointer points to
+   CATCH_SOLIB_BREAKPOINT_OPS.  */
+
+struct solib_catchpoint
+{
+  /* The base class.  */
+  struct breakpoint base;
+
+  /* True for "catch load", false for "catch unload".  */
+  unsigned char is_load;
+
+  /* Regular expression to match, if any.  COMPILED is only valid when
+     REGEX is non-NULL.  */
+  char *regex;
+  regex_t compiled;
+};
+
+static void
+dtor_catch_solib (struct breakpoint *b)
+{
+  struct solib_catchpoint *self = (struct solib_catchpoint *) b;
+
+  if (self->regex)
+    regfree (&self->compiled);
+  xfree (self->regex);
+
+  base_breakpoint_ops.dtor (b);
+}
+
+static int
+insert_catch_solib (struct bp_location *ignore)
+{
+  return 0;
+}
+
+static int
+remove_catch_solib (struct bp_location *ignore)
+{
+  return 0;
+}
+
+static int
+breakpoint_hit_catch_solib (const struct bp_location *bl,
+			    struct address_space *aspace,
+			    CORE_ADDR bp_addr,
+			    const struct target_waitstatus *ws)
+{
+  struct solib_catchpoint *self = (struct solib_catchpoint *) bl->owner;
+  struct breakpoint *other;
+
+  if (ws->kind == TARGET_WAITKIND_LOADED)
+    return 1;
+
+  ALL_BREAKPOINTS (other)
+  {
+    struct bp_location *other_bl;
+
+    if (other == bl->owner)
+      continue;
+
+    if (other->type != bp_shlib_event)
+      continue;
+
+    if (self->base.pspace != NULL && other->pspace != self->base.pspace)
+      continue;
+
+    for (other_bl = other->loc; other_bl != NULL; other_bl = other_bl->next)
+      {
+	if (other->ops->breakpoint_hit (other_bl, aspace, bp_addr, ws))
+	  return 1;
+      }
+  }
+
+  return 0;
+}
+
+static void
+check_status_catch_solib (struct bpstats *bs)
+{
+  struct solib_catchpoint *self
+    = (struct solib_catchpoint *) bs->breakpoint_at;
+  int ix;
+
+  if (self->is_load)
+    {
+      struct so_list *iter;
+
+      for (ix = 0;
+	   VEC_iterate (so_list_ptr, current_program_space->added_solibs,
+			ix, iter);
+	   ++ix)
+	{
+	  if (!self->regex
+	      || regexec (&self->compiled, iter->so_name, 0, NULL, 0) == 0)
+	    return;
+	}
+    }
+  else
+    {
+      char *iter;
+
+      for (ix = 0;
+	   VEC_iterate (char_ptr, current_program_space->deleted_solibs,
+			ix, iter);
+	   ++ix)
+	{
+	  if (!self->regex
+	      || regexec (&self->compiled, iter, 0, NULL, 0) == 0)
+	    return;
+	}
+    }
+
+  bs->stop = 0;
+  bs->print_it = print_it_noop;
+}
+
+static enum print_stop_action
+print_it_catch_solib (bpstat bs)
+{
+  struct breakpoint *b = bs->breakpoint_at;
+  struct ui_out *uiout = current_uiout;
+
+  annotate_catchpoint (b->number);
+  if (b->disposition == disp_del)
+    ui_out_text (uiout, "\nTemporary catchpoint ");
+  else
+    ui_out_text (uiout, "\nCatchpoint ");
+  ui_out_field_int (uiout, "bkptno", b->number);
+  ui_out_text (uiout, "\n");
+  if (ui_out_is_mi_like_p (uiout))
+    ui_out_field_string (uiout, "disp", bpdisp_text (b->disposition));
+  print_solib_event (1);
+  return PRINT_SRC_AND_LOC;
+}
+
+static void
+print_one_catch_solib (struct breakpoint *b, struct bp_location **locs)
+{
+  struct solib_catchpoint *self = (struct solib_catchpoint *) b;
+  struct value_print_options opts;
+  struct ui_out *uiout = current_uiout;
+  char *msg;
+
+  get_user_print_options (&opts);
+  /* Field 4, the address, is omitted (which makes the columns not
+     line up too nicely with the headers, but the effect is relatively
+     readable).  */
+  if (opts.addressprint)
+    {
+      annotate_field (4);
+      ui_out_field_skip (uiout, "addr");
+    }
+
+  annotate_field (5);
+  if (self->is_load)
+    {
+      if (self->regex)
+	msg = xstrprintf (_("load of library matching %s"), self->regex);
+      else
+	msg = xstrdup (_("load of library"));
+    }
+  else
+    {
+      if (self->regex)
+	msg = xstrprintf (_("unload of library matching %s"), self->regex);
+      else
+	msg = xstrdup (_("unload of library"));
+    }
+  ui_out_field_string (uiout, "what", msg);
+  xfree (msg);
+}
+
+static void
+print_mention_catch_solib (struct breakpoint *b)
+{
+  struct solib_catchpoint *self = (struct solib_catchpoint *) b;
+
+  printf_filtered (_("Catchpoint %d (%s)"), b->number,
+		   self->is_load ? "load" : "unload");
+}
+
+static void
+print_recreate_catch_solib (struct breakpoint *b, struct ui_file *fp)
+{
+  struct solib_catchpoint *self = (struct solib_catchpoint *) b;
+
+  fprintf_unfiltered (fp, "%s %s",
+		      b->disposition == disp_del ? "tcatch" : "catch",
+		      self->is_load ? "load" : "unload");
+  if (self->regex)
+    fprintf_unfiltered (fp, " %s", self->regex);
+  fprintf_unfiltered (fp, "\n");
+}
+
+static struct breakpoint_ops catch_solib_breakpoint_ops;
+
+/* A helper function that does all the work for "catch load" and
+   "catch unload".  */
+
+static void
+catch_load_or_unload (char *arg, int from_tty, int is_load,
+		      struct cmd_list_element *command)
+{
+  struct solib_catchpoint *c;
+  struct gdbarch *gdbarch = get_current_arch ();
+  int tempflag;
+  regex_t compiled;
+  struct cleanup *cleanup;
+
+  tempflag = get_cmd_context (command) == CATCH_TEMPORARY;
+
+  if (!arg)
+    arg = "";
+  arg = skip_spaces (arg);
+
+  c = XCNEW (struct solib_catchpoint);
+  cleanup = make_cleanup (xfree, c);
+
+  if (*arg != '\0')
+    {
+      int errcode;
+
+      errcode = regcomp (&c->compiled, arg, REG_NOSUB);
+      if (errcode != 0)
+	{
+	  char *err = get_regcomp_error (errcode, &c->compiled);
+
+	  make_cleanup (xfree, err);
+	  error (_("Invalid regexp (%s): %s"), err, arg);
+	}
+      c->regex = xstrdup (arg);
+    }
+
+  c->is_load = is_load;
+  init_catchpoint (&c->base, gdbarch, tempflag, NULL,
+		   &catch_solib_breakpoint_ops);
+
+  discard_cleanups (cleanup);
+  install_breakpoint (0, &c->base, 1);
+}
+
+static void
+catch_load_command_1 (char *arg, int from_tty,
+		      struct cmd_list_element *command)
+{
+  catch_load_or_unload (arg, from_tty, 1, command);
+}
+
+static void
+catch_unload_command_1 (char *arg, int from_tty,
+			struct cmd_list_element *command)
+{
+  catch_load_or_unload (arg, from_tty, 0, command);
+}
 
 /* An instance of this type is used to represent a syscall catchpoint.
    It includes a "struct breakpoint" as a kind of base class; users
@@ -6543,7 +6888,8 @@ remove_catch_syscall (struct bp_location *bl)
 
 static int
 breakpoint_hit_catch_syscall (const struct bp_location *bl,
-			      struct address_space *aspace, CORE_ADDR bp_addr)
+			      struct address_space *aspace, CORE_ADDR bp_addr,
+			      const struct target_waitstatus *ws)
 {
   /* We must check if we are catching specific syscalls in this
      breakpoint.  If we are, then we must guarantee that the called
@@ -6552,8 +6898,11 @@ breakpoint_hit_catch_syscall (const struct bp_location *bl,
   const struct syscall_catchpoint *c
     = (const struct syscall_catchpoint *) bl->owner;
 
-  if (!inferior_has_called_syscall (inferior_ptid, &syscall_number))
+  if (ws->kind != TARGET_WAITKIND_SYSCALL_ENTRY
+      && ws->kind != TARGET_WAITKIND_SYSCALL_RETURN)
     return 0;
+
+  syscall_number = ws->value.syscall_number;
 
   /* Now, checking if the syscall is the same.  */
   if (c->syscalls_to_be_caught)
@@ -6855,11 +7204,16 @@ remove_catch_exec (struct bp_location *bl)
 
 static int
 breakpoint_hit_catch_exec (const struct bp_location *bl,
-			   struct address_space *aspace, CORE_ADDR bp_addr)
+			   struct address_space *aspace, CORE_ADDR bp_addr,
+			   const struct target_waitstatus *ws)
 {
   struct exec_catchpoint *c = (struct exec_catchpoint *) bl->owner;
 
-  return inferior_has_execd (inferior_ptid, &c->exec_pathname);
+  if (ws->kind != TARGET_WAITKIND_EXECD)
+    return 0;
+
+  c->exec_pathname = xstrdup (ws->value.execd_pathname);
+  return 1;
 }
 
 static enum print_stop_action
@@ -8099,8 +8453,13 @@ stopat_command (char *arg, int from_tty)
 static int
 breakpoint_hit_ranged_breakpoint (const struct bp_location *bl,
 				  struct address_space *aspace,
-				  CORE_ADDR bp_addr)
+				  CORE_ADDR bp_addr,
+				  const struct target_waitstatus *ws)
 {
+  if (ws->kind != TARGET_WAITKIND_STOPPED
+      || ws->value.sig != TARGET_SIGNAL_TRAP)
+    return 0;
+
   return breakpoint_address_match_range (bl->pspace->aspace, bl->address,
 					 bl->length, aspace, bp_addr);
 }
@@ -8567,7 +8926,8 @@ remove_watchpoint (struct bp_location *bl)
 
 static int
 breakpoint_hit_watchpoint (const struct bp_location *bl,
-			   struct address_space *aspace, CORE_ADDR bp_addr)
+			   struct address_space *aspace, CORE_ADDR bp_addr,
+			   const struct target_waitstatus *ws)
 {
   struct breakpoint *b = bl->owner;
   struct watchpoint *w = (struct watchpoint *) b;
@@ -10229,12 +10589,13 @@ bp_location_compare (const void *ap, const void *bp)
   if (a_perm != b_perm)
     return (a_perm < b_perm) - (a_perm > b_perm);
 
-  /* Make the user-visible order stable across GDB runs.  Locations of
-     the same breakpoint can be sorted in arbitrary order.  */
+  /* Make the internal GDB representation stable across GDB runs
+     where A and B memory inside GDB can differ.  Breakpoint locations of
+     the same type at the same address can be sorted in arbitrary order.  */
 
   if (a->owner->number != b->owner->number)
-    return (a->owner->number > b->owner->number)
-           - (a->owner->number < b->owner->number);
+    return ((a->owner->number > b->owner->number)
+	    - (a->owner->number < b->owner->number));
 
   return (a > b) - (a < b);
 }
@@ -10826,7 +11187,8 @@ base_breakpoint_remove_location (struct bp_location *bl)
 static int
 base_breakpoint_breakpoint_hit (const struct bp_location *bl,
 				struct address_space *aspace,
-				CORE_ADDR bp_addr)
+				CORE_ADDR bp_addr,
+				const struct target_waitstatus *ws)
 {
   internal_error_pure_virtual_called ();
 }
@@ -10972,9 +11334,14 @@ bkpt_remove_location (struct bp_location *bl)
 
 static int
 bkpt_breakpoint_hit (const struct bp_location *bl,
-		     struct address_space *aspace, CORE_ADDR bp_addr)
+		     struct address_space *aspace, CORE_ADDR bp_addr,
+		     const struct target_waitstatus *ws)
 {
   struct breakpoint *b = bl->owner;
+
+  if (ws->kind != TARGET_WAITKIND_STOPPED
+      || ws->value.sig != TARGET_SIGNAL_TRAP)
+    return 0;
 
   if (!breakpoint_address_match (bl->pspace->aspace, bl->address,
 				 aspace, bp_addr))
@@ -11144,8 +11511,17 @@ internal_bkpt_re_set (struct breakpoint *b)
 static void
 internal_bkpt_check_status (bpstat bs)
 {
-  /* We do not stop for these.  */
-  bs->stop = 0;
+  if (bs->breakpoint_at->type == bp_shlib_event)
+    {
+      /* If requested, stop when the dynamic linker notifies GDB of
+	 events.  This allows the user to get control and place
+	 breakpoints in initializer routines for dynamically loaded
+	 objects (among other things).  */
+      bs->stop = stop_on_solib_events;
+      bs->print = stop_on_solib_events;
+    }
+  else
+    bs->stop = 0;
 }
 
 static enum print_stop_action
@@ -11162,10 +11538,7 @@ internal_bkpt_print_it (bpstat bs)
       /* Did we stop because the user set the stop_on_solib_events
 	 variable?  (If so, we report this as a generic, "Stopped due
 	 to shlib event" message.) */
-      ui_out_text (uiout, _("Stopped due to shared library event\n"));
-      if (ui_out_is_mi_like_p (uiout))
-	ui_out_field_string (uiout, "reason",
-			     async_reason_lookup (EXEC_ASYNC_SOLIB_EVENT));
+      print_solib_event (0);
       break;
 
     case bp_thread_event:
@@ -11267,7 +11640,8 @@ tracepoint_re_set (struct breakpoint *b)
 
 static int
 tracepoint_breakpoint_hit (const struct bp_location *bl,
-			   struct address_space *aspace, CORE_ADDR bp_addr)
+			   struct address_space *aspace, CORE_ADDR bp_addr,
+			   const struct target_waitstatus *ws)
 {
   /* By definition, the inferior does not report stops at
      tracepoints.  */
@@ -13622,7 +13996,8 @@ is_non_inline_function (struct breakpoint *b)
    have been inlined.  */
 
 int
-pc_at_non_inline_function (struct address_space *aspace, CORE_ADDR pc)
+pc_at_non_inline_function (struct address_space *aspace, CORE_ADDR pc,
+			   const struct target_waitstatus *ws)
 {
   struct breakpoint *b;
   struct bp_location *bl;
@@ -13635,7 +14010,7 @@ pc_at_non_inline_function (struct address_space *aspace, CORE_ADDR pc)
       for (bl = b->loc; bl != NULL; bl = bl->next)
 	{
 	  if (!bl->shlib_disabled
-	      && bpstat_check_location (bl, aspace, pc))
+	      && bpstat_check_location (bl, aspace, pc, ws))
 	    return 1;
 	}
     }
@@ -13802,6 +14177,19 @@ initialize_breakpoint_ops (void)
   ops->print_one = print_one_catch_syscall;
   ops->print_mention = print_mention_catch_syscall;
   ops->print_recreate = print_recreate_catch_syscall;
+
+  /* Solib-related catchpoints.  */
+  ops = &catch_solib_breakpoint_ops;
+  *ops = base_breakpoint_ops;
+  ops->dtor = dtor_catch_solib;
+  ops->insert_location = insert_catch_solib;
+  ops->remove_location = remove_catch_solib;
+  ops->breakpoint_hit = breakpoint_hit_catch_solib;
+  ops->check_status = check_status_catch_solib;
+  ops->print_it = print_it_catch_solib;
+  ops->print_one = print_one_catch_solib;
+  ops->print_mention = print_mention_catch_solib;
+  ops->print_recreate = print_recreate_catch_solib;
 }
 
 void
@@ -14103,6 +14491,20 @@ Catch an exception, when thrown."),
   add_catch_command ("exec", _("Catch calls to exec."),
 		     catch_exec_command_1,
                      NULL,
+		     CATCH_PERMANENT,
+		     CATCH_TEMPORARY);
+  add_catch_command ("load", _("Catch loads of shared libraries.\n\
+Usage: catch load [REGEX]\n\
+If REGEX is given, only stop for libraries matching the regular expression."),
+		     catch_load_command_1,
+		     NULL,
+		     CATCH_PERMANENT,
+		     CATCH_TEMPORARY);
+  add_catch_command ("unload", _("Catch unloads of shared libraries.\n\
+Usage: catch unload [REGEX]\n\
+If REGEX is given, only stop for libraries matching the regular expression."),
+		     catch_unload_command_1,
+		     NULL,
 		     CATCH_PERMANENT,
 		     CATCH_TEMPORARY);
   add_catch_command ("syscall", _("\

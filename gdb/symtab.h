@@ -81,7 +81,7 @@ struct language_defn;
 
 struct cplus_specific
 {
-  char *demangled_name;
+  const char *demangled_name;
 };
 
 /* Define a structure for the information that is common to all symbol types,
@@ -99,7 +99,7 @@ struct general_symbol_info
      the mangled name and demangled name, this is the mangled
      name.  */
 
-  char *name;
+  const char *name;
 
   /* Value of the symbol.  Which member of this union to use, and what
      it means, depends on what kind of symbol this is and its
@@ -135,7 +135,7 @@ struct general_symbol_info
        currently used by Ada, Java, and Objective C.  */
     struct mangled_lang
     {
-      char *demangled_name;
+      const char *demangled_name;
     }
     mangled_lang;
 
@@ -166,7 +166,8 @@ struct general_symbol_info
 extern void symbol_set_demangled_name (struct general_symbol_info *, char *,
                                        struct objfile *);
 
-extern char *symbol_get_demangled_name (const struct general_symbol_info *);
+extern const char *symbol_get_demangled_name
+  (const struct general_symbol_info *);
 
 extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 
@@ -225,7 +226,8 @@ extern void symbol_set_names (struct general_symbol_info *symbol,
 
 #define SYMBOL_NATURAL_NAME(symbol) \
   (symbol_natural_name (&(symbol)->ginfo))
-extern char *symbol_natural_name (const struct general_symbol_info *symbol);
+extern const char *symbol_natural_name
+  (const struct general_symbol_info *symbol);
 
 /* Return SYMBOL's name from the point of view of the linker.  In
    languages like C++ where symbols may be mangled for ease of
@@ -238,7 +240,8 @@ extern char *symbol_natural_name (const struct general_symbol_info *symbol);
    that symbol.  If no demangled name exists, return NULL.  */
 #define SYMBOL_DEMANGLED_NAME(symbol) \
   (symbol_demangled_name (&(symbol)->ginfo))
-extern char *symbol_demangled_name (const struct general_symbol_info *symbol);
+extern const char *symbol_demangled_name
+  (const struct general_symbol_info *symbol);
 
 /* Macro that returns a version of the name of a symbol that is
    suitable for output.  In C++ this is the "demangled" form of the
@@ -254,21 +257,6 @@ extern char *symbol_demangled_name (const struct general_symbol_info *symbol);
   (demangle ? SYMBOL_NATURAL_NAME (symbol) : SYMBOL_LINKAGE_NAME (symbol))
 extern int demangle;
 
-/* Macro that tests a symbol for a match against a specified name string.
-   First test the unencoded name, then looks for and test a C++ encoded
-   name if it exists.  Note that whitespace is ignored while attempting to
-   match a C++ encoded name, so that "foo::bar(int,long)" is the same as
-   "foo :: bar (int, long)".
-   Evaluates to zero if the match fails, or nonzero if it succeeds.  */
-
-/* Macro that tests a symbol for a match against a specified name
-   string.  It tests against SYMBOL_NATURAL_NAME, and it ignores
-   whitespace and trailing parentheses.  (See strcmp_iw for details
-   about its behavior.)  */
-
-#define SYMBOL_MATCHES_NATURAL_NAME(symbol, name)			\
-  (strcmp_iw (SYMBOL_NATURAL_NAME (symbol), (name)) == 0)
-
 /* Macro that returns the name to be used when sorting and searching symbols.
    In  C++, Chill, and Java, we search for the demangled form of a name,
    and so sort symbols accordingly.  In Ada, however, we search by mangled
@@ -276,10 +264,11 @@ extern int demangle;
    returns the same value (same pointer) as SYMBOL_LINKAGE_NAME.  */
 #define SYMBOL_SEARCH_NAME(symbol)					 \
    (symbol_search_name (&(symbol)->ginfo))
-extern char *symbol_search_name (const struct general_symbol_info *);
+extern const char *symbol_search_name (const struct general_symbol_info *);
 
-/* Analogous to SYMBOL_MATCHES_NATURAL_NAME, but uses the search
-   name.  */
+/* Return non-zero if NAME matches the "search" name of SYMBOL.
+   Whitespace and trailing parentheses are ignored.
+   See strcmp_iw for details about its behavior.  */
 #define SYMBOL_MATCHES_SEARCH_NAME(symbol, name)			\
   (strcmp_iw (SYMBOL_SEARCH_NAME (symbol), (name)) == 0)
 
@@ -966,14 +955,14 @@ extern struct symbol *find_pc_function (CORE_ADDR);
 
 extern struct symbol *find_pc_sect_function (CORE_ADDR, struct obj_section *);
 
-extern int find_pc_partial_function_gnu_ifunc (CORE_ADDR pc, char **name,
+extern int find_pc_partial_function_gnu_ifunc (CORE_ADDR pc, const char **name,
 					       CORE_ADDR *address,
 					       CORE_ADDR *endaddr,
 					       int *is_gnu_ifunc_p);
 
 /* lookup function from address, return name, start addr and end addr.  */
 
-extern int find_pc_partial_function (CORE_ADDR, char **, CORE_ADDR *,
+extern int find_pc_partial_function (CORE_ADDR, const char **, CORE_ADDR *,
 				     CORE_ADDR *);
 
 extern void clear_pc_function_cache (void);
@@ -1262,9 +1251,18 @@ DEF_VEC_I (CORE_ADDR);
 VEC (CORE_ADDR) *find_pcs_for_symtab_line (struct symtab *symtab, int line,
 					   struct linetable_entry **best_entry);
 
+/* Callback for LA_ITERATE_OVER_SYMBOLS.  The callback will be called
+   once per matching symbol SYM, with DATA being the argument of the
+   same name that was passed to LA_ITERATE_OVER_SYMBOLS.  The callback
+   should return nonzero to indicate that LA_ITERATE_OVER_SYMBOLS
+   should continue iterating, or zero to indicate that the iteration
+   should end.  */
+
+typedef int (symbol_found_callback_ftype) (struct symbol *sym, void *data);
+
 void iterate_over_symbols (const struct block *block, const char *name,
 			   const domain_enum domain,
-			   int (*callback) (struct symbol *, void *),
+			   symbol_found_callback_ftype *callback,
 			   void *data);
 
 struct cleanup *demangle_for_lookup (const char *name, enum language lang,

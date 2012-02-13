@@ -1029,7 +1029,7 @@ static struct type *read_type_die (struct die_info *, struct dwarf2_cu *);
 
 static struct type *read_type_die_1 (struct die_info *, struct dwarf2_cu *);
 
-static char *determine_prefix (struct die_info *die, struct dwarf2_cu *);
+static const char *determine_prefix (struct die_info *die, struct dwarf2_cu *);
 
 static char *typename_concat (struct obstack *obs, const char *prefix,
 			      const char *suffix, int physname,
@@ -2691,7 +2691,7 @@ static void
 dw2_expand_symtabs_matching
   (struct objfile *objfile,
    int (*file_matcher) (const char *, void *),
-   int (*name_matcher) (const struct language_defn *, const char *, void *),
+   int (*name_matcher) (const char *, void *),
    enum search_domain kind,
    void *data)
 {
@@ -2745,7 +2745,7 @@ dw2_expand_symtabs_matching
 
       name = index->constant_pool + MAYBE_SWAP (index->symbol_table[idx]);
 
-      if (! (*name_matcher) (current_language, name, data))
+      if (! (*name_matcher) (name, data))
 	continue;
 
       /* The name was matched, now expand corresponding CUs that were
@@ -3954,7 +3954,6 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
   struct objfile *objfile = cu->objfile;
   CORE_ADDR addr = 0;
   char *actual_name = NULL;
-  const struct partial_symbol *psym = NULL;
   CORE_ADDR baseaddr;
   int built_actual_name = 0;
 
@@ -5014,7 +5013,7 @@ dwarf2_compute_name (char *name, struct die_info *die, struct dwarf2_cu *cu,
       if (die_needs_namespace (die, cu))
 	{
 	  long length;
-	  char *prefix;
+	  const char *prefix;
 	  struct ui_file *buf;
 
 	  prefix = determine_prefix (die, cu);
@@ -7730,7 +7729,7 @@ process_structure_scope (struct die_info *die, struct dwarf2_cu *cu)
 		       i >= TYPE_N_BASECLASSES (t);
 		       --i)
 		    {
-		      char *fieldname = TYPE_FIELD_NAME (t, i);
+		      const char *fieldname = TYPE_FIELD_NAME (t, i);
 
                       if (is_vtable_name (fieldname, cu))
 			{
@@ -12480,7 +12479,7 @@ anonymous_struct_prefix (struct die_info *die, struct dwarf2_cu *cu)
 
    then determine_prefix on foo's die will return "N::C".  */
 
-static char *
+static const char *
 determine_prefix (struct die_info *die, struct dwarf2_cu *cu)
 {
   struct die_info *parent, *spec_die;
@@ -15137,7 +15136,7 @@ dwarf_parse_macro_header (gdb_byte **opcode_definitions,
 }
 
 /* A helper for dwarf_decode_macros that handles the GNU extensions,
-   including DW_GNU_MACINFO_transparent_include.  */
+   including DW_MACRO_GNU_transparent_include.  */
 
 static void
 dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
@@ -15146,7 +15145,8 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
 			  struct dwarf2_section_info *section,
 			  int section_is_gnu,
 			  unsigned int offset_size,
-			  struct objfile *objfile)
+			  struct objfile *objfile,
+			  htab_t include_hash)
 {
   enum dwarf_macro_record_type macinfo_type;
   int at_commandline;
@@ -15321,16 +15321,33 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
 	case DW_MACRO_GNU_transparent_include:
 	  {
 	    LONGEST offset;
+	    void **slot;
 
 	    offset = read_offset_1 (abfd, mac_ptr, offset_size);
 	    mac_ptr += offset_size;
 
-	    dwarf_decode_macro_bytes (abfd,
-				      section->buffer + offset,
-				      mac_end, current_file,
-				      lh, comp_dir,
-				      section, section_is_gnu,
-				      offset_size, objfile);
+	    slot = htab_find_slot (include_hash, mac_ptr, INSERT);
+	    if (*slot != NULL)
+	      {
+		/* This has actually happened; see
+		   http://sourceware.org/bugzilla/show_bug.cgi?id=13568.  */
+		complaint (&symfile_complaints,
+			   _("recursive DW_MACRO_GNU_transparent_include in "
+			     ".debug_macro section"));
+	      }
+	    else
+	      {
+		*slot = mac_ptr;
+
+		dwarf_decode_macro_bytes (abfd,
+					  section->buffer + offset,
+					  mac_end, current_file,
+					  lh, comp_dir,
+					  section, section_is_gnu,
+					  offset_size, objfile, include_hash);
+
+		htab_remove_elt (include_hash, mac_ptr);
+	      }
 	  }
 	  break;
 
@@ -15374,6 +15391,9 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
   enum dwarf_macro_record_type macinfo_type;
   unsigned int offset_size = cu->header.offset_size;
   gdb_byte *opcode_definitions[256];
+  struct cleanup *cleanup;
+  htab_t include_hash;
+  void **slot;
 
   dwarf2_read_section (objfile, section);
   if (section->buffer == NULL)
@@ -15507,9 +15527,16 @@ dwarf_decode_macros (struct line_header *lh, unsigned int offset,
      command-line macro definitions/undefinitions.  This flag is unset when we
      reach the first DW_MACINFO_start_file entry.  */
 
-  dwarf_decode_macro_bytes (abfd, section->buffer + offset, mac_end,
+  include_hash = htab_create_alloc (1, htab_hash_pointer, htab_eq_pointer,
+				    NULL, xcalloc, xfree);
+  cleanup = make_cleanup_htab_delete (include_hash);
+  mac_ptr = section->buffer + offset;
+  slot = htab_find_slot (include_hash, mac_ptr, INSERT);
+  *slot = mac_ptr;
+  dwarf_decode_macro_bytes (abfd, mac_ptr, mac_end,
 			    current_file, lh, comp_dir, section, section_is_gnu,
-			    offset_size, objfile);
+			    offset_size, objfile, include_hash);
+  do_cleanups (cleanup);
 }
 
 /* Check if the attribute's form is a DW_FORM_block*
