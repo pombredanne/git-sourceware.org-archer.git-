@@ -600,7 +600,7 @@ f:CORE_ADDR:skip_trampoline_code:struct frame_info *frame, CORE_ADDR pc:frame, p
 # a step-resume breakpoint to get us past the dynamic linker.
 m:CORE_ADDR:skip_solib_resolver:CORE_ADDR pc:pc::generic_skip_solib_resolver::0
 # Some systems also have trampoline code for returning from shared libs.
-m:int:in_solib_return_trampoline:CORE_ADDR pc, char *name:pc, name::generic_in_solib_return_trampoline::0
+m:int:in_solib_return_trampoline:CORE_ADDR pc, const char *name:pc, name::generic_in_solib_return_trampoline::0
 
 # A target might have problems with watchpoints as soon as the stack
 # frame of the current function has been destroyed.  This mostly happens
@@ -758,7 +758,7 @@ F:void:overlay_update:struct obj_section *osect:osect
 M:const struct target_desc *:core_read_description:struct target_ops *target, bfd *abfd:target, abfd
 
 # Handle special encoding of static variables in stabs debug info.
-F:char *:static_transform_name:char *name:name
+F:const char *:static_transform_name:const char *name:name
 # Set if the address in N_SO or N_FUN stabs may be zero.
 v:int:sofun_address_maybe_missing:::0:0::0
 

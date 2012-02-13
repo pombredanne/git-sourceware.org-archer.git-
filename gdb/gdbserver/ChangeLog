@@ -1,3 +1,47 @@
+2012-02-11  Yao Qi  <yao@codesourcery.com>
+
+	* server.c: (handle_monitor_command): Add a new parameter
+	`own_buf'.
+	(handle_query): Update caller.
+
+2012-02-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Add readlink to AC_CHECK_FUNCS list.
+	* configure, config.in: Regenerate.
+	* hostio.c: Provide an alternate implementation if HAVE_READLINK
+	is not defined.
+
+2012-02-02  Pedro Alves  <palves@redhat.com>
+
+	Try SIGKILL first, then PTRACE_KILL.
+	* linux-low.c (linux_kill_one_lwp): New.
+	(linux_kill_one_lwp): Rename to ...
+	(kill_one_lwp_callback): ... this.  Use the new
+	linux_kill_one_lwp.
+
+2012-02-02  Pedro Alves  <palves@redhat.com>
+
+	* tracepoint.c (cmd_qtminftpilen): Return 0 if there's no current
+	inferior.
+
+2012-01-27  Pedro Alves  <palves@redhat.com>
+
+	* linux-low.c (linux_child_pid_to_exec_file): Delete.
+	(elf_64_file_p): Make static.
+	(linux_pid_exe_is_elf_64_file): New.
+	* linux-low.h (linux_child_pid_to_exec_file, elf_64_file_p):
+	Delete declarations.
+	(linux_pid_exe_is_elf_64_file): Declare.
+	* linux-x86-low.c (x86_arch_setup): Use
+	linux_pid_exe_is_elf_64_file.
+
+2012-01-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-low.c (linux_wait_for_event_1): Rename to ...
+	(linux_wait_for_event): ... here and merge it with former
+	linux_wait_for_event - new variable wait_ptid, use it.
+	(linux_wait_for_event): Remove - merge it to linux_wait_for_event_1.
+
 2012-01-23  Pedro Alves  <palves@redhat.com>
 
 	* server.c (main): Avoid yet another case of infinite loop while

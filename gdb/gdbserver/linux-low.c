@@ -186,32 +186,6 @@ static int linux_event_pipe[2] = { -1, -1 };
 static void send_sigstop (struct lwp_info *lwp);
 static void wait_for_sigstop (struct inferior_list_entry *entry);
 
-/* Accepts an integer PID; Returns a string representing a file that
-   can be opened to get info for the child process.
-   Space for the result is malloc'd, caller must free.  */
-
-char *
-linux_child_pid_to_exec_file (int pid)
-{
-  char *name1, *name2;
-
-  name1 = xmalloc (MAXPATHLEN);
-  name2 = xmalloc (MAXPATHLEN);
-  memset (name2, 0, MAXPATHLEN);
-
-  sprintf (name1, "/proc/%d/exe", pid);
-  if (readlink (name1, name2, MAXPATHLEN) > 0)
-    {
-      free (name1);
-      return name2;
-    }
-  else
-    {
-      free (name2);
-      return name1;
-    }
-}
-
 /* Return non-zero if HEADER is a 64-bit ELF file.  */
 
 static int
@@ -228,7 +202,7 @@ elf_64_header_p (const Elf64_Ehdr *header)
    zero if the file is not a 64-bit ELF file,
    and -1 if the file is not accessible or doesn't exist.  */
 
-int
+static int
 elf_64_file_p (const char *file)
 {
   Elf64_Ehdr header;
@@ -246,6 +220,18 @@ elf_64_file_p (const char *file)
   close (fd);
 
   return elf_64_header_p (&header);
+}
+
+/* Accepts an integer PID; Returns true if the executable PID is
+   running is a 64-bit ELF file..  */
+
+int
+linux_pid_exe_is_elf_64_file (int pid)
+{
+  char file[MAXPATHLEN];
+
+  sprintf (file, "/proc/%d/exe", pid);
+  return elf_64_file_p (file);
 }
 
 static void
@@ -815,10 +801,49 @@ last_thread_of_process_p (struct thread_info *thread)
 			 second_thread_of_pid_p, &counter) == NULL);
 }
 
-/* Kill the inferior lwp.  */
+/* Kill LWP.  */
+
+static void
+linux_kill_one_lwp (struct lwp_info *lwp)
+{
+  int pid = lwpid_of (lwp);
+
+  /* PTRACE_KILL is unreliable.  After stepping into a signal handler,
+     there is no signal context, and ptrace(PTRACE_KILL) (or
+     ptrace(PTRACE_CONT, SIGKILL), pretty much the same) acts like
+     ptrace(CONT, pid, 0,0) and just resumes the tracee.  A better
+     alternative is to kill with SIGKILL.  We only need one SIGKILL
+     per process, not one for each thread.  But since we still support
+     linuxthreads, and we also support debugging programs using raw
+     clone without CLONE_THREAD, we send one for each thread.  For
+     years, we used PTRACE_KILL only, so we're being a bit paranoid
+     about some old kernels where PTRACE_KILL might work better
+     (dubious if there are any such, but that's why it's paranoia), so
+     we try SIGKILL first, PTRACE_KILL second, and so we're fine
+     everywhere.  */
+
+  errno = 0;
+  kill (pid, SIGKILL);
+  if (debug_threads)
+    fprintf (stderr,
+	     "LKL:  kill (SIGKILL) %s, 0, 0 (%s)\n",
+	     target_pid_to_str (ptid_of (lwp)),
+	     errno ? strerror (errno) : "OK");
+
+  errno = 0;
+  ptrace (PTRACE_KILL, pid, 0, 0);
+  if (debug_threads)
+    fprintf (stderr,
+	     "LKL:  PTRACE_KILL %s, 0, 0 (%s)\n",
+	     target_pid_to_str (ptid_of (lwp)),
+	     errno ? strerror (errno) : "OK");
+}
+
+/* Callback for `find_inferior'.  Kills an lwp of a given process,
+   except the leader.  */
 
 static int
-linux_kill_one_lwp (struct inferior_list_entry *entry, void *args)
+kill_one_lwp_callback (struct inferior_list_entry *entry, void *args)
 {
   struct thread_info *thread = (struct thread_info *) entry;
   struct lwp_info *lwp = get_thread_lwp (thread);
@@ -843,7 +868,7 @@ linux_kill_one_lwp (struct inferior_list_entry *entry, void *args)
 
   do
     {
-      ptrace (PTRACE_KILL, lwpid_of (lwp), 0, 0);
+      linux_kill_one_lwp (lwp);
 
       /* Make sure it died.  The loop is most likely unnecessary.  */
       pid = linux_wait_for_event (lwp->head.id, &wstat, __WALL);
@@ -868,7 +893,7 @@ linux_kill (int pid)
      first, as PTRACE_KILL will not work otherwise.  */
   stop_all_lwps (0, NULL);
 
-  find_inferior (&all_threads, linux_kill_one_lwp, &pid);
+  find_inferior (&all_threads, kill_one_lwp_callback , &pid);
 
   /* See the comment in linux_kill_one_lwp.  We did not kill the first
      thread in the list, so do so now.  */
@@ -888,7 +913,7 @@ linux_kill (int pid)
 
       do
 	{
-	  ptrace (PTRACE_KILL, lwpid_of (lwp), 0, 0);
+	  linux_kill_one_lwp (lwp);
 
 	  /* Make sure it died.  The loop is most likely unnecessary.  */
 	  lwpid = linux_wait_for_event (lwp->head.id, &wstat, __WALL);
@@ -1569,9 +1594,10 @@ ptid_t step_over_bkpt;
    the stopped child otherwise.  */
 
 static int
-linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
+linux_wait_for_event (ptid_t ptid, int *wstat, int options)
 {
   struct lwp_info *event_child, *requested_child;
+  ptid_t wait_ptid;
 
   event_child = NULL;
   requested_child = NULL;
@@ -1620,13 +1646,24 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
       return lwpid_of (event_child);
     }
 
+  if (ptid_is_pid (ptid))
+    {
+      /* A request to wait for a specific tgid.  This is not possible
+	 with waitpid, so instead, we wait for any child, and leave
+	 children we're not interested in right now with a pending
+	 status to report later.  */
+      wait_ptid = minus_one_ptid;
+    }
+  else
+    wait_ptid = ptid;
+
   /* We only enter this loop if no process has a pending wait status.  Thus
      any action taken in response to a wait status inside this loop is
      responding as soon as we detect the status, not after any pending
      events.  */
   while (1)
     {
-      event_child = linux_wait_for_lwp (ptid, wstat, options);
+      event_child = linux_wait_for_lwp (wait_ptid, wstat, options);
 
       if ((options & WNOHANG) && event_child == NULL)
 	{
@@ -1637,6 +1674,19 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
 
       if (event_child == NULL)
 	error ("event from unknown child");
+
+      if (ptid_is_pid (ptid)
+	  && ptid_get_pid (ptid) != ptid_get_pid (ptid_of (event_child)))
+	{
+	  if (! WIFSTOPPED (*wstat))
+	    mark_lwp_dead (event_child, *wstat);
+	  else
+	    {
+	      event_child->status_pending_p = 1;
+	      event_child->status_pending = *wstat;
+	    }
+	  continue;
+	}
 
       current_inferior = get_lwp_thread (event_child);
 
@@ -1729,48 +1779,6 @@ linux_wait_for_event_1 (ptid_t ptid, int *wstat, int options)
   /* NOTREACHED */
   return 0;
 }
-
-static int
-linux_wait_for_event (ptid_t ptid, int *wstat, int options)
-{
-  ptid_t wait_ptid;
-
-  if (ptid_is_pid (ptid))
-    {
-      /* A request to wait for a specific tgid.  This is not possible
-	 with waitpid, so instead, we wait for any child, and leave
-	 children we're not interested in right now with a pending
-	 status to report later.  */
-      wait_ptid = minus_one_ptid;
-    }
-  else
-    wait_ptid = ptid;
-
-  while (1)
-    {
-      int event_pid;
-
-      event_pid = linux_wait_for_event_1 (wait_ptid, wstat, options);
-
-      if (event_pid > 0
-	  && ptid_is_pid (ptid) && ptid_get_pid (ptid) != event_pid)
-	{
-	  struct lwp_info *event_child
-	    = find_lwp_pid (pid_to_ptid (event_pid));
-
-	  if (! WIFSTOPPED (*wstat))
-	    mark_lwp_dead (event_child, *wstat);
-	  else
-	    {
-	      event_child->status_pending_p = 1;
-	      event_child->status_pending = *wstat;
-	    }
-	}
-      else
-	return event_pid;
-    }
-}
-
 
 /* Count the LWP's that have had events.  */
 

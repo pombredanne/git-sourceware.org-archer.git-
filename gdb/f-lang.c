@@ -309,7 +309,7 @@ const struct language_defn f_language_defn =
   default_print_array_index,
   default_pass_by_reference,
   default_get_string,
-  strcmp_iw_ordered,
+  NULL,				/* la_get_symbol_name_cmp */
   iterate_over_symbols,
   LANG_MAGIC
 };
@@ -572,7 +572,7 @@ find_first_common_named (char *name)
    that belongs to function funcname.  */
 
 SAVED_F77_COMMON_PTR
-find_common_for_function (char *name, char *funcname)
+find_common_for_function (const char *name, const char *funcname)
 {
 
   SAVED_F77_COMMON_PTR tmp;

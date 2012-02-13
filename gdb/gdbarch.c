@@ -3008,7 +3008,7 @@ set_gdbarch_skip_solib_resolver (struct gdbarch *gdbarch,
 }
 
 int
-gdbarch_in_solib_return_trampoline (struct gdbarch *gdbarch, CORE_ADDR pc, char *name)
+gdbarch_in_solib_return_trampoline (struct gdbarch *gdbarch, CORE_ADDR pc, const char *name)
 {
   gdb_assert (gdbarch != NULL);
   gdb_assert (gdbarch->in_solib_return_trampoline != NULL);
@@ -3646,8 +3646,8 @@ gdbarch_static_transform_name_p (struct gdbarch *gdbarch)
   return gdbarch->static_transform_name != NULL;
 }
 
-char *
-gdbarch_static_transform_name (struct gdbarch *gdbarch, char *name)
+const char *
+gdbarch_static_transform_name (struct gdbarch *gdbarch, const char *name)
 {
   gdb_assert (gdbarch != NULL);
   gdb_assert (gdbarch->static_transform_name != NULL);

@@ -734,7 +734,7 @@ if test "${with_python}" = no; then
   have_libpython=no
 else
   case "${with_python}" in
-  /*)
+  [[\\/]]* | ?:[[\\/]]*)
     if test -d ${with_python}; then
       # Assume the python binary is ${with_python}/bin/python.
       python_prog="${with_python}/bin/python"
@@ -1908,8 +1908,11 @@ AC_SUBST(WIN32LIBS)
 OLD_CFLAGS=$CFLAGS
 OLD_LDFLAGS=$LDFLAGS
 OLD_LIBS=$LIBS
-CFLAGS="$CFLAGS -I${srcdir}/../include -I../bfd -I${srcdir}/../bfd"
-LDFLAGS="$LDFLAGS -L../bfd -L../libiberty"
+# Put the old CFLAGS/LDFLAGS last, in case the user's (C|LD)FLAGS
+# points somewhere with bfd, with -I/foo/lib and -L/foo/lib.  We
+# always want our bfd.
+CFLAGS="-I${srcdir}/../include -I../bfd -I${srcdir}/../bfd $CFLAGS"
+LDFLAGS="-L../bfd -L../libiberty $LDFLAGS"
 intl=`echo $LIBINTL | sed 's,${top_builddir}/,,g'`
 # -ldl is provided by bfd/Makfile.am (LIBDL) <PLUGINS>.
 if test "$plugins" = "yes"; then

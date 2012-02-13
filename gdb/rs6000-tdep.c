@@ -108,7 +108,7 @@ static struct cmd_list_element *showpowerpccmdlist = NULL;
 static enum auto_boolean powerpc_soft_float_global = AUTO_BOOLEAN_AUTO;
 
 /* The vector ABI to use.  Keep this in sync with powerpc_vector_abi.  */
-static const char *powerpc_vector_strings[] =
+static const char *const powerpc_vector_strings[] =
 {
   "auto",
   "generic",
@@ -2189,7 +2189,7 @@ rs6000_frame_align (struct gdbarch *gdbarch, CORE_ADDR addr)
 
 static int
 rs6000_in_solib_return_trampoline (struct gdbarch *gdbarch,
-				   CORE_ADDR pc, char *name)
+				   CORE_ADDR pc, const char *name)
 {
   return name && !strncmp (name, "@FIX", 4);
 }

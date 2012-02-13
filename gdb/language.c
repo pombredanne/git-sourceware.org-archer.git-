@@ -933,7 +933,7 @@ const struct language_defn unknown_language_defn =
   default_print_array_index,
   default_pass_by_reference,
   default_get_string,
-  strcmp_iw_ordered,
+  NULL,				/* la_get_symbol_name_cmp */
   iterate_over_symbols,
   LANG_MAGIC
 };
@@ -976,7 +976,7 @@ const struct language_defn auto_language_defn =
   default_print_array_index,
   default_pass_by_reference,
   default_get_string,
-  strcmp_iw_ordered,
+  NULL,				/* la_get_symbol_name_cmp */
   iterate_over_symbols,
   LANG_MAGIC
 };
@@ -1017,7 +1017,7 @@ const struct language_defn local_language_defn =
   default_print_array_index,
   default_pass_by_reference,
   default_get_string,
-  strcmp_iw_ordered,
+  NULL,				/* la_get_symbol_name_cmp */
   iterate_over_symbols,
   LANG_MAGIC
 };
@@ -1109,10 +1109,10 @@ language_lookup_primitive_type_by_name (const struct language_defn *la,
 void
 _initialize_language (void)
 {
-  static const char *type_or_range_names[]
+  static const char *const type_or_range_names[]
     = { "on", "off", "warn", "auto", NULL };
 
-  static const char *case_sensitive_names[]
+  static const char *const case_sensitive_names[]
     = { "on", "off", "auto", NULL };
 
   language_gdbarch_data

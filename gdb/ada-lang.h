@@ -219,7 +219,8 @@ extern enum language ada_update_initial_language (enum language);
 extern void clear_ada_sym_cache (void);
 
 extern int ada_lookup_symbol_list (const char *, const struct block *,
-                                   domain_enum, struct ada_symbol_info**);
+                                   domain_enum, struct ada_symbol_info**,
+				   int);
 
 extern char *ada_fold_name (const char *);
 
@@ -321,7 +322,7 @@ extern struct type *ada_template_to_fixed_record_type_1 (struct type *type,
 
 extern int ada_name_prefix_len (const char *);
 
-extern char *ada_type_name (struct type *);
+extern const char *ada_type_name (struct type *);
 
 extern struct type *ada_find_parallel_type (struct type *,
                                             const char *suffix);

@@ -321,18 +321,28 @@ cplusplus_error (const char *name, const char *fmt, ...)
   throw_error (NOT_FOUND_ERROR, "%s", message);
 }
 
+/* Some data for the expand_symtabs_matching callback.  */
+
+struct symbol_matcher_data
+{
+  /* The lookup name against which symbol name should be compared.  */
+  const char *lookup_name;
+
+  /* The routine to be used for comparison.  */
+  symbol_name_cmp_ftype symbol_name_cmp;
+};
+
 /* A helper for iterate_over_all_matching_symtabs that is passed as a
    callback to the expand_symtabs_matching method.  */
 
 static int
-iterate_name_matcher (const struct language_defn *language,
-		      const char *name, void *d)
+iterate_name_matcher (const char *name, void *d)
 {
-  const char **dname = d;
+  const struct symbol_matcher_data *data = d;
 
-  if (language->la_symbol_name_compare (name, *dname) == 0)
-    return 1;
-  return 0;
+  if (data->symbol_name_cmp (name, data->lookup_name) == 0)
+    return 1; /* Expand this symbol's symbol table.  */
+  return 0; /* Skip this symbol.  */
 }
 
 /* A helper that walks over all matching symtabs in all objfiles and
@@ -343,12 +353,19 @@ iterate_name_matcher (const struct language_defn *language,
 static void
 iterate_over_all_matching_symtabs (const char *name,
 				   const domain_enum domain,
-				   int (*callback) (struct symbol *, void *),
+				   symbol_found_callback_ftype *callback,
 				   void *data,
 				   struct program_space *search_pspace)
 {
   struct objfile *objfile;
   struct program_space *pspace;
+  struct symbol_matcher_data matcher_data;
+
+  matcher_data.lookup_name = name;
+  matcher_data.symbol_name_cmp =
+    current_language->la_get_symbol_name_cmp != NULL
+    ? current_language->la_get_symbol_name_cmp (name)
+    : strcmp_iw;
 
   ALL_PSPACES (pspace)
   {
@@ -367,7 +384,7 @@ iterate_over_all_matching_symtabs (const char *name,
 	objfile->sf->qf->expand_symtabs_matching (objfile, NULL,
 						  iterate_name_matcher,
 						  ALL_DOMAIN,
-						  &name);
+						  &matcher_data);
 
       ALL_OBJFILE_SYMTABS (objfile, symtab)
 	{
@@ -418,8 +435,7 @@ find_methods (struct type *t, const char *name,
 {
   int i1 = 0;
   int ibase;
-  char *class_name = type_name_no_tag (t);
-  char *canon;
+  const char *class_name = type_name_no_tag (t);
 
   /* Ignore this class if it doesn't have a name.  This is ugly, but
      unless we figure out how to get the physname without the name of
@@ -439,7 +455,7 @@ find_methods (struct type *t, const char *name,
 	   method_counter >= 0;
 	   --method_counter)
 	{
-	  char *method_name = TYPE_FN_FIELDLIST_NAME (t, method_counter);
+	  const char *method_name = TYPE_FN_FIELDLIST_NAME (t, method_counter);
 	  char dem_opname[64];
 
 	  if (strncmp (method_name, "__", 2) == 0 ||
@@ -887,7 +903,7 @@ decode_line_internal (struct linespec_state *self, char **argptr)
 
   /* Locate the end of the first half of the linespec.
      After the call, for instance, if the argptr string is "foo.c:123"
-     p will point at "123".  If there is only one part, like "foo", p
+     p will point at ":123".  If there is only one part, like "foo", p
      will point to "".  If this is a C++ name, like "A::B::foo", p will
      point to "::B::foo".  Argptr is not changed by this call.  */
 
@@ -896,9 +912,11 @@ decode_line_internal (struct linespec_state *self, char **argptr)
   /* First things first: if ARGPTR starts with a filename, get its
      symtab and strip the filename from ARGPTR.
      Avoid calling symtab_from_filename if we know can,
-     it can be expensive.  */
+     it can be expensive.  We know we can avoid the call if we see a
+     single word (e.g., "break NAME") or if we see a qualified C++
+     name ("break QUAL::NAME").  */
 
-  if (*p != '\0')
+  if (*p != '\0' && !(p[0] == ':' && p[1] == ':'))
     {
       TRY_CATCH (file_exception, RETURN_MASK_ERROR)
 	{
@@ -1791,14 +1809,14 @@ collect_one_symbol (struct symbol *sym, void *d)
   struct type *t;
 
   if (SYMBOL_CLASS (sym) != LOC_TYPEDEF)
-    return 1;
+    return 1; /* Continue iterating.  */
 
   t = SYMBOL_TYPE (sym);
   CHECK_TYPEDEF (t);
   if (TYPE_CODE (t) != TYPE_CODE_STRUCT
       && TYPE_CODE (t) != TYPE_CODE_UNION
       && TYPE_CODE (t) != TYPE_CODE_NAMESPACE)
-    return 1;
+    return 1; /* Continue iterating.  */
 
   slot = htab_find_slot (collector->unique_syms, sym, INSERT);
   if (!*slot)
@@ -1807,7 +1825,7 @@ collect_one_symbol (struct symbol *sym, void *d)
       VEC_safe_push (symbolp, collector->symbols, sym);
     }
 
-  return 1;
+  return 1; /* Continue iterating.  */
 }
 
 /* Return the symbol corresponding to the substring of *ARGPTR ending
@@ -2198,7 +2216,7 @@ collect_function_symbols (struct symbol *sym, void *arg)
   if (SYMBOL_CLASS (sym) == LOC_BLOCK)
     VEC_safe_push (symbolp, *syms, sym);
 
-  return 1;
+  return 1; /* Continue iterating.  */
 }
 
 /* Look up a function symbol in *ARGPTR.  If found, advance *ARGPTR
@@ -2705,7 +2723,7 @@ collect_symbols (struct symbol *sym, void *data)
     add_sal_to_sals (info->state, &info->result, &sal,
 		     SYMBOL_NATURAL_NAME (sym));
 
-  return 1;
+  return 1; /* Continue iterating.  */
 }
 
 /* We've found a minimal symbol MSYMBOL to associate with our

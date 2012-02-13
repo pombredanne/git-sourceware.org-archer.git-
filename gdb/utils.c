@@ -886,7 +886,7 @@ can_dump_core (const char *reason)
 const char internal_problem_ask[] = "ask";
 const char internal_problem_yes[] = "yes";
 const char internal_problem_no[] = "no";
-static const char *internal_problem_modes[] =
+static const char *const internal_problem_modes[] =
 {
   internal_problem_ask,
   internal_problem_yes,
@@ -2589,7 +2589,7 @@ print_spaces_filtered (int n, struct ui_file *stream)
    demangling is off, the name is printed in its "raw" form.  */
 
 void
-fprintf_symbol_filtered (struct ui_file *stream, char *name,
+fprintf_symbol_filtered (struct ui_file *stream, const char *name,
 			 enum language lang, int arg_mode)
 {
   char *demangled;
