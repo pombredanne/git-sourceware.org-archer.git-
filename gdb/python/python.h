@@ -39,6 +39,10 @@ int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			      const struct value_print_options *options,
 			      const struct language_defn *language);
 
+int apply_frame_filter (struct frame_info *frame, int print_level,
+			enum print_what print_what, int print_args,
+			struct ui_out *out);
+
 void preserve_python_values (struct objfile *objfile, htab_t copied_types);
 
 void load_auto_scripts_for_objfile (struct objfile *objfile);

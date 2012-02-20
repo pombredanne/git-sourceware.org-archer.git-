@@ -214,9 +214,11 @@ PyObject *frame_info_to_frame_object (struct frame_info *frame);
 
 PyObject *pspace_to_pspace_object (struct program_space *);
 PyObject *pspy_get_printers (PyObject *, void *);
+PyObject *pspy_get_frame_filters (PyObject *, void *);
 
 PyObject *objfile_to_objfile_object (struct objfile *);
 PyObject *objfpy_get_printers (PyObject *, void *);
+PyObject *objfpy_get_frame_filters (PyObject *, void *);
 
 thread_object *create_thread_object (struct thread_info *tp);
 thread_object *find_thread_object (ptid_t ptid);

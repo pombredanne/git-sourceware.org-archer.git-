@@ -1264,6 +1264,7 @@ message == an error message without a stack will be printed."),
 
   PyRun_SimpleString ("import gdb");
   PyRun_SimpleString ("gdb.pretty_printers = []");
+  PyRun_SimpleString ("gdb.frame_filters = []");
 
   gdbpy_to_string_cst = PyString_FromString ("to_string");
   gdbpy_children_cst = PyString_FromString ("children");

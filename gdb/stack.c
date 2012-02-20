@@ -53,6 +53,7 @@
 
 #include "psymtab.h"
 #include "symfile.h"
+#include "python/python.h"
 
 void (*deprecated_selected_frame_level_changed_hook) (int);
 
@@ -761,7 +762,12 @@ print_frame_info (struct frame_info *frame, int print_level,
   struct symtab_and_line sal;
   int source_print;
   int location_print;
+  int result;
   struct ui_out *uiout = current_uiout;
+
+  result = apply_frame_filter (frame, 1, LOCATION, 1, current_uiout);
+  if (result)
+    return;
 
   if (get_frame_type (frame) == DUMMY_FRAME
       || get_frame_type (frame) == SIGTRAMP_FRAME

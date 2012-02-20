@@ -34,6 +34,10 @@ typedef struct
 
   /* The pretty-printer list of functions.  */
   PyObject *printers;
+
+  /* The frame filter list of functions.  */
+  PyObject *frame_filters;
+
 } pspace_object;
 
 static PyTypeObject pspace_object_type;
@@ -66,6 +70,7 @@ pspy_dealloc (PyObject *self)
   pspace_object *ps_self = (pspace_object *) self;
 
   Py_XDECREF (ps_self->printers);
+  Py_XDECREF (ps_self->frame_filters);
   self->ob_type->tp_free (self);
 }
 
@@ -84,6 +89,15 @@ pspy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
 	  Py_DECREF (self);
 	  return NULL;
 	}
+
+      self->frame_filters = PyList_New (0);
+      if (!self->frame_filters)
+	{
+	  Py_DECREF (self->printers);
+	  Py_DECREF (self);
+	  return NULL;
+	}
+
     }
   return (PyObject *) self;
 }
@@ -121,6 +135,44 @@ pspy_set_printers (PyObject *o, PyObject *value, void *ignore)
   tmp = self->printers;
   Py_INCREF (value);
   self->printers = value;
+  Py_XDECREF (tmp);
+
+  return 0;
+}
+
+PyObject *
+pspy_get_frame_filters (PyObject *o, void *ignore)
+{
+  pspace_object *self = (pspace_object *) o;
+
+  Py_INCREF (self->frame_filters);
+  return self->frame_filters;
+}
+
+static int
+pspy_set_frame_filters (PyObject *o, PyObject *frame, void *ignore)
+{
+  PyObject *tmp;
+  pspace_object *self = (pspace_object *) o;
+
+  if (! frame)
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       "cannot delete the frame filter attribute");
+      return -1;
+    }
+
+  if (! PyList_Check (frame))
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       "the frame filter attribute must be a list");
+      return -1;
+    }
+
+  /* Take care in case the LHS and RHS are related somehow.  */
+  tmp = self->frame_filters;
+  Py_INCREF (frame);
+  self->frame_filters = frame;
   Py_XDECREF (tmp);
 
   return 0;
@@ -168,6 +220,14 @@ pspace_to_pspace_object (struct program_space *pspace)
 	      return NULL;
 	    }
 
+	  object->frame_filters = PyList_New (0);
+	  if (!object->frame_filters)
+	    {
+	      Py_DECREF (object->printers);
+	      Py_DECREF (object);
+	      return NULL;
+	    }
+
 	  set_program_space_data (pspace, pspy_pspace_data_key, object);
 	}
     }
@@ -197,6 +257,8 @@ static PyGetSetDef pspace_getset[] =
     "The progspace's main filename, or None.", NULL },
   { "pretty_printers", pspy_get_printers, pspy_set_printers,
     "Pretty printers.", NULL },
+  { "frame_filters", pspy_get_frame_filters, pspy_set_frame_filters,
+    "Frame filters.", NULL },
   { NULL }
 };
 
