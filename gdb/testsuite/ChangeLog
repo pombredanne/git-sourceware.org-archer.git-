@@ -1,3 +1,138 @@
+2012-02-20  Pedro Alves  <palves@redhat.com>
+
+	* gdb.threads/attach-into-signal.exp (corefunc): Don't enable
+	lin-lwp output.  Set SIGALRM to stop.  Adjust tests to not rely on
+	gdb's internal debug output.  For the non-threaded case, look for
+	"Program received signal SIGLARM", for the threaded case, peek at
+	the thread's siginfo.
+
+2012-02-20  Pedro Alves  <palves@redhat.com>
+
+	General cleanup, make output test messages unique, and build
+	different executable files for the non-threaded and threaded
+	cases.
+
+	* gdb.threads/attach-into-signal.exp (binfile, escapedbinfile):
+	Delete.
+	(executable_nothr, executable_thr): New globals.
+	(top level): Adjust to delete both executables.
+	(corefunc): New parameter $executable.  Set $pf_prefix instead of
+	hand writing a prefix in tests.  Issue a clean_restart and enable
+	lin-lwp debug output here.
+	(top level): Adjust.  Use build_executable.  Don't start gdb here,
+	and don't enable lin-lwp debug output here.
+	* gdb.threads/Makefile.in (EXECUTABLES): Adjust.
+
+2012-02-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix racy FAILs.
+	* gdb.base/catch-load.exp (one_catch_load_test): Remove duplicate
+	"continue" command.
+
+2012-02-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix for gdbserver non-extended mode.
+	* gdb.base/break-inline.exp (start): Replace "start" by gdb_breakpoint
+	and gdb_run_cmd.
+
+2012-02-17  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-events.py (exit_handler): Add test for 'dir'.
+	* gdb.python/py-events.exp: Check 'dir' output.
+	* gdb.python/py-type.exp (test_fields): Add test for 'dir'.
+
+2012-02-17  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/strace.exp (strace_info_marker): Test `info threads'.
+
+2012-02-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/inferior-died.c: Don't include stdio.h.
+
+2012-02-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/inferior-died.c: New file.
+	* gdb.base/inferior-died.exp: New file.
+
+2012-02-15  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* gdb.base/break-inline.exp: New file.
+	* gdb.base/break-inline.c: New file.
+
+2012-02-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/pc-fp.exp: Add "info register" tests.
+
+2012-02-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/regs.exp: Remove.
+
+2012-02-15  Pedro Alves  <palves@redhat.com>
+
+	* gdb.trace/backtrace.exp: Issue UNSUPPORTED instead of PASS when
+	the target doesn't support tracepoints.
+	* gdb.trace/circ.exp: Ditto.
+	* gdb.trace/collection.exp: Ditto.
+	* gdb.trace/packetlen.exp: Ditto.
+	* gdb.trace/passc-dyn.exp: Ditto.
+	* gdb.trace/report.exp: Ditto.
+	* gdb.trace/tfind.exp: Ditto.
+	* gdb.trace/tspeed.exp: Ditto.
+	* gdb.trace/tsv.exp: Ditto.
+	* gdb.trace/unavailable.exp: Ditto.
+	* gdb.trace/while-dyn.exp: Ditto.
+
+2012-02-15  Pedro Alves  <palves@redhat.com>
+
+	* gdb.trace/circ.exp (trace_buffer_normal): Rewrite using
+	gdb_test_multiple, and call unsupported instead of fail, if the
+	remote side does not support the request.
+
+2012-02-15  Pedro Alves  <palves@redhat.com>
+
+	* gdb.server/ext-attach.exp: Make sure gdb is disconnected.
+	* gdb.server/ext-run.exp: Make sure gdb is disconnected.
+	* gdb.server/file-transfer.exp: Make sure gdb is disconnected.
+	* gdb.server/server-mon.exp: Make sure gdb is disconnected.
+	* gdb.server/server-run.exp: Make sure gdb is disconnected.
+	* lib/gdbserver-support.exp (gdbserver_start_extended): Only
+	prepend "extended-" to $gdbserver_protocol if $gdbserver_protocol
+	doesn't start with "extended-" already.
+
+2012-02-15  Pedro Alves  <palves@redhat.com>
+
+	Support extended-remote.  Avoid cascading timeouts.
+
+	* gdb.base/attach.exp (do_attach_tests): Add expected output for
+	the extended-remote target.  If attaching with no file fails, load
+	the file manually.
+	* gdb.server/ext-attach.exp: Adjust expected attach/detach output.
+
+2012-02-14  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.base/ena-dis-br.exp: Add enable count test.
+
+2012-02-13  Pedro Alves  <palves@redhat.com>
+
+	* config/mips-idt.exp: Delete.
+	* gdb.base/a2-run.exp: Remove mips-idt xfails.
+	* gdb.base/bitfields.exp: Remove mips-idt restarts.
+	* gdb.base/break.exp: Remove mips-idt references.
+	* gdb.base/chng-syms.exp: Ditto.
+	* gdb.base/default.exp: Ditto.
+	* gdb.base/funcargs.exp (funcargs_reload): Delete.
+	(top level): Don't call it.
+	* gdb.base/opaque.exp: Remove mips-idt restarts.
+	* gdb.base/ptype.exp: Remove mips-idt xfails.
+	* gdb.base/scope.exp: Remove mips-idt restarts.
+	* gdb.base/sepdebug.exp: Remove mips-idt references.
+	* gdb.base/watchpoint.exp (maybe_clean_restart)
+	(maybe_reinitialize): Delete.
+	(test_disabling_watchpoints, test_disabling_watchpoints)
+	(test_watchpoint_triggered_in_syscall)
+	(test_watchpoint_and_breakpoint, test_inaccessible_watchpoint):
+	Don't call them.
+
 2012-02-12  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.server/server-exec-info.exp: New file.

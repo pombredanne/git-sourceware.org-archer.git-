@@ -3505,6 +3505,11 @@ has been hit.  This is especially useful in conjunction with the
 hits, look at the breakpoint info to see how many times the breakpoint
 was hit, and then run again, ignoring one less than that number.  This
 will get you quickly to the last hit of that breakpoint.
+
+@noindent
+For a breakpoints with an enable count (xref) greater than 1,
+@code{info break} also displays that count.
+
 @end table
 
 @value{GDBN} allows you to set any number of breakpoints at the same place in
@@ -4252,8 +4257,8 @@ do not know which numbers to use.
 Disabling and enabling a breakpoint that has multiple locations
 affects all of its locations.
 
-A breakpoint, watchpoint, or catchpoint can have any of four different
-states of enablement:
+A breakpoint, watchpoint, or catchpoint can have any of several
+different states of enablement:
 
 @itemize @bullet
 @item
@@ -4264,6 +4269,9 @@ Disabled.  The breakpoint has no effect on your program.
 @item
 Enabled once.  The breakpoint stops your program, but then becomes
 disabled.
+@item
+Enabled for a count.  The breakpoint stops your program for the next
+N times, then becomes disabled.
 @item
 Enabled for deletion.  The breakpoint stops your program, but
 immediately after it does so it is deleted permanently.  A breakpoint
@@ -4291,6 +4299,14 @@ become effective once again in stopping your program.
 @item enable @r{[}breakpoints@r{]} once @var{range}@dots{}
 Enable the specified breakpoints temporarily.  @value{GDBN} disables any
 of these breakpoints immediately after stopping your program.
+
+@item enable @r{[}breakpoints@r{]} count @var{count} @var{range}@dots{}
+Enable the specified breakpoints temporarily.  @value{GDBN} records
+@var{count} with each of the specified breakpoints, and decrements a
+breakpoint's count when it is hit.  When any count reaches 0,
+@value{GDBN} disables that breakpoint.  If a breakpoint has an ignore
+count (@pxref{Conditions, ,Break Conditions}), that will be
+decremented to 0 before @var{count} is affected.
 
 @item enable @r{[}breakpoints@r{]} delete @var{range}@dots{}
 Enable the specified breakpoints to work once, then die.  @value{GDBN}
@@ -19190,7 +19206,7 @@ Show MicroBlaze-specific debugging level.
 @cindex MIPS boards
 @value{GDBN} can use the MIPS remote debugging protocol to talk to a
 MIPS board attached to a serial line.  This is available when
-you configure @value{GDBN} with @samp{--target=mips-idt-ecoff}.
+you configure @value{GDBN} with @samp{--target=mips-elf}.
 
 @need 1000
 Use these @value{GDBN} commands to specify the connection to your target board:
@@ -19295,7 +19311,7 @@ waiting for an acknowledgment of a packet with the @code{set
 retransmit-timeout @var{seconds}} command.  The default is 3 seconds.
 You can inspect both values with @code{show timeout} and @code{show
 retransmit-timeout}.  (These commands are @emph{only} available when
-@value{GDBN} is configured for @samp{--target=mips-idt-ecoff}.)
+@value{GDBN} is configured for @samp{--target=mips-elf}.)
 
 The timeout set by @code{set timeout} does not apply when @value{GDBN}
 is waiting for your program to stop.  In that case, @value{GDBN} waits
@@ -24613,7 +24629,7 @@ then @value{GDBN} will look for @var{real-name} in all of the
 directories mentioned in the value of @code{debug-file-directory}.
 
 Finally, if this file does not exist, then @value{GDBN} will look for
-a file named @file{@var{data-directory}/python/auto-load/@var{real-name}}, where
+a file named @file{@var{data-directory}/auto-load/@var{real-name}}, where
 @var{data-directory} is @value{GDBN}'s data directory (available via
 @code{show data-directory}, @pxref{Data Files}), and @var{real-name}
 is the object file's real name, as described above.
