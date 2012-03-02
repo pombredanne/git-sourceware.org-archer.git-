@@ -409,6 +409,23 @@ linespec_lexer_lex_terminal (const char *p)
   return NULL;
 }
 
+/* Does STRING represent an Ada operator?  If so, return the length
+   of the decoded operator name.  If not, return 0.  */
+
+static int
+is_ada_operator (const char *string)
+{
+  const struct ada_opname_map *mapping;
+
+  for (mapping = ada_opname_table;
+       mapping->encoded != NULL
+	 && strncmp (mapping->decoded, string,
+		     strlen (mapping->decoded)) != 0; ++mapping)
+    ;
+
+  return mapping->decoded == NULL ? 0 : strlen (mapping->decoded);
+}
+
 /* Lex a string.  */
 
 static linespec_token
@@ -426,6 +443,26 @@ linespec_lexer_lex_string (linespec_parser *parser)
     {
       char *end;
       char quote_char = *PARSER_STREAM (parser);
+
+      /* Special case: Ada operators.  */
+      if (current_language->la_language == language_ada
+	  && quote_char == '\"')
+	{
+	  int len = is_ada_operator (PARSER_STREAM (parser));
+
+	  if (len != 0)
+	    {
+	      /* The input is an Ada operator.  Return the quoted string
+		 as-is.  */
+	      LS_TOKEN_STOKEN (token).ptr = PARSER_STREAM (parser);
+	      LS_TOKEN_STOKEN (token).length = len;
+	      PARSER_STREAM (parser) += len;
+	      return token;
+	    }
+
+	  /* The input does not represent an Ada operator -- fall through
+	     to normal quoted string handling.  */
+	}
 
       /* Skip past the beginning quote.  */
       ++(PARSER_STREAM (parser));
