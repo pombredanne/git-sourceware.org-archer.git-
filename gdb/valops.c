@@ -1037,7 +1037,8 @@ int
 value_fetch_lazy (struct value *val)
 {
   gdb_assert (value_lazy (val));
-  allocate_value_contents (val);
+  if (VALUE_LVAL (val) != lval_memory)
+    allocate_value_contents (val);
   if (value_bitsize (val))
     {
       /* To read a lazy bitfield, read the entire enclosing value.  This
@@ -1080,11 +1081,15 @@ value_fetch_lazy (struct value *val)
 
 	  if (length)
 	    {
+	      /* Delay it after object_address_get_data above.  */
+	      allocate_value_contents (val);
 	      addr += value_offset (val);
 	      read_value_memory (val, 0, value_stack (val),
 				 addr, value_contents_all_raw (val), length);
 	    }
 	}
+      /* Just to be sure it has been called.  */
+      allocate_value_contents (val);
     }
   else if (VALUE_LVAL (val) == lval_register)
     {
