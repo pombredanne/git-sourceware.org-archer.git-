@@ -583,8 +583,13 @@ linespec_lexer_lex_one (linespec_parser *parser)
           break;
 
 	case ':':
-	  parser->lexer.current.type = LSTOKEN_COLON;
-	  ++(PARSER_STREAM (parser));
+	  if (PARSER_STREAM (parser)[1] == ':')
+	    parser->lexer.current = linespec_lexer_lex_string (parser);
+	  else
+	    {
+	      parser->lexer.current.type = LSTOKEN_COLON;
+	      ++(PARSER_STREAM (parser));
+	    }
 	  break;
 
 	default:
