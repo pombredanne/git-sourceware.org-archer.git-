@@ -246,7 +246,7 @@ find_frame_filter (PyObject *frame, int print_level,
   return function;
 }
 
-int
+static int
 print_frame (PyObject *filter, int print_level,
 	     enum print_what print_what, int print_args,
 	     struct ui_out *out,
@@ -403,7 +403,7 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   get_user_print_options (&opts);
   print_result = print_frame (filter, print_level, print_what,
 			      print_args, out, opts, frame);
-
+  
   if (print_result)
     result = 1;
   else
