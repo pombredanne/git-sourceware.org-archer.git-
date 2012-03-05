@@ -274,12 +274,12 @@ static struct symtabs_and_lines decode_objc (struct linespec_state *self,
 
 static VEC (symbolp) *lookup_prefix_sym (struct linespec_state *state,
 					 VEC (symtab_p) *,
-					 char *);
+					 const char *);
 
 static void find_method (struct linespec_state *self,
 			 VEC (symtab_p) *file_symtabs,
 			 const char *class_name,
-			 char *method_name,
+			 const char *method_name,
 			 VEC (symbolp) *sym_classes,
 			 VEC (symbolp) **symbols,
 			 VEC (minsym_and_objfile_d) **minsyms);
@@ -289,7 +289,7 @@ static void cplusplus_error (const char *name, const char *fmt, ...)
 
 static const char *find_toplevel_char (const char *s, char c);
 
-static VEC (symtab_p) *symtabs_from_filename (char *);
+static VEC (symtab_p) *symtabs_from_filename (const char *);
 
 static void find_function_symbols (struct linespec_state *state,
 				   VEC (symtab_p) *file_symtabs,
@@ -300,16 +300,17 @@ static void find_function_symbols (struct linespec_state *state,
 static VEC (symbolp) *find_label_symbols (struct linespec_state *self,
 					  VEC (symbolp) *function_symbols,
 					  VEC (symbolp) **label_funcs_ret,
-					  char *name);
+					  const char *name);
 
 void find_linespec_symbols (struct linespec_state *self,
 			    VEC (symtab_p) *file_symtabs,
-			    char *name,
+			    const char *name,
 			    VEC (symbolp) **symbols,
 			    VEC (minsym_and_objfile_d) **minsyms);
 
 static struct line_offset
-     linespec_parse_variable (struct linespec_state *self, char *variable);
+     linespec_parse_variable (struct linespec_state *self,
+			      const char *variable);
 
 static int symbol_to_sal (struct symtab_and_line *result,
 			  int funfirstline, struct symbol *sym);
@@ -2219,7 +2220,7 @@ collect_one_symbol (struct symbol *sym, void *d)
 
 static VEC (symbolp) *
 lookup_prefix_sym (struct linespec_state *state, VEC (symtab_p) *file_symtabs,
-		   char *class_name)
+		   const char *class_name)
 {
   int ix;
   struct symtab *elt;
@@ -2375,7 +2376,7 @@ find_superclass_methods (VEC (typep) *superclasses,
 
 static void
 find_method (struct linespec_state *self, VEC (symtab_p) *file_symtabs,
-	     const char *class_name, char *method_name,
+	     const char *class_name, const char *method_name,
 	     VEC (symbolp) *sym_classes, VEC (symbolp) **symbols,
 	     VEC (minsym_and_objfile_d) **minsyms)
 {
@@ -2534,7 +2535,7 @@ collect_symtabs_from_filename (const char *file)
    current token in PARSER.  */
 
 static VEC (symtab_p) *
-symtabs_from_filename (char *filename)
+symtabs_from_filename (const char *filename)
 {
   VEC (symtab_p) *result;
   
@@ -2599,7 +2600,7 @@ find_function_symbols (struct linespec_state *state,
 void
 find_linespec_symbols (struct linespec_state *state,
 		       VEC (symtab_p) *file_symtabs,
-		       char *name,
+		       const char *name,
 		       VEC (symbolp) **symbols,
 		       VEC (minsym_and_objfile_d) **minsyms)
 {
@@ -2699,7 +2700,7 @@ find_linespec_symbols (struct linespec_state *state,
 static VEC (symbolp) *
 find_label_symbols (struct linespec_state *self,
 		    VEC (symbolp) *function_symbols,
-		    VEC (symbolp) **label_funcs_ret, char *name)
+		    VEC (symbolp) **label_funcs_ret, const char *name)
 {
   int ix;
   struct block *block;
@@ -2830,10 +2831,10 @@ decode_digits_ordinary (struct linespec_state *self,
 
 
 static struct line_offset
-linespec_parse_variable (struct linespec_state *self, char *variable)
+linespec_parse_variable (struct linespec_state *self, const char *variable)
 {
   int index = 0;
-  char *p;
+  const char *p;
   struct line_offset offset = {0, none};
 
   p = (variable[1] == '$') ? variable + 2 : variable + 1;
