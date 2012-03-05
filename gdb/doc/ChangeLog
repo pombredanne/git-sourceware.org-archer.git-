@@ -1,3 +1,48 @@
+2012-03-05  Tristan Gingold  <gingold@adacore.com>
+
+	* gdb.texinfo (General Query Packets): Document xfer:uib:read.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (In-Process Agent): New node.
+	Document new commands.
+	(General Query Packets): Add packet `QAgent'.
+
+2012-03-01  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* gdb.texinfo (MIPS Features): Add org.gnu.gdb.mips.dsp.
+
+2012-03-01  Scott J. Goldman <scottjg@vmware.com>
+
+	* gdb.texinfo (Commands In Python): Put example python macro in
+	COMMAND_USER category rather than COMMAND_OBSCURE.
+	Document gdb.COMMAND_USER.
+	(User-defined Commands): Update documentation to clarify
+	"set/show max-user-call-depth" and "show user" don't apply to python
+	commands.  Update documentation to clarify "help user-defined" may
+	also include python commands defined as COMMAND_USER.
+
+2012-02-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Startup): Add option -ex description to the option -x
+	description.
+
+2012-02-24  Luis Machado  <lgustavo@codesourcery.com>
+
+	* gdb.texinfo (Setting Breakpoints): Mention and explain the
+	condition-evaluation breakpoint parameter.
+	Mention condition-evaluation mode being shown in "info break".
+	(Break Conditions): Add description for target-side
+	conditional breakpoints.
+	(Remote Configuration): Mention conditional-breakpoints-packet. 
+	(Packets): Add cond-expr parameter to Z0/Z1 packets and explain
+	cond-expr.
+	(General Query Packets): Mention new ConditionalBreakpoint feature.
+
+2012-02-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Blocks In Python): Clarify block iteration.
+
 2012-02-17  Tom Tromey  <tromey@redhat.com>
 
 	PR python/10753:

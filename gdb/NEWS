@@ -5,6 +5,9 @@
 
 * Python scripting
 
+  ** GDB commands implemented in Python can now be put in command class
+     "gdb.COMMAND_USER".
+
   ** The "maint set python print-stack on|off" is now deleted.
 
   ** A new class, gdb.printing.FlagEnumerationPrinter, can be used to
@@ -44,6 +47,19 @@
 * The command "info catch" has been removed.  It has been disabled
   since December 2007.
 
+* The "catch exception" and "catch assert" commands now accept
+  a condition at the end of the command, much like the "break"
+  command does. For instance:
+
+        (gdb) catch exception Constraint_Error if Barrier = True
+
+  Previously, it was possible to add a condition to such catchpoints,
+  but it had to be done as a second step, after the catchpoint had been
+  created, using the "condition" command.
+
+* The "info static-tracepoint-marker" command will now also work on
+  native Linux targets with in-process agent.
+
 * New commands
 
   ** "catch load" and "catch unload" can be used to stop when a shared
@@ -55,6 +71,29 @@
 * New targets
 
 Renesas RL78			rl78-*-elf
+HP OpenVMS ia64			ia64-hp-openvms*
+
+* GDBserver supports evaluation of breakpoint conditions.  When
+  support is advertised by GDBserver, GDB may be told to send the
+  breakpoint conditions in bytecode form to GDBserver.  GDBserver
+  will only report the breakpoint trigger to GDB when its condition
+  evaluates to true.
+
+* New options
+
+set breakpoint condition-evaluation
+show breakpoint condition-evaluation
+  Controls whether breakpoint conditions are evaluated by GDB ("gdb") or by
+  GDBserver ("target").
+  This option can improve debugger efficiency depending on the speed of the
+  target.
+
+* New remote packets
+
+  The z0/z1 breakpoint insertion packets have been extended to carry
+  a list of conditional expressions over to the remote stub depending on the
+  condition evaluation mode.  The use of this extension can be controlled
+  via the "set remote conditional-breakpoints-packet" command.
 
 *** Changes in GDB 7.4
 

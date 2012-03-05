@@ -5008,7 +5008,8 @@ process_event_stop_test:
   /* If we're in the return path from a shared library trampoline,
      we want to proceed through the trampoline when stepping.  */
   if (gdbarch_in_solib_return_trampoline (gdbarch,
-					  stop_pc, ecs->stop_func_name))
+					  stop_pc, ecs->stop_func_name)
+      && ecs->event_thread->control.step_over_calls != STEP_OVER_NONE)
     {
       /* Determine where this trampoline returns.  */
       CORE_ADDR real_stop_pc;
@@ -5519,6 +5520,10 @@ insert_exception_resume_breakpoint (struct thread_info *tp,
 
 	  bp = set_momentary_breakpoint_at_pc (get_frame_arch (frame),
 					       handler, bp_exception_resume);
+
+	  /* set_momentary_breakpoint_at_pc invalidates FRAME.  */
+	  frame = NULL;
+
 	  bp->thread = tp->num;
 	  inferior_thread ()->control.exception_resume_breakpoint = bp;
 	}
@@ -6438,6 +6443,15 @@ xdb_handle_command (char *args, int from_tty)
 	}
     }
   do_cleanups (old_chain);
+}
+
+enum target_signal
+target_signal_from_command (int num)
+{
+  if (num >= 1 && num <= 15)
+    return (enum target_signal) num;
+  error (_("Only signals 1-15 are valid as numeric signals.\n\
+Use \"info signals\" for a list of symbolic signals."));
 }
 
 /* Print current contents of the tables set by the handle command.

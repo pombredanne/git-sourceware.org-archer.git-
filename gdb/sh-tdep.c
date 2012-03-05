@@ -41,8 +41,10 @@
 #include "osabi.h"
 #include "reggroups.h"
 #include "regset.h"
+#include "objfiles.h"
 
 #include "sh-tdep.h"
+#include "sh64-tdep.h"
 
 #include "elf-bfd.h"
 #include "solib-svr4.h"
@@ -712,55 +714,29 @@ sh_analyze_prologue (struct gdbarch *gdbarch,
 }
 
 /* Skip any prologue before the guts of a function.  */
-
-/* Skip the prologue using the debug information.  If this fails we'll
-   fall back on the 'guess' method below.  */
 static CORE_ADDR
-after_prologue (CORE_ADDR pc)
+sh_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
-  struct symtab_and_line sal;
-  CORE_ADDR func_addr, func_end;
-
-  /* If we can not find the symbol in the partial symbol table, then
-     there is no hope we can determine the function's start address
-     with this code.  */
-  if (!find_pc_partial_function (pc, NULL, &func_addr, &func_end))
-    return 0;
-
-  /* Get the line associated with FUNC_ADDR.  */
-  sal = find_pc_line (func_addr, 0);
-
-  /* There are only two cases to consider.  First, the end of the source line
-     is within the function bounds.  In that case we return the end of the
-     source line.  Second is the end of the source line extends beyond the
-     bounds of the current function.  We need to use the slow code to
-     examine instructions in that case.  */
-  if (sal.end < func_end)
-    return sal.end;
-  else
-    return 0;
-}
-
-static CORE_ADDR
-sh_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR start_pc)
-{
-  CORE_ADDR pc;
+  CORE_ADDR post_prologue_pc, func_addr;
   struct sh_frame_cache cache;
 
   /* See if we can determine the end of the prologue via the symbol table.
      If so, then return either PC, or the PC after the prologue, whichever
      is greater.  */
-  pc = after_prologue (start_pc);
+  if (find_pc_partial_function (pc, NULL, &func_addr, NULL))
+    {
+      post_prologue_pc = skip_prologue_using_sal (gdbarch, func_addr);
+      if (post_prologue_pc != 0)
+        return max (pc, post_prologue_pc);
+    }
 
-  /* If after_prologue returned a useful address, then use it.  Else
-     fall back on the instruction skipping code.  */
-  if (pc)
-    return max (pc, start_pc);
+  /* Can't determine prologue from the symbol table, need to examine
+     instructions.  */
 
   cache.sp_offset = -4;
-  pc = sh_analyze_prologue (gdbarch, start_pc, (CORE_ADDR) -1, &cache, 0);
-  if (!cache.uses_fp)
-    return start_pc;
+  post_prologue_pc = sh_analyze_prologue (gdbarch, pc, (CORE_ADDR) -1, &cache, 0);
+  if (cache.uses_fp)
+    pc = post_prologue_pc;
 
   return pc;
 }
@@ -2578,7 +2554,16 @@ sh_frame_cache (struct frame_info *this_frame, void **this_cache)
   if (cache->pc != 0)
     {
       ULONGEST fpscr;
-      fpscr = get_frame_register_unsigned (this_frame, FPSCR_REGNUM);
+
+      /* Check for the existence of the FPSCR register.	 If it exists,
+	 fetch its value for use in prologue analysis.	Passing a zero
+	 value is the best choice for architecture variants upon which
+	 there's no FPSCR register.  */
+      if (gdbarch_register_reggroup_p (gdbarch, FPSCR_REGNUM, all_reggroup))
+	fpscr = get_frame_register_unsigned (this_frame, FPSCR_REGNUM);
+      else
+	fpscr = 0;
+
       sh_analyze_prologue (gdbarch, cache->pc, current_pc, cache, fpscr);
     }
 
@@ -2690,6 +2675,57 @@ static const struct frame_base sh_frame_base = {
   sh_frame_base_address,
   sh_frame_base_address,
   sh_frame_base_address
+};
+
+static struct sh_frame_cache *
+sh_make_stub_cache (struct frame_info *this_frame)
+{
+  struct gdbarch *gdbarch = get_frame_arch (this_frame);
+  struct sh_frame_cache *cache;
+
+  cache = sh_alloc_frame_cache ();
+
+  cache->saved_sp
+    = get_frame_register_unsigned (this_frame, gdbarch_sp_regnum (gdbarch));
+
+  return cache;
+}
+
+static void
+sh_stub_this_id (struct frame_info *this_frame, void **this_cache,
+                 struct frame_id *this_id)
+{
+  struct sh_frame_cache *cache;
+
+  if (*this_cache == NULL)
+    *this_cache = sh_make_stub_cache (this_frame);
+  cache = *this_cache;
+
+  *this_id = frame_id_build (cache->saved_sp, get_frame_pc (this_frame));
+}
+
+static int
+sh_stub_unwind_sniffer (const struct frame_unwind *self,
+                        struct frame_info *this_frame,
+                        void **this_prologue_cache)
+{
+  CORE_ADDR addr_in_block;
+
+  addr_in_block = get_frame_address_in_block (this_frame);
+  if (in_plt_section (addr_in_block, NULL))
+    return 1;
+
+  return 0;
+}
+
+static const struct frame_unwind sh_stub_unwind =
+{
+  NORMAL_FRAME,
+  default_frame_unwind_stop_reason,
+  sh_stub_this_id,
+  sh_frame_prev_register,
+  NULL,
+  sh_stub_unwind_sniffer
 };
 
 /* The epilogue is defined here as the area at the end of a function,
@@ -3081,6 +3117,7 @@ sh_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   gdbarch_init_osabi (info, gdbarch);
 
   dwarf2_append_unwinders (gdbarch);
+  frame_unwind_append_unwinder (gdbarch, &sh_stub_unwind);
   frame_unwind_append_unwinder (gdbarch, &sh_frame_unwind);
 
   return gdbarch;

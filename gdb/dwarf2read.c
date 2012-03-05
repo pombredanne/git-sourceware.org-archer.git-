@@ -378,16 +378,6 @@ struct dwarf2_cu
   /* Mark used when releasing cached dies.  */
   unsigned int mark : 1;
 
-  /* This flag will be set if this compilation unit might include
-     inter-compilation-unit references.  */
-  unsigned int has_form_ref_addr : 1;
-
-  /* This flag will be set if this compilation unit includes any
-     DW_TAG_namespace DIEs.  If we know that there are explicit
-     DIEs for namespaces, we don't need to try to infer them
-     from mangled names.  */
-  unsigned int has_namespace_info : 1;
-
   /* This CU references .debug_loc.  See the symtab->locations_valid field.
      This test is imperfect as there may exist optimized debug code not using
      any location list and still facing inlining issues if handled as
@@ -2054,7 +2044,7 @@ find_slot_in_mapped_hash (struct mapped_index *index, const char *name,
     }
 
   /* Index version 4 did not support case insensitive searches.  But the
-     indexes for case insensitive languages are built in lowercase, therefore
+     indices for case insensitive languages are built in lowercase, therefore
      simulate our NAME being searched is also lowercased.  */
   hash = mapped_index_string_hash ((index->version == 4
                                     && case_sensitivity == case_sensitive_off
@@ -2125,7 +2115,7 @@ dwarf2_read_index (struct objfile *objfile)
      version 5 and later.  */
   if (version < 4)
     return 0;
-  /* Indexes with higher version than the one supported by GDB may be no
+  /* Indices with higher version than the one supported by GDB may be no
      longer backward compatible.  */
   if (version > 5)
     return 0;
@@ -2437,13 +2427,6 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 		return 1;
 	    }
 
-	    {
-	      if (dw2_map_expand_apply (objfile, per_cu,
-					name, full_path, real_path,
-					callback, data))
-		return 1;
-	    }
-
 	  /* Before we invoke realpath, which can get expensive when many
 	     files are involved, do a quick comparison of the basenames.  */
 	  if (! basenames_may_differ
@@ -2707,32 +2690,63 @@ dw2_expand_symtabs_matching
   index = dwarf2_per_objfile->index_table;
 
   if (file_matcher != NULL)
-    for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		     + dwarf2_per_objfile->n_type_units); ++i)
-      {
-	int j;
-	struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
-	struct quick_file_names *file_data;
+    {
+      struct cleanup *cleanup;
+      htab_t visited_found, visited_not_found;
 
-	per_cu->v.quick->mark = 0;
+      visited_found = htab_create_alloc (10,
+					 htab_hash_pointer, htab_eq_pointer,
+					 NULL, xcalloc, xfree);
+      cleanup = make_cleanup_htab_delete (visited_found);
+      visited_not_found = htab_create_alloc (10,
+					     htab_hash_pointer, htab_eq_pointer,
+					     NULL, xcalloc, xfree);
+      make_cleanup_htab_delete (visited_not_found);
 
-	/* We only need to look at symtabs not already expanded.  */
-	if (per_cu->v.quick->symtab)
-	  continue;
+      for (i = 0; i < (dwarf2_per_objfile->n_comp_units
+		       + dwarf2_per_objfile->n_type_units); ++i)
+	{
+	  int j;
+	  struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
+	  struct quick_file_names *file_data;
+	  void **slot;
 
-	file_data = dw2_get_file_names (objfile, per_cu);
-	if (file_data == NULL)
-	  continue;
+	  per_cu->v.quick->mark = 0;
 
-	for (j = 0; j < file_data->num_file_names; ++j)
-	  {
-	    if (file_matcher (file_data->file_names[j], data))
-	      {
-		per_cu->v.quick->mark = 1;
-		break;
-	      }
-	  }
-      }
+	  /* We only need to look at symtabs not already expanded.  */
+	  if (per_cu->v.quick->symtab)
+	    continue;
+
+	  file_data = dw2_get_file_names (objfile, per_cu);
+	  if (file_data == NULL)
+	    continue;
+
+	  if (htab_find (visited_not_found, file_data) != NULL)
+	    continue;
+	  else if (htab_find (visited_found, file_data) != NULL)
+	    {
+	      per_cu->v.quick->mark = 1;
+	      continue;
+	    }
+
+	  for (j = 0; j < file_data->num_file_names; ++j)
+	    {
+	      if (file_matcher (file_data->file_names[j], data))
+		{
+		  per_cu->v.quick->mark = 1;
+		  break;
+		}
+	    }
+
+	  slot = htab_find_slot (per_cu->v.quick->mark
+				 ? visited_found
+				 : visited_not_found,
+				 file_data, INSERT);
+	  *slot = file_data;
+	}
+
+      do_cleanups (cleanup);
+    }
 
   for (iter = 0; iter < index->symbol_table_slots; ++iter)
     {
@@ -2794,8 +2808,27 @@ dw2_map_symbol_filenames (struct objfile *objfile, symbol_filename_ftype *fun,
 			  void *data, int need_fullname)
 {
   int i;
+  struct cleanup *cleanup;
+  htab_t visited = htab_create_alloc (10, htab_hash_pointer, htab_eq_pointer,
+				      NULL, xcalloc, xfree);
 
+  cleanup = make_cleanup_htab_delete (visited);
   dw2_setup (objfile);
+
+  /* We can ignore file names coming from already-expanded CUs.  */
+  for (i = 0; i < (dwarf2_per_objfile->n_comp_units
+		   + dwarf2_per_objfile->n_type_units); ++i)
+    {
+      struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
+
+      if (per_cu->v.quick->symtab)
+	{
+	  void **slot = htab_find_slot (visited, per_cu->v.quick->file_names,
+					INSERT);
+
+	  *slot = per_cu->v.quick->file_names;
+	}
+    }
 
   for (i = 0; i < (dwarf2_per_objfile->n_comp_units
 		   + dwarf2_per_objfile->n_type_units); ++i)
@@ -2803,6 +2836,7 @@ dw2_map_symbol_filenames (struct objfile *objfile, symbol_filename_ftype *fun,
       int j;
       struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
       struct quick_file_names *file_data;
+      void **slot;
 
       /* We only need to look at symtabs not already expanded.  */
       if (per_cu->v.quick->symtab)
@@ -2811,6 +2845,14 @@ dw2_map_symbol_filenames (struct objfile *objfile, symbol_filename_ftype *fun,
       file_data = dw2_get_file_names (objfile, per_cu);
       if (file_data == NULL)
 	continue;
+
+      slot = htab_find_slot (visited, file_data, INSERT);
+      if (*slot)
+	{
+	  /* Already visited.  */
+	  continue;
+	}
+      *slot = file_data;
 
       for (j = 0; j < file_data->num_file_names; ++j)
 	{
@@ -2823,6 +2865,8 @@ dw2_map_symbol_filenames (struct objfile *objfile, symbol_filename_ftype *fun,
 	  (*fun) (file_data->file_names[j], this_real_name, data);
 	}
     }
+
+  do_cleanups (cleanup);
 }
 
 static int
@@ -3343,7 +3387,7 @@ dwarf2_find_base_address (struct die_info *die, struct dwarf2_cu *cu)
    SECTION is the section the CU/TU comes from,
    either .debug_info or .debug_types.  */
 
-void
+static void
 process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
 			   struct dwarf2_section_info *section,
 			   int is_debug_types_section)
@@ -4611,7 +4655,7 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
   struct dwarf2_cu *cu;
   unsigned int offset;
   gdb_byte *info_ptr, *beg_of_comp_unit;
-  struct cleanup *free_abbrevs_cleanup = NULL, *free_cu_cleanup = NULL;
+  struct cleanup *free_cu_cleanup = NULL;
   struct attribute *attr;
   int read_cu = 0;
 
@@ -4650,10 +4694,6 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
       cu->header.offset = offset;
       cu->header.first_die_offset = info_ptr - beg_of_comp_unit;
 
-      /* Read the abbrevs for this compilation unit.  */
-      dwarf2_read_abbrevs (cu);
-      free_abbrevs_cleanup = make_cleanup (dwarf2_free_abbrev_table, cu);
-
       /* Link this CU into read_in_chain.  */
       per_cu->cu->read_in_chain = dwarf2_per_objfile->read_in_chain;
       dwarf2_per_objfile->read_in_chain = per_cu;
@@ -4680,8 +4720,6 @@ load_full_comp_unit (struct dwarf2_per_cu_data *per_cu)
 
   if (read_cu)
     {
-      do_cleanups (free_abbrevs_cleanup);
-
       /* We've successfully allocated this compilation unit.  Let our
 	 caller clean it up when finished with it.  */
       discard_cleanups (free_cu_cleanup);
@@ -9289,9 +9327,6 @@ dwarf2_read_abbrevs (struct dwarf2_cu *cu)
       cur_abbrev->has_children = read_1_byte (abfd, abbrev_ptr);
       abbrev_ptr += 1;
 
-      if (cur_abbrev->tag == DW_TAG_namespace)
-	cu->has_namespace_info = 1;
-
       /* now read in declarations */
       abbrev_name = read_unsigned_leb128 (abfd, abbrev_ptr, &bytes_read);
       abbrev_ptr += bytes_read;
@@ -9306,16 +9341,6 @@ dwarf2_read_abbrevs (struct dwarf2_cu *cu)
 		= xrealloc (cur_attrs, (allocated_attrs
 					* sizeof (struct attr_abbrev)));
 	    }
-
-	  /* Record whether this compilation unit might have
-	     inter-compilation-unit references.  If we don't know what form
-	     this attribute will have, then it might potentially be a
-	     DW_FORM_ref_addr, so we conservatively expect inter-CU
-	     references.  */
-
-	  if (abbrev_form == DW_FORM_ref_addr
-	      || abbrev_form == DW_FORM_indirect)
-	    cu->has_form_ref_addr = 1;
 
 	  cur_attrs[cur_abbrev->num_attrs].name = abbrev_name;
 	  cur_attrs[cur_abbrev->num_attrs++].form = abbrev_form;
@@ -10062,9 +10087,7 @@ fixup_partial_die (struct partial_die_info *part_die,
 
   /* If there is no parent die to provide a namespace, and there are
      children, see if we can determine the namespace from their linkage
-     name.
-     NOTE: We need to do this even if cu->has_namespace_info != 0.
-     gcc-4.5 -gdwarf-4 can drop the enclosing namespace.  */
+     name.  */
   if (cu->language == language_cplus
       && !VEC_empty (dwarf2_section_info_def, dwarf2_per_objfile->types)
       && part_die->die_parent == NULL

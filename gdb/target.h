@@ -280,7 +280,9 @@ enum target_object
   /* Load maps for FDPIC systems.  */
   TARGET_OBJECT_FDPIC,
   /* Darwin dynamic linker info data.  */
-  TARGET_OBJECT_DARWIN_DYLD_INFO
+  TARGET_OBJECT_DARWIN_DYLD_INFO,
+  /* OpenVMS Unwind Information Block.  */
+  TARGET_OBJECT_OPENVMS_UIB
   /* Possible future objects: TARGET_OBJECT_FILE, ...  */
 };
 
@@ -662,6 +664,10 @@ struct target_ops
     /* Does this target support the tracenz bytecode for string collection?  */
     int (*to_supports_string_tracing) (void);
 
+    /* Does this target support evaluation of breakpoint conditions on its
+       end?  */
+    int (*to_supports_evaluation_of_breakpoint_conditions) (void);
+
     /* Determine current architecture of thread PTID.
 
        The target is supposed to determine the architecture of the code where
@@ -832,6 +838,13 @@ struct target_ops
        re-fetching when necessary.  */
     struct traceframe_info *(*to_traceframe_info) (void);
 
+    /* Ask the target to use or not to use agent according to USE.  Return 1
+       successful, 0 otherwise.  */
+    int (*to_use_agent) (int use);
+
+    /* Is the target able to use agent in current state?  */
+    int (*to_can_use_agent) (void);
+
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
      */
@@ -967,6 +980,12 @@ int target_supports_disable_randomization (void);
 
 #define target_supports_string_tracing() \
   (*current_target.to_supports_string_tracing) ()
+
+/* Returns true if this target can handle breakpoint conditions
+   on its end.  */
+
+#define target_supports_evaluation_of_breakpoint_conditions() \
+  (*current_target.to_supports_evaluation_of_breakpoint_conditions) ()
 
 /* Invalidate all target dcaches.  */
 extern void target_dcache_invalidate (void);
@@ -1483,6 +1502,8 @@ extern int target_ranged_break_num_registers (void);
 #define target_stopped_data_address(target, addr_p) \
     (*target.to_stopped_data_address) (target, addr_p)
 
+/* Return non-zero if ADDR is within the range of a watchpoint spanning
+   LENGTH bytes beginning at START.  */
 #define target_watchpoint_addr_within_range(target, addr, start, length) \
   (*target.to_watchpoint_addr_within_range) (target, addr, start, length)
 
@@ -1663,6 +1684,12 @@ extern char *target_fileio_read_stralloc (const char *filename);
 #define target_traceframe_info() \
   (*current_target.to_traceframe_info) ()
 
+#define target_use_agent(use) \
+  (*current_target.to_use_agent) (use)
+
+#define target_can_use_agent() \
+  (*current_target.to_can_use_agent) ()
+
 /* Command logging facility.  */
 
 #define target_log_command(p)						\
@@ -1814,16 +1841,6 @@ extern int remote_timeout;
 
 /* This is for native targets which use a unix/POSIX-style waitstatus.  */
 extern void store_waitstatus (struct target_waitstatus *, int);
-
-/* These are in common/signals.c, but they're only used by gdb.  */
-extern enum target_signal default_target_signal_from_host (struct gdbarch *,
-							   int);
-extern int default_target_signal_to_host (struct gdbarch *, 
-					  enum target_signal);
-
-/* Convert from a number used in a GDB command to an enum target_signal.  */
-extern enum target_signal target_signal_from_command (int);
-/* End of files in common/signals.c.  */
 
 /* Set the show memory breakpoints mode to show, and installs a cleanup
    to restore it back to the current value.  */

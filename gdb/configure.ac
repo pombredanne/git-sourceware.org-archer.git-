@@ -85,24 +85,12 @@ PACKAGE=gdb
 AC_DEFINE_UNQUOTED(PACKAGE, "$PACKAGE", [Name of this package. ])
 AC_SUBST(PACKAGE)
 
-# Do we have a single-tree copy of texinfo?  Even if we do, we can't
-# rely on it - libiberty is built before texinfo.
-AC_CHECK_PROG(MAKEINFO, makeinfo, makeinfo, )
-if test "x$MAKEINFO" = "x"; then
-  AC_ERROR([makeinfo is required for compilation])
-else
-  case "$MAKEINFO" in
-    */missing\ makeinfo*)
-      AC_ERROR([makeinfo is required for compilation])
-      ;;
-  esac
-fi
-AC_SUBST(MAKEINFO)
-
-# --split-size=5000000 may be already in $MAKEINFO from parent configure.
-# Re-running configure in gdb/ would lose it so ensure it stays present.
-MAKEINFOFLAGS=${MAKEINFOFLAGS---split-size=5000000}
-AC_SUBST(MAKEINFOFLAGS)
+# We never need to detect it in this sub-configure.
+# But preserve it for config.status --recheck.
+AC_ARG_VAR(MAKEINFO,
+  [Parent configure detects if it is of sufficient version.])
+AC_ARG_VAR(MAKEINFOFLAGS,
+  [Parameters for MAKEINFO.])
 
 MAKEINFO_EXTRA_FLAGS=""
 AC_CACHE_CHECK([whether $MAKEINFO supports @click], gdb_cv_have_makeinfo_click,
@@ -348,14 +336,14 @@ AS_HELP_STRING([--with-libunwind], [use libunwind frame unwinding support]),
   no)   enable_libunwind=no ;;
   *)    AC_MSG_ERROR(bad value ${withval} for GDB with-libunwind option) ;;
 esac],[
-  AC_CHECK_HEADERS(libunwind.h libunwind-ia64.h)
-  if test x"$ac_cv_header_libunwind_h" = xyes -a x"$ac_cv_header_libunwind_ia64_h" = xyes; then
+  AC_CHECK_HEADERS(libunwind-ia64.h)
+  if test x"$ac_cv_header_libunwind_ia64_h" = xyes; then
     enable_libunwind=yes;
   fi
 ])
    
 if test x"$enable_libunwind" = xyes; then
-  AC_CHECK_HEADERS(libunwind.h libunwind-ia64.h)
+  AC_CHECK_HEADERS(libunwind-ia64.h)
   AC_DEFINE(HAVE_LIBUNWIND, 1, [Define if libunwind library is being used.])
   CONFIG_OBS="$CONFIG_OBS libunwind-frame.o"
   CONFIG_DEPS="$CONFIG_DEPS libunwind-frame.o"
@@ -986,7 +974,7 @@ AC_CHECK_HEADERS([nlist.h machine/reg.h poll.h sys/poll.h proc_service.h \
 		  sys/reg.h sys/debugreg.h sys/select.h sys/syscall.h \
 		  sys/types.h sys/wait.h wait.h termios.h termio.h \
 		  sgtty.h unistd.h elf_hp.h ctype.h time.h locale.h \
-		  dlfcn.h])
+		  dlfcn.h sys/socket.h sys/un.h])
 AC_CHECK_HEADERS(link.h, [], [],
 [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -1807,7 +1795,7 @@ fi
 build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
 -Wformat-nonliteral -Wno-pointer-sign \
 -Wno-unused -Wunused-value -Wunused-function \
--Wno-switch -Wno-char-subscripts"
+-Wno-switch -Wno-char-subscripts -Wmissing-prototypes"
 
 # Enable -Wno-format by default when using gcc on mingw since many
 # GCC versions complain about %I64.

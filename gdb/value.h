@@ -351,6 +351,19 @@ extern short *deprecated_value_regnum_hack (struct value *);
 
 extern struct value *coerce_ref_if_computed (const struct value *arg);
 
+/* Setup a new value type and enclosing value type for dereferenced value VALUE.
+   ENC_TYPE is the new enclosing type that should be set.  ORIGINAL_TYPE and
+   ORIGINAL_VAL are the type and value of the original reference or pointer.
+
+   Note, that VALUE is modified by this function.
+
+   It is a common implementation for coerce_ref and value_ind.  */
+
+extern struct value * readjust_indirect_value_type (struct value *value,
+						    struct type *enc_type,
+						    struct type *original_type,
+						    struct value *original_val);
+
 /* Convert a REF to the object referenced.  */
 
 extern struct value *coerce_ref (struct value *value);
@@ -523,6 +536,9 @@ extern int symbol_read_needs_frame (struct symbol *);
 extern struct value *read_var_value (struct symbol *var,
 				     struct frame_info *frame);
 
+extern struct value *default_read_var_value (struct symbol *var,
+					     struct frame_info *frame);
+
 extern struct value *allocate_value (struct type *type);
 extern struct value *allocate_value_lazy (struct type *type);
 extern void allocate_value_contents (struct value *value);
@@ -615,8 +631,8 @@ extern struct value *value_primitive_field (struct value *arg1, int offset,
 					    struct type *arg_type);
 
 
-extern struct type *value_rtti_target_type (struct value *, int *, int *,
-					    int *);
+extern struct type *value_rtti_indirect_type (struct value *, int *, int *,
+					      int *);
 
 extern struct value *value_full_object (struct value *, struct type *, int,
 					int, int);
@@ -795,8 +811,8 @@ extern void print_floating (const gdb_byte *valaddr, struct type *type,
 extern void print_decimal_floating (const gdb_byte *valaddr, struct type *type,
 				    struct ui_file *stream);
 
-extern int value_print (struct value *val, struct ui_file *stream,
-			const struct value_print_options *options);
+extern void value_print (struct value *val, struct ui_file *stream,
+			 const struct value_print_options *options);
 
 extern void value_print_array_elements (struct value *val,
 					struct ui_file *stream, int format,
@@ -804,17 +820,17 @@ extern void value_print_array_elements (struct value *val,
 
 extern struct value *value_release_to_mark (struct value *mark);
 
-extern int val_print (struct type *type, const gdb_byte *valaddr,
-		      int embedded_offset, CORE_ADDR address,
-		      struct ui_file *stream, int recurse,
-		      const struct value *val,
-		      const struct value_print_options *options,
-		      const struct language_defn *language);
+extern void val_print (struct type *type, const gdb_byte *valaddr,
+		       int embedded_offset, CORE_ADDR address,
+		       struct ui_file *stream, int recurse,
+		       const struct value *val,
+		       const struct value_print_options *options,
+		       const struct language_defn *language);
 
-extern int common_val_print (struct value *val,
-			     struct ui_file *stream, int recurse,
-			     const struct value_print_options *options,
-			     const struct language_defn *language);
+extern void common_val_print (struct value *val,
+			      struct ui_file *stream, int recurse,
+			      const struct value_print_options *options,
+			      const struct language_defn *language);
 
 extern int val_print_string (struct type *elttype, const char *encoding,
 			     CORE_ADDR addr, int len,

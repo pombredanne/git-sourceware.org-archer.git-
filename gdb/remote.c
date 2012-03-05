@@ -65,13 +65,11 @@
 #include "tracepoint.h"
 #include "ax.h"
 #include "ax-gdb.h"
+#include "agent.h"
 
 /* Temp hacks for tracepoint encoding migration.  */
 static char *target_buf;
 static long target_buf_size;
-/*static*/ void
-encode_actions (struct breakpoint *t, struct bp_location *tloc,
-		char ***tdp_actions, char ***stepping_actions);
 
 /* The size to align memory write packets, when practical.  The protocol
    does not guarantee any alignment, and gdb will generate short
@@ -242,6 +240,8 @@ static int remote_read_description_p (struct target_ops *target);
 
 static void remote_console_output (char *msg);
 
+static int remote_supports_cond_breakpoints (void);
+
 /* The non-stop remote protocol provisions for one pending stop reply.
    This is where we keep it until it is acknowledged.  */
 
@@ -314,6 +314,10 @@ struct remote_state
 
   /* True if the stub reports support for conditional tracepoints.  */
   int cond_tracepoints;
+
+  /* True if the stub reports support for target-side breakpoint
+     conditions.  */
+  int cond_breakpoints;
 
   /* True if the stub reports support for fast tracepoints.  */
   int fast_tracepoints;
@@ -1250,6 +1254,7 @@ enum {
   PACKET_qXfer_threads,
   PACKET_qXfer_statictrace_read,
   PACKET_qXfer_traceframe_info,
+  PACKET_qXfer_uib,
   PACKET_qGetTIBAddr,
   PACKET_qGetTLSAddr,
   PACKET_qSupported,
@@ -1263,6 +1268,7 @@ enum {
   PACKET_qXfer_siginfo_write,
   PACKET_qAttached,
   PACKET_ConditionalTracepoints,
+  PACKET_ConditionalBreakpoints,
   PACKET_FastTracepoints,
   PACKET_StaticTracepoints,
   PACKET_InstallInTrace,
@@ -1272,6 +1278,7 @@ enum {
   PACKET_QAllow,
   PACKET_qXfer_fdpic,
   PACKET_QDisableRandomization,
+  PACKET_QAgent,
   PACKET_MAX
 };
 
@@ -1579,7 +1586,7 @@ remote_notice_new_inferior (ptid_t currthread, int running)
 
 /* Return the private thread data, creating it if necessary.  */
 
-struct private_thread_info *
+static struct private_thread_info *
 demand_private_info (ptid_t ptid)
 {
   struct thread_info *info = find_thread_ptid (ptid);
@@ -2844,20 +2851,6 @@ remote_static_tracepoint_marker_at (CORE_ADDR addr,
   return 0;
 }
 
-static void
-free_current_marker (void *arg)
-{
-  struct static_tracepoint_marker **marker_p = arg;
-
-  if (*marker_p != NULL)
-    {
-      release_static_tracepoint_marker (*marker_p);
-      xfree (*marker_p);
-    }
-  else
-    *marker_p = NULL;
-}
-
 static VEC(static_tracepoint_marker_p) *
 remote_static_tracepoint_markers_by_strid (const char *strid)
 {
@@ -3717,6 +3710,16 @@ remote_cond_tracepoint_feature (const struct protocol_feature *feature,
 }
 
 static void
+remote_cond_breakpoint_feature (const struct protocol_feature *feature,
+				enum packet_support support,
+				const char *value)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  rs->cond_breakpoints = (support == PACKET_ENABLE);
+}
+
+static void
 remote_fast_tracepoint_feature (const struct protocol_feature *feature,
 				enum packet_support support,
 				const char *value)
@@ -3810,6 +3813,8 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_qXfer_siginfo_write },
   { "ConditionalTracepoints", PACKET_DISABLE, remote_cond_tracepoint_feature,
     PACKET_ConditionalTracepoints },
+  { "ConditionalBreakpoints", PACKET_DISABLE, remote_cond_breakpoint_feature,
+    PACKET_ConditionalBreakpoints },
   { "FastTracepoints", PACKET_DISABLE, remote_fast_tracepoint_feature,
     PACKET_FastTracepoints },
   { "StaticTracepoints", PACKET_DISABLE, remote_static_tracepoint_feature,
@@ -3830,8 +3835,11 @@ static struct protocol_feature remote_protocol_features[] = {
     remote_enable_disable_tracepoint_feature, -1 },
   { "qXfer:fdpic:read", PACKET_DISABLE, remote_supported_packet,
     PACKET_qXfer_fdpic },
+  { "qXfer:uib:read", PACKET_DISABLE, remote_supported_packet,
+    PACKET_qXfer_uib },
   { "QDisableRandomization", PACKET_DISABLE, remote_supported_packet,
     PACKET_QDisableRandomization },
+  { "QAgent", PACKET_DISABLE, remote_supported_packet, PACKET_QAgent},
   { "tracenz", PACKET_DISABLE,
     remote_string_tracing_feature, -1 },
 };
@@ -7712,6 +7720,43 @@ extended_remote_create_inferior (struct target_ops *ops,
 }
 
 
+/* Given a location's target info BP_TGT and the packet buffer BUF,  output
+   the list of conditions (in agent expression bytecode format), if any, the
+   target needs to evaluate.  The output is placed into the packet buffer
+   BUF.  */
+
+static int
+remote_add_target_side_condition (struct gdbarch *gdbarch,
+				  struct bp_target_info *bp_tgt, char *buf)
+{
+  struct agent_expr *aexpr = NULL;
+  int i, ix;
+  char *pkt;
+  char *buf_start = buf;
+
+  if (VEC_empty (agent_expr_p, bp_tgt->conditions))
+    return 0;
+
+  buf += strlen (buf);
+  sprintf (buf, "%s", ";");
+  buf++;
+
+  /* Send conditions to the target and free the vector.  */
+  for (ix = 0;
+       VEC_iterate (agent_expr_p, bp_tgt->conditions, ix, aexpr);
+       ix++)
+    {
+      sprintf (buf, "X%x,", aexpr->len);
+      buf += strlen (buf);
+      for (i = 0; i < aexpr->len; ++i)
+	buf = pack_hex_byte (buf, aexpr->buf[i]);
+      *buf = '\0';
+    }
+
+  VEC_free (agent_expr_p, bp_tgt->conditions);
+  return 0;
+}
+
 /* Insert a breakpoint.  On targets that have software breakpoint
    support, we ask the remote target to do the work; on targets
    which don't, we insert a traditional memory breakpoint.  */
@@ -7731,6 +7776,7 @@ remote_insert_breakpoint (struct gdbarch *gdbarch,
       struct remote_state *rs;
       char *p;
       int bpsize;
+      struct condition_list *cond = NULL;
 
       gdbarch_remote_breakpoint_from_pc (gdbarch, &addr, &bpsize);
 
@@ -7743,6 +7789,9 @@ remote_insert_breakpoint (struct gdbarch *gdbarch,
       addr = (ULONGEST) remote_address_masked (addr);
       p += hexnumstr (p, addr);
       sprintf (p, ",%d", bpsize);
+
+      if (remote_supports_cond_breakpoints ())
+	remote_add_target_side_condition (gdbarch, bp_tgt, p);
 
       putpkt (rs->buf);
       getpkt (&rs->buf, &rs->buf_size, 0);
@@ -7842,6 +7891,15 @@ remote_insert_watchpoint (CORE_ADDR addr, int len, int type,
     }
   internal_error (__FILE__, __LINE__,
 		  _("remote_insert_watchpoint: reached end of function"));
+}
+
+static int
+remote_watchpoint_addr_within_range (struct target_ops *target, CORE_ADDR addr,
+				     CORE_ADDR start, int length)
+{
+  CORE_ADDR diff = remote_address_masked (addr - start);
+
+  return diff < length;
 }
 
 
@@ -7968,6 +8026,9 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
   addr = remote_address_masked (bp_tgt->placed_address);
   p += hexnumstr (p, (ULONGEST) addr);
   sprintf (p, ",%x", bp_tgt->placed_size);
+
+  if (remote_supports_cond_breakpoints ())
+    remote_add_target_side_condition (gdbarch, bp_tgt, p);
 
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
@@ -8426,6 +8487,11 @@ remote_xfer_partial (struct target_ops *ops, enum target_object object,
     case TARGET_OBJECT_FDPIC:
       return remote_read_qxfer (ops, "fdpic", annex, readbuf, offset, len,
 				&remote_protocol_packets[PACKET_qXfer_fdpic]);
+
+    case TARGET_OBJECT_OPENVMS_UIB:
+      return remote_read_qxfer (ops, "uib", annex, readbuf, offset, len,
+				&remote_protocol_packets[PACKET_qXfer_uib]);
+
     default:
       return -1;
     }
@@ -8920,7 +8986,7 @@ remote_get_thread_local_address (struct target_ops *ops,
 /* Provide thread local base, i.e. Thread Information Block address.
    Returns 1 if ptid is found and thread_local_base is non zero.  */
 
-int
+static int
 remote_get_tib_address (ptid_t ptid, CORE_ADDR *addr)
 {
   if (remote_protocol_packets[PACKET_qGetTIBAddr].support != PACKET_DISABLE)
@@ -9845,7 +9911,7 @@ remote_supports_multi_process (void)
   return rs->extended && remote_multi_process_p (rs);
 }
 
-int
+static int
 remote_supports_cond_tracepoints (void)
 {
   struct remote_state *rs = get_remote_state ();
@@ -9853,7 +9919,15 @@ remote_supports_cond_tracepoints (void)
   return rs->cond_tracepoints;
 }
 
-int
+static int
+remote_supports_cond_breakpoints (void)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  return rs->cond_breakpoints;
+}
+
+static int
 remote_supports_fast_tracepoints (void)
 {
   struct remote_state *rs = get_remote_state ();
@@ -10311,7 +10385,7 @@ remote_get_trace_status (struct trace_status *ts)
   return ts->running;
 }
 
-void
+static void
 remote_get_tracepoint_status (struct breakpoint *bp,
 			      struct uploaded_tp *utp)
 {
@@ -10680,6 +10754,34 @@ remote_set_trace_notes (char *user, char *notes, char *stop_notes)
   return 1;
 }
 
+static int
+remote_use_agent (int use)
+{
+  if (remote_protocol_packets[PACKET_QAgent].support != PACKET_DISABLE)
+    {
+      struct remote_state *rs = get_remote_state ();
+
+      /* If the stub supports QAgent.  */
+      sprintf (rs->buf, "QAgent:%d", use);
+      putpkt (rs->buf);
+      getpkt (&rs->buf, &rs->buf_size, 0);
+
+      if (strcmp (rs->buf, "OK") == 0)
+	{
+	  use_agent = use;
+	  return 1;
+	}
+    }
+
+  return 0;
+}
+
+static int
+remote_can_use_agent (void)
+{
+  return (remote_protocol_packets[PACKET_QAgent].support != PACKET_DISABLE);
+}
+
 static void
 init_remote_ops (void)
 {
@@ -10704,6 +10806,8 @@ Specify the serial device it is connected to\n\
   remote_ops.to_remove_breakpoint = remote_remove_breakpoint;
   remote_ops.to_stopped_by_watchpoint = remote_stopped_by_watchpoint;
   remote_ops.to_stopped_data_address = remote_stopped_data_address;
+  remote_ops.to_watchpoint_addr_within_range =
+    remote_watchpoint_addr_within_range;
   remote_ops.to_can_use_hw_breakpoint = remote_check_watch_resources;
   remote_ops.to_insert_hw_breakpoint = remote_insert_hw_breakpoint;
   remote_ops.to_remove_hw_breakpoint = remote_remove_hw_breakpoint;
@@ -10756,6 +10860,7 @@ Specify the serial device it is connected to\n\
   remote_ops.to_fileio_readlink = remote_hostio_readlink;
   remote_ops.to_supports_enable_disable_tracepoint = remote_supports_enable_disable_tracepoint;
   remote_ops.to_supports_string_tracing = remote_supports_string_tracing;
+  remote_ops.to_supports_evaluation_of_breakpoint_conditions = remote_supports_cond_breakpoints;
   remote_ops.to_trace_init = remote_trace_init;
   remote_ops.to_download_tracepoint = remote_download_tracepoint;
   remote_ops.to_can_download_tracepoint = remote_can_download_tracepoint;
@@ -10789,6 +10894,8 @@ Specify the serial device it is connected to\n\
   remote_ops.to_static_tracepoint_markers_by_strid
     = remote_static_tracepoint_markers_by_strid;
   remote_ops.to_traceframe_info = remote_traceframe_info;
+  remote_ops.to_use_agent = remote_use_agent;
+  remote_ops.to_can_use_agent = remote_can_use_agent;
 }
 
 /* Set up the extended remote vector by making a copy of the standard
@@ -11217,6 +11324,9 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
     (&remote_protocol_packets[PACKET_qXfer_traceframe_info],
      "qXfer:trace-frame-info:read", "traceframe-info", 0);
 
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qXfer_uib],
+			 "qXfer:uib:read", "unwind-info-block", 0);
+
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qGetTLSAddr],
 			 "qGetTLSAddr", "get-thread-local-storage-address",
 			 0);
@@ -11273,6 +11383,11 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
   add_packet_config_cmd (&remote_protocol_packets[PACKET_ConditionalTracepoints],
 			 "ConditionalTracepoints",
 			 "conditional-tracepoints", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_ConditionalBreakpoints],
+			 "ConditionalBreakpoints",
+			 "conditional-breakpoints", 0);
+
   add_packet_config_cmd (&remote_protocol_packets[PACKET_FastTracepoints],
 			 "FastTracepoints", "fast-tracepoints", 0);
 
@@ -11296,6 +11411,9 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_QDisableRandomization],
 			 "QDisableRandomization", "disable-randomization", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_QAgent],
+			 "QAgent", "agent", 0);
 
   /* Keep the old ``set remote Z-packet ...'' working.  Each individual
      Z sub-packet has its own set and show commands, but users may

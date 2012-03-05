@@ -60,6 +60,8 @@
 #include "linux-osdata.h"
 #include "linux-tdep.h"
 #include "symfile.h"
+#include "agent.h"
+#include "tracepoint.h"
 
 #ifndef SPUFS_MAGIC
 #define SPUFS_MAGIC 0x23c9b64e
@@ -1356,37 +1358,6 @@ exit_lwp (struct lwp_info *lp)
   delete_lwp (lp->ptid);
 }
 
-/* Detect `T (stopped)' in `/proc/PID/status'.
-   Other states including `T (tracing stop)' are reported as false.  */
-
-static int
-pid_is_stopped (pid_t pid)
-{
-  FILE *status_file;
-  char buf[100];
-  int retval = 0;
-
-  snprintf (buf, sizeof (buf), "/proc/%d/status", (int) pid);
-  status_file = fopen (buf, "r");
-  if (status_file != NULL)
-    {
-      int have_state = 0;
-
-      while (fgets (buf, sizeof (buf), status_file))
-	{
-	  if (strncmp (buf, "State:", 6) == 0)
-	    {
-	      have_state = 1;
-	      break;
-	    }
-	}
-      if (have_state && strstr (buf, "T (stopped)") != NULL)
-	retval = 1;
-      fclose (status_file);
-    }
-  return retval;
-}
-
 /* Wait for the LWP specified by LP, which we have just attached to.
    Returns a wait status for that LWP, to cache.  */
 
@@ -1397,7 +1368,7 @@ linux_nat_post_attach_wait (ptid_t ptid, int first, int *cloned,
   pid_t new_pid, pid = GET_LWP (ptid);
   int status;
 
-  if (pid_is_stopped (pid))
+  if (linux_proc_pid_is_stopped (pid))
     {
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -4803,6 +4774,73 @@ linux_xfer_partial (struct target_ops *ops, enum target_object object,
 			     offset, len);
 }
 
+static void
+cleanup_target_stop (void *arg)
+{
+  ptid_t *ptid = (ptid_t *) arg;
+
+  gdb_assert (arg != NULL);
+
+  /* Unpause all */
+  target_resume (*ptid, 0, TARGET_SIGNAL_0);
+}
+
+static VEC(static_tracepoint_marker_p) *
+linux_child_static_tracepoint_markers_by_strid (const char *strid)
+{
+  char s[IPA_CMD_BUF_SIZE];
+  struct cleanup *old_chain;
+  int pid = ptid_get_pid (inferior_ptid);
+  VEC(static_tracepoint_marker_p) *markers = NULL;
+  struct static_tracepoint_marker *marker = NULL;
+  char *p = s;
+  ptid_t ptid = ptid_build (pid, 0, 0);
+
+  /* Pause all */
+  target_stop (ptid);
+
+  memcpy (s, "qTfSTM", sizeof ("qTfSTM"));
+  s[sizeof ("qTfSTM")] = 0;
+
+  agent_run_command (pid, s);
+
+  old_chain = make_cleanup (free_current_marker, &marker);
+  make_cleanup (cleanup_target_stop, &ptid);
+
+  while (*p++ == 'm')
+    {
+      if (marker == NULL)
+	marker = XCNEW (struct static_tracepoint_marker);
+
+      do
+	{
+	  parse_static_tracepoint_marker_definition (p, &p, marker);
+
+	  if (strid == NULL || strcmp (strid, marker->str_id) == 0)
+	    {
+	      VEC_safe_push (static_tracepoint_marker_p,
+			     markers, marker);
+	      marker = NULL;
+	    }
+	  else
+	    {
+	      release_static_tracepoint_marker (marker);
+	      memset (marker, 0, sizeof (*marker));
+	    }
+	}
+      while (*p++ == ',');	/* comma-separated list */
+
+      memcpy (s, "qTsSTM", sizeof ("qTsSTM"));
+      s[sizeof ("qTsSTM")] = 0;
+      agent_run_command (pid, s);
+      p = s;
+    }
+
+  do_cleanups (old_chain);
+
+  return markers;
+}
+
 /* Create a prototype generic GNU/Linux target.  The client can override
    it with local methods.  */
 
@@ -4824,6 +4862,9 @@ linux_target_install_ops (struct target_ops *t)
 
   super_xfer_partial = t->to_xfer_partial;
   t->to_xfer_partial = linux_xfer_partial;
+
+  t->to_static_tracepoint_markers_by_strid
+    = linux_child_static_tracepoint_markers_by_strid;
 }
 
 struct target_ops *
@@ -5122,7 +5163,7 @@ linux_nat_close (int quitting)
    lwpid is a "main" process id or not (it assumes so).  We reverse
    look up the "main" process id from the lwp here.  */
 
-struct address_space *
+static struct address_space *
 linux_nat_thread_address_space (struct target_ops *t, ptid_t ptid)
 {
   struct lwp_info *lwp;
@@ -5215,7 +5256,7 @@ linux_nat_core_of_thread_1 (ptid_t ptid)
 
 /* Return the cached value of the processor core for thread PTID.  */
 
-int
+static int
 linux_nat_core_of_thread (struct target_ops *ops, ptid_t ptid)
 {
   struct lwp_info *info = find_lwp_pid (ptid);

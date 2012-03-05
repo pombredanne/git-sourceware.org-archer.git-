@@ -1,3 +1,42 @@
+2012-02-27  Alan Modra  <amodra@gmail.com>
+
+	* mt-dis.c: Regenerate.
+
+2012-02-27  Alan Modra  <amodra@gmail.com>
+
+	* v850-opc.c (extract_v8): Rearrange to make it obvious this
+	is the inverse of corresponding insert function.
+	(extract_d22, extract_u9, extract_r4): Likewise.
+	(extract_d9): Correct sign extension.
+	(extract_d16_15): Don't assume "long" is 32 bits, and don't
+	rely on implementation defined behaviour for shift right of
+	signed types.
+	(extract_d16_16, extract_d17_16, extract_i9): Likewise.
+	(extract_d23): Likewise, and correct mask.
+
+2012-02-27  Alan Modra  <amodra@gmail.com>
+
+	* crx-dis.c (print_arg): Mask constant to 32 bits.
+	* crx-opc.c (cst4_map): Use int array.
+
+2012-02-27  Alan Modra  <amodra@gmail.com>
+
+	* arc-dis.c (BITS): Don't use shifts to mask off bits.
+	(FIELDD): Sign extend with xor,sub.
+
+2012-02-25  Walter Lee  <walt@tilera.com>
+
+	* tilegx-opc.c: Handle TILEGX_OPC_LD4S_TLS and TILEGX_OPC_LD_TLS.
+	* tilepro-opc.c: Handle TILEPRO_OPC_LW_TLS and
+	TILEPRO_OPC_LW_TLS_SN.
+
+2012-02-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-opc.h (HLEPrefixNone): New.
+	(HLEPrefixLock): Likewise.
+	(HLEPrefixAny): Likewise.
+	(HLEPrefixRelease): Likewise.
+
 2012-02-08  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* i386-dis.c (HLE_Fixup1): New.

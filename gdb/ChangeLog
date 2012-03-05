@@ -1,3 +1,1036 @@
+2012-03-05  Tom Tromey  <tromey@redhat.com>
+
+	* ia64-vms-tdep.c (_initialize_ia64_vms_tdep): Rename from
+	_initialize_ia64_hpux_tdep.
+
+2012-03-05  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/13766
+
+	* i387-tdep.c (i387_supply_xsave): If we have an xsave buffer, and
+	the register state is clear, supply explicit zero, instead of
+	marking the register unavailable.
+
+2012-03-05  Tristan Gingold  <gingold@adacore.com>
+
+	* NEWS: Mention OpenVMS ia64 new target.
+
+2012-03-05  Tristan Gingold  <gingold@adacore.com>
+
+	* ia64-tdep.h: Include libunwind-frame.h and libunwind-ia64.h.
+	(ia64_unw_accessors, ia64_unw_rse_accessors)
+	(ia64_libunwind_descr): Declare.
+	* ia64-vms-tdep.c: New file.
+	* ia64-tdep.c (ia64_unw_accessors, ia64_unw_rse_accessors)
+	(ia64_libunwind_descr): Make them public.
+	* configure.tgt: Add ia64-*-*vms*.
+	* Makefile.in (ALL_64_TARGET_OBS): Add ia64-vms-tdep.o
+	(ALLDEPFILES): Add ia64-vms-tdep.c
+
+2012-03-05  Tristan Gingold  <gingold@adacore.com>
+
+	* target.h (target_object): Add TARGET_OBJECT_OPENVMS_UIB.
+	* remote.c (PACKET_qXfer_uib): New enum value.
+	(remote_protocol_features): Add entry for PACKET_qXfer_uib.
+	(remote_xfer_partial): Handle TARGET_OBJECT_OPENVMS_UIB.
+	(_initialize_remote): Call add_packet_config_cmd for
+	xfer:uib packet.
+
+2012-03-05  Tristan Gingold  <gingold@adacore.com>
+
+	* osabi.c (gdb_osabi_names): Add OpenVMS.
+	(generic_elf_osabi_sniffer): Likewise.
+	* defs.h (gdb_osabi): Add GDB_OSABI_OPENVMS.
+
+2012-03-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Removed unused code.
+	* libunwind-frame.c (libunwind_frame_unwind)
+	(libunwind_frame_base_address): Remove.
+	* libunwind-frame.h (libunwind_frame_base_address): Remove declaration.
+
+2012-03-04  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c (gdb_connect_sync_socket): Add _ markup and
+	remove trailing new line.
+	(agent_run_command, agent_run_command): Add _ markup.
+	(agent_capability_check): Likewise.
+
+2012-03-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (set_condition_evaluation_mode): Set
+	CONDITION_EVALUATION_MODE unconditionally.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c (agent_look_up_symbols): Add one parameter 'arg'.
+	* common/agent.h: Update declaration.
+	* inf-child.c (inf_child_use_agent): New.
+	(inf_child_can_use_agent): New.
+	(inf_child_target): Initialize fields `to_use_agent'
+	and `to_can_use_agent'.
+	* agent.c (agent_new_objfile): New.
+	(_initialize_agent): Add agent_new_objfile to new_objfile
+	observer.
+
+	* linux-nat.c (linux_child_static_tracepoint_markers_by_strid):
+	New.
+	(linux_target_install_ops): Initialize field
+	`to_static_tracepoint_markers_by_strid'.
+	* remote.c (free_current_marker): Move it to ...
+	* tracepoint.c (free_current_marker): ... here.  New.
+	(cleanup_target_stop): New.
+	* tracepoint.h: Declare free_current_marker.
+	* NEWS: Add one entry about `info static-tracepoint-marker'.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c (agent_loaded_p): New.
+	(agent_look_up_symbols): New global.
+	* common/agent.h: Declare agent_loaded_p.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c (struct ipa_sym_addresses) <addr_capability>: New.
+	(agent_capability_check, agent_capability_invalidate): New.
+	(symbol_list): New array element.
+	* common/agent.h (enum agent_capa): New.
+	* target.c (target_pre_inferior): Call agent_capability_invalidate.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* target.h (struct target_ops) <to_use_agent>: New field.
+	(struct target_ops) <to_can_use_agent>: New field.
+	(target_use_agent, target_can_use_agent): New macro.
+	* target.c (update_current_target): Update.
+	* remote.c: New enum `PACKET_QAgent'.
+	(remote_protocol_features): Add a new element.
+	(remote_use_agent, remote_can_use_agent): New.
+	(init_remote_ops): Initialize field `can_use_agent' with
+	remote_can_use_agent.  Intiailize field `use_agent' with
+	remote_use_agent.
+	* common/agent.c (use_agent): New global.
+	* common/agent.h: Declare it.
+	* tracepoint.c (info_static_tracepoint_markers_command): Add
+	comment.
+	* Makefile.in (SFILES): Add common/agent.c and agent.c.
+	(COMMON_OBS): Add common/agent.o and agent.o
+	(common-agent.o): New rule.
+	* agent.c: New.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c: New.
+	* common/agent.h: New.
+	* configure.ac: Add `sys/socket.h' and `sys/un.h' to
+	AC_CHECK_HEADERS.
+	* configure, configh.in: Regenerated.
+
+2012-03-02  Kevin Buettner  <kevinb@redhat.com>
+
+	* sh-tdep.c (sh_frame_cache): Don't fetch the FPSCR register
+	unless it exists for this architecture.
+
+2012-03-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* language.h (struct language_defn): New "method" la_read_var_value.
+	* findvar.c: #include "language.h".
+	(default_read_var_value): Renames read_var_value.  Rewrite
+	function description.
+	(read_var_value): New function.
+	* value.h (default_read_var_value): Add prototype.
+	* ada-lang.c (ada_read_renaming_var_value, ada_read_var_value):
+	New functions.
+	(ada_language_defn): Add entry for la_read_var_value.
+	* c-lang.c, d-lang.c, f-lang.c, jv-lang.c, language.c,
+	* m2-lang.c, objc-lang.c, opencl-lang.c, p-lang.c: Update
+	language_defn structures to add entry for new la_read_var_value
+	field.
+
+2012-03-02  Tom Tromey  <tromey@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	PR breakpoints/13776:
+	* breakpoint.c (breakpoint_init_inferior): Delete step-resume
+	breakpoints.
+	(delete_longjmp_breakpoint_at_next_stop): New.
+	* breakpoint.h (delete_longjmp_breakpoint_at_next_stop): Declare.
+	* target.c (generic_mourn_inferior): Call mark_breakpoints_out
+	before deleting the inferior.  Add comments.
+	* thread.c (clear_thread_inferior_resources): Don't delete lonjmp
+	breakpoints immediately, but only on next stop.  Move that code
+	next to where we mark other breakpoints for deletion.
+
+2012-03-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* mips-linux-nat.c (mips_linux_read_description): Add missing i18n
+	marker.
+	* mips-tdep.c (mips_linux_reg_names): Improve comment to avoid ARI
+	violation.
+
+2012-03-02  Pedro Alves  <palves@redhat.com>
+
+	* linux-thread-db.c (attach_thread): Avoid in_thread_list call.
+
+2012-03-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	Fix -Wmissing-prototypes build.
+	* ppc-linux-nat.c (ppc_linux_get_hwcap): Make static.
+	* remote-sim.c (gdbsim_has_all_memory): Likewise.
+	(gdbsim_has_memory): Likewise.
+
+2012-03-02  Yao Qi  <yao@codesourcery.com>
+
+	Fix -Wmissing-prototypes build.
+	* charset.c (phony_iconv_open): Make static.
+	(phony_iconv_close, phony_iconv): Likewise.
+	* i386-linux-nat.c (_initialize_i386_linux_nat): New prototype.
+	* i386-windows-nat.c (_initialize_i386_windows_nat): New
+	prototype.
+	* mingw-hdep.c (_initialize_mingw_hdep): New prototype.
+	* ser-mingw.c (create_select_thread): Make static.
+	* windows-termcap.c (tgetent): New prototype.
+	(tgetnum, tgetflag, tgetstr, tputs, tgoto): Likewise.
+
+2012-03-02  Zhang Yuanhui  <asmwarrior@gmail.com>
+
+	Fix -Wmissing-prototypes build.
+	* windows-nat.c (dll_symbol_command, ctrl_c_handler): Make them static.
+	(_initialize_windows_nat, _initialize_check_for_gdb_ini)
+	(_initialize_loadable): New prototypes.
+
+2012-03-02  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (load_full_comp_unit): Remove unnecessary reading of
+	abbrev table, read_comp_unit will do it.
+
+2012-03-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix -Wmissing-prototypes build.
+	* alpha-tdep.c (alpha_deal_with_atomic_sequence): Make it static.
+	* amd64-darwin-tdep.c (_initialize_amd64_darwin_tdep): New prototype.
+	* amd64-windows-tdep.c (_initialize_amd64_windows_tdep): Likewise.
+	* arm-symbian-tdep.c (arm_symbian_skip_trampoline_code): Make it static.
+	(_initialize_arm_symbian_tdep): New prototype.
+	* arm-wince-tdep.c (arm_wince_skip_main_prologue): Make it static.
+	* i386-darwin-tdep.c (_initialize_i386_darwin_tdep): New prototype.
+	* i386-linux-tdep.c (i386_linux_displaced_step_copy_insn): Make it
+	static.
+	* lm32-tdep.c (_initialize_lm32_tdep): New prototype.
+	* microblaze-linux-tdep.c (_initialize_microblaze_linux_tdep): New
+	prototype.
+	* microblaze-tdep.c (microblaze_debug, microblaze_fetch_instruction)
+	(microblaze_skip_prologue, microblaze_frame_cache): Make them static.
+	* mips-linux-tdep.c (mips_linux_regset_from_core_section): Make it
+	static.
+	* moxie-tdep.c (moxie_process_record): Likewise.
+	* remote-mips.c (mips_can_use_watchpoint, mips_insert_watchpoint)
+	(mips_remove_watchpoint, mips_stopped_by_watchpoint): Make them static.
+	* rl78-tdep.c (rl78_breakpoint_from_pc): Make it static.
+	(_initialize_rl78_tdep): New prototype.
+	* rx-tdep.c (rx_breakpoint_from_pc): Make it static.
+	(_initialize_rx_tdep): New prototype.
+	* solib-darwin.c (darwin_in_dynsym_resolve_code): Make it static.
+	(_initialize_darwin_solib): New prototype.
+	* solib-spu.c: Include solib-spu.h.
+	(_initialize_spu_solib): New prototype.
+	* spu-multiarch.c (_initialize_spu_multiarch): New prototype.
+	* tic6x-tdep.c (tic6x_analyze_prologue, tic6x_skip_prologue)
+	(tic6x_breakpoint_from_pc, tic6x_frame_unwind_cache)
+	(tic6x_software_single_step): Make it static.
+	(_initialize_tic6x_tdep): New prototype.
+
+2012-03-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix -Wmissing-prototypes build.
+	* cris-tdep.c (cris_can_use_hardware_watchpoint)
+	(cris_region_ok_for_watchpoint, cris_stopped_data_address): Remove.
+
+2012-03-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix -Wmissing-prototypes build.
+	* frv-tdep.c (frv_check_watch_resources, frv_stopped_data_address)
+	(frv_have_stopped_data_address): Remove.
+
+2012-03-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix -Wmissing-prototypes build.
+	* Makefile.in (HFILES_NO_SRCDIR): Add sh64-tdep.h.
+	* sh-tdep.c: Include sh64-tdep.h.
+	* sh-tdep.h (sh64_gdbarch_init, sh64_show_regs): Remove declarations.
+	* sh64-tdep.c: Include sh64-tdep.h.
+	* sh64-tdep.h: New file.
+
+2012-03-01  Maciej W. Rozycki <macro@codesourcery.com>
+
+	* mips-tdep.c (mips32_scan_prologue): Correct indentation.
+
+2012-03-01  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips_gdbarch_init): Only set pc_regnum and
+	sp_regnum once the gdbarch_init_osabi hook has been called.
+
+2012-03-01  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips32_bc1_pc): New function.
+	(mips32_next_pc): Handle BC1ANY2F, BC1ANY2T, BC1ANY4F, BC1ANY4T,
+	BPOSGE32 and BPOSGE64 instructions.
+	(deal_with_atomic_sequence): Likewise.
+	(mips32_instruction_has_delay_slot): Likewise.
+
+2012-03-01  Maciej W. Rozycki  <macro@mips.com>
+            Chris Dearman  <chris@mips.com>
+            Maciej W. Rozycki  <macro@codesourcery.com>
+            Joseph Myers  <joseph@codesourcery.com>
+
+	* features/mips-dsp.xml: New file.
+	* features/mips64-dsp.xml: New file.
+	* features/mips-dsp-linux.xml: New file.
+	* features/mips64-dsp-linux.xml: New file.
+	* features/Makefile (WHICH): Add mips-dsp-linux and
+	mips64-dsp-linux.
+	(mips-dsp-expedite, mips64-dsp-expedite): New variables.
+	* features/mips-dsp-linux.c: New file.
+	* features/mips64-dsp-linux.c: New file.
+	* regformats/mips-dsp-linux.dat: New file.
+	* regformats/mips64-dsp-linux.dat: New file.
+	* mips-linux-nat.c (mips_linux_register_addr): Handle DSP
+	registers.
+	(mips64_linux_register_addr): Likewise.
+	(mips64_linux_regsets_fetch_registers): Likewise.
+	(mips64_linux_regsets_store_registers): Likewise.
+	(mips64_linux_fetch_registers): Update call to
+	mips64_linux_regsets_fetch_registers.
+	(mips64_linux_store_registers): Update call to
+	mips64_linux_regsets_store_registers.
+	(mips_linux_read_description): Probe for DSP registers.
+	(_initialize_mips_linux_nat): Call initialize_tdesc_mips_dsp_linux
+	and initialize_tdesc_mips64_dsp_linux.
+	* mips-linux-tdep.c (supply_gregset, mips64_supply_gregset):
+	Remove padding of no longer used embedded register slots.
+	* mips-linux-tdep.h (DSP_BASE, DSP_CONTROL): New macros.
+	(MIPS_RESTART_REGNUM): Redefine enum value.
+	* mips-tdep.c (mips_generic_reg_names): Remove trailing null
+	strings.
+	(mips_tx39_reg_names): Likewise.
+	(mips_linux_reg_names): New array of register names for Linux
+	targets.
+	(mips_register_name): Check for a null pointer in
+	mips_processor_reg_names and return an empty string.
+	(mips_register_type): Exclude embedded registers for the IRIX
+	and Linux ABIs.
+	(mips_pseudo_register_type): Likewise.  Use dynamic numbers to
+	refer to FP registers, LO, HI, BadVAddr, Cause and PC.  Handle
+	DSP registers.
+	(mips_stab_reg_to_regnum): Handle DSP accumulators.
+	(mips_dwarf_dwarf2_ecoff_reg_to_regnum): Likewise.
+	(mips_gdbarch_init): Likewise.  Initialize internal register
+	indices for the Linux ABI.  Use dynamic numbers to refer to
+	registers, as applicable, while parsing the target description.
+	* mips-tdep.h (struct mips_regnum): Add dspacc/dspctl offsets.
+
+2012-03-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* frame.h (read_frame_register_unsigned): Fix typo in function
+	description.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* jit-reader.in [!__cplusplus]
+	(GDB_DECLARE_GPL_COMPATIBLE_READER): Add missing backslash.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* configure.ac (build_warnings): Add -Wmissing-prototypes.
+	* configure: Regenerate.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* amd64-linux-tdep.c (amd64_linux_record_signal): Make static.
+	* breakpoint.c (create_exception_master_breakpoint, trace_command)
+	(ftrace_command, strace_command): Make static.
+	* d-lang.c (_initialize_d_language): Declare.
+	* dwarf2expr.c (_initialize_dwarf2expr): Declare.
+	* dwarf2loc.c (_initialize_dwarf2loc):
+	* dwarf2read.c (process_psymtab_comp_unit): Make static.
+	* exec.c (exec_get_section_table): Make static.
+	* i386-linux-tdep.c (i386_linux_record_signal): Make static.
+	* infcmd.c (ensure_valid_thread, ensure_not_tfind_mode): Make static.
+	* inferior.c (remove_inferior_command, add_inferior_command)
+	(clone_inferior_command): Make static.
+	* linux-nat.c (linux_nat_thread_address_space)
+	(linux_nat_core_of_thread): Make static.
+	* linux-tdep.c (_initialize_linux_tdep): Declare.
+	* objc-lang.c (_initialize_objc_lang): Declare.
+	* opencl-lang.c (builtin_opencl_type, opencl_language_arch_info):
+	Make static.
+	(_initialize_opencl_language): Declare.
+	* record.c (_initialize_record): Declare.
+	* remote.c (demand_private_info, remote_get_tib_address)
+	(remote_supports_cond_tracepoints)
+	(remote_supports_fast_tracepoints, remote_get_tracepoint_status):
+	Make static.
+	* skip.c (_initialize_step_skip): Declare.
+	* symtab.c (skip_prologue_using_lineinfo): Make static.
+	* tracepoint.c (delete_trace_state_variable)
+	(trace_variable_command, delete_trace_variable_command)
+	(get_uploaded_tsv, find_matching_tracepoint_location)
+	(find_matching_tsv, create_tsv_from_upload, get_traceframe_info):
+	Make static.
+	* value.c (pack_unsigned_long): Make static.
+	* varobj.c (varobj_ensure_python_env): Make static.
+	* windows-tdep.c (_initialize_windows_tdep): Declare.
+	* xml-syscall.c (make_cleanup_free_syscalls_info): Make static.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* linux-tdep.c (linux_has_shared_address_space): Make static.  Add
+	gdbarch parameter.
+	(linux_init_abi): Install it as has_shared_address_space gdbarch
+	callback.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* observer.c (observer_test_first_notification_function)
+	(observer_test_second_notification_function)
+	(observer_test_third_notification_function): Add declarations.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* common/signals.c (default_target_signal_to_host)
+	(default_target_signal_from_host): Move ...
+	* arch-utils.c: ... here.
+	* arch-utils.h (default_target_signal_to_host)
+	(default_target_signal_from_host): Declare.
+
+	* common/signals.c (target_signal_from_command): Move ...
+	* infrun.c: ... here.
+	* inferior.h (target_signal_from_command): Declare.
+	* target.h (target_signal_from_command)
+	(default_target_signal_from_host, default_target_signal_to_host):
+	Delete declarations.
+
+	* common/signals.c (_initialize_signals): Delete.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* jit-reader.in (plugin_is_GPL_compatible): Add declarations for
+	both __cplusplus and !__cplusplus.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* psymtab.c (find_and_open_source): Delete declaration.
+	* source.c (find_and_open_source): Move comment ...
+	* source.h (find_and_open_source): ... to this new declaration.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* inline-frame.c: Include inline-frame.h.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* tui/tui-data.c (set_gen_win_origin): Delete.
+	* tui/tui-data.h (tui_set_gen_win_origin): Delete declaration.
+	* tui/tui-regs.c (tui_last_reg_element_no_in_line): Delete.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (encode_actions): Delete declaration.
+	* tracepoint.c (encode_actions): Make extern.
+	* tracepoint.h (encode_actions): Declare.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* python/py-breakpoint.c: Include python.h.
+	* python/py-continueevent.c (create_continue_event_object): Make
+	static.
+	* python/py-lazy-string.c (stpy_get_type): Make static.
+	* python/py-newobjfileevent.c (create_new_objfile_event_object):
+	Make static.
+	* python/py-utils.c (unicode_to_target_python_string): Make
+	static.
+	* python/py-value.c: Include python.h.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* inferior.c (delete_threads_of_inferior): Delete.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	Import fallback definitions from glibc.
+
+	* gdb_proc_service.h [!HAVE_PROC_SERVICE_H] (struct
+	ps_prochandle): Forward declare.
+	(ps_err_e): Use glibc's comments.
+	[!HAVE_PROC_SERVICE_H] (ps_pdread, ps_pdwrite, ps_ptread)
+	(ps_ptwrite, ps_lgetregs, ps_lsetregs, ps_lgetfpregs)
+	(ps_lsetfpregs, ps_getpid, ps_get_thread_area, ps_pglobal_lookup)
+	(ps_pstop, ps_pcontinue, ps_lstop, ps_lcontinue, ps_lgetxregsize)
+	(ps_lgetxregs, ps_lsetxregs, ps_plog): Declare.
+	(struct ps_prochandle): Adjust comment.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	* ada-lang.c (ada_modulus_from_name): Delete.
+	* ada-lex.l (lexer_init): Make static.
+
+2012-03-01  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/13767
+
+	* frame.c (read_frame_register_unsigned): New.
+	* frame.h (read_frame_register_unsigned): Declare.
+	* i387-tdep.c (print_i387_status_word): New parameter `status_p'.
+	Handle it.
+	(print_i387_control_word): New parameter `control_p'.  Handle it.
+	(i387_print_float_info): Handle unavailable float registers.
+
+2012-03-01  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (decode_line_2): Sort the list of methods
+	alphabetically before presenting the user with a selection
+	menu.
+
+2012-03-01  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf2_cu): Remove unused members has_form_ref_addr,
+	has_namespace_info.
+	(dwarf2_read_abbrevs): Remove corresponding initialization.
+
+2012-03-01  Scott J. Goldman <scottjg@vmware.com>
+
+	* NEWS: Mention new python command class gdb.COMMAND_USER.
+	* cli/cli-cmds.c (show_user): Print error when used on a python
+	command.
+	(init_cli_cmds): Update documentation strings for "show user" and
+	"set/show max-user-call-depth" to clarify that it does not apply to
+	python commands.
+	* python/py-cmd.c (cmdpy_init): Treat class_user as a valid class in
+	error check.
+	(gdbpy_initialize_commands): Add COMMAND_USER as a constant in
+	gdb python api.
+	* top.c (execute_command): Only execute a user-defined command as a
+	legacy macro if c->user_commands is set.
+
+2012-03-01  Tom Tromey  <tromey@redhat.com>
+
+	* valprint.h (struct generic_val_print_decorations): New.
+	(generic_val_print): Declare.
+	* valprint.c (generic_val_print): New function.
+	* p-valprint.c (p_decorations): New global.
+	(pascal_val_print) <TYPE_CODE_REF, TYPE_CODE_ENUM,
+	TYPE_CODE_FLAGS, TYPE_CODE_FUNC, TYPE_CODE_RANGE, TYPE_CODE_INT,
+	TYPE_CODE_FLT, TYPE_CODE_VOID, TYPE_CODE_ERROR, TYPE_CODE_UNDEF,
+	TYPE_CODE_BOOL, TYPE_CODE_CHAR>: Call generic_val_print.
+	* m2-valprint.c (m2_decorations): New global.
+	(m2_val_print) <TYPE_CODE_REF, TYPE_CODE_ENUM, TYPE_CODE_FUNC,
+	TYPE_CODE_BOOL, TYPE_CODE_RANGE, TYPE_CODE_INT, TYPE_CODE_CHAR,
+	TYPE_CODE_FLT, TYPE_CODE_METHOD, TYPE_CODE_VOID, TYPE_CODE_UNDEF,
+	TYPE_CODE_ERROR>: Call generic_val_print.
+	* f-valprint.c (f_decorations): New global.
+	(f_val_print): Use print_function_pointer_address.
+	<TYPE_CODE_REF, TYPE_CODE_FUNC, TYPE_CODE_CHAR, TYPE_CODE_FLAGS,
+	TYPE_CODE_FLT, TYPE_CODE_VOID, TYPE_CODE_ENUM, TYPE_CODE_RANGE,
+	TYPE_CODE_BOOL, TYPE_CODE_COMPLEX, TYPE_CODE_UNDEF>: Call
+	generic_val_print.
+	* c-valprint.c (c_decorations): New global.
+	(c_val_print) <TYPE_CODE_MEMBERPTR, TYPE_CODE_REF, TYPE_CODE_ENUM,
+	TYPE_CODE_FLAGS, TYPE_CODE_FUNC, TYPE_CODE_METHOD, TYPE_CODE_BOOL,
+	TYPE_CODE_RANGE, TYPE_CODE_CHAR, TYPE_CODE_FLT,
+	TYPE_CODE_DECFLOAT, TYPE_CODE_VOID, TYPE_CODE_ERROR,
+	TYPE_CODE_UNDEF, TYPE_CODE_COMPLEX>: Call generic_val_print.
+	* ada-valprint.c (ada_val_print_1) <TYPE_CODE_FLAGS>: Remove
+	case.
+
+2012-03-01  Tom Tromey  <tromey@redhat.com>
+
+	* valprint.c (val_print): Update.
+	* p-valprint (pascal_val_print): Return void.
+	* p-lang.h (pascal_val_print): Return void.
+	* m2-valprint.c (m2_val_print): Return void.
+	* m2-lang.h (m2_val_print): Return void.
+	* language.h (struct language_defn) <la_val_print>: Return void.
+	* language.c (unk_lang_val_print): Return void.
+	* jv-valprint.c (java_val_print): Return void.
+	* jv-lang.h (java_val_print): Return void.
+	* f-valprint.c (f_val_print): Return void.
+	* f-lang.h (f_val_print): Return void.
+	* d-valprint.c (d_val_print): Return void.
+	(dynamic_array_type): Update.
+	* d-lang.h (d_val_print): Return void.
+	* c-valprint.c (c_val_print): Return void.
+	* c-lang.h (c_val_print): Return void.
+	* ada-valprint.c (ada_vada_val_print, ada_val_print_1): Return
+	void.
+	* ada-lang.h (ada_val_print): Return void.
+
+2012-03-01  Tom Tromey  <tromey@redhat.com>
+
+	* value.h (val_print): Return void.
+	* valprint.c (val_print): Return void.
+
+2012-03-01  Tom Tromey  <tromey@redhat.com>
+
+	* value.h (common_val_print): Return void.
+	* valprint.c (common_val_print): Return void.
+
+2012-03-01  Tom Tromey  <tromey@redhat.com>
+
+	* value.h (value_print): Return void.
+	* valprint.c (value_print): Return void.
+	* p-valprint.c (pascal_value_print): Return void.
+	* p-lang.h (pascal_value_print): Return void.
+	* language.h (struct language_defn) <la_value_print>: Return
+	void.
+	* language.c (unk_lang_value_print): Return void.
+	* jv-valprint.c (java_value_print): Return void.
+	* jv-lang.h (java_value_print): Return void.
+	* f-valprint.c (c_value_print): Don't declare.
+	Include c-lang.h.
+	* c-valprint.c (c_value_print): Return void.
+	* c-lang.h (c_value_print): Return void.
+	* ada-valprint.c (ada_value_print): Return void.
+	* ada-lang.h (ada_value_print): Return void.
+
+2012-03-01  Tom Tromey  <tromey@redhat.com>
+
+	* value.c (value_primitive_field): Handle virtual base classes.
+
+2012-03-01  Tom Tromey  <tromey@redhat.com>
+
+	* gdbtypes.h (struct vbase): Remove.
+
+2012-03-01  Tom Tromey  <tromey@redhat.com>
+
+	* c-valprint.c (print_function_pointer_address): Move...
+	* valprint.c: ... here.  Make non-static.
+	* m2-valprint.c (print_function_pointer_address): Remove.
+	* valprint.h (print_function_pointer_address): Declare.
+
+2012-03-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* NEWS: Document the fact that one can provide a condition when
+	creating an Ada exception catchpoint.
+
+2012-03-01  Tom Tromey  <tromey@redhat.com>
+
+	* valprint.c (val_print_type_code_flags): Fix placement of
+	trailing brace.
+
+2012-03-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* copyright.py (MULTILINE_COMMENT_PREFIXES): Delete.
+	(update_files): Do not set MULTILINE_COMMENT_PREFIXES
+	environment variable before calling update-copyright.
+
+2012-03-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* gnulib/extra/update-copyright: Update to the latest from
+	gnulib's git repository.
+	* copyright.py: Set UPDATE_COPYRIGHT_USE_INTERVALS environment
+	variable to 2 instead of 1.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* varobj.c (c_value_of_variable): Remove dead code.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lex.p (processId): Do not modify already encoded IDs.
+	Update function documentation.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.h (ada_find_renaming_symbol): Replace parameter
+	"name" with "struct symbol *name_sym".
+	* ada-exp.y (write_var_or_type): Update call to
+	ada_find_renaming_symbol.
+	"name" with "struct symbol *name_sym". Adjust Implementation
+	accordingly.  Adjust the function documentation.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.h (ada_find_any_symbol, ada_find_any_type): Delete.
+	* ada-lang.c (ada_find_any_type): Add advance declaration.
+	Make static.  Replace ada_find_any_symbol by
+	ada_find_any_type_symbol.
+	(ada_find_any_type_symbol): Renames ada_find_any_symbol.
+	Improve function description.  Make static.
+	(ada_find_renaming_symbol, find_old_style_renaming_symbol):
+	Replace ada_find_any_symbol by ada_find_any_type_symbol.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (struct tag_args): Delete.
+	(ada_get_tsd_type): Function body moved up in source file.
+	(ada_tag_name_1, ada_tag_name_2): Delete.
+	(ada_get_tsd_from_tag): New function.
+	(ada_tag_name_from_tsd): New function.
+	(ada_tag_name): Use a TRY_CATCH block instead of catch_errors
+	to determine the tag name.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.h (ada_get_decoded_value, ada_get_decoded_type): Add
+	declaration.
+	* ada-lang.c (ada_get_decoded_value, ada_get_decoded_type): New
+	function.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_is_ignored_field): Rewrite wrong comment.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_lookup_symbol_list): Only cache the result of
+	full searches.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (constrained_packed_array_type): If there is a
+	parallel XA type, use it to determine the array index type.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-valprint.c (ada_val_print_1): If our value is a reference
+	to an array descriptor, dereference it before converting it
+	to a simple array.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_to_fixed_value): Call unwrap_value before
+	creating fixed value.
+	(ada_value_ind, ada_coerce_ref, assign_component)
+	(ada_evaluate_subexp): Remove call to unwrap_value before
+	call to ada_to_fixed_value.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (to_fixed_array_type): Set result's type name.
+
+2012-02-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (catch_ada_exception_command_split): Add new
+	argument cond_string.  Add support for condition at end of
+	"catch exception" commands.
+	(ada_decode_exception_location): Add new argument cond_string.
+	Update call to catch_ada_exception_command_split.
+	(create_ada_exception_catchpoint): Add new argument cond_string.
+	Set the breakpoint condition if needed.
+	(catch_ada_exception_command): Update call to
+	ada_decode_exception_location.
+	(ada_decode_assert_location): Add function documentation.
+	Add support for condition at end of "catch assert" command.
+	(catch_assert_command): Update calls to ada_decode_assert_location
+	and create_ada_exception_catchpoint.
+
+2012-02-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix disp-step-syscall.exp: fork: single step over fork.
+	* i386-linux-tdep.c (-i386_linux_get_syscall_number): Rename to ...
+	(i386_linux_get_syscall_number_from_regcache): ... here, new function
+	comment, change parameters gdbarch and ptid to regcache.  Remove
+	parameter regcache, initialize gdbarch from regcache here.
+	(i386_linux_get_syscall_number, i386_linux_displaced_step_copy_insn):
+	New functions.
+	(i386_linux_init_abi): Install i386_linux_displaced_step_copy_insn
+	instead.
+	* i386-tdep.c (i386_syscall_p): Check also for 'sysenter' and
+	'syscall'.  Make the 'int' check more strict.
+
+2012-02-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix reverse mode for syscall on AMD CPUs in 32-bit mode.
+	* i386-linux-tdep.c (i386_linux_intx80_sysenter_record): Rename to ...
+	(i386_linux_intx80_sysenter_syscall_record): ... here.
+	(i386_linux_init_abi): Initialize also I386_SYSCALL_RECORD.
+	Use the renamed function name.
+
+2012-02-29  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* arm-linux-tdep.c (arm_linux_copy_svc): Reset stale FRAME.
+	* breakpoint.c (until_break_command): Likewise.
+	* elfread.c (elf_gnu_ifunc_resolver_stop): Likewise.
+	* infcall.c (call_function_by_hand): Likewise.
+	* infcmd.c (finish_forward): Likewise.
+	* infrun.c (insert_exception_resume_breakpoint): Likewise.
+
+2012-02-28  Joel Brobecker  <brobecker@adacore.com>
+
+	From Tristan Gingold  <gingold@adacore.com>.
+	* ada-tasks.c (ada_tasks_inferior_data_sniffer): Rework code to
+	avoid variable assignments inside condition.
+
+2012-02-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix static analysis issue found by cppcheck.
+	* microblaze-tdep.c (microblaze_extract_return_value): Fix
+	uninitialized BUF for size 2.
+
+2012-02-27  Chris Dearman  <chris@mips.com>
+            Nathan Froyd  <froydnj@codesourcery.com>
+            Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips32_instruction_has_delay_slot): New function.
+	(mips16_instruction_has_delay_slot): Likewise.
+	(mips_segment_boundary): Likewise.
+	(mips_adjust_breakpoint_address): Likewise.
+	(mips_gdbarch_init): Use mips_adjust_breakpoint_address.
+
+2012-02-27  Maciej W. Rozycki  <macro@mips.com>
+            Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* infrun.c (handle_inferior_event): Don't proceed through
+	shared library trampolines if stepping at the machine
+	instruction level.
+
+2012-02-27  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-linux-tdep.c (mips_linux_init_abi): Set num_pseudo_regs
+	too.
+
+2012-02-27  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* sh-tdep.c (sh_make_stub_cache, sh_stub_this_id)
+	(sh_stub_unwind_sniffer): New functions.
+	(sh_stub_unwind): New variable.
+	(sh_gdbarch_init): Wire everything.
+
+2012-02-27  Pedro Alves  <palves@redhat.com>
+
+	* linux-nat.c (pid_is_stopped): Delete, moved to common/.
+	(linux_nat_post_attach_wait): Adjust to use
+	linux_proc_pid_is_stopped.
+	* common/linux-procfs.h (linux_proc_pid_is_stopped): Declare.
+	* common/linux-procfs.c (linux_proc_pid_is_stopped): New function,
+	based on pid_is_stopped from both linux-nat.c and
+	gdbserver/linux-low.c, and renamed.
+
+2012-02-24  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* remote.c (remote_watchpoint_addr_within_range): New function.
+	(init_remote_ops): Use it.
+
+2012-02-24  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* target.h (target_watchpoint_addr_within_range): Document macro.
+
+2012-02-24  Pedro Alves  <palves@redhat.com>
+
+	* stack.c (set_last_displayed_sal): Issue internal_error instead
+	of warning, and issue it after clearing the last displayed sal.
+
+2012-02-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* breakpoint.c (until_break_command): Install breakpoints after
+	all frame manipulations.
+
+2012-02-24  Luis Machado  <lgustavo@codesourcery.com>
+
+	* remote.c (remote_supports_cond_breakpoints): New forward
+	declaration.
+	(remote_add_target_side_condition): New function.
+	(remote_insert_breakpoint): Add target-side breakpoint
+	conditional if supported.
+	(remote_insert_hw_breakpoint): Likewise.
+	(init_remote_ops): Set to_supports_evaluation_of_breakpoint_conditions
+	hook.
+
+	* target.c (update_current_target): Inherit
+	to_supports_evaluation_of_breakpoint_conditions.
+	Default to_supports_evaluation_of_breakpoint_conditions to return_zero.
+
+	* target.h (struct target_ops)
+	<to_supports_evaluation_of_breakpoint_conditions>: New field.
+	(target_supports_evaluation_of_breakpoint_conditions): New #define.
+
+	* breakpoint.c (get_first_locp_gte_addr): New forward declaration.
+	(condition_evaluation_both, condition_evaluation_auto,
+	condition_evaluation_host, condition_evaluation_target,
+	condition_evaluation_enums, condition_evaluation_mode_1,
+	condition_evaluation_mode): New	static globals.
+	(translate_condition_evaluation_mode): New function.
+	(breakpoint_condition_evaluation_mode): New function.
+	(gdb_evaluates_breakpoint_condition_p): New function.
+	(ALL_BP_LOCATIONS_AT_ADDR): New helper macro.
+	(mark_breakpoint_modified): New function.
+	(mark_breakpoint_location_modified): New function.
+	(set_condition_evaluation_mode): New function.
+	(show_condition_evaluation_mode): New function.
+	(bp_location_compare_addrs): New function.
+	(get_first_location_gte_addr): New helper function.
+	(set_breakpoint_condition): Free condition bytecode if locations
+	has become unconditional.  Call mark_breakpoint_modified (...).
+	(condition_command): Call update_global_location_list (1) for
+	breakpoints.
+	(breakpoint_xfer_memory): Use is_breakpoint (...).
+	(is_breakpoint): New function.
+	(parse_cond_to_aexpr): New function.
+	(build_target_condition_list): New function.
+	(insert_bp_location): Handle target-side conditional
+	breakpoints and call build_target_condition_list (...).
+	(update_inserted_breakpoint_locations): New function.
+	(insert_breakpoint_locations): Handle target-side conditional
+	breakpoints.
+	(bpstat_check_breakpoint_conditions): Add comment.
+	(bp_condition_evaluator): New function.
+	(bp_location_condition_evaluator): New function.
+	(print_breakpoint_location): Print information on where the condition
+	will be evaluated.
+	(print_one_breakpoint_location): Likewise.
+	(init_bp_location): Call mark_breakpoint_location_modified (...) for
+	breakpoint location.
+	(force_breakpoint_reinsertion): New functions.
+	(update_global_location_list): Handle target-side breakpoint
+	conditions.
+	Reinsert locations that are already inserted if conditions have
+	changed.
+	(bp_location_dtor): Free agent expression bytecode.
+	(disable_breakpoint): Call mark_breakpoint_modified (...).
+	Call update_global_location_list (...) with parameter 1 for breakpoints.
+	(disable_command): Call mark_breakpoint_location_modified (...).
+	Call update_global_location_list (...) with parameter 1 for breakpoints.
+	(enable_breakpoint_disp): Call mark_breakpoint_modified (...).
+	(enable_command): mark_breakpoint_location_modified (...).
+	(_initialize_breakpoint): Update documentation and add
+	condition-evaluation breakpoint subcommand.
+
+	* breakpoint.h: Include ax.h.
+	(condition_list): New data structure.
+	(condition_status): New enum.
+	(bp_target_info) <cond_list>: New field.
+	(bp_location) <condition_changed, cond_bytecode>: New fields.
+	(is_breakpoint): New prototype.
+
+2012-02-24  Luis Machado  <lgustavo@codesourcery.com>
+
+	* remote.c (remote_state) <cond_breakpoints>: New field.
+	(PACKET_ConditionalBreakpoints): New enum.
+	(remote_cond_breakpoint_feature): New function.
+	(remote_protocol_features): Add new ConditionalBreakpoints entry.
+	(remote_supports_cond_breakpoints): New function.
+	(_initialize_remote): Add new packet configuration for
+	target-side conditional breakpoints.
+
+2012-02-24  Luis Machado  <lgustavo@codesourcery.com>
+
+	* NEWS: Mention target-side conditional breakpoint support,
+	new condition-evaluation breakpoint subcommand and remote
+	packet extensions.
+
+2012-02-24  Luis Machado  <lgustavo@codesourcery.com>
+
+	* breakpoint.c (bp_location_compare): Sort by pspace before sorting by
+	number.
+
+2012-02-24  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* sh-tdep.c (sh_skip_prologue): Use skip_prologue_using_sal.
+	(after_prologue): Remove.
+
+2012-02-23  Tom Tromey  <tromey@redhat.com>
+
+	* jv-valprint.c (java_val_print): Remove dead code.
+
+2012-02-23  Tristan Gingold  <gingold@adacore.com>
+
+       * ada-tasks.c (struct ada_tasks_inferior_data): Add
+        known_tasks_element and known_tasks_length fields.
+        (read_known_tasks_array): Change argument type.  Use pointer type
+        and number of elements from DATA.  Adjust.
+        (read_known_tasks_list): Likewise.
+        (get_known_tasks_addr): Remove.
+        (ada_set_current_inferior_known_tasks_addr): Renamed to ...
+        (ada_tasks_inferior_data_sniffer): ... this.  Use symtab for element
+        type and array length.  Merge former get_known_tasks_addr code.
+
+2012-02-23  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR backtrace/13716
+	* infcmd.c (finish_forward): New variable frame_id, initialize it, use
+	it after set_momentary_breakpoint.
+
+2012-02-22  Sterling Augustine  <saugustine@google.com>
+
+	PR 13689:
+	* breakpoint.c (watchpoint_exp_is_constant): Add UNOP_CAST to switch.
+
+2012-02-22  Gary Benson  <gbenson@redhat.com>
+
+	* dwarf2read.c (dwarf2_read_index): Correct misspelling.
+	(find_slot_in_mapped_hash): Likewise.
+
+2012-02-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR build/13638
+	* configure.ac (MAKEINFO): Replace AC_CHECK_PROG by AC_ARG_VAR.
+	(MAKEINFOFLAGS): Replace static string by AC_ARG_VAR.
+	* configure: Regenerate.
+
+2012-02-21  Tristan Gingold  <gingold@adacore.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* ia64-tdep.c: Do not include libunwind-ia64.h.
+	* libunwind-frame.h: Remove #ifdef HAVE_LIBUNWIND_H guard.
+	Include libunwind-ia64.h instead of libunwind.h.
+	* configure.ac (--with-libunwind, $enable_libunwind): Don't check
+	for libunwind.h existence.
+	* configure, config.in: Regenerate.
+
+2012-02-21  Anton Gorenkov  <xgsa@yandex.ru>
+
+	* c-valprint.c (c_value_print): Use value_rtti_indirect_type
+	instead of value_rtti_target_type.
+	* eval.c (evaluate_subexp_standard): Use value_rtti_indirect_type
+	instead of value_rtti_target_type.
+	* typeprint.c (whatis_exp): Use value_rtti_indirect_type instead of
+	value_rtti_target_type.
+	* valops.c (value_ind): Extract function readjust_indirect_value_type.
+	(value_rtti_target_type): Rename to ...
+	(value_rtti_indirect_type): ... here and make it indirect.  Update
+	function comment.
+	* value.c (readjust_indirect_value_type): New function.
+	(coerce_ref): Support for enclosing type setting for references
+	with readjust_indirect_value_type.
+	* value.h (readjust_value_type): New declaration.
+	(value_rtti_target_type): Rename to ...
+	(value_rtti_indirect_type): ... here.
+
+2012-02-21  Anton Gorenkov  <xgsa@yandex.ru>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list.
+
+2012-02-20  Doug Evans  <dje@google.com>
+
+	* objfiles.c (add_to_objfile_sections): Remove outdated comments.
+	Rename objfile_p_char parameter to objfilep.
+	(build_objfile_section_table): Result is now void.  All callers
+	updated.
+	* objfiles.h (struct objfile): Tweak comments, whitespace.
+	(build_objfile_section_table): Update.
+
+	* elfread.c (elf_symfile_segments): Fix warning text.
+
+2012-02-20  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/13498:
+	* dwarf2read.c (dw2_expand_symtabs_matching): Only visit a
+	particular set of file names once.
+	(dw2_map_symbol_filenames): Likewise.
+
+2012-02-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* main.c (write_files): Remove the declaration.
+	(external_editor_command): Move the declaration ...
+	[GDBTK] (external_editor_command): ... here.  Fix the comment.
+
+2012-02-20  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dw2_map_symtabs_matching_filename): Remove
+	extraneous block.
+
 2012-02-20  Tristan Gingold  <gingold@adacore.com>
 
 	* darwin-nat.h (enum darwin_msg_state): Add comments.
