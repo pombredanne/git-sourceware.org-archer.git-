@@ -494,9 +494,6 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	 This allows users to forgo quoting CV-qualifiers, template arguments,
 	 and similar common language constructs.  */
 
-      /* Check for valid operator name.  */
-      PARSER_STREAM (parser) += cp_validate_operator (PARSER_STREAM (parser));
-
       while (1)
 	{
 	  if (isspace (*PARSER_STREAM (parser)))
