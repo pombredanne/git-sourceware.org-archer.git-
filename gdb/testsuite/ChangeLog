@@ -1,3 +1,54 @@
+2012-03-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/ftrace.exp (test_fast_tracepoints): Run test on target
+	x86_64-*-* and i?86-*-*.
+	Set up KFAIL for gdb/13808.
+
+2012-03-05  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.ada/operator_bp.exp: Clear debug-file-directory.
+	* gdb.ada/mi_task_arg.exp: Clear debug-file-directory.
+
+2012-03-05  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.java/jprint.java (jprint.main): Keep 'x' live.
+
+2012-03-04  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/disp-step-syscall.exp (disp_step_cross_syscall): Catch error
+	messages for KFAIL.
+
+2012-03-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.ada/arrayidx.exp: Call get_compiler_info.  New variable old_gcc.
+	(print one_two_three, indexes off, print few_reps, indexes off)
+	(print many_reps, indexes off, print empty, indexes off)
+	(print one_two_three, print few_reps, print many_reps, print empty):
+	Call setup_xfail if $gcc_old.
+
+2012-03-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Implement testsuite workaround for PR breakpoints/13781.
+	* gdb.cp/mb-templates.exp: New loop with variable $workaround.
+	(set breakpoint condition-evaluation host): New conditional command.
+
+2012-03-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* gdb.cp/mb-templates.exp: New variables executable.  Use it for
+	binfile.  use clean_restart.  Replace gdb_expect by gdb_test_multiple.
+	Replace GDB restart by kill and delete_breakpoints.  Replace breakpoint
+	number 1 by $bpnum.  Four times.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/strace.exp: run strace_info_marker in linux native gdb.
+
+2012-03-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Setup KFAIL for PR server/13796.
+	* gdb.base/disp-step-syscall.exp (single step over vfork): Setup KFAIL.
+
 2012-03-02  Joel Brobecker  <brobecker@adacore.com>
 
 	* gdb.ada/operator_bp: New testcase.

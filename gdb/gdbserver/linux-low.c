@@ -19,6 +19,7 @@
 #include "server.h"
 #include "linux-low.h"
 #include "linux-osdata.h"
+#include "agent.h"
 
 #include <sys/wait.h>
 #include <stdio.h>
@@ -1390,7 +1391,7 @@ maybe_move_out_of_jump_pad (struct lwp_info *lwp, int *wstat)
   if ((wstat == NULL
        || (WIFSTOPPED (*wstat) && WSTOPSIG (*wstat) != SIGTRAP))
       && supports_fast_tracepoints ()
-      && in_process_agent_loaded ())
+      && agent_loaded_p ())
     {
       struct fast_tpoint_collect_status status;
       int r;
@@ -2321,7 +2322,7 @@ retry:
   if (WIFSTOPPED (w)
       && WSTOPSIG (w) != SIGTRAP
       && supports_fast_tracepoints ()
-      && in_process_agent_loaded ())
+      && agent_loaded_p ())
     {
       if (debug_threads)
 	fprintf (stderr,
@@ -2875,7 +2876,7 @@ stuck_in_jump_pad_callback (struct inferior_list_entry *entry, void *data)
 
   /* Allow debugging the jump pad, gdb_collect, etc..  */
   return (supports_fast_tracepoints ()
-	  && in_process_agent_loaded ()
+	  && agent_loaded_p ()
 	  && (gdb_breakpoint_here (lwp->stop_pc)
 	      || lwp->stopped_by_watchpoint
 	      || thread->last_resume_kind == resume_step)
@@ -4854,6 +4855,12 @@ linux_supports_disable_randomization (void)
 #endif
 }
 
+static int
+linux_supports_agent (void)
+{
+  return 1;
+}
+
 /* Enumerate spufs IDs for process PID.  */
 static int
 spu_enumerate_spu_ids (long pid, unsigned char *buf, CORE_ADDR offset, int len)
@@ -5243,7 +5250,16 @@ get_dynamic (const int pid, const int is_elf64)
 
   if (relocation == -1)
     {
-      warning ("Unexpected missing PT_PHDR");
+      /* PT_PHDR is optional, but necessary for PIE in general.  Fortunately
+	 any real world executables, including PIE executables, have always
+	 PT_PHDR present.  PT_PHDR is not present in some shared libraries or
+	 in fpc (Free Pascal 2.4) binaries but neither of those have a need for
+	 or present DT_DEBUG anyway (fpc binaries are statically linked).
+
+	 Therefore if there exists DT_DEBUG there is always also PT_PHDR.
+
+	 GDB could find RELOCATION also from AT_ENTRY - e_entry.  */
+
       return 0;
     }
 
@@ -5576,6 +5592,7 @@ static struct target_ops linux_target_ops = {
   linux_supports_disable_randomization,
   linux_get_min_fast_tracepoint_insn_len,
   linux_qxfer_libraries_svr4,
+  linux_supports_agent,
 };
 
 static void

@@ -4701,6 +4701,20 @@ init_tfile_ops (void)
   tfile_ops.to_magic = OPS_MAGIC;
 }
 
+void
+free_current_marker (void *arg)
+{
+  struct static_tracepoint_marker **marker_p = arg;
+
+  if (*marker_p != NULL)
+    {
+      release_static_tracepoint_marker (*marker_p);
+      xfree (*marker_p);
+    }
+  else
+    *marker_p = NULL;
+}
+
 /* Given a line of text defining a static tracepoint marker, parse it
    into a "static tracepoint marker" object.  Throws an error is
    parsing fails.  If PP is non-null, it points to one past the end of
@@ -4882,6 +4896,12 @@ info_static_tracepoint_markers_command (char *arg, int from_tty)
   struct static_tracepoint_marker *marker;
   struct ui_out *uiout = current_uiout;
   int i;
+
+  /* We don't have to check target_can_use_agent and agent's capability on
+     static tracepoint here, in order to be compatible with older GDBserver.
+     We don't check USE_AGENT is true or not, because static tracepoints
+     don't work without in-process agent, so we don't bother users to type
+     `set agent on' when to use static tracepoint.  */
 
   old_chain
     = make_cleanup_ui_out_table_begin_end (uiout, 5, -1,

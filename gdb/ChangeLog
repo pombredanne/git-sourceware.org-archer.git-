@@ -1,3 +1,186 @@
+2012-03-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* MAINTAINERS: List Maciej W. Rozycki as the mips maintainer.
+
+2012-03-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* common/linux-osdata.c (linux_common_core_of_thread): New function
+	comment.
+	* linux-nat.c (linux_nat_wait_1): Replace linux_nat_core_of_thread_1
+	call by linux_common_core_of_thread.
+	(linux_nat_core_of_thread_1): Remove.
+	* linux-nat.h (linux_nat_core_of_thread_1): Remove declaration.
+	* linux-thread-db.c: Include linux-osdata.h.
+	(update_thread_core): Replace linux_nat_core_of_thread_1 call by
+	linux_common_core_of_thread.
+
+2012-03-05  Tom Tromey  <tromey@redhat.com>
+
+	* value.c (value_primitive_field): Don't fetch contents for
+	non-virtual bases.
+
+2012-03-05  Tom Tromey  <tromey@redhat.com>
+
+	* jv-valprint.c (java_value_print): Correctly compute 'obj_addr'.
+
+2012-03-05  Joel Brobecker  <brobecker@adacore.com>
+
+	From Andreas Arnez  <arnez@linux.vnet.ibm.com>:
+	* s390-nat.c: Include "gregset.h".
+
+2012-03-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* libunwind-frame.c (LIBUNWIND_SO): Change .7 to .8.
+	[!LIBUNWIND_SO] (LIBUNWIND_SO_7): New #define.
+	(libunwind_load): New variable so_error, use it for dlerror.  Try to
+	load also LIBUNWIND_SO_7.
+
+2012-03-05  Pedro Alves  <palves@redhat.com>
+
+	* i387-tdep.c (i387_supply_xsave): Assert the xsave section buffer
+	is not NULL, and remove resulting dead code.
+
+2012-03-05  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* sh-tdep.c (sh_skip_prologue): Provide an upper limit on the function
+	prologue to sh_analyze_prologue.
+	(sh_analyze_prologue): Make better use of such an upper limit, and
+	generally be more cautious about accessing memory.
+
+2012-03-05  Tom Tromey  <tromey@redhat.com>
+
+	* ia64-vms-tdep.c (_initialize_ia64_vms_tdep): Rename from
+	_initialize_ia64_hpux_tdep.
+
+2012-03-05  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/13766
+
+	* i387-tdep.c (i387_supply_xsave): If we have an xsave buffer, and
+	the register state is clear, supply explicit zero, instead of
+	marking the register unavailable.
+
+2012-03-05  Tristan Gingold  <gingold@adacore.com>
+
+	* NEWS: Mention OpenVMS ia64 new target.
+
+2012-03-05  Tristan Gingold  <gingold@adacore.com>
+
+	* ia64-tdep.h: Include libunwind-frame.h and libunwind-ia64.h.
+	(ia64_unw_accessors, ia64_unw_rse_accessors)
+	(ia64_libunwind_descr): Declare.
+	* ia64-vms-tdep.c: New file.
+	* ia64-tdep.c (ia64_unw_accessors, ia64_unw_rse_accessors)
+	(ia64_libunwind_descr): Make them public.
+	* configure.tgt: Add ia64-*-*vms*.
+	* Makefile.in (ALL_64_TARGET_OBS): Add ia64-vms-tdep.o
+	(ALLDEPFILES): Add ia64-vms-tdep.c
+
+2012-03-05  Tristan Gingold  <gingold@adacore.com>
+
+	* target.h (target_object): Add TARGET_OBJECT_OPENVMS_UIB.
+	* remote.c (PACKET_qXfer_uib): New enum value.
+	(remote_protocol_features): Add entry for PACKET_qXfer_uib.
+	(remote_xfer_partial): Handle TARGET_OBJECT_OPENVMS_UIB.
+	(_initialize_remote): Call add_packet_config_cmd for
+	xfer:uib packet.
+
+2012-03-05  Tristan Gingold  <gingold@adacore.com>
+
+	* osabi.c (gdb_osabi_names): Add OpenVMS.
+	(generic_elf_osabi_sniffer): Likewise.
+	* defs.h (gdb_osabi): Add GDB_OSABI_OPENVMS.
+
+2012-03-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Removed unused code.
+	* libunwind-frame.c (libunwind_frame_unwind)
+	(libunwind_frame_base_address): Remove.
+	* libunwind-frame.h (libunwind_frame_base_address): Remove declaration.
+
+2012-03-04  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c (gdb_connect_sync_socket): Add _ markup and
+	remove trailing new line.
+	(agent_run_command, agent_run_command): Add _ markup.
+	(agent_capability_check): Likewise.
+
+2012-03-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (set_condition_evaluation_mode): Set
+	CONDITION_EVALUATION_MODE unconditionally.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c (agent_look_up_symbols): Add one parameter 'arg'.
+	* common/agent.h: Update declaration.
+	* inf-child.c (inf_child_use_agent): New.
+	(inf_child_can_use_agent): New.
+	(inf_child_target): Initialize fields `to_use_agent'
+	and `to_can_use_agent'.
+	* agent.c (agent_new_objfile): New.
+	(_initialize_agent): Add agent_new_objfile to new_objfile
+	observer.
+
+	* linux-nat.c (linux_child_static_tracepoint_markers_by_strid):
+	New.
+	(linux_target_install_ops): Initialize field
+	`to_static_tracepoint_markers_by_strid'.
+	* remote.c (free_current_marker): Move it to ...
+	* tracepoint.c (free_current_marker): ... here.  New.
+	(cleanup_target_stop): New.
+	* tracepoint.h: Declare free_current_marker.
+	* NEWS: Add one entry about `info static-tracepoint-marker'.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c (agent_loaded_p): New.
+	(agent_look_up_symbols): New global.
+	* common/agent.h: Declare agent_loaded_p.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c (struct ipa_sym_addresses) <addr_capability>: New.
+	(agent_capability_check, agent_capability_invalidate): New.
+	(symbol_list): New array element.
+	* common/agent.h (enum agent_capa): New.
+	* target.c (target_pre_inferior): Call agent_capability_invalidate.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* target.h (struct target_ops) <to_use_agent>: New field.
+	(struct target_ops) <to_can_use_agent>: New field.
+	(target_use_agent, target_can_use_agent): New macro.
+	* target.c (update_current_target): Update.
+	* remote.c: New enum `PACKET_QAgent'.
+	(remote_protocol_features): Add a new element.
+	(remote_use_agent, remote_can_use_agent): New.
+	(init_remote_ops): Initialize field `can_use_agent' with
+	remote_can_use_agent.  Intiailize field `use_agent' with
+	remote_use_agent.
+	* common/agent.c (use_agent): New global.
+	* common/agent.h: Declare it.
+	* tracepoint.c (info_static_tracepoint_markers_command): Add
+	comment.
+	* Makefile.in (SFILES): Add common/agent.c and agent.c.
+	(COMMON_OBS): Add common/agent.o and agent.o
+	(common-agent.o): New rule.
+	* agent.c: New.
+
+2012-03-03  Yao Qi  <yao@codesourcery.com>
+
+	* common/agent.c: New.
+	* common/agent.h: New.
+	* configure.ac: Add `sys/socket.h' and `sys/un.h' to
+	AC_CHECK_HEADERS.
+	* configure, configh.in: Regenerated.
+
+2012-03-02  Kevin Buettner  <kevinb@redhat.com>
+
+	* sh-tdep.c (sh_frame_cache): Don't fetch the FPSCR register
+	unless it exists for this architecture.
+
 2012-03-02  Joel Brobecker  <brobecker@adacore.com>
 
 	* language.h (struct language_defn): New "method" la_read_var_value.

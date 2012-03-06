@@ -280,7 +280,9 @@ enum target_object
   /* Load maps for FDPIC systems.  */
   TARGET_OBJECT_FDPIC,
   /* Darwin dynamic linker info data.  */
-  TARGET_OBJECT_DARWIN_DYLD_INFO
+  TARGET_OBJECT_DARWIN_DYLD_INFO,
+  /* OpenVMS Unwind Information Block.  */
+  TARGET_OBJECT_OPENVMS_UIB
   /* Possible future objects: TARGET_OBJECT_FILE, ...  */
 };
 
@@ -835,6 +837,13 @@ struct target_ops
        higher layers take care of caching, invalidating, and
        re-fetching when necessary.  */
     struct traceframe_info *(*to_traceframe_info) (void);
+
+    /* Ask the target to use or not to use agent according to USE.  Return 1
+       successful, 0 otherwise.  */
+    int (*to_use_agent) (int use);
+
+    /* Is the target able to use agent in current state?  */
+    int (*to_can_use_agent) (void);
 
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
@@ -1674,6 +1683,12 @@ extern char *target_fileio_read_stralloc (const char *filename);
 
 #define target_traceframe_info() \
   (*current_target.to_traceframe_info) ()
+
+#define target_use_agent(use) \
+  (*current_target.to_use_agent) (use)
+
+#define target_can_use_agent() \
+  (*current_target.to_can_use_agent) ()
 
 /* Command logging facility.  */
 

@@ -60,6 +60,8 @@
 #include "linux-osdata.h"
 #include "linux-tdep.h"
 #include "symfile.h"
+#include "agent.h"
+#include "tracepoint.h"
 
 #ifndef SPUFS_MAGIC
 #define SPUFS_MAGIC 0x23c9b64e
@@ -3998,7 +4000,7 @@ retry:
       || ourstatus->kind == TARGET_WAITKIND_SIGNALLED)
     lp->core = -1;
   else
-    lp->core = linux_nat_core_of_thread_1 (lp->ptid);
+    lp->core = linux_common_core_of_thread (lp->ptid);
 
   return lp->ptid;
 }
@@ -4772,6 +4774,73 @@ linux_xfer_partial (struct target_ops *ops, enum target_object object,
 			     offset, len);
 }
 
+static void
+cleanup_target_stop (void *arg)
+{
+  ptid_t *ptid = (ptid_t *) arg;
+
+  gdb_assert (arg != NULL);
+
+  /* Unpause all */
+  target_resume (*ptid, 0, TARGET_SIGNAL_0);
+}
+
+static VEC(static_tracepoint_marker_p) *
+linux_child_static_tracepoint_markers_by_strid (const char *strid)
+{
+  char s[IPA_CMD_BUF_SIZE];
+  struct cleanup *old_chain;
+  int pid = ptid_get_pid (inferior_ptid);
+  VEC(static_tracepoint_marker_p) *markers = NULL;
+  struct static_tracepoint_marker *marker = NULL;
+  char *p = s;
+  ptid_t ptid = ptid_build (pid, 0, 0);
+
+  /* Pause all */
+  target_stop (ptid);
+
+  memcpy (s, "qTfSTM", sizeof ("qTfSTM"));
+  s[sizeof ("qTfSTM")] = 0;
+
+  agent_run_command (pid, s);
+
+  old_chain = make_cleanup (free_current_marker, &marker);
+  make_cleanup (cleanup_target_stop, &ptid);
+
+  while (*p++ == 'm')
+    {
+      if (marker == NULL)
+	marker = XCNEW (struct static_tracepoint_marker);
+
+      do
+	{
+	  parse_static_tracepoint_marker_definition (p, &p, marker);
+
+	  if (strid == NULL || strcmp (strid, marker->str_id) == 0)
+	    {
+	      VEC_safe_push (static_tracepoint_marker_p,
+			     markers, marker);
+	      marker = NULL;
+	    }
+	  else
+	    {
+	      release_static_tracepoint_marker (marker);
+	      memset (marker, 0, sizeof (*marker));
+	    }
+	}
+      while (*p++ == ',');	/* comma-separated list */
+
+      memcpy (s, "qTsSTM", sizeof ("qTsSTM"));
+      s[sizeof ("qTsSTM")] = 0;
+      agent_run_command (pid, s);
+      p = s;
+    }
+
+  do_cleanups (old_chain);
+
+  return markers;
+}
+
 /* Create a prototype generic GNU/Linux target.  The client can override
    it with local methods.  */
 
@@ -4793,6 +4862,9 @@ linux_target_install_ops (struct target_ops *t)
 
   super_xfer_partial = t->to_xfer_partial;
   t->to_xfer_partial = linux_xfer_partial;
+
+  t->to_static_tracepoint_markers_by_strid
+    = linux_child_static_tracepoint_markers_by_strid;
 }
 
 struct target_ops *
@@ -5115,71 +5187,6 @@ linux_nat_thread_address_space (struct target_ops *t, ptid_t ptid)
   inf = find_inferior_pid (pid);
   gdb_assert (inf != NULL);
   return inf->aspace;
-}
-
-int
-linux_nat_core_of_thread_1 (ptid_t ptid)
-{
-  struct cleanup *back_to;
-  char *filename;
-  FILE *f;
-  char *content = NULL;
-  char *p;
-  char *ts = 0;
-  int content_read = 0;
-  int i;
-  int core;
-
-  filename = xstrprintf ("/proc/%d/task/%ld/stat",
-			 GET_PID (ptid), GET_LWP (ptid));
-  back_to = make_cleanup (xfree, filename);
-
-  f = fopen (filename, "r");
-  if (!f)
-    {
-      do_cleanups (back_to);
-      return -1;
-    }
-
-  make_cleanup_fclose (f);
-
-  for (;;)
-    {
-      int n;
-
-      content = xrealloc (content, content_read + 1024);
-      n = fread (content + content_read, 1, 1024, f);
-      content_read += n;
-      if (n < 1024)
-	{
-	  content[content_read] = '\0';
-	  break;
-	}
-    }
-
-  make_cleanup (xfree, content);
-
-  p = strchr (content, '(');
-
-  /* Skip ")".  */
-  if (p != NULL)
-    p = strchr (p, ')');
-  if (p != NULL)
-    p++;
-
-  /* If the first field after program name has index 0, then core number is
-     the field with index 36.  There's no constant for that anywhere.  */
-  if (p != NULL)
-    p = strtok_r (p, " ", &ts);
-  for (i = 0; p != NULL && i != 36; ++i)
-    p = strtok_r (NULL, " ", &ts);
-
-  if (p == NULL || sscanf (p, "%d", &core) == 0)
-    core = -1;
-
-  do_cleanups (back_to);
-
-  return core;
 }
 
 /* Return the cached value of the processor core for thread PTID.  */
