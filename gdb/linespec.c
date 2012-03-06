@@ -2895,7 +2895,10 @@ collect_symbols (struct symbol *sym, void *data)
 {
   struct collect_info *info = data;
 
-  VEC_safe_push (symbolp, info->result.symbols, sym);
+  /* In list mode, add all matching symbols, regardless of class.
+     This allows the user to type "list a_global_variable".  */
+  if (SYMBOL_CLASS (sym) == LOC_BLOCK || info->state->list_mode)
+    VEC_safe_push (symbolp, info->result.symbols, sym);
   return 1;
 }
 
