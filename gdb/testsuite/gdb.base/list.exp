@@ -468,7 +468,7 @@ proc test_list_filename_and_function {} {
     pass "list filename:function ($testcnt tests)"
 
     # Test with quoting.
-    gdb_test "list 'list0.c:main'" "int main.*"
+    gdb_test "list 'list0.c':'main'" "int main.*"
 
     # Test some invalid specs
     # The following test takes the FIXME result on most systems using

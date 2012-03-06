@@ -95,11 +95,6 @@ foreach test $methods {
 	&& !$have_gcc_45682_fixed} {
 	setup_xfail gcc/45682 "*-*-*"
     }
-    gdb_test "list '${srcfile}:$test'" $result
-    if {[string compare $test "xxx::${ans}::A::func"] == 0
-	&& !$have_gcc_45682_fixed} {
-	setup_xfail gcc/45682 "*-*-*"
-    }
     gdb_test "list '${srcfile}':'$test'" $result
     if {[string compare $test "xxx::${ans}::A::func"] == 0
 	&& !$have_gcc_45682_fixed} {
