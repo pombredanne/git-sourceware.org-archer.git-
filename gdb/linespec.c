@@ -266,7 +266,7 @@ typedef struct ls_parser linespec_parser;
 static void initialize_defaults (struct symtab **default_symtab,
 				 int *default_line);
 
-static CORE_ADDR linespec_expression_to_pc (char *expr);
+static CORE_ADDR linespec_expression_to_pc (char **exp_ptr);
 
 static struct symtabs_and_lines decode_objc (struct linespec_state *self,
 					     linespec_t ls,
@@ -1766,21 +1766,26 @@ parse_linespec (linespec_parser *parser, char **argptr)
   /* It must be either LSTOKEN_STRING or LSTOKEN_NUMBER.  */
   if (token.type == LSTOKEN_STRING && *LS_TOKEN_STOKEN (token).ptr == '*')
     {
-      char *expr;
+      char *expr, *copy;
 
       /* User specified an expression, *EXPR.  */
-      expr = COPY_TOKEN_STRING (token);
+      copy = expr = COPY_TOKEN_STRING (token);
       cleanup = make_cleanup (xfree, expr);
-      PARSER_RESULT (parser)->expr_pc = linespec_expression_to_pc (expr);
+      PARSER_RESULT (parser)->expr_pc = linespec_expression_to_pc (&copy);
       discard_cleanups (cleanup);
       PARSER_RESULT (parser)->expression = expr;
 
-      /* Get the next token.  */
-      token = linespec_lexer_consume_token (parser);
+      /* This is a little hacky/tricky.  If linespec_expression_to_pc
+	 did not evaluate the entire token, then we must find the
+	 string COPY inside the original token buffer.  */
+      if (*copy != '\0')
+	{
+	  PARSER_STREAM (parser) = strstr (parser->lexer.saved_arg, copy);
+	  gdb_assert (PARSER_STREAM (parser) != NULL);
+	}
 
-      /* The only valid input is EOF or TERMINAL.  */
-      if (token.type != LSTOKEN_EOF && token.type != LSTOKEN_TERMINAL)
-	return values;
+      /* Consume the token.  */
+      linespec_lexer_consume_token (parser);
 
       goto canonicalize_it;
     }
@@ -2086,18 +2091,16 @@ initialize_defaults (struct symtab **default_symtab, int *default_line)
 
 
 static CORE_ADDR
-linespec_expression_to_pc (char *expr)
+linespec_expression_to_pc (char **exp_ptr)
 {
-  char **expr_ptr = &expr;
-
   if (current_program_space->executing_startup)
     /* The error message doesn't really matter, because this case
        should only hit during breakpoint reset.  */
     throw_error (NOT_FOUND_ERROR, _("cannot evaluate expressions while "
 				    "program space is in startup"));
 
-  (*expr_ptr)++;
-  return value_as_address (parse_to_comma_and_eval (expr_ptr));
+  (*exp_ptr)++;
+  return value_as_address (parse_to_comma_and_eval (exp_ptr));
 }
 
 
