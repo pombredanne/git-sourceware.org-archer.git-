@@ -54,8 +54,8 @@ struct partial_symbol
 #define PSYMBOL_VALUE(symbol)		(symbol)->pginfo.value.ivalue
 #define PSYMBOL_RAW_VALUE_ADDRESS(symbol)	\
   ((symbol)->pginfo.value.address + 0)
-#define PSYMBOL_VALUE_ADDRESS(pst, symbol)	\
-  psymbol_address (pst, symbol)
+#define PSYMBOL_VALUE_ADDRESS(symbol, pst, objfile)	\
+  psymbol_address (symbol, pst, objfile)
 #define SET_PSYMBOL_VALUE_ADDRESS(symbol, addr)	\
   ((symbol)->pginfo.value.address = (addr))
 
@@ -112,10 +112,6 @@ struct partial_symtab
   /* Directory in which it was compiled, or NULL if we don't know.  */
 
   const char *dirname;
-
-  /* Information about the object file from which symbols should be read.  */
-
-  struct objfile *objfile;
 
   /* Set of relocation offsets to apply to each section.  */
 
@@ -180,7 +176,7 @@ struct partial_symtab
   /* Pointer to function which will read in the symtab corresponding to
      this psymtab.  */
 
-  void (*read_symtab) (struct partial_symtab *);
+  void (*read_symtab) (struct objfile *, struct partial_symtab *);
 
   /* Information that lets read_symtab() locate the part of the symbol table
      that this psymtab corresponds to.  This information is private to the
@@ -190,7 +186,7 @@ struct partial_symtab
   void *read_symtab_private;
 };
 
-extern void sort_pst_symbols (struct partial_symtab *);
+extern void sort_pst_symbols (struct objfile *, struct partial_symtab *);
 
 /* Add any kind of symbol to a psymbol_allocation_list.  */
 
@@ -213,7 +209,7 @@ extern struct partial_symtab *start_psymtab_common (struct objfile *,
 extern struct partial_symtab *allocate_psymtab (const char *,
 						struct objfile *);
 
-extern void discard_psymtab (struct partial_symtab *);
+extern void discard_psymtab (struct objfile *, struct partial_symtab *);
 
 /* Traverse all psymtabs in one objfile.  */
 
