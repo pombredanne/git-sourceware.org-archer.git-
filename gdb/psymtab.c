@@ -409,8 +409,9 @@ static struct partial_symbol *
 find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 		      struct obj_section *section)
 {
-  struct partial_symbol *best = NULL, *p, **pp;
+  struct partial_symbol *best = NULL;
   CORE_ADDR best_pc;
+  int pass;
 
   gdb_assert (psymtab != NULL);
 
@@ -420,54 +421,41 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
   /* Search the global symbols as well as the static symbols, so that
      find_pc_partial_function doesn't use a minimal symbol and thus
      cache a bad endaddr.  */
-  for (pp = psymtab->objfile->global_psymbols.list + psymtab->globals_offset;
-    (pp - (psymtab->objfile->global_psymbols.list + psymtab->globals_offset)
-     < psymtab->n_global_syms);
-       pp++)
+  for (pass = 0; pass < 2; ++pass)
     {
-      p = *pp;
-      if (SYMBOL_DOMAIN (p) == VAR_DOMAIN
-	  && SYMBOL_CLASS (p) == LOC_BLOCK
-	  && pc >= PSYMBOL_VALUE_ADDRESS (p)
-	  && (PSYMBOL_VALUE_ADDRESS (p) > best_pc
-	      || (psymtab->textlow == 0
-		  && best_pc == 0 && PSYMBOL_VALUE_ADDRESS (p) == 0)))
-	{
-	  if (section)		/* Match on a specific section.  */
-	    {
-	      fixup_psymbol_section (p, psymtab->objfile);
-	      if (!matching_obj_sections (PSYMBOL_OBJ_SECTION (psymtab->objfile,
-							       p),
-					  section))
-		continue;
-	    }
-	  best_pc = PSYMBOL_VALUE_ADDRESS (p);
-	  best = p;
-	}
-    }
+      struct partial_symbol *p, **pp, **last;
 
-  for (pp = psymtab->objfile->static_psymbols.list + psymtab->statics_offset;
-    (pp - (psymtab->objfile->static_psymbols.list + psymtab->statics_offset)
-     < psymtab->n_static_syms);
-       pp++)
-    {
-      p = *pp;
-      if (SYMBOL_DOMAIN (p) == VAR_DOMAIN
-	  && SYMBOL_CLASS (p) == LOC_BLOCK
-	  && pc >= PSYMBOL_VALUE_ADDRESS (p)
-	  && (PSYMBOL_VALUE_ADDRESS (p) > best_pc
-	      || (psymtab->textlow == 0
-		  && best_pc == 0 && PSYMBOL_VALUE_ADDRESS (p) == 0)))
+      if (pass == 0)
 	{
-	  if (section)		/* Match on a specific section.  */
+	  pp = psymtab->objfile->global_psymbols.list + psymtab->globals_offset;
+	  last = pp + psymtab->n_global_syms;
+	}
+      else
+	{
+	  pp = psymtab->objfile->static_psymbols.list + psymtab->statics_offset;
+	  last = pp + psymtab->n_static_syms;
+	}
+
+      for (; pp != last; ++pp)
+	{
+	  p = *pp;
+	  if (SYMBOL_DOMAIN (p) == VAR_DOMAIN
+	      && SYMBOL_CLASS (p) == LOC_BLOCK
+	      && pc >= PSYMBOL_VALUE_ADDRESS (p)
+	      && (PSYMBOL_VALUE_ADDRESS (p) > best_pc
+		  || (psymtab->textlow == 0
+		      && best_pc == 0 && PSYMBOL_VALUE_ADDRESS (p) == 0)))
 	    {
-	      fixup_psymbol_section (p, psymtab->objfile);
-	      if (!matching_obj_sections (PSYMBOL_OBJ_SECTION (psymtab->objfile, p),
-					  section))
-		continue;
+	      if (section)		/* Match on a specific section.  */
+		{
+		  fixup_psymbol_section (p, psymtab->objfile);
+		  if (!matching_obj_sections (PSYMBOL_OBJ_SECTION (psymtab->objfile, p),
+					      section))
+		    continue;
+		}
+	      best_pc = PSYMBOL_VALUE_ADDRESS (p);
+	      best = p;
 	    }
-	  best_pc = PSYMBOL_VALUE_ADDRESS (p);
-	  best = p;
 	}
     }
 
