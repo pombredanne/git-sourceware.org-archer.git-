@@ -436,7 +436,9 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 	  if (section)		/* Match on a specific section.  */
 	    {
 	      fixup_psymbol_section (p, psymtab->objfile);
-	      if (!matching_obj_sections (PSYMBOL_OBJ_SECTION (p), section))
+	      if (!matching_obj_sections (PSYMBOL_OBJ_SECTION (psymtab->objfile,
+							       p),
+					  section))
 		continue;
 	    }
 	  best_pc = PSYMBOL_VALUE_ADDRESS (p);
@@ -460,7 +462,8 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 	  if (section)		/* Match on a specific section.  */
 	    {
 	      fixup_psymbol_section (p, psymtab->objfile);
-	      if (!matching_obj_sections (PSYMBOL_OBJ_SECTION (p), section))
+	      if (!matching_obj_sections (PSYMBOL_OBJ_SECTION (psymtab->objfile, p),
+					  section))
 		continue;
 	    }
 	  best_pc = PSYMBOL_VALUE_ADDRESS (p);
@@ -479,7 +482,7 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
   if (!psym)
     return NULL;
 
-  if (PSYMBOL_OBJ_SECTION (psym))
+  if (PSYMBOL_SECTION_INDEX (psym) != -1)
     return psym;
 
   gdb_assert (objfile);
@@ -1496,11 +1499,13 @@ add_psymbol_to_bcache (const char *name, int namelength, int copy_name,
 {
   struct partial_symbol psymbol;
 
-  /* We must ensure that the entire 'value' field has been zeroed
+  /* We must ensure that the entire 'pginfo' field has been zeroed
      before assigning to it, because an assignment may not write the
      entire field.  */
-  memset (&psymbol.pginfo.value, 0, sizeof (psymbol.pginfo.value));
-  psymbol.pginfo.sinfo_index = 0;
+  memset (&psymbol.pginfo, 0, sizeof (psymbol.pginfo));
+
+  psymbol.pginfo.sinfo_index = 1;
+  psymbol.pginfo.sinfo.index = -1;
 
   /* val and coreaddr are mutually exclusive, one of them *will* be zero.  */
   if (val != 0)

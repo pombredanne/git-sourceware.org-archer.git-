@@ -59,7 +59,9 @@ struct partial_symbol
 
 #define PSYMBOL_LANGUAGE(symbol)	(symbol)->pginfo.language
 #define PSYMBOL_SECTION(symbol)		(symbol)->pginfo.section
-#define PSYMBOL_OBJ_SECTION(symbol)	(symbol)->pginfo.sinfo.obj_section
+#define PSYMBOL_OBJ_SECTION(objfile, symbol)	\
+  (&((objfile)->sections[(symbol)->pginfo.sinfo.index]))
+#define PSYMBOL_SECTION_INDEX(symbol)	(symbol)->pginfo.sinfo.index
 
 #define PSYMBOL_NATURAL_NAME(symbol) \
   (symbol_natural_name (&(symbol)->pginfo))
