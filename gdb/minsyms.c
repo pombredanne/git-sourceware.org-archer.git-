@@ -1003,7 +1003,7 @@ prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
 
   SET_MSYMBOL_VALUE_ADDRESS (msymbol, address);
   MSYMBOL_SECTION (msymbol) = section;
-  MSYMBOL_SECTION_INDEX (msymbol) = 0;
+  MSYMBOL_SECTION_INDEX (msymbol) = -1;
 
   /* Find obj_section corresponding to bfd_section.  */
   if (bfd_section)
