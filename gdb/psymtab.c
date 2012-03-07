@@ -67,7 +67,7 @@ static struct partial_symbol *find_pc_sect_psymbol (struct partial_symtab *,
 
 static struct partial_symbol *fixup_psymbol_section (struct partial_symbol
 						     *psym,
-						     struct objfile *objfile);
+						     struct partial_symtab *pst);
 
 static struct symtab *psymtab_to_symtab (struct partial_symtab *pst);
 
@@ -107,16 +107,27 @@ require_partial_symbols (struct objfile *objfile, int verbose)
   return objfile;
 }
 
+/* Return the offsets for PST.  */
+
+static struct section_offsets *
+psymtab_offsets (const struct partial_symtab *pst, struct objfile *objfile)
+{
+  return (pst->section_offsets
+	  ? pst->section_offsets
+	  : objfile->section_offsets);
+}
+
 /* Compute the address of a partial symbol.  */
 
 static CORE_ADDR
-psymbol_address (struct objfile *objfile, struct partial_symbol *psym)
+psymbol_address (struct partial_symtab *pst, struct partial_symbol *psym)
 {
   CORE_ADDR result = PSYMBOL_RAW_VALUE_ADDRESS (psym);
 
   /* Perhaps we should assert instead.  */
   if (PSYMBOL_SECTION (psym) >= 0)
-    result += ANOFFSET (objfile->section_offsets, PSYMBOL_SECTION (psym));
+    result += ANOFFSET (psymtab_offsets (pst, pst->objfile),
+			PSYMBOL_SECTION (psym));
 
   return result;
 }
@@ -126,7 +137,7 @@ psymbol_address (struct objfile *objfile, struct partial_symbol *psym)
 static CORE_ADDR
 psymtab_textlow (struct objfile *objfile, struct partial_symtab *pst)
 {
-  return (ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile))
+  return (ANOFFSET (psymtab_offsets (pst, objfile), SECT_OFF_TEXT (objfile))
 	  + pst->textlow);
 }
 
@@ -135,7 +146,7 @@ psymtab_textlow (struct objfile *objfile, struct partial_symtab *pst)
 static CORE_ADDR
 psymtab_texthigh (struct objfile *objfile, struct partial_symtab *pst)
 {
-  return (ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile))
+  return (ANOFFSET (psymtab_offsets (pst, objfile), SECT_OFF_TEXT (objfile))
 	  + pst->texthigh);
 }
 
@@ -303,7 +314,7 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
 	     object's symbol table.  */
 	  p = find_pc_sect_psymbol (tpst, pc, section);
 	  if (p != NULL
-	      && PSYMBOL_VALUE_ADDRESS (tpst->objfile, p)
+	      && PSYMBOL_VALUE_ADDRESS (tpst, p)
 	      == MSYMBOL_VALUE_ADDRESS (msymbol))
 	    return tpst;
 
@@ -312,7 +323,7 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
 	     symbol tables with line information but no debug
 	     symbols (e.g. those produced by an assembler).  */
 	  if (p != NULL)
-	    this_addr = PSYMBOL_VALUE_ADDRESS (tpst->objfile, p);
+	    this_addr = PSYMBOL_VALUE_ADDRESS (tpst, p);
 	  else
 	    this_addr = psymtab_textlow (objfile, tpst);
 
@@ -373,7 +384,7 @@ find_pc_sect_psymtab (struct objfile *objfile, CORE_ADDR pc,
 		 object's symbol table.  */
 	      p = find_pc_sect_psymbol (pst, pc, section);
 	      if (!p
-		  || PSYMBOL_VALUE_ADDRESS (pst->objfile, p)
+		  || PSYMBOL_VALUE_ADDRESS (pst, p)
 		  != MSYMBOL_VALUE_ADDRESS (msymbol))
 		goto next;
 	    }
@@ -476,20 +487,20 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 	  p = *pp;
 	  if (SYMBOL_DOMAIN (p) == VAR_DOMAIN
 	      && SYMBOL_CLASS (p) == LOC_BLOCK
-	      && pc >= PSYMBOL_VALUE_ADDRESS (psymtab->objfile, p)
-	      && (PSYMBOL_VALUE_ADDRESS (psymtab->objfile, p) > best_pc
+	      && pc >= PSYMBOL_VALUE_ADDRESS (psymtab, p)
+	      && (PSYMBOL_VALUE_ADDRESS (psymtab, p) > best_pc
 		  || (psymtab_textlow (psymtab->objfile, psymtab) == 0
 		      && best_pc == 0
-		      && PSYMBOL_VALUE_ADDRESS (psymtab->objfile, p) == 0)))
+		      && PSYMBOL_VALUE_ADDRESS (psymtab, p) == 0)))
 	    {
 	      if (section)		/* Match on a specific section.  */
 		{
-		  fixup_psymbol_section (p, psymtab->objfile);
+		  fixup_psymbol_section (p, psymtab);
 		  if (!matching_obj_sections (PSYMBOL_OBJ_SECTION (psymtab->objfile, p),
 					      section))
 		    continue;
 		}
-	      best_pc = PSYMBOL_VALUE_ADDRESS (psymtab->objfile, p);
+	      best_pc = PSYMBOL_VALUE_ADDRESS (psymtab, p);
 	      best = p;
 	    }
 	}
@@ -499,7 +510,7 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 }
 
 static struct partial_symbol *
-fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
+fixup_psymbol_section (struct partial_symbol *psym, struct partial_symtab *pst)
 {
   CORE_ADDR addr;
 
@@ -509,14 +520,14 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
   if (PSYMBOL_SECTION_INDEX (psym) != -1)
     return psym;
 
-  gdb_assert (objfile);
+  gdb_assert (pst);
 
   switch (PSYMBOL_CLASS (psym))
     {
     case LOC_STATIC:
     case LOC_LABEL:
     case LOC_BLOCK:
-      addr = PSYMBOL_VALUE_ADDRESS (objfile, psym);
+      addr = PSYMBOL_VALUE_ADDRESS (pst, psym);
       break;
     default:
       /* Nothing else will be listed in the minsyms -- no use looking
@@ -524,7 +535,7 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
       return psym;
     }
 
-  fixup_section (&psym->pginfo, addr, objfile);
+  fixup_section (&psym->pginfo, addr, pst->objfile);
 
   return psym;
 }
@@ -984,7 +995,9 @@ dump_psymtab (struct objfile *objfile, struct partial_symtab *psymtab,
 	fprintf_filtered (outfile, ", ");
       wrap_here ("    ");
       fputs_filtered (paddress (gdbarch,
-				ANOFFSET (psymtab->section_offsets, i)),
+				ANOFFSET (psymtab_offsets (psymtab,
+							   psymtab->objfile),
+					  i)),
 		      outfile);
     }
   fprintf_filtered (outfile, "\n");
@@ -1358,10 +1371,12 @@ sort_pst_symbols (struct partial_symtab *pst)
 	 pst->n_global_syms, sizeof (struct partial_symbol *),
 	 compare_psymbols);
 
-  pst->textlow -= ANOFFSET (pst->objfile->section_offsets,
+  pst->textlow -= ANOFFSET (pst->section_offsets,
 			    SECT_OFF_TEXT (pst->objfile));
-  pst->texthigh -= ANOFFSET (pst->objfile->section_offsets,
+  pst->texthigh -= ANOFFSET (pst->section_offsets,
 			     SECT_OFF_TEXT (pst->objfile));
+  if (pst->section_offsets == pst->objfile->section_offsets)
+    pst->section_offsets = NULL;
 }
 
 /* Allocate and partially fill a partial symtab.  It will be
@@ -1515,6 +1530,7 @@ add_psymbol_to_bcache (const char *name, int namelength, int copy_name,
     {
       /* If VAL==0 for a LOC_TYPEDEF, then we can have SECTION==-1
 	 here.  This is obviously a hack anyway.  */
+      /* FIXME - per-PST section offsets fail here */
       if (section >= 0)
 	coreaddr -= ANOFFSET (objfile->section_offsets, section);
       SET_PSYMBOL_VALUE_ADDRESS (&psymbol, coreaddr);
