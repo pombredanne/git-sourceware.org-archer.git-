@@ -1685,7 +1685,6 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
       return sals;
     }
 
- canonicalize_it:
   canonicalize_linespec (state, ls);
 
   if (sals.nelts > 0 && state->canonical != NULL)
@@ -1799,6 +1798,9 @@ parse_linespec (linespec_parser *parser, char **argptr)
 	= linespec_parse_variable (PARSER_STATE (parser), var);
       discard_cleanups (cleanup);
 
+      /* Consume this token.  */
+      linespec_lexer_consume_token (parser);
+
       goto canonicalize_it;
     }
   else if (token.type != LSTOKEN_STRING && token.type != LSTOKEN_NUMBER)
@@ -1872,13 +1874,13 @@ parse_linespec (linespec_parser *parser, char **argptr)
 			      PARSER_RESULT (parser)->source_filename);
     }
 
+ canonicalize_it:
+
   /* Get the last token and record how much of the input was parsed
      if necessary.  */
   token = linespec_lexer_lex_one (parser);
   if (token.type != LSTOKEN_EOF && token.type != LSTOKEN_TERMINAL)
     PARSER_STREAM (parser) = LS_TOKEN_STOKEN (token).ptr;
-
- canonicalize_it:
 
   /* Convert the data in PARSER_RESULT to SALs.  */
   values = convert_linespec_to_sals (PARSER_STATE (parser),
