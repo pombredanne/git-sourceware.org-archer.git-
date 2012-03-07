@@ -807,9 +807,6 @@ objfile_relocate1 (struct objfile *objfile,
       relocate_one_symbol (iter, objfile, delta);
   }
 
-  if (objfile->sf)
-    objfile->sf->qf->relocate (objfile, new_offsets, delta);
-
   if (objfile->ei.entry_point_p)
     {
       /* Relocate ei.entry_point with its section offset, use SECT_OFF_TEXT

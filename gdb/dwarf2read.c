@@ -2540,13 +2540,6 @@ dw2_dump (struct objfile *objfile)
 }
 
 static void
-dw2_relocate (struct objfile *objfile, struct section_offsets *new_offsets,
-	      struct section_offsets *delta)
-{
-  /* There's nothing to relocate here.  */
-}
-
-static void
 dw2_expand_symtabs_for_function (struct objfile *objfile,
 				 const char *func_name)
 {
@@ -2881,7 +2874,6 @@ const struct quick_symbol_functions dwarf2_gdb_index_functions =
   dw2_pre_expand_symtabs_matching,
   dw2_print_stats,
   dw2_dump,
-  dw2_relocate,
   dw2_expand_symtabs_for_function,
   dw2_expand_all_symtabs,
   dw2_expand_symtabs_with_filename,
