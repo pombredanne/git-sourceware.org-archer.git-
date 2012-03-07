@@ -1420,15 +1420,16 @@ separate_debug_file_exists (const char *name, unsigned long crc,
 	 gdbserver way it does not support the bfd_stat operation.  Verify
 	 whether those two files are not the same manually.  */
 
-      if (!verified_as_different && !parent_objfile->crc32_p)
+      if (!verified_as_different && !parent_objfile->per_bfd->crc32_p)
 	{
-	  parent_objfile->crc32_p = get_file_crc (parent_objfile->obfd,
-						  &parent_objfile->crc32);
-	  if (!parent_objfile->crc32_p)
+	  parent_objfile->per_bfd->crc32_p
+	    = get_file_crc (parent_objfile->obfd,
+			    &parent_objfile->per_bfd->crc32);
+	  if (!parent_objfile->per_bfd->crc32_p)
 	    return 0;
 	}
 
-      if (verified_as_different || parent_objfile->crc32 != file_crc)
+      if (verified_as_different || parent_objfile->per_bfd->crc32 != file_crc)
 	warning (_("the debug information found in \"%s\""
 		   " does not match \"%s\" (CRC mismatch).\n"),
 		 name, parent_objfile->name);
