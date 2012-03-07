@@ -158,6 +158,11 @@ struct general_symbol_info
 
   short section;
 
+  /* True if we should use the INDEX field in SINFO.
+     Note that this is never set for minimal symbols, as there is no
+     need.  */
+  unsigned int sinfo_index : 1;
+
   union
   {
     /* The section associated with this symbol.  It can be NULL.  */

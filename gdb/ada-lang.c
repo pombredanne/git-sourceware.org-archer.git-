@@ -1305,7 +1305,10 @@ ada_decode_symbol (const struct general_symbol_info *gsymbol)
     {
       const char *decoded = ada_decode (gsymbol->name);
 
-      if (gsymbol->sinfo.obj_section != NULL)
+      /* FIXME: this is bogus, but also temporary, as we plan to move
+	 all the symbols into per-BFD storage, and so we'll have to
+	 fix this up then.  */
+      if (!gsymbol->sinfo_index && gsymbol->sinfo.obj_section != NULL)
         {
 	  /* Note that there is no path to this code for minimal
 	     symbols.  */

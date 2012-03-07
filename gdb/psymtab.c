@@ -1500,6 +1500,7 @@ add_psymbol_to_bcache (const char *name, int namelength, int copy_name,
      before assigning to it, because an assignment may not write the
      entire field.  */
   memset (&psymbol.pginfo.value, 0, sizeof (psymbol.pginfo.value));
+  psymbol.pginfo.sinfo_index = 0;
 
   /* val and coreaddr are mutually exclusive, one of them *will* be zero.  */
   if (val != 0)
