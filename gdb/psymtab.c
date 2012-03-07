@@ -121,6 +121,24 @@ psymbol_address (struct objfile *objfile, struct partial_symbol *psym)
   return result;
 }
 
+/* Compute 'textlow' for a partial symtab.  */
+
+static CORE_ADDR
+psymtab_textlow (struct objfile *objfile, struct partial_symtab *pst)
+{
+  return (ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile))
+	  + pst->textlow);
+}
+
+/* Compute 'texthigh' for a partial symtab.  */
+
+static CORE_ADDR
+psymtab_texthigh (struct objfile *objfile, struct partial_symtab *pst)
+{
+  return (ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile))
+	  + pst->texthigh);
+}
+
 /* Traverse all psymtabs in one objfile, requiring that the psymtabs
    be read in.  */
 
@@ -249,7 +267,7 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
   struct objfile *objfile = pst->objfile;
   struct partial_symtab *tpst;
   struct partial_symtab *best_pst = pst;
-  CORE_ADDR best_addr = pst->textlow;
+  CORE_ADDR best_addr = psymtab_textlow (objfile, pst);
 
   gdb_assert (!pst->psymtabs_addrmap_supported);
 
@@ -273,7 +291,8 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
      that is closest and still less than the given PC.  */
   for (tpst = pst; tpst != NULL; tpst = tpst->next)
     {
-      if (pc >= tpst->textlow && pc < tpst->texthigh)
+      if (pc >= psymtab_textlow (objfile, tpst)
+	  && pc < psymtab_texthigh (objfile, tpst))
 	{
 	  struct partial_symbol *p;
 	  CORE_ADDR this_addr;
@@ -295,7 +314,7 @@ find_pc_sect_psymtab_closer (CORE_ADDR pc, struct obj_section *section,
 	  if (p != NULL)
 	    this_addr = PSYMBOL_VALUE_ADDRESS (tpst->objfile, p);
 	  else
-	    this_addr = tpst->textlow;
+	    this_addr = psymtab_textlow (objfile, tpst);
 
 	  /* Check whether it is closer than our current
 	     BEST_ADDR.  Since this symbol address is
@@ -382,7 +401,8 @@ find_pc_sect_psymtab (struct objfile *objfile, CORE_ADDR pc,
 
   ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, pst)
     if (!pst->psymtabs_addrmap_supported
-	&& pc >= pst->textlow && pc < pst->texthigh)
+	&& pc >= psymtab_textlow (objfile, pst)
+	&& pc < psymtab_texthigh (objfile, pst))
       {
 	struct partial_symtab *best_pst;
 
@@ -424,13 +444,14 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 		      struct obj_section *section)
 {
   struct partial_symbol *best = NULL;
-  CORE_ADDR best_pc;
+  CORE_ADDR best_pc, textlow;
   int pass;
 
   gdb_assert (psymtab != NULL);
 
   /* Cope with programs that start at address 0.  */
-  best_pc = (psymtab->textlow != 0) ? psymtab->textlow - 1 : 0;
+  textlow = psymtab_textlow (psymtab->objfile, psymtab);
+  best_pc = (textlow != 0) ? textlow - 1 : 0;
 
   /* Search the global symbols as well as the static symbols, so that
      find_pc_partial_function doesn't use a minimal symbol and thus
@@ -457,7 +478,7 @@ find_pc_sect_psymbol (struct partial_symtab *psymtab, CORE_ADDR pc,
 	      && SYMBOL_CLASS (p) == LOC_BLOCK
 	      && pc >= PSYMBOL_VALUE_ADDRESS (psymtab->objfile, p)
 	      && (PSYMBOL_VALUE_ADDRESS (psymtab->objfile, p) > best_pc
-		  || (psymtab->textlow == 0
+		  || (psymtab_textlow (psymtab->objfile, psymtab) == 0
 		      && best_pc == 0
 		      && PSYMBOL_VALUE_ADDRESS (psymtab->objfile, p) == 0)))
 	    {
@@ -1336,6 +1357,11 @@ sort_pst_symbols (struct partial_symtab *pst)
   qsort (pst->objfile->global_psymbols.list + pst->globals_offset,
 	 pst->n_global_syms, sizeof (struct partial_symbol *),
 	 compare_psymbols);
+
+  pst->textlow -= ANOFFSET (pst->objfile->section_offsets,
+			    SECT_OFF_TEXT (pst->objfile));
+  pst->texthigh -= ANOFFSET (pst->objfile->section_offsets,
+			     SECT_OFF_TEXT (pst->objfile));
 }
 
 /* Allocate and partially fill a partial symtab.  It will be
