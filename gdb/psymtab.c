@@ -1483,9 +1483,16 @@ add_psymbol_to_bcache (const char *name, int namelength, int copy_name,
 		       long val,	/* Value as a long */
 		       CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
 		       enum language language, struct objfile *objfile,
+		       short section,
 		       int *added)
 {
   struct partial_symbol psymbol;
+
+  /* Symbols naming addresses must have a section; other symbols must
+     not.  */
+  gdb_assert ((class == LOC_STATIC || class == LOC_LABEL || class == LOC_BLOCK)
+	      ? section != -1
+	      : section == -1);
 
   /* We must ensure that the entire 'pginfo' field has been zeroed
      before assigning to it, because an assignment may not write the
@@ -1494,6 +1501,7 @@ add_psymbol_to_bcache (const char *name, int namelength, int copy_name,
 
   psymbol.pginfo.sinfo_index = 1;
   psymbol.pginfo.sinfo.index = -1;
+  PSYMBOL_SECTION (&psymbol) = section;
 
   /* val and coreaddr are mutually exclusive, one of them *will* be zero.  */
   if (val != 0)
@@ -1570,7 +1578,8 @@ add_psymbol_to_list (const char *name, int namelength, int copy_name,
 		     struct psymbol_allocation_list *list, 
 		     long val,	/* Value as a long */
 		     CORE_ADDR coreaddr,	/* Value as a CORE_ADDR */
-		     enum language language, struct objfile *objfile)
+		     enum language language, struct objfile *objfile,
+		     short section)
 {
   const struct partial_symbol *psym;
 
@@ -1578,7 +1587,8 @@ add_psymbol_to_list (const char *name, int namelength, int copy_name,
 
   /* Stash the partial symbol away in the cache.  */
   psym = add_psymbol_to_bcache (name, namelength, copy_name, domain, class,
-				val, coreaddr, language, objfile, &added);
+				val, coreaddr, language, objfile, section,
+				&added);
 
   /* Do not duplicate global partial symbols.  */
   if (list == &objfile->global_psymbols

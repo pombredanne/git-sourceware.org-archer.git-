@@ -2659,7 +2659,8 @@ scan_xcoff_symtab (struct objfile *objfile)
 				     VAR_DOMAIN, LOC_STATIC,
 				     &objfile->static_psymbols,
 				     0, symbol.n_value,
-				     psymtab_language, objfile);
+				     psymtab_language, objfile,
+				     SECT_OFF_DATA (objfile));
 		continue;
 
 	      case 'G':
@@ -2671,7 +2672,8 @@ scan_xcoff_symtab (struct objfile *objfile)
 				     VAR_DOMAIN, LOC_STATIC,
 				     &objfile->global_psymbols,
 				     0, symbol.n_value,
-				     psymtab_language, objfile);
+				     psymtab_language, objfile,
+				     SECT_OFF_DATA (objfile));
 		continue;
 
 	      case 'T':
@@ -2689,7 +2691,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 					 STRUCT_DOMAIN, LOC_TYPEDEF,
 					 &objfile->static_psymbols,
 					 symbol.n_value, 0,
-					 psymtab_language, objfile);
+					 psymtab_language, objfile, -1);
 		    if (p[2] == 't')
 		      {
 			/* Also a typedef with the same name.  */
@@ -2697,7 +2699,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 					     VAR_DOMAIN, LOC_TYPEDEF,
 					     &objfile->static_psymbols,
 					     symbol.n_value, 0,
-					     psymtab_language, objfile);
+					     psymtab_language, objfile, -1);
 			p += 1;
 		      }
 		  }
@@ -2710,7 +2712,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 					 VAR_DOMAIN, LOC_TYPEDEF,
 					 &objfile->static_psymbols,
 					 symbol.n_value, 0,
-					 psymtab_language, objfile);
+					 psymtab_language, objfile, -1);
 		  }
 	      check_enum:
 		/* If this is an enumerated type, we need to
@@ -2772,7 +2774,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 			add_psymbol_to_list (p, q - p, 1,
 					     VAR_DOMAIN, LOC_CONST,
 					     &objfile->static_psymbols, 0,
-					     0, psymtab_language, objfile);
+					     0, psymtab_language, objfile, -1);
 			/* Point past the name.  */
 			p = q;
 			/* Skip over the value.  */
@@ -2790,7 +2792,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_CONST,
 				     &objfile->static_psymbols, symbol.n_value,
-				     0, psymtab_language, objfile);
+				     0, psymtab_language, objfile, -1);
 		continue;
 
 	      case 'f':
@@ -2810,7 +2812,8 @@ scan_xcoff_symtab (struct objfile *objfile)
 				     VAR_DOMAIN, LOC_BLOCK,
 				     &objfile->static_psymbols,
 				     0, symbol.n_value,
-				     psymtab_language, objfile);
+				     psymtab_language, objfile,
+				     SECT_OFF_TEXT (objfile));
 		continue;
 
 		/* Global functions were ignored here, but now they
@@ -2841,7 +2844,8 @@ scan_xcoff_symtab (struct objfile *objfile)
 				     VAR_DOMAIN, LOC_BLOCK,
 				     &objfile->global_psymbols,
 				     0, symbol.n_value,
-				     psymtab_language, objfile);
+				     psymtab_language, objfile,
+				     SECT_OFF_TEXT (objfile));
 		continue;
 
 		/* Two things show up here (hopefully); static symbols of

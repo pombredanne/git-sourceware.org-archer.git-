@@ -3149,7 +3149,8 @@ parse_partial_symbols (struct objfile *objfile)
 					     VAR_DOMAIN, LOC_STATIC,
 					     &objfile->static_psymbols,
 					     0, sh.value,
-					     psymtab_language, objfile);
+					     psymtab_language, objfile,
+					     SECT_OFF_DATA (objfile));
 			continue;
 		      case 'G':
 			sh.value += ANOFFSET (objfile->section_offsets,
@@ -3161,7 +3162,8 @@ parse_partial_symbols (struct objfile *objfile)
 					     VAR_DOMAIN, LOC_STATIC,
 					     &objfile->global_psymbols,
 					     0, sh.value,
-					     psymtab_language, objfile);
+					     psymtab_language, objfile,
+					     SECT_OFF_DATA (objfile));
 			continue;
 
 		      case 'T':
@@ -3179,7 +3181,7 @@ parse_partial_symbols (struct objfile *objfile)
 						 STRUCT_DOMAIN, LOC_TYPEDEF,
 						 &objfile->static_psymbols,
 						 sh.value, 0,
-						 psymtab_language, objfile);
+						 psymtab_language, objfile, -1);
 			    if (p[2] == 't')
 			      {
 				/* Also a typedef with the same name.  */
@@ -3189,7 +3191,7 @@ parse_partial_symbols (struct objfile *objfile)
 						     &objfile->static_psymbols,
 						     sh.value, 0,
 						     psymtab_language,
-						     objfile);
+						     objfile, -1);
 				p += 1;
 			      }
 			  }
@@ -3202,7 +3204,7 @@ parse_partial_symbols (struct objfile *objfile)
 						 VAR_DOMAIN, LOC_TYPEDEF,
 						 &objfile->static_psymbols,
 						 sh.value, 0,
-						 psymtab_language, objfile);
+						 psymtab_language, objfile, -1);
 			  }
 		      check_enum:
 			/* If this is an enumerated type, we need to add
@@ -3267,7 +3269,7 @@ parse_partial_symbols (struct objfile *objfile)
 						     VAR_DOMAIN, LOC_CONST,
 						     &objfile->static_psymbols,
 						     0, 0, psymtab_language,
-						     objfile);
+						     objfile, -1);
 				/* Point past the name.  */
 				p = q;
 				/* Skip over the value.  */
@@ -3285,7 +3287,7 @@ parse_partial_symbols (struct objfile *objfile)
 					     VAR_DOMAIN, LOC_CONST,
 					     &objfile->static_psymbols,
 					     sh.value, 0, psymtab_language,
-					     objfile);
+					     objfile, -1);
 			continue;
 
 		      case 'f':
@@ -3305,7 +3307,8 @@ parse_partial_symbols (struct objfile *objfile)
 					     VAR_DOMAIN, LOC_BLOCK,
 					     &objfile->static_psymbols,
 					     0, sh.value,
-					     psymtab_language, objfile);
+					     psymtab_language, objfile,
+					     SECT_OFF_TEXT (objfile));
 			continue;
 
 			/* Global functions were ignored here, but now they
@@ -3329,7 +3332,8 @@ parse_partial_symbols (struct objfile *objfile)
 					     VAR_DOMAIN, LOC_BLOCK,
 					     &objfile->global_psymbols,
 					     0, sh.value,
-					     psymtab_language, objfile);
+					     psymtab_language, objfile,
+					     SECT_OFF_TEXT (objfile));
 			continue;
 
 			/* Two things show up here (hopefully); static
@@ -3455,6 +3459,7 @@ parse_partial_symbols (struct objfile *objfile)
 	    {
 	      char *name;
 	      enum address_class class;
+	      short section = -1;
 
 	      (*swap_sym_in) (cur_bfd,
 			      ((char *) debug_info->external_sym
@@ -3487,8 +3492,11 @@ parse_partial_symbols (struct objfile *objfile)
 		  /* The value of a stEnd symbol is the displacement from the
 		     corresponding start symbol value, do not relocate it.  */
 		  if (sh.st != stEnd)
-		    sh.value += ANOFFSET (objfile->section_offsets,
-					  SECT_OFF_TEXT (objfile));
+		    {
+		      sh.value += ANOFFSET (objfile->section_offsets,
+					    SECT_OFF_TEXT (objfile));
+		      section = SECT_OFF_TEXT (objfile);
+		    }
 		  break;
 		case scData:
 		case scSData:
@@ -3497,11 +3505,13 @@ parse_partial_symbols (struct objfile *objfile)
 		case scXData:
 		  sh.value += ANOFFSET (objfile->section_offsets,
 					SECT_OFF_DATA (objfile));
+		  section = SECT_OFF_DATA (objfile);
 		  break;
 		case scBss:
 		case scSBss:
 		  sh.value += ANOFFSET (objfile->section_offsets,
 					SECT_OFF_BSS (objfile));
+		  section = SECT_OFF_BSS (objfile);
 		  break;
 		}
 
@@ -3568,12 +3578,14 @@ parse_partial_symbols (struct objfile *objfile)
 		    add_psymbol_to_list (name, strlen (name), 1,
 					 VAR_DOMAIN, LOC_BLOCK,
 					 &objfile->global_psymbols,
-				    0, sh.value, psymtab_language, objfile);
+					 0, sh.value, psymtab_language,
+					 objfile, SECT_OFF_TEXT (objfile));
 		  else
 		    add_psymbol_to_list (name, strlen (name), 1,
 					 VAR_DOMAIN, LOC_BLOCK,
 					 &objfile->static_psymbols,
-				    0, sh.value, psymtab_language, objfile);
+					 0, sh.value, psymtab_language,
+					 objfile, SECT_OFF_TEXT (objfile));
 
 		  procaddr = sh.value;
 
@@ -3598,17 +3610,24 @@ parse_partial_symbols (struct objfile *objfile)
 
 		case stStatic:	/* Variable */
 		  if (SC_IS_DATA (sh.sc))
-		    prim_record_minimal_symbol_and_info (name, sh.value,
-							 mst_file_data,
-							 SECT_OFF_DATA (objfile),
-							 NULL,
-							 objfile);
+		    {
+		      prim_record_minimal_symbol_and_info (name, sh.value,
+							   mst_file_data,
+							   SECT_OFF_DATA (objfile),
+							   NULL,
+							   objfile);
+		      section = SECT_OFF_DATA (objfile);
+		    }
 		  else
-		    prim_record_minimal_symbol_and_info (name, sh.value,
-							 mst_file_bss,
-							 SECT_OFF_BSS (objfile),
-							 NULL,
-							 objfile);
+		    {
+		      prim_record_minimal_symbol_and_info (name, sh.value,
+							   mst_file_bss,
+							   SECT_OFF_BSS (objfile),
+							   NULL,
+							   objfile);
+		      section = SECT_OFF_BSS (objfile);
+		    }
+
 		  class = LOC_STATIC;
 		  break;
 
@@ -3643,7 +3662,7 @@ parse_partial_symbols (struct objfile *objfile)
 					   STRUCT_DOMAIN, LOC_TYPEDEF,
 					   &objfile->static_psymbols,
 					   0, (CORE_ADDR) 0,
-					   psymtab_language, objfile);
+					   psymtab_language, objfile, -1);
 		    }
 		  handle_psymbol_enumerators (objfile, fh, sh.st, sh.value);
 
@@ -3683,7 +3702,8 @@ parse_partial_symbols (struct objfile *objfile)
 	      add_psymbol_to_list (name, strlen (name), 1,
 				   VAR_DOMAIN, class,
 				   &objfile->static_psymbols,
-				   0, sh.value, psymtab_language, objfile);
+				   0, sh.value, psymtab_language, objfile,
+				   section);
 	    skip:
 	      cur_sdx++;	/* Go to next file symbol.  */
 	    }
@@ -3699,6 +3719,7 @@ parse_partial_symbols (struct objfile *objfile)
 	      SYMR *psh;
 	      char *name;
 	      CORE_ADDR svalue;
+	      short section = -1;
 
 	      if (ext_ptr->ifd != f_idx)
 		internal_error (__FILE__, __LINE__,
@@ -3716,6 +3737,7 @@ parse_partial_symbols (struct objfile *objfile)
 		case scRConst:
 		  svalue += ANOFFSET (objfile->section_offsets,
 				      SECT_OFF_TEXT (objfile));
+		  section = SECT_OFF_TEXT (objfile);
 		  break;
 		case scData:
 		case scSData:
@@ -3724,11 +3746,13 @@ parse_partial_symbols (struct objfile *objfile)
 		case scXData:
 		  svalue += ANOFFSET (objfile->section_offsets,
 				      SECT_OFF_DATA (objfile));
+		  section = SECT_OFF_DATA (objfile);
 		  break;
 		case scBss:
 		case scSBss:
 		  svalue += ANOFFSET (objfile->section_offsets,
 				      SECT_OFF_BSS (objfile));
+		  section = SECT_OFF_BSS (objfile);
 		  break;
 		}
 
@@ -3764,7 +3788,7 @@ parse_partial_symbols (struct objfile *objfile)
 				   VAR_DOMAIN, class,
 				   &objfile->global_psymbols,
 				   0, svalue,
-				   psymtab_language, objfile);
+				   psymtab_language, objfile, section);
 	    }
 	}
 
@@ -3927,7 +3951,7 @@ handle_psymbol_enumerators (struct objfile *objfile, FDR *fh, int stype,
       add_psymbol_to_list (name, strlen (name), 1,
 			   VAR_DOMAIN, LOC_CONST,
 			   &objfile->static_psymbols, 0,
-			   (CORE_ADDR) 0, psymtab_language, objfile);
+			   (CORE_ADDR) 0, psymtab_language, objfile, -1);
       ext_sym += external_sym_size;
     }
 }

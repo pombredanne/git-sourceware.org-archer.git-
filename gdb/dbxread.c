@@ -1729,7 +1729,8 @@ read_dbx_symtab (struct objfile *objfile)
 				   VAR_DOMAIN, LOC_STATIC,
 				   &objfile->static_psymbols,
 				   0, nlist.n_value,
-				   psymtab_language, objfile);
+				   psymtab_language, objfile,
+				   data_sect_index);
 	      continue;
 
 	    case 'G':
@@ -1741,7 +1742,8 @@ read_dbx_symtab (struct objfile *objfile)
 				   VAR_DOMAIN, LOC_STATIC,
 				   &objfile->global_psymbols,
 				   0, nlist.n_value,
-				   psymtab_language, objfile);
+				   psymtab_language, objfile,
+				   data_sect_index);
 	      continue;
 
 	    case 'T':
@@ -1759,7 +1761,7 @@ read_dbx_symtab (struct objfile *objfile)
 				       STRUCT_DOMAIN, LOC_TYPEDEF,
 				       &objfile->static_psymbols,
 				       nlist.n_value, 0,
-				       psymtab_language, objfile);
+				       psymtab_language, objfile, -1);
 		  if (p[2] == 't')
 		    {
 		      /* Also a typedef with the same name.  */
@@ -1767,7 +1769,7 @@ read_dbx_symtab (struct objfile *objfile)
 					   VAR_DOMAIN, LOC_TYPEDEF,
 					   &objfile->static_psymbols,
 					   nlist.n_value, 0,
-					   psymtab_language, objfile);
+					   psymtab_language, objfile, -1);
 		      p += 1;
 		    }
 		}
@@ -1780,7 +1782,7 @@ read_dbx_symtab (struct objfile *objfile)
 				       VAR_DOMAIN, LOC_TYPEDEF,
 				       &objfile->static_psymbols,
 				       nlist.n_value, 0,
-				       psymtab_language, objfile);
+				       psymtab_language, objfile, -1);
 		}
 	    check_enum:
 	      /* If this is an enumerated type, we need to
@@ -1841,7 +1843,7 @@ read_dbx_symtab (struct objfile *objfile)
 		      add_psymbol_to_list (p, q - p, 1,
 					   VAR_DOMAIN, LOC_CONST,
 					   &objfile->static_psymbols, 0,
-					   0, psymtab_language, objfile);
+					   0, psymtab_language, objfile, -1);
 		      /* Point past the name.  */
 		      p = q;
 		      /* Skip over the value.  */
@@ -1859,7 +1861,7 @@ read_dbx_symtab (struct objfile *objfile)
 	      add_psymbol_to_list (sym_name, sym_len, 1,
 				   VAR_DOMAIN, LOC_CONST,
 				   &objfile->static_psymbols, nlist.n_value,
-				   0, psymtab_language, objfile);
+				   0, psymtab_language, objfile, -1);
 	      continue;
 
 	    case 'f':
@@ -1926,7 +1928,8 @@ read_dbx_symtab (struct objfile *objfile)
 				   VAR_DOMAIN, LOC_BLOCK,
 				   &objfile->static_psymbols,
 				   0, nlist.n_value,
-				   psymtab_language, objfile);
+				   psymtab_language, objfile,
+				   SECT_OFF_TEXT (objfile));
 	      continue;
 
 	      /* Global functions were ignored here, but now they
@@ -1996,7 +1999,8 @@ read_dbx_symtab (struct objfile *objfile)
 				   VAR_DOMAIN, LOC_BLOCK,
 				   &objfile->global_psymbols,
 				   0, nlist.n_value,
-				   psymtab_language, objfile);
+				   psymtab_language, objfile,
+				   SECT_OFF_TEXT (objfile));
 	      continue;
 
 	      /* Two things show up here (hopefully); static symbols of

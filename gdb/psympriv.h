@@ -197,7 +197,8 @@ extern void add_psymbol_to_list (const char *, int,
 				 enum address_class,
 				 struct psymbol_allocation_list *,
 				 long, CORE_ADDR,
-				 enum language, struct objfile *);
+				 enum language, struct objfile *,
+				 short);
 
 extern void init_psymbol_list (struct objfile *, int);
 

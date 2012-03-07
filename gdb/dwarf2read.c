@@ -4022,7 +4022,8 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 			       VAR_DOMAIN, LOC_BLOCK,
 			       &objfile->global_psymbols,
 			       0, pdi->lowpc + baseaddr,
-			       cu->language, objfile);
+			       cu->language, objfile,
+			       SECT_OFF_TEXT (objfile));
 	}
       else
 	{
@@ -4033,7 +4034,8 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 			       VAR_DOMAIN, LOC_BLOCK,
 			       &objfile->static_psymbols,
 			       0, pdi->lowpc + baseaddr,
-			       cu->language, objfile);
+			       cu->language, objfile,
+			       SECT_OFF_TEXT (objfile));
 	}
       break;
     case DW_TAG_constant:
@@ -4046,7 +4048,8 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 	  list = &objfile->static_psymbols;
 	add_psymbol_to_list (actual_name, strlen (actual_name),
 			     built_actual_name, VAR_DOMAIN, LOC_STATIC,
-			     list, 0, 0, cu->language, objfile);
+			     list, 0, 0, cu->language, objfile,
+			     SECT_OFF_TEXT (objfile));
       }
       break;
     case DW_TAG_variable:
@@ -4083,7 +4086,8 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 				 VAR_DOMAIN, LOC_STATIC,
 				 &objfile->global_psymbols,
 				 0, addr + baseaddr,
-				 cu->language, objfile);
+				 cu->language, objfile,
+				 SECT_OFF_TEXT (objfile));
 	}
       else
 	{
@@ -4101,7 +4105,8 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 			       VAR_DOMAIN, LOC_STATIC,
 			       &objfile->static_psymbols,
 			       0, addr + baseaddr,
-			       cu->language, objfile);
+			       cu->language, objfile,
+			       SECT_OFF_TEXT (objfile));
 	}
       break;
     case DW_TAG_typedef:
@@ -4111,14 +4116,14 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 			   built_actual_name,
 			   VAR_DOMAIN, LOC_TYPEDEF,
 			   &objfile->static_psymbols,
-			   0, (CORE_ADDR) 0, cu->language, objfile);
+			   0, (CORE_ADDR) 0, cu->language, objfile, -1);
       break;
     case DW_TAG_namespace:
       add_psymbol_to_list (actual_name, strlen (actual_name),
 			   built_actual_name,
 			   VAR_DOMAIN, LOC_TYPEDEF,
 			   &objfile->global_psymbols,
-			   0, (CORE_ADDR) 0, cu->language, objfile);
+			   0, (CORE_ADDR) 0, cu->language, objfile, -1);
       break;
     case DW_TAG_class_type:
     case DW_TAG_interface_type:
@@ -4146,7 +4151,7 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 			    || cu->language == language_java)
 			   ? &objfile->global_psymbols
 			   : &objfile->static_psymbols,
-			   0, (CORE_ADDR) 0, cu->language, objfile);
+			   0, (CORE_ADDR) 0, cu->language, objfile, -1);
 
       break;
     case DW_TAG_enumerator:
@@ -4157,7 +4162,7 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 			    || cu->language == language_java)
 			   ? &objfile->global_psymbols
 			   : &objfile->static_psymbols,
-			   0, (CORE_ADDR) 0, cu->language, objfile);
+			   0, (CORE_ADDR) 0, cu->language, objfile, -1);
       break;
     default:
       break;
@@ -9564,7 +9569,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 	    add_psymbol_to_list (part_die->name, strlen (part_die->name), 0,
 				 VAR_DOMAIN, LOC_TYPEDEF,
 				 &objfile->static_psymbols,
-				 0, (CORE_ADDR) 0, cu->language, objfile);
+				 0, (CORE_ADDR) 0, cu->language, objfile, -1);
 	  info_ptr = locate_pdi_sibling (part_die, buffer, info_ptr, abfd, cu);
 	  continue;
 	}
@@ -9603,7 +9608,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 				  || cu->language == language_java)
 				 ? &objfile->global_psymbols
 				 : &objfile->static_psymbols,
-				 0, (CORE_ADDR) 0, cu->language, objfile);
+				 0, (CORE_ADDR) 0, cu->language, objfile, -1);
 
 	  info_ptr = locate_pdi_sibling (part_die, buffer, info_ptr, abfd, cu);
 	  continue;
