@@ -8235,7 +8235,7 @@ read_common_block (struct die_info *die, struct dwarf2_cu *cu)
 	  if (sym != NULL
 	      && handle_data_member_location (child_die, cu, &offset))
 	    {
-	      SYMBOL_VALUE_ADDRESS (sym) = base + offset;
+	      SET_SYMBOL_VALUE_ADDRESS (sym, base + offset);
 	      add_symbol_to_list (sym, &global_symbols);
 	    }
 	  child_die = sibling_die (child_die);
@@ -11537,12 +11537,19 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
     {
       unsigned int dummy;
 
-      SYMBOL_VALUE_ADDRESS (sym) =
-	read_address (objfile->obfd, DW_BLOCK (attr)->data + 1, cu, &dummy);
+      SET_SYMBOL_VALUE_ADDRESS (sym,
+				read_address (objfile->obfd,
+					      DW_BLOCK (attr)->data + 1,
+					      cu, &dummy));
       SYMBOL_CLASS (sym) = LOC_STATIC;
       fixup_symbol_section (sym, objfile);
-      SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (objfile->section_offsets,
-					      SYMBOL_SECTION (sym));
+      /* FIXME this seems wrong to do after fixup_symbol_section.
+	 Don't we need the proper address for fixup_symbol_section to
+	 even work?  */
+      SET_SYMBOL_VALUE_ADDRESS (sym,
+				SYMBOL_VALUE_ADDRESS (sym)
+				+ ANOFFSET (objfile->section_offsets,
+					    SYMBOL_SECTION (sym)));
       return;
     }
 
@@ -11651,7 +11658,7 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	  attr = dwarf2_attr (die, DW_AT_low_pc, cu);
 	  if (attr)
 	    {
-	      SYMBOL_VALUE_ADDRESS (sym) = DW_ADDR (attr) + baseaddr;
+	      SET_SYMBOL_VALUE_ADDRESS (sym, DW_ADDR (attr) + baseaddr);
 	    }
 	  SYMBOL_TYPE (sym) = objfile_type (objfile)->builtin_core_addr;
 	  SYMBOL_DOMAIN (sym) = LABEL_DOMAIN;

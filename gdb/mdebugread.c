@@ -606,7 +606,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (top_stack->cur_st),
 			     GLOBAL_BLOCK);
       s = new_symbol (name);
-      SYMBOL_VALUE_ADDRESS (s) = (CORE_ADDR) sh->value;
+      SET_SYMBOL_VALUE_ADDRESS (s, (CORE_ADDR) sh->value);
       goto data;
 
     case stStatic:		/* Static data, goes into current block.  */
@@ -623,7 +623,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	  global_sym_chain[bucket] = s;
 	}
       else
-	SYMBOL_VALUE_ADDRESS (s) = (CORE_ADDR) sh->value;
+	SET_SYMBOL_VALUE_ADDRESS (s, (CORE_ADDR) sh->value);
       goto data;
 
     case stLocal:		/* Local variable, goes into current block.  */
@@ -695,7 +695,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       s = new_symbol (name);
       SYMBOL_DOMAIN (s) = VAR_DOMAIN;	/* So that it can be used */
       SYMBOL_CLASS (s) = LOC_LABEL;	/* but not misused.  */
-      SYMBOL_VALUE_ADDRESS (s) = (CORE_ADDR) sh->value;
+      SET_SYMBOL_VALUE_ADDRESS (s, (CORE_ADDR) sh->value);
       SYMBOL_TYPE (s) = objfile_type (objfile)->builtin_int;
       add_symbol (s, top_stack->cur_st, top_stack->cur_block);
       break;

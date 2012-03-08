@@ -192,7 +192,9 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
    field only, instead of the SYMBOL parameter.  */
 
 #define SYMBOL_VALUE(symbol)		(symbol)->ginfo.value.ivalue
-#define SYMBOL_VALUE_ADDRESS(symbol)	(symbol)->ginfo.value.address
+#define SYMBOL_VALUE_ADDRESS(symbol)	((symbol)->ginfo.value.address + 0)
+#define SET_SYMBOL_VALUE_ADDRESS(symbol, addr) \
+  (((symbol)->ginfo.value.address) = (addr))
 #define SYMBOL_VALUE_BYTES(symbol)	(symbol)->ginfo.value.bytes
 #define SYMBOL_BLOCK_VALUE(symbol)	(symbol)->ginfo.value.block
 #define SYMBOL_VALUE_CHAIN(symbol)	(symbol)->ginfo.value.chain

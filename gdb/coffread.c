@@ -1590,30 +1590,40 @@ process_coff_symbol (struct coff_symbol *cs,
 	case C_THUMBEXT:
 	case C_THUMBEXTFUNC:
 	case C_EXT:
-	  SYMBOL_CLASS (sym) = LOC_STATIC;
-	  SYMBOL_VALUE_ADDRESS (sym) = (CORE_ADDR) cs->c_value;
-	  SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (objfile->section_offsets,
-						  SECT_OFF_TEXT (objfile));
-	  add_symbol_to_list (sym, &global_symbols);
+	  {
+	    CORE_ADDR addr;
+
+	    SYMBOL_CLASS (sym) = LOC_STATIC;
+	    addr = ((CORE_ADDR) cs->c_value
+		    + ANOFFSET (objfile->section_offsets,
+				SECT_OFF_TEXT (objfile)));
+	    SET_SYMBOL_VALUE_ADDRESS (sym, addr);
+	    add_symbol_to_list (sym, &global_symbols);
+	  }
 	  break;
 
 	case C_THUMBSTAT:
 	case C_THUMBSTATFUNC:
 	case C_STAT:
-	  SYMBOL_CLASS (sym) = LOC_STATIC;
-	  SYMBOL_VALUE_ADDRESS (sym) = (CORE_ADDR) cs->c_value;
-	  SYMBOL_VALUE_ADDRESS (sym) += ANOFFSET (objfile->section_offsets,
-						  SECT_OFF_TEXT (objfile));
-	  if (within_function)
-	    {
-	      /* Static symbol of local scope.  */
-	      add_symbol_to_list (sym, &local_symbols);
-	    }
-	  else
-	    {
-	      /* Static symbol at top level of file.  */
-	      add_symbol_to_list (sym, &file_symbols);
-	    }
+	  {
+	    CORE_ADDR addr;
+
+	    SYMBOL_CLASS (sym) = LOC_STATIC;
+	    addr = ((CORE_ADDR) cs->c_value
+		    + ANOFFSET (objfile->section_offsets,
+				SECT_OFF_TEXT (objfile)));
+	    SET_SYMBOL_VALUE_ADDRESS (sym, addr);
+	    if (within_function)
+	      {
+		/* Static symbol of local scope.  */
+		add_symbol_to_list (sym, &local_symbols);
+	      }
+	    else
+	      {
+		/* Static symbol at top level of file.  */
+		add_symbol_to_list (sym, &file_symbols);
+	      }
+	  }
 	  break;
 
 #ifdef C_GLBLREG		/* AMD coff */
