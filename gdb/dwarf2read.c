@@ -1976,8 +1976,8 @@ create_addrmap_from_index (struct objfile *objfile, struct mapped_index *index)
       addrmap_set_empty (mutable_map, lo, hi - 1, dw2_get_cu (cu_index));
     }
 
-  objfile->psymtabs_addrmap = addrmap_create_fixed (mutable_map,
-						    &objfile->objfile_obstack);
+  objfile->psym_info->psymtabs_addrmap
+    = addrmap_create_fixed (mutable_map, objfile->psym_info->psym_obstack);
   do_cleanups (cleanup);
 }
 
@@ -2779,10 +2779,10 @@ dw2_find_pc_sect_symtab (struct objfile *objfile,
 
   dw2_setup (objfile);
 
-  if (!objfile->psymtabs_addrmap)
+  if (!objfile->psym_info->psymtabs_addrmap)
     return NULL;
 
-  data = addrmap_find (objfile->psymtabs_addrmap, pc);
+  data = addrmap_find (objfile->psym_info->psymtabs_addrmap, pc);
   if (!data)
     return NULL;
 
@@ -2933,7 +2933,7 @@ dwarf2_initialize_objfile (struct objfile *objfile)
 void
 dwarf2_build_psymtabs (struct objfile *objfile)
 {
-  if (objfile->global_psymbols.size == 0 && objfile->static_psymbols.size == 0)
+  if (objfile->psym_info == NULL)
     {
       init_psymbol_list (objfile, 1024);
     }
@@ -3460,8 +3460,8 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
 			      filename,
 			      /* TEXTLOW and TEXTHIGH are set below.  */
 			      0,
-			      objfile->global_psymbols.next,
-			      objfile->static_psymbols.next);
+			      objfile->psym_info->global_psymbols.next,
+			      objfile->psym_info->static_psymbols.next);
   pst->psymtabs_addrmap_supported = 1;
 
   attr = dwarf2_attr (comp_unit_die, DW_AT_comp_dir, &cu);
@@ -3486,7 +3486,7 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
   if (has_pc_info == 1 && best_lowpc < best_highpc)
     /* Store the contiguous range if it is not empty; it can be empty for
        CUs with no code.  */
-    addrmap_set_empty (objfile->psymtabs_addrmap,
+    addrmap_set_empty (objfile->psym_info->psymtabs_addrmap,
 		       best_lowpc,
 		       best_highpc - 1, pst);
 
@@ -3522,10 +3522,10 @@ process_psymtab_comp_unit (struct dwarf2_per_cu_data *this_cu,
   pst->textlow = best_lowpc + baseaddr;
   pst->texthigh = best_highpc + baseaddr;
 
-  pst->n_global_syms = objfile->global_psymbols.next -
-    (objfile->global_psymbols.list + pst->globals_offset);
-  pst->n_static_syms = objfile->static_psymbols.next -
-    (objfile->static_psymbols.list + pst->statics_offset);
+  pst->n_global_syms = objfile->psym_info->global_psymbols.next -
+    (objfile->psym_info->global_psymbols.list + pst->globals_offset);
+  pst->n_static_syms = objfile->psym_info->static_psymbols.next -
+    (objfile->psym_info->static_psymbols.list + pst->statics_offset);
   sort_pst_symbols (objfile, pst);
 
   if (is_debug_types_section)
@@ -3581,7 +3581,7 @@ psymtabs_addrmap_cleanup (void *o)
 {
   struct objfile *objfile = o;
 
-  objfile->psymtabs_addrmap = NULL;
+  objfile->psym_info->psymtabs_addrmap = NULL;
 }
 
 /* Build the partial symbol table by doing a quick pass through the
@@ -3610,7 +3610,7 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
      copy this to the final obstack.  */
   obstack_init (&temp_obstack);
   make_cleanup_obstack_free (&temp_obstack);
-  objfile->psymtabs_addrmap = addrmap_create_mutable (&temp_obstack);
+  objfile->psym_info->psymtabs_addrmap = addrmap_create_mutable (&temp_obstack);
   addrmap_cleanup = make_cleanup (psymtabs_addrmap_cleanup, objfile);
 
   for (i = 0; i < dwarf2_per_objfile->n_comp_units; ++i)
@@ -3620,8 +3620,9 @@ dwarf2_build_psymtabs_hard (struct objfile *objfile)
       process_psymtab_comp_unit (per_cu, &dwarf2_per_objfile->info, 0);
     }
 
-  objfile->psymtabs_addrmap = addrmap_create_fixed (objfile->psymtabs_addrmap,
-						    &objfile->objfile_obstack);
+  objfile->psym_info->psymtabs_addrmap
+    = addrmap_create_fixed (objfile->psym_info->psymtabs_addrmap,
+			    objfile->psym_info->psym_obstack);
   discard_cleanups (addrmap_cleanup);
 
   do_cleanups (back_to);
@@ -4013,7 +4014,7 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 	  add_psymbol_to_list (actual_name, strlen (actual_name),
 			       built_actual_name,
 			       VAR_DOMAIN, LOC_BLOCK,
-			       &objfile->global_psymbols,
+			       &objfile->psym_info->global_psymbols,
 			       0, pdi->lowpc + baseaddr,
 			       cu->language, objfile,
 			       SECT_OFF_TEXT (objfile));
@@ -4025,7 +4026,7 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 	  add_psymbol_to_list (actual_name, strlen (actual_name),
 			       built_actual_name,
 			       VAR_DOMAIN, LOC_BLOCK,
-			       &objfile->static_psymbols,
+			       &objfile->psym_info->static_psymbols,
 			       0, pdi->lowpc + baseaddr,
 			       cu->language, objfile,
 			       SECT_OFF_TEXT (objfile));
@@ -4036,9 +4037,9 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
         struct psymbol_allocation_list *list;
 
 	if (pdi->is_external)
-	  list = &objfile->global_psymbols;
+	  list = &objfile->psym_info->global_psymbols;
 	else
-	  list = &objfile->static_psymbols;
+	  list = &objfile->psym_info->static_psymbols;
 	add_psymbol_to_list (actual_name, strlen (actual_name),
 			     built_actual_name, VAR_DOMAIN, LOC_STATIC,
 			     list, 0, 0, cu->language, objfile,
@@ -4077,7 +4078,7 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 	    add_psymbol_to_list (actual_name, strlen (actual_name),
 				 built_actual_name,
 				 VAR_DOMAIN, LOC_STATIC,
-				 &objfile->global_psymbols,
+				 &objfile->psym_info->global_psymbols,
 				 0, addr + baseaddr,
 				 cu->language, objfile,
 				 SECT_OFF_TEXT (objfile));
@@ -4096,7 +4097,7 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 	  add_psymbol_to_list (actual_name, strlen (actual_name),
 			       built_actual_name,
 			       VAR_DOMAIN, LOC_STATIC,
-			       &objfile->static_psymbols,
+			       &objfile->psym_info->static_psymbols,
 			       0, addr + baseaddr,
 			       cu->language, objfile,
 			       SECT_OFF_TEXT (objfile));
@@ -4108,14 +4109,14 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
       add_psymbol_to_list (actual_name, strlen (actual_name),
 			   built_actual_name,
 			   VAR_DOMAIN, LOC_TYPEDEF,
-			   &objfile->static_psymbols,
+			   &objfile->psym_info->static_psymbols,
 			   0, (CORE_ADDR) 0, cu->language, objfile, -1);
       break;
     case DW_TAG_namespace:
       add_psymbol_to_list (actual_name, strlen (actual_name),
 			   built_actual_name,
 			   VAR_DOMAIN, LOC_TYPEDEF,
-			   &objfile->global_psymbols,
+			   &objfile->psym_info->global_psymbols,
 			   0, (CORE_ADDR) 0, cu->language, objfile, -1);
       break;
     case DW_TAG_class_type:
@@ -4142,8 +4143,8 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 			   STRUCT_DOMAIN, LOC_TYPEDEF,
 			   (cu->language == language_cplus
 			    || cu->language == language_java)
-			   ? &objfile->global_psymbols
-			   : &objfile->static_psymbols,
+			   ? &objfile->psym_info->global_psymbols
+			   : &objfile->psym_info->static_psymbols,
 			   0, (CORE_ADDR) 0, cu->language, objfile, -1);
 
       break;
@@ -4153,8 +4154,8 @@ add_partial_symbol (struct partial_die_info *pdi, struct dwarf2_cu *cu)
 			   VAR_DOMAIN, LOC_CONST,
 			   (cu->language == language_cplus
 			    || cu->language == language_java)
-			   ? &objfile->global_psymbols
-			   : &objfile->static_psymbols,
+			   ? &objfile->psym_info->global_psymbols
+			   : &objfile->psym_info->static_psymbols,
 			   0, (CORE_ADDR) 0, cu->language, objfile, -1);
       break;
     default:
@@ -4220,7 +4221,7 @@ add_partial_subprogram (struct partial_die_info *pdi,
           if (pdi->highpc > *highpc)
             *highpc = pdi->highpc;
 	  if (need_pc)
-	    addrmap_set_empty (cu->objfile->psymtabs_addrmap,
+	    addrmap_set_empty (cu->objfile->psym_info->psymtabs_addrmap,
 			       pdi->lowpc,
 			       pdi->highpc - 1,
 			       cu->per_cu->v.psymtab);
@@ -6494,7 +6495,7 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
       range_end += base;
 
       if (ranges_pst != NULL)
-	addrmap_set_empty (objfile->psymtabs_addrmap,
+	addrmap_set_empty (objfile->psym_info->psymtabs_addrmap,
 			   range_beginning,
 			   range_end - 1,
 			   ranges_pst);
@@ -9560,7 +9561,7 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 	  if (building_psymtab && part_die->name != NULL)
 	    add_psymbol_to_list (part_die->name, strlen (part_die->name), 0,
 				 VAR_DOMAIN, LOC_TYPEDEF,
-				 &objfile->static_psymbols,
+				 &objfile->psym_info->static_psymbols,
 				 0, (CORE_ADDR) 0, cu->language, objfile, -1);
 	  info_ptr = locate_pdi_sibling (part_die, buffer, info_ptr, abfd, cu);
 	  continue;
@@ -9598,8 +9599,8 @@ load_partial_dies (bfd *abfd, gdb_byte *buffer, gdb_byte *info_ptr,
 				 VAR_DOMAIN, LOC_CONST,
 				 (cu->language == language_cplus
 				  || cu->language == language_java)
-				 ? &objfile->global_psymbols
-				 : &objfile->static_psymbols,
+				 ? &objfile->psym_info->global_psymbols
+				 : &objfile->psym_info->static_psymbols,
 				 0, (CORE_ADDR) 0, cu->language, objfile, -1);
 
 	  info_ptr = locate_pdi_sibling (part_die, buffer, info_ptr, abfd, cu);
@@ -16726,7 +16727,8 @@ write_address_map (struct objfile *objfile, struct obstack *obstack,
   addrmap_index_data.cu_index_htab = cu_index_htab;
   addrmap_index_data.previous_valid = 0;
 
-  addrmap_foreach (objfile->psymtabs_addrmap, add_address_entry_worker,
+  addrmap_foreach (objfile->psym_info->psymtabs_addrmap,
+		   add_address_entry_worker,
 		   &addrmap_index_data);
 
   /* It's highly unlikely the last entry (end address = 0xff...ff)
@@ -16825,13 +16827,13 @@ write_one_signatured_type (void **slot, void *d)
 
   write_psymbols (info->symtab,
 		  info->psyms_seen,
-		  info->objfile->global_psymbols.list
+		  info->objfile->psym_info->global_psymbols.list
 		  + psymtab->globals_offset,
 		  psymtab->n_global_syms, info->cu_index,
 		  0);
   write_psymbols (info->symtab,
 		  info->psyms_seen,
-		  info->objfile->static_psymbols.list
+		  info->objfile->psym_info->static_psymbols.list
 		  + psymtab->statics_offset,
 		  psymtab->n_static_syms, info->cu_index,
 		  1);
@@ -16867,7 +16869,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
   htab_t cu_index_htab;
   struct psymtab_cu_index_map *psymtab_cu_index_map;
 
-  if (!objfile->psymtabs || !objfile->psymtabs_addrmap)
+  if (!objfile->psym_info->psymtabs || !objfile->psym_info->psymtabs_addrmap)
     return;
 
   if (dwarf2_per_objfile->using_index)
@@ -16934,12 +16936,14 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
 
       write_psymbols (symtab,
 		      psyms_seen,
-		      objfile->global_psymbols.list + psymtab->globals_offset,
+		      objfile->psym_info->global_psymbols.list
+		      + psymtab->globals_offset,
 		      psymtab->n_global_syms, i,
 		      0);
       write_psymbols (symtab,
 		      psyms_seen,
-		      objfile->static_psymbols.list + psymtab->statics_offset,
+		      objfile->psym_info->static_psymbols.list
+		      + psymtab->statics_offset,
 		      psymtab->n_static_syms, i,
 		      1);
 

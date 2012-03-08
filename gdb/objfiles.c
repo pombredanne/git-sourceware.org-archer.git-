@@ -239,11 +239,13 @@ allocate_objfile (bfd *abfd, int flags)
   struct objfile *objfile;
 
   objfile = (struct objfile *) xzalloc (sizeof (struct objfile));
-  objfile->psymbol_cache = psymbol_bcache_init ();
   objfile->macro_cache = bcache_xmalloc (NULL, NULL);
   /* We could use obstack_specify_allocation here instead, but
      gdb_obstack.h specifies the alloc/dealloc functions.  */
   obstack_init (&objfile->objfile_obstack);
+
+  /* For now we do not allow psym sharing.  */
+  objfile->psym_info = new_partial_symbol_info (&objfile->objfile_obstack);
 
   objfile_alloc_data (objfile);
 
@@ -659,12 +661,16 @@ free_objfile (struct objfile *objfile)
   /* The last thing we do is free the objfile struct itself.  */
 
   xfree (objfile->name);
-  if (objfile->global_psymbols.list)
-    xfree (objfile->global_psymbols.list);
-  if (objfile->static_psymbols.list)
-    xfree (objfile->static_psymbols.list);
+
+  if (objfile->psym_info != objfile->per_bfd->psym_info)
+    {
+      free_partial_symbol_info (objfile->psym_info);
+
+      /* For now we do not allow psym sharing.  */
+      objfile->psym_info = new_partial_symbol_info (&objfile->objfile_obstack);
+    }
+
   /* Free the obstacks for non-reusable objfiles.  */
-  psymbol_bcache_free (objfile->psymbol_cache);
   bcache_xfree (objfile->macro_cache);
   if (objfile->demangled_names_hash)
     htab_delete (objfile->demangled_names_hash);

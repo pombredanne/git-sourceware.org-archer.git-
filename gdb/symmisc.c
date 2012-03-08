@@ -90,7 +90,7 @@ print_symbol_bcache_statistics (void)
     ALL_PSPACE_OBJFILES (pspace, objfile)
   {
     printf_filtered (_("Byte cache statistics for '%s':\n"), objfile->name);
-    print_bcache_statistics (psymbol_bcache_get_bcache (objfile->psymbol_cache),
+    print_bcache_statistics (psymbol_bcache_get_bcache (objfile->psym_info->psymbol_cache),
                              "partial symbol cache");
     print_bcache_statistics (objfile->macro_cache, "preprocessor macro cache");
     /* FIXME */
@@ -152,7 +152,7 @@ print_objfile_statistics (void)
 		     obstack_memory_used (&objfile->objfile_obstack));
     printf_filtered (_("  Total memory used for psymbol cache: %d\n"),
 		     bcache_memory_used (psymbol_bcache_get_bcache
-		                          (objfile->psymbol_cache)));
+		                          (objfile->psym_info->psymbol_cache)));
     printf_filtered (_("  Total memory used for macro cache: %d\n"),
 		     bcache_memory_used (objfile->macro_cache));
     /* FIXME */

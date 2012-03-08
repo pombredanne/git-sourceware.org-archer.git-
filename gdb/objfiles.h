@@ -213,6 +213,11 @@ struct objfile_per_bfd_storage
      demangled names.  */
 
   struct minimal_symbol *msymbol_demangled_hash[MINIMAL_SYMBOL_HASH_SIZE];
+
+  /* If non-NULL, the partial symbol information is shared by all
+     objfiles using this BFD.  */
+
+  struct partial_symbol_info *psym_info;
 };
 
 /* Master structure for keeping track of each file from which
@@ -255,22 +260,11 @@ struct objfile
 
     struct symtab *symtabs;
 
-    /* Each objfile points to a linked list of partial symtabs derived from
-       this file, one partial symtab structure for each compilation unit
-       (source file).  */
+    /* If non-NULL, the partial symbol information for this objfile.
+       This might or might not be shared by all objfiles using the
+       same BFD.  */
 
-    struct partial_symtab *psymtabs;
-
-    /* Map addresses to the entries of PSYMTABS.  It would be more efficient to
-       have a map per the whole process but ADDRMAP cannot selectively remove
-       its items during FREE_OBJFILE.  This mapping is already present even for
-       PARTIAL_SYMTABs which still have no corresponding full SYMTABs read.  */
-
-    struct addrmap *psymtabs_addrmap;
-
-    /* List of freed partial symtabs, available for re-use.  */
-
-    struct partial_symtab *free_psymtabs;
+    struct partial_symbol_info *psym_info;
 
     /* The object file's BFD.  Can be null if the objfile contains only
        minimal symbols, e.g. the run time common symbols for SunOS4.  */
@@ -299,11 +293,8 @@ struct objfile
 
     struct obstack objfile_obstack; 
 
-    /* A byte cache where we can stash arbitrary "chunks" of bytes that
-       will not change.  */
-
-    struct psymbol_bcache *psymbol_cache; /* Byte cache for partial syms.  */
-    struct bcache *macro_cache;           /* Byte cache for macros.  */
+    /* Byte cache for macros.  */
+    struct bcache *macro_cache;
 
     /* Hash table for mapping symbol names to demangled names.  Each
        entry in the hash table is actually two consecutive strings,
@@ -312,12 +303,6 @@ struct objfile
        if the name doesn't demangle.  */
 
     struct htab *demangled_names_hash;
-
-    /* Vectors of all partial symbols read in from file.  The actual data
-       is stored in the objfile_obstack.  */
-
-    struct psymbol_allocation_list global_psymbols;
-    struct psymbol_allocation_list static_psymbols;
 
     /* Structure which keeps track of functions that manipulate objfile's
        of the same type as this objfile.  I.e. the function to read partial

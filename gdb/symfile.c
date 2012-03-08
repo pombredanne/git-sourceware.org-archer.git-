@@ -2563,20 +2563,12 @@ reread_symbols (void)
 	  memcpy (offsets, objfile->section_offsets,
 		  SIZEOF_N_SECTION_OFFSETS (num_offsets));
 
-	  /* FIXME: Do we have to free a whole linked list, or is this
-	     enough?  */
-	  if (objfile->global_psymbols.list)
-	    xfree (objfile->global_psymbols.list);
-	  memset (&objfile->global_psymbols, 0,
-		  sizeof (objfile->global_psymbols));
-	  if (objfile->static_psymbols.list)
-	    xfree (objfile->static_psymbols.list);
-	  memset (&objfile->static_psymbols, 0,
-		  sizeof (objfile->static_psymbols));
+	  if (objfile->psym_info != objfile->per_bfd->psym_info)
+	    free_partial_symbol_info (objfile->psym_info);
+	  /* FIXME - reinit here somehow */
+	  objfile->psym_info = NULL;
 
 	  /* Free the obstacks for non-reusable objfiles.  */
-	  psymbol_bcache_free (objfile->psymbol_cache);
-	  objfile->psymbol_cache = psymbol_bcache_init ();
 	  bcache_xfree (objfile->macro_cache);
 	  objfile->macro_cache = bcache_xmalloc (NULL, NULL);
 	  if (objfile->demangled_names_hash != NULL)
@@ -2587,9 +2579,6 @@ reread_symbols (void)
 	  obstack_free (&objfile->objfile_obstack, 0);
 	  objfile->sections = NULL;
 	  objfile->symtabs = NULL;
-	  objfile->psymtabs = NULL;
-	  objfile->psymtabs_addrmap = NULL;
-	  objfile->free_psymtabs = NULL;
 	  objfile->template_symbols = NULL;
 	  objfile->deprecated_sym_private = NULL;
 	  objfile->demangled_names_hash = NULL;

@@ -22,6 +22,51 @@
 
 #include "symfile.h"
 
+/* This structure holds all the information related to partial symbols
+   for a given objfile.  This might be allocated in the per-BFD
+   storage, or it might be allocated on the objfile obstack, depending
+   on the particular objfile.  */
+
+struct partial_symbol_info
+{
+  /* The obstack used for all psymbol allocation.  */
+  struct obstack *psym_obstack;
+
+  /* A linked list of partial symtabs derived from this file, one
+     partial symtab structure for each compilation unit (source
+     file).  */
+
+  struct partial_symtab *psymtabs;
+
+  /* Map addresses to the entries of PSYMTABS.  It would be more efficient to
+     have a map per the whole process but ADDRMAP cannot selectively remove
+     its items during FREE_OBJFILE.  This mapping is already present even for
+     PARTIAL_SYMTABs which still have no corresponding full SYMTABs read.  */
+
+  struct addrmap *psymtabs_addrmap;
+
+  /* List of freed partial symtabs, available for re-use.  */
+
+  struct partial_symtab *free_psymtabs;
+
+  /* Byte cache for partial syms.  */
+  struct psymbol_bcache *psymbol_cache;
+
+  /* Vectors of all partial symbols read in from file.  The actual
+     data is stored in the psym_obstack.  */
+
+  struct psymbol_allocation_list global_psymbols;
+  struct psymbol_allocation_list static_psymbols;
+};
+
+/* Allocate a new partial_symbol_info on OBSTACK and return it.  */
+
+extern struct partial_symbol_info *new_partial_symbol_info (struct obstack *);
+
+/* Free a partial_symbol_info.  */
+
+extern void free_partial_symbol_info (struct partial_symbol_info *);
+
 /* A bcache for partial symbols.  */
 
 struct psymbol_bcache;

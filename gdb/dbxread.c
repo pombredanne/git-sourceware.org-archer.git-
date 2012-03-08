@@ -560,7 +560,7 @@ dbx_symfile_read (struct objfile *objfile, int symfile_flags)
     perror_with_name (objfile->name);
 
   /* Size the symbol table.  */
-  if (objfile->global_psymbols.size == 0 && objfile->static_psymbols.size == 0)
+  if (objfile->psym_info == NULL)
     init_psymbol_list (objfile, DBX_SYMCOUNT (objfile));
 
   symbol_size = DBX_SYMBOL_SIZE (objfile);
@@ -1545,8 +1545,8 @@ read_dbx_symtab (struct objfile *objfile)
 		pst = start_psymtab (objfile,
 				     namestring, valu,
 				     first_so_symnum * symbol_size,
-				     objfile->global_psymbols.next,
-				     objfile->static_psymbols.next);
+				     objfile->psym_info->global_psymbols.next,
+				     objfile->psym_info->static_psymbols.next);
 		pst->dirname = dirname_nso;
 		dirname_nso = NULL;
 	      }
@@ -1729,7 +1729,7 @@ read_dbx_symtab (struct objfile *objfile)
 
 	      add_psymbol_to_list (sym_name, sym_len, 1,
 				   VAR_DOMAIN, LOC_STATIC,
-				   &objfile->static_psymbols,
+				   &objfile->psym_info->static_psymbols,
 				   0, nlist.n_value,
 				   psymtab_language, objfile,
 				   data_sect_index);
@@ -1742,7 +1742,7 @@ read_dbx_symtab (struct objfile *objfile)
 		 wrong.  See the code that reads 'G's for symtabs.  */
 	      add_psymbol_to_list (sym_name, sym_len, 1,
 				   VAR_DOMAIN, LOC_STATIC,
-				   &objfile->global_psymbols,
+				   &objfile->psym_info->global_psymbols,
 				   0, nlist.n_value,
 				   psymtab_language, objfile,
 				   data_sect_index);
@@ -1761,7 +1761,7 @@ read_dbx_symtab (struct objfile *objfile)
 		{
 		  add_psymbol_to_list (sym_name, sym_len, 1,
 				       STRUCT_DOMAIN, LOC_TYPEDEF,
-				       &objfile->static_psymbols,
+				       &objfile->psym_info->static_psymbols,
 				       nlist.n_value, 0,
 				       psymtab_language, objfile, -1);
 		  if (p[2] == 't')
@@ -1769,7 +1769,7 @@ read_dbx_symtab (struct objfile *objfile)
 		      /* Also a typedef with the same name.  */
 		      add_psymbol_to_list (sym_name, sym_len, 1,
 					   VAR_DOMAIN, LOC_TYPEDEF,
-					   &objfile->static_psymbols,
+					   &objfile->psym_info->static_psymbols,
 					   nlist.n_value, 0,
 					   psymtab_language, objfile, -1);
 		      p += 1;
@@ -1782,7 +1782,7 @@ read_dbx_symtab (struct objfile *objfile)
 		{
 		  add_psymbol_to_list (sym_name, sym_len, 1,
 				       VAR_DOMAIN, LOC_TYPEDEF,
-				       &objfile->static_psymbols,
+				       &objfile->psym_info->static_psymbols,
 				       nlist.n_value, 0,
 				       psymtab_language, objfile, -1);
 		}
@@ -1844,8 +1844,8 @@ read_dbx_symtab (struct objfile *objfile)
 			 enum constants in psymtabs, just in symtabs.  */
 		      add_psymbol_to_list (p, q - p, 1,
 					   VAR_DOMAIN, LOC_CONST,
-					   &objfile->static_psymbols, 0,
-					   0, psymtab_language, objfile, -1);
+					   &objfile->psym_info->static_psymbols,
+					   0, 0, psymtab_language, objfile, -1);
 		      /* Point past the name.  */
 		      p = q;
 		      /* Skip over the value.  */
@@ -1862,7 +1862,8 @@ read_dbx_symtab (struct objfile *objfile)
 	      /* Constant, e.g. from "const" in Pascal.  */
 	      add_psymbol_to_list (sym_name, sym_len, 1,
 				   VAR_DOMAIN, LOC_CONST,
-				   &objfile->static_psymbols, nlist.n_value,
+				   &objfile->psym_info->static_psymbols,
+				   nlist.n_value,
 				   0, psymtab_language, objfile, -1);
 	      continue;
 
@@ -1928,7 +1929,7 @@ read_dbx_symtab (struct objfile *objfile)
 		}
 	      add_psymbol_to_list (sym_name, sym_len, 1,
 				   VAR_DOMAIN, LOC_BLOCK,
-				   &objfile->static_psymbols,
+				   &objfile->psym_info->static_psymbols,
 				   0, nlist.n_value,
 				   psymtab_language, objfile,
 				   SECT_OFF_TEXT (objfile));
@@ -1999,7 +2000,7 @@ read_dbx_symtab (struct objfile *objfile)
 		}
 	      add_psymbol_to_list (sym_name, sym_len, 1,
 				   VAR_DOMAIN, LOC_BLOCK,
-				   &objfile->global_psymbols,
+				   &objfile->psym_info->global_psymbols,
 				   0, nlist.n_value,
 				   psymtab_language, objfile,
 				   SECT_OFF_TEXT (objfile));
@@ -2324,11 +2325,11 @@ end_psymtab (struct objfile *objfile,
   /* End of kludge for patching Solaris textlow and texthigh.  */
 
   pst->n_global_syms =
-    objfile->global_psymbols.next - (objfile->global_psymbols.list
-				     + pst->globals_offset);
+    (objfile->psym_info->global_psymbols.next
+     - (objfile->psym_info->global_psymbols.list + pst->globals_offset));
   pst->n_static_syms =
-    objfile->static_psymbols.next - (objfile->static_psymbols.list
-				     + pst->statics_offset);
+    (objfile->psym_info->static_psymbols.next
+     - (objfile->psym_info->static_psymbols.list + pst->statics_offset));
 
   pst->number_of_dependencies = number_dependencies;
   if (number_dependencies)
