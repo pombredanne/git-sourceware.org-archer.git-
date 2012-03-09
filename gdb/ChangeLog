@@ -1,3 +1,197 @@
+2012-03-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-sparc-thread.c (_initialize_ravenscar_sparc): Add
+	prototype.
+
+2012-03-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-thread.c (_initialize_ravenscar): Add prototype.
+
+2012-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix -Wmissing-prototypes build.
+	* arm-linux-nat.c (get_thread_id): Make it static.
+	* xtensa-linux-nat.c (get_thread_id): Likewise.
+
+2012-03-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* server.c (process_point_options): If a conditional expression
+	is found, only print a message if remote_debug is nonzero.
+
+2012-03-08  Luis Machado  <lgustavo@codesourcery.com>
+
+	* ax-gdb.c (gen_fetch): Fail gracefully and use error instead
+	of internal error for unknown/unsupported types.
+
+2012-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix CU relative vs. absolute DIE offsets.
+	* dwarf2loc.h (dwarf2_fetch_die_location_block): Rename parameter
+	offset to offset_in_cu.
+	* dwarf2read.c (process_enumeration_scope): Add CU offset to
+	TYPE_OFFSET.
+	(dwarf2_fetch_die_location_block): Rename parameter offset to
+	offset_in_cu.  New variable offset, add CU offset to OFFSET_IN_CU.
+
+2012-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* libunwind-frame.c: Rename to ...
+	* ia64-libunwind-tdep.c: ... here.
+	* libunwind-frame.h: Rename to ...
+	* ia64-libunwind-tdep.h: ... here.
+	* Makefile.in (HFILES_NO_SRCDIR): Rename libunwind-frame.h to
+	ia64-libunwind-tdep.h.
+	(ALLDEPFILES): Rename libunwind-frame.c to ia64-libunwind-tdep.c.
+	* README (--with-libunwind): Rename to ...
+	(--with-libunwind-ia64): ... here, note it is ia64 specific now.
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: New option --with-libunwind-ia64, make the
+	AS_HELP_STRING ia64 specific.  Deprecate option --with-libunwind.
+	Remove AC_DEFINE for HAVE_LIBUNWIND.
+	* ia64-libunwind-tdep.c: Make the file top comment ia64 specific.
+	Rename libunwind-frame.h #include to ia64-libunwind-tdep.h.
+	Rename libunwind-frame in the general comment.
+	* ia64-libunwind-tdep.h: Make the file top comment ia64 specific.
+	Rename symbol LIBUNWIND_FRAME_H to IA64_TDEP_LIBUNWIND_FRAME_H.
+	Move forward declarations inside #ifndef.  Rename libunwind-frame in
+	the general comment.
+	* ia64-tdep.c: Rename libunwind-frame.h #include to
+	ia64-libunwind-tdep.h.
+	(ia64_gdb2uw_regnum, ia64_uw2gdb_regnum, ia64_is_fpreg)
+	(ia64_libunwind_descr): Rename libunwind-frame to
+	ia64-libunwind-tdep in these function comments.
+	* ia64-tdep.h: Rename libunwind-frame.h #include to
+	ia64-libunwind-tdep.h.
+	* ia64-vms-tdep.c (ia64_vms_libunwind_descr): Rename libunwind-frame to
+	ia64-libunwind-tdep in that data comment.
+
+2012-03-08  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* libunwind-frame.h (struct frame_unwind): New declaration.
+
+2012-03-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* breakpoint.c (_initialize_breakpoint): Fix error in help of
+	"set breakpoint condition-evaluation" command.
+
+2012-03-08  Tristan Gingold  <gingold@adacore.com>
+
+	* sparc-stub.c: Move to stubs/
+	* sh-stub.c: Likewise.
+	* m68k-stub.c: Likewise.
+	* m32r-stub.c: Likewise.
+	* i386-stub.c: Likewise.
+
+2012-03-08  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* m68klinux-tdep.c (m68k_linux_init_abi): Register
+	linux_get_siginfo_type.
+
+	* m68klinux-nat.c: Include "gdb_proc_service.h".
+	(PTRACE_GET_THREAD_AREA): Define.
+	(ps_get_thread_area): New function.
+
+2012-03-08  Yao Qi  <yao@codesourcery.com>
+
+	* remote.c (remote_get_noisy_reply): Replace `sprintf' with
+	`xsnprintf'.
+	(remote_query_attached): Likewise.
+	(remote_static_tracepoint_marker_at): Likewise.
+	(remote_set_permissions): Likewise.
+	(remote_detach_1, extended_remote_attach_1): Likewise.
+	(send_g_packet, remote_vkill): Likewise.
+	(extended_remote_disable_randomization): Likewise.
+	(remote_add_target_side_condition): Likewise.
+	(remote_insert_breakpoint): Likewise.
+	(remote_remove_breakpoint): Likewise.
+	(remote_insert_watchpoint): Likewise.
+	(remote_remove_watchpoint): Likewise.
+	(remote_insert_hw_breakpoint): Likewise.
+	(remote_insert_hw_breakpoint): Likewise.
+	(remote_remove_hw_breakpoint): Likewise.
+	(remote_download_command_source): Likewise.
+	(remote_download_tracepoint): Likewise.
+	(remote_download_trace_state_variable): Likewise.
+	(remote_disable_tracepoint): Likewise.
+	(remote_trace_set_readonly_regions): Likewise.
+	(remote_get_tracepoint_status): Likewise.
+	(remote_trace_find): Likewise.
+	(remote_get_trace_state_variable_value): Likewise.
+	(remote_set_disconnected_tracing): Likewise.
+	(remote_set_circular_trace_buffer): Likewise.
+	(remote_get_min_fast_tracepoint_insn_len): Likewise.
+	(remote_use_agent): Likewise.
+	(remote_add_target_side_condition): Add one parameter BUF_SIZE.
+	Update callers.
+
+2012-03-07  Pedro Alves  <palves@redhat.com>
+
+	* NEWS: Mention QProgramSignals.
+	* inferior.h (update_signals_program_target): Declare.
+	* infrun.c: (update_signals_program_target): New.
+	(handle_command): Update the target of the new program signals
+	array changes.
+	* remote.c (PACKET_QProgramSignals): New enum.
+	(last_program_signals_packet): New global.
+	(remote_program_signals): New.
+	(remote_start_remote): Update the target with the program signals
+	list.
+	(remote_protocol_features): Add entry for QPassSignals.
+	(remote_open_1): Free anc clear last_program_signals_packet.
+	(init_remote_ops): Install remote_program_signals.
+	* target.c (update_current_target): Adjust.
+	(target_program_signals): New.
+	* target.h (struct target_ops) <to_program_signals>: New field.
+	(target_program_signals): Declare.
+
+2012-03-07  Pedro Alves  <palves@redhat.com>
+
+	* NEWS: Add subtitle for new z0/z1 conditional breakpoint
+	extensions.
+
+2012-03-07  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* m68klinux-nat.c (getregs_supplies): Make static.
+	(getfpregs_supplies): Likewise.
+	(have_ptrace_getregs): Likewise.
+
+2012-03-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* dwarf2read.c (dwarf2_get_die_type): Pass absolute offset
+	in call to get_die_type_at_offset.
+
+2012-03-06  Stan Shebs  <stan@codesourcery.com>
+
+	* mi/mi-cmd-break.c: Enforce coding standards, fix comments.
+	* mi/mi-cmd-disas.c: Ditto.
+	* mi/mi-cmd-env.c: Ditto.
+	* mi/mi-cmd-file.c: Ditto.
+	* mi/mi-cmd-stack.c: Ditto.
+	* mi/mi-cmd-target.c: Ditto.
+	* mi/mi-cmd-var.c: Ditto.
+	* mi/mi-cmds.c: Ditto.
+	* mi/mi-cmds.h: Ditto.
+	* mi/mi-console.c: Ditto.
+	* mi/mi-getopt.c: Ditto.
+	* mi/mi-getopt.h: Ditto.
+	* mi/mi-interp.c: Ditto.
+	* mi/mi-main.c: Ditto.
+	* mi/mi-out.c: Ditto.
+	* mi/mi-parse.c: Ditto.
+	* mi/mi-parse.h: Ditto.
+	* mi/mi-symbol-cmds.c: Ditto.
+
+	* mi/mi-getopt.h: Move mi_opt struct up.
+	* mi/mi-main.c (captured_mi_execute_command): Remove redundant
+	return.
+	* mi/mi-out.c (_initialize_mi_out): Remove empty initialize.
+
+2012-03-06  Tom Tromey  <tromey@redhat.com>
+
+	* proc-service.c (ps_pglobal_lookup): Set the current program
+	space.
+
 2012-03-06  Pedro Alves  <palves@redhat.com>
 
 	* gregset.h [HAVE_SYS_PROCFS_H]: Include <sys/procfs.h>.
@@ -28,9 +222,8 @@
 
 	* jv-valprint.c (java_value_print): Correctly compute 'obj_addr'.
 
-2012-03-05  Joel Brobecker  <brobecker@adacore.com>
+2012-03-05  Andreas Arnez  <arnez@linux.vnet.ibm.com>
 
-	From Andreas Arnez  <arnez@linux.vnet.ibm.com>:
 	* s390-nat.c: Include "gregset.h".
 
 2012-03-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
@@ -809,9 +1002,8 @@
 	* infcmd.c (finish_forward): Likewise.
 	* infrun.c (insert_exception_resume_breakpoint): Likewise.
 
-2012-02-28  Joel Brobecker  <brobecker@adacore.com>
+2012-02-28  Tristan Gingold  <gingold@adacore.com>
 
-	From Tristan Gingold  <gingold@adacore.com>.
 	* ada-tasks.c (ada_tasks_inferior_data_sniffer): Rework code to
 	avoid variable assignments inside condition.
 

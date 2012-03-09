@@ -1,4 +1,4 @@
-# Copyright 2008-2012 Free Software Foundation, Inc.
+# Copyright 2012 Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,8 +15,8 @@
 
 load_lib "ada.exp"
 
-set testdir "array_bounds"
-set testfile "${testdir}/bar"
+set testdir "bp_on_var"
+set testfile "${testdir}/foo"
 set srcfile ${srcdir}/${subdir}/${testfile}.adb
 set binfile ${objdir}/${subdir}/${testfile}
 
@@ -25,27 +25,24 @@ if {[gdb_compile_ada "${srcfile}" "${binfile}" executable [list debug ]] != "" }
   return -1
 }
 
+# Test inserting breakpoint on pck.my_global_variable.
+
 clean_restart ${testfile}
 
-set bp_location [gdb_get_line_number "START" ${testdir}/bar.adb]
-if ![runto "bar.adb:$bp_location" ] then {
-  perror "Couldn't run ${testfile}"
-  return
-} 
+# We are going to insert breakpoints using locations that are invalid.
+# Set "breakpoint pending" to "off" in order to avoid having to deal
+# with GDB asking whether to insert a pending breakpoint or not.
+gdb_test_no_output "set breakpoint pending off"
 
-gdb_test "print itable'first" \
-         "= 2" \
-         "print itable'first"
+gdb_test "break pck.my_global_variable" \
+         "Function \"pck\\.my_global_variable\" not defined\\."
 
-gdb_test "print itable'last" \
-         "= 5" \
-         "print itable'last"
 
-gdb_test "print table'first" \
-         "= zero" \
-         "print table'first"
+# Test inserting breakpoint on pck.my_hidden_variable.
 
-gdb_test "print table'last" \
-         "= two" \
-         "print table'last"
+clean_restart ${testfile}
 
+gdb_test_no_output "set breakpoint pending off"
+
+gdb_test "break pck.my_hidden_variable" \
+         "Function \"pck\\.my_hidden_variable\" not defined\\."
