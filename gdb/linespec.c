@@ -74,17 +74,27 @@ typedef struct minsym_and_objfile
 
 DEF_VEC_O (minsym_and_objfile_d);
 
+/* An enumeration of possible signs for a line offset.  */
 enum offset_relative_sign
 {
-    none, plus, minus
+  /* No sign  */
+  none,
+
+  /* A plus sign ("+")  */
+  plus,
+
+  /* A minus sign ("-")  */
+  minus,
+
+  /* A special "sign" for unspecified offset.  */
+  unknown
 };
 
 /* A line offset in a linespec.  */
 
 struct line_offset
 {
-  /* Line offset and any specified sign.  When LINE_OFFSET is zero,
-     and SIGN is none, then no line offset was specified.  */
+  /* Line offset and any specified sign.  */
   int offset;
   enum offset_relative_sign sign;
 };
@@ -95,7 +105,7 @@ struct line_offset
 
 struct linespec
 {
-  /* An expression.  */
+  /* An expression and the resulting PC.  */
   char *expression;
   CORE_ADDR expr_pc;
 
@@ -116,7 +126,7 @@ struct linespec
     VEC (symbolp) *function_symbols;
   } labels;
 
-  /* Line offset.  */
+  /* Line offset  */
   struct line_offset line_offset;
 };
 typedef struct linespec *linespec_t;
@@ -161,6 +171,8 @@ struct collect_info
 {
   /* The linespec object in use.  */
   struct linespec_state *state;
+
+  /* A list of symtabs to which to restrict matches.  */
   VEC (symtab_p) *file_symtabs;
 
   /* The result being accumulated.  */
@@ -172,10 +184,11 @@ struct collect_info
 };
 
 /* Token types  */
+
 enum ls_token_type
 {
-  /* Terminal keyword  */
-  LSTOKEN_TERMINAL,
+  /* A keyword  */
+  LSTOKEN_KEYWORD = 0,
 
   /* A colon "separator"  */
   LSTOKEN_COLON,
@@ -194,47 +207,56 @@ enum ls_token_type
 };
 typedef enum ls_token_type linespec_token_type;
 
-/* Terminal types  */
-enum ls_terminal_type
-{
-    LSTERMINAL_IF,
-    LSTERMINAL_THREAD,
-    LSTERMINAL_TASK
-};
-typedef enum ls_terminal_type linespec_terminal_type;
+/* Keyword types  */
 
-/* A linespec terminal  */
-struct ls_terminal
+enum ls_keyword_type
+{
+    LSKEYWORD_IF,
+    LSKEYWORD_THREAD,
+    LSKEYWORD_TASK
+};
+typedef enum ls_keyword_type linespec_keyword_type;
+
+/* A linespec keyword  */
+
+struct ls_keyword
 {
   const char *string;
-  linespec_terminal_type type;
+  linespec_keyword_type type;
 };
-typedef struct ls_terminal linespec_terminal;
+typedef struct ls_keyword linespec_keyword;
 
-/* List of terminals  */
-const linespec_terminal linespec_terminals[] = {
-  {"if", LSTERMINAL_IF},
-  {"thread", LSTERMINAL_THREAD},
-  {"task", LSTERMINAL_TASK}
+/* List of keywords  */
+
+const linespec_keyword linespec_keywords[] = {
+  {"if", LSKEYWORD_IF},
+  {"thread", LSKEYWORD_THREAD},
+  {"task", LSKEYWORD_TASK}
 };
 
-/* A token  */
+/* A token of the linespec lexer  */
+
 struct ls_token
 {
+  /* The type of the token  */
   linespec_token_type type;
+
+  /* Data for the token  */
   union
   {
+    /* A string, given as a stoken  */
     struct stoken string;
-    const linespec_terminal *terminal;
+
+    /* A keyword  */
+    const linespec_keyword *keyword;
   } data;
 };
 typedef struct ls_token linespec_token;
 
 #define LS_TOKEN_STOKEN(TOK) (TOK).data.string
-#define COPY_TOKEN_STRING(TOK) \
-  savestring (LS_TOKEN_STOKEN ((TOK)).ptr, LS_TOKEN_STOKEN ((TOK)).length)
 
 /* An instance of the linespec parser.  */
+
 struct ls_parser
 {
   /* Lexer internal data  */
@@ -283,9 +305,6 @@ static void find_method (struct linespec_state *self,
 			 VEC (symbolp) *sym_classes,
 			 VEC (symbolp) **symbols,
 			 VEC (minsym_and_objfile_d) **minsyms);
-
-static void cplusplus_error (const char *name, const char *fmt, ...)
-     ATTRIBUTE_NORETURN ATTRIBUTE_PRINTF (2, 3);
 
 static const char *find_toplevel_char (const char *s, char c);
 
@@ -346,19 +365,30 @@ static int compare_msymbols (const void *a, const void *b);
 
 /* Lexer functions.  */
 
-/* Lex a number from the input.  */
+/* A convenience macro for trimming trailing whitespace
+   from string P.  */
+
+#define TRIM_WHITESPACE(P)				\
+  do							\
+    {							\
+      char *_p = (P) + strlen ((P)) - 1;		\
+      while (_p >= (P) && (*_p == ' ' || *_p == '\t'))	\
+	_p--;						\
+      *(_p + 1) = '\0';					\
+    }							\
+  while (0)
+
+/* Lex a number from the input in PARSER.  This only supports
+   decimal numbers.  */
 
 static linespec_token
 linespec_lexer_lex_number (linespec_parser *parser)
 {
-  int is_hex;
   linespec_token token;
-  int (*is_a_digit) (int);
 
   token.type = LSTOKEN_NUMBER;
   LS_TOKEN_STOKEN (token).length = 0;
   LS_TOKEN_STOKEN (token).ptr = PARSER_STREAM (parser);
-  is_a_digit = isdigit;
 
   /* Keep any sign at the start of the stream.  */
   if (*PARSER_STREAM (parser) == '+' || *PARSER_STREAM (parser) == '-')
@@ -367,15 +397,7 @@ linespec_lexer_lex_number (linespec_parser *parser)
       ++(PARSER_STREAM (parser));
     }
 
-  /* If the stream starts with "0x", keep it, too.  */
-  if ((PARSER_STREAM (parser))[0] == '0' && (PARSER_STREAM (parser))[1] == 'x')
-    {
-      LS_TOKEN_STOKEN (token).length += 2;
-      PARSER_STREAM (parser) += 2;
-      is_a_digit = isxdigit;
-    }
-
-  while ((*is_a_digit) (*PARSER_STREAM (parser)))
+  while (isdigit (*PARSER_STREAM (parser)))
     {
       ++LS_TOKEN_STOKEN (token).length;
       ++(PARSER_STREAM (parser));
@@ -384,26 +406,26 @@ linespec_lexer_lex_number (linespec_parser *parser)
   return token;
 }
 
-/* Does P represent one of the terminal keywords?  If so, return
-   the terminal.  If not, return NULL.  */
+/* Does P represent one of the keywords?  If so, return
+   the keyword.  If not, return NULL.  */
 
-static const linespec_terminal *
-linespec_lexer_lex_terminal (const char *p)
+static const linespec_keyword *
+linespec_lexer_lex_keyword (const char *p)
 {
   int i;
 
   if (p != NULL)
     {
-      for (i = 0; i < ARRAY_SIZE (linespec_terminals); ++i)
+      for (i = 0; i < ARRAY_SIZE (linespec_keywords); ++i)
 	{
-	  int len = strlen (linespec_terminals[i].string);
+	  int len = strlen (linespec_keywords[i].string);
 
-	  /* If P begins with one of the terminals and the next
+	  /* If P begins with one of the keywords and the next
 	     character is not a valid identifier character,
-	     we have found a terminal.  */
-	  if (strncmp (p, linespec_terminals[i].string, len) == 0
+	     we have found a keyword.  */
+	  if (strncmp (p, linespec_keywords[i].string, len) == 0
 	      && !(isalnum (p[len]) || p[len] == '_'))
-	    return &linespec_terminals[i];
+	    return &linespec_keywords[i];
 	}
     }
 
@@ -427,7 +449,55 @@ is_ada_operator (const char *string)
   return mapping->decoded == NULL ? 0 : strlen (mapping->decoded);
 }
 
-/* Lex a string.  */
+/* Find QUOTE_CHAR in STRING, accounting for the ':' terminal.  Return
+   the location of QUOTE_CHAR, or NULL if not found.  */
+
+static char *
+skip_quote_char (const char *string, char quote_char)
+{
+  const char *p = string;
+  const char *found = NULL;
+
+  while (*p != '\0')
+    {
+      if (*p == ':')
+	{
+	  /* We found a colon.  If it is not the double-colon
+	     (C++ scope operator), then we are done looking for the
+	     quote character.  */
+	  if (*(p + 1) != ':')
+	    break;
+
+	  ++p;
+	}
+      else if (*p == quote_char)
+	{
+	  /* We found the quote_char, but keep going until
+	     we see EOF or a terminal.  */
+	  found = p;
+	}
+
+      ++p;
+    }
+
+  return (char *) found;
+}
+
+/* Make a writable copy of the string given in TOKEN, trimming
+   any trailing whitespace.  */
+
+static char *
+copy_token_string (linespec_token token)
+{
+  char *str;
+
+  str = savestring (LS_TOKEN_STOKEN (token).ptr,
+		    LS_TOKEN_STOKEN (token).length);
+  TRIM_WHITESPACE (str);
+  return str;
+}
+
+/* Lex a string from the input in PARSER.  */
 
 static linespec_token
 linespec_lexer_lex_string (linespec_parser *parser)
@@ -472,7 +542,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
       LS_TOKEN_STOKEN (token).ptr = PARSER_STREAM (parser);
 
       /* Skip to the ending quote.  */
-      end = strchr (PARSER_STREAM (parser), quote_char);
+      end = skip_quote_char (PARSER_STREAM (parser), quote_char);
 
       /* Error if the input did not terminate properly.  */
       if (end == NULL)
@@ -489,7 +559,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
       /* Otherwise, only identifier characters are permitted.
 	 Spaces are the exception.  In general, we keep spaces,
 	 but only if the next characters in the input do not resolve
-	 to one of the terminals.
+	 to one of the keywords.
 
 	 This allows users to forgo quoting CV-qualifiers, template arguments,
 	 and similar common language constructs.  */
@@ -499,7 +569,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	  if (isspace (*PARSER_STREAM (parser)))
 	    {
 	      p = skip_spaces (PARSER_STREAM (parser));
-	      if (linespec_lexer_lex_terminal (p) != NULL)
+	      if (linespec_lexer_lex_keyword (p) != NULL)
 		{
 		  LS_TOKEN_STOKEN (token).ptr = start;
 		  LS_TOKEN_STOKEN (token).length
@@ -547,21 +617,21 @@ linespec_lexer_lex_string (linespec_parser *parser)
   return token;
 }
 
-/* Lex a single linespec token from the parser.  */
+/* Lex a single linespec token from PARSER.  */
 
 static linespec_token
 linespec_lexer_lex_one (linespec_parser *parser)
 {
-  const linespec_terminal *terminal;
+  const linespec_keyword *keyword;
 
   if (parser->lexer.current.type == LSTOKEN_CONSUMED)
     {
       /* Skip any whitespace.  */
       PARSER_STREAM (parser) = skip_spaces (PARSER_STREAM (parser));
 
-      /* Check for a terminal.  */
-      terminal = linespec_lexer_lex_terminal (PARSER_STREAM (parser));
-      if (terminal != NULL)
+      /* Check for a keyword.  */
+      keyword = linespec_lexer_lex_keyword (PARSER_STREAM (parser));
+      if (keyword != NULL)
 	{
 	  parser->lexer.current.type = LSTOKEN_EOF;
 	  return parser->lexer.current;
@@ -581,6 +651,8 @@ linespec_lexer_lex_one (linespec_parser *parser)
           break;
 
 	case ':':
+	  /* If we have a scope operator, lex the input as a string.
+	     Otherwise, return LSTOKEN_COLON.  */
 	  if (PARSER_STREAM (parser)[1] == ':')
 	    parser->lexer.current = linespec_lexer_lex_string (parser);
 	  else
@@ -591,6 +663,8 @@ linespec_lexer_lex_one (linespec_parser *parser)
 	  break;
 
 	default:
+	  /* If the input is not a number, it must be a string.
+	     [Keywords were already considered above.]  */
 	  parser->lexer.current = linespec_lexer_lex_string (parser);
 	  break;
 	}
@@ -722,39 +796,6 @@ maybe_add_address (htab_t set, struct program_space *pspace, CORE_ADDR addr)
   return 1;
 }
 
-/* Issue a helpful hint on using the command completion feature on
-   single quoted demangled C++ symbols as part of the completion
-   error.  */
-
-static void
-cplusplus_error (const char *name, const char *fmt, ...)
-{
-  struct ui_file *tmp_stream;
-  char *message;
-
-  tmp_stream = mem_fileopen ();
-  make_cleanup_ui_file_delete (tmp_stream);
-
-  {
-    va_list args;
-
-    va_start (args, fmt);
-    vfprintf_unfiltered (tmp_stream, fmt, args);
-    va_end (args);
-  }
-
-  while (*name == '\'')
-    name++;
-  fprintf_unfiltered (tmp_stream,
-		      ("Hint: try '%s<TAB> or '%s<ESC-?>\n"
-		       "(Note leading single quote.)"),
-		      name, name);
-
-  message = ui_file_xstrdup (tmp_stream, NULL);
-  make_cleanup (xfree, message);
-  throw_error (NOT_FOUND_ERROR, "%s", message);
-}
-
 /* Some data for the expand_symtabs_matching callback.  */
 
 struct symbol_matcher_data
@@ -859,7 +900,7 @@ get_search_block (struct symtab *symtab)
 }
 
 /* A helper for find_method.  This finds all methods in type T which
-   match NAME.  It adds resulting symbol names to RESULT_NAMES, and
+   match NAME.  It adds matching symbol names to RESULT_NAMES, and
    adds T's direct superclasses to SUPERCLASSES.  */
 
 static void
@@ -966,7 +1007,7 @@ find_toplevel_char (const char *s, char c)
 
 /* The string equivalent of find_toplevel_char.  Returns a pointer
    to the location of NEEDLE in HAYSTACK, ignoring any occurrences
-   inside "()" and "<>" or NULL if NEEDLE was not found.  */
+   inside "()" and "<>".  Returns NULL if NEEDLE was not found.  */
 
 static const char *
 find_toplevel_string (const char *haystack, const char *needle)
@@ -983,7 +1024,7 @@ find_toplevel_string (const char *haystack, const char *needle)
 	  if (strncmp (s, needle, strlen (needle)) == 0)
 	    return s;
 
-	  /* Didn't find it, loop over HAYSTACK, looking for the next
+	  /* Didn't find it; loop over HAYSTACK, looking for the next
 	     instance of the first character of NEEDLE.  */
 	  ++s;
 	}
@@ -1164,9 +1205,15 @@ decode_line_2 (struct linespec_state *self,
 
 /* The parser of linespec itself.  */
 
-static void
+/* Throw an appropriate error when SYMBOL is not found (optionally in
+   FILENAME).  */
+
+static void ATTRIBUTE_NORETURN
 symbol_not_found_error (char *symbol, char *filename)
 {
+  if (symbol == NULL)
+    symbol = "";
+
   if (!have_full_symbols ()
       && !have_partial_symbols ()
       && !have_minimal_symbols ())
@@ -1179,8 +1226,28 @@ symbol_not_found_error (char *symbol, char *filename)
     throw_error (NOT_FOUND_ERROR, _("Function \"%s\" not defined."), symbol);
 }
 
+/* Throw an appropriate error when an unexpected token is encountered 
+   in the input.  */
+
+static void ATTRIBUTE_NORETURN
+unexpected_linespec_error (linespec_parser *parser)
+{
+  linespec_token token;
+  static const char * token_type_strings[]
+    = {"keyword", "colon", "string", "number", "EOF"};
+
+  /* Get the token that generated the error.  */
+  token = linespec_lexer_lex_one (parser);
+
+  /* Finally, throw the error.  */
+  throw_error (GENERIC_ERROR, _("malformed linespec error: unexpected %s"),
+	       token_type_strings[token.type]);
+}
+
+/* Parse and return a line offset in STRING.  */
+
 static struct line_offset
-linespec_parse_line_offset (struct linespec_state *state, char *string)
+linespec_parse_line_offset (char *string)
 {
   struct line_offset line_offset = {0, none};
 
@@ -1216,30 +1283,45 @@ linespec_parse_basic (linespec_parser *parser)
   /* Get the next token.  */
   token = linespec_lexer_lex_one (parser);
 
+  /* If it is EOF or KEYWORD, issue an error.  */
+  if (token.type == LSTOKEN_KEYWORD || token.type == LSTOKEN_EOF)
+    unexpected_linespec_error (parser);
   /* If it is a LSTOKEN_NUMBER, we have an offset.  */
-  if (token.type == LSTOKEN_NUMBER)
+  else if (token.type == LSTOKEN_NUMBER)
     {
       /* Record the line offset and get the next token.  */
-      name = COPY_TOKEN_STRING (token);
+      name = copy_token_string (token);
       cleanup = make_cleanup (xfree, name);
-      PARSER_RESULT (parser)->line_offset
-	= linespec_parse_line_offset (PARSER_STATE (parser), name);
+      PARSER_RESULT (parser)->line_offset = linespec_parse_line_offset (name);
       do_cleanups (cleanup);
 
       /* Get the next token.  */
       token = linespec_lexer_consume_token (parser);
+
+      /* If we're in list mode, and the next token is a string beginning
+	 with ",", we're dealing with a ranged listing.  Stop parsing
+	 and return.  */
+      if (PARSER_STATE (parser)->list_mode
+	  && token.type == LSTOKEN_STRING
+	  && *LS_TOKEN_STOKEN (token).ptr == ',')
+	return;
+
+      /* If the next token is anything but EOF or KEYWORD, issue
+	 an error.  */
+      if (token.type != LSTOKEN_KEYWORD && token.type != LSTOKEN_EOF)
+	unexpected_linespec_error (parser);
     }
 
-  if (token.type == LSTOKEN_TERMINAL || token.type == LSTOKEN_EOF)
+  if (token.type == LSTOKEN_KEYWORD || token.type == LSTOKEN_EOF)
     return;
 
   /* Next token must be LSTOKEN_STRING.  */
   if (token.type != LSTOKEN_STRING)
-    return;
+    unexpected_linespec_error (parser);
 
   /* The current token will contain the name of a function, method,
      or label.  */
-  name  = COPY_TOKEN_STRING (token);
+  name  = copy_token_string (token);
   cleanup = make_cleanup (xfree, name);
 
   /* Try looking it up as a function/method.  */
@@ -1271,6 +1353,7 @@ linespec_parse_basic (linespec_parser *parser)
 	}
       else
 	{
+	  /* !! can we throw it here? it would be easier.  */
 	  /* The name is also not a label.  Abort parsing.  Do not throw
 	     an error here.  parse_linespec will do it for us.  */
 
@@ -1291,20 +1374,20 @@ linespec_parse_basic (linespec_parser *parser)
 
       if (token.type == LSTOKEN_NUMBER)
 	{
-	  if (PARSER_RESULT (parser)->file_symtabs == NULL)
+	  if (PARSER_RESULT (parser)->function_name != NULL)
 	    {
 	      /* We could do this, but it is a new feature.  */
 	      throw_error (UNSUPPORTED_ERROR,
-			   _("func_or_label:line is unimplemented"));
+			   _("FUNCTION:OFFSET is unimplemented"));
 	    }
 	  else
 	    {
 	      /* User specified FILE:LINE.  Record the line offset and
 		 get the next token.  */
-	      name = COPY_TOKEN_STRING (token);
+	      name = copy_token_string (token);
 	      cleanup = make_cleanup (xfree, name);
 	      PARSER_RESULT (parser)->line_offset
-		= linespec_parse_line_offset (PARSER_STATE (parser), name);
+		= linespec_parse_line_offset (name);
 	      do_cleanups (cleanup);
 
 	      /* Ge the next token.  */
@@ -1314,7 +1397,7 @@ linespec_parse_basic (linespec_parser *parser)
       else if (token.type == LSTOKEN_STRING)
 	{
 	  /* Grab a copy of the label's name and look it up.  */
-	  name = COPY_TOKEN_STRING (token);
+	  name = copy_token_string (token);
 	  cleanup = make_cleanup (xfree, name);
 	  labels = find_label_symbols (PARSER_STATE (parser),
 				       PARSER_RESULT (parser)->function_symbols,
@@ -1331,8 +1414,9 @@ linespec_parse_basic (linespec_parser *parser)
 	  else
 	    {
 	      /* We don't know what it was, but it isn't a label.  */
-	      do_cleanups (cleanup);
-	      return;
+	      throw_error (NOT_FOUND_ERROR,
+			   _("No label \"%s\" defined in function \"%s\"."),
+			   name, PARSER_RESULT (parser)->function_name);
 	    }
 
 	  /* Check for a line offset.  */
@@ -1344,39 +1428,39 @@ linespec_parse_basic (linespec_parser *parser)
 
 	      /* It must be a line offset.  */
 	      if (token.type != LSTOKEN_NUMBER)
-		return;
+		unexpected_linespec_error (parser);
 
 	      /* Record the lione offset and get the next token.  */
-	      name = COPY_TOKEN_STRING (token);
+	      name = copy_token_string (token);
 	      cleanup = make_cleanup (xfree, name);
 
 	      PARSER_RESULT (parser)->line_offset
-		= linespec_parse_line_offset (PARSER_STATE (parser), name);
+		= linespec_parse_line_offset (name);
 	      do_cleanups (cleanup);
 
 	      /* Get the next token.  */
 	      token = linespec_lexer_consume_token (parser);
 	    }
 	}
+      else
+	{
+	  /* Trailing ':' in the input. Issue an error.  */
+	  unexpected_linespec_error (parser);
+	}
     }
 }
 
-/* Should be able to do something like:
-   if (file_symtab)
-     lappend file_symtab
-   if (symbol)
-     lappend symbol
-   if (label)
-     lappend label
-   if offest
-     lappend offset
-*/
+/* Canonicalize the linespec contained in LS.  The result is saved into
+   STATE->canonical.  */
+
 static void
 canonicalize_linespec (struct linespec_state *state, linespec_t ls)
 {
+  /* If canonicalization was not requested, no need to do anything.  */
   if (!state->canonical)
     return;
 
+  /* Shortcut expressions, which can only appear by themselves.  */
   if (ls->expression != NULL)
     state->canonical->addr_string = xstrdup (ls->expression);
   else
@@ -1408,8 +1492,7 @@ canonicalize_linespec (struct linespec_state *state, linespec_t ls)
 	    {
 	      struct symbol *s;
 
-	      /* No function was specified, so prepend the
-		 symbol.  */
+	      /* No function was specified, so add the symbol name.  */
 	      gdb_assert (ls->labels.function_symbols != NULL
 			  && (VEC_length (symbolp, ls->labels.function_symbols)
 			      == 1));
@@ -1423,7 +1506,7 @@ canonicalize_linespec (struct linespec_state *state, linespec_t ls)
 	  state->canonical->special_display = 1;
 	}
 
-      if (ls->line_offset.sign != none || ls->line_offset.offset != 0)
+      if (ls->line_offset.sign != unknown)
 	{
 	  if (need_colon)
 	    fputc_unfiltered (':', buf);
@@ -1438,8 +1521,7 @@ canonicalize_linespec (struct linespec_state *state, linespec_t ls)
     }
 }
 
-/* For now we need linespec state... If the canonicalization stuff is
-   removed, then we won't need it anymore.  */
+/* Given a line offset in LS, construct the relevant SALs.  */
 
 static struct symtabs_and_lines
 create_sals_line_offset (struct linespec_state *self,
@@ -1490,7 +1572,7 @@ create_sals_line_offset (struct linespec_state *self,
       if (use_default)
 	val.line = self->default_line - val.line;
       else
-	val.line = 1;
+	val.line = -val.line;
       break;
 
     case none:
@@ -1588,7 +1670,7 @@ create_sals_line_offset (struct linespec_state *self,
   return values;
 }
 
-/* Create the SALs.  */
+/* Create and return SALs from the linespec LS.  */
 
 static struct symtabs_and_lines
 convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
@@ -1597,6 +1679,7 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
 
   if (ls->expression != NULL)
     {
+      /* We have an expression.  No other attribute is allowed.  */
       sals.sals = XMALLOC (struct symtab_and_line);
       sals.nelts = 1;
       sals.sals[0] = find_pc_line (ls->expr_pc, 0);
@@ -1638,11 +1721,8 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
 	  pspace = SYMTAB_PSPACE (SYMBOL_SYMTAB (sym));
 	  set_current_program_space (pspace);
 	  symbol_to_sal (&sal, state->funfirstline, sym);
-	  if (maybe_add_address (state->addr_set, pspace,
-				 /*SYMTAB_PSPACE (SYMBOL_SYMTAB (sym)),*/
-				 sal.pc))
-	    add_sal_to_sals (state, &sals, &sal,
-			     SYMBOL_NATURAL_NAME (sym));
+	  if (maybe_add_address (state->addr_set, pspace, sal.pc))
+	    add_sal_to_sals (state, &sals, &sal, SYMBOL_NATURAL_NAME (sym));
 	}
 
       /* Sort minimal symbols by program space, too.  */
@@ -1661,6 +1741,7 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
     }
   else if (ls->minimal_symbols != NULL)
     {
+      /* We found minimal symbols, but no normal symbols.  */
       int i;
       minsym_and_objfile_d *elem;
 
@@ -1669,7 +1750,7 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
 	   ++i)
 	minsym_found (state, elem->objfile, elem->minsym, &sals);
     }
-  else if (ls->line_offset.offset != 0 || ls->line_offset.sign != none)
+  else if (ls->line_offset.sign != unknown)
     {
       /* Only an offset was specified.  */
 	sals = create_sals_line_offset (state, ls);
@@ -1681,7 +1762,6 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
   else
     {
       /* We haven't found any results...  */
-      printf ("convert_linespec_to_sals: no results?\n");
       return sals;
     }
 
@@ -1693,25 +1773,37 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
   return sals;
 }
 
-/* Parse a string that specifies a line number.
+/* Parse a string that specifies a linespec.
    Pass the address of a char * variable; that variable will be
    advanced over the characters actually parsed.
 
-   The string can be:
+   The basic grammar of linespecs:
 
-   LINENUM -- that line number in current file.  PC returned is 0.
-   FILE:LINENUM -- that line in that file.  PC returned is 0.
-   FUNCTION -- line number of openbrace of that function.
-   PC returned is the start of the function.
-   LABEL -- a label in the current scope
-   VARIABLE -- line number of definition of that variable.
-   PC returned is 0.
-   FILE:FUNCTION -- likewise, but prefer functions in that file.
-   *EXPR -- line in which address EXPR appears.
 
-   This may all be followed by an "if EXPR", which we ignore.
+   linespec -> expr_spec | var_spec | basic_spec
+   expr_spec -> '*' STRING
+   var_spec -> '$' (STRING | NUMBER)
 
-   FUNCTION may be an undebuggable function found in minimal symbol table.
+   basic_spec -> file_offset_spec | function_spec | label_spec
+   file_offset_spec -> opt_file_spec offset_spec
+   function_spec -> opt_file_spec function_name_spec opt_label_spec
+   label_spec -> label_name_spec
+
+   opt_file_spec -> "" | file_name_spec ':'
+   opt_label_spec -> "" | ':' label_name_spec
+
+   file_name_spec -> STRING
+   function_name_spec -> STRING
+   label_name_spec -> STRING
+   function_name_spec -> STRING
+   offset_spec -> NUMBER
+               -> '+' NUMBER
+	       -> '-' NUMBER
+
+   This may all be followed by several keywords such as "if EXPR",
+   which we ignore.
+
+   The function may be an undebuggable function found in minimal symbol table.
 
    If the argument FUNFIRSTLINE is nonzero, we want the first line
    of real code inside a function when a function is specified, and it is
@@ -1730,11 +1822,6 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
    Note that it is possible to return zero for the symtab
    if no file is validly specified.  Callers must check that.
    Also, the line number returned may be invalid.  */
-
-/* We allow single quotes in various places.  This is a hideous
-   kludge, which exists because the completer can't yet deal with the
-   lack of single quotes.  FIXME: write a linespec_completer which we
-   can use as appropriate instead of make_symbol_completion_list.  */
 
 /* Parse the linespec in ARGPTR.  */
 
@@ -1769,7 +1856,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
       char *expr, *copy;
 
       /* User specified an expression, *EXPR.  */
-      copy = expr = COPY_TOKEN_STRING (token);
+      copy = expr = copy_token_string (token);
       cleanup = make_cleanup (xfree, expr);
       PARSER_RESULT (parser)->expr_pc = linespec_expression_to_pc (&copy);
       discard_cleanups (cleanup);
@@ -1797,7 +1884,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
       VEC_safe_push (symtab_p, PARSER_RESULT (parser)->file_symtabs, NULL);
 
       /* User specified a convenience variable or history value.  */
-      var = COPY_TOKEN_STRING (token);
+      var = copy_token_string (token);
       cleanup = make_cleanup (xfree, var);
       PARSER_RESULT (parser)->line_offset
 	= linespec_parse_variable (PARSER_STATE (parser), var);
@@ -1809,7 +1896,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
       goto canonicalize_it;
     }
   else if (token.type != LSTOKEN_STRING && token.type != LSTOKEN_NUMBER)
-    return values;
+    unexpected_linespec_error (parser);
 
   /* Shortcut: If the next token is not LSTOKEN_COLON, we know that
      this token cannot represent a filename.  */
@@ -1821,7 +1908,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
 
       /* Get the current token again and extract the filename.  */
       token = linespec_lexer_lex_one (parser);
-      user_filename = COPY_TOKEN_STRING (token);
+      user_filename = copy_token_string (token);
 
       /* Check if the input is a filename.  */
       TRY_CATCH (file_exception, RETURN_MASK_ERROR)
@@ -1865,8 +1952,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
 
   if (PARSER_RESULT (parser)->function_symbols == NULL
       && PARSER_RESULT (parser)->labels.label_symbols == NULL
-      && PARSER_RESULT (parser)->line_offset.offset == 0
-      && PARSER_RESULT (parser)->line_offset.sign == none
+      && PARSER_RESULT (parser)->line_offset.sign == unknown
       && PARSER_RESULT (parser)->minimal_symbols == NULL)
     {
       /* The linespec didn't parse.  Re-throw the file exception if
@@ -1884,7 +1970,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
   /* Get the last token and record how much of the input was parsed
      if necessary.  */
   token = linespec_lexer_lex_one (parser);
-  if (token.type != LSTOKEN_EOF && token.type != LSTOKEN_TERMINAL)
+  if (token.type != LSTOKEN_EOF && token.type != LSTOKEN_KEYWORD)
     PARSER_STREAM (parser) = LS_TOKEN_STOKEN (token).ptr;
 
   /* Convert the data in PARSER_RESULT to SALs.  */
@@ -1925,6 +2011,7 @@ linespec_parser_new (linespec_parser *parser,
 {
   parser->lexer.current.type = LSTOKEN_CONSUMED;
   memset (PARSER_RESULT (parser), 0, sizeof (struct linespec));
+  PARSER_RESULT (parser)->line_offset.sign = unknown;
   linespec_state_constructor (PARSER_STATE (parser), flags,
 			      default_symtab, default_line, canonical);
 }
@@ -1938,6 +2025,7 @@ linespec_state_destructor (struct linespec_state *self)
 }
 
 /* Delete a linespec parser.  */
+
 static void
 linespec_parser_delete (void *arg)
 {
@@ -2090,6 +2178,9 @@ initialize_defaults (struct symtab **default_symtab, int *default_line)
 
 
 
+/* Evaluate the expression pointed to by EXP_PTR into a CORE_ADDR,
+   advancing EXP_PTR past any parsed text.  */
+
 static CORE_ADDR
 linespec_expression_to_pc (char **exp_ptr)
 {
@@ -2213,12 +2304,7 @@ collect_one_symbol (struct symbol *sym, void *d)
   return 1;
 }
 
-/* Return the symbol corresponding to the substring of *ARGPTR ending
-   at P, allowing whitespace.  Also, advance *ARGPTR past the symbol
-   name in question, the compound object separator ("::" or "."), and
-   whitespace.  Note that *ARGPTR is changed whether or not the
-   this call finds anything (i.e we return NULL).  As an
-   example, say ARGPTR is "AAA::inA::fun" and P is "::inA::fun".  */
+/* Return any symbols corresponding to CLASS_NAME in FILE_SYMTABS.  */
 
 static VEC (symbolp) *
 lookup_prefix_sym (struct linespec_state *state, VEC (symtab_p) *file_symtabs,
@@ -2300,6 +2386,8 @@ compare_symbols (const void *a, const void *b)
   return 0;
 }
 
+/* Like compare_symbols but for minimal symbols.  */
+
 static int
 compare_msymbols (const void *a, const void *b)
 {
@@ -2307,8 +2395,8 @@ compare_msymbols (const void *a, const void *b)
   struct minimal_symbol * const *sb = b;
   uintptr_t uia, uib;
 
-  uia = (uintptr_t) (*sa)->ginfo.obj_section->objfile->pspace;
-  uib = (uintptr_t) (*sb)->ginfo.obj_section->objfile->pspace;
+  uia = (uintptr_t) SYMBOL_OBJ_SECTION (*sa)->objfile->pspace;
+  uib = (uintptr_t) SYMBOL_OBJ_SECTION (*sb)->objfile->pspace;
 
   if (uia < uib)
     return -1;
@@ -2373,8 +2461,9 @@ find_superclass_methods (VEC (typep) *superclasses,
   do_cleanups (cleanup);
 }
 
-/* This finds the method COPY in the class whose type is given by one
-   of the symbols in SYM_CLASSES.  */
+/* This finds the method METHOD_NAME in the class CLASS_NAME whose type is
+   given by one of the symbols in SYM_CLASSES.  Matches are returned
+   in SYMBOLS (for debug symbols) and MINSYMS (for minimal symbols).  */
 
 static void
 find_method (struct linespec_state *self, VEC (symtab_p) *file_symtabs,
@@ -2462,16 +2551,9 @@ find_method (struct linespec_state *self, VEC (symtab_p) *file_symtabs,
       return;
     }
 
-  /* !!These errors are never output anymore: they are caught by
-     code like a decode_compound failure in CVS HEAD.  */
-  if (method_name[0] == '~')
-    cplusplus_error (class_name,
-		     "the class `%s' does not have destructor defined\n",
-		     class_name);
-  else
-    cplusplus_error (class_name,
-		     "the class %s does not have any method named %s\n",
-		     class_name, method_name);
+  /* Throw an NOT_FOUND_ERROR.  This will be caught by the caller
+     and other attempts to locate the symbol will be made.  */
+  throw_error (NOT_FOUND_ERROR, _("see caller, this text doesn't matter"));
 }
 
 
@@ -2533,8 +2615,7 @@ collect_symtabs_from_filename (const char *file)
   return collector.symtabs;
 }
 
-/* Return all the symtabs associated to the filename given by
-   current token in PARSER.  */
+/* Return all the symtabs associated to the FILENAME.  */
 
 static VEC (symtab_p) *
 symtabs_from_filename (const char *filename)
@@ -2555,6 +2636,10 @@ symtabs_from_filename (const char *filename)
   return result;
 }
 
+/* Look up a function symbol named NAME in symtabs FILE_SYMTABS.  Matching
+   debug symbols are returned in SYMBOLS.  Matching minimal symbols are
+   returned in MINSYMS.  */
+
 static void
 find_function_symbols (struct linespec_state *state,
 		       VEC (symtab_p) *file_symtabs, const char *name,
@@ -2574,9 +2659,7 @@ find_function_symbols (struct linespec_state *state,
   /* Try NAME as an Objective-C selector.  */
   find_imps ((char *) name, &symbol_names);
   if (!VEC_empty (const_char_ptr, symbol_names))
-    {
-      add_all_symbol_names_from_pspace (&info, NULL, symbol_names);
-    }
+    add_all_symbol_names_from_pspace (&info, NULL, symbol_names);
   else
     add_matching_symbols_to_info (name, &info, NULL);
 
@@ -2598,6 +2681,9 @@ find_function_symbols (struct linespec_state *state,
   else
     *minsyms = info.result.minimal_symbols;
 }
+
+/* Find all symbols named NAME in FILE_SYMTABS, returning debug symbols
+   in SYMBOLS and minimal symbols in MINSYMS.  */
 
 void
 find_linespec_symbols (struct linespec_state *state,
@@ -2698,6 +2784,9 @@ find_linespec_symbols (struct linespec_state *state,
    find_function_symbols (state, file_symtabs, lookup_name, symbols, minsyms);
    do_cleanups (cleanup);
 }
+
+/* Return all labels named NAME in FUNCTION_SYMBOLS.  Return the
+   actual function symbol in which the label was found in LABEL_FUNC_RET.  */
 
 static VEC (symbolp) *
 find_label_symbols (struct linespec_state *self,
@@ -2832,6 +2921,8 @@ decode_digits_ordinary (struct linespec_state *self,
 
 
 
+/* Return the line offset represented by VARIABLE.  */
+
 static struct line_offset
 linespec_parse_variable (struct linespec_state *self, const char *variable)
 {
@@ -2904,8 +2995,8 @@ collect_symbols (struct symbol *sym, void *data)
   return 1;
 }
 
-/* We've found a minimal symbol MSYMBOL to associate with our
-   linespec; add it to the result symtabs_and_lines.  */
+/* We've found a minimal symbol MSYMBOL in OBJFILE to associate with our
+   linespec; return the SAL in RESULT.  */
 
 static void
 minsym_found (struct linespec_state *self, struct objfile *objfile,
