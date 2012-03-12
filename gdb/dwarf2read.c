@@ -383,6 +383,13 @@ struct dwarf2_cu
      any location list and still facing inlining issues if handled as
      unoptimized code.  For a future better test see GCC PR other/32998.  */
   unsigned int has_loclist : 1;
+
+  /* These cache the results of producer_is_gxx_lt_4_6.
+     CHECKED_PRODUCER is set if PRODUCER_IS_GXX_LT_4_6 is valid.  This
+     information is cached because profiling CU expansion showed
+     excessive time spent in producer_is_gxx_lt_4_6.  */
+  unsigned int checked_producer : 1;
+  unsigned int producer_is_gxx_lt_4_6 : 1;
 };
 
 /* Persistent data held for a compilation unit, even when not
@@ -6826,6 +6833,7 @@ producer_is_gxx_lt_4_6 (struct dwarf2_cu *cu)
 {
   const char *cs;
   int major, minor, release;
+  int result = 0;
 
   if (cu->producer == NULL)
     {
@@ -6841,26 +6849,33 @@ producer_is_gxx_lt_4_6 (struct dwarf2_cu *cu)
       return 0;
     }
 
+  if (cu->checked_producer)
+    return cu->producer_is_gxx_lt_4_6;
+
   /* Skip any identifier after "GNU " - such as "C++" or "Java".  */
 
   if (strncmp (cu->producer, "GNU ", strlen ("GNU ")) != 0)
     {
       /* For non-GCC compilers expect their behavior is DWARF version
 	 compliant.  */
-
-      return 0;
     }
-  cs = &cu->producer[strlen ("GNU ")];
-  while (*cs && !isdigit (*cs))
-    cs++;
-  if (sscanf (cs, "%d.%d.%d", &major, &minor, &release) != 3)
+  else
     {
-      /* Not recognized as GCC.  */
-
-      return 0;
+      cs = &cu->producer[strlen ("GNU ")];
+      while (*cs && !isdigit (*cs))
+	cs++;
+      if (sscanf (cs, "%d.%d.%d", &major, &minor, &release) != 3)
+	{
+	  /* Not recognized as GCC.  */
+	}
+      else
+	result = major < 4 || (major == 4 && minor < 6);
     }
 
-  return major < 4 || (major == 4 && minor < 6);
+  cu->checked_producer = 1;
+  cu->producer_is_gxx_lt_4_6 = result;
+
+  return result;
 }
 
 /* Return the default accessibility type if it is not overriden by
@@ -8031,7 +8046,8 @@ process_enumeration_scope (struct die_info *die, struct dwarf2_cu *cu)
 	= lookup_signatured_type_at_offset (dwarf2_per_objfile->objfile,
 					    cu->per_cu->debug_types_section,
 					    cu->per_cu->offset);
-      if (type_sig->type_offset != die->offset)
+      if (type_sig->per_cu.offset + type_sig->type_offset
+	  != die->offset)
 	return;
     }
 
@@ -10707,22 +10723,24 @@ set_cu_language (unsigned int lang, struct dwarf2_cu *cu)
 static struct attribute *
 dwarf2_attr (struct die_info *die, unsigned int name, struct dwarf2_cu *cu)
 {
-  unsigned int i;
-  struct attribute *spec = NULL;
-
-  for (i = 0; i < die->num_attrs; ++i)
+  for (;;)
     {
-      if (die->attrs[i].name == name)
-	return &die->attrs[i];
-      if (die->attrs[i].name == DW_AT_specification
-	  || die->attrs[i].name == DW_AT_abstract_origin)
-	spec = &die->attrs[i];
-    }
+      unsigned int i;
+      struct attribute *spec = NULL;
 
-  if (spec)
-    {
+      for (i = 0; i < die->num_attrs; ++i)
+	{
+	  if (die->attrs[i].name == name)
+	    return &die->attrs[i];
+	  if (die->attrs[i].name == DW_AT_specification
+	      || die->attrs[i].name == DW_AT_abstract_origin)
+	    spec = &die->attrs[i];
+	}
+
+      if (!spec)
+	break;
+
       die = follow_die_ref (die, spec, &cu);
-      return dwarf2_attr (die, name, cu);
     }
 
   return NULL;
@@ -14202,11 +14220,12 @@ follow_die_ref (struct die_info *src_die, struct attribute *attr,
    dwarf2_locexpr_baton->data has lifetime of PER_CU->OBJFILE.  */
 
 struct dwarf2_locexpr_baton
-dwarf2_fetch_die_location_block (unsigned int offset,
+dwarf2_fetch_die_location_block (unsigned int offset_in_cu,
 				 struct dwarf2_per_cu_data *per_cu,
 				 CORE_ADDR (*get_frame_pc) (void *baton),
 				 void *baton)
 {
+  unsigned int offset = per_cu->offset + offset_in_cu;
   struct dwarf2_cu *cu;
   struct die_info *die;
   struct attribute *attr;
@@ -14269,7 +14288,7 @@ dwarf2_get_die_type (unsigned int die_offset,
 		     struct dwarf2_per_cu_data *per_cu)
 {
   dw2_setup (per_cu->objfile);
-  return get_die_type_at_offset (die_offset, per_cu);
+  return get_die_type_at_offset (per_cu->offset + die_offset, per_cu);
 }
 
 /* Follow the signature attribute ATTR in SRC_DIE.

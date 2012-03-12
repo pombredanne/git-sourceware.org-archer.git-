@@ -479,7 +479,7 @@ remote_get_noisy_reply (char **buf_p,
 	    {
 	      adjusted_size = to - org_to;
 
-	      sprintf (buf, "qRelocInsn:%x", adjusted_size);
+	      xsnprintf (buf, *sizeof_buf, "qRelocInsn:%x", adjusted_size);
 	      putpkt (buf);
 	    }
 	  else if (ex.reason < 0 && ex.error == MEMORY_ERROR)
@@ -1259,6 +1259,7 @@ enum {
   PACKET_qGetTLSAddr,
   PACKET_qSupported,
   PACKET_QPassSignals,
+  PACKET_QProgramSignals,
   PACKET_qSearch_memory,
   PACKET_vAttach,
   PACKET_vRun,
@@ -1418,14 +1419,15 @@ static int
 remote_query_attached (int pid)
 {
   struct remote_state *rs = get_remote_state ();
+  size_t size = get_remote_packet_size ();
 
   if (remote_protocol_packets[PACKET_qAttached].support == PACKET_DISABLE)
     return 0;
 
   if (remote_multi_process_p (rs))
-    sprintf (rs->buf, "qAttached:%x", pid);
+    xsnprintf (rs->buf, size, "qAttached:%x", pid);
   else
-    sprintf (rs->buf, "qAttached");
+    xsnprintf (rs->buf, size, "qAttached");
 
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
@@ -1666,6 +1668,65 @@ remote_pass_signals (int numsigs, unsigned char *pass_signals)
 	}
       else
 	xfree (pass_packet);
+    }
+}
+
+/* The last QProgramSignals packet sent to the target.  We bypass
+   sending a new program signals list down to the target if the new
+   packet is exactly the same as the last we sent.  IOW, we only let
+   the target know about program signals list changes.  */
+
+static char *last_program_signals_packet;
+
+/* If 'QProgramSignals' is supported, tell the remote stub what
+   signals it should pass through to the inferior when detaching.  */
+
+static void
+remote_program_signals (int numsigs, unsigned char *signals)
+{
+  if (remote_protocol_packets[PACKET_QProgramSignals].support != PACKET_DISABLE)
+    {
+      char *packet, *p;
+      int count = 0, i;
+
+      gdb_assert (numsigs < 256);
+      for (i = 0; i < numsigs; i++)
+	{
+	  if (signals[i])
+	    count++;
+	}
+      packet = xmalloc (count * 3 + strlen ("QProgramSignals:") + 1);
+      strcpy (packet, "QProgramSignals:");
+      p = packet + strlen (packet);
+      for (i = 0; i < numsigs; i++)
+	{
+	  if (signal_pass_state (i))
+	    {
+	      if (i >= 16)
+		*p++ = tohex (i >> 4);
+	      *p++ = tohex (i & 15);
+	      if (count)
+		*p++ = ';';
+	      else
+		break;
+	      count--;
+	    }
+	}
+      *p = 0;
+      if (!last_program_signals_packet
+	  || strcmp (last_program_signals_packet, packet) != 0)
+	{
+	  struct remote_state *rs = get_remote_state ();
+	  char *buf = rs->buf;
+
+	  putpkt (packet);
+	  getpkt (&rs->buf, &rs->buf_size, 0);
+	  packet_ok (buf, &remote_protocol_packets[PACKET_QProgramSignals]);
+	  xfree (last_program_signals_packet);
+	  last_program_signals_packet = packet;
+	}
+      else
+	xfree (packet);
     }
 }
 
@@ -2832,7 +2893,7 @@ remote_static_tracepoint_marker_at (CORE_ADDR addr,
   struct remote_state *rs = get_remote_state ();
   char *p = rs->buf;
 
-  sprintf (p, "qTSTMat:");
+  xsnprintf (p, get_remote_packet_size (), "qTSTMat:");
   p += strlen (p);
   p += hexnumstr (p, addr);
   putpkt (rs->buf);
@@ -3246,6 +3307,10 @@ remote_start_remote (int from_tty, struct target_ops *target, int extended_p)
       getpkt (&rs->buf, &rs->buf_size, 0);
     }
 
+  /* Let the target know which signals it is allowed to pass down to
+     the program.  */
+  update_signals_program_target ();
+
   /* Next, if the target can specify a description, read it.  We do
      this before anything involving memory or registers.  */
   target_find_description ();
@@ -3582,13 +3647,13 @@ remote_set_permissions (void)
 {
   struct remote_state *rs = get_remote_state ();
 
-  sprintf (rs->buf, "QAllow:"
-	   "WriteReg:%x;WriteMem:%x;"
-	   "InsertBreak:%x;InsertTrace:%x;"
-	   "InsertFastTrace:%x;Stop:%x",
-	   may_write_registers, may_write_memory,
-	   may_insert_breakpoints, may_insert_tracepoints,
-	   may_insert_fast_tracepoints, may_stop);
+  xsnprintf (rs->buf, get_remote_packet_size (), "QAllow:"
+	     "WriteReg:%x;WriteMem:%x;"
+	     "InsertBreak:%x;InsertTrace:%x;"
+	     "InsertFastTrace:%x;Stop:%x",
+	     may_write_registers, may_write_memory,
+	     may_insert_breakpoints, may_insert_tracepoints,
+	     may_insert_fast_tracepoints, may_stop);
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
 
@@ -3803,6 +3868,8 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_qXfer_traceframe_info },
   { "QPassSignals", PACKET_DISABLE, remote_supported_packet,
     PACKET_QPassSignals },
+  { "QProgramSignals", PACKET_DISABLE, remote_supported_packet,
+    PACKET_QProgramSignals },
   { "QStartNoAckMode", PACKET_DISABLE, remote_supported_packet,
     PACKET_QStartNoAckMode },
   { "multiprocess", PACKET_DISABLE, remote_multi_process_feature, -1 },
@@ -4073,6 +4140,11 @@ remote_open_1 (char *name, int from_tty,
   xfree (last_pass_packet);
   last_pass_packet = NULL;
 
+  /* Make sure we send the program signals list the next time we
+     resume.  */
+  xfree (last_program_signals_packet);
+  last_program_signals_packet = NULL;
+
   remote_fileio_reset ();
   reopen_exec_file ();
   reread_symbols ();
@@ -4225,7 +4297,7 @@ remote_detach_1 (char *args, int from_tty, int extended)
 
   /* Tell the remote target to detach.  */
   if (remote_multi_process_p (rs))
-    sprintf (rs->buf, "D;%x", pid);
+    xsnprintf (rs->buf, get_remote_packet_size (), "D;%x", pid);
   else
     strcpy (rs->buf, "D");
 
@@ -4307,7 +4379,7 @@ extended_remote_attach_1 (struct target_ops *target, char *args, int from_tty)
       gdb_flush (gdb_stdout);
     }
 
-  sprintf (rs->buf, "vAttach;%x", pid);
+  xsnprintf (rs->buf, get_remote_packet_size (), "vAttach;%x", pid);
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
 
@@ -5785,7 +5857,7 @@ send_g_packet (void)
   struct remote_state *rs = get_remote_state ();
   int buf_len;
 
-  sprintf (rs->buf, "g");
+  xsnprintf (rs->buf, get_remote_packet_size (), "g");
   remote_send (&rs->buf, &rs->buf_size);
 
   /* We can get out of synch in various cases.  If the first character
@@ -7450,7 +7522,7 @@ remote_vkill (int pid, struct remote_state *rs)
     return -1;
 
   /* Tell the remote target to detach.  */
-  sprintf (rs->buf, "vKill;%x", pid);
+  xsnprintf (rs->buf, get_remote_packet_size (), "vKill;%x", pid);
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
 
@@ -7593,7 +7665,8 @@ extended_remote_disable_randomization (int val)
   struct remote_state *rs = get_remote_state ();
   char *reply;
 
-  sprintf (rs->buf, "QDisableRandomization:%x", val);
+  xsnprintf (rs->buf, get_remote_packet_size (), "QDisableRandomization:%x",
+	     val);
   putpkt (rs->buf);
   reply = remote_get_noisy_reply (&target_buf, &target_buf_size);
   if (*reply == '\0')
@@ -7723,11 +7796,12 @@ extended_remote_create_inferior (struct target_ops *ops,
 /* Given a location's target info BP_TGT and the packet buffer BUF,  output
    the list of conditions (in agent expression bytecode format), if any, the
    target needs to evaluate.  The output is placed into the packet buffer
-   BUF.  */
+   started from BUF and ended at BUF_END.  */
 
 static int
 remote_add_target_side_condition (struct gdbarch *gdbarch,
-				  struct bp_target_info *bp_tgt, char *buf)
+				  struct bp_target_info *bp_tgt, char *buf,
+				  char *buf_end)
 {
   struct agent_expr *aexpr = NULL;
   int i, ix;
@@ -7738,7 +7812,7 @@ remote_add_target_side_condition (struct gdbarch *gdbarch,
     return 0;
 
   buf += strlen (buf);
-  sprintf (buf, "%s", ";");
+  xsnprintf (buf, buf_end - buf, "%s", ";");
   buf++;
 
   /* Send conditions to the target and free the vector.  */
@@ -7746,7 +7820,7 @@ remote_add_target_side_condition (struct gdbarch *gdbarch,
        VEC_iterate (agent_expr_p, bp_tgt->conditions, ix, aexpr);
        ix++)
     {
-      sprintf (buf, "X%x,", aexpr->len);
+      xsnprintf (buf, buf_end - buf, "X%x,", aexpr->len);
       buf += strlen (buf);
       for (i = 0; i < aexpr->len; ++i)
 	buf = pack_hex_byte (buf, aexpr->buf[i]);
@@ -7774,7 +7848,7 @@ remote_insert_breakpoint (struct gdbarch *gdbarch,
     {
       CORE_ADDR addr = bp_tgt->placed_address;
       struct remote_state *rs;
-      char *p;
+      char *p, *endbuf;
       int bpsize;
       struct condition_list *cond = NULL;
 
@@ -7782,16 +7856,17 @@ remote_insert_breakpoint (struct gdbarch *gdbarch,
 
       rs = get_remote_state ();
       p = rs->buf;
+      endbuf = rs->buf + get_remote_packet_size ();
 
       *(p++) = 'Z';
       *(p++) = '0';
       *(p++) = ',';
       addr = (ULONGEST) remote_address_masked (addr);
       p += hexnumstr (p, addr);
-      sprintf (p, ",%d", bpsize);
+      xsnprintf (p, endbuf - p, ",%d", bpsize);
 
       if (remote_supports_cond_breakpoints ())
-	remote_add_target_side_condition (gdbarch, bp_tgt, p);
+	remote_add_target_side_condition (gdbarch, bp_tgt, p, endbuf);
 
       putpkt (rs->buf);
       getpkt (&rs->buf, &rs->buf_size, 0);
@@ -7822,6 +7897,7 @@ remote_remove_breakpoint (struct gdbarch *gdbarch,
   if (remote_protocol_packets[PACKET_Z0].support != PACKET_DISABLE)
     {
       char *p = rs->buf;
+      char *endbuf = rs->buf + get_remote_packet_size ();
 
       *(p++) = 'z';
       *(p++) = '0';
@@ -7829,7 +7905,7 @@ remote_remove_breakpoint (struct gdbarch *gdbarch,
 
       addr = (ULONGEST) remote_address_masked (bp_tgt->placed_address);
       p += hexnumstr (p, addr);
-      sprintf (p, ",%d", bp_tgt->placed_size);
+      xsnprintf (p, endbuf - p, ",%d", bp_tgt->placed_size);
 
       putpkt (rs->buf);
       getpkt (&rs->buf, &rs->buf_size, 0);
@@ -7865,17 +7941,18 @@ remote_insert_watchpoint (CORE_ADDR addr, int len, int type,
 			  struct expression *cond)
 {
   struct remote_state *rs = get_remote_state ();
+  char *endbuf = rs->buf + get_remote_packet_size ();
   char *p;
   enum Z_packet_type packet = watchpoint_to_Z_packet (type);
 
   if (remote_protocol_packets[PACKET_Z0 + packet].support == PACKET_DISABLE)
     return 1;
 
-  sprintf (rs->buf, "Z%x,", packet);
+  xsnprintf (rs->buf, endbuf - rs->buf, "Z%x,", packet);
   p = strchr (rs->buf, '\0');
   addr = remote_address_masked (addr);
   p += hexnumstr (p, (ULONGEST) addr);
-  sprintf (p, ",%x", len);
+  xsnprintf (p, endbuf - p, ",%x", len);
 
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
@@ -7908,17 +7985,18 @@ remote_remove_watchpoint (CORE_ADDR addr, int len, int type,
 			  struct expression *cond)
 {
   struct remote_state *rs = get_remote_state ();
+  char *endbuf = rs->buf + get_remote_packet_size ();
   char *p;
   enum Z_packet_type packet = watchpoint_to_Z_packet (type);
 
   if (remote_protocol_packets[PACKET_Z0 + packet].support == PACKET_DISABLE)
     return -1;
 
-  sprintf (rs->buf, "z%x,", packet);
+  xsnprintf (rs->buf, endbuf - rs->buf, "z%x,", packet);
   p = strchr (rs->buf, '\0');
   addr = remote_address_masked (addr);
   p += hexnumstr (p, (ULONGEST) addr);
-  sprintf (p, ",%x", len);
+  xsnprintf (p, endbuf - p, ",%x", len);
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
 
@@ -8005,7 +8083,7 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
 {
   CORE_ADDR addr;
   struct remote_state *rs;
-  char *p;
+  char *p, *endbuf;
 
   /* The length field should be set to the size of a breakpoint
      instruction, even though we aren't inserting one ourselves.  */
@@ -8018,6 +8096,7 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
 
   rs = get_remote_state ();
   p = rs->buf;
+  endbuf = rs->buf + get_remote_packet_size ();
 
   *(p++) = 'Z';
   *(p++) = '1';
@@ -8025,10 +8104,10 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
 
   addr = remote_address_masked (bp_tgt->placed_address);
   p += hexnumstr (p, (ULONGEST) addr);
-  sprintf (p, ",%x", bp_tgt->placed_size);
+  xsnprintf (p, endbuf - p, ",%x", bp_tgt->placed_size);
 
   if (remote_supports_cond_breakpoints ())
-    remote_add_target_side_condition (gdbarch, bp_tgt, p);
+    remote_add_target_side_condition (gdbarch, bp_tgt, p, endbuf);
 
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
@@ -8053,6 +8132,7 @@ remote_remove_hw_breakpoint (struct gdbarch *gdbarch,
   CORE_ADDR addr;
   struct remote_state *rs = get_remote_state ();
   char *p = rs->buf;
+  char *endbuf = rs->buf + get_remote_packet_size ();
 
   if (remote_protocol_packets[PACKET_Z1].support == PACKET_DISABLE)
     return -1;
@@ -8063,7 +8143,7 @@ remote_remove_hw_breakpoint (struct gdbarch *gdbarch,
 
   addr = remote_address_masked (bp_tgt->placed_address);
   p += hexnumstr (p, (ULONGEST) addr);
-  sprintf (p, ",%x", bp_tgt->placed_size);
+  xsnprintf (p, endbuf  - p, ",%x", bp_tgt->placed_size);
 
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
@@ -10041,10 +10121,11 @@ remote_download_command_source (int num, ULONGEST addr,
 static void
 remote_download_tracepoint (struct bp_location *loc)
 {
+#define BUF_SIZE 2048
 
   CORE_ADDR tpaddr;
   char addrbuf[40];
-  char buf[2048];
+  char buf[BUF_SIZE];
   char **tdp_actions;
   char **stepping_actions;
   int ndx;
@@ -10063,10 +10144,10 @@ remote_download_tracepoint (struct bp_location *loc)
 
   tpaddr = loc->address;
   sprintf_vma (addrbuf, tpaddr);
-  sprintf (buf, "QTDP:%x:%s:%c:%lx:%x", b->number,
-	   addrbuf, /* address */
-	   (b->enable_state == bp_enabled ? 'E' : 'D'),
-	   t->step_count, t->pass_count);
+  xsnprintf (buf, BUF_SIZE, "QTDP:%x:%s:%c:%lx:%x", b->number,
+	     addrbuf, /* address */
+	     (b->enable_state == bp_enabled ? 'E' : 'D'),
+	     t->step_count, t->pass_count);
   /* Fast tracepoints are mostly handled by the target, but we can
      tell the target how big of an instruction block should be moved
      around.  */
@@ -10080,7 +10161,8 @@ remote_download_tracepoint (struct bp_location *loc)
 
 	  if (gdbarch_fast_tracepoint_valid_at (target_gdbarch,
 						tpaddr, &isize, NULL))
-	    sprintf (buf + strlen (buf), ":F%x", isize);
+	    xsnprintf (buf + strlen (buf), BUF_SIZE - strlen (buf), ":F%x",
+		       isize);
 	  else
 	    /* If it passed validation at definition but fails now,
 	       something is very wrong.  */
@@ -10124,7 +10206,8 @@ remote_download_tracepoint (struct bp_location *loc)
 	{
 	  aexpr = gen_eval_for_expr (tpaddr, loc->cond);
 	  aexpr_chain = make_cleanup_free_agent_expr (aexpr);
-	  sprintf (buf + strlen (buf), ":X%x,", aexpr->len);
+	  xsnprintf (buf + strlen (buf), BUF_SIZE - strlen (buf), ":X%x,",
+		     aexpr->len);
 	  pkt = buf + strlen (buf);
 	  for (ndx = 0; ndx < aexpr->len; ++ndx)
 	    pkt = pack_hex_byte (pkt, aexpr->buf[ndx]);
@@ -10149,11 +10232,11 @@ remote_download_tracepoint (struct bp_location *loc)
       for (ndx = 0; tdp_actions[ndx]; ndx++)
 	{
 	  QUIT;	/* Allow user to bail out with ^C.  */
-	  sprintf (buf, "QTDP:-%x:%s:%s%c",
-		   b->number, addrbuf, /* address */
-		   tdp_actions[ndx],
-		   ((tdp_actions[ndx + 1] || stepping_actions)
-		    ? '-' : 0));
+	  xsnprintf (buf, BUF_SIZE, "QTDP:-%x:%s:%s%c",
+		     b->number, addrbuf, /* address */
+		     tdp_actions[ndx],
+		     ((tdp_actions[ndx + 1] || stepping_actions)
+		      ? '-' : 0));
 	  putpkt (buf);
 	  remote_get_noisy_reply (&target_buf,
 				  &target_buf_size);
@@ -10166,11 +10249,11 @@ remote_download_tracepoint (struct bp_location *loc)
       for (ndx = 0; stepping_actions[ndx]; ndx++)
 	{
 	  QUIT;	/* Allow user to bail out with ^C.  */
-	  sprintf (buf, "QTDP:-%x:%s:%s%s%s",
-		   b->number, addrbuf, /* address */
-		   ((ndx == 0) ? "S" : ""),
-		   stepping_actions[ndx],
-		   (stepping_actions[ndx + 1] ? "-" : ""));
+	  xsnprintf (buf, BUF_SIZE, "QTDP:-%x:%s:%s%s%s",
+		     b->number, addrbuf, /* address */
+		     ((ndx == 0) ? "S" : ""),
+		     stepping_actions[ndx],
+		     (stepping_actions[ndx + 1] ? "-" : ""));
 	  putpkt (buf);
 	  remote_get_noisy_reply (&target_buf,
 				  &target_buf_size);
@@ -10236,8 +10319,9 @@ remote_download_trace_state_variable (struct trace_state_variable *tsv)
   struct remote_state *rs = get_remote_state ();
   char *p;
 
-  sprintf (rs->buf, "QTDV:%x:%s:%x:",
-	   tsv->number, phex ((ULONGEST) tsv->initial_value, 8), tsv->builtin);
+  xsnprintf (rs->buf, get_remote_packet_size (), "QTDV:%x:%s:%x:",
+	     tsv->number, phex ((ULONGEST) tsv->initial_value, 8),
+	     tsv->builtin);
   p = rs->buf + strlen (rs->buf);
   if ((p - rs->buf) + strlen (tsv->name) * 2 >= get_remote_packet_size ())
     error (_("Trace state variable name too long for tsv definition packet"));
@@ -10258,7 +10342,8 @@ remote_enable_tracepoint (struct bp_location *location)
   char addr_buf[40];
 
   sprintf_vma (addr_buf, location->address);
-  sprintf (rs->buf, "QTEnable:%x:%s", location->owner->number, addr_buf);
+  xsnprintf (rs->buf, get_remote_packet_size (), "QTEnable:%x:%s",
+	     location->owner->number, addr_buf);
   putpkt (rs->buf);
   remote_get_noisy_reply (&rs->buf, &rs->buf_size);
   if (*rs->buf == '\0')
@@ -10274,7 +10359,8 @@ remote_disable_tracepoint (struct bp_location *location)
   char addr_buf[40];
 
   sprintf_vma (addr_buf, location->address);
-  sprintf (rs->buf, "QTDisable:%x:%s", location->owner->number, addr_buf);
+  xsnprintf (rs->buf, get_remote_packet_size (), "QTDisable:%x:%s",
+	     location->owner->number, addr_buf);
   putpkt (rs->buf);
   remote_get_noisy_reply (&rs->buf, &rs->buf_size);
   if (*rs->buf == '\0')
@@ -10320,7 +10406,8 @@ remote_trace_set_readonly_regions (void)
 Too many sections for read-only sections definition packet."));
 	  break;
 	}
-      sprintf (target_buf + offset, ":%s,%s", tmp1, tmp2);
+      xsnprintf (target_buf + offset, target_buf_size - offset, ":%s,%s",
+		 tmp1, tmp2);
       offset += sec_length;
     }
   if (anysecs)
@@ -10393,6 +10480,7 @@ remote_get_tracepoint_status (struct breakpoint *bp,
   char *reply;
   struct bp_location *loc;
   struct tracepoint *tp = (struct tracepoint *) bp;
+  size_t size = get_remote_packet_size ();
 
   if (tp)
     {
@@ -10404,8 +10492,8 @@ remote_get_tracepoint_status (struct breakpoint *bp,
 	     any status.  */
 	  if (tp->number_on_target == 0)
 	    continue;
-	  sprintf (rs->buf, "qTP:%x:%s", tp->number_on_target,
-		   phex_nz (loc->address, 0));
+	  xsnprintf (rs->buf, size, "qTP:%x:%s", tp->number_on_target,
+		     phex_nz (loc->address, 0));
 	  putpkt (rs->buf);
 	  reply = remote_get_noisy_reply (&target_buf, &target_buf_size);
 	  if (reply && *reply)
@@ -10419,7 +10507,8 @@ remote_get_tracepoint_status (struct breakpoint *bp,
     {
       utp->hit_count = 0;
       utp->traceframe_usage = 0;
-      sprintf (rs->buf, "qTP:%x:%s", utp->number, phex_nz (utp->addr, 0));
+      xsnprintf (rs->buf, size, "qTP:%x:%s", utp->number,
+		 phex_nz (utp->addr, 0));
       putpkt (rs->buf);
       reply = remote_get_noisy_reply (&target_buf, &target_buf_size);
       if (reply && *reply)
@@ -10447,6 +10536,7 @@ remote_trace_find (enum trace_find_type type, int num,
 		   int *tpp)
 {
   struct remote_state *rs = get_remote_state ();
+  char *endbuf = rs->buf + get_remote_packet_size ();
   char *p, *reply;
   int target_frameno = -1, target_tracept = -1;
 
@@ -10462,19 +10552,21 @@ remote_trace_find (enum trace_find_type type, int num,
   switch (type)
     {
     case tfind_number:
-      sprintf (p, "%x", num);
+      xsnprintf (p, endbuf - p, "%x", num);
       break;
     case tfind_pc:
-      sprintf (p, "pc:%s", phex_nz (addr1, 0));
+      xsnprintf (p, endbuf - p, "pc:%s", phex_nz (addr1, 0));
       break;
     case tfind_tp:
-      sprintf (p, "tdp:%x", num);
+      xsnprintf (p, endbuf - p, "tdp:%x", num);
       break;
     case tfind_range:
-      sprintf (p, "range:%s:%s", phex_nz (addr1, 0), phex_nz (addr2, 0));
+      xsnprintf (p, endbuf - p, "range:%s:%s", phex_nz (addr1, 0),
+		 phex_nz (addr2, 0));
       break;
     case tfind_outside:
-      sprintf (p, "outside:%s:%s", phex_nz (addr1, 0), phex_nz (addr2, 0));
+      xsnprintf (p, endbuf - p, "outside:%s:%s", phex_nz (addr1, 0),
+		 phex_nz (addr2, 0));
       break;
     default:
       error (_("Unknown trace find type %d"), type);
@@ -10529,7 +10621,7 @@ remote_get_trace_state_variable_value (int tsvnum, LONGEST *val)
 
   set_remote_traceframe ();
 
-  sprintf (rs->buf, "qTV:%x", tsvnum);
+  xsnprintf (rs->buf, get_remote_packet_size (), "qTV:%x", tsvnum);
   putpkt (rs->buf);
   reply = remote_get_noisy_reply (&target_buf, &target_buf_size);
   if (reply && *reply)
@@ -10618,7 +10710,7 @@ remote_set_disconnected_tracing (int val)
     {
       char *reply;
 
-      sprintf (rs->buf, "QTDisconnected:%x", val);
+      xsnprintf (rs->buf, get_remote_packet_size (), "QTDisconnected:%x", val);
       putpkt (rs->buf);
       reply = remote_get_noisy_reply (&target_buf, &target_buf_size);
       if (*reply == '\0')
@@ -10646,7 +10738,7 @@ remote_set_circular_trace_buffer (int val)
   struct remote_state *rs = get_remote_state ();
   char *reply;
 
-  sprintf (rs->buf, "QTBuffer:circular:%x", val);
+  xsnprintf (rs->buf, get_remote_packet_size (), "QTBuffer:circular:%x", val);
   putpkt (rs->buf);
   reply = remote_get_noisy_reply (&target_buf, &target_buf_size);
   if (*reply == '\0')
@@ -10694,7 +10786,7 @@ remote_get_min_fast_tracepoint_insn_len (void)
   /* Make sure the remote is pointing at the right process.  */
   set_general_process ();
 
-  sprintf (rs->buf, "qTMinFTPILen");
+  xsnprintf (rs->buf, get_remote_packet_size (), "qTMinFTPILen");
   putpkt (rs->buf);
   reply = remote_get_noisy_reply (&target_buf, &target_buf_size);
   if (*reply == '\0')
@@ -10762,7 +10854,7 @@ remote_use_agent (int use)
       struct remote_state *rs = get_remote_state ();
 
       /* If the stub supports QAgent.  */
-      sprintf (rs->buf, "QAgent:%d", use);
+      xsnprintf (rs->buf, get_remote_packet_size (), "QAgent:%d", use);
       putpkt (rs->buf);
       getpkt (&rs->buf, &rs->buf_size, 0);
 
@@ -10819,6 +10911,7 @@ Specify the serial device it is connected to\n\
   remote_ops.to_load = generic_load;
   remote_ops.to_mourn_inferior = remote_mourn;
   remote_ops.to_pass_signals = remote_pass_signals;
+  remote_ops.to_program_signals = remote_program_signals;
   remote_ops.to_thread_alive = remote_thread_alive;
   remote_ops.to_find_new_threads = remote_threads_info;
   remote_ops.to_pid_to_str = remote_pid_to_str;
@@ -11262,6 +11355,9 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_QPassSignals],
 			 "QPassSignals", "pass-signals", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_QProgramSignals],
+			 "QProgramSignals", "program-signals", 0);
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qSymbol],
 			 "qSymbol", "symbol-lookup", 0);

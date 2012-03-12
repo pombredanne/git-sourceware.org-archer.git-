@@ -1947,6 +1947,8 @@ enum bfd_architecture
 #define bfd_mach_ppc_e500      500
 #define bfd_mach_ppc_e500mc    5001
 #define bfd_mach_ppc_e500mc64  5005
+#define bfd_mach_ppc_e5500     5006
+#define bfd_mach_ppc_e6500     5007
 #define bfd_mach_ppc_titan     83
   bfd_arch_rs6000,    /* IBM RS/6000 */
 #define bfd_mach_rs6k          6000
@@ -2963,6 +2965,25 @@ be honoured at the offset's location, regardless of linker
 relaxation.  */
   BFD_RELOC_MN10300_ALIGN,
 
+/* Various TLS-related relocations.  */
+  BFD_RELOC_MN10300_TLS_GD,
+  BFD_RELOC_MN10300_TLS_LD,
+  BFD_RELOC_MN10300_TLS_LDO,
+  BFD_RELOC_MN10300_TLS_GOTIE,
+  BFD_RELOC_MN10300_TLS_IE,
+  BFD_RELOC_MN10300_TLS_LE,
+  BFD_RELOC_MN10300_TLS_DTPMOD,
+  BFD_RELOC_MN10300_TLS_DTPOFF,
+  BFD_RELOC_MN10300_TLS_TPOFF,
+
+/* This is a 32bit pcrel reloc for the mn10300, offset by two bytes in the
+instruction.  */
+  BFD_RELOC_MN10300_32_PCREL,
+
+/* This is a 16bit pcrel reloc for the mn10300, offset by two bytes in the
+instruction.  */
+  BFD_RELOC_MN10300_16_PCREL,
+
 
 /* i386/elf relocations  */
   BFD_RELOC_386_GOT32,
@@ -3797,14 +3818,6 @@ instructions.  */
 
 /* start data in text.  */
   BFD_RELOC_V850_DATA,
-
-/* This is a 32bit pcrel reloc for the mn10300, offset by two bytes in the
-instruction.  */
-  BFD_RELOC_MN10300_32_PCREL,
-
-/* This is a 16bit pcrel reloc for the mn10300, offset by two bytes in the
-instruction.  */
-  BFD_RELOC_MN10300_16_PCREL,
 
 /* This is a 8bit DP reloc for the tms320c30, where the most
 significant 8 bits of a 24 bit word are placed into the least
