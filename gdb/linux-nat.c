@@ -62,6 +62,9 @@
 #include "symfile.h"
 #include "agent.h"
 #include "tracepoint.h"
+#include "exceptions.h"
+#include "linux-ptrace.h"
+#include "buffer.h"
 
 #ifndef SPUFS_MAGIC
 #define SPUFS_MAGIC 0x23c9b64e
@@ -1612,11 +1615,33 @@ linux_nat_attach (struct target_ops *ops, char *args, int from_tty)
   struct lwp_info *lp;
   int status;
   ptid_t ptid;
+  volatile struct gdb_exception ex;
 
   /* Make sure we report all signals during attach.  */
   linux_nat_pass_signals (0, NULL);
 
-  linux_ops->to_attach (ops, args, from_tty);
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      linux_ops->to_attach (ops, args, from_tty);
+    }
+  if (ex.reason < 0)
+    {
+      pid_t pid = parse_pid_to_attach (args);
+      struct buffer buffer;
+      char *message, *buffer_s;
+
+      message = xstrdup (ex.message);
+      make_cleanup (xfree, message);
+
+      buffer_init (&buffer);
+      linux_ptrace_attach_warnings (pid, &buffer);
+
+      buffer_grow_str0 (&buffer, "");
+      buffer_s = buffer_finish (&buffer);
+      make_cleanup (xfree, buffer_s);
+
+      throw_error (ex.error, "%s%s", buffer_s, message);
+    }
 
   /* The ptrace base target adds the main thread with (pid,0,0)
      format.  Decorate it with lwp info.  */
@@ -2465,37 +2490,6 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 		  _("unknown ptrace event %d"), event);
 }
 
-/* Return non-zero if LWP is a zombie.  */
-
-static int
-linux_lwp_is_zombie (long lwp)
-{
-  char buffer[MAXPATHLEN];
-  FILE *procfile;
-  int retval;
-  int have_state;
-
-  xsnprintf (buffer, sizeof (buffer), "/proc/%ld/status", lwp);
-  procfile = fopen (buffer, "r");
-  if (procfile == NULL)
-    {
-      warning (_("unable to open /proc file '%s'"), buffer);
-      return 0;
-    }
-
-  have_state = 0;
-  while (fgets (buffer, sizeof (buffer), procfile) != NULL)
-    if (strncmp (buffer, "State:", 6) == 0)
-      {
-	have_state = 1;
-	break;
-      }
-  retval = (have_state
-	    && strcmp (buffer, "State:\tZ (zombie)\n") == 0);
-  fclose (procfile);
-  return retval;
-}
-
 /* Wait for LP to stop.  Returns the wait status, or 0 if the LWP has
    exited.  */
 
@@ -2549,10 +2543,10 @@ wait_lwp (struct lwp_info *lp)
 
 	 This is racy, what if the tgl becomes a zombie right after we check?
 	 Therefore always use WNOHANG with sigsuspend - it is equivalent to
-	 waiting waitpid but the linux_lwp_is_zombie is safe this way.  */
+	 waiting waitpid but linux_proc_pid_is_zombie is safe this way.  */
 
       if (GET_PID (lp->ptid) == GET_LWP (lp->ptid)
-	  && linux_lwp_is_zombie (GET_LWP (lp->ptid)))
+	  && linux_proc_pid_is_zombie (GET_LWP (lp->ptid)))
 	{
 	  thread_dead = 1;
 	  if (debug_linux_nat)
@@ -3499,7 +3493,7 @@ check_zombie_leaders (void)
 	  /* Check if there are other threads in the group, as we may
 	     have raced with the inferior simply exiting.  */
 	  && num_lwps (inf->pid) > 1
-	  && linux_lwp_is_zombie (inf->pid))
+	  && linux_proc_pid_is_zombie (inf->pid))
 	{
 	  if (debug_linux_nat)
 	    fprintf_unfiltered (gdb_stdlog,
