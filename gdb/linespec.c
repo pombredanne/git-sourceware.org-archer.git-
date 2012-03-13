@@ -207,32 +207,9 @@ enum ls_token_type
 };
 typedef enum ls_token_type linespec_token_type;
 
-/* Keyword types  */
-
-enum ls_keyword_type
-{
-    LSKEYWORD_IF,
-    LSKEYWORD_THREAD,
-    LSKEYWORD_TASK
-};
-typedef enum ls_keyword_type linespec_keyword_type;
-
-/* A linespec keyword  */
-
-struct ls_keyword
-{
-  const char *string;
-  linespec_keyword_type type;
-};
-typedef struct ls_keyword linespec_keyword;
-
 /* List of keywords  */
 
-const linespec_keyword linespec_keywords[] = {
-  {"if", LSKEYWORD_IF},
-  {"thread", LSKEYWORD_THREAD},
-  {"task", LSKEYWORD_TASK}
-};
+const char * const linespec_keywords[] = { "if", "thread", "task" };
 
 /* A token of the linespec lexer  */
 
@@ -248,12 +225,13 @@ struct ls_token
     struct stoken string;
 
     /* A keyword  */
-    const linespec_keyword *keyword;
+    const char *keyword;
   } data;
 };
 typedef struct ls_token linespec_token;
 
 #define LS_TOKEN_STOKEN(TOK) (TOK).data.string
+#define LS_TOKEN_KEYWORD(TOK) (TOK).data.keyword
 
 /* An instance of the linespec parser.  */
 
@@ -409,7 +387,7 @@ linespec_lexer_lex_number (linespec_parser *parser)
 /* Does P represent one of the keywords?  If so, return
    the keyword.  If not, return NULL.  */
 
-static const linespec_keyword *
+static const char *
 linespec_lexer_lex_keyword (const char *p)
 {
   int i;
@@ -418,14 +396,14 @@ linespec_lexer_lex_keyword (const char *p)
     {
       for (i = 0; i < ARRAY_SIZE (linespec_keywords); ++i)
 	{
-	  int len = strlen (linespec_keywords[i].string);
+	  int len = strlen (linespec_keywords[i]);
 
 	  /* If P begins with one of the keywords and the next
 	     character is not a valid identifier character,
 	     we have found a keyword.  */
-	  if (strncmp (p, linespec_keywords[i].string, len) == 0
+	  if (strncmp (p, linespec_keywords[i], len) == 0
 	      && !(isalnum (p[len]) || p[len] == '_'))
-	    return &linespec_keywords[i];
+	    return linespec_keywords[i];
 	}
     }
 
@@ -490,6 +468,9 @@ static char *
 copy_token_string (linespec_token token)
 {
   char *str;
+
+  if (token.type == LSTOKEN_KEYWORD)
+    return xstrdup (LS_TOKEN_KEYWORD (token));
 
   str = savestring (LS_TOKEN_STOKEN (token).ptr,
 		    LS_TOKEN_STOKEN (token).length);
@@ -622,7 +603,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
 static linespec_token
 linespec_lexer_lex_one (linespec_parser *parser)
 {
-  const linespec_keyword *keyword;
+  const char *keyword;
 
   if (parser->lexer.current.type == LSTOKEN_CONSUMED)
     {
@@ -633,7 +614,8 @@ linespec_lexer_lex_one (linespec_parser *parser)
       keyword = linespec_lexer_lex_keyword (PARSER_STREAM (parser));
       if (keyword != NULL)
 	{
-	  parser->lexer.current.type = LSTOKEN_EOF;
+	  parser->lexer.current.type = LSTOKEN_KEYWORD;
+	  LS_TOKEN_KEYWORD (parser->lexer.current) = keyword;
 	  return parser->lexer.current;
 	}
 

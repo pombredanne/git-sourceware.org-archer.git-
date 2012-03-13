@@ -171,6 +171,10 @@ foreach x {"3" "+100" "-100" "foo"} {
     add the_tests "main:here $x" invalid_label "here $x" "main"
 }
 
+foreach x {"if" "task" "thread"} {
+    add the_tests $x unexpected_opt "keyword" $x
+}
+
 # Run the tests
 foreach linespec $the_tests(linespecs) {
     gdb_test "break $linespec" $the_tests("$linespec")
