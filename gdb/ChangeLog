@@ -1,3 +1,20 @@
+2012-03-13  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (load_partial_comp_unit): Defer adding cu to
+	read_in_chain until we have successfully read it in.
+	(load_full_comp_unit): Ditto.
+	(read_signatured_type): Add comment.
+
+2012-03-13  Chris January  <chris.january@allinea.com>
+
+	* stabsread.c (fix_common_block): Change type of valu argument
+	to CORE_ADDR.
+
+2012-03-13  Chris January  <chris.january@allinea.com>
+
+	* rs6000-tdep.c (skip_prologue): Support the oril r29, r1, 0x0
+	instruction.
+
 2012-03-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* common/linux-procfs.c (linux_proc_get_int): New, from
