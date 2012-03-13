@@ -1349,7 +1349,6 @@ linespec_parse_basic (linespec_parser *parser)
 	}
       else
 	{
-	  /* !! can we throw it here? it would be easier.  */
 	  /* The name is also not a label.  Abort parsing.  Do not throw
 	     an error here.  parse_linespec will do it for us.  */
 
