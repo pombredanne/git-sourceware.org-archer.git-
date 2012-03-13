@@ -1240,8 +1240,22 @@ unexpected_linespec_error (linespec_parser *parser)
   token = linespec_lexer_lex_one (parser);
 
   /* Finally, throw the error.  */
-  throw_error (GENERIC_ERROR, _("malformed linespec error: unexpected %s"),
-	       token_type_strings[token.type]);
+  if (token.type == LSTOKEN_STRING || token.type == LSTOKEN_NUMBER
+      || token.type == LSTOKEN_KEYWORD)
+    {
+      char *string;
+      struct cleanup *cleanup;
+
+      string = copy_token_string (token);
+      cleanup = make_cleanup (xfree, string);
+      throw_error (GENERIC_ERROR,
+		   _("malformed linespec error: unexpected %s, \"%s\""),
+		   token_type_strings[token.type], string);
+    }
+  else
+    throw_error (GENERIC_ERROR,
+		 _("malformed linespec error: unexpected %s"),
+		 token_type_strings[token.type]);
 }
 
 /* Parse and return a line offset in STRING.  */

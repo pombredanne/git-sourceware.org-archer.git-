@@ -58,6 +58,7 @@ array set error_messages {
     invalid_offset_f "No line %d in file \"%s\"."
     junk "Junk at end of arguments."
     unexpected "malformed linespec error: unexpected %s"
+    unexpected_opt "malformed linespec error: unexpected %s, \"%s\""
     unmatched_quote "unmatched quote"
 }
 
@@ -101,14 +102,14 @@ foreach x $spaces {
 }
 
 foreach x {1 +1 +100 -10} {
-    add the_tests "3 $x" unexpected "number"
-    add the_tests "+10 $x" unexpected "number"
-    add the_tests "-10 $x" unexpected "number"
+    add the_tests "3 $x" unexpected_opt "number" $x
+    add the_tests "+10 $x" unexpected_opt "number" $x
+    add the_tests "-10 $x" unexpected_opt "number" $x
 }
 
-add the_tests "3 foo" unexpected "string"
-add the_tests "+10 foo" unexpected "string"
-add the_tests "-10 foo" unexpected "string"
+add the_tests "3 foo" unexpected_opt "string" "foo"
+add the_tests "+10 foo" unexpected_opt "string" "foo"
+add the_tests "-10 foo" unexpected_opt "string" "foo"
 
 # Test invalid linespecs starting with filename.
 foreach x [list "this_file_doesn't_exist.c" \
@@ -141,10 +142,10 @@ foreach x $spaces {
 }
 
 add the_tests "${srcfile}::" invalid_function "${srcfile}::"
-add the_tests "$srcfile:3 1" unexpected "number"
-add the_tests "$srcfile:3 +100" unexpected "number"
-add the_tests "$srcfile:3 -100" unexpected "number"
-add the_tests "$srcfile:3 foo" unexpected "string"
+add the_tests "$srcfile:3 1" unexpected_opt "number" "1"
+add the_tests "$srcfile:3 +100" unexpected_opt "number" "+100"
+add the_tests "$srcfile:3 -100" unexpected_opt "number" "-100"
+add the_tests "$srcfile:3 foo" unexpected_opt "string" "foo"
 
 foreach x $invalid_offsets {
     add the_tests "$srcfile:$x" invalid_offset_f $x $srcfile
