@@ -1,4 +1,49 @@
+2012-03-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix double prompt of 'interpreter-exec mi'.
+	* mi/mi-interp.c (mi_execute_command_input_handler): New prototype.
+	(mi_interpreter_resume): use it.
+	(mi_execute_command_input_handler): New function.
+	* mi/mi-main.c (mi_execute_command): Move prompt printing to
+	mi_execute_command_input_handler.
+
+2012-03-13  Josh Matthews  <josh@joshmatthews.net>  (tiny change)
+
+	* darwin-nat-info.c (_initialize_darwin_info_commands): Add
+	prototype.
+	(darwin_debug_port_info): Make static.
+	* darwin-nat.c (_initialize_darwin_inferior): Add prototype.
+	* machoread.c (_initialize_machoread): Add prototype.
+	* i386-darwin-nat.c (i386_darwin_dr_set, i386_darwin_dr_get)
+	(i386_darwin_set_control, i386_darwin_get_control)
+	i386_darwin_dr_set_addr, i386_darwin_get_addr)
+	i386_darwin_get_status, i386_darwin_get_control):
+	Comment out with HW_WATCHPOINT_NOT_YET_ENABLED macro.
+
+2012-03-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* ax-gdb.c (gen_usual_unary): Remove special handling of
+	enum and bool types.
+
+2012-03-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* ax-gdb.c (gen_fetch): Add handling for TYPE_CODE_RANGE types.
+
+2012-03-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* aix-thread.c (supply_fprs): Make more consistent with fill_fprs.
+
+2012-03-13  Chris January  <chris.january@allinea.com>
+
+	* aix-thread.c (fill_sprs): Store the floating point registers
+	at the correct offsets into vals.
+
 2012-03-13  Doug Evans  <dje@google.com>
+
+	* NEWS: Mention symbol-reloading has been deleted.
+	* symfile.c (symbol_reloading): Delete.
+	(show_symbol_reloading): Delete.
+	(_initialize_symfile): Delete set/show symbol-reloading.
 
 	* dwarf2read.c (load_partial_comp_unit): Defer adding cu to
 	read_in_chain until we have successfully read it in.
