@@ -199,8 +199,8 @@ enum ls_token_type
   /* A number  */
   LSTOKEN_NUMBER,
 
-  /* EOF  */
-  LSTOKEN_EOF,
+  /* EOI (end of input)  */
+  LSTOKEN_EOI,
 
   /* Consumed token  */
   LSTOKEN_CONSUMED
@@ -451,7 +451,7 @@ skip_quote_char (const char *string, char quote_char)
       else if (*p == quote_char)
 	{
 	  /* We found the quote_char, but keep going until
-	     we see EOF or a terminal.  */
+	     we see EOI or a terminal.  */
 	  found = p;
 	}
 
@@ -562,7 +562,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	      PARSER_STREAM (parser) = p;
 	    }
 
-	  /* If the next character is EOF or (single) ':', the
+	  /* If the next character is EOI or (single) ':', the
 	     string is complete;  return the token.  */
 	  if (*PARSER_STREAM (parser) == 0)
 	    {
@@ -623,7 +623,7 @@ linespec_lexer_lex_one (linespec_parser *parser)
       switch (*PARSER_STREAM (parser))
 	{
 	case 0:
-	  parser->lexer.current.type = LSTOKEN_EOF;
+	  parser->lexer.current.type = LSTOKEN_EOI;
 	  break;
 
 	case '+': case '-':
@@ -1216,7 +1216,7 @@ unexpected_linespec_error (linespec_parser *parser)
 {
   linespec_token token;
   static const char * token_type_strings[]
-    = {"keyword", "colon", "string", "number", "EOF"};
+    = {"keyword", "colon", "string", "number", "end-of-input"};
 
   /* Get the token that generated the error.  */
   token = linespec_lexer_lex_one (parser);
@@ -1279,8 +1279,8 @@ linespec_parse_basic (linespec_parser *parser)
   /* Get the next token.  */
   token = linespec_lexer_lex_one (parser);
 
-  /* If it is EOF or KEYWORD, issue an error.  */
-  if (token.type == LSTOKEN_KEYWORD || token.type == LSTOKEN_EOF)
+  /* If it is EOI or KEYWORD, issue an error.  */
+  if (token.type == LSTOKEN_KEYWORD || token.type == LSTOKEN_EOI)
     unexpected_linespec_error (parser);
   /* If it is a LSTOKEN_NUMBER, we have an offset.  */
   else if (token.type == LSTOKEN_NUMBER)
@@ -1302,13 +1302,13 @@ linespec_parse_basic (linespec_parser *parser)
 	  && *LS_TOKEN_STOKEN (token).ptr == ',')
 	return;
 
-      /* If the next token is anything but EOF or KEYWORD, issue
+      /* If the next token is anything but EOI or KEYWORD, issue
 	 an error.  */
-      if (token.type != LSTOKEN_KEYWORD && token.type != LSTOKEN_EOF)
+      if (token.type != LSTOKEN_KEYWORD && token.type != LSTOKEN_EOI)
 	unexpected_linespec_error (parser);
     }
 
-  if (token.type == LSTOKEN_KEYWORD || token.type == LSTOKEN_EOF)
+  if (token.type == LSTOKEN_KEYWORD || token.type == LSTOKEN_EOI)
     return;
 
   /* Next token must be LSTOKEN_STRING.  */
@@ -1965,7 +1965,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
   /* Get the last token and record how much of the input was parsed
      if necessary.  */
   token = linespec_lexer_lex_one (parser);
-  if (token.type != LSTOKEN_EOF && token.type != LSTOKEN_KEYWORD)
+  if (token.type != LSTOKEN_EOI && token.type != LSTOKEN_KEYWORD)
     PARSER_STREAM (parser) = LS_TOKEN_STOKEN (token).ptr;
 
   /* Convert the data in PARSER_RESULT to SALs.  */

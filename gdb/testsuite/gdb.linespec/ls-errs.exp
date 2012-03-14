@@ -137,8 +137,8 @@ foreach x {"foo" " foo" " foo "} {
 }
 
 foreach x $spaces {
-    add the_tests "$srcfile$x" unexpected "EOF"
-    add the_tests "$srcfile:main$x" unexpected "EOF"
+    add the_tests "$srcfile$x" unexpected "end-of-input"
+    add the_tests "$srcfile:main$x" unexpected "end-of-input"
 }
 
 add the_tests "${srcfile}::" invalid_function "${srcfile}::"
@@ -159,7 +159,7 @@ foreach x {"foobar" "foo::bar" "foo.bar" "foo ." "foo bar" "foo 1" \
 
 foreach x $spaces {
     add the_tests "main${x}there" invalid_label "there" "main"
-    add the_tests "main:here${x}" unexpected "EOF"
+    add the_tests "main:here${x}" unexpected "end-of-input"
 }
 
 add the_tests "main 3" invalid_function "main 3"
