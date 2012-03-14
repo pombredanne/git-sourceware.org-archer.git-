@@ -3972,7 +3972,8 @@ const struct symbol_computed_ops dwarf2_locexpr_funcs = {
   locexpr_read_variable_at_entry,
   locexpr_read_needs_frame,
   locexpr_describe_location,
-  locexpr_tracepoint_var_ref
+  locexpr_tracepoint_var_ref,
+  dwarf2_fill_in_symbol_body
 };
 
 
@@ -4151,7 +4152,8 @@ const struct symbol_computed_ops dwarf2_loclist_funcs = {
   loclist_read_variable_at_entry,
   loclist_read_needs_frame,
   loclist_describe_location,
-  loclist_tracepoint_var_ref
+  loclist_tracepoint_var_ref,
+  dwarf2_fill_in_symbol_body
 };
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */

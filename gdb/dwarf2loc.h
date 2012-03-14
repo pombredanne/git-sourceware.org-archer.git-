@@ -96,6 +96,8 @@ CORE_ADDR dwarf2_read_addr_index (struct dwarf2_per_cu_data *per_cu,
 
 struct dwarf2_locexpr_baton
 {
+  sect_offset die_offset;
+
   /* Pointer to the start of the location expression.  Valid only if SIZE is
      not zero.  */
   const gdb_byte *data;
@@ -111,6 +113,8 @@ struct dwarf2_locexpr_baton
 
 struct dwarf2_loclist_baton
 {
+  sect_offset die_offset;
+
   /* The initial base address for the location list, based on the compilation
      unit.  */
   CORE_ADDR base_address;
@@ -172,5 +176,7 @@ struct call_site_stuff;
 extern struct call_site_chain *call_site_find_chain (struct gdbarch *gdbarch,
 						     CORE_ADDR caller_pc,
 						     CORE_ADDR callee_pc);
+
+extern void dwarf2_fill_in_symbol_body (struct symbol *symbol);
 
 #endif /* dwarf2loc.h */

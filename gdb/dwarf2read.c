@@ -1421,10 +1421,12 @@ static struct symbol *new_symbol (struct die_info *, struct type *,
 static struct symbol *new_symbol_full (struct die_info *, struct type *,
 				       struct dwarf2_cu *, struct symbol *);
 
-static void dwarf2_const_value (struct attribute *, struct symbol *,
+static void dwarf2_const_value (sect_offset,
+				struct attribute *, struct symbol *,
 				struct dwarf2_cu *);
 
-static void dwarf2_const_value_attr (struct attribute *attr,
+static void dwarf2_const_value_attr (sect_offset,
+				     struct attribute *attr,
 				     struct type *type,
 				     const char *name,
 				     struct obstack *obstack,
@@ -1579,6 +1581,9 @@ static sect_offset dwarf2_get_ref_die_offset (struct attribute *);
 
 static LONGEST dwarf2_get_attr_constant_value (struct attribute *, int);
 
+static struct die_info *follow_die_offset (sect_offset offset,
+					   struct dwarf2_cu **ref_cu);
+
 static struct die_info *follow_die_ref_or_sig (struct die_info *,
 					       struct attribute *,
 					       struct dwarf2_cu **);
@@ -1621,9 +1626,11 @@ static int attr_form_is_constant (struct attribute *);
 
 static void fill_in_loclist_baton (struct dwarf2_cu *cu,
 				   struct dwarf2_loclist_baton *baton,
+				   sect_offset,
 				   struct attribute *attr);
 
-static void dwarf2_symbol_mark_computed (struct attribute *attr,
+static void dwarf2_symbol_mark_computed (sect_offset die_offset,
+					 struct attribute *attr,
 					 struct symbol *sym,
 					 struct dwarf2_cu *cu);
 
@@ -7467,7 +7474,7 @@ dwarf2_compute_name (const char *name,
 		      continue;
 		    }
 
-		  dwarf2_const_value_attr (attr, type, name,
+		  dwarf2_const_value_attr (child->offset, attr, type, name,
 					   &cu->comp_unit_obstack, cu,
 					   &value, &bytes, &baton);
 
@@ -9418,6 +9425,66 @@ inherit_abstract_dies (struct die_info *die, struct dwarf2_cu *cu)
   do_cleanups (cleanups);
 }
 
+void
+dwarf2_fill_in_symbol_body (struct symbol *symbol)
+{
+  sect_offset die_offset = *(sect_offset *) SYMBOL_LOCATION_BATON (symbol);
+  struct symtab *symtab = SYMBOL_SYMTAB (symbol);
+  struct objfile *objfile = symtab->objfile;
+  struct dwarf2_per_cu_data *per_cu;
+  struct dwarf2_cu *cu;
+  struct cleanup *back_to;
+  CORE_ADDR baseaddr;
+  struct die_info *die;
+  struct context_stack *new;
+
+  dw2_setup (objfile);
+  per_cu = dwarf2_find_containing_comp_unit (die_offset, objfile);
+
+  if (per_cu->cu == NULL)
+    load_cu (per_cu);
+  cu = per_cu->cu;
+
+  baseaddr = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
+
+  back_to = make_cleanup (really_free_pendings, NULL);
+  /* FIXME: delayed list cleanup stuff?  */
+
+  cu->list_in_scope = &local_symbols;
+
+  new = push_context (0, 0);
+  die = follow_die_offset (die_offset, &cu);
+
+  if (die->child != NULL)
+    {
+      struct die_info *child_die = die->child;
+
+      while (child_die && child_die->tag)
+	{
+	  /* FIXME: what if process_die causes new globals to be
+	     created?  */
+	  if (child_die->tag != DW_TAG_template_type_param
+	      && child_die->tag != DW_TAG_template_value_param)
+	    process_die (child_die, cu);
+	  child_die = sibling_die (child_die);
+	}
+    }
+
+  new = pop_context ();
+  
+  finish_block_for_symbol (symbol, &local_symbols, objfile);
+			   
+  /* FIXME */
+  /* block = finish_block (new->name, &local_symbols, new->old_blocks, */
+  /*                       lowpc, highpc, objfile); */
+  // symtab = end_symtab (highpc + baseaddr, objfile, SECT_OFF_TEXT (objfile));
+
+  compute_delayed_physnames (cu);
+
+  cu->list_in_scope = &file_symbols;
+  do_cleanups (back_to);
+}
+
 static void
 read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 {
@@ -9508,7 +9575,9 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
        has nothing to do with the location of the function, ouch!  The
        relationship should be: a function's symbol has-a frame base; a
        frame-base has-a location expression.  */
-    dwarf2_symbol_mark_computed (attr, new->name, cu);
+    dwarf2_symbol_mark_computed (die->offset, attr, new->name, cu);
+  /* FIXME; */
+  new->name->bodiless = 1;
 
   cu->list_in_scope = &local_symbols;
 
@@ -9525,7 +9594,7 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
 	      if (arg != NULL)
 		VEC_safe_push (symbolp, template_args, arg);
 	    }
-	  else
+	  else if (child_die->tag == DW_TAG_formal_parameter)
 	    process_die (child_die, cu);
 	  child_die = sibling_die (child_die);
 	}
@@ -9785,6 +9854,7 @@ read_call_site_scope (struct die_info *die, struct dwarf2_cu *cu)
       struct dwarf2_locexpr_baton *dlbaton;
 
       dlbaton = obstack_alloc (&objfile->objfile_obstack, sizeof (*dlbaton));
+      dlbaton->die_offset = die->offset;
       dlbaton->data = DW_BLOCK (attr)->data;
       dlbaton->size = DW_BLOCK (attr)->size;
       dlbaton->per_cu = cu->per_cu;
@@ -15669,7 +15739,8 @@ dwarf2_start_symtab (struct dwarf2_cu *cu,
 }
 
 static void
-var_decode_location (struct attribute *attr, struct symbol *sym,
+var_decode_location (sect_offset die_offset,
+		     struct attribute *attr, struct symbol *sym,
 		     struct dwarf2_cu *cu)
 {
   struct objfile *objfile = cu->objfile;
@@ -15727,7 +15798,7 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
      not be worthwhile.  I'm assuming that it isn't unless performance
      or memory numbers show me otherwise.  */
 
-  dwarf2_symbol_mark_computed (attr, sym, cu);
+  dwarf2_symbol_mark_computed (die_offset, attr, sym, cu);
   SYMBOL_CLASS (sym) = LOC_COMPUTED;
 
   if (SYMBOL_COMPUTED_OPS (sym) == &dwarf2_loclist_funcs)
@@ -15885,7 +15956,7 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	    }
 	  if (attr)
 	    {
-	      dwarf2_const_value (attr, sym, cu);
+	      dwarf2_const_value (die->offset, attr, sym, cu);
 	      attr2 = dwarf2_attr (die, DW_AT_external, cu);
 	      if (!suppress_add)
 		{
@@ -15899,7 +15970,7 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	  attr = dwarf2_attr (die, DW_AT_location, cu);
 	  if (attr)
 	    {
-	      var_decode_location (attr, sym, cu);
+	      var_decode_location (die->offset, attr, sym, cu);
 	      attr2 = dwarf2_attr (die, DW_AT_external, cu);
 
 	      /* Fortran explicitly imports any global symbols to the local
@@ -15992,12 +16063,12 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	  attr = dwarf2_attr (die, DW_AT_location, cu);
 	  if (attr)
 	    {
-	      var_decode_location (attr, sym, cu);
+	      var_decode_location (die->offset, attr, sym, cu);
 	    }
 	  attr = dwarf2_attr (die, DW_AT_const_value, cu);
 	  if (attr)
 	    {
-	      dwarf2_const_value (attr, sym, cu);
+	      dwarf2_const_value (die->offset, attr, sym, cu);
 	    }
 
 	  list_to_add = cu->list_in_scope;
@@ -16067,7 +16138,7 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	  attr = dwarf2_attr (die, DW_AT_const_value, cu);
 	  if (attr)
 	    {
-	      dwarf2_const_value (attr, sym, cu);
+	      dwarf2_const_value (die->offset, attr, sym, cu);
 	    }
 	  {
 	    /* NOTE: carlton/2003-11-10: See comment above in the
@@ -16167,7 +16238,8 @@ dwarf2_const_value_data (struct attribute *attr, struct type *type,
    expression.  */
 
 static void
-dwarf2_const_value_attr (struct attribute *attr, struct type *type,
+dwarf2_const_value_attr (sect_offset die_offset,
+			 struct attribute *attr, struct type *type,
 			 const char *name, struct obstack *obstack,
 			 struct dwarf2_cu *cu,
 			 LONGEST *value, gdb_byte **bytes,
@@ -16199,6 +16271,7 @@ dwarf2_const_value_attr (struct attribute *attr, struct type *type,
 	   a new implementation of symbol_computed_ops.  */
 	*baton = obstack_alloc (&objfile->objfile_obstack,
 				sizeof (struct dwarf2_locexpr_baton));
+	(*baton)->die_offset = die_offset;
 	(*baton)->per_cu = cu->per_cu;
 	gdb_assert ((*baton)->per_cu);
 
@@ -16275,7 +16348,8 @@ dwarf2_const_value_attr (struct attribute *attr, struct type *type,
 /* Copy constant value from an attribute to a symbol.  */
 
 static void
-dwarf2_const_value (struct attribute *attr, struct symbol *sym,
+dwarf2_const_value (sect_offset die_offset,
+		    struct attribute *attr, struct symbol *sym,
 		    struct dwarf2_cu *cu)
 {
   struct objfile *objfile = cu->objfile;
@@ -16284,7 +16358,7 @@ dwarf2_const_value (struct attribute *attr, struct symbol *sym,
   gdb_byte *bytes;
   struct dwarf2_locexpr_baton *baton;
 
-  dwarf2_const_value_attr (attr, SYMBOL_TYPE (sym),
+  dwarf2_const_value_attr (die_offset, attr, SYMBOL_TYPE (sym),
 			   SYMBOL_PRINT_NAME (sym),
 			   &objfile->objfile_obstack, cu,
 			   &value, &bytes, &baton);
@@ -17511,7 +17585,7 @@ dwarf2_fetch_die_loc_sect_off (sect_offset offset,
       CORE_ADDR pc = (*get_frame_pc) (baton);
       size_t size;
 
-      fill_in_loclist_baton (cu, &loclist_baton, attr);
+      fill_in_loclist_baton (cu, &loclist_baton, die->offset, attr);
 
       retval.data = dwarf2_find_location_expression (&loclist_baton,
 						     &size, pc);
@@ -19007,12 +19081,14 @@ cu_debug_loc_section (struct dwarf2_cu *cu)
 static void
 fill_in_loclist_baton (struct dwarf2_cu *cu,
 		       struct dwarf2_loclist_baton *baton,
+		       sect_offset die_offset,
 		       struct attribute *attr)
 {
   struct dwarf2_section_info *section = cu_debug_loc_section (cu);
 
   dwarf2_read_section (dwarf2_per_objfile->objfile, section);
 
+  baton->die_offset = die_offset;
   baton->per_cu = cu->per_cu;
   gdb_assert (baton->per_cu);
   /* We don't know how long the location list is, but make sure we
@@ -19024,7 +19100,8 @@ fill_in_loclist_baton (struct dwarf2_cu *cu,
 }
 
 static void
-dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
+dwarf2_symbol_mark_computed (sect_offset die_offset,
+			     struct attribute *attr, struct symbol *sym,
 			     struct dwarf2_cu *cu)
 {
   struct objfile *objfile = dwarf2_per_objfile->objfile;
@@ -19041,7 +19118,7 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
       baton = obstack_alloc (&objfile->objfile_obstack,
 			     sizeof (struct dwarf2_loclist_baton));
 
-      fill_in_loclist_baton (cu, baton, attr);
+      fill_in_loclist_baton (cu, baton, die_offset, attr);
 
       if (cu->base_known == 0)
 	complaint (&symfile_complaints,
@@ -19057,6 +19134,7 @@ dwarf2_symbol_mark_computed (struct attribute *attr, struct symbol *sym,
 
       baton = obstack_alloc (&objfile->objfile_obstack,
 			     sizeof (struct dwarf2_locexpr_baton));
+      baton->die_offset = die_offset;
       baton->per_cu = cu->per_cu;
       gdb_assert (baton->per_cu);
 

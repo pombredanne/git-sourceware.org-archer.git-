@@ -108,6 +108,8 @@ static int compare_line_numbers (const void *ln1p, const void *ln2p);
 static void record_pending_block (struct objfile *objfile,
 				  struct block *block,
 				  struct pending_block *opblock);
+
+static void set_symbol_symtabs (struct block *block, struct symtab *symtab);
 
 
 /* Initial sizes of data structures.  These are realloc'd larger if
@@ -231,6 +233,35 @@ free_pending_blocks (void)
     }
 }
 
+static void
+free_struct_pendings (struct pending **listhead)
+{
+  struct pending *next, *next1;
+
+  for (next = *listhead; next; next = next1)
+    {
+      next1 = next->next;
+      next->next = free_pendings;
+      free_pendings = next;
+    }
+  *listhead = NULL;
+}
+
+static void
+add_pending_symbols_to_dict (struct dictionary *dict,
+			     struct pending **listhead)
+{
+  struct pending *iter;
+
+  for (iter = *listhead; iter; iter = iter->next)
+    {
+      int i;
+
+      for (i = 0; i < iter->nsyms; ++i)
+	dict_add_symbol (dict, iter->symbol[i]);
+    }
+}
+
 /* Take one of the lists of symbols and make a block from it.  Keep
    the order the symbols have in the list (reversed from the input
    file).  Put the block on the list of pending blocks.  */
@@ -243,7 +274,6 @@ finish_block_internal (struct symbol *symbol, struct pending **listhead,
 		       int is_global, int expandable)
 {
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
-  struct pending *next, *next1;
   struct block *block;
   struct pending_block *pblock;
   struct pending_block *opblock;
@@ -254,8 +284,15 @@ finish_block_internal (struct symbol *symbol, struct pending **listhead,
 
   if (symbol)
     {
-      BLOCK_DICT (block) = dict_create_linear (&objfile->objfile_obstack,
-					       *listhead);
+      if (SYMBOL_BODILESS (symbol))
+	{
+	  /* To be dealt with when blah */
+	  BLOCK_DICT (block) = dict_create_linear_expandable ();
+	  add_pending_symbols_to_dict (BLOCK_DICT (block), listhead);
+	}
+      else
+	BLOCK_DICT (block) = dict_create_linear (&objfile->objfile_obstack,
+						 *listhead);
     }
   else
     {
@@ -281,7 +318,7 @@ finish_block_internal (struct symbol *symbol, struct pending **listhead,
       struct type *ftype = SYMBOL_TYPE (symbol);
       struct dict_iterator iter;
       SYMBOL_BLOCK_VALUE (symbol) = block;
-      BLOCK_FUNCTION (block) = symbol;
+      SET_BLOCK_FUNCTION (block, symbol);
 
       if (TYPE_NFIELDS (ftype) <= 0)
 	{
@@ -324,18 +361,10 @@ finish_block_internal (struct symbol *symbol, struct pending **listhead,
     }
   else
     {
-      BLOCK_FUNCTION (block) = NULL;
+      SET_BLOCK_FUNCTION (block, NULL);
     }
 
-  /* Now "free" the links of the list, and empty the list.  */
-
-  for (next = *listhead; next; next = next1)
-    {
-      next1 = next->next;
-      next->next = free_pendings;
-      free_pendings = next;
-    }
-  *listhead = NULL;
+  free_struct_pendings (listhead);
 
   /* Check to be sure that the blocks have an end address that is
      greater than starting address.  */
@@ -378,7 +407,7 @@ finish_block_internal (struct symbol *symbol, struct pending **listhead,
 	     Skip blocks which correspond to a function; they're not
 	     physically nested inside this other blocks, only
 	     lexically nested.  */
-	  if (BLOCK_FUNCTION (pblock->block) == NULL
+	  if (BLOCK_RAW_FUNCTION (pblock->block) == NULL
 	      && (BLOCK_START (pblock->block) < BLOCK_START (block)
 		  || BLOCK_END (pblock->block) > BLOCK_END (block)))
 	    {
@@ -416,6 +445,7 @@ finish_block_internal (struct symbol *symbol, struct pending **listhead,
   return block;
 }
 
+
 struct block *
 finish_block (struct symbol *symbol, struct pending **listhead,
 	      struct pending_block *old_blocks,
@@ -424,6 +454,102 @@ finish_block (struct symbol *symbol, struct pending **listhead,
 {
   return finish_block_internal (symbol, listhead, old_blocks,
 				start, end, objfile, 0, 0);
+}
+
+void
+finish_block_for_symbol (struct symbol *symbol, struct pending **listhead,
+			 struct objfile *objfile)
+{
+  struct gdbarch *gdbarch = get_objfile_arch (objfile);
+  struct block *block;
+  struct blockvector *bv;
+  int n_new_blocks;
+  struct dictionary *expandable;
+  struct pending_block *iter;
+
+  gdb_assert (SYMBOL_BODILESS (symbol));
+
+  block = SYMBOL_BLOCK_VALUE (symbol);
+
+  expandable = BLOCK_DICT (block);
+  add_pending_symbols_to_dict (expandable, listhead);
+  BLOCK_DICT (block)
+    = dict_create_linear_from_expandable (&objfile->objfile_obstack,
+					  expandable);
+  dict_free (expandable);
+  free_struct_pendings (listhead);
+
+  set_symbol_symtabs (block, SYMBOL_SYMTAB (symbol));
+
+  bv = BLOCKVECTOR (SYMBOL_SYMTAB (symbol));
+
+  /* Count the number of new blocks to insert.  */
+  for (iter = pending_blocks, n_new_blocks = 0;
+       iter;
+       iter = iter->next, ++n_new_blocks)
+    ;
+
+  if (n_new_blocks > 0)
+    {
+      int n_blocks, idx;
+      struct block **new_blocks, *parent;
+
+      /* Find BLOCK in the blockvector.  */
+      /* FIXME could we just sort the blocks afterward?  */
+      n_blocks = BLOCKVECTOR_NBLOCKS (bv);
+      for (idx = 0; idx < n_blocks; ++idx)
+	if (BLOCKVECTOR_BLOCK (bv, idx) == block)
+	  break;
+      gdb_assert (idx < n_blocks);
+      ++idx;
+
+      new_blocks
+	= (struct block **) obstack_alloc (&objfile->objfile_obstack,
+					   (n_blocks + n_new_blocks)
+					   * sizeof (struct block *));
+
+      /* Copy the existing blocks to their final positions.  */
+      memcpy (new_blocks, bv->block, idx * sizeof (struct block *));
+      if (idx < n_blocks)
+	memcpy (&new_blocks[n_new_blocks + idx], &bv->block[idx],
+		(n_blocks - idx) * sizeof (struct block *));
+
+      /* Copy the blocks into the blockvector.  This is done in reverse
+	 order, which happens to put the blocks into the proper order
+	 (ascending starting address).  finish_block has hair to insert
+	 each block into the list after its subblocks in order to make
+	 sure this is true.  */
+
+      parent = new_blocks[idx - 1];
+      for (iter = pending_blocks; iter; iter = iter->next)
+	{
+	  if (BLOCK_SUPERBLOCK (iter->block) == NULL)
+	    BLOCK_SUPERBLOCK (iter->block) = parent;
+	  new_blocks[n_new_blocks + --idx] = iter->block;
+	  set_symbol_symtabs (iter->block, SYMBOL_SYMTAB (symbol));
+	}
+
+      BLOCKVECTOR_NBLOCKS (bv) = n_blocks + n_new_blocks;
+      /* The blockvector contents are on an obstack, so we can't free the
+	 old one.  */
+      bv->block = new_blocks;
+    }
+
+  free_pending_blocks ();
+
+  /* If we needed an address map for this symtab, record it in the
+     blockvector.  */
+  if (pending_addrmap && pending_addrmap_interesting)
+    BLOCKVECTOR_MAP (bv)
+      = addrmap_create_fixed (pending_addrmap, &objfile->objfile_obstack);
+  else
+    BLOCKVECTOR_MAP (bv) = 0;
+
+  if (pending_addrmap)
+    {
+      obstack_free (&pending_addrmap_obstack, NULL);
+      pending_addrmap = NULL;
+    }
 }
 
 /* Record BLOCK on the list of all blocks in the file.  Put it after
@@ -502,10 +628,10 @@ make_blockvector (struct objfile *objfile)
     {;
     }
 
-  blockvector = (struct blockvector *)
-    obstack_alloc (&objfile->objfile_obstack,
-		   (sizeof (struct blockvector)
-		    + (i - 1) * sizeof (struct block *)));
+  blockvector = OBSTACK_ZALLOC (&objfile->objfile_obstack, struct blockvector);
+  blockvector->block
+    = (struct block **) obstack_alloc (&objfile->objfile_obstack,
+				       i * sizeof (struct block *));
 
   /* Copy the blocks into the blockvector.  This is done in reverse
      order, which happens to put the blocks into the proper order
@@ -981,6 +1107,25 @@ reset_symtab_globals (void)
     }
 }
 
+static void
+set_symbol_symtabs (struct block *block, struct symtab *symtab)
+{
+  struct symbol *sym;
+  struct dict_iterator iter;
+
+  /* Inlined functions may have symbols not in the global or
+     static symbol lists.  */
+  if (BLOCK_RAW_FUNCTION (block) != NULL)
+    if (SYMBOL_SYMTAB (BLOCK_RAW_FUNCTION (block)) == NULL)
+      SYMBOL_SYMTAB (BLOCK_RAW_FUNCTION (block)) = symtab;
+
+  for (sym = dict_iterator_first (BLOCK_DICT (block), &iter);
+       sym != NULL;
+       sym = dict_iterator_next (&iter))
+    if (SYMBOL_SYMTAB (sym) == NULL)
+      SYMBOL_SYMTAB (sym) = symtab;
+}
+
 /* Implementation of the first part of end_symtab.  It allows modifying
    STATIC_BLOCK before it gets finalized by end_symtab_from_static_block.
    If the returned value is NULL there is no blockvector created for
@@ -1275,21 +1420,8 @@ end_symtab_from_static_block (struct block *static_block,
       for (block_i = 0; block_i < BLOCKVECTOR_NBLOCKS (blockvector); block_i++)
 	{
 	  struct block *block = BLOCKVECTOR_BLOCK (blockvector, block_i);
-	  struct symbol *sym;
-	  struct dict_iterator iter;
 
-	  /* Inlined functions may have symbols not in the global or
-	     static symbol lists.  */
-	  if (BLOCK_FUNCTION (block) != NULL)
-	    if (SYMBOL_SYMTAB (BLOCK_FUNCTION (block)) == NULL)
-	      SYMBOL_SYMTAB (BLOCK_FUNCTION (block)) = symtab;
-
-	  /* Note that we only want to fix up symbols from the local
-	     blocks, not blocks coming from included symtabs.  That is why
-	     we use ALL_DICT_SYMBOLS here and not ALL_BLOCK_SYMBOLS.  */
-	  ALL_DICT_SYMBOLS (BLOCK_DICT (block), iter, sym)
-	    if (SYMBOL_SYMTAB (sym) == NULL)
-	      SYMBOL_SYMTAB (sym) = symtab;
+	  set_symbol_symtabs (block, symtab);
 	}
     }
 

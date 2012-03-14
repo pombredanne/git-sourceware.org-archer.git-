@@ -641,10 +641,11 @@ finalize_symtab (struct gdb_symtab *stab, struct objfile *objfile)
       LINETABLE (symtab) = NULL;
     }
 
-  blockvector_size = (sizeof (struct blockvector)
-                      + (actual_nblocks - 1) * sizeof (struct block *));
-  symtab->blockvector = obstack_alloc (&objfile->objfile_obstack,
-                                       blockvector_size);
+  blockvector_size = actual_nblocks * sizeof (struct block *);
+  symtab->blockvector = OBSTACK_ZALLOC (&objfile->objfile_obstack,
+					struct blockvector);
+  symtab->blockvector->block
+    = obstack_alloc (&objfile->objfile_obstack, blockvector_size);
 
   /* (begin, end) will contain the PC range this entire blockvector
      spans.  */
@@ -687,7 +688,7 @@ finalize_symtab (struct gdb_symtab *stab, struct objfile *objfile)
 					      gdb_block_iter->name,
 					      strlen (gdb_block_iter->name));
 
-      BLOCK_FUNCTION (new_block) = block_name;
+      SET_BLOCK_FUNCTION (new_block, block_name);
 
       BLOCKVECTOR_BLOCK (symtab->blockvector, i) = new_block;
       if (begin > BLOCK_START (new_block))

@@ -2022,7 +2022,7 @@ lookup_block_symbol (const struct block *block, const char *name,
 	{
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
 				     SYMBOL_DOMAIN (sym), domain))
-	    return sym;
+	    return fill_in_symbol_body (sym);
 	}
       return NULL;
     }
@@ -2050,7 +2050,7 @@ lookup_block_symbol (const struct block *block, const char *name,
 		}
 	    }
 	}
-      return (sym_found);	/* Will be NULL if not found.  */
+      return fill_in_symbol_body (sym_found); /* Will be NULL if not found.  */
     }
 }
 
@@ -2083,7 +2083,7 @@ iterate_over_symbols (const struct block *block, const char *name,
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
 				     SYMBOL_DOMAIN (sym), domain))
 	    {
-	      if (!callback (sym, data))
+	      if (!callback (fill_in_symbol_body (sym), data))
 		return;
 	    }
 	}
@@ -4947,6 +4947,23 @@ skip_prologue_using_sal (struct gdbarch *gdbarch, CORE_ADDR func_addr)
     /* Don't return END_PC, which is past the end of the function.  */
     return prologue_sal.pc;
 }
+
+
+struct symbol *
+fill_in_symbol_body (struct symbol *function)
+{
+  if (!function || !SYMBOL_BODILESS (function))
+    return function;
+
+  if (SYMBOL_CLASS (function) == LOC_BLOCK
+      && SYMBOL_COMPUTED_OPS (function) != NULL
+      && SYMBOL_COMPUTED_OPS (function)->fill_in_symbol_body != NULL)
+    SYMBOL_COMPUTED_OPS (function)->fill_in_symbol_body (function);
+
+  SYMBOL_BODILESS (function) = 0;
+  return function;
+}
+
 
 /* Track MAIN */
 static char *name_of_main;

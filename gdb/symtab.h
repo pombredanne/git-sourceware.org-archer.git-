@@ -581,6 +581,8 @@ struct symbol_computed_ops
 
   void (*tracepoint_var_ref) (struct symbol *symbol, struct gdbarch *gdbarch,
 			      struct agent_expr *ax, struct axs_value *value);
+
+  void (*fill_in_symbol_body) (struct symbol *symbol);
 };
 
 /* Functions used with LOC_REGISTER and LOC_REGPARM_ADDR.  */
@@ -632,6 +634,9 @@ struct symbol
   /* True if this is a C++ function symbol with template arguments.
      In this case the symbol is really a "struct template_symbol".  */
   unsigned is_cplus_template_function : 1;
+
+  /* True if blah blah.  */
+  unsigned bodiless : 1;
 
   /* Line number of this symbol's definition, except for inlined
      functions.  For an inlined function (class LOC_BLOCK and
@@ -688,6 +693,7 @@ struct symbol
 #define SYMBOL_COMPUTED_OPS(symbol)     (symbol)->ops.ops_computed
 #define SYMBOL_REGISTER_OPS(symbol)     (symbol)->ops.ops_register
 #define SYMBOL_LOCATION_BATON(symbol)   (symbol)->aux_value
+#define SYMBOL_BODILESS(symbol)		(symbol)->bodiless
 
 /* An instance of this type is used to represent a C++ template
    function.  It includes a "struct symbol" as a kind of base class;
@@ -1318,5 +1324,7 @@ void iterate_over_symbols (const struct block *block, const char *name,
 
 struct cleanup *demangle_for_lookup (const char *name, enum language lang,
 				     const char **result_name);
+
+struct symbol *fill_in_symbol_body (struct symbol *sym);
 
 #endif /* !defined(SYMTAB_H) */
