@@ -1,3 +1,38 @@
+2012-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Mention "info vtbl", not "info vtable".
+	* cp-support.c (info_vtbl_command): Fix comment.
+	(_initialize_cp_support): Fix text.
+
+2012-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* cp-valprint.c (cp_print_value_fields): Use
+	print_function_pointer_address for vtable slot.
+
+2012-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* gnu-v3-abi.c (struct value_and_voffset): New.
+	(hash_value_and_voffset, eq_value_and_voffset)
+	(compare_value_and_voffset, compute_vtable_size)
+	(print_one_vtable, gnuv3_print_vtable): New functions.
+	(init_gnuv3_ops): Initialize 'print_vtable' field.
+	* cp-support.c (info_vtbl_command): New function.
+	(_initialize_cp_support): Add "info vtbl".
+	* cp-abi.h (cplus_print_vtable): Declare.
+	(struct cp_abi_ops) <print_vtable>: New field.
+	* cp-abi.c (cplus_print_vtable): New function.
+	* NEWS: Update.
+
+2012-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* d-lang.c (d_language_defn) <la_iterate_over_symbols>: Set to
+	iterate_over_symbols.
+
+2012-03-14  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf_stack_op_name): Add DW_OP_GNU_encoded_addr,
+	DW_OP_GNU_parameter_ref.
+
 2012-03-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix double prompt of 'interpreter-exec mi'.
