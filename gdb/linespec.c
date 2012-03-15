@@ -1194,8 +1194,8 @@ symbol_not_found_error (char *symbol, char *filename)
 		       "not defined in \"%s\"."), symbol, filename);
       else
 	throw_error (NOT_FOUND_ERROR,
-		     _("Convenience variable or function \"%s\" not defined."),
-		     symbol);
+		     _("Undefined convenience variable or function \"%s\" "
+		       "not defined."), symbol);
     }
   else
     {

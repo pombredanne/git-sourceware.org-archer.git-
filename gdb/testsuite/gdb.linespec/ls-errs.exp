@@ -52,7 +52,7 @@ proc add {array_name linespec msg_id args} {
 array set error_messages {
     invalid_file "No source file named %s."
     invalid_function "Function \"%s\" not defined."
-    invalid_var_or_func "Convenience variable or function \"%s\" not defined."
+    invalid_var_or_func "Undefined convenience variable or function \"%s\" not defined."
     invalid_function_f "Function \"%s\" not defined in \"%s\"."
     invalid_var_or_func_f \
 	"Undefined convenience variable or function \"%s\" not defined in \"%s\"."
