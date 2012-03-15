@@ -52,11 +52,13 @@ proc add {array_name linespec msg_id args} {
 array set error_messages {
     invalid_file "No source file named %s."
     invalid_function "Function \"%s\" not defined."
+    invalid_var_or_func "Convenience variable or function \"%s\" not defined."
     invalid_function_f "Function \"%s\" not defined in \"%s\"."
+    invalid_var_or_func_f \
+	"Undefined convenience variable or function \"%s\" not defined in \"%s\"."
     invalid_label "No label \"%s\" defined in function \"%s\"."
     invalid_offset "No line %d in the current file."
     invalid_offset_f "No line %d in file \"%s\"."
-    junk "Junk at end of arguments."
     unexpected "malformed linespec error: unexpected %s"
     unexpected_opt "malformed linespec error: unexpected %s, \"%s\""
     unmatched_quote "unmatched quote"
@@ -174,6 +176,11 @@ foreach x {"3" "+100" "-100" "foo"} {
 foreach x {"if" "task" "thread"} {
     add the_tests $x unexpected_opt "keyword" $x
 }
+
+# Test undefined convenience variables.
+set x {$zippo}
+add the_tests $x invalid_var_or_func $x
+add the_tests "$srcfile:$x" invalid_var_or_func_f $x $srcfile
 
 # Run the tests
 foreach linespec $the_tests(linespecs) {

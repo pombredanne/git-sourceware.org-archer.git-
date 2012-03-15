@@ -272,27 +272,7 @@ static struct symtabs_and_lines decode_objc (struct linespec_state *self,
 					     linespec_t ls,
 					     char **argptr);
 
-static VEC (symbolp) *lookup_prefix_sym (struct linespec_state *state,
-					 VEC (symtab_p) *,
-					 const char *);
-
-static void find_method (struct linespec_state *self,
-			 VEC (symtab_p) *file_symtabs,
-			 const char *class_name,
-			 const char *method_name,
-			 VEC (symbolp) *sym_classes,
-			 VEC (symbolp) **symbols,
-			 VEC (minsym_and_objfile_d) **minsyms);
-
-static const char *find_toplevel_char (const char *s, char c);
-
 static VEC (symtab_p) *symtabs_from_filename (const char *);
-
-static void find_function_symbols (struct linespec_state *state,
-				   VEC (symtab_p) *file_symtabs,
-				   const char *name,
-				   VEC (symbolp) **symbols,
-				   VEC (minsym_and_objfile_d) **minsyms);
 
 static VEC (symbolp) *find_label_symbols (struct linespec_state *self,
 					  VEC (symbolp) *function_symbols,
@@ -810,7 +790,7 @@ iterate_name_matcher (const char *name, void *d)
 static void
 iterate_over_all_matching_symtabs (const char *name,
 				   const domain_enum domain,
-				   int (*callback) (struct symbol *, void *),
+				   symbol_found_callback_ftype *callback,
 				   void *data,
 				   struct program_space *search_pspace)
 {
@@ -1201,11 +1181,32 @@ symbol_not_found_error (char *symbol, char *filename)
       && !have_minimal_symbols ())
     throw_error (NOT_FOUND_ERROR,
 		 _("No symbol table is loaded.  Use the \"file\" command."));
-  if (filename)
-    throw_error (NOT_FOUND_ERROR, _("Function \"%s\" not defined in \"%s\"."),
-		 symbol, filename);
+
+  /* If SYMBOL starts with '$', the user attempted to either lookup
+     a function/variable in his code starting with '$' or an internal
+     variable of that name.  Since we do not know which, be concise and
+     explain both possibilities.  */
+  if (*symbol == '$')
+    {
+      if (filename)
+	throw_error (NOT_FOUND_ERROR,
+		     _("Undefined convenience variable or function \"%s\" "
+		       "not defined in \"%s\"."), symbol, filename);
+      else
+	throw_error (NOT_FOUND_ERROR,
+		     _("Convenience variable or function \"%s\" not defined."),
+		     symbol);
+    }
   else
-    throw_error (NOT_FOUND_ERROR, _("Function \"%s\" not defined."), symbol);
+    {
+      if (filename)
+	throw_error (NOT_FOUND_ERROR,
+		     _("Function \"%s\" not defined in \"%s\"."),
+		     symbol, filename);
+      else
+	throw_error (NOT_FOUND_ERROR,
+		     _("Function \"%s\" not defined."), symbol);
+    }
 }
 
 /* Throw an appropriate error when an unexpected token is encountered 
@@ -1263,9 +1264,7 @@ linespec_parse_line_offset (char *string)
   return line_offset;
 }
 
-/* Parse the basic_spec in PARSER's input.
-
-   basic_spec: func_label | lineno  */
+/* Parse the basic_spec in PARSER's input.  */
 
 static void
 linespec_parse_basic (linespec_parser *parser)
@@ -1827,6 +1826,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
   struct symtabs_and_lines values;
   volatile struct gdb_exception file_exception;
   struct cleanup *cleanup;
+
   parser->lexer.saved_arg = *argptr;
   parser->lexer.stream = argptr;
   file_exception.reason = 0;
@@ -1883,12 +1883,20 @@ parse_linespec (linespec_parser *parser, char **argptr)
       cleanup = make_cleanup (xfree, var);
       PARSER_RESULT (parser)->line_offset
 	= linespec_parse_variable (PARSER_STATE (parser), var);
-      discard_cleanups (cleanup);
 
-      /* Consume this token.  */
-      linespec_lexer_consume_token (parser);
+      /* If a line_offset wasn't found (VAR is the name of a user
+	 variable/function), then skip to normal symbol processing.  */
+      if (PARSER_RESULT (parser)->line_offset.sign != unknown)
+	{
+	  discard_cleanups (cleanup);
 
-      goto canonicalize_it;
+	  /* Consume this token.  */
+	  linespec_lexer_consume_token (parser);
+
+	  goto canonicalize_it;
+	}
+
+      do_cleanups (cleanup);
     }
   else if (token.type != LSTOKEN_STRING && token.type != LSTOKEN_NUMBER)
     unexpected_linespec_error (parser);
@@ -2280,14 +2288,14 @@ collect_one_symbol (struct symbol *sym, void *d)
   struct type *t;
 
   if (SYMBOL_CLASS (sym) != LOC_TYPEDEF)
-    return 1;
+    return 1; /* Continue iterating.  */
 
   t = SYMBOL_TYPE (sym);
   CHECK_TYPEDEF (t);
   if (TYPE_CODE (t) != TYPE_CODE_STRUCT
       && TYPE_CODE (t) != TYPE_CODE_UNION
       && TYPE_CODE (t) != TYPE_CODE_NAMESPACE)
-    return 1;
+    return 1; /* Continue iterating.  */
 
   slot = htab_find_slot (collector->unique_syms, sym, INSERT);
   if (!*slot)
@@ -2296,7 +2304,7 @@ collect_one_symbol (struct symbol *sym, void *d)
       VEC_safe_push (symbolp, collector->symbols, sym);
     }
 
-  return 1;
+  return 1; /* Continue iterating.  */
 }
 
 /* Return any symbols corresponding to CLASS_NAME in FILE_SYMTABS.  */
@@ -2840,7 +2848,7 @@ find_label_symbols (struct linespec_state *self,
 
 
 
-/* A helper for decode_all_digits that handles the 'list_mode' case.  */
+/* A helper for create_sals_line_offset that handles the 'list_mode' case.  */
 
 static void
 decode_digits_list_mode (struct linespec_state *self,
@@ -2873,7 +2881,7 @@ decode_digits_list_mode (struct linespec_state *self,
     }
 }
 
-/* A helper for decode_all_digits that iterates over the symtabs,
+/* A helper for create_sals_line_offset that iterates over the symtabs,
    adding lines to the VEC.  */
 
 static void
@@ -2947,29 +2955,26 @@ linespec_parse_variable (struct linespec_state *self, const char *variable)
     {
       /* Not all digits -- may be user variable/function or a
 	 convenience variable.  */
-
-#if WHATS_THIS_FOR
-      volatile struct gdb_exception exc;
-
-      TRY_CATCH (exc, RETURN_MASK_ERROR)
-	{
-	  values = decode_variable (self, NULL, copy);
-	}
-
-      if (exc.reason == 0)
-	return values;
-
-      if (exc.error != NOT_FOUND_ERROR)
-	throw_exception (exc);
-#endif
       LONGEST valx;
+      struct internalvar *ivar;
 
-      /* Not a user variable or function -- must be convenience variable.  */
-      if (!get_internalvar_integer (lookup_internalvar (variable + 1), &valx))
-	error (_("Convenience variables used in line "
-		 "specs must have integer values."));
-
-      offset.offset = valx;
+      /* Try it as a convenience variable.  If it is not a convenience
+	 variable, return and allow normal symbol lookup to occur.  */
+      ivar = lookup_only_internalvar (variable + 1);
+      if (ivar == NULL)
+	/* No internal variable with that name.  Mark the offset
+	   as unknown to allow the name to be looked up as a symbol.  */
+	offset.sign = unknown;
+      else
+	{
+	  /* We found a valid variable name.  If it is not an integer,
+	     throw an error.  */
+	  if (!get_internalvar_integer (ivar, &valx))
+	    error (_("Convenience variables used in line "
+		     "specs must have integer values."));
+	  else
+	    offset.offset = valx;
+	}
     }
 
   return offset;
@@ -2987,7 +2992,7 @@ collect_symbols (struct symbol *sym, void *data)
      This allows the user to type "list a_global_variable".  */
   if (SYMBOL_CLASS (sym) == LOC_BLOCK || info->state->list_mode)
     VEC_safe_push (symbolp, info->result.symbols, sym);
-  return 1;
+  return 1; /* Continue iterating.  */
 }
 
 /* We've found a minimal symbol MSYMBOL in OBJFILE to associate with our
@@ -3192,9 +3197,7 @@ add_matching_symbols_to_info (const char *name,
   int ix;
   struct symtab *elt;
 
-  for (ix = 0;
-       VEC_iterate (symtab_p, info->file_symtabs, ix, elt);
-       ++ix)
+  for (ix = 0; VEC_iterate (symtab_p, info->file_symtabs, ix, elt); ++ix)
     {
       struct symbol *sym;
 
