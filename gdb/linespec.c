@@ -758,6 +758,33 @@ maybe_add_address (htab_t set, struct program_space *pspace, CORE_ADDR addr)
   return 1;
 }
 
+/* A callback function and the additional data to call it with.  */
+
+struct symbol_and_data_callback
+{
+  /* The callback to use.  */
+  symbol_found_callback_ftype *callback;
+
+  /* Data to be passed to the callback.  */
+  void *data;
+};
+
+/* A helper for iterate_over_all_matching_symtabs that is used to
+   restrict calls to another callback to symbols representing inline
+   symbols only.  */
+
+static int
+iterate_inline_only (struct symbol *sym, void *d)
+{
+  if (SYMBOL_INLINED (sym))
+    {
+      struct symbol_and_data_callback *cad = d;
+
+      return cad->callback (sym, cad->data);
+    }
+  return 1; /* Continue iterating.  */
+}
+
 /* Some data for the expand_symtabs_matching callback.  */
 
 struct symbol_matcher_data
@@ -785,14 +812,16 @@ iterate_name_matcher (const char *name, void *d)
 /* A helper that walks over all matching symtabs in all objfiles and
    calls CALLBACK for each symbol matching NAME.  If SEARCH_PSPACE is
    not NULL, then the search is restricted to just that program
-   space.  */
+   space.  If INCLUDE_INLINE is nonzero then symbols representing
+   inlined instances of functions will be included in the result.  */
 
 static void
 iterate_over_all_matching_symtabs (const char *name,
 				   const domain_enum domain,
 				   symbol_found_callback_ftype *callback,
 				   void *data,
-				   struct program_space *search_pspace)
+				   struct program_space *search_pspace,
+				   int include_inline)
 {
   struct objfile *objfile;
   struct program_space *pspace;
@@ -831,6 +860,20 @@ iterate_over_all_matching_symtabs (const char *name,
 
 	      block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), STATIC_BLOCK);
 	      LA_ITERATE_OVER_SYMBOLS (block, name, domain, callback, data);
+
+	      if (include_inline)
+		{
+		  struct symbol_and_data_callback cad = { callback, data };
+		  int i;
+
+		  for (i = FIRST_LOCAL_BLOCK;
+		       i < BLOCKVECTOR_NBLOCKS (BLOCKVECTOR (symtab)); i++)
+		    {
+		      block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), i);
+		      LA_ITERATE_OVER_SYMBOLS (block, name, domain,
+					       iterate_inline_only, &cad);
+		    }
+		}
 	    }
 	}
     }
@@ -2333,10 +2376,10 @@ lookup_prefix_sym (struct linespec_state *state, VEC (symtab_p) *file_symtabs,
 	{
 	  iterate_over_all_matching_symtabs (class_name, STRUCT_DOMAIN,
 					     collect_one_symbol, &collector,
-					     NULL);
+					     NULL, 0);
 	  iterate_over_all_matching_symtabs (class_name, VAR_DOMAIN,
 					     collect_one_symbol, &collector,
-					     NULL);
+					     NULL, 0);
 	}
       else
 	{
@@ -3205,7 +3248,7 @@ add_matching_symbols_to_info (const char *name,
 	{
 	  iterate_over_all_matching_symtabs (name, VAR_DOMAIN,
 					     collect_symbols, info,
-					     pspace);
+					     pspace, 1);
 	  search_minsyms_for_name (info, name, pspace);
 	}
       else if (pspace == NULL || pspace == SYMTAB_PSPACE (elt))

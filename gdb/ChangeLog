@@ -1,3 +1,69 @@
+2012-03-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR symtab/13777
+	* dwarf2read.c (process_full_comp_unit): Set LOCATIONS_VALID only for
+	GCC >=4.5.
+
+2012-03-16  Chris January  <chris.january@allinea.com>
+
+	* tui-tui.win.c (tui_resize_all): Use erase and clearok instead
+	of clear.
+
+2012-03-16  Chris January  <chris.january@allinea.com>
+
+	* source.c (add_path): Use memmove instead of strcpy because the
+	strings overlap.
+
+2012-03-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* value.h (set_value_parent): Add declaration.
+	* value.c (set_value_parent): New function.
+	(value_address): If VALUE->PARENT is not NULL, then use it as
+	the base address instead of VALUE->LOCATION.address.
+	* ada-lang.c (ada_value_primitive_packed_val): Keep V's address
+	the same as OBJ's address.  Adjust V's offset accordingly.
+	Set V's parent.
+
+2012-03-16  Gary Benson  <gbenson@redhat.com>
+
+	PR breakpoints/10738
+	* dwarf2read.c (use_deprecated_index_sections): New global.
+	(struct partial_die_info): New member may_be_inlined.
+	(read_partial_die): Set may_be_inlined where appropriate.
+	(add_partial_subprogram): Add partial symbols for partial
+	DIEs that may be inlined.
+	(new_symbol_full): Add inlined subroutines to the current
+	scope.
+	(write_psymtabs_to_index): Bump version number.
+	(dwarf2_read_index): Read only version 6 indices unless
+	use_deprecated_index_sections is set.
+	* linespec.c (symbol_and_data_callback): New structure.
+	(iterate_inline_only): New function.
+	(iterate_over_all_matching_symtabs): New argument
+	"include_inline".  If nonzero, also call the callback for
+	symbols representing inlined subroutines.
+	(lookup_prefix_sym): Pass extra argument to the above.
+	(find_function_symbols): Likewise.
+	(add_matching_symbols_to_info): Likewise.
+	* NEWS: Mention that GDB can now set breakpoints on inlined
+	functions.
+
+2012-03-16  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* p-typeprint.c (pascal_type_print_method_args):
+	Fix display of parameter of methods.
+
+2012-03-16  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* amd64-windows-nat.c (_initialize_amd64_windows_nat):
+	Add missing prototype.
+
+2012-03-16  Yao Qi  <yao@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix false compilation warning.
+	* gnu-v3-abi.c (print_one_vtable): Initialize ADDR.
+
 2012-03-15  Jonathan Larmour  <jifl@eCosCentric.com>
 	    Pedro Alves  <pedro@codesourcery.com>
 
