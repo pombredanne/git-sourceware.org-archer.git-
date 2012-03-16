@@ -1217,7 +1217,7 @@ unexpected_linespec_error (linespec_parser *parser)
 {
   linespec_token token;
   static const char * token_type_strings[]
-    = {"keyword", "colon", "string", "number", "end-of-input"};
+    = {"keyword", "colon", "string", "number", "end of input"};
 
   /* Get the token that generated the error.  */
   token = linespec_lexer_lex_one (parser);
