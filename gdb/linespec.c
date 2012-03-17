@@ -1912,7 +1912,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
       /* Consume the token.  */
       linespec_lexer_consume_token (parser);
 
-      goto canonicalize_it;
+      goto convert_to_sals;
     }
   else if (token.type == LSTOKEN_STRING && *LS_TOKEN_STOKEN (token).ptr == '$')
     {
@@ -1936,7 +1936,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
 	  /* Consume this token.  */
 	  linespec_lexer_consume_token (parser);
 
-	  goto canonicalize_it;
+	  goto convert_to_sals;
 	}
 
       do_cleanups (cleanup);
@@ -2011,9 +2011,9 @@ parse_linespec (linespec_parser *parser, char **argptr)
 			      PARSER_RESULT (parser)->source_filename);
     }
 
- canonicalize_it:
+ convert_to_sals:
 
-  /* Get the last token and record how much of the input was parsed
+  /* Get the last token and record how much of the input was parsed,
      if necessary.  */
   token = linespec_lexer_lex_one (parser);
   if (token.type != LSTOKEN_EOI && token.type != LSTOKEN_KEYWORD)
