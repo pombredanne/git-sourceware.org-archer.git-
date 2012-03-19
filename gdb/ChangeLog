@@ -1,3 +1,305 @@
+2012-03-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR symtab/13777
+	* dwarf2read.c (process_full_comp_unit): Set LOCATIONS_VALID only for
+	GCC >=4.5.
+
+2012-03-16  Chris January  <chris.january@allinea.com>
+
+	* tui-tui.win.c (tui_resize_all): Use erase and clearok instead
+	of clear.
+
+2012-03-16  Chris January  <chris.january@allinea.com>
+
+	* source.c (add_path): Use memmove instead of strcpy because the
+	strings overlap.
+
+2012-03-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* value.h (set_value_parent): Add declaration.
+	* value.c (set_value_parent): New function.
+	(value_address): If VALUE->PARENT is not NULL, then use it as
+	the base address instead of VALUE->LOCATION.address.
+	* ada-lang.c (ada_value_primitive_packed_val): Keep V's address
+	the same as OBJ's address.  Adjust V's offset accordingly.
+	Set V's parent.
+
+2012-03-16  Gary Benson  <gbenson@redhat.com>
+
+	PR breakpoints/10738
+	* dwarf2read.c (use_deprecated_index_sections): New global.
+	(struct partial_die_info): New member may_be_inlined.
+	(read_partial_die): Set may_be_inlined where appropriate.
+	(add_partial_subprogram): Add partial symbols for partial
+	DIEs that may be inlined.
+	(new_symbol_full): Add inlined subroutines to the current
+	scope.
+	(write_psymtabs_to_index): Bump version number.
+	(dwarf2_read_index): Read only version 6 indices unless
+	use_deprecated_index_sections is set.
+	* linespec.c (symbol_and_data_callback): New structure.
+	(iterate_inline_only): New function.
+	(iterate_over_all_matching_symtabs): New argument
+	"include_inline".  If nonzero, also call the callback for
+	symbols representing inlined subroutines.
+	(lookup_prefix_sym): Pass extra argument to the above.
+	(find_function_symbols): Likewise.
+	(add_matching_symbols_to_info): Likewise.
+	* NEWS: Mention that GDB can now set breakpoints on inlined
+	functions.
+
+2012-03-16  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* p-typeprint.c (pascal_type_print_method_args):
+	Fix display of parameter of methods.
+
+2012-03-16  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* amd64-windows-nat.c (_initialize_amd64_windows_nat):
+	Add missing prototype.
+
+2012-03-16  Yao Qi  <yao@codesourcery.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix false compilation warning.
+	* gnu-v3-abi.c (print_one_vtable): Initialize ADDR.
+
+2012-03-15  Jonathan Larmour  <jifl@eCosCentric.com>
+	    Pedro Alves  <pedro@codesourcery.com>
+
+	* arm-tdep.c: Include "remote.h" and "features/arm-with-m-fpa-layout.c".
+	(arm_register_g_packet_guesses): New function.
+	(arm_gdbarch_init): Don't force a target description with
+	registers when the executable is detected as M-profile.  Instead
+	set gdbarch->tdep->is_m.  Register `g' packet guesses.
+	(_initialize_arm_tdep): Initialize the new target description.
+	* features/arm-with-m-fpa-layout.xml: New description.
+	* features/arm-with-m-fpa-layout.c: New, generated.
+
+2012-03-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* breakpoint.c (breakpoint_xfer_memory): Add assertion.
+	Update function description.
+	(insert_bp_location): Do not wipe bl->target_info out.
+	* mem-break.c: #include "gdb_string.h".
+	(default_memory_insert_breakpoint): Do not call target_read_memory
+	with a pointer to the breakpoint's shadow_contents buffer.  Use
+	a local buffer instead.
+	* m32r-tdep.c (m32r_memory_insert_breakpoint): Ditto.
+
+2012-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Mention "info vtbl", not "info vtable".
+	* cp-support.c (info_vtbl_command): Fix comment.
+	(_initialize_cp_support): Fix text.
+
+2012-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* cp-valprint.c (cp_print_value_fields): Use
+	print_function_pointer_address for vtable slot.
+
+2012-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* gnu-v3-abi.c (struct value_and_voffset): New.
+	(hash_value_and_voffset, eq_value_and_voffset)
+	(compare_value_and_voffset, compute_vtable_size)
+	(print_one_vtable, gnuv3_print_vtable): New functions.
+	(init_gnuv3_ops): Initialize 'print_vtable' field.
+	* cp-support.c (info_vtbl_command): New function.
+	(_initialize_cp_support): Add "info vtbl".
+	* cp-abi.h (cplus_print_vtable): Declare.
+	(struct cp_abi_ops) <print_vtable>: New field.
+	* cp-abi.c (cplus_print_vtable): New function.
+	* NEWS: Update.
+
+2012-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* d-lang.c (d_language_defn) <la_iterate_over_symbols>: Set to
+	iterate_over_symbols.
+
+2012-03-14  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf_stack_op_name): Add DW_OP_GNU_encoded_addr,
+	DW_OP_GNU_parameter_ref.
+
+2012-03-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix double prompt of 'interpreter-exec mi'.
+	* mi/mi-interp.c (mi_execute_command_input_handler): New prototype.
+	(mi_interpreter_resume): use it.
+	(mi_execute_command_input_handler): New function.
+	* mi/mi-main.c (mi_execute_command): Move prompt printing to
+	mi_execute_command_input_handler.
+
+2012-03-13  Josh Matthews  <josh@joshmatthews.net>  (tiny change)
+
+	* darwin-nat-info.c (_initialize_darwin_info_commands): Add
+	prototype.
+	(darwin_debug_port_info): Make static.
+	* darwin-nat.c (_initialize_darwin_inferior): Add prototype.
+	* machoread.c (_initialize_machoread): Add prototype.
+	* i386-darwin-nat.c (i386_darwin_dr_set, i386_darwin_dr_get)
+	(i386_darwin_set_control, i386_darwin_get_control)
+	i386_darwin_dr_set_addr, i386_darwin_get_addr)
+	i386_darwin_get_status, i386_darwin_get_control):
+	Comment out with HW_WATCHPOINT_NOT_YET_ENABLED macro.
+
+2012-03-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* ax-gdb.c (gen_usual_unary): Remove special handling of
+	enum and bool types.
+
+2012-03-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* ax-gdb.c (gen_fetch): Add handling for TYPE_CODE_RANGE types.
+
+2012-03-13  Joel Brobecker  <brobecker@adacore.com>
+
+	* aix-thread.c (supply_fprs): Make more consistent with fill_fprs.
+
+2012-03-13  Chris January  <chris.january@allinea.com>
+
+	* aix-thread.c (fill_sprs): Store the floating point registers
+	at the correct offsets into vals.
+
+2012-03-13  Doug Evans  <dje@google.com>
+
+	* NEWS: Mention symbol-reloading has been deleted.
+	* symfile.c (symbol_reloading): Delete.
+	(show_symbol_reloading): Delete.
+	(_initialize_symfile): Delete set/show symbol-reloading.
+
+	* dwarf2read.c (load_partial_comp_unit): Defer adding cu to
+	read_in_chain until we have successfully read it in.
+	(load_full_comp_unit): Ditto.
+	(read_signatured_type): Add comment.
+
+2012-03-13  Chris January  <chris.january@allinea.com>
+
+	* stabsread.c (fix_common_block): Change type of valu argument
+	to CORE_ADDR.
+
+2012-03-13  Chris January  <chris.january@allinea.com>
+
+	* rs6000-tdep.c (skip_prologue): Support the oril r29, r1, 0x0
+	instruction.
+
+2012-03-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common/linux-procfs.c (linux_proc_get_int): New, from
+	linux_proc_get_tgid, change its LWPID type to pid_t, add parameter
+	field.
+	(linux_proc_get_tgid): Only call linux_proc_get_int.
+	(linux_proc_get_tracerpid): New.
+	(linux_proc_pid_has_state): New, from linux_proc_pid_is_zombie.
+	(linux_proc_pid_is_stopped, linux_proc_pid_is_zombie): Only call
+	linux_proc_pid_has_state.
+	* common/linux-procfs.h (linux_proc_get_tracerpid): New declaration.
+	* common/linux-ptrace.c: Include linux-procfs.h and buffer.h.
+	(linux_ptrace_attach_warnings): New.
+	* common/linux-ptrace.h (struct buffer, linux_ptrace_attach_warnings):
+	New declaration.
+	* linux-nat.c: Include exceptions.h, linux-ptrace.h and buffer.h.
+	(linux_nat_attach): New variables ex, buffer, message and message_s.
+	Wrap to_attach by TRY_CATCH and call linux_ptrace_attach_warnings.
+
+2012-03-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* Makefile.in (linux-ptrace.o): New.
+	* common/linux-procfs.c (linux_proc_pid_is_zombie): New,
+	from linux-nat.c.
+	* common/linux-procfs.h (linux_proc_pid_is_zombie): New declaration.
+	* common/linux-ptrace.c: New file.
+	* config/alpha/alpha-linux.mh (NATDEPFILES): Add linux-ptrace.o.
+	* config/arm/linux.mh: Likewise.
+	* config/i386/linux.mh: Likewise.
+	* config/i386/linux64.mh: Likewise.
+	* config/ia64/linux.mh: Likewise.
+	* config/m32r/linux.mh: Likewise.
+	* config/m68k/linux.mh: Likewise.
+	* config/mips/linux.mh: Likewise.
+	* config/pa/linux.mh: Likewise.
+	* config/powerpc/linux.mh: Likewise.
+	* config/powerpc/ppc64-linux.mh: Likewise.
+	* config/powerpc/spu-linux.mh: Likewise.
+	* config/s390/s390.mh: Likewise.
+	* config/sparc/linux.mh: Likewise.
+	* config/sparc/linux64.mh: Likewise.
+	* config/xtensa/linux.mh: Likewise.
+	* linux-nat.c (linux_lwp_is_zombie): Remove, move it to
+	common/linux-procfs.c.
+	(wait_lwp): Rename linux_lwp_is_zombie to linux_proc_pid_is_zombie.
+
+2012-03-13  Hui Zhu  <teawater@gmail.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* breakpoint.c (init_breakpoint_sal): New flags parameter.  Handle
+	CREATE_BREAKPOINT_FLAGS_INSERTED.
+	(create_breakpoint_sal, create_breakpoints_sal)
+	(base_breakpoint_create_breakpoints_sal)
+	(tracepoint_create_breakpoints_sal)
+	(strace_marker_create_breakpoints_sal): New flags parameter.  Pass
+	down.
+	(break_command_1, handle_gnu_v3_exceptions, trace_command)
+	(ftrace_command, strace_command): Adjust.
+	(create_tracepoint_from_upload): Pass
+	CREATE_BREAKPOINT_FLAGS_INSERTED.
+	* breakpoint.h (enum breakpoint_create_flags): New.
+	(create_breakpoint): New flags parameter.
+	* mi/mi-cmd-break.c (mi_cmd_break_insert): Adjust.
+	* python/py-breakpoint.c (bppy_init): Adjust.
+	* python/py-finishbreakpoint.c (bpfinishpy_init): Adjust.
+	* spu-tdep.c (spu_catch_start): Adjust.
+
+2012-03-13  Pedro Alves  <palves@redhat.com>
+	    Hui Zhu  <teawater@gmail.com>
+	    Yao Qi  <yao@codesourcery.com>
+
+	* remote.c (struct remote_state): New field `starting_up'.
+	(remote_start_remote): Set and clear it.
+	(remote_can_download_tracepoint): If starting up, return false.
+
+2012-03-13  Yao Qi  <yao@codesourcery.com>
+
+	* inferior.h (struct inferior): Remove fields any_syscall_count,
+	syscalls_counts and total_syscalls_count.  Move them to new
+	struct catch_syscall_inferior_data in breakpoint.c.
+	* breakpoint.c: Call DEF_VEC_I(int).
+	(struct catch_syscall_inferior_data): New.
+	(get_catch_syscall_inferior_data): New.
+	(catch_syscall_inferior_data_cleanup): New.
+	(insert_catch_syscall): Update to access data in
+	struct catch_syscall_inferior_data.
+	(insert_catch_syscall): Likewise.
+	(remove_catch_syscall): Likewise.
+	(remove_catch_syscall): Likewise.
+	(is_syscall_catchpoint_enabled): Likewise.
+	(add_catch_command): Likewise.
+	(_initialize_breakpoint): Register cleanup.
+	* breakpoint.h: Removed DEF_VEC_I(int).
+	* dwarf2loc.c: Call DEF_VEC_I(int).
+	* mi/mi-main.c: Likewise.
+
+2012-03-12  Mark Kettenis  <kettenis@gnu.org>
+
+	* inf-ptrace.c (inf_ptrace_post_attach): Make static.
+
+2012-03-12  Chris January  <chris.january@allinea.com>
+
+	* aix-thread.c (_initialize_aix_thread): Add prototype.
+	* rs6000-nat.c (_initialize_rs6000_nat): Ditto.
+	* xcoffsolib.c (_initialize_xcoffsolib): Ditto.
+
+2012-03-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* amd64bsd-nat.c: Move #include of "amd64bsd-nat.h" after
+	include of "amd64-nat.h".
+
+2012-03-12  Tom Tromey  <tromey@redhat.com>
+
+	* buildsym.c (record_pending_block): Now static.
+	* buildsym.h: (record_pending_block): Remove.
+
 2012-03-12  Andreas Tobler  <andreast@fgznet.ch>
 
 	* amd64bsd-nat.c: Include amd64bsd-nat.h.

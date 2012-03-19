@@ -1,3 +1,67 @@
+2012-03-16  Roland McGrath  <mcgrathr@google.com>
+
+	* config.bfd: Handle x86_64-*-nacl*.
+	* elf64-x86-64.c (bfd_elf64_x86_64_nacl_vec): New backend vector stanza.
+	(bfd_elf32_x86_64_nacl_vec): Likewise.
+	* targets.c: Support them.
+	* configure.in: Likewise.
+	* configure: Regenerated.
+
+2012-03-16  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* elf32-arm.c (elf32_arm_attributes_accept_div): New function.
+	(elf32_arm_attributes_forbid_div): Likewise.
+	(elf32_arm_merge_eabi_attributes): Correct handling of
+	Tag_DIV_use.
+
+2012-03-15  Roland McGrath  <mcgrathr@google.com>
+
+	* elf64-x86-64.c (elf_x86_64_create_dynamic_sections): Use
+	elf_x86_64_backend_data parameters for plt_eh_frame.
+
+	* elf64-x86-64.c (struct elf_x86_64_backend_data): New type.
+	(get_elf_x86_64_backend_data, GET_PLT_ENTRY_SIZE): New macros.
+	(elf_x86_64_arch_bed): New variable.
+	(elf_backend_arch_data): New macro.
+	(elf_x86_64_adjust_dynamic_symbol): Use GET_PLT_ENTRY_SIZE.
+	(elf_x86_64_allocate_dynrelocs): Likewise.
+	(elf_x86_64_relocate_section): Likewise.
+	(elf_x86_64_plt_sym_val): Likewise.
+	(elf_x86_64_finish_dynamic_symbol): Use elf_x86_64_backend_data
+	parameters for PLT details.
+	(elf_x86_64_finish_dynamic_sections): Likewise.
+
+2012-03-14  Roland McGrath  <mcgrathr@google.com>
+
+	* elf32-i386.c (elf_i386_nacl_pic_plt0_entry): Initialize up
+	to the full size, padding out with nop instructions.
+
+2012-03-12  Alan Modra  <amodra@gmail.com>
+
+	* elf-m10300.c (_bfd_mn10300_elf_adjust_dynamic_symbol): Don't warn
+	on zero size dynbss symbol.
+	* elf32-arm.c (elf32_arm_adjust_dynamic_symbol): Likewise.
+	* elf32-cr16.c (_bfd_cr16_elf_adjust_dynamic_symbol): Likewise.
+	* elf32-cris.c (elf_cris_adjust_dynamic_symbol): Likewise.
+	* elf32-hppa.c (elf32_hppa_adjust_dynamic_symbol): Likewise.
+	* elf32-i370.c (i370_elf_adjust_dynamic_symbol): Likewise.
+	* elf32-i386.c (elf_i386_adjust_dynamic_symbol): Likewise.
+	* elf32-lm32.c (lm32_elf_adjust_dynamic_symbol): Likewise.
+	* elf32-m32r.c (m32r_elf_adjust_dynamic_symbol): Likewise.
+	* elf32-m68k.c (elf_m68k_adjust_dynamic_symbol): Likewise.
+	* elf32-ppc.c (ppc_elf_adjust_dynamic_symbol): Likewise.
+	* elf32-s390.c (elf_s390_adjust_dynamic_symbol): Likewise.
+	* elf32-sh.c (sh_elf_adjust_dynamic_symbol): Likewise.
+	* elf32-tic6x.c (elf32_tic6x_adjust_dynamic_symbol): Likewise.
+	* elf32-tilepro.c (tilepro_elf_adjust_dynamic_symbol): Likewise.
+	* elf32-vax.c (elf_vax_adjust_dynamic_symbol): Likewise.
+	* elf64-ppc.c (ppc64_elf_adjust_dynamic_symbol): Likewise.
+	* elf64-s390.c (elf_s390_adjust_dynamic_symbol): Likewise.
+	* elf64-sh64.c (sh64_elf64_adjust_dynamic_symbol): Likewise.
+	* elf64-x86-64.c (elf_x86_64_adjust_dynamic_symbol): Likewise.
+	* elfxx-sparc.c (_bfd_sparc_elf_adjust_dynamic_symbol): Likewise.
+	* elfxx-tilegx.c (tilegx_elf_adjust_dynamic_symbol): Likewise.
+
 2012-03-10  Edmar Wienskoski  <edmar@freescale.com>
 
 	* archures.c: Add bfd_mach_ppc_e5500 and bfd_mach_ppc_e6500.

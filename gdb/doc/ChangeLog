@@ -1,3 +1,24 @@
+2012-03-16  Gary Benson  <gbenson@redhat.com>
+
+	PR breakpoints/10738
+	* gdb.texinfo (Inline Functions): Remove the now-unnecessary @item
+	stating that GDB cannot set breakpoints on inlined functions.
+	(Mode Options): Document --use-deprecated-index-sections.
+	(Index Section Format): Document new index section version format.
+
+2012-03-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Debugging C Plus Plus): Document "info vtbl".
+
+2012-03-13  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Help): Change apropos example to use "alias" instead
+	of "reload".
+	(Symbols): Delete docs for set/show symbol-reloading.
+	* gdbint.texinfo (Defining Other Architecture Features): Delete
+	SYMBOL_RELOADING_DEFAULT.
+	* refcard.tex: Delete reference to symbol-reloading.
+
 2012-03-07  Pedro Alves  <palves@redhat.com>
 
 	* gdb.texinfo (General Query Packets): Document new

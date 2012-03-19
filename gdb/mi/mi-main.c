@@ -508,6 +508,8 @@ mi_cmd_thread_info (char *command, char **argv, int argc)
   print_thread_info (current_uiout, argv[0], -1);
 }
 
+DEF_VEC_I(int);
+
 struct collect_cores_data
 {
   int pid;
@@ -2027,9 +2029,6 @@ mi_execute_command (char *cmd, int from_tty)
 
       mi_parse_free (command);
     }
-
-  fputs_unfiltered ("(gdb) \n", raw_stdout);
-  gdb_flush (raw_stdout);
 }
 
 static void

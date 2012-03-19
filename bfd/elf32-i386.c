@@ -1,6 +1,6 @@
 /* Intel 80386/80486-specific support for 32-bit ELF
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -2177,13 +2177,6 @@ elf_i386_adjust_dynamic_symbol (struct bfd_link_info *info,
 	}
     }
 
-  if (h->size == 0)
-    {
-      (*_bfd_error_handler) (_("dynamic variable `%s' is zero size"),
-			     h->root.root.string);
-      return TRUE;
-    }
-
   /* We must allocate the symbol in our .dynbss section, which will
      become part of the .bss section of the executable.  There will be
      an entry for this symbol in the .dynsym section.  The dynamic
@@ -2197,7 +2190,7 @@ elf_i386_adjust_dynamic_symbol (struct bfd_link_info *info,
   /* We must generate a R_386_COPY reloc to tell the dynamic linker to
      copy the initial value out of the dynamic object and into the
      runtime process image.  */
-  if ((h->root.u.def.section->flags & SEC_ALLOC) != 0)
+  if ((h->root.u.def.section->flags & SEC_ALLOC) != 0 && h->size != 0)
     {
       htab->srelbss->size += sizeof (Elf32_External_Rel);
       h->needs_copy = 1;
@@ -2709,7 +2702,7 @@ elf_i386_size_dynamic_sections (bfd *output_bfd, struct bfd_link_info *info)
      it's not incremented, so in order to compute the space reserved
      for them, it suffices to multiply the reloc count by the jump
      slot size.
-     
+
      PR ld/13302: We start next_irelative_index at the end of .rela.plt
      so that R_386_IRELATIVE entries come last.  */
   if (htab->elf.srelplt)
@@ -5116,7 +5109,10 @@ elf_i386_nacl_pic_plt0_entry[sizeof (elf_i386_nacl_plt0_entry)] =
     0x8b, 0x4b, 0x08,		/* mov 0x8(%ebx), %ecx */
     0x83, 0xe1, 0xe0,		/* and $NACLMASK, %ecx */
     0xff, 0xe1,			/* jmp *%ecx */
-    0x90                        /* nop */
+
+    /* This is expected to be the same size as elf_i386_nacl_plt0_entry,
+       so pad to that size with nop instructions.  */
+    0x90, 0x90, 0x90, 0x90, 0x90, 0x90
   };
 
 static const bfd_byte elf_i386_nacl_pic_plt_entry[NACL_PLT_ENTRY_SIZE] =
