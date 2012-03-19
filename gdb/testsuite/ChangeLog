@@ -1,3 +1,11 @@
+2012-03-19  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* gdb.base/cond-eval-mode.exp: Fix the anticipated warning string.
+
+2012-03-17  Doug Evans  <dje@google.com>
+
+	* dg-extract-results.sh: Handle KFAILs.
+
 2012-03-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	PR symtab/13777
@@ -12,8 +20,8 @@
 	PR breakpoints/10738
 	* gdb.opt/inline-break.exp: New file.
 	* gdb.opt/inline-break.c: Likewise.
-	* gdb.dwarf2/inline-break.exp: Likewise.
-	* gdb.dwarf2/inline-break.S: Likewise.
+	* gdb.dwarf2/dw2-inline-break.exp: Likewise.
+	* gdb.dwarf2/dw2-inline-break.S: Likewise.
 	* gdb.base/annota1.exp: Cope with old .gdb_index warnings.
 	* gdb.base/async-shell.exp: Likewise.
 	* lib/mi-support.exp (library_loaded_re): Likewise.
