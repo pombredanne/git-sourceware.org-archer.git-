@@ -18,7 +18,6 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
-#include "exceptions.h"
 #include "objfiles.h"
 #include "symtab.h"
 #include "language.h"
@@ -247,8 +246,10 @@ find_frame_filter (PyObject *frame, int print_level,
 }
 
 static int
-print_frame (PyObject *filter, int print_level,
-	     enum print_what print_what, int print_args,
+print_frame (PyObject *filter,
+	     int print_level,
+	     enum print_what print_what,
+	     int print_args,
 	     struct ui_out *out,
 	     struct value_print_options opts,
 	     struct frame_info *frame)
@@ -260,18 +261,53 @@ print_frame (PyObject *filter, int print_level,
   char *func = NULL;
   char *filename = NULL;
   int line = 0;
+  volatile struct gdb_exception except;
+
+  /* First check to see if this frame is to be omitted.  */
+  if (PyObject_HasAttrString (filter, "omit"))
+    {
+      PyObject *result = PyObject_CallMethod (filter, "omit", NULL);
+
+      if (result)
+	{
+	  int omit = 0;
+
+	  if (! PyBool_Check (result))
+	    {
+	      Py_DECREF (result);
+	      PyErr_SetString (PyExc_RuntimeError,
+			       _("'omit' must return type boolean."));
+	      goto error;
+	    }
+
+	  omit = PyObject_IsTrue (result);
+
+	  Py_DECREF (result);
+
+	  if (omit == -1)
+	    goto error;
+	  else if (omit)
+	    return 1;
+	}
+      else
+	goto error;
+    }
 
   if (print_level)
     {
       if (PyObject_HasAttrString (filter, "level"))
 	{
-	  PyObject *result = PyObject_CallMethod (filter, "level", NULL);
+	  PyObject *result = PyObject_CallMethod (filter, "level", "i",
+						  frame_relative_level (frame),
+						  NULL);
 
 	  if (result)
 	    {
 	      level = PyLong_AsLong (result);
 	      Py_DECREF (result);
 	    }
+	  else
+	    goto error;
 	}
       else
 	level = frame_relative_level (frame);
@@ -286,6 +322,8 @@ print_frame (PyObject *filter, int print_level,
 	  address = PyLong_AsLong (result);
 	  Py_DECREF (result);
 	}
+      else
+	goto error;
     }
   else
     address = 0;
@@ -311,15 +349,21 @@ print_frame (PyObject *filter, int print_level,
       if (result)
 	{
 	  char *dup = PyString_AsString (result);
-	  if (dup)
-	    func  = xstrdup (dup);
-	  else
-	    return 0;
+	  if (! dup)
+	    {
+	      Py_DECREF (result);
+	      goto error;
+	    }
+
+	  func = xstrdup (dup);
+
 	  Py_DECREF (result);
 	}
+      else
+	goto error;
     }
   else
-    func = xstrdup("<unknown>");
+    func = xstrdup ("<unknown>");
 
   annotate_frame_function_name ();
   ui_out_field_string (out, "func", func);
@@ -331,12 +375,19 @@ print_frame (PyObject *filter, int print_level,
       if (result)
 	{
 	  char *dup = PyString_AsString (result);
-	  if (dup)
-	    filename  = xstrdup (dup);
-	  else
-	    return 0;
+
+	  if (! dup)
+	    {
+	      Py_DECREF (result);
+	      goto error;
+	    }
+
+	  filename  = xstrdup (dup);
+
 	  Py_DECREF (result);
 	}
+      else
+	goto error;
     }
   else
     func = xstrdup("<unknown function>");
@@ -357,6 +408,8 @@ print_frame (PyObject *filter, int print_level,
 	  line  = PyLong_AsLong (result);
 	  Py_DECREF (result);
 	}
+      else
+	goto error;
     }
   else
     line = 0;
@@ -369,10 +422,55 @@ print_frame (PyObject *filter, int print_level,
   ui_out_text (out, "\n");
   annotate_frame_end ();
 
+  if (PyObject_HasAttrString (filter, "elide"))
+    {
+      PyObject *result = PyObject_CallMethod (filter, "elide", NULL);
+
+      if (result)
+	{
+	  struct frame_info *restart = NULL;
+	  struct frame_info *current = NULL;
+	  /* Fix result here.  */
+	  TRY_CATCH (except, RETURN_MASK_ALL)
+	    {
+	      restart = frame_object_to_frame_info (result);
+	    }
+	  if (except.reason > 0)
+	    {
+	      Py_DECREF (result);
+	      PyErr_SetString (PyExc_RuntimeError,
+			       except.message);
+	      goto error;
+	    }
+	  if (! restart)
+	    {
+	      Py_DECREF (result);
+	      PyErr_SetString (PyExc_RuntimeError,
+			       _("Cannot locate frame to continue backtrace."));
+	      goto error;
+	    }
+	  if (restart != frame)
+	    {
+	      current=get_prev_frame (frame);
+	      while (current!=restart)
+		{
+		  set_frame_print_elide (current);
+		  current = get_prev_frame (current);
+		}
+	    }
+	}
+      else
+	goto error;
+    }
+
   xfree (func);
   xfree (filename);
-
   return 1;
+
+ error:
+  xfree (func);
+  xfree (filename);
+  return 0;
 }
 
 int
@@ -386,6 +484,7 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   int result = 0;
   int print_result = 0;
   struct value_print_options opts;
+  int success = 0;
 
   cleanups = ensure_python_env (gdbarch, current_language);
 
@@ -396,32 +495,34 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   /* Find the constructor.  */
   filter = find_frame_filter (frame_obj, print_level, print_what, print_args);
   Py_DECREF (frame_obj);
+
   make_cleanup_py_decref (filter);
   if (! filter || filter == Py_None)
     goto done;
 
   get_user_print_options (&opts);
-  print_result = print_frame (filter, print_level, print_what,
-			      print_args, out, opts, frame);
+  success =  print_frame (filter, print_level, print_what,
+			  print_args, out, opts, frame);
   
-  if (print_result)
-    result = 1;
-  else
+  /* 'print_frame' can return a frame to "resume" from, in the case
+     that frames have been elided.  If the return value is NULL, also
+     check to see if this was because a Python error occurred.  */
+  if (success == 0 && PyErr_Occurred())
     gdbpy_print_stack ();
 
  done:
   do_cleanups (cleanups);
-  return result;
+  return success;
 }
 
 #else /* HAVE_PYTHON */
 
-int
+struct frame_info *
 apply_frame_filter (struct frame_info *frame, int print_level,
 		    enum print_what print_what, int print_args,
 		    struct ui_out *out)
 {
-  return 0;
+  return NULL;
 }
 
 #endif /* HAVE_PYTHON */

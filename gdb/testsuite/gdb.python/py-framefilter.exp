@@ -40,6 +40,6 @@ set remote_python_file [remote_download host ${srcdir}/${subdir}/${testfile}.py]
 gdb_test_no_output "python execfile ('${remote_python_file}')"
 gdb_test_no_output "python gdb.frame_filters.append(register_frame_filters)"
 gdb_breakpoint [gdb_get_line_number "Backtrace end breakpoint"]
-gdb_continue_to_breakpoint "Bactrace end breakpoint"
-gdb_test "bt" "#1.*in end_func.*#23.*in func1.*#27.*in main ().*"
+gdb_continue_to_breakpoint "Backtrace end breakpoint"
+gdb_test "bt" "#0.*in end_func.*#22.*in func1.*Composite frame func3.*#27.*in main ().*"
 remote_file host delete ${remote_python_file}

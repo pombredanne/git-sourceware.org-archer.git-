@@ -16,8 +16,6 @@
 # This file is part of the GDB testsuite.  It tests Python-based
 # frame-filters.
 
-flevel = 0
-
 class Main_filter:
     "Example main () filter"
 
@@ -26,16 +24,34 @@ class Main_filter:
         self.what = what
         self.lvl = level
         self.args = args
-        
+
+    def omit (self):
+        fname = str (self.frame.function())
+        if fname == "func2":
+            return True
+        else:
+            return False
+
+    def elide (self):
+        fname = str (self.frame.function())
+        frame = self.frame
+
+        if fname == "func3":
+            frame = frame.older()
+            frame = frame.older()
+            frame = frame.older()
+
+        return frame
 
     def function (self):
-        return str (self.frame.function())
+        fname = str (self.frame.function())
+        if fname == "func3":
+            return "Composite frame " + str(self.frame.function())
+        else:
+            return str (self.frame.function())
 
-    def level (self):
-        global flevel
-        rlevel = flevel
-        flevel = flevel + 1
-        return rlevel
+    def level (self, level):
+        return level
 
     def address (self):
         return self.frame.pc()

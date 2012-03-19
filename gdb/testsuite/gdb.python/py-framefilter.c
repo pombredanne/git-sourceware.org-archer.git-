@@ -37,7 +37,7 @@ void funca(void)
       count++;
       funcb(count);
     }
-  
+
   end_func();
   return;
 }
@@ -83,4 +83,3 @@ main()
 {
   func5(3);
 }
-

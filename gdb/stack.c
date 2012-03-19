@@ -762,12 +762,17 @@ print_frame_info (struct frame_info *frame, int print_level,
   struct symtab_and_line sal;
   int source_print;
   int location_print;
-  int result;
   struct ui_out *uiout = current_uiout;
 
-  result = apply_frame_filter (frame, 1, LOCATION, 1, current_uiout);
-  if (result)
-    return;
+  /* If a previous frame elided this one, do not run the frame
+     filters.  */
+  if (! frame_print_elide (frame))
+    {
+      int result = apply_frame_filter (frame, 1, LOCATION, 1,
+				       current_uiout);
+      if (result)
+	return;
+    }
 
   if (get_frame_type (frame) == DUMMY_FRAME
       || get_frame_type (frame) == SIGTRAMP_FRAME
@@ -783,7 +788,7 @@ print_frame_info (struct frame_info *frame, int print_level,
          to list for this frame.  */
       if (print_level)
         {
-          ui_out_text (uiout, "#");
+	  ui_out_text (uiout, "#");
           ui_out_field_fmt_int (uiout, 2, ui_left, "level",
 				frame_relative_level (frame));
         }
@@ -1127,6 +1132,9 @@ print_frame (struct frame_info *frame, int print_level,
 			gdbarch, pc);
 
   list_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "frame");
+
+  if (frame_print_elide (frame))
+    ui_out_spaces (uiout, 4);
 
   if (print_level)
     {
