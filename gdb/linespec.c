@@ -321,6 +321,8 @@ static int compare_symbols (const void *a, const void *b);
 
 static int compare_msymbols (const void *a, const void *b);
 
+static const char *find_toplevel_char (const char *s, char c);
+
 /* Lexer functions.  */
 
 /* A convenience macro for trimming trailing whitespace
@@ -413,32 +415,17 @@ is_ada_operator (const char *string)
 static char *
 skip_quote_char (const char *string, char quote_char)
 {
-  const char *p = string;
-  const char *found = NULL;
+  const char *p, *last;
 
-  while (*p != '\0')
+  p = last = find_toplevel_char (string, quote_char);
+  while (p && *p != '\0' && *p != ':')
     {
-      if (*p == ':')
-	{
-	  /* We found a colon.  If it is not the double-colon
-	     (C++ scope operator), then we are done looking for the
-	     quote character.  */
-	  if (*(p + 1) != ':')
-	    break;
-
-	  ++p;
-	}
-      else if (*p == quote_char)
-	{
-	  /* We found the quote_char, but keep going until
-	     we see EOI or a terminal.  */
-	  found = p;
-	}
-
-      ++p;
+      p = find_toplevel_char (p, quote_char);
+      if (p != NULL)
+	last = p++;
     }
 
-  return (char *) found;
+  return (char *) last;
 }
 
 /* Make a writable copy of the string given in TOKEN, trimming
