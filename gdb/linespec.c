@@ -1803,7 +1803,6 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
 
    The basic grammar of linespecs:
 
-
    linespec -> expr_spec | var_spec | basic_spec
    expr_spec -> '*' STRING
    var_spec -> '$' (STRING | NUMBER)
@@ -1973,6 +1972,19 @@ parse_linespec (linespec_parser *parser, char **argptr)
 	  /* A NULL entry means to use GLOBAL_DEFAULT_SYMTAB.  */
 	  VEC_safe_push (symtab_p, PARSER_RESULT (parser)->file_symtabs, NULL);
 	}
+    }
+  /* If the next token is not EOI or KEYWORD, issue an error.
+     Exception: In list mode, we allow the next token to be STRING,
+     as long as it starts with ',' (to accomodate ranges).  */
+  else if (token.type != LSTOKEN_EOI && token.type != LSTOKEN_KEYWORD
+	   && (!PARSER_STATE (parser)->list_mode
+	       || (token.type == LSTOKEN_STRING
+		   && *LS_TOKEN_STOKEN (token).ptr != ',')))
+    {
+      /* TOKEN is the _next_ token, not the one currently in the parser.
+	 Consuming the token will give the correct error message.  */
+      linespec_lexer_consume_token (parser);
+      unexpected_linespec_error (parser);
     }
   else
     {
