@@ -1,3 +1,25 @@
+2012-03-22  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* gdb.python/py-value.cc: Add test case for testing the
+	methodology exposing C++ values to Python.
+	* gdb.python/py-value-cc.exp: Add tests testing the methodology
+	exposing C++ values to Python.
+	* gdb.python/Makefile.in: Add py-value-cc to EXECUTABLES.
+
+2012-03-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* gdb.base/auxv.c (func2): setrlimit to infinity to enable core dumps.
+	* gdb.base/auxv.exp: Try to compile it with -DUSE_RLIMIT first.
+	(generate native core dump): Make the test unsupported if core cannot
+	be generated.
+
+2012-03-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.gdb/selftest.exp (do_steps_and_nexts): New entry
+	for cmdarg_vec = NULL.  Remove entries for cmdsize = 1, cmdarg = and
+	ncmd = 0.  New entry for VEC_cleanup cmdarg_s.
+
 2012-03-19  Siddhesh Poyarekar  <siddhesh@redhat.com>
 
 	* gdb.base/cond-eval-mode.exp: Fix the anticipated warning string.

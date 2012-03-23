@@ -1,3 +1,155 @@
+2012-03-22  Richard Henderson  <rth@redhat.com>
+
+	* sparc-linux-nat.c (_initialize_sparc_linux_nat): Fix prototype.
+	* sparc-nat.c (sparc_xfer_wcookie): Make static.
+
+2012-03-22  Richard Henderson  <rth@redhat.com>
+
+	* jit.c (jit_read_code_entry): Compute alignment and offset of
+	int64_t member before computing entry_size.
+
+2012-03-22  Siva Chandra Reddy  <sivachandra@google.com>
+
+	Python scripting: Add new method Value.referenced_value to
+	gdb.Value which can dereference pointer as well as reference
+	values.
+	* NEWS: Add entry under 'Python scripting' about the new method
+	Value.referenced_value on gdb.Value objects.
+	* python/py-value.c (valpy_referenced_value): New function
+	defining a new method on gdb.Value objects which can dereference
+	pointer and reference values.
+
+2012-03-22  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list.
+
+2012-03-21  Kevin Buettner  <kevinb@redhat.com>
+
+	* symtab.c (skip_prologue_sal): Change test to check for "main()"
+	in addition to "main".
+
+2012-03-21  Joel Brobecker  <brobecker@adacore.com>
+
+	* expression.h (op_name): Add declaration.
+	* expprint.c (op_name): Remove declaration.  Make non-static.
+	* ax-gdb.c (gen_expr): Use op_name instead of op_string.
+
+2012-03-21  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* amd64-linux-nat.c (amd64_linux_siginfo_fixup): Use siginfo_t instead
+	of struct siginfo.
+	* arm-linux-nat.c (arm_linux_stopped_data_address): Likewise.
+	* ia64-linux-nat.c (ia64_linux_stopped_data_address): Likewise.
+	* linux-nat.c (linux_nat_siginfo_fixup, siginfo_fixup)
+	(linux_xfer_siginfo, linux_nat_set_siginfo_fixup)
+	(linux_nat_get_siginfo): Likewise.
+	* linux-nat.h (struct lwp_info, linux_nat_set_siginfo_fixup)
+	(linux_nat_get_siginfo): Likewise.
+	* linux-tdep.c (linux_get_siginfo_type): Likewise.
+	* ppc-linux-nat.c (ppc_linux_stopped_data_address): Likewise.
+	* procfs.c (gdb_siginfo_t): Likewise.
+
+2012-03-21  Mike Frysinger  <vapier@gentoo.org>
+
+	* .gitignore: Ignore more files.
+
+2012-03-20  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (remote_start_remote): Clear `rs->starting_up' on early
+	returns.
+
+2012-03-20  Yao Qi  <yao@codesourcery.com>
+
+	* amd64-tdep.c (amd64_displaced_step_copy_insn): Complete missing "}" in
+	comment.
+
+2012-03-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanupp: Use cu_offset and sect_offset compile time type checking.
+	* dwarf2expr.c (add_piece, dwarf_get_base_type, execute_stack_op)
+	(ctx_no_dwarf_call, ctx_no_get_base_type): Use cu_offset and
+	sect_offset.
+	* dwarf2expr.h (cu_offset, sect_offset): New types.
+	(struct dwarf_expr_context_funcs) <dwarf_call>
+	(struct dwarf_expr_context_funcs) <get_base_type>: Use cu_offset and
+	sect_offset.
+	(struct dwarf_expr_context) <len>: Improve the comment.
+	(struct dwarf_expr_piece, ctx_no_dwarf_call, ctx_no_get_base_type): Use
+	cu_offset and sect_offset.
+	* dwarf2loc.c (per_cu_dwarf_call, dwarf_expr_dwarf_call)
+	(dwarf_expr_get_base_type, needs_frame_dwarf_call)
+	(dwarf2_compile_expr_to_ax, disassemble_dwarf_expression): Likewise.
+	* dwarf2loc.h: Include dwarf2expr.h.
+	(dwarf2_fetch_die_location_block, dwarf2_get_die_type): Use cu_offset
+	and sect_offset.
+	* dwarf2read.c (struct dwarf2_per_objfile) <debug_types_type_hash>:
+	Improve the comment.
+	(struct comp_unit_head, struct dwarf2_cu, struct dwarf2_per_cu_data)
+	(struct signatured_type, struct line_header, struct partial_die_info)
+	(struct die_info, find_partial_die, dwarf2_get_ref_die_offset)
+	(lookup_signatured_type_at_offset, dwarf2_find_containing_comp_unit)
+	(get_die_type_at_offset, create_cus_from_index)
+	(create_signatured_type_table_from_index, dw2_get_file_names)
+	(offset_in_cu_p, read_comp_unit_head, error_check_comp_unit_head)
+	(read_and_check_comp_unit_head, read_and_check_type_unit_head)
+	(create_debug_types_hash_table, process_psymtab_comp_unit)
+	(load_partial_comp_unit, create_all_comp_units)
+	(partial_die_parent_scope, partial_die_full_name, skip_one_die)
+	(load_full_comp_unit, dwarf2_physname, read_import_statement)
+	(inherit_abstract_dies, read_func_scope, read_call_site_scope)
+	(dwarf2_add_member_fn, process_enumeration_scope, read_module_type)
+	(read_typedef, die_hash, die_eq, read_full_die, dwarf2_read_abbrevs)
+	(load_partial_dies, read_partial_die, find_partial_die_in_comp_unit)
+	(find_partial_die, read_attribute_value, lookup_die_type)
+	(dump_die_shallow, store_in_ref_table): Use cu_offset and sect_offset.
+	(is_ref_attr): New function comment.
+	(dwarf2_get_ref_die_offset): New function comment, new variable retval.
+	Use cu_offset and sect_offset.
+	(follow_die_offset, follow_die_ref, dwarf2_fetch_die_location_block)
+	(dwarf2_get_die_type, follow_die_sig, lookup_signatured_type_at_offset)
+	(load_full_type_unit, read_signatured_type, per_cu_header_read_in)
+	(dwarf2_find_containing_comp_unit, struct dwarf2_offset_and_type)
+	(offset_and_type_hash, offset_and_type_eq, set_die_type)
+	(get_die_type_at_offset, partial_die_hash, partial_die_eq)
+	(write_one_signatured_type, write_psymtabs_to_index): Use cu_offset and
+	sect_offset.
+
+2012-03-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* python/py-auto-load.c (source_section_scripts): New variable back_to.
+	Turn fclose and xfree calls into make_cleanup_fclose and make_cleanup
+	with xfree.
+	(auto_load_objfile_script): Turn fclose into make_cleanup_fclose.
+
+2012-03-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* NEWS: Describe new options --init-command=FILE, -ix and
+	--init-eval-command=COMMAND, -iex.
+	* main.c (struct cmdarg): New enum items CMDARG_INIT_FILE and
+	CMDARG_INIT_COMMAND.
+	(captured_main): New enum items OPT_IX and OPT_IEX.  Add
+	"init-command", "init-eval-command", "ix" and "iex" to the variable
+	long_options.  Handle OPT_IX and OPT_IEX.  Process them from CMDARG_VEC.
+	New comment for CMDARG_FILE and CMDARG_COMMAND processing.
+	(print_gdb_help): Describe --init-command=FILE, -ix and
+	--init-eval-command=COMMAND, -iex.
+
+2012-03-19  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* main.c (struct cmdarg): Move it here from main.  Add more comments.
+	(cmdarg_s, VEC (cmdarg_s)): New.
+	(main): Move struct cmdarg from here.  New variables cmdarg_vec and
+	cmdarg_p.  Remove variables cmdsize and ncmd and their initialization.
+	Install cleanup for cmdarg_vec.  Update filling for options 'x' and
+	'X'.  Replace cmdarg processing by cmdarg_vec processing.  Remove xfree
+	of CMDARG.
+
+2012-03-19  Tom Tromey  <tromey@redhat.com>
+
+	* gnu-v3-abi.c (gnuv3_print_vtable): Initialize 'result_vec'.
+
 2012-03-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	PR symtab/13777
@@ -2071,7 +2223,7 @@
 
 2012-02-01  Gary Benson  <gbenson@redhat.com>
 
-	* symtab.h (symbol_name_match_p_ftype): New typedef.
+	* symtab.h (symbol_found_callback_ftype): New typedef.
 	(iterate_over_symbols): Use the above.
 	* symtab.c (iterate_over_symbols): Likewise.
 	* language.h (language_defn->la_iterate_over_symbols): Likewise.
