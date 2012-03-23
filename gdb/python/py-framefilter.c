@@ -262,6 +262,7 @@ print_frame (PyObject *filter,
   char *filename = NULL;
   int line = 0;
   volatile struct gdb_exception except;
+  const struct language_defn *language;
 
   /* First check to see if this frame is to be omitted.  */
   if (PyObject_HasAttrString (filter, "omit"))
@@ -293,6 +294,7 @@ print_frame (PyObject *filter,
 	goto error;
     }
 
+  /* Print frame level.  */
   if (print_level)
     {
       if (PyObject_HasAttrString (filter, "level"))
@@ -313,6 +315,7 @@ print_frame (PyObject *filter,
 	level = frame_relative_level (frame);
     }
 
+  /* Print frame address.  */
   if (PyObject_HasAttrString (filter, "address"))
     {
       PyObject *result = PyObject_CallMethod (filter, "address", NULL);
@@ -342,6 +345,7 @@ print_frame (PyObject *filter,
     }
   ui_out_text (out, " in ");
 
+  /* Print frame function.  */
   if (PyObject_HasAttrString (filter, "function"))
     {
       PyObject *result = PyObject_CallMethod (filter, "function", NULL);
@@ -368,6 +372,137 @@ print_frame (PyObject *filter,
   annotate_frame_function_name ();
   ui_out_field_string (out, "func", func);
 
+  /* Frame arguments.  */
+  annotate_frame_args ();
+  ui_out_text (out, " (");
+  if (print_args)
+    {
+       if (PyObject_HasAttrString (filter, "frame_args"))
+	{
+	  PyObject *result = PyObject_CallMethod (filter, "frame_args", NULL);
+	  struct ui_stream *stb;
+	  struct cleanup *old_chain;
+	  const char *sym_name;
+
+	  stb = ui_out_stream_new (out);
+	  old_chain = make_cleanup_ui_out_stream_delete (stb);
+
+	  if (result)
+	    {
+	      Py_ssize_t size, list_index;
+
+	      if (! PyList_Check (result))
+		{
+		  Py_DECREF (result);
+		  PyErr_SetString (PyExc_RuntimeError,
+				   _("frame_args must return a Python list."));
+		  do_cleanups (old_chain);
+		  goto error;
+		}
+
+	      size = PyList_Size (result);
+
+	      if (size > 0)
+		{
+		  for (list_index = 0; list_index < size; list_index++)
+		    {
+		      PyObject *sym_tuple, *sym, *value;
+		      char *symname;
+		      struct value *val;
+		      struct symbol *symbol;
+
+		      sym_tuple = PyList_GetItem (result, list_index);
+		      if (! sym_tuple)
+			{
+			  Py_DECREF (result);
+			  do_cleanups (old_chain);
+			  goto error;
+			}
+
+		      if (! PyTuple_Check (sym_tuple)
+			  && PyTuple_Size (sym_tuple) != 2)
+			{
+			  Py_DECREF (result);
+
+			  PyErr_SetString (PyExc_RuntimeError,
+					   _("frame_arg list must contain a Python tuple."));
+			  do_cleanups (old_chain);
+			  goto error;
+			}
+
+		      /* Each element in the frame arguments list should be a
+			 tuple containing two elements.  The argument name,
+			 which can be a string or a gdb.Symbol, and the
+			 value.  */
+
+		      /* Name.  */
+		      sym = PyTuple_GetItem (sym_tuple, 0);
+		      if (! sym)
+			{
+			  Py_DECREF (result);
+			  do_cleanups (old_chain);
+			  goto error;
+			}
+
+		      /* Value.  */
+		      value = PyTuple_GetItem (sym_tuple, 1);
+		      if (! value)
+			{
+			  Py_DECREF (result);
+			  do_cleanups (old_chain);
+			  goto error;
+			}
+
+		      /* For arg name, the user can return a symbol or a
+			 string.  */
+		      if (PyString_Check (sym))
+			{
+			  sym_name = PyString_AsString (sym);
+			  language = current_language;
+			  if (! sym_name)
+			    {
+			      Py_DECREF (result);
+			      do_cleanups (old_chain);
+			      goto error;
+			    }
+			}
+		      else
+			{
+			  symbol = symbol_object_to_symbol (sym);
+			  sym_name = SYMBOL_PRINT_NAME (symbol);
+			  if (language_mode == language_mode_auto)
+			    language = language_def (SYMBOL_LANGUAGE (symbol));
+			  else
+			    language = current_language;
+			}
+
+			annotate_arg_begin ();
+			ui_out_field_string (out, "name", sym_name);
+			ui_out_text (out, "=");
+
+			val = value_object_to_value (value);
+
+			annotate_arg_value (value_type (val));
+
+			opts.deref_ref = 1;
+
+			/* True in "summary" mode, false otherwise.  */
+			//  opts.summary = !strcmp (print_frame_arguments, "scalars");
+			common_val_print (val, stb->stream, 2, &opts, language);
+			ui_out_field_stream (out, "value", stb);
+			if (size != 1 && list_index < size-1)
+			  ui_out_text (out, ", ");
+			annotate_arg_end ();
+		    }
+		  Py_DECREF (result);
+		}
+	    }
+	  else
+	    goto error;
+	}
+    }
+
+  ui_out_text (out, ")");
   if (PyObject_HasAttrString (filter, "filename"))
     {
       PyObject *result = PyObject_CallMethod (filter, "filename", NULL);

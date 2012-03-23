@@ -63,12 +63,43 @@ class Main_filter:
         else:
             return "unknown"
 
+    def frame_args (self):
+        func = self.frame.function()
+        args = []
+        block = self.frame.block()
+
+        if not func:
+            return
+
+        for sym in block:
+            if not sym.is_argument:
+                continue;
+
+            if len (sym.linkage_name):
+                nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
+            if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
+                sym = nsym
+            try:
+                val = sym.value(self.frame)
+                if val != None:
+                    val = val
+                else:
+                    val="???"
+            except RuntimeError, text:
+                val = text
+
+            atuple = (sym.print_name, val)
+            args.append (atuple)
+
+        return args
+
     def line (self):
         sal = self.frame.find_sal()
         if (sal):
             return sal.line        
         else:
             return "<unknown line>"
+
 
 def register_frame_filters (frame, what, level, args):
 
