@@ -20,11 +20,6 @@ set srcfile "$base.c"
 set testfile "$base.exp"
 set exefile $base
 
-if {[skip_cplus_tests]} {
-    unsupported linespec.exp
-    return
-}
-
 if {[prepare_for_testing $testfile $exefile $srcfile \
 	 {debug nowarnings}]} {
     return -1

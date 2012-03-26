@@ -21,7 +21,7 @@ set testfile "$base.exp"
 set exefile $base
 
 if {[skip_cplus_tests]} {
-    unsupported linespec.exp
+    unsupported "skipping C++ tests"
     return
 }
 
