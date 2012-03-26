@@ -5428,8 +5428,30 @@ get_r_debug (const int pid, const int is_elf64)
 static int
 read_one_ptr (CORE_ADDR memaddr, CORE_ADDR *ptr, int ptr_size)
 {
-  *ptr = 0;
-  return linux_read_memory (memaddr, (unsigned char *) ptr, ptr_size);
+  int ret;
+
+  /* Go through a union so this works on either big or little endian
+     hosts, when the inferior's pointer size is smaller than the size
+     of CORE_ADDR.  It is assumed the inferior's endianness is the
+     same of the superior's.  */
+  union
+  {
+    CORE_ADDR core_addr;
+    unsigned int ui;
+    unsigned char uc;
+  } addr;
+
+  ret = linux_read_memory (memaddr, &addr.uc, ptr_size);
+  if (ret == 0)
+    {
+      if (ptr_size == sizeof (CORE_ADDR))
+	*ptr = addr.core_addr;
+      else if (ptr_size == sizeof (unsigned int))
+	*ptr = addr.ui;
+      else
+	gdb_assert_not_reached ("unhandled pointer size");
+    }
+  return ret;
 }
 
 struct link_map_offsets
@@ -5456,7 +5478,7 @@ struct link_map_offsets
     int l_prev_offset;
   };
 
-/* Construct qXfer:libraries:read reply.  */
+/* Construct qXfer:libraries-svr4:read reply.  */
 
 static int
 linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
@@ -5608,7 +5630,13 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
 	  lm_addr = l_next;
 	}
     done:
-      strcpy (p, "</library-list-svr4>");
+      if (!header_done)
+	{
+	  /* Empty list; terminate `<library-list-svr4'.  */
+	  strcpy (p, "/>");
+	}
+      else
+	strcpy (p, "</library-list-svr4>");
     }
 
   document_len = strlen (document);
