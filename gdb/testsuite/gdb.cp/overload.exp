@@ -306,6 +306,7 @@ gdb_test "list \"foo::overloadfnarg(int, int (*)(int))\"" \
 gdb_test "list ${srcfile}:intToChar" "int intToChar.*"
 gdb_test "list ${srcfile}:intToChar(char)" "int intToChar.*"
 gdb_test "list ${srcfile}:'intToChar(char)'" "int intToChar.*"
+gdb_test "list '${srcfile}:intToChar(char)'" "int intToChar.*"
 gdb_test "list '${srcfile}':intToChar(char)" "int intToChar.*"
 gdb_test "list '${srcfile}':'intToChar(char)'" "int intToChar.*"
 
