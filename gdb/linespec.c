@@ -251,6 +251,9 @@ struct ls_parser
     linespec_token current;
   } lexer;
 
+  /* Is the entire linespec quote-enclosed?  */
+  int is_quote_enclosed;
+
   /* The state of the parse.  */
   struct linespec_state state;
 #define PARSER_STATE(PPTR) (&(PPTR)->state)
@@ -322,6 +325,11 @@ static int compare_symbols (const void *a, const void *b);
 static int compare_msymbols (const void *a, const void *b);
 
 static const char *find_toplevel_char (const char *s, char c);
+
+/* Permitted quote characters for the parser.  This is different from the
+   completer's quote characters to allow backward compatibility with the
+   previous parser.  */
+static const char *const linespec_quote_characters = "\"\'";
 
 /* Lexer functions.  */
 
@@ -452,13 +460,12 @@ linespec_lexer_lex_string (linespec_parser *parser)
 {
   linespec_token token;
   char *start = PARSER_STREAM (parser);
-  static const char *quote_characters = "'\"";
 
   token.type = LSTOKEN_STRING;
 
   /* If the input stream starts with a quote character, skip to the next
      quote character, regardless of the content.  */
-  if (strchr (quote_characters, *PARSER_STREAM (parser)))
+  if (strchr (linespec_quote_characters, *PARSER_STREAM (parser)))
     {
       char *end;
       char quote_char = *PARSER_STREAM (parser);
@@ -556,6 +563,16 @@ linespec_lexer_lex_string (linespec_parser *parser)
 		  return token;
 		}
 	    }
+	  /* Special case: permit quote-enclosed linespecs.  */
+	  else if (parser->is_quote_enclosed
+		   && strchr (linespec_quote_characters,
+			      PARSER_STREAM (parser)[0])
+		   && PARSER_STREAM (parser)[1] == '\0')
+	    {
+	      LS_TOKEN_STOKEN (token).ptr = start;
+	      LS_TOKEN_STOKEN (token).length = PARSER_STREAM (parser) - start;
+	      return token;
+	    }
 
 	  /* Advance the stream.  */
 	  ++(PARSER_STREAM (parser));
@@ -609,6 +626,17 @@ linespec_lexer_lex_one (linespec_parser *parser)
 	      parser->lexer.current.type = LSTOKEN_COLON;
 	      ++(PARSER_STREAM (parser));
 	    }
+	  break;
+
+	case '\'': case '\"':
+	  /* Special case: permit quote-enclosed linespecs.  */
+	  if (parser->is_quote_enclosed && PARSER_STREAM (parser)[1] == '\0')
+	    {
+	      ++(PARSER_STREAM (parser));
+	      parser->lexer.current.type = LSTOKEN_EOI;
+	    }
+	  else
+	    parser->lexer.current = linespec_lexer_lex_string (parser);
 	  break;
 
 	default:
@@ -1855,6 +1883,25 @@ parse_linespec (linespec_parser *parser, char **argptr)
   struct symtabs_and_lines values;
   volatile struct gdb_exception file_exception;
   struct cleanup *cleanup;
+
+  /* A special case to start.  It has become quite popular for
+     IDEs to work around bugs in the previous parser by quoting
+     the entire linespec, so we attempt to deal with this nicely.  */
+  parser->is_quote_enclosed = 0;
+  if (!is_ada_operator (*argptr)
+      && strchr (linespec_quote_characters, **argptr) != NULL)
+    {
+      char *end;
+
+      end = skip_quote_char (*argptr + 1, **argptr);
+      if (end != NULL && end[1] == '\0')
+	{
+	  /* Here's the special case.  Skip ARGPTR past the initial
+	     quote.  */
+	  ++(*argptr);
+	  parser->is_quote_enclosed = 1;
+	}
+    }
 
   parser->lexer.saved_arg = *argptr;
   parser->lexer.stream = argptr;
