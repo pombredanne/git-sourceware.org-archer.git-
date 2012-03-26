@@ -250,6 +250,7 @@ print_frame (PyObject *filter,
 	     int print_level,
 	     enum print_what print_what,
 	     int print_args,
+	     const char *print_args_type,
 	     struct ui_out *out,
 	     struct value_print_options opts,
 	     struct frame_info *frame)
@@ -487,7 +488,7 @@ print_frame (PyObject *filter,
 			opts.deref_ref = 1;
 
 			/* True in "summary" mode, false otherwise.  */
-			//  opts.summary = !strcmp (print_frame_arguments, "scalars");
+			 opts.summary = !strcmp (print_args_type, "scalars");
 			common_val_print (val, stb->stream, 2, &opts, language);
 			ui_out_field_stream (out, "value", stb);
 			if (size != 1 && list_index < size-1)
@@ -611,6 +612,7 @@ print_frame (PyObject *filter,
 int
 apply_frame_filter (struct frame_info *frame, int print_level,
 		    enum print_what print_what, int print_args,
+		    const char *print_args_type, 
 		    struct ui_out *out)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
@@ -637,7 +639,9 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 
   get_user_print_options (&opts);
   success =  print_frame (filter, print_level, print_what,
-			  print_args, out, opts, frame);
+			  print_args, print_args_type, out, opts,
+			  frame);
+
   
   /* 'print_frame' can return a frame to "resume" from, in the case
      that frames have been elided.  If the return value is NULL, also

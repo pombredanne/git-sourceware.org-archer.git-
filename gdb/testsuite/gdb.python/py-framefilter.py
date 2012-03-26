@@ -77,8 +77,8 @@ class Main_filter:
 
             if len (sym.linkage_name):
                 nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
-            if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
-                sym = nsym
+                if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
+                    sym = nsym
             try:
                 val = sym.value(self.frame)
                 if val != None:

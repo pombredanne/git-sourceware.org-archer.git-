@@ -769,6 +769,7 @@ print_frame_info (struct frame_info *frame, int print_level,
   if (! frame_print_elide (frame))
     {
       int result = apply_frame_filter (frame, 1, LOCATION, 1,
+				       print_frame_arguments, 
 				       current_uiout);
       if (result)
 	return;
