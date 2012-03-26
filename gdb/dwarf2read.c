@@ -9014,6 +9014,44 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   /* Preserve BASE_TYPE's original type, just set its LENGTH.  */
   check_typedef (base_type);
 
+  /* Dwarf-2 specifications explicitly allows to create subrange types
+     without specifying a base type.
+     In that case, the base type must be set to the type of
+     the lower bound, upper bound or count, in that order, if any of these
+     three attributes references an object that has a type.
+     If no base type is found, the Dwarf-2 specifications say that
+     a signed integer type of size equal to the size of an address should
+     be used.
+     For the following C code: `extern char gdb_int [];'
+     GCC produces an empty range DIE.
+     FIXME: muller/2010-05-28: Possible references to object for low bound,
+     high bound or count are not yet handled by this code.  */
+  if (TYPE_CODE (base_type) == TYPE_CODE_VOID)
+    {
+      struct objfile *objfile = cu->objfile;
+      struct gdbarch *gdbarch = get_objfile_arch (objfile);
+      int addr_size = gdbarch_addr_bit (gdbarch) /8;
+      struct type *int_type = objfile_type (objfile)->builtin_int;
+
+      /* Test "int", "long int", and "long long int" objfile types,
+	 and select the first one having a size above or equal to the
+	 architecture address size.  */
+      if (int_type && TYPE_LENGTH (int_type) >= addr_size)
+	base_type = int_type;
+      else
+	{
+	  int_type = objfile_type (objfile)->builtin_long;
+	  if (int_type && TYPE_LENGTH (int_type) >= addr_size)
+	    base_type = int_type;
+	  else
+	    {
+	      int_type = objfile_type (objfile)->builtin_long_long;
+	      if (int_type && TYPE_LENGTH (int_type) >= addr_size)
+		base_type = int_type;
+	    }
+	}
+    }
+
   /* The die_type call above may have already set the type for this DIE.  */
   range_type = get_die_type (die, cu);
   if (range_type)
@@ -9139,44 +9177,6 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
       if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
 	high |= negative_mask;
       TYPE_HIGH_BOUND (range_type) = high;
-    }
-
-  /* Dwarf-2 specifications explicitly allows to create subrange types
-     without specifying a base type.
-     In that case, the base type must be set to the type of
-     the lower bound, upper bound or count, in that order, if any of these
-     three attributes references an object that has a type.
-     If no base type is found, the Dwarf-2 specifications say that
-     a signed integer type of size equal to the size of an address should
-     be used.
-     For the following C code: `extern char gdb_int [];'
-     GCC produces an empty range DIE.
-     FIXME: muller/2010-05-28: Possible references to object for low bound,
-     high bound or count are not yet handled by this code.  */
-  if (TYPE_CODE (base_type) == TYPE_CODE_VOID)
-    {
-      struct objfile *objfile = cu->objfile;
-      struct gdbarch *gdbarch = get_objfile_arch (objfile);
-      int addr_size = gdbarch_addr_bit (gdbarch) /8;
-      struct type *int_type = objfile_type (objfile)->builtin_int;
-
-      /* Test "int", "long int", and "long long int" objfile types,
-	 and select the first one having a size above or equal to the
-	 architecture address size.  */
-      if (int_type && TYPE_LENGTH (int_type) >= addr_size)
-	base_type = int_type;
-      else
-	{
-	  int_type = objfile_type (objfile)->builtin_long;
-	  if (int_type && TYPE_LENGTH (int_type) >= addr_size)
-	    base_type = int_type;
-	  else
-	    {
-	      int_type = objfile_type (objfile)->builtin_long_long;
-	      if (int_type && TYPE_LENGTH (int_type) >= addr_size)
-		base_type = int_type;
-	    }
-	}
     }
 
   /* DW_AT_bit_stride is currently unsupported as we count in bytes.  */
