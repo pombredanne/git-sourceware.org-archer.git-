@@ -333,19 +333,6 @@ static const char *const linespec_quote_characters = "\"\'";
 
 /* Lexer functions.  */
 
-/* A convenience macro for trimming trailing whitespace
-   from string P.  */
-
-#define TRIM_WHITESPACE(P)				\
-  do							\
-    {							\
-      char *_p = (P) + strlen ((P)) - 1;		\
-      while (_p >= (P) && (*_p == ' ' || *_p == '\t'))	\
-	_p--;						\
-      *(_p + 1) = '\0';					\
-    }							\
-  while (0)
-
 /* Lex a number from the input in PARSER.  This only supports
    decimal numbers.  */
 
@@ -442,14 +429,16 @@ skip_quote_char (const char *string, char quote_char)
 static char *
 copy_token_string (linespec_token token)
 {
-  char *str;
+  char *str, *s;
 
   if (token.type == LSTOKEN_KEYWORD)
     return xstrdup (LS_TOKEN_KEYWORD (token));
 
   str = savestring (LS_TOKEN_STOKEN (token).ptr,
 		    LS_TOKEN_STOKEN (token).length);
-  TRIM_WHITESPACE (str);
+  s = remove_trailing_whitespace (str, str + LS_TOKEN_STOKEN (token).length);
+  *s = '\0';
+
   return str;
 }
 
