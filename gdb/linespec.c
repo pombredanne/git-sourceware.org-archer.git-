@@ -1427,25 +1427,16 @@ linespec_parse_basic (linespec_parser *parser)
 
       if (token.type == LSTOKEN_NUMBER)
 	{
-	  if (PARSER_RESULT (parser)->function_name != NULL)
-	    {
-	      /* We could do this, but it is a new feature.  */
-	      throw_error (UNSUPPORTED_ERROR,
-			   _("FUNCTION:OFFSET is unimplemented"));
-	    }
-	  else
-	    {
-	      /* User specified FILE:LINE.  Record the line offset and
-		 get the next token.  */
-	      name = copy_token_string (token);
-	      cleanup = make_cleanup (xfree, name);
-	      PARSER_RESULT (parser)->line_offset
-		= linespec_parse_line_offset (name);
-	      do_cleanups (cleanup);
+	  /* User specified an offset.  Record the line offset and
+	     get the next token.  */
+	  name = copy_token_string (token);
+	  cleanup = make_cleanup (xfree, name);
+	  PARSER_RESULT (parser)->line_offset
+	    = linespec_parse_line_offset (name);
+	  do_cleanups (cleanup);
 
-	      /* Ge the next token.  */
-	      token = linespec_lexer_consume_token (parser);
-	    }
+	  /* Ge the next token.  */
+	  token = linespec_lexer_consume_token (parser);
 	}
       else if (token.type == LSTOKEN_STRING)
 	{
