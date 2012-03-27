@@ -757,6 +757,7 @@ do_gdb_disassembly (struct gdbarch *gdbarch,
 void
 print_frame_info (struct frame_info *frame, int print_level,
 		  enum print_what print_what, int print_args)
+
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct symtab_and_line sal;
@@ -768,9 +769,10 @@ print_frame_info (struct frame_info *frame, int print_level,
      filters.  */
   if (! frame_print_elide (frame))
     {
-      int result = apply_frame_filter (frame, 1, LOCATION, 1,
-				       print_frame_arguments, 
-				       current_uiout);
+      int result = 0;
+      result = apply_frame_filter (frame, 1, LOCATION, 1,
+				   print_frame_arguments,
+				   uiout, 1, 0);
       if (result)
 	return;
     }
@@ -1740,10 +1742,17 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
          means further attempts to backtrace would fail (on the other
          hand, perhaps the code does or could be fixed to make sure
          the frame->prev field gets set to NULL in that case).  */
+
       print_frame_info (fi, 1, LOCATION, 1);
       if (show_locals)
-	print_frame_local_vars (fi, 1, gdb_stdout);
+	{
+	  int result = 0;
+	  result = apply_frame_filter (fi, 1, LOCATION, 1,
+				       NULL, current_uiout, 0, 1);
+	  if (! result)
+	    print_frame_local_vars (fi, 1, gdb_stdout);
 
+	}
       /* Save the last frame to check for error conditions.  */
       trailing = fi;
     }

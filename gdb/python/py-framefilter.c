@@ -246,7 +246,279 @@ find_frame_filter (PyObject *frame, int print_level,
 }
 
 static int
-print_frame (PyObject *filter,
+py_print_locals (PyObject *filter,
+		 struct value_print_options opts)
+{
+  int indent = 4;
+  struct ui_stream *stb;
+  struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
+
+  if (PyObject_HasAttrString (filter, "frame_locals"))
+    {
+      PyObject *result = PyObject_CallMethod (filter, "frame_locals", NULL);
+      volatile struct gdb_exception except;
+      const struct language_defn *language;
+
+      if (result)
+	{
+	  Py_ssize_t size, list_index;
+
+	  make_cleanup_py_decref (result);
+
+	  if (! PyList_Check (result))
+	    {
+	      PyErr_SetString (PyExc_RuntimeError,
+			       _("frame_locals must return a Python list."));
+	      goto locals_error;
+	    }
+
+	  size = PyList_Size (result);
+
+	  if (size > 0)
+	    {
+	      for (list_index = 0; list_index < size; list_index++)
+		{
+		  PyObject *sym_tuple, *sym, *value;
+		  char *sym_name;
+		  struct value *val;
+		  struct symbol *symbol;
+
+		  sym_tuple = PyList_GetItem (result, list_index);
+		  if (! sym_tuple)
+		    goto locals_error;
+
+		  if (! PyTuple_Check (sym_tuple)
+		      && PyTuple_Size (sym_tuple) != 2)
+		    {
+		      PyErr_SetString (PyExc_RuntimeError,
+				       _("frame_locals list must contain a Python tuple."));
+		      goto locals_error;
+		    }
+
+		  /* Each element in the locals arguments list should be a
+		     tuple containing two elements.  The local name,
+		     which can be a string or a gdb.Symbol, and the
+		     value.  */
+
+		  /* Name.  */
+		  sym = PyTuple_GetItem (sym_tuple, 0);
+		  if (! sym)
+		      goto locals_error;
+
+		  /* Value.  */
+		  value = PyTuple_GetItem (sym_tuple, 1);
+		  if (! value)
+		    goto locals_error;
+
+		  /* For arg name, the user can return a symbol or a
+		     string.  */
+		  if (PyString_Check (sym))
+		    {
+		      sym_name = python_string_to_host_string (sym);
+		      language = current_language;
+		      if (! sym_name)
+			goto locals_error;
+		    }
+		  else
+		    {
+		      symbol = symbol_object_to_symbol (sym);
+		      sym_name = xstrdup (SYMBOL_PRINT_NAME (symbol));
+
+		      if (language_mode == language_mode_auto)
+			language = language_def (SYMBOL_LANGUAGE (symbol));
+		      else
+			language = current_language;
+		    }
+
+		  fprintf_filtered (gdb_stdout, "%s%s = ",
+				    n_spaces (2 * indent), sym_name);
+
+		  xfree (sym_name);
+		  val = value_object_to_value (value);
+		  if (! val)
+		    {
+		      PyErr_SetString (PyExc_RuntimeError,
+				       _("Invalid value in frame."));
+
+		      goto locals_error;
+		    }
+
+		  TRY_CATCH (except, RETURN_MASK_ERROR)
+		    {
+		      opts.deref_ref = 1;
+		      common_val_print (val, gdb_stdout, indent, &opts, language);
+		    }
+		  if (except.reason < 0)
+		    {
+		      PyErr_SetString (PyExc_RuntimeError,
+				       except.message);
+		      goto locals_error;
+		    }
+		  fprintf_filtered (gdb_stdout, "\n");
+
+		  gdb_flush (gdb_stdout);
+		}
+	    }
+	}
+      else
+	goto locals_error;
+    }
+
+  do_cleanups (old_chain);
+  return 1;
+
+ locals_error:
+  do_cleanups (old_chain);
+  return 0;
+}
+
+static int
+py_print_args (PyObject *filter,
+	    struct ui_out *out,
+	    struct value_print_options opts,
+	    const char *print_args_type)
+{
+  struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
+  PyObject *result = NULL;
+  struct ui_stream *stb = NULL;
+
+  /* Frame arguments.  */
+  annotate_frame_args ();
+  ui_out_text (out, " (");
+
+  if (PyObject_HasAttrString (filter, "frame_args"))
+    {
+      PyObject *result = PyObject_CallMethod (filter, "frame_args", NULL);
+      volatile struct gdb_exception except;
+      const struct language_defn *language;
+
+      result = PyObject_CallMethod (filter, "frame_args", NULL);
+
+      if (result)
+	{
+	  Py_ssize_t size, list_index;
+
+	  make_cleanup_py_decref (result);
+	  stb = ui_out_stream_new (out);
+	  make_cleanup_ui_out_stream_delete (stb);
+
+	  if (! PyList_Check (result))
+	    {
+	      PyErr_SetString (PyExc_RuntimeError,
+			       _("frame_args must return a Python list."));
+	      goto args_error;
+	    }
+
+	  size = PyList_Size (result);
+
+	  if (size > 0)
+	    {
+	      for (list_index = 0; list_index < size; list_index++)
+		{
+		  PyObject *sym_tuple, *sym, *value;
+		  const char *sym_name;
+		  struct value *val;
+		  struct symbol *symbol;
+
+		  sym_tuple = PyList_GetItem (result, list_index);
+		  if (! sym_tuple)
+		    goto args_error;
+
+		  if (! PyTuple_Check (sym_tuple)
+		      && PyTuple_Size (sym_tuple) != 2)
+		    {
+		      PyErr_SetString (PyExc_RuntimeError,
+				       _("frame_arg list must contain a Python tuple."));
+		      goto args_error;
+		    }
+
+		  /* Each element in the frame arguments list should be a
+		     tuple containing two elements.  The argument name,
+		     which can be a string or a gdb.Symbol, and the
+		     value.  */
+
+		  /* Name.  */
+		  sym = PyTuple_GetItem (sym_tuple, 0);
+		  if (! sym)
+		      goto args_error;
+
+		  /* Value.  */
+		  value = PyTuple_GetItem (sym_tuple, 1);
+		  if (! value)
+		    goto args_error;
+
+		  /* For arg name, the user can return a symbol or a
+		     string.  */
+		  if (PyString_Check (sym))
+		    {
+		      sym_name = PyString_AsString (sym);
+		      language = current_language;
+		      if (! sym_name)
+			goto args_error;
+		    }
+		  else
+		    {
+		      symbol = symbol_object_to_symbol (sym);
+		      sym_name = SYMBOL_PRINT_NAME (symbol);
+		      if (language_mode == language_mode_auto)
+			language = language_def (SYMBOL_LANGUAGE (symbol));
+		      else
+			language = current_language;
+		    }
+
+		  annotate_arg_begin ();
+		  ui_out_field_string (out, "name", sym_name);
+		  ui_out_text (out, "=");
+
+		  val = value_object_to_value (value);
+		  if (! val)
+		    {
+		      PyErr_SetString (PyExc_RuntimeError,
+				       _("Invalid value in frame."));
+		      goto args_error;
+		    }
+
+		  annotate_arg_value (value_type (val));
+
+		  opts.deref_ref = 1;
+
+		  /* True in "summary" mode, false otherwise.  */
+		  opts.summary = !strcmp (print_args_type, "scalars");
+
+		  TRY_CATCH (except, RETURN_MASK_ALL)
+		    {
+		      common_val_print (val, stb->stream, 2, &opts, language);
+		    }
+		  if (except.reason > 0)
+		    {
+		      PyErr_SetString (PyExc_RuntimeError,
+				       except.message);
+		      goto args_error;
+		    }
+
+		  ui_out_field_stream (out, "value", stb);
+
+		  if (size != 1 && list_index < size-1)
+		    ui_out_text (out, ", ");
+		  annotate_arg_end ();
+		}
+	    }
+	}
+      else
+	goto args_error;
+    }
+  ui_out_text (out, ")");
+
+  do_cleanups (old_chain);
+  return 1;
+
+ args_error:
+  do_cleanups (old_chain);
+  return 0;
+}
+
+static int
+py_print_frame (PyObject *filter,
 	     int print_level,
 	     enum print_what print_what,
 	     int print_args,
@@ -263,7 +535,6 @@ print_frame (PyObject *filter,
   char *filename = NULL;
   int line = 0;
   volatile struct gdb_exception except;
-  const struct language_defn *language;
 
   /* First check to see if this frame is to be omitted.  */
   if (PyObject_HasAttrString (filter, "omit"))
@@ -374,136 +645,12 @@ print_frame (PyObject *filter,
   ui_out_field_string (out, "func", func);
 
   /* Frame arguments.  */
-  annotate_frame_args ();
-  ui_out_text (out, " (");
   if (print_args)
     {
-       if (PyObject_HasAttrString (filter, "frame_args"))
-	{
-	  PyObject *result = PyObject_CallMethod (filter, "frame_args", NULL);
-	  struct ui_stream *stb;
-	  struct cleanup *old_chain;
-	  const char *sym_name;
-
-	  stb = ui_out_stream_new (out);
-	  old_chain = make_cleanup_ui_out_stream_delete (stb);
-
-	  if (result)
-	    {
-	      Py_ssize_t size, list_index;
-
-	      if (! PyList_Check (result))
-		{
-		  Py_DECREF (result);
-		  PyErr_SetString (PyExc_RuntimeError,
-				   _("frame_args must return a Python list."));
-		  do_cleanups (old_chain);
-		  goto error;
-		}
-
-	      size = PyList_Size (result);
-
-	      if (size > 0)
-		{
-		  for (list_index = 0; list_index < size; list_index++)
-		    {
-		      PyObject *sym_tuple, *sym, *value;
-		      char *symname;
-		      struct value *val;
-		      struct symbol *symbol;
-
-		      sym_tuple = PyList_GetItem (result, list_index);
-		      if (! sym_tuple)
-			{
-			  Py_DECREF (result);
-			  do_cleanups (old_chain);
-			  goto error;
-			}
-
-		      if (! PyTuple_Check (sym_tuple)
-			  && PyTuple_Size (sym_tuple) != 2)
-			{
-			  Py_DECREF (result);
-
-			  PyErr_SetString (PyExc_RuntimeError,
-					   _("frame_arg list must contain a Python tuple."));
-			  do_cleanups (old_chain);
-			  goto error;
-			}
-
-		      /* Each element in the frame arguments list should be a
-			 tuple containing two elements.  The argument name,
-			 which can be a string or a gdb.Symbol, and the
-			 value.  */
-
-		      /* Name.  */
-		      sym = PyTuple_GetItem (sym_tuple, 0);
-		      if (! sym)
-			{
-			  Py_DECREF (result);
-			  do_cleanups (old_chain);
-			  goto error;
-			}
-
-		      /* Value.  */
-		      value = PyTuple_GetItem (sym_tuple, 1);
-		      if (! value)
-			{
-			  Py_DECREF (result);
-			  do_cleanups (old_chain);
-			  goto error;
-			}
-
-		      /* For arg name, the user can return a symbol or a
-			 string.  */
-		      if (PyString_Check (sym))
-			{
-			  sym_name = PyString_AsString (sym);
-			  language = current_language;
-			  if (! sym_name)
-			    {
-			      Py_DECREF (result);
-			      do_cleanups (old_chain);
-			      goto error;
-			    }
-			}
-		      else
-			{
-			  symbol = symbol_object_to_symbol (sym);
-			  sym_name = SYMBOL_PRINT_NAME (symbol);
-			  if (language_mode == language_mode_auto)
-			    language = language_def (SYMBOL_LANGUAGE (symbol));
-			  else
-			    language = current_language;
-			}
-
-			annotate_arg_begin ();
-			ui_out_field_string (out, "name", sym_name);
-			ui_out_text (out, "=");
-
-			val = value_object_to_value (value);
-
-			annotate_arg_value (value_type (val));
-
-			opts.deref_ref = 1;
-
-			/* True in "summary" mode, false otherwise.  */
-			 opts.summary = !strcmp (print_args_type, "scalars");
-			common_val_print (val, stb->stream, 2, &opts, language);
-			ui_out_field_stream (out, "value", stb);
-			if (size != 1 && list_index < size-1)
-			  ui_out_text (out, ", ");
-			annotate_arg_end ();
-		    }
-		  Py_DECREF (result);
-		}
-	    }
-	  else
-	    goto error;
-	}
+      if (! py_print_args (filter, out, opts, print_args_type))
+	goto error;
     }
 
-  ui_out_text (out, ")");
   if (PyObject_HasAttrString (filter, "filename"))
     {
       PyObject *result = PyObject_CallMethod (filter, "filename", NULL);
@@ -613,7 +760,8 @@ int
 apply_frame_filter (struct frame_info *frame, int print_level,
 		    enum print_what print_what, int print_args,
 		    const char *print_args_type, 
-		    struct ui_out *out)
+		    struct ui_out *out, int print_frame,
+		    int print_locals)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct cleanup *cleanups;
@@ -638,16 +786,21 @@ apply_frame_filter (struct frame_info *frame, int print_level,
     goto done;
 
   get_user_print_options (&opts);
-  success =  print_frame (filter, print_level, print_what,
-			  print_args, print_args_type, out, opts,
-			  frame);
-
+  if (print_frame)
+    {
+      success =  py_print_frame (filter, print_level, print_what,
+				 print_args, print_args_type, out, opts,
+				 frame);
+      if (success == 0 && PyErr_Occurred ())
+	gdbpy_print_stack ();
+    }
   
-  /* 'print_frame' can return a frame to "resume" from, in the case
-     that frames have been elided.  If the return value is NULL, also
-     check to see if this was because a Python error occurred.  */
-  if (success == 0 && PyErr_Occurred())
-    gdbpy_print_stack ();
+  if (print_locals)
+    {
+      success = py_print_locals (filter, opts);
+      if (success == 0 && PyErr_Occurred ())
+	gdbpy_print_stack ();
+    }
 
  done:
   do_cleanups (cleanups);
@@ -655,11 +808,12 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 }
 
 #else /* HAVE_PYTHON */
-
-struct frame_info *
+int
 apply_frame_filter (struct frame_info *frame, int print_level,
 		    enum print_what print_what, int print_args,
-		    struct ui_out *out)
+		    const char *print_args_type,
+		    struct ui_out *out, int print_frame,
+		    int print_locals)
 {
   return NULL;
 }

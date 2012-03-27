@@ -21,11 +21,27 @@ int count = 0;
 
 void end_func (void)
 {
+  const char *str = "The End";
+  const char *st2 = "Is Near";
+  int b = 12;
+  short c = 5;
+
   return; /* Backtrace end breakpoint */
 }
 
 void funcb(int j)
 {
+  struct foo
+  {
+    int a;
+    int b;
+  };
+
+  struct foo bar;
+
+  bar.a = 42;
+  bar.b = 84;
+
   funca();
   return;
 }
@@ -73,6 +89,7 @@ int func4(int j)
 int func5(int f)
 {
   int i = 0;
+  char *random = "random";
   i=i+f;
   
   func4(i);
