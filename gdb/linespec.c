@@ -442,6 +442,17 @@ copy_token_string (linespec_token token)
   return str;
 }
 
+/* Does P represent the end of a quote-enclosed linespec?  */
+
+static int
+is_closing_quote_enclosed (const char *p)
+{
+  if (strchr (linespec_quote_characters, *p))
+    ++p;
+  p = skip_spaces ((char *) p);
+  return (*p == '\0' || linespec_lexer_lex_keyword (p));
+}
+
 /* Lex a string from the input in PARSER.  */
 
 static linespec_token
@@ -556,7 +567,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	  else if (parser->is_quote_enclosed
 		   && strchr (linespec_quote_characters,
 			      PARSER_STREAM (parser)[0])
-		   && PARSER_STREAM (parser)[1] == '\0')
+		   && is_closing_quote_enclosed (PARSER_STREAM (parser)))
 	    {
 	      LS_TOKEN_STOKEN (token).ptr = start;
 	      LS_TOKEN_STOKEN (token).length = PARSER_STREAM (parser) - start;
@@ -619,7 +630,8 @@ linespec_lexer_lex_one (linespec_parser *parser)
 
 	case '\'': case '\"':
 	  /* Special case: permit quote-enclosed linespecs.  */
-	  if (parser->is_quote_enclosed && PARSER_STREAM (parser)[1] == '\0')
+	  if (parser->is_quote_enclosed
+	      && is_closing_quote_enclosed (PARSER_STREAM (parser)))
 	    {
 	      ++(PARSER_STREAM (parser));
 	      parser->lexer.current.type = LSTOKEN_EOI;
@@ -1883,7 +1895,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
       char *end;
 
       end = skip_quote_char (*argptr + 1, **argptr);
-      if (end != NULL && end[1] == '\0')
+      if (is_closing_quote_enclosed (end))
 	{
 	  /* Here's the special case.  Skip ARGPTR past the initial
 	     quote.  */
