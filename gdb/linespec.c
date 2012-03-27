@@ -1895,7 +1895,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
       char *end;
 
       end = skip_quote_char (*argptr + 1, **argptr);
-      if (is_closing_quote_enclosed (end))
+      if (end != NULL && is_closing_quote_enclosed (end))
 	{
 	  /* Here's the special case.  Skip ARGPTR past the initial
 	     quote.  */
