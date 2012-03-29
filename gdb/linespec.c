@@ -105,7 +105,8 @@ struct line_offset
 
 struct linespec
 {
-  /* An expression and the resulting PC.  */
+  /* An expression and the resulting PC.  Specifying an expression
+     currently precludes the use of other members.  */
   char *expression;
   CORE_ADDR expr_pc;
 
@@ -209,7 +210,7 @@ typedef enum ls_token_type linespec_token_type;
 
 /* List of keywords  */
 
-const char * const linespec_keywords[] = { "if", "thread", "task" };
+static const char * const linespec_keywords[] = { "if", "thread", "task" };
 
 /* A token of the linespec lexer  */
 
@@ -1352,11 +1353,9 @@ linespec_parse_basic (linespec_parser *parser)
       /* Get the next token.  */
       token = linespec_lexer_consume_token (parser);
 
-      /* If we're in list mode, and the next token is a string beginning
-	 with ",", we're dealing with a ranged listing.  Stop parsing
+      /* If the next token is a string beginning with ",", stop parsing
 	 and return.  */
-      if (PARSER_STATE (parser)->list_mode
-	  && token.type == LSTOKEN_STRING
+      if (token.type == LSTOKEN_STRING
 	  && *LS_TOKEN_STOKEN (token).ptr == ',')
 	return;
 
@@ -1745,7 +1744,7 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
 			   SYMBOL_NATURAL_NAME (sym));
 	}
     }
-  else if (ls->function_symbols != NULL)
+  else if (ls->function_symbols != NULL || ls->minimal_symbols != NULL)
     {
       /* We have just a bunch of functions and/or methods.  */
       int i;
@@ -1754,45 +1753,40 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
       minsym_and_objfile_d *elem;
       struct program_space *pspace;
 
-      /* Sort symbols so that symbols with the same program space are next
-	 to each other.  */
-      qsort (VEC_address (symbolp, ls->function_symbols),
-	     VEC_length (symbolp, ls->function_symbols),
-	     sizeof (symbolp), compare_symbols);
-
-      for (i = 0; VEC_iterate (symbolp, ls->function_symbols, i, sym); ++i)
+      if (ls->function_symbols != NULL)
 	{
-	  pspace = SYMTAB_PSPACE (SYMBOL_SYMTAB (sym));
-	  set_current_program_space (pspace);
-	  symbol_to_sal (&sal, state->funfirstline, sym);
-	  if (maybe_add_address (state->addr_set, pspace, sal.pc))
-	    add_sal_to_sals (state, &sals, &sal, SYMBOL_NATURAL_NAME (sym));
+	  /* Sort symbols so that symbols with the same program space are next
+	     to each other.  */
+	  qsort (VEC_address (symbolp, ls->function_symbols),
+		 VEC_length (symbolp, ls->function_symbols),
+		 sizeof (symbolp), compare_symbols);
+
+	  for (i = 0; VEC_iterate (symbolp, ls->function_symbols, i, sym); ++i)
+	    {
+	      pspace = SYMTAB_PSPACE (SYMBOL_SYMTAB (sym));
+	      set_current_program_space (pspace);
+	      symbol_to_sal (&sal, state->funfirstline, sym);
+	      if (maybe_add_address (state->addr_set, pspace, sal.pc))
+		add_sal_to_sals (state, &sals, &sal, SYMBOL_NATURAL_NAME (sym));
+	    }
 	}
 
-      /* Sort minimal symbols by program space, too.  */
-      qsort (VEC_address (minsym_and_objfile_d, ls->minimal_symbols),
-	     VEC_length (minsym_and_objfile_d, ls->minimal_symbols),
-	     sizeof (minsym_and_objfile_d), compare_msymbols);
-
-      for (i = 0;
-	   VEC_iterate (minsym_and_objfile_d, ls->minimal_symbols, i, elem);
-	   ++i)
+      if (ls->minimal_symbols != NULL)
 	{
-	  pspace = elem->minsym->ginfo.obj_section->objfile->pspace;
-	  set_current_program_space (pspace);
-	  minsym_found (state, elem->objfile, elem->minsym, &sals);
-	}
-    }
-  else if (ls->minimal_symbols != NULL)
-    {
-      /* We found minimal symbols, but no normal symbols.  */
-      int i;
-      minsym_and_objfile_d *elem;
+	  /* Sort minimal symbols by program space, too.  */
+	  qsort (VEC_address (minsym_and_objfile_d, ls->minimal_symbols),
+		 VEC_length (minsym_and_objfile_d, ls->minimal_symbols),
+		 sizeof (minsym_and_objfile_d), compare_msymbols);
 
-      for (i = 0;
-	   VEC_iterate (minsym_and_objfile_d, ls->minimal_symbols, i, elem);
-	   ++i)
-	minsym_found (state, elem->objfile, elem->minsym, &sals);
+	  for (i = 0;
+	       VEC_iterate (minsym_and_objfile_d, ls->minimal_symbols, i, elem);
+	       ++i)
+	    {
+	      pspace = SYMBOL_OBJ_SECTION (elem->minsym)->objfile->pspace;
+	      set_current_program_space (pspace);
+	      minsym_found (state, elem->objfile, elem->minsym, &sals);
+	    }
+	}
     }
   else if (ls->line_offset.sign != unknown)
     {
