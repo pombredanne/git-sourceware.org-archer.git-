@@ -16,14 +16,21 @@
 # This file is part of the GDB testsuite.  It tests Python-based
 # frame-filters.
 
-class Main_filter:
-    "Example main () filter"
+class TestFilter:
+    "Testcase filter"
 
     def __init__ (self, frame, what, level, args):
         self.frame = frame
         self.what = what
         self.lvl = level
         self.args = args
+
+    def __new__ (self):
+        fname = str (self.frame.function())
+        if fname == "main":
+            return None
+        else:
+            return self
 
     def omit (self):
         fname = str (self.frame.function())
@@ -139,9 +146,3 @@ class Main_filter:
         else:
             return "<unknown line>"
 
-
-def register_frame_filters (frame, what, level, args):
-
-#    if (frame.name() == "main"):
-        x = Main_filter (frame, what, level, args)
-        return x

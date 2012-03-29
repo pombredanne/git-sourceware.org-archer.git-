@@ -64,6 +64,8 @@ search_frame_filter_list (PyObject *list, PyObject *frame,
 	  if (!attr)
 	    return NULL;
 	  cmp = PyObject_IsTrue (attr);
+
+	  Py_DECREF (attr);
 	  if (cmp == -1)
 	    return NULL;
 
@@ -73,6 +75,7 @@ search_frame_filter_list (PyObject *list, PyObject *frame,
 
       filter = PyObject_CallFunctionObjArgs (function, frame, level,
 					     what, args, NULL);
+
       if (! filter)
 	return NULL;
       else if (filter != Py_None)
@@ -101,6 +104,7 @@ find_frame_filter_from_gdb (PyObject *frame, PyObject *level,
   /* Fetch the global frame filter list.  */
   if (! PyObject_HasAttrString (gdb_module, "frame_filters"))
     Py_RETURN_NONE;
+
   filter_list = PyObject_GetAttrString (gdb_module, "frame_filters");
   if (filter_list == NULL || ! PyList_Check (filter_list))
     {

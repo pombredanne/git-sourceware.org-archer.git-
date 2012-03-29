@@ -86,7 +86,7 @@ int func4(int j)
   return 2;
 }
 
-int func5(int f)
+int func5(int f, int d)
 {
   int i = 0;
   char *random = "random";
@@ -98,5 +98,5 @@ int func5(int f)
     
 main()
 {
-  func5(3);
+  func5(3,5);
 }
