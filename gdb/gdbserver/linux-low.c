@@ -4036,7 +4036,7 @@ regsets_store_inferior_registers (struct regcache *regcache)
 #ifndef __sparc__
       res = ptrace (regset->get_request, pid, nt_type, data);
 #else
-      res = ptrace (regset->get_request, pid, &iov, data);
+      res = ptrace (regset->get_request, pid, data, nt_type);
 #endif
 
       if (res == 0)
@@ -4271,11 +4271,19 @@ linux_fetch_registers (struct regcache *regcache, int regno)
 
   if (regno == -1)
     {
+      if (the_low_target.fetch_register != NULL)
+	for (regno = 0; regno < the_low_target.num_regs; regno++)
+	  (*the_low_target.fetch_register) (regcache, regno);
+
       all = regsets_fetch_inferior_registers (regcache);
-      usr_fetch_inferior_registers (regcache, regno, all);
+      usr_fetch_inferior_registers (regcache, -1, all);
     }
   else
     {
+      if (the_low_target.fetch_register != NULL
+	  && (*the_low_target.fetch_register) (regcache, regno))
+	return;
+
       use_regsets = linux_register_in_regsets (regno);
       if (use_regsets)
 	all = regsets_fetch_inferior_registers (regcache);
