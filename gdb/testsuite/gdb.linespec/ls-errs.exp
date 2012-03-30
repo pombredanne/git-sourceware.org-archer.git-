@@ -173,7 +173,7 @@ foreach x {"if" "task" "thread"} {
 }
 
 add the_tests "'main.c'flubber" unexpected_opt "string" "flubber"
-add the_tests "'main.c',21" unexpected_opt "string" ",21"
+add the_tests "'main.c',21" invalid_function "main.c"
 add the_tests "'main.c' " invalid_function "main.c"
 add the_tests "'main.c'3" unexpected_opt "number" "3"
 add the_tests "'main.c'+3" unexpected_opt "number" "+3"

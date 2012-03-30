@@ -200,6 +200,9 @@ enum ls_token_type
   /* A number  */
   LSTOKEN_NUMBER,
 
+  /* A comma  */
+  LSTOKEN_COMMA,
+
   /* EOI (end of input)  */
   LSTOKEN_EOI,
 
@@ -454,6 +457,46 @@ is_closing_quote_enclosed (const char *p)
   return (*p == '\0' || linespec_lexer_lex_keyword (p));
 }
 
+/* Find the end of the parameter list that starts with *INPUT.
+   This helper function assists with lexing string segments
+   which might contain valid (non-terminating) commas.  */
+
+static char *
+find_parameter_list_end (char *input)
+{
+  char end_char, start_char;
+  int depth;
+  char *p;
+
+  start_char = *input;
+  if (start_char == '(')
+    end_char = ')';
+  else if (start_char == '<')
+    end_char = '>';
+  else
+    return NULL;
+
+  p = input;
+  depth = 0;
+  while (*p)
+    {
+      if (*p == start_char)
+	++depth;
+      else if (*p == end_char)
+	{
+	  if (--depth == 0)
+	    {
+	      ++p;
+	      break;
+	    }
+	}
+      ++p;
+    }
+
+  return p;
+}
+
+
 /* Lex a string from the input in PARSER.  */
 
 static linespec_token
@@ -567,9 +610,47 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	  /* Special case: permit quote-enclosed linespecs.  */
 	  else if (parser->is_quote_enclosed
 		   && strchr (linespec_quote_characters,
-			      PARSER_STREAM (parser)[0])
+			      *PARSER_STREAM (parser))
 		   && is_closing_quote_enclosed (PARSER_STREAM (parser)))
 	    {
+	      LS_TOKEN_STOKEN (token).ptr = start;
+	      LS_TOKEN_STOKEN (token).length = PARSER_STREAM (parser) - start;
+	      return token;
+	    }
+	  /* Because commas may terminate a linespec and appear in
+	     the middle of valid string input, special cases for
+	     '<' and '(' are necessary.  */
+	  else if (*PARSER_STREAM (parser) == '<'
+		   || *PARSER_STREAM (parser) == '(')
+	    {
+	      char *p;
+
+	      p = find_parameter_list_end (PARSER_STREAM (parser));
+	      if (p != NULL)
+		{
+		  PARSER_STREAM (parser) = p;
+		  continue;
+		}
+	    }
+	  /* Commas are terminators, but not if they are part of an
+	     operator name.  */
+	  else if (*PARSER_STREAM (parser) == ',')
+	    {
+	      if (current_language->la_language == language_cplus
+		  && (PARSER_STREAM (parser) - start) > 8
+		  /* strlen ("operator") */)
+		{
+		  char *p = strstr (start, "operator");
+
+		  if (p != NULL && is_operator_name (p))
+		    {
+		      /* This is an operator name.  Keep going.  */
+		      ++(PARSER_STREAM (parser));
+		      continue;
+		    }
+		}
+
+	      /* Comma terminates the string.  */
 	      LS_TOKEN_STOKEN (token).ptr = start;
 	      LS_TOKEN_STOKEN (token).length = PARSER_STREAM (parser) - start;
 	      return token;
@@ -639,6 +720,14 @@ linespec_lexer_lex_one (linespec_parser *parser)
 	    }
 	  else
 	    parser->lexer.current = linespec_lexer_lex_string (parser);
+	  break;
+
+	case ',':
+	  parser->lexer.current.type = LSTOKEN_COMMA;
+	  LS_TOKEN_STOKEN (parser->lexer.current).ptr
+	    = PARSER_STREAM (parser);
+	  LS_TOKEN_STOKEN (parser->lexer.current).length = 1;
+	  ++(PARSER_STREAM (parser));
 	  break;
 
 	default:
@@ -1277,7 +1366,7 @@ unexpected_linespec_error (linespec_parser *parser)
 {
   linespec_token token;
   static const char * token_type_strings[]
-    = {"keyword", "colon", "string", "number", "end of input"};
+    = {"keyword", "colon", "string", "number", "comma", "end of input"};
 
   /* Get the token that generated the error.  */
   token = linespec_lexer_lex_one (parser);
@@ -1353,10 +1442,8 @@ linespec_parse_basic (linespec_parser *parser)
       /* Get the next token.  */
       token = linespec_lexer_consume_token (parser);
 
-      /* If the next token is a string beginning with ",", stop parsing
-	 and return.  */
-      if (token.type == LSTOKEN_STRING
-	  && *LS_TOKEN_STOKEN (token).ptr == ',')
+      /* If the next token is a comma, stop parsing and return.  */
+      if (token.type == LSTOKEN_COMMA)
 	return;
 
       /* If the next token is anything but EOI or KEYWORD, issue
@@ -1840,6 +1927,8 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
    This may all be followed by several keywords such as "if EXPR",
    which we ignore.
 
+   A comma will terminate parsing.
+
    The function may be an undebuggable function found in minimal symbol table.
 
    If the argument FUNFIRSTLINE is nonzero, we want the first line
@@ -2006,13 +2095,9 @@ parse_linespec (linespec_parser *parser, char **argptr)
 	  VEC_safe_push (symtab_p, PARSER_RESULT (parser)->file_symtabs, NULL);
 	}
     }
-  /* If the next token is not EOI or KEYWORD, issue an error.
-     Exception: In list mode, we allow the next token to be STRING,
-     as long as it starts with ',' (to accomodate ranges).  */
+  /* If the next token is not EOI, KEYWORD, or COMMA, issue an error.  */
   else if (token.type != LSTOKEN_EOI && token.type != LSTOKEN_KEYWORD
-	   && (!PARSER_STATE (parser)->list_mode
-	       || (token.type == LSTOKEN_STRING
-		   && *LS_TOKEN_STOKEN (token).ptr != ',')))
+	   && token.type != LSTOKEN_COMMA)
     {
       /* TOKEN is the _next_ token, not the one currently in the parser.
 	 Consuming the token will give the correct error message.  */
