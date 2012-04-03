@@ -73,19 +73,6 @@ struct cmd_list_element *maint_cplus_cmd_list = NULL;
 static void maint_cplus_command (char *arg, int from_tty);
 static void first_component_command (char *arg, int from_tty);
 
-/* Operator validation.
-   NOTE: Multi-byte operators (usually the assignment variety
-   operator) must appear before the single byte version, i.e., "+="
-   before "+".  */
-static const char *operator_tokens[] =
-  {
-    "++", "+=", "+", "->*", "->", "--", "-=", "-", "*=", "*",
-    "/=", "/", "%=", "%", "!=", "==", "!", "&&", "<<=", "<<",
-    ">>=", ">>", "<=", "<", ">=", ">", "~", "&=", "&", "|=",
-    "||", "|", "^=", "^", "=", "()", "[]", ",", "new", "delete"
-    /* new[] and delete[] require special whitespace handling */
-  };
-
 /* A list of typedefs which should not be substituted by replace_typedefs.  */
 static const char * const ignore_typedefs[] =
   {
