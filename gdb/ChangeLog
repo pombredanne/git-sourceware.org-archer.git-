@@ -1,3 +1,33 @@
+2012-04-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cp-valprint.c (cp_print_value_fields): Check valprint_check_validity
+	for TYPE_VPTR_FIELDNO.
+	* valprint.c (valprint_check_validity): Make it global, move the
+	function comment ...
+	* value.h (valprint_check_validity): ... to this new declaration.
+
+2012-04-02  Tristan Gingold  <gingold@adacore.com>
+
+	* i386-darwin-nat.c (i386_darwin_fetch_inferior_registers): Use
+	the STATE32 api for i386 state.
+	(i386_darwin_store_inferior_registers): Likewise.
+
+2012-04-02  Tristan Gingold  <gingold@adacore.com>
+
+	* i386-darwin-tdep.c (i386_darwin_thread_state_reg_offset): Fix
+	SS offset.
+	* i386-darwin-nat.c (i386_darwin_fetch_inferior_registers): Fix
+	format_string.
+
+2012-04-02  Tristan Gingold  <gingold@adacore.com>
+
+	PR gdb/13901
+	* darwin-nat.c (darwin_execvp): Sey binary preference.
+
+2012-04-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* NEWS (set breakpoint condition-evaluation): Use imperative mood.
+
 2012-03-30  Tom Tromey  <tromey@redhat.com>
 
 	* python/python.c (gdbpy_decode_line): Move cleanup creation out
