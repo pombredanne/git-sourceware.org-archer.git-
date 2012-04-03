@@ -162,6 +162,9 @@ typedef struct linespec *linespec_p;
 
 struct linespec_state
 {
+  /* The language in use during linespec processing.  */
+  const struct language_defn *language;
+
   /* The program space as seen when the module was entered.  */
   struct program_space *program_space;
 
@@ -539,7 +542,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
       char quote_char = *PARSER_STREAM (parser);
 
       /* Special case: Ada operators.  */
-      if (current_language->la_language == language_ada
+      if (PARSER_STATE (parser)->language->la_language == language_ada
 	  && quote_char == '\"')
 	{
 	  int len = is_ada_operator (PARSER_STREAM (parser));
@@ -660,7 +663,8 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	     operator name.  */
 	  else if (*PARSER_STREAM (parser) == ',')
 	    {
-	      if (current_language->la_language == language_cplus
+	      if ((PARSER_STATE (parser)->language->la_language
+		   == language_cplus)
 		  && (PARSER_STREAM (parser) - start) > 8
 		  /* strlen ("operator") */)
 		{
@@ -829,7 +833,7 @@ add_sal_to_sals (struct linespec_state *self,
 	     input.  We only apply the ":LINE" treatment to Ada for
 	     the time being.  */
 	  if (symname != NULL && sal->line != 0
-	      && current_language->la_language == language_ada)
+	      && self->language->la_language == language_ada)
 	    canonical_name = xstrprintf ("%s:%s:%d", filename, symname,
 					 sal->line);
 	  else if (symname != NULL)
@@ -946,7 +950,8 @@ iterate_name_matcher (const char *name, void *d)
    inlined instances of functions will be included in the result.  */
 
 static void
-iterate_over_all_matching_symtabs (const char *name,
+iterate_over_all_matching_symtabs (struct linespec_state *state,
+				   const char *name,
 				   const domain_enum domain,
 				   symbol_found_callback_ftype *callback,
 				   void *data,
@@ -959,8 +964,8 @@ iterate_over_all_matching_symtabs (const char *name,
 
   matcher_data.lookup_name = name;
   matcher_data.symbol_name_cmp =
-    current_language->la_get_symbol_name_cmp != NULL
-    ? current_language->la_get_symbol_name_cmp (name)
+    state->language->la_get_symbol_name_cmp != NULL
+    ? state->language->la_get_symbol_name_cmp (name)
     : strcmp_iw;
 
   ALL_PSPACES (pspace)
@@ -2169,12 +2174,13 @@ parse_linespec (linespec_parser *parser, char **argptr)
 
 static void
 linespec_state_constructor (struct linespec_state *self,
-			    int flags,
+			    int flags, const struct language_defn *language,
 			    struct symtab *default_symtab,
 			    int default_line,
 			    struct linespec_result *canonical)
 {
   memset (self, 0, sizeof (*self));
+  self->language = language;
   self->funfirstline = (flags & DECODE_LINE_FUNFIRSTLINE) ? 1 : 0;
   self->list_mode = (flags & DECODE_LINE_LIST_MODE) ? 1 : 0;
   self->default_symtab = default_symtab;
@@ -2189,7 +2195,7 @@ linespec_state_constructor (struct linespec_state *self,
 
 static void
 linespec_parser_new (linespec_parser *parser,
-		     int flags,
+		     int flags, const struct language_defn *language,
 		     struct symtab *default_symtab,
 		     int default_line,
 		     struct linespec_result *canonical)
@@ -2197,7 +2203,7 @@ linespec_parser_new (linespec_parser *parser,
   parser->lexer.current.type = LSTOKEN_CONSUMED;
   memset (PARSER_RESULT (parser), 0, sizeof (struct linespec));
   PARSER_RESULT (parser)->line_offset.sign = LINE_OFFSET_UNKNOWN;
-  linespec_state_constructor (PARSER_STATE (parser), flags,
+  linespec_state_constructor (PARSER_STATE (parser), flags, language,
 			      default_symtab, default_line, canonical);
 }
 
@@ -2268,7 +2274,8 @@ decode_line_full (char **argptr, int flags,
 	      || select_mode == multiple_symbols_cancel);
   gdb_assert ((flags & DECODE_LINE_LIST_MODE) == 0);
 
-  linespec_parser_new (&parser, flags, default_symtab, default_line, canonical);
+  linespec_parser_new (&parser, flags, current_language, default_symtab,
+		       default_line, canonical);
   cleanups = make_cleanup (linespec_parser_delete, &parser);
   save_current_program_space ();
 
@@ -2330,7 +2337,8 @@ decode_line_1 (char **argptr, int flags,
   linespec_parser parser;
   struct cleanup *cleanups;
 
-  linespec_parser_new (&parser, flags, default_symtab, default_line, NULL);
+  linespec_parser_new (&parser, flags, current_language, default_symtab,
+		       default_line, NULL);
   cleanups = make_cleanup (linespec_parser_delete, &parser);
   save_current_program_space ();
 
@@ -2513,10 +2521,10 @@ lookup_prefix_sym (struct linespec_state *state, VEC (symtab_p) *file_symtabs,
     {
       if (elt == NULL)
 	{
-	  iterate_over_all_matching_symtabs (class_name, STRUCT_DOMAIN,
+	  iterate_over_all_matching_symtabs (state, class_name, STRUCT_DOMAIN,
 					     collect_one_symbol, &collector,
 					     NULL, 0);
-	  iterate_over_all_matching_symtabs (class_name, VAR_DOMAIN,
+	  iterate_over_all_matching_symtabs (state, class_name, VAR_DOMAIN,
 					     collect_one_symbol, &collector,
 					     NULL, 0);
 	}
@@ -2883,9 +2891,9 @@ find_linespec_symbols (struct linespec_state *state,
   VEC (symbolp) *classes;
   volatile struct gdb_exception except;
 
-  cleanup = demangle_for_lookup (name, current_language->la_language,
+  cleanup = demangle_for_lookup (name, state->language->la_language,
 				 &lookup_name);
-  if (current_language->la_language == language_ada)
+  if (state->language->la_language == language_ada)
     {
       /* In Ada, the symbol lookups are performed using the encoded
          name rather than the demangled name.  */
@@ -3382,7 +3390,7 @@ add_matching_symbols_to_info (const char *name,
 
       if (elt == NULL)
 	{
-	  iterate_over_all_matching_symtabs (name, VAR_DOMAIN,
+	  iterate_over_all_matching_symtabs (info->state, name, VAR_DOMAIN,
 					     collect_symbols, info,
 					     pspace, 1);
 	  search_minsyms_for_name (info, name, pspace);
