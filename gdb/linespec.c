@@ -78,16 +78,16 @@ DEF_VEC_O (minsym_and_objfile_d);
 enum offset_relative_sign
 {
   /* No sign  */
-  none,
+  LINE_OFFSET_NONE,
 
   /* A plus sign ("+")  */
-  plus,
+  LINE_OFFSET_PLUS,
 
   /* A minus sign ("-")  */
-  minus,
+  LINE_OFFSET_MINUS,
 
   /* A special "sign" for unspecified offset.  */
-  unknown
+  LINE_OFFSET_UNKNOWN
 };
 
 /* A line offset in a linespec.  */
@@ -107,30 +107,54 @@ struct linespec
 {
   /* An expression and the resulting PC.  Specifying an expression
      currently precludes the use of other members.  */
+
+  /* The expression entered by the user.  */
   char *expression;
+
+  /* The resulting PC expression derived from evaluating EXPRESSION.  */
   CORE_ADDR expr_pc;
 
   /* Any specified file symtabs.  */
+
+  /* The user-supplied source filename or NULL if none was specified.  */
   char *source_filename;
+
+  /* The list of symtabs to search to which to limit the search.  May not
+     be NULL.  If SOURCE_FILENAME is NULL (no user-specified filename),
+     FILE_SYMTABS should contain one single NULL member.  This will
+     cause the code to use the default symtab.  */
   VEC (symtab_p) *file_symtabs;
 
   /* The name of a function or method and any matching symbols.  */
+
+  /* The user-specified function name.  If no function name was
+     supplied, this may be NULL.  */
   char *function_name;
+
+  /* A list of matching function symbols and minimal symbols.  Both lists
+     may be NULL if no matching symbols were found.  */
   VEC (symbolp) *function_symbols;
   VEC (minsym_and_objfile_d) *minimal_symbols;
 
   /* The name of a label and matching symbols.  */
+
+  /* The user-specified label name.  */
   char *label_name;
+
+  /* A structure of matching label symbols and the corresponding
+     function symbol in which the label was found.  Both may be NULL
+     or both must be non-NULL.  */
   struct
   {
     VEC (symbolp) *label_symbols;
     VEC (symbolp) *function_symbols;
   } labels;
 
-  /* Line offset  */
+  /* Line offset.  It may be LINE_OFFSET_UNKNOWN, meaning that no
+   offset was specified.  */
   struct line_offset line_offset;
 };
-typedef struct linespec *linespec_t;
+typedef struct linespec *linespec_p;
 
 /* An instance of this is used to keep all state while linespec
    operates.  This instance is passed around as a 'this' pointer to
@@ -276,7 +300,7 @@ static void initialize_defaults (struct symtab **default_symtab,
 static CORE_ADDR linespec_expression_to_pc (char **exp_ptr);
 
 static struct symtabs_and_lines decode_objc (struct linespec_state *self,
-					     linespec_t ls,
+					     linespec_p ls,
 					     char **argptr);
 
 static VEC (symtab_p) *symtabs_from_filename (const char *);
@@ -310,13 +334,13 @@ static void add_all_symbol_names_from_pspace (struct collect_info *info,
 static VEC (symtab_p) *collect_symtabs_from_filename (const char *file);
 
 static void decode_digits_ordinary (struct linespec_state *self,
-				    linespec_t ls,
+				    linespec_p ls,
 				    int line,
 				    struct symtabs_and_lines *sals,
 				    struct linetable_entry **best_entry);
 
 static void decode_digits_list_mode (struct linespec_state *self,
-				     linespec_t ls,
+				     linespec_p ls,
 				     struct symtabs_and_lines *values,
 				     struct symtab_and_line val);
 
@@ -411,7 +435,7 @@ is_ada_operator (const char *string)
 /* Find QUOTE_CHAR in STRING, accounting for the ':' terminal.  Return
    the location of QUOTE_CHAR, or NULL if not found.  */
 
-static char *
+static const char *
 skip_quote_char (const char *string, char quote_char)
 {
   const char *p, *last;
@@ -424,7 +448,7 @@ skip_quote_char (const char *string, char quote_char)
 	last = p++;
     }
 
-  return (char *) last;
+  return last;
 }
 
 /* Make a writable copy of the string given in TOKEN, trimming
@@ -511,7 +535,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
      quote character, regardless of the content.  */
   if (strchr (linespec_quote_characters, *PARSER_STREAM (parser)))
     {
-      char *end;
+      const char *end;
       char quote_char = *PARSER_STREAM (parser);
 
       /* Special case: Ada operators.  */
@@ -548,7 +572,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	error (_("unmatched quote"));
 
       /* Skip over the ending quote and mark the length of the string.  */
-      PARSER_STREAM (parser) = ++end;
+      PARSER_STREAM (parser) = (char *) ++end;
       LS_TOKEN_STOKEN (token).length = PARSER_STREAM (parser) - 2 - start;
     }
   else
@@ -1395,16 +1419,16 @@ unexpected_linespec_error (linespec_parser *parser)
 static struct line_offset
 linespec_parse_line_offset (char *string)
 {
-  struct line_offset line_offset = {0, none};
+  struct line_offset line_offset = {0, LINE_OFFSET_NONE};
 
   if (*string == '+')
     {
-      line_offset.sign = plus;
+      line_offset.sign = LINE_OFFSET_PLUS;
       ++string;
     }
   else if (*string == '-')
     {
-      line_offset.sign = minus;
+      line_offset.sign = LINE_OFFSET_MINUS;
       ++string;
     }
 
@@ -1584,7 +1608,7 @@ linespec_parse_basic (linespec_parser *parser)
    STATE->canonical.  */
 
 static void
-canonicalize_linespec (struct linespec_state *state, linespec_t ls)
+canonicalize_linespec (struct linespec_state *state, linespec_p ls)
 {
   /* If canonicalization was not requested, no need to do anything.  */
   if (!state->canonical)
@@ -1636,13 +1660,14 @@ canonicalize_linespec (struct linespec_state *state, linespec_t ls)
 	  state->canonical->special_display = 1;
 	}
 
-      if (ls->line_offset.sign != unknown)
+      if (ls->line_offset.sign != LINE_OFFSET_UNKNOWN)
 	{
 	  if (need_colon)
 	    fputc_unfiltered (':', buf);
 	  fprintf_filtered (buf, "%s%d",
-			    (ls->line_offset.sign == none ? ""
-			     : ls->line_offset.sign == plus ? "+" : "-"),
+			    (ls->line_offset.sign == LINE_OFFSET_NONE ? ""
+			     : (ls->line_offset.sign
+				== LINE_OFFSET_PLUS ? "+" : "-")),
 			    ls->line_offset.offset);
 	}
 
@@ -1655,7 +1680,7 @@ canonicalize_linespec (struct linespec_state *state, linespec_t ls)
 
 static struct symtabs_and_lines
 create_sals_line_offset (struct linespec_state *self,
-			 linespec_t ls)
+			 linespec_p ls)
 {
   struct symtabs_and_lines values;
   struct symtab_and_line val;
@@ -1689,14 +1714,14 @@ create_sals_line_offset (struct linespec_state *self,
   val.line = ls->line_offset.offset;
   switch (ls->line_offset.sign)
     {
-    case plus:
+    case LINE_OFFSET_PLUS:
       if (ls->line_offset.offset == 0)
 	val.line = 5;
       if (use_default)
 	val.line = self->default_line + val.line;
       break;
 
-    case minus:
+    case LINE_OFFSET_MINUS:
       if (ls->line_offset.offset == 0)
 	val.line = 15;
       if (use_default)
@@ -1705,7 +1730,7 @@ create_sals_line_offset (struct linespec_state *self,
 	val.line = -val.line;
       break;
 
-    case none:
+    case LINE_OFFSET_NONE:
       break;			/* No need to adjust val.line.  */
     }
 
@@ -1803,7 +1828,7 @@ create_sals_line_offset (struct linespec_state *self,
 /* Create and return SALs from the linespec LS.  */
 
 static struct symtabs_and_lines
-convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
+convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 {
   struct symtabs_and_lines sals = {NULL, 0};
 
@@ -1875,7 +1900,7 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_t ls)
 	    }
 	}
     }
-  else if (ls->line_offset.sign != unknown)
+  else if (ls->line_offset.sign != LINE_OFFSET_UNKNOWN)
     {
       /* Only an offset was specified.  */
 	sals = create_sals_line_offset (state, ls);
@@ -1966,7 +1991,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
   if (!is_ada_operator (*argptr)
       && strchr (linespec_quote_characters, **argptr) != NULL)
     {
-      char *end;
+      const char *end;
 
       end = skip_quote_char (*argptr + 1, **argptr);
       if (end != NULL && is_closing_quote_enclosed (end))
@@ -2037,7 +2062,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
 
       /* If a line_offset wasn't found (VAR is the name of a user
 	 variable/function), then skip to normal symbol processing.  */
-      if (PARSER_RESULT (parser)->line_offset.sign != unknown)
+      if (PARSER_RESULT (parser)->line_offset.sign != LINE_OFFSET_UNKNOWN)
 	{
 	  discard_cleanups (cleanup);
 
@@ -2079,11 +2104,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
 	  /* Get the next token.  */
 	  token = linespec_lexer_consume_token (parser);
 
-	  /* This token must be LSTOKEN_COLON.  */
-	  if (token.type != LSTOKEN_COLON)
-	    return values;
-
-	  /* Consume the LSTOKEN_COLON.  */
+	  /* This is LSTOKEN_COLON; consume it.  */
 	  linespec_lexer_consume_token (parser);
 	}
       else
@@ -2115,7 +2136,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
 
   if (PARSER_RESULT (parser)->function_symbols == NULL
       && PARSER_RESULT (parser)->labels.label_symbols == NULL
-      && PARSER_RESULT (parser)->line_offset.sign == unknown
+      && PARSER_RESULT (parser)->line_offset.sign == LINE_OFFSET_UNKNOWN
       && PARSER_RESULT (parser)->minimal_symbols == NULL)
     {
       /* The linespec didn't parse.  Re-throw the file exception if
@@ -2165,6 +2186,7 @@ linespec_state_constructor (struct linespec_state *self,
 }
 
 /* Initialize a new linespec parser.  */
+
 static void
 linespec_parser_new (linespec_parser *parser,
 		     int flags,
@@ -2174,7 +2196,7 @@ linespec_parser_new (linespec_parser *parser,
 {
   parser->lexer.current.type = LSTOKEN_CONSUMED;
   memset (PARSER_RESULT (parser), 0, sizeof (struct linespec));
-  PARSER_RESULT (parser)->line_offset.sign = unknown;
+  PARSER_RESULT (parser)->line_offset.sign = LINE_OFFSET_UNKNOWN;
   linespec_state_constructor (PARSER_STATE (parser), flags,
 			      default_symtab, default_line, canonical);
 }
@@ -2367,7 +2389,7 @@ linespec_expression_to_pc (char **exp_ptr)
    the existing C++ code to let the user choose one.  */
 
 static struct symtabs_and_lines
-decode_objc (struct linespec_state *self, linespec_t ls, char **argptr)
+decode_objc (struct linespec_state *self, linespec_p ls, char **argptr)
 {
   struct collect_info info;
   VEC (const_char_ptr) *symbol_names = NULL;
@@ -2980,9 +3002,7 @@ find_label_symbols (struct linespec_state *self,
       if (sym != NULL)
 	{
 	  VEC_safe_push (symbolp, result, sym);
-
-	  if (label_funcs_ret != NULL)
-	    VEC_safe_push (symbolp, *label_funcs_ret, fn_sym);
+	  VEC_safe_push (symbolp, *label_funcs_ret, fn_sym);
 	}
     }
   else
@@ -2997,8 +3017,7 @@ find_label_symbols (struct linespec_state *self,
 	  if (sym != NULL)
 	    {
 	      VEC_safe_push (symbolp, result, sym);
-	      if (label_funcs_ret != NULL)
-		VEC_safe_push (symbolp, *label_funcs_ret, fn_sym);
+	      VEC_safe_push (symbolp, *label_funcs_ret, fn_sym);
 	    }
 	}
     }
@@ -3012,7 +3031,7 @@ find_label_symbols (struct linespec_state *self,
 
 static void
 decode_digits_list_mode (struct linespec_state *self,
-			 linespec_t ls,
+			 linespec_p ls,
 			 struct symtabs_and_lines *values,
 			 struct symtab_and_line val)
 {
@@ -3046,7 +3065,7 @@ decode_digits_list_mode (struct linespec_state *self,
 
 static void
 decode_digits_ordinary (struct linespec_state *self,
-			linespec_t ls,
+			linespec_p ls,
 			int line,
 			struct symtabs_and_lines *sals,
 			struct linetable_entry **best_entry)
@@ -3091,7 +3110,7 @@ linespec_parse_variable (struct linespec_state *self, const char *variable)
 {
   int index = 0;
   const char *p;
-  struct line_offset offset = {0, none};
+  struct line_offset offset = {0, LINE_OFFSET_NONE};
 
   p = (variable[1] == '$') ? variable + 2 : variable + 1;
   if (*p == '$')
@@ -3124,7 +3143,7 @@ linespec_parse_variable (struct linespec_state *self, const char *variable)
       if (ivar == NULL)
 	/* No internal variable with that name.  Mark the offset
 	   as unknown to allow the name to be looked up as a symbol.  */
-	offset.sign = unknown;
+	offset.sign = LINE_OFFSET_UNKNOWN;
       else
 	{
 	  /* We found a valid variable name.  If it is not an integer,
