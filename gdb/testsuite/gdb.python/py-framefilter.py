@@ -71,73 +71,24 @@ class TestFilter:
             return "unknown"
 
     def frame_args (self):
-        func = self.frame.function()
-        args = []
-        block = self.frame.block()
+        args = self.frame.arguments()
+        args_list = []
+        if args != None:
+            for arg in args:
+                value = arg.value(self.frame)
+                args_list.append((arg, value))
 
-        if not func:
-            return
-
-        for sym in block:
-            if not sym.is_argument:
-                continue;
-
-            if len (sym.linkage_name):
-                nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
-                if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
-                    sym = nsym
-            try:
-                val = sym.value(self.frame)
-                if val != None:
-                    val = val
-                else:
-                    val="???"
-            except RuntimeError, text:
-                val = text
-
-            atuple = (sym.print_name, val)
-            args.append (atuple)
-
-        return args
+        return args_list
 
     def frame_locals (self):
-        args = []
-        block = self.frame.block()
-        func = self.frame.function()
+        frame_locals = self.frame.locals()
+        frame_locals_list = []
+        if frame_locals != None:
+            for frame_local in frame_locals:
+                value = frame_local.value(self.frame)
+                frame_locals_list.append((frame_local, value))
 
-        if not func:
-            return
-        fname = str (func)
-
-        if fname == "end_func":
-            args.append(("Some kind of synthetic var", gdb.Value(42)))
-
-        for sym in block:
-            if not sym.is_variable:
-                continue;
-
-            if len (sym.linkage_name):
-                nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
-                if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
-                    sym = nsym
-            try:
-                val = sym.value(self.frame)
-                if val != None:
-                    val = val
-                else:
-                    val="???"
-            except RuntimeError, text:
-                val = text
-
-            atuple = (sym.print_name, val)
-            args.append (atuple)
-
-        fname = str (self.frame.function())
-
-        if fname == "end_func":
-            args.append(("Some kind of synthetic var", gdb.Value(42)))
-
-        return args
+        return frame_locals_list
 
     def line (self):
         sal = self.frame.find_sal()
