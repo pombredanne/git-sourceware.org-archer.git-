@@ -127,11 +127,6 @@ struct frame_info
   /* The reason why we could not set PREV, or UNWIND_NO_REASON if we
      could.  Only valid when PREV_P is set.  */
   enum unwind_stop_reason stop_reason;
-
-  /* In Python frame-filtering, we can "elide" frames.  Store state
-     (during printing and processing) if this frame has been elided by
-     another.  */
-  int elide;
 };
 
 /* A frame stash used to speed up frame lookups.  */
@@ -2220,24 +2215,6 @@ frame_relative_level (struct frame_info *fi)
     return -1;
   else
     return fi->level;
-}
-
-int
-frame_print_elide (struct frame_info *fi)
-{
-  if (fi == NULL)
-    return -1;
-  else
-    return fi->elide;
-}
-
-void
-set_frame_print_elide (struct frame_info *fi)
-{
-  if (fi == NULL)
-    return;
-  else
-    fi->elide = 1;
 }
 
 enum frame_type

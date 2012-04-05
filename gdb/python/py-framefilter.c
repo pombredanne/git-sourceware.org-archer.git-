@@ -40,14 +40,15 @@
 
 static PyObject *
 search_frame_filter_list (PyObject *list, PyObject *frame,
-			  PyObject *level, PyObject *what,
-			  PyObject *args)
+			  int limit)
 
 {
   Py_ssize_t list_size, list_index;
   PyObject *function;
   PyObject *filter = NULL;
-  
+  PyObject *slimit;
+  PyObject *arg;
+
   list_size = PyList_Size (list);
   for (list_index = 0; list_index < list_size; list_index++)
     {
@@ -73,8 +74,8 @@ search_frame_filter_list (PyObject *list, PyObject *frame,
 	    continue;
 	}
 
-      filter = PyObject_CallFunctionObjArgs (function, frame, level,
-					     what, args, NULL);
+      slimit = PyLong_FromLong (limit);
+      filter = PyObject_CallFunctionObjArgs (function, frame, slimit, NULL);
 
       if (! filter)
 	return NULL;
@@ -95,8 +96,7 @@ search_frame_filter_list (PyObject *list, PyObject *frame,
    frame filter function, suitably inc-ref'd.  */
 
 static PyObject *
-find_frame_filter_from_gdb (PyObject *frame, PyObject *level,
-			    PyObject *what, PyObject *args)
+find_frame_filter_from_gdb (PyObject *frame, int limit)
 {
   PyObject *filter_list;
   PyObject *function;
@@ -112,8 +112,7 @@ find_frame_filter_from_gdb (PyObject *frame, PyObject *level,
       Py_RETURN_NONE;
     }
 
-  function = search_frame_filter_list (filter_list, frame, level,
-				       what, args);
+  function = search_frame_filter_list (filter_list, frame, limit);
   Py_XDECREF (filter_list);
   return function;
 }
@@ -124,8 +123,7 @@ find_frame_filter_from_gdb (PyObject *frame, PyObject *level,
    pretty-printer function. */
 
 static PyObject *
-find_frame_filter_from_objfiles (PyObject *frame, PyObject *level,
-				 PyObject *what, PyObject *args)
+find_frame_filter_from_objfiles (PyObject *frame, int limit)
 {
   PyObject *filter_list;
   PyObject *function;
@@ -143,8 +141,7 @@ find_frame_filter_from_objfiles (PyObject *frame, PyObject *level,
 
     filter_list = objfpy_get_frame_filters (objf, NULL);
 
-    function = search_frame_filter_list (filter_list, frame, level,
-					 what, args);
+    function = search_frame_filter_list (filter_list, frame, limit);
 
     Py_XDECREF (filter_list);
 
@@ -168,8 +165,7 @@ find_frame_filter_from_objfiles (PyObject *frame, PyObject *level,
    is the pretty-printer function.  */
 
 static PyObject *
-find_frame_filter_from_progspace (PyObject *frame, PyObject *level,
-				  PyObject *what, PyObject *args)
+find_frame_filter_from_progspace (PyObject *frame, int limit)
 {
   PyObject *filter_list;
   PyObject *function;
@@ -179,8 +175,8 @@ find_frame_filter_from_progspace (PyObject *frame, PyObject *level,
     return NULL;
   filter_list = pspy_get_frame_filters (obj, NULL);
 
-  function = search_frame_filter_list (filter_list, frame, level,
-				       what, args);
+  function = search_frame_filter_list (filter_list, frame, limit);
+
   Py_XDECREF (filter_list);
   return function;
 }
@@ -191,61 +187,29 @@ find_frame_filter_from_progspace (PyObject *frame, PyObject *level,
    reference.  On error, set the Python error and return NULL.  */
 
 static PyObject *
-find_frame_filter (PyObject *frame, int print_level,
-		   enum print_what print_what, int print_args)
-
+find_frame_filter (PyObject *frame, int limit)
 {
   PyObject *function = NULL;
-  PyObject *py_print_level = NULL;
-  PyObject *py_print_args = NULL;
-  PyObject *py_print_what = NULL;
-
-  /* Convert the parameters to Python objects.  If any of them fail,
-     abort.  */
-  py_print_level = PyBool_FromLong (print_level);
-  if (!py_print_level)
-    goto exit_func;
-
-  py_print_args = PyBool_FromLong (print_args);
-  if (!py_print_args)
-    goto exit_func;
-
-  py_print_what = PyLong_FromLong (print_what);
-  if (!py_print_what)
-    goto exit_func;
 
   /* Look at the frame filter list for each objfile
      in the current program-space.  */
-  function = find_frame_filter_from_objfiles (frame,
-					      py_print_level,
-					      py_print_what,
-					      py_print_args);
+  function = find_frame_filter_from_objfiles (frame, limit);
 
   if (function == NULL || function != Py_None)
     goto exit_func;
   Py_DECREF (function);
 
   /* Look at the frame filter list for the current program-space.  */
-  function = find_frame_filter_from_progspace (frame,
-					       py_print_level,
-					       py_print_what,
-					       py_print_args);
+  function = find_frame_filter_from_progspace (frame, limit);
 
   if (function == NULL || function != Py_None)
     goto exit_func;
   Py_DECREF (function);
 
   /* Look at the frame filter list in the gdb module.  */
-  function = find_frame_filter_from_gdb (frame,
-					 py_print_level,
-					 py_print_what,
-					 py_print_args);
- exit_func:
+  function = find_frame_filter_from_gdb (frame, limit)    ;
 
-  Py_XDECREF (py_print_level);
-  Py_XDECREF (py_print_what);
-  Py_XDECREF (py_print_args);
-
+exit_func:
   return function;
 }
 
@@ -384,7 +348,7 @@ py_print_args (PyObject *filter,
 {
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
   PyObject *result = NULL;
-  struct ui_stream *stb = NULL;
+  struct ui_file *stb;
 
   /* Frame arguments.  */
   annotate_frame_args ();
@@ -403,8 +367,8 @@ py_print_args (PyObject *filter,
 	  Py_ssize_t size, list_index;
 
 	  make_cleanup_py_decref (result);
-	  stb = ui_out_stream_new (out);
-	  make_cleanup_ui_out_stream_delete (stb);
+	  stb = mem_fileopen ();
+	  make_cleanup_ui_file_delete (stb);
 
 	  if (! PyList_Check (result))
 	    {
@@ -491,7 +455,7 @@ py_print_args (PyObject *filter,
 
 		  TRY_CATCH (except, RETURN_MASK_ALL)
 		    {
-		      common_val_print (val, stb->stream, 2, &opts, language);
+		      common_val_print (val, stb, 2, &opts, language);
 		    }
 		  if (except.reason > 0)
 		    {
@@ -523,22 +487,43 @@ py_print_args (PyObject *filter,
 
 static int
 py_print_frame (PyObject *filter,
-	     int print_level,
-	     enum print_what print_what,
-	     int print_args,
-	     const char *print_args_type,
-	     struct ui_out *out,
-	     struct value_print_options opts,
-	     struct frame_info *frame)
-
+		int print_level,
+		enum print_what print_what,
+		int print_args,
+		const char *print_args_type,
+		struct ui_out *out,
+		struct value_print_options opts)
 {
   int level = 0;
   CORE_ADDR address = 0;
-  struct gdbarch *gdbarch = get_frame_arch (frame);
+  struct gdbarch *gdbarch = NULL;
   char *func = NULL;
   char *filename = NULL;
   int line = 0;
+  struct frame_info *frame = NULL;
   volatile struct gdb_exception except;
+
+  /* Get the frame.  */
+  if (PyObject_HasAttrString (filter, "inferior_frame"))
+    {
+      PyObject *result = PyObject_CallMethod (filter, "inferior_frame", NULL);
+
+      if (! result)
+	goto error;
+      frame = frame_object_to_frame_info (result);
+      if (! frame)
+	{
+	  Py_DECREF (result);
+	  goto error;
+	}
+      gdbarch = get_frame_arch (frame);
+    }
+  else
+    {
+      PyErr_SetString (PyExc_RuntimeError,
+		       _("frame filter must implement inferior_frame callback."));
+      goto error;
+    }
 
   /* First check to see if this frame is to be omitted.  */
   if (PyObject_HasAttrString (filter, "omit"))
@@ -565,6 +550,35 @@ py_print_frame (PyObject *filter,
 	    goto error;
 	  else if (omit)
 	    return 1;
+	}
+      else
+	goto error;
+    }
+
+  if (PyObject_HasAttrString (filter, "elide"))
+    {
+      PyObject *result = PyObject_CallMethod (filter, "elide", NULL);
+
+      if (result)
+	{
+	  int elide = 0;
+
+	  if (! PyBool_Check (result))
+	    {
+	      Py_DECREF (result);
+	      PyErr_SetString (PyExc_RuntimeError,
+			       _("'elide' must return type boolean."));
+	      goto error;
+	    }
+
+	  elide = PyObject_IsTrue (result);
+
+	  Py_DECREF (result);
+
+	  if (elide == -1)
+	    goto error;
+	  else if (elide)
+	    ui_out_spaces (out, 4);
 	}
       else
 	goto error;
@@ -709,47 +723,6 @@ py_print_frame (PyObject *filter,
   ui_out_text (out, "\n");
   annotate_frame_end ();
 
-  if (PyObject_HasAttrString (filter, "elide"))
-    {
-      PyObject *result = PyObject_CallMethod (filter, "elide", NULL);
-
-      if (result)
-	{
-	  struct frame_info *restart = NULL;
-	  struct frame_info *current = NULL;
-	  /* Fix result here.  */
-	  TRY_CATCH (except, RETURN_MASK_ALL)
-	    {
-	      restart = frame_object_to_frame_info (result);
-	    }
-	  if (except.reason > 0)
-	    {
-	      Py_DECREF (result);
-	      PyErr_SetString (PyExc_RuntimeError,
-			       except.message);
-	      goto error;
-	    }
-	  if (! restart)
-	    {
-	      Py_DECREF (result);
-	      PyErr_SetString (PyExc_RuntimeError,
-			       _("Cannot locate frame to continue backtrace."));
-	      goto error;
-	    }
-	  if (restart != frame)
-	    {
-	      current=get_prev_frame (frame);
-	      while (current!=restart)
-		{
-		  set_frame_print_elide (current);
-		  current = get_prev_frame (current);
-		}
-	    }
-	}
-      else
-	goto error;
-    }
-
   xfree (func);
   xfree (filename);
   return 1;
@@ -763,13 +736,12 @@ py_print_frame (PyObject *filter,
 int
 apply_frame_filter (struct frame_info *frame, int print_level,
 		    enum print_what print_what, int print_args,
-		    const char *print_args_type, 
-		    struct ui_out *out, int print_frame,
-		    int print_locals)
+		    const char *print_args_type,  struct ui_out *out,
+		    int print_locals, int count)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct cleanup *cleanups;
-  PyObject *frame_obj, *filter;
+  PyObject *frame_obj, *filter, *frame_iter, *iterable;
   int result = 0;
   int print_result = 0;
   struct value_print_options opts;
@@ -782,7 +754,7 @@ apply_frame_filter (struct frame_info *frame, int print_level,
     goto done;
 
   /* Find the constructor.  */
-  filter = find_frame_filter (frame_obj, print_level, print_what, print_args);
+  filter = find_frame_filter (frame_obj, count);
   Py_DECREF (frame_obj);
 
   make_cleanup_py_decref (filter);
@@ -790,23 +762,49 @@ apply_frame_filter (struct frame_info *frame, int print_level,
     goto done;
 
   get_user_print_options (&opts);
-  if (print_frame)
+
+  iterable = PyObject_CallMethod (filter, "invoke", NULL);
+  if (! iterable)
+    goto done;
+
+  make_cleanup_py_decref (iterable);
+
+  /* Is it an iterator */
+  if PyIter_Check (iterable)
     {
-      success =  py_print_frame (filter, print_level, print_what,
-				 print_args, print_args_type, out, opts,
-				 frame);
-      if (success == 0 && PyErr_Occurred ())
-	gdbpy_print_stack ();
+      PyObject *iterator = PyObject_GetIter (iterable);
+      PyObject *item;
+
+      if (iterator == NULL)
+	goto done;
+
+      while ((item = PyIter_Next (iterator)))
+	{
+	  success =  py_print_frame (item, print_level, print_what,
+				     print_args, print_args_type, out,
+				     opts);
+	  if (success == 0 && PyErr_Occurred ())
+	    gdbpy_print_stack ();
+
+	  if (print_locals)
+	    {
+	      success = py_print_locals (item, opts);
+	      if (success == 0 && PyErr_Occurred ())
+		gdbpy_print_stack ();
+	    }
+	  Py_DECREF (item);
+	}
+      Py_DECREF (iterator);
     }
-  
-  if (print_locals)
+  else
     {
-      success = py_print_locals (filter, opts);
-      if (success == 0 && PyErr_Occurred ())
-	gdbpy_print_stack ();
+      Py_DECREF (iterable);
+      error (_("Frame filter must support iteration protocol"));
     }
 
  done:
+  if (PyErr_Occurred ())
+    gdbpy_print_stack ();
   do_cleanups (cleanups);
   return success;
 }

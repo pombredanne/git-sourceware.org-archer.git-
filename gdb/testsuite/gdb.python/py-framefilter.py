@@ -15,85 +15,38 @@
 
 # This file is part of the GDB testsuite.  It tests Python-based
 # frame-filters.
+import gdb
+import itertools
+from gdb.FrameWrapper import FrameWrapper
 
-class TestFilter:
-    "Testcase filter"
 
-    def __init__ (self, frame, what, level, args):
-        self.frame = frame
-        self.what = what
-        self.lvl = level
-        self.args = args
+class Reverse_Function (FrameWrapper):
 
-    def __new__ (self):
+    def function (self):
         fname = str (self.frame.function())
-        if fname == "main":
-            return None
+        if (fname == ""):
+            return "<unknown function>"
         else:
-            return self
+            fname = fname[::-1]
+        return fname
 
-    def omit (self):
+    def elide (self):
         fname = str (self.frame.function())
-        if fname == "func2":
+        if (fname == "func2" or fname == "func3"):
             return True
         else:
             return False
 
-    def elide (self):
-        fname = str (self.frame.function())
-        frame = self.frame
+class FrameFilter ():
 
-        if fname == "func3":
-            frame = frame.older()
-            frame = frame.older()
-            frame = frame.older()
+    def __init__ (self, iterator, limit):
+        self.iterator = iterator
+        self.limit = limit
 
-        return frame
+    def __new__ (self):
+        return self;
 
-    def function (self):
-        fname = str (self.frame.function())
-        if fname == "func3":
-            return "Composite frame " + str(self.frame.function())
-        else:
-            return str (self.frame.function())
-
-    def level (self, level):
-        return level
-
-    def address (self):
-        return self.frame.pc()
-
-    def filename (self):
-        sal = self.frame.find_sal()
-        if (sal):
-            return sal.symtab.filename
-        else:
-            return "unknown"
-
-    def frame_args (self):
-        args = self.frame.arguments()
-        args_list = []
-        if args != None:
-            for arg in args:
-                value = arg.value(self.frame)
-                args_list.append((arg, value))
-
-        return args_list
-
-    def frame_locals (self):
-        frame_locals = self.frame.locals()
-        frame_locals_list = []
-        if frame_locals != None:
-            for frame_local in frame_locals:
-                value = frame_local.value(self.frame)
-                frame_locals_list.append((frame_local, value))
-
-        return frame_locals_list
-
-    def line (self):
-        sal = self.frame.find_sal()
-        if (sal):
-            return sal.line        
-        else:
-            return "<unknown line>"
-
+    def invoke (self):
+        iter = itertools.imap (Reverse_Function,
+                               self.iterator)
+        return iter

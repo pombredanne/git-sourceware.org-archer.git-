@@ -46,8 +46,7 @@ int apply_frame_filter (struct frame_info *frame,
 			int print_args,
 			const char *print_frame_arguments,
 			struct ui_out *out,
-			int print_frame,
-			int print_locals);
+			int print_locals, int count);
 
 void preserve_python_values (struct objfile *objfile, htab_t copied_types);
 

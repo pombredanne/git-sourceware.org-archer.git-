@@ -765,18 +765,6 @@ print_frame_info (struct frame_info *frame, int print_level,
   int location_print;
   struct ui_out *uiout = current_uiout;
 
-  /* If a previous frame elided this one, do not run the frame
-     filters.  */
-  if (! frame_print_elide (frame))
-    {
-      int result = 0;
-      result = apply_frame_filter (frame, 1, LOCATION, 1,
-				   print_frame_arguments,
-				   uiout, 1, 0);
-      if (result)
-	return;
-    }
-
   if (get_frame_type (frame) == DUMMY_FRAME
       || get_frame_type (frame) == SIGTRAMP_FRAME
       || get_frame_type (frame) == ARCH_FRAME)
@@ -1135,9 +1123,6 @@ print_frame (struct frame_info *frame, int print_level,
 			gdbarch, pc);
 
   list_chain = make_cleanup_ui_out_tuple_begin_end (uiout, "frame");
-
-  if (frame_print_elide (frame))
-    ui_out_spaces (uiout, 4);
 
   if (print_level)
     {
@@ -1673,6 +1658,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
   int i;
   struct frame_info *trailing;
   int trailing_level;
+  int result = 0;
 
   if (!target_has_stack)
     error (_("No stack."));
@@ -1734,43 +1720,44 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
 	}
     }
 
-  for (i = 0, fi = trailing; fi && count--; i++, fi = get_prev_frame (fi))
+  result = apply_frame_filter (trailing, 1, LOCATION, 1,
+			       print_frame_arguments, current_uiout,
+			       show_locals, count);
+
+  if (! result)
     {
-      QUIT;
-
-      /* Don't use print_stack_frame; if an error() occurs it probably
-         means further attempts to backtrace would fail (on the other
-         hand, perhaps the code does or could be fixed to make sure
-         the frame->prev field gets set to NULL in that case).  */
-
-      print_frame_info (fi, 1, LOCATION, 1);
-      if (show_locals)
+      for (i = 0, fi = trailing; fi && count--; i++, fi = get_prev_frame (fi))
 	{
-	  int result = 0;
-	  result = apply_frame_filter (fi, 1, LOCATION, 1,
-				       NULL, current_uiout, 0, 1);
-	  if (! result)
+	  QUIT;
+
+	  /* Don't use print_stack_frame; if an error() occurs it probably
+	     means further attempts to backtrace would fail (on the other
+	     hand, perhaps the code does or could be fixed to make sure
+	     the frame->prev field gets set to NULL in that case).  */
+
+	  print_frame_info (fi, 1, LOCATION, 1);
+	  if (show_locals)
 	    print_frame_local_vars (fi, 1, gdb_stdout);
 
+	  /* Save the last frame to check for error conditions.  */
+	  trailing = fi;
 	}
-      /* Save the last frame to check for error conditions.  */
-      trailing = fi;
-    }
 
-  /* If we've stopped before the end, mention that.  */
-  if (fi && from_tty)
-    printf_filtered (_("(More stack frames follow...)\n"));
+      /* If we've stopped before the end, mention that.  */
+      if (fi && from_tty)
+	printf_filtered (_("(More stack frames follow...)\n"));
 
-  /* If we've run out of frames, and the reason appears to be an error
-     condition, print it.  */
-  if (fi == NULL && trailing != NULL)
-    {
-      enum unwind_stop_reason reason;
+      /* If we've run out of frames, and the reason appears to be an error
+	 condition, print it.  */
+      if (fi == NULL && trailing != NULL)
+	{
+	  enum unwind_stop_reason reason;
 
-      reason = get_frame_unwind_stop_reason (trailing);
-      if (reason >= UNWIND_FIRST_ERROR)
-	printf_filtered (_("Backtrace stopped: %s\n"),
-			 frame_stop_reason_string (reason));
+	  reason = get_frame_unwind_stop_reason (trailing);
+	  if (reason >= UNWIND_FIRST_ERROR)
+	    printf_filtered (_("Backtrace stopped: %s\n"),
+			     frame_stop_reason_string (reason));
+	}
     }
 }
 

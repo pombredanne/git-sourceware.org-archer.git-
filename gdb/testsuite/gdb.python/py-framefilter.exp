@@ -37,8 +37,10 @@ if ![runto_main ] then {
 }
 
 set remote_python_file [remote_download host ${srcdir}/${subdir}/${testfile}.py]
+gdb_test_no_output "set python print-stack full"
 gdb_test_no_output "python execfile ('${remote_python_file}')"
-gdb_test_no_output "python gdb.frame_filters.append(TestFilter)"
+gdb_test_no_output "python gdb.frame_filters.append(FrameFilter)"
+
 gdb_breakpoint [gdb_get_line_number "Backtrace end breakpoint"]
 gdb_continue_to_breakpoint "Backtrace end breakpoint"
 gdb_test "bt" "#0.*in end_func.*#22.*in func1.*Composite frame func3.*#27.*in main ().*"

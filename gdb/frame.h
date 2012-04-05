@@ -428,12 +428,6 @@ extern CORE_ADDR get_frame_args_address (struct frame_info *);
    for an invalid frame).  */
 extern int frame_relative_level (struct frame_info *fi);
 
-/* Whether this frame has been marked as elided for printing
-   purposes.  */
-extern int frame_print_elide (struct frame_info *fi);
-
-extern void set_frame_print_elide (struct frame_info *fi);
-
 /* Return the frame's type.  */
 
 extern enum frame_type get_frame_type (struct frame_info *);
