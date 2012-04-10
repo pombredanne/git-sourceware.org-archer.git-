@@ -29,6 +29,7 @@
 #include "symfile.h"
 #include "objfiles.h"
 #include "dictionary.h"
+#include "gdb_regex.h"
 
 typedef struct frapy_type_object {
   PyObject_HEAD
@@ -49,8 +50,16 @@ typedef struct frapy_type_object {
 /* A frame iterator object.  */
 typedef struct {
   PyObject_HEAD
-  struct frapy_type_object *source;
-  struct frapy_type_object *current;
+  /* The current frame in the iterator.  */
+  struct frame_info *current;
+  int regex;
+  /* Regex pattern, or null.  */
+  regex_t pattern;
+  /* Whether the iteration has started.  */
+  int started;
+  /* reversed, if true will get the next frame, if false will get the
+     previous frame.  */
+  int reversed;
 } frame_iterator_object;
 
 /* Require a valid frame.  This must be called inside a TRY_CATCH, or
@@ -766,41 +775,75 @@ frapy_iter (PyObject *self)
       return NULL;
 
   Py_INCREF (self);
-  frame_iter_obj->source = (frame_object *) self;
-  frame_iter_obj->current = NULL;
+  frame_iter_obj->current = frame_object_to_frame_info (self);
+  if (! frame_iter_obj->current)
+    return NULL;
+  frame_iter_obj->regex = 0;
+  frame_iter_obj->started = 0;
+  frame_iter_obj->reversed = 0;
   return (PyObject *) frame_iter_obj;
 }
 
+
+static struct frame_info *
+frame_navigate (struct frame_info *fi, int reversed)
+{
+  if (reversed)
+    return get_next_frame (fi);
+
+  return get_prev_frame (fi);
+}
+
+static struct frame_info *
+get_next_iter_frame_h (frame_iterator_object *frame_iter)
+{
+  struct frame_info *fi;
+
+  if (! frame_iter->current)
+    return NULL;
+
+  if (frame_iter->started)
+    fi = frame_navigate (frame_iter->current, frame_iter->reversed);
+  else
+    {
+      fi = frame_iter->current;
+      frame_iter->started = 1;
+    }
+
+  if (frame_iter->regex)
+    {
+      while (fi)
+	{
+	  enum language lang;
+	  volatile struct gdb_exception except;
+	  const char *name;
+
+	  find_frame_funname (fi, &name, &lang,
+			      NULL);
+	  if (name && regexec (&frame_iter->pattern, name, 0, NULL, 0) == 0)
+	    break;
+	  fi = frame_navigate (fi, frame_iter->reversed);
+	}
+    }
+  return fi;
+}
 
 static PyObject *
 frapy_iternext (PyObject *self)
 {
   frame_iterator_object *iter_obj = (frame_iterator_object *) self;
-  PyObject *result;
-  struct frame_info *prev;
+  volatile struct gdb_exception except;
 
-  /* If the user does: foo = gdb.FrameIterator(gdb.newest_frame()) the
-     next iteration will return the next oldest frame.  But we want to
-     account for the first frame in iterations also.  */
-  if (iter_obj->current != NULL)
-      result = frapy_older ((PyObject *)iter_obj->current, NULL);
-  else
-      result = (PyObject *) iter_obj->source;
-
-  /* Iteration stops on error (preserve the exception), or when
-     frapy_older returns None.  */
-  if (result == NULL)
+  TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      /* Reset the iterator.  */
-      iter_obj->current = NULL;
-      return NULL;
+      iter_obj->current = get_next_iter_frame_h (iter_obj);
     }
+  GDB_PY_HANDLE_EXCEPTION (except);
 
-  iter_obj->current = (frame_object *)result;
-  if (result == Py_None)
+  if (iter_obj->current == NULL)
     return NULL;
 
-  return result;
+  return frame_info_to_frame_object (iter_obj->current);
 }
 
 /* Return a reference to the block iterator.  */
@@ -817,28 +860,49 @@ static void
 frapy_iterator_dealloc (PyObject *obj)
 {
   frame_iterator_object *iter_obj = (frame_iterator_object *) obj;
-
-  Py_XDECREF (iter_obj->current);
+  /*dealloc regex patterns here */
 }
 
 static int
 frapy_frame_iter_init (PyObject *self, PyObject *args, PyObject *kw)
 {
-  static char *keywords[] = { "frame", NULL };
+  static char *keywords[] = { "frame", "regex", "reverse", NULL };
   frame_iterator_object *iter_obj = (frame_iterator_object *) self;
   PyObject *frame;
+  struct frame_info *fi;
+  const char *regex = NULL;
+  int reverse;
 
-  if (! PyArg_ParseTupleAndKeywords (args, kw, "O",
-				     keywords, &frame))
+  if (! PyArg_ParseTupleAndKeywords (args, kw, "O|si",
+				     keywords, &frame, &regex, &reverse))
     return -1;
 
   iter_obj->current = NULL;
-  iter_obj->source = NULL;
+  iter_obj->regex = 0;
+  iter_obj->started = 0;
+  iter_obj->reversed = reverse;
 
   if (frapy_is_valid (frame, NULL))
     {
       Py_INCREF (frame);
-      iter_obj->source = (frame_object *)frame;
+      fi = frame_object_to_frame_info (frame);
+      if (! fi)
+	return -1;
+      iter_obj->current = fi;
+      if (regex)
+	{
+	  int code = regcomp (&iter_obj->pattern, regex, REG_NOSUB);
+	  if (code != 0)
+	    {
+	      char *re_err = get_regcomp_error (code, &iter_obj->pattern);
+	      PyErr_Format (PyExc_RuntimeError, "Invalid regex: %s",
+			    re_err);
+	      xfree (re_err);
+	      return -1;
+	    }
+
+	  iter_obj->regex = 1;
+	}
     }
   else
     return -1;
