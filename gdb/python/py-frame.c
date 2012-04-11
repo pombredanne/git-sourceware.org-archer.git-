@@ -871,7 +871,7 @@ frapy_frame_iter_init (PyObject *self, PyObject *args, PyObject *kw)
   PyObject *frame;
   struct frame_info *fi;
   const char *regex = NULL;
-  int reverse;
+  int reverse = 0;
 
   if (! PyArg_ParseTupleAndKeywords (args, kw, "O|si",
 				     keywords, &frame, &regex, &reverse))
@@ -894,8 +894,11 @@ frapy_frame_iter_init (PyObject *self, PyObject *args, PyObject *kw)
 	  int code = regcomp (&iter_obj->pattern, regex, REG_NOSUB);
 	  if (code != 0)
 	    {
-	      char *re_err = get_regcomp_error (code, &iter_obj->pattern);
-	      PyErr_Format (PyExc_RuntimeError, "Invalid regex: %s",
+	      char *re_err = get_regcomp_error (code,
+						&iter_obj->pattern);
+
+	      PyErr_Format (PyExc_RuntimeError,
+			    "Invalid FrameIterator regexp: %s",
 			    re_err);
 	      xfree (re_err);
 	      return -1;
@@ -945,7 +948,8 @@ gdbpy_initialize_frames (void)
   Py_INCREF (&frame_iterator_object_type);
 
   PyModule_AddObject (gdb_module, "Frame", (PyObject *) &frame_object_type);
-  PyModule_AddObject (gdb_module, "FrameIterator", (PyObject *) &frame_iterator_object_type);  
+  PyModule_AddObject (gdb_module, "FrameIterator",
+		      (PyObject *) &frame_iterator_object_type);
 }
 
 
@@ -1040,7 +1044,7 @@ static PyTypeObject frame_iterator_object_type = {
   PyObject_HEAD_INIT (NULL)
   0,				  /*ob_size*/
   "gdb.FrameIterator",		  /*tp_name*/
-  sizeof (frame_iterator_object),	      /*tp_basicsize*/
+  sizeof (frame_iterator_object), /*tp_basicsize*/
   0,				  /*tp_itemsize*/
   frapy_iterator_dealloc,	  /*tp_dealloc*/
   0,				  /*tp_print*/
@@ -1066,13 +1070,13 @@ static PyTypeObject frame_iterator_object_type = {
   frapy_frame_iter,               /*tp_iter */
   frapy_iternext,                 /*tp_iternext */
   0,                              /*tp_methods */
-  0,				  /* tp_members */
-  0,				  /* tp_getset */
-  0,				  /* tp_base */
-  0,				  /* tp_dict */
-  0,				  /* tp_descr_get */
-  0,				  /* tp_descr_set */
-  0,				  /* tp_dictoffset */
-  frapy_frame_iter_init,	  /* tp_init */
-  0,				  /* tp_alloc */
+  0,				  /*tp_members */
+  0,				  /*tp_getset */
+  0,				  /*tp_base */
+  0,				  /*tp_dict */
+  0,				  /*tp_descr_get */
+  0,				  /*tp_descr_set */
+  0,				  /*tp_dictoffset */
+  frapy_frame_iter_init,	  /*tp_init */
+  0,				  /*tp_alloc */
 };
