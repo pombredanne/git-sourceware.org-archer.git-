@@ -1,3 +1,114 @@
+2012-04-25  Doug Evans  <dje@google.com>
+
+	* configure.ac: Create gdb.go/Makefile.
+	* configure: Regenerate.
+	* gdb.base/default.exp: Add "go" to "set language" testing.
+	* gdb.go/Makefile.in: New file.
+	* gdb.go/basic-types.exp: New file.
+	* gdb.go/chan.exp: New file.
+	* gdb.go/chan.go: New file.
+	* gdb.go/handcall.exp: New file.
+	* gdb.go/handcall.go: New file.
+	* gdb.go/hello.exp: New file.
+	* gdb.go/hello.go: New file.
+	* gdb.go/integers.exp: New file.
+	* gdb.go/integers.go: New file.
+	* gdb.go/methods.exp: New file.
+	* gdb.go/methods.go: New file.
+	* gdb.go/package.exp: New file.
+	* gdb.go/package1.go: New file.
+	* gdb.go/package2.go: New file.
+	* gdb.go/print.exp: New file.
+	* gdb.go/strings.exp: New file.
+	* gdb.go/strings.go: New file.
+	* gdb.go/types.exp: New file.
+	* gdb.go/types.go: New file.
+	* gdb.go/unsafe.exp: New file.
+	* gdb.go/unsafe.go: New file.
+	* lib/future.exp: Add Go support.
+	(gdb_find_go, gdb_find_go_linker): New procs.
+	(gdb_default_target_compile): Add Go support.
+	* lib/gdb.exp (skip_go_tests): New proc.
+	* lib/go.exp: New file.
+
+2012-04-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.threads/linux-dp.exp: Unset 'seen' before 'array set'.
+
+2012-04-18  Siddhesh Poyarekar  <siddhesh@redhat.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR symtab/7259:
+	* gdb.base/enumval.c: New test case.
+	* gdb.base/enumval.exp: New test case.
+	* gdb.python/py-type.exp (test_enums): Use field.enumval instead of
+	field.bitpos.
+
+2012-04-17  Pedro Alves  <palves@redhat.com>
+
+	* Makefile.in (site.exp): Make site.exp source
+	$srcdir/lib/append_gdb_boards_dir.exp.
+	* lib/append_gdb_boards_dir.exp: New file.
+
+2012-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	New option "set auto-load safe-path".
+	* gdb.python/py-objfile-script.exp (set auto-load safe-path): New.
+	* gdb.python/py-section-script.exp (set auto-load safe-path): New.
+
+2012-04-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	auto-load: Implementation.
+	* gdb.base/help.exp (test set height): Increase the height.
+	* gdb.python/py-objfile-script.exp (info auto-load-scripts): Change
+	to ...
+	(info auto-load python-scripts): ... here.
+	* gdb.python/py-section-script.exp (info auto-load-scripts *): Change
+	to ...
+	(info auto-load python-scripts *): ... here.
+
+2012-04-16  Yao Qi  <yao@codesourcery.com>
+
+	* lib/trace-support.exp (get_in_proc_agent): New.
+	* gdb.trace/change-loc.exp: Call get_in_proc_agent to get the location
+	of in process trace agent.
+	* gdb.trace/ftrace.exp: Likewise.
+	* gdb.trace/pending.exp: Likewise.
+	* gdb.trace/trace-break.exp: Likewise.
+	* gdb.trace/trace-mt.exp
+	* gdb.trace/tspeed.exp: Likewise.
+	* gdb.trace/tstatus.exp
+	* gdb.trace/strace.exp: Likewise.
+
+2012-04-16  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gdb.asm/sh.inc (gdbasm_startup): Only set up the stack pointer if the
+	symbol _stack is defined.  Get rid of a hard-coded constant for _stack.
+
+	* gdb.asm/sh.inc (gdbasm_end) <.size>: Refer to the function's name.
+
+2012-04-14  Anton Gorenkov <xgsa@yandex.ru>
+
+	PR mi/13393
+	* gdb.mi/mi-var-rtti.cc: New file.
+	* gdb.mi/mi-var-rtti.exp: New file.
+	* lib/mi-support.exp (mi_varobj_update_with_child_type_change): New
+	function.
+	(mi_varobj_update_with_type_change): updated to avoid code duplication.
+
+2012-04-11  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* gdb.python/Makefile.in: Add py-explore and py-explore-cc to
+	EXECUTABLES.
+	* gdb.python/py-explore.c: C program used for testing the new
+	'explore' command on C constructs.
+	* gdb.python/py-explore.cc: C++ program used for testing the new
+	'explore' command on C++ constructs.
+	* gdb-python/py-explore.exp: Tests for the new 'explore'
+	command on C constructs.
+	* gdb-python/py-explore-cc.exp: Tests for the new 'explore'
+	command on C++ constructs.
+
 2012-04-07  Mark Kettenis  <kettenis@gnu.org>
 
 	* gdb.base/funcargs.exp (complex_args): Fix typo.

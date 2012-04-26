@@ -1,3 +1,156 @@
+2012-04-24  Hans-Peter Nilsson  <hp@axis.com>
+
+	PR ld/13990
+	* elf32-arm.c (elf32_arm_gc_sweep_hook): Handle a forced-local
+	symbol, where PLT refcount is set to -1.
+
+2012-04-24  Alan Modra  <amodra@gmail.com>
+
+	PR ld/13991
+	* bfd/elf-bfd.h (_bfd_elf_link_just_syms): Define as
+	_bfd_generic_link_just_syms.
+	* bfd/elflink.c (_bfd_elf_link_just_syms): Delete.
+	* bfd/linker.c (_bfd_generic_link_just_syms): Set sec_info_type.
+
+	* bfd/bfd-in.h (discarded_section): Renamed from elf_discarded_section.
+	* bfd/section.c (SEC_INFO_TYPE_NONE, SEC_INFO_TYPE_STABS,
+	SEC_INFO_TYPE_MERGE, SEC_INFO_TYPE_EH_FRAME,
+	SEC_INFO_TYPE_JUST_SYMS): Renamed from corresponding ELF_INFO_TYPE.
+	* bfd/elf-eh-frame.c, * bfd/elf-m10200.c, * bfd/elf-m10300.c,
+	* bfd/elf.c, * bfd/elf32-arm.c, * bfd/elf32-avr.c, * bfd/elf32-bfin.c,
+	* bfd/elf32-cr16.c, * bfd/elf32-cr16c.c, * bfd/elf32-cris.c,
+	* bfd/elf32-crx.c, * bfd/elf32-d10v.c, * bfd/elf32-epiphany.c,
+	* bfd/elf32-fr30.c, * bfd/elf32-frv.c, * bfd/elf32-h8300.c,
+	* bfd/elf32-hppa.c, * bfd/elf32-i370.c, * bfd/elf32-i386.c,
+	* bfd/elf32-i860.c, * bfd/elf32-ip2k.c, * bfd/elf32-iq2000.c,
+	* bfd/elf32-lm32.c, * bfd/elf32-m32c.c, * bfd/elf32-m32r.c,
+	* bfd/elf32-m68hc1x.c, * bfd/elf32-m68k.c, * bfd/elf32-mcore.c,
+	* bfd/elf32-mep.c, * bfd/elf32-moxie.c, * bfd/elf32-msp430.c,
+	* bfd/elf32-mt.c, * bfd/elf32-openrisc.c, * bfd/elf32-ppc.c,
+	* bfd/elf32-rl78.c, * bfd/elf32-rx.c, * bfd/elf32-s390.c,
+	* bfd/elf32-score.c, * bfd/elf32-score7.c, * bfd/elf32-sh.c,
+	* bfd/elf32-spu.c, * bfd/elf32-tic6x.c, * bfd/elf32-tilepro.c,
+	* bfd/elf32-v850.c, * bfd/elf32-vax.c, * bfd/elf32-xc16x.c,
+	* bfd/elf32-xstormy16.c, * bfd/elf32-xtensa.c, * bfd/elf64-alpha.c,
+	* bfd/elf64-hppa.c, * bfd/elf64-ia64-vms.c, * bfd/elf64-mmix.c,
+	* bfd/elf64-ppc.c, * bfd/elf64-s390.c, * bfd/elf64-sh64.c,
+	* bfd/elf64-x86-64.c, * bfd/elflink.c, * bfd/elfnn-ia64.c,
+	* bfd/elfxx-mips.c, * bfd/elfxx-sparc.c, * bfd/elfxx-tilegx.c,
+	* bfd/reloc.c: Update all references.
+	* bfd/bfd-in2.h: Regenerate.
+
+2012-04-20  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* elf32-s390.c (ELF_DYNAMIC_INTERPRETER): Set to the GCC default.
+	* elf64-s390.c (ELF_DYNAMIC_INTERPRETER): Set to the GCC default.
+
+2012-04-19  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* elf32-sh.c (elf_sh_link_hash_entry): Specify an enum identifier for
+	got_type.
+	(allocate_dynrelocs, sh_elf_relocate_section, sh_elf_check_relocs): Use
+	it.
+
+2012-04-17  Kaz Kojima  <kkojima@rr.iij4u.or.jp>
+
+	* elf32-sh.c (allocate_dynrelocs): Don't allocate dynamic
+	relocations when LE conversion happens on the IE tls symbol.
+
+2012-04-17  Roland McGrath  <mcgrathr@google.com>
+
+	* elf64-x86-64.c (elf_x86_64_nacl_plt0_entry): Fix nop padding
+	so that 32-byte boundary is a proper instruction boundary.
+
+2012-04-17  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-lib.c (_bfd_vms_lib_get_module): Append .obj extension to
+	member of an object archive.<
+
+2012-04-17  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-lib.c (MAX_EKEYLEN): Define.
+	(MAX_KEYLEN): Fix value.
+	(vms_write_index): Add comments and fix indentation.
+	Adjust comparaison.  Add assertions.  Free kbn_blk.
+	(_bfd_vms_lib_write_archive_contents): Use MAX_EKEYLEN.
+	Compense MAX_KEYLEN adjustment.
+
+2012-04-16  Maciej W. Rozycki  <macro@linux-mips.org>
+
+	* elfxx-mips.c (mips16_stub_symndx): Handle n64 compound relocs.
+	(_bfd_mips_elf_check_relocs): Update accordingly.
+
+2012-04-13  Alan Modra  <amodra@gmail.com>
+
+	PR ld/13947
+	* elflink.c (bfd_elf_final_link): Set reloc_count to 0 for
+	reloc sections.
+
+2012-04-12  David S. Miller  <davem@davemloft.net>
+
+	* reloc.c (BFD_RELOC_SPARC_H34, BFD_RELOC_SPARC_SIZE32,
+	BFD_RELOC_SPARC_SIZE64, BFD_RELOC_SPARC_WDISP10): New relocs.
+	* libbfd.h: Regenerate.
+	* bfd-in2.h: Likewise.
+	* elfxx-sparc.c (sparc_elf_wdisp10_reloc): New function.
+	(_bfd_sparc_elf_howto_table): Add entries for R_SPARC_H34,
+	R_SPARC_SIZE32, R_SPARC_64, and R_SPARC_WDISP10.
+	(_bfd_sparc_elf_reloc_type_lookup): Handle new relocs.
+	(_bfd_sparc_elf_check_relocs): Likewise.
+	(_bfd_sparc_elf_gc_sweep_hook): Likewise.
+	(_bfd_sparc_elf_relocate_section): Likewise.
+
+2012-04-12  Roland McGrath  <mcgrathr@google.com>
+
+	* elf32-arm.c (elf32_arm_nacl_plt0_entry, elf32_arm_nacl_plt_entry):
+	New variables.
+	(struct elf32_arm_link_hash_table): New member `nacl_p'.
+	(elf32_arm_link_hash_table_create): Initialize it.
+	(elf32_arm_nacl_link_hash_table_create): New function.
+	(arm_movw_immediate, arm_movt_immediate): New functions.
+	(elf32_arm_populate_plt_entry): Test HTAB->nacl_p.
+	(elf32_arm_finish_dynamic_sections): Likewise.
+	(elf32_arm_output_plt_map_1): Likewise.
+	(bfd_elf32_littlearm_nacl_vec, bfd_elf32_bigarm_nacl_vec):
+	New backend vector stanza.
+	(elf32_arm_nacl_modify_segment_map): New function.
+	* config.bfd: Handle arm-*-nacl*, armeb-*-nacl*.
+	* targets.c: Support bfd_elf32_{big,little}_nacl_vec.
+	* configure.in: Likewise.
+	(bfd_elf32_bigarm_nacl_vec): Add elf-nacl.lo here.
+	(bfd_elf32_littlearm_nacl_vec): Likewise.
+	(bfd_elf32_bigarm_vec, bfd_elf32_littlearm_vec): Likewise.
+	(bfd_elf32_bigarm_symbian_vec): Likewise.
+	(bfd_elf32_littlearm_symbian_vec): Likewise.
+	(bfd_elf32_bigarm_vxworks_vec): Likewise.
+	(bfd_elf32_littlearm_vxworks_vec): Likewise.
+	* configure: Regenerated.
+
+2012-04-12  Tristan Gingold  <gingold@adacore.com>
+
+	* elflink.c (elf_link_output_extsym): Add a guard.
+	(bfd_elf_final_link): Remove assertion.
+	(bfd_elf_final_link): Add a guard.
+	* elfnn-ia64.c (INCLUDE_IA64_VMS): Removed.
+	(elfNN_vms_section_from_shdr, elfNN_vms_object_p)
+	(elfNN_vms_post_process_headers, elfNN_vms_section_processing)
+	(elfNN_vms_final_write_processing, elfNN_vms_close_and_cleanup):
+	Remove.
+	(elfNN-ia64-vms target): Move to ...
+	* elf64-ia64-vms.c: New file.
+	* configure.in (bfd_elf64_ia64_vms_vec): Add elf64-ia64-vms.lo
+	* Makefile.am (BFD64_BACKENDS): Add elf64-ia64-vms.lo.
+	(BFD64_BACKENDS_CFILES): Ad elf64-ia64-vms.c.
+	* configure: Regenerate.
+	* Makefile.in: Regenerate.
+
+2012-04-11  Nick Clifton  <nickc@redhat.com>
+
+	PR binutils/13897
+	* elf64-ppc.c (opd_entry_value): When dealing with sections
+	without relocs, keep the last section loaded in order to avoid
+	unnecessary reloads.
+
 2012-04-09  Roland McGrath  <mcgrathr@google.com>
 
 	* elf.c (_bfd_elf_map_sections_to_segments): Set INFO->user_phdrs.

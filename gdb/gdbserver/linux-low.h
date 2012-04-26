@@ -24,6 +24,10 @@
 
 #include "gdb_proc_service.h"
 
+#define PTRACE_ARG3_TYPE void *
+#define PTRACE_ARG4_TYPE void *
+#define PTRACE_XFER_TYPE long
+
 #ifdef HAVE_LINUX_REGSETS
 typedef void (*regset_fill_func) (struct regcache *, void *);
 typedef void (*regset_store_func) (struct regcache *, const void *);
@@ -278,7 +282,7 @@ struct lwp_info
 
 extern struct inferior_list all_lwps;
 
-int linux_pid_exe_is_elf_64_file (int pid);
+int linux_pid_exe_is_elf_64_file (int pid, unsigned int *machine);
 
 void linux_attach_lwp (unsigned long pid);
 struct lwp_info *find_lwp_pid (ptid_t ptid);

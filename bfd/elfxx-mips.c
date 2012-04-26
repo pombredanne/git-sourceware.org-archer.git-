@@ -1,6 +1,6 @@
 /* MIPS-specific support for ELF
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
    Free Software Foundation, Inc.
 
    Most of the information added by Ian Lance Taylor, Cygnus Support,
@@ -1460,14 +1460,17 @@ section_allows_mips16_refs_p (asection *section)
    function, or 0 if we can't decide which function that is.  */
 
 static unsigned long
-mips16_stub_symndx (asection *sec ATTRIBUTE_UNUSED,
+mips16_stub_symndx (const struct elf_backend_data *bed,
+		    asection *sec ATTRIBUTE_UNUSED,
 		    const Elf_Internal_Rela *relocs,
 		    const Elf_Internal_Rela *relend)
 {
+  int int_rels_per_ext_rel = bed->s->int_rels_per_ext_rel;
   const Elf_Internal_Rela *rel;
 
-  /* Trust the first R_MIPS_NONE relocation, if any.  */
-  for (rel = relocs; rel < relend; rel++)
+  /* Trust the first R_MIPS_NONE relocation, if any, but not a subsequent
+     one in a compound relocation.  */
+  for (rel = relocs; rel < relend; rel += int_rels_per_ext_rel)
     if (ELF_R_TYPE (sec->owner, rel->r_info) == R_MIPS_NONE)
       return ELF_R_SYM (sec->owner, rel->r_info);
 
@@ -7569,7 +7572,7 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
       /* Look at the relocation information to figure out which symbol
          this is for.  */
 
-      r_symndx = mips16_stub_symndx (sec, relocs, rel_end);
+      r_symndx = mips16_stub_symndx (bed, sec, relocs, rel_end);
       if (r_symndx == 0)
 	{
 	  (*_bfd_error_handler)
@@ -7694,7 +7697,7 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
       /* Look at the relocation information to figure out which symbol
          this is for.  */
 
-      r_symndx = mips16_stub_symndx (sec, relocs, rel_end);
+      r_symndx = mips16_stub_symndx (bed, sec, relocs, rel_end);
       if (r_symndx == 0)
 	{
 	  (*_bfd_error_handler)
@@ -9386,7 +9389,7 @@ _bfd_mips_elf_relocate_section (bfd *output_bfd, struct bfd_link_info *info,
 	    sec = h->root.u.def.section;
 	}
 
-      if (sec != NULL && elf_discarded_section (sec))
+      if (sec != NULL && discarded_section (sec))
 	RELOC_AGAINST_DISCARDED_SECTION (info, input_bfd, input_section,
 					 rel, relend, howto, contents);
 

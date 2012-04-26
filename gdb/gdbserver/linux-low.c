@@ -241,10 +241,6 @@ struct pending_signals
   struct pending_signals *prev;
 };
 
-#define PTRACE_ARG3_TYPE void *
-#define PTRACE_ARG4_TYPE void *
-#define PTRACE_XFER_TYPE long
-
 #ifdef HAVE_LINUX_REGSETS
 static char *disabled_regsets;
 static int num_regsets;
@@ -263,13 +259,19 @@ static void wait_for_sigstop (struct inferior_list_entry *entry);
 /* Return non-zero if HEADER is a 64-bit ELF file.  */
 
 static int
-elf_64_header_p (const Elf64_Ehdr *header)
+elf_64_header_p (const Elf64_Ehdr *header, unsigned int *machine)
 {
-  return (header->e_ident[EI_MAG0] == ELFMAG0
-          && header->e_ident[EI_MAG1] == ELFMAG1
-          && header->e_ident[EI_MAG2] == ELFMAG2
-          && header->e_ident[EI_MAG3] == ELFMAG3
-          && header->e_ident[EI_CLASS] == ELFCLASS64);
+  if (header->e_ident[EI_MAG0] == ELFMAG0
+      && header->e_ident[EI_MAG1] == ELFMAG1
+      && header->e_ident[EI_MAG2] == ELFMAG2
+      && header->e_ident[EI_MAG3] == ELFMAG3)
+    {
+      *machine = header->e_machine;
+      return header->e_ident[EI_CLASS] == ELFCLASS64;
+
+    }
+  *machine = EM_NONE;
+  return -1;
 }
 
 /* Return non-zero if FILE is a 64-bit ELF file,
@@ -277,7 +279,7 @@ elf_64_header_p (const Elf64_Ehdr *header)
    and -1 if the file is not accessible or doesn't exist.  */
 
 static int
-elf_64_file_p (const char *file)
+elf_64_file_p (const char *file, unsigned int *machine)
 {
   Elf64_Ehdr header;
   int fd;
@@ -293,19 +295,19 @@ elf_64_file_p (const char *file)
     }
   close (fd);
 
-  return elf_64_header_p (&header);
+  return elf_64_header_p (&header, machine);
 }
 
 /* Accepts an integer PID; Returns true if the executable PID is
    running is a 64-bit ELF file..  */
 
 int
-linux_pid_exe_is_elf_64_file (int pid)
+linux_pid_exe_is_elf_64_file (int pid, unsigned int *machine)
 {
   char file[MAXPATHLEN];
 
   sprintf (file, "/proc/%d/exe", pid);
-  return elf_64_file_p (file);
+  return elf_64_file_p (file, machine);
 }
 
 static void
@@ -1151,7 +1153,8 @@ linux_detach_one_lwp (struct inferior_list_entry *entry, void *args)
   /* Finally, let it resume.  */
   if (the_low_target.prepare_to_resume != NULL)
     the_low_target.prepare_to_resume (lwp);
-  if (ptrace (PTRACE_DETACH, lwpid_of (lwp), 0, sig) < 0)
+  if (ptrace (PTRACE_DETACH, lwpid_of (lwp), 0,
+	      (PTRACE_ARG4_TYPE) (long) sig) < 0)
     error (_("Can't detach %s: %s"),
 	   target_pid_to_str (ptid_of (lwp)),
 	   strerror (errno));
@@ -3991,7 +3994,8 @@ regsets_fetch_inferior_registers (struct regcache *regcache)
 	data = buf;
 
 #ifndef __sparc__
-      res = ptrace (regset->get_request, pid, nt_type, data);
+      res = ptrace (regset->get_request, pid,
+		    (PTRACE_ARG3_TYPE) (long) nt_type, data);
 #else
       res = ptrace (regset->get_request, pid, data, nt_type);
 #endif
@@ -4064,7 +4068,8 @@ regsets_store_inferior_registers (struct regcache *regcache)
 	data = buf;
 
 #ifndef __sparc__
-      res = ptrace (regset->get_request, pid, nt_type, data);
+      res = ptrace (regset->get_request, pid,
+		    (PTRACE_ARG3_TYPE) (long) nt_type, data);
 #else
       res = ptrace (regset->get_request, pid, data, nt_type);
 #endif
@@ -4076,7 +4081,8 @@ regsets_store_inferior_registers (struct regcache *regcache)
 
 	  /* Only now do we write the register set.  */
 #ifndef __sparc__
-	  res = ptrace (regset->set_request, pid, nt_type, data);
+	  res = ptrace (regset->set_request, pid,
+			(PTRACE_ARG3_TYPE) (long) nt_type, data);
 #else
 	  res = ptrace (regset->set_request, pid, data, nt_type);
 #endif
@@ -5419,7 +5425,9 @@ get_dynamic (const int pid, const int is_elf64)
 }
 
 /* Return &_r_debug in the inferior, or -1 if not present.  Return value
-   can be 0 if the inferior does not yet have the library list initialized.  */
+   can be 0 if the inferior does not yet have the library list initialized.
+   We look for DT_MIPS_RLD_MAP first.  MIPS executables use this instead of
+   DT_DEBUG, although they sometimes contain an unused DT_DEBUG entry too.  */
 
 static CORE_ADDR
 get_r_debug (const int pid, const int is_elf64)
@@ -5427,19 +5435,35 @@ get_r_debug (const int pid, const int is_elf64)
   CORE_ADDR dynamic_memaddr;
   const int dyn_size = is_elf64 ? sizeof (Elf64_Dyn) : sizeof (Elf32_Dyn);
   unsigned char buf[sizeof (Elf64_Dyn)];  /* The larger of the two.  */
+  CORE_ADDR map = -1;
 
   dynamic_memaddr = get_dynamic (pid, is_elf64);
   if (dynamic_memaddr == 0)
-    return (CORE_ADDR) -1;
+    return map;
 
   while (linux_read_memory (dynamic_memaddr, buf, dyn_size) == 0)
     {
       if (is_elf64)
 	{
 	  Elf64_Dyn *const dyn = (Elf64_Dyn *) buf;
+	  union
+	    {
+	      Elf64_Xword map;
+	      unsigned char buf[sizeof (Elf64_Xword)];
+	    }
+	  rld_map;
 
-	  if (dyn->d_tag == DT_DEBUG)
-	    return dyn->d_un.d_val;
+	  if (dyn->d_tag == DT_MIPS_RLD_MAP)
+	    {
+	      if (linux_read_memory (dyn->d_un.d_val,
+				     rld_map.buf, sizeof (rld_map.buf)) == 0)
+		return rld_map.map;
+	      else
+		break;
+	    }
+
+	  if (dyn->d_tag == DT_DEBUG && map == -1)
+	    map = dyn->d_un.d_val;
 
 	  if (dyn->d_tag == DT_NULL)
 	    break;
@@ -5447,9 +5471,24 @@ get_r_debug (const int pid, const int is_elf64)
       else
 	{
 	  Elf32_Dyn *const dyn = (Elf32_Dyn *) buf;
+	  union
+	    {
+	      Elf32_Word map;
+	      unsigned char buf[sizeof (Elf32_Word)];
+	    }
+	  rld_map;
 
-	  if (dyn->d_tag == DT_DEBUG)
-	    return dyn->d_un.d_val;
+	  if (dyn->d_tag == DT_MIPS_RLD_MAP)
+	    {
+	      if (linux_read_memory (dyn->d_un.d_val,
+				     rld_map.buf, sizeof (rld_map.buf)) == 0)
+		return rld_map.map;
+	      else
+		break;
+	    }
+
+	  if (dyn->d_tag == DT_DEBUG && map == -1)
+	    map = dyn->d_un.d_val;
 
 	  if (dyn->d_tag == DT_NULL)
 	    break;
@@ -5458,7 +5497,7 @@ get_r_debug (const int pid, const int is_elf64)
       dynamic_memaddr += dyn_size;
     }
 
-  return (CORE_ADDR) -1;
+  return map;
 }
 
 /* Read one pointer from MEMADDR in the inferior.  */
@@ -5551,6 +5590,7 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
       32     /* l_prev offset in link_map.  */
     };
   const struct link_map_offsets *lmo;
+  unsigned int machine;
 
   if (writebuf != NULL)
     return -2;
@@ -5559,7 +5599,7 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
 
   pid = lwpid_of (get_thread_lwp (current_inferior));
   xsnprintf (filename, sizeof filename, "/proc/%d/exe", pid);
-  is_elf64 = elf_64_file_p (filename);
+  is_elf64 = elf_64_file_p (filename, &machine);
   lmo = is_elf64 ? &lmo_64bit_offsets : &lmo_32bit_offsets;
 
   if (priv->r_debug == 0)
