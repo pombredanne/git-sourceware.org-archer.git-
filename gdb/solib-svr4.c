@@ -47,6 +47,8 @@
 #include "auxv.h"
 #include "exceptions.h"
 
+#include "stap-probe.h"
+
 static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
@@ -91,6 +93,32 @@ static const char * const solib_break_names[] =
 
   NULL
 };
+
+/* A list of SystemTap probes which, if present in the dynamic linker,
+   allow more fine-grained breakpoints to be placed on shared library
+   events.  */
+
+struct probe_info
+  {
+    /* The name of the probe.  */
+    const char *name;
+
+    /* Nonzero if this probe must be stopped at even when
+       stop-on-solib-events is off.  */
+    int mandatory;
+  };
+
+static const struct probe_info probe_info[] =
+{
+  {"rtld_init_start", 0},
+  {"rtld_init_complete", 1},
+  {"rtld_map_start", 0},
+  {"rtld_reloc_complete", 1},
+  {"rtld_unmap_start", 0},
+  {"rtld_unmap_complete", 1},
+};
+
+#define NUM_PROBES (sizeof(probe_info) / sizeof(probe_info[0]))
 
 static const char * const bkpt_names[] =
 {
@@ -313,6 +341,12 @@ struct svr4_info
   CORE_ADDR interp_text_sect_high;
   CORE_ADDR interp_plt_sect_low;
   CORE_ADDR interp_plt_sect_high;
+
+  /* SystemTap probes.  */
+  VEC (stap_probe_p) *probes[NUM_PROBES];
+
+  /* Nonzero if we are using the SystemTap interface.  */
+  int using_probes;
 };
 
 /* Per-program-space data key.  */
@@ -322,8 +356,15 @@ static void
 svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
 {
   struct svr4_info *info;
+  int i;
 
   info = program_space_data (pspace, solib_svr4_pspace_data);
+  if (info == NULL)
+    return;
+
+  for (i = 0; i < NUM_PROBES; i++)
+    VEC_free (stap_probe_p, info->probes[i]);
+
   xfree (info);
 }
 
@@ -1392,6 +1433,126 @@ exec_entry_point (struct bfd *abfd, struct target_ops *targ)
 					     targ);
 }
 
+/* Helper function for svr4_update_solib_event_breakpoints.  */
+
+static int
+svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
+{
+  struct svr4_info *info = get_svr4_info ();
+  struct bp_location *loc;
+
+  if (b->type != bp_shlib_event)
+    return 0;
+
+  for (loc = b->loc; loc; loc = loc->next)
+    {
+      int i;
+
+      for (i = 0; i < NUM_PROBES; i++)
+	{
+	  if (!probe_info[i].mandatory)
+	    {
+	      struct stap_probe *probe;
+	      int ix;
+
+	      for (ix = 0;
+		   VEC_iterate (stap_probe_p, info->probes[i], ix, probe);
+		   ++ix)
+		{
+		  if (loc->pspace == current_program_space
+		      && loc->address == probe->address)
+		    {
+		      b->enable_state =
+			stop_on_solib_events ? bp_enabled : bp_disabled;
+		      return 0;
+		    }
+		}
+	    }
+	}
+    }
+
+  return 0;
+}
+
+/* Enable or disable optional solib event breakpoints as appropriate.
+   Called whenever stop_on_solib_events is changed.  */
+
+static void
+svr4_update_solib_event_breakpoints (void)
+{
+  struct svr4_info *info = get_svr4_info ();
+
+  if (info->using_probes)
+    iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
+}
+
+/* Both the SunOS and the SVR4 dynamic linkers call a marker function
+   before and after mapping and unmapping shared libraries.  The sole
+   purpose of this method is to allow debuggers to set a breakpoint so
+   they can track these changes.
+
+   Some versions of the glibc dynamic linker contain SystemTap probes
+   to allow more fine grained stopping.  Given the address of the
+   original marker function, this function attempts to find these
+   probes, and if found, sets breakpoints on those instead.  If the
+   probes aren't found, a single breakpoint is set on the original
+   SVR4 marker function.  */
+
+static void
+svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
+{
+  struct svr4_info *info = get_svr4_info ();
+  struct obj_section *os;
+
+  os = find_pc_section (address);
+  if (os != NULL)
+    {
+      int all_probes_found = 1;
+      int i;
+
+      for (i = 0; i < NUM_PROBES; i++)
+	{
+	  info->probes[i] = find_probes_in_objfile (os->objfile, "rtld",
+						    probe_info[i].name);
+
+	  if (!VEC_length(stap_probe_p, info->probes[i]))
+	    {
+	      int j;
+
+	      for (j = i - 1; j >= 0; j--)
+		{
+		  VEC_free (stap_probe_p, info->probes[j]);
+		  info->probes[j] = NULL;
+		}
+
+	      all_probes_found = 0;
+	      break;
+	    }
+	}
+
+      if (all_probes_found)
+	{
+	  info->using_probes = 1;
+
+	  for (i = 0; i < NUM_PROBES; i++)
+	    {
+	      struct stap_probe *probe;
+	      int ix;
+
+	      for (ix = 0;
+		   VEC_iterate (stap_probe_p, info->probes[i], ix, probe);
+		   ++ix)
+		create_solib_event_breakpoint (gdbarch, probe->address);
+	    }
+
+	  svr4_update_solib_event_breakpoints ();
+	  return;
+	}
+    }
+
+  create_solib_event_breakpoint (gdbarch, address);
+}
+
 /* Helper function for gdb_bfd_lookup_symbol.  */
 
 static int
@@ -1440,9 +1601,17 @@ enable_break (struct svr4_info *info, int from_tty)
   asection *interp_sect;
   gdb_byte *interp_name;
   CORE_ADDR sym_addr;
+  int i;
 
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
+
+  for (i = 0; i < NUM_PROBES; i++)
+    {
+      VEC_free (stap_probe_p, info->probes[i]);
+      info->probes[i] = NULL;
+    }
+  info->using_probes = 0;
 
   /* If we already have a shared library list in the target, and
      r_debug contains r_brk, set the breakpoint there - this should
@@ -1475,7 +1644,7 @@ enable_break (struct svr4_info *info, int from_tty)
 	 That knowledge is encoded in the address, if it's Thumb the low bit
 	 is 1.  However, we've stripped that info above and it's not clear
 	 what all the consequences are of passing a non-addr_bits_remove'd
-	 address to create_solib_event_breakpoint.  The call to
+	 address to svr4_create_solib_event_breakpoints.  The call to
 	 find_pc_section verifies we know about the address and have some
 	 hope of computing the right kind of breakpoint to use (via
 	 symbol info).  It does mean that GDB needs to be pointed at a
@@ -1513,7 +1682,7 @@ enable_break (struct svr4_info *info, int from_tty)
 		+ bfd_section_size (tmp_bfd, interp_sect);
 	    }
 
-	  create_solib_event_breakpoint (target_gdbarch, sym_addr);
+	  svr4_create_solib_event_breakpoints (target_gdbarch, sym_addr);
 	  return 1;
 	}
     }
@@ -1668,7 +1837,8 @@ enable_break (struct svr4_info *info, int from_tty)
 
       if (sym_addr != 0)
 	{
-	  create_solib_event_breakpoint (target_gdbarch, load_addr + sym_addr);
+	  svr4_create_solib_event_breakpoints (target_gdbarch,
+					       load_addr + sym_addr);
 	  xfree (interp_name);
 	  return 1;
 	}
@@ -1694,7 +1864,7 @@ enable_break (struct svr4_info *info, int from_tty)
 	  sym_addr = gdbarch_convert_from_func_ptr_addr (target_gdbarch,
 							 sym_addr,
 							 &current_target);
-	  create_solib_event_breakpoint (target_gdbarch, sym_addr);
+	  svr4_create_solib_event_breakpoints (target_gdbarch, sym_addr);
 	  return 1;
 	}
     }
@@ -1710,7 +1880,7 @@ enable_break (struct svr4_info *info, int from_tty)
 	      sym_addr = gdbarch_convert_from_func_ptr_addr (target_gdbarch,
 							     sym_addr,
 							     &current_target);
-	      create_solib_event_breakpoint (target_gdbarch, sym_addr);
+	      svr4_create_solib_event_breakpoints (target_gdbarch, sym_addr);
 	      return 1;
 	    }
 	}
@@ -2486,4 +2656,5 @@ _initialize_svr4_solib (void)
   svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
   svr4_so_ops.same = svr4_same;
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
+  svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
 }
