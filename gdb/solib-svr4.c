@@ -343,7 +343,7 @@ struct svr4_info
   CORE_ADDR interp_plt_sect_high;
 
   /* SystemTap probes.  */
-  VEC (stap_probe_p) *probes[NUM_PROBES];
+  VEC (probe_p) *probes[NUM_PROBES];
 
   /* Nonzero if we are using the SystemTap interface.  */
   int using_probes;
@@ -363,7 +363,7 @@ svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
     return;
 
   for (i = 0; i < NUM_PROBES; i++)
-    VEC_free (stap_probe_p, info->probes[i]);
+    VEC_free (probe_p, info->probes[i]);
 
   xfree (info);
 }
@@ -1452,11 +1452,11 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 	{
 	  if (!probe_info[i].mandatory)
 	    {
-	      struct stap_probe *probe;
+	      struct probe *probe;
 	      int ix;
 
 	      for (ix = 0;
-		   VEC_iterate (stap_probe_p, info->probes[i], ix, probe);
+		   VEC_iterate (probe_p, info->probes[i], ix, probe);
 		   ++ix)
 		{
 		  if (loc->pspace == current_program_space
@@ -1515,13 +1515,13 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
 	  info->probes[i] = find_probes_in_objfile (os->objfile, "rtld",
 						    probe_info[i].name);
 
-	  if (!VEC_length(stap_probe_p, info->probes[i]))
+	  if (!VEC_length(probe_p, info->probes[i]))
 	    {
 	      int j;
 
 	      for (j = i - 1; j >= 0; j--)
 		{
-		  VEC_free (stap_probe_p, info->probes[j]);
+		  VEC_free (probe_p, info->probes[j]);
 		  info->probes[j] = NULL;
 		}
 
@@ -1536,11 +1536,11 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
 
 	  for (i = 0; i < NUM_PROBES; i++)
 	    {
-	      struct stap_probe *probe;
+	      struct probe *probe;
 	      int ix;
 
 	      for (ix = 0;
-		   VEC_iterate (stap_probe_p, info->probes[i], ix, probe);
+		   VEC_iterate (probe_p, info->probes[i], ix, probe);
 		   ++ix)
 		create_solib_event_breakpoint (gdbarch, probe->address);
 	    }
@@ -1608,7 +1608,7 @@ enable_break (struct svr4_info *info, int from_tty)
 
   for (i = 0; i < NUM_PROBES; i++)
     {
-      VEC_free (stap_probe_p, info->probes[i]);
+      VEC_free (probe_p, info->probes[i]);
       info->probes[i] = NULL;
     }
   info->using_probes = 0;
