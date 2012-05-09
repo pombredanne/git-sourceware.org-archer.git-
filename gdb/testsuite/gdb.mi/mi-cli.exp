@@ -166,10 +166,15 @@ mi_gdb_test "34 next" \
     ".*34\\\^running.*\\*running,thread-id=\"all\"" \
     "34 next: run"
 
-if {!$async} {
-    gdb_expect {
-        -re "~\[^\r\n\]+\r\n" {
-        }
+# Test that the new current source line is output, given we executed
+# the console 'next' command, not -exec-next.
+set test "34 next: CLI output"
+gdb_expect {
+    -re "~\"67\[^\r\n\]+\r\n" {
+	pass $test
+    }
+    timeout {
+	fail "$test (timeout)"
     }
 }
 
