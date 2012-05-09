@@ -91,7 +91,7 @@ mi_gdb_test "-interpreter-exec console \"set listsize 1\"" \
 
 # {.*\~"32[ \t(\\t)]*callee1.*\\n".*\^done }
 mi_gdb_test "-interpreter-exec console \"list\"" \
-  ".*\~\"$line_main_body\[\\\\t \]*callee1.*;\\\\n\".*\\^done" \
+  ".*\~\"57\\\\t\{\\\\n\".*\\^done" \
   "-interpreter-exec console \"list\""
 
 mi_execute_to "exec-continue" "breakpoint-hit" "callee4" "" ".*basics.c" $line_callee4_body \

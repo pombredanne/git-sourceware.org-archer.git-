@@ -159,14 +159,14 @@ print_stack_frame (struct frame_info *frame, int print_level,
 {
   volatile struct gdb_exception e;
 
+  int center = (print_what == SRC_LINE || print_what == SRC_AND_LOC);
+
   /* For mi, alway print location and address.  */
   if (ui_out_is_mi_like_p (current_uiout))
     print_what = LOC_AND_ADDRESS;
 
   TRY_CATCH (e, RETURN_MASK_ERROR)
     {
-      int center = (print_what == SRC_LINE || print_what == SRC_AND_LOC);
-
       print_frame_info (frame, print_level, print_what, 1 /* print_args */);
       set_current_sal_from_frame (frame, center);
     }
