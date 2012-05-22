@@ -354,7 +354,8 @@ static const struct dwarf_expr_context_funcs dwarf2_frame_ctx_funcs =
   ctx_no_get_tls_address,
   ctx_no_dwarf_call,
   ctx_no_get_base_type,
-  ctx_no_push_dwarf_reg_entry_value
+  ctx_no_push_dwarf_reg_entry_value,
+  ctx_no_get_addr_index
 };
 
 static CORE_ADDR
@@ -891,7 +892,7 @@ dwarf2_compile_cfa_to_ax (struct agent_expr *expr, struct axs_value *loc,
   const int num_regs = gdbarch_num_regs (gdbarch)
 		       + gdbarch_num_pseudo_regs (gdbarch);
   struct dwarf2_fde *fde;
-  CORE_ADDR text_offset, cfa;
+  CORE_ADDR text_offset;
   struct dwarf2_frame_state fs;
   int addr_size;
 

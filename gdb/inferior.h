@@ -266,7 +266,7 @@ extern void detach_command (char *, int);
 
 extern void notice_new_inferior (ptid_t, int, int);
 
-extern struct value *get_return_value (struct type *func_type,
+extern struct value *get_return_value (struct value *function,
                                        struct type *value_type);
 
 /* Address at which inferior stopped.  */
@@ -357,7 +357,6 @@ struct displaced_step_closure *get_displaced_step_closure_by_addr (CORE_ADDR add
 /* Possible values for gdbarch_call_dummy_location.  */
 #define ON_STACK 1
 #define AT_ENTRY_POINT 4
-#define AT_SYMBOL 5
 
 /* If STARTUP_WITH_SHELL is set, GDB's "run"
    will attempts to start up the debugee under a shell.

@@ -3341,7 +3341,9 @@ all breakpoints in that range are operated on.
 * Disabling::                   Disabling breakpoints
 * Conditions::                  Break conditions
 * Break Commands::              Breakpoint command lists
+* Dynamic Printf::              Dynamic printf
 * Save Breakpoints::            How to save breakpoints in a file
+* Static Probe Points::         Listing static probe points
 * Error in Breakpoints::        ``Cannot insert breakpoints''
 * Breakpoint-related Warnings:: ``Breakpoint address adjusted...''
 @end menu
@@ -4627,6 +4629,89 @@ cont
 end
 @end smallexample
 
+@node Dynamic Printf
+@subsection Dynamic Printf
+
+@cindex dynamic printf
+@cindex dprintf
+The dynamic printf command @code{dprintf} combines a breakpoint with
+formatted printing of your program's data to give you the effect of
+inserting @code{printf} calls into your program on-the-fly, without
+having to recompile it.
+
+In its most basic form, the output goes to the GDB console.  However,
+you can set the variable @code{dprintf-style} for alternate handling.
+For instance, you can ask to format the output by calling your
+program's @code{printf} function.  This has the advantage that the
+characters go to the program's output device, so they can recorded in
+redirects to files and so forth.
+
+@table @code
+@kindex dprintf
+@item dprintf @var{location},@var{template},@var{expression}[,@var{expression}@dots{}]
+Whenever execution reaches @var{location}, print the values of one or
+more @var{expressions} under the control of the string @var{template}.
+To print several values, separate them with commas.
+
+@item set dprintf-style @var{style}
+Set the dprintf output to be handled in one of several different
+styles enumerated below.  A change of style affects all existing
+dynamic printfs immediately.  (If you need individual control over the
+print commands, simply define normal breakpoints with
+explicitly-supplied command lists.)
+
+@item gdb
+@kindex dprintf-style gdb
+Handle the output using the @value{GDBN} @code{printf} command.
+
+@item call
+@kindex dprintf-style call
+Handle the output by calling a function in your program (normally
+@code{printf}).
+
+@item set dprintf-function @var{function}
+Set the function to call if the dprintf style is @code{call}.  By
+default its value is @code{printf}.  You may set it to any expression.
+that @value{GDBN} can evaluate to a function, as per the @code{call}
+command.
+
+@item set dprintf-channel @var{channel}
+Set a ``channel'' for dprintf.  If set to a non-empty value,
+@value{GDBN} will evaluate it as an expression and pass the result as
+a first argument to the @code{dprintf-function}, in the manner of
+@code{fprintf} and similar functions.  Otherwise, the dprintf format
+string will be the first argument, in the manner of @code{printf}.
+
+As an example, if you wanted @code{dprintf} output to go to a logfile
+that is a standard I/O stream assigned to the variable @code{mylog},
+you could do the following:
+
+@example
+(gdb) set dprintf-style call
+(gdb) set dprintf-function fprintf
+(gdb) set dprintf-channel mylog
+(gdb) dprintf 25,"at line 25, glob=%d\n",glob
+Dprintf 1 at 0x123456: file main.c, line 25.
+(gdb) info break
+1       dprintf        keep y   0x00123456 in main at main.c:25
+        call (void) fprintf (mylog,"at line 25, glob=%d\n",glob)
+        continue
+(gdb)
+@end example
+
+Note that the @code{info break} displays the dynamic printf commands
+as normal breakpoint commands; you can thus easily see the effect of
+the variable settings.
+
+@end table
+
+@value{GDBN} does not check the validity of function and channel,
+relying on you to supply values that are meaningful for the contexts
+in which they are being used.  For instance, the function and channel
+may be the values of local variables, but if that is the case, then
+all enabled dynamic prints must be at locations within the scope of
+those locals.  If evaluation fails, @value{GDBN} will report an error.
+
 @node Save Breakpoints
 @subsection How to save breakpoints to a file
 
@@ -4651,6 +4736,69 @@ breakpoints, you can edit the file in your favorite editing program,
 and remove the breakpoint definitions you're not interested in, or
 that can no longer be recreated.
 @end table
+
+@node Static Probe Points
+@subsection Static Probe Points
+
+@cindex static probe point, SystemTap
+@value{GDBN} supports @dfn{SDT} probes in the code.  @acronym{SDT} stands
+for Statically Defined Tracing, and the probes are designed to have a tiny
+runtime code and data footprint, and no dynamic relocations.  They are
+usable from assembly, C and C@t{++} languages.  See
+@uref{http://sourceware.org/systemtap/wiki/UserSpaceProbeImplementation}
+for a good reference on how the @acronym{SDT} probes are implemented.
+
+Currently, @code{SystemTap} (@uref{http://sourceware.org/systemtap/})
+@acronym{SDT} probes are supported on ELF-compatible systems.  See
+@uref{http://sourceware.org/systemtap/wiki/AddingUserSpaceProbingToApps}
+for more information on how to add @code{SystemTap} @acronym{SDT} probes
+in your applications.
+
+@cindex semaphores on static probe points
+Some probes have an associated semaphore variable; for instance, this
+happens automatically if you defined your probe using a DTrace-style
+@file{.d} file.  If your probe has a semaphore, @value{GDBN} will
+automatically enable it when you specify a breakpoint using the
+@samp{-probe-stap} notation.  But, if you put a breakpoint at a probe's
+location by some other method (e.g., @code{break file:line}), then
+@value{GDBN} will not automatically set the semaphore.
+
+You can examine the available static static probes using @code{info
+probes}, with optional arguments:
+
+@table @code
+@kindex info probes
+@item info probes stap @r{[}@var{provider} @r{[}@var{name} @r{[}@var{objfile}@r{]}@r{]}@r{]}
+If given, @var{provider} is a regular expression used to match against provider
+names when selecting which probes to list.  If omitted, probes by all
+probes from all providers are listed.
+
+If given, @var{name} is a regular expression to match against probe names
+when selecting which probes to list.  If omitted, probe names are not
+considered when deciding whether to display them.
+
+If given, @var{objfile} is a regular expression used to select which
+object files (executable or shared libraries) to examine.  If not
+given, all object files are considered.
+
+@item info probes all
+List the available static probes, from all types.
+@end table
+
+@vindex $_probe_arg@r{, convenience variable}
+A probe may specify up to twelve arguments.  These are available at the
+point at which the probe is defined---that is, when the current PC is
+at the probe's location.  The arguments are available using the
+convenience variables (@pxref{Convenience Vars})
+@code{$_probe_arg0}@dots{}@code{$_probe_arg11}.  Each probe argument is
+an integer of the appropriate size; types are not preserved.  The
+convenience variable @code{$_probe_argc} holds the number of arguments
+at the current probe point.
+
+These variables are always available, but attempts to access them at
+any location other than a probe point will cause @value{GDBN} to give
+an error message.
+
 
 @c  @ifclear BARETARGET
 @node Error in Breakpoints
@@ -4809,7 +4957,7 @@ called within the line.
 Also, the @code{step} command only enters a function if there is line
 number information for the function.  Otherwise it acts like the
 @code{next} command.  This avoids problems when using @code{cc -gl}
-on MIPS machines.  Previously, @code{step} entered subroutines if there
+on @acronym{MIPS} machines.  Previously, @code{step} entered subroutines if there
 was any debugging information about the routine.
 
 @item step @var{count}
@@ -6341,7 +6489,7 @@ switches between them.
 On the SPARC architecture, @code{frame} needs two addresses to
 select an arbitrary frame: a frame pointer and a stack pointer.
 
-On the MIPS and Alpha architecture, it needs two addresses: a stack
+On the @acronym{MIPS} and Alpha architecture, it needs two addresses: a stack
 pointer and a program counter.
 
 On the 29k architecture, it needs three addresses: a register stack
@@ -6666,6 +6814,19 @@ file explicitly.  This is useful if the name of the function does not
 specify the function unambiguously, e.g., if there are several
 functions with identical names in different source files.
 @end table
+
+@cindex breakpoint at static probe point
+@item -pstap|-probe-stap @r{[}@var{objfile}:@r{[}@var{provider}:@r{]}@r{]}@var{name}
+The @sc{gnu}/Linux tool @code{SystemTap} provides a way for
+applications to embed static probes.  @xref{Static Probe Points}, for more
+information on finding and using static probes.  This form of linespec
+specifies the location of such a static probe.
+
+If @var{objfile} is given, only probes coming from that shared library
+or executable matching @var{objfile} as a regular expression are considered.
+If @var{provider} is given, then only probes from that provider are considered.
+If several probes match the spec, @value{GDBN} will insert a breakpoint at
+each one of those probes.
 
 @end table
 
@@ -8274,6 +8435,24 @@ does not show the symbol name and filename of the referent, even with
 the appropriate @code{set print} options turned on.
 @end quotation
 
+You can also enable @samp{/a}-like formatting all the time using
+@samp{set print symbol on}:
+
+@table @code
+@item set print symbol on
+Tell @value{GDBN} to print the symbol corresponding to an address, if
+one exists.
+
+@item set print symbol off
+Tell @value{GDBN} not to print the symbol corresponding to an
+address.  In this mode, @value{GDBN} will still print the symbol
+corresponding to pointers to functions.  This is the default.
+
+@item show print symbol
+Show whether @value{GDBN} will display the symbol corresponding to an
+address.
+@end table
+
 Other settings control how different kinds of objects are printed:
 
 @table @code
@@ -9071,6 +9250,10 @@ to match the format in which the data was printed.
 The variable @code{$_exitcode} is automatically set to the exit code when
 the program being debugged terminates.
 
+@item $_probe_argc
+@itemx $_probe_arg0@dots{}$_probe_arg11
+Arguments to a static probe.  @xref{Static Probe Points}.
+
 @item $_sdata
 @vindex $_sdata@r{, inspect, convenience variable}
 The variable @code{$_sdata} contains extra collected static tracepoint
@@ -9328,23 +9511,109 @@ most appropriate form for a recognized tag, and in hexadecimal for
 an unrecognized tag.
 @end table
 
-On some targets, @value{GDBN} can access operating-system-specific information
-and display it to user, without interpretation.  For remote targets,
-this functionality depends on the remote stub's support of the 
+On some targets, @value{GDBN} can access operating system-specific
+information and show it to you.  The types of information available
+will differ depending on the type of operating system running on the
+target.  The mechanism used to fetch the data is described in
+@ref{Operating System Information}.  For remote targets, this
+functionality depends on the remote stub's support of the
 @samp{qXfer:osdata:read} packet, see @ref{qXfer osdata read}.
 
 @table @code
 @kindex info os
-@item info os
-List the types of OS information available for the target.  If the
-target does not return a list of possible types, this command will
-report an error.
+@item info os @var{infotype}
 
+Display OS information of the requested type.
+
+On @sc{gnu}/Linux, the following values of @var{infotype} are valid:
+
+@anchor{linux info os infotypes}
+@table @code
 @kindex info os processes
-@item info os processes
+@item processes
 Display the list of processes on the target.  For each process,
-@value{GDBN} prints the process identifier, the name of the user, and
-the command corresponding to the process.
+@value{GDBN} prints the process identifier, the name of the user, the
+command corresponding to the process, and the list of processor cores
+that the process is currently running on.  (To understand what these
+properties mean, for this and the following info types, please consult
+the general @sc{gnu}/Linux documentation.)
+
+@kindex info os procgroups
+@item procgroups
+Display the list of process groups on the target.  For each process,
+@value{GDBN} prints the identifier of the process group that it belongs
+to, the command corresponding to the process group leader, the process
+identifier, and the command line of the process.  The list is sorted
+first by the process group identifier, then by the process identifier,
+so that processes belonging to the same process group are grouped together
+and the process group leader is listed first.
+
+@kindex info os threads
+@item threads
+Display the list of threads running on the target.  For each thread,
+@value{GDBN} prints the identifier of the process that the thread
+belongs to, the command of the process, the thread identifier, and the
+processor core that it is currently running on.  The main thread of a
+process is not listed.
+
+@kindex info os files
+@item files
+Display the list of open file descriptors on the target.  For each
+file descriptor, @value{GDBN} prints the identifier of the process
+owning the descriptor, the command of the owning process, the value
+of the descriptor, and the target of the descriptor.
+
+@kindex info os sockets
+@item sockets
+Display the list of Internet-domain sockets on the target.  For each
+socket, @value{GDBN} prints the address and port of the local and
+remote endpoints, the current state of the connection, the creator of
+the socket, the IP address family of the socket, and the type of the
+connection.
+
+@kindex info os shm
+@item shm
+Display the list of all System V shared-memory regions on the target.
+For each shared-memory region, @value{GDBN} prints the region key,
+the shared-memory identifier, the access permissions, the size of the
+region, the process that created the region, the process that last
+attached to or detached from the region, the current number of live
+attaches to the region, and the times at which the region was last
+attached to, detach from, and changed.
+
+@kindex info os semaphores
+@item semaphores
+Display the list of all System V semaphore sets on the target.  For each
+semaphore set, @value{GDBN} prints the semaphore set key, the semaphore
+set identifier, the access permissions, the number of semaphores in the
+set, the user and group of the owner and creator of the semaphore set,
+and the times at which the semaphore set was operated upon and changed.
+
+@kindex info os msg
+@item msg
+Display the list of all System V message queues on the target.  For each
+message queue, @value{GDBN} prints the message queue key, the message
+queue identifier, the access permissions, the current number of bytes
+on the queue, the current number of messages on the queue, the processes
+that last sent and received a message on the queue, the user and group
+of the owner and creator of the message queue, the times at which a
+message was last sent and received on the queue, and the time at which
+the message queue was last changed.
+
+@kindex info os modules
+@item modules
+Display the list of all loaded kernel modules on the target.  For each
+module, @value{GDBN} prints the module name, the size of the module in
+bytes, the number of times the module is used, the dependencies of the
+module, the status of the module, and the address of the loaded module
+in memory.
+@end table
+
+@item info os
+If @var{infotype} is omitted, then list the possible values for
+@var{infotype} and the kind of OS information available for each
+@var{infotype}.  If the target does not return a list of possible
+types, this command will report an error.
 @end table
 
 @node Memory Region Attributes
@@ -11014,6 +11283,16 @@ Collect all local variables.
 @item $_ret
 Collect the return address.  This is helpful if you want to see more
 of a backtrace.
+
+@item $_probe_argc
+Collects the number of arguments from the static probe at which the
+tracepoint is located.
+@xref{Static Probe Points}.
+
+@item $_probe_arg@var{n}
+@var{n} is an integer between 0 and 11.  Collects the @var{n}th argument
+from the static probe at which the tracepoint is located.
+@xref{Static Probe Points}.
 
 @item $_sdata
 @vindex $_sdata@r{, collect}
@@ -16110,7 +16389,7 @@ Show whether a source file may have multiple base names.
 @cindex debugging information in separate files
 @cindex @file{.debug} subdirectories
 @cindex debugging information directory, global
-@cindex global debugging information directory
+@cindex global debugging information directories
 @cindex build ID, and separate debugging files
 @cindex @file{.build-id} directory
 
@@ -16155,14 +16434,14 @@ uses two different methods of looking for the debug file:
 @item
 For the ``debug link'' method, @value{GDBN} looks up the named file in
 the directory of the executable file, then in a subdirectory of that
-directory named @file{.debug}, and finally under the global debug
-directory, in a subdirectory whose name is identical to the leading
+directory named @file{.debug}, and finally under each one of the global debug
+directories, in a subdirectory whose name is identical to the leading
 directories of the executable's absolute file name.
 
 @item
 For the ``build ID'' method, @value{GDBN} looks in the
-@file{.build-id} subdirectory of the global debug directory for a file
-named @file{@var{nn}/@var{nnnnnnnn}.debug}, where @var{nn} are the
+@file{.build-id} subdirectory of each one of the global debug directories for
+a file named @file{@var{nn}/@var{nnnnnnnn}.debug}, where @var{nn} are the
 first 2 hex characters of the build ID bit string, and @var{nnnnnnnn}
 are the rest of the bit string.  (Real build ID strings are 32 or more
 hex characters, not 10.)
@@ -16171,7 +16450,7 @@ hex characters, not 10.)
 So, for example, suppose you ask @value{GDBN} to debug
 @file{/usr/bin/ls}, which has a debug link that specifies the
 file @file{ls.debug}, and a build ID whose value in hex is
-@code{abcdef1234}.  If the global debug directory is
+@code{abcdef1234}.  If the list of the global debug directories includes
 @file{/usr/lib/debug}, then @value{GDBN} will look for the following
 debug information files, in the indicated order:
 
@@ -16186,16 +16465,19 @@ debug information files, in the indicated order:
 @file{/usr/lib/debug/usr/bin/ls.debug}.
 @end itemize
 
-You can set the global debugging info directory's name, and view the
-name @value{GDBN} is currently using.
+@anchor{debug-file-directory}
+Global debugging info directories default to what is set by @value{GDBN}
+configure option @option{--with-separate-debug-dir}.  During @value{GDBN} run
+you can also set the global debugging info directories, and view the list
+@value{GDBN} is currently using.
 
 @table @code
 
 @kindex set debug-file-directory
 @item set debug-file-directory @var{directories}
 Set the directories which @value{GDBN} searches for separate debugging
-information files to @var{directory}.  Multiple directory components can be set
-concatenating them by a directory separator.
+information files to @var{directory}.  Multiple path components can be set
+concatenating them by a path separator.
 
 @kindex show debug-file-directory
 @item show debug-file-directory
@@ -16811,7 +17093,7 @@ load programs into flash memory.
 @cindex choosing target byte order
 @cindex target byte order
 
-Some types of processors, such as the MIPS, PowerPC, and Renesas SH,
+Some types of processors, such as the @acronym{MIPS}, PowerPC, and Renesas SH,
 offer the ability to run either big-endian or little-endian byte
 orders.  Usually the executable or symbol will include a bit to
 designate the endian-ness, and you will not need to worry about
@@ -19478,11 +19760,11 @@ Show MicroBlaze-specific debugging level.
 @end table
 
 @node MIPS Embedded
-@subsection MIPS Embedded
+@subsection @acronym{MIPS} Embedded
 
-@cindex MIPS boards
-@value{GDBN} can use the MIPS remote debugging protocol to talk to a
-MIPS board attached to a serial line.  This is available when
+@cindex @acronym{MIPS} boards
+@value{GDBN} can use the @acronym{MIPS} remote debugging protocol to talk to a
+@acronym{MIPS} board attached to a serial line.  This is available when
 you configure @value{GDBN} with @samp{--target=mips-elf}.
 
 @need 1000
@@ -19540,7 +19822,7 @@ Array Tech LSI33K RAID controller board.
 
 
 @noindent
-@value{GDBN} also supports these special commands for MIPS targets:
+@value{GDBN} also supports these special commands for @acronym{MIPS} targets:
 
 @table @code
 @item set mipsfpu double
@@ -19550,9 +19832,9 @@ Array Tech LSI33K RAID controller board.
 @itemx show mipsfpu
 @kindex set mipsfpu
 @kindex show mipsfpu
-@cindex MIPS remote floating point
-@cindex floating point, MIPS remote
-If your target board does not support the MIPS floating point
+@cindex @acronym{MIPS} remote floating point
+@cindex floating point, @acronym{MIPS} remote
+If your target board does not support the @acronym{MIPS} floating point
 coprocessor, you should use the command @samp{set mipsfpu none} (if you
 need this, you may wish to put the command in your @value{GDBN} init
 file).  This tells @value{GDBN} how to find the return value of
@@ -19575,13 +19857,13 @@ As usual, you can inquire about the @code{mipsfpu} variable with
 @itemx set retransmit-timeout @var{seconds}
 @itemx show timeout
 @itemx show retransmit-timeout
-@cindex @code{timeout}, MIPS protocol
-@cindex @code{retransmit-timeout}, MIPS protocol
+@cindex @code{timeout}, @acronym{MIPS} protocol
+@cindex @code{retransmit-timeout}, @acronym{MIPS} protocol
 @kindex set timeout
 @kindex show timeout
 @kindex set retransmit-timeout
 @kindex show retransmit-timeout
-You can control the timeout used while waiting for a packet, in the MIPS
+You can control the timeout used while waiting for a packet, in the @acronym{MIPS}
 remote protocol, with the @code{set timeout @var{seconds}} command.  The
 default is 5 seconds.  Similarly, you can control the timeout used while
 waiting for an acknowledgment of a packet with the @code{set
@@ -19596,19 +19878,19 @@ forever because it has no way of knowing how long the program is going
 to run before stopping.
 
 @item set syn-garbage-limit @var{num}
-@kindex set syn-garbage-limit@r{, MIPS remote}
-@cindex synchronize with remote MIPS target
+@kindex set syn-garbage-limit@r{, @acronym{MIPS} remote}
+@cindex synchronize with remote @acronym{MIPS} target
 Limit the maximum number of characters @value{GDBN} should ignore when
 it tries to synchronize with the remote target.  The default is 10
 characters.  Setting the limit to -1 means there's no limit.
 
 @item show syn-garbage-limit
-@kindex show syn-garbage-limit@r{, MIPS remote}
+@kindex show syn-garbage-limit@r{, @acronym{MIPS} remote}
 Show the current limit on the number of characters to ignore when
 trying to synchronize with the remote system.
 
 @item set monitor-prompt @var{prompt}
-@kindex set monitor-prompt@r{, MIPS remote}
+@kindex set monitor-prompt@r{, @acronym{MIPS} remote}
 @cindex remote monitor prompt
 Tell @value{GDBN} to expect the specified @var{prompt} string from the
 remote monitor.  The default depends on the target:
@@ -19622,23 +19904,23 @@ remote monitor.  The default depends on the target:
 @end table
 
 @item show monitor-prompt
-@kindex show monitor-prompt@r{, MIPS remote}
+@kindex show monitor-prompt@r{, @acronym{MIPS} remote}
 Show the current strings @value{GDBN} expects as the prompt from the
 remote monitor.
 
 @item set monitor-warnings
-@kindex set monitor-warnings@r{, MIPS remote}
+@kindex set monitor-warnings@r{, @acronym{MIPS} remote}
 Enable or disable monitor warnings about hardware breakpoints.  This
 has effect only for the @code{lsi} target.  When on, @value{GDBN} will
 display warning messages whose codes are returned by the @code{lsi}
 PMON monitor for breakpoint commands.
 
 @item show monitor-warnings
-@kindex show monitor-warnings@r{, MIPS remote}
+@kindex show monitor-warnings@r{, @acronym{MIPS} remote}
 Show the current setting of printing monitor warnings.
 
 @item pmon @var{command}
-@kindex pmon@r{, MIPS remote}
+@kindex pmon@r{, @acronym{MIPS} remote}
 @cindex send PMON command
 This command allows sending an arbitrary @var{command} string to the
 monitor.  The monitor must be in debug mode for this to work.
@@ -20191,7 +20473,6 @@ all uses of @value{GDBN} with the architecture, both native and cross.
 
 @menu
 * i386::
-* A29K::
 * Alpha::
 * MIPS::
 * HPPA::               HP PA architecture
@@ -20221,56 +20502,30 @@ Show the current setting of the convention to return @code{struct}s
 from functions.
 @end table
 
-@node A29K
-@subsection A29K
-
-@table @code
-
-@kindex set rstack_high_address
-@cindex AMD 29K register stack
-@cindex register stack, AMD29K
-@item set rstack_high_address @var{address}
-On AMD 29000 family processors, registers are saved in a separate
-@dfn{register stack}.  There is no way for @value{GDBN} to determine the
-extent of this stack.  Normally, @value{GDBN} just assumes that the
-stack is ``large enough''.  This may result in @value{GDBN} referencing
-memory locations that do not exist.  If necessary, you can get around
-this problem by specifying the ending address of the register stack with
-the @code{set rstack_high_address} command.  The argument should be an
-address, which you probably want to precede with @samp{0x} to specify in
-hexadecimal.
-
-@kindex show rstack_high_address
-@item show rstack_high_address
-Display the current limit of the register stack, on AMD 29000 family
-processors.
-
-@end table
-
 @node Alpha
 @subsection Alpha
 
 See the following section.
 
 @node MIPS
-@subsection MIPS
+@subsection @acronym{MIPS}
 
 @cindex stack on Alpha
-@cindex stack on MIPS
+@cindex stack on @acronym{MIPS}
 @cindex Alpha stack
-@cindex MIPS stack
-Alpha- and MIPS-based computers use an unusual stack frame, which
+@cindex @acronym{MIPS} stack
+Alpha- and @acronym{MIPS}-based computers use an unusual stack frame, which
 sometimes requires @value{GDBN} to search backward in the object code to
 find the beginning of a function.
 
-@cindex response time, MIPS debugging
+@cindex response time, @acronym{MIPS} debugging
 To improve response time (especially for embedded applications, where
 @value{GDBN} may be restricted to a slow serial line for this search)
 you may want to limit the size of this search, using one of these
 commands:
 
 @table @code
-@cindex @code{heuristic-fence-post} (Alpha, MIPS)
+@cindex @code{heuristic-fence-post} (Alpha, @acronym{MIPS})
 @item set heuristic-fence-post @var{limit}
 Restrict @value{GDBN} to examining at most @var{limit} bytes in its
 search for the beginning of a function.  A value of @var{0} (the
@@ -20285,16 +20540,16 @@ Display the current limit.
 
 @noindent
 These commands are available @emph{only} when @value{GDBN} is configured
-for debugging programs on Alpha or MIPS processors.
+for debugging programs on Alpha or @acronym{MIPS} processors.
 
-Several MIPS-specific commands are available when debugging MIPS
+Several @acronym{MIPS}-specific commands are available when debugging @acronym{MIPS}
 programs:
 
 @table @code
 @item set mips abi @var{arg}
 @kindex set mips abi
-@cindex set ABI for MIPS
-Tell @value{GDBN} which MIPS ABI is used by the inferior.  Possible
+@cindex set ABI for @acronym{MIPS}
+Tell @value{GDBN} which @acronym{MIPS} ABI is used by the inferior.  Possible
 values of @var{arg} are:
 
 @table @samp
@@ -20311,7 +20566,39 @@ default).
 
 @item show mips abi
 @kindex show mips abi
-Show the MIPS ABI used by @value{GDBN} to debug the inferior.
+Show the @acronym{MIPS} ABI used by @value{GDBN} to debug the inferior.
+
+@item set mips compression @var{arg}
+@kindex set mips compression
+@cindex code compression, @acronym{MIPS}
+Tell @value{GDBN} which @acronym{MIPS} compressed
+@acronym{ISA, Instruction Set Architecture} encoding is used by the
+inferior.  @value{GDBN} uses this for code disassembly and other
+internal interpretation purposes.  This setting is only referred to
+when no executable has been associated with the debugging session or
+the executable does not provide information about the encoding it uses.
+Otherwise this setting is automatically updated from information
+provided by the executable.
+
+Possible values of @var{arg} are @samp{mips16} and @samp{micromips}.
+The default compressed @acronym{ISA} encoding is @samp{mips16}, as
+executables containing @acronym{MIPS16} code frequently are not
+identified as such.
+
+This setting is ``sticky''; that is, it retains its value across
+debugging sessions until reset either explicitly with this command or
+implicitly from an executable.
+
+The compiler and/or assembler typically add symbol table annotations to
+identify functions compiled for the @acronym{MIPS16} or
+@acronym{microMIPS} @acronym{ISA}s.  If these function-scope annotations
+are present, @value{GDBN} uses them in preference to the global
+compressed @acronym{ISA} encoding setting.
+
+@item show mips compression
+@kindex show mips compression
+Show the @acronym{MIPS} compressed @acronym{ISA} encoding used by
+@value{GDBN} to debug the inferior.
 
 @item set mipsfpu
 @itemx show mipsfpu
@@ -20319,36 +20606,36 @@ Show the MIPS ABI used by @value{GDBN} to debug the inferior.
 
 @item set mips mask-address @var{arg}
 @kindex set mips mask-address
-@cindex MIPS addresses, masking
+@cindex @acronym{MIPS} addresses, masking
 This command determines whether the most-significant 32 bits of 64-bit
-MIPS addresses are masked off.  The argument @var{arg} can be
+@acronym{MIPS} addresses are masked off.  The argument @var{arg} can be
 @samp{on}, @samp{off}, or @samp{auto}.  The latter is the default
 setting, which lets @value{GDBN} determine the correct value.
 
 @item show mips mask-address
 @kindex show mips mask-address
-Show whether the upper 32 bits of MIPS addresses are masked off or
+Show whether the upper 32 bits of @acronym{MIPS} addresses are masked off or
 not.
 
 @item set remote-mips64-transfers-32bit-regs
 @kindex set remote-mips64-transfers-32bit-regs
-This command controls compatibility with 64-bit MIPS targets that
-transfer data in 32-bit quantities.  If you have an old MIPS 64 target
+This command controls compatibility with 64-bit @acronym{MIPS} targets that
+transfer data in 32-bit quantities.  If you have an old @acronym{MIPS} 64 target
 that transfers 32 bits for some registers, like @sc{sr} and @sc{fsr},
 and 64 bits for other registers, set this option to @samp{on}.
 
 @item show remote-mips64-transfers-32bit-regs
 @kindex show remote-mips64-transfers-32bit-regs
-Show the current setting of compatibility with older MIPS 64 targets.
+Show the current setting of compatibility with older @acronym{MIPS} 64 targets.
 
 @item set debug mips
 @kindex set debug mips
-This command turns on and off debugging messages for the MIPS-specific
+This command turns on and off debugging messages for the @acronym{MIPS}-specific
 target code in @value{GDBN}.
 
 @item show debug mips
 @kindex show debug mips
-Show the current setting of MIPS debugging messages.
+Show the current setting of @acronym{MIPS} debugging messages.
 @end table
 
 
@@ -20909,6 +21196,10 @@ without being explicitly told so by the user.  We call this feature
 results or introduce security risks (e.g., if the file comes from untrusted
 sources).
 
+Note that loading of these associated files (including the local @file{.gdbinit}
+file) requires accordingly configured @code{auto-load safe-path}
+(@pxref{Auto-loading safe path}).
+
 For these reasons, @value{GDBN} includes commands and options to let you
 control when to auto-load files and which files should be auto-loaded.
 
@@ -20940,10 +21231,13 @@ or disabled.
 (gdb) show auto-load
 gdb-scripts:  Auto-loading of canned sequences of commands scripts is on.
 libthread-db:  Auto-loading of inferior specific libthread_db is on.
-local-gdbinit:  Auto-loading of .gdbinit script from current directory is on.
+local-gdbinit:  Auto-loading of .gdbinit script from current directory
+                is on.
 python-scripts:  Auto-loading of Python scripts is on.
 safe-path:  List of directories from which it is safe to auto-load files
-            is /usr/local.
+            is $debugdir:$datadir/auto-load.
+scripts-directory:  List of directories from which to load auto-loaded scripts
+                    is $debugdir:$datadir/auto-load.
 @end smallexample
 
 @anchor{info auto-load}
@@ -20958,7 +21252,8 @@ gdb-scripts:
 Loaded  Script
 Yes     /home/user/gdb/gdb-gdb.gdb
 libthread-db:  No auto-loaded libthread-db.
-local-gdbinit:  Local .gdbinit file "/home/user/gdb/.gdbinit" has been loaded.
+local-gdbinit:  Local .gdbinit file "/home/user/gdb/.gdbinit" has been
+                loaded.
 python-scripts:
 Loaded  Script
 Yes     /home/user/gdb/gdb-gdb.py
@@ -21003,6 +21298,10 @@ These are @value{GDBN} control commands for the auto-loading:
 @tab Show setting of @value{GDBN} Python scripts.
 @item @xref{info auto-load python-scripts}.
 @tab Show state of @value{GDBN} Python scripts.
+@item @xref{set auto-load scripts-directory}.
+@tab Control for @value{GDBN} auto-loaded scripts location.
+@item @xref{show auto-load scripts-directory}.
+@tab Show @value{GDBN} auto-loaded scripts location.
 @item @xref{set auto-load local-gdbinit}.
 @tab Control for init file in the current directory.
 @item @xref{show auto-load local-gdbinit}.
@@ -21040,6 +21339,9 @@ By default, @value{GDBN} reads and executes the canned sequences of commands
 from init file (if any) in the current working directory,
 see @ref{Init File in the Current Directory during Startup}.
 
+Note that loading of this local @file{.gdbinit} file also requires accordingly
+configured @code{auto-load safe-path} (@pxref{Auto-loading safe path}).
+
 @table @code
 @anchor{set auto-load local-gdbinit}
 @kindex set auto-load local-gdbinit
@@ -21076,6 +21378,9 @@ libraries have to be trusted in general.  In all other cases of
 auto-load libthread-db} is enabled before trying to open such thread debugging
 library.
 
+Note that loading of this debugging library also requires accordingly configured
+@code{auto-load safe-path} (@pxref{Auto-loading safe path}).
+
 @table @code
 @anchor{set auto-load libthread-db}
 @kindex set auto-load libthread-db
@@ -21102,6 +21407,9 @@ for each such library print list of inferior @var{pid}s using it.
 @value{GDBN} tries to load an @file{@var{objfile}-gdb.gdb} file containing
 canned sequences of commands (@pxref{Sequences}), as long as @samp{set
 auto-load gdb-scripts} is set to @samp{on}.
+
+Note that loading of this script file also requires accordingly configured
+@code{auto-load safe-path} (@pxref{Auto-loading safe path}).
 
 For more background refer to the similar Python scripts auto-loading
 description (@pxref{objfile-gdb.py file}).
@@ -21145,9 +21453,11 @@ get loaded:
 $ ./gdb -q ./gdb
 Reading symbols from /home/user/gdb/gdb...done.
 warning: File "/home/user/gdb/gdb-gdb.gdb" auto-loading has been
-         declined by your `auto-load safe-path' set to "/usr/local".
+         declined by your `auto-load safe-path' set
+         to "$debugdir:$datadir/auto-load".
 warning: File "/home/user/gdb/gdb-gdb.py" auto-loading has been
-         declined by your `auto-load safe-path' set to "/usr/local".
+         declined by your `auto-load safe-path' set
+         to "$debugdir:$datadir/auto-load".
 @end smallexample
 
 The list of trusted directories is controlled by the following commands:
@@ -21155,10 +21465,13 @@ The list of trusted directories is controlled by the following commands:
 @table @code
 @anchor{set auto-load safe-path}
 @kindex set auto-load safe-path
-@item set auto-load safe-path @var{directories}
+@item set auto-load safe-path @r{[}@var{directories}@r{]}
 Set the list of directories (and their subdirectories) trusted for automatic
 loading and execution of scripts.  You can also enter a specific trusted file.
-The list of directories uses directory separator (@samp{:} on GNU and Unix
+If you omit @var{directories}, @samp{auto-load safe-path} will be reset to
+its default value as specified during @value{GDBN} compilation.
+
+The list of directories uses path separator (@samp{:} on GNU and Unix
 systems, @samp{;} on MS-Windows and MS-DOS) to separate directories, similarly
 to the @env{PATH} environment variable.
 
@@ -21173,10 +21486,18 @@ scripts.
 @item add-auto-load-safe-path
 Add an entry (or list of entries) the list of directories trusted for automatic
 loading and execution of scripts.  Multiple entries may be delimited by the
-host platform directory separator in use.
+host platform path separator in use.
 @end table
 
-Setting this variable to an empty string disables this security protection.
+This variable defaults to what @code{--with-auto-load-dir} has been configured
+to (@pxref{with-auto-load-dir}).  @file{$debugdir} and @file{$datadir}
+substitution applies the same as for @ref{set auto-load scripts-directory}.
+The default @code{set auto-load safe-path} value can be also overriden by
+@value{GDBN} configuration option @option{--with-auto-load-safe-path}.
+
+Setting this variable to @file{/} disables this security protection,
+corresponding @value{GDBN} configuration option is
+@option{--without-auto-load-safe-path}.
 This variable is supposed to be set to the system directories writable by the
 system superuser only.  Users can add their source directories in init files in
 their home directories (@pxref{Home Directory Init File}).  See also deprecated
@@ -21196,7 +21517,7 @@ by @samp{show auto-load safe-path} (such as @samp{/usr:/bin} in this example).
 Specify this directory as in the previous case but just for a single
 @value{GDBN} session.
 
-@item @kbd{gdb -iex "set auto-load safe-path" @dots{}}
+@item @kbd{gdb -iex "set auto-load safe-path /" @dots{}}
 Disable auto-loading safety for a single @value{GDBN} session.
 This assumes all the files you debug during this @value{GDBN} session will come
 from trusted sources.
@@ -22323,6 +22644,15 @@ This function can be useful when implementing a new command
 command's argument as an expression.  It is also useful simply to
 compute values, for example, it is the only way to get the value of a
 convenience variable (@pxref{Convenience Vars}) as a @code{gdb.Value}.
+@end defun
+
+@findex gdb.find_pc_line
+@defun gdb.find_pc_line (pc)
+Return the @code{gdb.Symtab_and_line} object corresponding to the
+@var{pc} value.  @xref{Symbol Tables In Python}.  If an invalid
+value of @var{pc} is passed as an argument, then the @code{symtab} and
+@code{line} attributes of the returned @code{gdb.Symtab_and_line} object
+will be @code{None} and 0 respectively.
 @end defun
 
 @findex gdb.post_event
@@ -24580,7 +24910,11 @@ detailed technical information on @value{GDBN}'s book-keeping of the
 stack.
 
 A @code{gdb.Block} is iterable.  The iterator returns the symbols
-(@pxref{Symbols In Python}) local to the block.
+(@pxref{Symbols In Python}) local to the block.  Python programs
+should not assume that a specific block object will always contain a
+given symbol, since changes in @value{GDBN} features and
+infrastructure may cause symbols move across blocks in a symbol
+table.
 
 The following block-related functions are available in the @code{gdb}
 module:
@@ -24970,6 +25304,16 @@ if it is invalid at the time the method is called.
 @defun Symtab.fullname ()
 Return the symbol table's source absolute file name.
 @end defun
+
+@defun Symtab.global_block ()
+Return the global block of the underlying symbol table.
+@xref{Blocks In Python}.
+@end defun
+
+@defun Symtab.static_block ()
+Return the static block of the underlying symbol table.
+@xref{Blocks In Python}.
+@end defun
 @end table
 
 @node Breakpoints In Python
@@ -25355,22 +25699,51 @@ registering objfile-specific pretty-printers.
 @cindex @file{@var{objfile}-gdb.py}
 
 When a new object file is read, @value{GDBN} looks for
-a file named @file{@var{objfile}-gdb.py},
+a file named @file{@var{objfile}-gdb.py} (we call it @var{script-name} below),
 where @var{objfile} is the object file's real name, formed by ensuring
 that the file name is absolute, following all symlinks, and resolving
 @code{.} and @code{..} components.  If this file exists and is
 readable, @value{GDBN} will evaluate it as a Python script.
 
-If this file does not exist, and if the parameter
-@code{debug-file-directory} is set (@pxref{Separate Debug Files}),
-then @value{GDBN} will look for @var{real-name} in all of the
-directories mentioned in the value of @code{debug-file-directory}.
+If this file does not exist, then @value{GDBN} will look for
+@var{script-name} file in all of the directories as specified below.
 
-Finally, if this file does not exist, then @value{GDBN} will look for
-a file named @file{@var{data-directory}/auto-load/@var{real-name}}, where
-@var{data-directory} is @value{GDBN}'s data directory (available via
-@code{show data-directory}, @pxref{Data Files}), and @var{real-name}
-is the object file's real name, as described above.
+Note that loading of this script file also requires accordingly configured
+@code{auto-load safe-path} (@pxref{Auto-loading safe path}).
+
+@table @code
+@anchor{set auto-load scripts-directory}
+@kindex set auto-load scripts-directory
+@item set auto-load scripts-directory @r{[}@var{directories}@r{]}
+Control @value{GDBN} auto-loaded scripts location.  Multiple directory entries
+may be delimited by the host platform path separator in use
+(@samp{:} on Unix, @samp{;} on MS-Windows and MS-DOS).
+
+Each entry here needs to be covered also by the security setting
+@code{set auto-load safe-path} (@pxref{set auto-load safe-path}).
+
+@anchor{with-auto-load-dir}
+This variable defaults to @file{$debugdir:$datadir/auto-load}.  The default
+@code{set auto-load safe-path} value can be also overriden by @value{GDBN}
+configuration option @option{--with-auto-load-dir}.
+
+Any reference to @file{$debugdir} will get replaced by
+@var{debug-file-directory} value (@pxref{Separate Debug Files}) and any
+reference to @file{$datadir} will get replaced by @var{data-directory} which is
+determined at @value{GDBN} startup (@pxref{Data Files}).  @file{$debugdir} and
+@file{$datadir} must be placed as a directory component --- either alone or
+delimited by @file{/} or @file{\} directory separators, depending on the host
+platform.
+
+The list of directories uses path separator (@samp{:} on GNU and Unix
+systems, @samp{;} on MS-Windows and MS-DOS) to separate directories, similarly
+to the @env{PATH} environment variable.
+
+@anchor{show auto-load scripts-directory}
+@kindex show auto-load scripts-directory
+@item show auto-load scripts-directory
+Show @value{GDBN} auto-loaded scripts location.
+@end table
 
 @value{GDBN} does not track which files it has already auto-loaded this way.
 @value{GDBN} will load the associated script every time the corresponding
@@ -25415,6 +25788,9 @@ DEFINE_GDB_SCRIPT ("my-app-scripts.py")
 @end example
 
 The script name may include directories if desired.
+
+Note that loading of this script file also requires accordingly configured
+@code{auto-load safe-path} (@pxref{Auto-loading safe path}).
 
 If the macro is put in a header, any application or library
 using this header will get a reference to the specified script.
@@ -36525,9 +36901,21 @@ This section describes how the remote protocol is applied to specific
 target architectures.  Also see @ref{Standard Target Features}, for
 details of XML target descriptions for each architecture.
 
-@subsection ARM
+@menu
+* ARM-Specific Protocol Details::
+* MIPS-Specific Protocol Details::
+@end menu
 
-@subsubsection Breakpoint Kinds
+@node ARM-Specific Protocol Details
+@subsection @acronym{ARM}-specific Protocol Details
+
+@menu
+* ARM Breakpoint Kinds::
+@end menu
+
+@node ARM Breakpoint Kinds
+@subsubsection @acronym{ARM} Breakpoint Kinds
+@cindex breakpoint kinds, @acronym{ARM}
 
 These breakpoint kinds are defined for the @samp{Z0} and @samp{Z1} packets.
 
@@ -36540,34 +36928,62 @@ These breakpoint kinds are defined for the @samp{Z0} and @samp{Z1} packets.
 32-bit Thumb mode (Thumb-2) breakpoint.
 
 @item 4
-32-bit ARM mode breakpoint.
+32-bit @acronym{ARM} mode breakpoint.
 
 @end table
 
-@subsection MIPS
+@node MIPS-Specific Protocol Details
+@subsection @acronym{MIPS}-specific Protocol Details
 
-@subsubsection Register Packet Format
+@menu
+* MIPS Register packet Format::
+* MIPS Breakpoint Kinds::
+@end menu
+
+@node MIPS Register packet Format
+@subsubsection @acronym{MIPS} Register Packet Format
+@cindex register packet format, @acronym{MIPS}
 
 The following @code{g}/@code{G} packets have previously been defined.
 In the below, some thirty-two bit registers are transferred as
 sixty-four bits.  Those registers should be zero/sign extended (which?)
 to fill the space allocated.  Register bytes are transferred in target
 byte order.  The two nibbles within a register byte are transferred
-most-significant - least-significant.
+most-significant -- least-significant.
 
 @table @r
 
 @item MIPS32
-
 All registers are transferred as thirty-two bit quantities in the order:
 32 general-purpose; sr; lo; hi; bad; cause; pc; 32 floating-point
 registers; fsr; fir; fp.
 
 @item MIPS64
-
 All registers are transferred as sixty-four bit quantities (including
 thirty-two bit registers such as @code{sr}).  The ordering is the same
 as @code{MIPS32}.
+
+@end table
+
+@node MIPS Breakpoint Kinds
+@subsubsection @acronym{MIPS} Breakpoint Kinds
+@cindex breakpoint kinds, @acronym{MIPS}
+
+These breakpoint kinds are defined for the @samp{Z0} and @samp{Z1} packets.
+
+@table @r
+
+@item 2
+16-bit @acronym{MIPS16} mode breakpoint.
+
+@item 3
+16-bit @acronym{microMIPS} mode breakpoint.
+
+@item 4
+32-bit standard @acronym{MIPS} mode breakpoint.
+
+@item 5
+32-bit @acronym{microMIPS} mode breakpoint.
 
 @end table
 
@@ -38877,7 +39293,7 @@ The formal DTD for the traceframe info format is given below:
 One of the challenges of using @value{GDBN} to debug embedded systems
 is that there are so many minor variants of each processor
 architecture in use.  It is common practice for vendors to start with
-a standard processor core --- ARM, PowerPC, or MIPS, for example ---
+a standard processor core --- ARM, PowerPC, or @acronym{MIPS}, for example ---
 and then make changes to adapt it to a particular market niche.  Some
 architectures have hundreds of variants, available from dozens of
 vendors.  This leads to a number of problems:
@@ -39420,10 +39836,10 @@ The @samp{org.gnu.gdb.i386.linux} feature is optional.  It should
 describe a single register, @samp{orig_eax}.
 
 @node MIPS Features
-@subsection MIPS Features
-@cindex target descriptions, MIPS features
+@subsection @acronym{MIPS} Features
+@cindex target descriptions, @acronym{MIPS} features
 
-The @samp{org.gnu.gdb.mips.cpu} feature is required for MIPS targets.
+The @samp{org.gnu.gdb.mips.cpu} feature is required for @acronym{MIPS} targets.
 It should contain registers @samp{r0} through @samp{r31}, @samp{lo},
 @samp{hi}, and @samp{pc}.  They may be 32-bit or 64-bit depending
 on the target.

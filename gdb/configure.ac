@@ -30,6 +30,7 @@ AM_PROG_CC_STDC
 
 AC_CONFIG_AUX_DIR(..)
 AC_CANONICAL_SYSTEM
+AC_ARG_PROGRAM
 
 # Dependency checking.
 ZW_CREATE_DEPDIR
@@ -135,15 +136,28 @@ AS_HELP_STRING([--with-relocated-sources=PATH], [automatically relocate this pat
               [Relocated directory for source files. ])
 ])
 
+AC_MSG_CHECKING([for default auto-load directory])
+AC_ARG_WITH(auto-load-dir,
+AS_HELP_STRING([--with-auto-load-dir=PATH],
+  [directories from which to load auto-loaded scripts @<:@$debugdir:$datadir/auto-load@:>@]),,
+  [with_auto_load_dir='$debugdir:$datadir/auto-load'])
+escape_dir=`echo $with_auto_load_dir | sed 's/[[$]]\(datadir\|debugdir\)\>/\\\\\\\\\\\\&/g'`
+AC_DEFINE_DIR(AUTO_LOAD_DIR, escape_dir,
+	      [Directories from which to load auto-loaded scripts.])
+AC_MSG_RESULT([$with_auto_load_dir])
+
 AC_MSG_CHECKING([for default auto-load safe-path])
 AC_ARG_WITH(auto-load-safe-path,
-AS_HELP_STRING([--with-auto-load-safe-path=PATH], [directories safe to hold auto-loaded files])
-AS_HELP_STRING([--without-auto-load-safe-path], [do not restrict auto-loaded files locations]),
-[if test "$with_auto_load_safe_path" = "no"; then
-   with_auto_load_safe_path=""
- fi],
-[with_auto_load_safe_path="$prefix"])
-AC_DEFINE_DIR(DEFAULT_AUTO_LOAD_SAFE_PATH, with_auto_load_safe_path,
+AS_HELP_STRING([--with-auto-load-safe-path=PATH],
+  [directories safe to hold auto-loaded files @<:@--with-auto-load-dir@:>@])
+AS_HELP_STRING([--without-auto-load-safe-path],
+               [do not restrict auto-loaded files locations]),
+    [if test "$with_auto_load_safe_path" = "no"; then
+     with_auto_load_safe_path="/"
+     fi],
+[with_auto_load_safe_path="$with_auto_load_dir"])
+escape_dir=`echo $with_auto_load_safe_path | sed 's/[[$]]\(datadir\|debugdir\)\>/\\\\\\\\\\\\&/g'`
+AC_DEFINE_DIR(AUTO_LOAD_SAFE_PATH, escape_dir,
 	      [Directories safe to hold auto-loaded files.])
 AC_MSG_RESULT([$with_auto_load_safe_path])
 
@@ -1947,7 +1961,7 @@ AC_CACHE_CHECK([for ELF support in BFD], gdb_cv_var_elf,
 [bfd *abfd = NULL; bfd_get_elf_phdr_upper_bound (abfd); ],
 gdb_cv_var_elf=yes, gdb_cv_var_elf=no)])
 if test $gdb_cv_var_elf = yes; then
-  CONFIG_OBS="$CONFIG_OBS elfread.o"
+  CONFIG_OBS="$CONFIG_OBS elfread.o stap-probe.o"
   AC_DEFINE(HAVE_ELF, 1,
 	    [Define if ELF support should be included.])
   # -ldl is provided by bfd/Makfile.am (LIBDL) <PLUGINS>.

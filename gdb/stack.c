@@ -500,7 +500,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
   long highest_offset = -1;
   /* Number of ints of arguments that we have printed so far.  */
   int args_printed = 0;
-  struct cleanup *old_chain, *list_chain;
+  struct cleanup *old_chain;
   struct ui_file *stb;
   /* True if we should print arguments, false otherwise.  */
   int print_args = strcmp (print_frame_arguments, "none");
@@ -513,7 +513,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
   if (func)
     {
       struct block *b = SYMBOL_BLOCK_VALUE (func);
-      struct dict_iterator iter;
+      struct block_iterator iter;
       struct symbol *sym;
 
       ALL_BLOCK_SYMBOLS (b, iter, sym)
@@ -1832,7 +1832,7 @@ iterate_over_block_locals (struct block *b,
 			   iterate_over_block_arg_local_vars_cb cb,
 			   void *cb_data)
 {
-  struct dict_iterator iter;
+  struct block_iterator iter;
   struct symbol *sym;
 
   ALL_BLOCK_SYMBOLS (b, iter, sym)
@@ -1869,7 +1869,7 @@ static int
 print_block_frame_labels (struct gdbarch *gdbarch, struct block *b,
 			  int *have_default, struct ui_file *stream)
 {
-  struct dict_iterator iter;
+  struct block_iterator iter;
   struct symbol *sym;
   int values_printed = 0;
 
@@ -2001,7 +2001,7 @@ iterate_over_block_arg_vars (struct block *b,
 			     iterate_over_block_arg_local_vars_cb cb,
 			     void *cb_data)
 {
-  struct dict_iterator iter;
+  struct block_iterator iter;
   struct symbol *sym, *sym2;
 
   ALL_BLOCK_SYMBOLS (b, iter, sym)
@@ -2249,6 +2249,7 @@ return_command (char *retval_exp, int from_tty)
   struct gdbarch *gdbarch;
   struct symbol *thisfun;
   struct value *return_value = NULL;
+  struct value *function = NULL;
   const char *query_prefix = "";
 
   thisframe = get_selected_frame ("No selected frame.");
@@ -2293,6 +2294,9 @@ return_command (char *retval_exp, int from_tty)
       if (value_lazy (return_value))
 	value_fetch_lazy (return_value);
 
+      if (thisfun != NULL)
+	function = read_var_value (thisfun, thisframe);
+
       if (TYPE_CODE (return_type) == TYPE_CODE_VOID)
 	/* If the return-type is "void", don't try to find the
            return-value's location.  However, do still evaluate the
@@ -2301,8 +2305,7 @@ return_command (char *retval_exp, int from_tty)
            occur.  */
 	return_value = NULL;
       else if (thisfun != NULL
-	       && using_struct_return (gdbarch,
-				       SYMBOL_TYPE (thisfun), return_type))
+	       && using_struct_return (gdbarch, function, return_type))
 	{
 	  query_prefix = "The location at which to store the "
 	    "function's return value is unknown.\n"
@@ -2337,12 +2340,11 @@ return_command (char *retval_exp, int from_tty)
     {
       struct type *return_type = value_type (return_value);
       struct gdbarch *gdbarch = get_regcache_arch (get_current_regcache ());
-      struct type *func_type = thisfun == NULL ? NULL : SYMBOL_TYPE (thisfun);
 
-      gdb_assert (gdbarch_return_value (gdbarch, func_type, return_type, NULL,
+      gdb_assert (gdbarch_return_value (gdbarch, function, return_type, NULL,
 					NULL, NULL)
 		  == RETURN_VALUE_REGISTER_CONVENTION);
-      gdbarch_return_value (gdbarch, func_type, return_type,
+      gdbarch_return_value (gdbarch, function, return_type,
 			    get_current_regcache (), NULL /*read*/,
 			    value_contents (return_value) /*write*/);
     }

@@ -841,7 +841,6 @@ value_actual_type (struct value *value, int resolve_simple_types,
 		   int *real_type_found)
 {
   struct value_print_options opts;
-  struct value *target;
   struct type *result;
 
   get_user_print_options (&opts);
@@ -1629,7 +1628,14 @@ struct internalvar
       struct value *value;
 
       /* The call-back routine used with INTERNALVAR_MAKE_VALUE.  */
-      internalvar_make_value make_value;
+      struct
+        {
+	  /* The functions to call.  */
+	  const struct internalvar_funcs *functions;
+
+	  /* The function's user-data.  */
+	  void *data;
+        } make_value;
 
       /* The internal function used with INTERNALVAR_FUNCTION.  */
       struct
@@ -1728,16 +1734,37 @@ create_internalvar (const char *name)
 /* Create an internal variable with name NAME and register FUN as the
    function that value_of_internalvar uses to create a value whenever
    this variable is referenced.  NAME should not normally include a
-   dollar sign.  */
+   dollar sign.  DATA is passed uninterpreted to FUN when it is
+   called.  CLEANUP, if not NULL, is called when the internal variable
+   is destroyed.  It is passed DATA as its only argument.  */
 
 struct internalvar *
-create_internalvar_type_lazy (char *name, internalvar_make_value fun)
+create_internalvar_type_lazy (const char *name,
+			      const struct internalvar_funcs *funcs,
+			      void *data)
 {
   struct internalvar *var = create_internalvar (name);
 
   var->kind = INTERNALVAR_MAKE_VALUE;
-  var->u.make_value = fun;
+  var->u.make_value.functions = funcs;
+  var->u.make_value.data = data;
   return var;
+}
+
+/* See documentation in value.h.  */
+
+int
+compile_internalvar_to_ax (struct internalvar *var,
+			   struct agent_expr *expr,
+			   struct axs_value *value)
+{
+  if (var->kind != INTERNALVAR_MAKE_VALUE
+      || var->u.make_value.functions->compile_to_ax == NULL)
+    return 0;
+
+  var->u.make_value.functions->compile_to_ax (var, expr, value,
+					      var->u.make_value.data);
+  return 1;
 }
 
 /* Look up an internal variable with name NAME.  NAME should not
@@ -1812,7 +1839,8 @@ value_of_internalvar (struct gdbarch *gdbarch, struct internalvar *var)
       break;
 
     case INTERNALVAR_MAKE_VALUE:
-      val = (*var->u.make_value) (gdbarch, var);
+      val = (*var->u.make_value.functions->make_value) (gdbarch, var,
+							var->u.make_value.data);
       break;
 
     default:
@@ -2006,6 +2034,11 @@ clear_internalvar (struct internalvar *var)
 
     case INTERNALVAR_STRING:
       xfree (var->u.string);
+      break;
+
+    case INTERNALVAR_MAKE_VALUE:
+      if (var->u.make_value.functions->destroy != NULL)
+	var->u.make_value.functions->destroy (var->u.make_value.data);
       break;
 
     default:
@@ -3269,7 +3302,7 @@ coerce_array (struct value *arg)
 
 int
 using_struct_return (struct gdbarch *gdbarch,
-		     struct type *func_type, struct type *value_type)
+		     struct value *function, struct type *value_type)
 {
   enum type_code code = TYPE_CODE (value_type);
 
@@ -3282,7 +3315,7 @@ using_struct_return (struct gdbarch *gdbarch,
     return 0;
 
   /* Probe the architecture for the return-value convention.  */
-  return (gdbarch_return_value (gdbarch, func_type, value_type,
+  return (gdbarch_return_value (gdbarch, function, value_type,
 				NULL, NULL, NULL)
 	  != RETURN_VALUE_REGISTER_CONVENTION);
 }

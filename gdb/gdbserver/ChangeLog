@@ -1,3 +1,33 @@
+2012-05-21  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* linux-low.c (linux_store_registers): Don't re-retrieve data
+	with ptrace that has already been obtained from /proc.  Always
+	copy any data retrieved with ptrace to the buffer supplied.
+
+2012-05-11  Yao Qi  <yao@codesourcery.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* linux-low.c (enum stopping_threads_kind): New.
+	(stopping_threads): Change type to `enum stopping_threads_kind'.
+	(handle_extended_wait): If stopping and suspending threads, leave
+	the new_lwp suspended too.
+	(linux_wait_for_event): Adjust.
+	(stop_all_lwps): Set `stopping_threads' to
+	STOPPING_AND_SUSPENDING_THREADS or STOPPING_THREADS depending on
+	whether we're suspending threads or just stopping them.  Assert no
+	recursion happens.
+
+2012-04-29  Yao Qi  <yao@codesourcery.com>
+
+	* server.h: Move some code to ...
+	* gdbthread.h: ... here.  New.
+	* Makefile.in (inferiors.o, regcache.o): Depends on gdbthread.h
+	(remote-utils.o, server.o, target.o tracepoint.o): Likewise.
+	(nto-low.o, win32-low.o): Likewise.
+	* inferiors.c, linux-low.h, nto-low.c: Include gdbthread.h.
+	* regcache.c, remote-utils.c, server.c: Likewise.
+	* target.c, tracepoint.c, win32-low.c: Likewise.
+
 2012-04-24  Thiago Jung Bauermann  <thiago.bauermann@linaro.org>
 
 	* linux-low.h (PTRACE_ARG3_TYPE): Move macro from linux-low.c.

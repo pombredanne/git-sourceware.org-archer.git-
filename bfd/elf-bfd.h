@@ -428,6 +428,7 @@ enum elf_target_id
   TIC6X_ELF_DATA,
   X86_64_ELF_DATA,
   XTENSA_ELF_DATA,
+  XGATE_ELF_DATA,
   TILEGX_ELF_DATA,
   TILEPRO_ELF_DATA,
   GENERIC_ELF_DATA
@@ -1366,6 +1367,9 @@ struct bfd_elf_section_data
   /* The ELF header for this section.  */
   Elf_Internal_Shdr this_hdr;
 
+  /* INPUT_SECTION_FLAGS if specified in the linker script.  */
+  struct flag_info *section_flag_info;
+
   /* Information about the REL and RELA reloc sections associated
      with this section, if any.  */
   struct bfd_elf_section_reloc_data rel, rela;
@@ -2206,8 +2210,8 @@ extern bfd_boolean _bfd_elf_maybe_function_sym (const asymbol *,
 
 extern int bfd_elf_get_default_section_type (flagword);
 
-extern void bfd_elf_lookup_section_flags
-  (struct bfd_link_info *, struct flag_info *);
+extern bfd_boolean bfd_elf_lookup_section_flags
+  (struct bfd_link_info *, struct flag_info *, asection *);
 
 extern Elf_Internal_Phdr * _bfd_elf_find_segment_containing_section
   (bfd * abfd, asection * section);
@@ -2407,10 +2411,12 @@ extern asection _bfd_elf_large_com_section;
    link, we remove such relocations.  Otherwise, we just want the
    section contents zeroed and avoid any special processing.  */
 #define RELOC_AGAINST_DISCARDED_SECTION(info, input_bfd, input_section,	\
-					rel, relend, howto, contents)	\
+					rel, count, relend,		\
+					howto, index, contents)		\
   {									\
+    int i_;								\
     _bfd_clear_contents (howto, input_bfd, input_section,		\
-			 contents + rel->r_offset);			\
+			 contents + rel[index].r_offset);		\
 									\
     if (info->relocatable						\
 	&& (input_section->flags & SEC_DEBUGGING))			\
@@ -2422,23 +2428,28 @@ extern asection _bfd_elf_large_com_section;
 	rel_hdr = _bfd_elf_single_rel_hdr (input_section->output_section); \
 									\
 	/* Avoid empty output section.  */				\
-	if (rel_hdr->sh_size > rel_hdr->sh_entsize)			\
+	if (rel_hdr->sh_size > count * rel_hdr->sh_entsize)		\
 	  {								\
-	    rel_hdr->sh_size -= rel_hdr->sh_entsize;			\
+	    rel_hdr->sh_size -= count * rel_hdr->sh_entsize;		\
 	    rel_hdr = _bfd_elf_single_rel_hdr (input_section);		\
-	    rel_hdr->sh_size -= rel_hdr->sh_entsize;			\
+	    rel_hdr->sh_size -= count * rel_hdr->sh_entsize;		\
 									\
-	    memmove (rel, rel + 1, (relend - rel - 1) * sizeof (*rel));	\
+	    memmove (rel, rel + count,					\
+		     (relend - rel - count) * sizeof (*rel));		\
 									\
-	    input_section->reloc_count--;				\
-	    relend--;							\
+	    input_section->reloc_count -= count;			\
+	    relend -= count;						\
 	    rel--;							\
 	    continue;							\
 	  }								\
       }									\
 									\
-    rel->r_info = 0;							\
-    rel->r_addend = 0;							\
+    for (i_ = 0; i_ < count; i_++)					\
+      {									\
+	rel[i_].r_info = 0;						\
+	rel[i_].r_addend = 0;						\
+      }									\
+    rel += count - 1;							\
     continue;								\
   }
 

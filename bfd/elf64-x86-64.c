@@ -3145,7 +3145,7 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 
       if (sec != NULL && discarded_section (sec))
 	RELOC_AGAINST_DISCARDED_SECTION (info, input_bfd, input_section,
-					 rel, relend, howto, contents);
+					 rel, 1, relend, howto, 0, contents);
 
       if (info->relocatable)
 	continue;
@@ -3681,6 +3681,36 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 		      outrel.r_info = htab->r_info (0,
 						    R_X86_64_RELATIVE64);
 		      outrel.r_addend = relocation + rel->r_addend;
+		      /* Check addend overflow.  */
+		      if ((outrel.r_addend & 0x80000000)
+			  != (rel->r_addend & 0x80000000))
+			{
+			  const char *name;
+			  int addend = rel->r_addend;
+			  if (h && h->root.root.string)
+			    name = h->root.root.string;
+			  else
+			    name = bfd_elf_sym_name (input_bfd, symtab_hdr,
+						     sym, NULL);
+			  if (addend < 0)
+			    (*_bfd_error_handler)
+			      (_("%B: addend -0x%x in relocation %s against "
+				 "symbol `%s' at 0x%lx in section `%A' is "
+				 "out of range"),
+			       input_bfd, input_section, addend,
+			       x86_64_elf_howto_table[r_type].name,
+			       name, (unsigned long) rel->r_offset);
+			  else
+			    (*_bfd_error_handler)
+			      (_("%B: addend 0x%x in relocation %s against "
+				 "symbol `%s' at 0x%lx in section `%A' is "
+				 "out of range"),
+			       input_bfd, input_section, addend,
+			       x86_64_elf_howto_table[r_type].name,
+			       name, (unsigned long) rel->r_offset);
+			  bfd_set_error (bfd_error_bad_value);
+			  return FALSE;
+			}
 		    }
 		  else
 		    {
@@ -4230,7 +4260,7 @@ static bfd_boolean
 elf_x86_64_finish_dynamic_symbol (bfd *output_bfd,
 				  struct bfd_link_info *info,
 				  struct elf_link_hash_entry *h,
-				  Elf_Internal_Sym *sym)
+				  Elf_Internal_Sym *sym ATTRIBUTE_UNUSED)
 {
   struct elf_x86_64_link_hash_table *htab;
   const struct elf_x86_64_backend_data *const abed
@@ -4469,13 +4499,6 @@ do_glob_dat:
       elf_append_rela (output_bfd, htab->srelbss, &rela);
     }
 
-  /* Mark _DYNAMIC and _GLOBAL_OFFSET_TABLE_ as absolute.  SYM may
-     be NULL for local symbols.  */
-  if (sym != NULL
-      && (strcmp (h->root.root.string, "_DYNAMIC") == 0
-	  || h == htab->elf.hgot))
-    sym->st_shndx = SHN_ABS;
-
   return TRUE;
 }
 
@@ -4503,6 +4526,7 @@ elf_x86_64_reloc_type_class (const Elf_Internal_Rela *rela)
   switch ((int) ELF32_R_TYPE (rela->r_info))
     {
     case R_X86_64_RELATIVE:
+    case R_X86_64_RELATIVE64:
       return reloc_class_relative;
     case R_X86_64_JUMP_SLOT:
       return reloc_class_plt;

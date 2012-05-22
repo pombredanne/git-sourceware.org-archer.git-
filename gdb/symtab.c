@@ -95,7 +95,8 @@ struct symbol *lookup_symbol_aux_local (const char *name,
 static
 struct symbol *lookup_symbol_aux_symtabs (int block_index,
 					  const char *name,
-					  const domain_enum domain);
+					  const domain_enum domain,
+					  struct objfile *exclude_objfile);
 
 static
 struct symbol *lookup_symbol_aux_quick (struct objfile *objfile,
@@ -155,7 +156,6 @@ compare_filenames_for_search (const char *filename, const char *search_name,
 			      int search_len)
 {
   int len = strlen (filename);
-  int offset;
 
   if (len < search_len)
     return 0;
@@ -195,7 +195,6 @@ iterate_over_some_symtabs (const char *name,
 			   struct symtab *after_last)
 {
   struct symtab *s = NULL;
-  struct cleanup *cleanup;
   const char* base_name = lbasename (name);
   int name_len = strlen (name);
   int is_abs = IS_ABSOLUTE_PATH (name);
@@ -901,6 +900,7 @@ init_sal (struct symtab_and_line *sal)
   sal->end = 0;
   sal->explicit_pc = 0;
   sal->explicit_line = 0;
+  sal->probe = NULL;
 }
 
 
@@ -1360,7 +1360,7 @@ lookup_static_symbol_aux (const char *name, const domain_enum domain)
   struct objfile *objfile;
   struct symbol *sym;
 
-  sym = lookup_symbol_aux_symtabs (STATIC_BLOCK, name, domain);
+  sym = lookup_symbol_aux_symtabs (STATIC_BLOCK, name, domain, NULL);
   if (sym != NULL)
     return sym;
 
@@ -1499,40 +1499,61 @@ lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
   return NULL;
 }
 
-/* Check to see if the symbol is defined in one of the symtabs.
-   BLOCK_INDEX should be either GLOBAL_BLOCK or STATIC_BLOCK,
+/* Check to see if the symbol is defined in one of the OBJFILE's
+   symtabs.  BLOCK_INDEX should be either GLOBAL_BLOCK or STATIC_BLOCK,
    depending on whether or not we want to search global symbols or
    static symbols.  */
 
 static struct symbol *
-lookup_symbol_aux_symtabs (int block_index, const char *name,
-			   const domain_enum domain)
+lookup_symbol_aux_objfile (struct objfile *objfile, int block_index,
+			   const char *name, const domain_enum domain)
 {
-  struct symbol *sym;
-  struct objfile *objfile;
+  struct symbol *sym = NULL;
   struct blockvector *bv;
   const struct block *block;
   struct symtab *s;
 
+  if (objfile->sf)
+    objfile->sf->qf->pre_expand_symtabs_matching (objfile, block_index,
+						  name, domain);
+
+  ALL_OBJFILE_SYMTABS (objfile, s)
+    if (s->primary)
+      {
+	bv = BLOCKVECTOR (s);
+	block = BLOCKVECTOR_BLOCK (bv, block_index);
+	sym = lookup_block_symbol (block, name, domain);
+	if (sym)
+	  {
+	    block_found = block;
+	    return fixup_symbol_section (sym, objfile);
+	  }
+      }
+
+  return NULL;
+}
+
+/* Same as lookup_symbol_aux_objfile, except that it searches all
+   objfiles except for EXCLUDE_OBJFILE.  Return the first match found.
+
+   If EXCLUDE_OBJFILE is NULL, then all objfiles are searched.  */
+
+static struct symbol *
+lookup_symbol_aux_symtabs (int block_index, const char *name,
+			   const domain_enum domain,
+			   struct objfile *exclude_objfile)
+{
+  struct symbol *sym;
+  struct objfile *objfile;
+
   ALL_OBJFILES (objfile)
   {
-    if (objfile->sf)
-      objfile->sf->qf->pre_expand_symtabs_matching (objfile,
-						    block_index,
-						    name, domain);
-
-    ALL_OBJFILE_SYMTABS (objfile, s)
-      if (s->primary)
-	{
-	  bv = BLOCKVECTOR (s);
-	  block = BLOCKVECTOR_BLOCK (bv, block_index);
-	  sym = lookup_block_symbol (block, name, domain);
-	  if (sym)
-	    {
-	      block_found = block;
-	      return fixup_symbol_section (sym, objfile);
-	    }
-	}
+    if (objfile != exclude_objfile)
+      {
+	sym = lookup_symbol_aux_objfile (objfile, block_index, name, domain);
+	if (sym)
+	  return sym;
+      }
   }
 
   return NULL;
@@ -1658,24 +1679,46 @@ lookup_symbol_global (const char *name,
 		      const domain_enum domain)
 {
   struct symbol *sym = NULL;
+  struct objfile *block_objfile = NULL;
   struct objfile *objfile = NULL;
 
   /* Call library-specific lookup procedure.  */
-  objfile = lookup_objfile_from_block (block);
-  if (objfile != NULL)
-    sym = solib_global_lookup (objfile, name, domain);
+  block_objfile = lookup_objfile_from_block (block);
+  if (block_objfile != NULL)
+    sym = solib_global_lookup (block_objfile, name, domain);
   if (sym != NULL)
     return sym;
 
-  sym = lookup_symbol_aux_symtabs (GLOBAL_BLOCK, name, domain);
+  /* If BLOCK_OBJFILE is not NULL, then search this objfile first.
+     In case the global symbol is defined in multiple objfiles,
+     we have a better chance of finding the most relevant symbol.  */
+
+  if (block_objfile != NULL)
+    {
+      sym = lookup_symbol_aux_objfile (block_objfile, GLOBAL_BLOCK,
+				       name, domain);
+      if (sym == NULL)
+	sym = lookup_symbol_aux_quick (block_objfile, GLOBAL_BLOCK,
+				       name, domain);
+      if (sym != NULL)
+	return sym;
+    }
+
+  /* Symbol not found in the BLOCK_OBJFILE, so try all the other
+     objfiles, starting with symtabs first, and then partial symtabs.  */
+
+  sym = lookup_symbol_aux_symtabs (GLOBAL_BLOCK, name, domain, block_objfile);
   if (sym != NULL)
     return sym;
 
   ALL_OBJFILES (objfile)
   {
-    sym = lookup_symbol_aux_quick (objfile, GLOBAL_BLOCK, name, domain);
-    if (sym)
-      return sym;
+    if (objfile != block_objfile)
+      {
+	sym = lookup_symbol_aux_quick (objfile, GLOBAL_BLOCK, name, domain);
+	if (sym)
+	  return sym;
+      }
   }
 
   return NULL;
@@ -1879,14 +1922,14 @@ struct symbol *
 lookup_block_symbol (const struct block *block, const char *name,
 		     const domain_enum domain)
 {
-  struct dict_iterator iter;
+  struct block_iterator iter;
   struct symbol *sym;
 
   if (!BLOCK_FUNCTION (block))
     {
-      for (sym = dict_iter_name_first (BLOCK_DICT (block), name, &iter);
+      for (sym = block_iter_name_first (block, name, &iter);
 	   sym != NULL;
-	   sym = dict_iter_name_next (name, &iter))
+	   sym = block_iter_name_next (name, &iter))
 	{
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
 				     SYMBOL_DOMAIN (sym), domain))
@@ -1904,9 +1947,9 @@ lookup_block_symbol (const struct block *block, const char *name,
 
       struct symbol *sym_found = NULL;
 
-      for (sym = dict_iter_name_first (BLOCK_DICT (block), name, &iter);
+      for (sym = block_iter_name_first (block, name, &iter);
 	   sym != NULL;
-	   sym = dict_iter_name_next (name, &iter))
+	   sym = block_iter_name_next (name, &iter))
 	{
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
 				     SYMBOL_DOMAIN (sym), domain))
@@ -1941,12 +1984,12 @@ iterate_over_symbols (const struct block *block, const char *name,
 {
   while (block)
     {
-      struct dict_iterator iter;
+      struct block_iterator iter;
       struct symbol *sym;
 
-      for (sym = dict_iter_name_first (BLOCK_DICT (block), name, &iter);
+      for (sym = block_iter_name_first (block, name, &iter);
 	   sym != NULL;
-	   sym = dict_iter_name_next (name, &iter))
+	   sym = block_iter_name_next (name, &iter))
 	{
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
 				     SYMBOL_DOMAIN (sym), domain))
@@ -2036,7 +2079,7 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
 	  }
 	if (section != 0)
 	  {
-	    struct dict_iterator iter;
+	    struct block_iterator iter;
 	    struct symbol *sym = NULL;
 
 	    ALL_BLOCK_SYMBOLS (b, iter, sym)
@@ -3284,11 +3327,10 @@ search_symbols (char *regexp, enum search_domain kind,
   struct blockvector *bv;
   struct block *b;
   int i = 0;
-  struct dict_iterator iter;
+  struct block_iterator iter;
   struct symbol *sym;
   struct objfile *objfile;
   struct minimal_symbol *msymbol;
-  char *val;
   int found_misc = 0;
   static const enum minimal_symbol_type types[]
     = {mst_data, mst_text, mst_abs};
@@ -4086,7 +4128,7 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
   struct objfile *objfile;
   struct block *b;
   const struct block *surrounding_static_block, *surrounding_global_block;
-  struct dict_iterator iter;
+  struct block_iterator iter;
   /* The symbol we are completing on.  Points in same buffer as text.  */
   char *sym_text;
   /* Length of sym_text.  */
@@ -4318,7 +4360,7 @@ make_file_symbol_completion_list (char *text, char *word, char *srcfile)
   struct symbol *sym;
   struct symtab *s;
   struct block *b;
-  struct dict_iterator iter;
+  struct block_iterator iter;
   /* The symbol we are completing on.  Points in same buffer as text.  */
   char *sym_text;
   /* Length of sym_text.  */

@@ -651,7 +651,6 @@ static struct call_site_chain *
 call_site_find_chain_1 (struct gdbarch *gdbarch, CORE_ADDR caller_pc,
 			CORE_ADDR callee_pc)
 {
-  struct func_type *func_specific;
   struct obstack addr_obstack;
   struct cleanup *back_to_retval, *back_to_workdata;
   struct call_site_chain *retval = NULL;
@@ -833,8 +832,6 @@ dwarf_expr_reg_to_entry_parameter (struct frame_info *frame, int dwarf_reg,
   struct frame_info *caller_frame = get_prev_frame (frame);
   struct call_site *call_site;
   int iparams;
-  struct value *val;
-  struct dwarf2_locexpr_baton *dwarf_block;
   /* Initialize it just to avoid a GCC false warning.  */
   struct call_site_parameter *parameter = NULL;
   CORE_ADDR target_addr;
@@ -1006,6 +1003,17 @@ dwarf_expr_push_dwarf_reg_entry_value (struct dwarf_expr_context *ctx,
   ctx->addr_size = saved_ctx.addr_size;
   ctx->offset = saved_ctx.offset;
   ctx->baton = saved_ctx.baton;
+}
+
+/* Callback function for dwarf2_evaluate_loc_desc.
+   Fetch the address indexed by DW_OP_GNU_addr_index.  */
+
+static CORE_ADDR
+dwarf_expr_get_addr_index (void *baton, unsigned int index)
+{
+  struct dwarf_expr_baton *debaton = (struct dwarf_expr_baton *) baton;
+
+  return dwarf2_read_addr_index (debaton->per_cu, index);
 }
 
 /* VALUE must be of type lval_computed with entry_data_value_funcs.  Perform
@@ -1942,7 +1950,8 @@ static const struct dwarf_expr_context_funcs dwarf_expr_ctx_funcs =
   dwarf_expr_tls_address,
   dwarf_expr_dwarf_call,
   dwarf_expr_get_base_type,
-  dwarf_expr_push_dwarf_reg_entry_value
+  dwarf_expr_push_dwarf_reg_entry_value,
+  dwarf_expr_get_addr_index
 };
 
 /* Evaluate a location description, starting at DATA and with length
@@ -2241,6 +2250,15 @@ needs_dwarf_reg_entry_value (struct dwarf_expr_context *ctx,
   nf_baton->needs_frame = 1;
 }
 
+/* DW_OP_GNU_addr_index doesn't require a frame.  */
+
+static CORE_ADDR
+needs_get_addr_index (void *baton, unsigned int index)
+{
+  /* Nothing to do.  */
+  return 1;
+}
+
 /* Virtual method table for dwarf2_loc_desc_needs_frame below.  */
 
 static const struct dwarf_expr_context_funcs needs_frame_ctx_funcs =
@@ -2253,7 +2271,8 @@ static const struct dwarf_expr_context_funcs needs_frame_ctx_funcs =
   needs_frame_tls_address,
   needs_frame_dwarf_call,
   NULL,				/* get_base_type */
-  needs_dwarf_reg_entry_value
+  needs_dwarf_reg_entry_value,
+  needs_get_addr_index
 };
 
 /* Return non-zero iff the location expression at DATA (length SIZE)
@@ -2309,7 +2328,7 @@ dwarf2_loc_desc_needs_frame (const gdb_byte *data, unsigned short size,
 static void
 unimplemented (unsigned int op)
 {
-  const char *name = dwarf_stack_op_name (op);
+  const char *name = get_DW_OP_name (op);
 
   if (name)
     error (_("DWARF operator %s cannot be translated to an agent expression"),
@@ -2673,7 +2692,6 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	  {
 	    const gdb_byte *datastart;
 	    size_t datalen;
-	    unsigned int before_stack_len;
 	    struct block *b;
 	    struct symbol *framefunc;
 	    LONGEST base_offset = 0;
@@ -2755,10 +2773,10 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
 		ax_simple (expr, aop_ref64);
 		break;
 	      default:
-		/* Note that dwarf_stack_op_name will never return
+		/* Note that get_DW_OP_name will never return
 		   NULL here.  */
 		error (_("Unsupported size %d in %s"),
-		       size, dwarf_stack_op_name (op));
+		       size, get_DW_OP_name (op));
 	      }
 	  }
 	  break;
@@ -3277,7 +3295,7 @@ disassemble_dwarf_expression (struct ui_file *stream,
       LONGEST l;
       const char *name;
 
-      name = dwarf_stack_op_name (op);
+      name = get_DW_OP_name (op);
 
       if (!name)
 	error (_("Unrecognized DWARF opcode 0x%02x at %ld"),

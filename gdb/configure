@@ -778,6 +778,7 @@ enable_largefile
 with_separate_debug_dir
 with_gdb_datadir
 with_relocated_sources
+with_auto_load_dir
 with_auto_load_safe_path
 enable_targets
 enable_64_bit_bfd
@@ -1428,6 +1429,11 @@ _ACEOF
 
   cat <<\_ACEOF
 
+Program names:
+  --program-prefix=PREFIX            prepend PREFIX to installed program names
+  --program-suffix=SUFFIX            append SUFFIX to installed program names
+  --program-transform-name=PROGRAM   run sed PROGRAM on installed program names
+
 X features:
   --x-includes=DIR    X include files are in DIR
   --x-libraries=DIR   X library files are in DIR
@@ -1480,8 +1486,12 @@ Optional Packages:
                           [DATADIR/gdb]
   --with-relocated-sources=PATH
                           automatically relocate this path for source files
+  --with-auto-load-dir=PATH
+                          directories from which to load auto-loaded scripts
+                          [$debugdir:$datadir/auto-load]
   --with-auto-load-safe-path=PATH
                           directories safe to hold auto-loaded files
+                          [--with-auto-load-dir]
   --without-auto-load-safe-path
                           do not restrict auto-loaded files locations
   --with-libunwind-ia64   use libunwind frame unwinding for ia64 targets
@@ -4373,6 +4383,16 @@ ac_configure="$SHELL $ac_aux_dir/configure"  # Please don't use this var.
 
 
 
+test "$program_prefix" != NONE &&
+  program_transform_name="s&^&$program_prefix&;$program_transform_name"
+# Use a double $ so make ignores it.
+test "$program_suffix" != NONE &&
+  program_transform_name="s&\$&$program_suffix&;$program_transform_name"
+# Double any \ or $.
+# By default was `s,x,x', remove it if useless.
+ac_script='s/[\\$]/&&/g;s/;s,x,x,$//'
+program_transform_name=`$as_echo "$program_transform_name" | sed "$ac_script"`
+
 
 # Dependency checking.
 rm -rf .tst 2>/dev/null
@@ -4943,26 +4963,52 @@ _ACEOF
 fi
 
 
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for default auto-load directory" >&5
+$as_echo_n "checking for default auto-load directory... " >&6; }
+
+# Check whether --with-auto-load-dir was given.
+if test "${with_auto_load_dir+set}" = set; then :
+  withval=$with_auto_load_dir;
+else
+  with_auto_load_dir='$debugdir:$datadir/auto-load'
+fi
+
+escape_dir=`echo $with_auto_load_dir | sed 's/[$]\(datadir\|debugdir\)\>/\\\\\\\\\\\\&/g'`
+
+  test "x$prefix" = xNONE && prefix="$ac_default_prefix"
+  test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
+  ac_define_dir=`eval echo $escape_dir`
+  ac_define_dir=`eval echo $ac_define_dir`
+
+cat >>confdefs.h <<_ACEOF
+#define AUTO_LOAD_DIR "$ac_define_dir"
+_ACEOF
+
+
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $with_auto_load_dir" >&5
+$as_echo "$with_auto_load_dir" >&6; }
+
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for default auto-load safe-path" >&5
 $as_echo_n "checking for default auto-load safe-path... " >&6; }
 
 # Check whether --with-auto-load-safe-path was given.
 if test "${with_auto_load_safe_path+set}" = set; then :
   withval=$with_auto_load_safe_path; if test "$with_auto_load_safe_path" = "no"; then
-   with_auto_load_safe_path=""
- fi
+     with_auto_load_safe_path="/"
+     fi
 else
-  with_auto_load_safe_path="$prefix"
+  with_auto_load_safe_path="$with_auto_load_dir"
 fi
 
+escape_dir=`echo $with_auto_load_safe_path | sed 's/[$]\(datadir\|debugdir\)\>/\\\\\\\\\\\\&/g'`
 
   test "x$prefix" = xNONE && prefix="$ac_default_prefix"
   test "x$exec_prefix" = xNONE && exec_prefix='${prefix}'
-  ac_define_dir=`eval echo $with_auto_load_safe_path`
+  ac_define_dir=`eval echo $escape_dir`
   ac_define_dir=`eval echo $ac_define_dir`
 
 cat >>confdefs.h <<_ACEOF
-#define DEFAULT_AUTO_LOAD_SAFE_PATH "$ac_define_dir"
+#define AUTO_LOAD_SAFE_PATH "$ac_define_dir"
 _ACEOF
 
 
@@ -12447,7 +12493,7 @@ fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gdb_cv_var_elf" >&5
 $as_echo "$gdb_cv_var_elf" >&6; }
 if test $gdb_cv_var_elf = yes; then
-  CONFIG_OBS="$CONFIG_OBS elfread.o"
+  CONFIG_OBS="$CONFIG_OBS elfread.o stap-probe.o"
 
 $as_echo "#define HAVE_ELF 1" >>confdefs.h
 

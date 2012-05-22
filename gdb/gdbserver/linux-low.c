@@ -172,8 +172,20 @@ pull_pid_from_list (struct simple_pid_list **listp, int pid, int *statusp)
   return 0;
 }
 
-/* FIXME this is a bit of a hack, and could be removed.  */
-int stopping_threads;
+enum stopping_threads_kind
+  {
+    /* Not stopping threads presently.  */
+    NOT_STOPPING_THREADS,
+
+    /* Stopping threads.  */
+    STOPPING_THREADS,
+
+    /* Stopping and suspending threads.  */
+    STOPPING_AND_SUSPENDING_THREADS
+  };
+
+/* This is set while stop_all_lwps is in effect.  */
+enum stopping_threads_kind stopping_threads = NOT_STOPPING_THREADS;
 
 /* FIXME make into a target method?  */
 int using_threads = 1;
@@ -461,12 +473,17 @@ handle_extended_wait (struct lwp_info *event_child, int wstat)
 	 before calling linux_resume_one_lwp.  */
       new_lwp->stopped = 1;
 
+     /* If we're suspending all threads, leave this one suspended
+	too.  */
+      if (stopping_threads == STOPPING_AND_SUSPENDING_THREADS)
+	new_lwp->suspended = 1;
+
       /* Normally we will get the pending SIGSTOP.  But in some cases
 	 we might get another signal delivered to the group first.
 	 If we do get another signal, be sure not to lose it.  */
       if (WSTOPSIG (status) == SIGSTOP)
 	{
-	  if (stopping_threads)
+	  if (stopping_threads != NOT_STOPPING_THREADS)
 	    new_lwp->stop_pc = get_stop_pc (new_lwp);
 	  else
 	    linux_resume_one_lwp (new_lwp, 0, 0, NULL);
@@ -475,7 +492,7 @@ handle_extended_wait (struct lwp_info *event_child, int wstat)
 	{
 	  new_lwp->stop_expected = 1;
 
-	  if (stopping_threads)
+	  if (stopping_threads != NOT_STOPPING_THREADS)
 	    {
 	      new_lwp->stop_pc = get_stop_pc (new_lwp);
 	      new_lwp->status_pending_p = 1;
@@ -1815,7 +1832,7 @@ linux_wait_for_event (ptid_t ptid, int *wstat, int options)
     {
       requested_child = find_lwp_pid (ptid);
 
-      if (!stopping_threads
+      if (stopping_threads == NOT_STOPPING_THREADS
 	  && requested_child->status_pending_p
 	  && requested_child->collecting_fast_tracepoint)
 	{
@@ -1963,7 +1980,7 @@ linux_wait_for_event (ptid_t ptid, int *wstat, int options)
 	  event_child->stop_expected = 0;
 
 	  should_stop = (current_inferior->last_resume_kind == resume_stop
-			 || stopping_threads);
+			 || stopping_threads != NOT_STOPPING_THREADS);
 
 	  if (!should_stop)
 	    {
@@ -3072,14 +3089,19 @@ lwp_running (struct inferior_list_entry *entry, void *data)
 static void
 stop_all_lwps (int suspend, struct lwp_info *except)
 {
-  stopping_threads = 1;
+  /* Should not be called recursively.  */
+  gdb_assert (stopping_threads == NOT_STOPPING_THREADS);
+
+  stopping_threads = (suspend
+		      ? STOPPING_AND_SUSPENDING_THREADS
+		      : STOPPING_THREADS);
 
   if (suspend)
     find_inferior (&all_lwps, suspend_and_send_sigstop_callback, except);
   else
     find_inferior (&all_lwps, send_sigstop_callback, except);
   for_each_inferior (&all_lwps, wait_for_sigstop);
-  stopping_threads = 0;
+  stopping_threads = NOT_STOPPING_THREADS;
 }
 
 /* Resume execution of the inferior process.
@@ -4356,23 +4378,20 @@ linux_store_registers (struct regcache *regcache, int regno)
 static int
 linux_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
 {
-  register int i;
-  /* Round starting address down to longword boundary.  */
-  register CORE_ADDR addr = memaddr & -(CORE_ADDR) sizeof (PTRACE_XFER_TYPE);
-  /* Round ending address up; get number of longwords that makes.  */
-  register int count
-    = (((memaddr + len) - addr) + sizeof (PTRACE_XFER_TYPE) - 1)
-      / sizeof (PTRACE_XFER_TYPE);
-  /* Allocate buffer of that many longwords.  */
-  register PTRACE_XFER_TYPE *buffer
-    = (PTRACE_XFER_TYPE *) alloca (count * sizeof (PTRACE_XFER_TYPE));
-  int fd;
-  char filename[64];
   int pid = lwpid_of (get_thread_lwp (current_inferior));
+  register PTRACE_XFER_TYPE *buffer;
+  register CORE_ADDR addr;
+  register int count;
+  char filename[64];
+  register int i;
+  int ret;
+  int fd;
 
   /* Try using /proc.  Don't bother for one word.  */
   if (len >= 3 * sizeof (long))
     {
+      int bytes;
+
       /* We could keep this file open and cache it - possibly one per
 	 thread.  That requires some juggling, but is even faster.  */
       sprintf (filename, "/proc/%d/mem", pid);
@@ -4385,38 +4404,56 @@ linux_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
 	 32-bit platforms (for instance, SPARC debugging a SPARC64
 	 application).  */
 #ifdef HAVE_PREAD64
-      if (pread64 (fd, myaddr, len, memaddr) != len)
+      bytes = pread64 (fd, myaddr, len, memaddr);
 #else
-      if (lseek (fd, memaddr, SEEK_SET) == -1 || read (fd, myaddr, len) != len)
+      bytes = -1;
+      if (lseek (fd, memaddr, SEEK_SET) != -1)
+	bytes = read (fd, myaddr, len);
 #endif
-	{
-	  close (fd);
-	  goto no_proc;
-	}
 
       close (fd);
-      return 0;
+      if (bytes == len)
+	return 0;
+
+      /* Some data was read, we'll try to get the rest with ptrace.  */
+      if (bytes > 0)
+	{
+	  memaddr += bytes;
+	  myaddr += bytes;
+	  len -= bytes;
+	}
     }
 
  no_proc:
+  /* Round starting address down to longword boundary.  */
+  addr = memaddr & -(CORE_ADDR) sizeof (PTRACE_XFER_TYPE);
+  /* Round ending address up; get number of longwords that makes.  */
+  count = ((((memaddr + len) - addr) + sizeof (PTRACE_XFER_TYPE) - 1)
+	   / sizeof (PTRACE_XFER_TYPE));
+  /* Allocate buffer of that many longwords.  */
+  buffer = (PTRACE_XFER_TYPE *) alloca (count * sizeof (PTRACE_XFER_TYPE));
+
   /* Read all the longwords */
+  errno = 0;
   for (i = 0; i < count; i++, addr += sizeof (PTRACE_XFER_TYPE))
     {
-      errno = 0;
       /* Coerce the 3rd arg to a uintptr_t first to avoid potential gcc warning
 	 about coercing an 8 byte integer to a 4 byte pointer.  */
       buffer[i] = ptrace (PTRACE_PEEKTEXT, pid,
 			  (PTRACE_ARG3_TYPE) (uintptr_t) addr, 0);
       if (errno)
-	return errno;
+	break;
     }
+  ret = errno;
 
   /* Copy appropriate bytes out of the buffer.  */
+  i *= sizeof (PTRACE_XFER_TYPE);
+  i -= memaddr & (sizeof (PTRACE_XFER_TYPE) - 1);
   memcpy (myaddr,
 	  (char *) buffer + (memaddr & (sizeof (PTRACE_XFER_TYPE) - 1)),
-	  len);
+	  i < len ? i : len);
 
-  return 0;
+  return ret;
 }
 
 /* Copy LEN bytes of data from debugger memory at MYADDR to inferior's

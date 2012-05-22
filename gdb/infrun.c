@@ -55,6 +55,8 @@
 #include "continuations.h"
 #include "interps.h"
 #include "skip.h"
+#include "probe.h"
+#include "objfiles.h"
 
 /* Prototypes for local functions */
 
@@ -1543,7 +1545,7 @@ displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
 
 	  if (debug_displaced)
 	    fprintf_unfiltered (gdb_stdlog,
-				"breakpoint is gone %s: step(%d)\n",
+				"displaced: breakpoint is gone: %s, step(%d)\n",
 				target_pid_to_str (tp->ptid), step);
 
 	  target_resume (ptid, step, TARGET_SIGNAL_0);
@@ -2402,7 +2404,7 @@ static void handle_step_into_function (struct gdbarch *gdbarch,
 static void handle_step_into_function_backward (struct gdbarch *gdbarch,
 						struct execution_control_state *ecs);
 static void check_exception_resume (struct execution_control_state *,
-				    struct frame_info *, struct symbol *);
+				    struct frame_info *);
 
 static void stop_stepping (struct execution_control_state *ecs);
 static void prepare_to_wait (struct execution_control_state *ecs);
@@ -4437,9 +4439,17 @@ process_event_stop_test:
 
 	if (what.is_longjmp)
 	  {
-	    if (!gdbarch_get_longjmp_target_p (gdbarch)
-		|| !gdbarch_get_longjmp_target (gdbarch,
-						frame, &jmp_buf_pc))
+	    struct value *arg_value;
+
+	    /* If we set the longjmp breakpoint via a SystemTap probe,
+	       then use it to extract the arguments.  The destination
+	       PC is the third argument to the probe.  */
+	    arg_value = probe_safe_evaluate_at_pc (frame, 2);
+	    if (arg_value)
+	      jmp_buf_pc = value_as_address (arg_value);
+	    else if (!gdbarch_get_longjmp_target_p (gdbarch)
+		     || !gdbarch_get_longjmp_target (gdbarch,
+						     frame, &jmp_buf_pc))
 	      {
 		if (debug_infrun)
 		  fprintf_unfiltered (gdb_stdlog,
@@ -4457,12 +4467,7 @@ process_event_stop_test:
 	    insert_longjmp_resume_breakpoint (gdbarch, jmp_buf_pc);
 	  }
 	else
-	  {
-	    struct symbol *func = get_frame_function (frame);
-
-	    if (func)
-	      check_exception_resume (ecs, frame, func);
-	  }
+	  check_exception_resume (ecs, frame);
 	keep_going (ecs);
 	return;
 
@@ -4814,6 +4819,48 @@ process_event_stop_test:
       return;
     }
 
+  /* If we're in the return path from a shared library trampoline,
+     we want to proceed through the trampoline when stepping.  */
+  /* macro/2012-04-25: This needs to come before the subroutine
+     call check below as on some targets return trampolines look
+     like subroutine calls (MIPS16 return thunks).  */
+  if (gdbarch_in_solib_return_trampoline (gdbarch,
+					  stop_pc, ecs->stop_func_name)
+      && ecs->event_thread->control.step_over_calls != STEP_OVER_NONE)
+    {
+      /* Determine where this trampoline returns.  */
+      CORE_ADDR real_stop_pc;
+
+      real_stop_pc = gdbarch_skip_trampoline_code (gdbarch, frame, stop_pc);
+
+      if (debug_infrun)
+	 fprintf_unfiltered (gdb_stdlog,
+			     "infrun: stepped into solib return tramp\n");
+
+      /* Only proceed through if we know where it's going.  */
+      if (real_stop_pc)
+	{
+	  /* And put the step-breakpoint there and go until there.  */
+	  struct symtab_and_line sr_sal;
+
+	  init_sal (&sr_sal);	/* initialize to zeroes */
+	  sr_sal.pc = real_stop_pc;
+	  sr_sal.section = find_pc_overlay (sr_sal.pc);
+	  sr_sal.pspace = get_frame_program_space (frame);
+
+	  /* Do not specify what the fp should be when we stop since
+	     on some machines the prologue is where the new fp value
+	     is established.  */
+	  insert_step_resume_breakpoint_at_sal (gdbarch,
+						sr_sal, null_frame_id);
+
+	  /* Restart without fiddling with the step ranges or
+	     other state.  */
+	  keep_going (ecs);
+	  return;
+	}
+    }
+
   /* Check for subroutine calls.  The check for the current frame
      equalling the step ID is not necessary - the check of the
      previous frame's ID is sufficient - but it is a common case and
@@ -5019,45 +5066,6 @@ process_event_stop_test:
 	  sr_sal.pspace = get_frame_program_space (frame);
 	  insert_step_resume_breakpoint_at_sal (gdbarch, 
 						sr_sal, null_frame_id);
-	  keep_going (ecs);
-	  return;
-	}
-    }
-
-  /* If we're in the return path from a shared library trampoline,
-     we want to proceed through the trampoline when stepping.  */
-  if (gdbarch_in_solib_return_trampoline (gdbarch,
-					  stop_pc, ecs->stop_func_name)
-      && ecs->event_thread->control.step_over_calls != STEP_OVER_NONE)
-    {
-      /* Determine where this trampoline returns.  */
-      CORE_ADDR real_stop_pc;
-
-      real_stop_pc = gdbarch_skip_trampoline_code (gdbarch, frame, stop_pc);
-
-      if (debug_infrun)
-	 fprintf_unfiltered (gdb_stdlog,
-			     "infrun: stepped into solib return tramp\n");
-
-      /* Only proceed through if we know where it's going.  */
-      if (real_stop_pc)
-	{
-	  /* And put the step-breakpoint there and go until there.  */
-	  struct symtab_and_line sr_sal;
-
-	  init_sal (&sr_sal);	/* initialize to zeroes */
-	  sr_sal.pc = real_stop_pc;
-	  sr_sal.section = find_pc_overlay (sr_sal.pc);
-	  sr_sal.pspace = get_frame_program_space (frame);
-
-	  /* Do not specify what the fp should be when we stop since
-	     on some machines the prologue is where the new fp value
-	     is established.  */
-	  insert_step_resume_breakpoint_at_sal (gdbarch,
-						sr_sal, null_frame_id);
-
-	  /* Restart without fiddling with the step ranges or
-	     other state.  */
 	  keep_going (ecs);
 	  return;
 	}
@@ -5549,20 +5557,70 @@ insert_exception_resume_breakpoint (struct thread_info *tp,
     }
 }
 
+/* A helper for check_exception_resume that sets an
+   exception-breakpoint based on a SystemTap probe.  */
+
+static void
+insert_exception_resume_from_probe (struct thread_info *tp,
+				    const struct probe *probe,
+				    struct objfile *objfile,
+				    struct frame_info *frame)
+{
+  struct value *arg_value;
+  CORE_ADDR handler;
+  struct breakpoint *bp;
+
+  arg_value = probe_safe_evaluate_at_pc (frame, 1);
+  if (!arg_value)
+    return;
+
+  handler = value_as_address (arg_value);
+
+  if (debug_infrun)
+    fprintf_unfiltered (gdb_stdlog,
+			"infrun: exception resume at %s\n",
+			paddress (get_objfile_arch (objfile),
+				  handler));
+
+  bp = set_momentary_breakpoint_at_pc (get_frame_arch (frame),
+				       handler, bp_exception_resume);
+  bp->thread = tp->num;
+  inferior_thread ()->control.exception_resume_breakpoint = bp;
+}
+
 /* This is called when an exception has been intercepted.  Check to
    see whether the exception's destination is of interest, and if so,
    set an exception resume breakpoint there.  */
 
 static void
 check_exception_resume (struct execution_control_state *ecs,
-			struct frame_info *frame, struct symbol *func)
+			struct frame_info *frame)
 {
   volatile struct gdb_exception e;
+  struct objfile *objfile;
+  const struct probe *probe;
+  struct symbol *func;
+
+  /* First see if this exception unwinding breakpoint was set via a
+     SystemTap probe point.  If so, the probe has two arguments: the
+     CFA and the HANDLER.  We ignore the CFA, extract the handler, and
+     set a breakpoint there.  */
+  probe = find_probe_by_pc (get_frame_pc (frame), &objfile);
+  if (probe)
+    {
+      insert_exception_resume_from_probe (ecs->event_thread, probe,
+					  objfile, frame);
+      return;
+    }
+
+  func = get_frame_function (frame);
+  if (!func)
+    return;
 
   TRY_CATCH (e, RETURN_MASK_ERROR)
     {
       struct block *b;
-      struct dict_iterator iter;
+      struct block_iterator iter;
       struct symbol *sym;
       int argno = 0;
 
@@ -6599,7 +6657,8 @@ static const struct lval_funcs siginfo_value_funcs =
    if there's no object available.  */
 
 static struct value *
-siginfo_make_value (struct gdbarch *gdbarch, struct internalvar *var)
+siginfo_make_value (struct gdbarch *gdbarch, struct internalvar *var,
+		    void *ignore)
 {
   if (target_has_stack
       && !ptid_equal (inferior_ptid, null_ptid)
@@ -7021,6 +7080,15 @@ show_schedule_multiple (struct ui_file *file, int from_tty,
 			    "of all processes is %s.\n"), value);
 }
 
+/* Implementation of `siginfo' variable.  */
+
+static const struct internalvar_funcs siginfo_funcs =
+{
+  siginfo_make_value,
+  NULL,
+  NULL
+};
+
 void
 _initialize_infrun (void)
 {
@@ -7309,7 +7377,7 @@ enabled by default on some platforms."),
      value with a void typed value, and when we get here, gdbarch
      isn't initialized yet.  At this point, we're quite sure there
      isn't another convenience variable of the same name.  */
-  create_internalvar_type_lazy ("_siginfo", siginfo_make_value);
+  create_internalvar_type_lazy ("_siginfo", &siginfo_funcs, NULL);
 
   add_setshow_boolean_cmd ("observer", no_class,
 			   &observer_mode_1, _("\

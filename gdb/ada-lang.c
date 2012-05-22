@@ -4139,7 +4139,7 @@ ada_convert_actual (struct value *actual, struct type *formal_type0)
         }
       else
 	return actual;
-      return value_cast_pointers (formal_type, result);
+      return value_cast_pointers (formal_type, result, 0);
     }
   else if (TYPE_CODE (actual_type) == TYPE_CODE_PTR)
     return ada_value_ind (actual);
@@ -5470,7 +5470,7 @@ advance_wild_match (const char **namep, const char *name0, int target0)
 static int
 wild_match (const char *name, const char *patn)
 {
-  const char *p, *n;
+  const char *p;
   const char *name0 = name;
 
   while (1)
@@ -5515,7 +5515,7 @@ ada_add_block_symbols (struct obstack *obstackp,
                        domain_enum domain, struct objfile *objfile,
                        int wild)
 {
-  struct dict_iterator iter;
+  struct block_iterator iter;
   int name_len = strlen (name);
   /* A matching argument symbol, if any.  */
   struct symbol *arg_sym;
@@ -5527,9 +5527,8 @@ ada_add_block_symbols (struct obstack *obstackp,
   found_sym = 0;
   if (wild)
     {
-      for (sym = dict_iter_match_first (BLOCK_DICT (block), name,
-					wild_match, &iter);
-	   sym != NULL; sym = dict_iter_match_next (name, wild_match, &iter))
+      for (sym = block_iter_match_first (block, name, wild_match, &iter);
+	   sym != NULL; sym = block_iter_match_next (name, wild_match, &iter))
       {
         if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
                                    SYMBOL_DOMAIN (sym), domain)
@@ -5551,9 +5550,8 @@ ada_add_block_symbols (struct obstack *obstackp,
     }
   else
     {
-     for (sym = dict_iter_match_first (BLOCK_DICT (block), name,
-				       full_match, &iter);
-	   sym != NULL; sym = dict_iter_match_next (name, full_match, &iter))
+     for (sym = block_iter_match_first (block, name, full_match, &iter);
+	  sym != NULL; sym = block_iter_match_next (name, full_match, &iter))
       {
         if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
                                    SYMBOL_DOMAIN (sym), domain))
@@ -5816,7 +5814,7 @@ ada_make_symbol_completion_list (char *text0, char *word)
   struct objfile *objfile;
   struct block *b, *surrounding_static_block = 0;
   int i;
-  struct dict_iterator iter;
+  struct block_iterator iter;
 
   if (text0[0] == '<')
     {
@@ -10821,7 +10819,6 @@ static void
 ada_exception_support_info_sniffer (void)
 {
   struct ada_inferior_data *data = get_ada_inferior_data (current_inferior ());
-  struct symbol *sym;
 
   /* If the exception info is already known, then no need to recompute it.  */
   if (data->exception_info != NULL)
