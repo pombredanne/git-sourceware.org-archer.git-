@@ -52,6 +52,8 @@ gdb_start
 gdb_reinitialize_dir $srcdir/$subdir
 gdb_file_cmd ${binfile}
 
+gdb_test_no_output "set language c++" ""
+
 # Find the interesting functions.  We go to a little effort to find
 # the right function names here, to work around PR c++/40.
 set func1_name ""
@@ -122,6 +124,8 @@ if { $func1_sec == $func2_sec } {
 gdb_exit
 gdb_start
 gdb_reinitialize_dir $srcdir/$subdir
+
+gdb_test_no_output "set language c++" ""
 
 gdb_test "add-symbol-file ${binfile} 0 -s ${func1_sec} 0x10000 -s ${func2_sec} 0x20000" \
 	"Reading symbols from .*${testfile}\\.o\\.\\.\\.done\\.(|\r\nUsing host libthread_db library .*libthread_db.so.*\\.)" \

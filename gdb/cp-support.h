@@ -161,6 +161,10 @@ extern char *cp_func_name (const char *full_name);
 
 extern char *cp_remove_params (const char *demangled_name);
 
+extern int cp_name_has_template_parameters (const char *name);
+
+extern char *cp_remove_template_params (const char *name);
+
 extern struct symbol **make_symbol_overload_list (const char *,
 						  const char *);
 

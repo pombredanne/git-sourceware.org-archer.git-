@@ -1,0 +1,68 @@
+# Copyright 2008 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+if $tracelevel then {
+    strace $tracelevel
+}
+
+set testfile temp-op
+set srcfile ${testfile}.cc
+set binfile ${objdir}/${subdir}/${testfile}
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug c++}] != "" } {
+    untested "Couldn't compile test program"
+    return -1
+}
+
+# Get things started.
+
+gdb_exit
+gdb_start
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_load ${binfile}
+
+############################################
+
+if ![runto_main] then {
+    perror "couldn't run to breakpoint main"
+    continue
+}
+
+# Test that a templated function can be found
+# with out specification of template arguments
+gdb_test "p foo(a, 'a')"         "= 11"
+
+# Test that function names with '<' in their names
+# are not mistaken for templates
+gdb_test "p a << 22"         "= 12"
+gdb_test "p a <  22"         "= 13"
+gdb_test "p a <= 22"         "= 14"
+
+# Test that a template operator can be correctly
+# evaluated
+gdb_test "p a == 'a'"        "= 15"
+
+# Test that overload resolution is still correctly
+# performed.
+gdb_test "p a == 1"          "= 16"
+
+# Test calling a member function of a template class
+gdb_test "p b == 1"          "= 17"
+gdb_test "p b == 'a'"        "= 18"
+
+# Test that printing the a template name without
+# template parameters does not return an arbitrary match
+
+gdb_test "p foo" "No symbol \"foo\" in current context"
+gdb_test "ptype B" "No symbol \"foo\" in current context"

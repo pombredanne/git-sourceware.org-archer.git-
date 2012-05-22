@@ -13293,6 +13293,7 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
   if (name)
     {
       const char *linkagename;
+      const char *search_name = NULL;
       int suppress_add = 0;
 
       if (space)
@@ -13313,6 +13314,26 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	symbol_set_demangled_name (&(sym->ginfo),
 				   (char *) dwarf2_full_name (name, die, cu),
 	                           NULL);
+
+      /* For C++ if the name contains template parameters remove them, and set
+         the cleaned up name to be the search name.  */
+      if (cu->language == language_cplus && linkagename
+	  && cp_name_has_template_parameters (linkagename))
+	{
+	  char *tmp = cp_remove_template_params (linkagename);
+
+	  if (tmp != NULL && strcmp (tmp, linkagename) != 0)
+	    {
+	      search_name = obsavestring (tmp, strlen (tmp),
+	                                  &objfile->objfile_obstack);
+
+	      symbol_set_cplus_search_name (&sym->ginfo,
+	                                    objfile,
+	                                    search_name);
+	    }
+
+	  xfree (tmp);
+	}
 
       /* Default assumptions.
          Use the passed type or decode it from the die.  */

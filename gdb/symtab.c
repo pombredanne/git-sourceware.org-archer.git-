@@ -489,7 +489,33 @@ symbol_get_demangled_name (const struct general_symbol_info *gsymbol)
     return gsymbol->language_specific.mangled_lang.demangled_name;
 }
 
+/* Set the search name of the give GSYMBOL to name.  */
+
+void
+symbol_set_cplus_search_name (struct general_symbol_info *gsymbol,
+                                struct objfile *objfile,
+                                const char *name)
+{
+  if (gsymbol->language_specific.cplus_specific == NULL)
+    symbol_init_cplus_specific (gsymbol, objfile);
+
+  gsymbol->language_specific.cplus_specific->search_name = (char *) name;
+}
+
+/* Get the search name of the give GSYMBOL.  */
+
+char*
+symbol_get_cplus_search_name (const struct general_symbol_info *gsymbol)
+{
+  if (gsymbol->language_specific.cplus_specific != NULL
+      && gsymbol->language_specific.cplus_specific->search_name != NULL)
+    return gsymbol->language_specific.cplus_specific->search_name;
+
+  return symbol_natural_name (gsymbol);
+}
+
 
+
 /* Initialize the language dependent portion of a symbol
    depending upon the language for the symbol.  */
 
@@ -882,6 +908,8 @@ symbol_search_name (const struct general_symbol_info *gsymbol)
 {
   if (gsymbol->language == language_ada)
     return gsymbol->name;
+  else if (gsymbol->language == language_cplus)
+    return symbol_get_cplus_search_name (gsymbol);
   else
     return symbol_natural_name (gsymbol);
 }
@@ -1914,6 +1942,18 @@ find_main_filename (void)
   return (NULL);
 }
 
+/* Return 1 if NAME matches SYM's template name.  */
+
+static int
+symbol_matches_template_name (const char *name, struct symbol *sym)
+{
+  const char *template_name = SYMBOL_NATURAL_NAME(sym);
+  if (template_name == NULL)
+    return 0;
+
+  return strcmp_iw (template_name, name) == 0;
+}
+
 /* Search BLOCK for symbol NAME in DOMAIN.
 
    Note that if NAME is the demangled form of a C++ symbol, we will fail
@@ -1934,10 +1974,31 @@ lookup_block_symbol (const struct block *block, const char *name,
 
   if (!BLOCK_FUNCTION (block))
     {
+      const char *template_name = NULL;
+
+      if (current_language->la_language == language_cplus
+	  && cp_name_has_template_parameters (name))
+	{
+	  template_name = name;
+	  name = cp_remove_template_params (name);
+
+	  if (name == NULL)
+	    {
+	      /* Not a legal C++ name.  */
+	      return NULL;
+	    }
+	}
+
       for (sym = block_iter_name_first (block, name, &iter);
 	   sym != NULL;
 	   sym = block_iter_name_next (name, &iter))
 	{
+	  /* For C++ if the name being searched for contains template
+	     parameters check the template name of the symbol.  */
+	  if (template_name != NULL
+	      && !symbol_matches_template_name (template_name, sym))
+	    continue;
+
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
 				     SYMBOL_DOMAIN (sym), domain))
 	    return sym;

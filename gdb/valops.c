@@ -2686,7 +2686,7 @@ find_overload_match (struct value **args, int nargs,
 
       if (fsym)
         {
-          qualified_name = SYMBOL_NATURAL_NAME (fsym);
+          qualified_name = SYMBOL_SEARCH_NAME (fsym);
 
           /* If we have a function with a C++ name, try to extract just
 	     the function part.  Do not try this for non-functions (e.g.

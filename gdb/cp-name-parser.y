@@ -2058,9 +2058,12 @@ cp_merge_demangle_parse_infos (struct demangle_parse_info *dest,
   cp_demangled_name_parse_free (src);
 }
 
-/* Convert a demangled name to a demangle_component tree.  On success,
-   a structure containing the root of the new tree is returned; it must
-   be freed by calling cp_demangled_name_parse_free. On error, NULL is
+/* Convert a demangled name to a demangle_component tree.  The structure
+   of the tree depends on the format of each node in the tree.  For
+   information on the structure of a node see the comment corresponding
+   to its type in demangle_component_type.
+   On success, the root of the new tree is returned; it is valid until the
+   next call to this function and should not be freed.  On error, NULL is
    returned, and an error message will be set in *ERRMSG (which does
    not need to be freed).  */
 

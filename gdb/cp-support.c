@@ -833,6 +833,72 @@ cp_remove_params (const char *demangled_name)
   return ret;
 }
 
+/* Returns 1 if the given name contains template parameters;
+   otherwise return 0.
+   Used as a quick heuristic to avoid more expensive template
+   parsing when not necessary.  */
+
+int
+cp_name_has_template_parameters (const char *name)
+{
+  char *c = strchr (name, '<');
+  return c != NULL && strchr (c+1, '>') != NULL;
+}
+
+/* Remove template parameters components from the give tree.  */
+
+static struct demangle_component *
+cp_remove_template_params_component (struct demangle_component *comp)
+{
+
+  gdb_assert (comp != NULL);
+
+  switch (comp->type)
+    {
+    case DEMANGLE_COMPONENT_TEMPLATE:
+      /* If there is a template component remove this node by re-parenting the
+         the left child.  */
+      comp = d_left (comp);
+      break;
+    case DEMANGLE_COMPONENT_QUAL_NAME:
+      /* For a qualified name remove template components from the right
+         subtree.  */
+      d_right (comp) = cp_remove_template_params_component (d_right (comp));
+      break;
+    case DEMANGLE_COMPONENT_TYPED_NAME:
+      /* Template components, if present, will be in the left subtree.  Remove
+         them.  */
+      d_left (comp) = cp_remove_template_params_component (d_left (comp));
+      break;
+    default:
+      break;
+    }
+
+  return comp;
+}
+
+/* Remove template parameters from the given name.  The returned string is
+   malloc'ed and must be properly saved and freed.  */
+
+char *
+cp_remove_template_params (const char *name)
+{
+  struct demangle_component *ret_comp;
+  char *ret = NULL;
+
+  if (name == NULL)
+    return NULL;
+
+  ret_comp = cp_demangled_name_to_comp (name, NULL);
+  if (ret_comp == NULL)
+    return NULL;
+
+  ret_comp = cp_remove_template_params_component (ret_comp);
+  ret = cp_comp_to_string (ret_comp, 10);
+
+  return ret;
+}
+
 /* Here are some random pieces of trivia to keep in mind while trying
    to take apart demangled names:
 
@@ -1069,7 +1135,7 @@ overload_list_add_symbol (struct symbol *sym,
       return;
 
   /* Get the demangled name without parameters */
-  sym_name = cp_remove_params (SYMBOL_NATURAL_NAME (sym));
+  sym_name = cp_remove_params (SYMBOL_SEARCH_NAME (sym));
   if (!sym_name)
     return;
 

@@ -83,6 +83,11 @@ struct probe;
 struct cplus_specific
 {
   const char *demangled_name;
+
+  /* If the symbol name contains template parameters this is the name with
+     these parameters removed to be used during search.  Otherwise this
+     should be NULL, and the regular symbol name should be used.  */
+  char *search_name;
 };
 
 /* Define a structure for the information that is common to all symbol types,
@@ -166,6 +171,12 @@ extern void symbol_set_demangled_name (struct general_symbol_info *, char *,
 
 extern const char *symbol_get_demangled_name
   (const struct general_symbol_info *);
+
+extern void symbol_set_cplus_search_name (struct general_symbol_info *gsymbol,
+					  struct objfile *objfile,
+					  const char *name);
+
+extern char* symbol_get_cplus_search_name (const struct general_symbol_info *);
 
 extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 
