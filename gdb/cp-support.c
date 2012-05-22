@@ -883,7 +883,7 @@ cp_remove_template_params_component (struct demangle_component *comp)
 char *
 cp_remove_template_params (const char *name)
 {
-  struct demangle_component *ret_comp;
+  struct demangle_parse_info *ret_comp;
   char *ret = NULL;
 
   if (name == NULL)
@@ -893,8 +893,9 @@ cp_remove_template_params (const char *name)
   if (ret_comp == NULL)
     return NULL;
 
-  ret_comp = cp_remove_template_params_component (ret_comp);
-  ret = cp_comp_to_string (ret_comp, 10);
+  ret_comp->tree = cp_remove_template_params_component (ret_comp->tree);
+  ret = cp_comp_to_string (ret_comp->tree, 10);
+  cp_demangled_name_parse_free (ret_comp);
 
   return ret;
 }

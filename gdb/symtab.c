@@ -504,7 +504,7 @@ symbol_set_cplus_search_name (struct general_symbol_info *gsymbol,
 
 /* Get the search name of the give GSYMBOL.  */
 
-char*
+static const char *
 symbol_get_cplus_search_name (const struct general_symbol_info *gsymbol)
 {
   if (gsymbol->language_specific.cplus_specific != NULL
