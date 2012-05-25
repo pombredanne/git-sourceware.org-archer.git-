@@ -40,8 +40,18 @@ if ![runto_main] then {
 }
 
 # Test that a templated function can be found
-# with out specification of template arguments
-gdb_test "p foo(a, 'a')"         "= 11"
+# with out specification of template arguments.
+gdb_test "p foo(a, 'a')"            "= 11"
+
+# Test that overload resolution is still performed
+# correctly.
+gdb_test "p foo(a, 1)"              "= 1112"
+gdb_test "p foo(a, 1.0f)"           "= 1113"
+
+# Test that fully qualifed names names are not
+# confused.
+gdb_test "p foo(a, a, 'a')"        "= 112"
+gdb_test "p C::D::foo (a, a, 'a')" "= 113"
 
 # Test that function names with '<' in their names
 # are not mistaken for templates
@@ -64,5 +74,5 @@ gdb_test "p b == 'a'"        "= 18"
 # Test that printing the a template name without
 # template parameters does not return an arbitrary match
 
-gdb_test "p foo" "No symbol \"foo\" in current context"
-gdb_test "ptype B" "No symbol \"foo\" in current context"
+gdb_test "print foo" "Symbol represents a template and cannot be evaluated."
+gdb_test "ptype B" "type = Template Symbol"

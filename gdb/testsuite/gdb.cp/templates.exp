@@ -323,6 +323,9 @@ gdb_test_multiple "ptype Foo" "ptype Foo" {
 	# GCC 2.95.3, stabs+ output.
 	pass "ptype Foo"
     }
+    -re "type = Template Symbol\r\n$gdb_prompt $" {
+	pass "ptype Foo"
+    }
 }
 
 #    -re "type = class Foo<int> \\{\r\n\[ \t\]*public:\r\n\[ \t\]*int x;\r\n\[ \t\]*int t;\r\n\r\n\[ \t\]*int foo(int, int);\r\n\\}\r\n$gdb_prompt $"
@@ -406,6 +409,9 @@ gdb_test_multiple "ptype Bar" "ptype Bar" {
 	# GCC 2.95.3, stabs+ output.
 	pass "ptype Bar"
     }
+	-re "type = Template Symbol\r\n$gdb_prompt $" {
+	pass "ptype Bar"
+    }
 }
 
 
@@ -451,6 +457,9 @@ gdb_test_multiple "ptype Baz" "ptype Baz" {
     }
     -re "No symbol \"Baz\" in current context.\r\n$gdb_prompt $" {
 	# GCC 2.95.3, stabs+ output.
+	pass "ptype Baz"
+    }
+    -re "type = Template Symbol\r\n$gdb_prompt $" {
 	pass "ptype Baz"
     }
 }
@@ -499,6 +508,9 @@ gdb_test_multiple "ptype Qux" "ptype Qux" {
 	# GCC 2.95.3, stabs+ output.
 	pass "ptype Qux"
     }
+    -re "type = Template Symbol\r\n$gdb_prompt $" {
+	pass "ptype Qux"
+    }
 }
 
 # pt Qux<int,&string>
@@ -536,6 +548,9 @@ gdb_test_multiple "ptype Spec" "ptype Spec" {
     -re "No symbol \"Spec\" in current context.\r\n$gdb_prompt $" {
 	# GCC 2.95.3, stabs+ output.
 	pass "ptype Spec"
+    }
+    -re "type = Template Symbol\r\n$gdb_prompt $" {
+	pass "ptype Qux"
     }
 }
 

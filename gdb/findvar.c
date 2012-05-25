@@ -622,6 +622,10 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
     case LOC_OPTIMIZED_OUT:
       return allocate_optimized_out_value (type);
 
+    case LOC_TEMPLATE:
+      error (_("Symbol represents a template and cannot be evaluated."));
+      break;
+
     default:
       error (_("Cannot look up value of a botched symbol `%s'."),
 	     SYMBOL_PRINT_NAME (var));

@@ -137,7 +137,12 @@ enum type_code
     TYPE_CODE_MODULE,		/* Fortran module.  */
 
     /* Internal function type.  */
-    TYPE_CODE_INTERNAL_FUNCTION
+    TYPE_CODE_INTERNAL_FUNCTION,
+
+    /* Types with this code are artificial types created to
+       serve as the root for the instantiations of a given
+       template.  */
+    TYPE_CODE_TEMPLATE
   };
 
 /* For now allow source to use TYPE_CODE_CLASS for C++ classes, as an

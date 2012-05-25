@@ -2686,15 +2686,16 @@ find_overload_match (struct value **args, int nargs,
 
       if (fsym)
         {
+	  enum type_code code
+	    = TYPE_CODE (check_typedef (SYMBOL_TYPE (fsym)));
           qualified_name = SYMBOL_SEARCH_NAME (fsym);
 
           /* If we have a function with a C++ name, try to extract just
 	     the function part.  Do not try this for non-functions (e.g.
 	     function pointers).  */
-          if (qualified_name
-              && TYPE_CODE (check_typedef (SYMBOL_TYPE (fsym)))
-	      == TYPE_CODE_FUNC)
-            {
+	  if (qualified_name
+	      && (code == TYPE_CODE_FUNC || code == TYPE_CODE_TEMPLATE))
+	    {
 	      char *temp;
 
 	      temp = cp_func_name (qualified_name);

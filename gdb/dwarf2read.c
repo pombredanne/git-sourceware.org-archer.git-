@@ -13265,6 +13265,72 @@ var_decode_location (struct attribute *attr, struct symbol *sym,
     cu->has_loclist = 1;
 }
 
+static void
+add_template_variable (struct symbol *symbol, struct pending **listhead,
+		       struct objfile *objfile)
+{
+  const struct pending *iterator;
+  struct symbol *template_sym;
+  struct symbol *iterator_sym;
+  struct type *type;
+  const char *name = SYMBOL_NATURAL_NAME (symbol);
+  char *search_name;
+  char *tmp;
+  int i;
+  struct cleanup *all_cleanups = make_cleanup (null_cleanup, NULL);
+
+  gdb_assert (name != NULL);
+  gdb_assert (listhead != NULL);
+
+  /* Remove template parameters from the symbol's name and set its
+     search name.  */
+  tmp = cp_remove_template_params (name);
+
+  gdb_assert (tmp != NULL);
+  make_cleanup(xfree, tmp);
+
+  if (strcmp (tmp, name) == 0)
+    return;
+
+  search_name = obsavestring (tmp, strlen (tmp), &objfile->objfile_obstack);
+
+  symbol_set_cplus_search_name (&symbol->ginfo, objfile, search_name);
+
+  /* Has a template symbol for this symbol been added already?  */
+  for (iterator = *(listhead); iterator != NULL; iterator = iterator->next)
+    {
+      for (i = iterator->nsyms - 1; i >= 0; --i)
+	{
+	  iterator_sym = iterator->symbol[i];
+
+	  if (TYPE_CODE (SYMBOL_TYPE (iterator_sym)) == TYPE_CODE_TEMPLATE
+	      && strcmp (SYMBOL_SEARCH_NAME(iterator_sym), search_name) == 0)
+	    {
+	      do_cleanups (all_cleanups);
+	      return;
+	    }
+	}
+    }
+
+  /* Add a new template symbol.  */
+  template_sym = (struct symbol *) obstack_alloc (&objfile->objfile_obstack,
+						  sizeof (struct symbol));
+  OBJSTAT (objfile, n_syms++);
+  memset (template_sym, 0, sizeof (struct symbol));
+
+  SYMBOL_SET_NAMES (template_sym, search_name, strlen (search_name), 0, objfile);
+  type = alloc_type (objfile);
+  TYPE_CODE (type) = TYPE_CODE_TEMPLATE;
+  SYMBOL_TYPE (template_sym) = type;
+
+  SYMBOL_DOMAIN (template_sym) = VAR_DOMAIN;
+  SYMBOL_CLASS (template_sym) = LOC_TEMPLATE;
+
+  add_symbol_to_list (template_sym, listhead);
+
+  do_cleanups (all_cleanups);
+}
+
 /* Given a pointer to a DWARF information entry, figure out if we need
    to make a symbol table entry for it, and if so, create a new entry
    and return a pointer to it.
@@ -13314,26 +13380,6 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	symbol_set_demangled_name (&(sym->ginfo),
 				   (char *) dwarf2_full_name (name, die, cu),
 	                           NULL);
-
-      /* For C++ if the name contains template parameters remove them, and set
-         the cleaned up name to be the search name.  */
-      if (cu->language == language_cplus && linkagename
-	  && cp_name_has_template_parameters (linkagename))
-	{
-	  char *tmp = cp_remove_template_params (linkagename);
-
-	  if (tmp != NULL && strcmp (tmp, linkagename) != 0)
-	    {
-	      search_name = obsavestring (tmp, strlen (tmp),
-	                                  &objfile->objfile_obstack);
-
-	      symbol_set_cplus_search_name (&sym->ginfo,
-	                                    objfile,
-	                                    search_name);
-	    }
-
-	  xfree (tmp);
-	}
 
       /* Default assumptions.
          Use the passed type or decode it from the die.  */
@@ -13635,7 +13681,15 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 	}
 
       if (list_to_add != NULL)
-	add_symbol_to_list (sym, list_to_add);
+	{
+	  /* For C++ if the name contains template parameters remove them, and set
+             the cleaned up name to be the search name.  */
+	  if (cu->language == language_cplus && sym->ginfo.name
+	      && cp_name_has_template_parameters (sym->ginfo.name))
+	    add_template_variable (sym, list_to_add, objfile);
+
+	  add_symbol_to_list (sym, list_to_add);
+	}
 
       /* For the benefit of old versions of GCC, check for anonymous
 	 namespaces based on the demangled name.  */

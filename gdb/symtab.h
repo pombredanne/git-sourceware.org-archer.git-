@@ -516,6 +516,10 @@ enum address_class
   /* The variable's address is computed by a set of location
      functions (see "struct symbol_computed_ops" below).  */
   LOC_COMPUTED,
+
+  /* The variable is a meta variable representing a template
+     and has no location.  */
+  LOC_TEMPLATE
 };
 
 /* The methods needed to implement LOC_COMPUTED.  These methods can

@@ -326,6 +326,7 @@ c_type_print_varspec_prefix (struct type *type,
     case TYPE_CODE_COMPLEX:
     case TYPE_CODE_NAMESPACE:
     case TYPE_CODE_DECFLOAT:
+    case TYPE_CODE_TEMPLATE:
       /* These types need no prefix.  They are listed here so that
          gcc -Wall will reveal any types that haven't been handled.  */
       break;
@@ -683,6 +684,7 @@ c_type_print_varspec_suffix (struct type *type,
     case TYPE_CODE_COMPLEX:
     case TYPE_CODE_NAMESPACE:
     case TYPE_CODE_DECFLOAT:
+    case TYPE_CODE_TEMPLATE:
       /* These types do not need a suffix.  They are listed so that
          gcc -Wall will report types that may not have been
          considered.  */
@@ -1236,6 +1238,10 @@ c_type_print_base (struct type *type, struct ui_file *stream,
     case TYPE_CODE_NAMESPACE:
       fputs_filtered ("namespace ", stream);
       fputs_filtered (TYPE_TAG_NAME (type), stream);
+      break;
+
+    case TYPE_CODE_TEMPLATE:
+      fputs_filtered ("Template Symbol", stream);
       break;
 
     default:

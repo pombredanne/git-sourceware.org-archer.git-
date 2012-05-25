@@ -9,21 +9,35 @@ int foo (T, char)
   return 11;
 }
 
-template<typename T, typename T2>
-int foo2 (T, T2, char)
+template<typename T>
+int foo (T, int)
 {
   T t;
-  return 11;
+  return 1112;
+}
+
+template<typename T>
+int foo (T, float)
+{
+  T t;
+  return 1113;
+}
+
+template<typename T, typename T2>
+int foo (T, T2, char)
+{
+  T t;
+  return 112;
 }
 
 namespace C
 {
   namespace D {
     template<typename T, typename T2>
-    int foo3 (T, T2, char)
+    int foo (T, T2, char)
     {
       T t;
-      return 11;
+      return 113;
     }
   }
 }
@@ -85,8 +99,10 @@ int main ()
   
   foo (a, 'a');
   foo (a, 1);
-  foo2 (a, a, 'a');
-  C::D::foo3 (a, a, 'a');
+  foo (a, 1.0f);
+
+  foo (a, a, 'a');
+  C::D::foo (a, a, 'a');
 
   a << 22;
   a <  22;
