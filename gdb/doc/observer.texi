@@ -226,6 +226,10 @@ Called before a top-level prompt is displayed.  @var{current_prompt} is
 the current top-level prompt.
 @end deftypefun
 
+@deftypefun void gdb_datadir_changed (void)
+Variable gdb_datadir has been set.  The value may not necessarily change.
+@end deftypefun
+
 @c @deftypefun void mark_used (void)
 @c Mark any possibly reclaimable objects as used during a mark-and-sweep garbage
 @c collector pass.  Currently only @code{type_mark_used} marker is supported.

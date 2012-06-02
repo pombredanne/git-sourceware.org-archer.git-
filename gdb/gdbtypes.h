@@ -400,6 +400,7 @@ enum type_instance_flag_value
 enum field_loc_kind
   {
     FIELD_LOC_KIND_BITPOS,	/* bitpos */
+    FIELD_LOC_KIND_ENUMVAL,	/* enumval */
     FIELD_LOC_KIND_PHYSADDR,	/* physaddr */
     FIELD_LOC_KIND_PHYSNAME,	/* physname */
     FIELD_LOC_KIND_DWARF_BLOCK	/* dwarf_block */
@@ -494,9 +495,11 @@ struct main_type
   /* Name of this type, or NULL if none.
 
      This is used for printing only, except by poorly designed C++ code.
-     For looking up a name, look for a symbol in the VAR_DOMAIN.  */
+     For looking up a name, look for a symbol in the VAR_DOMAIN.
+     This is generally allocated in the objfile's obstack.
+     However coffread.c uses malloc.  */
 
-  char *name;
+  const char *name;
 
   /* Tag name for this type, or NULL if none.  This means that the
      name of the type consists of a keyword followed by the tag name.
@@ -509,7 +512,7 @@ struct main_type
      One more legitimate use is that if TYPE_FLAG_STUB is set, this is
      the name to use to look for definitions in other files.  */
 
-  char *tag_name;
+  const char *tag_name;
 
   /* Every type is now associated with a particular objfile, and the
      type is allocated on the objfile_obstack for that objfile.  One problem
@@ -581,10 +584,12 @@ struct main_type
 	   containing structure.  For gdbarch_bits_big_endian=1
 	   targets, it is the bit offset to the MSB.  For
 	   gdbarch_bits_big_endian=0 targets, it is the bit offset to
-	   the LSB.  For a range bound or enum value, this is the
-	   value itself.  */
+	   the LSB.  */
 
 	int bitpos;
+
+	/* Enum value.  */
+	LONGEST enumval;
 
 	/* For a static field, if TYPE_FIELD_STATIC_HAS_ADDR then physaddr
 	   is the location (in the target) of the static field.
@@ -608,7 +613,7 @@ struct main_type
       unsigned int artificial : 1;
 
       /* Discriminant for union field_location.  */
-      ENUM_BITFIELD(field_loc_kind) loc_kind : 2;
+      ENUM_BITFIELD(field_loc_kind) loc_kind : 3;
 
       /* Size of this field, in bits, or zero if not packed.
 	 If non-zero in an array type, indicates the element size in
@@ -616,7 +621,7 @@ struct main_type
 	 For an unpacked field, the field's type's length
 	 says how many bytes the field occupies.  */
 
-      unsigned int bitsize : 29;
+      unsigned int bitsize : 28;
 
       /* In a struct or union type, type of this field.
 	 In a function or member type, type of this argument.
@@ -628,7 +633,7 @@ struct main_type
 	 NULL for range bounds, array domains, and member function
 	 arguments.  */
 
-      char *name;
+      const char *name;
     } *fields;
 
     /* Union member used for range types.  */
@@ -854,9 +859,11 @@ struct cplus_struct_type
     struct fn_fieldlist
       {
 
-	/* The overloaded name.  */
+	/* The overloaded name.
+	   This is generally allocated in the objfile's obstack.
+	   However stabsread.c sometimes uses malloc.  */
 
-	char *name;
+	const char *name;
 
 	/* The number of methods with this name.  */
 
@@ -955,13 +962,6 @@ struct cplus_struct_type
     struct symbol **template_arguments;
   };
 
-/* Struct used in computing virtual base list.  */
-struct vbase
-  {
-    struct type *vbasetype;	/* pointer to virtual base */
-    struct vbase *next;		/* next in chain */
-  };
-
 /* Struct used to store conversion rankings.  */
 struct rank
   {
@@ -1027,7 +1027,7 @@ struct call_site
 	union field_location loc;
 
 	/* Discriminant for union field_location.  */
-	ENUM_BITFIELD(field_loc_kind) loc_kind : 2;
+	ENUM_BITFIELD(field_loc_kind) loc_kind : 3;
       }
     target;
 
@@ -1195,13 +1195,19 @@ extern void allocate_gnat_aux_type (struct type *);
 #define FIELD_TYPE(thisfld) ((thisfld).type)
 #define FIELD_NAME(thisfld) ((thisfld).name)
 #define FIELD_LOC_KIND(thisfld) ((thisfld).loc_kind)
-#define FIELD_BITPOS(thisfld) ((thisfld).loc.bitpos)
+#define FIELD_BITPOS_LVAL(thisfld) ((thisfld).loc.bitpos)
+#define FIELD_BITPOS(thisfld) (FIELD_BITPOS_LVAL (thisfld) + 0)
+#define FIELD_ENUMVAL_LVAL(thisfld) ((thisfld).loc.enumval)
+#define FIELD_ENUMVAL(thisfld) (FIELD_ENUMVAL_LVAL (thisfld) + 0)
 #define FIELD_STATIC_PHYSNAME(thisfld) ((thisfld).loc.physname)
 #define FIELD_STATIC_PHYSADDR(thisfld) ((thisfld).loc.physaddr)
 #define FIELD_DWARF_BLOCK(thisfld) ((thisfld).loc.dwarf_block)
 #define SET_FIELD_BITPOS(thisfld, bitpos)			\
   (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_BITPOS,		\
-   FIELD_BITPOS (thisfld) = (bitpos))
+   FIELD_BITPOS_LVAL (thisfld) = (bitpos))
+#define SET_FIELD_ENUMVAL(thisfld, enumval)			\
+  (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_ENUMVAL,		\
+   FIELD_ENUMVAL_LVAL (thisfld) = (enumval))
 #define SET_FIELD_PHYSNAME(thisfld, name)			\
   (FIELD_LOC_KIND (thisfld) = FIELD_LOC_KIND_PHYSNAME,		\
    FIELD_STATIC_PHYSNAME (thisfld) = (name))
@@ -1219,6 +1225,7 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_FIELD_NAME(thistype, n) FIELD_NAME(TYPE_FIELD(thistype, n))
 #define TYPE_FIELD_LOC_KIND(thistype, n) FIELD_LOC_KIND (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_BITPOS(thistype, n) FIELD_BITPOS (TYPE_FIELD (thistype, n))
+#define TYPE_FIELD_ENUMVAL(thistype, n) FIELD_ENUMVAL (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_STATIC_PHYSNAME(thistype, n) FIELD_STATIC_PHYSNAME (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_STATIC_PHYSADDR(thistype, n) FIELD_STATIC_PHYSADDR (TYPE_FIELD (thistype, n))
 #define TYPE_FIELD_DWARF_BLOCK(thistype, n) FIELD_DWARF_BLOCK (TYPE_FIELD (thistype, n))
@@ -1566,7 +1573,7 @@ extern void smash_to_methodptr_type (struct type *, struct type *);
 
 extern struct type *allocate_stub_method (struct type *);
 
-extern char *type_name_no_tag (const struct type *);
+extern const char *type_name_no_tag (const struct type *);
 
 extern const char *type_name_no_tag_or_error (struct type *type);
 
@@ -1606,10 +1613,10 @@ extern struct type *lookup_string_range_type (struct type *, int, int);
 extern struct type *create_set_type (struct type *, struct type *);
 
 extern struct type *lookup_unsigned_typename (const struct language_defn *,
-					      struct gdbarch *,char *);
+					      struct gdbarch *, const char *);
 
 extern struct type *lookup_signed_typename (const struct language_defn *,
-					    struct gdbarch *,char *);
+					    struct gdbarch *, const char *);
 
 extern struct type *check_typedef (struct type *);
 

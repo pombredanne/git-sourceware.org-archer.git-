@@ -36,7 +36,7 @@ struct terminal_info;
 /* For bpstat.  */
 #include "breakpoint.h"
 
-/* For enum target_signal.  */
+/* For enum gdb_signal.  */
 #include "target.h"
 
 /* For struct frame_id.  */
@@ -102,7 +102,7 @@ extern int sync_execution;
 
 extern void clear_proceed_status (void);
 
-extern void proceed (CORE_ADDR, enum target_signal, int);
+extern void proceed (CORE_ADDR, enum gdb_signal, int);
 
 extern int sched_multi;
 
@@ -159,7 +159,7 @@ extern void reopen_exec_file (void);
 /* The `resume' routine should only be called in special circumstances.
    Normally, use `proceed', which handles a lot of bookkeeping.  */
 
-extern void resume (int, enum target_signal);
+extern void resume (int, enum gdb_signal);
 
 extern ptid_t user_visible_resume_ptid (int step);
 
@@ -266,7 +266,7 @@ extern void detach_command (char *, int);
 
 extern void notice_new_inferior (ptid_t, int, int);
 
-extern struct value *get_return_value (struct type *func_type,
+extern struct value *get_return_value (struct value *function,
                                        struct type *value_type);
 
 /* Address at which inferior stopped.  */
@@ -357,7 +357,6 @@ struct displaced_step_closure *get_displaced_step_closure_by_addr (CORE_ADDR add
 /* Possible values for gdbarch_call_dummy_location.  */
 #define ON_STACK 1
 #define AT_ENTRY_POINT 4
-#define AT_SYMBOL 5
 
 /* If STARTUP_WITH_SHELL is set, GDB's "run"
    will attempts to start up the debugee under a shell.
@@ -502,19 +501,10 @@ struct inferior
   int has_exit_code;
   LONGEST exit_code;
 
-  /* We keep a count of the number of times the user has requested a
-     particular syscall to be tracked, and pass this information to the
-     target.  This lets capable targets implement filtering directly.  */
-
-  /* Number of times that "any" syscall is requested.  */
-  int any_syscall_count;
-
-  /* Count of each system call.  */
-  VEC(int) *syscalls_counts;
-
-  /* This counts all syscall catch requests, so we can readily determine
-     if any catching is necessary.  */
-  int total_syscalls_count;
+  /* Default flags to pass to the symbol reading functions.  These are
+     used whenever a new objfile is created.  The valid values come
+     from enum symfile_add_flags.  */
+  int symfile_flags;
 
   /* Per inferior data-pointers required by other GDB modules.  */
   void **data;
@@ -639,5 +629,17 @@ extern int number_of_inferiors (void);
 extern struct inferior *add_inferior_with_spaces (void);
 
 extern void update_observer_mode (void);
+
+extern void update_signals_program_target (void);
+
+/* In some circumstances we allow a command to specify a numeric
+   signal.  The idea is to keep these circumstances limited so that
+   users (and scripts) develop portable habits.  For comparison,
+   POSIX.2 `kill' requires that 1,2,3,6,9,14, and 15 work (and using a
+   numeric signal at all is obsolescent.  We are slightly more lenient
+   and allow 1-15 which should match host signal numbers on most
+   systems.  Use of symbolic signal names is strongly encouraged.  */
+
+enum gdb_signal gdb_signal_from_command (int num);
 
 #endif /* !defined (INFERIOR_H) */

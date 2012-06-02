@@ -1,6 +1,6 @@
 /* Motorola 68k series support for 32-bit ELF
    Copyright 1993, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003,
-   2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+   2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -2827,7 +2827,7 @@ elf_m68k_check_relocs (abfd, info, sec, relocs)
 		 turns out to be a function defined by a dynamic object.  */
 	      h->plt.refcount++;
 
-	      if (!info->shared)
+	      if (info->executable)
 		/* This symbol needs a non-GOT reference.  */
 		h->non_got_ref = 1;
 	    }
@@ -3252,13 +3252,6 @@ elf_m68k_adjust_dynamic_symbol (info, h)
   if (!h->non_got_ref)
     return TRUE;
 
-  if (h->size == 0)
-    {
-      (*_bfd_error_handler) (_("dynamic variable `%s' is zero size"),
-			     h->root.root.string);
-      return TRUE;
-    }
-
   /* We must allocate the symbol in our .dynbss section, which will
      become part of the .bss section of the executable.  There will be
      an entry for this symbol in the .dynsym section.  The dynamic
@@ -3276,7 +3269,7 @@ elf_m68k_adjust_dynamic_symbol (info, h)
      copy the initial value out of the dynamic object and into the
      runtime process image.  We need to remember the offset into the
      .rela.bss section we are going to use.  */
-  if ((h->root.u.def.section->flags & SEC_ALLOC) != 0)
+  if ((h->root.u.def.section->flags & SEC_ALLOC) != 0 && h->size != 0)
     {
       asection *srel;
 
@@ -3484,6 +3477,18 @@ elf_m68k_discard_copies (h, inf)
 		info->flags |= DF_TEXTREL;
 		break;
 	      }
+	}
+
+      /* Make sure undefined weak symbols are output as a dynamic symbol
+	 in PIEs.  */
+      if (h->non_got_ref
+	  && h->root.type == bfd_link_hash_undefweak
+	  && ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
+	  && h->dynindx == -1
+	  && !h->forced_local)
+	{
+	  if (! bfd_elf_link_record_dynamic_symbol (info, h))
+	    return FALSE;
 	}
 
       return TRUE;
@@ -3717,9 +3722,9 @@ elf_m68k_relocate_section (output_bfd, info, input_bfd, input_section,
 				   unresolved_reloc, warned);
 	}
 
-      if (sec != NULL && elf_discarded_section (sec))
+      if (sec != NULL && discarded_section (sec))
 	RELOC_AGAINST_DISCARDED_SECTION (info, input_bfd, input_section,
-					 rel, relend, howto, contents);
+					 rel, 1, relend, howto, 0, contents);
 
       if (info->relocatable)
 	continue;
@@ -3955,7 +3960,7 @@ elf_m68k_relocate_section (output_bfd, info, input_bfd, input_section,
 	case R_68K_TLS_LE32:
 	case R_68K_TLS_LE16:
 	case R_68K_TLS_LE8:
-	  if (info->shared)
+	  if (info->shared && !info->pie)
 	    {
 	      (*_bfd_error_handler)
 		(_("%B(%A+0x%lx): R_68K_TLS_LE32 relocation not permitted "
@@ -4816,6 +4821,69 @@ elf_m68k_plt_sym_val (bfd_vma i, const asection *plt,
   return plt->vma + (i + 1) * elf_m68k_get_plt_info (plt->owner)->size;
 }
 
+/* Support for core dump NOTE sections.  */
+
+static bfd_boolean
+elf_m68k_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
+{
+  int offset;
+  size_t size;
+
+  switch (note->descsz)
+    {
+    default:
+      return FALSE;
+
+    case 154:		/* Linux/m68k */
+      /* pr_cursig */
+      elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
+
+      /* pr_pid */
+      elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 22);
+
+      /* pr_reg */
+      offset = 70;
+      size = 80;
+
+      break;
+    }
+
+  /* Make a ".reg/999" section.  */
+  return _bfd_elfcore_make_pseudosection (abfd, ".reg",
+					  size, note->descpos + offset);
+}
+
+static bfd_boolean
+elf_m68k_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
+{
+  switch (note->descsz)
+    {
+    default:
+      return FALSE;
+
+    case 124:		/* Linux/m68k elf_prpsinfo.  */
+      elf_tdata (abfd)->core_pid
+	= bfd_get_32 (abfd, note->descdata + 12);
+      elf_tdata (abfd)->core_program
+	= _bfd_elfcore_strndup (abfd, note->descdata + 28, 16);
+      elf_tdata (abfd)->core_command
+	= _bfd_elfcore_strndup (abfd, note->descdata + 44, 80);
+    }
+
+  /* Note that for some reason, a spurious space is tacked
+     onto the end of the args in some (at least one anyway)
+     implementations, so strip it off if it exists.  */
+  {
+    char *command = elf_tdata (abfd)->core_command;
+    int n = strlen (command);
+
+    if (n > 0 && command[n - 1] == ' ')
+      command[n - 1] = '\0';
+  }
+
+  return TRUE;
+}
+
 #define TARGET_BIG_SYM			bfd_elf32_m68k_vec
 #define TARGET_BIG_NAME			"elf32-m68k"
 #define ELF_MACHINE_CODE		EM_68K
@@ -4855,6 +4923,8 @@ elf_m68k_plt_sym_val (bfd_vma i, const asection *plt,
 #define elf_backend_reloc_type_class	elf32_m68k_reloc_type_class
 #define elf_backend_plt_sym_val		elf_m68k_plt_sym_val
 #define elf_backend_object_p		elf32_m68k_object_p
+#define elf_backend_grok_prstatus	elf_m68k_grok_prstatus
+#define elf_backend_grok_psinfo		elf_m68k_grok_psinfo
 
 #define elf_backend_can_gc_sections 1
 #define elf_backend_can_refcount 1

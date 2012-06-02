@@ -32,10 +32,10 @@ extern const char *f_object_address_data_valid_print_to_stream
   (struct type *type, struct ui_file *stream);
 extern void f_object_address_data_valid_or_error (struct type *type);
 
-extern int f_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
-			struct ui_file *, int,
-			const struct value *,
-			const struct value_print_options *);
+extern void f_val_print (struct type *, const gdb_byte *, int, CORE_ADDR,
+			 struct ui_file *, int,
+			 const struct value *,
+			 const struct value_print_options *);
 
 /* Language-specific data structures */
 
@@ -79,7 +79,8 @@ extern SAVED_F77_COMMON_PTR head_common_list;	/* Ptr to 1st saved COMMON  */
 extern SAVED_F77_COMMON_PTR tail_common_list;	/* Ptr to last saved COMMON  */
 extern SAVED_F77_COMMON_PTR current_common;	/* Ptr to current COMMON */
 
-extern SAVED_F77_COMMON_PTR find_common_for_function (char *, char *);
+extern SAVED_F77_COMMON_PTR find_common_for_function (const char *,
+						      const char *);
 
 #define UNINITIALIZED_SECNUM -1
 #define COMMON_NEEDS_PATCHING(blk) ((blk)->secnum == UNINITIALIZED_SECNUM)

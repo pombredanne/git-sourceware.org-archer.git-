@@ -825,13 +825,13 @@ get_discrete_bounds (struct type *type, LONGEST *lowp, LONGEST *highp)
 	     entries.  */
 	  int i;
 
-	  *lowp = *highp = TYPE_FIELD_BITPOS (type, 0);
+	  *lowp = *highp = TYPE_FIELD_ENUMVAL (type, 0);
 	  for (i = 0; i < TYPE_NFIELDS (type); i++)
 	    {
-	      if (TYPE_FIELD_BITPOS (type, i) < *lowp)
-		*lowp = TYPE_FIELD_BITPOS (type, i);
-	      if (TYPE_FIELD_BITPOS (type, i) > *highp)
-		*highp = TYPE_FIELD_BITPOS (type, i);
+	      if (TYPE_FIELD_ENUMVAL (type, i) < *lowp)
+		*lowp = TYPE_FIELD_ENUMVAL (type, i);
+	      if (TYPE_FIELD_ENUMVAL (type, i) > *highp)
+		*highp = TYPE_FIELD_ENUMVAL (type, i);
 	    }
 
 	  /* Set unsigned indicator if warranted.  */
@@ -1147,7 +1147,7 @@ smash_to_method_type (struct type *type, struct type *domain,
 /* Return a typename for a struct/union/enum type without "struct ",
    "union ", or "enum ".  If the type has a NULL name, return NULL.  */
 
-char *
+const char *
 type_name_no_tag (const struct type *type)
 {
   if (TYPE_TAG_NAME (type) != NULL)
@@ -1198,28 +1198,21 @@ lookup_typename (const struct language_defn *language,
   struct type *tmp;
 
   sym = lookup_symbol (name, block, VAR_DOMAIN, 0);
-  if (sym == NULL || SYMBOL_CLASS (sym) != LOC_TYPEDEF)
-    {
-      tmp = language_lookup_primitive_type_by_name (language, gdbarch, name);
-      if (tmp)
-	{
-	  return tmp;
-	}
-      else if (!tmp && noerr)
-	{
-	  return NULL;
-	}
-      else
-	{
-	  error (_("No type named %s."), name);
-	}
-    }
-  return (SYMBOL_TYPE (sym));
+  if (sym != NULL && SYMBOL_CLASS (sym) == LOC_TYPEDEF)
+    return SYMBOL_TYPE (sym);
+
+  tmp = language_lookup_primitive_type_by_name (language, gdbarch, name);
+  if (tmp)
+    return tmp;
+
+  if (noerr)
+    return NULL;
+  error (_("No type named %s."), name);
 }
 
 struct type *
 lookup_unsigned_typename (const struct language_defn *language,
-			  struct gdbarch *gdbarch, char *name)
+			  struct gdbarch *gdbarch, const char *name)
 {
   char *uns = alloca (strlen (name) + 10);
 
@@ -1230,7 +1223,7 @@ lookup_unsigned_typename (const struct language_defn *language,
 
 struct type *
 lookup_signed_typename (const struct language_defn *language,
-			struct gdbarch *gdbarch, char *name)
+			struct gdbarch *gdbarch, const char *name)
 {
   struct type *t;
   char *uns = alloca (strlen (name) + 8);
@@ -1393,7 +1386,7 @@ lookup_struct_elt_type (struct type *type, char *name, int noerr)
 
   for (i = TYPE_NFIELDS (type) - 1; i >= TYPE_N_BASECLASSES (type); i--)
     {
-      char *t_field_name = TYPE_FIELD_NAME (type, i);
+      const char *t_field_name = TYPE_FIELD_NAME (type, i);
 
       if (t_field_name && (strcmp_iw (t_field_name, name) == 0))
 	{
@@ -1634,7 +1627,7 @@ check_typedef (struct type *type)
     {
       if (!TYPE_TARGET_TYPE (type))
 	{
-	  char *name;
+	  const char *name;
 	  struct symbol *sym;
 
 	  /* It is dangerous to call lookup_symbol if we are currently
@@ -1697,7 +1690,7 @@ check_typedef (struct type *type)
       && opaque_type_resolution 
       && !currently_reading_symtab)
     {
-      char *name = type_name_no_tag (type);
+      const char *name = type_name_no_tag (type);
       struct type *newtype;
 
       if (name == NULL)
@@ -1731,7 +1724,7 @@ check_typedef (struct type *type)
      types.  */
   else if (TYPE_STUB (type) && !currently_reading_symtab)
     {
-      char *name = type_name_no_tag (type);
+      const char *name = type_name_no_tag (type);
       /* FIXME: shouldn't we separately check the TYPE_NAME and the
          TYPE_TAG_NAME, and look in STRUCT_DOMAIN and/or VAR_DOMAIN
          as appropriate?  (this code was written before TYPE_NAME and
@@ -3337,10 +3330,15 @@ recursive_dump_type (struct type *type, int spaces)
   puts_filtered ("\n");
   for (idx = 0; idx < TYPE_NFIELDS (type); idx++)
     {
-      printfi_filtered (spaces + 2,
-			"[%d] bitpos %d bitsize %d type ",
-			idx, TYPE_FIELD_BITPOS (type, idx),
-			TYPE_FIELD_BITSIZE (type, idx));
+      if (TYPE_CODE (type) == TYPE_CODE_ENUM)
+	printfi_filtered (spaces + 2,
+			  "[%d] enumval %s type ",
+			  idx, plongest (TYPE_FIELD_ENUMVAL (type, idx)));
+      else
+	printfi_filtered (spaces + 2,
+			  "[%d] bitpos %d bitsize %d type ",
+			  idx, TYPE_FIELD_BITPOS (type, idx),
+			  TYPE_FIELD_BITSIZE (type, idx));
       gdb_print_host_address (TYPE_FIELD_TYPE (type, idx), gdb_stdout);
       printf_filtered (" name '%s' (",
 		       TYPE_FIELD_NAME (type, idx) != NULL
@@ -3597,6 +3595,10 @@ copy_type_recursive_1 (struct objfile *objfile,
 	    case FIELD_LOC_KIND_BITPOS:
 	      SET_FIELD_BITPOS (TYPE_FIELD (new_type, i),
 				TYPE_FIELD_BITPOS (type, i));
+	      break;
+	    case FIELD_LOC_KIND_ENUMVAL:
+	      SET_FIELD_ENUMVAL (TYPE_FIELD (new_type, i),
+				 TYPE_FIELD_ENUMVAL (type, i));
 	      break;
 	    case FIELD_LOC_KIND_PHYSADDR:
 	      SET_FIELD_PHYSADDR (TYPE_FIELD (new_type, i),
@@ -4173,12 +4175,12 @@ append_flags_type_flag (struct type *type, int bitpos, char *name)
   if (name)
     {
       TYPE_FIELD_NAME (type, bitpos) = xstrdup (name);
-      TYPE_FIELD_BITPOS (type, bitpos) = bitpos;
+      SET_FIELD_BITPOS (TYPE_FIELD (type, bitpos), bitpos);
     }
   else
     {
       /* Don't show this field to the user.  */
-      TYPE_FIELD_BITPOS (type, bitpos) = -1;
+      SET_FIELD_BITPOS (TYPE_FIELD (type, bitpos), -1);
     }
 }
 
@@ -4233,9 +4235,10 @@ append_composite_type_field_aligned (struct type *t, char *name,
       TYPE_LENGTH (t) = TYPE_LENGTH (t) + TYPE_LENGTH (field);
       if (TYPE_NFIELDS (t) > 1)
 	{
-	  FIELD_BITPOS (f[0]) = (FIELD_BITPOS (f[-1])
-				 + (TYPE_LENGTH (FIELD_TYPE (f[-1]))
-				    * TARGET_CHAR_BIT));
+	  SET_FIELD_BITPOS (f[0],
+			    (FIELD_BITPOS (f[-1])
+			     + (TYPE_LENGTH (FIELD_TYPE (f[-1]))
+				* TARGET_CHAR_BIT)));
 
 	  if (alignment)
 	    {
@@ -4246,7 +4249,7 @@ append_composite_type_field_aligned (struct type *t, char *name,
 
 	      if (left)
 		{
-		  FIELD_BITPOS (f[0]) += (alignment - left);
+		  SET_FIELD_BITPOS (f[0], FIELD_BITPOS (f[0]) + (alignment - left));
 		  TYPE_LENGTH (t) += (alignment - left) / TARGET_CHAR_BIT;
 		}
 	    }

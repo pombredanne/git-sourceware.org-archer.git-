@@ -75,9 +75,6 @@ struct gdbarch *core_gdbarch = NULL;
    unix child targets.  */
 static struct target_section_table *core_data;
 
-/* True if we needed to fake the pid of the loaded core inferior.  */
-static int core_has_fake_pid = 0;
-
 static void core_files_info (struct target_ops *);
 
 static struct core_fns *sniff_core_bfd (bfd *);
@@ -217,7 +214,6 @@ core_close (int quitting)
 	  xfree (core_data);
 	  core_data = NULL;
 	}
-      core_has_fake_pid = 0;
 
       name = bfd_get_filename (core_bfd);
       gdb_bfd_close_or_warn (core_bfd);
@@ -244,6 +240,8 @@ add_to_thread_list (bfd *abfd, asection *asect, void *reg_sect_arg)
   int core_tid;
   int pid, lwpid;
   asection *reg_sect = (asection *) reg_sect_arg;
+  int fake_pid_p = 0;
+  struct inferior *inf;
 
   if (strncmp (bfd_section_name (abfd, asect), ".reg/", 5) != 0)
     return;
@@ -253,14 +251,18 @@ add_to_thread_list (bfd *abfd, asection *asect, void *reg_sect_arg)
   pid = bfd_core_file_pid (core_bfd);
   if (pid == 0)
     {
-      core_has_fake_pid = 1;
+      fake_pid_p = 1;
       pid = CORELOW_PID;
     }
 
   lwpid = core_tid;
 
-  if (current_inferior ()->pid == 0)
-    inferior_appeared (current_inferior (), pid);
+  inf = current_inferior ();
+  if (inf->pid == 0)
+    {
+      inferior_appeared (inf, pid);
+      inf->fake_pid_p = fake_pid_p;
+    }
 
   ptid = ptid_build (pid, lwpid, 0);
 
@@ -382,7 +384,6 @@ core_open (char *filename, int from_tty)
   init_thread_list ();
 
   inferior_ptid = null_ptid;
-  core_has_fake_pid = 0;
 
   /* Need to flush the register cache (and the frame cache) from a
      previous debug session.  If inferior_ptid ends up the same as the
@@ -439,17 +440,15 @@ core_open (char *filename, int from_tty)
   siggy = bfd_core_file_failing_signal (core_bfd);
   if (siggy > 0)
     {
-      /* NOTE: target_signal_from_host() converts a target signal
-	 value into gdb's internal signal value.  Unfortunately gdb's
-	 internal value is called ``target_signal'' and this function
-	 got the name ..._from_host().  */
-      enum target_signal sig = (core_gdbarch != NULL
-		       ? gdbarch_target_signal_from_host (core_gdbarch,
-							  siggy)
-		       : target_signal_from_host (siggy));
+      /* If we don't have a CORE_GDBARCH to work with, assume a native
+	 core.  */
+      enum gdb_signal sig = (core_gdbarch != NULL
+		       ? gdbarch_gdb_signal_from_target (core_gdbarch,
+							 siggy)
+		       : gdb_signal_from_host (siggy));
 
       printf_filtered (_("Program terminated with signal %d, %s.\n"),
-		       siggy, target_signal_to_string (sig));
+		       siggy, gdb_signal_to_string (sig));
     }
 
   /* Fetch all registers from core file.  */
@@ -849,6 +848,7 @@ static char *
 core_pid_to_str (struct target_ops *ops, ptid_t ptid)
 {
   static char buf[64];
+  struct inferior *inf;
   int pid;
 
   /* The preferred way is to have a gdbarch/OS specific
@@ -867,7 +867,8 @@ core_pid_to_str (struct target_ops *ops, ptid_t ptid)
 
   /* Otherwise, this isn't a "threaded" core -- use the PID field, but
      only if it isn't a fake PID.  */
-  if (!core_has_fake_pid)
+  inf = find_inferior_pid (ptid_get_pid (ptid));
+  if (inf != NULL && !inf->fake_pid_p)
     return normal_pid_to_str (ptid);
 
   /* No luck.  We simply don't have a valid PID to print.  */

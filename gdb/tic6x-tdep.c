@@ -146,7 +146,7 @@ static int tic6x_register_number (int reg, int side, int crosspath);
    Bail out early if CURRENT_PC is reached.  Returns the address of the first
    instruction after the prologue.  */
 
-CORE_ADDR
+static CORE_ADDR
 tic6x_analyze_prologue (struct gdbarch *gdbarch, const CORE_ADDR start_pc,
 			const CORE_ADDR current_pc,
 			struct tic6x_unwind_cache *cache,
@@ -298,10 +298,9 @@ tic6x_analyze_prologue (struct gdbarch *gdbarch, const CORE_ADDR start_pc,
 
 /* This is the implementation of gdbarch method skip_prologue.  */
 
-CORE_ADDR
+static CORE_ADDR
 tic6x_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR start_pc)
 {
-  CORE_ADDR limit_pc;
   CORE_ADDR func_addr;
   struct tic6x_unwind_cache cache;
 
@@ -324,7 +323,7 @@ tic6x_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR start_pc)
 
 /* This is the implementation of gdbarch method breakpiont_from_pc.  */
 
-const unsigned char*
+static const unsigned char*
 tic6x_breakpoint_from_pc (struct gdbarch *gdbarch, CORE_ADDR *bp_addr,
 			  int *bp_size)
 {
@@ -398,14 +397,13 @@ tic6x_unwind_sp (struct gdbarch *gdbarch, struct frame_info *this_frame)
 
 /* Frame base handling.  */
 
-struct tic6x_unwind_cache*
+static struct tic6x_unwind_cache*
 tic6x_frame_unwind_cache (struct frame_info *this_frame,
 			  void **this_prologue_cache)
 {
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
   CORE_ADDR current_pc;
   struct tic6x_unwind_cache *cache;
-  int i;
 
   if (*this_prologue_cache)
     return *this_prologue_cache;
@@ -606,7 +604,6 @@ tic6x_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   unsigned long inst;
-  int offset;
   int register_number;
   int last = 0;
 
@@ -698,7 +695,7 @@ tic6x_get_next_pc (struct frame_info *frame, CORE_ADDR pc)
 
 /* This is the implementation of gdbarch method software_single_step.  */
 
-int
+static int
 tic6x_software_single_step (struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
@@ -821,7 +818,7 @@ tic6x_store_return_value (struct type *valtype, struct regcache *regcache,
 /* This is the implementation of gdbarch method return_value.  */
 
 static enum return_value_convention
-tic6x_return_value (struct gdbarch *gdbarch, struct type *func_type,
+tic6x_return_value (struct gdbarch *gdbarch, struct value *function,
 		    struct type *type, struct regcache *regcache,
 		    gdb_byte *readbuf, const gdb_byte *writebuf)
 {
@@ -1376,6 +1373,9 @@ tic6x_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   return gdbarch;
 }
+
+/* -Wmissing-prototypes */
+extern initialize_file_ftype _initialize_tic6x_tdep;
 
 void
 _initialize_tic6x_tdep (void)

@@ -23,7 +23,21 @@
 #if !defined (DWARF2EXPR_H)
 #define DWARF2EXPR_H
 
+#include "leb128.h"
+
 struct dwarf_expr_context;
+
+/* Offset relative to the start of its containing CU (compilation unit).  */
+typedef struct
+{
+  unsigned int cu_off;
+} cu_offset;
+
+/* Offset relative to the start of its .debug_info or .debug_types section.  */
+typedef struct
+{
+  unsigned int sect_off;
+} sect_offset;
 
 /* Virtual method table for struct dwarf_expr_context below.  */
 
@@ -53,14 +67,14 @@ struct dwarf_expr_context_funcs
   /* Execute DW_AT_location expression for the DWARF expression subroutine in
      the DIE at DIE_OFFSET in the CU from CTX.  Do not touch STACK while it
      being passed to and returned from the called DWARF subroutine.  */
-  void (*dwarf_call) (struct dwarf_expr_context *ctx, size_t die_offset);
+  void (*dwarf_call) (struct dwarf_expr_context *ctx, cu_offset die_offset);
 
   /* Return the base type given by the indicated DIE.  This can throw
      an exception if the DIE is invalid or does not represent a base
      type.  If can also be NULL in the special case where the
      callbacks are not performing evaluation, and thus it is
      meaningful to substitute a stub type of the correct size.  */
-  struct type *(*get_base_type) (struct dwarf_expr_context *ctx, size_t die);
+  struct type *(*get_base_type) (struct dwarf_expr_context *ctx, cu_offset die);
 
   /* Push on DWARF stack an entry evaluated for DW_TAG_GNU_call_site's
      DWARF_REG/FB_OFFSET at the caller of specified BATON.  If DWARF register
@@ -73,7 +87,9 @@ struct dwarf_expr_context_funcs
 				      int dwarf_reg, CORE_ADDR fb_offset,
 				      int deref_size);
 
-  /* Not yet implemented.  */
+  /* Return the address indexed by DW_OP_GNU_addr_index.
+     This can throw an exception if the index is out of range.  */
+  CORE_ADDR (*get_addr_index) (void *baton, unsigned int index);
 
   /* Return the `object address' for DW_OP_push_object_address.  */
   CORE_ADDR (*get_object_address) (void *baton);
@@ -158,7 +174,7 @@ struct dwarf_expr_context
 
   /* For DWARF_VALUE_LITERAL, the current literal value's length and
      data.  For DWARF_VALUE_IMPLICIT_POINTER, LEN is the offset of the
-     target DIE.  */
+     target DIE of cu_offset kind.  */
   ULONGEST len;
   const gdb_byte *data;
 
@@ -229,7 +245,7 @@ struct dwarf_expr_piece
     struct
     {
       /* The referent DIE from DW_OP_GNU_implicit_pointer.  */
-      ULONGEST die;
+      cu_offset die;
       /* The byte offset into the resulting data.  */
       LONGEST offset;
     } ptr;
@@ -255,14 +271,6 @@ struct value *dwarf_expr_fetch (struct dwarf_expr_context *ctx, int n);
 CORE_ADDR dwarf_expr_fetch_address (struct dwarf_expr_context *ctx, int n);
 int dwarf_expr_fetch_in_stack_memory (struct dwarf_expr_context *ctx, int n);
 
-
-const gdb_byte *read_uleb128 (const gdb_byte *buf, const gdb_byte *buf_end,
-			      ULONGEST * r);
-const gdb_byte *read_sleb128 (const gdb_byte *buf, const gdb_byte *buf_end,
-			      LONGEST * r);
-
-const char *dwarf_stack_op_name (unsigned int);
-
 void dwarf_expr_require_composition (const gdb_byte *, const gdb_byte *,
 				     const char *);
 
@@ -273,11 +281,13 @@ void ctx_no_get_frame_base (void *baton, const gdb_byte **start,
 CORE_ADDR ctx_no_get_frame_cfa (void *baton);
 CORE_ADDR ctx_no_get_frame_pc (void *baton);
 CORE_ADDR ctx_no_get_tls_address (void *baton, CORE_ADDR offset);
-void ctx_no_dwarf_call (struct dwarf_expr_context *ctx, size_t die_offset);
-struct type *ctx_no_get_base_type (struct dwarf_expr_context *ctx, size_t die);
+void ctx_no_dwarf_call (struct dwarf_expr_context *ctx, cu_offset die_offset);
+struct type *ctx_no_get_base_type (struct dwarf_expr_context *ctx,
+				   cu_offset die);
 void ctx_no_push_dwarf_reg_entry_value (struct dwarf_expr_context *ctx,
 					int dwarf_reg, CORE_ADDR fb_offset,
 					int deref_size);
+CORE_ADDR ctx_no_get_addr_index (void *baton, unsigned int index);
 
 int dwarf_block_to_dwarf_reg (const gdb_byte *buf, const gdb_byte *buf_end);
 
@@ -291,5 +301,51 @@ int dwarf_block_to_fb_offset (const gdb_byte *buf, const gdb_byte *buf_end,
 int dwarf_block_to_sp_offset (struct gdbarch *gdbarch, const gdb_byte *buf,
 			      const gdb_byte *buf_end,
 			      CORE_ADDR *sp_offset_return);
+
+/* Wrappers around the leb128 reader routines to simplify them for our
+   purposes.  */
+
+static inline const gdb_byte *
+gdb_read_uleb128 (const gdb_byte *buf, const gdb_byte *buf_end,
+		  uint64_t *r)
+{
+  size_t bytes_read = read_uleb128_to_uint64 (buf, buf_end, r);
+
+  if (bytes_read == 0)
+    return NULL;
+  return buf + bytes_read;
+}
+
+static inline const gdb_byte *
+gdb_read_sleb128 (const gdb_byte *buf, const gdb_byte *buf_end,
+		  int64_t *r)
+{
+  size_t bytes_read = read_sleb128_to_int64 (buf, buf_end, r);
+
+  if (bytes_read == 0)
+    return NULL;
+  return buf + bytes_read;
+}
+
+static inline const gdb_byte *
+gdb_skip_leb128 (const gdb_byte *buf, const gdb_byte *buf_end)
+{
+  size_t bytes_read = skip_leb128 (buf, buf_end);
+
+  if (bytes_read == 0)
+    return NULL;
+  return buf + bytes_read;
+}
+
+extern const gdb_byte *safe_read_uleb128 (const gdb_byte *buf,
+					  const gdb_byte *buf_end,
+					  uint64_t *r);
+
+extern const gdb_byte *safe_read_sleb128 (const gdb_byte *buf,
+					  const gdb_byte *buf_end,
+					  int64_t *r);
+
+extern const gdb_byte *safe_skip_leb128 (const gdb_byte *buf,
+					 const gdb_byte *buf_end);
 
 #endif /* dwarf2expr.h */

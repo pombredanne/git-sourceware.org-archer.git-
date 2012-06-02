@@ -74,7 +74,7 @@ default_print_typedef (struct type *type, struct symbol *new_symbol,
    If SHOW is negative, we never show the details of elements' types.  */
 
 void
-type_print (struct type *type, char *varstring, struct ui_file *stream,
+type_print (struct type *type, const char *varstring, struct ui_file *stream,
 	    int show)
 {
   if (show >= 0 && current_language->la_language != language_ada)
@@ -145,16 +145,7 @@ whatis_exp (char *exp, int show)
       if (((TYPE_CODE (type) == TYPE_CODE_PTR)
 	   || (TYPE_CODE (type) == TYPE_CODE_REF))
 	  && (TYPE_CODE (TYPE_TARGET_TYPE (type)) == TYPE_CODE_CLASS))
-        {
-          real_type = value_rtti_target_type (val, &full, &top, &using_enc);
-          if (real_type)
-            {
-              if (TYPE_CODE (type) == TYPE_CODE_PTR)
-                real_type = lookup_pointer_type (real_type);
-              else
-                real_type = lookup_reference_type (real_type);
-            }
-        }
+        real_type = value_rtti_indirect_type (val, &full, &top, &using_enc);
       else if (TYPE_CODE (type) == TYPE_CODE_CLASS)
 	real_type = value_rtti_type (val, &full, &top, &using_enc);
     }
@@ -220,7 +211,7 @@ print_type_scalar (struct type *type, LONGEST val, struct ui_file *stream)
       len = TYPE_NFIELDS (type);
       for (i = 0; i < len; i++)
 	{
-	  if (TYPE_FIELD_BITPOS (type, i) == val)
+	  if (TYPE_FIELD_ENUMVAL (type, i) == val)
 	    {
 	      break;
 	    }

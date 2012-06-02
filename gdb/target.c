@@ -29,7 +29,6 @@
 #include "bfd.h"
 #include "symfile.h"
 #include "objfiles.h"
-#include "gdb_wait.h"
 #include "dcache.h"
 #include <signal.h>
 #include "regcache.h"
@@ -43,6 +42,7 @@
 #include "inline-frame.h"
 #include "tracepoint.h"
 #include "gdb/fileio.h"
+#include "agent.h"
 
 static void target_info (char *, int);
 
@@ -638,6 +638,7 @@ update_current_target (void)
       /* Do not inherit to_mourn_inferior.  */
       INHERIT (to_can_run, t);
       /* Do not inherit to_pass_signals.  */
+      /* Do not inherit to_program_signals.  */
       /* Do not inherit to_thread_alive.  */
       /* Do not inherit to_find_new_threads.  */
       /* Do not inherit to_pid_to_str.  */
@@ -698,7 +699,10 @@ update_current_target (void)
       INHERIT (to_static_tracepoint_marker_at, t);
       INHERIT (to_static_tracepoint_markers_by_strid, t);
       INHERIT (to_traceframe_info, t);
+      INHERIT (to_use_agent, t);
+      INHERIT (to_can_use_agent, t);
       INHERIT (to_magic, t);
+      INHERIT (to_supports_evaluation_of_breakpoint_conditions, t);
       /* Do not inherit to_memory_map.  */
       /* Do not inherit to_flash_erase.  */
       /* Do not inherit to_flash_done.  */
@@ -925,6 +929,15 @@ update_current_target (void)
   de_fault (to_traceframe_info,
 	    (struct traceframe_info * (*) (void))
 	    tcomplain);
+  de_fault (to_supports_evaluation_of_breakpoint_conditions,
+	    (int (*) (void))
+	    return_zero);
+  de_fault (to_use_agent,
+	    (int (*) (int))
+	    tcomplain);
+  de_fault (to_can_use_agent,
+	    (int (*) (void))
+	    return_zero);
   de_fault (to_execution_direction, default_execution_direction);
 
 #undef de_fault
@@ -1743,7 +1756,7 @@ target_xfer_partial (struct target_ops *ops,
    it makes no progress, and then return how much was transferred).  */
 
 int
-target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
+target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, size_t len)
 {
   /* Dispatch to the topmost target, not the flattened current_target.
      Memory accesses check target->to_has_(all_)memory, and the
@@ -2488,6 +2501,8 @@ target_pre_inferior (int from_tty)
 
       target_clear_description ();
     }
+
+  agent_capability_invalidate ();
 }
 
 /* Callback for iterate_over_inferiors.  Gets rid of the given
@@ -2655,7 +2670,7 @@ target_thread_name (struct thread_info *info)
 }
 
 void
-target_resume (ptid_t ptid, int step, enum target_signal signal)
+target_resume (ptid_t ptid, int step, enum gdb_signal signal)
 {
   struct target_ops *t;
 
@@ -2670,7 +2685,7 @@ target_resume (ptid_t ptid, int step, enum target_signal signal)
 	    fprintf_unfiltered (gdb_stdlog, "target_resume (%d, %s, %s)\n",
 				PIDGET (ptid),
 				step ? "step" : "continue",
-				target_signal_to_name (signal));
+				gdb_signal_to_name (signal));
 
 	  registers_changed_ptid (ptid);
 	  set_executing (ptid, 1);
@@ -2702,12 +2717,42 @@ target_pass_signals (int numsigs, unsigned char *pass_signals)
 	      for (i = 0; i < numsigs; i++)
 		if (pass_signals[i])
 		  fprintf_unfiltered (gdb_stdlog, " %s",
-				      target_signal_to_name (i));
+				      gdb_signal_to_name (i));
 
 	      fprintf_unfiltered (gdb_stdlog, " })\n");
 	    }
 
 	  (*t->to_pass_signals) (numsigs, pass_signals);
+	  return;
+	}
+    }
+}
+
+void
+target_program_signals (int numsigs, unsigned char *program_signals)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_program_signals != NULL)
+	{
+	  if (targetdebug)
+	    {
+	      int i;
+
+	      fprintf_unfiltered (gdb_stdlog, "target_program_signals (%d, {",
+				  numsigs);
+
+	      for (i = 0; i < numsigs; i++)
+		if (program_signals[i])
+		  fprintf_unfiltered (gdb_stdlog, " %s",
+				      gdb_signal_to_name (i));
+
+	      fprintf_unfiltered (gdb_stdlog, " })\n");
+	    }
+
+	  (*t->to_program_signals) (numsigs, program_signals);
 	  return;
 	}
     }
@@ -3258,9 +3303,9 @@ target_fileio_pwrite (int fd, const gdb_byte *write_buf, int len,
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
-				"target_fileio_pwrite (%d,%p,%d,%s) "
+				"target_fileio_pwrite (%d,...,%d,%s) "
 				"= %d (%d)\n",
-				fd, write_buf, len, pulongest (offset),
+				fd, len, pulongest (offset),
 				ret, ret != -1 ? 0 : *target_errno);
 	  return ret;
 	}
@@ -3288,9 +3333,9 @@ target_fileio_pread (int fd, gdb_byte *read_buf, int len,
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
-				"target_fileio_pread (%d,%p,%d,%s) "
+				"target_fileio_pread (%d,...,%d,%s) "
 				"= %d (%d)\n",
-				fd, read_buf, len, pulongest (offset),
+				fd, len, pulongest (offset),
 				ret, ret != -1 ? 0 : *target_errno);
 	  return ret;
 	}
@@ -3579,13 +3624,22 @@ generic_mourn_inferior (void)
   ptid = inferior_ptid;
   inferior_ptid = null_ptid;
 
+  /* Mark breakpoints uninserted in case something tries to delete a
+     breakpoint while we delete the inferior's threads (which would
+     fail, since the inferior is long gone).  */
+  mark_breakpoints_out ();
+
   if (!ptid_equal (ptid, null_ptid))
     {
       int pid = ptid_get_pid (ptid);
       exit_inferior (pid);
     }
 
+  /* Note this wipes step-resume breakpoints, so needs to be done
+     after exit_inferior, which ends up referencing the step-resume
+     breakpoints through clear_thread_inferior_resources.  */
   breakpoint_init_inferior (inf_exited);
+
   registers_changed ();
 
   reopen_exec_file ();
@@ -3593,29 +3647,6 @@ generic_mourn_inferior (void)
 
   if (deprecated_detach_hook)
     deprecated_detach_hook ();
-}
-
-/* Helper function for child_wait and the derivatives of child_wait.
-   HOSTSTATUS is the waitstatus from wait() or the equivalent; store our
-   translation of that in OURSTATUS.  */
-void
-store_waitstatus (struct target_waitstatus *ourstatus, int hoststatus)
-{
-  if (WIFEXITED (hoststatus))
-    {
-      ourstatus->kind = TARGET_WAITKIND_EXITED;
-      ourstatus->value.integer = WEXITSTATUS (hoststatus);
-    }
-  else if (!WIFSTOPPED (hoststatus))
-    {
-      ourstatus->kind = TARGET_WAITKIND_SIGNALLED;
-      ourstatus->value.sig = target_signal_from_host (WTERMSIG (hoststatus));
-    }
-  else
-    {
-      ourstatus->kind = TARGET_WAITKIND_STOPPED;
-      ourstatus->value.sig = target_signal_from_host (WSTOPSIG (hoststatus));
-    }
 }
 
 /* Convert a normal process ID to a string.  Returns the string in a
@@ -3821,10 +3852,10 @@ target_waitstatus_to_string (const struct target_waitstatus *ws)
 			 kind_str, ws->value.integer);
     case TARGET_WAITKIND_STOPPED:
       return xstrprintf ("%sstopped, signal = %s",
-			 kind_str, target_signal_to_name (ws->value.sig));
+			 kind_str, gdb_signal_to_name (ws->value.sig));
     case TARGET_WAITKIND_SIGNALLED:
       return xstrprintf ("%ssignalled, signal = %s",
-			 kind_str, target_signal_to_name (ws->value.sig));
+			 kind_str, gdb_signal_to_name (ws->value.sig));
     case TARGET_WAITKIND_LOADED:
       return xstrprintf ("%sloaded", kind_str);
     case TARGET_WAITKIND_FORKED:
@@ -4600,8 +4631,8 @@ int target_async_permitted = 0;
 static int target_async_permitted_1 = 0;
 
 static void
-set_maintenance_target_async_permitted (char *args, int from_tty,
-					struct cmd_list_element *c)
+set_target_async_command (char *args, int from_tty,
+			  struct cmd_list_element *c)
 {
   if (have_live_inferiors ())
     {
@@ -4613,9 +4644,9 @@ set_maintenance_target_async_permitted (char *args, int from_tty,
 }
 
 static void
-show_maintenance_target_async_permitted (struct ui_file *file, int from_tty,
-					 struct cmd_list_element *c,
-					 const char *value)
+show_target_async_command (struct ui_file *file, int from_tty,
+			   struct cmd_list_element *c,
+			   const char *value)
 {
   fprintf_filtered (file,
 		    _("Controlling the inferior in "
@@ -4720,8 +4751,8 @@ result in significant performance improvement for remote targets."),
 Set whether gdb controls the inferior in asynchronous mode."), _("\
 Show whether gdb controls the inferior in asynchronous mode."), _("\
 Tells gdb whether to control the inferior in asynchronous mode."),
-			   set_maintenance_target_async_permitted,
-			   show_maintenance_target_async_permitted,
+			   set_target_async_command,
+			   show_target_async_command,
 			   &setlist,
 			   &showlist);
 

@@ -55,6 +55,7 @@ struct core_regset_section;
 struct syscall;
 struct agent_expr;
 struct axs_value;
+struct stap_parse_info;
 
 /* The architecture associated with the connection to the target.
  
@@ -433,8 +434,8 @@ typedef CORE_ADDR (gdbarch_integer_to_address_ftype) (struct gdbarch *gdbarch, s
 extern CORE_ADDR gdbarch_integer_to_address (struct gdbarch *gdbarch, struct type *type, const gdb_byte *buf);
 extern void set_gdbarch_integer_to_address (struct gdbarch *gdbarch, gdbarch_integer_to_address_ftype *integer_to_address);
 
-/* Return the return-value convention that will be used by FUNCTYPE
-   to return a value of type VALTYPE.  FUNCTYPE may be NULL in which
+/* Return the return-value convention that will be used by FUNCTION
+   to return a value of type VALTYPE.  FUNCTION may be NULL in which
    case the return convention is computed based only on VALTYPE.
   
    If READBUF is not NULL, extract the return value and save it in this buffer.
@@ -446,8 +447,8 @@ extern void set_gdbarch_integer_to_address (struct gdbarch *gdbarch, gdbarch_int
 
 extern int gdbarch_return_value_p (struct gdbarch *gdbarch);
 
-typedef enum return_value_convention (gdbarch_return_value_ftype) (struct gdbarch *gdbarch, struct type *functype, struct type *valtype, struct regcache *regcache, gdb_byte *readbuf, const gdb_byte *writebuf);
-extern enum return_value_convention gdbarch_return_value (struct gdbarch *gdbarch, struct type *functype, struct type *valtype, struct regcache *regcache, gdb_byte *readbuf, const gdb_byte *writebuf);
+typedef enum return_value_convention (gdbarch_return_value_ftype) (struct gdbarch *gdbarch, struct value *function, struct type *valtype, struct regcache *regcache, gdb_byte *readbuf, const gdb_byte *writebuf);
+extern enum return_value_convention gdbarch_return_value (struct gdbarch *gdbarch, struct value *function, struct type *valtype, struct regcache *regcache, gdb_byte *readbuf, const gdb_byte *writebuf);
 extern void set_gdbarch_return_value (struct gdbarch *gdbarch, gdbarch_return_value_ftype *return_value);
 
 typedef CORE_ADDR (gdbarch_skip_prologue_ftype) (struct gdbarch *gdbarch, CORE_ADDR ip);
@@ -631,8 +632,8 @@ extern void set_gdbarch_skip_solib_resolver (struct gdbarch *gdbarch, gdbarch_sk
 
 /* Some systems also have trampoline code for returning from shared libs. */
 
-typedef int (gdbarch_in_solib_return_trampoline_ftype) (struct gdbarch *gdbarch, CORE_ADDR pc, char *name);
-extern int gdbarch_in_solib_return_trampoline (struct gdbarch *gdbarch, CORE_ADDR pc, char *name);
+typedef int (gdbarch_in_solib_return_trampoline_ftype) (struct gdbarch *gdbarch, CORE_ADDR pc, const char *name);
+extern int gdbarch_in_solib_return_trampoline (struct gdbarch *gdbarch, CORE_ADDR pc, const char *name);
 extern void set_gdbarch_in_solib_return_trampoline (struct gdbarch *gdbarch, gdbarch_in_solib_return_trampoline_ftype *in_solib_return_trampoline);
 
 /* A target might have problems with watchpoints as soon as the stack
@@ -909,8 +910,8 @@ extern void set_gdbarch_core_read_description (struct gdbarch *gdbarch, gdbarch_
 
 extern int gdbarch_static_transform_name_p (struct gdbarch *gdbarch);
 
-typedef char * (gdbarch_static_transform_name_ftype) (char *name);
-extern char * gdbarch_static_transform_name (struct gdbarch *gdbarch, char *name);
+typedef const char * (gdbarch_static_transform_name_ftype) (const char *name);
+extern const char * gdbarch_static_transform_name (struct gdbarch *gdbarch, const char *name);
 extern void set_gdbarch_static_transform_name (struct gdbarch *gdbarch, gdbarch_static_transform_name_ftype *static_transform_name);
 
 /* Set if the address in N_SO or N_FUN stabs may be zero. */
@@ -934,23 +935,19 @@ extern void set_gdbarch_process_record (struct gdbarch *gdbarch, gdbarch_process
 
 extern int gdbarch_process_record_signal_p (struct gdbarch *gdbarch);
 
-typedef int (gdbarch_process_record_signal_ftype) (struct gdbarch *gdbarch, struct regcache *regcache, enum target_signal signal);
-extern int gdbarch_process_record_signal (struct gdbarch *gdbarch, struct regcache *regcache, enum target_signal signal);
+typedef int (gdbarch_process_record_signal_ftype) (struct gdbarch *gdbarch, struct regcache *regcache, enum gdb_signal signal);
+extern int gdbarch_process_record_signal (struct gdbarch *gdbarch, struct regcache *regcache, enum gdb_signal signal);
 extern void set_gdbarch_process_record_signal (struct gdbarch *gdbarch, gdbarch_process_record_signal_ftype *process_record_signal);
 
-/* Signal translation: translate inferior's signal (host's) number into
-   GDB's representation. */
+/* Signal translation: translate inferior's signal (target's) number
+   into GDB's representation.  This is mainly used when cross-debugging
+   core files --- "Live" targets hide the translation behind the target
+   interface (target_wait, target_resume, etc.).  The default is to do
+   the translation using host signal numbers. */
 
-typedef enum target_signal (gdbarch_target_signal_from_host_ftype) (struct gdbarch *gdbarch, int signo);
-extern enum target_signal gdbarch_target_signal_from_host (struct gdbarch *gdbarch, int signo);
-extern void set_gdbarch_target_signal_from_host (struct gdbarch *gdbarch, gdbarch_target_signal_from_host_ftype *target_signal_from_host);
-
-/* Signal translation: translate GDB's signal number into inferior's host
-   signal number. */
-
-typedef int (gdbarch_target_signal_to_host_ftype) (struct gdbarch *gdbarch, enum target_signal ts);
-extern int gdbarch_target_signal_to_host (struct gdbarch *gdbarch, enum target_signal ts);
-extern void set_gdbarch_target_signal_to_host (struct gdbarch *gdbarch, gdbarch_target_signal_to_host_ftype *target_signal_to_host);
+typedef enum gdb_signal (gdbarch_gdb_signal_from_target_ftype) (struct gdbarch *gdbarch, int signo);
+extern enum gdb_signal gdbarch_gdb_signal_from_target (struct gdbarch *gdbarch, int signo);
+extern void set_gdbarch_gdb_signal_from_target (struct gdbarch *gdbarch, gdbarch_gdb_signal_from_target_ftype *gdb_signal_from_target);
 
 /* Extra signal info inspection.
   
@@ -978,6 +975,125 @@ extern int gdbarch_get_syscall_number_p (struct gdbarch *gdbarch);
 typedef LONGEST (gdbarch_get_syscall_number_ftype) (struct gdbarch *gdbarch, ptid_t ptid);
 extern LONGEST gdbarch_get_syscall_number (struct gdbarch *gdbarch, ptid_t ptid);
 extern void set_gdbarch_get_syscall_number (struct gdbarch *gdbarch, gdbarch_get_syscall_number_ftype *get_syscall_number);
+
+/* SystemTap related fields and functions.
+   Prefix used to mark an integer constant on the architecture's assembly
+   For example, on x86 integer constants are written as:
+  
+    $10 ;; integer constant 10
+  
+   in this case, this prefix would be the character `$'. */
+
+extern const char * gdbarch_stap_integer_prefix (struct gdbarch *gdbarch);
+extern void set_gdbarch_stap_integer_prefix (struct gdbarch *gdbarch, const char * stap_integer_prefix);
+
+/* Suffix used to mark an integer constant on the architecture's assembly. */
+
+extern const char * gdbarch_stap_integer_suffix (struct gdbarch *gdbarch);
+extern void set_gdbarch_stap_integer_suffix (struct gdbarch *gdbarch, const char * stap_integer_suffix);
+
+/* Prefix used to mark a register name on the architecture's assembly.
+   For example, on x86 the register name is written as:
+  
+    %eax ;; register eax
+  
+   in this case, this prefix would be the character `%'. */
+
+extern const char * gdbarch_stap_register_prefix (struct gdbarch *gdbarch);
+extern void set_gdbarch_stap_register_prefix (struct gdbarch *gdbarch, const char * stap_register_prefix);
+
+/* Suffix used to mark a register name on the architecture's assembly */
+
+extern const char * gdbarch_stap_register_suffix (struct gdbarch *gdbarch);
+extern void set_gdbarch_stap_register_suffix (struct gdbarch *gdbarch, const char * stap_register_suffix);
+
+/* Prefix used to mark a register indirection on the architecture's assembly.
+   For example, on x86 the register indirection is written as:
+  
+    (%eax) ;; indirecting eax
+  
+   in this case, this prefix would be the charater `('.
+  
+   Please note that we use the indirection prefix also for register
+   displacement, e.g., `4(%eax)' on x86. */
+
+extern const char * gdbarch_stap_register_indirection_prefix (struct gdbarch *gdbarch);
+extern void set_gdbarch_stap_register_indirection_prefix (struct gdbarch *gdbarch, const char * stap_register_indirection_prefix);
+
+/* Suffix used to mark a register indirection on the architecture's assembly.
+   For example, on x86 the register indirection is written as:
+  
+    (%eax) ;; indirecting eax
+  
+   in this case, this prefix would be the charater `)'.
+  
+   Please note that we use the indirection suffix also for register
+   displacement, e.g., `4(%eax)' on x86. */
+
+extern const char * gdbarch_stap_register_indirection_suffix (struct gdbarch *gdbarch);
+extern void set_gdbarch_stap_register_indirection_suffix (struct gdbarch *gdbarch, const char * stap_register_indirection_suffix);
+
+/* Prefix used to name a register using GDB's nomenclature.
+  
+   For example, on PPC a register is represented by a number in the assembly
+   language (e.g., `10' is the 10th general-purpose register).  However,
+   inside GDB this same register has an `r' appended to its name, so the 10th
+   register would be represented as `r10' internally. */
+
+extern const char * gdbarch_stap_gdb_register_prefix (struct gdbarch *gdbarch);
+extern void set_gdbarch_stap_gdb_register_prefix (struct gdbarch *gdbarch, const char * stap_gdb_register_prefix);
+
+/* Suffix used to name a register using GDB's nomenclature. */
+
+extern const char * gdbarch_stap_gdb_register_suffix (struct gdbarch *gdbarch);
+extern void set_gdbarch_stap_gdb_register_suffix (struct gdbarch *gdbarch, const char * stap_gdb_register_suffix);
+
+/* Check if S is a single operand.
+  
+   Single operands can be:
+    - Literal integers, e.g. `$10' on x86
+    - Register access, e.g. `%eax' on x86
+    - Register indirection, e.g. `(%eax)' on x86
+    - Register displacement, e.g. `4(%eax)' on x86
+  
+   This function should check for these patterns on the string
+   and return 1 if some were found, or zero otherwise.  Please try to match
+   as much info as you can from the string, i.e., if you have to match
+   something like `(%', do not match just the `('. */
+
+extern int gdbarch_stap_is_single_operand_p (struct gdbarch *gdbarch);
+
+typedef int (gdbarch_stap_is_single_operand_ftype) (struct gdbarch *gdbarch, const char *s);
+extern int gdbarch_stap_is_single_operand (struct gdbarch *gdbarch, const char *s);
+extern void set_gdbarch_stap_is_single_operand (struct gdbarch *gdbarch, gdbarch_stap_is_single_operand_ftype *stap_is_single_operand);
+
+/* Function used to handle a "special case" in the parser.
+  
+   A "special case" is considered to be an unknown token, i.e., a token
+   that the parser does not know how to parse.  A good example of special
+   case would be ARM's register displacement syntax:
+  
+    [R0, #4]  ;; displacing R0 by 4
+  
+   Since the parser assumes that a register displacement is of the form:
+  
+    <number> <indirection_prefix> <register_name> <indirection_suffix>
+  
+   it means that it will not be able to recognize and parse this odd syntax.
+   Therefore, we should add a special case function that will handle this token.
+  
+   This function should generate the proper expression form of the expression
+   using GDB's internal expression mechanism (e.g., `write_exp_elt_opcode'
+   and so on).  It should also return 1 if the parsing was successful, or zero
+   if the token was not recognized as a special token (in this case, returning
+   zero means that the special parser is deferring the parsing to the generic
+   parser), and should advance the buffer pointer (p->arg). */
+
+extern int gdbarch_stap_parse_special_token_p (struct gdbarch *gdbarch);
+
+typedef int (gdbarch_stap_parse_special_token_ftype) (struct gdbarch *gdbarch, struct stap_parse_info *p);
+extern int gdbarch_stap_parse_special_token (struct gdbarch *gdbarch, struct stap_parse_info *p);
+extern void set_gdbarch_stap_parse_special_token (struct gdbarch *gdbarch, gdbarch_stap_parse_special_token_ftype *stap_parse_special_token);
 
 /* True if the list of shared libraries is one and only for all
    processes, as opposed to a list of shared libraries per inferior.
