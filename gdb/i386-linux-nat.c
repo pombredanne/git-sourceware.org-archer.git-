@@ -875,7 +875,7 @@ static const unsigned char linux_syscall[] = { 0xcd, 0x80 };
 
 static void
 i386_linux_resume (struct target_ops *ops,
-		   ptid_t ptid, int step, enum target_signal signal)
+		   ptid_t ptid, int step, enum gdb_signal signal)
 {
   int pid = PIDGET (ptid);
 
@@ -938,7 +938,7 @@ i386_linux_resume (struct target_ops *ops,
 	}
     }
 
-  if (ptrace (request, pid, 0, target_signal_to_host (signal)) == -1)
+  if (ptrace (request, pid, 0, gdb_signal_to_host (signal)) == -1)
     perror_with_name (("ptrace"));
 }
 
@@ -1007,6 +1007,9 @@ i386_linux_read_description (struct target_ops *ops)
   else
     return tdesc_i386_linux;
 }
+
+/* -Wmissing-prototypes */
+extern initialize_file_ftype _initialize_i386_linux_nat;
 
 void
 _initialize_i386_linux_nat (void)

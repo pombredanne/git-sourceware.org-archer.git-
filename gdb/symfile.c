@@ -147,23 +147,6 @@ DEF_VEC_P (sym_fns_ptr);
 
 static VEC (sym_fns_ptr) *symtab_fns = NULL;
 
-/* Flag for whether user will be reloading symbols multiple times.
-   Defaults to ON for VxWorks, otherwise OFF.  */
-
-#ifdef SYMBOL_RELOADING_DEFAULT
-int symbol_reloading = SYMBOL_RELOADING_DEFAULT;
-#else
-int symbol_reloading = 0;
-#endif
-static void
-show_symbol_reloading (struct ui_file *file, int from_tty,
-		       struct cmd_list_element *c, const char *value)
-{
-  fprintf_filtered (file, _("Dynamic symbol table reloading "
-			    "multiple times in one run is %s.\n"),
-		    value);
-}
-
 /* If non-zero, shared library symbols will be added automatically
    when the inferior is created, new libraries are loaded, or when
    attaching to the inferior.  This is almost always what users will
@@ -561,7 +544,7 @@ addrs_section_compar (const void *ap, const void *bp)
 {
   const struct other_sections *a = *((struct other_sections **) ap);
   const struct other_sections *b = *((struct other_sections **) bp);
-  int retval, a_idx, b_idx;
+  int retval;
 
   retval = strcmp (addr_section_name (a->name), addr_section_name (b->name));
   if (retval)
@@ -1246,14 +1229,17 @@ symbol_file_add_main (char *args, int from_tty)
 static void
 symbol_file_add_main_1 (char *args, int from_tty, int flags)
 {
-  const int add_flags = SYMFILE_MAINLINE | (from_tty ? SYMFILE_VERBOSE : 0);
+  const int add_flags = (current_inferior ()->symfile_flags
+			 | SYMFILE_MAINLINE | (from_tty ? SYMFILE_VERBOSE : 0));
+
   symbol_file_add (args, add_flags, NULL, flags);
 
   /* Getting new symbols may change our opinion about
      what is frameless.  */
   reinit_frame_cache ();
 
-  set_initial_language ();
+  if ((flags & SYMFILE_NO_READ) == 0)
+    set_initial_language ();
 }
 
 void
@@ -1455,6 +1441,9 @@ find_separate_debug_file (const char *dir,
   char *debugdir;
   char *debugfile;
   int i;
+  VEC (char_ptr) *debugdir_vec;
+  struct cleanup *back_to;
+  int ix;
 
   /* Set I to max (strlen (canon_dir), strlen (dir)).  */
   i = strlen (dir);
@@ -1489,20 +1478,12 @@ find_separate_debug_file (const char *dir,
      Keep backward compatibility so that DEBUG_FILE_DIRECTORY being "" will
      cause "/..." lookups.  */
 
-  debugdir = debug_file_directory;
-  do
+  debugdir_vec = dirnames_to_char_ptr_vec (debug_file_directory);
+  back_to = make_cleanup_free_char_ptr_vec (debugdir_vec);
+
+  for (ix = 0; VEC_iterate (char_ptr, debugdir_vec, ix, debugdir); ++ix)
     {
-      char *debugdir_end;
-
-      while (*debugdir == DIRNAME_SEPARATOR)
-	debugdir++;
-
-      debugdir_end = strchr (debugdir, DIRNAME_SEPARATOR);
-      if (debugdir_end == NULL)
-	debugdir_end = &debugdir[strlen (debugdir)];
-
-      memcpy (debugfile, debugdir, debugdir_end - debugdir);
-      debugfile[debugdir_end - debugdir] = 0;
+      strcpy (debugfile, debugdir);
       strcat (debugfile, "/");
       strcat (debugfile, dir);
       strcat (debugfile, debuglink);
@@ -1517,8 +1498,7 @@ find_separate_debug_file (const char *dir,
 			    strlen (gdb_sysroot)) == 0
 	  && IS_DIR_SEPARATOR (canon_dir[strlen (gdb_sysroot)]))
 	{
-	  memcpy (debugfile, debugdir, debugdir_end - debugdir);
-	  debugfile[debugdir_end - debugdir] = 0;
+	  strcpy (debugfile, debugdir);
 	  strcat (debugfile, canon_dir + strlen (gdb_sysroot));
 	  strcat (debugfile, "/");
 	  strcat (debugfile, debuglink);
@@ -1526,11 +1506,9 @@ find_separate_debug_file (const char *dir,
 	  if (separate_debug_file_exists (debugfile, crc32, objfile))
 	    return debugfile;
 	}
-
-      debugdir = debugdir_end;
     }
-  while (*debugdir != 0);
 
+  do_cleanups (back_to);
   xfree (debugfile);
   return NULL;
 }
@@ -1575,8 +1553,9 @@ find_separate_debug_file_by_debuglink (struct objfile *objfile)
       return NULL;
     }
 
+  cleanups = make_cleanup (xfree, debuglink);
   dir = xstrdup (objfile->name);
-  cleanups = make_cleanup (xfree, dir);
+  make_cleanup (xfree, dir);
   terminate_after_last_dir_separator (dir);
   canon_dir = lrealpath (dir);
 
@@ -1786,7 +1765,6 @@ symfile_bfd_open (char *name)
   sym_bfd = bfd_fopen (name, gnutarget, FOPEN_RB, desc);
   if (!sym_bfd)
     {
-      close (desc);
       make_cleanup (xfree, name);
       error (_("`%s': can't open to read symbols: %s."), name,
 	     bfd_errmsg (bfd_get_error ()));
@@ -2602,14 +2580,9 @@ reread_symbols (void)
 
 	  /* obstack_init also initializes the obstack so it is
 	     empty.  We could use obstack_specify_allocation but
-	     gdb_obstack.h specifies the alloc/dealloc
-	     functions.  */
+	     gdb_obstack.h specifies the alloc/dealloc functions.  */
 	  obstack_init (&objfile->objfile_obstack);
-	  if (build_objfile_section_table (objfile))
-	    {
-	      error (_("Can't find the file sections in `%s': %s"),
-		     objfile->name, bfd_errmsg (bfd_get_error ()));
-	    }
+	  build_objfile_section_table (objfile);
 	  terminate_minimal_symbol_table (objfile);
 
 	  /* We use the same section offsets as from last time.  I'm not
@@ -3652,7 +3625,9 @@ bfd_byte *
 default_symfile_relocate (struct objfile *objfile, asection *sectp,
                           bfd_byte *buf)
 {
-  bfd *abfd = objfile->obfd;
+  /* Use sectp->owner instead of objfile->obfd.  sectp may point to a
+     DWO file.  */
+  bfd *abfd = sectp->owner;
 
   /* We're only interested in sections with relocation
      information.  */
@@ -3834,14 +3809,6 @@ Dynamically load FILE into the running program, and record its symbols\n\
 for access from GDB.\n\
 A load OFFSET may also be given."), &cmdlist);
   set_cmd_completer (c, filename_completer);
-
-  add_setshow_boolean_cmd ("symbol-reloading", class_support,
-			   &symbol_reloading, _("\
-Set dynamic symbol table reloading multiple times in one run."), _("\
-Show dynamic symbol table reloading multiple times in one run."), NULL,
-			   NULL,
-			   show_symbol_reloading,
-			   &setlist, &showlist);
 
   add_prefix_cmd ("overlay", class_support, overlay_command,
 		  _("Commands for debugging overlays."), &overlaylist,

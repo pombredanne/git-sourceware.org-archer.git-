@@ -26,6 +26,7 @@
 
 #include "symtab.h"
 #include "vec.h"
+#include "gdb_vecs.h"
 #include "gdb_obstack.h"
 
 /* Opaque declarations.  */
@@ -170,13 +171,9 @@ extern struct symbol **make_symbol_overload_list_adl (struct type **arg_types,
 extern struct type *cp_lookup_rtti_type (const char *name,
 					 struct block *block);
 
-extern int cp_validate_operator (const char *input);
-
 /* Functions/variables from cp-namespace.c.  */
 
 extern int cp_is_anonymous (const char *namespace);
-
-DEF_VEC_P (const_char_ptr);
 
 extern void cp_add_using_directive (const char *dest,
                                     const char *src,
@@ -184,11 +181,6 @@ extern void cp_add_using_directive (const char *dest,
 				    const char *declaration,
 				    VEC (const_char_ptr) *excludes,
                                     struct obstack *obstack);
-
-extern void cp_initialize_namespace (void);
-
-extern void cp_finalize_namespace (struct block *static_block,
-				   struct obstack *obstack);
 
 extern void cp_set_block_scope (const struct symbol *symbol,
 				struct block *block,

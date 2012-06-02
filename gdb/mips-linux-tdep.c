@@ -119,13 +119,8 @@ mips_supply_gregset (struct regcache *regcache,
   supply_32bit_reg (regcache, mips_regnum (gdbarch)->cause,
 		    regp + EF_CP0_CAUSE);
 
-  /* Fill inaccessible registers with zero.  */
+  /* Fill the inaccessible zero register with zero.  */
   regcache_raw_supply (regcache, MIPS_ZERO_REGNUM, zerobuf);
-  regcache_raw_supply (regcache, MIPS_UNUSED_REGNUM, zerobuf);
-  for (regi = MIPS_FIRST_EMBED_REGNUM;
-       regi <= MIPS_LAST_EMBED_REGNUM;
-       regi++)
-    regcache_raw_supply (regcache, regi, zerobuf);
 }
 
 static void
@@ -251,7 +246,7 @@ mips_fill_fpregset (const struct regcache *regcache,
 		    mips_elf_fpregset_t *fpregsetp, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
-  char *from, *to;
+  char *to;
 
   if ((regno >= gdbarch_fp0_regnum (gdbarch))
       && (regno < gdbarch_fp0_regnum (gdbarch) + 32))
@@ -374,13 +369,8 @@ mips64_supply_gregset (struct regcache *regcache,
   supply_64bit_reg (regcache, mips_regnum (gdbarch)->cause,
 		    (const gdb_byte *) (regp + MIPS64_EF_CP0_CAUSE));
 
-  /* Fill inaccessible registers with zero.  */
+  /* Fill the inaccessible zero register with zero.  */
   regcache_raw_supply (regcache, MIPS_ZERO_REGNUM, zerobuf);
-  regcache_raw_supply (regcache, MIPS_UNUSED_REGNUM, zerobuf);
-  for (regi = MIPS_FIRST_EMBED_REGNUM;
-       regi <= MIPS_LAST_EMBED_REGNUM;
-       regi++)
-    regcache_raw_supply (regcache, regi, zerobuf);
 }
 
 static void
@@ -591,7 +581,7 @@ mips64_fill_fpregset_wrapper (const struct regset *regset,
   mips64_fill_fpregset (regcache, (mips64_elf_fpregset_t *)gregs, regnum);
 }
 
-const struct regset *
+static const struct regset *
 mips_linux_regset_from_core_section (struct gdbarch *gdbarch,
 			             const char *sect_name, size_t sect_size)
 {
@@ -879,6 +869,8 @@ static const struct tramp_frame mips_linux_n64_rt_sigframe = {
      sigset_t sf_mask;
    };
 
+   Pre-2.6.12 sigcontext:
+
    struct sigcontext {
         unsigned int       sc_regmask;          [Unused]
         unsigned int       sc_status;
@@ -898,6 +890,30 @@ static const struct tramp_frame mips_linux_n64_rt_sigframe = {
         unsigned int       sc_badvaddr;         [Unused]
 
         unsigned long      sc_sigset[4];        [kernel's sigset_t]
+   };
+
+   Post-2.6.12 sigcontext (SmartMIPS/DSP support added):
+
+   struct sigcontext {
+        unsigned int       sc_regmask;          [Unused]
+        unsigned int       sc_status;           [Unused]
+        unsigned long long sc_pc;
+        unsigned long long sc_regs[32];
+        unsigned long long sc_fpregs[32];
+        unsigned int       sc_acx;
+        unsigned int       sc_fpc_csr;
+        unsigned int       sc_fpc_eir;          [Unused]
+        unsigned int       sc_used_math;
+        unsigned int       sc_dsp;
+	[Alignment hole of four bytes]
+        unsigned long long sc_mdhi;
+        unsigned long long sc_mdlo;
+        unsigned long      sc_hi1;
+        unsigned long      sc_lo1;
+        unsigned long      sc_hi2;
+        unsigned long      sc_lo2;
+        unsigned long      sc_hi3;
+        unsigned long      sc_lo3;
    };
 
    The RT signal frames look like this:
@@ -932,10 +948,17 @@ static const struct tramp_frame mips_linux_n64_rt_sigframe = {
 #define SIGCONTEXT_REGS     (2 * 8)
 #define SIGCONTEXT_FPREGS   (34 * 8)
 #define SIGCONTEXT_FPCSR    (66 * 8 + 4)
+#define SIGCONTEXT_DSPCTL   (68 * 8 + 0)
 #define SIGCONTEXT_HI       (69 * 8)
 #define SIGCONTEXT_LO       (70 * 8)
 #define SIGCONTEXT_CAUSE    (71 * 8 + 0)
 #define SIGCONTEXT_BADVADDR (71 * 8 + 4)
+#define SIGCONTEXT_HI1      (71 * 8 + 0)
+#define SIGCONTEXT_LO1      (71 * 8 + 4)
+#define SIGCONTEXT_HI2      (72 * 8 + 0)
+#define SIGCONTEXT_LO2      (72 * 8 + 4)
+#define SIGCONTEXT_HI3      (73 * 8 + 0)
+#define SIGCONTEXT_LO3      (73 * 8 + 4)
 
 #define SIGCONTEXT_REG_SIZE 8
 
@@ -946,7 +969,7 @@ mips_linux_o32_sigframe_init (const struct tramp_frame *self,
 			      CORE_ADDR func)
 {
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
-  int ireg, reg_position;
+  int ireg;
   CORE_ADDR frame_sp = get_frame_sp (this_frame);
   CORE_ADDR sigcontext_base;
   const struct mips_regnum *regs = mips_regnum (gdbarch);
@@ -1010,18 +1033,49 @@ mips_linux_o32_sigframe_init (const struct tramp_frame *self,
 			   regs->fp_control_status
 			   + gdbarch_num_regs (gdbarch),
 			   sigcontext_base + SIGCONTEXT_FPCSR);
+
+  if (regs->dspctl != -1)
+    trad_frame_set_reg_addr (this_cache,
+			     regs->dspctl + gdbarch_num_regs (gdbarch),
+			     sigcontext_base + SIGCONTEXT_DSPCTL);
+
   trad_frame_set_reg_addr (this_cache,
 			   regs->hi + gdbarch_num_regs (gdbarch),
 			   regs_base + SIGCONTEXT_HI);
   trad_frame_set_reg_addr (this_cache,
 			   regs->lo + gdbarch_num_regs (gdbarch),
 			   regs_base + SIGCONTEXT_LO);
-  trad_frame_set_reg_addr (this_cache,
-			   regs->cause + gdbarch_num_regs (gdbarch),
-			   sigcontext_base + SIGCONTEXT_CAUSE);
-  trad_frame_set_reg_addr (this_cache,
-			   regs->badvaddr + gdbarch_num_regs (gdbarch),
-			   sigcontext_base + SIGCONTEXT_BADVADDR);
+
+  if (regs->dspacc != -1)
+    {
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 0 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + SIGCONTEXT_HI1);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 1 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + SIGCONTEXT_LO1);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 2 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + SIGCONTEXT_HI2);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 3 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + SIGCONTEXT_LO2);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 4 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + SIGCONTEXT_HI3);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 5 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + SIGCONTEXT_LO3);
+    }
+  else
+    {
+      trad_frame_set_reg_addr (this_cache,
+			       regs->cause + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + SIGCONTEXT_CAUSE);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->badvaddr + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + SIGCONTEXT_BADVADDR);
+    }
 
   /* Choice of the bottom of the sigframe is somewhat arbitrary.  */
   trad_frame_set_id (this_cache, frame_id_build (frame_sp, func));
@@ -1099,9 +1153,16 @@ mips_linux_o32_sigframe_init (const struct tramp_frame *self,
 #define N64_SIGCONTEXT_REGS     (0 * 8)
 #define N64_SIGCONTEXT_FPREGS   (32 * 8)
 #define N64_SIGCONTEXT_HI       (64 * 8)
+#define N64_SIGCONTEXT_HI1      (65 * 8)
+#define N64_SIGCONTEXT_HI2      (66 * 8)
+#define N64_SIGCONTEXT_HI3      (67 * 8)
 #define N64_SIGCONTEXT_LO       (68 * 8)
+#define N64_SIGCONTEXT_LO1      (69 * 8)
+#define N64_SIGCONTEXT_LO2      (70 * 8)
+#define N64_SIGCONTEXT_LO3      (71 * 8)
 #define N64_SIGCONTEXT_PC       (72 * 8)
-#define N64_SIGCONTEXT_FPCSR    (73 * 8)
+#define N64_SIGCONTEXT_FPCSR    (73 * 8 + 0)
+#define N64_SIGCONTEXT_DSPCTL   (74 * 8 + 0)
 
 #define N64_SIGCONTEXT_REG_SIZE 8
 
@@ -1112,7 +1173,7 @@ mips_linux_n32n64_sigframe_init (const struct tramp_frame *self,
 				 CORE_ADDR func)
 {
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
-  int ireg, reg_position;
+  int ireg;
   CORE_ADDR frame_sp = get_frame_sp (this_frame);
   CORE_ADDR sigcontext_base;
   const struct mips_regnum *regs = mips_regnum (gdbarch);
@@ -1150,6 +1211,7 @@ mips_linux_n32n64_sigframe_init (const struct tramp_frame *self,
 			   regs->fp_control_status
 			   + gdbarch_num_regs (gdbarch),
 			   sigcontext_base + N64_SIGCONTEXT_FPCSR);
+
   trad_frame_set_reg_addr (this_cache,
 			   regs->hi + gdbarch_num_regs (gdbarch),
 			   sigcontext_base + N64_SIGCONTEXT_HI);
@@ -1157,15 +1219,44 @@ mips_linux_n32n64_sigframe_init (const struct tramp_frame *self,
 			   regs->lo + gdbarch_num_regs (gdbarch),
 			   sigcontext_base + N64_SIGCONTEXT_LO);
 
+  if (regs->dspacc != -1)
+    {
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 0 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + N64_SIGCONTEXT_HI1);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 1 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + N64_SIGCONTEXT_LO1);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 2 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + N64_SIGCONTEXT_HI2);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 3 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + N64_SIGCONTEXT_LO2);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 4 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + N64_SIGCONTEXT_HI3);
+      trad_frame_set_reg_addr (this_cache,
+			       regs->dspacc + 5 + gdbarch_num_regs (gdbarch),
+			       sigcontext_base + N64_SIGCONTEXT_LO3);
+    }
+  if (regs->dspctl != -1)
+    trad_frame_set_reg_addr (this_cache,
+			     regs->dspctl + gdbarch_num_regs (gdbarch),
+			     sigcontext_base + N64_SIGCONTEXT_DSPCTL);
+
   /* Choice of the bottom of the sigframe is somewhat arbitrary.  */
   trad_frame_set_id (this_cache, frame_id_build (frame_sp, func));
 }
+
+/* Implement the "write_pc" gdbarch method.  */
 
 static void
 mips_linux_write_pc (struct regcache *regcache, CORE_ADDR pc)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
-  regcache_cooked_write_unsigned (regcache, gdbarch_pc_regnum (gdbarch), pc);
+
+  mips_write_pc (regcache, pc);
 
   /* Clear the syscall restart flag.  */
   if (mips_linux_restart_reg_p (gdbarch))
@@ -1334,6 +1425,7 @@ mips_linux_init_abi (struct gdbarch_info info,
 	 described or not).  */
       gdb_assert (gdbarch_num_regs (gdbarch) <= MIPS_RESTART_REGNUM);
       set_gdbarch_num_regs (gdbarch, MIPS_RESTART_REGNUM + 1);
+      set_gdbarch_num_pseudo_regs (gdbarch, MIPS_RESTART_REGNUM + 1);
 
       /* If it's present, then assign it to the reserved number.  */
       feature = tdesc_find_feature (info.target_desc,

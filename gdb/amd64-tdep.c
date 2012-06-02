@@ -43,6 +43,8 @@
 
 #include "features/i386/amd64.c"
 #include "features/i386/amd64-avx.c"
+#include "features/i386/x32.c"
+#include "features/i386/x32-avx.c"
 
 #include "ax.h"
 #include "ax-gdb.h"
@@ -592,7 +594,7 @@ amd64_classify (struct type *type, enum amd64_reg_class class[2])
 }
 
 static enum return_value_convention
-amd64_return_value (struct gdbarch *gdbarch, struct type *func_type,
+amd64_return_value (struct gdbarch *gdbarch, struct value *function,
 		    struct type *type, struct regcache *regcache,
 		    gdb_byte *readbuf, const gdb_byte *writebuf)
 {
@@ -1258,7 +1260,7 @@ amd64_displaced_step_copy_insn (struct gdbarch *gdbarch,
 				struct regcache *regs)
 {
   int len = gdbarch_max_insn_length (gdbarch);
-  /* Extra space for sentinels so fixup_{riprel,displaced_copy don't have to
+  /* Extra space for sentinels so fixup_{riprel,displaced_copy} don't have to
      continually watch for running off the end of the buffer.  */
   int fixup_sentinel_space = len;
   struct displaced_step_closure *dsc =
@@ -1865,10 +1867,16 @@ amd64_analyze_stack_align (CORE_ADDR pc, CORE_ADDR current_pc,
    We will handle only functions beginning with:
 
       pushq %rbp        0x55
-      movq %rsp, %rbp   0x48 0x89 0xe5
+      movq %rsp, %rbp   0x48 0x89 0xe5 (or 0x48 0x8b 0xec)
 
-   Any function that doesn't start with this sequence will be assumed
-   to have no prologue and thus no valid frame pointer in %rbp.  */
+   or (for the X32 ABI):
+
+      pushq %rbp        0x55
+      movl %esp, %ebp   0x89 0xe5 (or 0x8b 0xec)
+
+   Any function that doesn't start with one of these sequences will be
+   assumed to have no prologue and thus no valid frame pointer in
+   %rbp.  */
 
 static CORE_ADDR
 amd64_analyze_prologue (struct gdbarch *gdbarch,
@@ -1876,7 +1884,13 @@ amd64_analyze_prologue (struct gdbarch *gdbarch,
 			struct amd64_frame_cache *cache)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  static gdb_byte proto[3] = { 0x48, 0x89, 0xe5 }; /* movq %rsp, %rbp */
+  /* There are two variations of movq %rsp, %rbp.  */
+  static const gdb_byte mov_rsp_rbp_1[3] = { 0x48, 0x89, 0xe5 };
+  static const gdb_byte mov_rsp_rbp_2[3] = { 0x48, 0x8b, 0xec };
+  /* Ditto for movl %esp, %ebp.  */
+  static const gdb_byte mov_esp_ebp_1[2] = { 0x89, 0xe5 };
+  static const gdb_byte mov_esp_ebp_2[2] = { 0x8b, 0xec };
+
   gdb_byte buf[3];
   gdb_byte op;
 
@@ -1898,14 +1912,30 @@ amd64_analyze_prologue (struct gdbarch *gdbarch,
       if (current_pc <= pc + 1)
         return current_pc;
 
-      /* Check for `movq %rsp, %rbp'.  */
       read_memory (pc + 1, buf, 3);
-      if (memcmp (buf, proto, 3) != 0)
-	return pc + 1;
 
-      /* OK, we actually have a frame.  */
-      cache->frameless_p = 0;
-      return pc + 4;
+      /* Check for `movq %rsp, %rbp'.  */
+      if (memcmp (buf, mov_rsp_rbp_1, 3) == 0
+	  || memcmp (buf, mov_rsp_rbp_2, 3) == 0)
+	{
+	  /* OK, we actually have a frame.  */
+	  cache->frameless_p = 0;
+	  return pc + 4;
+	}
+
+      /* For X32, also check for `movq %esp, %ebp'.  */
+      if (gdbarch_ptr_bit (gdbarch) == 32)
+	{
+	  if (memcmp (buf, mov_esp_ebp_1, 2) == 0
+	      || memcmp (buf, mov_esp_ebp_2, 2) == 0)
+	    {
+	      /* OK, we actually have a frame.  */
+	      cache->frameless_p = 0;
+	      return pc + 3;
+	    }
+	}
+
+      return pc + 1;
     }
 
   return pc;
@@ -2688,6 +2718,16 @@ amd64_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_relocate_instruction (gdbarch, amd64_relocate_instruction);
 
   set_gdbarch_gen_return_address (gdbarch, amd64_gen_return_address);
+
+  /* SystemTap variables and functions.  */
+  set_gdbarch_stap_integer_prefix (gdbarch, "$");
+  set_gdbarch_stap_register_prefix (gdbarch, "%");
+  set_gdbarch_stap_register_indirection_prefix (gdbarch, "(");
+  set_gdbarch_stap_register_indirection_suffix (gdbarch, ")");
+  set_gdbarch_stap_is_single_operand (gdbarch,
+				      i386_stap_is_single_operand);
+  set_gdbarch_stap_parse_special_token (gdbarch,
+					i386_stap_parse_special_token);
 }
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */
@@ -2698,6 +2738,8 @@ _initialize_amd64_tdep (void)
 {
   initialize_tdesc_amd64 ();
   initialize_tdesc_amd64_avx ();
+  initialize_tdesc_x32 ();
+  initialize_tdesc_x32_avx ();
 }
 
 

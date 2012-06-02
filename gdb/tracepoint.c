@@ -52,6 +52,7 @@
 #include "memrange.h"
 #include "exceptions.h"
 #include "cli/cli-utils.h"
+#include "probe.h"
 
 /* readline include files */
 #include "readline/readline.h"
@@ -347,7 +348,7 @@ find_trace_state_variable (const char *name)
   return NULL;
 }
 
-void
+static void
 delete_trace_state_variable (const char *name)
 {
   struct trace_state_variable *tsv;
@@ -367,7 +368,7 @@ delete_trace_state_variable (const char *name)
 /* The 'tvariable' command collects a name and optional expression to
    evaluate into an initial value.  */
 
-void
+static void
 trace_variable_command (char *args, int from_tty)
 {
   struct expression *expr;
@@ -429,7 +430,7 @@ trace_variable_command (char *args, int from_tty)
   do_cleanups (old_chain);
 }
 
-void
+static void
 delete_trace_variable_command (char *args, int from_tty)
 {
   int ix;
@@ -740,10 +741,10 @@ validate_actionline (char **line, struct breakpoint *b)
 		{
 		  if (SYMBOL_CLASS (exp->elts[2].symbol) == LOC_CONST)
 		    {
-		      error (_("constant `%s' (value %ld) "
+		      error (_("constant `%s' (value %s) "
 			       "will not be collected."),
 			     SYMBOL_PRINT_NAME (exp->elts[2].symbol),
-			     SYMBOL_VALUE (exp->elts[2].symbol));
+			     plongest (SYMBOL_VALUE (exp->elts[2].symbol)));
 		    }
 		  else if (SYMBOL_CLASS (exp->elts[2].symbol)
 			   == LOC_OPTIMIZED_OUT)
@@ -980,8 +981,8 @@ collect_symbol (struct collection_list *collect,
 		       SYMBOL_CLASS (sym));
       break;
     case LOC_CONST:
-      printf_filtered ("constant %s (value %ld) will not be collected.\n",
-		       SYMBOL_PRINT_NAME (sym), SYMBOL_VALUE (sym));
+      printf_filtered ("constant %s (value %s) will not be collected.\n",
+		       SYMBOL_PRINT_NAME (sym), plongest (SYMBOL_VALUE (sym)));
       break;
     case LOC_STATIC:
       offset = SYMBOL_VALUE_ADDRESS (sym);
@@ -1577,7 +1578,8 @@ encode_actions_1 (struct command_line *action,
 }
 
 /* Render all actions into gdb protocol.  */
-/*static*/ void
+
+void
 encode_actions (struct breakpoint *t, struct bp_location *tloc,
 		char ***tdp_actions, char ***stepping_actions)
 {
@@ -1716,6 +1718,7 @@ start_tracing (char *notes)
   for (ix = 0; VEC_iterate (breakpoint_p, tp_vec, ix, b); ix++)
     {
       struct tracepoint *t = (struct tracepoint *) b;
+      struct bp_location *loc;
 
       if (b->enable_state == bp_enabled)
 	any_enabled = 1;
@@ -1778,6 +1781,10 @@ start_tracing (char *notes)
 	}
 
       t->number_on_target = b->number;
+
+      for (loc = b->loc; loc; loc = loc->next)
+	if (loc->probe != NULL)
+	  loc->probe->pops->set_semaphore (loc->probe, loc->gdbarch);
     }
   VEC_free (breakpoint_p, tp_vec);
 
@@ -1798,7 +1805,7 @@ start_tracing (char *notes)
   ret = target_set_trace_notes (trace_user, notes, NULL);
 
   if (!ret && (trace_user || notes))
-    warning ("Target does not support trace user/notes, info ignored");
+    warning (_("Target does not support trace user/notes, info ignored"));
 
   /* Now insert traps and begin collecting data.  */
   target_trace_start ();
@@ -1850,15 +1857,41 @@ void
 stop_tracing (char *note)
 {
   int ret;
+  VEC(breakpoint_p) *tp_vec = NULL;
+  int ix;
+  struct breakpoint *t;
 
   target_trace_stop ();
+
+  tp_vec = all_tracepoints ();
+  for (ix = 0; VEC_iterate (breakpoint_p, tp_vec, ix, t); ix++)
+    {
+      struct bp_location *loc;
+
+      if ((t->type == bp_fast_tracepoint
+	   ? !may_insert_fast_tracepoints
+	   : !may_insert_tracepoints))
+	continue;
+
+      for (loc = t->loc; loc; loc = loc->next)
+	{
+	  /* GDB can be totally absent in some disconnected trace scenarios,
+	     but we don't really care if this semaphore goes out of sync.
+	     That's why we are decrementing it here, but not taking care
+	     in other places.  */
+	  if (loc->probe != NULL)
+	    loc->probe->pops->clear_semaphore (loc->probe, loc->gdbarch);
+	}
+    }
+
+  VEC_free (breakpoint_p, tp_vec);
 
   if (!note)
     note = trace_stop_notes;
   ret = target_set_trace_notes (NULL, NULL, note);
 
   if (!ret && note)
-    warning ("Target does not support trace notes, note ignored");
+    warning (_("Target does not support trace notes, note ignored"));
 
   /* Should change in response to reply?  */
   current_trace_status ()->running = 0;
@@ -2579,7 +2612,7 @@ scope_info (char *args, int from_tty)
   struct block *block;
   const char *symname;
   char *save_args = args;
-  struct dict_iterator iter;
+  struct block_iterator iter;
   int j, count = 0;
   struct gdbarch *gdbarch;
   int regno;
@@ -2622,8 +2655,9 @@ scope_info (char *args, int from_tty)
 	      count--;		/* Don't count this one.  */
 	      continue;
 	    case LOC_CONST:
-	      printf_filtered ("a constant with value %ld (0x%lx)",
-			       SYMBOL_VALUE (sym), SYMBOL_VALUE (sym));
+	      printf_filtered ("a constant with value %s (%s)",
+			       plongest (SYMBOL_VALUE (sym)),
+			       hex_string (SYMBOL_VALUE (sym)));
 	      break;
 	    case LOC_CONST_BYTES:
 	      printf_filtered ("constant bytes: ");
@@ -2656,16 +2690,16 @@ scope_info (char *args, int from_tty)
 				 gdbarch_register_name (gdbarch, regno));
 	      break;
 	    case LOC_ARG:
-	      printf_filtered ("an argument at stack/frame offset %ld",
-			       SYMBOL_VALUE (sym));
+	      printf_filtered ("an argument at stack/frame offset %s",
+			       plongest (SYMBOL_VALUE (sym)));
 	      break;
 	    case LOC_LOCAL:
-	      printf_filtered ("a local variable at frame offset %ld",
-			       SYMBOL_VALUE (sym));
+	      printf_filtered ("a local variable at frame offset %s",
+			       plongest (SYMBOL_VALUE (sym)));
 	      break;
 	    case LOC_REF_ARG:
-	      printf_filtered ("a reference argument at offset %ld",
-			       SYMBOL_VALUE (sym));
+	      printf_filtered ("a reference argument at offset %s",
+			       plongest (SYMBOL_VALUE (sym)));
 	      break;
 	    case LOC_REGPARM_ADDR:
 	      /* Note comment at LOC_REGISTER.  */
@@ -3167,7 +3201,7 @@ set_trace_user (char *args, int from_tty,
   ret = target_set_trace_notes (trace_user, NULL, NULL);
 
   if (!ret)
-    warning ("Target does not support trace notes, user ignored");
+    warning (_("Target does not support trace notes, user ignored"));
 }
 
 static void
@@ -3179,7 +3213,7 @@ set_trace_notes (char *args, int from_tty,
   ret = target_set_trace_notes (NULL, trace_notes, NULL);
 
   if (!ret)
-    warning ("Target does not support trace notes, note ignored");
+    warning (_("Target does not support trace notes, note ignored"));
 }
 
 static void
@@ -3191,7 +3225,7 @@ set_trace_stop_notes (char *args, int from_tty,
   ret = target_set_trace_notes (NULL, NULL, trace_stop_notes);
 
   if (!ret)
-    warning ("Target does not support trace notes, stop note ignored");
+    warning (_("Target does not support trace notes, stop note ignored"));
 }
 
 /* Convert the memory pointed to by mem into hex, placing result in buf.
@@ -3343,7 +3377,7 @@ free_uploaded_tps (struct uploaded_tp **utpp)
 /* Given a number and address, return an uploaded tracepoint with that
    number, creating if necessary.  */
 
-struct uploaded_tsv *
+static struct uploaded_tsv *
 get_uploaded_tsv (int num, struct uploaded_tsv **utsvp)
 {
   struct uploaded_tsv *utsv;
@@ -3390,7 +3424,7 @@ cond_string_is_same (char *str1, char *str2)
    toggle that freely, and may have done so in anticipation of the
    next trace run.  Return the location of matched tracepoint.  */
 
-struct bp_location *
+static struct bp_location *
 find_matching_tracepoint_location (struct uploaded_tp *utp)
 {
   VEC(breakpoint_p) *tp_vec = all_tracepoints ();
@@ -3473,7 +3507,7 @@ merge_uploaded_tracepoints (struct uploaded_tp **uploaded_tps)
 /* Trace state variables don't have much to identify them beyond their
    name, so just use that to detect matches.  */
 
-struct trace_state_variable *
+static struct trace_state_variable *
 find_matching_tsv (struct uploaded_tsv *utsv)
 {
   if (!utsv->name)
@@ -3482,7 +3516,7 @@ find_matching_tsv (struct uploaded_tsv *utsv)
   return find_trace_state_variable (utsv->name);
 }
 
-struct trace_state_variable *
+static struct trace_state_variable *
 create_tsv_from_upload (struct uploaded_tsv *utsv)
 {
   const char *namebase;
@@ -4387,9 +4421,7 @@ tfile_fetch_registers (struct target_ops *ops,
 		       struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
-  char block_type;
-  int pos, offset, regn, regsize, pc_regno;
-  unsigned short mlen;
+  int offset, regn, regsize, pc_regno;
   char *regs;
 
   /* An uninitialized reg size says we're not going to be
@@ -4700,6 +4732,20 @@ init_tfile_ops (void)
   tfile_ops.to_magic = OPS_MAGIC;
 }
 
+void
+free_current_marker (void *arg)
+{
+  struct static_tracepoint_marker **marker_p = arg;
+
+  if (*marker_p != NULL)
+    {
+      release_static_tracepoint_marker (*marker_p);
+      xfree (*marker_p);
+    }
+  else
+    *marker_p = NULL;
+}
+
 /* Given a line of text defining a static tracepoint marker, parse it
    into a "static tracepoint marker" object.  Throws an error is
    parsing fails.  If PP is non-null, it points to one past the end of
@@ -4762,8 +4808,6 @@ print_one_static_tracepoint_marker (int count,
   char wrap_indent[80];
   char extra_field_indent[80];
   struct ui_out *uiout = current_uiout;
-  struct ui_stream *stb = ui_out_stream_new (uiout);
-  struct cleanup *old_chain = make_cleanup_ui_out_stream_delete (stb);
   struct cleanup *bkpt_chain;
   VEC(breakpoint_p) *tracepoints;
 
@@ -4870,7 +4914,6 @@ print_one_static_tracepoint_marker (int count,
   VEC_free (breakpoint_p, tracepoints);
 
   do_cleanups (bkpt_chain);
-  do_cleanups (old_chain);
 }
 
 static void
@@ -4881,6 +4924,12 @@ info_static_tracepoint_markers_command (char *arg, int from_tty)
   struct static_tracepoint_marker *marker;
   struct ui_out *uiout = current_uiout;
   int i;
+
+  /* We don't have to check target_can_use_agent and agent's capability on
+     static tracepoint here, in order to be compatible with older GDBserver.
+     We don't check USE_AGENT is true or not, because static tracepoints
+     don't work without in-process agent, so we don't bother users to type
+     `set agent on' when to use static tracepoint.  */
 
   old_chain
     = make_cleanup_ui_out_table_begin_end (uiout, 5, -1,
@@ -4925,7 +4974,8 @@ info_static_tracepoint_markers_command (char *arg, int from_tty)
    available.  */
 
 static struct value *
-sdata_make_value (struct gdbarch *gdbarch, struct internalvar *var)
+sdata_make_value (struct gdbarch *gdbarch, struct internalvar *var,
+		  void *ignore)
 {
   LONGEST size;
   gdb_byte *buf;
@@ -5051,7 +5101,7 @@ parse_traceframe_info (const char *tframe_info)
    This is where we avoid re-fetching the object from the target if we
    already have it cached.  */
 
-struct traceframe_info *
+static struct traceframe_info *
 get_traceframe_info (void)
 {
   if (traceframe_info == NULL)
@@ -5104,6 +5154,15 @@ traceframe_available_memory (VEC(mem_range_s) **result,
   return 0;
 }
 
+/* Implementation of `sdata' variable.  */
+
+static const struct internalvar_funcs sdata_funcs =
+{
+  sdata_make_value,
+  NULL,
+  NULL
+};
+
 /* module initialization */
 void
 _initialize_tracepoint (void)
@@ -5114,7 +5173,7 @@ _initialize_tracepoint (void)
      value with a void typed value, and when we get here, gdbarch
      isn't initialized yet.  At this point, we're quite sure there
      isn't another convenience variable of the same name.  */
-  create_internalvar_type_lazy ("_sdata", sdata_make_value);
+  create_internalvar_type_lazy ("_sdata", &sdata_funcs, NULL);
 
   traceframe_number = -1;
   tracepoint_number = -1;

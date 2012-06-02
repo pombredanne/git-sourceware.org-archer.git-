@@ -417,7 +417,7 @@ cd_command (char *dir, int from_tty)
     {
       if (IS_DIR_SEPARATOR (p[0]) && p[1] == '.'
 	  && (p[2] == 0 || IS_DIR_SEPARATOR (p[2])))
-	strcpy (p, p + 2);
+	memmove (p, p + 2, strlen (p + 2) + 1);
       else if (IS_DIR_SEPARATOR (p[0]) && p[1] == '.' && p[2] == '.'
 	       && (p[3] == 0 || IS_DIR_SEPARATOR (p[3])))
 	{
@@ -436,7 +436,7 @@ cd_command (char *dir, int from_tty)
 		++p;
 	      else
 		{
-		  strcpy (q - 1, p + 3);
+		  memmove (q - 1, p + 3, strlen (p + 3) + 1);
 		  p = q - 1;
 		}
 	    }
@@ -1241,7 +1241,8 @@ show_user (char *args, int from_tty)
       char *comname = args;
 
       c = lookup_cmd (&comname, cmdlist, "", 0, 1);
-      if (c->class != class_user)
+      /* c->user_commands would be NULL if it's a python command.  */
+      if (c->class != class_user || !c->user_commands)
 	error (_("Not a user command."));
       show_user_1 (c, "", args, gdb_stdout);
     }
@@ -1424,7 +1425,6 @@ alias_command (char *args, int from_tty)
     }
   else
     {
-      int i;
       dyn_string_t alias_prefix_dyn_string, command_prefix_dyn_string;
       char *alias_prefix, *command_prefix;
       struct cmd_list_element *c_alias, *c_command;
@@ -1912,7 +1912,7 @@ Two arguments (separated by a comma) are taken as a range of memory to dump,\n\
 Run the ``make'' program using the rest of the line as arguments."));
   set_cmd_completer (c, filename_completer);
   add_cmd ("user", no_class, show_user, _("\
-Show definitions of user defined commands.\n\
+Show definitions of non-python user defined commands.\n\
 Argument is the name of the user defined command.\n\
 With no argument, show definitions of all user defined commands."), &showlist);
   add_com ("apropos", class_support, apropos_command,
@@ -1920,8 +1920,8 @@ With no argument, show definitions of all user defined commands."), &showlist);
 
   add_setshow_integer_cmd ("max-user-call-depth", no_class,
 			   &max_user_call_depth, _("\
-Set the max call depth for user-defined commands."), _("\
-Show the max call depth for user-defined commands."), NULL,
+Set the max call depth for non-python user-defined commands."), _("\
+Show the max call depth for non-python user-defined commands."), NULL,
 			   NULL,
 			   show_max_user_call_depth,
 			   &setlist, &showlist);

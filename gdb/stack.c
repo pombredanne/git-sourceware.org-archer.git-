@@ -210,10 +210,10 @@ print_frame_arg (const struct frame_arg *arg)
   struct ui_out *uiout = current_uiout;
   volatile struct gdb_exception except;
   struct cleanup *old_chain;
-  struct ui_stream *stb;
+  struct ui_file *stb;
 
-  stb = ui_out_stream_new (uiout);
-  old_chain = make_cleanup_ui_out_stream_delete (stb);
+  stb = mem_fileopen ();
+  old_chain = make_cleanup_ui_file_delete (stb);
 
   gdb_assert (!arg->val || !arg->error);
   gdb_assert (arg->entry_kind == print_entry_values_no
@@ -224,21 +224,21 @@ print_frame_arg (const struct frame_arg *arg)
   annotate_arg_begin ();
 
   make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
-  fprintf_symbol_filtered (stb->stream, SYMBOL_PRINT_NAME (arg->sym),
+  fprintf_symbol_filtered (stb, SYMBOL_PRINT_NAME (arg->sym),
 			   SYMBOL_LANGUAGE (arg->sym), DMGL_PARAMS | DMGL_ANSI);
   if (arg->entry_kind == print_entry_values_compact)
     {
       /* It is OK to provide invalid MI-like stream as with
 	 PRINT_ENTRY_VALUE_COMPACT we never use MI.  */
-      fputs_filtered ("=", stb->stream);
+      fputs_filtered ("=", stb);
 
-      fprintf_symbol_filtered (stb->stream, SYMBOL_PRINT_NAME (arg->sym),
+      fprintf_symbol_filtered (stb, SYMBOL_PRINT_NAME (arg->sym),
 			       SYMBOL_LANGUAGE (arg->sym),
 			       DMGL_PARAMS | DMGL_ANSI);
     }
   if (arg->entry_kind == print_entry_values_only
       || arg->entry_kind == print_entry_values_compact)
-    fputs_filtered ("@entry", stb->stream);
+    fputs_filtered ("@entry", stb);
   ui_out_field_stream (uiout, "name", stb);
   annotate_arg_name_end ();
   ui_out_text (uiout, "=");
@@ -279,17 +279,17 @@ print_frame_arg (const struct frame_arg *arg)
 	      /* True in "summary" mode, false otherwise.  */
 	      opts.summary = !strcmp (print_frame_arguments, "scalars");
 
-	      common_val_print (arg->val, stb->stream, 2, &opts, language);
+	      common_val_print (arg->val, stb, 2, &opts, language);
 	    }
 	}
       if (except.message)
-	fprintf_filtered (stb->stream, _("<error reading variable: %s>"),
+	fprintf_filtered (stb, _("<error reading variable: %s>"),
 			  except.message);
     }
 
   ui_out_field_stream (uiout, "value", stb);
 
-  /* Aleo invoke ui_out_tuple_end.  */
+  /* Also invoke ui_out_tuple_end.  */
   do_cleanups (old_chain);
 
   annotate_arg_end ();
@@ -499,20 +499,20 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
   long highest_offset = -1;
   /* Number of ints of arguments that we have printed so far.  */
   int args_printed = 0;
-  struct cleanup *old_chain, *list_chain;
-  struct ui_stream *stb;
+  struct cleanup *old_chain;
+  struct ui_file *stb;
   /* True if we should print arguments, false otherwise.  */
   int print_args = strcmp (print_frame_arguments, "none");
   /* True in "summary" mode, false otherwise.  */
   int summary = !strcmp (print_frame_arguments, "scalars");
 
-  stb = ui_out_stream_new (uiout);
-  old_chain = make_cleanup_ui_out_stream_delete (stb);
+  stb = mem_fileopen ();
+  old_chain = make_cleanup_ui_file_delete (stb);
 
   if (func)
     {
       struct block *b = SYMBOL_BLOCK_VALUE (func);
-      struct dict_iterator iter;
+      struct block_iterator iter;
       struct symbol *sym;
 
       ALL_BLOCK_SYMBOLS (b, iter, sym)
@@ -909,6 +909,12 @@ set_last_displayed_sal (int valid, struct program_space *pspace,
   last_displayed_addr = addr;
   last_displayed_symtab = symtab;
   last_displayed_line = line;
+  if (valid && pspace == NULL)
+    {
+      clear_last_displayed_sal ();
+      internal_error (__FILE__, __LINE__,
+		      _("Trying to set NULL pspace."));
+    }
 }
 
 /* Forget the last sal we displayed.  */
@@ -1097,7 +1103,7 @@ print_frame (struct frame_info *frame, int print_level,
   struct ui_out *uiout = current_uiout;
   const char *funname = NULL;
   enum language funlang = language_unknown;
-  struct ui_stream *stb;
+  struct ui_file *stb;
   struct cleanup *old_chain, *list_chain;
   struct value_print_options opts;
   struct symbol *func;
@@ -1106,8 +1112,8 @@ print_frame (struct frame_info *frame, int print_level,
 
   pc_p = get_frame_pc_if_available (frame, &pc);
 
-  stb = ui_out_stream_new (uiout);
-  old_chain = make_cleanup_ui_out_stream_delete (stb);
+  stb = mem_fileopen ();
+  old_chain = make_cleanup_ui_file_delete (stb);
 
   find_frame_funname (frame, &funname, &funlang, &func);
 
@@ -1137,7 +1143,7 @@ print_frame (struct frame_info *frame, int print_level,
 	ui_out_text (uiout, " in ");
       }
   annotate_frame_function_name ();
-  fprintf_symbol_filtered (stb->stream, funname ? funname : "??",
+  fprintf_symbol_filtered (stb, funname ? funname : "??",
 			   funlang, DMGL_ANSI);
   ui_out_field_stream (uiout, "func", stb);
   ui_out_wrap_hint (uiout, "   ");
@@ -1815,7 +1821,7 @@ iterate_over_block_locals (struct block *b,
 			   iterate_over_block_arg_local_vars_cb cb,
 			   void *cb_data)
 {
-  struct dict_iterator iter;
+  struct block_iterator iter;
   struct symbol *sym;
 
   ALL_BLOCK_SYMBOLS (b, iter, sym)
@@ -1852,7 +1858,7 @@ static int
 print_block_frame_labels (struct gdbarch *gdbarch, struct block *b,
 			  int *have_default, struct ui_file *stream)
 {
-  struct dict_iterator iter;
+  struct block_iterator iter;
   struct symbol *sym;
   int values_printed = 0;
 
@@ -1984,7 +1990,7 @@ iterate_over_block_arg_vars (struct block *b,
 			     iterate_over_block_arg_local_vars_cb cb,
 			     void *cb_data)
 {
-  struct dict_iterator iter;
+  struct block_iterator iter;
   struct symbol *sym, *sym2;
 
   ALL_BLOCK_SYMBOLS (b, iter, sym)
@@ -2232,6 +2238,7 @@ return_command (char *retval_exp, int from_tty)
   struct gdbarch *gdbarch;
   struct symbol *thisfun;
   struct value *return_value = NULL;
+  struct value *function = NULL;
   const char *query_prefix = "";
 
   thisframe = get_selected_frame ("No selected frame.");
@@ -2276,6 +2283,9 @@ return_command (char *retval_exp, int from_tty)
       if (value_lazy (return_value))
 	value_fetch_lazy (return_value);
 
+      if (thisfun != NULL)
+	function = read_var_value (thisfun, thisframe);
+
       if (TYPE_CODE (return_type) == TYPE_CODE_VOID)
 	/* If the return-type is "void", don't try to find the
            return-value's location.  However, do still evaluate the
@@ -2284,8 +2294,7 @@ return_command (char *retval_exp, int from_tty)
            occur.  */
 	return_value = NULL;
       else if (thisfun != NULL
-	       && using_struct_return (gdbarch,
-				       SYMBOL_TYPE (thisfun), return_type))
+	       && using_struct_return (gdbarch, function, return_type))
 	{
 	  query_prefix = "The location at which to store the "
 	    "function's return value is unknown.\n"
@@ -2320,12 +2329,11 @@ return_command (char *retval_exp, int from_tty)
     {
       struct type *return_type = value_type (return_value);
       struct gdbarch *gdbarch = get_regcache_arch (get_current_regcache ());
-      struct type *func_type = thisfun == NULL ? NULL : SYMBOL_TYPE (thisfun);
 
-      gdb_assert (gdbarch_return_value (gdbarch, func_type, return_type, NULL,
+      gdb_assert (gdbarch_return_value (gdbarch, function, return_type, NULL,
 					NULL, NULL)
 		  == RETURN_VALUE_REGISTER_CONVENTION);
-      gdbarch_return_value (gdbarch, func_type, return_type,
+      gdbarch_return_value (gdbarch, function, return_type,
 			    get_current_regcache (), NULL /*read*/,
 			    value_contents (return_value) /*write*/);
     }

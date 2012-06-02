@@ -95,8 +95,6 @@ static void gen_int_literal (struct agent_expr *ax,
 			     struct axs_value *value,
 			     LONGEST k, struct type *type);
 
-
-static void require_rvalue (struct agent_expr *ax, struct axs_value *value);
 static void gen_usual_unary (struct expression *exp, struct agent_expr *ax,
 			     struct axs_value *value);
 static int type_wider_than (struct type *type1, struct type *type2);
@@ -157,8 +155,6 @@ static void gen_repeat (struct expression *exp, union exp_element **pc,
 static void gen_sizeof (struct expression *exp, union exp_element **pc,
 			struct agent_expr *ax, struct axs_value *value,
 			struct type *size_type);
-static void gen_expr (struct expression *exp, union exp_element **pc,
-		      struct agent_expr *ax, struct axs_value *value);
 static void gen_expr_binop_rest (struct expression *exp,
 				 enum exp_opcode op, union exp_element **pc,
 				 struct agent_expr *ax,
@@ -515,6 +511,9 @@ gen_fetch (struct agent_expr *ax, struct type *type)
       ax_trace_quick (ax, TYPE_LENGTH (type));
     }
 
+  if (TYPE_CODE (type) == TYPE_CODE_RANGE)
+    type = TYPE_TARGET_TYPE (type);
+
   switch (TYPE_CODE (type))
     {
     case TYPE_CODE_PTR:
@@ -553,12 +552,11 @@ gen_fetch (struct agent_expr *ax, struct type *type)
       break;
 
     default:
-      /* Either our caller shouldn't have asked us to dereference that
-         pointer (other code's fault), or we're not implementing
-         something we should be (this code's fault).  In any case,
-         it's a bug the user shouldn't see.  */
-      internal_error (__FILE__, __LINE__,
-		      _("gen_fetch: bad type code"));
+      /* Our caller requested us to dereference a pointer from an unsupported
+	 type.  Error out and give callers a chance to handle the failure
+	 gracefully.  */
+      error (_("gen_fetch: Unsupported type code `%s'."),
+	     TYPE_NAME (type));
     }
 }
 
@@ -789,7 +787,7 @@ gen_int_literal (struct agent_expr *ax, struct axs_value *value, LONGEST k,
 /* Take what's on the top of the stack (as described by VALUE), and
    try to make an rvalue out of it.  Signal an error if we can't do
    that.  */
-static void
+void
 require_rvalue (struct agent_expr *ax, struct axs_value *value)
 {
   /* Only deal with scalars, structs and such may be too large
@@ -878,12 +876,6 @@ gen_usual_unary (struct expression *exp, struct agent_expr *ax,
     case TYPE_CODE_STRUCT:
     case TYPE_CODE_UNION:
       return;
-
-      /* If the value is an enum or a bool, call it an integer.  */
-    case TYPE_CODE_ENUM:
-    case TYPE_CODE_BOOL:
-      value->type = builtin_type (exp->gdbarch)->builtin_int;
-      break;
     }
 
   /* If the value is an lvalue, dereference it.  */
@@ -1807,7 +1799,7 @@ gen_sizeof (struct expression *exp, union exp_element **pc,
 /* XXX: i18n */
 /* A gen_expr function written by a Gen-X'er guy.
    Append code for the subexpression of EXPR starting at *POS_P to AX.  */
-static void
+void
 gen_expr (struct expression *exp, union exp_element **pc,
 	  struct agent_expr *ax, struct axs_value *value)
 {
@@ -2042,7 +2034,8 @@ gen_expr (struct expression *exp, union exp_element **pc,
 
     case OP_INTERNALVAR:
       {
-	const char *name = internalvar_name ((*pc)[1].internalvar);
+	struct internalvar *var = (*pc)[1].internalvar;
+	const char *name = internalvar_name (var);
 	struct trace_state_variable *tsv;
 
 	(*pc) += 3;
@@ -2056,7 +2049,7 @@ gen_expr (struct expression *exp, union exp_element **pc,
 	    value->kind = axs_rvalue;
 	    value->type = builtin_type (exp->gdbarch)->builtin_long_long;
 	  }
-	else
+	else if (! compile_internalvar_to_ax (var, ax, value))
 	  error (_("$%s is not a trace state variable; GDB agent "
 		   "expressions cannot use convenience variables."), name);
       }
@@ -2178,7 +2171,6 @@ gen_expr (struct expression *exp, union exp_element **pc,
 
     case OP_THIS:
       {
-	char *this_name;
 	struct symbol *sym, *func;
 	struct block *b;
 	const struct language_defn *lang;
@@ -2221,7 +2213,7 @@ gen_expr (struct expression *exp, union exp_element **pc,
 
     default:
       error (_("Unsupported operator %s (%d) in expression."),
-	     op_string (op), op);
+	     op_name (exp, op), op);
     }
 }
 

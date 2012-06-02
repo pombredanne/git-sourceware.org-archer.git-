@@ -55,6 +55,8 @@
 #include "continuations.h"
 #include "interps.h"
 #include "skip.h"
+#include "probe.h"
+#include "objfiles.h"
 
 /* Prototypes for local functions */
 
@@ -62,7 +64,7 @@ static void signals_info (char *, int);
 
 static void handle_command (char *, int);
 
-static void sig_print_info (enum target_signal);
+static void sig_print_info (enum gdb_signal);
 
 static void sig_print_header (void);
 
@@ -88,11 +90,11 @@ static int prepare_to_proceed (int);
 
 static void print_exited_reason (int exitstatus);
 
-static void print_signal_exited_reason (enum target_signal siggnal);
+static void print_signal_exited_reason (enum gdb_signal siggnal);
 
 static void print_no_history_reason (void);
 
-static void print_signal_received_reason (enum target_signal siggnal);
+static void print_signal_received_reason (enum gdb_signal siggnal);
 
 static void print_end_stepping_range_reason (void);
 
@@ -334,6 +336,15 @@ static unsigned char *signal_pass;
       if ((sigs)[signum]) \
 	(flags)[signum] = 0; \
   } while (0)
+
+/* Update the target's copy of SIGNAL_PROGRAM.  The sole purpose of
+   this function is to avoid exporting `signal_program'.  */
+
+void
+update_signals_program_target (void)
+{
+  target_program_signals ((int) GDB_SIGNAL_LAST, signal_program);
+}
 
 /* Value to pass to target_resume() to cause all threads to resume.  */
 
@@ -611,7 +622,7 @@ proceed_after_vfork_done (struct thread_info *thread,
       && is_running (thread->ptid)
       && !is_executing (thread->ptid)
       && !thread->stop_requested
-      && thread->suspend.stop_signal == TARGET_SIGNAL_0)
+      && thread->suspend.stop_signal == GDB_SIGNAL_0)
     {
       if (debug_infrun)
 	fprintf_unfiltered (gdb_stdlog,
@@ -620,7 +631,7 @@ proceed_after_vfork_done (struct thread_info *thread,
 
       switch_to_thread (thread->ptid);
       clear_proceed_status ();
-      proceed ((CORE_ADDR) -1, TARGET_SIGNAL_DEFAULT, 0);
+      proceed ((CORE_ADDR) -1, GDB_SIGNAL_DEFAULT, 0);
     }
 
   return 0;
@@ -739,6 +750,7 @@ handle_vfork_child_exec_or_exit (int exec)
 	  pspace = add_program_space (maybe_new_address_space ());
 	  set_current_program_space (pspace);
 	  inf->removable = 1;
+	  inf->symfile_flags = SYMFILE_NO_READ;
 	  clone_program_space (pspace, inf->vfork_parent->pspace);
 	  inf->pspace = pspace;
 	  inf->aspace = pspace->aspace;
@@ -900,10 +912,13 @@ follow_exec (ptid_t pid, char *execd_pathname)
      solib_create_inferior_hook below.  breakpoint_re_set would fail to insert
      the breakpoints with the zero displacement.  */
 
-  symbol_file_add (execd_pathname, SYMFILE_MAINLINE | SYMFILE_DEFER_BP_RESET,
+  symbol_file_add (execd_pathname,
+		   (inf->symfile_flags
+		    | SYMFILE_MAINLINE | SYMFILE_DEFER_BP_RESET),
 		   NULL, 0);
 
-  set_initial_language ();
+  if ((inf->symfile_flags & SYMFILE_NO_READ) == 0)
+    set_initial_language ();
 
 #ifdef SOLIB_CREATE_INFERIOR_HOOK
   SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
@@ -1283,6 +1298,7 @@ displaced_step_prepare (ptid_t ptid)
   ULONGEST len;
   struct displaced_step_closure *closure;
   struct displaced_step_inferior_state *displaced;
+  int status;
 
   /* We should never reach this function if the architecture does not
      support displaced stepping.  */
@@ -1343,7 +1359,12 @@ displaced_step_prepare (ptid_t ptid)
   displaced->step_saved_copy = xmalloc (len);
   ignore_cleanups = make_cleanup (free_current_contents,
 				  &displaced->step_saved_copy);
-  read_memory (copy, displaced->step_saved_copy, len);
+  status = target_read_memory (copy, displaced->step_saved_copy, len);
+  if (status != 0)
+    throw_error (MEMORY_ERROR,
+		 _("Error accessing memory address %s (%s) for "
+		   "displaced-stepping scratch space."),
+		 paddress (gdbarch, copy), safe_strerror (status));
   if (debug_displaced)
     {
       fprintf_unfiltered (gdb_stdlog, "displaced: saved %s: ",
@@ -1412,7 +1433,7 @@ displaced_step_restore (struct displaced_step_inferior_state *displaced,
 }
 
 static void
-displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
+displaced_step_fixup (ptid_t event_ptid, enum gdb_signal signal)
 {
   struct cleanup *old_cleanups;
   struct displaced_step_inferior_state *displaced
@@ -1432,7 +1453,7 @@ displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
   displaced_step_restore (displaced, displaced->step_ptid);
 
   /* Did the instruction complete successfully?  */
-  if (signal == TARGET_SIGNAL_TRAP)
+  if (signal == GDB_SIGNAL_TRAP)
     {
       /* Fix up the resulting state.  */
       gdbarch_displaced_step_fixup (displaced->step_gdbarch,
@@ -1503,9 +1524,9 @@ displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
 
 	  if (gdbarch_displaced_step_hw_singlestep (gdbarch,
 						    displaced->step_closure))
-	    target_resume (ptid, 1, TARGET_SIGNAL_0);
+	    target_resume (ptid, 1, GDB_SIGNAL_0);
 	  else
-	    target_resume (ptid, 0, TARGET_SIGNAL_0);
+	    target_resume (ptid, 0, GDB_SIGNAL_0);
 
 	  /* Done, we're stepping a thread.  */
 	  break;
@@ -1524,11 +1545,11 @@ displaced_step_fixup (ptid_t event_ptid, enum target_signal signal)
 
 	  if (debug_displaced)
 	    fprintf_unfiltered (gdb_stdlog,
-				"breakpoint is gone %s: step(%d)\n",
+				"displaced: breakpoint is gone: %s, step(%d)\n",
 				target_pid_to_str (tp->ptid), step);
 
-	  target_resume (ptid, step, TARGET_SIGNAL_0);
-	  tp->suspend.stop_signal = TARGET_SIGNAL_0;
+	  target_resume (ptid, step, GDB_SIGNAL_0);
+	  tp->suspend.stop_signal = GDB_SIGNAL_0;
 
 	  /* This request was discarded.  See if there's any other
 	     thread waiting for its turn.  */
@@ -1684,7 +1705,7 @@ user_visible_resume_ptid (int step)
    STEP nonzero if we should step (zero to continue instead).
    SIG is the signal to give the inferior (zero for none).  */
 void
-resume (int step, enum target_signal sig)
+resume (int step, enum gdb_signal sig)
 {
   int should_resume = 1;
   struct cleanup *old_cleanups = make_cleanup (resume_cleanups, 0);
@@ -1752,7 +1773,7 @@ a command like `return' or `jump' to continue execution."));
   if (use_displaced_stepping (gdbarch)
       && (tp->control.trap_expected
 	  || (step && gdbarch_software_single_step_p (gdbarch)))
-      && sig == TARGET_SIGNAL_0
+      && sig == GDB_SIGNAL_0
       && !current_inferior ()->waiting_for_vfork_done)
     {
       struct displaced_step_inferior_state *displaced;
@@ -1769,6 +1790,10 @@ a command like `return' or `jump' to continue execution."));
 	  discard_cleanups (old_cleanups);
 	  return;
 	}
+
+      /* Update pc to reflect the new address from which we will execute
+	 instructions due to displaced stepping.  */
+      pc = regcache_read_pc (get_thread_regcache (inferior_ptid));
 
       displaced = get_displaced_stepping_state (ptid_get_pid (inferior_ptid));
       step = gdbarch_displaced_step_hw_singlestep (gdbarch,
@@ -1804,7 +1829,7 @@ a command like `return' or `jump' to continue execution."));
      once we arrive back at the step-resume breakpoint, actually step
      over the breakpoint we originally wanted to step over.  */
   if (singlestep_breakpoints_inserted_p
-      && tp->control.trap_expected && sig != TARGET_SIGNAL_0)
+      && tp->control.trap_expected && sig != GDB_SIGNAL_0)
     {
       /* If we have nested signals or a pending signal is delivered
 	 immediately after a handler returns, might might already have
@@ -1900,7 +1925,7 @@ a command like `return' or `jump' to continue execution."));
 
       /* Avoid confusing the next resume, if the next stop/resume
 	 happens to apply to another thread.  */
-      tp->suspend.stop_signal = TARGET_SIGNAL_0;
+      tp->suspend.stop_signal = GDB_SIGNAL_0;
 
       /* Advise target which signals may be handled silently.  If we have
 	 removed breakpoints because we are stepping over one (which can
@@ -1912,7 +1937,7 @@ a command like `return' or `jump' to continue execution."));
 	  && !use_displaced_stepping (gdbarch))
 	target_pass_signals (0, NULL);
       else
-	target_pass_signals ((int) TARGET_SIGNAL_LAST, signal_pass);
+	target_pass_signals ((int) GDB_SIGNAL_LAST, signal_pass);
 
       target_resume (resume_ptid, step, sig);
     }
@@ -2018,10 +2043,10 @@ prepare_to_proceed (int step)
 
   /* Make sure we were stopped at a breakpoint.  */
   if (wait_status.kind != TARGET_WAITKIND_STOPPED
-      || (wait_status.value.sig != TARGET_SIGNAL_TRAP
-	  && wait_status.value.sig != TARGET_SIGNAL_ILL
-	  && wait_status.value.sig != TARGET_SIGNAL_SEGV
-	  && wait_status.value.sig != TARGET_SIGNAL_EMT))
+      || (wait_status.value.sig != GDB_SIGNAL_TRAP
+	  && wait_status.value.sig != GDB_SIGNAL_ILL
+	  && wait_status.value.sig != GDB_SIGNAL_SEGV
+	  && wait_status.value.sig != GDB_SIGNAL_EMT))
     {
       return 0;
     }
@@ -2085,7 +2110,7 @@ prepare_to_proceed (int step)
    You should call clear_proceed_status before calling proceed.  */
 
 void
-proceed (CORE_ADDR addr, enum target_signal siggnal, int step)
+proceed (CORE_ADDR addr, enum gdb_signal siggnal, int step)
 {
   struct regcache *regcache;
   struct gdbarch *gdbarch;
@@ -2213,17 +2238,17 @@ proceed (CORE_ADDR addr, enum target_signal siggnal, int step)
 	  if (last_thread)
 	    {
 	      tp->suspend.stop_signal = last_thread->suspend.stop_signal;
-	      last_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+	      last_thread->suspend.stop_signal = GDB_SIGNAL_0;
 	    }
 	}
     }
 
-  if (siggnal != TARGET_SIGNAL_DEFAULT)
+  if (siggnal != GDB_SIGNAL_DEFAULT)
     tp->suspend.stop_signal = siggnal;
   /* If this signal should not be seen by program,
      give it zero.  Used for debugging signals.  */
   else if (!signal_program[tp->suspend.stop_signal])
-    tp->suspend.stop_signal = TARGET_SIGNAL_0;
+    tp->suspend.stop_signal = GDB_SIGNAL_0;
 
   annotate_starting ();
 
@@ -2379,7 +2404,7 @@ static void handle_step_into_function (struct gdbarch *gdbarch,
 static void handle_step_into_function_backward (struct gdbarch *gdbarch,
 						struct execution_control_state *ecs);
 static void check_exception_resume (struct execution_control_state *,
-				    struct frame_info *, struct symbol *);
+				    struct frame_info *);
 
 static void stop_stepping (struct execution_control_state *ecs);
 static void prepare_to_wait (struct execution_control_state *ecs);
@@ -2421,7 +2446,7 @@ infrun_thread_stop_requested_callback (struct thread_info *info, void *arg)
       ecs->ptid = info->ptid;
       ecs->event_thread = find_thread_ptid (info->ptid);
       ecs->ws.kind = TARGET_WAITKIND_STOPPED;
-      ecs->ws.value.sig = TARGET_SIGNAL_0;
+      ecs->ws.value.sig = GDB_SIGNAL_0;
 
       handle_inferior_event (ecs);
 
@@ -2669,8 +2694,6 @@ void
 wait_for_inferior (void)
 {
   struct cleanup *old_cleanups;
-  struct execution_control_state ecss;
-  struct execution_control_state *ecs;
 
   if (debug_infrun)
     fprintf_unfiltered
@@ -2679,12 +2702,13 @@ wait_for_inferior (void)
   old_cleanups =
     make_cleanup (delete_step_thread_step_resume_breakpoint_cleanup, NULL);
 
-  ecs = &ecss;
-  memset (ecs, 0, sizeof (*ecs));
-
   while (1)
     {
+      struct execution_control_state ecss;
+      struct execution_control_state *ecs = &ecss;
       struct cleanup *old_chain;
+
+      memset (ecs, 0, sizeof (*ecs));
 
       overlay_cache_invalid = 1;
 
@@ -2923,7 +2947,7 @@ adjust_pc_after_break (struct execution_control_state *ecs)
   if (ecs->ws.kind != TARGET_WAITKIND_STOPPED)
     return;
 
-  if (ecs->ws.value.sig != TARGET_SIGNAL_TRAP)
+  if (ecs->ws.value.sig != GDB_SIGNAL_TRAP)
     return;
 
   /* In reverse execution, when a breakpoint is hit, the instruction
@@ -3087,13 +3111,13 @@ handle_syscall_event (struct execution_control_state *ecs)
       if (!ecs->random_signal)
 	{
 	  /* Catchpoint hit.  */
-	  ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_TRAP;
+	  ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_TRAP;
 	  return 0;
 	}
     }
 
   /* If no catchpoint triggered for this, then keep going.  */
-  ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+  ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_0;
   keep_going (ecs);
   return 1;
 }
@@ -3236,9 +3260,9 @@ handle_inferior_event (struct execution_control_state *ecs)
      for architectures like SPARC that place call dummies on the
      stack.  */
   if (ecs->ws.kind == TARGET_WAITKIND_STOPPED
-      && (ecs->ws.value.sig == TARGET_SIGNAL_ILL
-	  || ecs->ws.value.sig == TARGET_SIGNAL_SEGV
-	  || ecs->ws.value.sig == TARGET_SIGNAL_EMT))
+      && (ecs->ws.value.sig == GDB_SIGNAL_ILL
+	  || ecs->ws.value.sig == GDB_SIGNAL_SEGV
+	  || ecs->ws.value.sig == GDB_SIGNAL_EMT))
     {
       struct regcache *regcache = get_thread_regcache (ecs->ptid);
 
@@ -3248,7 +3272,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  if (debug_infrun)
 	    fprintf_unfiltered (gdb_stdlog,
 				"infrun: Treating signal as SIGTRAP\n");
-	  ecs->ws.value.sig = TARGET_SIGNAL_TRAP;
+	  ecs->ws.value.sig = GDB_SIGNAL_TRAP;
 	}
     }
 
@@ -3333,7 +3357,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  if (!ecs->random_signal)
 	    {
 	      /* A catchpoint triggered.  */
-	      ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_TRAP;
+	      ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_TRAP;
 	      goto process_event_stop_test;
 	    }
 
@@ -3341,7 +3365,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	     gdb of events.  This allows the user to get control
 	     and place breakpoints in initializer routines for
 	     dynamically loaded objects (among other things).  */
-	  ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+	  ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_0;
 	  if (stop_on_solib_events)
 	    {
 	      /* Make sure we print "Stopped due to solib-event" in
@@ -3364,7 +3388,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  if (stop_soon == NO_STOP_QUIETLY
 	      && !breakpoints_always_inserted_mode ())
 	    insert_breakpoints ();
-	  resume (0, TARGET_SIGNAL_0);
+	  resume (0, GDB_SIGNAL_0);
 	  prepare_to_wait (ecs);
 	  return;
 	}
@@ -3374,7 +3398,7 @@ handle_inferior_event (struct execution_control_state *ecs)
     case TARGET_WAITKIND_SPURIOUS:
       if (debug_infrun)
         fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_SPURIOUS\n");
-      resume (0, TARGET_SIGNAL_0);
+      resume (0, GDB_SIGNAL_0);
       prepare_to_wait (ecs);
       return;
 
@@ -3456,7 +3480,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	       has been done.  Perform cleanup for parent process here.  Note
 	       that this operation also cleans up the child process for vfork,
 	       because their pages are shared.  */
-	    displaced_step_fixup (ecs->ptid, TARGET_SIGNAL_TRAP);
+	    displaced_step_fixup (ecs->ptid, GDB_SIGNAL_TRAP);
 
 	    if (ecs->ws.kind == TARGET_WAITKIND_FORKED)
 	      {
@@ -3550,7 +3574,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  int follow_child
 	    = (follow_fork_mode_string == follow_fork_mode_child);
 
-	  ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+	  ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_0;
 
 	  should_resume = follow_fork ();
 
@@ -3584,7 +3608,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	    stop_stepping (ecs);
 	  return;
 	}
-      ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_TRAP;
+      ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_TRAP;
       goto process_event_stop_test;
 
     case TARGET_WAITKIND_VFORK_DONE:
@@ -3642,11 +3666,11 @@ handle_inferior_event (struct execution_control_state *ecs)
       /* If no catchpoint triggered for this, then keep going.  */
       if (ecs->random_signal)
 	{
-	  ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+	  ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_0;
 	  keep_going (ecs);
 	  return;
 	}
-      ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_TRAP;
+      ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_TRAP;
       goto process_event_stop_test;
 
       /* Be careful not to try to gather much state about a thread
@@ -3708,7 +3732,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 
       if (!ptid_equal (ecs->ptid, inferior_ptid))
 	context_switch (ecs->ptid);
-      target_resume (RESUME_ALL, 0, TARGET_SIGNAL_0);
+      target_resume (RESUME_ALL, 0, GDB_SIGNAL_0);
       prepare_to_wait (ecs);
       return;
     }
@@ -3726,8 +3750,8 @@ handle_inferior_event (struct execution_control_state *ecs)
 	 SIG0 (generic unsignaled stop).  */
 
       if (ecs->event_thread->stop_requested
-	  && ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP)
-	ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+	  && ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP)
+	ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_0;
     }
 
   stop_pc = regcache_read_pc (get_thread_regcache (ecs->ptid));
@@ -3771,7 +3795,7 @@ handle_inferior_event (struct execution_control_state *ecs)
       /* We've either finished single-stepping past the single-step
          breakpoint, or stopped for some other reason.  It would be nice if
          we could tell, but we can't reliably.  */
-      if (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP)
+      if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP)
 	{
 	  if (debug_infrun)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3788,7 +3812,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  if (deprecated_context_hook)
 	    deprecated_context_hook (pid_to_thread_id (ecs->ptid));
 
-	  resume (1, TARGET_SIGNAL_0);
+	  resume (1, GDB_SIGNAL_0);
 	  prepare_to_wait (ecs);
 	  return;
 	}
@@ -3801,7 +3825,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 
       /* If we stopped for some other reason than single-stepping, ignore
 	 the fact that we were supposed to switch back.  */
-      if (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP)
+      if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP)
 	{
 	  if (debug_infrun)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3823,7 +3847,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  /* Suppress spurious "Switching to ..." message.  */
 	  previous_inferior_ptid = inferior_ptid;
 
-	  resume (1, TARGET_SIGNAL_0);
+	  resume (1, GDB_SIGNAL_0);
 	  prepare_to_wait (ecs);
 	  return;
 	}
@@ -3835,7 +3859,7 @@ handle_inferior_event (struct execution_control_state *ecs)
      another thread.  If so, then step that thread past the breakpoint,
      and continue it.  */
 
-  if (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP)
+  if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP)
     {
       int thread_hop_needed = 0;
       struct address_space *aspace = 
@@ -3891,7 +3915,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 
 	     if (new_singlestep_pc != singlestep_pc)
 	       {
-		 enum target_signal stop_signal;
+		 enum gdb_signal stop_signal;
 
 		 if (debug_infrun)
 		   fprintf_unfiltered (gdb_stdlog, "infrun: unexpected thread,"
@@ -3902,7 +3926,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 		    the context we want to use.  Just fudge our
 		    state and continue.  */
                  stop_signal = ecs->event_thread->suspend.stop_signal;
-                 ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+                 ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_0;
                  ecs->ptid = singlestep_ptid;
                  ecs->event_thread = find_thread_ptid (ecs->ptid);
                  ecs->event_thread->suspend.stop_signal = stop_signal;
@@ -4048,7 +4072,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	}
 	/* Single step */
       hw_step = maybe_software_singlestep (gdbarch, stop_pc);
-      target_resume (ecs->ptid, hw_step, TARGET_SIGNAL_0);
+      target_resume (ecs->ptid, hw_step, GDB_SIGNAL_0);
       waiton_ptid = ecs->ptid;
       if (target_have_steppable_watchpoint)
 	infwait_state = infwait_step_watch_state;
@@ -4090,7 +4114,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	 skip_inline_frames call would break things.  Fortunately
 	 that's an extremely unlikely scenario.  */
       if (!pc_at_non_inline_function (aspace, stop_pc, &ecs->ws)
-          && !(ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP
+          && !(ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
                && ecs->event_thread->control.trap_expected
                && pc_at_non_inline_function (aspace,
                                              ecs->event_thread->prev_pc,
@@ -4098,7 +4122,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	skip_inline_frames (ecs->ptid);
     }
 
-  if (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP
+  if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
       && ecs->event_thread->control.trap_expected
       && gdbarch_single_step_through_delay_p (gdbarch)
       && currently_stepping (ecs->event_thread))
@@ -4142,11 +4166,11 @@ handle_inferior_event (struct execution_control_state *ecs)
      3) set ecs->random_signal to 1, and the decision between 1 and 2
      will be made according to the signal handling tables.  */
 
-  if (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP
+  if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
       || stop_soon == STOP_QUIETLY || stop_soon == STOP_QUIETLY_NO_SIGSTOP
       || stop_soon == STOP_QUIETLY_REMOTE)
     {
-      if (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP
+      if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
 	  && stop_after_trap)
 	{
           if (debug_infrun)
@@ -4180,19 +4204,19 @@ handle_inferior_event (struct execution_control_state *ecs)
 	 signal, so this is no exception.
 
 	 Also consider that the attach is complete when we see a
-	 TARGET_SIGNAL_0.  In non-stop mode, GDB will explicitly tell
+	 GDB_SIGNAL_0.  In non-stop mode, GDB will explicitly tell
 	 the target to stop all threads of the inferior, in case the
 	 low level attach operation doesn't stop them implicitly.  If
 	 they weren't stopped implicitly, then the stub will report a
-	 TARGET_SIGNAL_0, meaning: stopped for no particular reason
+	 GDB_SIGNAL_0, meaning: stopped for no particular reason
 	 other than GDB's request.  */
       if (stop_soon == STOP_QUIETLY_NO_SIGSTOP
-	  && (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_STOP
-	      || ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP
-	      || ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_0))
+	  && (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_STOP
+	      || ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
+	      || ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_0))
 	{
 	  stop_stepping (ecs);
-	  ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+	  ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_0;
 	  return;
 	}
 
@@ -4215,7 +4239,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	 set.  */
 
       if (debug_infrun
-	  && ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP
+	  && ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
 	  && !bpstat_explains_signal (ecs->event_thread->control.stop_bpstat)
 	  && stopped_by_watchpoint)
 	fprintf_unfiltered (gdb_stdlog,
@@ -4242,7 +4266,7 @@ handle_inferior_event (struct execution_control_state *ecs)
          be necessary for call dummies on a non-executable stack on
          SPARC.  */
 
-      if (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP)
+      if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP)
 	ecs->random_signal
 	  = !(bpstat_explains_signal (ecs->event_thread->control.stop_bpstat)
 	      || stopped_by_watchpoint
@@ -4255,7 +4279,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  ecs->random_signal = !bpstat_explains_signal
 				     (ecs->event_thread->control.stop_bpstat);
 	  if (!ecs->random_signal)
-	    ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_TRAP;
+	    ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_TRAP;
 	}
     }
 
@@ -4313,7 +4337,7 @@ process_event_stop_test:
 
       /* Clear the signal if it should not be passed.  */
       if (signal_program[ecs->event_thread->suspend.stop_signal] == 0)
-	ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+	ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_0;
 
       if (ecs->event_thread->prev_pc == stop_pc
 	  && ecs->event_thread->control.trap_expected
@@ -4343,7 +4367,7 @@ process_event_stop_test:
 	}
 
       if (ecs->event_thread->control.step_range_end != 0
-	  && ecs->event_thread->suspend.stop_signal != TARGET_SIGNAL_0
+	  && ecs->event_thread->suspend.stop_signal != GDB_SIGNAL_0
 	  && (ecs->event_thread->control.step_range_start <= stop_pc
 	      && stop_pc < ecs->event_thread->control.step_range_end)
 	  && frame_id_eq (get_stack_frame_id (frame),
@@ -4414,9 +4438,17 @@ process_event_stop_test:
 
 	if (what.is_longjmp)
 	  {
-	    if (!gdbarch_get_longjmp_target_p (gdbarch)
-		|| !gdbarch_get_longjmp_target (gdbarch,
-						frame, &jmp_buf_pc))
+	    struct value *arg_value;
+
+	    /* If we set the longjmp breakpoint via a SystemTap probe,
+	       then use it to extract the arguments.  The destination
+	       PC is the third argument to the probe.  */
+	    arg_value = probe_safe_evaluate_at_pc (frame, 2);
+	    if (arg_value)
+	      jmp_buf_pc = value_as_address (arg_value);
+	    else if (!gdbarch_get_longjmp_target_p (gdbarch)
+		     || !gdbarch_get_longjmp_target (gdbarch,
+						     frame, &jmp_buf_pc))
 	      {
 		if (debug_infrun)
 		  fprintf_unfiltered (gdb_stdlog,
@@ -4434,12 +4466,7 @@ process_event_stop_test:
 	    insert_longjmp_resume_breakpoint (gdbarch, jmp_buf_pc);
 	  }
 	else
-	  {
-	    struct symbol *func = get_frame_function (frame);
-
-	    if (func)
-	      check_exception_resume (ecs, frame, func);
-	  }
+	  check_exception_resume (ecs, frame);
 	keep_going (ecs);
 	return;
 
@@ -4607,7 +4634,7 @@ process_event_stop_test:
 	     breakpoint, and we simply need to step over that breakpoint
 	     to get it going again, do that first.  */
 	  if ((ecs->event_thread->control.trap_expected
-	       && ecs->event_thread->suspend.stop_signal != TARGET_SIGNAL_TRAP)
+	       && ecs->event_thread->suspend.stop_signal != GDB_SIGNAL_TRAP)
 	      || ecs->event_thread->stepping_over_breakpoint)
 	    {
 	      keep_going (ecs);
@@ -4789,6 +4816,48 @@ process_event_stop_test:
          or returning).  */
       keep_going (ecs);
       return;
+    }
+
+  /* If we're in the return path from a shared library trampoline,
+     we want to proceed through the trampoline when stepping.  */
+  /* macro/2012-04-25: This needs to come before the subroutine
+     call check below as on some targets return trampolines look
+     like subroutine calls (MIPS16 return thunks).  */
+  if (gdbarch_in_solib_return_trampoline (gdbarch,
+					  stop_pc, ecs->stop_func_name)
+      && ecs->event_thread->control.step_over_calls != STEP_OVER_NONE)
+    {
+      /* Determine where this trampoline returns.  */
+      CORE_ADDR real_stop_pc;
+
+      real_stop_pc = gdbarch_skip_trampoline_code (gdbarch, frame, stop_pc);
+
+      if (debug_infrun)
+	 fprintf_unfiltered (gdb_stdlog,
+			     "infrun: stepped into solib return tramp\n");
+
+      /* Only proceed through if we know where it's going.  */
+      if (real_stop_pc)
+	{
+	  /* And put the step-breakpoint there and go until there.  */
+	  struct symtab_and_line sr_sal;
+
+	  init_sal (&sr_sal);	/* initialize to zeroes */
+	  sr_sal.pc = real_stop_pc;
+	  sr_sal.section = find_pc_overlay (sr_sal.pc);
+	  sr_sal.pspace = get_frame_program_space (frame);
+
+	  /* Do not specify what the fp should be when we stop since
+	     on some machines the prologue is where the new fp value
+	     is established.  */
+	  insert_step_resume_breakpoint_at_sal (gdbarch,
+						sr_sal, null_frame_id);
+
+	  /* Restart without fiddling with the step ranges or
+	     other state.  */
+	  keep_going (ecs);
+	  return;
+	}
     }
 
   /* Check for subroutine calls.  The check for the current frame
@@ -4996,44 +5065,6 @@ process_event_stop_test:
 	  sr_sal.pspace = get_frame_program_space (frame);
 	  insert_step_resume_breakpoint_at_sal (gdbarch, 
 						sr_sal, null_frame_id);
-	  keep_going (ecs);
-	  return;
-	}
-    }
-
-  /* If we're in the return path from a shared library trampoline,
-     we want to proceed through the trampoline when stepping.  */
-  if (gdbarch_in_solib_return_trampoline (gdbarch,
-					  stop_pc, ecs->stop_func_name))
-    {
-      /* Determine where this trampoline returns.  */
-      CORE_ADDR real_stop_pc;
-
-      real_stop_pc = gdbarch_skip_trampoline_code (gdbarch, frame, stop_pc);
-
-      if (debug_infrun)
-	 fprintf_unfiltered (gdb_stdlog,
-			     "infrun: stepped into solib return tramp\n");
-
-      /* Only proceed through if we know where it's going.  */
-      if (real_stop_pc)
-	{
-	  /* And put the step-breakpoint there and go until there.  */
-	  struct symtab_and_line sr_sal;
-
-	  init_sal (&sr_sal);	/* initialize to zeroes */
-	  sr_sal.pc = real_stop_pc;
-	  sr_sal.section = find_pc_overlay (sr_sal.pc);
-	  sr_sal.pspace = get_frame_program_space (frame);
-
-	  /* Do not specify what the fp should be when we stop since
-	     on some machines the prologue is where the new fp value
-	     is established.  */
-	  insert_step_resume_breakpoint_at_sal (gdbarch,
-						sr_sal, null_frame_id);
-
-	  /* Restart without fiddling with the step ranges or
-	     other state.  */
 	  keep_going (ecs);
 	  return;
 	}
@@ -5515,10 +5546,45 @@ insert_exception_resume_breakpoint (struct thread_info *tp,
 
 	  bp = set_momentary_breakpoint_at_pc (get_frame_arch (frame),
 					       handler, bp_exception_resume);
+
+	  /* set_momentary_breakpoint_at_pc invalidates FRAME.  */
+	  frame = NULL;
+
 	  bp->thread = tp->num;
 	  inferior_thread ()->control.exception_resume_breakpoint = bp;
 	}
     }
+}
+
+/* A helper for check_exception_resume that sets an
+   exception-breakpoint based on a SystemTap probe.  */
+
+static void
+insert_exception_resume_from_probe (struct thread_info *tp,
+				    const struct probe *probe,
+				    struct objfile *objfile,
+				    struct frame_info *frame)
+{
+  struct value *arg_value;
+  CORE_ADDR handler;
+  struct breakpoint *bp;
+
+  arg_value = probe_safe_evaluate_at_pc (frame, 1);
+  if (!arg_value)
+    return;
+
+  handler = value_as_address (arg_value);
+
+  if (debug_infrun)
+    fprintf_unfiltered (gdb_stdlog,
+			"infrun: exception resume at %s\n",
+			paddress (get_objfile_arch (objfile),
+				  handler));
+
+  bp = set_momentary_breakpoint_at_pc (get_frame_arch (frame),
+				       handler, bp_exception_resume);
+  bp->thread = tp->num;
+  inferior_thread ()->control.exception_resume_breakpoint = bp;
 }
 
 /* This is called when an exception has been intercepted.  Check to
@@ -5527,14 +5593,33 @@ insert_exception_resume_breakpoint (struct thread_info *tp,
 
 static void
 check_exception_resume (struct execution_control_state *ecs,
-			struct frame_info *frame, struct symbol *func)
+			struct frame_info *frame)
 {
   volatile struct gdb_exception e;
+  struct objfile *objfile;
+  const struct probe *probe;
+  struct symbol *func;
+
+  /* First see if this exception unwinding breakpoint was set via a
+     SystemTap probe point.  If so, the probe has two arguments: the
+     CFA and the HANDLER.  We ignore the CFA, extract the handler, and
+     set a breakpoint there.  */
+  probe = find_probe_by_pc (get_frame_pc (frame), &objfile);
+  if (probe)
+    {
+      insert_exception_resume_from_probe (ecs->event_thread, probe,
+					  objfile, frame);
+      return;
+    }
+
+  func = get_frame_function (frame);
+  if (!func)
+    return;
 
   TRY_CATCH (e, RETURN_MASK_ERROR)
     {
       struct block *b;
-      struct dict_iterator iter;
+      struct block_iterator iter;
       struct symbol *sym;
       int argno = 0;
 
@@ -5599,7 +5684,7 @@ keep_going (struct execution_control_state *ecs)
      inferior and not return to debugger.  */
 
   if (ecs->event_thread->control.trap_expected
-      && ecs->event_thread->suspend.stop_signal != TARGET_SIGNAL_TRAP)
+      && ecs->event_thread->suspend.stop_signal != GDB_SIGNAL_TRAP)
     {
       /* We took a signal (which we are supposed to pass through to
 	 the inferior, else we'd not get here) and we haven't yet
@@ -5667,9 +5752,9 @@ keep_going (struct execution_control_state *ecs)
          simulator; the simulator then delivers the hardware
          equivalent of a SIGNAL_TRAP to the program being debugged.  */
 
-      if (ecs->event_thread->suspend.stop_signal == TARGET_SIGNAL_TRAP
+      if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
 	  && !signal_program[ecs->event_thread->suspend.stop_signal])
-	ecs->event_thread->suspend.stop_signal = TARGET_SIGNAL_0;
+	ecs->event_thread->suspend.stop_signal = GDB_SIGNAL_0;
 
       discard_cleanups (old_cleanups);
       resume (currently_stepping (ecs->event_thread),
@@ -5720,7 +5805,7 @@ print_end_stepping_range_reason (void)
 /* The inferior was terminated by a signal, print why it stopped.  */
 
 static void
-print_signal_exited_reason (enum target_signal siggnal)
+print_signal_exited_reason (enum gdb_signal siggnal)
 {
   struct ui_out *uiout = current_uiout;
 
@@ -5731,12 +5816,12 @@ print_signal_exited_reason (enum target_signal siggnal)
   ui_out_text (uiout, "\nProgram terminated with signal ");
   annotate_signal_name ();
   ui_out_field_string (uiout, "signal-name",
-		       target_signal_to_name (siggnal));
+		       gdb_signal_to_name (siggnal));
   annotate_signal_name_end ();
   ui_out_text (uiout, ", ");
   annotate_signal_string ();
   ui_out_field_string (uiout, "signal-meaning",
-		       target_signal_to_string (siggnal));
+		       gdb_signal_to_string (siggnal));
   annotate_signal_string_end ();
   ui_out_text (uiout, ".\n");
   ui_out_text (uiout, "The program no longer exists.\n");
@@ -5784,13 +5869,13 @@ print_exited_reason (int exitstatus)
    tells us to print about it.  */
 
 static void
-print_signal_received_reason (enum target_signal siggnal)
+print_signal_received_reason (enum gdb_signal siggnal)
 {
   struct ui_out *uiout = current_uiout;
 
   annotate_signal ();
 
-  if (siggnal == TARGET_SIGNAL_0 && !ui_out_is_mi_like_p (uiout))
+  if (siggnal == GDB_SIGNAL_0 && !ui_out_is_mi_like_p (uiout))
     {
       struct thread_info *t = inferior_thread ();
 
@@ -5808,12 +5893,12 @@ print_signal_received_reason (enum target_signal siggnal)
 	ui_out_field_string
 	  (uiout, "reason", async_reason_lookup (EXEC_ASYNC_SIGNAL_RECEIVED));
       ui_out_field_string (uiout, "signal-name",
-			   target_signal_to_name (siggnal));
+			   gdb_signal_to_name (siggnal));
       annotate_signal_name_end ();
       ui_out_text (uiout, ", ");
       annotate_signal_string ();
       ui_out_field_string (uiout, "signal-meaning",
-			   target_signal_to_string (siggnal));
+			   gdb_signal_to_string (siggnal));
       annotate_signal_string_end ();
     }
   ui_out_text (uiout, ".\n");
@@ -6123,7 +6208,7 @@ signal_cache_update (int signo)
 {
   if (signo == -1)
     {
-      for (signo = 0; signo < (int) TARGET_SIGNAL_LAST; signo++)
+      for (signo = 0; signo < (int) GDB_SIGNAL_LAST; signo++)
 	signal_cache_update (signo);
 
       return;
@@ -6172,9 +6257,9 @@ sig_print_header (void)
 }
 
 static void
-sig_print_info (enum target_signal oursig)
+sig_print_info (enum gdb_signal oursig)
 {
-  const char *name = target_signal_to_name (oursig);
+  const char *name = gdb_signal_to_name (oursig);
   int name_padding = 13 - strlen (name);
 
   if (name_padding <= 0)
@@ -6185,7 +6270,7 @@ sig_print_info (enum target_signal oursig)
   printf_filtered ("%s\t", signal_stop[oursig] ? "Yes" : "No");
   printf_filtered ("%s\t", signal_print[oursig] ? "Yes" : "No");
   printf_filtered ("%s\t\t", signal_program[oursig] ? "Yes" : "No");
-  printf_filtered ("%s\n", target_signal_to_string (oursig));
+  printf_filtered ("%s\n", gdb_signal_to_string (oursig));
 }
 
 /* Specify how various signals in the inferior should be handled.  */
@@ -6196,7 +6281,7 @@ handle_command (char *args, int from_tty)
   char **argv;
   int digits, wordlen;
   int sigfirst, signum, siglast;
-  enum target_signal oursig;
+  enum gdb_signal oursig;
   int allsigs;
   int nsigs;
   unsigned char *sigs;
@@ -6209,7 +6294,7 @@ handle_command (char *args, int from_tty)
 
   /* Allocate and zero an array of flags for which signals to handle.  */
 
-  nsigs = (int) TARGET_SIGNAL_LAST;
+  nsigs = (int) GDB_SIGNAL_LAST;
   sigs = (unsigned char *) alloca (nsigs);
   memset (sigs, 0, nsigs);
 
@@ -6283,11 +6368,11 @@ handle_command (char *args, int from_tty)
 	     SIGHUP, SIGINT, SIGALRM, etc. will work right anyway.  */
 
 	  sigfirst = siglast = (int)
-	    target_signal_from_command (atoi (*argv));
+	    gdb_signal_from_command (atoi (*argv));
 	  if ((*argv)[digits] == '-')
 	    {
 	      siglast = (int)
-		target_signal_from_command (atoi ((*argv) + digits + 1));
+		gdb_signal_from_command (atoi ((*argv) + digits + 1));
 	    }
 	  if (sigfirst > siglast)
 	    {
@@ -6299,8 +6384,8 @@ handle_command (char *args, int from_tty)
 	}
       else
 	{
-	  oursig = target_signal_from_name (*argv);
-	  if (oursig != TARGET_SIGNAL_UNKNOWN)
+	  oursig = gdb_signal_from_name (*argv);
+	  if (oursig != GDB_SIGNAL_UNKNOWN)
 	    {
 	      sigfirst = siglast = (int) oursig;
 	    }
@@ -6316,15 +6401,15 @@ handle_command (char *args, int from_tty)
 
       for (signum = sigfirst; signum >= 0 && signum <= siglast; signum++)
 	{
-	  switch ((enum target_signal) signum)
+	  switch ((enum gdb_signal) signum)
 	    {
-	    case TARGET_SIGNAL_TRAP:
-	    case TARGET_SIGNAL_INT:
+	    case GDB_SIGNAL_TRAP:
+	    case GDB_SIGNAL_INT:
 	      if (!allsigs && !sigs[signum])
 		{
 		  if (query (_("%s is used by the debugger.\n\
 Are you sure you want to change it? "),
-			     target_signal_to_name ((enum target_signal) signum)))
+			     gdb_signal_to_name ((enum gdb_signal) signum)))
 		    {
 		      sigs[signum] = 1;
 		    }
@@ -6335,9 +6420,9 @@ Are you sure you want to change it? "),
 		    }
 		}
 	      break;
-	    case TARGET_SIGNAL_0:
-	    case TARGET_SIGNAL_DEFAULT:
-	    case TARGET_SIGNAL_UNKNOWN:
+	    case GDB_SIGNAL_0:
+	    case GDB_SIGNAL_DEFAULT:
+	    case GDB_SIGNAL_UNKNOWN:
 	      /* Make sure that "all" doesn't print these.  */
 	      break;
 	    default:
@@ -6353,7 +6438,8 @@ Are you sure you want to change it? "),
     if (sigs[signum])
       {
 	signal_cache_update (-1);
-	target_pass_signals ((int) TARGET_SIGNAL_LAST, signal_pass);
+	target_pass_signals ((int) GDB_SIGNAL_LAST, signal_pass);
+	target_program_signals ((int) GDB_SIGNAL_LAST, signal_program);
 
 	if (from_tty)
 	  {
@@ -6393,9 +6479,9 @@ xdb_handle_command (char *args, int from_tty)
       if (argBuf)
 	{
 	  int validFlag = 1;
-	  enum target_signal oursig;
+	  enum gdb_signal oursig;
 
-	  oursig = target_signal_from_name (argv[0]);
+	  oursig = gdb_signal_from_name (argv[0]);
 	  memset (argBuf, 0, bufLen);
 	  if (strcmp (argv[1], "Q") == 0)
 	    sprintf (argBuf, "%s %s", argv[0], "noprint");
@@ -6436,6 +6522,15 @@ xdb_handle_command (char *args, int from_tty)
   do_cleanups (old_chain);
 }
 
+enum gdb_signal
+gdb_signal_from_command (int num)
+{
+  if (num >= 1 && num <= 15)
+    return (enum gdb_signal) num;
+  error (_("Only signals 1-15 are valid as numeric signals.\n\
+Use \"info signals\" for a list of symbolic signals."));
+}
+
 /* Print current contents of the tables set by the handle command.
    It is possible we should just be printing signals actually used
    by the current target (but for things to work right when switching
@@ -6444,19 +6539,19 @@ xdb_handle_command (char *args, int from_tty)
 static void
 signals_info (char *signum_exp, int from_tty)
 {
-  enum target_signal oursig;
+  enum gdb_signal oursig;
 
   sig_print_header ();
 
   if (signum_exp)
     {
       /* First see if this is a symbol name.  */
-      oursig = target_signal_from_name (signum_exp);
-      if (oursig == TARGET_SIGNAL_UNKNOWN)
+      oursig = gdb_signal_from_name (signum_exp);
+      if (oursig == GDB_SIGNAL_UNKNOWN)
 	{
 	  /* No, try numeric.  */
 	  oursig =
-	    target_signal_from_command (parse_and_eval_long (signum_exp));
+	    gdb_signal_from_command (parse_and_eval_long (signum_exp));
 	}
       sig_print_info (oursig);
       return;
@@ -6464,14 +6559,14 @@ signals_info (char *signum_exp, int from_tty)
 
   printf_filtered ("\n");
   /* These ugly casts brought to you by the native VAX compiler.  */
-  for (oursig = TARGET_SIGNAL_FIRST;
-       (int) oursig < (int) TARGET_SIGNAL_LAST;
-       oursig = (enum target_signal) ((int) oursig + 1))
+  for (oursig = GDB_SIGNAL_FIRST;
+       (int) oursig < (int) GDB_SIGNAL_LAST;
+       oursig = (enum gdb_signal) ((int) oursig + 1))
     {
       QUIT;
 
-      if (oursig != TARGET_SIGNAL_UNKNOWN
-	  && oursig != TARGET_SIGNAL_DEFAULT && oursig != TARGET_SIGNAL_0)
+      if (oursig != GDB_SIGNAL_UNKNOWN
+	  && oursig != GDB_SIGNAL_DEFAULT && oursig != GDB_SIGNAL_0)
 	sig_print_info (oursig);
     }
 
@@ -6561,7 +6656,8 @@ static const struct lval_funcs siginfo_value_funcs =
    if there's no object available.  */
 
 static struct value *
-siginfo_make_value (struct gdbarch *gdbarch, struct internalvar *var)
+siginfo_make_value (struct gdbarch *gdbarch, struct internalvar *var,
+		    void *ignore)
 {
   if (target_has_stack
       && !ptid_equal (inferior_ptid, null_ptid)
@@ -6642,8 +6738,8 @@ save_infcall_suspend_state (void)
   inf_state->inferior_suspend = inf->suspend;
 
   /* run_inferior_call will not use the signal due to its `proceed' call with
-     TARGET_SIGNAL_0 anyway.  */
-  tp->suspend.stop_signal = TARGET_SIGNAL_0;
+     GDB_SIGNAL_0 anyway.  */
+  tp->suspend.stop_signal = GDB_SIGNAL_0;
 
   inf_state->stop_pc = stop_pc;
 
@@ -6983,6 +7079,15 @@ show_schedule_multiple (struct ui_file *file, int from_tty,
 			    "of all processes is %s.\n"), value);
 }
 
+/* Implementation of `siginfo' variable.  */
+
+static const struct internalvar_funcs siginfo_funcs =
+{
+  siginfo_make_value,
+  NULL,
+  NULL
+};
+
 void
 _initialize_infrun (void)
 {
@@ -7076,7 +7181,7 @@ leave it stopped or free to run as needed."),
 			   &setlist,
 			   &showlist);
 
-  numsigs = (int) TARGET_SIGNAL_LAST;
+  numsigs = (int) GDB_SIGNAL_LAST;
   signal_stop = (unsigned char *) xmalloc (sizeof (signal_stop[0]) * numsigs);
   signal_print = (unsigned char *)
     xmalloc (sizeof (signal_print[0]) * numsigs);
@@ -7093,39 +7198,39 @@ leave it stopped or free to run as needed."),
 
   /* Signals caused by debugger's own actions
      should not be given to the program afterwards.  */
-  signal_program[TARGET_SIGNAL_TRAP] = 0;
-  signal_program[TARGET_SIGNAL_INT] = 0;
+  signal_program[GDB_SIGNAL_TRAP] = 0;
+  signal_program[GDB_SIGNAL_INT] = 0;
 
   /* Signals that are not errors should not normally enter the debugger.  */
-  signal_stop[TARGET_SIGNAL_ALRM] = 0;
-  signal_print[TARGET_SIGNAL_ALRM] = 0;
-  signal_stop[TARGET_SIGNAL_VTALRM] = 0;
-  signal_print[TARGET_SIGNAL_VTALRM] = 0;
-  signal_stop[TARGET_SIGNAL_PROF] = 0;
-  signal_print[TARGET_SIGNAL_PROF] = 0;
-  signal_stop[TARGET_SIGNAL_CHLD] = 0;
-  signal_print[TARGET_SIGNAL_CHLD] = 0;
-  signal_stop[TARGET_SIGNAL_IO] = 0;
-  signal_print[TARGET_SIGNAL_IO] = 0;
-  signal_stop[TARGET_SIGNAL_POLL] = 0;
-  signal_print[TARGET_SIGNAL_POLL] = 0;
-  signal_stop[TARGET_SIGNAL_URG] = 0;
-  signal_print[TARGET_SIGNAL_URG] = 0;
-  signal_stop[TARGET_SIGNAL_WINCH] = 0;
-  signal_print[TARGET_SIGNAL_WINCH] = 0;
-  signal_stop[TARGET_SIGNAL_PRIO] = 0;
-  signal_print[TARGET_SIGNAL_PRIO] = 0;
+  signal_stop[GDB_SIGNAL_ALRM] = 0;
+  signal_print[GDB_SIGNAL_ALRM] = 0;
+  signal_stop[GDB_SIGNAL_VTALRM] = 0;
+  signal_print[GDB_SIGNAL_VTALRM] = 0;
+  signal_stop[GDB_SIGNAL_PROF] = 0;
+  signal_print[GDB_SIGNAL_PROF] = 0;
+  signal_stop[GDB_SIGNAL_CHLD] = 0;
+  signal_print[GDB_SIGNAL_CHLD] = 0;
+  signal_stop[GDB_SIGNAL_IO] = 0;
+  signal_print[GDB_SIGNAL_IO] = 0;
+  signal_stop[GDB_SIGNAL_POLL] = 0;
+  signal_print[GDB_SIGNAL_POLL] = 0;
+  signal_stop[GDB_SIGNAL_URG] = 0;
+  signal_print[GDB_SIGNAL_URG] = 0;
+  signal_stop[GDB_SIGNAL_WINCH] = 0;
+  signal_print[GDB_SIGNAL_WINCH] = 0;
+  signal_stop[GDB_SIGNAL_PRIO] = 0;
+  signal_print[GDB_SIGNAL_PRIO] = 0;
 
   /* These signals are used internally by user-level thread
      implementations.  (See signal(5) on Solaris.)  Like the above
      signals, a healthy program receives and handles them as part of
      its normal operation.  */
-  signal_stop[TARGET_SIGNAL_LWP] = 0;
-  signal_print[TARGET_SIGNAL_LWP] = 0;
-  signal_stop[TARGET_SIGNAL_WAITING] = 0;
-  signal_print[TARGET_SIGNAL_WAITING] = 0;
-  signal_stop[TARGET_SIGNAL_CANCEL] = 0;
-  signal_print[TARGET_SIGNAL_CANCEL] = 0;
+  signal_stop[GDB_SIGNAL_LWP] = 0;
+  signal_print[GDB_SIGNAL_LWP] = 0;
+  signal_stop[GDB_SIGNAL_WAITING] = 0;
+  signal_print[GDB_SIGNAL_WAITING] = 0;
+  signal_stop[GDB_SIGNAL_CANCEL] = 0;
+  signal_print[GDB_SIGNAL_CANCEL] = 0;
 
   /* Update cached state.  */
   signal_cache_update (-1);
@@ -7271,7 +7376,7 @@ enabled by default on some platforms."),
      value with a void typed value, and when we get here, gdbarch
      isn't initialized yet.  At this point, we're quite sure there
      isn't another convenience variable of the same name.  */
-  create_internalvar_type_lazy ("_siginfo", siginfo_make_value);
+  create_internalvar_type_lazy ("_siginfo", &siginfo_funcs, NULL);
 
   add_setshow_boolean_cmd ("observer", no_class,
 			   &observer_mode_1, _("\

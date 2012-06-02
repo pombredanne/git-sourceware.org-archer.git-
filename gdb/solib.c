@@ -380,8 +380,6 @@ solib_bfd_fopen (char *pathname, int fd)
 
       if (abfd)
 	bfd_set_cacheable (abfd, 1);
-      else if (fd != -1)
-	close (fd);
     }
 
   if (!abfd)
@@ -591,6 +589,8 @@ solib_read_symbols (struct so_list *so, int flags)
   else
     {
       volatile struct gdb_exception e;
+
+      flags |= current_inferior ()->symfile_flags;
 
       TRY_CATCH (e, RETURN_MASK_ERROR)
 	{

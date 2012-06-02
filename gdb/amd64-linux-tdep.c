@@ -38,9 +38,12 @@
 #include "amd64-tdep.h"
 #include "solib-svr4.h"
 #include "xml-syscall.h"
+#include "glibc-tdep.h"
 
 #include "features/i386/amd64-linux.c"
 #include "features/i386/amd64-avx-linux.c"
+#include "features/i386/x32-linux.c"
+#include "features/i386/x32-avx-linux.c"
 
 /* The syscall's XML filename for i386.  */
 #define XML_SYSCALL_FILENAME_AMD64 "syscalls/amd64-linux.xml"
@@ -1225,10 +1228,10 @@ amd64_linux_syscall_record (struct regcache *regcache)
 #define AMD64_LINUX_xstate     512
 #define AMD64_LINUX_frame_size 560
 
-int
+static int
 amd64_linux_record_signal (struct gdbarch *gdbarch,
                            struct regcache *regcache,
-                           enum target_signal signal)
+                           enum gdb_signal signal)
 {
   ULONGEST rsp;
 
@@ -1272,9 +1275,15 @@ amd64_linux_core_read_description (struct gdbarch *gdbarch,
   switch ((xcr0 & I386_XSTATE_AVX_MASK))
     {
     case I386_XSTATE_AVX_MASK:
-      return tdesc_amd64_avx_linux;
+      if (gdbarch_ptr_bit (gdbarch) == 32)
+	return tdesc_x32_avx_linux;
+      else
+	return tdesc_amd64_avx_linux;
     default:
-      return tdesc_amd64_linux;
+      if (gdbarch_ptr_bit (gdbarch) == 32)
+	return tdesc_x32_linux;
+      else
+	return tdesc_amd64_linux;
     }
 }
 
@@ -1341,6 +1350,9 @@ amd64_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
   /* GNU/Linux uses SVR4-style shared libraries.  */
   set_gdbarch_skip_trampoline_code (gdbarch, find_solib_trampoline_target);
+
+  /* GNU/Linux uses the dynamic linker included in the GNU C Library.  */
+  set_gdbarch_skip_solib_resolver (gdbarch, glibc_skip_solib_resolver);
 
   /* Install supported register note sections.  */
   set_gdbarch_core_regset_sections (gdbarch, amd64_linux_regset_sections);
@@ -1545,4 +1557,6 @@ _initialize_amd64_linux_tdep (void)
   /* Initialize the Linux target description.  */
   initialize_tdesc_amd64_linux ();
   initialize_tdesc_amd64_avx_linux ();
+  initialize_tdesc_x32_linux ();
+  initialize_tdesc_x32_avx_linux ();
 }

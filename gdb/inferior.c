@@ -22,6 +22,7 @@
 #include "inferior.h"
 #include "target.h"
 #include "command.h"
+#include "completer.h"
 #include "gdbcmd.h"
 #include "gdbthread.h"
 #include "ui-out.h"
@@ -176,25 +177,6 @@ delete_thread_of_inferior (struct thread_info *tp, void *data)
     }
 
   return 0;
-}
-
-void
-delete_threads_of_inferior (int pid)
-{
-  struct inferior *inf;
-  struct delete_thread_of_inferior_arg arg;
-
-  for (inf = inferior_list; inf; inf = inf->next)
-    if (inf->pid == pid)
-      break;
-
-  if (!inf)
-    return;
-
-  arg.pid = pid;
-  arg.silent = 1;
-
-  iterate_over_threads (delete_thread_of_inferior, &arg);
 }
 
 /* If SILENT then be quiet -- don't announce a inferior death, or the
@@ -760,7 +742,7 @@ info_inferiors_command (char *args, int from_tty)
 
 /* remove-inferior ID */
 
-void
+static void
 remove_inferior_command (char *args, int from_tty)
 {
   int num;
@@ -819,7 +801,7 @@ add_inferior_with_spaces (void)
 
 /* add-inferior [-copies N] [-exec FILENAME]  */
 
-void
+static void
 add_inferior_command (char *args, int from_tty)
 {
   int i, copies = 1;
@@ -882,7 +864,7 @@ add_inferior_command (char *args, int from_tty)
 
 /* clone-inferior [-copies N] [ID] */
 
-void
+static void
 clone_inferior_command (char *args, int from_tty)
 {
   int i, copies = 1;
@@ -1075,6 +1057,8 @@ inferior_data (struct inferior *inf, const struct inferior_data *data)
 void
 initialize_inferiors (void)
 {
+  struct cmd_list_element *c = NULL;
+
   /* There's always one inferior.  Note that this function isn't an
      automatic _initialize_foo function, since other _initialize_foo
      routines may need to install their per-inferior data keys.  We
@@ -1088,12 +1072,13 @@ initialize_inferiors (void)
   add_info ("inferiors", info_inferiors_command, 
 	    _("IDs of specified inferiors (all inferiors if no argument)."));
 
-  add_com ("add-inferior", no_class, add_inferior_command, _("\
+  c = add_com ("add-inferior", no_class, add_inferior_command, _("\
 Add a new inferior.\n\
 Usage: add-inferior [-copies <N>] [-exec <FILENAME>]\n\
 N is the optional number of inferiors to add, default is 1.\n\
 FILENAME is the file name of the executable to use\n\
 as main program."));
+  set_cmd_completer (c, filename_completer);
 
   add_com ("remove-inferiors", no_class, remove_inferior_command, _("\
 Remove inferior ID (or list of IDs).\n\

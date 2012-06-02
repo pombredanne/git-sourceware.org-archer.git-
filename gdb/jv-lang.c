@@ -158,8 +158,9 @@ get_java_class_symtab (struct gdbarch *gdbarch)
       BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK) = bl;
 
       /* Allocate GLOBAL_BLOCK.  */
-      bl = allocate_block (&objfile->objfile_obstack);
+      bl = allocate_global_block (&objfile->objfile_obstack);
       BLOCK_DICT (bl) = dict_create_hashed_expandable ();
+      set_block_symtab (bl, class_symtab);
       BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK) = bl;
 
       /* Arrange to free the dict.  */
@@ -480,7 +481,7 @@ java_link_class_type (struct gdbarch *gdbarch,
       if (accflags & 0x0008)	/* ACC_STATIC */
 	SET_FIELD_PHYSADDR (TYPE_FIELD (type, i), boffset);
       else
-	TYPE_FIELD_BITPOS (type, i) = 8 * boffset;
+	SET_FIELD_BITPOS (TYPE_FIELD (type, i), 8 * boffset);
       if (accflags & 0x8000)	/* FIELD_UNRESOLVED_FLAG */
 	{
 	  TYPE_FIELD_TYPE (type, i) = get_java_object_type ();	/* FIXME */
@@ -1181,6 +1182,7 @@ const struct language_defn java_language_defn =
   default_print_typedef,	/* Print a typedef using appropriate syntax */
   java_val_print,		/* Print a value using appropriate syntax */
   java_value_print,		/* Print a top-level value */
+  default_read_var_value,	/* la_read_var_value */
   NULL,				/* Language specific skip_trampoline */
   "this",	                /* name_of_this */
   basic_lookup_symbol_nonlocal,	/* lookup_symbol_nonlocal */
