@@ -453,24 +453,26 @@ symbol_init_cplus_specific (struct general_symbol_info *gsymbol,
 }
 
 /* Set the demangled name of GSYMBOL to NAME.  NAME must be already
-   correctly allocated.  For C++ symbols a cplus_specific struct is
-   allocated so OBJFILE must not be NULL.  If this is a non C++ symbol
-   OBJFILE can be NULL.  */
+   correctly allocated.  */
 
 void
 symbol_set_demangled_name (struct general_symbol_info *gsymbol,
                            char *name,
                            struct objfile *objfile)
 {
+  gsymbol->use_cpp_specific_p = 0;
+  gsymbol->language_specific.demangled_name = name;
+#if 0
   if (gsymbol->language == language_cplus)
     {
       if (gsymbol->language_specific.cplus_specific == NULL)
 	symbol_init_cplus_specific (gsymbol, objfile);
 
-      gsymbol->language_specific.cplus_specific->demangled_name = name;
+      gsymbol->language_specific.demangled_name = name;
     }
   else
     gsymbol->language_specific.mangled_lang.demangled_name = name;
+#endif
 }
 
 /* Return the demangled name of GSYMBOL.  */
@@ -478,6 +480,8 @@ symbol_set_demangled_name (struct general_symbol_info *gsymbol,
 const char *
 symbol_get_demangled_name (const struct general_symbol_info *gsymbol)
 {
+  return gsymbol->language_specific.demangled_name;
+#if 0
   if (gsymbol->language == language_cplus)
     {
       if (gsymbol->language_specific.cplus_specific != NULL)
@@ -487,6 +491,7 @@ symbol_get_demangled_name (const struct general_symbol_info *gsymbol)
     }
   else
     return gsymbol->language_specific.mangled_lang.demangled_name;
+#endif
 }
 
 /* Set the search name of the give GSYMBOL to name.  */
@@ -500,6 +505,7 @@ symbol_set_cplus_search_name (struct general_symbol_info *gsymbol,
     symbol_init_cplus_specific (gsymbol, objfile);
 
   gsymbol->language_specific.cplus_specific->search_name = (char *) name;
+  gsymbol->use_cpp_specific_p = 1;
 }
 
 /* Get the search name of the give GSYMBOL.  */
@@ -507,9 +513,13 @@ symbol_set_cplus_search_name (struct general_symbol_info *gsymbol,
 static const char *
 symbol_get_cplus_search_name (const struct general_symbol_info *gsymbol)
 {
-  if (gsymbol->language_specific.cplus_specific != NULL
-      && gsymbol->language_specific.cplus_specific->search_name != NULL)
-    return gsymbol->language_specific.cplus_specific->search_name;
+  if (gsymbol->use_cpp_specific_p)
+    {
+      gdb_assert (gsymbol->language_specific.cplus_specific != NULL);
+      gdb_assert (gsymbol->language_specific.cplus_specific->search_name
+		  != NULL);
+      return gsymbol->language_specific.cplus_specific->search_name;
+    }
 
   return symbol_natural_name (gsymbol);
 }
@@ -525,6 +535,7 @@ symbol_set_language (struct general_symbol_info *gsymbol,
 {
   gsymbol->language = language;
   if (gsymbol->language == language_d
+      || gsymbol->language == language_cplus
       || gsymbol->language == language_go
       || gsymbol->language == language_java
       || gsymbol->language == language_objc
@@ -532,8 +543,10 @@ symbol_set_language (struct general_symbol_info *gsymbol,
     {
       symbol_set_demangled_name (gsymbol, NULL, NULL);
     }
+#if 0
   else if (gsymbol->language == language_cplus)
     gsymbol->language_specific.cplus_specific = NULL;
+#endif
   else
     {
       memset (&gsymbol->language_specific, 0,

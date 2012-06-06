@@ -81,14 +81,12 @@ struct probe;
 /* Struct for storing C++ specific information.  Allocated when needed.  */
 
 struct cplus_specific
-{
-  const char *demangled_name;
-
-  /* If the symbol name contains template parameters this is the name with
-     these parameters removed to be used during search.  Otherwise this
-     should be NULL, and the regular symbol name should be used.  */
-  char *search_name;
-};
+  {
+    /* If the symbol name contains template parameters this is the name with
+       these parameters removed to be used during search.  Otherwise this
+       should be NULL, and the regular symbol name should be used.  */
+    char *search_name;
+  };
 
 /* Define a structure for the information that is common to all symbol types,
    including minimal symbols, partial symbols, and full symbols.  In a
@@ -136,11 +134,8 @@ struct general_symbol_info
   {
     /* This is used by languages which wish to store a demangled name.
        currently used by Ada, Java, and Objective C.  */
-    struct mangled_lang
-    {
-      const char *demangled_name;
-    }
-    mangled_lang;
+
+    const char *demangled_name;
 
     struct cplus_specific *cplus_specific;
   }
@@ -151,6 +146,11 @@ struct general_symbol_info
      union above.  */
 
   ENUM_BITFIELD(language) language : 8;
+
+  /* This bit indicates whether this symbol uses the CPLUS_SPECIFIC field in
+     the union below or not.  */
+
+  unsigned int use_cpp_specific_p : 1;
 
   /* Which section is this symbol in?  This is an index into
      section_offsets for this objfile.  Negative means that the symbol
