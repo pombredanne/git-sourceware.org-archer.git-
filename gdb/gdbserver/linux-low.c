@@ -78,6 +78,8 @@
 
 #ifdef __UCLIBC__
 #if !(defined(__UCLIBC_HAS_MMU__) || defined(__ARCH_HAS_MMU__))
+/* PTRACE_TEXT_ADDR and friends.  */
+#include <asm/ptrace.h>
 #define HAS_NOMMU
 #endif
 #endif
@@ -1060,7 +1062,7 @@ linux_kill (int pid)
 static int
 get_detach_signal (struct thread_info *thread)
 {
-  enum target_signal signo = TARGET_SIGNAL_0;
+  enum gdb_signal signo = GDB_SIGNAL_0;
   int status;
   struct lwp_info *lp = get_thread_lwp (thread);
 
@@ -1072,7 +1074,7 @@ get_detach_signal (struct thread_info *thread)
 	 cleanly, then it'll have stopped with SIGSTOP.  But we don't
 	 want to deliver that SIGSTOP.  */
       if (thread->last_status.kind != TARGET_WAITKIND_STOPPED
-	  || thread->last_status.value.sig == TARGET_SIGNAL_0)
+	  || thread->last_status.value.sig == GDB_SIGNAL_0)
 	return 0;
 
       /* Otherwise, we may need to deliver the signal we
@@ -1100,7 +1102,7 @@ get_detach_signal (struct thread_info *thread)
       return 0;
     }
 
-  signo = target_signal_from_host (WSTOPSIG (status));
+  signo = gdb_signal_from_host (WSTOPSIG (status));
 
   if (program_signals_p && !program_signals[signo])
     {
@@ -1108,21 +1110,21 @@ get_detach_signal (struct thread_info *thread)
 	fprintf (stderr,
 		 "GPS: lwp %s had signal %s, but it is in nopass state\n",
 		 target_pid_to_str (ptid_of (lp)),
-		 target_signal_to_string (signo));
+		 gdb_signal_to_string (signo));
       return 0;
     }
   else if (!program_signals_p
 	   /* If we have no way to know which signals GDB does not
 	      want to have passed to the program, assume
 	      SIGTRAP/SIGINT, which is GDB's default.  */
-	   && (signo == TARGET_SIGNAL_TRAP || signo == TARGET_SIGNAL_INT))
+	   && (signo == GDB_SIGNAL_TRAP || signo == GDB_SIGNAL_INT))
     {
       if (debug_threads)
 	fprintf (stderr,
 		 "GPS: lwp %s had signal %s, "
 		 "but we don't know if we should pass it.  Default to not.\n",
 		 target_pid_to_str (ptid_of (lp)),
-		 target_signal_to_string (signo));
+		 gdb_signal_to_string (signo));
       return 0;
     }
   else
@@ -1131,7 +1133,7 @@ get_detach_signal (struct thread_info *thread)
 	fprintf (stderr,
 		 "GPS: lwp %s has pending signal %s: delivering it.\n",
 		 target_pid_to_str (ptid_of (lp)),
-		 target_signal_to_string (signo));
+		 gdb_signal_to_string (signo));
 
       return WSTOPSIG (status);
     }
@@ -2260,10 +2262,10 @@ linux_stabilize_threads (void)
 	  /* Lock it.  */
 	  lwp->suspended++;
 
-	  if (ourstatus.value.sig != TARGET_SIGNAL_0
+	  if (ourstatus.value.sig != GDB_SIGNAL_0
 	      || current_inferior->last_resume_kind == resume_stop)
 	    {
-	      wstat = W_STOPCODE (target_signal_to_host (ourstatus.value.sig));
+	      wstat = W_STOPCODE (gdb_signal_to_host (ourstatus.value.sig));
 	      enqueue_one_deferred_signal (lwp, &wstat);
 	    }
 	}
@@ -2384,7 +2386,7 @@ retry:
 	  else
 	    {
 	      ourstatus->kind = TARGET_WAITKIND_SIGNALLED;
-	      ourstatus->value.sig = target_signal_from_host (WTERMSIG (w));
+	      ourstatus->value.sig = gdb_signal_from_host (WTERMSIG (w));
 
 	      if (debug_threads)
 		fprintf (stderr,
@@ -2556,7 +2558,7 @@ Check if we're already there.\n",
 	      if (stabilizing_threads)
 		{
 		  ourstatus->kind = TARGET_WAITKIND_STOPPED;
-		  ourstatus->value.sig = TARGET_SIGNAL_0;
+		  ourstatus->value.sig = GDB_SIGNAL_0;
 		  return ptid_of (event_child);
 		}
 	    }
@@ -2583,7 +2585,7 @@ Check if we're already there.\n",
 	       || WSTOPSIG (w) == __SIGRTMIN + 1))
 	  ||
 #endif
-	  (pass_signals[target_signal_from_host (WSTOPSIG (w))]
+	  (pass_signals[gdb_signal_from_host (WSTOPSIG (w))]
 	   && !(WSTOPSIG (w) == SIGSTOP
 		&& current_inferior->last_resume_kind == resume_stop))))
     {
@@ -2729,18 +2731,18 @@ Check if we're already there.\n",
       /* A thread that has been requested to stop by GDB with vCont;t,
 	 and it stopped cleanly, so report as SIG0.  The use of
 	 SIGSTOP is an implementation detail.  */
-      ourstatus->value.sig = TARGET_SIGNAL_0;
+      ourstatus->value.sig = GDB_SIGNAL_0;
     }
   else if (current_inferior->last_resume_kind == resume_stop
 	   && WSTOPSIG (w) != SIGSTOP)
     {
       /* A thread that has been requested to stop by GDB with vCont;t,
 	 but, it stopped for other reasons.  */
-      ourstatus->value.sig = target_signal_from_host (WSTOPSIG (w));
+      ourstatus->value.sig = gdb_signal_from_host (WSTOPSIG (w));
     }
   else
     {
-      ourstatus->value.sig = target_signal_from_host (WSTOPSIG (w));
+      ourstatus->value.sig = gdb_signal_from_host (WSTOPSIG (w));
     }
 
   gdb_assert (ptid_equal (step_over_bkpt, null_ptid));
@@ -4447,11 +4449,14 @@ linux_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
   ret = errno;
 
   /* Copy appropriate bytes out of the buffer.  */
-  i *= sizeof (PTRACE_XFER_TYPE);
-  i -= memaddr & (sizeof (PTRACE_XFER_TYPE) - 1);
-  memcpy (myaddr,
-	  (char *) buffer + (memaddr & (sizeof (PTRACE_XFER_TYPE) - 1)),
-	  i < len ? i : len);
+  if (i > 0)
+    {
+      i *= sizeof (PTRACE_XFER_TYPE);
+      i -= memaddr & (sizeof (PTRACE_XFER_TYPE) - 1);
+      memcpy (myaddr,
+	      (char *) buffer + (memaddr & (sizeof (PTRACE_XFER_TYPE) - 1)),
+	      i < len ? i : len);
+    }
 
   return ret;
 }
@@ -4796,6 +4801,9 @@ linux_stopped_data_address (void)
 }
 
 #if defined(__UCLIBC__) && defined(HAS_NOMMU)
+#if ! (defined(PT_TEXT_ADDR) \
+       || defined(PT_DATA_ADDR) \
+       || defined(PT_TEXT_END_ADDR))
 #if defined(__mcoldfire__)
 /* These should really be defined in the kernel's ptrace.h header.  */
 #define PT_TEXT_ADDR 49*4
@@ -4809,6 +4817,7 @@ linux_stopped_data_address (void)
 #define PT_TEXT_ADDR     (0x10000*4)
 #define PT_DATA_ADDR     (0x10004*4)
 #define PT_TEXT_END_ADDR (0x10008*4)
+#endif
 #endif
 
 /* Under uClinux, programs are loaded at non-zero offsets, which we need
@@ -5483,6 +5492,7 @@ get_r_debug (const int pid, const int is_elf64)
       if (is_elf64)
 	{
 	  Elf64_Dyn *const dyn = (Elf64_Dyn *) buf;
+#ifdef DT_MIPS_RLD_MAP
 	  union
 	    {
 	      Elf64_Xword map;
@@ -5498,6 +5508,7 @@ get_r_debug (const int pid, const int is_elf64)
 	      else
 		break;
 	    }
+#endif	/* DT_MIPS_RLD_MAP */
 
 	  if (dyn->d_tag == DT_DEBUG && map == -1)
 	    map = dyn->d_un.d_val;
@@ -5508,6 +5519,7 @@ get_r_debug (const int pid, const int is_elf64)
       else
 	{
 	  Elf32_Dyn *const dyn = (Elf32_Dyn *) buf;
+#ifdef DT_MIPS_RLD_MAP
 	  union
 	    {
 	      Elf32_Word map;
@@ -5523,6 +5535,7 @@ get_r_debug (const int pid, const int is_elf64)
 	      else
 		break;
 	    }
+#endif	/* DT_MIPS_RLD_MAP */
 
 	  if (dyn->d_tag == DT_DEBUG && map == -1)
 	    map = dyn->d_un.d_val;
@@ -5642,7 +5655,13 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
   if (priv->r_debug == 0)
     priv->r_debug = get_r_debug (pid, is_elf64);
 
-  if (priv->r_debug == (CORE_ADDR) -1 || priv->r_debug == 0)
+  /* We failed to find DT_DEBUG.  Such situation will not change for this
+     inferior - do not retry it.  Report it to GDB as E01, see for the reasons
+     at the GDB solib-svr4.c side.  */
+  if (priv->r_debug == (CORE_ADDR) -1)
+    return -1;
+
+  if (priv->r_debug == 0)
     {
       document = xstrdup ("<library-list-svr4 version=\"1.0\"/>\n");
     }

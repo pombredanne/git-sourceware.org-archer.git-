@@ -1553,8 +1553,9 @@ find_separate_debug_file_by_debuglink (struct objfile *objfile)
       return NULL;
     }
 
+  cleanups = make_cleanup (xfree, debuglink);
   dir = xstrdup (objfile->name);
-  cleanups = make_cleanup (xfree, dir);
+  make_cleanup (xfree, dir);
   terminate_after_last_dir_separator (dir);
   canon_dir = lrealpath (dir);
 
@@ -1764,7 +1765,6 @@ symfile_bfd_open (char *name)
   sym_bfd = bfd_fopen (name, gnutarget, FOPEN_RB, desc);
   if (!sym_bfd)
     {
-      close (desc);
       make_cleanup (xfree, name);
       error (_("`%s': can't open to read symbols: %s."), name,
 	     bfd_errmsg (bfd_get_error ()));

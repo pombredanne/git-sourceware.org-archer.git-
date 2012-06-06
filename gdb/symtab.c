@@ -95,8 +95,7 @@ struct symbol *lookup_symbol_aux_local (const char *name,
 static
 struct symbol *lookup_symbol_aux_symtabs (int block_index,
 					  const char *name,
-					  const domain_enum domain,
-					  struct objfile *exclude_objfile);
+					  const domain_enum domain);
 
 static
 struct symbol *lookup_symbol_aux_quick (struct objfile *objfile,
@@ -850,6 +849,8 @@ symbol_natural_name (const struct general_symbol_info *gsymbol)
 const char *
 symbol_demangled_name (const struct general_symbol_info *gsymbol)
 {
+  const char *dem_name = NULL;
+
   switch (gsymbol->language)
     {
     case language_cplus:
@@ -858,19 +859,17 @@ symbol_demangled_name (const struct general_symbol_info *gsymbol)
     case language_java:
     case language_objc:
     case language_fortran:
-      if (symbol_get_demangled_name (gsymbol) != NULL)
-	return symbol_get_demangled_name (gsymbol);
+      dem_name = symbol_get_demangled_name (gsymbol);
       break;
     case language_ada:
-      if (symbol_get_demangled_name (gsymbol) != NULL)
-	return symbol_get_demangled_name (gsymbol);
-      else
-	return ada_decode_symbol (gsymbol);
+      dem_name = symbol_get_demangled_name (gsymbol);
+      if (dem_name == NULL)
+	dem_name = ada_decode_symbol (gsymbol);
       break;
     default:
       break;
     }
-  return NULL;
+  return dem_name;
 }
 
 /* Return the search name of a symbol---generally the demangled or
@@ -1360,7 +1359,7 @@ lookup_static_symbol_aux (const char *name, const domain_enum domain)
   struct objfile *objfile;
   struct symbol *sym;
 
-  sym = lookup_symbol_aux_symtabs (STATIC_BLOCK, name, domain, NULL);
+  sym = lookup_symbol_aux_symtabs (STATIC_BLOCK, name, domain);
   if (sym != NULL)
     return sym;
 
@@ -1478,17 +1477,17 @@ lookup_global_symbol_from_objfile (const struct objfile *main_objfile,
        objfile = objfile_separate_debug_iterate (main_objfile, objfile))
     {
       /* Go through symtabs.  */
-      ALL_OBJFILE_SYMTABS (objfile, s)
-        {
-          bv = BLOCKVECTOR (s);
-          block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
-          sym = lookup_block_symbol (block, name, domain);
-          if (sym)
-            {
-              block_found = block;
-              return fixup_symbol_section (sym, (struct objfile *)objfile);
-            }
-        }
+      ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
+	{
+	  bv = BLOCKVECTOR (s);
+	  block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
+	  sym = lookup_block_symbol (block, name, domain);
+	  if (sym)
+	    {
+	      block_found = block;
+	      return fixup_symbol_section (sym, (struct objfile *)objfile);
+	    }
+	}
 
       sym = lookup_symbol_aux_quick ((struct objfile *) objfile, GLOBAL_BLOCK,
 				     name, domain);
@@ -1534,26 +1533,20 @@ lookup_symbol_aux_objfile (struct objfile *objfile, int block_index,
 }
 
 /* Same as lookup_symbol_aux_objfile, except that it searches all
-   objfiles except for EXCLUDE_OBJFILE.  Return the first match found.
-
-   If EXCLUDE_OBJFILE is NULL, then all objfiles are searched.  */
+   objfiles.  Return the first match found.  */
 
 static struct symbol *
 lookup_symbol_aux_symtabs (int block_index, const char *name,
-			   const domain_enum domain,
-			   struct objfile *exclude_objfile)
+			   const domain_enum domain)
 {
   struct symbol *sym;
   struct objfile *objfile;
 
   ALL_OBJFILES (objfile)
   {
-    if (objfile != exclude_objfile)
-      {
-	sym = lookup_symbol_aux_objfile (objfile, block_index, name, domain);
-	if (sym)
-	  return sym;
-      }
+    sym = lookup_symbol_aux_objfile (objfile, block_index, name, domain);
+    if (sym)
+      return sym;
   }
 
   return NULL;
@@ -1670,6 +1663,46 @@ lookup_symbol_static (const char *name,
     return NULL;
 }
 
+/* Private data to be used with lookup_symbol_global_iterator_cb.  */
+
+struct global_sym_lookup_data
+{
+  /* The name of the symbol we are searching for.  */
+  const char *name;
+
+  /* The domain to use for our search.  */
+  domain_enum domain;
+
+  /* The field where the callback should store the symbol if found.
+     It should be initialized to NULL before the search is started.  */
+  struct symbol *result;
+};
+
+/* A callback function for gdbarch_iterate_over_objfiles_in_search_order.
+   It searches by name for a symbol in the GLOBAL_BLOCK of the given
+   OBJFILE.  The arguments for the search are passed via CB_DATA,
+   which in reality is a pointer to struct global_sym_lookup_data.  */
+
+static int
+lookup_symbol_global_iterator_cb (struct objfile *objfile,
+				  void *cb_data)
+{
+  struct global_sym_lookup_data *data =
+    (struct global_sym_lookup_data *) cb_data;
+
+  gdb_assert (data->result == NULL);
+
+  data->result = lookup_symbol_aux_objfile (objfile, GLOBAL_BLOCK,
+					    data->name, data->domain);
+  if (data->result == NULL)
+    data->result = lookup_symbol_aux_quick (objfile, GLOBAL_BLOCK,
+					    data->name, data->domain);
+
+  /* If we found a match, tell the iterator to stop.  Otherwise,
+     keep going.  */
+  return (data->result != NULL);
+}
+
 /* Lookup a symbol in all files' global blocks (searching psymtabs if
    necessary).  */
 
@@ -1679,49 +1712,24 @@ lookup_symbol_global (const char *name,
 		      const domain_enum domain)
 {
   struct symbol *sym = NULL;
-  struct objfile *block_objfile = NULL;
   struct objfile *objfile = NULL;
+  struct global_sym_lookup_data lookup_data;
 
   /* Call library-specific lookup procedure.  */
-  block_objfile = lookup_objfile_from_block (block);
-  if (block_objfile != NULL)
-    sym = solib_global_lookup (block_objfile, name, domain);
+  objfile = lookup_objfile_from_block (block);
+  if (objfile != NULL)
+    sym = solib_global_lookup (objfile, name, domain);
   if (sym != NULL)
     return sym;
 
-  /* If BLOCK_OBJFILE is not NULL, then search this objfile first.
-     In case the global symbol is defined in multiple objfiles,
-     we have a better chance of finding the most relevant symbol.  */
+  memset (&lookup_data, 0, sizeof (lookup_data));
+  lookup_data.name = name;
+  lookup_data.domain = domain;
+  gdbarch_iterate_over_objfiles_in_search_order
+    (objfile != NULL ? get_objfile_arch (objfile) : target_gdbarch,
+     lookup_symbol_global_iterator_cb, &lookup_data, objfile);
 
-  if (block_objfile != NULL)
-    {
-      sym = lookup_symbol_aux_objfile (block_objfile, GLOBAL_BLOCK,
-				       name, domain);
-      if (sym == NULL)
-	sym = lookup_symbol_aux_quick (block_objfile, GLOBAL_BLOCK,
-				       name, domain);
-      if (sym != NULL)
-	return sym;
-    }
-
-  /* Symbol not found in the BLOCK_OBJFILE, so try all the other
-     objfiles, starting with symtabs first, and then partial symtabs.  */
-
-  sym = lookup_symbol_aux_symtabs (GLOBAL_BLOCK, name, domain, block_objfile);
-  if (sym != NULL)
-    return sym;
-
-  ALL_OBJFILES (objfile)
-  {
-    if (objfile != block_objfile)
-      {
-	sym = lookup_symbol_aux_quick (objfile, GLOBAL_BLOCK, name, domain);
-	if (sym)
-	  return sym;
-      }
-  }
-
-  return NULL;
+  return lookup_data.result;
 }
 
 int
@@ -1829,17 +1837,16 @@ basic_lookup_transparent_type (const char *name)
 						    GLOBAL_BLOCK,
 						    name, STRUCT_DOMAIN);
 
-    ALL_OBJFILE_SYMTABS (objfile, s)
-      if (s->primary)
-	{
-	  bv = BLOCKVECTOR (s);
-	  block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
-	  sym = lookup_block_symbol (block, name, STRUCT_DOMAIN);
-	  if (sym && !TYPE_IS_OPAQUE (SYMBOL_TYPE (sym)))
-	    {
-	      return SYMBOL_TYPE (sym);
-	    }
-	}
+    ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
+      {
+	bv = BLOCKVECTOR (s);
+	block = BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
+	sym = lookup_block_symbol (block, name, STRUCT_DOMAIN);
+	if (sym && !TYPE_IS_OPAQUE (SYMBOL_TYPE (sym)))
+	  {
+	    return SYMBOL_TYPE (sym);
+	  }
+      }
   }
 
   ALL_OBJFILES (objfile)
@@ -1862,7 +1869,7 @@ basic_lookup_transparent_type (const char *name)
       objfile->sf->qf->pre_expand_symtabs_matching (objfile, STATIC_BLOCK,
 						    name, STRUCT_DOMAIN);
 
-    ALL_OBJFILE_SYMTABS (objfile, s)
+    ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
       {
 	bv = BLOCKVECTOR (s);
 	block = BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK);
@@ -3426,7 +3433,9 @@ search_symbols (char *regexp, enum search_domain kind,
   {
     if (objfile->sf)
       objfile->sf->qf->expand_symtabs_matching (objfile,
-						search_symbols_file_matches,
+						(nfiles == 0
+						 ? NULL
+						 : search_symbols_file_matches),
 						search_symbols_name_matches,
 						kind,
 						&datum);
@@ -3452,10 +3461,10 @@ search_symbols (char *regexp, enum search_domain kind,
       {
         QUIT;
 
-	if (MSYMBOL_TYPE (msymbol) == ourtype ||
-	    MSYMBOL_TYPE (msymbol) == ourtype2 ||
-	    MSYMBOL_TYPE (msymbol) == ourtype3 ||
-	    MSYMBOL_TYPE (msymbol) == ourtype4)
+	if (MSYMBOL_TYPE (msymbol) == ourtype
+	    || MSYMBOL_TYPE (msymbol) == ourtype2
+	    || MSYMBOL_TYPE (msymbol) == ourtype3
+	    || MSYMBOL_TYPE (msymbol) == ourtype4)
 	  {
 	    if (!datum.preg_p
 		|| regexec (&datum.preg, SYMBOL_NATURAL_NAME (msymbol), 0,
@@ -3484,69 +3493,69 @@ search_symbols (char *regexp, enum search_domain kind,
   ALL_PRIMARY_SYMTABS (objfile, s)
   {
     bv = BLOCKVECTOR (s);
-      for (i = GLOBAL_BLOCK; i <= STATIC_BLOCK; i++)
-	{
-	  struct symbol_search *prevtail = tail;
-	  int nfound = 0;
+    for (i = GLOBAL_BLOCK; i <= STATIC_BLOCK; i++)
+      {
+	struct symbol_search *prevtail = tail;
+	int nfound = 0;
 
-	  b = BLOCKVECTOR_BLOCK (bv, i);
-	  ALL_BLOCK_SYMBOLS (b, iter, sym)
-	    {
-	      struct symtab *real_symtab = SYMBOL_SYMTAB (sym);
+	b = BLOCKVECTOR_BLOCK (bv, i);
+	ALL_BLOCK_SYMBOLS (b, iter, sym)
+	  {
+	    struct symtab *real_symtab = SYMBOL_SYMTAB (sym);
 
-	      QUIT;
+	    QUIT;
 
-	      if (file_matches (real_symtab->filename, files, nfiles)
-		  && ((!datum.preg_p
-		       || regexec (&datum.preg, SYMBOL_NATURAL_NAME (sym), 0,
-				   NULL, 0) == 0)
-		      && ((kind == VARIABLES_DOMAIN
-			   && SYMBOL_CLASS (sym) != LOC_TYPEDEF
-			   && SYMBOL_CLASS (sym) != LOC_UNRESOLVED
-			   && SYMBOL_CLASS (sym) != LOC_BLOCK
-			   /* LOC_CONST can be used for more than just enums,
-			      e.g., c++ static const members.
-			      We only want to skip enums here.  */
-			   && !(SYMBOL_CLASS (sym) == LOC_CONST
-				&& TYPE_CODE (SYMBOL_TYPE (sym))
-				== TYPE_CODE_ENUM))
-			  || (kind == FUNCTIONS_DOMAIN 
-			      && SYMBOL_CLASS (sym) == LOC_BLOCK)
-			  || (kind == TYPES_DOMAIN
-			      && SYMBOL_CLASS (sym) == LOC_TYPEDEF))))
-		{
-		  /* match */
-		  psr = (struct symbol_search *)
-		    xmalloc (sizeof (struct symbol_search));
-		  psr->block = i;
-		  psr->symtab = real_symtab;
-		  psr->symbol = sym;
-		  psr->msymbol = NULL;
-		  psr->next = NULL;
-		  if (tail == NULL)
-		    sr = psr;
-		  else
-		    tail->next = psr;
-		  tail = psr;
-		  nfound ++;
-		}
-	    }
-	  if (nfound > 0)
-	    {
-	      if (prevtail == NULL)
-		{
-		  struct symbol_search dummy;
+	    if (file_matches (real_symtab->filename, files, nfiles)
+		&& ((!datum.preg_p
+		     || regexec (&datum.preg, SYMBOL_NATURAL_NAME (sym), 0,
+				 NULL, 0) == 0)
+		    && ((kind == VARIABLES_DOMAIN
+			 && SYMBOL_CLASS (sym) != LOC_TYPEDEF
+			 && SYMBOL_CLASS (sym) != LOC_UNRESOLVED
+			 && SYMBOL_CLASS (sym) != LOC_BLOCK
+			 /* LOC_CONST can be used for more than just enums,
+			    e.g., c++ static const members.
+			    We only want to skip enums here.  */
+			 && !(SYMBOL_CLASS (sym) == LOC_CONST
+			      && TYPE_CODE (SYMBOL_TYPE (sym))
+			      == TYPE_CODE_ENUM))
+			|| (kind == FUNCTIONS_DOMAIN 
+			    && SYMBOL_CLASS (sym) == LOC_BLOCK)
+			|| (kind == TYPES_DOMAIN
+			    && SYMBOL_CLASS (sym) == LOC_TYPEDEF))))
+	      {
+		/* match */
+		psr = (struct symbol_search *)
+		  xmalloc (sizeof (struct symbol_search));
+		psr->block = i;
+		psr->symtab = real_symtab;
+		psr->symbol = sym;
+		psr->msymbol = NULL;
+		psr->next = NULL;
+		if (tail == NULL)
+		  sr = psr;
+		else
+		  tail->next = psr;
+		tail = psr;
+		nfound ++;
+	      }
+	  }
+	if (nfound > 0)
+	  {
+	    if (prevtail == NULL)
+	      {
+		struct symbol_search dummy;
 
-		  dummy.next = sr;
-		  tail = sort_search_symbols (&dummy, nfound);
-		  sr = dummy.next;
+		dummy.next = sr;
+		tail = sort_search_symbols (&dummy, nfound);
+		sr = dummy.next;
 
-		  make_cleanup_free_search_symbols (sr);
-		}
-	      else
-		tail = sort_search_symbols (prevtail, nfound);
-	    }
-	}
+		make_cleanup_free_search_symbols (sr);
+	      }
+	    else
+	      tail = sort_search_symbols (prevtail, nfound);
+	  }
+      }
   }
 
   /* If there are no eyes, avoid all contact.  I mean, if there are
@@ -3558,10 +3567,10 @@ search_symbols (char *regexp, enum search_domain kind,
       {
         QUIT;
 
-	if (MSYMBOL_TYPE (msymbol) == ourtype ||
-	    MSYMBOL_TYPE (msymbol) == ourtype2 ||
-	    MSYMBOL_TYPE (msymbol) == ourtype3 ||
-	    MSYMBOL_TYPE (msymbol) == ourtype4)
+	if (MSYMBOL_TYPE (msymbol) == ourtype
+	    || MSYMBOL_TYPE (msymbol) == ourtype2
+	    || MSYMBOL_TYPE (msymbol) == ourtype3
+	    || MSYMBOL_TYPE (msymbol) == ourtype4)
 	  {
 	    if (!datum.preg_p
 		|| regexec (&datum.preg, SYMBOL_NATURAL_NAME (msymbol), 0,
@@ -3628,9 +3637,9 @@ print_symbol_info (enum search_domain kind,
       && SYMBOL_DOMAIN (sym) != STRUCT_DOMAIN)
     typedef_print (SYMBOL_TYPE (sym), sym, gdb_stdout);
   /* variable, func, or typedef-that-is-c++-class.  */
-  else if (kind < TYPES_DOMAIN ||
-	   (kind == TYPES_DOMAIN &&
-	    SYMBOL_DOMAIN (sym) == STRUCT_DOMAIN))
+  else if (kind < TYPES_DOMAIN
+	   || (kind == TYPES_DOMAIN
+	       && SYMBOL_DOMAIN (sym) == STRUCT_DOMAIN))
     {
       type_print (SYMBOL_TYPE (sym),
 		  (SYMBOL_CLASS (sym) == LOC_TYPEDEF

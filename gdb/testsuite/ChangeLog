@@ -1,3 +1,94 @@
+2012-06-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/dprintf.c (main): Add extra parameter when calling
+	printf and fprintf.
+	(bar): New function.  It is a dead function, but to ensure
+	'malloc' is linked explicitly.
+
+2012-06-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/info-proc.exp: Return if target doesn't support
+	'info proc'.
+
+2012-06-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/freebpcmd.exp (set lines): Check valid range of I.
+	(run program with breakpoint commands): XFAIl if it is not.
+
+2012-06-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/ctxobj-f.c (GET_VERSION): Introduce local variable
+	and add comment.
+	* gdb.base/ctxobj-m.c (main): Rewrite, and add comment.
+	* gdb.base/ctxobj.exp: Insert breakpoint in ctxobj-f.c using
+	"STOP" marker.  Adjust testing strategy to make it work on
+	all targets.
+
+	* gdb.base/print-file-var-main.c (main): Rewrite using local
+	variables and adjust get_version_2's return value check.
+	Add small comment.
+	* gdb.base/print-file-var.exp: Insert breakpoint using "STOP"
+	marker.  Adjust testing strategy to make it work on all targets.
+
+2012-06-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/bad-task-bp-keyword: New testcase.
+
+2012-06-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/code_elim.exp (add-symbol-file ${testfile1} 0x100000):
+	Simplify it to ...
+	(symbol-file ${testfile1}): ... here.
+	(test eliminated var my_global_symbol)
+	(test eliminated var my_static_symbol)
+	(test eliminated var my_global_func, get address of main): Wrap them to
+	'single psymtabs' and 'single symtabs'
+	(get address of my_global_symbol, get address of my_static_symbol)
+	(get address of my_global_func, get address of main): Wrap them to
+	'order1' and 'order2'.
+
+	* gdb.base/code_elim.exp
+	(add-symbol-file ${testfile1} 0x100000)
+	(add-symbol-file ${testfile2} 0x200000): Wrap them to 'order1' and
+	'order2'.
+	(order1: add-symbol-file ${testfile1} 0x100000)
+	(order1: add-symbol-file ${testfile2} 0x200000)
+	(order2: add-symbol-file ${testfile2} 0x200000)
+	(order2: add-symbol-file ${testfile1} 0x100000): Add -s .data and -s
+	.bss as appropriate.
+
+2012-05-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.server/solib-list-lib.c: New file.
+	* gdb.server/solib-list-main.c: New file.
+	* gdb.server/solib-list.exp: New file.
+
+2012-05-25  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* gdb.trace/unavailable.exp (gdb_collect_globals_test): Update
+	for 'set print symbol' change.
+
+2012-05-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-icc-opaque.S: Add debug_info_seg3 and
+	.debug_abbrev_seg3.
+
+2012-05-24  John Steele Scott  <toojays@toojays.net>
+
+	PR symtab/13277: Resolving opaque structures in ICC generated binaries.
+	* gdb.dwarf2/dw2-icc-opaque.S: New file.
+	* gdb.dwarf2/dw2-icc-opaque.exp: New file.
+
+2012-05-23  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.mi/mi-info-os.exp: New file.
+
+2012-05-23  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.trace/stap-trace.exp: If compile_stap_bin fails,
+	return -1 to suppress the rest of the tests.
+	(compile_stap_bin): Return boolean success value.
+
 2012-05-21  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.cp/inherit.exp (test_print_mi_members): Expect errors.

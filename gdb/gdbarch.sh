@@ -770,14 +770,16 @@ M:int:process_record:struct regcache *regcache, CORE_ADDR addr:regcache, addr
 
 # Save process state after a signal.
 # Return -1 if something goes wrong, 0 otherwise.
-M:int:process_record_signal:struct regcache *regcache, enum target_signal signal:regcache, signal
+M:int:process_record_signal:struct regcache *regcache, enum gdb_signal signal:regcache, signal
 
-# Signal translation: translate inferior's signal (host's) number into
-# GDB's representation.
-m:enum target_signal:target_signal_from_host:int signo:signo::default_target_signal_from_host::0
-# Signal translation: translate GDB's signal number into inferior's host
-# signal number.
-m:int:target_signal_to_host:enum target_signal ts:ts::default_target_signal_to_host::0
+# Signal translation: translate inferior's signal (target's) number
+# into GDB's representation.  The implementation of this method must
+# be host independent.  IOW, don't rely on symbols of the NAT_FILE
+# header (the nm-*.h files), the host <signal.h> header, or similar
+# headers.  This is mainly used when cross-debugging core files ---
+# "Live" targets hide the translation behind the target interface
+# (target_wait, target_resume, etc.).
+M:enum gdb_signal:gdb_signal_from_target:int signo:signo
 
 # Extra signal info inspection.
 #
@@ -934,6 +936,21 @@ m:void:gen_return_address:struct agent_expr *ax, struct axs_value *value, CORE_A
 # Implement the "info proc" command.
 M:void:info_proc:char *args, enum info_proc_what what:args, what
 
+# Iterate over all objfiles in the order that makes the most sense
+# for the architecture to make global symbol searches.
+#
+# CB is a callback function where OBJFILE is the objfile to be searched,
+# and CB_DATA a pointer to user-defined data (the same data that is passed
+# when calling this gdbarch method).  The iteration stops if this function
+# returns nonzero.
+#
+# CB_DATA is a pointer to some user-defined data to be passed to
+# the callback.
+#
+# If not NULL, CURRENT_OBJFILE corresponds to the objfile being
+# inspected when the symbol search was requested.
+m:void:iterate_over_objfiles_in_search_order:iterate_over_objfiles_in_search_order_cb_ftype *cb, void *cb_data, struct objfile *current_objfile:cb, cb_data, current_objfile:0:default_iterate_over_objfiles_in_search_order::0
+
 EOF
 }
 
@@ -1062,6 +1079,12 @@ struct stap_parse_info;
    Eventually, when support for multiple targets is implemented in
    GDB, this global should be made target-specific.  */
 extern struct gdbarch *target_gdbarch;
+
+/* Callback type for the 'iterate_over_objfiles_in_search_order'
+   gdbarch  method.  */
+
+typedef int (iterate_over_objfiles_in_search_order_cb_ftype)
+  (struct objfile *objfile, void *cb_data);
 EOF
 
 # function typedef's
@@ -1380,6 +1403,7 @@ cat <<EOF
 #include "gdb_obstack.h"
 #include "observer.h"
 #include "regcache.h"
+#include "objfiles.h"
 
 /* Static function declarations */
 
