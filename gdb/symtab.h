@@ -82,6 +82,8 @@ struct probe;
 
 struct cplus_specific
   {
+    const char *demangled_name;
+
     /* If the symbol name contains template parameters this is the name with
        these parameters removed to be used during search.  Otherwise this
        should be NULL, and the regular symbol name should be used.  */

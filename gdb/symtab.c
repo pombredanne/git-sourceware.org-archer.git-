@@ -460,8 +460,10 @@ symbol_set_demangled_name (struct general_symbol_info *gsymbol,
                            char *name,
                            struct objfile *objfile)
 {
-  gsymbol->use_cpp_specific_p = 0;
-  gsymbol->language_specific.demangled_name = name;
+  if (gsymbol->use_cpp_specific_p)
+    gsymbol->language_specific.cplus_specific->demangled_name = name;
+  else
+    gsymbol->language_specific.demangled_name = name;
 #if 0
   if (gsymbol->language == language_cplus)
     {
@@ -480,7 +482,10 @@ symbol_set_demangled_name (struct general_symbol_info *gsymbol,
 const char *
 symbol_get_demangled_name (const struct general_symbol_info *gsymbol)
 {
-  return gsymbol->language_specific.demangled_name;
+  if (gsymbol->use_cpp_specific_p)
+    return gsymbol->language_specific.cplus_specific->demangled_name;
+  else
+    return gsymbol->language_specific.demangled_name;
 #if 0
   if (gsymbol->language == language_cplus)
     {
@@ -501,10 +506,13 @@ symbol_set_cplus_search_name (struct general_symbol_info *gsymbol,
                                 struct objfile *objfile,
                                 const char *name)
 {
+  const char *dem_name = gsymbol->language_specific.demangled_name;
+
   if (gsymbol->language_specific.cplus_specific == NULL)
     symbol_init_cplus_specific (gsymbol, objfile);
 
   gsymbol->language_specific.cplus_specific->search_name = (char *) name;
+  gsymbol->language_specific.cplus_specific->demangled_name = dem_name;
   gsymbol->use_cpp_specific_p = 1;
 }
 
@@ -2067,11 +2075,31 @@ iterate_over_symbols (const struct block *block, const char *name,
     {
       struct block_iterator iter;
       struct symbol *sym;
+      const char *template_name = NULL;
+      const char *actual_name = name;
 
-      for (sym = block_iter_name_first (block, name, &iter);
-	   sym != NULL;
-	   sym = block_iter_name_next (name, &iter))
+      if (current_language->la_language == language_cplus
+	  && cp_name_has_template_parameters (name))
 	{
+	  template_name = actual_name;
+	  actual_name = cp_remove_template_params (actual_name);
+#if 0
+	  if (actual_name == NULL)
+	    {
+	      /* Not a valid C++ name.  */
+	      continue;
+	    }
+#endif
+	}
+
+      for (sym = block_iter_name_first (block, actual_name, &iter);
+	   sym != NULL;
+	   sym = block_iter_name_next (actual_name, &iter))
+	{
+	  if (template_name != NULL
+	      && symbol_matches_template_name (template_name, sym) == 0)
+	    continue;
+
 	  if (symbol_matches_domain (SYMBOL_LANGUAGE (sym),
 				     SYMBOL_DOMAIN (sym), domain))
 	    {
