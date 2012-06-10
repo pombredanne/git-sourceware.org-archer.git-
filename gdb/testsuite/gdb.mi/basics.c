@@ -61,7 +61,9 @@ main ()
 {
   callee1 (2, "A string argument.", 3.5);
   callee1 (2, "A string argument.", 3.5);
+  goto a_label;
 
+ a_label:
   do_nothing (); /* Hello, World! */
 
   callme (1);

@@ -6831,7 +6831,7 @@ each one of those probes.
 
 @end table
 
-
+Additionally, linespecs may be specified explicitly. That is, 
 @node Edit
 @section Editing Source Files
 @cindex editing source files

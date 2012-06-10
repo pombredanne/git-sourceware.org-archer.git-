@@ -106,6 +106,10 @@ static void create_sals_from_address_default (char **,
 					      enum bptype, char *,
 					      char **);
 
+static void create_sals_from_explicit_default (explicit_linespec *,
+					       struct linespec_result *,
+					       enum bptype);
+
 static void create_breakpoints_sal_default (struct gdbarch *,
 					    struct linespec_result *,
 					    struct linespec_sals *,
@@ -115,8 +119,23 @@ static void create_breakpoints_sal_default (struct gdbarch *,
 					    const struct breakpoint_ops *,
 					    int, int, int, unsigned);
 
+static void create_breakpoints_sal_explicit_default
+   (struct gdbarch *,
+    struct linespec_result *,
+    struct linespec_sals *,
+    char *,
+    enum bptype,
+    enum bpdisp,
+    int,
+    const struct breakpoint_ops *,
+    int, int, int, unsigned);
+
 static void decode_linespec_default (struct breakpoint *, char **,
 				     struct symtabs_and_lines *);
+
+static void decode_linespec_explicit_default (struct breakpoint *,
+					      explicit_linespec *,
+					      struct symtabs_and_lines *);
 
 static void clear_command (char *, int);
 
@@ -271,6 +290,18 @@ static void init_catchpoint (struct breakpoint *b,
 			     struct gdbarch *gdbarch, int tempflag,
 			     char *cond_string,
 			     const struct breakpoint_ops *ops);
+
+static void
+base_breakpoint_create_breakpoints_sal_explicit (struct gdbarch *gdbarch,
+						 struct linespec_result *c,
+						 struct linespec_sals *lsal,
+						 char *extra_string,
+						 enum bptype type_wanted,
+						 enum bpdisp disposition,
+						 int ignore_count,
+						 const struct breakpoint_ops *o,
+						 int from_tty, int enabled,
+						 int internal, unsigned flags);
 
 /* The abstract base class all breakpoint_ops structures inherit
    from.  */
@@ -3197,7 +3228,7 @@ update_breakpoints_after_exec (void)
     /* Without a symbolic address, we have little hope of the
        pre-exec() address meaning the same thing in the post-exec()
        a.out.  */
-    if (b->addr_string == NULL)
+    if (b->addr_string == NULL && !explicit_linespec_is_valid_p (b->explicit))
       {
 	delete_breakpoint (b);
 	continue;
@@ -8514,11 +8545,14 @@ update_dprintf_commands (char *args, int from_tty,
 
 /* Create a breakpoint with SAL as location.  Use ADDR_STRING
    as textual description of the location, and COND_STRING
-   as condition expression.  */
+   as condition expression.  If the explicit linespec ELS is
+   non-NULL, it overrides ADDR_STRING, COND_STRING, THREAD, and
+   TASK.  */
 
 static void
 init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
 		     struct symtabs_and_lines sals, char *addr_string,
+		     explicit_linespec *els,
 		     char *filter, char *cond_string,
 		     char *extra_string,
 		     enum bptype type, enum bpdisp disposition,
@@ -8528,6 +8562,19 @@ init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
 		     int display_canonical)
 {
   int i;
+  struct cleanup *cleanup;
+
+  cleanup = make_cleanup (null_cleanup, NULL);
+  if (els != NULL)
+    {
+      if (els->condition != NULL)
+	{
+	  cond_string = xstrdup (els->condition);
+	  make_cleanup (xfree, cond_string);
+	}
+      task = els->task;
+      thread = els->thread;
+    }
 
   if (type == bp_hardware_breakpoint)
     {
@@ -8654,7 +8701,11 @@ init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
        me.  */
     b->addr_string
       = xstrprintf ("*%s", paddress (b->loc->gdbarch, b->loc->address));
+  if (els != NULL)
+    b->explicit = copy_explicit_linespec (els);
   b->filter = filter;
+
+  discard_cleanups (cleanup);
 }
 
 static void
@@ -8684,10 +8735,52 @@ create_breakpoint_sal (struct gdbarch *gdbarch,
   old_chain = make_cleanup (xfree, b);
 
   init_breakpoint_sal (b, gdbarch,
-		       sals, addr_string,
+		       sals, addr_string, NULL,
 		       filter, cond_string, extra_string,
 		       type, disposition,
 		       thread, task, ignore_count,
+		       ops, from_tty,
+		       enabled, internal, flags,
+		       display_canonical);
+  discard_cleanups (old_chain);
+
+  install_breakpoint (internal, b, 0);
+}
+
+/* Like create_breakpoint_sal but for explicit linespecs instead of
+   address strings.  */
+static void
+create_breakpoint_sal_explicit (struct gdbarch *gdbarch,
+				struct symtabs_and_lines sals,
+				char *addr_string,
+				explicit_linespec *els,
+				char *filter, char *extra_string,
+				enum bptype type, enum bpdisp disposition,
+				int ignore_count,
+				const struct breakpoint_ops *ops, int from_tty,
+				int enabled, int internal, unsigned flags,
+				int display_canonical)
+{
+  struct breakpoint *b;
+  struct cleanup *old_chain;
+
+  if (is_tracepoint_type (type))
+    {
+      struct tracepoint *t;
+
+      t = XCNEW (struct tracepoint);
+      b = &t->base;
+    }
+  else
+    b = XNEW (struct breakpoint);
+
+  old_chain = make_cleanup (xfree, b);
+
+  init_breakpoint_sal (b, gdbarch,
+		       sals, addr_string, els,
+		       filter, NULL, extra_string,
+		       type, disposition, -1, -1,
+		       ignore_count,
 		       ops, from_tty,
 		       enabled, internal, flags,
 		       display_canonical);
@@ -8745,6 +8838,46 @@ create_breakpoints_sal (struct gdbarch *gdbarch,
 			     thread, task, ignore_count, ops,
 			     from_tty, enabled, internal, flags,
 			     canonical->special_display);
+      discard_cleanups (inner);
+    }
+}
+
+/* Like create_breakpoints_sal but using explicit linespecs.  */
+
+static void
+create_breakpoints_sal_explicit (struct gdbarch *gdbarch,
+				 struct linespec_result *canonical,
+				 char *extra_string,
+				 enum bptype type, enum bpdisp disposition,
+				 int ignore_count,
+				 const struct breakpoint_ops *ops, int from_tty,
+				 int enabled, int internal, unsigned flags)
+{
+  int i;
+  struct linespec_sals *lsal;
+
+  if (canonical->pre_expanded)
+    gdb_assert (VEC_length (linespec_sals, canonical->sals) == 1);
+
+  for (i = 0; VEC_iterate (linespec_sals, canonical->sals, i, lsal); ++i)
+    {
+      /* Note that 'addr_string' can be NULL in the case of a plain
+	 'break', without arguments.  */
+      char *addr_string = (canonical->addr_string
+			   ? xstrdup (canonical->addr_string)
+			   : NULL);
+      char *filter_string = lsal->canonical ? xstrdup (lsal->canonical) : NULL;
+      struct cleanup *inner = make_cleanup (xfree, addr_string);
+      explicit_linespec *els = canonical->explicit;
+
+      make_cleanup (xfree, filter_string);
+      create_breakpoint_sal_explicit (gdbarch, lsal->sals,
+				      addr_string, els,
+				      filter_string, extra_string,
+				      type, disposition,
+				      ignore_count, ops,
+				      from_tty, enabled, internal, flags,
+				      canonical->special_display);
       discard_cleanups (inner);
     }
 }
@@ -8870,6 +9003,22 @@ check_fast_tracepoint_sals (struct gdbarch *gdbarch,
     }
 }
 
+/* Issue an invalid thread ID error.  */
+
+static void ATTRIBUTE_NORETURN
+invalid_thread_id_error (int id)
+{
+  error (_("Unknown thread %d."), id);
+}
+
+/* Issue an invalid task ID error.  */
+
+static void ATTRIBUTE_NORETURN
+invalid_task_id_error (int id)
+{
+  error (_("Unknown task %d."), id);
+}
+
 /* Given TOK, a string specification of condition and thread, as
    accepted by the 'break' command, extract the condition
    string and thread number and set *COND_STRING and *THREAD.
@@ -8923,7 +9072,7 @@ find_condition_and_thread (char *tok, CORE_ADDR pc,
 	  if (tok == tmptok)
 	    error (_("Junk after thread keyword."));
 	  if (!valid_thread_id (*thread))
-	    error (_("Unknown thread %d."), *thread);
+	    invalid_thread_id_error (*thread);
 	}
       else if (toklen >= 1 && strncmp (tok, "task", toklen) == 0)
 	{
@@ -8935,7 +9084,7 @@ find_condition_and_thread (char *tok, CORE_ADDR pc,
 	  if (tok == tmptok)
 	    error (_("Junk after task keyword."));
 	  if (!valid_task_id (*task))
-	    error (_("Unknown task %d."), *task);
+	    invalid_task_id_error (*task);
 	}
       else if (rest)
 	{
@@ -8994,6 +9143,142 @@ decode_static_tracepoint_spec (char **arg_p)
   return sals;
 }
 
+/* The workhorse of create_breakpoint and create_breakpoint_explicit.
+   See the comments of create_breakpoint for parameter meanings.  */
+
+static int
+create_breakpoint_1 (struct gdbarch *gdbarch,
+		     struct linespec_result *canonical, char *extra_string,
+		     int tempflag, enum bptype type_wanted, int ignore_count,
+		     enum auto_boolean pending_break_support,
+		     const struct breakpoint_ops *ops,
+		     int from_tty, int enabled, int internal, int flags)
+{
+  struct cleanup *bkpt_chain = NULL;
+  int pending = 0;
+  int prev_bkpt_count = breakpoint_count;
+
+  if (canonical->sals == NULL)
+    {
+      struct linespec_sals lsal;
+
+      /* If pending breakpoint support is auto query and the user
+	 selects no, then simply return the error code.  */
+      if (pending_break_support == AUTO_BOOLEAN_AUTO
+	  && !nquery (_("Make %s pending on future shared library load? "),
+		      bptype_string (type_wanted)))
+	return 0;
+
+      /* At this point, either the user was queried about setting
+	 a pending breakpoint and selected yes, or pending
+	 breakpoint behavior is on and thus a pending breakpoint
+	 is defaulted on behalf of the user.  */
+      if (canonical->addr_string != NULL)
+	lsal.canonical = xstrdup (canonical->addr_string);
+      lsal.sals.nelts = 1;
+      lsal.sals.sals = XNEW (struct symtab_and_line);
+      init_sal (&lsal.sals.sals[0]);
+      pending = 1;
+      VEC_safe_push (linespec_sals, canonical->sals, &lsal);
+    }
+
+  /* ----------------------------- SNIP -----------------------------
+     Anything added to the cleanup chain beyond this point is assumed
+     to be part of a breakpoint.  If the breakpoint create succeeds
+     then the memory is not reclaimed.  */
+  bkpt_chain = make_cleanup (null_cleanup, 0);
+
+
+  /* Fast tracepoints may have additional restrictions on location.  */
+  if (!pending && type_wanted == bp_fast_tracepoint)
+    {
+      int ix;
+      struct linespec_sals *iter;
+
+      for (ix = 0; VEC_iterate (linespec_sals, canonical->sals, ix, iter); ++ix)
+	check_fast_tracepoint_sals (gdbarch, &iter->sals);
+    }
+
+  if (!pending)
+    {
+      struct linespec_sals *lsal;
+
+      lsal = VEC_index (linespec_sals, canonical->sals, 0);
+
+      /* !!Is this necessary?  I cannot seem to trigger this case.  */
+      /* Not all breakpoint types support explicit linespecs.  */
+      if (ops->create_breakpoints_sal_explicit
+	  != base_breakpoint_create_breakpoints_sal_explicit)
+	ops->create_breakpoints_sal_explicit
+	  (gdbarch, canonical, lsal,
+	   extra_string, type_wanted,
+	   tempflag ? disp_del : disp_donttouch,
+	   ignore_count, ops,
+	   from_tty, enabled, internal, flags);
+      else
+	{
+	  int thread = canonical->explicit->thread;
+	  int task = canonical->explicit->task;
+	  char *cond_string = (char *) canonical->explicit->condition;
+
+	  ops->create_breakpoints_sal (gdbarch, canonical, lsal,
+				       cond_string, extra_string, type_wanted,
+				       tempflag ? disp_del : disp_donttouch,
+				       thread, task, ignore_count, ops,
+				       from_tty, enabled, internal, flags);
+	}
+    }
+  else
+    {
+      struct breakpoint *b;
+
+      if (is_tracepoint_type (type_wanted))
+	{
+	  struct tracepoint *t;
+
+	  t = XCNEW (struct tracepoint);
+	  b = &t->base;
+	}
+      else
+	b = XNEW (struct breakpoint);
+
+      init_raw_breakpoint_without_location (b, gdbarch, type_wanted, ops);
+
+      if (canonical->explicit != NULL)
+	b->explicit = copy_explicit_linespec (canonical->explicit);
+      if (canonical->addr_string)
+	b->addr_string = xstrdup (canonical->addr_string);
+      b->cond_string = NULL;
+      b->extra_string = NULL;
+      b->ignore_count = ignore_count;
+      b->disposition = tempflag ? disp_del : disp_donttouch;
+      b->condition_not_parsed = 1;
+      b->enable_state = enabled ? bp_enabled : bp_disabled;
+      if ((type_wanted != bp_breakpoint
+           && type_wanted != bp_hardware_breakpoint)
+	  || canonical->explicit->thread != -1)
+	b->pspace = current_program_space;
+
+      install_breakpoint (internal, b, 0);
+    }
+
+  if (VEC_length (linespec_sals, canonical->sals) > 1)
+    {
+      warning (_("Multiple breakpoints were set.\nUse the "
+		 "\"delete\" command to delete unwanted breakpoints."));
+      prev_breakpoint_count = prev_bkpt_count;
+    }
+
+  /* That's it.  Discard the cleanups for data inserted into the
+     breakpoint.  */
+  discard_cleanups (bkpt_chain);
+
+  /* error call may happen here - have BKPT_CHAIN already discarded.  */
+  update_global_location_list (1);
+
+  return 1;
+}
+
 /* Set a breakpoint.  This function is shared between CLI and MI
    functions for setting a breakpoint.  This function has two major
    modes of operations, selected by the PARSE_CONDITION_AND_THREAD
@@ -9021,11 +9306,9 @@ create_breakpoint (struct gdbarch *gdbarch,
   char *copy_arg = NULL;
   char *addr_start = arg;
   struct linespec_result canonical;
-  struct cleanup *old_chain;
-  struct cleanup *bkpt_chain = NULL;
-  int pending = 0;
-  int task = 0;
-  int prev_bkpt_count = breakpoint_count;
+  struct cleanup *outer, *inner;
+  int result;
+  explicit_linespec *els;
 
   gdb_assert (ops != NULL);
 
@@ -9037,107 +9320,61 @@ create_breakpoint (struct gdbarch *gdbarch,
 				     addr_start, &copy_arg);
     }
 
-  /* If caller is interested in rc value from parse, set value.  */
-  switch (e.reason)
+  if (e.error == GDB_NO_ERROR)
     {
-    case GDB_NO_ERROR:
       if (VEC_empty (linespec_sals, canonical.sals))
 	return 0;
-      break;
-    case RETURN_ERROR:
-      switch (e.error)
-	{
-	case NOT_FOUND_ERROR:
+    }
+  else if (e.error != NOT_FOUND_ERROR
+	   || pending_break_support == AUTO_BOOLEAN_FALSE)
+    throw_exception (e);
 
-	  /* If pending breakpoint support is turned off, throw
-	     error.  */
-
-	  if (pending_break_support == AUTO_BOOLEAN_FALSE)
-	    throw_exception (e);
-
-	  exception_print (gdb_stderr, e);
-
-          /* If pending breakpoint support is auto query and the user
-	     selects no, then simply return the error code.  */
-	  if (pending_break_support == AUTO_BOOLEAN_AUTO
-	      && !nquery (_("Make %s pending on future shared library load? "),
-			  bptype_string (type_wanted)))
-	    return 0;
-
-	  /* At this point, either the user was queried about setting
-	     a pending breakpoint and selected yes, or pending
-	     breakpoint behavior is on and thus a pending breakpoint
-	     is defaulted on behalf of the user.  */
-	  {
-	    struct linespec_sals lsal;
-
-	    copy_arg = xstrdup (addr_start);
-	    lsal.canonical = xstrdup (copy_arg);
-	    lsal.sals.nelts = 1;
-	    lsal.sals.sals = XNEW (struct symtab_and_line);
-	    init_sal (&lsal.sals.sals[0]);
-	    pending = 1;
-	    VEC_safe_push (linespec_sals, canonical.sals, &lsal);
-	  }
-	  break;
-	default:
-	  throw_exception (e);
-	}
-      break;
-    default:
-      throw_exception (e);
+  if (canonical.sals == NULL)
+    {
+      /* Pending breakpoint is being set;  print the exception.  */
+      exception_print (gdb_stderr, e);
     }
 
-  /* Create a chain of things that always need to be cleaned up.  */
-  old_chain = make_cleanup_destroy_linespec_result (&canonical);
+  outer = make_cleanup_destroy_linespec_result (&canonical);
+  inner = make_cleanup (null_cleanup, 0);
 
-  /* ----------------------------- SNIP -----------------------------
-     Anything added to the cleanup chain beyond this point is assumed
-     to be part of a breakpoint.  If the breakpoint create succeeds
-     then the memory is not reclaimed.  */
-  bkpt_chain = make_cleanup (null_cleanup, 0);
+  if (canonical.explicit == NULL)
+    {
+      canonical.explicit = new_explicit_linespec ();
+      if (addr_start)
+	canonical.addr_string = xstrdup (addr_start);
+    }
 
-  /* Resolve all line numbers to PC's and verify that the addresses
-     are ok for the target.  */
-  if (!pending)
+  if (canonical.sals != NULL)
     {
       int ix;
+      int task = 0;
       struct linespec_sals *iter;
 
+      /* Resolve all line numbers to PC's and verify that the addresses
+	 are ok for the target.  */
       for (ix = 0; VEC_iterate (linespec_sals, canonical.sals, ix, iter); ++ix)
 	breakpoint_sals_to_pc (&iter->sals);
-    }
 
-  /* Fast tracepoints may have additional restrictions on location.  */
-  if (!pending && type_wanted == bp_fast_tracepoint)
-    {
-      int ix;
-      struct linespec_sals *iter;
-
-      for (ix = 0; VEC_iterate (linespec_sals, canonical.sals, ix, iter); ++ix)
-	check_fast_tracepoint_sals (gdbarch, &iter->sals);
-    }
-
-  /* Verify that condition can be parsed, before setting any
-     breakpoints.  Allocate a separate condition expression for each
-     breakpoint.  */
-  if (!pending)
-    {
-      struct linespec_sals *lsal;
-
-      lsal = VEC_index (linespec_sals, canonical.sals, 0);
+      /* Verify that condition can be parsed, before setting any
+	 breakpoints.  Allocate a separate condition expression for each
+	 breakpoint.  */
 
       if (parse_condition_and_thread)
         {
 	    char *rest;
+
             /* Here we only parse 'arg' to separate condition
                from thread number, so parsing in context of first
-               sal is OK.  When setting the breakpoint we'll 
+               sal is OK.  When setting the breakpoint we'll
                re-parse it in context of each sal.  */
+
+	    iter = VEC_index (linespec_sals, canonical.sals, 0);
+
             cond_string = NULL;
             thread = -1;
 	    rest = NULL;
-            find_condition_and_thread (arg, lsal->sals.sals[0].pc, &cond_string,
+            find_condition_and_thread (arg, iter->sals.sals[0].pc, &cond_string,
                                        &thread, &task, &rest);
             if (cond_string)
                 make_cleanup (xfree, cond_string);
@@ -9148,75 +9385,141 @@ create_breakpoint (struct gdbarch *gdbarch,
         }
       else
         {
-            /* Create a private copy of condition string.  */
-            if (cond_string)
+	  /* Create a private copy of condition string.  */
+	  if (cond_string)
             {
-                cond_string = xstrdup (cond_string);
-                make_cleanup (xfree, cond_string);
+	      cond_string = xstrdup (cond_string);
+	      make_cleanup (xfree, cond_string);
             }
-            /* Create a private copy of any extra string.  */
-            if (extra_string)
-	      {
-                extra_string = xstrdup (extra_string);
-                make_cleanup (xfree, extra_string);
-	      }
+	  /* Create a private copy of any extra string.  */
+	  if (extra_string)
+	    {
+	      extra_string = xstrdup (extra_string);
+	      make_cleanup (xfree, extra_string);
+	    }
         }
 
-      ops->create_breakpoints_sal (gdbarch, &canonical, lsal,
-				   cond_string, extra_string, type_wanted,
-				   tempflag ? disp_del : disp_donttouch,
-				   thread, task, ignore_count, ops,
-				   from_tty, enabled, internal, flags);
+      canonical.explicit->condition = cond_string;
+      canonical.explicit->thread = thread;
+      canonical.explicit->task = task;
+    }
+
+  result = create_breakpoint_1 (gdbarch, &canonical, extra_string,
+				tempflag, type_wanted, ignore_count,
+				pending_break_support, ops, from_tty,
+				enabled, internal, flags);
+  discard_cleanups (inner);
+  do_cleanups (outer);
+  return result;
+}
+
+/* Like create_breakpoint but for explicit linespecs instead
+   of address strings.  */
+
+int
+create_breakpoint_explicit (struct gdbarch *gdbarch,
+			    explicit_linespec *els,
+			    char *extra_string, int tempflag,
+			    enum bptype type_wanted, int ignore_count,
+			    enum auto_boolean pending_break_support,
+			    const struct breakpoint_ops *ops,
+			    int from_tty, int enabled, int internal,
+			    unsigned flags)
+{
+  volatile struct gdb_exception e;
+  struct linespec_result canonical;
+  struct cleanup *cleanup;
+  int result;
+
+  gdb_assert (ops != NULL);
+
+  init_linespec_result (&canonical);
+
+  TRY_CATCH (e, RETURN_MASK_ALL)
+    {
+      ops->create_sals_from_explicit (els, &canonical, type_wanted);
+    }
+
+  /* Rethrow the exception for any errors except NOT_FOUND_ERROR
+     (to allow the user to set a pending breakpoint).  */
+  if (e.error == GDB_NO_ERROR)
+    {
+      if (VEC_empty (linespec_sals, canonical.sals))
+	return 0;
+    }
+  else if (e.error != NOT_FOUND_ERROR
+	   || pending_break_support == AUTO_BOOLEAN_FALSE)
+    throw_exception (e);
+
+  if (canonical.sals == NULL)
+    {
+      /* Pending breakpoint is being set;  print the exception.  */
+      exception_print (gdb_stderr, e);
+    }
+
+  cleanup = make_cleanup_destroy_linespec_result (&canonical);
+
+  /* If create_sals_from_explicit did not find any SALs, the
+     breakpoint could be pending.  In this case, an appropriate
+     addr_string must be set.  */
+  if (canonical.sals == NULL)
+    {
+      canonical.addr_string = explicit_linespec_to_addr_string (els);
+      canonical.explicit = copy_explicit_linespec (els);
     }
   else
     {
-      struct breakpoint *b;
+      int ix;
+      struct linespec_sals *iter;
 
-      make_cleanup (xfree, copy_arg);
-
-      if (is_tracepoint_type (type_wanted))
-	{
-	  struct tracepoint *t;
-
-	  t = XCNEW (struct tracepoint);
-	  b = &t->base;
-	}
-      else
-	b = XNEW (struct breakpoint);
-
-      init_raw_breakpoint_without_location (b, gdbarch, type_wanted, ops);
-
-      b->addr_string = copy_arg;
-      b->cond_string = NULL;
-      b->extra_string = NULL;
-      b->ignore_count = ignore_count;
-      b->disposition = tempflag ? disp_del : disp_donttouch;
-      b->condition_not_parsed = 1;
-      b->enable_state = enabled ? bp_enabled : bp_disabled;
-      if ((type_wanted != bp_breakpoint
-           && type_wanted != bp_hardware_breakpoint) || thread != -1)
-	b->pspace = current_program_space;
-
-      install_breakpoint (internal, b, 0);
+      /* Resolve all line numbers to PC's and verify that the addresses
+	 are ok for the target.  */
+      for (ix = 0; VEC_iterate (linespec_sals, canonical.sals, ix, iter); ++ix)
+	breakpoint_sals_to_pc (&iter->sals);
     }
-  
-  if (VEC_length (linespec_sals, canonical.sals) > 1)
+
+  /* Validate the thread and task IDs and condition, if any.  */
+  if (els->condition != NULL && canonical.sals != NULL)
     {
-      warning (_("Multiple breakpoints were set.\nUse the "
-		 "\"delete\" command to delete unwanted breakpoints."));
-      prev_breakpoint_count = prev_bkpt_count;
+      char *tok;
+      struct linespec_sals *iter;
+      struct expression *expr;
+      struct cleanup *inner;
+
+      inner = make_cleanup (null_cleanup, NULL);
+      iter = VEC_index (linespec_sals, canonical.sals, 0);
+      tok = xstrdup (els->condition);
+      make_cleanup (xfree, tok);
+
+      /* parse_exp_1 will call error() if the condition does not
+	 parse.  */
+      expr = parse_exp_1 (&tok, block_for_pc (iter->sals.sals[0].pc), 0);
+      xfree (expr);
+      do_cleanups (inner);
+    }
+  if (els->thread != -1)
+    {
+      if (!valid_thread_id (els->thread))
+	invalid_thread_id_error (els->thread);
+    }
+  if (els->task != 0)
+    {
+      if (!valid_task_id (els->task))
+	invalid_task_id_error (els->task);
     }
 
-  /* That's it.  Discard the cleanups for data inserted into the
-     breakpoint.  */
-  discard_cleanups (bkpt_chain);
-  /* But cleanup everything else.  */
-  do_cleanups (old_chain);
+  /* Copy any condition, thread, or task information into the result.  */
+  if (els->condition != NULL)
+    canonical.explicit->condition = xstrdup (els->condition);
+  canonical.explicit->thread = els->thread;
+  canonical.explicit->task = els->task;
 
-  /* error call may happen here - have BKPT_CHAIN already discarded.  */
-  update_global_location_list (1);
-
-  return 1;
+  result = create_breakpoint_1 (gdbarch, &canonical, extra_string,
+				tempflag, type_wanted, ignore_count,
+				pending_break_support, ops, from_tty,
+				enabled, internal, flags);
+  do_cleanups (cleanup);
+  return result;
 }
 
 /* Set a breakpoint.
@@ -9242,17 +9545,82 @@ break_command_1 (char *arg, int flag, int from_tty)
   else
     ops = &bkpt_breakpoint_ops;
 
-  create_breakpoint (get_current_arch (),
-		     arg,
-		     NULL, 0, NULL, 1 /* parse arg */,
-		     tempflag, type_wanted,
-		     0 /* Ignore count */,
-		     pending_break_support,
-		     ops,
-		     from_tty,
-		     1 /* enabled */,
-		     0 /* internal */,
-		     0);
+  if (arg != NULL && arg[0] == '-' && isalpha (arg[1]))
+    {
+      char **argv, *cond_string;
+      explicit_linespec *els;
+      struct cleanup *cleanup;
+
+      els = new_explicit_linespec ();
+      cleanup = make_cleanup (free_explicit_linespec, els);
+
+      /* Turn ARG_STRING into argument vector and process arguments.  */
+      argv = gdb_buildargv (arg);
+      make_cleanup_freeargv (argv);
+
+#define ASSIGN_OARG(D,EXPR)			\
+      do {					\
+	if (oarg != NULL) els->D = (EXPR);	\
+      } while (0)
+      for (; *argv != NULL; argv += 2)
+	{
+	  int len = strlen (*argv);
+	  char *oarg = argv[1];
+
+	  /* All options have a required argument.  */
+	  if (strncmp (*argv, "-source", len) == 0)
+	    ASSIGN_OARG (source_filename, xstrdup (oarg));
+	  else if (strncmp (*argv, "-function", len) == 0)
+	    ASSIGN_OARG (function_name, xstrdup (oarg));
+	  else if (strncmp (*argv, "-label", len) == 0)
+	    ASSIGN_OARG (label_name, xstrdup (oarg));
+	  else if (strncmp (*argv, "-offset", len) == 0)
+	    ASSIGN_OARG (offset, xstrdup (oarg));
+	  else if (strncmp (*argv, "-thread", len) == 0)
+	    ASSIGN_OARG (thread, atol (oarg));
+	  else if (strncmp (*argv, "-task", len) == 0)
+	    ASSIGN_OARG (task, atol (oarg));
+	  else if (strncmp (*argv, "-condition", len) == 0)
+	    ASSIGN_OARG (condition, xstrdup (oarg));
+	  else if (strncmp (*argv, "-expression", len) == 0)
+	    ASSIGN_OARG (expression, xstrdup (oarg));
+	  else
+	    error (_("invalid linespec argument, \"%s\""), *argv);
+
+	  /* It's a little lame to error after the fact, but in this
+	     case, it provides a much better user experience to issue
+	     the "invalid linespec argument" error before any missing
+	     argument error.  */
+	  if (oarg == NULL)
+	    error (_("missing argument for \"%s\""), *argv);
+	}
+#undef ASSIGN_OARG
+
+      create_breakpoint_explicit (get_current_arch (),
+				  els, NULL,
+				  tempflag, type_wanted,
+				  0 /* Ignore count */,
+				  pending_break_support,
+				  &bkpt_breakpoint_ops,
+				  from_tty,
+				  1 /* enabled */,
+				  0 /* internal */,
+				  0);
+
+      do_cleanups (cleanup);
+    }
+  else
+    create_breakpoint (get_current_arch (),
+		       arg,
+		       NULL, 0, NULL, 1 /* parse arg */,
+		       tempflag, type_wanted,
+		       0 /* Ignore count */,
+		       pending_break_support,
+		       ops,
+		       from_tty,
+		       1 /* enabled */,
+		       0 /* internal */,
+		       0);
 }
 
 /* Helper function for break_command_1 and disassemble_command.  */
@@ -10396,7 +10764,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
 
 	      /* Check if the thread actually exists.  */
 	      if (!valid_thread_id (thread))
-		error (_("Unknown thread %d."), thread);
+		invalid_thread_id_error (thread);
 	    }
 	  else if (toklen == 4 && !strncmp (tok, "mask", 4))
 	    {
@@ -12273,6 +12641,7 @@ base_breakpoint_dtor (struct breakpoint *self)
   xfree (self->addr_string);
   xfree (self->filter);
   xfree (self->addr_string_range_end);
+  free_explicit_linespec (self->explicit);
 }
 
 static struct bp_location *
@@ -12374,6 +12743,17 @@ base_breakpoint_create_sals_from_address (char **arg,
   internal_error_pure_virtual_called ();
 }
 
+/* The base implementation of the create_sals_from_explicit method of
+   breakpoint_ops.  */
+
+static void
+base_breakpoint_create_sals_from_explicit (explicit_linespec *els,
+					   struct linespec_result *canonical,
+					   enum bptype type_wanted)
+{
+  internal_error_pure_virtual_called ();
+}
+
 static void
 base_breakpoint_create_breakpoints_sal (struct gdbarch *gdbarch,
 					struct linespec_result *c,
@@ -12391,9 +12771,38 @@ base_breakpoint_create_breakpoints_sal (struct gdbarch *gdbarch,
   internal_error_pure_virtual_called ();
 }
 
+/* The base implementation of the create_breakpoints_sal_explicit
+   method of breakpoint_ops.  */
+
+static void
+base_breakpoint_create_breakpoints_sal_explicit (struct gdbarch *gdbarch,
+						 struct linespec_result *c,
+						 struct linespec_sals *lsal,
+						 char *extra_string,
+						 enum bptype type_wanted,
+						 enum bpdisp disposition,
+						 int ignore_count,
+						 const struct breakpoint_ops *o,
+						 int from_tty, int enabled,
+						 int internal, unsigned flags)
+{
+  internal_error_pure_virtual_called ();
+}
+
 static void
 base_breakpoint_decode_linespec (struct breakpoint *b, char **s,
 				 struct symtabs_and_lines *sals)
+{
+  internal_error_pure_virtual_called ();
+}
+
+/* The base implementation of the decode_linespec_explicit method
+   of breakpoint_ops.  */
+
+static void
+base_breakpoint_decode_linespec_explicit (struct breakpoint *b,
+					  explicit_linespec *els,
+					  struct symtabs_and_lines *sals)
 {
   internal_error_pure_virtual_called ();
 }
@@ -12415,8 +12824,11 @@ static struct breakpoint_ops base_breakpoint_ops =
   base_breakpoint_print_mention,
   base_breakpoint_print_recreate,
   base_breakpoint_create_sals_from_address,
+  base_breakpoint_create_sals_from_explicit,
   base_breakpoint_create_breakpoints_sal,
+  base_breakpoint_create_breakpoints_sal_explicit,
   base_breakpoint_decode_linespec,
+  base_breakpoint_decode_linespec_explicit
 };
 
 /* Default breakpoint_ops methods.  */
@@ -12425,7 +12837,7 @@ static void
 bkpt_re_set (struct breakpoint *b)
 {
   /* FIXME: is this still reachable?  */
-  if (b->addr_string == NULL)
+  if (b->addr_string == NULL && !explicit_linespec_is_valid_p (b->explicit))
     {
       /* Anything without a string can't be re-set.  */
       delete_breakpoint (b);
@@ -12580,6 +12992,16 @@ bkpt_create_sals_from_address (char **arg,
 				    addr_start, copy_arg);
 }
 
+/* The default breakpoint_ops method for create_sals_from_explicit.  */
+
+static void
+bkpt_create_sals_from_explicit (explicit_linespec *els,
+				struct linespec_result *canonical,
+				enum bptype type_wanted)
+{
+  create_sals_from_explicit_default (els, canonical, type_wanted);
+}
+
 static void
 bkpt_create_breakpoints_sal (struct gdbarch *gdbarch,
 			     struct linespec_result *canonical,
@@ -12602,11 +13024,42 @@ bkpt_create_breakpoints_sal (struct gdbarch *gdbarch,
 				  enabled, internal, flags);
 }
 
+/* The default breakpoint_ops method for create_breakpoints_sal_explicit.  */
+
+static void
+bkpt_create_breakpoints_sal_explicit (struct gdbarch *gdbarch,
+				      struct linespec_result *canonical,
+				      struct linespec_sals *lsal,
+				      char *extra_string,
+				      enum bptype type_wanted,
+				      enum bpdisp disposition,
+				      int ignore_count,
+				      const struct breakpoint_ops *ops,
+				      int from_tty, int enabled,
+				      int internal, unsigned flags)
+{
+  create_breakpoints_sal_explicit_default (gdbarch, canonical, lsal,
+					   extra_string, type_wanted,
+					   disposition, ignore_count,
+					   ops, from_tty, enabled,
+					   internal, flags);
+}
+
 static void
 bkpt_decode_linespec (struct breakpoint *b, char **s,
 		      struct symtabs_and_lines *sals)
 {
   decode_linespec_default (b, s, sals);
+}
+
+/* The default breakpoint_ops method for decode_linespec_explicit.  */
+
+static void
+bkpt_decode_linespec_explicit (struct breakpoint *b,
+			       explicit_linespec *els,
+			       struct symtabs_and_lines *sals)
+{
+  decode_linespec_explicit_default (b, els, sals);
 }
 
 /* Virtual table for internal breakpoints.  */
@@ -12925,11 +13378,43 @@ tracepoint_create_breakpoints_sal (struct gdbarch *gdbarch,
 				  enabled, internal, flags);
 }
 
+/* The tracepoint implementation of the create_breakpoints_sal_explicit
+   method of breakpoint_ops.  */
+
+static void
+tracepoint_create_breakpoints_sal_explicit (struct gdbarch *gdbarch,
+					    struct linespec_result *canonical,
+					    struct linespec_sals *lsal,
+					    char *extra_string,
+					    enum bptype type_wanted,
+					    enum bpdisp disposition,
+					    int ignore_count,
+					    const struct breakpoint_ops *ops,
+					    int from_tty, int enabled,
+					    int internal, unsigned flags)
+{
+  create_breakpoints_sal_explicit_default (gdbarch, canonical, lsal,
+					   extra_string, type_wanted,
+					   disposition, ignore_count, ops,
+					   from_tty, enabled, internal, flags);
+}
+
 static void
 tracepoint_decode_linespec (struct breakpoint *b, char **s,
 			    struct symtabs_and_lines *sals)
 {
   decode_linespec_default (b, s, sals);
+}
+
+/* The tracepoint-specific implementation of the decode_linespec_explicit
+   method of breakpoint_ops.  */
+
+static void
+tracepoint_decode_linespec_explicit (struct breakpoint *b,
+				     explicit_linespec *els,
+				     struct symtabs_and_lines *sals)
+{
+  decode_linespec_explicit_default (b, els, sals);
 }
 
 struct breakpoint_ops tracepoint_breakpoint_ops;
@@ -13016,7 +13501,7 @@ strace_marker_create_breakpoints_sal (struct gdbarch *gdbarch,
 
       tp = XCNEW (struct tracepoint);
       init_breakpoint_sal (&tp->base, gdbarch, expanded,
-			   addr_string, NULL,
+			   addr_string, NULL, NULL,
 			   cond_string, extra_string,
 			   type_wanted, disposition,
 			   thread, task, ignore_count, ops,
@@ -13509,6 +13994,8 @@ update_breakpoint_locations (struct breakpoint *b,
 
       /* Reparse conditions, they might contain references to the
 	 old symtab.  */
+      if (b->explicit != NULL && b->explicit->condition != NULL)
+	b->cond_string = xstrdup (b->explicit->condition);
       if (b->cond_string != NULL)
 	{
 	  char *s;
@@ -13614,7 +14101,7 @@ addr_string_to_sals (struct breakpoint *b, char *addr_string, int *found)
 	 breakpoint being disabled, and don't want to see more
 	 errors.  */
       if (e.error == NOT_FOUND_ERROR
-	  && (b->condition_not_parsed 
+	  && (b->condition_not_parsed
 	      || (b->loc && b->loc->shlib_disabled)
 	      || (b->loc && b->loc->pspace->executing_startup)
 	      || b->enable_state == bp_disabled))
@@ -13669,6 +14156,69 @@ addr_string_to_sals (struct breakpoint *b, char *addr_string, int *found)
   return sals;
 }
 
+/* Find the SaL locations corresponding to the given explicit linespec,
+   ELS.  On return, FOUND will be 1 if any SaL was found, zero otherwise.  */
+
+static struct symtabs_and_lines
+explicit_to_sals (struct breakpoint *b, explicit_linespec *els, int *found)
+{
+  struct symtabs_and_lines sals = {0};
+  volatile struct gdb_exception e;
+
+  gdb_assert (b->ops != NULL);
+
+  TRY_CATCH (e, RETURN_MASK_ERROR)
+    {
+      b->ops->decode_linespec_explicit (b, els, &sals);
+    }
+  if (e.reason < 0)
+    {
+      int not_found_and_ok = 0;
+      /* For pending breakpoints, it's expected that parsing will
+	 fail until the right shared library is loaded.  User has
+	 already told to create pending breakpoints and don't need
+	 extra messages.  If breakpoint is in bp_shlib_disabled
+	 state, then user already saw the message about that
+	 breakpoint being disabled, and don't want to see more
+	 errors.  */
+      if (e.error == NOT_FOUND_ERROR
+	  && (b->condition_not_parsed
+	      || (b->loc && b->loc->shlib_disabled)
+	      || (b->loc && b->loc->pspace->executing_startup)
+	      || b->enable_state == bp_disabled))
+	not_found_and_ok = 1;
+
+      if (!not_found_and_ok)
+	{
+	  /* We surely don't want to warn about the same breakpoint
+	     10 times.  One solution, implemented here, is disable
+	     the breakpoint on error.  Another solution would be to
+	     have separate 'warning emitted' flag.  Since this
+	     happens only when a binary has changed, I don't know
+	     which approach is better.  */
+	  b->enable_state = bp_disabled;
+	  throw_exception (e);
+	}
+    }
+
+  if (e.reason == 0 || e.error != NOT_FOUND_ERROR)
+    {
+      int i;
+
+      for (i = 0; i < sals.nelts; ++i)
+	resolve_sal_pc (&sals.sals[i]);
+
+      if (b->type == bp_static_tracepoint && !strace_marker_p (b))
+	sals.sals[0] = update_static_tracepoint (b, sals.sals[0]);
+
+      *found = 1;
+    }
+  else
+    *found = 0;
+
+  return sals;
+}
+
 /* The default re_set method, for typical hardware or software
    breakpoints.  Reevaluate the breakpoint and recreate its
    locations.  */
@@ -13681,7 +14231,11 @@ breakpoint_re_set_default (struct breakpoint *b)
   struct symtabs_and_lines expanded = {0};
   struct symtabs_and_lines expanded_end = {0};
 
-  sals = addr_string_to_sals (b, b->addr_string, &found);
+  if (explicit_linespec_is_valid_p (b->explicit))
+    sals = explicit_to_sals (b, b->explicit, &found);
+  else
+    sals = addr_string_to_sals (b, b->addr_string, &found);
+
   if (found)
     {
       make_cleanup (xfree, sals.sals);
@@ -13713,6 +14267,29 @@ create_sals_from_address_default (char **arg,
   parse_breakpoint_sals (arg, canonical);
 }
 
+/* Default method for creating SaLs from an explicit linespec.  Returns
+   1 for success, zero for failure.  */
+
+static void
+create_sals_from_explicit_default (explicit_linespec *els,
+				   struct linespec_result *canonical,
+				   enum bptype type_wanted)
+{
+  /* Force almost all breakpoints to be in terms of the
+     current_source_symtab (which is decode_line_1's default).
+     This should produce the results we want almost all of the
+     time while leaving default_breakpoint_* alone.  */
+  if (last_displayed_sal_is_valid ())
+    decode_explicit_linespec (els, DECODE_LINE_FUNFIRSTLINE,
+			      get_last_displayed_symtab (),
+			      get_last_displayed_line (),
+			      canonical, NULL, NULL);
+  else
+    decode_explicit_linespec (els, DECODE_LINE_FUNFIRSTLINE,
+			      (struct symtab *) NULL, 0,
+			      canonical, NULL, NULL);
+}
+
 /* Call create_breakpoints_sal for the given arguments.  This is the default
    function for the `create_breakpoints_sal' method of
    breakpoint_ops.  */
@@ -13738,6 +14315,27 @@ create_breakpoints_sal_default (struct gdbarch *gdbarch,
 			  enabled, internal, flags);
 }
 
+/* Call create_breakpoints_sal_explicit for the given arguments.
+   This is the default function for the `create_breakpoints_sal_explicit'
+   method of breakpoint_ops.  */
+
+static void
+create_breakpoints_sal_explicit_default (struct gdbarch *gdbarch,
+					 struct linespec_result *canonical,
+					 struct linespec_sals *lsal,
+					 char *extra_string,
+					 enum bptype type_wanted,
+					 enum bpdisp disposition,
+					 int ignore_count,
+					 const struct breakpoint_ops *ops,
+					 int from_tty, int enabled,
+					 int internal, unsigned flags)
+{
+  create_breakpoints_sal_explicit (gdbarch, canonical, extra_string,
+				   type_wanted, disposition, ignore_count,
+				   ops, from_tty, enabled, internal, flags);
+}
+
 /* Decode the line represented by S by calling decode_line_full.  This is the
    default function for the `decode_linespec' method of breakpoint_ops.  */
 
@@ -13752,6 +14350,40 @@ decode_linespec_default (struct breakpoint *b, char **s,
 		    (struct symtab *) NULL, 0,
 		    &canonical, multiple_symbols_all,
 		    b->filter);
+
+  /* We should get 0 or 1 resulting SALs.  */
+  gdb_assert (VEC_length (linespec_sals, canonical.sals) < 2);
+
+  if (VEC_length (linespec_sals, canonical.sals) > 0)
+    {
+      struct linespec_sals *lsal;
+
+      lsal = VEC_index (linespec_sals, canonical.sals, 0);
+      *sals = lsal->sals;
+      /* Arrange it so the destructor does not free the
+	 contents.  */
+      lsal->sals.sals = NULL;
+    }
+
+  destroy_linespec_result (&canonical);
+}
+
+/* Decode the line represented by ELS by calling decode_explicit_linespec.
+   This is the default function for the `decode_explicit_linespec' method
+   of breakpoint_ops.  */
+
+static void
+decode_linespec_explicit_default (struct breakpoint *b,
+				  explicit_linespec *els,
+				  struct symtabs_and_lines *sals)
+{
+  struct linespec_result canonical;
+
+  init_linespec_result (&canonical);
+  decode_explicit_linespec (els, DECODE_LINE_FUNFIRSTLINE,
+			    (struct symtab *) NULL, 0,
+			    &canonical, multiple_symbols_all,
+			    b->filter);
 
   /* We should get 0 or 1 resulting SALs.  */
   gdb_assert (VEC_length (linespec_sals, canonical.sals) < 2);
@@ -15308,8 +15940,11 @@ initialize_breakpoint_ops (void)
   ops->remove_location = bkpt_remove_location;
   ops->breakpoint_hit = bkpt_breakpoint_hit;
   ops->create_sals_from_address = bkpt_create_sals_from_address;
+  ops->create_sals_from_explicit = bkpt_create_sals_from_explicit;
   ops->create_breakpoints_sal = bkpt_create_breakpoints_sal;
+  ops->create_breakpoints_sal_explicit = bkpt_create_breakpoints_sal_explicit;
   ops->decode_linespec = bkpt_decode_linespec;
+  ops->decode_linespec_explicit = bkpt_decode_linespec_explicit;
 
   /* The breakpoint_ops structure to be used in regular breakpoints.  */
   ops = &bkpt_breakpoint_ops;
@@ -15400,7 +16035,10 @@ initialize_breakpoint_ops (void)
   ops->print_recreate = tracepoint_print_recreate;
   ops->create_sals_from_address = tracepoint_create_sals_from_address;
   ops->create_breakpoints_sal = tracepoint_create_breakpoints_sal;
+  ops->create_breakpoints_sal_explicit
+    = tracepoint_create_breakpoints_sal_explicit;
   ops->decode_linespec = tracepoint_decode_linespec;
+  ops->decode_linespec_explicit = tracepoint_decode_linespec_explicit;
 
   /* Probe tracepoints.  */
   ops = &tracepoint_probe_breakpoint_ops;

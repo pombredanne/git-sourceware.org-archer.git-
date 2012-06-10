@@ -18,6 +18,7 @@
 #define LINESPEC_H 1
 
 struct symtab;
+struct explicit_linespec;
 
 #include "vec.h"
 
@@ -53,6 +54,36 @@ struct linespec_sals
 typedef struct linespec_sals linespec_sals;
 DEF_VEC_O (linespec_sals);
 
+/* Specification of an explicit linespec.  */
+
+struct explicit_linespec
+{
+  /* An expression, *expr  */
+  const char *expression;
+
+  /* The source filename  */
+  const char *source_filename;
+
+  /* The function name  */
+  const char *function_name;
+
+  /* The name of a label  */
+  const char *label_name;
+
+  /* An offset  */
+  const char *offset;
+
+  /* A breakpoint condition  */
+  const char *condition;
+
+  /* Task number in which to stop  */
+  int task;
+
+  /* Thread in which to stop  */
+  int thread;
+};
+typedef struct explicit_linespec explicit_linespec;
+
 /* An instance of this may be filled in by decode_line_1.  The caller
    must call init_linespec_result to initialize it and
    destroy_linespec_result to destroy it.  The caller must make copies
@@ -75,6 +106,10 @@ struct linespec_result
      by the user.  This will be freed by destroy_linespec_result.  */
   char *addr_string;
 
+  /* The explicit linespec returned by the parser or NULL if the
+     input could not be parsed.  */
+  struct explicit_linespec *explicit;
+
   /* The sals.  The vector will be freed by
      destroy_linespec_result.  */
   VEC (linespec_sals) *sals;
@@ -92,6 +127,22 @@ extern void destroy_linespec_result (struct linespec_result *);
 
 extern struct cleanup *
         make_cleanup_destroy_linespec_result (struct linespec_result *);
+
+/* Allocate and initialize a new explicit_linespec.  */
+extern explicit_linespec *new_explicit_linespec (void);
+
+/* Free the explicit linespec represented by OBJ.  */
+extern void free_explicit_linespec (void *obj);
+
+/* Is ELS valid?  */
+extern int explicit_linespec_is_valid_p (explicit_linespec *els);
+
+/* Copy the given explicit linespec.  Free memory with
+   free_explicit_linespec.  */
+extern explicit_linespec *copy_explicit_linespec (explicit_linespec *src);
+
+/* Return an addr_string-like representation of the explicit linespec ELS.  */
+extern char *explicit_linespec_to_addr_string (explicit_linespec *els);
 
 extern struct symtabs_and_lines
 	decode_line_1 (char **argptr, int flags,
@@ -139,4 +190,10 @@ extern void decode_line_full (char **argptr, int flags,
 			      const char *select_mode,
 			      const char *filter);
 
+extern void decode_explicit_linespec (struct explicit_linespec *els, int flags,
+				      struct symtab *default_symtab,
+				      int default_line,
+				      struct linespec_result *canonical,
+				      const char *select_mode,
+				      const char *filter);
 #endif /* defined (LINESPEC_H) */

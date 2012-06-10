@@ -246,6 +246,84 @@ proc test_breakpoint_commands {} {
     mi_expect_stop "exited-normally" "" "" "" "" "" "test hitting breakpoint with commands"
 }
 
+# Test explicit breakpoints.  These tests only test the MI portion of the
+# code.  In-depth testing of explicit breakpoints is accomplished in
+# gdb.linespec tests.
+
+proc test_explicit_breakpoints {} {
+    global mi_gdb_prompt
+    global srcfile
+    global hex
+    global line_callee4_head line_callee4_body
+    global line_callee3_head line_callee3_body
+    global line_callee2_head line_callee2_body
+    global line_callee1_head line_callee1_body
+    global line_main_head    line_main_body
+    global fullname
+
+    mi_delete_breakpoints
+
+    # Insert some breakpoints and list them
+    # Also, disable some so they do not interfere with other tests
+    # Tests:
+    # -break-insert -t -e -f main
+    # -break-insert -t -e -s basics.c -f callee2
+    # -break-insert -t -e -s basics.c -o $line_callee3_head
+    # -break-insert -t -e -s srcfile -o $line_callee4_head
+    # -break-list
+
+    mi_create_breakpoint "-t -e -f main" 10 del main ".*$srcfile" \
+	$line_main_body $hex "insert temp explicit breakpoint at -f main"
+
+    mi_create_breakpoint "-t -e -s $srcfile -f callee2" 11 del \
+	callee2 ".*$srcfile" $line_callee2_body $hex \
+	"insert temp explicit breakpoint at -s $srcfile -f callee2"
+
+    mi_create_breakpoint "-t -e -s $srcfile -o $line_callee3_head" \
+	12 del callee3 ".*$srcfile" $line_callee3_head $hex \
+	"insert temp explicit breakpoint at -s $srcfile -o $line_callee3_head"
+
+    mi_create_breakpoint \
+	"-t -e -s \"$srcfile\" -o $line_callee4_head" \
+	13 del callee4 ".*$srcfile" $line_callee4_head $hex \
+	"insert temp explicit breakpoint at -s \"<fullfilename>\" -o \$line_callee4_head"
+
+    mi_gdb_test "888-break-list" \
+     	    "888\\\^done,BreakpointTable=\{nr_rows=\".\",nr_cols=\".\",hdr=\\\[\{width=\".*\",alignment=\".*\",col_name=\"number\",colhdr=\"Num\"\}.*colhdr=\"Type\".*colhdr=\"Disp\".*colhdr=\"Enb\".*colhdr=\"Address\".*colhdr=\"What\".*\\\],body=\\\[bkpt=\{number=\"10\",type=\"breakpoint\",disp=\"del\",enabled=\"y\",addr=\"$hex\",func=\"main\",file=\".*$srcfile\",${fullname},line=\"$line_main_body\",times=\"0\",original-location=\".*\"\}.*\\\]\}" \
+                "list of explicit breakpoints"
+
+    mi_gdb_test "999-break-delete" \
+	    "999\\^done" \
+	    "delete temp breakpoints"
+
+    mi_create_breakpoint "-c \"intarg == 3\" -e -f callee2" \
+	14 keep callee2 ".*$srcfile" $line_callee2_body $hex \
+	"insert explicit conditional breakpoint at -f callee2" \
+	"intarg == 3"
+
+    # mi_create_breakpoint cannot deal with displaying canonical
+    # linespecs.
+    mi_gdb_test \
+	"1000-break-insert -c \"foo == 3\" -e -s $srcfile -f main -l label" \
+	".*No symbol \"foo\" in current context.*"
+
+    mi_gdb_test \
+	"1001-break-insert -e -s foobar.c -offset 3" \
+	".*No source file named foobar.c.*"
+
+    mi_gdb_test \
+	"1002-break-insert -e -s $srcfile -f foobar" \
+	".*Function \"foobar\" not defined in \"$srcfile\".*"
+
+    mi_gdb_test \
+	"1003-break-insert -e -s $srcfile -f main -label foobar" \
+	".*No label \"foobar\" defined in function \"main\".*"
+
+    mi_gdb_test \
+	"1004-break-insert -e -s $srcfile" \
+	".*Source filename requires function, label, or offset.*"
+}
+
 test_tbreak_creation_and_listing
 test_rbreak_creation_and_listing
 
@@ -256,6 +334,8 @@ test_error
 test_disabled_creation
 
 test_breakpoint_commands
+
+test_explicit_breakpoints
 
 mi_gdb_exit
 return 0

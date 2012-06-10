@@ -1,0 +1,94 @@
+# Copyright 2012 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Tests for explicit linespecs
+
+set base cpexplicit
+set srcfile "$base.cc"
+set testfile "$base.exp"
+set exefile $base
+
+if {[skip_cplus_tests]} {
+    unsupported "skipping C++ tests"
+    return
+}
+
+if {[prepare_for_testing $testfile $exefile $srcfile \
+	 {c++ debug nowarnings}]} {
+    return -1
+}
+
+# Test the given (explicit) LINESPEC which should cause gdb to break
+# at LOCATION.
+proc test_breakpoint {linespec location} {
+
+    # Delete all breakpoints, set a new breakpoint at LINESPEC,
+    # and attempt to run to it.
+    delete_breakpoints
+    gdb_breakpoint $linespec
+    gdb_continue_to_breakpoint $linespec $location
+}
+
+# Add the given LINESPEC to the array named in THEARRAY.  GDB is expected
+# to stop at LOCATION.
+proc add {thearray linespec location} {
+    upvar $thearray ar
+
+    lappend ar(linespecs) $linespec
+    lappend ar(locations) $location
+}
+
+# Make sure variables are not already in use
+unset -nocomplain lineno location linespecs
+
+# Some locations used in this test
+set lineno(normal) [gdb_get_line_number "myfunction location" $srcfile]
+set lineno(entry) [gdb_get_line_number "entry location" $srcfile]
+set lineno(top) [gdb_get_line_number "top location" $srcfile]
+foreach v [array names lineno] {
+    set location($v) ".*[string_to_regexp "$srcfile:$lineno($v)"].*"
+}
+
+# A list of explicit linespecs and the corresponding location
+set linespecs(linespecs) {}
+set linespecs(location) {}
+
+add linespecs "-source $srcfile -function myclass::myfunction" $location(normal)
+add linespecs "-source $srcfile -function myclass::myfunction -label top" \
+    $location(top)
+
+# This isn't implemented yet; -offset is silently ignored.
+add linespecs "-source $srcfile -function myclass::myfunction -label top -offset 3" \
+    $location(top)
+add linespecs "-source $srcfile -offset $lineno(top)" $location(top)
+add linespecs "-function myclass::myfunction" $location(normal)
+add linespecs "-function myclass::myfunction -label top" $location(top)
+
+# These are also not yet supported; -offset is silently ignored.
+add linespecs "-function myclass::myfunction -offset 3" $location(normal)
+add linespecs "-function myclass::myfunction -label top -offset 3" $location(top)
+add linespecs "-offset 3" $location(normal)
+add linespecs "-expression *myclass::myfunction" $location(entry)
+
+# Fire up gdb.
+if {![runto_main]} {
+    return -1
+}
+
+# Test explicit linespecs, with and without conditions.
+foreach linespec $linespecs(linespecs) loc_pattern $linespecs(locations) {
+    # Test the linespec
+    test_breakpoint $linespec $loc_pattern
+}

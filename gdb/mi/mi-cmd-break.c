@@ -23,6 +23,7 @@
 #include "ui-out.h"
 #include "mi-out.h"
 #include "breakpoint.h"
+#include "linespec.h"
 #include "gdb_string.h"
 #include "mi-getopt.h"
 #include "gdb.h"
@@ -59,6 +60,70 @@ enum bp_type
     REGEXP_BP
   };
 
+static void
+mi_create_explicit_breakpoint (struct gdbarch *gdbarch, int argc, char *argv[],
+			       char *condition, int thread, int task,
+			       int tempflag,
+			       enum bptype wanted_type, int ignore_count,
+			       enum auto_boolean pending_break_support,
+			       const struct breakpoint_ops *ops,
+			       int from_tty, int enabled, int internal,
+			       unsigned flags)
+{
+  struct cleanup *cleanup;
+  enum opt { EXPR_OPT, SOURCE_OPT, FUNCTION_OPT, LABEL_OPT, OFFSET_OPT };
+  static const struct mi_opt opts[] =
+    {
+      {"e", EXPR_OPT, 1},
+      {"s", SOURCE_OPT, 1},
+      {"f", FUNCTION_OPT, 1},
+      {"l", LABEL_OPT, 1},
+      {"o", OFFSET_OPT, 1},
+      {0, 0, 0}
+    };
+
+  int oind = 0;
+  char *oarg;
+  explicit_linespec *els;
+
+  els = new_explicit_linespec ();
+  cleanup = make_cleanup (xfree, els);
+  els->condition = condition;
+  els->thread = thread;
+  els->task = task;
+
+  while (1)
+    {
+      int opt = mi_getopt ("-break-insert -e", argc, argv, opts,
+			   &oind, &oarg);
+      if (opt < 0)
+	break;
+      switch ((enum opt) opt)
+	{
+	case SOURCE_OPT:
+	  els->source_filename = oarg;
+	  break;
+	case FUNCTION_OPT:
+	  els->function_name = oarg;
+	  break;
+	case LABEL_OPT:
+	  els->label_name = oarg;
+	  break;
+	case OFFSET_OPT:
+	  els->offset = oarg;
+	  break;
+	}
+    }
+
+  if (oind < argc -1)
+    error (_("-break-insert: Garbage following explicit <location>"));
+
+  create_breakpoint_explicit (gdbarch, els, NULL, tempflag, wanted_type,
+			      ignore_count, pending_break_support, ops,
+			      from_tty, enabled, internal, flags);
+  do_cleanups (cleanup);
+}
+
 /* Implements the -break-insert command.
    See the MI manual for the list of possible options.  */
 
@@ -74,6 +139,8 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
   int pending = 0;
   int enabled = 1;
   int tracepoint = 0;
+  int task = 0;
+  int explicit = 0;
   struct cleanup *back_to;
   enum bptype type_wanted;
 
@@ -81,7 +148,7 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
     {
       HARDWARE_OPT, TEMP_OPT, CONDITION_OPT,
       IGNORE_COUNT_OPT, THREAD_OPT, PENDING_OPT, DISABLE_OPT,
-      TRACEPOINT_OPT,
+      TRACEPOINT_OPT, TASK_OPT, EXPLICIT_OPT
     };
   static const struct mi_opt opts[] =
   {
@@ -93,6 +160,8 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
     {"f", PENDING_OPT, 0},
     {"d", DISABLE_OPT, 0},
     {"a", TRACEPOINT_OPT, 0},
+    {"k", TASK_OPT, 1},
+    {"e", EXPLICIT_OPT, 0},
     { 0, 0, 0 }
   };
 
@@ -101,7 +170,10 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
   int oind = 0;
   char *oarg;
 
-  while (1)
+  /* Only loop over options until the last option is seen
+     (OPT < 0) or explicit is set.  Everything else is considered
+     the linespec.  */
+  while (!explicit)
     {
       int opt = mi_getopt ("-break-insert", argc, argv,
 			   opts, &oind, &oarg);
@@ -133,14 +205,22 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
 	case TRACEPOINT_OPT:
 	  tracepoint = 1;
 	  break;
+	case TASK_OPT:
+	  task = atol (oarg);
+	case EXPLICIT_OPT:
+	  explicit = 1;
+	  break;
 	}
     }
 
   if (oind >= argc)
     error (_("-break-insert: Missing <location>"));
-  if (oind < argc - 1)
-    error (_("-break-insert: Garbage following <location>"));
-  address = argv[oind];
+  if (!explicit)
+    {
+      if (oind < argc - 1)
+	error (_("-break-insert: Garbage following <location>"));
+      address = argv[oind];
+    }
 
   /* Now we have what we need, let's insert the breakpoint!  */
   if (! mi_breakpoint_observers_installed)
@@ -163,13 +243,22 @@ mi_cmd_break_insert (char *command, char **argv, int argc)
 		 ? (hardware ? bp_fast_tracepoint : bp_tracepoint)
 		 : (hardware ? bp_hardware_breakpoint : bp_breakpoint));
 
-  create_breakpoint (get_current_arch (), address, condition, thread,
-		     NULL,
-		     0 /* condition and thread are valid.  */,
-		     temp_p, type_wanted,
-		     ignore_count,
-		     pending ? AUTO_BOOLEAN_TRUE : AUTO_BOOLEAN_FALSE,
-		     &bkpt_breakpoint_ops, 0, enabled, 0, 0);
+  if (explicit)
+    mi_create_explicit_breakpoint (get_current_arch (), argc - oind,
+				   &argv[oind], condition, thread,
+				   task, temp_p,
+				   type_wanted, ignore_count,
+				   (pending
+				    ? AUTO_BOOLEAN_TRUE : AUTO_BOOLEAN_FALSE),
+				   &bkpt_breakpoint_ops, 0, enabled, 0, 0);
+  else
+    create_breakpoint (get_current_arch (), address, condition, thread,
+		       NULL,
+		       0 /* condition and thread are valid.  */,
+		       temp_p, type_wanted,
+		       ignore_count,
+		       pending ? AUTO_BOOLEAN_TRUE : AUTO_BOOLEAN_FALSE,
+		       &bkpt_breakpoint_ops, 0, enabled, 0, 0);
   do_cleanups (back_to);
 
 }

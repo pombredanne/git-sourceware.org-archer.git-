@@ -1,0 +1,166 @@
+# Copyright 2012 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# Tests for explicit linespecs
+
+set base explicit
+set srcfile "$base.c"
+set testfile "$base.exp"
+set exefile $base
+
+if {[prepare_for_testing $testfile $exefile $srcfile \
+	 {debug nowarnings}]} {
+    return -1
+}
+
+# Test the given (explicit) LINESPEC which should cause gdb to break
+# at LOCATION.
+proc test_breakpoint {linespec location} {
+
+    set testname "set breakpoint at \"$linespec\""
+    # Delete all breakpoints, set a new breakpoint at LINESPEC,
+    # and attempt to run to it.
+    delete_breakpoints
+    if {[gdb_breakpoint $linespec]} {
+	pass $testname
+	gdb_continue_to_breakpoint $linespec $location
+    } else {
+	fail $testname
+    }
+}
+
+# Add the given LINESPEC to the array named in THEARRAY.  GDB is expected
+# to stop at LOCATION.
+proc add {thearray linespec location} {
+    upvar $thearray ar
+
+    lappend ar(linespecs) $linespec
+    lappend ar(locations) $location
+}
+
+# Make sure variables are not already in use
+unset -nocomplain all_arguments lineno location linespecs
+
+# A list of all explicit linespec arguments.
+set all_arguments {"source" "function" "label" "offset" "expression" \
+		       "thread" "task" "condition"}
+
+# Some locations used in this test
+set lineno(normal) [gdb_get_line_number "myfunction location" $srcfile]
+set lineno(entry) [gdb_get_line_number "entry location" $srcfile]
+set lineno(top) [gdb_get_line_number "top location" $srcfile]
+foreach v [array names lineno] {
+    set location($v) ".*[string_to_regexp "$srcfile:$lineno($v)"].*"
+}
+
+# A list of explicit linespecs and the corresponding location.
+set linespecs(linespecs) {}
+set linespecs(location) {}
+
+add linespecs "-source $srcfile -function myfunction" $location(normal)
+add linespecs "-source $srcfile -function myfunction -label top" \
+    $location(top)
+
+# This isn't implemented yet; -offset is silently ignored.
+add linespecs "-source $srcfile -function myfunction -label top -offset 3" \
+    $location(top)
+add linespecs "-source $srcfile -offset $lineno(top)" $location(top)
+add linespecs "-function myfunction" $location(normal)
+add linespecs "-function myfunction -label top" $location(top)
+
+# These are also not yet supported; -offset is silently ignored.
+add linespecs "-function myfunction -offset 3" $location(normal)
+add linespecs "-function myfunction -label top -offset 3" $location(top)
+add linespecs "-offset 3" $location(normal)
+add linespecs "-expression *myfunction" $location(entry)
+
+# Fire up gdb.
+if {![runto_main]} {
+    return -1
+}
+
+# Simple error tests (many more are tested in ls-err.exp)
+foreach arg $all_arguments {
+    # Test missing argument
+    gdb_test "break -$arg" [string_to_regexp "missing argument for \"-$arg\""]
+
+    # Test abbreviations
+    set short [string range $arg 0 3]
+    gdb_test "break -$short" \
+	[string_to_regexp "missing argument for \"-$short\""]
+}
+
+# Test invalid arguments
+foreach arg {"-foo" "-foo bar" "-function myfunction -foo" \
+		 "-function -myfunction -foo bar"} {
+    gdb_test "break $arg" \
+	[string_to_regexp "invalid linespec argument, \"-foo\""]
+}
+
+# Test explicit linespecs, with and without conditions.
+foreach linespec $linespecs(linespecs) loc_pattern $linespecs(locations) {
+
+    # Test the linespec
+    test_breakpoint $linespec $loc_pattern
+
+    # Test with a valid condition
+    delete_breakpoints
+    set tst "set breakpoint at \"$linespec\" with valid condition"
+    if {[gdb_breakpoint "$linespec -cond 'arg == 0'"]} {
+	pass $tst
+
+	gdb_test "info break" ".*stop only if arg == 0.*" \
+	    "info break of conditional breakpoint at \"$linespec\""
+    } else {
+	fail $tst
+    }
+
+    # Test with invalid condition
+    gdb_test "break $linespec -cond \"foofoofoo == 1\"" \
+	".*No symbol \"foofoofoo\" in current context.*" \
+	"set breakpoint at \"$linespec\" with invalid condition"
+
+    # Test with thread
+    delete_breakpoints
+    gdb_test "break $linespec -thread 123" "Unknown thread 123."
+}
+
+# Test pending explicit breakpoints
+gdb_exit
+gdb_start
+
+set tst "pending invalid conditional explicit breakpoint"
+if {![gdb_breakpoint "-func myfunction -cond 'foofoofoo == 1'" \
+	  allow-pending]} {
+    fail "set $tst"
+} else {
+    gdb_test "info break" ".*PENDING.*myfunction if foofoofoo == 1.*" $tst
+}
+
+gdb_exit
+gdb_start
+
+set tst "pending valid conditional explicit breakpoint"
+if {![gdb_breakpoint "-func myfunction -cond 'arg == 0'" \
+	  allow-pending]} {
+    fail "set $tst"
+} else {
+    gdb_test "info break" ".*PENDING.*myfunction if arg == 0" $tst
+
+    gdb_load $objdir/$subdir/$exefile
+    gdb_test "info break" \
+	".*in myfunction at .*$srcfile:.*stop only if arg == 0.*" \
+	"$tst resolved"
+}

@@ -109,7 +109,7 @@ struct linespec
      currently precludes the use of other members.  */
 
   /* The expression entered by the user.  */
-  char *expression;
+  const char *expression;
 
   /* The resulting PC expression derived from evaluating EXPRESSION.  */
   CORE_ADDR expr_pc;
@@ -117,7 +117,7 @@ struct linespec
   /* Any specified file symtabs.  */
 
   /* The user-supplied source filename or NULL if none was specified.  */
-  char *source_filename;
+  const char *source_filename;
 
   /* The list of symtabs to search to which to limit the search.  May not
      be NULL.  If SOURCE_FILENAME is NULL (no user-specified filename),
@@ -129,7 +129,7 @@ struct linespec
 
   /* The user-specified function name.  If no function name was
      supplied, this may be NULL.  */
-  char *function_name;
+  const char *function_name;
 
   /* A list of matching function symbols and minimal symbols.  Both lists
      may be NULL if no matching symbols were found.  */
@@ -139,7 +139,7 @@ struct linespec
   /* The name of a label and matching symbols.  */
 
   /* The user-specified label name.  */
-  char *label_name;
+  const char *label_name;
 
   /* A structure of matching label symbols and the corresponding
      function symbol in which the label was found.  Both may be NULL
@@ -264,6 +264,12 @@ typedef struct ls_token linespec_token;
 #define LS_TOKEN_STOKEN(TOK) (TOK).data.string
 #define LS_TOKEN_KEYWORD(TOK) (TOK).data.keyword
 
+/* A parser function definition used by do_decode_line.  */
+
+struct ls_parser;
+typedef struct symtabs_and_lines (*linespec_parse_func) (struct ls_parser *,
+							 void *client_data);
+
 /* An instance of the linespec parser.  */
 
 struct ls_parser
@@ -292,6 +298,9 @@ struct ls_parser
   /* The result of the parse.  */
   struct linespec result;
 #define PARSER_RESULT(PPTR) (&(PPTR)->result)
+
+  /* The function to actually do the parsing.  */
+  linespec_parse_func parse_it;
 };
 typedef struct ls_parser linespec_parser;
 
@@ -841,6 +850,8 @@ add_sal_to_sals (struct linespec_state *self,
 	  else
 	    canonical_name = xstrprintf ("%s:%d", filename, sal->line);
 	}
+      else if (symname != NULL)
+	canonical_name = xstrdup (symname);
 
       self->canonical_names[sals->nelts - 1] = canonical_name;
     }
@@ -1346,7 +1357,7 @@ decode_line_2 (struct linespec_state *self,
    FILENAME).  */
 
 static void ATTRIBUTE_NORETURN
-symbol_not_found_error (char *symbol, char *filename)
+symbol_not_found_error (const char *symbol, const char *filename)
 {
   if (symbol == NULL)
     symbol = "";
@@ -1416,10 +1427,29 @@ unexpected_linespec_error (linespec_parser *parser)
 		 token_type_strings[token.type]);
 }
 
+static void ATTRIBUTE_NORETURN
+undefined_label_error (const char *function, const char *label)
+{
+  if (function != NULL)
+    throw_error (NOT_FOUND_ERROR,
+                _("No label \"%s\" defined in function \"%s\"."),
+                label, function);
+  else
+    throw_error (NOT_FOUND_ERROR,
+                _("No label \"%s\" defined in current function."), label);
+}
+
+static void ATTRIBUTE_NORETURN
+source_file_not_found_error (const char *name)
+{
+  throw_error (NOT_FOUND_ERROR,
+              _("No source file named %s."), name);
+}
+
 /* Parse and return a line offset in STRING.  */
 
 static struct line_offset
-linespec_parse_line_offset (char *string)
+linespec_parse_line_offset (const char *string)
 {
   struct line_offset line_offset = {0, LINE_OFFSET_NONE};
 
@@ -1570,9 +1600,8 @@ linespec_parse_basic (linespec_parser *parser)
 	  else
 	    {
 	      /* We don't know what it was, but it isn't a label.  */
-	      throw_error (NOT_FOUND_ERROR,
-			   _("No label \"%s\" defined in function \"%s\"."),
-			   name, PARSER_RESULT (parser)->function_name);
+	      undefined_label_error (PARSER_RESULT (parser)->function_name,
+				     name);
 	    }
 
 	  /* Check for a line offset.  */
@@ -1616,9 +1645,14 @@ canonicalize_linespec (struct linespec_state *state, linespec_p ls)
   if (!state->canonical)
     return;
 
+  state->canonical->explicit = new_explicit_linespec ();
+
   /* Shortcut expressions, which can only appear by themselves.  */
   if (ls->expression != NULL)
-    state->canonical->addr_string = xstrdup (ls->expression);
+    {
+      state->canonical->addr_string = xstrdup (ls->expression);
+      state->canonical->explicit->expression = xstrdup (ls->expression);
+    }
   else
     {
       struct ui_file *buf;
@@ -1628,6 +1662,8 @@ canonicalize_linespec (struct linespec_state *state, linespec_p ls)
       if (ls->source_filename)
 	{
 	  fputs_unfiltered (ls->source_filename, buf);
+	  state->canonical->explicit->source_filename
+	    = xstrdup (ls->source_filename);
 	  need_colon = 1;
 	}
 
@@ -1636,6 +1672,8 @@ canonicalize_linespec (struct linespec_state *state, linespec_p ls)
 	  if (need_colon)
 	    fputc_unfiltered (':', buf);
 	  fputs_unfiltered (ls->function_name, buf);
+	  state->canonical->explicit->function_name
+	    = xstrdup (ls->function_name);
 	  need_colon = 1;
 	}
 
@@ -1658,6 +1696,7 @@ canonicalize_linespec (struct linespec_state *state, linespec_p ls)
 	    }
 
 	  fputs_unfiltered (ls->label_name, buf);
+	  state->canonical->explicit->label_name = xstrdup (ls->label_name);
 	  need_colon = 1;
 	  state->canonical->special_display = 1;
 	}
@@ -1666,11 +1705,13 @@ canonicalize_linespec (struct linespec_state *state, linespec_p ls)
 	{
 	  if (need_colon)
 	    fputc_unfiltered (':', buf);
-	  fprintf_filtered (buf, "%s%d",
-			    (ls->line_offset.sign == LINE_OFFSET_NONE ? ""
-			     : (ls->line_offset.sign
-				== LINE_OFFSET_PLUS ? "+" : "-")),
-			    ls->line_offset.offset);
+	  state->canonical->explicit->offset
+	    = xstrprintf ("%s%d",
+			  (ls->line_offset.sign == LINE_OFFSET_NONE ? ""
+			   : (ls->line_offset.sign
+			      == LINE_OFFSET_PLUS ? "+" : "-")),
+			  ls->line_offset.offset);
+	  fputs_filtered (state->canonical->explicit->offset, buf);
 	}
 
       state->canonical->addr_string = ui_file_xstrdup (buf, NULL);
@@ -1836,13 +1877,14 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 
   if (ls->expression != NULL)
     {
+      struct symtab_and_line sal;
+
       /* We have an expression.  No other attribute is allowed.  */
-      sals.sals = XMALLOC (struct symtab_and_line);
-      sals.nelts = 1;
-      sals.sals[0] = find_pc_line (ls->expr_pc, 0);
-      sals.sals[0].pc = ls->expr_pc;
-      sals.sals[0].section = find_pc_overlay (ls->expr_pc);
-      sals.sals[0].explicit_pc = 1;
+      sal = find_pc_line (ls->expr_pc, 0);
+      sal.pc = ls->expr_pc;
+      sal.section = find_pc_overlay (ls->expr_pc);
+      sal.explicit_pc = 1;
+      add_sal_to_sals (state, &sals, &sal, ls->expression);
     }
   else if (ls->labels.label_symbols != NULL)
     {
@@ -1976,15 +2018,16 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
    if no file is validly specified.  Callers must check that.
    Also, the line number returned may be invalid.  */
 
-/* Parse the linespec in ARGPTR.  */
+/* Parse the linespec in DATA.  */
 
 static struct symtabs_and_lines
-parse_linespec (linespec_parser *parser, char **argptr)
+parse_linespec (linespec_parser *parser, void *data)
 {
   linespec_token token;
   struct symtabs_and_lines values;
   volatile struct gdb_exception file_exception;
   struct cleanup *cleanup;
+  char **argptr = (char **) data;
 
   /* A special case to start.  It has become quite popular for
      IDEs to work around bugs in the previous parser by quoting
@@ -2166,7 +2209,6 @@ parse_linespec (linespec_parser *parser, char **argptr)
   return values;
 }
 
-
 /* A constructor for linespec_state.  */
 
 static void
@@ -2191,7 +2233,7 @@ linespec_state_constructor (struct linespec_state *self,
 /* Initialize a new linespec parser.  */
 
 static void
-linespec_parser_new (linespec_parser *parser,
+linespec_parser_new (linespec_parser *parser, linespec_parse_func func,
 		     int flags, const struct language_defn *language,
 		     struct symtab *default_symtab,
 		     int default_line,
@@ -2200,6 +2242,7 @@ linespec_parser_new (linespec_parser *parser,
   parser->lexer.current.type = LSTOKEN_CONSUMED;
   memset (PARSER_RESULT (parser), 0, sizeof (struct linespec));
   PARSER_RESULT (parser)->line_offset.sign = LINE_OFFSET_UNKNOWN;
+  parser->parse_it = func;
   linespec_state_constructor (PARSER_STATE (parser), flags, language,
 			      default_symtab, default_line, canonical);
 }
@@ -2219,14 +2262,10 @@ linespec_parser_delete (void *arg)
 {
   linespec_parser *parser = (linespec_parser *) arg;
 
-  if (PARSER_RESULT (parser)->expression)
-    xfree (PARSER_RESULT (parser)->expression);
-  if (PARSER_RESULT (parser)->source_filename)
-    xfree (PARSER_RESULT (parser)->source_filename);
-  if (PARSER_RESULT (parser)->label_name)
-    xfree (PARSER_RESULT (parser)->label_name);
-  if (PARSER_RESULT (parser)->function_name)
-    xfree (PARSER_RESULT (parser)->function_name);
+  xfree ((char *) PARSER_RESULT (parser)->expression);
+  xfree ((char *) PARSER_RESULT (parser)->source_filename);
+  xfree ((char *) PARSER_RESULT (parser)->label_name);
+  xfree ((char *) PARSER_RESULT (parser)->function_name);
 
   if (PARSER_RESULT (parser)->file_symtabs != NULL)
     VEC_free (symtab_p, PARSER_RESULT (parser)->file_symtabs);
@@ -2246,56 +2285,45 @@ linespec_parser_delete (void *arg)
   linespec_state_destructor (PARSER_STATE (parser));
 }
 
-/* See linespec.h.  */
+/* Decode the linespec given in ARGPTR or PARSER using the parsing function
+   THE_PARSER.  SELECT_MODE and FILTER are from decode_line_full.  */
 
-void
-decode_line_full (char **argptr, int flags,
-		  struct symtab *default_symtab,
-		  int default_line, struct linespec_result *canonical,
-		  const char *select_mode,
-		  const char *filter)
+static void
+do_decode_line (linespec_parser *parser, void *data,
+		const char *select_mode, const char *filter)
 {
   struct symtabs_and_lines result;
   struct cleanup *cleanups;
-  char *arg_start = *argptr;
   VEC (const_char_ptr) *filters = NULL;
-  linespec_parser parser;
   struct linespec_state *state;
 
-  gdb_assert (canonical != NULL);
   /* The filter only makes sense for 'all'.  */
   gdb_assert (filter == NULL || select_mode == multiple_symbols_all);
   gdb_assert (select_mode == NULL
 	      || select_mode == multiple_symbols_all
 	      || select_mode == multiple_symbols_ask
 	      || select_mode == multiple_symbols_cancel);
-  gdb_assert ((flags & DECODE_LINE_LIST_MODE) == 0);
 
-  linespec_parser_new (&parser, flags, current_language, default_symtab,
-		       default_line, canonical);
-  cleanups = make_cleanup (linespec_parser_delete, &parser);
+  cleanups = make_cleanup (null_cleanup, NULL);
   save_current_program_space ();
 
-  result = parse_linespec (&parser, argptr);
-  state = PARSER_STATE (&parser);
+  result = (*parser->parse_it) (parser, data);
+  state = PARSER_STATE (parser);
 
-  gdb_assert (result.nelts == 1 || canonical->pre_expanded);
-  gdb_assert (canonical->addr_string != NULL);
-  canonical->pre_expanded = 1;
+  gdb_assert (result.nelts == 1 || state->canonical->pre_expanded);
+  gdb_assert (state->canonical->addr_string != NULL);
+  gdb_assert (result.nelts == 0 || state->canonical_names != NULL);
+  state->canonical->pre_expanded = 1;
 
-  /* Fill in the missing canonical names.  */
+  /* Arrange for allocated canonical names to be freed.  */
   if (result.nelts > 0)
     {
       int i;
 
-      if (state->canonical_names == NULL)
-	state->canonical_names = xcalloc (result.nelts, sizeof (char *));
       make_cleanup (xfree, state->canonical_names);
       for (i = 0; i < result.nelts; ++i)
 	{
-	  if (state->canonical_names[i] == NULL)
-	    state->canonical_names[i] = savestring (arg_start,
-						    *argptr - arg_start);
+	  gdb_assert (state->canonical_names[i] != NULL);
 	  make_cleanup (xfree, state->canonical_names[i]);
 	}
     }
@@ -2325,6 +2353,148 @@ decode_line_full (char **argptr, int flags,
   do_cleanups (cleanups);
 }
 
+/* See linespec.h.
+   All of the real work is done in do_decode_line.  */
+
+void
+decode_line_full (char **argptr, int flags,
+		  struct symtab *default_symtab,
+		  int default_line, struct linespec_result *canonical,
+		  const char *select_mode,
+		  const char *filter)
+{
+  linespec_parser parser;
+  struct cleanup *cleanups;
+
+  gdb_assert (canonical != NULL);
+  gdb_assert ((flags & DECODE_LINE_LIST_MODE) == 0);
+
+  linespec_parser_new (&parser, parse_linespec, flags, current_language,
+		       default_symtab, default_line, canonical);
+  cleanups = make_cleanup (linespec_parser_delete, &parser);
+  do_decode_line (&parser, argptr, select_mode, filter);
+  do_cleanups (cleanups);
+}
+
+/* A parsing function for explicit linespecs.  */
+
+static struct symtabs_and_lines
+parse_explicit_linespec (linespec_parser *parser, void *data)
+{
+  VEC (symbolp) *symbols, *labels;
+  VEC (minsym_and_objfile_d) *minimal_symbols;
+  explicit_linespec *els = (explicit_linespec *) data;
+
+  if (els->expression != NULL)
+    {
+      char *copy = xstrdup (els->expression);
+      struct cleanup *cleanup = make_cleanup (xfree, copy);
+
+      /* Convert the expression to a PC and save the result.  */
+      PARSER_RESULT (parser)->expr_pc = linespec_expression_to_pc (&copy);
+      PARSER_RESULT (parser)->expression = xstrdup (els->expression);
+      do_cleanups (cleanup);
+    }
+  else
+    {
+      if (els->source_filename != NULL)
+	{
+	  volatile struct gdb_exception except;
+
+	  TRY_CATCH (except, RETURN_MASK_ERROR)
+	    {
+	      PARSER_RESULT (parser)->file_symtabs
+		= symtabs_from_filename (els->source_filename);
+	    }
+
+	  if (except.reason < 0
+	      || PARSER_RESULT (parser)->file_symtabs == NULL)
+	    source_file_not_found_error (els->source_filename);
+
+	  /* Save the source filename in the parser's result.  */
+	  PARSER_RESULT (parser)->source_filename
+	    = xstrdup (els->source_filename);
+	}
+      else
+	{
+	  /* A NULL entry means to use the default symtab.  */
+	  VEC_safe_push (symtab_p, PARSER_RESULT (parser)->file_symtabs, NULL);
+	}
+
+      if (els->function_name != NULL)
+	{
+	  find_linespec_symbols (PARSER_STATE (parser),
+				 PARSER_RESULT (parser)->file_symtabs,
+				 els->function_name, &symbols,
+				 &minimal_symbols);
+
+	  if (symbols == NULL && minimal_symbols == NULL)
+	    symbol_not_found_error (els->function_name,
+				    PARSER_RESULT (parser)->source_filename);
+
+	  PARSER_RESULT (parser)->function_name = xstrdup (els->function_name);
+	  PARSER_RESULT (parser)->function_symbols = symbols;
+	  PARSER_RESULT (parser)->minimal_symbols = minimal_symbols;
+	}
+
+      if (els->label_name != NULL)
+	{
+	  symbols = NULL;
+	  labels = find_label_symbols (PARSER_STATE (parser),
+				       PARSER_RESULT (parser)->function_symbols,
+				       &symbols, els->label_name);
+
+	  if (labels == NULL)
+	    undefined_label_error (PARSER_RESULT (parser)->function_name,
+				   els->label_name);
+
+	  PARSER_RESULT (parser)->label_name = xstrdup (els->label_name);
+	  PARSER_RESULT (parser)->labels.label_symbols = labels;
+	  PARSER_RESULT (parser)->labels.function_symbols = symbols;
+	}
+
+      if (els->offset != NULL)
+	PARSER_RESULT (parser)->line_offset
+	  = linespec_parse_line_offset (els->offset);
+
+      /* One special error check: If SOURCE_FILENAME was given without
+	 OFFSET, FUNCTION_NAME, or LABEL_NAME, issue an error.  */
+      if (PARSER_RESULT (parser)->source_filename != NULL
+	  && PARSER_RESULT (parser)->function_name == NULL
+	  && PARSER_RESULT (parser)->label_name == NULL
+	  && PARSER_RESULT (parser)->line_offset.sign == LINE_OFFSET_UNKNOWN)
+	error (_("Source filename requires function, label, or offset."));
+    }
+
+  /* Convert the "parse" to SALs.  */
+  return convert_linespec_to_sals (PARSER_STATE (parser),
+				   PARSER_RESULT (parser));
+}
+
+/* Decode the explicit linespec in ELS.  The other parameters are
+   the same as decode_line_full.  */
+
+void
+decode_explicit_linespec (explicit_linespec *els, int flags,
+			  struct symtab *default_symtab,
+			  int default_line, struct linespec_result *canonical,
+			  const char *select_mode,
+			  const char *filter)
+{
+  linespec_parser parser;
+  struct cleanup *cleanups;
+
+  gdb_assert (canonical != NULL);
+  gdb_assert ((flags & DECODE_LINE_LIST_MODE) == 0);
+
+  linespec_parser_new (&parser, parse_explicit_linespec, flags,
+		       current_language, default_symtab,
+		       default_line, canonical);
+  cleanups = make_cleanup (linespec_parser_delete, &parser);
+  do_decode_line (&parser, els, select_mode, filter);
+  do_cleanups (cleanups);
+}
+
 struct symtabs_and_lines
 decode_line_1 (char **argptr, int flags,
 	       struct symtab *default_symtab,
@@ -2334,12 +2504,12 @@ decode_line_1 (char **argptr, int flags,
   linespec_parser parser;
   struct cleanup *cleanups;
 
-  linespec_parser_new (&parser, flags, current_language, default_symtab,
-		       default_line, NULL);
+  linespec_parser_new (&parser, parse_linespec, flags, current_language,
+		       default_symtab, default_line, NULL);
   cleanups = make_cleanup (linespec_parser_delete, &parser);
   save_current_program_space ();
 
-  result = parse_linespec (&parser, argptr);
+  result = (*parser.parse_it) (&parser, argptr);
 
   do_cleanups (cleanups);
   return result;
@@ -2380,7 +2550,8 @@ linespec_expression_to_pc (char **exp_ptr)
     throw_error (NOT_FOUND_ERROR, _("cannot evaluate expressions while "
 				    "program space is in startup"));
 
-  (*exp_ptr)++;
+  if (**exp_ptr == '*')
+    (*exp_ptr)++;
   return value_as_address (parse_to_comma_and_eval (exp_ptr));
 }
 
@@ -2430,6 +2601,7 @@ decode_objc (struct linespec_state *self, linespec_p ls, char **argptr)
       memcpy (saved_arg, *argptr, new_argptr - *argptr);
       saved_arg[new_argptr - *argptr] = '\0';
 
+      ls->function_name = xstrdup (saved_arg);
       ls->function_symbols = info.result.symbols;
       ls->minimal_symbols = info.result.minimal_symbols;
       values = convert_linespec_to_sals (self, ls);
@@ -2820,7 +2992,7 @@ symtabs_from_filename (const char *filename)
 	throw_error (NOT_FOUND_ERROR,
 		     _("No symbol table is loaded.  "
 		       "Use the \"file\" command."));
-      throw_error (NOT_FOUND_ERROR, _("No source file named %s."), filename);
+      source_file_not_found_error (filename);
     }
 
   return result;
@@ -3465,6 +3637,7 @@ destroy_linespec_result (struct linespec_result *ls)
   struct linespec_sals *lsal;
 
   xfree (ls->addr_string);
+  free_explicit_linespec (ls->explicit);
   for (i = 0; VEC_iterate (linespec_sals, ls->sals, i, lsal); ++i)
     {
       xfree (lsal->canonical);
@@ -3487,4 +3660,139 @@ struct cleanup *
 make_cleanup_destroy_linespec_result (struct linespec_result *ls)
 {
   return make_cleanup (cleanup_linespec_result, ls);
+}
+
+/* Allocate and initialize a new explicit_linespec.  */
+
+explicit_linespec *
+new_explicit_linespec (void)
+{
+  explicit_linespec *els;
+
+  els = XNEW (explicit_linespec);
+  memset (els, 0, sizeof (explicit_linespec));
+  els->thread = -1;
+  return els;
+}
+
+/* Free the explicit_linespec represented by OBJ.  */
+
+void
+free_explicit_linespec (void *obj)
+{
+  explicit_linespec *els = (explicit_linespec *) obj;
+
+  if (els != NULL)
+    {
+      xfree ((char *) els->source_filename);
+      xfree ((char *) els->function_name);
+      xfree ((char *) els->label_name);
+      xfree ((char *) els->offset);
+      xfree ((char *) els->condition);
+      xfree ((char *) els->expression);
+      xfree (els);
+    }
+}
+
+/* Is the explicit linespec ELS valid, i.e., is it non-NULL and
+   does contain any location information?  */
+
+int
+explicit_linespec_is_valid_p (explicit_linespec *els)
+{
+  return !(els == NULL
+	  || (els->source_filename == NULL
+	      && els->function_name == NULL
+	      && els->label_name == NULL
+	      && els->offset == NULL
+	      && els->expression == NULL
+	      && els->condition == NULL
+	      && els->thread == -1
+	      && els->task == 0));
+}
+
+/* Deep copy the explicit linespec given by SRC and return
+   the copy.  */
+
+explicit_linespec *
+copy_explicit_linespec (explicit_linespec *src)
+{
+  explicit_linespec *copy;
+
+  copy = XCNEW (explicit_linespec);
+#define STRDUP_IF(MBR)				\
+  do {						\
+    if (src->MBR != NULL)			\
+      copy->MBR = xstrdup (src->MBR);		\
+  }						\
+  while (0)
+  STRDUP_IF (source_filename);
+  STRDUP_IF (function_name);
+  STRDUP_IF (label_name);
+  STRDUP_IF (offset);
+  STRDUP_IF (expression);
+  STRDUP_IF (condition);
+  copy->thread = src->thread;
+  copy->task = src->task;
+#undef STRDUP_IF
+  return copy;
+}
+
+/* Return an address string-like representation of the explicit linespec
+   ELS.  */
+
+char *
+explicit_linespec_to_addr_string (explicit_linespec *els)
+{
+  char *addr_string;
+  struct ui_file *buf;
+  int need_colon = 0;
+
+  buf = mem_fileopen ();
+
+  if (els->expression)
+    fprintf_unfiltered (buf, "*%s", els->expression);
+  else
+    {
+      if (els->source_filename != NULL)
+	{
+	  fputs_unfiltered (els->source_filename, buf);
+	  need_colon = 1;
+	}
+
+      if (els->function_name != NULL)
+	{
+	  if (need_colon)
+	    fputc_unfiltered (':', buf);
+	  fputs_unfiltered (els->function_name, buf);
+	  need_colon = 1;
+	}
+
+      if (els->label_name != NULL)
+	{
+	  if (need_colon)
+	    fputc_unfiltered (':', buf);
+	  fputs_unfiltered (els->label_name, buf);
+	  need_colon = 1;
+	}
+
+      if (els->offset != NULL)
+	{
+	  if (need_colon)
+	    fputc_unfiltered (':', buf);
+	  fputs_unfiltered (els->offset, buf);
+	}
+    }
+
+  if (els->condition != NULL)
+    fprintf_filtered (buf, " if %s", els->condition);
+
+  if (els->thread != -1)
+    fprintf_filtered (buf, " thread %d", els->thread);
+  else if (els->task != 0)
+    fprintf_filtered (buf, " task %d", els->task);
+
+  addr_string = ui_file_xstrdup (buf, NULL);
+  ui_file_delete (buf);
+  return addr_string;
 }

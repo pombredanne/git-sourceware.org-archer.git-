@@ -1204,11 +1204,14 @@ proc mi0_continue_to { bkptno func args file line test } {
 }
 
 # Creates a breakpoint and checks the reported fields are as expected
-proc mi_create_breakpoint { location number disp func file line address test } {
-    verbose -log "Expecting: 222\\^done,bkpt=\{number=\"$number\",type=\"breakpoint\",disp=\"$disp\",enabled=\"y\",addr=\"$address\",func=\"$func\",file=\"$file\",fullname=\".*\",line=\"$line\",times=\"0\",original-location=\".*\"\}"
-    mi_gdb_test "222-break-insert $location" \
-        "222\\^done,bkpt=\{number=\"$number\",type=\"breakpoint\",disp=\"$disp\",enabled=\"y\",addr=\"$address\",func=\"$func\",file=\"$file\",fullname=\".*\",line=\"$line\",times=\"0\",original-location=\".*\"\}" \
-        $test
+proc mi_create_breakpoint { location number disp func file line address test {cond ""} } {
+    set expected "222\\^done,bkpt=\{number=\"$number\",type=\"breakpoint\",disp=\"$disp\",enabled=\"y\",addr=\"$address\",func=\"$func\",file=\"$file\",fullname=\".*\",line=\"$line\","
+    if {[string length $cond]} {
+	append expected "cond=\"$cond\","
+    }
+    append expected "times=\"0\",original-location=\".*\"\}"
+    verbose -log "Expecting: $expected"
+    mi_gdb_test "222-break-insert $location" $expected $test
 }
 
 proc mi_list_breakpoints { expected test } {

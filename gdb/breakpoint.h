@@ -33,6 +33,7 @@ struct bpstats;
 struct bp_location;
 struct linespec_result;
 struct linespec_sals;
+struct explicit_linespec;
 
 /* This is the maximum number of bytes a breakpoint instruction can
    take.  Feel free to increase it.  It's just used in a few places to
@@ -554,6 +555,11 @@ struct breakpoint_ops
   void (*create_sals_from_address) (char **, struct linespec_result *,
 				    enum bptype, char *, char **);
 
+  /* Create SALs from explicit linespec, storing the result in
+     linespec_result.  */
+  void (*create_sals_from_explicit) (struct explicit_linespec *,
+				     struct linespec_result *, enum bptype);
+
   /* This method will be responsible for creating a breakpoint given its SALs.
      Usually, it just calls `create_breakpoints_sal' (for ordinary
      breakpoints).  However, there may be some special cases where we might
@@ -569,6 +575,16 @@ struct breakpoint_ops
 				  int, const struct breakpoint_ops *,
 				  int, int, int, unsigned);
 
+  /* Like create_breakpoints_sal, but for explicit linespecs
+     instead of address strings.  */
+  void (*create_breakpoints_sal_explicit) (struct gdbarch *,
+					   struct linespec_result *,
+					   struct linespec_sals *,
+					   char *,
+					   enum bptype, enum bpdisp,
+					   int, const struct breakpoint_ops *,
+					   int, int, int, unsigned);
+
   /* Given the address string (second parameter), this method decodes it
      and provides the SAL locations related to it.  For ordinary breakpoints,
      it calls `decode_line_full'.
@@ -576,6 +592,11 @@ struct breakpoint_ops
      This function is called inside `addr_string_to_sals'.  */
   void (*decode_linespec) (struct breakpoint *, char **,
 			   struct symtabs_and_lines *);
+
+  /* Turn the explicit linespec into SALs.  */
+  void (*decode_linespec_explicit) (struct breakpoint *,
+				    struct explicit_linespec *,
+				    struct symtabs_and_lines *);
 };
 
 /* Helper for breakpoint_ops->print_recreate implementations.  Prints
@@ -668,6 +689,11 @@ struct breakpoint
 
     /* String we used to set the breakpoint (malloc'd).  */
     char *addr_string;
+
+    /* The explicit linespec used to set the breakpoint (malloc'd).
+       This may be computed by decode_line_full/decode_explicit_linespec
+       or set by the user.  */
+    struct explicit_linespec *explicit;
 
     /* The filter that should be passed to decode_line_full when
        re-setting this breakpoint.  This may be NULL, but otherwise is
@@ -1233,6 +1259,16 @@ extern int create_breakpoint (struct gdbarch *gdbarch, char *arg,
 			      int from_tty,
 			      int enabled,
 			      int internal, unsigned flags);
+
+extern int create_breakpoint_explicit (struct gdbarch *arch,
+				       struct explicit_linespec *els,
+				       char *extra_string,
+				       int tempflag, enum bptype wanted_type,
+				       int ignore_count,
+				       enum auto_boolean pending_break_support,
+				       const struct breakpoint_ops *ops,
+				       int from_tty, int enabled,
+				       int internal, unsigned flags);
 
 extern void insert_breakpoints (void);
 
