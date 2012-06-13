@@ -1,3 +1,29 @@
+2012-06-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix regression by the "ambiguous linespec" series.
+	* gdb.base/break.exp (list marker1, break lineno, delete $bpnum): New
+	tests.
+
+2012-06-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/future.exp: Set $use_gdb_compile even if only find_go_linker is
+	missing.
+
+2012-06-11  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/longjmp.c (hidden_longjmp): Move expected catch
+	location...
+	(main): ...here.
+
+2012-06-07  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/strace.exp: Shorten some too-long lines.
+
+2012-06-06  Pedro Alves  <palves@redhat.com>
+
+	* gdb.threads/clone-new-thread-event.c: New file.
+	* gdb.threads/clone-new-thread-event.exp: New file.
+
 2012-06-06  Yao Qi  <yao@codesourcery.com>
 
 	* gdb.base/dprintf.c (main): Add extra parameter when calling

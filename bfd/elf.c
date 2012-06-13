@@ -4152,18 +4152,25 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 	{
 	  for (m = mfirst; m != NULL; m = m->next)
 	    {
-	      if (m->p_type == PT_LOAD)
+	      if (m->p_type == PT_LOAD
+		  && m->count != 0
+		  && m->sections[0]->vma >= info->relro_start
+		  && m->sections[0]->vma < info->relro_end)
 		{
-		  asection *last = m->sections[m->count - 1];
-		  bfd_vma vaddr = m->sections[0]->vma;
-		  bfd_vma filesz = last->vma - vaddr + last->size;
+		  i = m->count;
+		  while (--i != (unsigned) -1)
+		    if ((m->sections[i]->flags & (SEC_LOAD | SEC_HAS_CONTENTS))
+			== (SEC_LOAD | SEC_HAS_CONTENTS))
+		      break;
 
-		  if (vaddr < info->relro_end
-		      && vaddr >= info->relro_start
-		      && (vaddr + filesz) >= info->relro_end)
+		  if (i == (unsigned) -1)
+		    continue;
+
+		  if (m->sections[i]->vma + m->sections[i]->size
+		      >= info->relro_end)
 		    break;
 		}
-	      }
+	    }
 
 	  /* Make a PT_GNU_RELRO segment only when it isn't empty.  */
 	  if (m != NULL)
@@ -4924,6 +4931,11 @@ assign_file_positions_for_non_load_sections (bfd *abfd,
 		      && lp->p_vaddr + lp->p_filesz >= link_info->relro_end)
 		    break;
 		}
+
+	      /* PR ld/14207.  If the RELRO segment doesn't fit in the
+		 LOAD segment, it should be removed.  */
+	      if (lp == (phdrs + count))
+		abort ();
 	    }
 	  else
 	    {
@@ -4949,14 +4961,15 @@ assign_file_positions_for_non_load_sections (bfd *abfd,
 	      else
 		abort ();
 	      p->p_memsz = p->p_filesz;
-          /* Preserve the alignment and flags if they are valid. The gold
-             linker generates RW/4 for the PT_GNU_RELRO section. It is better
-             for objcopy/strip to honor these attributes otherwise gdb will
-             choke when using separate debug files. */
-          if (!m->p_align_valid)
-            p->p_align = 1;
-          if (!m->p_flags_valid)
-            p->p_flags = (lp->p_flags & ~PF_W);
+	      /* Preserve the alignment and flags if they are valid. The
+	         gold linker generates RW/4 for the PT_GNU_RELRO section.
+		 It is better for objcopy/strip to honor these attributes
+		 otherwise gdb will choke when using separate debug files.
+	       */
+	      if (!m->p_align_valid)
+		p->p_align = 1;
+	      if (!m->p_flags_valid)
+		p->p_flags = (lp->p_flags & ~PF_W);
 	    }
 	  else
 	    {

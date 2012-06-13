@@ -1,3 +1,195 @@
+2012-06-13  Pedro Alves  <palves@redhat.com>
+
+	Partial revert of previous change.
+
+	* serial.c (scb_base): New global.
+	(serial_for_fd): New.
+	(serial_open, serial_fdopen_ops): Link new serial in open serials
+	chain.
+	(do_serial_close): Unlink serial from the open serials chain.
+
+2012-06-12  Pedro Alves  <palves@redhat.com>
+
+	* infrun.c (infrun_thread_stop_requested_callback): Don't switch
+	threads here.
+	(prepare_for_detach): No longer context switch here in non-stop
+	mode.
+	(fetch_inferior_event): Ditto.
+	(handle_inferior_event) <STOP_QUIETLY || NO_STOP_QUIETLY>: Switch
+	to the event thread before removing breakpoints.  Switch to the
+	event thread before inserting breakpoints and resuming.
+	(handle_inferior_event) <TARGET_WAITKIND_SPURIOUS>: Switch to the
+	event thread before resuming.
+	(handle_inferior_event) <stepping_past_singlestep_breakpoint>:
+	Switch to the event thread before removing breakpoints.
+
+2012-06-12  Eli Zaretskii  <eliz@gnu.org>
+
+	* infcmd.c (construct_inferior_arguments) [__MINGW32__]: Quote
+	special characters correctly for the Windows shells.  See
+	http://sourceware.org/ml/gdb/2012-06/msg00047.html for the bug
+	report.
+	[!__MINGW32__]: Remove extra double quote character from special
+	characters.
+
+2012-06-11  Stan Shebs  <stan@codesourcery.com>
+
+	* ui-out.h: Remove #if 0 declarations.
+	* ui-out.c: Remove #if 0 functions.
+
+2012-06-11  Pedro Alves  <palves@redhat.com>
+
+	* ser-base.c (run_async_handler_and_reschedule): New.
+	(fd_event, push_event): Use it.
+	* serial.c (serial_open, serial_fdopen_ops): Set the initial
+	reference count to 1.
+	(do_serial_close): Set the bufp field to NULL.  Use serial_unref
+	instead of xfree.
+	(serial_is_open, serial_ref, serial_unref): New.
+	* serial.h (serial_open): Adjust comment.
+	(serial_is_open): Declare.
+	(serial_close): Adjust comment.
+	(serial_ref, serial_unref) Declare.
+	(struct serial): New field 'refcnt'.
+
+2012-06-11  Pedro Alves  <palves@redhat.com>
+
+	Remove #if 0'd "connect" command, and unnecessary associated
+	refcounting and serial reuse bits.
+
+	* serial.h (struct serial): Remove fields 'next' and 'refcnt'.
+	* serial.c (last_serial_opened): Delete.
+	(scb_base): Delete.
+	(serial_open): Adjust.
+	(serial_for_fd): Delete.
+	(serial_fdopen_ops, do_serial_close): Adjust.
+	(serial_fdopen_ops): Adjust.
+
+2012-06-11  Pedro Alves  <palves@redhat.com>
+
+	* serial.c (do_serial_close): Remove early return when SCB is
+	null.
+
+2012-06-11  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dw2_get_file_names_reader): Ignore partial units.
+
+2012-06-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix regression by the "ambiguous linespec" series.
+	* breakpoint.c (parse_breakpoint_sals): New variable cursal.  Use
+	get_last_displayed_symtab and get_last_displayed_line and depending
+	on CURSAL.
+
+2012-06-11  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dw2_get_primary_filename_reader): New function.
+	(dw2_find_symbol_file): Use it.
+
+2012-06-11  Michael Eager  <eager@eagercon.com>
+
+	* mips-linux-tdep.c (mips_gdb_signal_from_target): New
+	* mips-linux-tdep.h (mips_signals): New
+
+2012-06-11  Tom Tromey  <tromey@redhat.com>
+
+	* infrun.c (handle_inferior_event)
+	<BPSTAT_WHAT_SET_LONGJMP_RESUME>: Don't delete the step-resume
+	breakpoint.
+	<BPSTAT_WHAT_CLEAR_LONGJMP_RESUME>: Remove longjmp logic; use
+	exception logic in all cases.  Update comments.
+	(insert_longjmp_resume_breakpoint): Set the exception resume
+	breakpoint.
+
+2012-06-11  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips_push_dummy_code): Handle microMIPS code.
+
+2012-06-09  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* valarith.c (binop_types_user_defined_p): Fix a typo.
+
+2012-06-08  Yao Qi  <yao@codesourcery.com>
+            Chung-Lin Tang <cltang@codesourcery.com>
+
+	* arch-utils.c (default_return_in_first_hidden_param_p): New.
+	* arch-utils.h: Declare.
+	* gdbarch.sh: Add return_in_first_hidden_param_p.
+	* gdbarch.c, gdbarch.h: Regenerated.
+	* infcall.c (call_function_by_hand): Call
+	gdbarch_return_in_first_hidden_param_p instead of
+	language_pass_by_reference.
+
+	* m68k-tdep.c (m68k_return_in_first_hidden_param_p): New.
+	(m68k_gdbarch_init): Install m68k_return_in_first_hidden_param_p.
+	* sh-tdep.c (sh_return_in_first_hidden_param_p): New.
+	(sh_gdbarch_init): Install sh_return_in_first_hidden_param_p.
+	* tic6x-tdep.c (tic6x_push_dummy_call): Remove local variable
+	`cplus_return_struct_by_reference'.
+	(tic6x_return_value): Handle language cplusplus.
+	(tic6x_return_in_first_hidden_param_p): New.
+	(tic6x_gdbarch_init): Install tic6x_return_in_first_hidden_param_p.
+
+2012-06-07  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf2_cu): Add comment.
+
+2012-06-06  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips_pseudo_register_type): Remove tdep local
+	variable.
+	(mips_eabi_push_dummy_call): Likewise.
+	(mips_n32n64_push_dummy_call): Likewise.
+	(mips_o32_push_dummy_call): Likewise.
+	(mips_o64_push_dummy_call): Likewise.
+
+2012-06-06  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips_convert_register_p): Correct coding style.
+
+2012-06-06  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips_pseudo_register_type): Use
+	mips_float_register_p.
+
+2012-06-06  Pedro Alves  <palves@redhat.com>
+
+	* infrun.c (handle_inferior_event): Remove calls to
+	reinit_frame_cache that follow a context_switch call.
+
+2012-06-06  Pedro Alves  <palves@redhat.com>
+
+	* infrun.c (handle_inferior_event) <deferred_step_ptid>: Use
+	context_switch and remove stale comment.
+
+2012-06-06  Pedro Alves  <palves@redhat.com>
+
+	* infrun.c (struct execution_control_state): Remove
+	`new_thread_event' field.
+	(handle_inferior_event): Simplify new threads handling; don't
+	resume the inferior if we find a new thread.
+
+2012-06-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* NEWS: Document the deprecation of SH's 'regs' command.
+	* inferior.h (all_registers_info): Add function declaration.
+	* sh-tdep.c (sh_show_regs): Remove variable.
+	(sh_generic_show_regs, sh3_show_regs, sh2e_show_regs, sh2a_show_regs)
+	(sh2a_nofpu_show_regs, sh3e_show_regs, sh3_dsp_show_regs)
+	(sh4_show_regs, sh4_nofpu_show_regs, sh_dsp_show_regs)
+	(sh_show_regs_command): Remove functions.
+	(sh_gdbarch_init): Don't set sh_show_regs.
+	(_initialize_sh_tdep): Make the 'regs' command an deprecated alias to
+	'info all-registers'.
+	* sh64-tdep.c (sh64_show_media_regs, sh64_show_compact_regs)
+	(sh64_show_regs): Remove functions.
+	* sh64-tdep.h (sh64_show_regs): Remove function declaration.
+
+2012-06-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* configure.ac: Move development=true below AC_INIT.
+	* configure: Regenerate.
+
 2012-06-05  Stan Shebs  <stan@codesourcery.com>
 
 	* mi/mi-interp.c (mi_interpreter_init): Set raw_stdout from
