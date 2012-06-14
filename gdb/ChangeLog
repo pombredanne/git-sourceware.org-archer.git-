@@ -1,3 +1,120 @@
+2012-06-13  Mark Kettenis  <kettenis@gnu.org>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR tdep/14222
+	* i386-tdep.c (i386_push_dummy_call): Unconditionally align the
+	stack on a 16-byte boundary.
+
+2012-06-13  Kaushik Srenevasan  <kaushik@twitter.com>
+
+	* jit.c (finalize_symtab): Set function's return type to 'void' by
+	default.
+
+2012-06-13  Mark Kettenis  <kettenis@gnu.org>
+	    H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-linux-tdep.c (amd64_linux_init_abi_common): New function.
+	Move bits common to both the classic LP64 and the new x32 ILP32
+	ABI here.
+	(amd64_linux_init_abi): Call amd64_linux_init_abi_common.
+	(amd64_x32_linux_init_abi): New function.
+	(_initialize_amd64_linux_tdep): Register osabi for bfd_mach_x64_32
+	subtype.
+
+	* i386-tdep.h (i386_pseudo_register_name): New prototype.
+	* i386-tdep.c (i386_pseudo_register_name): Make public.
+	* amd64-tdep.h (amd64_x32_init_abi): New prototype.
+	* amd64-tdep.c (amd64_dword_names): Add "eip".
+	(amd64_x32_pseudo_register_type): New function
+	(amd64_x32_init_abi): New function.
+
+2012-06-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR build/14003
+	* inferior.h (struct inferior_suspend_state): Comment out.
+	(struct inferior): Comment out the field suspend.
+	* infrun.c (struct infcall_suspend_state): Comment out the field
+	inferior_suspend.
+	(save_infcall_suspend_state, restore_infcall_suspend_state): Comment
+	out its assignment.
+
+2012-06-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR c++/14177 - Fix parsing TYPENAME:: in parentheses.
+	* c-exp.y (classify_inner_name): Remove caller assumptions in the
+	function comment.  Return ERROR for unresolved cases.  Implement
+	returning proper NAME.
+	(yylex): Accept also NAME from classify_inner_name.
+	* cp-namespace.c (cp_lookup_nested_type): Rename to ...
+	(cp_lookup_nested_symbol): ... here.  Return any found symbol, not just
+	LOC_TYPEDEF type.
+	* cp-support.h (cp_lookup_nested_type): Update its declaration.
+
+2012-06-13  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (condition_completer): New function.
+	(_initialize_breakpoint): Use it.
+	* value.c (complete_internalvar): New function.
+	* value.h (complete_internalvar): Declare.
+
+2012-06-13  Tom Tromey  <tromey@redhat.com>
+
+	* ada-lang.c (ada_make_symbol_completion_list): Return a VEC.
+	* breakpoint.c (catch_syscall_completer): Return a VEC.
+	* cli/cli-cmds.c (complete_command): Update.
+	* cli/cli-decode.c (complete_on_cmdlist): Return a VEC.
+	(complete_on_enum): Likewise.
+	* command.h: Include gdb_vecs.h.
+	(completer_ftype): Change return type.
+	(complete_on_cmdlist, complete_on_enum): Likewise.
+	* completer.c (noop_completer, filename_completer)
+	(location_completer): Return a VEC.
+	(add_struct_fields): Remove 'nextp' argument.  Change 'output'
+	to a VEC.
+	(expression_completer, complete_line_internal, complete_line)
+	(command_completer): Return a VEC.
+	(gdb_completion_word_break_characters, line_completion_function):
+	Update.
+	* completer.h: Include gdb_vecs.h.
+	(complete_line, noop_completer, filename_completer)
+	(expression_completer, location_completer, command_completer):
+	Update.
+	* f-lang.c (f_word_break_characters): Return a VEC.
+	* interps.c (interpreter_completer): Return a VEC.
+	* language.h (struct language_defn)
+	<la_make_symbol_completion_list>: Return a VEC.
+	* python/py-cmd.c (cmdpy_completer): Return a VEC.
+	* symtab.c (free_completion_list): Take a VEC.
+	(return_val_size, return_val_index): Remove.
+	(return_val): Now a VEC.
+	(completion_list_add_name): Update.
+	(default_make_symbol_completion_list_break_on)
+	(default_make_symbol_completion_list, make_symbol_completion_list)
+	(make_symbol_completion_list_fn, make_file_symbol_completion_list):
+	Return a VEC.
+	(add_filename_to_list): Update.
+	(struct add_partial_filename_data) <list_used, list_alloced>: Remove.
+	<list>: Now a VEC.
+	(maybe_add_partial_symtab_filename): Update.
+	(make_source_files_completion_list): Return a VEC.
+	* symtab.h (default_make_symbol_completion_list_break_on)
+	(default_make_symbol_completion_list, make_symbol_completion_list)
+	(make_symbol_completion_list_fn, make_file_symbol_completion_list)
+	(make_source_files_completion_list): Update.
+
+2012-06-13  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (add_catch_command): Use completer_ftype.
+	* breakpoint.h: Include command.h.
+	(add_catch_command): Use completer_ftype.
+	* cli/cli-decode.c (set_cmd_completer): Use completer_ftype.
+	* cli/cli-decode.h (struct cmd_list_element) <completer>:
+	Use completer_ftype.
+	* command.h (completer_ftype): New typedef.
+	(set_cmd_completer): Use it.
+	* python/py-cmd.c (struct cmdpy_completer) <completer>: Use
+	completer_ftype.
+
 2012-06-13  Pedro Alves  <palves@redhat.com>
 
 	Partial revert of previous change.
