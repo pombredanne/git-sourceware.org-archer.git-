@@ -244,6 +244,7 @@ using either the Apple/NeXT or the GNU Objective-C runtime.
 
 @menu
 * Free Software::               Freely redistributable software
+* Free Documentation::          Free Software Needs Free Documentation
 * Contributors::                Contributors to GDB
 @end menu
 
@@ -263,6 +264,7 @@ Fundamentally, the General Public License is a license which says that
 you have these freedoms and that you cannot take these freedoms away
 from anyone else.
 
+@node Free Documentation
 @unnumberedsec Free Software Needs Free Documentation
 
 The biggest deficiency in the free software community today is not in
@@ -5094,7 +5096,7 @@ invocations have returned.
 
 
 @kindex advance @var{location}
-@itemx advance @var{location}
+@item advance @var{location}
 Continue running the program up to the given @var{location}.  An argument is
 required, which should be of one of the forms described in
 @ref{Specify Location}.
@@ -5989,7 +5991,7 @@ function invocation, you end up at the beginning.
 @kindex set exec-direction
 @item set exec-direction
 Set the direction of target execution.
-@itemx set exec-direction reverse
+@item set exec-direction reverse
 @cindex execute forward or backward in time
 @value{GDBN} will perform all execution commands in reverse, until the
 exec-direction mode is changed to ``forward''.  Affected commands include
@@ -19454,8 +19456,8 @@ acceptable commands.
 * MicroBlaze::			Xilinx MicroBlaze
 * MIPS Embedded::               MIPS Embedded
 * OpenRISC 1000::               OpenRisc 1000
-* PA::                          HP PA Embedded
 * PowerPC Embedded::            PowerPC Embedded
+* PA::                          HP PA Embedded
 * Sparclet::                    Tsqware Sparclet
 * Sparclite::                   Fujitsu Sparclite
 * Z8000::                       Zilog Z8000
@@ -22562,10 +22564,10 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Blocks In Python::            Accessing frame blocks from Python.
 * Symbols In Python::           Python representation of symbols.
 * Symbol Tables In Python::     Python representation of symbol tables.
-* Lazy Strings In Python::      Python representation of lazy strings.
 * Breakpoints In Python::       Manipulating breakpoints using Python.
 * Finish Breakpoints in Python:: Setting Breakpoints on function return
                                 using Python.
+* Lazy Strings In Python::      Python representation of lazy strings.
 @end menu
 
 @node Basic Python
@@ -23888,20 +23890,20 @@ when it is called.  If there are no valid threads, the method will
 return an empty tuple.
 @end defun
 
-@findex gdb.read_memory
+@findex Inferior.read_memory
 @defun Inferior.read_memory (address, length)
 Read @var{length} bytes of memory from the inferior, starting at
 @var{address}.  Returns a buffer object, which behaves much like an array
-or a string.  It can be modified and given to the @code{gdb.write_memory}
-function.
+or a string.  It can be modified and given to the
+@code{Inferior.write_memory} function.
 @end defun
 
-@findex gdb.write_memory
+@findex Inferior.write_memory
 @defun Inferior.write_memory (address, buffer @r{[}, length@r{]})
 Write the contents of @var{buffer} to the inferior, starting at
 @var{address}.  The @var{buffer} parameter must be a Python object
 which supports the buffer protocol, i.e., a string, an array or the
-object returned from @code{gdb.read_memory}.  If given, @var{length}
+object returned from @code{Inferior.read_memory}.  If given, @var{length}
 determines the number of bytes from @var{buffer} to be written.
 @end defun
 
@@ -28018,7 +28020,7 @@ N.A.
 @smallexample
  -break-insert [ -t ] [ -h ] [ -f ] [ -d ] [ -a ]
     [ -c @var{condition} ] [ -i @var{ignore-count} ]
-    [ -p @var{thread} ] [ @var{location} ]
+    [ -p @var{thread-id} ] [ @var{location} ]
 @end smallexample
 
 @noindent
@@ -28041,10 +28043,6 @@ The possible optional parameters of this command are:
 Insert a temporary breakpoint.
 @item -h
 Insert a hardware breakpoint.
-@item -c @var{condition}
-Make the breakpoint conditional on @var{condition}.
-@item -i @var{ignore-count}
-Initialize the @var{ignore-count}.
 @item -f
 If @var{location} cannot be parsed (for example if it
 refers to unknown files or functions), create a pending
@@ -28056,6 +28054,12 @@ Create a disabled breakpoint.
 @item -a
 Create a tracepoint.  @xref{Tracepoints}.  When this parameter
 is used together with @samp{-h}, a fast tracepoint is created.
+@item -c @var{condition}
+Make the breakpoint conditional on @var{condition}.
+@item -i @var{ignore-count}
+Initialize the @var{ignore-count}.
+@item -p @var{thread-id}
+Restrict the breakpoint to the specified @var{thread-id}.
 @end table
 
 @subsubheading Result
@@ -40396,7 +40400,7 @@ A string in the constant pool is zero-terminated.
 @printindex cp
 
 @tex
-% I think something like @colophon should be in texinfo.  In the
+% I think something like @@colophon should be in texinfo.  In the
 % meantime:
 \long\def\colophon{\hbox to0pt{}\vfill
 \centerline{The body of this manual is set in}
@@ -40408,7 +40412,7 @@ A string in the constant pool is zero-terminated.
 \centerline{{\sl\fontname\tensl\/}}
 \centerline{are used for emphasis.}\vfill}
 \page\colophon
-% Blame: doc@cygnus.com, 1991.
+% Blame: doc@@cygnus.com, 1991.
 @end tex
 
 @bye

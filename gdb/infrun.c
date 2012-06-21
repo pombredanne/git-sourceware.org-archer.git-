@@ -4069,12 +4069,19 @@ handle_inferior_event (struct execution_control_state *ecs)
 	 skip_inline_frames call would break things.  Fortunately
 	 that's an extremely unlikely scenario.  */
       if (!pc_at_non_inline_function (aspace, stop_pc, &ecs->ws)
-          && !(ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
-               && ecs->event_thread->control.trap_expected
-               && pc_at_non_inline_function (aspace,
-                                             ecs->event_thread->prev_pc,
+	  && !(ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
+	       && ecs->event_thread->control.trap_expected
+	       && pc_at_non_inline_function (aspace,
+					     ecs->event_thread->prev_pc,
 					     &ecs->ws)))
-	skip_inline_frames (ecs->ptid);
+	{
+	  skip_inline_frames (ecs->ptid);
+
+	  /* Re-fetch current thread's frame in case that invalidated
+	     the frame cache.  */
+	  frame = get_current_frame ();
+	  gdbarch = get_frame_arch (frame);
+	}
     }
 
   if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
@@ -4438,17 +4445,33 @@ process_event_stop_test:
 	     3. The initiating frame exists and is different from the
 	     current frame.  This means the exception or longjmp has
 	     been caught beneath the initiating frame, so keep
-	     going.  */
+	     going.
+
+	     4. longjmp breakpoint has been placed just to protect
+	     against stale dummy frames and user is not interested in
+	     stopping around longjmps.  */
 
 	  if (debug_infrun)
 	    fprintf_unfiltered (gdb_stdlog,
 				"infrun: BPSTAT_WHAT_CLEAR_LONGJMP_RESUME\n");
 
-	  init_frame = frame_find_by_id (ecs->event_thread->initiating_frame);
-
 	  gdb_assert (ecs->event_thread->control.exception_resume_breakpoint
 		      != NULL);
 	  delete_exception_resume_breakpoint (ecs->event_thread);
+
+	  if (what.is_longjmp)
+	    {
+	      check_longjmp_breakpoint_for_call_dummy (ecs->event_thread->num);
+
+	      if (!frame_id_p (ecs->event_thread->initiating_frame))
+		{
+		  /* Case 4.  */
+		  keep_going (ecs);
+		  return;
+		}
+	    }
+
+	  init_frame = frame_find_by_id (ecs->event_thread->initiating_frame);
 
 	  if (init_frame)
 	    {
