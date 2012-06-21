@@ -6,8 +6,12 @@ class FrameFilter():
     priority = 100
     enabled = True
 
-    def __init__(self, next_filter):
-        self.next_filter = next_filter
+    def __init__(self, name, pri, enb):
+        self.name = name
+        self.priority  = pri
+        self.enabled = enb
         
+        gdb.frame_filters[name] = self
+
     def filter(iter):
         return iter

@@ -81,7 +81,7 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
 	  return NULL;
 	}
 
-      self->frame_filters = PyList_New (0);
+      self->frame_filters = PyDict_New ();
       if (!self->frame_filters)
 	{
 	  Py_DECREF (self->printers);
@@ -153,10 +153,10 @@ objfpy_set_frame_filters (PyObject *o, PyObject *filters, void *ignore)
       return -1;
     }
 
-  if (! PyList_Check (filters))
+  if (! PyDict_Check (filters))
     {
       PyErr_SetString (PyExc_TypeError,
-		       _("The frame_filters attribute must be a list."));
+		       _("The frame_filters attribute must be a dictionary."));
       return -1;
     }
 
@@ -223,7 +223,7 @@ objfile_to_objfile_object (struct objfile *objfile)
 	      return NULL;
 	    }
 
-	  object->frame_filters = PyList_New (0);
+	  object->frame_filters = PyDict_New ();
 	  if (!object->frame_filters)
 	    {
 	      Py_DECREF (object->printers);

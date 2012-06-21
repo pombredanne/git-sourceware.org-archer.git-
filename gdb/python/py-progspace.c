@@ -90,7 +90,7 @@ pspy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
 	  return NULL;
 	}
 
-      self->frame_filters = PyList_New (0);
+      self->frame_filters = PyDict_New ();
       if (!self->frame_filters)
 	{
 	  Py_DECREF (self->printers);
@@ -162,10 +162,10 @@ pspy_set_frame_filters (PyObject *o, PyObject *frame, void *ignore)
       return -1;
     }
 
-  if (! PyList_Check (frame))
+  if (! PyDict_Check (frame))
     {
       PyErr_SetString (PyExc_TypeError,
-		       "the frame filter attribute must be a list");
+		       "the frame filter attribute must be a dictionary");
       return -1;
     }
 
@@ -220,7 +220,7 @@ pspace_to_pspace_object (struct program_space *pspace)
 	      return NULL;
 	    }
 
-	  object->frame_filters = PyList_New (0);
+	  object->frame_filters = PyDict_New ();
 	  if (!object->frame_filters)
 	    {
 	      Py_DECREF (object->printers);

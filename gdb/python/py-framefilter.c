@@ -748,12 +748,26 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   int print_result = 0;
   struct value_print_options opts;
   int success = 0;
+  PyObject *filter_list;
+  PyObject *sort_func;
+  PyObject *sort;
+  PyObject *module;
 
   cleanups = ensure_python_env (gdbarch, current_language);
 
   frame_obj = frame_info_to_frame_object (frame);
   if (! frame_obj)
     goto done;
+  module = PyImport_AddModule ("__main__");
+  sort_func = PyObject_GetAttrString (module, "sort_list");  
+  filter_list = PyObject_GetAttrString (gdb_module, "frame_filters");  
+  sort = PyObject_CallFunctionObjArgs (sort_func, filter_list, NULL);
+  if (PyErr_Occurred())
+    {
+      gdbpy_print_stack ();
+      return 0;
+    }
+  /* Build the filter list ordered by priority.  */
 
   /* Find the constructor.  */
   filter = find_frame_filter (frame_obj, count);
