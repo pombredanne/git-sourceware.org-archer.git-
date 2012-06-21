@@ -32,196 +32,6 @@
 #ifdef HAVE_PYTHON
 #include "python-internal.h"
 
-/* Helper function for find_frame_filter which iterates over a list,
-   calls each function and inspects output.  This will return a filter
-   object if one of the filters registers interest in FRAME.  If no
-   frame filter is found, it will return None.  On error, it will set
-   the Python error and return NULL.  */
-
-static PyObject *
-search_frame_filter_list (PyObject *list, PyObject *frame,
-			  int limit)
-
-{
-  Py_ssize_t list_size, list_index;
-  PyObject *filter = NULL;
-  PyObject *slimit = PyLong_FromLong (limit);
-
-  if (! slimit)
-    return NULL;
-
-  list_size = PyList_Size (list);
-  for (list_index = 0; list_index < list_size; list_index++)
-    {
-      PyObject *function;
-
-      function = PyList_GetItem (list, list_index);
-      if (! function)
-	return NULL;
-
-      /* Skip if disabled.  */
-      if (PyObject_HasAttr (function, gdbpy_enabled_cst))
-	{
-	  PyObject *attr = PyObject_GetAttr (function, gdbpy_enabled_cst);
-	  int cmp;
-
-	  if (!attr)
-	    return NULL;
-	  cmp = PyObject_IsTrue (attr);
-
-	  Py_DECREF (attr);
-	  if (cmp == -1)
-	    return NULL;
-
-	  if (!cmp)
-	    continue;
-	}
-
-      filter = PyObject_CallFunctionObjArgs (function, frame, slimit, NULL);
-
-      Py_DECREF (slimit);
-      if (! filter)
-	{
-	  Py_DECREF (slimit);
-	  return NULL;
-	}
-      else if (filter != Py_None)
-	{
-	  Py_DECREF (slimit);
-	  return filter;
-	}
-
-      Py_DECREF (filter);
-    }
-
-  Py_RETURN_NONE;
-}
-
-
-/* Subroutine of find_frame_filter to simplify it.  Look for a frame
-   filter for FRAME in the gdb module.  The result is NULL if there's
-   an error and the search should be terminated.  The result is
-   Py_None, if no frame filter is found.  Otherwise the result is the
-   frame filter function, suitably inc-ref'd.  */
-
-static PyObject *
-find_frame_filter_from_gdb (PyObject *frame, int limit)
-{
-  PyObject *filter_list;
-  PyObject *function;
-
-  /* Fetch the global frame filter list.  */
-  if (! PyObject_HasAttrString (gdb_module, "frame_filters"))
-    Py_RETURN_NONE;
-
-  filter_list = PyObject_GetAttrString (gdb_module, "frame_filters");
-  if (filter_list == NULL || ! PyList_Check (filter_list))
-    {
-      Py_XDECREF (filter_list);
-      Py_RETURN_NONE;
-    }
-
-  function = search_frame_filter_list (filter_list, frame, limit);
-  Py_XDECREF (filter_list);
-  return function;
-}
-/* Subroutine of find_frame_filter to simplify it.  Look for a frame
-   filter for FRAME in all objfiles.  The result is NULL if there's an
-   error and the search should be terminated.  The result is Py_None
-   if no frame filter found.  Otherwise the result is the
-   pretty-printer function. */
-
-static PyObject *
-find_frame_filter_from_objfiles (PyObject *frame, int limit)
-{
-  PyObject *filter_list;
-  PyObject *function;
-  struct objfile *obj;
-
-  ALL_OBJFILES (obj)
-  {
-    PyObject *objf = objfile_to_objfile_object (obj);
-    if (!objf)
-      {
-	/* Ignore the error and continue.  */
-	PyErr_Clear ();
-	continue;
-      }
-
-    filter_list = objfpy_get_frame_filters (objf, NULL);
-
-    function = search_frame_filter_list (filter_list, frame, limit);
-
-    Py_XDECREF (filter_list);
-
-    /* If there is an error in any objfile list, abort the search and exit.  */
-    if (! function)
-      return NULL;
-
-    if (function != Py_None)
-      return function;
-
-    Py_DECREF (function);
-  }
-
-  Py_RETURN_NONE;
-}
-
-/* Subroutine of find_pretty_printer to simplify it.  Look for a frame
-   filter for FRAME in the current program space.  The result is NULL
-   if there's an error and the search should be terminated.  The
-   result is Py_None, no frame filter was found.  Otherwise the result
-   is the pretty-printer function.  */
-
-static PyObject *
-find_frame_filter_from_progspace (PyObject *frame, int limit)
-{
-  PyObject *filter_list;
-  PyObject *function;
-  PyObject *obj = pspace_to_pspace_object (current_program_space);
-
-  if (!obj)
-    return NULL;
-  filter_list = pspy_get_frame_filters (obj, NULL);
-
-  function = search_frame_filter_list (filter_list, frame, limit);
-
-  Py_XDECREF (filter_list);
-  return function;
-}
-
-
-/* Find the frame filter constructor function for FRAME.  If no
-   frame filter exists, return None.  If one exists, return a new
-   reference.  On error, set the Python error and return NULL.  */
-
-static PyObject *
-find_frame_filter (PyObject *frame, int limit)
-{
-  PyObject *function = NULL;
-
-  /* Look at the frame filter list for each objfile
-     in the current program-space.  */
-  function = find_frame_filter_from_objfiles (frame, limit);
-
-  if (function == NULL || function != Py_None)
-    goto exit_func;
-  Py_DECREF (function);
-
-  /* Look at the frame filter list for the current program-space.  */
-  function = find_frame_filter_from_progspace (frame, limit);
-
-  if (function == NULL || function != Py_None)
-    goto exit_func;
-  Py_DECREF (function);
-
-  /* Look at the frame filter list in the gdb module.  */
-  function = find_frame_filter_from_gdb (frame, limit)    ;
-
-exit_func:
-  return function;
-}
-
 static int
 py_print_locals (PyObject *filter,
 		 struct value_print_options opts)
@@ -541,22 +351,22 @@ py_print_frame (PyObject *filter,
 
       if (! result)
 	goto error;
-      frame = frame_object_to_frame_info (result);
-      if (! frame)
+      if (result == Py_None)
+	gdbarch = target_gdbarch;
+      else
 	{
-	  Py_DECREF (result);
-	  goto error;
+	  frame = frame_object_to_frame_info (result);
+	  if (! frame)
+	    {
+	      Py_DECREF (result);
+	      goto error;
+	    }
+	  gdbarch = get_frame_arch (frame);
 	}
-
       Py_DECREF (result);
-      gdbarch = get_frame_arch (frame);
     }
   else
-    {
-      PyErr_SetString (PyExc_RuntimeError,
-		       _("frame filter must implement inferior_frame callback."));
-      goto error;
-    }
+    gdbarch = target_gdbarch;
 
   if (PyObject_HasAttrString (filter, "elide"))
     {
@@ -743,45 +553,37 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct cleanup *cleanups;
-  PyObject *frame_obj, *filter, *frame_iter, *iterable;
   int result = 0;
   int print_result = 0;
   struct value_print_options opts;
   int success = 0;
-  PyObject *filter_list;
-  PyObject *sort_func;
-  PyObject *sort;
   PyObject *module;
+  PyObject *sort_func;
+  PyObject *iterable;
+  PyObject *frame_obj;
 
   cleanups = ensure_python_env (gdbarch, current_language);
 
   frame_obj = frame_info_to_frame_object (frame);
   if (! frame_obj)
     goto done;
-  module = PyImport_AddModule ("__main__");
-  sort_func = PyObject_GetAttrString (module, "sort_list");  
-  filter_list = PyObject_GetAttrString (gdb_module, "frame_filters");  
-  sort = PyObject_CallFunctionObjArgs (sort_func, filter_list, NULL);
-  if (PyErr_Occurred())
+
+  module = PyImport_AddModule ("gdb.command.frame_filters");
+
+  sort_func = PyObject_GetAttrString (module, "invoke");
+  if (!sort_func)
     {
-      gdbpy_print_stack ();
-      return 0;
+      Py_DECREF (module);
+      goto done;
     }
-  /* Build the filter list ordered by priority.  */
-
-  /* Find the constructor.  */
-  filter = find_frame_filter (frame_obj, count);
+  iterable = PyObject_CallFunctionObjArgs (sort_func, frame_obj, NULL);
+  Py_DECREF (sort_func);
   Py_DECREF (frame_obj);
-
-  make_cleanup_py_decref (filter);
-  if (! filter || filter == Py_None)
+  Py_DECREF (module);
+  if (!iterable || PyErr_Occurred())
     goto done;
-
+ 
   get_user_print_options (&opts);
-
-  iterable = PyObject_CallMethod (filter, "invoke", NULL);
-  if (! iterable)
-    goto done;
 
   make_cleanup_py_decref (iterable);
 

@@ -79,3 +79,6 @@ class FrameWrapper:
 
     def inferior_frame (self):
         return self.frame
+
+    def older(self):
+        return self.frame.older()

@@ -37,16 +37,69 @@ class Reverse_Function (FrameWrapper):
         else:
             return False
 
+class Dummy:
+    def __init__(self, nextframe):
+        self.nextframe = nextframe
+
+    def omit (self):
+        return False
+
+    def elide (self):
+        return False
+
+    def function (self):
+        return "Dummy function"
+
+    def address (self):
+        return 0x123
+
+    def filename (self):
+        return "Dummy filename"
+
+    def frame_args (self):
+        return []
+
+    def frame_locals (self):
+        return []
+
+    def line (self):
+        return 0
+
+    def older (self):
+        return self.nextframe
+
+    def inferior_frame (self):
+        return None
+
+class FrameAdd ():
+
+    def __init__ (self):
+        self.name = "Add"
+        self.priority = 10
+        self.enabled = True
+        gdb.frame_filters [self.name] = self
+
+    def filter (self, frame_iter):
+        for f in frame_iter:
+            nextv = f
+            break
+        dummies = [Dummy(nextv)]
+        frame_iter = itertools.chain (dummies,
+                                      frame_iter)
+        return frame_iter
+
 class FrameFilter ():
 
-    def __init__ (self, iterator, limit):
-        self.iterator = iterator
-        self.limit = limit
+    def __init__ (self):
+        self.name = "Reverse"
+        self.priority = 100
+        self.enabled = True
+        gdb.frame_filters [self.name] = self
 
-    def __new__ (self):
-        return self;
+    def filter (self, frame_iter):
+        frame_iter = itertools.imap (Reverse_Function,
+                                     frame_iter)
+        return frame_iter
 
-    def invoke (self):
-        iter = itertools.imap (Reverse_Function,
-                               self.iterator)
-        return iter
+FrameAdd()
+FrameFilter()

@@ -56,8 +56,9 @@ PYTHON_FILES = \
 	gdb/types.py \
 	gdb/printing.py \
 	gdb/prompt.py \
-	gdb/FrameWrapper.py \
 	gdb/FrameFilter.py \
+	gdb/FrameIterator.py \
+	gdb/FrameWrapper.py \
 	gdb/command/__init__.py \
 	gdb/command/frame_filters.py \
 	gdb/command/pretty_printers.py \

@@ -19,6 +19,7 @@
 import gdb
 import copy
 import gdb.FrameFilter
+from gdb.FrameIterator import FrameIterator
 
 def _parse_arg (cmd_name, arg):
     """ Internal Worker function to take an argument and return a
@@ -151,14 +152,15 @@ def _sort_list ():
     sorted_frame_filters = filter (_get_enabled, sorted_frame_filters)
     return sorted_frame_filters
 
-def invoke (frame_iterator):
+def invoke (frame):
     """ Public internal function that will execute the chain of frame
     filters.  Each filter is executed in priority order.
 
     Arguments:
         frame_iterator:  An iterator of frames.
     """
-    sorted_list = sort_list()
+    sorted_list = _sort_list()
+    frame_iterator = FrameIterator (frame)
     for ff in sorted_list:
         frame_iterator = ff[1].filter (frame_iterator)
 
