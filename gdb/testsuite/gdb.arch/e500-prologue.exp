@@ -23,9 +23,7 @@ if ![istarget "powerpc-*"] then {
     return
 }
 
-set testfile "e500-prologue"
-set srcfile ${testfile}.c
-set binfile ${objdir}/${subdir}/${testfile}
+standard_testfile
 if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {}] != "" } {
     unsupported "Testcase compile failed."
     return -1

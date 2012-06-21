@@ -18,9 +18,7 @@ if ![istarget "ia64-*-*"] {
     return
 }
 
-set testfile ia64-breakpoint-shadow
-set srcfile ${testfile}.S
-set binfile ${objdir}/${subdir}/${testfile}
+standard_testfile .S
 if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
     untested "Couldn't compile test program"
     return -1

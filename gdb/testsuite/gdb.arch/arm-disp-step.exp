@@ -22,9 +22,7 @@ if {![istarget "arm*-*-*"]} then {
     return
 }
 
-set testfile "arm-disp-step"
-set srcfile ${testfile}.S
-set binfile ${objdir}/${subdir}/${testfile}
+standard_testfile .S
 
 set additional_flags "-Wa,-g"
 

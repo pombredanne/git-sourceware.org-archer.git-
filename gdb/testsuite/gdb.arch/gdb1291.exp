@@ -29,9 +29,7 @@ if ![istarget "sh-*-*"] then {
     return
 }
 
-set testfile "gdb1291"
-set srcfile ${testfile}.s
-set binfile ${objdir}/${subdir}/${testfile}
+standard_testfile .s
 if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable ""] != "" } {
     untested gdb1291.exp
     return -1
