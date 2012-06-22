@@ -1651,7 +1651,9 @@ frame_info (char *addr_exp, int from_tty)
    frames.  */
 
 static void
-backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
+backtrace_command_1 (char *count_exp, int show_locals, int raw, 
+		     int from_tty)
+
 {
   struct frame_info *fi;
   int count;
@@ -1719,11 +1721,12 @@ backtrace_command_1 (char *count_exp, int show_locals, int from_tty)
 	  find_pc_sect_symtab_via_partial (pc, find_pc_mapped_section (pc));
 	}
     }
-
-  result = apply_frame_filter (trailing, 1, LOCATION, 1,
-			       print_frame_arguments, current_uiout,
-			       show_locals, count);
-
+  
+  if (! raw)
+    result = apply_frame_filter (trailing, 1, LOCATION, 1,
+				 print_frame_arguments, current_uiout,
+				 show_locals, count);
+  
   if (! result)
     {
       for (i = 0, fi = trailing; fi && count--; i++, fi = get_prev_frame (fi))
@@ -1765,7 +1768,8 @@ static void
 backtrace_command (char *arg, int from_tty)
 {
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
-  int fulltrace_arg = -1, arglen = 0, argc = 0;
+  int fulltrace_arg = -1, arglen = 0, argc = 0, raw_arg = -1;
+  int user_arg = 0;
 
   if (arg)
     {
@@ -1781,26 +1785,32 @@ backtrace_command (char *arg, int from_tty)
 
 	  for (j = 0; j < strlen (argv[i]); j++)
 	    argv[i][j] = tolower (argv[i][j]);
-
-	  if (fulltrace_arg < 0 && subset_compare (argv[i], "full"))
-	    fulltrace_arg = argc;
+	  
+	  if (raw_arg < 0 && subset_compare (argv[i], "raw"))
+	    raw_arg = argc;
 	  else
 	    {
-	      arglen += strlen (argv[i]);
-	      argc++;
+	      if (fulltrace_arg < 0 && subset_compare (argv[i], "full"))
+		fulltrace_arg = argc;
+	      else
+		{
+		  user_arg++;
+		  arglen += strlen (argv[i]);
+		}
 	    }
+	  argc++;
 	}
-      arglen += argc;
-      if (fulltrace_arg >= 0)
+      arglen += user_arg;
+      if (fulltrace_arg >= 0 || raw_arg >= 0)
 	{
 	  if (arglen > 0)
 	    {
 	      arg = xmalloc (arglen + 1);
 	      make_cleanup (xfree, arg);
 	      arg[0] = 0;
-	      for (i = 0; i < (argc + 1); i++)
+	      for (i = 0; i < argc; i++)
 		{
-		  if (i != fulltrace_arg)
+		  if (i != fulltrace_arg && i != raw_arg)
 		    {
 		      strcat (arg, argv[i]);
 		      strcat (arg, " ");
@@ -1812,7 +1822,8 @@ backtrace_command (char *arg, int from_tty)
 	}
     }
 
-  backtrace_command_1 (arg, fulltrace_arg >= 0 /* show_locals */, from_tty);
+  backtrace_command_1 (arg, fulltrace_arg >= 0 /* show_locals */,
+		       raw_arg >= 0 /* no frame-filters */, from_tty);
 
   do_cleanups (old_chain);
 }
@@ -1820,7 +1831,7 @@ backtrace_command (char *arg, int from_tty)
 static void
 backtrace_full_command (char *arg, int from_tty)
 {
-  backtrace_command_1 (arg, 1 /* show_locals */, from_tty);
+  backtrace_command_1 (arg, 1 /* show_locals */, 0, from_tty);
 }
 
 

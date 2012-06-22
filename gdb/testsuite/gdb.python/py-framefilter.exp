@@ -22,26 +22,52 @@ set testfile "py-framefilter"
 set srcfile ${testfile}.c
 set binfile ${objdir}/${subdir}/${testfile}
 
-if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile}] } {
+# We cannot use prepare_for_testing as we have to set the safe-patch
+# to check objfile and progspace printers.
+if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
+    untested "Couldn't compile ${srcfile}"
     return -1
 }
+
+# Start with a fresh gdb.
+gdb_exit
+gdb_start
 
 # Skip all tests if Python scripting is not enabled.
 if { [skip_python_tests] } { continue }
 
-set nl "\[\r\n\]+"
+# Make the -gdb.py script available to gdb, it is automagically loaded by gdb.
+# Care is taken to put it in the same directory as the binary so that
+# gdb will find it.
+set remote_obj_python_file [remote_download host ${srcdir}/${subdir}/${testfile}-gdb.py.in ${subdir}/${testfile}-gdb.py]
+
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_test_no_output "set auto-load safe-path ${remote_obj_python_file}" "set auto-load safe-path"
+gdb_load ${binfile}
+
+# Verify gdb loaded the script.
+gdb_test "info auto-load python-scripts" "Yes.*/${testfile}-gdb.py.*"
 
 if ![runto_main ] then {
     perror "couldn't run to breakpoint"
     return
 }
 
+# Load global frame-filters
 set remote_python_file [remote_download host ${srcdir}/${subdir}/${testfile}.py]
 gdb_test_no_output "python execfile ('${remote_python_file}')"
 
 gdb_breakpoint [gdb_get_line_number "Backtrace end breakpoint"]
 gdb_continue_to_breakpoint "Backtrace end breakpoint"
 
-gdb_test "bt" "#-1.*in Dummy function.*#22.*in 1cnuf.*#27.*in niam ().*"
-gdb_test "bt" "#-1.*in Dummy function.*#22.*in 1cnuf.*#27.*in niam ().*"
+gdb_test "info frame-filter" \
+    {.*100.*Yes.*Reverse.*10.*Yes.*Add.*1.*No.*Object.*1.*}
+# Test raw
+gdb_test "bt raw" \
+    {.*#0.*end_func.*#22.*in func1.*#27.*in main ().*}
+gdb_test "bt" \
+    {.*in Dummy function.*#22.*in 1cnuf.*#27.*in niam ().*}
+gdb_test "bt" \
+    {.*in Dummy function.*#22.*in 1cnuf.*#27.*in niam ().*}
+
 remote_file host delete ${remote_python_file}

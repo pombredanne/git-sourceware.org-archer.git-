@@ -564,25 +564,30 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 
   cleanups = ensure_python_env (gdbarch, current_language);
 
+  module = PyImport_ImportModule ("gdb.command.frame_filters");
+  if (! module)
+    goto done;
+  
   frame_obj = frame_info_to_frame_object (frame);
   if (! frame_obj)
     goto done;
-
-  module = PyImport_AddModule ("gdb.command.frame_filters");
 
   sort_func = PyObject_GetAttrString (module, "invoke");
   if (!sort_func)
     {
       Py_DECREF (module);
+      Py_DECREF (frame_obj);
       goto done;
     }
+  
   iterable = PyObject_CallFunctionObjArgs (sort_func, frame_obj, NULL);
+  Py_DECREF (module);
   Py_DECREF (sort_func);
   Py_DECREF (frame_obj);
-  Py_DECREF (module);
-  if (!iterable || PyErr_Occurred())
+  
+  if (!iterable)
     goto done;
- 
+  
   get_user_print_options (&opts);
 
   make_cleanup_py_decref (iterable);
