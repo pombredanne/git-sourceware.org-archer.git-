@@ -15,14 +15,16 @@
 
 import gdb
 
-class FrameWrapper:
+class FrameWrapper (object):
     "Base Frame Wrapper"
 
-    def __init__ (self, frame):
+    # frame her can refer to a gdb.Frame or another frame like object
+    # conforming to the interface in this class.  As we can have frame
+    # wrappers wrapping frame wrappers, we should defer to that
+    # object's method.
+    def __init__(self, frame):
+        super(FrameWrapper, self).__init__()
         self.frame = frame
-
-    def __new__ (self):
-        return self
 
     def omit (self):
         return False
@@ -31,6 +33,9 @@ class FrameWrapper:
         return False
 
     def function (self):
+        if hasattr(self.frame, "function"):
+            return str(self.frame.function())
+
         fname = str (self.frame.function())
         if (fname == ""):
             return "<unknown function>"
@@ -38,12 +43,21 @@ class FrameWrapper:
             return fname
 
     def level (self, level):
+        if hasattr(self.frame, "level"):
+            return self.frame.level()
+
         return level
 
     def address (self):
+        if hasattr(self.frame, "address"):
+            return self.frame.address()
+
         return self.frame.pc()
 
     def filename (self):
+        if hasattr(self.frame, "filename"):
+            return self.frame.filename()
+
         sal = self.frame.find_sal()
         if (sal):
             return sal.symtab.filename
@@ -51,6 +65,9 @@ class FrameWrapper:
             return "<unknown filename>"
 
     def frame_args (self):
+        if hasattr(self.frame, "frame_args"):
+            return self.frame.frame_args()
+
         args = self.frame.arguments()
         args_list = []
         if args != None:
@@ -61,6 +78,9 @@ class FrameWrapper:
         return args_list
 
     def frame_locals (self):
+        if hasattr(self.frame, "frame_locals"):
+            return self.frame.frame_locals()
+
         frame_locals = self.frame.locals()
         frame_locals_list = []
         if frame_locals != None:
@@ -71,6 +91,9 @@ class FrameWrapper:
         return frame_locals_list
 
     def line (self):
+        if hasattr(self.frame, "line"):
+            return self.frame.line()
+
         sal = self.frame.find_sal()
         if (sal):
             return sal.line        
@@ -78,6 +101,9 @@ class FrameWrapper:
             return "<unknown line>"
 
     def inferior_frame (self):
+        if hasattr(self.frame, "inferior_frame"):
+            return self.frame.inferior_frame()
+
         return self.frame
 
     def older(self):

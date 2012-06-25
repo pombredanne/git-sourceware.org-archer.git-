@@ -166,7 +166,7 @@ py_print_args (PyObject *filter,
   /* Frame arguments.  */
   annotate_frame_args ();
   ui_out_text (out, " (");
-
+  
   if (PyObject_HasAttrString (filter, "frame_args"))
     {
       PyObject *result = PyObject_CallMethod (filter, "frame_args", NULL);
@@ -194,7 +194,7 @@ py_print_args (PyObject *filter,
 
 	  for (list_index = 0; list_index < size; list_index++)
 	    {
-	      PyObject *sym_tuple, *sym, *value;
+	      PyObject *sym_tuple, *sym, *value, *pvalue;
 	      const char *sym_name;
 	      struct value *val;
 	      struct symbol *symbol;
@@ -248,8 +248,9 @@ py_print_args (PyObject *filter,
 	      annotate_arg_begin ();
 	      ui_out_field_string (out, "name", sym_name);
 	      ui_out_text (out, "=");
-
-	      val = value_object_to_value (value);
+	      
+	      val = convert_value_from_python (value);
+	      //	      val = value_object_to_value (pvalue);
 	      if (! val)
 		{
 		  PyErr_SetString (PyExc_RuntimeError,
@@ -296,6 +297,34 @@ py_print_args (PyObject *filter,
   return 0;
 }
 
+static CORE_ADDR
+get_address (PyObject *filter, int *error)
+{
+  PyObject *result = NULL;
+  CORE_ADDR address = 0;
+  
+  *error = 0;
+  if (PyObject_HasAttrString (filter, "address"))
+      result = PyObject_CallMethod (filter, "address", NULL);
+  else
+    {
+      if (PyObject_HasAttrString (filter, "pc"))
+	  result = PyObject_CallMethod (filter, "pc", NULL);
+      else
+	return 0;
+    }
+      
+  if (result)
+    {
+      address = PyLong_AsLong (result);
+      Py_DECREF (result);
+    }
+  else
+    *error = 1;
+  
+  return address;
+}
+
 static int
 py_print_frame (PyObject *filter,
 		int print_level,
@@ -313,7 +342,35 @@ py_print_frame (PyObject *filter,
   int line = 0;
   struct frame_info *frame = NULL;
   volatile struct gdb_exception except;
+  int error = 0;
+  
+  /* Get the frame.  */
+  if (PyObject_HasAttrString (filter, "inferior_frame"))
+    {
+      PyObject *result = PyObject_CallMethod (filter, "inferior_frame", NULL);
 
+      if (! result)
+	goto error;
+      if (result == Py_None)
+	gdbarch = target_gdbarch;
+      else
+	{
+	  frame = frame_object_to_frame_info (result);
+	  if (! frame)
+	    {
+	      Py_DECREF (result);
+	      PyErr_SetString (PyExc_RuntimeError,
+			       _("'inferior_frame' should return None, " \
+				 "or a gdb.Frame."));
+	      goto error;
+	    }
+	  gdbarch = get_frame_arch (frame);
+	}
+      Py_DECREF (result);
+    }
+  else
+    gdbarch = target_gdbarch;
+  
   /* First check to see if this frame is to be omitted.  */
   if (PyObject_HasAttrString (filter, "omit"))
     {
@@ -343,30 +400,6 @@ py_print_frame (PyObject *filter,
       else
 	goto error;
     }
-
-  /* Get the frame.  */
-  if (PyObject_HasAttrString (filter, "inferior_frame"))
-    {
-      PyObject *result = PyObject_CallMethod (filter, "inferior_frame", NULL);
-
-      if (! result)
-	goto error;
-      if (result == Py_None)
-	gdbarch = target_gdbarch;
-      else
-	{
-	  frame = frame_object_to_frame_info (result);
-	  if (! frame)
-	    {
-	      Py_DECREF (result);
-	      goto error;
-	    }
-	  gdbarch = get_frame_arch (frame);
-	}
-      Py_DECREF (result);
-    }
-  else
-    gdbarch = target_gdbarch;
 
   if (PyObject_HasAttrString (filter, "elide"))
     {
@@ -416,22 +449,11 @@ py_print_frame (PyObject *filter,
       else
 	level = frame_relative_level (frame);
     }
-
-  /* Print frame address.  */
-  if (PyObject_HasAttrString (filter, "address"))
-    {
-      PyObject *result = PyObject_CallMethod (filter, "address", NULL);
-
-      if (result)
-	{
-	  address = PyLong_AsLong (result);
-	  Py_DECREF (result);
-	}
-      else
-	goto error;
-    }
-  else
-    address = 0;
+  
+  
+  address = get_address (filter, &error);
+  if (error)
+    goto error;
 
   annotate_frame_begin (print_level ? level : 0,
 			gdbarch, address);

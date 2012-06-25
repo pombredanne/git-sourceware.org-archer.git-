@@ -22,8 +22,12 @@ from gdb.FrameWrapper import FrameWrapper
 
 class Reverse_Function (FrameWrapper):
 
+    def __init__(self, fobj):
+        super(Reverse_Function, self).__init__(fobj)
+        self.fobj = fobj
+ 
     def function (self):
-        fname = str (self.frame.function())
+        fname = str (self.fobj.function())
         if (fname == ""):
             return "<unknown function>"
         else:
@@ -31,21 +35,13 @@ class Reverse_Function (FrameWrapper):
         return fname
 
     def elide (self):
-        fname = str (self.frame.function())
+        fname = str (self.fobj.function())
         if (fname == "func2" or fname == "func3"):
             return True
         else:
             return False
 
-class Dummy:
-    def __init__(self, nextframe):
-        self.nextframe = nextframe
-
-    def omit (self):
-        return False
-
-    def elide (self):
-        return False
+class Dummy ():
 
     def function (self):
         return "Dummy function"
@@ -57,7 +53,7 @@ class Dummy:
         return "Dummy filename"
 
     def frame_args (self):
-        return []
+        return [("Foo",gdb.Value(12)),("Bar","Stuff"), ("FooBar",42)]
 
     def frame_locals (self):
         return []
@@ -65,25 +61,19 @@ class Dummy:
     def line (self):
         return 0
 
-    def older (self):
-        return self.nextframe
-
     def inferior_frame (self):
         return None
 
 class FrameAdd ():
 
     def __init__ (self):
-        self.name = "Add"
+        self.name = "Dummy"
         self.priority = 10
         self.enabled = True
         gdb.frame_filters [self.name] = self
 
     def filter (self, frame_iter):
-        for f in frame_iter:
-            nextv = f
-            break
-        dummies = [Dummy(nextv)]
+        dummies = [Dummy()]
         frame_iter = itertools.chain (dummies,
                                       frame_iter)
         return frame_iter

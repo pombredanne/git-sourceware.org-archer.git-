@@ -20,6 +20,23 @@ import gdb
 import copy
 import gdb.FrameFilter
 from gdb.FrameIterator import FrameIterator
+from gdb.FrameWrapper import FrameWrapper
+
+class PrimordialFilter:
+
+    def filter_unwrapped (self, frame):
+        foo =  gdb.Frame
+        if isinstance (frame, foo):
+            return True
+        else:
+            return False
+
+    def filter (self, iterator):
+        for it in iterator:
+            if self.filter_unwrapped (it):
+                yield FrameWrapper(it)
+            else:
+                yield it
 
 def _parse_arg (cmd_name, arg):
     """ Internal Worker function to take an argument and return a
@@ -164,6 +181,8 @@ def invoke (frame):
     for ff in sorted_list:
         frame_iterator = ff[1].filter (frame_iterator)
 
+    pri = PrimordialFilter ()
+    frame_iterator = pri.filter (frame_iterator)
     return frame_iterator
 
 class InfoFrameFilter(gdb.Command):

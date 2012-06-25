@@ -61,13 +61,23 @@ gdb_breakpoint [gdb_get_line_number "Backtrace end breakpoint"]
 gdb_continue_to_breakpoint "Backtrace end breakpoint"
 
 gdb_test "info frame-filter" \
-    {.*100.*Yes.*Reverse.*10.*Yes.*Add.*1.*No.*Object.*1.*}
+    {.*100.*Yes.*Reverse.*10.*Yes.*Dummy.*1.*No.*Object.*1.*}
 # Test raw
 gdb_test "bt raw" \
     {.*#0.*end_func.*#22.*in func1.*#27.*in main ().*}
 gdb_test "bt" \
     {.*in Dummy function.*#22.*in 1cnuf.*#27.*in niam ().*}
+
+# Make the Dummy filter a higher priority than Reverse.  This ensures
+# we chain correctly.
+gdb_test_no_output "set python frame-filter priority global Dummy 5000"
 gdb_test "bt" \
-    {.*in Dummy function.*#22.*in 1cnuf.*#27.*in niam ().*}
+    {.*in noitcnuf ymmuD.*#22.*in 1cnuf.*#27.*in niam ().*}
+
+# Disable Reverse
+gdb_test_no_output "set python frame-filter disable global Reverse"
+gdb_test "bt" \
+    {.*in Dummy function.*#22.*in func1.*#27.*in main ().*}
 
 remote_file host delete ${remote_python_file}
+
