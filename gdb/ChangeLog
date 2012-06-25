@@ -1,3 +1,63 @@
+2012-06-25  Michael Eager  <eager@eagercon.com>
+
+	PR python/14291
+	* python/python.c (gdbpy_write): Check for interrupted output. 
+
+2012-06-25  Greta Yorsh  <greta.yorsh@arm.com>
+
+	* arm-tdep.c (arm_in_function_epilogue_p): Recognize POP with a single
+	register as a stack alignment in ARM mode.
+
+2012-06-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Update gnulib to GIT commit a39f53ccb70a613e647e1019fb4c63645220267e.
+	* gnulib/config.in: Regenerate.
+	* gnulib/configure: Likewise.
+	* gnulib/import/m4/extensions.m4: Update it.
+	* gnulib/import/m4/gnulib-common.m4: Likewise.
+	* gnulib/import/m4/memmem.m4: Likewise.
+	* gnulib/import/m4/mmap-anon.m4: Likewise.
+	* gnulib/import/m4/multiarch.m4: Likewise.
+	* gnulib/import/stdint.in.h: Likewise.
+
+2012-06-24  Yao Qi  <yao@codesourcery.com>
+
+	* corefile.c (write_memory_with_notification): New.
+	* gdbcore.h: Declare write_memory_with_notification.
+	* ada-lang.c (ada_value_assign): Replace 'write_memory' and
+	'observer_notify_memory_changed' with 'write_memory_with_notification'.
+	* valops.c (value_assign): Likewise.
+	* python/py-inferior.c (infpy_write_memory): Call
+	'write_memory_with_notification'.
+
+2012-06-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cc-with-index.sh: Use also -ex "set auto-load no".
+
+2012-06-23  Doug Evans  <dje@google.com>
+
+	PR 14125
+	* NEWS: Document additions to .gdb_index.
+	* dwarf2read.c: #include "gdb/gdb-index.h".
+	(DW2_GDB_INDEX_SYMBOL_STATIC_SET_VALUE): New macro.
+	(DW2_GDB_INDEX_SYMBOL_KIND_SET_VALUE): New macro.
+	(DW2_GDB_INDEX_CU_SET_VALUE): New macro.
+	(dwarf2_read_index): Recognize version 7.
+	(dw2_do_expand_symtabs_matching): New args want_specific_block,
+	block_kind, domain): All callers updated.
+	(dw2_find_symbol_file): Handle new index CU values.
+	(dw2_expand_symtabs_matching): Match symbol kind if requested.
+	(add_index_entry): New args is_static, kind.  All callers updated.
+	(offset_type_compare, uniquify_cu_indices): New functions
+	(symbol_kind): New function.
+	(write_psymtabs_to_index): Remove duplicate CU values.
+	(write_psymtabs_to_index): Write .gdb_index version 7.
+
+2012-06-22  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac (build_warnings): Add -Wdeclaration-after-statement.
+	* configure: Regenerate.
+
 2012-06-20  Yao Qi  <yao@codesourcery.com>
 
 	* python/py-inferior.c: Update comments of infpy_read_memory
