@@ -28,10 +28,8 @@
 #include "python-internal.h"
 #include "symfile.h"
 #include "objfiles.h"
-#include "dictionary.h"
-#include "gdb_regex.h"
 
-typedef struct frapy_type_object {
+typedef struct {
   PyObject_HEAD
   struct frame_id frame_id;
   struct gdbarch *gdbarch;
@@ -47,21 +45,6 @@ typedef struct frapy_type_object {
   int frame_id_is_next;
 } frame_object;
 
-/* A frame iterator object.  */
-typedef struct {
-  PyObject_HEAD
-  /* The current frame in the iterator.  */
-  struct frame_info *current;
-  int regex;
-  /* Regex pattern, or null.  */
-  regex_t pattern;
-  /* Whether the iteration has started.  */
-  int started;
-  /* reversed, if true will get the next frame, if false will get the
-     previous frame.  */
-  int reversed;
-} frame_iterator_object;
-
 /* Require a valid frame.  This must be called inside a TRY_CATCH, or
    another context in which a gdb exception is allowed.  */
 #define FRAPY_REQUIRE_VALID(frame_obj, frame)		\
@@ -70,8 +53,6 @@ typedef struct {
       if (frame == NULL)				\
 	error (_("Frame is invalid."));			\
     } while (0)
-
-static PyTypeObject frame_iterator_object_type;
 
 /* Returns the frame_info object corresponding to the given Python Frame
    object.  If the frame doesn't exist anymore (the frame id doesn't
@@ -761,158 +742,6 @@ frapy_richcompare (PyObject *self, PyObject *other, int op)
   Py_RETURN_FALSE;
 }
 
-static PyObject *
-frapy_iter (PyObject *self)
-{
-  struct frame_info *fi;
-  frame_iterator_object *frame_iter_obj;
-
-  FRAPY_REQUIRE_VALID (self, fi);
-
-  frame_iter_obj = PyObject_New (frame_iterator_object,
-				 &frame_iterator_object_type);
-  if (frame_iter_obj == NULL)
-      return NULL;
-
-  Py_INCREF (self);
-  frame_iter_obj->current = frame_object_to_frame_info (self);
-  if (! frame_iter_obj->current)
-    return NULL;
-  frame_iter_obj->regex = 0;
-  frame_iter_obj->started = 0;
-  frame_iter_obj->reversed = 0;
-  return (PyObject *) frame_iter_obj;
-}
-
-
-static struct frame_info *
-frame_navigate (struct frame_info *fi, int reversed)
-{
-  if (reversed)
-    return get_next_frame (fi);
-
-  return get_prev_frame (fi);
-}
-
-static struct frame_info *
-get_next_iter_frame_h (frame_iterator_object *frame_iter)
-{
-  struct frame_info *fi;
-
-  if (! frame_iter->current)
-    return NULL;
-
-  if (frame_iter->started)
-    fi = frame_navigate (frame_iter->current, frame_iter->reversed);
-  else
-    {
-      fi = frame_iter->current;
-      frame_iter->started = 1;
-    }
-
-  if (frame_iter->regex)
-    {
-      while (fi)
-	{
-	  enum language lang;
-	  volatile struct gdb_exception except;
-	  const char *name;
-
-	  find_frame_funname (fi, &name, &lang,
-			      NULL);
-	  if (name && regexec (&frame_iter->pattern, name, 0, NULL, 0) == 0)
-	    break;
-	  fi = frame_navigate (fi, frame_iter->reversed);
-	}
-    }
-  return fi;
-}
-
-static PyObject *
-frapy_iternext (PyObject *self)
-{
-  frame_iterator_object *iter_obj = (frame_iterator_object *) self;
-  volatile struct gdb_exception except;
-
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
-      iter_obj->current = get_next_iter_frame_h (iter_obj);
-    }
-  GDB_PY_HANDLE_EXCEPTION (except);
-
-  if (iter_obj->current == NULL)
-    return NULL;
-
-  return frame_info_to_frame_object (iter_obj->current);
-}
-
-/* Return a reference to the block iterator.  */
-static PyObject *
-frapy_frame_iter (PyObject *self)
-{
-  frame_iterator_object *iter_obj = (frame_iterator_object *) self;
-
-  Py_INCREF (self);
-  return self;
-}
-
-static void
-frapy_iterator_dealloc (PyObject *obj)
-{
-  frame_iterator_object *iter_obj = (frame_iterator_object *) obj;
-  /*dealloc regex patterns here */
-}
-
-static int
-frapy_frame_iter_init (PyObject *self, PyObject *args, PyObject *kw)
-{
-  static char *keywords[] = { "frame", "regex", "reverse", NULL };
-  frame_iterator_object *iter_obj = (frame_iterator_object *) self;
-  PyObject *frame;
-  struct frame_info *fi;
-  const char *regex = NULL;
-  int reverse = 0;
-
-  if (! PyArg_ParseTupleAndKeywords (args, kw, "O|si",
-				     keywords, &frame, &regex, &reverse))
-    return -1;
-
-  iter_obj->current = NULL;
-  iter_obj->regex = 0;
-  iter_obj->started = 0;
-  iter_obj->reversed = reverse;
-
-  if (frapy_is_valid (frame, NULL))
-    {
-      Py_INCREF (frame);
-      fi = frame_object_to_frame_info (frame);
-      if (! fi)
-	return -1;
-      iter_obj->current = fi;
-      if (regex)
-	{
-	  int code = regcomp (&iter_obj->pattern, regex, REG_NOSUB);
-	  if (code != 0)
-	    {
-	      char *re_err = get_regcomp_error (code,
-						&iter_obj->pattern);
-
-	      PyErr_Format (PyExc_RuntimeError,
-			    "Invalid FrameIterator regexp: %s",
-			    re_err);
-	      xfree (re_err);
-	      return -1;
-	    }
-
-	  iter_obj->regex = 1;
-	}
-    }
-  else
-    return -1;
-
-  return 0;
-}
-
 /* Sets up the Frame API in the gdb module.  */
 
 void
@@ -920,10 +749,6 @@ gdbpy_initialize_frames (void)
 {
   frame_object_type.tp_new = PyType_GenericNew;
   if (PyType_Ready (&frame_object_type) < 0)
-    return;
-
-  frame_iterator_object_type.tp_new = PyType_GenericNew;
-  if (PyType_Ready (&frame_iterator_object_type) < 0)
     return;
 
   /* Note: These would probably be best exposed as class attributes of
@@ -945,11 +770,7 @@ gdbpy_initialize_frames (void)
 #undef SET
 
   Py_INCREF (&frame_object_type);
-  Py_INCREF (&frame_iterator_object_type);
-
   PyModule_AddObject (gdb_module, "Frame", (PyObject *) &frame_object_type);
-  PyModule_AddObject (gdb_module, "FrameIterator",
-		      (PyObject *) &frame_iterator_object_type);
 }
 
 
@@ -1020,14 +841,14 @@ PyTypeObject frame_object_type = {
   0,				  /* tp_getattro */
   0,				  /* tp_setattro */
   0,				  /* tp_as_buffer */
-  Py_TPFLAGS_DEFAULT| Py_TPFLAGS_HAVE_ITER,		  /* tp_flags */
+  Py_TPFLAGS_DEFAULT,		  /* tp_flags */
   "GDB frame object",		  /* tp_doc */
   0,				  /* tp_traverse */
   0,				  /* tp_clear */
   frapy_richcompare,		  /* tp_richcompare */
   0,				  /* tp_weaklistoffset */
-  frapy_iter,			  /* tp_iter */
-  0,		  /* tp_iternext */
+  0,				  /* tp_iter */
+  0,				  /* tp_iternext */
   frame_object_methods,		  /* tp_methods */
   0,				  /* tp_members */
   0,				  /* tp_getset */
@@ -1038,45 +859,4 @@ PyTypeObject frame_object_type = {
   0,				  /* tp_dictoffset */
   0,				  /* tp_init */
   0,				  /* tp_alloc */
-};
-
-static PyTypeObject frame_iterator_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
-  "gdb.FrameIterator",		  /*tp_name*/
-  sizeof (frame_iterator_object), /*tp_basicsize*/
-  0,				  /*tp_itemsize*/
-  frapy_iterator_dealloc,	  /*tp_dealloc*/
-  0,				  /*tp_print*/
-  0,				  /*tp_getattr*/
-  0,				  /*tp_setattr*/
-  0,				  /*tp_compare*/
-  0,				  /*tp_repr*/
-  0,				  /*tp_as_number*/
-  0,				  /*tp_as_sequence*/
-  0,				  /*tp_as_mapping*/
-  0,				  /*tp_hash */
-  0,				  /*tp_call*/
-  0,				  /*tp_str*/
-  0,				  /*tp_getattro*/
-  0,				  /*tp_setattro*/
-  0,				  /*tp_as_buffer*/
-  Py_TPFLAGS_DEFAULT | Py_TPFLAGS_HAVE_ITER,  /*tp_flags*/
-  "GDB frame iterator object",	  /*tp_doc */
-  0,				  /*tp_traverse */
-  0,				  /*tp_clear */
-  0,				  /*tp_richcompare */
-  0,				  /*tp_weaklistoffset */
-  frapy_frame_iter,               /*tp_iter */
-  frapy_iternext,                 /*tp_iternext */
-  0,                              /*tp_methods */
-  0,				  /*tp_members */
-  0,				  /*tp_getset */
-  0,				  /*tp_base */
-  0,				  /*tp_dict */
-  0,				  /*tp_descr_get */
-  0,				  /*tp_descr_set */
-  0,				  /*tp_dictoffset */
-  frapy_frame_iter_init,	  /*tp_init */
-  0,				  /*tp_alloc */
 };
