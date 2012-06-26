@@ -110,12 +110,12 @@ struct probe_info
 
 static const struct probe_info probe_info[] =
 {
-  {"rtld_init_start", 0},
-  {"rtld_init_complete", 1},
-  {"rtld_map_start", 0},
-  {"rtld_reloc_complete", 1},
-  {"rtld_unmap_start", 0},
-  {"rtld_unmap_complete", 1},
+  {"init_start", 0},
+  {"init_complete", 1},
+  {"map_start", 0},
+  {"reloc_complete", 1},
+  {"unmap_start", 0},
+  {"unmap_complete", 1},
 };
 
 #define NUM_PROBES (sizeof(probe_info) / sizeof(probe_info[0]))
@@ -1512,10 +1512,30 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
 
       for (i = 0; i < NUM_PROBES; i++)
 	{
-	  info->probes[i] = find_probes_in_objfile (os->objfile, "rtld",
-						    probe_info[i].name);
+	  int with_prefix;
 
-	  if (!VEC_length(probe_p, info->probes[i]))
+	  for (with_prefix = 0; with_prefix <= 1; with_prefix++)
+	    {
+	      char name[32] = { '\0' };
+
+	      if (with_prefix)
+		strncat (name, "rtld_", sizeof (name));
+
+	      strncat (name, probe_info[i].name, sizeof (name));
+
+	      info->probes[i] = find_probes_in_objfile (os->objfile, "rtld",
+							name);
+
+	      if (!VEC_length (probe_p, info->probes[i]))
+		{
+		  VEC_free (probe_p, info->probes[i]);
+		  continue;
+		}
+
+	      break;
+	    }
+
+	  if (!VEC_length (probe_p, info->probes[i]))
 	    {
 	      int j;
 
