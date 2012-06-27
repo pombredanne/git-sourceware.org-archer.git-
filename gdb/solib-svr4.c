@@ -109,14 +109,14 @@ struct probe_info
   };
 
 static const struct probe_info probe_info[] =
-{
-  {"init_start", 0},
-  {"init_complete", 1},
-  {"map_start", 0},
-  {"reloc_complete", 1},
-  {"unmap_start", 0},
-  {"unmap_complete", 1},
-};
+  {
+    { "init_start", 0 },
+    { "init_complete", 1 },
+    { "map_start", 0 },
+    { "reloc_complete", 1 },
+    { "unmap_start", 0 },
+    { "unmap_complete", 1 },
+  };
 
 #define NUM_PROBES (sizeof(probe_info) / sizeof(probe_info[0]))
 
