@@ -352,6 +352,17 @@ struct svr4_info
 /* Per-program-space data key.  */
 static const struct program_space_data *solib_svr4_pspace_data;
 
+/* Free any allocated probe vectors.  */
+
+static void
+free_probes (struct svr4_info *info)
+{
+  for (i = 0; i < NUM_PROBES; i++)
+    VEC_free (probe_p, info->probes[i]);
+
+  memset (info->probes, 0, sizeof (info->probes));
+}
+
 static void
 svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
 {
@@ -362,8 +373,7 @@ svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
   if (info == NULL)
     return;
 
-  for (i = 0; i < NUM_PROBES; i++)
-    VEC_free (probe_p, info->probes[i]);
+  free_probes (info);
 
   xfree (info);
 }
@@ -1552,14 +1562,7 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
 
 	  if (!VEC_length (probe_p, info->probes[i]))
 	    {
-	      int j;
-
-	      for (j = i - 1; j >= 0; j--)
-		{
-		  VEC_free (probe_p, info->probes[j]);
-		  info->probes[j] = NULL;
-		}
-
+	      free_probes (info);
 	      all_probes_found = 0;
 	      break;
 	    }
@@ -1636,16 +1639,11 @@ enable_break (struct svr4_info *info, int from_tty)
   asection *interp_sect;
   gdb_byte *interp_name;
   CORE_ADDR sym_addr;
-  int i;
 
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
 
-  for (i = 0; i < NUM_PROBES; i++)
-    {
-      VEC_free (probe_p, info->probes[i]);
-      info->probes[i] = NULL;
-    }
+  free_probes (info);
   info->using_probes = 0;
 
   /* If we already have a shared library list in the target, and
