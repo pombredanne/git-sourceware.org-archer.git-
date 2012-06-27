@@ -118,7 +118,7 @@ static const struct probe_info probe_info[] =
     { "unmap_complete", 1 },
   };
 
-#define NUM_PROBES (sizeof(probe_info) / sizeof(probe_info[0]))
+#define NUM_PROBES ARRAY_SIZE (probe_info)
 
 static const char * const bkpt_names[] =
 {
