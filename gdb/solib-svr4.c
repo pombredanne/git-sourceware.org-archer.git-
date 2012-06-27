@@ -1525,23 +1525,23 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
   os = find_pc_section (address);
   if (os != NULL)
     {
-      int all_probes_found = 1;
-      int i;
+      int with_prefix;
 
-      for (i = 0; i < NUM_PROBES; i++)
+      for (with_prefix = 0; with_prefix <= 1; with_prefix++)
 	{
-	  int with_prefix;
+	  int all_probes_found = 1;
+	  int i;
 
-	  /* Some Fedora and RHEL releases shipped with glibc locally
-	     patched with an older version of the probes patch in
-	     which the probes' names were prefixed with "rtld_".  The
-	     locations and arguments of the probes are the same, so we
-	     check for the prefixed version if the unprefixed probe is
-	     not found.  */
-
-	  for (with_prefix = 0; with_prefix <= 1; with_prefix++)
+	  for (i = 0; i < NUM_PROBES; i++)
 	    {
 	      char name[32] = { '\0' };
+
+	      /* Fedora 17 and RHEL 6.2 shipped with an early version
+		 of the probes code in which the probes' names were
+		 prefixed with "rtld_".  The locations and arguments
+		 of the probes are otherwise the same, so we check for
+		 the prefixed version if the unprefixed probes are not
+		 found.  */
 
 	      if (with_prefix)
 		strncat (name, "rtld_", sizeof (name));
@@ -1553,38 +1553,30 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
 
 	      if (!VEC_length (probe_p, info->probes[i]))
 		{
-		  VEC_free (probe_p, info->probes[i]);
-		  continue;
+		  free_probes (info);
+		  all_probes_found = 0;
+		  break;
+		}
+	    }
+
+	  if (all_probes_found)
+	    {
+	      info->using_probes = 1;
+
+	      for (i = 0; i < NUM_PROBES; i++)
+		{
+		  struct probe *probe;
+		  int ix;
+
+		  for (ix = 0;
+		       VEC_iterate (probe_p, info->probes[i], ix, probe);
+		       ++ix)
+		    create_solib_event_breakpoint (gdbarch, probe->address);
 		}
 
-	      break;
+	      svr4_update_solib_event_breakpoints ();
+	      return;
 	    }
-
-	  if (!VEC_length (probe_p, info->probes[i]))
-	    {
-	      free_probes (info);
-	      all_probes_found = 0;
-	      break;
-	    }
-	}
-
-      if (all_probes_found)
-	{
-	  info->using_probes = 1;
-
-	  for (i = 0; i < NUM_PROBES; i++)
-	    {
-	      struct probe *probe;
-	      int ix;
-
-	      for (ix = 0;
-		   VEC_iterate (probe_p, info->probes[i], ix, probe);
-		   ++ix)
-		create_solib_event_breakpoint (gdbarch, probe->address);
-	    }
-
-	  svr4_update_solib_event_breakpoints ();
-	  return;
 	}
     }
 
