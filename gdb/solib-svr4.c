@@ -94,7 +94,7 @@ static const char * const solib_break_names[] =
   NULL
 };
 
-/* A list of SystemTap probes which, if present in the dynamic linker,
+/* A list of named probes which, if present in the dynamic linker,
    allow more fine-grained breakpoints to be placed on shared library
    events.  */
 
@@ -342,10 +342,10 @@ struct svr4_info
   CORE_ADDR interp_plt_sect_low;
   CORE_ADDR interp_plt_sect_high;
 
-  /* SystemTap probes.  */
+  /* Named probes in the dynamic linker.  */
   VEC (probe_p) *probes[NUM_PROBES];
 
-  /* Nonzero if we are using the SystemTap interface.  */
+  /* Nonzero if we are using the probes-based interface.  */
   int using_probes;
 };
 
@@ -1499,7 +1499,7 @@ svr4_update_solib_event_breakpoints (void)
    purpose of this method is to allow debuggers to set a breakpoint so
    they can track these changes.
 
-   Some versions of the glibc dynamic linker contain SystemTap probes
+   Some versions of the glibc dynamic linker contain named probes
    to allow more fine grained stopping.  Given the address of the
    original marker function, this function attempts to find these
    probes, and if found, sets breakpoints on those instead.  If the
