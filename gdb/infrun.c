@@ -362,6 +362,9 @@ static struct symbol *step_start_function;
    of shared library events by the dynamic linker.  */
 int stop_on_solib_events;
 
+/* Enable or disable optional shared library event breakpoints
+   as appropriate when the above flag is changed.  */
+
 static void
 set_stop_on_solib_events (char *args, int from_tty, struct cmd_list_element *c)
 {
