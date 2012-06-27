@@ -1522,6 +1522,13 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
 	{
 	  int with_prefix;
 
+	  /* Some Fedora and RHEL releases shipped with glibc locally
+	     patched with an older version of the probes patch in
+	     which the probes' names were prefixed with "rtld_".  The
+	     locations and arguments of the probes are the same, so we
+	     check for the prefixed version if the unprefixed probe is
+	     not found.  */
+
 	  for (with_prefix = 0; with_prefix <= 1; with_prefix++)
 	    {
 	      char name[32] = { '\0' };
