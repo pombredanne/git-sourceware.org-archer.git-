@@ -1209,8 +1209,6 @@ no_shared_libraries (char *ignored, int from_tty)
   objfile_purge_solibs ();
 }
 
-/* Enable or disable optional solib event breakpoints as appropriate.  */
-
 void
 update_solib_breakpoints (void)
 {
@@ -1219,7 +1217,7 @@ update_solib_breakpoints (void)
   if (ops->update_breakpoints != NULL)
     ops->update_breakpoints ();
 }
-  
+
 
 /* Reload shared libraries, but avoid reloading the same symbol file
    we already have loaded.  */
