@@ -47,7 +47,7 @@
 #include "auxv.h"
 #include "exceptions.h"
 
-#include "stap-probe.h"
+#include "probe.h"
 
 static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
