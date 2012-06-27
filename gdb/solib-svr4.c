@@ -357,6 +357,8 @@ static const struct program_space_data *solib_svr4_pspace_data;
 static void
 free_probes (struct svr4_info *info)
 {
+  int i;
+
   for (i = 0; i < NUM_PROBES; i++)
     VEC_free (probe_p, info->probes[i]);
 
@@ -367,7 +369,6 @@ static void
 svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
 {
   struct svr4_info *info;
-  int i;
 
   info = program_space_data (pspace, solib_svr4_pspace_data);
   if (info == NULL)
@@ -1514,7 +1515,7 @@ svr4_update_solib_event_breakpoints (void)
    original marker function, this function attempts to find these
    probes, and if found, sets breakpoints on those instead.  If the
    probes aren't found, a single breakpoint is set on the original
-   SVR4 marker function.  */
+   marker function.  */
 
 static void
 svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
