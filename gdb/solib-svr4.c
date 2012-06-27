@@ -1536,12 +1536,12 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
 	    {
 	      char name[32] = { '\0' };
 
-	      /* Fedora 17 and RHEL 6.2 shipped with an early version
-		 of the probes code in which the probes' names were
-		 prefixed with "rtld_".  The locations and arguments
-		 of the probes are otherwise the same, so we check for
-		 the prefixed version if the unprefixed probes are not
-		 found.  */
+	      /* Fedora 17, RHEL 6.2, and RHEL 6.3 shipped with an
+		 early version of the probes code in which the probes'
+		 names were prefixed with "rtld_".  The locations and
+		 arguments of the probes are otherwise the same, so we
+		 check for the prefixed version if the unprefixed
+		 probes are not found.  */
 
 	      if (with_prefix)
 		strncat (name, "rtld_", sizeof (name));
