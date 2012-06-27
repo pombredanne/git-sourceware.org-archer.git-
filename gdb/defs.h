@@ -67,7 +67,7 @@
 
 #include "gdb_wchar.h"
 
-/* For ``enum target_signal''.  */
+/* For ``enum gdb_signal''.  */
 #include "gdb/signals.h"
 
 /* Just in case they're not defined in stdio.h.  */
@@ -381,6 +381,9 @@ extern struct cleanup *make_bpstat_clear_actions_cleanup (void);
 
 extern int producer_is_gcc_ge_4 (const char *producer);
 
+extern void substitute_path_component (char **stringp, const char *from,
+				       const char *to);
+
 #ifdef HAVE_WAITPID
 extern pid_t wait_to_die_with_timeout (pid_t pid, int *status, int timeout);
 #endif
@@ -580,8 +583,8 @@ extern int info_verbose;
 
 extern void set_next_address (struct gdbarch *, CORE_ADDR);
 
-extern void print_address_symbolic (struct gdbarch *, CORE_ADDR,
-				    struct ui_file *, int, char *);
+extern int print_address_symbolic (struct gdbarch *, CORE_ADDR,
+				   struct ui_file *, int, char *);
 
 extern int build_address_symbolic (struct gdbarch *,
 				   CORE_ADDR addr,

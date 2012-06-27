@@ -272,7 +272,7 @@ elf_symtab_read (struct objfile *objfile, int type,
 
       offset = ANOFFSET (objfile->section_offsets, sym->section->index);
       if (type == ST_DYNAMIC
-	  && sym->section == &bfd_und_section
+	  && sym->section == bfd_und_section_ptr
 	  && (sym->flags & BSF_FUNCTION))
 	{
 	  struct minimal_symbol *msym;
@@ -367,7 +367,7 @@ elf_symtab_read (struct objfile *objfile, int type,
 	  symaddr = sym->value + sym->section->vma;
 	  /* Relocate all non-absolute and non-TLS symbols by the
 	     section offset.  */
-	  if (sym->section != &bfd_abs_section
+	  if (sym->section != bfd_abs_section_ptr
 	      && !(sym->section->flags & SEC_THREAD_LOCAL))
 	    {
 	      symaddr += offset;
@@ -375,7 +375,7 @@ elf_symtab_read (struct objfile *objfile, int type,
 	  /* For non-absolute symbols, use the type of the section
 	     they are relative to, to intuit text/data.  Bfd provides
 	     no way of figuring this out for absolute symbols.  */
-	  if (sym->section == &bfd_abs_section)
+	  if (sym->section == bfd_abs_section_ptr)
 	    {
 	      /* This is a hack to get the minimal symbol type
 		 right for Irix 5, which has absolute addresses
@@ -517,7 +517,7 @@ elf_symtab_read (struct objfile *objfile, int type,
 		      symaddr = sym->value + sym->section->vma;
 		      /* Relocate non-absolute symbols by the
 			 section offset.  */
-		      if (sym->section != &bfd_abs_section)
+		      if (sym->section != bfd_abs_section_ptr)
 			symaddr += offset;
 		      sectinfo->sections[special_local_sect] = symaddr;
 		      /* The special local symbols don't go in the
@@ -594,6 +594,7 @@ elf_symtab_read (struct objfile *objfile, int type,
 		  if (mtramp)
 		    {
 		      MSYMBOL_SIZE (mtramp) = MSYMBOL_SIZE (msym);
+		      mtramp->created_by_gdb = 1;
 		      mtramp->filename = filesymname;
 		      gdbarch_elf_make_msymbol_special (gdbarch, sym, mtramp);
 		    }
@@ -616,7 +617,6 @@ elf_rel_plt_read (struct objfile *objfile, asymbol **dyn_symbol_table)
   bfd *obfd = objfile->obfd;
   const struct elf_backend_data *bed = get_elf_backend_data (obfd);
   asection *plt, *relplt, *got_plt;
-  unsigned u;
   int plt_elf_idx;
   bfd_size_type reloc_count, reloc;
   char *string_buffer = NULL;
@@ -655,7 +655,7 @@ elf_rel_plt_read (struct objfile *objfile, asymbol **dyn_symbol_table)
   reloc_count = relplt->size / elf_section_data (relplt)->this_hdr.sh_entsize;
   for (reloc = 0; reloc < reloc_count; reloc++)
     {
-      const char *name, *name_got_plt;
+      const char *name;
       struct minimal_symbol *msym;
       CORE_ADDR address;
       const size_t got_suffix_len = strlen (SYMBOL_GOT_PLT_SUFFIX);
@@ -1020,20 +1020,13 @@ elf_gnu_ifunc_resolver_return_stop (struct breakpoint *b)
   struct type *func_func_type = builtin_type (gdbarch)->builtin_func_func;
   struct type *value_type = TYPE_TARGET_TYPE (func_func_type);
   struct regcache *regcache = get_thread_regcache (inferior_ptid);
+  struct value *func_func;
   struct value *value;
   CORE_ADDR resolved_address, resolved_pc;
   struct symtab_and_line sal;
   struct symtabs_and_lines sals, sals_end;
 
   gdb_assert (b->type == bp_gnu_ifunc_resolver_return);
-
-  value = allocate_value (value_type);
-  gdbarch_return_value (gdbarch, func_func_type, value_type, regcache,
-			value_contents_raw (value), NULL);
-  resolved_address = value_as_address (value);
-  resolved_pc = gdbarch_convert_from_func_ptr_addr (gdbarch,
-						    resolved_address,
-						    &current_target);
 
   while (b->related_breakpoint != b)
     {
@@ -1055,6 +1048,18 @@ elf_gnu_ifunc_resolver_return_stop (struct breakpoint *b)
       b = b_next;
     }
   gdb_assert (b->type == bp_gnu_ifunc_resolver);
+  gdb_assert (b->loc->next == NULL);
+
+  func_func = allocate_value (func_func_type);
+  set_value_address (func_func, b->loc->related_address);
+
+  value = allocate_value (value_type);
+  gdbarch_return_value (gdbarch, func_func, value_type, regcache,
+			value_contents_raw (value), NULL);
+  resolved_address = value_as_address (value);
+  resolved_pc = gdbarch_convert_from_func_ptr_addr (gdbarch,
+						    resolved_address,
+						    &current_target);
 
   gdb_assert (current_program_space == b->pspace || b->pspace == NULL);
   elf_gnu_ifunc_record_cache (b->addr_string, resolved_pc);
@@ -1245,6 +1250,13 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
   long symcount = 0, dynsymcount = 0, synthcount, storage_needed;
   asymbol **symbol_table = NULL, **dyn_symbol_table = NULL;
   asymbol *synthsyms;
+
+  if (symtab_create_debug)
+    {
+      fprintf_unfiltered (gdb_stdlog,
+			  "Reading minimal symbols of objfile %s ...\n",
+			  objfile->name);
+    }
 
   init_minimal_symbol_collection ();
   back_to = make_cleanup_discard_minimal_symbols ();
@@ -1438,6 +1450,9 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
 	  xfree (debugfile);
 	}
     }
+
+  if (symtab_create_debug)
+    fprintf_unfiltered (gdb_stdlog, "Done reading minimal symbols.\n");
 }
 
 /* Callback to lazily read psymtabs.  */

@@ -730,7 +730,9 @@ objfile_relocate1 (struct objfile *objfile,
 	  BLOCK_START (b) += ANOFFSET (delta, s->block_line_section);
 	  BLOCK_END (b) += ANOFFSET (delta, s->block_line_section);
 
-	  ALL_BLOCK_SYMBOLS (b, iter, sym)
+	  /* We only want to iterate over the local symbols, not any
+	     symbols in included symtabs.  */
+	  ALL_DICT_SYMBOLS (BLOCK_DICT (b), iter, sym)
 	    {
 	      relocate_one_symbol (sym, objfile, delta);
 	    }
@@ -1521,6 +1523,31 @@ gdb_bfd_unref (struct bfd *abfd)
   name = bfd_get_filename (abfd);
   gdb_bfd_close_or_warn (abfd);
   xfree (name);
+}
+
+/* The default implementation for the "iterate_over_objfiles_in_search_order"
+   gdbarch method.  It is equivalent to use the ALL_OBJFILES macro,
+   searching the objfiles in the order they are stored internally,
+   ignoring CURRENT_OBJFILE.
+
+   On most platorms, it should be close enough to doing the best
+   we can without some knowledge specific to the architecture.  */
+
+void
+default_iterate_over_objfiles_in_search_order
+  (struct gdbarch *gdbarch,
+   iterate_over_objfiles_in_search_order_cb_ftype *cb,
+   void *cb_data, struct objfile *current_objfile)
+{
+  int stop = 0;
+  struct objfile *objfile;
+
+  ALL_OBJFILES (objfile)
+    {
+       stop = cb (objfile, cb_data);
+       if (stop)
+	 return;
+    }
 }
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */

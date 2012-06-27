@@ -1197,7 +1197,6 @@ i386_match_insn_block (CORE_ADDR pc, struct i386_insn *insn_patterns)
 {
   CORE_ADDR current_pc;
   int ix, i;
-  gdb_byte op;
   struct i386_insn *insn;
 
   insn = i386_match_insn (pc, insn_patterns);
@@ -2333,6 +2332,22 @@ i386_16_byte_align_p (struct type *type)
   return 0;
 }
 
+/* Implementation for set_gdbarch_push_dummy_code.  */
+
+static CORE_ADDR
+i386_push_dummy_code (struct gdbarch *gdbarch, CORE_ADDR sp, CORE_ADDR funaddr,
+		      struct value **args, int nargs, struct type *value_type,
+		      CORE_ADDR *real_pc, CORE_ADDR *bp_addr,
+		      struct regcache *regcache)
+{
+  /* Use 0xcc breakpoint - 1 byte.  */
+  *bp_addr = sp - 1;
+  *real_pc = funaddr;
+
+  /* Keep the stack aligned.  */
+  return sp - 16;
+}
+
 static CORE_ADDR
 i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 		      struct regcache *regcache, CORE_ADDR bp_addr, int nargs,
@@ -2352,7 +2367,6 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
   for (write_pass = 0; write_pass < 2; write_pass++)
     {
       int args_space_used = 0;
-      int have_16_byte_aligned_arg = 0;
 
       if (struct_return)
 	{
@@ -2390,19 +2404,20 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	  else
 	    {
 	      if (i386_16_byte_align_p (value_enclosing_type (args[i])))
-		{
-		  args_space = align_up (args_space, 16);
-		  have_16_byte_aligned_arg = 1;
-		}
+		args_space = align_up (args_space, 16);
 	      args_space += align_up (len, 4);
 	    }
 	}
 
       if (!write_pass)
 	{
-	  if (have_16_byte_aligned_arg)
-	    args_space = align_up (args_space, 16);
 	  sp -= args_space;
+
+	  /* The original System V ABI only requires word alignment,
+	     but modern incarnations need 16-byte alignment in order
+	     to support SSE.  Since wasting a few bytes here isn't
+	     harmful we unconditionally enforce 16-byte alignment.  */
+	  sp &= ~0xf;
 	}
     }
 
@@ -2605,7 +2620,7 @@ i386_reg_struct_return_p (struct gdbarch *gdbarch, struct type *type)
    from WRITEBUF into REGCACHE.  */
 
 static enum return_value_convention
-i386_return_value (struct gdbarch *gdbarch, struct type *func_type,
+i386_return_value (struct gdbarch *gdbarch, struct value *function,
 		   struct type *type, struct regcache *regcache,
 		   gdb_byte *readbuf, const gdb_byte *writebuf)
 {
@@ -2656,7 +2671,7 @@ i386_return_value (struct gdbarch *gdbarch, struct type *func_type,
   if (code == TYPE_CODE_STRUCT && TYPE_NFIELDS (type) == 1)
     {
       type = check_typedef (TYPE_FIELD_TYPE (type, 0));
-      return i386_return_value (gdbarch, func_type, type, regcache,
+      return i386_return_value (gdbarch, function, type, regcache,
 				readbuf, writebuf);
     }
 
@@ -2781,7 +2796,7 @@ i386_mmx_type (struct gdbarch *gdbarch)
 /* Return the GDB type object for the "standard" data type of data in
    register REGNUM.  */
 
-static struct type *
+struct type *
 i386_pseudo_register_type (struct gdbarch *gdbarch, int regnum)
 {
   if (i386_mmx_regnum_p (gdbarch, regnum))
@@ -3392,8 +3407,6 @@ int
 i386_stap_parse_special_token (struct gdbarch *gdbarch,
 			       struct stap_parse_info *p)
 {
-  const char *s = p->arg;
-
   /* In order to parse special tokens, we use a state-machine that go
      through every known token and try to get a match.  */
   enum
@@ -3856,7 +3869,7 @@ i386_fetch_pointer_argument (struct frame_info *frame, int argi,
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  CORE_ADDR sp = get_frame_register_unsigned  (frame, I386_ESP_REGNUM);
+  CORE_ADDR sp = get_frame_register_unsigned (frame, I386_ESP_REGNUM);
   return read_memory_unsigned_integer (sp + (4 * (argi + 1)), 4, byte_order);
 }
 
@@ -4319,7 +4332,7 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
   int prefixes = 0;
   int regnum = 0;
   uint32_t opcode;
-  uint8_t  opcode8;
+  uint8_t opcode8;
   ULONGEST addr;
   gdb_byte buf[MAX_REGISTER_SIZE];
   struct i386_record_s ir;
@@ -7708,6 +7721,8 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   set_gdbarch_get_longjmp_target (gdbarch, i386_get_longjmp_target);
 
   /* Call dummy code.  */
+  set_gdbarch_call_dummy_location (gdbarch, ON_STACK);
+  set_gdbarch_push_dummy_code (gdbarch, i386_push_dummy_code);
   set_gdbarch_push_dummy_call (gdbarch, i386_push_dummy_call);
   set_gdbarch_frame_align (gdbarch, i386_frame_align);
 

@@ -544,7 +544,7 @@ addrs_section_compar (const void *ap, const void *bp)
 {
   const struct other_sections *a = *((struct other_sections **) ap);
   const struct other_sections *b = *((struct other_sections **) bp);
-  int retval, a_idx, b_idx;
+  int retval;
 
   retval = strcmp (addr_section_name (a->name), addr_section_name (b->name));
   if (retval)
@@ -1553,8 +1553,9 @@ find_separate_debug_file_by_debuglink (struct objfile *objfile)
       return NULL;
     }
 
+  cleanups = make_cleanup (xfree, debuglink);
   dir = xstrdup (objfile->name);
-  cleanups = make_cleanup (xfree, dir);
+  make_cleanup (xfree, dir);
   terminate_after_last_dir_separator (dir);
   canon_dir = lrealpath (dir);
 
@@ -1764,7 +1765,6 @@ symfile_bfd_open (char *name)
   sym_bfd = bfd_fopen (name, gnutarget, FOPEN_RB, desc);
   if (!sym_bfd)
     {
-      close (desc);
       make_cleanup (xfree, name);
       error (_("`%s': can't open to read symbols: %s."), name,
 	     bfd_errmsg (bfd_get_error ()));
@@ -2872,6 +2872,26 @@ allocate_symtab (const char *filename, struct objfile *objfile)
   symtab->objfile = objfile;
   symtab->next = objfile->symtabs;
   objfile->symtabs = symtab;
+
+  if (symtab_create_debug)
+    {
+      /* Be a bit clever with debugging messages, and don't print objfile
+	 every time, only when it changes.  */
+      static char *last_objfile_name = NULL;
+
+      if (last_objfile_name == NULL
+	  || strcmp (last_objfile_name, objfile->name) != 0)
+	{
+	  xfree (last_objfile_name);
+	  last_objfile_name = xstrdup (objfile->name);
+	  fprintf_unfiltered (gdb_stdlog,
+			      "Creating one or more symtabs for objfile %s ...\n",
+			      last_objfile_name);
+	}
+      fprintf_unfiltered (gdb_stdlog,
+			  "Created symtab 0x%lx for module %s.\n",
+			  (long) symtab, filename);
+    }
 
   return (symtab);
 }

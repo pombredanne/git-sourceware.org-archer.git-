@@ -1805,7 +1805,7 @@ start_tracing (char *notes)
   ret = target_set_trace_notes (trace_user, notes, NULL);
 
   if (!ret && (trace_user || notes))
-    warning ("Target does not support trace user/notes, info ignored");
+    warning (_("Target does not support trace user/notes, info ignored"));
 
   /* Now insert traps and begin collecting data.  */
   target_trace_start ();
@@ -1891,7 +1891,7 @@ stop_tracing (char *note)
   ret = target_set_trace_notes (NULL, NULL, note);
 
   if (!ret && note)
-    warning ("Target does not support trace notes, note ignored");
+    warning (_("Target does not support trace notes, note ignored"));
 
   /* Should change in response to reply?  */
   current_trace_status ()->running = 0;
@@ -2612,7 +2612,7 @@ scope_info (char *args, int from_tty)
   struct block *block;
   const char *symname;
   char *save_args = args;
-  struct dict_iterator iter;
+  struct block_iterator iter;
   int j, count = 0;
   struct gdbarch *gdbarch;
   int regno;
@@ -3201,7 +3201,7 @@ set_trace_user (char *args, int from_tty,
   ret = target_set_trace_notes (trace_user, NULL, NULL);
 
   if (!ret)
-    warning ("Target does not support trace notes, user ignored");
+    warning (_("Target does not support trace notes, user ignored"));
 }
 
 static void
@@ -3213,7 +3213,7 @@ set_trace_notes (char *args, int from_tty,
   ret = target_set_trace_notes (NULL, trace_notes, NULL);
 
   if (!ret)
-    warning ("Target does not support trace notes, note ignored");
+    warning (_("Target does not support trace notes, note ignored"));
 }
 
 static void
@@ -3225,7 +3225,7 @@ set_trace_stop_notes (char *args, int from_tty,
   ret = target_set_trace_notes (NULL, NULL, trace_stop_notes);
 
   if (!ret)
-    warning ("Target does not support trace notes, stop note ignored");
+    warning (_("Target does not support trace notes, stop note ignored"));
 }
 
 /* Convert the memory pointed to by mem into hex, placing result in buf.
@@ -4421,9 +4421,7 @@ tfile_fetch_registers (struct target_ops *ops,
 		       struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
-  char block_type;
-  int pos, offset, regn, regsize, pc_regno;
-  unsigned short mlen;
+  int offset, regn, regsize, pc_regno;
   char *regs;
 
   /* An uninitialized reg size says we're not going to be
@@ -4547,6 +4545,8 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
 	      if (amt > len)
 		amt = len;
 
+	      if (maddr != offset)
+	        lseek (trace_fd, offset - maddr, SEEK_CUR);
 	      tfile_read (readbuf, amt);
 	      return amt;
 	    }

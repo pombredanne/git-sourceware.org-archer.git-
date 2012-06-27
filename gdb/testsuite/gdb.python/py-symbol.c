@@ -40,9 +40,14 @@ int qq = 72;			/* line of qq */
 int func (int arg)
 {
   int i = 2;
-  i = i * arg;
-  return arg; /* Block break here.  */
+  i = i * arg; /* Block break here.  */
+  return arg;
 }
+
+struct simple_struct
+{
+  int a;
+};
 
 int main (int argc, char *argv[])
 {
@@ -51,6 +56,7 @@ int main (int argc, char *argv[])
 #endif
   int a = 0;
   int result;
+  struct simple_struct ss = { 10 };
   enum tag {one, two, three};
   enum tag t = one;
 

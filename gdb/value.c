@@ -841,7 +841,6 @@ value_actual_type (struct value *value, int resolve_simple_types,
 		   int *real_type_found)
 {
   struct value_print_options opts;
-  struct value *target;
   struct type *result;
 
   get_user_print_options (&opts);
@@ -1715,6 +1714,29 @@ lookup_only_internalvar (const char *name)
   return NULL;
 }
 
+/* Complete NAME by comparing it to the names of internal variables.
+   Returns a vector of newly allocated strings, or NULL if no matches
+   were found.  */
+
+VEC (char_ptr) *
+complete_internalvar (const char *name)
+{
+  VEC (char_ptr) *result = NULL;
+  struct internalvar *var;
+  int len;
+
+  len = strlen (name);
+
+  for (var = internalvars; var; var = var->next)
+    if (strncmp (var->name, name, len) == 0)
+      {
+	char *r = xstrdup (var->name);
+
+	VEC_safe_push (char_ptr, result, r);
+      }
+
+  return result;
+}
 
 /* Create an internal variable with name NAME and with a void value.
    NAME should not normally include a dollar sign.  */
@@ -3303,7 +3325,7 @@ coerce_array (struct value *arg)
 
 int
 using_struct_return (struct gdbarch *gdbarch,
-		     struct type *func_type, struct type *value_type)
+		     struct value *function, struct type *value_type)
 {
   enum type_code code = TYPE_CODE (value_type);
 
@@ -3316,7 +3338,7 @@ using_struct_return (struct gdbarch *gdbarch,
     return 0;
 
   /* Probe the architecture for the return-value convention.  */
-  return (gdbarch_return_value (gdbarch, func_type, value_type,
+  return (gdbarch_return_value (gdbarch, function, value_type,
 				NULL, NULL, NULL)
 	  != RETURN_VALUE_REGISTER_CONVENTION);
 }

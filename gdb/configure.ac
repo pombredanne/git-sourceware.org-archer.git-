@@ -23,6 +23,11 @@ AC_INIT(main.c)
 AC_CONFIG_HEADER(config.h:config.in)
 AM_MAINTAINER_MODE
 
+# Provide more thorough testing by -lmcheck.
+# Set it to 'true' for development snapshots, 'false' for releases or
+# pre-releases.
+development=true
+
 AC_PROG_CC
 AC_USE_SYSTEM_EXTENSIONS
 ACX_LARGEFILE
@@ -136,15 +141,28 @@ AS_HELP_STRING([--with-relocated-sources=PATH], [automatically relocate this pat
               [Relocated directory for source files. ])
 ])
 
+AC_MSG_CHECKING([for default auto-load directory])
+AC_ARG_WITH(auto-load-dir,
+AS_HELP_STRING([--with-auto-load-dir=PATH],
+  [directories from which to load auto-loaded scripts @<:@$debugdir:$datadir/auto-load@:>@]),,
+  [with_auto_load_dir='$debugdir:$datadir/auto-load'])
+escape_dir=`echo $with_auto_load_dir | sed 's/[[$]]\(datadir\|debugdir\)\>/\\\\\\\\\\\\&/g'`
+AC_DEFINE_DIR(AUTO_LOAD_DIR, escape_dir,
+	      [Directories from which to load auto-loaded scripts.])
+AC_MSG_RESULT([$with_auto_load_dir])
+
 AC_MSG_CHECKING([for default auto-load safe-path])
 AC_ARG_WITH(auto-load-safe-path,
-AS_HELP_STRING([--with-auto-load-safe-path=PATH], [directories safe to hold auto-loaded files])
-AS_HELP_STRING([--without-auto-load-safe-path], [do not restrict auto-loaded files locations]),
-[if test "$with_auto_load_safe_path" = "no"; then
-   with_auto_load_safe_path=""
- fi],
-[with_auto_load_safe_path="$prefix"])
-AC_DEFINE_DIR(DEFAULT_AUTO_LOAD_SAFE_PATH, with_auto_load_safe_path,
+AS_HELP_STRING([--with-auto-load-safe-path=PATH],
+  [directories safe to hold auto-loaded files @<:@--with-auto-load-dir@:>@])
+AS_HELP_STRING([--without-auto-load-safe-path],
+               [do not restrict auto-loaded files locations]),
+    [if test "$with_auto_load_safe_path" = "no"; then
+     with_auto_load_safe_path="/"
+     fi],
+[with_auto_load_safe_path="$with_auto_load_dir"])
+escape_dir=`echo $with_auto_load_safe_path | sed 's/[[$]]\(datadir\|debugdir\)\>/\\\\\\\\\\\\&/g'`
+AC_DEFINE_DIR(AUTO_LOAD_SAFE_PATH, escape_dir,
 	      [Directories safe to hold auto-loaded files.])
 AC_MSG_RESULT([$with_auto_load_safe_path])
 
@@ -626,6 +644,11 @@ AC_SUBST(READLINE)
 AC_SUBST(READLINE_DEPS)
 AC_SUBST(READLINE_CFLAGS)
 AC_SUBST(READLINE_TEXI_INCFLAG)
+
+dnl -lmcheck provides cheap enough memory mangling for debugging purposes.
+if $development; then
+  AC_CHECK_LIB(mcheck, main)
+fi
 
 # Generate jit-reader.h
 
@@ -1251,6 +1274,12 @@ fi
 AC_CHECK_MEMBERS([struct reg.r_fs, struct reg.r_gs], [], [],
                  [#include <machine/reg.h>])
 
+# See if <sys/user.h> supports the %fs_base and %gs_bas amd64 segment registers.
+# Older amd64 Linux's don't have the fs_base and gs_base members of
+# `struct user_regs_struct'.
+AC_CHECK_MEMBERS([struct user_regs_struct.fs_base, struct user_regs_struct.gs_base],
+		 [], [], [#include <sys/user.h>])
+
 # See if <sys/ptrace.h> provides the PTRACE_GETREGS request.
 AC_MSG_CHECKING(for PTRACE_GETREGS)
 AC_CACHE_VAL(gdb_cv_have_ptrace_getregs,
@@ -1809,8 +1838,8 @@ AC_ARG_ENABLE(werror,
      *) AC_MSG_ERROR(bad value ${enableval} for --enable-werror) ;;
    esac])
 
-# Enable -Werror by default when using gcc
-if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" ; then
+# Enable -Werror by default when using gcc.  Turn it off for releases.
+if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" && $development; then
     ERROR_ON_WARNING=yes
 fi
 
@@ -1827,7 +1856,8 @@ fi
 build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
 -Wformat-nonliteral -Wno-pointer-sign \
 -Wno-unused -Wunused-value -Wunused-function \
--Wno-switch -Wno-char-subscripts -Wmissing-prototypes"
+-Wno-switch -Wno-char-subscripts -Wmissing-prototypes \
+-Wdeclaration-after-statement"
 
 # Enable -Wno-format by default when using gcc on mingw since many
 # GCC versions complain about %I64.

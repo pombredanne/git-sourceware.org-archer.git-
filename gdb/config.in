@@ -3,6 +3,12 @@
 /* Define if building universal (internal helper macro) */
 #undef AC_APPLE_UNIVERSAL_BUILD
 
+/* Directories from which to load auto-loaded scripts. */
+#undef AUTO_LOAD_DIR
+
+/* Directories safe to hold auto-loaded files. */
+#undef AUTO_LOAD_SAFE_PATH
+
 /* Directory of programs. */
 #undef BINDIR
 
@@ -23,9 +29,6 @@
 /* Define if the separate-debug-dir directory should be relocated when GDB is
    moved. */
 #undef DEBUGDIR_RELOCATABLE
-
-/* Directories safe to hold auto-loaded files. */
-#undef DEFAULT_AUTO_LOAD_SAFE_PATH
 
 /* Define to BFD's default architecture. */
 #undef DEFAULT_BFD_ARCH
@@ -197,6 +200,9 @@
 
 /* Define to 1 if you have the `m' library (-lm). */
 #undef HAVE_LIBM
+
+/* Define to 1 if you have the `mcheck' library (-lmcheck). */
+#undef HAVE_LIBMCHECK
 
 /* Define if Python 2.4 is being used. */
 #undef HAVE_LIBPYTHON2_4
@@ -440,6 +446,12 @@
 
 /* Define to 1 if `struct thread' is a member of `td_pcb'. */
 #undef HAVE_STRUCT_THREAD_TD_PCB
+
+/* Define to 1 if `struct user_regs_struct' is a member of `fs_base'. */
+#undef HAVE_STRUCT_USER_REGS_STRUCT_FS_BASE
+
+/* Define to 1 if `struct user_regs_struct' is a member of `gs_base'. */
+#undef HAVE_STRUCT_USER_REGS_STRUCT_GS_BASE
 
 /* Define to 1 if you have the `syscall' function. */
 #undef HAVE_SYSCALL
