@@ -99,24 +99,24 @@ static const char * const solib_break_names[] =
    events.  */
 
 struct probe_info
-  {
-    /* The name of the probe.  */
-    const char *name;
+{
+  /* The name of the probe.  */
+  const char *name;
 
-    /* Nonzero if this probe must be stopped at even when
-       stop-on-solib-events is off.  */
-    int mandatory;
-  };
+  /* Nonzero if this probe must be stopped at even when
+     stop-on-solib-events is off.  */
+  int mandatory;
+};
 
 static const struct probe_info probe_info[] =
-  {
-    { "init_start", 0 },
-    { "init_complete", 1 },
-    { "map_start", 0 },
-    { "reloc_complete", 1 },
-    { "unmap_start", 0 },
-    { "unmap_complete", 1 },
-  };
+{
+  { "init_start", 0 },
+  { "init_complete", 1 },
+  { "map_start", 0 },
+  { "reloc_complete", 1 },
+  { "unmap_start", 0 },
+  { "unmap_complete", 1 },
+};
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
 
