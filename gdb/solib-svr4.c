@@ -1470,8 +1470,8 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 		  if (loc->pspace == current_program_space
 		      && loc->address == probe->address)
 		    {
-		      b->enable_state =
-			stop_on_solib_events ? bp_enabled : bp_disabled;
+		      b->enable_state = (stop_on_solib_events
+					 ? bp_enabled : bp_disabled);
 		      return 0;
 		    }
 		}
