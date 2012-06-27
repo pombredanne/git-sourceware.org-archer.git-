@@ -366,7 +366,7 @@ static void
 set_stop_on_solib_events (char *args, int from_tty, struct cmd_list_element *c)
 {
   update_solib_breakpoints ();
-} 
+}
 
 static void
 show_stop_on_solib_events (struct ui_file *file, int from_tty,
