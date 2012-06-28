@@ -109,9 +109,10 @@ proc strip_debug {dest} {
     }
 }
 
-# Former symbol for solib changes notifications was _dl_debug_state, newer one
-# is dl_main (in fact _dl_debug_notify but it is inlined without any extra
-# debug info), the right one one traps by `set stop-on-solib-events 1'.
+# The marker function for the standard runtime linker interface is
+# _dl_debug_state.  The probes-based interface has no specific marker
+# function; the probe we will stop on (init_start) is in dl_main so we
+# check for that.
 
 set solib_bp {(_dl_debug_state|dl_main)}
 
@@ -123,7 +124,6 @@ proc reach_1 {func command displacement} {
     if {$func == $solib_bp} {
 	# Breakpoint on _dl_debug_state can have problems due to its overlap
 	# with the existing internal breakpoint from GDB.
-	# With also _dl_debug_notify we would need even two breakpoints.
 	gdb_test_no_output "set stop-on-solib-events 1"
     } elseif {! [gdb_breakpoint $func allow-pending]} {
 	return
