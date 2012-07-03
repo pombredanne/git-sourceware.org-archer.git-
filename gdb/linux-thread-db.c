@@ -46,10 +46,6 @@
 #include <signal.h>
 #include <ctype.h>
 
-#ifdef HAVE_GNU_LIBC_VERSION_H
-#include <gnu/libc-version.h>
-#endif
-
 /* GNU/Linux libthread_db support.
 
    libthread_db is a library, provided along with libpthread.so, which
@@ -576,15 +572,42 @@ enable_thread_event (int event, CORE_ADDR *bp)
   return TD_OK;
 }
 
+/* Verify inferior's '\0'-terminated symbol VER_SYMBOL starts with "%d.%d" and
+   return 1 if this version is lower (and not equal) to
+   VER_MAJOR_MIN.VER_MINOR_MIN.  Return 0 in all other cases.  */
+
+static int
+inferior_has_bug (const char *ver_symbol, int ver_major_min, int ver_minor_min)
+{
+  struct minimal_symbol *version_msym;
+  CORE_ADDR version_addr;
+  char *version;
+  int err, got, retval = 0;
+
+  version_msym = lookup_minimal_symbol (ver_symbol, NULL, NULL);
+  if (version_msym == NULL)
+    return 0;
+
+  version_addr = SYMBOL_VALUE_ADDRESS (version_msym);
+  got = target_read_string (version_addr, &version, 32, &err);
+  if (err == 0 && memchr (version, 0, got) == &version[got -1])
+    {
+      int major, minor;
+
+      retval = (sscanf (version, "%d.%d", &major, &minor) == 2
+		&& (major < ver_major_min
+		    || (major == ver_major_min && minor < ver_minor_min)));
+    }
+  xfree (version);
+
+  return retval;
+}
+
 static void
 enable_thread_event_reporting (void)
 {
   td_thr_events_t events;
   td_err_e err;
-#ifdef HAVE_GNU_LIBC_VERSION_H
-  const char *libc_version;
-  int libc_major, libc_minor;
-#endif
   struct thread_db_info *info;
 
   info = get_thread_db_info (GET_PID (inferior_ptid));
@@ -601,14 +624,13 @@ enable_thread_event_reporting (void)
   td_event_emptyset (&events);
   td_event_addset (&events, TD_CREATE);
 
-#ifdef HAVE_GNU_LIBC_VERSION_H
-  /* The event reporting facility is broken for TD_DEATH events in
-     glibc 2.1.3, so don't enable it if we have glibc but a lower
-     version.  */
-  libc_version = gnu_get_libc_version ();
-  if (sscanf (libc_version, "%d.%d", &libc_major, &libc_minor) == 2
-      && (libc_major > 2 || (libc_major == 2 && libc_minor > 1)))
-#endif
+  /* There is a bug fixed between linuxthreads 2.1.3 and 2.2 by
+       commit 2e4581e4fba917f1779cd0a010a45698586c190a
+       * manager.c (pthread_exited): Correctly report event as TD_REAP
+       instead of TD_DEATH.  Fix comments.
+     where event reporting facility is broken for TD_DEATH events,
+     so don't enable it if we have glibc but a lower version.  */
+  if (!inferior_has_bug ("__linuxthreads_version", 2, 2))
     td_event_addset (&events, TD_DEATH);
 
   err = info->td_ta_set_event_p (info->thread_agent, &events);
@@ -643,9 +665,13 @@ enable_thread_event_reporting (void)
     }
 }
 
-/* Same as thread_db_find_new_threads_1, but silently ignore errors.  */
+/* Similar as thread_db_find_new_threads_1, but try to silently ignore errors
+   if appropriate.
 
-static void
+   Return 1 if the caller should abort libthread_db initialization.  Return 0
+   otherwise.  */
+
+static int
 thread_db_find_new_threads_silently (ptid_t ptid)
 {
   volatile struct gdb_exception except;
@@ -655,11 +681,36 @@ thread_db_find_new_threads_silently (ptid_t ptid)
       thread_db_find_new_threads_2 (ptid, 1);
     }
 
-  if (except.reason < 0 && libthread_db_debug)
+  if (except.reason < 0)
     {
-      exception_fprintf (gdb_stderr, except,
-			 "Warning: thread_db_find_new_threads_silently: ");
+      if (libthread_db_debug)
+	exception_fprintf (gdb_stderr, except,
+			   "Warning: thread_db_find_new_threads_silently: ");
+
+      /* There is a bug fixed between nptl 2.6.1 and 2.7 by
+	   commit 7d9d8bd18906fdd17364f372b160d7ab896ce909
+	 where calls to td_thr_get_info fail with TD_ERR for statically linked
+	 executables if td_thr_get_info is called before glibc has initialized
+	 itself.
+	 
+	 If the nptl bug is NOT present in the inferior and still thread_db
+	 reports an error return 1.  It means the inferior has corrupted thread
+	 list and GDB should fall back only to LWPs.
+
+	 If the nptl bug is present in the inferior return 0 to silently ignore
+	 such errors, and let gdb enumerate threads again later.  In such case
+	 GDB cannot properly display LWPs if the inferior thread list is
+	 corrupted.  */
+
+      if (!inferior_has_bug ("nptl_version", 2, 7))
+	{
+	  exception_fprintf (gdb_stderr, except,
+			     _("Warning: couldn't activate thread debugging "
+			       "using libthread_db: "));
+	  return 1;
+	}
     }
+  return 0;
 }
 
 /* Lookup a library in which given symbol resides.
@@ -762,6 +813,14 @@ try_thread_db_load_1 (struct thread_db_info *info)
   info->td_thr_event_enable_p = dlsym (info->handle, "td_thr_event_enable");
   info->td_thr_tls_get_addr_p = dlsym (info->handle, "td_thr_tls_get_addr");
 
+  if (thread_db_find_new_threads_silently (inferior_ptid) != 0)
+    {
+      /* Even if libthread_db initializes, if the thread list is
+         corrupted, we'd not manage to list any threads.  Better reject this
+         thread_db, and fall back to at least listing LWPs.  */
+      return 0;
+    }
+
   printf_unfiltered (_("[Thread debugging using libthread_db enabled]\n"));
 
   if (libthread_db_debug || *libthread_db_search_path)
@@ -784,12 +843,6 @@ try_thread_db_load_1 (struct thread_db_info *info)
   /* Enable event reporting, but not when debugging a core file.  */
   if (target_has_execution)
     enable_thread_event_reporting ();
-
-  /* There appears to be a bug in glibc-2.3.6: calls to td_thr_get_info fail
-     with TD_ERR for statically linked executables if td_thr_get_info is
-     called before glibc has initialized itself.  Silently ignore such
-     errors, and let gdb enumerate threads again later.  */
-  thread_db_find_new_threads_silently (inferior_ptid);
 
   return 1;
 }
@@ -1132,6 +1185,12 @@ thread_db_new_objfile (struct objfile *objfile)
      correctly.  */
 
   if (objfile != NULL
+      /* libpthread with separate debug info has its debug info file already
+	 loaded (and notified without successful thread_db initialization)
+	 the time observer_notify_new_objfile is called for the library itself.
+	 Static executables have their separate debug info loaded already
+	 before the inferior has started.  */
+      && objfile->separate_debug_objfile_backlink == NULL
       /* Only check for thread_db if we loaded libpthread,
 	 or if this is the main symbol file.
 	 We need to check OBJF_MAINLINE to handle the case of debugging
@@ -1612,7 +1671,7 @@ find_new_threads_once (struct thread_db_info *info, int iteration,
 static void
 thread_db_find_new_threads_2 (ptid_t ptid, int until_no_new)
 {
-  td_err_e err;
+  td_err_e err = TD_OK;
   struct thread_db_info *info;
   int pid = ptid_get_pid (ptid);
   int i, loop;
@@ -1628,17 +1687,18 @@ thread_db_find_new_threads_2 (ptid_t ptid, int until_no_new)
 	 The 4 is a heuristic: there is an inherent race here, and I have
 	 seen that 2 iterations in a row are not always sufficient to
 	 "capture" all threads.  */
-      for (i = 0, loop = 0; loop < 4; ++i, ++loop)
-	if (find_new_threads_once (info, i, NULL) != 0)
-	  /* Found some new threads.  Restart the loop from beginning.	*/
-	  loop = -1;
+      for (i = 0, loop = 0; loop < 4 && err == TD_OK; ++i, ++loop)
+	if (find_new_threads_once (info, i, &err) != 0)
+	  {
+	    /* Found some new threads.  Restart the loop from beginning.  */
+	    loop = -1;
+	  }
     }
   else
-    {
-      find_new_threads_once (info, 0, &err);
-      if (err != TD_OK)
-	error (_("Cannot find new threads: %s"), thread_db_err_str (err));
-    }
+    find_new_threads_once (info, 0, &err);
+
+  if (err != TD_OK)
+    error (_("Cannot find new threads: %s"), thread_db_err_str (err));
 }
 
 static void

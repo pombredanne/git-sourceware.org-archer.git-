@@ -703,6 +703,7 @@ update_current_target (void)
       INHERIT (to_can_use_agent, t);
       INHERIT (to_magic, t);
       INHERIT (to_supports_evaluation_of_breakpoint_conditions, t);
+      INHERIT (to_can_run_breakpoint_commands, t);
       /* Do not inherit to_memory_map.  */
       /* Do not inherit to_flash_erase.  */
       /* Do not inherit to_flash_done.  */
@@ -930,6 +931,9 @@ update_current_target (void)
 	    (struct traceframe_info * (*) (void))
 	    tcomplain);
   de_fault (to_supports_evaluation_of_breakpoint_conditions,
+	    (int (*) (void))
+	    return_zero);
+  de_fault (to_can_run_breakpoint_commands,
 	    (int (*) (void))
 	    return_zero);
   de_fault (to_use_agent,
@@ -1756,7 +1760,7 @@ target_xfer_partial (struct target_ops *ops,
    it makes no progress, and then return how much was transferred).  */
 
 int
-target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, size_t len)
+target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
 {
   /* Dispatch to the topmost target, not the flattened current_target.
      Memory accesses check target->to_has_(all_)memory, and the
@@ -1772,7 +1776,7 @@ target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, size_t len)
    the target's stack.  This may trigger different cache behavior.  */
 
 int
-target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
+target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
 {
   /* Dispatch to the topmost target, not the flattened current_target.
      Memory accesses check target->to_has_(all_)memory, and the
@@ -1791,7 +1795,7 @@ target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
    Callers that can deal with partial writes should call target_write.  */
 
 int
-target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, int len)
+target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
 {
   /* Dispatch to the topmost target, not the flattened current_target.
      Memory accesses check target->to_has_(all_)memory, and the
@@ -1810,7 +1814,7 @@ target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, int len)
    should call target_write.  */
 
 int
-target_write_raw_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, int len)
+target_write_raw_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
 {
   /* Dispatch to the topmost target, not the flattened current_target.
      Memory accesses check target->to_has_(all_)memory, and the

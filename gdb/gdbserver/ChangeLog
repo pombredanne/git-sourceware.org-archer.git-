@@ -1,3 +1,56 @@
+2012-07-02  Doug Evans  <dje@google.com>
+
+	* mem-break.c (gdb_no_commands_at_breakpoint): Fix cast from
+	pointer to int.
+
+2012-07-02  Stan Shebs  <stan@codesourcery.com>
+
+	* Makefile.in (WARN_CFLAGS_NO_FORMAT): Define.
+	(ax.o): Add it to build rule.
+	(ax-ipa.o): Ditto.
+	(OBS): Add format.o.
+	(IPA_OBS): Add format.o.
+	* server.c (handle_query): Claim support for breakpoint commands.
+	(process_point_options): Add command case.
+	(process_serial_event): Leave running if there are printfs in
+	effect.
+	* mem-break.h (any_persistent_commands): Declare.
+	(add_breakpoint_commands): Declare.
+	(gdb_no_commands_at_breakpoint): Declare.
+	(run_breakpoint_commands): Declare.
+	* mem-break.c (struct point_command_list): New struct.
+	(struct breakpoint): New field command_list.
+	(any_persistent_commands): New function.
+	(add_commands_to_breakpoint): New function.
+	(add_breakpoint_commands): New function.
+	(gdb_no_commands_at_breakpoint): New function.
+	(run_breakpoint_commands): New function.
+	* linux-low.c (linux_wait_1): Test for and run breakpoint commands
+	locally.
+	* ax.c: Include format.h.
+	(ax_printf): New function.
+	(gdb_eval_agent_expr): Add printf opcode.
+
+2012-06-13  Yao Qi  <yao@codesourcery.com>
+
+	* server.c (start_inferior): Remove duplicated writes to fields
+	'last_resume_kind' and 'last_status' of 'current_inferior'.
+
+2012-06-12  Yao Qi  <yao@codesourcery.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* linux-low.c (linux_set_resume_request): Simplify predicate.  Add
+	comment.
+	* server.c (handle_v_cont): Extend comment.
+
+2012-06-11  Yao Qi  <yao@codesourcery.com>
+
+	* linux-low.c (linux_attach): Add 'static'.
+
+2012-06-06  Yao Qi  <yao@codesourcery.com>
+
+	* ax.c (gdb_eval_agent_expr): Print `top' in hex.
+
 2012-06-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Fix gcc -flto compilation warning.

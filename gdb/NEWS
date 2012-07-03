@@ -60,6 +60,9 @@
   ** New function gdb.find_pc_line which returns the gdb.Symtab_and_line
      object associated with a PC value.
 
+  ** gdb.Symtab_and_line has new attribute 'last' which holds the end
+     of the address range occupied by code for the current source line.
+
 * Go language support.
   GDB now supports debugging programs written in the Go programming
   language.
@@ -112,6 +115,12 @@
   the ability to set breakpoints on inlined functions will be lost
   in symbol files with older .gdb_index sections.
 
+  The .gdb_index section has also been updated to record more information
+  about each symbol.  This speeds up the "info variables", "info functions"
+  and "info types" commands when used with programs having the .gdb_index
+  section, as well as speeding up debugging with shared libraries using
+  the .gdb_index section.
+
 * Ada support for GDB/MI Variable Objects has been added.
 
 * GDB can now support 'breakpoint always-inserted mode' in 'record'
@@ -120,6 +129,8 @@
 * MI changes
 
   ** New command -info-os is the MI equivalent of "info os".
+
+  ** Output logs ("set logging" and related) now include MI output.
 
 * New commands
 
@@ -160,6 +171,11 @@
      Controls whether GDB attempts to display the symbol, if any,
      corresponding to addresses it prints.  This defaults to "on", but
      you can set it to "off" to restore GDB's previous behavior.
+
+* Deprecated commands
+
+  ** For the Renesas Super-H architecture, the "regs" command has been
+     deprecated, and "info all-registers" should be used instead.
 
 * New targets
 
@@ -228,11 +244,12 @@ set debug auto-load on|off
 show debug auto-load
   Control display of debugging info for auto-loading the files above.
 
-set dprintf-style gdb|call
+set dprintf-style gdb|call|agent
 show dprintf-style
-  Control the way in which a dynamic printf is performed; "gdb" requests
-  a GDB printf command, while "call" causes dprintf to call a function
-  in the inferior.
+  Control the way in which a dynamic printf is performed; "gdb"
+  requests a GDB printf command, while "call" causes dprintf to call a
+  function in the inferior.  "agent" requests that the target agent
+  (such as GDBserver) do the printing.
 
 set dprintf-function <expr>
 show dprintf-function
@@ -240,6 +257,11 @@ set dprintf-channel <expr>
 show dprintf-channel
   Set the function and optional first argument to the call when using
   the "call" style of dynamic printf.
+
+set disconnected-dprintf on|off
+show disconnected-dprintf
+  Control whether agent-style dynamic printfs continue to be in effect
+  after GDB disconnects.
 
 * New configure options
 
@@ -456,6 +478,16 @@ tstop [NOTES]
   limited to locations with instructions of 5 bytes or longer.
 
 * New options
+
+set debug dwarf2-read
+show debug dwarf2-read
+  Turns on or off display of debugging messages related to reading
+  DWARF debug info.  The default is off.
+
+set debug symtab-create
+show debug symtab-create
+  Turns on or off display of debugging messages related to symbol table
+  creation.  The default is off.
 
 set extended-prompt
 show extended-prompt

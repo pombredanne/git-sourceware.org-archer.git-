@@ -22,6 +22,7 @@
 #define SYMTAB_H 1
 
 #include "vec.h"
+#include "gdb_vecs.h"
 
 /* Opaque declarations.  */
 struct ui_file;
@@ -338,6 +339,10 @@ struct minimal_symbol
   /* Classification type for this minimal symbol.  */
 
   ENUM_BITFIELD(minimal_symbol_type) type : 8;
+
+  /* Non-zero if this symbol was created by gdb.
+     Such symbols do not appear in the output of "info var|fun".  */
+  unsigned int created_by_gdb : 1;
 
   /* Two flag bits provided for the use of the target.  */
   unsigned int target_flag_1 : 1;
@@ -1108,13 +1113,6 @@ extern int find_line_pc_range (struct symtab_and_line, CORE_ADDR *,
 
 extern void resolve_sal_pc (struct symtab_and_line *);
 
-/* Given a string, return the line specified by it.  For commands like "list"
-   and "breakpoint".  */
-
-extern struct symtabs_and_lines decode_line_spec (char *, int);
-
-extern struct symtabs_and_lines decode_line_spec_1 (char *, int);
-
 /* Symmisc.c */
 
 void maintenance_print_symbols (char *, int);
@@ -1150,16 +1148,17 @@ extern void forget_cached_source_info (void);
 
 extern void select_source_symtab (struct symtab *);
 
-extern char **default_make_symbol_completion_list_break_on
+extern VEC (char_ptr) *default_make_symbol_completion_list_break_on
   (char *text, char *word, const char *break_on);
-extern char **default_make_symbol_completion_list (char *, char *);
-extern char **make_symbol_completion_list (char *, char *);
-extern char **make_symbol_completion_list_fn (struct cmd_list_element *,
-					      char *, char *);
+extern VEC (char_ptr) *default_make_symbol_completion_list (char *, char *);
+extern VEC (char_ptr) *make_symbol_completion_list (char *, char *);
+extern VEC (char_ptr) *make_symbol_completion_list_fn (struct cmd_list_element *,
+						       char *, char *);
 
-extern char **make_file_symbol_completion_list (char *, char *, char *);
+extern VEC (char_ptr) *make_file_symbol_completion_list (char *,
+							 char *, char *);
 
-extern char **make_source_files_completion_list (char *, char *);
+extern VEC (char_ptr) *make_source_files_completion_list (char *, char *);
 
 /* symtab.c */
 
@@ -1243,6 +1242,8 @@ void fixup_section (struct general_symbol_info *ginfo,
 		    CORE_ADDR addr, struct objfile *objfile);
 
 struct objfile *lookup_objfile_from_block (const struct block *block);
+
+extern int symtab_create_debug;
 
 extern int basenames_may_differ;
 

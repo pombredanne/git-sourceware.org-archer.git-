@@ -2332,6 +2332,22 @@ i386_16_byte_align_p (struct type *type)
   return 0;
 }
 
+/* Implementation for set_gdbarch_push_dummy_code.  */
+
+static CORE_ADDR
+i386_push_dummy_code (struct gdbarch *gdbarch, CORE_ADDR sp, CORE_ADDR funaddr,
+		      struct value **args, int nargs, struct type *value_type,
+		      CORE_ADDR *real_pc, CORE_ADDR *bp_addr,
+		      struct regcache *regcache)
+{
+  /* Use 0xcc breakpoint - 1 byte.  */
+  *bp_addr = sp - 1;
+  *real_pc = funaddr;
+
+  /* Keep the stack aligned.  */
+  return sp - 16;
+}
+
 static CORE_ADDR
 i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 		      struct regcache *regcache, CORE_ADDR bp_addr, int nargs,
@@ -2351,7 +2367,6 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
   for (write_pass = 0; write_pass < 2; write_pass++)
     {
       int args_space_used = 0;
-      int have_16_byte_aligned_arg = 0;
 
       if (struct_return)
 	{
@@ -2389,19 +2404,20 @@ i386_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 	  else
 	    {
 	      if (i386_16_byte_align_p (value_enclosing_type (args[i])))
-		{
-		  args_space = align_up (args_space, 16);
-		  have_16_byte_aligned_arg = 1;
-		}
+		args_space = align_up (args_space, 16);
 	      args_space += align_up (len, 4);
 	    }
 	}
 
       if (!write_pass)
 	{
-	  if (have_16_byte_aligned_arg)
-	    args_space = align_up (args_space, 16);
 	  sp -= args_space;
+
+	  /* The original System V ABI only requires word alignment,
+	     but modern incarnations need 16-byte alignment in order
+	     to support SSE.  Since wasting a few bytes here isn't
+	     harmful we unconditionally enforce 16-byte alignment.  */
+	  sp &= ~0xf;
 	}
     }
 
@@ -2780,7 +2796,7 @@ i386_mmx_type (struct gdbarch *gdbarch)
 /* Return the GDB type object for the "standard" data type of data in
    register REGNUM.  */
 
-static struct type *
+struct type *
 i386_pseudo_register_type (struct gdbarch *gdbarch, int regnum)
 {
   if (i386_mmx_regnum_p (gdbarch, regnum))
@@ -7705,6 +7721,8 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   set_gdbarch_get_longjmp_target (gdbarch, i386_get_longjmp_target);
 
   /* Call dummy code.  */
+  set_gdbarch_call_dummy_location (gdbarch, ON_STACK);
+  set_gdbarch_push_dummy_code (gdbarch, i386_push_dummy_code);
   set_gdbarch_push_dummy_call (gdbarch, i386_push_dummy_call);
   set_gdbarch_frame_align (gdbarch, i386_frame_align);
 
