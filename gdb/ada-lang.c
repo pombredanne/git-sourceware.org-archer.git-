@@ -2534,8 +2534,7 @@ ada_value_assign (struct value *toval, struct value *fromval)
       else
         move_bits (buffer, value_bitpos (toval),
 		   value_contents (fromval), 0, bits, 0);
-      write_memory (to_addr, buffer, len);
-      observer_notify_memory_changed (to_addr, len, buffer);
+      write_memory_with_notification (to_addr, buffer, len);
 
       val = value_copy (toval);
       memcpy (value_contents_raw (val), value_contents (fromval),
@@ -4061,7 +4060,7 @@ ada_read_renaming_var_value (struct symbol *renaming_sym,
 
   sym_name = xstrdup (SYMBOL_LINKAGE_NAME (renaming_sym));
   old_chain = make_cleanup (xfree, sym_name);
-  expr = parse_exp_1 (&sym_name, block, 0);
+  expr = parse_exp_1 (&sym_name, 0, block, 0);
   make_cleanup (free_current_contents, &expr);
   value = evaluate_expression (expr);
 
@@ -5797,11 +5796,10 @@ ada_expand_partial_symbol_name (const char *name, void *user_data)
                                   data->wild_match, data->encoded) != NULL;
 }
 
-/* Return a list of possible symbol names completing TEXT0.  The list
-   is NULL terminated.  WORD is the entire command on which completion
-   is made.  */
+/* Return a list of possible symbol names completing TEXT0.  WORD is
+   the entire command on which completion is made.  */
 
-static char **
+static VEC (char_ptr) *
 ada_make_symbol_completion_list (char *text0, char *word)
 {
   char *text;
@@ -5914,24 +5912,7 @@ ada_make_symbol_completion_list (char *text0, char *word)
     }
   }
 
-  /* Append the closing NULL entry.  */
-  VEC_safe_push (char_ptr, completions, NULL);
-
-  /* Make a copy of the COMPLETIONS VEC before we free it, and then
-     return the copy.  It's unfortunate that we have to make a copy
-     of an array that we're about to destroy, but there is nothing much
-     we can do about it.  Fortunately, it's typically not a very large
-     array.  */
-  {
-    const size_t completions_size = 
-      VEC_length (char_ptr, completions) * sizeof (char *);
-    char **result = xmalloc (completions_size);
-    
-    memcpy (result, VEC_address (char_ptr, completions), completions_size);
-
-    VEC_free (char_ptr, completions);
-    return result;
-  }
+  return completions;
 }
 
                                 /* Field Access */
@@ -11159,7 +11140,8 @@ create_excep_cond_exprs (struct ada_catchpoint *c)
 	  s = cond_string;
 	  TRY_CATCH (e, RETURN_MASK_ERROR)
 	    {
-	      exp = parse_exp_1 (&s, block_for_pc (bl->address), 0);
+	      exp = parse_exp_1 (&s, bl->address,
+				 block_for_pc (bl->address), 0);
 	    }
 	  if (e.reason < 0)
 	    warning (_("failed to reevaluate internal exception condition "

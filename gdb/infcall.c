@@ -464,7 +464,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
 {
   CORE_ADDR sp;
   struct type *values_type, *target_values_type;
-  unsigned char struct_return = 0, lang_struct_return = 0;
+  unsigned char struct_return = 0, hidden_first_param_p = 0;
   CORE_ADDR struct_addr = 0;
   struct infcall_control_state *inf_status;
   struct cleanup *inf_status_cleanup;
@@ -598,9 +598,9 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
      the first argument is passed in out0 but the hidden structure
      return pointer would normally be passed in r8.  */
 
-  if (language_pass_by_reference (values_type))
+  if (gdbarch_return_in_first_hidden_param_p (gdbarch, values_type))
     {
-      lang_struct_return = 1;
+      hidden_first_param_p = 1;
 
       /* Tell the target specific argument pushing routine not to
 	 expect a value.  */
@@ -680,7 +680,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
      stack, if necessary.  Make certain that the value is correctly
      aligned.  */
 
-  if (struct_return || lang_struct_return)
+  if (struct_return || hidden_first_param_p)
     {
       int len = TYPE_LENGTH (values_type);
 
@@ -706,7 +706,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
 	}
     }
 
-  if (lang_struct_return)
+  if (hidden_first_param_p)
     {
       struct value **new_args;
 
@@ -744,7 +744,7 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
      inferior.  That way it breaks when it returns.  */
 
   {
-    struct breakpoint *bpt;
+    struct breakpoint *bpt, *longjmp_b;
     struct symtab_and_line sal;
 
     init_sal (&sal);		/* initialize to zeroes */
@@ -760,6 +760,17 @@ call_function_by_hand (struct value *function, int nargs, struct value **args)
     frame = NULL;
 
     bpt->disposition = disp_del;
+    gdb_assert (bpt->related_breakpoint == bpt);
+
+    longjmp_b = set_longjmp_breakpoint_for_call_dummy ();
+    if (longjmp_b)
+      {
+	/* Link BPT into the chain of LONGJMP_B.  */
+	bpt->related_breakpoint = longjmp_b;
+	while (longjmp_b->related_breakpoint != bpt->related_breakpoint)
+	  longjmp_b = longjmp_b->related_breakpoint;
+	longjmp_b->related_breakpoint = bpt;
+      }
   }
 
   /* Create a breakpoint in std::terminate.
@@ -1012,7 +1023,7 @@ When the function is done executing, GDB will silently stop."),
     /* Figure out the value returned by the function.  */
     retval = allocate_value (values_type);
 
-    if (lang_struct_return)
+    if (hidden_first_param_p)
       read_value_memory (retval, 0, 1, struct_addr,
 			 value_contents_raw (retval),
 			 TYPE_LENGTH (values_type));

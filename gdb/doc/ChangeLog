@@ -1,3 +1,108 @@
+2012-07-02  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (Dynamic Printf): Mention agent style and
+	disconnected dprintf.
+	(Maintenance Commands): Describe maint agent-printf.
+	(General Query Packets): Mention BreakpointCommands feature.
+	(Packets): Document commands extension to Z0 packet.
+	* agentexpr.texi (Bytecode Descriptions): Document printf
+	bytecode.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (File Options): Change -ix and -iex commands that apply
+	only after gdbinit files.
+	(Startup): Move -iex and -iex commands down after gdbinit files.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Auto-loading safe path): Note the shell wildcard
+	possibility.
+
+2012-06-29  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Index Section Format): Update for version 7.
+
+2012-06-28  Stan Shebs  <stan@codesourcery.com>
+
+	* gdb.texinfo (Miscellaneous GDB/MI Commands): Update -info-os
+	example, add note about title column.
+
+2012-06-26  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* gdb.texinfo (Symbol Tables In Python): Add description about
+	the new 'last' attribute of gdb.Symtab_and line.
+
+2012-06-26  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* gdb.texinfo (Symbol Tables In Python): Correct the description
+	of the 'pc' attribute of gdb.Symtab_and_line.
+
+2012-06-26  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Debugging Output): Document debug options dwarf2-read
+	and symtab-create.
+
+2012-06-25  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.texinfo (GDB/MI Breakpoint Commands): Remove "-r" option
+	from example.  Remove "rbreak" from list of corresponding
+	gdb commands.
+
+2012-06-23  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Index Section Format): Document version 7 format.
+
+2012-06-22  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo: Add missing cindex for some packets.
+
+2012-06-20  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.texinfo (GDB/MI Breakpoint Commands): Re-order options
+	for -break-insert and document -p.
+
+2012-06-20  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Inferiors In Python): Replace "gdb.read_memory"
+	and "gdb.write_memory" with "Inferior.read_memory" and
+	"Inferior.write_memory".
+
+2012-06-15  Patrice Dumas  <pertusus@free.fr>  (tiny change)
+
+	* gdb.texinfo (Summary): Add a link to "Free Documentation".
+	(Free Documentation): Add @node line.
+	(Continuing and Stepping) <advance location>: Use @item instead of
+	@itemx.
+	(Reverse Execution) <set exec-direction reverse>: Use @item instead of
+	@itemx.
+	(Embedded Processors): Put the link to "PA" to its correct place,
+	according to document structure.
+	(Python API): Put the link to "Lazy Strings In Python" to its
+	correct place.
+	(Index): Use @@ in @tex block to get a literal @.
+
+	* gdbint.texinfo: Fix the @subtitle line.
+
+	* stabs.texinfo (Top): Put the link to "Symbol Types Index" to its
+	correct place.
+
+2012-06-08  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (In-Process Agent): Add 'In-Process Agent
+	Protocol'.
+	(In-Process Agent Protocol, IPA Protocol Objects)
+	(IPA Protocol Commands): New nodes.
+	(Tracepoint Packets): Add anchors.
+
+2012-06-06  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gdb.texinfo: Document the deprecation of SH's 'regs' command.
+
+2012-06-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo: Update copyright year.
+
 2012-05-23  Stan Shebs  <stan@codesourcery.com>
 	    Kwok Cheung Yeung  <kcy@codesourcery.com>
 

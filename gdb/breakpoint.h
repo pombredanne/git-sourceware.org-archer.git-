@@ -23,6 +23,7 @@
 #include "value.h"
 #include "vec.h"
 #include "ax.h"
+#include "command.h"
 
 struct value;
 struct block;
@@ -64,6 +65,12 @@ enum bptype
     bp_longjmp,			/* secret breakpoint to find longjmp() */
     bp_longjmp_resume,		/* secret breakpoint to escape longjmp() */
 
+    /* Breakpoint placed to the same location(s) like bp_longjmp but used to
+       protect against stale DUMMY_FRAME.  Multiple bp_longjmp_call_dummy and
+       one bp_call_dummy are chained together by related_breakpoint for each
+       DUMMY_FRAME.  */
+    bp_longjmp_call_dummy,
+
     /* An internal breakpoint that is installed on the unwinder's
        debug hook.  */
     bp_exception,
@@ -93,14 +100,8 @@ enum bptype
        3) It can never be disabled.  */
     bp_watchpoint_scope,
 
-    /* The breakpoint at the end of a call dummy.  */
-    /* FIXME: What if the function we are calling longjmp()s out of
-       the call, or the user gets out with the "return" command?  We
-       currently have no way of cleaning up the breakpoint in these
-       (obscure) situations.  (Probably can solve this by noticing
-       longjmp, "return", etc., it's similar to noticing when a
-       watchpoint on a local variable goes out of scope (with hardware
-       support for watchpoints)).  */
+    /* The breakpoint at the end of a call dummy.  See bp_longjmp_call_dummy it
+       is chained with by related_breakpoint.  */
     bp_call_dummy,
 
     /* A breakpoint set on std::terminate, that is used to catch
@@ -271,6 +272,14 @@ struct bp_target_info
   /* Vector of conditions the target should evaluate if it supports target-side
      breakpoint conditions.  */
   VEC(agent_expr_p) *conditions;
+
+  /* Vector of commands the target should evaluate if it supports
+     target-side breakpoint commands.  */
+  VEC(agent_expr_p) *tcommands;
+
+  /* Flag that is true if the breakpoint should be left in place even
+     when GDB is not connected.  */
+  int persist;
 };
 
 /* GDB maintains two types of information about each breakpoint (or
@@ -357,8 +366,11 @@ struct bp_location
 
   enum condition_status condition_changed;
 
-  /* Signals that breakpoint conditions need to be re-synched with the
-     target.  This has no use other than target-side breakpoints.  */
+  struct agent_expr *cmd_bytecode;
+
+  /* Signals that breakpoint conditions and/or commands need to be
+     re-synched with the target.  This has no use other than
+     target-side breakpoints.  */
   char needs_update;
 
   /* This location's address is in an unloaded solib, and so this
@@ -1187,8 +1199,7 @@ extern void
   add_catch_command (char *name, char *docstring,
 		     void (*sfunc) (char *args, int from_tty,
 				    struct cmd_list_element *command),
-		     char **(*completer) (struct cmd_list_element *cmd,
-					  char *text, char *word),
+		     completer_ftype *completer,
 		     void *user_data_catch,
 		     void *user_data_tcatch);
 
@@ -1286,6 +1297,9 @@ extern void delete_longjmp_breakpoint (int thread);
 
 /* Mark all longjmp breakpoints from THREAD for later deletion.  */
 extern void delete_longjmp_breakpoint_at_next_stop (int thread);
+
+extern struct breakpoint *set_longjmp_breakpoint_for_call_dummy (void);
+extern void check_longjmp_breakpoint_for_call_dummy (int thread);
 
 extern void enable_overlay_breakpoints (void);
 extern void disable_overlay_breakpoints (void);

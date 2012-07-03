@@ -81,13 +81,12 @@ mi_interpreter_init (struct interp *interp, int top_level)
   const char *name;
   int mi_version;
 
-  /* HACK: We need to force stdout/stderr to point at the console.
-     This avoids any potential side effects caused by legacy code that
-     is still using the TUI / fputs_unfiltered_hook.  So we set up
-     output channels for this now, and swap them in when we are
-     run.  */
+  /* Assign the output channel created at startup to its own global,
+     so that we can create a console channel that encapsulates and
+     prefixes all gdb_output-type bits coming from the rest of the
+     debugger.  */
 
-  raw_stdout = stdio_fileopen (stdout);
+  raw_stdout = gdb_stdout;
 
   /* Create MI console channels, each with a different prefix so they
      can be distinguished.  */
@@ -756,6 +755,54 @@ mi_ui_out (struct interp *interp)
   return mi->uiout;
 }
 
+/* Save the original value of raw_stdout here when logging, so we can
+   restore correctly when done.  */
+
+static struct ui_file *saved_raw_stdout;
+
+/* Do MI-specific logging actions; save raw_stdout, and change all
+   the consoles to use the supplied ui-file(s).  */
+
+static int
+mi_set_logging (struct interp *interp, int start_log,
+		struct ui_file *out, struct ui_file *logfile)
+{
+  struct mi_interp *mi = interp_data (interp);
+
+  if (!mi)
+    return 0;
+
+  if (start_log)
+    {
+      /* The tee created already is based on gdb_stdout, which for MI
+	 is a console and so we end up in an infinite loop of console
+	 writing to ui_file writing to console etc.  So discard the
+	 existing tee (it hasn't been used yet, and MI won't ever use
+	 it), and create one based on raw_stdout instead.  */
+      if (logfile)
+	{
+	  ui_file_delete (out);
+	  out = tee_file_new (raw_stdout, 0, logfile, 0);
+	}
+
+      saved_raw_stdout = raw_stdout;
+      raw_stdout = out;
+    }
+  else
+    {
+      raw_stdout = saved_raw_stdout;
+      saved_raw_stdout = NULL;
+    }
+  
+  mi_console_set_raw (mi->out, raw_stdout);
+  mi_console_set_raw (mi->err, raw_stdout);
+  mi_console_set_raw (mi->log, raw_stdout);
+  mi_console_set_raw (mi->targ, raw_stdout);
+  mi_console_set_raw (mi->event_channel, raw_stdout);
+
+  return 1;
+}
+
 extern initialize_file_ftype _initialize_mi_interp; /* -Wmissing-prototypes */
 
 void
@@ -768,7 +815,8 @@ _initialize_mi_interp (void)
       mi_interpreter_suspend,	/* suspend_proc */
       mi_interpreter_exec,	/* exec_proc */
       mi_interpreter_prompt_p,	/* prompt_proc_p */
-      mi_ui_out 		/* ui_out_proc */
+      mi_ui_out, 		/* ui_out_proc */
+      mi_set_logging		/* set_logging_proc */
     };
 
   /* The various interpreter levels.  */

@@ -734,7 +734,8 @@ validate_actionline (char **line, struct breakpoint *b)
 	  for (loc = t->base.loc; loc; loc = loc->next)
 	    {
 	      p = tmp_p;
-	      exp = parse_exp_1 (&p, block_for_pc (loc->address), 1);
+	      exp = parse_exp_1 (&p, loc->address,
+				 block_for_pc (loc->address), 1);
 	      old_chain = make_cleanup (free_current_contents, &exp);
 
 	      if (exp->elts[0].opcode == OP_VAR_VALUE)
@@ -787,7 +788,8 @@ validate_actionline (char **line, struct breakpoint *b)
 	    {
 	      p = tmp_p;
 	      /* Only expressions are allowed for this action.  */
-	      exp = parse_exp_1 (&p, block_for_pc (loc->address), 1);
+	      exp = parse_exp_1 (&p, loc->address,
+				 block_for_pc (loc->address), 1);
 	      old_chain = make_cleanup (free_current_contents, &exp);
 
 	      /* We have something to evaluate, make sure that the expr to
@@ -1452,7 +1454,7 @@ encode_actions_1 (struct command_line *action,
 		  struct cleanup *old_chain = NULL;
 		  struct cleanup *old_chain1 = NULL;
 
-		  exp = parse_exp_1 (&action_exp, 
+		  exp = parse_exp_1 (&action_exp, tloc->address,
 				     block_for_pc (tloc->address), 1);
 		  old_chain = make_cleanup (free_current_contents, &exp);
 
@@ -1542,7 +1544,7 @@ encode_actions_1 (struct command_line *action,
 		  struct cleanup *old_chain = NULL;
 		  struct cleanup *old_chain1 = NULL;
 
-		  exp = parse_exp_1 (&action_exp, 
+		  exp = parse_exp_1 (&action_exp, tloc->address,
 				     block_for_pc (tloc->address), 1);
 		  old_chain = make_cleanup (free_current_contents, &exp);
 
@@ -2492,7 +2494,7 @@ trace_find_line_command (char *args, int from_tty)
     }
   else
     {
-      sals = decode_line_spec (args, DECODE_LINE_FUNFIRSTLINE);
+      sals = decode_line_with_current_source (args, DECODE_LINE_FUNFIRSTLINE);
       sal = sals.sals[0];
     }
   
@@ -4545,6 +4547,8 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
 	      if (amt > len)
 		amt = len;
 
+	      if (maddr != offset)
+	        lseek (trace_fd, offset - maddr, SEEK_CUR);
 	      tfile_read (readbuf, amt);
 	      return amt;
 	    }

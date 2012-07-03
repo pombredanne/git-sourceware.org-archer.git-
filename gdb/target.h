@@ -672,6 +672,10 @@ struct target_ops
        end?  */
     int (*to_supports_evaluation_of_breakpoint_conditions) (void);
 
+    /* Does this target support evaluation of breakpoint commands on its
+       end?  */
+    int (*to_can_run_breakpoint_commands) (void);
+
     /* Determine current architecture of thread PTID.
 
        The target is supposed to determine the architecture of the code where
@@ -920,10 +924,16 @@ extern void target_detach (char *, int);
 
 extern void target_disconnect (char *, int);
 
-/* Resume execution of the target process PTID.  STEP says whether to
-   single-step or to run free; SIGGNAL is the signal to be given to
-   the target, or GDB_SIGNAL_0 for no signal.  The caller may not
-   pass GDB_SIGNAL_DEFAULT.  */
+/* Resume execution of the target process PTID (or a group of
+   threads).  STEP says whether to single-step or to run free; SIGGNAL
+   is the signal to be given to the target, or GDB_SIGNAL_0 for no
+   signal.  The caller may not pass GDB_SIGNAL_DEFAULT.  A specific
+   PTID means `step/resume only this process id'.  A wildcard PTID
+   (all threads, or all threads of process) means `step/resume
+   INFERIOR_PTID, and let other threads (for which the wildcard PTID
+   matches) resume with their 'thread->suspend.stop_signal' signal
+   (usually GDB_SIGNAL_0) if it is in "pass" state, or with no signal
+   if in "no pass" state.  */
 
 extern void target_resume (ptid_t ptid, int step, enum gdb_signal signal);
 
@@ -991,21 +1001,27 @@ int target_supports_disable_randomization (void);
 #define target_supports_evaluation_of_breakpoint_conditions() \
   (*current_target.to_supports_evaluation_of_breakpoint_conditions) ()
 
+/* Returns true if this target can handle breakpoint commands
+   on its end.  */
+
+#define target_can_run_breakpoint_commands() \
+  (*current_target.to_can_run_breakpoint_commands) ()
+
 /* Invalidate all target dcaches.  */
 extern void target_dcache_invalidate (void);
 
 extern int target_read_string (CORE_ADDR, char **, int, int *);
 
 extern int target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr,
-			       size_t len);
+			       ssize_t len);
 
-extern int target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, int len);
+extern int target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len);
 
 extern int target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr,
-				int len);
+				ssize_t len);
 
 extern int target_write_raw_memory (CORE_ADDR memaddr, const gdb_byte *myaddr,
-				    int len);
+				    ssize_t len);
 
 /* Fetches the target's memory map.  If one is found it is sorted
    and returned, after some consistency checking.  Otherwise, NULL
