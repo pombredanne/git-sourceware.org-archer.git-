@@ -1,3 +1,26 @@
+2012-07-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-linux-tdep.c (linux_sigtramp_code): Renamed to ...
+	(amd64_linux_sigtramp_code): This.
+	(amd64_x32_linux_sigtramp_code): New.
+	(LINUX_SIGTRAMP_LEN): Updated.
+	(amd64_linux_sigtramp_start): Check x32 sigtramp.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-thread-db.c (thread_db_new_objfile): Fix comment typos.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Remove check for gnu/libc-version.h.
+	* linux-thread-db.c <HAVE_GNU_LIBC_VERSION_H>: Remove include of
+	gnu/libc-version.h.
+	(enable_thread_event_reporting) <HAVE_GNU_LIBC_VERSION_H>: Remove
+	variables libc_version, libc_major and libc_minor.  Replace sscanf by
+	inferior_has_bug.  Extend the comment.
+
 2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* linux-thread-db.c (inferior_has_bug): New function.
@@ -5,6 +28,7 @@
 	inferior_has_bug, describe it in the comments.
 	(try_thread_db_load_1): Move call to thread_db_find_new_threads_silently
 	earlier.  Abort the initialization if it returned non-zero.
+	(thread_db_new_objfile): Exclude debug files.
 	(thread_db_find_new_threads_2): Preinitialize ERR.  Check errors also
 	if UNTIL_NO_NEW,
 

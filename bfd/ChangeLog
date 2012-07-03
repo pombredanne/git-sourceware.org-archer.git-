@@ -1,3 +1,30 @@
+2012-07-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/3351
+	* elflink.c (_bfd_elf_update_dynamic_flags): New.
+	(_bfd_elf_merge_symbol): Update both real and indirect symbol
+	dynamic flags.
+	(_bfd_elf_add_default_symbol): Make the real symbol dynamic if
+	the indirect symbol is defined in a shared library.
+	(elf_link_add_object_symbols): Likewise.  If the indirect
+	symbol has been forced local, don't make the real symbol
+	dynamic.
+	(elf_link_check_versioned_symbol): Check indirect symbol.
+	(elf_link_output_extsym): Use real symbol definition when
+	reporting indirect symbol error.  Check version info for
+	dynamic versioned symbol.
+
+2012-07-03  Alan Modra  <amodra@gmail.com>
+
+	PR ld/14207
+	* elf.c (assign_file_positions_for_load_sections): Remove assertions
+	that only PT_LOAD headers include file header and section headers.
+	(assign_file_positions_for_non_load_sections): Similarly don't
+	assert PT_GNU_RELRO header does not include file and section headers.
+	Compare first section vma rather than PT_LOAD p_vaddr against
+	relro_start when looking for PT_LOAD covering PT_GNU_RELRO.  Replace
+	abort with assertion.
+
 2012-07-02  Alan Modra  <amodra@gmail.com>
 
 	* elf32-m32c.c (m32c_elf_check_relocs): Use bfd_make_section
