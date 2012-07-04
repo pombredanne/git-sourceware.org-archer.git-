@@ -26,7 +26,7 @@ set binfile_lib $objdir/$subdir/$libname.so
 set normal_bp "_dl_debug_state"
 set probes_bp "dl_main"
 
-if { [gdb_compile_shlib $srcfile_lib $binfile_lib {}] != "" } {
+if { [gdb_compile_shlib $srcfile_lib $binfile_lib [list additional_flags=-fPIC]] != "" } {
     untested "Could not compile $binfile_lib."
     return -1
 }
@@ -46,7 +46,7 @@ gdb_test "run" ".*Stopped due to shared library event.*"
 
 # XFAIL if we are not using probes
 set test "ensure using probes"
-set using_probes 0
+set using_probes 1
 gdb_test_multiple "bt" $test {
     -re "#0 +\[^\r\n\]*\\m(__GI_)?$normal_bp\\M.*$gdb_prompt $" {
 	xfail $test
@@ -72,6 +72,6 @@ if { $using_probes } {
 	}
     }
 
-    # Call function to ensure relocation occurred
-    gdb_test "call foo()" "\\\$.* = .*"
+    # Call something to ensure that relocation occurred
+    gdb_test "call foo(23)" "foo 23.*\\\$.* = .*"
 }

@@ -13,8 +13,12 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+#include <stdio.h>
+
 int
-foo (void)
+foo (int n)
 {
+  printf ("foo %d\n", n);
+
   return 0;
 }
