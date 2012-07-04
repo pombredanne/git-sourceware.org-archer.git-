@@ -32,15 +32,20 @@ if { [gdb_compile_shlib $srcfile_lib $binfile_lib {}] != "" } {
 }
 
 if { [prepare_for_testing $testfile.exp $testfile $srcfile \
-	  [list additional_flags=-DSHLIB_NAME\=\"$binfile_lib\" libs=-ldl]] } {
+	  [list additional_flags=-DSHLIB_NAME\=\"$binfile_lib\" \
+	   ldflags=-Wl,--dynamic-linker=/home/gary/work/glibc/install/lib/ld-linux-x86-64.so.2 \
+	   libs=-ldl]] } {
     return -1
 }
 
+# Enable stop-on-solib-events
 gdb_test_no_output "set stop-on-solib-events 1"
 
+# Run to the first stop
 gdb_test "run" ".*Stopped due to shared library event.*"
 
-set test "using-probes"
+# XFAIL if we are not using probes
+set test "ensure using probes"
 gdb_test_multiple "bt" $test {
     -re "#0 +\[^\r\n\]*\\m(__GI_)?$normal_bp\\M.*$gdb_prompt $" {
 	xfail $test
@@ -50,4 +55,23 @@ gdb_test_multiple "bt" $test {
 	pass $test
 	set using_probes 1
     }
+}
+
+if { $using_probes } {
+    # Run til it loads our library
+    set test "run til our library loads"
+    set loaded_library 0
+    while { !$loaded_library } {
+	gdb_test_multiple "c" $test {
+	    -re "Inferior loaded $binfile_lib\\M.*$gdb_prompt $" {
+		pass $test
+		set loaded_library 1
+	    }
+	    -re "Stopped due to shared library event\\M.*$gdb_prompt $" {
+	    }
+	}
+    }
+
+    # Call function to ensure relocation occurred
+    gdb_test "call foo()" "\\\$.* = .*"
 }
