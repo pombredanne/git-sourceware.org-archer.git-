@@ -13,10 +13,6 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# Note that the testcase gdb.dwarf2/dw2-inline-break.exp largely
-# mirrors this testcase, and should be updated if this testcase is
-# changed.
-
 if { [skip_shlib_tests] || [is_remote target] } {
     return 0
 }
@@ -26,6 +22,9 @@ standard_testfile
 set libname $testfile-solib
 set srcfile_lib $srcdir/$subdir/$libname.c
 set binfile_lib $objdir/$subdir/$libname.so
+
+set normal_bp "_dl_debug_state"
+set probes_bp "dl_main"
 
 if { [gdb_compile_shlib $srcfile_lib $binfile_lib {}] != "" } {
     untested "Could not compile $binfile_lib."
@@ -39,5 +38,16 @@ if { [prepare_for_testing $testfile.exp $testfile $srcfile \
 
 gdb_test_no_output "set stop-on-solib-events 1"
 
-gdb_test "run" \
-    "blah"
+gdb_test "run" ".*Stopped due to shared library event.*"
+
+set test "using-probes"
+gdb_test_multiple "bt" $test {
+    -re "#0 +\[^\r\n\]*\\m(__GI_)?$normal_bp\\M.*$gdb_prompt $" {
+	xfail $test
+	set using_probes 0
+    }
+    -re "#0 +\[^\r\n\]*\\m(__GI_)?$probes_bp\\M.*$gdb_prompt $" {
+	pass $test
+	set using_probes 1
+    }
+}
