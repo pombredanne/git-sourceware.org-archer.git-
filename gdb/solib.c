@@ -1214,6 +1214,11 @@ no_shared_libraries (char *ignored, int from_tty)
 void
 handle_solib_event (bpstat bs)
 {
+  struct target_so_ops *ops = solib_ops (target_gdbarch);
+
+  if (ops->handle_solib_event != NULL)
+    ops->handle_solib_event (bs);
+
   clear_program_space_solib_cache (current_inferior ()->pspace);
 
   /* Check for any newly added shared libraries if we're supposed to

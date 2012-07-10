@@ -21,6 +21,7 @@
 #ifndef SOLIB_H
 #define SOLIB_H
 
+/* For bpstat.  */
 #include "breakpoint.h"
 
 /* Forward decl's for prototypes */
