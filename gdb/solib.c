@@ -1209,6 +1209,8 @@ no_shared_libraries (char *ignored, int from_tty)
   objfile_purge_solibs ();
 }
 
+/* See solib.h.  */
+
 void
 update_solib_breakpoints (void)
 {
