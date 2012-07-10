@@ -3333,7 +3333,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 	    context_switch (ecs->ptid);
 	  regcache = get_thread_regcache (ecs->ptid);
 
-	  handle_solib_event ();
+	  handle_solib_event (NULL);
 
 	  ecs->event_thread->control.stop_bpstat
 	    = bpstat_stop_status (get_regcache_aspace (regcache),

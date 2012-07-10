@@ -21,6 +21,8 @@
 #ifndef SOLIB_H
 #define SOLIB_H
 
+#include "breakpoint.h"
+
 /* Forward decl's for prototypes */
 struct so_list;
 struct target_ops;
@@ -90,6 +92,13 @@ extern CORE_ADDR gdb_bfd_lookup_symbol_from_symtab (bfd *abfd,
 						    int (*match_sym) (asymbol *,
 								      void *),
 						    void *data);
+
+/* Handle an solib event by calling solib_add.  Targets which handle
+   solib events using breakpoints must pass a valid bpstat.  Targets
+   which handle solib events using some other mechanism should pass
+   NULL.  */
+
+extern void handle_solib_event (bpstat bs);
 
 /* Enable or disable optional solib event breakpoints as appropriate.  */
 
