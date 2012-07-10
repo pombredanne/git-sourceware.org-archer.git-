@@ -94,6 +94,16 @@ static const char * const solib_break_names[] =
   NULL
 };
 
+/* What to do with the link_map cache when a breakpoint at this probe
+   is hit.  */
+
+enum probe_action
+  {
+    LM_CACHE_NO_ACTION,
+    LM_CACHE_RELOAD,
+    LM_CACHE_UPDATE_OR_RELOAD
+  };
+
 /* A list of named probes which, if present in the dynamic linker,
    allow more fine-grained breakpoints to be placed on shared library
    events.  */
@@ -106,16 +116,20 @@ struct probe_info
   /* Nonzero if this probe must be stopped at even when
      stop-on-solib-events is off.  */
   int mandatory;
+
+  /* What to do with the link_map cache when a breakpoint at this
+     probe is hit.  */
+  enum probe_action action;
 };
 
 static const struct probe_info probe_info[] =
 {
-  { "init_start", 0 },
-  { "init_complete", 1 },
-  { "map_start", 0 },
-  { "reloc_complete", 1 },
-  { "unmap_start", 0 },
-  { "unmap_complete", 1 },
+  { "init_start", 0, LM_CACHE_NO_ACTION },
+  { "init_complete", 1, LM_CACHE_RELOAD },
+  { "map_start", 0, LM_CACHE_NO_ACTION },
+  { "reloc_complete", 1, LM_CACHE_UPDATE_OR_RELOAD },
+  { "unmap_start", 0, LM_CACHE_NO_ACTION },
+  { "unmap_complete", 1, LM_CACHE_RELOAD },
 };
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
@@ -1452,6 +1466,47 @@ exec_entry_point (struct bfd *abfd, struct target_ops *targ)
 					     targ);
 }
 
+/* XXX.  */
+
+static void
+svr4_handle_solib_event (bpstat bs)
+{
+  struct svr4_info *info = get_svr4_info ();
+  struct bp_location *loc;
+  enum probe_action action = LM_CACHE_RELOAD;
+  struct probe *probe;
+  int probe_found, i;
+
+  /* It is possible that this function will be called incorrectly via
+     the handle_solib_event in handle_inferior_event if GDB truly goes
+     multi-target.  */
+  gdb_assert (bs != NULL);
+  loc = bs->bp_location_at;
+
+  if (!info->using_probes)
+    return;
+
+  for (probe_found = i = 0; !probe_found && i < NUM_PROBES; i++)
+    {
+      int ix;
+
+      for (ix = 0;
+	   VEC_iterate (probe_p, info->probes[i], ix, probe);
+	   ++ix)
+	{
+	  if (loc->pspace == current_program_space
+	      && loc->address == probe->address)
+	    {
+	      action = probe_info[i].action;
+	      probe_found = 1;
+	      break;
+	    }
+	}
+    }
+
+  printf_unfiltered ("probe_found = %d, action = %d\n", probe_found, action);
+}
+
 /* Helper function for svr4_update_solib_event_breakpoints.  */
 
 static int
@@ -2682,5 +2737,6 @@ _initialize_svr4_solib (void)
   svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
   svr4_so_ops.same = svr4_same;
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
+  svr4_so_ops.handle_solib_event = svr4_handle_solib_event;
   svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
 }
