@@ -1568,6 +1568,33 @@ solib_event_probe_action (struct probe_and_info *pi)
 /* XXX.  */
 
 static void
+solib_cache_clear (void)
+{
+  printf_unfiltered ("%s:%d: unimplemented.\n", __FILE__, __LINE__);
+  abort ();
+}
+
+/* XXX.  */
+
+static void
+solib_cache_reload (void)
+{
+  printf_unfiltered ("%s:%d: unimplemented.\n", __FILE__, __LINE__);
+  abort ();
+}
+
+/* XXX.  */
+
+static int
+solib_cache_update (struct probe_and_info *pi)
+{
+  printf_unfiltered ("%s:%d: unimplemented.\n", __FILE__, __LINE__);
+  abort ();
+}
+
+/* XXX.  */
+
+static void
 svr4_handle_solib_event (bpstat bs)
 {
   struct svr4_info *info = get_svr4_info ();
@@ -1587,6 +1614,23 @@ svr4_handle_solib_event (bpstat bs)
     action = LM_CACHE_INVALIDATE; /* Should never happen.  */
   else
     action = solib_event_probe_action (pi);
+
+  if (action == LM_CACHE_NO_ACTION)
+    return;
+
+  if (action == LM_CACHE_UPDATE_OR_RELOAD)
+    {
+      if (solib_cache_update (pi))
+	return;
+
+      action = LM_CACHE_RELOAD;
+    }
+
+  solib_cache_clear ();
+  if (action == LM_CACHE_INVALIDATE)
+    return;
+
+  solib_cache_reload ();
 }
 
 /* Helper function for svr4_update_solib_event_breakpoints.  */
