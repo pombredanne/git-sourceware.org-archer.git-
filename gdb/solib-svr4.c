@@ -1510,7 +1510,8 @@ solib_event_probe_at (struct bp_location *loc, struct probe_and_info *result)
   return NULL;
 }
 
-/* XXX.  */
+/* Decide what action to take when the specified solib event probe is
+   hit.  */
 
 static enum probe_action
 solib_event_probe_action (struct probe_and_info *pi)
