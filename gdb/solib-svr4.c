@@ -100,9 +100,18 @@ static const char * const solib_break_names[] =
 
 enum probe_action
   {
+    /* No action is required.  The cache is still valid.  */
     LM_CACHE_NO_ACTION,
+
+    /* Something went wrong.  The cache may be invalid and must be
+       cleared.  Do not attempt further caching at this stop.  */
     LM_CACHE_INVALIDATE,
+
+    /* The cache should be reloaded now.  */
     LM_CACHE_RELOAD,
+
+    /* Attempt to incrementally update the cache.  If the update
+       fails or is not possible, fall back to LM_CACHE_RELOAD.  */
     LM_CACHE_UPDATE_OR_RELOAD
   };
 
