@@ -52,6 +52,7 @@
 static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
+static void svr4_free_library_list (void *p_list);
 
 /* Link map info to include in an allocated so_list entry.  */
 
@@ -384,6 +385,18 @@ free_probes (struct svr4_info *info)
   memset (info->probes, 0, sizeof (info->probes));
 }
 
+/* Free any cached solibs.  */
+
+static void
+free_solib_cache (struct svr4_info *info)
+{
+  if (info->solib_cache == NULL)
+    return;
+
+  svr4_free_library_list (&info->solib_cache);
+  info->solib_cache = NULL;
+}
+
 static void
 svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
 {
@@ -394,6 +407,7 @@ svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
     return;
 
   free_probes (info);
+  free_solib_cache (info);
 
   xfree (info);
 }
@@ -1571,20 +1585,6 @@ solib_event_probe_action (struct probe_and_info *pi)
 /* XXX.  */
 
 static void
-solib_cache_clear (void)
-{
-  struct svr4_info *info = get_svr4_info ();
-
-  if (info->solib_cache == NULL)
-    return;
-
-  svr4_free_library_list (&info->solib_cache);
-  info->solib_cache = NULL;
-}
-
-/* XXX.  */
-
-static void
 solib_cache_update_full (void)
 {
   struct svr4_info *info = get_svr4_info ();
@@ -1636,7 +1636,7 @@ svr4_handle_solib_event (bpstat bs)
       action = LM_CACHE_RELOAD;
     }
 
-  solib_cache_clear ();
+  free_solib_cache (info);
   if (action == LM_CACHE_INVALIDATE)
     return;
 
