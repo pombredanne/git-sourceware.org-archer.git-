@@ -1530,7 +1530,6 @@ solib_event_probe_action (struct probe_and_info *pi)
 
   gdb_assert (action == LM_CACHE_RELOAD
 	      || action == LM_CACHE_UPDATE_OR_RELOAD);
-  update = (action == LM_CACHE_UPDATE_OR_RELOAD);
 
   os = find_pc_section (pi->probe->address);
   if (os == NULL)
@@ -1540,10 +1539,10 @@ solib_event_probe_action (struct probe_and_info *pi)
      We expect:
        arg1: Lmid_t lmid (mandatory)
        arg2: struct r_debug *r_debug (mandatory)
-       arg3: struct link_map *new (optional)  */
+       arg3: struct link_map *new (optional, for incremental updates)  */
   probe_argc = get_probe_argument_count (os->objfile, pi->probe);
   if (probe_argc == 2)
-    update = 0;
+    action = LM_CACHE_RELOAD;
   else if (probe_argc < 2)
     return LM_CACHE_INVALIDATE;
 
@@ -1562,9 +1561,7 @@ solib_event_probe_action (struct probe_and_info *pi)
   if (debug_base != info->debug_base)
     return LM_CACHE_NO_ACTION;
 
-  /* XXX.  */
-  printf_unfiltered (" ...%s (still here)\n", pi->info->name); /* XXX */
-  return LM_CACHE_INVALIDATE;
+  return action;
 }
 
 /* XXX.  */
