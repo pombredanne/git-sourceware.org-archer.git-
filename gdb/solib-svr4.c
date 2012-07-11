@@ -1069,6 +1069,38 @@ svr4_free_library_list (void *p_list)
     }
 }
 
+/* Copy library list.  */
+
+static struct so_list *
+svr4_copy_library_list (struct so_list *src)
+{
+  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+  struct so_list *dst = NULL;
+  struct so_list **link = &dst;
+
+  printf_unfiltered ("Copying list...\n"); /* XXX */
+
+  while (src != NULL)
+    {
+      struct so_list *new;
+
+      new = XZALLOC (struct so_list);
+
+      memcpy (new, src, sizeof (struct so_list));
+
+      new->lm_info = xmalloc (lmo->link_map_size);
+      memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
+
+      new->next = NULL;
+      *link = new;
+      link = &new->next;
+
+      src = src->next;
+    }
+
+  return dst;
+}
+
 #ifdef HAVE_LIBEXPAT
 
 #include "xml-support.h"
@@ -1365,6 +1397,10 @@ svr4_current_sos (void)
     }
 
   info = get_svr4_info ();
+
+  /* If we have a cached result then return a copy.  */
+  if (info->solib_cache != NULL)
+    return svr4_copy_library_list (info->solib_cache);
 
   /* Always locate the debug struct, in case it has moved.  */
   info->debug_base = 0;
