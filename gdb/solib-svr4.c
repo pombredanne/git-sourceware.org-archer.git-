@@ -2654,6 +2654,9 @@ svr4_solib_create_inferior_hook (int from_tty)
 
   info = get_svr4_info ();
 
+  /* Free any solibs cached by the probes-based linker interface.  */
+  free_solib_cache (info);
+
   /* Relocate the main executable if necessary.  */
   svr4_relocate_main_executable ();
 
