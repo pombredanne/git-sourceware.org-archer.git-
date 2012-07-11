@@ -1280,16 +1280,17 @@ svr4_default_sos (void)
   return new;
 }
 
-/* Read the whole inferior libraries chain starting at address LM.  Add the
-   entries to the tail referenced by LINK_PTR_PTR.  Ignore the first entry if
-   IGNORE_FIRST and set global MAIN_LM_ADDR according to it.  Returns nonzero
-   upon success.  */
+/* Read the whole inferior libraries chain starting at address LM.
+   Expect the first entry in the chain's previous entry to be PREV_LM.
+   Add the entries to the tail referenced by LINK_PTR_PTR.  Ignore the
+   first entry if IGNORE_FIRST and set global MAIN_LM_ADDR according
+   to it.  Returns nonzero upon success.  */
 
 static int
-svr4_read_so_list (CORE_ADDR lm, struct so_list ***link_ptr_ptr,
-		   int ignore_first)
+svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
+		   struct so_list ***link_ptr_ptr, int ignore_first)
 {
-  CORE_ADDR prev_lm = 0, next_lm;
+  CORE_ADDR next_lm;
 
   for (; lm != 0; prev_lm = lm, lm = next_lm)
     {
@@ -1427,7 +1428,7 @@ svr4_current_sos (void)
      `struct so_list' nodes.  */
   lm = solib_svr4_r_map (info);
   if (lm)
-    svr4_read_so_list (lm, &link_ptr, ignore_first);
+    svr4_read_so_list (lm, 0, &link_ptr, ignore_first);
 
   /* On Solaris, the dynamic linker is not in the normal list of
      shared objects, so make sure we pick it up too.  Having
@@ -1435,7 +1436,7 @@ svr4_current_sos (void)
      for skipping dynamic linker resolver code.  */
   lm = solib_svr4_r_ldsomap (info);
   if (lm)
-    svr4_read_so_list (lm, &link_ptr, 0);
+    svr4_read_so_list (lm, 0, &link_ptr, 0);
 
   discard_cleanups (back_to);
 
@@ -1638,17 +1639,17 @@ static int
 solib_cache_update_incremental (struct probe_and_info *pi)
 {
   struct svr4_info *info = get_svr4_info ();
-  struct so_list *item, **link;
+  struct so_list *tail, **link;
   struct obj_section *os;
   CORE_ADDR lm;
 
   if (info->solib_cache == NULL)
     return 0;
 
-  item = info->solib_cache;
-  while (item->next)
-    item = item->next;
-  link = &item->next;
+  tail = info->solib_cache;
+  while (tail->next)
+    tail = tail->next;
+  link = &tail->next;
 
   os = find_pc_section (pi->probe->address);
   if (os == NULL)
@@ -1657,7 +1658,7 @@ solib_cache_update_incremental (struct probe_and_info *pi)
   lm = value_as_address (evaluate_probe_argument (os->objfile,
 						  pi->probe, 2));
 
-  return svr4_read_so_list (lm, &link, 0);
+  return svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0);
 }
 
 /* XXX.  */
