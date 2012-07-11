@@ -1469,43 +1469,69 @@ exec_entry_point (struct bfd *abfd, struct target_ops *targ)
 
 /* XXX.  */
 
+struct probe_with_info
+{
+  /* XXX.  */
+  const struct probe_info *info;
+
+  /* XXX.  */
+  struct probe *probe;
+};
+
+/* XXX.  */
+
+static struct probe_with_info *
+probe_at (struct bp_location *loc, struct probe_with_info *result)
+{
+  struct svr4_info *info = get_svr4_info ();
+  int i;
+
+  for (i = 0; i < NUM_PROBES; i++)
+    {
+      struct probe *probe;
+      int ix;
+
+      for (ix = 0; VEC_iterate (probe_p, info->probes[i], ix, probe); ++ix)
+	{
+	  if (loc->pspace == current_program_space
+	      && loc->address == probe->address)
+	    {
+	      result->info = &probe_info[i];
+	      result->probe = probe;
+
+	      return result;
+	    }
+	}
+    }
+
+  return NULL;
+}
+
+/* XXX.  */
+
 static void
 svr4_handle_solib_event (bpstat bs)
 {
   struct svr4_info *info = get_svr4_info ();
-  struct bp_location *loc;
-  enum probe_action action = LM_CACHE_RELOAD;
-  struct probe *probe;
-  int probe_found, i;
+  struct probe_with_info buf, *pi;
+  enum probe_action action;
 
   /* It is possible that this function will be called incorrectly via
      the handle_solib_event in handle_inferior_event if GDB truly goes
      multi-target.  */
   gdb_assert (bs != NULL);
-  loc = bs->bp_location_at;
 
   if (!info->using_probes)
     return;
 
-  for (probe_found = i = 0; !probe_found && i < NUM_PROBES; i++)
+  pi = probe_at (bs->bp_location_at, &buf);
+  if (pi == NULL)
+    action = LM_CACHE_RELOAD; /* Should never happen.  */
+  else
     {
-      int ix;
-
-      for (ix = 0;
-	   VEC_iterate (probe_p, info->probes[i], ix, probe);
-	   ++ix)
-	{
-	  if (loc->pspace == current_program_space
-	      && loc->address == probe->address)
-	    {
-	      action = probe_info[i].action;
-	      probe_found = 1;
-	      break;
-	    }
-	}
+      printf_unfiltered ("HIT %s\n", pi->info->name);
+      action = pi->info->action;
     }
-
-  printf_unfiltered ("probe_found = %d, action = %d\n", probe_found, action);
 }
 
 /* Helper function for svr4_update_solib_event_breakpoints.  */
@@ -1521,28 +1547,16 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 
   for (loc = b->loc; loc; loc = loc->next)
     {
-      int i;
+      struct probe_with_info buf, *pi;
 
-      for (i = 0; i < NUM_PROBES; i++)
+      pi = probe_at (loc, &buf);
+      if (pi != NULL)
 	{
-	  if (!probe_info[i].mandatory)
-	    {
-	      struct probe *probe;
-	      int ix;
+	  if (!pi->info->mandatory)
+	    b->enable_state = (stop_on_solib_events
+			       ? bp_enabled : bp_disabled);
 
-	      for (ix = 0;
-		   VEC_iterate (probe_p, info->probes[i], ix, probe);
-		   ++ix)
-		{
-		  if (loc->pspace == current_program_space
-		      && loc->address == probe->address)
-		    {
-		      b->enable_state = (stop_on_solib_events
-					 ? bp_enabled : bp_disabled);
-		      return 0;
-		    }
-		}
-	    }
+	  return 0;
 	}
     }
 
