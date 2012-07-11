@@ -658,6 +658,17 @@ info_probes_command (char *arg, int from_tty)
 
 /* See comments in probe.h.  */
 
+unsigned
+get_probe_argument_count (struct objfile *objfile, struct probe *probe)
+{
+  gdb_assert (objfile->sf && objfile->sf->sym_probe_fns);
+
+  return objfile->sf->sym_probe_fns->sym_get_probe_argument_count (objfile,
+								   probe);
+}
+
+/* See comments in probe.h.  */
+
 struct value *
 probe_safe_evaluate_at_pc (struct frame_info *frame, unsigned n)
 {
@@ -670,9 +681,7 @@ probe_safe_evaluate_at_pc (struct frame_info *frame, unsigned n)
     return NULL;
   gdb_assert (objfile->sf && objfile->sf->sym_probe_fns);
 
-  n_probes
-    = objfile->sf->sym_probe_fns->sym_get_probe_argument_count (objfile,
-								probe);
+  n_probes = get_probe_argument_count (objfile, probe);
   if (n >= n_probes)
     return NULL;
 
