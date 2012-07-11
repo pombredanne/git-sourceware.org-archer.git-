@@ -692,7 +692,6 @@ probe_safe_evaluate_at_pc (struct frame_info *frame, unsigned n)
   probe = find_probe_by_pc (get_frame_pc (frame), &objfile);
   if (!probe)
     return NULL;
-  gdb_assert (objfile->sf && objfile->sf->sym_probe_fns);
 
   n_probes = get_probe_argument_count (objfile, probe);
   if (n >= n_probes)
