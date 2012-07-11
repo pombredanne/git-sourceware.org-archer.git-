@@ -1519,6 +1519,8 @@ solib_event_probe_action (struct probe_and_info *pi)
   int update;
   struct obj_section *os;
   unsigned probe_argc;
+  struct svr4_info *info;
+  CORE_ADDR debug_base;
 
   printf_unfiltered ("HIT %s\n", pi->info->name); /* XXX */
 
@@ -1544,6 +1546,21 @@ solib_event_probe_action (struct probe_and_info *pi)
     update = 0;
   else if (probe_argc < 2)
     return LM_CACHE_INVALIDATE;
+
+  /* We only currently support the global namespace (PR gdb/11839).
+     If the probe's r_debug doesn't match the global r_debug then
+     this event refers to some other namespace and must be ignored.  */
+  info = get_svr4_info ();
+
+  /* Always locate the debug struct, in case it has moved.  */
+  info->debug_base = 0;
+  locate_base (info);
+
+  debug_base = value_as_address (evaluate_probe_argument (os->objfile,
+							  pi->probe, 1));
+
+  if (debug_base != info->debug_base)
+    return LM_CACHE_NO_ACTION;
 
   /* XXX.  */
   printf_unfiltered (" ...%s (still here)\n", pi->info->name); /* XXX */
