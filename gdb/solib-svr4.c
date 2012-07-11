@@ -129,7 +129,6 @@ static const struct probe_info probe_info[] =
   { "init_start", 0, LM_CACHE_NO_ACTION },
   { "init_complete", 1, LM_CACHE_RELOAD },
   { "map_start", 0, LM_CACHE_NO_ACTION },
- /* "map_failed" XXX */
   { "reloc_complete", 1, LM_CACHE_UPDATE_OR_RELOAD },
   { "unmap_start", 0, LM_CACHE_NO_ACTION },
   { "unmap_complete", 1, LM_CACHE_RELOAD },
@@ -359,13 +358,14 @@ struct svr4_info
   CORE_ADDR interp_plt_sect_low;
   CORE_ADDR interp_plt_sect_high;
 
-  /* Named probes in the dynamic linker.  */
-  VEC (probe_p) *probes[NUM_PROBES];
-
   /* Nonzero if we are using the probes-based interface.  */
   int using_probes;
 
-  /* XXX.  */
+  /* Named probes in the dynamic linker.  */
+  VEC (probe_p) *probes[NUM_PROBES];
+
+  /* List of objects loaded from the inferior, used by the
+     probes-based interface to support incremental updates.  */
   struct so_list *solib_cache;
 };
 
@@ -1078,8 +1078,6 @@ svr4_copy_library_list (struct so_list *src)
   struct so_list *dst = NULL;
   struct so_list **link = &dst;
 
-  printf_unfiltered ("Copying list...\n"); /* XXX */
-
   while (src != NULL)
     {
       struct so_list *new;
@@ -1580,8 +1578,6 @@ solib_event_probe_action (struct probe_and_info *pi)
   struct svr4_info *info;
   CORE_ADDR debug_base;
 
-  printf_unfiltered ("HIT %s\n", pi->info->name); /* XXX */
-
   action = pi->info->action;
   if (action == LM_CACHE_NO_ACTION || action == LM_CACHE_INVALIDATE)
     return action;
@@ -1622,7 +1618,8 @@ solib_event_probe_action (struct probe_and_info *pi)
   return action;
 }
 
-/* XXX.  */
+/* Populate the solib cache with by reading the entire list of shared
+   objects from the inferior.  */
 
 static void
 solib_cache_update_full (void)
@@ -1633,7 +1630,9 @@ solib_cache_update_full (void)
   info->solib_cache = svr4_current_sos ();
 }
 
-/* XXX.  */
+/* Update the solib cache starting from the link-map supplied by the
+   linker in the probe's third argument.  Returns nonzero if the list
+   was successfully updated, or zero to indicate failure.  */
 
 static int
 solib_cache_update_incremental (struct probe_and_info *pi)
@@ -1661,7 +1660,8 @@ solib_cache_update_incremental (struct probe_and_info *pi)
   return svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0);
 }
 
-/* XXX.  */
+/* Update the solib cache as appropriate when using the probes-based
+   linker interface.  Do nothing if using the standard interface.  */
 
 static void
 svr4_handle_solib_event (bpstat bs)
@@ -1670,9 +1670,9 @@ svr4_handle_solib_event (bpstat bs)
   struct probe_and_info buf, *pi;
   enum probe_action action;
 
-  /* It is possible that this function will be called incorrectly via
-     the handle_solib_event in handle_inferior_event if GDB truly goes
-     multi-target.  */
+  /* It is possible that this function will be called incorrectly
+     by the handle_solib_event in handle_inferior_event if GDB goes
+     fully multi-target.  */
   gdb_assert (bs != NULL);
 
   if (!info->using_probes)
