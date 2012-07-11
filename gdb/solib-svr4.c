@@ -363,6 +363,9 @@ struct svr4_info
 
   /* Nonzero if we are using the probes-based interface.  */
   int using_probes;
+
+  /* XXX.  */
+  struct so_list *solib_cache;
 };
 
 /* Per-program-space data key.  */
@@ -1570,23 +1573,30 @@ solib_event_probe_action (struct probe_and_info *pi)
 static void
 solib_cache_clear (void)
 {
-  printf_unfiltered ("%s:%d: unimplemented.\n", __FILE__, __LINE__);
-  abort ();
+  struct svr4_info *info = get_svr4_info ();
+
+  if (info->solib_cache == NULL)
+    return;
+
+  svr4_free_library_list (&info->solib_cache);
+  info->solib_cache = NULL;
 }
 
 /* XXX.  */
 
 static void
-solib_cache_reload (void)
+solib_cache_update_full (void)
 {
-  printf_unfiltered ("%s:%d: unimplemented.\n", __FILE__, __LINE__);
-  abort ();
+  struct svr4_info *info = get_svr4_info ();
+
+  gdb_assert (info->solib_cache == NULL);
+  info->solib_cache = svr4_current_sos ();
 }
 
 /* XXX.  */
 
 static int
-solib_cache_update (struct probe_and_info *pi)
+solib_cache_update_incremental (struct probe_and_info *pi)
 {
   printf_unfiltered ("%s:%d: unimplemented.\n", __FILE__, __LINE__);
   abort ();
@@ -1620,7 +1630,7 @@ svr4_handle_solib_event (bpstat bs)
 
   if (action == LM_CACHE_UPDATE_OR_RELOAD)
     {
-      if (solib_cache_update (pi))
+      if (solib_cache_update_incremental (pi))
 	return;
 
       action = LM_CACHE_RELOAD;
@@ -1630,7 +1640,7 @@ svr4_handle_solib_event (bpstat bs)
   if (action == LM_CACHE_INVALIDATE)
     return;
 
-  solib_cache_reload ();
+  solib_cache_update_full ();
 }
 
 /* Helper function for svr4_update_solib_event_breakpoints.  */
