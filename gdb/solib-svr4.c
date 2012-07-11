@@ -100,6 +100,7 @@ static const char * const solib_break_names[] =
 enum probe_action
   {
     LM_CACHE_NO_ACTION,
+    LM_CACHE_INVALIDATE,
     LM_CACHE_RELOAD,
     LM_CACHE_UPDATE_OR_RELOAD
   };
@@ -1511,6 +1512,46 @@ solib_event_probe_at (struct bp_location *loc, struct probe_and_info *result)
 
 /* XXX.  */
 
+static enum probe_action
+solib_event_probe_action (struct probe_and_info *pi)
+{
+  enum probe_action action;
+  int update;
+  struct obj_section *os;
+  unsigned probe_argc;
+
+  printf_unfiltered ("HIT %s\n", pi->info->name); /* XXX */
+
+  action = pi->info->action;
+  if (action == LM_CACHE_NO_ACTION || action == LM_CACHE_INVALIDATE)
+    return action;
+
+  gdb_assert (action == LM_CACHE_RELOAD
+	      || action == LM_CACHE_UPDATE_OR_RELOAD);
+  update = (action == LM_CACHE_UPDATE_OR_RELOAD);
+
+  os = find_pc_section (pi->probe->address);
+  if (os == NULL)
+    return LM_CACHE_INVALIDATE;
+
+  /* Check that an appropriate number of arguments has been supplied.
+     We expect:
+       arg1: Lmid_t lmid (mandatory)
+       arg2: struct r_debug *r_debug (mandatory)
+       arg3: struct link_map *new (optional)  */
+  probe_argc = get_probe_argument_count (os->objfile, pi->probe);
+  if (probe_argc == 2)
+    update = 0;
+  else if (probe_argc < 2)
+    return LM_CACHE_INVALIDATE;
+
+  /* XXX.  */
+  printf_unfiltered (" ...%s (still here)\n", pi->info->name); /* XXX */
+  return LM_CACHE_INVALIDATE;
+}
+
+/* XXX.  */
+
 static void
 svr4_handle_solib_event (bpstat bs)
 {
@@ -1528,12 +1569,9 @@ svr4_handle_solib_event (bpstat bs)
 
   pi = solib_event_probe_at (bs->bp_location_at, &buf);
   if (pi == NULL)
-    action = LM_CACHE_RELOAD; /* Should never happen.  */
+    action = LM_CACHE_INVALIDATE; /* Should never happen.  */
   else
-    {
-      printf_unfiltered ("HIT %s\n", pi->info->name);
-      action = pi->info->action;
-    }
+    action = solib_event_probe_action (pi);
 }
 
 /* Helper function for svr4_update_solib_event_breakpoints.  */
