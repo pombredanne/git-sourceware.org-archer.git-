@@ -8850,7 +8850,7 @@ fi
 # FIXME: kettenis/20030102: In most cases we include these (ctype.h, time.h)
 # unconditionally, so what's the point in checking these?
 for ac_header in nlist.h machine/reg.h poll.h sys/poll.h proc_service.h \
-                  thread_db.h gnu/libc-version.h signal.h stddef.h \
+                  thread_db.h signal.h stddef.h \
 		  stdlib.h string.h memory.h strings.h sys/fault.h \
 		  sys/file.h sys/filio.h sys/ioctl.h sys/param.h \
 		  sys/resource.h sys/procfs.h sys/ptrace.h ptrace.h \
@@ -10606,6 +10606,31 @@ if test "x$ac_cv_member_struct_reg_r_gs" = x""yes; then :
 
 cat >>confdefs.h <<_ACEOF
 #define HAVE_STRUCT_REG_R_GS 1
+_ACEOF
+
+
+fi
+
+
+# See if <sys/user.h> supports the %fs_base and %gs_bas amd64 segment registers.
+# Older amd64 Linux's don't have the fs_base and gs_base members of
+# `struct user_regs_struct'.
+ac_fn_c_check_member "$LINENO" "struct user_regs_struct" "fs_base" "ac_cv_member_struct_user_regs_struct_fs_base" "#include <sys/user.h>
+"
+if test "x$ac_cv_member_struct_user_regs_struct_fs_base" = x""yes; then :
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_STRUCT_USER_REGS_STRUCT_FS_BASE 1
+_ACEOF
+
+
+fi
+ac_fn_c_check_member "$LINENO" "struct user_regs_struct" "gs_base" "ac_cv_member_struct_user_regs_struct_gs_base" "#include <sys/user.h>
+"
+if test "x$ac_cv_member_struct_user_regs_struct_gs_base" = x""yes; then :
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_STRUCT_USER_REGS_STRUCT_GS_BASE 1
 _ACEOF
 
 

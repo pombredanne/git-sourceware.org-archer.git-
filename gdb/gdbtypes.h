@@ -23,13 +23,27 @@
 #define GDBTYPES_H 1
 
 #include "hashtab.h"
-#include "dwarf2expr.h"
 
 /* Forward declarations for prototypes.  */
 struct field;
 struct block;
 struct value_print_options;
 struct language_defn;
+
+/* These declarations are DWARF-specific as some of the gdbtypes.h data types
+   are already DWARF-specific.  */
+
+/* Offset relative to the start of its containing CU (compilation unit).  */
+typedef struct
+{
+  unsigned int cu_off;
+} cu_offset;
+
+/* Offset relative to the start of its .debug_info or .debug_types section.  */
+typedef struct
+{
+  unsigned int sect_off;
+} sect_offset;
 
 /* Some macros for char-based bitfields.  */
 
@@ -1505,6 +1519,10 @@ extern struct type *lookup_pointer_type (struct type *);
 extern struct type *make_function_type (struct type *, struct type **);
 
 extern struct type *lookup_function_type (struct type *);
+
+extern struct type *lookup_function_type_with_arguments (struct type *,
+							 int,
+							 struct type **);
 
 extern struct type *create_range_type (struct type *, struct type *, LONGEST,
 				       LONGEST);

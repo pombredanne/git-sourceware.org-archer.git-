@@ -1113,13 +1113,6 @@ extern int find_line_pc_range (struct symtab_and_line, CORE_ADDR *,
 
 extern void resolve_sal_pc (struct symtab_and_line *);
 
-/* Given a string, return the line specified by it.  For commands like "list"
-   and "breakpoint".  */
-
-extern struct symtabs_and_lines decode_line_spec (char *, int);
-
-extern struct symtabs_and_lines decode_line_spec_1 (char *, int);
-
 /* Symmisc.c */
 
 void maintenance_print_symbols (char *, int);
@@ -1249,6 +1242,8 @@ void fixup_section (struct general_symbol_info *ginfo,
 		    CORE_ADDR addr, struct objfile *objfile);
 
 struct objfile *lookup_objfile_from_block (const struct block *block);
+
+extern int symtab_create_debug;
 
 extern int basenames_may_differ;
 

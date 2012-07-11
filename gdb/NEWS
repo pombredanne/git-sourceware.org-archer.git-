@@ -3,6 +3,9 @@
 
 *** Changes since GDB 7.4
 
+* GDB now supports x32 ABI.  Visit <http://sites.google.com/site/x32abi/>
+  for more x32 ABI info.
+
 * GDB now supports access to MIPS DSP registers on Linux targets.
 
 * GDB now supports debugging microMIPS binaries.
@@ -59,6 +62,9 @@
 
   ** New function gdb.find_pc_line which returns the gdb.Symtab_and_line
      object associated with a PC value.
+
+  ** gdb.Symtab_and_line has new attribute 'last' which holds the end
+     of the address range occupied by code for the current source line.
 
 * Go language support.
   GDB now supports debugging programs written in the Go programming
@@ -126,6 +132,8 @@
 * MI changes
 
   ** New command -info-os is the MI equivalent of "info os".
+
+  ** Output logs ("set logging" and related) now include MI output.
 
 * New commands
 
@@ -239,11 +247,12 @@ set debug auto-load on|off
 show debug auto-load
   Control display of debugging info for auto-loading the files above.
 
-set dprintf-style gdb|call
+set dprintf-style gdb|call|agent
 show dprintf-style
-  Control the way in which a dynamic printf is performed; "gdb" requests
-  a GDB printf command, while "call" causes dprintf to call a function
-  in the inferior.
+  Control the way in which a dynamic printf is performed; "gdb"
+  requests a GDB printf command, while "call" causes dprintf to call a
+  function in the inferior.  "agent" requests that the target agent
+  (such as GDBserver) do the printing.
 
 set dprintf-function <expr>
 show dprintf-function
@@ -251,6 +260,11 @@ set dprintf-channel <expr>
 show dprintf-channel
   Set the function and optional first argument to the call when using
   the "call" style of dynamic printf.
+
+set disconnected-dprintf on|off
+show disconnected-dprintf
+  Control whether agent-style dynamic printfs continue to be in effect
+  after GDB disconnects.
 
 * New configure options
 
@@ -467,6 +481,16 @@ tstop [NOTES]
   limited to locations with instructions of 5 bytes or longer.
 
 * New options
+
+set debug dwarf2-read
+show debug dwarf2-read
+  Turns on or off display of debugging messages related to reading
+  DWARF debug info.  The default is off.
+
+set debug symtab-create
+show debug symtab-create
+  Turns on or off display of debugging messages related to symbol table
+  creation.  The default is off.
 
 set extended-prompt
 show extended-prompt

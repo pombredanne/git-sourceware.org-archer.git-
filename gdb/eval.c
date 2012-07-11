@@ -125,7 +125,7 @@ parse_and_eval (char *exp)
 struct value *
 parse_to_comma_and_eval (char **expp)
 {
-  struct expression *expr = parse_exp_1 (expp, (struct block *) 0, 1);
+  struct expression *expr = parse_exp_1 (expp, 0, (struct block *) 0, 1);
   struct value *val;
   struct cleanup *old_chain =
     make_cleanup (free_current_contents, &expr);
@@ -769,6 +769,23 @@ make_params (int num_types, struct type **param_types)
   TYPE_CODE (type) = TYPE_CODE_METHOD;
   TYPE_VPTR_FIELDNO (type) = -1;
   TYPE_CHAIN (type) = type;
+  if (num_types > 0)
+    {
+      if (param_types[num_types - 1] == NULL)
+	{
+	  --num_types;
+	  TYPE_VARARGS (type) = 1;
+	}
+      else if (TYPE_CODE (check_typedef (param_types[num_types - 1]))
+	       == TYPE_CODE_VOID)
+	{
+	  --num_types;
+	  /* Caller should have ensured this.  */
+	  gdb_assert (num_types == 0);
+	  TYPE_PROTOTYPED (type) = 1;
+	}
+    }
+
   TYPE_NFIELDS (type) = num_types;
   TYPE_FIELDS (type) = (struct field *)
     TYPE_ZALLOC (type, sizeof (struct field) * num_types);

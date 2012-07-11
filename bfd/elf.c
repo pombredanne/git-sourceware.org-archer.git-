@@ -1025,7 +1025,7 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
       else
 	{
 	  /* Normal section.  Check if we should compress.  */
-	  if ((abfd->flags & BFD_COMPRESS))
+	  if ((abfd->flags & BFD_COMPRESS) && newsect->size != 0)
 	    action = compress;
 	}
 
@@ -1038,7 +1038,7 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
 	  if (!bfd_init_section_compress_status (abfd, newsect))
 	    {
 	      (*_bfd_error_handler)
-		(_("%B: unable to initialize commpress status for section %s"),
+		(_("%B: unable to initialize compress status for section %s"),
 		 abfd, name);
 	      return FALSE;
 	    }
@@ -1058,7 +1058,7 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
 	  if (!bfd_init_section_decompress_status (abfd, newsect))
 	    {
 	      (*_bfd_error_handler)
-		(_("%B: unable to initialize decommpress status for section %s"),
+		(_("%B: unable to initialize decompress status for section %s"),
 		 abfd, name);
 	      return FALSE;
 	    }
@@ -3014,6 +3014,13 @@ assign_section_numbers (bfd *abfd, struct bfd_link_info *link_info)
       _bfd_elf_strtab_addref (elf_shstrtab (abfd), t->strtab_hdr.sh_name);
     }
 
+  if (section_number >= SHN_LORESERVE)
+    {
+      _bfd_error_handler (_("%B: too many sections: %u"),
+			  abfd, section_number);
+      return FALSE;
+    }
+
   _bfd_elf_strtab_finalize (elf_shstrtab (abfd));
   t->shstrtab_hdr.sh_size = _bfd_elf_strtab_size (elf_shstrtab (abfd));
 
@@ -4575,8 +4582,6 @@ assign_file_positions_for_load_sections (bfd *abfd,
 	  p->p_memsz = bed->s->sizeof_ehdr;
 	  if (m->count > 0)
 	    {
-	      BFD_ASSERT (p->p_type == PT_LOAD);
-
 	      if (p->p_vaddr < (bfd_vma) off)
 		{
 		  (*_bfd_error_handler)
@@ -4603,7 +4608,6 @@ assign_file_positions_for_load_sections (bfd *abfd,
 
 	      if (m->count > 0)
 		{
-		  BFD_ASSERT (p->p_type == PT_LOAD);
 		  p->p_vaddr -= off - p->p_offset;
 		  if (!m->p_paddr_valid)
 		    p->p_paddr -= off - p->p_offset;
@@ -4965,26 +4969,27 @@ assign_file_positions_for_non_load_sections (bfd *abfd,
       if (p->p_type == PT_GNU_RELRO)
 	{
 	  const Elf_Internal_Phdr *lp;
-
-	  BFD_ASSERT (!m->includes_filehdr && !m->includes_phdrs);
+	  struct elf_segment_map *lm;
 
 	  if (link_info != NULL)
 	    {
 	      /* During linking the range of the RELRO segment is passed
 		 in link_info.  */
-	      for (lp = phdrs; lp < phdrs + count; ++lp)
+	      for (lm = elf_tdata (abfd)->segment_map, lp = phdrs;
+		   lm != NULL;
+		   lm = lm->next, lp++)
 		{
 		  if (lp->p_type == PT_LOAD
-		      && lp->p_vaddr >= link_info->relro_start
 		      && lp->p_vaddr < link_info->relro_end
-		      && lp->p_vaddr + lp->p_filesz >= link_info->relro_end)
+		      && lp->p_vaddr + lp->p_filesz >= link_info->relro_end
+		      && lm->count != 0
+		      && lm->sections[0]->vma >= link_info->relro_start)
 		    break;
 		}
 
 	      /* PR ld/14207.  If the RELRO segment doesn't fit in the
 		 LOAD segment, it should be removed.  */
-	      if (lp == (phdrs + count))
-		abort ();
+	      BFD_ASSERT (lm != NULL);
 	    }
 	  else
 	    {

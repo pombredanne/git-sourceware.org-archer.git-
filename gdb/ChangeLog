@@ -1,3 +1,675 @@
+2012-07-10  Doug Evans  <dje@google.com>
+
+	PR gdb/13498
+	* dwarf2read.c (dwarf2_per_objfile): New members n_type_unit_groups,
+	all_type_unit_groups, type_unit_groups, tu_stats.
+	(dwarf2_per_cu_data): Move "imported_symtabs" into new union "s".
+	All uses updated.  Add type_unit_group to union "s".
+	(type_unit_group): New struct.
+	(IS_TYPE_UNIT_GROUP): New macro.
+	(abbrev_table): Delete unused member "section".
+	(dw2_do_instantiate_symtab): Early exit if type_unit_group.
+	(dw2_get_cu): Assert not used with type_unit_group.
+	(dw2_get_primary_cu): New function.
+	(dw2_build_type_unit_groups_reader): New function.
+	(dw2_build_type_unit_groups): New function.
+	(dw2_get_file_names): Assert not called on type units.
+	(dw2_map_symtabs_matching_filename): Call dw2_build_type_unit_groups.
+	Redo loop to iterate over type unit groups instead of type units.
+	(dw2_expand_symtabs_matching, dw2_map_symbol_filenames): Ditto.
+	(read_abbrev_offset): New function.
+	(init_cutu_and_read_dies): New arg "abbrev_table".  All callers
+	updated.
+	(create_partial_symtab): New function.
+	(process_psymtab_comp_unit_reader): Assert not used with type units.
+	Call create_partial_symtab.
+	(process_psymtab_type_unit): Delete.
+	(hash_type_unit_group, eq_type_unit_group): New functions.
+	(allocate_type_unit_groups_table): New function.
+	(NO_STMT_LIST_TYPE_UNIT_PSYMTAB): New macro.
+	(NO_STMT_LIST_TYPE_UNIT_PSYMTAB_SIZE): New macro.
+	(create_type_unit_group, get_type_unit_group): New functions.
+	(tu_abbrev_offset): New struct.
+	(sort_tu_by_abbrev_offset): New function.
+	(add_type_unit_group_to_table): New function.
+	(build_type_unit_groups): New function.
+	(build_type_psymtabs_reader): New function.
+	(build_type_psymtab_dependencies): New function.
+	(build_type_psymtabs): Rewrite.
+	(scan_partial_symbols): Flag an error if a DW_TAG_imported_unit
+	is seen in a type unit.
+	(process_queue): Move symtab expansion debugging printfs here.
+	Call process_full_type_unit for type units.
+	(compute_symtab_includes): Assert not called for type units.
+	(process_cu_includes): Don't call compute_symtab_includes for
+	type units.
+	(process_full_type_unit): New function.
+	(process_imported_unit_die): Flag an error if called for type units.
+	(handle_DW_AT_stmt_list): Delete arg "want_line_info".  All callers
+	updated.  Assert not called for type units.
+	(read_file_scope): Call dwarf2_start_symtab.
+	(setup_type_unit_groups): New function.
+	(read_type_unit_scope): Rewrite.
+	(abbrev_table_read_table): Initialize abbrev_table->offset.
+	(abbrev_table_free_cleanup): New function.
+	(dwarf2_start_symtab): New function.
+	(load_full_type_unit): Assert not called for type unit groups.
+	* buildsym.c (finish_block_internal): New arg "expandable".
+	All callers updated.
+	(start_symtab): Move most contents to ...
+	(restart_symtab): ... here.  New function.
+	(reset_symtab_globals): New function.
+	(end_symtab_1): Renamed from end_symtab.  New arg "expandable".
+	Call reset_symtab_globals.
+	(end_symtab, end_expandable_symtab): New functions.
+	(set_missing_symtab, augment_type_symtab): New functions.
+	* buildsym.h (end_expandable_symtab): Declare.
+	(augment_type_symtab, restart_symtab): Declare.
+	* psympriv.h (struct partial_symtab): New member "anonymous".
+	* psymtab.c (partial_map_symtabs_matching_filename): Ignore
+	anonymous psymtabs.
+	(read_psymtabs_with_filename): Ditto.
+	(map_symbol_filenames_psymtab, psymtab_to_fullname): Ditto.
+	(expand_symtabs_matching_via_partial): Ditto.
+	(dump_psymtab): Update.
+	* dictionary.c (dict_add_pending): New function.
+	* dictionary.h (dict_add_pending): Declare.
+
+2012-07-09  Doug Evans  <dje@google.com>
+
+	* buildsym.c (start_subfile): Remove unnecessary check for
+	name == NULL.
+
+	* psymtab.c (allocate_psymtab): Use host_address_to_string.
+
+	* dwarf2read.c (load_full_type_unit): Simplify.
+
+	* dwarf2read.c (dwarf2_per_objfile): Change type of all_type_units
+	to struct signatured_type **.  All uses updated.
+
+	* dwarf2read.c (dwarf2_attr_no_follow): Delete unused arg "cu".
+	All callers updated.
+
+2012-07-09  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (check_parameter_typelist): New function.
+	(parameter_typelist): Call it.
+	* eval.c (make_params): Handle '(void)' case.
+	* gdbtypes.c (lookup_function_type_with_arguments): Handle
+	'(void)' case.
+
+2012-07-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common/linux-ptrace.c: Include gdb_assert.h.
+	<__i386__> (linux_ptrace_test_ret_to_nx_instr): New declaration.
+	<__i386__>: Include sys/reg.h, sys/mman.h, signal.h, sys/wait.h and
+	stdint.h.
+	(linux_ptrace_test_ret_to_nx, linux_ptrace_init_warnings): New
+	functions.
+	* common/linux-ptrace.h (linux_ptrace_init_warnings): New declarations.
+	* linux-nat.c (linux_child_post_attach)
+	(linux_child_post_startup_inferior): Call linux_ptrace_init_warnings.
+
+2012-07-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-thread-db.c (thread_db_find_new_threads_silently): Do not apply
+	nptl <2.7 bug workaround for core files.
+
+2012-07-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-nat.c (resume_lwp, linux_nat_resume): Remove LP->SIGINFO
+	clearing.
+	(save_siginfo): Remove.
+	(stop_wait_callback, linux_nat_filter_event): Remove the save_siginfo
+	call.
+	(resume_stopped_resumed_lwps): Remove LP->SIGINFO clearing.
+	(linux_nat_get_siginfo): Use PTRACE_GETSIGINFO.
+	* linux-nat.h (struct lwp_info): Remove field siginfo.
+
+2012-07-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup for the next patch.
+	* arm-linux-nat.c (arm_linux_stopped_data_address): Change variable
+	siginfo_p to siginfo, update its users incl. the linux_nat_get_siginfo
+	call for it.
+	* ia64-linux-nat.c (ia64_linux_stopped_data_address): Likewise.
+	(ia64_linux_stopped_data_address):
+	* linux-nat.c (linux_nat_get_siginfo): Add parameter siginfo, change
+	the return value.
+	* linux-nat.h (linux_nat_get_siginfo): Likewise.
+	* ppc-linux-nat.c (ppc_linux_stopped_data_address): Change variable
+	siginfo_p to siginfo, update its users incl. the linux_nat_get_siginfo
+	call for it.
+
+2012-07-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 14321
+	* findcmd.c (parse_find_args): New variable pattern_buf_size_need.
+	Increase buffer sizes to 2x we need, not just 2x of the previous size.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (DOTDOTDOT): New token.
+	(func_mod, exp): Use parameter_typelist.
+	(parameter_typelist): New production.
+	(tokentab3): Add "..." token.
+	* eval.c (make_params): Handle varargs.
+	* gdbtypes.c (lookup_function_type_with_arguments): Handle
+	varargs.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/9608:
+	* c-exp.y (%union) <tvec>: Change type.
+	(func_mod): Now uses <tvec> type.
+	(exp): Update for tvec change.
+	(direct_abs_decl): Push the typelist.
+	(func_mod): Return a typelist.
+	(nonempty_typelist): Update for tvec change.
+	* gdbtypes.c (lookup_function_type_with_arguments): New function.
+	* gdbtypes.h (lookup_function_type_with_arguments): Declare.
+	* parse.c (pop_type_list): New function.
+	(push_typelist): New function.
+	(follow_types): Handle tp_function_with_arguments.
+	* parser-defs.h (type_ptr): New typedef.  Define a VEC.
+	(enum type_pieces) <tp_function_with_arguments>: New constant.
+	(union type_stack_elt) <typelist_val>: New field.
+	(push_typelist): Declare.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (%union) <type_stack>: New field.
+	(abs_decl, direct_abs_decl): Use <type_stack> type.  Update.
+	(ptr_operator_ts): New production.
+	(ptype): Update.
+	* parse.c (type_stack_reserve): New function.
+	(check_type_stack_depth): Use it.
+	(pop_type_stack, append_type_stack, push_type_stack)
+	(get_type_stack, type_stack_cleanup): New functions.
+	(follow_types): Handle tp_type_stack.
+	(_initialize_parse): Simplify initialization.
+	* parser-defs.h (enum type_pieces) <tp_type_stack>: New
+	constant.
+	(union type_stack_elt) <stack_val>: New field.
+	(get_type_stack, append_type_stack, push_type_stack)
+	(type_stack_cleanup): Declare.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	* parser-defs.h (type_stack, type_stack_size, type_stack_depth):
+	Remove.
+	(struct type_stack): New.
+	* parse.c (type_stack, type_stack_size, type_stack_depth):
+	Remove.
+	(type_stack): New global.
+	(parse_exp_in_context, check_type_stack_depth)
+	(insert_into_type_stack, insert_type, push_type, push_type_int)
+	(insert_type_address_space, pop_type, pop_type_int)
+	(_initialize_parse): Update.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (func_mod, direct_abs_decl, abs_decl, ptr_operator):
+	Remove %type.
+
+2012-07-06  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* c-lang.c (c_printstr): Remove ununsed variable WIDTH.
+
+2012-07-06  Siddhesh Poyarekar  <siddhesh@redhat.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cp-valprint.c (cp_print_value): Replace potentially unsafe
+	alloca with xmalloc/xfree.
+
+2012-07-06  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list.
+
+2012-07-05  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dw2_expand_symtabs_matching): Fix typo.
+
+2012-07-05  Hui Zhu  <hui_zhu@mentor.com>
+
+	* ax-gdb.c (cli/cli-utils.h): New include.
+	(linespec.h): Ditto.
+	(agent_eval_command_one): New function.
+	(agent_command_1): Ditto.
+	(agent_command): Call function agent_command_1.
+	(agent_eval_command): Ditto.
+	(_initialize_ax_gdb): Change help for "maint agent"
+	and "maint agent-eval".
+
+2012-07-05  Hui Zhu  <hui_zhu@mentor.com>
+
+	* breakpoint.c (check_for_argument): Move to file cli/cli-utils.c.
+	* cli/cli-utils.c (check_for_argument): New function.
+	* cli/cli-utils.h (check_for_argument): Ditto.
+
+2012-07-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* NEWS: Mention x32 ABI support.
+
+2012-07-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-tdep.c (amd64_x32_init_abi): Set sp_regnum_from_eax to
+	AMD64_RSP_REGNUM and pc_regnum_from_eax to AMD64_RIP_REGNUM.
+
+	* i386-tdep.c (i386_gdbarch_init): Initialize sp_regnum_from_eax
+	and pc_regnum_from_eax to -1.  Update SP regnum from
+	sp_regnum_from_eax and PC regnum from pc_regnum_from_eax if
+	needed.
+
+	* i386-tdep.h (gdbarch_tdep): Add sp_regnum_from_eax and
+	pc_regnum_from_eax.
+
+2012-07-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix 'warning: parameter has incomplete type' with gcc-3.4.6.
+	* dwarf2expr.h: Include gdbtypes.h.
+	(enum call_site_parameter_kind, union call_site_parameter_u): Remove
+	these forward declarations.
+	(cu_offset, sect_offset): Move these ...
+	* gdbtypes.h: Remove include dwarf2expr.h.
+	(cu_offset, sect_offset): ... here.
+
+2012-07-03  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-linux-tdep.c (linux_sigtramp_code): Renamed to ...
+	(amd64_linux_sigtramp_code): This.
+	(amd64_x32_linux_sigtramp_code): New.
+	(LINUX_SIGTRAMP_LEN): Updated.
+	(amd64_linux_sigtramp_start): Check x32 sigtramp.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-thread-db.c (thread_db_new_objfile): Fix comment typos.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* config.in: Regenerate.
+	* configure: Regenerate.
+	* configure.ac: Remove check for gnu/libc-version.h.
+	* linux-thread-db.c <HAVE_GNU_LIBC_VERSION_H>: Remove include of
+	gnu/libc-version.h.
+	(enable_thread_event_reporting) <HAVE_GNU_LIBC_VERSION_H>: Remove
+	variables libc_version, libc_major and libc_minor.  Replace sscanf by
+	inferior_has_bug.  Extend the comment.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-thread-db.c (inferior_has_bug): New function.
+	(thread_db_find_new_threads_silently): Return boolean as checked by
+	inferior_has_bug, describe it in the comments.
+	(try_thread_db_load_1): Move call to thread_db_find_new_threads_silently
+	earlier.  Abort the initialization if it returned non-zero.
+	(thread_db_new_objfile): Exclude debug files.
+	(thread_db_find_new_threads_2): Preinitialize ERR.  Check errors also
+	if UNTIL_NO_NEW,
+
+2012-07-02  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (maybe_queue_comp_unit): Move definition next to others
+	related to queue management.
+
+	* dwarf2read.c (create_debug_types_hash_table): Use "debug dwarf2-read"
+	instead of "debug dwarf2-die" in debugging printfs.
+	(create_debug_info_hash_table_reader): Ditto.
+	(create_debug_info_hash_table): Ditto.
+	(init_dwo_file): Ditto.
+	(init_cutu_and_read_dies): Add debugging printf.
+	(init_cutu_and_read_dies_no_follow): Ditto.
+	(process_psymtab_comp_unit_reader): Ditto.
+
+2012-07-02  Stan Shebs  <stan@codesourcery.com>
+
+	Add target-side support for dynamic printf.
+	* NEWS: Mention the additional style.
+	* breakpoint.h (struct bp_target_info): New fields tcommands, persist.
+	(struct bp_location): New field cmd_bytecode.
+	* breakpoint.c: Include format.h.
+	(disconnected_dprintf): New global.
+	(parse_cmd_to_aexpr): New function.
+	(build_target_command_list): New function.
+	(insert_bp_location): Call it.
+	(remove_breakpoints_pid): Skip dprintf breakpoints.
+	(print_one_breakpoint_location): Ditto.
+	(dprintf_style_agent): New global.
+	(dprintf_style_enums): Add dprintf_style_agent.
+	(update_dprintf_command_list): Add agent case.
+	(agent_printf_command): New function.
+	(_initialize_breakpoint): Add new commands.
+	* common/ax.def (printf): New bytecode.
+	* ax.h (ax_string): Declare.
+	* ax-gdb.h (gen_printf): Declare.
+	* ax-gdb.c: Include cli-utils.h, format.h.
+	(gen_printf): New function.
+	(maint_agent_print_command): New function.
+	(_initialize_ax_gdb): Add maint agent-printf command.
+	* ax-general.c (ax_string): New function.
+	(ax_print): Add printf disassembly.
+	* Makefile.in (SFILES): Add format.c
+	(COMMON_OBS): Add format.o.
+	* common/format.h: New file.
+	* common/format.c: New file.
+	* printcmd.c: Include format.h.
+	(ui_printf): Call parse_format_string.
+	* remote.c (remote_state): New field breakpoint_commands.
+	(PACKET_BreakpointCommands): New enum.
+	(remote_breakpoint_commands_feature): New function.
+	(remote_protocol_features): Add new BreakpointCommands entry.
+	(remote_can_run_breakpoint_commands): New function.
+	(remote_add_target_side_commands): New function.
+	(remote_insert_breakpoint): Call it.
+	(remote_insert_hw_breakpoint): Ditto.
+	(_initialize_remote): Add new packet configuration for
+	target-side breakpoint commands.
+	* target.h (struct target_ops): New field
+	to_can_run_breakpoint_commands.
+	(target_can_run_breakpoint_commands): New macro.
+	* target.c (update_current_target): Handle
+	to_can_run_breakpoint_commands.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Execute -ix and -iex only after system and user gdbinit files.
+	* main.c (captured_main): Move CMDARG_INIT_FILE and CMDARG_INIT_COMMAND
+	processing down after gdbinit files.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Add fnmatch-gnu module.
+	* gnulib/Makefile.in (aclocal_m4_deps): Add new files and remove one.
+	* gnulib/configure.ac (AC_INIT): Use now import/memmem.c.
+	* gnulib/aclocal.m4: Regenerate.
+	* gnulib/config.in: Regenerate.
+	* gnulib/configure: Regenerate.
+	* gnulib/import/dummy.c: Remove.
+	* gnulib/import/Makefile.am: Regenerate.
+	* gnulib/import/Makefile.in: Likewise.
+	* gnulib/import/m4/gnulib-cache.m4: Likewise.
+	* gnulib/import/m4/gnulib-comp.m4: Likewise.
+	* gnulib/import/alloca.c: New file.
+	* gnulib/import/alloca.in.h: Likewise.
+	* gnulib/import/config.charset: Likewise.
+	* gnulib/import/fnmatch.c: Likewise.
+	* gnulib/import/fnmatch.in.h: Likewise.
+	* gnulib/import/fnmatch_loop.c: Likewise.
+	* gnulib/import/localcharset.c: Likewise.
+	* gnulib/import/localcharset.h: Likewise.
+	* gnulib/import/m4/alloca.m4: Likewise.
+	* gnulib/import/m4/codeset.m4: Likewise.
+	* gnulib/import/m4/configmake.m4: Likewise.
+	* gnulib/import/m4/fcntl-o.m4: Likewise.
+	* gnulib/import/m4/fnmatch.m4: Likewise.
+	* gnulib/import/m4/glibc21.m4: Likewise.
+	* gnulib/import/m4/localcharset.m4: Likewise.
+	* gnulib/import/m4/locale-fr.m4: Likewise.
+	* gnulib/import/m4/locale-ja.m4: Likewise.
+	* gnulib/import/m4/locale-zh.m4: Likewise.
+	* gnulib/import/m4/mbrtowc.m4: Likewise.
+	* gnulib/import/m4/mbsinit.m4: Likewise.
+	* gnulib/import/m4/mbsrtowcs.m4: Likewise.
+	* gnulib/import/m4/mbstate_t.m4: Likewise.
+	* gnulib/import/m4/stdbool.m4: Likewise.
+	* gnulib/import/m4/wchar_h.m4: Likewise.
+	* gnulib/import/m4/wctype_h.m4: Likewise.
+	* gnulib/import/m4/wint_t.m4: Likewise.
+	* gnulib/import/mbrtowc.c: Likewise.
+	* gnulib/import/mbsinit.c: Likewise.
+	* gnulib/import/mbsrtowcs-impl.h: Likewise.
+	* gnulib/import/mbsrtowcs-state.c: Likewise.
+	* gnulib/import/mbsrtowcs.c: Likewise.
+	* gnulib/import/ref-add.sin: Likewise.
+	* gnulib/import/ref-del.sin: Likewise.
+	* gnulib/import/stdbool.in.h: Likewise.
+	* gnulib/import/streq.h: Likewise.
+	* gnulib/import/strnlen1.c: Likewise.
+	* gnulib/import/strnlen1.h: Likewise.
+	* gnulib/import/verify.h: Likewise.
+	* gnulib/import/wchar.in.h: Likewise.
+	* gnulib/import/wctype.in.h: Likewise.
+
+2012-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Support shell wildcards for 'set auto-load safe-path'.
+	* auto-load.c: Include fnmatch.h.
+	(filename_is_in_dir): Rename to ...
+	(filename_is_in_pattern_1, filename_is_in_pattern): ... here and split
+	it.  Update function comment.  Rename dir_len to pattern_len.  New
+	variables filename_len, pattern and filename.  Add more DEBUG_AUTO_LOAD
+	messages.  Use gdb_filename_fnmatch.
+	(filename_is_in_auto_load_safe_path_vec): Rename variable dir to
+	pattern.
+	(_initialize_auto_load): Extend the "set auto-load safe-path" help text.
+	* defs.h (gdb_filename_fnmatch): New declaration.
+	* utils.c: Include fnmatch.h.
+	(gdb_filename_fnmatch): New function.
+
+2012-07-02  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* breakpoint.c (BREAK_ARGS_HELP): Include help message for the new
+	`-probe' and `-probe-stap' options.
+
+2012-07-01  Yao Qi  <yao@codesourcery.com>
+
+	* breakpoint.c: Removed always_inserted_auto, always_inserted_on,
+	always_inserted_off, and always_inserted_enums.
+	Change always_inserted_mode's type to 'enum auto_boolean'.
+	(show_always_inserted_mode, breakpoint_always_inserted_mode): Update
+	callers.
+	(_initialize_breakpoint): Call add_setshow_auto_boolean_cmd instead
+	of add_setshow_enum_cmd.
+	* infrun.c: Remove can_use_displaced_stepping_auto,
+	can_use_displaced_stepping_on, can_use_displaced_stepping_off, and
+	can_use_displaced_stepping_enum.
+	Change can_use_displaced_stepping's type to 'enum auto_boolean'.
+	(show_can_use_displaced_stepping, use_displaced_stepping): Update callers.
+	(_initialize_infrun): Call add_setshow_auto_boolean_cmd instead of
+	add_setshow_enum_cmd.
+
+2012-06-30  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (signatured_type): Make "per_cu" member first.
+	(init_cutu_and_read_dies): Handle rereading a DWO CU while it's
+	currently being read.  Propagate DW_AT_comp_dir to DWO DIE.
+
+2012-06-29  Doug Evans  <dje@google.com>
+
+	* linespec.c: #include "stack.h".
+	(decode_line_with_current_source): Moved here from symtab.c and
+	renamed from decode_line_spec.  All callers updated.
+	(decode_line_with_last_displayed): Moved here from breakpoint.c and
+	renamed from decode_line_spec_1.  All callers updated.
+	* linespec.h (decode_line_with_current_source): Move declaration here
+	from symtab.h and renamed from decode_line_spec.
+	(decode_line_with_last_displayed): Move declaration here from symtab.h
+	and renamed from decode_line_spec_1.
+	* macrocmd.c: #include "linespec.h".
+	* symtab.c: Remove #include "linespec.h".
+
+2012-06-28  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (get_cu_length): New function.
+	(offset_in_cu_p, error_check_comp_unit_head): Call it.
+	(create_debug_types_hash_table): Ditto.
+	(init_cutu_and_read_dies): Ditto.
+	(init_cutu_and_read_dies_no_follow): Ditto.
+
+	* dwarf2read.c (dwarf2_find_base_address): Move definition.
+
+	* dwarf2read.c (ABBREV_HASH_SIZE): Remove enclosing #ifndef/#endif.
+	(struct abbrev_table): Define.
+	(dwarf2_cu): Replace members dwarf2_abbrevs, abbrev_obstack with
+	abbrev_table.
+	(init_cutu_and_read_dies): Update.
+	(abbrev_table_alloc_abbrev): New function.  Replaces
+	dwarf_alloc_abbrev.  All callers updated.
+	(abbrev_table_add_abbrev): New function.
+	(abbrev_table_lookup_abbrev): New function.  Replaces
+	dwarf2_lookup_abbrev.  All callers updated.
+	(abbrev_table_read_table): New function.  Contents moved here from
+	dwarf2_read_abbrevs.
+	(dwarf2_read_abbrevs): Call it.
+	(abbrev_table_free): New function.
+	(dwarf2_free_abbrev_table): Call it.
+
+2012-06-28  Stan Shebs  <stan@codesourcery.com>
+
+	* osdata.c (info_osdata_command): Filter out "Title" columns
+	from non-MI uses.
+	* common/linux-osdata.c (struct osdata_type): Add title field.
+	(osdata_table): Add titles to each entry.
+	(linux_command_xfer_osdata): Add a column for title data.
+
+2012-06-28  Stan Shebs  <stan@codesourcery.com>
+
+	Make logging work for MI.
+	* NEWS: Mention it.
+	* interps.h (interp_set_logging_ftype): New typedef.
+	(struct interp_procs): New field set_logging_proc.
+	(current_interp_set_logging): Declare.
+	* interps.c (current_interp_set_logging): New function.
+	* cli/cli-logging.c: Include interps.h.
+	(set_logging_redirect): Call current_interp_set_logging.
+	(pop_output_files): Ditto.
+	(handle_redirections): Ditto, plus skip ui-out redirect if MI.
+	* mi/mi-console.h (mi_console_set_raw): Declare.
+	* mi/mi-console.c (mi_console_set_raw): New function.
+	* mi/mi-interp.c (saved_raw_stdout): New global.
+	(mi_set_logging): New function.
+	(_initialize_mi_interp): Add it to interp procs.
+
+2012-06-28  Doug Evans  <dje@google.com>
+
+	* symtab.c (lookup_symbol_aux_objfile): Use
+	ALL_OBJFILE_PRIMARY_SYMTABS.
+
+	* gdbtypes.c (lookup_typename): Rename local variable "tmp" to "type".
+
+2012-06-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common/buffer.c: Include inttypes.h and stdint.h.
+	(buffer_xml_printf): Use PRId64, PRIu64, PRIx64 and PRIo64.
+
+2012-06-28  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* gdbthread.h (ALL_THREADS): New macro.
+	(thread_list): Declare.
+	* infrun.c (handle_inferior_event) <spurious signal>: Don't keep
+	going, but instead fall through to the stepping handling.
+	* linux-nat.c (resume_lwp): New parameter 'signo'.  Resume with
+	the passed in signal.  Adjust debug output.
+	(resume_callback): Rename to ...
+	(linux_nat_resume_callback): ... this.  Pass the thread's last
+	stop signal, if in "pass" state.
+	(linux_nat_resume): Adjust to rename.
+	(stop_wait_callback): New assertion.  Don't respawn signals;
+	instead let the LWP remain with SIGNALLED set.
+	(linux_nat_wait_1): Remove flushing of pending SIGSTOPs.
+	* remote.c (append_pending_thread_resumptions): New.
+	(remote_vcont_resume): Call it.
+	* target.h (target_resume): Extend comment.
+
+2012-06-28  Iain Sandoe  <iain@codesourcery.com>
+
+	* auxv.c (fprint_target_auxv): Handle extended cache data tags.
+
+2012-06-27  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf2_cu): Add ranges_base.
+	Delete have_addr_base, unused.  All uses updated.
+	(init_cutu_and_read_dies): Process DW_AT_GNU_ranges_base.
+	(dwarf2_get_pc_bounds): Add ranges_base.
+	(dwarf2_record_block_ranges): Ditto.
+
+2012-06-27  Tom Tromey  <tromey@redhat.com>
+
+	PR macros/7961:
+	* varobj.c (varobj_create): Update.
+	(varobj_set_value): Update.
+	* tracepoint.c (validate_actionline): Update.
+	(encode_actions_1): Update.
+	* parse.c (parse_exp_1): Add 'pc' argument.
+	(parse_exp_in_context): Add 'pc' argument.  Change how
+	expression_context_pc is set.
+	(parse_expression): Update.
+	(parse_field_expression): Update.
+	* expression.h (parse_exp_1): Update.
+	* eval.c (parse_to_comma_and_eval): Update.
+	* breakpoint.c (set_breakpoint_condition): Update.
+	(update_watchpoint): Update.
+	(init_breakpoint_sal): Update
+	(find_condition_and_thread): Update.
+	(watch_command_1): Update.
+	(update_breakpoint_locations): Update.
+	* ada-lang.c (ada_read_renaming_var_value): Update.
+	(create_excep_cond_exprs): Update.
+
+2012-06-27  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (per_cu_header_read_in): Simplify, and handle
+	type units.
+
+2012-06-26  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (read_and_check_comp_unit_head): Delete unnecessary
+	prototype.
+	(error_check_comp_unit_head): New arg abbrev_section.  All callers
+	updated.
+	(read_and_check_comp_unit_head): Ditto.
+	(read_and_check_type_unit_head): Ditto.
+
+2012-06-26  Siva Chandra Reddy  <sivachandra@google.com>
+
+	New attribute 'last' for gdb.Symtab_and_line.
+	* NEWS (Python Scripting): Add entry about the new attribute.
+	* python/py-symtab.c (salpy_get_last): New function which
+	implements the get method for the 'last' attribute of
+	gdb.Symtab_and_line.
+	(sal_object_getset): Add entry for the 'last' attribute.
+
+2012-06-26  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwo_section_names): Add macinfo_dwo, macro_dwo.
+	(dwo_sections): Add macinfo, macro.
+	(dwarf2_locate_dwo_sections): Watch for macro sections.
+	(dwarf_decode_macros): Remove args lh, abfd, section, section_name.
+	All callers updated.  Handle DWO files.
+
+	* NEWS: Mention new options "set debug dwarf2-read" and
+	"set debug symtab-create".
+	* dwarf2read.c (dwarf2_read_debug): New static global.
+	(dwarf2_build_psymtabs_hard): Add debugging printfs.
+	(process_queue): Ditto.
+	(process_full_comp_unit): Ditto.
+	(_initialize_dwarf2_read): Add new option "set debug dwarf2-read".
+	* elfread.c (elf_symfile_read): Add debugging printf.
+	* minsyms.c (install_minimal_symbols): Ditto.
+	* psymtab.c (allocate_psymtab): Ditto.
+	* symfile.c (allocate_symtab): Ditto.
+	* symtab.c (symtab_create_debug): New global.
+	(_initialize_symtab): Add new option "set debug symtab-create".
+	* symtab.h (symtab_create_debug): Declare.
+
+	* dwarf2read.c (lookup_dwo_comp_unit): Enhance comment.
+	(lookup_dwo_type_unit): Ditto.
+
+2012-06-26  Roland McGrath  <roland@hack.frob.com>
+	    H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-linux-nat.c: Include <sys/user.h>.
+	(ps_get_thread_area): Use PTRACE_PEEKUSER to get fs_base/gs_base
+	if HAVE_STRUCT_USER_REGS_STRUCT_FS_BASE or
+	HAVE_STRUCT_USER_REGS_STRUCT_GS_BASE is defined.
+
+	* configure.ac: Check if the fs_base and gs_base members of
+	`struct user_regs_struct' exist.
+	* config.in: Regenerated.
+	* configure: Likewise.
+
 2012-06-25  Michael Eager  <eager@eagercon.com>
 
 	PR python/14291
