@@ -670,6 +670,19 @@ get_probe_argument_count (struct objfile *objfile, struct probe *probe)
 /* See comments in probe.h.  */
 
 struct value *
+evaluate_probe_argument (struct objfile *objfile, struct probe *probe,
+			 unsigned n)
+{
+  gdb_assert (objfile->sf && objfile->sf->sym_probe_fns);
+
+  return objfile->sf->sym_probe_fns->sym_evaluate_probe_argument (objfile,
+								  probe,
+								  n);
+}
+
+/* See comments in probe.h.  */
+
+struct value *
 probe_safe_evaluate_at_pc (struct frame_info *frame, unsigned n)
 {
   struct probe *probe;
@@ -685,9 +698,7 @@ probe_safe_evaluate_at_pc (struct frame_info *frame, unsigned n)
   if (n >= n_probes)
     return NULL;
 
-  return objfile->sf->sym_probe_fns->sym_evaluate_probe_argument (objfile,
-								  probe,
-								  n);
+  return evaluate_probe_argument (objfile, probe, n);
 }
 
 /* See comment in probe.h.  */
