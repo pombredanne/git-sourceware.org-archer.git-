@@ -127,6 +127,7 @@ static const struct probe_info probe_info[] =
   { "init_start", 0, LM_CACHE_NO_ACTION },
   { "init_complete", 1, LM_CACHE_RELOAD },
   { "map_start", 0, LM_CACHE_NO_ACTION },
+ /* "map_failed" XXX */
   { "reloc_complete", 1, LM_CACHE_UPDATE_OR_RELOAD },
   { "unmap_start", 0, LM_CACHE_NO_ACTION },
   { "unmap_complete", 1, LM_CACHE_RELOAD },
