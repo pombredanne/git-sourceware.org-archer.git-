@@ -155,27 +155,31 @@ void yyerror (char *);
     struct internalvar *ivar;
 
     struct stoken_vector svec;
-    struct type **tvec;
+    VEC (type_ptr) *tvec;
     int *ivec;
+
+    struct type_stack *type_stack;
   }
 
 %{
 /* YYSTYPE gets defined by %union */
 static int parse_number (char *, int, int, YYSTYPE *);
 static struct stoken operator_stoken (const char *);
+static void check_parameter_typelist (VEC (type_ptr) *);
 %}
 
 %type <voidval> exp exp1 type_exp start variable qualified_name lcurly
 %type <lval> rcurly
 %type <tval> type typebase
-%type <tvec> nonempty_typelist
+%type <tvec> nonempty_typelist func_mod parameter_typelist
 /* %type <bval> block */
 
 /* Fancy type parsing.  */
-%type <voidval> func_mod direct_abs_decl abs_decl ptr_operator
 %type <tval> ptype
 %type <lval> array_mod
 %type <tval> conversion_type_id
+
+%type <type_stack> ptr_operator_ts abs_decl direct_abs_decl
 
 %token <typed_val_int> INT
 %token <typed_val_float> FLOAT
@@ -250,6 +254,8 @@ static struct stoken operator_stoken (const char *);
 %token <bval> FILENAME
 %type <bval> block
 %left COLONCOLON
+
+%token DOTDOTDOT
 
 
 %%
@@ -437,15 +443,21 @@ arglist	:	arglist ',' exp   %prec ABOVE_COMMA
 			{ arglist_len++; }
 	;
 
-exp     :       exp '(' nonempty_typelist ')' const_or_volatile
+exp     :       exp '(' parameter_typelist ')' const_or_volatile
 			{ int i;
+			  VEC (type_ptr) *type_list = $3;
+			  struct type *type_elt;
+			  LONGEST len = VEC_length (type_ptr, type_list);
+
 			  write_exp_elt_opcode (TYPE_INSTANCE);
-			  write_exp_elt_longcst ((LONGEST) $<ivec>3[0]);
-			  for (i = 0; i < $<ivec>3[0]; ++i)
-			    write_exp_elt_type ($<tvec>3[i + 1]);
-			  write_exp_elt_longcst((LONGEST) $<ivec>3[0]);
+			  write_exp_elt_longcst (len);
+			  for (i = 0;
+			       VEC_iterate (type_ptr, type_list, i, type_elt);
+			       ++i)
+			    write_exp_elt_type (type_elt);
+			  write_exp_elt_longcst(len);
 			  write_exp_elt_opcode (TYPE_INSTANCE);
-			  free ($3);
+			  VEC_free (type_ptr, type_list);
 			}
 	;
 
@@ -955,19 +967,27 @@ ptr_operator:
 		ptr_operator '*'
 			{ insert_type (tp_pointer); }
 		const_or_volatile_or_space_identifier
-			{ $$ = 0; }
 	|	'*' 
 			{ insert_type (tp_pointer); }
 		const_or_volatile_or_space_identifier
-			{ $$ = 0; }
 	|	'&'
-			{ insert_type (tp_reference); $$ = 0; }
+			{ insert_type (tp_reference); }
 	|	'&' ptr_operator
-			{ insert_type (tp_reference); $$ = 0; }
+			{ insert_type (tp_reference); }
 	;
 
-abs_decl:	ptr_operator direct_abs_decl
-	|	ptr_operator
+ptr_operator_ts: ptr_operator
+			{
+			  $$ = get_type_stack ();
+			  /* This cleanup is eventually run by
+			     c_parse.  */
+			  make_cleanup (type_stack_cleanup, $$);
+			}
+	;
+
+abs_decl:	ptr_operator_ts direct_abs_decl
+			{ $$ = append_type_stack ($2, $1); }
+	|	ptr_operator_ts 
 	|	direct_abs_decl
 	;
 
@@ -975,20 +995,29 @@ direct_abs_decl: '(' abs_decl ')'
 			{ $$ = $2; }
 	|	direct_abs_decl array_mod
 			{
+			  push_type_stack ($1);
 			  push_type_int ($2);
 			  push_type (tp_array);
+			  $$ = get_type_stack ();
 			}
 	|	array_mod
 			{
 			  push_type_int ($1);
 			  push_type (tp_array);
-			  $$ = 0;
+			  $$ = get_type_stack ();
 			}
 
 	| 	direct_abs_decl func_mod
-			{ push_type (tp_function); }
+			{
+			  push_type_stack ($1);
+			  push_typelist ($2);
+			  $$ = get_type_stack ();
+			}
 	|	func_mod
-			{ push_type (tp_function); }
+			{
+			  push_typelist ($1);
+			  $$ = get_type_stack ();
+			}
 	;
 
 array_mod:	'[' ']'
@@ -998,9 +1027,9 @@ array_mod:	'[' ']'
 	;
 
 func_mod:	'(' ')'
-			{ $$ = 0; }
-	|	'(' nonempty_typelist ')'
-			{ free ($2); $$ = 0; }
+			{ $$ = NULL; }
+	|	'(' parameter_typelist ')'
+			{ $$ = $2; }
 	;
 
 /* We used to try to recognize pointer to member types here, but
@@ -1197,22 +1226,37 @@ typename:	TYPENAME
 		}
 	;
 
+parameter_typelist:
+		nonempty_typelist
+			{ check_parameter_typelist ($1); }
+	|	nonempty_typelist ',' DOTDOTDOT
+			{
+			  VEC_safe_push (type_ptr, $1, NULL);
+			  check_parameter_typelist ($1);
+			  $$ = $1;
+			}
+	;
+
 nonempty_typelist
 	:	type
-		{ $$ = (struct type **) malloc (sizeof (struct type *) * 2);
-		  $<ivec>$[0] = 1;	/* Number of types in vector */
-		  $$[1] = $1;
+		{
+		  VEC (type_ptr) *typelist = NULL;
+		  VEC_safe_push (type_ptr, typelist, $1);
+		  $$ = typelist;
 		}
 	|	nonempty_typelist ',' type
-		{ int len = sizeof (struct type *) * (++($<ivec>1[0]) + 1);
-		  $$ = (struct type **) realloc ((char *) $1, len);
-		  $$[$<ivec>$[0]] = $3;
+		{
+		  VEC_safe_push (type_ptr, $1, $3);
+		  $$ = $1;
 		}
 	;
 
 ptype	:	typebase
 	|	ptype abs_decl
-		{ $$ = follow_types ($1); }
+		{
+		  push_type_stack ($2);
+		  $$ = follow_types ($1);
+		}
 	;
 
 conversion_type_id: typebase conversion_declarator
@@ -1402,6 +1446,37 @@ operator_stoken (const char *op)
   make_cleanup (free, st.ptr);
   return st;
 };
+
+/* Validate a parameter typelist.  */
+
+static void
+check_parameter_typelist (VEC (type_ptr) *params)
+{
+  struct type *type;
+  int ix;
+
+  for (ix = 0; VEC_iterate (type_ptr, params, ix, type); ++ix)
+    {
+      if (type != NULL && TYPE_CODE (check_typedef (type)) == TYPE_CODE_VOID)
+	{
+	  if (ix == 0)
+	    {
+	      if (VEC_length (type_ptr, params) == 1)
+		{
+		  /* Ok.  */
+		  break;
+		}
+	      VEC_free (type_ptr, params);
+	      error (_("parameter types following 'void'"));
+	    }
+	  else
+	    {
+	      VEC_free (type_ptr, params);
+	      error (_("'void' invalid as parameter type"));
+	    }
+	}
+    }
+}
 
 /* Take care of parsing a number (anything that starts with a digit).
    Set yylval and return the token type; update lexptr.
@@ -1912,7 +1987,8 @@ static const struct token tokentab3[] =
   {
     {">>=", ASSIGN_MODIFY, BINOP_RSH, 0},
     {"<<=", ASSIGN_MODIFY, BINOP_LSH, 0},
-    {"->*", ARROW_STAR, BINOP_END, 1}
+    {"->*", ARROW_STAR, BINOP_END, 1},
+    {"...", DOTDOTDOT, BINOP_END, 0}
   };
 
 static const struct token tokentab2[] =

@@ -242,6 +242,8 @@ static void remote_console_output (char *msg);
 
 static int remote_supports_cond_breakpoints (void);
 
+static int remote_can_run_breakpoint_commands (void);
+
 /* The non-stop remote protocol provisions for one pending stop reply.
    This is where we keep it until it is acknowledged.  */
 
@@ -322,6 +324,10 @@ struct remote_state
   /* True if the stub reports support for target-side breakpoint
      conditions.  */
   int cond_breakpoints;
+
+  /* True if the stub reports support for target-side breakpoint
+     commands.  */
+  int breakpoint_commands;
 
   /* True if the stub reports support for fast tracepoints.  */
   int fast_tracepoints;
@@ -1274,6 +1280,7 @@ enum {
   PACKET_qAttached,
   PACKET_ConditionalTracepoints,
   PACKET_ConditionalBreakpoints,
+  PACKET_BreakpointCommands,
   PACKET_FastTracepoints,
   PACKET_StaticTracepoints,
   PACKET_InstallInTrace,
@@ -3801,6 +3808,16 @@ remote_cond_breakpoint_feature (const struct protocol_feature *feature,
 }
 
 static void
+remote_breakpoint_commands_feature (const struct protocol_feature *feature,
+				    enum packet_support support,
+				    const char *value)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  rs->breakpoint_commands = (support == PACKET_ENABLE);
+}
+
+static void
 remote_fast_tracepoint_feature (const struct protocol_feature *feature,
 				enum packet_support support,
 				const char *value)
@@ -3898,6 +3915,8 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_ConditionalTracepoints },
   { "ConditionalBreakpoints", PACKET_DISABLE, remote_cond_breakpoint_feature,
     PACKET_ConditionalBreakpoints },
+  { "BreakpointCommands", PACKET_DISABLE, remote_breakpoint_commands_feature,
+    PACKET_BreakpointCommands },
   { "FastTracepoints", PACKET_DISABLE, remote_fast_tracepoint_feature,
     PACKET_FastTracepoints },
   { "StaticTracepoints", PACKET_DISABLE, remote_static_tracepoint_feature,
@@ -4644,6 +4663,28 @@ append_resumption (char *p, char *endp,
   return p;
 }
 
+/* Append a vCont continue-with-signal action for threads that have a
+   non-zero stop signal.  */
+
+static char *
+append_pending_thread_resumptions (char *p, char *endp, ptid_t ptid)
+{
+  struct thread_info *thread;
+
+  ALL_THREADS (thread)
+    if (ptid_match (thread->ptid, ptid)
+	&& !ptid_equal (inferior_ptid, thread->ptid)
+	&& thread->suspend.stop_signal != GDB_SIGNAL_0
+	&& signal_pass_state (thread->suspend.stop_signal))
+      {
+	p = append_resumption (p, endp, thread->ptid,
+			       0, thread->suspend.stop_signal);
+	thread->suspend.stop_signal = GDB_SIGNAL_0;
+      }
+
+  return p;
+}
+
 /* Resume the remote inferior by using a "vCont" packet.  The thread
    to be resumed is PTID; STEP and SIGGNAL indicate whether the
    resumed thread should be single-stepped and/or signalled.  If PTID
@@ -4695,6 +4736,10 @@ remote_vcont_resume (ptid_t ptid, int step, enum gdb_signal siggnal)
 	  /* Step inferior_ptid, with or without signal.  */
 	  p = append_resumption (p, endp, inferior_ptid, step, siggnal);
 	}
+
+      /* Also pass down any pending signaled resumption for other
+	 threads not the current.  */
+      p = append_pending_thread_resumptions (p, endp, ptid);
 
       /* And continue others without a signal.  */
       append_resumption (p, endp, ptid, /*step=*/ 0, GDB_SIGNAL_0);
@@ -7847,6 +7892,37 @@ remote_add_target_side_condition (struct gdbarch *gdbarch,
   return 0;
 }
 
+static void
+remote_add_target_side_commands (struct gdbarch *gdbarch,
+				 struct bp_target_info *bp_tgt, char *buf)
+{
+  struct agent_expr *aexpr = NULL;
+  int i, ix;
+
+  if (VEC_empty (agent_expr_p, bp_tgt->tcommands))
+    return;
+
+  buf += strlen (buf);
+
+  sprintf (buf, ";cmds:%x,", bp_tgt->persist);
+  buf += strlen (buf);
+
+  /* Concatenate all the agent expressions that are commands into the
+     cmds parameter.  */
+  for (ix = 0;
+       VEC_iterate (agent_expr_p, bp_tgt->tcommands, ix, aexpr);
+       ix++)
+    {
+      sprintf (buf, "X%x,", aexpr->len);
+      buf += strlen (buf);
+      for (i = 0; i < aexpr->len; ++i)
+	buf = pack_hex_byte (buf, aexpr->buf[i]);
+      *buf = '\0';
+    }
+
+  VEC_free (agent_expr_p, bp_tgt->tcommands);
+}
+
 /* Insert a breakpoint.  On targets that have software breakpoint
    support, we ask the remote target to do the work; on targets
    which don't, we insert a traditional memory breakpoint.  */
@@ -7883,6 +7959,9 @@ remote_insert_breakpoint (struct gdbarch *gdbarch,
 
       if (remote_supports_cond_breakpoints ())
 	remote_add_target_side_condition (gdbarch, bp_tgt, p, endbuf);
+
+      if (remote_can_run_breakpoint_commands ())
+	remote_add_target_side_commands (gdbarch, bp_tgt, p);
 
       putpkt (rs->buf);
       getpkt (&rs->buf, &rs->buf_size, 0);
@@ -8124,6 +8203,9 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
 
   if (remote_supports_cond_breakpoints ())
     remote_add_target_side_condition (gdbarch, bp_tgt, p, endbuf);
+
+  if (remote_can_run_breakpoint_commands ())
+    remote_add_target_side_commands (gdbarch, bp_tgt, p);
 
   putpkt (rs->buf);
   getpkt (&rs->buf, &rs->buf_size, 0);
@@ -10063,6 +10145,14 @@ remote_supports_string_tracing (void)
   return rs->string_tracing;
 }
 
+static int
+remote_can_run_breakpoint_commands (void)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  return rs->breakpoint_commands;
+}
+
 static void
 remote_trace_init (void)
 {
@@ -10981,6 +11071,7 @@ Specify the serial device it is connected to\n\
   remote_ops.to_supports_enable_disable_tracepoint = remote_supports_enable_disable_tracepoint;
   remote_ops.to_supports_string_tracing = remote_supports_string_tracing;
   remote_ops.to_supports_evaluation_of_breakpoint_conditions = remote_supports_cond_breakpoints;
+  remote_ops.to_can_run_breakpoint_commands = remote_can_run_breakpoint_commands;
   remote_ops.to_trace_init = remote_trace_init;
   remote_ops.to_download_tracepoint = remote_download_tracepoint;
   remote_ops.to_can_download_tracepoint = remote_can_download_tracepoint;
@@ -11510,6 +11601,10 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
   add_packet_config_cmd (&remote_protocol_packets[PACKET_ConditionalBreakpoints],
 			 "ConditionalBreakpoints",
 			 "conditional-breakpoints", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_BreakpointCommands],
+			 "BreakpointCommands",
+			 "breakpoint-commands", 0);
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_FastTracepoints],
 			 "FastTracepoints", "fast-tracepoints", 0);

@@ -1,3 +1,16 @@
+2012-07-05  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* mips-dis.c: Remove gratuitous newline.
+
+2012-07-02  Roland McGrath  <mcgrathr@google.com>
+
+	* i386-opc.tbl: Add RepPrefixOk to nop.
+	* i386-tbl.h: Regenerate.
+
+2012-06-28  Nick Clifton  <nickc@redhat.com>
+
+	* po/vi.po: Updated Vietnamese translation.
+
 2012-06-22  Roland McGrath  <mcgrathr@google.com>
 
 	* i386-opc.tbl: Add RepPrefixOk to ret.

@@ -33,7 +33,6 @@
 #include "language.h"
 #include "demangle.h"
 #include "inferior.h"
-#include "linespec.h"
 #include "source.h"
 #include "filenames.h"		/* for FILENAME_CMP */
 #include "objc-lang.h"
@@ -1519,18 +1518,17 @@ lookup_symbol_aux_objfile (struct objfile *objfile, int block_index,
     objfile->sf->qf->pre_expand_symtabs_matching (objfile, block_index,
 						  name, domain);
 
-  ALL_OBJFILE_SYMTABS (objfile, s)
-    if (s->primary)
-      {
-	bv = BLOCKVECTOR (s);
-	block = BLOCKVECTOR_BLOCK (bv, block_index);
-	sym = lookup_block_symbol (block, name, domain);
-	if (sym)
-	  {
-	    block_found = block;
-	    return fixup_symbol_section (sym, objfile);
-	  }
-      }
+  ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
+    {
+      bv = BLOCKVECTOR (s);
+      block = BLOCKVECTOR_BLOCK (bv, block_index);
+      sym = lookup_block_symbol (block, name, domain);
+      if (sym)
+	{
+	  block_found = block;
+	  return fixup_symbol_section (sym, objfile);
+	}
+    }
 
   return NULL;
 }
@@ -4822,27 +4820,6 @@ skip_prologue_using_sal (struct gdbarch *gdbarch, CORE_ADDR func_addr)
     return prologue_sal.pc;
 }
 
-struct symtabs_and_lines
-decode_line_spec (char *string, int flags)
-{
-  struct symtabs_and_lines sals;
-  struct symtab_and_line cursal;
-
-  if (string == 0)
-    error (_("Empty line specification."));
-
-  /* We use whatever is set as the current source line.  We do not try
-     and get a default  or it will recursively call us!  */
-  cursal = get_current_source_symtab_and_line ();
-
-  sals = decode_line_1 (&string, flags,
-			cursal.symtab, cursal.line);
-
-  if (*string)
-    error (_("Junk at end of line specification: %s"), string);
-  return sals;
-}
-
 /* Track MAIN */
 static char *name_of_main;
 enum language language_of_main = language_unknown;
