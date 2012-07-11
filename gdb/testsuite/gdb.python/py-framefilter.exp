@@ -44,7 +44,7 @@ set remote_obj_python_file [remote_download host ${srcdir}/${subdir}/${testfile}
 gdb_reinitialize_dir $srcdir/$subdir
 gdb_test_no_output "set auto-load safe-path ${remote_obj_python_file}" "set auto-load safe-path"
 gdb_load ${binfile}
-
+gdb_test_no_output "set python print-stack full" "set auto-load safe-path"
 # Verify gdb loaded the script.
 gdb_test "info auto-load python-scripts" "Yes.*/${testfile}-gdb.py.*"
 
@@ -61,23 +61,19 @@ gdb_breakpoint [gdb_get_line_number "Backtrace end breakpoint"]
 gdb_continue_to_breakpoint "Backtrace end breakpoint"
 
 gdb_test "info frame-filter" \
-    {.*100.*Yes.*Reverse.*10.*Yes.*Dummy.*1.*No.*Object.*1.*}
+    {.*1000.*Yes.*Elider.*100.*Yes.*Reverse.*10.*.*No.*Object.*1.*}
 # Test raw
 gdb_test "bt raw" \
     {.*#0.*end_func.*#22.*in func1.*#27.*in main ().*}
-gdb_test "bt" \
-    {.*in Dummy function.*#22.*in 1cnuf.*#27.*in niam ().*}
 
-# Make the Dummy filter a higher priority than Reverse.  This ensures
-# we chain correctly.
-gdb_test_no_output "set python frame-filter priority global Dummy 5000"
+# Test reverse
 gdb_test "bt" \
-    {.*in noitcnuf ymmuD.*#22.*in 1cnuf.*#27.*in niam ().*}
+    {.*#0.*cnuf_dne.*#22.*in 1cnuf.*#27.*in niam ().*}
 
 # Disable Reverse
 gdb_test_no_output "set python frame-filter disable global Reverse"
 gdb_test "bt" \
-    {.*in Dummy function.*#22.*in func1.*#27.*in main ().*}
+    {.*#0.*end_func.*#22.*in func1.*#27.*in main ().*}
 
 remote_file host delete ${remote_python_file}
 

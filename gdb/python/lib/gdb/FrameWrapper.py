@@ -16,95 +16,130 @@
 import gdb
 
 class FrameWrapper (object):
-    "Base Frame Wrapper"
+    """Interface for a Frame Wrapper"""
 
-    # frame her can refer to a gdb.Frame or another frame like object
-    # conforming to the interface in this class.  As we can have frame
-    # wrappers wrapping frame wrappers, we should defer to that
-    # object's method.
+    """ A frame wrapper wraps a frame and provides additional and
+    convenience methods. """
     def __init__(self, frame):
         super(FrameWrapper, self).__init__()
         self.frame = frame
 
-    def omit (self):
-        return False
+    def elided (self):
+        """ The 'elided' function groups frames together in a
+        hierarchical system.  An example would be an interpreter call
+        that occurs over many frames but might be better represented
+        as a group of frames distinct from the other frames.
 
-    def elide (self):
-        return False
+        Arguments: None 
+        
+        Returns: The 'elide' function must return an iterator that
+        contains the frames that are being elided.  Elided frames are
+        indented from normal frames in a backtrace, to show affinity
+        with the frame that elided them.  Note that it is the Frame
+        Filter's task to filter out the elided frames from the
+        iterator the source frames were acquired, and also to provide
+        the iterator of elided frames in this function.
+
+        If this function returns a Python None, no frames will be
+        elided.
+        """
+       
+        pass
 
     def function (self):
-        if hasattr(self.frame, "function"):
-            return str(self.frame.function())
+        """ The name of the function in the frame.
 
-        fname = str (self.frame.function())
-        if (fname == ""):
-            return "<unknown function>"
-        else:
-            return fname
+        Arguments: None.
 
-    def level (self, level):
-        if hasattr(self.frame, "level"):
-            return self.frame.level()
+        Returns: A string describing the function.
 
-        return level
+        If this function returns a Python None, no data will be
+        displayed for this field at printing.
+        """
+        pass
 
     def address (self):
-        if hasattr(self.frame, "address"):
-            return self.frame.address()
+        """ The address of the frame.
 
-        return self.frame.pc()
+        Arguments: None.
+
+        Returns: A numeric integer type of sufficient size to describe
+        the address of the frame.
+
+        If this function returns a Python None, no data will be
+        displayed for this field at printing.
+        """
+
+        pass
 
     def filename (self):
-        if hasattr(self.frame, "filename"):
-            return self.frame.filename()
+        """ The filename associated with the function and line number
+        addressed by this frame.
 
-        sal = self.frame.find_sal()
-        if (sal):
-            return sal.symtab.filename
-        else:
-            return "<unknown filename>"
+        Arguments: None.
 
-    def frame_args (self):
-        if hasattr(self.frame, "frame_args"):
-            return self.frame.frame_args()
+        Returns: A string containing the filename, and optionally, the
+        path to the filename of the frame.
 
-        args = self.frame.arguments()
-        args_list = []
-        if args != None:
-            for arg in args:
-                value = arg.value(self.frame)
-                args_list.append((arg, value))
+        If this function returns a Python None, the field output from
+        the function will be left blank.""
+        """
 
-        return args_list
-
-    def frame_locals (self):
-        if hasattr(self.frame, "frame_locals"):
-            return self.frame.frame_locals()
-
-        frame_locals = self.frame.locals()
-        frame_locals_list = []
-        if frame_locals != None:
-            for frame_local in frame_locals:
-                value = frame_local.value(self.frame)
-                frame_locals_list.append((frame_local, value))
-
-        return frame_locals_list
+        pass
 
     def line (self):
-        if hasattr(self.frame, "line"):
-            return self.frame.line()
+        """ The line number associated with the current position
+        within the function addressed by this frame.
 
-        sal = self.frame.find_sal()
-        if (sal):
-            return sal.line        
-        else:
-            return "<unknown line>"
+        Arguments: None.
 
-    def inferior_frame (self):
-        if hasattr(self.frame, "inferior_frame"):
-            return self.frame.inferior_frame()
+        Returns: A number integer type line number
 
-        return self.frame
+        If this function returns a Python None, the field output from
+        the function will be left blank.""
+        """
 
-    def older(self):
-        return self.frame.older()
+        pass
+
+    def frame_args (self):
+        """ The arguments of the function in this frame.
+
+        Arguments: None.
+
+        Returns: An iterator that returns a tuple pairing of
+        "argument", and "value".  The "argument" element can be either
+        a gdb.Symbol or a string.  The "value" argument must be a
+        gdb.Value or a Python value that can be translated into a
+        gdb.Value.
+
+
+        If this function returns a Python None, frame arguments will
+        not be printed.
+        """
+        pass
+
+    def frame_locals (self):
+        """ The local variables of the function in this frame.
+
+        Arguments: None.
+
+        Returns: An iterator that returns a tuple pairing of
+        "argument", and "value".  The "argument" element can be either
+        a gdb.Symbol or a string.  The "value" argument must be a
+        gdb.Value or a Python value that can be translated into a
+        gdb.Value.
+
+
+        If this function returns a Python None, local variables will
+        not be printed.
+        """
+        pass
+
+    def frame (self):
+        """ The gdb.Frame that this wrapper is wrapping.
+
+        Arguments: None.
+
+        Returns: The gdb.Frame that this wrapper is wrapping.
+        """
+        pass

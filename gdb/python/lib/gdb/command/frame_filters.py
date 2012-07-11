@@ -20,23 +20,8 @@ import gdb
 import copy
 import gdb.FrameFilter
 from gdb.FrameIterator import FrameIterator
-from gdb.FrameWrapper import FrameWrapper
-
-class PrimordialFilter:
-
-    def filter_unwrapped (self, frame):
-        foo =  gdb.Frame
-        if isinstance (frame, foo):
-            return True
-        else:
-            return False
-
-    def filter (self, iterator):
-        for it in iterator:
-            if self.filter_unwrapped (it):
-                yield FrameWrapper(it)
-            else:
-                yield it
+from gdb.BaseFrameWrapper import BaseFrameWrapper
+import itertools
 
 def _parse_arg (cmd_name, arg):
     """ Internal Worker function to take an argument and return a
@@ -79,10 +64,10 @@ def _set_priority(filter_item, priority):
         priority: The priority to assign as an integer.
     """
 
-    if priority < 0 and priority > 10000:
-        raise SyntaxError("Priority must be between 0 - 10000")
     if hasattr(filter_item, "priority"):
         filter_item.priority = priority
+    else:
+        raise gdb.GdbError("Cannot find class attribute 'priority'")
 
 def _get_enabled(filter_item):
     """ Internal Worker function to return the frame-filter's enabled
@@ -96,7 +81,7 @@ def _get_enabled(filter_item):
     if hasattr(filter_item[1], "enabled"):
         return filter_item[1].enabled
     else:
-        return True
+        raise gdb.GdbError("Cannot find class attribute 'enabled'")
 
 def _set_enabled(filter_item, state):
     """ Internal Worker function to set the frame-filter's enabled
@@ -107,9 +92,10 @@ def _set_enabled(filter_item, state):
         and the second being the frame-filter object.
         state: True or False, depending on desired state.
     """
-
     if hasattr(filter_item, "enabled"):
         filter_item.enabled = state
+    else:        
+        raise gdb.GdbError("Cannot find class attribute 'enabled'")
 
 def _get_name (frame_filter):
     """ Internal Worker function to return the name of the
@@ -121,10 +107,7 @@ def _get_name (frame_filter):
     """
     if hasattr(frame_filter, "name"):
         return frame_filter.name
-    if hasattr(frame_filter, "__name__"):
-        return frame_filter.__name__
-    # Deal with anonymous objects/functions
-    return "Unknown"
+    raise gdb.GdbError("Cannot find class attribute 'name'")
 
 def _return_list (name):
     """ Internal Worker function to return the frame-filter name,
@@ -178,11 +161,15 @@ def invoke (frame):
     """
     sorted_list = _sort_list()
     frame_iterator = FrameIterator (frame)
+
+    # Apply base filter to all gdb.Frames.  This unifies the in
+    # interface
+
+    frame_iterator = itertools.imap (BaseFrameWrapper, frame_iterator) 
+
     for ff in sorted_list:
         frame_iterator = ff[1].filter (frame_iterator)
 
-    pri = PrimordialFilter ()
-    frame_iterator = pri.filter (frame_iterator)
     return frame_iterator
 
 class InfoFrameFilter(gdb.Command):
