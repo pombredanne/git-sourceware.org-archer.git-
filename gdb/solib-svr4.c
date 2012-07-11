@@ -1467,21 +1467,23 @@ exec_entry_point (struct bfd *abfd, struct target_ops *targ)
 					     targ);
 }
 
-/* XXX.  */
+/* A probe and its associated information structure.  */
 
-struct probe_with_info
+struct probe_and_info
 {
-  /* XXX.  */
-  const struct probe_info *info;
-
-  /* XXX.  */
+  /* The probe.  */
   struct probe *probe;
+
+  /* The probe_info from which the probe was created.  */
+  const struct probe_info *info;
 };
 
-/* XXX.  */
+/* Get the solib event probe at the specified location, and the
+   probe_info the probe was created with.  Returns NULL if no solib
+   event probe exists at that location.  */
 
-static struct probe_with_info *
-probe_at (struct bp_location *loc, struct probe_with_info *result)
+static struct probe_and_info *
+solib_event_probe_at (struct bp_location *loc, struct probe_and_info *result)
 {
   struct svr4_info *info = get_svr4_info ();
   int i;
@@ -1513,7 +1515,7 @@ static void
 svr4_handle_solib_event (bpstat bs)
 {
   struct svr4_info *info = get_svr4_info ();
-  struct probe_with_info buf, *pi;
+  struct probe_and_info buf, *pi;
   enum probe_action action;
 
   /* It is possible that this function will be called incorrectly via
@@ -1524,7 +1526,7 @@ svr4_handle_solib_event (bpstat bs)
   if (!info->using_probes)
     return;
 
-  pi = probe_at (bs->bp_location_at, &buf);
+  pi = solib_event_probe_at (bs->bp_location_at, &buf);
   if (pi == NULL)
     action = LM_CACHE_RELOAD; /* Should never happen.  */
   else
@@ -1547,9 +1549,9 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 
   for (loc = b->loc; loc; loc = loc->next)
     {
-      struct probe_with_info buf, *pi;
+      struct probe_and_info buf, *pi;
 
-      pi = probe_at (loc, &buf);
+      pi = solib_event_probe_at (loc, &buf);
       if (pi != NULL)
 	{
 	  if (!pi->info->mandatory)
