@@ -1,0 +1,54 @@
+# Copyright 2012 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+if { [skip_shlib_tests] || [is_remote target] } {
+    return 0
+}
+
+standard_testfile
+
+set lib1name $testfile-solib1
+set srcfile_lib1 $srcdir/$subdir/$lib1name.c
+set binfile_lib1 $objdir/$subdir/$lib1name.so
+set define1 -DSHLIB1_NAME\=\"$binfile_lib1\"
+
+set lib2name $testfile-solib2
+set srcfile_lib2 $srcdir/$subdir/$lib2name.c
+set binfile_lib2 $objdir/$subdir/$lib2name.so
+set define2 -DSHLIB2_NAME\=\"$binfile_lib2\"
+
+if { [gdb_compile_shlib $srcfile_lib1 $binfile_lib1 \
+	  [list additional_flags=-fPIC]] != "" } {
+    untested "Could not compile $binfile_lib1."
+    return -1
+}
+
+if { [gdb_compile_shlib $srcfile_lib2 $binfile_lib2 \
+	  [list additional_flags=-fPIC]] != "" } {
+    untested "Could not compile $binfile_lib2."
+    return -1
+}
+
+set cflags "$define1 $define2"
+if { [prepare_for_testing $testfile.exp $testfile $srcfile \
+	  [list additional_flags=$cflags libs=-ldl]] } {
+    return -1
+}
+
+# Set up breakpoints
+gdb_test "break stop" {Breakpoint [0-9]+ at .*}
+gdb_test_no_output "set breakpoint pending on"
+gdb_test "break foo" {Breakpoint [0-9]+ \(foo\) pending\.}
+gdb_test "break bar" {Breakpoint [0-9]+ \(bar\) pending\.}
