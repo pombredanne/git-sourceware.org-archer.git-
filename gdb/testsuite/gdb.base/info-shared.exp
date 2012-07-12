@@ -52,3 +52,64 @@ gdb_test "break stop" {Breakpoint [0-9]+ at .*}
 gdb_test_no_output "set breakpoint pending on"
 gdb_test "break foo" {Breakpoint [0-9]+ \(foo\) pending\.}
 gdb_test "break bar" {Breakpoint [0-9]+ \(bar\) pending\.}
+
+# Check neither of the libraries are loaded at the start
+gdb_test "start" {Temporary breakpoint [0-9]+, .* in main \(\)}
+set test "info sharedlibrary #1"
+gdb_test_multiple "info sharedlibrary" $test {
+    -re $lib1name {
+	fail $test
+    }
+    -re $lib2name {
+	fail $test
+    }
+    -re "\r\n$gdb_prompt $" {
+	pass $test
+    }
+}
+
+# Run to the first stop and check that only the first library is loaded
+gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
+set test "info sharedlibrary #2"
+set found1 0
+set found2 0
+gdb_test_multiple "info sharedlibrary" $test {
+    -re $lib1name {
+	set found1 1
+	exp_continue
+    }
+    -re $lib2name {
+	set found2 1
+	exp_continue
+    }
+    -re "\r\n$gdb_prompt $" {
+	if { $found1 && !$found2 } {
+	    pass $test
+	} else {
+	    fail $test
+	}
+    }
+}
+
+# Run to the second stop and check that both libraries are loaded
+gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
+set test "info sharedlibrary #2"
+set found1 0
+set found2 0
+gdb_test_multiple "info sharedlibrary" $test {
+    -re $lib1name {
+	set found1 1
+	exp_continue
+    }
+    -re $lib2name {
+	set found2 1
+	exp_continue
+    }
+    -re "\r\n$gdb_prompt $" {
+	if { $found1 && $found2 } {
+	    pass $test
+	} else {
+	    fail $test
+	}
+    }
+}
