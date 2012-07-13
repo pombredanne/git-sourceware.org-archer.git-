@@ -95,8 +95,7 @@ static const char * const solib_break_names[] =
   NULL
 };
 
-/* What to do with the link_map cache when a breakpoint at this probe
-   is hit.  */
+/* What to do with the link_map cache.  */
 
 enum probe_action
   {
@@ -1665,6 +1664,9 @@ solib_cache_update_incremental (struct probe_and_info *pi)
 
   lm = value_as_address (evaluate_probe_argument (os->objfile,
 						  pi->probe, 2));
+
+  if (lm == 0)
+    return 0;
 
   return svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0);
 }
