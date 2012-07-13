@@ -1604,6 +1604,29 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
   return action;
 }
 
+/* Returns a hash code for P.  */
+
+static hashval_t
+hash_longest (const PTR p)
+{
+  const LONGEST *l = (const LONGEST *) p;
+  hashval_t hash = (hashval_t) *l;
+
+  gdb_assert (*l == hash);
+  return hash;
+}
+
+/* Returns non-zero if P1 and P2 are equal.  */
+
+static int
+equal_longest (const PTR p1, const PTR p2)
+{
+  const LONGEST *l1 = (const LONGEST *) p1;
+  const LONGEST *l2 = (const LONGEST *) p2;
+
+  return *l1 == *l2;
+}
+
 /* Populate the solib cache with by reading the entire list of shared
    objects from the inferior.  */
 
@@ -1617,7 +1640,11 @@ solib_cache_update_full (struct obj_section *os,
 
   if (info->solib_cache == NULL)
     {
-      abort (); /* XXX */
+      info->solib_cache = htab_create_alloc (1,
+					     hash_longest,
+					     equal_longest,
+					     svr4_free_library_list,
+					     xcalloc, xfree);
     }
 
   slot = htab_find_slot (info->solib_cache, &lmid, INSERT);
