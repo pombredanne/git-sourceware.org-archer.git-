@@ -1613,14 +1613,18 @@ solib_cache_update_full (struct obj_section *os,
 			 LONGEST lmid)
 {
   struct svr4_info *info = get_svr4_info ();
+  void **slot;
 
   if (info->solib_cache == NULL)
     {
       abort (); /* XXX */
     }
 
-  gdb_assert (info->solib_cache == NULL);
-  info->solib_cache = svr4_current_sos ();
+  slot = htab_find_slot (info->solib_cache, &lmid, INSERT);
+  if (*slot != NULL)
+    svr4_free_library_list (slot);
+
+  *slot = svr4_current_sos ();
 }
 
 /* Update the solib cache starting from the link-map supplied by the
