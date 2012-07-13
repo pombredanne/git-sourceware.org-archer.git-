@@ -1385,52 +1385,20 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
   return 1;
 }
 
-/* Implement the "current_sos" target_so_ops method.  */
+/* Read the list of loaded libraries from the dynamic linker's base
+   structure.  */
 
 static struct so_list *
-svr4_current_sos (void)
+svr4_current_sos_from_debug_base (void)
 {
+  struct svr4_info *info = get_svr4_info ();
   CORE_ADDR lm;
   struct so_list *head = NULL;
   struct so_list **link_ptr = &head;
-  struct svr4_info *info;
   struct cleanup *back_to;
   int ignore_first;
-  struct svr4_library_list library_list;
 
-  /* Fall back to manual examination of the target if the packet is not
-     supported or gdbserver failed to find DT_DEBUG.  gdb.server/solib-list.exp
-     tests a case where gdbserver cannot find the shared libraries list while
-     GDB itself is able to find it via SYMFILE_OBJFILE.
-
-     Unfortunately statically linked inferiors will also fall back through this
-     suboptimal code path.  */
-
-  if (svr4_current_sos_via_xfer_libraries (&library_list))
-    {
-      if (library_list.main_lm)
-	{
-	  info = get_svr4_info ();
-	  info->main_lm_addr = library_list.main_lm;
-	}
-
-      return library_list.head ? library_list.head : svr4_default_sos ();
-    }
-
-  info = get_svr4_info ();
-
-  /* If we have a cached result then return a copy.  */
-  if (info->solib_table != NULL)
-    return svr4_create_library_list (info->solib_table);
-
-  /* Always locate the debug struct, in case it has moved.  */
-  info->debug_base = 0;
-  locate_base (info);
-
-  /* If we can't find the dynamic linker's base structure, this
-     must not be a dynamically linked executable.  Hmm.  */
-  if (! info->debug_base)
-    return svr4_default_sos ();
+  gdb_assert (info->debug_base);
 
   /* Assume that everything is a library if the dynamic loader was loaded
      late by a static executable.  */
@@ -1457,10 +1425,58 @@ svr4_current_sos (void)
 
   discard_cleanups (back_to);
 
-  if (head == NULL)
+  return head;
+}
+
+/* Implement the "current_sos" target_so_ops method.  */
+
+static struct so_list *
+svr4_current_sos (void)
+{
+  struct svr4_info *info;
+  struct svr4_library_list library_list;
+  struct so_list *result;
+
+  /* Fall back to manual examination of the target if the packet is not
+     supported or gdbserver failed to find DT_DEBUG.  gdb.server/solib-list.exp
+     tests a case where gdbserver cannot find the shared libraries list while
+     GDB itself is able to find it via SYMFILE_OBJFILE.
+
+     Unfortunately statically linked inferiors will also fall back through this
+     suboptimal code path.  */
+
+  if (svr4_current_sos_via_xfer_libraries (&library_list))
+    {
+      if (library_list.main_lm)
+	{
+	  info = get_svr4_info ();
+	  info->main_lm_addr = library_list.main_lm;
+	}
+
+      return library_list.head ? library_list.head : svr4_default_sos ();
+    }
+
+  info = get_svr4_info ();
+
+  /* Always locate the debug struct, in case it has moved.  */
+  info->debug_base = 0;
+  locate_base (info);
+
+  /* If we have a cached result then return a copy.  */
+  if (info->solib_table != NULL)
+    return svr4_create_library_list (info->solib_table);
+
+  /* If we can't find the dynamic linker's base structure, this
+     must not be a dynamically linked executable.  Hmm.  */
+  if (! info->debug_base)
     return svr4_default_sos ();
 
-  return head;
+  result = svr4_current_sos_from_debug_base ();
+
+  if (result == NULL)
+    return svr4_default_sos ();
+
+  return result;
 }
 
 /* Get the address of the link_map for a given OBJFILE.  */
