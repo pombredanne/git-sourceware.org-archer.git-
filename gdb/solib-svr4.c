@@ -1681,6 +1681,11 @@ solib_table_update_full (struct obj_section *os,
   if (r_debug == 0)
     return 0;
 
+  /* Always locate the debug struct, in case it moved.  */
+  info->debug_base = 0;
+  if (locate_base (info) == 0)
+    return 0;
+
   if (r_debug == info->debug_base)
     {
       /* The global namespace requires special handling.  */
