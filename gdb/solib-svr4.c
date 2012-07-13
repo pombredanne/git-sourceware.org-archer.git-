@@ -373,8 +373,9 @@ struct svr4_info
   VEC (probe_p) *probes[NUM_PROBES];
 
   /* List of objects loaded from the inferior, used by the
-     probes-based interface to support incremental updates.  */
-  struct so_list *solib_cache;
+     probes-based interface to support incremental updates
+     and multiple namespaces.  */
+  htab_t solib_cache;
 };
 
 /* Per-program-space data key.  */
@@ -401,7 +402,7 @@ free_solib_cache (struct svr4_info *info)
   if (info->solib_cache == NULL)
     return;
 
-  svr4_free_library_list (&info->solib_cache);
+  htab_delete (info->solib_cache);
   info->solib_cache = NULL;
 }
 
@@ -1630,9 +1631,16 @@ solib_event_probe_action (struct probe_and_info *pi)
    objects from the inferior.  */
 
 static void
-solib_cache_update_full (void)
+solib_cache_update_full (struct obj_section *os,
+			 struct probe_and_info *pi,
+			 LONGEST lmid)
 {
   struct svr4_info *info = get_svr4_info ();
+
+  if (info->solib_cache == NULL)
+    {
+      abort (); /* XXX */
+    }
 
   gdb_assert (info->solib_cache == NULL);
   info->solib_cache = svr4_current_sos ();
@@ -1643,24 +1651,24 @@ solib_cache_update_full (void)
    was successfully updated, or zero to indicate failure.  */
 
 static int
-solib_cache_update_incremental (struct probe_and_info *pi)
+solib_cache_update_incremental (struct obj_section *os,
+				struct probe_and_info *pi,
+				LONGEST lmid)
 {
   struct svr4_info *info = get_svr4_info ();
   struct so_list *tail, **link;
-  struct obj_section *os;
   CORE_ADDR lm;
 
   if (info->solib_cache == NULL)
     return 0;
 
-  tail = info->solib_cache;
+  tail = htab_find (info->solib_cache, &lmid);
+  if (tail == NULL)
+    return 0;
+
   while (tail->next)
     tail = tail->next;
   link = &tail->next;
-
-  os = find_pc_section (pi->probe->address);
-  if (os == NULL)
-    return 0;
 
   lm = value_as_address (evaluate_probe_argument (os->objfile,
 						  pi->probe, 2));
@@ -1679,7 +1687,9 @@ svr4_handle_solib_event (bpstat bs)
 {
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_info buf, *pi;
-  enum probe_action action;
+  struct obj_section *os;
+  LONGEST lmid;
+  enum probe_action action = LM_CACHE_INVALIDATE;
 
   /* It is possible that this function will be called incorrectly
      by the handle_solib_event in handle_inferior_event if GDB goes
@@ -1690,27 +1700,35 @@ svr4_handle_solib_event (bpstat bs)
     return;
 
   pi = solib_event_probe_at (bs->bp_location_at, &buf);
-  if (pi == NULL)
-    action = LM_CACHE_INVALIDATE; /* Should never happen.  */
-  else
-    action = solib_event_probe_action (pi);
+  if (pi != NULL)
+    {
+      os = find_pc_section (pi->probe->address);
+      if (os != NULL)
+	action = solib_event_probe_action (os, pi);
+    }
+
+  if (action == LM_CACHE_INVALIDATE)
+    {
+      /* Should never happen.  */
+      free_solib_cache (info);
+      return;
+    }
 
   if (action == LM_CACHE_NO_ACTION)
     return;
 
-  if (action == LM_CACHE_UPDATE_OR_RELOAD)
+  lmid = value_as_long (evaluate_probe_argument (os->objfile,
+						 pi->probe, 0));
+
+  gdb_assert (action == LM_CACHE_RELOAD
+	      || action == LM_CACHE_UPDATE_OR_RELOAD);
+
+  if (action == LM_CACHE_RELOAD
+      || !solib_cache_update_incremental (os, pi, lmid))
     {
-      if (solib_cache_update_incremental (pi))
-	return;
-
-      action = LM_CACHE_RELOAD;
+      free_solib_cache_line (info);
+      solib_cache_update_full (os, pi, lmid);
     }
-
-  free_solib_cache (info);
-  if (action == LM_CACHE_INVALIDATE)
-    return;
-
-  solib_cache_update_full ();
 }
 
 /* Helper function for svr4_update_solib_event_breakpoints.  */
