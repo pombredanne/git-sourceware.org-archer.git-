@@ -95,23 +95,25 @@ static const char * const solib_break_names[] =
   NULL
 };
 
-/* What to do with the link_map cache.  */
+/* What to do with this namespace's entry in the solib table.  */
 
 enum probe_action
   {
-    /* No action is required.  The cache is still valid.  */
-    LM_CACHE_NO_ACTION,
+    /* Something went seriously wrong.  Stop using probes and
+       revert to using the older interface.  */
+    SOLIB_TABLE_INVALIDATE,
 
-    /* Something went wrong.  The cache may be invalid and must be
-       cleared.  Do not attempt further caching at this stop.  */
-    LM_CACHE_INVALIDATE,
+    /* No action is required.  This namespace's entry is still
+       valid.  */
+    SOLIB_TABLE_NO_ACTION,
 
-    /* The cache should be reloaded now.  */
-    LM_CACHE_RELOAD,
+    /* This namespace's entry should be reloaded entirely.  */
+    SOLIB_TABLE_RELOAD,
 
-    /* Attempt to incrementally update the cache.  If the update
-       fails or is not possible, fall back to LM_CACHE_RELOAD.  */
-    LM_CACHE_UPDATE_OR_RELOAD
+    /* Attempt to incrementally update this namespace's entry. If
+       the update fails or is not possible, fall back to reloading
+       the entry in full.  */
+    SOLIB_TABLE_UPDATE_OR_RELOAD
   };
 
 /* A list of named probes which, if present in the dynamic linker,
@@ -127,19 +129,19 @@ struct probe_info
      stop-on-solib-events is off.  */
   int mandatory;
 
-  /* What to do with the link_map cache when a breakpoint at this
-     probe is hit.  */
+  /* What to do with this namespace's entry in the solib table
+     when a breakpoint at this probe is hit.  */
   enum probe_action action;
 };
 
 static const struct probe_info probe_info[] =
 {
-  { "init_start", 0, LM_CACHE_NO_ACTION },
-  { "init_complete", 1, LM_CACHE_RELOAD },
-  { "map_start", 0, LM_CACHE_NO_ACTION },
-  { "reloc_complete", 1, LM_CACHE_UPDATE_OR_RELOAD },
-  { "unmap_start", 0, LM_CACHE_NO_ACTION },
-  { "unmap_complete", 1, LM_CACHE_RELOAD },
+  { "init_start", 0, SOLIB_TABLE_NO_ACTION },
+  { "init_complete", 1, SOLIB_TABLE_RELOAD },
+  { "map_start", 0, SOLIB_TABLE_NO_ACTION },
+  { "reloc_complete", 1, SOLIB_TABLE_UPDATE_OR_RELOAD },
+  { "unmap_start", 0, SOLIB_TABLE_NO_ACTION },
+  { "unmap_complete", 1, SOLIB_TABLE_RELOAD },
 };
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
@@ -375,7 +377,7 @@ struct svr4_info
   /* List of objects loaded from the inferior, used by the
      probes-based interface to support incremental updates
      and multiple namespaces.  */
-  htab_t solib_cache;
+  htab_t solib_table;
 };
 
 /* Per-program-space data key.  */
@@ -394,16 +396,16 @@ free_probes (struct svr4_info *info)
   memset (info->probes, 0, sizeof (info->probes));
 }
 
-/* Free any cached solibs.  */
+/* Free the solib table.  */
 
 static void
-free_solib_cache (struct svr4_info *info)
+free_solib_table (struct svr4_info *info)
 {
-  if (info->solib_cache == NULL)
+  if (info->solib_table == NULL)
     return;
 
-  htab_delete (info->solib_cache);
-  info->solib_cache = NULL;
+  htab_delete (info->solib_table);
+  info->solib_table = NULL;
 }
 
 static void
@@ -416,7 +418,7 @@ svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
     return;
 
   free_probes (info);
-  free_solib_cache (info);
+  free_solib_table (info);
 
   xfree (info);
 }
@@ -1111,11 +1113,11 @@ svr4_create_library_list_helper (void **slot, void *arg)
 /* Create library list.  */
 
 static struct so_list *
-svr4_create_library_list (htab_t solib_cache)
+svr4_create_library_list (htab_t solib_table)
 {
   struct so_list *dst = NULL;
 
-  htab_traverse (solib_cache, svr4_create_library_list_helper, &dst);
+  htab_traverse (solib_table, svr4_create_library_list_helper, &dst);
 
   return dst;
 }
@@ -1422,8 +1424,8 @@ svr4_current_sos (void)
   info = get_svr4_info ();
 
   /* If we have a cached result then return a copy.  */
-  if (info->solib_cache != NULL)
-    return svr4_create_library_list (info->solib_cache);
+  if (info->solib_table != NULL)
+    return svr4_create_library_list (info->solib_table);
 
   /* Always locate the debug struct, in case it has moved.  */
   info->debug_base = 0;
@@ -1596,11 +1598,11 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
   unsigned probe_argc;
 
   action = pi->info->action;
-  if (action == LM_CACHE_NO_ACTION || action == LM_CACHE_INVALIDATE)
+  if (action == SOLIB_TABLE_NO_ACTION || action == SOLIB_TABLE_INVALIDATE)
     return action;
 
-  gdb_assert (action == LM_CACHE_RELOAD
-	      || action == LM_CACHE_UPDATE_OR_RELOAD);
+  gdb_assert (action == SOLIB_TABLE_RELOAD
+	      || action == SOLIB_TABLE_UPDATE_OR_RELOAD);
 
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
@@ -1609,9 +1611,9 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
        arg3: struct link_map *new (optional, for incremental updates)  */
   probe_argc = get_probe_argument_count (os->objfile, pi->probe);
   if (probe_argc == 2)
-    action = LM_CACHE_RELOAD;
+    action = SOLIB_TABLE_RELOAD;
   else if (probe_argc < 2)
-    return LM_CACHE_INVALIDATE;
+    return SOLIB_TABLE_INVALIDATE;
 
   return action;
 }
@@ -1640,39 +1642,40 @@ equal_longest (const PTR p1, const PTR p2)
   return *l1 == *l2;
 }
 
-/* Populate the solib cache with by reading the entire list of shared
-   objects from the inferior.  */
+/* Populate this namespace's entry in the solib table with by reading
+   the entire list of shared objects from the inferior.  */
 
 static void
-solib_cache_update_full (struct obj_section *os,
+solib_table_update_full (struct obj_section *os,
 			 struct probe_and_info *pi,
 			 LONGEST lmid)
 {
   struct svr4_info *info = get_svr4_info ();
   void **slot;
 
-  if (info->solib_cache == NULL)
+  if (info->solib_table == NULL)
     {
-      info->solib_cache = htab_create_alloc (1,
+      info->solib_table = htab_create_alloc (1,
 					     hash_longest,
 					     equal_longest,
 					     svr4_free_library_list,
 					     xcalloc, xfree);
     }
 
-  slot = htab_find_slot (info->solib_cache, &lmid, INSERT);
+  slot = htab_find_slot (info->solib_table, &lmid, INSERT);
   if (*slot != NULL)
     svr4_free_library_list (slot);
 
   *slot = svr4_current_sos ();
 }
 
-/* Update the solib cache starting from the link-map supplied by the
-   linker in the probe's third argument.  Returns nonzero if the list
-   was successfully updated, or zero to indicate failure.  */
+/* Update this namespace's entry in the solib table starting from the
+   link-map supplied by the linker in the probe's third argument.
+   Returns nonzero if the list was successfully updated, or zero to
+   indicate failure.  */
 
 static int
-solib_cache_update_incremental (struct obj_section *os,
+solib_table_update_incremental (struct obj_section *os,
 				struct probe_and_info *pi,
 				LONGEST lmid)
 {
@@ -1680,10 +1683,10 @@ solib_cache_update_incremental (struct obj_section *os,
   struct so_list *tail, **link;
   CORE_ADDR lm;
 
-  if (info->solib_cache == NULL)
+  if (info->solib_table == NULL)
     return 0;
 
-  tail = htab_find (info->solib_cache, &lmid);
+  tail = htab_find (info->solib_table, &lmid);
   if (tail == NULL)
     return 0;
 
@@ -1700,7 +1703,7 @@ solib_cache_update_incremental (struct obj_section *os,
   return svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0);
 }
 
-/* Update the solib cache as appropriate when using the probes-based
+/* Update the solib table as appropriate when using the probes-based
    linker interface.  Do nothing if using the standard interface.  */
 
 static void
@@ -1710,7 +1713,7 @@ svr4_handle_solib_event (bpstat bs)
   struct probe_and_info buf, *pi;
   struct obj_section *os;
   LONGEST lmid;
-  enum probe_action action = LM_CACHE_INVALIDATE;
+  enum probe_action action = SOLIB_TABLE_INVALIDATE;
 
   /* It is possible that this function will be called incorrectly
      by the handle_solib_event in handle_inferior_event if GDB goes
@@ -1728,31 +1731,31 @@ svr4_handle_solib_event (bpstat bs)
 	action = solib_event_probe_action (os, pi);
     }
 
-  if (action == LM_CACHE_INVALIDATE)
+  if (action == SOLIB_TABLE_INVALIDATE)
     {
       /* This should never happen, but if it does we disable the
 	 probes interface and revert to the original interface.
 	 We don't reset the breakpoints as the ones we've set up
 	 are adequate.  */
-      free_solib_cache (info);
+      free_solib_table (info);
       free_probes (info);
       info->using_probes = 0;
       return;
     }
 
-  if (action == LM_CACHE_NO_ACTION)
+  if (action == SOLIB_TABLE_NO_ACTION)
     return;
 
   lmid = value_as_long (evaluate_probe_argument (os->objfile,
 						 pi->probe, 0));
 
-  gdb_assert (action == LM_CACHE_RELOAD
-	      || action == LM_CACHE_UPDATE_OR_RELOAD);
+  gdb_assert (action == SOLIB_TABLE_RELOAD
+	      || action == SOLIB_TABLE_UPDATE_OR_RELOAD);
 
-  if (action == LM_CACHE_RELOAD
-      || !solib_cache_update_incremental (os, pi, lmid))
+  if (action == SOLIB_TABLE_RELOAD
+      || !solib_table_update_incremental (os, pi, lmid))
     {
-      solib_cache_update_full (os, pi, lmid);
+      solib_table_update_full (os, pi, lmid);
     }
 }
 
@@ -2708,8 +2711,8 @@ svr4_solib_create_inferior_hook (int from_tty)
 
   info = get_svr4_info ();
 
-  /* Free any solibs cached by the probes-based linker interface.  */
-  free_solib_cache (info);
+  /* Free the probes-based linker interface's solib table.  */
+  free_solib_table (info);
 
   /* Relocate the main executable if necessary.  */
   svr4_relocate_main_executable ();
