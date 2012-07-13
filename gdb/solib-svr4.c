@@ -866,6 +866,25 @@ locate_base (struct svr4_info *info)
   return info->debug_base;
 }
 
+/* Read the r_map field from the supplied r_debug structure.  */
+
+static CORE_ADDR
+r_map_from_debug_base (CORE_ADDR debug_base)
+{
+  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+  struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
+  CORE_ADDR addr = 0;
+  volatile struct gdb_exception ex;
+
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      addr = read_memory_typed_address (debug_base + lmo->r_map_offset,
+                                        ptr_type);
+    }
+  exception_print (gdb_stderr, ex);
+  return addr;
+}
+
 /* Find the first element in the inferior's dynamic link map, and
    return its address in the inferior.  Return zero if the address
    could not be determined.
@@ -877,18 +896,7 @@ locate_base (struct svr4_info *info)
 static CORE_ADDR
 solib_svr4_r_map (struct svr4_info *info)
 {
-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
-  struct type *ptr_type = builtin_type (target_gdbarch)->builtin_data_ptr;
-  CORE_ADDR addr = 0;
-  volatile struct gdb_exception ex;
-
-  TRY_CATCH (ex, RETURN_MASK_ERROR)
-    {
-      addr = read_memory_typed_address (info->debug_base + lmo->r_map_offset,
-                                        ptr_type);
-    }
-  exception_print (gdb_stderr, ex);
-  return addr;
+  return r_map_from_debug_base (info->debug_base);
 }
 
 /* Find r_brk from the inferior's debug base.  */
@@ -1655,15 +1663,40 @@ equal_longest (const PTR p1, const PTR p2)
 }
 
 /* Populate this namespace's entry in the solib table with by reading
-   the entire list of shared objects from the inferior.  */
+   the entire list of shared objects from the inferior.  Returns
+   nonzero on success.  */
 
-static void
+static int
 solib_table_update_full (struct obj_section *os,
 			 struct probe_and_info *pi,
 			 LONGEST lmid)
 {
   struct svr4_info *info = get_svr4_info ();
   void **slot;
+  CORE_ADDR r_debug;
+  struct so_list *result = NULL;
+
+  r_debug = value_as_address (evaluate_probe_argument (os->objfile,
+						       pi->probe, 1));
+  if (r_debug == 0)
+    return 0;
+
+  if (r_debug == info->debug_base)
+    {
+      /* The global namespace requires special handling.  */
+      result = svr4_current_sos_from_debug_base ();
+    }
+  else
+    {
+      CORE_ADDR lm = r_map_from_debug_base (r_debug);
+      struct so_list **link_ptr = &result;
+
+      if (!svr4_read_so_list (lm, 0, &link_ptr, 0))
+	return 0;
+    }
+
+  if (result == NULL)
+    return 0;
 
   if (info->solib_table == NULL)
     {
@@ -1678,7 +1711,9 @@ solib_table_update_full (struct obj_section *os,
   if (*slot != NULL)
     svr4_free_library_list (slot);
 
-  *slot = svr4_current_sos ();
+  *slot = result;
+
+  return 1;
 }
 
 /* Update this namespace's entry in the solib table starting from the
@@ -1724,7 +1759,6 @@ svr4_handle_solib_event (bpstat bs)
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_info buf, *pi;
   struct obj_section *os;
-  LONGEST lmid;
   enum probe_action action = SOLIB_TABLE_INVALIDATE;
 
   /* It is possible that this function will be called incorrectly
@@ -1743,32 +1777,35 @@ svr4_handle_solib_event (bpstat bs)
 	action = solib_event_probe_action (os, pi);
     }
 
-  if (action == SOLIB_TABLE_INVALIDATE)
-    {
-      /* This should never happen, but if it does we disable the
-	 probes interface and revert to the original interface.
-	 We don't reset the breakpoints as the ones we've set up
-	 are adequate.  */
-      free_solib_table (info);
-      free_probes (info);
-      info->using_probes = 0;
-      return;
-    }
-
   if (action == SOLIB_TABLE_NO_ACTION)
     return;
 
-  lmid = value_as_long (evaluate_probe_argument (os->objfile,
-						 pi->probe, 0));
-
-  gdb_assert (action == SOLIB_TABLE_RELOAD
-	      || action == SOLIB_TABLE_UPDATE_OR_RELOAD);
-
-  if (action == SOLIB_TABLE_RELOAD
-      || !solib_table_update_incremental (os, pi, lmid))
+  if (action != SOLIB_TABLE_INVALIDATE)
     {
-      solib_table_update_full (os, pi, lmid);
+      LONGEST lmid = value_as_long (evaluate_probe_argument (os->objfile,
+							     pi->probe, 0));
+
+      if (action == SOLIB_TABLE_UPDATE_OR_RELOAD)
+	{
+	  if (solib_table_update_incremental (os, pi, lmid))
+	    return;
+
+	  action = SOLIB_TABLE_RELOAD;
+	}
+
+      gdb_assert (action == SOLIB_TABLE_RELOAD);
+
+      if (solib_table_update_full (os, pi, lmid))
+	return;
     }
+
+  /* We should never reach here, but if we do we disable the
+     probes interface and revert to the original interface.
+     We don't reset the breakpoints as the ones we've set up
+     are adequate.  */
+  free_solib_table (info);
+  free_probes (info);
+  info->using_probes = 0;
 }
 
 /* Helper function for svr4_update_solib_event_breakpoints.  */
