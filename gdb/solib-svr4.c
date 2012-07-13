@@ -1808,6 +1808,9 @@ svr4_handle_solib_event (bpstat bs)
      probes interface and revert to the original interface.
      We don't reset the breakpoints as the ones we've set up
      are adequate.  */
+  warning (_("Probes-based dynamic linker interface failed.\n"
+	     "Reverting to original interface.\n"));
+
   free_solib_table (info);
   free_probes (info);
   info->using_probes = 0;
