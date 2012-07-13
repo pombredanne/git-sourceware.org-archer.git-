@@ -21,12 +21,12 @@ standard_testfile
 
 set lib1name $testfile-solib1
 set srcfile_lib1 $srcdir/$subdir/$lib1name.c
-set binfile_lib1 $objdir/$subdir/$lib1name.so
+set binfile_lib1 [standard_output_file $lib1name.so]
 set define1 -DSHLIB1_NAME\=\"$binfile_lib1\"
 
 set lib2name $testfile-solib2
 set srcfile_lib2 $srcdir/$subdir/$lib2name.c
-set binfile_lib2 $objdir/$subdir/$lib2name.so
+set binfile_lib2 [standard_output_file $lib2name.so]
 set define2 -DSHLIB2_NAME\=\"$binfile_lib2\"
 
 if { [gdb_compile_shlib $srcfile_lib1 $binfile_lib1 \

@@ -21,7 +21,7 @@ standard_testfile
 
 set libname $testfile-solib
 set srcfile_lib $srcdir/$subdir/$libname.c
-set binfile_lib $objdir/$subdir/$libname.so
+set binfile_lib [standard_output_file $libname.so]
 
 set normal_bp "_dl_debug_state"
 set probes_bp "dl_main"
