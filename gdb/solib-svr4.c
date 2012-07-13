@@ -1604,7 +1604,7 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
   return action;
 }
 
-/* Returns a hash code for P.  */
+/* Returns a hash code for the LONGEST referenced by P.  */
 
 static hashval_t
 hash_longest (const PTR p)
@@ -1616,7 +1616,8 @@ hash_longest (const PTR p)
   return hash;
 }
 
-/* Returns non-zero if P1 and P2 are equal.  */
+/* Returns non-zero if the LONGESTs referenced by P1 and P2 are
+   equal.  */
 
 static int
 equal_longest (const PTR p1, const PTR p2)
