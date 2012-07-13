@@ -1578,14 +1578,10 @@ solib_event_probe_at (struct bp_location *loc, struct probe_and_info *result)
    hit.  */
 
 static enum probe_action
-solib_event_probe_action (struct probe_and_info *pi)
+solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
 {
   enum probe_action action;
-  int update;
-  struct obj_section *os;
   unsigned probe_argc;
-  struct svr4_info *info;
-  CORE_ADDR debug_base;
 
   action = pi->info->action;
   if (action == LM_CACHE_NO_ACTION || action == LM_CACHE_INVALIDATE)
@@ -1593,10 +1589,6 @@ solib_event_probe_action (struct probe_and_info *pi)
 
   gdb_assert (action == LM_CACHE_RELOAD
 	      || action == LM_CACHE_UPDATE_OR_RELOAD);
-
-  os = find_pc_section (pi->probe->address);
-  if (os == NULL)
-    return LM_CACHE_INVALIDATE;
 
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
@@ -1608,21 +1600,6 @@ solib_event_probe_action (struct probe_and_info *pi)
     action = LM_CACHE_RELOAD;
   else if (probe_argc < 2)
     return LM_CACHE_INVALIDATE;
-
-  /* We only currently support the global namespace (PR gdb/11839).
-     If the probe's r_debug doesn't match the global r_debug then
-     this event refers to some other namespace and must be ignored.  */
-  info = get_svr4_info ();
-
-  /* Always locate the debug struct, in case it has moved.  */
-  info->debug_base = 0;
-  locate_base (info);
-
-  debug_base = value_as_address (evaluate_probe_argument (os->objfile,
-							  pi->probe, 1));
-
-  if (debug_base != info->debug_base)
-    return LM_CACHE_NO_ACTION;
 
   return action;
 }
@@ -1709,8 +1686,13 @@ svr4_handle_solib_event (bpstat bs)
 
   if (action == LM_CACHE_INVALIDATE)
     {
-      /* Should never happen.  */
+      /* This should never happen, but if it does we disable the
+	 probes interface and revert to the original interface.
+	 We don't reset the breakpoints as the ones we've set up
+	 are adequate.  */
       free_solib_cache (info);
+      free_probes (info);
+      info->using_probes = 0;
       return;
     }
 
