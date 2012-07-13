@@ -1,3 +1,54 @@
+2012-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix gdbserver run regression.
+	* gdb.trace/disconnected-tracing.exp (executabel): Fix typo.
+
+2012-07-12  Tom Tromey  <tromey@redhat.com>
+
+	* lib/gdb.exp (standard_testfile): Don't declare objdir.
+	(clean_restart): Likewise.
+	(core_find): Use standard_output_file.
+
+2012-07-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/dup-psym.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/dw2-anonymous-func.exp: Use
+	prepare_for_testing_full.
+	* gdb.dwarf2/dw2-basic.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/dw2-compressed.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/dw2-const.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/dw2-cu-size.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/dw2-intercu.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/dw2-intermix.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/dw2-linkage-name-trust.exp: Use
+	prepare_for_testing_full.
+	* gdb.dwarf2/dw2-producer.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/dw2-ref-missing-frame.exp: Use
+	prepare_for_testing_full.
+	* gdb.dwarf2/dw2-restore.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/dw2-strp.exp: Use prepare_for_testing_full.
+	* gdb.dwarf2/mac-fileno.exp: Use prepare_for_testing_full.
+
+2012-07-12  Tom Tromey  <tromey@redhat.com>
+
+	* lib/gdb.exp (build_executable_from_specs): New proc, from
+	build_executable.
+	(build_executable): Use it.
+	(prepare_for_testing_full): New proc.
+
+2012-07-11  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.reverse/break-precsave.exp: Use standard_output_file.
+	* gdb.reverse/consecutive-precsave.exp: Use standard_output_file.
+	* gdb.reverse/finish-precsave.exp: Use standard_output_file.
+	* gdb.reverse/i386-precsave.exp: Use standard_output_file.
+	* gdb.reverse/machinestate-precsave.exp: Use standard_output_file.
+	* gdb.reverse/sigall-precsave.exp: Use standard_output_file.
+	* gdb.reverse/solib-precsave.exp: Use standard_output_file.
+	* gdb.reverse/step-precsave.exp: Use standard_output_file.
+	* gdb.reverse/until-precsave.exp: Use standard_output_file.
+	* gdb.reverse/watch-precsave.exp: Use standard_output_file.
+
 2012-07-10  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.mi/dw2-ref-missing-frame.exp: Use standard_testfile,
