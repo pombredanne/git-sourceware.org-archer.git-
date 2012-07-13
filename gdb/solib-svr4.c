@@ -1834,7 +1834,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
       pi = solib_event_probe_at (loc, &buf);
       if (pi != NULL)
 	{
-	  if (pi->info->action != SOLIB_TABLE_NO_ACTION)
+	  if (pi->info->action == SOLIB_TABLE_NO_ACTION)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
 
