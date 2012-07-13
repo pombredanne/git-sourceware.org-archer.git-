@@ -125,10 +125,6 @@ struct probe_info
   /* The name of the probe.  */
   const char *name;
 
-  /* Nonzero if this probe must be stopped at even when
-     stop-on-solib-events is off.  */
-  int mandatory;
-
   /* What to do with this namespace's entry in the solib table
      when a breakpoint at this probe is hit.  */
   enum probe_action action;
@@ -136,12 +132,12 @@ struct probe_info
 
 static const struct probe_info probe_info[] =
 {
-  { "init_start", 0, SOLIB_TABLE_NO_ACTION },
-  { "init_complete", 1, SOLIB_TABLE_RELOAD },
-  { "map_start", 0, SOLIB_TABLE_NO_ACTION },
-  { "reloc_complete", 1, SOLIB_TABLE_UPDATE_OR_RELOAD },
-  { "unmap_start", 0, SOLIB_TABLE_NO_ACTION },
-  { "unmap_complete", 1, SOLIB_TABLE_RELOAD },
+  { "init_start", SOLIB_TABLE_NO_ACTION },
+  { "init_complete", SOLIB_TABLE_RELOAD },
+  { "map_start", SOLIB_TABLE_NO_ACTION },
+  { "reloc_complete", SOLIB_TABLE_UPDATE_OR_RELOAD },
+  { "unmap_start", SOLIB_TABLE_NO_ACTION },
+  { "unmap_complete", SOLIB_TABLE_RELOAD },
 };
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
@@ -1777,7 +1773,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
       pi = solib_event_probe_at (loc, &buf);
       if (pi != NULL)
 	{
-	  if (!pi->info->mandatory)
+	  if (pi->info->action != SOLIB_TABLE_NO_ACTION)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
 
