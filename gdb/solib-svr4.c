@@ -1114,7 +1114,7 @@ svr4_create_library_list_helper (void **slot, void *arg)
   return 1; /* Continue traversal.  */
 }
 
-/* Create library list.  */
+/* Flatten the solib table into a single list.  */
 
 static struct so_list *
 svr4_create_library_list (htab_t solib_table)
