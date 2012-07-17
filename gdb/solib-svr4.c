@@ -1668,9 +1668,12 @@ solib_table_flatten_helper (void **slot, void *arg)
   struct so_list *src = ns->solist;
   struct so_list **link = (struct so_list **) arg;
 
+  printf_unfiltered ("  <namespace lmid=\"%ld\">\n", ns->lmid);
   while (src != NULL)
     {
       struct so_list *new;
+
+      printf_unfiltered ("    <solib path=\"%s\">\n", src->so_name);
 
       new = XZALLOC (struct so_list);
 
@@ -1685,6 +1688,7 @@ solib_table_flatten_helper (void **slot, void *arg)
 
       src = src->next;
     }
+  printf_unfiltered ("  </namespace>\n");
 
   return 1; /* Continue traversal.  */
 }
@@ -1696,7 +1700,9 @@ solib_table_flatten (htab_t solib_table)
 {
   struct so_list *dst = NULL;
 
+  printf_unfiltered ("<solib_table>\n");
   htab_traverse (solib_table, solib_table_flatten_helper, &dst);
+  printf_unfiltered ("</solib_table>\n");
 
   return dst;
 }
@@ -1841,6 +1847,8 @@ svr4_handle_solib_event (bpstat bs)
   pi = solib_event_probe_at (bs->bp_location_at, &buf);
   if (pi != NULL)
     {
+      printf_unfiltered ("hit %s\n", pi->probe->name);
+
       os = find_pc_section (pi->probe->address);
       if (os != NULL)
 	action = solib_event_probe_action (os, pi);
