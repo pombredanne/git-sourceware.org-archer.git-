@@ -1331,6 +1331,7 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
 
       strncpy (new->so_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
       new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
+      printf_unfiltered ("read_so_list: read %s\n", new->so_name);
       strcpy (new->so_original_name, new->so_name);
       xfree (buffer);
 
@@ -1658,55 +1659,6 @@ solib_table_create (void)
   return info->solib_table != NULL;
 }
 
-/* Helper for solib_table_flatten.  */
-
-static int
-solib_table_flatten_helper (void **slot, void *arg)
-{
-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
-  struct namespace_so_list *ns = (struct namespace_so_list *) *slot;
-  struct so_list *src = ns->solist;
-  struct so_list **link = (struct so_list **) arg;
-
-  printf_unfiltered ("  <namespace lmid=\"%ld\">\n", ns->lmid);
-  while (src != NULL)
-    {
-      struct so_list *new;
-
-      printf_unfiltered ("    <solib path=\"%s\">\n", src->so_name);
-
-      new = XZALLOC (struct so_list);
-
-      memcpy (new, src, sizeof (struct so_list));
-
-      new->lm_info = xmalloc (lmo->link_map_size);
-      memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
-
-      new->next = NULL;
-      *link = new;
-      link = &new->next;
-
-      src = src->next;
-    }
-  printf_unfiltered ("  </namespace>\n");
-
-  return 1; /* Continue traversal.  */
-}
-
-/* Flatten the solib table into a single list.  */
-
-static struct so_list *
-solib_table_flatten (htab_t solib_table)
-{
-  struct so_list *dst = NULL;
-
-  printf_unfiltered ("<solib_table>\n");
-  htab_traverse (solib_table, solib_table_flatten_helper, &dst);
-  printf_unfiltered ("</solib_table>\n");
-
-  return dst;
-}
-
 /* Populate this namespace's entry in the solib table with by reading
    the entire list of shared objects from the inferior.  Returns
    nonzero on success.  */
@@ -1886,6 +1838,122 @@ svr4_handle_solib_event (bpstat bs)
   free_solib_table (info);
   free_probes (info);
   info->using_probes = 0;
+}
+
+/* XXX.  */
+
+static int
+solib_table_hash_by_name (void **slot, void *arg)
+{
+  struct namespace_so_list *ns = (struct namespace_so_list *) *slot;
+  struct so_list *src = ns->solist;
+  htab_t dst = (htab_t) arg;
+  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+
+  printf_unfiltered ("  <namespace lmid=\"%ld\">\n", ns->lmid);
+  while (src != NULL)
+    {
+      struct so_list lookup;
+
+      strncpy (lookup.so_name, src->so_name, SO_NAME_MAX_PATH_SIZE - 1);
+      lookup.so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
+
+      slot = htab_find_slot (dst, &lookup, INSERT);
+      if (slot == NULL)
+	return 0; /* Stop traversal.  */
+
+      printf_unfiltered ("    <solib seen=\"%d\" path=\"%s\">\n",
+			 *slot != HTAB_EMPTY_ENTRY, src->so_name);
+
+
+      if (*slot == HTAB_EMPTY_ENTRY)
+	{
+	  struct so_list *new;
+
+	  new = XZALLOC (struct so_list);
+
+	  memcpy (new, src, sizeof (struct so_list));
+
+	  new->lm_info = xmalloc (lmo->link_map_size);
+	  memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
+
+	  *slot = new;
+	}
+
+      src = src->next;
+    }
+  printf_unfiltered ("  </namespace>\n");
+
+  return 1; /* Continue traversal.  */
+}
+
+/* XXX.  */
+
+static int
+solib_table_chain_list (void **slot, void *arg)
+{
+  struct so_list *elem = (struct so_list *) *slot;
+  struct so_list **link = (struct so_list **) arg;
+
+  elem->next = *link;
+  *link = elem;
+
+  return 1; /* Continue traversal.  */
+}
+
+/* Returns a hash code for the so_list referenced by p.  */
+
+static hashval_t
+hash_so_list (const PTR p)
+{
+  const struct so_list *solist = (const struct so_list *) p;
+
+  return htab_hash_string (solist->so_name);
+}
+
+/* Returns non-zero if the so_lists referenced by p1 and p2 have the
+   same so_name.  */
+
+static int
+equal_so_list (const PTR p1, const PTR p2)
+{
+  const struct so_list *solist1 = (const struct so_list *) p1;
+  const struct so_list *solist2 = (const struct so_list *) p2;
+
+  return !strcmp (solist1->so_name, solist2->so_name);
+}
+
+/* Flatten the solib table into a single list.  */
+
+static struct so_list *
+solib_table_flatten (htab_t solib_table)
+{
+  struct so_list *dst = NULL;
+  htab_t tmp;
+
+  tmp = htab_create_alloc (16,
+			   hash_so_list,
+			   equal_so_list,
+			   NULL, xcalloc, xfree);
+  if (tmp == NULL)
+    return NULL;
+
+  htab_traverse (solib_table, solib_table_hash_by_name, tmp);
+
+  htab_traverse (tmp, solib_table_chain_list, &dst);
+
+  htab_delete (tmp);
+
+  {
+    struct so_list *e;
+
+    printf_unfiltered ("<solib_list>\n");
+    for (e = dst; e; e = e->next)
+      printf_unfiltered ("  <solib path=\"%s\">\n", e->so_name);
+    printf_unfiltered ("</solib_list>\n");
+  }
+
+  return dst;
 }
 
 /* Helper function for svr4_update_solib_event_breakpoints.  */
