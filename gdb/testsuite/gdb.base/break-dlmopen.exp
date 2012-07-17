@@ -97,17 +97,17 @@ if { $using_probes } {
     # The next stop should be the function in the library.
     gdb_test "c" {Breakpoint [0-9]+, .* in foo \(\) from .*}
 
-    # Run to the next stop and check our is still loaded only once.
+    # Run to the next stop and check our library is now loaded twice.
     gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
-    check_info_shared "info sharedlibrary #3" 1
+    check_info_shared "info sharedlibrary #3" 2
 
     # The next stop should be the function in the library.
     gdb_test "c" {Breakpoint [0-9]+, .* in foo \(\) from .*}
 
-    # Run to the next stop and check our is still loaded only once
-    # after a dlopen.
+    # Run to the next stop and check our library is now loaded three
+    # times.
     gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
-    check_info_shared "info sharedlibrary #4" 1
+    check_info_shared "info sharedlibrary #4" 3
 
     # The next stop should be the function in the library.
     gdb_test "c" {Breakpoint [0-9]+, .* in foo \(\) from .*}
