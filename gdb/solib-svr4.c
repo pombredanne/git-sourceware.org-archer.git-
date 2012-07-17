@@ -1331,7 +1331,6 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
 
       strncpy (new->so_name, buffer, SO_NAME_MAX_PATH_SIZE - 1);
       new->so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
-      printf_unfiltered ("read_so_list: read %s\n", new->so_name);
       strcpy (new->so_original_name, new->so_name);
       xfree (buffer);
 
@@ -1754,13 +1753,19 @@ solib_table_update_incremental (struct obj_section *os,
 				LONGEST lmid)
 {
   struct svr4_info *info = get_svr4_info ();
+  struct namespace_so_list lookup, *ns;
   struct so_list *tail, **link;
   CORE_ADDR lm;
 
   if (info->solib_table == NULL)
     return 0;
 
-  tail = htab_find (info->solib_table, &lmid);
+  lookup.lmid = lmid;
+  ns = htab_find (info->solib_table, &lookup);
+  if (ns == NULL)
+    return 0;
+
+  tail = ns->solist;
   if (tail == NULL)
     return 0;
 
@@ -1850,7 +1855,6 @@ solib_table_hash_by_name (void **slot, void *arg)
   htab_t dst = (htab_t) arg;
   struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
 
-  printf_unfiltered ("  <namespace lmid=\"%ld\">\n", ns->lmid);
   while (src != NULL)
     {
       struct so_list lookup;
@@ -1861,10 +1865,6 @@ solib_table_hash_by_name (void **slot, void *arg)
       slot = htab_find_slot (dst, &lookup, INSERT);
       if (slot == NULL)
 	return 0; /* Stop traversal.  */
-
-      printf_unfiltered ("    <solib seen=\"%d\" path=\"%s\">\n",
-			 *slot != HTAB_EMPTY_ENTRY, src->so_name);
-
 
       if (*slot == HTAB_EMPTY_ENTRY)
 	{
@@ -1882,7 +1882,6 @@ solib_table_hash_by_name (void **slot, void *arg)
 
       src = src->next;
     }
-  printf_unfiltered ("  </namespace>\n");
 
   return 1; /* Continue traversal.  */
 }
@@ -1943,15 +1942,6 @@ solib_table_flatten (htab_t solib_table)
   htab_traverse (tmp, solib_table_chain_list, &dst);
 
   htab_delete (tmp);
-
-  {
-    struct so_list *e;
-
-    printf_unfiltered ("<solib_list>\n");
-    for (e = dst; e; e = e->next)
-      printf_unfiltered ("  <solib path=\"%s\">\n", e->so_name);
-    printf_unfiltered ("</solib_list>\n");
-  }
 
   return dst;
 }
