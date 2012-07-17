@@ -1640,24 +1640,6 @@ free_namespace_so_list (PTR p)
   xfree (ns);
 }
 
-/* Create the solib table.  */
-
-static int
-solib_table_create (void)
-{
-  struct svr4_info *info = get_svr4_info ();
-
-  gdb_assert (info->solib_table == NULL);
-
-  info->solib_table = htab_create_alloc (1,
-					 hash_namespace_so_list,
-					 equal_namespace_so_list,
-					 free_namespace_so_list,
-					 xcalloc, xfree);
-
-  return info->solib_table != NULL;
-}
-
 /* Populate this namespace's entry in the solib table with by reading
    the entire list of shared objects from the inferior.  Returns
    nonzero on success.  */
@@ -1708,11 +1690,11 @@ solib_table_update_full (struct obj_section *os,
   /* Create the solib table, if necessary.  */
   if (info->solib_table == NULL)
     {
-      if (!solib_table_create ())
-	{
-	  do_cleanups (old_chain);
-	  return 0;
-	}
+      info->solib_table = htab_create_alloc (1,
+					     hash_namespace_so_list,
+					     equal_namespace_so_list,
+					     free_namespace_so_list,
+					     xcalloc, xfree);
     }
 
   lookup.lmid = lmid;
@@ -1928,17 +1910,15 @@ static struct so_list *
 solib_table_flatten (htab_t solib_table)
 {
   struct so_list *dst = NULL;
-  htab_t tmp;
+  htab_t tmp = htab_create_alloc (16,
+				  hash_so_list,
+				  equal_so_list,
+				  NULL, xcalloc, xfree);
 
-  tmp = htab_create_alloc (16,
-			   hash_so_list,
-			   equal_so_list,
-			   NULL, xcalloc, xfree);
-  if (tmp == NULL)
-    return NULL;
-
+  /* XXX.  */
   htab_traverse (solib_table, solib_table_hash_by_name, tmp);
 
+  /* XXX.  */
   htab_traverse (tmp, solib_table_chain_list, &dst);
 
   htab_delete (tmp);
