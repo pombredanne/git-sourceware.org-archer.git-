@@ -75,6 +75,7 @@ struct lm_info
     CORE_ADDR l_ld, l_next, l_prev, l_name;
 
     /* XXX.  */
+    LONGEST lmid; // XXX will be 0 if !probes
     unsigned int in_global_namespace : 1;
     unsigned int in_global_namespace_p : 1;
   };
@@ -188,10 +189,14 @@ svr4_same_1 (const char *gdb_so_name, const char *inferior_so_name)
   return 0;
 }
 
+/* XXX.  */
+
 static int
 svr4_same (struct so_list *gdb, struct so_list *inferior)
 {
-  return (svr4_same_1 (gdb->so_original_name, inferior->so_original_name));
+  return (gdb->lm_info->lmid == inferior->lm_info->lmid
+	  && svr4_same_1 (gdb->so_original_name,
+			  inferior->so_original_name));
 }
 
 static struct lm_info *
@@ -1691,6 +1696,7 @@ solib_table_update_full (struct obj_section *os,
   /* XXX.  */
   for (so = result; so; so = so->next)
     {
+      so->lm_info->lmid = lmid;
       so->lm_info->in_global_namespace = is_global_namespace;
       so->lm_info->in_global_namespace_p = 1;
     }
@@ -1769,6 +1775,7 @@ solib_table_update_incremental (struct obj_section *os,
   /* XXX. */
   for (so = tail; so; so = so->next)
     {
+      so->lm_info->lmid = lmid;
       so->lm_info->in_global_namespace = is_global_namespace;
       so->lm_info->in_global_namespace_p = 1;
     }
@@ -1856,73 +1863,29 @@ svr4_handle_solib_event (bpstat bs)
 /* XXX.  */
 
 static int
-solib_table_hash_by_name (void **slot, void *arg)
+solib_table_flatten_helper (void **slot, void *arg)
 {
   struct namespace_so_list *ns = (struct namespace_so_list *) *slot;
   struct so_list *src = ns->solist;
-  htab_t dst = (htab_t) arg;
+  struct so_list **link = (struct so_list **) arg;
 
   while (src != NULL)
     {
-      struct so_list lookup;
+      struct so_list *dst;
 
-      strncpy (lookup.so_name, src->so_name, SO_NAME_MAX_PATH_SIZE - 1);
-      lookup.so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
+      dst = xmalloc (sizeof (struct so_list));
+      memcpy (dst, src, sizeof (struct so_list));
 
-      slot = htab_find_slot (dst, &lookup, INSERT);
-      if (*slot == HTAB_EMPTY_ENTRY)
-	{
-	  struct so_list *new;
+      dst->lm_info = xmalloc (sizeof (struct lm_info));
+      memcpy (dst->lm_info, src->lm_info, sizeof (struct lm_info));
 
-	  new = xmalloc (sizeof (struct so_list));
-	  memcpy (new, src, sizeof (struct so_list));
-
-	  new->lm_info = xmalloc (sizeof (struct lm_info));
-	  memcpy (new->lm_info, src->lm_info, sizeof (struct lm_info));
-
-	  *slot = new;
-	}
+      dst->next = *link;
+      *link = dst;
 
       src = src->next;
     }
 
   return 1; /* Continue traversal.  */
-}
-
-/* XXX.  */
-
-static int
-solib_table_chain_list (void **slot, void *arg)
-{
-  struct so_list *elem = (struct so_list *) *slot;
-  struct so_list **link = (struct so_list **) arg;
-
-  elem->next = *link;
-  *link = elem;
-
-  return 1; /* Continue traversal.  */
-}
-
-/* Returns a hash code for the so_list referenced by p.  */
-
-static hashval_t
-hash_so_list (const PTR p)
-{
-  const struct so_list *solist = (const struct so_list *) p;
-
-  return (hashval_t) ((intptr_t) solist->lm_info->lm_addr >> 3);
-}
-
-/* Returns non-zero if the so_lists referenced by p1 and p2 have the
-   same base address.  */
-
-static int
-equal_so_list (const PTR p1, const PTR p2)
-{
-  const struct so_list *solist1 = (const struct so_list *) p1;
-  const struct so_list *solist2 = (const struct so_list *) p2;
-
-  return solist1->lm_info->lm_addr == solist2->lm_info->lm_addr;
 }
 
 /* Flatten the solib table into a single list.  */
@@ -1931,18 +1894,8 @@ static struct so_list *
 solib_table_flatten (htab_t solib_table)
 {
   struct so_list *dst = NULL;
-  htab_t tmp = htab_create_alloc (16,
-				  hash_so_list,
-				  equal_so_list,
-				  NULL, xcalloc, xfree);
 
-  /* XXX.  */
-  htab_traverse (solib_table, solib_table_hash_by_name, tmp);
-
-  /* XXX.  */
-  htab_traverse (tmp, solib_table_chain_list, &dst);
-
-  htab_delete (tmp);
+  htab_traverse (solib_table, solib_table_flatten_helper, &dst);
 
   return dst;
 }
