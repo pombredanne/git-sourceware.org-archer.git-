@@ -1885,11 +1885,11 @@ hash_so_list (const PTR p)
 {
   const struct so_list *solist = (const struct so_list *) p;
 
-  return htab_hash_string (solist->so_name);
+  return (hashval_t) ((intptr_t) p >> 3);
 }
 
 /* Returns non-zero if the so_lists referenced by p1 and p2 have the
-   same so_name.  */
+   same base address.  */
 
 static int
 equal_so_list (const PTR p1, const PTR p2)
@@ -1897,7 +1897,7 @@ equal_so_list (const PTR p1, const PTR p2)
   const struct so_list *solist1 = (const struct so_list *) p1;
   const struct so_list *solist2 = (const struct so_list *) p2;
 
-  return !strcmp (solist1->so_name, solist2->so_name);
+  return solist1->lm_info->lm_addr == solist2->lm_info->lm_addr;
 }
 
 /* Flatten the solib table into a single list.  */
