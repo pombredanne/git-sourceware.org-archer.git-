@@ -1885,7 +1885,7 @@ hash_so_list (const PTR p)
 {
   const struct so_list *solist = (const struct so_list *) p;
 
-  return (hashval_t) ((intptr_t) p >> 3);
+  return (hashval_t) ((intptr_t) solist->lm_info->lm_addr >> 3);
 }
 
 /* Returns non-zero if the so_lists referenced by p1 and p2 have the
