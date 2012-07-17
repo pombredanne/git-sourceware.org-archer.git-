@@ -73,6 +73,10 @@ struct lm_info
 
     /* Values read in from inferior's fields of the same name.  */
     CORE_ADDR l_ld, l_next, l_prev, l_name;
+
+    /* XXX.  */
+    unsigned int in_global_namespace : 1;
+    unsigned int in_global_namespace_p : 1;
   };
 
 /* On SVR4 systems, a list of symbols in the dynamic linker where
@@ -316,7 +320,8 @@ lm_addr_check (struct so_list *so, bfd *abfd)
 				   paddress (target_gdbarch, l_addr),
 				   so->so_name);
 	    }
-	  else
+	  else if (!so->lm_info->in_global_namespace_p
+		   || so->lm_info->in_global_namespace)
 	    {
 	      /* There is no way to verify the library file matches.  prelink
 		 can during prelinking of an unprelinked file (or unprelinking
@@ -1647,28 +1652,18 @@ free_namespace_so_list (PTR p)
 static int
 solib_table_update_full (struct obj_section *os,
 			 struct probe_and_info *pi,
-			 LONGEST lmid)
+			 LONGEST lmid, CORE_ADDR r_debug,
+			 int is_global_namespace)
 {
   struct svr4_info *info = get_svr4_info ();
-  CORE_ADDR r_debug;
-  struct so_list *result = NULL;
+  struct so_list *result = NULL, *so;
   struct namespace_so_list lookup, *ns;
   void **slot;
 
-  r_debug = value_as_address (evaluate_probe_argument (os->objfile,
-						       pi->probe, 1));
-  if (r_debug == 0)
-    return 0;
-
-  /* Always locate the debug struct, in case it moved.  */
-  info->debug_base = 0;
-  if (locate_base (info) == 0)
-    return 0;
-
-  /* Read the list of shared objects from the inferior.  The
-     global namespace requires some extra processing and is
-     handled separately.  */
-  if (r_debug == info->debug_base)
+  /* Read the list of shared objects from the inferior.
+     The global namespace requires extra processing and
+     is handled separately.  */
+  if (is_global_namespace)
     {
       result = svr4_current_sos_from_debug_base ();
     }
@@ -1691,6 +1686,13 @@ solib_table_update_full (struct obj_section *os,
 	}
 
       return 1;
+    }
+
+  /* XXX.  */
+  for (so = result; so; so = so->next)
+    {
+      so->lm_info->in_global_namespace = is_global_namespace;
+      so->lm_info->in_global_namespace_p = 1;
     }
 
   /* Create the solib table, if necessary.  */
@@ -1731,11 +1733,12 @@ solib_table_update_full (struct obj_section *os,
 static int
 solib_table_update_incremental (struct obj_section *os,
 				struct probe_and_info *pi,
-				LONGEST lmid)
+				LONGEST lmid, CORE_ADDR r_debug,
+				int is_global_namespace)
 {
   struct svr4_info *info = get_svr4_info ();
   struct namespace_so_list lookup, *ns;
-  struct so_list *tail, **link;
+  struct so_list *tail, **link, *so;
   CORE_ADDR lm;
 
   if (info->solib_table == NULL)
@@ -1760,7 +1763,17 @@ solib_table_update_incremental (struct obj_section *os,
   if (lm == 0)
     return 0;
 
-  return svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0);
+  if (!svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0))
+    return 0;
+
+  /* XXX. */
+  for (so = tail; so; so = so->next)
+    {
+      so->lm_info->in_global_namespace = is_global_namespace;
+      so->lm_info->in_global_namespace_p = 1;
+    }
+
+  return 1;
 }
 
 /* Update the solib table as appropriate when using the probes-based
@@ -1800,18 +1813,32 @@ svr4_handle_solib_event (bpstat bs)
       LONGEST lmid = value_as_long (evaluate_probe_argument (os->objfile,
 							     pi->probe, 0));
 
-      if (action == SOLIB_TABLE_UPDATE_OR_RELOAD)
+      CORE_ADDR r_debug = value_as_address (evaluate_probe_argument (os->objfile,
+								     pi->probe, 1));
+      if (r_debug != 0)
 	{
-	  if (solib_table_update_incremental (os, pi, lmid))
-	    return;
+	  /* Always locate the debug struct, in case it moved.  */
+	  info->debug_base = 0;
+	  if (locate_base (info) != 0)
+	    {
+	      int is_global_namespace = r_debug == info->debug_base;
 
-	  action = SOLIB_TABLE_RELOAD;
+	      if (action == SOLIB_TABLE_UPDATE_OR_RELOAD)
+		{
+		  if (solib_table_update_incremental (os, pi, lmid, r_debug,
+						      is_global_namespace))
+		    return;
+
+		  action = SOLIB_TABLE_RELOAD;
+		}
+
+	      gdb_assert (action == SOLIB_TABLE_RELOAD);
+
+	      if (solib_table_update_full (os, pi, lmid, r_debug,
+					   is_global_namespace))
+		return;
+	    }
 	}
-
-      gdb_assert (action == SOLIB_TABLE_RELOAD);
-
-      if (solib_table_update_full (os, pi, lmid))
-	return;
     }
 
   /* We should never reach here, but if we do we disable the
@@ -1834,7 +1861,6 @@ solib_table_hash_by_name (void **slot, void *arg)
   struct namespace_so_list *ns = (struct namespace_so_list *) *slot;
   struct so_list *src = ns->solist;
   htab_t dst = (htab_t) arg;
-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
 
   while (src != NULL)
     {
@@ -1848,12 +1874,11 @@ solib_table_hash_by_name (void **slot, void *arg)
 	{
 	  struct so_list *new;
 
-	  new = XZALLOC (struct so_list);
-
+	  new = xmalloc (sizeof (struct so_list));
 	  memcpy (new, src, sizeof (struct so_list));
 
-	  new->lm_info = xmalloc (lmo->link_map_size);
-	  memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
+	  new->lm_info = xmalloc (sizeof (struct lm_info));
+	  memcpy (new->lm_info, src->lm_info, sizeof (struct lm_info));
 
 	  *slot = new;
 	}
