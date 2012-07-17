@@ -111,4 +111,16 @@ if { $using_probes } {
 
     # The next stop should be the function in the library.
     gdb_test "c" {Breakpoint [0-9]+, .* in foo \(\) from .*}
+
+    # Run to the next stop and check our library is now loaded twice.
+    gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
+    check_info_shared "info sharedlibrary #5" 2
+
+    # Run to the next stop and check our library is now loaded once.
+    gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
+    check_info_shared "info sharedlibrary #6" 1
+
+    # Run to the next stop and check our library is not loaded.
+    gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
+    check_info_shared "info sharedlibrary #7" 0
 }
