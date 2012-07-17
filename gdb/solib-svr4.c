@@ -52,7 +52,7 @@
 static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
-static void svr4_free_library_list (void *p_list);
+static struct so_list *solib_table_flatten (htab_t solib_table);
 
 /* Link map info to include in an allocated so_list entry.  */
 
@@ -370,7 +370,7 @@ struct svr4_info
   /* Named probes in the dynamic linker.  */
   VEC (probe_p) *probes[NUM_PROBES];
 
-  /* List of objects loaded from the inferior, used by the
+  /* Table of objects loaded from the inferior, used by the
      probes-based interface to support incremental updates
      and multiple namespaces.  */
   htab_t solib_table;
@@ -1084,48 +1084,6 @@ svr4_free_library_list (void *p_list)
     }
 }
 
-/* Helper for svr4_create_library_list.  */
-
-static int
-svr4_create_library_list_helper (void **slot, void *arg)
-{
-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
-  struct so_list *src = (struct so_list *) *slot;
-  struct so_list **link = (struct so_list **) arg;
-
-  while (src != NULL)
-    {
-      struct so_list *new;
-
-      new = XZALLOC (struct so_list);
-
-      memcpy (new, src, sizeof (struct so_list));
-
-      new->lm_info = xmalloc (lmo->link_map_size);
-      memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
-
-      new->next = NULL;
-      *link = new;
-      link = &new->next;
-
-      src = src->next;
-    }
-
-  return 1; /* Continue traversal.  */
-}
-
-/* Flatten the solib table into a single list.  */
-
-static struct so_list *
-svr4_create_library_list (htab_t solib_table)
-{
-  struct so_list *dst = NULL;
-
-  htab_traverse (solib_table, svr4_create_library_list_helper, &dst);
-
-  return dst;
-}
-
 #ifdef HAVE_LIBEXPAT
 
 #include "xml-support.h"
@@ -1470,9 +1428,9 @@ svr4_current_sos (void)
   info->debug_base = 0;
   locate_base (info);
 
-  /* If we have a cached result then return a copy.  */
+  /* If we have a solib table built then return a flattened copy.  */
   if (info->solib_table != NULL)
-    return svr4_create_library_list (info->solib_table);
+    return solib_table_flatten (info->solib_table);
 
   /* If we can't find the dynamic linker's base structure, this
      must not be a dynamically linked executable.  Hmm.  */
@@ -1638,28 +1596,109 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
   return action;
 }
 
-/* Returns a hash code for the LONGEST referenced by P.  */
+/* XXX.  */
+
+struct namespace_so_list
+{
+  /* XXX.  */
+  LONGEST lmid;
+
+  /* XXX.  */
+  struct so_list *solist;
+};
+
+/* Returns a hash code for the namespace_so_list referenced by p.  */
 
 static hashval_t
-hash_longest (const PTR p)
+hash_namespace_so_list (const PTR p)
 {
-  const LONGEST *l = (const LONGEST *) p;
-  hashval_t hash = (hashval_t) *l;
+  const struct namespace_so_list *ns = (const struct namespace_so_list *) p;
 
-  gdb_assert (*l == hash);
-  return hash;
+  return (hashval_t) ns->lmid;
 }
 
-/* Returns non-zero if the LONGESTs referenced by P1 and P2 are
-   equal.  */
+/* Returns non-zero if the namespace_so_lists referenced by p1 and p2
+   are equal.  */
 
 static int
-equal_longest (const PTR p1, const PTR p2)
+equal_namespace_so_list (const PTR p1, const PTR p2)
 {
-  const LONGEST *l1 = (const LONGEST *) p1;
-  const LONGEST *l2 = (const LONGEST *) p2;
+  const struct namespace_so_list *ns1 = (const struct namespace_so_list *) p1;
+  const struct namespace_so_list *ns2 = (const struct namespace_so_list *) p2;
 
-  return *l1 == *l2;
+  return ns1->lmid == ns2->lmid;
+}
+
+/* Free a namespace_so_list.  */
+
+static void
+free_namespace_so_list (PTR p)
+{
+  struct namespace_so_list *ns = (struct namespace_so_list *) p;
+
+  svr4_free_library_list (ns->solist);
+  xfree (ns);
+}
+
+/* Create the solib table.  */
+
+static int
+solib_table_create (void)
+{
+  struct svr4_info *info = get_svr4_info ();
+
+  gdb_assert (info->solib_table == NULL);
+
+  info->solib_table = htab_create_alloc (1,
+					 hash_namespace_so_list,
+					 equal_namespace_so_list,
+					 free_namespace_so_list,
+					 xcalloc, xfree);
+
+  return info->solib_table != NULL;
+}
+
+/* Helper for solib_table_flatten.  */
+
+static int
+solib_table_flatten_helper (void **slot, void *arg)
+{
+  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+  struct namespace_so_list *ns = (struct namespace_so_list *) *slot;
+  struct so_list *src = ns->solist;
+  struct so_list **link = (struct so_list **) arg;
+
+  while (src != NULL)
+    {
+      struct so_list *new;
+
+      new = XZALLOC (struct so_list);
+
+      memcpy (new, src, sizeof (struct so_list));
+
+      new->lm_info = xmalloc (lmo->link_map_size);
+      memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
+
+      new->next = NULL;
+      *link = new;
+      link = &new->next;
+
+      src = src->next;
+    }
+
+  return 1; /* Continue traversal.  */
+}
+
+/* Flatten the solib table into a single list.  */
+
+static struct so_list *
+solib_table_flatten (htab_t solib_table)
+{
+  struct so_list *dst = NULL;
+
+  htab_traverse (solib_table, solib_table_flatten_helper, &dst);
+
+  return dst;
 }
 
 /* Populate this namespace's entry in the solib table with by reading
@@ -1672,9 +1711,11 @@ solib_table_update_full (struct obj_section *os,
 			 LONGEST lmid)
 {
   struct svr4_info *info = get_svr4_info ();
-  void **slot;
   CORE_ADDR r_debug;
   struct so_list *result = NULL;
+  struct cleanup *old_chain;
+  struct namespace_so_list lookup, *ns;
+  void **slot;
 
   r_debug = value_as_address (evaluate_probe_argument (os->objfile,
 						       pi->probe, 1));
@@ -1686,9 +1727,11 @@ solib_table_update_full (struct obj_section *os,
   if (locate_base (info) == 0)
     return 0;
 
+  /* Read the list of shared objects from the inferior.  The
+     global namespace requires some extra processing and is
+     handled separately.  */
   if (r_debug == info->debug_base)
     {
-      /* The global namespace requires special handling.  */
       result = svr4_current_sos_from_debug_base ();
     }
   else
@@ -1703,20 +1746,41 @@ solib_table_update_full (struct obj_section *os,
   if (result == NULL)
     return 0;
 
+  old_chain = make_cleanup (svr4_free_library_list, result);
+
+  /* Create the solib table, if necessary.  */
   if (info->solib_table == NULL)
     {
-      info->solib_table = htab_create_alloc (1,
-					     hash_longest,
-					     equal_longest,
-					     svr4_free_library_list,
-					     xcalloc, xfree);
+      if (!solib_table_create ())
+	{
+	  do_cleanups (old_chain);
+	  return 0;
+	}
     }
 
-  slot = htab_find_slot (info->solib_table, &lmid, INSERT);
-  if (*slot != NULL)
-    svr4_free_library_list (slot);
+  lookup.lmid = lmid;
+  slot = htab_find_slot (info->solib_table, &lookup, INSERT);
+  if (slot == NULL)
+    {
+      do_cleanups (old_chain);
+      return 0;
+    }
 
-  *slot = result;
+  if (*slot == HTAB_EMPTY_ENTRY)
+    {
+      ns = xcalloc (sizeof (struct namespace_so_list), 1);
+      ns->lmid = lmid;
+      *slot = ns;
+    }
+  else
+    {
+      ns = *slot;
+      svr4_free_library_list (ns->solist);
+    }
+
+  ns->solist = result;
+
+  discard_cleanups (old_chain);
 
   return 1;
 }
@@ -1892,7 +1956,7 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
 	      /* Fedora 17, RHEL 6.2, and RHEL 6.3 shipped with an
 		 early version of the probes code in which the probes'
 		 names were prefixed with "rtld_".  The locations and
-		 arguments of the probes are otherwise the same, so we
+		 arguments XXXof the probes are otherwise the same, so we
 		 check for the prefixed version if the unprefixed
 		 probes are not found.  */
 
