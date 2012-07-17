@@ -1699,12 +1699,6 @@ solib_table_update_full (struct obj_section *os,
 
   lookup.lmid = lmid;
   slot = htab_find_slot (info->solib_table, &lookup, INSERT);
-  if (slot == NULL)
-    {
-      do_cleanups (old_chain);
-      return 0;
-    }
-
   if (*slot == HTAB_EMPTY_ENTRY)
     {
       ns = xcalloc (sizeof (struct namespace_so_list), 1);
@@ -1845,9 +1839,6 @@ solib_table_hash_by_name (void **slot, void *arg)
       lookup.so_name[SO_NAME_MAX_PATH_SIZE - 1] = '\0';
 
       slot = htab_find_slot (dst, &lookup, INSERT);
-      if (slot == NULL)
-	return 0; /* Stop traversal.  */
-
       if (*slot == HTAB_EMPTY_ENTRY)
 	{
 	  struct so_list *new;
