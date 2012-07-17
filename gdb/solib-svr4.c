@@ -1652,7 +1652,6 @@ solib_table_update_full (struct obj_section *os,
   struct svr4_info *info = get_svr4_info ();
   CORE_ADDR r_debug;
   struct so_list *result = NULL;
-  struct cleanup *old_chain;
   struct namespace_so_list lookup, *ns;
   void **slot;
 
@@ -1682,10 +1681,17 @@ solib_table_update_full (struct obj_section *os,
 	return 0;
     }
 
+  /* If the namespace is empty, then drop our copy.  */
   if (result == NULL)
-    return 0;
+    {
+      if (info->solib_table != NULL)
+	{
+	  lookup.lmid = lmid;
+	  htab_remove_elt (info->solib_table, &lookup);
+	}
 
-  old_chain = make_cleanup (svr4_free_library_list, result);
+      return 1;
+    }
 
   /* Create the solib table, if necessary.  */
   if (info->solib_table == NULL)
@@ -1697,6 +1703,7 @@ solib_table_update_full (struct obj_section *os,
 					     xcalloc, xfree);
     }
 
+  /* XXX.  */
   lookup.lmid = lmid;
   slot = htab_find_slot (info->solib_table, &lookup, INSERT);
   if (*slot == HTAB_EMPTY_ENTRY)
@@ -1712,8 +1719,6 @@ solib_table_update_full (struct obj_section *os,
     }
 
   ns->solist = result;
-
-  discard_cleanups (old_chain);
 
   return 1;
 }
