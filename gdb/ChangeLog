@@ -1,3 +1,125 @@
+2012-07-18  Terry Guo  <terry.guo@arm.com>
+
+	PR 14329
+	* defs.h (GDB_MI_MSG_WIDTH): New.
+	* ser_base (ser_base_read_error_fd): New function.
+	(do_ser_base_readchar): Poll error file descriptor as well as
+	standard output.
+	(generic_readchar): Refactor error handling. 
+
+2012-07-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* NEWS: Create a new section for the next release branch.
+	Rename the section of the current branch, now that it has
+	been cut.
+
+2012-07-18  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB 7.5 branch created (branch timestamp: 2012-07-18 03:22 UTC)
+	* version.in: Bump version to 7.5.50.20120718-cvs.
+
+2012-07-17  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (linespec_parse_line_offset): Make parameter
+	const.
+
+2012-07-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 11914
+	* f-valprint.c (info_common_command): New variable frame_id.
+	Reinitialize FI form FRAME_ID after each print_variable_and_value.
+	* printcmd.c (print_variable_and_value): Extend function comment.
+	Add comment for invalidated FRAME.
+	* stack.c (backtrace_command_1): New variable frame_id.  Reinitialize
+	FI form FRAME_ID after each print_frame_local_vars.
+	(struct print_variable_and_value_data): Change frame to frame_id.
+	(do_print_variable_and_value): New variable frame, initialize it from
+	p->frame_id.  Add comment for invalidated FRAME.
+	(print_frame_local_vars, print_frame_arg_vars): New function comment.
+	Update CB_DATA.FRAME to CB_DATA.FRAME_ID initialization.  Add comment
+	for invalidated FRAME.
+
+2012-07-16  Marc Khouzam  <marc.khouzam@ericsson.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* linux-nat.c (linux_nat_detach): Don't unregister from the event
+	loop.
+
+2012-07-16  Tom Tromey  <tromey@redhat.com>
+
+	* jv-typeprint.c (c_type_print_varspec_suffix): Don't declare.
+
+2012-07-15  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (stmt_list_hash): New struct.
+	(type_unit_group): Embed "per_cu" member, remove pointer.
+	New union member "t", move member "tus" into it, all uses updated.
+	New member "hash", replaces member "line_offset, all uses updated.
+	(quick_file_names): Replace member "offset" with "hash", all uses
+	updated.
+	(hash_stmt_list_entry, eq_stmt_list_entry): New functions.
+	(hash_file_name_entry, eq_file_name_entry): Call them.
+	(hash_type_unit_group, eq_type_unit_group): Ditto.
+	(dw2_get_cu, dw2_get_primary_cu): Replace assert with a better one.
+	(dw2_get_file_names_reader): Fix file name table calculation for TUs.
+	(dw2_get_file_names): Update.
+	(create_type_unit_group): Replace "per_cu" arg with "cu".
+	All callers updated.  Fix "quick" (.gdb_index) handling.
+	(get_type_unit_group): Replace "per_cu" arg with "cu".
+	All callers updated.
+	(build_type_unit_groups): Don't reset tu_stats.
+
+	* symtab.c (filename_seen_cache): Delete members "tab_alloc_size",
+	"tab_cur_size".  Change member "tab" to be a htab_t.
+	(create_filename_seen_cache): Update.
+	(clear_filename_seen_cache, delete_filename_seen_cache): Update.
+	(filename_seen): Update.
+
+2012-07-13  Doug Evans  <dje@google.com>
+
+	* symtab.c (filename_seen): Update comment.
+
+2012-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Doug Evans  <dje@google.com>
+
+	* buildsym.c (end_symtab_1): Split it to ...
+	(end_symtab_get_static_block): ... this ...
+	(end_symtab_from_static_block): ... and this function.
+	(end_symtab, end_expandable_symtab): Call them.
+	* buildsym.h (end_symtab_get_static_block)
+	(end_symtab_from_static_block): New declarations.
+	* dwarf2read.c (process_full_comp_unit): New variable static_block.
+	Set its valid CU ranges.
+
+2012-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2loc.c (disassemble_dwarf_expression): Handle
+	DW_OP_GNU_parameter_ref.
+
+2012-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (read_call_site_scope): Do not gdb_assert for invalid
+	read-in CALL_SITE_PARAMETER_PARAM_OFFSET.
+
+2012-07-13  Doug Evans  <dje@google.com>
+
+	* symtab.c (output_source_filename): Delete unnecessary forward decl.
+	(filename_seen_cache): New struct.
+	(INITIAL_FILENAME_SEEN_CACHE_SIZE): New macro.
+	(create_filename_seen_cache): New function.
+	(clear_filename_seen_cache, delete_filename_seen_cache): New functions.
+	(filename_seen): Delete arg "first".  New arg "cache".  All callers
+	updated.
+	(output_source_filename_data): New struct.
+	(output_source_filename): Delete arg "first".  New arg "data".
+	All callers updated.
+	(sources_info): Delete local "first".  New locals "data", "cleanups".
+	Rewrite to use filename_seen_cache.
+	(add_partial_filename_data): Delete member "first".  New member
+	"filename_seen_cache".  All uses updated.
+	(make_source_files_completion_list): Rewrite to use
+	filename_seen_cache.
+
 2012-07-12  Doug Evans  <dje@google.com>
 
 	* psymtab.c (map_symbol_filenames_psymtab): Skip shared psymtabs.
