@@ -1895,6 +1895,9 @@ namespace_table_flatten_helper (void **slot, void *arg)
   struct so_list *src = ns->solist;
   struct so_list **link = (struct so_list **) arg;
 
+  while (*link)
+    link = &(*link)->next;
+
   while (src != NULL)
     {
       struct so_list *dst;
@@ -1905,8 +1908,8 @@ namespace_table_flatten_helper (void **slot, void *arg)
       dst->lm_info = xmalloc (sizeof (struct lm_info));
       memcpy (dst->lm_info, src->lm_info, sizeof (struct lm_info));
 
-      dst->next = *link;
       *link = dst;
+      link = &dst->next;
 
       src = src->next;
     }
