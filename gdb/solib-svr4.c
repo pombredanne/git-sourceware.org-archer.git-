@@ -1625,45 +1625,45 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
   return action;
 }
 
-/* XXX.  */
+/* A linker namespace.  */
 
-struct namespace_so_list
+struct namespace
 {
-  /* XXX.  */
+  /* Numeric link-map ID of the namespace.  */
   LONGEST lmid;
 
-  /* XXX.  */
+  /* List of objects loaded into the namespace.  */
   struct so_list *solist;
 };
 
-/* Returns a hash code for the namespace_so_list referenced by p.  */
+/* Returns a hash code for the namespace referenced by p.  */
 
 static hashval_t
-hash_namespace_so_list (const PTR p)
+hash_namespace (const PTR p)
 {
-  const struct namespace_so_list *ns = (const struct namespace_so_list *) p;
+  const struct namespace *ns = (const struct namespace *) p;
 
   return (hashval_t) ns->lmid;
 }
 
-/* Returns non-zero if the namespace_so_lists referenced by p1 and p2
+/* Returns non-zero if the namespaces referenced by p1 and p2
    are equal.  */
 
 static int
-equal_namespace_so_list (const PTR p1, const PTR p2)
+equal_namespace (const PTR p1, const PTR p2)
 {
-  const struct namespace_so_list *ns1 = (const struct namespace_so_list *) p1;
-  const struct namespace_so_list *ns2 = (const struct namespace_so_list *) p2;
+  const struct namespace *ns1 = (const struct namespace *) p1;
+  const struct namespace *ns2 = (const struct namespace *) p2;
 
   return ns1->lmid == ns2->lmid;
 }
 
-/* Free a namespace_so_list.  */
+/* Free a namespace.  */
 
 static void
-free_namespace_so_list (PTR p)
+free_namespace (PTR p)
 {
-  struct namespace_so_list *ns = (struct namespace_so_list *) p;
+  struct namespace *ns = (struct namespace *) p;
 
   svr4_free_library_list (ns->solist);
   xfree (ns);
@@ -1681,7 +1681,7 @@ solib_table_update_full (struct obj_section *os,
 {
   struct svr4_info *info = get_svr4_info ();
   struct so_list *result = NULL, *so;
-  struct namespace_so_list lookup, *ns;
+  struct namespace lookup, *ns;
   void **slot;
 
   /* Read the list of shared objects from the inferior.
@@ -1723,9 +1723,9 @@ solib_table_update_full (struct obj_section *os,
   if (info->solib_table == NULL)
     {
       info->solib_table = htab_create_alloc (1,
-					     hash_namespace_so_list,
-					     equal_namespace_so_list,
-					     free_namespace_so_list,
+					     hash_namespace,
+					     equal_namespace,
+					     free_namespace,
 					     xcalloc, xfree);
     }
 
@@ -1734,7 +1734,7 @@ solib_table_update_full (struct obj_section *os,
   slot = htab_find_slot (info->solib_table, &lookup, INSERT);
   if (*slot == HTAB_EMPTY_ENTRY)
     {
-      ns = xcalloc (sizeof (struct namespace_so_list), 1);
+      ns = xcalloc (sizeof (struct namespace), 1);
       ns->lmid = lmid;
       *slot = ns;
     }
@@ -1761,7 +1761,7 @@ solib_table_update_incremental (struct obj_section *os,
 				int is_global_namespace)
 {
   struct svr4_info *info = get_svr4_info ();
-  struct namespace_so_list lookup, *ns;
+  struct namespace lookup, *ns;
   struct so_list *tail, **link, *so;
   CORE_ADDR lm;
 
@@ -1882,7 +1882,7 @@ svr4_handle_solib_event (bpstat bs)
 static int
 solib_table_flatten_helper (void **slot, void *arg)
 {
-  struct namespace_so_list *ns = (struct namespace_so_list *) *slot;
+  struct namespace *ns = (struct namespace *) *slot;
   struct so_list *src = ns->solist;
   struct so_list **link = (struct so_list **) arg;
 
