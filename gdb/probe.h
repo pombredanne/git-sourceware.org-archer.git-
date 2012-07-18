@@ -210,12 +210,15 @@ extern void info_probes_for_ops (char *arg, int from_tty,
 
 extern struct cmd_list_element **info_probes_cmdlist_get (void);
 
-/* Return the argument count of the specified probe.  */
+/* Return the argument count of the specified probe.  OBJFILE must
+   be known to have probes support.  */
 
 extern unsigned get_probe_argument_count (struct objfile *objfile,
 					  struct probe *probe);
 
-/* Evaluate argument N of the specified probe.  */
+/* Evaluate argument N of the specified probe.  OBJFILE must be
+   known to have probes support.  N must be between 0 inclusive
+   and get_probe_argument_count exclusive.  */
 
 extern struct value *evaluate_probe_argument (struct objfile *objfile,
 					      struct probe *probe,

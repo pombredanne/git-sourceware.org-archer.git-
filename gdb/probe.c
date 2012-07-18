@@ -676,8 +676,7 @@ evaluate_probe_argument (struct objfile *objfile, struct probe *probe,
   gdb_assert (objfile->sf && objfile->sf->sym_probe_fns);
 
   return objfile->sf->sym_probe_fns->sym_evaluate_probe_argument (objfile,
-								  probe,
-								  n);
+								  probe, n);
 }
 
 /* See comments in probe.h.  */
