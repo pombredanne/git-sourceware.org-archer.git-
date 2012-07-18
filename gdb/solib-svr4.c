@@ -52,7 +52,7 @@
 static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
-static struct so_list *solib_table_flatten (htab_t solib_table);
+static struct so_list *namespace_table_flatten (htab_t namespace_table);
 
 /* Link map info to include in an allocated so_list entry.  */
 
@@ -105,6 +105,20 @@ static const char * const solib_break_names[] =
   NULL
 };
 
+static const char * const bkpt_names[] =
+{
+  "_start",
+  "__start",
+  "main",
+  NULL
+};
+
+static const  char * const main_name_list[] =
+{
+  "main_$main",
+  NULL
+};
+
 /* What to do with the namespace table when a probe stop occurs.  */
 
 enum probe_action
@@ -125,21 +139,20 @@ enum probe_action
     NAMESPACE_UPDATE_OR_RELOAD,
   };
 
-/* A probe name and an associated action.  */
+/* A probe's name and its associated action.  */
 
 struct probe_info
 {
   /* The name of the probe.  */
   const char *name;
 
-  /* What to do with this namespace's entry in the solib table
-     when a breakpoint at this probe is hit.  */
+  /* What to do with the namespace table when a probe stop occurs.  */
   enum probe_action action;
 };
 
-/* A list of named probes which, if present in the dynamic linker,
-   allow more fine-grained breakpoints to be placed on shared library
-   events.  */
+/* A list of named probes and their associated actions.  If all
+   probes are present in the dynamic linker then the probes-based
+   interface will be used.  */
 
 static const struct probe_info probe_info[] =
 {
@@ -153,20 +166,6 @@ static const struct probe_info probe_info[] =
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
 
-static const char * const bkpt_names[] =
-{
-  "_start",
-  "__start",
-  "main",
-  NULL
-};
-
-static const  char * const main_name_list[] =
-{
-  "main_$main",
-  NULL
-};
-
 /* Per pspace SVR4 specific data.  */
 
 struct svr4_info
@@ -174,7 +173,7 @@ struct svr4_info
   CORE_ADDR debug_base;	/* Base of dynamic linker structures.  */
 
   /* Validity flag for debug_loader_offset.  */
-  int debug_loader_offset_p;
+  unsigned int debug_loader_offset_p : 1;
 
   /* Load address for the dynamic linker, inferred.  */
   CORE_ADDR debug_loader_offset;
@@ -191,15 +190,14 @@ struct svr4_info
   CORE_ADDR interp_plt_sect_high;
 
   /* Nonzero if we are using the probes-based interface.  */
-  int using_probes;
+  unsigned int using_probes : 1;
 
   /* Named probes in the dynamic linker.  */
   VEC (probe_p) *probes[NUM_PROBES];
 
-  /* Table of objects loaded from the inferior, used by the
-     probes-based interface to support incremental updates
-     and multiple namespaces.  */
-  htab_t solib_table;
+  /* Table of dynamic linker namespaces, used by the probes-based
+     interface.  */
+  htab_t namespace_table;
 };
 
 /* Per-program-space data key.  */
@@ -218,16 +216,16 @@ free_probes (struct svr4_info *info)
   memset (info->probes, 0, sizeof (info->probes));
 }
 
-/* Free the solib table.  */
+/* Free the namespace table.  */
 
 static void
-free_solib_table (struct svr4_info *info)
+free_namespace_table (struct svr4_info *info)
 {
-  if (info->solib_table == NULL)
+  if (info->namespace_table == NULL)
     return;
 
-  htab_delete (info->solib_table);
-  info->solib_table = NULL;
+  htab_delete (info->namespace_table);
+  info->namespace_table = NULL;
 }
 
 static void
@@ -240,7 +238,7 @@ svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
     return;
 
   free_probes (info);
-  free_solib_table (info);
+  free_namespace_table (info);
 
   xfree (info);
 }
@@ -1458,9 +1456,9 @@ svr4_current_sos (void)
   info->debug_base = 0;
   locate_base (info);
 
-  /* If we have a solib table built then return a flattened copy.  */
-  if (info->solib_table != NULL)
-    return solib_table_flatten (info->solib_table);
+  /* If we have a namespace table then return a flattened copy.  */
+  if (info->namespace_table != NULL)
+    return namespace_table_flatten (info->namespace_table);
 
   /* If we can't find the dynamic linker's base structure, this
      must not be a dynamically linked executable.  Hmm.  */
@@ -1626,7 +1624,7 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
   return action;
 }
 
-/* A linker namespace.  */
+/* A namespace in the dynamic linker.  */
 
 struct namespace
 {
@@ -1704,10 +1702,10 @@ solib_table_update_full (struct obj_section *os,
   /* If the namespace is empty, then drop our copy.  */
   if (result == NULL)
     {
-      if (info->solib_table != NULL)
+      if (info->namespace_table != NULL)
 	{
 	  lookup.lmid = lmid;
-	  htab_remove_elt (info->solib_table, &lookup);
+	  htab_remove_elt (info->namespace_table, &lookup);
 	}
 
       return 1;
@@ -1720,10 +1718,10 @@ solib_table_update_full (struct obj_section *os,
       so->lm_info->in_initial_namespace = is_global_namespace;
     }
 
-  /* Create the solib table, if necessary.  */
-  if (info->solib_table == NULL)
+  /* Create the namespace table, if necessary.  */
+  if (info->namespace_table == NULL)
     {
-      info->solib_table = htab_create_alloc (1,
+      info->namespace_table = htab_create_alloc (1,
 					     hash_namespace,
 					     equal_namespace,
 					     free_namespace,
@@ -1732,7 +1730,7 @@ solib_table_update_full (struct obj_section *os,
 
   /* XXX.  */
   lookup.lmid = lmid;
-  slot = htab_find_slot (info->solib_table, &lookup, INSERT);
+  slot = htab_find_slot (info->namespace_table, &lookup, INSERT);
   if (*slot == HTAB_EMPTY_ENTRY)
     {
       ns = xcalloc (sizeof (struct namespace), 1);
@@ -1766,11 +1764,11 @@ solib_table_update_incremental (struct obj_section *os,
   struct so_list *tail, **link, *so;
   CORE_ADDR lm;
 
-  if (info->solib_table == NULL)
+  if (info->namespace_table == NULL)
     return 0;
 
   lookup.lmid = lmid;
-  ns = htab_find (info->solib_table, &lookup);
+  ns = htab_find (info->namespace_table, &lookup);
   if (ns == NULL)
     return 0;
 
@@ -1801,8 +1799,9 @@ solib_table_update_incremental (struct obj_section *os,
   return 1;
 }
 
-/* Update the solib table as appropriate when using the probes-based
-   linker interface.  Do nothing if using the standard interface.  */
+/* Update the namespace table as appropriate when using the
+   probes-based linker interface.  Do nothing if using the
+   standard interface.  */
 
 static void
 svr4_handle_solib_event (bpstat bs)
@@ -1873,7 +1872,7 @@ svr4_handle_solib_event (bpstat bs)
   warning (_("Probes-based dynamic linker interface failed.\n"
 	     "Reverting to original interface.\n"));
 
-  free_solib_table (info);
+  free_namespace_table (info);
   free_probes (info);
   info->using_probes = 0;
 }
@@ -1881,7 +1880,7 @@ svr4_handle_solib_event (bpstat bs)
 /* XXX.  */
 
 static int
-solib_table_flatten_helper (void **slot, void *arg)
+namespace_table_flatten_helper (void **slot, void *arg)
 {
   struct namespace *ns = (struct namespace *) *slot;
   struct so_list *src = ns->solist;
@@ -1906,14 +1905,14 @@ solib_table_flatten_helper (void **slot, void *arg)
   return 1; /* Continue traversal.  */
 }
 
-/* Flatten the solib table into a single list.  */
+/* Flatten the namespace table into a single list.  */
 
 static struct so_list *
-solib_table_flatten (htab_t solib_table)
+namespace_table_flatten (htab_t namespace_table)
 {
   struct so_list *dst = NULL;
 
-  htab_traverse (solib_table, solib_table_flatten_helper, &dst);
+  htab_traverse (namespace_table, namespace_table_flatten_helper, &dst);
 
   return dst;
 }
@@ -2870,8 +2869,8 @@ svr4_solib_create_inferior_hook (int from_tty)
 
   info = get_svr4_info ();
 
-  /* Free the probes-based linker interface's solib table.  */
-  free_solib_table (info);
+  /* Free the probes-based interface's namespace table.  */
+  free_namespace_table (info);
 
   /* Relocate the main executable if necessary.  */
   svr4_relocate_main_executable ();
