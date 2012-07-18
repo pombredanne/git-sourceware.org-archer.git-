@@ -1914,6 +1914,8 @@ namespace_table_flatten_helper (void **slot, void *arg)
       src = src->next;
     }
 
+  *link = NULL;
+
   return 1; /* Continue traversal.  */
 }
 
