@@ -1754,6 +1754,7 @@ namespace_update_incremental (struct svr4_info *info, struct obj_section *os,
 {
   struct namespace lookup, *ns;
   struct so_list *tail, **link, *so;
+  struct value *val;
   CORE_ADDR lm;
 
   /* Find our namespace in the table.  */
@@ -1775,9 +1776,11 @@ namespace_update_incremental (struct svr4_info *info, struct obj_section *os,
   link = &tail->next;
 
   /* Read the new objects.  */
-  lm = value_as_address (evaluate_probe_argument (os->objfile,
-						  pi->probe, 2));
+  val = evaluate_probe_argument (os->objfile, pi->probe, 2);
+  if (val == NULL)
+    return 0;
 
+  lm = value_as_address (val);
   if (lm == 0)
     return 0;
 
