@@ -1613,9 +1613,9 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
 
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
-       arg1: Lmid_t lmid (mandatory)
-       arg2: struct r_debug *r_debug (mandatory)
-       arg3: struct link_map *new (optional, for incremental updates)  */
+       arg0: Lmid_t lmid (mandatory)
+       arg1: struct r_debug *r_debug (mandatory)
+       arg2: struct link_map *new (optional, for incremental updates)  */
   probe_argc = get_probe_argument_count (os->objfile, pi->probe);
   if (probe_argc == 2)
     action = SOLIB_TABLE_RELOAD;
