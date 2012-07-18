@@ -162,34 +162,6 @@ static const  char * const main_name_list[] =
   NULL
 };
 
-/* Return non-zero if GDB_SO_NAME and INFERIOR_SO_NAME represent
-   the same shared library.  */
-
-static int
-svr4_same_1 (const char *gdb_so_name, const char *inferior_so_name)
-{
-  if (strcmp (gdb_so_name, inferior_so_name) == 0)
-    return 1;
-
-  /* On Solaris, when starting inferior we think that dynamic linker is
-     /usr/lib/ld.so.1, but later on, the table of loaded shared libraries
-     contains /lib/ld.so.1.  Sometimes one file is a link to another, but
-     sometimes they have identical content, but are not linked to each
-     other.  We don't restrict this check for Solaris, but the chances
-     of running into this situation elsewhere are very low.  */
-  if (strcmp (gdb_so_name, "/usr/lib/ld.so.1") == 0
-      && strcmp (inferior_so_name, "/lib/ld.so.1") == 0)
-    return 1;
-
-  /* Similarly, we observed the same issue with sparc64, but with
-     different locations.  */
-  if (strcmp (gdb_so_name, "/usr/lib/sparcv9/ld.so.1") == 0
-      && strcmp (inferior_so_name, "/lib/sparcv9/ld.so.1") == 0)
-    return 1;
-
-  return 0;
-}
-
 static struct lm_info *
 lm_info_read (CORE_ADDR lm_addr)
 {
@@ -435,6 +407,34 @@ get_svr4_info (void)
   info = XZALLOC (struct svr4_info);
   set_program_space_data (current_program_space, solib_svr4_pspace_data, info);
   return info;
+}
+
+/* Return non-zero if GDB_SO_NAME and INFERIOR_SO_NAME represent
+   the same shared library.  */
+
+static int
+svr4_same_1 (const char *gdb_so_name, const char *inferior_so_name)
+{
+  if (strcmp (gdb_so_name, inferior_so_name) == 0)
+    return 1;
+
+  /* On Solaris, when starting inferior we think that dynamic linker is
+     /usr/lib/ld.so.1, but later on, the table of loaded shared libraries
+     contains /lib/ld.so.1.  Sometimes one file is a link to another, but
+     sometimes they have identical content, but are not linked to each
+     other.  We don't restrict this check for Solaris, but the chances
+     of running into this situation elsewhere are very low.  */
+  if (strcmp (gdb_so_name, "/usr/lib/ld.so.1") == 0
+      && strcmp (inferior_so_name, "/lib/ld.so.1") == 0)
+    return 1;
+
+  /* Similarly, we observed the same issue with sparc64, but with
+     different locations.  */
+  if (strcmp (gdb_so_name, "/usr/lib/sparcv9/ld.so.1") == 0
+      && strcmp (inferior_so_name, "/lib/sparcv9/ld.so.1") == 0)
+    return 1;
+
+  return 0;
 }
 
 /* Return non-zero if GDB and INFERIOR represent the same shared
