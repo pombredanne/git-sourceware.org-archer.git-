@@ -1613,7 +1613,7 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
        arg0: Lmid_t lmid (mandatory)
-       arg1: struct r_debug *r_debug (mandatory)
+       arg1: struct r_debug *debug_base (mandatory)
        arg2: struct link_map *new (optional, for incremental updates)  */
   probe_argc = get_probe_argument_count (os->objfile, pi->probe);
   if (probe_argc == 2)
@@ -1668,38 +1668,36 @@ free_namespace (PTR p)
   xfree (ns);
 }
 
-/* Populate this namespace's entry in the solib table with by reading
-   the entire list of shared objects from the inferior.  Returns
-   nonzero on success.  */
+/* Populate this namespace by reading the entire list of shared
+   objects from the inferior.  Returns nonzero on success.  */
 
 static int
-solib_table_update_full (struct obj_section *os,
-			 struct probe_and_info *pi,
-			 LONGEST lmid, CORE_ADDR r_debug,
-			 int is_global_namespace)
+namespace_update_full (struct obj_section *os, struct probe_and_info *pi,
+		       LONGEST lmid, CORE_ADDR debug_base,
+		       int is_initial_namespace)
 {
   struct svr4_info *info = get_svr4_info ();
   struct so_list *result = NULL, *so;
   struct namespace lookup, *ns;
   void **slot;
 
-  /* Read the list of shared objects from the inferior.
-     The global namespace requires extra processing and
-     is handled separately.  */
-  if (is_global_namespace)
+  /* Read the list of shared objects from the inferior.  The
+     initial namespace requires extra processing and is handled
+     separately.  */
+  if (is_initial_namespace)
     {
       result = svr4_current_sos_from_debug_base ();
     }
   else
     {
-      CORE_ADDR lm = r_map_from_debug_base (r_debug);
+      CORE_ADDR lm = r_map_from_debug_base (debug_base);
       struct so_list **link_ptr = &result;
 
       if (!svr4_read_so_list (lm, 0, &link_ptr, 0))
 	return 0;
     }
 
-  /* If the namespace is empty, then drop our copy.  */
+  /* If the namespace is empty then delete it from the table.  */
   if (result == NULL)
     {
       if (info->namespace_table != NULL)
@@ -1711,24 +1709,23 @@ solib_table_update_full (struct obj_section *os,
       return 1;
     }
 
-  /* XXX.  */
+  /* Fill in the link-map IDs and initial namespace flags.  */
   for (so = result; so; so = so->next)
     {
       so->lm_info->lmid = lmid;
-      so->lm_info->in_initial_namespace = is_global_namespace;
+      so->lm_info->in_initial_namespace = is_initial_namespace;
     }
 
   /* Create the namespace table, if necessary.  */
   if (info->namespace_table == NULL)
     {
-      info->namespace_table = htab_create_alloc (1,
-					     hash_namespace,
-					     equal_namespace,
-					     free_namespace,
-					     xcalloc, xfree);
+      info->namespace_table = htab_create_alloc (1, hash_namespace,
+						 equal_namespace,
+						 free_namespace,
+						 xcalloc, xfree);
     }
 
-  /* XXX.  */
+  /* Update the namespace table with our new list.  */
   lookup.lmid = lmid;
   slot = htab_find_slot (info->namespace_table, &lookup, INSERT);
   if (*slot == HTAB_EMPTY_ENTRY)
@@ -1742,28 +1739,26 @@ solib_table_update_full (struct obj_section *os,
       ns = *slot;
       svr4_free_library_list (ns->solist);
     }
-
   ns->solist = result;
 
   return 1;
 }
 
-/* Update this namespace's entry in the solib table starting from the
-   link-map supplied by the linker in the probe's third argument.
-   Returns nonzero if the list was successfully updated, or zero to
-   indicate failure.  */
+/* Update this namespace starting from the link-map entry passed by
+   the linker in the probe's third argument.  Returns nonzero if the
+   list was successfully updated, or zero to indicate failure.  */
 
 static int
-solib_table_update_incremental (struct obj_section *os,
-				struct probe_and_info *pi,
-				LONGEST lmid, CORE_ADDR r_debug,
-				int is_global_namespace)
+namespace_update_incremental (struct obj_section *os,
+			      struct probe_and_info *pi, LONGEST lmid,
+			      CORE_ADDR debug_base, int is_initial_namespace)
 {
   struct svr4_info *info = get_svr4_info ();
   struct namespace lookup, *ns;
   struct so_list *tail, **link, *so;
   CORE_ADDR lm;
 
+  /* Find our namespace in the table.  */
   if (info->namespace_table == NULL)
     return 0;
 
@@ -1772,6 +1767,7 @@ solib_table_update_incremental (struct obj_section *os,
   if (ns == NULL)
     return 0;
 
+  /* Walk to the end of the list.  */
   tail = ns->solist;
   if (tail == NULL)
     return 0;
@@ -1780,6 +1776,7 @@ solib_table_update_incremental (struct obj_section *os,
     tail = tail->next;
   link = &tail->next;
 
+  /* Read the new objects.  */
   lm = value_as_address (evaluate_probe_argument (os->objfile,
 						  pi->probe, 2));
 
@@ -1789,11 +1786,11 @@ solib_table_update_incremental (struct obj_section *os,
   if (!svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0))
     return 0;
 
-  /* XXX. */
+  /* Fill in the link-map IDs and initial namespace flags.  */
   for (so = tail; so; so = so->next)
     {
       so->lm_info->lmid = lmid;
-      so->lm_info->in_initial_namespace = is_global_namespace;
+      so->lm_info->in_initial_namespace = is_initial_namespace;
     }
 
   return 1;
@@ -1837,20 +1834,20 @@ svr4_handle_solib_event (bpstat bs)
       LONGEST lmid = value_as_long (evaluate_probe_argument (os->objfile,
 							     pi->probe, 0));
 
-      CORE_ADDR r_debug = value_as_address (evaluate_probe_argument (os->objfile,
+      CORE_ADDR debug_base = value_as_address (evaluate_probe_argument (os->objfile,
 								     pi->probe, 1));
-      if (r_debug != 0)
+      if (debug_base != 0)
 	{
 	  /* Always locate the debug struct, in case it moved.  */
 	  info->debug_base = 0;
 	  if (locate_base (info) != 0)
 	    {
-	      int is_global_namespace = r_debug == info->debug_base;
+	      int is_initial_namespace = debug_base == info->debug_base;
 
 	      if (action == NAMESPACE_UPDATE_OR_RELOAD)
 		{
-		  if (solib_table_update_incremental (os, pi, lmid, r_debug,
-						      is_global_namespace))
+		  if (namespace_update_incremental (os, pi, lmid, debug_base,
+						      is_initial_namespace))
 		    return;
 
 		  action = NAMESPACE_RELOAD;
@@ -1858,8 +1855,8 @@ svr4_handle_solib_event (bpstat bs)
 
 	      gdb_assert (action == NAMESPACE_RELOAD);
 
-	      if (solib_table_update_full (os, pi, lmid, r_debug,
-					   is_global_namespace))
+	      if (namespace_update_full (os, pi, lmid, debug_base,
+					   is_initial_namespace))
 		return;
 	    }
 	}
@@ -1877,7 +1874,7 @@ svr4_handle_solib_event (bpstat bs)
   info->using_probes = 0;
 }
 
-/* XXX.  */
+/* Helper function for namespace_table_flatten.  */
 
 static int
 namespace_table_flatten_helper (void **slot, void *arg)
@@ -1926,7 +1923,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
   struct bp_location *loc;
 
   if (b->type != bp_shlib_event)
-    return 0;
+    return 0; /* Continue iterating.  */
 
   for (loc = b->loc; loc; loc = loc->next)
     {
@@ -1939,11 +1936,11 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
 
-	  return 0;
+	  return 0; /* Continue iterating.  */
 	}
     }
 
-  return 0;
+  return 0; /* Continue iterating.  */
 }
 
 /* Enable or disable optional solib event breakpoints as appropriate.
@@ -1971,7 +1968,8 @@ svr4_update_solib_event_breakpoints (void)
    marker function.  */
 
 static void
-svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
+svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
+				     CORE_ADDR address)
 {
   struct svr4_info *info = get_svr4_info ();
   struct obj_section *os;
@@ -1993,7 +1991,7 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch, CORE_ADDR address)
 	      /* Fedora 17, RHEL 6.2, and RHEL 6.3 shipped with an
 		 early version of the probes code in which the probes'
 		 names were prefixed with "rtld_".  The locations and
-		 arguments XXXof the probes are otherwise the same, so we
+		 arguments of the probes are otherwise the same, so we
 		 check for the prefixed version if the unprefixed
 		 probes are not found.  */
 
