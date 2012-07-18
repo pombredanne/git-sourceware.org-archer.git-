@@ -1452,13 +1452,13 @@ svr4_current_sos (void)
 
   info = get_svr4_info ();
 
-  /* Always locate the debug struct, in case it has moved.  */
-  info->debug_base = 0;
-  locate_base (info);
-
   /* If we have a namespace table then return a flattened copy.  */
   if (info->namespace_table != NULL)
     return namespace_table_flatten (info->namespace_table);
+
+  /* Always locate the debug struct, in case it has moved.  */
+  info->debug_base = 0;
+  locate_base (info);
 
   /* If we can't find the dynamic linker's base structure, this
      must not be a dynamically linked executable.  Hmm.  */
