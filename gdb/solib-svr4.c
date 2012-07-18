@@ -1672,11 +1672,10 @@ free_namespace (PTR p)
    objects from the inferior.  Returns nonzero on success.  */
 
 static int
-namespace_update_full (struct obj_section *os, struct probe_and_info *pi,
-		       LONGEST lmid, CORE_ADDR debug_base,
-		       int is_initial_namespace)
+namespace_update_full (struct svr4_info *info, struct obj_section *os,
+		       struct probe_and_info *pi, LONGEST lmid,
+		       CORE_ADDR debug_base, int is_initial_namespace)
 {
-  struct svr4_info *info = get_svr4_info ();
   struct so_list *result = NULL, *so;
   struct namespace lookup, *ns;
   void **slot;
@@ -1749,11 +1748,10 @@ namespace_update_full (struct obj_section *os, struct probe_and_info *pi,
    list was successfully updated, or zero to indicate failure.  */
 
 static int
-namespace_update_incremental (struct obj_section *os,
+namespace_update_incremental (struct svr4_info *info, struct obj_section *os,
 			      struct probe_and_info *pi, LONGEST lmid,
 			      CORE_ADDR debug_base, int is_initial_namespace)
 {
-  struct svr4_info *info = get_svr4_info ();
   struct namespace lookup, *ns;
   struct so_list *tail, **link, *so;
   CORE_ADDR lm;
@@ -1846,7 +1844,7 @@ svr4_handle_solib_event (bpstat bs)
 
 	      if (action == NAMESPACE_UPDATE_OR_RELOAD)
 		{
-		  if (namespace_update_incremental (os, pi, lmid, debug_base,
+		  if (namespace_update_incremental (info, os, pi, lmid, debug_base,
 						      is_initial_namespace))
 		    return;
 
@@ -1855,7 +1853,7 @@ svr4_handle_solib_event (bpstat bs)
 
 	      gdb_assert (action == NAMESPACE_RELOAD);
 
-	      if (namespace_update_full (os, pi, lmid, debug_base,
+	      if (namespace_update_full (info, os, pi, lmid, debug_base,
 					   is_initial_namespace))
 		return;
 	    }
