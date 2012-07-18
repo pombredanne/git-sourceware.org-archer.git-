@@ -74,8 +74,9 @@ struct lm_info
     /* Values read in from inferior's fields of the same name.  */
     CORE_ADDR l_ld, l_next, l_prev, l_name;
 
-    /* XXX.  */
-    LONGEST lmid; // XXX will be 0 if !probes
+    /* Numeric link-map ID of the link-map list this object is loaded
+       into.  Will be zero if not using the probes-based interface.  */
+    LONGEST lmid;
     unsigned int in_global_namespace : 1;
     unsigned int in_global_namespace_p : 1;
   };
@@ -187,16 +188,6 @@ svr4_same_1 (const char *gdb_so_name, const char *inferior_so_name)
     return 1;
 
   return 0;
-}
-
-/* XXX.  */
-
-static int
-svr4_same (struct so_list *gdb, struct so_list *inferior)
-{
-  return (gdb->lm_info->lmid == inferior->lm_info->lmid
-	  && svr4_same_1 (gdb->so_original_name,
-			  inferior->so_original_name));
 }
 
 static struct lm_info *
@@ -444,6 +435,23 @@ get_svr4_info (void)
   info = XZALLOC (struct svr4_info);
   set_program_space_data (current_program_space, solib_svr4_pspace_data, info);
   return info;
+}
+
+/* Return non-zero if GDB and INFERIOR represent the same shared
+   library.  */
+
+static int
+svr4_same (struct so_list *gdb, struct so_list *inferior)
+{
+  struct svr4_info *info = get_svr4_info ();
+
+  if (info->using_probes)
+    {
+      if (gdb->lm_info->lmid != inferior->lm_info->lmid)
+	return 0;
+    }
+
+  return svr4_same_1 (gdb->so_original_name, inferior->so_original_name);
 }
 
 /* Local function prototypes */
