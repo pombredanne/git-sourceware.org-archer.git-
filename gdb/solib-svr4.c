@@ -1568,9 +1568,9 @@ struct probe_and_info
    event probe exists at that location.  */
 
 static struct probe_and_info *
-solib_event_probe_at (struct bp_location *loc, struct probe_and_info *result)
+solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
+		      struct probe_and_info *result)
 {
-  struct svr4_info *info = get_svr4_info ();
   int i;
 
   for (i = 0; i < NUM_PROBES; i++)
@@ -1816,7 +1816,7 @@ svr4_handle_solib_event (bpstat bs)
   if (!info->using_probes)
     return;
 
-  pi = solib_event_probe_at (bs->bp_location_at, &buf);
+  pi = solib_event_probe_at (info, bs->bp_location_at, &buf);
   if (pi != NULL)
     {
       printf_unfiltered ("hit %s\n", pi->probe->name);
@@ -1929,7 +1929,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
     {
       struct probe_and_info buf, *pi;
 
-      pi = solib_event_probe_at (loc, &buf);
+      pi = solib_event_probe_at (info, loc, &buf);
       if (pi != NULL)
 	{
 	  if (pi->info->action == NAMESPACE_NO_ACTION)
