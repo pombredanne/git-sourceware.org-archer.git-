@@ -27,9 +27,9 @@ class BaseFrameWrapper (FrameWrapper):
         super(BaseFrameWrapper, self).__init__(base)
         self.base = base
 
-    def elide (self):
-        if hasattr(self.base, "elide"):
-            return self.base.elide()
+    def elided (self):
+        if hasattr(self.base, "elided"):
+            return self.base.elided()
 
         return None
 
@@ -63,27 +63,15 @@ class BaseFrameWrapper (FrameWrapper):
         if hasattr(self.base, "frame_args"):
             return self.base.frame_args()
 
-        args = self.base.arguments()
-        args_list = []
-        if args != None:
-            for arg in args:
-                value = arg.value(self.base)
-                args_list.append((arg, value))
-
-        return args_list
+        args = FrameVars (self.base)
+        return args.fetch_frame_args()
 
     def frame_locals (self):
         if hasattr(self.base, "frame_locals"):
             return self.base.frame_locals()
 
-        frame_locals = self.base.locals()
-        frame_locals_list = []
-        if frame_locals != None:
-            for frame_local in frame_locals:
-                value = frame_local.value(self.base)
-                frame_locals_list.append((frame_local, value))
-
-        return frame_locals_list
+        args = FrameVars (self.base)
+        return args.fetch_frame_locals()
 
     def line (self):
         if hasattr(self.base, "line"):
@@ -100,3 +88,54 @@ class BaseFrameWrapper (FrameWrapper):
             return self.base.inferior_frame()
 
         return self.base
+
+class FrameVars ():
+
+    def __init__(self,frame):
+        self.frame = frame
+
+    def fetch_frame_locals (self):
+        frame_vars = []
+        block = self.frame.block()
+
+        for sym in block:
+            if sym.is_argument:
+                continue;
+            frame_vars.append((sym, self.get_value (sym, block)))
+
+        if len(frame_vars) == 0:
+            return None
+
+        return iter (frame_vars)
+
+    def fetch_frame_args (self):
+        frame_args = []
+        block = self.frame.block()
+
+        for sym in block:
+            if not sym.is_argument:
+                continue;
+
+            frame_args.append((sym, self.get_value (sym,block)))
+
+        if len(frame_args) == 0:
+            return None
+
+        return iter (frame_args)
+
+    def get_value (self, sym, block):
+        if len (sym.linkage_name):
+            nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
+
+            if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
+                sym = nsym
+
+        try:
+            val = sym.value (self.frame)
+
+        except RuntimeError, text:
+            val = text
+        if val == None:
+            val = "???"
+
+        return val

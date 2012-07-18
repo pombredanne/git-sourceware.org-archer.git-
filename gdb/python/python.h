@@ -24,6 +24,11 @@
 
 struct breakpoint_object;
 
+/* Python frame-filter status returns constants.  */
+static const int PY_BT_ERROR = 0;
+static const int PY_BT_COMPLETED = 1;
+static const int PY_BT_NO_FILTERS = 2;
+
 extern void finish_python_initialization (void);
 
 void eval_python_from_control_command (struct command_line *);

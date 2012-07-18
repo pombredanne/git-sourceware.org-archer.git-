@@ -34,15 +34,6 @@ class Reverse_Function (BaseFrameWrapper):
             fname = fname[::-1]
         return fname
 
-class ElideFrames (BaseFrameWrapper):
-    def __init__(self,fobj,fiter):
-        super(ElideFrames, self).__init__(fobj)
-        self.elide_iter = fiter
-
-    def elide (self):
-        return iter(self.elide_iter)
-
-
 class Dummy (BaseFrameWrapper):
 
     def __init__(self, fobj):
@@ -67,7 +58,7 @@ class Dummy (BaseFrameWrapper):
     def line (self):
         return 0
 
-    def elide (self):
+    def elided (self):
         return None
     
 class FrameFilter ():
@@ -83,6 +74,36 @@ class FrameFilter ():
                                      frame_iter)
         return frame_iter
 
+class ElidingFrameWrapper(BaseFrameWrapper):
+
+    def __init__(self, frame, elided_frames):
+        super(ElidingFrameWrapper, self).__init__(frame)
+        self.frame = frame
+        self.elided_frames = elided_frames
+
+    def elided(self):
+        return iter(self.elided_frames)
+
+class ElidingIterator:
+    def __init__(self, ii):
+        self.input_iterator = ii
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        frame = next(self.input_iterator)
+        if str(frame.function()) != 'func1':
+            return frame
+
+        # Suppose we want to return the 'func1' frame but elide the
+        # next frame.  E.g., if call in our interpreter language takes
+        # two C frames to implement, and the first one we see is the
+        # "sentinel".
+        elided = next(self.input_iterator)
+        return ElidingFrameWrapper(frame, [elided])
+        
+
 class FrameElider ():
 
     def __init__ (self):
@@ -91,58 +112,8 @@ class FrameElider ():
         self.enabled = True
         gdb.frame_filters [self.name] = self
 
-    def interp_b (self, it):
-        fn = str(it.function())
-        if fn == "func1":
-            return True
-
-        return False
-
-    def elide_b (self, it):
-        f = str(it.function())
-        if f == "func2" or f == "func3":
-            return True
-        
-        return False
-
-    def elider (self,frame):
-        if str(frame.function()) == "func1":
-            return ElideFrames(frame, self.fr)
-        else:
-            return frame
-        
     def filter (self, frame_iter):
-
-        # First find if the functions we are interested in exist in
-        # the iterable.  Copy the iterator pointer to two copies, also
-        # over the reference of frame_iter so that will remain
-        # uncorrupted.
-        frame_iter, f1, f2 = itertools.tee(frame_iter,3)
-
-        # Is there a function we are interested in?  If not just
-        # return the iterator.
-        check = itertools.ifilter (self.interp_b, f1)
-        try:
-            f = next(check)
-        except StopIteration:
-            return frame_iter
-            
-        # And are there frames that we want to elide into the previous
-        # function?  If so we need to copy the frames, as later we
-        # will filter them out of the main iterator.
-        elide_iter = itertools.ifilter (self.elide_b, f2)
-        self.fr = []
-        for fri in elide_iter:
-            self.fr.append (fri)
-
-        # Add in a synthetic frame to the elided frames group
-        self.fr.append (Dummy(f))
-        
-        frame_iter = itertools.imap (self.elider, frame_iter)
-
-        # Filter out elided frames from main iterator
-        frame_iter = itertools.ifilterfalse  (self.elide_b, frame_iter)
-        return frame_iter
+        return ElidingIterator (frame_iter)
 
 FrameFilter()
 FrameElider()

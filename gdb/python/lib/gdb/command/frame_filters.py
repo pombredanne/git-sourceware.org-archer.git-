@@ -159,12 +159,18 @@ def invoke (frame):
     Arguments:
         frame_iterator:  An iterator of frames.
     """
+
     sorted_list = _sort_list()
+
+    # Check to see if there are any frame-filters.  If not, just
+    # return None and let default backtrace printing occur.
+    if len(sorted_list) == 0:
+        return None
+
     frame_iterator = FrameIterator (frame)
 
     # Apply base filter to all gdb.Frames.  This unifies the in
     # interface
-
     frame_iterator = itertools.imap (BaseFrameWrapper, frame_iterator) 
 
     for ff in sorted_list:

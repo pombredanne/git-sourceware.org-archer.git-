@@ -1727,7 +1727,9 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
 				 print_frame_arguments, current_uiout,
 				 show_locals, count);
   
-  if (! result)
+  /* Run the inbuilt backtrace if there are no filters registered, or
+     if there was an error in the Python backtracing output.  */
+  if (raw || result == PY_BT_ERROR || result == PY_BT_NO_FILTERS)
     {
       for (i = 0, fi = trailing; fi && count--; i++, fi = get_prev_frame (fi))
 	{
