@@ -1804,7 +1804,11 @@ svr4_handle_solib_event (bpstat bs)
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_info buf, *pi;
   struct obj_section *os;
-  enum probe_action action = NAMESPACE_TABLE_INVALIDATE;
+  enum probe_action action;
+  struct value *val;
+  LONGEST lmid;
+  CORE_ADDR debug_base;
+  int is_initial_namespace;
 
   /* It is possible that this function will be called incorrectly
      by the handle_solib_event in handle_inferior_event if GDB goes
@@ -1815,50 +1819,57 @@ svr4_handle_solib_event (bpstat bs)
     return;
 
   pi = solib_event_probe_at (info, bs->bp_location_at, &buf);
-  if (pi != NULL)
-    {
-      printf_unfiltered ("hit %s\n", pi->probe->name);
+  if (pi == NULL)
+    goto error;
 
-      os = find_pc_section (pi->probe->address);
-      if (os != NULL)
-	action = solib_event_probe_action (os, pi);
-    }
+  os = find_pc_section (pi->probe->address);
+  if (os == NULL)
+    goto error;
+
+  action = solib_event_probe_action (os, pi);
+  if (action == NAMESPACE_TABLE_INVALIDATE)
+    goto error;
 
   if (action == NAMESPACE_NO_ACTION)
     return;
 
-  if (action != NAMESPACE_TABLE_INVALIDATE)
+  val = evaluate_probe_argument (os->objfile, pi->probe, 0);
+  if (val == NULL)
+    goto error;
+
+  lmid = value_as_long (val);
+
+  val = evaluate_probe_argument (os->objfile, pi->probe, 1);
+  if (val == NULL)
+    goto error;
+
+  debug_base = value_as_address (val);
+  if (debug_base == 0)
+    goto error;
+
+  /* Always locate the debug struct, in case it moved.  */
+  info->debug_base = 0;
+  if (locate_base (info) == 0)
+    goto error;
+
+  is_initial_namespace = (debug_base == info->debug_base);
+
+  if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
-      LONGEST lmid = value_as_long (evaluate_probe_argument (os->objfile,
-							     pi->probe, 0));
+      if (namespace_update_incremental (info, os, pi, lmid, debug_base,
+					is_initial_namespace))
+	return;
 
-      CORE_ADDR debug_base = value_as_address (evaluate_probe_argument (os->objfile,
-								     pi->probe, 1));
-      if (debug_base != 0)
-	{
-	  /* Always locate the debug struct, in case it moved.  */
-	  info->debug_base = 0;
-	  if (locate_base (info) != 0)
-	    {
-	      int is_initial_namespace = debug_base == info->debug_base;
-
-	      if (action == NAMESPACE_UPDATE_OR_RELOAD)
-		{
-		  if (namespace_update_incremental (info, os, pi, lmid, debug_base,
-						      is_initial_namespace))
-		    return;
-
-		  action = NAMESPACE_RELOAD;
-		}
-
-	      gdb_assert (action == NAMESPACE_RELOAD);
-
-	      if (namespace_update_full (info, os, pi, lmid, debug_base,
-					   is_initial_namespace))
-		return;
-	    }
-	}
+      action = NAMESPACE_RELOAD;
     }
+
+  gdb_assert (action == NAMESPACE_RELOAD);
+
+  if (namespace_update_full (info, os, pi, lmid, debug_base,
+			     is_initial_namespace))
+    return;
+
+ error:
 
   /* We should never reach here, but if we do we disable the
      probes interface and revert to the original interface.
