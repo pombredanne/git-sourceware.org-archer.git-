@@ -105,30 +105,27 @@ static const char * const solib_break_names[] =
   NULL
 };
 
-/* What to do with this namespace's entry in the solib table.  */
+/* What to do with the namespace table when a probe stop occurs.  */
 
 enum probe_action
   {
     /* Something went seriously wrong.  Stop using probes and
        revert to using the older interface.  */
-    SOLIB_TABLE_INVALIDATE,
+    NAMESPACE_TABLE_INVALIDATE,
 
-    /* No action is required.  This namespace's entry is still
-       valid.  */
-    SOLIB_TABLE_NO_ACTION,
+    /* No action is required.  This namespace is still valid.  */
+    NAMESPACE_NO_ACTION,
 
-    /* This namespace's entry should be reloaded entirely.  */
-    SOLIB_TABLE_RELOAD,
+    /* This namespace should be reloaded entirely.  */
+    NAMESPACE_RELOAD,
 
-    /* Attempt to incrementally update this namespace's entry. If
-       the update fails or is not possible, fall back to reloading
-       the entry in full.  */
-    SOLIB_TABLE_UPDATE_OR_RELOAD
+    /* Attempt to incrementally update this namespace. If the
+       update fails or is not possible, fall back to reloading
+       the namespace in full.  */
+    NAMESPACE_UPDATE_OR_RELOAD,
   };
 
-/* A list of named probes which, if present in the dynamic linker,
-   allow more fine-grained breakpoints to be placed on shared library
-   events.  */
+/* A probe name and an associated action.  */
 
 struct probe_info
 {
@@ -140,14 +137,18 @@ struct probe_info
   enum probe_action action;
 };
 
+/* A list of named probes which, if present in the dynamic linker,
+   allow more fine-grained breakpoints to be placed on shared library
+   events.  */
+
 static const struct probe_info probe_info[] =
 {
-  { "init_start", SOLIB_TABLE_NO_ACTION },
-  { "init_complete", SOLIB_TABLE_RELOAD },
-  { "map_start", SOLIB_TABLE_NO_ACTION },
-  { "reloc_complete", SOLIB_TABLE_UPDATE_OR_RELOAD },
-  { "unmap_start", SOLIB_TABLE_NO_ACTION },
-  { "unmap_complete", SOLIB_TABLE_RELOAD },
+  { "init_start", NAMESPACE_NO_ACTION },
+  { "init_complete", NAMESPACE_RELOAD },
+  { "map_start", NAMESPACE_NO_ACTION },
+  { "reloc_complete", NAMESPACE_UPDATE_OR_RELOAD },
+  { "unmap_start", NAMESPACE_NO_ACTION },
+  { "unmap_complete", NAMESPACE_RELOAD },
 };
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
@@ -1605,11 +1606,11 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
   unsigned probe_argc;
 
   action = pi->info->action;
-  if (action == SOLIB_TABLE_NO_ACTION || action == SOLIB_TABLE_INVALIDATE)
+  if (action == NAMESPACE_NO_ACTION || action == NAMESPACE_TABLE_INVALIDATE)
     return action;
 
-  gdb_assert (action == SOLIB_TABLE_RELOAD
-	      || action == SOLIB_TABLE_UPDATE_OR_RELOAD);
+  gdb_assert (action == NAMESPACE_RELOAD
+	      || action == NAMESPACE_UPDATE_OR_RELOAD);
 
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
@@ -1618,9 +1619,9 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
        arg2: struct link_map *new (optional, for incremental updates)  */
   probe_argc = get_probe_argument_count (os->objfile, pi->probe);
   if (probe_argc == 2)
-    action = SOLIB_TABLE_RELOAD;
+    action = NAMESPACE_RELOAD;
   else if (probe_argc < 2)
-    return SOLIB_TABLE_INVALIDATE;
+    return NAMESPACE_TABLE_INVALIDATE;
 
   return action;
 }
@@ -1809,7 +1810,7 @@ svr4_handle_solib_event (bpstat bs)
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_info buf, *pi;
   struct obj_section *os;
-  enum probe_action action = SOLIB_TABLE_INVALIDATE;
+  enum probe_action action = NAMESPACE_TABLE_INVALIDATE;
 
   /* It is possible that this function will be called incorrectly
      by the handle_solib_event in handle_inferior_event if GDB goes
@@ -1829,10 +1830,10 @@ svr4_handle_solib_event (bpstat bs)
 	action = solib_event_probe_action (os, pi);
     }
 
-  if (action == SOLIB_TABLE_NO_ACTION)
+  if (action == NAMESPACE_NO_ACTION)
     return;
 
-  if (action != SOLIB_TABLE_INVALIDATE)
+  if (action != NAMESPACE_TABLE_INVALIDATE)
     {
       LONGEST lmid = value_as_long (evaluate_probe_argument (os->objfile,
 							     pi->probe, 0));
@@ -1847,16 +1848,16 @@ svr4_handle_solib_event (bpstat bs)
 	    {
 	      int is_global_namespace = r_debug == info->debug_base;
 
-	      if (action == SOLIB_TABLE_UPDATE_OR_RELOAD)
+	      if (action == NAMESPACE_UPDATE_OR_RELOAD)
 		{
 		  if (solib_table_update_incremental (os, pi, lmid, r_debug,
 						      is_global_namespace))
 		    return;
 
-		  action = SOLIB_TABLE_RELOAD;
+		  action = NAMESPACE_RELOAD;
 		}
 
-	      gdb_assert (action == SOLIB_TABLE_RELOAD);
+	      gdb_assert (action == NAMESPACE_RELOAD);
 
 	      if (solib_table_update_full (os, pi, lmid, r_debug,
 					   is_global_namespace))
@@ -1935,7 +1936,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
       pi = solib_event_probe_at (loc, &buf);
       if (pi != NULL)
 	{
-	  if (pi->info->action == SOLIB_TABLE_NO_ACTION)
+	  if (pi->info->action == NAMESPACE_NO_ACTION)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
 
