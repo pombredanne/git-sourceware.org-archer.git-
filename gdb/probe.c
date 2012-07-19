@@ -633,26 +633,35 @@ info_probes_command (char *arg, int from_tty)
 /* See comments in probe.h.  */
 
 unsigned
-get_probe_argument_count (struct objfile *objfile, struct probe *probe)
+get_probe_argument_count (struct probe *probe)
 {
+  const struct sym_probe_fns *probe_fns;
+
   gdb_assert (probe->objfile != NULL);
   gdb_assert (probe->objfile->sf != NULL);
-  gdb_assert (probe->objfile->sf->sym_probe_fns != NULL);
 
-  return objfile->sf->sym_probe_fns->sym_get_probe_argument_count (probe);
+  probe_fns = probe->objfile->sf->sym_probe_fns;
+
+  gdb_assert (probe_fns != NULL);
+
+  return probe_fns->sym_get_probe_argument_count (probe);
 }
 
 /* See comments in probe.h.  */
 
 struct value *
-evaluate_probe_argument (struct objfile *objfile, struct probe *probe,
-			 unsigned n)
+evaluate_probe_argument (struct probe *probe, unsigned n)
 {
+  const struct sym_probe_fns *probe_fns;
+
   gdb_assert (probe->objfile != NULL);
   gdb_assert (probe->objfile->sf != NULL);
-  gdb_assert (probe->objfile->sf->sym_probe_fns != NULL);
 
-  return objfile->sf->sym_probe_fns->sym_evaluate_probe_argument (probe, n);
+  probe_fns = probe->objfile->sf->sym_probe_fns;
+
+  gdb_assert (probe_fns != NULL);
+
+  return probe_fns->sym_evaluate_probe_argument (probe, n);
 }
 
 /* See comments in probe.h.  */

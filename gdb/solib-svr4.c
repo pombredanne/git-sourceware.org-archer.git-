@@ -1598,7 +1598,7 @@ solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
    hit.  */
 
 static enum probe_action
-solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
+solib_event_probe_action (struct probe_and_info *pi)
 {
   enum probe_action action;
   unsigned probe_argc;
@@ -1615,7 +1615,7 @@ solib_event_probe_action (struct obj_section *os, struct probe_and_info *pi)
        arg0: Lmid_t lmid (mandatory)
        arg1: struct r_debug *debug_base (mandatory)
        arg2: struct link_map *new (optional, for incremental updates)  */
-  probe_argc = get_probe_argument_count (os->objfile, pi->probe);
+  probe_argc = get_probe_argument_count (pi->probe);
   if (probe_argc == 2)
     action = NAMESPACE_RELOAD;
   else if (probe_argc < 2)
@@ -1672,8 +1672,7 @@ free_namespace (PTR p)
    objects from the inferior.  Returns nonzero on success.  */
 
 static int
-namespace_update_full (struct svr4_info *info, struct obj_section *os,
-		       struct probe_and_info *pi, LONGEST lmid,
+namespace_update_full (struct svr4_info *info, LONGEST lmid,
 		       CORE_ADDR debug_base, int is_initial_namespace)
 {
   struct so_list *result = NULL, *so;
@@ -1748,7 +1747,7 @@ namespace_update_full (struct svr4_info *info, struct obj_section *os,
    list was successfully updated, or zero to indicate failure.  */
 
 static int
-namespace_update_incremental (struct svr4_info *info, struct obj_section *os,
+namespace_update_incremental (struct svr4_info *info,
 			      struct probe_and_info *pi, LONGEST lmid,
 			      CORE_ADDR debug_base, int is_initial_namespace)
 {
@@ -1776,7 +1775,7 @@ namespace_update_incremental (struct svr4_info *info, struct obj_section *os,
   link = &tail->next;
 
   /* Read the new objects.  */
-  val = evaluate_probe_argument (os->objfile, pi->probe, 2);
+  val = evaluate_probe_argument (pi->probe, 2);
   if (val == NULL)
     return 0;
 
@@ -1806,7 +1805,6 @@ svr4_handle_solib_event (bpstat bs)
 {
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_info buf, *pi;
-  struct obj_section *os;
   enum probe_action action;
   struct value *val;
   LONGEST lmid;
@@ -1825,24 +1823,20 @@ svr4_handle_solib_event (bpstat bs)
   if (pi == NULL)
     goto error;
 
-  os = find_pc_section (pi->probe->address);
-  if (os == NULL)
-    goto error;
-
-  action = solib_event_probe_action (os, pi);
+  action = solib_event_probe_action (pi);
   if (action == NAMESPACE_TABLE_INVALIDATE)
     goto error;
 
   if (action == NAMESPACE_NO_ACTION)
     return;
 
-  val = evaluate_probe_argument (os->objfile, pi->probe, 0);
+  val = evaluate_probe_argument (pi->probe, 0);
   if (val == NULL)
     goto error;
 
   lmid = value_as_long (val);
 
-  val = evaluate_probe_argument (os->objfile, pi->probe, 1);
+  val = evaluate_probe_argument (pi->probe, 1);
   if (val == NULL)
     goto error;
 
@@ -1859,7 +1853,7 @@ svr4_handle_solib_event (bpstat bs)
 
   if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
-      if (namespace_update_incremental (info, os, pi, lmid, debug_base,
+      if (namespace_update_incremental (info, pi, lmid, debug_base,
 					is_initial_namespace))
 	return;
 
@@ -1868,8 +1862,7 @@ svr4_handle_solib_event (bpstat bs)
 
   gdb_assert (action == NAMESPACE_RELOAD);
 
-  if (namespace_update_full (info, os, pi, lmid, debug_base,
-			     is_initial_namespace))
+  if (namespace_update_full (info, lmid, debug_base, is_initial_namespace))
     return;
 
  error:
