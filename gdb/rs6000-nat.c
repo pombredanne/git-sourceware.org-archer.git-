@@ -730,7 +730,7 @@ static struct vmap *
 add_vmap (LdInfo *ldi)
 {
   bfd *abfd, *last;
-  char *mem, *objname, *filename;
+  char *mem, *filename;
   struct objfile *obj;
   struct vmap *vp;
   int fd;
@@ -743,21 +743,22 @@ add_vmap (LdInfo *ldi)
   filename = LDI_FILENAME (ldi, arch64);
   mem = filename + strlen (filename) + 1;
   mem = xstrdup (mem);
-  objname = xstrdup (filename);
 
   fd = LDI_FD (ldi, arch64);
   if (fd < 0)
     /* Note that this opens it once for every member; a possible
        enhancement would be to only open it once for every object.  */
-    abfd = bfd_openr (objname, gnutarget);
+    abfd = bfd_openr (filename, gnutarget);
   else
-    abfd = bfd_fdopenr (objname, gnutarget, fd);
+    abfd = bfd_fdopenr (filename, gnutarget, fd);
+  abfd = gdb_bfd_ref (abfd);
   if (!abfd)
     {
       warning (_("Could not open `%s' as an executable file: %s"),
-	       objname, bfd_errmsg (bfd_get_error ()));
+	       filename, bfd_errmsg (bfd_get_error ()));
       return NULL;
     }
+  gdb_bfd_stash_filename (abfd);
 
   /* Make sure we have an object file.  */
 
@@ -768,23 +769,23 @@ add_vmap (LdInfo *ldi)
     {
       last = 0;
       /* FIXME??? am I tossing BFDs?  bfd?  */
-      while ((last = bfd_openr_next_archived_file (abfd, last)))
+      while ((last = gdb_bfd_ref (bfd_openr_next_archived_file (abfd, last))))
 	if (strcmp (mem, last->filename) == 0)
 	  break;
 
       if (!last)
 	{
-	  warning (_("\"%s\": member \"%s\" missing."), objname, mem);
-	  bfd_close (abfd);
+	  warning (_("\"%s\": member \"%s\" missing."), filename, mem);
+	  gdb_bfd_unref (abfd);
 	  return NULL;
 	}
 
       if (!bfd_check_format (last, bfd_object))
 	{
 	  warning (_("\"%s\": member \"%s\" not in executable format: %s."),
-		   objname, mem, bfd_errmsg (bfd_get_error ()));
-	  bfd_close (last);
-	  bfd_close (abfd);
+		   filename, mem, bfd_errmsg (bfd_get_error ()));
+	  gdb_bfd_unref (last);
+	  gdb_bfd_unref (abfd);
 	  return NULL;
 	}
 
@@ -793,11 +794,11 @@ add_vmap (LdInfo *ldi)
   else
     {
       warning (_("\"%s\": not in executable format: %s."),
-	       objname, bfd_errmsg (bfd_get_error ()));
-      bfd_close (abfd);
+	       filename, bfd_errmsg (bfd_get_error ()));
+      gdb_bfd_unref (abfd);
       return NULL;
     }
-  obj = allocate_objfile (vp->bfd, 0);
+  obj = allocate_objfile (gdb_bfd_ref (vp->bfd), 0);
   vp->objfile = obj;
 
   /* Always add symbols for the main objfile.  */

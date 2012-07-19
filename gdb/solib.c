@@ -46,6 +46,7 @@
 #include "solib.h"
 #include "interps.h"
 #include "filesystem.h"
+#include "gdb_bfd.h"
 
 /* Architecture-specific operations.  */
 
@@ -360,9 +361,9 @@ solib_find (char *in_pathname, int *fd)
    it is used as file handle to open the file.  Throws an error if the file
    could not be opened.  Handles both local and remote file access.
 
-   PATHNAME must be malloc'ed by the caller.  If successful, the new BFD's
-   name will point to it.  If unsuccessful, PATHNAME will be freed and the
-   FD will be closed (unless FD was -1).  */
+   PATHNAME must be malloc'ed by the caller.  It will be freed by this
+   function.  If unsuccessful, the FD will be closed (unless FD was
+   -1).  */
 
 bfd *
 solib_bfd_fopen (char *pathname, int fd)
@@ -389,7 +390,10 @@ solib_bfd_fopen (char *pathname, int fd)
 	     pathname, bfd_errmsg (bfd_get_error ()));
     }
 
-  return abfd;
+  gdb_bfd_stash_filename (abfd);
+  xfree (pathname);
+
+  return gdb_bfd_ref (abfd);
 }
 
 /* Find shared library PATHNAME and open a BFD for it.  */
@@ -420,17 +424,16 @@ solib_bfd_open (char *pathname)
   /* Check bfd format.  */
   if (!bfd_check_format (abfd, bfd_object))
     {
-      bfd_close (abfd);
-      make_cleanup (xfree, found_pathname);
+      make_cleanup_bfd_unref (abfd);
       error (_("`%s': not in executable format: %s"),
-	     found_pathname, bfd_errmsg (bfd_get_error ()));
+	     bfd_get_filename (abfd), bfd_errmsg (bfd_get_error ()));
     }
 
   /* Check bfd arch.  */
   b = gdbarch_bfd_arch_info (target_gdbarch);
   if (!b->compatible (b, bfd_get_arch_info (abfd)))
     warning (_("`%s': Shared library architecture %s is not compatible "
-               "with target architecture %s."), found_pathname,
+               "with target architecture %s."), bfd_get_filename (abfd),
              bfd_get_arch_info (abfd)->printable_name, b->printable_name);
 
   return abfd;
@@ -466,7 +469,7 @@ solib_map_sections (struct so_list *so)
     return 0;
 
   /* Leave bfd open, core_xfer_memory and "info files" need it.  */
-  so->abfd = gdb_bfd_ref (abfd);
+  so->abfd = abfd;
 
   /* copy full path name into so_name, so that later symbol_file_add
      can find it.  */
@@ -608,7 +611,7 @@ solib_read_symbols (struct so_list *so, int flags)
 
 	  sap = build_section_addr_info_from_section_table (so->sections,
 							    so->sections_end);
-	  so->objfile = symbol_file_add_from_bfd (so->abfd,
+	  so->objfile = symbol_file_add_from_bfd (gdb_bfd_ref (so->abfd),
 						  flags, sap, OBJF_SHARED,
 						  NULL);
 	  so->objfile->addr_low = so->addr_low;
@@ -1233,7 +1236,7 @@ reload_shared_libraries_1 (int from_tty)
 	{
 	  found_pathname = xstrdup (bfd_get_filename (abfd));
 	  make_cleanup (xfree, found_pathname);
-	  gdb_bfd_close_or_warn (abfd);
+	  gdb_bfd_unref (abfd);
 	}
 
       /* If this shared library is no longer associated with its previous

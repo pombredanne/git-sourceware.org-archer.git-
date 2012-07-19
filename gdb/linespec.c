@@ -110,7 +110,7 @@ struct linespec
      currently precludes the use of other members.  */
 
   /* The expression entered by the user.  */
-  char *expression;
+  const char *expression;
 
   /* The resulting PC expression derived from evaluating EXPRESSION.  */
   CORE_ADDR expr_pc;
@@ -118,7 +118,7 @@ struct linespec
   /* Any specified file symtabs.  */
 
   /* The user-supplied source filename or NULL if none was specified.  */
-  char *source_filename;
+  const char *source_filename;
 
   /* The list of symtabs to search to which to limit the search.  May not
      be NULL.  If SOURCE_FILENAME is NULL (no user-specified filename),
@@ -130,7 +130,7 @@ struct linespec
 
   /* The user-specified function name.  If no function name was
      supplied, this may be NULL.  */
-  char *function_name;
+  const char *function_name;
 
   /* A list of matching function symbols and minimal symbols.  Both lists
      may be NULL if no matching symbols were found.  */
@@ -140,7 +140,7 @@ struct linespec
   /* The name of a label and matching symbols.  */
 
   /* The user-specified label name.  */
-  char *label_name;
+  const char *label_name;
 
   /* A structure of matching label symbols and the corresponding
      function symbol in which the label was found.  Both may be NULL
@@ -810,13 +810,16 @@ add_sal_to_sals_basic (struct symtabs_and_lines *sals,
 
 /* Add SAL to SALS, and also update SELF->CANONICAL_NAMES to reflect
    the new sal, if needed.  If not NULL, SYMNAME is the name of the
-   symbol to use when constructing the new canonical name.  */
+   symbol to use when constructing the new canonical name.
+
+   If LITERAL_CANONICAL is non-zero, SYMNAME will be used as the
+   canonical name for the SAL.  */
 
 static void
 add_sal_to_sals (struct linespec_state *self,
 		 struct symtabs_and_lines *sals,
 		 struct symtab_and_line *sal,
-		 const char *symname)
+		 const char *symname, int literal_canonical)
 {
   add_sal_to_sals_basic (sals, sal);
 
@@ -826,7 +829,7 @@ add_sal_to_sals (struct linespec_state *self,
 
       self->canonical_names = xrealloc (self->canonical_names,
 					sals->nelts * sizeof (char *));
-      if (sal->symtab && sal->symtab->filename)
+      if (!literal_canonical && sal->symtab && sal->symtab->filename)
 	{
 	  char *filename = sal->symtab->filename;
 
@@ -842,6 +845,8 @@ add_sal_to_sals (struct linespec_state *self,
 	  else
 	    canonical_name = xstrprintf ("%s:%d", filename, sal->line);
 	}
+      else if (symname != NULL)
+	canonical_name = xstrdup (symname);
 
       self->canonical_names[sals->nelts - 1] = canonical_name;
     }
@@ -1347,7 +1352,7 @@ decode_line_2 (struct linespec_state *self,
    FILENAME).  */
 
 static void ATTRIBUTE_NORETURN
-symbol_not_found_error (char *symbol, char *filename)
+symbol_not_found_error (const char *symbol, const char *filename)
 {
   if (symbol == NULL)
     symbol = "";
@@ -1809,7 +1814,7 @@ create_sals_line_offset (struct linespec_state *self,
 	       found.  */
 	    intermediate_results.sals[i].line = val.line;
 	    add_sal_to_sals (self, &values, &intermediate_results.sals[i],
-			     sym ? SYMBOL_NATURAL_NAME (sym) : NULL);
+			     sym ? SYMBOL_NATURAL_NAME (sym) : NULL, 0);
 	  }
 
       do_cleanups (cleanup);
@@ -1837,13 +1842,14 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 
   if (ls->expression != NULL)
     {
+      struct symtab_and_line sal;
+
       /* We have an expression.  No other attribute is allowed.  */
-      sals.sals = XMALLOC (struct symtab_and_line);
-      sals.nelts = 1;
-      sals.sals[0] = find_pc_line (ls->expr_pc, 0);
-      sals.sals[0].pc = ls->expr_pc;
-      sals.sals[0].section = find_pc_overlay (ls->expr_pc);
-      sals.sals[0].explicit_pc = 1;
+      sal = find_pc_line (ls->expr_pc, 0);
+      sal.pc = ls->expr_pc;
+      sal.section = find_pc_overlay (ls->expr_pc);
+      sal.explicit_pc = 1;
+      add_sal_to_sals (state, &sals, &sal, ls->expression, 1);
     }
   else if (ls->labels.label_symbols != NULL)
     {
@@ -1856,7 +1862,7 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 	{
 	  symbol_to_sal (&sal, state->funfirstline, sym);
 	  add_sal_to_sals (state, &sals, &sal,
-			   SYMBOL_NATURAL_NAME (sym));
+			   SYMBOL_NATURAL_NAME (sym), 0);
 	}
     }
   else if (ls->function_symbols != NULL || ls->minimal_symbols != NULL)
@@ -1882,7 +1888,8 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 	      set_current_program_space (pspace);
 	      symbol_to_sal (&sal, state->funfirstline, sym);
 	      if (maybe_add_address (state->addr_set, pspace, sal.pc))
-		add_sal_to_sals (state, &sals, &sal, SYMBOL_NATURAL_NAME (sym));
+		add_sal_to_sals (state, &sals, &sal,
+				 SYMBOL_NATURAL_NAME (sym), 0);
 	    }
 	}
 
@@ -2220,14 +2227,10 @@ linespec_parser_delete (void *arg)
 {
   linespec_parser *parser = (linespec_parser *) arg;
 
-  if (PARSER_RESULT (parser)->expression)
-    xfree (PARSER_RESULT (parser)->expression);
-  if (PARSER_RESULT (parser)->source_filename)
-    xfree (PARSER_RESULT (parser)->source_filename);
-  if (PARSER_RESULT (parser)->label_name)
-    xfree (PARSER_RESULT (parser)->label_name);
-  if (PARSER_RESULT (parser)->function_name)
-    xfree (PARSER_RESULT (parser)->function_name);
+  xfree ((char *) PARSER_RESULT (parser)->expression);
+  xfree ((char *) PARSER_RESULT (parser)->source_filename);
+  xfree ((char *) PARSER_RESULT (parser)->label_name);
+  xfree ((char *) PARSER_RESULT (parser)->function_name);
 
   if (PARSER_RESULT (parser)->file_symtabs != NULL)
     VEC_free (symtab_p, PARSER_RESULT (parser)->file_symtabs);
@@ -2284,19 +2287,15 @@ decode_line_full (char **argptr, int flags,
   gdb_assert (canonical->addr_string != NULL);
   canonical->pre_expanded = 1;
 
-  /* Fill in the missing canonical names.  */
+  /* Arrange for allocated canonical names to be freed.  */
   if (result.nelts > 0)
     {
       int i;
 
-      if (state->canonical_names == NULL)
-	state->canonical_names = xcalloc (result.nelts, sizeof (char *));
       make_cleanup (xfree, state->canonical_names);
       for (i = 0; i < result.nelts; ++i)
 	{
-	  if (state->canonical_names[i] == NULL)
-	    state->canonical_names[i] = savestring (arg_start,
-						    *argptr - arg_start);
+	  gdb_assert (state->canonical_names[i] != NULL);
 	  make_cleanup (xfree, state->canonical_names[i]);
 	}
     }
@@ -3110,7 +3109,7 @@ decode_digits_list_mode (struct linespec_state *self,
       val.pc = 0;
       val.explicit_line = 1;
 
-      add_sal_to_sals (self, values, &val, NULL);
+      add_sal_to_sals (self, values, &val, NULL, 0);
     }
 }
 
@@ -3254,7 +3253,7 @@ minsym_found (struct linespec_state *self, struct objfile *objfile,
     skip_prologue_sal (&sal);
 
   if (maybe_add_address (self->addr_set, objfile->pspace, sal.pc))
-    add_sal_to_sals (self, result, &sal, SYMBOL_NATURAL_NAME (msymbol));
+    add_sal_to_sals (self, result, &sal, SYMBOL_NATURAL_NAME (msymbol), 0);
 }
 
 /* A helper struct to pass some data through

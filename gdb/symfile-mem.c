@@ -54,6 +54,7 @@
 #include "observer.h"
 #include "auxv.h"
 #include "elf/common.h"
+#include "gdb_bfd.h"
 
 /* Verify parameters of target_read_memory_bfd and target_read_memory are
    compatible.  */
@@ -100,17 +101,19 @@ symbol_file_add_from_memory (struct bfd *templ, CORE_ADDR addr, char *name,
   if (nbfd == NULL)
     error (_("Failed to read a valid object file image from memory."));
 
+  gdb_bfd_ref (nbfd);
   if (name == NULL)
-    nbfd->filename = xstrdup ("shared object read from target memory");
+    nbfd->filename = "shared object read from target memory";
   else
-    nbfd->filename = name;
+    {
+      nbfd->filename = name;
+      gdb_bfd_stash_filename (nbfd);
+      xfree (name);
+    }
 
   if (!bfd_check_format (nbfd, bfd_object))
     {
-      /* FIXME: should be checking for errors from bfd_close (for one thing,
-         on error it does not free all the storage associated with the
-         bfd).  */
-      bfd_close (nbfd);
+      make_cleanup_bfd_unref (nbfd);
       error (_("Got object file from memory but can't read symbols: %s."),
 	     bfd_errmsg (bfd_get_error ()));
     }

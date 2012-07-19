@@ -55,6 +55,7 @@
 #include "solib.h"
 #include "remote.h"
 #include "stack.h"
+#include "gdb_bfd.h"
 
 #include <sys/types.h>
 #include <fcntl.h>
@@ -1074,7 +1075,7 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
       add_flags &= ~SYMFILE_NO_READ;
     }
 
-  my_cleanups = make_cleanup_bfd_close (abfd);
+  my_cleanups = make_cleanup_bfd_unref (abfd);
 
   /* Give user a chance to burp if we'd be
      interactively wiping out any existing symbols.  */
@@ -1372,7 +1373,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
       if (abfd_stat.st_dev == parent_stat.st_dev
 	  && abfd_stat.st_ino == parent_stat.st_ino)
 	{
-	  bfd_close (abfd);
+	  gdb_bfd_unref (abfd);
 	  return 0;
 	}
       verified_as_different = 1;
@@ -1382,7 +1383,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
 
   file_crc_p = get_file_crc (abfd, &file_crc);
 
-  bfd_close (abfd);
+  gdb_bfd_unref (abfd);
 
   if (!file_crc_p)
     return 0;
@@ -1690,15 +1691,22 @@ set_initial_language (void)
 }
 
 /* If NAME is a remote name open the file using remote protocol, otherwise
-   open it normally.  */
+   open it normally.  Returns a new reference to the BFD.  On error,
+   returns NULL with the BFD error set.  */
 
 bfd *
 bfd_open_maybe_remote (const char *name)
 {
   if (remote_filename_p (name))
-    return remote_bfd_open (name, gnutarget);
+    return gdb_bfd_ref (remote_bfd_open (name, gnutarget));
   else
-    return bfd_openr (name, gnutarget);
+    {
+      bfd *result = gdb_bfd_ref (bfd_openr (name, gnutarget));
+
+      if (result != NULL)
+	gdb_bfd_stash_filename (result);
+      return result;
+    }
 }
 
 
@@ -1716,19 +1724,14 @@ symfile_bfd_open (char *name)
 
   if (remote_filename_p (name))
     {
-      name = xstrdup (name);
-      sym_bfd = remote_bfd_open (name, gnutarget);
+      sym_bfd = gdb_bfd_ref (remote_bfd_open (name, gnutarget));
       if (!sym_bfd)
-	{
-	  make_cleanup (xfree, name);
-	  error (_("`%s': can't open to read symbols: %s."), name,
-		 bfd_errmsg (bfd_get_error ()));
-	}
+	error (_("`%s': can't open to read symbols: %s."), name,
+	       bfd_errmsg (bfd_get_error ()));
 
       if (!bfd_check_format (sym_bfd, bfd_object))
 	{
-	  bfd_close (sym_bfd);
-	  make_cleanup (xfree, name);
+	  make_cleanup_bfd_unref (sym_bfd);
 	  error (_("`%s': can't read symbols: %s."), name,
 		 bfd_errmsg (bfd_get_error ()));
 	}
@@ -1757,12 +1760,11 @@ symfile_bfd_open (char *name)
       perror_with_name (name);
     }
 
-  /* Free 1st new malloc'd copy, but keep the 2nd malloc'd copy in
-     bfd.  It'll be freed in free_objfile().  */
   xfree (name);
   name = absolute_name;
+  make_cleanup (xfree, name);
 
-  sym_bfd = bfd_fopen (name, gnutarget, FOPEN_RB, desc);
+  sym_bfd = gdb_bfd_ref (bfd_fopen (name, gnutarget, FOPEN_RB, desc));
   if (!sym_bfd)
     {
       make_cleanup (xfree, name);
@@ -1773,17 +1775,12 @@ symfile_bfd_open (char *name)
 
   if (!bfd_check_format (sym_bfd, bfd_object))
     {
-      /* FIXME: should be checking for errors from bfd_close (for one
-         thing, on error it does not free all the storage associated
-         with the bfd).  */
-      bfd_close (sym_bfd);	/* This also closes desc.  */
-      make_cleanup (xfree, name);
+      make_cleanup_bfd_unref (sym_bfd);
       error (_("`%s': can't read symbols: %s."), name,
 	     bfd_errmsg (bfd_get_error ()));
     }
 
-  /* bfd_usrdata exists for applications and libbfd must not touch it.  */
-  gdb_assert (bfd_usrdata (sym_bfd) == NULL);
+  gdb_bfd_stash_filename (sym_bfd);
 
   return sym_bfd;
 }
@@ -2109,17 +2106,14 @@ generic_load (char *args, int from_tty)
     }
 
   /* Open the file for loading.  */
-  loadfile_bfd = bfd_openr (filename, gnutarget);
+  loadfile_bfd = gdb_bfd_ref (bfd_openr (filename, gnutarget));
   if (loadfile_bfd == NULL)
     {
       perror_with_name (filename);
       return;
     }
 
-  /* FIXME: should be checking for errors from bfd_close (for one thing,
-     on error it does not free all the storage associated with the
-     bfd).  */
-  make_cleanup_bfd_close (loadfile_bfd);
+  make_cleanup_bfd_unref (loadfile_bfd);
 
   if (!bfd_check_format (loadfile_bfd, bfd_object))
     {
@@ -2518,15 +2512,18 @@ reread_symbols (void)
 	  /* Clean up any state BFD has sitting around.  We don't need
 	     to close the descriptor but BFD lacks a way of closing the
 	     BFD without closing the descriptor.  */
-	  obfd_filename = bfd_get_filename (objfile->obfd);
-	  if (!bfd_close (objfile->obfd))
-	    error (_("Can't close BFD for %s: %s"), objfile->name,
-		   bfd_errmsg (bfd_get_error ()));
-	  objfile->obfd = bfd_open_maybe_remote (obfd_filename);
+	  {
+	    struct bfd *obfd = objfile->obfd;
+
+	    obfd_filename = bfd_get_filename (objfile->obfd);
+	    /* Open the new BFD before freeing the old one, so that
+	       the filename remains live.  */
+	    objfile->obfd = bfd_open_maybe_remote (obfd_filename);
+	    gdb_bfd_unref (obfd);
+	  }
+
 	  if (objfile->obfd == NULL)
 	    error (_("Can't open %s to read symbols."), objfile->name);
-	  else
-	    objfile->obfd = gdb_bfd_ref (objfile->obfd);
 	  /* bfd_openr sets cacheable to true, which is what we want.  */
 	  if (!bfd_check_format (objfile->obfd, bfd_object))
 	    error (_("Can't read symbols from %s: %s."), objfile->name,

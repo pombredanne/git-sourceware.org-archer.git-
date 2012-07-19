@@ -9231,6 +9231,14 @@ check_fast_tracepoint_sals (struct gdbarch *gdbarch,
     }
 }
 
+/* Issue an invalid thread ID error.  */
+
+static void ATTRIBUTE_NORETURN
+invalid_thread_id_error (int id)
+{
+  error (_("Unknown thread %d."), id);
+}
+
 /* Given TOK, a string specification of condition and thread, as
    accepted by the 'break' command, extract the condition
    string and thread number and set *COND_STRING and *THREAD.
@@ -9245,6 +9253,9 @@ find_condition_and_thread (char *tok, CORE_ADDR pc,
 {
   *cond_string = NULL;
   *thread = -1;
+  *task = 0;
+  *rest = NULL;
+
   while (tok && *tok)
     {
       char *end_tok;
@@ -9284,7 +9295,7 @@ find_condition_and_thread (char *tok, CORE_ADDR pc,
 	  if (tok == tmptok)
 	    error (_("Junk after thread keyword."));
 	  if (!valid_thread_id (*thread))
-	    error (_("Unknown thread %d."), *thread);
+	    invalid_thread_id_error (*thread);
 	}
       else if (toklen >= 1 && strncmp (tok, "task", toklen) == 0)
 	{
@@ -9495,9 +9506,7 @@ create_breakpoint (struct gdbarch *gdbarch,
                from thread number, so parsing in context of first
                sal is OK.  When setting the breakpoint we'll 
                re-parse it in context of each sal.  */
-            cond_string = NULL;
-            thread = -1;
-	    rest = NULL;
+
             find_condition_and_thread (arg, lsal->sals.sals[0].pc, &cond_string,
                                        &thread, &task, &rest);
             if (cond_string)
@@ -10763,7 +10772,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
 
 	      /* Check if the thread actually exists.  */
 	      if (!valid_thread_id (thread))
-		error (_("Unknown thread %d."), thread);
+		invalid_thread_id_error (thread);
 	    }
 	  else if (toklen == 4 && !strncmp (tok, "mask", 4))
 	    {
@@ -14009,10 +14018,8 @@ addr_string_to_sals (struct breakpoint *b, char *addr_string, int *found)
 	resolve_sal_pc (&sals.sals[i]);
       if (b->condition_not_parsed && s && s[0])
 	{
-	  char *cond_string = 0;
-	  int thread = -1;
-	  int task = 0;
-	  char *extra_string = NULL;
+	  char *cond_string, *extra_string;
+	  int thread, task;
 
 	  find_condition_and_thread (s, sals.sals[0].pc,
 				     &cond_string, &thread, &task,
