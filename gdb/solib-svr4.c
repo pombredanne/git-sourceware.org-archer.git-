@@ -82,7 +82,7 @@ struct lm_info
     /* Nonzero if the namespace list this object is loaded into is the
        application's initial namespace (LM_ID_BASE).  This value is
        only valid when using the probes-based interface.  */
-    unsigned int in_initial_namespace : 1;
+    unsigned int in_initial_ns : 1;
   };
 
 /* On SVR4 systems, a list of symbols in the dynamic linker where
@@ -435,7 +435,7 @@ lm_addr_check (struct so_list *so, bfd *abfd)
 	    {
 	      struct svr4_info *info = get_svr4_info ();
 
-	      if (!info->using_probes || so->lm_info->in_initial_namespace)
+	      if (!info->using_probes || so->lm_info->in_initial_ns)
 		{
 		  /* There is no way to verify the library file
 		     matches.  prelink can during prelinking of an
@@ -1673,7 +1673,7 @@ free_namespace (PTR p)
 
 static int
 namespace_update_full (struct svr4_info *info, LONGEST lmid,
-		       CORE_ADDR debug_base, int is_initial_namespace)
+		       CORE_ADDR debug_base, int is_initial_ns)
 {
   struct so_list *result = NULL, *so;
   struct namespace lookup, *ns;
@@ -1682,7 +1682,7 @@ namespace_update_full (struct svr4_info *info, LONGEST lmid,
   /* Read the list of shared objects from the inferior.  The
      initial namespace requires extra processing and is handled
      separately.  */
-  if (is_initial_namespace)
+  if (is_initial_ns)
     {
       result = svr4_current_sos_from_debug_base ();
     }
@@ -1711,7 +1711,7 @@ namespace_update_full (struct svr4_info *info, LONGEST lmid,
   for (so = result; so; so = so->next)
     {
       so->lm_info->lmid = lmid;
-      so->lm_info->in_initial_namespace = is_initial_namespace;
+      so->lm_info->in_initial_ns = is_initial_ns;
     }
 
   /* Create the namespace table, if necessary.  */
@@ -1747,14 +1747,12 @@ namespace_update_full (struct svr4_info *info, LONGEST lmid,
    list was successfully updated, or zero to indicate failure.  */
 
 static int
-namespace_update_incremental (struct svr4_info *info,
-			      struct probe_and_info *pi, LONGEST lmid,
-			      CORE_ADDR debug_base, int is_initial_namespace)
+namespace_update_incremental (struct svr4_info *info, LONGEST lmid,
+			      CORE_ADDR lm, int is_initial_ns)
 {
   struct namespace lookup, *ns;
   struct so_list *tail, **link, *so;
   struct value *val;
-  CORE_ADDR lm;
 
   /* Find our namespace in the table.  */
   if (info->namespace_table == NULL)
@@ -1775,14 +1773,6 @@ namespace_update_incremental (struct svr4_info *info,
   link = &tail->next;
 
   /* Read the new objects.  */
-  val = evaluate_probe_argument (pi->probe, 2);
-  if (val == NULL)
-    return 0;
-
-  lm = value_as_address (val);
-  if (lm == 0)
-    return 0;
-
   if (!svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0))
     return 0;
 
@@ -1790,7 +1780,7 @@ namespace_update_incremental (struct svr4_info *info,
   for (so = tail; so; so = so->next)
     {
       so->lm_info->lmid = lmid;
-      so->lm_info->in_initial_namespace = is_initial_namespace;
+      so->lm_info->in_initial_ns = is_initial_ns;
     }
 
   return 1;
@@ -1808,8 +1798,8 @@ svr4_handle_solib_event (bpstat bs)
   enum probe_action action;
   struct value *val;
   LONGEST lmid;
-  CORE_ADDR debug_base;
-  int is_initial_namespace;
+  CORE_ADDR debug_base, lm = 0;
+  int is_initial_ns;
 
   /* It is possible that this function will be called incorrectly
      by the handle_solib_event in handle_inferior_event if GDB goes
@@ -1849,12 +1839,21 @@ svr4_handle_solib_event (bpstat bs)
   if (locate_base (info) == 0)
     goto error;
 
-  is_initial_namespace = (debug_base == info->debug_base);
+  is_initial_ns = (debug_base == info->debug_base);
 
   if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
-      if (namespace_update_incremental (info, pi, lmid, debug_base,
-					is_initial_namespace))
+      val = evaluate_probe_argument (pi->probe, 2);
+      if (val != NULL)
+	lm = value_as_address (val);
+
+      if (lm == 0)
+	action = NAMESPACE_RELOAD;
+    }
+
+  if (action == NAMESPACE_UPDATE_OR_RELOAD)
+    {
+      if (namespace_update_incremental (info, lmid, lm, is_initial_ns))
 	return;
 
       action = NAMESPACE_RELOAD;
@@ -1862,7 +1861,7 @@ svr4_handle_solib_event (bpstat bs)
 
   gdb_assert (action == NAMESPACE_RELOAD);
 
-  if (namespace_update_full (info, lmid, debug_base, is_initial_namespace))
+  if (namespace_update_full (info, lmid, debug_base, is_initial_ns))
     return;
 
  error:
