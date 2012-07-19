@@ -666,4 +666,12 @@ extern void default_iterate_over_objfiles_in_search_order
 
 #define MULTI_OBJFILE_P() (object_files && object_files->next)
 
+extern int auto_update_section_map;
+
+#define inhibit_section_map_updates() \
+  (auto_update_section_map = 0)
+
+#define resume_section_map_updates() \
+  (auto_update_section_map = 1)
+
 #endif /* !defined (OBJFILES_H) */

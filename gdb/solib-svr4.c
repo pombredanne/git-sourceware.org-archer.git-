@@ -1820,6 +1820,8 @@ svr4_handle_solib_event (bpstat bs)
   if (action == NAMESPACE_NO_ACTION)
     return;
 
+  inhibit_section_map_updates ();
+
   val = evaluate_probe_argument (pi->probe, 0);
   if (val == NULL)
     goto error;
@@ -1851,6 +1853,8 @@ svr4_handle_solib_event (bpstat bs)
 	action = NAMESPACE_RELOAD;
     }
 
+  resume_section_map_updates ();
+
   if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
       if (namespace_update_incremental (info, lmid, lm, is_initial_ns))
@@ -1873,6 +1877,7 @@ svr4_handle_solib_event (bpstat bs)
   warning (_("Probes-based dynamic linker interface failed.\n"
 	     "Reverting to original interface.\n"));
 
+  resume_section_map_updates ();
   free_namespace_table (info);
   free_probes (info);
   info->using_probes = 0;

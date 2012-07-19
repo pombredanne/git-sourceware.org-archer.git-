@@ -55,6 +55,8 @@
 #include "solist.h"
 #include "gdb_bfd.h"
 
+int auto_update_section_map = 1;
+
 /* Prototypes for local functions */
 
 static void objfile_alloc_data (struct objfile *objfile);
@@ -1289,7 +1291,7 @@ find_pc_section (CORE_ADDR pc)
     return s;
 
   pspace_info = get_objfile_pspace_data (current_program_space);
-  if (pspace_info->objfiles_changed_p != 0)
+  if (auto_update_section_map && pspace_info->objfiles_changed_p != 0)
     {
       update_section_map (current_program_space,
 			  &pspace_info->sections,
