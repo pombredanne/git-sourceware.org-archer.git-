@@ -522,6 +522,19 @@ extern void set_objfile_data (struct objfile *objfile,
 extern void *objfile_data (struct objfile *objfile,
 			   const struct objfile_data *data);
 
+/* In normal use, the section map will be rebuilt by FIND_PC_SECTION
+   if objfiles have been added, removed or relocated since it was last
+   called.  Calling INHIBIT_SECTION_MAP_UPDATES will inhibit this
+   behavior until RESUME_SECTION_MAP_UPDATES is called.  If you call
+   INHIBIT_SECTION_MAP_UPDATES you must ensure that every call to
+   FIND_PC_SECTION in the inhibited region relates to a section that
+   is already in the section map and has not since been removed or
+   relocated.  */
+extern void inhibit_section_map_updates (void);
+
+/* Resume automatically rebuilding the section map as required.  */
+extern void resume_section_map_updates (void);
+
 extern void default_iterate_over_objfiles_in_search_order
   (struct gdbarch *gdbarch,
    iterate_over_objfiles_in_search_order_cb_ftype *cb,
@@ -665,13 +678,5 @@ extern void default_iterate_over_objfiles_in_search_order
 /* Answer whether there is more than one object file loaded.  */
 
 #define MULTI_OBJFILE_P() (object_files && object_files->next)
-
-extern int auto_update_section_map;
-
-#define inhibit_section_map_updates() \
-  (auto_update_section_map = 0)
-
-#define resume_section_map_updates() \
-  (auto_update_section_map = 1)
 
 #endif /* !defined (OBJFILES_H) */
