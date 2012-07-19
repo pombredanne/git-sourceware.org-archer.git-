@@ -38,6 +38,7 @@
 #include "gdb-dlfcn.h"
 #include "gdb_stat.h"
 #include "exceptions.h"
+#include "gdb_bfd.h"
 
 static const char *jit_reader_dir = NULL;
 
@@ -132,12 +133,11 @@ mem_bfd_iovec_stat (struct bfd *abfd, void *stream, struct stat *sb)
 static struct bfd *
 bfd_open_from_target_memory (CORE_ADDR addr, ULONGEST size, char *target)
 {
-  const char *filename = xstrdup ("<in-memory>");
   struct target_buffer *buffer = xmalloc (sizeof (struct target_buffer));
 
   buffer->base = addr;
   buffer->size = size;
-  return bfd_openr_iovec (filename, target,
+  return bfd_openr_iovec ("<in-memory>", target,
                           mem_bfd_iovec_open,
                           buffer,
                           mem_bfd_iovec_pread,
@@ -861,6 +861,7 @@ jit_bfd_try_read_symtab (struct jit_code_entry *code_entry,
       puts_unfiltered (_("Error opening JITed symbol file, ignoring it.\n"));
       return;
     }
+  nbfd = gdb_bfd_ref (nbfd);
 
   /* Check the format.  NOTE: This initializes important data that GDB uses!
      We would segfault later without this line.  */
@@ -868,7 +869,7 @@ jit_bfd_try_read_symtab (struct jit_code_entry *code_entry,
     {
       printf_unfiltered (_("\
 JITed symbol file is not an object file, ignoring it.\n"));
-      bfd_close (nbfd);
+      gdb_bfd_unref (nbfd);
       return;
     }
 

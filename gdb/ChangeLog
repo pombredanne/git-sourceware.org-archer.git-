@@ -1,3 +1,348 @@
+2012-07-18  Doug Evans  <dje@google.com>
+
+	* common/gdb_vecs.h: Moved here from ./gdb_vecs.h.
+	* common/gdb_vecs.c: New file, contents from utils.c.
+	* common/host-defs.h: New file, contents from defs.h.
+	* utils.h: New file, contents from defs.h.
+	* defs.h: Move all declarations of objects defined in utils.c
+	to utils.h (except QUIT() and related).
+	#include "utils.h", "host-defs.h".
+	* probe.h (probe_p): Move here from gdb_vecs.h.
+	* symfile.c: #include "probe.h" instead of "gdb_vecs.h".
+	* utils.c (free_char_ptr_vec): Moved to common/gdb_vecs.c.
+	(dirnames_to_char_ptr_vec_append, dirnames_to_char_ptr_vec): Ditto.
+	* Makefile.in (SFILES): Add common/gdb_vecs.c.
+	(HFILES_NO_SRCDIR): Add common/gdb_vecs.h, common/host-defs.h, utils.h.
+	(COMMON_OBS): Add gdb_vecs.o.
+	(gdb_vecs.o): New rule.
+
+2012-07-18  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (add_sal_to_sals): Add LITERAL_CANONICAL
+	parameter.  If non-zero, use SYMNAME as the canonical name
+	for the SaL.
+	Update all callers.
+	(convert_linespec_to_sals): Use add_sal_to_sals for
+	expressions, too.
+	(decode_line_full): No need to "fill in missing canonical names"
+	anymore. Simply make cleanups for the allocated names.
+
+2012-07-18  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (struct linespec): Constify expression,
+	source_filename, function_name, and label_name.
+	(symbol_not_found_error): Make all parameters const.
+	(linespec_parser_delete): No need to check for NULL
+	when using xfree. Cast const char * to char * for xfree.
+
+2012-07-18  Keith Seitz  <keiths@redhat.com>
+
+	* breakpoint.c (invalid_thread_id_error): New function.
+	(find_condition_and_thread): Use invalid_thread_id_error.
+	(watch_command_1): Likewise.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* cc-with-index.sh, cc-with-dwz.sh: Remove.
+	* contrib/cc-with-tweaks.sh: New file.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (struct dwz_file) <gdb_index>: New field.
+	(locate_dwz_sections): Recognize .gdb_index.
+	(create_cus_from_index_list): New function.
+	(create_cus_from_index): Use it.  Handle .dwz data.
+	(read_index_from_section): New function, extracted from
+	dwarf2_read_index.
+	(dwarf2_read_index): Use it.  Read .gdb_index from dwz file,
+	if needed.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (struct dwarf2_per_objfile) <dwz_file>: New field.
+	(struct dwarf2_per_cu_data) <length>: No longer bitfield.
+	<is_dwz>: New field.
+	(struct dwz_file): New.
+	(struct partial_die_info) <is_dwz, spec_is_dwz>: New fields.
+	(locate_dwz_sections, dwarf2_get_dwz_file)
+	(get_abbrev_section_for_cu): New functions.
+	(error_check_comp_unit_head, read_and_check_comp_unit_head)
+	(read_and_check_type_unit_head): Add abbrev_section argument.
+	(create_debug_types_hash_table): Update.
+	(init_cutu_and_read_dies): Use proper abbrev section.
+	(init_cutu_and_read_dies_no_follow): Likewise.
+	(set_partial_user): Do nothing if PST==NULL.
+	(read_comp_units_from_section): New function.
+	(create_all_comp_units): Use it.
+	(scan_partial_symbols, partial_die_parent_scope): Update.
+	(skip_one_die): Handle DW_FORM_GNU_ref_alt, DW_FORM_GNU_strp_alt.
+	(process_imported_unit_die, read_partial_die): Handle .dwz files.
+	(find_partial_die): Add offset_in_dwz argument.  Update.
+	(guess_partial_die_structure_name, fixup_partial_die): Update.
+	(read_attribute_value): Handle DW_FORM_GNU_ref_alt,
+	DW_FORM_GNU_strp_alt.
+	(read_indirect_string_from_dwz): New function.
+	(dwarf2_const_value_attr): Handle DW_FORM_GNU_strp_alt.
+	(dump_die_shallow): Handle DW_FORM_GNU_ref_alt, DW_FORM_GNU_strp_alt.
+	(is_ref_attr): Handle DW_FORM_GNU_ref_alt.
+	(follow_die_offset): Add offset_in_dwz argument.
+	(follow_die_ref, dwarf2_fetch_die_location_block): Update.
+	(skip_form_bytes): Handle DW_FORM_GNU_strp_alt.
+	(dwarf_decode_macro_bytes): Add section_is_dwz argument.
+	Handle new macro forms.
+	(dwarf_decode_macros): Update.
+	(dwarf2_find_containing_comp_unit): Add offset_in_dwz argument.
+	(dwarf2_per_objfile_free): Unref dwz_bfd, if it exists
+	(lookup_die_type): Handle DW_FORM_GNU_ref_alt.
+	(create_debug_types_hash_table): Use correct abbrev section.
+	(get_debug_line_section): New function.
+	(dwarf_decode_line_header, dwarf_decode_lines_1): Use it.
+	(process_full_comp_unit): Pass 'required' argument to
+	end_symtab_get_static_block.
+	* buildsym.h (end_symtab_get_static_block): Update.
+	* buildsym.c (end_symtab_get_static_block): Add 'required'
+	argument.
+	(end_symtab, end_expandable_symtab): Update.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c: Don't include zlib.h or sys/mman.h.
+	(pagesize): Remove.
+	(struct dwarf2_section_info) <map_addr, map_len>: Remove.
+	(zlib_decompress_section): Remove.
+	(dwarf2_read_section): Use gdb_bfd_map_section.
+	(munmap_section_buffer): Remove.
+	(free_dwo_file, dwarf2_per_objfile_free): Don't use
+	munmap_section_buffer.
+	* gdb_bfd.c: Include zlib.h, sys/mman.h.
+	(struct gdb_bfd_section_data): New.
+	(free_one_bfd_section): New function.
+	(gdb_bfd_close_or_warn): Use free_one_bfd_section.
+	(get_section_descriptor, zlib_decompress_section)
+	(gdb_bfd_map_section): New functions.
+	* gdb_bfd.h (gdb_bfd_map_section): Declare.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (try_open_dwo_file): use gdb_bfd_open.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* gdb_bfd.c (struct gdb_bfd_data): New.
+	(gdb_bfd_cache): New global.
+	(struct gdb_bfd_cache_search): New.
+	(hash_bfd, eq_bfd, gdb_bfd_open): New functions.
+	(gdb_bfd_ref, gdb_bfd_unref): Use gdb_bfd_data.
+	* gdb_bfd.h (gdb_bfd_open): Declare.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* utils.c (make_cleanup_bfd_unref): Rename from
+	make_cleanup_bfd_close.
+	* defs.h (make_cleanup_bfd_unref): Rename from
+	make_cleanup_bfd_close.
+	* cli/cli-dump.c (bfd_openr_with_cleanup): Update.
+	(bfd_openw_with_cleanup): Update.
+	* corelow.c (core_open): Update.
+	* dsrec.c (load_srec): Update.
+	* m32r-rom.c (m32r_load, m32r_upload_command): Update.
+	* remote-m32r-sdi.c (m32r_load): Update.
+	* remote-mips.c (mips_load_srec): Update.
+	(pmon_load_fast): Update.
+	* solib-darwin.c (darwin_solib_get_all_image_info_addr_at_init):
+	Update.
+	(darwin_bfd_open): Update.
+	* solib.c (solib_bfd_fopen): Update.
+	* symfile-mem.c (symbol_file_add_from_memory): Update.
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): Update.
+	(symfile_bfd_open): Update.
+	(generic_load): Update.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* remote-mips.c (mips_load_srec): Use make_cleanup_bfd_close.
+	(pmon_load_fast): Likewise.
+	* m32r-rom.c (m32r_load): Use make_cleanup_bfd_close.
+	(m32r_upload_command): Likewise.
+	* dsrec.c (load_srec): Use make_cleanup_bfd_close.
+	* solib-darwin.c (darwin_solib_get_all_image_info_addr_at_init):
+	Use make_cleanup_bfd_close.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (symfile_bfd_open): Don't copy name.  Call
+	gdb_bfd_stash_filename.
+	(load_command): Open the new BFD before freeing the old.
+	(bfd_open_maybe_remote): Call gdb_bfd_stash_filename.
+	* symfile-mem.c (symbol_file_add_from_memory): Don't copy name.
+	Call gdb_bfd_stash_filename.
+	* spu-linux-nat.c (spu_bfd_open): Don't copy name.
+	* solib-spu.c (spu_bfd_fopen): Don't copy name.  Call
+	gdb_bfd_stash_filename.
+	* solib-darwin.c (darwin_solib_get_all_image_info_addr_at_init):
+	Free found_pathname.
+	* rs6000-nat.c (add_vmap): Don't copy filename.  Call
+	gdb_bfd_stash_filename.
+	* remote.c (remote_bfd_open): Call gdb_bfd_stash_filename.
+	* machoread.c (macho_add_oso_symfile): Call
+	gdb_bfd_stash_filename.
+	(macho_symfile_read_all_oso): Arrange to free archive_name.  Call
+	gdb_bfd_stash_filename.
+	(macho_check_dsym): Don't copy filename.  Call
+	gdb_bfd_stash_filename.
+	* jit.c (bfd_open_from_target_memory): Don't copy the filename.
+	* gdb_bfd.c (gdb_bfd_stash_filename): New function.
+	* gdb_bfd.h (gdb_bfd_stash_filename): Declare.
+	* gcore.c (create_gcore_bfd): Call gdb_bfd_stash_filename.
+	* exec.c (exec_close): Don't free the BFD's filename.
+	(exec_file_attach): Don't copy the filename.  Call
+	gdb_bfd_stash_filename.
+	* corelow.c (core_close): Don't free the BFD's filename.
+	(core_open): Call gdb_bfd_stash_filename.
+	* corefile.c (reopen_exec_file): Remove #if 0 code.
+	* solib.c (solib_bfd_fopen): Call gdb_bfd_stash_filename.  Free
+	pathname.
+	* dwarf2read.c (try_open_dwo_file): Call gdb_bfd_stash_filename.
+
+2012-07-18  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (try_open_dwo_file): Use gdb_bfd_ref and
+	gdb_bfd_unref.
+	(free_dwo_file): Use gdb_bfd_unref.
+	* cli/cli-dump.c: Include gdb_bfd.h.
+	(bfd_openw_with_cleanup): Use gdb_bfd_ref.
+	(bfd_openr_with_cleanup): Likewise.
+	* windows-nat.c (windows_make_so): Use gdb_bfd_ref,
+	gdb_bfd_unref.
+	* utils.c: Include gdb_bfd.h.
+	(do_bfd_close_cleanup): Use gdb_bfd_unref.
+	* symfile.c: Include gdb_bfd.h.
+	(separate_debug_file_exists): Use gdb_bfd_unref.
+	(bfd_open_maybe_remote): Use gdb_bfd_ref.
+	(symfile_bfd_open): Use gdb_bfd_ref, gdb_bfd_unref.
+	(generic_load): Use gdb_bfd_ref.
+	(reread_symbols): Use gdb_bfd_unref.
+	* symfile-mem.c: Include gdb_bfd.h.
+	(symbol_file_add_from_memory): Use make_cleanup_bfd_close.
+	* spu-linux-nat.c (spu_bfd_open): Use gdb_bfd_ref, gdb_bfd_unref.
+	* solib.c: Include gdb_bfd.h.
+	(solib_bfd_fopen): Use gdb_bfd_ref.
+	(solib_bfd_open): Use gdb_bfd_unref.
+	(free_so_symbols): Use gdb_bfd_unref.
+	(reload_shared_libraries_1): Use gdb_bfd_unref.
+	* solib-spu.c: Include gdb_bfd.h.
+	(spu_bfd_fopen): Use gdb_bfd_ref, gdb_bfd_unref.
+	* solib-pa64.c (pa64_solib_create_inferior_hook): Use gdb_bfd_ref,
+	gdb_bfd_unref.
+	* solib-frv.c: Include gdb_bfd.h.
+	(enable_break2): Use gdb_bfd_unref.
+	* solib-dsbt.c: Include gdb_bfd.h.
+	(enable_break2): Use gdb_bfd_unref.
+	* solib-darwin.c: Include gdb_bfd.h.
+	(darwin_solib_get_all_image_info_addr_at_init): Use gdb_bfd_ref,
+	gdb_bfd_unref.
+	(darwin_bfd_open): Use gdb_bfd_unref.
+	* rs6000-nat.c (add_vmap): Use gdb_bfd_ref, gdb_bfd_unref.
+	* remote-mips.c: Include gdb_bfd.h.
+	(mips_load_srec): Use gdb_bfd_ref.
+	(pmon_load_fast): Use gdb_bfd_ref.
+	* remote-m32r-sdi.c: Include gdb_bfd.h.
+	(m32r_load): Use gdb_bfd_ref.
+	* record.c: Include gdb_bfd.h.
+	(record_save_cleanups): Use gdb_bfd_unref.
+	(cmd_record_save): Use gdb_bfd_unref.
+	* procfs.c (insert_dbx_link_bpt_in_file): Use gdb_bfd_ref,
+	gdb_bfd_unref.
+	* objfiles.h (gdb_bfd_close_or_warn): Remove.
+	(gdb_bfd_ref, gdb_bfd_unref): Move to gdb_bfd.h.
+	* objfiles.c: Include gdb_bfd.h.
+	(free_objfile): Use gdb_bfd_unref.
+	(gdb_bfd_close_or_warn, gdb_bfd_ref, gdb_bfd_unref): Move to
+	gdb_bfd.c.
+	* machoread.c (macho_add_oso_symfile): Use gdb_bfd_unref.
+	(macho_symfile_read_all_oso): Use gdb_bfd_ref, gdb_bfd_unref.
+	(macho_check_dsym): Likewise.
+	* m32r-rom.c: Include gdb_bfd.h.
+	(m32r_load): Use gdb_bfd_ref.
+	(m32r_upload_command): Use gdb_bfd_ref.
+	* jit.c: Include gdb_bfd.h.
+	(jit_bfd_try_read_symtab): Use gdb_bfd_ref, gdb_bfd_unref.
+	* gdb_bfd.h: New file.
+	* gdb_bfd.c: New file.
+	* gcore.c: Include gdb_bfd.h.
+	(create_gcore_bfd): Use gdb_bfd_ref.
+	(do_bfd_delete_cleanup): Use gdb_bfd_unref.
+	(gcore_command): Use gdb_bfd_unref.
+	* exec.c: Include gdb_bfd.h.
+	(exec_close): Use gdb_bfd_unref.
+	(exec_close_1): Use gdb_bfd_unref.
+	(exec_file_attach): Use gdb_bfd_ref.
+	* elfread.c: Include gdb_bfd.h.
+	(build_id_verify): Use gdb_bfd_unref.
+	* dsrec.c: Include gdb_bfd.h.
+	(load_srec): Use gdb_bfd_ref.
+	* corelow.c: Include gdb_bfd.h.
+	(core_close): Use gdb_bfd_unref.
+	(core_open): Use gdb_bfd_ref.
+	* bfd-target.c: Include gdb_bfd.h.
+	(target_bfd_xclose): Use gdb_bfd_unref.
+	(target_bfd_reopen): Use gdb_bfd_ref.
+	* Makefile.in (SFILES): Add gdb_bfd.c.
+	(HFILES_NO_SRCDIR): Add gdb_bfd.h.
+	(COMMON_OBS): Add gdb_bfd.o.
+
+2012-07-18  Keith Seitz  <keiths@redhat.com>
+
+	* breakpoint.c (find_condition_and_thread): Initialize
+	TASK and REST.
+	(create_breakpiont): find_condition_and_thread will now
+	initialize COND_STRING, THREAD, and REST (and TASK).
+	(addr_string_to_sals): Likewise.
+
+2012-07-18  Pedro Alves  <palves@redhat.com>
+
+	* infrun.c (handle_inferior_event) <TARGET_WAITKIND_NO_HISTORY>:
+	Pull the single step breakpoints out of the target.
+
+2012-07-18  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* probe.c (probe_safe_evaluate_at_pc): Rename variable `n_probes'.
+	* stap-probe.c (compile_probe_arg): Likewise.
+
+2012-07-18  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* elfread.c (elf_get_probe_argument_count): Remove `objfile' argument.
+	(elf_compile_to_ax): Likewise.
+	* infrun.c (insert_exception_resume_from_probe): Likewise.
+	(check_exception_resume): Remove `objfile' variable.
+	* probe.c (find_probe_by_pc): Remove `objfile' argument.
+	(struct probe_and_objfile, probe_and_objfile_s): Delete.
+	(collect_probes): Adjust return value to `VEC (probe_p) *'.
+	(compare_entries): Rename to...
+	(compare_probes): ...this.  Adjust function to work with
+	`struct probe *'.  Rename variables `ea' and `eb' to `pa' and `pb'
+	respectively.
+	(gen_ui_out_table_header_info): Adjust `probes' argument to be
+	`VEC (probe_p) *'.
+	(print_ui_out_info): Adjust argument to be `struct probe *'.
+	(info_probes_for_ops): Adjust internal computations to use
+	`VEC (probe_p) *'.
+	(probe_safe_evaluate_at_pc): Refactor to not pass `objfile' anymore.
+	* probe.h (struct probe_ops) <get_probe_argument_count, compile_to_ax,
+	gen_info_probes_table_values>: Remove `objfile' argument.
+	(struct probe) <objfile>: New field.
+	(find_probe_by_pc): Remove `objfile' argument.
+	* stap-probe.c (stap_parse_probe_arguments): Likewise.
+	(stap_get_probe_argument_count): Likewise.
+	(stap_get_arg): Likewise.
+	(stap_evaluate_probe_argument): Likewise.
+	(stap_compile_to_ax): Likewise.
+	(compile_probe_arg): Refactor not to pass `objfile' anymore.
+	(handle_stap_probe): Fill `objfile' field from `struct probe'.
+	(stap_gen_info_probes_table_header): Remove `objfile' argument.
+	* symfile.h (struct sym_probe_fns) <sym_evaluate_probe_argument,
+	sym_compile_to_ax>: Likewise.
+
 2012-07-18  Terry Guo  <terry.guo@arm.com>
 
 	PR 14329

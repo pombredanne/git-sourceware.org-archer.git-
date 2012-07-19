@@ -36,6 +36,7 @@
 #include <ctype.h>
 #include "mips-tdep.h"
 #include "gdbthread.h"
+#include "gdb_bfd.h"
 
 
 /* Breakpoint types.  Values 0, 1, and 2 must agree with the watch
@@ -2783,20 +2784,23 @@ mips_load_srec (char *args)
   unsigned int i;
   unsigned int srec_frame = 200;
   int reclen;
+  struct cleanup *cleanup;
   static int hashmark = 1;
 
   buffer = alloca (srec_frame * 2 + 256);
 
-  abfd = bfd_openr (args, 0);
+  abfd = gdb_bfd_ref (bfd_openr (args, 0));
   if (!abfd)
     {
       printf_filtered ("Unable to open file %s\n", args);
       return;
     }
 
+  cleanup = make_cleanup_bfd_unref (abfd);
   if (bfd_check_format (abfd, bfd_object) == 0)
     {
       printf_filtered ("File is not an object file\n");
+      do_cleanups (cleanup);
       return;
     }
 
@@ -2850,6 +2854,7 @@ mips_load_srec (char *args)
   send_srec (srec, reclen, abfd->start_address);
 
   serial_flush_input (mips_desc);
+  do_cleanups (cleanup);
 }
 
 /*
@@ -3366,20 +3371,23 @@ pmon_load_fast (char *file)
   int bintotal = 0;
   int final = 0;
   int finished = 0;
+  struct cleanup *cleanup;
 
   buffer = (char *) xmalloc (MAXRECSIZE + 1);
   binbuf = (unsigned char *) xmalloc (BINCHUNK);
 
-  abfd = bfd_openr (file, 0);
+  abfd = gdb_bfd_ref (bfd_openr (file, 0));
   if (!abfd)
     {
       printf_filtered ("Unable to open file %s\n", file);
       return;
     }
+  cleanup = make_cleanup_bfd_unref (abfd);
 
   if (bfd_check_format (abfd, bfd_object) == 0)
     {
       printf_filtered ("File is not an object file\n");
+      do_cleanups (cleanup);
       return;
     }
 
@@ -3503,6 +3511,7 @@ pmon_load_fast (char *file)
       pmon_end_download (final, bintotal);
     }
 
+  do_cleanups (cleanup);
   return;
 }
 

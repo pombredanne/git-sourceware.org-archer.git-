@@ -315,16 +315,17 @@ spu_bfd_open (ULONGEST addr)
   ULONGEST *open_closure = xmalloc (sizeof (ULONGEST));
   *open_closure = addr;
 
-  nbfd = bfd_openr_iovec (xstrdup ("<in-memory>"), "elf32-spu",
+  nbfd = bfd_openr_iovec ("<in-memory>", "elf32-spu",
 			  spu_bfd_iovec_open, open_closure,
 			  spu_bfd_iovec_pread, spu_bfd_iovec_close,
 			  spu_bfd_iovec_stat);
   if (!nbfd)
     return NULL;
+  nbfd = gdb_bfd_ref (nbfd);
 
   if (!bfd_check_format (nbfd, bfd_object))
     {
-      bfd_close (nbfd);
+      gdb_bfd_unref (nbfd);
       return NULL;
     }
 
