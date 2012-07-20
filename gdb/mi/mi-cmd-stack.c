@@ -32,12 +32,23 @@
 #include "language.h"
 #include "valprint.h"
 #include "exceptions.h"
-
+#include "utils.h"
+#include "python/python.h"
+#include <ctype.h>
 enum what_to_list { locals, arguments, all };
 
 static void list_args_or_locals (enum what_to_list what, 
 				 enum print_values values,
 				 struct frame_info *fi);
+
+/* True if we want to allow Python-based frame filters.  */
+static int frame_filters = 0;
+
+void
+stack_enable_frame_filters (void)
+{
+  frame_filters = 1;
+}
 
 /* Print a list of the stack frames.  Args can be none, in which case
    we want to print the whole backtrace, or a pair of numbers
@@ -53,14 +64,28 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
   int i;
   struct cleanup *cleanup_stack;
   struct frame_info *fi;
+  int result = 0;
+  int raw_arg = 0;
+  int j;
 
-  if (argc > 2 || argc == 1)
-    error (_("-stack-list-frames: Usage: [FRAME_LOW FRAME_HIGH]"));
-
-  if (argc == 2)
+  if (argc)
     {
-      frame_low = atoi (argv[0]);
-      frame_high = atoi (argv[1]);
+      /* Find 'raw-frames' at argv[0] if passed as an argument */
+      for (j = 0; j < strlen (argv[0]); j++)
+	argv[0][j] = tolower (argv[0][j]);
+
+      if (subset_compare (argv[0], "raw-frames"))
+	raw_arg = 1;
+    }
+
+  if ((argc > 3 && ! raw_arg) || (argc == 1 && ! raw_arg)
+      || (argc == 2 && raw_arg))
+    error (_("-stack-list-frames: Usage: [RAW-FRAMES FRAME_LOW FRAME_HIGH]"));
+
+  if (argc == 3 || argc == 2)
+    {
+      frame_low = atoi (argv[0 + raw_arg]);
+      frame_high = atoi (argv[1 + raw_arg]);
     }
   else
     {
@@ -82,16 +107,35 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
 
   cleanup_stack = make_cleanup_ui_out_list_begin_end (current_uiout, "stack");
 
-  /* Now let's print the frames up to frame_high, or until there are
-     frames in the stack.  */
-  for (;
-       fi && (i <= frame_high || frame_high == -1);
-       i++, fi = get_prev_frame (fi))
+  if (! raw_arg && frame_filters)
     {
-      QUIT;
-      /* Print the location and the address always, even for level 0.
-         If args is 0, don't print the arguments.  */
-      print_frame_info (fi, 1, LOC_AND_ADDRESS, 0 /* args */ );
+      int count = frame_high;
+
+      if (frame_high != -1)
+	count = (frame_high - frame_low) + 1;
+      result = apply_frame_filter (fi, 1, LOC_AND_ADDRESS, 0,
+				   0 /* print args */, current_uiout,
+				   0 /* show locals */, count);
+    }
+
+  /* Run the inbuilt backtrace if there are no filters registered, or
+     if there was an error in the Python backtracing output, or if
+     frame-filters are disabled.  */
+  if (! frame_filters || raw_arg || result == PY_BT_ERROR
+      || result == PY_BT_NO_FILTERS)
+
+    {
+      /* Now let's print the frames up to frame_high, or until there are
+	 frames in the stack.  */
+      for (;
+	   fi && (i <= frame_high || frame_high == -1);
+	   i++, fi = get_prev_frame (fi))
+	{
+	  QUIT;
+	  /* Print the location and the address always, even for level 0.
+	     If args is 0, don't print the arguments.  */
+	  print_frame_info (fi, 1, LOC_AND_ADDRESS, 0 /* args */ );
+	}
     }
 
   do_cleanups (cleanup_stack);

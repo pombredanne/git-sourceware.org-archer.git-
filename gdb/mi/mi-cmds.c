@@ -60,6 +60,7 @@ struct mi_cmd mi_cmds[] =
     mi_cmd_data_write_register_values},
   { "enable-timings", { NULL, 0 }, mi_cmd_enable_timings},
   { "enable-pretty-printing", { NULL, 0 }, mi_cmd_enable_pretty_printing},
+  { "enable-frame-filters", { NULL, 0 }, mi_cmd_enable_frame_filters},
   { "environment-cd", { NULL, 0 }, mi_cmd_env_cd},
   { "environment-directory", { NULL, 0 }, mi_cmd_env_dir},
   { "environment-path", { NULL, 0 }, mi_cmd_env_path},

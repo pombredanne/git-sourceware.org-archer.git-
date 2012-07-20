@@ -548,13 +548,15 @@ py_print_frame (PyObject *filter,
       else
 	goto error;
     }
-  
-  annotate_frame_source_end ();
-  
-  ui_out_text (out, "\n");
-  
-  if (has_addr)
-    annotate_frame_end ();
+
+  /* For MI we need to deal with the children population of elided
+     frames, so if MI output detected do not send newline.  */
+  if (! ui_out_is_mi_like_p (out))
+    {
+      if (has_addr)
+	annotate_frame_end ();
+      ui_out_text (out, "\n");
+    }
   
   if (print_locals)
     {
@@ -583,11 +585,21 @@ py_print_frame (PyObject *filter,
 	    {
 	      PyObject *iterator = PyObject_GetIter (result);
 	      PyObject *item;
-	      
+	      struct cleanup *cleanup_stack;
+
 	      if (iterator == NULL)
 		goto error;
-	      
-	      indent = indent + 4;
+
+	      if (ui_out_is_mi_like_p (out))
+		{
+		  cleanup_stack = make_cleanup_ui_out_list_begin_end (out, "children");
+		}
+	      else
+		{
+		  cleanup_stack = make_cleanup (null_cleanup, NULL);
+		  indent = indent + 4;
+		}
+
 	      while ((item = PyIter_Next (iterator)))
 		{
 		  int success =  py_print_frame (item, print_level, print_what,
@@ -595,8 +607,13 @@ py_print_frame (PyObject *filter,
 						 print_locals, out,
 						 opts, indent, levels_printed);
 		  if (success == 0 && PyErr_Occurred ())
-		    goto error;
+		    {
+		      do_cleanups (cleanup_stack);
+		      goto error;
+		    }
 		}
+
+	      do_cleanups (cleanup_stack);
 	    }
 	}     
     }
@@ -676,7 +693,7 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 				    eq_printed_frame_entry,
 				    NULL);
 
-      while ((item = PyIter_Next (iterator)))
+      while ((item = PyIter_Next (iterator)) && count--)
 	{
 	  success =  py_print_frame (item, print_level, print_what,
 				     print_args, print_args_type,
