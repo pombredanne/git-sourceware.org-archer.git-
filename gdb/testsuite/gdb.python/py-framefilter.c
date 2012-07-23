@@ -66,8 +66,7 @@ void func1(void)
 }
 
 int func2(void)
-{  
-  
+{
   func1();
   return 1;
 }
@@ -91,11 +90,11 @@ int func5(int f, int d)
   int i = 0;
   char *random = "random";
   i=i+f;
-  
+
   func4(i);
   return i;
 }
-    
+
 main()
 {
   func5(3,5);

@@ -37,10 +37,10 @@ def _parse_arg (cmd_name, arg):
     if argc != 2:
         raise SyntaxError(cmd_name + " takes exactly " + \
                           "two arguments.")
-    
+
     object_list = argv[0]
     argument = argv[1]
-    
+
     return (object_list, argument)
 
 def _get_priority(filter_item):
@@ -94,7 +94,7 @@ def _set_enabled(filter_item, state):
     """
     if hasattr(filter_item, "enabled"):
         filter_item.enabled = state
-    else:        
+    else:
         raise gdb.GdbError("Cannot find class attribute 'enabled'")
 
 def _get_name (frame_filter):
@@ -171,7 +171,7 @@ def invoke (frame):
 
     # Apply base filter to all gdb.Frames.  This unifies the in
     # interface
-    frame_iterator = itertools.imap (BaseFrameWrapper, frame_iterator) 
+    frame_iterator = itertools.imap (BaseFrameWrapper, frame_iterator)
 
     for ff in sorted_list:
         frame_iterator = ff[1].filter (frame_iterator)
@@ -254,7 +254,7 @@ def do_enable_frame_filter (command_tuple, flag):
 class FilterPrefixCmd (gdb.Command):
     def __init__ (self):
         super (FilterPrefixCmd, self).__init__ ("set python frame-filter",
-                                                gdb.COMMAND_DATA, 
+                                                gdb.COMMAND_DATA,
                                                 gdb.COMPLETE_COMMAND, True)
 
 class EnableFrameFilter (gdb.Command):
@@ -331,7 +331,7 @@ class SetFrameFilterPriority (gdb.Command):
         if argc != 3:
             raise SyntaxError("set python frame-filter priority " \
                               "takes exactly three arguments.")
-        
+
         object_list = argv[0]
         name = argv[1]
         priority = argv[2]
@@ -339,7 +339,7 @@ class SetFrameFilterPriority (gdb.Command):
 
     def _set_filter_priority_1 (self, frame_filters, name, priority):
         """Worker for setting priority of frame_filters.
-        
+
         Arguments:
 
         frame_filters: list of frame_filters.

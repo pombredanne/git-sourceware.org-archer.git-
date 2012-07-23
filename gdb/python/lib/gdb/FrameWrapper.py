@@ -30,8 +30,8 @@ class FrameWrapper (object):
         that occurs over many frames but might be better represented
         as a group of frames distinct from the other frames.
 
-        Arguments: None 
-        
+        Arguments: None
+
         Returns: The 'elide' function must return an iterator that
         contains the frames that are being elided.  Elided frames are
         indented from normal frames in a backtrace, to show affinity
@@ -43,7 +43,7 @@ class FrameWrapper (object):
         If this function returns a Python None, no frames will be
         elided.
         """
-       
+
         pass
 
     def function (self):

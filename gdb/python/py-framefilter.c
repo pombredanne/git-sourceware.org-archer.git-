@@ -211,7 +211,7 @@ py_print_args (PyObject *filter,
   /* Frame arguments.  */
   annotate_frame_args ();
   ui_out_text (out, " (");
-  
+
   if (PyObject_HasAttrString (filter, "frame_args"))
     {
       PyObject *result;
@@ -348,7 +348,7 @@ eq_printed_frame_entry (const void *a, const void *b)
 {
   const struct frame_info *ea = a;
   const struct frame_info *eb = b;
-  
+
   return ea == eb;
 }
 
@@ -393,12 +393,12 @@ py_print_frame (PyObject *filter,
 		       _("'inferior_frame' API must be implemented."));
       goto error;
     }
-  
+
   /* Elided frames are also printed with this function (recursively)
      and are printed with indention.  */
   if (indent > 0)
     ui_out_spaces (out, indent);
-  
+
   /* The address is required for frame annotations, and also for
      address printing.  */
   if (PyObject_HasAttrString (filter, "address"))
@@ -416,7 +416,7 @@ py_print_frame (PyObject *filter,
       else
 	goto error;
     }
-    
+
   /* Print frame level.  */
   if (print_level)
     {
@@ -424,9 +424,9 @@ py_print_frame (PyObject *filter,
       int level;
 
       slot = (struct frame_info **) htab_find_slot (levels_printed,
-						    frame, INSERT);      
+						    frame, INSERT);
       level = frame_relative_level (frame);
-      
+
       /* Check if this frame has already been printed (there are cases
 	 where elided synthetic dummy-frames have to 'borrow' the frame
 	 architecture from the eliding frame.  If that is the case, do
@@ -439,15 +439,15 @@ py_print_frame (PyObject *filter,
 	}
       else
 	{
-	  *slot = frame;	  
+	  *slot = frame;
 	  annotate_frame_begin (print_level ? level : 0,
-				gdbarch, address);	  
+				gdbarch, address);
 	  ui_out_text (out, "#");
 	  ui_out_field_fmt_int (out, 2, ui_left, "level",
 				level);
 	}
     }
-  
+
   /* Print address to the address field.  If no is provided address,
      printing nothing.  */
   if  (opts.addressprint && has_addr)
@@ -456,14 +456,14 @@ py_print_frame (PyObject *filter,
       ui_out_field_core_addr (out, "addr", gdbarch, address);
       annotate_frame_address_end ();
     }
-  
+
   ui_out_text (out, " in ");
 
   /* Print frame function.  */
   if (PyObject_HasAttrString (filter, "function"))
     {
       PyObject *result = PyObject_CallMethod (filter, "function", NULL);
-      
+
       if (result)
 	{
 	  if (result != Py_None)
@@ -476,13 +476,13 @@ py_print_frame (PyObject *filter,
 		  Py_DECREF (result);
 		  goto error;
 		}
-	      
-	      func = xstrdup (dup);	     
+
+	      func = xstrdup (dup);
 	      annotate_frame_function_name ();
 	      ui_out_field_string (out, "func", func);
 	      xfree (func);
-	      
-	    }	  
+
+	    }
 	  Py_DECREF (result);
 	}
       else
@@ -495,7 +495,7 @@ py_print_frame (PyObject *filter,
       if (! py_print_args (filter, out, opts, print_args_type))
 	goto error;
     }
-  
+
   annotate_frame_source_begin ();
 
   if (PyObject_HasAttrString (filter, "filename"))
@@ -508,13 +508,13 @@ py_print_frame (PyObject *filter,
 	    {
 	      char *filename = NULL;
 	      char *dup = PyString_AsString (result);
-	      
+
 	      if (! dup)
 		{
 		  Py_DECREF (result);
 		  goto error;
 		}
-	      
+
 	      filename  = xstrdup (dup);
 	      ui_out_wrap_hint (out, "   ");
 	      ui_out_text (out, " at ");
@@ -557,14 +557,14 @@ py_print_frame (PyObject *filter,
 	annotate_frame_end ();
       ui_out_text (out, "\n");
     }
-  
+
   if (print_locals)
     {
       int success = py_print_locals (filter, opts);
       if (success == 0 && PyErr_Occurred ())
-	goto error;      
+	goto error;
     }
-  
+
   /* Finally recursively print elided frames, if any.  */
   if (PyObject_HasAttrString (filter, "elided"))
     {
@@ -615,7 +615,7 @@ py_print_frame (PyObject *filter,
 
 	      do_cleanups (cleanup_stack);
 	    }
-	}     
+	}
     }
 
   return PY_BT_COMPLETED;
@@ -646,7 +646,7 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   module = PyImport_ImportModule ("gdb.command.frame_filters");
   if (! module)
     goto done;
-  
+
   frame_obj = frame_info_to_frame_object (frame);
   if (! frame_obj)
     goto done;
@@ -658,15 +658,15 @@ apply_frame_filter (struct frame_info *frame, int print_level,
       Py_DECREF (frame_obj);
       goto done;
     }
-  
+
   iterable = PyObject_CallFunctionObjArgs (sort_func, frame_obj, NULL);
   Py_DECREF (module);
   Py_DECREF (sort_func);
   Py_DECREF (frame_obj);
-  
+
   if (!iterable)
     goto done;
-  
+
   if (iterable == Py_None)
     {
       Py_DECREF (iterable);
@@ -683,12 +683,11 @@ apply_frame_filter (struct frame_info *frame, int print_level,
       PyObject *iterator = PyObject_GetIter (iterable);
       PyObject *item;
       htab_t levels_printed;
-      
-      
+
       if (iterator == NULL)
 	goto done;
-      
-      levels_printed = htab_create (20, 
+
+      levels_printed = htab_create (20,
 				    hash_printed_frame_entry,
 				    eq_printed_frame_entry,
 				    NULL);
@@ -697,7 +696,7 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 	{
 	  success =  py_print_frame (item, print_level, print_what,
 				     print_args, print_args_type,
-				     print_locals, out, opts, 0, 
+				     print_locals, out, opts, 0,
 				     levels_printed);
 	  if (success == PY_BT_ERROR && PyErr_Occurred ())
 	    {

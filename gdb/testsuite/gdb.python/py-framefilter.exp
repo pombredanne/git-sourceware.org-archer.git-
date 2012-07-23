@@ -82,4 +82,3 @@ gdb_test "bt 3" \
     {.*#0.*end_func.*#1.*in funca ().*#2.*in funcb ().*}
 
 remote_file host delete ${remote_python_file}
-

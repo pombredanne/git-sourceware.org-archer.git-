@@ -65,4 +65,3 @@ mi_gdb_test "-stack-list-frames 22 24" \
 
 
 remote_file host delete ${remote_python_file}
-

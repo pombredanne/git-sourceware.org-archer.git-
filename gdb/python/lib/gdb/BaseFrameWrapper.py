@@ -79,7 +79,7 @@ class BaseFrameWrapper (FrameWrapper):
 
         sal = self.base.find_sal()
         if (sal):
-            return sal.line        
+            return sal.line
         else:
             return None
 

@@ -1651,7 +1651,7 @@ frame_info (char *addr_exp, int from_tty)
    frames.  */
 
 static void
-backtrace_command_1 (char *count_exp, int show_locals, int raw, 
+backtrace_command_1 (char *count_exp, int show_locals, int raw,
 		     int from_tty)
 
 {
@@ -1721,12 +1721,12 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
 	  find_pc_sect_symtab_via_partial (pc, find_pc_mapped_section (pc));
 	}
     }
-  
+
   if (! raw)
     result = apply_frame_filter (trailing, 1, LOCATION, 1,
 				 print_frame_arguments, current_uiout,
 				 show_locals, count);
-  
+
   /* Run the inbuilt backtrace if there are no filters registered, or
      if there was an error in the Python backtracing output.  */
   if (raw || result == PY_BT_ERROR || result == PY_BT_NO_FILTERS)
@@ -1800,7 +1800,7 @@ backtrace_command (char *arg, int from_tty)
 
 	  for (j = 0; j < strlen (argv[i]); j++)
 	    argv[i][j] = tolower (argv[i][j]);
-	  
+
 	  if (raw_arg < 0 && subset_compare (argv[i], "raw"))
 	    raw_arg = argc;
 	  else

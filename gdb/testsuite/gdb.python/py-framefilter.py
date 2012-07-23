@@ -25,7 +25,7 @@ class Reverse_Function (BaseFrameWrapper):
     def __init__(self, fobj):
         super(Reverse_Function, self).__init__(fobj)
         self.fobj = fobj
- 
+
     def function (self):
         fname = str (self.fobj.function())
         if (fname == None or fname == ""):
@@ -60,7 +60,7 @@ class Dummy (BaseFrameWrapper):
 
     def elided (self):
         return None
-    
+
 class FrameFilter ():
 
     def __init__ (self):
@@ -102,7 +102,6 @@ class ElidingIterator:
         # "sentinel".
         elided = next(self.input_iterator)
         return ElidingFrameWrapper(frame, [elided])
-        
 
 class FrameElider ():
 
