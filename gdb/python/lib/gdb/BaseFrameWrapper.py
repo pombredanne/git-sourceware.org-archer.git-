@@ -89,39 +89,52 @@ class BaseFrameWrapper (FrameWrapper):
 
         return self.base
 
+class BaseSymValueWrapper ():
+
+    def __init__(self, symbol, value):
+        self.sym = symbol
+        self.val = value
+
+    def value (self):
+        return self.val
+
+    def symbol (self):
+        return self.sym
+
 class FrameVars ():
 
     def __init__(self,frame):
         self.frame = frame
 
     def fetch_frame_locals (self):
-        frame_vars = []
+        lvars = []
         block = self.frame.block()
 
         for sym in block:
             if sym.is_argument:
                 continue;
-            frame_vars.append((sym, self.get_value (sym, block)))
 
-        if len(frame_vars) == 0:
+            lvars.append(BaseSymValueWrapper(sym, self.get_value(sym,block)))
+
+        if len(lvars) == 0:
             return None
 
-        return iter (frame_vars)
+        return iter (lvars)
 
     def fetch_frame_args (self):
-        frame_args = []
+        args = []
         block = self.frame.block()
 
         for sym in block:
             if not sym.is_argument:
                 continue;
 
-            frame_args.append((sym, self.get_value (sym,block)))
+            args.append(BaseSymValueWrapper(sym,self.get_value (sym,block)))
 
-        if len(frame_args) == 0:
+        if len(args) == 0:
             return None
 
-        return iter (frame_args)
+        return iter (args)
 
     def get_value (self, sym, block):
         if len (sym.linkage_name):

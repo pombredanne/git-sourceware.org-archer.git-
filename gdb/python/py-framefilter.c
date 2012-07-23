@@ -34,63 +34,82 @@
 #include "python-internal.h"
 
 static int
-extract_value (PyObject *tuple, char **name,
-	       struct value **value,
-	       const struct language_defn **language)
+extract_sym_and_value (PyObject *obj, char **name,
+		       struct value **value,
+		       const struct language_defn **language)
 {
-  PyObject *sym, *pvalue;
-
-  /* Each element in the locals arguments list should be a
-     tuple containing two elements.  The local name,
-     which can be a string or a gdb.Symbol, and the
-     value.  */
-
-  /* Name.  */
-  sym = PyTuple_GetItem (tuple, 0);
-  if (! sym)
-    return 0;
-
-  /* Value.  */
-  pvalue = PyTuple_GetItem (tuple, 1);
-  if (! pvalue)
-    return 0;
-
-  /* For arg name, the user can return a symbol or a
-     string.  */
-  if (PyString_Check (sym))
+  if (PyObject_HasAttrString (obj, "symbol"))
     {
-      *name = python_string_to_host_string (sym);
-      if (! name)
+      PyObject *result = PyObject_CallMethod (obj, "symbol", NULL);
+      if (! result)
 	return 0;
-      *language = current_language;
+
+      /* For 'symbol' callback, the function can return a symbol or a
+	 string.  */
+      if (PyString_Check (result))
+	{
+	  *name = python_string_to_host_string (result);
+	  Py_DECREF (result);
+
+	  if (! name)
+	      return 0;
+	  *language = current_language;
+	}
+      else
+	{
+	  struct symbol *symbol = symbol_object_to_symbol (result);
+
+	  Py_DECREF (result);
+	  if (! symbol)
+	    {
+	      PyErr_SetString (PyExc_RuntimeError,
+			       _("Unexpected value.  Expecting a " \
+				 "gdb.Symbol or a Python string."));
+	      return 0;
+	    }
+
+	  *name = xstrdup (SYMBOL_PRINT_NAME (symbol));
+
+	  if (language_mode == language_mode_auto)
+	    *language = language_def (SYMBOL_LANGUAGE (symbol));
+	  else
+	    *language = current_language;
+	}
     }
   else
     {
-      struct symbol *symbol = symbol_object_to_symbol (sym);
-      if (! symbol)
-	{
-	  PyErr_SetString (PyExc_RuntimeError,
-			   _("Unexpected value in tuple.  " \
-			     "Expecting being a gdb.Symbol or a " \
-			     "Python string."));
-	  return 0;
-	}
-
-      *name = xstrdup (SYMBOL_PRINT_NAME (symbol));
-
-      if (language_mode == language_mode_auto)
-	*language = language_def (SYMBOL_LANGUAGE (symbol));
-      else
-	*language = current_language;
-    }
-
-  *value = convert_value_from_python (pvalue);
-  if (! *value)
-    {
-      xfree (*name);
+      PyErr_SetString (PyExc_RuntimeError,
+		       _("Mandatory function 'symbol' not " \
+			 "implemented."));
       return 0;
     }
 
+  if (PyObject_HasAttrString (obj, "value"))
+    {
+      PyObject *result = PyObject_CallMethod (obj, "value", NULL);
+
+      if (! result)
+	{
+	  xfree (*name);
+	  return 0;
+	}
+
+      *value = convert_value_from_python (result);
+
+      Py_DECREF (result);
+      if (! *value)
+	{
+	  xfree (*name);
+	  return 0;
+	}
+    }
+  else
+    {
+      PyErr_SetString (PyExc_RuntimeError,
+		       _("Mandatory function 'value' not " \
+			 "implemented."));
+      return 0;
+    }
   return 1;
 }
 
@@ -138,20 +157,10 @@ py_print_locals (PyObject *filter,
 		      if (! item)
 			goto locals_error;
 
-		      if (! PyTuple_Check (item)
-			  && PyTuple_Size (item) != 2)
-			{
-			  PyErr_SetString (PyExc_RuntimeError,
-					   _("frame_locals iterator must " \
-					     "return Python tuples."));
-			  Py_DECREF (item);
-			  Py_DECREF (iterator);
-			  goto locals_error;
-			}
 
-		      value_success = extract_value (item, &sym_name,
-						     &val,
-						     &language);
+		      value_success = extract_sym_and_value (item, &sym_name,
+							     &val,
+							     &language);
 		      Py_DECREF (item);
 
 		      if (! value_success)
@@ -254,20 +263,10 @@ py_print_args (PyObject *filter,
 		      int value_success = 0;
 		      volatile struct gdb_exception except;
 
-		      if (! PyTuple_Check (item)
-			  && PyTuple_Size (item) != 2)
-			{
-			  PyErr_SetString (PyExc_RuntimeError,
-					   _("frame_locals iterator must " \
-					     "return Python tuples."));
-			  Py_DECREF (item);
-			  Py_DECREF (iterator);
-			  goto args_error;
-			}
-
-		      value_success = extract_value (item, &sym_name,
-						     &val,
-						     &language);
+		      value_success = extract_sym_and_value (item,
+							     &sym_name,
+							     &val,
+							     &language);
 		      Py_DECREF (item);
 
 		      if (! value_success)
