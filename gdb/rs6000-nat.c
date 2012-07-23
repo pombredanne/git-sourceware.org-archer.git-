@@ -748,17 +748,15 @@ add_vmap (LdInfo *ldi)
   if (fd < 0)
     /* Note that this opens it once for every member; a possible
        enhancement would be to only open it once for every object.  */
-    abfd = bfd_openr (filename, gnutarget);
+    abfd = gdb_bfd_openr (filename, gnutarget);
   else
-    abfd = bfd_fdopenr (filename, gnutarget, fd);
-  abfd = gdb_bfd_ref (abfd);
+    abfd = gdb_bfd_fdopenr (filename, gnutarget, fd);
   if (!abfd)
     {
       warning (_("Could not open `%s' as an executable file: %s"),
 	       filename, bfd_errmsg (bfd_get_error ()));
       return NULL;
     }
-  gdb_bfd_stash_filename (abfd);
 
   /* Make sure we have an object file.  */
 
@@ -767,11 +765,17 @@ add_vmap (LdInfo *ldi)
 
   else if (bfd_check_format (abfd, bfd_archive))
     {
-      last = 0;
-      /* FIXME??? am I tossing BFDs?  bfd?  */
-      while ((last = gdb_bfd_ref (bfd_openr_next_archived_file (abfd, last))))
-	if (strcmp (mem, last->filename) == 0)
-	  break;
+      last = gdb_bfd_openr_next_archived_file (abfd, NULL);
+      while (last != NULL)
+	{
+	  bfd *next;
+
+	  if (strcmp (mem, last->filename) == 0)
+	    break;
+
+	  next = gdb_bfd_openr_next_archived_file (abfd, last);
+	  gdb_bfd_unref (last);
+	}
 
       if (!last)
 	{
@@ -790,6 +794,9 @@ add_vmap (LdInfo *ldi)
 	}
 
       vp = map_vmap (last, abfd);
+      /* map_vmap acquired a reference to LAST, so we can release
+	 ours.  */
+      gdb_bfd_unref (last);
     }
   else
     {
@@ -798,12 +805,17 @@ add_vmap (LdInfo *ldi)
       gdb_bfd_unref (abfd);
       return NULL;
     }
-  obj = allocate_objfile (gdb_bfd_ref (vp->bfd), 0);
+  obj = allocate_objfile (vp->bfd, 0);
   vp->objfile = obj;
 
   /* Always add symbols for the main objfile.  */
   if (vp == vmap || auto_solib_add)
     vmap_add_symbols (vp);
+
+  /* Anything needing a reference to ABFD has already acquired it, so
+     release our local reference.  */
+  gdb_bfd_unref (abfd);
+
   return vp;
 }
 

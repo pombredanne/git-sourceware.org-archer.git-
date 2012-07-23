@@ -35,14 +35,14 @@ void gdb_bfd_stash_filename (struct bfd *abfd);
 
 struct bfd *gdb_bfd_open (const char *name, const char *target, int fd);
 
-/* Acquire a new reference to ABFD.  Returns ABFD for convenience.
-   It is fine for ABFD to be NULL; in this case the function does
-   nothing and returns NULL.  */
+/* Increment the reference count of ABFD.  It is fine for ABFD to be
+   NULL; in this case the function does nothing.  */
 
-struct bfd *gdb_bfd_ref (struct bfd *abfd);
+void gdb_bfd_ref (struct bfd *abfd);
 
-/* Release a reference to ABFD.  If this is the last reference, ABFD
-   will be freed.  If ABFD is NULL, this function does nothing.  */
+/* Decrement the reference count of ABFD.  If this is the last
+   reference, ABFD will be freed.  If ABFD is NULL, this function does
+   nothing.  */
 
 void gdb_bfd_unref (struct bfd *abfd);
 
@@ -57,5 +57,50 @@ void gdb_bfd_unref (struct bfd *abfd);
    function will throw on error.  */
 
 const gdb_byte *gdb_bfd_map_section (asection *section, bfd_size_type *size);
+
+
+
+/* A wrapper for bfd_fopen that initializes the gdb-specific reference
+   count and calls gdb_bfd_stash_filename.  */
+
+bfd *gdb_bfd_fopen (const char *, const char *, const char *, int);
+
+/* A wrapper for bfd_openr that initializes the gdb-specific reference
+   count and calls gdb_bfd_stash_filename.  */
+
+bfd *gdb_bfd_openr (const char *, const char *);
+
+/* A wrapper for bfd_openw that initializes the gdb-specific reference
+   count and calls gdb_bfd_stash_filename.  */
+
+bfd *gdb_bfd_openw (const char *, const char *);
+
+/* A wrapper for bfd_openr_iovec that initializes the gdb-specific
+   reference count and calls gdb_bfd_stash_filename.  */
+
+bfd *gdb_bfd_openr_iovec (const char *filename, const char *target,
+			  void *(*open_func) (struct bfd *nbfd,
+					      void *open_closure),
+			  void *open_closure,
+			  file_ptr (*pread_func) (struct bfd *nbfd,
+						  void *stream,
+						  void *buf,
+						  file_ptr nbytes,
+						  file_ptr offset),
+			  int (*close_func) (struct bfd *nbfd,
+					     void *stream),
+			  int (*stat_func) (struct bfd *abfd,
+					    void *stream,
+					    struct stat *sb));
+
+/* A wrapper for bfd_openr_next_archived_file that initializes the
+   gdb-specific reference count and calls gdb_bfd_stash_filename.  */
+
+bfd *gdb_bfd_openr_next_archived_file (bfd *archive, bfd *previous);
+
+/* A wrapper for bfd_fdopenr that initializes the gdb-specific
+   reference count and calls gdb_bfd_stash_filename.  */
+
+bfd *gdb_bfd_fdopenr (const char *filename, const char *target, int fd);
 
 #endif /* GDB_BFD_H */

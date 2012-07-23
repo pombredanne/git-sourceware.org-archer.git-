@@ -910,10 +910,16 @@ operator_length_standard (const struct expression *expr, int endpos,
       oplen = 3;
       break;
 
-    case BINOP_VAL:
-    case UNOP_CAST:
+    case UNOP_CAST_TYPE:
     case UNOP_DYNAMIC_CAST:
     case UNOP_REINTERPRET_CAST:
+    case UNOP_MEMVAL_TYPE:
+      oplen = 1;
+      args = 2;
+      break;
+
+    case BINOP_VAL:
+    case UNOP_CAST:
     case UNOP_MEMVAL:
       oplen = 3;
       args = 1;
@@ -932,6 +938,8 @@ operator_length_standard (const struct expression *expr, int endpos,
     case UNOP_ODD:
     case UNOP_ORD:
     case UNOP_TRUNC:
+    case OP_TYPEOF:
+    case OP_DECLTYPE:
       oplen = 1;
       args = 1;
       break;
@@ -1732,8 +1740,6 @@ operator_check_standard (struct expression *exp, int pos,
     case OP_SCOPE:
     case OP_TYPE:
     case UNOP_CAST:
-    case UNOP_DYNAMIC_CAST:
-    case UNOP_REINTERPRET_CAST:
     case UNOP_MAX:
     case UNOP_MEMVAL:
     case UNOP_MIN:

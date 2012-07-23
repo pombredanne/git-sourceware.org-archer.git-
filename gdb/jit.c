@@ -137,12 +137,12 @@ bfd_open_from_target_memory (CORE_ADDR addr, ULONGEST size, char *target)
 
   buffer->base = addr;
   buffer->size = size;
-  return bfd_openr_iovec ("<in-memory>", target,
-                          mem_bfd_iovec_open,
-                          buffer,
-                          mem_bfd_iovec_pread,
-                          mem_bfd_iovec_close,
-                          mem_bfd_iovec_stat);
+  return gdb_bfd_openr_iovec ("<in-memory>", target,
+			      mem_bfd_iovec_open,
+			      buffer,
+			      mem_bfd_iovec_pread,
+			      mem_bfd_iovec_close,
+			      mem_bfd_iovec_stat);
 }
 
 /* One reader that has been loaded successfully, and can potentially be used to
@@ -861,7 +861,6 @@ jit_bfd_try_read_symtab (struct jit_code_entry *code_entry,
       puts_unfiltered (_("Error opening JITed symbol file, ignoring it.\n"));
       return;
     }
-  nbfd = gdb_bfd_ref (nbfd);
 
   /* Check the format.  NOTE: This initializes important data that GDB uses!
      We would segfault later without this line.  */
@@ -897,7 +896,8 @@ JITed symbol file is not an object file, ignoring it.\n"));
         ++i;
       }
 
-  /* This call takes ownership of NBFD.  It does not take ownership of SAI.  */
+  /* This call does not take ownership of SAI.  */
+  make_cleanup_bfd_unref (nbfd);
   objfile = symbol_file_add_from_bfd (nbfd, 0, sai, OBJF_SHARED, NULL);
 
   do_cleanups (old_cleanups);

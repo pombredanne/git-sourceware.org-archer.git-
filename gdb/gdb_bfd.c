@@ -158,7 +158,8 @@ gdb_bfd_open (const char *name, const char *target, int fd)
   if (abfd != NULL)
     {
       close (fd);
-      return gdb_bfd_ref (abfd);
+      gdb_bfd_ref (abfd);
+      return abfd;
     }
 
   abfd = bfd_fopen (name, target, FOPEN_RB, fd);
@@ -170,7 +171,8 @@ gdb_bfd_open (const char *name, const char *target, int fd)
   *slot = abfd;
 
   gdb_bfd_stash_filename (abfd);
-  return gdb_bfd_ref (abfd);
+  gdb_bfd_ref (abfd);
+  return abfd;
 }
 
 /* A helper function that releases any section data attached to the
@@ -216,33 +218,31 @@ gdb_bfd_close_or_warn (struct bfd *abfd)
   return ret;
 }
 
-/* Add reference to ABFD.  Returns ABFD.  */
+/* See gdb_bfd.h.  */
 
-struct bfd *
+void
 gdb_bfd_ref (struct bfd *abfd)
 {
   struct gdb_bfd_data *gdata;
 
   if (abfd == NULL)
-    return NULL;
+    return;
 
   gdata = bfd_usrdata (abfd);
 
   if (gdata != NULL)
     {
       gdata->refc += 1;
-      return abfd;
+      return;
     }
 
   gdata = bfd_zalloc (abfd, sizeof (struct gdb_bfd_data));
   gdata->refc = 1;
   gdata->mtime = bfd_get_mtime (abfd);
   bfd_usrdata (abfd) = gdata;
-
-  return abfd;
 }
 
-/* Unreference and possibly close ABFD.  */
+/* See gdb_bfd.h.  */
 
 void
 gdb_bfd_unref (struct bfd *abfd)
@@ -480,4 +480,118 @@ gdb_bfd_map_section (asection *sectp, bfd_size_type *size)
   gdb_assert (descriptor->data != NULL);
   *size = descriptor->size;
   return descriptor->data;
+}
+
+
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_fopen (const char *filename, const char *target, const char *mode,
+	       int fd)
+{
+  bfd *result = bfd_fopen (filename, target, mode, fd);
+
+  if (result)
+    {
+      gdb_bfd_stash_filename (result);
+      gdb_bfd_ref (result);
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_openr (const char *filename, const char *target)
+{
+  bfd *result = bfd_openr (filename, target);
+
+  if (result)
+    {
+      gdb_bfd_stash_filename (result);
+      gdb_bfd_ref (result);
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_openw (const char *filename, const char *target)
+{
+  bfd *result = bfd_openw (filename, target);
+
+  if (result)
+    {
+      gdb_bfd_stash_filename (result);
+      gdb_bfd_ref (result);
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_openr_iovec (const char *filename, const char *target,
+		     void *(*open_func) (struct bfd *nbfd,
+					 void *open_closure),
+		     void *open_closure,
+		     file_ptr (*pread_func) (struct bfd *nbfd,
+					     void *stream,
+					     void *buf,
+					     file_ptr nbytes,
+					     file_ptr offset),
+		     int (*close_func) (struct bfd *nbfd,
+					void *stream),
+		     int (*stat_func) (struct bfd *abfd,
+				       void *stream,
+				       struct stat *sb))
+{
+  bfd *result = bfd_openr_iovec (filename, target,
+				 open_func, open_closure,
+				 pread_func, close_func, stat_func);
+
+  if (result)
+    {
+      gdb_bfd_ref (result);
+      gdb_bfd_stash_filename (result);
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_openr_next_archived_file (bfd *archive, bfd *previous)
+{
+  bfd *result = bfd_openr_next_archived_file (archive, previous);
+
+  if (result)
+    {
+      gdb_bfd_ref (result);
+      /* No need to stash the filename here.  */
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_fdopenr (const char *filename, const char *target, int fd)
+{
+  bfd *result = bfd_fdopenr (filename, target, fd);
+
+  if (result)
+    {
+      gdb_bfd_ref (result);
+      gdb_bfd_stash_filename (result);
+    }
+
+  return result;
 }

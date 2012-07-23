@@ -1420,7 +1420,7 @@ static ptid_t any_thread_ptid;
 static ptid_t general_thread;
 static ptid_t continue_thread;
 
-/* This the traceframe which we last selected on the remote system.
+/* This is the traceframe which we last selected on the remote system.
    It will be -1 if no traceframe is selected.  */
 static int remote_traceframe_number = -1;
 
@@ -9824,14 +9824,12 @@ remote_filename_p (const char *filename)
 bfd *
 remote_bfd_open (const char *remote_file, const char *target)
 {
-  bfd *abfd = bfd_openr_iovec (remote_file, target,
-			       remote_bfd_iovec_open, NULL,
-			       remote_bfd_iovec_pread,
-			       remote_bfd_iovec_close,
-			       remote_bfd_iovec_stat);
+  bfd *abfd = gdb_bfd_openr_iovec (remote_file, target,
+				   remote_bfd_iovec_open, NULL,
+				   remote_bfd_iovec_pread,
+				   remote_bfd_iovec_close,
+				   remote_bfd_iovec_stat);
 
-  if (abfd != NULL)
-    gdb_bfd_stash_filename (abfd);
   return abfd;
 }
 

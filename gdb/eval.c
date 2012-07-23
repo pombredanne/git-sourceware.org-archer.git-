@@ -2707,17 +2707,27 @@ evaluate_subexp_standard (struct type *expect_type,
 	arg1 = value_cast (type, arg1);
       return arg1;
 
+    case UNOP_CAST_TYPE:
+      arg1 = evaluate_subexp (NULL, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
+      type = value_type (arg1);
+      arg1 = evaluate_subexp (type, exp, pos, noside);
+      if (noside == EVAL_SKIP)
+	goto nosideret;
+      if (type != value_type (arg1))
+	arg1 = value_cast (type, arg1);
+      return arg1;
+
     case UNOP_DYNAMIC_CAST:
-      (*pos) += 2;
-      type = exp->elts[pc + 1].type;
+      arg1 = evaluate_subexp (NULL, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
+      type = value_type (arg1);
       arg1 = evaluate_subexp (type, exp, pos, noside);
       if (noside == EVAL_SKIP)
 	goto nosideret;
       return value_dynamic_cast (type, arg1);
 
     case UNOP_REINTERPRET_CAST:
-      (*pos) += 2;
-      type = exp->elts[pc + 1].type;
+      arg1 = evaluate_subexp (NULL, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
+      type = value_type (arg1);
       arg1 = evaluate_subexp (type, exp, pos, noside);
       if (noside == EVAL_SKIP)
 	goto nosideret;
@@ -2725,6 +2735,18 @@ evaluate_subexp_standard (struct type *expect_type,
 
     case UNOP_MEMVAL:
       (*pos) += 2;
+      arg1 = evaluate_subexp (expect_type, exp, pos, noside);
+      if (noside == EVAL_SKIP)
+	goto nosideret;
+      if (noside == EVAL_AVOID_SIDE_EFFECTS)
+	return value_zero (exp->elts[pc + 1].type, lval_memory);
+      else
+	return value_at_lazy (exp->elts[pc + 1].type,
+			      value_as_address (arg1));
+
+    case UNOP_MEMVAL_TYPE:
+      arg1 = evaluate_subexp (NULL, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
+      type = value_type (arg1);
       arg1 = evaluate_subexp (expect_type, exp, pos, noside);
       if (noside == EVAL_SKIP)
 	goto nosideret;
@@ -2878,6 +2900,45 @@ evaluate_subexp_standard (struct type *expect_type,
       else
         error (_("Attempt to use a type name as an expression"));
 
+    case OP_TYPEOF:
+    case OP_DECLTYPE:
+      if (noside == EVAL_SKIP)
+	{
+	  evaluate_subexp (NULL_TYPE, exp, pos, EVAL_SKIP);
+	  goto nosideret;
+	}
+      else if (noside == EVAL_AVOID_SIDE_EFFECTS)
+	{
+	  enum exp_opcode sub_op = exp->elts[*pos].opcode;
+	  struct value *result;
+
+	  result = evaluate_subexp (NULL_TYPE, exp, pos,
+				    EVAL_AVOID_SIDE_EFFECTS);
+
+	  /* 'decltype' has special semantics for lvalues.  */
+	  if (op == OP_DECLTYPE
+	      && (sub_op == BINOP_SUBSCRIPT
+		  || sub_op == STRUCTOP_MEMBER
+		  || sub_op == STRUCTOP_MPTR
+		  || sub_op == UNOP_IND
+		  || sub_op == STRUCTOP_STRUCT
+		  || sub_op == STRUCTOP_PTR
+		  || sub_op == OP_SCOPE))
+	    {
+	      struct type *type = value_type (result);
+
+	      if (TYPE_CODE (check_typedef (type)) != TYPE_CODE_REF)
+		{
+		  type = lookup_reference_type (type);
+		  result = allocate_value (type);
+		}
+	    }
+
+	  return result;
+	}
+      else
+        error (_("Attempt to use a type as an expression"));
+
     default:
       /* Removing this case and compiling with gcc -Wall reveals that
          a lot of cases are hitting this case.  Some of these should
@@ -2935,6 +2996,17 @@ evaluate_subexp_for_address (struct expression *exp, int *pos,
       (*pos) += 3;
       return value_cast (lookup_pointer_type (exp->elts[pc + 1].type),
 			 evaluate_subexp (NULL_TYPE, exp, pos, noside));
+
+    case UNOP_MEMVAL_TYPE:
+      {
+	struct type *type;
+
+	(*pos) += 1;
+	x = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
+	type = value_type (x);
+	return value_cast (lookup_pointer_type (type),
+			   evaluate_subexp (NULL_TYPE, exp, pos, noside));
+      }
 
     case OP_VAR_VALUE:
       var = exp->elts[pc + 2].symbol;
@@ -3076,6 +3148,12 @@ evaluate_subexp_for_sizeof (struct expression *exp, int *pos)
     case UNOP_MEMVAL:
       (*pos) += 3;
       type = check_typedef (exp->elts[pc + 1].type);
+      return value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
+
+    case UNOP_MEMVAL_TYPE:
+      (*pos) += 1;
+      val = evaluate_subexp (NULL, exp, pos, EVAL_AVOID_SIDE_EFFECTS);
+      type = check_typedef (value_type (val));
       return value_from_longest (size_type, (LONGEST) TYPE_LENGTH (type));
 
     case OP_VAR_VALUE:

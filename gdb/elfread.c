@@ -1109,7 +1109,7 @@ build_id_verify (const char *filename, struct build_id *check)
   int retval = 0;
 
   /* We expect to be silent on the non-existing files.  */
-  abfd = bfd_open_maybe_remote (filename);
+  abfd = gdb_bfd_open_maybe_remote (filename);
   if (abfd == NULL)
     return 0;
 
@@ -1445,10 +1445,12 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
 
       if (debugfile)
 	{
+	  struct cleanup *cleanup = make_cleanup (xfree, debugfile);
 	  bfd *abfd = symfile_bfd_open (debugfile);
 
+	  make_cleanup_bfd_unref (abfd);
 	  symbol_file_add_separate (abfd, symfile_flags, objfile);
-	  xfree (debugfile);
+	  do_cleanups (cleanup);
 	}
     }
 

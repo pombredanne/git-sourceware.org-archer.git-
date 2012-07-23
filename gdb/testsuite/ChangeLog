@@ -1,3 +1,48 @@
+2012-07-20  Pedro Alves  <palves@redhat.com>
+
+	PR threads/11692
+	PR gdb/12203
+
+	* gdb.threads/create-fail.c: New file.
+	* gdb.threads/create-fail.exp: New file.
+
+2012-07-19  Pedro Alves  <palves@redhat.com>
+
+	* config/monitor.exp (gdb_load): Remove redundant ';' in for loop.
+	* config/vx.exp (gdb_start): Likewise.
+	* gdb.base/printcmds.exp (test_print_repeats_10): Likewise.
+	* gdb.base/setvar.exp (test_set): Likewise.
+	* gdb.base/sigall.exp: Use foreach+lrange instead of for+continue.
+	* gdb.reverse/sigall-precsave.exp: Likewise.
+	* gdb.reverse/sigall-reverse.exp: Likewise.
+
+2012-07-19  Pedro Alves  <palves@redhat.com>
+
+	* gdb.reverse/sigall-precsave.exp: Set a breakpoint at each signal
+	handler before recording.
+
+2012-07-19  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/casts.exp: Add tests for typeof and decltype.
+	* gdb.cp/casts.cc (decltype): New function.
+	(main): Use it.
+
+2012-07-19  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/sigall.exp (signals): New list.
+	<top level>: Loop over signals in the $signals list instead of
+	calling a test function once per signal.
+	* gdb.reverse/sigall-precsave.exp (signals): New list.
+	<top level>: Loop over signals in the $signals list instead of
+	calling a test function once per signal.
+	* gdb.reverse/sigall-reverse.exp (signals): New list.
+	<top level>: Loop over signals in the $signals list instead of
+	calling a test function once per signal.
+
+2012-07-19  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/setshow.exp: Test 'set args ~'.
+
 2012-07-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.base/store.exp (check_set): Import gdb_prompt.
