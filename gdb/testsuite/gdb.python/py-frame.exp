@@ -18,8 +18,8 @@
 
 load_lib gdb-python.exp
 
-standard_testfile
-
+set testfile "py-frame"
+set srcfile ${testfile}.c
 if { [prepare_for_testing ${testfile}.exp ${testfile} ${srcfile}] } {
     return -1
 }
@@ -58,29 +58,6 @@ gdb_py_test_silent_cmd "python sb = sb.superblock" "get superblock" 0
 gdb_test "python print bf1.read_var(\"i\", sb)" "99" "test i = 99"
 gdb_test "python print bf1.read_var(\"i\", sb).type" "int" "test int i"
 
-# Test frame.locals and frame.arg
-gdb_py_test_multiple "simple frame print" \
-  "python" "" \
-  "def print_var (iterator, frame):" "" \
-  "   for i in iterator:" "" \
-  "      print str(i),\"=\", frame.read_var (i)" "" \
-  "end" ""
-gdb_py_test_silent_cmd "python fframe = gdb.selected_frame ()" "get frame" 0
-gdb_py_test_silent_cmd "python flocals = fframe.locals()" "get locals" 0
-gdb_test "python print_var(flocals,fframe)" \
-    "i =.*\"stuff\".*f =.*\"foo\".*b =.*\"bar\".*i = 1.1.*f = 2.2.*i = 99.*" \
-    "test locals output"
-gdb_py_test_silent_cmd "python fargs = fframe.arguments()" "get arguments" 0
-gdb_test "python print fargs" "None" "Test arguments, with no arguments"
-gdb_test "up" ".*" ""
-gdb_py_test_silent_cmd "python fframe = gdb.selected_frame ()" "get frame" 0
-gdb_py_test_silent_cmd "python flocals = fframe.locals()" "get locals" 0
-gdb_test "python print flocals" "None" "Test locals(), with mo locals"
-gdb_py_test_silent_cmd "python fargs = fframe.arguments()" "get arguments" 0
-gdb_test "python print_var(fargs,fframe)" \
-    "argc = .*argv = .*" \
-    "test arguments() output"
-
 gdb_breakpoint "f2"
 gdb_continue_to_breakpoint "breakpoint at f2"
 gdb_py_test_silent_cmd "python bframe = gdb.selected_frame()" \
@@ -113,42 +90,3 @@ gdb_test "python print 'result =', f0.read_var ('variable_which_surely_doesnt_ex
 gdb_test "python print 'result =', f0.read_var ('a')" " = 1" "test Frame.read_var - success"
 
 gdb_test "python print 'result =', gdb.selected_frame () == f1" " = True" "test gdb.selected_frame"
-
-# Test FrameIterator.  This tests both the inbuilt iterator, and the
-# seperate class.
-gdb_breakpoint "f3"
-gdb_continue_to_breakpoint "breakpoint at f3"
-gdb_py_test_silent_cmd "python it = gdb.FrameIterator (gdb.newest_frame())" \
-    "get iterator from newest frame" 0
-gdb_py_test_multiple "simple frame print" \
-  "python" "" \
-  "def print_function (iterator):" "" \
-  "   for i in iterator:" "" \
-  "      print str(i.function())" "" \
-  "end" ""
-gdb_test "python print_function(it)" \
-    "f3.*f2.*f1.*main.*" "test vanilla frame iterator"
-gdb_test "python print_function(gdb.newest_frame())" \
-    "f3.*f2.*f1.*main.*" "test vanilla inbuilt frame iterator"
-gdb_test "select 3" ".*" ""
-gdb_py_test_silent_cmd "python it = gdb.FrameIterator (gdb.selected_frame(), reverse=True)" \
-    "get iterator from selected frame" 0
-gdb_test "python print_function(it)" \
-    "main.*f1.*f2.*f3.*" "test reverse traversal vanilla frame iterator"
-gdb_py_test_silent_cmd "python it = gdb.FrameIterator(gdb.newest_frame(), regex=\"f\[0-9\]\")" \
-    "get iterator from newest frame" 0
-gdb_test "python print_function(it)" \
-    "f3.*f2.*f1.*" "test traversal with a regex filtered iterator"
-gdb_py_test_silent_cmd "python it = gdb.FrameIterator(gdb.selected_frame(), regex=\"f\[0-9\]\", reverse=True)" \
-    "get iterator from newest frame" 0
-gdb_test "python print_function(it)" \
-    "f1.*f2.*f3.*" "test reverse traversal with a regex filtered iterator"
-gdb_py_test_silent_cmd "python it = gdb.FrameIterator(gdb.selected_frame(), regex=\"nothing\")" \
-    "get iterator from newest frame" 0
-gdb_test "python print_function(it)" \
-    "" "test regex iterator that returns nothing"
-gdb_test  "python ite = gdb.FrameIterator(gdb.selected_frame(), regex=\"\[\")" \
-    "Traceback.*Invalid regex.*Invalid regular expression.*" "test invalid regex"
-gdb_test "python print ite" \
-    ".*NameError.*name.*ite.*is not defined.*" \
-    "test invalid iterator did not return an iterator"
