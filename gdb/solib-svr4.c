@@ -1638,7 +1638,7 @@ struct namespace
 /* Returns a hash code for the namespace referenced by p.  */
 
 static hashval_t
-hash_namespace (const PTR p)
+hash_namespace (const void *p)
 {
   const struct namespace *ns = (const struct namespace *) p;
 
@@ -1649,7 +1649,7 @@ hash_namespace (const PTR p)
    are equal.  */
 
 static int
-equal_namespace (const PTR p1, const PTR p2)
+equal_namespace (const void *p1, const void *p2)
 {
   const struct namespace *ns1 = (const struct namespace *) p1;
   const struct namespace *ns2 = (const struct namespace *) p2;
@@ -1660,7 +1660,7 @@ equal_namespace (const PTR p1, const PTR p2)
 /* Free a namespace.  */
 
 static void
-free_namespace (PTR p)
+free_namespace (void *p)
 {
   struct namespace *ns = (struct namespace *) p;
 
