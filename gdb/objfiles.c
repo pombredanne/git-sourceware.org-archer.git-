@@ -1466,7 +1466,6 @@ void
 inhibit_section_map_updates (void)
 {
   get_objfile_pspace_data (current_program_space)->inhibit_updates = 1;
-
 }
 
 /* See comments in objfiles.h.  */
