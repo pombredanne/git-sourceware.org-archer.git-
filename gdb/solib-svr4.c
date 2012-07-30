@@ -1640,7 +1640,7 @@ struct namespace
 static hashval_t
 hash_namespace (const void *p)
 {
-  const struct namespace *ns = (const struct namespace *) p;
+  const struct namespace *ns = p;
 
   return (hashval_t) ns->lmid;
 }
@@ -1651,8 +1651,8 @@ hash_namespace (const void *p)
 static int
 equal_namespace (const void *p1, const void *p2)
 {
-  const struct namespace *ns1 = (const struct namespace *) p1;
-  const struct namespace *ns2 = (const struct namespace *) p2;
+  const struct namespace *ns1 = p1;
+  const struct namespace *ns2 = p2;
 
   return ns1->lmid == ns2->lmid;
 }
@@ -1662,7 +1662,7 @@ equal_namespace (const void *p1, const void *p2)
 static void
 free_namespace (void *p)
 {
-  struct namespace *ns = (struct namespace *) p;
+  struct namespace *ns = p;
 
   svr4_free_library_list (ns->solist);
   xfree (ns);
