@@ -535,6 +535,9 @@ extern void inhibit_section_map_updates (void);
 /* Resume automatically rebuilding the section map as required.  */
 extern void resume_section_map_updates (void);
 
+/* Version of the above suitable for use as a cleanup.  */
+extern void resume_section_map_updates_cleanup (void *arg);
+
 extern void default_iterate_over_objfiles_in_search_order
   (struct gdbarch *gdbarch,
    iterate_over_objfiles_in_search_order_cb_ftype *cb,

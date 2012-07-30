@@ -1476,6 +1476,14 @@ resume_section_map_updates (void)
   get_objfile_pspace_data (current_program_space)->inhibit_updates = 0;
 }
 
+/* See comments in objfiles.h.  */
+
+void
+resume_section_map_updates_cleanup (void *arg)
+{
+  resume_section_map_updates ();
+}
+
 /* The default implementation for the "iterate_over_objfiles_in_search_order"
    gdbarch method.  It is equivalent to use the ALL_OBJFILES macro,
    searching the objfiles in the order they are stored internally,

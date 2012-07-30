@@ -1796,6 +1796,7 @@ svr4_handle_solib_event (bpstat bs)
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_info buf, *pi;
   enum probe_action action;
+  struct cleanup *cleanups = NULL;
   struct value *val;
   LONGEST lmid;
   CORE_ADDR debug_base, lm = 0;
@@ -1831,6 +1832,7 @@ svr4_handle_solib_event (bpstat bs)
      section map.  We can therefore inhibit section map updates across
      these calls to EVALUATE_PROBE_ARGUMENT and save a lot of time.  */
   inhibit_section_map_updates ();
+  cleanups = make_cleanup (resume_section_map_updates_cleanup, NULL);
 
   val = evaluate_probe_argument (pi->probe, 0);
   if (val == NULL)
@@ -1863,7 +1865,8 @@ svr4_handle_solib_event (bpstat bs)
 	action = NAMESPACE_RELOAD;
     }
 
-  resume_section_map_updates ();
+  do_cleanups (cleanups);
+  cleanups = NULL;
 
   if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
@@ -1887,7 +1890,8 @@ svr4_handle_solib_event (bpstat bs)
   warning (_("Probes-based dynamic linker interface failed.\n"
 	     "Reverting to original interface.\n"));
 
-  resume_section_map_updates ();
+  if (cleanups != NULL)
+    do_cleanups (cleanups);
   free_namespace_table (info);
   free_probes (info);
   info->using_probes = 0;
