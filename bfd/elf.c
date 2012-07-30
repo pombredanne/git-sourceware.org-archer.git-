@@ -1025,7 +1025,7 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
       else
 	{
 	  /* Normal section.  Check if we should compress.  */
-	  if ((abfd->flags & BFD_COMPRESS))
+	  if ((abfd->flags & BFD_COMPRESS) && newsect->size != 0)
 	    action = compress;
 	}
 
@@ -3012,6 +3012,13 @@ assign_section_numbers (bfd *abfd, struct bfd_link_info *link_info)
 	}
       t->strtab_section = section_number++;
       _bfd_elf_strtab_addref (elf_shstrtab (abfd), t->strtab_hdr.sh_name);
+    }
+
+  if (section_number >= SHN_LORESERVE)
+    {
+      _bfd_error_handler (_("%B: too many sections: %u"),
+			  abfd, section_number);
+      return FALSE;
     }
 
   _bfd_elf_strtab_finalize (elf_shstrtab (abfd));

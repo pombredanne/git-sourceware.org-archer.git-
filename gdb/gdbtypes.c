@@ -511,6 +511,43 @@ lookup_function_type (struct type *type)
   return make_function_type (type, (struct type **) 0);
 }
 
+/* Given a type TYPE and argument types, return the appropriate
+   function type.  If the final type in PARAM_TYPES is NULL, make a
+   varargs function.  */
+
+struct type *
+lookup_function_type_with_arguments (struct type *type,
+				     int nparams,
+				     struct type **param_types)
+{
+  struct type *fn = make_function_type (type, (struct type **) 0);
+  int i;
+
+  if (nparams > 0)
+    {
+      if (param_types[nparams - 1] == NULL)
+	{
+	  --nparams;
+	  TYPE_VARARGS (fn) = 1;
+	}
+      else if (TYPE_CODE (check_typedef (param_types[nparams - 1]))
+	       == TYPE_CODE_VOID)
+	{
+	  --nparams;
+	  /* Caller should have ensured this.  */
+	  gdb_assert (nparams == 0);
+	  TYPE_PROTOTYPED (fn) = 1;
+	}
+    }
+
+  TYPE_NFIELDS (fn) = nparams;
+  TYPE_FIELDS (fn) = TYPE_ZALLOC (fn, nparams * sizeof (struct field));
+  for (i = 0; i < nparams; ++i)
+    TYPE_FIELD_TYPE (fn, i) = param_types[i];
+
+  return fn;
+}
+
 /* Identify address space identifier by name --
    return the integer flag defined in gdbtypes.h.  */
 extern int

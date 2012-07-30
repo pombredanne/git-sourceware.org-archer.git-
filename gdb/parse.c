@@ -75,8 +75,7 @@ struct block *expression_context_block;
 CORE_ADDR expression_context_pc;
 struct block *innermost_block;
 int arglist_len;
-union type_stack_elt *type_stack;
-int type_stack_depth, type_stack_size;
+static struct type_stack type_stack;
 char *lexptr;
 char *prev_lexptr;
 int paren_depth;
@@ -1123,7 +1122,7 @@ parse_exp_in_context (char **stringptr, CORE_ADDR pc, struct block *block,
   prev_lexptr = NULL;
 
   paren_depth = 0;
-  type_stack_depth = 0;
+  type_stack.depth = 0;
   expout_last_struct = -1;
 
   comma_terminates = comma;
@@ -1359,15 +1358,27 @@ parse_c_float (struct gdbarch *gdbarch, const char *p, int len,
 /* Stuff for maintaining a stack of types.  Currently just used by C, but
    probably useful for any language which declares its types "backwards".  */
 
+/* Ensure that there are HOWMUCH open slots on the type stack STACK.  */
+
+static void
+type_stack_reserve (struct type_stack *stack, int howmuch)
+{
+  if (stack->depth + howmuch >= stack->size)
+    {
+      stack->size *= 2;
+      if (stack->size < howmuch)
+	stack->size = howmuch;
+      stack->elements = xrealloc (stack->elements,
+				  stack->size * sizeof (union type_stack_elt));
+    }
+}
+
+/* Ensure that there is a single open slot in the global type stack.  */
+
 static void
 check_type_stack_depth (void)
 {
-  if (type_stack_depth == type_stack_size)
-    {
-      type_stack_size *= 2;
-      type_stack = (union type_stack_elt *)
-	xrealloc ((char *) type_stack, type_stack_size * sizeof (*type_stack));
-    }
+  type_stack_reserve (&type_stack, 1);
 }
 
 /* A helper function for insert_type and insert_type_address_space.
@@ -1379,11 +1390,11 @@ insert_into_type_stack (int slot, union type_stack_elt element)
 {
   check_type_stack_depth ();
 
-  if (slot < type_stack_depth)
-    memmove (&type_stack[slot + 1], &type_stack[slot],
-	     (type_stack_depth - slot) * sizeof (union type_stack_elt));
-  type_stack[slot] = element;
-  ++type_stack_depth;
+  if (slot < type_stack.depth)
+    memmove (&type_stack.elements[slot + 1], &type_stack.elements[slot],
+	     (type_stack.depth - slot) * sizeof (union type_stack_elt));
+  type_stack.elements[slot] = element;
+  ++type_stack.depth;
 }
 
 /* Insert a new type, TP, at the bottom of the type stack.  If TP is
@@ -1404,7 +1415,7 @@ insert_type (enum type_pieces tp)
   /* If there is anything on the stack (we know it will be a
      tp_pointer), insert the qualifier above it.  Otherwise, simply
      push this on the top of the stack.  */
-  if (type_stack_depth && (tp == tp_const || tp == tp_volatile))
+  if (type_stack.depth && (tp == tp_const || tp == tp_volatile))
     slot = 1;
   else
     slot = 0;
@@ -1417,14 +1428,14 @@ void
 push_type (enum type_pieces tp)
 {
   check_type_stack_depth ();
-  type_stack[type_stack_depth++].piece = tp;
+  type_stack.elements[type_stack.depth++].piece = tp;
 }
 
 void
 push_type_int (int n)
 {
   check_type_stack_depth ();
-  type_stack[type_stack_depth++].int_val = n;
+  type_stack.elements[type_stack.depth++].int_val = n;
 }
 
 /* Insert a tp_space_identifier and the corresponding address space
@@ -1444,7 +1455,7 @@ insert_type_address_space (char *string)
   /* If there is anything on the stack (we know it will be a
      tp_pointer), insert the address space qualifier above it.
      Otherwise, simply push this on the top of the stack.  */
-  if (type_stack_depth)
+  if (type_stack.depth)
     slot = 1;
   else
     slot = 0;
@@ -1458,18 +1469,101 @@ insert_type_address_space (char *string)
 enum type_pieces
 pop_type (void)
 {
-  if (type_stack_depth)
-    return type_stack[--type_stack_depth].piece;
+  if (type_stack.depth)
+    return type_stack.elements[--type_stack.depth].piece;
   return tp_end;
 }
 
 int
 pop_type_int (void)
 {
-  if (type_stack_depth)
-    return type_stack[--type_stack_depth].int_val;
+  if (type_stack.depth)
+    return type_stack.elements[--type_stack.depth].int_val;
   /* "Can't happen".  */
   return 0;
+}
+
+/* Pop a type list element from the global type stack.  */
+
+static VEC (type_ptr) *
+pop_typelist (void)
+{
+  gdb_assert (type_stack.depth);
+  return type_stack.elements[--type_stack.depth].typelist_val;
+}
+
+/* Pop a type_stack element from the global type stack.  */
+
+static struct type_stack *
+pop_type_stack (void)
+{
+  gdb_assert (type_stack.depth);
+  return type_stack.elements[--type_stack.depth].stack_val;
+}
+
+/* Append the elements of the type stack FROM to the type stack TO.
+   Always returns TO.  */
+
+struct type_stack *
+append_type_stack (struct type_stack *to, struct type_stack *from)
+{
+  type_stack_reserve (to, from->depth);
+
+  memcpy (&to->elements[to->depth], &from->elements[0],
+	  from->depth * sizeof (union type_stack_elt));
+  to->depth += from->depth;
+
+  return to;
+}
+
+/* Push the type stack STACK as an element on the global type stack.  */
+
+void
+push_type_stack (struct type_stack *stack)
+{
+  check_type_stack_depth ();
+  type_stack.elements[type_stack.depth++].stack_val = stack;
+  push_type (tp_type_stack);
+}
+
+/* Copy the global type stack into a newly allocated type stack and
+   return it.  The global stack is cleared.  The returned type stack
+   must be freed with type_stack_cleanup.  */
+
+struct type_stack *
+get_type_stack (void)
+{
+  struct type_stack *result = XNEW (struct type_stack);
+
+  *result = type_stack;
+  type_stack.depth = 0;
+  type_stack.size = 0;
+  type_stack.elements = NULL;
+
+  return result;
+}
+
+/* A cleanup function that destroys a single type stack.  */
+
+void
+type_stack_cleanup (void *arg)
+{
+  struct type_stack *stack = arg;
+
+  xfree (stack->elements);
+  xfree (stack);
+}
+
+/* Push a function type with arguments onto the global type stack.
+   LIST holds the argument types.  If the final item in LIST is NULL,
+   then the function will be varargs.  */
+
+void
+push_typelist (VEC (type_ptr) *list)
+{
+  check_type_stack_depth ();
+  type_stack.elements[type_stack.depth++].typelist_val = list;
+  push_type (tp_function_with_arguments);
 }
 
 /* Pop the type stack and return the type which corresponds to FOLLOW_TYPE
@@ -1558,6 +1652,36 @@ follow_types (struct type *follow_type)
 	   done with it.  */
 	follow_type = lookup_function_type (follow_type);
 	break;
+
+      case tp_function_with_arguments:
+	{
+	  VEC (type_ptr) *args = pop_typelist ();
+
+	  follow_type
+	    = lookup_function_type_with_arguments (follow_type,
+						   VEC_length (type_ptr, args),
+						   VEC_address (type_ptr,
+								args));
+	  VEC_free (type_ptr, args);
+	}
+	break;
+
+      case tp_type_stack:
+	{
+	  struct type_stack *stack = pop_type_stack ();
+	  /* Sort of ugly, but not really much worse than the
+	     alternatives.  */
+	  struct type_stack save = type_stack;
+
+	  type_stack = *stack;
+	  follow_type = follow_types (follow_type);
+	  gdb_assert (type_stack.depth == 0);
+
+	  type_stack = save;
+	}
+	break;
+      default:
+	gdb_assert_not_reached ("unrecognized tp_ value in follow_types");
       }
   return follow_type;
 }
@@ -1753,10 +1877,9 @@ exp_types_mark_used (struct expression *exp)
 void
 _initialize_parse (void)
 {
-  type_stack_size = 80;
-  type_stack_depth = 0;
-  type_stack = (union type_stack_elt *)
-    xmalloc (type_stack_size * sizeof (*type_stack));
+  type_stack.size = 0;
+  type_stack.depth = 0;
+  type_stack.elements = NULL;
 
   add_setshow_zinteger_cmd ("expression", class_maintenance,
 			    &expressiondebug,
