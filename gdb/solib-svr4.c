@@ -1564,10 +1564,12 @@ struct probe_and_info
 };
 
 /* Get the solib event probe at the specified location, and the
-   probe_info the probe was created with.  Returns NULL if no solib
-   event probe exists at that location.  */
+   probe_info the probe was created with.  Fills in RESULT and
+   returns nonzero if a solib event probe was found at the
+   specified location.  Returns zero if no solib event probe
+   was found.  */
 
-static struct probe_and_info *
+static int
 solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
 		      struct probe_and_info *result)
 {
@@ -1586,12 +1588,12 @@ solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
 	      result->info = &probe_info[i];
 	      result->probe = probe;
 
-	      return result;
+	      return 1;
 	    }
 	}
     }
 
-  return NULL;
+  return 0;
 }
 
 /* Decide what action to take when the specified solib event probe is
@@ -1794,7 +1796,7 @@ static void
 svr4_handle_solib_event (bpstat bs)
 {
   struct svr4_info *info = get_svr4_info ();
-  struct probe_and_info buf, *pi;
+  struct probe_and_info buf, *pi = &buf;
   enum probe_action action;
   struct value *val;
   LONGEST lmid;
@@ -1809,8 +1811,7 @@ svr4_handle_solib_event (bpstat bs)
   if (!info->using_probes)
     return;
 
-  pi = solib_event_probe_at (info, bs->bp_location_at, &buf);
-  if (pi == NULL)
+  if (!solib_event_probe_at (info, bs->bp_location_at, pi))
     goto error;
 
   action = solib_event_probe_action (pi);
@@ -1936,10 +1937,9 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 
   for (loc = b->loc; loc; loc = loc->next)
     {
-      struct probe_and_info buf, *pi;
+      struct probe_and_info buf, *pi = &buf;
 
-      pi = solib_event_probe_at (info, loc, &buf);
-      if (pi != NULL)
+      if (solib_event_probe_at (info, loc, pi))
 	{
 	  if (pi->info->action == NAMESPACE_NO_ACTION)
 	    b->enable_state = (stop_on_solib_events
