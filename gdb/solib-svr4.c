@@ -1728,7 +1728,7 @@ namespace_update_full (struct svr4_info *info, LONGEST lmid,
   slot = htab_find_slot (info->namespace_table, &lookup, INSERT);
   if (*slot == HTAB_EMPTY_ENTRY)
     {
-      ns = xcalloc (sizeof (struct namespace), 1);
+      ns = XCNEW (struct namespace);
       ns->lmid = lmid;
       *slot = ns;
     }
