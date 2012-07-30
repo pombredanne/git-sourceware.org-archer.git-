@@ -1619,7 +1619,7 @@ solib_event_probe_action (struct probe_and_info *pi)
   if (probe_argc == 2)
     action = NAMESPACE_RELOAD;
   else if (probe_argc < 2)
-    return NAMESPACE_TABLE_INVALIDATE;
+    action = NAMESPACE_TABLE_INVALIDATE;
 
   return action;
 }
