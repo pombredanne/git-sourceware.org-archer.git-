@@ -43,13 +43,12 @@ int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			      const struct language_defn *language);
 
 
-int apply_frame_filter (struct frame_info *frame,
-			int print_level,
-			enum print_what print_what,
-			int print_args,
-			const char *print_frame_arguments,
-			struct ui_out *out,
-			int print_locals, int count);
+
+int apply_frame_filter (struct frame_info *frame, int print_level,
+			enum print_what print_what, int print_frame_info,
+			int print_args, int mi_print_args_type,
+			const char *cli_print_args_type,
+			struct ui_out *out, int print_locals, int count);
 
 void preserve_python_values (struct objfile *objfile, htab_t copied_types);
 

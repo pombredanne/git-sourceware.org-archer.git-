@@ -113,9 +113,16 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
 
       if (frame_high != -1)
 	count = (frame_high - frame_low) + 1;
-      result = apply_frame_filter (fi, 1, LOC_AND_ADDRESS, 0,
-				   0 /* print args */, current_uiout,
-				   0 /* show locals */, count);
+      result = apply_frame_filter (fi,/* frame */
+				   1, /* print_level */
+				   LOC_AND_ADDRESS, /* print_what */
+				   1, /* print_frame_info */
+				   0, /* print_args */
+				   0, /* mi_print_args_type */
+				   0, /* cli_print_args_type */
+				   current_uiout, /* out */
+				   0, /* print_locals */
+				   count /* count */);
     }
 
   /* Run the inbuilt backtrace if there are no filters registered, or
@@ -215,15 +222,28 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
   struct cleanup *cleanup_stack_args;
   enum print_values print_values;
   struct ui_out *uiout = current_uiout;
+  int raw_arg = 0;
+  int result = 0;
 
-  if (argc < 1 || argc > 3 || argc == 2)
-    error (_("-stack-list-arguments: Usage: "
-	     "PRINT_VALUES [FRAME_LOW FRAME_HIGH]"));
-
-  if (argc == 3)
+  if (argc > 1)
     {
-      frame_low = atoi (argv[1]);
-      frame_high = atoi (argv[2]);
+      int j;
+      /* Find 'raw-frames' at argv[1] if passed as an argument */
+      for (j = 0; j < strlen (argv[1]); j++)
+	argv[1][j] = tolower (argv[1][j]);
+
+      if (subset_compare (argv[1], "raw-frames"))
+	raw_arg = 1;
+    }
+
+  if (argc < 1 || (argc > 3 && ! raw_arg) || (argc == 2 && ! raw_arg))
+    error (_("-stack-list-arguments: Usage: "
+	     "PRINT_VALUES [RAW FRAME_LOW FRAME_HIGH]"));
+
+  if (argc >= 3)
+    {
+      frame_low = atoi (argv[1] + raw_arg);
+      frame_high = atoi (argv[2] + raw_arg);
     }
   else
     {
@@ -248,21 +268,44 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
   cleanup_stack_args
     = make_cleanup_ui_out_list_begin_end (uiout, "stack-args");
 
-  /* Now let's print the frames up to frame_high, or until there are
-     frames in the stack.  */
-  for (;
-       fi && (i <= frame_high || frame_high == -1);
-       i++, fi = get_prev_frame (fi))
+  if (! raw_arg && frame_filters)
     {
-      struct cleanup *cleanup_frame;
+      int count = frame_high;
 
-      QUIT;
-      cleanup_frame = make_cleanup_ui_out_tuple_begin_end (uiout, "frame");
-      ui_out_field_int (uiout, "level", i);
-      list_args_or_locals (arguments, print_values, fi);
-      do_cleanups (cleanup_frame);
+      if (frame_high != -1)
+	count = (frame_high - frame_low) + 1;
+
+      result = apply_frame_filter (fi,/* frame */
+				   1, /* print_level */
+				   LOC_AND_ADDRESS, /* print_what */
+				   0, /* print_frame_info */
+				   1, /* print_args */
+				   print_values, /* mi_print_args_type */
+				   0, /* cli_print_args_type */
+				   current_uiout, /* out */
+				   0, /* print_locals */
+				   count /* count */);
     }
 
+  if (! frame_filters || raw_arg || result == PY_BT_ERROR
+      || result == PY_BT_NO_FILTERS)
+    {
+
+      /* Now let's print the frames up to frame_high, or until there are
+	 frames in the stack.  */
+      for (;
+	   fi && (i <= frame_high || frame_high == -1);
+	   i++, fi = get_prev_frame (fi))
+	{
+	  struct cleanup *cleanup_frame;
+
+	  QUIT;
+	  cleanup_frame = make_cleanup_ui_out_tuple_begin_end (uiout, "frame");
+	  ui_out_field_int (uiout, "level", i);
+	  list_args_or_locals (arguments, print_values, fi);
+	  do_cleanups (cleanup_frame);
+	}
+    }
   do_cleanups (cleanup_stack_args);
 }
 

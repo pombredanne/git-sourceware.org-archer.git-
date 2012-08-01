@@ -29,6 +29,7 @@
 #include "valprint.h"
 #include "annotate.h"
 #include "hashtab.h"
+#include "mi/mi-cmds.h"
 
 #ifdef HAVE_PYTHON
 #include "python-internal.h"
@@ -210,16 +211,21 @@ py_print_locals (PyObject *filter,
 
 static int
 py_print_args (PyObject *filter,
-	    struct ui_out *out,
-	    struct value_print_options opts,
-	    const char *print_args_type)
+	       struct ui_out *out,
+	       struct value_print_options opts,
+	       int print_type,
+	       const char *print_args_type)
 {
-  struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
+  struct cleanup *old_chain;
   PyObject *result = NULL;
+
+  old_chain = make_cleanup_ui_out_list_begin_end (out, "args");
 
   /* Frame arguments.  */
   annotate_frame_args ();
-  ui_out_text (out, " (");
+
+  if (! ui_out_is_mi_like_p (out))
+    ui_out_text (out, " (");
 
   if (PyObject_HasAttrString (filter, "frame_args"))
     {
@@ -264,6 +270,8 @@ py_print_args (PyObject *filter,
 		      int value_success = 0;
 		      volatile struct gdb_exception except;
 		      struct ui_file *stb;
+		      struct cleanup *inner_cleanup =
+			make_cleanup (null_cleanup, NULL);
 
 		      value_success = extract_sym_and_value (item,
 							     &sym_name,
@@ -275,31 +283,71 @@ py_print_args (PyObject *filter,
 		      if (! value_success)
 			goto args_error;
 
+		      if (ui_out_is_mi_like_p (out))
+			{
+			  if(print_type != PRINT_NO_VALUES)
+			    {
+			      inner_cleanup =
+				make_cleanup_ui_out_tuple_begin_end (out,
+								     NULL);
+			    }
+			}
+
 		      annotate_arg_begin ();
 		      ui_out_field_string (out, "name", sym_name);
-		      ui_out_text (out, "=");
+
+		      if (! ui_out_is_mi_like_p (out))
+			ui_out_text (out, "=");
+
 		      annotate_arg_value (value_type (val));
 		      opts.deref_ref = 1;
 
-		      /* True in "summary" mode, false otherwise.  */
-		      opts.summary = !strcmp (print_args_type, "scalars");
-
-		      stb = mem_fileopen ();
-		      make_cleanup_ui_file_delete (stb);
-
-		      TRY_CATCH (except, RETURN_MASK_ALL)
+		      if (ui_out_is_mi_like_p (out)
+			  && print_type == PRINT_SIMPLE_VALUES)
 			{
-			  common_val_print (val, stb, 2, &opts, language);
+			  TRY_CATCH (except, RETURN_MASK_ALL)
+			    {
+			      struct type *type;
+			      stb = mem_fileopen ();
+			      make_cleanup_ui_file_delete (stb);
+			      type = check_typedef (value_type (val));
+			      type_print (type, "", stb, -1);
+			      ui_out_field_stream (out, "type", stb);
+			    }
+			  if (except.reason > 0)
+			    {
+			      PyErr_SetString (PyExc_RuntimeError,
+					       except.message);
+			      goto args_error;
+			    }
 			}
-		      if (except.reason > 0)
+
+		      if (! ui_out_is_mi_like_p (out))
 			{
-			  PyErr_SetString (PyExc_RuntimeError,
-					   except.message);
-			  goto args_error;
+			  opts.summary = !strcmp (print_args_type, "scalars");
 			}
 
-		      ui_out_field_stream (out, "value", stb);
+		      if (ui_out_is_mi_like_p (out)
+			  && print_type != PRINT_NO_VALUES)
+			{
+			  stb = mem_fileopen ();
+			  make_cleanup_ui_file_delete (stb);
 
+			  TRY_CATCH (except, RETURN_MASK_ALL)
+			    {
+			      common_val_print (val, stb, 2, &opts, language);
+			    }
+			  if (except.reason > 0)
+			    {
+			      PyErr_SetString (PyExc_RuntimeError,
+					       except.message);
+			      goto args_error;
+			    }
+
+			  ui_out_field_stream (out, "value", stb);
+			}
+
+		      do_cleanups (inner_cleanup);
 		      /* Collect the next item from the iterator.  If
 			 this is the last item, we do not print the
 			 ",".  */
@@ -319,7 +367,8 @@ py_print_args (PyObject *filter,
 	goto args_error;
     }
 
-  ui_out_text (out, ")");
+  if (! ui_out_is_mi_like_p (out))
+    ui_out_text (out, ")");
 
   do_cleanups (old_chain);
   return 1;
@@ -355,7 +404,9 @@ static int
 py_print_frame (PyObject *filter,
 		int print_level,
 		enum print_what print_what,
+		int print_frame_info,
 		int print_args,
+		int mi_print_args_type,
 		const char *print_args_type,
 		int print_locals,
 		struct ui_out *out,
@@ -367,6 +418,9 @@ py_print_frame (PyObject *filter,
   CORE_ADDR address = 0;
   struct gdbarch *gdbarch = NULL;
   struct frame_info *frame = NULL;
+  struct cleanup *cleanup_stack = make_cleanup (null_cleanup, NULL);
+
+  cleanup_stack	= make_cleanup_ui_out_tuple_begin_end (out, "frame");
 
   /* Get the underlying frame.  */
   if (PyObject_HasAttrString (filter, "inferior_frame"))
@@ -392,29 +446,32 @@ py_print_frame (PyObject *filter,
       goto error;
     }
 
-  /* Elided frames are also printed with this function (recursively)
-     and are printed with indention.  */
-  if (indent > 0)
-    ui_out_spaces (out, indent);
-
-  /* The address is required for frame annotations, and also for
-     address printing.  */
-  if (PyObject_HasAttrString (filter, "address"))
+  if (print_frame_info)
     {
-      PyObject *paddr = PyObject_CallMethod (filter, "address", NULL);
-      if (paddr)
-	{
-	  if (paddr != Py_None)
-	    {
-	      address = PyLong_AsLong (paddr);
-	      has_addr = 1;
-	    }
-	  Py_DECREF (paddr);
-	}
-      else
-	goto error;
-    }
+      /* Elided frames are also printed with this function (recursively)
+	 and are printed with indention.  */
+      if (indent > 0)
+	ui_out_spaces (out, indent);
 
+      /* The address is required for frame annotations, and also for
+	 address printing.  */
+      if (PyObject_HasAttrString (filter, "address"))
+	{
+	  PyObject *paddr = PyObject_CallMethod (filter, "address", NULL);
+	  if (paddr)
+	    {
+	      if (paddr != Py_None)
+		{
+		  address = PyLong_AsLong (paddr);
+		  has_addr = 1;
+		}
+	      Py_DECREF (paddr);
+	    }
+	  else
+	    goto error;
+	}
+
+    }
   /* Print frame level.  */
   if (print_level)
     {
@@ -446,107 +503,113 @@ py_print_frame (PyObject *filter,
 	}
     }
 
-  /* Print address to the address field.  If an address is not provided,
-     print nothing.  */
-  if (opts.addressprint && has_addr)
+  if (print_frame_info)
     {
-      annotate_frame_address ();
-      ui_out_field_core_addr (out, "addr", gdbarch, address);
-      annotate_frame_address_end ();
-    }
-
-  ui_out_text (out, " in ");
-
-  /* Print frame function.  */
-  if (PyObject_HasAttrString (filter, "function"))
-    {
-      PyObject *result = PyObject_CallMethod (filter, "function", NULL);
-
-      if (result)
+      /* Print address to the address field.  If an address is not provided,
+	 print nothing.  */
+      if (opts.addressprint && has_addr)
 	{
-	  if (result != Py_None)
-	    {
-	      char *func = NULL;
-	      char *dup = PyString_AsString (result);
-
-	      if (! dup)
-		{
-		  Py_DECREF (result);
-		  goto error;
-		}
-
-	      func = xstrdup (dup);
-	      annotate_frame_function_name ();
-	      ui_out_field_string (out, "func", func);
-	      xfree (func);
-
-	    }
-	  Py_DECREF (result);
+	  annotate_frame_address ();
+	  ui_out_field_core_addr (out, "addr", gdbarch, address);
+	  annotate_frame_address_end ();
 	}
-      else
-	goto error;
+
+      ui_out_text (out, " in ");
+
+      /* Print frame function.  */
+      if (PyObject_HasAttrString (filter, "function"))
+	{
+	  PyObject *result = PyObject_CallMethod (filter, "function", NULL);
+
+	  if (result)
+	    {
+	      if (result != Py_None)
+		{
+		  char *func = NULL;
+		  char *dup = PyString_AsString (result);
+
+		  if (! dup)
+		    {
+		      Py_DECREF (result);
+		      goto error;
+		    }
+
+		  func = xstrdup (dup);
+		  annotate_frame_function_name ();
+		  ui_out_field_string (out, "func", func);
+		  xfree (func);
+
+		}
+	      Py_DECREF (result);
+	    }
+	  else
+	    goto error;
+	}
     }
+
 
   /* Frame arguments.  */
   if (print_args)
     {
-      if (! py_print_args (filter, out, opts, print_args_type))
+      if (! py_print_args (filter, out, opts, mi_print_args_type, print_args_type))
 	goto error;
     }
 
-  annotate_frame_source_begin ();
-
-  if (PyObject_HasAttrString (filter, "filename"))
+  if (print_frame_info)
     {
-      PyObject *result = PyObject_CallMethod (filter, "filename",
+      annotate_frame_source_begin ();
+
+      if (PyObject_HasAttrString (filter, "filename"))
+	{
+	  PyObject *result = PyObject_CallMethod (filter, "filename",
 					      NULL);
-      if (result)
-	{
-	  if (result != Py_None)
+	  if (result)
 	    {
-	      char *filename = NULL;
-	      char *dup = PyString_AsString (result);
-
-	      if (! dup)
+	      if (result != Py_None)
 		{
-		  Py_DECREF (result);
-		  goto error;
+		  char *filename = NULL;
+		  char *dup = PyString_AsString (result);
+
+		  if (! dup)
+		    {
+		      Py_DECREF (result);
+		      goto error;
+		    }
+
+		  filename  = xstrdup (dup);
+		  ui_out_wrap_hint (out, "   ");
+		  ui_out_text (out, " at ");
+		  annotate_frame_source_file ();
+		  ui_out_field_string (out, "file", filename);
+		  annotate_frame_source_file_end ();
+		  xfree (filename);
 		}
-
-	      filename  = xstrdup (dup);
-	      ui_out_wrap_hint (out, "   ");
-	      ui_out_text (out, " at ");
-	      annotate_frame_source_file ();
-	      ui_out_field_string (out, "file", filename);
-	      annotate_frame_source_file_end ();
-	      xfree (filename);
+	      Py_DECREF (result);
 	    }
-	  Py_DECREF (result);
-	}
-      else
+	  else
 	goto error;
-    }
+	}
 
-  if (PyObject_HasAttrString (filter, "line"))
-    {
-      PyObject *result = PyObject_CallMethod (filter, "line", NULL);
-      int line;
-
-      if (result)
+      if (PyObject_HasAttrString (filter, "line"))
 	{
-	  if (result != Py_None)
-	    {
-	      line  = PyLong_AsLong (result);
-	      ui_out_text (out, ":");
-	      annotate_frame_source_line ();
-	      ui_out_field_int (out, "line", line);
-	    }
-	  Py_DECREF (result);
-	}
-      else
-	goto error;
-    }
+	  PyObject *result = PyObject_CallMethod (filter, "line", NULL);
+	  int line;
 
+	  if (result)
+	    {
+	      if (result != Py_None)
+		{
+		  line  = PyLong_AsLong (result);
+		  ui_out_text (out, ":");
+		  annotate_frame_source_line ();
+		  ui_out_field_int (out, "line", line);
+		}
+	      Py_DECREF (result);
+	    }
+	  else
+	    goto error;
+	}
+    }
   /* For MI we need to deal with the "children" list population of
      elided frames, so if MI output detected do not send newline.  */
   if (! ui_out_is_mi_like_p (out))
@@ -569,6 +632,7 @@ py_print_frame (PyObject *filter,
 
       if (! result)
 	goto error;
+
       if (result != Py_None)
 	{
 	  if (! PyIter_Check (result))
@@ -582,32 +646,28 @@ py_print_frame (PyObject *filter,
 	    {
 	      PyObject *iterator = PyObject_GetIter (result);
 	      PyObject *item;
-	      struct cleanup *cleanup_stack;
 
 	      Py_DECREF (result);
 
-	      if (iterator == NULL)
+	      if (! iterator)
 		goto error;
 
-	      if (ui_out_is_mi_like_p (out))
-		{
-		  cleanup_stack = make_cleanup_ui_out_list_begin_end (out, "children");
-		}
-	      else
-		{
-		  cleanup_stack = make_cleanup (null_cleanup, NULL);
-		  indent = indent + 4;
-		}
+	      make_cleanup_py_decref (iterator);
+	      make_cleanup_ui_out_list_begin_end (out, "children");
+
+	      if (! ui_out_is_mi_like_p (out))
+		indent = indent + 4;
 
 	      while ((item = PyIter_Next (iterator)))
 		{
 		  int success =  py_print_frame (item, print_level, print_what,
-						 print_args, print_args_type,
+						 print_frame_info,
+						 print_args, mi_print_args_type,
+						 print_args_type,
 						 print_locals, out,
 						 opts, indent, levels_printed);
 		  if (success == 0 && PyErr_Occurred ())
 		    {
-		      Py_DECREF (iterator);
 		      Py_DECREF (item);
 		      do_cleanups (cleanup_stack);
 		      goto error;
@@ -615,31 +675,65 @@ py_print_frame (PyObject *filter,
 
 		  Py_DECREF (item);
 		}
-
-	      Py_DECREF (iterator);
-	      do_cleanups (cleanup_stack);
 	    }
 	}
     }
 
   /* In MI now we can signal the end.  */
   if (ui_out_is_mi_like_p (out))
-    {
-      annotate_frame_end ();
       ui_out_text (out, "\n");
-    }
 
+  do_cleanups (cleanup_stack);
   return PY_BT_COMPLETED;
 
  error:
+  do_cleanups (cleanup_stack);
   return PY_BT_ERROR;
+}
+
+static PyObject *
+bootstrap_python_frame_filters (struct frame_info *frame)
+{
+
+  PyObject *module, *sort_func, *iterable, *frame_obj;
+
+  frame_obj = frame_info_to_frame_object (frame);
+  if (! frame_obj)
+    return NULL;
+
+  module = PyImport_ImportModule ("gdb.command.frame_filters");
+  if (! module)
+    {
+      Py_DECREF (frame_obj);
+      return NULL;
+    }
+
+  sort_func = PyObject_GetAttrString (module, "invoke");
+  if (! sort_func)
+    {
+      Py_DECREF (frame_obj);
+      Py_DECREF (module);
+      return NULL;
+    }
+
+  iterable = PyObject_CallFunctionObjArgs (sort_func, frame_obj, NULL);
+
+  Py_DECREF (module);
+  Py_DECREF (sort_func);
+  Py_DECREF (frame_obj);
+
+  if (! iterable)
+    return NULL;
+
+  return iterable;
 }
 
 int
 apply_frame_filter (struct frame_info *frame, int print_level,
-		    enum print_what print_what, int print_args,
-		    const char *print_args_type,  struct ui_out *out,
-		    int print_locals, int count)
+		    enum print_what print_what, int print_frame_info,
+		    int print_args, int mi_print_args_type,
+		    const char *cli_print_args_type,
+		    struct ui_out *out, int print_locals, int count)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct cleanup *cleanups;
@@ -647,33 +741,11 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   int print_result = 0;
   struct value_print_options opts;
   int success = 0;
-  PyObject *module;
-  PyObject *sort_func;
   PyObject *iterable;
-  PyObject *frame_obj;
 
   cleanups = ensure_python_env (gdbarch, current_language);
 
-  module = PyImport_ImportModule ("gdb.command.frame_filters");
-  if (! module)
-    goto done;
-
-  frame_obj = frame_info_to_frame_object (frame);
-  if (! frame_obj)
-    goto done;
-
-  sort_func = PyObject_GetAttrString (module, "invoke");
-  if (!sort_func)
-    {
-      Py_DECREF (module);
-      Py_DECREF (frame_obj);
-      goto done;
-    }
-
-  iterable = PyObject_CallFunctionObjArgs (sort_func, frame_obj, NULL);
-  Py_DECREF (module);
-  Py_DECREF (sort_func);
-  Py_DECREF (frame_obj);
+  iterable = bootstrap_python_frame_filters (frame);
 
   if (!iterable)
     goto done;
@@ -705,9 +777,12 @@ apply_frame_filter (struct frame_info *frame, int print_level,
       while ((item = PyIter_Next (iterator)) && count--)
 	{
 	  success =  py_print_frame (item, print_level, print_what,
-				     print_args, print_args_type,
-				     print_locals, out, opts, 0,
-				     levels_printed);
+				     print_frame_info, print_args,
+				     mi_print_args_type,
+				     cli_print_args_type,
+				     print_locals,
+				     out, opts, 0, levels_printed);
+
 	  if (success == PY_BT_ERROR && PyErr_Occurred ())
 	    gdbpy_print_stack ();
 
@@ -732,12 +807,12 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 #else /* HAVE_PYTHON */
 int
 apply_frame_filter (struct frame_info *frame, int print_level,
-		    enum print_what print_what, int print_args,
-		    const char *print_args_type,
-		    struct ui_out *out, int print_frame,
-		    int print_locals)
+		    enum print_what print_what, int print_frame_info,
+		    int print_args, int mi_print_args_type,
+		    const char *cli_print_args_type,
+		    struct ui_out *out, int print_locals, int count)
 {
-  return 2; /* PY_BT_NO_FILTERS */
+  return PY_BT_NO_FILTERS
 }
 
 #endif /* HAVE_PYTHON */

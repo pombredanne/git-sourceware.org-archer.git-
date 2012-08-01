@@ -52,16 +52,43 @@ mi_gdb_test "python execfile ('${remote_python_file}')" ""
 mi_continue_to_line [gdb_get_line_number {Backtrace end breakpoint} ${srcfile}] \
   "step to breakpoint"
 
+mi_gdb_test "-stack-list-frames" ""
 mi_gdb_test "-enable-frame-filters" ""
 mi_gdb_test "-stack-list-frames" \
-    "\\^done,stack=\\\[level=\"0\",addr=\"$hex\",func=\"cnuf_dne\".*,level=\"1\",addr=\"$hex\",func=\"acnuf\".*,level=\"2\",addr=\"$hex\",func=\"bcnuf\".*,level=\"3\",addr=\"$hex\",func=\"acnuf\".*,level=\"22\",addr=\"$hex\",func=\"1cnuf\".*,children=\\\[level=\"23\",addr=\"$hex\",func=\"func2\".*\\\],level=\"24\",addr=\"$hex\",func=\"3cnuf\".*,level=\"27\",addr=\"$hex\",func=\"niam\".*\\\]" \
+    "\\^done,stack=\\\[frame={level=\"0\",addr=\"$hex\",func=\"cnuf_dne\".*},frame={level=\"1\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"2\",addr=\"$hex\",func=\"bcnuf\".*},frame={level=\"3\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"22\",addr=\"$hex\",func=\"1cnuf\".*,children=\\\[frame={level=\"23\",addr=\"$hex\",func=\"func2\".*}\\\]},frame={level=\"24\",addr=\"$hex\",func=\"3cnuf\".*},frame={level=\"27\",addr=\"$hex\",func=\"niam\".*}\\\]" \
     "filtered stack listing"
 mi_gdb_test "-stack-list-frames 0 3" \
-    "\\^done,stack=\\\[level=\"0\",addr=\"$hex\",func=\"cnuf_dne\".*,level=\"1\",addr=\"$hex\",func=\"acnuf\".*,level=\"2\",addr=\"$hex\",func=\"bcnuf\".*,level=\"3\",addr=\"$hex\",func=\"acnuf\".*\\\]" \
+    "\\^done,stack=\\\[frame={level=\"0\",addr=\"$hex\",func=\"cnuf_dne\".*},frame={level=\"1\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"2\",addr=\"$hex\",func=\"bcnuf\".*},frame={level=\"3\",addr=\"$hex\",func=\"acnuf\".*}\\\]" \
     "filtered stack list 0 3"
 mi_gdb_test "-stack-list-frames 22 24" \
-    "\\^done,stack=\\\[level=\"22\",addr=\"$hex\",func=\"1cnuf\".*,children=\\\[level=\"23\",addr=\"$hex\",func=\"func2\".*\\\],level=\"24\",addr=\"$hex\",func=\"3cnuf\".*\\\]" \
-    "filtered stack list 0 3"
+    "\\^done,stack=\\\[frame={level=\"22\",addr=\"$hex\",func=\"1cnuf\".*,children=\\\[frame={level=\"23\",addr=\"$hex\",func=\"func2\".*}\\\]},frame={level=\"24\",addr=\"$hex\",func=\"3cnuf\".*}\\\]" \
+    "filtered stack list 22 24"
+
+#stack list arguments
+
+mi_gdb_test "-stack-list-arguments 0" \
+    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[name=\"j\"\\\]},.*frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[name=\"f\",name=\"d\"\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
+    "stack-list-arguments 0"
+
+mi_gdb_test "-stack-list-arguments 0 0 3" \
+    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[name=\"j\"\\\]},frame={level=\"3\",args=\\\[\\\]}\\\]" \
+    "stack-list-arguments 0 0 3"
+
+mi_gdb_test "-stack-list-arguments 0 22 27" \
+    "\\^done,stack-args=\\\[frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[name=\"f\",name=\"d\"\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
+    "stack-list-arguments 0 22 27"
+
+mi_gdb_test "-stack-list-arguments 1" \
+    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",value=\"3\"},{name=\"d\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
+    "stack-list-arguments 1"
+
+mi_gdb_test "-stack-list-arguments 1 0 3" \
+    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",value=\"10\"}\\\]},frame={level=\"3\",args=\\\[\\\]}\\\]" \
+    "stack-list-arguments 1 0 3"
+
+mi_gdb_test "-stack-list-arguments 1 22 27" \
+    "\\^done,stack-args=\\\[frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",value=\"3\"},{name=\"d\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
+    "stack-list-arguments 1 22 27"
 
 
 remote_file host delete ${remote_python_file}
