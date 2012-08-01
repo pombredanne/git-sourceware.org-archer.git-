@@ -1,3 +1,61 @@
+2012-08-01  Alan Modra  <amodra@gmail.com>
+
+	* h8300-dis.c: Fix printf arg warnings.
+	* i960-dis.c: Likewise.
+	* mips-dis.c: Likewise.
+	* pdp11-dis.c: Likewise.
+	* sh-dis.c: Likewise.
+	* v850-dis.c: Likewise.
+	* configure.in: Formatting.
+	* configure: Regenerate.
+	* rl78-decode.c: Regenerate.
+	* po/POTFILES.in: Regenerate.
+
+2012-07-31  Chao-Ying Fu  <fu@mips.com>
+            Catherine Moore  <clm@codesourcery.com>
+            Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* micromips-opc.c (WR_a, RD_a, MOD_a): New macros.
+	(DSP_VOLA): Likewise.
+	(D32, D33): Likewise.
+	(micromips_opcodes): Add DSP ASE instructions.
+	* mips-dis.c (print_insn_micromips) <'2', '3'>: New cases.
+	<'4', '5', '6', '7', '8', '0', '^', '@'>: Likewise.
+
+2012-07-31  Jan Beulich <jbeulich@suse.com>
+
+	* i386-opc.tbl (vmovntdqa): Move up into 256-bit integer AVX2
+	instruction group. Mark as requiring AVX2.
+	* i386-tbl.h: Re-generate.
+
+2012-07-30  Nick Clifton  <nickc@redhat.com>
+
+	* po/opcodes.pot: Updated template.
+	* po/es.po: Updated Spanish translation.
+	* po/fi.po: Updated Finnish translation.
+
+2012-07-27  Mike Frysinger  <vapier@gentoo.org>
+
+	* configure.in (BFD_VERSION): Run bfd/configure --version and
+	parse the output of that.
+	* configure: Regenerate.
+
+2012-07-25  James Lemke  <jwlemke@codesourcery.com>
+
+	* ppc-opc.c (powerpc_opcodes): Add/remove PPCVLE for some 32-bit insns.
+
+2012-07-24  Stephan McCamant  <smcc@cs.berkeley.edu>
+	    Dr David Alan Gilbert  <dave@treblig.org>
+
+	PR binutils/13135
+	* arm-dis.c: Add necessary casts for printing integer values.
+	Use %s when printing string values.
+	* hppa-dis.c: Likewise.
+	* m68k-dis.c: Likewise.
+	* microblaze-dis.c: Likewise.
+	* mips-dis.c: Likewise.
+	* sparc-dis.c: Likewise.
+
 2012-07-19  Michael Zolotukhin  <michael.v.zolotukhin@intel.com>
 
 	PR binutils/14355
@@ -34,6 +92,13 @@
 2012-07-05  Thomas Schwinge  <thomas@codesourcery.com>
 
 	* mips-dis.c: Remove gratuitous newline.
+
+2012-07-05  Sean Keys  <skeys@ipdatasys.com>
+
+	* xgate-dis.c: Removed an IF statement that will
+        always be false due to overlapping operand masks.
+        * xgate-opc.c: Corrected 'com' opcode entry and
+        fixed spacing.
 
 2012-07-02  Roland McGrath  <mcgrathr@google.com>
 

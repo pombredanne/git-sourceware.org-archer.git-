@@ -366,31 +366,42 @@ static const char *const linespec_quote_characters = "\"\'";
 /* Lexer functions.  */
 
 /* Lex a number from the input in PARSER.  This only supports
-   decimal numbers.  */
+   decimal numbers.
 
-static linespec_token
-linespec_lexer_lex_number (linespec_parser *parser)
+   Return true if input is decimal numbers.  Return false if not.  */
+
+static int
+linespec_lexer_lex_number (linespec_parser *parser, linespec_token *tokenp)
 {
-  linespec_token token;
-
-  token.type = LSTOKEN_NUMBER;
-  LS_TOKEN_STOKEN (token).length = 0;
-  LS_TOKEN_STOKEN (token).ptr = PARSER_STREAM (parser);
+  tokenp->type = LSTOKEN_NUMBER;
+  LS_TOKEN_STOKEN (*tokenp).length = 0;
+  LS_TOKEN_STOKEN (*tokenp).ptr = PARSER_STREAM (parser);
 
   /* Keep any sign at the start of the stream.  */
   if (*PARSER_STREAM (parser) == '+' || *PARSER_STREAM (parser) == '-')
     {
-      ++LS_TOKEN_STOKEN (token).length;
+      ++LS_TOKEN_STOKEN (*tokenp).length;
       ++(PARSER_STREAM (parser));
     }
 
   while (isdigit (*PARSER_STREAM (parser)))
     {
-      ++LS_TOKEN_STOKEN (token).length;
+      ++LS_TOKEN_STOKEN (*tokenp).length;
       ++(PARSER_STREAM (parser));
     }
 
-  return token;
+  /* If the next character in the input buffer is not a space, comma,
+     quote, or colon, this input does not represent a number.  */
+  if (*PARSER_STREAM (parser) != '\0'
+      && !isspace (*PARSER_STREAM (parser)) && *PARSER_STREAM (parser) != ','
+      && *PARSER_STREAM (parser) != ':'
+      && !strchr (linespec_quote_characters, *PARSER_STREAM (parser)))
+    {
+      PARSER_STREAM (parser) = LS_TOKEN_STOKEN (*tokenp).ptr;
+      return 0;
+    }
+
+  return 1;
 }
 
 /* Does P represent one of the keywords?  If so, return
@@ -724,7 +735,8 @@ linespec_lexer_lex_one (linespec_parser *parser)
 	case '+': case '-':
 	case '0': case '1': case '2': case '3': case '4':
         case '5': case '6': case '7': case '8': case '9':
-          parser->lexer.current = linespec_lexer_lex_number (parser);
+           if (!linespec_lexer_lex_number (parser, &(parser->lexer.current)))
+	     parser->lexer.current = linespec_lexer_lex_string (parser);
           break;
 
 	case ':':
@@ -1860,9 +1872,9 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 
       for (i = 0; VEC_iterate (symbolp, ls->labels.label_symbols, i, sym); ++i)
 	{
-	  symbol_to_sal (&sal, state->funfirstline, sym);
-	  add_sal_to_sals (state, &sals, &sal,
-			   SYMBOL_NATURAL_NAME (sym), 0);
+	  if (symbol_to_sal (&sal, state->funfirstline, sym))
+	    add_sal_to_sals (state, &sals, &sal,
+			     SYMBOL_NATURAL_NAME (sym), 0);
 	}
     }
   else if (ls->function_symbols != NULL || ls->minimal_symbols != NULL)
@@ -1886,8 +1898,8 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 	    {
 	      pspace = SYMTAB_PSPACE (SYMBOL_SYMTAB (sym));
 	      set_current_program_space (pspace);
-	      symbol_to_sal (&sal, state->funfirstline, sym);
-	      if (maybe_add_address (state->addr_set, pspace, sal.pc))
+	      if (symbol_to_sal (&sal, state->funfirstline, sym)
+		  && maybe_add_address (state->addr_set, pspace, sal.pc))
 		add_sal_to_sals (state, &sals, &sal,
 				 SYMBOL_NATURAL_NAME (sym), 0);
 	    }
@@ -2477,6 +2489,7 @@ decode_objc (struct linespec_state *self, linespec_p ls, char **argptr)
       memcpy (saved_arg, *argptr, new_argptr - *argptr);
       saved_arg[new_argptr - *argptr] = '\0';
 
+      ls->function_name = xstrdup (saved_arg);
       ls->function_symbols = info.result.symbols;
       ls->minimal_symbols = info.result.minimal_symbols;
       values = convert_linespec_to_sals (self, ls);

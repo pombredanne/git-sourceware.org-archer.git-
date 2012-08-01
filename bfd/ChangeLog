@@ -1,3 +1,102 @@
+2012-08-01  Alan Modra  <amodra@gmail.com>
+
+	* dwarf2.c (struct dwarf2_debug): Add close_on_cleanup.
+	(_bfd_dwarf2_slurp_debug_info): Set close_on_cleanup if we open
+	gnu_debuglink bfd.
+	(_bfd_dwarf2_cleanup_debug_info): Act on close_on_cleanup.
+
+2012-07-30  Nick Clifton  <nickc@redhat.com>
+
+	* po/bfd.pot: Updated template.
+	* po/es.po: Updated Spanish translation.
+	* po/fi.po: Updated Finnish translation.
+	* po/fr.po: Updated French translation.
+	* po/ru.po: Updated Russian translation.
+	* po/uk.po: Updated Ukranian translation.
+
+2012-07-27  Mike Frysinger  <vapier@gentoo.org>
+
+	* configure.in (AC_INIT): Call with the args bfd and 2.22.52.
+	(AM_INIT_AUTOMAKE): Remove args.
+	* configure: Regenerate.
+
+2012-07-27  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* cpu-s390.c (bfd_s390_64_arch, bfd_s390_arch): Pick the default
+	arch depending on the target size.
+
+2012-07-27  Tristan Gingold  <gingold@adacore.com>
+
+	* configure.in: Bump version to 2.23.51
+	* configure: Regenerate.
+
+2012-07-26  Teresa Johnson  <tejohnson@google.com>
+
+	* bfd/dwarf2.c (find_line): Initialize discriminator_ptr
+	if it is non-NULL.
+
+2012-07-26  Meador Inge  <meadori@codesourcery.com>
+	    Nick Clifton  <nickc@redhat.com>
+
+	PR ld/14397
+	* elf32-arm.c (elf32_arm_finish_dynamic_sections): Report an error
+	if a required section is missing from the linker script.
+
+2012-07-24  Jan Waclawek <konfera@efton.sk>
+	PR 13899
+	* elf32-avr.c (elf32_avr_relax_delete_bytes): Call
+	_bfd_elf_link_read_relocs with keep_memory as TRUE.
+
+2012-07-24  Teresa Johnson  <tejohnson@google.com>
+
+	* bfd.c (bfd_find_nearest_line_discriminator): New macro.
+	* coff-rs6000.c: Init _bfd_find_nearest_line_discriminator.
+	* coff64-rs6000.c: Likewise.
+	* dwarf2.c (struct line_info): Add discriminator field.
+	(add_line_info): Fill in new discriminator field.
+	(decode_line_info): Record discriminator information instead
+        of ignoring it.
+	(lookup_address_in_line_info_table): Return discriminator field if
+        requested.
+	(comp_unit_find_nearest_line): Add discriminator argument.
+	(find_line): Likewise.
+	(_bfd_dwarf2_find_nearest_line): Likewise.
+	(_bfd_dwarf2_find_line): Likewise.
+	* elf-bfd.h (_bfd_elf_find_nearest_line_discriminator): New.
+        (_bfd_elf_find_line_discriminator): Likewise.
+        (_bfd_generic_find_nearest_line_discriminator): Likewise. Defined.
+	* elf.c (_bfd_elf_find_nearest_line): Change to a wrapper
+        that invokes _bfd_elf_find_nearest_line_discriminator with correct
+        arguments.
+	(_bfd_elf_find_nearest_line_discriminator): New.
+	(_bfd_elf_find_line): Change to a wrapper
+        that invokes _bfd_elf_find_line_discriminator with correct
+        arguments.
+	(_bfd_elf_find_line_discriminator): New.
+	* coffgen.c (coff_find_nearest_line_with_names): Handle
+        new discriminator argument.
+	* elf32-arm.c (elf32_arm_find_nearest_line): Likewise.
+	* elf64-alpha.c (elf64_alpha_find_nearest_line): Likewise.
+	* elfxx-mips.c (_bfd_mips_elf_find_nearest_line): Likewise.
+	* mach-o.c (bfd_mach_o_find_nearest_line): Likewise.
+	* libbfd-in.h (_bfd_dwarf2_find_nearest_line): Add discriminator
+        argument.
+        (_bfd_dwarf2_find_line): Likewise.
+        (_bfd_generic_find_nearest_line_discriminator): New.
+	* libbfd.c (_bfd_generic_find_nearest_line_discriminator): New.
+	* bfd-in2.h: Regenerated.
+	* libbfd.h: Likewise.
+	* targets.c (BFD_JUMP_TABLE_SYMBOLS): Initialize
+        _bfd_find_nearest_line_discriminator with
+        _bfd_generic_find_nearest_line_discriminator.
+        (bfd_target): Add _bfd_find_nearest_line_discriminator.
+
+2012-07-24  Sean Keys  <skeys@ipdatasys.com>
+
+        * elf32-m68hc1x.c (elf32_m68hc11_relocate_section): Added code
+	that enables the linker to offset addresses, when linking against
+        symbols from the XGATE processor and vice versa.
+
 2012-07-23  Nick Clifton  <nickc@redhat.com>
 
 	* cisco-core.c (cisco_core_file_failing_command): Make static.

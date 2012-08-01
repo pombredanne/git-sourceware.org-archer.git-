@@ -33673,6 +33673,10 @@ for an error
 
 @end table
 
+@item close
+Closes the in-process agent.  This command is sent when @value{GDBN} or GDBserver
+is about to kill inferiors.
+
 @item qTfSTM
 @xref{qTfSTM}.
 @item qTsSTM
@@ -34535,6 +34539,11 @@ Temporary internal breakpoint used by the @value{GDBN} @code{finish} command.
 Shared library events.
 
 @end table
+
+@kindex maint info bfds
+@item maint info bfds
+This prints information about each @code{bfd} object that is known to
+@value{GDBN}.  @xref{Top, , BFD, bfd, The Binary File Descriptor Library}.
 
 @kindex set displaced-stepping
 @kindex show displaced-stepping

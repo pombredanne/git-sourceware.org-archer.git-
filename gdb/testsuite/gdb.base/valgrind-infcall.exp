@@ -1,4 +1,4 @@
-# Copyright 2009, 2011-2012 Free Software Foundation, Inc.
+# Copyright 2012 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,7 +18,7 @@ if [is_remote target] {
     return 0
 }
 
-set test valgrind-db-attach
+set test valgrind-infcall
 set srcfile $test.c
 set executable $test
 set binfile ${objdir}/${subdir}/${executable}
@@ -26,16 +26,8 @@ if {[build_executable $test.exp $executable $srcfile {debug}] == -1} {
     return -1
 }
 
-gdb_exit
-
-# remote_spawn breaks the command on each whitespace despite possible quoting.
-# Use backslash-escaped whitespace there instead:
-
-set db_command "--db-command=$GDB $INTERNAL_GDBFLAGS $GDBFLAGS [host_info gdb_opts] %f %p"
-regsub -all " " $db_command "\\ " db_command
-
 set test "spawn valgrind"
-set cmd "valgrind --db-attach=yes $db_command $binfile"
+set cmd "valgrind --vgdb-error=0 $binfile"
 set res [remote_spawn host $cmd];
 if { $res < 0 || $res == "" } {
     verbose -log "Spawning $cmd failed."
@@ -46,9 +38,8 @@ pass $test
 # Declare GDB now as running.
 set gdb_spawn_id -1
 
-# GDB spawned by `valgrind --db-attach=yes' stops already after the startup is
-# executed, like with non-extended gdbserver.  It is also not correct to
-# run/attach the inferior.
+# GDB started by vgdb stops already after the startup is executed, like with
+# non-extended gdbserver.  It is also not correct to run/attach the inferior.
 set use_gdb_stub 1
 
 set test "valgrind started"
@@ -71,28 +62,54 @@ gdb_test_multiple "" $test {
 	unsupported $test
 	return -1
     }
+    -re "valgrind: Bad option.*--vgdb-error=0" {
+	# valgrind is not >= 3.7.0.
+	unsupported $test
+	return -1
+    }
 }
 
-set double_free [gdb_get_line_number "double-free"]
-
-set test "attach to debugger"
+set test "vgdb prompt"
+# The trailing '.' differs for different memcheck versions.
 gdb_test_multiple "" $test {
-    -re "Invalid free\\(\\).*: main \\(${srcfile}:$double_free\\)\r\n.*---- Attach to debugger \\? --- \[^\r\n\]* ---- " {
-	send_gdb "y\r"
-    }
-    -re "---- Attach to debugger \\? --- \[^\r\n\]* ---- " {
-	send_gdb "n\r"
-	exp_continue
+    -re "  (target remote | \[^\r\n\]*/vgdb \[^\r\n\]*)\r\n" {
+	set vgdbcmd $expect_out(1,string)
+	pass $test
     }
 }
 
-gdb_test "" ".*" "eat first prompt"
+# Do not kill valgrind.
+unset gdb_spawn_id
+set board [host_info name]
+unset_board_info fileid
 
-# Initialization from default_gdb_start.
-gdb_test_no_output "set height 0"
-gdb_test_no_output "set width 0"
+clean_restart $executable
 
-gdb_test "bt" "in main \\(.*\\) at .*${srcfile}:$double_free"
+gdb_test "$vgdbcmd" " in _start .*" "target remote for vgdb"
 
-# Explicitly kill the program so it doesn't dump core when we quit->detach.
-gdb_test "kill" "" "kill program" "Kill the program being debugged.*y or n. $" "y"
+gdb_test "monitor v.set gdb_output" "valgrind output will go to gdb.*"
+
+set continue_count 1
+while 1 {
+    set test "continue #$continue_count"
+    gdb_test_multiple "continue" "" {
+	-re "Invalid free\\(\\).*: main .*\r\n$gdb_prompt $" {
+	    pass $test
+	    break
+	}
+	-re "\r\n$gdb_prompt $" {
+	    pass "$test (false warning)"
+	}
+    }
+    set continue_count [expr $continue_count + 1]
+}
+
+set test "p gdb_test_infcall ()"
+gdb_test_multiple $test $test {
+    -re "unhandled instruction bytes.*\r\n$gdb_prompt $" {
+	fail $test
+    }
+    -re "Continuing \\.\\.\\..*\r\n\\\$1 = 2\r\n$gdb_prompt $" {
+	pass $test
+    }
+}

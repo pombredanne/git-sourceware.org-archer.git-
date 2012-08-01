@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2007-2012 Free Software Foundation, Inc.
+   Copyright 2012 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,21 +15,26 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include <stdio.h>
+#include <stdlib.h>
 
-void pendfunc1 (int x)
+static volatile int infcall_var;
+
+static int
+gdb_test_infcall (void)
 {
-  int y = x + 4;
-  printf ("in pendfunc1, x is %d\n", x);
+  return ++infcall_var;
 }
 
-void pendfunc2 (int x)
+int
+main (void)
 {
-  printf ("in pendfunc2, x is %d\n", x);
-}
+  void *p;
 
-void pendfunc (int x)
-{
-  pendfunc1 (x);
-  pendfunc2 (x);
+  gdb_test_infcall ();
+  p = malloc (1);
+  if (p == NULL)
+    return 1;
+  free (p);
+  free (p);	/* double-free */
+  return 0;
 }
