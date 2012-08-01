@@ -147,7 +147,8 @@ extern int errno;
    it's generally short enough to search linearly.
    Note that the pointers here point to the front of the ar_hdr, not
    to the front of the contents!  */
-struct ar_cache {
+struct ar_cache
+{
   file_ptr ptr;
   bfd *arbfd;
 };
@@ -168,6 +169,7 @@ _bfd_ar_spacepad (char *p, size_t n, const char *fmt, long val)
 {
   static char buf[20];
   size_t len;
+
   snprintf (buf, sizeof (buf), fmt, val);
   len = strlen (buf);
   if (len < n)
@@ -296,6 +298,7 @@ _bfd_look_for_bfd_in_cache (bfd *arch_bfd, file_ptr filepos)
 {
   htab_t hash_table = bfd_ardata (arch_bfd)->cache;
   struct ar_cache m;
+
   m.ptr = filepos;
 
   if (hash_table)
@@ -311,7 +314,7 @@ _bfd_look_for_bfd_in_cache (bfd *arch_bfd, file_ptr filepos)
 }
 
 static hashval_t
-hash_file_ptr (const PTR p)
+hash_file_ptr (const void * p)
 {
   return (hashval_t) (((struct ar_cache *) p)->ptr);
 }
@@ -319,7 +322,7 @@ hash_file_ptr (const PTR p)
 /* Returns non-zero if P1 and P2 are equal.  */
 
 static int
-eq_file_ptr (const PTR p1, const PTR p2)
+eq_file_ptr (const void * p1, const void * p2)
 {
   struct ar_cache *arc1 = (struct ar_cache *) p1;
   struct ar_cache *arc2 = (struct ar_cache *) p2;
@@ -2405,6 +2408,9 @@ bsd_write_armap (bfd *arch,
   unsigned int count;
   struct ar_hdr hdr;
   long uid, gid;
+  file_ptr max_first_real = 1;
+
+  max_first_real <<= 31;
 
   firstreal = mapsize + elength + sizeof (struct ar_hdr) + SARMAG;
 
@@ -2463,6 +2469,15 @@ bsd_write_armap (bfd *arch,
 	  while (current != map[count].u.abfd);
 	}
 
+      /* The archive file format only has 4 bytes to store the offset
+	 of the member.  Check to make sure that firstreal has not grown
+	 too big.  */
+      if (firstreal >= max_first_real)
+	{
+	  bfd_set_error (bfd_error_file_truncated);
+	  return FALSE;
+	}
+      
       last_elt = current;
       H_PUT_32 (arch, map[count].namidx, buf);
       H_PUT_32 (arch, firstreal, buf + BSD_SYMDEF_OFFSET_SIZE);
@@ -2574,7 +2589,7 @@ coff_write_armap (bfd *arch,
   unsigned int ranlibsize = (symbol_count * 4) + 4;
   unsigned int stringsize = stridx;
   unsigned int mapsize = stringsize + ranlibsize;
-  unsigned int archive_member_file_ptr;
+  file_ptr archive_member_file_ptr;
   bfd *current = arch->archive_head;
   unsigned int count;
   struct ar_hdr hdr;
@@ -2625,7 +2640,15 @@ coff_write_armap (bfd *arch,
 
       while (count < symbol_count && map[count].u.abfd == current)
 	{
-	  if (!bfd_write_bigendian_4byte_int (arch, archive_member_file_ptr))
+	  unsigned int offset = (unsigned int) archive_member_file_ptr;
+
+	  /* Catch an attempt to grow an archive past its 4Gb limit.  */
+	  if (archive_member_file_ptr != (file_ptr) offset)
+	    {
+	      bfd_set_error (bfd_error_file_truncated);
+	      return FALSE;
+	    }
+	  if (!bfd_write_bigendian_4byte_int (arch, offset))
 	    return FALSE;
 	  count++;
 	}

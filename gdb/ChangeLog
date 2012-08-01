@@ -1,3 +1,380 @@
+2012-07-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 11914
+	* f-valprint.c (info_common_command): New variable frame_id.
+	Reinitialize FI form FRAME_ID after each print_variable_and_value.
+	* printcmd.c (print_variable_and_value): Extend function comment.
+	Add comment for invalidated FRAME.
+	* stack.c (backtrace_command_1): New variable frame_id.  Reinitialize
+	FI form FRAME_ID after each print_frame_local_vars.
+	(struct print_variable_and_value_data): Change frame to frame_id.
+	(do_print_variable_and_value): New variable frame, initialize it from
+	p->frame_id.  Add comment for invalidated FRAME.
+	(print_frame_local_vars, print_frame_arg_vars): New function comment.
+	Update CB_DATA.FRAME to CB_DATA.FRAME_ID initialization.  Add comment
+	for invalidated FRAME.
+
+2012-07-16  Marc Khouzam  <marc.khouzam@ericsson.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* linux-nat.c (linux_nat_detach): Don't unregister from the event
+	loop.
+
+2012-07-16  Tom Tromey  <tromey@redhat.com>
+
+	* jv-typeprint.c (c_type_print_varspec_suffix): Don't declare.
+
+2012-07-15  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (stmt_list_hash): New struct.
+	(type_unit_group): Embed "per_cu" member, remove pointer.
+	New union member "t", move member "tus" into it, all uses updated.
+	New member "hash", replaces member "line_offset, all uses updated.
+	(quick_file_names): Replace member "offset" with "hash", all uses
+	updated.
+	(hash_stmt_list_entry, eq_stmt_list_entry): New functions.
+	(hash_file_name_entry, eq_file_name_entry): Call them.
+	(hash_type_unit_group, eq_type_unit_group): Ditto.
+	(dw2_get_cu, dw2_get_primary_cu): Replace assert with a better one.
+	(dw2_get_file_names_reader): Fix file name table calculation for TUs.
+	(dw2_get_file_names): Update.
+	(create_type_unit_group): Replace "per_cu" arg with "cu".
+	All callers updated.  Fix "quick" (.gdb_index) handling.
+	(get_type_unit_group): Replace "per_cu" arg with "cu".
+	All callers updated.
+	(build_type_unit_groups): Don't reset tu_stats.
+
+	* symtab.c (filename_seen_cache): Delete members "tab_alloc_size",
+	"tab_cur_size".  Change member "tab" to be a htab_t.
+	(create_filename_seen_cache): Update.
+	(clear_filename_seen_cache, delete_filename_seen_cache): Update.
+	(filename_seen): Update.
+
+2012-07-13  Doug Evans  <dje@google.com>
+
+	* symtab.c (filename_seen): Update comment.
+
+2012-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Doug Evans  <dje@google.com>
+
+	* buildsym.c (end_symtab_1): Split it to ...
+	(end_symtab_get_static_block): ... this ...
+	(end_symtab_from_static_block): ... and this function.
+	(end_symtab, end_expandable_symtab): Call them.
+	* buildsym.h (end_symtab_get_static_block)
+	(end_symtab_from_static_block): New declarations.
+	* dwarf2read.c (process_full_comp_unit): New variable static_block.
+	Set its valid CU ranges.
+
+2012-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2loc.c (disassemble_dwarf_expression): Handle
+	DW_OP_GNU_parameter_ref.
+
+2012-07-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (read_call_site_scope): Do not gdb_assert for invalid
+	read-in CALL_SITE_PARAMETER_PARAM_OFFSET.
+
+2012-07-13  Doug Evans  <dje@google.com>
+
+	* symtab.c (output_source_filename): Delete unnecessary forward decl.
+	(filename_seen_cache): New struct.
+	(INITIAL_FILENAME_SEEN_CACHE_SIZE): New macro.
+	(create_filename_seen_cache): New function.
+	(clear_filename_seen_cache, delete_filename_seen_cache): New functions.
+	(filename_seen): Delete arg "first".  New arg "cache".  All callers
+	updated.
+	(output_source_filename_data): New struct.
+	(output_source_filename): Delete arg "first".  New arg "data".
+	All callers updated.
+	(sources_info): Delete local "first".  New locals "data", "cleanups".
+	Rewrite to use filename_seen_cache.
+	(add_partial_filename_data): Delete member "first".  New member
+	"filename_seen_cache".  All uses updated.
+	(make_source_files_completion_list): Rewrite to use
+	filename_seen_cache.
+
+2012-07-12  Doug Evans  <dje@google.com>
+
+	* psymtab.c (map_symbol_filenames_psymtab): Skip shared psymtabs.
+
+2012-07-10  Doug Evans  <dje@google.com>
+
+	PR gdb/13498
+	* dwarf2read.c (dwarf2_per_objfile): New members n_type_unit_groups,
+	all_type_unit_groups, type_unit_groups, tu_stats.
+	(dwarf2_per_cu_data): Move "imported_symtabs" into new union "s".
+	All uses updated.  Add type_unit_group to union "s".
+	(type_unit_group): New struct.
+	(IS_TYPE_UNIT_GROUP): New macro.
+	(abbrev_table): Delete unused member "section".
+	(dw2_do_instantiate_symtab): Early exit if type_unit_group.
+	(dw2_get_cu): Assert not used with type_unit_group.
+	(dw2_get_primary_cu): New function.
+	(dw2_build_type_unit_groups_reader): New function.
+	(dw2_build_type_unit_groups): New function.
+	(dw2_get_file_names): Assert not called on type units.
+	(dw2_map_symtabs_matching_filename): Call dw2_build_type_unit_groups.
+	Redo loop to iterate over type unit groups instead of type units.
+	(dw2_expand_symtabs_matching, dw2_map_symbol_filenames): Ditto.
+	(read_abbrev_offset): New function.
+	(init_cutu_and_read_dies): New arg "abbrev_table".  All callers
+	updated.
+	(create_partial_symtab): New function.
+	(process_psymtab_comp_unit_reader): Assert not used with type units.
+	Call create_partial_symtab.
+	(process_psymtab_type_unit): Delete.
+	(hash_type_unit_group, eq_type_unit_group): New functions.
+	(allocate_type_unit_groups_table): New function.
+	(NO_STMT_LIST_TYPE_UNIT_PSYMTAB): New macro.
+	(NO_STMT_LIST_TYPE_UNIT_PSYMTAB_SIZE): New macro.
+	(create_type_unit_group, get_type_unit_group): New functions.
+	(tu_abbrev_offset): New struct.
+	(sort_tu_by_abbrev_offset): New function.
+	(add_type_unit_group_to_table): New function.
+	(build_type_unit_groups): New function.
+	(build_type_psymtabs_reader): New function.
+	(build_type_psymtab_dependencies): New function.
+	(build_type_psymtabs): Rewrite.
+	(scan_partial_symbols): Flag an error if a DW_TAG_imported_unit
+	is seen in a type unit.
+	(process_queue): Move symtab expansion debugging printfs here.
+	Call process_full_type_unit for type units.
+	(compute_symtab_includes): Assert not called for type units.
+	(process_cu_includes): Don't call compute_symtab_includes for
+	type units.
+	(process_full_type_unit): New function.
+	(process_imported_unit_die): Flag an error if called for type units.
+	(handle_DW_AT_stmt_list): Delete arg "want_line_info".  All callers
+	updated.  Assert not called for type units.
+	(read_file_scope): Call dwarf2_start_symtab.
+	(setup_type_unit_groups): New function.
+	(read_type_unit_scope): Rewrite.
+	(abbrev_table_read_table): Initialize abbrev_table->offset.
+	(abbrev_table_free_cleanup): New function.
+	(dwarf2_start_symtab): New function.
+	(load_full_type_unit): Assert not called for type unit groups.
+	* buildsym.c (finish_block_internal): New arg "expandable".
+	All callers updated.
+	(start_symtab): Move most contents to ...
+	(restart_symtab): ... here.  New function.
+	(reset_symtab_globals): New function.
+	(end_symtab_1): Renamed from end_symtab.  New arg "expandable".
+	Call reset_symtab_globals.
+	(end_symtab, end_expandable_symtab): New functions.
+	(set_missing_symtab, augment_type_symtab): New functions.
+	* buildsym.h (end_expandable_symtab): Declare.
+	(augment_type_symtab, restart_symtab): Declare.
+	* psympriv.h (struct partial_symtab): New member "anonymous".
+	* psymtab.c (partial_map_symtabs_matching_filename): Ignore
+	anonymous psymtabs.
+	(read_psymtabs_with_filename): Ditto.
+	(map_symbol_filenames_psymtab, psymtab_to_fullname): Ditto.
+	(expand_symtabs_matching_via_partial): Ditto.
+	(dump_psymtab): Update.
+	* dictionary.c (dict_add_pending): New function.
+	* dictionary.h (dict_add_pending): Declare.
+
+2012-07-09  Doug Evans  <dje@google.com>
+
+	* buildsym.c (start_subfile): Remove unnecessary check for
+	name == NULL.
+
+	* psymtab.c (allocate_psymtab): Use host_address_to_string.
+
+	* dwarf2read.c (load_full_type_unit): Simplify.
+
+	* dwarf2read.c (dwarf2_per_objfile): Change type of all_type_units
+	to struct signatured_type **.  All uses updated.
+
+	* dwarf2read.c (dwarf2_attr_no_follow): Delete unused arg "cu".
+	All callers updated.
+
+2012-07-09  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (check_parameter_typelist): New function.
+	(parameter_typelist): Call it.
+	* eval.c (make_params): Handle '(void)' case.
+	* gdbtypes.c (lookup_function_type_with_arguments): Handle
+	'(void)' case.
+
+2012-07-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common/linux-ptrace.c: Include gdb_assert.h.
+	<__i386__> (linux_ptrace_test_ret_to_nx_instr): New declaration.
+	<__i386__>: Include sys/reg.h, sys/mman.h, signal.h, sys/wait.h and
+	stdint.h.
+	(linux_ptrace_test_ret_to_nx, linux_ptrace_init_warnings): New
+	functions.
+	* common/linux-ptrace.h (linux_ptrace_init_warnings): New declarations.
+	* linux-nat.c (linux_child_post_attach)
+	(linux_child_post_startup_inferior): Call linux_ptrace_init_warnings.
+
+2012-07-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-thread-db.c (thread_db_find_new_threads_silently): Do not apply
+	nptl <2.7 bug workaround for core files.
+
+2012-07-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linux-nat.c (resume_lwp, linux_nat_resume): Remove LP->SIGINFO
+	clearing.
+	(save_siginfo): Remove.
+	(stop_wait_callback, linux_nat_filter_event): Remove the save_siginfo
+	call.
+	(resume_stopped_resumed_lwps): Remove LP->SIGINFO clearing.
+	(linux_nat_get_siginfo): Use PTRACE_GETSIGINFO.
+	* linux-nat.h (struct lwp_info): Remove field siginfo.
+
+2012-07-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup for the next patch.
+	* arm-linux-nat.c (arm_linux_stopped_data_address): Change variable
+	siginfo_p to siginfo, update its users incl. the linux_nat_get_siginfo
+	call for it.
+	* ia64-linux-nat.c (ia64_linux_stopped_data_address): Likewise.
+	(ia64_linux_stopped_data_address):
+	* linux-nat.c (linux_nat_get_siginfo): Add parameter siginfo, change
+	the return value.
+	* linux-nat.h (linux_nat_get_siginfo): Likewise.
+	* ppc-linux-nat.c (ppc_linux_stopped_data_address): Change variable
+	siginfo_p to siginfo, update its users incl. the linux_nat_get_siginfo
+	call for it.
+
+2012-07-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 14321
+	* findcmd.c (parse_find_args): New variable pattern_buf_size_need.
+	Increase buffer sizes to 2x we need, not just 2x of the previous size.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (DOTDOTDOT): New token.
+	(func_mod, exp): Use parameter_typelist.
+	(parameter_typelist): New production.
+	(tokentab3): Add "..." token.
+	* eval.c (make_params): Handle varargs.
+	* gdbtypes.c (lookup_function_type_with_arguments): Handle
+	varargs.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/9608:
+	* c-exp.y (%union) <tvec>: Change type.
+	(func_mod): Now uses <tvec> type.
+	(exp): Update for tvec change.
+	(direct_abs_decl): Push the typelist.
+	(func_mod): Return a typelist.
+	(nonempty_typelist): Update for tvec change.
+	* gdbtypes.c (lookup_function_type_with_arguments): New function.
+	* gdbtypes.h (lookup_function_type_with_arguments): Declare.
+	* parse.c (pop_type_list): New function.
+	(push_typelist): New function.
+	(follow_types): Handle tp_function_with_arguments.
+	* parser-defs.h (type_ptr): New typedef.  Define a VEC.
+	(enum type_pieces) <tp_function_with_arguments>: New constant.
+	(union type_stack_elt) <typelist_val>: New field.
+	(push_typelist): Declare.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (%union) <type_stack>: New field.
+	(abs_decl, direct_abs_decl): Use <type_stack> type.  Update.
+	(ptr_operator_ts): New production.
+	(ptype): Update.
+	* parse.c (type_stack_reserve): New function.
+	(check_type_stack_depth): Use it.
+	(pop_type_stack, append_type_stack, push_type_stack)
+	(get_type_stack, type_stack_cleanup): New functions.
+	(follow_types): Handle tp_type_stack.
+	(_initialize_parse): Simplify initialization.
+	* parser-defs.h (enum type_pieces) <tp_type_stack>: New
+	constant.
+	(union type_stack_elt) <stack_val>: New field.
+	(get_type_stack, append_type_stack, push_type_stack)
+	(type_stack_cleanup): Declare.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	* parser-defs.h (type_stack, type_stack_size, type_stack_depth):
+	Remove.
+	(struct type_stack): New.
+	* parse.c (type_stack, type_stack_size, type_stack_depth):
+	Remove.
+	(type_stack): New global.
+	(parse_exp_in_context, check_type_stack_depth)
+	(insert_into_type_stack, insert_type, push_type, push_type_int)
+	(insert_type_address_space, pop_type, pop_type_int)
+	(_initialize_parse): Update.
+
+2012-07-06  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (func_mod, direct_abs_decl, abs_decl, ptr_operator):
+	Remove %type.
+
+2012-07-06  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* c-lang.c (c_printstr): Remove ununsed variable WIDTH.
+
+2012-07-06  Siddhesh Poyarekar  <siddhesh@redhat.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cp-valprint.c (cp_print_value): Replace potentially unsafe
+	alloca with xmalloc/xfree.
+
+2012-07-06  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list.
+
+2012-07-05  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dw2_expand_symtabs_matching): Fix typo.
+
+2012-07-05  Hui Zhu  <hui_zhu@mentor.com>
+
+	* ax-gdb.c (cli/cli-utils.h): New include.
+	(linespec.h): Ditto.
+	(agent_eval_command_one): New function.
+	(agent_command_1): Ditto.
+	(agent_command): Call function agent_command_1.
+	(agent_eval_command): Ditto.
+	(_initialize_ax_gdb): Change help for "maint agent"
+	and "maint agent-eval".
+
+2012-07-05  Hui Zhu  <hui_zhu@mentor.com>
+
+	* breakpoint.c (check_for_argument): Move to file cli/cli-utils.c.
+	* cli/cli-utils.c (check_for_argument): New function.
+	* cli/cli-utils.h (check_for_argument): Ditto.
+
+2012-07-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* NEWS: Mention x32 ABI support.
+
+2012-07-04  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* amd64-tdep.c (amd64_x32_init_abi): Set sp_regnum_from_eax to
+	AMD64_RSP_REGNUM and pc_regnum_from_eax to AMD64_RIP_REGNUM.
+
+	* i386-tdep.c (i386_gdbarch_init): Initialize sp_regnum_from_eax
+	and pc_regnum_from_eax to -1.  Update SP regnum from
+	sp_regnum_from_eax and PC regnum from pc_regnum_from_eax if
+	needed.
+
+	* i386-tdep.h (gdbarch_tdep): Add sp_regnum_from_eax and
+	pc_regnum_from_eax.
+
+2012-07-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix 'warning: parameter has incomplete type' with gcc-3.4.6.
+	* dwarf2expr.h: Include gdbtypes.h.
+	(enum call_site_parameter_kind, union call_site_parameter_u): Remove
+	these forward declarations.
+	(cu_offset, sect_offset): Move these ...
+	* gdbtypes.h: Remove include dwarf2expr.h.
+	(cu_offset, sect_offset): ... here.
+
 2012-07-03  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* amd64-linux-tdep.c (linux_sigtramp_code): Renamed to ...
