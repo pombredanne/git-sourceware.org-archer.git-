@@ -238,12 +238,12 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
 
   if (argc < 1 || (argc > 3 && ! raw_arg) || (argc == 2 && ! raw_arg))
     error (_("-stack-list-arguments: Usage: "
-	     "PRINT_VALUES [RAW FRAME_LOW FRAME_HIGH]"));
+	     "PRINT_VALUES [RAW-FRAMES FRAME_LOW FRAME_HIGH]"));
 
   if (argc >= 3)
     {
-      frame_low = atoi (argv[1] + raw_arg);
-      frame_high = atoi (argv[2] + raw_arg);
+      frame_low = atoi (argv[1 + raw_arg]);
+      frame_high = atoi (argv[2 + raw_arg]);
     }
   else
     {
