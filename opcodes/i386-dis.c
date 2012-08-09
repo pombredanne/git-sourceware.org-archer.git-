@@ -1,6 +1,6 @@
 /* Print i386 instructions for GDB, the GNU debugger.
    Copyright 1988, 1989, 1991, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
+   2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
    Free Software Foundation, Inc.
 
    This file is part of the GNU opcodes library.
@@ -257,7 +257,7 @@ fetch_data (struct disassemble_info *info, bfd_byte *addr)
 #define sIb { OP_sI, b_mode }	/* sign extened byte */
 #define sIbT { OP_sI, b_T_mode } /* sign extened byte like 'T' */
 #define Iv { OP_I, v_mode }
-#define sIv { OP_sI, v_mode } 
+#define sIv { OP_sI, v_mode }
 #define Iq { OP_I, q_mode }
 #define Iv64 { OP_I64, v_mode }
 #define Iw { OP_I, w_mode }
@@ -668,6 +668,10 @@ enum
   MOD_0F18_REG_1,
   MOD_0F18_REG_2,
   MOD_0F18_REG_3,
+  MOD_0F18_REG_4,
+  MOD_0F18_REG_5,
+  MOD_0F18_REG_6,
+  MOD_0F18_REG_7,
   MOD_0F20,
   MOD_0F21,
   MOD_0F22,
@@ -2652,6 +2656,12 @@ static const struct dis386 reg_table[][8] = {
   {
     { "prefetch",	{ Mb } },
     { "prefetchw",	{ Mb } },
+    { "prefetch",	{ Mb } },
+    { "prefetch",	{ Mb } },
+    { "prefetch",	{ Mb } },
+    { "prefetch",	{ Mb } },
+    { "prefetch",	{ Mb } },
+    { "prefetch",	{ Mb } },
   },
   /* REG_0F18 */
   {
@@ -2659,6 +2669,10 @@ static const struct dis386 reg_table[][8] = {
     { MOD_TABLE (MOD_0F18_REG_1) },
     { MOD_TABLE (MOD_0F18_REG_2) },
     { MOD_TABLE (MOD_0F18_REG_3) },
+    { MOD_TABLE (MOD_0F18_REG_4) },
+    { MOD_TABLE (MOD_0F18_REG_5) },
+    { MOD_TABLE (MOD_0F18_REG_6) },
+    { MOD_TABLE (MOD_0F18_REG_7) },
   },
   /* REG_0F71 */
   {
@@ -2890,9 +2904,9 @@ static const struct dis386 prefix_table[][4] = {
 
   /* PREFIX_0F2E */
   {
-    { "ucomiss",{ XM, EXd } }, 
+    { "ucomiss",{ XM, EXd } },
     { Bad_Opcode },
-    { "ucomisd",{ XM, EXq } }, 
+    { "ucomisd",{ XM, EXq } },
   },
 
   /* PREFIX_0F2F */
@@ -3483,7 +3497,7 @@ static const struct dis386 prefix_table[][4] = {
     { "movbeS",	{ Gv, { MOVBE_Fixup, v_mode } } },
     { Bad_Opcode },
     { "movbeS",	{ Gv, { MOVBE_Fixup, v_mode } } },
-    { "crc32",	{ Gdq, { CRC32_Fixup, b_mode } } },	
+    { "crc32",	{ Gdq, { CRC32_Fixup, b_mode } } },
   },
 
   /* PREFIX_0F38F1 */
@@ -3491,7 +3505,7 @@ static const struct dis386 prefix_table[][4] = {
     { "movbeS",	{ { MOVBE_Fixup, v_mode }, Gv } },
     { Bad_Opcode },
     { "movbeS",	{ { MOVBE_Fixup, v_mode }, Gv } },
-    { "crc32",	{ Gdq, { CRC32_Fixup, v_mode } } },	
+    { "crc32",	{ Gdq, { CRC32_Fixup, v_mode } } },
   },
 
   /* PREFIX_0F38F6 */
@@ -9162,11 +9176,11 @@ static const struct dis386 vex_w_table[][2] = {
   },
   {
     /* VEX_W_0F2E_P_0 */
-    { "vucomiss",	{ XMScalar, EXdScalar } }, 
+    { "vucomiss",	{ XMScalar, EXdScalar } },
   },
   {
     /* VEX_W_0F2E_P_2 */
-    { "vucomisd",	{ XMScalar, EXqScalar } }, 
+    { "vucomisd",	{ XMScalar, EXqScalar } },
   },
   {
     /* VEX_W_0F2F_P_0 */
@@ -10221,6 +10235,22 @@ static const struct dis386 mod_table[][2] = {
     { "prefetcht2",	{ Mb } },
   },
   {
+    /* MOD_0F18_REG_4 */
+    { "nop/reserved",	{ Mb } },
+  },
+  {
+    /* MOD_0F18_REG_5 */
+    { "nop/reserved",	{ Mb } },
+  },
+  {
+    /* MOD_0F18_REG_6 */
+    { "nop/reserved",	{ Mb } },
+  },
+  {
+    /* MOD_0F18_REG_7 */
+    { "nop/reserved",	{ Mb } },
+  },
+  {
     /* MOD_0F20 */
     { Bad_Opcode },
     { "movZ",		{ Rm, Cm } },
@@ -10242,7 +10272,7 @@ static const struct dis386 mod_table[][2] = {
   },
   {
     /* MOD_0F24 */
-    { Bad_Opcode },    
+    { Bad_Opcode },
     { "movL",		{ Rd, Td } },
   },
   {
@@ -10987,7 +11017,7 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
 	      break;
 	    }
 	}
-      else 
+      else
 	{
 	  vindex = 0;
 	  used_prefixes |= (prefixes & PREFIX_REPZ);
@@ -11450,9 +11480,10 @@ print_insn (bfd_vma pc, disassemble_info *info)
       for (i = 0;
 	   i < (int) ARRAY_SIZE (all_prefixes) && all_prefixes[i];
 	   i++)
-	(*info->fprintf_func) (info->stream, "%s",
+	(*info->fprintf_func) (info->stream, "%s%s",
+                               i == 0 ? "" : " ",
 			       prefix_name (all_prefixes[i], sizeflag));
-      return 1;
+      return i;
     }
 
   insn_codep = codep;
@@ -12275,7 +12306,7 @@ case_L:
 	case 'T':
 	  if (!intel_syntax
 	      && address_mode == mode_64bit
-	      && (sizeflag & DFLAG))
+	      && ((sizeflag & DFLAG) || (rex & REX_W)))
 	    {
 	      *obufp++ = 'q';
 	      break;
@@ -12313,7 +12344,8 @@ case_L:
 	case 'U':
 	  if (intel_syntax)
 	    break;
-	  if (address_mode == mode_64bit && (sizeflag & DFLAG))
+	  if (address_mode == mode_64bit
+              && ((sizeflag & DFLAG) || (rex & REX_W)))
 	    {
 	      if (modrm.mod != 3 || (sizeflag & SUFFIX_ALWAYS))
 		*obufp++ = 'q';
@@ -12385,7 +12417,8 @@ case_Q:
 	    {
 	      if (intel_syntax)
 		break;
-	      if (address_mode == mode_64bit && (sizeflag & DFLAG))
+	      if (address_mode == mode_64bit
+                  && ((sizeflag & DFLAG) || (rex & REX_W)))
 		{
 		  if (sizeflag & SUFFIX_ALWAYS)
 		    *obufp++ = 'q';
@@ -12721,7 +12754,7 @@ intel_operand_size (int bytemode, int sizeflag)
       oappend ("WORD PTR ");
       break;
     case stack_v_mode:
-      if (address_mode == mode_64bit && (sizeflag & DFLAG))
+      if (address_mode == mode_64bit && ((sizeflag & DFLAG) || (rex & REX_W)))
 	{
 	  oappend ("QWORD PTR ");
 	  break;
@@ -12998,7 +13031,7 @@ OP_E_register (int bytemode, int sizeflag)
       names = address_mode == mode_64bit ? names64 : names32;
       break;
     case stack_v_mode:
-      if (address_mode == mode_64bit && (sizeflag & DFLAG))
+      if (address_mode == mode_64bit && ((sizeflag & DFLAG) || (rex & REX_W)))
 	{
 	  names = names64;
 	  break;
@@ -13016,7 +13049,7 @@ OP_E_register (int bytemode, int sizeflag)
 	names = names64;
       else
 	{
-	  if ((sizeflag & DFLAG) 
+	  if ((sizeflag & DFLAG)
 	      || (bytemode != v_mode
 		  && bytemode != v_swap_mode))
 	    names = names32;
@@ -13083,13 +13116,13 @@ OP_E_memory (int bytemode, int sizeflag)
 	      switch (vex.length)
 		{
 		case 128:
-		  indexes64 = indexes32 = names_xmm; 
+		  indexes64 = indexes32 = names_xmm;
 		  break;
 		case 256:
 		  if (!vex.w || bytemode == vex_vsib_q_w_dq_mode)
-		    indexes64 = indexes32 = names_ymm; 
+		    indexes64 = indexes32 = names_ymm;
 		  else
-		    indexes64 = indexes32 = names_xmm; 
+		    indexes64 = indexes32 = names_xmm;
 		  break;
 		default:
 		  abort ();
@@ -13182,11 +13215,11 @@ OP_E_memory (int bytemode, int sizeflag)
 		      *obufp = '\0';
 		    }
 		  if (haveindex)
-		    oappend (address_mode == mode_64bit 
+		    oappend (address_mode == mode_64bit
 			     && (sizeflag & AFLAG)
 			     ? indexes64[vindex] : indexes32[vindex]);
 		  else
-		    oappend (address_mode == mode_64bit 
+		    oappend (address_mode == mode_64bit
 			     && (sizeflag & AFLAG)
 			     ? index64 : index32);
 
@@ -13469,6 +13502,15 @@ OP_REG (int code, int sizeflag)
 {
   const char *s;
   int add;
+
+  switch (code)
+    {
+    case es_reg: case ss_reg: case cs_reg:
+    case ds_reg: case fs_reg: case gs_reg:
+      oappend (names_seg[code - es_reg]);
+      return;
+    }
+
   USED_REX (REX_B);
   if (rex & REX_B)
     add = 8;
@@ -13481,10 +13523,6 @@ OP_REG (int code, int sizeflag)
     case sp_reg: case bp_reg: case si_reg: case di_reg:
       s = names16[code - ax_reg + add];
       break;
-    case es_reg: case ss_reg: case cs_reg:
-    case ds_reg: case fs_reg: case gs_reg:
-      s = names_seg[code - es_reg + add];
-      break;
     case al_reg: case ah_reg: case cl_reg: case ch_reg:
     case dl_reg: case dh_reg: case bl_reg: case bh_reg:
       USED_REX (0);
@@ -13495,7 +13533,8 @@ OP_REG (int code, int sizeflag)
       break;
     case rAX_reg: case rCX_reg: case rDX_reg: case rBX_reg:
     case rSP_reg: case rBP_reg: case rSI_reg: case rDI_reg:
-      if (address_mode == mode_64bit && (sizeflag & DFLAG))
+      if (address_mode == mode_64bit
+          && ((sizeflag & DFLAG) || (rex & REX_W)))
 	{
 	  s = names64[code - rAX_reg + add];
 	  break;
@@ -13710,9 +13749,10 @@ OP_sI (int bytemode, int sizeflag)
       if (bytemode == b_T_mode)
 	{
 	  if (address_mode != mode_64bit
-	      || !(sizeflag & DFLAG))
+	      || !((sizeflag & DFLAG) || (rex & REX_W)))
 	    {
-	      if (sizeflag & DFLAG)
+              /* The operand-size prefix is overridden by a REX prefix.  */
+              if ((sizeflag & DFLAG) || (rex & REX_W))
 		op &= 0xffffffff;
 	      else
 		op &= 0xffff;
@@ -13730,7 +13770,8 @@ OP_sI (int bytemode, int sizeflag)
 	}
       break;
     case v_mode:
-      if (sizeflag & DFLAG)
+      /* The operand-size prefix is overridden by a REX prefix.  */
+      if ((sizeflag & DFLAG) || (rex & REX_W))
 	op = get32s ();
       else
 	op = get16 ();
@@ -14159,7 +14200,7 @@ OP_EX (int bytemode, int sizeflag)
   if ((sizeflag & SUFFIX_ALWAYS)
       && (bytemode == x_swap_mode
 	  || bytemode == d_swap_mode
-	  || bytemode == d_scalar_swap_mode 
+	  || bytemode == d_scalar_swap_mode
 	  || bytemode == q_swap_mode
 	  || bytemode == q_scalar_swap_mode))
     swap_operand ();
@@ -14174,7 +14215,7 @@ OP_EX (int bytemode, int sizeflag)
       && bytemode != xmm_mq_mode
       && bytemode != xmmq_mode
       && bytemode != d_scalar_mode
-      && bytemode != d_scalar_swap_mode 
+      && bytemode != d_scalar_swap_mode
       && bytemode != q_scalar_mode
       && bytemode != q_scalar_swap_mode
       && bytemode != vex_scalar_w_dq_mode)
@@ -14593,7 +14634,7 @@ CRC32_Fixup (int bytemode, int sizeflag)
       USED_REX (REX_W);
       if (rex & REX_W)
 	*p++ = 'q';
-      else 
+      else
 	{
 	  if (sizeflag & DFLAG)
 	    *p++ = 'l';
@@ -15145,7 +15186,7 @@ PCLMUL_Fixup (int bytemode ATTRIBUTE_UNUSED,
       break;
     default:
       break;
-    } 
+    }
   if (pclmul_type < ARRAY_SIZE (pclmul_op))
     {
       char suffix [4];
@@ -15240,4 +15281,3 @@ OP_LWP_E (int bytemode ATTRIBUTE_UNUSED, int sizeflag ATTRIBUTE_UNUSED)
 
   oappend (names[vex.register_specifier]);
 }
-

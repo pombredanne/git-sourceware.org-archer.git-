@@ -1,3 +1,44 @@
+2012-08-09  Yao Qi  <yao@codesourcery.com>
+
+	* observer.texi: New observer command_param_changed.
+	* gdb.texinfo (GDB/MI Async Records): Doc for '=cmd-param-changed'.
+
+2012-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdbint.texinfo (Debugging GDB): In section
+	'Debugging @value{GDBN} with itself' change .gdbinit for gdb-gdb.gdb.
+	Mention also gdb-gdb.py.
+
+2012-08-07  Yao Qi  <yao@codesourcery.com>
+
+	Revert the folloing patch:
+	2012-08-06  Yao Qi  <yao@codesourcery.com>
+	* gdb.texinfo (Remote Configuration): Add kindex for 'set
+	remote hardware-watchpoint-limit' and 'set
+	remote hardware-breakpoint-limit'.
+
+2012-08-06  Nathaniel Flath  <flat0103@gmail.com>
+
+	* gdb.texinfo (Working Directory): Added information about new
+	default argument for 'cd' command.
+
+2012-08-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Remote Configuration): Add kindex for 'set
+	remote hardware-watchpoint-limit' and 'set
+	remote hardware-breakpoint-limit'.
+
+2012-08-06  Yao Qi  <yao@codesourcery.com>
+
+	Fix PR14371.
+
+	* gdb.texinfo (GDB/MI Async Records): Fix the doc for
+	'=breakpoint-deleted'.
+
+2012-08-02  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Native): Remove node Neutrino.
+
 2012-07-27  Yao Qi  <yao@codesourcery.com>
 
 	* gdb.texinfo (IPA Protocol Commands): Document new command

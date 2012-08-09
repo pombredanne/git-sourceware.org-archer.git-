@@ -1,3 +1,43 @@
+2012-08-09  Nick Clifton  <nickc@redhat.com>
+
+	* po/vi.po: Updated Vietnamese translation.
+
+2012-08-07  Roland McGrath  <mcgrathr@google.com>
+
+	* i386-dis.c (reg_table): Fill out REG_0F0D table with
+	AMD-reserved cases as "prefetch".
+	(MOD_0F18_REG_4, MOD_0F18_REG_5): New enum constants.
+	(MOD_0F18_REG_6, MOD_0F18_REG_7): Likewise.
+	(reg_table): Use those under REG_0F18.
+	(mod_table): Add those cases as "nop/reserved".
+
+2012-08-07  Jan Beulich <jbeulich@suse.com>
+
+	* i386-opc.tbl: Remove "FIXME" comments from SVME instructions.
+
+2012-08-06  Roland McGrath  <mcgrathr@google.com>
+
+	* i386-dis.c (print_insn): Print spaces between multiple excess
+	prefixes.  Return actual number of excess prefixes consumed,
+	not always one.
+
+	* i386-dis.c (OP_REG): Ignore REX_B for segment register cases.
+
+2012-08-06  Roland McGrath  <mcgrathr@google.com>
+	    Victor Khimenko  <khim@google.com>
+	    H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-dis.c (OP_sI): In b_T_mode and v_mode, REX_W trumps DFLAG.
+	(putop): For 'T', 'U', and 'V', treat REX_W like DFLAG.
+	(intel_operand_size): For stack_v_mode, treat REX_W like DFLAG.
+	(OP_E_register): Likewise.
+	(OP_REG): For low 8 whole registers, treat REX_W like DFLAG.
+
+2012-08-02  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
+
+	* configure.in: Formatting.
+	* configure: Regenerate.
+
 2012-08-01  Alan Modra  <amodra@gmail.com>
 
 	* h8300-dis.c: Fix printf arg warnings.

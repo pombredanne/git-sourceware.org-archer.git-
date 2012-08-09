@@ -1,3 +1,264 @@
+2012-08-09  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-decode.c (set_cmd_prefix): New.
+	(lookup_cmd_for_prefixlist): New.
+	(add_prefix_cmd): Call set_cmd_prefix and update field 'prefix'
+	of each cmd_list_element in *prefixlist.
+	(add_setshow_cmd_full): set_cmd_prefix.
+	(add_alias_cmd): Likewise.
+	* cli/cli-decode.h (struct cmd_list_element) <prefix>: New field.
+	Declare 'auto_boolean_enums'.
+	* cli/cli-setshow.c: Include "observer.h".
+	(notify_command_param_changed_p): New.
+	(add_setshow_auto_boolean_cmd): Move auto_boolean_enums out.
+	Remove 'static'.
+	(do_setshow_command): Split it to ...
+	(do_set_command, do_show_command): ... them.  New.
+	(do_set_command): Call observer_notify_command_param_changed if
+	notify_command_param_changed_p returns true.
+	(cmd_show_list): Caller update.
+	* auto-load.c (set_auto_load_cmd): Likewise.
+	* remote.c (show_remote_cmd): Likewise.
+	* cli/cli-setshow.h: Update declarations.
+	* top.c (execute_command): Call do_set_command and do_show_command.
+
+	* NEWS: Mention new MI notification.
+	* mi/mi-interp.c: Declare mi_command_param_changed.
+	(mi_interpreter_init): Attach mi_command_param_changed to
+	observer command_param_changed.
+	(mi_command_param_changed): New.
+	Remove mi_suppress_breakpoint_notifications.
+	Define global variable mi_suppress_notification.
+	(mi_breakpoint_created): Update.
+	(mi_breakpoint_deleted): Likewise.
+	(mi_breakpoint_modified): Likewise.
+	* mi/mi-main.c (mi_cmd_execute): Likewise.  Check command
+	'gdb-set' and set mi_suppress_notification.
+	* mi/mi-main.h: (mi_suppress_notification): New struct.
+
+2012-08-09  Andreas Tobler  <andreast@fgznet.ch>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* fbsd-nat.h (fbsd_find_memory_regions): Use find_memory_region_ftype.
+
+2012-08-09  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-cmds.c (enablebreaklist): Move it to breakpoint.c.
+	(skiplist): Move it to skip.c.
+	(init_cmd_lists): Remove code setting enablebreaklist and
+	skiplist to NULL.
+	* breakpoint.c (enablebreaklist): Moved from cli/cli-cmds.c.
+	* cli/cli-cmds.h: Remove declaration of enablebreaklist and
+	skiplist.
+	* gdbcmd.h: Likewise.
+	* skip.c (_initialize_step_skip): Move 'skiplist' from
+	cli/cli-cmds.c.
+
+2012-08-09  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-dump.c: Add 'static' to some cmd_list_element variables.
+	* gnu-nat.c, symfile.c: Likewise.
+
+2012-08-08  Aaron Gamble  <agamble@google.com>
+
+	* utils.c (prompt_for_continue_wait_time): New static global.
+	(make_command_stats_cleanup): Initialize it.
+	(report_command_stats): Subtract time waiting for user.
+	(prompt_for_continue): Track time waiting for user.
+	(defaulted_query): Track time waiting for user.
+
+2012-08-08  Doug Evans  <dje@google.com>
+
+	* eval.c (evaluate_subexp_standard): Fix thinko in handling
+	UNOP_MEMVAL_TYPE.
+	* expprint.c (print_subexp_standard, case OP_TYPE): New.
+	(print_subexp_standard, case UNOP_CAST_TYPE): Don't increment pos.
+	(print_subexp_standard, case UNOP_DYNAMIC_CAST): Ditto.
+	(print_subexp_standard, case UNOP_REINTERPRET_CAST): Ditto.
+	(print_subexp_standard, case UNOP_MEMVAL_TYPE): Ditto.
+	(dump_subexp_body_standard, case UNOP_DYNAMIC_CAST): Don't increment
+	elt.
+	(dump_subexp_body_standard, case UNOP_REINTERPRET_CAST): Ditto.
+	(dump_subexp_body_standard, case UNOP_CAST_TYPE): Ditto.
+	(dump_subexp_body_standard, case UNOP_MEMVAL_TYPE): Ditto.
+	(dump_prefix_expression): Handle OP_TYPE.
+
+2012-08-08  Keith Seitz  <keiths@redhat.com>
+
+	* breakpoint.c (parse_breakpoint_sals): Remove unused variable
+	addr_start.
+
+2012-08-08  Doug Evans  <dje@google.com>
+
+	* linux-thread-db.c: #include "gdb_vecs.h".
+	(try_thread_db_load_from_pdir_1): New arg "subdir".  All callers
+	updated.
+	(try_thread_db_load_from_pdir): New arg "subdir".  All callers updated.
+	(thread_db_load_search): Use a vector to iterate over path elements.
+	Handle text appearing after "$pdir".
+
+	* gdb_string.h: Moved to ...
+	* common/gdb_string.h: ... here.
+	* common/vec.h: Remove #ifndef GDBSERVER conditional inclusion of
+	gdb_string.h and gdb_assert.h.
+
+2012-08-08  Yao Qi  <yao@codesourcery.com>
+
+	* tic6x-tdep.c (tic6x_register_to_value): Remove.
+	(tic6x_value_to_register): Likewise.
+	(tic6x_gdbarch_init): Don't call set_gdbarch_register_to_value
+	and set_gdbarch_value_to_register.
+
+2012-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Jean-Marc Saffroy  <saffroy@gmail.com>
+
+	PR 11804
+	* defs.h (find_memory_region_ftype): New comment.  New arg modified.
+	* fbsd-nat.c (fbsd_find_memory_regions): Add the passed modified value.
+	* gcore.c (gcore_create_callback): New function comment.  Add modified
+	parameter.  Only write modified regions.  Set SEC_READONLY exactly
+	according to MODIFIED.
+	(objfile_find_memory_regions): Ignore separate debug info files.  Ass
+	the passed modified value to FUNC.
+	* gnu-nat.c (gnu_find_memory_regions): Add the passed modified value.
+	* linux-tdep.c (linux_find_memory_regions): Try to reads smaps file
+	first.  New variables modified and has_anonymous.  Parse the lines of
+	smaps file.  Add the passed MODIFIED value to FUNC.
+	* procfs.c (find_memory_regions_callback): Add the passed modified
+	value.
+
+2012-08-06  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2-frame.c (clear_pointer_cleanup): New function.
+	(dwarf2_frame_cache): Use it.
+	* frame-unwind.h (frame_sniffer_ftype): Document prologue
+	cache initialization constraint.
+
+2012-08-06  Tom Tromey  <tromey@redhat.com>
+
+	PR python/14386:
+	* varobj.c (update_dynamic_varobj_children): Don't call
+	PyIter_Check.
+
+2012-08-06  Tom Tromey  <tromey@redhat.com>
+
+	PR cli/14392:
+	* cli/cli-cmds.c (list_command): Filter 'sals_end'.
+
+2012-08-06  Nathaniel Flath  <flat0103@gmail.com>
+
+	* NEWS: New entry for 'cd' default parameters.
+	* cli/cli-cmds.c (cd_command): Replace error_no_arg by DIR assignment.
+
+2012-08-03  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2-frame.c (dwarf2_frame_cache): Call do_cleanups before
+	return.
+
+2012-08-02  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* inf-child.c (inf_child_fileio_pwrite): If pwrite fails, fall back
+	to attempting lseek/write.
+	(inf_child_fileio_pread): Likewise for pread.
+
+2012-08-02  Yao Qi  <yao@codesourcery.com>
+
+	* dwarf2loc.c (entry_values_debug): Add 'unsigned'.
+	(_initialize_dwarf2loc): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* dwarf2loc.h: Update the declaration of 'entry_values_debug'.
+	* dwarf2read.c (dwarf2_die_debug): Add 'unsigned'.
+	(_initialize_dwarf2_read): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* darwin-nat.c (dwarwin_debug_flag): Add 'unsigned'.
+	(_initialize_darwin_inferior): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* frame.c (frame_debug): Add 'unsigned'.
+	(_intialize_frame): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* frame.h: Update the declaration of 'frame_debug'.
+	* gdbtypes.c (overload_debug): Add 'unsigned'.
+	(_initialize_gdbtypes): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* inferior.h: Update declaration of 'debug_infrun'.
+	* infrun.c (debug_infrun): Add 'unsigned'.
+	(_initialize_infrun): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* jit.c (jit_debug): Add 'unsigned'.
+	(_initialize_jit): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* linux-nat.c (debug_linux_nat): Add 'unsigned'.
+	(_initialize_linux_nat): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* linux-thread-db.c (libthread_db_debug): Add 'unsigned'.
+	(_initialize_thread_db): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* machoread.c (mach_o_debug_level): Add 'unsigned'.
+	(_initialize_machoread): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* mi/mi-cmd-var.c: Update the declaration of 'varobjdebug'.
+	* microblaze-tdep.c (microblaze_debug_flag): Add 'unsigned'.
+	(_initialize_microblaze_tdep): Call add_setshow_zuinteger_cmd
+	intead of add_setshow_zinteger_cmd.
+	* mips-tdep.c (mips_debug): Add 'unsigned'.
+	(_initialize_mips_tdep): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* monitor.c (monitor_debug): Add 'unsigned'.
+	(_initialize_remote_monitors): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* observer.c (observer_debug): Add 'unsigned'.
+	(_initialize_observer): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* parse.c (expressiondebug): Add 'unsigned'.
+	(_initialize_parse): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* record.c (record_debug): Add 'unsigned'.
+	(_initialize_record): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* record.h: Update the declaration of 'record_debug'.
+	* stap-probe.c (stap_expression_debug): Add 'unsigned'.
+	(_initialize_stap_probe): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* serial.c (global_serial_debug_p): Add 'unsigned'.
+	(_initialize_serial): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* solib-dsbt.c (solib_dsbt_debug): Add 'unsigned'.
+	(_initialize_dsbt_solib): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* solib-frv.c (solib_frv_debug): Add 'unsigned'.
+	(_initialize_frv_solib): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* target.c (targetdebug): Add 'unsigned'.
+	(initialize_targets): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* valops.c (overload_debug): Add 'unsigned'.
+	* varobj.c (varobjdebug): Add 'unsigned'.
+	(_initialize_varobj): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* xtensa-tdep.c (xtensa_debug_level): Add 'unsigned'.
+	(_initialize_xtensa_tdep): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+
+	* arch-utils.h: Remove the declaration of 'gdbarch_debug'.
+	* gdbarch.sh (gdbarch_debug): Add 'unsigned'.
+	(extern void _initialize_gdbarch): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* gdbarch.c, gdbarch.h: Re-generated.
+
+2012-08-02  Yao Qi  <yao@codesourcery.com>
+
+	* nto-tdep.c: Don't include cli/cli-decode.h and
+	cli/cli-cmds.h.
+	(_initialize_nto_tdep): Remove.
+	* nto-tdep.h (struct nto_target_ops) <internal_debugging>:
+	Remove field.
+	Remove macro nto_internal_debugging.
+
+2012-08-01  Richard Henderson  <rth@redhat.com>
+
+	* configure.tgt (m32c-*-*) [gdb_target_obs]: Remove prologue-value.o.
+	(mep-*-*) [gdb_target_obs]: Likewise.
+
 2012-07-31  Andreas Schwab  <schwab@linux-m68k.org>
 
 	* ppc-linux-tdep.c (ppc_linux_init_abi): Register

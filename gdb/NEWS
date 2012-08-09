@@ -3,6 +3,9 @@
 
 *** Changes since GDB 7.5
 
+* The 'cd' command now defaults to using '~' (the home directory) if not
+  given an argument.
+
 * New configure options
 
 --enable-libmcheck/--disable-libmcheck
@@ -16,6 +19,11 @@
 
 maint info bfds
   List the BFDs known to GDB.
+
+* MI changes
+
+  ** Command parameter changes are now notified using new async record
+     "=cmd-param-changed".
 
 *** Changes in GDB 7.5
 

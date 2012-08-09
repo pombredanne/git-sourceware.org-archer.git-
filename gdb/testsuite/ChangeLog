@@ -1,3 +1,107 @@
+2012-08-09  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi-cmd-param-changed.exp: New.
+	* gdb.mi/mi-cli.exp: Update for MI notification "=cmd-param-changed".
+	* gdb.mi/mi-var-rtti.exp, gdb.mi/mi2-cli.exp: Likewise.
+	* gdb.mi/mi2-prompt.exp: Likewise.
+
+2012-08-08  Doug Evans  <dje@google.com>
+
+	* gdb.base/debug-expr.c: New file.
+	* gdb.base/debug-expr.exp: New file.
+	* gdb.base/exprs.exp: Test {type} casts.
+	* gdb.cp/debug-expr.exp: New file.
+
+2012-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/valgrind-infcall.exp (continue #$continue_count): Use
+	global variable loop, not a 'break'.  Add loop count limit to 100.
+	Add new fail case for terminated vgdb.
+
+2012-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Jean-Marc Saffroy  <saffroy@gmail.com>
+
+	PR 11804
+	* gdb.base/gcore-relro.exp: New file.
+	* gdb.base/gcore-relro-main.c: New file.
+	* gdb.base/gcore-relro-lib.c: New file.
+
+2012-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Do not false FAIL with old GCCs.
+	* gdb.base/watchpoint.exp (self-delete local watch) <$no_hw>: XFAIL for
+	GCC < 4.5 in $no_hw mode.
+
+2012-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/default.exp (cd): Accept new directory with no arguments.
+
+2012-08-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/list.exp (test_only_end): New function.
+	Call it.
+
+2012-08-06  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-mi.exp: Add test for printer whose children
+	are a list.
+	* gdb.python/py-prettyprint.c (struct children_as_list): New.
+	(main): New variable children_as_list.
+	* gdb.python/py-prettyprint.py (class pp_children_as_list):
+	New.
+	(register_pretty_printers): Register new printer.
+
+2012-08-03  Edjunior Machado  <emachado@linux.vnet.ibm.com>
+
+	* gdb.base/valgrind-infcall.exp: Expect leading `.' on ppc64's
+	symbols. Abort if vgdb remote connection is closed.
+
+2012-08-02  Doug Evans  <dje@google.com>
+
+	* gdb.base/info-fun.exp: Fix failures on m68k, ppc64, s390x.
+
+2012-08-02  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb.base/pc-fp.exp: Adjust testcase to match different outputs from
+	s390x, PowerPC 64 and m68k-linux.
+
+2012-08-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.base/annota1.exp: Accept no frames-invalid notification
+	when starting up the program.
+	* gdb.python/py-value.exp (test_value_numeric_ops): Pointers may
+	show a symbolic value as well.
+	* gdb.server/server-exec-info.exp: Skip test when skipping
+	gdbserver test and/or when skipping shared library tests.
+	* gdb.threads/linux-dp.exp: Unset "seen" when done with it to
+	avoid name conflicts with other tests.
+
+2012-08-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.dwarf2/dw2-icc-opaque.S: Remove .align directives.
+	Fix wrong output on big-endian systems.
+	* gdb.dwarf2/dw2-icc-opaque.exp: Expect @mode32 attribute on
+	4-byte pointer types on 64-bit s390x.
+
+2012-08-02  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* gdb.base/watchpoint.c (func2): Initialize local_a.  Add
+	marker comment at the beginning (after intialization).
+	* gdb.base/watchpoint.exp (test_complex_watchpoint): Set func2
+	breakpoint on marker comment instead of function begin.
+	(test_wide_location_1): Do not expect HW watchpoints on 32-bit
+	PowerPC.
+	(test_wide_location_2): Do not expect HW watchpoints on 32-bit
+	or 64-bit PowerPC.
+	(do_tests): Consistently set can-use-hw-watchpoints to 0 if
+	gdb,no_hardware_watchpoints flag is set.
+	(initialize): Remove now redundant can-use-hw-watchpoints change.
+
+2012-08-02  Yao Qi  <yao@codesourcery.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* boards/local-remote-host.exp: New.
+
 2012-08-01  Ulrich Weigand  <ulrich.weigand@linaro.org>
 
 	* gdb.base/catch-load.exp: Fix argument to gdb_load_shlibs.
