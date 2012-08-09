@@ -116,11 +116,46 @@ extract_sym_and_value (PyObject *obj, char **name,
 }
 
 static int
-py_print_locals (PyObject *filter,
-		 struct value_print_options opts)
+py_print_type (struct ui_out *out,
+	       struct value *val)
 {
-  int indent = 4;
-  struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
+  volatile struct gdb_exception except;
+
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      struct type *type;
+      struct ui_file *stb;
+      struct cleanup *cleanup;
+
+      stb = mem_fileopen ();
+      cleanup = make_cleanup_ui_file_delete (stb);
+      type = check_typedef (value_type (val));
+      type_print (type, "", stb, -1);
+      ui_out_field_stream (out, "type", stb);
+      do_cleanups (cleanup);
+    }
+  if (except.reason > 0)
+    {
+      PyErr_SetString (PyExc_RuntimeError,
+		       except.message);
+      return 0;
+    }
+
+  return 1;
+}
+
+static int
+py_print_locals (PyObject *filter,
+		 struct ui_out *out,
+		 struct value_print_options opts,
+		 int mi_print_type,
+		 int indent)
+{
+  /* In traditional bt full backtraces this is num_tabs (4) * 2 = 8.  It
+     never appears to deviate from this.  */
+  struct cleanup *old_chain = make_cleanup_ui_out_list_begin_end (out,
+								  "locals");
+
 
   if (PyObject_HasAttrString (filter, "frame_locals"))
     {
@@ -156,40 +191,70 @@ py_print_locals (PyObject *filter,
 		      struct value *val;
 		      int value_success = 0;
 		      volatile struct gdb_exception except;
-
-		      if (! item)
-			goto locals_error;
+		      struct cleanup *inner_cleanup =
+			make_cleanup (null_cleanup, NULL);
 
 		      value_success = extract_sym_and_value (item, &sym_name,
 							     &val,
 							     &language);
+
 		      Py_DECREF (item);
-		      item = NULL;
 
 		      if (! value_success)
 			goto locals_error;
 
-		      fprintf_filtered (gdb_stdout, "%s%s = ",
-					n_spaces (2 * indent),
-					sym_name);
+		      if (ui_out_is_mi_like_p (out))
+			{
+			  if (mi_print_type != PRINT_NO_VALUES)
+			    {
+			      inner_cleanup =
+				make_cleanup_ui_out_tuple_begin_end (out,
+								     NULL);
+			    }
+			}
+		      else
+			ui_out_spaces (out, (8 + (indent * 2)));
 
+		      ui_out_field_string (out, "name", sym_name);
 		      xfree (sym_name);
 
-		      TRY_CATCH (except, RETURN_MASK_ERROR)
+		      if (! ui_out_is_mi_like_p (out))
+			ui_out_text (out, " = ");
+
+		      if (ui_out_is_mi_like_p (out)
+			  && mi_print_type == PRINT_SIMPLE_VALUES)
 			{
-			  opts.deref_ref = 1;
-			  common_val_print (val, gdb_stdout,
-					    indent, &opts,
-					    language);
+			  if (! py_print_type (out, val))
+			    goto locals_error;
 			}
-		      if (except.reason < 0)
+
+		      if (! ui_out_is_mi_like_p (out)
+			  || (ui_out_is_mi_like_p (out)
+			      && mi_print_type != PRINT_NO_VALUES))
 			{
-			  PyErr_SetString (PyExc_RuntimeError,
-					   except.message);
-			  goto locals_error;
+			  struct ui_file *stb;
+			  stb = mem_fileopen ();
+			  make_cleanup_ui_file_delete (stb);
+
+			  TRY_CATCH (except, RETURN_MASK_ALL)
+			    {
+			      get_user_print_options (&opts);
+			      opts.deref_ref = 1;
+			      common_val_print (val, stb, 2, &opts, language);
+			    }
+			  if (except.reason > 0)
+			    {
+			      PyErr_SetString (PyExc_RuntimeError,
+					       except.message);
+			      goto locals_error;
+			    }
+
+			  ui_out_field_stream (out, "value", stb);
 			}
-		      fprintf_filtered (gdb_stdout, "\n");
-		      gdb_flush (gdb_stdout);
+
+		      ui_out_text (out, "\n");
+		      do_cleanups (inner_cleanup);
+
 		    }
 
 		  if (! item && PyErr_Occurred())
@@ -197,9 +262,10 @@ py_print_locals (PyObject *filter,
 		}
 	    }
 	}
+      else
+	goto locals_error;
     }
-  else
-    goto locals_error;
+
 
   do_cleanups (old_chain);
   return 1;
@@ -213,7 +279,7 @@ static int
 py_print_args (PyObject *filter,
 	       struct ui_out *out,
 	       struct value_print_options opts,
-	       int print_type,
+	       int mi_print_type,
 	       const char *print_args_type)
 {
   struct cleanup *old_chain;
@@ -285,7 +351,7 @@ py_print_args (PyObject *filter,
 
 		      if (ui_out_is_mi_like_p (out))
 			{
-			  if(print_type != PRINT_NO_VALUES)
+			  if(mi_print_type != PRINT_NO_VALUES)
 			    {
 			      inner_cleanup =
 				make_cleanup_ui_out_tuple_begin_end (out,
@@ -303,23 +369,9 @@ py_print_args (PyObject *filter,
 		      opts.deref_ref = 1;
 
 		      if (ui_out_is_mi_like_p (out)
-			  && print_type == PRINT_SIMPLE_VALUES)
+			  && mi_print_type == PRINT_SIMPLE_VALUES)
 			{
-			  TRY_CATCH (except, RETURN_MASK_ALL)
-			    {
-			      struct type *type;
-			      stb = mem_fileopen ();
-			      make_cleanup_ui_file_delete (stb);
-			      type = check_typedef (value_type (val));
-			      type_print (type, "", stb, -1);
-			      ui_out_field_stream (out, "type", stb);
-			    }
-			  if (except.reason > 0)
-			    {
-			      PyErr_SetString (PyExc_RuntimeError,
-					       except.message);
-			      goto args_error;
-			    }
+			  py_print_type (out, val);
 			}
 
 		      if (! ui_out_is_mi_like_p (out))
@@ -327,8 +379,9 @@ py_print_args (PyObject *filter,
 			  opts.summary = !strcmp (print_args_type, "scalars");
 			}
 
-		      if (ui_out_is_mi_like_p (out)
-			  && print_type != PRINT_NO_VALUES)
+		      if (! ui_out_is_mi_like_p (out)
+			  || (ui_out_is_mi_like_p (out)
+			      && mi_print_type != PRINT_NO_VALUES))
 			{
 			  stb = mem_fileopen ();
 			  make_cleanup_ui_file_delete (stb);
@@ -420,7 +473,10 @@ py_print_frame (PyObject *filter,
   struct frame_info *frame = NULL;
   struct cleanup *cleanup_stack = make_cleanup (null_cleanup, NULL);
 
-  cleanup_stack	= make_cleanup_ui_out_tuple_begin_end (out, "frame");
+  /* -stack-list-locals and -stack-list-arguments do not require a
+     wrapping frame attribute.  */
+  if (print_frame_info || print_args)
+    make_cleanup_ui_out_tuple_begin_end (out, "frame");
 
   /* Get the underlying frame.  */
   if (PyObject_HasAttrString (filter, "inferior_frame"))
@@ -473,7 +529,7 @@ py_print_frame (PyObject *filter,
 
     }
   /* Print frame level.  */
-  if (print_level)
+  if ((print_frame_info || print_args) && print_level)
     {
       struct frame_info **slot;
       int level;
@@ -620,7 +676,9 @@ py_print_frame (PyObject *filter,
 
   if (print_locals)
     {
-      int success = py_print_locals (filter, opts);
+      int success = py_print_locals (filter, out, opts,
+				     mi_print_args_type, indent);
+
       if (success == 0 && PyErr_Occurred ())
 	goto error;
     }
@@ -669,7 +727,7 @@ py_print_frame (PyObject *filter,
 		  if (success == 0 && PyErr_Occurred ())
 		    {
 		      Py_DECREF (item);
-		      do_cleanups (cleanup_stack);
+		      //do_cleanups (cleanup_stack);
 		      goto error;
 		    }
 

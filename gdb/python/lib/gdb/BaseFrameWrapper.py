@@ -106,6 +106,25 @@ class FrameVars ():
     def __init__(self,frame):
         self.frame = frame
 
+    def fetch_b (self, sym):
+
+        # We may have a string as a symbol, in the case of synthetic
+        # locals/args
+        if isinstance(sym, basestring):
+            return True
+
+        sym_type = sym.addr_class
+
+        return {
+            gdb.SYMBOL_LOC_STATIC: True,
+            gdb.SYMBOL_LOC_REGISTER: True,
+            gdb.SYMBOL_LOC_ARG: True,
+            gdb.SYMBOL_LOC_REF_ARG: True,
+            gdb.SYMBOL_LOC_LOCAL: True,
+	    gdb.SYMBOL_LOC_REGPARM_ADDR: True,
+	    gdb.SYMBOL_LOC_COMPUTED: True
+          }.get(sym_type, False)
+
     def fetch_frame_locals (self):
         lvars = []
         block = self.frame.block()
@@ -113,8 +132,8 @@ class FrameVars ():
         for sym in block:
             if sym.is_argument:
                 continue;
-
-            lvars.append(BaseSymValueWrapper(sym, self.get_value(sym,block)))
+            if self.fetch_b (sym):
+                lvars.append(BaseSymValueWrapper(sym, self.get_value(sym,block)))
 
         if len(lvars) == 0:
             return None
@@ -128,8 +147,8 @@ class FrameVars ():
         for sym in block:
             if not sym.is_argument:
                 continue;
-
-            args.append(BaseSymValueWrapper(sym,self.get_value (sym,block)))
+            if self.fetch_b (sym):
+                args.append(BaseSymValueWrapper(sym,self.get_value (sym,block)))
 
         if len(args) == 0:
             return None
@@ -139,9 +158,9 @@ class FrameVars ():
     def get_value (self, sym, block):
         if len (sym.linkage_name):
             nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
-
-            if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
-                sym = nsym
+            if nsym != None:
+                if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
+                    sym = nsym
 
         try:
             val = sym.value (self.frame)

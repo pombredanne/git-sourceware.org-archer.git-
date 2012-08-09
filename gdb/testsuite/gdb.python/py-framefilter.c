@@ -67,6 +67,8 @@ void func1(void)
 
 int func2(void)
 {
+  int foo = 42;
+
   func1();
   return 1;
 }

@@ -17,6 +17,7 @@
 # frame-filters.
 
 load_lib gdb-python.exp
+global hex
 
 set testfile "py-framefilter"
 set srcfile ${testfile}.c
@@ -61,24 +62,31 @@ gdb_breakpoint [gdb_get_line_number "Backtrace end breakpoint"]
 gdb_continue_to_breakpoint "Backtrace end breakpoint"
 
 gdb_test "info frame-filter" \
-    {.*1000.*Yes.*Elider.*100.*Yes.*Reverse.*10.*.*No.*Object.*1.*}
+    ".*1000.*Yes.*Elider.*100.*Yes.*Reverse.*10.*.*No.*Object.*1.*"
 # Test raw
 gdb_test "bt raw" \
-    {.*#0.*end_func.*#22.*in func1.*#27.*in main ().*}
+    ".*#0.*end_func.*#22.*in func1.*#27.*in main ().*"
 
 # Test reverse
 gdb_test "bt" \
-    {.*#0.*cnuf_dne.*#22.*in 1cnuf.*#27.*in niam ().*}
+    ".*#0.*cnuf_dne.*#22.*in 1cnuf.*#27.*in niam ().*"
 
 # Disable Reverse
 gdb_test_no_output "set python frame-filter disable global Reverse"
 gdb_test "bt" \
-    {.*#0.*end_func.*#22.*in func1.*#27.*in main ().*}
+    ".*#0.*end_func.*#22.*in func1.*#27.*in main ().*"
 
 gdb_test "bt -2" \
-    {.*#26.*func5.*#27.*in main ().*}
+    ".*#26.*func5.*#27.*in main ().*"
 
 gdb_test "bt 3" \
-    {.*#0.*end_func.*#1.*in funca ().*#2.*in funcb ().*}
+    ".*#0.*end_func.*#1.*in funca ().*#2.*in funcb ().*"
+
+gdb_test "bt raw full" \
+    ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca ().*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*"
+
+gdb_test "bt full" \
+    ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca ().*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*#22.*in func1 \\(\\).*#23.*in func2 \\(\\).*foo = 42.*"
+
 
 remote_file host delete ${remote_python_file}

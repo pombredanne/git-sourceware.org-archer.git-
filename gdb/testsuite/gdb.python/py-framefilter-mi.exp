@@ -104,10 +104,35 @@ mi_gdb_test "-stack-list-arguments 2 22 27" \
 
 mi_gdb_test "-stack-list-arguments 2 raw-frames" \
     "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",type=\"int\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\]},frame={level=\"23\",args=\\\[\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
-    "stack-list-arguments 2"
+    "stack-list-arguments 2 raw-frames"
 
 mi_gdb_test "-stack-list-arguments 2 raw-frames 22 27" \
     "\\^done,stack-args=\\\[frame={level=\"22\",args=\\\[\\\]},frame={level=\"23\",args=\\\[\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
-    "stack-list-arguments 2 22 27"
+    "stack-list-arguments 2 raw-frames 22 27"
+
+#stack-list-locals
+mi_gdb_test "-stack-list-locals 0 raw-frames" \
+    "\\^done,locals=\\\[name=\"str\",name=\"st2\",name=\"b\",name=\"c\"\\\]" \
+    "stack-list-locals 0 raw-frames"
+
+mi_gdb_test "-stack-list-locals 1 raw-frames" \
+    "\\^done,locals=\\\[{name=\"str\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",value=\"12\"},{name=\"c\",value=\"5\"}\\\]" \
+    "stack-list-locals 1 raw-frames"
+
+mi_gdb_test "-stack-list-locals 2 raw-frames" \
+    "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short int\",value=\"5\"}\\\]" \
+    "stack-list-locals 2 raw-frames"
+
+mi_gdb_test "-stack-list-locals 0" \
+    "\\^done,locals=\\\[name=\"str\",name=\"st2\",name=\"b\",name=\"c\"\\\]" \
+    "stack-list-locals 0"
+
+mi_gdb_test "-stack-list-locals 1" \
+    "\\^done,locals=\\\[{name=\"str\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",value=\"12\"},{name=\"c\",value=\"5\"}\\\]" \
+    "stack-list-locals 1"
+
+mi_gdb_test "-stack-list-locals 2" \
+    "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short int\",value=\"5\"}\\\]" \
+    "stack-list-locals 2"
 
 remote_file host delete ${remote_python_file}
