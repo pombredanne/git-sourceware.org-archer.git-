@@ -353,13 +353,49 @@ void
 mi_cmd_stack_list_variables (char *command, char **argv, int argc)
 {
   struct frame_info *frame;
+  int raw_arg = 0;
+  int result = 0;
 
-  if (argc != 1)
-    error (_("Usage: PRINT_VALUES"));
+  if (argc == 2)
+    {
+      int j;
+      /* Find 'raw-frames' at argv[1] if passed as an argument */
+      for (j = 0; j < strlen (argv[1]); j++)
+	argv[1][j] = tolower (argv[1][j]);
 
-  frame = get_selected_frame (NULL);
+      if (subset_compare (argv[1], "raw-frames"))
+	raw_arg = 1;
+    }
 
-  list_args_or_locals (all, parse_print_values (argv[0]), frame);
+  if (argc < 1 || argc > 2 || (argc == 2 && ! raw_arg)
+      || (argc == 1 && raw_arg))
+    error (_("-stack-list-arguments: Usage: PRINT_VALUES [RAW-FRAMES]"));
+
+   frame = get_selected_frame (NULL);
+
+   if (! raw_arg && frame_filters)
+     {
+       int count = 1;
+       int arg = atoi (argv[0]);
+
+       result = apply_frame_filter (frame,/* frame */
+				    1, /* print_level */
+				    LOC_AND_ADDRESS, /* print_what */
+				    0, /* print_frame_info */
+				    1, /* print_args */
+				    arg, /* mi_print_args_type */
+				    0, /* cli_print_args_type */
+				    current_uiout, /* out */
+				    1, /* print_locals */
+				    count /* count */);
+     }
+
+   if (! frame_filters || raw_arg || result == PY_BT_ERROR
+       || result == PY_BT_NO_FILTERS)
+     {
+
+       list_args_or_locals (all, parse_print_values (argv[0]), frame);
+     }
 }
 
 /* Print single local or argument.  ARG must be already read in.  For

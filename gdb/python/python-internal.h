@@ -264,6 +264,7 @@ void gdbpy_initialize_thread_event (void);
 void gdbpy_initialize_new_objfile_event (void);
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
+struct cleanup *make_cleanup_py_xdecref (PyObject *py);
 
 struct cleanup *ensure_python_env (struct gdbarch *gdbarch,
 				   const struct language_defn *language);
