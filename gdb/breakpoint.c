@@ -10160,7 +10160,6 @@ watchpoint_exp_is_const (const struct expression *exp)
 	case BINOP_RANGE:
 	case TERNOP_COND:
 	case TERNOP_SLICE:
-	case TERNOP_SLICE_COUNT:
 
 	case OP_LONG:
 	case OP_DOUBLE:
@@ -10168,7 +10167,6 @@ watchpoint_exp_is_const (const struct expression *exp)
 	case OP_LAST:
 	case OP_COMPLEX:
 	case OP_STRING:
-	case OP_BITSTRING:
 	case OP_ARRAY:
 	case OP_TYPE:
 	case OP_TYPEOF:

@@ -210,13 +210,6 @@ print_subexp_standard (struct expression *exp, int *pos,
       }
       return;
 
-    case OP_BITSTRING:
-      nargs = longest_to_int (exp->elts[pc + 1].longconst);
-      (*pos)
-	+= 3 + BYTES_TO_EXP_ELEM ((nargs + HOST_CHAR_BIT - 1) / HOST_CHAR_BIT);
-      fprintf_unfiltered (stream, "B'<unimplemented>'");
-      return;
-
     case OP_OBJC_NSSTRING:	/* Objective-C Foundation Class
 				   NSString constant.  */
       {
@@ -367,7 +360,6 @@ print_subexp_standard (struct expression *exp, int *pos,
       return;
 
     case TERNOP_SLICE:
-    case TERNOP_SLICE_COUNT:
       print_subexp (exp, pos, stream, PREC_SUFFIX);
       fputs_filtered ("(", stream);
       print_subexp (exp, pos, stream, PREC_ABOVE_COMMA);
@@ -794,7 +786,6 @@ dump_subexp_body_standard (struct expression *exp,
     {
     case TERNOP_COND:
     case TERNOP_SLICE:
-    case TERNOP_SLICE_COUNT:
       elt = dump_subexp (exp, stream, elt);
       /* FALL THROUGH */
     case BINOP_ADD:
@@ -1037,7 +1028,6 @@ dump_subexp_body_standard (struct expression *exp,
     case OP_F77_UNDETERMINED_ARGLIST:
     case OP_COMPLEX:
     case OP_STRING:
-    case OP_BITSTRING:
     case OP_BOOL:
     case OP_M2_STRING:
     case OP_THIS:

@@ -1,3 +1,19 @@
+2012-08-13  Doug Evans  <dje@google.com>
+
+	* gdb.base/help.exp: Update expected output.
+	* gdb.base/default.exp: Update expected output of "show convenience".
+
+2012-08-10  Doug Evans  <dje@google.com>
+
+	* gdb.python/py-strfns.c: New file.
+	* gdb.python/py-strfns.exp: New file.
+	* gdb.python/py-type.exp (test_fields): Add vector tests.
+
+2012-08-10  Mike Frysinger  <vapier@gentoo.org>
+
+	PR cli/10436:
+	* gdb.base/completion.exp: Add tests for handle completion.
+
 2012-08-09  Yao Qi  <yao@codesourcery.com>
 
 	* gdb.mi/mi-cmd-param-changed.exp: New.
