@@ -1247,13 +1247,6 @@ memory usage after it completes each command and returns to the prompt.
 This option causes @value{GDBN} to print its version number and
 no-warranty blurb, and exit.
 
-@item -use-deprecated-index-sections
-@cindex @code{--use-deprecated-index-sections}
-This option causes @value{GDBN} to read and use deprecated
-@samp{.gdb_index} sections from symbol files.  This can speed up
-startup, but may result in some functionality being lost.
-@xref{Index Section Format}.
-
 @end table
 
 @node Startup
@@ -2274,8 +2267,9 @@ Specify Files}.
 @table @code
 @kindex cd
 @cindex change working directory
-@item cd @var{directory}
-Set the @value{GDBN} working directory to @var{directory}.
+@item cd @r{[}@var{directory}@r{]}
+Set the @value{GDBN} working directory to @var{directory}.  If not
+given, @var{directory} uses @file{'~'}.
 
 @kindex pwd
 @item pwd
@@ -7564,6 +7558,7 @@ being passed the type of @var{arg} as the argument.
 * Pretty Printing::             Python pretty printing
 * Value History::               Value history
 * Convenience Vars::            Convenience variables
+* Convenience Funs::            Convenience functions
 * Registers::                   Registers
 * Floating Point Hardware::     Floating point hardware
 * Vector Unit::                 Vector Unit
@@ -9230,9 +9225,10 @@ variable, when used as an expression, has the type of its current value.
 
 @table @code
 @kindex show convenience
-@cindex show all user variables
+@cindex show all user variables and functions
 @item show convenience
-Print a list of convenience variables used so far, and their values.
+Print a list of convenience variables used so far, and their values,
+as well as a list of the convenience functions.
 Abbreviated @code{show conv}.
 
 @kindex init-if-undefined
@@ -9317,12 +9313,47 @@ On HP-UX systems, if you refer to a function or variable name that
 begins with a dollar sign, @value{GDBN} searches for a user or system
 name first, before it searches for a convenience variable.
 
+@node Convenience Funs
+@section Convenience Functions
+
 @cindex convenience functions
 @value{GDBN} also supplies some @dfn{convenience functions}.  These
 have a syntax similar to convenience variables.  A convenience
 function can be used in an expression just like an ordinary function;
 however, a convenience function is implemented internally to
 @value{GDBN}.
+
+These functions require @value{GDBN} to be configured with
+@code{Python} support.
+
+@table @code
+
+@item $_memeq(@var{buf1}, @var{buf2}, @var{length})
+@findex $_memeq@r{, convenience function}
+Returns one if the @var{length} bytes at the addresses given by
+@var{buf1} and @var{buf2} are equal.
+Otherwise it returns zero.
+
+@item $_regex(@var{str}, @var{regex})
+@findex $_regex@r{, convenience function}
+Returns one if the string @var{str} matches the regular expression
+@var{regex}.  Otherwise it returns zero.
+The syntax of the regular expression is that specified by @code{Python}'s
+regular expression support.
+
+@item $_streq(@var{str1}, @var{str2})
+@findex $_streq@r{, convenience function}
+Returns one if the strings @var{str1} and @var{str2} are equal.
+Otherwise it returns zero.
+
+@item $_strlen(@var{str})
+@findex $_strlen@r{, convenience function}
+Returns the length of string @var{str}.
+
+@end table
+
+@value{GDBN} provides the ability to list and get help on
+convenience functions.
 
 @table @code
 @item help function
@@ -16753,6 +16784,28 @@ $ objcopy --add-section .gdb_index=symfile.gdb-index \
     --set-section-flags .gdb_index=readonly symfile symfile
 @end smallexample
 
+@value{GDBN} will normally ignore older versions of @file{.gdb_index}
+sections that have been deprecated.  Usually they are deprecated because
+they are missing a new feature or have performance issues.
+To tell @value{GDBN} to use a deprecated index section anyway
+specify @code{set use-deprecated-index-sections on}.
+The default is @code{off}.
+This can speed up startup, but may result in some functionality being lost.
+@xref{Index Section Format}.
+
+@emph{Warning:} Setting @code{use-deprecated-index-sections} to @code{on}
+must be done before gdb reads the file.  The following will not work:
+
+@smallexample
+$ gdb -ex "set use-deprecated-index-sections on" <program>
+@end smallexample
+
+Instead you must do, for example,
+
+@smallexample
+$ gdb -iex "set use-deprecated-index-sections on" <program>
+@end smallexample
+
 There are currently some limitation on indices.  They only work when
 for DWARF debugging information, not stabs.  And, they do not
 currently work for programs using Ada.
@@ -18445,7 +18498,6 @@ configurations.
 * DJGPP Native::                Features specific to the DJGPP port
 * Cygwin Native::		Features specific to the Cygwin port
 * Hurd Native::                 Features specific to @sc{gnu} Hurd
-* Neutrino::                    Features specific to QNX Neutrino
 * Darwin::			Features specific to Darwin
 @end menu
 
@@ -19222,25 +19274,6 @@ thread default exception-port}, etc.).  The @code{thread default}
 variety of commands sets the default thread properties for all
 threads; you can then change the properties of individual threads with
 the non-default commands.
-@end table
-
-
-@node Neutrino
-@subsection QNX Neutrino
-@cindex QNX Neutrino
-
-@value{GDBN} provides the following commands specific to the QNX
-Neutrino target:
-
-@table @code
-@item set debug nto-debug
-@kindex set debug nto-debug
-When set to on, enables debugging messages specific to the QNX
-Neutrino support.
-
-@item show debug nto-debug
-@kindex show debug nto-debug
-Show the current state of QNX Neutrino messages.
 @end table
 
 @node Darwin
@@ -23363,6 +23396,19 @@ the array; in this case the lower bound is zero.  If two arguments are
 given, the first argument is the lower bound of the array, and the
 second argument is the upper bound of the array.  An array's length
 must not be negative, but the bounds can be.
+@end defun
+
+@defun Type.vector (@var{n1} @r{[}, @var{n2}@r{]})
+Return a new @code{gdb.Type} object which represents a vector of this
+type.  If one argument is given, it is the inclusive upper bound of
+the vector; in this case the lower bound is zero.  If two arguments are
+given, the first argument is the lower bound of the vector, and the
+second argument is the upper bound of the vector.  A vector's length
+must not be negative, but the bounds can be.
+
+The difference between an @code{array} and a @code{vector} is that
+arrays behave like in C: when used in expressions they decay to a pointer
+to the first element whereas vectors are treated as first class values.
 @end defun
 
 @defun Type.const ()
@@ -27612,17 +27658,24 @@ thread groups.
 
 @item =breakpoint-created,bkpt=@{...@}
 @itemx =breakpoint-modified,bkpt=@{...@}
-@itemx =breakpoint-deleted,bkpt=@{...@}
+@itemx =breakpoint-deleted,id=@var{number}
 Reports that a breakpoint was created, modified, or deleted,
 respectively.  Only user-visible breakpoints are reported to the MI
 user.
 
 The @var{bkpt} argument is of the same form as returned by the various
-breakpoint commands; @xref{GDB/MI Breakpoint Commands}.
+breakpoint commands; @xref{GDB/MI Breakpoint Commands}.  The
+@var{number} is the ordinal number of the breakpoint.
 
 Note that if a breakpoint is emitted in the result record of a
 command, then it will not also be emitted in an async record.
 
+@item =cmd-param-changed,param=@var{param},value=@var{value}
+Reports that a parameter of the command @code{set @var{param}} is
+changed to @var{value}.  In the multi-word @code{set} command,
+the @var{param} is the whole parameter list to @code{set} command.
+For example, In command @code{set check type on}, @var{param}
+is @code{check type} and @var{value} is @code{on}.
 @end table
 
 @node GDB/MI Frame Information
@@ -33658,6 +33711,10 @@ for an error
 
 @end table
 
+@item close
+Closes the in-process agent.  This command is sent when @value{GDBN} or GDBserver
+is about to kill inferiors.
+
 @item qTfSTM
 @xref{qTfSTM}.
 @item qTsSTM
@@ -34520,6 +34577,11 @@ Temporary internal breakpoint used by the @value{GDBN} @code{finish} command.
 Shared library events.
 
 @end table
+
+@kindex maint info bfds
+@item maint info bfds
+This prints information about each @code{bfd} object that is known to
+@value{GDBN}.  @xref{Top, , BFD, bfd, The Binary File Descriptor Library}.
 
 @kindex set displaced-stepping
 @kindex show displaced-stepping
@@ -40408,7 +40470,7 @@ Version 4 uses a different hashing function from versions 5 and 6.
 Version 6 includes symbols for inlined functions, whereas versions 4
 and 5 do not.  Version 7 adds attributes to the CU indices in the
 symbol table.  @value{GDBN} will only read version 4, 5, or 6 indices
-if the @code{--use-deprecated-index-sections} option is used.
+by specifying @code{set use-deprecated-index-sections on}.
 
 @item
 The offset, from the start of the file, of the CU list.

@@ -79,13 +79,13 @@ DEF_VEC_P (symbolp);
 static int dwarf2_read_debug = 0;
 
 /* When non-zero, dump DIEs after they are read in.  */
-static int dwarf2_die_debug = 0;
+static unsigned int dwarf2_die_debug = 0;
 
 /* When non-zero, cross-check physname against demangler.  */
 static int check_physname = 0;
 
 /* When non-zero, do not reject deprecated .gdb_index sections.  */
-int use_deprecated_index_sections = 0;
+static int use_deprecated_index_sections = 0;
 
 /* When set, the file that we're processing is known to have debugging
    info for C++ namespaces.  GCC 3.3.x did not produce this information,
@@ -990,7 +990,7 @@ struct die_info
 /* Blocks are a bunch of untyped bytes.  */
 struct dwarf_block
   {
-    unsigned int size;
+    size_t size;
 
     /* Valid only if SIZE is not zero.  */
     gdb_byte *data;
@@ -2611,15 +2611,17 @@ read_index_from_section (struct objfile *objfile,
      Versions earlier than 6 did not emit psymbols for inlined
      functions.  Using these files will cause GDB not to be able to
      set breakpoints on inlined functions by name, so we ignore these
-     indices unless the --use-deprecated-index-sections command line
-     option was supplied.  */
+     indices unless the user has done
+     "set use-deprecated-index-sections on".  */
   if (version < 6 && !deprecated_ok)
     {
       static int warning_printed = 0;
       if (!warning_printed)
 	{
-	  warning (_("Skipping deprecated .gdb_index section in %s, pass "
-		     "--use-deprecated-index-sections to use them anyway"),
+	  warning (_("\
+Skipping deprecated .gdb_index section in %s.\n\
+Do \"set use-deprecated-index-sections on\" before the file is read\n\
+to use the section anyway."),
 		   filename);
 	  warning_printed = 1;
 	}
@@ -8278,7 +8280,6 @@ try_open_dwo_file (const char *file_name)
       xfree (absolute_name);
       return NULL;
     }
-  gdb_bfd_stash_filename (sym_bfd);
   xfree (absolute_name);
   bfd_set_cacheable (sym_bfd, 1);
 
@@ -9284,6 +9285,17 @@ dwarf2_ranges_read (unsigned offset, CORE_ADDR *low_return,
       range_beginning += base;
       range_end += base;
 
+      /* A not-uncommon case of bad debug info.
+	 Don't pollute the addrmap with bad data.  */
+      if (range_beginning + baseaddr == 0
+	  && !dwarf2_per_objfile->has_section_at_zero)
+	{
+	  complaint (&symfile_complaints,
+		     _(".debug_ranges entry has start address of zero"
+		       " [in module %s]"), objfile->name);
+	  continue;
+	}
+
       if (ranges_pst != NULL)
 	addrmap_set_empty (objfile->psymtabs_addrmap,
 			   range_beginning + baseaddr,
@@ -9599,9 +9611,20 @@ dwarf2_record_block_ranges (struct die_info *die, struct block *block,
 	      if (start == end)
 		continue;
 
-              record_block_range (block,
-                                  baseaddr + base + start,
-                                  baseaddr + base + end - 1);
+	      start += base + baseaddr;
+	      end += base + baseaddr;
+
+	      /* A not-uncommon case of bad debug info.
+		 Don't pollute the addrmap with bad data.  */
+	      if (start == 0 && !dwarf2_per_objfile->has_section_at_zero)
+		{
+		  complaint (&symfile_complaints,
+			     _(".debug_ranges entry has start address of zero"
+			       " [in module %s]"), objfile->name);
+		  continue;
+		}
+
+              record_block_range (block, start, end - 1);
             }
         }
     }
@@ -16174,12 +16197,12 @@ dump_die_shallow (struct ui_file *f, int indent, struct die_info *die)
 	case DW_FORM_block4:
 	case DW_FORM_block:
 	case DW_FORM_block1:
-	  fprintf_unfiltered (f, "block: size %d",
-			      DW_BLOCK (&die->attrs[i])->size);
+	  fprintf_unfiltered (f, "block: size %s",
+			      pulongest (DW_BLOCK (&die->attrs[i])->size));
 	  break;
 	case DW_FORM_exprloc:
-	  fprintf_unfiltered (f, "expression: size %u",
-			      DW_BLOCK (&die->attrs[i])->size);
+	  fprintf_unfiltered (f, "expression: size %s",
+			      pulongest (DW_BLOCK (&die->attrs[i])->size));
 	  break;
 	case DW_FORM_ref_addr:
 	  fprintf_unfiltered (f, "ref address: ");
@@ -16723,8 +16746,8 @@ static CORE_ADDR
 decode_locdesc (struct dwarf_block *blk, struct dwarf2_cu *cu)
 {
   struct objfile *objfile = cu->objfile;
-  int i;
-  int size = blk->size;
+  size_t i;
+  size_t size = blk->size;
   gdb_byte *data = blk->data;
   CORE_ADDR stack[64];
   int stacki;
@@ -17518,7 +17541,8 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
 		mac_ptr += offset_size;
 
 		if (macinfo_type == DW_MACRO_GNU_define_indirect_alt
-		    || macinfo_type == DW_MACRO_GNU_undef_indirect_alt)
+		    || macinfo_type == DW_MACRO_GNU_undef_indirect_alt
+		    || section_is_dwz)
 		  {
 		    struct dwz_file *dwz = dwarf2_get_dwz_file ();
 
@@ -17841,6 +17865,8 @@ dwarf_decode_macros (struct dwarf2_cu *cu, unsigned int offset,
 
 	case DW_MACRO_GNU_define_indirect:
 	case DW_MACRO_GNU_undef_indirect:
+	case DW_MACRO_GNU_define_indirect_alt:
+	case DW_MACRO_GNU_undef_indirect_alt:
 	  {
 	    unsigned int bytes_read;
 
@@ -17851,6 +17877,7 @@ dwarf_decode_macros (struct dwarf2_cu *cu, unsigned int offset,
 	  break;
 
 	case DW_MACRO_GNU_transparent_include:
+	case DW_MACRO_GNU_transparent_include_alt:
 	  /* Note that, according to the spec, a transparent include
 	     chain cannot call DW_MACRO_GNU_start_file.  So, we can just
 	     skip this opcode.  */
@@ -19613,14 +19640,14 @@ and symtab expansion."),
 			    NULL,
 			    &setdebuglist, &showdebuglist);
 
-  add_setshow_zinteger_cmd ("dwarf2-die", no_class, &dwarf2_die_debug, _("\
+  add_setshow_zuinteger_cmd ("dwarf2-die", no_class, &dwarf2_die_debug, _("\
 Set debugging of the dwarf2 DIE reader."), _("\
 Show debugging of the dwarf2 DIE reader."), _("\
 When enabled (non-zero), DIEs are dumped after they are read in.\n\
 The value is the maximum depth to print."),
-			    NULL,
-			    NULL,
-			    &setdebuglist, &showdebuglist);
+			     NULL,
+			     NULL,
+			     &setdebuglist, &showdebuglist);
 
   add_setshow_boolean_cmd ("check-physname", no_class, &check_physname, _("\
 Set cross-checking of \"physname\" code against demangler."), _("\
@@ -19629,6 +19656,18 @@ When enabled, GDB's internal \"physname\" code is checked against\n\
 the demangler."),
 			   NULL, show_check_physname,
 			   &setdebuglist, &showdebuglist);
+
+  add_setshow_boolean_cmd ("use-deprecated-index-sections",
+			   no_class, &use_deprecated_index_sections, _("\
+Set whether to use deprecated gdb_index sections."), _("\
+Show whether to use deprecated gdb_index sections."), _("\
+When enabled, deprecated .gdb_index sections are used anyway.\n\
+Normally they are ignored either because of a missing feature or\n\
+performance issue.\n\
+Warning: This option must be enabled before gdb reads the file."),
+			   NULL,
+			   NULL,
+			   &setlist, &showlist);
 
   c = add_cmd ("gdb-index", class_files, save_gdb_index_command,
 	       _("\

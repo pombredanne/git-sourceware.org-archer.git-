@@ -22,6 +22,8 @@
 #include "gdb_bfd.h"
 #include "gdb_assert.h"
 #include "gdb_string.h"
+#include "ui-out.h"
+#include "gdbcmd.h"
 #include "hashtab.h"
 #ifdef HAVE_ZLIB_H
 #include <zlib.h>
@@ -47,6 +49,13 @@ struct gdb_bfd_section_data
   /* If the data was mmapped, this is the map address.  */
   void *map_addr;
 };
+
+/* A hash table holding every BFD that gdb knows about.  This is not
+   to be confused with 'gdb_bfd_cache', which is used for sharing
+   BFDs; in contrast, this hash is used just to implement
+   "maint info bfd".  */
+
+static htab_t all_bfds;
 
 /* See gdb_bfd.h.  */
 
@@ -158,7 +167,8 @@ gdb_bfd_open (const char *name, const char *target, int fd)
   if (abfd != NULL)
     {
       close (fd);
-      return gdb_bfd_ref (abfd);
+      gdb_bfd_ref (abfd);
+      return abfd;
     }
 
   abfd = bfd_fopen (name, target, FOPEN_RB, fd);
@@ -170,7 +180,8 @@ gdb_bfd_open (const char *name, const char *target, int fd)
   *slot = abfd;
 
   gdb_bfd_stash_filename (abfd);
-  return gdb_bfd_ref (abfd);
+  gdb_bfd_ref (abfd);
+  return abfd;
 }
 
 /* A helper function that releases any section data attached to the
@@ -216,22 +227,23 @@ gdb_bfd_close_or_warn (struct bfd *abfd)
   return ret;
 }
 
-/* Add reference to ABFD.  Returns ABFD.  */
+/* See gdb_bfd.h.  */
 
-struct bfd *
+void
 gdb_bfd_ref (struct bfd *abfd)
 {
   struct gdb_bfd_data *gdata;
+  void **slot;
 
   if (abfd == NULL)
-    return NULL;
+    return;
 
   gdata = bfd_usrdata (abfd);
 
   if (gdata != NULL)
     {
       gdata->refc += 1;
-      return abfd;
+      return;
     }
 
   gdata = bfd_zalloc (abfd, sizeof (struct gdb_bfd_data));
@@ -239,10 +251,13 @@ gdb_bfd_ref (struct bfd *abfd)
   gdata->mtime = bfd_get_mtime (abfd);
   bfd_usrdata (abfd) = gdata;
 
-  return abfd;
+  /* This is the first we've seen it, so add it to the hash table.  */
+  slot = htab_find_slot (all_bfds, abfd, INSERT);
+  gdb_assert (slot && !*slot);
+  *slot = abfd;
 }
 
-/* Unreference and possibly close ABFD.  */
+/* See gdb_bfd.h.  */
 
 void
 gdb_bfd_unref (struct bfd *abfd)
@@ -276,6 +291,8 @@ gdb_bfd_unref (struct bfd *abfd)
     }
 
   bfd_usrdata (abfd) = NULL;  /* Paranoia.  */
+
+  htab_remove_elt (all_bfds, abfd);
 
   gdb_bfd_close_or_warn (abfd);
 }
@@ -312,7 +329,7 @@ zlib_decompress_section (asection *sectp,
   error (_("Support for zlib-compressed data (from '%s', section '%s') "
            "is disabled in this copy of GDB"),
          bfd_get_filename (abfd),
-	 bfd_get_section_name (sectp));
+	 bfd_get_section_name (abfd, sectp));
 #else
   bfd_size_type compressed_size = bfd_get_section_size (sectp);
   gdb_byte *compressed_buffer = xmalloc (compressed_size);
@@ -323,7 +340,6 @@ zlib_decompress_section (asection *sectp,
   z_stream strm;
   int rc;
   int header_size = 12;
-  struct dwarf2_per_bfd_section *section_data;
 
   if (bfd_seek (abfd, sectp->filepos, SEEK_SET) != 0
       || bfd_bread (compressed_buffer,
@@ -399,7 +415,6 @@ const gdb_byte *
 gdb_bfd_map_section (asection *sectp, bfd_size_type *size)
 {
   bfd *abfd;
-  gdb_byte *buf, *retbuf;
   unsigned char header[4];
   struct gdb_bfd_section_data *descriptor;
 
@@ -480,4 +495,173 @@ gdb_bfd_map_section (asection *sectp, bfd_size_type *size)
   gdb_assert (descriptor->data != NULL);
   *size = descriptor->size;
   return descriptor->data;
+}
+
+
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_fopen (const char *filename, const char *target, const char *mode,
+	       int fd)
+{
+  bfd *result = bfd_fopen (filename, target, mode, fd);
+
+  if (result)
+    {
+      gdb_bfd_stash_filename (result);
+      gdb_bfd_ref (result);
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_openr (const char *filename, const char *target)
+{
+  bfd *result = bfd_openr (filename, target);
+
+  if (result)
+    {
+      gdb_bfd_stash_filename (result);
+      gdb_bfd_ref (result);
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_openw (const char *filename, const char *target)
+{
+  bfd *result = bfd_openw (filename, target);
+
+  if (result)
+    {
+      gdb_bfd_stash_filename (result);
+      gdb_bfd_ref (result);
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_openr_iovec (const char *filename, const char *target,
+		     void *(*open_func) (struct bfd *nbfd,
+					 void *open_closure),
+		     void *open_closure,
+		     file_ptr (*pread_func) (struct bfd *nbfd,
+					     void *stream,
+					     void *buf,
+					     file_ptr nbytes,
+					     file_ptr offset),
+		     int (*close_func) (struct bfd *nbfd,
+					void *stream),
+		     int (*stat_func) (struct bfd *abfd,
+				       void *stream,
+				       struct stat *sb))
+{
+  bfd *result = bfd_openr_iovec (filename, target,
+				 open_func, open_closure,
+				 pread_func, close_func, stat_func);
+
+  if (result)
+    {
+      gdb_bfd_ref (result);
+      gdb_bfd_stash_filename (result);
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_openr_next_archived_file (bfd *archive, bfd *previous)
+{
+  bfd *result = bfd_openr_next_archived_file (archive, previous);
+
+  if (result)
+    {
+      gdb_bfd_ref (result);
+      /* No need to stash the filename here.  */
+    }
+
+  return result;
+}
+
+/* See gdb_bfd.h.  */
+
+bfd *
+gdb_bfd_fdopenr (const char *filename, const char *target, int fd)
+{
+  bfd *result = bfd_fdopenr (filename, target, fd);
+
+  if (result)
+    {
+      gdb_bfd_ref (result);
+      gdb_bfd_stash_filename (result);
+    }
+
+  return result;
+}
+
+
+
+/* A callback for htab_traverse that prints a single BFD.  */
+
+static int
+print_one_bfd (void **slot, void *data)
+{
+  bfd *abfd = *slot;
+  struct gdb_bfd_data *gdata = bfd_usrdata (abfd);
+  struct ui_out *uiout = data;
+  struct cleanup *inner;
+
+  inner = make_cleanup_ui_out_tuple_begin_end (uiout, NULL);
+  ui_out_field_int (uiout, "refcount", gdata->refc);
+  ui_out_field_string (uiout, "addr", host_address_to_string (abfd));
+  ui_out_field_string (uiout, "filename", bfd_get_filename (abfd));
+  ui_out_text (uiout, "\n");
+  do_cleanups (inner);
+
+  return 1;
+}
+
+/* Implement the 'maint info bfd' command.  */
+
+static void
+maintenance_info_bfds (char *arg, int from_tty)
+{
+  struct cleanup *cleanup;
+  struct ui_out *uiout = current_uiout;
+
+  cleanup = make_cleanup_ui_out_table_begin_end (uiout, 3, -1, "bfds");
+  ui_out_table_header (uiout, 10, ui_left, "refcount", "Refcount");
+  ui_out_table_header (uiout, 18, ui_left, "addr", "Address");
+  ui_out_table_header (uiout, 40, ui_left, "filename", "Filename");
+
+  ui_out_table_body (uiout);
+  htab_traverse (all_bfds, print_one_bfd, uiout);
+
+  do_cleanups (cleanup);
+}
+
+/* -Wmissing-prototypes */
+extern initialize_file_ftype _initialize_gdb_bfd;
+
+void
+_initialize_gdb_bfd (void)
+{
+  all_bfds = htab_create_alloc (10, htab_hash_pointer, htab_eq_pointer,
+				NULL, xcalloc, xfree);
+
+  add_cmd ("bfds", class_maintenance, maintenance_info_bfds, _("\
+List the BFDs that are currently open."),
+	   &maintenanceinfolist);
 }

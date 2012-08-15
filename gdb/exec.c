@@ -127,16 +127,13 @@ exec_close_1 (int quitting)
       vp = nxt;
       nxt = vp->nxt;
 
-      /* if there is an objfile associated with this bfd,
-         free_objfile() will do proper cleanup of objfile *and* bfd.  */
-
       if (vp->objfile)
 	{
 	  free_objfile (vp->objfile);
 	  need_symtab_cleanup = 1;
 	}
-      else if (vp->bfd != exec_bfd)
-	gdb_bfd_unref (vp->bfd);
+
+      gdb_bfd_unref (vp->bfd);
 
       xfree (vp);
     }
@@ -233,9 +230,9 @@ exec_file_attach (char *filename, int from_tty)
 
       if (scratch_chan < 0)
 	perror_with_name (filename);
-      exec_bfd = gdb_bfd_ref (bfd_fopen (scratch_pathname, gnutarget,
-					 write_files ? FOPEN_RUB : FOPEN_RB,
-					 scratch_chan));
+      exec_bfd = gdb_bfd_fopen (scratch_pathname, gnutarget,
+				write_files ? FOPEN_RUB : FOPEN_RB,
+				scratch_chan);
 
       if (!exec_bfd)
 	{
@@ -252,8 +249,6 @@ exec_file_attach (char *filename, int from_tty)
 		 scratch_pathname,
 		 gdb_bfd_errmsg (bfd_get_error (), matching));
 	}
-
-      gdb_bfd_stash_filename (exec_bfd);
 
       /* FIXME - This should only be run for RS6000, but the ifdef is a poor
          way to accomplish.  */
@@ -550,6 +545,7 @@ map_vmap (bfd *abfd, bfd *arch)
   memset ((char *) vp, '\0', sizeof (*vp));
   vp->nxt = 0;
   vp->bfd = abfd;
+  gdb_bfd_ref (abfd);
   vp->name = bfd_get_filename (arch ? arch : abfd);
   vp->member = arch ? bfd_get_filename (abfd) : "";
 

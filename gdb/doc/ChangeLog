@@ -1,3 +1,71 @@
+2012-08-13  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Convenience Vars): Update text for "show convenience"
+	to include functions.
+
+2012-08-10  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Convenience Funs): New node.
+	(Types In Python): Document Type.vector.
+
+2012-08-09  Yao Qi  <yao@codesourcery.com>
+
+	* observer.texi: New observer command_param_changed.
+	* gdb.texinfo (GDB/MI Async Records): Doc for '=cmd-param-changed'.
+
+2012-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdbint.texinfo (Debugging GDB): In section
+	'Debugging @value{GDBN} with itself' change .gdbinit for gdb-gdb.gdb.
+	Mention also gdb-gdb.py.
+
+2012-08-07  Yao Qi  <yao@codesourcery.com>
+
+	Revert the folloing patch:
+	2012-08-06  Yao Qi  <yao@codesourcery.com>
+	* gdb.texinfo (Remote Configuration): Add kindex for 'set
+	remote hardware-watchpoint-limit' and 'set
+	remote hardware-breakpoint-limit'.
+
+2012-08-06  Nathaniel Flath  <flat0103@gmail.com>
+
+	* gdb.texinfo (Working Directory): Added information about new
+	default argument for 'cd' command.
+
+2012-08-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Remote Configuration): Add kindex for 'set
+	remote hardware-watchpoint-limit' and 'set
+	remote hardware-breakpoint-limit'.
+
+2012-08-06  Yao Qi  <yao@codesourcery.com>
+
+	Fix PR14371.
+
+	* gdb.texinfo (GDB/MI Async Records): Fix the doc for
+	'=breakpoint-deleted'.
+
+2012-08-02  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Native): Remove node Neutrino.
+
+2012-07-27  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (IPA Protocol Commands): Document new command
+	'close'.
+
+2012-07-25  Tom Tromey  <tromey@redhat.com>
+
+    	* gdb.texinfo (Maintenance Commands): Document maint info bfds.
+
+2012-07-20  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Mode Options): Delete --use-deprecated-index-sections.
+	(Index Files): Document how to control the use of deprecated index
+	sections.
+	(Index Section Format): Replace --use-deprecated-index-sections with
+	"set use-deprecated-index-sections on".
+
 2012-07-12  Eli Zaretskii  <eliz@gnu.org>
 
 	* gdbint.texinfo: Remove @syncodeindex directives that put all the

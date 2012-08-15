@@ -46,7 +46,7 @@
 #include "symtab.h"
 #include "exceptions.h"
 
-extern int overload_debug;
+extern unsigned int overload_debug;
 /* Local functions.  */
 
 static int typecmp (int staticp, int varargs, int nargs,
@@ -1875,19 +1875,6 @@ value_string (char *ptr, int len, struct type *char_type)
   return val;
 }
 
-struct value *
-value_bitstring (char *ptr, int len, struct type *index_type)
-{
-  struct value *val;
-  struct type *domain_type
-    = create_range_type (NULL, index_type, 0, len - 1);
-  struct type *type = create_set_type (NULL, domain_type);
-
-  TYPE_CODE (type) = TYPE_CODE_BITSTRING;
-  val = allocate_value (type);
-  memcpy (value_contents_raw (val), ptr, TYPE_LENGTH (type));
-  return val;
-}
 
 /* See if we can pass arguments in T2 to a function which takes
    arguments of types T1.  T1 is a list of NARGS arguments, and T2 is
@@ -2281,8 +2268,13 @@ search_struct_method (const char *name, struct value **arg1p,
 
 	  if (offset < 0 || offset >= TYPE_LENGTH (type))
 	    {
-	      gdb_byte *tmp = alloca (TYPE_LENGTH (baseclass));
-	      CORE_ADDR address = value_address (*arg1p);
+	      gdb_byte *tmp;
+	      struct cleanup *back_to;
+	      CORE_ADDR address;
+
+	      tmp = xmalloc (TYPE_LENGTH (baseclass));
+	      back_to = make_cleanup (xfree, tmp);
+	      address = value_address (*arg1p);
 
 	      if (target_read_memory (address + offset,
 				      tmp, TYPE_LENGTH (baseclass)) != 0)
@@ -2293,6 +2285,7 @@ search_struct_method (const char *name, struct value **arg1p,
 							  address + offset);
 	      base_valaddr = value_contents_for_printing (base_val);
 	      this_offset = 0;
+	      do_cleanups (back_to);
 	    }
 	  else
 	    {

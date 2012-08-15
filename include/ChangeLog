@@ -1,3 +1,29 @@
+2012-08-13  Ian Bolton  <ian.bolton@arm.com>
+            Laurent Desnogues  <laurent.desnogues@arm.com>
+            Jim MacArthur  <jim.macarthur@arm.com>
+            Marcus Shawcroft  <marcus.shawcroft@arm.com>
+            Nigel Stephens  <nigel.stephens@arm.com>
+            Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
+            Richard Earnshaw  <rearnsha@arm.com>
+            Sofiane Naci  <sofiane.naci@arm.com>
+            Tejas Belagod  <tejas.belagod@arm.com>
+            Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* dis-asm.h (print_insn_aarch64): New declaration.
+	(print_aarch64_disassembler_options): New declaration.
+	(aarch64_symbol_is_valid): New declaration.
+
+2012-08-02  Sean Keys  <skeys@ipdatasys.com>
+
+	* elf/m68hc11.h: #define E_M68HC11_NO_BANK_WARNING
+        0x000000200
+
+2012-07-24  Stephan McCamant  <smcc@cs.berkeley.edu>
+            Dr David Alan Gilbert  <dave@treblig.org>
+
+	PR binutils/13135
+	* dis-asm.h (fprintf_ftype): Add ATTRIBUTE_FPTR_PRINTF_2.
+
 2012-07-13  Doug Evans  <dje@google.com>
 
 	* filenames.h: #include "hashtab.h".
@@ -6,6 +32,11 @@
 2012-07-13  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
 
 	* elf/s390.h (START_RELOC_NUMBERS): Define R_390_IRELATIVE reloc.
+
+2012-07-05  Sean Keys  <skeys@ipdatasys.com>
+
+        * opcode/xgate.h: Changed the format string for mode
+        XGATE_OP_DYA_MON.
 
 2012-06-18  Doug Evans  <dje@google.com>
 

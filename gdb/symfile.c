@@ -1037,7 +1037,7 @@ new_symfile_objfile (struct objfile *objfile, int add_flags)
    loaded file.
 
    ABFD is a BFD already open on the file, as from symfile_bfd_open.
-   This BFD will be closed on error, and is always consumed by this function.
+   A new reference is acquired by this function.
 
    ADD_FLAGS encodes verbosity, whether this is main symbol file or
    extra, such as dynamically loaded code, and what to do with breakpoins.
@@ -1061,7 +1061,6 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
                                        int flags, struct objfile *parent)
 {
   struct objfile *objfile;
-  struct cleanup *my_cleanups;
   const char *name = bfd_get_filename (abfd);
   const int from_tty = add_flags & SYMFILE_VERBOSE;
   const int mainline = add_flags & SYMFILE_MAINLINE;
@@ -1075,8 +1074,6 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
       add_flags &= ~SYMFILE_NO_READ;
     }
 
-  my_cleanups = make_cleanup_bfd_unref (abfd);
-
   /* Give user a chance to burp if we'd be
      interactively wiping out any existing symbols.  */
 
@@ -1087,7 +1084,6 @@ symbol_file_add_with_addrs_or_offsets (bfd *abfd,
     error (_("Not confirmed."));
 
   objfile = allocate_objfile (abfd, flags | (mainline ? OBJF_MAINLINE : 0));
-  discard_cleanups (my_cleanups);
 
   if (parent)
     add_separate_debug_objfile (objfile, parent);
@@ -1208,8 +1204,13 @@ struct objfile *
 symbol_file_add (char *name, int add_flags, struct section_addr_info *addrs,
 		 int flags)
 {
-  return symbol_file_add_from_bfd (symfile_bfd_open (name), add_flags, addrs,
-                                   flags, NULL);
+  bfd *bfd = symfile_bfd_open (name);
+  struct cleanup *cleanup = make_cleanup_bfd_unref (bfd);
+  struct objfile *objf;
+
+  objf = symbol_file_add_from_bfd (bfd, add_flags, addrs, flags, NULL);
+  do_cleanups (cleanup);
+  return objf;
 }
 
 
@@ -1351,7 +1352,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
   if (filename_cmp (name, parent_objfile->name) == 0)
     return 0;
 
-  abfd = bfd_open_maybe_remote (name);
+  abfd = gdb_bfd_open_maybe_remote (name);
 
   if (!abfd)
     return 0;
@@ -1695,18 +1696,16 @@ set_initial_language (void)
    returns NULL with the BFD error set.  */
 
 bfd *
-bfd_open_maybe_remote (const char *name)
+gdb_bfd_open_maybe_remote (const char *name)
 {
-  if (remote_filename_p (name))
-    return gdb_bfd_ref (remote_bfd_open (name, gnutarget));
-  else
-    {
-      bfd *result = gdb_bfd_ref (bfd_openr (name, gnutarget));
+  bfd *result;
 
-      if (result != NULL)
-	gdb_bfd_stash_filename (result);
-      return result;
-    }
+  if (remote_filename_p (name))
+    result = remote_bfd_open (name, gnutarget);
+  else
+    result = gdb_bfd_openr (name, gnutarget);
+
+  return result;
 }
 
 
@@ -1724,7 +1723,7 @@ symfile_bfd_open (char *name)
 
   if (remote_filename_p (name))
     {
-      sym_bfd = gdb_bfd_ref (remote_bfd_open (name, gnutarget));
+      sym_bfd = remote_bfd_open (name, gnutarget);
       if (!sym_bfd)
 	error (_("`%s': can't open to read symbols: %s."), name,
 	       bfd_errmsg (bfd_get_error ()));
@@ -1764,7 +1763,7 @@ symfile_bfd_open (char *name)
   name = absolute_name;
   make_cleanup (xfree, name);
 
-  sym_bfd = gdb_bfd_ref (bfd_fopen (name, gnutarget, FOPEN_RB, desc));
+  sym_bfd = gdb_bfd_fopen (name, gnutarget, FOPEN_RB, desc);
   if (!sym_bfd)
     {
       make_cleanup (xfree, name);
@@ -1779,8 +1778,6 @@ symfile_bfd_open (char *name)
       error (_("`%s': can't read symbols: %s."), name,
 	     bfd_errmsg (bfd_get_error ()));
     }
-
-  gdb_bfd_stash_filename (sym_bfd);
 
   return sym_bfd;
 }
@@ -2106,7 +2103,7 @@ generic_load (char *args, int from_tty)
     }
 
   /* Open the file for loading.  */
-  loadfile_bfd = gdb_bfd_ref (bfd_openr (filename, gnutarget));
+  loadfile_bfd = gdb_bfd_openr (filename, gnutarget);
   if (loadfile_bfd == NULL)
     {
       perror_with_name (filename);
@@ -2518,7 +2515,7 @@ reread_symbols (void)
 	    obfd_filename = bfd_get_filename (objfile->obfd);
 	    /* Open the new BFD before freeing the old one, so that
 	       the filename remains live.  */
-	    objfile->obfd = bfd_open_maybe_remote (obfd_filename);
+	    objfile->obfd = gdb_bfd_open_maybe_remote (obfd_filename);
 	    gdb_bfd_unref (obfd);
 	  }
 
@@ -3396,7 +3393,7 @@ overlay_load_command (char *args, int from_tty)
    A place-holder for a mis-typed command.  */
 
 /* Command list chain containing all defined "overlay" subcommands.  */
-struct cmd_list_element *overlaylist;
+static struct cmd_list_element *overlaylist;
 
 static void
 overlay_command (char *args, int from_tty)

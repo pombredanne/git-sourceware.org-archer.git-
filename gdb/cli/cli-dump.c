@@ -112,7 +112,7 @@ bfd_openr_with_cleanup (const char *filename, const char *target)
 {
   bfd *ibfd;
 
-  ibfd = gdb_bfd_ref (bfd_openr (filename, target));
+  ibfd = gdb_bfd_openr (filename, target);
   if (ibfd == NULL)
     error (_("Failed to open %s: %s."), filename, 
 	   bfd_errmsg (bfd_get_error ()));
@@ -132,7 +132,7 @@ bfd_openw_with_cleanup (const char *filename, const char *target,
 
   if (*mode == 'w')	/* Write: create new file */
     {
-      obfd = gdb_bfd_ref (bfd_openw (filename, target));
+      obfd = gdb_bfd_openw (filename, target);
       if (obfd == NULL)
 	error (_("Failed to open %s: %s."), filename, 
 	       bfd_errmsg (bfd_get_error ()));
@@ -150,13 +150,13 @@ bfd_openw_with_cleanup (const char *filename, const char *target,
   return obfd;
 }
 
-struct cmd_list_element *dump_cmdlist;
-struct cmd_list_element *append_cmdlist;
-struct cmd_list_element *srec_cmdlist;
-struct cmd_list_element *ihex_cmdlist;
-struct cmd_list_element *tekhex_cmdlist;
-struct cmd_list_element *binary_dump_cmdlist;
-struct cmd_list_element *binary_append_cmdlist;
+static struct cmd_list_element *dump_cmdlist;
+static struct cmd_list_element *append_cmdlist;
+static struct cmd_list_element *srec_cmdlist;
+static struct cmd_list_element *ihex_cmdlist;
+static struct cmd_list_element *tekhex_cmdlist;
+static struct cmd_list_element *binary_dump_cmdlist;
+static struct cmd_list_element *binary_append_cmdlist;
 
 static void
 dump_command (char *cmd, int from_tty)

@@ -1,3 +1,958 @@
+2012-08-14  Mike Frysinger  <vapier@gentoo.org>
+
+	* infcmd.c (_initialize_infcmd): Update help text for the signal,
+	stepi, nexti, finish, next, step, jump, and continue commands.
+	* infrun.c (_initialize_infrun): Update help text for the handle
+	command.
+
+2012-08-14  Doug Evans  <dje@google.com>
+
+	* gdbtypes.c (struct extra): Delete, unused.
+
+	* gdbtypes.c: Whitespace cleanup.
+	(address_space_name_to_int): Remove "extern" from definition.
+	(_initialize_gdbtypes): Declare with initialize_file_ftype.
+
+	* gdbtypes.c (make_pointer_type): Remove redundant setting of
+	TYPE_POINTER_TYPE (type).
+
+2012-08-14  Gary Benson  <gbenson@redhat.com>
+
+	* solib-svr4.c (svr4_free_library_list): Use free_so.
+
+2012-08-13  Mike Frysinger  <vapier@gentoo.org>
+
+	* .gitignore: Add go-exp.c.
+
+2012-08-13  Doug Evans  <dje@google.com>
+
+	* value.c (show_convenience): Tweak comment.
+	(_initialize_values): Mention convenience functions in the help text
+	for "show convenience".
+
+2012-08-13  Yao Qi  <yao@codesourcery.com>
+
+	* std-operator.def: Remove TERNOP_SLICE_COUNT.
+	* breakpoint.c (watchpoint_exp_is_const): Remove handling to
+	TERNOP_SLICE_COUNT.
+	* eval.c (evaluate_subexp_standard): Likewise.
+	* expprint.c (print_subexp_standard): Likewise.
+	(dump_subexp_body_standard): Likewise.
+	* parse.c (operator_length_standard): Likewise.
+
+2012-08-13  Yao Qi  <yao@codesourcery.com>
+
+	* std-operator.def: Remove OP_BITSTRING.
+	* breakpoint.c (watchpoint_exp_is_const): Update.
+	* eval.c (evaluate_subexp_standard): Remove handling to
+	OP_BITSTRING.
+	* expprint.c (print_subexp_standard): Likewise.
+	(dump_subexp_body_standard): Likewise.
+	* parse.c (operator_length_standard): Likewise.
+	* valops.c (value_bitstring): Remove.
+	* value.h: Remove the declaration of 'value_bitstring'.
+
+2012-08-10  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* linespec.c (find_methods): Remove unused variables `i1' and
+	`name_len'.
+	(decode_line_full): Likewise for `arg_start'.
+
+2012-08-10  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb_bfd.c (gdb_bfd_unref): Remove unused variable `slot'.
+	(zlib_decompress_section): Likewise for `section_data'.
+	(gdb_bfd_map_section): Likewise for `buf' and `retbuf'.
+
+2012-08-10  Doug Evans  <dje@google.com>
+
+	Add $_memeq, $_regex, $_streq, $_strlen convenience functions.
+	* NEWS: Document them.
+	* data-directory/Makefile.in (PYTHON_FILES): Add function/__init__.py,
+	function/strfns.py.
+	* python/py-type.c (typy_array_1): New function.
+	(typy_array): Call it.
+	(typy_vector): New function.
+	(type_object_methods): Add "vector".
+	* python/lib/gdb/function/__init__.py: New file.
+	* python/lib/gdb/function/strfns.py: New file.
+
+2012-08-10  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* python/py-type.c (convert_field): Use gdb_py_long_from_longest
+	for TYPE_FIELD_BITPOS.
+	(typy_get_sizeof): Likewise for TYPE_LENGTH.
+
+2012-08-10  Mike Frysinger  <vapier@gentoo.org>
+
+	PR cli/10436:
+	* common/vec.h (VEC_merge): Define.
+	(DEF_VEC_ALLOC_FUNC_I): Add a merge helper.
+	(DEF_VEC_ALLOC_FUNC_P): Likewise.
+	(DEF_VEC_ALLOC_FUNC_O): Likewise.
+	* completer.c: Include gdb_signals.h.
+	(signal_completer): Define.
+	* completer.h (signal_completer): Add prototype.
+	* infcmd.c (_initialize_infcmd): Assign the command
+	completer for "signal" to handle_completer.
+	* infrun.c: Include completer.h.
+	(handle_completer): Define.
+	(_initialize_infrun): Declare a new local variable c.  Store the
+	result of add_com("handle") to it.  Assign the command
+	completer for "handle" to handle_completer.
+
+2012-08-09  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-decode.c (set_cmd_prefix): New.
+	(lookup_cmd_for_prefixlist): New.
+	(add_prefix_cmd): Call set_cmd_prefix and update field 'prefix'
+	of each cmd_list_element in *prefixlist.
+	(add_setshow_cmd_full): set_cmd_prefix.
+	(add_alias_cmd): Likewise.
+	* cli/cli-decode.h (struct cmd_list_element) <prefix>: New field.
+	Declare 'auto_boolean_enums'.
+	* cli/cli-setshow.c: Include "observer.h".
+	(notify_command_param_changed_p): New.
+	(add_setshow_auto_boolean_cmd): Move auto_boolean_enums out.
+	Remove 'static'.
+	(do_setshow_command): Split it to ...
+	(do_set_command, do_show_command): ... them.  New.
+	(do_set_command): Call observer_notify_command_param_changed if
+	notify_command_param_changed_p returns true.
+	(cmd_show_list): Caller update.
+	* auto-load.c (set_auto_load_cmd): Likewise.
+	* remote.c (show_remote_cmd): Likewise.
+	* cli/cli-setshow.h: Update declarations.
+	* top.c (execute_command): Call do_set_command and do_show_command.
+
+	* NEWS: Mention new MI notification.
+	* mi/mi-interp.c: Declare mi_command_param_changed.
+	(mi_interpreter_init): Attach mi_command_param_changed to
+	observer command_param_changed.
+	(mi_command_param_changed): New.
+	Remove mi_suppress_breakpoint_notifications.
+	Define global variable mi_suppress_notification.
+	(mi_breakpoint_created): Update.
+	(mi_breakpoint_deleted): Likewise.
+	(mi_breakpoint_modified): Likewise.
+	* mi/mi-main.c (mi_cmd_execute): Likewise.  Check command
+	'gdb-set' and set mi_suppress_notification.
+	* mi/mi-main.h: (mi_suppress_notification): New struct.
+
+2012-08-09  Andreas Tobler  <andreast@fgznet.ch>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* fbsd-nat.h (fbsd_find_memory_regions): Use find_memory_region_ftype.
+
+2012-08-09  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-cmds.c (enablebreaklist): Move it to breakpoint.c.
+	(skiplist): Move it to skip.c.
+	(init_cmd_lists): Remove code setting enablebreaklist and
+	skiplist to NULL.
+	* breakpoint.c (enablebreaklist): Moved from cli/cli-cmds.c.
+	* cli/cli-cmds.h: Remove declaration of enablebreaklist and
+	skiplist.
+	* gdbcmd.h: Likewise.
+	* skip.c (_initialize_step_skip): Move 'skiplist' from
+	cli/cli-cmds.c.
+
+2012-08-09  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-dump.c: Add 'static' to some cmd_list_element variables.
+	* gnu-nat.c, symfile.c: Likewise.
+
+2012-08-08  Aaron Gamble  <agamble@google.com>
+
+	* utils.c (prompt_for_continue_wait_time): New static global.
+	(make_command_stats_cleanup): Initialize it.
+	(report_command_stats): Subtract time waiting for user.
+	(prompt_for_continue): Track time waiting for user.
+	(defaulted_query): Track time waiting for user.
+
+2012-08-08  Doug Evans  <dje@google.com>
+
+	* eval.c (evaluate_subexp_standard): Fix thinko in handling
+	UNOP_MEMVAL_TYPE.
+	* expprint.c (print_subexp_standard, case OP_TYPE): New.
+	(print_subexp_standard, case UNOP_CAST_TYPE): Don't increment pos.
+	(print_subexp_standard, case UNOP_DYNAMIC_CAST): Ditto.
+	(print_subexp_standard, case UNOP_REINTERPRET_CAST): Ditto.
+	(print_subexp_standard, case UNOP_MEMVAL_TYPE): Ditto.
+	(dump_subexp_body_standard, case UNOP_DYNAMIC_CAST): Don't increment
+	elt.
+	(dump_subexp_body_standard, case UNOP_REINTERPRET_CAST): Ditto.
+	(dump_subexp_body_standard, case UNOP_CAST_TYPE): Ditto.
+	(dump_subexp_body_standard, case UNOP_MEMVAL_TYPE): Ditto.
+	(dump_prefix_expression): Handle OP_TYPE.
+
+2012-08-08  Keith Seitz  <keiths@redhat.com>
+
+	* breakpoint.c (parse_breakpoint_sals): Remove unused variable
+	addr_start.
+
+2012-08-08  Doug Evans  <dje@google.com>
+
+	* linux-thread-db.c: #include "gdb_vecs.h".
+	(try_thread_db_load_from_pdir_1): New arg "subdir".  All callers
+	updated.
+	(try_thread_db_load_from_pdir): New arg "subdir".  All callers updated.
+	(thread_db_load_search): Use a vector to iterate over path elements.
+	Handle text appearing after "$pdir".
+
+	* gdb_string.h: Moved to ...
+	* common/gdb_string.h: ... here.
+	* common/vec.h: Remove #ifndef GDBSERVER conditional inclusion of
+	gdb_string.h and gdb_assert.h.
+
+2012-08-08  Yao Qi  <yao@codesourcery.com>
+
+	* tic6x-tdep.c (tic6x_register_to_value): Remove.
+	(tic6x_value_to_register): Likewise.
+	(tic6x_gdbarch_init): Don't call set_gdbarch_register_to_value
+	and set_gdbarch_value_to_register.
+
+2012-08-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Jean-Marc Saffroy  <saffroy@gmail.com>
+
+	PR 11804
+	* defs.h (find_memory_region_ftype): New comment.  New arg modified.
+	* fbsd-nat.c (fbsd_find_memory_regions): Add the passed modified value.
+	* gcore.c (gcore_create_callback): New function comment.  Add modified
+	parameter.  Only write modified regions.  Set SEC_READONLY exactly
+	according to MODIFIED.
+	(objfile_find_memory_regions): Ignore separate debug info files.  Ass
+	the passed modified value to FUNC.
+	* gnu-nat.c (gnu_find_memory_regions): Add the passed modified value.
+	* linux-tdep.c (linux_find_memory_regions): Try to reads smaps file
+	first.  New variables modified and has_anonymous.  Parse the lines of
+	smaps file.  Add the passed MODIFIED value to FUNC.
+	* procfs.c (find_memory_regions_callback): Add the passed modified
+	value.
+
+2012-08-06  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2-frame.c (clear_pointer_cleanup): New function.
+	(dwarf2_frame_cache): Use it.
+	* frame-unwind.h (frame_sniffer_ftype): Document prologue
+	cache initialization constraint.
+
+2012-08-06  Tom Tromey  <tromey@redhat.com>
+
+	PR python/14386:
+	* varobj.c (update_dynamic_varobj_children): Don't call
+	PyIter_Check.
+
+2012-08-06  Tom Tromey  <tromey@redhat.com>
+
+	PR cli/14392:
+	* cli/cli-cmds.c (list_command): Filter 'sals_end'.
+
+2012-08-06  Nathaniel Flath  <flat0103@gmail.com>
+
+	* NEWS: New entry for 'cd' default parameters.
+	* cli/cli-cmds.c (cd_command): Replace error_no_arg by DIR assignment.
+
+2012-08-03  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2-frame.c (dwarf2_frame_cache): Call do_cleanups before
+	return.
+
+2012-08-02  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* inf-child.c (inf_child_fileio_pwrite): If pwrite fails, fall back
+	to attempting lseek/write.
+	(inf_child_fileio_pread): Likewise for pread.
+
+2012-08-02  Yao Qi  <yao@codesourcery.com>
+
+	* dwarf2loc.c (entry_values_debug): Add 'unsigned'.
+	(_initialize_dwarf2loc): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* dwarf2loc.h: Update the declaration of 'entry_values_debug'.
+	* dwarf2read.c (dwarf2_die_debug): Add 'unsigned'.
+	(_initialize_dwarf2_read): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* darwin-nat.c (dwarwin_debug_flag): Add 'unsigned'.
+	(_initialize_darwin_inferior): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* frame.c (frame_debug): Add 'unsigned'.
+	(_intialize_frame): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* frame.h: Update the declaration of 'frame_debug'.
+	* gdbtypes.c (overload_debug): Add 'unsigned'.
+	(_initialize_gdbtypes): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* inferior.h: Update declaration of 'debug_infrun'.
+	* infrun.c (debug_infrun): Add 'unsigned'.
+	(_initialize_infrun): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* jit.c (jit_debug): Add 'unsigned'.
+	(_initialize_jit): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* linux-nat.c (debug_linux_nat): Add 'unsigned'.
+	(_initialize_linux_nat): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* linux-thread-db.c (libthread_db_debug): Add 'unsigned'.
+	(_initialize_thread_db): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* machoread.c (mach_o_debug_level): Add 'unsigned'.
+	(_initialize_machoread): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* mi/mi-cmd-var.c: Update the declaration of 'varobjdebug'.
+	* microblaze-tdep.c (microblaze_debug_flag): Add 'unsigned'.
+	(_initialize_microblaze_tdep): Call add_setshow_zuinteger_cmd
+	intead of add_setshow_zinteger_cmd.
+	* mips-tdep.c (mips_debug): Add 'unsigned'.
+	(_initialize_mips_tdep): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* monitor.c (monitor_debug): Add 'unsigned'.
+	(_initialize_remote_monitors): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* observer.c (observer_debug): Add 'unsigned'.
+	(_initialize_observer): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* parse.c (expressiondebug): Add 'unsigned'.
+	(_initialize_parse): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* record.c (record_debug): Add 'unsigned'.
+	(_initialize_record): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* record.h: Update the declaration of 'record_debug'.
+	* stap-probe.c (stap_expression_debug): Add 'unsigned'.
+	(_initialize_stap_probe): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* serial.c (global_serial_debug_p): Add 'unsigned'.
+	(_initialize_serial): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* solib-dsbt.c (solib_dsbt_debug): Add 'unsigned'.
+	(_initialize_dsbt_solib): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* solib-frv.c (solib_frv_debug): Add 'unsigned'.
+	(_initialize_frv_solib): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* target.c (targetdebug): Add 'unsigned'.
+	(initialize_targets): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* valops.c (overload_debug): Add 'unsigned'.
+	* varobj.c (varobjdebug): Add 'unsigned'.
+	(_initialize_varobj): Call add_setshow_zuinteger_cmd instead of
+	add_setshow_zinteger_cmd.
+	* xtensa-tdep.c (xtensa_debug_level): Add 'unsigned'.
+	(_initialize_xtensa_tdep): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+
+	* arch-utils.h: Remove the declaration of 'gdbarch_debug'.
+	* gdbarch.sh (gdbarch_debug): Add 'unsigned'.
+	(extern void _initialize_gdbarch): Call add_setshow_zuinteger_cmd
+	instead of add_setshow_zinteger_cmd.
+	* gdbarch.c, gdbarch.h: Re-generated.
+
+2012-08-02  Yao Qi  <yao@codesourcery.com>
+
+	* nto-tdep.c: Don't include cli/cli-decode.h and
+	cli/cli-cmds.h.
+	(_initialize_nto_tdep): Remove.
+	* nto-tdep.h (struct nto_target_ops) <internal_debugging>:
+	Remove field.
+	Remove macro nto_internal_debugging.
+
+2012-08-01  Richard Henderson  <rth@redhat.com>
+
+	* configure.tgt (m32c-*-*) [gdb_target_obs]: Remove prologue-value.o.
+	(mep-*-*) [gdb_target_obs]: Likewise.
+
+2012-07-31  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* ppc-linux-tdep.c (ppc_linux_init_abi): Register
+	linux_get_siginfo_type.
+
+2012-07-31  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* infcall.c (call_function_by_hand): Move BP_ADDR comment to
+	AT_ENTRY_POINT.
+	(call_function_by_hand) <ON_STACK>: Call write_memory with
+	gdbarch_breakpoint_from_pc, if possible.
+	(call_function_by_hand) <AT_ENTRY_POINT>: The BP_ADDR comment is moved
+	here.
+
+2012-07-31  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c: Add 'static' for some variables.
+
+2012-07-31  Yao Qi  <yao@codesourcery.com>
+
+	* go32-nat.c: Declare _initialize_go32_nat.
+	* ser-go32.c: Declare _initialize_ser_dos.
+	* top.c (do_chdir_cleanup): Add 'static'.
+
+2012-07-30  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (linespec_lex_number): A number followed
+	by quotes is a valid number, too.
+
+2012-07-30  Tom Tromey  <tromey@redhat.com>
+
+	* remote-sim.c (gdb_os_poll_quit): Don't check immediate_quit.
+
+2012-07-30  Ulrich Weigand  <ulrich.weigand@linaro.org>
+
+	* arm-linux-nat.c (arm_linux_hw_breakpoint_initialize): Do not
+	attempt to 4-byte-align HW breakpoint addresses for Thumb.
+
+2012-07-30  Andrew Burgess  <aburgess@broadcom.com>
+
+	* varobj.c (varobj_invalidate_iter): All varobj must be marked as
+	invalid or reevaluated to prevent prevent references to possibly
+	delete'd type objects being left in the varobj.
+
+2012-07-27  Tom Tromey  <tromey@redhat.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* copying.awk: Print buffer-read-only and vi ro markers.
+	* copying.c: Rebuild.
+	* gdbarch.sh (copyright): Print buffer-read-only and vi ro markers.
+	* gdbarch.c, gdbarch.h: Rebuild.
+	* target-descriptions.c (maint_print_c_tdesc_cmd): Print
+	buffer-read-only and vi ro markers.
+	* features/arm-with-iwmmxt.c: Rebuild.
+	* features/arm-with-m-fpa-layout.c: Rebuild.
+	* features/arm-with-m-vfp-d16.c: Rebuild.
+	* features/arm-with-m.c: Rebuild.
+	* features/arm-with-neon.c: Rebuild.
+	* features/arm-with-vfpv2.c: Rebuild.
+	* features/arm-with-vfpv3.c: Rebuild.
+	* features/i386/amd64-avx-linux.c: Rebuild.
+	* features/i386/amd64-avx.c: Rebuild.
+	* features/i386/amd64-linux.c: Rebuild.
+	* features/i386/amd64.c: Rebuild.
+	* features/i386/i386-avx-linux.c: Rebuild.
+	* features/i386/i386-avx.c: Rebuild.
+	* features/i386/i386-linux.c: Rebuild.
+	* features/i386/i386-mmx-linux.c: Rebuild.
+	* features/i386/i386-mmx.c: Rebuild.
+	* features/i386/i386.c: Rebuild.
+	* features/i386/x32-avx-linux.c: Rebuild.
+	* features/i386/x32-avx.c: Rebuild.
+	* features/i386/x32-linux.c: Rebuild.
+	* features/i386/x32.c: Rebuild.
+	* features/mips-dsp-linux.c: Rebuild.
+	* features/mips-linux.c: Rebuild.
+	* features/mips64-dsp-linux.c: Rebuild.
+	* features/mips64-linux.c: Rebuild.
+	* features/rs6000/powerpc-32.c: Rebuild.
+	* features/rs6000/powerpc-32l.c: Rebuild.
+	* features/rs6000/powerpc-403.c: Rebuild.
+	* features/rs6000/powerpc-403gc.c: Rebuild.
+	* features/rs6000/powerpc-405.c: Rebuild.
+	* features/rs6000/powerpc-505.c: Rebuild.
+	* features/rs6000/powerpc-601.c: Rebuild.
+	* features/rs6000/powerpc-602.c: Rebuild.
+	* features/rs6000/powerpc-603.c: Rebuild.
+	* features/rs6000/powerpc-604.c: Rebuild.
+	* features/rs6000/powerpc-64.c: Rebuild.
+	* features/rs6000/powerpc-64l.c: Rebuild.
+	* features/rs6000/powerpc-7400.c: Rebuild.
+	* features/rs6000/powerpc-750.c: Rebuild.
+	* features/rs6000/powerpc-860.c: Rebuild.
+	* features/rs6000/powerpc-altivec32.c: Rebuild.
+	* features/rs6000/powerpc-altivec32l.c: Rebuild.
+	* features/rs6000/powerpc-altivec64.c: Rebuild.
+	* features/rs6000/powerpc-altivec64l.c: Rebuild.
+	* features/rs6000/powerpc-cell32l.c: Rebuild.
+	* features/rs6000/powerpc-cell64l.c: Rebuild.
+	* features/rs6000/powerpc-e500.c: Rebuild.
+	* features/rs6000/powerpc-e500l.c: Rebuild.
+	* features/rs6000/powerpc-isa205-32l.c: Rebuild.
+	* features/rs6000/powerpc-isa205-64l.c: Rebuild.
+	* features/rs6000/powerpc-isa205-altivec32l.c: Rebuild.
+	* features/rs6000/powerpc-isa205-altivec64l.c: Rebuild.
+	* features/rs6000/powerpc-isa205-vsx32l.c: Rebuild.
+	* features/rs6000/powerpc-isa205-vsx64l.c: Rebuild.
+	* features/rs6000/powerpc-vsx32.c: Rebuild.
+	* features/rs6000/powerpc-vsx32l.c: Rebuild.
+	* features/rs6000/powerpc-vsx64.c: Rebuild.
+	* features/rs6000/powerpc-vsx64l.c: Rebuild.
+	* features/rs6000/rs6000.c: Rebuild.
+	* features/s390-linux32.c: Rebuild.
+	* features/s390-linux32v1.c: Rebuild.
+	* features/s390-linux32v2.c: Rebuild.
+	* features/s390-linux64.c: Rebuild.
+	* features/s390-linux64v1.c: Rebuild.
+	* features/s390-linux64v2.c: Rebuild.
+	* features/s390x-linux64.c: Rebuild.
+	* features/s390x-linux64v1.c: Rebuild.
+	* features/s390x-linux64v2.c: Rebuild.
+	* features/tic6x-c62x-linux.c: Rebuild.
+	* features/tic6x-c62x.c: Rebuild.
+	* features/tic6x-c64x-linux.c: Rebuild.
+	* features/tic6x-c64x.c: Rebuild.
+	* features/tic6x-c64xp-linux.c: Rebuild.
+	* features/tic6x-c64xp.c: Rebuild.
+
+2012-07-27  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (classify_name): Avoid assignment in condition.
+
+2012-07-27  Roland Schwingel  <roland.schwingel@onevision.com>
+
+	* amd64-windows-tdep.c: Include "frame.h".
+	(amd64_windows_skip_trampoline_code): New function.
+	(amd64_windows_init_abi): Add trampoline registration.
+
+2012-07-27  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (cur_traceframe_number): Remove.
+	(set_tfile_traceframe): Remove.
+	(tfile_trace_find, tfile_fetch_registers): Update callers.
+	(tfile_xfer_partial, tfile_get_trace_state_variable_value): Likewise.
+	(tfile_open, tfile_trace_find): Likewise.
+
+2012-07-27  Yao Qi  <yao@codesourcery.com>
+
+	* thread.c (switch_to_thread): Don't call registers_changed.
+
+2012-07-26  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (SFILES): Remove objc-exp.y.
+	(YYFILES): Remove objc-exp.c.
+	(YYOBJ): Remove objc-exp.o.
+	(local-maintainer-clean): Don't mention objc-exp.c.
+	* c-exp.y: Include objc-lang.h.
+	(%union) <class>: New field.
+	(NSSTRING, SELECTOR, CLASSNAME, OBJC_LBRAC): New tokens.
+	(exp): Clone subscript production for OBJC_LBRAC.  Add various
+	Objective C productions.
+	(msglist, msgarglist, msgarg): New productions.
+	(array_mod, func_mod, operator): Clone productions for
+	OBJC_LBRAC.
+	(parse_string_or_char): Handle '@' strings.
+	(lex_one_token): Return OBJC_LBRAC.  Recognize @selector.
+	(classify_name): Check la_name_of_this.  Recognize ObjC class
+	names.
+	* objc-exp.y: Remove.
+	* objc-lang.c (objc_language_defn): Use c_parse, c_error.
+	* objc-lang.h (objc_parse, objc_error): Don't declare.
+
+2012-07-26  Markus Metzger  <markus.t.metzger@intel.com>
+
+	* python/py-inferior.c (infpy_threads): Call update_thread_list ().
+
+2012-07-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* auto-load.c (auto_load_info_scripts): Remove immediate_quit increment
+	and decrement.
+
+2012-07-26  Tom Tromey  <tromey@redhat.com>
+
+	* copying.c: Rebuild.
+	* copying.awk: Don't use immediate_quit.  Use 'no_set_class', not
+	'no_class'.
+
+2012-07-26  Tom Tromey  <tromey@redhat.com>
+
+	* symmisc.c (print_symbol_bcache_statistics): Use QUIT, not
+	immediate_quit.
+	(print_objfile_statistics): Likewise.
+	(maintenance_print_symbols): Likewise.
+	(maintenance_print_msymbols): Likewise.
+	(maintenance_print_objfiles): Likewise.
+	* psymtab.c (print_partial_symbols): Call QUIT.
+	(maintenance_print_psymbols): Likewise.  Don't modify
+	immediate_quit.
+	* copying.c (show_copying_command): Don't modify immediate_quit.
+	(show_warranty_command): Likewise.
+	* cli/cli-cmds.c (show_version): Don't modify immediate_quit.
+
+2012-07-26  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (linespec_lexer_lex_number): The input
+	is also a valid number if the next character is a comma
+	or colon.
+
+2012-07-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* NEWS: Document new --enable-libmcheck/--disable-libmcheck
+	configure options.
+
+2012-07-26  Tristan Gingold  <gingold@adacore.com>
+
+	* machoread.c: Include gdb_bfd.h.
+
+2012-07-26  Tristan Gingold  <gingold@adacore.com>
+
+	* dwarf2loc.c (locexpr_describe_location_piece): Use uint64_t for
+	offset.
+
+2012-07-26  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc_full): Expand parameter
+	SIZE to size_t.
+	(dwarf2_evaluate_loc_desc): Likewise.
+	(dwarf2_loc_desc_needs_frame): Likewise.
+	(locexpr_describe_location_1): Likewise.
+	* dwarf2loc.h (struct dwarf2_locexpr_baton): Make SIZE as
+	size_t.
+	(struct dwarf2_loclist_baton): Likewise.
+	* dwarf2read.c (struct dwarf_block): Likewise.
+	(dump_die_shallow): Use pulongest to print dwarf_block.size.
+	(decode_locdesc): Expand SIZE and I to size_t.
+
+2012-07-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* contrib/cc-with-tweaks.sh: Put into comment path gdb/contrib/.
+
+2012-07-25  Joel Brobecker  <brobecker@adacore.com>
+
+	* doublest.c (convert_doublest_to_floatformat): If the exponent
+	is too small, treat the value as zero.  If the exponent is too
+	large, treat the value as infinity.
+
+2012-07-25  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Add --enable-lmcheck configure option.
+	* configure: Regenerate.
+
+2012-07-25  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Mention maint info bfds.
+	* gdb_bfd.c (all_bfds): New global.
+	(gdb_bfd_ref, gdb_bfd_unref): Update all_bfds.
+	(print_one_bfd, maintenance_info_bfds, _initialize_gdb_bfd):
+	New functions.
+
+2012-07-25  Ralf Corsépius  <ralf.corsepius@rtems.org>
+
+	* configure.tgt: Add v850*-*-rtems*.
+
+2012-07-25  Tom Tromey  <tromey@redhat.com>
+
+	* macrotab.c (macro_bcache_str): Remove cast.
+
+2012-07-25  Hui Zhu  <hui_zhu@mentor.com>
+
+	* linespec.c (linespec_lexer_lex_number): Update comments,
+	change the return and add check to make sure the input is
+	the decimal numbers.
+	(linespec_lexer_lex_one): If linespec_lexer_lex_number return
+	false, call linespec_lexer_lex_string.
+
+2012-07-24  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (symbol_file_add): Don't open BFD twice.
+
+2012-07-24  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* breakpoint.c (create_breakpoint): Store condition for pending
+	breakpoints.
+
+2012-07-24  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* m68k-tdep.c (m68k_reg_struct_return_p): Accept complex types.
+	(m68k_return_value): Handle complex types like structures.
+	(m68k_svr4_return_value): Likewise.
+
+2012-07-24  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* gdb_bfd.c (zlib_decompress_section) <!HAVE_ZLIB_H>: Adjust
+	parameters to bfd_get_section_name.
+
+2012-07-24  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-setshow.c: Handle case 'var_uinteger'
+	and 'var_zuninteger' together.  Handle case 'var_integer' and
+	'var_zinteger' together.
+
+2012-07-23  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (convert_linespec_to_sal): Don't add
+	any symbols to the result vector if symbol_to_sal
+	returns zero.
+
+2012-07-23  Keith Seitz  <keiths@redhat.com>
+
+	* linespec.c (decode_objc): Record the function name
+	in the linespec.
+
+2012-07-23  Tom Tromey  <tromey@redhat.com>
+
+	* rs6000-nat.c (add_vmap): Rewrite archive loop.  Fix reference
+	counting.
+	* exec.c (exec_close_1): Unconditionally release vmap's BFD.
+	(map_vmap): Acquire a reference to the BFD.
+
+2012-07-23  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* p-valprint.c (pascal_object_print_value): Replace potentially
+	unsafe alloca with xmalloc/xfree.
+	* valops.c (search_struct_method): Likewise.
+
+2012-07-23  Tom Tromey  <tromey@redhat.com>
+
+	* solib-svr4.c (enable_break): Update.
+	* bfd-target.h (target_bfd_reopen): Update documentation.
+
+2012-07-23  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (separate_debug_file_exists): Update.
+	(gdb_bfd_open_maybe_remote): Rename from bfd_open_maybe_remote.
+	(reread_symbols): Update.
+	* elfread.c (build_id_verify): Update.
+	* symfile.h (gdb_bfd_open_maybe_remote): Rename from
+	bfd_open_maybe_remote.
+
+2012-07-23  Tom Tromey  <tromey@redhat.com>
+
+	* gdb_bfd.c (gdb_bfd_ref, gdb_bfd_unref): Fix comment.
+
+2012-07-23  Tom Tromey  <tromey@redhat.com>
+
+	* coffread.c (coff_symfile_read): Make a cleanup for 'debugfile'
+	and 'abfd'.
+	* elfread.c (elf_symfile_read): Make a cleanup for 'debugfile'
+	and 'abfd'.
+	* jit.c (jit_bfd_try_read_symtab): Make a cleanup for 'nbfd'.
+	* machoread.c (macho_add_oso_symfile): Make a cleanup for
+	'abfd'.
+	(macho_symfile_read): Make a cleanup for 'dsym_bfd'.
+	* objfiles.c (allocate_objfile): Acquire a new reference.
+	* rs6000-nat.c (add_vmap): Don't acquire a BFD reference.
+	* solib.c (solib_read_symbols): Don't acquire a BFD reference.
+	* spu-linux-nat.c (spu_symbol_file_add_from_memory): Make
+	a cleanup for 'nbfd'.
+	* symfile-mem.c (symbol_file_add_from_memory): Make a cleanup
+	for 'nbfd'.
+	* symfile.c (symbol_file_add_with_addrs_or_offsets): Don't
+	make a cleanup for 'abfd'.
+	(symbol_file_add): Make a BFD cleanup.
+
+2012-07-23  Tom Tromey  <tromey@redhat.com>
+
+	* cli/cli-dump.c (bfd_openr_with_cleanup): Use gdb_bfd_openr.
+	(bfd_openw_with_cleanup): Use gdb_bfd_openw.
+	* corelow.c (core_open): Use gdb_bfd_fopen.
+	* dsrec.c (load_srec): Use gdb_bfd_openr.
+	* exec.c (exec_file_attach): Use gdb_bfd_fopen.
+	* gcore.c (gcore_memory_sections): Use gdb_bfd_openw.
+	* gdb_bfd.c (gdb_bfd_fopen, gdb_bfd_openr, gdb_bfd_openw)
+	(gdb_bfd_openr_iovec, gdb_bfd_openr_next_archived_file)
+	(gdb_bfd_fdopenr): New functions.
+	* gdb_bfd.h (gdb_bfd_fopen, gdb_bfd_openr, gdb_bfd_openw)
+	(gdb_bfd_openr_iovec, gdb_bfd_openr_next_archived_file)
+	(gdb_bfd_fdopenr): Declare.
+	* jit.c (bfd_open_from_target_memory): Use gdb_bfd_openr_iovec.
+	* m32-rom.c (m32r_load, m32r_upload_command): Use gdb_bfd_openr.
+	* machoread.c (macho_symfile_read_all_oso): Use gdb_bfd_openr,
+	gdb_bfd_openr_next_archived_file.
+	(macho_check_dsym): Use gdb_bfd_openr.
+	(macho_add_oso_symfile): Don't call gdb_bfd_stash_filename.
+	* procfs.c (insert_dbx_link_bpt_in_file): Use gdb_bfd_fdopenr.
+	* remote-m32r-sdi.c (m32r_load): Use gdb_bfd_openr.
+	* remote-mips.c (mips_load_srec, pmon_load_fast): Use
+	gdb_bfd_openr.
+	* remote.c (remote_bfd_open): Use gdb_bfd_openr_iovec.
+	* rs6000-nat.c (add_vmap): Use gdb_bfd_openr, gdb_bfd_fdopenr,
+	gdb_bfd_openr_next_archived_file.
+	* solib-darwin.c (darwin_solib_get_all_image_info_addr_at_init):
+	Use gdb_bfd_openr.
+	* solib-pa64.c (pa64_solib_create_inferior_hook): Use
+	gdb_bfd_openr.
+	* solib-spu.c (spu_bfd_fopen): Use gdb_bfd_openr_iovec.
+	* solib.c (solib_bfd_fopen): Use gdb_bfd_fopen.
+	* spu-linux-nat.c (spu_bfd_open): Use gdb_bfd_openr_iovec.
+	* symfile.c (bfd_open_maybe_remote): Use gdb_bfd_openr.
+	(symfile_bfd_open): Use gdb_bfd_fopen.
+	(generic_load): Use gdb_bfd_openr.
+	* windows-nat.c (windows_make_so): Use gdb_bfd_openr.
+
+2012-07-23  Tom Tromey  <tromey@redhat.com>
+
+	* bfd-target.c (target_bfd_reopen): Update.
+	* cli/cli-dump.c (bfd_openr_with_cleanup)
+	(bfd_openw_with_cleanup): Update.
+	* corelow.c (core_open): Update.
+	* dsrec.c (load_srec): Update.
+	* exec.c (exec_file_attach): Update.
+	* gcore.c (create_gcore_bfd): Update.
+	* gdb_bfd.c (gdb_bfd_ref): Return void.
+	(gdb_bfd_open): Update.
+	* gdb_bfd.h (gdb_bfd_ref): Return void.
+	Update comments.
+	* jit.c (jit_bfd_try_read_symtab): Update.
+	* m32r-rom.c (m32r_load, m32r_upload_command): Update.
+	* machoread.c (macho_symfile_read_all_oso): Update.
+	(macho_check_dsym): Update.
+	* procfs.c (insert_dbx_link_bpt_in_file): Update.
+	* remote-m32r-sdi.c (m32r_load): Update.
+	* remote-mips.c (mips_load_srec, pmon_load_fast): Update.
+	* rs6000-nat.c (add_vmap): Update.
+	* solib-darwin.c (darwin_solib_get_all_image_info_addr_at_init):
+	Update.
+	* solib-pa64.c (pa64_solib_create_inferior_hook): Update.
+	* solib-spu.c (spu_bfd_open): Update.
+	* solib.c (solib_bfd_fopen, solib_read_symbols): Update.
+	* spu-linux-nat.c (spu_bfd_open): Update.
+	* symfile.c (bfd_open_maybe_remote, symfile_bfd_open)
+	(generic_load): Update.
+	* windows-nat.c (windows_make_so): Update.
+
+2012-07-22  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* sh-tdep.c (sh_treat_as_flt_p): Remove unused variable LEN.
+
+2012-07-20  Jeff Kenton  <jkenton@tilera.com>
+
+	* tilegx-linux-tdep.c (tilegx_linux_sigframe_init): Fix
+	SIGTRAMP_FRAME unwinding.
+
+2012-07-20  Doug Evans  <dje@google.com>
+
+	* NEWS: Document new options "set/show use-deprecated-index-sections",
+	and delete reference to --use-deprecated-index-sections.
+	* symfile.h (use_deprecated_index_sections): Delete.
+	* dwarf2read.c (use_deprecated_index_sections): Make static.
+	(read_index_from_section): Update wording of how to load
+	deprecated index sections.
+	(_initialize_dwarf2_read): New options
+	"set/show use-deprecated-index-sections".
+	* main.c (captured_main): Delete --use-deprecated-index-sections.
+
+2012-07-20  Pedro Alves  <palves@redhat.com>
+
+	PR threads/11692
+	PR gdb/12203
+
+	* infrun.c (handle_inferior_event) <new thread>: Don't special
+	case minus_one_ptid.
+	<TARGET_WAITKIND_SPURIOUS>: Ditto.
+	* linux-thread-db.c (thread_get_info_callback): Don't return early
+	if the thread is zombie.
+	(thread_from_lwp): Change return type to void.  Rewrite stale
+	comment.
+	(attach_thread): Don't return early if the thread is zombie,
+	instead set its "dying" flag.
+	(thread_db_wait): Don't return TARGET_WAITKIND_SPURIOUS anymore.
+	(find_new_threads_callback): Don't return early if the thread is
+	zombie.
+
+2012-07-20  Pedro Alves  <palves@redhat.com>
+
+	* linux-nat.c (linux_nat_wait): Dump the passed in target options.
+	* target.c (target_wait): Likewise.
+	(str_comma_list_concat_elem, do_option, target_options_to_string):
+	New functions.
+	* target.h (target_options_to_string): Declare.
+
+2012-07-20  Jan Kratochvil <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dwarf_decode_macros)
+	<DW_MACRO_GNU_define_indirect_alt, DW_MACRO_GNU_undef_indirect_alt,
+	DW_MACRO_GNU_transparent_include_alt>: New cases.
+	(dwarf_decode_macro_bytes) <DW_MACRO_GNU_define_indirect,
+	DW_MACRO_GNU_undef_indirect>: Examine 'section_is_dwz'.
+
+2012-07-20  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (try_open_dwo_file): Don't call
+	gdb_bfd_stash_filename.
+
+2012-07-20  Pedro Alves  <palves@redhat.com>
+
+	* i386-tdep.c (i386_record_modrm, i386_record_lea_modrm_addr)
+	(i386_record_lea_modrm, i386_record_push, i386_record_floats)
+	(i386_process_record): Tweak description comments.
+
+2012-07-20  Pedro Alves  <palves@redhat.com>
+
+	* i386-tdep.c (i386_record_modrm, i386_record_lea_modrm_addr)
+	(i386_process_record): Use record_read_memory.
+	* record.c (record_read_memory): New function.
+	(record_arch_list_add_mem, record_exec_insn): Use
+	record_read_memory.
+	* record.h (record_read_memory): Declare.
+
+2012-07-20  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-setshow.c (do_setshow_command): Don't check pointer is
+	NULL for xfree.
+
+2012-07-19  Pedro Alves  <palves@redhat.com>
+
+	* record.c (record_resume): Ask the target beneath to report all
+	signals.
+
+2012-07-19  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf2_ranges_read): Ignore ranges starting at zero if
+	there's no section at address zero.
+	(dwarf2_record_block_ranges): Ditto.
+
+2012-07-19  Yao Qi  <yao@codesourcery.com>
+
+	* command.h, remote.c: Fix a typo in comment.
+
+2012-07-19  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/13206:
+	* ax-gdb.c (gen_expr) <OP_TYPEOF, OP_DECLTYPE>: New cases.
+	* breakpoint.c (watchpoint_exp_is_const) <OP_TYPEOF,
+	OP_DECLTYPE>: New cases.
+	* c-exp.y (TYPEOF, DECLTYPE): New tokens.
+	(type_exp): Add new productions.
+	(ident_tokens): Add __typeof__, typeof, __typeof, __decltype,
+	and decltype.
+	* eval.c (evaluate_subexp_standard) <OP_TYPEOF, OP_DECLTYPE>:
+	New case.
+	* expprint.c (dump_subexp_body_standard) <OP_TYPEOF,
+	OP_DECLTYPE>: New case.
+	* parse.c (operator_length_standard) <OP_TYPEOF, OP_DECLTYPE>:
+	New case.
+	* std-operator.def (OP_TYPEOF, OP_DECLTYPE): New constants.
+	* varobj.c (varobj_create): Handle OP_TYPEOF, OP_DECLTYPE.
+
+2012-07-19  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (enum token_flags): New.
+	(struct token) <cxx_only>: Remove.
+	<flags>: New field.
+	(tokentab3, tokentab2, ident_tokens): Update.
+	(lex_one_token): Update.  Handle FLAG_SHADOW.
+
+2012-07-19  Tom Tromey  <tromey@redhat.com>
+
+	* ax-gdb.c (gen_expr): Handle UNOP_CAST_TYPE, UNOP_MEMVAL_TYPE.
+	* breakpoint.c (watchpoint_exp_is_const): Handle UNOP_CAST_TYPE,
+	UNOP_REINTERPRET_CAST, UNOP_DYNAMIC_CAST.
+	* c-exp.y (exp): Emit UNOP_MEMVAL_TYPE, UNOP_CAST_TYPE.  Update
+	for changes to UNOP_REINTERPRET_CAST, UNOP_DYNAMIC_CAST.  Use
+	type_exp production where appropriate.
+	* eval.c (evaluate_subexp_standard) <UNOP_CAST_TYPE>: New case.
+	<UNOP_DYNAMIC_CAST, UNOP_REINTERPRET_CAST>: Update.
+	<UNOP_MEMVAL_TYPE>: New case.
+	(evaluate_subexp_for_address) <UNOP_MEMVAL_TYPE>: New case.
+	(evaluate_subexp_for_sizeof) <UNOP_MEMVAL_TYPE>: New case.
+	* expprint.c (print_subexp_standard) <UNOP_CAST_TYPE>: New case.
+	<UNOP_MEMVAL_TYPE>: New case.
+	(dump_subexp_body_standard) <UNOP_DYNAMIC_CAST,
+	UNOP_REINTERPRET_CAST>: Update.
+	<UNOP_CAST_TYPE, UNOP_MEMVAL_TYPE>: New cases.
+	* parse.c (operator_length_standard) <UNOP_DYNAMIC_CAST,
+	UNOP_REINTERPRET_CAST>: Update.
+	<UNOP_CAST_TYPE, UNOP_MEMVAL_TYPE>: New cases.
+	* stack.c (return_command): Also check for UNOP_CAST_TYPE.
+	* std-operator.def (UNOP_CAST_TYPE, UNOP_MEMVAL_TYPE): New
+	constants.
+
+2012-07-19  Yao Qi  <yao@codesourcery.com>
+	    Jan Kratochvil <jan.kratochvil@redhat.com>
+
+	* cli/cli-setshow.c (do_setshow_command): Handle case 'var_filename'
+	and case 'var_optional_filename' together.
+	* infcmd.c (_initialize_infcmd): Call add_setshow_string_noescape_cmd
+	instead of add_setshow_optional_filename_cmd for setshow command
+	'args'.  Set completer for 'set args'.
+
 2012-07-18  Doug Evans  <dje@google.com>
 
 	* common/gdb_vecs.h: Moved here from ./gdb_vecs.h.
@@ -350,7 +1305,7 @@
 	* ser_base (ser_base_read_error_fd): New function.
 	(do_ser_base_readchar): Poll error file descriptor as well as
 	standard output.
-	(generic_readchar): Refactor error handling. 
+	(generic_readchar): Refactor error handling.
 
 2012-07-18  Joel Brobecker  <brobecker@adacore.com>
 
@@ -1144,7 +2099,7 @@
 2012-06-25  Michael Eager  <eager@eagercon.com>
 
 	PR python/14291
-	* python/python.c (gdbpy_write): Check for interrupted output. 
+	* python/python.c (gdbpy_write): Check for interrupted output.
 
 2012-06-25  Greta Yorsh  <greta.yorsh@arm.com>
 
@@ -1659,7 +2614,7 @@
 	* valarith.c (binop_types_user_defined_p): Fix a typo.
 
 2012-06-08  Yao Qi  <yao@codesourcery.com>
-            Chung-Lin Tang <cltang@codesourcery.com>
+	    Chung-Lin Tang <cltang@codesourcery.com>
 
 	* arch-utils.c (default_return_in_first_hidden_param_p): New.
 	* arch-utils.h: Declare.
@@ -2054,7 +3009,7 @@
 
 	PR gdb/7205
 
-        Replace TARGET_SIGNAL_ with GDB_SIGNAL_ throughout.
+	Replace TARGET_SIGNAL_ with GDB_SIGNAL_ throughout.
 
 2012-05-24  Pedro Alves  <palves@redhat.com>
 
@@ -2374,7 +3329,7 @@
 	(mips16_instruction_has_delay_slot): Simplify making use of the
 	updated mips_fetch_instruction interface.
 	(mips_adjust_breakpoint_address): Check for the standard MIPS
-	ISA rather than for MIPS16 ISA.  Update for unmake_compact_addr 
+	ISA rather than for MIPS16 ISA.  Update for unmake_compact_addr
 	calls.  Handle microMIPS code.
 	(mips_get_mips16_fn_stub_pc): Update mips_fetch_instruction call.
 	(mips_skip_trampoline_code): Handle microMIPS code.
@@ -2634,7 +3589,7 @@
 	* dwarf2read.c (macro_start_file): Call macro_define_special.
 
 2012-05-16  Maciej W. Rozycki  <macro@codesourcery.com>
-            Maciej W. Rozycki  <macro@mips.com>
+	    Maciej W. Rozycki  <macro@mips.com>
 
 	* breakpoint.h (bp_location): Add related_address member.
 	* inferior.h (get_return_value): Take a pointer to struct value
@@ -3763,7 +4718,7 @@
 	no default by the DWARF standard.
 
 2012-04-26  Maciej W. Rozycki  <macro@mips.com>
-            Maciej W. Rozycki  <macro@codesourcery.com>
+	    Maciej W. Rozycki  <macro@codesourcery.com>
 
 	* infrun.c (handle_inferior_event): Move the check for return
 	trampolines ahead of the check for function trampolines.
@@ -3903,9 +4858,9 @@
 	Revert this patch to allow breakpoint always-inserted
 	in record target.
 	2011-12-05  Pedro Alves  <pedro@codesourcery.com>
-        * breakpoint.c: Include record.h.
-        (breakpoints_always_inserted_mode): Return false when the record
-        target is in use.
+	* breakpoint.c: Include record.h.
+	(breakpoints_always_inserted_mode): Return false when the record
+	target is in use.
 
 	* breakpoint.c (iterate_over_bp_locations): New.
 	* breakpoint.h: Declare.
@@ -3958,8 +4913,8 @@
 2012-04-21  Paul Hilfinger  <hilfinger@adacore.com>
 
 	* ada-lang.c (ada_evaluate_subexp): Add cases for
-        TYPE_CODE_INTERNAL_FUNCTION and for TYPE_GNU_IFUNC, following
-        their treatment in eval.c.
+	TYPE_CODE_INTERNAL_FUNCTION and for TYPE_GNU_IFUNC, following
+	their treatment in eval.c.
 
 2012-04-21  David S. Miller  <davem@davemloft.net>
 
@@ -3972,7 +4927,7 @@
 	* arm-tdep.c (arm_register_g_packet_guesses): Fix comment.
 
 2012-04-20  Nigel Stephens  <nigel@mips.com>
-            Maciej W. Rozycki  <macro@codesourcery.com>
+	    Maciej W. Rozycki  <macro@codesourcery.com>
 
 	* mips-tdep.c (mips_float_register_p): New function.
 	(mips_convert_register_float_case_p): Use mips_float_register_p.

@@ -46,6 +46,7 @@
 #include "exec.h"
 #include "auxv.h"
 #include "exceptions.h"
+#include "gdb_bfd.h"
 
 #include "probe.h"
 
@@ -1107,7 +1108,7 @@ svr4_free_library_list (void *p_list)
     {
       struct so_list *next = list->next;
 
-      svr4_free_so (list);
+      free_so (list);
       list = next;
     }
 }
@@ -2205,9 +2206,11 @@ enable_break (struct svr4_info *info, int from_tty)
 	goto bkpt_at_symbol;
 
       /* Now convert the TMP_BFD into a target.  That way target, as
-         well as BFD operations can be used.  Note that closing the
-         target will also close the underlying bfd.  */
+         well as BFD operations can be used.  */
       tmp_bfd_target = target_bfd_reopen (tmp_bfd);
+      /* target_bfd_reopen acquired its own reference, so we can
+         release ours now.  */
+      gdb_bfd_unref (tmp_bfd);
 
       /* On a running target, we can get the dynamic linker's base
          address from the shared library table.  */
@@ -2317,8 +2320,9 @@ enable_break (struct svr4_info *info, int from_tty)
 						       sym_addr,
 						       tmp_bfd_target);
 
-      /* We're done with both the temporary bfd and target.  Remember,
-         closing the target closes the underlying bfd.  */
+      /* We're done with both the temporary bfd and target.  Closing
+         the target closes the underlying bfd, because it holds the
+         only remaining reference.  */
       target_close (tmp_bfd_target, 0);
 
       if (sym_addr != 0)

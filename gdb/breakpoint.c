@@ -9096,8 +9096,6 @@ static void
 parse_breakpoint_sals (char **address,
 		       struct linespec_result *canonical)
 {
-  char *addr_start = *address;
-
   /* If no arg given, or if first arg is 'if ', use the default
      breakpoint.  */
   if ((*address) == NULL
@@ -9538,7 +9536,18 @@ create_breakpoint (struct gdbarch *gdbarch,
       init_raw_breakpoint_without_location (b, gdbarch, type_wanted, ops);
 
       b->addr_string = copy_arg;
-      b->cond_string = NULL;
+      if (parse_condition_and_thread)
+	b->cond_string = NULL;
+      else
+	{
+	  /* Create a private copy of condition string.  */
+	  if (cond_string)
+	    {
+	      cond_string = xstrdup (cond_string);
+	      make_cleanup (xfree, cond_string);
+	    }
+	  b->cond_string = cond_string;
+	}
       b->extra_string = NULL;
       b->ignore_count = ignore_count;
       b->disposition = tempflag ? disp_del : disp_donttouch;
@@ -10132,7 +10141,6 @@ watchpoint_exp_is_const (const struct expression *exp)
 	case BINOP_RANGE:
 	case TERNOP_COND:
 	case TERNOP_SLICE:
-	case TERNOP_SLICE_COUNT:
 
 	case OP_LONG:
 	case OP_DOUBLE:
@@ -10140,9 +10148,10 @@ watchpoint_exp_is_const (const struct expression *exp)
 	case OP_LAST:
 	case OP_COMPLEX:
 	case OP_STRING:
-	case OP_BITSTRING:
 	case OP_ARRAY:
 	case OP_TYPE:
+	case OP_TYPEOF:
+	case OP_DECLTYPE:
 	case OP_NAME:
 	case OP_OBJC_NSSTRING:
 
@@ -10152,6 +10161,10 @@ watchpoint_exp_is_const (const struct expression *exp)
 	case UNOP_ADDR:
 	case UNOP_HIGH:
 	case UNOP_CAST:
+
+	case UNOP_CAST_TYPE:
+	case UNOP_REINTERPRET_CAST:
+	case UNOP_DYNAMIC_CAST:
 	  /* Unary, binary and ternary operators: We have to check
 	     their operands.  If they are constant, then so is the
 	     result of that operation.  For instance, if A and B are
@@ -15824,6 +15837,10 @@ initialize_breakpoint_ops (void)
   ops->print_mention = bkpt_print_mention;
   ops->print_recreate = bkpt_print_recreate;
 }
+
+/* Chain containing all defined "enable breakpoint" subcommands.  */
+
+static struct cmd_list_element *enablebreaklist = NULL;
 
 void
 _initialize_breakpoint (void)

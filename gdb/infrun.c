@@ -57,6 +57,7 @@
 #include "skip.h"
 #include "probe.h"
 #include "objfiles.h"
+#include "completer.h"
 
 /* Prototypes for local functions */
 
@@ -140,7 +141,7 @@ show_debug_displaced (struct ui_file *file, int from_tty,
   fprintf_filtered (file, _("Displace stepping debugging is %s.\n"), value);
 }
 
-int debug_infrun = 0;
+unsigned int debug_infrun = 0;
 static void
 show_debug_infrun (struct ui_file *file, int from_tty,
 		   struct cmd_list_element *c, const char *value)
@@ -3204,8 +3205,7 @@ handle_inferior_event (struct execution_control_state *ecs)
     }
 
   if (ecs->ws.kind != TARGET_WAITKIND_EXITED
-      && ecs->ws.kind != TARGET_WAITKIND_SIGNALLED
-      && !ptid_equal (ecs->ptid, minus_one_ptid))
+      && ecs->ws.kind != TARGET_WAITKIND_SIGNALLED)
     {
       ecs->event_thread = find_thread_ptid (ecs->ptid);
       /* If it's a new thread, add it to the thread database.  */
@@ -3373,8 +3373,7 @@ handle_inferior_event (struct execution_control_state *ecs)
     case TARGET_WAITKIND_SPURIOUS:
       if (debug_infrun)
         fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_SPURIOUS\n");
-      if (!ptid_equal (ecs->ptid, inferior_ptid)
-	  && !ptid_equal (ecs->ptid, minus_one_ptid))
+      if (!ptid_equal (ecs->ptid, inferior_ptid))
 	context_switch (ecs->ptid);
       resume (0, GDB_SIGNAL_0);
       prepare_to_wait (ecs);
@@ -6428,6 +6427,36 @@ Are you sure you want to change it? "),
   do_cleanups (old_chain);
 }
 
+/* Complete the "handle" command.  */
+
+static VEC (char_ptr) *
+handle_completer (struct cmd_list_element *ignore,
+		  char *text, char *word)
+{
+  VEC (char_ptr) *vec_signals, *vec_keywords, *return_val;
+  static const char * const keywords[] =
+    {
+      "all",
+      "stop",
+      "ignore",
+      "print",
+      "pass",
+      "nostop",
+      "noignore",
+      "noprint",
+      "nopass",
+      NULL,
+    };
+
+  vec_signals = signal_completer (ignore, text, word);
+  vec_keywords = complete_on_enum (keywords, word, word);
+
+  return_val = VEC_merge (char_ptr, vec_signals, vec_keywords);
+  VEC_free (char_ptr, vec_signals);
+  VEC_free (char_ptr, vec_keywords);
+  return return_val;
+}
+
 static void
 xdb_handle_command (char *args, int from_tty)
 {
@@ -7071,20 +7100,26 @@ _initialize_infrun (void)
 {
   int i;
   int numsigs;
+  struct cmd_list_element *c;
 
   add_info ("signals", signals_info, _("\
 What debugger does when program gets various signals.\n\
 Specify a signal as argument to print info on that signal only."));
   add_info_alias ("handle", "signals", 0);
 
-  add_com ("handle", class_run, handle_command, _("\
+  c = add_com ("handle", class_run, handle_command, _("\
 Specify how to handle a signal.\n\
+Usage: handle SIGNAL [ACTIONS]\n\
 Args are signals and actions to apply to those signals.\n\
+If no actions are specified, the current settings for the specified signal\n\
+will be displayed instead.\n\
+\n\
 Symbolic signals (e.g. SIGSEGV) are recommended but numeric signals\n\
 from 1-15 are allowed for compatibility with old versions of GDB.\n\
 Numeric ranges may be specified with the form LOW-HIGH (e.g. 1-5).\n\
 The special arg \"all\" is recognized to mean all signals except those\n\
 used by the debugger, typically SIGTRAP and SIGINT.\n\
+\n\
 Recognized actions include \"stop\", \"nostop\", \"print\", \"noprint\",\n\
 \"pass\", \"nopass\", \"ignore\", or \"noignore\".\n\
 Stop means reenter debugger if this signal happens (implies print).\n\
@@ -7092,6 +7127,8 @@ Print means print a message if this signal happens.\n\
 Pass means let program see this signal; otherwise program doesn't know.\n\
 Ignore is a synonym for nopass and noignore is a synonym for pass.\n\
 Pass and Stop may be combined."));
+  set_cmd_completer (c, handle_completer);
+
   if (xdb_commands)
     {
       add_com ("lz", class_info, signals_info, _("\
@@ -7122,13 +7159,13 @@ There is no `stop' command, but you can set a hook on `stop'.\n\
 This allows you to set a list of commands to be run each time execution\n\
 of the program stops."), &cmdlist);
 
-  add_setshow_zinteger_cmd ("infrun", class_maintenance, &debug_infrun, _("\
+  add_setshow_zuinteger_cmd ("infrun", class_maintenance, &debug_infrun, _("\
 Set inferior debugging."), _("\
 Show inferior debugging."), _("\
 When non-zero, inferior specific debugging is enabled."),
-			    NULL,
-			    show_debug_infrun,
-			    &setdebuglist, &showdebuglist);
+			     NULL,
+			     show_debug_infrun,
+			     &setdebuglist, &showdebuglist);
 
   add_setshow_boolean_cmd ("displaced", class_maintenance,
 			   &debug_displaced, _("\

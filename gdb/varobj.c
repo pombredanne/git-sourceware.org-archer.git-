@@ -49,7 +49,7 @@ typedef int PyObject;
 
 /* Non-zero if we want to see trace of varobj level stuff.  */
 
-int varobjdebug = 0;
+unsigned int varobjdebug = 0;
 static void
 show_varobjdebug (struct ui_file *file, int from_tty,
 		  struct cmd_list_element *c, const char *value)
@@ -675,7 +675,9 @@ varobj_create (char *objname,
 	}
 
       /* Don't allow variables to be created for types.  */
-      if (var->root->exp->elts[0].opcode == OP_TYPE)
+      if (var->root->exp->elts[0].opcode == OP_TYPE
+	  || var->root->exp->elts[0].opcode == OP_TYPEOF
+	  || var->root->exp->elts[0].opcode == OP_DECLTYPE)
 	{
 	  do_cleanups (old_chain);
 	  fprintf_unfiltered (gdb_stderr, "Attempt to use a type name"
@@ -1111,9 +1113,6 @@ update_dynamic_varobj_children (struct varobj *var,
 	}
 
       make_cleanup_py_decref (children);
-
-      if (!PyIter_Check (children))
-	error (_("Returned value is not iterable"));
 
       Py_XDECREF (var->child_iter);
       var->child_iter = PyObject_GetIter (children);
@@ -4174,28 +4173,27 @@ _initialize_varobj (void)
   varobj_table = xmalloc (sizeof_table);
   memset (varobj_table, 0, sizeof_table);
 
-  add_setshow_zinteger_cmd ("debugvarobj", class_maintenance,
-			    &varobjdebug,
-			    _("Set varobj debugging."),
-			    _("Show varobj debugging."),
-			    _("When non-zero, varobj debugging is enabled."),
-			    NULL, show_varobjdebug,
-			    &setlist, &showlist);
+  add_setshow_zuinteger_cmd ("debugvarobj", class_maintenance,
+			     &varobjdebug,
+			     _("Set varobj debugging."),
+			     _("Show varobj debugging."),
+			     _("When non-zero, varobj debugging is enabled."),
+			     NULL, show_varobjdebug,
+			     &setlist, &showlist);
 }
 
 /* Invalidate varobj VAR if it is tied to locals and re-create it if it is
-   defined on globals.  It is a helper for varobj_invalidate.  */
+   defined on globals.  It is a helper for varobj_invalidate.
+
+   This function is called after changing the symbol file, in this case the
+   pointers to "struct type" stored by the varobj are no longer valid.  All
+   varobj must be either re-evaluated, or marked as invalid here.  */
 
 static void
 varobj_invalidate_iter (struct varobj *var, void *unused)
 {
-  /* Floating varobjs are reparsed on each stop, so we don't care if the
-     presently parsed expression refers to something that's gone.  */
-  if (var->root->floating)
-    return;
-
-  /* global var must be re-evaluated.  */     
-  if (var->root->valid_block == NULL)
+  /* global and floating var must be re-evaluated.  */
+  if (var->root->floating || var->root->valid_block == NULL)
     {
       struct varobj *tmp_var;
 

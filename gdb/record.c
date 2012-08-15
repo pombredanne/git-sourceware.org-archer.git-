@@ -153,7 +153,7 @@ struct record_entry
 };
 
 /* This is the debug switch for process record.  */
-int record_debug = 0;
+unsigned int record_debug = 0;
 
 /* If true, query if PREC cannot record memory
    change of next instruction.  */
@@ -485,6 +485,20 @@ record_arch_list_add_reg (struct regcache *regcache, int regnum)
   return 0;
 }
 
+int
+record_read_memory (struct gdbarch *gdbarch,
+		    CORE_ADDR memaddr, gdb_byte *myaddr,
+		    ssize_t len)
+{
+  int ret = target_read_memory (memaddr, myaddr, len);
+
+  if (ret && record_debug)
+    printf_unfiltered (_("Process record: error reading memory "
+			 "at addr %s len = %ld.\n"),
+		       paddress (gdbarch, memaddr), (long) len);
+  return ret;
+}
+
 /* Record the value of a region of memory whose address is ADDR and
    length is LEN to record_arch_list.  */
 
@@ -504,13 +518,8 @@ record_arch_list_add_mem (CORE_ADDR addr, int len)
 
   rec = record_mem_alloc (addr, len);
 
-  if (target_read_memory (addr, record_get_loc (rec), len))
+  if (record_read_memory (target_gdbarch, addr, record_get_loc (rec), len))
     {
-      if (record_debug)
-	fprintf_unfiltered (gdb_stdlog,
-			    "Process record: error reading memory at "
-			    "addr = %s len = %d.\n",
-			    paddress (target_gdbarch, addr), len);
       record_mem_release (rec);
       return -1;
     }
@@ -739,15 +748,9 @@ record_exec_insn (struct regcache *regcache, struct gdbarch *gdbarch,
                                   paddress (gdbarch, entry->u.mem.addr),
                                   entry->u.mem.len);
 
-            if (target_read_memory (entry->u.mem.addr, mem, entry->u.mem.len))
-              {
-                entry->u.mem.mem_entry_not_accessible = 1;
-                if (record_debug)
-                  warning (_("Process record: error reading memory at "
-			     "addr = %s len = %d."),
-                           paddress (gdbarch, entry->u.mem.addr),
-                           entry->u.mem.len);
-              }
+            if (record_read_memory (gdbarch,
+				    entry->u.mem.addr, mem, entry->u.mem.len))
+	      entry->u.mem.mem_entry_not_accessible = 1;
             else
               {
                 if (target_write_memory (entry->u.mem.addr, 
@@ -1103,6 +1106,9 @@ record_resume (struct target_ops *ops, ptid_t ptid, int step,
                 }
             }
         }
+
+      /* Make sure the target beneath reports all signals.  */
+      target_pass_signals (0, NULL);
 
       record_beneath_to_resume (record_beneath_to_resume_ops,
                                 ptid, step, signal);
@@ -2976,13 +2982,13 @@ _initialize_record (void)
   init_record_core_ops ();
   add_target (&record_core_ops);
 
-  add_setshow_zinteger_cmd ("record", no_class, &record_debug,
-			    _("Set debugging of record/replay feature."),
-			    _("Show debugging of record/replay feature."),
-			    _("When enabled, debugging output for "
-			      "record/replay feature is displayed."),
-			    NULL, show_record_debug, &setdebuglist,
-			    &showdebuglist);
+  add_setshow_zuinteger_cmd ("record", no_class, &record_debug,
+			     _("Set debugging of record/replay feature."),
+			     _("Show debugging of record/replay feature."),
+			     _("When enabled, debugging output for "
+			       "record/replay feature is displayed."),
+			     NULL, show_record_debug, &setdebuglist,
+			     &showdebuglist);
 
   c = add_prefix_cmd ("record", class_obscure, cmd_record_start,
 		      _("Abbreviated form of \"target record\" command."),

@@ -136,10 +136,6 @@ struct cmd_list_element *detachlist;
 
 struct cmd_list_element *killlist;
 
-/* Chain containing all defined "enable breakpoint" subcommands.  */
-
-struct cmd_list_element *enablebreaklist;
-
 /* Chain containing all defined set subcommands */
 
 struct cmd_list_element *setlist;
@@ -187,8 +183,6 @@ struct cmd_list_element *showdebuglist;
 struct cmd_list_element *setchecklist;
 
 struct cmd_list_element *showchecklist;
-
-struct cmd_list_element *skiplist;
 
 /* Command tracing state.  */
 
@@ -319,10 +313,8 @@ is_complete_command (struct cmd_list_element *c)
 static void
 show_version (char *args, int from_tty)
 {
-  immediate_quit++;
   print_gdb_version (gdb_stdout);
   printf_filtered ("\n");
-  immediate_quit--;
 }
 
 /* Handle the quit command.  */
@@ -367,7 +359,7 @@ cd_command (char *dir, int from_tty)
   dont_repeat ();
 
   if (dir == 0)
-    error_no_arg (_("new working directory"));
+    dir = "~";
 
   dir = tilde_expand (dir);
   make_cleanup (xfree, dir);
@@ -961,7 +953,7 @@ list_command (char *arg, int from_tty)
 	  else
 	    sals_end = decode_line_1 (&arg1, DECODE_LINE_LIST_MODE,
 				      sal.symtab, sal.line);
-	  filter_sals (&sals);
+	  filter_sals (&sals_end);
 	  if (sals_end.nelts == 0)
 	    return;
 	  if (sals_end.nelts > 1)
@@ -1578,7 +1570,6 @@ init_cmd_lists (void)
   stoplist = NULL;
   deletelist = NULL;
   detachlist = NULL;
-  enablebreaklist = NULL;
   setlist = NULL;
   unsetlist = NULL;
   showlist = NULL;
@@ -1592,7 +1583,6 @@ init_cmd_lists (void)
   showprintlist = NULL;
   setchecklist = NULL;
   showchecklist = NULL;
-  skiplist = NULL;
 }
 
 static void

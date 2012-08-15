@@ -90,7 +90,7 @@ int in_parse_field;
    field name.  It is -1 if no dereference operation was found.  */
 static int expout_last_struct = -1;
 
-static int expressiondebug = 0;
+static unsigned int expressiondebug = 0;
 static void
 show_expressiondebug (struct ui_file *file, int from_tty,
 		      struct cmd_list_element *c, const char *value)
@@ -910,10 +910,16 @@ operator_length_standard (const struct expression *expr, int endpos,
       oplen = 3;
       break;
 
-    case BINOP_VAL:
-    case UNOP_CAST:
+    case UNOP_CAST_TYPE:
     case UNOP_DYNAMIC_CAST:
     case UNOP_REINTERPRET_CAST:
+    case UNOP_MEMVAL_TYPE:
+      oplen = 1;
+      args = 2;
+      break;
+
+    case BINOP_VAL:
+    case UNOP_CAST:
     case UNOP_MEMVAL:
       oplen = 3;
       args = 1;
@@ -932,6 +938,8 @@ operator_length_standard (const struct expression *expr, int endpos,
     case UNOP_ODD:
     case UNOP_ORD:
     case UNOP_TRUNC:
+    case OP_TYPEOF:
+    case OP_DECLTYPE:
       oplen = 1;
       args = 1;
       break;
@@ -959,12 +967,6 @@ operator_length_standard (const struct expression *expr, int endpos,
       oplen = 4 + BYTES_TO_EXP_ELEM (oplen + 1);
       break;
 
-    case OP_BITSTRING:
-      oplen = longest_to_int (expr->elts[endpos - 2].longconst);
-      oplen = (oplen + HOST_CHAR_BIT - 1) / HOST_CHAR_BIT;
-      oplen = 4 + BYTES_TO_EXP_ELEM (oplen);
-      break;
-
     case OP_ARRAY:
       oplen = 4;
       args = longest_to_int (expr->elts[endpos - 2].longconst);
@@ -974,7 +976,6 @@ operator_length_standard (const struct expression *expr, int endpos,
 
     case TERNOP_COND:
     case TERNOP_SLICE:
-    case TERNOP_SLICE_COUNT:
       args = 3;
       break;
 
@@ -1732,8 +1733,6 @@ operator_check_standard (struct expression *exp, int pos,
     case OP_SCOPE:
     case OP_TYPE:
     case UNOP_CAST:
-    case UNOP_DYNAMIC_CAST:
-    case UNOP_REINTERPRET_CAST:
     case UNOP_MAX:
     case UNOP_MEMVAL:
     case UNOP_MIN:
@@ -1853,15 +1852,15 @@ _initialize_parse (void)
   type_stack.depth = 0;
   type_stack.elements = NULL;
 
-  add_setshow_zinteger_cmd ("expression", class_maintenance,
-			    &expressiondebug,
-			    _("Set expression debugging."),
-			    _("Show expression debugging."),
-			    _("When non-zero, the internal representation "
-			      "of expressions will be printed."),
-			    NULL,
-			    show_expressiondebug,
-			    &setdebuglist, &showdebuglist);
+  add_setshow_zuinteger_cmd ("expression", class_maintenance,
+			     &expressiondebug,
+			     _("Set expression debugging."),
+			     _("Show expression debugging."),
+			     _("When non-zero, the internal representation "
+			       "of expressions will be printed."),
+			     NULL,
+			     show_expressiondebug,
+			     &setdebuglist, &showdebuglist);
   add_setshow_boolean_cmd ("parser", class_maintenance,
 			    &parser_debug,
 			   _("Set parser debugging."),
