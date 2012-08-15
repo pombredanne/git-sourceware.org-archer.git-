@@ -1885,10 +1885,7 @@ namespace_table_flatten_helper (void **slot, void *arg)
 {
   struct namespace *ns = (struct namespace *) *slot;
   struct so_list *src = ns->solist;
-  struct so_list **link = (struct so_list **) arg;
-
-  while (*link)
-    link = &(*link)->next;
+  struct so_list ***tail = (struct so_list ***) arg;
 
   while (src != NULL)
     {
@@ -1900,13 +1897,13 @@ namespace_table_flatten_helper (void **slot, void *arg)
       dst->lm_info = xmalloc (sizeof (struct lm_info));
       memcpy (dst->lm_info, src->lm_info, sizeof (struct lm_info));
 
-      *link = dst;
-      link = &dst->next;
+      **tail = dst;
+      *tail = &dst->next;
 
       src = src->next;
     }
 
-  *link = NULL;
+  **tail = NULL;
 
   return 1; /* Continue traversal.  */
 }
@@ -1917,8 +1914,9 @@ static struct so_list *
 namespace_table_flatten (htab_t namespace_table)
 {
   struct so_list *dst = NULL;
+  struct so_list **tail = &dst;
 
-  htab_traverse (namespace_table, namespace_table_flatten_helper, &dst);
+  htab_traverse (namespace_table, namespace_table_flatten_helper, &tail);
 
   return dst;
 }
