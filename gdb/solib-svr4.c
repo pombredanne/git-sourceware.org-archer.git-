@@ -213,8 +213,6 @@ free_probes (struct svr4_info *info)
 
   for (i = 0; i < NUM_PROBES; i++)
     VEC_free (probe_p, info->probes[i]);
-
-  memset (info->probes, 0, sizeof (info->probes));
 }
 
 /* Free the namespace table.  */
