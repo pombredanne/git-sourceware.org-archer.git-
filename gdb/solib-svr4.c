@@ -1889,16 +1889,25 @@ namespace_table_flatten_helper (void **slot, void *arg)
 
   while (src != NULL)
     {
-      struct so_list *dst;
+      /* glibc includes an entry for the interpreter in each
+	 namespace, but in all but the initial namespace these
+	 have l_addr_inferior == 0.  Returning these "broken"
+	 placeholders makes it impossible to set breakpoints
+	 in the runtime linker when more than one namespace
+	 exists.  */
+      if (src->lm_info->l_addr_inferior != 0)
+	{
+	  struct so_list *dst;
 
-      dst = xmalloc (sizeof (struct so_list));
-      memcpy (dst, src, sizeof (struct so_list));
+	  dst = xmalloc (sizeof (struct so_list));
+	  memcpy (dst, src, sizeof (struct so_list));
 
-      dst->lm_info = xmalloc (sizeof (struct lm_info));
-      memcpy (dst->lm_info, src->lm_info, sizeof (struct lm_info));
+	  dst->lm_info = xmalloc (sizeof (struct lm_info));
+	  memcpy (dst->lm_info, src->lm_info, sizeof (struct lm_info));
 
-      **tail = dst;
-      *tail = &dst->next;
+	  **tail = dst;
+	  *tail = &dst->next;
+	}
 
       src = src->next;
     }
