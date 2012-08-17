@@ -1797,6 +1797,7 @@ svr4_handle_solib_event (bpstat bs)
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_info buf, *pi = &buf;
   enum probe_action action;
+  struct cleanup *cleanups = NULL;
   struct value *val;
   LONGEST lmid;
   CORE_ADDR debug_base, lm = 0;
@@ -1819,6 +1820,19 @@ svr4_handle_solib_event (bpstat bs)
 
   if (action == NAMESPACE_NO_ACTION)
     return;
+
+  /* EVALUATE_PROBE_ARGUMENT looks up symbols in the dynamic linker
+     using FIND_PC_SECTION.  FIND_PC_SECTION is accelerated by a cache
+     called the section map.  The section map is invalidated every
+     time a shared library is loaded or unloaded, and if the inferior
+     is generating a lot of shared library events then the section map
+     will be updated every time SVR4_HANDLE_SOLIB_EVENT is called.
+     We called FIND_PC_SECTION in SVR4_CREATE_SOLIB_EVENT_BREAKPOINTS,
+     so we can guarantee that the dynamic linker's sections are in the
+     section map.  We can therefore inhibit section map updates across
+     these calls to EVALUATE_PROBE_ARGUMENT and save a lot of time.  */
+  inhibit_section_map_updates ();
+  cleanups = make_cleanup (resume_section_map_updates_cleanup, NULL);
 
   val = evaluate_probe_argument (pi->probe, 0);
   if (val == NULL)
@@ -1851,6 +1865,9 @@ svr4_handle_solib_event (bpstat bs)
 	action = NAMESPACE_RELOAD;
     }
 
+  do_cleanups (cleanups);
+  cleanups = NULL;
+
   if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
       if (namespace_update_incremental (info, lmid, lm, is_initial_ns))
@@ -1873,6 +1890,8 @@ svr4_handle_solib_event (bpstat bs)
   warning (_("Probes-based dynamic linker interface failed.\n"
 	     "Reverting to original interface.\n"));
 
+  if (cleanups != NULL)
+    do_cleanups (cleanups);
   free_namespace_table (info);
   free_probes (info);
   info->using_probes = 0;
