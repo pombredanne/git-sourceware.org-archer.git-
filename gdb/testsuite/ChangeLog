@@ -1,3 +1,77 @@
+2012-08-23  Yao Qi  <yao@codesourcery.com>
+
+	* boards/native-gdbserver.exp (${board}_upload): New.
+	* boards/native-stdio-gdbserver.exp (${board}_upload): New.
+	* gdb.trace/tfile.exp: Don't check 'gdb,nofileio'.
+	Execute tfile on remote target.
+	Copy trace file from target to host.
+
+2012-08-22  Joseph Myers  <joseph@codesourcery.com>
+
+	* gdb.arch/thumb-bx-pc.S: New file.
+	* gdb.arch/thumb-bx-pc.exp: New file.
+
+2012-08-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/maint.exp: Update.
+
+2012-08-22  Tom Tromey  <tromey@redhat.com>
+
+	* lib/gdb.exp (skip_unwinder_tests): New proc.
+	* gdb.cp/nextoverthrow.exp: Use skip_unwinder_tests.
+	* gdb.java/jnpe.exp: Use skip_unwinder_tests.
+
+2012-08-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.hp/gdb.aCC/exception.exp: Remove.
+
+012-08-19  Andrew Pinski  <apinski@cavium.com>
+
+	* gdb.arch/mips-octeon-bbit.c: New file.
+	* gdb.arch/mips-octeon-bbit.exp: New Test.
+
+012-08-19  Keith Seitz  <keiths@redhat.com>
+
+	PR c++/14365
+	* gdb.dwarf2/dw2-anon-mptr.exp: New file.
+	* gdb.dwarf2/dw2-anon-mptr.S: New file.
+
+2012-08-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/solib-corrupted.exp (make solibs looping): Replace
+	verbose -log by more specific untested call.
+
+2012-08-18  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/tfind.exp: Move tests on various command help before
+	checking target supports trace.
+	Fix the expected output of 'help tfind end'.
+
+2012-08-17  Keith Seitz  <keiths@redhat.com>
+
+	PR c++/13356
+	* gdb.base/default.exp: Update all "check type" tests.
+	* gdb.base/help.exp: Likewise.
+	* gdb.base/setshow.exp: Likewise.
+	* gdb.cp/converts.cc (foo1_type_check): New function.
+	(foo2_type_check): New function.
+	(foo3_type_check): New function.
+	(main): Call new functions.
+	* converts.exp: Add tests for integer-to-pointer conversions
+	with/without strict type-checking.
+
+2012-08-16  Mike Frysinger  <vapier@gentoo.org>
+
+	* gdb.base/help.exp: Update expected output.
+
+2012-08-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/rdv_wait: New testcase.
+
+2012-08-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/attach-twice.exp: Remove excessive ps exec.
+
 2012-08-13  Doug Evans  <dje@google.com>
 
 	* gdb.base/help.exp: Update expected output.
@@ -144,6 +218,11 @@
 	* gdb.base/valgrind-infcall.exp: New file.
 
 	* gdb.base/valgrind-db-attach.exp: Do not run in remote mode.
+
+2012-07-30  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.linespec/ls-errs.exp: Check some quote-enclosed
+	linespecs.
 
 2012-07-30  Doug Evans  <dje@google.com>
 

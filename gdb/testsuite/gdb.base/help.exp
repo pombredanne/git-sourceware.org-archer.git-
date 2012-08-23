@@ -194,7 +194,7 @@ gdb_test "help file" "Use FILE as program to be debugged\.\[\r\n\]+It is read fo
 # test help files
 gdb_test "help files" "Specifying.*" "help files"
 # test help finish
-gdb_test "help finish" "Execute until selected stack frame returns\.\[\r\n\]+Upon return, the value returned is printed and put in the value history\." "help finish"
+gdb_test "help finish" "Execute until selected stack frame returns\.\[\r\n\]+Usage: finish\[\r\n\]+Upon return, the value returned is printed and put in the value history\.\[\r\n\]+" "help finish"
 # test help forward-search
 gdb_test "help forward-search" "Search for regular expression \\(see regex\\(3\\)\\) from last line listed.*" "help forward-search"
 # test help gcore
@@ -295,7 +295,7 @@ gdb_test "help info watchpoints" \
 # test help inspect
 gdb_test "help inspect" "Same as \"print\" command, except that if you are running in the epoch\[\r\n\]+environment, the value is printed in its own window\." "help inspect"
 # test help jump
-gdb_test "help jump" "Continue program being debugged at specified line or address\.\[\r\n\]+Give as argument either LINENUM or \[*\]+ADDR, where ADDR is an expression\[\r\n\]+for an address to start at\." "help jump"
+gdb_test "help jump" "Continue program being debugged at specified line or address\.\[\r\n\]+Usage: jump <location>\[\r\n\]+Give as argument either LINENUM or \[*\]+ADDR, where ADDR is an expression\[\r\n\]+for an address to start at\." "help jump"
 # test help kill
 test_prefix_command_help "kill" {
     "Kill execution of program being debugged\.\[\r\n\]+"
@@ -309,11 +309,11 @@ gdb_test "help load" "Dynamically load FILE into the running program, and record
 # test help make
 gdb_test "help make" "Run the ``make'' program using the rest of the line as arguments\." "help make"
 # test help next "n" abbreviation
-gdb_test "help n" "Step program, proceeding through subroutine calls\.\[\r\n\]+Like the \"step\" command as long as subroutine calls do not happen;\[\r\n\]+when they do, the call is treated as one instruction\.\[\r\n\]+Argument N means do this N times \\(or till program stops for another reason\\)\." "help next \"n\" abbreviation"
+gdb_test "help n" "Step program, proceeding through subroutine calls\.\[\r\n\]+Usage: next \\\[N\\\]\[\r\n\]+Unlike \"step\", if the current source line calls a subroutine,\[\r\n\]+this command does not enter the subroutine, but instead steps over\[\r\n\]+the call, in effect treating it as a single source line\.\[\r\n\]+" "help next \"n\" abbreviation"
 # test help next
-gdb_test "help next" "Step program, proceeding through subroutine calls\.\[\r\n\]+Like the \"step\" command as long as subroutine calls do not happen;\[\r\n\]+when they do, the call is treated as one instruction\.\[\r\n\]+Argument N means do this N times \\(or till program stops for another reason\\)\." "help next"
+gdb_test "help next" "Step program, proceeding through subroutine calls\.\[\r\n\]+Usage: next \\\[N\\\]\[\r\n\]+Unlike \"step\", if the current source line calls a subroutine,\[\r\n\]+this command does not enter the subroutine, but instead steps over\[\r\n\]+the call, in effect treating it as a single source line\.\[\r\n\]+" "help next \"n\" abbreviation"
 # test help nexti
-gdb_test "help ni" "Step one instruction, but proceed through subroutine calls\.\[\r\n\]+Argument N means do this N times \\(or till program stops for another reason\\)\." "help nexti"
+gdb_test "help ni" "Step one instruction, but proceed through subroutine calls\.\[\r\n\]+Usage: nexti \\\[N\\\]\[\r\n\]+Argument N means step N times \\(or till program stops for another reason\\)\.\[\r\n\]+" "help nexti"
 # all the commands that used to be here are now in "maintainance" instead
 # test help obscure
 test_class_help "obscure" {
@@ -365,9 +365,9 @@ test_class_help "running" {
     "Running the program\.\[\r\n\]+"
 }
 # test help step "s" abbreviation
-gdb_test "help s" "Step program until it reaches a different source line\.\[\r\n\]+Argument N means do this N times \\(or till program stops for another reason\\)\." "help step \"s\" abbreviation"
+gdb_test "help s" "Step program until it reaches a different source line\.\[\r\n\]+Usage: step \\\[N\\\]\[\r\n\]+Argument N means step N times \\(or till program stops for another reason\\)\.\[\r\n\]+" "help step \"s\" abbreviation"
 # test help step
-gdb_test "help step" "Step program until it reaches a different source line\.\[\r\n\]+Argument N means do this N times \\(or till program stops for another reason\\)\." "help step #1"
+gdb_test "help step" "Step program until it reaches a different source line\.\[\r\n\]+Usage: step \\\[N\\\]\[\r\n\]+Argument N means step N times \\(or till program stops for another reason\\)\.\[\r\n\]+" "help step #1"
 # test help search
 gdb_test "help search" "Search for regular expression \\(see regex\\(3\\)\\) from last line listed\..*" "help search"
 # test help section
@@ -376,22 +376,26 @@ gdb_test "help section" "Change the base address of section SECTION of the exec 
 gdb_test "help set annotate" "Set annotation_level\.\[\r\n\]+0 == normal;     1 == fullname \\(for use when running under emacs\\)\[\r\n\]+2 == output annotated suitably for use by programs that control GDB\." "help set annotate"
 # test help set args
 gdb_test "help set args" "Set argument list to give program being debugged when it is started\.\[\r\n\]+Follow this command with any number of args, to be passed to the program\."
-# test help set check "c" abbreviation
-test_prefix_command_help {"set c" "set check"} {
-    "Set the status of the type/range checker\.\[\r\n\]+"
-} "help set check \"c\" abbreviation"
-# test help set check "ch" abbreviation
-test_prefix_command_help {"set ch" "set check"} {
-    "Set the status of the type/range checker\.\[\r\n\]+"
-} "help set check \"ch\" abbreviation"
-# test help set check
+
+# Test help set check abbreviations
+foreach x {"c" "ch"} {
+    test_prefix_command_help [list "set $x" "set check"] {
+	"Set the status of the type/range checker\.\[\r\n\]+"
+    } "help set check \"$x\" abbreviation"
+}
+
+# Test help set check
 test_prefix_command_help {"set check"} {
     "Set the status of the type/range checker\.\[\r\n\]+"
 }
+
 # test help set check range
 gdb_test "help set check range" "Set range checking\.  \\(on/warn/off/auto\\)" "help set check range"
-# test help set check type
-gdb_test "help set check type" "Set type checking\.  \\(on/warn/off/auto\\)." "help set check type"
+
+# Test help set check type
+gdb_test "help set check type" "Set strict type checking\." \
+    "help set check type"
+
 # test help set complaints
 gdb_test "help set complaints" "Set max number of complaints about incorrect symbols\." "help set complaints"
 # test help set confirm
@@ -487,18 +491,25 @@ gdb_test "help shell" "Execute the rest of the line as a shell command\.\[\r\n\]
 gdb_test "help show annotate" "Show annotation_level\.\[\r\n\]+0 == normal;     1 == fullname \\(for use when running under emacs\\)\[\r\n\]+2 == output annotated suitably for use by programs that control GDB\." "help show annotate"
 # test help show args
 gdb_test "help show args" "Show argument list to give program being debugged when it is started\.\[\r\n\]+Follow this command with any number of args, to be passed to the program\."
-# test help show check "c" abbreviation
-test_prefix_command_help {"show c" "show check"} {
-    "Show the status of the type/range checker\.\[\r\n\]+"
-} "help show check \"c\" abbreviation"
+
+# Test help show check abbreviations
+foreach x {"c" "check"} {
+    test_prefix_command_help [list "show $x" "show check"] {
+	"Show the status of the type/range checker\.\[\r\n\]+"
+    } "help show check \"$x\" abbreviation"
+}
+
 # test help show check
 test_prefix_command_help {"show check"} {
     "Show the status of the type/range checker\.\[\r\n\]+"
 }
 # test help show check range
 gdb_test "help show check range" "Show range checking\.  \\(on/warn/off/auto\\)" "help show check range"
+
 # test help show check type
-gdb_test "help show check type" "Show type checking\.  \\(on/warn/off/auto\\)" "help show check type"
+gdb_test "help show check type" "Show strict type checking\." \
+    "help show check type"
+
 # test help show commands
 gdb_test "help show commands" "Show the history of commands you typed\.\[\r\n\]+You can supply a command number to start with, or a `\[+\]' to start after\[\r\n\]+the previous command number shown\." "help show commands"
 # test help show complaints
@@ -590,13 +601,13 @@ test_prefix_command_help "show" {
     "Generic command for showing things about the debugger\.\[\r\n\]+"
 }
 # test help step
-gdb_test "help step" "Step program until it reaches a different source line\.\[\r\n\]+Argument N means do this N times \\(or till program stops for another reason\\)\." "help step #2"
+gdb_test "help step" "Step program until it reaches a different source line\.\[\r\n\]+Usage: step \\\[N\\\]\[\r\n\]+Argument N means step N times \\(or till program stops for another reason\\)\.\[\r\n\]+" "help step #2"
 # test help stepi "si" abbreviation
-gdb_test "help si" "Step one instruction exactly\.\[\r\n\]+Argument N means do this N times \\(or till program stops for another reason\\)\." "help stepi \"si\" abbreviation"
+gdb_test "help si" "Step one instruction exactly\.\[\r\n\]+Usage: stepi \\\[N\\\]\[\r\n\]+Argument N means step N times \\(or till program stops for another reason\\)\.\[\r\n\]+" "help stepi \"si\" abbreviation"
 # test help stepi
-gdb_test "help stepi" "Step one instruction exactly\.\[\r\n\]+Argument N means do this N times \\(or till program stops for another reason\\)\." "help stepi"
+gdb_test "help stepi" "Step one instruction exactly\.\[\r\n\]+Usage: stepi \\\[N\\\]\[\r\n\]+Argument N means step N times \\(or till program stops for another reason\\)\.\[\r\n\]+" "help stepi"
 # test help signal
-gdb_test "help signal" "Continue program giving it signal.*" "help signal"
+gdb_test "help signal" "Continue program with the specified signal.*" "help signal"
 # test help source
 # vxgdb reads .vxgdbinit
 # ".-s. .-v." is written that way to avoid the complications of trying

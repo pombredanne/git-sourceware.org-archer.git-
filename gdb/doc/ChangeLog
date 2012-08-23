@@ -1,3 +1,22 @@
+2012-08-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdbint.texinfo (Host Definition): Remove documentation for
+	SIGWINCH_HANDLER and SIGWINCH_HANDLER_BODY.
+
+2012-08-17  Keith Seitz  <keiths@redhat.com>
+
+	PR c++/13356
+	* gdb.texinfo (Type and Range Checking): Remove warning.
+	Remove spurious commas.
+	Update text and examples for re-implementation of set/show
+	check type.
+	(C and C++ Type and Range Checks): Likewise.
+
+2012-08-16  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Types In Python): Mention gdb.TYPE_CODE_BITSTRING
+	is deprecated.
+
 2012-08-13  Doug Evans  <dje@google.com>
 
 	* gdb.texinfo (Convenience Vars): Update text for "show convenience"

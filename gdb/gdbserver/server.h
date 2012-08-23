@@ -21,6 +21,7 @@
 #define SERVER_H
 
 #include "config.h"
+#include "build-gnulib-gdbserver/config.h"
 
 #ifdef __MINGW32CE__
 #include "wincecompat.h"
@@ -367,9 +368,8 @@ void *xmalloc (size_t) ATTR_MALLOC;
 void *xrealloc (void *, size_t);
 void *xcalloc (size_t, size_t) ATTR_MALLOC;
 char *xstrdup (const char *) ATTR_MALLOC;
-int xsnprintf (char *str, size_t size, const char *format, ...)
-  ATTR_FORMAT (printf, 3, 4);;
 void freeargv (char **argv);
+
 void perror_with_name (const char *string);
 void error (const char *string,...) ATTR_NORETURN ATTR_FORMAT (printf, 1, 2);
 void fatal (const char *string,...) ATTR_NORETURN ATTR_FORMAT (printf, 1, 2);
