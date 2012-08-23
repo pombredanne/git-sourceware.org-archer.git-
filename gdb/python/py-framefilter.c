@@ -23,32 +23,33 @@
 #include "language.h"
 #include "exceptions.h"
 #include "arch-utils.h"
-#include "language.h"
 #include "python.h"
 #include "ui-out.h"
 #include "valprint.h"
 #include "annotate.h"
 #include "hashtab.h"
 #include "mi/mi-cmds.h"
+#include "demangle.h"
 
 #ifdef HAVE_PYTHON
 #include "python-internal.h"
 
-/* Helper function to extract a name, value and language definition
-   from a Python object that conforms SymbolValue interface.  OBJ is
-   the Python object to extract the values from.  **NAME is a
+
+/* Helper function to extract a symbol, name and language definition
+   from a Python object that conforms to the SymbolValue interface.
+   OBJ is the Python object to extract the values from.  **NAME is a
    pass-through argument where the name of the symbol will be written.
-   **VALUE is a pass-through argument where the value corresponding
-   the to the Symbol will be written, and LANGUAGE is also a
-   pass-through argument denoting the language attributed to the
-   Symbol.  Returns 0 on error with the appropriate Python exception
-   set, and 1 on success.  */
+   **SYM is a pass-through argument where the symbol will be written.
+   In the case of the API returning a string, this will be set to
+   NULL.  **LANGUAGE is also a pass-through argument denoting the
+   language attributed to the Symbol. In the case of **SYM being NULL,
+   this will be set to the current language.  Returns 0 on error with
+   the appropriate Python exception set, and 1 on success.  */
 
-static int extract_sym_and_value (PyObject *obj,
-				  char **name, struct value **value,
-				  const struct language_defn **language)
+static int
+extract_sym (PyObject *obj, char **name, struct symbol **sym,
+	       const struct language_defn **language)
 {
-
   if (PyObject_HasAttrString (obj, "symbol"))
     {
       PyObject *result = PyObject_CallMethod (obj, "symbol", NULL);
@@ -66,14 +67,15 @@ static int extract_sym_and_value (PyObject *obj,
 	  if (! *name)
 	    return 0;
 	  *language = current_language;
+	  *sym = NULL;
 	}
       else
 	{
-	  struct symbol *symbol = symbol_object_to_symbol (result);
+	  *sym = symbol_object_to_symbol (result);
 
 	  Py_DECREF (result);
 
-	  if (! symbol)
+	  if (! *sym)
 	    {
 	      PyErr_SetString (PyExc_RuntimeError,
 			       _("Unexpected value.  Expecting a " \
@@ -81,10 +83,10 @@ static int extract_sym_and_value (PyObject *obj,
 	      return 0;
 	    }
 
-	  *name = xstrdup (SYMBOL_PRINT_NAME (symbol));
+	  *name = xstrdup (SYMBOL_PRINT_NAME (*sym));
 
 	  if (language_mode == language_mode_auto)
-	    *language = language_def (SYMBOL_LANGUAGE (symbol));
+	    *language = language_def (SYMBOL_LANGUAGE (*sym));
 	  else
 	    *language = current_language;
 	}
@@ -92,37 +94,52 @@ static int extract_sym_and_value (PyObject *obj,
   else
     {
       PyErr_SetString (PyExc_RuntimeError,
-		       _("Mandatory function 'symbol' not " \
+			 _("Mandatory function 'symbol' not " \
 			 "implemented."));
       return 0;
     }
 
+  return 1;
+}
+
+/* Helper function to extract a value from an object that conforms to
+   the SymbolValue interface.  OBJ is the Python object to extract the
+   value from.  **VALUE is a pass-through argument where the value
+   will be written.  If the object does not have the value attribute,
+   or provides the Python None for a value, **VALUE will be set to
+   NULL and this function will return as successful.  Returns 0 on
+   error with the appropriate Python exception set, and 1 on
+   success.  */
+
+static int
+extract_value (PyObject *obj, struct value **value)
+{
   if (PyObject_HasAttrString (obj, "value"))
     {
-      PyObject *result = PyObject_CallMethod (obj, "value", NULL);
+      PyObject *vresult = PyObject_CallMethod (obj, "value", NULL);
 
-      if (! result)
+      if (! vresult)
+	return 0;
+
+      if (vresult == Py_None)
 	{
-	  xfree (*name);
-	  return 0;
+	  Py_DECREF (vresult);
+	  *value = NULL;
+	  return 1;
 	}
-
-      *value = convert_value_from_python (result);
-
-      Py_DECREF (result);
-      if (! *value)
+      else
 	{
-	  xfree (*name);
-	  return 0;
+	  *value = convert_value_from_python (vresult);
+	  Py_DECREF (vresult);
+
+	  if (*value == NULL)
+	    return 0;
+
+	  return 1;
 	}
     }
   else
-    {
-      PyErr_SetString (PyExc_RuntimeError,
-		       _("Mandatory function 'value' not " \
-			 "implemented."));
-      return 0;
-    }
+    *value = NULL;
 
   return 1;
 }
@@ -145,7 +162,7 @@ py_print_type (struct ui_out *out, struct value *val)
       stb = mem_fileopen ();
       cleanup = make_cleanup_ui_file_delete (stb);
       type = check_typedef (value_type (val));
-      type_print (type, "", stb, -1);
+      type_print (value_type (val), "", stb, -1);
       ui_out_field_stream (out, "type", stb);
       do_cleanups (cleanup);
     }
@@ -166,30 +183,54 @@ py_print_type (struct ui_out *out, struct value *val)
 
 static int
 py_print_value (struct ui_out *out, struct value *val,
+		struct value_print_options opts,
+		int mi_print_type,
 		const struct language_defn *language)
 {
-  volatile struct gdb_exception except;
+  int should_print = 0;
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  /* MI disallows different value types against different options the
+     client passes, so test type against option.  For CLI print all
+     values.  */
+  if (ui_out_is_mi_like_p (out))
     {
-      struct ui_file *stb;
-      struct cleanup *cleanup;
-      struct value_print_options opts;
+      struct type *type;
 
-      stb = mem_fileopen ();
-      cleanup = make_cleanup_ui_file_delete (stb);
-      get_user_print_options (&opts);
-      opts.deref_ref = 1;
-      common_val_print (val, stb, 2, &opts, language);
-      ui_out_field_stream (out, "value", stb);
-      do_cleanups (cleanup);
+      type = value_type (val);
+      check_typedef (type);
+      if (mi_print_type == PRINT_ALL_VALUES
+	  || (mi_print_type == PRINT_SIMPLE_VALUES
+	      && TYPE_CODE (type) != TYPE_CODE_ARRAY
+	      && TYPE_CODE (type) != TYPE_CODE_STRUCT
+	      && TYPE_CODE (type) != TYPE_CODE_UNION))
+	should_print = 1;
     }
-  if (except.reason > 0)
+  else
+    should_print = 1;
+
+  if (should_print)
     {
-      PyErr_SetString (PyExc_RuntimeError,
-		       except.message);
-      return 0;
+      volatile struct gdb_exception except;
+
+      TRY_CATCH (except, RETURN_MASK_ALL)
+	{
+	  struct ui_file *stb;
+	  struct cleanup *cleanup;
+
+	  stb = mem_fileopen ();
+	  cleanup = make_cleanup_ui_file_delete (stb);
+	  common_val_print (val, stb, 0, &opts, language);
+	  ui_out_field_stream (out, "value", stb);
+	  do_cleanups (cleanup);
+	}
+      if (except.reason > 0)
+	{
+	  PyErr_SetString (PyExc_RuntimeError,
+			   except.message);
+	  return 0;
+	}
     }
+
   return 1;
 }
 
@@ -239,12 +280,113 @@ get_py_iter_from_func (PyObject *filter, char *func)
 }
 
 static int
+py_print_single_arg (struct ui_out *out,
+		     char *sym_name,
+		     struct frame_arg *fa,
+		     struct value *fv,
+		     struct value_print_options opts,
+		     int mi_print_type,
+		     const char *print_args_type,
+		     int print_mi_args_flag,
+		     const struct language_defn *language)
+{
+  struct value *val;
+  struct cleanup *inner_cleanup =
+    make_cleanup (null_cleanup, NULL);
+
+  if (fa)
+    {
+      language = language_def (SYMBOL_LANGUAGE (fa->sym));
+      val = fa->val;
+    }
+  else
+    val = fv;
+
+  if (print_mi_args_flag || mi_print_type != PRINT_NO_VALUES)
+    {
+      inner_cleanup =
+	make_cleanup_ui_out_tuple_begin_end (out,
+					     NULL);
+    }
+
+  annotate_arg_begin ();
+
+  if (fa)
+    {
+      struct ui_file *stb;
+
+      stb = mem_fileopen ();
+
+      fprintf_symbol_filtered (stb, SYMBOL_PRINT_NAME (fa->sym),
+			       SYMBOL_LANGUAGE (fa->sym),
+			       DMGL_PARAMS | DMGL_ANSI);
+      if (fa->entry_kind == print_entry_values_compact)
+	{
+	  fputs_filtered ("=", stb);
+
+	  fprintf_symbol_filtered (stb, SYMBOL_PRINT_NAME (fa->sym),
+				   SYMBOL_LANGUAGE (fa->sym),
+				   DMGL_PARAMS | DMGL_ANSI);
+	}
+      if (fa->entry_kind == print_entry_values_only
+	  || fa->entry_kind == print_entry_values_compact)
+	{
+	  fputs_filtered ("@entry", stb);
+	}
+      ui_out_field_stream (out, "name", stb);
+      ui_file_delete (stb);
+    }
+  else
+    ui_out_field_string (out, "name", sym_name);
+
+  annotate_arg_name_end ();
+
+  if (! ui_out_is_mi_like_p (out))
+    ui_out_text (out, "=");
+
+  if (print_mi_args_flag)
+    ui_out_field_int (out, "arg", 1);
+
+  opts.deref_ref = 1;
+  if (ui_out_is_mi_like_p (out)
+      && mi_print_type == PRINT_SIMPLE_VALUES)
+    {
+      if (! py_print_type (out, val))
+	goto error;
+    }
+
+  if (! ui_out_is_mi_like_p (out))
+    {
+      opts.summary = !strcmp (print_args_type, "scalars");
+    }
+
+  annotate_arg_value (value_type (val));
+  if (! ui_out_is_mi_like_p (out)
+      || (ui_out_is_mi_like_p (out)
+	  && mi_print_type != PRINT_NO_VALUES))
+    {
+
+      if (! py_print_value (out, val, opts, mi_print_type, language))
+	goto error;
+    }
+
+  do_cleanups (inner_cleanup);
+
+  return 1;
+
+ error:
+  do_cleanups (inner_cleanup);
+  return 0;
+}
+
+static int
 enumerate_args (PyObject *iter,
 		struct ui_out *out,
 		struct value_print_options opts,
 		int mi_print_type,
 		const char *print_args_type,
-		int print_mi_args_flag)
+		int print_mi_args_flag,
+		struct frame_info *frame)
 {
   PyObject *item;
 
@@ -258,63 +400,103 @@ enumerate_args (PyObject *iter,
     {
       const struct language_defn *language;
       char *sym_name;
+      struct symbol *sym;
       struct value *val;
-      int value_success = 0;
+      int success = 0;
       volatile struct gdb_exception except;
-      struct cleanup *inner_cleanup =
-	make_cleanup (null_cleanup, NULL);
+      struct frame_arg arg, entryarg;
 
-      value_success = extract_sym_and_value (item,
-					     &sym_name,
-					     &val,
-					     &language);
+      success = extract_sym (item, &sym_name, &sym, &language);
+      if (! success)
+	{
+	  Py_DECREF (item);
+	  goto error;
+	}
+
+      success = extract_value (item, &val);
+      if (! success)
+	{
+	  xfree (sym_name);
+	  Py_DECREF (item);
+	  goto error;
+	}
+
       Py_DECREF (item);
       item = NULL;
 
-      if (! value_success)
-	goto error;
-
-      if (ui_out_is_mi_like_p (out))
+      /* If the object did not provide a value, read it.  */
+      if (! val)
 	{
-	  if(mi_print_type != PRINT_NO_VALUES)
+
+	  /* If there is no value, and also no symbol, set error and
+	     exit.  */
+	  if (! sym)
 	    {
-	      inner_cleanup =
-		make_cleanup_ui_out_tuple_begin_end (out,
-						     NULL);
+	      PyErr_SetString (PyExc_RuntimeError,
+			       _("No symbol or value provided."));
+	      xfree (sym_name);
+	      goto error;
 	    }
+
+	    read_frame_arg (sym, frame, &arg, &entryarg);
 	}
 
-      annotate_arg_begin ();
-      ui_out_field_string (out, "name", sym_name);
 
-      if (! ui_out_is_mi_like_p (out))
-	ui_out_text (out, "=");
-
-      if (print_mi_args_flag)
-	ui_out_field_int (out, "arg", 1);
-
-      annotate_arg_value (value_type (val));
-      opts.deref_ref = 1;
-
-      if (ui_out_is_mi_like_p (out)
-	  && mi_print_type == PRINT_SIMPLE_VALUES)
+      /* If the object has provided a value, we print that.  */
+      if (val)
+	py_print_single_arg (out,
+			     sym_name,
+			     NULL,
+			     val,
+			     opts,
+			     mi_print_type,
+			     print_args_type,
+			     print_mi_args_flag,
+			     language);
+      else
 	{
-	  py_print_type (out, val);
+	  /* The object has not provided a value, so this is a frame
+	     argument read by GDB.  In this case we have to account
+	     for entry-values.  */
+
+	  if (arg.entry_kind != print_entry_values_only)
+	    py_print_single_arg (out,
+				 NULL,
+				 &arg,
+				 NULL,
+				 opts,
+				 mi_print_type,
+				 print_args_type,
+				 print_mi_args_flag,
+				 NULL);
+
+
+	  if (entryarg.entry_kind != print_entry_values_no)
+	    {
+	      if (arg.entry_kind != print_entry_values_only)
+		{
+		  ui_out_text (out, ", ");
+		  ui_out_wrap_hint (out, "    ");
+		}
+
+	      py_print_single_arg (out,
+				   NULL,
+				   &entryarg,
+				   NULL,
+				   opts,
+				   mi_print_type,
+				   print_args_type,
+				   print_mi_args_flag,
+				   NULL);
+
+	    }
+
+	  xfree (arg.error);
+	  xfree (entryarg.error);
 	}
 
-      if (! ui_out_is_mi_like_p (out))
-	{
-	  opts.summary = !strcmp (print_args_type, "scalars");
-	}
+      xfree (sym_name);
 
-      if (! ui_out_is_mi_like_p (out)
-	  || (ui_out_is_mi_like_p (out)
-	      && mi_print_type != PRINT_NO_VALUES))
-	{
-	  py_print_value (out, val, language);
-	}
-
-      do_cleanups (inner_cleanup);
 
       /* Collect the next item from the iterator.  If
 	 this is the last item, we do not print the
@@ -337,10 +519,12 @@ enumerate_args (PyObject *iter,
 
 static int
 enumerate_locals (PyObject *iter,
-		 struct ui_out *out,
-		 struct value_print_options opts,
-		 int mi_print_type,
-		 int indent)
+		  struct ui_out *out,
+		  struct value_print_options opts,
+		  int mi_print_type,
+		  int indent,
+		  int print_mi_args_flag,
+		  struct frame_info *frame)
 {
   PyObject *item;
 
@@ -349,23 +533,41 @@ enumerate_locals (PyObject *iter,
       const struct language_defn *language;
       char *sym_name;
       struct value *val;
-      int value_success = 0;
+      int success = 0;
+      struct symbol *sym;
       volatile struct gdb_exception except;
       struct cleanup *inner_cleanup =
 	make_cleanup (null_cleanup, NULL);
 
-      value_success = extract_sym_and_value (item, &sym_name,
-					     &val,
-					     &language);
+      success = extract_sym (item, &sym_name, &sym, &language);
+      if (! success)
+	{
+	  Py_DECREF (item);
+	  goto error;
+	}
+
+      success = extract_value (item, &val);
+      if (! success)
+	{
+	  xfree (sym_name);
+	  Py_DECREF (item);
+	  goto error;
+	}
 
       Py_DECREF (item);
 
-      if (! value_success)
-	goto error;
 
+      /* If the object did not provide a value, read it.  */
+      if (! val)
+	{
+	  val = read_var_value (sym, frame);
+	}
+
+      /* With PRINT_NO_VALUES, MI does not emit a tuple, unless in
+	 -stack-list-variables.  */
       if (ui_out_is_mi_like_p (out))
 	{
-	  if (mi_print_type != PRINT_NO_VALUES)
+	  if (print_mi_args_flag || mi_print_type != PRINT_NO_VALUES)
 	    {
 	      inner_cleanup =
 		make_cleanup_ui_out_tuple_begin_end (out,
@@ -392,7 +594,7 @@ enumerate_locals (PyObject *iter,
 	  || (ui_out_is_mi_like_p (out)
 	      && mi_print_type != PRINT_NO_VALUES))
 	{
-	  py_print_value (out, val, language);
+	  py_print_value (out, val, opts, mi_print_type, language);
 	}
 
       ui_out_text (out, "\n");
@@ -412,7 +614,8 @@ enumerate_locals (PyObject *iter,
 static int
 py_mi_print_variables (PyObject *filter, struct ui_out *out,
 		       struct value_print_options opts,
-		       int mi_print_type, const char *print_args_type)
+		       int mi_print_type, const char *print_args_type,
+		       struct frame_info *frame)
 {
   struct cleanup *old_chain;
   PyObject *args_iter;
@@ -432,12 +635,12 @@ py_mi_print_variables (PyObject *filter, struct ui_out *out,
 
   if (args_iter != Py_None)
       if (! enumerate_args (args_iter, out, opts, mi_print_type,
-			    print_args_type, 1))
+			    print_args_type, 1, frame))
 	goto error;
 
   if (locals_iter != Py_None)
     if (! enumerate_locals (locals_iter, out, opts,
-			    mi_print_type, 0))
+			    mi_print_type, 1, 1, frame))
       goto error;
 
   do_cleanups (old_chain);
@@ -453,7 +656,8 @@ py_print_locals (PyObject *filter,
 		 struct ui_out *out,
 		 struct value_print_options opts,
 		 int mi_print_type,
-		 int indent)
+		 int indent,
+		 struct frame_info *frame)
 {
   PyObject *locals_iter = get_py_iter_from_func (filter,
 						 "frame_locals");
@@ -465,7 +669,7 @@ py_print_locals (PyObject *filter,
   make_cleanup_ui_out_list_begin_end (out, "locals");
   if (locals_iter != Py_None)
     if (! enumerate_locals (locals_iter, out, opts, mi_print_type,
-			    indent))
+			    indent, 0, frame))
       goto locals_error;
 
   do_cleanups (old_chain);
@@ -481,7 +685,8 @@ py_print_args (PyObject *filter,
 	       struct ui_out *out,
 	       struct value_print_options opts,
 	       int mi_print_type,
-	       const char *print_args_type)
+	       const char *print_args_type,
+	       struct frame_info *frame)
 {
   PyObject *args_iter  = get_py_iter_from_func (filter, "frame_args");
   struct cleanup *old_chain = make_cleanup_py_xdecref (args_iter);
@@ -497,7 +702,7 @@ py_print_args (PyObject *filter,
 
   if (args_iter != Py_None)
     if (! enumerate_args (args_iter, out, opts, mi_print_type,
-			  print_args_type, 0))
+			  print_args_type, 0, frame))
       goto args_error;
 
   if (! ui_out_is_mi_like_p (out))
@@ -553,12 +758,36 @@ py_print_frame (PyObject *filter,
   struct frame_info *frame = NULL;
   struct cleanup *cleanup_stack = make_cleanup (null_cleanup, NULL);
 
+  /* Get the underlying frame.  */
+  if (PyObject_HasAttrString (filter, "inferior_frame"))
+    {
+      PyObject *result = PyObject_CallMethod (filter, "inferior_frame", NULL);
+
+      if (! result)
+	goto error;
+      frame = frame_object_to_frame_info (result);
+      if (! frame)
+	{
+	  Py_DECREF (result);
+	  goto error;
+	}
+
+      gdbarch = get_frame_arch (frame);
+      Py_DECREF (result);
+    }
+  else
+    {
+      PyErr_SetString (PyExc_RuntimeError,
+		       _("'inferior_frame' API must be implemented."));
+      goto error;
+    }
+
   /* stack-list-variables.  */
   if (print_locals && print_args && ! print_frame_info)
     {
       if (! py_mi_print_variables (filter, out, opts,
 				   mi_print_args_type,
-				   print_args_type))
+				   print_args_type, frame))
 	goto error;
       else
 	return PY_BT_COMPLETED;
@@ -698,7 +927,8 @@ py_print_frame (PyObject *filter,
   /* Frame arguments.  */
   if (print_args)
     {
-      if (! py_print_args (filter, out, opts, mi_print_args_type, print_args_type))
+      if (! py_print_args (filter, out, opts, mi_print_args_type,
+			   print_args_type, frame))
 	goto error;
     }
 
@@ -768,7 +998,9 @@ py_print_frame (PyObject *filter,
   if (print_locals)
     {
       int success = py_print_locals (filter, out, opts,
-				     mi_print_args_type, indent);
+				     mi_print_args_type, indent,
+				     frame);
+
 
       if (success == 0 && PyErr_Occurred ())
 	goto error;

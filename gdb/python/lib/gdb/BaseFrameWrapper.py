@@ -133,7 +133,7 @@ class FrameVars ():
             if sym.is_argument:
                 continue;
             if self.fetch_b (sym):
-                lvars.append(BaseSymValueWrapper(sym, self.get_value(sym,block)))
+                lvars.append(BaseSymValueWrapper(sym, None))
 
         if len(lvars) == 0:
             return None
@@ -148,7 +148,7 @@ class FrameVars ():
             if not sym.is_argument:
                 continue;
             if self.fetch_b (sym):
-                args.append(BaseSymValueWrapper(sym,self.get_value (sym,block)))
+                args.append(BaseSymValueWrapper(sym,None))
 
         if len(args) == 0:
             return None

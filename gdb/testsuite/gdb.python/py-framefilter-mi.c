@@ -15,11 +15,19 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+#include <stdlib.h>
 
 void funca(void);
 int count = 0;
 
-void end_func (void)
+typedef struct
+{
+  char *nothing;
+  int f;
+  short s;
+} foobar;
+
+void end_func (int foo, char *bar, foobar *fb, foobar bf)
 {
   const char *str = "The End";
   const char *st2 = "Is Near";
@@ -48,13 +56,28 @@ void funcb(int j)
 
 void funca(void)
 {
+  foobar fb;
+  foobar *bf;
+
   if (count < 10)
     {
       count++;
       funcb(count);
     }
 
-  end_func();
+  fb.nothing = "Foo Bar";
+  fb.f = 42;
+  fb.s = 19;
+
+  bf = malloc (sizeof (foobar));
+  bf->nothing = malloc (128);
+  bf->nothing = "Bar Foo";
+  bf->f = 24;
+  bf->s = 91;
+
+  end_func(21, "Param", bf, fb);
+  free (bf->nothing);
+  free (bf);
   return;
 }
 
