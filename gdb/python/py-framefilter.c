@@ -36,19 +36,21 @@
 
 
 /* Helper function to extract a symbol, name and language definition
-   from a Python object that conforms to the SymbolValue interface.
+   from a Python object that conforms to the "Symbol Value" interface.
    OBJ is the Python object to extract the values from.  **NAME is a
    pass-through argument where the name of the symbol will be written.
-   **SYM is a pass-through argument where the symbol will be written.
-   In the case of the API returning a string, this will be set to
-   NULL.  **LANGUAGE is also a pass-through argument denoting the
-   language attributed to the Symbol. In the case of **SYM being NULL,
-   this will be set to the current language.  Returns 0 on error with
-   the appropriate Python exception set, and 1 on success.  */
+   **NAME is allocated in this function, but the caller is responsible
+   for clean up.  **SYM is a pass-through argument where the symbol
+   will be written.  In the case of the API returning a string, this
+   will be set to NULL.  **LANGUAGE is also a pass-through argument
+   denoting the language attributed to the Symbol. In the case of
+   **SYM being NULL, this will be set to the current language.
+   Returns 0 on error with the appropriate Python exception set, and 1
+   on success.  */
 
 static int
 extract_sym (PyObject *obj, char **name, struct symbol **sym,
-	       const struct language_defn **language)
+	     const struct language_defn **language)
 {
   if (PyObject_HasAttrString (obj, "symbol"))
     {
@@ -71,6 +73,8 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
 	}
       else
 	{
+	  /* This type checks 'result' during the conversion so we
+	     just call it unconditionally and check the return.  */
 	  *sym = symbol_object_to_symbol (result);
 
 	  Py_DECREF (result);
@@ -83,6 +87,8 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
 	      return 0;
 	    }
 
+	  /* Duplicate the symbol name, so the caller has consistency
+	     in garbage collection.  */
 	  *name = xstrdup (SYMBOL_PRINT_NAME (*sym));
 
 	  if (language_mode == language_mode_auto)
@@ -103,8 +109,8 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
 }
 
 /* Helper function to extract a value from an object that conforms to
-   the SymbolValue interface.  OBJ is the Python object to extract the
-   value from.  **VALUE is a pass-through argument where the value
+   the "Symbol Value" interface.  OBJ is the Python object to extract
+   the value from.  **VALUE is a pass-through argument where the value
    will be written.  If the object does not have the value attribute,
    or provides the Python None for a value, **VALUE will be set to
    NULL and this function will return as successful.  Returns 0 on
@@ -121,6 +127,9 @@ extract_value (PyObject *obj, struct value **value)
       if (! vresult)
 	return 0;
 
+      /* The Python code has returned 'None' for a value, so we set
+	 value to NULL.  This flags that GDB should read the
+	 value.  */
       if (vresult == Py_None)
 	{
 	  Py_DECREF (vresult);
@@ -144,10 +153,12 @@ extract_value (PyObject *obj, struct value **value)
   return 1;
 }
 
-/* Helper function which outputs a type name to a stream.  OUT is the
-   ui-out structure the type name will be output too, and VAL is the
-   value that the type will be extracted from.  Returns 0 on error,
-   with any GDB exceptions converted to a Python exception.  */
+/* Helper function which outputs a type name to a "type" field in a
+   stream.  OUT is the ui-out structure the type name will be output
+   too, and VAL is the value that the type will be extracted from.
+   Returns 0 on error, with any GDB exceptions converted to a Python
+   exception.  */
+
 static int
 py_print_type (struct ui_out *out, struct value *val)
 {
@@ -175,11 +186,14 @@ py_print_type (struct ui_out *out, struct value *val)
   return 1;
 }
 
-/* Helper function which outputs a value name to a stream.  OUT is the
-   ui-out structure the value will be output too, and VAL is the value
-   that will be printed.  LANGUAGE is the language_defn that the value
-   will be printed with.  Returns 0 on error, with any GDB exceptions
-   converted to a Python exception.  */
+/* Helper function which outputs a value name to value field in a
+   stream.  OUT is the ui-out structure the value will be output too,
+   VAL is the value that will be printed, OPTS contains the value
+   printing options, MI_PRINT_TYPE is the value delimiter for MI
+   output and LANGUAGE is the language_defn that the value will be
+   printed with.  If the output is detected to be non-MI,
+   MI_PRINT_TYPE is ignored.  Returns 0 on error, with any GDB
+   exceptions converted to a Python exception.  */
 
 static int
 py_print_value (struct ui_out *out, struct value *val,
@@ -238,7 +252,8 @@ py_print_value (struct ui_out *out, struct value *val,
    from the result, error checking for Python exception and returns
    that are not iterators.  FILTER is the Python object to call, and
    FUNC is the name of the method.  Returns a PyObject, or NULL on
-   error with the appropriate exception set.  */
+   error with the appropriate exception set.  This function can return
+   an iterator, or None.  */
 
 static PyObject *
 get_py_iter_from_func (PyObject *filter, char *func)
@@ -253,9 +268,9 @@ get_py_iter_from_func (PyObject *filter, char *func)
 	    {
 	      if (! PyIter_Check (result))
 		{
-		  PyErr_SetString (PyExc_RuntimeError,
-				   strcat (func, _(" function must "	\
-						   "return an iterator.")));
+		  PyErr_Format (PyExc_RuntimeError,
+				_(" %s function must " \
+				  "return an iterator."), func);
 		  Py_DECREF (result);
 		  return NULL;
 		}
@@ -279,6 +294,18 @@ get_py_iter_from_func (PyObject *filter, char *func)
     Py_RETURN_NONE;
 }
 
+/*  Helper function to output a single frame argument and value to an
+    output stream, accounting for entry values if the passed argument
+    has them.  Will output in CLI or MI like format depending on the
+    type of output.  OUT is the output stream , SYM_NAME is the name
+    of the symbol if this a synthetic argument (one which does not
+    have a backing symbol.  If SYM_NAME is populated then it must have
+    an accompanying value in the parameter FV.  FA is a frame argument
+    structure.  If this is populated, both SYM_NAME and FV are
+    ignored. OPTS contains the value printing options, MI_PRINT_TYPE
+    is an enumerator to the value types that will be printed if the
+    output is MI.  PRINT_MI_ARGS indciates whether to output the ARGS
+    field in MI output.  */
 static int
 py_print_single_arg (struct ui_out *out,
 		     char *sym_name,
@@ -286,7 +313,6 @@ py_print_single_arg (struct ui_out *out,
 		     struct value *fv,
 		     struct value_print_options opts,
 		     int mi_print_type,
-		     const char *print_args_type,
 		     int print_mi_args_flag,
 		     const struct language_defn *language)
 {
@@ -302,6 +328,8 @@ py_print_single_arg (struct ui_out *out,
   else
     val = fv;
 
+  /*  MI has varying rules for tuples, but generally if there is only
+      one element in each item in the list, do not start a tuple.  */
   if (print_mi_args_flag || mi_print_type != PRINT_NO_VALUES)
     {
       inner_cleanup =
@@ -311,6 +339,8 @@ py_print_single_arg (struct ui_out *out,
 
   annotate_arg_begin ();
 
+  /* If frame argument is populated, check for entry-values and the
+     entry value options.  */
   if (fa)
     {
       struct ui_file *stb;
@@ -337,6 +367,7 @@ py_print_single_arg (struct ui_out *out,
       ui_file_delete (stb);
     }
   else
+    /* Otherwise, just output the name.  */
     ui_out_field_string (out, "name", sym_name);
 
   annotate_arg_name_end ();
@@ -348,6 +379,8 @@ py_print_single_arg (struct ui_out *out,
     ui_out_field_int (out, "arg", 1);
 
   opts.deref_ref = 1;
+
+  /* For MI print the type.  */
   if (ui_out_is_mi_like_p (out)
       && mi_print_type == PRINT_SIMPLE_VALUES)
     {
@@ -355,12 +388,10 @@ py_print_single_arg (struct ui_out *out,
 	goto error;
     }
 
-  if (! ui_out_is_mi_like_p (out))
-    {
-      opts.summary = !strcmp (print_args_type, "scalars");
-    }
-
   annotate_arg_value (value_type (val));
+
+  /* If CLI, always print values.  For MI do not print values if the
+     enumerator is PRINT_NO_VALUES.  */
   if (! ui_out_is_mi_like_p (out)
       || (ui_out_is_mi_like_p (out)
 	  && mi_print_type != PRINT_NO_VALUES))
@@ -379,12 +410,21 @@ py_print_single_arg (struct ui_out *out,
   return 0;
 }
 
+/* Helper function to loop over frame arguments provided by the
+   frame_arguments Python API.  Elements in the iterator must conform
+   to the "Symbol Value" interface.  ITER is the Python iterator
+   object, OUT is the output stream, OPTS contains the value printing
+   options, MI_PRINT_TYPE is an enumerator to the value types that
+   will be printed if the output is MI, PRINT_MI_ARGS indciates
+   whether to output the ARGS field in MI output, and FRAME is the
+   backing frame.  If (all) the frame argument values are provided via
+   the value API call, FRAME is not needed.  */
+
 static int
 enumerate_args (PyObject *iter,
 		struct ui_out *out,
 		struct value_print_options opts,
 		int mi_print_type,
-		const char *print_args_type,
 		int print_mi_args_flag,
 		struct frame_info *frame)
 {
@@ -392,6 +432,10 @@ enumerate_args (PyObject *iter,
 
   annotate_frame_args ();
 
+  /*  Collect the first argument outside of the loop, so output of
+      commas in the argument output is correct.  At the end of the
+      loop block collect another item from the iterator, and, if it is
+      not null emit a comma.  */
   item = PyIter_Next (iter);
   if (! item && PyErr_Occurred ())
     goto error;
@@ -404,7 +448,6 @@ enumerate_args (PyObject *iter,
       struct value *val;
       int success = 0;
       volatile struct gdb_exception except;
-      struct frame_arg arg, entryarg;
 
       success = extract_sym (item, &sym_name, &sym, &language);
       if (! success)
@@ -424,9 +467,11 @@ enumerate_args (PyObject *iter,
       Py_DECREF (item);
       item = NULL;
 
-      /* If the object did not provide a value, read it.  */
+      /* If the object did not provide a value, read it using
+	 read_frame_args and account for entry values, if any.  */
       if (! val)
 	{
+	  struct frame_arg arg, entryarg;
 
 	  /* If there is no value, and also no symbol, set error and
 	     exit.  */
@@ -438,38 +483,26 @@ enumerate_args (PyObject *iter,
 	      goto error;
 	    }
 
-	    read_frame_arg (sym, frame, &arg, &entryarg);
-	}
+	  TRY_CATCH (except, RETURN_MASK_ALL)
+	    {
+	      read_frame_arg (sym, frame, &arg, &entryarg);
+	    }
+	  if (except.reason > 0)
+	    {
+	      xfree (sym_name);
+	      PyErr_SetString (PyExc_RuntimeError,
+			       except.message);
+	      goto error;
+	    }
 
-
-      /* If the object has provided a value, we print that.  */
-      if (val)
-	py_print_single_arg (out,
-			     sym_name,
-			     NULL,
-			     val,
-			     opts,
-			     mi_print_type,
-			     print_args_type,
-			     print_mi_args_flag,
-			     language);
-      else
-	{
 	  /* The object has not provided a value, so this is a frame
-	     argument read by GDB.  In this case we have to account
-	     for entry-values.  */
+	     argument to be read by GDB.  In this case we have to
+	     account for entry-values.  */
 
 	  if (arg.entry_kind != print_entry_values_only)
-	    py_print_single_arg (out,
-				 NULL,
-				 &arg,
-				 NULL,
-				 opts,
+	    py_print_single_arg (out, NULL, &arg, NULL, opts,
 				 mi_print_type,
-				 print_args_type,
-				 print_mi_args_flag,
-				 NULL);
-
+				 print_mi_args_flag, NULL);
 
 	  if (entryarg.entry_kind != print_entry_values_no)
 	    {
@@ -479,28 +512,28 @@ enumerate_args (PyObject *iter,
 		  ui_out_wrap_hint (out, "    ");
 		}
 
-	      py_print_single_arg (out,
-				   NULL,
-				   &entryarg,
-				   NULL,
-				   opts,
+	      py_print_single_arg (out, NULL, &entryarg, NULL, opts,
 				   mi_print_type,
-				   print_args_type,
-				   print_mi_args_flag,
-				   NULL);
-
+				   print_mi_args_flag, NULL);
 	    }
 
 	  xfree (arg.error);
 	  xfree (entryarg.error);
 	}
+      else
+	{
+	  /* If the object has provided a value, we just print that.  */
+	  if (val)
+	    py_print_single_arg (out, sym_name, NULL, val, opts,
+				 mi_print_type,
+				 print_mi_args_flag, language);
+	}
 
       xfree (sym_name);
 
-
       /* Collect the next item from the iterator.  If
-	 this is the last item, we do not print the
-	 ",".  */
+	 this is the last item, do not print the
+	 comma.  */
       item = PyIter_Next (iter);
       if (item)
 	ui_out_text (out, ", ");
@@ -516,6 +549,17 @@ enumerate_args (PyObject *iter,
  error:
   return 0;
 }
+
+
+/* Helper function to loop over variables provided by the frame_locals
+   Python API.  Elements in the iterator must conform to the "Symbol
+   Value" interface.  ITER is the Python iterator object, OUT is the
+   output stream, OPTS contains the value printing options,
+   MI_PRINT_TYPE is an enumerator to the value types that will be
+   printed if the output is MI, PRINT_MI_ARGS_FLAG indciates whether
+   to output the ARGS field in MI output, and FRAME is the backing
+   frame.  If (all) of the variables values are provided via the value
+   API call, FRAME is not needed.  */
 
 static int
 enumerate_locals (PyObject *iter,
@@ -560,11 +604,22 @@ enumerate_locals (PyObject *iter,
       /* If the object did not provide a value, read it.  */
       if (! val)
 	{
-	  val = read_var_value (sym, frame);
+	  TRY_CATCH (except, RETURN_MASK_ALL)
+	    {
+	      val = read_var_value (sym, frame);
+	    }
+	  if (except.reason > 0)
+	    {
+	      xfree (sym_name);
+	      PyErr_SetString (PyExc_RuntimeError,
+			       except.message);
+	      goto error;
+	    }
 	}
 
-      /* With PRINT_NO_VALUES, MI does not emit a tuple, unless in
-	 -stack-list-variables.  */
+      /* With PRINT_NO_VALUES, MI does not emit a tuple normally as
+	 each output contains only one field.  The exception is
+	 -stack-list-variables, which always provides a tuple.  */
       if (ui_out_is_mi_like_p (out))
 	{
 	  if (print_mi_args_flag || mi_print_type != PRINT_NO_VALUES)
@@ -575,6 +630,7 @@ enumerate_locals (PyObject *iter,
 	    }
 	}
       else
+	/* If the output is not MI we indent locals.  */
 	ui_out_spaces (out, (8 + (indent * 2)));
 
       ui_out_field_string (out, "name", sym_name);
@@ -611,10 +667,12 @@ enumerate_locals (PyObject *iter,
   return 0;
 }
 
+/*  Help function for -stack-list-variables.  */
+
 static int
 py_mi_print_variables (PyObject *filter, struct ui_out *out,
 		       struct value_print_options opts,
-		       int mi_print_type, const char *print_args_type,
+		       int mi_print_type,
 		       struct frame_info *frame)
 {
   struct cleanup *old_chain;
@@ -635,7 +693,7 @@ py_mi_print_variables (PyObject *filter, struct ui_out *out,
 
   if (args_iter != Py_None)
       if (! enumerate_args (args_iter, out, opts, mi_print_type,
-			    print_args_type, 1, frame))
+			    1, frame))
 	goto error;
 
   if (locals_iter != Py_None)
@@ -650,6 +708,9 @@ py_mi_print_variables (PyObject *filter, struct ui_out *out,
   do_cleanups (old_chain);
   return 0;
 }
+
+/* Helper function for printing locals.  This function largely just
+   creates the wrapping tuple, and calls enumerate_locals.  */
 
 static int
 py_print_locals (PyObject *filter,
@@ -680,12 +741,15 @@ py_print_locals (PyObject *filter,
   return 0;
 }
 
+/* Helper function for printing frame arguments.  This function
+   largely just creates the wrapping tuple, and calls
+   enumerate_args.  */
+
 static int
 py_print_args (PyObject *filter,
 	       struct ui_out *out,
 	       struct value_print_options opts,
 	       int mi_print_type,
-	       const char *print_args_type,
 	       struct frame_info *frame)
 {
   PyObject *args_iter  = get_py_iter_from_func (filter, "frame_args");
@@ -702,7 +766,7 @@ py_print_args (PyObject *filter,
 
   if (args_iter != Py_None)
     if (! enumerate_args (args_iter, out, opts, mi_print_type,
-			  print_args_type, 0, frame))
+			  0, frame))
       goto args_error;
 
   if (! ui_out_is_mi_like_p (out))
@@ -738,19 +802,22 @@ eq_printed_frame_entry (const void *a, const void *b)
 }
 
 
+/*  Print a single frame to the designated output stream, detecting
+    whether the output is MI or console, and formatting the output
+    according to the conventions of that protocol.  FILTER is the
+    frame-filter associated with this frame. PRINT_LEVEL is a flag
+    and indicates whether to print the frame level.  PRINT_WHAT is
+    the enumerator of what to print.  PRINT_FRAME_INFO is a flag that
+    indicates to print the frame information (everything other than
+    arguments or locals).  PRINT_ARGS is a flag that indicates
+    whether to print the frame arguments.   */
+
 static int
-py_print_frame (PyObject *filter,
-		int print_level,
-		enum print_what print_what,
-		int print_frame_info,
-		int print_args,
-		int mi_print_args_type,
-		const char *print_args_type,
+py_print_frame (PyObject *filter, int print_level, int print_frame_info,
+		int print_args, int mi_print_type,
 		int print_locals,
-		struct ui_out *out,
-		struct value_print_options opts,
-		int indent,
-		htab_t levels_printed)
+		struct ui_out *out, struct value_print_options opts,
+		int indent, htab_t levels_printed)
 {
   int has_addr = 0;
   CORE_ADDR address = 0;
@@ -786,8 +853,8 @@ py_print_frame (PyObject *filter,
   if (print_locals && print_args && ! print_frame_info)
     {
       if (! py_mi_print_variables (filter, out, opts,
-				   mi_print_args_type,
-				   print_args_type, frame))
+				   mi_print_type,
+				   frame))
 	goto error;
       else
 	return PY_BT_COMPLETED;
@@ -797,30 +864,6 @@ py_print_frame (PyObject *filter,
      wrapping frame attribute.  */
   if (print_frame_info || (print_args && ! print_locals))
     make_cleanup_ui_out_tuple_begin_end (out, "frame");
-
-  /* Get the underlying frame.  */
-  if (PyObject_HasAttrString (filter, "inferior_frame"))
-    {
-      PyObject *result = PyObject_CallMethod (filter, "inferior_frame", NULL);
-
-      if (! result)
-	goto error;
-      frame = frame_object_to_frame_info (result);
-      if (! frame)
-	{
-	  Py_DECREF (result);
-	  goto error;
-	}
-
-      gdbarch = get_frame_arch (frame);
-      Py_DECREF (result);
-    }
-  else
-    {
-      PyErr_SetString (PyExc_RuntimeError,
-		       _("'inferior_frame' API must be implemented."));
-      goto error;
-    }
 
   if (print_frame_info)
     {
@@ -927,8 +970,8 @@ py_print_frame (PyObject *filter,
   /* Frame arguments.  */
   if (print_args)
     {
-      if (! py_print_args (filter, out, opts, mi_print_args_type,
-			   print_args_type, frame))
+      if (! py_print_args (filter, out, opts, mi_print_type,
+			   frame))
 	goto error;
     }
 
@@ -998,7 +1041,7 @@ py_print_frame (PyObject *filter,
   if (print_locals)
     {
       int success = py_print_locals (filter, out, opts,
-				     mi_print_args_type, indent,
+				     mi_print_type, indent,
 				     frame);
 
 
@@ -1041,10 +1084,9 @@ py_print_frame (PyObject *filter,
 
 	      while ((item = PyIter_Next (iterator)))
 		{
-		  int success =  py_print_frame (item, print_level, print_what,
+		  int success =  py_print_frame (item, print_level,
 						 print_frame_info,
-						 print_args, mi_print_args_type,
-						 print_args_type,
+						 print_args, mi_print_type,
 						 print_locals, out,
 						 opts, indent, levels_printed);
 		  if (success == 0 && PyErr_Occurred ())
@@ -1111,7 +1153,7 @@ bootstrap_python_frame_filters (struct frame_info *frame)
 
 int
 apply_frame_filter (struct frame_info *frame, int print_level,
-		    enum print_what print_what, int print_frame_info,
+		    int print_frame_info,
 		    int print_args, int mi_print_args_type,
 		    const char *cli_print_args_type,
 		    struct ui_out *out, int print_locals, int count)
@@ -1123,6 +1165,10 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   struct value_print_options opts;
   int success = 0;
   PyObject *iterable;
+
+  if (cli_print_args_type != NULL)
+    /* Override print_args if the user option is set.  */
+    print_args = strcmp (cli_print_args_type, "none");
 
   cleanups = ensure_python_env (gdbarch, current_language);
 
@@ -1138,6 +1184,15 @@ apply_frame_filter (struct frame_info *frame, int print_level,
       return PY_BT_NO_FILTERS;
     }
   get_user_print_options (&opts);
+
+  get_raw_print_options (&opts);
+  opts.deref_ref = 1;
+
+  if (! ui_out_is_mi_like_p (out))
+    {
+      /* True in "summary" mode, false otherwise.  */
+      opts.summary = !strcmp (cli_print_args_type, "scalars");
+    }
 
   /* Is it an iterator */
   if PyIter_Check (iterable)
@@ -1157,10 +1212,9 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 
       while ((item = PyIter_Next (iterator)) && count--)
 	{
-	  success =  py_print_frame (item, print_level, print_what,
+	  success =  py_print_frame (item, print_level,
 				     print_frame_info, print_args,
 				     mi_print_args_type,
-				     cli_print_args_type,
 				     print_locals,
 				     out, opts, 0, levels_printed);
 
@@ -1188,7 +1242,7 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 #else /* HAVE_PYTHON */
 int
 apply_frame_filter (struct frame_info *frame, int print_level,
-		    enum print_what print_what, int print_frame_info,
+		    int print_frame_info,
 		    int print_args, int mi_print_args_type,
 		    const char *cli_print_args_type,
 		    struct ui_out *out, int print_locals, int count)

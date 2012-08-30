@@ -1725,7 +1725,6 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
   if (! raw)
     result = apply_frame_filter (trailing, /* frame */
 				 1,        /* print_level */
-				 LOCATION, /* print_what */
 				 1, /* print_frame_info */
 				 1, /* print_args */
 				 0, /* mi_print_args_type */

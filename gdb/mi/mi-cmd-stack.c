@@ -115,7 +115,6 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
 	count = (frame_high - frame_low) + 1;
       result = apply_frame_filter (fi,/* frame */
 				   1, /* print_level */
-				   LOC_AND_ADDRESS, /* print_what */
 				   1, /* print_frame_info */
 				   0, /* print_args */
 				   0, /* mi_print_args_type */
@@ -226,7 +225,6 @@ mi_cmd_stack_list_locals (char *command, char **argv, int argc)
 
        result = apply_frame_filter (frame,/* frame */
 				    1, /* print_level */
-				    LOC_AND_ADDRESS, /* print_what */
 				    0, /* print_frame_info */
 				    0, /* print_args */
 				    arg, /* mi_print_args_type */
@@ -312,7 +310,6 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
 
       result = apply_frame_filter (fi,/* frame */
 				   1, /* print_level */
-				   LOC_AND_ADDRESS, /* print_what */
 				   0, /* print_frame_info */
 				   1, /* print_args */
 				   print_values, /* mi_print_args_type */
@@ -380,7 +377,6 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
 
        result = apply_frame_filter (frame,/* frame */
 				    1, /* print_level */
-				    LOC_AND_ADDRESS, /* print_what */
 				    0, /* print_frame_info */
 				    1, /* print_args */
 				    arg, /* mi_print_args_type */
