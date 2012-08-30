@@ -1,3 +1,58 @@
+2012-08-28  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elf32-ppc.c (ppc_elf_relocate_section): Assert that dynindx is
+	not minus one.
+	* elf64-ppc.c (ppc64_elf_relocate_section): Likewise.
+
+2012-08-28  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elflink.c (_bfd_elf_merge_symbol): Also override the version
+	a dynamic symbol defaulted to if preempted with a hidden or
+	internal definition.
+
+2012-08-28  Walter Lee  <walt@tilera.com>
+
+	* elf32-tilepro.c (allocate_dynrelocs): Use PLT_ENTRY_SIZE as size
+	of header.
+	(tilepro_plt_entry_build): Account for new header size.
+	(tilepro_elf_finish_dynamic_sections): Ditto.
+	(tilepro_elf_plt_sym_val): Ditto.
+	* elfxx-tilegx.c (allocate_dynrelocs): Use PLT_ENTRY_SIZE as size
+	of header + tail.
+	(tilegx_elf_finish_dynamic_sections): Account for new padding.
+
+2012-08-27  Walter Lee  <walt@tilera.com>
+
+	* reloc.c (Add BFD_RELOC_TILEGX_IMM16_X0_HW0_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X1_HW0_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X0_HW1_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X1_HW1_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X0_HW2_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X1_HW2_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X0_HW3_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X1_HW3_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X0_HW0_LAST_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X1_HW0_LAST_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X0_HW1_LAST_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X1_HW1_LAST_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X0_HW2_LAST_PLT_PCREL,
+	BFD_RELOC_TILEGX_IMM16_X1_HW2_LAST_PLT_PCREL): new relocations.
+	* elfxx-tilegx.c (tilegx_elf_howto_table): Handle new relocations.
+	(tilegx_reloc_map): Ditto.
+	(reloc_to_create_func): Ditto.
+	(tilegx_elf_check_relocs): Ditto.
+	(tilegx_elf_gc_sweep_hook): Ditto.
+	(tilegx_elf_relocate_section): Ditto.
+	* libbfd.h: Regenerate.
+	* bfd-in2.h: Regenerate.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* elf32-arm.c (v8): New array.
+	(tag_cpu_arch_combine): Add support for ARMv8 attributes.
+	(elf32_arm_merge_eabi_attributes): Likewise.
+	(VFP_VERSION_COUNT): New define.
+
 2012-08-20  Tom Tromey  <tromey@redhat.com>
 
 	* vms-lib.c (_bfd_vms_lib_get_module): Use bfd_zmalloc for

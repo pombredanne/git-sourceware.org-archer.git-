@@ -1,3 +1,114 @@
+2012-08-29  Doug Evans  <dje@google.com>
+
+	* main.c (print_gdb_help): Remove reference to
+	--use-deprecated-index-sections.
+
+2012-08-28  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-cmds.c (max_user_call_depth): Add 'unsigned'.
+	(init_cmds): Call add_setshow_uinteger_cmd for command
+	'max-user-call-depth'.
+	* cli/cli-script.c (execute_user_command): Add 'unsigned' to the
+	declaration of 'max_user_call_depth'.
+	* frame.c (backtrace_limit): Add 'unsigned'.
+	(_initialize_frame): Call add_setshow_uinteger_cmd for command
+	'limit'.
+	* remote.c (remoteaddresssize): Add 'unsigned'.
+	(remote_address_masked): Change local var 'address_size' to
+	'unsigned'.
+	(_initialize_remote): Call add_setshow_uinteger_cmd for
+	'remoteaddresssize'.
+	* top.c (history_size): Add 'unsigned'.
+	(show_commands): Change local variables to 'unsigned'.
+	(set_history_size_command): Don't check history_size is negative.
+	Adjust the condition to call unstifle_history and set history_size
+	to UNIT_MAX.
+
+2012-08-28  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/14428
+
+	* infcmd.c (default_print_one_register_info): New, factored out
+	from default_print_registers_info.
+	(default_print_registers_info): Use it.  Mark value unavailable if
+	necessary.
+	(registers_info): Print user registers with
+	default_print_one_register_info.
+
+2010-08-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR tui/14486
+	* tui/tui-source.c (tui_source_is_displayed): Check if TUI_SRC_WIN
+	is not NULL before referencing it.
+
+2012-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (parse_breakpoint_sals) <(*address) == NULL>: New
+	variable pc.  Call find_pc_line instead of find_pc_overlay, restore
+	original PC for it.
+
+2012-08-27  Eli Zaretskii  <eliz@gnu.org>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* auto-load.c (auto_load_objfile_script): Rename to ...
+	(auto_load_objfile_script_1): ... here, change variable realname to
+	parameter realname, document it, add return value, add variable retval.
+	(auto_load_objfile_script): New function.
+
+2012-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cli/cli-decode.c (print_doc_line): Keep skipping '.' and ',' not
+	followed by a whitespace.
+
+2012-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR gdb/14494.
+	* dwarf2read.c (dwarf2_locate_sections): Move variable aflag here.
+	Move the SEC_HAS_CONTENTS check here - for any NAMES use.
+	(dwarf2_locate_sections) <eh_frame>: Move the variable and check from
+	here.
+
+2012-08-27  Wei-cheng Wang  <cole945@gmail.com>
+
+	* memattr.c (create_mem_region): Fix memory region overlapping
+	checking.
+
+2012-08-24  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* h8300-tdep.c (h8300_push_dummy_call): Replace unsafe alloca
+	with xmalloc/cleanup.
+	* mt-tdep.c (mt_push_dummy_call): Likewise.
+	* tilegx-tdep.c (tilegx_push_dummy_call): Likewise.
+	* xstormy16-tdep.c (xstormy16_push_dummy_call): Likewise.
+
+2012-08-24  Yao Qi  <yao@codesourcery.com>
+
+	* jv-exp.y (push_expression_name): Add "." at the end of error
+	message.
+
+2012-08-23  Khoo Yit Phang <khooyp@cs.umd.edu>
+
+	Document how to return from "python-interactive" to GDB.
+	* python/python.c (_initialize_python): Update documentation.
+
+2012-08-23  Pedro Alves  <palves@redhat.com>
+
+	* infrun.c (_initialize_infrun) <handle command help text>:
+	Mention that multiple signals are supported.
+
+2012-08-23  Pedro Alves  <palves@redhat.com>
+
+	* infcmd.c (_initialize_infcmd) <signal command>: Fix typo in help
+	string.
+
+2012-08-23  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (disconnect_tracing): Call set_tracepoint_num.
+	(tfind_1): Don't call registers_changed, set_traceframe_num,
+	and clear_traceframe_info.
+	Call set_current_traceframe.
+	(set_current_traceframe): call set_traceframe_num.
+
 2012-08-22  Sergio Durigan Junior  <sergiodj@redhat.com>
 
 	* remote-sim.c (_initialize_remote_sim): Pass NULL argument to
@@ -31,8 +142,6 @@
 	Python interactive prompt with "pi" as alias, and add "py" as
 	an alias to "python".
 	* NEWS: Mention the new commands.
-	* doc/gdb.texinfo (Python Commands): Document the new
-	commands.
 	* python/python.c (eval_python_command): New function.
 	(python_interactive_command): For "python-interactive" with
 	arguments, call eval_python_command.  For "python-interactive"

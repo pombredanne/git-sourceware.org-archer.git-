@@ -1,3 +1,98 @@
+2012-08-29  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c (VXASHB_MASK): New define.
+	(powerpc_opcodes) <vsldoi>: Use VXASHB_MASK.
+
+2012-08-28  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c (UIMM4, UIMM3, UIMM2, VXVA_MASK, VXVB_MASK, VXVAVB_MASK,
+	VXVDVA_MASK, VXUIMM4_MASK, VXUIMM3_MASK, VXUIMM2_MASK): New defines.
+	(powerpc_opcodes) <vexptefp, vlogefp, vrefp, vrfim, vrfin, vrfip,
+	vrfiz, vrsqrtefp, vupkhpx, vupkhsb, vupkhsh, vupklpx, vupklsb,
+	vupklsh>: Use VXVA_MASK.
+	<vspltisb, vspltish, vspltisw>: Use VXVB_MASK.
+	<mfvscr>: Use VXVAVB_MASK.
+	<mtvscr>: Use VXVDVA_MASK.
+	<vspltb>: Use VXUIMM4_MASK.
+	<vsplth>: Use VXUIMM3_MASK.
+	<vspltw>: Use VXUIMM2_MASK.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (neon_opcodes): Add 2 operand sha instructions.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (neon_opcodes): Add SHA 3-operand instructions.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (neon_opcodes): Handle VMULL.P64.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (neon_opcodes): Add support for AES instructions.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add support for HP/DP
+	conversions.
+
+2012-08-24  Matthew  Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add VRINT.
+	(neon_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add support for new VCVT
+	variants.
+	(neon_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add VMAXNM/VMINNM.
+	(neon_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add VSEL.
+	(print_insn_coprocessor): Add new %<>c bitfield format
+	specifier.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): Add LDRA/STRL instructions.
+	(thumb32_opcodes): Likewise.
+	(print_arm_insn): Add support for %<>T formatter.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): Add HLT.
+	(thumb_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (thumb32_opcodes): Add DCPS instruction.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): Add SEVL.
+	(thumb_opcodes): Likewise.
+	(thumb32_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (data_barrier_option): New function.
+	(print_insn_arm): Use data_barrier_option.
+	(print_insn_thumb32): Use data_barrier_option.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com
+
+	* arm-dis.c (COND_UNCOND): New constant.
+	(print_insn_coprocessor): Add support for %u format specifier.
+	(print_insn_neon): Likewise.
+
 2012-08-21  David S. Miller  <davem@davemloft.net>
 
 	* sparc-opc.c (4-argument crypto instructions): Fix encoding using

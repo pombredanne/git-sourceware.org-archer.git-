@@ -1,3 +1,49 @@
+2012-08-28  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/14428
+
+	* gdb.base/pc-fp.exp: Adjust expected output of 'info registers pc fp'.
+
+2012-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-caller-line.c: New file.
+	* gdb.base/break-caller-line.exp: New file.
+
+2012-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.ada/rdv_wait.exp (set debug-file-directory): New command.
+	* gdb.arch/i386-cfi-notcurrent.S: New file.
+	* gdb.arch/i386-cfi-notcurrent.exp: New file.
+
+2012-08-27  Wei-cheng Wang  <cole945@gmail.com>
+	    Yao Qi <yao@codesourcery.com>
+	    Pedro Alves <palves@redhat.com>
+
+	* gdb.base/memattr.exp (delete_memory, region_pass, region_fail):
+	New procedures.
+	(top level): Add overlap checking tests.
+
+2012-08-24  Tom Tromey  <tromey@redhat.com>
+
+	* lib/gdb.exp (skip_unwinder_tests): Don't leave 'ok' set if
+	gdb_test_multiple fails for other reasons.
+
+2012-08-24  Yao Qi  <yao@codesourcery.com>
+
+	* lib/gdb.exp (skip_unwinder_tests): Remove pass.
+
+2012-08-23  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/help.exp: Adjust to "handle" help text change.
+
+2012-08-23  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/disconnected-tracing.c (start, end): New.
+	(main): Call start and end.
+	* gdb.trace/disconnected-tracing.exp (disconnected_tracing): Move
+	existing tests into this proc.
+	(disconnected_tfind): New.
+
 2012-08-23  Yao Qi  <yao@codesourcery.com>
 
 	* boards/native-gdbserver.exp (${board}_upload): New.
