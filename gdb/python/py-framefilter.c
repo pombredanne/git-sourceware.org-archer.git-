@@ -295,17 +295,18 @@ get_py_iter_from_func (PyObject *filter, char *func)
 }
 
 /*  Helper function to output a single frame argument and value to an
-    output stream, accounting for entry values if the passed argument
-    has them.  Will output in CLI or MI like format depending on the
-    type of output.  OUT is the output stream , SYM_NAME is the name
-    of the symbol if this a synthetic argument (one which does not
-    have a backing symbol.  If SYM_NAME is populated then it must have
-    an accompanying value in the parameter FV.  FA is a frame argument
-    structure.  If this is populated, both SYM_NAME and FV are
-    ignored. OPTS contains the value printing options, MI_PRINT_TYPE
-    is an enumerator to the value types that will be printed if the
-    output is MI.  PRINT_MI_ARGS indciates whether to output the ARGS
-    field in MI output.  */
+    output stream.  This function will account for entry values if the
+    FV parameter is populated, the frame argument has entry values
+    associated with them, and the appropriate "set entry-value"
+    options are set.  Will output in CLI or MI like format depending
+    on the type of output stream detected.  OUT is the output stream,
+    SYM_NAME is the name of the symbol.  If SYM_NAME is populated then
+    it must have an accompanying value in the parameter FV.  FA is a
+    frame argument structure.  If FA is populated, both SYM_NAME and
+    FV are ignored.  OPTS contains the value printing options,
+    MI_PRINT_TYPE is an enumerator to the value types that will be
+    printed if the output is MI.  PRINT_MI_ARGS indciates whether to
+    output the ARGS="1" field in MI output.  */
 static int
 py_print_single_arg (struct ui_out *out,
 		     char *sym_name,
@@ -378,8 +379,6 @@ py_print_single_arg (struct ui_out *out,
   if (print_mi_args_flag)
     ui_out_field_int (out, "arg", 1);
 
-  opts.deref_ref = 1;
-
   /* For MI print the type.  */
   if (ui_out_is_mi_like_p (out)
       && mi_print_type == PRINT_SIMPLE_VALUES)
@@ -411,24 +410,39 @@ py_print_single_arg (struct ui_out *out,
 }
 
 /* Helper function to loop over frame arguments provided by the
-   frame_arguments Python API.  Elements in the iterator must conform
-   to the "Symbol Value" interface.  ITER is the Python iterator
-   object, OUT is the output stream, OPTS contains the value printing
-   options, MI_PRINT_TYPE is an enumerator to the value types that
-   will be printed if the output is MI, PRINT_MI_ARGS indciates
-   whether to output the ARGS field in MI output, and FRAME is the
+   "frame_arguments" Python API.  Elements in the iterator must
+   conform to the "Symbol Value" interface.  ITER is the Python
+   iterator object, OUT is the output stream, MI_PRINT_TYPE is an
+   enumerator to the value types that will be printed if the output is
+   MI, PRINT_MI_ARGS indciates whether to output the ARGS="1" field in
+   MI output, CLI_PRINT_FRAME_ARGS_TYPE is an enumerator of the user
+   set option for frame argument printing output, and FRAME is the
    backing frame.  If (all) the frame argument values are provided via
-   the value API call, FRAME is not needed.  */
+   the "value" API call, FRAME is not needed.  */
 
 static int
 enumerate_args (PyObject *iter,
 		struct ui_out *out,
-		struct value_print_options opts,
 		int mi_print_type,
 		int print_mi_args_flag,
+		const char *cli_print_frame_args_type,
 		struct frame_info *frame)
 {
   PyObject *item;
+  struct value_print_options opts;
+
+  get_user_print_options (&opts);
+
+  opts.deref_ref = 1;
+
+  if (! ui_out_is_mi_like_p (out))
+    {
+      /* True in "summary" mode, false otherwise.  */
+      opts.summary = !strcmp (cli_print_frame_args_type, "scalars");
+    }
+
+  opts.deref_ref = 1;
+
 
   annotate_frame_args ();
 
@@ -551,26 +565,29 @@ enumerate_args (PyObject *iter,
 }
 
 
-/* Helper function to loop over variables provided by the frame_locals
-   Python API.  Elements in the iterator must conform to the "Symbol
-   Value" interface.  ITER is the Python iterator object, OUT is the
-   output stream, OPTS contains the value printing options,
-   MI_PRINT_TYPE is an enumerator to the value types that will be
-   printed if the output is MI, PRINT_MI_ARGS_FLAG indciates whether
-   to output the ARGS field in MI output, and FRAME is the backing
-   frame.  If (all) of the variables values are provided via the value
-   API call, FRAME is not needed.  */
+/* Helper function to loop over variables provided by the
+   "frame_locals" Python API.  Elements in the iterator must conform
+   to the "Symbol Value" interface.  ITER is the Python iterator
+   object, OUT is the output stream, MI_PRINT_TYPE is an enumerator to
+   the value types that will be printed if the output is MI,
+   PRINT_MI_ARGS_FLAG indciates whether to output the ARGS field in MI
+   output, and FRAME is the backing frame.  If (all) of the variables
+   values are provided via the "value" API call, FRAME is not
+   needed.  */
 
 static int
 enumerate_locals (PyObject *iter,
 		  struct ui_out *out,
-		  struct value_print_options opts,
 		  int mi_print_type,
 		  int indent,
 		  int print_mi_args_flag,
 		  struct frame_info *frame)
 {
   PyObject *item;
+  struct value_print_options opts;
+
+  get_user_print_options (&opts);
+  opts.deref_ref = 1;
 
   while ((item = PyIter_Next (iter)))
     {
@@ -667,12 +684,12 @@ enumerate_locals (PyObject *iter,
   return 0;
 }
 
-/*  Help function for -stack-list-variables.  */
+/*  Helper function for -stack-list-variables.  */
 
 static int
 py_mi_print_variables (PyObject *filter, struct ui_out *out,
-		       struct value_print_options opts,
 		       int mi_print_type,
+		       const char *cli_print_frame_args_type,
 		       struct frame_info *frame)
 {
   struct cleanup *old_chain;
@@ -692,13 +709,14 @@ py_mi_print_variables (PyObject *filter, struct ui_out *out,
   make_cleanup_ui_out_list_begin_end (out, "variables");
 
   if (args_iter != Py_None)
-      if (! enumerate_args (args_iter, out, opts, mi_print_type,
-			    1, frame))
+      if (! enumerate_args (args_iter, out, mi_print_type,
+			    1, cli_print_frame_args_type, frame))
 	goto error;
 
   if (locals_iter != Py_None)
-    if (! enumerate_locals (locals_iter, out, opts,
-			    mi_print_type, 1, 1, frame))
+    if (! enumerate_locals (locals_iter, out, mi_print_type, 1, 1,
+			    frame))
+
       goto error;
 
   do_cleanups (old_chain);
@@ -715,7 +733,6 @@ py_mi_print_variables (PyObject *filter, struct ui_out *out,
 static int
 py_print_locals (PyObject *filter,
 		 struct ui_out *out,
-		 struct value_print_options opts,
 		 int mi_print_type,
 		 int indent,
 		 struct frame_info *frame)
@@ -729,7 +746,7 @@ py_print_locals (PyObject *filter,
 
   make_cleanup_ui_out_list_begin_end (out, "locals");
   if (locals_iter != Py_None)
-    if (! enumerate_locals (locals_iter, out, opts, mi_print_type,
+    if (! enumerate_locals (locals_iter, out, mi_print_type,
 			    indent, 0, frame))
       goto locals_error;
 
@@ -748,8 +765,8 @@ py_print_locals (PyObject *filter,
 static int
 py_print_args (PyObject *filter,
 	       struct ui_out *out,
-	       struct value_print_options opts,
 	       int mi_print_type,
+	       const char *cli_print_frame_args_type,
 	       struct frame_info *frame)
 {
   PyObject *args_iter  = get_py_iter_from_func (filter, "frame_args");
@@ -765,8 +782,9 @@ py_print_args (PyObject *filter,
     ui_out_text (out, " (");
 
   if (args_iter != Py_None)
-    if (! enumerate_args (args_iter, out, opts, mi_print_type,
-			  0, frame))
+    if (! enumerate_args (args_iter, out, mi_print_type,
+			  0, cli_print_frame_args_type,
+			  frame))
       goto args_error;
 
   if (! ui_out_is_mi_like_p (out))
@@ -805,27 +823,40 @@ eq_printed_frame_entry (const void *a, const void *b)
 /*  Print a single frame to the designated output stream, detecting
     whether the output is MI or console, and formatting the output
     according to the conventions of that protocol.  FILTER is the
-    frame-filter associated with this frame. PRINT_LEVEL is a flag
-    and indicates whether to print the frame level.  PRINT_WHAT is
-    the enumerator of what to print.  PRINT_FRAME_INFO is a flag that
-    indicates to print the frame information (everything other than
-    arguments or locals).  PRINT_ARGS is a flag that indicates
-    whether to print the frame arguments.   */
+    frame-filter associated with this frame.  PRINT_LEVEL is a flag
+    and indicates whether to print the frame level.  PRINT_FRAME_INFO
+    is a flag that indicates to print the frame information
+    (everything other than arguments or locals).  PRINT_ARGS is a flag
+    that indicates whether to print frame arguments, and PRINT_LOCALS
+    is a flag that indicates whether to print frame local variables.
+    MI_PRINT_TYPE is an enumerator to the value types that will be
+    printed if the output is MI.  CLI_PRINT_FRAMES_ARGS_TYPE is an
+    enumerator indicating what type of frame arguments to print.  OUT
+    is the output stream to print too, INDENT is the level of
+    indention for this frame (in the case of elided frames), and
+    LEVELS_PRINTED is a hash-table containing all the frames level
+    that have already been printed.  If a frame level has been
+    printed, do not print it again (in the case of elided frames).  */
 
 static int
 py_print_frame (PyObject *filter, int print_level, int print_frame_info,
-		int print_args, int mi_print_type,
-		int print_locals,
-		struct ui_out *out, struct value_print_options opts,
-		int indent, htab_t levels_printed)
+		int print_args, int print_locals, int mi_print_type,
+		const char *cli_print_frame_args_type,
+		struct ui_out *out, int indent, htab_t levels_printed)
 {
   int has_addr = 0;
   CORE_ADDR address = 0;
   struct gdbarch *gdbarch = NULL;
   struct frame_info *frame = NULL;
   struct cleanup *cleanup_stack = make_cleanup (null_cleanup, NULL);
+  struct value_print_options opts;
+  PyObject *elided;
 
-  /* Get the underlying frame.  */
+  get_user_print_options (&opts);
+
+  /* Get the underlying frame.  This is needed to determine GDB
+  architecture, and also, in the cases of frame variables/arguments to
+  read them if they returned filter object requires us to do so.  */
   if (PyObject_HasAttrString (filter, "inferior_frame"))
     {
       PyObject *result = PyObject_CallMethod (filter, "inferior_frame", NULL);
@@ -852,8 +883,9 @@ py_print_frame (PyObject *filter, int print_level, int print_frame_info,
   /* stack-list-variables.  */
   if (print_locals && print_args && ! print_frame_info)
     {
-      if (! py_mi_print_variables (filter, out, opts,
+      if (! py_mi_print_variables (filter, out,
 				   mi_print_type,
+				   cli_print_frame_args_type,
 				   frame))
 	goto error;
       else
@@ -891,7 +923,9 @@ py_print_frame (PyObject *filter, int print_level, int print_frame_info,
 	}
 
     }
-  /* Print frame level.  */
+
+  /* Print frame level.  MI does not require the level if
+     locals/variables only are being printed.  */
   if ((print_frame_info || print_args) && print_level)
     {
       struct frame_info **slot;
@@ -967,14 +1001,16 @@ py_print_frame (PyObject *filter, int print_level, int print_frame_info,
     }
 
 
-  /* Frame arguments.  */
+  /* Frame arguments.  Check the result, and error if something went
+     wrong.  */
   if (print_args)
     {
-      if (! py_print_args (filter, out, opts, mi_print_type,
-			   frame))
+      if (! py_print_args (filter, out, mi_print_type,
+			   cli_print_frame_args_type, frame))
 	goto error;
     }
 
+  /* File name/source/line number information.  */
   if (print_frame_info)
     {
       annotate_frame_source_begin ();
@@ -1030,6 +1066,7 @@ py_print_frame (PyObject *filter, int print_level, int print_frame_info,
 	    goto error;
 	}
     }
+
   /* For MI we need to deal with the "children" list population of
      elided frames, so if MI output detected do not send newline.  */
   if (! ui_out_is_mi_like_p (out))
@@ -1040,65 +1077,44 @@ py_print_frame (PyObject *filter, int print_level, int print_frame_info,
 
   if (print_locals)
     {
-      int success = py_print_locals (filter, out, opts,
-				     mi_print_type, indent,
-				     frame);
-
-
-      if (success == 0 && PyErr_Occurred ())
+      if (! py_print_locals (filter, out, mi_print_type, indent,
+			     frame))
 	goto error;
     }
 
   /* Finally recursively print elided frames, if any.  */
-  if (PyObject_HasAttrString (filter, "elided"))
+  elided  = get_py_iter_from_func (filter, "elided");
+  if (! elided)
+    goto error;
+
+  if (elided != Py_None)
     {
-      PyObject *result = PyObject_CallMethod (filter, "elided", NULL);
+      PyObject *item;
 
-      if (! result)
-	goto error;
+      make_cleanup_py_decref (elided);
+      make_cleanup_ui_out_list_begin_end (out, "children");
 
-      if (result != Py_None)
+      if (! ui_out_is_mi_like_p (out))
+	indent = indent + 4;
+
+      while ((item = PyIter_Next (elided)))
 	{
-	  if (! PyIter_Check (result))
+	  int success =  py_print_frame (item, print_level,
+					 print_frame_info,
+					 print_args,
+					 print_locals,
+					 mi_print_type,
+					 cli_print_frame_args_type,
+					 out, indent,
+					 levels_printed);
+
+	  if (success == 0 && PyErr_Occurred ())
 	    {
-	      PyErr_SetString (PyExc_RuntimeError,
-			       _("'elided' function must return an iterator."));
-	      Py_DECREF (result);
+	      Py_DECREF (item);
 	      goto error;
 	    }
-	  else
-	    {
-	      PyObject *iterator = PyObject_GetIter (result);
-	      PyObject *item;
 
-	      Py_DECREF (result);
-
-	      if (! iterator)
-		goto error;
-
-	      make_cleanup_py_decref (iterator);
-	      make_cleanup_ui_out_list_begin_end (out, "children");
-
-	      if (! ui_out_is_mi_like_p (out))
-		indent = indent + 4;
-
-	      while ((item = PyIter_Next (iterator)))
-		{
-		  int success =  py_print_frame (item, print_level,
-						 print_frame_info,
-						 print_args, mi_print_type,
-						 print_locals, out,
-						 opts, indent, levels_printed);
-		  if (success == 0 && PyErr_Occurred ())
-		    {
-		      Py_DECREF (item);
-		      //do_cleanups (cleanup_stack);
-		      goto error;
-		    }
-
-		  Py_DECREF (item);
-		}
-	    }
+	  Py_DECREF (item);
 	}
     }
 
@@ -1114,6 +1130,8 @@ py_print_frame (PyObject *filter, int print_level, int print_frame_info,
   return PY_BT_ERROR;
 }
 
+/* Helper function to initiate frame filter invocation at starting
+   frame FRAME.  */
 static PyObject *
 bootstrap_python_frame_filters (struct frame_info *frame)
 {
@@ -1151,24 +1169,38 @@ bootstrap_python_frame_filters (struct frame_info *frame)
   return iterable;
 }
 
+/*  Public and dispatch function for frame filters.  This is the only
+    publicly exported function in this file.  FRAME is the source
+    frame to start frame-filter invocation.  PRINT_LEVEL is a flag
+    indicating whether to print the frame's relative level in the
+    output.  PRINT_FRAME_INFO is a flag that indicates whether this
+    function should print the frame information, PRINT_ARGS is a flag
+    that indicates whether to print frame arguments, and PRINT_LOCALS,
+    likewise, with frame local variables.  MI_PRINT_ARGS_TYPE is an
+    element from an internal enumerator from MI that indicates which
+    values types to print.  This parameter is ignored if the output is
+    detected to be CLI.  CLI_PRINT_FRAME_ARGS_TYPE likewise is a an
+    element of what value types to print from CLI.  OUT is the output
+    stream to print, and COUNT is a delimiter (required for MI
+    slices).  */
 int
 apply_frame_filter (struct frame_info *frame, int print_level,
-		    int print_frame_info,
-		    int print_args, int mi_print_args_type,
-		    const char *cli_print_args_type,
-		    struct ui_out *out, int print_locals, int count)
+		    int print_frame_info,  int print_args,
+		    int print_locals, int mi_print_args_type,
+		    const char *cli_print_frame_args_type,
+		    struct ui_out *out, int count)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct cleanup *cleanups;
   int result = 0;
   int print_result = 0;
-  struct value_print_options opts;
   int success = 0;
   PyObject *iterable;
 
-  if (cli_print_args_type != NULL)
+  /* XXX: Does MI pay attention to this command? */
+  if (cli_print_frame_args_type != NULL)
     /* Override print_args if the user option is set.  */
-    print_args = strcmp (cli_print_args_type, "none");
+    print_args = strcmp (cli_print_frame_args_type, "none");
 
   cleanups = ensure_python_env (gdbarch, current_language);
 
@@ -1177,21 +1209,15 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   if (!iterable)
     goto done;
 
+  /*  If iterable is None, then there are not any frame filters
+      registered.  If this is the case, defer to default GDB printing
+      routines in MI and CLI.  */
+
   make_cleanup_py_decref (iterable);
   if (iterable == Py_None)
     {
       do_cleanups (cleanups);
       return PY_BT_NO_FILTERS;
-    }
-  get_user_print_options (&opts);
-
-  get_raw_print_options (&opts);
-  opts.deref_ref = 1;
-
-  if (! ui_out_is_mi_like_p (out))
-    {
-      /* True in "summary" mode, false otherwise.  */
-      opts.summary = !strcmp (cli_print_args_type, "scalars");
     }
 
   /* Is it an iterator */
@@ -1214,10 +1240,13 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 	{
 	  success =  py_print_frame (item, print_level,
 				     print_frame_info, print_args,
-				     mi_print_args_type,
 				     print_locals,
-				     out, opts, 0, levels_printed);
+				     mi_print_args_type,
+				     cli_print_frame_args_type,
+				     out, 0, levels_printed);
 
+	  /* Do not exit on error printing the frame, continue with
+	     other frames.  */
 	  if (success == PY_BT_ERROR && PyErr_Occurred ())
 	    gdbpy_print_stack ();
 
@@ -1242,10 +1271,10 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 #else /* HAVE_PYTHON */
 int
 apply_frame_filter (struct frame_info *frame, int print_level,
-		    int print_frame_info,
-		    int print_args, int mi_print_args_type,
-		    const char *cli_print_args_type,
-		    struct ui_out *out, int print_locals, int count)
+		    int print_frame_info, int print_args,
+		    int print_locals, int mi_print_args_type,
+		    const char *cli_print_frame_args_type,
+		    struct ui_out *out, int count)
 {
   return PY_BT_NO_FILTERS
 }

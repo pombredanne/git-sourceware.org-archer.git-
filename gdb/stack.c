@@ -1727,10 +1727,10 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
 				 1,        /* print_level */
 				 1, /* print_frame_info */
 				 1, /* print_args */
+				 show_locals,   /* print_locals */
 				 0, /* mi_print_args_type */
 				 print_frame_arguments, /* cli_print_args_type */
 				 current_uiout, /* out */
-				 show_locals,   /* print_locals */
 				 count /* count */);
 
   /* Run the inbuilt backtrace if there are no filters registered, or

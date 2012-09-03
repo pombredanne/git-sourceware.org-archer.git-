@@ -117,10 +117,10 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
 				   1, /* print_level */
 				   1, /* print_frame_info */
 				   0, /* print_args */
+				   0, /* print_locals */
 				   0, /* mi_print_args_type */
 				   0, /* cli_print_args_type */
 				   current_uiout, /* out */
-				   0, /* print_locals */
 				   count /* count */);
     }
 
@@ -227,10 +227,10 @@ mi_cmd_stack_list_locals (char *command, char **argv, int argc)
 				    1, /* print_level */
 				    0, /* print_frame_info */
 				    0, /* print_args */
+				    1, /* print_locals */
 				    arg, /* mi_print_args_type */
 				    0, /* cli_print_args_type */
 				    current_uiout, /* out */
-				    1, /* print_locals */
 				    count /* count */);
      }
 
@@ -312,10 +312,10 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
 				   1, /* print_level */
 				   0, /* print_frame_info */
 				   1, /* print_args */
+				   0, /* print_locals */
 				   print_values, /* mi_print_args_type */
 				   0, /* cli_print_args_type */
 				   current_uiout, /* out */
-				   0, /* print_locals */
 				   count /* count */);
     }
 
@@ -379,10 +379,10 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
 				    1, /* print_level */
 				    0, /* print_frame_info */
 				    1, /* print_args */
+				    1, /* print_locals */
 				    arg, /* mi_print_args_type */
 				    0, /* cli_print_args_type */
 				    current_uiout, /* out */
-				    1, /* print_locals */
 				    count /* count */);
      }
 
