@@ -153,6 +153,42 @@ extract_value (PyObject *obj, struct value **value)
   return 1;
 }
 
+static int
+mi_should_print (struct symbol *sym, const char *type)
+{
+  int print_me = 0;
+
+  switch (SYMBOL_CLASS (sym))
+    {
+    default:
+    case LOC_UNDEF:	/* catches errors        */
+    case LOC_CONST:	/* constant              */
+    case LOC_TYPEDEF:	/* local typedef         */
+    case LOC_LABEL:	/* local label           */
+    case LOC_BLOCK:	/* local function        */
+    case LOC_CONST_BYTES:	/* loc. byte seq.        */
+    case LOC_UNRESOLVED:	/* unresolved static     */
+    case LOC_OPTIMIZED_OUT:	/* optimized out         */
+      print_me = 0;
+      break;
+
+    case LOC_ARG:	/* argument              */
+    case LOC_REF_ARG:	/* reference arg         */
+    case LOC_REGPARM_ADDR:	/* indirect register arg */
+    case LOC_LOCAL:	/* stack local           */
+    case LOC_STATIC:	/* static                */
+    case LOC_REGISTER:	/* register              */
+    case LOC_COMPUTED:	/* computed location     */
+      if (strcmp (type, "all"))
+	print_me = 1;
+      else if (strcmp (type, "locals"))
+	print_me = !SYMBOL_IS_ARGUMENT (sym);
+      else
+	print_me = SYMBOL_IS_ARGUMENT (sym);
+    }
+  return print_me;
+}
+
 /* Helper function which outputs a type name to a "type" field in a
    stream.  OUT is the ui-out structure the type name will be output
    too, and VAL is the value that the type will be extracted from.
@@ -315,6 +351,7 @@ py_print_single_arg (struct ui_out *out,
 		     struct value_print_options opts,
 		     int mi_print_type,
 		     int print_mi_args_flag,
+		     const char *cli_print_frame_args_type,
 		     const struct language_defn *language)
 {
   struct value *val;
@@ -389,15 +426,26 @@ py_print_single_arg (struct ui_out *out,
 
   annotate_arg_value (value_type (val));
 
-  /* If CLI, always print values.  For MI do not print values if the
-     enumerator is PRINT_NO_VALUES.  */
+    /* If the output is to the CLI, and the user option set print
+     frame-arguments is set to none, just output "...".  */
   if (! ui_out_is_mi_like_p (out)
-      || (ui_out_is_mi_like_p (out)
-	  && mi_print_type != PRINT_NO_VALUES))
-    {
+      && ! strcmp (cli_print_frame_args_type, "none"))
 
-      if (! py_print_value (out, val, opts, mi_print_type, language))
-	goto error;
+    {
+      ui_out_field_string (out, "value", "...");
+    }
+  else
+    {
+      /* If CLI, and the first if condition above not true always
+	 print values.  For MI do not print values if the enumerator
+	 is PRINT_NO_VALUES.  */
+      if (! ui_out_is_mi_like_p (out)
+	  || (ui_out_is_mi_like_p (out)
+	      && mi_print_type != PRINT_NO_VALUES))
+	{
+	  if (! py_print_value (out, val, opts, mi_print_type, language))
+	    goto error;
+	}
     }
 
   do_cleanups (inner_cleanup);
@@ -481,6 +529,9 @@ enumerate_args (PyObject *iter,
       Py_DECREF (item);
       item = NULL;
 
+      if (sym && ui_out_is_mi_like_p (out) && ! mi_should_print (sym, "args"))
+	continue;
+
       /* If the object did not provide a value, read it using
 	 read_frame_args and account for entry values, if any.  */
       if (! val)
@@ -516,7 +567,8 @@ enumerate_args (PyObject *iter,
 	  if (arg.entry_kind != print_entry_values_only)
 	    py_print_single_arg (out, NULL, &arg, NULL, opts,
 				 mi_print_type,
-				 print_mi_args_flag, NULL);
+				 print_mi_args_flag,
+				 cli_print_frame_args_type, NULL);
 
 	  if (entryarg.entry_kind != print_entry_values_no)
 	    {
@@ -528,7 +580,8 @@ enumerate_args (PyObject *iter,
 
 	      py_print_single_arg (out, NULL, &entryarg, NULL, opts,
 				   mi_print_type,
-				   print_mi_args_flag, NULL);
+				   print_mi_args_flag,
+				   cli_print_frame_args_type, NULL);
 	    }
 
 	  xfree (arg.error);
@@ -540,7 +593,9 @@ enumerate_args (PyObject *iter,
 	  if (val)
 	    py_print_single_arg (out, sym_name, NULL, val, opts,
 				 mi_print_type,
-				 print_mi_args_flag, language);
+				 print_mi_args_flag,
+				 cli_print_frame_args_type,
+				 language);
 	}
 
       xfree (sym_name);
@@ -617,6 +672,8 @@ enumerate_locals (PyObject *iter,
 
       Py_DECREF (item);
 
+      if (sym && ui_out_is_mi_like_p (out) && ! mi_should_print (sym, "locals"))
+	continue;
 
       /* If the object did not provide a value, read it.  */
       if (! val)

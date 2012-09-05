@@ -27,6 +27,20 @@ class BaseFrameWrapper (FrameWrapper):
         super(BaseFrameWrapper, self).__init__(base)
         self.base = base
 
+        # Determine if this a library or limited frame
+        frame = self.inferior_frame()
+
+    def is_limited_frame (self, frame):
+        sal = frame.find_sal()
+
+        if (not sal.symtab or not sal.symtab.filename
+            or frame == gdb.DUMMY_FRAME
+            or frame == gdb.SIGTRAMP_FRAME):
+
+            return True
+
+        return False
+
     def elided (self):
         if hasattr(self.base, "elided"):
             return self.base.elided()
@@ -34,14 +48,32 @@ class BaseFrameWrapper (FrameWrapper):
         return None
 
     def function (self):
-        if hasattr(self.base, "function"):
-            return str(self.base.function())
-
-        fname = str (self.base.function())
-        if (fname == ""):
-            return None
+        # As this is the base wrapper, "base" can either be a gdb.Frame,
+        # or a another frame wrapper object (another filter may extend
+        # this object, but not implement "function".  So in this case
+        # we must instance check what "base" is, as later there is
+        # some work to be done on solib names.
+        if isinstance(self.base, gdb.Frame):
+            name = self.base.name()
         else:
-            return fname
+            if hasattr(self.base, "function"):
+                return str(self.base.function())
+
+        frame = self.inferior_frame()
+
+        if frame == gdb.DUMMY_FRAME:
+            return "<function called from gdb>"
+        elif frame == gdb.SIGTRAMP_FRAME:
+            return "<signal handler called>"
+
+        sal = frame.find_sal ()
+        pc = frame.pc ()
+
+        if not name and not sal.symtab:
+            unknown =  format (" 0x%08x in" % pc)
+            return unknown
+
+        return name
 
     def address (self):
         if hasattr(self.base, "address"):
@@ -54,14 +86,18 @@ class BaseFrameWrapper (FrameWrapper):
             return self.base.filename()
 
         sal = self.base.find_sal()
-        if (sal):
-            return sal.symtab.filename
+        if (not sal.symtab or not sal.symtab.filename):
+            pc = self.inferior_frame().pc()
+            return gdb.solib_name (pc)
         else:
-            return None
+            return sal.symtab.filename
 
     def frame_args (self):
         if hasattr(self.base, "frame_args"):
             return self.base.frame_args()
+
+        if self.is_limited_frame (self.base):
+            return None
 
         args = FrameVars (self.base)
         return args.fetch_frame_args()
@@ -70,12 +106,18 @@ class BaseFrameWrapper (FrameWrapper):
         if hasattr(self.base, "frame_locals"):
             return self.base.frame_locals()
 
+        if self.is_limited_frame (self.base):
+            return None
+
         args = FrameVars (self.base)
         return args.fetch_frame_locals()
 
     def line (self):
         if hasattr(self.base, "line"):
             return self.base.line()
+
+        if self.is_limited_frame (self.base):
+            return None
 
         sal = self.base.find_sal()
         if (sal):
@@ -127,7 +169,10 @@ class FrameVars ():
 
     def fetch_frame_locals (self):
         lvars = []
-        block = self.frame.block()
+        try:
+            block = self.frame.block()
+        except:
+            return None
 
         for sym in block:
             if sym.is_argument:
@@ -142,13 +187,15 @@ class FrameVars ():
 
     def fetch_frame_args (self):
         args = []
-        block = self.frame.block()
+        try:
+            block = self.frame.block()
+        except:
+            return None
 
         for sym in block:
             if not sym.is_argument:
                 continue;
-            if self.fetch_b (sym):
-                args.append(BaseSymValueWrapper(sym,None))
+            args.append(BaseSymValueWrapper(sym,None))
 
         if len(args) == 0:
             return None
