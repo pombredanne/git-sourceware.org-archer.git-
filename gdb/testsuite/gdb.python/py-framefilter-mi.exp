@@ -101,16 +101,16 @@ mi_gdb_test "-stack-list-arguments 1 22 27" \
     "stack-list-arguments 1 22 27"
 
 mi_gdb_test "-stack-list-arguments 2" \
-    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",type=\"int\",value=\"21\"},{name=\"bar\",type=\"char \\\*\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",type=\"foobar \\\*\",value=\"$hex\"},{name=\"bf\",type=\"foobar\",value=\"{nothing = $hex \\\\\"Foo Bar\\\\\", f = 42, s = 19}\"}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",type=\"int\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
+    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",type=\"int\",value=\"21\"},{name=\"bar\",type=\"char \\\*\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",type=\"foobar \\\*\",value=\"$hex\"},{name=\"bf\",type=\"foobar\"\}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",type=\"int\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
     "stack-list-arguments 2"
 
-# This fails as stock MI does not print typedefs and we do not.
 mi_gdb_test "-stack-list-arguments 2 raw-frames" \
-    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",type=\"int\",value=\"21\"},{name=\"bar\",type=\"char \\\*\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",type=\"foobar \\\*\",value=\"$hex\"},{name=\"bf\",type=\"foobar\",value=\"{nothing = $hex \\\\\"Foo Bar\\\\\", f = 42, s = 19}\"}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",type=\"int\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
+    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",type=\"int\",value=\"21\"},{name=\"bar\",type=\"char \\\*\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",type=\"foobar \\\*\",value=\"$hex\"},{name=\"bf\",type=\"foobar\"}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",type=\"int\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
     "stack-list-arguments 2 raw-frames"
 
+
 mi_gdb_test "-stack-list-arguments 2 0 3" \
-    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",type=\"int\",value=\"21\"},{name=\"bar\",type=\"char \\\*\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",type=\"foobar \\\*\",value=\"$hex\"},{name=\"bf\",type=\"foobar\",value=\"{nothing = $hex \\\\\"Foo Bar\\\\\", f = 42, s = 19}\"}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",type=\"int\",value=\"10\"}\\\]},frame={level=\"3\",args=\\\[\\\]}\\\]" \
+    "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",type=\"int\",value=\"21\"},{name=\"bar\",type=\"char \\\*\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",type=\"foobar \\\*\",value=\"$hex\"},{name=\"bf\",type=\"foobar\"}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",type=\"int\",value=\"10\"}\\\]},frame={level=\"3\",args=\\\[\\\]}\\\]" \
     "stack-list-arguments 2 0 3"
 
 mi_gdb_test "-stack-list-arguments 2 22 27" \

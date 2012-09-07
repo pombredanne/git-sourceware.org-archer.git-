@@ -246,13 +246,13 @@ py_print_value (struct ui_out *out, struct value *val,
     {
       struct type *type;
 
-      type = value_type (val);
-      check_typedef (type);
-      if (mi_print_type == PRINT_ALL_VALUES
-	  || (mi_print_type == PRINT_SIMPLE_VALUES
-	      && TYPE_CODE (type) != TYPE_CODE_ARRAY
-	      && TYPE_CODE (type) != TYPE_CODE_STRUCT
-	      && TYPE_CODE (type) != TYPE_CODE_UNION))
+      type = check_typedef (value_type (val));
+      if (mi_print_type == PRINT_ALL_VALUES)
+	should_print = 1;
+      else if (mi_print_type == PRINT_SIMPLE_VALUES
+	       && TYPE_CODE (type) != TYPE_CODE_ARRAY
+	       && TYPE_CODE (type) != TYPE_CODE_STRUCT
+	       && TYPE_CODE (type) != TYPE_CODE_UNION)
 	should_print = 1;
     }
   else
