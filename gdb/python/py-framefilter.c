@@ -481,8 +481,6 @@ enumerate_args (PyObject *iter,
 
   get_user_print_options (&opts);
 
-  opts.deref_ref = 1;
-
   if (! ui_out_is_mi_like_p (out))
     {
       /* True in "summary" mode, false otherwise.  */
@@ -1022,9 +1020,8 @@ py_print_frame (PyObject *filter, int print_level, int print_frame_info,
 	  annotate_frame_address ();
 	  ui_out_field_core_addr (out, "addr", gdbarch, address);
 	  annotate_frame_address_end ();
+	  ui_out_text (out, " in ");
 	}
-
-      ui_out_text (out, " in ");
 
       /* Print frame function.  */
       if (PyObject_HasAttrString (filter, "function"))
@@ -1253,11 +1250,6 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   int print_result = 0;
   int success = 0;
   PyObject *iterable;
-
-  /* XXX: Does MI pay attention to this command? */
-  if (cli_print_frame_args_type != NULL)
-    /* Override print_args if the user option is set.  */
-    print_args = strcmp (cli_print_frame_args_type, "none");
 
   cleanups = ensure_python_env (gdbarch, current_language);
 

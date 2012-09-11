@@ -45,7 +45,6 @@ set remote_obj_python_file [remote_download host ${srcdir}/${subdir}/${testfile}
 gdb_reinitialize_dir $srcdir/$subdir
 gdb_test_no_output "set auto-load safe-path ${remote_obj_python_file}" "set auto-load safe-path"
 gdb_load ${binfile}
-gdb_test_no_output "set python print-stack full" "set auto-load safe-path"
 # Verify gdb loaded the script.
 gdb_test "info auto-load python-scripts" "Yes.*/${testfile}-gdb.py.*"
 
@@ -65,28 +64,63 @@ gdb_test "info frame-filter" \
     ".*1000.*Yes.*Elider.*100.*Yes.*Reverse.*10.*.*No.*Object.*1.*"
 # Test raw
 gdb_test "bt raw" \
-    ".*#0.*end_func.*#22.*in func1.*#27.*in main ().*"
+    ".*#0.*end_func.*#22.*in func1.*#27.*in main \\(\\).*"
 
 # Test reverse
 gdb_test "bt" \
-    ".*#0.*cnuf_dne.*#22.*in 1cnuf.*#27.*in niam ().*"
+    ".*#0.*cnuf_dne.*#22.*in 1cnuf.*#27.*in niam \\(\\).*"
 
 # Disable Reverse
 gdb_test_no_output "set python frame-filter disable global Reverse"
 gdb_test "bt" \
-    ".*#0.*end_func.*#22.*in func1.*#27.*in main ().*"
+    ".*#0.*end_func.*#22.*in func1.*#27.*in main \\(\\).*"
 
 gdb_test "bt -2" \
-    ".*#26.*func5.*#27.*in main ().*"
+    ".*#26.*func5.*#27.*in main \\(\\).*"
 
 gdb_test "bt 3" \
-    ".*#0.*end_func.*#1.*in funca ().*#2.*in funcb ().*"
+    ".*#0.*end_func.*#1.*in funca \\(\\).*#2.*in funcb \\(j=10\\).*"
 
 gdb_test "bt raw full" \
-    ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca ().*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*"
+    ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca \\(\\).*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*"
 
 gdb_test "bt full" \
-    ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca ().*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*#22.*in func1 \\(\\).*#23.*in func2 \\(\\).*foo = 42.*"
+    ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca \\(\\).*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*#22.*in func1 \\(\\).*#23.*in func2 \\(\\).*"
 
+# Test set print frame-arguments
+# none
+gdb_test_no_output "set print frame-arguments none" "turn off frame arguments"
+gdb_test "bt raw 1" \
+    "#0.*end_func \\(foo=\.\.\., bar=\.\.\., fb=\.\.\., bf=\.\.\.\\) at .*py-framefilter.c.*" \
+    "bt raw no args"
+gdb_test "bt 1" \
+    "#0.*end_func \\(foo=\.\.\., bar=\.\.\., fb=\.\.\., bf=\.\.\.\\) at .*py-framefilter.c.*" \
+    "bt full no args"
+# scalars
+gdb_test_no_output "set print frame-arguments scalars" "turn off frame arguments"
+gdb_test "bt raw 1" \
+    "#0.*end_func \\(foo=21, bar=$hex \"Param\", fb=$hex, bf=\.\.\.\\) at .*py-framefilter.c.*" \
+    "bt raw scalars"
+
+gdb_test "bt 1" \
+    "#0.*end_func \\(foo=21, bar=$hex \"Param\", fb=$hex, bf=\.\.\.\\) at .*py-framefilter.c.*" \
+    "bt scalars"
+# all
+gdb_test_no_output "set print frame-arguments all" "turn off frame arguments"
+gdb_test "bt raw 1" \
+    "#0.*end_func \\(foo=21, bar=$hex \"Param\", fb=$hex, bf=\{nothing = $hex \"Foo Bar\", f = 42, s = 19\}\\) at .*py-framefilter.c.*" \
+    "bt raw all args"
+gdb_test "bt 1" \
+    "#0.*end_func \\(foo=21, bar=$hex \"Param\", fb=$hex, bf=\{nothing = $hex \"Foo Bar\", f = 42, s = 19\}\\) at .*py-framefilter.c.*" \
+    "bt all args"
+
+# set print address off
+gdb_test_no_output "set print address off" "turn off address printing"
+gdb_test "bt raw 1" \
+    "#0  end_func \\(foo=21, bar=\"Param\", fb=, bf=\{nothing = \"Foo Bar\", f = 42, s = 19\}\\) at .*py-framefilter.c.*" \
+    "bt raw no address"
+gdb_test "bt 1" \
+    "#0  end_func \\(foo=21, bar=\"Param\", fb=, bf=\{nothing = \"Foo Bar\", f = 42, s = 19\}\\) at .*py-framefilter.c.*" \
+    "bt no addresss"
 
 remote_file host delete ${remote_python_file}
