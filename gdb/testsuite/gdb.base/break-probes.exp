@@ -40,8 +40,9 @@ if { [prepare_for_testing $testfile.exp $testfile $srcfile \
 # Enable stop-on-solib-events
 gdb_test_no_output "set stop-on-solib-events 1"
 
-# Run to the first stop
-gdb_test "run" ".*Stopped due to shared library event.*"
+# Start the inferior and run to the first stop
+gdb_run_cmd
+gdb_test "" ".*Stopped due to shared library event.*"
 
 # XFAIL if we are not using probes
 set test "ensure using probes"

@@ -76,15 +76,16 @@ proc check_info_shared { test expect1 expect2 } {
     }
 }
 
+# Start the inferior, and check neither of the libraries are loaded at
+# the start.
+runto_main
+check_info_shared "info sharedlibrary #1" 0 0
+
 # Set up breakpoints.
 gdb_test "break stop" {Breakpoint [0-9]+ at .*}
 gdb_test_no_output "set breakpoint pending on"
 gdb_test "break foo" {Breakpoint [0-9]+ \(foo\) pending\.}
 gdb_test "break bar" {Breakpoint [0-9]+ \(bar\) pending\.}
-
-# Check neither of the libraries are loaded at the start.
-gdb_test "start" {Temporary breakpoint [0-9]+, .* in main \(\)}
-check_info_shared "info sharedlibrary #1" 0 0
 
 # Run to the first stop and check that only the first library is loaded.
 gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
@@ -104,7 +105,8 @@ gdb_test "c" {Breakpoint [0-9]+, .* in bar \(\) from .*}
 # errors.  These can happen with the probes-based runtime linker
 # interface if the cache is not cleared correctly.
 set test "restart"
-gdb_test_multiple "run" $test {
+gdb_run_cmd
+gdb_test_multiple "" $test {
     -re {Start it from the beginning\? \(y or n\) } {
 	send_gdb "y\n"
 	exp_continue
@@ -117,12 +119,16 @@ gdb_test_multiple "run" $test {
     }
 }
 
-# We're at the first stop.  Check that only the first library is loaded.
-check_info_shared "info sharedlibrary #4" 1 0
+# Check that neither library is loaded.
+check_info_shared "info sharedlibrary #4" 0 0
+
+# Run to the first stop and check that only the first library is loaded.
+gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
+check_info_shared "info sharedlibrary #5" 1 0
 
 # Run to the second stop and check that both libraries are loaded.
 gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
-check_info_shared "info sharedlibrary #5" 1 1
+check_info_shared "info sharedlibrary #6" 1 1
 
 # Check that the next stop is in foo.
 gdb_test "c" {Breakpoint [0-9]+, .* in foo \(\) from .*}
@@ -132,8 +138,8 @@ gdb_test "c" {Breakpoint [0-9]+, .* in bar \(\) from .*}
 
 # Run to the next stop and check that the first library has been unloaded.
 gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
-check_info_shared "info sharedlibrary #6" 0 1
+check_info_shared "info sharedlibrary #7" 0 1
 
 # Run to the last stop and check that both libraries are gone.
 gdb_test "c" {Breakpoint [0-9]+, .* in stop \(\)}
-check_info_shared "info sharedlibrary #7" 0 0
+check_info_shared "info sharedlibrary #8" 0 0
