@@ -73,5 +73,5 @@ if { $using_probes } {
     }
 
     # Call something to ensure that relocation occurred
-    gdb_test "call foo(23)" "foo 23.*\\\$.* = .*"
+    gdb_test "call foo(23)" "\\\$.* = 31.*\\\M.*"
 }

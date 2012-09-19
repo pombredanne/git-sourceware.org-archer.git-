@@ -18,7 +18,5 @@
 int
 foo (int n)
 {
-  printf ("foo %d\n", n);
-
-  return 0;
+  return n * n / 17;
 }
