@@ -1574,6 +1574,9 @@ solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
 {
   int i;
 
+  if (loc->pspace != current_program_space)
+    return 0;
+
   for (i = 0; i < NUM_PROBES; i++)
     {
       struct probe *probe;
@@ -1581,8 +1584,7 @@ solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
 
       for (ix = 0; VEC_iterate (probe_p, info->probes[i], ix, probe); ++ix)
 	{
-	  if (loc->pspace == current_program_space
-	      && loc->address == probe->address)
+	  if (loc->address == probe->address)
 	    {
 	      result->info = &probe_info[i];
 	      result->probe = probe;
