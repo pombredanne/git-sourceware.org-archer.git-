@@ -81,7 +81,19 @@ struct gdb_bfd_data
 
   /* The mtime of the BFD at the point the cache entry was made.  */
   time_t mtime;
+
+  /* If the BFD comes from an archive, this points to the archive's
+     BFD.  Otherwise, this is NULL.  */
+  bfd *archive_bfd;
+
+  /* The registry.  */
+  REGISTRY_FIELDS;
 };
+
+#define GDB_BFD_DATA_ACCESSOR(ABFD) \
+  ((struct gdb_bfd_data *) bfd_usrdata (ABFD))
+
+DEFINE_REGISTRY (bfd, GDB_BFD_DATA_ACCESSOR)
 
 /* A hash table storing all the BFDs maintained in the cache.  */
 
@@ -249,7 +261,10 @@ gdb_bfd_ref (struct bfd *abfd)
   gdata = bfd_zalloc (abfd, sizeof (struct gdb_bfd_data));
   gdata->refc = 1;
   gdata->mtime = bfd_get_mtime (abfd);
+  gdata->archive_bfd = NULL;
   bfd_usrdata (abfd) = gdata;
+
+  bfd_alloc_data (abfd);
 
   /* This is the first we've seen it, so add it to the hash table.  */
   slot = htab_find_slot (all_bfds, abfd, INSERT);
@@ -264,6 +279,7 @@ gdb_bfd_unref (struct bfd *abfd)
 {
   struct gdb_bfd_data *gdata;
   struct gdb_bfd_cache_search search;
+  bfd *archive_bfd;
 
   if (abfd == NULL)
     return;
@@ -275,6 +291,7 @@ gdb_bfd_unref (struct bfd *abfd)
   if (gdata->refc > 0)
     return;
 
+  archive_bfd = gdata->archive_bfd;
   search.filename = bfd_get_filename (abfd);
 
   if (gdb_bfd_cache && search.filename)
@@ -290,11 +307,14 @@ gdb_bfd_unref (struct bfd *abfd)
 	htab_clear_slot (gdb_bfd_cache, slot);
     }
 
+  bfd_free_data (abfd);
   bfd_usrdata (abfd) = NULL;  /* Paranoia.  */
 
   htab_remove_elt (all_bfds, abfd);
 
   gdb_bfd_close_or_warn (abfd);
+
+  gdb_bfd_unref (archive_bfd);
 }
 
 /* A helper function that returns the section data descriptor
@@ -588,8 +608,16 @@ gdb_bfd_openr_next_archived_file (bfd *archive, bfd *previous)
 
   if (result)
     {
+      struct gdb_bfd_data *gdata;
+
       gdb_bfd_ref (result);
-      /* No need to stash the filename here.  */
+      /* No need to stash the filename here, because we also keep a
+	 reference on the parent archive.  */
+
+      gdata = bfd_usrdata (result);
+      gdb_assert (gdata->archive_bfd == NULL || gdata->archive_bfd == archive);
+      gdata->archive_bfd = archive;
+      gdb_bfd_ref (archive);
     }
 
   return result;

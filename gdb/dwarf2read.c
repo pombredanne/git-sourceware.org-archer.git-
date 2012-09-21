@@ -1710,13 +1710,17 @@ static void
 dwarf2_locate_sections (bfd *abfd, asection *sectp, void *vnames)
 {
   const struct dwarf2_debug_sections *names;
+  flagword aflag = bfd_get_section_flags (abfd, sectp);
 
   if (vnames == NULL)
     names = &dwarf2_elf_names;
   else
     names = (const struct dwarf2_debug_sections *) vnames;
 
-  if (section_is_p (sectp->name, &names->info))
+  if ((aflag & SEC_HAS_CONTENTS) == 0)
+    {
+    }
+  else if (section_is_p (sectp->name, &names->info))
     {
       dwarf2_per_objfile->info.asection = sectp;
       dwarf2_per_objfile->info.size = bfd_get_section_size (sectp);
@@ -1763,13 +1767,8 @@ dwarf2_locate_sections (bfd *abfd, asection *sectp, void *vnames)
     }
   else if (section_is_p (sectp->name, &names->eh_frame))
     {
-      flagword aflag = bfd_get_section_flags (abfd, sectp);
-
-      if (aflag & SEC_HAS_CONTENTS)
-        {
-	  dwarf2_per_objfile->eh_frame.asection = sectp;
-          dwarf2_per_objfile->eh_frame.size = bfd_get_section_size (sectp);
-        }
+      dwarf2_per_objfile->eh_frame.asection = sectp;
+      dwarf2_per_objfile->eh_frame.size = bfd_get_section_size (sectp);
     }
   else if (section_is_p (sectp->name, &names->ranges))
     {
@@ -3134,15 +3133,21 @@ dw2_do_expand_symtabs_matching (struct objfile *objfile,
 	      int is_static = GDB_INDEX_SYMBOL_STATIC_VALUE (cu_index_and_attrs);
 	      gdb_index_symbol_kind symbol_kind =
 		GDB_INDEX_SYMBOL_KIND_VALUE (cu_index_and_attrs);
+	      /* Only check the symbol attributes if they're present.
+		 Indices prior to version 7 don't record them,
+		 and indices >= 7 may elide them for certain symbols
+		 (gold does this).  */
+	      int attrs_valid =
+		(index->version >= 7
+		 && symbol_kind != GDB_INDEX_SYMBOL_KIND_NONE);
 
-	      if (want_specific_block
-		  && index->version >= 7
+	      if (attrs_valid
+		  && want_specific_block
 		  && want_static != is_static)
 		continue;
 
-	      /* Only check the symbol's kind if it has one.
-		 Indices prior to version 7 don't record it.  */
-	      if (index->version >= 7)
+	      /* Only check the symbol's kind if it has one.  */
+	      if (attrs_valid)
 		{
 		  switch (domain)
 		    {
@@ -8832,7 +8837,6 @@ read_func_scope (struct die_info *die, struct dwarf2_cu *cu)
      when we finish processing a function scope, we may need to go
      back to building a containing block's symbol lists.  */
   local_symbols = new->locals;
-  param_symbols = new->params;
   using_directives = new->using_directives;
 
   /* If we've finished processing a top-level function, subsequent
@@ -13723,8 +13727,9 @@ dwarf2_read_addr_index (struct dwarf2_per_cu_data *per_cu,
 
      We don't need to read the entire CU(/TU).
      We just need the header and top level die.
+
      IWBN to use the aging mechanism to let us lazily later discard the CU.
-     See however init_cutu_and_read_dies_simple.  */
+     For now we skip this optimization.  */
 
   if (cu != NULL)
     {
@@ -13735,8 +13740,10 @@ dwarf2_read_addr_index (struct dwarf2_per_cu_data *per_cu,
     {
       struct dwarf2_read_addr_index_data aidata;
 
-      init_cutu_and_read_dies_simple (per_cu, dwarf2_read_addr_index_reader,
-				      &aidata);
+      /* Note: We can't use init_cutu_and_read_dies_simple here,
+	 we need addr_base.  */
+      init_cutu_and_read_dies (per_cu, NULL, 0, 0,
+			       dwarf2_read_addr_index_reader, &aidata);
       addr_base = aidata.addr_base;
       addr_size = aidata.addr_size;
     }
@@ -17082,8 +17089,8 @@ macro_start_file (int file, int line,
   /* We don't create a macro table for this compilation unit
      at all until we actually get a filename.  */
   if (! pending_macros)
-    pending_macros = new_macro_table (&objfile->objfile_obstack,
-                                      objfile->macro_cache);
+    pending_macros = new_macro_table (&objfile->per_bfd->storage_obstack,
+                                      objfile->per_bfd->macro_cache);
 
   if (! current_file)
     {
@@ -17658,11 +17665,32 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
 	  {
 	    LONGEST offset;
 	    void **slot;
+	    bfd *include_bfd = abfd;
+	    struct dwarf2_section_info *include_section = section;
+	    struct dwarf2_section_info alt_section;
+	    gdb_byte *include_mac_end = mac_end;
+	    int is_dwz = section_is_dwz;
+	    gdb_byte *new_mac_ptr;
 
 	    offset = read_offset_1 (abfd, mac_ptr, offset_size);
 	    mac_ptr += offset_size;
 
-	    slot = htab_find_slot (include_hash, mac_ptr, INSERT);
+	    if (macinfo_type == DW_MACRO_GNU_transparent_include_alt)
+	      {
+		struct dwz_file *dwz = dwarf2_get_dwz_file ();
+
+		dwarf2_read_section (dwarf2_per_objfile->objfile,
+				     &dwz->macro);
+
+		include_bfd = dwz->macro.asection->owner;
+		include_section = &dwz->macro;
+		include_mac_end = dwz->macro.buffer + dwz->macro.size;
+		is_dwz = 1;
+	      }
+
+	    new_mac_ptr = include_section->buffer + offset;
+	    slot = htab_find_slot (include_hash, new_mac_ptr, INSERT);
+
 	    if (*slot != NULL)
 	      {
 		/* This has actually happened; see
@@ -17673,35 +17701,15 @@ dwarf_decode_macro_bytes (bfd *abfd, gdb_byte *mac_ptr, gdb_byte *mac_end,
 	      }
 	    else
 	      {
-		bfd *include_bfd = abfd;
-		struct dwarf2_section_info *include_section = section;
-		struct dwarf2_section_info alt_section;
-		gdb_byte *include_mac_end = mac_end;
-		int is_dwz = section_is_dwz;
+		*slot = new_mac_ptr;
 
-		*slot = mac_ptr;
-
-		if (macinfo_type == DW_MACRO_GNU_transparent_include_alt)
-		  {
-		    struct dwz_file *dwz = dwarf2_get_dwz_file ();
-
-		    dwarf2_read_section (dwarf2_per_objfile->objfile,
-					 &dwz->macro);
-
-		    include_bfd = dwz->macro.asection->owner;
-		    include_section = &dwz->macro;
-		    include_mac_end = dwz->macro.buffer + dwz->macro.size;
-		    is_dwz = 1;
-		  }
-
-		dwarf_decode_macro_bytes (include_bfd,
-					  include_section->buffer + offset,
+		dwarf_decode_macro_bytes (include_bfd, new_mac_ptr,
 					  include_mac_end, current_file,
 					  lh, comp_dir,
 					  section, section_is_gnu, is_dwz,
 					  offset_size, objfile, include_hash);
 
-		htab_remove_elt (include_hash, mac_ptr);
+		htab_remove_elt (include_hash, new_mac_ptr);
 	      }
 	  }
 	  break;

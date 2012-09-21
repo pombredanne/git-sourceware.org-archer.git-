@@ -280,6 +280,7 @@ SUBDIR_PYTHON_OBS = \
 	py-finishbreakpoint.o \
 	py-frame.o \
 	py-function.o \
+	py-gdb-readline.o \
 	py-inferior.o \
 	py-infthread.o \
 	py-lazy-string.o \
@@ -312,6 +313,7 @@ SUBDIR_PYTHON_SRCS = \
 	python/py-finishbreakpoint.c \
 	python/py-frame.c \
 	python/py-function.c \
+	python/py-gdb-readline.c \
 	python/py-inferior.c \
 	python/py-infthread.c \
 	python/py-lazy-string.c \
@@ -772,7 +774,7 @@ cli-out.h gdb_expat.h breakpoint.h infcall.h obsd-tdep.h \
 exec.h m32r-tdep.h osabi.h gdbcore.h solib-som.h amd64bsd-nat.h \
 i386bsd-nat.h xml-support.h xml-tdesc.h alphabsd-tdep.h gdb_obstack.h \
 ia64-tdep.h ada-lang.h ada-varobj.h varobj.h frv-tdep.h nto-tdep.h serial.h \
-c-lang.h d-lang.h golang.h frame.h event-loop.h block.h cli/cli-setshow.h \
+c-lang.h d-lang.h go-lang.h frame.h event-loop.h block.h cli/cli-setshow.h \
 cli/cli-decode.h cli/cli-cmds.h cli/cli-dump.h cli/cli-utils.h \
 cli/cli-script.h macrotab.h symtab.h version.h \
 gnulib/import/string.in.h gnulib/import/str-two-way.h \
@@ -919,7 +921,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	inferior.o osdata.o gdb_usleep.o record.o gcore.o \
 	gdb_vecs.o jit.o progspace.o skip.o probe.o \
 	common-utils.o buffer.o ptid.o gdb-dlfcn.o common-agent.o \
-	format.o
+	format.o registry.o
 
 TSOBS = inflow.o
 
@@ -2081,6 +2083,10 @@ py-frame.o: $(srcdir)/python/py-frame.c
 
 py-function.o: $(srcdir)/python/py-function.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-function.c
+	$(POSTCOMPILE)
+
+py-gdb-readline.o: $(srcdir)/python/py-gdb-readline.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-gdb-readline.c
 	$(POSTCOMPILE)
 
 py-inferior.o: $(srcdir)/python/py-inferior.c

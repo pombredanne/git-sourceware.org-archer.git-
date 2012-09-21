@@ -2375,9 +2375,12 @@ static int
 insert_bp_location (struct bp_location *bl,
 		    struct ui_file *tmp_error_stream,
 		    int *disabled_breaks,
-		    int *hw_breakpoint_error)
+		    int *hw_breakpoint_error,
+		    int *hw_bp_error_explained_already)
 {
   int val = 0;
+  char *hw_bp_err_string = NULL;
+  struct gdb_exception e;
 
   if (!should_be_inserted (bl) || (bl->inserted && !bl->needs_update))
     return 0;
@@ -2474,8 +2477,15 @@ insert_bp_location (struct bp_location *bl,
 	  || !(section_is_overlay (bl->section)))
 	{
 	  /* No overlay handling: just set the breakpoint.  */
-
-	  val = bl->owner->ops->insert_location (bl);
+	  TRY_CATCH (e, RETURN_MASK_ALL)
+	    {
+	      val = bl->owner->ops->insert_location (bl);
+	    }
+	  if (e.reason < 0)
+	    {
+	      val = 1;
+	      hw_bp_err_string = (char *) e.message;
+	    }
 	}
       else
 	{
@@ -2509,7 +2519,15 @@ insert_bp_location (struct bp_location *bl,
 	  if (section_is_mapped (bl->section))
 	    {
 	      /* Yes.  This overlay section is mapped into memory.  */
-	      val = bl->owner->ops->insert_location (bl);
+	      TRY_CATCH (e, RETURN_MASK_ALL)
+	        {
+	          val = bl->owner->ops->insert_location (bl);
+	        }
+	      if (e.reason < 0)
+	        {
+	          val = 1;
+	          hw_bp_err_string = (char *) e.message;
+	        }
 	    }
 	  else
 	    {
@@ -2545,11 +2563,13 @@ insert_bp_location (struct bp_location *bl,
 	    {
 	      if (bl->loc_type == bp_loc_hardware_breakpoint)
 		{
-		  *hw_breakpoint_error = 1;
-		  fprintf_unfiltered (tmp_error_stream,
-				      "Cannot insert hardware "
-				      "breakpoint %d.\n",
-				      bl->owner->number);
+                  *hw_breakpoint_error = 1;
+                  *hw_bp_error_explained_already = hw_bp_err_string != NULL;
+                  fprintf_unfiltered (tmp_error_stream,
+                                      "Cannot insert hardware breakpoint %d%s",
+                                      bl->owner->number, hw_bp_err_string ? ":" : ".\n");
+                  if (hw_bp_err_string)
+                    fprintf_unfiltered (tmp_error_stream, "%s.\n", hw_bp_err_string);
 		}
 	      else
 		{
@@ -2741,6 +2761,7 @@ update_inserted_breakpoint_locations (void)
   int val = 0;
   int disabled_breaks = 0;
   int hw_breakpoint_error = 0;
+  int hw_bp_details_reported = 0;
 
   struct ui_file *tmp_error_stream = mem_fileopen ();
   struct cleanup *cleanups = make_cleanup_ui_file_delete (tmp_error_stream);
@@ -2775,7 +2796,7 @@ update_inserted_breakpoint_locations (void)
 	continue;
 
       val = insert_bp_location (bl, tmp_error_stream, &disabled_breaks,
-				    &hw_breakpoint_error);
+				    &hw_breakpoint_error, &hw_bp_details_reported);
       if (val)
 	error_flag = val;
     }
@@ -2800,6 +2821,7 @@ insert_breakpoint_locations (void)
   int val = 0;
   int disabled_breaks = 0;
   int hw_breakpoint_error = 0;
+  int hw_bp_error_explained_already = 0;
 
   struct ui_file *tmp_error_stream = mem_fileopen ();
   struct cleanup *cleanups = make_cleanup_ui_file_delete (tmp_error_stream);
@@ -2833,7 +2855,7 @@ insert_breakpoint_locations (void)
 	continue;
 
       val = insert_bp_location (bl, tmp_error_stream, &disabled_breaks,
-				    &hw_breakpoint_error);
+				    &hw_breakpoint_error, &hw_bp_error_explained_already);
       if (val)
 	error_flag = val;
     }
@@ -2878,7 +2900,7 @@ insert_breakpoint_locations (void)
     {
       /* If a hardware breakpoint or watchpoint was inserted, add a
          message about possibly exhausted resources.  */
-      if (hw_breakpoint_error)
+      if (hw_breakpoint_error && !hw_bp_error_explained_already)
 	{
 	  fprintf_unfiltered (tmp_error_stream, 
 			      "Could not insert hardware breakpoints:\n\
@@ -2943,7 +2965,7 @@ reattach_breakpoints (int pid)
   struct bp_location *bl, **blp_tmp;
   int val;
   struct ui_file *tmp_error_stream;
-  int dummy1 = 0, dummy2 = 0;
+  int dummy1 = 0, dummy2 = 0, dummy3 = 0;
   struct inferior *inf;
   struct thread_info *tp;
 
@@ -2967,7 +2989,7 @@ reattach_breakpoints (int pid)
     if (bl->inserted)
       {
 	bl->inserted = 0;
-	val = insert_bp_location (bl, tmp_error_stream, &dummy1, &dummy2);
+	val = insert_bp_location (bl, tmp_error_stream, &dummy1, &dummy2, &dummy3);
 	if (val != 0)
 	  {
 	    do_cleanups (old_chain);
@@ -3500,18 +3522,18 @@ update_breakpoints_after_exec (void)
 }
 
 int
-detach_breakpoints (int pid)
+detach_breakpoints (ptid_t ptid)
 {
   struct bp_location *bl, **blp_tmp;
   int val = 0;
   struct cleanup *old_chain = save_inferior_ptid ();
   struct inferior *inf = current_inferior ();
 
-  if (pid == PIDGET (inferior_ptid))
+  if (PIDGET (ptid) == PIDGET (inferior_ptid))
     error (_("Cannot detach breakpoints of inferior_ptid"));
 
   /* Set inferior_ptid; remove_breakpoint_1 uses this global.  */
-  inferior_ptid = pid_to_ptid (pid);
+  inferior_ptid = ptid;
   ALL_BP_LOCATIONS (bl, blp_tmp)
   {
     if (bl->pspace != inf->pspace)
@@ -8568,9 +8590,9 @@ set_momentary_breakpoint (struct gdbarch *gdbarch, struct symtab_and_line sal,
 {
   struct breakpoint *b;
 
-  /* If FRAME_ID is valid, it should be a real frame, not an inlined
-     one.  */
-  gdb_assert (!frame_id_inlined_p (frame_id));
+  /* If FRAME_ID is valid, it should be a real frame, not an inlined or
+     tail-called one.  */
+  gdb_assert (!frame_id_artificial_p (frame_id));
 
   b = set_raw_breakpoint (gdbarch, sal, type, &momentary_breakpoint_ops);
   b->enable_state = bp_enabled;
@@ -9107,21 +9129,27 @@ parse_breakpoint_sals (char **address,
 	{
 	  struct linespec_sals lsal;
 	  struct symtab_and_line sal;
+	  CORE_ADDR pc;
 
 	  init_sal (&sal);		/* Initialize to zeroes.  */
 	  lsal.sals.sals = (struct symtab_and_line *)
 	    xmalloc (sizeof (struct symtab_and_line));
 
 	  /* Set sal's pspace, pc, symtab, and line to the values
-	     corresponding to the last call to print_frame_info.  */
+	     corresponding to the last call to print_frame_info.
+	     Be sure to reinitialize LINE with NOTCURRENT == 0
+	     as the breakpoint line number is inappropriate otherwise.
+	     find_pc_line would adjust PC, re-set it back.  */
 	  get_last_displayed_sal (&sal);
-          sal.section = find_pc_overlay (sal.pc);
+	  pc = sal.pc;
+	  sal = find_pc_line (pc, 0);
 
 	  /* "break" without arguments is equivalent to "break *PC"
 	     where PC is the last displayed codepoint's address.  So
 	     make sure to set sal.explicit_pc to prevent GDB from
 	     trying to expand the list of sals to include all other
 	     instances with the same symtab and line.  */
+	  sal.pc = pc;
 	  sal.explicit_pc = 1;
 
 	  lsal.sals.sals[0] = sal;
@@ -15857,7 +15885,8 @@ _initialize_breakpoint (void)
     = register_objfile_data_with_cleanup (NULL, free_breakpoint_probes);
 
   catch_syscall_inferior_data
-    = register_inferior_data_with_cleanup (catch_syscall_inferior_data_cleanup);
+    = register_inferior_data_with_cleanup (NULL,
+					   catch_syscall_inferior_data_cleanup);
 
   breakpoint_chain = 0;
   /* Don't bother to call set_breakpoint_count.  $bpnum isn't useful

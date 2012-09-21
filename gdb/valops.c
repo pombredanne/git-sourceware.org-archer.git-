@@ -1374,7 +1374,6 @@ value_assign (struct value *toval, struct value *fromval)
 
 	if (deprecated_register_changed_hook)
 	  deprecated_register_changed_hook (-1);
-	observer_notify_target_changed (&current_target);
 	break;
       }
 
@@ -1396,7 +1395,7 @@ value_assign (struct value *toval, struct value *fromval)
 
   /* Assigning to the stack pointer, frame pointer, and other
      (architecture and calling convention specific) registers may
-     cause the frame cache to be out of date.  Assigning to memory
+     cause the frame cache and regcache to be out of date.  Assigning to memory
      also can.  We just do this on all assignments to registers or
      memory, for simplicity's sake; I doubt the slowdown matters.  */
   switch (VALUE_LVAL (toval))
@@ -1405,7 +1404,7 @@ value_assign (struct value *toval, struct value *fromval)
     case lval_register:
     case lval_computed:
 
-      reinit_frame_cache ();
+      observer_notify_target_changed (&current_target);
 
       /* Having destroyed the frame cache, restore the selected
 	 frame.  */
@@ -3744,8 +3743,7 @@ value_slice (struct value *array, int lowbound, int length)
 
   array_type = check_typedef (value_type (array));
   if (TYPE_CODE (array_type) != TYPE_CODE_ARRAY
-      && TYPE_CODE (array_type) != TYPE_CODE_STRING
-      && TYPE_CODE (array_type) != TYPE_CODE_BITSTRING)
+      && TYPE_CODE (array_type) != TYPE_CODE_STRING)
     error (_("cannot take slice of non-array"));
 
   range_type = TYPE_INDEX_TYPE (array_type);
@@ -3762,38 +3760,7 @@ value_slice (struct value *array, int lowbound, int length)
 					TYPE_TARGET_TYPE (range_type),
 					lowbound, 
 					lowbound + length - 1);
-  if (TYPE_CODE (array_type) == TYPE_CODE_BITSTRING)
-    {
-      int i;
 
-      slice_type = create_set_type ((struct type *) NULL,
-				    slice_range_type);
-      TYPE_CODE (slice_type) = TYPE_CODE_BITSTRING;
-      slice = value_zero (slice_type, not_lval);
-
-      for (i = 0; i < length; i++)
-	{
-	  int element = value_bit_index (array_type,
-					 value_contents (array),
-					 lowbound + i);
-
-	  if (element < 0)
-	    error (_("internal error accessing bitstring"));
-	  else if (element > 0)
-	    {
-	      int j = i % TARGET_CHAR_BIT;
-
-	      if (gdbarch_bits_big_endian (get_type_arch (array_type)))
-		j = TARGET_CHAR_BIT - 1 - j;
-	      value_contents_raw (slice)[i / TARGET_CHAR_BIT] |= (1 << j);
-	    }
-	}
-      /* We should set the address, bitssize, and bitspos, so the
-         slice can be used on the LHS, but that may require extensions
-         to value_assign.  For now, just leave as a non_lval.
-         FIXME.  */
-    }
-  else
     {
       struct type *element_type = TYPE_TARGET_TYPE (array_type);
       LONGEST offset =

@@ -1,3 +1,219 @@
+2012-09-20  Michael Zolotukhin  <michael.v.zolotukhin@intel.com>
+
+	* i386-gen.c (cpu_flag_init): Add CpuCX16 to CPU_NOCONA_FLAGS,
+	CPU_CORE_FLAGS, CPU_CORE2_FLAGS, CPU_COREI7_FLAGS,
+	CPU_BDVER1_FLAGS, CPU_BDVER2_FLAGS, CPU_BTVER1_FLAGS,
+	CPU_BTVER2_FLAGS.  Add CPU_CX16_FLAGS.
+	(cpu_flags): Add CpuCX16.
+	* i386-opc.h (CpuCX16): New.
+	(i386_cpu_flags): Add cpucx16.
+	* i386-opc.tbl: Replace CpuSSE3 with CpuCX16 for cmpxchg16b.
+	* i386-tbl.h: Regenerate.
+	* i386-init.h: Likewise.
+
+2012-09-18  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* arm-dis.c: Changed ldra and strl-form mnemonics
+	to lda and stl-form.
+
+2012-09-18  Chao-ying Fu  <fu@mips.com>
+
+	* micromips-opc.c (micromips_opcodes): Correct the encoding of
+	the "swxc1" instruction.
+
+2012-09-17  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-asm.c (aarch64_ins_imm_half): Remove ATTRIBUTE_UNUSED from
+	the parameter 'inst'.
+	(aarch64_ins_addr_simm): Add ATTRIBUTE_UNUSED to the parameter 'inst'.
+	(convert_mov_to_movewide): Change to assert (0) when
+	aarch64_wide_constant_p returns FALSE.
+
+2012-09-14  David Edelsohn  <dje.gcc@gmail.com>
+
+	* configure: Regenerate.
+
+2012-09-14  Anthony Green  <green@moxielogic.com>
+
+	* moxie-dis.c (print_insn_moxie): Branch targets are relative to
+	the address after the branch instruction.
+
+2012-09-13  Anthony Green  <green@moxielogic.com>
+
+	* moxie-dis.c (print_insn_moxie): Handle bi-endian encodings.
+
+2012-09-10  Matthias Klose  <doko@ubuntu.com>
+
+	* config.in: Disable sanity check for kfreebsd.
+
+2012-09-10  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* configure: Regenerated.
+
+2012-09-04  Sergey A. Guriev <sergey.a.guriev@intel.com>
+
+	* ia64-asmtab.h (completer_index): Extend bitfield to full uint.
+	* ia64-gen.c: Promote completer index type to longlong.
+	(irf_operand): Add new register recognition.
+	(in_iclass_mov_x): Add an entry for the new mov_* instruction type.
+	(lookup_specifier): Add new resource recognition.
+	(insert_bit_table_ent): Relax abort condition according to the
+	changed completer index type.
+	(print_dis_table): Fix printf format for completer index.
+	* ia64-ic.tbl: Add a new instruction class.
+	* ia64-opc-i.c (ia64_opcodes_i): Define new I-instructions.
+	* ia64-opc-m.c (ia64_opcodes_m): Define new M-instructions.
+	* ia64-opc.h: Define short names for new operand types.
+	* ia64-raw.tbl: Add new RAW resource for DAHR register.
+	* ia64-waw.tbl: Add new WAW resource for DAHR register.
+	* ia64-asmtab.c: Regenerate.
+
+2012-08-29  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c (VXASHB_MASK): New define.
+	(powerpc_opcodes) <vsldoi>: Use VXASHB_MASK.
+
+2012-08-28  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c (UIMM4, UIMM3, UIMM2, VXVA_MASK, VXVB_MASK, VXVAVB_MASK,
+	VXVDVA_MASK, VXUIMM4_MASK, VXUIMM3_MASK, VXUIMM2_MASK): New defines.
+	(powerpc_opcodes) <vexptefp, vlogefp, vrefp, vrfim, vrfin, vrfip,
+	vrfiz, vrsqrtefp, vupkhpx, vupkhsb, vupkhsh, vupklpx, vupklsb,
+	vupklsh>: Use VXVA_MASK.
+	<vspltisb, vspltish, vspltisw>: Use VXVB_MASK.
+	<mfvscr>: Use VXVAVB_MASK.
+	<mtvscr>: Use VXVDVA_MASK.
+	<vspltb>: Use VXUIMM4_MASK.
+	<vsplth>: Use VXUIMM3_MASK.
+	<vspltw>: Use VXUIMM2_MASK.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (neon_opcodes): Add 2 operand sha instructions.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (neon_opcodes): Add SHA 3-operand instructions.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (neon_opcodes): Handle VMULL.P64.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (neon_opcodes): Add support for AES instructions.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add support for HP/DP
+	conversions.
+
+2012-08-24  Matthew  Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add VRINT.
+	(neon_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add support for new VCVT
+	variants.
+	(neon_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add VMAXNM/VMINNM.
+	(neon_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (coprocessor_opcodes): Add VSEL.
+	(print_insn_coprocessor): Add new %<>c bitfield format
+	specifier.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): Add LDRA/STRL instructions.
+	(thumb32_opcodes): Likewise.
+	(print_arm_insn): Add support for %<>T formatter.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): Add HLT.
+	(thumb_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (thumb32_opcodes): Add DCPS instruction.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (arm_opcodes): Add SEVL.
+	(thumb_opcodes): Likewise.
+	(thumb32_opcodes): Likewise.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com>
+
+	* arm-dis.c (data_barrier_option): New function.
+	(print_insn_arm): Use data_barrier_option.
+	(print_insn_thumb32): Use data_barrier_option.
+
+2012-08-24  Matthew Gretton-Dann  <matthew.gretton-dann@arm.com
+
+	* arm-dis.c (COND_UNCOND): New constant.
+	(print_insn_coprocessor): Add support for %u format specifier.
+	(print_insn_neon): Likewise.
+
+2012-08-21  David S. Miller  <davem@davemloft.net>
+
+	* sparc-opc.c (4-argument crypto instructions): Fix encoding using
+	F3F4 macro.
+
+2012-08-20  Edmar Wienskoski  <edmar@freescale.com>
+
+	* ppc-opc.c (powerpc_opcodes): Changed opcode for vabsdub,
+	vabsduh, vabsduw, mviwsplt.
+
+2012-08-17  Nagajyothi Eggone  <nagajyothi.eggone@amd.com>
+
+	* i386-gen.c (cpu_flag_init): Add CPU_BTVER1_FLAGS and
+	CPU_BTVER2_FLAGS.
+
+	* i386-opc.h: Update CpuPRFCHW comment.
+
+	* i386-opc.tbl: Enable prefetch instruction for CpuPRFCHW.
+	* i386-init.h: Regenerated.
+	* i386-tbl.h: Likewise.
+
+2012-08-17  Nick Clifton  <nickc@redhat.com>
+
+	* po/uk.po: New Ukranian translation.
+	* configure.in (ALL_LINGUAS): Add uk.
+	* configure: Regenerate.
+
+2012-08-16  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c (powerpc_opcodes) <"lswx">: Use RAX for the second and
+	RBX for the third operand.
+	<"lswi">: Use RAX for second and NBI for the third operand.
+
+2012-08-15  DJ Delorie  <dj@redhat.com>
+
+	* rl78-decode.opc (rl78_decode_opcode): Merge %e and %[01]
+	operands, so that data addresses can be corrected when not
+	ES-overridden.
+	* rl78-decode.c: Regenerate.
+	* rl78-dis.c (print_insn_rl78): Make order of modifiers
+	irrelevent.  When the 'e' specifier is used on an operand and no
+	ES prefix is provided, adjust address to make it absolute.
+
+2012-08-15  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c <RSQ, RTQ>: Use PPC_OPERAND_GPR.
+
+2012-08-15  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c <xnop, yield, mdoio, mdoom>: New extended mnemonics.
+
 2012-08-14  Maciej W. Rozycki  <macro@codesourcery.com>
 
 	* mips-dis.c (print_insn_args): Add GET_OP and GET_OP_S local
@@ -12,15 +228,15 @@
 	the instruction word.
 
 2012-08-13  Ian Bolton  <ian.bolton@arm.com>
-            Laurent Desnogues  <laurent.desnogues@arm.com>
-            Jim MacArthur  <jim.macarthur@arm.com>
-            Marcus Shawcroft  <marcus.shawcroft@arm.com>
-            Nigel Stephens  <nigel.stephens@arm.com>
-            Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
-            Richard Earnshaw  <rearnsha@arm.com>
-            Sofiane Naci  <sofiane.naci@arm.com>
-            Tejas Belagod  <tejas.belagod@arm.com>
-            Yufeng Zhang  <yufeng.zhang@arm.com>
+	    Laurent Desnogues  <laurent.desnogues@arm.com>
+	    Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Ramana Radhakrishnan  <ramana.radhakrishnan@arm.com>
+	    Richard Earnshaw  <rearnsha@arm.com>
+	    Sofiane Naci  <sofiane.naci@arm.com>
+	    Tejas Belagod  <tejas.belagod@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
 
 	* Makefile.am: Add AArch64.
 	* Makefile.in: Regenerate.
@@ -119,8 +335,8 @@
 	* po/POTFILES.in: Regenerate.
 
 2012-07-31  Chao-Ying Fu  <fu@mips.com>
-            Catherine Moore  <clm@codesourcery.com>
-            Maciej W. Rozycki  <macro@codesourcery.com>
+	    Catherine Moore  <clm@codesourcery.com>
+	    Maciej W. Rozycki  <macro@codesourcery.com>
 
 	* micromips-opc.c (WR_a, RD_a, MOD_a): New macros.
 	(DSP_VOLA): Likewise.
@@ -203,9 +419,9 @@
 2012-07-05  Sean Keys  <skeys@ipdatasys.com>
 
 	* xgate-dis.c: Removed an IF statement that will
-        always be false due to overlapping operand masks.
-        * xgate-opc.c: Corrected 'com' opcode entry and
-        fixed spacing.
+	always be false due to overlapping operand masks.
+	* xgate-opc.c: Corrected 'com' opcode entry and
+	fixed spacing.
 
 2012-07-02  Roland McGrath  <mcgrathr@google.com>
 

@@ -96,7 +96,7 @@ static void filter_sals (struct symtabs_and_lines *);
 
 
 /* Limit the call depth of user-defined commands */
-int max_user_call_depth;
+unsigned int max_user_call_depth;
 
 /* Define all cmd_list_elements.  */
 
@@ -1534,13 +1534,14 @@ filter_sals (struct symtabs_and_lines *sals)
 	  ++out;
 	}
     }
-  sals->nelts = out;
 
   if (sals->nelts == 0)
     {
       xfree (sals->sals);
       sals->sals = NULL;
     }
+  else
+    sals->nelts = out;
 }
 
 static void
@@ -1825,14 +1826,15 @@ is displayed."),
 			    show_remote_debug,
 			    &setdebuglist, &showdebuglist);
 
-  add_setshow_integer_cmd ("remotetimeout", no_class, &remote_timeout, _("\
+  add_setshow_zuinteger_unlimited_cmd ("remotetimeout", no_class,
+				       &remote_timeout, _("\
 Set timeout limit to wait for target to respond."), _("\
 Show timeout limit to wait for target to respond."), _("\
 This value is used to set the time limit for gdb to wait for a response\n\
 from the target."),
-			   NULL,
-			   show_remote_timeout,
-			   &setlist, &showlist);
+				       NULL,
+				       show_remote_timeout,
+				       &setlist, &showlist);
 
   add_prefix_cmd ("debug", no_class, set_debug,
 		  _("Generic command for setting gdb debugging flags"),
@@ -1906,13 +1908,13 @@ With no argument, show definitions of all user defined commands."), &showlist);
   add_com ("apropos", class_support, apropos_command,
 	   _("Search for commands matching a REGEXP"));
 
-  add_setshow_integer_cmd ("max-user-call-depth", no_class,
+  add_setshow_uinteger_cmd ("max-user-call-depth", no_class,
 			   &max_user_call_depth, _("\
 Set the max call depth for non-python user-defined commands."), _("\
 Show the max call depth for non-python user-defined commands."), NULL,
-			   NULL,
-			   show_max_user_call_depth,
-			   &setlist, &showlist);
+			    NULL,
+			    show_max_user_call_depth,
+			    &setlist, &showlist);
 
   add_setshow_boolean_cmd ("trace-commands", no_class, &trace_commands, _("\
 Set tracing of GDB CLI commands."), _("\

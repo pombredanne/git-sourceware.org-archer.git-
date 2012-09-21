@@ -10129,7 +10129,7 @@ _bfd_mips_elf_finish_dynamic_symbol (bfd *output_bfd,
 
   /* Mark _DYNAMIC and _GLOBAL_OFFSET_TABLE_ as absolute.  */
   name = h->root.root.string;
-  if (strcmp (name, "_DYNAMIC") == 0
+  if (h == elf_hash_table (info)->hdynamic
       || h == elf_hash_table (info)->hgot)
     sym->st_shndx = SHN_ABS;
   else if (strcmp (name, "_DYNAMIC_LINK") == 0
@@ -12764,7 +12764,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 	  /* Fix the relocation's type.  */
 	  irel->r_info = ELF32_R_INFO (r_symndx, R_MICROMIPS_PC10_S1);
 
-	  /* Replace the the 32-bit opcode with a 16-bit opcode.  */
+	  /* Replace the 32-bit opcode with a 16-bit opcode.  */
 	  bfd_put_16 (abfd,
 		      (b_insn_16.match
 		       | (opcode & 0x3ff)),		/* Addend value.  */
@@ -12791,7 +12791,7 @@ _bfd_mips_elf_relax_section (bfd *abfd, asection *sec,
 	  /* Fix the relocation's type.  */
 	  irel->r_info = ELF32_R_INFO (r_symndx, R_MICROMIPS_PC7_S1);
 
-	  /* Replace the the 32-bit opcode with a 16-bit opcode.  */
+	  /* Replace the 32-bit opcode with a 16-bit opcode.  */
 	  bfd_put_16 (abfd,
 		      (bz_insns_16[fndopc].match
 		       | BZ16_REG_FIELD (reg)

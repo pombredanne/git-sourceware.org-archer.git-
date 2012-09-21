@@ -680,6 +680,7 @@ build_address_symbolic (struct gdbarch *gdbarch,
     }
 
   if (msymbol != NULL
+      && MSYMBOL_HAS_SIZE (msymbol)
       && MSYMBOL_SIZE (msymbol) == 0
       && MSYMBOL_TYPE (msymbol) != mst_text
       && MSYMBOL_TYPE (msymbol) != mst_text_gnu_ifunc
@@ -2266,7 +2267,6 @@ ui_printf (char *arg, struct ui_file *stream)
 
 	      /* Parameter data.  */
 	      struct type *param_type = value_type (val_args[i]);
-	      unsigned int param_len = TYPE_LENGTH (param_type);
 	      struct gdbarch *gdbarch = get_type_arch (param_type);
 	      enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
@@ -2328,8 +2328,8 @@ ui_printf (char *arg, struct ui_file *stream)
 
 	      /* Conversion between different DFP types.  */
 	      if (TYPE_CODE (param_type) == TYPE_CODE_DECFLOAT)
-		decimal_convert (param_ptr, param_len, byte_order,
-				 dec, dfp_len, byte_order);
+		decimal_convert (param_ptr, TYPE_LENGTH (param_type),
+				 byte_order, dec, dfp_len, byte_order);
 	      else
 		/* If this is a non-trivial conversion, just output 0.
 		   A correct converted value can be displayed by explicitly

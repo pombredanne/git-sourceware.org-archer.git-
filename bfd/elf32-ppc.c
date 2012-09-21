@@ -7826,6 +7826,7 @@ ppc_elf_relocate_section (bfd *output_bfd,
 		  ;
 		else
 		  {
+		    BFD_ASSERT (h->dynindx != -1);
 		    indx = h->dynindx;
 		    unresolved_reloc = FALSE;
 		  }
@@ -8176,6 +8177,7 @@ ppc_elf_relocate_section (bfd *output_bfd,
 			    || h->root.type == bfd_link_hash_undefweak))
 		       || !SYMBOL_REFERENCES_LOCAL (info, h))
 		{
+		  BFD_ASSERT (h->dynindx != -1);
 		  unresolved_reloc = FALSE;
 		  outrel.r_info = ELF32_R_INFO (h->dynindx, r_type);
 		  outrel.r_addend = rel->r_addend;
@@ -8980,7 +8982,7 @@ ppc_elf_finish_dynamic_symbol (bfd *output_bfd,
 			    htab->plt->contents + ent->plt.offset + 28);
 
 		/* Fill in the GOT entry corresponding to this PLT slot with
-		   the address immediately after the the "bctr" instruction
+		   the address immediately after the "bctr" instruction
 		   in this PLT entry.  */
 		bfd_put_32 (output_bfd, (htab->plt->output_section->vma
 					 + htab->plt->output_offset

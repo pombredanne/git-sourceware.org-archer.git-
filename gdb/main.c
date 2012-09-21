@@ -331,7 +331,7 @@ captured_main (void *data)
   dirarg = (char **) xmalloc (dirsize * sizeof (*dirarg));
   ndir = 0;
 
-  quit_flag = 0;
+  clear_quit_flag ();
   saved_command_line = (char *) xmalloc (saved_command_line_size);
   saved_command_line[0] = '\0';
   instream = stdin;
@@ -1082,10 +1082,6 @@ Options:\n\n\
   --tui              Use a terminal user interface.\n\
 "), stream);
 #endif
-  fputs_unfiltered (_("\
-  --use-deprecated-index-sections\n\
-                     Do not reject deprecated .gdb_index sections.\n\
-"), stream);
   fputs_unfiltered (_("\
   --version          Print version information and then exit.\n\
   -w                 Use a window interface.\n\

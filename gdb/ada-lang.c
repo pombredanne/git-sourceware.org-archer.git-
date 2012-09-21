@@ -581,6 +581,7 @@ coerce_unspec_val_to_type (struct value *val, struct type *type)
       set_value_bitsize (result, value_bitsize (val));
       set_value_bitpos (result, value_bitpos (val));
       set_value_address (result, value_address (val));
+      set_value_optimized_out (result, value_optimized_out (val));
       return result;
     }
 }
@@ -12499,7 +12500,6 @@ const struct language_defn ada_language_defn = {
   "ada",                        /* Language name */
   language_ada,
   range_check_off,
-  type_check_off,
   case_sensitive_on,            /* Yes, Ada is case-insensitive, but
                                    that's not quite what this means.  */
   array_row_major,
@@ -12658,5 +12658,5 @@ With an argument, catch only exceptions with the given name."),
   /* Setup per-inferior data.  */
   observer_attach_inferior_exit (ada_inferior_exit);
   ada_inferior_data
-    = register_inferior_data_with_cleanup (ada_inferior_data_cleanup);
+    = register_inferior_data_with_cleanup (NULL, ada_inferior_data_cleanup);
 }

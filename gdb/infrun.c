@@ -3507,11 +3507,9 @@ handle_inferior_event (struct execution_control_state *ecs)
 	 vfork follow are detached.  */
       if (ecs->ws.kind != TARGET_WAITKIND_VFORKED)
 	{
-	  int child_pid = ptid_get_pid (ecs->ws.value.related_pid);
-
 	  /* This won't actually modify the breakpoint list, but will
 	     physically remove the breakpoints from the child.  */
-	  detach_breakpoints (child_pid);
+	  detach_breakpoints (ecs->ws.value.related_pid);
 	}
 
       if (singlestep_breakpoints_inserted_p)
@@ -4914,14 +4912,22 @@ process_event_stop_test:
 
 	  if (execution_direction == EXEC_REVERSE)
 	    {
-	      struct symtab_and_line sr_sal;
+	      /* If we're already at the start of the function, we've either
+		 just stepped backward into a single instruction function,
+		 or stepped back out of a signal handler to the first instruction
+		 of the function.  Just keep going, which will single-step back
+		 to the caller.  */
+	      if (ecs->stop_func_start != stop_pc)
+		{
+		  struct symtab_and_line sr_sal;
 
-	      /* Normal function call return (static or dynamic).  */
-	      init_sal (&sr_sal);
-	      sr_sal.pc = ecs->stop_func_start;
-	      sr_sal.pspace = get_frame_program_space (frame);
-	      insert_step_resume_breakpoint_at_sal (gdbarch,
-						    sr_sal, null_frame_id);
+		  /* Normal function call return (static or dynamic).  */
+		  init_sal (&sr_sal);
+		  sr_sal.pc = ecs->stop_func_start;
+		  sr_sal.pspace = get_frame_program_space (frame);
+		  insert_step_resume_breakpoint_at_sal (gdbarch,
+							sr_sal, null_frame_id);
+		}
 	    }
 	  else
 	    insert_step_resume_breakpoint_at_caller (frame);
@@ -4991,15 +4997,23 @@ process_event_stop_test:
 
       if (execution_direction == EXEC_REVERSE)
 	{
-	  /* Set a breakpoint at callee's start address.
-	     From there we can step once and be back in the caller.  */
-	  struct symtab_and_line sr_sal;
+	  /* If we're already at the start of the function, we've either just
+	     stepped backward into a single instruction function without line
+	     number info, or stepped back out of a signal handler to the first
+	     instruction of the function without line number info.  Just keep
+	     going, which will single-step back to the caller.  */
+	  if (ecs->stop_func_start != stop_pc)
+	    {
+	      /* Set a breakpoint at callee's start address.
+		 From there we can step once and be back in the caller.  */
+	      struct symtab_and_line sr_sal;
 
-	  init_sal (&sr_sal);
-	  sr_sal.pc = ecs->stop_func_start;
-	  sr_sal.pspace = get_frame_program_space (frame);
-	  insert_step_resume_breakpoint_at_sal (gdbarch,
-						sr_sal, null_frame_id);
+	      init_sal (&sr_sal);
+	      sr_sal.pc = ecs->stop_func_start;
+	      sr_sal.pspace = get_frame_program_space (frame);
+	      insert_step_resume_breakpoint_at_sal (gdbarch,
+						    sr_sal, null_frame_id);
+	    }
 	}
       else
 	/* Set a breakpoint at callee's return address (the address
@@ -6773,11 +6787,10 @@ restore_infcall_suspend_state (struct infcall_suspend_state *inf_state)
   if (inf_state->siginfo_gdbarch == gdbarch)
     {
       struct type *type = gdbarch_get_siginfo_type (gdbarch);
-      size_t len = TYPE_LENGTH (type);
 
       /* Errors ignored.  */
       target_write (&current_target, TARGET_OBJECT_SIGNAL_INFO, NULL,
-		    inf_state->siginfo_data, 0, len);
+		    inf_state->siginfo_data, 0, TYPE_LENGTH (type));
     }
 
   /* The inferior can be gone if the user types "print exit(0)"
@@ -7108,10 +7121,10 @@ Specify a signal as argument to print info on that signal only."));
   add_info_alias ("handle", "signals", 0);
 
   c = add_com ("handle", class_run, handle_command, _("\
-Specify how to handle a signal.\n\
+Specify how to handle signals.\n\
 Usage: handle SIGNAL [ACTIONS]\n\
 Args are signals and actions to apply to those signals.\n\
-If no actions are specified, the current settings for the specified signal\n\
+If no actions are specified, the current settings for the specified signals\n\
 will be displayed instead.\n\
 \n\
 Symbolic signals (e.g. SIGSEGV) are recommended but numeric signals\n\
@@ -7126,7 +7139,11 @@ Stop means reenter debugger if this signal happens (implies print).\n\
 Print means print a message if this signal happens.\n\
 Pass means let program see this signal; otherwise program doesn't know.\n\
 Ignore is a synonym for nopass and noignore is a synonym for pass.\n\
-Pass and Stop may be combined."));
+Pass and Stop may be combined.\n\
+\n\
+Multiple signals may be specified.  Signal numbers and signal names\n\
+may be interspersed with actions, with the actions being performed for\n\
+all signals cumulatively specified."));
   set_cmd_completer (c, handle_completer);
 
   if (xdb_commands)

@@ -834,7 +834,7 @@ static struct serial *remote_desc = NULL;
    some remote targets this variable is principly provided to
    facilitate backward compatibility.  */
 
-static int remote_address_size;
+static unsigned int remote_address_size;
 
 /* Temporary to track who currently owns the terminal.  See
    remote_terminal_* for more details.  */
@@ -3271,6 +3271,7 @@ remote_start_remote (int from_tty, struct target_ops *target, int extended_p)
   char *wait_status = NULL;
 
   immediate_quit++;		/* Allow user to interrupt it.  */
+  QUIT;
 
   if (interrupt_on_connect)
     send_interrupt_sequence ();
@@ -5714,9 +5715,9 @@ remote_wait_as (ptid_t ptid, struct target_waitstatus *status, int options)
 	  ofunc = signal (SIGINT, remote_interrupt);
 	  /* If the user hit C-c before this packet, or between packets,
 	     pretend that it was hit right here.  */
-	  if (quit_flag)
+	  if (check_quit_flag ())
 	    {
-	      quit_flag = 0;
+	      clear_quit_flag ();
 	      remote_interrupt (SIGINT);
 	    }
 	}
@@ -6313,7 +6314,7 @@ hexnumnstr (char *buf, ULONGEST num, int width)
 static CORE_ADDR
 remote_address_masked (CORE_ADDR addr)
 {
-  int address_size = remote_address_size;
+  unsigned int address_size = remote_address_size;
 
   /* If "remoteaddresssize" was not set, default to target address size.  */
   if (!address_size)
@@ -6744,7 +6745,7 @@ remote_read_bytes (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
 /* Remote notification handler.  */
 
 static void
-handle_notification (char *buf, size_t length)
+handle_notification (char *buf)
 {
   if (strncmp (buf, "Stop:", 5) == 0)
     {
@@ -7025,6 +7026,7 @@ putpkt_binary (char *buf, int cnt)
   int ch;
   int tcount = 0;
   char *p;
+  char *message;
 
   /* Catch cases like trying to read memory or listing threads while
      we're waiting for a stop reply.  The remote server wouldn't be
@@ -7156,7 +7158,7 @@ putpkt_binary (char *buf, int cnt)
 					    str);
 			do_cleanups (old_chain);
 		      }
-		    handle_notification (rs->buf, val);
+		    handle_notification (rs->buf);
 		    /* We're in sync now, rewait for the ack.  */
 		    tcount = 0;
 		  }
@@ -7534,7 +7536,7 @@ getpkt_or_notif_sane_1 (char **buf, long *sizeof_buf, int forever,
 	      do_cleanups (old_chain);
 	    }
 
-	  handle_notification (*buf, val);
+	  handle_notification (*buf);
 
 	  /* Notifications require no acknowledgement.  */
 
@@ -8180,6 +8182,7 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
   CORE_ADDR addr;
   struct remote_state *rs;
   char *p, *endbuf;
+  char *message;
 
   /* The length field should be set to the size of a breakpoint
      instruction, even though we aren't inserting one ourselves.  */
@@ -8214,6 +8217,13 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
   switch (packet_ok (rs->buf, &remote_protocol_packets[PACKET_Z1]))
     {
     case PACKET_ERROR:
+      if (rs->buf[1] == '.')
+        {
+          message = strchr (rs->buf + 2, '.');
+          if (message)
+            error ("Remote failure reply: %s", message + 1);
+        }
+      return -1;
     case PACKET_UNKNOWN:
       return -1;
     case PACKET_OK:
@@ -11460,13 +11470,13 @@ Specify a negative limit for unlimited."),
 					   breakpoints is %s.  */
 			    &remote_set_cmdlist, &remote_show_cmdlist);
 
-  add_setshow_integer_cmd ("remoteaddresssize", class_obscure,
-			   &remote_address_size, _("\
+  add_setshow_uinteger_cmd ("remoteaddresssize", class_obscure,
+			    &remote_address_size, _("\
 Set the maximum size of the address (in bits) in a memory packet."), _("\
 Show the maximum size of the address (in bits) in a memory packet."), NULL,
-			   NULL,
-			   NULL, /* FIXME: i18n: */
-			   &setlist, &showlist);
+			    NULL,
+			    NULL, /* FIXME: i18n: */
+			    &setlist, &showlist);
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_X],
 			 "X", "binary-download", 1);

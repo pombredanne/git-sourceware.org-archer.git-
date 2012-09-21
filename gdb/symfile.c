@@ -1703,7 +1703,7 @@ gdb_bfd_open_maybe_remote (const char *name)
   if (remote_filename_p (name))
     result = remote_bfd_open (name, gnutarget);
   else
-    result = gdb_bfd_openr (name, gnutarget);
+    result = gdb_bfd_open (name, gnutarget, -1);
 
   return result;
 }
@@ -1763,7 +1763,7 @@ symfile_bfd_open (char *name)
   name = absolute_name;
   make_cleanup (xfree, name);
 
-  sym_bfd = gdb_bfd_fopen (name, gnutarget, FOPEN_RB, desc);
+  sym_bfd = gdb_bfd_open (name, gnutarget, desc);
   if (!sym_bfd)
     {
       make_cleanup (xfree, name);
@@ -1986,7 +1986,7 @@ load_progress (ULONGEST bytes, void *untyped_arg)
   args->buffer += bytes;
   totals->write_count += 1;
   args->section_sent += bytes;
-  if (quit_flag
+  if (check_quit_flag ()
       || (deprecated_ui_load_progress_hook != NULL
 	  && deprecated_ui_load_progress_hook (args->section_name,
 					       args->section_sent)))
@@ -2103,7 +2103,7 @@ generic_load (char *args, int from_tty)
     }
 
   /* Open the file for loading.  */
-  loadfile_bfd = gdb_bfd_openr (filename, gnutarget);
+  loadfile_bfd = gdb_bfd_open (filename, gnutarget, -1);
   if (loadfile_bfd == NULL)
     {
       perror_with_name (filename);
@@ -2506,9 +2506,7 @@ reread_symbols (void)
 
 	  clear_objfile_data (objfile);
 
-	  /* Clean up any state BFD has sitting around.  We don't need
-	     to close the descriptor but BFD lacks a way of closing the
-	     BFD without closing the descriptor.  */
+	  /* Clean up any state BFD has sitting around.  */
 	  {
 	    struct bfd *obfd = objfile->obfd;
 
@@ -2516,11 +2514,18 @@ reread_symbols (void)
 	    /* Open the new BFD before freeing the old one, so that
 	       the filename remains live.  */
 	    objfile->obfd = gdb_bfd_open_maybe_remote (obfd_filename);
+	    if (objfile->obfd == NULL)
+	      {
+		/* We have to make a cleanup and error here, rather
+		   than erroring later, because once we unref OBFD,
+		   OBFD_FILENAME will be freed.  */
+		make_cleanup_bfd_unref (obfd);
+		error (_("Can't open %s to read symbols."), obfd_filename);
+	      }
 	    gdb_bfd_unref (obfd);
 	  }
 
-	  if (objfile->obfd == NULL)
-	    error (_("Can't open %s to read symbols."), objfile->name);
+	  objfile->name = bfd_get_filename (objfile->obfd);
 	  /* bfd_openr sets cacheable to true, which is what we want.  */
 	  if (!bfd_check_format (objfile->obfd, bfd_object))
 	    error (_("Can't read symbols from %s: %s."), objfile->name,
@@ -2548,10 +2553,6 @@ reread_symbols (void)
 	  /* Free the obstacks for non-reusable objfiles.  */
 	  psymbol_bcache_free (objfile->psymbol_cache);
 	  objfile->psymbol_cache = psymbol_bcache_init ();
-	  bcache_xfree (objfile->macro_cache);
-	  objfile->macro_cache = bcache_xmalloc (NULL, NULL);
-	  bcache_xfree (objfile->filename_cache);
-	  objfile->filename_cache = bcache_xmalloc (NULL,NULL);
 	  if (objfile->demangled_names_hash != NULL)
 	    {
 	      htab_delete (objfile->demangled_names_hash);
@@ -2571,6 +2572,8 @@ reread_symbols (void)
 		  sizeof (objfile->msymbol_hash));
 	  memset (&objfile->msymbol_demangled_hash, 0,
 		  sizeof (objfile->msymbol_demangled_hash));
+
+	  set_objfile_per_bfd (objfile);
 
 	  /* obstack_init also initializes the obstack so it is
 	     empty.  We could use obstack_specify_allocation but
@@ -2856,7 +2859,7 @@ allocate_symtab (const char *filename, struct objfile *objfile)
     obstack_alloc (&objfile->objfile_obstack, sizeof (struct symtab));
   memset (symtab, 0, sizeof (*symtab));
   symtab->filename = (char *) bcache (filename, strlen (filename) + 1,
-				      objfile->filename_cache);
+				      objfile->per_bfd->filename_cache);
   symtab->fullname = NULL;
   symtab->language = deduce_language_from_filename (filename);
   symtab->debugformat = "unknown";
@@ -2883,8 +2886,8 @@ allocate_symtab (const char *filename, struct objfile *objfile)
 			      last_objfile_name);
 	}
       fprintf_unfiltered (gdb_stdlog,
-			  "Created symtab 0x%lx for module %s.\n",
-			  (long) symtab, filename);
+			  "Created symtab %s for module %s.\n",
+			  host_address_to_string (symtab), filename);
     }
 
   return (symtab);

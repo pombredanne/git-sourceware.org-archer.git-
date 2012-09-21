@@ -359,6 +359,9 @@ delete_trace_state_variable (const char *name)
       {
 	xfree ((void *)tsv->name);
 	VEC_unordered_remove (tsv_s, tvariables, ix);
+
+	observer_notify_tsv_deleted (name);
+
 	return;
       }
 
@@ -423,6 +426,8 @@ trace_variable_command (char *args, int from_tty)
   tsv = create_trace_state_variable (internalvar_name (intvar));
   tsv->initial_value = initval;
 
+  observer_notify_tsv_created (tsv->name, initval);
+
   printf_filtered (_("Trace state variable $%s "
 		     "created, with initial value %s.\n"),
 		   tsv->name, plongest (tsv->initial_value));
@@ -442,6 +447,7 @@ delete_trace_variable_command (char *args, int from_tty)
       if (query (_("Delete all trace state variables? ")))
 	VEC_free (tsv_s, tvariables);
       dont_repeat ();
+      observer_notify_tsv_deleted (NULL);
       return;
     }
 
@@ -2212,6 +2218,7 @@ disconnect_tracing (int from_tty)
      full tfind_1 behavior because we're in the middle of detaching,
      and there's no point to updating current stack frame etc.  */
   set_current_traceframe (-1);
+  set_tracepoint_num (-1);
   set_traceframe_context (NULL);
 }
 
@@ -2285,11 +2292,15 @@ tfind_1 (enum trace_find_type type, int num,
   tp = get_tracepoint_by_number_on_target (target_tracept);
 
   reinit_frame_cache ();
-  registers_changed ();
   target_dcache_invalidate ();
-  set_traceframe_num (target_frameno);
-  clear_traceframe_info ();
+
   set_tracepoint_num (tp ? tp->base.number : target_tracept);
+
+  if (target_frameno != get_traceframe_number ())
+    observer_notify_traceframe_changed (target_frameno, tracepoint_number);
+
+  set_current_traceframe (target_frameno);
+
   if (target_frameno == -1)
     set_traceframe_context (NULL);
   else
@@ -2400,13 +2411,6 @@ trace_find_command (char *args, int from_tty)
 /* tfind end */
 static void
 trace_find_end_command (char *args, int from_tty)
-{
-  trace_find_command ("-1", from_tty);
-}
-
-/* tfind none */
-static void
-trace_find_none_command (char *args, int from_tty)
 {
   trace_find_command ("-1", from_tty);
 }
@@ -3280,7 +3284,7 @@ set_current_traceframe (int num)
   if (newnum != num)
     warning (_("could not change traceframe"));
 
-  traceframe_number = newnum;
+  set_traceframe_num (newnum);
 
   /* Changing the traceframe changes our view of registers and of the
      frame chain.  */
@@ -3552,6 +3556,8 @@ create_tsv_from_upload (struct uploaded_tsv *utsv)
   tsv = create_trace_state_variable (buf);
   tsv->initial_value = utsv->initial_value;
   tsv->builtin = utsv->builtin;
+
+  observer_notify_tsv_created (tsv->name, tsv->initial_value);
 
   do_cleanups (old_chain);
 
@@ -5243,13 +5249,10 @@ Default is the current PC, or the PC of the current trace frame."),
 	   &tfindlist);
 
   add_cmd ("end", class_trace, trace_find_end_command, _("\
-Synonym for 'none'.\n\
 De-select any trace frame and resume 'live' debugging."),
 	   &tfindlist);
 
-  add_cmd ("none", class_trace, trace_find_none_command,
-	   _("De-select any trace frame and resume 'live' debugging."),
-	   &tfindlist);
+  add_alias_cmd ("none", "end", class_trace, 0, &tfindlist);
 
   add_cmd ("start", class_trace, trace_find_start_command,
 	   _("Select the first trace frame in the trace buffer."),

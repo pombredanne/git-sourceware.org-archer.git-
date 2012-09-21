@@ -1,3 +1,272 @@
+2012-09-21  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi2-cli.exp: Remove redundant '\'.
+
+2012-09-21  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi-cli.exp: Remove.
+	* gdb.mi/mi2-cli.exp: Merged from mi-cli.exp.
+
+2012-09-21  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi-reverse.exp: Fix the typo in expected output of
+	"=record-started" notification.
+
+2012-09-21  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi-record-changed.exp: New.
+	* gdb.mi/mi-reverse.exp: Adjust expected output.
+
+2012-09-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/python.exp: Test atexit.register.
+
+2012-09-20  Doug Evans  <dje@google.com>
+
+	* boards/dwarf4-gdb-index.exp: New file.
+
+	* gdb.base/callfuncs.exp (do_function_calls): Set unwindonsignal to on
+	while running the tests.
+
+2012-09-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/bp_reset: New testcase.
+
+2012-09-18  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/mi-tsv-changed.exp: New.
+
+2012-09-18  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/mi-traceframe-changed.exp: New.
+
+2012-09-17  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/list.exp (set_listsize): Don't set arg to "unlimited"
+	when it is less than 0.
+
+2012-09-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 14119
+	* gdb.arch/amd64-tailcall-ret.S: New file.
+	* gdb.arch/amd64-tailcall-ret.c: New file.
+	* gdb.arch/amd64-tailcall-ret.exp: New file.
+	* gdb.reverse/amd64-tailcall-reverse.S: New file.
+	* gdb.reverse/amd64-tailcall-reverse.c: New file.
+	* gdb.reverse/amd64-tailcall-reverse.exp: New file.
+
+2012-09-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 14548
+	* gdb.reverse/singlejmp-reverse-nodebug.S: New file.
+	* gdb.reverse/singlejmp-reverse-nodebug.c: New file.
+	* gdb.reverse/singlejmp-reverse.S: New file.
+	* gdb.reverse/singlejmp-reverse.c: New file.
+	* gdb.reverse/singlejmp-reverse.exp: New file.
+
+2012-09-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix compatibility with old GCC (~4.1).
+	* gdb.cp/converts.cc (my_enum_var): New variable.
+
+2012-09-14  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.xml/tdesc-regs.exp: Update expected output for new
+	vector_size syntax of vector types.
+
+2012-09-13  Khoo Yit Phang  <khooyp@cs.umd.edu>
+
+	Refactor Python "gdb" module into a proper Python package, by
+	introducing a new "_gdb" module for code implemented in C, and
+	using reload/__import__ instead of exec.
+	* gdb.python/python.exp (Test stderr location): Update module
+	location of GDB-specific sys.stderr.
+	(Test stdout location): Ditto for sys.stdout.
+
+2012-09-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/valgrind-infcall.exp: Remove comment about Ubuntu.
+
+2012-09-12  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.cp/converts.cc (main): Comment out the pointer to boolean
+	conversion statement.
+
+2012-09-12  Doug Evans  <dje@google.com>
+
+	* gdb.base/help.exp: Remove testing of individual command help text,
+	too much of a maintenance burden.  Instead, test the functionality
+	of "help" itself.
+
+2012-09-11  Doug Evans  <dje@google.com>
+
+	* gdb.cp/mb-inline.exp: Do "info break" after setting multi-location
+	breakpoint.
+
+	* gdb.dwarf2/fission-base.S: Include gdb.dwarf2/ in dwo_name.
+	* gdb.dwarf2/fission-reread.S: Ditto.
+	* gdb.dwarf2/fission-base.exp: Remove setting of debug-file-directory.
+	* gdb.dwarf2/fission-reread.exp: Ditto.
+
+2012-09-11  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.base/ptype.exp: Test ptype on a pointer to a typedef.
+
+2012-09-10  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/optim_drec: New testcase.
+
+2012-09-10  Doug Evans  <dje@google.com>
+
+	* boards/fission.exp: Explicitly mark "board" as not remote.
+
+2012-09-10  Keith Seitz  <keiths@redhat.com>
+
+	PR gdb/13483
+	* gdb.cp/converts.cc (A::A): Add ctor.
+	(A::member_): Add member.
+	(enum my_enum): New enumeration.
+	(main): Add calls to foo1_7 with various
+	permitted arguments.
+	* gdb.cp/converts.exp: Add tests for boolean
+	conversions permitted by the standard.
+
+2012-09-08  Khoo Yit Phang  <khooyp@cs.umd.edu>
+
+	Replace -nw option with $INTERNAL_GDBFLAGS in "xgdb" tests to
+	avoid spurious results due to ~/.gdbinit.
+	* gdb.gdb/complaint.exp (setup_test): Replace -nw option with
+	$INTERNAL_GDBFLAGS in run command.
+	* gdb.gdb/observer.exp (setup_test): Ditto.
+	* gdb.gdb/selftest.exp (test_with_self): Ditto.
+	* gdb.gdb/xfullpath.exp (setup_test): Ditto.
+
+2012-09-06  Doug Evans  <dje@google.com>
+
+	* boards/fission.exp: New file.
+
+	* gdb.python/py-value.exp: Use clean_restart.
+
+2012-09-05  Doug Evans  <dje@google.com>
+
+	* gdb.base/info-macros.c: Fix whitespace.
+
+2012-08-28  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/14428
+
+	* gdb.base/pc-fp.exp: Adjust expected output of 'info registers pc fp'.
+
+2012-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-caller-line.c: New file.
+	* gdb.base/break-caller-line.exp: New file.
+
+2012-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.ada/rdv_wait.exp (set debug-file-directory): New command.
+	* gdb.arch/i386-cfi-notcurrent.S: New file.
+	* gdb.arch/i386-cfi-notcurrent.exp: New file.
+
+2012-08-27  Wei-cheng Wang  <cole945@gmail.com>
+	    Yao Qi <yao@codesourcery.com>
+	    Pedro Alves <palves@redhat.com>
+
+	* gdb.base/memattr.exp (delete_memory, region_pass, region_fail):
+	New procedures.
+	(top level): Add overlap checking tests.
+
+2012-08-24  Tom Tromey  <tromey@redhat.com>
+
+	* lib/gdb.exp (skip_unwinder_tests): Don't leave 'ok' set if
+	gdb_test_multiple fails for other reasons.
+
+2012-08-24  Yao Qi  <yao@codesourcery.com>
+
+	* lib/gdb.exp (skip_unwinder_tests): Remove pass.
+
+2012-08-23  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/help.exp: Adjust to "handle" help text change.
+
+2012-08-23  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/disconnected-tracing.c (start, end): New.
+	(main): Call start and end.
+	* gdb.trace/disconnected-tracing.exp (disconnected_tracing): Move
+	existing tests into this proc.
+	(disconnected_tfind): New.
+
+2012-08-23  Yao Qi  <yao@codesourcery.com>
+
+	* boards/native-gdbserver.exp (${board}_upload): New.
+	* boards/native-stdio-gdbserver.exp (${board}_upload): New.
+	* gdb.trace/tfile.exp: Don't check 'gdb,nofileio'.
+	Execute tfile on remote target.
+	Copy trace file from target to host.
+
+2012-08-22  Joseph Myers  <joseph@codesourcery.com>
+
+	* gdb.arch/thumb-bx-pc.S: New file.
+	* gdb.arch/thumb-bx-pc.exp: New file.
+
+2012-08-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/maint.exp: Update.
+
+2012-08-22  Tom Tromey  <tromey@redhat.com>
+
+	* lib/gdb.exp (skip_unwinder_tests): New proc.
+	* gdb.cp/nextoverthrow.exp: Use skip_unwinder_tests.
+	* gdb.java/jnpe.exp: Use skip_unwinder_tests.
+
+2012-08-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.hp/gdb.aCC/exception.exp: Remove.
+
+012-08-19  Andrew Pinski  <apinski@cavium.com>
+
+	* gdb.arch/mips-octeon-bbit.c: New file.
+	* gdb.arch/mips-octeon-bbit.exp: New Test.
+
+012-08-19  Keith Seitz  <keiths@redhat.com>
+
+	PR c++/14365
+	* gdb.dwarf2/dw2-anon-mptr.exp: New file.
+	* gdb.dwarf2/dw2-anon-mptr.S: New file.
+
+2012-08-18  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/solib-corrupted.exp (make solibs looping): Replace
+	verbose -log by more specific untested call.
+
+2012-08-18  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/tfind.exp: Move tests on various command help before
+	checking target supports trace.
+	Fix the expected output of 'help tfind end'.
+
+2012-08-17  Keith Seitz  <keiths@redhat.com>
+
+	PR c++/13356
+	* gdb.base/default.exp: Update all "check type" tests.
+	* gdb.base/help.exp: Likewise.
+	* gdb.base/setshow.exp: Likewise.
+	* gdb.cp/converts.cc (foo1_type_check): New function.
+	(foo2_type_check): New function.
+	(foo3_type_check): New function.
+	(main): Call new functions.
+	* converts.exp: Add tests for integer-to-pointer conversions
+	with/without strict type-checking.
+
+2012-08-16  Mike Frysinger  <vapier@gentoo.org>
+
+	* gdb.base/help.exp: Update expected output.
+
+2012-08-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/rdv_wait: New testcase.
+
 2012-08-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.base/attach-twice.exp: Remove excessive ps exec.
@@ -148,6 +417,11 @@
 	* gdb.base/valgrind-infcall.exp: New file.
 
 	* gdb.base/valgrind-db-attach.exp: Do not run in remote mode.
+
+2012-07-30  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.linespec/ls-errs.exp: Check some quote-enclosed
+	linespecs.
 
 2012-07-30  Doug Evans  <dje@google.com>
 

@@ -265,7 +265,7 @@ c_type_print_varspec_prefix (struct type *type,
 	fputs_filtered (name, stream);
       else
 	c_type_print_base (TYPE_DOMAIN_TYPE (type),
-			   stream, 0, passed_a_ptr);
+			   stream, -1, passed_a_ptr);
       fprintf_filtered (stream, "::*");
       break;
 
@@ -278,7 +278,7 @@ c_type_print_varspec_prefix (struct type *type,
 	fputs_filtered (name, stream);
       else
 	c_type_print_base (TYPE_DOMAIN_TYPE (type),
-			   stream, 0, passed_a_ptr);
+			   stream, -1, passed_a_ptr);
       fprintf_filtered (stream, "::*");
       break;
 
@@ -306,7 +306,7 @@ c_type_print_varspec_prefix (struct type *type,
 
     case TYPE_CODE_TYPEDEF:
       c_type_print_varspec_prefix (TYPE_TARGET_TYPE (type),
-				   stream, show, 0, 0);
+				   stream, show, passed_a_ptr, 0);
       break;
 
     case TYPE_CODE_UNDEF:
@@ -322,7 +322,6 @@ c_type_print_varspec_prefix (struct type *type,
     case TYPE_CODE_SET:
     case TYPE_CODE_RANGE:
     case TYPE_CODE_STRING:
-    case TYPE_CODE_BITSTRING:
     case TYPE_CODE_COMPLEX:
     case TYPE_CODE_NAMESPACE:
     case TYPE_CODE_DECFLOAT:
@@ -619,15 +618,17 @@ c_type_print_varspec_suffix (struct type *type,
     case TYPE_CODE_ARRAY:
       {
 	LONGEST low_bound, high_bound;
+	int is_vector = TYPE_VECTOR (type);
 
 	if (passed_a_ptr)
 	  fprintf_filtered (stream, ")");
 
-	fprintf_filtered (stream, "[");
+	fprintf_filtered (stream, (is_vector ?
+				   "__attribute__ ((vector_size(" : "["));
 	if (get_array_bounds (type, &low_bound, &high_bound))
 	  fprintf_filtered (stream, "%d", 
 			    (int) (high_bound - low_bound + 1));
-	fprintf_filtered (stream, "]");
+	fprintf_filtered (stream, (is_vector ? ")))" : "]"));
 
 	c_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream,
 				     show, 0, 0);
@@ -679,7 +680,6 @@ c_type_print_varspec_suffix (struct type *type,
     case TYPE_CODE_SET:
     case TYPE_CODE_RANGE:
     case TYPE_CODE_STRING:
-    case TYPE_CODE_BITSTRING:
     case TYPE_CODE_COMPLEX:
     case TYPE_CODE_NAMESPACE:
     case TYPE_CODE_DECFLOAT:

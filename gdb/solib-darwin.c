@@ -371,7 +371,7 @@ darwin_solib_get_all_image_info_addr_at_init (struct darwin_info *info)
   cleanup = make_cleanup (null_cleanup, NULL);
 
   /* Create a bfd for the interpreter.  */
-  dyld_bfd = gdb_bfd_openr (interp_name, gnutarget);
+  dyld_bfd = gdb_bfd_open (interp_name, gnutarget, -1);
   if (dyld_bfd)
     {
       bfd *sub;
@@ -534,7 +534,8 @@ void
 _initialize_darwin_solib (void)
 {
   solib_darwin_pspace_data
-    = register_program_space_data_with_cleanup (darwin_pspace_data_cleanup);
+    = register_program_space_data_with_cleanup (NULL,
+						darwin_pspace_data_cleanup);
 
   darwin_so_ops.relocate_section_addresses = darwin_relocate_section_addresses;
   darwin_so_ops.free_so = darwin_free_so;

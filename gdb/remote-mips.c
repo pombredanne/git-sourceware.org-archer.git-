@@ -588,6 +588,7 @@ mips_expect_timeout (const char *string, int timeout)
     }
 
   immediate_quit++;
+  QUIT;
   while (1)
     {
       int c;
@@ -2789,7 +2790,7 @@ mips_load_srec (char *args)
 
   buffer = alloca (srec_frame * 2 + 256);
 
-  abfd = gdb_bfd_openr (args, 0);
+  abfd = gdb_bfd_open (args, NULL, -1);
   if (!abfd)
     {
       printf_filtered ("Unable to open file %s\n", args);
@@ -3376,7 +3377,7 @@ pmon_load_fast (char *file)
   buffer = (char *) xmalloc (MAXRECSIZE + 1);
   binbuf = (unsigned char *) xmalloc (BINCHUNK);
 
-  abfd = gdb_bfd_openr (file, 0);
+  abfd = gdb_bfd_open (file, NULL, -1);
   if (!abfd)
     {
       printf_filtered ("Unable to open file %s\n", file);
