@@ -1930,11 +1930,10 @@ namespace_table_flatten_helper (void **slot, void *arg)
     {
       /* glibc includes an entry for the interpreter in each
 	 namespace, but in all but the initial namespace these
-	 have l_addr_inferior == 0.  Returning these "broken"
-	 placeholders makes it impossible to set breakpoints
-	 in the runtime linker when more than one namespace
-	 exists.  */
-      if (src->lm_info->l_addr_inferior != 0)
+	 have l_ld == 0.  Returning these "broken" placeholders
+	 makes it impossible to set breakpoints in the runtime
+	 linker when more than one namespace exists.  */
+      if (src->lm_info->l_ld != 0)
 	{
 	  struct so_list *dst;
 
