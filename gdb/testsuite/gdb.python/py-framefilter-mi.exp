@@ -71,9 +71,9 @@ mi_gdb_test "-stack-list-arguments 0" \
     "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[name=\"foo\",name=\"bar\",name=\"fb\",name=\"bf\"\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[name=\"j\"\\\]},.*frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[name=\"f\",name=\"d\"\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
     "stack-list-arguments 0"
 
-mi_gdb_test "-stack-list-arguments 0 raw-frames" \
+mi_gdb_test "-stack-list-arguments --no-frame-filters 0" \
     "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[name=\"foo\",name=\"bar\",name=\"fb\",name=\"bf\"\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[name=\"j\"\\\]},.*frame={level=\"22\",args=\\\[\\\]},frame={level=\"23\",args=\\\[\\\]},.*frame={level=\"26\",args=\\\[name=\"f\",name=\"d\"\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
-    "stack-list-arguments 0 raw-frammes"
+    "stack-list-arguments --no-frame-filters 0"
 
 mi_gdb_test "-stack-list-arguments 0 0 3" \
     "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[name=\"foo\",name=\"bar\",name=\"fb\",name=\"bf\"\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[name=\"j\"\\\]},frame={level=\"3\",args=\\\[\\\]}\\\]" \
@@ -87,9 +87,9 @@ mi_gdb_test "-stack-list-arguments 1" \
     "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",value=\"21\"},{name=\"bar\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",value=\"$hex\"},{name=\"bf\",value=\"{nothing = $hex \\\\\"Foo Bar\\\\\", f = 42, s = 19}\"}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",value=\"3\"},{name=\"d\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
     "stack-list-arguments 1"
 
-mi_gdb_test "-stack-list-arguments 1 raw-frames" \
+mi_gdb_test "-stack-list-arguments --no-frame-filters 1" \
     "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",value=\"21\"},{name=\"bar\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",value=\"$hex\"},{name=\"bf\",value=\"{nothing = $hex \\\\\"Foo Bar\\\\\", f = 42, s = 19}\"}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\]},frame={level=\"23\",args=\\\[\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",value=\"3\"},{name=\"d\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
-    "stack-list-arguments raw-frames 1"
+    "stack-list-arguments --no-frame-filters 1"
 
 
 mi_gdb_test "-stack-list-arguments 1 0 3" \
@@ -104,9 +104,9 @@ mi_gdb_test "-stack-list-arguments 2" \
     "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",type=\"int\",value=\"21\"},{name=\"bar\",type=\"char \\\*\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",type=\"foobar \\\*\",value=\"$hex\"},{name=\"bf\",type=\"foobar\"\}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",type=\"int\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
     "stack-list-arguments 2"
 
-mi_gdb_test "-stack-list-arguments 2 raw-frames" \
+mi_gdb_test "-stack-list-arguments --no-frame-filters 2" \
     "\\^done,stack-args=\\\[frame={level=\"0\",args=\\\[{name=\"foo\",type=\"int\",value=\"21\"},{name=\"bar\",type=\"char \\\*\",value=\"$hex \\\\\"Param\\\\\"\"},{name=\"fb\",type=\"foobar \\\*\",value=\"$hex\"},{name=\"bf\",type=\"foobar\"}\\\]},frame={level=\"1\",args=\\\[\\\]},frame={level=\"2\",args=\\\[{name=\"j\",type=\"int\",value=\"10\"}\\\]},.*frame={level=\"22\",args=\\\[\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
-    "stack-list-arguments 2 raw-frames"
+    "stack-list-arguments --no-frame-filters 2"
 
 
 mi_gdb_test "-stack-list-arguments 2 0 3" \
@@ -117,22 +117,34 @@ mi_gdb_test "-stack-list-arguments 2 22 27" \
     "\\^done,stack-args=\\\[frame={level=\"22\",args=\\\[\\\],children=\\\[frame={level=\"23\",args=\\\[\\\]}\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
     "stack-list-arguments 2 22 27"
 
-mi_gdb_test "-stack-list-arguments 2 raw-frames 22 27" \
+mi_gdb_test "-stack-list-arguments --no-frame-filters 2 22 27" \
     "\\^done,stack-args=\\\[frame={level=\"22\",args=\\\[\\\]},frame={level=\"23\",args=\\\[\\\]},.*frame={level=\"26\",args=\\\[{name=\"f\",type=\"int\",value=\"3\"},{name=\"d\",type=\"int\",value=\"5\"}\\\]},frame={level=\"27\",args=\\\[\\\]}\\\]" \
-    "stack-list-arguments 2 raw-frames 22 27"
+    "stack-list-arguments --no-frame-filters 2 22 27"
 
 #stack-list-locals
-mi_gdb_test "-stack-list-locals 0 raw-frames" \
+mi_gdb_test "-stack-list-locals --no-frame-filters 0" \
     "\\^done,locals=\\\[name=\"str\",name=\"st2\",name=\"b\",name=\"c\"\\\]" \
-    "stack-list-locals 0 raw-frames"
+    "stack-list-locals --no-frame-filters 0"
 
-mi_gdb_test "-stack-list-locals 1 raw-frames" \
+mi_gdb_test "-stack-list-locals --no-frame-filters 1" \
     "\\^done,locals=\\\[{name=\"str\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",value=\"12\"},{name=\"c\",value=\"5\"}\\\]" \
-    "stack-list-locals 1 raw-frames"
+    "stack-list-locals --no-frame-filters 1"
 
-mi_gdb_test "-stack-list-locals 2 raw-frames" \
+mi_gdb_test "-stack-list-locals --no-frame-filters 2" \
     "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short int\",value=\"5\"}\\\]" \
-    "stack-list-locals 2 raw-frames"
+    "stack-list-locals --no-frame-filters 2"
+
+mi_gdb_test "-stack-list-locals --no-frame-filters --no-values" \
+    "\\^done,locals=\\\[name=\"str\",name=\"st2\",name=\"b\",name=\"c\"\\\]" \
+    "stack-list-locals --no-frame-filters --no-values"
+
+mi_gdb_test "-stack-list-locals --no-frame-filters --all-values" \
+    "\\^done,locals=\\\[{name=\"str\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",value=\"12\"},{name=\"c\",value=\"5\"}\\\]" \
+    "stack-list-locals --no-frame-filters --all-values"
+
+mi_gdb_test "-stack-list-locals --no-frame-filters --simple-values" \
+    "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short int\",value=\"5\"}\\\]" \
+    "stack-list-locals --no-frame-filters --simple-values"
 
 mi_gdb_test "-stack-list-locals 0" \
     "\\^done,locals=\\\[name=\"str\",name=\"st2\",name=\"b\",name=\"c\"\\\]" \
@@ -146,13 +158,13 @@ mi_gdb_test "-stack-list-locals 2" \
     "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short int\",value=\"5\"}\\\]" \
     "stack-list-locals 2"
 
-#stack-list-variables
-mi_gdb_test "-stack-list-variables 0 raw-frames" \
+# stack-list-variables
+mi_gdb_test "-stack-list-variables --no-frame-filters 0" \
     "\\^done,variables=\\\[{name=\"foo\",arg=\"1\"},{name=\"bar\",arg=\"1\"},{name=\"fb\",arg=\"1\"},{name=\"bf\",arg=\"1\"},{name=\"str\"},{name=\"st2\"},{name=\"b\"},{name=\"c\"}\\\]" \
-    "stack-list-locals 0 raw-frames"
+    "stack-list-variables --no-frame-filters 0"
 
 mi_gdb_test "-stack-list-variables 0" \
     "\\^done,variables=\\\[{name=\"foo\",arg=\"1\"},{name=\"bar\",arg=\"1\"},{name=\"fb\",arg=\"1\"},{name=\"bf\",arg=\"1\"},{name=\"str\"},{name=\"st2\"},{name=\"b\"},{name=\"c\"}\\\]" \
-    "stack-list-locals 0"
+    "stack-list-variables 0"
 
 remote_file host delete ${remote_python_file}

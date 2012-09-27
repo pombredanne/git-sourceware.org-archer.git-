@@ -50,6 +50,15 @@ stack_enable_frame_filters (void)
   frame_filters = 1;
 }
 
+static int
+parse_no_frames_option (char *arg)
+{
+  if (arg && (strcmp (arg, "--no-frame-filters") == 0))
+    return 1;
+
+  return 0;
+}
+
 /* Print a list of the stack frames.  Args can be none, in which case
    we want to print the whole backtrace, or a pair of numbers
    specifying the frame numbers at which to start and stop the
@@ -68,19 +77,12 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
   int raw_arg = 0;
   int j;
 
-  if (argc)
-    {
-      /* Find 'raw-frames' at argv[0] if passed as an argument */
-      for (j = 0; j < strlen (argv[0]); j++)
-	argv[0][j] = tolower (argv[0][j]);
-
-      if (subset_compare (argv[0], "raw-frames"))
-	raw_arg = 1;
-    }
+  if (argc > 0)
+    raw_arg = parse_no_frames_option (argv[0]);
 
   if ((argc > 3 && ! raw_arg) || (argc == 1 && ! raw_arg)
       || (argc == 2 && raw_arg))
-    error (_("-stack-list-frames: Usage: [RAW-FRAMES FRAME_LOW FRAME_HIGH]"));
+    error (_("-stack-list-frames: Usage: [--no-frame-filters] [FRAME_LOW FRAME_HIGH]"));
 
   if (argc == 3 || argc == 2)
     {
@@ -200,44 +202,35 @@ mi_cmd_stack_list_locals (char *command, char **argv, int argc)
   struct frame_info *frame;
   int raw_arg = 0;
   int result = 0;
+  int print_value;
 
-  if (argc == 2)
-    {
-      int j;
-      /* Find 'raw-frames' at argv[1] if passed as an argument */
-      for (j = 0; j < strlen (argv[1]); j++)
-	argv[1][j] = tolower (argv[1][j]);
-
-      if (subset_compare (argv[1], "raw-frames"))
-	raw_arg = 1;
-    }
+  if (argc > 0)
+    raw_arg = parse_no_frames_option (argv[0]);
 
   if (argc < 1 || argc > 2 || (argc == 2 && ! raw_arg)
       || (argc == 1 && raw_arg))
-    error (_("-stack-list-locals: Usage: PRINT_VALUES [RAW-FRAMES]"));
+    error (_("-stack-list-locals: Usage: [--no-frame-filters] PRINT_VALUES"));
 
    frame = get_selected_frame (NULL);
+   print_value = parse_print_values (argv[raw_arg]);
 
    if (! raw_arg && frame_filters)
      {
-       int count = 1;
-       int arg = atoi (argv[0]);
-
        result = apply_frame_filter (frame,/* frame */
 				    1, /* print_level */
 				    0, /* print_frame_info */
 				    0, /* print_args */
 				    1, /* print_locals */
-				    arg, /* mi_print_args_type */
+				    print_value, /* mi_print_args_type */
 				    0, /* cli_print_args_type */
 				    current_uiout, /* out */
-				    count /* count */);
+				    1 /* count */);
      }
 
    if (! frame_filters || raw_arg || result == PY_BT_ERROR
        || result == PY_BT_NO_FILTERS)
      {
-       list_args_or_locals (locals, parse_print_values (argv[0]), frame);
+       list_args_or_locals (locals, print_value, frame);
      }
 }
 
@@ -258,20 +251,12 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
   int raw_arg = 0;
   int result = 0;
 
-  if (argc > 1)
-    {
-      int j;
-      /* Find 'raw-frames' at argv[1] if passed as an argument */
-      for (j = 0; j < strlen (argv[1]); j++)
-	argv[1][j] = tolower (argv[1][j]);
-
-      if (subset_compare (argv[1], "raw-frames"))
-	raw_arg = 1;
-    }
+  if (argc > 0)
+    raw_arg = parse_no_frames_option (argv[0]);
 
   if (argc < 1 || (argc > 3 && ! raw_arg) || (argc == 2 && ! raw_arg))
-    error (_("-stack-list-arguments: Usage: "
-	     "PRINT_VALUES [RAW-FRAMES FRAME_LOW FRAME_HIGH]"));
+    error (_("-stack-list-arguments: Usage: " \
+	     "[--no-frame-filters] PRINT_VALUES [FRAME_LOW FRAME_HIGH]"));
 
   if (argc >= 3)
     {
@@ -286,7 +271,7 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
       frame_high = -1;
     }
 
-  print_values = parse_print_values (argv[0]);
+  print_values = parse_print_values (argv[raw_arg]);
 
   /* Let's position fi on the frame at which to start the
      display. Could be the innermost frame if the whole stack needs
@@ -352,45 +337,37 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
   struct frame_info *frame;
   int raw_arg = 0;
   int result = 0;
+  int print_value;
 
-  if (argc == 2)
-    {
-      int j;
-      /* Find 'raw-frames' at argv[1] if passed as an argument */
-      for (j = 0; j < strlen (argv[1]); j++)
-	argv[1][j] = tolower (argv[1][j]);
-
-      if (subset_compare (argv[1], "raw-frames"))
-	raw_arg = 1;
-    }
+  if (argc > 0)
+    raw_arg = parse_no_frames_option (argv[0]);
 
   if (argc < 1 || argc > 2 || (argc == 2 && ! raw_arg)
       || (argc == 1 && raw_arg))
-    error (_("-stack-list-arguments: Usage: PRINT_VALUES [RAW-FRAMES]"));
+    error (_("-stack-list-arguments: Usage: " \
+	     "[--no-frame-filters] PRINT_VALUES"));
 
    frame = get_selected_frame (NULL);
+   print_value = parse_print_values (argv[raw_arg]);
 
    if (! raw_arg && frame_filters)
      {
-       int count = 1;
-       int arg = atoi (argv[0]);
-
        result = apply_frame_filter (frame,/* frame */
 				    1, /* print_level */
 				    0, /* print_frame_info */
 				    1, /* print_args */
 				    1, /* print_locals */
-				    arg, /* mi_print_args_type */
+				    print_value, /* mi_print_args_type */
 				    0, /* cli_print_args_type */
 				    current_uiout, /* out */
-				    count /* count */);
+				    1 /* count */);
      }
 
    if (! frame_filters || raw_arg || result == PY_BT_ERROR
        || result == PY_BT_NO_FILTERS)
      {
 
-       list_args_or_locals (all, parse_print_values (argv[0]), frame);
+       list_args_or_locals (all, print_value, frame);
      }
 }
 
