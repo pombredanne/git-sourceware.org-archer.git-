@@ -21,6 +21,7 @@
 #define GDB_PYTHON_H
 
 #include "value.h"
+#include "mi/mi-cmds.h"
 
 struct breakpoint_object;
 
@@ -32,6 +33,23 @@ struct breakpoint_object;
 static const int PY_BT_ERROR = 0;
 static const int PY_BT_COMPLETED = 1;
 static const int PY_BT_NO_FILTERS = 2;
+
+/* Flags to pass to apply_frame_filter.  */
+
+enum frame_filter_flags
+  {
+    /* Set this flag if frame level is to be printed.  */
+    PRINT_LEVEL = 1,
+
+    /* Set this flag if frame information is to be printed.  */
+    PRINT_FRAME_INFO = 2,
+
+    /* Set this flag if frame arguments are to be printed.  */
+    PRINT_ARGS = 4,
+
+    /* Set this flag if frame locals are to be printed.  */
+    PRINT_LOCALS = 8,
+  };
 
 extern void finish_python_initialization (void);
 
@@ -46,9 +64,8 @@ int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			      const struct value_print_options *options,
 			      const struct language_defn *language);
 
-int apply_frame_filter (struct frame_info *frame, int print_level,
-			int print_frame_info, int print_args,
-			int print_locals, int mi_print_args_type,
+int apply_frame_filter (struct frame_info *frame, int flags,
+			enum print_values mi_print_args_type,
 			const char *cli_print_args_type,
 			struct ui_out *out, int count);
 

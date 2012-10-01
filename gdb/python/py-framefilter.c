@@ -30,6 +30,7 @@
 #include "hashtab.h"
 #include "mi/mi-cmds.h"
 #include "demangle.h"
+#include "mi/mi-cmds.h"
 
 #ifdef HAVE_PYTHON
 #include "python-internal.h"
@@ -1225,24 +1226,24 @@ bootstrap_python_frame_filters (struct frame_info *frame)
 
 /*  Public and dispatch function for frame filters.  This is the only
     publicly exported function in this file.  FRAME is the source
-    frame to start frame-filter invocation.  PRINT_LEVEL is a flag
-    indicating whether to print the frame's relative level in the
+    frame to start frame-filter invocation.  FLAGS is an integer
+    holding the flags for printing. The following elements of the
+    FRAME_FILTER_FLAGS enum denotes makeup of FLAGS: PRINT_LEVEL is a
+    flag indicating whether to print the frame's relative level in the
     output.  PRINT_FRAME_INFO is a flag that indicates whether this
     function should print the frame information, PRINT_ARGS is a flag
     that indicates whether to print frame arguments, and PRINT_LOCALS,
     likewise, with frame local variables.  MI_PRINT_ARGS_TYPE is an
-    element from an internal enumerator from MI that indicates which
-    values types to print.  This parameter is ignored if the output is
-    detected to be CLI.  CLI_PRINT_FRAME_ARGS_TYPE likewise is a an
-    element of what value types to print from CLI.  OUT is the output
-    stream to print, and COUNT is a delimiter (required for MI
-    slices).  */
-int
-apply_frame_filter (struct frame_info *frame, int print_level,
-		    int print_frame_info,  int print_args,
-		    int print_locals, int mi_print_args_type,
-		    const char *cli_print_frame_args_type,
-		    struct ui_out *out, int count)
+    enum from MI that indicates which values types to print.  This
+    parameter is ignored if the output is detected to be CLI.
+    CLI_PRINT_FRAME_ARGS_TYPE likewise is a an element of what value
+    types to print from CLI.  OUT is the output stream to print, and
+    COUNT is a delimiter (required for MI slices).  */
+
+int apply_frame_filter (struct frame_info *frame, int flags,
+			enum print_values mi_print_args_type,
+			const char *cli_print_frame_args_type,
+			struct ui_out *out, int count)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct cleanup *cleanups;
@@ -1250,6 +1251,13 @@ apply_frame_filter (struct frame_info *frame, int print_level,
   int print_result = 0;
   int success = 0;
   PyObject *iterable;
+  int print_level, print_frame_info, print_args, print_locals;
+
+  /* Extract print settings from FLAGS.  */
+  print_level = (flags & PRINT_LEVEL) ? 1 : 0;
+  print_frame_info = (flags & PRINT_FRAME_INFO) ? 1 : 0;
+  print_args = (flags & PRINT_ARGS) ? 1 : 0;
+  print_locals = (flags & PRINT_LOCALS) ? 1 : 0;
 
   cleanups = ensure_python_env (gdbarch, current_language);
 
@@ -1319,13 +1327,12 @@ apply_frame_filter (struct frame_info *frame, int print_level,
 
 #else /* HAVE_PYTHON */
 int
-apply_frame_filter (struct frame_info *frame, int print_level,
-		    int print_frame_info, int print_args,
-		    int print_locals, int mi_print_args_type,
-		    const char *cli_print_frame_args_type,
-		    struct ui_out *out, int count)
+int apply_frame_filter (struct frame_info *frame, int flags,
+			enum print_values mi_print_args_type,
+			const char *cli_print_args_type,
+			struct ui_out *out, int count)
 {
-  return PY_BT_NO_FILTERS
+  return PY_BT_NO_FILTERS;
 }
 
 #endif /* HAVE_PYTHON */

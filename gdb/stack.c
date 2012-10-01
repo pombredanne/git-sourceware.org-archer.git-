@@ -1724,16 +1724,17 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
     }
 
   if (! raw)
-    result = apply_frame_filter (trailing, /* frame */
-				 1,        /* print_level */
-				 1, /* print_frame_info */
-				 1, /* print_args */
-				 show_locals,   /* print_locals */
-				 0, /* mi_print_args_type */
-				 print_frame_arguments, /* cli_print_args_type */
-				 current_uiout, /* out */
-				 count /* count */);
+    {
+      int flags = PRINT_LEVEL | PRINT_FRAME_INFO | PRINT_ARGS;
 
+      if (show_locals)
+	flags |= PRINT_LOCALS;
+
+      result = apply_frame_filter (trailing, flags, 0,
+				   print_frame_arguments,
+				   current_uiout, count);
+
+    }
   /* Run the inbuilt backtrace if there are no filters registered, or
      if there was an error in the Python backtracing output.  */
   if (raw || result == PY_BT_ERROR || result == PY_BT_NO_FILTERS)

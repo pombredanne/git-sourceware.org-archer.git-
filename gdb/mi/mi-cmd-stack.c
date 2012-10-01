@@ -112,18 +112,13 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
   if (! raw_arg && frame_filters)
     {
       int count = frame_high;
+      int flags = PRINT_LEVEL | PRINT_FRAME_INFO;
 
       if (frame_high != -1)
 	count = (frame_high - frame_low) + 1;
-      result = apply_frame_filter (fi,/* frame */
-				   1, /* print_level */
-				   1, /* print_frame_info */
-				   0, /* print_args */
-				   0, /* print_locals */
-				   0, /* mi_print_args_type */
-				   0, /* cli_print_args_type */
-				   current_uiout, /* out */
-				   count /* count */);
+
+      result = apply_frame_filter (fi, flags, 0, NULL, current_uiout,
+				   count);
     }
 
   /* Run the inbuilt backtrace if there are no filters registered, or
@@ -216,15 +211,10 @@ mi_cmd_stack_list_locals (char *command, char **argv, int argc)
 
    if (! raw_arg && frame_filters)
      {
-       result = apply_frame_filter (frame,/* frame */
-				    1, /* print_level */
-				    0, /* print_frame_info */
-				    0, /* print_args */
-				    1, /* print_locals */
-				    print_value, /* mi_print_args_type */
-				    0, /* cli_print_args_type */
-				    current_uiout, /* out */
-				    1 /* count */);
+       int flags = PRINT_LEVEL | PRINT_LOCALS;
+
+       result = apply_frame_filter (frame, flags, print_value,
+				    NULL,  current_uiout, 1);
      }
 
    if (! frame_filters || raw_arg || result == PY_BT_ERROR
@@ -289,19 +279,13 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
   if (! raw_arg && frame_filters)
     {
       int count = frame_high;
+      int flags = PRINT_LEVEL | PRINT_ARGS;
 
       if (frame_high != -1)
 	count = (frame_high - frame_low) + 1;
 
-      result = apply_frame_filter (fi,/* frame */
-				   1, /* print_level */
-				   0, /* print_frame_info */
-				   1, /* print_args */
-				   0, /* print_locals */
-				   print_values, /* mi_print_args_type */
-				   0, /* cli_print_args_type */
-				   current_uiout, /* out */
-				   count /* count */);
+      result = apply_frame_filter (fi, flags, print_values, NULL,
+				   current_uiout, count);
     }
 
   if (! frame_filters || raw_arg || result == PY_BT_ERROR
@@ -352,15 +336,10 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
 
    if (! raw_arg && frame_filters)
      {
-       result = apply_frame_filter (frame,/* frame */
-				    1, /* print_level */
-				    0, /* print_frame_info */
-				    1, /* print_args */
-				    1, /* print_locals */
-				    print_value, /* mi_print_args_type */
-				    0, /* cli_print_args_type */
-				    current_uiout, /* out */
-				    1 /* count */);
+       int flags = PRINT_LEVEL | PRINT_ARGS | PRINT_LOCALS;
+
+       result = apply_frame_filter (frame, flags, print_value, NULL,
+				    current_uiout, 1);
      }
 
    if (! frame_filters || raw_arg || result == PY_BT_ERROR

@@ -70,6 +70,9 @@ sys.argv = ['']
 # Initial pretty printers.
 pretty_printers = []
 
+# Initial frame filters.
+frame_filters = {}
+
 # Convenience variable to GDB's python directory
 PYTHONDIR = os.path.dirname(os.path.dirname(__file__))
 
