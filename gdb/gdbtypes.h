@@ -1526,11 +1526,11 @@ extern struct type *create_range_type (struct type *, struct type *, LONGEST,
 
 extern struct type *create_array_type (struct type *, struct type *,
 				       struct type *);
-extern struct type *lookup_array_range_type (struct type *, int, int);
+extern struct type *lookup_array_range_type (struct type *, LONGEST, LONGEST);
 
 extern struct type *create_string_type (struct type *, struct type *,
 					struct type *);
-extern struct type *lookup_string_range_type (struct type *, int, int);
+extern struct type *lookup_string_range_type (struct type *, LONGEST, LONGEST);
 
 extern struct type *create_set_type (struct type *, struct type *);
 
@@ -1603,8 +1603,8 @@ extern const struct rank FLOAT_CONVERSION_BADNESS;
 extern const struct rank INT_FLOAT_CONVERSION_BADNESS;
 /* Badness of conversion of pointer to void pointer.  */
 extern const struct rank VOID_PTR_CONVERSION_BADNESS;
-/* Badness of conversion of pointer to boolean.  */
-extern const struct rank BOOL_PTR_CONVERSION_BADNESS;
+/* Badness of conversion to boolean.  */
+extern const struct rank BOOL_CONVERSION_BADNESS;
 /* Badness of converting derived to base class.  */
 extern const struct rank BASE_CONVERSION_BADNESS;
 /* Badness of converting from non-reference to reference.  */

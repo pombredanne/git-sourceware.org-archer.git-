@@ -24,6 +24,10 @@
 
 struct breakpoint_object;
 
+/* The suffix of per-objfile scripts to auto-load.
+   E.g. When the program loads libfoo.so, look for libfoo-gdb.py.  */
+#define GDBPY_AUTO_FILE_NAME "-gdb.py"
+
 /* Python frame-filter status returns constants.  */
 static const int PY_BT_ERROR = 0;
 static const int PY_BT_COMPLETED = 1;

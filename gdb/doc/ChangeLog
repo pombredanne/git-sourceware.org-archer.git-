@@ -1,3 +1,47 @@
+2012-09-26  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* observer.texi (memory_changed): Expand parameter LEN to ssize_t.
+
+2012-09-21  Yao Qi  <yao@codesourcery.com>
+            Pedro Alves  <palves@redhat.com>
+
+	* gdb.texinfo (GDB/MI Async Records): Document notification
+	'record-started' and 'record-stopped'.
+	* observer.texi (GDB Observers): New observer 'record-changed'.
+
+2012-09-19  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* gdb.texinfo: Document the removal of SH's 'regs' command.
+
+2012-09-18  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb.texinfo (jump): Mention new alias `j' for `jump'.
+
+2012-09-18  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Async Records): Document new MI
+	notifications '=tsv-created' and '=tsv-deleted'.
+	* observer.texi (GDB Observers): New observer tsv_created and
+	tsv_deleted.
+
+2012-09-18  Yao Qi  <yao@codesourcery.com>
+
+	* observer.texi (GDB Observers): New observer 'traceframe_changed'.
+	* gdb.texinfo (GDB/MI Async Records): Mention new MI notification
+	'=traceframe-changed'.
+
+2012-09-17  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (List): Describe the meaning of 0 and -1 in
+	'set listsize'.
+
+2012-09-13  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	* gdbint.texinfo (Defining Other Architecture Features): Clarify *pcptr
+	encoding for gdbarch_breakpoint_from_pc, bp_addr for
+	gdbarch_push_dummy_call and bp_addr for gdbarch_push_dummy_code.
+
 2012-08-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.texinfo (objfile-gdb.py file): New paragraph for .exe stripping.

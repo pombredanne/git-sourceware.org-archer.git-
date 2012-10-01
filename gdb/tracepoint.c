@@ -359,6 +359,9 @@ delete_trace_state_variable (const char *name)
       {
 	xfree ((void *)tsv->name);
 	VEC_unordered_remove (tsv_s, tvariables, ix);
+
+	observer_notify_tsv_deleted (name);
+
 	return;
       }
 
@@ -423,6 +426,8 @@ trace_variable_command (char *args, int from_tty)
   tsv = create_trace_state_variable (internalvar_name (intvar));
   tsv->initial_value = initval;
 
+  observer_notify_tsv_created (tsv->name, initval);
+
   printf_filtered (_("Trace state variable $%s "
 		     "created, with initial value %s.\n"),
 		   tsv->name, plongest (tsv->initial_value));
@@ -442,6 +447,7 @@ delete_trace_variable_command (char *args, int from_tty)
       if (query (_("Delete all trace state variables? ")))
 	VEC_free (tsv_s, tvariables);
       dont_repeat ();
+      observer_notify_tsv_deleted (NULL);
       return;
     }
 
@@ -1450,7 +1456,7 @@ encode_actions_1 (struct command_line *action,
 		}
 	      else
 		{
-		  unsigned long addr, len;
+		  unsigned long addr;
 		  struct cleanup *old_chain = NULL;
 		  struct cleanup *old_chain1 = NULL;
 
@@ -1480,8 +1486,10 @@ encode_actions_1 (struct command_line *action,
 		      /* Safe because we know it's a simple expression.  */
 		      tempval = evaluate_expression (exp);
 		      addr = value_address (tempval);
-		      len = TYPE_LENGTH (check_typedef (exp->elts[1].type));
-		      add_memrange (collect, memrange_absolute, addr, len);
+		      /* Initialize the TYPE_LENGTH if it is a typedef.  */
+		      check_typedef (exp->elts[1].type);
+		      add_memrange (collect, memrange_absolute, addr,
+				    TYPE_LENGTH (exp->elts[1].type));
 		      break;
 
 		    case OP_VAR_VALUE:
@@ -2288,9 +2296,13 @@ tfind_1 (enum trace_find_type type, int num,
   reinit_frame_cache ();
   target_dcache_invalidate ();
 
+  set_tracepoint_num (tp ? tp->base.number : target_tracept);
+
+  if (target_frameno != get_traceframe_number ())
+    observer_notify_traceframe_changed (target_frameno, tracepoint_number);
+
   set_current_traceframe (target_frameno);
 
-  set_tracepoint_num (tp ? tp->base.number : target_tracept);
   if (target_frameno == -1)
     set_traceframe_context (NULL);
   else
@@ -3546,6 +3558,8 @@ create_tsv_from_upload (struct uploaded_tsv *utsv)
   tsv = create_trace_state_variable (buf);
   tsv->initial_value = utsv->initial_value;
   tsv->builtin = utsv->builtin;
+
+  observer_notify_tsv_created (tsv->name, tsv->initial_value);
 
   do_cleanups (old_chain);
 

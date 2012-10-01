@@ -1,3 +1,97 @@
+2012-09-20  Walter Lee  <walt@tilera.com>
+
+	* elf32-tilepro.c (tilepro_elf_relocate_section): Adjust got
+	relocations with value of hgot.
+	* elfxx-tilegx.c (tilegx_elf_relocate_section): Ditto.
+
+2012-09-19  Steve Ellcey  <sellcey@mips.com>
+
+	* config.bfd: Add mips*-mti-elf* target.
+
+2012-09-18  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/14591
+	* elf-bfd.h (_bfd_elf_merge_symbol): Add an argument to return 
+	if the old symbol is weak.
+
+	* elf32-sh-symbian.c (sh_symbian_relocate_section): Update
+	_bfd_elf_merge_symbol call.
+
+	* elflink.c (_bfd_elf_merge_symbol): Add an argument to return
+	if the old symbol is weak.
+	(_bfd_elf_add_default_symbol): Update _bfd_elf_merge_symbol
+	call.
+	(elf_link_add_object_symbols): Don't update symbol type from a
+	weak definition.  Update symbol type from a common symbol when
+	overriding a weak symbol.
+
+2012-09-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_convert_mov_to_lea): Ignore discarded
+	section.
+	* elf64-x86-64.c (elf_x86_64_convert_mov_to_lea): Likewise.
+
+2012-09-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_finish_dynamic_symbol): Replace return
+	FALSE with abort.
+	* elf64-x86-64.c (elf_x86_64_finish_dynamic_symbol): Likewise.
+
+2012-09-17  Walter Lee  <walt@tilera.com>
+
+	* elf32-tilepro.c (tilepro_elf_relocate_section): Remove unused
+	got_base variable.
+	* elfxx-tilegx.c (tilegx_elf_relocate_section): Ditto.
+
+2012-09-17  Walter Lee  <walt@tilera.com>
+
+	* elf32-tilepro.c (tilepro_elf_relocate_section): Fix computation
+	of got relocations for when .got.plt section is merged with .got.
+	* elfxx-tilegx.c (tilegx_elf_relocate_section): Ditto.
+
+2012-09-14  David Edelsohn  <dje.gcc@gmail.com>
+
+	* configure: Regenerate.
+
+2012-09-13  Anthony Green  <green@moxielogic.com>
+
+	* targets.c (bfd_elf32_bigmoxie_vec, bfd_elf32_littlemoxie_vec):
+	Define.
+	(bfd_elf32_moxie_vec): Remove.
+	* config.bfd, configure.in: Add bi-endian support for moxie.
+	* configure: Rebuilt.
+	* elf32-moxie.c (TARGET_LITTLE_NAME, TARGET_LITTLE_SYM): Define.
+	(TARGET_BIG_NAME, TARGET_BIG_SYM): Update for bi-endian support.
+
+2012-09-12  Doug Kwan  <dougkwan@google.com>
+
+	* elf64-ppc.c (ppc64_elf_relocate_section): Use pre-adjusted
+	relocation for stub lookup.
+
+2012-09-12  Chris Schlumberger-Socha  <chris.schlumberger-socha@arm.com>
+
+	* bfd-in2.h: Regenerated.
+	* elf64-aarch64.c
+	(elf64_aarch64_howto_table): Add R_AARCH64_GOT_LD_PREL19 reloc to HOWTO.
+	(elf64_aarch64_reloc_map): Add reloc entry.
+	(aarch64_resolve_relocation): Likewise.
+	(bfd_elf_aarch64_put_addend): Likewise.
+	(aarch64_reloc_got_type): Likewise.
+	(elf64_aarch64_final_link_relocate): Likewise.
+	(lf64_aarch64_check_relocs): Likewise.
+	(elf64_aarch64_check_relocs): New case for R_AARCH64_ADR_PREL_LO21
+	reloc.
+	* libbfd.h: Regenerated.
+	* reloc.c (R_AARCH64_GOT_LD_PREL19): New reloc.
+
+2012-09-10  Matthias Klose  <doko@ubuntu.com>
+
+	* config.in: Disable sanity check for kfreebsd.
+
+2012-09-10  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* configure: Regenerated.
+
 2012-09-04  Sergey A. Guriev <sergey.a.guriev@intel.com>
 
 	* cpu-ia64-opc.c (ins_cnt6a): New function.

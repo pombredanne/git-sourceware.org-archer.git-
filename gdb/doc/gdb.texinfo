@@ -6706,6 +6706,8 @@ the @code{list} command.  You can change this using @code{set listsize}:
 @item set listsize @var{count}
 Make the @code{list} command display @var{count} source lines (unless
 the @code{list} argument explicitly specifies some other number).
+Setting @var{count} to -1 means there's no limit and 0 means suppress
+display of source lines.
 
 @kindex show listsize
 @item show listsize
@@ -15493,8 +15495,11 @@ an address of your own choosing, with the following commands:
 
 @table @code
 @kindex jump
+@kindex j @r{(@code{jump})}
 @item jump @var{linespec}
+@itemx j @var{linespec}
 @itemx jump @var{location}
+@itemx j @var{location}
 Resume execution at line @var{linespec} or at address given by
 @var{location}.  Execution stops again immediately if there is a
 breakpoint there.  @xref{Specify Location}, for a description of the
@@ -20458,13 +20463,6 @@ For the Renesas Super-H processor, @value{GDBN} provides these
 commands:
 
 @table @code
-@item regs
-@kindex regs@r{, Super-H}
-This command is deprecated, and @code{info all-registers} should be
-used instead.
-
-Show the values of all Super-H registers.
-
 @item set sh calling-convention @var{convention}
 @kindex set sh calling-convention
 Set the calling-convention used when calling functions from @value{GDBN}.
@@ -27631,6 +27629,21 @@ thread group in whose context the library was unloaded.  If the field is
 absent, it means the library was unloaded in the context of all present
 thread groups.
 
+@item =traceframe-changed,num=@var{tfnum},tracepoint=@var{tpnum}
+@itemx =traceframe-changed,end
+Reports that the trace frame was changed and its new number is
+@var{tfnum}.  The number of the tracepoint associated with this trace
+frame is @var{tpnum}.
+
+@item =tsv-created,name=@var{name},value=@var{value}
+Reports that the new trace state variable @var{name} is created with
+value @var{value}.
+
+@item =tsv-deleted,name=@var{name}
+@itemx =tsv-deleted
+Reports that the trace state variable @var{name} is deleted or all
+trace state variables are deleted.
+
 @item =breakpoint-created,bkpt=@{...@}
 @itemx =breakpoint-modified,bkpt=@{...@}
 @itemx =breakpoint-deleted,id=@var{number}
@@ -27644,6 +27657,12 @@ breakpoint commands; @xref{GDB/MI Breakpoint Commands}.  The
 
 Note that if a breakpoint is emitted in the result record of a
 command, then it will not also be emitted in an async record.
+
+@item =record-started,thread-group="@var{id}"
+@itemx =record-stopped,thread-group="@var{id}"
+Execution log recording was either started or stopped on an
+inferior.  The @var{id} is the @value{GDBN} identifier of the thread
+group corresponding to the affected inferior.
 
 @item =cmd-param-changed,param=@var{param},value=@var{value}
 Reports that a parameter of the command @code{set @var{param}} is

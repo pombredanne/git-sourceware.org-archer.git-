@@ -1,3 +1,611 @@
+2012-09-28  Nathan Miller  <nathanm2@us.ibm.com>
+	    Edjunior Machado  <emachado@linux.vnet.ibm.com>
+
+	PR gdb/13989
+	* solib.c (solib_find): Prevent GDB from loading native libraries when
+	debugging a cross-target corefile.
+
+2012-09-28  selven  <pcthegreat@gmail.com>
+
+	Make definition match declaration.
+
+	* regcache.c (regcache_register_status): Change return type to
+	enum register_status.
+
+2012-09-28  Yao Qi  <yao@codesourcery.com>
+
+	* mi/mi-main.c (mi_cmd_data_write_memory): Call
+	write_memory_with_notification instead of write_memory.
+	(mi_cmd_data_write_memory_bytes): Call write_memory_with_notification
+	instead of target_write_memory.
+
+2012-09-28  Yao Qi  <yao@codesourcery.com>
+
+	* mi/mi-main.c (mi_cmd_data_write_memory_bytes): Emit error
+	when the length of content is not an even number.
+
+2012-09-27  Tom Tromey  <tromey@redhat.com>
+
+	Fix https://bugzilla.redhat.com/show_bug.cgi?id=849357
+	* cp-valprint.c (cp_print_value_fields): Use get_vptr_fieldno.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* sol-thread.c (sol_thread_fetch_registers)
+	(sol_thread_store_registers): Delete commented out code.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* sol-thread.c (ps_lgetxregsize, ps_lgetxregs, ps_lsetxregs):
+	Move these functions to sparc-sol-thread.c.
+	* sparc-sol-thread.c: New file.
+	* configure.ac: Add sparc-sol-thread.o to CONFIG_OBS and
+	sparc-sol-thread.c to CONFIG_SRCS for sparc-solaris native
+	configurations.
+	* configure: Regenerate.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* sol-thread.c (ps_lgetxregsize, ps_lgetxregs, ps_lsetxregs):
+	Remove commented-out code.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* sol-thread.c (ps_lgetxregsize, ps_lgetxregs, ps_lsetxregs):
+	Enable this code for sparc hosts only.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* procfs.h (procfs_find_LDT_entry): Add declaration.
+	* sol-thread.c (ps_lgetLDT): Delete local declaration of
+	function procfs_find_LDT_entry.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* procfs.c (proc_get_LDT_entry): Make static.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* procfs.c (proc_find_memory_regions): Fix declaration.
+
+2012-09-27  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* amd64-tdep.c (amd64_return_value): Revert previous change
+	that used TYPE_LENGTH directly.
+	* bfin-tdep.c (bfin_extract_return_value): Likewise.
+	(bfin_store_return_value): Likewise.
+	* cris-tdep.c (cris_store_return_value): Likewise.
+	(cris_extract_return_value): Likewise.
+	* h8300-tdep.c (h8300_extract_return_value): Likewise.
+	* hppa-tdep.c (hppa64_return_value): Likewise.
+	* lm32-tdep.c (lm32_store_return_value): Likewise.
+	* microblaze-tdep.c (microblaze_store_return_value): Likewise.
+	* spu-tdep.c (spu_value_from_register): Likewise.
+	* vax-tdep.c (vax_return_value): Likewise.
+
+2012-09-27  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* gdbtypes.c (lookup_array_range_type): Expand parameters
+	LOW_BOUND and HIGH_BOUND to LONGEST.
+	(lookup_string_range_type): Likewise.
+	* gdbtypes.h (lookup_array_range_type): Likewise.
+	(lookup_string_range_type): Likewise.
+	* valops.c (value_cstring): Expand parameter LEN to ssize_t.
+	Expand HIGHBOUND to ssize_t.
+	(value_string): Likewise.
+	* value.h (value_cstring): Expand parameter LEN to ssize_t.
+	(value_string): Likewise.
+
+2012-09-27  Yao Qi  <yao@codesourcery.com>
+
+	PR breakpoints/13898
+	* breakpoint.h (tracepoint_breakpoint_ops): Forward declaration.
+	* mi/mi-cmd-break.c (mi_cmd_break_insert): Set breakpoint_ops
+	per breakpoint type.
+
+2012-09-26  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* procfs.c: Add gdb_bfd header.
+	* rs6000-nat.c: Likewise.
+	* solib-pa64.c: Likewise.
+	* spu-linux-nat.c: Likewise.
+	* windows-nat.c: Likewise.
+
+2012-09-26  Tom Tromey  <tromey@redhat.com>
+
+	* f-lang.h (BLANK_COMMON_NAME_LOCAL): Remove.
+
+2012-09-26  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (mark_common_block_symbol_computed): New function.
+	(read_common_block): Handle child DIEs with
+	DW_AT_data_member_location.
+	(new_symbol_full): Add special case for common blocks.
+
+2012-09-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (read_common_block): Rewrite.
+	(new_symbol_full): Handle DW_TAG_common_block.
+	* f-lang.c (head_common_list, find_common_for_function):
+	Remove.
+	* f-lang.h (struct common_entry, struct saved_f77_common,
+	SAVED_F77_COMMON, SAVED_F77_COMMON_PTR, COMMON_ENTRY,
+	COMMON_ENTRY_PTR, head_common_list, find_common_for_function,
+	BLANK_COMMON_NAME_LOCAL): Remove.
+	(struct common_block): New.
+	* f-valprint.c (list_all_visible_commons): Remove.
+	(info_common_command_for_block): New function.
+	(info_common_command): Use it.
+	* stack.c (iterate_over_block_locals): Special case for
+	COMMON_BLOCK_DOMAIN.
+	* symtab.h (enum domain_enum_tag) <COMMON_BLOCK_DOMAIN>: New
+	constant.
+	(struct general_symbol_info) <value.common_block>: New field.
+	(SYMBOL_VALUE_COMMON_BLOCK): New define.
+
+2012-09-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* f-lang.c (allocate_saved_bf_node,
+	allocate_saved_function_node, allocate_saved_f77_common_node,
+	allocate_common_entry_node, tail_common_list, current_common,
+	saved_bf_list, saved_bf_list_end, current_head_bf_list,
+	tmp_bf_ptr, add_common_block, add_common_entry,
+	find_first_common_named, patch_common_entries,
+	patch_all_commons_by_name, ADD_BF_SYMNUM, clear_bf_list,
+	global_remote_debug, get_bf_for_fcn, saved_function_list,
+	saved_function_list_end, clear_function_list, struct saved_fcn,
+	struct saved_bf_symnum, SAVED_FUNCTION, SAVED_FUNCTION_PTR,
+	SAVED_BF, SAVED_BF_PTR): Remove.
+	* f-lang.h (tail_common_list, current_common,
+	UNINITIALIZED_SECNUM, COMMON_NEEDS_PATCHING,
+	BLANK_COMMON_NAME_ORIGINAL, BLANK_COMMON_NAME_MF77,
+	DEFAULT_UPPER_BOUND, DEFAULT_LOWER_BOUND, real_main_name,
+	real_main_c_value): Remove.
+	* f-valprint.c (there_is_a_visible_common_named): Remove.
+
+2012-09-26  Andrew Burgess  <aburgess@broadcom.com>
+
+	* breakpoint.c (update_global_location_list): Ignore previous
+	duplicate status of a breakpoint when starting a new scan for
+	duplicate breakpoints.
+
+2012-09-26  Karthik Bhat  <kv.bhat@samsung.com>
+	PR breakpoints/14419
+	* arm-tdep.c (arm_skip_prologue): Extending producer check to
+	support LLVM compiler.
+
+2012-09-26  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* amd64-tdep.c (amd64_return_value): Use TYPE_LENGTH directly.
+	* bfin-tdep.c (bfin_extract_return_value): Likewise.
+	(bfin_store_return_value): Likewise.
+	* cris-tdep.c (cris_store_return_value): Likewise.
+	(cris_extract_return_value): Likewise.
+	* h8300-tdep.c (h8300_extract_return_value): Likewise.
+	* hppa-tdep.c (hppa64_return_value): Likewise.
+	* lm32-tdep.c (lm32_store_return_value): Likewise.
+	* microblaze-tdep.c (microblaze_store_return_value): Likewise.
+	* spu-tdep.c (spu_value_from_register): Likewise.
+	* vax-tdep.c (vax_return_value): Likewise.
+
+2012-09-26  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* breakpoint.c (invalidate_bp_value_on_memory_change): Expand
+	parameter LEN to ssize_t.
+
+2012-09-25  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* ada-valprint.c (ada_val_print_1): Eliminate single-use
+	variable LEN.
+	* alpha-tdep.c (alpha_extract_return_value): Use TYPE_LENGTH
+	directly.
+	(alpha_store_return_value): Likewise.
+	* amd64-tdep.c (amd64_classify_aggregate): Likewise.
+	(amd64_push_arguments): Likewise.
+	* ax-gdb.c (gen_trace_static_fields): Likewise.
+	(gen_traced_pop): Likewise.
+	* bfin-tdep.c (bfin_push_dummy_call): Likewise.
+	* breakpoint.c (update_watchpoint): Likewise.
+	* findcmd.c (parse_find_args): Use local variable for type
+	instead of length.
+	* findvar.c (default_read_var_value): Use TYPE_LENGTH directly.
+	* h8300-tdep.c (h8300h_extract_return_value): Likewise.
+	(h8300_store_return_value): Likewise.
+	* i386-darwin-tdep.c (i386_darwin_push_dummy_call): Likewise.
+	Use i386_darwin_arg_type_alignment directly.
+	* infcall.c (call_function_by_hand): Use TYPE_LENGTH directly.
+	* lm32-tdep.c (lm32_push_dummy_call): Likewise.
+	* m68hc11-tdep.c (m68hc11_push_dummy_call): Likewise.
+	(m68hc11_extract_return_value): Likewise.
+	* mep-tdep.c (mep_push_dummy_call): Likewise.
+	* printcmd.c (float_type_from_length): Likewise.
+	* s390-tdep.c (s390_value_from_register): Likewise.
+	* stack.c (read_frame_arg): Likewise.
+	* tracepoint.c (encode_actions_1): Likewise.
+	* valops.c (value_fetch_lazy): Use local variable for type
+	instead of length.  Use TYPE_LENGTH directly.
+	* value.c (value_contents_equal): Use TYPE_LENGTH directly.
+
+2012-09-25  Joel Brobecker  <brobecker@adacore.com>
+
+	* symtab.c (skip_prologue_sal): Fix typo in comment.
+
+2012-09-25  Joel Brobecker  <brobecker@adacore.com>
+
+	* linespec.c (create_sals_line_offset): Fix typo in comment.
+
+2012-09-25  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* c-typeprint.c (c_type_print_varspec_suffix): Remove cast and
+	use plongest to print the array size.
+
+2012-09-24  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* m2-typeprint.c (m2_enum): Expand LASTVAL to LONGEST.
+	* p-valprint.c (pascal_type_print_base): Likewise.
+
+2012-09-22  Yao Qi  <yao@codesourcery.com>
+
+	* remote.c (remote_get_trace_status): Remove setting default
+	values of fields of 'ts'.
+
+2012-09-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix internal error on canonicalization of clang types.
+	* cp-name-parser.y (operator): New comment at make_operator call for
+	new, delete, new[] and delete[].
+	(exp): Use "sizeof ".  Add new comment at make_operator call.
+
+2012-09-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix disassemble without parameters in tailcall frame.
+	* cli/cli-cmds.c (disassemble_current_function): Use
+	get_frame_address_in_block.
+
+2012-09-21  Tom Tromey  <tromey@redhat.com>
+
+	* c-typeprint.c (c_type_print_base) <TYPE_CODE_STRUCT,
+	TYPE_CODE_UNION>: Unify, removing a goto.
+
+2012-09-21  Tom Tromey  <tromey@redhat.com>
+
+	* c-typeprint.c (cp_type_print_derivation_info): Fix comment.
+
+2012-09-21  Andrew Burgess  <aburgess@broadcom.com>
+
+	* findvar.c (read_frame_register_value): Mark the result value as
+	optimized out if any of the input registers have been optimized out.
+
+2012-09-21  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* python/python.c (finalize_python): Only define if HAVE_PYTHON.
+
+2012-09-21  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* eval.c (evaluate_subexp_standard): Eliminate single-use
+	variable LOWER.
+
+2012-09-21  Yao Qi  <yao@codesourcery.com>
+
+	* mi/mi-interp.c: Declare mi_record_changed.
+	(mi_interpreter_init): Call observer_attach_record_changed.
+	(mi_record_changed): New.
+	* record.c (record_open): Call observer_notify_record_changed.
+	(cmd_record_stop): Call observer_notify_record_changed.
+	* NEWS: Mention it.
+
+2012-09-20  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Update.
+	* python/python.c (finalize_python): New function.
+	(_initialize_python): Make a final cleanup.
+
+2012-09-19  Doug Evans  <dje@google.com>
+
+	* buildsym.h (param_symbols): Delete, unused.
+	(context_stack): Delete member "params", unused.
+	* buildsym.c (push_context): Update.
+	* dwarf2read.c (read_func_scope): Update.
+
+2012-09-19  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* sh-tdep.c (sh_register_convert_to_virtual)
+	(sh_register_convert_to_raw): Add a gdbarch parameter.  Update
+	all callers.  Just do a memcpy if not the little-endian case.
+
+	* h8300-tdep.c (h8300_gdbarch_init): Invoke
+	set_gdbarch_double_format and set_gdbarch_long_double_format.
+	* m68hc11-tdep.c (m68hc11_gdbarch_init): Invoke
+	set_gdbarch_double_format.
+	* sh-tdep.c (sh_gdbarch_init): Likewise.
+
+	* NEWS: Document the removal of SH's 'regs' command.
+	* sh-tdep.c (_initialize_sh_tdep): Remove the deprecated 'regs'
+	command.
+
+2012-09-18  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* infcmd.c (_initialize_infcmd): Register `j' as an alias for
+	`jump'.
+
+2012-09-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* linespec.c (iterate_over_all_matching_symtabs): Use the correct
+	language when iterating over symbols.
+
+2012-09-18  Yao Qi  <yao@codesourcery.com>
+
+	* mi/mi-interp.c: Declare mi_tsv_created and mi_tsv_deleted.
+	(mi_interpreter_init): Call observer_attach_tsv_created and
+	observer_attach_tsv_deleted.
+	(mi_tsv_created, mi_tsv_deleted): New.
+	* tracepoint.c (delete_trace_state_variable): Call
+	observer_notify_tsv_deleted.
+	(trace_variable_command): Call observer_notify_tsv_created.
+	(delete_trace_variable_command): Call
+	observer_notify_tsv_deleted.
+	(create_tsv_from_upload): Call observer_notify_tsv_created.
+	* NEWS: Mention it.
+
+2012-09-18  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (tfind_1): Call observer_notify_traceframe_changed
+	if traceframe changed.
+	* mi/mi-cmds.c (mi_cmd mi_cmds): Adjust for command
+	"trace-find".
+	* mi/mi-interp.c: Declare 'mi_traceframe_changed'.
+	(mi_interpreter_init): Hook mi_traceframe_changed to observer
+	'traceframe_changed'.
+	(mi_traceframe_changed): New.
+	* mi/mi-main.h (struct mi_suppress_notification) <traceframe>:
+	New field.
+	* NEWS: Mention the new MI notification.
+
+2012-09-17  Mike Wrighton  <wrighton@codesourcery.com>
+
+	* MAINTAINERS (Write After Approval): Add "Mike Wrighton".
+
+2012-09-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* common/linux-ptrace.c: Change __i386__ to __i386__ || __x86_64__.
+	(linux_ptrace_test_ret_to_nx): Extend comment for x86_64.  Change
+	__i386__ to __i386__ || __x86_64__. Extend code also for __x86_64__.
+	Extend code also for PaX support.  Convert all gdb_assert to warning
+	calls.
+
+2012-09-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Implement auto-load user conveniences suggested by Doug Evans.
+	* auto-load.c: Include top.h.
+	(file_is_auto_load_safe): New variable advice_printed.  Print advice.
+	(_initialize_auto_load): New variable scripts_directory_help.  Mention
+	GDBPY_AUTO_FILE_NAME and GDB_AUTO_FILE_NAME for set auto-load
+	scripts-directory.  Document in online help one can use also files for
+	set auto-load safe-path.
+	* python/py-auto-load.c: (GDBPY_AUTO_FILE_NAME): Move it from here ...
+	* python/python.h (GDBPY_AUTO_FILE_NAME): ... to here.
+
+2012-09-17  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* tic6x-tdep.c (tic6x_push_dummy_call): Remove unused definition
+	of LEN.
+
+2012-09-17  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* m2-valprint.c (m2_print_array_contents): Eliminate variable
+	ELTLEN and use TYPE_LENGTH directly.
+	(m2_val_print): Likewise.
+	* m68k-tdep.c (m68k_svr4_extract_return_value): Eliminate
+	variable LEN and use TYPE_LENGTH directly.
+	(m68k_svr4_store_return_value): Likewise.
+	* mips-tdep.c (mips_o32_push_dummy_call): Eliminate variable
+	ARGLEN and use TYPE_LENGTH directly.
+	(mips_o64_push_dummy_call): Likewise.
+	* s390-tdep (s390_function_arg_pass_by_reference): Eliminate
+	variable LENGTH and use TYPE_LENGTH directly.
+	(s390_function_arg_float): Likewise.
+	(s390_function_arg_integer): Likewise.
+	(s390_push_dummy_call): Likewise.
+	(s390_return_value_convention): Likewise.
+	* spu-tdep.c (spu_push_dummy_call): Eliminate LEN and use
+	TYPE_LENGTH directly.
+
+2012-09-17  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-decode.c (add_setshow_zuinteger_unlimited_cmd): New.
+	Update comment to add_setshow_integer_cmd.
+	* cli/cli-setshow.c (do_set_command): Handle case
+	'var_zuinteger_unlimited'.
+	(do_show_command): Likewise.
+	* cli/cli-cmds.c (init_cmds): Call add_setshow_zuinteger_unlimited_cmd
+	for command 'remotetimeout'.
+	* command.h (enum var_types): New zuinteger_unlimited.  Update comment
+	to var_integer.
+	* source.c (_initialize_source): Call add_setshow_zuinteger_unlimited_cmd
+	for command 'set listsize'.
+
+2012-09-17  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* infrun.c (restore_infcall_suspend_state): Eliminate single-use
+	variable LEN.
+
+2012-09-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR 14119
+	* frame.c (skip_inlined_frames): Skip also TAILCALL_FRAME frames.
+	(frame_pop): Drop also TAILCALL_FRAME frames.
+	* infcmd.c (finish_command): Ignore also TAILCALL_FRAME frames.
+
+2012-09-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	PR 14548
+	* infrun.c (handle_inferior_event): Do not reverse-continue back to the
+	function start if we are already at function start.  Both for
+	reverse-next and for reverse-step into function without line number
+	info.
+
+2012-09-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup - rename 'inline' depth to 'artificial' depth.
+	* breakpoint.c (set_momentary_breakpoint): Rename at a caller to
+	frame_id_artificial_p, extend the comment.
+	* dwarf2-frame-tailcall.c (tailcall_frame_this_id): Rename at a user.
+	* frame.c (fprint_frame_id): Rename at a user, change debug output
+	text to "artificial=".
+	(skip_inlined_frames): Rename to ...
+	(skip_artificial_frames): ... here.  Extend the comment.
+	(get_stack_frame_id, frame_unwind_caller_id): Rename at a caller.
+	(frame_id_inlined_p): Rename to ...
+	(frame_id_artificial_p): ... here.  Rename at a user.
+	(frame_id_eq, frame_id_inner, frame_unwind_caller_pc)
+	(frame_unwind_caller_pc_if_available, frame_unwind_caller_arch): Rename
+	at a user.
+	* frame.h (struct frame_id): Rename inline_depth to artificial_depth.
+	Extend the comment.
+	(frame_id_inlined_p): Rename to ...
+	(frame_id_artificial_p): ... here.
+	* inline-frame.c (inline_frame_this_id): Rename at a user.
+
+2012-09-14  Andrew Burgess  <aburgess@broadcom.com>
+
+	* c-typeprint.c (c_type_print_varspec_suffix): Display the size of
+	vector variables using vector_size syntax rather than array
+	syntax.
+
+2012-09-14  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* valarith.c (value_concat): Replace unsafe ALLOCA with
+	XMALLOC/XFREE.
+
+2012-09-14  Pedro Alves  <palves@redhat.com>
+
+	* gdb.1 (SEE ALSO): Expand pointer to GDB's Texinfo manual.
+
+2012-09-14  Khoo Yit Phang  <khooyp@cs.umd.edu>
+
+	Point contrib/cc-with-tweaks.sh to the build-local data-directory.
+	* contrib/cc-with-tweaks.sh (GDB): Add -data-directory
+	data-directory as appropriate.
+
+2012-09-14  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* printcmd.c (ui_printf): Eliminate single-use variable
+	PARAM_LEN.
+
+2012-09-14  Yao Qi  <yao@codesourcery.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* valops.c (value_assign): Move observer_notify_target_changed
+	below to replace reinit_frame_cache.
+
+2012-09-13  Khoo Yit Phang  <khooyp@cs.umd.edu>
+
+	Refactor Python "gdb" module into a proper Python package, by
+	introducing a new "_gdb" module for code implemented in C, and
+	using reload/__import__ instead of exec.
+	* python/lib/gdb/__init__.py: Import * from _gdb.
+	(GdbOutputFile, sys.stdout, GdbOutputErrorFile, sys.stderr,
+	prompt_hook, sys.argv): Moved from finish_python_initialization.
+	(pretty_printers, PYTHONDIR): Moved from _initialize_python.
+	(packages, auto_load_packages): New list and function replacing
+	module_dict and auto-loading code, using __file__ instead of
+	gdb.PYTHONDIR and reload/__import__ instead of exec.
+	(GdbSetPythonDirectory): Replacing function of the same name
+	from finish_python_initialization, using reload/__import__ instead
+	of exec, as well as call auto_load_packages.
+	* python/py-prettyprint.c (find_pretty_printer_from_gdb): Check
+	gdb_python_module and not gdb_module.
+	* python/python-internal.h (gdb_python_module): Declare.
+	* python/python.c (gdb_python_module): New global.
+	(before_prompt_hook): Check gdb_python_module and not gdb_module.
+	(_initialize_python): Rename gdb module to _gdb.
+	Move gdb.PYTHONDIR and gdb.pretty_printer to lib/gdb/__init__.py.
+	(finish_python_initialization): Move Python code to
+	lib/gdb/__init__.py; instead, set up sys.path and import gdb into
+	__main__.
+
+2012-09-13  Pedro Alves  <palves@redhat.com>
+
+	* Makefile.in (COMMON_OBS): Add registry.o.
+	* registry.c: New file.
+	* registry.h (struct registry_container): Declare.
+	(registry_data_callback): New typedef.
+	(struct registry_data, struct registry_data_registration, struct
+	registry_data_registry): New type.
+	(register_data_with_cleanup, registry_alloc_data)
+	(registry_callback_adaptor, registry_clear_data)
+	(registry_container_free_data, registry_set_data, registry_data):
+	Declare.
+	(DEFINE_REGISTRY): Refactor structures and functions as shims over
+	the new common structures and functions.
+	(DECLARE_REGISTRY): Declare struct TAG ## _data.  Use the tagged
+	callback typedefs.
+
+2012-09-12  Mike Wrighton  <wrighton@codesourcery.com>
+
+	* remote.c (remote_insert_hw_breakpoint): Throw exception if
+	there is an error inserting hardware breakpoints and use the
+	error message from the target.
+
+	* breakpoint.c (insert_bp_location, insert_breakpoint_locations):
+	Catch this exception and print the error message contained within. Do not
+	print the default hardware error breakpoint message in this case.
+
+2012-09-12  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf2_read_addr_index): Fix handling the case where
+	cu == NULL.
+
+2012-09-11  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dw2_do_expand_symtabs_matching): Don't examine
+	.gdb_index symbol attributes if there are none.
+
+2012-09-11  Joel Brobecker  <brobecker@adacore.com>
+
+	* symtab.h (struct minimal_symbol) [has_size]: New field.
+	(MSYMBOL_SIZE): Adjust to forbid macro from being used as lvalue.
+	(SET_MSYMBOL_SIZE, MSYMBOL_HAS_SIZE): New macros.
+	* printcmd.c (build_address_symbolic): Only filter out zero-sized
+	minimal symbols if the symbol's size is actually known.
+	* minsyms.c (prim_record_minimal_symbol_full): Adjust setting
+	of msymbol's size field.  Add comment.
+	* elfread.c (elf_symtab_read, elf_rel_plt_read): Use
+	SET_MSYMBOL_SIZE to set the minimal symbol size.
+
+2012-09-11  Joel Brobecker  <brobecker@adacore.com>
+
+	* minsyms.c (install_minimal_symbols): Use memset to fill entire
+	minimal_symbol struct object, rather than setting some of its
+	fields one by one.
+
+2012-09-11  Andrew Burgess  <aburgess@broadcom.com>
+
+	* c-typeprint.c (c_type_print_varspec_prefix): Pass through the
+	passed_a_ptr flag when displaying typedef types.
+
+2012-09-10  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (coerce_unspec_val_to_type): Make sure that
+	the optimized_out flag is preserved.
+
+2012-09-10  Anthony Green  <green@moxielogic.com>
+
+	* moxie-tdep.c (moxie_analyze_prologue): Update for function
+	prologue changes in GCC.
+
+2012-09-10  Keith Seitz  <keiths@redhat.com>
+
+	PR gdb/13483
+	* gdbtypes.h (BOOL_PTR_CONVERSION_BADNESS): Rename to ...
+	(BOOL_CONVERSION_BADNESS): ... this.
+	* gdbtypes.c (BOOL_PTR_CONVERSION_BADNESS): Likewise.
+	(rank_one_type): Allow all boolean conversions
+	permitted by the standard.
+
 2012-09-06  Tom Tromey  <tromey@redhat.com>
 
 	* python/py-newobjfileevent.c (create_new_objfile_event_object):

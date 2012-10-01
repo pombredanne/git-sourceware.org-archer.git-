@@ -1648,7 +1648,7 @@ mi_cmd_data_write_memory (char *command, char **argv, int argc)
   old_chain = make_cleanup (xfree, buffer);
   store_signed_integer (buffer, word_size, byte_order, value);
   /* Write it down to memory.  */
-  write_memory (addr, buffer, word_size);
+  write_memory_with_notification (addr, buffer, word_size);
   /* Free the buffer.  */
   do_cleanups (old_chain);
 }
@@ -1672,6 +1672,10 @@ mi_cmd_data_write_memory_bytes (char *command, char **argv, int argc)
 
   addr = parse_and_eval_address (argv[0]);
   cdata = argv[1];
+  if (strlen (cdata) % 2)
+    error (_("Hex-encoded '%s' must have an even number of characters."),
+	   cdata);
+
   len = strlen (cdata)/2;
 
   data = xmalloc (len);
@@ -1684,9 +1688,7 @@ mi_cmd_data_write_memory_bytes (char *command, char **argv, int argc)
       data[i] = (gdb_byte) x;
     }
 
-  r = target_write_memory (addr, data, len);
-  if (r != 0)
-    error (_("Could not write memory"));
+  write_memory_with_notification (addr, data, len);
 
   do_cleanups (back_to);
 }

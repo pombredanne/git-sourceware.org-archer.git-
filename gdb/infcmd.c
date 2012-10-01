@@ -1777,6 +1777,11 @@ finish_command (char *arg, int from_tty)
       return;
     }
 
+  /* Ignore TAILCALL_FRAME type frames, they were executed already before
+     entering THISFRAME.  */
+  while (get_frame_type (frame) == TAILCALL_FRAME)
+    frame = get_prev_frame (frame);
+
   /* Find the function we will return from.  */
 
   function = find_pc_function (get_frame_pc (get_selected_frame (NULL)));
@@ -3099,6 +3104,7 @@ Usage: jump <location>\n\
 Give as argument either LINENUM or *ADDR, where ADDR is an expression\n\
 for an address to start at."));
   set_cmd_completer (c, location_completer);
+  add_com_alias ("j", "jump", class_run, 1);
 
   if (xdb_commands)
     {

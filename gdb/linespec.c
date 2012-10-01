@@ -1010,7 +1010,8 @@ iterate_over_all_matching_symtabs (struct linespec_state *state,
 	  struct block *block;
 
 	  block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), STATIC_BLOCK);
-	  LA_ITERATE_OVER_SYMBOLS (block, name, domain, callback, data);
+	  state->language->la_iterate_over_symbols (block, name, domain,
+						    callback, data);
 
 	  if (include_inline)
 	    {
@@ -1021,8 +1022,8 @@ iterate_over_all_matching_symtabs (struct linespec_state *state,
 		   i < BLOCKVECTOR_NBLOCKS (BLOCKVECTOR (symtab)); i++)
 		{
 		  block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), i);
-		  LA_ITERATE_OVER_SYMBOLS (block, name, domain,
-					   iterate_inline_only, &cad);
+		  state->language->la_iterate_over_symbols
+		    (block, name, domain, iterate_inline_only, &cad);
 		}
 	    }
 	}
@@ -1710,7 +1711,7 @@ create_sals_line_offset (struct linespec_state *self,
 
   /* This is where we need to make sure we have good defaults.
      We must guarantee that this section of code is never executed
-     when we are called with just a function anme, since
+     when we are called with just a function name, since
      set_default_source_symtab_and_line uses
      select_source_symtab that calls us with such an argument.  */
 

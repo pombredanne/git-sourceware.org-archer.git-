@@ -1844,11 +1844,10 @@ update_watchpoint (struct watchpoint *b, int reparse)
 		      && TYPE_CODE (vtype) != TYPE_CODE_ARRAY))
 		{
 		  CORE_ADDR addr;
-		  int len, type;
+		  int type;
 		  struct bp_location *loc, **tmp;
 
 		  addr = value_address (v);
-		  len = TYPE_LENGTH (value_type (v));
 		  type = hw_write;
 		  if (b->base.type == bp_read_watchpoint)
 		    type = hw_read;
@@ -1863,7 +1862,7 @@ update_watchpoint (struct watchpoint *b, int reparse)
 
 		  loc->pspace = frame_pspace;
 		  loc->address = addr;
-		  loc->length = len;
+		  loc->length = TYPE_LENGTH (value_type (v));
 		  loc->watchpoint_type = type;
 		}
 	    }
@@ -2375,9 +2374,12 @@ static int
 insert_bp_location (struct bp_location *bl,
 		    struct ui_file *tmp_error_stream,
 		    int *disabled_breaks,
-		    int *hw_breakpoint_error)
+		    int *hw_breakpoint_error,
+		    int *hw_bp_error_explained_already)
 {
   int val = 0;
+  char *hw_bp_err_string = NULL;
+  struct gdb_exception e;
 
   if (!should_be_inserted (bl) || (bl->inserted && !bl->needs_update))
     return 0;
@@ -2474,8 +2476,15 @@ insert_bp_location (struct bp_location *bl,
 	  || !(section_is_overlay (bl->section)))
 	{
 	  /* No overlay handling: just set the breakpoint.  */
-
-	  val = bl->owner->ops->insert_location (bl);
+	  TRY_CATCH (e, RETURN_MASK_ALL)
+	    {
+	      val = bl->owner->ops->insert_location (bl);
+	    }
+	  if (e.reason < 0)
+	    {
+	      val = 1;
+	      hw_bp_err_string = (char *) e.message;
+	    }
 	}
       else
 	{
@@ -2509,7 +2518,15 @@ insert_bp_location (struct bp_location *bl,
 	  if (section_is_mapped (bl->section))
 	    {
 	      /* Yes.  This overlay section is mapped into memory.  */
-	      val = bl->owner->ops->insert_location (bl);
+	      TRY_CATCH (e, RETURN_MASK_ALL)
+	        {
+	          val = bl->owner->ops->insert_location (bl);
+	        }
+	      if (e.reason < 0)
+	        {
+	          val = 1;
+	          hw_bp_err_string = (char *) e.message;
+	        }
 	    }
 	  else
 	    {
@@ -2545,11 +2562,13 @@ insert_bp_location (struct bp_location *bl,
 	    {
 	      if (bl->loc_type == bp_loc_hardware_breakpoint)
 		{
-		  *hw_breakpoint_error = 1;
-		  fprintf_unfiltered (tmp_error_stream,
-				      "Cannot insert hardware "
-				      "breakpoint %d.\n",
-				      bl->owner->number);
+                  *hw_breakpoint_error = 1;
+                  *hw_bp_error_explained_already = hw_bp_err_string != NULL;
+                  fprintf_unfiltered (tmp_error_stream,
+                                      "Cannot insert hardware breakpoint %d%s",
+                                      bl->owner->number, hw_bp_err_string ? ":" : ".\n");
+                  if (hw_bp_err_string)
+                    fprintf_unfiltered (tmp_error_stream, "%s.\n", hw_bp_err_string);
 		}
 	      else
 		{
@@ -2741,6 +2760,7 @@ update_inserted_breakpoint_locations (void)
   int val = 0;
   int disabled_breaks = 0;
   int hw_breakpoint_error = 0;
+  int hw_bp_details_reported = 0;
 
   struct ui_file *tmp_error_stream = mem_fileopen ();
   struct cleanup *cleanups = make_cleanup_ui_file_delete (tmp_error_stream);
@@ -2775,7 +2795,7 @@ update_inserted_breakpoint_locations (void)
 	continue;
 
       val = insert_bp_location (bl, tmp_error_stream, &disabled_breaks,
-				    &hw_breakpoint_error);
+				    &hw_breakpoint_error, &hw_bp_details_reported);
       if (val)
 	error_flag = val;
     }
@@ -2800,6 +2820,7 @@ insert_breakpoint_locations (void)
   int val = 0;
   int disabled_breaks = 0;
   int hw_breakpoint_error = 0;
+  int hw_bp_error_explained_already = 0;
 
   struct ui_file *tmp_error_stream = mem_fileopen ();
   struct cleanup *cleanups = make_cleanup_ui_file_delete (tmp_error_stream);
@@ -2833,7 +2854,7 @@ insert_breakpoint_locations (void)
 	continue;
 
       val = insert_bp_location (bl, tmp_error_stream, &disabled_breaks,
-				    &hw_breakpoint_error);
+				    &hw_breakpoint_error, &hw_bp_error_explained_already);
       if (val)
 	error_flag = val;
     }
@@ -2878,7 +2899,7 @@ insert_breakpoint_locations (void)
     {
       /* If a hardware breakpoint or watchpoint was inserted, add a
          message about possibly exhausted resources.  */
-      if (hw_breakpoint_error)
+      if (hw_breakpoint_error && !hw_bp_error_explained_already)
 	{
 	  fprintf_unfiltered (tmp_error_stream, 
 			      "Could not insert hardware breakpoints:\n\
@@ -2943,7 +2964,7 @@ reattach_breakpoints (int pid)
   struct bp_location *bl, **blp_tmp;
   int val;
   struct ui_file *tmp_error_stream;
-  int dummy1 = 0, dummy2 = 0;
+  int dummy1 = 0, dummy2 = 0, dummy3 = 0;
   struct inferior *inf;
   struct thread_info *tp;
 
@@ -2967,7 +2988,7 @@ reattach_breakpoints (int pid)
     if (bl->inserted)
       {
 	bl->inserted = 0;
-	val = insert_bp_location (bl, tmp_error_stream, &dummy1, &dummy2);
+	val = insert_bp_location (bl, tmp_error_stream, &dummy1, &dummy2, &dummy3);
 	if (val != 0)
 	  {
 	    do_cleanups (old_chain);
@@ -8587,9 +8608,9 @@ set_momentary_breakpoint (struct gdbarch *gdbarch, struct symtab_and_line sal,
 {
   struct breakpoint *b;
 
-  /* If FRAME_ID is valid, it should be a real frame, not an inlined
-     one.  */
-  gdb_assert (!frame_id_inlined_p (frame_id));
+  /* If FRAME_ID is valid, it should be a real frame, not an inlined or
+     tail-called one.  */
+  gdb_assert (!frame_id_artificial_p (frame_id));
 
   b = set_raw_breakpoint (gdbarch, sal, type, &momentary_breakpoint_ops);
   b->enable_state = bp_enabled;
@@ -12441,7 +12462,7 @@ update_global_location_list (int should_insert)
       struct bp_location **loc_first_p;
       b = loc->owner;
 
-      if (!should_be_inserted (loc)
+      if (!unduplicated_should_be_inserted (loc)
 	  || !breakpoint_address_is_meaningful (b)
 	  /* Don't detect duplicate for tracepoint locations because they are
 	   never duplicated.  See the comments in field `duplicate' of
@@ -14697,7 +14718,7 @@ show_breakpoint_cmd (char *args, int from_tty)
    GDB itself.  */
 
 static void
-invalidate_bp_value_on_memory_change (CORE_ADDR addr, int len,
+invalidate_bp_value_on_memory_change (CORE_ADDR addr, ssize_t len,
 				      const bfd_byte *data)
 {
   struct breakpoint *bp;

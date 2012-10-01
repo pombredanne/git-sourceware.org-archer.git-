@@ -1,3 +1,70 @@
+2012-09-28  Ian Lance Taylor  <iant@google.com>
+
+	* Makefile.def: Make all-target-libgo depend on
+	all-target-libbacktrace.
+	* Makefile.in: Rebuild.
+
+2012-09-26  Ian Lance Taylor  <iant@google.com>
+
+	* Makefile.def: Make all-gcc depend on all-libbacktrace.
+	* Makefile.in: Rebuild.
+
+2012-09-06  Diego Novillo  <dnovillo@google.com>
+
+	* configure.ac: Bump minimum GMP version to 4.2.3.
+	* configure: Re-generate.
+
+2012-09-05  Georg-Johann Lay  <avr@gjlay.de>
+
+	PR target/54461
+	* configure.ac (noconfigdirs,target=avr-*-*): Add target-newlib,
+	target-libgloss if not configured --with-avrlibc=no.
+	* configure: Regenerate.
+
+2012-09-04  Jason Merrill  <jason@redhat.com>
+
+	* configure.ac: Fix --enable-languages=all.
+
+2012-09-03  Richard Guenther  <rguenther@suse.de>
+
+	PR bootstrap/54138
+	* configure.ac: Re-organize ISL / CLOOG checks to allow
+	disabling with either --without-isl or --without-cloog.
+	* configure: Regenerated.
+
+2012-09-03  Georg-Johann Lay  <avr@gjlay.de>
+
+	* configure.ac (noconfigdirs,target=avr): Add target-libquadmath.
+	* configure: Regenerate.
+
+2012-09-21  Steve Ellcey  <sellcey@mips.com>
+
+	* configure.ac: Add mips*-mti-elf* target.
+	* configure: Regenerate.
+
+2012-09-19  Ian Lance Taylor  <iant@google.com>
+
+	* configure.ac (host_libs): Add libbacktrace.
+	(target_libraries): Add libbacktrace.
+	* Makefile.def (host_modules): Add libbacktrace.
+	(target_modules): Likewise.
+	* configure, Makefile.in: Rebuild.
+
+2012-09-15  Jiong Wang  <jiwang@tilera.com>
+
+	* configure.ac (ENABLE_GOLD): support tilegx*
+	* configure: rebuild
+
+2012-09-14  David Edelsohn  <dje.gcc@gmail.com>
+
+	PR target/38607
+	Merge upstream change.
+	* libtool.m4 (_LT_COMPILER_PIC): Add -fPIC to GCC and GXX for AIX.
+
+	* configure.ac: Add target-libquadmath to noconfigdirs for AIX.
+	Add libgomp*.o to compare_exclusions for AIX.
+	* configure: Regenerate.
+
 2012-08-26  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR binutils/4970

@@ -60,6 +60,7 @@ static void mi_on_normal_stop (struct bpstats *bs, int print_frame);
 
 static void mi_new_thread (struct thread_info *t);
 static void mi_thread_exit (struct thread_info *t, int silent);
+static void mi_record_changed (struct inferior*, int);
 static void mi_inferior_added (struct inferior *inf);
 static void mi_inferior_appeared (struct inferior *inf);
 static void mi_inferior_exit (struct inferior *inf);
@@ -68,6 +69,9 @@ static void mi_on_resume (ptid_t ptid);
 static void mi_solib_loaded (struct so_list *solib);
 static void mi_solib_unloaded (struct so_list *solib);
 static void mi_about_to_proceed (void);
+static void mi_traceframe_changed (int tfnum, int tpnum);
+static void mi_tsv_created (const char *name, LONGEST value);
+static void mi_tsv_deleted (const char *name);
 static void mi_breakpoint_created (struct breakpoint *b);
 static void mi_breakpoint_deleted (struct breakpoint *b);
 static void mi_breakpoint_modified (struct breakpoint *b);
@@ -121,11 +125,15 @@ mi_interpreter_init (struct interp *interp, int top_level)
       observer_attach_inferior_appeared (mi_inferior_appeared);
       observer_attach_inferior_exit (mi_inferior_exit);
       observer_attach_inferior_removed (mi_inferior_removed);
+      observer_attach_record_changed (mi_record_changed);
       observer_attach_normal_stop (mi_on_normal_stop);
       observer_attach_target_resumed (mi_on_resume);
       observer_attach_solib_loaded (mi_solib_loaded);
       observer_attach_solib_unloaded (mi_solib_unloaded);
       observer_attach_about_to_proceed (mi_about_to_proceed);
+      observer_attach_traceframe_changed (mi_traceframe_changed);
+      observer_attach_tsv_created (mi_tsv_created);
+      observer_attach_tsv_deleted (mi_tsv_deleted);
       observer_attach_breakpoint_created (mi_breakpoint_created);
       observer_attach_breakpoint_deleted (mi_breakpoint_deleted);
       observer_attach_breakpoint_modified (mi_breakpoint_modified);
@@ -375,6 +383,19 @@ mi_thread_exit (struct thread_info *t, int silent)
   gdb_flush (mi->event_channel);
 }
 
+/* Emit notification on changing the state of record.  */
+
+static void
+mi_record_changed (struct inferior *inferior, int started)
+{
+  struct mi_interp *mi = top_level_interpreter_data ();
+
+  fprintf_unfiltered (mi->event_channel,  "record-%s,thread-group=\"i%d\"",
+		      started ? "started" : "stopped", inferior->num);
+
+  gdb_flush (mi->event_channel);
+}
+
 static void
 mi_inferior_added (struct inferior *inf)
 {
@@ -510,7 +531,64 @@ struct mi_suppress_notification mi_suppress_notification =
   {
     0,
     0,
+    0,
   };
+
+/* Emit notification on changing a traceframe.  */
+
+static void
+mi_traceframe_changed (int tfnum, int tpnum)
+{
+  struct mi_interp *mi = top_level_interpreter_data ();
+
+  if (mi_suppress_notification.traceframe)
+    return;
+
+  target_terminal_ours ();
+
+  if (tfnum >= 0)
+    fprintf_unfiltered (mi->event_channel, "traceframe-changed,"
+			"num=\"%d\",tracepoint=\"%d\"\n",
+			tfnum, tpnum);
+  else
+    fprintf_unfiltered (mi->event_channel, "traceframe-changed,end");
+
+  gdb_flush (mi->event_channel);
+}
+
+/* Emit notification on creating a trace state variable.  */
+
+static void
+mi_tsv_created (const char *name, LONGEST value)
+{
+  struct mi_interp *mi = top_level_interpreter_data ();
+
+  target_terminal_ours ();
+
+  fprintf_unfiltered (mi->event_channel, "tsv-created,"
+		      "name=\"%s\",value=\"%s\"\n",
+		      name, plongest (value));
+
+  gdb_flush (mi->event_channel);
+}
+
+/* Emit notification on deleting a trace state variable.  */
+
+static void
+mi_tsv_deleted (const char *name)
+{
+  struct mi_interp *mi = top_level_interpreter_data ();
+
+  target_terminal_ours ();
+
+  if (name != NULL)
+    fprintf_unfiltered (mi->event_channel, "tsv-deleted,"
+			"name=\"%s\"\n", name);
+  else
+    fprintf_unfiltered (mi->event_channel, "tsv-deleted\n");
+
+  gdb_flush (mi->event_channel);
+}
 
 /* Emit notification about a created breakpoint.  */
 

@@ -7026,6 +7026,7 @@ putpkt_binary (char *buf, int cnt)
   int ch;
   int tcount = 0;
   char *p;
+  char *message;
 
   /* Catch cases like trying to read memory or listing threads while
      we're waiting for a stop reply.  The remote server wouldn't be
@@ -8181,6 +8182,7 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
   CORE_ADDR addr;
   struct remote_state *rs;
   char *p, *endbuf;
+  char *message;
 
   /* The length field should be set to the size of a breakpoint
      instruction, even though we aren't inserting one ourselves.  */
@@ -8215,6 +8217,13 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
   switch (packet_ok (rs->buf, &remote_protocol_packets[PACKET_Z1]))
     {
     case PACKET_ERROR:
+      if (rs->buf[1] == '.')
+        {
+          message = strchr (rs->buf + 2, '.');
+          if (message)
+            error ("Remote failure reply: %s", message + 1);
+        }
+      return -1;
     case PACKET_UNKNOWN:
       return -1;
     case PACKET_OK:
@@ -10579,15 +10588,11 @@ remote_get_trace_status (struct trace_status *ts)
   /* We're working with a live target.  */
   ts->from_file = 0;
 
-  /* Set some defaults.  */
-  ts->running_known = 0;
-  ts->stop_reason = trace_stop_reason_unknown;
-  ts->traceframe_count = -1;
-  ts->buffer_free = 0;
-
   if (*p++ != 'T')
     error (_("Bogus trace status reply from target: %s"), target_buf);
 
+  /* Function 'parse_trace_status' sets default value of each field of
+     'ts' at first, so we don't have to do it here.  */
   parse_trace_status (p, ts);
 
   return ts->running;
