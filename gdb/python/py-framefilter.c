@@ -1315,7 +1315,7 @@ int apply_frame_filter (struct frame_info *frame, int flags,
   else
     {
       Py_DECREF (iterable);
-      error (_("Frame filter must support iteration protocol"));
+      error (_("Frame filter must support iteration protocol."));
     }
 
  done:
@@ -1327,10 +1327,10 @@ int apply_frame_filter (struct frame_info *frame, int flags,
 
 #else /* HAVE_PYTHON */
 int
-int apply_frame_filter (struct frame_info *frame, int flags,
-			enum print_values mi_print_args_type,
-			const char *cli_print_args_type,
-			struct ui_out *out, int count)
+apply_frame_filter (struct frame_info *frame, int flags,
+		    enum print_values mi_print_args_type,
+		    const char *cli_print_args_type,
+		    struct ui_out *out, int count)
 {
   return PY_BT_NO_FILTERS;
 }

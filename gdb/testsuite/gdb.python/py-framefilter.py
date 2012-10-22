@@ -107,7 +107,7 @@ class FrameElider ():
 
     def __init__ (self):
         self.name = "Elider"
-        self.priority = 1000
+        self.priority = 900
         self.enabled = True
         gdb.frame_filters [self.name] = self
 
