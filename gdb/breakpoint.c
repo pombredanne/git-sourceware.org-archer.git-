@@ -5689,7 +5689,7 @@ print_breakpoint_location (struct breakpoint *b,
       if (ui_out_is_mi_like_p (uiout))
 	{
 	  struct symtab_and_line sal = find_pc_line (loc->address, 0);
-	  char *fullname = symtab_to_fullname (sal.symtab);
+	  const char *fullname = symtab_to_fullname (sal.symtab);
 	  
 	  if (fullname)
 	    ui_out_field_string (uiout, "fullname", fullname);
@@ -11766,7 +11766,7 @@ compare_breakpoints (const void *a, const void *b)
      the number 0.  */
   if (ua < ub)
     return -1;
-  return ub > ub ? 1 : 0;
+  return ua > ub ? 1 : 0;
 }
 
 /* Delete breakpoints by address or line.  */
@@ -13822,7 +13822,7 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 
 	  if (ui_out_is_mi_like_p (uiout))
 	    {
-	      char *fullname = symtab_to_fullname (sal2.symtab);
+	      const char *fullname = symtab_to_fullname (sal2.symtab);
 
 	      if (fullname)
 		ui_out_field_string (uiout, "fullname", fullname);
@@ -14718,7 +14718,8 @@ show_breakpoint_cmd (char *args, int from_tty)
    GDB itself.  */
 
 static void
-invalidate_bp_value_on_memory_change (CORE_ADDR addr, ssize_t len,
+invalidate_bp_value_on_memory_change (struct inferior *inferior,
+				      CORE_ADDR addr, ssize_t len,
 				      const bfd_byte *data)
 {
   struct breakpoint *bp;

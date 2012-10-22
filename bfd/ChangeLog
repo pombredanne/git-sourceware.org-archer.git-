@@ -1,3 +1,111 @@
+2012-10-22  Alan Modra  <amodra@gmail.com>
+
+	* cache.c (cache_bmmap): Don't use void* arithmetic.
+
+2012-10-21  Alan Modra  <amodra@gmail.com>
+
+	* compress.c (bfd_cache_section_contents): New function.
+	* bfd-in2.h: Regenerate.
+
+2012-10-21  Hans-Peter Nilsson  <hp@bitrange.com>
+
+	* linker.c (_bfd_generic_link_output_symbols): Handle a
+	no-longer-global symbol entered through a plugin.
+
+2012-10-20  Alan Modra  <amodra@gmail.com>
+
+	* compress.c: Reinstate 2012-10-19 change.
+	(bfd_get_full_section_contents): Don't free unless we alloc.
+	Use proper decompress size.  Delete some vars, rename others.
+
+2012-10-19  Tom Tromey  <tromey@redhat.com>
+
+	* compress.c: Revert previous patch.
+
+2012-10-19  Tom Tromey  <tromey@redhat.com>
+
+	* compress.c (bfd_get_full_section_contents): Don't cache
+	decompressed contents.
+
+2012-10-18  Kai Tietz  <ktietz@redhat.com>
+
+	PR binutils/14067
+	* coff-i386.c (bfd_target): Add section flag SEC_EXCLUDE.
+	Allow BFD_COMPRESS and BFD_DECOMPRESS flags.
+	* coff-x86_64.c: Likewise.
+	* coffcode.h (DOT_ZDEBUG): New define.
+	(sec_to_styp_flags): Check for .zdebug.
+	(styp_to_sec_flags): Likewise.
+	* coffgen.c (make_a_section): Handle .debug_* section
+	compression/decompression flags.
+	* cofflink.c (mark_relocs): Ignore relocations
+	for a section, which isn't marked as used.
+	(_bfd_coff_link_input_bfd): Add support of compressed
+	debug sections.
+	* compress.c (decompress_contents): Loop as long
+	as there is input available and there is room for
+	output.
+	* bfd/pe-arm.c: Add .zdebug_ partial match entry.
+	* pe-i386.c: Likewise.
+	* pe-x86_64.c: Likewise.
+	* peXXigen.c (_bfd_XXi_swap_aouthdr_out): Don't clear all
+	data-directories as this might destroy content.
+
+	* coff-i386.c (_bfd_generic_find_nearest_line_discriminator):
+	define as coff_find_nearest_line_discriminator.
+	* libcoff-in.h (coff_find_nearest_line_discriminator): New
+	* libcoff.h: Regenerated.
+	* coff-x86_64.c: Likewise.
+	* coffgen.c (coff_find_nearest_line_discriminator): New function.
+	prototype.
+
+2012-10-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* coff64-rs6000.c (rs6000coff64_vec): Set _close_and_cleanup
+	field to _bfd_archive_close_and_cleanup.
+	(aix5coff64_vec): Likewise.
+
+2012-10-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* coff-rs6000.c (rs6000coff_vec): Set _close_and_cleanup
+	field to _bfd_archive_close_and_cleanup.
+	(pmac_xcoff_vec): Likewise.
+
+2012-10-16  Sofiane Naci  <sofiane.naci@arm.com>
+
+	* elf64-aarch64.c (elf64_aarch64_tls_howto_table): Fix shift value for
+	R_AARCH64_TLSIE_LD_GOTTPREL_PREL19, R_AARCH64_TLSLE_MOVW_TPREL_G2,
+	R_AARCH64_TLSLE_MOVW_TPREL_G1, R_AARCH64_TLSLE_MOVW_TPREL_G1_NC,
+	R_AARCH64_TLSLE_ADD_TPREL_HI12.
+	(elf64_aarch64_tlsdesc_howto_table): Fix shift value for
+	R_AARCH64_TLSDESC_LD64_PREL19 and R_AARCH64_TLSDESC_OFF_G1.
+	(elf64_aarch64_final_link_relocate): Add signed_addend when resolving
+	AARCH64_TLSLE_*_TPREL_* relocations.
+
+2012-10-16  Alan Modra  <amodra@gmail.com>
+
+	* elf32-xtensa.c (free_section_cache): Renamed from
+	clear_section_cache.  Don't zero cache.
+	(section_cache_section): Remove ineffectual zero of cache.
+	Call init_section_cache instead.
+
+2012-10-15  Doug Evans  <dje@google.com>
+
+	* elf.c (special_sections_d): Add comment.
+
+2012-10-13  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* Makefile.am (LIBDL): Replace -ldl with @lt_cv_dlopen_libs@.
+	* configure.in (lt_cv_dlopen_libs): AC_SUBST.
+	* Makefile.in: Regenerated.
+	* configure: Likewise.
+
+2012-10-08  Alan Modra  <amodra@gmail.com>
+
+	PR binutils/14662
+	* elf.c (_bfd_elf_make_section_from_shdr): Treat .gdb_index as
+	SEC_DEBUGGING.
+
 2012-09-20  Walter Lee  <walt@tilera.com>
 
 	* elf32-tilepro.c (tilepro_elf_relocate_section): Adjust got
@@ -11,7 +119,7 @@
 2012-09-18  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR ld/14591
-	* elf-bfd.h (_bfd_elf_merge_symbol): Add an argument to return 
+	* elf-bfd.h (_bfd_elf_merge_symbol): Add an argument to return
 	if the old symbol is weak.
 
 	* elf32-sh-symbian.c (sh_symbian_relocate_section): Update
