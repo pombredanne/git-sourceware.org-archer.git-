@@ -6360,6 +6360,7 @@ line per frame, for many frames, starting with the currently executing
 frame (frame zero), followed by its caller (frame one), and on up the
 stack.
 
+@anchor{backtrace-command}
 @table @code
 @kindex backtrace
 @kindex bt @r{(@code{backtrace})}
@@ -22626,6 +22627,11 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Pretty Printing API::         Pretty-printing values.
 * Selecting Pretty-Printers::   How GDB chooses a pretty-printer.
 * Writing a Pretty-Printer::    Writing a Pretty-Printer.
+* Frame Filters API::           Filtering and Wrapping Frames.
+* Writing a Frame Filter::      Writing a Frame Filter.
+* Frame Wrapper API::           Wrapping and Decorating Frames.
+* Managing Frame Filters::      Management of Frame Filters.
+* Writing a Frame Wrapper::     Writing a Frame Wrapper.
 * Inferiors In Python::         Python representation of inferiors (processes)
 * Events In Python::            Listening for events from @value{GDBN}.
 * Threads In Python::           Accessing inferior threads from Python.
@@ -23920,6 +23926,149 @@ my_library.so:
     foo
     bar
 @end smallexample
+
+@node Frame Filters API 
+@subsubsection Filtering and Wrapping Frames.
+@cindex Frame Filter/Wrappers API
+
+Frame filters are Python objects that manipulate the visibility of a
+frame or frames when a backtrace (@pxref{Backtrace}) is printed by
+@value{GDBN}.  
+
+Only commands that print a backtrace, or, in the case of @sc{gdb/mi} commands
+(@pxref{GDB/MI}), those that return a collection of frames are affected.  The
+commands that work with frame filters are: 
+
+@code{backtrace} (@pxref{backtrace-command,, The backtrace command}), 
+@code{-stack-list-frames}
+(@pxref{-stack-list-frames,, The -stack-list-frames command}),
+@code{-stack-list-variables} (@pxref{-stack-list-variables,, The
+-stack-list-variables command}), @code{-stack-list-arguments}
+@pxref{-stack-list-arguments,, The -stack-list-arguments command}) and
+@code{-stack-list-locals} (@pxref{-stack-list-locals,, The
+-stack-list-locals command}).
+
+Frame filters work by applying actions to an iterator that is passed
+to the frame filter.  The frame filter works with tools such as
+Python's @code{itertools} module to modify the iterator, and returns
+this modified iterator. A frame filter must not alter the underlying
+@value{GDBN} frame or frames, or attempt to alter the call stack
+within @value{GDBN}.  Frame filters may only work on the wrapping
+iterator.  This preserves data integrity within @value{GDBN}.
+
+Frame filters are executed on a priority basis and care should be
+taken that some frame filters may have been executed before your
+filter, and that some frame filters will execute after.  Each frame
+filter object takes a Python iterator, and returns a Python iterator.
+For further information on frame filters see, @ref{Writing a Frame
+Filter}.
+
+Frame filters have a mandatory interface which each frame filter must
+implement, defined here:
+
+@defun FrameFilter.filter (iterator)
+@value{GDBN} will call this method on a frame filter when it has
+reached the order in the priority list for that filter. 
+
+For example, if there are four frame filters:
+
+@smallexample
+Name         Priority
+
+Filter1      5
+Filter2      10
+Filter3      100
+Filter4      1
+@end smallexample
+
+The order that the frame filters will be called is:
+
+@smallexample
+Filter3 -> Filter2 -> Filter1 -> Filter4
+@end smallexample
+
+Please note that the output (a Python iterator) from @code{Filter3} is
+passed to the input of @code{Filter2}, and so on.
+
+This @code{filter} method is passed a Python iterator.  This iterator
+contains a sequence of frame wrappers that wrap each @code{gdb.Frame},
+or another frame wrapper that wraps a frame wrapper.  The
+first filter that is executed in the sequence of frame filters will
+receive an iterator entirely comprised of @code{BaseFrameWrapper}
+objects.  However, after each frame filter is executed in turn, the
+previous frame filter may have wrapped some @code{BaseFrameWrappers}
+in its own custom frame wrapper.  As Frame Wrappers must also conform
+to a mandatory interface, these wrappers can be assumed to act in a
+uniform manner (@pxref{Writing a Frame Wrapper}).
+
+This method must return an object conforming to the Python iterator
+protocol.  Each item returned by the iterator must be a an object
+conforming to the frame wrapper interface.  As the initial iterator in
+the sequence is already wrapped in @code{BaseFrameWrapper} then if this
+iterator has no operations to perform it may just return the iterator
+without alteration.
+
+This method is not optional.  If it does not exist, @value{GDBN} will
+raise and print an error.
+@end defun
+
+@defvar FrameFilter.name
+The @code{name} attribute must be Python string which contains the
+name of the filter displayed by @value{GDBN} (@pxref{Managing Frame
+Filters}).  This name is for display only, and may contain any
+combination of letters, numbers and spaces.  This attribute is
+mandatory.
+@end defvar
+
+@defvar FrameFilter.enabled
+The @code{enabled} attribute must be Python boolean.  This attributes
+controls whether the frame filter is enabled.  If @code{enabled} is
+@code{True}, then the frame filter will be executed when any of the
+backtrace commands detailed earlier in this chapter are executed.  If
+@code{enabled} is @code{False}, then the frame filter will not be
+executed.  This attribute is mandatory.
+@end defvar
+
+@defvar FrameFilter.priority
+The @code{priority} attribute must be Python integer.  This attribute
+controls the order of execution in relation to other frame filters.
+There is no imposed limits on the range of @code{priority} other than
+it must be a valid integer.  The higher the priority assigned to a
+frame filter, the sooner it will be executed in relation to other
+frame filters.  Though @code{priority} can be negative, it is good
+practice to assume zero is the lowest priority that a frame filter can
+be assigned.  Frame filters that have the same priority are executed
+in unsorted order in that priority slot.  This attribute is mandatory.
+@end defvar
+
+@node Writing a Frame Filter
+@subsubsection Writing a Frame Filter.
+@cindex Writing a Frame Filter
+
+Blah blah blah.
+
+@node Frame Wrapper API 
+@subsubsection Wrapping and Decorating Frames.
+@cindex Frame Wrapper API
+
+Frame wrappers are sister objects that decorate frames affected by
+frame filters.  Frame wrappers are applied by frame filters and
+customize the printed content of each frame via an API.  A frame
+wrapper works on one frame, but a frame wrapper object can be applied
+to many different frames.  Each frame wrapper dictates the contents of
+each frame that is printed by @value{GDBN}.
+
+@node Managing Frame Filters
+@subsubsection Management of Frame Filters.
+@cindex Managing Frame Filters
+
+Blah blah blah.
+
+@node Writing a Frame Wrapper
+@subsubsection Writing a Frame Wrapper.
+@cindex Writing a Frame Wrapper
+
+Blah blah blah.
 
 @node Inferiors In Python
 @subsubsection Inferiors In Python
@@ -29504,9 +29653,9 @@ For a stack with frame levels 0 through 11:
 (gdb)
 @end smallexample
 
+@anchor{-stack-list-arguments}
 @subheading The @code{-stack-list-arguments} Command
 @findex -stack-list-arguments
-
 @subsubheading Synopsis
 
 @smallexample
@@ -29597,10 +29746,9 @@ args=[@{name="intarg",value="2"@},
 
 @c @subheading -stack-list-exception-handlers
 
-
+@anchor{-stack-list-frames}
 @subheading The @code{-stack-list-frames} Command
 @findex -stack-list-frames
-
 @subsubheading Synopsis
 
 @smallexample
@@ -29704,6 +29852,7 @@ Show a single frame:
 
 @subheading The @code{-stack-list-locals} Command
 @findex -stack-list-locals
+@anchor{-stack-list-locals}
 
 @subsubheading Synopsis
 
@@ -29744,6 +29893,7 @@ This command is deprecated in favor of the
 (gdb)
 @end smallexample
 
+@anchor{-stack-list-variables}
 @subheading The @code{-stack-list-variables} Command
 @findex -stack-list-variables
 
