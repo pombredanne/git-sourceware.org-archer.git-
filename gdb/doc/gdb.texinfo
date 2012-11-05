@@ -24015,9 +24015,9 @@ raise and print an error.
 @defvar FrameFilter.name
 The @code{name} attribute must be Python string which contains the
 name of the filter displayed by @value{GDBN} (@pxref{Managing Frame
-Filters}).  This name is for display only, and may contain any
-combination of letters, numbers and spaces.  This attribute is
-mandatory.
+Filters}).  This attribute may contain any combination of letters,
+numbers and spaces, but care should be taken to ensure that it is
+unique.  This attribute is mandatory.
 @end defvar
 
 @defvar FrameFilter.enabled
@@ -24045,7 +24045,105 @@ in unsorted order in that priority slot.  This attribute is mandatory.
 @subsubsection Writing a Frame Filter.
 @cindex Writing a Frame Filter
 
-Blah blah blah.
+There are three basic elements that a frame filter must implement.
+The first is that it must correctly implement the documented interface
+(@pxref{Frame Filters API}), secondly it must register itself with
+@value{GDBN}, and finally it must decide if it is to work on the frames
+provided by @value{GDBN}, and if so, implement a filtering strategy.
+A basic frame filter follows the pattern:
+
+@smallexample
+import gdb
+
+class FrameFilter ():
+
+    def __init__ (self):
+        self.name = "Foo"
+        self.priority = 100
+        self.enabled = True
+        gdb.frame_filters [self.name] = self
+
+    def filter (self, frame_iter):
+        return frame_iter
+@end smallexample
+
+In writing the above example, the attributes are just assigned
+directly in the Python's @code{__init__} function.  However attribute
+assignment and creation is entirely at the author's discretion.
+Generally attributes should be created on object creation.  This an
+equally valid, but more dynamic approach:
+
+@smallexample
+    def __init__(self, name, pri, enb):
+        self.name = name
+        self.priority = pri
+        self.enabled = enb
+
+        gdb.frame_filters[self.name] = self
+@end smallexample
+
+
+In the example above the frame filter implements the three steps that
+it must fulfill.  They implement the API, they self register, and they
+make a decision on the iterator (in this case, they just return the
+iterator untouched).
+
+These requirements are performed in two steps:
+
+@smallexample
+import gdb
+
+class FrameFilter ():
+
+    def __init__ (self):
+        self.name = "Foo"
+        self.priority = 100
+        self.enabled = True
+        gdb.frame_filters [self.name] = self
+@end smallexample
+
+In this step, the frame filters implements the attributes required in
+the interface, and registers the frame filter with @value{GDBN}.
+@value{GDBN} makes registration available through use of a Python
+dictionary.  In the following example: 
+
+@smallexample
+        gdb.frame_filters [self.name] = self
+@end smallexample
+
+The registration step is highlighted. @code{gdb.frame_filters} is a
+dictionary that is initialized in the @code{gdb} module when
+@value{GDBN} starts.
+
+As @value{GDBN} takes a hands-off approach to frame filter
+registration, it is the frame filter's responsibility to ensure
+registration has occurred, and that any exceptions are handled
+appropriately.  In particular, you may wish to handle exceptions
+related to Python dictionary key uniqueness.  It is mandatory that the
+dictionary key is the same as frame filter's @code{name} attribute.
+When a user manages frame filters (@pxref{Managing Frame Filters}),
+the names @value{GDBN} will display are those contained in the
+@code{name} attribute.  
+
+The last step of our small example is the implementation of the
+@code{filter} method:
+
+@smallexample
+    def filter (self, frame_iter):
+        return frame_iter
+@end smallexample
+
+Note that the @code{filter} method has to take an iterator, and also
+return an iterator.  In this example, this frame filter is not very
+useful as it just returns the iterator untouched.  However this is a
+valid operation for frame filters that have decided not to operate on
+any frames.
+
+In this next example, the frame filter operates on all frames, and
+uses a @code{Frame Wrapper}. @xref{Frame Wrapper API}, for the API
+relating to a @code{Frame Wrapper}. Also, @xref{Writing a Frame
+Wrapper}, for a tutorial on writing a @code{Frame Wrapper}.
+
 
 @node Frame Wrapper API 
 @subsubsection Wrapping and Decorating Frames.
@@ -24068,7 +24166,7 @@ Blah blah blah.
 @subsubsection Writing a Frame Wrapper.
 @cindex Writing a Frame Wrapper
 
-Blah blah blah.
+A f
 
 @node Inferiors In Python
 @subsubsection Inferiors In Python
