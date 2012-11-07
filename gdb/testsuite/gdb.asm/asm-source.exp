@@ -27,6 +27,8 @@ set asm-flags ""
 set link-flags "-e _start"
 set debug-flags ""
 
+standard_testfile asmsrc1.s asmsrc2.s
+
 set obj_include -I[standard_output_file {}]
 
 switch -glob -- [istarget] {
@@ -197,8 +199,6 @@ if [board_info $dest exists multilib_flags] {
 	   return
 	 }
 }
-
-standard_testfile asmsrc1.s asmsrc2.s
 
 remote_exec build "rm -f ${subdir}/arch.inc"
 remote_download host ${srcdir}/${subdir}/${asm-arch}.inc ${subdir}/arch.inc

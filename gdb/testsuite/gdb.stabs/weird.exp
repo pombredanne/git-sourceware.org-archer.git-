@@ -156,7 +156,7 @@ proc do_tests {} {
         gdb_test "p constString2" " = \"Double quote String2\"" "String constant 2"
 
         gdb_test "p constString3" " = \"String3 with embedded quote ' in the middle\"" "String constant 3"
-        gdb_test "p constString4" { = "String4 with embedded quote \\" in the middle"} "String constant 4"
+        gdb_test "p constString4" { = "String4 with embedded quote \\\" in the middle"} "String constant 4"
 	gdb_test "p bad_neg0" " = \{field0 = 42, field2 =.*field3 = 45\}" "p bad_neg0"
 
 	gdb_test "ptype inttype" "type = (unsigned int|inttype)" "ptype on inttype"
@@ -292,7 +292,8 @@ gdb_exit
 gdb_start
 gdb_reinitialize_dir $srcdir/$subdir
 
-set binfile [remote_download host ${binfile} object.o]
+set binfile [gdb_remote_download host ${binfile} \
+		 [standard_output_file object.o]]
 send_gdb "file $binfile\n"
 # If $binfile is very long, a \r (but not a \n) will echo in the
 # middle of the echo of the command.  So to match the echo, we
