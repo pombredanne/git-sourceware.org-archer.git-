@@ -54,15 +54,15 @@ proc mi_gdbserver_run { } {
 }
 
 proc test_file_transfer { filename description } {
-    mi_gdb_test "-target-file-put \"$filename\" \"down-server\"" \
+    mi_gdb_test "-target-file-put \"$filename\" \"mi-down-server\"" \
 	"\\^done" "put $description"
-    mi_gdb_test "-target-file-get \"down-server\" \"up-server\"" \
+    mi_gdb_test "-target-file-get \"mi-down-server\" \"mi-up-server\"" \
 	"\\^done" "get $description"
 
     if { ![is_remote target] } {
 	# If we can check the target copy of the file, do that too.
 	# This should catch symmetric errors in upload and download.
-	set result [remote_exec host "cmp -s $filename down-server"]
+	set result [remote_exec host "cmp -s $filename mi-down-server"]
 	if { [lindex $result 0] == 0 } {
 	    pass "compare intermediate $description"
 	} else {
@@ -70,25 +70,25 @@ proc test_file_transfer { filename description } {
 	}
     }
 
-    set result [remote_exec host "cmp -s $filename up-server"]
+    set result [remote_exec host "cmp -s $filename mi-up-server"]
     if { [lindex $result 0] == 0 } {
 	pass "compare $description"
     } else {
 	fail "compare $description"
     }
 
-    mi_gdb_test "-target-file-delete \"down-server\"" \
+    mi_gdb_test "-target-file-delete \"mi-down-server\"" \
 	"\\^done" "deleted $description"
 
     if { ![is_remote target] } {
-	if { ! [remote_file target exists down-server] } {
+	if { ! [remote_file target exists mi-down-server] } {
 	    pass "verified deleted $description"
 	} else {
 	    fail "verified deleted $description"
 	}
     }
 
-    catch { file delete up-server }
+    catch { file delete mi-up-server }
 }
 
 mi_gdbserver_run
