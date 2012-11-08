@@ -36,28 +36,9 @@ esac
 AM_CONDITIONAL(GMAKE, test "$MAKE_IS_GNU" = yes)
 AC_PROG_MAKE_SET
 
-# Enable gdbtk.
-AC_ARG_ENABLE(gdbtk,
-[  --enable-gtk            enable gdbtk graphical user interface (GUI)],,
-  [if test -d $srcdir/../gdbtk && test -d $srcdir/gdb.gdbtk; then
-    enable_gdbtk=yes
-  else
-    enable_gdbtk=no
-  fi])
-# We unconditionally disable gdbtk tests on selected platforms.
-case $host_os in
-  go32* | windows*)
-    enable_gdbtk=no ;;
-esac
-
-# Add gdbtk tests when appropriate.
-if test $enable_gdbtk = yes; then
-   AC_CONFIG_SUBDIRS(gdb.gdbtk)
-fi
-
 # Enable shared libraries.
 AC_ARG_ENABLE(shared,
-[  --enable-shared         build shared libraries [deault=yes]],,
+[  --enable-shared         build shared libraries [default=yes]],,
   enable_shared=yes)
 
 # If we have shared libraries, try to set RPATH_ENVVAR reasonably,
@@ -83,19 +64,6 @@ else
 fi
 AC_SUBST(RPATH_ENVVAR)
 
-AC_CHECK_HEADERS(pthread.h)
-
 AC_EXEEXT
 
-AC_OUTPUT([Makefile \
-  gdb.ada/Makefile \
-  gdb.arch/Makefile gdb.asm/Makefile gdb.base/Makefile gdb.btrace/Makefile \
-  gdb.cell/Makefile gdb.cp/Makefile gdb.disasm/Makefile gdb.dwarf2/Makefile \
-  gdb.fortran/Makefile gdb.go/Makefile gdb.server/Makefile gdb.java/Makefile \
-  gdb.hp/Makefile gdb.hp/gdb.objdbg/Makefile gdb.hp/gdb.base-hp/Makefile \
-  gdb.hp/gdb.aCC/Makefile gdb.hp/gdb.compat/Makefile \
-  gdb.hp/gdb.defects/Makefile gdb.linespec/Makefile \
-  gdb.mi/Makefile gdb.modula2/Makefile gdb.multi/Makefile \
-  gdb.objc/Makefile gdb.opencl/Makefile gdb.opt/Makefile gdb.pascal/Makefile \
-  gdb.python/Makefile gdb.reverse/Makefile gdb.stabs/Makefile \
-  gdb.threads/Makefile gdb.trace/Makefile gdb.xml/Makefile])
+AC_OUTPUT([Makefile])
