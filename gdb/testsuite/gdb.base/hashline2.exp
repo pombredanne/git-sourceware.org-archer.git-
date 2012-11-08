@@ -25,7 +25,7 @@ standard_testfile
 
 set outfile [standard_output_file ${srcfile}]
 set fd [open $outfile w]
-puts $fd "#line 2 \"///[pwd]/${subdir}/${srcfile}\""
+puts $fd "#line 2 \"///$outfile\""
 puts $fd "int main () { return 0; } /* set breakpoint here */"
 close $fd
 
@@ -36,7 +36,7 @@ if { [gdb_compile $outfile "${binfile}" executable {debug}] != "" } {
 
 clean_restart ${binfile}
 
-set bp_location [gdb_get_line_number "set breakpoint here" ${objdir}/${subdir}/${srcfile}]
+set bp_location [gdb_get_line_number "set breakpoint here" $outfile]
 
 # Try to set a breakpoint on the specified file location.
 
