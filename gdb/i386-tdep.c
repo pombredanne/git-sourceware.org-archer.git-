@@ -750,7 +750,7 @@ i386_relocate_instruction (struct gdbarch *gdbarch,
       /* Where "ret" in the original code will return to.  */
       ret_addr = oldloc + insn_length;
       push_buf[0] = 0x68; /* pushq $...  */
-      memcpy (&push_buf[1], &ret_addr, 4);
+      store_unsigned_integer (&push_buf[1], 4, byte_order, ret_addr);
       /* Push the push.  */
       append_insns (to, 5, push_buf);
 
@@ -2630,6 +2630,9 @@ i386_return_value (struct gdbarch *gdbarch, struct value *function,
 	|| code == TYPE_CODE_UNION
 	|| code == TYPE_CODE_ARRAY)
        && !i386_reg_struct_return_p (gdbarch, type))
+      /* Complex double and long double uses the struct return covention.  */
+      || (code == TYPE_CODE_COMPLEX && TYPE_LENGTH (type) == 16)
+      || (code == TYPE_CODE_COMPLEX && TYPE_LENGTH (type) == 24)
       /* 128-bit decimal float uses the struct return convention.  */
       || (code == TYPE_CODE_DECFLOAT && TYPE_LENGTH (type) == 16))
     {
@@ -7705,9 +7708,6 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   tdep->num_mmx_regs = 8;
   tdep->num_ymm_regs = 0;
 
-  tdep->sp_regnum_from_eax = -1;
-  tdep->pc_regnum_from_eax = -1;
-
   tdesc_data = tdesc_data_alloc ();
 
   set_gdbarch_relocate_instruction (gdbarch, i386_relocate_instruction);
@@ -7752,14 +7752,6 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
       /* Support dword pseudo-register if it hasn't been disabled.  */
       tdep->eax_regnum = ymm0_regnum;
       ymm0_regnum += tdep->num_dword_regs;
-      if (tdep->sp_regnum_from_eax != -1)
-	set_gdbarch_sp_regnum (gdbarch,
-			       (tdep->eax_regnum
-				+ tdep->sp_regnum_from_eax));
-      if (tdep->pc_regnum_from_eax != -1)
-	set_gdbarch_pc_regnum (gdbarch,
-			       (tdep->eax_regnum
-				+ tdep->pc_regnum_from_eax));
     }
   else
     tdep->eax_regnum = -1;

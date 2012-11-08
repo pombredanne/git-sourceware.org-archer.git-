@@ -1,3 +1,423 @@
+2012-11-06  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/14810
+
+	* gdb.base/disabled-location.c: New file.
+	* gdb.base/disabled-location.exp: New file.
+
+2012-11-06  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.threads/gcore-thread.exp: Use gdb_gcore_cmd.
+	* gdb.python/py-strfns.exp (test_strfns_core_file): Use
+	gdb_gcore_cmd.
+	* gdb.cell/gcore.exp: Use gdb_gcore_cmd.
+	* gdb.base/gcore.exp: Use gdb_gcore_cmd.
+	* gdb.base/gcore-relro.exp: Use gdb_gcore_cmd.
+	* gdb.base/gcore-buffer-overflow.exp: Use gdb_gcore_cmd.
+	* gdb.base/auxv.exp: Use gdb_gcore_cmd.
+	* gdb.arch/vsx-regs.exp: Use gdb_gcore_cmd.
+	* gdb.arch/system-gcore.exp: Use gdb_gcore_cmd.
+	* gdb.arch/pa-nullify.exp (test_core_bt): Use gdb_gcore_cmd.
+	* lib/gdb.exp (gdb_gcore_cmd): New proc.
+
+2012-11-05  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/foll-vfork.exp (vfork_relations_in_info_inferiors): New
+	procedure.
+	(do_vfork_and_follow_child_tests_exec)
+	(do_vfork_and_follow_child_tests_exit): Call it.
+
+2012-11-05  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/foll-vfork.c (main): Call perror and _exit if execlp()
+	fails.
+
+2012-11-03  Yao Qi  <yao@codesourcery.com>
+
+	Fix PR gdb/14617.
+	* gdb.mi/mi-breakpoint-changed.exp (test_insert_delete_modify):
+	Remove setup_kfail, and update test.
+
+2012-11-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/catch-syscall.exp (do_syscall_tests): Add completion
+	test.
+
+2012-11-02  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/14766
+
+	* gdb.base/foll-vfork.exp (vfork_child_follow_to_exit): Remove
+	setup_kfail.
+	(tcatch_vfork_then_child_follow_exit): No longer expect "Couldn't
+	get registers".
+
+2012-11-02  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/foll-vfork-exit.c: New file.
+	* gdb.base/foll-vfork.exp (top level): New file-describing
+	comment.
+	(vfork_child_follow_to_exit): New procedure.
+	(tcatch_vfork_then_child_follow): Rename as ...
+	(tcatch_vfork_then_child_follow_exec): ... this.
+	(tcatch_vfork_then_child_follow_exit): New procedure.
+	(do_vfork_and_follow_parent_tests): New procedure, factored out
+	from do_vfork_and_exec_tests.
+	(do_vfork_and_follow_child_tests_exec): Ditto.
+	(do_vfork_and_exec_tests): Delete.
+	(do_vfork_and_follow_child_tests_exit): New procedure.
+	(top level): Run tests with both the program that has the vfork
+	child execing, and the program has the vfork child exiting.
+
+2012-11-02  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/foll-vfork.exp (setup_gdb): New procedure.
+	(check_vfork_catchpoints, vfork_parent_follow_through_step)
+	(vfork_parent_follow_to_bp): Call it.
+	(kill_child): Delete.
+	(vfork_and_exec_child_follow_to_main_bp)
+	(vfork_and_exec_child_follow_through_step): Call setup_gdb.  No
+	longer call kill_child.
+	(tcatch_vfork_then_parent_follow): Call setup_gdb.
+	(do_vfork_and_exec_tests): Don't runto_main before calling each
+	test procedure.
+	(top level): Don't clean restart and set verbose before running
+	each test procedure.
+
+2012-11-02  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/foll-vfork.exp (vfork_parent_follow_through_step)
+	(vfork_parent_follow_to_bp)
+	(vfork_and_exec_child_follow_to_main_bp)
+	(vfork_and_exec_child_follow_through_step)
+	(tcatch_vfork_then_parent_follow)
+	(tcatch_vfork_then_parent_follow, tcatch_vfork_then_child_follow):
+	Use with_test_prefix.
+
+2012-11-02  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/foll-vfork.c: Add copyright header.
+	* gdb.base/vforked-prog.c: Add copyright header.
+
+2012-11-02  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/foll-vfork.exp
+	(vfork_and_exec_child_follow_through_step): Don't skip on
+	non-HP/UX targets.  Expect the next to only step one line on
+	non-HP/UX targets, rather than stopping only after the exec.
+
+2012-11-02  Pedro Alves  <palves@redhat.com>
+
+	Don't hard code line numbers.
+
+	* gdb.base/foll-vfork.exp (vfork_parent_follow_through_step):
+	Expect text from the sources instead of a line number.
+	(vfork_parent_follow_to_bp)
+	(vfork_and_exec_child_follow_to_main_bp)
+	(vfork_and_exec_child_follow_through_step)
+	(tcatch_vfork_then_parent_follow, tcatch_vfork_then_child_follow):
+	Use gdb_get_line_number.
+
+2012-11-02  Pedro Alves  <palves@redhat.com>
+
+	Modernize.
+
+	* gdb.base/foll-vfork.exp: Use standard_testfile and
+	build_executable.  Pass descriptive string to untested.
+	(vfork_parent_follow_through_step, vfork_parent_follow_to_bp)
+	(vfork_and_exec_child_follow_to_main_bp)
+	(vfork_and_exec_child_follow_through_step)
+	(tcatch_vfork_then_parent_follow, tcatch_vfork_then_child_follow)
+	(do_vfork_and_exec_tests): Use gdb_test/gdb_test_multiple instead
+	of send_gdb/gdb_expect.
+
+	(kill_child): New procedure.
+	(vfork_and_exec_child_follow_to_main_bp)
+	(vfork_and_exec_child_follow_through_step): Use it.
+
+2012-11-02  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/setvar.exp: Test setting nested struct.
+	* gdb.base/setvar.c (v_struct3): New.
+
+2012-11-01  Doug Evans  <dje@google.com>
+
+	* gdb.arch/amd64-pseudo.c (main): Mark registers that the testsuite
+	changes as clobbered (e.g., amd64-dword.exp) so gcc doesn't try to
+	use them.
+
+2012-10-31  Andrew Burgess  <aburgess@broadcom.com>
+
+	PR cli/14772
+	* gdb.base/gnu_vector.c (union_with_vector_1)
+	(struct_with_vector_1): Add new struct and union for testing
+	ptype.
+	* gdb.base/gnu_vector.exp: Add testing of ptype on vectors, and
+	structs / unions containing vectors.
+
+2012-10-25  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/ftrace.exp (test_fast_tracepoints): Use
+	'setup_kfail' instead of 'setup_kfail_for_target'.
+	* gdb.base/varargs.exp: Likewise.
+	* lib/gdb.exp (setup_kfail_for_target): Remove.
+
+2012-10-25  Mark Kettenis  <kettenis@openbsd.nfra.nl>
+
+	* gdb.base/varargs.exp: PR gdb/12790 is now fixed.
+
+2012-10-25  Mark Kettenis  <kettenis@gnu.org>
+
+	* gdb.base/varargs.exp: PR gdb/12776 is now fixed.
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/set_wstr: New testcase.
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/ldbl_e308.c, gdb.base/ldbl_e308.exp: New files.
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/unc_arr_ptr_in_var_rec: New testcase.
+
+2012-10-24  Mark Kettenis  <kettenis@gnu.org>
+
+	* gdb.base/callfuncs.exp: PR gdb/12783 is now fixed.
+
+2012-10-24  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/callfuncs.exp (do_function_calls): Fix
+	setup_kfail_for_target for -m32 mode.
+
+2012-10-23  Mark Kettenis  <kettenis@gnu.org>
+
+	* gdb.base/callfuncs.exp: PR gdb/12796, gdb/12798 and gdb/12800
+	are now fixed.
+
+2012-10-23  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/info-os.exp: Resume the inferior until it exits.
+
+2012-10-18  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* gdb.base/ctxobj.exp: Skip if skip_shlib_tests returns true.
+	* gdb.base/print-file-var.exp: Likewise.
+	* gdb.base/type-opaque.exp: Likewise.
+
+2012-10-17  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi-memory-changed.exp: New.
+
+2012-10-16  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.reverse/solib-precsave.exp: Skip if skip_shlib_test
+	returns true.
+	Call gdb_load_shlibs.
+	* gdb.reverse/solib-reverse.exp: Likewise.
+
+2012-10-15  Keith Seitz  <keiths@redhat.com>
+
+	* lib/cp-support.exp (cp_test_ptype_class): Add support
+	for class typedefs.
+
+	* gdb.cp/derivation.exp: Add tests for g_instance.
+
+2012-10-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix entry values resolving in inlined frames.
+	* gdb.arch/amd64-entry-value-inline.S: New file.
+	* gdb.arch/amd64-entry-value-inline.c: New file.
+	* gdb.arch/amd64-entry-value-inline.exp: New file.
+
+2012-10-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Doug Evans  <dje@google.com>
+
+	Fix recent gdb_breakpoint regression.
+	* gdb.java/jmisc.exp: gdb_breakpoint for $function - remove curly
+	braces from the parameter.
+	* gdb.java/jprint.exp: Likewise.
+
+2012-10-15  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (runto): Fix call to gdb_breakpoint.
+
+2012-10-15  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* gdb.dwarf2/dw2-icc-opaque.S: Remove '#'.
+
+2012-10-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-symtab.exp: Test sal and symtab destructors.
+
+2012-10-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-symbol.exp: Test symbol destructor.
+
+2012-10-14  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi2-cli.exp: Move to mi-cli.exp.
+	* gdb.mi/mi-cli.exp: New.
+
+	* gdb.mi/mi2-basics.exp: Remove.
+	* gdb.mi/mi2-break.exp: Remove.
+	* gdb.mi/mi2-console.exp: Remove.
+	* gdb.mi/mi2-disassemble.exp: Remove.
+	* gdb.mi/mi2-eval.exp: Remove.
+	* gdb.mi/mi2-file.exp: Remove.
+	* gdb.mi/mi2-hack-cli.exp: Remove.
+	* gdb.mi/mi2-pthreads.exp: Remove.
+	* gdb.mi/mi2-read-memory.exp: Remove.
+	* gdb.mi/mi2-regs.exp: Remove.
+	* gdb.mi/mi2-return.exp: Remove.
+	* gdb.mi/mi2-simplerun.exp: Remove.
+	* gdb.mi/mi2-stack.exp: Remove.
+	* gdb.mi/mi2-stepi.exp: Remove.
+	* gdb.mi/mi2-syn-frame.exp: Remove.
+	* gdb.mi/mi2-until.exp: Remove.
+	* gdb.mi/mi2-watch.exp: Remove.
+	* gdb.mi/mi2-var-block.exp: Remove.
+	* gdb.mi/mi2-var-cmd.exp: Remove.
+	* gdb.mi/mi2-var-display.exp: Remove.
+
+2012-10-12  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi-breakpoint-changed.exp (test_pending_resolved): Remove
+	trail '.*' on matching patterns.
+
+2012-10-11  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdb.arch/i386-bp_permanent.exp: Skip if not is_x86_like_target.
+	* gdb.arch/i386-cfi-notcurrent.exp: Likewise.
+	* gdb.arch/i386-disp-step.exp: Likewise.
+	* gdb.arch/i386-gnu-cfi.exp: Likewise.
+	* gdb.arch/i386-prologue.exp: Likewise.
+	* gdb.arch/i386-size-overlap.exp: Likewise.
+	* gdb.arch/i386-size.exp: Likewise.
+	* gdb.arch/i386-unwind.exp: Likewise.
+
+2012-10-11  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdb.arch/i386-byte.exp: Remove is_ilp32_target check.
+	* gdb.arch/i386-word.exp: Likewise.
+
+2012-10-11  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* gdb.arch/i386-avx.exp: Check is_amd64_regs_target instead of
+	is_ilp32_target to set nr_regs.
+	* gdb.arch/i386-sse.exp: Likewise.
+
+2012-10-11  Doug Evans  <dje@google.com>
+
+	PR breakpoints/14643.
+	* gdb.linespec/ls-errs.exp: Change tests of "b if|task|thread".
+	* gdb.linespec/thread.c: New file.
+	* gdb.linespec/thread.exp: New file.
+
+	* lib/gdb.exp (gdb_breakpoint): Fix varargs scan.
+	Recognize "message" -> print pass and fail.  Add eof case.
+	(runto): Recognize message, no-message.  Print pass/fail if requested,
+	with same treatment as gdb_breakpoint.
+	(runto_main): Pass no-message to runto.
+	(gdb_internal_error_resync): Add log message.
+	(gdb_file_cmd): Tweak internal error fail text for consistency.
+
+2012-10-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash during stepping on ppc32.
+	* gdb.base/step-symless.c: New file.
+	* gdb.base/step-symless.exp: New file.
+
+2012-10-03  Doug Evans  <dje@google.com>
+
+	PR symtab/14601
+	* gdb.cp/using-crash.exp: New file.
+	* gdb.cp/using-crash.cc: New file.
+
+2012-10-02  Doug Evans  <dje@google.com>
+
+	* lib/gdb.exp (gdb_unload): Change wording of perror text to be
+	more consistent.
+	(runto,gdb_debug_format): Ditto.
+	(gdb_file_cmd): Watch for eof in nested gdb_expect.
+	Clean up logging and error messages.
+
+2012-10-01  Andrew Burgess  <aburgess@broadcom.com>
+
+	Test find command on unmapped memory.
+	* gdb.base/find-unmapped.c: New file.
+	* gdb.base/find-unmapped.exp: New file.
+
+2012-09-29  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/mi-tracepoint-changed.exp: New.
+	* gdb.mi/mi-breakpoint-changed.exp: New.
+	* gdb.mi/pending.c, gdb.mi/pendshr1.c: New
+	* gdb.mi/pendshr2.c: New.
+
+2012-09-28  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/pr11022.exp: New.
+	* gdb.mi/pr11022.c: New.  Copied from gdb.base/.
+
+2012-09-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/derivation.exp: Add regression test.
+	* gdb.cp/derivation.cc (class V_base, class V_inter, class
+	V_derived): New.
+	(vderived): New global.
+
+2012-09-26  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/dw2-common-block.S: New file.
+	* gdb.dwarf2/dw2-common-block.exp: New file.
+
+2012-09-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.fortran/common-block.exp: New file.
+	* gdb.fortran/common-block.f90: New file.
+
+2012-09-26  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.base/duplicate-bp.c: New file.
+	* gdb.base/duplicate-bp.exp: New file.
+
+2012-09-26  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi2-cli.exp:  Avoid line number in test summary.
+
+	Revert:
+	2012-09-21  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi2-cli.exp: Remove redundant '\'.
+
+2012-09-25  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* gdb.base/longest-types.c: New test case.
+	* gdb.base/longest-types.exp: New test case.
+
+2012-09-25  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi2-cli.exp: Check breakpoint notification.
+
+2012-09-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix internal error on canonicalization of clang types.
+	* gdb.dwarf2/dw2-canonicalize-type.S: New file.
+	* gdb.dwarf2/dw2-canonicalize-type.exp: New file.
+	* lib/gdb.exp (gdb_file_cmd): Catch also GDB internal error.
+
+2012-09-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix disassemble without parameters in tailcall frame.
+	* gdb.arch/amd64-entry-value.exp (down, disassemble): New tests.
+
+2012-09-21  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.dwarf2/dw2-op-out-param.S: New file.
+	* gdb.dwarf2/dw2-op-out-param.exp: New file.
+
 2012-09-21  Yao Qi  <yao@codesourcery.com>
 
 	* gdb.mi/mi2-cli.exp: Remove redundant '\'.

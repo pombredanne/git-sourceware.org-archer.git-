@@ -107,6 +107,8 @@ _bfd_new_bfd (void)
   return nbfd;
 }
 
+static const struct bfd_iovec opncls_iovec;
+
 /* Allocate a new BFD as a member of archive OBFD.  */
 
 bfd *
@@ -119,6 +121,8 @@ _bfd_new_bfd_contained_in (bfd *obfd)
     return NULL;
   nbfd->xvec = obfd->xvec;
   nbfd->iovec = obfd->iovec;
+  if (obfd->iovec == &opncls_iovec)
+    nbfd->iostream = obfd->iostream;
   nbfd->my_archive = obfd;
   nbfd->direction = read_direction;
   nbfd->target_defaulted = obfd->target_defaulted;
@@ -504,7 +508,7 @@ opncls_bwrite (struct bfd *abfd ATTRIBUTE_UNUSED,
   return -1;
 }
 
-static int
+static bfd_boolean
 opncls_bclose (struct bfd *abfd)
 {
   struct opncls *vec = (struct opncls *) abfd->iostream;
@@ -514,7 +518,7 @@ opncls_bclose (struct bfd *abfd)
   if (vec->close != NULL)
     status = (vec->close) (abfd, vec->stream);
   abfd->iostream = NULL;
-  return status;
+  return status == 0;
 }
 
 static int

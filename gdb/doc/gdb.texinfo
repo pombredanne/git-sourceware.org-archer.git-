@@ -1043,10 +1043,37 @@ batch mode or quiet mode.
 @itemx -n
 @cindex @code{--nx}
 @cindex @code{-n}
-Do not execute commands found in any initialization files.  Normally,
-@value{GDBN} executes the commands in these files after all the command
-options and arguments have been processed.  @xref{Command Files,,Command
-Files}.
+Do not execute commands found in any initialization file.
+There are three init files, loaded in the following order:
+
+@table @code
+@item @file{system.gdbinit}
+This is the system-wide init file.
+Its location is specified with the @code{--with-system-gdbinit}
+configure option (@pxref{System-wide configuration}).
+It is loaded first when @value{GDBN} starts, before command line options
+have been processed.
+@item @file{~/.gdbinit}
+This is the init file in your home directory.
+It is loaded next, after @file{system.gdbinit}, and before
+command options have been processed.
+@item @file{./.gdbinit}
+This is the init file in the current directory.
+It is loaded last, after command line options other than @code{-x} and
+@code{-ex} have been processed.  Command line options @code{-x} and
+@code{-ex} are processed last, after @file{./.gdbinit} has been loaded.
+@end table
+
+For further documentation on startup processing, @xref{Startup}.
+For documentation on how to write command files,
+@xref{Command Files,,Command Files}.
+
+@anchor{-nh}
+@item -nh
+@cindex @code{--nh}
+Do not execute commands found in @file{~/.gdbinit}, the init file
+in your home directory.
+@xref{Startup}.
 
 @item -quiet
 @itemx -silent
@@ -6928,6 +6955,7 @@ regular expression.
 @table @code
 @kindex search
 @kindex forward-search
+@kindex fo @r{(@code{forward-search})}
 @item forward-search @var{regexp}
 @itemx search @var{regexp}
 The command @samp{forward-search @var{regexp}} checks each line,
@@ -24688,6 +24716,13 @@ registration of the function with @value{GDBN}.  Depending on how the
 Python code is read into @value{GDBN}, you may need to import the
 @code{gdb} module explicitly.
 
+Now you can use the function in an expression:
+
+@smallexample
+(gdb) print $greet("Bob")
+$1 = "Hello, Bob!"
+@end smallexample
+
 @node Progspaces In Python
 @subsubsection Program Spaces In Python
 
@@ -27670,6 +27705,13 @@ changed to @var{value}.  In the multi-word @code{set} command,
 the @var{param} is the whole parameter list to @code{set} command.
 For example, In command @code{set check type on}, @var{param}
 is @code{check type} and @var{value} is @code{on}.
+
+@item =memory-changed,thread-group=@var{id},addr=@var{addr},len=@var{len}[,type="code"]
+Reports that bytes from @var{addr} to @var{data} + @var{len} were
+written in an inferior.  The @var{id} is the identifier of the
+thread group corresponding to the affected inferior.  The optional
+@code{type="code"} part is reported if the memory written to holds
+executable code.
 @end table
 
 @node GDB/MI Frame Information
@@ -36095,7 +36137,7 @@ Here are the currently defined query and set packets:
 @table @samp
 
 @item QAgent:1
-@item QAgent:0
+@itemx QAgent:0
 Turn on or off the agent as a helper to perform some debugging operations
 delegated from @value{GDBN} (@pxref{Control Agent}).
 
@@ -36330,7 +36372,7 @@ Don't use this packet; use the @samp{qThreadExtraInfo} query instead
 Reply: see @code{remote.c:remote_unpack_thread_info_response()}.
 
 @item QNonStop:1
-@item QNonStop:0
+@itemx QNonStop:0
 @cindex non-stop mode, remote request
 @cindex @samp{QNonStop} packet
 @anchor{QNonStop}
@@ -36954,8 +36996,8 @@ encoded).  @value{GDBN} will continue to supply the values of symbols
 @end table
 
 @item qTBuffer
-@item QTBuffer
-@item QTDisconnected
+@itemx QTBuffer
+@itemx QTDisconnected
 @itemx QTDP
 @itemx QTDPsrc
 @itemx QTDV
@@ -36992,10 +37034,10 @@ conventions above.  Please don't use this packet as a model for new
 packets.)
 
 @item QTNotes
-@item qTP
-@item QTSave
-@item qTsP
-@item qTsV
+@itemx qTP
+@itemx QTSave
+@itemx qTsP
+@itemx qTsV
 @itemx QTStart    
 @itemx QTStop     
 @itemx QTEnable

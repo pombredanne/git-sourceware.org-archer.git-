@@ -994,7 +994,6 @@ value_fetch_lazy (struct value *val)
       struct value *parent = value_parent (val);
       LONGEST offset = value_offset (val);
       LONGEST num;
-      int length = TYPE_LENGTH (type);
 
       if (!value_bits_valid (val,
 			     TARGET_CHAR_BIT * offset + value_bitpos (val),
@@ -1008,19 +1007,20 @@ value_fetch_lazy (struct value *val)
 				      value_bitsize (val), parent, &num))
 	mark_value_bytes_unavailable (val,
 				      value_embedded_offset (val),
-				      length);
+				      TYPE_LENGTH (type));
       else
-	store_signed_integer (value_contents_raw (val), length,
+	store_signed_integer (value_contents_raw (val), TYPE_LENGTH (type),
 			      byte_order, num);
     }
   else if (VALUE_LVAL (val) == lval_memory)
     {
       CORE_ADDR addr = value_address (val);
-      int length = TYPE_LENGTH (check_typedef (value_enclosing_type (val)));
+      struct type *type = check_typedef (value_enclosing_type (val));
 
-      if (length)
+      if (TYPE_LENGTH (type))
 	read_value_memory (val, 0, value_stack (val),
-			   addr, value_contents_all_raw (val), length);
+			   addr, value_contents_all_raw (val),
+			   TYPE_LENGTH (type));
     }
   else if (VALUE_LVAL (val) == lval_register)
     {
@@ -1838,11 +1838,11 @@ value_array (int lowbound, int highbound, struct value **elemvec)
 }
 
 struct value *
-value_cstring (char *ptr, int len, struct type *char_type)
+value_cstring (char *ptr, ssize_t len, struct type *char_type)
 {
   struct value *val;
   int lowbound = current_language->string_lower_bound;
-  int highbound = len / TYPE_LENGTH (char_type);
+  ssize_t highbound = len / TYPE_LENGTH (char_type);
   struct type *stringtype
     = lookup_array_range_type (char_type, lowbound, highbound + lowbound - 1);
 
@@ -1861,11 +1861,11 @@ value_cstring (char *ptr, int len, struct type *char_type)
    string may contain embedded null bytes.  */
 
 struct value *
-value_string (char *ptr, int len, struct type *char_type)
+value_string (char *ptr, ssize_t len, struct type *char_type)
 {
   struct value *val;
   int lowbound = current_language->string_lower_bound;
-  int highbound = len / TYPE_LENGTH (char_type);
+  ssize_t highbound = len / TYPE_LENGTH (char_type);
   struct type *stringtype
     = lookup_string_range_type (char_type, lowbound, highbound + lowbound - 1);
 

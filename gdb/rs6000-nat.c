@@ -53,6 +53,7 @@
 #include <a.out.h>
 #include <sys/file.h>
 #include "gdb_stat.h"
+#include "gdb_bfd.h"
 #include <sys/core.h>
 #define __LDINFO_PTRACE32__	/* for __ld_info32 */
 #define __LDINFO_PTRACE64__	/* for __ld_info64 */
@@ -770,6 +771,7 @@ add_vmap (LdInfo *ldi)
 
 	  next = gdb_bfd_openr_next_archived_file (abfd, last);
 	  gdb_bfd_unref (last);
+	  last = next;
 	}
 
       if (!last)

@@ -179,21 +179,6 @@ A breakpoint has been modified in some way.  The argument @var{b}
 is the modified breakpoint.
 @end deftypefun
 
-@deftypefun void tracepoint_created (int @var{tpnum})
-A new tracepoint has been created.  The argument @var{tpnum} is the
-number of the newly-created tracepoint.
-@end deftypefun
-
-@deftypefun void tracepoint_deleted (int @var{tpnum})
-A tracepoint has been destroyed.  The argument @var{tpnum} is the
-number of the newly-destroyed tracepoint.
-@end deftypefun
-
-@deftypefun void tracepoint_modified (int @var{tpnum})
-A tracepoint has been modified in some way.  The argument @var{tpnum}
-is the number of the modified tracepoint.
-@end deftypefun
-
 @deftypefun void traceframe_changed (int @var{tfnum}, int @var{tpnum})
 The trace frame is changed to @var{tfnum} (e.g., by using the
 @code{tfind} command).  If @var{tfnum} is negative, it means
@@ -230,9 +215,9 @@ The inferior @var{inf} has been removed from the list of inferiors.
 This method is called immediately before freeing @var{inf}.
 @end deftypefun
 
-@deftypefun void memory_changed (CORE_ADDR @var{addr}, int @var{len}, const bfd_byte *@var{data})
+@deftypefun void memory_changed (struct inferior *@var{inferior}, CORE_ADDR @var{addr}, ssize_t @var{len}, const bfd_byte *@var{data})
 Bytes from @var{data} to @var{data} + @var{len} have been written
-to the current inferior at @var{addr}.
+to the @var{inferior} at @var{addr}.
 @end deftypefun
 
 @deftypefun void before_prompt (const char *@var{current_prompt})

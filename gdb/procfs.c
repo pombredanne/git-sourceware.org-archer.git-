@@ -45,6 +45,7 @@
 #include "gdb_wait.h"
 #include <signal.h>
 #include <ctype.h>
+#include "gdb_bfd.h"
 #include "gdb_string.h"
 #include "gdb_assert.h"
 #include "inflow.h"
@@ -141,11 +142,7 @@ static int procfs_thread_alive (struct target_ops *ops, ptid_t);
 static void procfs_find_new_threads (struct target_ops *ops);
 static char *procfs_pid_to_str (struct target_ops *, ptid_t);
 
-static int proc_find_memory_regions (int (*) (CORE_ADDR,
-					      unsigned long,
-					      int, int, int,
-					      void *),
-				     void *);
+static int proc_find_memory_regions (find_memory_region_ftype, void *);
 
 static char * procfs_make_note_section (bfd *, int *);
 
@@ -2520,7 +2517,7 @@ proc_set_watchpoint (procinfo *pi, CORE_ADDR addr, int len, int wflags)
    register for the LWP that we're interested in.  Returns the
    matching ssh struct (LDT entry).  */
 
-struct ssd *
+static struct ssd *
 proc_get_LDT_entry (procinfo *pi, int key)
 {
   static struct ssd *ldt_entry = NULL;

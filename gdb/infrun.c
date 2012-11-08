@@ -673,7 +673,18 @@ handle_vfork_child_exec_or_exit (int exec)
 
 	  /* follow-fork child, detach-on-fork on.  */
 
-	  old_chain = make_cleanup_restore_current_thread ();
+	  inf->vfork_parent->pending_detach = 0;
+
+	  if (!exec)
+	    {
+	      /* If we're handling a child exit, then inferior_ptid
+		 points at the inferior's pid, not to a thread.  */
+	      old_chain = save_inferior_ptid ();
+	      save_current_program_space ();
+	      save_current_inferior ();
+	    }
+	  else
+	    old_chain = save_current_space_and_thread ();
 
 	  /* We're letting loose of the parent.  */
 	  tp = any_live_thread_of_process (inf->vfork_parent->pid);
@@ -3380,23 +3391,38 @@ handle_inferior_event (struct execution_control_state *ecs)
       return;
 
     case TARGET_WAITKIND_EXITED:
+    case TARGET_WAITKIND_SIGNALLED:
       if (debug_infrun)
-        fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_EXITED\n");
+	{
+	  if (ecs->ws.kind == TARGET_WAITKIND_EXITED)
+	    fprintf_unfiltered (gdb_stdlog,
+				"infrun: TARGET_WAITKIND_EXITED\n");
+	  else
+	    fprintf_unfiltered (gdb_stdlog,
+				"infrun: TARGET_WAITKIND_SIGNALLED\n");
+	}
+
       inferior_ptid = ecs->ptid;
       set_current_inferior (find_inferior_pid (ptid_get_pid (ecs->ptid)));
       set_current_program_space (current_inferior ()->pspace);
       handle_vfork_child_exec_or_exit (0);
       target_terminal_ours ();	/* Must do this before mourn anyway.  */
-      print_exited_reason (ecs->ws.value.integer);
 
-      /* Record the exit code in the convenience variable $_exitcode, so
-         that the user can inspect this again later.  */
-      set_internalvar_integer (lookup_internalvar ("_exitcode"),
-			       (LONGEST) ecs->ws.value.integer);
+      if (ecs->ws.kind == TARGET_WAITKIND_EXITED)
+	{
+	  /* Record the exit code in the convenience variable $_exitcode, so
+	     that the user can inspect this again later.  */
+	  set_internalvar_integer (lookup_internalvar ("_exitcode"),
+				   (LONGEST) ecs->ws.value.integer);
 
-      /* Also record this in the inferior itself.  */
-      current_inferior ()->has_exit_code = 1;
-      current_inferior ()->exit_code = (LONGEST) ecs->ws.value.integer;
+	  /* Also record this in the inferior itself.  */
+	  current_inferior ()->has_exit_code = 1;
+	  current_inferior ()->exit_code = (LONGEST) ecs->ws.value.integer;
+
+	  print_exited_reason (ecs->ws.value.integer);
+	}
+      else
+	print_signal_exited_reason (ecs->ws.value.sig);
 
       gdb_flush (gdb_stdout);
       target_mourn_inferior ();
@@ -3406,35 +3432,17 @@ handle_inferior_event (struct execution_control_state *ecs)
       stop_stepping (ecs);
       return;
 
-    case TARGET_WAITKIND_SIGNALLED:
-      if (debug_infrun)
-        fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_SIGNALLED\n");
-      inferior_ptid = ecs->ptid;
-      set_current_inferior (find_inferior_pid (ptid_get_pid (ecs->ptid)));
-      set_current_program_space (current_inferior ()->pspace);
-      handle_vfork_child_exec_or_exit (0);
-      stop_print_frame = 0;
-      target_terminal_ours ();	/* Must do this before mourn anyway.  */
-
-      /* Note: By definition of TARGET_WAITKIND_SIGNALLED, we shouldn't
-         reach here unless the inferior is dead.  However, for years
-         target_kill() was called here, which hints that fatal signals aren't
-         really fatal on some systems.  If that's true, then some changes
-         may be needed.  */
-      target_mourn_inferior ();
-
-      print_signal_exited_reason (ecs->ws.value.sig);
-      singlestep_breakpoints_inserted_p = 0;
-      cancel_single_step_breakpoints ();
-      stop_stepping (ecs);
-      return;
-
       /* The following are the only cases in which we keep going;
          the above cases end in a continue or goto.  */
     case TARGET_WAITKIND_FORKED:
     case TARGET_WAITKIND_VFORKED:
       if (debug_infrun)
-        fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_FORKED\n");
+	{
+	  if (ecs->ws.kind == TARGET_WAITKIND_FORKED)
+	    fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_FORKED\n");
+	  else
+	    fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_VFORKED\n");
+	}
 
       /* Check whether the inferior is displaced stepping.  */
       {

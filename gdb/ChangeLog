@@ -1,3 +1,765 @@
+2012-11-08  Pierre Muller  <muller@sourceware.org>
+
+	* contrib/ari/gdb_ari.sh (LANG, LC_ALL): Use 'C' instead of 'c'
+	as default language.
+	(AWK): Use = instead of == for sh test to avoid warning.
+	(Linux rule): Correct [:digit] into [[:digit:]].
+	(__func__ rule): Adapt to "gdb_assert.h" move to common subdirectory.
+	(vasprintf rule): Adapt to common subdirectory moves.
+	(xasprintf rule): Idem.
+	(xvasprintf rule): Idem.
+	(var_boolean rule): Accept occurence in == or != test.
+
+	* contrib/ari/gdb_find.sh: Also prune gdbtk directory.
+
+2012-11-08  Stephane Carrez  <Stephane.Carrez@gmail.com>
+
+	* tui/tui-hooks.c (tui_inferior_exit): New function.
+	(tui_detach_hook): Remove.
+	(tui_install_hooks): Install the inferior exit observer.
+	(tui_remove_hooks): Remove it.
+
+2012-11-08  Yao Qi  <yao@codesourcery.com>
+
+	PR gdb/14777.
+	* source.c (_initialize_source): Call add_com_alias to abbreviate
+	'forward-search' as 'fo'.
+
+2012-11-07  Pedro Alves  <palves@redhat.com>
+
+	* arm-tdep.c: Make defs.h be the first include.
+	* coff-pe-read.c: Ditto.
+	* gnu-nat.c: Ditto.
+	* go32-nat.c: Ditto.
+	* i386-nat.c: Ditto.
+	* ppcnbsd-nat.c: Ditto.
+	* ada-varobj.h: Don't include defs.h.
+	* i386-darwin-tdep.h: Ditto.
+	* i386-nat.h: Ditto.
+
+2012-11-07  Pedro Alves  <palves@redhat.com>
+
+	* MAINTAINERS: New FSF-appointed maintainers replace the Steering
+	Committee.
+
+2012-11-07  Pierre Muller  <muller@sourceware.org>
+
+	* common/linux-osdata.c (dirent.h): ARI fix: Remove.
+	File already uses "gdb_dirent.h" header.
+
+2012-11-07  Yao Qi  <yao@codesourcery.com>
+
+	* breakpoint.c (get_tracepoint_by_number): Remove 'extern int
+	tracepoint_count'.
+
+2012-11-06  Tom Tromey  <tromey@redhat.com>
+
+	* target.h (inferior_has_forked, inferior_has_vforked)
+	(inferior_has_execd, inferior_has_called_syscall): Remove
+	declarations.
+
+2012-11-06  Pierre Muller  <muller@sourceware.org>
+
+	* remote.c (remote_insert_hw_breakpoint): ARI fix,
+	add missing internalization markup.
+
+2012-11-06  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/14810
+
+	* breakpoint.c (bpstat_stop_status): Skip disabled locations.
+
+2012-11-06  Pierre Muller  <muller@sourceware.org>
+
+	* contrib/ari/create-web-ari-in-src.sh: Avoid problem if script
+	is not executable.
+
+2012-11-05  Joel Brobecker  <brobecker@adacore.com>
+
+	* gnulib/update-gnulib.sh: New script.
+
+2012-11-05  Stephane Carrez  <Stephane.Carrez@gmail.com>
+
+	* MAINTAINERS: Update my email address.
+
+2012-11-05  Tom Tromey  <tromey@redhat.com>
+
+	* frame.c (put_frame_register): Don't use temporary buffer.
+
+2012-11-05  Pedro Alves  <palves@redhat.com>
+
+	* inferior.c (exit_inferior_1): Clear 'vfork_parent' in the vfork
+	child.  Clear 'pending_detach'.
+	* infrun.c (handle_vfork_child_exec_or_exit): Clear
+	'pending_detach' in the vfork parent.
+
+2012-11-05  Doug Evans  <dje@google.com>
+
+	Add support for DWP files.  http://gcc.gnu.org/wiki/DebugFissionDWP
+	* contrib/cc-with-tweaks.sh: Add -p parameter to invoke dwp.
+	* dwarf2read.c: #include "elf-bfd.h".
+	(struct dwarf2_per_objfile): New members dwp_checked, dwp_file.
+	(dwop_section_names): Renamed from dwo_section names.  All uses
+	updated.  Add entries for .debug_cu_index, .debug_tu_index.
+	(struct dwo_file): Rename dwo_name to name, dwo_bfd to dbfd.
+	All uses updated.
+	(struct dwp_sections): New type.
+	(struct virtual_dwo_sections): New type.
+	(struct dwp_hash_table): New type.
+	(struct dwp_file): New type.
+	(init_cutu_and_read_dies): Ensure DWO info/types section has been
+	read in.  Handle DWOs coming from DWP files.
+	(lookup_dwo_file_slot): New function.
+	(dwarf2_locate_dwo_sections): Move definition closer to use.
+	(create_dwo_debug_info_hash_table_reader): Renamed from
+	create_debug_info_hash_table_reader.  All callers updated.
+	(create_dwo_debug_info_hash_table): Renamed from
+	create_debug_info_hash_table.  All callers updated.
+	(create_dwp_hash_table): New function.
+	(locate_virtual_dwo_sections, create_dwo_in_dwp): New functions.
+	(lookup_dwo_in_dwp): New function.
+	(try_open_dwop_file): Renamed from try_open_dwo_file.  New parameter
+	is_dwp.  All callers updated.
+	(open_dwop_file): Renamed from open_dwo_file.  All callers updated.
+	(open_and_init_dwo_file): Renamed from init_dwo_file.
+	All callers updated.
+	(lookup_dwo_file): Delete.
+	(dwarf2_locate_dwp_sections): New function.
+	(hash_dwp_loaded_cutus, eq_dwp_loaded_cutus): New functions.
+	(allocate_dwp_loaded_cutus_table): New function.
+	(open_and_init_dwp_file): New function.
+	(lookup_dwo_cutu): New function.
+	(lookup_dwo_comp_unit, lookup_dwo_type_unit): Call it.
+
+2012-11-03  Yao Qi  <yao@codesourcery.com>
+
+	Fix PR gdb/14617.
+	* breakpoint.c (trace_pass_set_count): Call
+	observer_notify_breakpoint_modified instead of
+	observer_notify_tracepoint_modified.
+	* mi/mi-cmd-break.c (mi_cmd_break_passcount): Likewise.
+
+2012-11-02  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (catch_syscall_completer): Pass 'word' as second
+	argument to complete_on_enum.
+
+2012-11-02  Tom Tromey  <tromey@redhat.com>
+
+	* configure: Rebuild.
+	* configure.ac (build_warnings): Add -Wempty-body.
+	* m68k-tdep.c (m68k_gdbarch_init): Remove empty 'if'.
+	* remote.c (handle_notification): Use braces for empty 'else' body.
+	* s390-tdep.c (s390_analyze_prologue): Use braces for empty
+	'else' body.
+	* sh64-tdep.c (sh64_push_dummy_call): Use braces for empty
+	'else' body.
+	* solib-som.c (som_relocate_section_addresses): Use braces
+	for empty 'else' body.
+	* ui-file.c (stdio_file_write): Use braces for empty 'if' body.
+	(stdio_file_write_async_safe, stdio_file_fputs): Likewise.
+
+2012-11-02  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/14766
+
+	* infrun.c (handle_inferior_event)
+	<TARGET_WAITKIND_EXITED/TARGET_WAITKIND_SIGNALLED>: Switch to
+	null_ptid before handling a vfork child exec or exit.  Switch to
+	the event ptid afterwards.
+
+2012-11-02  Yao Qi  <yao@codesourcery.com>
+
+	* std-operator.def: Remove OP_LABELED.
+	* eval.c: Remove the declaration of 'get_label'.
+	(get_label): Remove.
+	(evaluate_struct_tuple): Remove code handling OP_LABELED.
+	Update comment.
+	Remove local variable 'variantno' and related code.
+	Replace 'substruct_type' with 'struct_type'.  Replace 'subfieldno'
+	with 'fieldno'.
+	* expprint.c (print_subexp_standard): Likewise.
+	(dump_subexp_body_standard): Likewise.
+	* parse.c (operator_length_standard): Likewise.
+
+2012-11-01  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	Incorporate ARI web page generator into GDB sources.
+	* contrib/ari/create-web-ari-in-src.sh: New file.
+	* contrib/ari/gdb_ari.sh: New file.
+	* contrib/ari/gdb_find.sh: New file.
+	* contrib/ari/update-web-ari.sh: New file.
+
+2012-10-31  Tom Tromey  <tromey@redhat.com>
+
+	* gdbarch.c: Rebuild.
+	* gdbarch.sh: Remove references to gdbarch_swap.
+	* corelow.c (core_open): Remove obsolete comment.
+
+2012-10-31  Andrew Burgess  <aburgess@broadcom.com>
+
+	PR cli/14772
+	* c-typeprint.c (c_print_type): Don't print a space for vector
+	types, this is handled within the suffix.
+	(c_type_print_varspec_suffix): Add a space to vector suffix.
+
+2012-10-26  Pedro Alves  <palves@redhat.com>
+
+	* amd64-tdep.c (amd64_relocate_instruction): Use
+	store_unsigned_integer instead of memcpy.
+	* i386-tdep.c (i386_relocate_instruction): Ditto.
+
+2012-10-26  Pedro Alves  <palves@redhat.com>
+
+	* infrun.c (handle_inferior_event): Merge handling of
+	TARGET_WAITKIND_EXITED and TARGET_WAITKIND_SIGNALLED into a single
+	switch case.
+
+2012-10-26  Pedro Alves  <palves@redhat.com>
+
+	* infrun.c (handle_inferior_event) <TARGET_WAITKIND_SIGNALLED>:
+	Remove comment.
+
+2012-10-26  Pedro Alves  <palves@redhat.com>
+
+	* target.c (target_waitstatus_to_string): Handle
+	TARGET_WAITKIND_VFORK_DONE.
+
+2012-10-26  Pedro Alves  <palves@redhat.com>
+
+	* infrun.c (handle_inferior_event): Print TARGET_WAITKIND_VFORKED
+	as "TARGET_WAITKIND_VFORKED", not "TARGET_WAITKIND_FORKED".
+
+2012-10-24  Tristan Gingold  <gingold@adacore.com>
+
+	* ravenscar-sparc-thread.c (ravenscar_sparc_fetch_registers):
+	Add comments.
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-thread.c (ravenscar_wait): Only update the list
+	of threads and inferior_ptid if the inferior is still alive.
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (is_known_support_routine): Use lbasename when
+	matching the symtab's filename against
+	known_runtime_file_name_patterns.
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_same_array_size_p): New function.
+	(ada_promote_array_of_integrals): New function.
+	(coerce_for_assign): Add handling of arrays where the elements
+	are integrals of a smaller size than the size of the target
+	array element type.
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* doublest.c (convert_doublest_to_floatformat): Fix comparison
+	against maximum exponent value.
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.h (ADA_KNOWN_RUNTIME_FILE_NAME_PATTERNS): Add entry for
+	"unwind-seh.c".
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_template_to_fixed_record_type_1): Do not
+	strip typedef layer when computing the fixed type's field type,
+	only when computing its size.
+
+2012-10-24  Mark Kettenis  <kettenis@gnu.org>
+
+	PR gdb/12783
+	* i386-tdep.c (i386_return_value): Handle complex double and long
+	double.
+
+2012-10-24  Joel Brobecker  <brobecker@adacore.com>
+
+	* windows-nat.c (windows_create_inferior) [!__CYGWIN__]:
+	New local variable args_len.
+	Quote the name of the executable when computing the command line.
+
+2012-10-23  Mark Kettenis  <kettenis@gnu.org>
+
+	PR gdb/12796
+	PR gdb/12798
+	PR gdb/12800
+	* amd64-tdep.h (enum amd64_regnum): Add AMD64_ST1_REGNUM and
+	AMD64_FTAG_REGNUM.
+	* amd64-tdep.c (amd64_classify): Classify complex types.
+	(amd64_return_value): Handle the COMPLEX_X87 class.
+
+2012-10-23  Joel Brobecker  <brobecker@adacore.com>
+
+	* rs6000-aix-tdep.c (rs6000_aix_auto_wide_charset): New function.
+	(rs6000_aix_init_osabi): Set auto_wide_charset gdbarch method.
+
+2012-10-23  Joel Brobecker  <brobecker@adacore.com>
+
+	* amd64-windows-tdep.c (amd64_windows_auto_wide_charset): New
+	function.
+	(amd64_windows_init_abi): Set auto_wide_charset gdbarch method
+	to amd64_windows_auto_wide_charset.
+
+2012-10-23  Yao Qi  <yao@codesourcery.com>
+
+	* event-top.c (mark_async_signal_handler_wrapper): Remove.
+	* event-top.h: Remove its declaration.
+	(async_request_quit): Call mark_async_signal_handler instead of
+	mark_async_signal_handler_wrapper.
+	(async_do_nothing, async_disconnect): Likewise.
+	(async_stop_sig): Likewise.
+	* remote.c (handle_remote_sigint): Likewise.
+	(handle_remote_sigint_twice): Likewise.
+
+2012-10-23  Yao Qi  <yao@codesourcery.com>
+
+	* event-top.c (sigint_token, sighup_token): Replace 'void *'
+	with 'static struct async_signal_handler *'.
+	(sighup_token, sigquit_token, sigstp_token): Likewise.
+
+2012-10-22  Ali Anwar  <ali_anwar@codesourcery.com>
+
+	* gdbarch.sh (function_list): Use 'pstring' when printing
+	a variable which could return NULL.
+	* gdbarch.c: Regenerate.
+
+2012-10-10  Joel Brobecker  <brobecker@adacore.com>
+            Tom Tromey  <tromey@redhat.com>
+
+	* rs6000-aix-tdep.c (rs6000_aix_osabi_sniffer): Replace
+	inneffective if condition by gdb assertion.  Add function
+	description comment.
+
+2012-10-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* parser-defs.h (struct exp_descriptor): Document constraint
+	on return value for "op_name" callbacks.
+
+2012-10-18  Tom Tromey  <tromey@redhat.com>
+
+	* tracepoint.c (print_one_static_tracepoint_marker): Constify.
+	* symtab.c (iterate_over_some_symtabs): Constify.
+	* source.h (symtab_to_fullname): Return 'const char *'.
+	* source.c (symtab_to_fullname): Return 'const char *'.
+	* python/py-symtab.c (stpy_fullname): Constify.
+	* cli/cli-cmds.c (edit_command): Constify.
+	* breakpoint.c (print_breakpoint_location)
+	(update_static_tracepoint): Constify.
+
+2012-10-18  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (compare_breakpoints): Fix comparison.
+
+2012-10-18  Tom Tromey  <tromey@redhat.com>
+
+	* valprint.c (generic_emit_char, generic_printstr): Pass size of
+	gdb_wchar_t to convert_between_encodings.
+
+2012-10-17  Yao Qi  <yao@codesourcery.com>
+
+	* breakpoint.c (invalidate_bp_value_on_memory_change): Add one
+	more parameter 'inferior'.
+	* corefile.c (write_memory_with_notification): Caller update.
+
+	* mi/mi-cmd-var.c: Include "mi-main.h".
+	(mi_cmd_var_assign): Set mi_suppress_notification.data_write_memory
+	to 1 and restore it later.
+	* mi/mi-cmds.c (mi_cmd mi_cmds): Update for "data-write-memory"
+	and "data-write-memory-bytes.
+	* mi/mi-interp.c: Include objfiles.h.
+	(mi_interpreter_init): Call observer_attach_memory_changed.
+	(mi_memory_changed): New.
+	* mi/mi-main.h (struct mi_suppress_notification) <memory>:
+	New field.
+
+	* NEWS: Mention new MI notification "memory-changed".
+
+2012-10-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2loc.c (dwarf_expr_reg_to_entry_parameter): Remove comment.
+
+2012-10-15  Doug Evans  <dje@google.com>
+
+	New option -nh: inhibit loading of ~/.gdbinit.
+	* NEWS: Mention -nh.
+	* main.c (captured_main): Recognize and process -nh.
+	(print_gdb_help): Mention -nh.
+	* gdb.1: Mention -nh.  Remove erroneous docs on -nx behavior.
+
+2012-10-15  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR backtrace/14646
+	PR gdb/14647
+	* i386-tdep.h (gdbarch_tdep): Remove sp_regnum_from_eax and
+	pc_regnum_from_eax.
+	* i386-tdep.c (i386_gdbarch_init): Don't use sp_regnum_from_eax
+	nor pc_regnum_from_eax.
+	* amd64-tdep.c (amd64_x32_init_abi): Don't set sp_regnum_from_eax
+	nor pc_regnum_from_eax.
+
+2012-10-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix entry values resolving in inlined frames.
+	* dwarf2loc.c (dwarf_expr_reg_to_entry_parameter): Move func_addr,
+	gdbarch and caller_frame initialization later.  Skip INLINE_FRAME
+	entries of FRAME.
+
+2012-10-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.ac: Build with -DMS_WIN64 if building with Python
+	enabled using GCC on amd64-windows.
+	* configure: Regenerate.
+
+2012-10-15  Tom Tromey  <tromey@redhat.com>
+
+	PR python/14635:
+	* python/py-symtab.c (del_objfile_sal): Set 'symtab' field
+	to Py_None.
+
+2012-10-15  Tom Tromey  <tromey@redhat.com>
+
+	PR python/14634:
+	* python/py-symbol.c (sympy_dealloc): Check for NULL symbol.
+
+2012-10-11  Andrew Burgess  <aburgess@broadcom.com>
+
+	* remote-sim.c (gdbsim_create_inferior): Call init_thread_list to
+	reset thread numbering back to 1.
+
+2012-10-11  Doug Evans  <dje@google.com>
+
+	PR breakpoints/14643.
+	* linespec.c (struct ls_parser): New member keyword_ok.
+	(linespec_lexer_lex_string): Add comment.
+	(linespec_lexer_lex_one): Ignore keywords if it's the wrong place
+	for one.
+	(parse_linespec): Set keyword_ok.
+
+2012-10-10  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (process_psymtab_comp_unit_reader): Remove duplicate
+	"0x" prefix on address in log message.
+
+	* dwarf2read.c (read_1_byte): Add const to buf parameter.
+	(read_1_signed_byte, read_2_bytes, read_2_signed_bytes): Ditto.
+	(read_4_bytes, read_4_signed_bytes, read_8_bytes): Ditto.
+	(lookup_dwo_file): Add const to dwo_name parameter.
+	(lookup_dwo_comp_unit, lookup_dwo_type_unit): Ditto.
+
+2012-10-06  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix crash during stepping on ppc32.
+	* ppc-linux-tdep.c (powerpc_linux_in_dynsym_resolve_code): Test NULL
+	SYM.
+
+2012-10-03  Doug Evans  <dje@google.com>
+
+	PR symtab/14601
+	* buildsym.c (buildsym_init): Reset using_directives to NULL.
+
+2012-10-02  Andrew Burgess  <aburgess@broadcom.com>
+
+	* remote-sim.c (dump_mem): Always dump buffer contents, zero fill
+	output and use uint32_t not long to ensure 4 byte size.
+
+2012-10-02  Joel Brobecker  <brobecker@adacore.com>
+
+	* rs6000-nat.c (add_vmap): Set "last" to "next" after having
+	unref'ed it.
+
+2012-10-01  Andrew Burgess  <aburgess@broadcom.com>
+
+	* target.c (simple_search_memory): Include access length in
+	warning message.
+
+2012-09-28  Nathan Miller  <nathanm2@us.ibm.com>
+	    Edjunior Machado  <emachado@linux.vnet.ibm.com>
+
+	PR gdb/13989
+	* solib.c (solib_find): Prevent GDB from loading native libraries when
+	debugging a cross-target corefile.
+
+2012-09-28  selven  <pcthegreat@gmail.com>
+
+	Make definition match declaration.
+
+	* regcache.c (regcache_register_status): Change return type to
+	enum register_status.
+
+2012-09-28  Yao Qi  <yao@codesourcery.com>
+
+	* mi/mi-main.c (mi_cmd_data_write_memory): Call
+	write_memory_with_notification instead of write_memory.
+	(mi_cmd_data_write_memory_bytes): Call write_memory_with_notification
+	instead of target_write_memory.
+
+2012-09-28  Yao Qi  <yao@codesourcery.com>
+
+	* mi/mi-main.c (mi_cmd_data_write_memory_bytes): Emit error
+	when the length of content is not an even number.
+
+2012-09-27  Tom Tromey  <tromey@redhat.com>
+
+	Fix https://bugzilla.redhat.com/show_bug.cgi?id=849357
+	* cp-valprint.c (cp_print_value_fields): Use get_vptr_fieldno.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* sol-thread.c (sol_thread_fetch_registers)
+	(sol_thread_store_registers): Delete commented out code.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* sol-thread.c (ps_lgetxregsize, ps_lgetxregs, ps_lsetxregs):
+	Move these functions to sparc-sol-thread.c.
+	* sparc-sol-thread.c: New file.
+	* configure.ac: Add sparc-sol-thread.o to CONFIG_OBS and
+	sparc-sol-thread.c to CONFIG_SRCS for sparc-solaris native
+	configurations.
+	* configure: Regenerate.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* sol-thread.c (ps_lgetxregsize, ps_lgetxregs, ps_lsetxregs):
+	Remove commented-out code.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* sol-thread.c (ps_lgetxregsize, ps_lgetxregs, ps_lsetxregs):
+	Enable this code for sparc hosts only.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* procfs.h (procfs_find_LDT_entry): Add declaration.
+	* sol-thread.c (ps_lgetLDT): Delete local declaration of
+	function procfs_find_LDT_entry.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* procfs.c (proc_get_LDT_entry): Make static.
+
+2012-09-27  Joel Brobecker  <brobecker@adacore.com>
+
+	* procfs.c (proc_find_memory_regions): Fix declaration.
+
+2012-09-27  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* amd64-tdep.c (amd64_return_value): Revert previous change
+	that used TYPE_LENGTH directly.
+	* bfin-tdep.c (bfin_extract_return_value): Likewise.
+	(bfin_store_return_value): Likewise.
+	* cris-tdep.c (cris_store_return_value): Likewise.
+	(cris_extract_return_value): Likewise.
+	* h8300-tdep.c (h8300_extract_return_value): Likewise.
+	* hppa-tdep.c (hppa64_return_value): Likewise.
+	* lm32-tdep.c (lm32_store_return_value): Likewise.
+	* microblaze-tdep.c (microblaze_store_return_value): Likewise.
+	* spu-tdep.c (spu_value_from_register): Likewise.
+	* vax-tdep.c (vax_return_value): Likewise.
+
+2012-09-27  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* gdbtypes.c (lookup_array_range_type): Expand parameters
+	LOW_BOUND and HIGH_BOUND to LONGEST.
+	(lookup_string_range_type): Likewise.
+	* gdbtypes.h (lookup_array_range_type): Likewise.
+	(lookup_string_range_type): Likewise.
+	* valops.c (value_cstring): Expand parameter LEN to ssize_t.
+	Expand HIGHBOUND to ssize_t.
+	(value_string): Likewise.
+	* value.h (value_cstring): Expand parameter LEN to ssize_t.
+	(value_string): Likewise.
+
+2012-09-27  Yao Qi  <yao@codesourcery.com>
+
+	PR breakpoints/13898
+	* breakpoint.h (tracepoint_breakpoint_ops): Forward declaration.
+	* mi/mi-cmd-break.c (mi_cmd_break_insert): Set breakpoint_ops
+	per breakpoint type.
+
+2012-09-26  Pierre Muller  <muller@ics.u-strasbg.fr>
+
+	* procfs.c: Add gdb_bfd header.
+	* rs6000-nat.c: Likewise.
+	* solib-pa64.c: Likewise.
+	* spu-linux-nat.c: Likewise.
+	* windows-nat.c: Likewise.
+
+2012-09-26  Tom Tromey  <tromey@redhat.com>
+
+	* f-lang.h (BLANK_COMMON_NAME_LOCAL): Remove.
+
+2012-09-26  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (mark_common_block_symbol_computed): New function.
+	(read_common_block): Handle child DIEs with
+	DW_AT_data_member_location.
+	(new_symbol_full): Add special case for common blocks.
+
+2012-09-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (read_common_block): Rewrite.
+	(new_symbol_full): Handle DW_TAG_common_block.
+	* f-lang.c (head_common_list, find_common_for_function):
+	Remove.
+	* f-lang.h (struct common_entry, struct saved_f77_common,
+	SAVED_F77_COMMON, SAVED_F77_COMMON_PTR, COMMON_ENTRY,
+	COMMON_ENTRY_PTR, head_common_list, find_common_for_function,
+	BLANK_COMMON_NAME_LOCAL): Remove.
+	(struct common_block): New.
+	* f-valprint.c (list_all_visible_commons): Remove.
+	(info_common_command_for_block): New function.
+	(info_common_command): Use it.
+	* stack.c (iterate_over_block_locals): Special case for
+	COMMON_BLOCK_DOMAIN.
+	* symtab.h (enum domain_enum_tag) <COMMON_BLOCK_DOMAIN>: New
+	constant.
+	(struct general_symbol_info) <value.common_block>: New field.
+	(SYMBOL_VALUE_COMMON_BLOCK): New define.
+
+2012-09-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* f-lang.c (allocate_saved_bf_node,
+	allocate_saved_function_node, allocate_saved_f77_common_node,
+	allocate_common_entry_node, tail_common_list, current_common,
+	saved_bf_list, saved_bf_list_end, current_head_bf_list,
+	tmp_bf_ptr, add_common_block, add_common_entry,
+	find_first_common_named, patch_common_entries,
+	patch_all_commons_by_name, ADD_BF_SYMNUM, clear_bf_list,
+	global_remote_debug, get_bf_for_fcn, saved_function_list,
+	saved_function_list_end, clear_function_list, struct saved_fcn,
+	struct saved_bf_symnum, SAVED_FUNCTION, SAVED_FUNCTION_PTR,
+	SAVED_BF, SAVED_BF_PTR): Remove.
+	* f-lang.h (tail_common_list, current_common,
+	UNINITIALIZED_SECNUM, COMMON_NEEDS_PATCHING,
+	BLANK_COMMON_NAME_ORIGINAL, BLANK_COMMON_NAME_MF77,
+	DEFAULT_UPPER_BOUND, DEFAULT_LOWER_BOUND, real_main_name,
+	real_main_c_value): Remove.
+	* f-valprint.c (there_is_a_visible_common_named): Remove.
+
+2012-09-26  Andrew Burgess  <aburgess@broadcom.com>
+
+	* breakpoint.c (update_global_location_list): Ignore previous
+	duplicate status of a breakpoint when starting a new scan for
+	duplicate breakpoints.
+
+2012-09-26  Karthik Bhat  <kv.bhat@samsung.com>
+	PR breakpoints/14419
+	* arm-tdep.c (arm_skip_prologue): Extending producer check to
+	support LLVM compiler.
+
+2012-09-26  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* amd64-tdep.c (amd64_return_value): Use TYPE_LENGTH directly.
+	* bfin-tdep.c (bfin_extract_return_value): Likewise.
+	(bfin_store_return_value): Likewise.
+	* cris-tdep.c (cris_store_return_value): Likewise.
+	(cris_extract_return_value): Likewise.
+	* h8300-tdep.c (h8300_extract_return_value): Likewise.
+	* hppa-tdep.c (hppa64_return_value): Likewise.
+	* lm32-tdep.c (lm32_store_return_value): Likewise.
+	* microblaze-tdep.c (microblaze_store_return_value): Likewise.
+	* spu-tdep.c (spu_value_from_register): Likewise.
+	* vax-tdep.c (vax_return_value): Likewise.
+
+2012-09-26  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* breakpoint.c (invalidate_bp_value_on_memory_change): Expand
+	parameter LEN to ssize_t.
+
+2012-09-25  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* ada-valprint.c (ada_val_print_1): Eliminate single-use
+	variable LEN.
+	* alpha-tdep.c (alpha_extract_return_value): Use TYPE_LENGTH
+	directly.
+	(alpha_store_return_value): Likewise.
+	* amd64-tdep.c (amd64_classify_aggregate): Likewise.
+	(amd64_push_arguments): Likewise.
+	* ax-gdb.c (gen_trace_static_fields): Likewise.
+	(gen_traced_pop): Likewise.
+	* bfin-tdep.c (bfin_push_dummy_call): Likewise.
+	* breakpoint.c (update_watchpoint): Likewise.
+	* findcmd.c (parse_find_args): Use local variable for type
+	instead of length.
+	* findvar.c (default_read_var_value): Use TYPE_LENGTH directly.
+	* h8300-tdep.c (h8300h_extract_return_value): Likewise.
+	(h8300_store_return_value): Likewise.
+	* i386-darwin-tdep.c (i386_darwin_push_dummy_call): Likewise.
+	Use i386_darwin_arg_type_alignment directly.
+	* infcall.c (call_function_by_hand): Use TYPE_LENGTH directly.
+	* lm32-tdep.c (lm32_push_dummy_call): Likewise.
+	* m68hc11-tdep.c (m68hc11_push_dummy_call): Likewise.
+	(m68hc11_extract_return_value): Likewise.
+	* mep-tdep.c (mep_push_dummy_call): Likewise.
+	* printcmd.c (float_type_from_length): Likewise.
+	* s390-tdep.c (s390_value_from_register): Likewise.
+	* stack.c (read_frame_arg): Likewise.
+	* tracepoint.c (encode_actions_1): Likewise.
+	* valops.c (value_fetch_lazy): Use local variable for type
+	instead of length.  Use TYPE_LENGTH directly.
+	* value.c (value_contents_equal): Use TYPE_LENGTH directly.
+
+2012-09-25  Joel Brobecker  <brobecker@adacore.com>
+
+	* symtab.c (skip_prologue_sal): Fix typo in comment.
+
+2012-09-25  Joel Brobecker  <brobecker@adacore.com>
+
+	* linespec.c (create_sals_line_offset): Fix typo in comment.
+
+2012-09-25  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* c-typeprint.c (c_type_print_varspec_suffix): Remove cast and
+	use plongest to print the array size.
+
+2012-09-24  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* m2-typeprint.c (m2_enum): Expand LASTVAL to LONGEST.
+	* p-valprint.c (pascal_type_print_base): Likewise.
+
+2012-09-22  Yao Qi  <yao@codesourcery.com>
+
+	* remote.c (remote_get_trace_status): Remove setting default
+	values of fields of 'ts'.
+
+2012-09-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix internal error on canonicalization of clang types.
+	* cp-name-parser.y (operator): New comment at make_operator call for
+	new, delete, new[] and delete[].
+	(exp): Use "sizeof ".  Add new comment at make_operator call.
+
+2012-09-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix disassemble without parameters in tailcall frame.
+	* cli/cli-cmds.c (disassemble_current_function): Use
+	get_frame_address_in_block.
+
+2012-09-21  Tom Tromey  <tromey@redhat.com>
+
+	* c-typeprint.c (c_type_print_base) <TYPE_CODE_STRUCT,
+	TYPE_CODE_UNION>: Unify, removing a goto.
+
+2012-09-21  Tom Tromey  <tromey@redhat.com>
+
+	* c-typeprint.c (cp_type_print_derivation_info): Fix comment.
+
+2012-09-21  Andrew Burgess  <aburgess@broadcom.com>
+
+	* findvar.c (read_frame_register_value): Mark the result value as
+	optimized out if any of the input registers have been optimized out.
+
+2012-09-21  Andreas Schwab  <schwab@linux-m68k.org>
+
+	* python/python.c (finalize_python): Only define if HAVE_PYTHON.
+
 2012-09-21  Siddhesh Poyarekar  <siddhesh@redhat.com>
 
 	* eval.c (evaluate_subexp_standard): Eliminate single-use

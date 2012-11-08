@@ -242,7 +242,7 @@ iterate_over_some_symtabs (const char *name,
 
     if (real_path != NULL)
       {
-        char *fullname = symtab_to_fullname (s);
+        const char *fullname = symtab_to_fullname (s);
 
         if (fullname != NULL)
           {
@@ -2810,7 +2810,7 @@ skip_prologue_sal (struct symtab_and_line *sal)
   struct block *b, *function_block;
   int force_skip, skip;
 
-  /* Do not change the SAL is PC was specified explicitly.  */
+  /* Do not change the SAL if PC was specified explicitly.  */
   if (sal->explicit_pc)
     return;
 

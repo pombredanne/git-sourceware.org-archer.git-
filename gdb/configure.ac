@@ -989,9 +989,23 @@ if test "${have_libpython}" != no; then
   # unilaterally defined, and that in turn causes _SGIAPI to evaluate
   # to false.  So, we work around this issue by defining siginfo ourself
   # though the command-line.
+  #
+  # On x64 Windows, Python's include headers, and pyconfig.h in
+  # particular, rely on MS_WIN64 macro to detect that it's a 64bit
+  # version of Windows.  Unfortunately, MS_WIN64 is only defined if
+  # _MSC_VER, a Microsoft-specific macro, is defined.  So, when
+  # building on x64 Windows with GCC, we define MS_WIN64 ourselves.
+  # The issue was reported to the Python community, but still isn't
+  # solved as of 2012-10-02 (http://bugs.python.org/issue4709).
+
   case "$gdb_host" in
     irix*) if test "${GCC}" = yes; then
              CPPFLAGS="$CPPFLAGS -Dsiginfo=__siginfo"
+           fi
+           ;;
+    mingw64)
+           if test "${GCC}" = yes; then
+             CPPFLAGS="$CPPFLAGS -DMS_WIN64"
            fi
            ;;
   esac
@@ -1719,6 +1733,13 @@ if test ${build} = ${host} -a ${host} = ${target} ; then
          [Define if using Solaris thread debugging.])
          CONFIG_OBS="${CONFIG_OBS} sol-thread.o"
          CONFIG_SRCS="${CONFIG_SRCS} sol-thread.c"
+         # On SPARC CPUs, we also need to build sparc-sol-thread.
+         case ${host_cpu} in
+           sparc*)
+             CONFIG_OBS="${CONFIG_OBS} sparc-sol-thread.o"
+             CONFIG_SRCS="${CONFIG_SRCS} sparc-sol-thread.c"
+             ;;
+         esac
          AC_CHECK_LIB(dl, dlopen)
 	 CONFIG_LDFLAGS="${CONFIG_LDFLAGS} $RDYNAMIC"
 	 # Sun randomly tweaked the prototypes in <proc_service.h>
@@ -1899,7 +1920,7 @@ build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
 -Wformat-nonliteral -Wno-pointer-sign \
 -Wno-unused -Wunused-value -Wunused-function \
 -Wno-switch -Wno-char-subscripts -Wmissing-prototypes \
--Wdeclaration-after-statement"
+-Wdeclaration-after-statement -Wempty-body"
 
 # Enable -Wno-format by default when using gcc on mingw since many
 # GCC versions complain about %I64.

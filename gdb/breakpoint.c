@@ -1844,11 +1844,10 @@ update_watchpoint (struct watchpoint *b, int reparse)
 		      && TYPE_CODE (vtype) != TYPE_CODE_ARRAY))
 		{
 		  CORE_ADDR addr;
-		  int len, type;
+		  int type;
 		  struct bp_location *loc, **tmp;
 
 		  addr = value_address (v);
-		  len = TYPE_LENGTH (value_type (v));
 		  type = hw_write;
 		  if (b->base.type == bp_read_watchpoint)
 		    type = hw_read;
@@ -1863,7 +1862,7 @@ update_watchpoint (struct watchpoint *b, int reparse)
 
 		  loc->pspace = frame_pspace;
 		  loc->address = addr;
-		  loc->length = len;
+		  loc->length = TYPE_LENGTH (value_type (v));
 		  loc->watchpoint_type = type;
 		}
 	    }
@@ -5176,7 +5175,7 @@ bpstat_stop_status (struct address_space *aspace,
 	  if (b->type == bp_hardware_watchpoint && bl != b->loc)
 	    break;
 
-	  if (bl->shlib_disabled)
+	  if (!bl->enabled || bl->shlib_disabled)
 	    continue;
 
 	  if (!bpstat_check_location (bl, aspace, bp_addr, ws))
@@ -5671,7 +5670,7 @@ print_breakpoint_location (struct breakpoint *b,
       if (ui_out_is_mi_like_p (uiout))
 	{
 	  struct symtab_and_line sal = find_pc_line (loc->address, 0);
-	  char *fullname = symtab_to_fullname (sal.symtab);
+	  const char *fullname = symtab_to_fullname (sal.symtab);
 	  
 	  if (fullname)
 	    ui_out_field_string (uiout, "fullname", fullname);
@@ -11748,7 +11747,7 @@ compare_breakpoints (const void *a, const void *b)
      the number 0.  */
   if (ua < ub)
     return -1;
-  return ub > ub ? 1 : 0;
+  return ua > ub ? 1 : 0;
 }
 
 /* Delete breakpoints by address or line.  */
@@ -12444,7 +12443,7 @@ update_global_location_list (int should_insert)
       struct bp_location **loc_first_p;
       b = loc->owner;
 
-      if (!should_be_inserted (loc)
+      if (!unduplicated_should_be_inserted (loc)
 	  || !breakpoint_address_is_meaningful (b)
 	  /* Don't detect duplicate for tracepoint locations because they are
 	   never duplicated.  See the comments in field `duplicate' of
@@ -13804,7 +13803,7 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 
 	  if (ui_out_is_mi_like_p (uiout))
 	    {
-	      char *fullname = symtab_to_fullname (sal2.symtab);
+	      const char *fullname = symtab_to_fullname (sal2.symtab);
 
 	      if (fullname)
 		ui_out_field_string (uiout, "fullname", fullname);
@@ -14700,7 +14699,8 @@ show_breakpoint_cmd (char *args, int from_tty)
    GDB itself.  */
 
 static void
-invalidate_bp_value_on_memory_change (CORE_ADDR addr, int len,
+invalidate_bp_value_on_memory_change (struct inferior *inferior,
+				      CORE_ADDR addr, ssize_t len,
 				      const bfd_byte *data)
 {
   struct breakpoint *bp;
@@ -14953,7 +14953,7 @@ catch_syscall_completer (struct cmd_list_element *cmd,
 {
   const char **list = get_syscall_names ();
   VEC (char_ptr) *retlist
-    = (list == NULL) ? NULL : complete_on_enum (list, text, word);
+    = (list == NULL) ? NULL : complete_on_enum (list, word, word);
 
   xfree (list);
   return retlist;
@@ -15226,7 +15226,7 @@ static void
 trace_pass_set_count (struct tracepoint *tp, int count, int from_tty)
 {
   tp->pass_count = count;
-  observer_notify_tracepoint_modified (tp->base.number);
+  observer_notify_breakpoint_modified (&tp->base);
   if (from_tty)
     printf_filtered (_("Setting tracepoint %d's passcount to %d\n"),
 		     tp->base.number, count);
@@ -15328,7 +15328,6 @@ get_tracepoint_by_number (char **arg,
 			  struct get_number_or_range_state *state,
 			  int optional_p)
 {
-  extern int tracepoint_count;
   struct breakpoint *t;
   int tpnum;
   char *instring = arg == NULL ? NULL : *arg;

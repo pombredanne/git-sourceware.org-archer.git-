@@ -7504,25 +7504,35 @@ ada_template_to_fixed_record_type_1 (struct type *type,
         }
       else
         {
-          struct type *field_type = TYPE_FIELD_TYPE (type, f);
+	  /* Note: If this field's type is a typedef, it is important
+	     to preserve the typedef layer.
 
-	  /* If our field is a typedef type (most likely a typedef of
-	     a fat pointer, encoding an array access), then we need to
-	     look at its target type to determine its characteristics.
-	     In particular, we would miscompute the field size if we took
-	     the size of the typedef (zero), instead of the size of
-	     the target type.  */
-	  if (TYPE_CODE (field_type) == TYPE_CODE_TYPEDEF)
-	    field_type = ada_typedef_target_type (field_type);
-
-          TYPE_FIELD_TYPE (rtype, f) = field_type;
+	     Otherwise, we might be transforming a typedef to a fat
+	     pointer (encoding a pointer to an unconstrained array),
+	     into a basic fat pointer (encoding an unconstrained
+	     array).  As both types are implemented using the same
+	     structure, the typedef is the only clue which allows us
+	     to distinguish between the two options.  Stripping it
+	     would prevent us from printing this field appropriately.  */
+          TYPE_FIELD_TYPE (rtype, f) = TYPE_FIELD_TYPE (type, f);
           TYPE_FIELD_NAME (rtype, f) = TYPE_FIELD_NAME (type, f);
           if (TYPE_FIELD_BITSIZE (type, f) > 0)
             fld_bit_len =
               TYPE_FIELD_BITSIZE (rtype, f) = TYPE_FIELD_BITSIZE (type, f);
           else
-            fld_bit_len =
-              TYPE_LENGTH (ada_check_typedef (field_type)) * TARGET_CHAR_BIT;
+	    {
+	      struct type *field_type = TYPE_FIELD_TYPE (type, f);
+
+	      /* We need to be careful of typedefs when computing
+		 the length of our field.  If this is a typedef,
+		 get the length of the target type, not the length
+		 of the typedef.  */
+	      if (TYPE_CODE (field_type) == TYPE_CODE_TYPEDEF)
+		field_type = ada_typedef_target_type (field_type);
+
+              fld_bit_len =
+                TYPE_LENGTH (ada_check_typedef (field_type)) * TARGET_CHAR_BIT;
+	    }
         }
       if (off + fld_bit_len > bit_len)
         bit_len = off + fld_bit_len;
@@ -8619,6 +8629,72 @@ cast_from_fixed (struct type *type, struct value *arg)
   return value_from_double (type, val);
 }
 
+/* Given two array types T1 and T2, return nonzero iff both arrays
+   contain the same number of elements.  */
+
+static int
+ada_same_array_size_p (struct type *t1, struct type *t2)
+{
+  LONGEST lo1, hi1, lo2, hi2;
+
+  /* Get the array bounds in order to verify that the size of
+     the two arrays match.  */
+  if (!get_array_bounds (t1, &lo1, &hi1)
+      || !get_array_bounds (t2, &lo2, &hi2))
+    error (_("unable to determine array bounds"));
+
+  /* To make things easier for size comparison, normalize a bit
+     the case of empty arrays by making sure that the difference
+     between upper bound and lower bound is always -1.  */
+  if (lo1 > hi1)
+    hi1 = lo1 - 1;
+  if (lo2 > hi2)
+    hi2 = lo2 - 1;
+
+  return (hi1 - lo1 == hi2 - lo2);
+}
+
+/* Assuming that VAL is an array of integrals, and TYPE represents
+   an array with the same number of elements, but with wider integral
+   elements, return an array "casted" to TYPE.  In practice, this
+   means that the returned array is built by casting each element
+   of the original array into TYPE's (wider) element type.  */
+
+static struct value *
+ada_promote_array_of_integrals (struct type *type, struct value *val)
+{
+  struct type *elt_type = TYPE_TARGET_TYPE (type);
+  LONGEST lo, hi;
+  struct value *res;
+  LONGEST i;
+
+  /* Verify that both val and type are arrays of scalars, and
+     that the size of val's elements is smaller than the size
+     of type's element.  */
+  gdb_assert (TYPE_CODE (type) == TYPE_CODE_ARRAY);
+  gdb_assert (is_integral_type (TYPE_TARGET_TYPE (type)));
+  gdb_assert (TYPE_CODE (value_type (val)) == TYPE_CODE_ARRAY);
+  gdb_assert (is_integral_type (TYPE_TARGET_TYPE (value_type (val))));
+  gdb_assert (TYPE_LENGTH (TYPE_TARGET_TYPE (type))
+	      > TYPE_LENGTH (TYPE_TARGET_TYPE (value_type (val))));
+
+  if (!get_array_bounds (type, &lo, &hi))
+    error (_("unable to determine array bounds"));
+
+  res = allocate_value (type);
+
+  /* Promote each array element.  */
+  for (i = 0; i < hi - lo + 1; i++)
+    {
+      struct value *elt = value_cast (elt_type, value_subscript (val, lo + i));
+
+      memcpy (value_contents_writeable (res) + (i * TYPE_LENGTH (elt_type)),
+	      value_contents_all (elt), TYPE_LENGTH (elt_type));
+    }
+
+  return res;
+}
+
 /* Coerce VAL as necessary for assignment to an lval of type TYPE, and
    return the converted value.  */
 
@@ -8643,9 +8719,21 @@ coerce_for_assign (struct type *type, struct value *val)
   if (TYPE_CODE (type2) == TYPE_CODE_ARRAY
       && TYPE_CODE (type) == TYPE_CODE_ARRAY)
     {
-      if (TYPE_LENGTH (type2) != TYPE_LENGTH (type)
-          || TYPE_LENGTH (TYPE_TARGET_TYPE (type2))
-          != TYPE_LENGTH (TYPE_TARGET_TYPE (type2)))
+      if (!ada_same_array_size_p (type, type2))
+	error (_("cannot assign arrays of different length"));
+
+      if (is_integral_type (TYPE_TARGET_TYPE (type))
+	  && is_integral_type (TYPE_TARGET_TYPE (type2))
+	  && TYPE_LENGTH (TYPE_TARGET_TYPE (type2))
+	       < TYPE_LENGTH (TYPE_TARGET_TYPE (type)))
+	{
+	  /* Allow implicit promotion of the array elements to
+	     a wider type.  */
+	  return ada_promote_array_of_integrals (type, val);
+	}
+
+      if (TYPE_LENGTH (TYPE_TARGET_TYPE (type2))
+          != TYPE_LENGTH (TYPE_TARGET_TYPE (type)))
         error (_("Incompatible types in assignment"));
       deprecated_set_value_type (val, type);
     }
@@ -10885,7 +10973,7 @@ is_known_support_routine (struct frame_info *frame)
   for (i = 0; known_runtime_file_name_patterns[i] != NULL; i += 1)
     {
       re_comp (known_runtime_file_name_patterns[i]);
-      if (re_exec (sal.symtab->filename))
+      if (re_exec (lbasename (sal.symtab->filename)))
         return 1;
       if (sal.symtab->objfile != NULL
           && re_exec (sal.symtab->objfile->name))

@@ -126,7 +126,7 @@ stpy_get_objfile (PyObject *self, void *closure)
 static PyObject *
 stpy_fullname (PyObject *self, PyObject *args)
 {
-  char *fullname;
+  const char *fullname;
   struct symtab *symtab = NULL;
 
   STPY_REQUIRE_VALID (self, symtab);
@@ -470,7 +470,10 @@ del_objfile_sal (struct objfile *objfile, void *datum)
     {
       sal_object *next = obj->next;
 
-      obj->symtab = NULL;
+      Py_DECREF (obj->symtab);
+      obj->symtab = (symtab_object *) Py_None;
+      Py_INCREF (Py_None);
+
       obj->next = NULL;
       obj->prev = NULL;
       xfree (obj->sal);

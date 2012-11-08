@@ -1,3 +1,42 @@
+2012-11-08  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Search): Add kindex for 'fo'.
+
+2012-11-05  Tom Tromey  <tromey@redhat.com>
+
+	PR python/14802:
+	* gdb.texinfo (Functions In Python): Add example.
+
+2012-11-03  Yao Qi  <yao@codesourcery.com>
+
+	* observer.texi (GDB Observers): Remove observer
+	'tracepoint_modified', 'tracepoint_created' and
+	'tracepoint_deleted'.
+
+2012-10-26  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (General Query Packets): Use @itemx for QAgent.
+
+2012-10-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (General Query Packets): Use @itemx.
+
+2012-10-17  Yao Qi  <yao@codesourcery.com>
+
+	* observer.texi (GDB Observers): Update observer
+	'memory_changed'.
+	* gdb.texinfo (GDB/MI Async Records): Document for
+	"memory-changed" notification.
+
+2012-10-15  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Mode Options): Document -nh.
+	Elaborate on docs for -nx.
+
+2012-09-26  Siddhesh Poyarekar  <siddhesh@redhat.com>
+
+	* observer.texi (memory_changed): Expand parameter LEN to ssize_t.
+
 2012-09-21  Yao Qi  <yao@codesourcery.com>
             Pedro Alves  <palves@redhat.com>
 

@@ -1456,7 +1456,7 @@ encode_actions_1 (struct command_line *action,
 		}
 	      else
 		{
-		  unsigned long addr, len;
+		  unsigned long addr;
 		  struct cleanup *old_chain = NULL;
 		  struct cleanup *old_chain1 = NULL;
 
@@ -1486,8 +1486,10 @@ encode_actions_1 (struct command_line *action,
 		      /* Safe because we know it's a simple expression.  */
 		      tempval = evaluate_expression (exp);
 		      addr = value_address (tempval);
-		      len = TYPE_LENGTH (check_typedef (exp->elts[1].type));
-		      add_memrange (collect, memrange_absolute, addr, len);
+		      /* Initialize the TYPE_LENGTH if it is a typedef.  */
+		      check_typedef (exp->elts[1].type);
+		      add_memrange (collect, memrange_absolute, addr,
+				    TYPE_LENGTH (exp->elts[1].type));
 		      break;
 
 		    case OP_VAR_VALUE:
@@ -4836,7 +4838,7 @@ print_one_static_tracepoint_marker (int count,
 
       if (ui_out_is_mi_like_p (uiout))
 	{
-	  char *fullname = symtab_to_fullname (sal.symtab);
+	  const char *fullname = symtab_to_fullname (sal.symtab);
 
 	  if (fullname)
 	    ui_out_field_string (uiout, "fullname", fullname);

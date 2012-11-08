@@ -67,7 +67,8 @@ c_print_type (struct type *type,
       || ((show > 0 || TYPE_NAME (type) == 0)
 	  && (code == TYPE_CODE_PTR || code == TYPE_CODE_FUNC
 	      || code == TYPE_CODE_METHOD
-	      || code == TYPE_CODE_ARRAY
+	      || (code == TYPE_CODE_ARRAY
+		  && !TYPE_VECTOR (type))
 	      || code == TYPE_CODE_MEMBERPTR
 	      || code == TYPE_CODE_METHODPTR
 	      || code == TYPE_CODE_REF)))
@@ -131,12 +132,7 @@ c_print_typedef (struct type *type,
    }
 
    In general, gdb should try to print the types as closely as
-   possible to the form that they appear in the source code.
-
-   Note that in case of protected derivation gcc will not say
-   'protected' but 'private'.  The HP's aCC compiler emits specific
-   information for derivation via protected inheritance, so gdb can
-   print it out */
+   possible to the form that they appear in the source code.  */
 
 static void
 cp_type_print_derivation_info (struct ui_file *stream,
@@ -624,10 +620,10 @@ c_type_print_varspec_suffix (struct type *type,
 	  fprintf_filtered (stream, ")");
 
 	fprintf_filtered (stream, (is_vector ?
-				   "__attribute__ ((vector_size(" : "["));
+				   " __attribute__ ((vector_size(" : "["));
 	if (get_array_bounds (type, &low_bound, &high_bound))
-	  fprintf_filtered (stream, "%d", 
-			    (int) (high_bound - low_bound + 1));
+	  fprintf_filtered (stream, "%s", 
+			    plongest (high_bound - low_bound + 1));
 	fprintf_filtered (stream, (is_vector ? ")))" : "]"));
 
 	c_type_print_varspec_suffix (TYPE_TARGET_TYPE (type), stream,
@@ -773,18 +769,14 @@ c_type_print_base (struct type *type, struct ui_file *stream,
       break;
 
     case TYPE_CODE_STRUCT:
+    case TYPE_CODE_UNION:
       c_type_print_modifier (type, stream, 0, 1);
-      if (TYPE_DECLARED_CLASS (type))
+      if (TYPE_CODE (type) == TYPE_CODE_UNION)
+	fprintf_filtered (stream, "union ");
+      else if (TYPE_DECLARED_CLASS (type))
 	fprintf_filtered (stream, "class ");
       else
 	fprintf_filtered (stream, "struct ");
-      goto struct_union;
-
-    case TYPE_CODE_UNION:
-      c_type_print_modifier (type, stream, 0, 1);
-      fprintf_filtered (stream, "union ");
-
-    struct_union:
 
       /* Print the tag if it exists.  The HP aCC compiler emits a
          spurious "{unnamed struct}"/"{unnamed union}"/"{unnamed

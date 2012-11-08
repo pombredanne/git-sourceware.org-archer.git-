@@ -4862,7 +4862,7 @@ static void
 handle_remote_sigint (int sig)
 {
   signal (sig, handle_remote_sigint_twice);
-  mark_async_signal_handler_wrapper (sigint_remote_token);
+  mark_async_signal_handler (sigint_remote_token);
 }
 
 /* Signal handler for SIGINT, installed after SIGINT has already been
@@ -4872,7 +4872,7 @@ static void
 handle_remote_sigint_twice (int sig)
 {
   signal (sig, handle_remote_sigint);
-  mark_async_signal_handler_wrapper (sigint_remote_twice_token);
+  mark_async_signal_handler (sigint_remote_twice_token);
 }
 
 /* Perform the real interruption of the target execution, in response
@@ -6781,9 +6781,10 @@ handle_notification (char *buf)
 	}
     }
   else
-    /* We ignore notifications we don't recognize, for compatibility
-       with newer stubs.  */
-    ;
+    {
+      /* We ignore notifications we don't recognize, for compatibility
+	 with newer stubs.  */
+    }
 }
 
 
@@ -8221,7 +8222,7 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
         {
           message = strchr (rs->buf + 2, '.');
           if (message)
-            error ("Remote failure reply: %s", message + 1);
+            error (_("Remote failure reply: %s"), message + 1);
         }
       return -1;
     case PACKET_UNKNOWN:
@@ -10588,15 +10589,11 @@ remote_get_trace_status (struct trace_status *ts)
   /* We're working with a live target.  */
   ts->from_file = 0;
 
-  /* Set some defaults.  */
-  ts->running_known = 0;
-  ts->stop_reason = trace_stop_reason_unknown;
-  ts->traceframe_count = -1;
-  ts->buffer_free = 0;
-
   if (*p++ != 'T')
     error (_("Bogus trace status reply from target: %s"), target_buf);
 
+  /* Function 'parse_trace_status' sets default value of each field of
+     'ts' at first, so we don't have to do it here.  */
   parse_trace_status (p, ts);
 
   return ts->running;

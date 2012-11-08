@@ -880,45 +880,25 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
     {
       /* The debugging sections appear to be recognized only by name,
 	 not any sort of flag.  Their SEC_ALLOC bits are cleared.  */
-      static const struct
-	{
-	  const char *name;
-	  int len;
-	} debug_sections [] =
-	{
-	  { STRING_COMMA_LEN ("debug") },	/* 'd' */
-	  { NULL,		 0  },	/* 'e' */
-	  { NULL,		 0  },	/* 'f' */
-	  { STRING_COMMA_LEN ("gnu.linkonce.wi.") },	/* 'g' */
-	  { NULL,		 0  },	/* 'h' */
-	  { NULL,		 0  },	/* 'i' */
-	  { NULL,		 0  },	/* 'j' */
-	  { NULL,		 0  },	/* 'k' */
-	  { STRING_COMMA_LEN ("line") },	/* 'l' */
-	  { NULL,		 0  },	/* 'm' */
-	  { NULL,		 0  },	/* 'n' */
-	  { NULL,		 0  },	/* 'o' */
-	  { NULL,		 0  },	/* 'p' */
-	  { NULL,		 0  },	/* 'q' */
-	  { NULL,		 0  },	/* 'r' */
-	  { STRING_COMMA_LEN ("stab") },	/* 's' */
-	  { NULL,		 0  },	/* 't' */
-	  { NULL,		 0  },	/* 'u' */
-	  { NULL,		 0  },	/* 'v' */
-	  { NULL,		 0  },	/* 'w' */
-	  { NULL,		 0  },	/* 'x' */
-	  { NULL,		 0  },	/* 'y' */
-	  { STRING_COMMA_LEN ("zdebug") }	/* 'z' */
-	};
-
       if (name [0] == '.')
 	{
-	  int i = name [1] - 'd';
-	  if (i >= 0
-	      && i < (int) ARRAY_SIZE (debug_sections)
-	      && debug_sections [i].name != NULL
-	      && strncmp (&name [1], debug_sections [i].name,
-			  debug_sections [i].len) == 0)
+	  const char *p;
+	  int n;
+	  if (name[1] == 'd')
+	    p = ".debug", n = 6;
+	  else if (name[1] == 'g' && name[2] == 'n')
+	    p = ".gnu.linkonce.wi.", n = 17;
+	  else if (name[1] == 'g' && name[2] == 'd')
+	    p = ".gdb_index", n = 11; /* yes we really do mean 11.  */
+	  else if (name[1] == 'l')
+	    p = ".line", n = 5;
+	  else if (name[1] == 's')
+	    p = ".stab", n = 5;
+	  else if (name[1] == 'z')
+	    p = ".zdebug", n = 7;
+	  else
+	    p = NULL, n = 0;
+	  if (p != NULL && strncmp (name, p, n) == 0)
 	    flags |= SEC_DEBUGGING;
 	}
     }
@@ -2081,6 +2061,9 @@ static const struct bfd_elf_special_section special_sections_d[] =
 {
   { STRING_COMMA_LEN (".data"),         -2, SHT_PROGBITS, SHF_ALLOC + SHF_WRITE },
   { STRING_COMMA_LEN (".data1"),         0, SHT_PROGBITS, SHF_ALLOC + SHF_WRITE },
+  /* There are more DWARF sections than these, but they needn't be added here
+     unless you have to cope with broken compilers that don't emit section
+     attributes or you want to help the user writing assembler.  */
   { STRING_COMMA_LEN (".debug"),         0, SHT_PROGBITS, 0 },
   { STRING_COMMA_LEN (".debug_line"),    0, SHT_PROGBITS, 0 },
   { STRING_COMMA_LEN (".debug_info"),    0, SHT_PROGBITS, 0 },
@@ -4157,7 +4140,14 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 	  m->next = NULL;
 	  m->p_type = PT_GNU_STACK;
 	  m->p_flags = elf_tdata (abfd)->stack_flags;
+	  m->p_align = bed->stack_align;
 	  m->p_flags_valid = 1;
+	  m->p_align_valid = m->p_align != 0;
+	  if (info->stacksize > 0)
+	    {
+	      m->p_size = info->stacksize;
+	      m->p_size_valid = 1;
+	    }
 
 	  *pm = m;
 	  pm = &m->next;
@@ -5038,6 +5028,11 @@ assign_file_positions_for_non_load_sections (bfd *abfd,
 	      memset (p, 0, sizeof *p);
 	      p->p_type = PT_NULL;
 	    }
+	}
+      else if (p->p_type == PT_GNU_STACK)
+	{
+	  if (m->p_size_valid)
+	    p->p_memsz = m->p_size;
 	}
       else if (m->count != 0)
 	{
@@ -6183,12 +6178,15 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
       map->p_align_valid = 1;
       map->p_vaddr_offset = 0;
 
-      if (map->p_type == PT_GNU_RELRO)
+      if (map->p_type == PT_GNU_RELRO
+	  || map->p_type == PT_GNU_STACK)
 	{
 	  /* The PT_GNU_RELRO segment may contain the first a few
 	     bytes in the .got.plt section even if the whole .got.plt
 	     section isn't in the PT_GNU_RELRO segment.  We won't
-	     change the size of the PT_GNU_RELRO segment.  */
+	     change the size of the PT_GNU_RELRO segment.
+	     Similarly, PT_GNU_STACK size is significant on uclinux
+	     systems.    */
 	  map->p_size = segment->p_memsz;
 	  map->p_size_valid = 1;
 	}

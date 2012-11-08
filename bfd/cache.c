@@ -359,7 +359,7 @@ cache_bwrite (struct bfd *abfd, const void *where, file_ptr nbytes)
   return nwrite;
 }
 
-static int
+static bfd_boolean
 cache_bclose (struct bfd *abfd)
 {
   return bfd_cache_close (abfd);
@@ -437,7 +437,7 @@ cache_bmmap (struct bfd *abfd ATTRIBUTE_UNUSED,
         {
           *map_addr = ret;
           *map_len = pg_len;
-          ret += offset & pagesize_m1;
+          ret = (char *) ret + (offset & pagesize_m1);
         }
     }
 #endif

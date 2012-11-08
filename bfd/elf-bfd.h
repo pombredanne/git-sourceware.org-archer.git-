@@ -168,6 +168,8 @@ struct elf_link_hash_entry
   /* Symbol has a non-weak reference from a non-shared object (other than
      the object in which it is defined).  */
   unsigned int ref_regular_nonweak : 1;
+  /* Symbol has a non-weak reference from a shared object.  */
+  unsigned int ref_dynamic_nonweak : 1;  
   /* Dynamic symbol has been adjustd.  */
   unsigned int dynamic_adjusted : 1;
   /* Symbol needs a copy reloc.  */
@@ -1284,6 +1286,9 @@ struct elf_backend_data
 
   /* This is non-zero if static TLS segments require a special alignment.  */
   unsigned static_tls_alignment;
+
+  /* Alignment for the PT_GNU_STACK segment. */
+  unsigned stack_align;
 
   /* This is TRUE if the linker should act like collect and gather
      global constructors and destructors by name.  This is TRUE for
