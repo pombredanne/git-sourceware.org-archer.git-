@@ -36,6 +36,7 @@
 # (More documentation is to come.)
 
 # ARGS determine what is done.  They can be:
+# -Z invoke objcopy --compress-debug-sections
 # -z compress using dwz
 # -m compress using dwz -m
 # -i make an index
@@ -61,8 +62,10 @@ then
 fi
 
 OBJCOPY=${OBJCOPY:-objcopy}
+READELF=${READELF:-readelf}
 
 DWZ=${DWZ:-dwz}
+DWP=${DWP:-dwp}
 
 have_link=unknown
 next_is_output_file=no
@@ -71,12 +74,16 @@ output_file=a.out
 want_index=false
 want_dwz=false
 want_multi=false
+want_dwp=false
+want_objcopy_compress=false
 
 while [ $# -gt 0 ]; do
     case "$1" in
+	-Z) want_objcopy_compress=true ;;
 	-z) want_dwz=true ;;
 	-i) want_index=true ;;
 	-m) want_multi=true ;;
+	-p) want_dwp=true ;;
 	*) break ;;
     esac
     shift
@@ -134,6 +141,12 @@ then
     exit 1
 fi
 
+if [ "$want_objcopy_compress" = true ]; then
+    $OBJCOPY --compress-debug-sections "$output_file"
+    rc=$?
+    [ $rc != 0 ] && exit $rc
+fi
+
 if [ "$want_index" = true ]; then
     $GDB --batch-silent -nx -ex "set auto-load no" -ex "file $output_file" -ex "save gdb-index $output_dir"
     rc=$?
@@ -157,6 +170,13 @@ if [ "$want_dwz" = true ]; then
 elif [ "$want_multi" = true ]; then
     cp $output_file ${output_file}.alt
     $DWZ -m ${output_file}.dwz "$output_file" ${output_file}.alt > /dev/null 2>&1
+fi
+
+if [ "$want_dwp" = true ]; then
+    dwo_files=$($READELF -wi "${output_file}" | grep _dwo_name | \
+	sed -e 's/^.*: //' | sort | uniq)
+    $DWP -o "${output_file}.dwp" ${dwo_files} > /dev/null
+    rm -f ${dwo_files}
 fi
 
 rm -f "$index_file"

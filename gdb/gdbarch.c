@@ -113,9 +113,6 @@ struct gdbarch
   unsigned nr_data;
   void **data;
 
-  /* per-architecture swap-regions.  */
-  struct gdbarch_swap *swap;
-
   /* Multi-arch values.
 
      When extending this structure you must:
@@ -308,8 +305,8 @@ struct gdbarch startup_gdbarch =
   0,  /* target_desc */
   /* target specific vector and its dump routine.  */
   NULL, NULL,
-  /*per-architecture data-pointers and swap regions.  */
-  0, NULL, NULL,
+  /*per-architecture data-pointers.  */
+  0, NULL,
   /* Multi-arch values */
   1,  /* bits_big_endian */
   8 * sizeof (short),  /* short_bit */
@@ -460,7 +457,6 @@ struct gdbarch startup_gdbarch =
   /* startup_gdbarch() */
 };
 
-struct gdbarch *target_gdbarch = &startup_gdbarch;
 
 /* Create a new ``struct gdbarch'' based on information provided by
    ``struct gdbarch_info''.  */
@@ -1315,16 +1311,16 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
                       host_address_to_string (gdbarch->stabs_argument_has_addr));
   fprintf_unfiltered (file,
                       "gdbarch_dump: stap_gdb_register_prefix = %s\n",
-                      gdbarch->stap_gdb_register_prefix);
+                      pstring (gdbarch->stap_gdb_register_prefix));
   fprintf_unfiltered (file,
                       "gdbarch_dump: stap_gdb_register_suffix = %s\n",
-                      gdbarch->stap_gdb_register_suffix);
+                      pstring (gdbarch->stap_gdb_register_suffix));
   fprintf_unfiltered (file,
                       "gdbarch_dump: stap_integer_prefix = %s\n",
-                      gdbarch->stap_integer_prefix);
+                      pstring (gdbarch->stap_integer_prefix));
   fprintf_unfiltered (file,
                       "gdbarch_dump: stap_integer_suffix = %s\n",
-                      gdbarch->stap_integer_suffix);
+                      pstring (gdbarch->stap_integer_suffix));
   fprintf_unfiltered (file,
                       "gdbarch_dump: gdbarch_stap_is_single_operand_p() = %d\n",
                       gdbarch_stap_is_single_operand_p (gdbarch));
@@ -1339,16 +1335,16 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
                       host_address_to_string (gdbarch->stap_parse_special_token));
   fprintf_unfiltered (file,
                       "gdbarch_dump: stap_register_indirection_prefix = %s\n",
-                      gdbarch->stap_register_indirection_prefix);
+                      pstring (gdbarch->stap_register_indirection_prefix));
   fprintf_unfiltered (file,
                       "gdbarch_dump: stap_register_indirection_suffix = %s\n",
-                      gdbarch->stap_register_indirection_suffix);
+                      pstring (gdbarch->stap_register_indirection_suffix));
   fprintf_unfiltered (file,
                       "gdbarch_dump: stap_register_prefix = %s\n",
-                      gdbarch->stap_register_prefix);
+                      pstring (gdbarch->stap_register_prefix));
   fprintf_unfiltered (file,
                       "gdbarch_dump: stap_register_suffix = %s\n",
-                      gdbarch->stap_register_suffix);
+                      pstring (gdbarch->stap_register_suffix));
   fprintf_unfiltered (file,
                       "gdbarch_dump: gdbarch_static_transform_name_p() = %d\n",
                       gdbarch_static_transform_name_p (gdbarch));
@@ -4674,9 +4670,17 @@ deprecated_target_gdbarch_select_hack (struct gdbarch *new_gdbarch)
 {
   gdb_assert (new_gdbarch != NULL);
   gdb_assert (new_gdbarch->initialized_p);
-  target_gdbarch = new_gdbarch;
+  current_inferior ()->gdbarch = new_gdbarch;
   observer_notify_architecture_changed (new_gdbarch);
   registers_changed ();
+}
+
+/* Helper for 'target_gdbarch'.  */
+
+struct gdbarch *
+get_target_gdbarch (void)
+{
+  return current_inferior ()->gdbarch;
 }
 
 extern void _initialize_gdbarch (void);

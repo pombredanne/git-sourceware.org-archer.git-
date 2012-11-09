@@ -809,10 +809,10 @@ M:LONGEST:get_syscall_number:ptid_t ptid:ptid
 #  \$10 ;; integer constant 10
 #
 # in this case, this prefix would be the character \`\$\'.
-v:const char *:stap_integer_prefix:::0:0::0:gdbarch->stap_integer_prefix
+v:const char *:stap_integer_prefix:::0:0::0:pstring (gdbarch->stap_integer_prefix)
 
 # Suffix used to mark an integer constant on the architecture's assembly.
-v:const char *:stap_integer_suffix:::0:0::0:gdbarch->stap_integer_suffix
+v:const char *:stap_integer_suffix:::0:0::0:pstring (gdbarch->stap_integer_suffix)
 
 # Prefix used to mark a register name on the architecture's assembly.
 # For example, on x86 the register name is written as:
@@ -820,10 +820,10 @@ v:const char *:stap_integer_suffix:::0:0::0:gdbarch->stap_integer_suffix
 #  \%eax ;; register eax
 #
 # in this case, this prefix would be the character \`\%\'.
-v:const char *:stap_register_prefix:::0:0::0:gdbarch->stap_register_prefix
+v:const char *:stap_register_prefix:::0:0::0:pstring (gdbarch->stap_register_prefix)
 
 # Suffix used to mark a register name on the architecture's assembly
-v:const char *:stap_register_suffix:::0:0::0:gdbarch->stap_register_suffix
+v:const char *:stap_register_suffix:::0:0::0:pstring (gdbarch->stap_register_suffix)
 
 # Prefix used to mark a register indirection on the architecture's assembly.
 # For example, on x86 the register indirection is written as:
@@ -834,7 +834,7 @@ v:const char *:stap_register_suffix:::0:0::0:gdbarch->stap_register_suffix
 #
 # Please note that we use the indirection prefix also for register
 # displacement, e.g., \`4\(\%eax\)\' on x86.
-v:const char *:stap_register_indirection_prefix:::0:0::0:gdbarch->stap_register_indirection_prefix
+v:const char *:stap_register_indirection_prefix:::0:0::0:pstring (gdbarch->stap_register_indirection_prefix)
 
 # Suffix used to mark a register indirection on the architecture's assembly.
 # For example, on x86 the register indirection is written as:
@@ -845,7 +845,7 @@ v:const char *:stap_register_indirection_prefix:::0:0::0:gdbarch->stap_register_
 #
 # Please note that we use the indirection suffix also for register
 # displacement, e.g., \`4\(\%eax\)\' on x86.
-v:const char *:stap_register_indirection_suffix:::0:0::0:gdbarch->stap_register_indirection_suffix
+v:const char *:stap_register_indirection_suffix:::0:0::0:pstring (gdbarch->stap_register_indirection_suffix)
 
 # Prefix used to name a register using GDB's nomenclature.
 #
@@ -853,10 +853,10 @@ v:const char *:stap_register_indirection_suffix:::0:0::0:gdbarch->stap_register_
 # language (e.g., \`10\' is the 10th general-purpose register).  However,
 # inside GDB this same register has an \`r\' appended to its name, so the 10th
 # register would be represented as \`r10\' internally.
-v:const char *:stap_gdb_register_prefix:::0:0::0:gdbarch->stap_gdb_register_prefix
+v:const char *:stap_gdb_register_prefix:::0:0::0:pstring (gdbarch->stap_gdb_register_prefix)
 
 # Suffix used to name a register using GDB's nomenclature.
-v:const char *:stap_gdb_register_suffix:::0:0::0:gdbarch->stap_gdb_register_suffix
+v:const char *:stap_gdb_register_suffix:::0:0::0:pstring (gdbarch->stap_gdb_register_suffix)
 
 # Check if S is a single operand.
 #
@@ -1076,17 +1076,26 @@ struct agent_expr;
 struct axs_value;
 struct stap_parse_info;
 
-/* The architecture associated with the connection to the target.
- 
-   The architecture vector provides some information that is really
-   a property of the target: The layout of certain packets, for instance;
-   or the solib_ops vector.  Etc.  To differentiate architecture accesses
-   to per-target properties from per-thread/per-frame/per-objfile properties,
-   accesses to per-target properties should be made through target_gdbarch.
+/* The architecture associated with the inferior through the
+   connection to the target.
 
-   Eventually, when support for multiple targets is implemented in
-   GDB, this global should be made target-specific.  */
-extern struct gdbarch *target_gdbarch;
+   The architecture vector provides some information that is really a
+   property of the inferior, accessed through a particular target:
+   ptrace operations; the layout of certain RSP packets; the solib_ops
+   vector; etc.  To differentiate architecture accesses to
+   per-inferior/target properties from
+   per-thread/per-frame/per-objfile properties, accesses to
+   per-inferior/target properties should be made through this
+   gdbarch.  */
+
+/* This is a convenience wrapper for 'current_inferior ()->gdbarch'.  */
+#define target_gdbarch get_target_gdbarch ()
+extern struct gdbarch *get_target_gdbarch (void);
+
+/* The initial, default architecture.  It uses host values (for want of a better
+   choice).  */
+extern struct gdbarch startup_gdbarch;
+
 
 /* Callback type for the 'iterate_over_objfiles_in_search_order'
    gdbarch  method.  */
@@ -1479,9 +1488,6 @@ printf "  /* per-architecture data-pointers.  */\n"
 printf "  unsigned nr_data;\n"
 printf "  void **data;\n"
 printf "\n"
-printf "  /* per-architecture swap-regions.  */\n"
-printf "  struct gdbarch_swap *swap;\n"
-printf "\n"
 cat <<EOF
   /* Multi-arch values.
 
@@ -1547,8 +1553,8 @@ done
 cat <<EOF
   /* target specific vector and its dump routine.  */
   NULL, NULL,
-  /*per-architecture data-pointers and swap regions.  */
-  0, NULL, NULL,
+  /*per-architecture data-pointers.  */
+  0, NULL,
   /* Multi-arch values */
 EOF
 function_list | while do_read
@@ -1562,7 +1568,6 @@ cat <<EOF
   /* startup_gdbarch() */
 };
 
-struct gdbarch *target_gdbarch = &startup_gdbarch;
 EOF
 
 # Create a new gdbarch struct
@@ -2281,9 +2286,17 @@ deprecated_target_gdbarch_select_hack (struct gdbarch *new_gdbarch)
 {
   gdb_assert (new_gdbarch != NULL);
   gdb_assert (new_gdbarch->initialized_p);
-  target_gdbarch = new_gdbarch;
+  current_inferior ()->gdbarch = new_gdbarch;
   observer_notify_architecture_changed (new_gdbarch);
   registers_changed ();
+}
+
+/* Helper for 'target_gdbarch'.  */
+
+struct gdbarch *
+get_target_gdbarch (void)
+{
+  return current_inferior ()->gdbarch;
 }
 
 extern void _initialize_gdbarch (void);

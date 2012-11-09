@@ -1366,9 +1366,9 @@ can use @kbd{gdb --help}.
 The @value{GDBN} init files are normally called @file{.gdbinit}.
 The DJGPP port of @value{GDBN} uses the name @file{gdb.ini}, due to
 the limitations of file names imposed by DOS filesystems.  The Windows
-ports of @value{GDBN} use the standard name, but if they find a
-@file{gdb.ini} file, they warn you about that and suggest to rename
-the file to the standard name.
+port of @value{GDBN} uses the standard name, but if it finds a
+@file{gdb.ini} file in your home directory, it warns you about that
+and suggests to rename the file to the standard name.
 
 
 @node Quitting GDB
@@ -6956,6 +6956,7 @@ regular expression.
 @table @code
 @kindex search
 @kindex forward-search
+@kindex fo @r{(@code{forward-search})}
 @item forward-search @var{regexp}
 @itemx search @var{regexp}
 The command @samp{forward-search @var{regexp}} checks each line,
@@ -9562,24 +9563,6 @@ layout vary depending on the hardware.
 
 @value{GDBN} provides interfaces to useful OS facilities that can help
 you debug your program.
-
-@cindex @code{ptrace} system call
-@cindex @code{struct user} contents
-When @value{GDBN} runs on a @dfn{Posix system} (such as GNU or Unix
-machines), it interfaces with the inferior via the @code{ptrace}
-system call.  The operating system creates a special sata structure,
-called @code{struct user}, for this interface.  You can use the
-command @code{info udot} to display the contents of this data
-structure.
-
-@table @code
-@item info udot
-@kindex info udot
-Display the contents of the @code{struct user} maintained by the OS
-kernel for the program being debugged.  @value{GDBN} displays the
-contents of @code{struct user} as a list of hex numbers, similar to
-the @code{examine} command.
-@end table
 
 @cindex auxiliary vector
 @cindex vector, auxiliary
@@ -25164,6 +25147,13 @@ registration of the function with @value{GDBN}.  Depending on how the
 Python code is read into @value{GDBN}, you may need to import the
 @code{gdb} module explicitly.
 
+Now you can use the function in an expression:
+
+@smallexample
+(gdb) print $greet("Bob")
+$1 = "Hello, Bob!"
+@end smallexample
+
 @node Progspaces In Python
 @subsubsection Program Spaces In Python
 
@@ -31167,21 +31157,65 @@ mixed source and disassembly with raw opcodes).
 
 @subsubheading Result
 
-The output for each instruction is composed of four fields:
+The result of the @code{-data-disassemble} command will be a list named
+@samp{asm_insns}, the contents of this list depend on the @var{mode}
+used with the @code{-data-disassemble} command.
 
-@itemize @bullet
-@item Address
-@item Func-name
-@item Offset
-@item Instruction
-@end itemize
+For modes 0 and 2 the @samp{asm_insns} list contains tuples with the
+following fields:
 
-Note that whatever included in the instruction field, is not manipulated
-directly by @sc{gdb/mi}, i.e., it is not possible to adjust its format.
+@table @code
+@item address
+The address at which this instruction was disassembled.
+
+@item func-name
+The name of the function this instruction is within.
+
+@item offset
+The decimal offset in bytes from the start of @samp{func-name}.
+
+@item inst
+The text disassembly for this @samp{address}.
+
+@item opcodes
+This field is only present for mode 2.  This contains the raw opcode
+bytes for the @samp{inst} field.
+
+@end table
+
+For modes 1 and 3 the @samp{asm_insns} list contains tuples named
+@samp{src_and_asm_line}, each of which has the following fields:
+
+@table @code
+@item line
+The line number within @samp{file}.
+
+@item file
+The file name from the compilation unit.  This might be an absolute
+file name or a relative file name depending on the compile command
+used.
+
+@item fullname
+This field is optional.  If it is present it will contain an absolute
+file name of @samp{file}.  If this field is not present then
+@value{GDBN} was unable to determine the absolute file name.
+
+@item line_asm_insn
+This is a list of tuples containing the disassembly for @samp{line} in
+@samp{file}.  The fields of each tuple are the same as for
+@code{-data-disassemble} in @var{mode} 0 and 2, so @samp{address},
+@samp{func-name}, @samp{offset}, @samp{inst}, and optionally
+@samp{opcodes}.
+
+@end table
+
+Note that whatever included in the @samp{inst} field, is not
+manipulated directly by @sc{gdb/mi}, i.e., it is not possible to
+adjust its format.
 
 @subsubheading @value{GDBN} Command
 
-There's no direct mapping from this command to the CLI.
+The corresponding @value{GDBN} command is @samp{disassemble}.
 
 @subsubheading Example
 
@@ -31245,15 +31279,15 @@ Disassemble 3 instructions from the start of @code{main} in mixed mode:
 -data-disassemble -f basics.c -l 32 -n 3 -- 1
 ^done,asm_insns=[
 src_and_asm_line=@{line="31",
-file="/kwikemart/marge/ezannoni/flathead-dev/devo/gdb/ \
-  testsuite/gdb.mi/basics.c",line_asm_insn=[
-@{address="0x000107bc",func-name="main",offset="0",
-inst="save  %sp, -112, %sp"@}]@},
+file="../../../src/gdb/testsuite/gdb.mi/basics.c",
+fullname="/absolute/path/to/src/gdb/testsuite/gdb.mi/basics.c",
+line_asm_insn=[@{address="0x000107bc",
+func-name="main",offset="0",inst="save  %sp, -112, %sp"@}]@},
 src_and_asm_line=@{line="32",
-file="/kwikemart/marge/ezannoni/flathead-dev/devo/gdb/ \
-  testsuite/gdb.mi/basics.c",line_asm_insn=[
-@{address="0x000107c0",func-name="main",offset="4",
-inst="mov  2, %o0"@},
+file="../../../src/gdb/testsuite/gdb.mi/basics.c",
+fullname="/absolute/path/to/src/gdb/testsuite/gdb.mi/basics.c",
+line_asm_insn=[@{address="0x000107c0",
+func-name="main",offset="4",inst="mov  2, %o0"@},
 @{address="0x000107c4",func-name="main",offset="8",
 inst="sethi  %hi(0x11800), %o2"@}]@}]
 (gdb)
@@ -36579,7 +36613,7 @@ Here are the currently defined query and set packets:
 @table @samp
 
 @item QAgent:1
-@item QAgent:0
+@itemx QAgent:0
 Turn on or off the agent as a helper to perform some debugging operations
 delegated from @value{GDBN} (@pxref{Control Agent}).
 
@@ -36814,7 +36848,7 @@ Don't use this packet; use the @samp{qThreadExtraInfo} query instead
 Reply: see @code{remote.c:remote_unpack_thread_info_response()}.
 
 @item QNonStop:1
-@item QNonStop:0
+@itemx QNonStop:0
 @cindex non-stop mode, remote request
 @cindex @samp{QNonStop} packet
 @anchor{QNonStop}
@@ -37438,8 +37472,8 @@ encoded).  @value{GDBN} will continue to supply the values of symbols
 @end table
 
 @item qTBuffer
-@item QTBuffer
-@item QTDisconnected
+@itemx QTBuffer
+@itemx QTDisconnected
 @itemx QTDP
 @itemx QTDPsrc
 @itemx QTDV
@@ -37476,10 +37510,10 @@ conventions above.  Please don't use this packet as a model for new
 packets.)
 
 @item QTNotes
-@item qTP
-@item QTSave
-@item qTsP
-@item qTsV
+@itemx qTP
+@itemx QTSave
+@itemx qTsP
+@itemx qTsV
 @itemx QTStart    
 @itemx QTStop     
 @itemx QTEnable

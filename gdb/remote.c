@@ -4862,7 +4862,7 @@ static void
 handle_remote_sigint (int sig)
 {
   signal (sig, handle_remote_sigint_twice);
-  mark_async_signal_handler_wrapper (sigint_remote_token);
+  mark_async_signal_handler (sigint_remote_token);
 }
 
 /* Signal handler for SIGINT, installed after SIGINT has already been
@@ -4872,7 +4872,7 @@ static void
 handle_remote_sigint_twice (int sig)
 {
   signal (sig, handle_remote_sigint);
-  mark_async_signal_handler_wrapper (sigint_remote_twice_token);
+  mark_async_signal_handler (sigint_remote_twice_token);
 }
 
 /* Perform the real interruption of the target execution, in response
@@ -6781,9 +6781,10 @@ handle_notification (char *buf)
 	}
     }
   else
-    /* We ignore notifications we don't recognize, for compatibility
-       with newer stubs.  */
-    ;
+    {
+      /* We ignore notifications we don't recognize, for compatibility
+	 with newer stubs.  */
+    }
 }
 
 
@@ -8221,7 +8222,7 @@ remote_insert_hw_breakpoint (struct gdbarch *gdbarch,
         {
           message = strchr (rs->buf + 2, '.');
           if (message)
-            error ("Remote failure reply: %s", message + 1);
+            error (_("Remote failure reply: %s"), message + 1);
         }
       return -1;
     case PACKET_UNKNOWN:

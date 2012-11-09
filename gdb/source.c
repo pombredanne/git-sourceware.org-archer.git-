@@ -1301,6 +1301,13 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
 	  ui_out_field_int (uiout, "line", line);
 	  ui_out_text (uiout, "\tin ");
 	  ui_out_field_string (uiout, "file", s->filename);
+	  if (ui_out_is_mi_like_p (uiout))
+	    {
+	      const char *fullname = symtab_to_fullname (s);
+
+	      if (fullname != NULL)
+		ui_out_field_string (uiout, "fullname", fullname);
+	    }
 	  ui_out_text (uiout, "\n");
 	}
 
@@ -1953,6 +1960,7 @@ The address is also stored as the value of \"$_\"."));
 Search for regular expression (see regex(3)) from last line listed.\n\
 The matching line number is also stored as the value of \"$_\"."));
   add_com_alias ("search", "forward-search", class_files, 0);
+  add_com_alias ("fo", "forward-search", class_files, 1);
 
   add_com ("reverse-search", class_files, reverse_search_command, _("\
 Search backward for regular expression (see regex(3)) from last line listed.\n\

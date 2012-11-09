@@ -121,7 +121,7 @@ AC_CONFIG_HEADERS(config.h:config.in)
 AH_VERBATIM([00_CONFIG_H_CHECK],
 [/* Check that config.h is #included before system headers
     (this works only for glibc, but that should be enough).  */
-#if defined(__GLIBC__) && !defined(__CONFIG_H__)
+#if defined(__GLIBC__) && !defined(__FreeBSD_kernel__) && !defined(__CONFIG_H__)
 #  error config.h must be #included before system headers
 #endif
 #define __CONFIG_H__ 1])
@@ -331,6 +331,10 @@ changequote(,)dnl
 changequote([,])dnl
 	COREFILE=trad-core.lo
 	TRAD_HEADER='"hosts/i386linux.h"'
+	case "$enable_targets"-"$want64" in
+	*x86_64-*linux*|*-true)
+	  CORE_HEADER='"hosts/x86-64linux.h"'
+	esac
 	;;
 changequote(,)dnl
   i[3-7]86-*-isc*)	COREFILE=trad-core.lo ;;

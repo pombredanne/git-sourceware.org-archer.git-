@@ -750,7 +750,7 @@ i386_relocate_instruction (struct gdbarch *gdbarch,
       /* Where "ret" in the original code will return to.  */
       ret_addr = oldloc + insn_length;
       push_buf[0] = 0x68; /* pushq $...  */
-      memcpy (&push_buf[1], &ret_addr, 4);
+      store_unsigned_integer (&push_buf[1], 4, byte_order, ret_addr);
       /* Push the push.  */
       append_insns (to, 5, push_buf);
 
@@ -1388,18 +1388,40 @@ i386_analyze_frame_setup (struct gdbarch *gdbarch,
       if (target_read_memory (pc + skip, &op, 1))
 	return pc + skip;
 
-      /* Check for `movl %esp, %ebp' -- can be written in two ways.  */
+      /* The i386 prologue looks like
+
+	 push   %ebp
+	 mov    %esp,%ebp
+	 sub    $0x10,%esp
+
+	 and a different prologue can be generated for atom.
+
+	 push   %ebp
+	 lea    (%esp),%ebp
+	 lea    -0x10(%esp),%esp
+
+	 We handle both of them here.  */
+
       switch (op)
 	{
+	  /* Check for `movl %esp, %ebp' -- can be written in two ways.  */
 	case 0x8b:
 	  if (read_memory_unsigned_integer (pc + skip + 1, 1, byte_order)
 	      != 0xec)
 	    return pc;
+	  pc += (skip + 2);
 	  break;
 	case 0x89:
 	  if (read_memory_unsigned_integer (pc + skip + 1, 1, byte_order)
 	      != 0xe5)
 	    return pc;
+	  pc += (skip + 2);
+	  break;
+	case 0x8d: /* Check for 'lea (%ebp), %ebp'.  */
+	  if (read_memory_unsigned_integer (pc + skip + 1, 2, byte_order)
+	      != 0x242c)
+	    return pc;
+	  pc += (skip + 3);
 	  break;
 	default:
 	  return pc;
@@ -1410,7 +1432,6 @@ i386_analyze_frame_setup (struct gdbarch *gdbarch,
 	 necessary.  We also now commit to skipping the special
 	 instructions mentioned before.  */
       cache->locals = 0;
-      pc += (skip + 2);
 
       /* If that's all, return now.  */
       if (limit <= pc)
@@ -1419,6 +1440,8 @@ i386_analyze_frame_setup (struct gdbarch *gdbarch,
       /* Check for stack adjustment 
 
 	    subl $XXX, %esp
+	 or
+	    lea -XXX(%esp),%esp
 
 	 NOTE: You can't subtract a 16-bit immediate from a 32-bit
 	 reg, so we don't have to worry about a data16 prefix.  */
@@ -1447,9 +1470,18 @@ i386_analyze_frame_setup (struct gdbarch *gdbarch,
 	  cache->locals = read_memory_integer (pc + 2, 4, byte_order);
 	  return pc + 6;
 	}
+      else if (op == 0x8d)
+	{
+	  /* The ModR/M byte is 0x64.  */
+	  if (read_memory_unsigned_integer (pc + 1, 1, byte_order) != 0x64)
+	    return pc;
+	  /* 'lea' with 8-bit displacement.  */
+	  cache->locals = -1 * read_memory_integer (pc + 3, 1, byte_order);
+	  return pc + 4;
+	}
       else
 	{
-	  /* Some instruction other than `subl'.  */
+	  /* Some instruction other than `subl' nor 'lea'.  */
 	  return pc;
 	}
     }
@@ -2630,6 +2662,9 @@ i386_return_value (struct gdbarch *gdbarch, struct value *function,
 	|| code == TYPE_CODE_UNION
 	|| code == TYPE_CODE_ARRAY)
        && !i386_reg_struct_return_p (gdbarch, type))
+      /* Complex double and long double uses the struct return covention.  */
+      || (code == TYPE_CODE_COMPLEX && TYPE_LENGTH (type) == 16)
+      || (code == TYPE_CODE_COMPLEX && TYPE_LENGTH (type) == 24)
       /* 128-bit decimal float uses the struct return convention.  */
       || (code == TYPE_CODE_DECFLOAT && TYPE_LENGTH (type) == 16))
     {

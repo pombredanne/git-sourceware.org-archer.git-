@@ -1,3 +1,234 @@
+2012-11-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* aout-tic30.c (MY_final_link_callback): Remove trailing
+	redundant `;'.
+	* coff-h8500.c (extra_case): Likewise.
+	(bfd_coff_reloc16_get_value): Likewise.
+	* dwarf2.c (_bfd_dwarf2_cleanup_debug_info): Likewise.
+	* elf.c (_bfd_elf_slurp_version_tables): Likewise.
+	* elf32-frv.c (elf32_frv_relocate_section): Likewise.
+	* elf32-v850.c (v850_elf_perform_relocation): Likewise.
+	* opncls.c (bfd_calc_gnu_debuglink_crc32): Likewise.
+	* plugin.c (add_symbols): Likewise.
+	* reloc.c (bfd_check_overflow): Likewise.
+	* vms-lib.c (_bfd_vms_lib_archive_p): Likewise.
+
+2012-11-08  Tom Tromey  <tromey@redhat.com>
+
+	* elf.c (elfcore_grok_note) <NT_SIGINFO>: New case; make
+	pseudosection.
+
+2012-11-08  Alan Modra  <amodra@gmail.com>
+
+	* aclocal.m4: Regenerate.
+	* Makefile.in: Regenerate.
+	* po/SRC-POTFILES.in: Regenerate.
+
+2012-11-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* section.c (bfd_get_section_contents): Replace memcpy
+	with memmove.
+
+2012-11-07  Hans-Peter Nilsson  <hp@axis.com>
+
+	PR binutils/14481
+	* aout-target.h (MY_close_and_cleanup): Make local function
+	instead of alias of MY_bfd_free_cached_info.  Also call
+	_bfd_generic_close_and_cleanup.
+
+2012-11-06  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR binutils/14813
+	* bfdio.c (bfd_iovec): Change return type of bclose to
+	bfd_boolean.
+	(memory_bclose): Change return type to bfd_boolean.
+	* cache.c (cache_bclose): Likewise.
+	* opncls.c (opncls_bclose): Likewise.  Return TRUE on success.
+	* vms-lib.c (vms_lib_bclose): Likewise.  Return TRUE.
+	* libbfd.h: Regenerated.
+
+2012-11-06  Tristan Gingold  <gingold@adacore.com>
+
+	* coff-x86_64.c (_bfd_generic_find_nearest_line_discriminator):
+	Define as coff_find_nearest_line_discriminator.
+
+2012-11-06  Alan Modra  <amodra@gmail.com>
+
+	PR binutils/14567
+	* opncls.c (opncls_iovec): Forward declare.
+	(_bfd_new_bfd_contained_in): If using opncls_iovec, copy iostream
+	to new bfd.
+
+2012-11-06  Alan Modra  <amodra@gmail.com>
+
+	* mach-o.c (bfd_mach_o_close_and_cleanup): Don't call
+	_bfd_generic_close_and_cleanup for mach_o_fat archives.
+
+2012-11-06  Alan Modra  <amodra@gmail.com>
+
+	* coff-tic4x.c (tic4x_coff0_vec, tic4x_coff0_beh_vec,
+	tic4x_coff1_vec, tic4x_coff1_beh_vec, tic4x_coff2_vec,
+	tic4x_coff2_beh_vec): Allow SEC_CODE and SEC_READONLY in
+	section flags.
+	* coff-ppc.c (TARGET_LITTLE_SYM): Likewise.
+	(TARGET_BIG_SYM): Likewise.
+
+2012-11-06  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (struct ppc_link_hash_table): Add dot_toc_dot.
+	(ppc64_elf_size_stubs): Lookup ".TOC.".
+	(ppc64_elf_relocate_section): Resolve special symbol ".TOC.".
+
+2012-11-06  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (maybe_strip_output): Heed SEC_KEEP.
+
+2012-11-05  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	PR target/14788
+	* elf32-s390.c (elf_s390_relocate_section): Set elf.dynobj for
+	local ifunc symbols.
+	* elf64-s390.c (elf_s390_relocate_section): Likewise.
+
+2012-11-05  Alan Modra  <amodra@gmail.com>
+
+	* configure.in: Apply 2012-09-10 change to config.in here.
+
+2012-11-05  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_edit_toc): Clear "repeat" inside
+	loop.  Really mark toc entry referring to another toc entry
+	only if the first is used.
+
+2012-10-30  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* configure.in: Also handle --enable-64-bit-bfd when setting
+	CORE_HEADER for 'i[3-7]86-*-linux-*'.
+
+2012-10-30  Steve McIntyre  <steve.mcintyre@linaro.org>
+
+	* elf32-arm.c (elf32_arm_print_private_bfd_data): Recognise and
+	display the new ARM hard-float/soft-float ABI flags for EABI_VER5
+	(elf32_arm_post_process_headers): Add the hard-float/soft-float
+	ABI flag as appropriate for ET_DYN/ET_EXEC in EABI_VER5.
+
+2012-10-30  Yao Qi  <yao@codesourcery.com>
+	    H.J. Lu  <hongjiu.lu@intel.com>
+
+	* configure.in: Set CORE_HEADER to hosts/x86-64linux.h for
+	'i[3-7]86-*-linux-*' if x86_64-*linux is enabled.
+	* configure: Regenerated.
+
+	* elf64-x86-64.c (elf_x86_64_write_core_note): Replace type
+	'prpsinfo_t' and 'prstatus_t' with 'prpsinfo64_t' and
+	'prstatus64_t' respectively.
+
+	* hosts/x86-64linux.h (a8_uint64_t): New.
+	(user_regsx32_struct): Renamed to ...
+	(user_regs64_struct): This.  Replace uint64_t with a8_uint64_t.
+	(elf_gregx32_t): Renamed to ...
+	(elf_greg64_t): This.  Replace uint64_t with a8_uint64_t.
+	(ELF_NGREGX32): Removed.
+	(ELF_NGREG64): New.
+	(elf_gregx32_t): Removed.
+	(elf_greg64_t): New.
+	(struct prstatus64_timeval): New.
+	(elf_prstatusx32): Replace elf_gregsetx32_t with elf_gregset64_t.
+	(elf_prstatus64): New.
+	(elf_prpsinfo64): New.
+	(prstatus64_t, prpsinfo64_t): New typedef.
+
+2012-10-29  Sean Keys <skeys@ipdatasys.com>
+
+	* elf32-xgate.c(elf_xgate_howto_table): Fix src and dest mask for
+	R_XGATE_16
+
+2012-10-29  Alan Modra  <amodra@gmail.com>
+
+	* elf32-ppc.c (ppc_elf_howto_raw): Correct dst_mask in
+	R_PPC_VLE_LO16A, R_PPC_VLE_HI16A, R_PPC_VLE_HA16A,
+	R_PPC_VLE_SDAREL_LO16A, R_PPC_VLE_SDAREL_HI16A,
+	R_PPC_VLE_SDAREL_HA16A reloc howtos.
+
+2012-10-26  Nick Clifton  <nickc@redhat.com>
+
+	* po/uk.po: Updated Ukranian translation.
+
+2012-10-26  Alan Modra  <amodra@gmail.com>
+
+	PR target/14758
+	* elf32-ppc.c (ppc_elf_reloc_type_lookup): Decode ppc64 _DS
+	bfd_reloc values.  Map to corresponding D-form relocs.
+	(is_insn_ds_form, is_insn_qs_form): New functions.
+	(ppc_elf_relocate_section): Validate insn with DS-form or DQ-form
+	fields using D-form reloc.
+
+2012-10-25  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_size_dynamic_sections): Replace
+	_GLOBAL_OFFSET_TABLE_ lookup with htab->elf.hgot.
+	* elf64-x86-64.c (elf_x86_64_size_dynamic_sections): Likewise.
+
+2012-10-24  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* compress.c (bfd_is_section_compressed): Don't decompress the
+	section.
+
+2012-10-23  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* bfd-in.h (bfd_elf_stack_segment_size): Declare.
+	* bfd-in2.h: Rebuilt.
+	* elfxx-target.h (elf_backend_stack_align): New.
+	(elfNN_bed): Add it.
+	* elf-bfd.h (struct elf_backend_data): Add stack_align field.
+	* elf.c (bfd_elf_map_sections_to_segments): Pay attention to
+	stack_align and stacksize for PT_GNU_STACK segment.
+	(assign_file_positions_for_non_load_sections): Set p_memsz for
+	PT_GNU_STACK segment.
+	(copy_elf_program_header): Copy PT_GNU_STACK size.
+	* elflink.c (bfd_elf_stack_segment_size): New function, taken from
+	uclinux backends.
+	(bfd_elf_size_dynamic_sections): Determine
+	PT_GNU_STACK requirements after calling backend.  Pay attention to
+	stacksize.
+	* elf32-bfin.c (elf32_bfinfdpic_always_size_sections): Call
+	bfd_elf_stack_segment_size.
+	(elf32_bfinfdpic_modify_program_headers): Delete.
+	(elf32_bfingfdpic_copy_private_bfd_data): Don't copy PT_GNU_STACK
+	here.
+	(elf_backend_stack_align): Override.
+	(elf_backend_modify_program_headers): Don't override.
+	* elf32-frv.c (frvfdpic_always_size_sections): Call
+	bfd_elf_stack_segment_size.
+	(elf32_frvfdpic_modify_program_headers): Delete.
+	(elf32_frvfdpic_copy_private_bfd_data): Don't copy PT_GNU_STACK
+	here.
+	(elf_backend_stack_align): Override.
+	(elf_backend_modify_program_headers): Don't override.
+	* elf32-lm32.c (lm32_elf_always_size_sections): Leave
+	PT_GNU_STACK creation to underlying elf support.  Check
+	__stacksize here for backwards compatibility, and set it if
+	needed.
+	(lm32_elf_modify_segment_map): Delete.
+	(lm32_elf_modify_program_headers): Delete.
+	(elf_backend_stack_align): Override.
+	(elf_backend_modify_segment_map): Don't override.
+	(elf_backend_modify_program_headers): Don't override.
+	* elf32-sh.c (sh_elf_always_size_sections): Call
+	bfd_elf_stack_segment_size.
+	(sh_elf_modify_program_headers): Delete.
+	(sh_elf_copy_private_data): Don't copy PT_GNU_STACK
+	here.
+	(elf_backend_stack_align): Override.
+	(elf_backend_modify_program_headers): Don't override.
+	* elf32-tic6x.c (elf32_tic6x_always_size_sections): Call
+	bfd_elf_stack_segment_size.
+	(elf32_tic6x_modify_program_headers): Delete.
+	(elf32_tic6x_copy_private_data): Delete.
+	(elf_backend_stack_align): Override.
+	(bfd_elf32_bfd_copy_private_bfd_data): Don't override.
+	(elf_backend_modify_program_headers): Don't override.
+
 2012-10-22  Alan Modra  <amodra@gmail.com>
 
 	* cache.c (cache_bmmap): Don't use void* arithmetic.
@@ -1301,7 +1532,7 @@
 	PR target/13503
 	* reloc.c: Rename BFD_RELOC_AVR_8_HHI to BFD_RELOC_AVR_8_HLO.
 	* bfd-in2.h: Regenerate.
-	* libbfd.h: Regenrate.
+	* libbfd.h: Regenerate.
 	* elf32-avr.c (elf_avr_howto_table): Rename R_AVR_8_HHI8 to
 	R_AVR_8_HLO8.
 	(avr_reloc_map): Likewise.
@@ -1439,7 +1670,7 @@
 	* reloc.c: Add new ENUM for BFD_RELOC_AVR_8_LO,
 	BFD_RELOC_AVR_8_HI, BFD_RELOC_AVR_8_HHI.
 	* bfd-in2.h: Regenerate.
-	* libbfd.h: Regenrate.
+	* libbfd.h: Regenerate.
 	* elf32-avr.c (elf_avr_howto_table): Add entries for
 	R_AVR_8_LO8, R_AVR_8_HI8, R_AVR_8_HHI8.
 	(avr_reloc_map): Add RELOC mappings for R_AVR_8_LO8, R_AVR_8_HI8,

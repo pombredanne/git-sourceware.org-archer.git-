@@ -449,7 +449,7 @@ elf_x86_64_write_core_note (bfd *abfd, char *buf, int *bufsiz,
 	}
       else
 	{
-	  prpsinfo_t data;
+	  prpsinfo64_t data;
 	  memset (&data, 0, sizeof (data));
 	  strncpy (data.pr_fname, fname, sizeof (data.pr_fname));
 	  strncpy (data.pr_psargs, psargs, sizeof (data.pr_psargs));
@@ -490,7 +490,7 @@ elf_x86_64_write_core_note (bfd *abfd, char *buf, int *bufsiz,
 	}
       else
 	{
-	  prstatus_t prstat;
+	  prstatus64_t prstat;
 	  memset (&prstat, 0, sizeof (prstat));
 	  prstat.pr_pid = pid;
 	  prstat.pr_cursig = cursig;
@@ -2917,15 +2917,10 @@ elf_x86_64_size_dynamic_sections (bfd *output_bfd,
 
   if (htab->elf.sgotplt)
     {
-      struct elf_link_hash_entry *got;
-      got = elf_link_hash_lookup (elf_hash_table (info),
-				  "_GLOBAL_OFFSET_TABLE_",
-				  FALSE, FALSE, FALSE);
-
       /* Don't allocate .got.plt section if there are no GOT nor PLT
 	 entries and there is no refeence to _GLOBAL_OFFSET_TABLE_.  */
-      if ((got == NULL
-	   || !got->ref_regular_nonweak)
+      if ((htab->elf.hgot == NULL
+	   || !htab->elf.hgot->ref_regular_nonweak)
 	  && (htab->elf.sgotplt->size
 	      == get_elf_backend_data (output_bfd)->got_header_size)
 	  && (htab->elf.splt == NULL

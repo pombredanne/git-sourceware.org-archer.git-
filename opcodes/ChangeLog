@@ -1,3 +1,43 @@
+2012-11-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* aarch64-opc.h (gen_mask): Remove trailing redundant `;'.
+	* ia64-gen.c (fetch_insn_class): Likewise.
+
+2012-11-08  Alan Modra  <amodra@gmail.com>
+
+	* po/POTFILES.in: Regenerate.
+
+2012-11-05  Alan Modra  <amodra@gmail.com>
+
+	* configure.in: Apply 2012-09-10 change to config.in here.
+
+2012-10-26  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* s390-mkopc.c: Accept empty lines in s390-opc.txt.
+	* s390-opc.c: Add M_20OPT field. New instruction formats RRF_RURR2
+	and RRF_RMRR.
+	* s390-opc.txt: Add new instructions.  New instruction type for lptea.
+
+2012-10-26  Christian Groessler  <chris@groessler.org>
+
+	* z8kgen.c (struct op): Fix encoding for translate opcodes (trdb,
+	trdrb, trib, trirb, trtdb, trtdrb, trtib, trtirb).  Remove
+	non-existing opcode trtrb.
+	* z8k-opc.h: Regenerate.
+
+2012-10-26  Alan Modra  <amodra@gmail.com>
+
+	* ppc-opc (powerpc_opcodes): "lfdp" and "stfdp" use DS offset.
+
+2012-10-24  Roland McGrath  <mcgrathr@google.com>
+
+	* i386-dis.c (ckprefix): When bailing out for fwait with prefixes,
+	set rex_used to rex.
+
+2012-10-22  Peter Bergner  <bergner@vnet.ibm.com>
+
+	* ppc-opc.c (powerpc_opcodes) <vcfpsxws>: Fix opcode spelling.
+
 2012-10-18  Tom Tromey  <tromey@redhat.com>
 
 	* tic54x-dis.c (print_instruction): Don't use K&R style.

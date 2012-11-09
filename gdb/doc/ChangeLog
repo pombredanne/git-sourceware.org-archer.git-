@@ -1,3 +1,44 @@
+2012-11-09  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.texinfo (GDB/MI Data Manipulation): Add fullname field to
+	the example -data-disassemble output.  Extend the description of
+	the -data-disassemble results to document all fields.  Document
+	the cli disassemble command as being related to -data-disassemble.
+
+2012-11-09  Yao Qi  <yao@codesourcery.com>
+
+	PR gdb/14777.
+	* gdb.texinfo (OS Information): Remove doc on command
+	'info udot'.
+
+2012-11-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Startup): Minor rewording, and clarify scope of
+	gdb.ini warning for Windows port.
+
+2012-11-08  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Search): Add kindex for 'fo'.
+
+2012-11-05  Tom Tromey  <tromey@redhat.com>
+
+	PR python/14802:
+	* gdb.texinfo (Functions In Python): Add example.
+
+2012-11-03  Yao Qi  <yao@codesourcery.com>
+
+	* observer.texi (GDB Observers): Remove observer
+	'tracepoint_modified', 'tracepoint_created' and
+	'tracepoint_deleted'.
+
+2012-10-26  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (General Query Packets): Use @itemx for QAgent.
+
+2012-10-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (General Query Packets): Use @itemx.
+
 2012-10-17  Yao Qi  <yao@codesourcery.com>
 
 	* observer.texi (GDB Observers): Update observer
