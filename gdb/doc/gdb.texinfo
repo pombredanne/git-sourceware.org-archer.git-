@@ -22628,8 +22628,8 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Selecting Pretty-Printers::   How GDB chooses a pretty-printer.
 * Writing a Pretty-Printer::    Writing a Pretty-Printer.
 * Frame Filters API::           Filtering and Wrapping Frames.
-* Writing a Frame Filter::      Writing a Frame Filter.
 * Frame Wrapper API::           Wrapping and Decorating Frames.
+* Writing a Frame Filter::      Writing a Frame Filter.
 * Managing Frame Filters::      Management of Frame Filters.
 * Writing a Frame Wrapper::     Writing a Frame Wrapper.
 * Inferiors In Python::         Python representation of inferiors (processes)
@@ -24140,21 +24140,223 @@ valid operation for frame filters that have decided not to operate on
 any frames.
 
 In this next example, the frame filter operates on all frames, and
-uses a @code{Frame Wrapper}. @xref{Frame Wrapper API}, for the API
+uses a Frame Wrapper. @xref{Frame Wrapper API}, for the API
 relating to a @code{Frame Wrapper}. Also, @xref{Writing a Frame
-Wrapper}, for a tutorial on writing a @code{Frame Wrapper}.
+Wrapper}, for a tutorial on writing a Frame Wrapper.
 
+@smallexample
+class Reverse_Function (BaseFrameWrapper):
+
+    def __init__(self, fobj):
+        super(Reverse_Function, self).__init__(fobj)
+        self.fobj = fobj
+
+    def function (self):
+        fname = str (self.fobj.function())
+        fname = fname[::-1]
+        return fname
+
+class FrameFilter ():
+
+    def __init__ (self):
+        self.name = "Reverse Filter"
+        self.priority = 100
+        self.enabled = True
+        gdb.frame_filters [self.name] = self
+
+    def filter (self, frame_iter):
+        frame_iter = itertools.imap (Reverse_Function,
+                                     frame_iter)
+        return frame_iter
+@end smallexample
+
+There are two objects in this example. A Frame Wrapper and a Frame
+Filter. The frame filter in this example uses the Python
+@code{itertool} module to operator on the iterator that was passed to
+it.  
 
 @node Frame Wrapper API 
 @subsubsection Wrapping and Decorating Frames.
 @cindex Frame Wrapper API
 
 Frame wrappers are sister objects that decorate frames affected by
-frame filters.  Frame wrappers are applied by frame filters and
-customize the printed content of each frame via an API.  A frame
-wrapper works on one frame, but a frame wrapper object can be applied
-to many different frames.  Each frame wrapper dictates the contents of
-each frame that is printed by @value{GDBN}.
+frame filters.  Frame wrappers can only be used in conjunction with
+Frame wrappers.
+
+Frame wrappers are applied by frame filters and customize the printed
+content of each frame via an API, defined here.  A frame wrapper works
+on one frame, but a frame wrapper object can be applied to many
+multiple frames.
+
+@defun FrameWrapper.elided ()
+
+The @code{elided} method groups frames together in a hierarchical
+system.  An example would be an interpreter call that occurs over many
+frames but might be better represented as a group of frames distinct
+from the other frames.
+
+The @code{elide} function must return an iterator that conforms to the
+Python iterator protocol, and contains the frames that are being
+elided, or @code{None}.  Elided frames are indented from normal frames
+in a @code{CLI} backtrace, or in the case of @code{GDB/MI} are placed
+in the @code{children} field of the eliding frame.
+
+Note that it is the frame filter that instantiated this frame
+wrapper's task to filter out the elided frames from the source
+iterator.  This will avoid the frame being printed twice. 
+
+If this function returns @code{None}, no frames will be elided.
+@end defun
+
+
+@defun FrameWrapper.function ()
+
+This method returns the name of the function in the frame that is to
+be printed.
+
+This method must return a Python string describing the function, or
+@code{None}.
+
+If this function returns a Python None, @value{GDBN} will not print
+any data for this field.
+@end defun
+
+@defun FrameWrapper.address ()
+
+This method returns the address of the frame that is to be printed.
+
+This method must return a Python numeric integer type of sufficient
+size to describe the address of the frame, or @code{None}.
+
+If this function returns a @code{None}, @value{GDBN} will not print
+any data for this field.
+@end defun
+
+@defun FrameWrapper.filename ()
+
+This method returns the filename associated with this frame.
+
+This method must return a Python string containing the filename, and
+optionally, the path to the filename of the frame, or @code{None}.
+
+If this function returns a @code{None}, @value{GDBN} will not print
+any data for this field.
+@end defun
+
+
+@defun FrameWrapper.line ():
+
+This method returns the line number associated with the current
+position within the function addressed by this frame.
+
+This method must return a Python integer type, or @code{None}.
+
+If this function returns a @code{None}, @value{GDBN} will not print
+any data for this field.
+@end defun
+
+@defun FrameWrapper.frame_args ()
+
+This method must return a Python iterator that conforms to the Python
+iterator protocol.  This iterator must contain objects that implement
+two methods, described here.
+
+The object must implement an @code{argument} method which takes no
+parameters and must return a @code{gdb.Symbol} or a Python string, and
+@code{value} method which takes no parameters and which must return a
+@code{gdb.Value}, a Python value, or @code{None}.  If the @code{value}
+method returns a @code{None}, and the @code{argument} method
+returns a @code{gdb.Symbol}, @value{GDBN} will read and print the value
+of the @code{gdb.Symbol} automatically.
+
+A brief example:
+
+@smallexample
+class SymValueWrapper ():
+
+    def __init__(self, symbol, value):
+        self.sym = symbol
+        self.val = value
+
+    def value (self):
+        return self.val
+
+    def symbol (self):
+      
+        return self.sym
+
+class SomeFrameWrapper ()
+...
+...
+    def frame_args (self):
+        fvars = []
+        fvars.append (SymValueWrapper (``foo'', 42))
+        
+        return iter (fvars)
+@end smallexample
+
+Even if the @code{frame_args} method returns only a single object, it
+must be wrapped in an iterator.
+
+If this function returns a @code{None}, @value{GDBN} will not print
+locals for this frame.
+@end defun
+
+@defun FrameWrapper.frame_locals ()
+
+This method must return a Python iterator that conforms to the Python
+iterator protocol.  This iterator must contain objects that implement
+two methods, described here.
+
+The object must implement an @code{argument} method which takes no
+parameters and must return a @code{gdb.Symbol} or a Python string, and
+@code{value} method which takes no parameters and which must return a
+@code{gdb.Value}, a Python value, or @code{None}.  If the @code{value}
+method returns a @code{None}, and the @code{argument} method
+returns a @code{gdb.Symbol}, @value{GDBN} will read and print the value
+of the @code{gdb.Symbol} automatically.
+
+A brief example:
+
+@smallexample
+class SymValueWrapper ():
+
+    def __init__(self, symbol, value):
+        self.sym = symbol
+        self.val = value
+
+    def value (self):
+        return self.val
+
+    def symbol (self):
+      
+        return self.sym
+
+class SomeFrameWrapper ()
+...
+...
+    def frame_locals (self):
+        fvars = []
+        fvars.append (SymValueWrapper (``foo'', 42))
+        
+        return iter (fvars)
+@end smallexample
+    
+Even if the @code{frame_locals} method returns only a single object, it
+must be wrapped in an iterator.
+
+If this function returns a @code{None}, @value{GDBN} will not print
+locals for this frame.
+
+@end defun
+
+@defun FrameWrapper.frame ():
+
+This method must return the underlying @code{gdb.Frame} that this
+frame wrapper is wrapping.  @value{GDBN} requires the underlying frame
+for internal frame information such as architecture so as to determine
+how to print certain values in frame printing
+@end defun
 
 @node Managing Frame Filters
 @subsubsection Management of Frame Filters.
