@@ -22612,9 +22612,8 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Writing a Pretty-Printer::    Writing a Pretty-Printer.
 * Frame Filters API::           Filtering and Wrapping Frames.
 * Frame Wrapper API::           Wrapping and Decorating Frames.
-* Writing a Frame Filter::      Writing a Frame Filter.
+* Writing a Frame Filter/Wrapper::  Writing a Frame Filter and Wrapper.
 * Managing Frame Filters::      Management of Frame Filters.
-* Writing a Frame Wrapper::     Writing a Frame Wrapper.
 * Inferiors In Python::         Python representation of inferiors (processes)
 * Events In Python::            Listening for events from @value{GDBN}.
 * Threads In Python::           Accessing inferior threads from Python.
@@ -23944,7 +23943,7 @@ taken that some frame filters may have been executed before your
 filter, and that some frame filters will execute after.  Each frame
 filter object takes a Python iterator, and returns a Python iterator.
 For further information on frame filters see, @ref{Writing a Frame
-Filter}.
+Filter/Wrapper}.
 
 Frame filters have a mandatory interface which each frame filter must
 implement, defined here:
@@ -23982,7 +23981,7 @@ objects.  However, after each frame filter is executed in turn, the
 previous frame filter may have wrapped some @code{BaseFrameWrappers}
 in its own custom frame wrapper.  As Frame Wrappers must also conform
 to a mandatory interface, these wrappers can be assumed to act in a
-uniform manner (@pxref{Writing a Frame Wrapper}).
+uniform manner (@pxref{Writing a Frame Filter/Wrapper}).
 
 This method must return an object conforming to the Python iterator
 protocol.  Each item returned by the iterator must be a an object
@@ -24024,9 +24023,9 @@ be assigned.  Frame filters that have the same priority are executed
 in unsorted order in that priority slot.  This attribute is mandatory.
 @end defvar
 
-@node Writing a Frame Filter
-@subsubsection Writing a Frame Filter.
-@cindex Writing a Frame Filter
+@node Writing a Frame Filter/Wrapper
+@subsubsection Writing a Frame Filter and Wrapper
+@cindex Writing a Frame Filter/Wrapper
 
 There are three basic elements that a frame filter must implement.
 The first is that it must correctly implement the documented interface
@@ -24125,7 +24124,7 @@ any frames.
 In this next example, the frame filter operates on all frames, and
 uses a Frame Wrapper. @xref{Frame Wrapper API}, for the API
 relating to a @code{Frame Wrapper}. Also, @xref{Writing a Frame
-Wrapper}, for a tutorial on writing a Frame Wrapper.
+Filter/Wrapper}, for a tutorial on writing a Frame Wrapper.
 
 @smallexample
 class Reverse_Function (BaseFrameWrapper):
@@ -24345,13 +24344,166 @@ how to print certain values in frame printing
 @subsubsection Management of Frame Filters.
 @cindex Managing Frame Filters
 
-Blah blah blah.
+The Python dictionary @code{gdb.frame_filters} contains name/object
+pairings that compromise a frame filter.  These frame filters
+self-register with the dictionary directly.  Frame filters in this
+dictionary are called @code{global} frame filters, they are available
+when debugging all inferiors.  In addition to the @code{global}
+dictionary, there are other dictionaries that are loaded with
+different inferiors via auto-loading (@pxref{Python Auto-loading}).
+The two other areas where you can find frame filter dictionaries are:
+@code{gdb.Progspace} which contains a @code{frame_filters} dictionary
+attribute, and each @code{gdb.Objfile} which also contain a
+@code{frame_filters} dictionary attribute.
 
-@node Writing a Frame Wrapper
-@subsubsection Writing a Frame Wrapper.
-@cindex Writing a Frame Wrapper
+Each object in these dictionaries is passed a single Python iterator
+argument and should return a Python iterator.  Each frame filter
+object must conform to the frame filter interface definition
+(@pxref{Frame Filters API}).  The iterator returned by the frame
+filter must contain only a collection of Frame Wrappers (@pxref{Frame
+Wrapper API}).
 
-A f
+When a command is run from @value{GDBN} that is compatible with frame
+filters, @value{GDBN} combines all of the dictionaries from the
+@code{global}, @code{gdb.Progspace} and @code{gdb.ObjFiles}
+dictionaries.  @value{GDBN} then prunes any frame filter where the
+@code{enabled} attribute is set to @code{False}, and finally, sorts
+these frame filters according to the @code{priority} attribute in each
+filter.  Once the dictionaries are combined, sorted and pruned,
+@value{GDBN} then wraps all of the frames in the call-stack with a
+@code{BaseFrameWrapper} object, and calls each filter in priority
+order.  The input to the first frame filter will be an iterator
+wrapping this collection of @code{BaseFrameWrapper} frame wrapper
+objects.  The output from this filter will always be the input to the
+next filter, and so on.
+
+There are several commands available within @value{GDBN} to manage
+frame filters, detailed here.
+
+@table @code
+@kindex info frame-filter
+@item info frame-filter
+Print a list of installed frame-filters from all dictionaries, showing
+their name, priority and enabled status.
+
+@kindex disable frame-filter
+@item disable frame-filter @var{filter-dictionary} @var{filter-name}
+Disable a frame filter in the dictionary matching
+@var{filter-dictionary} and @var{filter-name}.
+@var{filter-dictionary} may be @code{global}, @code{progspace} or the
+name of the object file where the frame filter dictionary resides.
+@var{filter-name} is the name of the frame filter.  A disabled
+frame-filter is not deleted, it may be enabled again later.
+
+@kindex enable frame-filter
+@item enable frame-filter @var{filter-dictionary} @var{filter-name}
+Enabke a frame filter in the dictionary matching
+@var{filter-dictionary} and @var{filter-name}.
+@var{filter-dictionary} may be @code{global}, @code{progspace} or the
+name of the object file where the frame filter dictionary resides.
+@var{filter-name} is the name of the frame filter.  
+
+Example:
+
+@smallexample
+(gdb) info frame-filter
+
+global frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  1000      No       Capital Primary Function Filter
+  100       Yes      Reverse
+progspace /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  100       Yes      Progspace Filter 1
+objfile /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  999       Yes      Build Test Program Filter
+
+(gdb) disable frame-filter ``/build/test'' ``Build Test Program Filter''
+(gdb) info frame-filter
+
+global frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  1000      No       Capital Primary Function Filter
+  100       Yes      Reverse
+progspace /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  100       Yes      Progspace Filter 1
+objfile /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  999       No       Build Test Program Filter
+
+(gdb) enable frame-filter global ``Capital Primary Function Filter''
+(gdb) info frame-filter
+
+global frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  1000      Yes      Capital Primary Function Filter
+  100       Yes      Reverse
+progspace /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  100       Yes      Progspace Filter 1
+objfile /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  999       No       Build Test Program Filter
+
+@end smallexample
+
+@kindex set python frame-filter priority 
+@item set python frame-filter priority @var{filter-dictionary} @var{filter-name} @var{priority}
+Set the @var{priority} of a frame filter in the dictionary matching
+@var{filter-dictionary}, and the frame filter name matching
+@var{filter-name}.  @var{filter-dictionary} may be @code{global},
+@code{progspace} or the name of the object file where the frame-filter
+dictionary resides.  @var{priority} is an integer.
+
+Example:
+
+@smallexample
+(gdb) info frame-filter
+
+global frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  1000      No       Capital Primary Function Filter
+  100       Yes      Reverse
+progspace /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  100       Yes      Progspace Filter 1
+objfile /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  999       Yes      Build Test Program Filter
+
+(gdb) set python  frame-filter priority global ``Reverse'' 50
+(gdb) info frame-filter
+
+global frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  1000      No       Capital Primary Function Filter
+  50       Yes      Reverse
+progspace /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  100       Yes      Progspace Filter 1
+objfile /build/test frame-filters:
+  Priority  Enabled  Name
+  ========  =======  ====
+  999       No       Build Test Program Filter
+@end smallexample
+@end table
+
 
 @node Inferiors In Python
 @subsubsection Inferiors In Python
@@ -26223,7 +26375,7 @@ No     my-foo-pretty-printers.py
 When reading an auto-loaded file, @value{GDBN} sets the
 @dfn{current objfile}.  This is available via the @code{gdb.current_objfile}
 function (@pxref{Objfiles In Python}).  This can be useful for
-registering objfile-specific pretty-printers.
+registering objfile-specific pretty-printers and frame-filters.
 
 @menu
 * objfile-gdb.py file::          The @file{@var{objfile}-gdb.py} file
