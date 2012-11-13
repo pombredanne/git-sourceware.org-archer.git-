@@ -35,6 +35,8 @@ typedef struct
 
   /* The frame filter list of functions.  */
   PyObject *frame_filters;
+  /* The type-printer list.  */
+  PyObject *type_printers;
 } objfile_object;
 
 static PyTypeObject objfile_object_type;
@@ -62,6 +64,7 @@ objfpy_dealloc (PyObject *o)
 
   Py_XDECREF (self->printers);
   Py_XDECREF (self->frame_filters);
+  Py_XDECREF (self->type_printers);
   self->ob_type->tp_free ((PyObject *) self);
 }
 
@@ -89,6 +92,13 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
 	  return NULL;
 	}
 
+      self->type_printers = PyList_New (0);
+      if (!self->type_printers)
+	{
+	  Py_DECREF (self);
+	  return NULL;
+	}
+	
     }
   return (PyObject *) self;
 }
@@ -169,6 +179,48 @@ objfpy_set_frame_filters (PyObject *o, PyObject *filters, void *ignore)
   return 0;
 }
 
+/* Get the 'type_printers' attribute.  */
+
+static PyObject *
+objfpy_get_type_printers (PyObject *o, void *ignore)
+{
+  objfile_object *self = (objfile_object *) o;
+
+  Py_INCREF (self->type_printers);
+  return self->type_printers;
+}
+
+/* Set the 'type_printers' attribute.  */
+
+static int
+objfpy_set_type_printers (PyObject *o, PyObject *value, void *ignore)
+{
+  PyObject *tmp;
+  objfile_object *self = (objfile_object *) o;
+
+  if (! value)
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       _("Cannot delete the type_printers attribute."));
+      return -1;
+    }
+
+  if (! PyList_Check (value))
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       _("The type_printers attribute must be a list."));
+      return -1;
+    }
+
+  /* Take care in case the LHS and RHS are related somehow.  */
+  tmp = self->type_printers;
+  Py_INCREF (value);
+  self->type_printers = value;
+  Py_XDECREF (tmp);
+
+  return 0;
+}
+
 /* Implementation of gdb.Objfile.is_valid (self) -> Boolean.
    Returns True if this object file still exists in GDB.  */
 
@@ -223,13 +275,21 @@ objfile_to_objfile_object (struct objfile *objfile)
 	      return NULL;
 	    }
 
-	  object->frame_filters = PyDict_New ();
+    	  object->frame_filters = PyDict_New ();
 	  if (!object->frame_filters)
 	    {
 	      Py_DECREF (object->printers);
 	      Py_DECREF (object);
 	      return NULL;
 	    }
+
+	  object->type_printers = PyList_New (0);
+	  if (!object->type_printers)
+	    {
+	      Py_DECREF (object);
+	      return NULL;
+	    }
+
 
 	  set_objfile_data (objfile, objfpy_objfile_data_key, object);
 	}
@@ -271,6 +331,8 @@ static PyGetSetDef objfile_getset[] =
     "Pretty printers.", NULL },
   { "frame_filters", objfpy_get_frame_filters,
     objfpy_set_frame_filters, "Frame Filters.", NULL },
+  { "type_printers", objfpy_get_type_printers, objfpy_set_type_printers,
+    "Type printers.", NULL },
   { NULL }
 };
 

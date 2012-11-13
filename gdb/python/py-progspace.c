@@ -37,6 +37,8 @@ typedef struct
 
   /* The frame filter list of functions.  */
   PyObject *frame_filters;
+  /* The type-printer list.  */
+  PyObject *type_printers;
 
 } pspace_object;
 
@@ -71,6 +73,7 @@ pspy_dealloc (PyObject *self)
 
   Py_XDECREF (ps_self->printers);
   Py_XDECREF (ps_self->frame_filters);
+  Py_XDECREF (ps_self->type_printers);
   self->ob_type->tp_free (self);
 }
 
@@ -98,6 +101,12 @@ pspy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
 	  return NULL;
 	}
 
+      self->type_printers = PyList_New (0);
+      if (!self->type_printers)
+	{
+	  Py_DECREF (self);
+	  return NULL;
+	}
     }
   return (PyObject *) self;
 }
@@ -178,6 +187,48 @@ pspy_set_frame_filters (PyObject *o, PyObject *frame, void *ignore)
   return 0;
 }
 
+/* Get the 'type_printers' attribute.  */
+
+static PyObject *
+pspy_get_type_printers (PyObject *o, void *ignore)
+{
+  pspace_object *self = (pspace_object *) o;
+
+  Py_INCREF (self->type_printers);
+  return self->type_printers;
+}
+
+/* Set the 'type_printers' attribute.  */
+
+static int
+pspy_set_type_printers (PyObject *o, PyObject *value, void *ignore)
+{
+  PyObject *tmp;
+  pspace_object *self = (pspace_object *) o;
+
+  if (! value)
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       "cannot delete the type_printers attribute");
+      return -1;
+    }
+
+  if (! PyList_Check (value))
+    {
+      PyErr_SetString (PyExc_TypeError,
+		       "the type_printers attribute must be a list");
+      return -1;
+    }
+
+  /* Take care in case the LHS and RHS are related somehow.  */
+  tmp = self->type_printers;
+  Py_INCREF (value);
+  self->type_printers = value;
+  Py_XDECREF (tmp);
+
+  return 0;
+}
+
 
 
 /* Clear the PSPACE pointer in a Pspace object and remove the reference.  */
@@ -219,7 +270,7 @@ pspace_to_pspace_object (struct program_space *pspace)
 	      Py_DECREF (object);
 	      return NULL;
 	    }
-
+	    
 	  object->frame_filters = PyDict_New ();
 	  if (!object->frame_filters)
 	    {
@@ -227,6 +278,14 @@ pspace_to_pspace_object (struct program_space *pspace)
 	      Py_DECREF (object);
 	      return NULL;
 	    }
+
+	  object->type_printers = PyList_New (0);
+	  if (!object->type_printers)
+	    {
+	      Py_DECREF (object);
+	      return NULL;
+	    }
+
 
 	  set_program_space_data (pspace, pspy_pspace_data_key, object);
 	}
@@ -259,6 +318,8 @@ static PyGetSetDef pspace_getset[] =
     "Pretty printers.", NULL },
   { "frame_filters", pspy_get_frame_filters, pspy_set_frame_filters,
     "Frame filters.", NULL },
+  { "type_printers", pspy_get_type_printers, pspy_set_type_printers,
+    "Type printers.", NULL },
   { NULL }
 };
 

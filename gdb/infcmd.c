@@ -469,7 +469,7 @@ post_create_inferior (struct target_ops *target, int from_tty)
 
 	  /* If the solist is global across processes, there's no need to
 	     refetch it here.  */
-	  if (!gdbarch_has_global_solist (target_gdbarch))
+	  if (!gdbarch_has_global_solist (target_gdbarch ()))
 	    {
 #ifdef SOLIB_ADD
 	      SOLIB_ADD (NULL, 0, target, auto_solib_add);
@@ -1839,7 +1839,7 @@ program_info (char *args, int from_tty)
 
   target_files_info ();
   printf_filtered (_("Program stopped at %s.\n"),
-		   paddress (target_gdbarch, stop_pc));
+		   paddress (target_gdbarch (), stop_pc));
   if (tp->control.stop_step)
     printf_filtered (_("It stopped after being stepped.\n"));
   else if (stat != 0)
@@ -2155,7 +2155,7 @@ default_print_registers_info (struct gdbarch *gdbarch,
       val = allocate_value (regtype);
 
       /* Get the data in raw format.  */
-      if (! frame_register_read (frame, i, value_contents_raw (val)))
+      if (! deprecated_frame_register_read (frame, i, value_contents_raw (val)))
 	mark_value_bytes_unavailable (val, 0, TYPE_LENGTH (value_type (val)));
 
       default_print_one_register_info (file,
@@ -2542,7 +2542,7 @@ attach_command (char *args, int from_tty)
 
   dont_repeat ();		/* Not for the faint of heart */
 
-  if (gdbarch_has_global_solist (target_gdbarch))
+  if (gdbarch_has_global_solist (target_gdbarch ()))
     /* Don't complain if all processes share the same symbol
        space.  */
     ;
@@ -2732,7 +2732,7 @@ detach_command (char *args, int from_tty)
 
   /* If the solist is global across inferiors, don't clear it when we
      detach from a single inferior.  */
-  if (!gdbarch_has_global_solist (target_gdbarch))
+  if (!gdbarch_has_global_solist (target_gdbarch ()))
     no_shared_libraries (NULL, from_tty);
 
   /* If we still have inferiors to debug, then don't mess with their

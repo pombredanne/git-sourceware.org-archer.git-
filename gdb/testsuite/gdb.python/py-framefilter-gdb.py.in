@@ -23,10 +23,11 @@ from gdb.FrameWrapper import FrameWrapper
 class FrameObjFile ():
 
     def __init__ (self):
-        self.name = "Object File Filter 1"
+        self.name = "Filter 1"
         self.priority = 1
         self.enabled = False
-        gdb.current_progspace().frame_filters [self.name] = self
+        gdb.current_progspace().frame_filters ["Progspace " + self.name] = self
+        gdb.current_objfile().frame_filters ["ObjectFile " + self.name] = self
 
     def filter (self, frame_iter):
         return frame_iter
@@ -34,10 +35,11 @@ class FrameObjFile ():
 class FrameObjFile2 ():
 
     def __init__ (self):
-        self.name = "Object File Filter 2"
+        self.name = "Filter 2"
         self.priority = 100
         self.enabled = True
-        gdb.current_progspace().frame_filters [self.name] = self
+        gdb.current_progspace().frame_filters ["Progspace " + self.name] = self
+        gdb.current_objfile().frame_filters ["ObjectFile " + self.name] = self
 
     def filter (self, frame_iter):
         return frame_iter

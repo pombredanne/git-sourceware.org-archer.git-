@@ -70,6 +70,8 @@ sys.argv = ['']
 # Initial pretty printers.
 pretty_printers = []
 
+# Initial type printers.
+type_printers = []
 # Initial frame filters.
 frame_filters = {}
 

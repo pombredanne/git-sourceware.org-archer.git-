@@ -144,7 +144,7 @@ def _get_name (frame_filter):
 def _return_list (name):
     """ Internal Worker function to return the frame-filter name,
     depending on the name supplied as an argument.  If the name is not
-    "global" or "progspace", it is assumed to name and object-file.
+    "global" or "progspace", it is assumed to name an object-file.
 
     Arguments:
         name: The name of the list, as specified by GDB user commands.

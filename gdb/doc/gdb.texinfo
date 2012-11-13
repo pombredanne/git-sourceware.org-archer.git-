@@ -14991,6 +14991,42 @@ case-insensitive matches.
 This command shows the current setting of case sensitivity for symbols
 lookups.
 
+@kindex set print type methods
+@item set print type methods
+@itemx set print type methods on
+@itemx set print type methods off
+Normally, when @value{GDBN} prints a class, it displays any methods
+declared in that class.  You can control this behavior either by
+passing the appropriate flag to @code{ptype}, or using @command{set
+print type methods}.  Specifying @code{on} will cause @value{GDBN} to
+display the methods; this is the default.  Specifying @code{off} will
+cause @value{GDBN} to omit the methods.
+
+@kindex show print type methods
+@item show print type methods
+This command shows the current setting of method display when printing
+classes.
+
+@kindex set print type typedefs
+@item set print type typedefs
+@itemx set print type typedefs on
+@itemx set print type typedefs off
+
+Normally, when @value{GDBN} prints a class, it displays any typedefs
+defined in that class.  You can control this behavior either by
+passing the appropriate flag to @code{ptype}, or using @command{set
+print type typedefs}.  Specifying @code{on} will cause @value{GDBN} to
+display the typedef definitions; this is the default.  Specifying
+@code{off} will cause @value{GDBN} to omit the typedef definitions.
+Note that this controls whether the typedef definition itself is
+printed, not whether typedef names are substituted when printing other
+types.
+
+@kindex show print type typedefs
+@item show print type typedefs
+This command shows the current setting of typedef display when
+printing classes.
+
 @kindex info address
 @cindex address of a symbol
 @item info address @var{symbol}
@@ -15031,7 +15067,7 @@ __read_nocancel + 6 in section .text of /usr/lib64/libc.so.6
 @end smallexample
 
 @kindex whatis
-@item whatis [@var{arg}]
+@item whatis[/@var{flags}] [@var{arg}]
 Print the data type of @var{arg}, which can be either an expression
 or a name of a data type.  With no argument, print the data type of
 @code{$}, the last value in the value history.
@@ -15061,8 +15097,34 @@ For C code, the type names may also have the form @samp{class
 @var{class-name}}, @samp{struct @var{struct-tag}}, @samp{union
 @var{union-tag}} or @samp{enum @var{enum-tag}}.
 
+@var{flags} can be used to modify how the type is displayed.
+Available flags are:
+
+@table @code
+@item r
+Display in ``raw'' form.  Normally, @value{GDBN} substitutes template
+parameters and typedefs defined in a class when printing the class'
+members.  The @code{/r} flag disables this.
+
+@item m
+Do not print methods defined in the class.
+
+@item M
+Print methods defined in the class.  This is the default, but the flag
+exists in case you change the default with @command{set print type methods}.
+
+@item t
+Do not print typedefs defined in the class.  Note that this controls
+whether the typedef definition itself is printed, not whether typedef
+names are substituted when printing other types.
+
+@item T
+Print typedefs defined in the class.  This is the default, but the flag
+exists in case you change the default with @command{set print type typedefs}.
+@end table
+
 @kindex ptype
-@item ptype [@var{arg}]
+@item ptype[/@var{flags}] [@var{arg}]
 @code{ptype} accepts the same arguments as @code{whatis}, but prints a
 detailed description of the type, instead of just the name of the type.
 @xref{Expressions, ,Expressions}.
@@ -15156,6 +15218,22 @@ name is @code{value}.
 This command differs from @code{ptype} in two ways: first, like
 @code{whatis}, it does not print a detailed description; second, it
 lists all source files where a type is defined.
+
+@kindex info type-printers
+@item info type-printers
+Versions of @value{GDBN} that ship with Python scripting enabled may
+have ``type printers'' available.  When using @command{ptype} or
+@command{whatis}, these printers are consulted when the name of a type
+is needed.  @xref{Type Printing API}, for more information on writing
+type printers.
+
+@code{info type-printers} displays all the available type printers.
+
+@kindex enable type-printer
+@kindex disable type-printer
+@item enable type-printer @var{name}@dots{}
+@item disable type-printer @var{name}@dots{}
+These commands can be used to enable or disable type printers.
 
 @kindex info scope
 @cindex local variables
@@ -22610,6 +22688,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Pretty Printing API::         Pretty-printing values.
 * Selecting Pretty-Printers::   How GDB chooses a pretty-printer.
 * Writing a Pretty-Printer::    Writing a Pretty-Printer.
+* Type Printing API::		Pretty-printing types.
 * Frame Filters API::           Filtering and Wrapping Frames.
 * Frame Wrapper API::           Wrapping and Decorating Frames.
 * Writing a Frame Filter/Wrapper::  Writing a Frame Filter and Wrapper.
@@ -23908,6 +23987,68 @@ my_library.so:
     foo
     bar
 @end smallexample
+
+@node Type Printing API
+@subsubsection Type Printing API
+@cindex type printing API for Python
+
+@value{GDBN} provides a way for Python code to customize type display.
+This is mainly useful for substituting canonical typedef names for
+types.
+
+@cindex type printer
+A @dfn{type printer} is just a Python object conforming to a certain
+protocol.  A simple base class implementing the protocol is provided;
+see @ref{gdb.types}.  A type printer must supply at least:
+
+@defivar type_printer enabled
+A boolean which is True if the printer is enabled, and False
+otherwise.  This is manipulated by the @code{enable type-printer}
+and @code{disable type-printer} commands.
+@end defivar
+
+@defivar type_printer name
+The name of the type printer.  This must be a string.  This is used by
+the @code{enable type-printer} and @code{disable type-printer}
+commands.
+@end defivar
+
+@defmethod type_printer instantiate (self)
+This is called by @value{GDBN} at the start of type-printing.  It is
+only called if the type printer is enabled.  This method must return a
+new object that supplies a @code{recognize} method, as described below.
+@end defmethod
+
+
+When displaying a type, say via the @code{ptype} command, @value{GDBN}
+will compute a list of type recognizers.  This is done by iterating
+first over the per-objfile type printers (@pxref{Objfiles In Python}),
+followed by the per-progspace type printers (@pxref{Progspaces In
+Python}), and finally the global type printers.
+
+@value{GDBN} will call the @code{instantiate} method of each enabled
+type printer.  If this method returns @code{None}, then the result is
+ignored; otherwise, it is appended to the list of recognizers.
+
+Then, when @value{GDBN} is going to display a type name, it iterates
+over the list of recognizers.  For each one, it calls the recognition
+function, stopping if the function returns a non-@code{None} value.
+The recognition function is defined as:
+
+@defmethod type_recognizer recognize (self, type)
+If @var{type} is not recognized, return @code{None}.  Otherwise,
+return a string which is to be printed as the name of @var{type}.
+@var{type} will be an instance of @code{gdb.Type} (@pxref{Types In
+Python}).
+@end defmethod
+
+@value{GDBN} uses this two-pass approach so that type printers can
+efficiently cache information without holding on to it too long.  For
+example, it can be convenient to look up type information in a type
+printer and hold it for a recognizer's lifetime; if a single pass were
+done then type printers would have to make use of the event system in
+order to avoid holding information that could become stale as the
+inferior changed.
 
 @node Frame Filters API 
 @subsubsection Filtering and Wrapping Frames.
@@ -25349,6 +25490,11 @@ which is used to format the value.  @xref{Pretty Printing API}, for more
 information.
 @end defvar
 
+@defvar Progspace.type_printers
+The @code{type_printers} attribute is a list of type printer objects.
+@xref{Type Printing API}, for more information.
+@end defvar
+
 @node Objfiles In Python
 @subsubsection Objfiles In Python
 
@@ -25392,6 +25538,11 @@ function in order; if the function returns @code{None}, then the
 search continues.  Otherwise, the return value should be an object
 which is used to format the value.  @xref{Pretty Printing API}, for more
 information.
+@end defvar
+
+@defvar Objfile.type_printers
+The @code{type_printers} attribute is a list of type printer objects.
+@xref{Type Printing API}, for more information.
 @end defvar
 
 A @code{gdb.Objfile} object has the following methods:
@@ -26596,7 +26747,7 @@ if a printer with the same name already exists.
 @cindex gdb.types
 
 This module provides a collection of utilities for working with
-@code{gdb.Types} objects.
+@code{gdb.Type} objects.
 
 @table @code
 @item get_basic_type (@var{type})
@@ -26656,6 +26807,37 @@ Then in @value{GDBN}:
 (@value{GDBP}) python print [k for k,v in gdb.types.deep_items(struct_a)]
 @{['a', 'b0', 'b1']@}
 @end smallexample
+
+@item get_type_recognizers ()
+Return a list of the enabled type recognizers for the current context.
+This is called by @value{GDBN} during the type-printing process
+(@pxref{Type Printing API}).
+
+@item apply_type_recognizers (recognizers, type_obj)
+Apply the type recognizers, @var{recognizers}, to the type object
+@var{type_obj}.  If any recognizer returns a string, return that
+string.  Otherwise, return @code{None}.  This is called by
+@value{GDBN} during the type-printing process (@pxref{Type Printing
+API}).
+
+@item register_type_printer (locus, printer)
+This is a convenience function to register a type printer.
+@var{printer} is the type printer to register.  It must implement the
+type printer protocol.  @var{locus} is either a @code{gdb.Objfile}, in
+which case the printer is registered with that objfile; a
+@code{gdb.Progspace}, in which case the printer is registered with
+that progspace; or @code{None}, in which case the printer is
+registered globally.
+
+@item TypePrinter
+This is a base class that implements the type printer protocol.  Type
+printers are encouraged, but not required, to derive from this class.
+It defines a constructor:
+
+@defmethod TypePrinter __init__ (self, name)
+Initialize the type printer with the given name.  The new printer
+starts in the enabled state.
+@end defmethod
 
 @end table
 
