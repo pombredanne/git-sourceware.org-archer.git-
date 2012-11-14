@@ -621,9 +621,8 @@ enum gdb_osabi
 
 /* From other system libraries */
 
-#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
-#endif
+
 #ifndef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
 #endif

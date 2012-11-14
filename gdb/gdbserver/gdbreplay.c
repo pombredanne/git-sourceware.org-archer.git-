@@ -35,9 +35,7 @@
 #if HAVE_ERRNO_H
 #include <errno.h>
 #endif
-#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
-#endif
 #include <string.h>
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
