@@ -49,9 +49,7 @@
    included, so it's ok to blank out gstdint.h.  */
 #define GCC_GENERATED_STDINT_H 1
 
-#ifdef HAVE_STDDEF_H
 #include <stddef.h>
-#endif
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -622,10 +620,6 @@ enum gdb_osabi
    above, instead.  */
 
 /* From other system libraries */
-
-#ifdef HAVE_STDDEF_H
-#include <stddef.h>
-#endif
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
