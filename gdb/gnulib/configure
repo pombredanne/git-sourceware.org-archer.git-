@@ -6586,7 +6586,18 @@ main ()
             #if HAVE_SYMLINK
             {
               static char const sym[] = "conftest.sym";
-              if (symlink (".", sym) != 0)
+              if (symlink ("/dev/null", sym) != 0)
+                result |= 2;
+              else
+                {
+                  int fd = open (sym, O_WRONLY | O_NOFOLLOW | O_CREAT, 0);
+                  if (fd >= 0)
+                    {
+                      close (fd);
+                      result |= 4;
+                    }
+                }
+              if (unlink (sym) != 0 || symlink (".", sym) != 0)
                 result |= 2;
               else
                 {
@@ -8479,7 +8490,7 @@ else
 fi
 
 
-if test -n "$FNMATCH_H"; then
+  if test -n "$FNMATCH_H"; then
 
 
 
@@ -8545,13 +8556,13 @@ _ACEOF
 
 
 
-fi
+  fi
 
 
 
 
 
-if test -n "$FNMATCH_H"; then
+  if test -n "$FNMATCH_H"; then
 
 
 
@@ -8617,7 +8628,7 @@ _ACEOF
 
 
 
-fi
+  fi
 
 
 
@@ -8885,7 +8896,7 @@ $as_echo "$gl_cv_test_UINT64_MAX_EQ_ULONG_MAX" >&6; }
 
 
 
-LOCALCHARSET_TESTS_ENVIRONMENT="CHARSETALIASDIR=\"\$(abs_top_builddir)/$gl_source_base\""
+  LOCALCHARSET_TESTS_ENVIRONMENT="CHARSETALIASDIR=\"\$(abs_top_builddir)/$gl_source_base\""
 
 
 
@@ -9468,7 +9479,7 @@ $as_echo "#define MBRTOWC_NUL_RETVAL_BUG 1" >>confdefs.h
     fi
   fi
 
-if test $HAVE_MBRTOWC = 0 || test $REPLACE_MBRTOWC = 1; then
+  if test $HAVE_MBRTOWC = 0 || test $REPLACE_MBRTOWC = 1; then
 
 
 
@@ -9482,7 +9493,7 @@ if test $HAVE_MBRTOWC = 0 || test $REPLACE_MBRTOWC = 1; then
 
   :
 
-fi
+  fi
 
 
 
@@ -9709,7 +9720,7 @@ _ACEOF
     fi
   fi
 
-if test $HAVE_MBSINIT = 0 || test $REPLACE_MBSINIT = 1; then
+  if test $HAVE_MBSINIT = 0 || test $REPLACE_MBSINIT = 1; then
 
 
 
@@ -9723,7 +9734,7 @@ if test $HAVE_MBSINIT = 0 || test $REPLACE_MBSINIT = 1; then
 
   :
 
-fi
+  fi
 
 
 
@@ -10063,7 +10074,7 @@ $as_echo "$gl_cv_func_mbsrtowcs_works" >&6; }
     fi
   fi
 
-if test $HAVE_MBSRTOWCS = 0 || test $REPLACE_MBSRTOWCS = 1; then
+  if test $HAVE_MBSRTOWCS = 0 || test $REPLACE_MBSRTOWCS = 1; then
 
 
 
@@ -10087,7 +10098,7 @@ if test $HAVE_MBSRTOWCS = 0 || test $REPLACE_MBSRTOWCS = 1; then
 
   :
 
-fi
+  fi
 
 
 
@@ -10104,7 +10115,7 @@ $as_echo "#define GNULIB_TEST_MBSRTOWCS 1" >>confdefs.h
 
 
 
-if test $HAVE_MEMCHR = 0 || test $REPLACE_MEMCHR = 1; then
+  if test $HAVE_MEMCHR = 0 || test $REPLACE_MEMCHR = 1; then
 
 
 
@@ -10129,7 +10140,7 @@ fi
 done
 
 
-fi
+  fi
 
 
 
@@ -10240,7 +10251,7 @@ $as_echo "$gl_cv_func_memmem_works_fast" >&6; }
     esac
   fi
 
-if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
+  if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
 
 
 
@@ -10251,7 +10262,7 @@ if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
 
   gl_LIBOBJS="$gl_LIBOBJS memmem.$ac_objext"
 
-fi
+  fi
 
 
 
@@ -10368,7 +10379,7 @@ $as_echo "$gl_cv_func_memmem_works_always" >&6; }
   fi
   :
 
-if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
+  if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
 
 
 
@@ -10379,7 +10390,7 @@ if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
 
   gl_LIBOBJS="$gl_LIBOBJS memmem.$ac_objext"
 
-fi
+  fi
 
 
 
