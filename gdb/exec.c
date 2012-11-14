@@ -42,7 +42,7 @@
 #include "gdbcore.h"
 
 #include <ctype.h>
-#include "gdb_stat.h"
+#include <sys/stat.h>
 
 #include "xcoffsolib.h"
 

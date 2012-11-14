@@ -38,11 +38,12 @@
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <sys/stat.h>
 
 #include "xml-utils.h"
 #include "buffer.h"
 #include "gdb_assert.h"
-#include "gdb_stat.h"
+#include <sys/stat.h>
 #include <dirent.h>
 
 #define NAMELEN(dirent) strlen ((dirent)->d_name)

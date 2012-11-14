@@ -43,7 +43,7 @@
 #endif
 
 #include <sys/file.h>
-#include "gdb_stat.h"
+#include <sys/stat.h>
 
 #include "floatformat.h"
 
