@@ -53,7 +53,7 @@
 #include "event-top.h"
 #include <pwd.h>
 #include <sys/types.h>
-#include "gdb_dirent.h"
+#include <dirent.h>
 #include "xml-support.h"
 #include "terminal.h"
 #include <sys/vfs.h>

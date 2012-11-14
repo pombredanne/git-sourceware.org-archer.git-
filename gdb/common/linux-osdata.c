@@ -42,8 +42,10 @@
 #include "xml-utils.h"
 #include "buffer.h"
 #include "gdb_assert.h"
-#include "gdb_dirent.h"
 #include "gdb_stat.h"
+#include <dirent.h>
+
+#define NAMELEN(dirent) strlen ((dirent)->d_name)
 
 /* Define PID_T to be a fixed size that is at least as large as pid_t,
    so that reading pid values embedded in /proc works
