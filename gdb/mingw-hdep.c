@@ -23,7 +23,7 @@
 
 #include "gdb_assert.h"
 #include "gdb_select.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "readline/readline.h"
 
 #include <windows.h>

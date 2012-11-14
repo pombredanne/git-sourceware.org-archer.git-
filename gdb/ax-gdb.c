@@ -31,7 +31,7 @@
 #include "target.h"
 #include "ax.h"
 #include "ax-gdb.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "block.h"
 #include "regcache.h"
 #include "user-regs.h"

@@ -37,7 +37,7 @@
 #include "event-top.h"
 #include "interps.h"
 #include "completer.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdb_assert.h"
 #include "top.h"		/* For command_loop.  */
 #include "exceptions.h"

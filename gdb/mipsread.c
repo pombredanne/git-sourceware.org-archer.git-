@@ -25,7 +25,7 @@
    mdebugread.c.  */
 
 #include "defs.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "bfd.h"
 #include "symtab.h"
 #include "objfiles.h"

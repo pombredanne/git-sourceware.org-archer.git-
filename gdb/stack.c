@@ -49,7 +49,7 @@
 
 #include "gdb_assert.h"
 #include <ctype.h>
-#include "gdb_string.h"
+#include <string.h>
 
 #include "psymtab.h"
 #include "symfile.h"

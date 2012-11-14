@@ -32,7 +32,7 @@
 #include "typeprint.h"
 #include "cp-abi.h"
 #include "jv-lang.h"
-#include "gdb_string.h"
+#include <string.h>
 #include <errno.h>
 #include "cp-support.h"
 

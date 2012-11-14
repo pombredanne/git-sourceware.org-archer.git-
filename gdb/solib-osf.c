@@ -45,7 +45,7 @@
 
 #include <sys/types.h>
 #include <signal.h>
-#include "gdb_string.h"
+#include <string.h>
 
 #include "bfd.h"
 #include "symtab.h"

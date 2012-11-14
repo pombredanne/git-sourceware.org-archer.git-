@@ -37,7 +37,7 @@
 #include "dictionary.h"
 #include "typeprint.h"
 
-#include "gdb_string.h"
+#include <string.h>
 #include "readline/readline.h"
 
 #include "psymtab.h"

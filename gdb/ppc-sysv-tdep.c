@@ -24,7 +24,7 @@
 #include "inferior.h"
 #include "regcache.h"
 #include "value.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdb_assert.h"
 #include "ppc-tdep.h"
 #include "target.h"

@@ -19,7 +19,7 @@
 
 #include "defs.h"
 #include "mi-getopt.h"
-#include "gdb_string.h"
+#include <string.h>
 
 int
 mi_getopt (const char *prefix,

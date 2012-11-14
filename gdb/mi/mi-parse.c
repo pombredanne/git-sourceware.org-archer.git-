@@ -25,7 +25,7 @@
 #include "charset.h"
 
 #include <ctype.h>
-#include "gdb_string.h"
+#include <string.h>
 
 /* Like parse_escape, but leave the results as a host char, not a
    target char.  */

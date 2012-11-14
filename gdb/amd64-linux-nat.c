@@ -27,7 +27,7 @@
 #include "amd64-linux-tdep.h"
 
 #include "gdb_assert.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "elf/common.h"
 #include <sys/uio.h>
 #include <sys/ptrace.h>

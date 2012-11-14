@@ -29,7 +29,7 @@
 #     regenerate the various scripts and Makefiles are on the PATH.
 
 # The list of gnulib modules we are importing in GDB.
-IMPORTED_GNULIB_MODULES="fnmatch-gnu inttypes memmem update-copyright"
+IMPORTED_GNULIB_MODULES="fnmatch-gnu inttypes memmem update-copyright strerror strstr"
 
 # The gnulib commit ID to use for the update.
 GNULIB_COMMIT_SHA1="0dc43482065b697a7e64ac7cc7fba7c848924997"

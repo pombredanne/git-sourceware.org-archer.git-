@@ -50,7 +50,7 @@ AC_CHECK_PROGS(MAKE, make)
 # build it in the same directory, when building in the source dir.
 ACX_CONFIGURE_DIR(["../gnulib"], ["build-gnulib-gdbserver"])
 
-AC_CHECK_HEADERS(sgtty.h termio.h termios.h sys/reg.h string.h dnl
+AC_CHECK_HEADERS(sgtty.h termio.h termios.h sys/reg.h dnl
 		 proc_service.h sys/procfs.h thread_db.h linux/elf.h dnl
 		 stdlib.h unistd.h dnl
 		 errno.h fcntl.h signal.h sys/file.h malloc.h dnl
@@ -174,7 +174,7 @@ AC_TRY_LINK([
   [AC_MSG_RESULT(no)])
 fi
 
-AC_CHECK_DECLS([strerror, strstr, perror, vasprintf, vsnprintf])
+AC_CHECK_DECLS([perror, vasprintf, vsnprintf])
 
 AC_CHECK_TYPES(socklen_t, [], [],
 [#include <sys/types.h>

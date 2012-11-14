@@ -22,7 +22,7 @@
 #include "language.h"
 #include "d-lang.h"
 #include "c-lang.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "parser-defs.h"
 #include "gdb_obstack.h"
 

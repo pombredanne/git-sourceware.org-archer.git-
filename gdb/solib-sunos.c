@@ -22,7 +22,7 @@
 
 #include <sys/types.h>
 #include <signal.h>
-#include "gdb_string.h"
+#include <string.h>
 #include <sys/param.h>
 #include <fcntl.h>
 

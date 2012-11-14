@@ -20,7 +20,7 @@
 #include "defs.h"
 #include <ctype.h>
 #include "serial.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdbcmd.h"
 
 extern void _initialize_serial (void);

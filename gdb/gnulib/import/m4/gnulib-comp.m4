@@ -41,11 +41,13 @@ AC_DEFUN([gl_EARLY],
   # Code from module alloca:
   # Code from module alloca-opt:
   # Code from module configmake:
+  # Code from module errno:
   # Code from module extensions:
   AC_REQUIRE([gl_USE_SYSTEM_EXTENSIONS])
   # Code from module fnmatch:
   # Code from module fnmatch-gnu:
   # Code from module include_next:
+  # Code from module intprops:
   # Code from module inttypes:
   # Code from module inttypes-incomplete:
   # Code from module localcharset:
@@ -63,8 +65,12 @@ AC_DEFUN([gl_EARLY],
   # Code from module stddef:
   # Code from module stdint:
   # Code from module streq:
+  # Code from module strerror:
+  # Code from module strerror-override:
   # Code from module string:
   # Code from module strnlen1:
+  # Code from module strstr:
+  # Code from module strstr-simple:
   # Code from module update-copyright:
   # Code from module verify:
   # Code from module wchar:
@@ -89,6 +95,7 @@ AC_DEFUN([gl_INIT],
   gl_source_base='import'
   gl_FUNC_ALLOCA
   gl_CONFIGMAKE_PREP
+  gl_HEADER_ERRNO_H
   gl_FUNC_FNMATCH_POSIX
   if test -n "$FNMATCH_H"; then
     AC_LIBOBJ([fnmatch])
@@ -142,7 +149,28 @@ AC_DEFUN([gl_INIT],
   AM_STDBOOL_H
   gl_STDDEF_H
   gl_STDINT_H
+  gl_FUNC_STRERROR
+  if test $REPLACE_STRERROR = 1; then
+    AC_LIBOBJ([strerror])
+  fi
+  gl_MODULE_INDICATOR([strerror])
+  gl_STRING_MODULE_INDICATOR([strerror])
+  AC_REQUIRE([gl_HEADER_ERRNO_H])
+  AC_REQUIRE([gl_FUNC_STRERROR_0])
+  if test -n "$ERRNO_H" || test $REPLACE_STRERROR_0 = 1; then
+    AC_LIBOBJ([strerror-override])
+    gl_PREREQ_SYS_H_WINSOCK2
+  fi
   gl_HEADER_STRING_H
+  gl_FUNC_STRSTR
+  if test $REPLACE_STRSTR = 1; then
+    AC_LIBOBJ([strstr])
+  fi
+  gl_FUNC_STRSTR_SIMPLE
+  if test $REPLACE_STRSTR = 1; then
+    AC_LIBOBJ([strstr])
+  fi
+  gl_STRING_MODULE_INDICATOR([strstr])
   gl_WCHAR_H
   gl_WCTYPE_H
   # End of code from modules
@@ -292,9 +320,11 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/alloca.c
   lib/alloca.in.h
   lib/config.charset
+  lib/errno.in.h
   lib/fnmatch.c
   lib/fnmatch.in.h
   lib/fnmatch_loop.c
+  lib/intprops.h
   lib/inttypes.in.h
   lib/localcharset.c
   lib/localcharset.h
@@ -313,9 +343,13 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/stdint.in.h
   lib/str-two-way.h
   lib/streq.h
+  lib/strerror-override.c
+  lib/strerror-override.h
+  lib/strerror.c
   lib/string.in.h
   lib/strnlen1.c
   lib/strnlen1.h
+  lib/strstr.c
   lib/verify.h
   lib/wchar.in.h
   lib/wctype.in.h
@@ -323,6 +357,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/alloca.m4
   m4/codeset.m4
   m4/configmake.m4
+  m4/errno_h.m4
   m4/extensions.m4
   m4/fcntl-o.m4
   m4/fnmatch.m4
@@ -347,7 +382,10 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/stdbool.m4
   m4/stddef_h.m4
   m4/stdint.m4
+  m4/strerror.m4
   m4/string_h.m4
+  m4/strstr.m4
+  m4/sys_socket_h.m4
   m4/warn-on-use.m4
   m4/wchar_h.m4
   m4/wchar_t.m4

@@ -30,7 +30,7 @@
 #include <sys/time.h>
 
 #include "gdb_select.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdbcmd.h"
 
 #ifdef HAVE_TERMIOS

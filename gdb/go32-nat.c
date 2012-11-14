@@ -99,7 +99,7 @@
 #include "i386-tdep.h"
 #include "value.h"
 #include "regcache.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "top.h"
 
 #include <stdio.h>		/* might be required for __DJGPP_MINOR__ */

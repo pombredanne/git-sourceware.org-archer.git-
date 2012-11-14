@@ -24,7 +24,7 @@
 #include "floatformat.h"
 #include "frame.h"
 #include "target.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdbtypes.h"
 #include "osabi.h"
 #include "regcache.h"

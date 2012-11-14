@@ -38,9 +38,7 @@
 #endif
 #include <setjmp.h>
 
-#ifdef HAVE_STRING_H
 #include <string.h>
-#endif
 
 #ifdef HAVE_ALLOCA_H
 #include <alloca.h>
@@ -49,12 +47,6 @@
    (there is no alloca.h).  */
 #if HAVE_MALLOC_H
 #include <malloc.h>
-#endif
-
-#if !HAVE_DECL_STRERROR
-#ifndef strerror
-extern char *strerror (int);	/* X3.159-1989  4.11.6.2 */
-#endif
 #endif
 
 #if !HAVE_DECL_PERROR

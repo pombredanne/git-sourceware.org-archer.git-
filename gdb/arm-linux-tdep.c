@@ -49,7 +49,7 @@
 #include "user-regs.h"
 #include <ctype.h>
 
-#include "gdb_string.h"
+#include <string.h>
 
 /* This is defined in <elf.h> on ARM GNU/Linux systems.  */
 #define AT_HWCAP        16

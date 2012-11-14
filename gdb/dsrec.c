@@ -22,7 +22,7 @@
 #include "srec.h"
 #include <time.h>
 #include "gdb_assert.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdb_bfd.h"
 
 extern void report_transfer_performance (unsigned long, time_t, time_t);
