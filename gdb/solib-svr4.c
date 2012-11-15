@@ -170,11 +170,9 @@ struct svr4_info
   CORE_ADDR interp_plt_sect_low;
   CORE_ADDR interp_plt_sect_high;
 
-  /* Nonzero if we are using the probes-based interface.  */
-  unsigned int using_probes : 1;
-
-  /* Named probes in the dynamic linker.  */
-//  VEC (probe_p) *probes[NUM_PROBES];
+  /* Table mapping breakpoint addresses to probes and actions, used
+     by the probes-based interface.  */
+  htab_t probes_table;
 
   /* Table of dynamic linker namespaces, used by the probes-based
      interface.  */
@@ -184,18 +182,17 @@ struct svr4_info
 /* Per-program-space data key.  */
 static const struct program_space_data *solib_svr4_pspace_data;
 
-/* Free any allocated probe vectors.  */
+/* Free the probes table.  */
 
-/*
 static void
-free_probes (struct svr4_info *info)
+free_probes_table (struct svr4_info *info)
 {
-  int i;
+  if (info->probes_table == NULL)
+    return;
 
-  for (i = 0; i < NUM_PROBES; i++)
-    VEC_free (probe_p, info->probes[i]);
+  htab_delete (info->probes_table);
+  info->probes_table = NULL;
 }
-*/
 
 /* Free the namespace table.  */
 
@@ -218,7 +215,7 @@ svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
   if (info == NULL)
     return;
 
-//  free_probes (info);
+  free_probes_table (info);
   free_namespace_table (info);
 
   xfree (info);
@@ -277,7 +274,7 @@ svr4_same (struct so_list *gdb, struct so_list *inferior)
 {
   struct svr4_info *info = get_svr4_info ();
 
-  if (info->using_probes)
+  if (info->probes_table)
     {
       if (gdb->lm_info->lmid != inferior->lm_info->lmid)
 	return 0;
@@ -416,7 +413,7 @@ lm_addr_check (struct so_list *so, bfd *abfd)
 	    {
 	      struct svr4_info *info = get_svr4_info ();
 
-	      if (!info->using_probes || so->lm_info->in_initial_ns)
+	      if (!info->probes_table || so->lm_info->in_initial_ns)
 		{
 		  /* There is no way to verify the library file
 		     matches.  prelink can during prelinking of an
@@ -1784,9 +1781,8 @@ disable_probes_interface_cleanup (void *arg)
   warning (_("Probes-based dynamic linker interface failed.\n"
 	     "Reverting to original interface.\n"));
 
+  free_probes_table (info);
   free_namespace_table (info);
-//  free_probes (info);
-  info->using_probes = 0;
 }
 
 /* Update the namespace table as appropriate when using the
@@ -1810,7 +1806,7 @@ svr4_handle_solib_event (bpstat bs)
      fully multi-target.  */
   gdb_assert (bs != NULL);
 
-  if (!info->using_probes)
+  if (!info->probes_table)
     return;
 
   /* If anything goes wrong we revert to the original linker
@@ -1987,8 +1983,26 @@ svr4_update_solib_event_breakpoints (void)
 {
   struct svr4_info *info = get_svr4_info ();
 
-  if (info->using_probes)
+  if (info->probes_table)
     iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
+}
+
+/* XXX.  */
+
+static void
+svr4_reset_solib_event_probes (void)
+{
+  printf_unfiltered ("\x1B[35mResetting solib event probes.\x1B[0m\n");
+}
+
+/* XXX.  */
+
+static void
+svr4_register_solib_event_probe (struct probe *probe,
+				 enum solib_event_action action)
+{
+  printf_unfiltered ("\x1B[35mRegistering probe %d 0x%lx.\x1B[0m\n",
+		     action, probe->address);
 }
 
 /* XXX.  */
@@ -1998,8 +2012,6 @@ svr4_create_probe_event_breakpoints (struct gdbarch *gdbarch,
 				     VEC (probe_p) **probes)
 {
   int i;
-
-  target_reset_solib_event_probes ();
 
   for (i = 0; i < NUM_PROBES; i++)
     {
@@ -2142,8 +2154,7 @@ enable_break (struct svr4_info *info, int from_tty)
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
 
-//  free_probes (info);
-  info->using_probes = 0;
+  target_reset_solib_event_probes ();
 
   /* If we already have a shared library list in the target, and
      r_debug contains r_brk, set the breakpoint there - this should
@@ -3194,6 +3205,8 @@ _initialize_svr4_solib (void)
   svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
   svr4_so_ops.same = svr4_same;
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
+  svr4_so_ops.reset_solib_event_probes = svr4_reset_solib_event_probes;
+  svr4_so_ops.register_solib_event_probe = svr4_register_solib_event_probe;
   svr4_so_ops.handle_solib_event = svr4_handle_solib_event;
   svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
 }
