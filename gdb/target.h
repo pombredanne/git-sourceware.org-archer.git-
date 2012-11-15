@@ -1728,17 +1728,11 @@ extern char *target_fileio_read_stralloc (const char *filename);
 #define target_can_use_agent() \
   (*current_target.to_can_use_agent) ()
 
-#define target_reset_solib_event_probes()                               \
-  do									\
-    if (current_target.to_reset_solib_event_probes)			\
-      (*current_target.to_reset_solib_event_probes) ();			\
-  while (0)
+#define target_reset_solib_event_probes() \
+  (*current_target.to_reset_solib_event_probes) ()
 
-#define target_register_solib_event_probe(probe, action)                \
-  do									\
-    if (current_target.to_register_solib_event_probe)			\
-      (*current_target.to_register_solib_event_probe) (probe, action);	\
-  while (0)
+#define target_register_solib_event_probe(probe, action) \
+  (*current_target.to_register_solib_event_probe) (probe, action)
 
 /* Command logging facility.  */
 
