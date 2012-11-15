@@ -1629,26 +1629,25 @@ solib_event_probe_at (struct svr4_info *info, struct bp_location *loc)
 
 /* Decide what action to take when the specified solib event probe is
    hit.  */
- /*
+
 static enum solib_event_action
-solib_event_probe_action (struct probe_and_info *pi)
+solib_event_probe_action (struct probe_and_action *pa)
 {
   enum solib_event_action action;
   unsigned probe_argc;
 
-  action = pi->info->action;
+  action = pa->action;
   if (action == SEA_NO_ACTION || action == SEA_FATAL_ERROR)
     return action;
 
   gdb_assert (action == SEA_RELOAD || action == SEA_UPDATE_OR_RELOAD);
-*/
+
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
        arg0: Lmid_t lmid (mandatory)
        arg1: struct r_debug *debug_base (mandatory)
        arg2: struct link_map *new (optional, for incremental updates)  */
-/*
-  probe_argc = get_probe_argument_count (pi->probe);
+  probe_argc = get_probe_argument_count (pa->probe);
   if (probe_argc == 2)
     action = SEA_RELOAD;
   else if (probe_argc < 2)
@@ -1656,7 +1655,6 @@ solib_event_probe_action (struct probe_and_info *pi)
 
   return action;
 }
-*/
 
 /* A namespace in the dynamic linker.  */
 
@@ -1670,7 +1668,7 @@ struct namespace
 };
 
 /* Returns a hash code for the namespace referenced by p.  */
-#if 0
+
 static hashval_t
 hash_namespace (const void *p)
 {
@@ -1819,7 +1817,6 @@ namespace_update_incremental (struct svr4_info *info, LONGEST lmid,
 
   return 1;
 }
-#endif
 
 /* Disable the probes-based linker interface and revert to the
    original interface.  We don't reset the breakpoints as the
@@ -1845,7 +1842,7 @@ static void
 svr4_preprocess_solib_event (bpstat bs)
 {
   struct svr4_info *info = get_svr4_info ();
-//  struct probe_and_info buf, *pi = &buf;
+  struct probe_and_action *pa;
   enum solib_event_action action;
   struct cleanup *old_chain, *usm_chain;
   struct value *val;
@@ -1864,17 +1861,19 @@ svr4_preprocess_solib_event (bpstat bs)
   /* If anything goes wrong we revert to the original linker
      interface.  */
   old_chain = make_cleanup (disable_probes_interface_cleanup, NULL);
-/*
-  if (!solib_event_probe_at (info, bs->bp_location_at, pi))
+
+  pa = solib_event_probe_at (info, bs->bp_location_at);
+  if (pa == NULL)
     goto error;
-  action = solib_event_probe_action (pi);
+
+  action = solib_event_probe_action (pa);
 
   if (action == SEA_FATAL_ERROR)
     goto error;
 
   if (action == SEA_NO_ACTION)
     return;
-*/
+
   /* EVALUATE_PROBE_ARGUMENT looks up symbols in the dynamic linker
      using FIND_PC_SECTION.  FIND_PC_SECTION is accelerated by a cache
      called the section map.  The section map is invalidated every
@@ -1885,26 +1884,24 @@ svr4_preprocess_solib_event (bpstat bs)
      so we can guarantee that the dynamic linker's sections are in the
      section map.  We can therefore inhibit section map updates across
      these calls to EVALUATE_PROBE_ARGUMENT and save a lot of time.  */
-/*
   inhibit_section_map_updates ();
   usm_chain = make_cleanup (resume_section_map_updates_cleanup, NULL);
 
-  val = evaluate_probe_argument (pi->probe, 0);
+  val = evaluate_probe_argument (pa->probe, 0);
   if (val == NULL)
     goto error;
 
   lmid = value_as_long (val);
 
-  val = evaluate_probe_argument (pi->probe, 1);
+  val = evaluate_probe_argument (pa->probe, 1);
   if (val == NULL)
     goto error;
 
   debug_base = value_as_address (val);
   if (debug_base == 0)
     goto error;
-*/
+
   /* Always locate the debug struct, in case it moved.  */
-/*
   info->debug_base = 0;
   if (locate_base (info) == 0)
     goto error;
@@ -1913,16 +1910,15 @@ svr4_preprocess_solib_event (bpstat bs)
 
   if (action == SEA_UPDATE_OR_RELOAD)
     {
-      val = evaluate_probe_argument (pi->probe, 2);
+      val = evaluate_probe_argument (pa->probe, 2);
       if (val != NULL)
 	lm = value_as_address (val);
 
       if (lm == 0)
 	action = SEA_RELOAD;
     }
-*/
+
   /* Resume section map updates.  */
-/*
   do_cleanups (usm_chain);
 
   if (action == SEA_UPDATE_OR_RELOAD)
@@ -1945,11 +1941,10 @@ svr4_preprocess_solib_event (bpstat bs)
     }
 
  error:
-*/
   /* We should never reach here, but if we do we disable the
      probes interface and revert to the original interface.  */
 
-//  do_cleanups (old_chain);
+  do_cleanups (old_chain);
 }
 
 /* Helper function for namespace_table_flatten.  */
