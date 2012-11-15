@@ -194,7 +194,7 @@ struct svr4_info
   unsigned int using_probes : 1;
 
   /* Named probes in the dynamic linker.  */
-  VEC (probe_p) *probes[NUM_PROBES];
+//  VEC (probe_p) *probes[NUM_PROBES];
 
   /* Table of dynamic linker namespaces, used by the probes-based
      interface.  */
@@ -206,6 +206,7 @@ static const struct program_space_data *solib_svr4_pspace_data;
 
 /* Free any allocated probe vectors.  */
 
+/*
 static void
 free_probes (struct svr4_info *info)
 {
@@ -214,6 +215,7 @@ free_probes (struct svr4_info *info)
   for (i = 0; i < NUM_PROBES; i++)
     VEC_free (probe_p, info->probes[i]);
 }
+*/
 
 /* Free the namespace table.  */
 
@@ -236,7 +238,7 @@ svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
   if (info == NULL)
     return;
 
-  free_probes (info);
+//  free_probes (info);
   free_namespace_table (info);
 
   xfree (info);
@@ -1568,6 +1570,7 @@ struct probe_and_info
    specified location.  Returns zero if no solib event probe
    was found.  */
 
+/*
 static int
 solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
 		      struct probe_and_info *result)
@@ -1596,6 +1599,7 @@ solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
 
   return 0;
 }
+*/
 
 /* Decide what action to take when the specified solib event probe is
    hit.  */
@@ -1802,7 +1806,7 @@ disable_probes_interface_cleanup (void *arg)
 	     "Reverting to original interface.\n"));
 
   free_namespace_table (info);
-  free_probes (info);
+//  free_probes (info);
   info->using_probes = 0;
 }
 
@@ -1833,10 +1837,10 @@ svr4_handle_solib_event (bpstat bs)
   /* If anything goes wrong we revert to the original linker
      interface.  */
   old_chain = make_cleanup (disable_probes_interface_cleanup, NULL);
-
+/*
   if (!solib_event_probe_at (info, bs->bp_location_at, pi))
     goto error;
-
+*/
   action = solib_event_probe_action (pi);
   if (action == NAMESPACE_TABLE_INVALIDATE)
     goto error;
@@ -1982,15 +1986,15 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
   for (loc = b->loc; loc; loc = loc->next)
     {
       struct probe_and_info buf, *pi = &buf;
-
+/*
       if (solib_event_probe_at (info, loc, pi))
 	{
 	  if (pi->info->action == NAMESPACE_NO_ACTION)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
-
-	  return 0; /* Continue iterating.  */
-	}
+*/
+//	  return 0; /* Continue iterating.  */
+//	}
     }
 
   return 0; /* Continue iterating.  */
@@ -2052,7 +2056,7 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 		strncat (name, "rtld_", sizeof (name) - 1);
 
 	      strncat (name, probe_info[i].name, sizeof (name) - 1);
-
+/*
 	      info->probes[i] = find_probes_in_objfile (os->objfile, "rtld",
 							name);
 
@@ -2062,8 +2066,9 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 		  all_probes_found = 0;
 		  break;
 		}
+*/
 	    }
-
+/*
 	  if (all_probes_found)
 	    {
 	      info->using_probes = 1;
@@ -2082,6 +2087,7 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 	      svr4_update_solib_event_breakpoints ();
 	      return;
 	    }
+*/
 	}
     }
 
@@ -2140,7 +2146,7 @@ enable_break (struct svr4_info *info, int from_tty)
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
 
-  free_probes (info);
+//  free_probes (info);
   info->using_probes = 0;
 
   /* If we already have a shared library list in the target, and
