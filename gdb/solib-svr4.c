@@ -120,26 +120,6 @@ static const  char * const main_name_list[] =
   NULL
 };
 
-/* What to do with the namespace table when a probe stop occurs.  */
-
-enum probe_action
-  {
-    /* Something went seriously wrong.  Stop using probes and
-       revert to using the older interface.  */
-    NAMESPACE_TABLE_INVALIDATE,
-
-    /* No action is required.  This namespace is still valid.  */
-    NAMESPACE_NO_ACTION,
-
-    /* This namespace should be reloaded entirely.  */
-    NAMESPACE_RELOAD,
-
-    /* Attempt to incrementally update this namespace. If the
-       update fails or is not possible, fall back to reloading
-       the namespace in full.  */
-    NAMESPACE_UPDATE_OR_RELOAD,
-  };
-
 /* A probe's name and its associated action.  */
 
 struct probe_info
@@ -148,7 +128,7 @@ struct probe_info
   const char *name;
 
   /* What to do with the namespace table when a probe stop occurs.  */
-  enum probe_action action;
+  enum solib_event_action action;
 };
 
 /* A list of named probes and their associated actions.  If all
@@ -157,12 +137,12 @@ struct probe_info
 
 static const struct probe_info probe_info[] =
 {
-  { "init_start", NAMESPACE_NO_ACTION },
-  { "init_complete", NAMESPACE_RELOAD },
-  { "map_start", NAMESPACE_NO_ACTION },
-  { "reloc_complete", NAMESPACE_UPDATE_OR_RELOAD },
-  { "unmap_start", NAMESPACE_NO_ACTION },
-  { "unmap_complete", NAMESPACE_RELOAD },
+  { "init_start", SEA_NO_ACTION },
+  { "init_complete", SEA_RELOAD },
+  { "map_start", SEA_NO_ACTION },
+  { "reloc_complete", SEA_UPDATE_OR_RELOAD },
+  { "unmap_start", SEA_NO_ACTION },
+  { "unmap_complete", SEA_RELOAD },
 };
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
@@ -1604,18 +1584,17 @@ solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
 /* Decide what action to take when the specified solib event probe is
    hit.  */
 
-static enum probe_action
+static enum solib_event_action
 solib_event_probe_action (struct probe_and_info *pi)
 {
-  enum probe_action action;
+  enum solib_event_action action;
   unsigned probe_argc;
 
   action = pi->info->action;
-  if (action == NAMESPACE_NO_ACTION || action == NAMESPACE_TABLE_INVALIDATE)
+  if (action == SEA_NO_ACTION || action == SEA_FATAL_ERROR)
     return action;
 
-  gdb_assert (action == NAMESPACE_RELOAD
-	      || action == NAMESPACE_UPDATE_OR_RELOAD);
+  gdb_assert (action == SEA_RELOAD || action == SEA_UPDATE_OR_RELOAD);
 
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
@@ -1624,9 +1603,9 @@ solib_event_probe_action (struct probe_and_info *pi)
        arg2: struct link_map *new (optional, for incremental updates)  */
   probe_argc = get_probe_argument_count (pi->probe);
   if (probe_argc == 2)
-    action = NAMESPACE_RELOAD;
+    action = SEA_RELOAD;
   else if (probe_argc < 2)
-    action = NAMESPACE_TABLE_INVALIDATE;
+    action = SEA_FATAL_ERROR;
 
   return action;
 }
@@ -1819,7 +1798,7 @@ svr4_handle_solib_event (bpstat bs)
 {
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_info buf, *pi = &buf;
-  enum probe_action action;
+  enum solib_event_action action;
   struct cleanup *old_chain, *usm_chain;
   struct value *val;
   LONGEST lmid;
@@ -1842,10 +1821,10 @@ svr4_handle_solib_event (bpstat bs)
     goto error;
 */
   action = solib_event_probe_action (pi);
-  if (action == NAMESPACE_TABLE_INVALIDATE)
+  if (action == SEA_FATAL_ERROR)
     goto error;
 
-  if (action == NAMESPACE_NO_ACTION)
+  if (action == SEA_NO_ACTION)
     return;
 
   /* EVALUATE_PROBE_ARGUMENT looks up symbols in the dynamic linker
@@ -1882,20 +1861,20 @@ svr4_handle_solib_event (bpstat bs)
 
   is_initial_ns = (debug_base == info->debug_base);
 
-  if (action == NAMESPACE_UPDATE_OR_RELOAD)
+  if (action == SEA_UPDATE_OR_RELOAD)
     {
       val = evaluate_probe_argument (pi->probe, 2);
       if (val != NULL)
 	lm = value_as_address (val);
 
       if (lm == 0)
-	action = NAMESPACE_RELOAD;
+	action = SEA_RELOAD;
     }
 
   /* Resume section map updates.  */
   do_cleanups (usm_chain);
 
-  if (action == NAMESPACE_UPDATE_OR_RELOAD)
+  if (action == SEA_UPDATE_OR_RELOAD)
     {
       if (namespace_update_incremental (info, lmid, lm, is_initial_ns))
 	{
@@ -1903,10 +1882,10 @@ svr4_handle_solib_event (bpstat bs)
 	  return;
 	}
 
-      action = NAMESPACE_RELOAD;
+      action = SEA_RELOAD;
     }
 
-  gdb_assert (action == NAMESPACE_RELOAD);
+  gdb_assert (action == SEA_RELOAD);
 
   if (namespace_update_full (info, lmid, debug_base, is_initial_ns))
     {
@@ -1989,7 +1968,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 /*
       if (solib_event_probe_at (info, loc, pi))
 	{
-	  if (pi->info->action == NAMESPACE_NO_ACTION)
+	  if (pi->info->action == SEA_NO_ACTION)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
 */
@@ -2010,6 +1989,35 @@ svr4_update_solib_event_breakpoints (void)
 
   if (info->using_probes)
     iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
+}
+
+/* XXX.  */
+
+static void
+svr4_create_probe_event_breakpoints (struct gdbarch *gdbarch,
+				     VEC (probe_p) **probes)
+{
+  int i;
+
+  target_reset_solib_event_probes ();
+
+  for (i = 0; i < NUM_PROBES; i++)
+    {
+      enum solib_event_action action = probe_info[i].action;
+      struct probe *probe;
+      int ix;
+
+      for (ix = 0;
+	   VEC_iterate (probe_p, probes[i], ix, probe);
+	   ++ix)
+	{
+	  create_solib_event_breakpoint (gdbarch, probe->address);
+
+	  target_register_solib_event_probe (probe, action);
+	}
+    }
+
+  svr4_update_solib_event_breakpoints ();
 }
 
 /* Both the SunOS and the SVR4 dynamic linkers call a marker function
@@ -2038,9 +2046,11 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 
       for (with_prefix = 0; with_prefix <= 1; with_prefix++)
 	{
+	  VEC (probe_p) *probes[NUM_PROBES];
 	  int all_probes_found = 1;
 	  int i;
 
+	  memset (probes, 0, sizeof (probes));
 	  for (i = 0; i < NUM_PROBES; i++)
 	    {
 	      char name[32] = { '\0' };
@@ -2056,38 +2066,24 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 		strncat (name, "rtld_", sizeof (name) - 1);
 
 	      strncat (name, probe_info[i].name, sizeof (name) - 1);
-/*
-	      info->probes[i] = find_probes_in_objfile (os->objfile, "rtld",
-							name);
 
-	      if (!VEC_length (probe_p, info->probes[i]))
+	      probes[i] = find_probes_in_objfile (os->objfile, "rtld", name);
+
+	      if (!VEC_length (probe_p, probes[i]))
 		{
-		  free_probes (info);
 		  all_probes_found = 0;
 		  break;
 		}
-*/
 	    }
-/*
+
 	  if (all_probes_found)
-	    {
-	      info->using_probes = 1;
+	    svr4_create_probe_event_breakpoints (gdbarch, probes);
 
-	      for (i = 0; i < NUM_PROBES; i++)
-		{
-		  struct probe *probe;
-		  int ix;
+	  for (i = 0; i < NUM_PROBES; i++)
+	    VEC_free (probe_p, probes[i]);
 
-		  for (ix = 0;
-		       VEC_iterate (probe_p, info->probes[i], ix, probe);
-		       ++ix)
-		    create_solib_event_breakpoint (gdbarch, probe->address);
-		}
-
-	      svr4_update_solib_event_breakpoints ();
-	      return;
-	    }
-*/
+	  if (all_probes_found)
+	    return;
 	}
     }
 
