@@ -1530,16 +1530,77 @@ exec_entry_point (struct bfd *abfd, struct target_ops *targ)
 					     targ);
 }
 
-/* A probe and its associated information structure.  */
+/* A probe and its associated action.  */
 
-struct probe_and_info
+struct probe_and_action
 {
   /* The probe.  */
   struct probe *probe;
 
-  /* The probe_info from which the probe was created.  */
-  const struct probe_info *info;
+  /* The action.  */
+  enum solib_event_action action;
 };
+
+/* Returns a hash code for the probe_and_action referenced by p.  */
+
+static hashval_t
+hash_probe_and_action (const void *p)
+{
+  const struct probe_and_action *pa = p;
+
+  return (hashval_t) pa->probe->address;
+}
+
+/* Returns non-zero if the probe_and_actions referenced by p1 and p2
+   are equal.  */
+
+static int
+equal_probe_and_action (const void *p1, const void *p2)
+{
+  const struct probe_and_action *pa1 = p1;
+  const struct probe_and_action *pa2 = p2;
+
+  return pa1->probe->address == pa2->probe->address;
+}
+
+/* XXX.  */
+
+static void
+svr4_reset_solib_event_probes (void)
+{
+  struct svr4_info *info = get_svr4_info ();
+
+  free_probes_table (info);
+}
+
+/* XXX.  */
+
+static void
+svr4_register_solib_event_probe (struct probe *probe,
+				 enum solib_event_action action)
+{
+  struct svr4_info *info = get_svr4_info ();
+  struct probe_and_action lookup, *pa;
+  void **slot;
+
+  /* Create the probes table, if necessary.  */
+  if (info->probes_table == NULL)
+    {
+      info->probes_table = htab_create_alloc (1, hash_probe_and_action,
+					      equal_probe_and_action,
+					      xfree, xcalloc, xfree);
+    }
+
+  lookup.probe = probe;
+  slot = htab_find_slot (info->probes_table, &lookup, INSERT);
+  gdb_assert (*slot == HTAB_EMPTY_ENTRY);
+
+  pa = XCNEW (struct probe_and_action);
+  pa->probe = probe;
+  pa->action = action;
+
+  *slot = pa;
+}
 
 /* Get the solib event probe at the specified location, and the
    probe_info the probe was created with.  Fills in RESULT and
@@ -1580,7 +1641,7 @@ solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
 
 /* Decide what action to take when the specified solib event probe is
    hit.  */
-
+ /*
 static enum solib_event_action
 solib_event_probe_action (struct probe_and_info *pi)
 {
@@ -1592,12 +1653,13 @@ solib_event_probe_action (struct probe_and_info *pi)
     return action;
 
   gdb_assert (action == SEA_RELOAD || action == SEA_UPDATE_OR_RELOAD);
-
+*/
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
        arg0: Lmid_t lmid (mandatory)
        arg1: struct r_debug *debug_base (mandatory)
        arg2: struct link_map *new (optional, for incremental updates)  */
+/*
   probe_argc = get_probe_argument_count (pi->probe);
   if (probe_argc == 2)
     action = SEA_RELOAD;
@@ -1606,6 +1668,7 @@ solib_event_probe_action (struct probe_and_info *pi)
 
   return action;
 }
+*/
 
 /* A namespace in the dynamic linker.  */
 
@@ -1619,7 +1682,7 @@ struct namespace
 };
 
 /* Returns a hash code for the namespace referenced by p.  */
-
+#if 0
 static hashval_t
 hash_namespace (const void *p)
 {
@@ -1768,6 +1831,7 @@ namespace_update_incremental (struct svr4_info *info, LONGEST lmid,
 
   return 1;
 }
+#endif
 
 /* Disable the probes-based linker interface and revert to the
    original interface.  We don't reset the breakpoints as the
@@ -1793,7 +1857,7 @@ static void
 svr4_handle_solib_event (bpstat bs)
 {
   struct svr4_info *info = get_svr4_info ();
-  struct probe_and_info buf, *pi = &buf;
+//  struct probe_and_info buf, *pi = &buf;
   enum solib_event_action action;
   struct cleanup *old_chain, *usm_chain;
   struct value *val;
@@ -1815,14 +1879,14 @@ svr4_handle_solib_event (bpstat bs)
 /*
   if (!solib_event_probe_at (info, bs->bp_location_at, pi))
     goto error;
-*/
   action = solib_event_probe_action (pi);
+
   if (action == SEA_FATAL_ERROR)
     goto error;
 
   if (action == SEA_NO_ACTION)
     return;
-
+*/
   /* EVALUATE_PROBE_ARGUMENT looks up symbols in the dynamic linker
      using FIND_PC_SECTION.  FIND_PC_SECTION is accelerated by a cache
      called the section map.  The section map is invalidated every
@@ -1833,6 +1897,7 @@ svr4_handle_solib_event (bpstat bs)
      so we can guarantee that the dynamic linker's sections are in the
      section map.  We can therefore inhibit section map updates across
      these calls to EVALUATE_PROBE_ARGUMENT and save a lot of time.  */
+/*
   inhibit_section_map_updates ();
   usm_chain = make_cleanup (resume_section_map_updates_cleanup, NULL);
 
@@ -1849,8 +1914,9 @@ svr4_handle_solib_event (bpstat bs)
   debug_base = value_as_address (val);
   if (debug_base == 0)
     goto error;
-
+*/
   /* Always locate the debug struct, in case it moved.  */
+/*
   info->debug_base = 0;
   if (locate_base (info) == 0)
     goto error;
@@ -1866,8 +1932,9 @@ svr4_handle_solib_event (bpstat bs)
       if (lm == 0)
 	action = SEA_RELOAD;
     }
-
+*/
   /* Resume section map updates.  */
+/*
   do_cleanups (usm_chain);
 
   if (action == SEA_UPDATE_OR_RELOAD)
@@ -1890,10 +1957,11 @@ svr4_handle_solib_event (bpstat bs)
     }
 
  error:
+*/
   /* We should never reach here, but if we do we disable the
      probes interface and revert to the original interface.  */
 
-  do_cleanups (old_chain);
+//  do_cleanups (old_chain);
 }
 
 /* Helper function for namespace_table_flatten.  */
@@ -1960,7 +2028,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 
   for (loc = b->loc; loc; loc = loc->next)
     {
-      struct probe_and_info buf, *pi = &buf;
+//      struct probe_and_info buf, *pi = &buf;
 /*
       if (solib_event_probe_at (info, loc, pi))
 	{
@@ -1985,24 +2053,6 @@ svr4_update_solib_event_breakpoints (void)
 
   if (info->probes_table)
     iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
-}
-
-/* XXX.  */
-
-static void
-svr4_reset_solib_event_probes (void)
-{
-  printf_unfiltered ("\x1B[35mResetting solib event probes.\x1B[0m\n");
-}
-
-/* XXX.  */
-
-static void
-svr4_register_solib_event_probe (struct probe *probe,
-				 enum solib_event_action action)
-{
-  printf_unfiltered ("\x1B[35mRegistering probe %d 0x%lx.\x1B[0m\n",
-		     action, probe->address);
 }
 
 /* XXX.  */
