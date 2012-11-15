@@ -152,6 +152,13 @@ struct target_so_ops
     int (*keep_data_in_core) (CORE_ADDR vaddr,
 			      unsigned long size);
 
+    /* XXX.  */
+    void (*reset_solib_event_probes) (void);
+
+    /* XXX.  */
+    void (*register_solib_event_probe) (struct probe *probe,
+					enum solib_event_action action);
+
     /* Target-specific handling of solib events.  For targets which
        handle solib events using breakpoints a valid bpstat must be
        passed.  Targets which handle solib events using some other
