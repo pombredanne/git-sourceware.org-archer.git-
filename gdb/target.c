@@ -707,7 +707,7 @@ update_current_target (void)
       /* Do not inherit to_memory_map.  */
       /* Do not inherit to_flash_erase.  */
       /* Do not inherit to_flash_done.  */
-      INHERIT (to_reset_solib_event_probes, t);
+      INHERIT (to_clear_solib_event_probes, t);
       INHERIT (to_register_solib_event_probe, t);
     }
 #undef INHERIT
@@ -945,7 +945,7 @@ update_current_target (void)
 	    (int (*) (void))
 	    return_zero);
   de_fault (to_execution_direction, default_execution_direction);
-  de_fault (to_reset_solib_event_probes,
+  de_fault (to_clear_solib_event_probes,
 	    (void (*) (void))
 	    target_ignore);
   de_fault (to_register_solib_event_probe,

@@ -1566,13 +1566,13 @@ equal_probe_and_action (const void *p1, const void *p2)
 /* XXX.  */
 
 static void
-reset_solib_event_probes (void)
+clear_solib_event_probes (void)
 {
   struct svr4_info *info = get_svr4_info ();
 
   free_probes_table (info);
 
-  target_reset_solib_event_probes ();
+  target_clear_solib_event_probes ();
 }
 
 /* XXX.  */
@@ -2191,7 +2191,7 @@ enable_break (struct svr4_info *info, int from_tty)
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
 
-  reset_solib_event_probes ();
+  clear_solib_event_probes ();
 
   /* If we already have a shared library list in the target, and
      r_debug contains r_brk, set the breakpoint there - this should
