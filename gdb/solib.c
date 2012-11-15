@@ -1209,29 +1209,6 @@ no_shared_libraries (char *ignored, int from_tty)
 /* See solib.h.  */
 
 void
-reset_solib_event_probes (void)
-{
-  struct target_so_ops *ops = solib_ops (target_gdbarch);
-
-  if (ops->reset_solib_event_probes != NULL)
-    ops->reset_solib_event_probes ();
-}
-
-/* See solib.h.  */
-
-void
-register_solib_event_probe (struct probe *probe,
-			    enum solib_event_action action)
-{
-  struct target_so_ops *ops = solib_ops (target_gdbarch);
-
-  if (ops->register_solib_event_probe != NULL)
-    ops->register_solib_event_probe (probe, action);
-}
-
-/* See solib.h.  */
-
-void
 handle_solib_event (bpstat bs)
 {
   struct target_so_ops *ops = solib_ops (target_gdbarch);

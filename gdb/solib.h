@@ -94,15 +94,6 @@ extern CORE_ADDR gdb_bfd_lookup_symbol_from_symtab (bfd *abfd,
 								      void *),
 						    void *data);
 
-/* XXX.  */
-
-extern void reset_solib_event_probes (void);
-
-/* XXX.  */
-
-extern void register_solib_event_probe (struct probe *probe,
-					enum solib_event_action action);
-
 /* Handle an solib event by calling solib_add.  Targets which handle
    solib events using breakpoints must pass a valid bpstat.  Targets
    which handle solib events using some other mechanism should pass

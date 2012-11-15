@@ -1566,18 +1566,20 @@ equal_probe_and_action (const void *p1, const void *p2)
 /* XXX.  */
 
 static void
-svr4_reset_solib_event_probes (void)
+reset_solib_event_probes (void)
 {
   struct svr4_info *info = get_svr4_info ();
 
   free_probes_table (info);
+
+  target_reset_solib_event_probes ();
 }
 
 /* XXX.  */
 
 static void
-svr4_register_solib_event_probe (struct probe *probe,
-				 enum solib_event_action action)
+register_solib_event_probe (struct probe *probe,
+			    enum solib_event_action action)
 {
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_action lookup, *pa;
@@ -1600,6 +1602,8 @@ svr4_register_solib_event_probe (struct probe *probe,
   pa->action = action;
 
   *slot = pa;
+
+  target_register_solib_event_probe (probe, action);
 }
 
 /* Get the solib event probe at the specified location, and the
@@ -2043,7 +2047,7 @@ svr4_update_solib_event_breakpoints (void)
 
 static void
 svr4_create_probe_breakpoints (struct gdbarch *gdbarch,
-				     VEC (probe_p) **probes)
+			       VEC (probe_p) **probes)
 {
   int i;
 
@@ -2058,8 +2062,7 @@ svr4_create_probe_breakpoints (struct gdbarch *gdbarch,
 	   ++ix)
 	{
 	  create_solib_event_breakpoint (gdbarch, probe->address);
-
-	  target_register_solib_event_probe (probe, action);
+	  register_solib_event_probe (probe, action);
 	}
     }
 
@@ -2188,7 +2191,7 @@ enable_break (struct svr4_info *info, int from_tty)
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
 
-  target_reset_solib_event_probes ();
+  reset_solib_event_probes ();
 
   /* If we already have a shared library list in the target, and
      r_debug contains r_brk, set the breakpoint there - this should
@@ -3239,8 +3242,6 @@ _initialize_svr4_solib (void)
   svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
   svr4_so_ops.same = svr4_same;
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
-  svr4_so_ops.reset_solib_event_probes = svr4_reset_solib_event_probes;
-  svr4_so_ops.register_solib_event_probe = svr4_register_solib_event_probe;
   svr4_so_ops.handle_solib_event = svr4_handle_solib_event;
   svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
 }

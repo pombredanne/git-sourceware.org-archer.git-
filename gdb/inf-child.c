@@ -31,7 +31,6 @@
 #include "gdb/fileio.h"
 #include "agent.h"
 #include "gdb_wait.h"
-#include "solib.h"
 
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>		/* for MAXPATHLEN */
@@ -426,7 +425,5 @@ inf_child_target (void)
   t->to_magic = OPS_MAGIC;
   t->to_use_agent = inf_child_use_agent;
   t->to_can_use_agent = inf_child_can_use_agent;
-  t->to_reset_solib_event_probes = reset_solib_event_probes;
-  t->to_register_solib_event_probe = register_solib_event_probe;
   return t;
 }
