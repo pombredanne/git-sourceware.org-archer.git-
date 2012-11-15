@@ -5330,7 +5330,7 @@ handle_jit_event (void)
 void
 handle_solib_event (bpstat bs)
 {
-  target_handle_solib_event (bs);
+  target_preprocess_solib_event (bs);
 
   clear_program_space_solib_cache (current_inferior ()->pspace);
 

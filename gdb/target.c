@@ -709,7 +709,7 @@ update_current_target (void)
       /* Do not inherit to_flash_done.  */
       INHERIT (to_clear_solib_event_probes, t);
       INHERIT (to_register_solib_event_probe, t);
-      INHERIT (to_handle_solib_event, t);
+      INHERIT (to_preprocess_solib_event, t);
     }
 #undef INHERIT
 
@@ -952,7 +952,7 @@ update_current_target (void)
   de_fault (to_register_solib_event_probe,
 	    (void (*) (struct probe *, enum solib_event_action))
 	    target_ignore);
-  de_fault (to_handle_solib_event,
+  de_fault (to_preprocess_solib_event,
 	    (void (*) (bpstat))
 	    target_ignore);
 

@@ -866,7 +866,7 @@ struct target_ops
 					   enum solib_event_action action);
 
     /* XXX.  */
-    void (*to_handle_solib_event) (bpstat bs);
+    void (*to_preprocess_solib_event) (bpstat bs);
 
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
@@ -1738,8 +1738,8 @@ extern char *target_fileio_read_stralloc (const char *filename);
 #define target_register_solib_event_probe(probe, action) \
   (*current_target.to_register_solib_event_probe) (probe, action)
 
-#define target_handle_solib_event(bs) \
-  (*current_target.to_handle_solib_event) (bs)
+#define target_preprocess_solib_event(bs) \
+  (*current_target.to_preprocess_solib_event) (bs)
 
 /* Command logging facility.  */
 
