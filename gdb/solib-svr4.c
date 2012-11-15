@@ -2042,7 +2042,7 @@ svr4_update_solib_event_breakpoints (void)
 /* XXX.  */
 
 static void
-svr4_create_probe_event_breakpoints (struct gdbarch *gdbarch,
+svr4_create_probe_breakpoints (struct gdbarch *gdbarch,
 				     VEC (probe_p) **probes)
 {
   int i;
@@ -2123,7 +2123,7 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 	    }
 
 	  if (all_probes_found)
-	    svr4_create_probe_event_breakpoints (gdbarch, probes);
+	    svr4_create_probe_breakpoints (gdbarch, probes);
 
 	  for (i = 0; i < NUM_PROBES; i++)
 	    VEC_free (probe_p, probes[i]);
