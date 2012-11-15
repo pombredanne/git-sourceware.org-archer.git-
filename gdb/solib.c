@@ -1217,6 +1217,16 @@ update_solib_breakpoints (void)
     ops->update_breakpoints ();
 }
 
+/* See solib.h.  */
+
+void
+preprocess_solib_event (bpstat bs)
+{
+  struct target_so_ops *ops = solib_ops (target_gdbarch);
+
+  if (ops->preprocess_event != NULL)
+    ops->preprocess_event (bs);
+}
 
 /* Reload shared libraries, but avoid reloading the same symbol file
    we already have loaded.  */

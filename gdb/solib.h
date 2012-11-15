@@ -98,4 +98,11 @@ extern CORE_ADDR gdb_bfd_lookup_symbol_from_symtab (bfd *abfd,
 
 extern void update_solib_breakpoints (void);
 
+/* Target-specific processing of solib events that will be performed
+   before solib_add is called.  Targets which handle solib events
+   using breakpoints must pass a valid bpstat.  Targets which handle
+   solib events using some other mechanism should pass NULL.  */
+
+extern void preprocess_solib_event (bpstat bs);
+
 #endif /* SOLIB_H */

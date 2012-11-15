@@ -3242,6 +3242,6 @@ _initialize_svr4_solib (void)
   svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
   svr4_so_ops.same = svr4_same;
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
-  svr4_so_ops.handle_solib_event = svr4_preprocess_solib_event;
   svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
+  svr4_so_ops.preprocess_event = svr4_preprocess_solib_event;
 }

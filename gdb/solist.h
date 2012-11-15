@@ -152,19 +152,20 @@ struct target_so_ops
     int (*keep_data_in_core) (CORE_ADDR vaddr,
 			      unsigned long size);
 
-    /* Target-specific handling of solib events.  For targets which
-       handle solib events using breakpoints a valid bpstat must be
-       passed.  Targets which handle solib events using some other
-       mechanism should pass NULL.  This pointer can be NULL, in which
-       case no specific handling is necessary for this target.  */
-    void (*handle_solib_event) (bpstat bs);
-
     /* Enable or disable optional solib event breakpoints as
        appropriate.  This should be called whenever
        stop_on_solib_events is changed.  This pointer can be
        NULL, in which case no enabling or disabling is necessary
        for this target.  */
     void (*update_breakpoints) (void);
+
+    /* Target-specific processing of solib events that will be
+       performed before solib_add is called.  Targets which handle
+       solib events using breakpoints must pass a valid bpstat.
+       Targets which handle solib events using some other mechanism
+       should pass NULL.  This pointer can be NULL, in which case no
+       specific preprocessing is necessary for this target.  */
+    void (*preprocess_event) (bpstat bs);
   };
 
 /* Free the memory associated with a (so_list *).  */
