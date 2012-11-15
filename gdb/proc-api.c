@@ -45,7 +45,7 @@
 #include <sys/user.h>	/* for struct user */
 #endif
 #include <fcntl.h>	/* for O_RDWR etc.  */
-#include "gdb_wait.h"
+#include <sys/wait.h>
 
 #include "proc-utils.h"
 

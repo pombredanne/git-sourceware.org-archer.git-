@@ -21,7 +21,7 @@
 #include "linux-osdata.h"
 #include "agent.h"
 
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/ptrace.h>

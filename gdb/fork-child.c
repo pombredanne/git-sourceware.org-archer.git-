@@ -25,7 +25,7 @@
 #include "inferior.h"
 #include "terminal.h"
 #include "target.h"
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include "gdb_vfork.h"
 #include "gdbcore.h"
 #include "terminal.h"

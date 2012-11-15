@@ -492,9 +492,6 @@
 /* Define to 1 if you have the <sys/user.h> header file. */
 #undef HAVE_SYS_USER_H
 
-/* Define to 1 if you have the <sys/wait.h> header file. */
-#undef HAVE_SYS_WAIT_H
-
 /* Define to 1 if you have the <termios.h> header file. */
 #undef HAVE_TERMIOS_H
 
@@ -527,9 +524,6 @@
 
 /* Define to 1 if you have the `waitpid' function. */
 #undef HAVE_WAITPID
-
-/* Define to 1 if you have the <wait.h> header file. */
-#undef HAVE_WAIT_H
 
 /* Define to 1 if you have the `wborder' function. */
 #undef HAVE_WBORDER

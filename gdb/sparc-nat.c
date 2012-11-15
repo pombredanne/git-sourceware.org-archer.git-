@@ -26,7 +26,7 @@
 #include <signal.h>
 #include <string.h>
 #include <sys/ptrace.h>
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #ifdef HAVE_MACHINE_REG_H
 #include <machine/reg.h>
 #endif

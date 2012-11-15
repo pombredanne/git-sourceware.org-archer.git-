@@ -31,7 +31,7 @@
 #include "gdbthread.h"
 
 #include <sys/ptrace.h>
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include <sys/param.h>
 #include <dirent.h>
 #include <ctype.h>

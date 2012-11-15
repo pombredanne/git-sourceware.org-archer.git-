@@ -30,7 +30,7 @@
 #include "inf-child.h"
 #include "gdb/fileio.h"
 #include "agent.h"
-#include "gdb_wait.h"
+#include <sys/wait.h>
 
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>		/* for MAXPATHLEN */

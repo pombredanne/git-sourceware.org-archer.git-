@@ -22,7 +22,7 @@
 #include "gdbcmd.h"
 #include "gdb_assert.h"
 #include "gdb_obstack.h"
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include "charset-list.h"
 #include "vec.h"
 #include "environ.h"

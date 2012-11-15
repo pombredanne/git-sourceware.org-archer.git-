@@ -27,7 +27,7 @@
 #include "inf-ptrace.h"
 #include "regcache.h"
 #include "symfile.h"
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include "gdbthread.h"
 #include "gdb_bfd.h"
 

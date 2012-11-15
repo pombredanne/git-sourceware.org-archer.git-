@@ -89,7 +89,7 @@
 #include "i386-nat.h"
 #include "inferior.h"
 #include "gdbthread.h"
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include "gdbcore.h"
 #include "command.h"
 #include "gdbcmd.h"

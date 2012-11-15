@@ -26,7 +26,7 @@
 #include "inferior.h"
 #include "exceptions.h"
 #include "breakpoint.h"
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include "gdbcore.h"
 #include "gdbcmd.h"
 #include "cli/cli-script.h"

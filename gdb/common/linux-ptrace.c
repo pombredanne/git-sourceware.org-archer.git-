@@ -27,7 +27,7 @@
 #include "linux-procfs.h"
 #include "buffer.h"
 #include "gdb_assert.h"
-#include "gdb_wait.h"
+#include <sys/wait.h>
 
 /* Find all possible reasons we could fail to attach PID and append these
    newline terminated reason strings to initialized BUFFER.  '\0' termination

@@ -29,7 +29,7 @@
 
 #include <signal.h>
 #include <sys/ptrace.h>
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #ifdef HAVE_SYS_REG_H
 #include <sys/reg.h>
 #endif

@@ -42,7 +42,7 @@
 #include <sys/syscall.h>
 #endif
 #include <sys/errno.h>
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include <signal.h>
 #include <ctype.h>
 #include "gdb_bfd.h"

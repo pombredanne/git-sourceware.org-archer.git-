@@ -29,7 +29,7 @@
 #include "gdb_assert.h"
 #include <string.h>
 #include "gdb_ptrace.h"
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include <signal.h>
 
 #include "inf-ptrace.h"

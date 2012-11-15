@@ -21,7 +21,7 @@
 #include "inferior.h"
 #include "target.h"
 #include <string.h>
-#include "gdb_wait.h"
+#include <sys/wait.h>
 #include "gdb_assert.h"
 #ifdef HAVE_TKILL_SYSCALL
 #include <unistd.h>

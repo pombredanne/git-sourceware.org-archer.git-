@@ -167,9 +167,6 @@
 /* Define to 1 if you have the <sys/un.h> header file. */
 #undef HAVE_SYS_UN_H
 
-/* Define to 1 if you have the <sys/wait.h> header file. */
-#undef HAVE_SYS_WAIT_H
-
 /* Define if TD_VERSION is available. */
 #undef HAVE_TD_VERSION
 
@@ -193,9 +190,6 @@
 
 /* Define to 1 if you have the `vsnprintf' function. */
 #undef HAVE_VSNPRINTF
-
-/* Define to 1 if you have the <wait.h> header file. */
-#undef HAVE_WAIT_H
 
 /* Checking if errno must be defined */
 #undef MUST_DEFINE_ERRNO
