@@ -1603,41 +1603,25 @@ svr4_register_solib_event_probe (struct probe *probe,
 }
 
 /* Get the solib event probe at the specified location, and the
-   probe_info the probe was created with.  Fills in RESULT and
-   returns nonzero if a solib event probe was found at the
-   specified location.  Returns zero if no solib event probe
+   action associated with it.  Returns NULL if no solib event probe
    was found.  */
 
-/*
-static int
-solib_event_probe_at (struct svr4_info *info, struct bp_location *loc,
-		      struct probe_and_info *result)
+static struct probe_and_action *
+solib_event_probe_at (struct svr4_info *info, struct bp_location *loc)
 {
-  int i;
+  struct probe lookup_probe;
+  struct probe_and_action lookup;
+  void **slot;
 
-  if (loc->pspace != current_program_space)
-    return 0;
+  lookup_probe.address = loc->address;
+  lookup.probe = &lookup_probe;
+  slot = htab_find_slot (info->probes_table, &lookup, NO_INSERT);
 
-  for (i = 0; i < NUM_PROBES; i++)
-    {
-      struct probe *probe;
-      int ix;
+  if (slot == NULL)
+    return NULL;
 
-      for (ix = 0; VEC_iterate (probe_p, info->probes[i], ix, probe); ++ix)
-	{
-	  if (loc->address == probe->address)
-	    {
-	      result->info = &probe_info[i];
-	      result->probe = probe;
-
-	      return 1;
-	    }
-	}
-    }
-
-  return 0;
+  return (struct probe_and_action *) *slot;
 }
-*/
 
 /* Decide what action to take when the specified solib event probe is
    hit.  */
@@ -2028,16 +2012,16 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 
   for (loc = b->loc; loc; loc = loc->next)
     {
-//      struct probe_and_info buf, *pi = &buf;
-/*
-      if (solib_event_probe_at (info, loc, pi))
+      struct probe_and_action *pa = solib_event_probe_at (info, loc);
+
+      if (pa != NULL)
 	{
-	  if (pi->info->action == SEA_NO_ACTION)
+	  if (pa->action == SEA_NO_ACTION)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
-*/
-//	  return 0; /* Continue iterating.  */
-//	}
+
+	  return 0; /* Continue iterating.  */
+	}
     }
 
   return 0; /* Continue iterating.  */
