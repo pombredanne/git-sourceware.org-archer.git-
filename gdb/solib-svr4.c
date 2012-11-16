@@ -1409,6 +1409,14 @@ svr4_current_sos (void)
   struct svr4_library_list library_list;
   struct so_list *result;
 
+  info = get_svr4_info ();
+
+  if (info->probes_table)
+    {
+      struct regcache *regcache = get_current_regcache ();
+      CORE_ADDR pc = regcache_read_pc (regcache);
+    }
+
   /* Fall back to manual examination of the target if the packet is not
      supported or gdbserver failed to find DT_DEBUG.  gdb.server/solib-list.exp
      tests a case where gdbserver cannot find the shared libraries list while
@@ -1427,8 +1435,6 @@ svr4_current_sos (void)
 
       return library_list.head ? library_list.head : svr4_default_sos ();
     }
-
-  info = get_svr4_info ();
 
   /* If we have a namespace table then return a flattened copy.  */
   if (info->namespace_table != NULL)
