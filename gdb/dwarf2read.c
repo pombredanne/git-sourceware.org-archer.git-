@@ -28,6 +28,8 @@
    reading off the end of the section.
    E.g., load_partial_dies, read_partial_die.  */
 
+#define CLI_CONST const
+
 #include "defs.h"
 #include "bfd.h"
 #include "elf-bfd.h"
@@ -19674,13 +19676,13 @@ static struct cmd_list_element *set_dwarf2_cmdlist;
 static struct cmd_list_element *show_dwarf2_cmdlist;
 
 static void
-set_dwarf2_cmd (char *args, int from_tty)
+set_dwarf2_cmd (const char *args, int from_tty)
 {
   help_list (set_dwarf2_cmdlist, "maintenance set dwarf2 ", -1, gdb_stdout);
 }
 
 static void
-show_dwarf2_cmd (char *args, int from_tty)
+show_dwarf2_cmd (const char *args, int from_tty)
 {
   cmd_show_list (show_dwarf2_cmdlist, from_tty, "");
 }
@@ -20573,7 +20575,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
    GDB manual.  Any changes here must be documented there.  */
 
 static void
-save_gdb_index_command (char *arg, int from_tty)
+save_gdb_index_command (const char *arg, int from_tty)
 {
   struct objfile *objfile;
 
