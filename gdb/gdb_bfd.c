@@ -17,6 +17,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+#define CLI_CONST const
+
 #include "defs.h"
 #include "gdb_bfd.h"
 #include "gdb_assert.h"
@@ -628,7 +630,7 @@ print_one_bfd (void **slot, void *data)
 /* Implement the 'maint info bfd' command.  */
 
 static void
-maintenance_info_bfds (char *arg, int from_tty)
+maintenance_info_bfds (const char *arg, int from_tty)
 {
   struct cleanup *cleanup;
   struct ui_out *uiout = current_uiout;
