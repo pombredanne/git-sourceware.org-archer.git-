@@ -17,6 +17,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+#define CLI_CONST const
+
 #include "defs.h"
 
 #include "jit.h"
@@ -198,7 +200,7 @@ jit_reader_load (const char *file_name)
 /* Provides the jit-reader-load command.  */
 
 static void
-jit_reader_load_command (char *args, int from_tty)
+jit_reader_load_command (const char *args, int from_tty)
 {
   char *so_name;
   struct cleanup *prev_cleanup;
@@ -222,7 +224,7 @@ jit_reader_load_command (char *args, int from_tty)
 /* Provides the jit-reader-unload command.  */
 
 static void
-jit_reader_unload_command (char *args, int from_tty)
+jit_reader_unload_command (const char *args, int from_tty)
 {
   if (!loaded_jit_reader)
     error (_("No JIT reader loaded."));
