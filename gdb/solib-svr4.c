@@ -54,6 +54,12 @@ static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
 static struct so_list *namespace_table_flatten (htab_t namespace_table);
+struct svr4_info;
+struct probe_and_action;
+static void svr4_preprocess_solib_event (struct svr4_info *info,
+					 struct probe_and_action *pa);
+static struct probe_and_action *solib_event_probe_at (struct svr4_info *info,
+						      CORE_ADDR address);
 
 /* Link map info to include in an allocated so_list entry.  */
 
@@ -1415,6 +1421,10 @@ svr4_current_sos (void)
     {
       struct regcache *regcache = get_current_regcache ();
       CORE_ADDR pc = regcache_read_pc (regcache);
+      struct probe_and_action *pa = solib_event_probe_at (info, pc);
+
+      if (pa != NULL)
+	svr4_preprocess_solib_event (info, pa);
     }
 
   /* Fall back to manual examination of the target if the packet is not
@@ -1617,13 +1627,13 @@ register_solib_event_probe (struct probe *probe,
    was found.  */
 
 static struct probe_and_action *
-solib_event_probe_at (struct svr4_info *info, struct bp_location *loc)
+solib_event_probe_at (struct svr4_info *info, CORE_ADDR address)
 {
   struct probe lookup_probe;
   struct probe_and_action lookup;
   void **slot;
 
-  lookup_probe.address = loc->address;
+  lookup_probe.address = address;
   lookup.probe = &lookup_probe;
   slot = htab_find_slot (info->probes_table, &lookup, NO_INSERT);
 
@@ -1845,10 +1855,9 @@ disable_probes_interface_cleanup (void *arg)
    standard interface.  */
 
 static void
-svr4_preprocess_solib_event (bpstat bs)
+svr4_preprocess_solib_event (struct svr4_info *info,
+			     struct probe_and_action *pa)
 {
-  struct svr4_info *info = get_svr4_info ();
-  struct probe_and_action *pa;
   enum solib_event_action action;
   struct cleanup *old_chain, *usm_chain;
   struct value *val;
@@ -1856,21 +1865,9 @@ svr4_preprocess_solib_event (bpstat bs)
   CORE_ADDR debug_base, lm = 0;
   int is_initial_ns;
 
-  /* It is possible that this function will be called incorrectly
-     by the handle_solib_event in handle_inferior_event if GDB goes
-     fully multi-target.  */
-  gdb_assert (bs != NULL);
-
-  if (!info->probes_table)
-    return;
-
   /* If anything goes wrong we revert to the original linker
      interface.  */
   old_chain = make_cleanup (disable_probes_interface_cleanup, NULL);
-
-  pa = solib_event_probe_at (info, bs->bp_location_at);
-  if (pa == NULL)
-    goto error;
 
   action = solib_event_probe_action (pa);
 
@@ -2017,7 +2014,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 
   for (loc = b->loc; loc; loc = loc->next)
     {
-      struct probe_and_action *pa = solib_event_probe_at (info, loc);
+      struct probe_and_action *pa = solib_event_probe_at (info, loc->address);
 
       if (pa != NULL)
 	{
@@ -3244,5 +3241,4 @@ _initialize_svr4_solib (void)
   svr4_so_ops.same = svr4_same;
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
   svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
-  svr4_so_ops.preprocess_event = svr4_preprocess_solib_event;
 }
