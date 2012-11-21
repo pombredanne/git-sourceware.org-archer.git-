@@ -1206,28 +1206,6 @@ no_shared_libraries (char *ignored, int from_tty)
   objfile_purge_solibs ();
 }
 
-/* See solib.h.  */
-
-void
-update_solib_breakpoints (void)
-{
-  struct target_so_ops *ops = solib_ops (target_gdbarch);
-
-  if (ops->update_breakpoints != NULL)
-    ops->update_breakpoints ();
-}
-
-/* See solib.h.  */
-
-void
-preprocess_solib_event (bpstat bs)
-{
-  struct target_so_ops *ops = solib_ops (target_gdbarch);
-
-  if (ops->preprocess_event != NULL)
-    ops->preprocess_event (bs);
-}
-
 /* Reload shared libraries, but avoid reloading the same symbol file
    we already have loaded.  */
 
@@ -1468,6 +1446,28 @@ gdb_bfd_lookup_symbol (bfd *abfd,
     symaddr = bfd_lookup_symbol_from_dyn_symtab (abfd, match_sym, data);
 
   return symaddr;
+}
+
+/* See solib.h.  */
+
+void
+update_solib_breakpoints (void)
+{
+  struct target_so_ops *ops = solib_ops (target_gdbarch);
+
+  if (ops->update_breakpoints != NULL)
+    ops->update_breakpoints ();
+}
+
+/* See solib.h.  */
+
+void
+preprocess_solib_event (bpstat bs)
+{
+  struct target_so_ops *ops = solib_ops (target_gdbarch);
+
+  if (ops->preprocess_event != NULL)
+    ops->preprocess_event (bs);
 }
 
 extern initialize_file_ftype _initialize_solib; /* -Wmissing-prototypes */
