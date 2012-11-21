@@ -23,8 +23,6 @@
 #define SO_NAME_MAX_PATH_SIZE 512	/* FIXME: Should be dynamic */
 /* For domain_enum domain.  */
 #include "symtab.h"
-/* For bpstat.  */
-#include "breakpoint.h"
 
 /* Forward declaration for target specific link map information.  This
    struct is opaque to all but the target specific file.  */
@@ -160,12 +158,10 @@ struct target_so_ops
     void (*update_breakpoints) (void);
 
     /* Target-specific processing of solib events that will be
-       performed before solib_add is called.  Targets which handle
-       solib events using breakpoints must pass a valid bpstat.
-       Targets which handle solib events using some other mechanism
-       should pass NULL.  This pointer can be NULL, in which case no
-       specific preprocessing is necessary for this target.  */
-    void (*preprocess_event) (bpstat bs);
+       performed before solib_add is called.  This pointer can be
+       NULL, in which case no specific preprocessing is necessary
+       for this target.  */
+    void (*handle_event) (void);
   };
 
 /* Free the memory associated with a (so_list *).  */

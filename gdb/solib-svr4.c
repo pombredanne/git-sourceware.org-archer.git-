@@ -55,9 +55,6 @@ static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
 static struct so_list *namespace_table_flatten (htab_t namespace_table);
 struct svr4_info;
-struct probe_and_action;
-static void svr4_preprocess_solib_event (struct svr4_info *info,
-					 struct probe_and_action *pa);
 static struct probe_and_action *solib_event_probe_at (struct svr4_info *info,
 						      CORE_ADDR address);
 
@@ -1411,21 +1408,13 @@ svr4_current_sos_from_debug_base (void)
 static struct so_list *
 svr4_current_sos (void)
 {
-  struct svr4_info *info;
+  struct svr4_info *info = get_svr4_info ();
   struct svr4_library_list library_list;
   struct so_list *result;
 
-  info = get_svr4_info ();
-
-  if (info->probes_table)
-    {
-      struct regcache *regcache = get_current_regcache ();
-      CORE_ADDR pc = regcache_read_pc (regcache);
-      struct probe_and_action *pa = solib_event_probe_at (info, pc);
-
-      if (pa != NULL)
-	svr4_preprocess_solib_event (info, pa);
-    }
+  /* If we have a namespace table then return a flattened copy.  */
+  if (info->namespace_table != NULL)
+    return namespace_table_flatten (info->namespace_table);
 
   /* Fall back to manual examination of the target if the packet is not
      supported or gdbserver failed to find DT_DEBUG.  gdb.server/solib-list.exp
@@ -1445,10 +1434,6 @@ svr4_current_sos (void)
 
       return library_list.head ? library_list.head : svr4_default_sos ();
     }
-
-  /* If we have a namespace table then return a flattened copy.  */
-  if (info->namespace_table != NULL)
-    return namespace_table_flatten (info->namespace_table);
 
   /* Always locate the debug struct, in case it has moved.  */
   info->debug_base = 0;
@@ -1855,20 +1840,26 @@ disable_probes_interface_cleanup (void *arg)
    standard interface.  */
 
 static void
-svr4_preprocess_solib_event (struct svr4_info *info,
-			     struct probe_and_action *pa)
+svr4_handle_solib_event (void)
 {
+  struct svr4_info *info = get_svr4_info ();
+  struct probe_and_action *pa;
   enum solib_event_action action;
   struct cleanup *old_chain, *usm_chain;
   struct value *val;
   LONGEST lmid;
-  CORE_ADDR debug_base, lm = 0;
+  CORE_ADDR pc, debug_base, lm = 0;
   int is_initial_ns;
+
+  if (info->probes_table == NULL)
+    return;
 
   /* If anything goes wrong we revert to the original linker
      interface.  */
   old_chain = make_cleanup (disable_probes_interface_cleanup, NULL);
 
+  pc = regcache_read_pc (get_current_regcache ());
+  pa = solib_event_probe_at (info, pc);
   action = solib_event_probe_action (pa);
 
   if (action == SEA_FATAL_ERROR)
@@ -3241,4 +3232,5 @@ _initialize_svr4_solib (void)
   svr4_so_ops.same = svr4_same;
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
   svr4_so_ops.update_breakpoints = svr4_update_solib_event_breakpoints;
+  svr4_so_ops.handle_event = svr4_handle_solib_event;
 }
