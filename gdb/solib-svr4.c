@@ -123,6 +123,26 @@ static const  char * const main_name_list[] =
   NULL
 };
 
+/* Actions to take at solib event breakpoint stops.  */
+
+enum solib_event_action
+  {
+    /* Something went seriously wrong.  Stop using probes and
+       revert to the older interface.  */
+    SEA_FATAL_ERROR,
+
+    /* No action is required at this stop.  */
+    SEA_NO_ACTION,
+
+    /* The specified namespace should be reloaded entirely.  */
+    SEA_RELOAD,
+
+    /* Attempt to incrementally update the specified namespace.
+       If the update fails or is not possible, fall back to
+       reloading the namespace in full.  */
+    SEA_UPDATE_OR_RELOAD,
+  };
+
 /* A probe's name and its associated action.  */
 
 struct probe_info
