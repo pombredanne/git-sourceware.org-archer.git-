@@ -1567,18 +1567,6 @@ equal_probe_and_action (const void *p1, const void *p2)
 /* XXX.  */
 
 static void
-clear_solib_event_probes (void)
-{
-  struct svr4_info *info = get_svr4_info ();
-
-  free_probes_table (info);
-
-  target_clear_solib_event_probes ();
-}
-
-/* XXX.  */
-
-static void
 register_solib_event_probe (struct probe *probe,
 			    enum solib_event_action action)
 {
@@ -1603,8 +1591,6 @@ register_solib_event_probe (struct probe *probe,
   pa->action = action;
 
   *slot = pa;
-
-  target_register_solib_event_probe (probe, action);
 }
 
 /* Get the solib event probe at the specified location, and the
@@ -2180,7 +2166,7 @@ enable_break (struct svr4_info *info, int from_tty)
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
 
-  clear_solib_event_probes ();
+  free_probes_table (info);
 
   /* If we already have a shared library list in the target, and
      r_debug contains r_brk, set the breakpoint there - this should

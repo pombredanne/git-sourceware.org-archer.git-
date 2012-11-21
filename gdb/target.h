@@ -62,7 +62,6 @@ struct expression;
 #include "memattr.h"
 #include "vec.h"
 #include "gdb_signals.h"
-#include "breakpoint.h"
 
 enum strata
   {
@@ -857,16 +856,6 @@ struct target_ops
 
     /* Is the target able to use agent in current state?  */
     int (*to_can_use_agent) (void);
-
-    /* XXX.  */
-    void (*to_clear_solib_event_probes) (void);
-
-    /* XXX.  */
-    void (*to_register_solib_event_probe) (struct probe *probe,
-					   enum solib_event_action action);
-
-    /* XXX.  */
-    void (*to_preprocess_solib_event) (bpstat bs);
 
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
@@ -1731,15 +1720,6 @@ extern char *target_fileio_read_stralloc (const char *filename);
 
 #define target_can_use_agent() \
   (*current_target.to_can_use_agent) ()
-
-#define target_clear_solib_event_probes() \
-  (*current_target.to_clear_solib_event_probes) ()
-
-#define target_register_solib_event_probe(probe, action) \
-  (*current_target.to_register_solib_event_probe) (probe, action)
-
-#define target_preprocess_solib_event(bs) \
-  (*current_target.to_preprocess_solib_event) (bs)
 
 /* Command logging facility.  */
 
