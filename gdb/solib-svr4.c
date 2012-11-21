@@ -129,18 +129,18 @@ enum solib_event_action
   {
     /* Something went seriously wrong.  Stop using probes and
        revert to the older interface.  */
-    SEA_FATAL_ERROR,
+    NAMESPACE_TABLE_INVALIDATE,
 
     /* No action is required at this stop.  */
-    SEA_NO_ACTION,
+    NAMESPACE_NO_ACTION,
 
     /* The specified namespace should be reloaded entirely.  */
-    SEA_RELOAD,
+    NAMESPACE_RELOAD,
 
     /* Attempt to incrementally update the specified namespace.
        If the update fails or is not possible, fall back to
        reloading the namespace in full.  */
-    SEA_UPDATE_OR_RELOAD,
+    NAMESPACE_UPDATE_OR_RELOAD,
   };
 
 /* A probe's name and its associated action.  */
@@ -160,12 +160,12 @@ struct probe_info
 
 static const struct probe_info probe_info[] =
 {
-  { "init_start", SEA_NO_ACTION },
-  { "init_complete", SEA_RELOAD },
-  { "map_start", SEA_NO_ACTION },
-  { "reloc_complete", SEA_UPDATE_OR_RELOAD },
-  { "unmap_start", SEA_NO_ACTION },
-  { "unmap_complete", SEA_RELOAD },
+  { "init_start", NAMESPACE_NO_ACTION },
+  { "init_complete", NAMESPACE_RELOAD },
+  { "map_start", NAMESPACE_NO_ACTION },
+  { "reloc_complete", NAMESPACE_UPDATE_OR_RELOAD },
+  { "unmap_start", NAMESPACE_NO_ACTION },
+  { "unmap_complete", NAMESPACE_RELOAD },
 };
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
@@ -1644,10 +1644,11 @@ solib_event_probe_action (struct probe_and_action *pa)
   unsigned probe_argc;
 
   action = pa->action;
-  if (action == SEA_NO_ACTION || action == SEA_FATAL_ERROR)
+  if (action == NAMESPACE_NO_ACTION || action == NAMESPACE_TABLE_INVALIDATE)
     return action;
 
-  gdb_assert (action == SEA_RELOAD || action == SEA_UPDATE_OR_RELOAD);
+  gdb_assert (action == NAMESPACE_RELOAD
+	      || action == NAMESPACE_UPDATE_OR_RELOAD);
 
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
@@ -1656,9 +1657,9 @@ solib_event_probe_action (struct probe_and_action *pa)
        arg2: struct link_map *new (optional, for incremental updates)  */
   probe_argc = get_probe_argument_count (pa->probe);
   if (probe_argc == 2)
-    action = SEA_RELOAD;
+    action = NAMESPACE_RELOAD;
   else if (probe_argc < 2)
-    action = SEA_FATAL_ERROR;
+    action = NAMESPACE_TABLE_INVALIDATE;
 
   return action;
 }
@@ -1868,10 +1869,10 @@ svr4_handle_solib_event (void)
   pa = solib_event_probe_at (info, pc);
   action = solib_event_probe_action (pa);
 
-  if (action == SEA_FATAL_ERROR)
+  if (action == NAMESPACE_TABLE_INVALIDATE)
     goto error;
 
-  if (action == SEA_NO_ACTION)
+  if (action == NAMESPACE_NO_ACTION)
     return;
 
   /* EVALUATE_PROBE_ARGUMENT looks up symbols in the dynamic linker
@@ -1908,20 +1909,20 @@ svr4_handle_solib_event (void)
 
   is_initial_ns = (debug_base == info->debug_base);
 
-  if (action == SEA_UPDATE_OR_RELOAD)
+  if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
       val = evaluate_probe_argument (pa->probe, 2);
       if (val != NULL)
 	lm = value_as_address (val);
 
       if (lm == 0)
-	action = SEA_RELOAD;
+	action = NAMESPACE_RELOAD;
     }
 
   /* Resume section map updates.  */
   do_cleanups (usm_chain);
 
-  if (action == SEA_UPDATE_OR_RELOAD)
+  if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
       if (namespace_update_incremental (info, lmid, lm, is_initial_ns))
 	{
@@ -1929,10 +1930,10 @@ svr4_handle_solib_event (void)
 	  return;
 	}
 
-      action = SEA_RELOAD;
+      action = NAMESPACE_RELOAD;
     }
 
-  gdb_assert (action == SEA_RELOAD);
+  gdb_assert (action == NAMESPACE_RELOAD);
 
   if (namespace_update_full (info, lmid, debug_base, is_initial_ns))
     {
@@ -2015,7 +2016,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 
       if (pa != NULL)
 	{
-	  if (pa->action == SEA_NO_ACTION)
+	  if (pa->action == NAMESPACE_NO_ACTION)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
 
