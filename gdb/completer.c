@@ -327,39 +327,6 @@ location_completer (struct cmd_list_element *ignore,
   return list;
 }
 
-/* Helper for expression_completer which recursively counts the number
-   of named fields and methods in a structure or union type.  */
-static int
-count_struct_fields (struct type *type)
-{
-  int i, result = 0;
-
-  CHECK_TYPEDEF (type);
-  for (i = 0; i < TYPE_NFIELDS (type); ++i)
-    {
-      if (i < TYPE_N_BASECLASSES (type))
-	result += count_struct_fields (TYPE_BASECLASS (type, i));
-      else if (TYPE_FIELD_NAME (type, i))
-	{
-	  if (TYPE_FIELD_NAME (type, i)[0] != '\0')
-	    ++result;
-	  else if (TYPE_CODE (TYPE_FIELD_TYPE (type, i)) == TYPE_CODE_UNION)
-	    {
-	      /* Recurse into anonymous unions.  */
-	      result += count_struct_fields (TYPE_FIELD_TYPE (type, i));
-	    }
-	}
-    }
-
-  for (i = TYPE_NFN_FIELDS (type) - 1; i >= 0; --i)
-    {
-      if (TYPE_FN_FIELDLIST_NAME (type, i))
-	++result;
-    }
-
-  return result;
-}
-
 /* Helper for expression_completer which recursively adds field and
    method names from TYPE, a struct or union type, to the array
    OUTPUT.  */
@@ -447,7 +414,6 @@ expression_completer (struct cmd_list_element *ignore,
       if (TYPE_CODE (type) == TYPE_CODE_UNION
 	  || TYPE_CODE (type) == TYPE_CODE_STRUCT)
 	{
-	  int alloc = count_struct_fields (type);
 	  int flen = strlen (fieldname);
 	  VEC (char_ptr) *result = NULL;
 
@@ -535,6 +501,7 @@ complete_line_internal (const char *text,
 {
   VEC (char_ptr) *list = NULL;
   char *tmp_command, *p;
+  int ignore_help_classes;
   /* Pointer within tmp_command which corresponds to text.  */
   char *word;
   struct cmd_list_element *c, *result_list;
@@ -554,6 +521,9 @@ complete_line_internal (const char *text,
   tmp_command = (char *) alloca (point + 1);
   p = tmp_command;
 
+  /* The help command should complete help aliases.  */
+  ignore_help_classes = reason != handle_help;
+
   strncpy (tmp_command, line_buffer, point);
   tmp_command[point] = '\0';
   /* Since text always contains some number of characters leading up
@@ -570,7 +540,7 @@ complete_line_internal (const char *text,
     }
   else
     {
-      c = lookup_cmd_1 (&p, cmdlist, &result_list, 1);
+      c = lookup_cmd_1 (&p, cmdlist, &result_list, ignore_help_classes);
     }
 
   /* Move p up to the next interesting thing.  */
@@ -611,12 +581,13 @@ complete_line_internal (const char *text,
 	    {
 	      if (reason != handle_brkchars)
 		list = complete_on_cmdlist (*result_list->prefixlist, p,
-					    word);
+					    word, ignore_help_classes);
 	    }
 	  else
 	    {
 	      if (reason != handle_brkchars)
-		list = complete_on_cmdlist (cmdlist, p, word);
+		list = complete_on_cmdlist (cmdlist, p, word,
+					    ignore_help_classes);
 	    }
 	  /* Ensure that readline does the right thing with respect to
 	     inserting quotes.  */
@@ -642,7 +613,8 @@ complete_line_internal (const char *text,
 		  /* It is a prefix command; what comes after it is
 		     a subcommand (e.g. "info ").  */
 		  if (reason != handle_brkchars)
-		    list = complete_on_cmdlist (*c->prefixlist, p, word);
+		    list = complete_on_cmdlist (*c->prefixlist, p, word,
+						ignore_help_classes);
 
 		  /* Ensure that readline does the right thing
 		     with respect to inserting quotes.  */
@@ -713,7 +685,8 @@ complete_line_internal (const char *text,
 		}
 
 	      if (reason != handle_brkchars)
-		list = complete_on_cmdlist (result_list, q, word);
+		list = complete_on_cmdlist (result_list, q, word,
+					    ignore_help_classes);
 
 	      /* Ensure that readline does the right thing
 		 with respect to inserting quotes.  */

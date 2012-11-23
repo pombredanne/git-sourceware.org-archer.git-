@@ -1,3 +1,18 @@
+2012-11-16  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (System-wide configuration): If the system-wide init
+	file lives in the data-directory, and --data-directory is provided,
+	look for it there.
+
+2012-11-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Signaling): Fix typo.
+
+2012-11-13  Giuseppe Montalto  <giuseppe.montalto@st.com>
+
+	* gdb.texinfo (GDB/MI Data Manipulation): Document new optional
+	parameter "count" of -data-write-memory-bytes, and add an example.
+
 2012-11-12  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (Symbols): Document "info type-printers",

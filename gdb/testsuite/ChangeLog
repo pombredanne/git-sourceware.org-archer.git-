@@ -1,3 +1,61 @@
+2012-11-20  Mike Frysinger  <vapier@gentoo.org>
+
+	* gdb.base/completion.exp: Add test for help aliases completion.
+
+2012-11-20  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.mi/mi-cmd-param-changed.exp (test_command_param_changed):
+	Don't test 'maint set show-debug-regs'.
+	Use command 'set remotecache' instead of
+	'set circular-trace-buffer'.
+
+2012-11-16  Keith Seitz  <keiths@redhat.com>
+
+	PR c++/13615
+	* gdb.cp/baseenum.cc: New file.
+	* gdb.cp/baseenum.exp: New file.
+	* gdb.cp/derivation.cc (A): Add copyright.
+	Add a typedef.
+	(B): Use A::value_type instead of int.  Change all references.
+	(D): Use value_type instead of int.  Change all references.
+	(E): Likewise.
+	(F); Likewise.
+	(Z): New class.
+	(ZZ): New class.
+ 	(N, Base, Derived): New namespace and classes.
+	(main): Add instances of Z and ZZ.
+	Make sure all symbols from N are kept.
+	* gdb.cp/derivation.exp: Update typedef changes in tests.
+	Add tests for class typedefs both before and after starting
+	the inferior.
+	Add tests for searching for a typedef while stopped in a
+	method.
+
+2012-11-14  Luis Machado  <lgustavo@codesourcery.com>
+
+	* gdb.mi/mi-var-create-rtti.c: New file.
+	* gdb.mi/mi-var-create-rtti.exp: New file.
+
+2012-11-14  Luis Machado  <lgustavo@codesourcery.com>
+
+	* gdb.base/structs3.exp: Run to main before doing any tests.
+
+2012-11-14  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.python/py-type.exp: Uniquify test names.
+
+2012-11-14  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.threads/manythreads.c [DEBUG]: Include "stdio.h".
+	(thread_function) [DEBUG]: Call 'printf'.
+	* gdb.threads/manythreads.exp: Pass '-DDEBUG' to compilation
+	command line if 'DEBUG=1' is passed to test.
+	Remove a pattern to match inferior's output.
+
+2012-11-13  Giuseppe Montalto  <giuseppe.montalto@st.com>
+
+	* gdb.mi/mi-fill-memory.exp: New test.
+
 2012-11-12  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.base/completion.exp: Update for "info type-printers".

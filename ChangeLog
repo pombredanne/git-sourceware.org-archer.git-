@@ -1,3 +1,34 @@
+2012-11-19  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
+
+	* config.sub (arm): Merge from upstream: Handle armv[6-8] targets.
+
+2012-11-14  Roland McGrath  <mcgrathr@google.com>
+
+	* configure.ac (ENABLE_GOLD): Consider *-*-nacl* targets ELF.
+	* configure: Regenerate.
+
+2012-11-13  Richard Henderson  <rth@redhat.com>
+
+	* configure.ac: Move libsanitizer logic to subdirectory.
+	* configure: Regenerate.
+
+2012-11-13  Dodji Seketeli  <dodji@redhat.com>
+
+	* configure.ac: Enable libsanitizer just on x86 linux for now.
+	* configure: Re-generate.
+
+2012-11-13  David Edelsohn  <dje.gcc@gmail.com>
+
+	* configure.ac: Merge libquadmath sections.
+	* configure: Regenerate.
+
+2012-11-12  Wei Mi <wmi@google.com>
+
+	* configure.ac: Add libsanitizer to target_libraries.
+	* Makefile.def: Ditto.
+	* configure: Regenerate.
+	* Makefile.in: Regenerate.
+
 2012-11-03  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* configure: Regenerated.

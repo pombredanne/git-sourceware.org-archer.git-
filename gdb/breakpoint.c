@@ -983,7 +983,7 @@ set_breakpoint_condition (struct breakpoint *b, char *exp,
     }
   mark_breakpoint_modified (b);
 
-  breakpoints_changed ();
+  annotate_breakpoints_changed ();
   observer_notify_breakpoint_modified (b);
 }
 
@@ -1024,9 +1024,10 @@ condition_completer (struct cmd_list_element *cmd, char *text, char *word)
 	    char location[50];
 
 	    if (single)
-	      sprintf (location, "%d", b->number);
+	      xsnprintf (location, sizeof (location), "%d", b->number);
 	    else
-	      sprintf (location, "%d.%d", b->number, count);
+	      xsnprintf (location, sizeof (location),  "%d.%d", b->number,
+			 count);
 
 	    if (strncmp (location, text, len) == 0)
 	      VEC_safe_push (char_ptr, result, xstrdup (location));
@@ -1214,7 +1215,7 @@ breakpoint_set_commands (struct breakpoint *b,
 
   decref_counted_command_line (&b->commands);
   b->commands = alloc_counted_command_line (commands);
-  breakpoints_changed ();
+  annotate_breakpoints_changed ();
   observer_notify_breakpoint_modified (b);
 }
 
@@ -1331,7 +1332,7 @@ do_map_commands_command (struct breakpoint *b, void *data)
       incref_counted_command_line (info->cmd);
       decref_counted_command_line (&b->commands);
       b->commands = info->cmd;
-      breakpoints_changed ();
+      annotate_breakpoints_changed ();
       observer_notify_breakpoint_modified (b);
     }
 }
@@ -6996,7 +6997,7 @@ init_raw_breakpoint (struct breakpoint *b, struct gdbarch *gdbarch,
   if (bptype != bp_breakpoint && bptype != bp_hardware_breakpoint)
     b->pspace = sal.pspace;
 
-  breakpoints_changed ();
+  annotate_breakpoints_changed ();
 }
 
 /* set_raw_breakpoint is a low level routine for allocating and
@@ -11941,7 +11942,7 @@ clear_command (char *arg, int from_tty)
       else
 	printf_unfiltered (_("Deleted breakpoints "));
     }
-  breakpoints_changed ();
+  annotate_breakpoints_changed ();
 
   for (ix = 0; VEC_iterate(breakpoint_p, found, ix, b); ix++)
     {
@@ -14319,7 +14320,7 @@ set_ignore_count (int bptnum, int count, int from_tty)
 			       "crossings of breakpoint %d."),
 			     count, bptnum);
 	}
-      breakpoints_changed ();
+      annotate_breakpoints_changed ();
       observer_notify_breakpoint_modified (b);
       return;
     }
@@ -14584,7 +14585,7 @@ enable_breakpoint_disp (struct breakpoint *bpt, enum bpdisp disposition,
   bpt->disposition = disposition;
   bpt->enable_count = count;
   update_global_location_list (1);
-  breakpoints_changed ();
+  annotate_breakpoints_changed ();
   
   observer_notify_breakpoint_modified (bpt);
 }
@@ -15101,7 +15102,7 @@ create_tracepoint_from_upload (struct uploaded_tp *utp)
       warning (_("Uploaded tracepoint %d has no "
 		 "source location, using raw address"),
 	       utp->number);
-      sprintf (small_buf, "*%s", hex_string (utp->addr));
+      xsnprintf (small_buf, sizeof (small_buf), "*%s", hex_string (utp->addr));
       addr_str = small_buf;
     }
 
@@ -15132,7 +15133,8 @@ create_tracepoint_from_upload (struct uploaded_tp *utp)
 
   if (utp->pass > 0)
     {
-      sprintf (small_buf, "%d %d", utp->pass, tp->base.number);
+      xsnprintf (small_buf, sizeof (small_buf), "%d %d", utp->pass,
+		 tp->base.number);
 
       trace_pass_command (small_buf, 0);
     }
