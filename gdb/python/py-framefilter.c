@@ -44,7 +44,7 @@
    for clean up.  **SYM is a pass-through argument where the symbol
    will be written.  In the case of the API returning a string, this
    will be set to NULL.  **LANGUAGE is also a pass-through argument
-   denoting the language attributed to the Symbol. In the case of
+   denoting the language attributed to the Symbol.  In the case of
    **SYM being NULL, this will be set to the current language.
    Returns 0 on error with the appropriate Python exception set, and 1
    on success.  */
@@ -342,7 +342,7 @@ get_py_iter_from_func (PyObject *filter, char *func)
     frame argument structure.  If FA is populated, both SYM_NAME and
     FV are ignored.  OPTS contains the value printing options,
     MI_PRINT_TYPE is an enumerator to the value types that will be
-    printed if the output is MI.  PRINT_MI_ARGS indciates whether to
+    printed if the output is MI.  PRINT_MI_ARGS indicates whether to
     output the ARGS="1" field in MI output.  */
 static int
 py_print_single_arg (struct ui_out *out,
@@ -463,7 +463,7 @@ py_print_single_arg (struct ui_out *out,
    conform to the "Symbol Value" interface.  ITER is the Python
    iterator object, OUT is the output stream, MI_PRINT_TYPE is an
    enumerator to the value types that will be printed if the output is
-   MI, PRINT_MI_ARGS indciates whether to output the ARGS="1" field in
+   MI, PRINT_MI_ARGS indicates whether to output the ARGS="1" field in
    MI output, CLI_PRINT_FRAME_ARGS_TYPE is an enumerator of the user
    set option for frame argument printing output, and FRAME is the
    backing frame.  If (all) the frame argument values are provided via
@@ -624,7 +624,7 @@ enumerate_args (PyObject *iter,
    to the "Symbol Value" interface.  ITER is the Python iterator
    object, OUT is the output stream, MI_PRINT_TYPE is an enumerator to
    the value types that will be printed if the output is MI,
-   PRINT_MI_ARGS_FLAG indciates whether to output the ARGS field in MI
+   PRINT_MI_ARGS_FLAG indicates whether to output the ARGS field in MI
    output, and FRAME is the backing frame.  If (all) of the variables
    values are provided via the "value" API call, FRAME is not
    needed.  */
@@ -1227,7 +1227,7 @@ bootstrap_python_frame_filters (struct frame_info *frame)
 /*  Public and dispatch function for frame filters.  This is the only
     publicly exported function in this file.  FRAME is the source
     frame to start frame-filter invocation.  FLAGS is an integer
-    holding the flags for printing. The following elements of the
+    holding the flags for printing.  The following elements of the
     FRAME_FILTER_FLAGS enum denotes makeup of FLAGS: PRINT_LEVEL is a
     flag indicating whether to print the frame's relative level in the
     output.  PRINT_FRAME_INFO is a flag that indicates whether this

@@ -55,7 +55,7 @@ mi_continue_to_line [gdb_get_line_number {Backtrace end breakpoint} ${srcfile}] 
 mi_gdb_test "-stack-list-frames" ""
 mi_gdb_test "-enable-frame-filters" ""
 mi_gdb_test "-stack-list-frames" \
-    "\\^done,stack=\\\[frame={level=\"0\",addr=\"$hex\",func=\"cnuf_dne\".*},frame={level=\"1\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"2\",addr=\"$hex\",func=\"bcnuf\".*},frame={level=\"3\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"22\",addr=\"$hex\",func=\"1cnuf\".*,children=\\\[frame={level=\"23\",addr=\"$hex\",func=\"func2\".*}\\\]},frame={level=\"24\",addr=\"$hex\",func=\"3cnuf\".*},frame={level=\"27\",addr=\"$hex\",func=\"niam\".*}\\\]" \
+    "\\^done,stack=\\\[frame={level=\"0\",addr=\"$hex\",func=\"cnuf_dne\".*},frame={level=\"1\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"2\",addr=\"$hex\",func=\"bcnuf\".*},frame={level=\"3\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"22\",addr=\"$hex\",func=\"1cnuf\".*,children=\\\[frame={level=\"23\",addr=\"$hex\",func=\"func2\".*}\\\]},frame={level=\"24\",addr=\"$hex\",func=\"3cnuf\".*},frame={level=\"27\",addr=\"$hex\",func=\"niam\".*}\\\].*" \
     "filtered stack listing"
 mi_gdb_test "-stack-list-frames 0 3" \
     "\\^done,stack=\\\[frame={level=\"0\",addr=\"$hex\",func=\"cnuf_dne\".*},frame={level=\"1\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"2\",addr=\"$hex\",func=\"bcnuf\".*},frame={level=\"3\",addr=\"$hex\",func=\"acnuf\".*}\\\]" \
@@ -131,7 +131,7 @@ mi_gdb_test "-stack-list-locals --no-frame-filters 1" \
     "stack-list-locals --no-frame-filters 1"
 
 mi_gdb_test "-stack-list-locals --no-frame-filters 2" \
-    "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short int\",value=\"5\"}\\\]" \
+    "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short\",value=\"5\"}\\\]" \
     "stack-list-locals --no-frame-filters 2"
 
 mi_gdb_test "-stack-list-locals --no-frame-filters --no-values" \
@@ -143,7 +143,7 @@ mi_gdb_test "-stack-list-locals --no-frame-filters --all-values" \
     "stack-list-locals --no-frame-filters --all-values"
 
 mi_gdb_test "-stack-list-locals --no-frame-filters --simple-values" \
-    "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short int\",value=\"5\"}\\\]" \
+    "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short\",value=\"5\"}\\\]" \
     "stack-list-locals --no-frame-filters --simple-values"
 
 mi_gdb_test "-stack-list-locals 0" \
@@ -155,7 +155,7 @@ mi_gdb_test "-stack-list-locals 1" \
     "stack-list-locals 1"
 
 mi_gdb_test "-stack-list-locals 2" \
-    "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short int\",value=\"5\"}\\\]" \
+    "\\^done,locals=\\\[{name=\"str\",type=\"const char \\\*\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",type=\"const char \\\*\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",type=\"int\",value=\"12\"},{name=\"c\",type=\"short\",value=\"5\"}\\\]" \
     "stack-list-locals 2"
 
 # stack-list-variables

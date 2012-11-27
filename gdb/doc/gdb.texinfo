@@ -24050,19 +24050,19 @@ done then type printers would have to make use of the event system in
 order to avoid holding information that could become stale as the
 inferior changed.
 
-@node Frame Filters API 
+@node Frame Filters API
 @subsubsection Filtering and Wrapping Frames.
 @cindex Frame Filter/Wrappers API
 
 Frame filters are Python objects that manipulate the visibility of a
 frame or frames when a backtrace (@pxref{Backtrace}) is printed by
-@value{GDBN}.  
+@value{GDBN}.
 
 Only commands that print a backtrace, or, in the case of @sc{gdb/mi} commands
 (@pxref{GDB/MI}), those that return a collection of frames are affected.  The
-commands that work with frame filters are: 
+commands that work with frame filters are:
 
-@code{backtrace} (@pxref{backtrace-command,, The backtrace command}), 
+@code{backtrace} (@pxref{backtrace-command,, The backtrace command}),
 @code{-stack-list-frames}
 (@pxref{-stack-list-frames,, The -stack-list-frames command}),
 @code{-stack-list-variables} (@pxref{-stack-list-variables,, The
@@ -24074,7 +24074,7 @@ commands that work with frame filters are:
 Frame filters work by applying actions to an iterator that is passed
 to the frame filter.  The frame filter works with tools such as
 Python's @code{itertools} module to modify the iterator, and returns
-this modified iterator. A frame filter must not alter the underlying
+this modified iterator.  A frame filter must not alter the underlying
 @value{GDBN} frame or frames, or attempt to alter the call stack
 within @value{GDBN}.  Frame filters may only work on the wrapping
 iterator.  This preserves data integrity within @value{GDBN}.
@@ -24091,7 +24091,7 @@ implement, defined here:
 
 @defun FrameFilter.filter (iterator)
 @value{GDBN} will call this method on a frame filter when it has
-reached the order in the priority list for that filter. 
+reached the order in the priority list for that filter.
 
 For example, if there are four frame filters:
 
@@ -24164,7 +24164,7 @@ priority are executed in unsorted order in that priority slot.  This
 attribute is mandatory.
 @end defvar
 
-@node Frame Wrapper API 
+@node Frame Wrapper API
 @subsubsection Wrapping and Decorating Frames.
 @cindex Frame Wrapper API
 
@@ -24280,7 +24280,7 @@ class SymValueWrapper ():
         return self.val
 
     def symbol (self):
-      
+
         return self.sym
 
 class SomeFrameWrapper ()
@@ -24289,7 +24289,7 @@ class SomeFrameWrapper ()
     def frame_args (self):
         fvars = []
         fvars.append (SymValueWrapper (``foo'', 42))
-        
+
         return iter (fvars)
 @end smallexample
 
@@ -24328,7 +24328,7 @@ class SymValueWrapper ():
         return self.val
 
     def symbol (self):
-      
+
         return self.sym
 
 class SomeFrameWrapper ()
@@ -24337,10 +24337,10 @@ class SomeFrameWrapper ()
     def frame_locals (self):
         fvars = []
         fvars.append (SymValueWrapper (``foo'', 42))
-        
+
         return iter (fvars)
 @end smallexample
-    
+
 Even if the @code{frame_locals} method returns only a single object, it
 must be wrapped in an iterator.
 
@@ -24400,7 +24400,7 @@ There are three basic elements that a frame filter must implement: it
 must correctly implement the documented interface (@pxref{Frame
 Filters API}), it must register itself with @value{GDBN}, and finally,
 it must decide if it is to work on the data provided by
-@value{GDBN}. In all cases, whether it works on the iterator or not,
+@value{GDBN}.  In all cases, whether it works on the iterator or not,
 each frame filter must return an iterator.  A bare-bones frame filter
 follows the pattern:
 
@@ -24470,7 +24470,7 @@ this is a valid operation for frame filters that have the
 
 In the next example, the frame filter operates on all frames and
 utilizes a frame wrapper to perform some work on the
-frames. @xref{Frame Wrapper API}, for the further information on the
+frames.  @xref{Frame Wrapper API}, for the further information on the
 interface.
 
 The following example works on inlined frames.  It highlights frames
@@ -24488,13 +24488,13 @@ performed when each frame is printed.  This is an important
 consideration, and well worth reflecting upon when designing a frame
 filter.  An issue that frame filters should avoid is unwinding the
 stack if possible.  To search every frame to determine if it is
-inlined may be too expensive at the filtering step. The frame filter
+inlined may be too expensive at the filtering step.  The frame filter
 cannot know how many frames it has to deal with, and it would have to
 iterate through them all.  This ends up duplicating effort as
-@value{GDBN} performs this unwinding when it prints the frames. In
+@value{GDBN} performs this unwinding when it prints the frames.  In
 this example it can be deferred to the printing step where it can
 examine each frame when it is printed.  From a performance viewpoint,
-this is an important note. A backtrace from large or complex programs
+this is an important note.  A backtrace from large or complex programs
 can constitute many thousands of frames.  Also, if there are many frame
 filters unwinding the stack during filtering, it can substantially
 delay the printing of the backtrace which will result in large memory
@@ -24517,7 +24517,7 @@ class InlineFilter ():
 
 This frame filter is somewhat similar to the earlier example, except
 that the @code{filter} method applies a frame wrapper object called
-@code{InlinedFrameWrapper} to each element in the iterator.  
+@code{InlinedFrameWrapper} to each element in the iterator.
 
 Below is the frame wrapper:
 
@@ -24529,7 +24529,7 @@ class InlinedFrameWrapper (BaseFrameWrapper):
         self.fobj = fobj
 
     def function (self):
-        frame = self.inferior_frame()        
+        frame = self.inferior_frame()
         name = str(frame.name())
         function = str(frame.function())
 
@@ -24585,7 +24585,7 @@ class InlineFrameFilter ():
 
 This frame filter is very similar to the other examples.  The only
 difference is this frame filter is wrapping the iterator provided to
-it (@code{frame_iter}) with a custom iterator: 
+it (@code{frame_iter}) with a custom iterator:
 @code{ElidingInlineIterator}.  This again defers actions to when
 @value{GDBN} prints the backtrace, as the iterator is not traversed
 until printing.
@@ -24618,10 +24618,10 @@ untouched.  If it is wrapping an inlined frame, it assumes that the
 inlined frame was contained within the next oldest frame,
 @code{eliding_frame}, which it fetches.  It then creates and returns a
 frame wrapper, @code{ElidingFrameWrapper}, which contains both the
-elided frame, and the eliding frame.  
+elided frame, and the eliding frame.
 
 @smallexample
-ElidingInlineWrapper(BaseFrameWrapper):
+class ElidingInlineWrapper(BaseFrameWrapper):
 
     def __init__(self, frame, elided_frames):
         super(ElidingInlineWrapper, self).__init__(frame)
@@ -24671,7 +24671,7 @@ Enable a frame filter in the dictionary matching
 @var{filter-dictionary} and @var{filter-name}.
 @var{filter-dictionary} may be @code{global}, @code{progspace} or the
 name of the object file where the frame filter dictionary resides.
-@var{filter-name} is the name of the frame filter.  
+@var{filter-name} is the name of the frame filter.
 
 Example:
 
@@ -24728,7 +24728,7 @@ objfile /build/test frame-filters:
 
 @end smallexample
 
-@kindex set python frame-filter priority 
+@kindex set python frame-filter priority
 @item set python frame-filter priority @var{filter-dictionary} @var{filter-name} @var{priority}
 Set the @var{priority} of a frame filter in the dictionary matching
 @var{filter-dictionary}, and the frame filter name matching
@@ -30408,6 +30408,7 @@ For a stack with frame levels 0 through 11:
 @anchor{-stack-list-arguments}
 @subheading The @code{-stack-list-arguments} Command
 @findex -stack-list-arguments
+
 @subsubheading Synopsis
 
 @smallexample
@@ -30498,9 +30499,11 @@ args=[@{name="intarg",value="2"@},
 
 @c @subheading -stack-list-exception-handlers
 
+
 @anchor{-stack-list-frames}
 @subheading The @code{-stack-list-frames} Command
 @findex -stack-list-frames
+
 @subsubheading Synopsis
 
 @smallexample

@@ -78,7 +78,6 @@ class ElidingFrameWrapper(BaseFrameWrapper):
 
     def __init__(self, frame, elided_frames):
         super(ElidingFrameWrapper, self).__init__(frame)
-        self.frame = frame
         self.elided_frames = elided_frames
 
     def elided(self):
@@ -93,7 +92,7 @@ class ElidingIterator:
 
     def next(self):
         frame = next(self.input_iterator)
-        if str(frame.function()) != 'func1':
+        if str(frame.function()) != 'func1': 
             return frame
 
         # Suppose we want to return the 'func1' frame but elide the
