@@ -110,7 +110,7 @@ def _get_filter_enabled (filter_item):
     # operations, just set enabled to False.
     try:
         enabled = _get_enabled (filter_item[1])
-    except gdbError as e:
+    except gdb.GdbError as e:
         enabled = False
 
     return enabled
@@ -415,7 +415,7 @@ class SetFrameFilterPriority (gdb.Command):
         command_tuple = self._parse_pri_arg(arg)
         try:
             self._set_filter_priority (command_tuple)
-        except e:
+        except gdb.GdbError as e:
             # Print the error, instead of raising it.
             gdb.write(e.message+"\n")
 
