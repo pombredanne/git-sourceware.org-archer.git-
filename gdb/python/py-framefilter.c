@@ -31,8 +31,6 @@
 #include "mi/mi-cmds.h"
 #include "demangle.h"
 #include "mi/mi-cmds.h"
-
-#ifdef HAVE_PYTHON
 #include "python-internal.h"
 
 
@@ -1324,15 +1322,3 @@ int apply_frame_filter (struct frame_info *frame, int flags,
   do_cleanups (cleanups);
   return success;
 }
-
-#else /* HAVE_PYTHON */
-int
-apply_frame_filter (struct frame_info *frame, int flags,
-		    enum print_values mi_print_args_type,
-		    const char *cli_print_args_type,
-		    struct ui_out *out, int count)
-{
-  return PY_BT_NO_FILTERS;
-}
-
-#endif /* HAVE_PYTHON */
