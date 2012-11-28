@@ -35,7 +35,7 @@ def _parse_arg (cmd_name, arg):
     argv = gdb.string_to_argv(arg);
     argc = len(argv)
     if argc != 2:
-        raise SyntaxError(cmd_name + " takes exactly " + \
+        raise gdb.GdbError(cmd_name + " takes exactly " + \
                           "two arguments.")
 
     object_list = argv[0]
@@ -374,7 +374,7 @@ class SetFrameFilterPriority (gdb.Command):
         argv = gdb.string_to_argv(arg);
         argc = len(argv)
         if argc != 3:
-            raise SyntaxError("set python frame-filter priority " \
+            raise gdb.GdbError("set python frame-filter priority " \
                               "takes exactly three arguments.")
 
         object_list = argv[0]
@@ -413,7 +413,11 @@ class SetFrameFilterPriority (gdb.Command):
     def invoke(self, arg, from_tty):
         """GDB calls this to perform the command."""
         command_tuple = self._parse_pri_arg(arg)
-        self._set_filter_priority (command_tuple)
+        try:
+            self._set_filter_priority (command_tuple)
+        except e:
+            # Print the error, instead of raising it.
+            gdb.write(e.message+"\n")
 
 class ShowFrameFilterPriority (gdb.Command):
     """GDB command to show the priority of the specified frame-filter.
@@ -438,7 +442,7 @@ class ShowFrameFilterPriority (gdb.Command):
         argv = gdb.string_to_argv(arg);
         argc = len(argv)
         if argc != 2:
-            raise SyntaxError("show python frame-filter priority " \
+            raise gdb.GdbError("show python frame-filter priority " \
                               "takes exactly two arguments.")
 
         object_list = argv[0]
@@ -465,7 +469,12 @@ class ShowFrameFilterPriority (gdb.Command):
 
     def invoke(self, arg, from_tty):
         """GDB calls this to perform the command."""
-        command_tuple = self._parse_pri_arg(arg)
+        try:
+            command_tuple = self._parse_pri_arg(arg)
+        except gdb.GdbError as e:
+            # Print the error instead of raising it.
+            gdb.write(e.message+"\n")
+            return
         filter_name = command_tuple[1]
         list_name = command_tuple[0]
         try:
