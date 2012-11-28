@@ -1,3 +1,27 @@
+2012-11-27  Daniel Jacobowitz  <dan@codesourcery.com>
+
+	* gdb.cp/member-ptr.cc (class Diamond): Add func_ptr.
+	(func): New function.
+	(main): Initialize diamond.func_ptr and add diamond_pfunc_ptr.
+	* gdb.cp/member-ptr.exp: Add new tests for ptype and for
+	pointers to members with pointer-to-function type.
+
+2012-11-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/gnu-debugdata.exp: New file.
+	* gdb.base/gnu-debugdata.c: New file.
+	* lib/gdb.exp (gdb_file_cmd): Handle LZMA warning.
+	(gdb_unload): Return 0 on success.
+
+2012-11-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/enumval.exp (print e, print f, print K): XFAIL on GCC <= 4.6.
+
+2012-11-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.base/empty_exe.exp: New testcase.
+
 2012-11-20  Mike Frysinger  <vapier@gentoo.org>
 
 	* gdb.base/completion.exp: Add test for help aliases completion.

@@ -1,8 +1,6 @@
-/* Native-dependent code for NetBSD.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright (C) 2006-2012 Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2012 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,29 +15,16 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include "defs.h"
+#include <signal.h>
 
-#include <sys/param.h>
-
-#include "nbsd-nat.h"
-
-/* Return the name of a file that can be opened to get the symbols for
-   the child process identified by PID.  */
-
-char *
-nbsd_pid_to_exec_file (int pid)
+static int
+debugdata_function (void)
 {
-  size_t len = MAXPATHLEN;
-  char *buf = xcalloc (len, sizeof (char));
-  char *path;
+  return raise (SIGSEGV) + 1;
+}
 
-  path = xstrprintf ("/proc/%d/exe", pid);
-  if (readlink (path, buf, MAXPATHLEN - 1) == -1)
-    {
-      xfree (buf);
-      buf = NULL;
-    }
-
-  xfree (path);
-  return buf;
+int
+main (void)
+{
+  return debugdata_function () + 1;
 }
