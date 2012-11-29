@@ -98,7 +98,6 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
 	  Py_DECREF (self);
 	  return NULL;
 	}
-	
     }
   return (PyObject *) self;
 }
@@ -275,7 +274,7 @@ objfile_to_objfile_object (struct objfile *objfile)
 	      return NULL;
 	    }
 
-    	  object->frame_filters = PyDict_New ();
+	  object->frame_filters = PyDict_New ();
 	  if (!object->frame_filters)
 	    {
 	      Py_DECREF (object->printers);

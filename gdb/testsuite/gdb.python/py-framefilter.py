@@ -92,7 +92,7 @@ class ElidingIterator:
 
     def next(self):
         frame = next(self.input_iterator)
-        if str(frame.function()) != 'func1': 
+        if str(frame.function()) != 'func1':
             return frame
 
         # Suppose we want to return the 'func1' frame but elide the

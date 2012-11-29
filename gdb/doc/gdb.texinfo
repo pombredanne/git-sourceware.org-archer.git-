@@ -24545,7 +24545,7 @@ search every frame to determine if it is inlined ahead of time may be
 too expensive at the filtering step.  The frame filter cannot know how
 many frames it has to iterate over, and it would have to iterate
 through them all.  This ends up duplicating effort as @value{GDBN}
-performs this iteration when it prints the frames.  
+performs this iteration when it prints the frames.
 
 In this example decision making can be deferred to the printing step.
 As each frame is printed, the frame wrapper can examine each frame in

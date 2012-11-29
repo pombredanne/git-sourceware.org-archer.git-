@@ -270,7 +270,7 @@ pspace_to_pspace_object (struct program_space *pspace)
 	      Py_DECREF (object);
 	      return NULL;
 	    }
-	    
+
 	  object->frame_filters = PyDict_New ();
 	  if (!object->frame_filters)
 	    {
