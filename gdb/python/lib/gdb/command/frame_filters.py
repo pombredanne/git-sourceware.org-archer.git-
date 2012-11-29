@@ -18,7 +18,6 @@
 
 import gdb
 import copy
-import gdb.FrameFilter
 from gdb.FrameIterator import FrameIterator
 from gdb.BaseFrameWrapper import BaseFrameWrapper
 import itertools
