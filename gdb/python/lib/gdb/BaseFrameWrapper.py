@@ -16,7 +16,7 @@
 import gdb
 from gdb.FrameWrapper import FrameWrapper
 
-class BaseFrameWrapper (FrameWrapper):
+class BaseFrameWrapper(FrameWrapper):
     """Basic implementation of a Frame Wrapper"""
 
     """ This base frame wrapper wraps a frame or another frame
@@ -64,7 +64,7 @@ class BaseFrameWrapper (FrameWrapper):
 
         return False
 
-    def elided (self):
+    def elided(self):
         """Return any elided frames that this class might be
         wrapping, or None."""
         if hasattr(self.base, "elided"):
@@ -72,7 +72,7 @@ class BaseFrameWrapper (FrameWrapper):
 
         return None
 
-    def function (self):
+    def function(self):
         """ Return the name of the frame's function, first determining
         if it is a special frame.  If not, try to determine filename
         from GDB's frame internal function API.  Finally, if a name
@@ -94,12 +94,12 @@ class BaseFrameWrapper (FrameWrapper):
         pc = frame.pc()
 
         if func == None:
-            unknown =  format (" 0x%08x in" % pc)
+            unknown =  format(" 0x%08x in" % pc)
             return unknown
 
         return str(func)
 
-    def address (self):
+    def address(self):
         """ Return the address of the frame's pc"""
 
         if hasattr(self.base, "address"):
@@ -108,9 +108,9 @@ class BaseFrameWrapper (FrameWrapper):
         frame = self.inferior_frame()
         return frame.pc()
 
-    def filename (self):
+    def filename(self):
         """ Return the filename associated with this frame, detecting
-        and returns the appropriate library name is this is a shared
+        and returning the appropriate library name is this is a shared
         library."""
 
         if hasattr(self.base, "filename"):
@@ -120,11 +120,11 @@ class BaseFrameWrapper (FrameWrapper):
         sal = frame.find_sal()
         if (not sal.symtab or not sal.symtab.filename):
             pc = frame.pc()
-            return gdb.solib_name (pc)
+            return gdb.solib_name(pc)
         else:
             return sal.symtab.filename
 
-    def frame_args (self):
+    def frame_args(self):
         """ Return an iterator of frame arguments for this frame, if
         any.  The iterator contains objects conforming with the
         Symbol/Value interface.  If there are no frame arguments, or
@@ -134,13 +134,13 @@ class BaseFrameWrapper (FrameWrapper):
             return self.base.frame_args()
 
         frame = self.inferior_frame()
-        if self.is_limited_frame (frame):
+        if self.is_limited_frame(frame):
             return None
 
-        args = FrameVars (frame)
+        args = FrameVars(frame)
         return args.fetch_frame_args()
 
-    def frame_locals (self):
+    def frame_locals(self):
         """ Return an iterator of local variables for this frame, if
         any.  The iterator contains objects conforming with the
         Symbol/Value interface.  If there are no frame locals, or if
@@ -150,13 +150,13 @@ class BaseFrameWrapper (FrameWrapper):
             return self.base.frame_locals()
 
         frame = self.inferior_frame()
-        if self.is_limited_frame (frame):
+        if self.is_limited_frame(frame):
             return None
 
-        args = FrameVars (frame)
+        args = FrameVars(frame)
         return args.fetch_frame_locals()
 
-    def line (self):
+    def line(self):
         """ Return line number information associated with the frame's
         pc.  If symbol table/line information does not exist, or if
         this frame is deemed to be a special case, return None"""
@@ -165,7 +165,7 @@ class BaseFrameWrapper (FrameWrapper):
             return self.base.line()
 
         frame = self.inferior_frame()
-        if self.is_limited_frame (frame):
+        if self.is_limited_frame(frame):
             return None
 
         sal = frame.find_sal()
@@ -174,7 +174,7 @@ class BaseFrameWrapper (FrameWrapper):
         else:
             return None
 
-    def inferior_frame (self):
+    def inferior_frame(self):
         """ Return the gdb.Frame underpinning this frame wrapper."""
 
         # If 'base' is a frame wrapper, we want to call its inferior
@@ -183,23 +183,23 @@ class BaseFrameWrapper (FrameWrapper):
             return self.base.inferior_frame()
         return self.base
 
-class BaseSymValueWrapper ():
+class BaseSymValueWrapper():
     """A container class conforming to the Symbol/Value interface
     which holds frame locals or frame arguments."""
     def __init__(self, symbol, value):
         self.sym = symbol
         self.val = value
 
-    def value (self):
+    def value(self):
         """ Return the value associated with this symbol, or None"""
         return self.val
 
-    def symbol (self):
+    def symbol(self):
         """ Return the symbol, or Python text, associated with this
         symbol, or None"""
         return self.sym
 
-class FrameVars ():
+class FrameVars():
 
     """Utility class to fetch and store frame local variables, or
     frame arguments."""
@@ -208,7 +208,7 @@ class FrameVars ():
         self.frame = frame
 
     @staticmethod
-    def fetch_b (sym):
+    def fetch_b(sym):
         """ Local utility method to determine if according to Symbol
         type whether it should be included in the iterator.  Not all
         symbols are fetched, and only symbols that return
@@ -232,7 +232,7 @@ class FrameVars ():
 	    gdb.SYMBOL_LOC_COMPUTED: True
           }.get(sym_type, False)
 
-    def fetch_frame_locals (self):
+    def fetch_frame_locals(self):
         """Public utility method to fetch frame local variables for
         the stored frame.  Frame arguments are not fetched.  If there
         are not frame local variables, return None."""
@@ -245,15 +245,15 @@ class FrameVars ():
         for sym in block:
             if sym.is_argument:
                 continue;
-            if self.fetch_b (sym):
+            if self.fetch_b(sym):
                 lvars.append(BaseSymValueWrapper(sym, None))
 
         if len(lvars) == 0:
             return None
 
-        return iter (lvars)
+        return iter(lvars)
 
-    def fetch_frame_args (self):
+    def fetch_frame_args(self):
         """Public utility method to fetch frame argument for the
         stored frame.  Frame arguments are the only type fetched.  If
         there are no frame arguments variables, return None."""
@@ -272,18 +272,18 @@ class FrameVars ():
         if len(args) == 0:
             return None
 
-        return iter (args)
+        return iter(args)
 
-    def get_value (self, sym, block):
+    def get_value(self, sym, block):
         """Public utility method to fetch a value from a symbol."""
-        if len (sym.linkage_name):
-            nsym, is_field_of_this = gdb.lookup_symbol (sym.linkage_name, block)
+        if len(sym.linkage_name):
+            nsym, is_field_of_this = gdb.lookup_symbol(sym.linkage_name, block)
             if nsym != None:
                 if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
                     sym = nsym
 
         try:
-            val = sym.value (self.frame)
+            val = sym.value(self.frame)
 
         except RuntimeError, text:
             val = text

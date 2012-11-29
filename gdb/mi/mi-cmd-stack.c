@@ -75,7 +75,6 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
   struct frame_info *fi;
   int result = 0;
   int raw_arg = 0;
-  int j;
 
   if (argc > 0)
     raw_arg = parse_no_frames_option (argv[0]);
