@@ -95,6 +95,8 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
       self->type_printers = PyList_New (0);
       if (!self->type_printers)
 	{
+	  Py_DECREF (self->printers);
+	  Py_DECREF (self->frame_filters);
 	  Py_DECREF (self);
 	  return NULL;
 	}
@@ -285,10 +287,11 @@ objfile_to_objfile_object (struct objfile *objfile)
 	  object->type_printers = PyList_New (0);
 	  if (!object->type_printers)
 	    {
+	      Py_DECREF (object->printers);
+	      Py_DECREF (object->frame_filters);
 	      Py_DECREF (object);
 	      return NULL;
 	    }
-
 
 	  set_objfile_data (objfile, objfpy_objfile_data_key, object);
 	}

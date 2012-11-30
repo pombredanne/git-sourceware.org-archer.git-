@@ -39,7 +39,6 @@ typedef struct
   PyObject *frame_filters;
   /* The type-printer list.  */
   PyObject *type_printers;
-
 } pspace_object;
 
 static PyTypeObject pspace_object_type;
@@ -104,6 +103,8 @@ pspy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
       self->type_printers = PyList_New (0);
       if (!self->type_printers)
 	{
+	  Py_DECREF (self->printers);
+	  Py_DECREF (self->frame_filters);
 	  Py_DECREF (self);
 	  return NULL;
 	}
@@ -282,6 +283,8 @@ pspace_to_pspace_object (struct program_space *pspace)
 	  object->type_printers = PyList_New (0);
 	  if (!object->type_printers)
 	    {
+	      Py_DECREF (object->printers);
+	      Py_DECREF (object->frame_filters);
 	      Py_DECREF (object);
 	      return NULL;
 	    }

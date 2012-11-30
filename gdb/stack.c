@@ -758,7 +758,6 @@ do_gdb_disassembly (struct gdbarch *gdbarch,
 void
 print_frame_info (struct frame_info *frame, int print_level,
 		  enum print_what print_what, int print_args)
-
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct symtab_and_line sal;
@@ -780,7 +779,7 @@ print_frame_info (struct frame_info *frame, int print_level,
          to list for this frame.  */
       if (print_level)
         {
-	  ui_out_text (uiout, "#");
+          ui_out_text (uiout, "#");
           ui_out_field_fmt_int (uiout, 2, ui_left, "level",
 				frame_relative_level (frame));
         }
@@ -1654,7 +1653,6 @@ frame_info (char *addr_exp, int from_tty)
 static void
 backtrace_command_1 (char *count_exp, int show_locals, int raw,
 		     int from_tty)
-
 {
   struct frame_info *fi;
   int count;

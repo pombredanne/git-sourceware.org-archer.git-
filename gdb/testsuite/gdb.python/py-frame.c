@@ -1,11 +1,5 @@
-int f3 (int b)
-{
-  return b;
-}
-
 int f2 (int a)
 {
-  f3 (a);
   return ++a;
 }
 
