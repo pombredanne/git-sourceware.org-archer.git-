@@ -2582,7 +2582,9 @@ It can be a stack frame number or the address of the frame.\n"));
   add_com ("backtrace", class_stack, backtrace_command, _("\
 Print backtrace of all stack frames, or innermost COUNT frames.\n\
 With a negative argument, print outermost -COUNT frames.\nUse of the \
-'full' qualifier also prints the values of the local variables.\n"));
+'full' qualifier also prints the values of the local variables.\n\
+Use of the 'raw' qualifier prohibits frame filters from executing\n\
+on this backtrace.\n"));
   add_com_alias ("bt", "backtrace", class_stack, 0);
   if (xdb_commands)
     {

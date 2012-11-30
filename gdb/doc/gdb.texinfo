@@ -6386,6 +6386,17 @@ Similar, but print only the outermost @var{n} frames.
 @itemx bt full -@var{n}
 Print the values of the local variables also.  @var{n} specifies the
 number of frames to print, as described above.
+
+@item backtrace raw
+@itemx bt raw
+@itemx bt raw @var{n}
+@itemx bt raw -@var{n}
+@itemx bt raw full
+@itemx bt raw full @var{n}
+@itemx bt raw full -@var{n}
+Do not run Python frame filters on this backtrace.  @xref{Frame
+Filters API}, for more information.  This is only relevant when
+@value{GDBN} has been configured with @code{Python} support.
 @end table
 
 @kindex where
@@ -25702,6 +25713,11 @@ The @code{type_printers} attribute is a list of type printer objects.
 @xref{Type Printing API}, for more information.
 @end defvar
 
+@defvar Progspace.frame_filters
+The @code{frame_filters} attribute is a dictionary of frame filter
+objects.  @xref{Frame Filters API}, for more information.
+@end defvar
+
 @node Objfiles In Python
 @subsubsection Objfiles In Python
 
@@ -25750,6 +25766,11 @@ information.
 @defvar Objfile.type_printers
 The @code{type_printers} attribute is a list of type printer objects.
 @xref{Type Printing API}, for more information.
+@end defvar
+
+@defvar Objfile.frame_filters
+The @code{frame_filters} attribute is a dictionary of frame filter
+objects.  @xref{Frame Filters API}, for more information.
 @end defvar
 
 A @code{gdb.Objfile} object has the following methods:
@@ -30417,6 +30438,25 @@ Is this going away????
 @node GDB/MI Stack Manipulation
 @section @sc{gdb/mi} Stack Manipulation Commands
 
+@subheading The @code{-enable-frame-filters} Command
+@findex -enable-frame-filters
+
+@smallexample
+-enable-frame-filters
+@end smallexample
+
+@value{GDBN} allows Python-based frame filters to affect the output of
+the MI commands relating to stack traces.  As there is no way to
+implement this in a fully backward-compatible way, a front end must
+request that this functionality be enabled.
+
+Once enabled, this feature cannot be disabled.
+
+Note that if Python support has not been compiled into @value{GDBN},
+this command will still succeed (and do nothing).
+
+This feature is currently (as of @value{GDBN} 7.6) experimental, and
+may work differently in future versions of @value{GDBN}.
 
 @subheading The @code{-stack-info-frame} Command
 @findex -stack-info-frame
@@ -30491,7 +30531,7 @@ For a stack with frame levels 0 through 11:
 @subsubheading Synopsis
 
 @smallexample
- -stack-list-arguments @var{print-values}
+ -stack-list-arguments [ --no-frame-filters ] @var{print-values}
     [ @var{low-frame} @var{high-frame} ]
 @end smallexample
 
@@ -30508,7 +30548,9 @@ If @var{print-values} is 0 or @code{--no-values}, print only the names of
 the variables; if it is 1 or @code{--all-values}, print also their
 values; and if it is 2 or @code{--simple-values}, print the name,
 type and value for simple data types, and the name and type for arrays,
-structures and unions.
+structures and unions.  If the option @code{--no-frame-filters} is
+supplied, then Python frame filters will not be executed.
+
 
 Use of this command to obtain arguments in a single frame is
 deprecated in favor of the @samp{-stack-list-variables} command.
@@ -30586,7 +30628,7 @@ args=[@{name="intarg",value="2"@},
 @subsubheading Synopsis
 
 @smallexample
- -stack-list-frames [ @var{low-frame} @var{high-frame} ]
+ -stack-list-frames [ --no-frame-filters @var{low-frame} @var{high-frame} ]
 @end smallexample
 
 List the frames currently on the stack.  For each frame it displays the
@@ -30616,7 +30658,9 @@ levels are between the two arguments (inclusive).  If the two arguments
 are equal, it shows the single frame at the corresponding level.  It is
 an error if @var{low-frame} is larger than the actual number of
 frames.  On the other hand, @var{high-frame} may be larger than the
-actual number of frames, in which case only existing frames will be returned.
+actual number of frames, in which case only existing frames will be
+returned.  If the option @code{--no-frame-filters} is supplied, then
+Python frame filters will not be executed.
 
 @subsubheading @value{GDBN} Command
 
@@ -30691,7 +30735,7 @@ Show a single frame:
 @subsubheading Synopsis
 
 @smallexample
- -stack-list-locals @var{print-values}
+ -stack-list-locals [ --no-frame-filters ] @var{print-values}
 @end smallexample
 
 Display the local variable names for the selected frame.  If
@@ -30702,7 +30746,8 @@ type and value for simple data types, and the name and type for arrays,
 structures and unions.  In this last case, a frontend can immediately
 display the value of simple data types and create variable objects for
 other data types when the user wishes to explore their values in
-more detail.
+more detail.  If the option @code{--no-frame-filters} is supplied, then
+Python frame filters will not be executed.
 
 This command is deprecated in favor of the
 @samp{-stack-list-variables} command.
@@ -30734,7 +30779,7 @@ This command is deprecated in favor of the
 @subsubheading Synopsis
 
 @smallexample
- -stack-list-variables @var{print-values}
+ -stack-list-variables [ --no-frame-filters ] @var{print-values}
 @end smallexample
 
 Display the names of local variables and function arguments for the selected frame.  If
@@ -30742,7 +30787,8 @@ Display the names of local variables and function arguments for the selected fra
 the variables; if it is 1 or @code{--all-values}, print also their
 values; and if it is 2 or @code{--simple-values}, print the name,
 type and value for simple data types, and the name and type for arrays,
-structures and unions.  
+structures and unions.  If the option @code{--no-frame-filters} is
+supplied, then Python frame filters will not be executed.
 
 @subsubheading Example
 
