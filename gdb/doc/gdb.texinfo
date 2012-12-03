@@ -6516,6 +6516,24 @@ unlimited.
 Display the current limit on backtrace levels.
 @end table
 
+You can control how file names are displayed in backtraces.
+
+@table @code
+@item set backtrace filename-display
+@itemx set backtrace filename-display relative
+@cindex backtrace filename-display
+Display file names relative to the compilation directory.  This is the default.
+
+@item set backtrace filename-display basename
+Display only basename of a filename.
+
+@item set backtrace filename-display absolute
+Display an absolute filename.
+
+@item show backtrace filename-display
+Show the current way to display filenames in backtraces.
+@end table
+
 @node Selection
 @section Selecting a Frame
 

@@ -43,7 +43,9 @@
 #include "gdbthread.h"
 #include "block.h"
 #include "inline-frame.h"
-#include  "tracepoint.h"
+#include "tracepoint.h"
+#include "filenames.h"
+#include "source.h"
 
 static struct frame_info *get_prev_frame_1 (struct frame_info *this_frame);
 static struct frame_info *get_prev_frame_raw (struct frame_info *this_frame);
@@ -135,6 +137,18 @@ struct frame_info
    sufficient for now.  */
 static struct frame_info *frame_stash = NULL;
 
+/* Possible values of 'set backtrace filename-display'.  */
+static const char filename_display_basename[] = "basename";
+static const char filename_display_relative[] = "relative";
+static const char filename_display_absolute[] = "absolute";
+
+static const char *const filename_display_kind_names[] = {
+  filename_display_basename,
+  filename_display_relative,
+  filename_display_absolute,
+  NULL
+};
+
 /* Add the following FRAME to the frame stash.  */
 
 static void
@@ -207,6 +221,16 @@ show_backtrace_limit (struct ui_file *file, int from_tty,
 		    value);
 }
 
+static const char *filename_display_string = filename_display_relative;
+
+static void
+show_filename_display_string (struct ui_file *file, int from_tty,
+			      struct cmd_list_element *c, const char *value)
+{
+  fprintf_filtered (file,
+		    _("A filename is displayed in backtrace as \"%s\".\n"),
+		    value);
+}
 
 static void
 fprint_field (struct ui_file *file, const char *name, int p, CORE_ADDR addr)
@@ -2143,6 +2167,28 @@ find_frame_sal (struct frame_info *frame, struct symtab_and_line *sal)
   (*sal) = find_pc_line (pc, notcurrent);
 }
 
+/* See commentary in frame.h.  */
+
+const char *
+get_filename_display_from_sal (const struct symtab_and_line *sal)
+{
+  const char *filename = sal->symtab->filename;
+
+  if (filename == NULL)
+      return NULL;
+  else if (filename_display_string == filename_display_basename)
+      return lbasename (filename);
+  else if (filename_display_string == filename_display_absolute)
+    {
+      const char *retval = symtab_to_fullname (sal->symtab);
+
+      if (retval != NULL)
+	return retval;
+    }
+
+  return filename;
+}
+
 /* Per "frame.h", return the ``address'' of the frame.  Code should
    really be using get_frame_id().  */
 CORE_ADDR
@@ -2501,6 +2547,21 @@ Zero is unlimited."),
 			    show_backtrace_limit,
 			    &set_backtrace_cmdlist,
 			    &show_backtrace_cmdlist);
+
+  add_setshow_enum_cmd ("filename-display", class_obscure,
+			filename_display_kind_names,
+			&filename_display_string, _("\
+Set how to display filenames in backtraces."), _("\
+Show how to display filenames in backtraces."), _("\
+filename-display can be:\n\
+  basename - display only basename of a filename\n\
+  relative - display a filename relative to the compilation directory\n\
+  absolute - display an absolute filename\n\
+By default, relative filename is displayed."),
+			NULL,
+			show_filename_display_string,
+			&set_backtrace_cmdlist,
+			&show_backtrace_cmdlist);
 
   /* Debug this files internals.  */
   add_setshow_zuinteger_cmd ("frame", class_maintenance, &frame_debug,  _("\
