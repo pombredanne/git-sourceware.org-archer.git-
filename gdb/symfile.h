@@ -231,7 +231,8 @@ struct quick_symbol_functions
 					const char *filename);
 
   /* Return the file name of the file holding the global symbol in OBJFILE
-     named NAME.  If no such symbol exists in OBJFILE, return NULL.  */
+     named NAME.  If no such symbol exists in OBJFILE, return NULL.
+     Only file extension of returned filename is recognized.  */
   const char *(*find_symbol_file) (struct objfile *objfile, const char *name);
 
   /* Find global or static symbols in all tables that are in NAMESPACE 
