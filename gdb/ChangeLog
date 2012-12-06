@@ -1,3 +1,77 @@
+2012-12-06  Joel Brobecker  <brobecker@adacore.com>
+
+	* aix-thread.c (getthrds): Fix type of 4th parameter.
+	(get_signaled_thread): Change type of variable ktid to tid_t.
+
+2012-12-06  Hui Zhu  <hui_zhu@mentor.com>
+
+	* dwarf2loc.c (dwarf_expr_frame_base): Add check for the return
+	value of get_frame_block.
+
+2012-12-05  Pierre Muller  <muller@sourceware.org>
+
+	Avoid memory leaks on struct cmd_list_element.doc field.
+	* cli/cli-decode.c (add_alias_cmd): Make a copy of doc field
+	if flags contains DOC_ALLOCATED.
+	(add_setshow_cmd_full): Add DOC_ALLOCATED to set and show
+	flags.
+	(delete_cmd): Handle DOC_ALLOCATED flag.
+	* cli/cli-decode.h (DOC_ALLOCATED): New macro for use
+	in flags filed of struct cmd_list_element.
+	(struct cmd_list_element): Document new flag item.
+
+2012-12-04  Doug Evans  <dje@google.com>
+
+	* symmisc.c: Whitespace fixes.
+
+2012-12-04  Karthik Bhat  <kv.bhat@samsung.com>
+
+	* i386-tdep.c (i386_skip_prologue): Using symbol table
+	to find the end of prologue for clang compiled binaries.
+	* amd64-tdep.c (amd64_skip_prologue): Using symbol table
+	to find the end of prologue for clang compiled binaries.
+
+2012-12-03  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (struct dwarf2_per_objfile): Clarify comment.
+	(dw2_find_symbol_file): Delete unused local file_data.
+
+2012-12-03  Tom Tromey  <tromey@redhat.com>
+
+	* ada-exp.y (write_object_renaming, write_var_or_type)
+	(write_ambiguous_var, write_var_from_sym): Make blocks const.
+	* ada-lang.c (replace_operator_with_call)
+	(find_old_style_renaming_symbol): Make blocks const.
+	* ada-lang.h (ada_find_renaming_symbol): Update.
+	(struct ada_symbol_info) <block>: Now const.
+	* breakpoint.c (watch_command_1): Update.
+	* breakpoint.h (struct watchpoint) <exp_valid_block,
+	cond_exp_valid_block>: Now const.
+	* c-exp.y (classify_inner_name, classify_name): Make block
+	argument const.
+	* expprint.c (print_subexp_standard) <OP_VAR_VALUE>: Make 'b'
+	const.
+	* expression.h (innermost_block, parse_exp_1): Update.
+	(union exp_element) <block>: Now const.
+	* gdbtypes.c (lookup_template_type, lookup_enum, lookup_union)
+	(lookup_struct): Make block argument const.
+	* gdbtypes.h (lookup_template_type): Update.
+	* go-exp.y (classify_name, classify_packaged_name)
+	(package_name_p): Make block argument const.
+	* objc-lang.c (lookup_struct_typedef): Make block argument const.
+	* objc-lang.h (lookup_struct_typedef): Update.
+	* parse.c (parse_exp_in_context, parse_exp_1)
+	(write_exp_elt_block): Make block arguments const.
+	(expression_context_block, innermost_block): Now const.
+	* parser-defs.h (write_exp_elt_block): Update.
+	(expression_context_block, innermost_block, block_found): Now
+	const.
+	* printcmd.c (struct display) <block>: Now const.
+	* symtab.h (lookup_struct, lookup_union, lookup_enum): Update.
+	* valops.c (address_of_variable): Make block argument const.
+	* value.h (value_of_variable): Update.
+	* varobj.c (struct varobj_root) <valid_block>: Now const.
+
 2012-11-30  Yao Qi  <yao@codesourcery.com>
 
 	* breakpoint.c (print_one_breakpoint_location): Indent code.
