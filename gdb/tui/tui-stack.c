@@ -29,6 +29,7 @@
 #include "top.h"
 #include "gdb-demangle.h"
 #include "gdb_string.h"
+#include "source.h"
 #include "tui/tui.h"
 #include "tui/tui-data.h"
 #include "tui/tui-stack.h"
@@ -348,11 +349,12 @@ tui_show_frame_info (struct frame_info *fi)
       find_frame_sal (fi, &sal);
 
       source_already_displayed = sal.symtab != 0
-        && tui_source_is_displayed (sal.symtab->filename);
+        && tui_source_is_displayed (symtab_to_filename (sal.symtab));
 
       if (get_frame_pc_if_available (fi, &pc))
 	tui_set_locator_info (get_frame_arch (fi),
-			      sal.symtab == 0 ? "??" : sal.symtab->filename,
+			      (sal.symtab == 0
+			       ? "??" : symtab_to_filename (sal.symtab)),
 			      tui_get_function_from_frame (fi),
 			      sal.line,
 			      pc);

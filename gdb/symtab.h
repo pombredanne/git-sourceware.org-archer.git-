@@ -816,7 +816,7 @@ struct symtab
 
   /* Name of this source file.  */
 
-  char *filename;
+  char *filenamex;
 
   /* Directory in which it was compiled, or NULL if we don't know.  */
 

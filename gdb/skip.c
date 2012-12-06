@@ -32,6 +32,7 @@
 #include "objfiles.h"
 #include "exceptions.h"
 #include "breakpoint.h" /* for get_sal_arch () */
+#include "source.h"
 
 struct skiplist_entry
 {
@@ -304,7 +305,7 @@ Skiplist entry should have either a filename or a function name."));
 	   if (sym)
 	     ui_out_field_fmt (current_uiout, "what", "%s at %s:%d",
 			       sym->ginfo.name,
-			       SYMBOL_SYMTAB (sym)->filename,
+			       symtab_to_filename (SYMBOL_SYMTAB (sym)),
 			       sym->line);
 	   else
 	     ui_out_field_string (current_uiout, "what", "?");
@@ -469,7 +470,9 @@ function_pc_is_marked_for_skip (CORE_ADDR pc)
                 filename = sal.symtab->filename;
 	      searched_for_sal = 1;
 	    }
-	  if (filename != 0 && strcmp (filename, e->filename) == 0)
+	  if (filename != 0
+	      && compare_filenames_for_search (filename, e->filename,
+					       strlen (e->filename)))
 	    return 1;
 	}
     }

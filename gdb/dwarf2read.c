@@ -6758,8 +6758,8 @@ fixup_go_packaging (struct dwarf2_cu *cu)
 		    complaint (&symfile_complaints,
 			       _("Symtab %s has objects from two different Go packages: %s and %s"),
 			       (SYMBOL_SYMTAB (sym)
-				&& SYMBOL_SYMTAB (sym)->filename
-				? SYMBOL_SYMTAB (sym)->filename
+				&& SYMBOL_SYMTAB (sym)->filenamex
+				? SYMBOL_SYMTAB (sym)->filenamex
 				: cu->objfile->name),
 			       this_package_name, package_name);
 		  xfree (this_package_name);

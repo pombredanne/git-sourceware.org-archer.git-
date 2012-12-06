@@ -201,13 +201,13 @@ iterate_over_some_symtabs (const char *name,
   for (s = first; s != NULL && s != after_last; s = s->next)
     {
       /* Exact match is always ok.  */
-      if (FILENAME_CMP (name, s->filename) == 0)
+      if (FILENAME_CMP (name, s->filenamex) == 0)
 	{
 	  if (callback (s, data))
 	    return 1;
 	}
 
-      if (!is_abs && compare_filenames_for_search (s->filename, name, name_len))
+      if (!is_abs && compare_filenames_for_search (s->filenamex, name, name_len))
 	{
 	  if (callback (s, data))
 	    return 1;
@@ -216,7 +216,7 @@ iterate_over_some_symtabs (const char *name,
     /* Before we invoke realpath, which can get expensive when many
        files are involved, do a quick comparison of the basenames.  */
     if (! basenames_may_differ
-	&& FILENAME_CMP (base_name, lbasename (s->filename)) != 0)
+	&& FILENAME_CMP (base_name, lbasename (s->filenamex)) != 0)
       continue;
 
     /* If the user gave us an absolute path, try to find the file in
@@ -1638,7 +1638,7 @@ Internal: %s symbol `%s' found in %s psymtab but not in symtab.\n\
 %s may be an inlined function, or may be a template function\n\
 (if a template, try specifying an instantiation: %s<type>)."),
 	       kind == GLOBAL_BLOCK ? "global" : "static",
-	       name, symtab->filename, name, name);
+	       name, symtab_to_filename (symtab), name, name);
     }
   return fixup_symbol_section (sym, objfile);
 }
@@ -1843,7 +1843,7 @@ basic_lookup_transparent_type_quick (struct objfile *objfile, int kind,
 Internal: global symbol `%s' found in %s psymtab but not in symtab.\n\
 %s may be an inlined function, or may be a template function\n\
 (if a template, try specifying an instantiation: %s<type>)."),
-	       name, symtab->filename, name, name);
+	       name, symtab_to_filename (symtab), name, name);
     }
   if (!TYPE_IS_OPAQUE (SYMBOL_TYPE (sym)))
     return SYMBOL_TYPE (sym);
@@ -2504,7 +2504,7 @@ find_line_symtab (struct symtab *symtab, int line,
       {
 	if (objfile->sf)
 	  objfile->sf->qf->expand_symtabs_with_filename (objfile,
-							 symtab->filename);
+							 symtab->filenamex);
       }
 
       /* Get symbol full file name if possible.  */
@@ -2515,7 +2515,7 @@ find_line_symtab (struct symtab *symtab, int line,
 	struct linetable *l;
 	int ind;
 
-	if (FILENAME_CMP (symtab->filename, s->filename) != 0)
+	if (FILENAME_CMP (symtab->filenamex, s->filenamex) != 0)
 	  continue;
 	if (symtab->fullname != NULL
 	    && symtab_to_fullname (s) != NULL
@@ -3250,7 +3250,7 @@ sources_info (char *ignore, int from_tty)
   {
     const char *fullname = symtab_to_fullname (s);
 
-    output_source_filename (fullname ? fullname : s->filename, &data);
+    output_source_filename (fullname ? fullname : s->filenamex, &data);
   }
   printf_filtered ("\n\n");
 
@@ -3706,12 +3706,14 @@ search_symbols (char *regexp, enum search_domain kind,
 static void
 print_symbol_info (enum search_domain kind,
 		   struct symtab *s, struct symbol *sym,
-		   int block, char *last)
+		   int block, const char *last)
 {
-  if (last == NULL || filename_cmp (last, s->filename) != 0)
+  const char *s_filename = symtab_to_filename (s);
+
+  if (last == NULL || filename_cmp (last, s_filename) != 0)
     {
       fputs_filtered ("\nFile ", gdb_stdout);
-      fputs_filtered (s->filename, gdb_stdout);
+      fputs_filtered (s_filename, gdb_stdout);
       fputs_filtered (":\n", gdb_stdout);
     }
 
@@ -3769,7 +3771,7 @@ symtab_symbol_info (char *regexp, enum search_domain kind, int from_tty)
   struct symbol_search *symbols;
   struct symbol_search *p;
   struct cleanup *old_chain;
-  char *last_filename = NULL;
+  const char *last_filename = NULL;
   int first = 1;
 
   gdb_assert (kind <= TYPES_DOMAIN);
@@ -3804,7 +3806,7 @@ symtab_symbol_info (char *regexp, enum search_domain kind, int from_tty)
 			     p->symbol,
 			     p->block,
 			     last_filename);
-	  last_filename = p->symtab->filename;
+	  last_filename = symtab_to_filename (p->symtab);
 	}
     }
 
@@ -3888,7 +3890,9 @@ rbreak_command (char *regexp, int from_tty)
     {
       if (p->msymbol == NULL)
 	{
-	  int newlen = (strlen (p->symtab->filename)
+	  const char *filename = symtab_to_filename (p->symtab);
+
+	  int newlen = (strlen (filename)
 			+ strlen (SYMBOL_LINKAGE_NAME (p->symbol))
 			+ 4);
 
@@ -3897,7 +3901,7 @@ rbreak_command (char *regexp, int from_tty)
 	      string = xrealloc (string, newlen);
 	      len = newlen;
 	    }
-	  strcpy (string, p->symtab->filename);
+	  strcpy (string, filename);
 	  strcat (string, ":'");
 	  strcat (string, SYMBOL_LINKAGE_NAME (p->symbol));
 	  strcat (string, "'");
@@ -3906,7 +3910,7 @@ rbreak_command (char *regexp, int from_tty)
 			     p->symtab,
 			     p->symbol,
 			     p->block,
-			     p->symtab->filename);
+			     filename);
 	}
       else
 	{
@@ -4661,8 +4665,8 @@ make_source_files_completion_list (char *text, char *word)
 	     debug info records leading directories, but not the other
 	     way around.  This is what subroutines of breakpoint
 	     command do when they parse file names.  */
-	  base_name = lbasename (s->filename);
-	  if (base_name != s->filename
+	  base_name = lbasename (s->filenamex);
+	  if (base_name != s->filenamex
 	      && !filename_seen (filename_seen_cache, base_name, 1)
 	      && filename_ncmp (base_name, text, text_len) == 0)
 	    add_filename_to_list (base_name, text, word, &list);
