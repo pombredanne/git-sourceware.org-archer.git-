@@ -700,8 +700,8 @@ maintenance_print_objfiles (char *ignore, int from_tty)
       }
 }
 
-
 /* List all the symbol tables whose names match REGEXP (optional).  */
+
 void
 maintenance_info_symtabs (char *regexp, int from_tty)
 {
@@ -779,6 +779,7 @@ block_depth (struct block *block)
 
 
 /* Do early runtime initializations.  */
+
 void
 _initialize_symmisc (void)
 {
