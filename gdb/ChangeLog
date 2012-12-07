@@ -1,3 +1,49 @@
+2012-12-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* copyright.py (NOT_FSF_LIST): Remove duplicate entry
+	"sim/common/cgen-fpu.h".  Remove invalid entries
+	"sim/common/sim-fpu.c" and "sim/mn10300/sim-main.h",
+	which actually have an FSF copyright header.
+
+2012-12-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* osf-share/AT386/cma_thread_io.h: Delete.
+	* osf-share/HP800/cma_thread_io.h: Delete.
+	* osf-share/README: Delete.
+	* osf-share/RIOS/cma_thread_io.h: Delete.
+	* osf-share/cma_attr.h: Delete.
+	* osf-share/cma_deb_core.h: Delete.
+	* osf-share/cma_debug_client.h: Delete.
+	* osf-share/cma_errors.h: Delete.
+	* osf-share/cma_handle.h: Delete.
+	* osf-share/cma_init.h: Delete.
+	* osf-share/cma_list.h: Delete.
+	* osf-share/cma_mutex.h: Delete.
+	* osf-share/cma_sched.h: Delete.
+	* osf-share/cma_semaphore_defs.h: Delete.
+	* osf-share/cma_sequence.h: Delete.
+	* osf-share/cma_stack.h: Delete.
+	* osf-share/cma_stack_int.h: Delete.
+	* osf-share/cma_tcb_defs.h: Delete.
+	* osf-share/cma_util.h: Delete.
+	* Makefile.in (HFILES_NO_SRCDIR): Remove entries for the files
+	in osf-share.
+	* config/djgpp/fnchange.lst: Remove osf-share/cma_stack_int.h entry.
+	* contrib/ari/gdb_find.sh: Remove handling of osf-share.
+	* copyright.sh (NOT_FSF_LIST): Remove "gdb/osf-share" entry.
+
+2012-12-06  Pedro Alves  <palves@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* valops.c (value_cast): Move TYPE_CODE_VOID case earlier.
+
+2012-12-06  Jens Elmenthaler <jens.elmenthaler@advantest.com>
+
+	PR mi/14741:
+	* mi/mi-cmd-var.c (varobj_update_one): Take value of
+	attribute "dynamic" and "displayhint" from printed child,
+	not the root variable.
+
 2012-12-06  Joel Brobecker  <brobecker@adacore.com>
 
 	* aix-thread.c (getthrds): Fix type of 4th parameter.
