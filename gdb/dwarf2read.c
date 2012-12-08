@@ -3092,7 +3092,6 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 {
   int i;
   const char *name_basename = lbasename (name);
-  int name_len = strlen (name);
 
   dw2_setup (objfile);
 
@@ -3117,7 +3116,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 	{
 	  const char *this_name = file_data->file_names[j];
 
-	  if (compare_filenames_for_search (this_name, name, name_len))
+	  if (compare_filenames_for_search (this_name, name))
 	    {
 	      if (dw2_map_expand_apply (objfile, per_cu,
 					name, full_path, real_path,
@@ -3137,8 +3136,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      if (this_real_name != NULL
-		  && compare_filenames_for_search (this_real_name, name,
-						   name_len))
+		  && compare_filenames_for_search (this_real_name, name))
 		{
 		  if (dw2_map_expand_apply (objfile, per_cu,
 					    name, full_path, real_path,
@@ -3153,8 +3151,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      if (this_real_name != NULL
-		  && compare_filenames_for_search (this_real_name, name,
-						   name_len))
+		  && compare_filenames_for_search (this_real_name, name))
 		{
 		  if (dw2_map_expand_apply (objfile, per_cu,
 					    name, full_path, real_path,
@@ -3350,8 +3347,7 @@ dw2_expand_symtabs_with_filename (struct objfile *objfile,
 	{
 	  const char *this_name = file_data->file_names[j];
 
-	  if (compare_filenames_for_search (this_name, filename,
-					    strlen (filename)))
+	  if (compare_filenames_for_search (this_name, filename))
 	    {
 	      dw2_instantiate_symtab (per_cu);
 	      break;

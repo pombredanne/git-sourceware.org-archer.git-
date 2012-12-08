@@ -148,29 +148,27 @@ const struct block *block_found;
 /* See whether FILENAME matches SEARCH_NAME using the rule that we
    advertise to the user.  (The manual's description of linespecs
    describes what we advertise).  SEARCH_LEN is the length of
-   SEARCH_NAME.  We assume that SEARCH_NAME is a relative path.
-   Returns true if they match, false otherwise.  */
+   SEARCH_NAME.  Returns true if they match, false otherwise.  */
 
 int
-compare_filenames_for_search (const char *filename, const char *search_name,
-			      int search_len)
+compare_filenames_for_search (const char *filename, const char *search_name)
 {
-  int len = strlen (filename);
+  size_t len = strlen (filename);
+  size_t search_len = strlen (search_name);
 
   if (len < search_len)
     return 0;
 
   /* The tail of FILENAME must match.  */
-  if (FILENAME_CMP (filename + len - search_len, search_name) != 0)
+  if (FILENAME_CMP (filename + len - search_len, search_name) != 0
+      || IS_ABSOLUTE_PATH (search_name))
     return 0;
 
   /* Either the names must completely match, or the character
      preceding the trailing SEARCH_NAME segment of FILENAME must be a
      directory separator.  */
   return (len == search_len
-	  || IS_DIR_SEPARATOR (filename[len - search_len - 1])
-	  || (HAS_DRIVE_SPEC (filename)
-	      && STRIP_DRIVE_SPEC (filename) == &filename[len - search_len]));
+	  || IS_DIR_SEPARATOR (filename[len - search_len - 1]));
 }
 
 /* Check for a symtab of a specific name by searching some symtabs.
@@ -196,19 +194,10 @@ iterate_over_some_symtabs (const char *name,
 {
   struct symtab *s = NULL;
   const char* base_name = lbasename (name);
-  int name_len = strlen (name);
-  int is_abs = IS_ABSOLUTE_PATH (name);
 
   for (s = first; s != NULL && s != after_last; s = s->next)
     {
-      /* Exact match is always ok.  */
-      if (FILENAME_CMP (name, s->filenamex) == 0)
-	{
-	  if (callback (s, data))
-	    return 1;
-	}
-
-      if (!is_abs && compare_filenames_for_search (s->filenamex, name, name_len))
+      if (compare_filenames_for_search (s->filenamex, name))
 	{
 	  if (callback (s, data))
 	    return 1;
@@ -233,8 +222,7 @@ iterate_over_some_symtabs (const char *name,
 	      return 1;
           }
 
-	if (fp != NULL && !is_abs && compare_filenames_for_search (fp, name,
-								   name_len))
+	if (fp != NULL && compare_filenames_for_search (fp, name))
 	  {
 	    if (callback (s, data))
 	      return 1;
@@ -256,7 +244,7 @@ iterate_over_some_symtabs (const char *name,
 		  return 1;
 	      }
 
-	    if (!is_abs && compare_filenames_for_search (rp, name, name_len))
+	    if (compare_filenames_for_search (rp, name))
 	      {
 		if (callback (s, data))
 		  return 1;
@@ -3276,7 +3264,7 @@ file_matches (const char *file, char *files[], int nfiles)
     {
       for (i = 0; i < nfiles; i++)
 	{
-	  if (compare_filenames_for_search (file, files[i], strlen (files[i])))
+	  if (compare_filenames_for_search (file, files[i]))
 	    return 1;
 	}
     }
@@ -4635,7 +4623,6 @@ struct add_partial_filename_data
   struct filename_seen_cache *filename_seen_cache;
   char *text;
   char *word;
-  int text_len;
   VEC (char_ptr) **list;
 };
 
@@ -4646,25 +4633,36 @@ maybe_add_partial_symtab_filename (const char *filename, const char *fullname,
 				   void *user_data)
 {
   struct add_partial_filename_data *data = user_data;
+  struct cleanup *back_to;
+  char *fullname_shortened, *fullname_shortener, *fullname_min;
 
   if (not_interesting_fname (filename))
     return;
-  if (!filename_seen (data->filename_seen_cache, filename, 1)
-      && filename_ncmp (filename, data->text, data->text_len) == 0)
-    {
-      /* This file matches for a completion; add it to the
-	 current list of matches.  */
-      add_filename_to_list (filename, data->text, data->word, data->list);
-    }
-  else
-    {
-      const char *base_name = lbasename (filename);
+  if (filename_seen (data->filename_seen_cache, fullname, 1))
+    return;
 
-      if (base_name != filename
-	  && !filename_seen (data->filename_seen_cache, base_name, 1)
-	  && filename_ncmp (base_name, data->text, data->text_len) == 0)
-	add_filename_to_list (base_name, data->text, data->word, data->list);
+  fullname_shortened = xstrdup (fullname);
+  back_to = make_cleanup (xfree, fullname_shortened);
+  fullname_min = &fullname_shortened[strlen (data->text)];
+
+  for (fullname_shortener = &fullname_shortened[strlen (fullname_shortened)];
+       fullname_shortener > fullname_min;
+       fullname_shortener--)
+    {
+      *fullname_shortener = '\0';
+      
+      if (compare_filenames_for_search (fullname_shortened, data->text))
+	{
+	  /* This file matches for a completion; add it to the
+	     current list of matches.  */
+	  add_filename_to_list ((fullname + strlen (fullname_shortened)
+				 - strlen (data->text)),
+				data->text, data->word, data->list);
+	  break;
+	}
     }
+
+  do_cleanups (back_to);
 }
 
 /* Return a vector of all source files whose names begin with matching
@@ -4677,7 +4675,6 @@ make_source_files_completion_list (char *text, char *word)
 {
   struct symtab *s;
   struct objfile *objfile;
-  size_t text_len = strlen (text);
   VEC (char_ptr) *list = NULL;
   const char *base_name;
   struct add_partial_filename_data datum;
@@ -4696,15 +4693,14 @@ make_source_files_completion_list (char *text, char *word)
   datum.filename_seen_cache = filename_seen_cache;
   datum.text = text;
   datum.word = word;
-  datum.text_len = text_len;
   datum.list = &list;
 
   ALL_SYMTABS (objfile, s)
     {
-      /* FIXME: realname is not present here.  */
+      /* FIXME: gdb_realpath is not used here.  */
       const char *fullname = symtab_to_fullname (s);
 
-      if (fullname == NULL);
+      if (fullname == NULL)
 	fullname = s->filenamex;
       maybe_add_partial_symtab_filename (s->filenamex, fullname, &datum);
     }

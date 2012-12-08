@@ -11845,8 +11845,6 @@ clear_command (char *arg, int from_tty)
   make_cleanup (VEC_cleanup (breakpoint_p), &found);
   for (i = 0; i < sals.nelts; i++)
     {
-      int is_abs, sal_name_len;
-
       /* If exact pc given, clear bpts at that pc.
          If line given (pc == 0), clear all bpts on specified line.
          If defaulting, clear all bpts on default line
@@ -11860,8 +11858,6 @@ clear_command (char *arg, int from_tty)
          1              0             <can't happen> */
 
       sal = sals.sals[i];
-      is_abs = sal.symtab == NULL ? 1 : IS_ABSOLUTE_PATH (sal.symtab->filenamex);
-      sal_name_len = is_abs ? 0 : strlen (sal.symtab->filenamex);
 
       /* Find all matching breakpoints and add them to 'found'.  */
       ALL_BREAKPOINTS (b)
@@ -11889,13 +11885,8 @@ clear_command (char *arg, int from_tty)
 		      && sal.pspace == loc->pspace
 		      && loc->line_number == sal.line)
 		    {
-		      if (filename_cmp (loc->source_file,
-					sal.symtab->filenamex) == 0)
-			line_match = 1;
-		      else if (!IS_ABSOLUTE_PATH (sal.symtab->filenamex)
-			       && compare_filenames_for_search (loc->source_file,
-								sal.symtab->filenamex,
-								sal_name_len))
+		      if (compare_filenames_for_search (loc->source_file,
+							sal.symtab->filenamex))
 			line_match = 1;
 		    }
 
@@ -14260,9 +14251,6 @@ breakpoint_re_set (void)
   create_longjmp_master_breakpoint ();
   create_std_terminate_master_breakpoint ();
   create_exception_master_breakpoint ();
-
-  /* While we're at it, reset the skip list too.  */
-  skip_re_set ();
 }
 
 /* Reset the thread number of this breakpoint:

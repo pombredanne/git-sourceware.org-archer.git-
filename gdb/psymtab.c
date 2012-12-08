@@ -166,8 +166,6 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 {
   struct partial_symtab *pst;
   const char *name_basename = lbasename (name);
-  int name_len = strlen (name);
-  int is_abs = IS_ABSOLUTE_PATH (name);
 
   ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, pst)
   {
@@ -180,7 +178,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
     if (pst->anonymous)
       continue;
 
-    if (compare_filenames_for_search (pst->filename, name, name_len))
+    if (compare_filenames_for_search (pst->filename, name))
       {
 	if (partial_map_expand_apply (objfile, name, full_path, real_path,
 				      pst, callback, data))
@@ -199,7 +197,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
       {
 	psymtab_to_fullname (pst);
 	if (pst->fullname != NULL
-	    && compare_filenames_for_search (pst->fullname, name, name_len))
+	    && compare_filenames_for_search (pst->fullname, name))
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
@@ -212,7 +210,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
         const char *rp = psymtab_to_realname (pst);
 
 	if (rp != NULL
-	    && compare_filenames_for_search (real_path, name, name_len))
+	    && compare_filenames_for_search (real_path, name))
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
