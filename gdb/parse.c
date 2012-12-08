@@ -81,14 +81,20 @@ char *prev_lexptr;
 int paren_depth;
 int comma_terminates;
 
-/* True if parsing an expression to find a field reference.  This is
-   only used by completion.  */
-int in_parse_field;
+/* True if parsing an expression to attempt completion.  */
+int parse_completion;
 
 /* The index of the last struct expression directly before a '.' or
    '->'.  This is set when parsing and is only used when completing a
    field name.  It is -1 if no dereference operation was found.  */
 static int expout_last_struct = -1;
+
+/* If we are completing a tagged type name, this will be nonzero.  */
+static enum type_code expout_tag_completion_type = TYPE_CODE_UNDEF;
+
+/* The token for tagged type name completion.  */
+static char *expout_completion_name;
+
 
 static unsigned int expressiondebug = 0;
 static void
@@ -579,7 +585,30 @@ write_exp_msymbol (struct minimal_symbol *msymbol)
 void
 mark_struct_expression (void)
 {
+  gdb_assert (parse_completion
+	      && expout_tag_completion_type == TYPE_CODE_UNDEF);
   expout_last_struct = expout_ptr;
+}
+
+/* Indicate that the current parser invocation is completing a tag.
+   TAG is the type code of the tag, and PTR and LENGTH represent the
+   start of the tag name.  */
+
+void
+mark_completion_tag (enum type_code tag, const char *ptr, int length)
+{
+  gdb_assert (parse_completion
+	      && expout_tag_completion_type == TYPE_CODE_UNDEF
+	      && expout_completion_name == NULL
+	      && expout_last_struct == -1);
+  gdb_assert (tag == TYPE_CODE_UNION
+	      || tag == TYPE_CODE_STRUCT
+	      || tag == TYPE_CODE_CLASS
+	      || tag == TYPE_CODE_ENUM);
+  expout_tag_completion_type = tag;
+  expout_completion_name = xmalloc (length + 1);
+  memcpy (expout_completion_name, ptr, length);
+  expout_completion_name[length] = '\0';
 }
 
 
@@ -1125,6 +1154,9 @@ parse_exp_in_context (char **stringptr, CORE_ADDR pc, const struct block *block,
   paren_depth = 0;
   type_stack.depth = 0;
   expout_last_struct = -1;
+  expout_tag_completion_type = TYPE_CODE_UNDEF;
+  xfree (expout_completion_name);
+  expout_completion_name = NULL;
 
   comma_terminates = comma;
 
@@ -1191,7 +1223,7 @@ parse_exp_in_context (char **stringptr, CORE_ADDR pc, const struct block *block,
     }
   if (except.reason < 0)
     {
-      if (! in_parse_field)
+      if (! parse_completion)
 	{
 	  xfree (expout);
 	  throw_exception (except);
@@ -1245,7 +1277,8 @@ parse_expression (char *string)
    *NAME must be freed by the caller.  */
 
 struct type *
-parse_field_expression (char *string, char **name)
+parse_expression_for_completion (char *string, char **name,
+				 enum type_code *code)
 {
   struct expression *exp = NULL;
   struct value *val;
@@ -1254,12 +1287,21 @@ parse_field_expression (char *string, char **name)
 
   TRY_CATCH (except, RETURN_MASK_ERROR)
     {
-      in_parse_field = 1;
+      parse_completion = 1;
       exp = parse_exp_in_context (&string, 0, 0, 0, 0, &subexp);
     }
-  in_parse_field = 0;
+  parse_completion = 0;
   if (except.reason < 0 || ! exp)
     return NULL;
+
+  if (expout_tag_completion_type != TYPE_CODE_UNDEF)
+    {
+      *code = expout_tag_completion_type;
+      *name = expout_completion_name;
+      expout_completion_name = NULL;
+      return NULL;
+    }
+
   if (expout_last_struct == -1)
     {
       xfree (exp);
