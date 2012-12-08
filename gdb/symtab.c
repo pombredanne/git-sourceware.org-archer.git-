@@ -3276,7 +3276,7 @@ file_matches (const char *file, char *files[], int nfiles)
     {
       for (i = 0; i < nfiles; i++)
 	{
-	  if (filename_cmp (files[i], lbasename (file)) == 0)
+	  if (compare_filenames_for_search (file, files[i], strlen (files[i])))
 	    return 1;
 	}
     }
@@ -3586,10 +3586,14 @@ search_symbols (char *regexp, enum search_domain kind,
 	ALL_BLOCK_SYMBOLS (b, iter, sym)
 	  {
 	    struct symtab *real_symtab = SYMBOL_SYMTAB (sym);
+	    const char *real_symtab_fullname = symtab_to_fullname (real_symtab);
+
+	    if (real_symtab_fullname == NULL)
+	      real_symtab_fullname = real_symtab->filenamex;
 
 	    QUIT;
 
-	    if (file_matches (real_symtab->filename, files, nfiles)
+	    if (file_matches (real_symtab_fullname, files, nfiles)
 		&& ((!datum.preg_p
 		     || regexec (&datum.preg, SYMBOL_NATURAL_NAME (sym), 0,
 				 NULL, 0) == 0)
@@ -4649,38 +4653,24 @@ make_source_files_completion_list (char *text, char *word)
   cache_cleanup = make_cleanup (delete_filename_seen_cache,
 				filename_seen_cache);
 
-  ALL_SYMTABS (objfile, s)
-    {
-      if (not_interesting_fname (s->filename))
-	continue;
-      if (!filename_seen (filename_seen_cache, s->filename, 1)
-	  && filename_ncmp (s->filename, text, text_len) == 0)
-	{
-	  /* This file matches for a completion; add it to the current
-	     list of matches.  */
-	  add_filename_to_list (s->filename, text, word, &list);
-	}
-      else
-	{
-	  /* NOTE: We allow the user to type a base name when the
-	     debug info records leading directories, but not the other
-	     way around.  This is what subroutines of breakpoint
-	     command do when they parse file names.  */
-	  base_name = lbasename (s->filenamex);
-	  if (base_name != s->filenamex
-	      && !filename_seen (filename_seen_cache, base_name, 1)
-	      && filename_ncmp (base_name, text, text_len) == 0)
-	    add_filename_to_list (base_name, text, word, &list);
-	}
-    }
-
   datum.filename_seen_cache = filename_seen_cache;
   datum.text = text;
   datum.word = word;
   datum.text_len = text_len;
   datum.list = &list;
+
+  ALL_SYMTABS (objfile, s)
+    {
+      /* FIXME: realname is not present here.  */
+      const char *fullname = symtab_to_fullname (s);
+
+      if (fullname == NULL);
+	fullname = s->filenamex;
+      maybe_add_partial_symtab_filename (s->filenamex, fullname, &datum);
+    }
+
   map_partial_symbol_filenames (maybe_add_partial_symtab_filename, &datum,
-				0 /*need_fullname*/);
+				1 /*need_fullname*/);
 
   do_cleanups (cache_cleanup);
   discard_cleanups (back_to);
