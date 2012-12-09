@@ -160,8 +160,7 @@ compare_filenames_for_search (const char *filename, const char *search_name)
     return 0;
 
   /* The tail of FILENAME must match.  */
-  if (FILENAME_CMP (filename + len - search_len, search_name) != 0
-      || IS_ABSOLUTE_PATH (search_name))
+  if (FILENAME_CMP (filename + len - search_len, search_name) != 0)
     return 0;
 
   /* Either the names must completely match, or the character
@@ -4636,6 +4635,9 @@ maybe_add_partial_symtab_filename (const char *filename, const char *fullname,
   struct cleanup *back_to;
   char *fullname_shortened, *fullname_shortener, *fullname_min;
 
+  if (fullname == NULL)
+    fullname = filename;
+
   if (not_interesting_fname (filename))
     return;
   if (filename_seen (data->filename_seen_cache, fullname, 1))
@@ -4646,7 +4648,7 @@ maybe_add_partial_symtab_filename (const char *filename, const char *fullname,
   fullname_min = &fullname_shortened[strlen (data->text)];
 
   for (fullname_shortener = &fullname_shortened[strlen (fullname_shortened)];
-       fullname_shortener > fullname_min;
+       fullname_shortener >= fullname_min;
        fullname_shortener--)
     {
       *fullname_shortener = '\0';

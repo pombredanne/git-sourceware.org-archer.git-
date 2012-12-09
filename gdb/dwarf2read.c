@@ -4018,6 +4018,12 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
 {
   struct partial_symtab *subpst = allocate_psymtab (name, objfile);
 
+  if (!IS_ABSOLUTE_PATH (subpst->filename))
+    {
+      /* It shares objfile->objfile_obstack.  */
+      subpst->dirname = pst->dirname;
+    }
+
   subpst->section_offsets = pst->section_offsets;
   subpst->textlow = 0;
   subpst->texthigh = 0;
@@ -15034,7 +15040,9 @@ dwarf_decode_line_header (unsigned int offset, struct dwarf2_cu *cu)
    in line header LH of PST.
    COMP_DIR is the compilation directory (DW_AT_comp_dir) or NULL if unknown.
    If space for the result is malloc'd, it will be freed by a cleanup.
-   Returns NULL if FILE_INDEX should be ignored, i.e., it is pst->filename.  */
+   Returns NULL if FILE_INDEX should be ignored, i.e., it is pst->filename.
+   
+   The function creates dangling cleanup registration.  */
 
 static char *
 psymtab_include_file_name (const struct line_header *lh, int file_index,
@@ -17898,8 +17906,6 @@ file_full_name (int file, struct line_header *lh, const char *comp_dir)
       else
         {
           const char *dir;
-          int dir_len;
-          char *full_name;
 
           if (fe->dir_index == 0)
             dir = comp_dir;
@@ -17907,30 +17913,12 @@ file_full_name (int file, struct line_header *lh, const char *comp_dir)
 	    {
 	      dir = lh->include_dirs[fe->dir_index - 1];
 	      if (!IS_ABSOLUTE_PATH (dir))
-		{
-		  size_t comp_dir_len = strlen (comp_dir);
-
-		  dir_len = strlen (dir);
-		  full_name = xmalloc (comp_dir_len + 1 + dir_len + 1
-				       + strlen (fe->name) + 1);
-		  memcpy (full_name, comp_dir, comp_dir_len);
-		  full_name[comp_dir_len] = '/';
-		  memcpy (&full_name[comp_dir_len + 1], dir, dir_len);
-		  full_name[comp_dir_len + dir_len] = '/';
-		  strcpy (&full_name[comp_dir_len + 1 + dir_len + 1], fe->name);
-		  return full_name;
-		}
+		return concat (comp_dir, SLASH_STRING, dir, SLASH_STRING,
+			       fe->name, NULL);
 	    }
 
           if (dir)
-            {
-              dir_len = strlen (dir);
-              full_name = xmalloc (dir_len + 1 + strlen (fe->name) + 1);
-              strcpy (full_name, dir);
-              full_name[dir_len] = '/';
-              strcpy (full_name + dir_len + 1, fe->name);
-              return full_name;
-            }
+	    return concat (dir, SLASH_STRING, fe->name, NULL);
           else
             return xstrdup (fe->name);
         }
