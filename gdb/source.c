@@ -1135,9 +1135,9 @@ symtab_to_filename (struct symtab *symtab)
   const char *filename = symtab->filenamex;
 
   if (filename == NULL)
-      return NULL;
+    return NULL;
   else if (filename_display_string == filename_display_basename)
-      return lbasename (filename);
+    return lbasename (filename);
   else if (filename_display_string == filename_display_absolute)
     {
       const char *retval = symtab_to_fullname (symtab);

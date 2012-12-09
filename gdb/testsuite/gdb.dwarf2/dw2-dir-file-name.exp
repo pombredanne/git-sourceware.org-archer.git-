@@ -19,7 +19,7 @@ if {![dwarf2_support]} {
     return 0  
 }
 
-set testfile "dw2-dir-file-name"
+standard_testfile
 set executable ${testfile}
 set binfile ${objdir}/${subdir}/${executable}
 set srcfile ${testfile}.c
