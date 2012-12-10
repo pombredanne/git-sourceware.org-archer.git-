@@ -119,7 +119,7 @@ skip_function_command (char *arg, int from_tty)
 	error (_("No default function now."));
 
       pc = get_last_displayed_addr ();
-      if (pc == 0 || !find_pc_partial_function (pc, &name, NULL, NULL))
+      if (!find_pc_partial_function (pc, &name, NULL, NULL))
 	{
 	  error (_("No function found containing current program point %s."),
 		  paddress (get_current_arch (), pc));
