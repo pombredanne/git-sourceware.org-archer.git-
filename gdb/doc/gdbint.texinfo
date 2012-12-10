@@ -5907,6 +5907,10 @@ protected with parentheses.)
 Declarations like @samp{struct foo *} should be used in preference to
 declarations like @samp{typedef struct foo @{ @dots{} @} *foo_ptr}.
 
+Zero constant (@code{0}) is not interchangeable with a null pointer
+constant (@code{NULL}) anywhere.  @sc{gcc} does not give a warning for
+such interchange.
+
 @subsection Function Prototypes
 @cindex function prototypes
 
