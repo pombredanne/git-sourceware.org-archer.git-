@@ -128,56 +128,21 @@ skip_function_command (char *arg, int from_tty)
     }
   else
     {
-      /* Decode arg.  We set funfirstline = 1 so decode_line_1 will give us the
-	 first line of the function specified, if it can, and so that we'll
-	 reject variable names and the like.  */
-      char *orig_arg = arg; /* decode_line_1 modifies the arg pointer.  */
-      volatile struct gdb_exception decode_exception;
-      struct symtabs_and_lines sals = { NULL };
-
-      TRY_CATCH (decode_exception, RETURN_MASK_ERROR)
-	{
-	  sals = decode_line_1 (&arg, DECODE_LINE_FUNFIRSTLINE, NULL, 0);
-	}
-
-      if (decode_exception.reason < 0)
+      if (lookup_symbol (arg, NULL, VAR_DOMAIN, NULL) == NULL)
         {
-          if (decode_exception.error != NOT_FOUND_ERROR)
-            throw_exception (decode_exception);
-
 	  fprintf_filtered (gdb_stderr,
-			    _("No function found named %s.\n"), orig_arg);
+			    _("No function found named %s.\n"), arg);
 
 	  if (nquery (_("\
 Ignore function pending future shared library load? ")))
 	    {
 	      /* Add the unverified skiplist entry.  */
-	      skip_function (orig_arg);
+	      skip_function (arg);
 	    }
 	  return;
 	}
 
-      if (sals.nelts > 1)
-	error (_("Specify just one function at a time."));
-      if (*arg != 0)
-	error (_("Junk at end of arguments."));
-
-      /* The pc decode_line_1 gives us is the first line of the function,
-	 but we actually want the line before that.  The call to
-	 find_pc_partial_function gets us the value we actually want.  */
-      {
-	struct symtab_and_line sal = sals.sals[0];
-	CORE_ADDR pc = sal.pc;
-	struct gdbarch *arch = get_sal_arch (sal);
-
-	if (!find_pc_partial_function (pc, &name, NULL, NULL))
-	  {
-	    error (_("No function found containing program point %s."),
-		     paddress (arch, pc));
-	  }
-
-	skip_function (name);
-      }
+      skip_function (arg);
     }
 }
 
