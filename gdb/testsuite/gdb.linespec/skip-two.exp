@@ -61,3 +61,24 @@ gdb_test_multiple "step" $test {
     }
 }
 
+gdb_test_no_output "skip delete 1"
+
+gdb_test "skip file thefile.cc" \
+	 {File thefile\.cc will be skipped when stepping\.}
+
+if ![runto_main] {
+    return -1
+}
+
+gdb_test "step" "static int dupname .*" "step into dupname"
+gdb_test "finish" "return dupname.* body_elsewhere.*" "finish from dupname"
+
+set test "dupname ignored for thefile.cc"
+gdb_test_multiple "step" $test {
+    -re "^step\r\ndupname .*\r\n$gdb_prompt $" {
+	fail $test
+    }
+    -re "^step\r\nf1 .* f1 breakpoint .*\r\n$gdb_prompt $" {
+	pass $test
+    }
+}
