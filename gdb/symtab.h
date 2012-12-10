@@ -817,7 +817,7 @@ struct symtab
 
   /* Name of this source file.  */
 
-  char *filename;
+  char *filenamex;
 
   /* Directory in which it was compiled, or NULL if we don't know.  */
 
@@ -1286,8 +1286,7 @@ extern int symtab_create_debug;
 extern int basenames_may_differ;
 
 int compare_filenames_for_search (const char *filename,
-				  const char *search_name,
-				  int search_len);
+				  const char *search_name);
 
 int iterate_over_some_symtabs (const char *name,
 			       const char *full_path,

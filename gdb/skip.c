@@ -32,6 +32,7 @@
 #include "objfiles.h"
 #include "exceptions.h"
 #include "breakpoint.h" /* for get_sal_arch () */
+#include "source.h"
 
 struct skiplist_entry
 {
@@ -74,7 +75,7 @@ skip_file_command (char *arg, int from_tty)
 {
   struct skiplist_entry *e;
   struct symtab *symtab;
-  char *filename = 0;
+  const char *filename = 0;
 
   /* If no argument was given, try to default to the last
      displayed codepoint.  */
@@ -83,8 +84,9 @@ skip_file_command (char *arg, int from_tty)
       symtab = get_last_displayed_symtab ();
       if (symtab == 0)
 	error (_("No default file now."));
-      else
-	filename = symtab->filename;
+      filename = symtab_to_fullname (symtab);
+      if (filename == NULL)
+	filename = symtab->filenamex;
     }
   else
     {
@@ -95,8 +97,9 @@ skip_file_command (char *arg, int from_tty)
 	  if (!nquery (_("\
 Ignore file pending future shared library load? ")))
 	    return;
-
 	}
+      /* Do not use SYMTAB's filename, later loaded shared libraries may match
+         given ARG but not SYMTAB's filename.  */
       filename = arg;
     }
 
@@ -118,11 +121,12 @@ skip_function_command (char *arg, int from_tty)
   if (arg == 0)
     {
       CORE_ADDR pc;
+
       if (!last_displayed_sal_is_valid ())
 	error (_("No default function now."));
 
       pc = get_last_displayed_addr ();
-      if (pc == 0 || !find_pc_partial_function (pc, &name, NULL, 0))
+      if (pc == 0 || !find_pc_partial_function (pc, &name, NULL, NULL))
 	{
 	  error (_("No function found containing current program point %s."),
 		  paddress (get_current_arch (), pc));
@@ -174,7 +178,7 @@ Ignore function pending future shared library load? ")))
 	CORE_ADDR pc = sal.pc;
 	struct gdbarch *arch = get_sal_arch (sal);
 
-	if (!find_pc_partial_function (pc, &name, NULL, 0))
+	if (!find_pc_partial_function (pc, &name, NULL, NULL))
 	  {
 	    error (_("No function found containing program point %s."),
 		     paddress (arch, pc));
@@ -249,11 +253,7 @@ Skiplist entry should have either a filename or a function name."));
 	ui_out_field_string (current_uiout, "enabled", "n");             /* 3 */
 
       if (e->function_name != NULL)
-	{
-	   struct symbol *sym;
-
-	   ui_out_field_string (current_uiout, "what", e->function_name);
-	}
+	ui_out_field_string (current_uiout, "what", e->function_name);
       else if (e->filename != NULL)
 	ui_out_field_string (current_uiout, "what", e->filename);
 
@@ -373,6 +373,8 @@ int
 function_name_is_marked_for_skip (const char *function_name,
 				  const struct symtab_and_line *function_sal)
 {
+  int searched_for_fullname = 0;
+  const char *fullname = NULL;
   struct skiplist_entry *e;
 
   if (function_name == NULL)
@@ -388,11 +390,24 @@ function_name_is_marked_for_skip (const char *function_name,
 	  && strcmp_iw (function_name, e->function_name) == 0)
 	return 1;
 
-      if (e->filename != 0 && function_sal->symtab != NULL
-	  && function_sal->symtab->filename != NULL
-	  && compare_filenames_for_search (function_sal->symtab->filename,
-					   e->filename, strlen (e->filename)))
-	return 1;
+      if (e->filename != 0)
+	{
+	  /* Get the filename corresponding to this FUNCTION_SAL, if we haven't
+	     yet.  */
+	  if (!searched_for_fullname)
+	    {
+	      if (function_sal->symtab != NULL)
+		{
+		  fullname = symtab_to_fullname (function_sal->symtab);
+		  if (fullname == NULL)
+		    fullname = function_sal->symtab->filenamex;
+		}
+	      searched_for_fullname = 1;
+	    }
+	  if (fullname != NULL
+	      && compare_filenames_for_search (fullname, e->filename))
+	    return 1;
+	}
     }
 
   return 0;

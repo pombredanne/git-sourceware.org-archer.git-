@@ -3061,8 +3061,6 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 {
   int i;
   const char *name_basename = lbasename (name);
-  int name_len = strlen (name);
-  int is_abs = IS_ABSOLUTE_PATH (name);
 
   dw2_setup (objfile);
 
@@ -3087,9 +3085,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 	{
 	  const char *this_name = file_data->file_names[j];
 
-	  if (FILENAME_CMP (name, this_name) == 0
-	      || (!is_abs && compare_filenames_for_search (this_name,
-							   name, name_len)))
+	  if (compare_filenames_for_search (this_name, name))
 	    {
 	      if (dw2_map_expand_apply (objfile, per_cu,
 					name, full_path, real_path,
@@ -3109,10 +3105,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      if (this_real_name != NULL
-		  && (FILENAME_CMP (full_path, this_real_name) == 0
-		      || (!is_abs
-			  && compare_filenames_for_search (this_real_name,
-							   name, name_len))))
+		  && compare_filenames_for_search (this_real_name, name))
 		{
 		  if (dw2_map_expand_apply (objfile, per_cu,
 					    name, full_path, real_path,
@@ -3127,10 +3120,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      if (this_real_name != NULL
-		  && (FILENAME_CMP (real_path, this_real_name) == 0
-		      || (!is_abs
-			  && compare_filenames_for_search (this_real_name,
-							   name, name_len))))
+		  && compare_filenames_for_search (this_real_name, name))
 		{
 		  if (dw2_map_expand_apply (objfile, per_cu,
 					    name, full_path, real_path,
@@ -3325,7 +3315,8 @@ dw2_expand_symtabs_with_filename (struct objfile *objfile,
       for (j = 0; j < file_data->num_file_names; ++j)
 	{
 	  const char *this_name = file_data->file_names[j];
-	  if (FILENAME_CMP (this_name, filename) == 0)
+
+	  if (compare_filenames_for_search (this_name, filename))
 	    {
 	      dw2_instantiate_symtab (per_cu);
 	      break;
@@ -3376,7 +3367,7 @@ dw2_find_symbol_file (struct objfile *objfile, const char *name)
 	  struct symbol *sym = lookup_block_symbol (block, name, VAR_DOMAIN);
 
 	  if (sym)
-	    return SYMBOL_SYMTAB (sym)->filename;
+	    return SYMBOL_SYMTAB (sym)->filenamex;
 	}
       return NULL;
     }
@@ -3393,7 +3384,7 @@ dw2_find_symbol_file (struct objfile *objfile, const char *name)
   per_cu = dw2_get_cu (GDB_INDEX_CU_VALUE (MAYBE_SWAP (vec[1])));
 
   if (per_cu->v.quick->symtab != NULL)
-    return per_cu->v.quick->symtab->filename;
+    return per_cu->v.quick->symtab->filenamex;
 
   init_cutu_and_read_dies (per_cu, NULL, 0, 0,
 			   dw2_get_primary_filename_reader, &filename);
@@ -3477,7 +3468,16 @@ dw2_expand_symtabs_matching
 
 	  for (j = 0; j < file_data->num_file_names; ++j)
 	    {
+	      const char *this_real_name;
+
 	      if (file_matcher (file_data->file_names[j], data))
+		{
+		  per_cu->v.quick->mark = 1;
+		  break;
+		}
+
+	      this_real_name = dw2_get_real_path (objfile, file_data, j);
+	      if (file_matcher (this_real_name, data))
 		{
 		  per_cu->v.quick->mark = 1;
 		  break;
@@ -3986,6 +3986,12 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
                                struct objfile *objfile)
 {
   struct partial_symtab *subpst = allocate_psymtab (name, objfile);
+
+  if (!IS_ABSOLUTE_PATH (subpst->filename))
+    {
+      /* It shares objfile->objfile_obstack.  */
+      subpst->dirname = pst->dirname;
+    }
 
   subpst->section_offsets = pst->section_offsets;
   subpst->textlow = 0;
@@ -6729,8 +6735,8 @@ fixup_go_packaging (struct dwarf2_cu *cu)
 		    complaint (&symfile_complaints,
 			       _("Symtab %s has objects from two different Go packages: %s and %s"),
 			       (SYMBOL_SYMTAB (sym)
-				&& SYMBOL_SYMTAB (sym)->filename
-				? SYMBOL_SYMTAB (sym)->filename
+				&& SYMBOL_SYMTAB (sym)->filenamex
+				? SYMBOL_SYMTAB (sym)->filenamex
 				: cu->objfile->name),
 			       this_package_name, package_name);
 		  xfree (this_package_name);
@@ -15003,7 +15009,9 @@ dwarf_decode_line_header (unsigned int offset, struct dwarf2_cu *cu)
    in line header LH of PST.
    COMP_DIR is the compilation directory (DW_AT_comp_dir) or NULL if unknown.
    If space for the result is malloc'd, it will be freed by a cleanup.
-   Returns NULL if FILE_INDEX should be ignored, i.e., it is pst->filename.  */
+   Returns NULL if FILE_INDEX should be ignored, i.e., it is pst->filename.
+   
+   The function creates dangling cleanup registration.  */
 
 static char *
 psymtab_include_file_name (const struct line_header *lh, int file_index,
@@ -17867,23 +17875,19 @@ file_full_name (int file, struct line_header *lh, const char *comp_dir)
       else
         {
           const char *dir;
-          int dir_len;
-          char *full_name;
 
-          if (fe->dir_index)
-            dir = lh->include_dirs[fe->dir_index - 1];
-          else
+          if (fe->dir_index == 0)
             dir = comp_dir;
+	  else
+	    {
+	      dir = lh->include_dirs[fe->dir_index - 1];
+	      if (!IS_ABSOLUTE_PATH (dir))
+		return concat (comp_dir, SLASH_STRING, dir, SLASH_STRING,
+			       fe->name, NULL);
+	    }
 
           if (dir)
-            {
-              dir_len = strlen (dir);
-              full_name = xmalloc (dir_len + 1 + strlen (fe->name) + 1);
-              strcpy (full_name, dir);
-              full_name[dir_len] = '/';
-              strcpy (full_name + dir_len + 1, fe->name);
-              return full_name;
-            }
+	    return concat (dir, SLASH_STRING, fe->name, NULL);
           else
             return xstrdup (fe->name);
         }
