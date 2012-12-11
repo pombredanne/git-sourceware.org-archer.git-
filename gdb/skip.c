@@ -298,7 +298,7 @@ Skiplist entry should have either a filename or a function name."));
 
 	   gdb_assert (e->pc != 0);
 	   sym = find_pc_function (e->pc);
-	   if (sym)
+	   if (sym != NULL)
 	     ui_out_field_fmt (current_uiout, "what", "%s at %s:%d",
 			       sym->ginfo.name,
 			       SYMBOL_SYMTAB (sym)->filename,
