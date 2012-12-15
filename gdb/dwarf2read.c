@@ -483,7 +483,12 @@ struct dwarf2_cu
      (zero is a valid value though).
      Note this value comes from the stub CU/TU's DIE.
      Also note that the value is zero in the non-DWO case so this value can
-     be used without needing to know whether DWO files are in use or not.  */
+     be used without needing to know whether DWO files are in use or not.
+     N.B. This does not apply to DW_AT_ranges appearing in
+     DW_TAG_compile_unit dies.  This is a bit of a wart, consider if ever
+     DW_AT_ranges appeared in the DW_TAG_compile_unit of DWO DIEs: then
+     DW_AT_ranges_base *would* have to be applied, and we'd have to care
+     whether the DW_AT_ranges attribute came from the skeleton or DWO.  */
   ULONGEST ranges_base;
 
   /* Mark used when releasing cached dies.  */
@@ -1279,7 +1284,8 @@ static void add_partial_subprogram (struct partial_die_info *pdi,
 				    CORE_ADDR *lowpc, CORE_ADDR *highpc,
 				    int need_pc, struct dwarf2_cu *cu);
 
-static void dwarf2_psymtab_to_symtab (struct partial_symtab *);
+static void dwarf2_psymtab_to_symtab (struct objfile *,
+				      struct partial_symtab *);
 
 static void psymtab_to_symtab_1 (struct partial_symtab *);
 
@@ -2107,6 +2113,7 @@ dwarf2_get_dwz_file (void)
 
   do_cleanups (cleanup);
 
+  dwarf2_per_objfile->dwz_file = result;
   return result;
 }
 
@@ -4888,7 +4895,7 @@ process_psymtab_comp_unit_reader (const struct die_reader_specs *reader,
     (objfile->global_psymbols.list + pst->globals_offset);
   pst->n_static_syms = objfile->static_psymbols.next -
     (objfile->static_psymbols.list + pst->statics_offset);
-  sort_pst_symbols (pst);
+  sort_pst_symbols (objfile, pst);
 
   if (!VEC_empty (dwarf2_per_cu_ptr, cu->per_cu->s.imported_symtabs))
     {
@@ -5316,7 +5323,7 @@ build_type_psymtabs_reader (const struct die_reader_specs *reader,
     (objfile->global_psymbols.list + pst->globals_offset);
   pst->n_static_syms = objfile->static_psymbols.next -
     (objfile->static_psymbols.list + pst->statics_offset);
-  sort_pst_symbols (pst);
+  sort_pst_symbols (objfile, pst);
 }
 
 /* Traversal function for build_type_psymtabs.  */
@@ -6317,7 +6324,7 @@ locate_pdi_sibling (const struct die_reader_specs *reader,
 /* Expand this partial symbol table into a full symbol table.  */
 
 static void
-dwarf2_psymtab_to_symtab (struct partial_symtab *pst)
+dwarf2_psymtab_to_symtab (struct objfile *objfile, struct partial_symtab *pst)
 {
   if (pst != NULL)
     {
@@ -6336,17 +6343,16 @@ dwarf2_psymtab_to_symtab (struct partial_symtab *pst)
 	    }
 
 	  /* Restore our global data.  */
-	  dwarf2_per_objfile = objfile_data (pst->objfile,
-					     dwarf2_objfile_data_key);
+	  dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
 
 	  /* If this psymtab is constructed from a debug-only objfile, the
 	     has_section_at_zero flag will not necessarily be correct.  We
 	     can get the correct value for this flag by looking at the data
 	     associated with the (presumably stripped) associated objfile.  */
-	  if (pst->objfile->separate_debug_objfile_backlink)
+	  if (objfile->separate_debug_objfile_backlink)
 	    {
 	      struct dwarf2_per_objfile *dpo_backlink
-	        = objfile_data (pst->objfile->separate_debug_objfile_backlink,
+	        = objfile_data (objfile->separate_debug_objfile_backlink,
 		                dwarf2_objfile_data_key);
 
 	      dwarf2_per_objfile->has_section_at_zero
@@ -8592,8 +8598,8 @@ create_dwo_in_dwp (struct dwp_file *dwp_file,
      have dwo_unit "live" in that.  At least for now.
 
      The DWP file can be made up of a random collection of CUs and TUs.
-     However, for each CU + set of TUs that came from the same original
-     DWO file, we want combine them back into a virtual DWO file to save space
+     However, for each CU + set of TUs that came from the same original DWO
+     file, we want to combine them back into a virtual DWO file to save space
      (fewer struct dwo_file objects to allocated).  Remember that for really
      large apps there can be on the order of 8K CUs and 200K TUs, or more.  */
 
@@ -10054,7 +10060,14 @@ dwarf2_get_pc_bounds (struct die_info *die, CORE_ADDR *lowpc,
       attr = dwarf2_attr (die, DW_AT_ranges, cu);
       if (attr != NULL)
 	{
-	  unsigned int ranges_offset = DW_UNSND (attr) + cu->ranges_base;
+	  /* DW_AT_ranges_base does not apply to DIEs from the DWO skeleton.
+	     We take advantage of the fact that DW_AT_ranges does not appear
+	     in DW_TAG_compile_unit of DWO files.  */
+	  int need_ranges_base = die->tag != DW_TAG_compile_unit;
+	  unsigned int ranges_offset = (DW_UNSND (attr)
+					+ (need_ranges_base
+					   ? cu->ranges_base
+					   : 0));
 
 	  /* Value of the DW_AT_ranges attribute is the offset in the
 	     .debug_ranges section.  */
@@ -10215,10 +10228,15 @@ dwarf2_record_block_ranges (struct die_info *die, struct block *block,
   if (attr)
     {
       bfd *obfd = objfile->obfd;
+      /* DW_AT_ranges_base does not apply to DIEs from the DWO skeleton.
+	 We take advantage of the fact that DW_AT_ranges does not appear
+	 in DW_TAG_compile_unit of DWO files.  */
+      int need_ranges_base = die->tag != DW_TAG_compile_unit;
 
       /* The value of the DW_AT_ranges attribute is the offset of the
          address range list in the .debug_ranges section.  */
-      unsigned long offset = DW_UNSND (attr) + cu->ranges_base;
+      unsigned long offset = (DW_UNSND (attr)
+			      + (need_ranges_base ? cu->ranges_base : 0));
       gdb_byte *buffer = dwarf2_per_objfile->ranges.buffer + offset;
 
       /* For some target architectures, but not others, the
@@ -10758,6 +10776,34 @@ dwarf2_attach_fields_to_type (struct field_info *fip, struct type *type,
     }
 }
 
+/* Return true if this member function is a constructor, false
+   otherwise.  */
+
+static int
+dwarf2_is_constructor (struct die_info *die, struct dwarf2_cu *cu)
+{
+  const char *fieldname;
+  const char *typename;
+  int len;
+
+  if (die->parent == NULL)
+    return 0;
+
+  if (die->parent->tag != DW_TAG_structure_type
+      && die->parent->tag != DW_TAG_union_type
+      && die->parent->tag != DW_TAG_class_type)
+    return 0;
+
+  fieldname = dwarf2_name (die, cu);
+  typename = dwarf2_name (die->parent, cu);
+  if (fieldname == NULL || typename == NULL)
+    return 0;
+
+  len = strlen (fieldname);
+  return (strncmp (fieldname, typename, len) == 0
+	  && (typename[len] == '\0' || typename[len] == '<'));
+}
+
 /* Add a member function to the proper fieldlist.  */
 
 static void
@@ -10888,6 +10934,8 @@ dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
   attr = dwarf2_attr (die, DW_AT_artificial, cu);
   if (attr && DW_UNSND (attr) != 0)
     fnp->is_artificial = 1;
+
+  fnp->is_constructor = dwarf2_is_constructor (die, cu);
 
   /* Get index in virtual function table if it is a virtual member
      function.  For older versions of GCC, this is an offset in the
@@ -17332,12 +17380,11 @@ follow_die_ref (struct die_info *src_die, struct attribute *attr,
    dwarf2_locexpr_baton->data has lifetime of PER_CU->OBJFILE.  */
 
 struct dwarf2_locexpr_baton
-dwarf2_fetch_die_location_block (cu_offset offset_in_cu,
-				 struct dwarf2_per_cu_data *per_cu,
-				 CORE_ADDR (*get_frame_pc) (void *baton),
-				 void *baton)
+dwarf2_fetch_die_loc_sect_off (sect_offset offset,
+			       struct dwarf2_per_cu_data *per_cu,
+			       CORE_ADDR (*get_frame_pc) (void *baton),
+			       void *baton)
 {
-  sect_offset offset = { per_cu->offset.sect_off + offset_in_cu.cu_off };
   struct dwarf2_cu *cu;
   struct die_info *die;
   struct attribute *attr;
@@ -17390,6 +17437,20 @@ dwarf2_fetch_die_location_block (cu_offset offset_in_cu,
   age_cached_comp_units ();
 
   return retval;
+}
+
+/* Like dwarf2_fetch_die_loc_sect_off, but take a CU
+   offset.  */
+
+struct dwarf2_locexpr_baton
+dwarf2_fetch_die_loc_cu_off (cu_offset offset_in_cu,
+			     struct dwarf2_per_cu_data *per_cu,
+			     CORE_ADDR (*get_frame_pc) (void *baton),
+			     void *baton)
+{
+  sect_offset offset = { per_cu->offset.sect_off + offset_in_cu.cu_off };
+
+  return dwarf2_fetch_die_loc_sect_off (offset, per_cu, get_frame_pc, baton);
 }
 
 /* Return the type of the DIE at DIE_OFFSET in the CU named by
