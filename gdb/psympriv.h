@@ -100,10 +100,6 @@ struct partial_symtab
 
   const char *dirname;
 
-  /* Information about the object file from which symbols should be read.  */
-
-  struct objfile *objfile;
-
   /* Set of relocation offsets to apply to each section.  */
 
   struct section_offsets *section_offsets;
@@ -204,7 +200,7 @@ struct partial_symtab
   /* Pointer to function which will read in the symtab corresponding to
      this psymtab.  */
 
-  void (*read_symtab) (struct partial_symtab *);
+  void (*read_symtab) (struct objfile *, struct partial_symtab *);
 
   /* Information that lets read_symtab() locate the part of the symbol table
      that this psymtab corresponds to.  This information is private to the
@@ -214,7 +210,7 @@ struct partial_symtab
   void *read_symtab_private;
 };
 
-extern void sort_pst_symbols (struct partial_symtab *);
+extern void sort_pst_symbols (struct objfile *, struct partial_symtab *);
 
 /* Add any kind of symbol to a psymbol_allocation_list.  */
 
@@ -236,7 +232,7 @@ extern struct partial_symtab *start_psymtab_common (struct objfile *,
 extern struct partial_symtab *allocate_psymtab (const char *,
 						struct objfile *);
 
-extern void discard_psymtab (struct partial_symtab *);
+extern void discard_psymtab (struct objfile *, struct partial_symtab *);
 
 /* Traverse all psymtabs in one objfile.  */
 

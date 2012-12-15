@@ -1,3 +1,644 @@
+2012-12-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.tgt (sparc-*-*): Add missing '\' in gdb_target_ops.
+
+2012-12-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* ppc-ravenscar-thread.h, ppc-ravenscar-thread.c: New files.
+	* Makefile.in (ALL_TARGET_OBS): Add ppc-ravenscar-thread.o.
+	(HFILES_NO_SRCDIR): Add ppc-ravenscar-thread.h.
+	(ALLDEPFILES): Add ppc-ravenscar-thread.c.
+	* configure.tgt: Add ravenscar-thread.o and ppc-ravenscar-thread.o
+	to gdb_target_obs for every target that uses rs6000-tdep.o.
+	* rs6000-tdep.c: #include "ppc-ravenscar-thread.h".
+	(rs6000_gdbarch_init): Call register_e500_ravenscar_ops
+	or register_ppc_ravenscar_ops.
+
+2012-12-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* sparc-ravenscar-thread.h: SPARC_RAVENSCAR_THREAD_H renames
+	RAVENSCAR_SPARC_THREAD_H.
+	* sparc-ravenscar-thread.c: Rename all global entities
+	whose name is uses "ravenscar_sparc" as the prefix to use
+	"sparc_ravenscar" instead.
+
+2012-12-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* sparc-ravenscar-thread.h: Renames ravenscar-sparc-thread.h.
+	* sparc-ravenscar-thread.c: Renames ravenscar-sparc-thread.c.
+	Adjust sparc-ravenscar-thread.h #include.
+	* sparc-tdep.c: Adjust sparc-ravenscar-thread.h #include
+	accordingly.
+	* Makefile.in: Replace ravenscar-sparc-thread with
+	sparc-ravenscar-thread throughout.
+	* configure.tgt: Likewise.
+
+2012-12-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbarch.sh: Add "struct ravenscar_arch_ops" forward
+	declaration.
+	(ravenscar_ops): New gdbarch variable.
+	* gdbarch.h, gdbarch.c: Regenerate.
+	* ravenscar-thread.h (ravenscar_register_arch_ops): Delete.
+	* ravenscar-thread.c (current_arch_ops): Delete.
+	(ravenscar_fetch_registers): Get the ravenscar_arch_ops
+	from the gdbarch.
+	(ravenscar_store_registers, ravenscar_prepare_to_store): Likewise.
+	(ravenscar_inferior_created): Add gdbarch_ravenscar_ops check.
+	(ravenscar_register_arch_ops): Delete.
+	* ravenscar-sparc-thread.h: New file.
+	* ravenscar-sparc-thread.c: #include "ravenscar-sparc-thread.h".
+	(ravenscar_sparc_ops): Define value statically.
+	(_initialize_ravenscar_sparc): Delete.
+	(register_sparc_ravenscar_ops): New function.
+	* sparc-tdep.c: #include "ravenscar-sparc-thread.h".
+	(sparc32_gdbarch_init): Add call to register_sparc_ravenscar_ops.
+	* Makefile.in (ALL_TARGET_OBS): Add ravenscar-thread.o and
+	ravenscar-sparc-thread.o.
+	(SFILES): Add ravenscar-thread.c.
+	(HFILES_NO_SRCDIR): Add ravenscar-sparc-thread.h.
+	(ALLDEPFILES): ravenscar-sparc-thread.c.
+	* configure.tgt: Add ravenscar-thread.o and ravenscar-sparc-thread.o
+	to gdb_target_obs
+	for all the targets that use sparc-tdep.o.
+
+2012-12-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* ravenscar-thread.c (ravenscar_is_open): Delete.
+	(ravenscar_initialize): Move most of the code from here...
+	(ravenscar_inferior_created): ... to there.  Invert logic.
+	(ravenscar_close): Delete.
+	(init_ravenscar_thread_ops): Remove setting of
+	ravenscar_ops.to_close.
+
+2012-12-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* objfiles.c (init_entry_point_info): Move function from here...
+	* symfile.c (init_entry_point_info): ... to there.  Make static.
+	* objfiles.h (objfiles.h): Delete declaration.
+
+2012-12-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* symfile.c (syms_from_objfile_1): Renames syms_from_objfile.
+	Remove call to init_entry_point_info.  Add OBJFILE's
+	section_offsets and num_sections initialization.  Add note
+	about entry info in the function documentation.
+	(syms_from_objfile): New function.
+	* coffread.c (coff_symfile_init): Remove call to
+	init_entry_point_info.
+	* machoread.c (macho_symfile_init): Likewise.
+	* xcoffread.c(xcoff_symfile_init): Likewise.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+
+	* remote-notif.c (_initialize_notif): Add new commands
+	'set debug notification' and 'show debug notification'.
+	* NEWS: Mention these new commands.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (REMOTE_OBS): Add "remote-notif.o".
+	(SFILES): Add "remote-notif.c".
+	(HFILES_NO_SRCDIR): Add "remote-notif.h" and "common/queue.h".
+	* remote-notif.c: New.  Factored out from remote.c.
+	* remote-notif.h: New.
+	* remote.c: Include "remote-notif.h".
+	(stop_reply_xmalloc, do_stop_reply_xfree):
+	(remote_parse_stop_reply, remote_get_pending_stop_replies):
+	(remote_async_get_pending_events_handler): Remove declarations.
+	(remote_parse_stop_reply): Declare.
+	(pending_stop_reply): Remove.
+	(remote_async_get_pending_events_token): Move to
+	remote-notif.c.
+	(remote_close): Replace 'delete_async_event_handler' with
+	remote_notif_unregister_async_event_handler.
+	Don't call discard_pending_stop_replies.
+	(remote_start_remote): Replace code with remote_notif_parse
+	and remote_notif_get_pending_replies.
+	(remote_open_1): Replace 'create_async_event_handler' with
+	remote_notif_register_async_event_handler.
+	(extended_remote_attach_1): Call remote_notif_parse and
+	notif_stop_reply_push.
+	(struct stop_reply) <next>: Remove.
+	<base>: New field.
+	Callers update.
+	(stop_reply_queue): Change its type.
+	(stop_reply_xmalloc, do_stop_reply_xfree): Remove.
+	(remote_notif_remove_all): New.
+	(discard_pending_stop_replies): Update.
+	(remote_notif_stop_ack, stop_reply_dtr): New.
+	(remote_notif_stop_alloc_event): New.
+	(notif_client_stop): New variable.
+	(stop_reply_match_ptid, stop_reply_match_ptid_and_ws: New.
+	(queued_stop_reply, peek_stop_reply): Adjust.
+	(remote_get_pending_stop_replies): Rename to
+	remote_notif_get_pending_events.
+	(handle_notification): Move to remote-notif.c.
+	(remote_async_get_pending_events_handler): Likewise.
+	(remote_wait_as): Adjust to call remote_notif_parse.
+	Call 'getpkt_or_notif_sane' instead of 'getpkt_sane'.
+	Return minus_one_ptid early if gets a notification.
+	(remote_wait): Call QUEUE_is_empty (notif_reply_p).
+	(_initialize_remote): Call QUEUE_alloc.  Update caller.
+	(remote_resume): Call 'remote_notif_process' in all-stop mode.
+	* remote.h: Include "remote-notif.h".
+	(remote_notif_get_pending_replies): Declare.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+
+	* remote.c (discard_pending_stop_replies): Update declaration.
+	(remote_detach_1, extended_remote_mourn_1): Likewise.
+	(discard_pending_stop_replies): Change parameter from PID to
+	INF.
+	(remote_close): Update caller.
+	(_initialize_remote): Attach discard_pending_stop_replies to
+	inferior_exit observer.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+
+	* remote.c (getpkt_or_notif_sane): Add one more argument in
+	its declaration.
+	(getpkt_or_notif_sane_1): Add one more argument.
+	(getpkt_sane): Update caller.
+	(getpkt_or_notif_sane): Likewise.  Update call
+	togetpkt_or_notif_sane_1.
+	(remote_wait_ns): Update caller.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+	    Doug Evans  <dje@google.com>
+
+	* common/queue.h: New.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+
+	* breakpoint.c (print_one_breakpoint_location): Display the
+	state of 'installed' of each non-pending location of a tracepoint
+	in both CLI and MI.
+	(download_tracepoint_locations): Notify 'breakpoint-modified'
+	observer if any tracepoint location is downloaded.
+	* tracepoint.c (start_tracing): Likewise.
+	(merge_uploaded_tracepoints): Record all modified
+	tracepoints and notify 'breakpoint-modified' observer for them.
+
+	* NEWS: Mention the change for CLI and MI.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+
+	* breakpoint.c (download_tracepoint_locations): Iterate over
+	ALL_TRACEPOINTS first and then iterate over locations of
+	each tracepoint.
+
+2012-12-14  Pierre Muller  <muller@sourceware.org>
+	    Pedro Alves  <palves@redhat.com>
+
+	* solib-target.c (solib_target_current_sos): Remove 'const'
+	qualifier from type of library_document local variable to be
+	able to free it and avoid a memory leak.
+	Use cleanup chain to avoid leak even if exceptino is generated.
+
+2012-12-14  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/8888:
+	* symtab.c (lookup_symbol_aux): If constructor is found, consider
+	returning the type instead.
+	* c-exp.y (classify_name): Check STRUCT_DOMAIN if a constructor is
+	found.
+
+2012-12-14  Tom Tromey  <tromey@redhat.com>
+
+	Partial fix for PR c++/14160:
+	* c-typeprint.c (c_type_print_base): Use TYPE_FN_FIELD_CONSTRUCTOR.
+	* dwarf2read.c (dwarf2_is_constructor): New function.
+	(dwarf2_add_member_fn): Use it.
+	* gnu-v3-abi.c (gnuv3_pass_by_reference): Use
+	TYPE_FN_FIELD_CONSTRUCTOR.
+	* jv-typeprint.c (java_type_print_base): Use
+	TYPE_FN_FIELD_CONSTRUCTOR.
+	* gdbtypes.h (struct fn_field) <is_constructor>: New field.
+	<dummy>: Shrink.
+	(TYPE_FN_FIELD_CONSTRUCTOR): New macro.
+
+2012-12-14  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (block, variable, name_not_typename, lex_one_token,
+	classify_name): Update.
+	* c-valprint.c (c_val_print): Update.
+	* f-exp.y (yylex): Update.
+	* go-exp.y (package_name_p, classify_packaged_name)
+	(classify_name): Update.
+	* jv-exp.y (push_variable): Update.
+	* m2-exp.y (variable): Update.
+	* mi/mi-cmd-stack.c (list_args_or_locals): Update.
+	* p-exp.y (block, variable, yylex): Update.
+	* p-valprint.c (pascal_val_print): Update.
+	* parse.c (write_dollar_variable): Update.
+	* printcmd.c (address_info): Update.
+	* python/py-symbol.c (gdbpy_lookup_symbol): Update.
+	* symtab.c (lookup_symbol_aux, lookup_symbol_in_language)
+	(lookup_symbol): Change type of 'is_a_field_of_this'.
+	(check_field): Add 'is_a_field_of_this' argument.
+	* symtab.h (struct field_of_this_result): New.
+	(lookup_symbol, lookup_symbol_in_language): Update.
+
+2012-12-14  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (check_field): Now static.  Move from...
+	* valops.c (check_field): ... here.  Remove.
+	* value.h (check_field): Don't declare.
+
+2012-12-14  Tom Tromey  <tromey@redhat.com>
+
+        * NEWS: Mention "info proc" and core files.
+        * corelow.c (core_info_proc): New function.
+        (init_core_ops): Set to_info_proc.
+        * gdbarch.c, gdbarch.h: Rebuild.
+        * gdbarch.sh (core_info_proc): New method.
+        * infcmd.c (info_proc_cmd_1): Invoke target_info_proc first.
+        * linux-tdep.c (linux_core_info_proc_mappings)
+        (linux_core_info_proc): New functions.
+        (linux_find_memory_region_ftype): New typedef.
+        (linux_find_memory_regions_full): New function, from
+        linux_find_memory_regions.
+        (struct linux_find_memory_regions_data): New.
+        (linux_find_memory_regions_thunk): New function.
+        (linux_find_memory_regions): Rewrite.
+        (struct linux_make_mappings_data): New.
+        (linux_make_mappings_callback)
+        (linux_make_mappings_corefile_notes): New functions.
+        (linux_make_corefile_notes): Call linux_make_mappings_corefile_notes.
+        (linux_init_abi): Call set_gdbarch_core_info_proc.
+        * target.c (target_info_proc): Return 'int'.
+        * target.h (target_info_proc): Update.
+
+2012-12-14  Pierre Muller  <muller@sourceware.org>
+
+	* windows-nat.c (windows_xfer_shared_libraries): Avoid
+	memory leak when OFFSET >= LEN_AVAIL.
+
+2012-12-13  Tom Tromey  <tromey@redhat.com>
+
+	* solib-svr4.c (enable_break): Use SECT_OFF_TEXT.
+
+2012-12-13  Tom Tromey  <tromey@redhat.com>
+
+	* acinclude.m4 (CY_AC_C_WORKS): Remove.
+
+2012-12-13  Pierre Muller  <muller@sourceware.org>
+
+	* coff-pe-read.c (pe_text_section_offset): Increase size of sname
+	local variable and zero terminate it to avoid possible problems
+	in strcmp.
+
+2012-12-13  Pedro Alves  <palves@redhat.com>
+
+	* coff-pe-read.c: Include coff/internal.h.
+	(read_pe_exported_syms): Use SCNNMLEN instead of hardcoded 8.
+	Null terminate buffer explicitly instead of memset the whole
+	buffer.
+
+2012-12-13  Pierre Muller  <muller@sourceware.org>
+
+	* coff-pe-read.c (IMAGE_SCN_CNT_TEXT, IMAGE_SCN_CNT_INITIALIZED_DATA)
+	(IMAGE_SCN_CNT_UNINITIALIZED_DATA): Remove useless checks
+	for already defined macros.
+
+2012-12-13  Pierre Muller  <muller@sourceware.org>
+
+	* coff-pe-read.h (pe_text_section_offset): Declare new function.
+	* coff-pe-read.c (debug_coff_pe_read): New static variable.
+	(struct read_pe_section_data): Add section_name field.
+	(IMAGE_SCN_CNT_CODE): New macro, if not already defined.
+	(IMAGE_SCN_CNT_INITIALIZED_DATA): Ditto.
+	(IMAGE_SCN_CNT_UNINITIALIZED_DATA): Ditto.
+	(get_pe_section_index): New function.
+	(struct pe_sections_info): New type.
+	(get_section_vmas): Use new struct pe_sections_info.
+	(add_pe_exported_sym): Handle unnamed exported function.
+	(add_pe_forwarded_sym): New function.
+	(read_pe_truncate_name): Truncate at last dot.
+	(pe_as16): New function.
+	(read_pe_exported_syms): Use ordinal of function to
+	retrieve correct RVA address of function and handle
+	forwarded symbol.
+	(pe_text_section_offset): New function.
+	(show_debug_coff_pe_read): New function.
+	(_initialize_coff_pe_read): New function adding
+	'set/show debug coff_pe_read' commands.
+
+	* windows-tdep.c (windows_xfer_shared_library): Use
+	pe_text_section_offset function instead of possibly wrong
+	0x1000 constant for .text sextion offset.
+
+2012-12-13  Pedro Alves  <palves@redhat.com>
+
+	* gdbarch.sh (do_read): Set IFS to blank.
+
+2012-12-12  Mircea Gherzan  <mircea.gherzan@intel.com>
+
+	* NEWS: Mention the -catch-load/-catch-unload MI commands.
+
+2012-12-12  Mircea Gherzan  <mircea.gherzan@intel.com>
+
+	* Makefile.in (SUBDIR_MI_OBS): Add mi-cmd-catch.o.
+	(SUBDIR_MI_SRCS): Add mi/mi-cmd-catch.c.
+	* breakpoint.c (add_solib_catchpoint): New function that
+	can be used by both CLI and MI, factored out from
+	catch_load_or_unload.
+	(catch_load_or_unload): Strip it down and make it use the
+	new add_solib_catchpoint.
+	* breakpoint.h (add_solib_catchpoint): Declare it.
+	* mi/mi-cmd-break.h: New file.
+	* mi/mi-cmd-break.c: Include mi-cmd-break.h.
+	(setup_breakpoint_reporting): New function used for both
+	catchpoints and breakpoints.
+	(mi_cmd_break_insert): Use setup_breakpoint_reporting.
+	* mi/mi-cmd-catch.c: New file.
+	* mi/mi-cmds.c (mi_cmds): Add the handlers for -catch-load
+	and -catch-unload.
+	* mi/mi-cmds.h: Declare the handlers for -catch-load and
+	-catch-unload.
+
+2012-11-28  Tom Tromey  <tromey@redhat.com>
+
+	* dbxread.c (read_dbx_symtab): Update.
+	(end_psymtab, dbx_psymtab_to_symtab_1, dbx_psymtab_to_symtab)
+	(read_ofile_symtab): Add 'objfile' argument.
+	* dwarf2read.c (process_psymtab_comp_unit_reader)
+	(build_type_psymtabs_reader): Update.
+	(dwarf2_psymtab_to_symtab): Add 'objfile' argument.
+	* mdebugread.c (mdebug_psymtab_to_symtab): Add 'objfile'
+	argument.
+	(parse_procedure, parse_partial_symbols): Update.
+	(psymtab_to_symtab_1): Add 'objfile' argument.
+	* psympriv.h (struct partial_symtab) <objfile>: Remove.
+	<read_symtab>: Add 'objfile' argument.
+	(sort_pst_symbols, discard_psymtab): Update.
+	* psymtab.c (partial_map_expand_apply): Update.
+	(find_pc_sect_psymtab_closer): Add 'objfile' argument.
+	(find_pc_sect_psymtab, find_pc_sect_symtab_from_partial): Update.
+	(find_pc_sect_psymbol): Add 'objfile' argument.
+	(lookup_symbol_aux_psymtabs): Update.
+	(match_partial_symbol, lookup_partial_symbol, psymtab_to_symtab):
+	Add 'objfile' argument.
+	(find_last_source_symtab_from_partial, dump_psymtab)
+	(dump_psymtabs_for_objfile, read_symtabs_for_function)
+	(expand_partial_symbol_tables, read_psymtabs_with_filename)
+	(find_symbol_file_from_partial, map_matching_symbols_psymtab)
+	(expand_symtabs_matching_via_partial): Update.
+	(sort_pst_symbols): Add 'objfile' argument.
+	(allocate_psymtab): Update.
+	(discard_psymtab): Add 'objfile' argument.
+	(maintenance_info_psymtabs, maintenance_check_symtabs): Update.
+	* stabsread.h (end_psymtab): Update.
+	* xcoffread.c (this_symtab_objfile): New global.
+	(process_linenos, enter_line_range, xcoff_next_symbol_text):
+	Update.
+	(read_xcoff_symtab): Add 'objfile' argument.
+	(read_symbol, read_symbol_lineno): Update.
+	(xcoff_psymtab_to_symtab_1, xcoff_psymtab_to_symtab)
+	(xcoff_end_psymtab): Add 'objfile' argument.
+	(scan_xcoff_symtab): Update.
+
+2012-12-12  Paul Koning  <paul_koning@dell.com>
+
+	Add support for Python 3.
+	* NEWS: Mention Python 3 support.
+	* varobj.c (value_get_print_value): Use
+	python_string_to_target_string.
+	* python/py-block.c: Use PyVarObject_HEAD_INIT in initialization
+	of type objects.
+	* python/py-breakpoint.c: Ditto.
+	* python/py-cmd.c:  Ditto.
+	* python/py-event.c: Ditto.
+	* python/py-event.h: Ditto.
+	* python/py-evtregistry.c: Ditto.
+	* python/py-finishbreakpoint.c: Ditto.
+	* python/py-frame.c: Ditto.
+	* python/py-function.c: Ditto.
+	* python/py-infthread.c: Ditto.
+	* python/py-lazy-string.c: Ditto.
+	* python/py-progspace.c: Ditto.
+	* /python/py-symbol.c: Ditto.
+	* python/py-evts.c:  (gdbpy_initialize_py_events): Add module
+	initialization for Python 3.
+	* python/py-inferior.c: Use PyVarObject_HEAD_INIT in initialization
+	of type objects.
+	(infpy_read_memory): Return memoryview object if Python 3.
+	(infpy_write_memory): Use "s*" operand parsing code for Python 3.
+	(infpy_search_memory): Ditto.
+	(get_buffer): New function for Python 3.
+	* python/py-objfile.c: Use PyVarObject_HEAD_INIT in initialization
+	of type objects.
+	(objfpy_dealloc): Use Py_TYPE to call tp_free.
+	* python/py-param.c: Use PyVarObject_HEAD_INIT in initialization
+	of type objects.
+	(get_attr): Use PyUnicode_CompareWithASCIIString if Python 3.
+	(set_attr): Ditto.
+	* python/py-prettyprint.c (print_string_repr): use PyBytes methods
+	instead of PyString methods if Python 3.
+	(print_children): Skip push_dummy_python_frame call if Python 3.
+	* python/py-symtab.c: Use PyVarObject_HEAD_INIT in initialization
+	of type objects.
+	(salpy_dealloc): Use Py_TYPE to call tp_free.
+	* python/py-type.c: Use PyVarObject_HEAD_INIT in initialization
+	of type objects.
+	(field_dealloc): Use Py_TYPE to call tp_free.
+	(typy_dealloc): Ditto.
+	(type_object_as_number): Adjust struct initializations for
+	differences in layout for Python 2 vs. Python 3.
+	* python/py-utils.c (python_string_to_unicode): Omit non-Unicode
+	string case for Python 3.
+	(unicode_to_encoded_python_string): Shorten code (no functional
+	change).
+	(python_string_to_target_python_string): Comment that in Python 3
+	returned value is a Python "bytes" type.
+	(gdbpy_is_string): Omit non-Unicode string check in Python 3.
+	(gdb_py_object_from_longest): Omit non-long integer case in Python
+	3.
+	(gdb_py_object_from_ulongest): Ditto.
+	* python/py-value.c: Use PyVarObject_HEAD_INIT in initialization
+	of type objects.
+	(valpy_dealloc): Use Py_TYPE to call tp_free.
+	(valpy_int): Omit function if Python 3.
+	(convert_value_from_python): Use "%S" format (Python object as a
+	string) if Python 3.
+	(value_object_as_number): Adjust struct initializations for
+	differences in layout for Python 2 vs. Python 3.
+	* python/python-config.py: Adjust syntax for Python 3
+	compatibility.
+	Include "sys.abiflags" string as part of python library name, if
+	that attribute exists (Python 3).
+	* python/python-internal.h (IS_PY3): Define if Python 3.
+	(Py_TPFLAGS_HAVE_ITER, Py_TPFLAGS_CHECKTYPES): Define with
+	placeholder value if Python 3.
+	(PyInt_Check, PyInt_FromLong, PyInt_AsLong, PyString_FromString,
+	PyString_Decode, PyString_FromFormat, PyString_Check): Define as
+	analogous Python 3 API function if Python 3.
+	(PyVarObject_HEAD_INIT): Define if not already defined.
+	(Py_TYPE): Ditto.
+	* python/python.c (eval_python_command): Omit Py_FlushLine call if
+	Python 3.
+	Check return values of all Python API calls for error.
+	Supply dummy "python" and "python-interactive" commands if Python
+	initialization failed.
+	(_initialize_python): Convert argc to wchar_t** if Python 3.
+	Add module initialization for Python 3.
+	(finish_python_initialization): Pass wchar_t * argument to
+	PySys_SetPath if Python 3.
+	* python/lib/gdb/__init__.py: Define "reload" if Python 3.
+	(_GdbFile): New class for common output file behavior.
+	(GdbOutFile): Subclass from _GdbFile.
+	(GdbOutputErrorFile): Ditto.
+	(auto_load_packages): Adjust syntax for Python 3 compatibility.
+	* python/lib/gdb/printing.py: Define basestr and int if Python 3.
+	* python/lib/gdb/prompt.py: Use sorted() function rather than
+	sort() method.
+	* python/lib/gdb/command/explore.py: Define raw_input if Python 3.
+	Adjust syntax for Python 3 compatibility.
+	* python/lib/gdb/command/pretty_printers.py: Use sorted() function
+	rather than sort() method.
+	Adjust syntax for Python 3 compatibility.
+	* python/lib/gdb/command/type_printers.py: Ditto.
+	* doc/gdb.texinfo (Inferior.read_memory): Mention that the return
+	value is a memoryview object if Python 3.
+
+2012-12-12  Tom Tromey  <tromey@redhat.com>
+
+	* coffread.c (coff_objfile_data_key): New global.
+	(coff_symfile_init): Use set_objfile_data.
+	(coff_symfile_read): Use objfile_data.
+	(coff_symfile_finish): Don't free deprecated_sym_private.
+	(coff_free_info): New function.
+	(_initialize_coffread): Initialize coff_objfile_data_key.
+	* mdebugread.c (pending_list): Update comment.
+	* objfiles.h (struct objfile) <deprecated_sym_private>: Remove.
+	* symfile.c (reread_symbols): Don't mention
+	deprecated_sym_private.
+	* xcoffread.c (xcoff_objfile_data_key): New global.
+	(XCOFF_DATA): New macro.
+	(process_linenos, enter_line_range, xcoff_next_symbol_text)
+	(read_xcoff_symtab, coff_getfilename, read_symbol_lineno): Use
+	XCOFF_DATA.
+	(xcoff_new_init) Use set_objfile_data.
+	(xcoff_symfile_finish): Don't free deprecated_sym_private.
+	(init_stringtab, swap_sym, scan_xcoff_symtab)
+	(xcoff_get_toc_offset, xcoff_initial_scan): Use XCOFF_DATA.
+	(xcoff_free_info): New function.
+	(_initialize_xcoffread): Initialize xcoff_objfile_data_key.
+
+2012-12-12  Mircea Gherzan  <mircea.gherzan@intel.com>
+
+	* MAINTAINERS (Write After Approval): Add "Mircea Gherzan".
+
+2012-12-12  Tom Tromey  <tromey@redhat.com>
+
+	* coffread.c (coff_symfile_init): Use set_objfile_data.
+	(coff_symfile_read): Use DBX_SYMFILE_INFO.
+	* dbxread.c (dbx_objfile_data_key): New global.
+	(dbx_symfile_init): Use set_objfile_data.
+	(dbx_symfile_finish): Don't free deprecated_sym_stab_info.
+	(dbx_free_symfile_info): New function.
+	(coffstab_build_psymtabs, elfstab_build_psymtabs): Use
+	DBX_SYMFILE_INFO.
+	(stabsect_build_psymtabs): Use set_objfile_data.
+	(_initialize_dbxreadb): Initialize dbx_objfile_data_key.
+	* elfread.c (elf_symtab_read): Use DBX_SYMFILE_INFO,
+	set_objfile_data.
+	(free_elfinfo): Use DBX_SYMFILE_INFO.
+	(elf_symfile_finish): Don't free deprecated_sym_stab_info.
+	(elfstab_offset_sections): Use DBX_SYMFILE_INFO.
+	* gdb-stabs.h (dbx_objfile_data_key): Declare.
+	(DBX_SYMFILE_INFO): Rewrite to use objfile_data.
+	* objfiles.h (struct objfile) <deprecated_sym_stab_info>: Remove.
+	* somread.c (som_symfile_finish): Don't free
+	deprecated_sym_stab_info.
+
+2012-12-12  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbarch.sh (software_single_step): Remove trailing space in
+	comment (gdbarch.h is already correct).
+
+2012-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dwarf2_get_dwz_file): Set 'dwz_file'.
+
+2012-12-11  Tom Tromey  <tromey@redhat.com>
+
+	* dsrec.c (report_transfer_performance): Don't declare.
+	(load_srec): Use gettimeofday, print_transfer_performance.
+	* symfile.c (report_transfer_performance): Remove.
+
+2012-12-11  Pedro Alves  <pedro@codesourcery.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* procfs.c (procfs_make_note_section) [NEW_PROC_API]: Output a
+	NT_PSTATUS note.
+	* sol2-tdep.c (sol2_core_pid_to_str): Print process IDs
+	differently from LWP IDs.
+
+2012-12-11  Pedro Alves  <palves@redhat.com>
+
+	* configure.ac (detect type of /proc): Remove Unixware handling.
+	* configure: Regenerate.
+	* proc-api.c (ioctl_table) [PIOCLSTATUS]: Don't mention Unixware.
+	(ioctl_table) [PCRESET]: Remove entry.
+	* proc-events.c (SYS_lwp_create, SYS_lwp_exit, SYS_lwp_wait)
+	(SYS_lwp_self, SYS_lwp_info, SYS_lwp_private, SYS_lwp_kill)
+	(SYS_lwp_suspend, SYS_lwp_continue): Don't define.
+	* proc-why.c (pr_why_table) [PR_SUSPENDED]: Don't mention Unixware.
+	* procfs.c: Remove all UNIXWARE guarded code, and all traces of
+	Unixware in comments throughout.
+	* i386-tdep.c (i386_svr4_sigtramp_p): Don't match _sigacthandler,
+	and remove mention of Unixware.
+
+2012-12-10  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dwarf2_cu): Enhance comment.
+	(dwarf2_get_pc_bounds): Only add ranges_base for DIEs that live in
+	the DWO file.
+	(dwarf2_record_block_ranges): Ditto.
+
+	* dwarf2read.c (create_dwo_in_dwp): Tweak comment.
+
+	* symtab.c (find_pc_sect_symtab): Add comment.
+
+2012-12-10  Tom Tromey  <tromey@redhat.com>
+
+	* defs.h: Don't check for definition of LONGEST.
+	(min, max): Remove duplicates.
+
+2012-12-10  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (dwarf2_fetch_die_loc_sect_off): New function.
+	(dwarf2_fetch_die_loc_cu_off): Rename from
+	dwarf2_fetch_die_location_block.  Rewrite to use
+	dwarf2_fetch_die_loc_sect_off.
+	* dwarf2loc.h (dwarf2_fetch_die_loc_sect_off): Declare.
+	(dwarf2_fetch_die_loc_cu_off): Rename.
+	* dwarf2loc.c (indirect_pieced_value): Use
+	dwarf2_fetch_die_loc_sect_off.
+	* dwarf2expr.h (struct dwarf_expr_context) <len, data>: Update
+	comment.
+	(struct dwarf_expr_piece) <v.ptr.die>: Now a sect_offset.
+	* dwarf2expr.c (add_piece): Update.
+	(execute_stack_op) <DW_OP_GNU_implicit_pointer>: Update comment.
+
+2012-12-10  Tom Tromey  <tromey@redhat.com>
+
+	* buildsym.c (struct pending_block): Move from buildsym.h.
+	(pending_blocks): Likewise; now static.
+	(pending_block_obstack): New global.
+	(free_pending_blocks): Free blocks.
+	(record_pending_block): Use pending_block_obstack.
+	* buildsym.h (struct pending_block): Move definition to
+	buildsym.c.
+	(pending_blocks): Don't declare.
+
+2012-12-10  Pedro Alves  <palves@redhat.com>
+
+	* solib-svr4.c (svr4_solib_create_inferior_hook) [_SCO_DS]: Remove
+	dead SCO code, and adjust function description comment.
+
 2012-12-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* configure.ac (CC_HAS_LONG_LONG): Replace by AC_MSG_ERROR.
@@ -248,7 +889,7 @@
 
 2012-11-29  Jerome Guitton  <guitton@adacore.com>
 
-        * ada-lang.h (ada_tag_value_at_base_address): New function
+	* ada-lang.h (ada_tag_value_at_base_address): New function
 	declaration.
 	* ada-lang.c (is_ada95_tag, ada_tag_value_at_base_address):
 	New functions.
@@ -1389,7 +2030,7 @@
 	* gdbarch.c: Regenerate.
 
 2012-10-10  Joel Brobecker  <brobecker@adacore.com>
-            Tom Tromey  <tromey@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
 
 	* rs6000-aix-tdep.c (rs6000_aix_osabi_sniffer): Replace
 	inneffective if condition by gdb assertion.  Add function
@@ -1962,8 +2603,8 @@
 	for command 'remotetimeout'.
 	* command.h (enum var_types): New zuinteger_unlimited.  Update comment
 	to var_integer.
-	* source.c (_initialize_source): Call add_setshow_zuinteger_unlimited_cmd
-	for command 'set listsize'.
+	* source.c (_initialize_source): Call
+	add_setshow_zuinteger_unlimited_cmd for command 'set listsize'.
 
 2012-09-17  Siddhesh Poyarekar  <siddhesh@redhat.com>
 
@@ -2090,8 +2731,9 @@
 	error message from the target.
 
 	* breakpoint.c (insert_bp_location, insert_breakpoint_locations):
-	Catch this exception and print the error message contained within. Do not
-	print the default hardware error breakpoint message in this case.
+	Catch this exception and print the error message contained within.
+	Do not print the default hardware error breakpoint message in this
+	case.
 
 2012-09-12  Doug Evans  <dje@google.com>
 
@@ -2167,8 +2809,8 @@
 	DEF_MI_CMD_MI DEF_MI_CMD_CLI_1 and DEF_MI_CMD_CLI_1.
 	Update some commands.
 	* mi/mi-cmds.h (struct mi_cmd) <suppress_notification>: New field.
-	* mi/mi-main.c (mi_cmd_execute): Set '*parse->cmd->suppress_notification'
-	to 1.
+	* mi/mi-main.c (mi_cmd_execute): Set
+	'*parse->cmd->suppress_notification' to 1.
 
 2012-08-31  Yao Qi  <yao@codesourcery.com>
 
@@ -4620,7 +5262,8 @@
 	can_use_displaced_stepping_on, can_use_displaced_stepping_off, and
 	can_use_displaced_stepping_enum.
 	Change can_use_displaced_stepping's type to 'enum auto_boolean'.
-	(show_can_use_displaced_stepping, use_displaced_stepping): Update callers.
+	(show_can_use_displaced_stepping, use_displaced_stepping): Update
+	callers.
 	(_initialize_infrun): Call add_setshow_auto_boolean_cmd instead of
 	add_setshow_enum_cmd.
 

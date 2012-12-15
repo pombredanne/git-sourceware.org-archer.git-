@@ -82,7 +82,7 @@ static struct symbol *lookup_symbol_aux (const char *name,
 					 const struct block *block,
 					 const domain_enum domain,
 					 enum language language,
-					 int *is_a_field_of_this);
+					 struct field_of_this_result *is_a_field_of_this);
 
 static
 struct symbol *lookup_symbol_aux_local (const char *name,
@@ -1212,7 +1212,7 @@ demangle_for_lookup (const char *name, enum language lang,
 struct symbol *
 lookup_symbol_in_language (const char *name, const struct block *block,
 			   const domain_enum domain, enum language lang,
-			   int *is_a_field_of_this)
+			   struct field_of_this_result *is_a_field_of_this)
 {
   const char *modified_name;
   struct symbol *returnval;
@@ -1230,7 +1230,8 @@ lookup_symbol_in_language (const char *name, const struct block *block,
 
 struct symbol *
 lookup_symbol (const char *name, const struct block *block,
-	       domain_enum domain, int *is_a_field_of_this)
+	       domain_enum domain,
+	       struct field_of_this_result *is_a_field_of_this)
 {
   return lookup_symbol_in_language (name, block, domain,
 				    current_language->la_language,
@@ -1265,24 +1266,68 @@ lookup_language_this (const struct language_defn *lang,
   return NULL;
 }
 
+/* Given TYPE, a structure/union,
+   return 1 if the component named NAME from the ultimate target
+   structure/union is defined, otherwise, return 0.  */
+
+static int
+check_field (struct type *type, const char *name,
+	     struct field_of_this_result *is_a_field_of_this)
+{
+  int i;
+
+  /* The type may be a stub.  */
+  CHECK_TYPEDEF (type);
+
+  for (i = TYPE_NFIELDS (type) - 1; i >= TYPE_N_BASECLASSES (type); i--)
+    {
+      const char *t_field_name = TYPE_FIELD_NAME (type, i);
+
+      if (t_field_name && (strcmp_iw (t_field_name, name) == 0))
+	{
+	  is_a_field_of_this->type = type;
+	  is_a_field_of_this->field = &TYPE_FIELD (type, i);
+	  return 1;
+	}
+    }
+
+  /* C++: If it was not found as a data field, then try to return it
+     as a pointer to a method.  */
+
+  for (i = TYPE_NFN_FIELDS (type) - 1; i >= 0; --i)
+    {
+      if (strcmp_iw (TYPE_FN_FIELDLIST_NAME (type, i), name) == 0)
+	{
+	  is_a_field_of_this->type = type;
+	  is_a_field_of_this->fn_field = &TYPE_FN_FIELDLIST (type, i);
+	  return 1;
+	}
+    }
+
+  for (i = TYPE_N_BASECLASSES (type) - 1; i >= 0; i--)
+    if (check_field (TYPE_BASECLASS (type, i), name, is_a_field_of_this))
+      return 1;
+
+  return 0;
+}
+
 /* Behave like lookup_symbol except that NAME is the natural name
    (e.g., demangled name) of the symbol that we're looking for.  */
 
 static struct symbol *
 lookup_symbol_aux (const char *name, const struct block *block,
 		   const domain_enum domain, enum language language,
-		   int *is_a_field_of_this)
+		   struct field_of_this_result *is_a_field_of_this)
 {
   struct symbol *sym;
   const struct language_defn *langdef;
 
   /* Make sure we do something sensible with is_a_field_of_this, since
      the callers that set this parameter to some non-null value will
-     certainly use it later and expect it to be either 0 or 1.
-     If we don't set it, the contents of is_a_field_of_this are
-     undefined.  */
+     certainly use it later.  If we don't set it, the contents of
+     is_a_field_of_this are undefined.  */
   if (is_a_field_of_this != NULL)
-    *is_a_field_of_this = 0;
+    memset (is_a_field_of_this, 0, sizeof (*is_a_field_of_this));
 
   /* Search specified block and its superiors.  Don't search
      STATIC_BLOCK or GLOBAL_BLOCK.  */
@@ -1296,7 +1341,10 @@ lookup_symbol_aux (const char *name, const struct block *block,
 
   langdef = language_def (language);
 
-  if (is_a_field_of_this != NULL)
+  /* Don't do this check if we are searching for a struct.  It will
+     not be found by check_field, but will be found by other
+     means.  */
+  if (is_a_field_of_this != NULL && domain != STRUCT_DOMAIN)
     {
       struct symbol *sym = lookup_language_this (langdef, block);
 
@@ -1316,11 +1364,8 @@ lookup_symbol_aux (const char *name, const struct block *block,
 	    error (_("Internal error: `%s' is not an aggregate"),
 		   langdef->la_name_of_this);
 
-	  if (check_field (t, name))
-	    {
-	      *is_a_field_of_this = 1;
-	      return NULL;
-	    }
+	  if (check_field (t, name, is_a_field_of_this))
+	    return NULL;
 	}
     }
 
@@ -2136,6 +2181,8 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
 
   if (best_s != NULL)
     return (best_s);
+
+  /* Not found in symtabs, search the "quick" symtabs (e.g. psymtabs).  */
 
   ALL_OBJFILES (objfile)
   {
