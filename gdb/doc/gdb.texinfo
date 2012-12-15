@@ -9951,7 +9951,7 @@ specified, the file name defaults to @file{core.@var{pid}}, where
 @var{pid} is the inferior process ID.
 
 Note that this command is implemented only for some systems (as of
-this writing, @sc{gnu}/Linux, FreeBSD, Solaris, Unixware, and S390).
+this writing, @sc{gnu}/Linux, FreeBSD, Solaris, and S390).
 @end table
 
 @node Character Sets
@@ -11476,6 +11476,9 @@ tracing:
 @itemize @bullet
 @item
 its passcount as given by the @code{passcount @var{n}} command
+
+@item
+the state about installed on target of each location
 @end itemize
 
 @smallexample
@@ -11488,6 +11491,15 @@ Num     Type           Disp Enb Address    What
         collect globfoo2
         end
         pass count 1200 
+2       tracepoint     keep y   <MULTIPLE>
+        collect $eip
+2.1                         y     0x0804859c in func4 at change-loc.h:35
+        installed on target
+2.2                         y     0xb7ffc480 in func4 at change-loc.h:35
+        installed on target
+2.3                         y     <PENDING>  set_tracepoint
+3       tracepoint     keep y   0x080485b1 in foo at change-loc.c:29
+        not installed on target
 (@value{GDBP})
 @end smallexample
 
@@ -18649,13 +18661,17 @@ modern FreeBSD systems.
 
 Many versions of SVR4 and compatible systems provide a facility called
 @samp{/proc} that can be used to examine the image of a running
-process using file-system subroutines.  If @value{GDBN} is configured
-for an operating system with this facility, the command @code{info
-proc} is available to report information about the process running
-your program, or about any process running on your system.  @code{info
-proc} works only on SVR4 systems that include the @code{procfs} code.
-This includes, as of this writing, @sc{gnu}/Linux, OSF/1 (Digital
-Unix), Solaris, Irix, and Unixware, but not HP-UX, for example.
+process using file-system subroutines.
+
+If @value{GDBN} is configured for an operating system with this
+facility, the command @code{info proc} is available to report
+information about the process running your program, or about any
+process running on your system.  This includes, as of this writing,
+@sc{gnu}/Linux, OSF/1 (Digital Unix), Solaris, and Irix, but
+not HP-UX, for example.
+
+This command may also work on core files that were created on a system
+that has the @samp{/proc} facility.
 
 @table @code
 @kindex info proc
@@ -21967,6 +21983,12 @@ Displays the current state of @value{GDBN} JIT debugging.
 Turns on or off debugging messages from the Linux LWP debug support.
 @item show debug lin-lwp
 Show the current state of Linux LWP debugging messages.
+@item set debug notification
+@cindex remote async notification debugging info
+Turns on or off debugging messages about remote async notification.
+The default is off.
+@item show debug notification
+Displays the current state of remote async notification debugging messages.
 @item set debug observer
 @cindex observer debugging info
 Turns on or off display of @value{GDBN} observer debugging.  This
@@ -24171,7 +24193,8 @@ return an empty tuple.
 Read @var{length} bytes of memory from the inferior, starting at
 @var{address}.  Returns a buffer object, which behaves much like an array
 or a string.  It can be modified and given to the
-@code{Inferior.write_memory} function.
+@code{Inferior.write_memory} function.  In @code{Python} 3, the return
+value is a @code{memoryview} object.
 @end defun
 
 @findex Inferior.write_memory
@@ -27154,6 +27177,7 @@ may repeat one or more times.
 * GDB/MI Simple Examples::
 * GDB/MI Command Description Format::
 * GDB/MI Breakpoint Commands::
+* GDB/MI Catchpoint Commands::
 * GDB/MI Program Context::
 * GDB/MI Thread Commands::
 * GDB/MI Ada Tasking Commands::
@@ -28441,17 +28465,19 @@ The result is in the form:
 ^done,bkpt=@{number="@var{number}",type="@var{type}",disp="del"|"keep",
 enabled="y"|"n",addr="@var{hex}",func="@var{funcname}",file="@var{filename}",
 fullname="@var{full_filename}",line="@var{lineno}",[thread="@var{threadno},]
-times="@var{times}"@}
+times="@var{times}"[,installed="@var{installed}"]@}
 @end smallexample
 
 @noindent
 where @var{number} is the @value{GDBN} number for this breakpoint,
 @var{funcname} is the name of the function where the breakpoint was
 inserted, @var{filename} is the name of the source file which contains
-this function, @var{lineno} is the source line number within that file
-and @var{times} the number of times that the breakpoint has been hit
+this function, @var{lineno} is the source line number within that file,
+@var{times} the number of times that the breakpoint has been hit
 (always 0 for -break-insert but may be greater for -break-info or -break-list
-which use the same output).
+which use the same output), and @var{installed}, which is an optional
+boolean, is about the state of each non-pending tracepoint location
+installed on target or not.
 
 Note: this format is open to change.
 @c An out-of-band breakpoint instead of part of the result?
@@ -28727,6 +28753,73 @@ fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",
 times="1"@}]@}
 (gdb)
 @end smallexample
+
+
+@c %%%%%%%%%%%%%%%%%%%%%%%%%%%% SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+@node GDB/MI Catchpoint Commands
+@section @sc{gdb/mi} Catchpoint Commands
+
+This section documents @sc{gdb/mi} commands for manipulating
+catchpoints.
+
+@subheading The @code{-catch-load} Command
+@findex -catch-load
+
+@subsubheading Synopsis
+
+@smallexample
+ -catch-load [ -t ] [ -d ] @var{regexp}
+@end smallexample
+
+Add a catchpoint for library load events.  If the @samp{-t} option is used,
+the catchpoint is a temporary one (@pxref{Set Breaks, ,Setting
+Breakpoints}).  If the @samp{-d} option is used, the catchpoint is created
+in a disabled state.  The @samp{regexp} argument is a regular
+expression used to match the name of the loaded library.
+
+
+@subsubheading @value{GDBN} Command
+
+The corresponding @value{GDBN} command is @samp{catch load}.
+
+@subsubheading Example
+
+@smallexample
+-catch-load -t foo.so
+^done,bkpt=@{number="1",type="catchpoint",disp="del",enabled="y",
+what="load of library matching foo.so",times="0"@}
+(gdb)
+@end smallexample
+
+
+@subheading The @code{-catch-unload} Command
+@findex -catch-unload
+
+@subsubheading Synopsis
+
+@smallexample
+ -catch-unload [ -t ] [ -d ] @var{regexp}
+@end smallexample
+
+Add a catchpoint for library unload events.  If the @samp{-t} option is
+used, the catchpoint is a temporary one (@pxref{Set Breaks, ,Setting
+Breakpoints}).  If the @samp{-d} option is used, the catchpoint is
+created in a disabled state.  The @samp{regexp} argument is a regular
+expression used to match the name of the unloaded library.
+
+@subsubheading @value{GDBN} Command
+
+The corresponding @value{GDBN} command is @samp{catch unload}.
+
+@subsubheading Example
+
+@smallexample
+-catch-unload -d bar.so
+^done,bkpt=@{number="2",type="catchpoint",disp="keep",enabled="n",
+what="load of library matching bar.so",times="0"@}
+(gdb)
+@end smallexample
+
 
 @c %%%%%%%%%%%%%%%%%%%%%%%%%%%% SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 @node GDB/MI Program Context

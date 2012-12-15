@@ -82,10 +82,6 @@ static void clear_symtab_users_cleanup (void *ignore);
 /* Global variables owned by this file.  */
 int readnow_symbol_files;	/* Read full symbols immediately.  */
 
-/* External variables and functions referenced.  */
-
-extern void report_transfer_performance (unsigned long, time_t, time_t);
-
 /* Functions this file defines.  */
 
 static void load_command (char *, int);
@@ -897,8 +893,58 @@ read_symbols (struct objfile *objfile, int add_flags)
     require_partial_symbols (objfile, 0);
 }
 
+/* Initialize entry point information for this objfile.  */
+
+static void
+init_entry_point_info (struct objfile *objfile)
+{
+  /* Save startup file's range of PC addresses to help blockframe.c
+     decide where the bottom of the stack is.  */
+
+  if (bfd_get_file_flags (objfile->obfd) & EXEC_P)
+    {
+      /* Executable file -- record its entry point so we'll recognize
+         the startup file because it contains the entry point.  */
+      objfile->ei.entry_point = bfd_get_start_address (objfile->obfd);
+      objfile->ei.entry_point_p = 1;
+    }
+  else if (bfd_get_file_flags (objfile->obfd) & DYNAMIC
+	   && bfd_get_start_address (objfile->obfd) != 0)
+    {
+      /* Some shared libraries may have entry points set and be
+	 runnable.  There's no clear way to indicate this, so just check
+	 for values other than zero.  */
+      objfile->ei.entry_point = bfd_get_start_address (objfile->obfd);
+      objfile->ei.entry_point_p = 1;
+    }
+  else
+    {
+      /* Examination of non-executable.o files.  Short-circuit this stuff.  */
+      objfile->ei.entry_point_p = 0;
+    }
+
+  if (objfile->ei.entry_point_p)
+    {
+      CORE_ADDR entry_point =  objfile->ei.entry_point;
+
+      /* Make certain that the address points at real code, and not a
+	 function descriptor.  */
+      entry_point
+	= gdbarch_convert_from_func_ptr_addr (objfile->gdbarch,
+					      entry_point,
+					      &current_target);
+
+      /* Remove any ISA markers, so that this matches entries in the
+	 symbol table.  */
+      objfile->ei.entry_point
+	= gdbarch_addr_bits_remove (objfile->gdbarch, entry_point);
+    }
+}
+
 /* Process a symbol file, as either the main file or as a dynamically
    loaded file.
+
+   This function does not set the OBJFILE's entry-point info.
 
    OBJFILE is where the symbols are to be read from.
 
@@ -927,12 +973,12 @@ read_symbols (struct objfile *objfile, int add_flags)
    an extra symbol file such as dynamically loaded code, and wether
    breakpoint reset should be deferred.  */
 
-void
-syms_from_objfile (struct objfile *objfile,
-                   struct section_addr_info *addrs,
-                   struct section_offsets *offsets,
-                   int num_offsets,
-		   int add_flags)
+static void
+syms_from_objfile_1 (struct objfile *objfile,
+		     struct section_addr_info *addrs,
+		     struct section_offsets *offsets,
+		     int num_offsets,
+		     int add_flags)
 {
   struct section_addr_info *local_addr = NULL;
   struct cleanup *old_chain;
@@ -940,11 +986,21 @@ syms_from_objfile (struct objfile *objfile,
 
   gdb_assert (! (addrs && offsets));
 
-  init_entry_point_info (objfile);
   objfile->sf = find_sym_fns (objfile->obfd);
 
   if (objfile->sf == NULL)
-    return;	/* No symbols.  */
+    {
+      /* No symbols to load, but we still need to make sure
+	 that the section_offsets table is allocated.  */
+      int num_sections = bfd_count_sections (objfile->obfd);
+      size_t size = SIZEOF_N_SECTION_OFFSETS (num_offsets);
+
+      objfile->num_sections = num_sections;
+      objfile->section_offsets
+        = obstack_alloc (&objfile->objfile_obstack, size);
+      memset (objfile->section_offsets, 0, size);
+      return;
+    }
 
   /* Make sure that partially constructed symbol tables will be cleaned up
      if an error occurs during symbol reading.  */
@@ -1023,6 +1079,20 @@ syms_from_objfile (struct objfile *objfile,
 
   discard_cleanups (old_chain);
   xfree (local_addr);
+}
+
+/* Same as syms_from_objfile_1, but also initializes the objfile
+   entry-point info.  */
+
+void
+syms_from_objfile (struct objfile *objfile,
+		   struct section_addr_info *addrs,
+		   struct section_offsets *offsets,
+		   int num_offsets,
+		   int add_flags)
+{
+  syms_from_objfile_1 (objfile, addrs, offsets, num_offsets, add_flags);
+  init_entry_point_info (objfile);
 }
 
 /* Perform required actions after either reading in the initial
@@ -2185,24 +2255,6 @@ generic_load (char *args, int from_tty)
 
 /* Report how fast the transfer went.  */
 
-/* DEPRECATED: cagney/1999-10-18: report_transfer_performance is being
-   replaced by print_transfer_performance (with a very different
-   function signature).  */
-
-void
-report_transfer_performance (unsigned long data_count, time_t start_time,
-			     time_t end_time)
-{
-  struct timeval start, end;
-
-  start.tv_sec = start_time;
-  start.tv_usec = 0;
-  end.tv_sec = end_time;
-  end.tv_usec = 0;
-
-  print_transfer_performance (gdb_stdout, data_count, 0, &start, &end);
-}
-
 void
 print_transfer_performance (struct ui_file *stream,
 			    unsigned long data_count,
@@ -2585,7 +2637,6 @@ reread_symbols (void)
 	  objfile->free_psymtabs = NULL;
 	  objfile->template_symbols = NULL;
 	  objfile->msymbols = NULL;
-	  objfile->deprecated_sym_private = NULL;
 	  objfile->minimal_symbol_count = 0;
 	  memset (&objfile->msymbol_hash, 0,
 		  sizeof (objfile->msymbol_hash));
