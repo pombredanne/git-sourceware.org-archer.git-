@@ -47,6 +47,10 @@
 
 extern void _initialize_coffread (void);
 
+/* Key for COFF-associated data.  */
+
+static const struct objfile_data *coff_objfile_data_key;
+
 /* The objfile we are currently reading.  */
 
 static struct objfile *coffread_objfile;
@@ -450,26 +454,21 @@ record_minimal_symbol (struct coff_symbol *cs, CORE_ADDR address,
 static void
 coff_symfile_init (struct objfile *objfile)
 {
-  /* Allocate struct to keep track of stab reading.  */
-  objfile->deprecated_sym_stab_info = (struct dbx_symfile_info *)
-    xmalloc (sizeof (struct dbx_symfile_info));
+  struct dbx_symfile_info *dbx;
+  struct coff_symfile_info *coff;
 
-  memset (objfile->deprecated_sym_stab_info, 0,
-	  sizeof (struct dbx_symfile_info));
+  /* Allocate struct to keep track of stab reading.  */
+  dbx = XCNEW (struct dbx_symfile_info);
+  set_objfile_data (objfile, dbx_objfile_data_key, dbx);
 
   /* Allocate struct to keep track of the symfile.  */
-  objfile->deprecated_sym_private
-    = xmalloc (sizeof (struct coff_symfile_info));
-
-  memset (objfile->deprecated_sym_private, 0,
-	  sizeof (struct coff_symfile_info));
+  coff = XCNEW (struct coff_symfile_info);
+  set_objfile_data (objfile, coff_objfile_data_key, coff);
 
   /* COFF objects may be reordered, so set OBJF_REORDERED.  If we
      find this causes a significant slowdown in gdb then we could
      set it in the debug symbol readers only when necessary.  */
   objfile->flags |= OBJF_REORDERED;
-
-  init_entry_point_info (objfile);
 }
 
 /* This function is called for every section; it finds the outer
@@ -527,8 +526,8 @@ coff_symfile_read (struct objfile *objfile, int symfile_flags)
   struct cleanup *back_to, *cleanup_minimal_symbols;
   int stabstrsize;
   
-  info = (struct coff_symfile_info *) objfile->deprecated_sym_private;
-  dbxinfo = objfile->deprecated_sym_stab_info;
+  info = objfile_data (objfile, coff_objfile_data_key);
+  dbxinfo = DBX_SYMFILE_INFO (objfile);
   symfile_bfd = abfd;		/* Kludge for swap routines.  */
 
 /* WARNING WILL ROBINSON!  ACCESSING BFD-PRIVATE DATA HERE!  FIXME!  */
@@ -681,11 +680,6 @@ coff_new_init (struct objfile *ignore)
 static void
 coff_symfile_finish (struct objfile *objfile)
 {
-  if (objfile->deprecated_sym_private != NULL)
-    {
-      xfree (objfile->deprecated_sym_private);
-    }
-
   /* Let stabs reader clean up.  */
   stabsread_clear_cache ();
 
@@ -2200,8 +2194,19 @@ static const struct sym_fns coff_sym_fns =
   &psym_functions
 };
 
+/* Free the per-objfile COFF data.  */
+
+static void
+coff_free_info (struct objfile *objfile, void *arg)
+{
+  xfree (arg);
+}
+
 void
 _initialize_coffread (void)
 {
   add_symtab_fns (&coff_sym_fns);
+
+  coff_objfile_data_key = register_objfile_data_with_cleanup (NULL,
+							      coff_free_info);
 }

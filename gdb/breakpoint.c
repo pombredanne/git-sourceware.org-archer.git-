@@ -6120,6 +6120,25 @@ print_one_breakpoint_location (struct breakpoint *b,
 	  ui_out_field_int (uiout, "pass", t->pass_count);
 	  ui_out_text (uiout, " \n");
 	}
+
+      /* Don't display it when tracepoint or tracepoint location is
+	 pending.   */
+      if (!header_of_multiple && loc != NULL && !loc->shlib_disabled)
+	{
+	  annotate_field (11);
+
+	  if (ui_out_is_mi_like_p (uiout))
+	    ui_out_field_string (uiout, "installed",
+				 loc->inserted ? "y" : "n");
+	  else
+	    {
+	      if (loc->inserted)
+		ui_out_text (uiout, "\t");
+	      else
+		ui_out_text (uiout, "\tnot ");
+	      ui_out_text (uiout, "installed on target\n");
+	    }
+	}
     }
 
   if (ui_out_is_mi_like_p (uiout) && !part_of_multiple)
@@ -7850,19 +7869,19 @@ print_recreate_catch_solib (struct breakpoint *b, struct ui_file *fp)
 
 static struct breakpoint_ops catch_solib_breakpoint_ops;
 
-/* A helper function that does all the work for "catch load" and
-   "catch unload".  */
+/* Shared helper function (MI and CLI) for creating and installing
+   a shared object event catchpoint.  If IS_LOAD is non-zero then
+   the events to be caught are load events, otherwise they are
+   unload events.  If IS_TEMP is non-zero the catchpoint is a
+   temporary one.  If ENABLED is non-zero the catchpoint is
+   created in an enabled state.  */
 
-static void
-catch_load_or_unload (char *arg, int from_tty, int is_load,
-		      struct cmd_list_element *command)
+void
+add_solib_catchpoint (char *arg, int is_load, int is_temp, int enabled)
 {
   struct solib_catchpoint *c;
   struct gdbarch *gdbarch = get_current_arch ();
-  int tempflag;
   struct cleanup *cleanup;
-
-  tempflag = get_cmd_context (command) == CATCH_TEMPORARY;
 
   if (!arg)
     arg = "";
@@ -7887,11 +7906,28 @@ catch_load_or_unload (char *arg, int from_tty, int is_load,
     }
 
   c->is_load = is_load;
-  init_catchpoint (&c->base, gdbarch, tempflag, NULL,
+  init_catchpoint (&c->base, gdbarch, is_temp, NULL,
 		   &catch_solib_breakpoint_ops);
+
+  c->base.enable_state = enabled ? bp_enabled : bp_disabled;
 
   discard_cleanups (cleanup);
   install_breakpoint (0, &c->base, 1);
+}
+
+/* A helper function that does all the work for "catch load" and
+   "catch unload".  */
+
+static void
+catch_load_or_unload (char *arg, int from_tty, int is_load,
+		      struct cmd_list_element *command)
+{
+  int tempflag;
+  const int enabled = 1;
+
+  tempflag = get_cmd_context (command) == CATCH_TEMPORARY;
+
+  add_solib_catchpoint (arg, is_load, tempflag, enabled);
 }
 
 static void
@@ -12062,7 +12098,7 @@ bp_location_target_extensions_update (void)
 static void
 download_tracepoint_locations (void)
 {
-  struct bp_location *bl, **blp_tmp;
+  struct breakpoint *b;
   struct cleanup *old_chain;
 
   if (!target_can_download_tracepoint ())
@@ -12070,31 +12106,36 @@ download_tracepoint_locations (void)
 
   old_chain = save_current_space_and_thread ();
 
-  ALL_BP_LOCATIONS (bl, blp_tmp)
+  ALL_TRACEPOINTS (b)
     {
+      struct bp_location *bl;
       struct tracepoint *t;
+      int bp_location_downloaded = 0;
 
-      if (!is_tracepoint (bl->owner))
-	continue;
-
-      if ((bl->owner->type == bp_fast_tracepoint
+      if ((b->type == bp_fast_tracepoint
 	   ? !may_insert_fast_tracepoints
 	   : !may_insert_tracepoints))
 	continue;
 
-      /* In tracepoint, locations are _never_ duplicated, so
-	 should_be_inserted is equivalent to
-	 unduplicated_should_be_inserted.  */
-      if (!should_be_inserted (bl) || bl->inserted)
-	continue;
+      for (bl = b->loc; bl; bl = bl->next)
+	{
+	  /* In tracepoint, locations are _never_ duplicated, so
+	     should_be_inserted is equivalent to
+	     unduplicated_should_be_inserted.  */
+	  if (!should_be_inserted (bl) || bl->inserted)
+	    continue;
 
-      switch_to_program_space_and_thread (bl->pspace);
+	  switch_to_program_space_and_thread (bl->pspace);
 
-      target_download_tracepoint (bl);
+	  target_download_tracepoint (bl);
 
-      bl->inserted = 1;
-      t = (struct tracepoint *) bl->owner;
-      t->number_on_target = bl->owner->number;
+	  bl->inserted = 1;
+	  bp_location_downloaded = 1;
+	}
+      t = (struct tracepoint *) b;
+      t->number_on_target = b->number;
+      if (bp_location_downloaded)
+	observer_notify_breakpoint_modified (b);
     }
 
   do_cleanups (old_chain);

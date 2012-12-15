@@ -322,30 +322,7 @@ struct objfile
 
     struct entry_info ei;
 
-    /* Information about stabs.  Will be filled in with a dbx_symfile_info
-       struct by those readers that need it.  */
-    /* NOTE: cagney/2004-10-23: This has been replaced by per-objfile
-       data points implemented using "data" and "num_data" below.  For
-       an example of how to use this replacement, see "objfile_data"
-       in "mips-tdep.c".  */
-
-    struct dbx_symfile_info *deprecated_sym_stab_info;
-
-    /* Hook for information for use by the symbol reader (currently used
-       for information shared by sym_init and sym_read).  It is
-       typically a pointer to malloc'd memory.  The symbol reader's finish
-       function is responsible for freeing the memory thusly allocated.  */
-    /* NOTE: cagney/2004-10-23: This has been replaced by per-objfile
-       data points implemented using "data" and "num_data" below.  For
-       an example of how to use this replacement, see "objfile_data"
-       in "mips-tdep.c".  */
-
-    void *deprecated_sym_private;
-
     /* Per objfile data-pointers required by other GDB modules.  */
-    /* FIXME: kettenis/20030711: This mechanism could replace
-       deprecated_sym_stab_info and deprecated_sym_private
-       entirely.  */
 
     REGISTRY_FIELDS;
 
@@ -465,8 +442,6 @@ extern struct objfile *rt_common_objfile;
 extern struct objfile *allocate_objfile (bfd *, int);
 
 extern struct gdbarch *get_objfile_arch (struct objfile *);
-
-extern void init_entry_point_info (struct objfile *);
 
 extern int entry_point_address_query (CORE_ADDR *entry_p);
 
