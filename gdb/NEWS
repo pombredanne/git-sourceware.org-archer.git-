@@ -93,6 +93,11 @@ show print type typedefs
   Control whether typedef definitions are displayed by "ptype".
   The default is to show them.
 
+set backtrace filename-display basename|relative|absolute
+show backtrace filename-display
+  Control the way in which filenames is displayed in backtraces.
+  The default is "relative", which preserves previous behavior.
+
 * MI changes
 
   ** Command parameter changes are now notified using new async record
