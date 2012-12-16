@@ -1178,9 +1178,9 @@ print_frame (struct frame_info *frame, int print_level,
       QUIT;
     }
   ui_out_text (uiout, ")");
-  if (sal.symtab && sal.symtab->filename)
+  if (sal.symtab && sal.symtab->filenamex)
     {
-      const char *filename_display = get_filename_display_from_sal (&sal);
+      const char *filename_display = symtab_to_filename (sal.symtab);
 
       annotate_frame_source_begin ();
       ui_out_wrap_hint (uiout, "   ");
@@ -1201,7 +1201,7 @@ print_frame (struct frame_info *frame, int print_level,
       annotate_frame_source_end ();
     }
 
-  if (pc_p && (!funname || (!sal.symtab || !sal.symtab->filename)))
+  if (pc_p && (!funname || (!sal.symtab || !sal.symtab->filenamex)))
     {
 #ifdef PC_SOLIB
       char *lib = PC_SOLIB (get_frame_pc (frame));
@@ -1462,7 +1462,7 @@ frame_info (char *addr_exp, int from_tty)
     }
   wrap_here ("   ");
   if (sal.symtab)
-    printf_filtered (" (%s:%d)", sal.symtab->filename, sal.line);
+    printf_filtered (" (%s:%d)", symtab_to_filename (sal.symtab), sal.line);
   puts_filtered ("; ");
   wrap_here ("    ");
   printf_filtered ("saved %s ", pc_regname);

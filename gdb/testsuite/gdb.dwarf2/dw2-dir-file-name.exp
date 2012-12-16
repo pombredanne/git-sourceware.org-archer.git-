@@ -19,7 +19,7 @@ if {![dwarf2_support]} {
     return 0  
 }
 
-set testfile "dw2-dir-file-name"
+standard_testfile
 set executable ${testfile}
 set binfile ${objdir}/${subdir}/${executable}
 set srcfile ${testfile}.c
@@ -354,15 +354,15 @@ proc test { func compdir filename } { with_test_prefix "$func" {
     gdb_breakpoint $func
     gdb_continue_to_breakpoint $func "$func \\(\\) at .*"
 
-    gdb_test_no_output "set backtrace filename-display absolute"
+    gdb_test_no_output "set filename-display absolute"
     verbose -log "expect: ${absolute}"
     gdb_test "frame" " in $func \\(\\) at [string_to_regexp ${absolute}]:999" "absolute"
 
-    gdb_test_no_output "set backtrace filename-display basename"
+    gdb_test_no_output "set filename-display basename"
     verbose -log "expect: [file tail $filename]"
     gdb_test "frame" " in $func \\(\\) at [string_to_regexp [file tail $filename]]:999" "basename"
 
-    gdb_test_no_output "set backtrace filename-display relative"
+    gdb_test_no_output "set filename-display relative"
     verbose -log "expect: $filename"
     gdb_test "frame" " in $func \\(\\) at [string_to_regexp $filename]:999" "relative"
 }}

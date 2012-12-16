@@ -2167,28 +2167,6 @@ find_frame_sal (struct frame_info *frame, struct symtab_and_line *sal)
   (*sal) = find_pc_line (pc, notcurrent);
 }
 
-/* See commentary in frame.h.  */
-
-const char *
-get_filename_display_from_sal (const struct symtab_and_line *sal)
-{
-  const char *filename = sal->symtab->filename;
-
-  if (filename == NULL)
-      return NULL;
-  else if (filename_display_string == filename_display_basename)
-      return lbasename (filename);
-  else if (filename_display_string == filename_display_absolute)
-    {
-      const char *retval = symtab_to_fullname (sal->symtab);
-
-      if (retval != NULL)
-	return retval;
-    }
-
-  return filename;
-}
-
 /* Per "frame.h", return the ``address'' of the frame.  Code should
    really be using get_frame_id().  */
 CORE_ADDR

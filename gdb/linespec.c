@@ -852,9 +852,12 @@ add_sal_to_sals (struct linespec_state *self,
 
       self->canonical_names = xrealloc (self->canonical_names,
 					sals->nelts * sizeof (char *));
-      if (!literal_canonical && sal->symtab && sal->symtab->filename)
+      if (!literal_canonical && sal->symtab && sal->symtab->filenamex)
 	{
-	  char *filename = sal->symtab->filename;
+	  const char *filename = symtab_to_fullname (sal->symtab);
+
+	  if (filename == NULL)
+	    filename = sal->symtab->filenamex;
 
 	  /* Note that the filter doesn't have to be a valid linespec
 	     input.  We only apply the ":LINE" treatment to Ada for
@@ -1729,15 +1732,19 @@ create_sals_line_offset (struct linespec_state *self,
   if (VEC_length (symtab_p, ls->file_symtabs) == 1
       && VEC_index (symtab_p, ls->file_symtabs, 0) == NULL)
     {
+      const char *filename;
+
       set_current_program_space (self->program_space);
 
       /* Make sure we have at least a default source line.  */
       set_default_source_symtab_and_line ();
       initialize_defaults (&self->default_symtab, &self->default_line);
+      filename = symtab_to_fullname (self->default_symtab);
+      if (filename == NULL)
+	filename = self->default_symtab->filenamex;
       VEC_pop (symtab_p, ls->file_symtabs);
       VEC_free (symtab_p, ls->file_symtabs);
-      ls->file_symtabs
-	= collect_symtabs_from_filename (self->default_symtab->filename);
+      ls->file_symtabs = collect_symtabs_from_filename (filename);
       use_default = 1;
     }
 
@@ -1939,7 +1946,13 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 
 	/* Make sure we have a filename for canonicalization.  */
 	if (ls->source_filename == NULL)
-	  ls->source_filename = xstrdup (state->default_symtab->filename);
+	  {
+	    const char *filename = symtab_to_fullname (state->default_symtab);
+
+	    if (filename == NULL)
+	      filename = state->default_symtab->filenamex;
+	    ls->source_filename = xstrdup (filename);
+	  }
     }
   else
     {

@@ -46,7 +46,7 @@ tui_set_source_content (struct symtab *s,
 {
   enum tui_status ret = TUI_FAILURE;
 
-  if (s != (struct symtab *) NULL && s->filename != (char *) NULL)
+  if (s != (struct symtab *) NULL && s->filenamex != (char *) NULL)
     {
       FILE *stream;
       int i, desc, c, line_width, nlines;
@@ -63,9 +63,10 @@ tui_set_source_content (struct symtab *s,
 	    {
 	      if (!noerror)
 		{
-		  char *name = alloca (strlen (s->filename) + 100);
+		  const char *filename = symtab_to_filename (s);
+		  char *name = alloca (strlen (filename) + 100);
 
-		  sprintf (name, "%s:%d", s->filename, line_no);
+		  sprintf (name, "%s:%d", filename, line_no);
 		  print_sys_errmsg (name, errno);
 		}
 	      ret = TUI_FAILURE;
@@ -78,14 +79,15 @@ tui_set_source_content (struct symtab *s,
 	      if (line_no < 1 || line_no > s->nlines)
 		{
 		  close (desc);
-		  printf_unfiltered (
-			  "Line number %d out of range; %s has %d lines.\n",
-				      line_no, s->filename, s->nlines);
+		  printf_unfiltered ("Line number %d out of range; "
+				     "%s has %d lines.\n",
+				     line_no, symtab_to_filename (s),
+				     s->nlines);
 		}
 	      else if (lseek (desc, s->line_charpos[line_no - 1], 0) < 0)
 		{
 		  close (desc);
-		  perror_with_name (s->filename);
+		  perror_with_name (symtab_to_filename (s));
 		}
 	      else
 		{
@@ -97,11 +99,11 @@ tui_set_source_content (struct symtab *s,
 
                   if (TUI_SRC_WIN->generic.title)
                     xfree (TUI_SRC_WIN->generic.title);
-                  TUI_SRC_WIN->generic.title = xstrdup (s->filename);
+                  TUI_SRC_WIN->generic.title = xstrdup (symtab_to_filename (s));
 
                   if (src->filename)
                     xfree (src->filename);
-                  src->filename = xstrdup (s->filename);
+                  src->filename = xstrdup (symtab_to_filename (s));
 
 		  /* Determine the threshold for the length of the
                      line and the offset to start the display.  */
@@ -151,7 +153,7 @@ tui_set_source_content (struct symtab *s,
 		      element->which_element.source.is_exec_point =
 			(filename_cmp (((struct tui_win_element *)
 				       locator->content[0])->which_element.locator.file_name,
-				       s->filename) == 0
+				       symtab_to_filename (s)) == 0
 			 && cur_line_no == ((struct tui_win_element *)
 					    locator->content[0])->which_element.locator.line_no);
 		      if (c != EOF)
@@ -332,7 +334,7 @@ tui_show_symtab_source (struct gdbarch *gdbarch, struct symtab *s,
 /* Answer whether the source is currently displayed in the source
    window.  */
 int
-tui_source_is_displayed (char *fname)
+tui_source_is_displayed (const char *fname)
 {
   return (TUI_SRC_WIN != NULL
 	  && TUI_SRC_WIN->generic.content_in_use 
