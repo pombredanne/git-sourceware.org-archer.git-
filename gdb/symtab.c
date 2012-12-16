@@ -147,13 +147,13 @@ const struct block *block_found;
 
 /* See whether FILENAME matches SEARCH_NAME using the rule that we
    advertise to the user.  (The manual's description of linespecs
-   describes what we advertise).  SEARCH_LEN is the length of
-   SEARCH_NAME.  Returns true if they match, false otherwise.  */
+   describes what we advertise).  Returns true if they match, false
+   otherwise.  */
 
 int
 compare_filenames_for_search (const char *filename, const char *search_name)
 {
-  size_t len = strlen (filename);
+  int len = strlen (filename);
   size_t search_len = strlen (search_name);
 
   if (len < search_len)

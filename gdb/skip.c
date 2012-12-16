@@ -52,10 +52,6 @@ struct skiplist_entry
   struct skiplist_entry *next;
 };
 
-static void skip_function_command (char *arg, int from_tty);
-static void skip_file_command (char *arg, int from_tty);
-static void skip_info (char *arg, int from_tty);
-
 static void add_skiplist_entry (struct skiplist_entry *e);
 static void skip_function (const char *name);
 
@@ -75,14 +71,14 @@ skip_file_command (char *arg, int from_tty)
 {
   struct skiplist_entry *e;
   struct symtab *symtab;
-  const char *filename = 0;
+  const char *filename = NULL;
 
   /* If no argument was given, try to default to the last
      displayed codepoint.  */
-  if (arg == 0)
+  if (arg == NULL)
     {
       symtab = get_last_displayed_symtab ();
-      if (symtab == 0)
+      if (symtab == NULL)
 	error (_("No default file now."));
       filename = symtab_to_fullname (symtab);
       if (filename == NULL)
@@ -91,7 +87,7 @@ skip_file_command (char *arg, int from_tty)
   else
     {
       symtab = lookup_symtab (arg);
-      if (symtab == 0)
+      if (symtab == NULL)
 	{
 	  fprintf_filtered (gdb_stderr, _("No source file named %s.\n"), arg);
 	  if (!nquery (_("\
@@ -118,7 +114,7 @@ skip_function_command (char *arg, int from_tty)
   const char *name = NULL;
 
   /* Default to the current function if no argument is given.  */
-  if (arg == 0)
+  if (arg == NULL)
     {
       CORE_ADDR pc;
 
@@ -126,7 +122,7 @@ skip_function_command (char *arg, int from_tty)
 	error (_("No default function now."));
 
       pc = get_last_displayed_addr ();
-      if (pc == 0 || !find_pc_partial_function (pc, &name, NULL, NULL))
+      if (!find_pc_partial_function (pc, &name, NULL, NULL))
 	{
 	  error (_("No function found containing current program point %s."),
 		  paddress (get_current_arch (), pc));
@@ -135,57 +131,21 @@ skip_function_command (char *arg, int from_tty)
     }
   else
     {
-      /* Decode arg.  We set funfirstline=1 so decode_line_1 will give us the
-	 first line of the function specified, if it can, and so that we'll
-	 reject variable names and the like.  */
-      char *orig_arg = arg; /* decode_line_1 modifies the arg pointer.  */
-      volatile struct gdb_exception decode_exception;
-      struct symtabs_and_lines sals = { 0 };
-
-      TRY_CATCH (decode_exception, RETURN_MASK_ERROR)
-	{
-	  sals = decode_line_1 (&arg, DECODE_LINE_FUNFIRSTLINE, 0, 0);
-	}
-
-      if (decode_exception.reason < 0)
+      if (lookup_symbol (arg, NULL, VAR_DOMAIN, NULL) == NULL)
         {
-          if (decode_exception.error != NOT_FOUND_ERROR)
-            throw_exception (decode_exception);
-
 	  fprintf_filtered (gdb_stderr,
-			    _("No function found named %s.\n"), orig_arg);
+			    _("No function found named %s.\n"), arg);
 
 	  if (nquery (_("\
 Ignore function pending future shared library load? ")))
 	    {
 	      /* Add the unverified skiplist entry.  */
-	      skip_function (orig_arg);
+	      skip_function (arg);
 	    }
-
 	  return;
 	}
 
-      if (sals.nelts > 1)
-	error (_("Specify just one function at a time."));
-      if (strlen (arg) != 0)
-	error (_("Junk at end of arguments."));
-
-      /* The pc decode_line_1 gives us is the first line of the function,
-	 but we actually want the line before that.  The call to
-	 find_pc_partial_function gets us the value we actually want.  */
-      {
-	struct symtab_and_line sal = sals.sals[0];
-	CORE_ADDR pc = sal.pc;
-	struct gdbarch *arch = get_sal_arch (sal);
-
-	if (!find_pc_partial_function (pc, &name, NULL, NULL))
-	  {
-	    error (_("No function found containing program point %s."),
-		     paddress (arch, pc));
-	  }
-
-	skip_function (name);
-      }
+      skip_function (arg);
     }
 }
 
@@ -202,12 +162,12 @@ skip_info (char *arg, int from_tty)
   /* Count the number of rows in the table and see if we need space for a
      64-bit address anywhere.  */
   ALL_SKIPLIST_ENTRIES (e)
-    if (arg == 0 || number_is_in_list (arg, e->number))
+    if (arg == NULL || number_is_in_list (arg, e->number))
       num_printable_entries++;
 
   if (num_printable_entries == 0)
     {
-      if (arg == 0)
+      if (arg == NULL)
 	ui_out_message (current_uiout, 0, _("\
 Not skipping any files or functions.\n"));
       else
@@ -232,16 +192,16 @@ Not skipping any files or functions.\n"));
       struct cleanup *entry_chain;
 
       QUIT;
-      if (arg != 0 && !number_is_in_list (arg, e->number))
+      if (arg != NULL && !number_is_in_list (arg, e->number))
 	continue;
 
       entry_chain = make_cleanup_ui_out_tuple_begin_end (current_uiout,
 							 "blklst-entry");
       ui_out_field_int (current_uiout, "number", e->number);             /* 1 */
 
-      if (e->function_name != 0)
+      if (e->function_name != NULL)
 	ui_out_field_string (current_uiout, "type", "function");         /* 2 */
-      else if (e->filename != 0)
+      else if (e->filename != NULL)
 	ui_out_field_string (current_uiout, "type", "file");             /* 2 */
       else
 	internal_error (__FILE__, __LINE__, _("\
@@ -253,9 +213,9 @@ Skiplist entry should have either a filename or a function name."));
 	ui_out_field_string (current_uiout, "enabled", "n");             /* 3 */
 
       if (e->function_name != NULL)
-	ui_out_field_string (current_uiout, "what", e->function_name);
+	ui_out_field_string (current_uiout, "what", e->function_name);	 /* 4 */
       else if (e->filename != NULL)
-	ui_out_field_string (current_uiout, "what", e->filename);
+	ui_out_field_string (current_uiout, "what", e->filename);	 /* 4 */
 
       ui_out_text (current_uiout, "\n");
       do_cleanups (entry_chain);
@@ -271,7 +231,7 @@ skip_enable_command (char *arg, int from_tty)
   int found = 0;
 
   ALL_SKIPLIST_ENTRIES (e)
-    if (arg == 0 || number_is_in_list (arg, e->number))
+    if (arg == NULL || number_is_in_list (arg, e->number))
       {
         e->enabled = 1;
         found = 1;
@@ -288,7 +248,7 @@ skip_disable_command (char *arg, int from_tty)
   int found = 0;
 
   ALL_SKIPLIST_ENTRIES (e)
-    if (arg == 0 || number_is_in_list (arg, e->number))
+    if (arg == NULL || number_is_in_list (arg, e->number))
       {
 	e->enabled = 0;
         found = 1;
@@ -306,9 +266,9 @@ skip_delete_command (char *arg, int from_tty)
 
   b_prev = 0;
   ALL_SKIPLIST_ENTRIES_SAFE (e, temp)
-    if (arg == 0 || number_is_in_list (arg, e->number))
+    if (arg == NULL || number_is_in_list (arg, e->number))
       {
-	if (b_prev != 0)
+	if (b_prev != NULL)
 	  b_prev->next = e->next;
 	else
 	  skiplist_entry_chain = e->next;
@@ -356,7 +316,7 @@ add_skiplist_entry (struct skiplist_entry *e)
      skiplist entries will be in numerical order.  */
 
   e1 = skiplist_entry_chain;
-  if (e1 == 0)
+  if (e1 == NULL)
     skiplist_entry_chain = e;
   else
     {
@@ -390,7 +350,7 @@ function_name_is_marked_for_skip (const char *function_name,
 	  && strcmp_iw (function_name, e->function_name) == 0)
 	return 1;
 
-      if (e->filename != 0)
+      if (e->filename != NULL)
 	{
 	  /* Get the filename corresponding to this FUNCTION_SAL, if we haven't
 	     yet.  */
