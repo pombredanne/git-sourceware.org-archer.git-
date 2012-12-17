@@ -469,9 +469,9 @@ struct bp_location
 
   int line_number;
 
-  /* Source file name of this address.  */
+  /* Source file name of this address, as absolute filename.  */
 
-  char *source_file;
+  char *source_fullname;
 };
 
 /* This structure is a collection of function pointers that, if available,
