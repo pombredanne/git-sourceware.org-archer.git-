@@ -356,12 +356,6 @@ extern int get_frame_func_if_available (struct frame_info *fi, CORE_ADDR *);
 extern void find_frame_sal (struct frame_info *frame,
 			    struct symtab_and_line *sal);
 
-/* Returns filename without the compile directory part, basename or absolute
-   filename.  It depends on 'set backtrace filename-display' value.  */
-
-extern const char *
-  get_filename_display_from_sal (const struct symtab_and_line *sal);
-
 /* Set the current source and line to the location given by frame
    FRAME, if possible.  When CENTER is true, adjust so the relevant
    line is in the center of the next 'list'.  */
