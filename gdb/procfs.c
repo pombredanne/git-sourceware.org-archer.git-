@@ -5471,39 +5471,41 @@ procfs_make_note_section (bfd *obfd, int *note_size)
   struct cleanup *old_chain;
   gdb_gregset_t gregs;
   gdb_fpregset_t fpregs;
-  char fname[16] = {'\0'};
-  char psargs[80] = {'\0'};
+  struct elf_internal_prpsinfo prpsinfo;
   procinfo *pi = find_procinfo_or_die (PIDGET (inferior_ptid), 0);
   char *note_data = NULL;
-  char *inf_args;
   struct procfs_corefile_thread_data thread_args;
   gdb_byte *auxv;
   int auxv_len;
   enum gdb_signal stop_signal;
 
+  memset (&prpsinfo, 0, sizeof (prpsinfo));
+
   if (get_exec_file (0))
     {
-      strncpy (fname, lbasename (get_exec_file (0)), sizeof (fname));
-      fname[sizeof (fname) - 1] = 0;
-      strncpy (psargs, get_exec_file (0), sizeof (psargs));
-      psargs[sizeof (psargs) - 1] = 0;
+      char *inf_args;
+      char *psargs;
+
+      strncpy (prpsinfo.pr_fname, lbasename (get_exec_file (0)),
+	       sizeof (prpsinfo.pr_fname));
+      prpsinfo.pr_fname[sizeof (prpsinfo.pr_fname) - 1] = '\0';
+
+      psargs = xstrdup (prpsinfo.pr_fname);
 
       inf_args = get_inferior_args ();
-      if (inf_args && *inf_args &&
-	  strlen (inf_args) < ((int) sizeof (psargs) - (int) strlen (psargs)))
-	{
-	  strncat (psargs, " ",
-		   sizeof (psargs) - strlen (psargs));
-	  strncat (psargs, inf_args,
-		   sizeof (psargs) - strlen (psargs));
-	}
+      if (inf_args != NULL)
+	psargs = reconcat (psargs, psargs, " ", inf_args, NULL);
+
+      strncpy (prpsinfo.pr_psargs, psargs, sizeof (prpsinfo.pr_psargs));
+      prpsinfo.pr_psargs[sizeof (prpsinfo.pr_psargs) - 1] = '\0';
+
+      xfree (psargs);
     }
 
   note_data = (char *) elfcore_write_prpsinfo (obfd,
 					       note_data,
 					       note_size,
-					       fname,
-					       psargs);
+					       &prpsinfo);
 
   stop_signal = find_stop_signal ();
 
