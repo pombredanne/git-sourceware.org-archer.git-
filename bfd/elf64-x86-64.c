@@ -32,11 +32,13 @@
 #include "hashtab.h"
 #include "dwarf2.h"
 #include "libiberty.h"
+#include "elf-psinfo.h"
+
+#include <stdarg.h>
 
 #include "elf/x86-64.h"
 
 #ifdef CORE_HEADER
-#include <stdarg.h>
 #include CORE_HEADER
 #endif
 
@@ -415,14 +417,13 @@ elf_x86_64_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
   return TRUE;
 }
 
-#ifdef CORE_HEADER
 static char *
 elf_x86_64_write_core_note (bfd *abfd, char *buf, int *bufsiz,
 			    int note_type, ...)
 {
   const struct elf_backend_data *bed = get_elf_backend_data (abfd);
   va_list ap;
-  const char *fname, *psargs;
+  const struct elf_internal_prpsinfo *prpsinfo;
   long pid;
   int cursig;
   const void *gregs;
@@ -434,31 +435,33 @@ elf_x86_64_write_core_note (bfd *abfd, char *buf, int *bufsiz,
 
     case NT_PRPSINFO:
       va_start (ap, note_type);
-      fname = va_arg (ap, const char *);
-      psargs = va_arg (ap, const char *);
+      prpsinfo = va_arg (ap, const struct elf_internal_prpsinfo *);
       va_end (ap);
 
       if (bed->s->elfclass == ELFCLASS32)
 	{
-	  prpsinfo32_t data;
-	  memset (&data, 0, sizeof (data));
-	  strncpy (data.pr_fname, fname, sizeof (data.pr_fname));
-	  strncpy (data.pr_psargs, psargs, sizeof (data.pr_psargs));
+	  struct elf_external_prpsinfo32 data32;
+
+	  memset (&data32, 0, sizeof (data32));
+	  PRPSINFO32_SWAP_FIELDS (abfd, prpsinfo, data32);
+
 	  return elfcore_write_note (abfd, buf, bufsiz, "CORE", note_type,
-				     &data, sizeof (data));
+				     &data32, sizeof (data32));
 	}
       else
 	{
-	  prpsinfo64_t data;
-	  memset (&data, 0, sizeof (data));
-	  strncpy (data.pr_fname, fname, sizeof (data.pr_fname));
-	  strncpy (data.pr_psargs, psargs, sizeof (data.pr_psargs));
+	  struct elf_external_prpsinfo64 data64;
+
+	  memset (&data64, 0, sizeof (data64));
+	  PRPSINFO64_SWAP_FIELDS (abfd, prpsinfo, data64);
+
 	  return elfcore_write_note (abfd, buf, bufsiz, "CORE", note_type,
-				     &data, sizeof (data));
+				     &data64, sizeof (data64));
 	}
       /* NOTREACHED */
 
     case NT_PRSTATUS:
+#ifdef CORE_HEADER
       va_start (ap, note_type);
       pid = va_arg (ap, long);
       cursig = va_arg (ap, int);
@@ -498,10 +501,13 @@ elf_x86_64_write_core_note (bfd *abfd, char *buf, int *bufsiz,
 	  return elfcore_write_note (abfd, buf, bufsiz, "CORE", note_type,
 				     &prstat, sizeof (prstat));
 	}
+#else
+      return NULL;
+#endif /* CORE_HEADER */
     }
   /* NOTREACHED */
 }
-#endif
+
 
 /* Functions for the x86-64 ELF linker.	 */
 
@@ -5158,9 +5164,7 @@ static const struct bfd_elf_special_section
 #define elf_backend_gc_sweep_hook	    elf_x86_64_gc_sweep_hook
 #define elf_backend_grok_prstatus	    elf_x86_64_grok_prstatus
 #define elf_backend_grok_psinfo		    elf_x86_64_grok_psinfo
-#ifdef CORE_HEADER
 #define elf_backend_write_core_note	    elf_x86_64_write_core_note
-#endif
 #define elf_backend_reloc_type_class	    elf_x86_64_reloc_type_class
 #define elf_backend_relocate_section	    elf_x86_64_relocate_section
 #define elf_backend_size_dynamic_sections   elf_x86_64_size_dynamic_sections

@@ -45,6 +45,7 @@ SECTION
 #include "elf-bfd.h"
 #include "libiberty.h"
 #include "safe-ctype.h"
+#include "elf-psinfo.h"
 
 #ifdef CORE_HEADER
 #include CORE_HEADER
@@ -9103,16 +9104,16 @@ char *
 elfcore_write_prpsinfo (bfd  *abfd,
 			char *buf,
 			int  *bufsiz,
-			const char *fname,
-			const char *psargs)
+			const struct elf_internal_prpsinfo *input)
 {
   const struct elf_backend_data *bed = get_elf_backend_data (abfd);
 
   if (bed->elf_backend_write_core_note != NULL)
     {
       char *ret;
+
       ret = (*bed->elf_backend_write_core_note) (abfd, buf, bufsiz,
-						 NT_PRPSINFO, fname, psargs);
+						 NT_PRPSINFO, input);
       if (ret != NULL)
 	return ret;
     }
@@ -9130,8 +9131,8 @@ elfcore_write_prpsinfo (bfd  *abfd,
 #endif
 
       memset (&data, 0, sizeof (data));
-      strncpy (data.pr_fname, fname, sizeof (data.pr_fname));
-      strncpy (data.pr_psargs, psargs, sizeof (data.pr_psargs));
+      strncpy (data.pr_fname, input->pr_fname, sizeof (data.pr_fname));
+      strncpy (data.pr_psargs, input->pr_psargs, sizeof (data.pr_psargs));
       return elfcore_write_note (abfd, buf, bufsiz,
 				 "CORE", note_type, &data, sizeof (data));
     }
@@ -9147,8 +9148,8 @@ elfcore_write_prpsinfo (bfd  *abfd,
 #endif
 
       memset (&data, 0, sizeof (data));
-      strncpy (data.pr_fname, fname, sizeof (data.pr_fname));
-      strncpy (data.pr_psargs, psargs, sizeof (data.pr_psargs));
+      strncpy (data.pr_fname, input->pr_fname, sizeof (data.pr_fname));
+      strncpy (data.pr_psargs, input->pr_psargs, sizeof (data.pr_psargs));
       return elfcore_write_note (abfd, buf, bufsiz,
 				 "CORE", note_type, &data, sizeof (data));
     }

@@ -1723,6 +1723,30 @@ struct elf_obj_tdata
   (elf_known_obj_attributes (bfd) [OBJ_ATTR_PROC])
 #define elf_other_obj_attributes_proc(bfd) \
   (elf_other_obj_attributes (bfd) [OBJ_ATTR_PROC])
+
+/* Internal structure which holds information to be included in the
+   PRPSINFO section of the corefile.
+
+   This is an "internal" structure in the sense that it should be used to
+   pass information to BFD (via the `elfcore_write_prpsinfo', for example),
+   so things like endianess shouldn't be an issue.  This structure will
+   eventually be converted in one of the `elf_external_*' structures
+   below.  */
+
+struct elf_internal_prpsinfo
+  {
+    char pr_state;			/* Numeric process state.  */
+    char pr_sname;			/* Char for pr_state.  */
+    char pr_zomb;			/* Zombie.  */
+    char pr_nice;			/* Nice val.  */
+    unsigned long pr_flag;		/* Flags.  */
+    unsigned int pr_uid;
+    unsigned int pr_gid;
+    int pr_pid, pr_ppid, pr_pgrp, pr_sid;
+    char pr_fname[16 + 1];		/* Filename of executable.  */
+    char pr_psargs[80 + 1];		/* Initial part of arg list.  */
+  };
+
 
 extern void _bfd_elf_swap_verdef_in
   (bfd *, const Elf_External_Verdef *, Elf_Internal_Verdef *);
@@ -2243,7 +2267,7 @@ extern Elf_Internal_Phdr * _bfd_elf_find_segment_containing_section
 extern char *elfcore_write_note
   (bfd *, char *, int *, const char *, int, const void *, int);
 extern char *elfcore_write_prpsinfo
-  (bfd *, char *, int *, const char *, const char *);
+  (bfd *, char *, int *, const struct elf_internal_prpsinfo *);
 extern char *elfcore_write_prstatus
   (bfd *, char *, int *, long, int, const void *);
 extern char * elfcore_write_pstatus

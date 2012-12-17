@@ -30,6 +30,7 @@
 #include "elf-nacl.h"
 #include "elf-vxworks.h"
 #include "elf/arm.h"
+#include "elf-psinfo.h"
 
 /* Return the relocation section associated with NAME.  HTAB is the
    bfd's elf32_arm_link_hash_entry.  */
@@ -2004,17 +2005,19 @@ elf32_arm_nabi_write_core_note (bfd *abfd, char *buf, int *bufsiz,
 
     case NT_PRPSINFO:
       {
-	char data[124];
+	const struct elf_internal_prpsinfo *prpsinfo;
+	struct elf_external_prpsinfo32 data;
 	va_list ap;
 
 	va_start (ap, note_type);
-	memset (data, 0, sizeof (data));
-	strncpy (data + 28, va_arg (ap, const char *), 16);
-	strncpy (data + 44, va_arg (ap, const char *), 80);
+	prpsinfo = va_arg (ap, const struct elf_internal_prpsinfo *);
 	va_end (ap);
 
+	memset (&data, 0, sizeof (data));
+	PRPSINFO32_SWAP_FIELDS (abfd, prpsinfo, data);
+
 	return elfcore_write_note (abfd, buf, bufsiz,
-				   "CORE", note_type, data, sizeof (data));
+				   "CORE", note_type, &data, sizeof (data));
       }
 
     case NT_PRSTATUS:

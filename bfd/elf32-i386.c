@@ -31,6 +31,10 @@
 #include "objalloc.h"
 #include "hashtab.h"
 #include "dwarf2.h"
+#include "elf-bfd.h"
+#include "elf-psinfo.h"
+
+#include <stdarg.h>
 
 /* 386 uses REL relocations instead of RELA.  */
 #define USE_REL	1
@@ -500,6 +504,38 @@ elf_i386_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
 
   return TRUE;
 }
+
+static char *
+elf_i386_write_core_note (bfd *abfd, char *buf, int *bufsiz,
+			  int note_type, ...)
+{
+  va_list ap;
+
+  switch (note_type)
+    {
+    default:
+      return NULL;
+
+    case NT_PRPSINFO:
+	{
+	  const struct elf_internal_prpsinfo *prpsinfo;
+	  struct elf_external_prpsinfo32 data;
+
+	  va_start (ap, note_type);
+	  prpsinfo = va_arg (ap, const struct elf_internal_prpsinfo *);
+	  va_end (ap);
+
+	  memset (&data, 0, sizeof (data));
+	  PRPSINFO32_SWAP_FIELDS (abfd, prpsinfo, data);
+
+	  return elfcore_write_note (abfd, buf, bufsiz, "CORE", note_type,
+				     &data, sizeof (data));
+	}
+      /* NOTREACHED */
+    }
+  /* NOTREACHED */
+}
+
 
 /* Functions for the i386 ELF linker.
 
@@ -5043,6 +5079,7 @@ elf_i386_add_symbol_hook (bfd * abfd,
 #define elf_backend_gc_sweep_hook	      elf_i386_gc_sweep_hook
 #define elf_backend_grok_prstatus	      elf_i386_grok_prstatus
 #define elf_backend_grok_psinfo		      elf_i386_grok_psinfo
+#define elf_backend_write_core_note	      elf_i386_write_core_note
 #define elf_backend_reloc_type_class	      elf_i386_reloc_type_class
 #define elf_backend_relocate_section	      elf_i386_relocate_section
 #define elf_backend_size_dynamic_sections     elf_i386_size_dynamic_sections

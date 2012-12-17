@@ -37,6 +37,7 @@
 #include "elf32-ppc.h"
 #include "elf-vxworks.h"
 #include "dwarf2.h"
+#include "elf-psinfo.h"
 
 typedef enum split16_format_type
 {
@@ -1777,6 +1778,62 @@ static reloc_howto_type ppc_elf_howto_raw[] = {
 	 0xffff,		/* dst_mask */
 	 FALSE),		/* pcrel_offset */
 };
+
+/* External 32-bit PPC structure for PRPSINFO.  This structure is ABI-defined,
+   thus we choose to use char arrays here in order to avoid dealing with
+   different types in different architectures.
+
+   The reason why we have a different structure only for PPC is because
+   on this architecture the size of 32-bit structure changes.  This is
+   due to the different sizes of `pr_uid' and `pr_gid', which on non-PPC
+   architectures are declared as `short int' and on PPC architectures are
+   declared as `int'.
+
+   This structure will ultimately be written in the corefile's note section,
+   as the PRPSINFO.  */
+
+struct elf_external_ppc_prpsinfo32
+  {
+    char pr_state;			/* Numeric process state.  */
+    char pr_sname;			/* Char for pr_state.  */
+    char pr_zomb;			/* Zombie.  */
+    char pr_nice;			/* Nice val.  */
+    char pr_flag[4];			/* Flags.  */
+    char pr_uid[4];
+    char pr_gid[4];
+    char pr_pid[4];
+    char pr_ppid[4];
+    char pr_pgrp[4];
+    char pr_sid[4];
+    /* Lots missing */
+    char pr_fname[16];			/* Filename of executable.  */
+    char pr_psargs[80];			/* Initial part of arg list.  */
+  };
+
+/* Helper macro to swap (properly handling endianess) things from the
+   `elf_internal_prpsinfo' structure to the `elf_external_ppc_prpsinfo32'
+   structure.
+
+   Note that FROM should be a pointer, and TO should be the explicit type.  */
+
+#define PRPSINFO32_PPC_SWAP_FIELDS(abfd, from, to) \
+  do \
+    { \
+      H_PUT_8 (abfd, from->pr_state, &to.pr_state); \
+      H_PUT_8 (abfd, from->pr_sname, &to.pr_sname); \
+      H_PUT_8 (abfd, from->pr_zomb, &to.pr_zomb); \
+      H_PUT_8 (abfd, from->pr_nice, &to.pr_nice); \
+      H_PUT_32 (abfd, from->pr_flag, to.pr_flag); \
+      H_PUT_32 (abfd, from->pr_uid, to.pr_uid); \
+      H_PUT_32 (abfd, from->pr_gid, to.pr_gid); \
+      H_PUT_32 (abfd, from->pr_pid, to.pr_pid); \
+      H_PUT_32 (abfd, from->pr_ppid, to.pr_ppid); \
+      H_PUT_32 (abfd, from->pr_pgrp, to.pr_pgrp); \
+      H_PUT_32 (abfd, from->pr_sid, to.pr_sid); \
+      strncpy (to.pr_fname, from->pr_fname, sizeof (to.pr_fname)); \
+      strncpy (to.pr_psargs, from->pr_psargs, sizeof (to.pr_psargs)); \
+    } while (0)
+
 
 /* Initialize the ppc_elf_howto_table, so that linear accesses can be done.  */
 
@@ -2222,16 +2279,19 @@ ppc_elf_write_core_note (bfd *abfd, char *buf, int *bufsiz, int note_type, ...)
 
     case NT_PRPSINFO:
       {
-	char data[128];
+	const struct elf_internal_prpsinfo *prpsinfo;
+	struct elf_external_ppc_prpsinfo32 data;
 	va_list ap;
 
 	va_start (ap, note_type);
-	memset (data, 0, sizeof (data));
-	strncpy (data + 32, va_arg (ap, const char *), 16);
-	strncpy (data + 48, va_arg (ap, const char *), 80);
+	prpsinfo = va_arg (ap, const struct elf_internal_prpsinfo *);
 	va_end (ap);
+
+	memset (&data, 0, sizeof (data));
+	PRPSINFO32_PPC_SWAP_FIELDS (abfd, prpsinfo, data);
+
 	return elfcore_write_note (abfd, buf, bufsiz,
-				   "CORE", note_type, data, sizeof (data));
+				   "CORE", note_type, &data, sizeof (data));
       }
 
     case NT_PRSTATUS:

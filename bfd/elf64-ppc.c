@@ -34,6 +34,7 @@
 #include "elf-bfd.h"
 #include "elf/ppc64.h"
 #include "elf64-ppc.h"
+#include "elf-psinfo.h"
 #include "dwarf2.h"
 
 static bfd_reloc_status_type ppc64_elf_ha_reloc
@@ -2718,16 +2719,19 @@ ppc64_elf_write_core_note (bfd *abfd, char *buf, int *bufsiz, int note_type,
 
     case NT_PRPSINFO:
       {
-	char data[136];
+	const struct elf_internal_prpsinfo *prpsinfo;
+	struct elf_external_prpsinfo64 data;
 	va_list ap;
 
 	va_start (ap, note_type);
-	memset (data, 0, sizeof (data));
-	strncpy (data + 40, va_arg (ap, const char *), 16);
-	strncpy (data + 56, va_arg (ap, const char *), 80);
+	prpsinfo = va_arg (ap, const struct elf_internal_prpsinfo *);
 	va_end (ap);
+
+	memset (&data, 0, sizeof (data));
+	PRPSINFO64_SWAP_FIELDS (abfd, prpsinfo, data);
+
 	return elfcore_write_note (abfd, buf, bufsiz,
-				   "CORE", note_type, data, sizeof (data));
+				   "CORE", note_type, &data, sizeof (data));
       }
 
     case NT_PRSTATUS:

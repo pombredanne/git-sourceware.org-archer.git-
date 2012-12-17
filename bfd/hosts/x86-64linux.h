@@ -43,11 +43,6 @@ typedef unsigned long long int uint64_t;
 /* Unsigned 64-bit integer aligned to 8 bytes.  */
 typedef uint64_t __attribute__ ((__aligned__ (8))) a8_uint64_t;
 
-#undef HAVE_PRPSINFO32_T
-#define HAVE_PRPSINFO32_T
-#undef HAVE_PRPSINFO32_T_PR_PID
-#define HAVE_PRPSINFO32_T_PR_PID
-
 #undef HAVE_PRSTATUS32_T
 #define HAVE_PRSTATUS32_T
 
@@ -191,36 +186,6 @@ struct elf_prstatus64
     int pr_fpvalid;			/* True if math copro being used.  */
   };
 
-struct elf_prpsinfo32
-  {
-    char pr_state;			/* Numeric process state.  */
-    char pr_sname;			/* Char for pr_state.  */
-    char pr_zomb;			/* Zombie.  */
-    char pr_nice;			/* Nice val.  */
-    unsigned int pr_flag;		/* Flags.  */
-    unsigned short int pr_uid;
-    unsigned short int pr_gid;
-    int pr_pid, pr_ppid, pr_pgrp, pr_sid;
-    /* Lots missing */
-    char pr_fname[16];			/* Filename of executable.  */
-    char pr_psargs[ELF_PRARGSZ];	/* Initial part of arg list.  */
-  };
-
-struct elf_prpsinfo64
-  {
-    char pr_state;			/* Numeric process state.  */
-    char pr_sname;			/* Char for pr_state.  */
-    char pr_zomb;			/* Zombie.  */
-    char pr_nice;			/* Nice val.  */
-    a8_uint64_t pr_flag;		/* Flags.  */
-    unsigned int pr_uid;
-    unsigned int pr_gid;
-    int pr_pid, pr_ppid, pr_pgrp, pr_sid;
-    /* Lots missing */
-    char pr_fname[16];			/* Filename of executable.  */
-    char pr_psargs[ELF_PRARGSZ];	/* Initial part of arg list.  */
-  };
-
 /* The rest of this file provides the types for emulation of the
    Solaris <proc_service.h> interfaces that should be implemented by
    users of libthread_db.  */
@@ -229,5 +194,3 @@ struct elf_prpsinfo64
 typedef struct elf_prstatus32 prstatus32_t;
 typedef struct elf_prstatusx32 prstatusx32_t;
 typedef struct elf_prstatus64 prstatus64_t;
-typedef struct elf_prpsinfo32 prpsinfo32_t;
-typedef struct elf_prpsinfo64 prpsinfo64_t;
