@@ -1129,21 +1129,14 @@ symtab_to_fullname (struct symtab *s)
 const char *
 symtab_to_filename (struct symtab *symtab)
 {
-  const char *filename = symtab->filename;
-
-  if (filename == NULL)
-    return NULL;
-  else if (filename_display_string == filename_display_basename)
-    return lbasename (filename);
+  if (filename_display_string == filename_display_basename)
+    return lbasename (symtab->filename);
   else if (filename_display_string == filename_display_absolute)
-    {
-      const char *retval = symtab_to_fullname (symtab);
-
-      if (retval != NULL)
-	return retval;
-    }
-
-  return filename;
+    return symtab_to_fullname (symtab);
+  else if (filename_display_string == filename_display_relative)
+    return symtab->filename;
+  else
+    internal_error (__FILE__, __LINE__, _("invalid filename_display_string"));
 }
 
 /* Create and initialize the table S->line_charpos that records
