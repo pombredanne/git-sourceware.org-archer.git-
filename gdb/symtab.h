@@ -817,7 +817,7 @@ struct symtab
 
   /* Name of this source file.  This pointer is never NULL.  */
 
-  char *filename;
+  char *filenamex;
 
   /* Directory in which it was compiled, or NULL if we don't know.  */
 

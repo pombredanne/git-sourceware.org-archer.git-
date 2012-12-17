@@ -59,7 +59,7 @@ tui_display_main (void)
 	  tui_update_source_windows_with_addr (gdbarch, addr);
 	  sal = find_pc_line (addr, 0);
           if (sal.symtab)
-             tui_update_locator_filename (sal.symtab->filename);
+             tui_update_locator_filename (symtab_to_filename (sal.symtab));
           else
              tui_update_locator_filename ("??");
 	}
@@ -462,7 +462,7 @@ tui_update_breakpoint_info (struct tui_win_info *win,
 	  for (loc = bp->loc; loc != NULL; loc = loc->next)
 	    {
 	      if ((win == TUI_SRC_WIN
-		   && loc->source_file
+		   && loc->source_fullname
 		   && (filename_cmp (src->filename, loc->source_file) == 0)
 		   && line->line_or_addr.loa == LOA_LINE
 		   && loc->line_number == line->line_or_addr.u.line_no)
