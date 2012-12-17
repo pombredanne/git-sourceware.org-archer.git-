@@ -1180,7 +1180,7 @@ print_frame (struct frame_info *frame, int print_level,
   ui_out_text (uiout, ")");
   if (sal.symtab && sal.symtab->filename)
     {
-      const char *filename_display = get_filename_display_from_sal (&sal);
+      const char *filename_display = symtab_to_filename (sal.symtab);
 
       annotate_frame_source_begin ();
       ui_out_wrap_hint (uiout, "   ");
