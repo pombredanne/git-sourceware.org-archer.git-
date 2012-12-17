@@ -1132,7 +1132,7 @@ symtab_to_fullname (struct symtab *s)
 const char *
 symtab_to_filename (struct symtab *symtab)
 {
-  const char *filename = symtab->filenamex;
+  const char *filename = symtab->filename;
 
   if (filename == NULL)
     return NULL;
