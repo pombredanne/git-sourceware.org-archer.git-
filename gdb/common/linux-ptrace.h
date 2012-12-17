@@ -67,6 +67,10 @@ struct buffer;
 #define __WALL          0x40000000 /* Wait for any child.  */
 #endif
 
+#ifndef __WCLONE
+#define __WCLONE        0x80000000 /* Wait for cloned process.  */
+#endif
+
 extern void linux_ptrace_attach_warnings (pid_t pid, struct buffer *buffer);
 extern void linux_ptrace_init_warnings (void);
 
