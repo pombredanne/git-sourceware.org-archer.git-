@@ -1100,7 +1100,7 @@ symtab_to_fullname (struct symtab *s)
 	s->fullname = concat (s->dirname, SLASH_STRING, s->filename, NULL);
     } 
 
-  return NULL;
+  return s->fullname;
 }
 
 /* Create and initialize the table S->line_charpos that records
