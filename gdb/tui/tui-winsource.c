@@ -461,14 +461,26 @@ tui_update_breakpoint_info (struct tui_win_info *win,
 
 	  for (loc = bp->loc; loc != NULL; loc = loc->next)
 	    {
-	      if ((win == TUI_SRC_WIN
-		   && loc->source_file
-		   && (filename_cmp (src->filename, loc->source_file) == 0)
-		   && line->line_or_addr.loa == LOA_LINE
-		   && loc->line_number == line->line_or_addr.u.line_no)
-		  || (win == TUI_DISASM_WIN
-		      && line->line_or_addr.loa == LOA_ADDRESS
-		      && loc->address == line->line_or_addr.u.addr))
+	      int match = 0;
+
+	      if (win == TUI_SRC_WIN && line->line_or_addr.loa == LOA_LINE)
+		{
+		  struct symtab_and_line loc_sal;
+
+		  loc_sal = find_pc_sect_line (loc->address, loc->section, 0);
+		  if (loc_sal.symtab != NULL
+		      && filename_cmp (src->filename,
+				       loc_sal.symtab->filename) == 0
+		      && loc_sal.line
+		      && loc_sal.line == line->line_or_addr.u.line_no)
+		    match = 1;
+		}
+	      if (win == TUI_DISASM_WIN
+		  && line->line_or_addr.loa == LOA_ADDRESS
+		  && loc->address == line->line_or_addr.u.addr)
+		match = 1;
+
+	      if (match)
 		{
 		  if (bp->enable_state == bp_disabled)
 		    mode |= TUI_BP_DISABLED;
