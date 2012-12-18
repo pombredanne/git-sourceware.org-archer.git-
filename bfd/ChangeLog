@@ -1,6 +1,48 @@
+2012-12-18  Alan Modra  <amodra@gmail.com>
+
+	* elf.c (swap_out_syms): Set shndx to SHN_ABS when not one of
+	the special MAP_* values.
+
+2012-12-17  Roland McGrath  <mcgrathr@google.com>
+	    Alan Modra  <amodra@gmail.com>
+
+	* elf32-arm.c (elf32_arm_size_stubs): Skip input BFDs that are
+	not ARM ELF.
+
+2012-12-17  Nick Clifton  <nickc@redhat.com>
+
+	* MAINTAINERS: Add copyright notice.
+	* Makefile.am: Likewise.
+	* PORTING: Likewise.
+	* README: Likewise.
+	* TODO: Likewise.
+	* acinclude.m4: Likewise.
+	* bfd.m4: Likewise.
+	* config.bfd: Likewise.
+	* configure.com: Likewise.
+	* configure.host: Likewise.
+	* configure.in: Likewise.
+	* makefile.vms: Likewise.
+	* warning.m4: Likewise.
+	* elf64-hppa.c: Fix copyright notice.
+	* Makefile.in: Regenerate.
+
+2012-12-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_check_relocs): Don't check IFUNC
+	relocations here.
+	* elf64-x86-64.c (elf_x86_64_check_relocs): Likewise.
+
+2012-12-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/14968
+	* elf32-i386.c (elf_i386_adjust_dynamic_symbol): Also check
+	local IFUNC references.
+	* elf64-x86-64.c (elf_x86_64_adjust_dynamic_symbol): Likewise.
+
 2012-12-14  Tom Tromey  <tromey@redhat.com>
 
-        * elf.c (elfcore_grok_note) <NT_FILE>: New case.
+	* elf.c (elfcore_grok_note) <NT_FILE>: New case.
 
 2012-12-13  H.J. Lu  <hongjiu.lu@intel.com>
 
