@@ -464,14 +464,6 @@ struct bp_location
      This variable keeps a number of events still to go, when
      it becomes 0 this location is retired.  */
   int events_till_retirement;
-
-  /* Line number of this address.  */
-
-  int line_number;
-
-  /* Source file name of this address, as absolute filename.  */
-
-  char *source_fullname;
 };
 
 /* This structure is a collection of function pointers that, if available,

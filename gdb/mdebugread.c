@@ -59,6 +59,7 @@
 #include "gdb_stat.h"
 #include "gdb_string.h"
 #include "psympriv.h"
+#include "source.h"
 
 #include "bfd.h"
 

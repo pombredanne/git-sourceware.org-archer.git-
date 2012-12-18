@@ -461,11 +461,19 @@ tui_update_breakpoint_info (struct tui_win_info *win,
 
 	  for (loc = bp->loc; loc != NULL; loc = loc->next)
 	    {
+	      struct symtab_and_line loc_sal;
+	      const char *loc_fullname;
+
+	      loc_sal = find_pc_sect_line (loc->address, loc->section, 0);
+	      if (loc_sal.symtab == NULL)
+		continue;
+	      loc_fullname = symtab_to_fullname (loc_sal.symtab);
+	      
 	      if ((win == TUI_SRC_WIN
-		   && loc->source_fullname
-		   && (filename_cmp (src->fullnamex, loc->source_fullname) == 0)
+		   && filename_cmp (src->fullnamex, loc_fullname) == 0
 		   && line->line_or_addr.loa == LOA_LINE
-		   && loc->line_number == line->line_or_addr.u.line_no)
+		   && loc_sal.line
+		   && loc_sal.line == line->line_or_addr.u.line_no)
 		  || (win == TUI_DISASM_WIN
 		      && line->line_or_addr.loa == LOA_ADDRESS
 		      && loc->address == line->line_or_addr.u.addr))

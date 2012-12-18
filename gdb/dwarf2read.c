@@ -67,6 +67,7 @@
 #include <ctype.h>
 #include "gdb_bfd.h"
 #include "f-lang.h"
+#include "source.h"
 
 #include <fcntl.h>
 #include "gdb_string.h"
