@@ -284,7 +284,7 @@ select_source_symtab (struct symtab *s)
     {
       for (s = ofp->symtabs; s; s = s->next)
 	{
-	  const char *name = s->filenamex;
+	  const char *name = s->filename;
 	  int len = strlen (name);
 
 	  if (!(len > 2 && (strcmp (&name[len - 2], ".h") == 0
@@ -634,7 +634,7 @@ source_info (char *ignore, int from_tty)
       printf_filtered (_("No current source file.\n"));
       return;
     }
-  printf_filtered (_("Current source file is %s\n"), s->filenamex);
+  printf_filtered (_("Current source file is %s\n"), s->filename);
   if (s->dirname)
     printf_filtered (_("Compilation directory is %s\n"), s->dirname);
   if (s->fullname)
@@ -1091,7 +1091,7 @@ open_source_file (struct symtab *s)
   if (!s)
     return -1;
 
-  return find_and_open_source (s->filenamex, s->dirname, &s->fullname);
+  return find_and_open_source (s->filename, s->dirname, &s->fullname);
 }
 
 /* Finds the fullname that a symtab represents.
@@ -1111,14 +1111,14 @@ symtab_to_fullname (struct symtab *s)
      to handle cases like the file being moved.  */
   if (s->fullname == NULL)
     {
-      int fd = find_and_open_source (s->filenamex, s->dirname, &s->fullname);
+      int fd = find_and_open_source (s->filename, s->dirname, &s->fullname);
 
       if (fd >= 0)
 	close (fd);
       else if (s->dirname == NULL)
-	s->fullname = xstrdup (s->filenamex);
+	s->fullname = xstrdup (s->filename);
       else
-	s->fullname = concat (s->dirname, SLASH_STRING, s->filenamex, NULL);
+	s->fullname = concat (s->dirname, SLASH_STRING, s->filename, NULL);
     } 
 
   return s->fullname;
@@ -1130,11 +1130,11 @@ const char *
 symtab_to_filename (struct symtab *symtab)
 {
   if (filename_display_string == filename_display_basename)
-    return lbasename (symtab->filenamex);
+    return lbasename (symtab->filename);
   else if (filename_display_string == filename_display_absolute)
     return symtab_to_fullname (symtab);
   else if (filename_display_string == filename_display_relative)
-    return symtab->filenamex;
+    return symtab->filename;
   else
     internal_error (__FILE__, __LINE__, _("invalid filename_display_string"));
 }

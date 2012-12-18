@@ -11112,7 +11112,7 @@ is_known_support_routine (struct frame_info *frame)
   for (i = 0; known_runtime_file_name_patterns[i] != NULL; i += 1)
     {
       re_comp (known_runtime_file_name_patterns[i]);
-      if (re_exec (lbasename (sal.symtab->filenamex)))
+      if (re_exec (lbasename (sal.symtab->filename)))
         return 1;
       if (sal.symtab->objfile != NULL
           && re_exec (sal.symtab->objfile->name))

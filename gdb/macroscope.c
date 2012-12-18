@@ -48,7 +48,7 @@ sal_macro_scope (struct symtab_and_line sal)
   ms = (struct macro_scope *) xmalloc (sizeof (*ms));
 
   main_file = macro_main (sal.symtab->macro_table);
-  inclusion = macro_lookup_inclusion (main_file, sal.symtab->filenamex);
+  inclusion = macro_lookup_inclusion (main_file, sal.symtab->filename);
 
   if (inclusion)
     {
@@ -77,7 +77,7 @@ sal_macro_scope (struct symtab_and_line sal)
       complaint (&symfile_complaints,
                  _("symtab found for `%s', but that file\n"
                  "is not covered in the compilation unit's macro information"),
-                 sal.symtab->filenamex);
+                 sal.symtab->filename);
     }
 
   return ms;

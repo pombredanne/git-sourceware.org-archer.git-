@@ -1483,7 +1483,7 @@ compare_symtabs (const void *a, const void *b)
 	return r;
     }
 
-  r = filename_cmp (sala->symtab->filenamex, salb->symtab->filenamex);
+  r = filename_cmp (sala->symtab->filename, salb->symtab->filename);
   if (r)
     return r;
 

@@ -186,7 +186,7 @@ dump_objfile (struct objfile *objfile)
 	   symtab != NULL;
 	   symtab = symtab->next)
 	{
-	  printf_filtered ("%s at ", symtab->filenamex);
+	  printf_filtered ("%s at ", symtab->filename);
 	  gdb_print_host_address (symtab, gdb_stdout);
 	  printf_filtered (", ");
 	  if (symtab->objfile != objfile)
@@ -295,7 +295,7 @@ dump_symtab_1 (struct objfile *objfile, struct symtab *symtab,
   struct block *b;
   int depth;
 
-  fprintf_filtered (outfile, "\nSymtab for file %s\n", symtab->filenamex);
+  fprintf_filtered (outfile, "\nSymtab for file %s\n", symtab->filename);
   if (symtab->dirname)
     fprintf_filtered (outfile, "Compilation directory is %s\n",
 		      symtab->dirname);
@@ -736,7 +736,7 @@ maintenance_info_symtabs (char *regexp, int from_tty)
 		  printed_objfile_start = 1;
 		}
 
-	      printf_filtered ("	{ symtab %s ", symtab->filenamex);
+	      printf_filtered ("	{ symtab %s ", symtab->filename);
 	      wrap_here ("    ");
 	      printf_filtered ("((struct symtab *) %s)\n", 
 			       host_address_to_string (symtab));

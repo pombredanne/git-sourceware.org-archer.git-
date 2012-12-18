@@ -3377,7 +3377,7 @@ dw2_find_symbol_file (struct objfile *objfile, const char *name)
 	  if (sym)
 	    {
 	      /* Only file extension of returned filename is recognized.  */
-	      return SYMBOL_SYMTAB (sym)->filenamex;
+	      return SYMBOL_SYMTAB (sym)->filename;
 	    }
 	}
       return NULL;
@@ -3397,7 +3397,7 @@ dw2_find_symbol_file (struct objfile *objfile, const char *name)
   if (per_cu->v.quick->symtab != NULL)
     {
       /* Only file extension of returned filename is recognized.  */
-      return per_cu->v.quick->symtab->filenamex;
+      return per_cu->v.quick->symtab->filename;
     }
 
   init_cutu_and_read_dies (per_cu, NULL, 0, 0,

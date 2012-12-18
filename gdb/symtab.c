@@ -196,7 +196,7 @@ iterate_over_some_symtabs (const char *name,
 
   for (s = first; s != NULL && s != after_last; s = s->next)
     {
-      if (compare_filenames_for_search (s->filenamex, name))
+      if (compare_filenames_for_search (s->filename, name))
 	{
 	  if (callback (s, data))
 	    return 1;
@@ -205,7 +205,7 @@ iterate_over_some_symtabs (const char *name,
     /* Before we invoke realpath, which can get expensive when many
        files are involved, do a quick comparison of the basenames.  */
     if (! basenames_may_differ
-	&& FILENAME_CMP (base_name, lbasename (s->filenamex)) != 0)
+	&& FILENAME_CMP (base_name, lbasename (s->filename)) != 0)
       continue;
 
     /* If the user gave us an absolute path, try to find the file in
@@ -2535,7 +2535,7 @@ find_line_symtab (struct symtab *symtab, int line,
       {
 	if (objfile->sf)
 	  objfile->sf->qf->expand_symtabs_with_filename (objfile,
-							 symtab->filenamex);
+							 symtab->filename);
       }
 
       ALL_SYMTABS (objfile, s)
@@ -2543,7 +2543,7 @@ find_line_symtab (struct symtab *symtab, int line,
 	struct linetable *l;
 	int ind;
 
-	if (FILENAME_CMP (symtab->filenamex, s->filenamex) != 0)
+	if (FILENAME_CMP (symtab->filename, s->filename) != 0)
 	  continue;
 	if (FILENAME_CMP (symtab->fullname, symtab_to_fullname (s)) != 0)
 	  continue;	
@@ -4736,7 +4736,7 @@ make_source_files_completion_list (char *text, char *word)
       /* FIXME: gdb_realpath is not used here.  */
       const char *fullname = symtab_to_fullname (s);
 
-      maybe_add_partial_symtab_filename (s->filenamex, fullname, &datum);
+      maybe_add_partial_symtab_filename (s->filename, fullname, &datum);
     }
 
   map_partial_symbol_filenames (maybe_add_partial_symtab_filename, &datum,
