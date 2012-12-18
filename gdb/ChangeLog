@@ -1,3 +1,74 @@
+2012-12-18  Hui Zhu  <hui_zhu@mentor.com>
+
+	* ui-file.c (ui_file): Add to_fseek.
+	(ui_file_new): Call set_ui_file_fseek.
+	(null_file_fseek, ui_file_fseek, set_ui_file_fseek,
+	 stdio_file_fseek): New functions.
+	(stdio_file_new): Call set_ui_file_fseek.
+	* ui-file.h (ui_file_fseek_ftype): New typedef.
+	(set_ui_file_fseek, ui_file_fseek): New externs.
+
+2012-12-18  Hui Zhu  <hui_zhu@mentor.com>
+
+	* ui-file.c (set_ui_file_flush): Change flush to flush_ptr.
+	(set_ui_file_isatty): Change isatty to isatty_ptr.
+	(set_ui_file_rewind): Change rewind to rewind_ptr.
+	(set_ui_file_put): Change put to put_ptr.
+	(set_ui_file_write): Change write to write_ptr.
+	(set_ui_file_write_async_safe): Change write_async_safe to
+	write_async_safe_ptr.
+	(set_ui_file_read): Change read to read_ptr.
+	(set_ui_file_fputs): Change fputs to fputs_ptr.
+	(set_ui_file_data): Change delete to delete_ptr.
+
+2012-12-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* solib-darwin.c (darwin_current_sos): Fix indentation.
+	(darwin_read_exec_load_addr): New function.
+	(darwin_solib_create_inferior_hook): Rebase executable.
+	* objfiles.c (objfile_rebase1, objfile_rebase): New functions.
+	* objfiles.h (objfile_rebase1, objfile_rebase): Add prototypes.
+
+2012-12-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* gnulib/update-gnulib.sh (IMPORTED_GNULIB_MODULES): Add errno.
+	* gnulib/import/errno.in.h: Import.
+	* gnulib/import/m4/errno_h.m4: Import.
+	* gnulib/aclocal.m4: Regenerate.
+	* gnulib/configure: Regenerate.
+	* gnulib/import/Makefile.am: Update.
+	* gnulib/import/Makefile.in: Update.
+	* gnulib/import/m4/gnulib-cache.m4: Update.
+	* gnulib/import/m4/gnulib-comp.m4: Update.
+
+2012-12-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* gnulib/update-gnulib.sh (GNULIB_COMMIT_SHA1): Set to
+	8d5bd1402003bd0153984b138735adf537d960b0.
+	* gnulib/aclocal.m4, configure, config.in: Regenerate.
+	* gnulib/import/m4/extern-inline.m4: Import.
+	* gnulib/import/wctype-h.c: Import.
+	* gnulib/import/Makefile.am: Update.
+	* gnulib/import/Makefile.in: Update.
+	* gnulib/import/alloca.in.h: Update.
+	* gnulib/import/extra/snippet/warn-on-use.h: Update.
+	* gnulib/import/localcharset.c: Update.
+	* gnulib/import/m4/fcntl-o.m4: Update.
+	* gnulib/import/m4/gnulib-cache.m4: Update.
+	* gnulib/import/m4/gnulib-comp.m4: Update.
+	* gnulib/import/m4/wctype_h.m4: Update.
+	* gnulib/import/stdbool.in.h: Update.
+	* gnulib/import/verify.h: Update.
+	* gnulib/import/wctype.in.h: Update.
+
+2012-12-18  Joel Brobecker  <brobecker@adacore.com>
+
+	* gnulib/update-gnulib.sh: Add call to autoheader.
+
+2012-12-17  Tom Tromey  <tromey@redhat.com>
+
+	* top.c (xgdb_verbose): Remove.
+
 2012-12-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Code cleanup.
@@ -974,7 +1045,7 @@
 	* gdb_bfd.c (gdb_bfd_mark_parent): New function.
 	(gdb_bfd_openr_next_archived_file): Use it.
 
-2012-11-28  Markus Metzger <markus.t.metzger@intel.com>
+2012-11-28  Markus Metzger  <markus.t.metzger@intel.com>
 
 	* configure.ac: Check for linux/perf_event.h.
 	* config.in: Regenerated.
@@ -1328,7 +1399,7 @@
 	parameter COUNT, for pattern filling of memory regions.
 	* NEWS: Mention it.
 
-2012-11-13 Markus Metzger <markus.t.metzger@intel.com>
+2012-11-13 Markus Metzger  <markus.t.metzger@intel.com>
 
 	* disasm.h (DISASSEMBLY_FILENAME): New macro.
 	* disasm.c (do_mixed_source_and_assembly): Pass filename flag on
@@ -1338,7 +1409,7 @@
 	* source.c (print_source_lines_base): Prefix source line with
 	filename if PRINT_SOURCE_LINES_FILENAME flag is set.
 
-2012-11-13 Markus Metzger <markus.t.metzger@intel.com>
+2012-11-13 Markus Metzger  <markus.t.metzger@intel.com>
 
 	* symtab.h (print_source_lines_flags): New enum.
 	* source.c (print_source_lines_base): Change noerror to flags.
