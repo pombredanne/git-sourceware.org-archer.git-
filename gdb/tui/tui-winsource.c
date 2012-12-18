@@ -471,7 +471,7 @@ tui_update_breakpoint_info (struct tui_win_info *win,
 		  if (loc_sal.symtab != NULL
 		      && loc_sal.line
 		      && loc_sal.line == line->line_or_addr.u.line_no
-		      && (filename_cmp (src->fullnamex,
+		      && (filename_cmp (src->fullname,
 				        symtab_to_fullname (loc_sal.symtab))
 			  == 0))
 		    match = 1;
