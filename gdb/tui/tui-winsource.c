@@ -59,7 +59,7 @@ tui_display_main (void)
 	  tui_update_source_windows_with_addr (gdbarch, addr);
 	  sal = find_pc_line (addr, 0);
           if (sal.symtab)
-             tui_update_locator_filename (sal.symtab->filename);
+             tui_update_locator_filename (symtab_to_filename (sal.symtab));
           else
              tui_update_locator_filename ("??");
 	}
@@ -469,10 +469,11 @@ tui_update_breakpoint_info (struct tui_win_info *win,
 
 		  loc_sal = find_pc_sect_line (loc->address, loc->section, 0);
 		  if (loc_sal.symtab != NULL
-		      && filename_cmp (src->filename,
-				       loc_sal.symtab->filename) == 0
 		      && loc_sal.line
-		      && loc_sal.line == line->line_or_addr.u.line_no)
+		      && loc_sal.line == line->line_or_addr.u.line_no
+		      && (filename_cmp (src->fullnamex,
+				        symtab_to_fullname (loc_sal.symtab))
+			  == 0))
 		    match = 1;
 		}
 	      if (win == TUI_DISASM_WIN

@@ -5692,7 +5692,7 @@ print_breakpoint_location (struct breakpoint *b,
 	  ui_out_wrap_hint (uiout, wrap_indent_at_field (uiout, "what"));
 	  ui_out_text (uiout, "at ");
 
-	  ui_out_field_string (uiout, "file", symtab->filename);
+	  ui_out_field_string (uiout, "file", symtab_to_filename (symtab));
 	  ui_out_text (uiout, ":");
 	  
 	  if (ui_out_is_mi_like_p (uiout))
@@ -9713,7 +9713,7 @@ resolve_sal_pc (struct symtab_and_line *sal)
     {
       if (!find_line_pc (sal->symtab, sal->line, &pc))
 	error (_("No line %d in file \"%s\"."),
-	       sal->line, sal->symtab->filename);
+	       sal->line, symtab_to_filename (sal->symtab));
       sal->pc = pc;
 
       /* If this SAL corresponds to a breakpoint inserted using a line
@@ -11878,7 +11878,7 @@ clear_command (char *arg, int from_tty)
   make_cleanup (VEC_cleanup (breakpoint_p), &found);
   for (i = 0; i < sals.nelts; i++)
     {
-      int is_abs;
+      const char *sal_fullname;
 
       /* If exact pc given, clear bpts at that pc.
          If line given (pc == 0), clear all bpts on specified line.
@@ -11893,7 +11893,8 @@ clear_command (char *arg, int from_tty)
          1              0             <can't happen> */
 
       sal = sals.sals[i];
-      is_abs = sal.symtab == NULL ? 1 : IS_ABSOLUTE_PATH (sal.symtab->filename);
+      sal_fullname = (sal.symtab == NULL
+		      ? NULL : symtab_to_fullname (sal.symtab));
 
       /* Find all matching breakpoints and add them to 'found'.  */
       ALL_BREAKPOINTS (b)
@@ -11916,7 +11917,7 @@ clear_command (char *arg, int from_tty)
 		  int line_match = 0;
 
 		  if ((default_match || sal.explicit_line)
-		      && sal.symtab != NULL
+		      && sal_fullname != NULL
 		      && sal.pspace == loc->pspace
 		      && sal.line != 0)
 		    {
@@ -11924,17 +11925,10 @@ clear_command (char *arg, int from_tty)
 
 		      loc_sal = find_pc_sect_line (loc->address,
 		                                   loc->section, 0);
-		      if (loc_sal.symtab != NULL && loc_sal.line == sal.line)
-			{
-			  if (filename_cmp (loc_sal.symtab->filename,
-					    sal.symtab->filename) == 0)
-			    line_match = 1;
-			  else if (!IS_ABSOLUTE_PATH (sal.symtab->filename)
-				   && compare_filenames_for_search
-						      (loc_sal.symtab->filename,
-						       sal.symtab->filename))
-			    line_match = 1;
-			}
+		      if (loc_sal.symtab != NULL && loc_sal.line == sal.line
+		          && filename_cmp (symtab_to_fullname (loc_sal.symtab),
+			                   sal_fullname) == 0)
+			line_match = 1;
 		    }
 
 		  if (pc_match || line_match)
@@ -12681,7 +12675,7 @@ say_where (struct breakpoint *b)
 	     more nicely.  */
 	  if (b->loc->next == NULL)
 	    printf_filtered (": file %s, line %d.",
-			     sal.symtab->filename, sal.line);
+			     symtab_to_filename (sal.symtab), sal.line);
 	  else
 	    /* This is not ideal, but each location may have a
 	       different file name, and this at least reflects the
@@ -13871,7 +13865,7 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 				   SYMBOL_PRINT_NAME (sym));
 	      ui_out_text (uiout, " at ");
 	    }
-	  ui_out_field_string (uiout, "file", sal2.symtab->filename);
+	  ui_out_field_string (uiout, "file", symtab_to_filename (sal2.symtab));
 	  ui_out_text (uiout, ":");
 
 	  if (ui_out_is_mi_like_p (uiout))
@@ -13885,7 +13879,8 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 	  ui_out_text (uiout, "\n");
 
 	  xfree (b->addr_string);
-	  b->addr_string = xstrprintf ("%s:%d", sal2.symtab->filename,
+	  b->addr_string = xstrprintf ("%s:%d",
+				       symtab_to_filename (sal2.symtab),
 				       sal2.line);
 
 	  /* Might be nice to check if function changed, and warn if
