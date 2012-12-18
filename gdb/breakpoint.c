@@ -5673,7 +5673,7 @@ print_breakpoint_location (struct breakpoint *b,
 
   if (b->display_canonical)
     ui_out_field_string (uiout, "what", b->addr_string);
-  else if (loc && loc->source_file)
+  else if (loc && loc->source_fullname)
     {
       struct symbol *sym 
 	= find_pc_sect_function (loc->address, loc->section);

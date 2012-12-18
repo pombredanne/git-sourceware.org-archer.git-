@@ -3611,14 +3611,10 @@ search_symbols (char *regexp, enum search_domain kind,
 	ALL_BLOCK_SYMBOLS (b, iter, sym)
 	  {
 	    struct symtab *real_symtab = SYMBOL_SYMTAB (sym);
-	    const char *real_symtab_fullname = symtab_to_fullname (real_symtab);
-
-	    if (real_symtab_fullname == NULL)
-	      real_symtab_fullname = real_symtab->filenamex;
 
 	    QUIT;
 
-	    if (file_matches (real_symtab_fullname, files, nfiles)
+	    if (file_matches (symtab_to_fullname (real_symtab), files, nfiles)
 		&& ((!datum.preg_p
 		     || regexec (&datum.preg, SYMBOL_NATURAL_NAME (sym), 0,
 				 NULL, 0) == 0)
@@ -4740,8 +4736,6 @@ make_source_files_completion_list (char *text, char *word)
       /* FIXME: gdb_realpath is not used here.  */
       const char *fullname = symtab_to_fullname (s);
 
-      if (fullname == NULL)
-	fullname = s->filenamex;
       maybe_add_partial_symtab_filename (s->filenamex, fullname, &datum);
     }
 

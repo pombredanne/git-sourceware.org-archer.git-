@@ -463,7 +463,7 @@ tui_update_breakpoint_info (struct tui_win_info *win,
 	    {
 	      if ((win == TUI_SRC_WIN
 		   && loc->source_fullname
-		   && (filename_cmp (src->filename, loc->source_file) == 0)
+		   && (filename_cmp (src->fullnamex, loc->source_fullname) == 0)
 		   && line->line_or_addr.loa == LOA_LINE
 		   && loc->line_number == line->line_or_addr.u.line_no)
 		  || (win == TUI_DISASM_WIN

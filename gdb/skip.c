@@ -81,8 +81,6 @@ skip_file_command (char *arg, int from_tty)
       if (symtab == NULL)
 	error (_("No default file now."));
       filename = symtab_to_fullname (symtab);
-      if (filename == NULL)
-	filename = symtab->filenamex;
     }
   else
     {
@@ -357,11 +355,7 @@ function_name_is_marked_for_skip (const char *function_name,
 	  if (!searched_for_fullname)
 	    {
 	      if (function_sal->symtab != NULL)
-		{
-		  fullname = symtab_to_fullname (function_sal->symtab);
-		  if (fullname == NULL)
-		    fullname = function_sal->symtab->filenamex;
-		}
+		fullname = symtab_to_fullname (function_sal->symtab);
 	      searched_for_fullname = 1;
 	    }
 	  if (fullname != NULL

@@ -98,15 +98,12 @@ tui_set_source_content (struct symtab *s,
 		    = &TUI_SRC_WIN->detail.source_info;
 		  const char *s_fullname = symtab_to_fullname (s);
 
-		  if (s_fullname == NULL)
-		    s_fullname = s->filename;
-
                   if (TUI_SRC_WIN->generic.title)
                     xfree (TUI_SRC_WIN->generic.title);
                   TUI_SRC_WIN->generic.title = xstrdup (symtab_to_filename (s));
 
-		  xfree (src->fullname);
-                  src->fullname = xstrdup (s_fullname);
+		  xfree (src->fullnamex);
+                  src->fullnamex = xstrdup (s_fullname);
 
 		  /* Determine the threshold for the length of the
                      line and the offset to start the display.  */

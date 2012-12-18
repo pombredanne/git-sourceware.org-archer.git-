@@ -854,22 +854,19 @@ add_sal_to_sals (struct linespec_state *self,
 					sals->nelts * sizeof (char *));
       if (!literal_canonical && sal->symtab)
 	{
-	  const char *filename = symtab_to_fullname (sal->symtab);
-
-	  if (filename == NULL)
-	    filename = sal->symtab->filenamex;
+	  const char *fullname = symtab_to_fullname (sal->symtab);
 
 	  /* Note that the filter doesn't have to be a valid linespec
 	     input.  We only apply the ":LINE" treatment to Ada for
 	     the time being.  */
 	  if (symname != NULL && sal->line != 0
 	      && self->language->la_language == language_ada)
-	    canonical_name = xstrprintf ("%s:%s:%d", filename, symname,
+	    canonical_name = xstrprintf ("%s:%s:%d", fullname, symname,
 					 sal->line);
 	  else if (symname != NULL)
-	    canonical_name = xstrprintf ("%s:%s", filename, symname);
+	    canonical_name = xstrprintf ("%s:%s", fullname, symname);
 	  else
-	    canonical_name = xstrprintf ("%s:%d", filename, sal->line);
+	    canonical_name = xstrprintf ("%s:%d", fullname, sal->line);
 	}
       else if (symname != NULL)
 	canonical_name = xstrdup (symname);
@@ -1732,19 +1729,17 @@ create_sals_line_offset (struct linespec_state *self,
   if (VEC_length (symtab_p, ls->file_symtabs) == 1
       && VEC_index (symtab_p, ls->file_symtabs, 0) == NULL)
     {
-      const char *filename;
+      const char *fullname;
 
       set_current_program_space (self->program_space);
 
       /* Make sure we have at least a default source line.  */
       set_default_source_symtab_and_line ();
       initialize_defaults (&self->default_symtab, &self->default_line);
-      filename = symtab_to_fullname (self->default_symtab);
-      if (filename == NULL)
-	filename = self->default_symtab->filenamex;
+      fullname = symtab_to_fullname (self->default_symtab);
       VEC_pop (symtab_p, ls->file_symtabs);
       VEC_free (symtab_p, ls->file_symtabs);
-      ls->file_symtabs = collect_symtabs_from_filename (filename);
+      ls->file_symtabs = collect_symtabs_from_filename (fullname);
       use_default = 1;
     }
 
@@ -1947,11 +1942,9 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 	/* Make sure we have a filename for canonicalization.  */
 	if (ls->source_filename == NULL)
 	  {
-	    const char *filename = symtab_to_fullname (state->default_symtab);
+	    const char *fullname = symtab_to_fullname (state->default_symtab);
 
-	    if (filename == NULL)
-	      filename = state->default_symtab->filenamex;
-	    ls->source_filename = xstrdup (filename);
+	    ls->source_filename = xstrdup (fullname);
 	  }
     }
   else
