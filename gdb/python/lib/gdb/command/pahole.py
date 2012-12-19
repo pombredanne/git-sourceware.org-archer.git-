@@ -1,6 +1,6 @@
 # pahole command for gdb
 
-# Copyright (C) 2008, 2009 Free Software Foundation, Inc.
+# Copyright (C) 2008, 2009, 2012 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -26,6 +26,11 @@ It prints the type and displays comments showing where holes are."""
         super (Pahole, self).__init__ ("pahole", gdb.COMMAND_NONE,
                                        gdb.COMPLETE_SYMBOL)
 
+    def maybe_print_hole(self, bitpos, field_bitpos):
+        if bitpos != field_bitpos:
+            hole = field_bitpos - bitpos
+            print '  /* XXX %d bit hole, try to pack */' % hole
+
     def pahole (self, type, level, name):
         if name is None:
             name = ''
@@ -41,10 +46,8 @@ It prints the type and displays comments showing where holes are."""
 
             ftype = field.type.strip_typedefs()
 
-            if bitpos != field.bitpos:
-                hole = field.bitpos - bitpos
-                print '  /* XXX %d bit hole, try to pack */' % hole
-                bitpos = field.bitpos
+            self.maybe_print_hole(bitpos, field.bitpos)
+            bitpos = field.bitpos
             if field.bitsize > 0:
                 fieldsize = field.bitsize
             else:
@@ -60,6 +63,9 @@ It prints the type and displays comments showing where holes are."""
             else:
                 print ' ' * (2 + 2 * level),
                 print '%s %s' % (str (ftype), field.name)
+
+        if level == 0:
+            self.maybe_print_hole(bitpos, 8 * type.sizeof)
 
         print ' ' * (14 + 2 * level),
         print '} %s' % name
