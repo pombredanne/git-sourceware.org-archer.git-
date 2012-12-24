@@ -2042,8 +2042,6 @@ Print the rule for substituting FROM in source file names. If FROM\n\
 is not specified, print all substitution rules."),
            &showlist);
 
-  if (annotation_level)
-    filename_display_string = filename_display_absolute;
   add_setshow_enum_cmd ("filename-display", class_obscure,
 			filename_display_kind_names,
 			&filename_display_string, _("\
