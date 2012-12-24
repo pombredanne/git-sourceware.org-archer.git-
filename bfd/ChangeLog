@@ -1,3 +1,34 @@
+2012-12-23  Mike Frysinger  <vapier@gentoo.org>
+
+	* config.bfd (i[3-7]86-*-linux-*): Add x86_64pei_vec to
+	targ64_selvecs.
+
+2012-12-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf64-x86-64.c (elf_x86_64_relocate_section): Check
+	R_X86_64_standard instead of R_X86_64_max for unrecognized
+	relocation.
+
+2012-12-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/14980
+	* elf32-i386.c (elf_i386_adjust_dynamic_symbol): Properly
+	adjust h->plt.refcount.
+	* elf64-x86-64.c (elf_x86_64_adjust_dynamic_symbol): Likewise.
+
+2012-12-19  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_relocate_section): Replace
+	bfd_elf32_swap_reloc_out with elf_append_rel.
+	(elf_i386_finish_dynamic_symbol): Likewise.
+
+	* elflink.c (elf_append_rel): Call swap_reloc_out instead of
+	swap_reloca_out.
+
+2012-12-18  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf32-i386.c (elf_i386_finish_dynamic_symbol): Reindent.
+
 2012-12-18  Edgar E. Iglesias <edgar.iglesias@gmail.com>
 
 	PR ld/14736

@@ -395,7 +395,7 @@ maintenance_info_sections (char *arg, int from_tty)
     }
 }
 
-void
+static void
 maintenance_print_statistics (char *args, int from_tty)
 {
   print_objfile_statistics ();
@@ -821,41 +821,6 @@ For each node in a type chain, print the raw data for each member of\n\
 the type structure, and the interpretation of the data."),
 	   &maintenanceprintlist);
 
-  add_cmd ("symbols", class_maintenance, maintenance_print_symbols, _("\
-Print dump of current symbol definitions.\n\
-Entries in the full symbol table are dumped to file OUTFILE.\n\
-If a SOURCE file is specified, dump only that file's symbols."),
-	   &maintenanceprintlist);
-
-  add_cmd ("msymbols", class_maintenance, maintenance_print_msymbols, _("\
-Print dump of current minimal symbol definitions.\n\
-Entries in the minimal symbol table are dumped to file OUTFILE.\n\
-If a SOURCE file is specified, dump only that file's minimal symbols."),
-	   &maintenanceprintlist);
-
-  add_cmd ("psymbols", class_maintenance, maintenance_print_psymbols, _("\
-Print dump of current partial symbol definitions.\n\
-Entries in the partial symbol table are dumped to file OUTFILE.\n\
-If a SOURCE file is specified, dump only that file's partial symbols."),
-	   &maintenanceprintlist);
-
-  add_cmd ("objfiles", class_maintenance, maintenance_print_objfiles,
-	   _("Print dump of current object file definitions."),
-	   &maintenanceprintlist);
-
-  add_cmd ("symtabs", class_maintenance, maintenance_info_symtabs, _("\
-List the full symbol tables for all object files.\n\
-This does not include information about individual symbols, blocks, or\n\
-linetables --- just the symbol table structures themselves.\n\
-With an argument REGEXP, list the symbol tables whose names that match that."),
-	   &maintenanceinfolist);
-
-  add_cmd ("psymtabs", class_maintenance, maintenance_info_psymtabs, _("\
-List the partial symbol tables for all object files.\n\
-This does not include information about individual partial symbols,\n\
-just the symbol table structures themselves."),
-	   &maintenanceinfolist);
-
   add_cmd ("statistics", class_maintenance, maintenance_print_statistics,
 	   _("Print statistics about internal gdb state."),
 	   &maintenanceprintlist);
@@ -865,10 +830,6 @@ just the symbol table structures themselves."),
 Print the internal architecture configuration.\n\
 Takes an optional file parameter."),
 	   &maintenanceprintlist);
-
-  add_cmd ("check-symtabs", class_maintenance, maintenance_check_symtabs,
-	   _("Check consistency of psymtabs and symtabs."),
-	   &maintenancelist);
 
   add_cmd ("translate-address", class_maintenance,
 	   maintenance_translate_address,
