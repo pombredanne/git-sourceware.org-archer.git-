@@ -15714,18 +15714,6 @@ breakpoint_free_objfile (struct objfile *objfile)
 }
 
 void
-breakpoint_free_objfile (struct objfile *objfile)
-{
-static struct bp_location **bp_location;
-
-  struct bp_location **locp, *loc;
-
-  ALL_BP_LOCATIONS (loc, locp)
-    if (loc->symtab != NULL && loc->symtab->objfile == objfile)
-      loc->symtab = NULL;
-}
-
-void
 initialize_breakpoint_ops (void)
 {
   static int initialized = 0;
