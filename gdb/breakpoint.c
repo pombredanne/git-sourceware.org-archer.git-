@@ -15705,11 +15705,11 @@ pc_at_non_inline_function (struct address_space *aspace, CORE_ADDR pc,
   return 0;
 }
 
+/* Remove any references to OBJFILE which is going to be freed.  */
+
 void
 breakpoint_free_objfile (struct objfile *objfile)
 {
-static struct bp_location **bp_location;
-
   struct bp_location **locp, *loc;
 
   ALL_BP_LOCATIONS (loc, locp)
