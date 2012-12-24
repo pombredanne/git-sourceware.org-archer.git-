@@ -1158,26 +1158,6 @@ extern int find_line_pc_range (struct symtab_and_line, CORE_ADDR *,
 
 extern void resolve_sal_pc (struct symtab_and_line *);
 
-/* Symmisc.c */
-
-void maintenance_print_symbols (char *, int);
-
-void maintenance_print_psymbols (char *, int);
-
-void maintenance_print_msymbols (char *, int);
-
-void maintenance_print_objfiles (char *, int);
-
-void maintenance_info_symtabs (char *, int);
-
-void maintenance_info_psymtabs (char *, int);
-
-void maintenance_check_symtabs (char *, int);
-
-/* maint.c */
-
-void maintenance_print_statistics (char *, int);
-
 /* Symbol-reading stuff in symfile.c and solib.c.  */
 
 extern void clear_solib (void);
