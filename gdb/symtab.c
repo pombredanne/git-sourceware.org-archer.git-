@@ -166,9 +166,7 @@ compare_filenames_for_search (const char *filename, const char *search_name)
      preceding the trailing SEARCH_NAME segment of FILENAME must be a
      directory separator.  */
   return (len == search_len
-	  || IS_DIR_SEPARATOR (filename[len - search_len - 1])
-	  || (HAS_DRIVE_SPEC (filename)
-	      && STRIP_DRIVE_SPEC (filename) == &filename[len - search_len]));
+	  || IS_DIR_SEPARATOR (filename[len - search_len - 1]));
 }
 
 /* Check for a symtab of a specific name by searching some symtabs.
