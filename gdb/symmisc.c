@@ -37,6 +37,7 @@
 #include "dictionary.h"
 #include "typeprint.h"
 #include "gdbcmd.h"
+#include "source.h"
 
 #include "gdb_string.h"
 #include "readline/readline.h"
@@ -444,7 +445,8 @@ maintenance_print_symbols (char *args, int from_tty)
   ALL_SYMTABS (objfile, s)
     {
       QUIT;
-      if (symname == NULL || filename_cmp (symname, s->filename) == 0)
+      if (symname == NULL
+	  || filename_cmp (symname, symtab_to_filename (s)) == 0)
 	dump_symtab (objfile, s, outfile);
     }
   do_cleanups (cleanups);
@@ -724,7 +726,7 @@ maintenance_info_symtabs (char *regexp, int from_tty)
 	  QUIT;
 
 	  if (! regexp
-	      || re_exec (symtab->filename))
+	      || re_exec (symtab_to_filename (symtab)))
 	    {
 	      if (! printed_objfile_start)
 		{

@@ -5686,13 +5686,13 @@ print_breakpoint_location (struct breakpoint *b,
 	  ui_out_wrap_hint (uiout, wrap_indent_at_field (uiout, "what"));
 	  ui_out_text (uiout, "at ");
 	}
-      ui_out_field_string (uiout, "file", loc->symtab->filename);
+      ui_out_field_string (uiout, "file", symtab_to_filename (loc->symtab));
       ui_out_text (uiout, ":");
-      
+
       if (ui_out_is_mi_like_p (uiout))
 	ui_out_field_string (uiout, "fullname",
 			     symtab_to_fullname (loc->symtab));
-      
+
       ui_out_field_int (uiout, "line", loc->line_number);
     }
   else if (loc)
@@ -9706,7 +9706,7 @@ resolve_sal_pc (struct symtab_and_line *sal)
     {
       if (!find_line_pc (sal->symtab, sal->line, &pc))
 	error (_("No line %d in file \"%s\"."),
-	       sal->line, sal->symtab->filename);
+	       sal->line, symtab_to_filename (sal->symtab));
       sal->pc = pc;
 
       /* If this SAL corresponds to a breakpoint inserted using a line
@@ -11869,7 +11869,7 @@ clear_command (char *arg, int from_tty)
   make_cleanup (VEC_cleanup (breakpoint_p), &found);
   for (i = 0; i < sals.nelts; i++)
     {
-      int is_abs;
+      const char *sal_fullname;
 
       /* If exact pc given, clear bpts at that pc.
          If line given (pc == 0), clear all bpts on specified line.
@@ -11884,7 +11884,8 @@ clear_command (char *arg, int from_tty)
          1              0             <can't happen> */
 
       sal = sals.sals[i];
-      is_abs = sal.symtab == NULL ? 1 : IS_ABSOLUTE_PATH (sal.symtab->filename);
+      sal_fullname = (sal.symtab == NULL
+		      ? NULL : symtab_to_fullname (sal.symtab));
 
       /* Find all matching breakpoints and add them to 'found'.  */
       ALL_BREAKPOINTS (b)
@@ -11910,16 +11911,10 @@ clear_command (char *arg, int from_tty)
 		      && loc->symtab != NULL
 		      && sal.symtab != NULL
 		      && sal.pspace == loc->pspace
-		      && loc->line_number == sal.line)
-		    {
-		      if (filename_cmp (loc->symtab->filename,
-					sal.symtab->filename) == 0)
-			line_match = 1;
-		      else if (!IS_ABSOLUTE_PATH (sal.symtab->filename)
-			       && compare_filenames_for_search (loc->symtab->filename,
-								sal.symtab->filename))
-			line_match = 1;
-		    }
+		      && loc->line_number == sal.line
+		      && filename_cmp (symtab_to_fullname (loc->symtab),
+				       symtab_to_fullname (sal.symtab)) == 0)
+		    line_match = 1;
 
 		  if (pc_match || line_match)
 		    {
@@ -12662,7 +12657,8 @@ say_where (struct breakpoint *b)
 	     more nicely.  */
 	  if (b->loc->next == NULL)
 	    printf_filtered (": file %s, line %d.",
-			     b->loc->symtab->filename, b->loc->line_number);
+			     symtab_to_filename (b->loc->symtab),
+			     b->loc->line_number);
 	  else
 	    /* This is not ideal, but each location may have a
 	       different file name, and this at least reflects the
@@ -13852,7 +13848,7 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 				   SYMBOL_PRINT_NAME (sym));
 	      ui_out_text (uiout, " at ");
 	    }
-	  ui_out_field_string (uiout, "file", sal2.symtab->filename);
+	  ui_out_field_string (uiout, "file", symtab_to_filename (sal2.symtab));
 	  ui_out_text (uiout, ":");
 
 	  if (ui_out_is_mi_like_p (uiout))
@@ -13870,7 +13866,7 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 
 	  xfree (b->addr_string);
 	  b->addr_string = xstrprintf ("%s:%d",
-				       b->loc->symtab->filename,
+				       symtab_to_filename (b->loc->symtab),
 				       b->loc->line_number);
 
 	  /* Might be nice to check if function changed, and warn if
@@ -15710,6 +15706,18 @@ pc_at_non_inline_function (struct address_space *aspace, CORE_ADDR pc,
 void
 breakpoint_free_objfile (struct objfile *objfile)
 {
+  struct bp_location **locp, *loc;
+
+  ALL_BP_LOCATIONS (loc, locp)
+    if (loc->symtab != NULL && loc->symtab->objfile == objfile)
+      loc->symtab = NULL;
+}
+
+void
+breakpoint_free_objfile (struct objfile *objfile)
+{
+static struct bp_location **bp_location;
+
   struct bp_location **locp, *loc;
 
   ALL_BP_LOCATIONS (loc, locp)

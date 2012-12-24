@@ -58,7 +58,9 @@ static struct partial_symbol *lookup_partial_symbol (struct objfile *,
 						     const char *, int,
 						     domain_enum);
 
-static char *psymtab_to_fullname (struct partial_symtab *ps);
+static const char *psymtab_to_fullname (struct partial_symtab *ps);
+
+static const char *psymtab_to_realname (struct partial_symtab *ps);
 
 static struct partial_symbol *find_pc_sect_psymbol (struct objfile *,
 						    struct partial_symtab *,
@@ -169,7 +171,6 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 {
   struct partial_symtab *pst;
   const char *name_basename = lbasename (name);
-  int is_abs = IS_ABSOLUTE_PATH (name);
 
   ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, pst)
   {
@@ -182,8 +183,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
     if (pst->anonymous)
       continue;
 
-    if (FILENAME_CMP (name, pst->filename) == 0
-	|| (!is_abs && compare_filenames_for_search (pst->filename, name)))
+    if (compare_filenames_for_search (pst->filename, name))
       {
 	if (partial_map_expand_apply (objfile, name, full_path, real_path,
 				      pst, callback, data))
@@ -202,9 +202,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
       {
 	psymtab_to_fullname (pst);
 	if (pst->fullname != NULL
-	    && (FILENAME_CMP (full_path, pst->fullname) == 0
-		|| (!is_abs && compare_filenames_for_search (pst->fullname,
-							     name))))
+	    && compare_filenames_for_search (pst->fullname, name))
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
@@ -214,16 +212,10 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 
     if (real_path != NULL)
       {
-        char *rp = NULL;
-	psymtab_to_fullname (pst);
-        if (pst->fullname != NULL)
-          {
-            rp = gdb_realpath (pst->fullname);
-            make_cleanup (xfree, rp);
-          }
+        const char *rp = psymtab_to_realname (pst);
+
 	if (rp != NULL
-	    && (FILENAME_CMP (real_path, rp) == 0
-		|| (!is_abs && compare_filenames_for_search (real_path, name))))
+	    && compare_filenames_for_search (real_path, name))
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
@@ -884,6 +876,11 @@ forget_cached_source_info_partial (struct objfile *objfile)
 	  xfree (pst->fullname);
 	  pst->fullname = NULL;
 	}
+      if (pst->realname != NULL)
+	{
+	  xfree (pst->realname);
+	  pst->realname = NULL;
+	}
     }
 }
 
@@ -1189,7 +1186,7 @@ map_symbol_filenames_psymtab (struct objfile *objfile,
    If this function fails to find the file that this partial_symtab represents,
    NULL will be returned and ps->fullname will be set to NULL.  */
 
-static char *
+static const char *
 psymtab_to_fullname (struct partial_symtab *ps)
 {
   int r;
@@ -1214,6 +1211,24 @@ psymtab_to_fullname (struct partial_symtab *ps)
     }
 
   return NULL;
+}
+
+static const char *
+psymtab_to_realname (struct partial_symtab *ps)
+{
+  if (ps == NULL || ps->anonymous)
+    return NULL;
+
+  if (ps->realname == NULL)
+    {
+      const char *fullname = psymtab_to_fullname (ps);
+
+      if (fullname == NULL)
+	return NULL;
+      ps->realname = gdb_realpath (fullname); 
+    }
+
+  return ps->realname;
 }
 
 static const char *
@@ -1410,10 +1425,22 @@ expand_symtabs_matching_via_partial
 
       if (file_matcher)
 	{
+	  const char *fullname;
+
 	  if (ps->anonymous)
 	    continue;
-	  if (! (*file_matcher) (ps->filename, data))
-	    continue;
+
+	  fullname = psymtab_to_fullname (ps);
+	  if (fullname == NULL)
+	    fullname = ps->filename;
+
+	  if (!(*file_matcher) (fullname, data))
+	    {
+	      const char *realname = psymtab_to_realname (ps);
+
+	      if (realname && !(*file_matcher) (realname, data))
+		continue;
+	    }
 	}
 
       if (recursively_search_psymtabs (ps, objfile, kind, name_matcher, data))
@@ -1910,6 +1937,9 @@ maintenance_info_psymtabs (char *regexp, int from_tty)
 	      printf_filtered ("    fullname %s\n",
 			       psymtab->fullname
 			       ? psymtab->fullname : "(null)");
+	      printf_filtered ("    realname %s\n",
+			       psymtab->realname
+			       ? psymtab->realname : "(null)");
 	      printf_filtered ("    text addresses ");
 	      fputs_filtered (paddress (gdbarch, psymtab->textlow),
 			      gdb_stdout);
