@@ -2090,8 +2090,11 @@ elf_x86_64_adjust_dynamic_symbol (struct bfd_link_info *info,
 	  if (pc_count || count)
 	    {
 	      h->needs_plt = 1;
-	      h->plt.refcount += 1;
 	      h->non_got_ref = 1;
+	      if (h->plt.refcount <= 0)
+		h->plt.refcount = 1;
+	      else
+		h->plt.refcount += 1;
 	    }
 	}
 
@@ -3204,8 +3207,11 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 	  || r_type == (int) R_X86_64_GNU_VTENTRY)
 	continue;
 
-      if (r_type >= R_X86_64_max)
+      if (r_type >= (int) R_X86_64_standard)
 	{
+	  (*_bfd_error_handler)
+	    (_("%B: unrecognized relocation (0x%x) in section `%A'"),
+	     input_bfd, input_section, r_type);
 	  bfd_set_error (bfd_error_bad_value);
 	  return FALSE;
 	}
