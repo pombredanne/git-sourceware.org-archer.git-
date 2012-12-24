@@ -3068,7 +3068,6 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 {
   int i;
   const char *name_basename = lbasename (name);
-  int is_abs = IS_ABSOLUTE_PATH (name);
 
   dw2_setup (objfile);
 
@@ -3093,8 +3092,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 	{
 	  const char *this_name = file_data->file_names[j];
 
-	  if (FILENAME_CMP (name, this_name) == 0
-	      || (!is_abs && compare_filenames_for_search (this_name, name)))
+	  if (compare_filenames_for_search (this_name, name))
 	    {
 	      if (dw2_map_expand_apply (objfile, per_cu,
 					name, full_path, real_path,
@@ -3113,11 +3111,9 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 	      const char *this_real_name = dw2_get_real_path (objfile,
 							      file_data, j);
 
+	      gdb_assert (IS_ABSOLUTE_PATH (full_path));
 	      if (this_real_name != NULL
-		  && (FILENAME_CMP (full_path, this_real_name) == 0
-		      || (!is_abs
-			  && compare_filenames_for_search (this_real_name,
-							   name))))
+		  && FILENAME_CMP (full_path, this_real_name) == 0)
 		{
 		  if (dw2_map_expand_apply (objfile, per_cu,
 					    name, full_path, real_path,
@@ -3131,11 +3127,9 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 	      const char *this_real_name = dw2_get_real_path (objfile,
 							      file_data, j);
 
+	      gdb_assert (IS_ABSOLUTE_PATH (real_path));
 	      if (this_real_name != NULL
-		  && (FILENAME_CMP (real_path, this_real_name) == 0
-		      || (!is_abs
-			  && compare_filenames_for_search (this_real_name,
-							   name))))
+		  && FILENAME_CMP (real_path, this_real_name) == 0)
 		{
 		  if (dw2_map_expand_apply (objfile, per_cu,
 					    name, full_path, real_path,

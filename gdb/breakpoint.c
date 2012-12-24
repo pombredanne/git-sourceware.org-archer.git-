@@ -11912,12 +11912,8 @@ clear_command (char *arg, int from_tty)
 		      && sal.pspace == loc->pspace
 		      && loc->line_number == sal.line)
 		    {
-		      if (filename_cmp (loc->symtab->filename,
-					sal.symtab->filename) == 0)
-			line_match = 1;
-		      else if (!IS_ABSOLUTE_PATH (sal.symtab->filename)
-			       && compare_filenames_for_search (loc->symtab->filename,
-								sal.symtab->filename))
+		      if (compare_filenames_for_search (loc->symtab->filename,
+							sal.symtab->filename))
 			line_match = 1;
 		    }
 

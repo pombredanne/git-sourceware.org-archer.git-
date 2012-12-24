@@ -160,8 +160,9 @@ struct quick_symbol_functions
      where the source file is named NAME.
 
      If NAME is not absolute, a match after a '/' in the symbol
-     table's file name will also work.  FULL_PATH is the absolute file
-     name, and REAL_PATH is the same, run through gdb_realpath.
+     table's file name will also work.  FULL_PATH, if non-NULL, is the
+     absolute file name resolved via xfullpath.  REAL_PATH, if non-NULL,
+     is the absolute file name resolved via gdb_realpath.
 
      If a match is found, the "partial" symbol table is expanded.
      Then, this calls iterate_over_some_symtabs (or equivalent) over

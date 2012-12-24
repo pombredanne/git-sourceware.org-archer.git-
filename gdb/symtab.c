@@ -146,8 +146,8 @@ const struct block *block_found;
 
 /* See whether FILENAME matches SEARCH_NAME using the rule that we
    advertise to the user.  (The manual's description of linespecs
-   describes what we advertise).  We assume that SEARCH_NAME is
-   a relative path.  Returns true if they match, false otherwise.  */
+   describes what we advertise).  Returns true if they match, false
+   otherwise.  */
 
 int
 compare_filenames_for_search (const char *filename, const char *search_name)
@@ -166,7 +166,8 @@ compare_filenames_for_search (const char *filename, const char *search_name)
      preceding the trailing SEARCH_NAME segment of FILENAME must be a
      directory separator.  */
   return (len == search_len
-	  || IS_DIR_SEPARATOR (filename[len - search_len - 1]));
+	  || (!IS_ABSOLUTE_PATH (search_name)
+	      && IS_DIR_SEPARATOR (filename[len - search_len - 1])));
 }
 
 /* Check for a symtab of a specific name by searching some symtabs.
@@ -192,18 +193,10 @@ iterate_over_some_symtabs (const char *name,
 {
   struct symtab *s = NULL;
   const char* base_name = lbasename (name);
-  int is_abs = IS_ABSOLUTE_PATH (name);
 
   for (s = first; s != NULL && s != after_last; s = s->next)
     {
-      /* Exact match is always ok.  */
-      if (FILENAME_CMP (name, s->filename) == 0)
-	{
-	  if (callback (s, data))
-	    return 1;
-	}
-
-      if (!is_abs && compare_filenames_for_search (s->filename, name))
+      if (compare_filenames_for_search (s->filename, name))
 	{
 	  if (callback (s, data))
 	    return 1;
@@ -222,17 +215,12 @@ iterate_over_some_symtabs (const char *name,
       {
         const char *fp = symtab_to_fullname (s);
 
+	gdb_assert (IS_ABSOLUTE_PATH (full_path));
         if (FILENAME_CMP (full_path, fp) == 0)
           {
 	    if (callback (s, data))
 	      return 1;
           }
-
-	if (!is_abs && compare_filenames_for_search (fp, name))
-	  {
-	    if (callback (s, data))
-	      return 1;
-	  }
       }
 
     if (real_path != NULL)
@@ -240,14 +228,9 @@ iterate_over_some_symtabs (const char *name,
         const char *fullname = symtab_to_fullname (s);
 	char *rp = gdb_realpath (fullname);
 
+	gdb_assert (IS_ABSOLUTE_PATH (real_path));
 	make_cleanup (xfree, rp);
 	if (FILENAME_CMP (real_path, rp) == 0)
-	  {
-	    if (callback (s, data))
-	      return 1;
-	  }
-
-	if (!is_abs && compare_filenames_for_search (rp, name))
 	  {
 	    if (callback (s, data))
 	      return 1;
