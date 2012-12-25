@@ -1138,7 +1138,7 @@ expand_partial_symbol_tables (struct objfile *objfile)
 }
 
 static void
-read_psymtabs_with_filename (struct objfile *objfile, const char *filename)
+read_psymtabs_with_fullname (struct objfile *objfile, const char *fullname)
 {
   struct partial_symtab *p;
 
@@ -1148,7 +1148,7 @@ read_psymtabs_with_filename (struct objfile *objfile, const char *filename)
       if (p->anonymous)
 	continue;
 
-      if (filename_cmp (filename, p->filename) == 0)
+      if (filename_cmp (fullname, psymtab_to_fullname (p)) == 0)
 	psymtab_to_symtab (objfile, p);
     }
 }
@@ -1474,7 +1474,7 @@ const struct quick_symbol_functions psym_functions =
   relocate_psymtabs,
   read_symtabs_for_function,
   expand_partial_symbol_tables,
-  read_psymtabs_with_filename,
+  read_psymtabs_with_fullname,
   find_symbol_file_from_partial,
   map_matching_symbols_psymtab,
   expand_symtabs_matching_via_partial,

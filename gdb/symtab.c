@@ -196,7 +196,9 @@ iterate_over_some_symtabs (const char *name,
 
   for (s = first; s != NULL && s != after_last; s = s->next)
     {
-      if (compare_filenames_for_search (s->filename, name))
+      const char *fullname = symtab_to_fullname (s);
+
+      if (compare_filenames_for_search (fullname, name))
 	{
 	  if (callback (s, data))
 	    return 1;
@@ -205,7 +207,7 @@ iterate_over_some_symtabs (const char *name,
     /* Before we invoke realpath, which can get expensive when many
        files are involved, do a quick comparison of the basenames.  */
     if (! basenames_may_differ
-	&& FILENAME_CMP (base_name, lbasename (s->filename)) != 0)
+	&& FILENAME_CMP (base_name, lbasename (fullname)) != 0)
       continue;
 
     /* If the user gave us an absolute path, try to find the file in
@@ -213,28 +215,38 @@ iterate_over_some_symtabs (const char *name,
 
     if (full_path != NULL)
       {
-        const char *fp = symtab_to_fullname (s);
+        char *fp = xfullpath (fullname);
+	struct cleanup *cleanups = make_cleanup (xfree, fp);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
-        if (FILENAME_CMP (full_path, fp) == 0)
+        if (FILENAME_CMP (fp, full_path) == 0
+	    || compare_filenames_for_search (fp, name))
           {
 	    if (callback (s, data))
-	      return 1;
+	      {
+		do_cleanups (cleanups);
+		return 1;
+	      }
           }
+	do_cleanups (cleanups);
       }
 
     if (real_path != NULL)
       {
-        const char *fullname = symtab_to_fullname (s);
 	char *rp = gdb_realpath (fullname);
+	struct cleanup *cleanups = make_cleanup (xfree, rp);
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
-	make_cleanup (xfree, rp);
-	if (FILENAME_CMP (real_path, rp) == 0)
+	if (FILENAME_CMP (rp, real_path) == 0
+	    || compare_filenames_for_search (rp, name))
 	  {
 	    if (callback (s, data))
-	      return 1;
+	      {
+		do_cleanups (cleanups);
+		return 1;
+	      }
 	  }
+	do_cleanups (cleanups);
       }
     }
 
@@ -2524,8 +2536,8 @@ find_line_symtab (struct symtab *symtab, int line,
       ALL_OBJFILES (objfile)
       {
 	if (objfile->sf)
-	  objfile->sf->qf->expand_symtabs_with_filename (objfile,
-							 symtab->filename);
+	  objfile->sf->qf->expand_symtabs_with_fullname (objfile,
+						   symtab_to_fullname (symtab));
       }
 
       ALL_SYMTABS (objfile, s)
@@ -2533,8 +2545,6 @@ find_line_symtab (struct symtab *symtab, int line,
 	struct linetable *l;
 	int ind;
 
-	if (FILENAME_CMP (symtab->filename, s->filename) != 0)
-	  continue;
 	if (FILENAME_CMP (symtab->fullname, symtab_to_fullname (s)) != 0)
 	  continue;	
 	l = LINETABLE (s);
@@ -4659,9 +4669,6 @@ maybe_add_partial_symtab_filename (const char *filename, const char *fullname,
   struct cleanup *back_to;
   char *fullname_shortened, *fullname_shortener, *fullname_min;
 
-  if (fullname == NULL)
-    fullname = filename;
-
   if (not_interesting_fname (filename))
     return;
   if (filename_seen (data->filename_seen_cache, fullname, 1))
@@ -4723,10 +4730,18 @@ make_source_files_completion_list (char *text, char *word)
 
   ALL_SYMTABS (objfile, s)
     {
-      /* FIXME: gdb_realpath is not used here.  */
       const char *fullname = symtab_to_fullname (s);
+      char *full_path = xfullpath (fullname);
+      struct cleanup *cleanups = make_cleanup (xfree, full_path);
+      char *real_path = gdb_realpath (fullname);
 
-      maybe_add_partial_symtab_filename (s->filename, fullname, &datum);
+      make_cleanup (xfree, real_path);
+      maybe_add_partial_symtab_filename (s->filename_, fullname, &datum);
+      if (strcmp (fullname, full_path) != 0)
+	maybe_add_partial_symtab_filename (s->filename_, full_path, &datum);
+      if (strcmp (full_path, real_path) != 0)
+	maybe_add_partial_symtab_filename (s->filename_, real_path, &datum);
+      do_cleanups (cleanups);
     }
 
   map_partial_symbol_filenames (maybe_add_partial_symtab_filename, &datum,

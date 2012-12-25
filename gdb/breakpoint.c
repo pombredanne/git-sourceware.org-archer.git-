@@ -11909,11 +11909,11 @@ clear_command (char *arg, int from_tty)
 
 		  if ((default_match || sal.explicit_line)
 		      && loc->symtab != NULL
-		      && sal.symtab != NULL
+		      && sal_fullname != NULL
 		      && sal.pspace == loc->pspace
 		      && loc->line_number == sal.line
-		      && compare_filenames_for_search (loc->symtab->filename,
-						       sal.symtab->filename))
+		      && compare_filenames_for_search
+			       (symtab_to_fullname (loc->symtab), sal_fullname))
 		    line_match = 1;
 
 		  if (pc_match || line_match)

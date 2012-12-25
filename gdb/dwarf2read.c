@@ -3296,8 +3296,8 @@ dw2_expand_all_symtabs (struct objfile *objfile)
 }
 
 static void
-dw2_expand_symtabs_with_filename (struct objfile *objfile,
-				  const char *filename)
+dw2_expand_symtabs_with_fullname (struct objfile *objfile,
+				  const char *fullname)
 {
   int i;
 
@@ -3324,9 +3324,9 @@ dw2_expand_symtabs_with_filename (struct objfile *objfile,
 
       for (j = 0; j < file_data->num_file_names; ++j)
 	{
-	  const char *this_name = file_data->file_names[j];
+	  const char *this_fullname = file_data->file_names[j];
 
-	  if (compare_filenames_for_search (this_name, filename))
+	  if (filename_cmp (this_fullname, fullname) == 0)
 	    {
 	      dw2_instantiate_symtab (per_cu);
 	      break;
@@ -3715,7 +3715,7 @@ const struct quick_symbol_functions dwarf2_gdb_index_functions =
   dw2_relocate,
   dw2_expand_symtabs_for_function,
   dw2_expand_all_symtabs,
-  dw2_expand_symtabs_with_filename,
+  dw2_expand_symtabs_with_fullname,
   dw2_find_symbol_file,
   dw2_map_matching_symbols,
   dw2_expand_symtabs_matching,
