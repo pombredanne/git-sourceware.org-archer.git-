@@ -31088,7 +31088,7 @@ used.
 @item fullname
 Absolute file name of @samp{file}.  It is converted to a canonical form
 using the source file search path
-(@pxref{Source Path, ,Specifying Source Directories}).
+(@pxref{Source Path, ,Specifying Source Directories})
 and after resolving all the symbolic links.
 
 If the source file is not found this field will contain the path as
