@@ -4736,11 +4736,11 @@ make_source_files_completion_list (char *text, char *word)
       char *real_path = gdb_realpath (fullname);
 
       make_cleanup (xfree, real_path);
-      maybe_add_partial_symtab_filename (s->filename_, fullname, &datum);
+      maybe_add_partial_symtab_filename (s->filename, fullname, &datum);
       if (strcmp (fullname, full_path) != 0)
-	maybe_add_partial_symtab_filename (s->filename_, full_path, &datum);
+	maybe_add_partial_symtab_filename (s->filename, full_path, &datum);
       if (strcmp (full_path, real_path) != 0)
-	maybe_add_partial_symtab_filename (s->filename_, real_path, &datum);
+	maybe_add_partial_symtab_filename (s->filename, real_path, &datum);
       do_cleanups (cleanups);
     }
 
