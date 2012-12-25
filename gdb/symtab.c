@@ -207,7 +207,7 @@ iterate_over_some_symtabs (const char *name,
     /* Before we invoke realpath, which can get expensive when many
        files are involved, do a quick comparison of the basenames.  */
     if (! basenames_may_differ
-	&& FILENAME_CMP (base_name, lbasename (fullname)) != 0)
+	&& FILENAME_CMP (base_name, lbasename (s->filename)) != 0)
       continue;
 
     /* If the user gave us an absolute path, try to find the file in
