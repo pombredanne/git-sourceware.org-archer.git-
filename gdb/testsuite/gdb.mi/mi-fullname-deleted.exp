@@ -22,19 +22,20 @@ if [mi_gdb_start] {
 }
 
 standard_testfile
+set srcfileabs [standard_output_file $srcfile]
 
-set f [open ${objdir}/${subdir}/${srcfile} "w"]
+set f [open $srcfileabs "w"]
 puts $f "int main (void) { return 0; }"
 close $f
 
-if { [gdb_compile "${objdir}/${subdir}/${srcfile}" "${binfile}" executable {debug}] != "" } {
+if { [gdb_compile "$srcfileabs" "${binfile}" executable {debug}] != "" } {
     untested $testname
     return -1
 }
 
-file delete -- ${objdir}/${subdir}/${srcfile}
+file delete -- $srcfileabs
 
 mi_gdb_reinitialize_dir $srcdir/$subdir
 mi_gdb_load ${binfile}
 
-mi_gdb_test "-file-list-exec-source-file" ".*\",fullname=\"[string_to_regexp ${objdir}/${subdir}/${srcfile}]\".*" "fullname present"
+mi_gdb_test "-file-list-exec-source-file" ".*\",fullname=\"[string_to_regexp $srcfileabs]\".*" "fullname present"
