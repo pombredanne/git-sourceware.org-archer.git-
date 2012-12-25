@@ -126,7 +126,7 @@ struct macro_source_file
   struct macro_table *table;
 
   /* A source file --- possibly a header file.  */
-  const char *filename;
+  const char *fullname;
 
   /* The location we were #included from, or zero if we are the
      compilation unit's main source file.  */
@@ -173,19 +173,19 @@ struct macro_table *new_macro_table (struct obstack *obstack,
 void free_macro_table (struct macro_table *table);
 
 
-/* Set FILENAME as the main source file of TABLE.  Return a source
+/* Set FULLNAME as the main source file of TABLE.  Return a source
    file structure describing that file; if we record the #definition
-   of macros, or the #inclusion of other files into FILENAME, we'll
+   of macros, or the #inclusion of other files into FULLNAME, we'll
    use that source file structure to indicate the context.
 
    The "main source file" is the one that was given to the compiler;
    all other source files that contributed to the compilation unit are
    #included, directly or indirectly, from this one.
 
-   The macro table makes its own copy of FILENAME; the caller is
-   responsible for freeing FILENAME when it is no longer needed.  */
+   The macro table makes its own copy of FULLNAME; the caller is
+   responsible for freeing FULLNAME when it is no longer needed.  */
 struct macro_source_file *macro_set_main (struct macro_table *table,
-                                          const char *filename);
+                                          const char *fullname);
 
 
 /* Return the main source file of the macro table TABLE.  */
@@ -199,18 +199,19 @@ void macro_allow_redefinitions (struct macro_table *table);
 
 /* Record a #inclusion.
    Record in SOURCE's macro table that, at line number LINE in SOURCE,
-   we #included the file INCLUDED.  Return a source file structure we
-   can use for symbols #defined or files #included into that.  If we've
-   already created a source file structure for this #inclusion, return
-   the same structure we created last time.
+   we #included the file INCLUDED_FULLNAME.  Return a source file
+   structure we can use for symbols #defined or files #included into
+   that.  If we've already created a source file structure for this
+   #inclusion, return the same structure we created last time.
 
    The first line of the source file has a line number of 1, not 0.
 
-   The macro table makes its own copy of INCLUDED; the caller is
-   responsible for freeing INCLUDED when it is no longer needed.  */
+   The macro table makes its own copy of INCLUDED_FULLNAME; the caller
+   is responsible for freeing INCLUDED_FULLNAME when it is no longer
+   needed.  */
 struct macro_source_file *macro_include (struct macro_source_file *source,
                                          int line,
-                                         const char *included);
+                                         const char *included_fullname);
 
 /* Define any special macros, like __FILE__ or __LINE__.  This should
    be called once, on the main source file.  */
