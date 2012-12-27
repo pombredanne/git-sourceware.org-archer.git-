@@ -174,6 +174,8 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 
   ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, pst)
   {
+    const char *fullname;
+
     /* We can skip shared psymtabs here, because any file name will be
        attached to the unshared psymtab.  */
     if (pst->user != NULL)
@@ -183,7 +185,9 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
     if (pst->anonymous)
       continue;
 
-    if (compare_filenames_for_search (pst->filename, name))
+    fullname = psymtab_to_fullname (pst);
+
+    if (compare_filenames_for_search (fullname, name))
       {
 	if (partial_map_expand_apply (objfile, name, full_path, real_path,
 				      pst, callback, data))
@@ -200,29 +204,30 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
        this symtab and use its absolute path.  */
     if (full_path != NULL)
       {
+        char *fp = xfullpath (fullname);
+	struct cleanup *cleanups = make_cleanup (xfree, fp);
+
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
-	psymtab_to_fullname (pst);
-	if (pst->fullname != NULL
-	    && FILENAME_CMP (full_path, pst->fullname) == 0)
+	if (FILENAME_CMP (fp, full_path) == 0
+	    || compare_filenames_for_search (fp, name))
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
-	      return 1;
+	      {
+		do_cleanups (cleanups);
+		return 1;
+	      }
 	  }
+	do_cleanups (cleanups);
       }
 
     if (real_path != NULL)
       {
-        char *rp = NULL;
+	const char *rp = psymtab_to_realname (pst);
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
-	psymtab_to_fullname (pst);
-        if (pst->fullname != NULL)
-          {
-            rp = gdb_realpath (pst->fullname);
-            make_cleanup (xfree, rp);
-          }
-	if (rp != NULL && FILENAME_CMP (real_path, rp) == 0)
+	if (FILENAME_CMP (rp, real_path) == 0
+	    || compare_filenames_for_search (rp, name))
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
@@ -1196,28 +1201,24 @@ map_symbol_filenames_psymtab (struct objfile *objfile,
 static const char *
 psymtab_to_fullname (struct partial_symtab *ps)
 {
-  int r;
-
-  if (!ps)
-    return NULL;
-  if (ps->anonymous)
-    return NULL;
+  gdb_assert (!ps->anonymous);
 
   /* Use cached copy if we have it.
      We rely on forget_cached_source_info being called appropriately
      to handle cases like the file being moved.  */
-  if (ps->fullname)
-    return ps->fullname;
-
-  r = find_and_open_source (ps->filename, ps->dirname, &ps->fullname);
-
-  if (r >= 0)
+  if (ps->fullname == NULL)
     {
-      close (r);
-      return ps->fullname;
-    }
+      int fd = find_and_open_source (ps->filename, ps->dirname, &ps->fullname);
 
-  return NULL;
+      if (fd >= 0)
+	close (fd);
+      else if (ps->dirname == NULL)
+	ps->fullname = xstrdup (ps->filename);
+      else
+	ps->fullname = concat (ps->dirname, SLASH_STRING, ps->filename, NULL);
+    } 
+
+  return ps->fullname;
 }
 
 static const char *
@@ -1227,13 +1228,7 @@ psymtab_to_realname (struct partial_symtab *ps)
     return NULL;
 
   if (ps->realname == NULL)
-    {
-      const char *fullname = psymtab_to_fullname (ps);
-
-      if (fullname == NULL)
-	return NULL;
-      ps->realname = gdb_realpath (fullname); 
-    }
+    ps->realname = gdb_realpath (psymtab_to_fullname (ps)); 
 
   return ps->realname;
 }

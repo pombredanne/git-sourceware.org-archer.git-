@@ -3916,9 +3916,9 @@ rbreak_command (char *regexp, int from_tty)
     {
       if (p->msymbol == NULL)
 	{
-	  const char *filename = symtab_to_filename (p->symtab);
+	  const char *fullname = symtab_to_fullname (p->symtab);
 
-	  int newlen = (strlen (filename)
+	  int newlen = (strlen (fullname)
 			+ strlen (SYMBOL_LINKAGE_NAME (p->symbol))
 			+ 4);
 
@@ -3927,7 +3927,7 @@ rbreak_command (char *regexp, int from_tty)
 	      string = xrealloc (string, newlen);
 	      len = newlen;
 	    }
-	  strcpy (string, filename);
+	  strcpy (string, fullname);
 	  strcat (string, ":'");
 	  strcat (string, SYMBOL_LINKAGE_NAME (p->symbol));
 	  strcat (string, "'");
@@ -3936,7 +3936,7 @@ rbreak_command (char *regexp, int from_tty)
 			     p->symtab,
 			     p->symbol,
 			     p->block,
-			     filename);
+			     symtab_to_filename (p->symtab));
 	}
       else
 	{
