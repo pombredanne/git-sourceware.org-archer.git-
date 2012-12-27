@@ -501,24 +501,8 @@ struct macro_source_file *
 macro_lookup_inclusion (struct macro_source_file *source, const char *name)
 {
   /* Is SOURCE itself named NAME?  */
-  if (filename_cmp (name, source->fullname) == 0)
+  if (filenames_are_same_file (name, source->fullname))
     return source;
-
-  /* The filename in the source structure is probably a full path, but
-     NAME could be just the final component of the name.  */
-  {
-    int name_len = strlen (name);
-    int src_name_len = strlen (source->fullname);
-
-    /* We do mean < here, and not <=; if the lengths are the same,
-       then the filename_cmp above should have triggered, and we need to
-       check for a slash here.  */
-    if (name_len < src_name_len
-        && IS_DIR_SEPARATOR (source->fullname[src_name_len - name_len - 1])
-        && filename_cmp (name,
-			 source->fullname + src_name_len - name_len) == 0)
-      return source;
-  }
 
   /* It's not us.  Try all our children, and return the lowest.  */
   {

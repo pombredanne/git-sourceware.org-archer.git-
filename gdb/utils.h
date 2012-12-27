@@ -124,6 +124,9 @@ extern char *gdb_realpath (const char *);
 
 extern char *xfullpath (const char *);
 
+extern int filenames_are_same_file (const char *filename1,
+				    const char *filename2);
+
 extern int gdb_filename_fnmatch (const char *pattern, const char *string,
 				 int flags);
 

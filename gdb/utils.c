@@ -3310,6 +3310,92 @@ xfullpath (const char *filename)
   return result;
 }
 
+/* Fallback for filenames_are_same_file - if the filename strings do not match
+   make the expensive query of system whether the file inodes are the same.  */
+
+static int
+filenames_are_same_file_stat (const char *filename1, const char *filename2)
+{
+  struct stat stat1, stat2;
+
+  if (stat (filename1, &stat1) != 0 || stat (filename2, &stat2) != 0)
+    return 0;
+
+  /* MS-Windows may provide just zero instead.  We have to rely on filename_cmp
+     there.  */
+  if (stat1.st_ino == 0)
+    return 0;
+
+  return stat1.st_dev == stat2.st_dev && stat1.st_ino == stat2.st_ino;
+}
+
+/* Remove "./" substrings and reduce "//" to "/" in the path *VECP parsed by
+   dirnames_to_char_ptr_vec.  */
+
+static void
+filenames_are_same_file_simplify (VEC (char_ptr) **vecp)
+{
+  int ix = 0;
+
+  while (ix < VEC_length (char_ptr, *vecp))
+    {
+      char *s = VEC_index (char_ptr, *vecp, ix);
+
+      if (*s == '\0' || strcmp (s, ".") == 0)
+	{
+	  xfree (s);
+	  VEC_ordered_remove (char_ptr, *vecp, ix);
+	}
+      else
+	ix++;
+    }
+}
+
+/* Check if FILENAME1 and FILENAME2 point to the same file inode.  Try to
+   reduce the number of stat system calls.  */
+
+int
+filenames_are_same_file (const char *filename1, const char *filename2)
+{
+  VEC (char_ptr) *vec1, *vec2;
+  struct cleanup *back_to;
+  int ix;
+
+  /* Acceleration only.  */
+  if (filename_cmp (filename1, filename2) == 0)
+    return 1;
+
+  if ((IS_ABSOLUTE_PATH (filename1) && !IS_ABSOLUTE_PATH (filename2))
+      || (!IS_ABSOLUTE_PATH (filename1) && IS_ABSOLUTE_PATH (filename2)))
+    return filenames_are_same_file_stat (filename1, filename2);
+
+  vec1 = dirnames_to_char_ptr_vec (filename1);
+  filenames_are_same_file_simplify (&vec1);
+  back_to = make_cleanup_free_char_ptr_vec (vec1);
+  vec2 = dirnames_to_char_ptr_vec (filename2);
+  filenames_are_same_file_simplify (&vec2);
+  make_cleanup_free_char_ptr_vec (vec2);
+
+  if (VEC_length (char_ptr, vec1) != VEC_length (char_ptr, vec2))
+    {
+      do_cleanups (back_to);
+      return filenames_are_same_file_stat (filename1, filename2);
+    }
+
+  for (ix = 0; ix < VEC_length (char_ptr, vec1); ix++)
+    {
+      const char *s1 = VEC_index (char_ptr, vec1, ix);
+      const char *s2 = VEC_index (char_ptr, vec2, ix);
+
+      if (filename_cmp (s1, s2) != 0)
+	{
+	  do_cleanups (back_to);
+	  return filenames_are_same_file_stat (filename1, filename2);
+	}
+    }
+
+  return 1;
+}
 
 /* This is the 32-bit CRC function used by the GNU separate debug
    facility.  An executable may contain a section named
