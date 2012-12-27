@@ -3317,16 +3317,23 @@ static int
 filenames_are_same_file_stat (const char *filename1, const char *filename2)
 {
   struct stat stat1, stat2;
+  char *realpath1, *realpath2;
+  int retval;
 
   if (stat (filename1, &stat1) != 0 || stat (filename2, &stat2) != 0)
     return 0;
 
-  /* MS-Windows may provide just zero instead.  We have to rely on filename_cmp
-     there.  */
-  if (stat1.st_ino == 0)
-    return 0;
+  /* MS-Windows may provide just zero instead.  We have to rely on slow
+     gdb_realpath there.  */
+  if (stat1.st_ino != 0 && stat2.st_ino != 0)
+    return stat1.st_dev == stat2.st_dev && stat1.st_ino == stat2.st_ino;
 
-  return stat1.st_dev == stat2.st_dev && stat1.st_ino == stat2.st_ino;
+  realpath1 = gdb_realpath (filename1);
+  realpath2 = gdb_realpath (filename2);
+  retval = filename_cmp (realpath1, realpath2) == 0;
+  xfree (realpath2);
+  xfree (realpath1);
+  return retval;
 }
 
 /* Remove "./" substrings and reduce "//" to "/" in the path *VECP parsed by
@@ -3351,8 +3358,9 @@ filenames_are_same_file_simplify (VEC (char_ptr) **vecp)
     }
 }
 
-/* Check if FILENAME1 and FILENAME2 point to the same file inode.  Try to
-   reduce the number of stat system calls.  */
+/* Check if FILENAME1 and FILENAME2 point to the same file inode.
+   Process is optimalized to minimize the number of system calls which
+   are expensive for example on NFS.  */
 
 int
 filenames_are_same_file (const char *filename1, const char *filename2)
@@ -3364,6 +3372,15 @@ filenames_are_same_file (const char *filename1, const char *filename2)
   /* Acceleration only.  */
   if (filename_cmp (filename1, filename2) == 0)
     return 1;
+
+  if (!basenames_may_differ)
+    {
+      const char *basename1 = lbasename (filename1);
+      const char *basename2 = lbasename (filename2);
+
+      if (filename_cmp (basename1, basename2) != 0)
+	return 0;
+    }
 
   if ((IS_ABSOLUTE_PATH (filename1) && !IS_ABSOLUTE_PATH (filename2))
       || (!IS_ABSOLUTE_PATH (filename1) && IS_ABSOLUTE_PATH (filename2)))
