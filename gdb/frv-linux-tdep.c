@@ -1,7 +1,7 @@
 /* Target-dependent code for GNU/Linux running on the Fujitsu FR-V,
    for GDB.
 
-   Copyright (C) 2004, 2006-2012 Free Software Foundation, Inc.
+   Copyright (C) 2004-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -57,7 +57,7 @@ frv_linux_pc_in_sigtramp (struct gdbarch *gdbarch, CORE_ADDR pc,
 
   if (instr == 0x8efc0077)	/* setlos #__NR_sigreturn, gr7 */
     retval = NORMAL_SIGTRAMP;
-  else if (instr -= 0x8efc00ad)	/* setlos #__NR_rt_sigreturn, gr7 */
+  else if (instr == 0x8efc00ad)	/* setlos #__NR_rt_sigreturn, gr7 */
     retval = RT_SIGTRAMP;
   else
     return 0;
