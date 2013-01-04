@@ -1,6 +1,5 @@
 /* Read HP PA/Risc object files for GDB.
-   Copyright (C) 1991-1992, 1994-1996, 1998-2002, 2004, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1991-2013 Free Software Foundation, Inc.
    Written by Fred Fish at Cygnus Support.
 
    This file is part of GDB.
@@ -351,10 +350,6 @@ som_new_init (struct objfile *ignore)
 static void
 som_symfile_finish (struct objfile *objfile)
 {
-  if (objfile->deprecated_sym_stab_info != NULL)
-    {
-      xfree (objfile->deprecated_sym_stab_info);
-    }
 }
 
 /* SOM specific initialization routine for reading symbols.  */

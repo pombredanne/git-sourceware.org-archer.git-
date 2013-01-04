@@ -1,6 +1,6 @@
 /* Print values for GNU debugger GDB.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -145,7 +145,7 @@ struct display
     struct program_space *pspace;
 
     /* Innermost block required by this expression when evaluated.  */
-    struct block *block;
+    const struct block *block;
 
     /* Status of this display (enabled or disabled).  */
     int enabled_p;
@@ -1199,8 +1199,7 @@ address_info (char *exp, int from_tty)
   long val;
   struct obj_section *section;
   CORE_ADDR load_addr, context_pc = 0;
-  int is_a_field_of_this;	/* C++: lookup_symbol sets this to nonzero
-				   if exp is a field of `this'.  */
+  struct field_of_this_result is_a_field_of_this;
 
   if (exp == 0)
     error (_("Argument required."));
@@ -1209,7 +1208,7 @@ address_info (char *exp, int from_tty)
 		       &is_a_field_of_this);
   if (sym == NULL)
     {
-      if (is_a_field_of_this)
+      if (is_a_field_of_this.type != NULL)
 	{
 	  printf_filtered ("Symbol \"");
 	  fprintf_symbol_filtered (gdb_stdout, exp,
@@ -2221,7 +2220,7 @@ ui_printf (char *arg, struct ui_file *stream)
 	    error (_("long double not supported in printf"));
 #endif
 	  case long_long_arg:
-#if defined (CC_HAS_LONG_LONG) && defined (PRINTF_HAS_LONG_LONG)
+#ifdef PRINTF_HAS_LONG_LONG
 	    {
 	      long long val = value_as_long (val_args[i]);
 
@@ -2356,7 +2355,7 @@ ui_printf (char *arg, struct ui_file *stream)
 		 handle %p as glibc would: %#x or a literal "(nil)".  */
 
 	      char *p, *fmt, *fmt_p;
-#if defined (CC_HAS_LONG_LONG) && defined (PRINTF_HAS_LONG_LONG)
+#ifdef PRINTF_HAS_LONG_LONG
 	      long long val = value_as_long (val_args[i]);
 #else
 	      long val = value_as_long (val_args[i]);
@@ -2391,7 +2390,7 @@ ui_printf (char *arg, struct ui_file *stream)
 	      gdb_assert (*p == 'p' && *(p + 1) == '\0');
 	      if (val != 0)
 		{
-#if defined (CC_HAS_LONG_LONG) && defined (PRINTF_HAS_LONG_LONG)
+#ifdef PRINTF_HAS_LONG_LONG
 		  *fmt_p++ = 'l';
 #endif
 		  *fmt_p++ = 'l';

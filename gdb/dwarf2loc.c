@@ -1,6 +1,6 @@
 /* DWARF 2 location expression support for GDB.
 
-   Copyright (C) 2003, 2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2003-2013 Free Software Foundation, Inc.
 
    Contributed by Daniel Jacobowitz, MontaVista Software, Inc.
 
@@ -332,11 +332,15 @@ dwarf_expr_frame_base (void *baton, const gdb_byte **start, size_t * length)
      this_base method.  */
   struct symbol *framefunc;
   struct dwarf_expr_baton *debaton = (struct dwarf_expr_baton *) baton;
+  struct block *bl = get_frame_block (debaton->frame, NULL);
+
+  if (bl == NULL)
+    error (_("frame address is not available."));
 
   /* Use block_linkage_function, which returns a real (not inlined)
      function, instead of get_frame_function, which may return an
      inlined function.  */
-  framefunc = block_linkage_function (get_frame_block (debaton->frame, NULL));
+  framefunc = block_linkage_function (bl);
 
   /* If we found a frame-relative symbol then it was certainly within
      some function associated with a frame. If we can't find the frame,
@@ -425,8 +429,7 @@ per_cu_dwarf_call (struct dwarf_expr_context *ctx, cu_offset die_offset,
 {
   struct dwarf2_locexpr_baton block;
 
-  block = dwarf2_fetch_die_location_block (die_offset, per_cu,
-					   get_frame_pc, baton);
+  block = dwarf2_fetch_die_loc_cu_off (die_offset, per_cu, get_frame_pc, baton);
 
   /* DW_OP_call_ref is currently not supported.  */
   gdb_assert (block.per_cu == per_cu);
@@ -2034,9 +2037,10 @@ indirect_pieced_value (struct value *value)
   byte_offset = value_as_address (value);
 
   gdb_assert (piece);
-  baton = dwarf2_fetch_die_location_block (piece->v.ptr.die, c->per_cu,
-					   get_frame_address_in_block_wrapper,
-					   frame);
+  baton
+    = dwarf2_fetch_die_loc_sect_off (piece->v.ptr.die, c->per_cu,
+				     get_frame_address_in_block_wrapper,
+				     frame);
 
   return dwarf2_evaluate_loc_desc_full (TYPE_TARGET_TYPE (type), frame,
 					baton.data, baton.size, baton.per_cu,
@@ -3201,8 +3205,8 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	    op_ptr += size;
 
 	    offset.cu_off = uoffset;
-	    block = dwarf2_fetch_die_location_block (offset, per_cu,
-						     get_ax_pc, expr);
+	    block = dwarf2_fetch_die_loc_cu_off (offset, per_cu,
+						 get_ax_pc, expr);
 
 	    /* DW_OP_call_ref is currently not supported.  */
 	    gdb_assert (block.per_cu == per_cu);

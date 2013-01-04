@@ -1,6 +1,6 @@
 /* Tracing functionality for remote targets in custom GDB protocol
 
-   Copyright (C) 1997-2012 Free Software Foundation, Inc.
+   Copyright (C) 1997-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -312,8 +312,7 @@ set_traceframe_context (struct frame_info *trace_frame)
 
   /* Save file name as "$trace_file", a debugger variable visible to
      users.  */
-  if (traceframe_sal.symtab == NULL
-      || traceframe_sal.symtab->filename == NULL)
+  if (traceframe_sal.symtab == NULL)
     clear_internalvar (lookup_internalvar ("trace_file"));
   else
     set_internalvar_string (lookup_internalvar ("trace_file"),
@@ -1767,6 +1766,7 @@ start_tracing (char *notes)
     {
       struct tracepoint *t = (struct tracepoint *) b;
       struct bp_location *loc;
+      int bp_location_downloaded = 0;
 
       /* Clear `inserted' flag.  */
       for (loc = b->loc; loc; loc = loc->next)
@@ -1788,6 +1788,7 @@ start_tracing (char *notes)
 	  target_download_tracepoint (loc);
 
 	  loc->inserted = 1;
+	  bp_location_downloaded = 1;
 	}
 
       t->number_on_target = b->number;
@@ -1795,6 +1796,9 @@ start_tracing (char *notes)
       for (loc = b->loc; loc; loc = loc->next)
 	if (loc->probe != NULL)
 	  loc->probe->pops->set_semaphore (loc->probe, loc->gdbarch);
+
+      if (bp_location_downloaded)
+	observer_notify_breakpoint_modified (b);
     }
   VEC_free (breakpoint_p, tp_vec);
 
@@ -3470,6 +3474,10 @@ void
 merge_uploaded_tracepoints (struct uploaded_tp **uploaded_tps)
 {
   struct uploaded_tp *utp;
+  /* A set of tracepoints which are modified.  */
+  VEC(breakpoint_p) *modified_tp = NULL;
+  int ix;
+  struct breakpoint *b;
 
   /* Look for GDB tracepoints that match up with our uploaded versions.  */
   for (utp = *uploaded_tps; utp; utp = utp->next)
@@ -3480,6 +3488,8 @@ merge_uploaded_tracepoints (struct uploaded_tp **uploaded_tps)
       loc = find_matching_tracepoint_location (utp);
       if (loc)
 	{
+	  int found = 0;
+
 	  /* Mark this location as already inserted.  */
 	  loc->inserted = 1;
 	  t = (struct tracepoint *) loc->owner;
@@ -3487,6 +3497,22 @@ merge_uploaded_tracepoints (struct uploaded_tp **uploaded_tps)
 			     "as target's tracepoint %d at %s.\n"),
 			   loc->owner->number, utp->number,
 			   paddress (loc->gdbarch, utp->addr));
+
+	  /* The tracepoint LOC->owner was modified (the location LOC
+	     was marked as inserted in the target).  Save it in
+	     MODIFIED_TP if not there yet.  The 'breakpoint-modified'
+	     observers will be notified later once for each tracepoint
+	     saved in MODIFIED_TP.  */
+	  for (ix = 0;
+	       VEC_iterate (breakpoint_p, modified_tp, ix, b);
+	       ix++)
+	    if (b == loc->owner)
+	      {
+		found = 1;
+		break;
+	      }
+	  if (!found)
+	    VEC_safe_push (breakpoint_p, modified_tp, loc->owner);
 	}
       else
 	{
@@ -3509,6 +3535,12 @@ merge_uploaded_tracepoints (struct uploaded_tp **uploaded_tps)
 	t->number_on_target = utp->number;
     }
 
+  /* Notify 'breakpoint-modified' observer that at least one of B's
+     locations was changed.  */
+  for (ix = 0; VEC_iterate (breakpoint_p, modified_tp, ix, b); ix++)
+    observer_notify_breakpoint_modified (b);
+
+  VEC_free (breakpoint_p, modified_tp);
   free_uploaded_tps (uploaded_tps);
 }
 
@@ -4840,8 +4872,7 @@ print_one_static_tracepoint_marker (int count,
 	{
 	  const char *fullname = symtab_to_fullname (sal.symtab);
 
-	  if (fullname)
-	    ui_out_field_string (uiout, "fullname", fullname);
+	  ui_out_field_string (uiout, "fullname", fullname);
 	}
       else
 	ui_out_field_skip (uiout, "fullname");

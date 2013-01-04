@@ -1,8 +1,7 @@
 /* Variables that describe the inferior process running under GDB:
    Where it is, why it stopped, and how to step it.
 
-   Copyright (C) 1986, 1988-1996, 1998-2001, 2003-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -228,12 +227,6 @@ extern void get_last_target_status(ptid_t *ptid,
 
 extern void follow_inferior_reset_breakpoints (void);
 
-/* Throw an error indicating the current thread is running.  */
-extern void error_is_running (void);
-
-/* Calls error_is_running if the current thread is running.  */
-extern void ensure_not_running (void);
-
 void set_step_info (struct frame_info *frame, struct symtab_and_line sal);
 
 /* From infcmd.c */
@@ -248,19 +241,9 @@ extern void set_inferior_args (char *);
 
 extern void set_inferior_args_vector (int, char **);
 
-extern void all_registers_info (char *, int);
-
 extern void registers_info (char *, int);
 
-extern void nexti_command (char *, int);
-
-extern void stepi_command (char *, int);
-
 extern void continue_1 (int all_threads);
-
-extern void continue_command (char *, int);
-
-extern void interrupt_target_command (char *args, int from_tty);
 
 extern void interrupt_target_1 (int all_threads);
 

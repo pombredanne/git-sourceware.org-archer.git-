@@ -1,6 +1,6 @@
 /* Support routines for manipulating internal types for GDB.
 
-   Copyright (C) 1992-1996, 1998-2012 Free Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -1234,7 +1234,7 @@ lookup_signed_typename (const struct language_defn *language,
    visible in lexical block BLOCK.  */
 
 struct type *
-lookup_struct (const char *name, struct block *block)
+lookup_struct (const char *name, const struct block *block)
 {
   struct symbol *sym;
 
@@ -1256,7 +1256,7 @@ lookup_struct (const char *name, struct block *block)
    visible in lexical block BLOCK.  */
 
 struct type *
-lookup_union (const char *name, struct block *block)
+lookup_union (const char *name, const struct block *block)
 {
   struct symbol *sym;
   struct type *t;
@@ -1280,7 +1280,7 @@ lookup_union (const char *name, struct block *block)
    visible in lexical block BLOCK.  */
 
 struct type *
-lookup_enum (const char *name, struct block *block)
+lookup_enum (const char *name, const struct block *block)
 {
   struct symbol *sym;
 
@@ -1302,7 +1302,7 @@ lookup_enum (const char *name, struct block *block)
 
 struct type *
 lookup_template_type (char *name, struct type *type, 
-		      struct block *block)
+		      const struct block *block)
 {
   struct symbol *sym;
   char *nam = (char *) 

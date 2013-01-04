@@ -1,7 +1,6 @@
 /* Support for printing Pascal values for GDB, the GNU debugger.
 
-   Copyright (C) 2000-2001, 2003, 2005-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 2000-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -243,7 +242,7 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	      struct symbol *wsym = (struct symbol *) NULL;
 	      struct type *wtype;
 	      struct block *block = (struct block *) NULL;
-	      int is_this_fld;
+	      struct field_of_this_result is_this_fld;
 
 	      if (want_space)
 		fputs_filtered (" ", stream);

@@ -1,7 +1,6 @@
 /* Definitions for BFD wrappers used by GDB.
 
-   Copyright (C) 2011, 2012
-   Free Software Foundation, Inc.
+   Copyright (C) 2011-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -49,6 +48,15 @@ void gdb_bfd_ref (struct bfd *abfd);
    nothing.  */
 
 void gdb_bfd_unref (struct bfd *abfd);
+
+/* Mark the CHILD BFD as being a member of PARENT.  Also, increment
+   the reference count of CHILD.  Calling this function ensures that
+   as along as CHILD remains alive, PARENT will as well.  Both CHILD
+   and PARENT must be non-NULL.  This can be called more than once
+   with the same arguments; but it is not allowed to call it for a
+   single CHILD with different values for PARENT.  */
+
+void gdb_bfd_mark_parent (bfd *child, bfd *parent);
 
 /* Try to read or map the contents of the section SECT.  If
    successful, the section data is returned and *SIZE is set to the

@@ -1,6 +1,6 @@
 /* Objective-C language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 2002-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2002-2013 Free Software Foundation, Inc.
 
    Contributed by Apple Computer, Inc.
    Written by Michael Snyder.
@@ -82,7 +82,7 @@ static const struct objfile_data *objc_objfile_data;
    suitably defined.  */
 
 struct symbol *
-lookup_struct_typedef (char *name, struct block *block, int noerr)
+lookup_struct_typedef (char *name, const struct block *block, int noerr)
 {
   struct symbol *sym;
 

@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2012 Free Software Foundation, Inc.
+/* Copyright (C) 2009-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -255,9 +255,14 @@ ptrace_request_to_str (int request)
       case PTRACE_GETLOADINFO:
         return "PTRACE_GETLOADINFO";
         break;
+      case PTRACE_GETTRACESIG:
+	return "PTRACE_GETTRACESIG";
+	break;
+#ifdef PTRACE_GETTHREADLIST
       case PTRACE_GETTHREADLIST:
         return "PTRACE_GETTHREADLIST";
         break;
+#endif
     }
   return "<unknown-request>";
 }
@@ -291,7 +296,6 @@ lynx_ptrace (int request, ptid_t ptid, int addr, int data, int addr2)
 static int
 lynx_create_inferior (char *program, char **allargs)
 {
-  struct process_info *new_process;
   int pid;
 
   lynx_debug ("lynx_create_inferior ()");
@@ -316,7 +320,7 @@ lynx_create_inferior (char *program, char **allargs)
       _exit (0177);
     }
 
-  new_process = add_process (pid, 0);
+  add_process (pid, 0);
   /* Do not add the process thread just yet, as we do not know its tid.
      We will add it later, during the wait for the STOP event corresponding
      to the lynx_ptrace (PTRACE_TRACEME) call above.  */
@@ -328,14 +332,13 @@ lynx_create_inferior (char *program, char **allargs)
 static int
 lynx_attach (unsigned long pid)
 {
-  struct process_info *new_process;
   ptid_t ptid = lynx_ptid_build (pid, 0);
 
   if (lynx_ptrace (PTRACE_ATTACH, ptid, 0, 0, 0) != 0)
     error ("Cannot attach to process %lu: %s (%d)\n", pid,
 	   strerror (errno), errno);
 
-  new_process = add_process (pid, 1);
+  add_process (pid, 1);
   add_thread (ptid, NULL);
 
   return 0;
@@ -445,7 +448,11 @@ retry:
      for non-threaded applications where the new-thread events are not
      generated.  */
   if (!find_thread_ptid (new_ptid))
-    add_thread (new_ptid, NULL);
+    {
+      lynx_debug ("New thread: (pid = %d, tid = %d)",
+		  lynx_ptid_get_pid (new_ptid), lynx_ptid_get_tid (new_ptid));
+      add_thread (new_ptid, NULL);
+    }
 
   if (WIFSTOPPED (wstat))
     {

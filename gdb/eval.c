@@ -1,6 +1,6 @@
 /* Evaluate expressions for GDB.
 
-   Copyright (C) 1986-2003, 2005-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1404,13 +1404,15 @@ evaluate_subexp_standard (struct type *expect_type,
 	    {
 	      struct type *type_ptr
 		= lookup_pointer_type (TYPE_DOMAIN_TYPE (type));
+	      struct type *target_type_ptr
+		= lookup_pointer_type (TYPE_TARGET_TYPE (type));
 
 	      /* Now, convert these values to an address.  */
 	      arg2 = value_cast (type_ptr, arg2);
 
 	      mem_offset = value_as_long (arg1);
 
-	      arg1 = value_from_pointer (type_ptr,
+	      arg1 = value_from_pointer (target_type_ptr,
 					 value_as_long (arg2) + mem_offset);
 	      arg1 = value_ind (arg1);
 	      tem = 1;

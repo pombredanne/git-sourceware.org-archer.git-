@@ -1,6 +1,6 @@
 /* Everything about breakpoints, for GDB.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -81,6 +81,13 @@
 
 #include "mi/mi-common.h"
 #include "python/python.h"
+
+/* Enums for exception-handling support.  */
+enum exception_event_kind
+{
+  EX_EVENT_THROW,
+  EX_EVENT_CATCH
+};
 
 /* Prototypes for local functions.  */
 
@@ -5694,8 +5701,7 @@ print_breakpoint_location (struct breakpoint *b,
 	  struct symtab_and_line sal = find_pc_line (loc->address, 0);
 	  const char *fullname = symtab_to_fullname (sal.symtab);
 	  
-	  if (fullname)
-	    ui_out_field_string (uiout, "fullname", fullname);
+	  ui_out_field_string (uiout, "fullname", fullname);
 	}
       
       ui_out_field_int (uiout, "line", loc->line_number);
@@ -6026,28 +6032,31 @@ print_one_breakpoint_location (struct breakpoint *b,
       ui_out_text (uiout, "\n");
     }
   
-  if (!part_of_multiple && b->hit_count)
+  if (!part_of_multiple)
     {
-      /* FIXME should make an annotation for this.  */
-      if (is_catchpoint (b))
-	ui_out_text (uiout, "\tcatchpoint");
-      else if (is_tracepoint (b))
-	ui_out_text (uiout, "\ttracepoint");
+      if (b->hit_count)
+	{
+	  /* FIXME should make an annotation for this.  */
+	  if (is_catchpoint (b))
+	    ui_out_text (uiout, "\tcatchpoint");
+	  else if (is_tracepoint (b))
+	    ui_out_text (uiout, "\ttracepoint");
+	  else
+	    ui_out_text (uiout, "\tbreakpoint");
+	  ui_out_text (uiout, " already hit ");
+	  ui_out_field_int (uiout, "times", b->hit_count);
+	  if (b->hit_count == 1)
+	    ui_out_text (uiout, " time\n");
+	  else
+	    ui_out_text (uiout, " times\n");
+	}
       else
-	ui_out_text (uiout, "\tbreakpoint");
-      ui_out_text (uiout, " already hit ");
-      ui_out_field_int (uiout, "times", b->hit_count);
-      if (b->hit_count == 1)
-	ui_out_text (uiout, " time\n");
-      else
-	ui_out_text (uiout, " times\n");
+	{
+	  /* Output the count also if it is zero, but only if this is mi.  */
+	  if (ui_out_is_mi_like_p (uiout))
+	    ui_out_field_int (uiout, "times", b->hit_count);
+	}
     }
-  
-  /* Output the count also if it is zero, but only if this is mi.
-     FIXME: Should have a better test for this.  */
-  if (ui_out_is_mi_like_p (uiout))
-    if (!part_of_multiple && b->hit_count == 0)
-      ui_out_field_int (uiout, "times", b->hit_count);
 
   if (!part_of_multiple && b->ignore_count)
     {
@@ -6116,6 +6125,25 @@ print_one_breakpoint_location (struct breakpoint *b,
 	  ui_out_text (uiout, "\tpass count ");
 	  ui_out_field_int (uiout, "pass", t->pass_count);
 	  ui_out_text (uiout, " \n");
+	}
+
+      /* Don't display it when tracepoint or tracepoint location is
+	 pending.   */
+      if (!header_of_multiple && loc != NULL && !loc->shlib_disabled)
+	{
+	  annotate_field (11);
+
+	  if (ui_out_is_mi_like_p (uiout))
+	    ui_out_field_string (uiout, "installed",
+				 loc->inserted ? "y" : "n");
+	  else
+	    {
+	      if (loc->inserted)
+		ui_out_text (uiout, "\t");
+	      else
+		ui_out_text (uiout, "\tnot ");
+	      ui_out_text (uiout, "installed on target\n");
+	    }
 	}
     }
 
@@ -7847,19 +7875,19 @@ print_recreate_catch_solib (struct breakpoint *b, struct ui_file *fp)
 
 static struct breakpoint_ops catch_solib_breakpoint_ops;
 
-/* A helper function that does all the work for "catch load" and
-   "catch unload".  */
+/* Shared helper function (MI and CLI) for creating and installing
+   a shared object event catchpoint.  If IS_LOAD is non-zero then
+   the events to be caught are load events, otherwise they are
+   unload events.  If IS_TEMP is non-zero the catchpoint is a
+   temporary one.  If ENABLED is non-zero the catchpoint is
+   created in an enabled state.  */
 
-static void
-catch_load_or_unload (char *arg, int from_tty, int is_load,
-		      struct cmd_list_element *command)
+void
+add_solib_catchpoint (char *arg, int is_load, int is_temp, int enabled)
 {
   struct solib_catchpoint *c;
   struct gdbarch *gdbarch = get_current_arch ();
-  int tempflag;
   struct cleanup *cleanup;
-
-  tempflag = get_cmd_context (command) == CATCH_TEMPORARY;
 
   if (!arg)
     arg = "";
@@ -7884,11 +7912,28 @@ catch_load_or_unload (char *arg, int from_tty, int is_load,
     }
 
   c->is_load = is_load;
-  init_catchpoint (&c->base, gdbarch, tempflag, NULL,
+  init_catchpoint (&c->base, gdbarch, is_temp, NULL,
 		   &catch_solib_breakpoint_ops);
+
+  c->base.enable_state = enabled ? bp_enabled : bp_disabled;
 
   discard_cleanups (cleanup);
   install_breakpoint (0, &c->base, 1);
+}
+
+/* A helper function that does all the work for "catch load" and
+   "catch unload".  */
+
+static void
+catch_load_or_unload (char *arg, int from_tty, int is_load,
+		      struct cmd_list_element *command)
+{
+  int tempflag;
+  const int enabled = 1;
+
+  tempflag = get_cmd_context (command) == CATCH_TEMPORARY;
+
+  add_solib_catchpoint (arg, is_load, tempflag, enabled);
 }
 
 static void
@@ -9820,14 +9865,12 @@ stopat_command (char *arg, int from_tty)
     break_command_1 (arg, 0, from_tty);
 }
 
-void dprintf_command (char *arg, int from_tty);
-
 /* The dynamic printf command is mostly like a regular breakpoint, but
    with a prewired command list consisting of a single output command,
    built from extra arguments supplied on the dprintf command
    line.  */
 
-void
+static void
 dprintf_command (char *arg, int from_tty)
 {
   create_breakpoint (get_current_arch (),
@@ -10747,7 +10790,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   volatile struct gdb_exception e;
   struct breakpoint *b, *scope_breakpoint = NULL;
   struct expression *exp;
-  struct block *exp_valid_block = NULL, *cond_exp_valid_block = NULL;
+  const struct block *exp_valid_block = NULL, *cond_exp_valid_block = NULL;
   struct value *val, *mark, *result;
   struct frame_info *frame;
   char *exp_start = NULL;
@@ -11842,7 +11885,7 @@ clear_command (char *arg, int from_tty)
   make_cleanup (VEC_cleanup (breakpoint_p), &found);
   for (i = 0; i < sals.nelts; i++)
     {
-      int is_abs, sal_name_len;
+      int is_abs;
 
       /* If exact pc given, clear bpts at that pc.
          If line given (pc == 0), clear all bpts on specified line.
@@ -11858,7 +11901,6 @@ clear_command (char *arg, int from_tty)
 
       sal = sals.sals[i];
       is_abs = sal.symtab == NULL ? 1 : IS_ABSOLUTE_PATH (sal.symtab->filename);
-      sal_name_len = is_abs ? 0 : strlen (sal.symtab->filename);
 
       /* Find all matching breakpoints and add them to 'found'.  */
       ALL_BREAKPOINTS (b)
@@ -11891,8 +11933,7 @@ clear_command (char *arg, int from_tty)
 			line_match = 1;
 		      else if (!IS_ABSOLUTE_PATH (sal.symtab->filename)
 			       && compare_filenames_for_search (loc->source_file,
-								sal.symtab->filename,
-								sal_name_len))
+								sal.symtab->filename))
 			line_match = 1;
 		    }
 
@@ -12061,7 +12102,7 @@ bp_location_target_extensions_update (void)
 static void
 download_tracepoint_locations (void)
 {
-  struct bp_location *bl, **blp_tmp;
+  struct breakpoint *b;
   struct cleanup *old_chain;
 
   if (!target_can_download_tracepoint ())
@@ -12069,31 +12110,36 @@ download_tracepoint_locations (void)
 
   old_chain = save_current_space_and_thread ();
 
-  ALL_BP_LOCATIONS (bl, blp_tmp)
+  ALL_TRACEPOINTS (b)
     {
+      struct bp_location *bl;
       struct tracepoint *t;
+      int bp_location_downloaded = 0;
 
-      if (!is_tracepoint (bl->owner))
-	continue;
-
-      if ((bl->owner->type == bp_fast_tracepoint
+      if ((b->type == bp_fast_tracepoint
 	   ? !may_insert_fast_tracepoints
 	   : !may_insert_tracepoints))
 	continue;
 
-      /* In tracepoint, locations are _never_ duplicated, so
-	 should_be_inserted is equivalent to
-	 unduplicated_should_be_inserted.  */
-      if (!should_be_inserted (bl) || bl->inserted)
-	continue;
+      for (bl = b->loc; bl; bl = bl->next)
+	{
+	  /* In tracepoint, locations are _never_ duplicated, so
+	     should_be_inserted is equivalent to
+	     unduplicated_should_be_inserted.  */
+	  if (!should_be_inserted (bl) || bl->inserted)
+	    continue;
 
-      switch_to_program_space_and_thread (bl->pspace);
+	  switch_to_program_space_and_thread (bl->pspace);
 
-      target_download_tracepoint (bl);
+	  target_download_tracepoint (bl);
 
-      bl->inserted = 1;
-      t = (struct tracepoint *) bl->owner;
-      t->number_on_target = bl->owner->number;
+	  bl->inserted = 1;
+	  bp_location_downloaded = 1;
+	}
+      t = (struct tracepoint *) b;
+      t->number_on_target = b->number;
+      if (bp_location_downloaded)
+	observer_notify_breakpoint_modified (b);
     }
 
   do_cleanups (old_chain);
@@ -13830,8 +13876,7 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 	    {
 	      const char *fullname = symtab_to_fullname (sal2.symtab);
 
-	      if (fullname)
-		ui_out_field_string (uiout, "fullname", fullname);
+	      ui_out_field_string (uiout, "fullname", fullname);
 	    }
 
 	  ui_out_field_int (uiout, "line", sal2.line);
@@ -14257,9 +14302,6 @@ breakpoint_re_set (void)
   create_longjmp_master_breakpoint ();
   create_std_terminate_master_breakpoint ();
   create_exception_master_breakpoint ();
-
-  /* While we're at it, reset the skip list too.  */
-  skip_re_set ();
 }
 
 /* Reset the thread number of this breakpoint:

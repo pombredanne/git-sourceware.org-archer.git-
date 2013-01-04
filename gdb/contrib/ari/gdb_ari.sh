@@ -2,7 +2,7 @@
 
 # GDB script to list of problems using awk.
 #
-# Copyright (C) 2002-2012 Free Software Foundation, Inc.
+# Copyright (C) 2002-2013 Free Software Foundation, Inc.
 #
 # This file is part of GDB.
 #
@@ -1125,26 +1125,6 @@ Do not use vasprintf(), instead use xstrvprintf"
 }
 /(^|[^_[:alnum:]])vasprintf[[:space:]]*\(/ {
     fail("vasprintf")
-}
-
-BEGIN { doc["xasprintf"] = "\
-Do not use xasprintf(), instead use xstrprintf"
-    fix("xasprintf", "common/common-utils.h", 1)
-    fix("xasprintf", "common/common-utils.c", 1)
-    category["xasprintf"] = ari_regression
-}
-/(^|[^_[:alnum:]])xasprintf[[:space:]]*\(/ {
-    fail("xasprintf")
-}
-
-BEGIN { doc["xvasprintf"] = "\
-Do not use xvasprintf(), instead use xstrvprintf"
-    fix("xvasprintf", "common/common-utils.h", 1)
-    fix("xvasprintf", "common/common-utils.c", 1)
-    category["xvasprintf"] = ari_regression
-}
-/(^|[^_[:alnum:]])xvasprintf[[:space:]]*\(/ {
-    fail("xvasprintf")
 }
 
 # More generic memory operations

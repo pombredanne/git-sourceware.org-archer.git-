@@ -1,6 +1,6 @@
 /* Target-dependent code for SPARC.
 
-   Copyright (C) 2003-2012 Free Software Foundation, Inc.
+   Copyright (C) 2003-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -39,6 +39,7 @@
 #include "gdb_string.h"
 
 #include "sparc-tdep.h"
+#include "sparc-ravenscar-thread.h"
 
 struct regset;
 
@@ -1682,6 +1683,8 @@ sparc32_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   if (tdep->gregset)
     set_gdbarch_regset_from_core_section (gdbarch,
 					  sparc_regset_from_core_section);
+
+  register_sparc_ravenscar_ops (gdbarch);
 
   return gdbarch;
 }

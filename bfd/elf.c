@@ -3874,6 +3874,7 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 
 	  if (phdr_size == (bfd_size_type) -1)
 	    phdr_size = get_program_header_size (abfd, info);
+	  phdr_size += bed->s->sizeof_ehdr;
 	  if ((abfd->flags & D_PAGED) == 0
 	      || (sections[0]->lma & addr_mask) < phdr_size
 	      || ((sections[0]->lma & addr_mask) % maxpagesize
@@ -6790,6 +6791,7 @@ swap_out_syms (bfd *abfd,
 		  shndx = elf_tdata (abfd)->symtab_shndx_section;
 		  break;
 		default:
+		  shndx = SHN_ABS;
 		  break;
 		}
 	    }
@@ -8624,6 +8626,10 @@ elfcore_grok_note (bfd *abfd, Elf_Internal_Note *note)
 
 	return TRUE;
       }
+
+    case NT_FILE:
+      return elfcore_make_note_pseudosection (abfd, ".note.linuxcore.file",
+					      note);
 
     case NT_SIGINFO:
       return elfcore_make_note_pseudosection (abfd, ".note.linuxcore.siginfo",

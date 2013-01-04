@@ -1,7 +1,7 @@
 /* Abstraction of GNU v3 abi.
    Contributed by Jim Blandy <jimb@redhat.com>
 
-   Copyright (C) 2001-2003, 2005-2012 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1071,7 +1071,8 @@ gnuv3_pass_by_reference (struct type *type)
 	   with the mangled name.  We don't have a convenient function
 	   to strip off both leading scope qualifiers and trailing
 	   template arguments yet.  */
-	if (!is_constructor_name (TYPE_FN_FIELD_PHYSNAME (fn, fieldelem)))
+	if (!is_constructor_name (TYPE_FN_FIELD_PHYSNAME (fn, fieldelem))
+	    && !TYPE_FN_FIELD_CONSTRUCTOR (fn, fieldelem))
 	  continue;
 
 	/* If this method takes two arguments, and the second argument is

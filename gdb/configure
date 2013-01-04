@@ -8893,7 +8893,7 @@ for ac_header in nlist.h machine/reg.h poll.h sys/poll.h proc_service.h \
 		  sys/reg.h sys/debugreg.h sys/select.h sys/syscall.h \
 		  sys/types.h sys/wait.h wait.h termios.h termio.h \
 		  sgtty.h unistd.h elf_hp.h locale.h \
-		  dlfcn.h sys/socket.h sys/un.h
+		  dlfcn.h sys/socket.h sys/un.h linux/perf_event.h
 do :
   as_ac_Header=`$as_echo "ac_cv_header_$ac_header" | $as_tr_sh`
 ac_fn_c_check_header_mongrel "$LINENO" "$ac_header" "$as_ac_Header" "$ac_includes_default"
@@ -10807,11 +10807,11 @@ $as_echo "#define HAVE_PT_GETXMMREGS 1" >>confdefs.h
 
 fi
 
-# Detect which type of /proc is in use, such as for Unixware or Solaris.
+# Detect which type of /proc is in use, such as for Solaris.
 
 if test "${target}" = "${host}"; then
   case "${host}" in
-  *-*-unixware* | *-*-sysv4.2* | *-*-sysv5* | *-*-interix* )
+  *-*-sysv4.2* | *-*-sysv5* | *-*-interix* )
 
 $as_echo "#define NEW_PROC_API 1" >>confdefs.h
 
@@ -11602,10 +11602,9 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gdb_cv_c_long_long" >&5
 $as_echo "$gdb_cv_c_long_long" >&6; }
-if test $gdb_cv_c_long_long = yes; then
-
-$as_echo "#define CC_HAS_LONG_LONG 1" >>confdefs.h
-
+if test $gdb_cv_c_long_long != yes; then
+  # libdecnumber requires long long.
+  as_fn_error "Compiler must support long long for GDB." "$LINENO" 5
 fi
 
 # Check if the compiler and runtime support printing long longs.
@@ -12565,21 +12564,22 @@ esac
 
 
 # Add ELF support to GDB, but only if BFD includes ELF support.
-OLD_CFLAGS=$CFLAGS
-OLD_LDFLAGS=$LDFLAGS
-OLD_LIBS=$LIBS
-# Put the old CFLAGS/LDFLAGS last, in case the user's (C|LD)FLAGS
-# points somewhere with bfd, with -I/foo/lib and -L/foo/lib.  We
-# always want our bfd.
-CFLAGS="-I${srcdir}/../include -I../bfd -I${srcdir}/../bfd $CFLAGS"
-LDFLAGS="-L../bfd -L../libiberty $LDFLAGS"
-intl=`echo $LIBINTL | sed 's,${top_builddir}/,,g'`
-# -ldl is provided by bfd/Makfile.am (LIBDL) <PLUGINS>.
-if test "$plugins" = "yes"; then
-  LIBS="-ldl $LIBS"
-fi
-LIBS="-lbfd -liberty $intl $LIBS"
-{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for ELF support in BFD" >&5
+
+  OLD_CFLAGS=$CFLAGS
+  OLD_LDFLAGS=$LDFLAGS
+  OLD_LIBS=$LIBS
+  # Put the old CFLAGS/LDFLAGS last, in case the user's (C|LD)FLAGS
+  # points somewhere with bfd, with -I/foo/lib and -L/foo/lib.  We
+  # always want our bfd.
+  CFLAGS="-I${srcdir}/../include -I../bfd -I${srcdir}/../bfd $CFLAGS"
+  LDFLAGS="-L../bfd -L../libiberty $LDFLAGS"
+  intl=`echo $LIBINTL | sed 's,${top_builddir}/,,g'`
+  # -ldl is provided by bfd/Makfile.am (LIBDL) <PLUGINS>.
+  if test "$plugins" = "yes"; then
+    LIBS="-ldl $LIBS"
+  fi
+  LIBS="-lbfd -liberty $intl $LIBS"
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for ELF support in BFD" >&5
 $as_echo_n "checking for ELF support in BFD... " >&6; }
 if test "${gdb_cv_var_elf+set}" = set; then :
   $as_echo_n "(cached) " >&6
@@ -12587,13 +12587,13 @@ else
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <stdlib.h>
-#include "bfd.h"
-#include "elf-bfd.h"
+  #include "bfd.h"
+  #include "elf-bfd.h"
 
 int
 main ()
 {
-bfd *abfd = NULL; bfd_get_elf_phdr_upper_bound (abfd);
+return bfd_get_elf_phdr_upper_bound (NULL);
   ;
   return 0;
 }
@@ -12608,6 +12608,9 @@ rm -f core conftest.err conftest.$ac_objext \
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gdb_cv_var_elf" >&5
 $as_echo "$gdb_cv_var_elf" >&6; }
+  CFLAGS=$OLD_CFLAGS
+  LDFLAGS=$OLD_LDFLAGS
+  LIBS=$OLD_LIBS
 if test $gdb_cv_var_elf = yes; then
   CONFIG_OBS="$CONFIG_OBS elfread.o stap-probe.o"
 
@@ -12615,12 +12618,61 @@ $as_echo "#define HAVE_ELF 1" >>confdefs.h
 
   # -ldl is provided by bfd/Makfile.am (LIBDL) <PLUGINS>.
   if test "$plugins" = "yes"; then
-    OLD_LIBS="-ldl $OLD_LIBS"
+    LIBS="-ldl $LIBS"
   fi
 fi
-CFLAGS=$OLD_CFLAGS
-LDFLAGS=$OLD_LDFLAGS
-LIBS=$OLD_LIBS
+
+# Add macho support to GDB, but only if BFD includes it.
+
+  OLD_CFLAGS=$CFLAGS
+  OLD_LDFLAGS=$LDFLAGS
+  OLD_LIBS=$LIBS
+  # Put the old CFLAGS/LDFLAGS last, in case the user's (C|LD)FLAGS
+  # points somewhere with bfd, with -I/foo/lib and -L/foo/lib.  We
+  # always want our bfd.
+  CFLAGS="-I${srcdir}/../include -I../bfd -I${srcdir}/../bfd $CFLAGS"
+  LDFLAGS="-L../bfd -L../libiberty $LDFLAGS"
+  intl=`echo $LIBINTL | sed 's,${top_builddir}/,,g'`
+  # -ldl is provided by bfd/Makfile.am (LIBDL) <PLUGINS>.
+  if test "$plugins" = "yes"; then
+    LIBS="-ldl $LIBS"
+  fi
+  LIBS="-lbfd -liberty $intl $LIBS"
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for Mach-O support in BFD" >&5
+$as_echo_n "checking for Mach-O support in BFD... " >&6; }
+if test "${gdb_cv_var_macho+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <stdlib.h>
+  #include "bfd.h"
+  #include "mach-o.h"
+
+int
+main ()
+{
+return bfd_mach_o_lookup_command (NULL, 0, NULL);
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  gdb_cv_var_macho=yes
+else
+  gdb_cv_var_macho=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gdb_cv_var_macho" >&5
+$as_echo "$gdb_cv_var_macho" >&6; }
+  CFLAGS=$OLD_CFLAGS
+  LDFLAGS=$OLD_LDFLAGS
+  LIBS=$OLD_LIBS
+if test $gdb_cv_var_macho = yes; then
+  CONFIG_OBS="$CONFIG_OBS machoread.o"
+fi
 
 # Add any host-specific objects to GDB.
 CONFIG_OBS="${CONFIG_OBS} ${gdb_host_obs}"

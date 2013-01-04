@@ -1,7 +1,6 @@
 /* Ada language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 1992-1994, 1997-2000, 2003-2005, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -128,7 +127,7 @@ static struct value *resolve_subexp (struct expression **, int *, int,
                                      struct type *);
 
 static void replace_operator_with_call (struct expression **, int, int, int,
-                                        struct symbol *, struct block *);
+                                        struct symbol *, const struct block *);
 
 static int possible_user_operator_p (enum exp_opcode, struct value **);
 
@@ -150,7 +149,7 @@ static enum ada_renaming_category parse_old_style_renaming (struct type *,
 							    const char **);
 
 static struct symbol *find_old_style_renaming_symbol (const char *,
-						      struct block *);
+						      const struct block *);
 
 static struct type *ada_lookup_struct_elt_type (struct type *, char *,
                                                 int, int, int *);
@@ -3719,7 +3718,7 @@ get_selections (int *choices, int n_choices, int max_results,
 static void
 replace_operator_with_call (struct expression **expp, int pc, int nargs,
                             int oplen, struct symbol *sym,
-                            struct block *block)
+                            const struct block *block)
 {
   /* A new expression, with 6 more elements (3 for funcall, 4 for function
      symbol, -oplen for operator being replaced).  */
@@ -4232,7 +4231,7 @@ lookup_cached_symbol (const char *name, domain_enum namespace,
 
 static void
 cache_symbol (const char *name, domain_enum namespace, struct symbol *sym,
-              struct block *block)
+              const struct block *block)
 {
 }
 
@@ -4805,7 +4804,7 @@ remove_irrelevant_renamings (struct ada_symbol_info *syms,
   for (i = 0; i < nsyms; i += 1)
     {
       struct symbol *sym = syms[i].sym;
-      struct block *block = syms[i].block;
+      const struct block *block = syms[i].block;
       const char *name;
       const char *suffix;
 
@@ -5802,7 +5801,7 @@ ada_expand_partial_symbol_name (const char *name, void *user_data)
    the entire command on which completion is made.  */
 
 static VEC (char_ptr) *
-ada_make_symbol_completion_list (char *text0, char *word)
+ada_make_symbol_completion_list (char *text0, char *word, enum type_code code)
 {
   char *text;
   int text_len;
@@ -5816,6 +5815,8 @@ ada_make_symbol_completion_list (char *text0, char *word)
   struct block *b, *surrounding_static_block = 0;
   int i;
   struct block_iterator iter;
+
+  gdb_assert (code == TYPE_CODE_UNDEF);
 
   if (text0[0] == '<')
     {
@@ -5937,6 +5938,19 @@ ada_is_dispatch_table_ptr_type (struct type *type)
   return (strcmp (name, "ada__tags__dispatch_table") == 0);
 }
 
+/* Return non-zero if TYPE is an interface tag.  */
+
+static int
+ada_is_interface_tag (struct type *type)
+{
+  const char *name = TYPE_NAME (type);
+
+  if (name == NULL)
+    return 0;
+
+  return (strcmp (name, "ada__tags__interface_tag") == 0);
+}
+
 /* True if field number FIELD_NUM in struct or union type TYPE is supposed
    to be invisible to users.  */
 
@@ -5967,9 +5981,11 @@ ada_is_ignored_field (struct type *type, int field_num)
       return 1;
   }
 
-  /* If this is the dispatch table of a tagged type, then ignore.  */
+  /* If this is the dispatch table of a tagged type or an interface tag,
+     then ignore.  */
   if (ada_is_tagged_type (type, 1)
-      && ada_is_dispatch_table_ptr_type (TYPE_FIELD_TYPE (type, field_num)))
+      && (ada_is_dispatch_table_ptr_type (TYPE_FIELD_TYPE (type, field_num))
+	  || ada_is_interface_tag (TYPE_FIELD_TYPE (type, field_num))))
     return 1;
 
   /* Not a special field, so it should not be ignored.  */
@@ -6007,6 +6023,15 @@ struct type *
 ada_tag_type (struct value *val)
 {
   return ada_lookup_struct_elt_type (value_type (val), "_tag", 1, 0, NULL);
+}
+
+/* Return 1 if TAG follows the old scheme for Ada tags (used for Ada 95,
+   retired at Ada 05).  */
+
+static int
+is_ada95_tag (struct value *tag)
+{
+  return ada_value_struct_elt (tag, "tsd", 1) != NULL;
 }
 
 /* The value of the tag on VAL.  */
@@ -6050,6 +6075,88 @@ type_from_tag (struct value *tag)
   if (type_name != NULL)
     return ada_find_any_type (ada_encode (type_name));
   return NULL;
+}
+
+/* Given a value OBJ of a tagged type, return a value of this
+   type at the base address of the object.  The base address, as
+   defined in Ada.Tags, it is the address of the primary tag of
+   the object, and therefore where the field values of its full
+   view can be fetched.  */
+
+struct value *
+ada_tag_value_at_base_address (struct value *obj)
+{
+  volatile struct gdb_exception e;
+  struct value *val;
+  LONGEST offset_to_top = 0;
+  struct type *ptr_type, *obj_type;
+  struct value *tag;
+  CORE_ADDR base_address;
+
+  obj_type = value_type (obj);
+
+  /* It is the responsability of the caller to deref pointers.  */
+
+  if (TYPE_CODE (obj_type) == TYPE_CODE_PTR
+      || TYPE_CODE (obj_type) == TYPE_CODE_REF)
+    return obj;
+
+  tag = ada_value_tag (obj);
+  if (!tag)
+    return obj;
+
+  /* Base addresses only appeared with Ada 05 and multiple inheritance.  */
+
+  if (is_ada95_tag (tag))
+    return obj;
+
+  ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
+  ptr_type = lookup_pointer_type (ptr_type);
+  val = value_cast (ptr_type, tag);
+  if (!val)
+    return obj;
+
+  /* It is perfectly possible that an exception be raised while
+     trying to determine the base address, just like for the tag;
+     see ada_tag_name for more details.  We do not print the error
+     message for the same reason.  */
+
+  TRY_CATCH (e, RETURN_MASK_ERROR)
+    {
+      offset_to_top = value_as_long (value_ind (value_ptradd (val, -2)));
+    }
+
+  if (e.reason < 0)
+    return obj;
+
+  /* If offset is null, nothing to do.  */
+
+  if (offset_to_top == 0)
+    return obj;
+
+  /* -1 is a special case in Ada.Tags; however, what should be done
+     is not quite clear from the documentation.  So do nothing for
+     now.  */
+
+  if (offset_to_top == -1)
+    return obj;
+
+  base_address = value_address (obj) - offset_to_top;
+  tag = value_tag_from_contents_and_address (obj_type, NULL, base_address);
+
+  /* Make sure that we have a proper tag at the new address.
+     Otherwise, offset_to_top is bogus (which can happen when
+     the object is not initialized yet).  */
+
+  if (!tag)
+    return obj;
+
+  obj_type = type_from_tag (tag);
+
+  if (!obj_type)
+    return obj;
+
+  return value_from_contents_and_address (obj_type, NULL, base_address);
 }
 
 /* Return the "ada__tags__type_specific_data" type.  */
@@ -6707,9 +6814,9 @@ ada_value_struct_elt (struct value *arg, char *name, int no_err)
       CORE_ADDR address;
 
       if (TYPE_CODE (t) == TYPE_CODE_PTR)
-        address = value_as_address (arg);
+	address = value_address (ada_value_ind (arg));
       else
-        address = unpack_pointer (t, value_contents (arg));
+	address = value_address (ada_coerce_ref (arg));
 
       t1 = ada_to_fixed_type (ada_get_base_type (t1), NULL, address, NULL, 1);
       if (find_struct_field (name, t1, 0,
@@ -6985,6 +7092,9 @@ ada_value_ind (struct value *val0)
 {
   struct value *val = value_ind (val0);
 
+  if (ada_is_tagged_type (value_type (val), 0))
+    val = ada_tag_value_at_base_address (val);
+
   return ada_to_fixed_value (val);
 }
 
@@ -6999,6 +7109,10 @@ ada_coerce_ref (struct value *val0)
       struct value *val = val0;
 
       val = coerce_ref (val);
+
+      if (ada_is_tagged_type (value_type (val), 0))
+	val = ada_tag_value_at_base_address (val);
+
       return ada_to_fixed_value (val);
     }
   else
@@ -7082,7 +7196,7 @@ ada_find_any_type (const char *name)
    Return symbol if found, and NULL otherwise.  */
 
 struct symbol *
-ada_find_renaming_symbol (struct symbol *name_sym, struct block *block)
+ada_find_renaming_symbol (struct symbol *name_sym, const struct block *block)
 {
   const char *name = SYMBOL_LINKAGE_NAME (name_sym);
   struct symbol *sym;
@@ -7104,7 +7218,7 @@ ada_find_renaming_symbol (struct symbol *name_sym, struct block *block)
 }
 
 static struct symbol *
-find_old_style_renaming_symbol (const char *name, struct block *block)
+find_old_style_renaming_symbol (const char *name, const struct block *block)
 {
   const struct symbol *function_sym = block_linkage_function (block);
   char *rename;
@@ -7982,14 +8096,20 @@ ada_to_fixed_type_1 (struct type *type, const gdb_byte *valaddr,
 
         if (check_tag && address != 0 && ada_is_tagged_type (static_type, 0))
           {
-            struct type *real_type =
-              type_from_tag (value_tag_from_contents_and_address
-                             (fixed_record_type,
-                              valaddr,
-                              address));
-
+	    struct value *tag =
+	      value_tag_from_contents_and_address
+	      (fixed_record_type,
+	       valaddr,
+	       address);
+	    struct type *real_type = type_from_tag (tag);
+	    struct value *obj =
+	      value_from_contents_and_address (fixed_record_type,
+					       valaddr,
+					       address);
             if (real_type != NULL)
-              return to_fixed_record_type (real_type, valaddr, address, NULL);
+              return to_fixed_record_type
+		(real_type, NULL,
+		 value_address (ada_tag_value_at_base_address (obj)), NULL);
           }
 
         /* Check to see if there is a parallel ___XVZ variable.
@@ -9453,7 +9573,9 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
     default:
       *pos -= 1;
       arg1 = evaluate_subexp_standard (expect_type, exp, pos, noside);
-      arg1 = unwrap_value (arg1);
+
+      if (noside == EVAL_NORMAL)
+	arg1 = unwrap_value (arg1);
 
       /* If evaluating an OP_DOUBLE and an EXPECT_TYPE was provided,
          then we need to perform the conversion manually, because
@@ -9690,19 +9812,31 @@ ada_evaluate_subexp (struct type *expect_type, struct expression *exp,
                a fixed type would result in the loss of that type name,
                thus preventing us from printing the name of the ancestor
                type in the type description.  */
-            struct type *actual_type;
-
             arg1 = evaluate_subexp (NULL_TYPE, exp, pos, EVAL_NORMAL);
-            actual_type = type_from_tag (ada_value_tag (arg1));
-            if (actual_type == NULL)
-              /* If, for some reason, we were unable to determine
-                 the actual type from the tag, then use the static
-                 approximation that we just computed as a fallback.
-                 This can happen if the debugging information is
-                 incomplete, for instance.  */
-              actual_type = type;
 
-            return value_zero (actual_type, not_lval);
+	    if (TYPE_CODE (type) != TYPE_CODE_REF)
+	      {
+		struct type *actual_type;
+
+		actual_type = type_from_tag (ada_value_tag (arg1));
+		if (actual_type == NULL)
+		  /* If, for some reason, we were unable to determine
+		     the actual type from the tag, then use the static
+		     approximation that we just computed as a fallback.
+		     This can happen if the debugging information is
+		     incomplete, for instance.  */
+		  actual_type = type;
+		return value_zero (actual_type, not_lval);
+	      }
+	    else
+	      {
+		/* In the case of a ref, ada_coerce_ref takes care
+		   of determining the actual type.  But the evaluation
+		   should return a ref as it should be valid to ask
+		   for its address; so rebuild a ref after coerce.  */
+		arg1 = ada_coerce_ref (arg1);
+		return value_ref (arg1);
+	      }
           }
 
           *pos += 4;
@@ -10949,6 +11083,7 @@ is_known_support_routine (struct frame_info *frame)
   const char *func_name;
   enum language func_lang;
   int i;
+  const char *fullname;
 
   /* If this code does not have any debugging information (no symtab),
      This cannot be any user code.  */
@@ -10963,7 +11098,8 @@ is_known_support_routine (struct frame_info *frame)
      for the user.  This should also take care of case such as VxWorks
      where the kernel has some debugging info provided for a few units.  */
 
-  if (symtab_to_fullname (sal.symtab) == NULL)
+  fullname = symtab_to_fullname (sal.symtab);
+  if (access (fullname, R_OK) != 0)
     return 1;
 
   /* Check the unit filename againt the Ada runtime file naming.

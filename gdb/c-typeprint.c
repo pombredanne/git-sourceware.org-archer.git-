@@ -1,6 +1,5 @@
 /* Support for printing C and C++ types for GDB, the GNU debugger.
-   Copyright (C) 1986, 1988-1989, 1991-1996, 1998-2003, 2006-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1143,7 +1142,8 @@ c_type_print_base (struct type *type, struct ui_file *stream,
 		  struct cleanup *inner_cleanup;
 		  const char *physname = TYPE_FN_FIELD_PHYSNAME (f, j);
 		  int is_full_physname_constructor =
-		    is_constructor_name (physname) 
+		    TYPE_FN_FIELD_CONSTRUCTOR (f, j)
+		    || is_constructor_name (physname)
 		    || is_destructor_name (physname)
 		    || method_name[0] == '~';
 

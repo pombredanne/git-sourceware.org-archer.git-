@@ -1,6 +1,6 @@
 /* Ravenscar SPARC target support.
 
-   Copyright 2004, 2010-2012 Free Software Foundation, Inc.
+   Copyright 2004-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -23,14 +23,13 @@
 #include "sparc-tdep.h"
 #include "inferior.h"
 #include "ravenscar-thread.h"
+#include "sparc-ravenscar-thread.h"
 
-static struct ravenscar_arch_ops ravenscar_sparc_ops;
-
-static void ravenscar_sparc_fetch_registers (struct regcache *regcache,
+static void sparc_ravenscar_fetch_registers (struct regcache *regcache,
                                              int regnum);
-static void ravenscar_sparc_store_registers (struct regcache *regcache,
+static void sparc_ravenscar_store_registers (struct regcache *regcache,
                                              int regnum);
-static void ravenscar_sparc_prepare_to_store (struct regcache *regcache);
+static void sparc_ravenscar_prepare_to_store (struct regcache *regcache);
 
 /* Register offsets from a referenced address (exempli gratia the
    Thread_Descriptor).  The referenced address depends on the register
@@ -102,7 +101,7 @@ register_in_thread_descriptor_p (int regnum)
    thread.  */
 
 static void
-ravenscar_sparc_fetch_registers (struct regcache *regcache, int regnum)
+sparc_ravenscar_fetch_registers (struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   const int sp_regnum = gdbarch_sp_regnum (gdbarch);
@@ -145,7 +144,7 @@ ravenscar_sparc_fetch_registers (struct regcache *regcache, int regnum)
    thread.  */
 
 static void
-ravenscar_sparc_prepare_to_store (struct regcache *regcache)
+sparc_ravenscar_prepare_to_store (struct regcache *regcache)
 {
   /* Nothing to do.  */
 }
@@ -154,7 +153,7 @@ ravenscar_sparc_prepare_to_store (struct regcache *regcache)
    thread.  */
 
 static void
-ravenscar_sparc_store_registers (struct regcache *regcache, int regnum)
+sparc_ravenscar_store_registers (struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   int buf_size = register_size (gdbarch, regnum);
@@ -179,14 +178,17 @@ ravenscar_sparc_store_registers (struct regcache *regcache, int regnum)
                 buf_size);
 }
 
-/* Provide a prototype to silence -Wmissing-prototypes.  */
-extern void _initialize_ravenscar_sparc (void);
+static struct ravenscar_arch_ops sparc_ravenscar_ops =
+{
+  sparc_ravenscar_fetch_registers,
+  sparc_ravenscar_store_registers,
+  sparc_ravenscar_prepare_to_store
+};
+
+/* Register ravenscar_arch_ops in GDBARCH.  */
 
 void
-_initialize_ravenscar_sparc (void)
+register_sparc_ravenscar_ops (struct gdbarch *gdbarch)
 {
-  ravenscar_sparc_ops.to_fetch_registers = ravenscar_sparc_fetch_registers;
-  ravenscar_sparc_ops.to_store_registers = ravenscar_sparc_store_registers;
-  ravenscar_sparc_ops.to_prepare_to_store = ravenscar_sparc_prepare_to_store;
-  ravenscar_register_arch_ops (&ravenscar_sparc_ops);
+  set_gdbarch_ravenscar_ops (gdbarch, &sparc_ravenscar_ops);
 }

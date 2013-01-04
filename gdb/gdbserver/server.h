@@ -1,6 +1,5 @@
 /* Common definitions for remote server for GDB.
-   Copyright (C) 1993, 1995, 1997-2000, 2002-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1993-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -265,8 +264,6 @@ extern void start_event_loop (void);
 extern int handle_serial_event (int err, gdb_client_data client_data);
 extern int handle_target_event (int err, gdb_client_data client_data);
 
-extern void push_event (ptid_t ptid, struct target_waitstatus *status);
-
 /* Functions from hostio.c.  */
 extern int handle_vFile (char *, int, int *);
 
@@ -523,8 +520,8 @@ CORE_ADDR get_get_tsv_func_addr (void);
    function in the IPA.  */
 CORE_ADDR get_set_tsv_func_addr (void);
 
-CORE_ADDR current_insn_ptr;
-int emit_error;
+extern CORE_ADDR current_insn_ptr;
+extern int emit_error;
 
 /* Version information, from version.c.  */
 extern const char version[];

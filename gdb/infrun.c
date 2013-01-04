@@ -1,7 +1,7 @@
 /* Target-struct-independent code to start (run) and stop an inferior
    process.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -397,7 +397,7 @@ static void context_switch (ptid_t ptid);
 
 void init_thread_stepping_state (struct thread_info *tss);
 
-void init_infwait_state (void);
+static void init_infwait_state (void);
 
 static const char follow_fork_mode_child[] = "child";
 static const char follow_fork_mode_parent[] = "parent";
@@ -3033,25 +3033,11 @@ adjust_pc_after_break (struct execution_control_state *ecs)
     }
 }
 
-void
+static void
 init_infwait_state (void)
 {
   waiton_ptid = pid_to_ptid (-1);
   infwait_state = infwait_normal_state;
-}
-
-void
-error_is_running (void)
-{
-  error (_("Cannot execute this command while "
-	   "the selected thread is running."));
-}
-
-void
-ensure_not_running (void)
-{
-  if (is_running (inferior_ptid))
-    error_is_running ();
 }
 
 static int
@@ -4990,7 +4976,8 @@ process_event_stop_test:
 
 	tmp_sal = find_pc_line (ecs->stop_func_start, 0);
 	if (tmp_sal.line != 0
-	    && !function_pc_is_marked_for_skip (ecs->stop_func_start))
+	    && !function_name_is_marked_for_skip (ecs->stop_func_name,
+						  &tmp_sal))
 	  {
 	    if (execution_direction == EXEC_REVERSE)
 	      handle_step_into_function_backward (gdbarch, ecs);

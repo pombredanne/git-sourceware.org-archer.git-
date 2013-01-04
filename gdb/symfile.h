@@ -1,6 +1,6 @@
 /* Definitions for reading symbol files into GDB.
 
-   Copyright (C) 1990-2004, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1990-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -454,7 +454,8 @@ extern struct symfile_segment_data *default_symfile_segments (bfd *abfd);
 extern bfd_byte *default_symfile_relocate (struct objfile *objfile,
                                            asection *sectp, bfd_byte *buf);
 
-extern struct symtab *allocate_symtab (const char *, struct objfile *);
+extern struct symtab *allocate_symtab (const char *, struct objfile *)
+  ATTRIBUTE_NONNULL (1);
 
 extern void add_symtab_fns (const struct sym_fns *);
 
@@ -674,13 +675,6 @@ extern void dwarf2_build_frame_info (struct objfile *);
 void dwarf2_free_objfile (struct objfile *);
 
 /* From mdebugread.c */
-
-/* Hack to force structures to exist before use in parameter list.  */
-struct ecoff_debug_hack
-{
-  struct ecoff_debug_swap *a;
-  struct ecoff_debug_info *b;
-};
 
 extern void mdebug_build_psymtabs (struct objfile *,
 				   const struct ecoff_debug_swap *,

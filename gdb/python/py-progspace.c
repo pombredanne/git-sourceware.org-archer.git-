@@ -1,6 +1,6 @@
 /* Python interface to program spaces.
 
-   Copyright (C) 2010-2012 Free Software Foundation, Inc.
+   Copyright (C) 2010-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -73,7 +73,7 @@ pspy_dealloc (PyObject *self)
   Py_XDECREF (ps_self->printers);
   Py_XDECREF (ps_self->frame_filters);
   Py_XDECREF (ps_self->type_printers);
-  self->ob_type->tp_free (self);
+  Py_TYPE (self)->tp_free (self);
 }
 
 static PyObject *
@@ -328,8 +328,7 @@ static PyGetSetDef pspace_getset[] =
 
 static PyTypeObject pspace_object_type =
 {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
+  PyVarObject_HEAD_INIT (NULL, 0)
   "gdb.Progspace",		  /*tp_name*/
   sizeof (pspace_object),	  /*tp_basicsize*/
   0,				  /*tp_itemsize*/

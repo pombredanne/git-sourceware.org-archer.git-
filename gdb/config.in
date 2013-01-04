@@ -12,9 +12,6 @@
 /* Directory of programs. */
 #undef BINDIR
 
-/* Define to 1 if the compiler supports long long. */
-#undef CC_HAS_LONG_LONG
-
 /* Define to one of `_getb67', `GETB67', `getb67' for Cray-2 and Cray-YMP
    systems. This function is required for `alloca.c' support on those systems.
    */
@@ -221,6 +218,9 @@
 
 /* Define to 1 if you have the <link.h> header file. */
 #undef HAVE_LINK_H
+
+/* Define to 1 if you have the <linux/perf_event.h> header file. */
+#undef HAVE_LINUX_PERF_EVENT_H
 
 /* Define to 1 if you have the <locale.h> header file. */
 #undef HAVE_LOCALE_H

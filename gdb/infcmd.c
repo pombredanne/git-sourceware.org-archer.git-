@@ -1,6 +1,6 @@
 /* Memory-access and commands for "inferior" process, for GDB.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -56,20 +56,6 @@
 #include "inf-loop.h"
 #include "continuations.h"
 #include "linespec.h"
-
-/* Functions exported for general use, in inferior.h: */
-
-void all_registers_info (char *, int);
-
-void registers_info (char *, int);
-
-void nexti_command (char *, int);
-
-void stepi_command (char *, int);
-
-void continue_command (char *, int);
-
-void interrupt_target_command (char *args, int from_tty);
 
 /* Local functions: */
 
@@ -708,6 +694,24 @@ ensure_not_tfind_mode (void)
     error (_("Cannot execute this command while looking at trace frames."));
 }
 
+/* Throw an error indicating the current thread is running.  */
+
+static void
+error_is_running (void)
+{
+  error (_("Cannot execute this command while "
+	   "the selected thread is running."));
+}
+
+/* Calls error_is_running if the current thread is running.  */
+
+static void
+ensure_not_running (void)
+{
+  if (is_running (inferior_ptid))
+    error_is_running ();
+}
+
 void
 continue_1 (int all_threads)
 {
@@ -738,7 +742,7 @@ continue_1 (int all_threads)
 }
 
 /* continue [-a] [proceed-count] [&]  */
-void
+static void
 continue_command (char *args, int from_tty)
 {
   int async_exec = 0;
@@ -857,13 +861,13 @@ next_command (char *count_string, int from_tty)
 
 /* Likewise, but step only one instruction.  */
 
-void
+static void
 stepi_command (char *count_string, int from_tty)
 {
   step_1 (0, 1, count_string);
 }
 
-void
+static void
 nexti_command (char *count_string, int from_tty)
 {
   step_1 (1, 1, count_string);
@@ -2276,7 +2280,7 @@ registers_info (char *addr_exp, int fpregs)
     }
 }
 
-void
+static void
 all_registers_info (char *addr_exp, int from_tty)
 {
   registers_info (addr_exp, 1);
@@ -2791,7 +2795,7 @@ interrupt_target_1 (int all_threads)
    if the `-a' switch is used.  */
 
 /* interrupt [-a]  */
-void
+static void
 interrupt_target_command (char *args, int from_tty)
 {
   if (target_can_async_p ())
@@ -2865,10 +2869,13 @@ info_proc_cmd_1 (char *args, enum info_proc_what what, int from_tty)
 {
   struct gdbarch *gdbarch = get_current_arch ();
 
-  if (gdbarch_info_proc_p (gdbarch))
-    gdbarch_info_proc (gdbarch, args, what);
-  else
-    target_info_proc (args, what);
+  if (!target_info_proc (args, what))
+    {
+      if (gdbarch_info_proc_p (gdbarch))
+	gdbarch_info_proc (gdbarch, args, what);
+      else
+	error (_("Not supported on this target."));
+    }
 }
 
 /* Implement `info proc' when given without any futher parameters.  */

@@ -1,6 +1,6 @@
 /* Perform non-arithmetic operations on values, for GDB.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -569,6 +569,10 @@ value_cast (struct type *type, struct value *arg2)
 	}
       return val;
     }
+  else if (code1 == TYPE_CODE_VOID)
+    {
+      return value_zero (type, not_lval);
+    }
   else if (TYPE_LENGTH (type) == TYPE_LENGTH (type2))
     {
       if (code1 == TYPE_CODE_PTR && code2 == TYPE_CODE_PTR)
@@ -582,10 +586,6 @@ value_cast (struct type *type, struct value *arg2)
     }
   else if (VALUE_LVAL (arg2) == lval_memory)
     return value_at_lazy (type, value_address (arg2));
-  else if (code1 == TYPE_CODE_VOID)
-    {
-      return value_zero (type, not_lval);
-    }
   else
     {
       error (_("Invalid cast."));
@@ -1516,7 +1516,7 @@ value_of_variable (struct symbol *var, const struct block *b)
 }
 
 struct value *
-address_of_variable (struct symbol *var, struct block *b)
+address_of_variable (struct symbol *var, const struct block *b)
 {
   struct type *type = SYMBOL_TYPE (var);
   struct value *val;
@@ -3177,42 +3177,6 @@ destructor_name_p (const char *name, struct type *type)
       else
 	return 1;
     }
-  return 0;
-}
-
-/* Given TYPE, a structure/union,
-   return 1 if the component named NAME from the ultimate target
-   structure/union is defined, otherwise, return 0.  */
-
-int
-check_field (struct type *type, const char *name)
-{
-  int i;
-
-  /* The type may be a stub.  */
-  CHECK_TYPEDEF (type);
-
-  for (i = TYPE_NFIELDS (type) - 1; i >= TYPE_N_BASECLASSES (type); i--)
-    {
-      const char *t_field_name = TYPE_FIELD_NAME (type, i);
-
-      if (t_field_name && (strcmp_iw (t_field_name, name) == 0))
-	return 1;
-    }
-
-  /* C++: If it was not found as a data field, then try to return it
-     as a pointer to a method.  */
-
-  for (i = TYPE_NFN_FIELDS (type) - 1; i >= 0; --i)
-    {
-      if (strcmp_iw (TYPE_FN_FIELDLIST_NAME (type, i), name) == 0)
-	return 1;
-    }
-
-  for (i = TYPE_N_BASECLASSES (type) - 1; i >= 0; i--)
-    if (check_field (TYPE_BASECLASS (type, i), name))
-      return 1;
-
   return 0;
 }
 

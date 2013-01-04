@@ -1,7 +1,6 @@
 /* Low level interface for debugging AIX 4.3+ pthreads.
 
-   Copyright (C) 1999-2000, 2002, 2007-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 1999-2013 Free Software Foundation, Inc.
    Written by Nick Duffek <nsd@redhat.com>.
 
    This file is part of GDB.
@@ -59,7 +58,7 @@
 #include <sys/pthdebug.h>
 
 #if !HAVE_DECL_GETTHRDS
-extern int getthrds (pid_t, struct thrdsinfo64 *, int, pthdb_tid_t *, int);
+extern int getthrds (pid_t, struct thrdsinfo64 *, int, tid_t *, int);
 #endif
 
 /* Whether to emit debugging output.  */
@@ -648,7 +647,7 @@ static pthdb_tid_t
 get_signaled_thread (void)
 {
   struct thrdsinfo64 thrinf;
-  pthdb_tid_t ktid = 0;
+  tid_t ktid = 0;
   int result = 0;
 
   while (1)

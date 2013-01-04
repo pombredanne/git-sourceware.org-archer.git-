@@ -1,4 +1,4 @@
-# Copyright (C) 2010-2012 Free Software Foundation, Inc.
+# Copyright (C) 2010-2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -18,9 +18,17 @@ import os
 import sys
 import _gdb
 
+if sys.version_info[0] > 2:
+    # Python 3 moved "reload"
+    from imp import reload
+
 from _gdb import *
 
-class GdbOutputFile:
+class _GdbFile (object):
+    # These two are needed in Python 3
+    encoding = "UTF-8"
+    errors = "strict"
+    
     def close(self):
         # Do nothing.
         return None
@@ -28,35 +36,22 @@ class GdbOutputFile:
     def isatty(self):
         return False
 
+    def writelines(self, iterable):
+        for line in iterable:
+            self.write(line)
+
+    def flush(self):
+        flush()
+
+class GdbOutputFile (_GdbFile):
     def write(self, s):
         write(s, stream=STDOUT)
 
-    def writelines(self, iterable):
-        for line in iterable:
-            self.write(line)
-
-    def flush(self):
-        flush()
-
 sys.stdout = GdbOutputFile()
 
-class GdbOutputErrorFile:
-    def close(self):
-        # Do nothing.
-        return None
-
-    def isatty(self):
-        return False
-
+class GdbOutputErrorFile (_GdbFile):
     def write(self, s):
         write(s, stream=STDERR)
-
-    def writelines(self, iterable):
-        for line in iterable:
-            self.write(line)
-
-    def flush(self):
-        flush()
 
 sys.stderr = GdbOutputErrorFile()
 
@@ -109,7 +104,7 @@ def auto_load_packages():
                     else:
                         __import__(modname)
                 except:
-                    print >> sys.stderr, traceback.format_exc()
+                    sys.stderr.write (traceback.format_exc() + "\n")
 
 auto_load_packages()
 

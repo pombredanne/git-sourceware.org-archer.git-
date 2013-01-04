@@ -1,8 +1,7 @@
 /* *INDENT-OFF* */ /* ATTRIBUTE_PRINTF confuses indent, avoid running it
 		      for now.  */
 /* Basic, host-specific, and target-specific definitions for GDB.
-   Copyright (C) 1986, 1988-2005, 2007-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -116,8 +115,6 @@ typedef bfd_vma CORE_ADDR;
 
 /* This is to make sure that LONGEST is at least as big as CORE_ADDR.  */
 
-#ifndef LONGEST
-
 #ifdef BFD64
 
 #define LONGEST BFD_HOST_64_BIT
@@ -125,24 +122,10 @@ typedef bfd_vma CORE_ADDR;
 
 #else /* No BFD64 */
 
-#ifdef CC_HAS_LONG_LONG
 #define LONGEST long long
 #define ULONGEST unsigned long long
-#else
-#ifdef BFD_HOST_64_BIT
-/* BFD_HOST_64_BIT is defined for some hosts that don't have long long
-   (e.g. i386-windows) so try it.  */
-#define LONGEST BFD_HOST_64_BIT
-#define ULONGEST BFD_HOST_U_64_BIT
-#else
-#define LONGEST long
-#define ULONGEST unsigned long
-#endif
-#endif
 
 #endif /* No BFD64 */
-
-#endif /* ! LONGEST */
 
 #ifndef min
 #define min(a, b) ((a) < (b) ? (a) : (b))
@@ -372,8 +355,6 @@ extern int source_full_path_of (const char *, char **);
 extern void mod_path (char *, char **);
 
 extern void add_path (char *, char **, int);
-
-extern void directory_command (char *, int);
 
 extern void directory_switch (char *, int);
 
@@ -613,6 +594,7 @@ enum gdb_osabi
   GDB_OSABI_DARWIN,
   GDB_OSABI_SYMBIAN,
   GDB_OSABI_OPENVMS,
+  GDB_OSABI_LYNXOS178,
 
   GDB_OSABI_INVALID		/* keep this last */
 };
@@ -629,12 +611,6 @@ enum gdb_osabi
 
 #ifdef HAVE_STDLIB_H
 #include <stdlib.h>
-#endif
-#ifndef min
-#define min(a, b) ((a) < (b) ? (a) : (b))
-#endif
-#ifndef max
-#define max(a, b) ((a) > (b) ? (a) : (b))
 #endif
 
 
