@@ -126,7 +126,7 @@ struct macro_source_file
   struct macro_table *table;
 
   /* A source file --- possibly a header file.  */
-  const char *fullname;
+  const char *raw_fullname;
 
   /* The location we were #included from, or zero if we are the
      compilation unit's main source file.  */
@@ -226,7 +226,7 @@ void macro_define_special (struct macro_table *table);
    least-nested inclusion --- the one closest to the main source file.  */
 struct macro_source_file *(macro_lookup_inclusion
                            (struct macro_source_file *source,
-                            const char *name));
+                            const char *raw_fullname));
 
 
 /* Record an object-like #definition (i.e., one with no parameter list).

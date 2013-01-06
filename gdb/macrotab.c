@@ -387,7 +387,7 @@ new_source_file (struct macro_table *t,
 
   memset (f, 0, sizeof (*f));
   f->table = t;
-  f->fullname = macro_bcache_str (t, fullname);
+  f->raw_fullname = macro_bcache_str (t, fullname);
   f->includes = 0;
 
   return f;
@@ -407,7 +407,7 @@ free_macro_source_file (struct macro_source_file *src)
       free_macro_source_file (child);
     }
 
-  macro_bcache_free (src->table, (char *) src->fullname);
+  macro_bcache_free (src->table, (char *) src->raw_fullname);
   macro_free (src, src->table);
 }
 
@@ -472,7 +472,8 @@ macro_include (struct macro_source_file *source,
          First, squawk.  */
       complaint (&symfile_complaints,
 		 _("both `%s' and `%s' allegedly #included at %s:%d"),
-		 included_fullname, (*link)->fullname, source->fullname, line);
+		 included_fullname, (*link)->raw_fullname, source->raw_fullname,
+		 line);
 
       /* Now, choose a new, unoccupied line number for this
          #inclusion, after the alleged #inclusion line.  */
@@ -498,30 +499,12 @@ macro_include (struct macro_source_file *source,
 
 
 struct macro_source_file *
-macro_lookup_inclusion (struct macro_source_file *source, const char *name)
+macro_lookup_inclusion (struct macro_source_file *source,
+			const char *raw_fullname)
 {
-+printf("source->fullname=<%s> name=<%s>\n",source->fullname,name);
   /* Is SOURCE itself named NAME?  */
-  if (filename_cmp (name, source->fullname) == 0)
+  if (filename_cmp (raw_fullname, source->raw_fullname) == 0)
     return source;
-
-#if 0
-  /* The filename in the source structure is probably a full path, but
-     NAME could be just the final component of the name.  */
-  {
-    int name_len = strlen (name);
-    int src_name_len = strlen (source->fullname);
-
-    /* We do mean < here, and not <=; if the lengths are the same,
-       then the filename_cmp above should have triggered, and we need to
-       check for a slash here.  */
-    if (name_len < src_name_len
-        && IS_DIR_SEPARATOR (source->fullname[src_name_len - name_len - 1])
-        && filename_cmp (name,
-			 source->fullname + src_name_len - name_len) == 0)
-      return source;
-  }
-#endif
 
   /* It's not us.  Try all our children, and return the lowest.  */
   {
@@ -532,7 +515,7 @@ macro_lookup_inclusion (struct macro_source_file *source, const char *name)
     for (child = source->includes; child; child = child->next_included)
       {
         struct macro_source_file *result
-          = macro_lookup_inclusion (child, name);
+          = macro_lookup_inclusion (child, raw_fullname);
 
         if (result)
           {
@@ -736,8 +719,9 @@ check_for_redefinition (struct macro_source_file *source, int line,
 	  complaint (&symfile_complaints,
 		     _("macro `%s' redefined at %s:%d; "
 		       "original definition at %s:%d"),
-		     name, source->fullname, line,
-		     found_key->start_file->fullname, found_key->start_line);
+		     name, source->raw_fullname, line,
+		     found_key->start_file->raw_fullname,
+		     found_key->start_line);
         }
 
       return found_key;
@@ -860,8 +844,8 @@ macro_undef (struct macro_source_file *source, int line,
                          _("macro '%s' is #undefined twice,"
                            " at %s:%d and %s:%d"),
                          name,
-                         source->fullname, line,
-                         key->end_file->fullname, key->end_line);
+                         source->raw_fullname, line,
+                         key->end_file->raw_fullname, key->end_line);
             }
 
           /* Whether or not we've seen a prior #undefinition, wipe out
@@ -887,7 +871,7 @@ macro_undef (struct macro_source_file *source, int line,
    when needed.  */
 
 static struct macro_definition *
-fixup_definition (const char *fullname, int line, struct macro_definition *def)
+fixup_definition (const char *raw_fullname, int line, struct macro_definition *def)
 {
   static char *saved_expansion;
 
@@ -901,7 +885,7 @@ fixup_definition (const char *fullname, int line, struct macro_definition *def)
     {
       if (def->argc == macro_FILE)
 	{
-	  saved_expansion = macro_stringify (fullname);
+	  saved_expansion = macro_stringify (raw_fullname);
 	  def->replacement = saved_expansion;
 	}
       else if (def->argc == macro_LINE)
@@ -921,7 +905,7 @@ macro_lookup_definition (struct macro_source_file *source,
   splay_tree_node n = find_definition (name, source, line);
 
   if (n)
-    return fixup_definition (source->fullname, line,
+    return fixup_definition (source->raw_fullname, line,
 			     (struct macro_definition *) n->value);
   else
     return 0;
@@ -966,7 +950,7 @@ foreach_macro (splay_tree_node node, void *arg)
   struct macro_for_each_data *datum = (struct macro_for_each_data *) arg;
   struct macro_key *key = (struct macro_key *) node->key;
   struct macro_definition *def
-    = fixup_definition (key->start_file->fullname, key->start_line,
+    = fixup_definition (key->start_file->raw_fullname, key->start_line,
 			(struct macro_definition *) node->value);
 
   (*datum->fn) (key->name, def, key->start_file, key->start_line,
@@ -994,7 +978,7 @@ foreach_macro_in_scope (splay_tree_node node, void *info)
   struct macro_for_each_data *datum = (struct macro_for_each_data *) info;
   struct macro_key *key = (struct macro_key *) node->key;
   struct macro_definition *def
-    = fixup_definition (datum->file->fullname, datum->line,
+    = fixup_definition (datum->file->raw_fullname, datum->line,
 			(struct macro_definition *) node->value);
 
   /* See if this macro is defined before the passed-in line, and
