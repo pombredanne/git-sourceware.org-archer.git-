@@ -26,6 +26,7 @@
 #include "frame.h"
 #include "inferior.h"
 #include "complaints.h"
+#include "filenames.h"
 
 /* A table of user-defined macros.  Unlike the macro tables used for
    symtabs, this one uses xmalloc for all its allocation, not an
@@ -50,7 +51,7 @@ sal_macro_scope (struct symtab_and_line sal)
 
   main_file = macro_main (sal.symtab->macro_table);
 
-  if (sal.symtab->dirname == NULL)
+  if (IS_ABSOLUTE_PATH (sal.symtab->filename) || sal.symtab->dirname == NULL)
     raw_fullname = xstrdup (sal.symtab->filename);
   else
     raw_fullname = concat (sal.symtab->dirname, SLASH_STRING,
