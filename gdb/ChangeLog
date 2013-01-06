@@ -1,3 +1,49 @@
+2013-01-03  Pierre Muller  <muller@sourceware.org>
+
+	* main.c (relocate_gdb_directory): Avoid calling stat function
+	if DIR is empty.
+
+2013-01-03  Yao Qi  <yao@codesourcery.com>
+
+	* psymtab.c (fixup_psymbol_section): Update declaration.
+	(fixup_psymbol_section): Remove code returning value.
+
+2013-01-03  Yao Qi  <yao@codesourcery.com>
+
+	* symtab.h: Remove some out of date comments.
+	 (enum exception_event_kind): Move it ...
+	* breakpoint.c: ... here.
+
+2013-01-02  Iain Sandoe  <developer@sandoe-acoustics.co.uk>
+
+	PR gdb/14405
+	* darwin-nat.c (darwin_read_dyld_info): Only build if
+	TASK_DYLD_INFO_COUNT is defined.
+	(darwin_xfer_partial): Call darwin_read_dyld_info only if
+	TASK_DYLD_INFO_COUNT is defined.
+
+2013-01-02  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.h (struct ecoff_debug_hack): Remove.
+	* objfiles.c: Don't include mdebugread.h.
+
+2013-01-02  Tom Tromey  <tromey@redhat.com>
+
+	* config/i386/darwin.mh (NATDEPFILES): Remove machoread.o.
+	* configure.ac: Check for Mach-O support in BFD.  Update
+	CONFIG_OBS.
+	* configure: Rebuild.
+
+2013-01-02  Tom Tromey  <tromey@redhat.com>
+
+	* acinclude.m4 (GDB_AC_CHECK_BFD): New macro.
+	* configure.ac: Use GDB_AC_CHECK_BFD.
+	* configure: Rebuild.
+
+2013-01-01  Maxim Kuvyrkov  <maxim.kuvyrkov@gmail.com>
+
+	* MAINTAINERS: Update my email.
+
 2013-01-01  Joel Brobecker  <brobecker@adacore.com>
 
 	* cli/cli-script.h (make_cleanup_free_command_lines): Make extern.
