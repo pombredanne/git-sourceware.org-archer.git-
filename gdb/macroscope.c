@@ -52,7 +52,7 @@ sal_macro_scope (struct symtab_and_line sal)
 
   if (sal.symtab->dirname == NULL)
     raw_fullname = xstrdup (sal.symtab->filename);
-
+  else
     raw_fullname = concat (sal.symtab->dirname, SLASH_STRING,
 			   sal.symtab->filename, NULL);
   inclusion = macro_lookup_inclusion (main_file, raw_fullname);
