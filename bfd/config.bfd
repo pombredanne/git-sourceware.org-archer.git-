@@ -1,6 +1,6 @@
 # config.bfd
 #
-#   Copyright 2012 Free Software Foundation
+#   Copyright 2012, 2013 Free Software Foundation
 #
 # This file is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -378,7 +378,7 @@ case "${targ}" in
     targ_underscore=yes
     ;;
 
-  cr16-*-elf*)
+  cr16-*-elf* | cr16*-*-uclinux*)
     targ_defvec=bfd_elf32_cr16_vec
     targ_underscore=yes
     ;;
@@ -974,7 +974,16 @@ case "${targ}" in
     targ_selvecs="bfd_elf32_nlittlemips_vec bfd_elf32_bigmips_vec bfd_elf32_littlemips_vec bfd_elf64_bigmips_vec bfd_elf64_littlemips_vec"
     want64=true
     ;;
+  mips64*-ps2-elf*)
+    targ_defvec=bfd_elf32_nlittlemips_vec
+    targ_selvecs="bfd_elf32_nlittlemips_vec bfd_elf32_nbigmips_vec bfd_elf32_bigmips_vec bfd_elf32_littlemips_vec bfd_elf64_bigmips_vec bfd_elf64_littlemips_vec"
+    want64=true
+    ;;
 #endif
+  mips*-ps2-elf*)
+    targ_defvec=bfd_elf32_littlemips_vec
+    targ_selvecs="bfd_elf32_bigmips_vec bfd_elf32_littlemips_vec bfd_elf64_bigmips_vec bfd_elf64_littlemips_vec"
+    ;;
   mips*-*-irix5*)
     targ_defvec=bfd_elf32_bigmips_vec
     targ_selvecs="bfd_elf32_littlemips_vec ecoff_big_vec ecoff_little_vec"
