@@ -26,7 +26,8 @@ if {[prepare_for_testing $testfile.exp $testfile $srcfile {debug c++}]} {
 
 if { [skip_python_tests] } { continue }
 
-set remote_python_file [remote_download host ${srcdir}/${subdir}/${testfile}.py]
+set remote_python_file [gdb_remote_download host \
+			    ${srcdir}/${subdir}/${testfile}.py]
 
 gdb_test_no_output "python exec (open ('${remote_python_file}').read ())"
 
