@@ -5699,7 +5699,7 @@ print_breakpoint_location (struct breakpoint *b,
       if (ui_out_is_mi_like_p (uiout))
 	ui_out_field_string (uiout, "fullname",
 			     symtab_to_fullname (loc->symtab));
-
+      
       ui_out_field_int (uiout, "line", loc->line_number);
     }
   else if (loc)
