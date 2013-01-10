@@ -351,7 +351,7 @@ function_name_is_marked_for_skip (const char *function_name,
       if (e->filename != NULL)
 	{
 	  if (function_sal->symtab != NULL
-	      && compare_filenames_for_search (function_sal->symtab->filename_,
+	      && compare_filenames_for_search (function_sal->symtab->filename,
 					       e->filename))
 	    return 1;
 

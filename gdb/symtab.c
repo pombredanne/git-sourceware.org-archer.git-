@@ -203,7 +203,7 @@ iterate_over_some_symtabs (const char *name,
 
   for (s = first; s != NULL && s != after_last; s = s->next)
     {
-      if (compare_filenames_for_search (s->filename_, name)
+      if (compare_filenames_for_search (s->filename, name)
 	  || compare_filenames_for_search (symtab_to_fullname (s), name))
 	{
 	  if (callback (s, data))
