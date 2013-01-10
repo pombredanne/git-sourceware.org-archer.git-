@@ -1,3 +1,34 @@
+2013-01-09  Anthony Green  <green@moxielogic.com>
+
+	* cp-abi.c (cplus_print_vtable): Don't return value from void
+	function.
+	* ada-lang.c (re_set_catch_assert): Ditto.
+
+2013-01-09  Doug Evans  <dje@google.com>
+
+	* symfile.h (quick_symbol_functions): Delete member
+	pre_expand_symtabs_matching.  All uses removed.
+	* dwarf2read.c (dw2_lookup_symbol): Implement.
+	(dw2_do_expand_symtabs_matching): Delete.
+	(dw2_pre_expand_symtabs_matching): Delete.
+	(struct dw2_symtab_iterator): New type.
+	(dw2_symtab_iter_init, dw2_symtab_iter_next): New functions.
+	(dw2_expand_symtabs_for_function): Rewrite.
+	(dwarf2_gdb_index_functions): Update.
+	* psymtab.c (pre_expand_symtabs_matching_psymtabs): Delete.
+	(psym_functions): Update.
+
+2013-01-09  Tom Tromey  <tromey@redhat.com>
+
+	* config/pa/hpux.mh (NATDEPFILES): Remove somread.o.
+	* configure: Rebuild.
+	* configure.ac: Add somread.o to the build if BFD has SOM
+	support.
+	* somread.c: Include som/aout.h, not syms.h.
+	(som_symtab_read): Use som_external_symbol_dictionary_record.
+	Unpack records manually.
+	(_initialize_somread): Declare.
+
 2012-01-08  Mike Frysinger  <vapier@gentoo.org>
 
 	* common/linux-ptrace.c (linux_ptrace_test_ret_to_nx) [__x86_64__]:
