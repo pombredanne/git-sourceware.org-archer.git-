@@ -11794,7 +11794,7 @@ allocate_location_catch_assert (struct breakpoint *self)
 static void
 re_set_catch_assert (struct breakpoint *b)
 {
-  return re_set_exception (ex_catch_assert, b);
+  re_set_exception (ex_catch_assert, b);
 }
 
 static void
