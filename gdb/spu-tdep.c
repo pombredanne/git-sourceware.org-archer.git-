@@ -1,5 +1,5 @@
 /* SPU target-dependent code for GDB, the GNU debugger.
-   Copyright (C) 2006-2012 Free Software Foundation, Inc.
+   Copyright (C) 2006-2013 Free Software Foundation, Inc.
 
    Contributed by Ulrich Weigand <uweigand@de.ibm.com>.
    Based on a port by Sid Manning <sid@us.ibm.com>.
@@ -1186,7 +1186,7 @@ spu2ppu_sniffer (const struct frame_unwind *self,
   CORE_ADDR base, func, backchain;
   gdb_byte buf[4];
 
-  if (gdbarch_bfd_arch_info (target_gdbarch)->arch == bfd_arch_spu)
+  if (gdbarch_bfd_arch_info (target_gdbarch ())->arch == bfd_arch_spu)
     return 0;
 
   base = get_frame_sp (this_frame);
@@ -1217,7 +1217,7 @@ spu2ppu_sniffer (const struct frame_unwind *self,
       else
 	{
 	  struct regcache *regcache;
-	  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch);
+	  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch ());
 	  cache->regcache = regcache_dup (regcache);
 	  *this_prologue_cache = cache;
 	  return 1;

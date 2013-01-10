@@ -1,7 +1,6 @@
 /* Target-dependent code for the HP PA-RISC architecture.
 
-   Copyright (C) 1986-1987, 1989-1996, 1998-2005, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    Contributed by the Center for Software Science at the
    University of Utah (pa-gdb-bugs@cs.utah.edu).
@@ -2640,7 +2639,7 @@ hppa64_cannot_fetch_register (struct gdbarch *gdbarch, int regnum)
 }
 
 static CORE_ADDR
-hppa_smash_text_address (struct gdbarch *gdbarch, CORE_ADDR addr)
+hppa_addr_bits_remove (struct gdbarch *gdbarch, CORE_ADDR addr)
 {
   /* The low two bits of the PC on the PA contain the privilege level.
      Some genius implementing a (non-GCC) compiler apparently decided
@@ -3058,8 +3057,7 @@ hppa_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   set_gdbarch_inner_than (gdbarch, core_addr_greaterthan);
   set_gdbarch_sp_regnum (gdbarch, HPPA_SP_REGNUM);
   set_gdbarch_fp0_regnum (gdbarch, HPPA_FP0_REGNUM);
-  set_gdbarch_addr_bits_remove (gdbarch, hppa_smash_text_address);
-  set_gdbarch_smash_text_address (gdbarch, hppa_smash_text_address);
+  set_gdbarch_addr_bits_remove (gdbarch, hppa_addr_bits_remove);
   set_gdbarch_believe_pcc_promotion (gdbarch, 1);
   set_gdbarch_read_pc (gdbarch, hppa_read_pc);
   set_gdbarch_write_pc (gdbarch, hppa_write_pc);

@@ -1,3 +1,137 @@
+2013-01-07  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Mode Options): Don't mention -epoch.
+	(Data, Emacs): Remove obsolete comments.
+
+2013-01-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (GDB/MI Output Records): Update menu.
+	(GDB/MI Breakpoint Information): New node.
+	(GDB/MI Breakpoint Commands) <-break-info>: Link to new node.
+	<-break-insert>: Likewise.
+
+2012-12-31  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Remote Non-Stop): Move paragraphs to ...
+	(Packets): Move "vStopped" packet to ...
+	(Notification Packets): ... here.  Describe the components
+	of notification.  Add a table of supported notifications.
+	Add an example on the process of he async notification.
+
+2012-12-25  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (GDB/MI Data Manipulation) (fullname): Make it always
+	present.
+	(GDB/MI File Commands) (-file-list-exec-source-files): Make the
+	fullname output always present.
+
+2012-12-23  Pierre Muller  <muller@sourceware.org>
+
+        * gdbint.texinfo (Function prototypes): Require use of "extern"
+        modifier for function prototypes in headers.
+
+2012-12-19  Joel Brobecker  <brobecker@adacore.com>
+
+	* refcard.tex: Update copyright notice to GPL v3 or later.
+	Update contact info.
+
+2012-12-16  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdbint.texinfo (Coding Standards) (C Usage): New rule for 0 vs. NULL.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Debugging Output): Document 'set debug
+	notification' and 'show debug notification'.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Listing Tracepoints): New item and example about
+	'installed on target' output.
+	Add more in the example about 'installed on target'.
+	(GDB/MI Breakpoint Commands): Doc about 'installed field.
+
+2012-12-14  Tom Tromey  <tromey@redhat.com>
+
+        * gdb.texinfo (SVR4 Process Information): Mention core files.
+
+2012-12-12 Mircea Gherzan <mircea.gherzan@intel.com>
+    
+	* gdb.texinfo (GDB/MI Catchpoint Commands): New section.
+
+2012-12-11  Pedro Alves  <palves@redhat.com>
+
+	* gdb.texinfo: Remove all mentions of Unixware throughout.
+
+2012-12-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdbint.texinfo (Host Definition): Remove CC_HAS_LONG_LONG.
+
+2012-11-29  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (SVR4 Process Information): Document missing
+	"info proc" subcommands.
+
+2012-11-29  Yao Qi  <yao@codesourcery.com>
+
+	PR gdb/1477.
+	* gdb.texinfo (Print Settings): Correct the default 'demangle-style'
+	to 'auto' instead of 'gnu'.
+
+2012-11-26  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (MiniDebugInfo): New node.
+	(GDB Files): Update.
+
+2012-11-16  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (System-wide configuration): If the system-wide init
+	file lives in the data-directory, and --data-directory is provided,
+	look for it there.
+
+2012-11-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Signaling): Fix typo.
+
+2012-11-13  Giuseppe Montalto  <giuseppe.montalto@st.com>
+
+	* gdb.texinfo (GDB/MI Data Manipulation): Document new optional
+	parameter "count" of -data-write-memory-bytes, and add an example.
+
+2012-11-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Symbols): Document "info type-printers",
+	"enable type-printer" and "disable type-printer".
+	(Python API): Add new node to menu.
+	(Type Printing API): New node.
+	(Progspaces In Python): Document type_printers field.
+	(Objfiles In Python): Likewise.
+	(gdb.types) <get_type_recognizers, apply_type_recognizers,
+	register_type_printer, TypePrinter>: Document.
+
+2012-11-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Symbols): Document "set print type methods",
+	"set print type typedefs", and flags to ptype and whatis.
+
+2012-11-09  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.texinfo (GDB/MI Data Manipulation): Add fullname field to
+	the example -data-disassemble output.  Extend the description of
+	the -data-disassemble results to document all fields.  Document
+	the cli disassemble command as being related to -data-disassemble.
+
+2012-11-09  Yao Qi  <yao@codesourcery.com>
+
+	PR gdb/14777.
+	* gdb.texinfo (OS Information): Remove doc on command
+	'info udot'.
+
+2012-11-08  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.texinfo (Startup): Minor rewording, and clarify scope of
+	gdb.ini warning for Windows port.
+
 2012-11-08  Yao Qi  <yao@codesourcery.com>
 
 	* gdb.texinfo (Search): Add kindex for 'fo'.

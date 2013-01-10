@@ -1,6 +1,6 @@
 /* General python/gdb code
 
-   Copyright (C) 2008-2012 Free Software Foundation, Inc.
+   Copyright (C) 2008-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -70,8 +70,13 @@ static const char *gdbpy_should_print_stack = python_excp_message;
 #include "gdbthread.h"
 #include "observer.h"
 #include "interps.h"
+#include "event-top.h"
 
 static PyMethodDef GdbMethods[];
+
+#ifdef IS_PY3K
+static struct PyModuleDef GdbModuleDef;
+#endif
 
 PyObject *gdb_module;
 PyObject *gdb_python_module;
@@ -198,8 +203,10 @@ eval_python_command (const char *command)
     return -1;
 
   Py_DECREF (v);
+#ifndef IS_PY3K
   if (Py_FlushLine ())
     PyErr_Clear ();
+#endif
 
   return 0;
 }
@@ -1181,6 +1188,125 @@ gdbpy_objfiles (PyObject *unused1, PyObject *unused2)
   return list;
 }
 
+/* Compute the list of active type printers and return it.  The result
+   of this function can be passed to apply_type_printers, and should
+   be freed by free_type_printers.  */
+
+void *
+start_type_printers (void)
+{
+  struct cleanup *cleanups;
+  PyObject *type_module, *func, *result_obj = NULL;
+
+  cleanups = ensure_python_env (get_current_arch (), current_language);
+
+  type_module = PyImport_ImportModule ("gdb.types");
+  if (type_module == NULL)
+    {
+      gdbpy_print_stack ();
+      goto done;
+    }
+  make_cleanup_py_decref (type_module);
+
+  func = PyObject_GetAttrString (type_module, "get_type_recognizers");
+  if (func == NULL)
+    {
+      gdbpy_print_stack ();
+      goto done;
+    }
+  make_cleanup_py_decref (func);
+
+  result_obj = PyObject_CallFunctionObjArgs (func, (char *) NULL);
+  if (result_obj == NULL)
+    gdbpy_print_stack ();
+
+ done:
+  do_cleanups (cleanups);
+  return result_obj;
+}
+
+/* If TYPE is recognized by some type printer, return a newly
+   allocated string holding the type's replacement name.  The caller
+   is responsible for freeing the string.  Otherwise, return NULL.
+
+   This function has a bit of a funny name, since it actually applies
+   recognizers, but this seemed clearer given the start_type_printers
+   and free_type_printers functions.  */
+
+char *
+apply_type_printers (void *printers, struct type *type)
+{
+  struct cleanup *cleanups;
+  PyObject *type_obj, *type_module, *func, *result_obj;
+  PyObject *printers_obj = printers;
+  char *result = NULL;
+
+  if (printers_obj == NULL)
+    return NULL;
+
+  cleanups = ensure_python_env (get_current_arch (), current_language);
+
+  type_obj = type_to_type_object (type);
+  if (type_obj == NULL)
+    {
+      gdbpy_print_stack ();
+      goto done;
+    }
+  make_cleanup_py_decref (type_obj);
+
+  type_module = PyImport_ImportModule ("gdb.types");
+  if (type_module == NULL)
+    {
+      gdbpy_print_stack ();
+      goto done;
+    }
+  make_cleanup_py_decref (type_module);
+
+  func = PyObject_GetAttrString (type_module, "apply_type_recognizers");
+  if (func == NULL)
+    {
+      gdbpy_print_stack ();
+      goto done;
+    }
+  make_cleanup_py_decref (func);
+
+  result_obj = PyObject_CallFunctionObjArgs (func, printers_obj,
+					     type_obj, (char *) NULL);
+  if (result_obj == NULL)
+    {
+      gdbpy_print_stack ();
+      goto done;
+    }
+  make_cleanup_py_decref (result_obj);
+
+  if (result_obj != Py_None)
+    {
+      result = python_string_to_host_string (result_obj);
+      if (result == NULL)
+	gdbpy_print_stack ();
+    }
+
+ done:
+  do_cleanups (cleanups);
+  return result;
+}
+
+/* Free the result of start_type_printers.  */
+
+void
+free_type_printers (void *arg)
+{
+  struct cleanup *cleanups;
+  PyObject *printers = arg;
+
+  if (printers == NULL)
+    return;
+
+  cleanups = ensure_python_env (get_current_arch (), current_language);
+  Py_DECREF (printers);
+  do_cleanups (cleanups);
+}
+
 #else /* HAVE_PYTHON */
 
 /* Dummy implementation of the gdb "python-interactive" and "python"
@@ -1238,6 +1364,23 @@ gdbpy_breakpoint_has_py_cond (struct breakpoint_object *bp_obj)
 		    "scripting is not supported."));
 }
 
+void *
+start_type_printers (void)
+{
+  return NULL;
+}
+
+char *
+apply_type_printers (void *ignore, struct type *type)
+{
+  return NULL;
+}
+
+void
+free_type_printers (void *arg)
+{
+}
+
 #endif /* HAVE_PYTHON */
 
 
@@ -1279,8 +1422,8 @@ finalize_python (void *ignore)
      Python interpreter, which we are about to destroy.  It seems
      clearer to make the needed calls explicitly here than to create a
      cleanup and then mysteriously discard it.  */
-  PyGILState_Ensure ();
-  python_gdbarch = target_gdbarch;
+  (void) PyGILState_Ensure ();
+  python_gdbarch = target_gdbarch ();
   python_language = current_language;
 
   Py_Finalize ();
@@ -1295,6 +1438,13 @@ _initialize_python (void)
 {
   char *cmd_name;
   struct cmd_list_element *cmd;
+  char *progname;
+#ifdef IS_PY3K
+  int i;
+  size_t progsize, count;
+  char *oldloc;
+  wchar_t *progname_copy;
+#endif
 
   add_com ("python-interactive", class_obscure,
 	   python_interactive_command,
@@ -1374,14 +1524,50 @@ message == an error message without a stack will be printed."),
      /foo/bin/python
      /foo/lib/pythonX.Y/...
      This must be done before calling Py_Initialize.  */
-  Py_SetProgramName (concat (ldirname (python_libdir), SLASH_STRING, "bin",
-			     SLASH_STRING, "python", NULL));
+  progname = concat (ldirname (python_libdir), SLASH_STRING, "bin",
+		     SLASH_STRING, "python", NULL);
+#ifdef IS_PY3K
+  oldloc = setlocale (LC_ALL, NULL);
+  setlocale (LC_ALL, "");
+  progsize = strlen (progname);
+  if (progsize == (size_t) -1)
+    {
+      fprintf (stderr, "Could not convert python path to string\n");
+      return;
+    }
+  progname_copy = PyMem_Malloc ((progsize + 1) * sizeof (wchar_t));
+  if (!progname_copy)
+    {
+      fprintf (stderr, "out of memory\n");
+      return;
+    }
+  count = mbstowcs (progname_copy, progname, progsize + 1);
+  if (count == (size_t) -1)
+    {
+      fprintf (stderr, "Could not convert python path to string\n");
+      return;
+    }
+  setlocale (LC_ALL, oldloc);
+
+  /* Note that Py_SetProgramName expects the string it is passed to
+     remain alive for the duration of the program's execution, so
+     it is not freed after this call.  */
+  Py_SetProgramName (progname_copy);
+#else
+  Py_SetProgramName (progname);
+#endif
 #endif
 
   Py_Initialize ();
   PyEval_InitThreads ();
 
+#ifdef IS_PY3K
+  gdb_module = PyModule_Create (&GdbModuleDef);
+  /* Add _gdb module to the list of known built-in modules.  */
+  _PyImport_FixupBuiltin (gdb_module, "_gdb");
+#else
   gdb_module = Py_InitModule ("_gdb", GdbMethods);
+#endif
 
   /* The casts to (char*) are for python 2.4.  */
   PyModule_AddStringConstant (gdb_module, "VERSION", (char*) version);
@@ -1476,7 +1662,17 @@ finish_python_initialization (void)
 
   sys_path = PySys_GetObject ("path");
 
-  if (sys_path && PyList_Check (sys_path))
+  /* If sys.path is not defined yet, define it first.  */
+  if (!(sys_path && PyList_Check (sys_path)))
+    {
+#ifdef IS_PY3K
+      PySys_SetPath (L"");
+#else
+      PySys_SetPath ("");
+#endif
+      sys_path = PySys_GetObject ("path");
+    }
+  if (sys_path && PyList_Check (sys_path))  
     {
       PyObject *pythondir;
       int err;
@@ -1492,7 +1688,7 @@ finish_python_initialization (void)
       Py_DECREF (pythondir);
     }
   else
-    PySys_SetPath (gdb_pythondir);
+    goto fail;
 
   /* Import the gdb module to finish the initialization, and
      add it to __main__ for convenience.  */
@@ -1632,4 +1828,18 @@ Return a tuple containing all inferiors." },
   {NULL, NULL, 0, NULL}
 };
 
+#ifdef IS_PY3K
+static struct PyModuleDef GdbModuleDef =
+{
+  PyModuleDef_HEAD_INIT,
+  "_gdb",
+  NULL,
+  -1, 
+  GdbMethods,
+  NULL,
+  NULL,
+  NULL,
+  NULL
+};
+#endif
 #endif /* HAVE_PYTHON */

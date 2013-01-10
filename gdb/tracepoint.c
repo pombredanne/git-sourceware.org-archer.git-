@@ -1,6 +1,6 @@
 /* Tracing functionality for remote targets in custom GDB protocol
 
-   Copyright (C) 1997-2012 Free Software Foundation, Inc.
+   Copyright (C) 1997-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -92,11 +92,6 @@ void (*deprecated_trace_start_stop_hook) (int start, int from_tty);
 extern void (*deprecated_readline_begin_hook) (char *, ...);
 extern char *(*deprecated_readline_hook) (char *);
 extern void (*deprecated_readline_end_hook) (void);
-
-/* GDB commands implemented in other modules:
- */  
-
-extern void output_command (char *, int);
 
 /* 
    Tracepoint.c:
@@ -312,8 +307,7 @@ set_traceframe_context (struct frame_info *trace_frame)
 
   /* Save file name as "$trace_file", a debugger variable visible to
      users.  */
-  if (traceframe_sal.symtab == NULL
-      || traceframe_sal.symtab->filename == NULL)
+  if (traceframe_sal.symtab == NULL)
     clear_internalvar (lookup_internalvar ("trace_file"));
   else
     set_internalvar_string (lookup_internalvar ("trace_file"),
@@ -1767,6 +1761,7 @@ start_tracing (char *notes)
     {
       struct tracepoint *t = (struct tracepoint *) b;
       struct bp_location *loc;
+      int bp_location_downloaded = 0;
 
       /* Clear `inserted' flag.  */
       for (loc = b->loc; loc; loc = loc->next)
@@ -1788,6 +1783,7 @@ start_tracing (char *notes)
 	  target_download_tracepoint (loc);
 
 	  loc->inserted = 1;
+	  bp_location_downloaded = 1;
 	}
 
       t->number_on_target = b->number;
@@ -1795,6 +1791,9 @@ start_tracing (char *notes)
       for (loc = b->loc; loc; loc = loc->next)
 	if (loc->probe != NULL)
 	  loc->probe->pops->set_semaphore (loc->probe, loc->gdbarch);
+
+      if (bp_location_downloaded)
+	observer_notify_breakpoint_modified (b);
     }
   VEC_free (breakpoint_p, tp_vec);
 
@@ -3470,6 +3469,10 @@ void
 merge_uploaded_tracepoints (struct uploaded_tp **uploaded_tps)
 {
   struct uploaded_tp *utp;
+  /* A set of tracepoints which are modified.  */
+  VEC(breakpoint_p) *modified_tp = NULL;
+  int ix;
+  struct breakpoint *b;
 
   /* Look for GDB tracepoints that match up with our uploaded versions.  */
   for (utp = *uploaded_tps; utp; utp = utp->next)
@@ -3480,6 +3483,8 @@ merge_uploaded_tracepoints (struct uploaded_tp **uploaded_tps)
       loc = find_matching_tracepoint_location (utp);
       if (loc)
 	{
+	  int found = 0;
+
 	  /* Mark this location as already inserted.  */
 	  loc->inserted = 1;
 	  t = (struct tracepoint *) loc->owner;
@@ -3487,6 +3492,22 @@ merge_uploaded_tracepoints (struct uploaded_tp **uploaded_tps)
 			     "as target's tracepoint %d at %s.\n"),
 			   loc->owner->number, utp->number,
 			   paddress (loc->gdbarch, utp->addr));
+
+	  /* The tracepoint LOC->owner was modified (the location LOC
+	     was marked as inserted in the target).  Save it in
+	     MODIFIED_TP if not there yet.  The 'breakpoint-modified'
+	     observers will be notified later once for each tracepoint
+	     saved in MODIFIED_TP.  */
+	  for (ix = 0;
+	       VEC_iterate (breakpoint_p, modified_tp, ix, b);
+	       ix++)
+	    if (b == loc->owner)
+	      {
+		found = 1;
+		break;
+	      }
+	  if (!found)
+	    VEC_safe_push (breakpoint_p, modified_tp, loc->owner);
 	}
       else
 	{
@@ -3509,6 +3530,12 @@ merge_uploaded_tracepoints (struct uploaded_tp **uploaded_tps)
 	t->number_on_target = utp->number;
     }
 
+  /* Notify 'breakpoint-modified' observer that at least one of B's
+     locations was changed.  */
+  for (ix = 0; VEC_iterate (breakpoint_p, modified_tp, ix, b); ix++)
+    observer_notify_breakpoint_modified (b);
+
+  VEC_free (breakpoint_p, modified_tp);
   free_uploaded_tps (uploaded_tps);
 }
 
@@ -4206,7 +4233,7 @@ tfile_get_traceframe_address (off_t tframe_offset)
   tfile_read ((gdb_byte *) &tpnum, 2);
   tpnum = (short) extract_signed_integer ((gdb_byte *) &tpnum, 2,
 					  gdbarch_byte_order
-					      (target_gdbarch));
+					      (target_gdbarch ()));
 
   tp = get_tracepoint_by_number_on_target (tpnum);
   /* FIXME this is a poor heuristic if multiple locations.  */
@@ -4250,14 +4277,14 @@ tfile_trace_find (enum trace_find_type type, int num,
       tfile_read ((gdb_byte *) &tpnum, 2);
       tpnum = (short) extract_signed_integer ((gdb_byte *) &tpnum, 2,
 					      gdbarch_byte_order
-						  (target_gdbarch));
+						  (target_gdbarch ()));
       offset += 2;
       if (tpnum == 0)
 	break;
       tfile_read ((gdb_byte *) &data_size, 4);
       data_size = (unsigned int) extract_unsigned_integer
                                      ((gdb_byte *) &data_size, 4,
-				      gdbarch_byte_order (target_gdbarch));
+				      gdbarch_byte_order (target_gdbarch ()));
       offset += 4;
       switch (type)
 	{
@@ -4365,7 +4392,7 @@ traceframe_walk_blocks (walk_blocks_callback_func callback,
           mlen = (unsigned short)
                 extract_unsigned_integer ((gdb_byte *) &mlen, 2,
                                           gdbarch_byte_order
-                                              (target_gdbarch));
+                                              (target_gdbarch ()));
 	  lseek (trace_fd, mlen, SEEK_CUR);
 	  pos += (8 + 2 + mlen);
 	  break;
@@ -4502,7 +4529,7 @@ tfile_xfer_partial (struct target_ops *ops, enum target_object object,
 	{
 	  ULONGEST maddr, amt;
 	  unsigned short mlen;
-	  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
+	  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
 
 	  tfile_read ((gdb_byte *) &maddr, 8);
 	  maddr = extract_unsigned_integer ((gdb_byte *) &maddr, 8,
@@ -4585,13 +4612,13 @@ tfile_get_trace_state_variable_value (int tsvnum, LONGEST *val)
       tfile_read ((gdb_byte *) &vnum, 4);
       vnum = (int) extract_signed_integer ((gdb_byte *) &vnum, 4,
 					   gdbarch_byte_order
-					   (target_gdbarch));
+					   (target_gdbarch ()));
       if (tsvnum == vnum)
 	{
 	  tfile_read ((gdb_byte *) val, 8);
 	  *val = extract_signed_integer ((gdb_byte *) val, 8,
 					 gdbarch_byte_order
-					 (target_gdbarch));
+					 (target_gdbarch ()));
 	  return 1;
 	}
       pos += (4 + 8);
@@ -4739,7 +4766,7 @@ parse_static_tracepoint_marker_definition (char *line, char **pp,
   p = unpack_varlen_hex (p, &addr);
   p++;  /* skip a colon */
 
-  marker->gdbarch = target_gdbarch;
+  marker->gdbarch = target_gdbarch ();
   marker->address = (CORE_ADDR) addr;
 
   endp = strchr (p, ':');
@@ -4840,8 +4867,7 @@ print_one_static_tracepoint_marker (int count,
 	{
 	  const char *fullname = symtab_to_fullname (sal.symtab);
 
-	  if (fullname)
-	    ui_out_field_string (uiout, "fullname", fullname);
+	  ui_out_field_string (uiout, "fullname", fullname);
 	}
       else
 	ui_out_field_skip (uiout, "fullname");
@@ -4916,7 +4942,7 @@ info_static_tracepoint_markers_command (char *arg, int from_tty)
   ui_out_table_header (uiout, 40, ui_left, "marker-id", "ID");
 
   ui_out_table_header (uiout, 3, ui_left, "enabled", "Enb");
-  if (gdbarch_addr_bit (target_gdbarch) <= 32)
+  if (gdbarch_addr_bit (target_gdbarch ()) <= 32)
     ui_out_table_header (uiout, 10, ui_left, "addr", "Address");
   else
     ui_out_table_header (uiout, 18, ui_left, "addr", "Address");

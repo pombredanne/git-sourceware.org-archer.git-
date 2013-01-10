@@ -1,6 +1,6 @@
 /* ELF linking support for BFD.
    Copyright 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
+   2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -4394,8 +4394,6 @@ error_free_dyn:
 		    {
 		      h->def_dynamic = 0;
 		      h->ref_dynamic = 1;
-		      /* PR 12549: Note if the dynamic reference is weak.  */
-		      h->ref_dynamic_nonweak = (bind != STB_WEAK);
 		    }
 		}
 
@@ -4413,9 +4411,6 @@ error_free_dyn:
 		{
 		  h->ref_dynamic = 1;
 		  hi->ref_dynamic = 1;
-		  /* PR 12549: Note if the dynamic reference is weak.  */
-		  hi->ref_dynamic_nonweak =
-		    h->ref_dynamic_nonweak = (bind != STB_WEAK);
 		}
 	      else
 		{
@@ -4503,8 +4498,8 @@ error_free_dyn:
 	  if (!add_needed
 	      && definition
 	      && ((dynsym
-		   && h->ref_regular_nonweak)
-		  || (h->ref_dynamic_nonweak
+		   && h->ref_regular)
+		  || (h->ref_dynamic
 		      && (elf_dyn_lib_class (abfd) & DYN_AS_NEEDED) != 0
 		      && !on_needed_list (elf_dt_name (abfd), htab->needed))))
 	    {
@@ -7922,31 +7917,49 @@ get_value (bfd_vma size,
 	   bfd *input_bfd,
 	   bfd_byte *location)
 {
+  int shift;
   bfd_vma x = 0;
+
+  /* Sanity checks.  */
+  BFD_ASSERT (chunksz <= sizeof (x)
+	      && size >= chunksz
+	      && chunksz != 0
+	      && (size % chunksz) == 0
+	      && input_bfd != NULL
+	      && location != NULL);
+
+  if (chunksz == sizeof (x))
+    {
+      BFD_ASSERT (size == chunksz);
+
+      /* Make sure that we do not perform an undefined shift operation.
+	 We know that size == chunksz so there will only be one iteration
+	 of the loop below.  */
+      shift = 0;
+    }
+  else
+    shift = 8 * chunksz;
 
   for (; size; size -= chunksz, location += chunksz)
     {
       switch (chunksz)
 	{
-	default:
-	case 0:
-	  abort ();
 	case 1:
-	  x = (x << (8 * chunksz)) | bfd_get_8 (input_bfd, location);
+	  x = (x << shift) | bfd_get_8 (input_bfd, location);
 	  break;
 	case 2:
-	  x = (x << (8 * chunksz)) | bfd_get_16 (input_bfd, location);
+	  x = (x << shift) | bfd_get_16 (input_bfd, location);
 	  break;
 	case 4:
-	  x = (x << (8 * chunksz)) | bfd_get_32 (input_bfd, location);
+	  x = (x << shift) | bfd_get_32 (input_bfd, location);
 	  break;
-	case 8:
 #ifdef BFD64
-	  x = (x << (8 * chunksz)) | bfd_get_64 (input_bfd, location);
-#else
-	  abort ();
-#endif
+	case 8:
+	  x = (x << shift) | bfd_get_64 (input_bfd, location);
 	  break;
+#endif
+	default:
+	  abort ();
 	}
     }
   return x;
@@ -13082,5 +13095,5 @@ elf_append_rel (bfd *abfd, asection *s, Elf_Internal_Rela *rel)
   const struct elf_backend_data *bed = get_elf_backend_data (abfd);
   bfd_byte *loc = s->contents + (s->reloc_count++ * bed->s->sizeof_rel);
   BFD_ASSERT (loc + bed->s->sizeof_rel <= s->contents + s->size);
-  bed->s->swap_reloca_out (abfd, rel, loc);
+  bed->s->swap_reloc_out (abfd, rel, loc);
 }

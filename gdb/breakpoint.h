@@ -1,5 +1,5 @@
 /* Data structures associated with breakpoints in GDB.
-   Copyright (C) 1992-2004, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -756,12 +756,12 @@ struct watchpoint
   struct expression *exp;
   /* The largest block within which it is valid, or NULL if it is
      valid anywhere (e.g. consists just of global symbols).  */
-  struct block *exp_valid_block;
+  const struct block *exp_valid_block;
   /* The conditional expression if any.  */
   struct expression *cond_exp;
   /* The largest block within which it is valid, or NULL if it is
      valid anywhere (e.g. consists just of global symbols).  */
-  struct block *cond_exp_valid_block;
+  const struct block *cond_exp_valid_block;
   /* Value of the watchpoint the last time we checked it, or NULL when
      we do not know the value yet or the value was not readable.  VAL
      is never lazy.  */
@@ -1404,6 +1404,11 @@ extern void disable_breakpoints_in_shlibs (void);
 
 /* This function returns TRUE if ep is a catchpoint.  */
 extern int is_catchpoint (struct breakpoint *);
+
+/* Shared helper function (MI and CLI) for creating and installing
+   a shared object event catchpoint.  */
+extern void add_solib_catchpoint (char *arg, int is_load, int is_temp,
+                                  int enabled);
 
 /* Enable breakpoints and delete when hit.  Called with ARG == NULL
    deletes all breakpoints.  */

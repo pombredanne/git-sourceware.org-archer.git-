@@ -1575,7 +1575,7 @@ struct relax_table {
 /* These sections are global, and are managed by BFD.  The application
    and target back end are not permitted to change the values in
    these sections.  */
-extern asection std_section[4];
+extern asection _bfd_std_section[4];
 
 #define BFD_ABS_SECTION_NAME "*ABS*"
 #define BFD_UND_SECTION_NAME "*UND*"
@@ -1583,13 +1583,13 @@ extern asection std_section[4];
 #define BFD_IND_SECTION_NAME "*IND*"
 
 /* Pointer to the common section.  */
-#define bfd_com_section_ptr (&std_section[0])
+#define bfd_com_section_ptr (&_bfd_std_section[0])
 /* Pointer to the undefined section.  */
-#define bfd_und_section_ptr (&std_section[1])
+#define bfd_und_section_ptr (&_bfd_std_section[1])
 /* Pointer to the absolute section.  */
-#define bfd_abs_section_ptr (&std_section[2])
+#define bfd_abs_section_ptr (&_bfd_std_section[2])
 /* Pointer to the indirect section.  */
-#define bfd_ind_section_ptr (&std_section[3])
+#define bfd_ind_section_ptr (&_bfd_std_section[3])
 
 #define bfd_is_und_section(sec) ((sec) == bfd_und_section_ptr)
 #define bfd_is_abs_section(sec) ((sec) == bfd_abs_section_ptr)
@@ -1892,6 +1892,7 @@ enum bfd_architecture
 #define bfd_mach_mips5000              5000
 #define bfd_mach_mips5400              5400
 #define bfd_mach_mips5500              5500
+#define bfd_mach_mips5900              5900
 #define bfd_mach_mips6000              6000
 #define bfd_mach_mips7000              7000
 #define bfd_mach_mips8000              8000
@@ -2054,6 +2055,7 @@ enum bfd_architecture
   bfd_arch_tic6x,     /* Texas Instruments TMS320C6X */
   bfd_arch_tic80,     /* TI TMS320c80 (MVP) */
   bfd_arch_v850,      /* NEC V850 */
+  bfd_arch_v850_rh850,/* NEC V850 (using RH850 ABI) */
 #define bfd_mach_v850          1
 #define bfd_mach_v850e         'E'
 #define bfd_mach_v850e1        '1'
@@ -5069,6 +5071,37 @@ value in a word.  The relocation is relative offset from  */
 /* This is used to tell the dynamic linker to copy the value out of
 the dynamic object into the runtime process image.  */
   BFD_RELOC_MICROBLAZE_COPY,
+
+/* Unused Reloc  */
+  BFD_RELOC_MICROBLAZE_64_TLS,
+
+/* This is a 64 bit reloc that stores the 32 bit GOT relative value
+of the GOT TLS GD info entry in two words (with an imm instruction). The
+relocation is GOT offset.  */
+  BFD_RELOC_MICROBLAZE_64_TLSGD,
+
+/* This is a 64 bit reloc that stores the 32 bit GOT relative value
+of the GOT TLS LD info entry in two words (with an imm instruction). The
+relocation is GOT offset.  */
+  BFD_RELOC_MICROBLAZE_64_TLSLD,
+
+/* This is a 32 bit reloc that stores the Module ID to GOT(n).  */
+  BFD_RELOC_MICROBLAZE_32_TLSDTPMOD,
+
+/* This is a 32 bit reloc that stores TLS offset to GOT(n+1).  */
+  BFD_RELOC_MICROBLAZE_32_TLSDTPREL,
+
+/* This is a 32 bit reloc for storing TLS offset to two words (uses imm
+instruction)  */
+  BFD_RELOC_MICROBLAZE_64_TLSDTPREL,
+
+/* This is a 64 bit reloc that stores 32-bit thread pointer relative offset
+to two words (uses imm instruction).  */
+  BFD_RELOC_MICROBLAZE_64_TLSGOTTPREL,
+
+/* This is a 64 bit reloc that stores 32-bit thread pointer relative offset
+to two words (uses imm instruction).  */
+  BFD_RELOC_MICROBLAZE_64_TLSTPREL,
 
 /* AArch64 ADD immediate instruction, holding bits 0 to 11 of the address.
 Used in conjunction with BFD_RELOC_AARCH64_ADR_HI21_PCREL.  */

@@ -9,8 +9,7 @@
 @end direntry
 
 @copying
-Copyright @copyright{} 1990-1994, 1996, 1998-2006, 2008-2012 Free
-Software Foundation, Inc.
+Copyright @copyright{} 1990-2013 Free Software Foundation, Inc.
 Contributed by Cygnus Solutions.  Written by John Gilmore.
 Second Edition by Stan Shebs.
 
@@ -2760,11 +2759,6 @@ Substitute for isatty, if not available.
 
 @item FOPEN_RB
 Define this if binary files are opened the same way as text files.
-
-@item CC_HAS_LONG_LONG
-@cindex @code{long long} data type
-Define this if the host C compiler supports @code{long long}.  This is set
-by the @code{configure} script.
 
 @item PRINTF_HAS_LONG_LONG
 Define this if the host can handle printing of long long integers via
@@ -5912,6 +5906,25 @@ protected with parentheses.)
 Declarations like @samp{struct foo *} should be used in preference to
 declarations like @samp{typedef struct foo @{ @dots{} @} *foo_ptr}.
 
+Zero constant (@code{0}) is not interchangeable with a null pointer
+constant (@code{NULL}) anywhere.  @sc{gcc} does not give a warning for
+such interchange.  Specifically:
+
+@multitable @columnfractions .2 .5
+@item incorrect
+@tab @code{if (pointervar) @{@}}
+@item incorrect
+@tab @code{if (!pointervar) @{@}}
+@item incorrect
+@tab @code{if (pointervar != 0) @{@}}
+@item incorrect
+@tab @code{if (pointervar == 0) @{@}}
+@item correct
+@tab @code{if (pointervar != NULL) @{@}}
+@item correct
+@tab @code{if (pointervar == NULL) @{@}}
+@end multitable
+
 @subsection Function Prototypes
 @cindex function prototypes
 
@@ -5921,7 +5934,8 @@ argument type and name, with the name matching that used in the actual
 function definition.
 
 All external functions should have a declaration in a header file that
-callers include, except for @code{_initialize_*} functions, which must
+callers include, that declaration should use the @code{extern} modifier.
+The only exception concerns @code{_initialize_*} functions, which must
 be external so that @file{init.c} construction works, but shouldn't be
 visible to random source files.
 

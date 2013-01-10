@@ -1,7 +1,6 @@
 /* Source-language-related definitions for GDB.
 
-   Copyright (C) 1991-1995, 1998-2000, 2003-2004, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1991-2013 Free Software Foundation, Inc.
 
    Contributed by the Department of Computer Science at the State University
    of New York at Buffalo.
@@ -31,6 +30,7 @@ struct frame_info;
 struct expression;
 struct ui_file;
 struct value_print_options;
+struct type_print_options;
 
 #define MAX_FORTRAN_DIMS  7	/* Maximum number of F77 array dims.  */
 
@@ -185,7 +185,7 @@ struct language_defn
     /* Print a type using syntax appropriate for this language.  */
 
     void (*la_print_type) (struct type *, const char *, struct ui_file *, int,
-			   int);
+			   int, const struct type_print_options *);
 
     /* Print a typedef using syntax appropriate for this language.
        TYPE is the underlying type.  NEW_SYMBOL is the symbol naming
@@ -283,8 +283,11 @@ struct language_defn
 
     /* Should return a vector of all symbols which are possible
        completions for TEXT.  WORD is the entire command on which the
-       completion is being made.  */
-    VEC (char_ptr) *(*la_make_symbol_completion_list) (char *text, char *word);
+       completion is being made.  If CODE is TYPE_CODE_UNDEF, then all
+       symbols should be examined; otherwise, only STRUCT_DOMAIN
+       symbols whose type has a code of CODE should be matched.  */
+    VEC (char_ptr) *(*la_make_symbol_completion_list) (char *text, char *word,
+						       enum type_code code);
 
     /* The per-architecture (OS/ABI) language information.  */
     void (*la_language_arch_info) (struct gdbarch *,
@@ -416,8 +419,8 @@ extern enum language set_language (enum language);
    the current setting of working_lang, which the user sets
    with the "set language" command.  */
 
-#define LA_PRINT_TYPE(type,varstring,stream,show,level) \
-  (current_language->la_print_type(type,varstring,stream,show,level))
+#define LA_PRINT_TYPE(type,varstring,stream,show,level,flags)		\
+  (current_language->la_print_type(type,varstring,stream,show,level,flags))
 
 #define LA_PRINT_TYPEDEF(type,new_symbol,stream) \
   (current_language->la_print_typedef(type,new_symbol,stream))

@@ -1,6 +1,6 @@
 /* Internal type definitions for GDB.
 
-   Copyright (C) 1992-2004, 2006-2012 Free Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -837,8 +837,12 @@ struct cplus_struct_type
 	       to reconstruct the rest of the fields).  */
 	    unsigned int is_stub:1;
 
+	    /* True if this function is a constructor, false
+	       otherwise.  */
+	    unsigned int is_constructor : 1;
+
 	    /* Unused.  */
-	    unsigned int dummy:4;
+	    unsigned int dummy:3;
 
 	    /* Index into that baseclass's virtual function table,
 	       minus 2; else if static: VOFFSET_STATIC; else: 0.  */
@@ -852,15 +856,6 @@ struct cplus_struct_type
 
       }
      *fn_fieldlists;
-
-    /* Pointer to information about enclosing scope, if this is a
-       local type.  If it is not a local type, this is NULL. */
-    struct local_type_info
-      {
-	char *file;
-	int line;
-      }
-     *localtype_ptr;
 
     /* typedefs defined inside this class.  TYPEDEF_FIELD points to an array of
        TYPEDEF_FIELD_COUNT elements.  */
@@ -1221,14 +1216,11 @@ extern void allocate_gnat_aux_type (struct type *);
 #define TYPE_FN_FIELD_ARTIFICIAL(thisfn, n) ((thisfn)[n].is_artificial)
 #define TYPE_FN_FIELD_ABSTRACT(thisfn, n) ((thisfn)[n].is_abstract)
 #define TYPE_FN_FIELD_STUB(thisfn, n) ((thisfn)[n].is_stub)
+#define TYPE_FN_FIELD_CONSTRUCTOR(thisfn, n) ((thisfn)[n].is_constructor)
 #define TYPE_FN_FIELD_FCONTEXT(thisfn, n) ((thisfn)[n].fcontext)
 #define TYPE_FN_FIELD_VOFFSET(thisfn, n) ((thisfn)[n].voffset-2)
 #define TYPE_FN_FIELD_VIRTUAL_P(thisfn, n) ((thisfn)[n].voffset > 1)
 #define TYPE_FN_FIELD_STATIC_P(thisfn, n) ((thisfn)[n].voffset == VOFFSET_STATIC)
-
-#define TYPE_LOCALTYPE_PTR(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr)
-#define TYPE_LOCALTYPE_FILE(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr->file)
-#define TYPE_LOCALTYPE_LINE(thistype) (TYPE_CPLUS_SPECIFIC(thistype)->localtype_ptr->line)
 
 #define TYPE_TYPEDEF_FIELD_ARRAY(thistype) \
   TYPE_CPLUS_SPECIFIC (thistype)->typedef_field
@@ -1556,7 +1548,7 @@ extern struct type *lookup_typename (const struct language_defn *,
 				     const struct block *, int);
 
 extern struct type *lookup_template_type (char *, struct type *,
-					  struct block *);
+					  const struct block *);
 
 extern int get_vptr_fieldno (struct type *, struct type **);
 
@@ -1656,5 +1648,7 @@ extern struct type *copy_type_recursive (struct objfile *objfile,
 					 htab_t copied_types);
 
 extern struct type *copy_type (const struct type *type);
+
+extern int types_equal (struct type *, struct type *);
 
 #endif /* GDBTYPES_H */

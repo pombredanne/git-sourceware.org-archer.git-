@@ -1,6 +1,6 @@
 /* Memory-access and commands for "inferior" process, for GDB.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -56,20 +56,6 @@
 #include "inf-loop.h"
 #include "continuations.h"
 #include "linespec.h"
-
-/* Functions exported for general use, in inferior.h: */
-
-void all_registers_info (char *, int);
-
-void registers_info (char *, int);
-
-void nexti_command (char *, int);
-
-void stepi_command (char *, int);
-
-void continue_command (char *, int);
-
-void interrupt_target_command (char *args, int from_tty);
 
 /* Local functions: */
 
@@ -469,7 +455,7 @@ post_create_inferior (struct target_ops *target, int from_tty)
 
 	  /* If the solist is global across processes, there's no need to
 	     refetch it here.  */
-	  if (!gdbarch_has_global_solist (target_gdbarch))
+	  if (!gdbarch_has_global_solist (target_gdbarch ()))
 	    {
 #ifdef SOLIB_ADD
 	      SOLIB_ADD (NULL, 0, target, auto_solib_add);
@@ -708,6 +694,24 @@ ensure_not_tfind_mode (void)
     error (_("Cannot execute this command while looking at trace frames."));
 }
 
+/* Throw an error indicating the current thread is running.  */
+
+static void
+error_is_running (void)
+{
+  error (_("Cannot execute this command while "
+	   "the selected thread is running."));
+}
+
+/* Calls error_is_running if the current thread is running.  */
+
+static void
+ensure_not_running (void)
+{
+  if (is_running (inferior_ptid))
+    error_is_running ();
+}
+
 void
 continue_1 (int all_threads)
 {
@@ -738,7 +742,7 @@ continue_1 (int all_threads)
 }
 
 /* continue [-a] [proceed-count] [&]  */
-void
+static void
 continue_command (char *args, int from_tty)
 {
   int async_exec = 0;
@@ -857,13 +861,13 @@ next_command (char *count_string, int from_tty)
 
 /* Likewise, but step only one instruction.  */
 
-void
+static void
 stepi_command (char *count_string, int from_tty)
 {
   step_1 (0, 1, count_string);
 }
 
-void
+static void
 nexti_command (char *count_string, int from_tty)
 {
   step_1 (1, 1, count_string);
@@ -1839,7 +1843,7 @@ program_info (char *args, int from_tty)
 
   target_files_info ();
   printf_filtered (_("Program stopped at %s.\n"),
-		   paddress (target_gdbarch, stop_pc));
+		   paddress (target_gdbarch (), stop_pc));
   if (tp->control.stop_step)
     printf_filtered (_("It stopped after being stepped.\n"));
   else if (stat != 0)
@@ -2155,7 +2159,7 @@ default_print_registers_info (struct gdbarch *gdbarch,
       val = allocate_value (regtype);
 
       /* Get the data in raw format.  */
-      if (! frame_register_read (frame, i, value_contents_raw (val)))
+      if (! deprecated_frame_register_read (frame, i, value_contents_raw (val)))
 	mark_value_bytes_unavailable (val, 0, TYPE_LENGTH (value_type (val)));
 
       default_print_one_register_info (file,
@@ -2276,7 +2280,7 @@ registers_info (char *addr_exp, int fpregs)
     }
 }
 
-void
+static void
 all_registers_info (char *addr_exp, int from_tty)
 {
   registers_info (addr_exp, 1);
@@ -2542,7 +2546,7 @@ attach_command (char *args, int from_tty)
 
   dont_repeat ();		/* Not for the faint of heart */
 
-  if (gdbarch_has_global_solist (target_gdbarch))
+  if (gdbarch_has_global_solist (target_gdbarch ()))
     /* Don't complain if all processes share the same symbol
        space.  */
     ;
@@ -2732,7 +2736,7 @@ detach_command (char *args, int from_tty)
 
   /* If the solist is global across inferiors, don't clear it when we
      detach from a single inferior.  */
-  if (!gdbarch_has_global_solist (target_gdbarch))
+  if (!gdbarch_has_global_solist (target_gdbarch ()))
     no_shared_libraries (NULL, from_tty);
 
   /* If we still have inferiors to debug, then don't mess with their
@@ -2791,7 +2795,7 @@ interrupt_target_1 (int all_threads)
    if the `-a' switch is used.  */
 
 /* interrupt [-a]  */
-void
+static void
 interrupt_target_command (char *args, int from_tty)
 {
   if (target_can_async_p ())
@@ -2865,10 +2869,13 @@ info_proc_cmd_1 (char *args, enum info_proc_what what, int from_tty)
 {
   struct gdbarch *gdbarch = get_current_arch ();
 
-  if (gdbarch_info_proc_p (gdbarch))
-    gdbarch_info_proc (gdbarch, args, what);
-  else
-    target_info_proc (args, what);
+  if (!target_info_proc (args, what))
+    {
+      if (gdbarch_info_proc_p (gdbarch))
+	gdbarch_info_proc (gdbarch, args, what);
+      else
+	error (_("Not supported on this target."));
+    }
 }
 
 /* Implement `info proc' when given without any futher parameters.  */

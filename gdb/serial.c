@@ -1,6 +1,6 @@
 /* Generic serial interface routines
 
-   Copyright (C) 1992-2002, 2004-2012 Free Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -544,19 +544,6 @@ serial_async (struct serial *scb,
   /* Only change mode if there is a need.  */
   if (changed)
     scb->ops->async (scb, handler != NULL);
-}
-
-int
-deprecated_serial_fd (struct serial *scb)
-{
-  /* FIXME: should this output a warning that deprecated code is being
-     called?  */
-  if (scb->fd < 0)
-    {
-      internal_error (__FILE__, __LINE__,
-		      _("serial: FD not valid"));
-    }
-  return scb->fd; /* sigh */
 }
 
 void

@@ -1,5 +1,5 @@
 /* Thread management interface, for the remote server for GDB.
-   Copyright (C) 2002, 2004-2012 Free Software Foundation, Inc.
+   Copyright (C) 2002-2013 Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
 
@@ -406,7 +406,7 @@ static void
 thread_db_find_new_threads (void)
 {
   td_err_e err;
-  ptid_t ptid = ((struct inferior_list_entry *) current_inferior)->id;
+  ptid_t ptid = current_ptid;
   struct thread_db *thread_db = current_process ()->private->thread_db;
   int loop, iteration;
 

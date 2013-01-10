@@ -2,7 +2,7 @@
 
 # GDB script to list of problems using awk.
 #
-# Copyright (C) 2002-2012 Free Software Foundation, Inc.
+# Copyright (C) 2002-2013 Free Software Foundation, Inc.
 #
 # This file is part of GDB.
 #
@@ -358,7 +358,7 @@ Do not include gnu-regex.h, instead include gdb_regex.h"
 BEGIN { doc["stat.h"] = "\
 Do not include stat.h or sys/stat.h, instead include gdb_stat.h"
     category["stat.h"] = ari_regression
-    fix("stat.h", "gdb/gdb_stat.h", 1)
+    fix("stat.h", "common/gdb_stat.h", 1)
 }
 /^#[[:space:]]*include[[:space:]]*.stat\.h./ \
 || /^#[[:space:]]*include[[:space:]]*.sys\/stat\.h./ {
@@ -367,7 +367,7 @@ Do not include stat.h or sys/stat.h, instead include gdb_stat.h"
 
 BEGIN { doc["wait.h"] = "\
 Do not include wait.h or sys/wait.h, instead include gdb_wait.h"
-    fix("wait.h", "gdb/gdb_wait.h", 2);
+    fix("wait.h", "common/gdb_wait.h", 2);
     category["wait.h"] = ari_regression
 }
 /^#[[:space:]]*include[[:space:]]*.wait\.h./ \
@@ -1125,26 +1125,6 @@ Do not use vasprintf(), instead use xstrvprintf"
 }
 /(^|[^_[:alnum:]])vasprintf[[:space:]]*\(/ {
     fail("vasprintf")
-}
-
-BEGIN { doc["xasprintf"] = "\
-Do not use xasprintf(), instead use xstrprintf"
-    fix("xasprintf", "common/common-utils.h", 1)
-    fix("xasprintf", "common/common-utils.c", 1)
-    category["xasprintf"] = ari_regression
-}
-/(^|[^_[:alnum:]])xasprintf[[:space:]]*\(/ {
-    fail("xasprintf")
-}
-
-BEGIN { doc["xvasprintf"] = "\
-Do not use xvasprintf(), instead use xstrvprintf"
-    fix("xvasprintf", "common/common-utils.h", 1)
-    fix("xvasprintf", "common/common-utils.c", 1)
-    category["xvasprintf"] = ari_regression
-}
-/(^|[^_[:alnum:]])xvasprintf[[:space:]]*\(/ {
-    fail("xvasprintf")
 }
 
 # More generic memory operations

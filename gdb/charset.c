@@ -1,6 +1,6 @@
 /* Character set conversion support for GDB.
 
-   Copyright (C) 2001, 2003, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -531,7 +531,7 @@ convert_between_encodings (const char *from, const char *to,
 		  {
 		    char octal[5];
 
-		    sprintf (octal, "\\%.3o", *inp & 0xff);
+		    xsnprintf (octal, sizeof (octal), "\\%.3o", *inp & 0xff);
 		    obstack_grow_str (output, octal);
 
 		    ++inp;

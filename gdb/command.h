@@ -1,7 +1,6 @@
 /* Header file for command creation.
 
-   Copyright (C) 1986, 1989-1995, 1999-2000, 2002, 2004, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -216,7 +215,7 @@ extern struct cmd_list_element *add_info (char *,
 extern struct cmd_list_element *add_info_alias (char *, char *, int);
 
 extern VEC (char_ptr) *complete_on_cmdlist (struct cmd_list_element *,
-					    char *, char *);
+					    char *, char *, int);
 
 extern VEC (char_ptr) *complete_on_enum (const char *const *enumlist,
 					 char *, char *);

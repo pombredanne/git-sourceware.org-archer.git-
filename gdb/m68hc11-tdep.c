@@ -1,6 +1,6 @@
 /* Target-dependent code for Motorola 68HC11 & 68HC12
 
-   Copyright (C) 1999-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1999-2013 Free Software Foundation, Inc.
 
    Contributed by Stephane Carrez, stcarrez@nerim.fr
 
@@ -247,7 +247,7 @@ m68hc11_initialize_register_info (void)
     {
       char buf[10];
 
-      sprintf (buf, "_.d%d", i - SOFT_D1_REGNUM + 1);
+      xsnprintf (buf, sizeof (buf), "_.d%d", i - SOFT_D1_REGNUM + 1);
       m68hc11_get_register_info (&soft_regs[i], buf);
     }
 

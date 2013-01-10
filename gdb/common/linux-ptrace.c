@@ -1,5 +1,5 @@
 /* Linux-specific ptrace manipulation routines.
-   Copyright (C) 2012 Free Software Foundation, Inc.
+   Copyright (C) 2012-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -27,6 +27,7 @@
 #include "linux-procfs.h"
 #include "buffer.h"
 #include "gdb_assert.h"
+#include "gdb_wait.h"
 
 /* Find all possible reasons we could fail to attach PID and append these
    newline terminated reason strings to initialized BUFFER.  '\0' termination
@@ -57,7 +58,6 @@ extern void (linux_ptrace_test_ret_to_nx_instr) (void);
 #include <sys/reg.h>
 #include <sys/mman.h>
 #include <signal.h>
-#include <sys/wait.h>
 #include <stdint.h>
 
 #endif /* defined __i386__ || defined __x86_64__ */
@@ -114,7 +114,8 @@ linux_ptrace_test_ret_to_nx (void)
 			".globl linux_ptrace_test_ret_to_nx_instr;"
 			"linux_ptrace_test_ret_to_nx_instr:"
 			"ret"
-			: : "r" (return_address) : "%rsp", "memory");
+			: : "r" ((uint64_t) (uintptr_t) return_address)
+			: "%rsp", "memory");
 #else
 # error "!__i386__ && !__x86_64__"
 #endif

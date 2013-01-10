@@ -1,6 +1,6 @@
 /* libthread_db assisted debugging support, generic parts.
 
-   Copyright (C) 1999-2001, 2003-2012 Free Software Foundation, Inc.
+   Copyright (C) 1999-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -544,13 +544,13 @@ enable_thread_event (int event, CORE_ADDR *bp)
   /* Set up the breakpoint.  */
   gdb_assert (exec_bfd);
   (*bp) = (gdbarch_convert_from_func_ptr_addr
-	   (target_gdbarch,
+	   (target_gdbarch (),
 	    /* Do proper sign extension for the target.  */
 	    (bfd_get_sign_extend_vma (exec_bfd) > 0
 	     ? (CORE_ADDR) (intptr_t) notify.u.bptaddr
 	     : (CORE_ADDR) (uintptr_t) notify.u.bptaddr),
 	    &current_target));
-  create_thread_event_breakpoint (target_gdbarch, *bp);
+  create_thread_event_breakpoint (target_gdbarch (), *bp);
 
   return TD_OK;
 }

@@ -1,3 +1,95 @@
+2013-01-08  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
+
+	* config.guss: Update from config repo.
+	* config.sub: Dito.
+
+2013-01-07  Jeff Johnston  <jjohnstn@redhat.com>
+
+	* COPYING.LIBGLOSS: Remove license for mips/lsi33k-stub.h which no longer
+	exists and replace the new bfin license in its location.
+
+2013-01-07  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR gas/14899
+	* Makefile.def (dependencies): Make all-binutils, all-gprof,
+	all-ld and all-gold depend on all-gas.
+	* Makefile.in: Regenerated.
+
+2012-12-29  Ben Elliston  <bje@gnu.org>
+
+	* config.guess: Update to 2012-12-29 version.
+	* config.sub: Likewise.
+
+2012-12-20  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
+
+	* Makefile.def (install-target-libgo): Depend on
+	install-target-libatomic. Merged from GCC repo.
+	* Makefile.in: Regenerate.
+
+2012-12-17  Jeff Johnston  <jjohnstn@redhat.com>
+
+	* COPYING.LIBGLOSS: Add license for bfin libgloss.
+
+2012-12-16  Thomas Schwinge  <thomas@codesourcery.com>
+
+	* configure.ac (ENABLE_GOLD): Consider *-*-gnu* targets ELF.
+	* configure: Regenerate.
+
+2012-12-11  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* Makefile.def (target_modules): Add bootstrap=true and
+	raw_cxx=true to libsanitizer.
+	* configure.ac (bootstrap_target_libs): Add libsanitizer.
+	* Makefile.in: Regenerated.
+	* configure: Likewise.
+
+2012-12-08  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
+
+	* config.sub: Merge from config repo.
+
+2012-11-30  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
+
+	* configure.ac: Merge from GCC.
+	* Makefile.tpl: Dito.
+	* Makefile.in: Dito.
+	* configure: Dito.
+
+2012-11-28  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
+
+	* configure.ac (noconfigdirs): Merge from GCC.
+	* configure: Regenerate.
+
+2012-11-19  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
+
+	* config.sub (arm): Merge from upstream: Handle armv[6-8] targets.
+
+2012-11-14  Roland McGrath  <mcgrathr@google.com>
+
+	* configure.ac (ENABLE_GOLD): Consider *-*-nacl* targets ELF.
+	* configure: Regenerate.
+
+2012-11-13  Richard Henderson  <rth@redhat.com>
+
+	* configure.ac: Move libsanitizer logic to subdirectory.
+	* configure: Regenerate.
+
+2012-11-13  Dodji Seketeli  <dodji@redhat.com>
+
+	* configure.ac: Enable libsanitizer just on x86 linux for now.
+	* configure: Re-generate.
+
+2012-11-13  David Edelsohn  <dje.gcc@gmail.com>
+
+	* configure.ac: Merge libquadmath sections.
+	* configure: Regenerate.
+
+2012-11-12  Wei Mi <wmi@google.com>
+
+	* configure.ac: Add libsanitizer to target_libraries.
+	* Makefile.def: Ditto.
+	* configure: Regenerate.
+	* Makefile.in: Regenerate.
+
 2012-11-03  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* configure: Regenerated.

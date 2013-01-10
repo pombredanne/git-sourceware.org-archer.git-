@@ -1,6 +1,6 @@
 /* Parser for linespec for the GNU debugger, GDB.
 
-   Copyright (C) 1986-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -852,7 +852,7 @@ add_sal_to_sals (struct linespec_state *self,
 
       self->canonical_names = xrealloc (self->canonical_names,
 					sals->nelts * sizeof (char *));
-      if (!literal_canonical && sal->symtab && sal->symtab->filename)
+      if (!literal_canonical && sal->symtab)
 	{
 	  char *filename = sal->symtab->filename;
 
@@ -2095,20 +2095,17 @@ parse_linespec (linespec_parser *parser, char **argptr)
       cleanup = make_cleanup (xfree, var);
       PARSER_RESULT (parser)->line_offset
 	= linespec_parse_variable (PARSER_STATE (parser), var);
+      do_cleanups (cleanup);
 
       /* If a line_offset wasn't found (VAR is the name of a user
 	 variable/function), then skip to normal symbol processing.  */
       if (PARSER_RESULT (parser)->line_offset.sign != LINE_OFFSET_UNKNOWN)
 	{
-	  discard_cleanups (cleanup);
-
 	  /* Consume this token.  */
 	  linespec_lexer_consume_token (parser);
 
 	  goto convert_to_sals;
 	}
-
-      do_cleanups (cleanup);
     }
   else if (token.type != LSTOKEN_STRING && token.type != LSTOKEN_NUMBER)
     unexpected_linespec_error (parser);

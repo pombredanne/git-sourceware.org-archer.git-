@@ -1,7 +1,6 @@
 /* Print in infix form a struct expression.
 
-   Copyright (C) 1986, 1988-1989, 1991-2000, 2003, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -33,9 +32,7 @@
 #include "gdb_assert.h"
 #include "valprint.h"
 
-#ifdef HAVE_CTYPE_H
 #include <ctype.h>
-#endif
 
 void
 print_expression (struct expression *exp, struct ui_file *stream)
@@ -124,7 +121,7 @@ print_subexp_standard (struct expression *exp, int *pos,
 
     case OP_VAR_VALUE:
       {
-	struct block *b;
+	const struct block *b;
 
 	(*pos) += 3;
 	b = exp->elts[pc + 1].block;
@@ -670,7 +667,7 @@ op_name_standard (enum exp_opcode opcode)
       {
 	static char buf[30];
 
-	sprintf (buf, "<unknown %d>", opcode);
+	xsnprintf (buf, sizeof (buf), "<unknown %d>", opcode);
 	return buf;
       }
 #define OP(name)	\

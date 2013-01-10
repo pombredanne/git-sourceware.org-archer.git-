@@ -1,6 +1,5 @@
 /* Annotation routines for GDB.
-   Copyright (C) 1986, 1989-1992, 1994-1996, 1998-2000, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -50,7 +49,7 @@ print_value_flags (struct type *t)
 }
 
 void
-breakpoints_changed (void)
+annotate_breakpoints_changed (void)
 {
   if (annotation_level == 2)
     {
@@ -110,7 +109,7 @@ annotate_stopped (void)
   if (annotation_level > 1 && ignore_count_changed)
     {
       ignore_count_changed = 0;
-      breakpoints_changed ();
+      annotate_breakpoints_changed ();
     }
 }
 
@@ -563,7 +562,7 @@ annotate_array_section_end (void)
 static void
 breakpoint_changed (struct breakpoint *b)
 {
-  breakpoints_changed ();
+  annotate_breakpoints_changed ();
 }
 
 void

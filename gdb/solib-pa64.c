@@ -1,6 +1,6 @@
 /* Handle PA64 shared libraries for GDB, the GNU Debugger.
 
-   Copyright (C) 2004, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2004-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -391,7 +391,7 @@ manpage for methods to privately map shared library text."));
       /* Create the shared library breakpoint.  */
       {
 	struct breakpoint *b
-	  = create_solib_event_breakpoint (target_gdbarch, sym_addr);
+	  = create_solib_event_breakpoint (target_gdbarch (), sym_addr);
 
 	/* The breakpoint is actually hard-coded into the dynamic linker,
 	   so we don't need to actually insert a breakpoint instruction

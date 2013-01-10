@@ -1,7 +1,6 @@
 /* Cache and manage frames for GDB, the GNU debugger.
 
-   Copyright (C) 1986-1987, 1989, 1991, 1994-1996, 1998, 2000-2004,
-   2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -776,7 +775,7 @@ get_frame_func (struct frame_info *this_frame)
 static enum register_status
 do_frame_register_read (void *src, int regnum, gdb_byte *buf)
 {
-  if (!frame_register_read (src, regnum, buf))
+  if (!deprecated_frame_register_read (src, regnum, buf))
     return REG_UNAVAILABLE;
   else
     return REG_VALID;
@@ -1088,7 +1087,8 @@ put_frame_register (struct frame_info *frame, int regnum,
     }
 }
 
-/* frame_register_read ()
+/* This function is deprecated.  Use get_frame_register_value instead,
+   which provides more accurate information.
 
    Find and return the value of REGNUM for the specified stack frame.
    The number of bytes copied is REGISTER_SIZE (REGNUM).
@@ -1096,7 +1096,7 @@ put_frame_register (struct frame_info *frame, int regnum,
    Returns 0 if the register value could not be found.  */
 
 int
-frame_register_read (struct frame_info *frame, int regnum,
+deprecated_frame_register_read (struct frame_info *frame, int regnum,
 		     gdb_byte *myaddr)
 {
   int optimized;
@@ -1217,7 +1217,7 @@ put_frame_register_bytes (struct frame_info *frame, int regnum,
 	{
 	  gdb_byte buf[MAX_REGISTER_SIZE];
 
-	  frame_register_read (frame, regnum, buf);
+	  deprecated_frame_register_read (frame, regnum, buf);
 	  memcpy (buf + offset, myaddr, curr_len);
 	  put_frame_register (frame, regnum, buf);
 	}

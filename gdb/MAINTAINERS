@@ -408,6 +408,8 @@ readline/		Master version: ftp://ftp.cwru.edu/pub/bash/
 
 tcl/ tk/ itcl/		ALL
 
+contrib/ari		Pierre Muller		muller@sourceware.org
+
 
 		Authorized Committers
 		---------------------
@@ -506,6 +508,7 @@ Brian Ford					ford@vss.fsi.com
 Orjan Friberg					orjanf@axis.com
 Nathan Froyd					froydnj@codesourcery.com
 Gary Funck					gary@intrepid.com
+Mircea Gherzan					mircea.gherzan@intel.com
 Paul Gilliam					pgilliam@us.ibm.com
 Tristan Gingold					gingold@adacore.com
 Anton Gorenkov					xgsa@yandex.ru
@@ -539,6 +542,7 @@ Marc Khouzam					marc.khouzam@ericsson.com
 Jim Kingdon					kingdon@panix.com
 Paul Koning					paul_koning@dell.com
 Jan Kratochvil					jan.kratochvil@redhat.com
+Maxim Kuvyrkov					maxim.kuvyrkov@gmail.com
 Jonathan Larmour				jifl@ecoscentric.com
 Jeff Law					law@redhat.com
 Justin Lebar					justin.lebar@gmail.com

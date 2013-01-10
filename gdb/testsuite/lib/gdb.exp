@@ -1,4 +1,4 @@
-# Copyright 1992-2005, 2007-2012 Free Software Foundation, Inc.
+# Copyright 1992-2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -128,6 +128,7 @@ proc gdb_version { } {
 
 #
 # gdb_unload -- unload a file if one is loaded
+# Return 0 on success, -1 on error.
 #
 
 proc gdb_unload {} {
@@ -152,6 +153,7 @@ proc gdb_unload {} {
 	    return -1
 	}
     }
+    return 0
 }
 
 # Many of the tests depend on setting breakpoints at various places and
@@ -1278,6 +1280,8 @@ proc default_gdb_exit {} {
 #
 #   debug    file was loaded successfully and has debug information
 #   nodebug  file was loaded successfully and has no debug information
+#   lzma     file was loaded, .gnu_debugdata found, but no LZMA support
+#            compiled in
 #   fail     file was not loaded
 #
 # I tried returning this information as part of the return value,
@@ -1325,6 +1329,11 @@ proc gdb_file_cmd { arg } {
 
     send_gdb "file $arg\n"
     gdb_expect 120 {
+	-re "Reading symbols from.*LZMA support was disabled.*done.*$gdb_prompt $" {
+	    verbose "\t\tLoaded $arg into $GDB; .gnu_debugdata found but no LZMA available"
+	    set gdb_file_cmd_debug_info "lzma"
+	    return 0
+	}
 	-re "Reading symbols from.*no debugging symbols found.*done.*$gdb_prompt $" {
 	    verbose "\t\tLoaded $arg into $GDB with no debugging symbols"
 	    set gdb_file_cmd_debug_info "nodebug"
@@ -1541,12 +1550,35 @@ proc skip_java_tests {} {
 
 proc skip_python_tests {} {
     global gdb_prompt
-    gdb_test_multiple "python print 'test'" "verify python support" {
+    global gdb_py_is_py3k
+    global gdb_py_is_py24
+
+    gdb_test_multiple "python print ('test')" "verify python support" {
 	-re "not supported.*$gdb_prompt $"	{
 	    unsupported "Python support is disabled."
 	    return 1
 	}
 	-re "$gdb_prompt $"	{}
+    }
+
+    set gdb_py_is_py24 0
+    gdb_test_multiple "python print (sys.version_info\[0\])" "check if python 3" {
+	-re "3.*$gdb_prompt $"	{
+            set gdb_py_is_py3k 1
+        }
+	-re ".*$gdb_prompt $"	{
+            set gdb_py_is_py3k 0
+        }
+    }
+    if { $gdb_py_is_py3k == 0 } {
+        gdb_test_multiple "python print (sys.version_info\[1\])" "check if python 2.4" {
+	    -re "\[45\].*$gdb_prompt $" {
+                set gdb_py_is_py24 1
+            }
+	    -re ".*$gdb_prompt $" {
+                set gdb_py_is_py24 0
+            }
+        }
     }
 
     return 0

@@ -1,6 +1,6 @@
 /* GDB CLI commands.
 
-   Copyright (C) 2000-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2000-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -85,8 +85,6 @@ static void shell_escape (char *, int);
 static void edit_command (char *, int);
 
 static void list_command (char *, int);
-
-void apropos_command (char *, int);
 
 /* Prototypes for local utility functions */
 
@@ -842,16 +840,7 @@ edit_command (char *arg, int from_tty)
   if ((editor = (char *) getenv ("EDITOR")) == NULL)
       editor = "/bin/ex";
 
-  /* If we don't already know the full absolute file name of the
-     source file, find it now.  */
-  if (!sal.symtab->fullname)
-    {
-      fn = symtab_to_fullname (sal.symtab);
-      if (!fn)
-	fn = "unknown";
-    }
-  else
-    fn = sal.symtab->fullname;
+  fn = symtab_to_fullname (sal.symtab);
 
   /* Quote the file name, in case it has whitespace or other special
      characters.  */
@@ -1250,7 +1239,7 @@ show_user (char *args, int from_tty)
 /* Search through names of commands and documentations for a certain
    regular expression.  */
 
-void 
+static void 
 apropos_command (char *searchstr, int from_tty)
 {
   regex_t pattern;
@@ -1643,11 +1632,13 @@ show_max_user_call_depth (struct ui_file *file, int from_tty,
 }
 
 
+
+initialize_file_ftype _initialize_cli_cmds;
+
 void
-init_cli_cmds (void)
+_initialize_cli_cmds (void)
 {
   struct cmd_list_element *c;
-  char *source_help_text;
 
   /* Define the classes of commands.
      They will appear in the help list in alphabetical order.  */
@@ -1703,30 +1694,6 @@ use \"\\n\" if you want a newline to be printed.\n\
 Since leading and trailing whitespace are ignored in command arguments,\n\
 if you want to print some you must use \"\\\" before leading whitespace\n\
 to be printed or after trailing whitespace."));
-  add_com ("document", class_support, document_command, _("\
-Document a user-defined command.\n\
-Give command name as argument.  Give documentation on following lines.\n\
-End with a line of just \"end\"."));
-  add_com ("define", class_support, define_command, _("\
-Define a new command name.  Command name is argument.\n\
-Definition appears on following lines, one command per line.\n\
-End with a line of just \"end\".\n\
-Use the \"document\" command to give documentation for the new command.\n\
-Commands defined in this way may have up to ten arguments."));
-
-  source_help_text = xstrprintf (_("\
-Read commands from a file named FILE.\n\
-\n\
-Usage: source [-s] [-v] FILE\n\
--s: search for the script in the source search path,\n\
-    even if FILE contains directories.\n\
--v: each command in FILE is echoed as it is executed.\n\
-\n\
-Note that the file \"%s\" is read automatically in this way\n\
-when GDB is started."), gdbinit);
-  c = add_cmd ("source", class_support, source_command,
-	       source_help_text, &cmdlist);
-  set_cmd_completer (c, filename_completer);
 
   add_setshow_enum_cmd ("script-extension", class_support,
 			script_ext_enums, &script_ext_mode, _("\
@@ -1793,19 +1760,6 @@ the previous command number shown."),
 
   add_cmd ("version", no_set_class, show_version,
 	   _("Show what version of GDB this is."), &showlist);
-
-  add_com ("while", class_support, while_command, _("\
-Execute nested commands WHILE the conditional expression is non zero.\n\
-The conditional expression must follow the word `while' and must in turn be\n\
-followed by a new line.  The nested commands must be entered one per line,\n\
-and should be terminated by the word `end'."));
-
-  add_com ("if", class_support, if_command, _("\
-Execute nested commands once IF the conditional expression is non zero.\n\
-The conditional expression must follow the word `if' and must in turn be\n\
-followed by a new line.  The nested commands must be entered one per line,\n\
-and should be terminated by the word 'else' or `end'.  If an else clause\n\
-is used, the same rules apply to its nested commands as to the first ones."));
 
   /* If target is open when baud changes, it doesn't take effect until
      the next open (I think, not sure).  */
@@ -1938,4 +1892,25 @@ Make \"spe\" an alias of \"set print elements\":\n\
   alias spe = set print elements\n\
 Make \"elms\" an alias of \"elements\" in the \"set print\" command:\n\
   alias -a set print elms = set print elements"));
+}
+
+void
+init_cli_cmds (void)
+{
+  struct cmd_list_element *c;
+  char *source_help_text;
+
+  source_help_text = xstrprintf (_("\
+Read commands from a file named FILE.\n\
+\n\
+Usage: source [-s] [-v] FILE\n\
+-s: search for the script in the source search path,\n\
+    even if FILE contains directories.\n\
+-v: each command in FILE is echoed as it is executed.\n\
+\n\
+Note that the file \"%s\" is read automatically in this way\n\
+when GDB is started."), gdbinit);
+  c = add_cmd ("source", class_support, source_command,
+	       source_help_text, &cmdlist);
+  set_cmd_completer (c, filename_completer);
 }

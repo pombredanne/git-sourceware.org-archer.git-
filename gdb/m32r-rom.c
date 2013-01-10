@@ -1,8 +1,7 @@
 /* Remote debugging interface to m32r and mon2000 ROM monitors for GDB, 
    the GNU debugger.
 
-   Copyright (C) 1996-2001, 2004-2005, 2007-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1996-2013 Free Software Foundation, Inc.
 
    Adapted by Michael Snyder of Cygnus Support.
 
@@ -79,7 +78,7 @@ m32r_load_section (bfd *abfd, asection *s, void *obj)
   unsigned int *data_count = obj;
   if (s->flags & SEC_LOAD)
     {
-      int addr_size = gdbarch_addr_bit (target_gdbarch) / 8;
+      int addr_size = gdbarch_addr_bit (target_gdbarch ()) / 8;
       bfd_size_type section_size = bfd_section_size (abfd, s);
       bfd_vma section_base = bfd_section_lma (abfd, s);
       unsigned int buffer, i;
@@ -89,7 +88,7 @@ m32r_load_section (bfd *abfd, asection *s, void *obj)
       printf_filtered ("Loading section %s, size 0x%lx lma ",
 		       bfd_section_name (abfd, s),
 		       (unsigned long) section_size);
-      fputs_filtered (paddress (target_gdbarch, section_base), gdb_stdout);
+      fputs_filtered (paddress (target_gdbarch (), section_base), gdb_stdout);
       printf_filtered ("\n");
       gdb_flush (gdb_stdout);
       monitor_printf ("%s mw\r", phex_nz (section_base, addr_size));
@@ -149,7 +148,7 @@ m32r_load (char *filename, int from_tty)
 
 	printf_filtered ("Loading section %s, size 0x%lx vma ",
 			 bfd_section_name (abfd, s), section_size);
-	fputs_filtered (paddress (target_gdbarch, section_base), gdb_stdout);
+	fputs_filtered (paddress (target_gdbarch (), section_base), gdb_stdout);
 	printf_filtered ("\n");
 	gdb_flush (gdb_stdout);
 	monitor_printf ("%x mw\r", section_base);
@@ -548,7 +547,7 @@ m32r_upload_command (char *args, int from_tty)
 	    printf_filtered ("Loading section %s, size 0x%lx lma ",
 			     bfd_section_name (abfd, s),
 			     (unsigned long) section_size);
-	    fputs_filtered (paddress (target_gdbarch, section_base),
+	    fputs_filtered (paddress (target_gdbarch (), section_base),
 			    gdb_stdout);
 	    printf_filtered ("\n");
 	    gdb_flush (gdb_stdout);

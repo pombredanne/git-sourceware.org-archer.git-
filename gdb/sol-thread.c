@@ -1,6 +1,6 @@
 /* Solaris threads debugging interface.
 
-   Copyright (C) 1996-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1996-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -196,7 +196,8 @@ td_err_string (td_err_e errcode)
     if (td_err_table[i].num == errcode)
       return td_err_table[i].str;
 
-  sprintf (buf, "Unknown libthread_db error code: %d", errcode);
+  xsnprintf (buf, sizeof (buf), "Unknown libthread_db error code: %d",
+	     errcode);
 
   return buf;
 }
@@ -227,7 +228,8 @@ td_state_string (td_thr_state_e statecode)
     if (td_thr_state_table[i].num == statecode)
       return td_thr_state_table[i].str;
 
-  sprintf (buf, "Unknown libthread_db state code: %d", statecode);
+  xsnprintf (buf, sizeof (buf), "Unknown libthread_db state code: %d",
+	     statecode);
 
   return buf;
 }
@@ -861,7 +863,7 @@ ps_lgetregs (gdb_ps_prochandle_t ph, lwpid_t lwpid, prgregset_t gregset)
   old_chain = save_inferior_ptid ();
 
   inferior_ptid = BUILD_LWP (lwpid, PIDGET (inferior_ptid));
-  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch);
+  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch ());
 
   target_fetch_registers (regcache, -1);
   fill_gregset (regcache, (gdb_gregset_t *) gregset, -1);
@@ -883,7 +885,7 @@ ps_lsetregs (gdb_ps_prochandle_t ph, lwpid_t lwpid,
   old_chain = save_inferior_ptid ();
 
   inferior_ptid = BUILD_LWP (lwpid, PIDGET (inferior_ptid));
-  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch);
+  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch ());
 
   supply_gregset (regcache, (const gdb_gregset_t *) gregset);
   target_store_registers (regcache, -1);
@@ -917,7 +919,7 @@ ps_lgetfpregs (gdb_ps_prochandle_t ph, lwpid_t lwpid,
   old_chain = save_inferior_ptid ();
 
   inferior_ptid = BUILD_LWP (lwpid, PIDGET (inferior_ptid));
-  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch);
+  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch ());
 
   target_fetch_registers (regcache, -1);
   fill_fpregset (regcache, (gdb_fpregset_t *) fpregset, -1);
@@ -939,7 +941,7 @@ ps_lsetfpregs (gdb_ps_prochandle_t ph, lwpid_t lwpid,
   old_chain = save_inferior_ptid ();
 
   inferior_ptid = BUILD_LWP (lwpid, PIDGET (inferior_ptid));
-  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch);
+  regcache = get_thread_arch_regcache (inferior_ptid, target_gdbarch ());
 
   supply_fpregset (regcache, (const gdb_fpregset_t *) fpregset);
   target_store_registers (regcache, -1);
@@ -1015,17 +1017,18 @@ solaris_pid_to_str (struct target_ops *ops, ptid_t ptid)
       lwp = thread_to_lwp (ptid, -2);
 
       if (PIDGET (lwp) == -1)
-	sprintf (buf, "Thread %ld (defunct)", GET_THREAD (ptid));
+	xsnprintf (buf, sizeof (buf), "Thread %ld (defunct)",
+		   GET_THREAD (ptid));
       else if (PIDGET (lwp) != -2)
-	sprintf (buf, "Thread %ld (LWP %ld)",
+	xsnprintf (buf, sizeof (buf), "Thread %ld (LWP %ld)",
 		 GET_THREAD (ptid), GET_LWP (lwp));
       else
-	sprintf (buf, "Thread %ld        ", GET_THREAD (ptid));
+	xsnprintf (buf, sizeof (buf), "Thread %ld        ", GET_THREAD (ptid));
     }
   else if (GET_LWP (ptid) != 0)
-    sprintf (buf, "LWP    %ld        ", GET_LWP (ptid));
+    xsnprintf (buf, sizeof (buf), "LWP    %ld        ", GET_LWP (ptid));
   else
-    sprintf (buf, "process %d    ", PIDGET (ptid));
+    xsnprintf (buf, sizeof (buf), "process %d    ", PIDGET (ptid));
 
   return buf;
 }
@@ -1119,7 +1122,7 @@ info_cb (const td_thrhandle_t *th, void *s)
 			     SYMBOL_PRINT_NAME (msym));
 	  else
 	    printf_filtered ("   startfunc: %s\n",
-			     paddress (target_gdbarch, ti.ti_startfunc));
+			     paddress (target_gdbarch (), ti.ti_startfunc));
 	}
 
       /* If thread is asleep, print function that went to sleep.  */
@@ -1132,7 +1135,7 @@ info_cb (const td_thrhandle_t *th, void *s)
 			     SYMBOL_PRINT_NAME (msym));
 	  else
 	    printf_filtered (" - Sleep func: %s\n",
-			     paddress (target_gdbarch, ti.ti_startfunc));
+			     paddress (target_gdbarch (), ti.ti_startfunc));
 	}
 
       /* Wrap up line, if necessary.  */

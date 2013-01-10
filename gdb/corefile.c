@@ -1,7 +1,6 @@
 /* Core dump and executable file functions above target vector, for GDB.
 
-   Copyright (C) 1986-1987, 1989, 1991-1994, 1996-2001, 2003, 2006-2012
-   Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -203,11 +202,11 @@ memory_error (int status, CORE_ADDR memaddr)
        bounds.  */
     throw_error (MEMORY_ERROR,
 		 _("Cannot access memory at address %s"),
-		 paddress (target_gdbarch, memaddr));
+		 paddress (target_gdbarch (), memaddr));
   else
     throw_error (MEMORY_ERROR,
 		 _("Error accessing memory address %s: %s."),
-		 paddress (target_gdbarch, memaddr),
+		 paddress (target_gdbarch (), memaddr),
 		 safe_strerror (status));
 }
 
@@ -456,6 +455,7 @@ Use `set gnutarget auto' to specify automatic detection."),
 				   set_gnutarget_command,
 				   show_gnutarget_string,
 				   &setlist, &showlist);
+  add_alias_cmd ("g", "gnutarget", class_files, 1, &setlist);
 
   if (getenv ("GNUTARGET"))
     set_gnutarget (getenv ("GNUTARGET"));

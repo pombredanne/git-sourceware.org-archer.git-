@@ -2,7 +2,7 @@
 # Wrapper around gcc to tweak the output in various ways when running
 # the testsuite.
 
-# Copyright (C) 2010-2012 Free Software Foundation, Inc.
+# Copyright (C) 2010-2013 Free Software Foundation, Inc.
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation; either version 3 of the License, or
@@ -36,6 +36,7 @@
 # (More documentation is to come.)
 
 # ARGS determine what is done.  They can be:
+# -Z invoke objcopy --compress-debug-sections
 # -z compress using dwz
 # -m compress using dwz -m
 # -i make an index
@@ -74,9 +75,11 @@ want_index=false
 want_dwz=false
 want_multi=false
 want_dwp=false
+want_objcopy_compress=false
 
 while [ $# -gt 0 ]; do
     case "$1" in
+	-Z) want_objcopy_compress=true ;;
 	-z) want_dwz=true ;;
 	-i) want_index=true ;;
 	-m) want_multi=true ;;
@@ -136,6 +139,12 @@ if [ ! -f "$output_file" ]
 then
     echo "$myname: Internal error: $output_file missing." >&2
     exit 1
+fi
+
+if [ "$want_objcopy_compress" = true ]; then
+    $OBJCOPY --compress-debug-sections "$output_file"
+    rc=$?
+    [ $rc != 0 ] && exit $rc
 fi
 
 if [ "$want_index" = true ]; then

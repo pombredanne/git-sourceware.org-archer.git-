@@ -1,6 +1,6 @@
 /* Target-dependent code for the MIPS architecture, for GDB, the GNU Debugger.
 
-   Copyright (C) 1988-2012 Free Software Foundation, Inc.
+   Copyright (C) 1988-2013 Free Software Foundation, Inc.
 
    Contributed by Alessandro Forin(af@cs.cmu.edu) at CMU
    and by Per Bothner(bothner@cs.wisc.edu) at U.Wisconsin.
@@ -1087,7 +1087,7 @@ static void
 show_mask_address (struct ui_file *file, int from_tty,
 		   struct cmd_list_element *c, const char *value)
 {
-  struct gdbarch_tdep *tdep = gdbarch_tdep (target_gdbarch);
+  struct gdbarch_tdep *tdep = gdbarch_tdep (target_gdbarch ());
 
   deprecated_show_value_hack (file, from_tty, c, value);
   switch (mask_address_var)
@@ -3796,7 +3796,8 @@ micromips_deal_with_atomic_sequence (struct gdbarch *gdbarch,
   const int atomic_sequence_length = 16; /* Instruction sequence length.  */
   int last_breakpoint = 0; /* Defaults to 0 (no breakpoints placed).  */
   CORE_ADDR breaks[2] = {-1, -1};
-  CORE_ADDR branch_bp; /* Breakpoint at branch instruction's destination.  */
+  CORE_ADDR branch_bp = 0; /* Breakpoint at branch instruction's
+			      destination.  */
   CORE_ADDR loc = pc;
   int sc_found = 0;
   ULONGEST insn;
@@ -6032,7 +6033,7 @@ mips_read_fp_register_single (struct frame_info *frame, int regno,
   int raw_size = register_size (gdbarch, regno);
   gdb_byte *raw_buffer = alloca (raw_size);
 
-  if (!frame_register_read (frame, regno, raw_buffer))
+  if (!deprecated_frame_register_read (frame, regno, raw_buffer))
     error (_("can't read register %d (%s)"),
 	   regno, gdbarch_register_name (gdbarch, regno));
   if (raw_size == 8)
@@ -6069,7 +6070,7 @@ mips_read_fp_register_double (struct frame_info *frame, int regno,
     {
       /* We have a 64-bit value for this register, and we should use
          all 64 bits.  */
-      if (!frame_register_read (frame, regno, rare_buffer))
+      if (!deprecated_frame_register_read (frame, regno, rare_buffer))
 	error (_("can't read register %d (%s)"),
 	       regno, gdbarch_register_name (gdbarch, regno));
     }
@@ -6302,7 +6303,7 @@ print_gp_register_row (struct ui_file *file, struct frame_info *frame,
 	break;			/* End row: large register.  */
 
       /* OK: get the data in raw format.  */
-      if (!frame_register_read (frame, regnum, raw_buffer))
+      if (!deprecated_frame_register_read (frame, regnum, raw_buffer))
 	error (_("can't read register %d (%s)"),
 	       regnum, gdbarch_register_name (gdbarch, regnum));
       /* pad small registers */
@@ -6652,7 +6653,7 @@ show_mipsfpu_command (char *args, int from_tty)
 {
   char *fpu;
 
-  if (gdbarch_bfd_arch_info (target_gdbarch)->arch != bfd_arch_mips)
+  if (gdbarch_bfd_arch_info (target_gdbarch ())->arch != bfd_arch_mips)
     {
       printf_unfiltered
 	("The MIPS floating-point coprocessor is unknown "
@@ -6660,7 +6661,7 @@ show_mipsfpu_command (char *args, int from_tty)
       return;
     }
 
-  switch (MIPS_FPU_TYPE (target_gdbarch))
+  switch (MIPS_FPU_TYPE (target_gdbarch ()))
     {
     case MIPS_FPU_SINGLE:
       fpu = "single-precision";
@@ -8681,7 +8682,7 @@ show_mips_abi (struct ui_file *file,
 	       struct cmd_list_element *ignored_cmd,
 	       const char *ignored_value)
 {
-  if (gdbarch_bfd_arch_info (target_gdbarch)->arch != bfd_arch_mips)
+  if (gdbarch_bfd_arch_info (target_gdbarch ())->arch != bfd_arch_mips)
     fprintf_filtered
       (file, 
        "The MIPS ABI is unknown because the current architecture "
@@ -8689,7 +8690,7 @@ show_mips_abi (struct ui_file *file,
   else
     {
       enum mips_abi global_abi = global_mips_abi ();
-      enum mips_abi actual_abi = mips_abi (target_gdbarch);
+      enum mips_abi actual_abi = mips_abi (target_gdbarch ());
       const char *actual_abi_str = mips_abi_strings[actual_abi];
 
       if (global_abi == MIPS_ABI_UNKNOWN)

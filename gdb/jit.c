@@ -1,6 +1,6 @@
 /* Handle JIT code generation in the inferior for GDB, the GNU Debugger.
 
-   Copyright (C) 2009-2012 Free Software Foundation, Inc.
+   Copyright (C) 2009-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -757,7 +757,7 @@ jit_object_close_impl (struct gdb_symbol_callbacks *cb,
   priv_data = cb->priv_data;
 
   objfile = allocate_objfile (NULL, 0);
-  objfile->gdbarch = target_gdbarch;
+  objfile->gdbarch = target_gdbarch ();
 
   terminate_minimal_symbol_table (objfile);
 
@@ -1061,8 +1061,8 @@ jit_unwind_reg_get_impl (struct gdb_unwind_callbacks *cb, int regnum)
   gdb_reg = gdbarch_dwarf2_reg_to_regnum (frame_arch, regnum);
   size = register_size (frame_arch, gdb_reg);
   value = xmalloc (sizeof (struct gdb_reg_value) + size - 1);
-  value->defined = frame_register_read (priv->this_frame, gdb_reg,
-                                        value->value);
+  value->defined = deprecated_frame_register_read (priv->this_frame, gdb_reg,
+						   value->value);
   value->size = size;
   value->free = reg_value_free_impl;
   return value;
@@ -1290,7 +1290,7 @@ jit_inferior_init (struct gdbarch *gdbarch)
 void
 jit_inferior_created_hook (void)
 {
-  jit_inferior_init (target_gdbarch);
+  jit_inferior_init (target_gdbarch ());
 }
 
 /* Exported routine to call to re-set the jit breakpoints,
@@ -1299,7 +1299,7 @@ jit_inferior_created_hook (void)
 void
 jit_breakpoint_re_set (void)
 {
-  jit_breakpoint_re_set_internal (target_gdbarch,
+  jit_breakpoint_re_set_internal (target_gdbarch (),
 				  get_jit_inferior_data ());
 }
 

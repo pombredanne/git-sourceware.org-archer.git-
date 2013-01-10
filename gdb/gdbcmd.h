@@ -6,8 +6,7 @@
    fnasser@redhat.com    */
 
 /* Header file for GDB-specific command-line stuff.
-   Copyright (C) 1986, 1989-1994, 1998-2000, 2002, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -111,6 +110,10 @@ extern struct cmd_list_element *maintenance_show_cmdlist;
 extern struct cmd_list_element *setprintlist;
 
 extern struct cmd_list_element *showprintlist;
+
+extern struct cmd_list_element *setprinttypelist;
+
+extern struct cmd_list_element *showprinttypelist;
 
 extern struct cmd_list_element *setdebuglist;
 

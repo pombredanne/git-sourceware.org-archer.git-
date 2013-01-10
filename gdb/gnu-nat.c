@@ -1,6 +1,5 @@
 /* Interface GDB to the GNU Hurd.
-   Copyright (C) 1992, 1995-2001, 2006-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -2491,7 +2490,7 @@ gnu_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
     {
       inf_debug (gnu_current_inf, "%s %s[%d] %s %s",
 		 write ? "writing" : "reading",
-		 paddress (target_gdbarch, memaddr), len,
+		 paddress (target_gdbarch (), memaddr), len,
 		 write ? "<--" : "-->", host_address_to_string (myaddr));
       if (write)
 	return gnu_write_inferior (task, memaddr, myaddr, len);
@@ -2587,10 +2586,10 @@ proc_string (struct proc *proc)
   static char tid_str[80];
 
   if (proc_is_task (proc))
-    sprintf (tid_str, "process %d", proc->inf->pid);
+    xsnprintf (tid_str, sizeof (tid_str), "process %d", proc->inf->pid);
   else
-    sprintf (tid_str, "Thread %d.%d",
-	     proc->inf->pid, proc->tid);
+    xsnprintf (tid_str, sizeof (tid_str), "Thread %d.%d",
+	       proc->inf->pid, proc->tid);
   return tid_str;
 }
 
@@ -2607,7 +2606,7 @@ gnu_pid_to_str (struct target_ops *ops, ptid_t ptid)
     {
       static char tid_str[80];
 
-      sprintf (tid_str, "bogus thread id %d", tid);
+      xsnprintf (tid_str, sizeof (tid_str), "bogus thread id %d", tid);
       return tid_str;
     }
 }

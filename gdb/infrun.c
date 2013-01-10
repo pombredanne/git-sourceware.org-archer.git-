@@ -1,7 +1,7 @@
 /* Target-struct-independent code to start (run) and stop an inferior
    process.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -58,6 +58,7 @@
 #include "probe.h"
 #include "objfiles.h"
 #include "completer.h"
+#include "target-descriptions.h"
 
 /* Prototypes for local functions */
 
@@ -406,7 +407,7 @@ static void context_switch (ptid_t ptid);
 
 void init_thread_stepping_state (struct thread_info *tss);
 
-void init_infwait_state (void);
+static void init_infwait_state (void);
 
 static const char follow_fork_mode_child[] = "child";
 static const char follow_fork_mode_parent[] = "parent";
@@ -923,6 +924,16 @@ follow_exec (ptid_t pid, char *execd_pathname)
       set_current_inferior (inf);
       set_current_program_space (pspace);
     }
+  else
+    {
+      /* The old description may no longer be fit for the new image.
+	 E.g, a 64-bit process exec'ed a 32-bit process.  Clear the
+	 old description; we'll read a new one below.  No need to do
+	 this on "follow-exec-mode new", as the old inferior stays
+	 around (its description is later cleared/refetched on
+	 restart).  */
+      target_clear_description ();
+    }
 
   gdb_assert (current_program_space == inf->pspace);
 
@@ -941,6 +952,14 @@ follow_exec (ptid_t pid, char *execd_pathname)
 
   if ((inf->symfile_flags & SYMFILE_NO_READ) == 0)
     set_initial_language ();
+
+  /* If the target can specify a description, read it.  Must do this
+     after flipping to the new executable (because the target supplied
+     description must be compatible with the executable's
+     architecture, and the old executable may e.g., be 32-bit, while
+     the new one 64-bit), and before anything involving memory or
+     registers.  */
+  target_find_description ();
 
 #ifdef SOLIB_CREATE_INFERIOR_HOOK
   SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
@@ -2383,7 +2402,7 @@ enum infwait_states
 ptid_t waiton_ptid;
 
 /* Current inferior wait state.  */
-enum infwait_states infwait_state;
+static enum infwait_states infwait_state;
 
 /* Data to be passed around while handling an event.  This data is
    discarded between events.  */
@@ -3024,25 +3043,11 @@ adjust_pc_after_break (struct execution_control_state *ecs)
     }
 }
 
-void
+static void
 init_infwait_state (void)
 {
   waiton_ptid = pid_to_ptid (-1);
   infwait_state = infwait_normal_state;
-}
-
-void
-error_is_running (void)
-{
-  error (_("Cannot execute this command while "
-	   "the selected thread is running."));
-}
-
-void
-ensure_not_running (void)
-{
-  if (is_running (inferior_ptid))
-    error_is_running ();
 }
 
 static int
@@ -3774,7 +3779,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 
 	  context_switch (saved_singlestep_ptid);
 	  if (deprecated_context_hook)
-	    deprecated_context_hook (pid_to_thread_id (ecs->ptid));
+	    deprecated_context_hook (pid_to_thread_id (saved_singlestep_ptid));
 
 	  resume (1, GDB_SIGNAL_0);
 	  prepare_to_wait (ecs);
@@ -4981,7 +4986,8 @@ process_event_stop_test:
 
 	tmp_sal = find_pc_line (ecs->stop_func_start, 0);
 	if (tmp_sal.line != 0
-	    && !function_pc_is_marked_for_skip (ecs->stop_func_start))
+	    && !function_name_is_marked_for_skip (ecs->stop_func_name,
+						  &tmp_sal))
 	  {
 	    if (execution_direction == EXEC_REVERSE)
 	      handle_step_into_function_backward (gdbarch, ecs);

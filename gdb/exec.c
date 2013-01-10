@@ -1,6 +1,6 @@
 /* Work with executable files, for GDB. 
 
-   Copyright (C) 1988-2003, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1988-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -225,11 +225,11 @@ exec_file_attach (char *filename, int from_tty)
 	     &scratch_pathname);
 	}
 #endif
+      if (scratch_chan < 0)
+	perror_with_name (filename);
 
       cleanups = make_cleanup (xfree, scratch_pathname);
 
-      if (scratch_chan < 0)
-	perror_with_name (filename);
       if (write_files)
 	exec_bfd = gdb_bfd_fopen (scratch_pathname, gnutarget,
 				  FOPEN_RUB, scratch_chan);
@@ -767,7 +767,7 @@ exec_files_info (struct target_ops *t)
 
   if (vmap)
     {
-      int addr_size = gdbarch_addr_bit (target_gdbarch) / 8;
+      int addr_size = gdbarch_addr_bit (target_gdbarch ()) / 8;
       struct vmap *vp;
 
       printf_unfiltered (_("\tMapping info for file `%s'.\n"), vmap->name);

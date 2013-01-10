@@ -1,6 +1,6 @@
 /* Low level packing and unpacking of values for GDB, the GNU Debugger.
 
-   Copyright (C) 1986-2000, 2002-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -850,8 +850,12 @@ value_actual_type (struct value *value, int resolve_simple_types,
   result = value_type (value);
   if (opts.objectprint)
     {
-      if (TYPE_CODE (result) == TYPE_CODE_PTR
+      /* If result's target type is TYPE_CODE_STRUCT, proceed to
+	 fetch its rtti type.  */
+      if ((TYPE_CODE (result) == TYPE_CODE_PTR
 	  || TYPE_CODE (result) == TYPE_CODE_REF)
+	  && TYPE_CODE (check_typedef (TYPE_TARGET_TYPE (result)))
+	     == TYPE_CODE_STRUCT)
         {
           struct type *real_type;
 
@@ -3380,6 +3384,7 @@ A few convenience variables are given values automatically:\n\
 Convenience functions are defined via the Python API."
 #endif
 	   ), &showlist);
+  add_alias_cmd ("conv", "convenience", no_class, 1, &showlist);
 
   add_cmd ("values", no_set_class, show_values, _("\
 Elements of value history around item number IDX (or last ten)."),

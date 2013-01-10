@@ -1,6 +1,6 @@
 /* Target-dependent code for Xilinx MicroBlaze.
 
-   Copyright 2009-2012 Free Software Foundation, Inc.
+   Copyright 2009-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -123,7 +123,7 @@ microblaze_register_type (struct gdbarch *gdbarch, int regnum)
 static unsigned long
 microblaze_fetch_instruction (CORE_ADDR pc)
 {
-  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
+  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
   gdb_byte buf[4];
 
   /* If we can't read the instruction at PC, return zero.  */
