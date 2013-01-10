@@ -33,7 +33,7 @@ if { [gdb_compile_shlib $srcfile_lib $binfile_lib \
 }
 
 if { [prepare_for_testing $testfile.exp $testfile $srcfile \
-	  [list additional_flags=-DSHLIB_NAME\=\"$binfile_lib\" libs=-ldl ldflags=-Wl,--dynamic-linker=/home/gary/work/glibc/install/lib/ld-linux-x86-64.so.2]] } { # XXX
+	  [list additional_flags=-DSHLIB_NAME\=\"$binfile_lib\" libs=-ldl]] } {
     return -1
 }
 
