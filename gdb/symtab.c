@@ -1556,10 +1556,6 @@ lookup_symbol_aux_objfile (struct objfile *objfile, int block_index,
   const struct block *block;
   struct symtab *s;
 
-  if (objfile->sf)
-    objfile->sf->qf->pre_expand_symtabs_matching (objfile, block_index,
-						  name, domain);
-
   ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
     {
       bv = BLOCKVECTOR (s);
@@ -1917,11 +1913,6 @@ basic_lookup_transparent_type (const char *name)
 
   ALL_OBJFILES (objfile)
   {
-    if (objfile->sf)
-      objfile->sf->qf->pre_expand_symtabs_matching (objfile,
-						    GLOBAL_BLOCK,
-						    name, STRUCT_DOMAIN);
-
     ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
       {
 	bv = BLOCKVECTOR (s);
@@ -1950,10 +1941,6 @@ basic_lookup_transparent_type (const char *name)
 
   ALL_OBJFILES (objfile)
   {
-    if (objfile->sf)
-      objfile->sf->qf->pre_expand_symtabs_matching (objfile, STATIC_BLOCK,
-						    name, STRUCT_DOMAIN);
-
     ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
       {
 	bv = BLOCKVECTOR (s);
