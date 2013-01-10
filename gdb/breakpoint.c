@@ -11919,8 +11919,8 @@ clear_command (char *arg, int from_tty)
 		      && sal_fullname != NULL
 		      && sal.pspace == loc->pspace
 		      && loc->line_number == sal.line
-		      && compare_filenames_for_search
-			       (symtab_to_fullname (loc->symtab), sal_fullname))
+		      && filename_cmp (symtab_to_fullname (loc->symtab),
+				       sal_fullname) == 0)
 		    line_match = 1;
 
 		  if (pc_match || line_match)
