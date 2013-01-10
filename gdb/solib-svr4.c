@@ -163,6 +163,7 @@ static const struct probe_info probe_info[] =
   { "init_start", NAMESPACE_NO_ACTION },
   { "init_complete", NAMESPACE_RELOAD },
   { "map_start", NAMESPACE_NO_ACTION },
+  { "map_failed", NAMESPACE_NO_ACTION },
   { "reloc_complete", NAMESPACE_UPDATE_OR_RELOAD },
   { "unmap_start", NAMESPACE_NO_ACTION },
   { "unmap_complete", NAMESPACE_RELOAD },
@@ -2102,10 +2103,11 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 
 	      /* Fedora 17, RHEL 6.2, and RHEL 6.3 shipped with an
 		 early version of the probes code in which the probes'
-		 names were prefixed with "rtld_".  The locations and
-		 arguments of the probes are otherwise the same, so we
-		 check for the prefixed version if the unprefixed
-		 probes are not found.  */
+		 names were prefixed with "rtld_" and the "map_failed"
+		 probe did not exist.  The locations of the probes are
+		 otherwise the same, so we check for probes with
+		 prefixed names if probes with unprefixed names are
+		 not present.  */
 
 	      if (with_prefix)
 		strncat (name, "rtld_", sizeof (name) - 1);
@@ -2113,6 +2115,9 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 	      strncat (name, probe_info[i].name, sizeof (name) - 1);
 
 	      probes[i] = find_probes_in_objfile (os->objfile, "rtld", name);
+
+	      if (!strcmp (name, "rtld_map_failed"))
+		continue;
 
 	      if (!VEC_length (probe_p, probes[i]))
 		{
