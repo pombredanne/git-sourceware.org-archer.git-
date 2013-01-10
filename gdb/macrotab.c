@@ -500,10 +500,10 @@ macro_include (struct macro_source_file *source,
 
 struct macro_source_file *
 macro_lookup_inclusion (struct macro_source_file *source,
-			const char *raw_fullname)
+			const char *rawfullname)
 {
-  /* Is SOURCE itself named NAME?  */
-  if (filename_cmp (name, source->rawfullname) == 0)
+  /* Is SOURCE itself named RAWFULLNAME?  */
+  if (filename_cmp (rawfullname, source->rawfullname) == 0)
     return source;
 
   /* It's not us.  Try all our children, and return the lowest.  */
@@ -515,7 +515,7 @@ macro_lookup_inclusion (struct macro_source_file *source,
     for (child = source->includes; child; child = child->next_included)
       {
         struct macro_source_file *result
-          = macro_lookup_inclusion (child, raw_fullname);
+          = macro_lookup_inclusion (child, rawfullname);
 
         if (result)
           {
