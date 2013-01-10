@@ -380,14 +380,14 @@ macro_tree_delete_key (void *untyped_key)
 /* Allocate and initialize a new source file structure.  */
 static struct macro_source_file *
 new_source_file (struct macro_table *t,
-                 const char *fullname)
+                 const char *rawfullname)
 {
   /* Get space for the source file structure itself.  */
   struct macro_source_file *f = macro_alloc (sizeof (*f), t);
 
   memset (f, 0, sizeof (*f));
   f->table = t;
-  f->raw_fullname = macro_bcache_str (t, fullname);
+  f->rawfullname = macro_bcache_str (t, rawfullname);
   f->includes = 0;
 
   return f;
@@ -407,20 +407,20 @@ free_macro_source_file (struct macro_source_file *src)
       free_macro_source_file (child);
     }
 
-  macro_bcache_free (src->table, (char *) src->raw_fullname);
+  macro_bcache_free (src->table, (char *) src->rawfullname);
   macro_free (src, src->table);
 }
 
 
 struct macro_source_file *
 macro_set_main (struct macro_table *t,
-                const char *fullname)
+                const char *rawfullname)
 {
   /* You can't change a table's main source file.  What would that do
      to the tree?  */
   gdb_assert (! t->main_source);
 
-  t->main_source = new_source_file (t, fullname);
+  t->main_source = new_source_file (t, rawfullname);
 
   return t->main_source;
 }
@@ -446,7 +446,7 @@ macro_allow_redefinitions (struct macro_table *t)
 struct macro_source_file *
 macro_include (struct macro_source_file *source,
                int line,
-               const char *included_fullname)
+               const char *included_rawfullname)
 {
   struct macro_source_file *new;
   struct macro_source_file **link;
@@ -472,8 +472,8 @@ macro_include (struct macro_source_file *source,
          First, squawk.  */
       complaint (&symfile_complaints,
 		 _("both `%s' and `%s' allegedly #included at %s:%d"),
-		 included_fullname, (*link)->raw_fullname, source->raw_fullname,
-		 line);
+		 included_rawfullname, (*link)->rawfullname,
+		 source->rawfullname, line);
 
       /* Now, choose a new, unoccupied line number for this
          #inclusion, after the alleged #inclusion line.  */
@@ -488,7 +488,7 @@ macro_include (struct macro_source_file *source,
   /* At this point, we know that LINE is an unused line number, and
      *LINK points to the entry an #inclusion at that line should
      precede.  */
-  new = new_source_file (source->table, included_fullname);
+  new = new_source_file (source->table, included_rawfullname);
   new->included_by = source;
   new->included_at_line = line;
   new->next_included = *link;
@@ -503,7 +503,7 @@ macro_lookup_inclusion (struct macro_source_file *source,
 			const char *raw_fullname)
 {
   /* Is SOURCE itself named NAME?  */
-  if (filename_cmp (raw_fullname, source->raw_fullname) == 0)
+  if (filename_cmp (name, source->rawfullname) == 0)
     return source;
 
   /* It's not us.  Try all our children, and return the lowest.  */
@@ -719,9 +719,8 @@ check_for_redefinition (struct macro_source_file *source, int line,
 	  complaint (&symfile_complaints,
 		     _("macro `%s' redefined at %s:%d; "
 		       "original definition at %s:%d"),
-		     name, source->raw_fullname, line,
-		     found_key->start_file->raw_fullname,
-		     found_key->start_line);
+		     name, source->rawfullname, line,
+		     found_key->start_file->rawfullname, found_key->start_line);
         }
 
       return found_key;
@@ -844,8 +843,8 @@ macro_undef (struct macro_source_file *source, int line,
                          _("macro '%s' is #undefined twice,"
                            " at %s:%d and %s:%d"),
                          name,
-                         source->raw_fullname, line,
-                         key->end_file->raw_fullname, key->end_line);
+                         source->rawfullname, line,
+                         key->end_file->rawfullname, key->end_line);
             }
 
           /* Whether or not we've seen a prior #undefinition, wipe out
@@ -871,7 +870,7 @@ macro_undef (struct macro_source_file *source, int line,
    when needed.  */
 
 static struct macro_definition *
-fixup_definition (const char *raw_fullname, int line, struct macro_definition *def)
+fixup_definition (const char *rawfullname, int line, struct macro_definition *def)
 {
   static char *saved_expansion;
 
@@ -885,7 +884,7 @@ fixup_definition (const char *raw_fullname, int line, struct macro_definition *d
     {
       if (def->argc == macro_FILE)
 	{
-	  saved_expansion = macro_stringify (raw_fullname);
+	  saved_expansion = macro_stringify (rawfullname);
 	  def->replacement = saved_expansion;
 	}
       else if (def->argc == macro_LINE)
@@ -905,7 +904,7 @@ macro_lookup_definition (struct macro_source_file *source,
   splay_tree_node n = find_definition (name, source, line);
 
   if (n)
-    return fixup_definition (source->raw_fullname, line,
+    return fixup_definition (source->rawfullname, line,
 			     (struct macro_definition *) n->value);
   else
     return 0;
@@ -950,7 +949,7 @@ foreach_macro (splay_tree_node node, void *arg)
   struct macro_for_each_data *datum = (struct macro_for_each_data *) arg;
   struct macro_key *key = (struct macro_key *) node->key;
   struct macro_definition *def
-    = fixup_definition (key->start_file->raw_fullname, key->start_line,
+    = fixup_definition (key->start_file->rawfullname, key->start_line,
 			(struct macro_definition *) node->value);
 
   (*datum->fn) (key->name, def, key->start_file, key->start_line,
@@ -978,7 +977,7 @@ foreach_macro_in_scope (splay_tree_node node, void *info)
   struct macro_for_each_data *datum = (struct macro_for_each_data *) info;
   struct macro_key *key = (struct macro_key *) node->key;
   struct macro_definition *def
-    = fixup_definition (datum->file->raw_fullname, datum->line,
+    = fixup_definition (datum->file->rawfullname, datum->line,
 			(struct macro_definition *) node->value);
 
   /* See if this macro is defined before the passed-in line, and
