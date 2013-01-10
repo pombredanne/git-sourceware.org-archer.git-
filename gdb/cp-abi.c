@@ -1,6 +1,6 @@
 /* Generic code for supporting multiple C++ ABI's
 
-   Copyright (C) 2001-2003, 2005-2012 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -176,7 +176,7 @@ cplus_print_vtable (struct value *value)
 {
   if (current_cp_abi.print_vtable == NULL)
     error (_("GDB cannot print the vtable on this target"));
-  return (*current_cp_abi.print_vtable) (value);
+  (*current_cp_abi.print_vtable) (value);
 }
 
 int

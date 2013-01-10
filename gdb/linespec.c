@@ -1,6 +1,6 @@
 /* Parser for linespec for the GNU debugger, GDB.
 
-   Copyright (C) 1986-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -285,6 +285,11 @@ struct ls_parser
 
   /* Is the entire linespec quote-enclosed?  */
   int is_quote_enclosed;
+
+  /* Is a keyword syntactically valid at this point?
+     In, e.g., "break thread thread 1", the leading "keyword" must not
+     be interpreted as such.  */
+  int keyword_ok;
 
   /* The state of the parse.  */
   struct linespec_state state;
@@ -607,6 +612,10 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	  if (isspace (*PARSER_STREAM (parser)))
 	    {
 	      p = skip_spaces (PARSER_STREAM (parser));
+	      /* When we get here we know we've found something followed by
+		 a space (we skip over parens and templates below).
+		 So if we find a keyword now, we know it is a keyword and not,
+		 say, a function name.  */
 	      if (linespec_lexer_lex_keyword (p) != NULL)
 		{
 		  LS_TOKEN_STOKEN (token).ptr = start;
@@ -716,8 +725,10 @@ linespec_lexer_lex_one (linespec_parser *parser)
       /* Skip any whitespace.  */
       PARSER_STREAM (parser) = skip_spaces (PARSER_STREAM (parser));
 
-      /* Check for a keyword.  */
-      keyword = linespec_lexer_lex_keyword (PARSER_STREAM (parser));
+      /* Check for a keyword, they end the linespec.  */
+      keyword = NULL;
+      if (parser->keyword_ok)
+	keyword = linespec_lexer_lex_keyword (PARSER_STREAM (parser));
       if (keyword != NULL)
 	{
 	  parser->lexer.current.type = LSTOKEN_KEYWORD;
@@ -841,7 +852,7 @@ add_sal_to_sals (struct linespec_state *self,
 
       self->canonical_names = xrealloc (self->canonical_names,
 					sals->nelts * sizeof (char *));
-      if (!literal_canonical && sal->symtab && sal->symtab->filename)
+      if (!literal_canonical && sal->symtab)
 	{
 	  char *filename = sal->symtab->filename;
 
@@ -1010,7 +1021,8 @@ iterate_over_all_matching_symtabs (struct linespec_state *state,
 	  struct block *block;
 
 	  block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), STATIC_BLOCK);
-	  LA_ITERATE_OVER_SYMBOLS (block, name, domain, callback, data);
+	  state->language->la_iterate_over_symbols (block, name, domain,
+						    callback, data);
 
 	  if (include_inline)
 	    {
@@ -1021,8 +1033,8 @@ iterate_over_all_matching_symtabs (struct linespec_state *state,
 		   i < BLOCKVECTOR_NBLOCKS (BLOCKVECTOR (symtab)); i++)
 		{
 		  block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), i);
-		  LA_ITERATE_OVER_SYMBOLS (block, name, domain,
-					   iterate_inline_only, &cad);
+		  state->language->la_iterate_over_symbols
+		    (block, name, domain, iterate_inline_only, &cad);
 		}
 	    }
 	}
@@ -1710,7 +1722,7 @@ create_sals_line_offset (struct linespec_state *self,
 
   /* This is where we need to make sure we have good defaults.
      We must guarantee that this section of code is never executed
-     when we are called with just a function anme, since
+     when we are called with just a function name, since
      set_default_source_symtab_and_line uses
      select_source_symtab that calls us with such an argument.  */
 
@@ -2023,6 +2035,10 @@ parse_linespec (linespec_parser *parser, char **argptr)
 	}
     }
 
+  /* A keyword at the start cannot be interpreted as such.
+     Consider "b thread thread 42".  */
+  parser->keyword_ok = 0;
+
   parser->lexer.saved_arg = *argptr;
   parser->lexer.stream = argptr;
   file_exception.reason = 0;
@@ -2079,23 +2095,23 @@ parse_linespec (linespec_parser *parser, char **argptr)
       cleanup = make_cleanup (xfree, var);
       PARSER_RESULT (parser)->line_offset
 	= linespec_parse_variable (PARSER_STATE (parser), var);
+      do_cleanups (cleanup);
 
       /* If a line_offset wasn't found (VAR is the name of a user
 	 variable/function), then skip to normal symbol processing.  */
       if (PARSER_RESULT (parser)->line_offset.sign != LINE_OFFSET_UNKNOWN)
 	{
-	  discard_cleanups (cleanup);
-
 	  /* Consume this token.  */
 	  linespec_lexer_consume_token (parser);
 
 	  goto convert_to_sals;
 	}
-
-      do_cleanups (cleanup);
     }
   else if (token.type != LSTOKEN_STRING && token.type != LSTOKEN_NUMBER)
     unexpected_linespec_error (parser);
+
+  /* Now we can recognize keywords.  */
+  parser->keyword_ok = 1;
 
   /* Shortcut: If the next token is not LSTOKEN_COLON, we know that
      this token cannot represent a filename.  */

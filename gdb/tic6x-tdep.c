@@ -1,6 +1,6 @@
 /* Target dependent code for GDB on TI C6x systems.
 
-   Copyright (C) 2010-2012 Free Software Foundation, Inc.
+   Copyright (C) 2010-2013 Free Software Foundation, Inc.
    Contributed by Andrew Jenner <andrew@codesourcery.com>
    Contributed by Yao Qi <yao@codesourcery.com>
 
@@ -895,7 +895,6 @@ tic6x_push_dummy_call (struct gdbarch *gdbarch, struct value *function,
 {
   int argreg = 0;
   int argnum;
-  int len = 0;
   int stack_offset = 4;
   int references_offset = 4;
   CORE_ADDR func_addr = find_function_addr (function, NULL);

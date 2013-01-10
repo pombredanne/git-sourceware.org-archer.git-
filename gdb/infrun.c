@@ -1,7 +1,7 @@
 /* Target-struct-independent code to start (run) and stop an inferior
    process.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -58,6 +58,7 @@
 #include "probe.h"
 #include "objfiles.h"
 #include "completer.h"
+#include "target-descriptions.h"
 
 /* Prototypes for local functions */
 
@@ -406,7 +407,7 @@ static void context_switch (ptid_t ptid);
 
 void init_thread_stepping_state (struct thread_info *tss);
 
-void init_infwait_state (void);
+static void init_infwait_state (void);
 
 static const char follow_fork_mode_child[] = "child";
 static const char follow_fork_mode_parent[] = "parent";
@@ -673,7 +674,18 @@ handle_vfork_child_exec_or_exit (int exec)
 
 	  /* follow-fork child, detach-on-fork on.  */
 
-	  old_chain = make_cleanup_restore_current_thread ();
+	  inf->vfork_parent->pending_detach = 0;
+
+	  if (!exec)
+	    {
+	      /* If we're handling a child exit, then inferior_ptid
+		 points at the inferior's pid, not to a thread.  */
+	      old_chain = save_inferior_ptid ();
+	      save_current_program_space ();
+	      save_current_inferior ();
+	    }
+	  else
+	    old_chain = save_current_space_and_thread ();
 
 	  /* We're letting loose of the parent.  */
 	  tp = any_live_thread_of_process (inf->vfork_parent->pid);
@@ -912,6 +924,16 @@ follow_exec (ptid_t pid, char *execd_pathname)
       set_current_inferior (inf);
       set_current_program_space (pspace);
     }
+  else
+    {
+      /* The old description may no longer be fit for the new image.
+	 E.g, a 64-bit process exec'ed a 32-bit process.  Clear the
+	 old description; we'll read a new one below.  No need to do
+	 this on "follow-exec-mode new", as the old inferior stays
+	 around (its description is later cleared/refetched on
+	 restart).  */
+      target_clear_description ();
+    }
 
   gdb_assert (current_program_space == inf->pspace);
 
@@ -930,6 +952,14 @@ follow_exec (ptid_t pid, char *execd_pathname)
 
   if ((inf->symfile_flags & SYMFILE_NO_READ) == 0)
     set_initial_language ();
+
+  /* If the target can specify a description, read it.  Must do this
+     after flipping to the new executable (because the target supplied
+     description must be compatible with the executable's
+     architecture, and the old executable may e.g., be 32-bit, while
+     the new one 64-bit), and before anything involving memory or
+     registers.  */
+  target_find_description ();
 
 #ifdef SOLIB_CREATE_INFERIOR_HOOK
   SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
@@ -2372,7 +2402,7 @@ enum infwait_states
 ptid_t waiton_ptid;
 
 /* Current inferior wait state.  */
-enum infwait_states infwait_state;
+static enum infwait_states infwait_state;
 
 /* Data to be passed around while handling an event.  This data is
    discarded between events.  */
@@ -3013,25 +3043,11 @@ adjust_pc_after_break (struct execution_control_state *ecs)
     }
 }
 
-void
+static void
 init_infwait_state (void)
 {
   waiton_ptid = pid_to_ptid (-1);
   infwait_state = infwait_normal_state;
-}
-
-void
-error_is_running (void)
-{
-  error (_("Cannot execute this command while "
-	   "the selected thread is running."));
-}
-
-void
-ensure_not_running (void)
-{
-  if (is_running (inferior_ptid))
-    error_is_running ();
 }
 
 static int
@@ -3380,23 +3396,38 @@ handle_inferior_event (struct execution_control_state *ecs)
       return;
 
     case TARGET_WAITKIND_EXITED:
+    case TARGET_WAITKIND_SIGNALLED:
       if (debug_infrun)
-        fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_EXITED\n");
+	{
+	  if (ecs->ws.kind == TARGET_WAITKIND_EXITED)
+	    fprintf_unfiltered (gdb_stdlog,
+				"infrun: TARGET_WAITKIND_EXITED\n");
+	  else
+	    fprintf_unfiltered (gdb_stdlog,
+				"infrun: TARGET_WAITKIND_SIGNALLED\n");
+	}
+
       inferior_ptid = ecs->ptid;
       set_current_inferior (find_inferior_pid (ptid_get_pid (ecs->ptid)));
       set_current_program_space (current_inferior ()->pspace);
       handle_vfork_child_exec_or_exit (0);
       target_terminal_ours ();	/* Must do this before mourn anyway.  */
-      print_exited_reason (ecs->ws.value.integer);
 
-      /* Record the exit code in the convenience variable $_exitcode, so
-         that the user can inspect this again later.  */
-      set_internalvar_integer (lookup_internalvar ("_exitcode"),
-			       (LONGEST) ecs->ws.value.integer);
+      if (ecs->ws.kind == TARGET_WAITKIND_EXITED)
+	{
+	  /* Record the exit code in the convenience variable $_exitcode, so
+	     that the user can inspect this again later.  */
+	  set_internalvar_integer (lookup_internalvar ("_exitcode"),
+				   (LONGEST) ecs->ws.value.integer);
 
-      /* Also record this in the inferior itself.  */
-      current_inferior ()->has_exit_code = 1;
-      current_inferior ()->exit_code = (LONGEST) ecs->ws.value.integer;
+	  /* Also record this in the inferior itself.  */
+	  current_inferior ()->has_exit_code = 1;
+	  current_inferior ()->exit_code = (LONGEST) ecs->ws.value.integer;
+
+	  print_exited_reason (ecs->ws.value.integer);
+	}
+      else
+	print_signal_exited_reason (ecs->ws.value.sig);
 
       gdb_flush (gdb_stdout);
       target_mourn_inferior ();
@@ -3406,35 +3437,17 @@ handle_inferior_event (struct execution_control_state *ecs)
       stop_stepping (ecs);
       return;
 
-    case TARGET_WAITKIND_SIGNALLED:
-      if (debug_infrun)
-        fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_SIGNALLED\n");
-      inferior_ptid = ecs->ptid;
-      set_current_inferior (find_inferior_pid (ptid_get_pid (ecs->ptid)));
-      set_current_program_space (current_inferior ()->pspace);
-      handle_vfork_child_exec_or_exit (0);
-      stop_print_frame = 0;
-      target_terminal_ours ();	/* Must do this before mourn anyway.  */
-
-      /* Note: By definition of TARGET_WAITKIND_SIGNALLED, we shouldn't
-         reach here unless the inferior is dead.  However, for years
-         target_kill() was called here, which hints that fatal signals aren't
-         really fatal on some systems.  If that's true, then some changes
-         may be needed.  */
-      target_mourn_inferior ();
-
-      print_signal_exited_reason (ecs->ws.value.sig);
-      singlestep_breakpoints_inserted_p = 0;
-      cancel_single_step_breakpoints ();
-      stop_stepping (ecs);
-      return;
-
       /* The following are the only cases in which we keep going;
          the above cases end in a continue or goto.  */
     case TARGET_WAITKIND_FORKED:
     case TARGET_WAITKIND_VFORKED:
       if (debug_infrun)
-        fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_FORKED\n");
+	{
+	  if (ecs->ws.kind == TARGET_WAITKIND_FORKED)
+	    fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_FORKED\n");
+	  else
+	    fprintf_unfiltered (gdb_stdlog, "infrun: TARGET_WAITKIND_VFORKED\n");
+	}
 
       /* Check whether the inferior is displaced stepping.  */
       {
@@ -3507,11 +3520,9 @@ handle_inferior_event (struct execution_control_state *ecs)
 	 vfork follow are detached.  */
       if (ecs->ws.kind != TARGET_WAITKIND_VFORKED)
 	{
-	  int child_pid = ptid_get_pid (ecs->ws.value.related_pid);
-
 	  /* This won't actually modify the breakpoint list, but will
 	     physically remove the breakpoints from the child.  */
-	  detach_breakpoints (child_pid);
+	  detach_breakpoints (ecs->ws.value.related_pid);
 	}
 
       if (singlestep_breakpoints_inserted_p)
@@ -3768,7 +3779,7 @@ handle_inferior_event (struct execution_control_state *ecs)
 
 	  context_switch (saved_singlestep_ptid);
 	  if (deprecated_context_hook)
-	    deprecated_context_hook (pid_to_thread_id (ecs->ptid));
+	    deprecated_context_hook (pid_to_thread_id (saved_singlestep_ptid));
 
 	  resume (1, GDB_SIGNAL_0);
 	  prepare_to_wait (ecs);
@@ -4914,14 +4925,22 @@ process_event_stop_test:
 
 	  if (execution_direction == EXEC_REVERSE)
 	    {
-	      struct symtab_and_line sr_sal;
+	      /* If we're already at the start of the function, we've either
+		 just stepped backward into a single instruction function,
+		 or stepped back out of a signal handler to the first instruction
+		 of the function.  Just keep going, which will single-step back
+		 to the caller.  */
+	      if (ecs->stop_func_start != stop_pc)
+		{
+		  struct symtab_and_line sr_sal;
 
-	      /* Normal function call return (static or dynamic).  */
-	      init_sal (&sr_sal);
-	      sr_sal.pc = ecs->stop_func_start;
-	      sr_sal.pspace = get_frame_program_space (frame);
-	      insert_step_resume_breakpoint_at_sal (gdbarch,
-						    sr_sal, null_frame_id);
+		  /* Normal function call return (static or dynamic).  */
+		  init_sal (&sr_sal);
+		  sr_sal.pc = ecs->stop_func_start;
+		  sr_sal.pspace = get_frame_program_space (frame);
+		  insert_step_resume_breakpoint_at_sal (gdbarch,
+							sr_sal, null_frame_id);
+		}
 	    }
 	  else
 	    insert_step_resume_breakpoint_at_caller (frame);
@@ -4967,7 +4986,8 @@ process_event_stop_test:
 
 	tmp_sal = find_pc_line (ecs->stop_func_start, 0);
 	if (tmp_sal.line != 0
-	    && !function_pc_is_marked_for_skip (ecs->stop_func_start))
+	    && !function_name_is_marked_for_skip (ecs->stop_func_name,
+						  &tmp_sal))
 	  {
 	    if (execution_direction == EXEC_REVERSE)
 	      handle_step_into_function_backward (gdbarch, ecs);
@@ -4991,15 +5011,23 @@ process_event_stop_test:
 
       if (execution_direction == EXEC_REVERSE)
 	{
-	  /* Set a breakpoint at callee's start address.
-	     From there we can step once and be back in the caller.  */
-	  struct symtab_and_line sr_sal;
+	  /* If we're already at the start of the function, we've either just
+	     stepped backward into a single instruction function without line
+	     number info, or stepped back out of a signal handler to the first
+	     instruction of the function without line number info.  Just keep
+	     going, which will single-step back to the caller.  */
+	  if (ecs->stop_func_start != stop_pc)
+	    {
+	      /* Set a breakpoint at callee's start address.
+		 From there we can step once and be back in the caller.  */
+	      struct symtab_and_line sr_sal;
 
-	  init_sal (&sr_sal);
-	  sr_sal.pc = ecs->stop_func_start;
-	  sr_sal.pspace = get_frame_program_space (frame);
-	  insert_step_resume_breakpoint_at_sal (gdbarch,
-						sr_sal, null_frame_id);
+	      init_sal (&sr_sal);
+	      sr_sal.pc = ecs->stop_func_start;
+	      sr_sal.pspace = get_frame_program_space (frame);
+	      insert_step_resume_breakpoint_at_sal (gdbarch,
+						    sr_sal, null_frame_id);
+	    }
 	}
       else
 	/* Set a breakpoint at callee's return address (the address
@@ -6773,11 +6801,10 @@ restore_infcall_suspend_state (struct infcall_suspend_state *inf_state)
   if (inf_state->siginfo_gdbarch == gdbarch)
     {
       struct type *type = gdbarch_get_siginfo_type (gdbarch);
-      size_t len = TYPE_LENGTH (type);
 
       /* Errors ignored.  */
       target_write (&current_target, TARGET_OBJECT_SIGNAL_INFO, NULL,
-		    inf_state->siginfo_data, 0, len);
+		    inf_state->siginfo_data, 0, TYPE_LENGTH (type));
     }
 
   /* The inferior can be gone if the user types "print exit(0)"
@@ -7108,10 +7135,10 @@ Specify a signal as argument to print info on that signal only."));
   add_info_alias ("handle", "signals", 0);
 
   c = add_com ("handle", class_run, handle_command, _("\
-Specify how to handle a signal.\n\
+Specify how to handle signals.\n\
 Usage: handle SIGNAL [ACTIONS]\n\
 Args are signals and actions to apply to those signals.\n\
-If no actions are specified, the current settings for the specified signal\n\
+If no actions are specified, the current settings for the specified signals\n\
 will be displayed instead.\n\
 \n\
 Symbolic signals (e.g. SIGSEGV) are recommended but numeric signals\n\
@@ -7126,7 +7153,11 @@ Stop means reenter debugger if this signal happens (implies print).\n\
 Print means print a message if this signal happens.\n\
 Pass means let program see this signal; otherwise program doesn't know.\n\
 Ignore is a synonym for nopass and noignore is a synonym for pass.\n\
-Pass and Stop may be combined."));
+Pass and Stop may be combined.\n\
+\n\
+Multiple signals may be specified.  Signal numbers and signal names\n\
+may be interspersed with actions, with the actions being performed for\n\
+all signals cumulatively specified."));
   set_cmd_completer (c, handle_completer);
 
   if (xdb_commands)

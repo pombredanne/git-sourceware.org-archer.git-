@@ -1,6 +1,6 @@
 /* Intel 386 target-dependent stuff.
 
-   Copyright (C) 1988-2012 Free Software Foundation, Inc.
+   Copyright (C) 1988-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -750,7 +750,7 @@ i386_relocate_instruction (struct gdbarch *gdbarch,
       /* Where "ret" in the original code will return to.  */
       ret_addr = oldloc + insn_length;
       push_buf[0] = 0x68; /* pushq $...  */
-      memcpy (&push_buf[1], &ret_addr, 4);
+      store_unsigned_integer (&push_buf[1], 4, byte_order, ret_addr);
       /* Push the push.  */
       append_insns (to, 5, push_buf);
 
@@ -1388,18 +1388,40 @@ i386_analyze_frame_setup (struct gdbarch *gdbarch,
       if (target_read_memory (pc + skip, &op, 1))
 	return pc + skip;
 
-      /* Check for `movl %esp, %ebp' -- can be written in two ways.  */
+      /* The i386 prologue looks like
+
+	 push   %ebp
+	 mov    %esp,%ebp
+	 sub    $0x10,%esp
+
+	 and a different prologue can be generated for atom.
+
+	 push   %ebp
+	 lea    (%esp),%ebp
+	 lea    -0x10(%esp),%esp
+
+	 We handle both of them here.  */
+
       switch (op)
 	{
+	  /* Check for `movl %esp, %ebp' -- can be written in two ways.  */
 	case 0x8b:
 	  if (read_memory_unsigned_integer (pc + skip + 1, 1, byte_order)
 	      != 0xec)
 	    return pc;
+	  pc += (skip + 2);
 	  break;
 	case 0x89:
 	  if (read_memory_unsigned_integer (pc + skip + 1, 1, byte_order)
 	      != 0xe5)
 	    return pc;
+	  pc += (skip + 2);
+	  break;
+	case 0x8d: /* Check for 'lea (%ebp), %ebp'.  */
+	  if (read_memory_unsigned_integer (pc + skip + 1, 2, byte_order)
+	      != 0x242c)
+	    return pc;
+	  pc += (skip + 3);
 	  break;
 	default:
 	  return pc;
@@ -1410,7 +1432,6 @@ i386_analyze_frame_setup (struct gdbarch *gdbarch,
 	 necessary.  We also now commit to skipping the special
 	 instructions mentioned before.  */
       cache->locals = 0;
-      pc += (skip + 2);
 
       /* If that's all, return now.  */
       if (limit <= pc)
@@ -1419,6 +1440,8 @@ i386_analyze_frame_setup (struct gdbarch *gdbarch,
       /* Check for stack adjustment 
 
 	    subl $XXX, %esp
+	 or
+	    lea -XXX(%esp),%esp
 
 	 NOTE: You can't subtract a 16-bit immediate from a 32-bit
 	 reg, so we don't have to worry about a data16 prefix.  */
@@ -1447,9 +1470,18 @@ i386_analyze_frame_setup (struct gdbarch *gdbarch,
 	  cache->locals = read_memory_integer (pc + 2, 4, byte_order);
 	  return pc + 6;
 	}
+      else if (op == 0x8d)
+	{
+	  /* The ModR/M byte is 0x64.  */
+	  if (read_memory_unsigned_integer (pc + 1, 1, byte_order) != 0x64)
+	    return pc;
+	  /* 'lea' with 8-bit displacement.  */
+	  cache->locals = -1 * read_memory_integer (pc + 3, 1, byte_order);
+	  return pc + 4;
+	}
       else
 	{
-	  /* Some instruction other than `subl'.  */
+	  /* Some instruction other than `subl' nor 'lea'.  */
 	  return pc;
 	}
     }
@@ -1550,7 +1582,23 @@ i386_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR start_pc)
   CORE_ADDR pc;
   gdb_byte op;
   int i;
+  CORE_ADDR func_addr;
 
+  if (find_pc_partial_function (start_pc, NULL, &func_addr, NULL))
+    {
+      CORE_ADDR post_prologue_pc
+	= skip_prologue_using_sal (gdbarch, func_addr);
+      struct symtab *s = find_pc_symtab (func_addr);
+
+      /* Clang always emits a line note before the prologue and another
+	 one after.  We trust clang to emit usable line notes.  */
+      if (post_prologue_pc
+	  && (s != NULL
+	      && s->producer != NULL
+	      && strncmp (s->producer, "clang ", sizeof ("clang ") - 1) == 0))
+        return max (start_pc, post_prologue_pc);
+    }
+ 
   cache.locals = -1;
   pc = i386_analyze_prologue (gdbarch, start_pc, 0xffffffff, &cache);
   if (cache.locals < 0)
@@ -1751,7 +1799,8 @@ i386_frame_cache_1 (struct frame_info *this_frame,
       /* Saved stack pointer has been saved (but the SAVED_SP_REG
 	 register may be unavailable).  */
       if (cache->saved_sp == 0
-	  && frame_register_read (this_frame, cache->saved_sp_reg, buf))
+	  && deprecated_frame_register_read (this_frame,
+					     cache->saved_sp_reg, buf))
 	cache->saved_sp = extract_unsigned_integer (buf, 4, byte_order);
     }
   /* Now that we have the base address for the stack frame we can
@@ -2630,6 +2679,9 @@ i386_return_value (struct gdbarch *gdbarch, struct value *function,
 	|| code == TYPE_CODE_UNION
 	|| code == TYPE_CODE_ARRAY)
        && !i386_reg_struct_return_p (gdbarch, type))
+      /* Complex double and long double uses the struct return covention.  */
+      || (code == TYPE_CODE_COMPLEX && TYPE_LENGTH (type) == 16)
+      || (code == TYPE_CODE_COMPLEX && TYPE_LENGTH (type) == 24)
       /* 128-bit decimal float uses the struct return convention.  */
       || (code == TYPE_CODE_DECFLOAT && TYPE_LENGTH (type) == 16))
     {
@@ -3361,11 +3413,9 @@ i386_svr4_sigtramp_p (struct frame_info *this_frame)
   CORE_ADDR pc = get_frame_pc (this_frame);
   const char *name;
 
-  /* UnixWare uses _sigacthandler.  The origin of the other symbols is
-     currently unknown.  */
+  /* The origin of these symbols is currently unknown.  */
   find_pc_partial_function (pc, &name, NULL, NULL);
   return (name && (strcmp ("_sigreturn", name) == 0
-		   || strcmp ("_sigacthandler", name) == 0
 		   || strcmp ("sigvechandler", name) == 0));
 }
 
@@ -7705,9 +7755,6 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   tdep->num_mmx_regs = 8;
   tdep->num_ymm_regs = 0;
 
-  tdep->sp_regnum_from_eax = -1;
-  tdep->pc_regnum_from_eax = -1;
-
   tdesc_data = tdesc_data_alloc ();
 
   set_gdbarch_relocate_instruction (gdbarch, i386_relocate_instruction);
@@ -7752,14 +7799,6 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
       /* Support dword pseudo-register if it hasn't been disabled.  */
       tdep->eax_regnum = ymm0_regnum;
       ymm0_regnum += tdep->num_dword_regs;
-      if (tdep->sp_regnum_from_eax != -1)
-	set_gdbarch_sp_regnum (gdbarch,
-			       (tdep->eax_regnum
-				+ tdep->sp_regnum_from_eax));
-      if (tdep->pc_regnum_from_eax != -1)
-	set_gdbarch_pc_regnum (gdbarch,
-			       (tdep->eax_regnum
-				+ tdep->pc_regnum_from_eax));
     }
   else
     tdep->eax_regnum = -1;

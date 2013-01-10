@@ -1,6 +1,6 @@
 /* Low level packing and unpacking of values for GDB, the GNU Debugger.
 
-   Copyright (C) 1986-2000, 2002-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -850,8 +850,12 @@ value_actual_type (struct value *value, int resolve_simple_types,
   result = value_type (value);
   if (opts.objectprint)
     {
-      if (TYPE_CODE (result) == TYPE_CODE_PTR
+      /* If result's target type is TYPE_CODE_STRUCT, proceed to
+	 fetch its rtti type.  */
+      if ((TYPE_CODE (result) == TYPE_CODE_PTR
 	  || TYPE_CODE (result) == TYPE_CODE_REF)
+	  && TYPE_CODE (check_typedef (TYPE_TARGET_TYPE (result)))
+	     == TYPE_CODE_STRUCT)
         {
           struct type *real_type;
 
@@ -1033,15 +1037,14 @@ value_contents_equal (struct value *val1, struct value *val2)
 {
   struct type *type1;
   struct type *type2;
-  int len;
 
   type1 = check_typedef (value_type (val1));
   type2 = check_typedef (value_type (val2));
-  len = TYPE_LENGTH (type1);
-  if (len != TYPE_LENGTH (type2))
+  if (TYPE_LENGTH (type1) != TYPE_LENGTH (type2))
     return 0;
 
-  return (memcmp (value_contents (val1), value_contents (val2), len) == 0);
+  return (memcmp (value_contents (val1), value_contents (val2),
+		  TYPE_LENGTH (type1)) == 0);
 }
 
 int
@@ -3381,6 +3384,7 @@ A few convenience variables are given values automatically:\n\
 Convenience functions are defined via the Python API."
 #endif
 	   ), &showlist);
+  add_alias_cmd ("conv", "convenience", no_class, 1, &showlist);
 
   add_cmd ("values", no_set_class, show_values, _("\
 Elements of value history around item number IDX (or last ten)."),

@@ -1,7 +1,6 @@
 /* Print in infix form a struct expression.
 
-   Copyright (C) 1986, 1988-1989, 1991-2000, 2003, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -33,9 +32,7 @@
 #include "gdb_assert.h"
 #include "valprint.h"
 
-#ifdef HAVE_CTYPE_H
 #include <ctype.h>
-#endif
 
 void
 print_expression (struct expression *exp, struct ui_file *stream)
@@ -124,7 +121,7 @@ print_subexp_standard (struct expression *exp, int *pos,
 
     case OP_VAR_VALUE:
       {
-	struct block *b;
+	const struct block *b;
 
 	(*pos) += 3;
 	b = exp->elts[pc + 1].block;
@@ -326,21 +323,6 @@ print_subexp_standard (struct expression *exp, int *pos,
 	    }
 	  fputs_filtered ("}", stream);
 	}
-      return;
-
-    case OP_LABELED:
-      tem = longest_to_int (exp->elts[pc + 1].longconst);
-      (*pos) += 3 + BYTES_TO_EXP_ELEM (tem + 1);
-      /* Gcc support both these syntaxes.  Unsure which is preferred.  */
-#if 1
-      fputs_filtered (&exp->elts[pc + 2].string, stream);
-      fputs_filtered (": ", stream);
-#else
-      fputs_filtered (".", stream);
-      fputs_filtered (&exp->elts[pc + 2].string, stream);
-      fputs_filtered ("=", stream);
-#endif
-      print_subexp (exp, pos, stream, PREC_SUFFIX);
       return;
 
     case TERNOP_COND:
@@ -685,7 +667,7 @@ op_name_standard (enum exp_opcode opcode)
       {
 	static char buf[30];
 
-	sprintf (buf, "<unknown %d>", opcode);
+	xsnprintf (buf, sizeof (buf), "<unknown %d>", opcode);
 	return buf;
       }
 #define OP(name)	\
@@ -1031,7 +1013,6 @@ dump_subexp_body_standard (struct expression *exp,
     case OP_BOOL:
     case OP_M2_STRING:
     case OP_THIS:
-    case OP_LABELED:
     case OP_NAME:
       fprintf_filtered (stream, "Unknown format");
     }

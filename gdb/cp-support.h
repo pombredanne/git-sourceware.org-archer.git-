@@ -1,5 +1,5 @@
 /* Helper routines for C++ support in GDB.
-   Copyright (C) 2002-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2002-2013 Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
    Namespace support contributed by David Carlton.
@@ -148,6 +148,12 @@ struct using_direct
 extern char *cp_canonicalize_string (const char *string);
 
 extern char *cp_canonicalize_string_no_typedefs (const char *string);
+
+typedef const char *(canonicalization_ftype) (struct type *, void *);
+
+extern char *cp_canonicalize_string_full (const char *string,
+					  canonicalization_ftype *finder,
+					  void *data);
 
 extern char *cp_class_name_from_physname (const char *physname);
 

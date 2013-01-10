@@ -1,5 +1,5 @@
 /* Darwin support for GDB, the GNU debugger.
-   Copyright (C) 2008-2012 Free Software Foundation, Inc.
+   Copyright (C) 2008-2013 Free Software Foundation, Inc.
 
    Contributed by AdaCore.
 
@@ -79,7 +79,6 @@ static void
 macho_symfile_init (struct objfile *objfile)
 {
   objfile->flags |= OBJF_REORDERED;
-  init_entry_point_info (objfile);
 }
 
 /*  Add a new OSO to the vector of OSO to load.  */
@@ -688,7 +687,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
             }
 
 	  /* Open the archive and check the format.  */
-	  archive_bfd = gdb_bfd_openr (archive_name, gnutarget);
+	  archive_bfd = gdb_bfd_open (archive_name, gnutarget, -1);
 	  if (archive_bfd == NULL)
 	    {
 	      warning (_("Could not open OSO archive file \"%s\""),
@@ -762,7 +761,7 @@ macho_symfile_read_all_oso (struct objfile *main_objfile, int symfile_flags)
 	{
           bfd *abfd;
 
-	  abfd = gdb_bfd_openr (oso->name, gnutarget);
+	  abfd = gdb_bfd_open (oso->name, gnutarget, -1);
 	  if (!abfd)
             warning (_("`%s': can't open to read symbols: %s."), oso->name,
                      bfd_errmsg (bfd_get_error ()));

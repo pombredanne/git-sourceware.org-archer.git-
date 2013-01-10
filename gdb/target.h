@@ -1,6 +1,6 @@
 /* Interface between GDB and target environments, including files and processes
 
-   Copyright (C) 1990-2012 Free Software Foundation, Inc.
+   Copyright (C) 1990-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by John Gilmore.
 
@@ -687,9 +687,9 @@ struct target_ops
        to_thread_architecture would return SPU, otherwise PPC32 or PPC64).
        This is architecture used to perform decr_pc_after_break adjustment,
        and also determines the frame architecture of the innermost frame.
-       ptrace operations need to operate according to target_gdbarch.
+       ptrace operations need to operate according to target_gdbarch ().
 
-       The default implementation always returns target_gdbarch.  */
+       The default implementation always returns target_gdbarch ().  */
     struct gdbarch *(*to_thread_architecture) (struct target_ops *, ptid_t);
 
     /* Determine current address space of thread PTID.
@@ -976,9 +976,12 @@ extern void target_store_registers (struct regcache *regcache, int regs);
 
 struct address_space *target_thread_address_space (ptid_t);
 
-/* Implement the "info proc" command.  */
+/* Implement the "info proc" command.  This returns one if the request
+   was handled, and zero otherwise.  It can also throw an exception if
+   an error was encountered while attempting to handle the
+   request.  */
 
-void target_info_proc (char *, enum info_proc_what);
+int target_info_proc (char *, enum info_proc_what);
 
 /* Returns true if this target can debug multiple processes
    simultaneously.  */
@@ -1080,16 +1083,6 @@ enum flash_preserve_mode
 int target_write_memory_blocks (VEC(memory_write_request_s) *requests,
 				enum flash_preserve_mode preserve_flash_p,
 				void (*progress_cb) (ULONGEST, void *));
-
-/* From infrun.c.  */
-
-extern int inferior_has_forked (ptid_t pid, ptid_t *child_pid);
-
-extern int inferior_has_vforked (ptid_t pid, ptid_t *child_pid);
-
-extern int inferior_has_execd (ptid_t pid, char **execd_pathname);
-
-extern int inferior_has_called_syscall (ptid_t pid, int *syscall_number);
 
 /* Print a line about the current target.  */
 
@@ -1803,6 +1796,12 @@ struct target_section
     CORE_ADDR endaddr;		/* 1+highest address in section */
 
     struct bfd_section *the_bfd_section;
+
+    /* A given BFD may appear multiple times in the target section
+       list, so each BFD is associated with a given key.  The key is
+       just some convenient pointer that can be used to differentiate
+       the BFDs.  These are managed only by convention.  */
+    void *key;
 
     bfd *bfd;			/* BFD file pointer */
   };

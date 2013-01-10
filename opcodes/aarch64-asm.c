@@ -146,7 +146,7 @@ aarch64_ins_ldst_reglist (const aarch64_operand *self ATTRIBUTE_UNUSED,
 			  const aarch64_opnd_info *info, aarch64_insn *code,
 			  const aarch64_inst *inst)
 {
-  aarch64_insn value;
+  aarch64_insn value = 0;
   /* Number of elements in each structure to be loaded/stored.  */
   unsigned num = get_opcode_dependent_value (inst->opcode);
 
@@ -215,8 +215,8 @@ aarch64_ins_ldst_elemlist (const aarch64_operand *self ATTRIBUTE_UNUSED,
 			   const aarch64_inst *inst ATTRIBUTE_UNUSED)
 {
   aarch64_field field = {0, 0};
-  aarch64_insn QSsize;		/* fields Q:S:size.  */
-  aarch64_insn opcodeh2;	/* opcode<2:1> */
+  aarch64_insn QSsize = 0;	/* fields Q:S:size.  */
+  aarch64_insn opcodeh2 = 0;	/* opcode<2:1> */
 
   assert (info->reglist.has_index);
 
@@ -336,8 +336,7 @@ aarch64_ins_imm (const aarch64_operand *self, const aarch64_opnd_info *info,
      MOVZ <Wd>, #<imm16>{, LSL #<shift>}.  */
 const char *
 aarch64_ins_imm_half (const aarch64_operand *self, const aarch64_opnd_info *info,
-		      aarch64_insn *code,
-		      const aarch64_inst *inst ATTRIBUTE_UNUSED)
+		      aarch64_insn *code, const aarch64_inst *inst)
 {
   /* imm16 */
   aarch64_ins_imm (self, info, code, inst);
@@ -453,7 +452,7 @@ const char *
 aarch64_ins_ft (const aarch64_operand *self, const aarch64_opnd_info *info,
 		aarch64_insn *code, const aarch64_inst *inst)
 {
-  aarch64_insn value;
+  aarch64_insn value = 0;
 
   assert (info->idx == 0);
 
@@ -532,7 +531,8 @@ aarch64_ins_addr_regoff (const aarch64_operand *self ATTRIBUTE_UNUSED,
 const char *
 aarch64_ins_addr_simm (const aarch64_operand *self,
 		       const aarch64_opnd_info *info,
-		       aarch64_insn *code, const aarch64_inst *inst)
+		       aarch64_insn *code,
+		       const aarch64_inst *inst ATTRIBUTE_UNUSED)
 {
   int imm;
 
@@ -834,7 +834,7 @@ static void
 do_special_encoding (struct aarch64_inst *inst)
 {
   int idx;
-  aarch64_insn value;
+  aarch64_insn value = 0;
 
   DEBUG_TRACE ("enter with coding 0x%x", (uint32_t) inst->value);
 
@@ -1090,8 +1090,9 @@ convert_mov_to_movewide (aarch64_inst *inst)
     }
   inst->operands[1].type = AARCH64_OPND_HALF;
   is32 = inst->operands[0].qualifier == AARCH64_OPND_QLF_W;
-  /* This should have been guaranteed by the constraint check.  */
-  assert (aarch64_wide_constant_p (value, is32, &shift_amount) == TRUE);
+  if (! aarch64_wide_constant_p (value, is32, &shift_amount))
+    /* The constraint check should have guaranteed this wouldn't happen.  */
+    assert (0);
   value >>= shift_amount;
   value &= 0xffff;
   inst->operands[1].imm.value = value;

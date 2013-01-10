@@ -1,6 +1,6 @@
 /* GNU/Linux native-dependent code common to multiple platforms.
 
-   Copyright (C) 2001-2012 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -66,6 +66,7 @@
 #include "exceptions.h"
 #include "linux-ptrace.h"
 #include "buffer.h"
+#include "target-descriptions.h"
 
 #ifndef SPUFS_MAGIC
 #define SPUFS_MAGIC 0x23c9b64e
@@ -723,6 +724,8 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 	  parent_inf = current_inferior ();
 	  child_inf->attach_flag = parent_inf->attach_flag;
 	  copy_terminal_info (child_inf, parent_inf);
+	  child_inf->gdbarch = parent_inf->gdbarch;
+	  copy_inferior_target_desc_info (child_inf, parent_inf);
 
 	  old_chain = save_inferior_ptid ();
 	  save_current_program_space ();
@@ -887,6 +890,8 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
       parent_inf = current_inferior ();
       child_inf->attach_flag = parent_inf->attach_flag;
       copy_terminal_info (child_inf, parent_inf);
+      child_inf->gdbarch = parent_inf->gdbarch;
+      copy_inferior_target_desc_info (child_inf, parent_inf);
 
       parent_pspace = parent_inf->pspace;
 
@@ -1307,7 +1312,6 @@ linux_nat_iterate_watchpoint_lwps
       pid_t child_pid = GET_PID (inferior_ptid);
       ptid_t child_ptid = ptid_build (child_pid, child_pid, 0);
 
-      gdb_assert (!is_lwp (inferior_ptid));
       gdb_assert (find_lwp_pid (child_ptid) == NULL);
       child_lp = add_lwp (child_ptid);
       child_lp->stopped = 1;
@@ -2314,7 +2318,7 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 
 	  /* This won't actually modify the breakpoint list, but will
 	     physically remove the breakpoints from the child.  */
-	  detach_breakpoints (new_pid);
+	  detach_breakpoints (ptid_build (new_pid, new_pid, 0));
 
 	  /* Retain child fork in ptrace (stopped) state.  */
 	  if (!find_fork_pid (new_pid))
@@ -4315,7 +4319,7 @@ linux_child_pid_to_exec_file (int pid)
   memset (name2, 0, MAXPATHLEN);
 
   sprintf (name1, "/proc/%d/exe", pid);
-  if (readlink (name1, name2, MAXPATHLEN) > 0)
+  if (readlink (name1, name2, MAXPATHLEN - 1) > 0)
     return name2;
   else
     return name1;
@@ -4372,7 +4376,7 @@ linux_nat_make_corefile_notes (bfd *obfd, int *note_size)
 {
   /* FIXME: uweigand/2011-10-06: Once all GNU/Linux architectures have been
      converted to gdbarch_core_regset_sections, this function can go away.  */
-  return linux_make_corefile_notes (target_gdbarch, obfd, note_size,
+  return linux_make_corefile_notes (target_gdbarch (), obfd, note_size,
 				    linux_nat_collect_thread_registers);
 }
 
@@ -4427,7 +4431,7 @@ linux_proc_xfer_partial (struct target_ops *ops, enum target_object object,
 static LONGEST
 spu_enumerate_spu_ids (int pid, gdb_byte *buf, ULONGEST offset, LONGEST len)
 {
-  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
+  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
   LONGEST pos = 0;
   LONGEST written = 0;
   char path[128];
@@ -4636,7 +4640,7 @@ linux_xfer_partial (struct target_ops *ops, enum target_object object,
 
   if (object == TARGET_OBJECT_MEMORY)
     {
-      int addr_bit = gdbarch_addr_bit (target_gdbarch);
+      int addr_bit = gdbarch_addr_bit (target_gdbarch ());
 
       if (addr_bit < (sizeof (ULONGEST) * HOST_CHAR_BIT))
 	offset &= ((ULONGEST) 1 << addr_bit) - 1;

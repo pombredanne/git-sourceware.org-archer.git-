@@ -1,7 +1,6 @@
 /* C language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 1992-1996, 1998-2000, 2002-2005, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -831,7 +830,6 @@ const struct language_defn c_language_defn =
   "c",				/* Language name */
   language_c,
   range_check_off,
-  type_check_off,
   case_sensitive_on,
   array_row_major,
   macro_expansion_c,
@@ -955,7 +953,6 @@ const struct language_defn cplus_language_defn =
   "c++",			/* Language name */
   language_cplus,
   range_check_off,
-  type_check_off,
   case_sensitive_on,
   array_row_major,
   macro_expansion_c,
@@ -997,7 +994,6 @@ const struct language_defn asm_language_defn =
   "asm",			/* Language name */
   language_asm,
   range_check_off,
-  type_check_off,
   case_sensitive_on,
   array_row_major,
   macro_expansion_c,
@@ -1044,7 +1040,6 @@ const struct language_defn minimal_language_defn =
   "minimal",			/* Language name */
   language_minimal,
   range_check_off,
-  type_check_off,
   case_sensitive_on,
   array_row_major,
   macro_expansion_c,

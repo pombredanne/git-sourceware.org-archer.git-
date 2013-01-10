@@ -1,6 +1,6 @@
 /* Shared general utility routines for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1988-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -135,22 +135,6 @@ xstrvprintf (const char *format, va_list ap)
   if (ret == NULL || status < 0)
     internal_error (__FILE__, __LINE__, _("vasprintf call failed"));
   return ret;
-}
-
-void
-xasprintf (char **ret, const char *format, ...)
-{
-  va_list args;
-
-  va_start (args, format);
-  (*ret) = xstrvprintf (format, args);
-  va_end (args);
-}
-
-void
-xvasprintf (char **ret, const char *format, va_list ap)
-{
-  (*ret) = xstrvprintf (format, ap);
 }
 
 int

@@ -570,7 +570,7 @@ elfNN_ia64_relax_section (bfd *abfd, asection *sec,
 	     .plt section.  After the first relaxation pass, linker may
 	     increase the gap between the .plt and .text sections up
 	     to 32byte.  We assume linker will always insert 32byte
-	     between the .plt and .text sections after the the first
+	     between the .plt and .text sections after the first
 	     relaxation pass.  */
 	  if (tsec == ia64_info->root.splt)
 	    offset = -0x1000000 + 32;
@@ -4586,7 +4586,7 @@ elfNN_ia64_finish_dynamic_symbol (bfd *output_bfd,
     }
 
   /* Mark some specially defined symbols as absolute.  */
-  if (strcmp (h->root.root.string, "_DYNAMIC") == 0
+  if (h == ia64_info->root.hdynamic
       || h == ia64_info->root.hgot
       || h == ia64_info->root.hplt)
     sym->st_shndx = SHN_ABS;

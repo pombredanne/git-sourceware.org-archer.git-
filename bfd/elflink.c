@@ -1,6 +1,6 @@
 /* ELF linking support for BFD.
    Copyright 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
+   2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -187,6 +187,7 @@ _bfd_elf_link_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
   flagword flags;
   asection *s;
   const struct elf_backend_data *bed;
+  struct elf_link_hash_entry *h;
 
   if (! is_elf_hash_table (info->hash))
     return FALSE;
@@ -254,7 +255,9 @@ _bfd_elf_link_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
      section.  We don't want to define it if there is no .dynamic
      section, since on some ELF platforms the start up code examines it
      to decide how to initialize the process.  */
-  if (!_bfd_elf_define_linkage_sym (abfd, info, s, "_DYNAMIC"))
+  h = _bfd_elf_define_linkage_sym (abfd, info, s, "_DYNAMIC");
+  elf_hash_table (info)->hdynamic = h;
+  if (h == NULL)
     return FALSE;
 
   if (info->emit_hash)
@@ -938,6 +941,7 @@ _bfd_elf_merge_symbol (bfd *abfd,
 		       Elf_Internal_Sym *sym,
 		       asection **psec,
 		       bfd_vma *pvalue,
+		       bfd_boolean *pold_weak,
 		       unsigned int *pold_alignment,
 		       struct elf_link_hash_entry **sym_hash,
 		       bfd_boolean *skip,
@@ -1040,6 +1044,8 @@ _bfd_elf_merge_symbol (bfd *abfd,
   newweak = bind == STB_WEAK;
   oldweak = (h->root.type == bfd_link_hash_defweak
 	     || h->root.type == bfd_link_hash_undefweak);
+  if (pold_weak)
+    *pold_weak = oldweak;
 
   /* In cases involving weak versioned symbols, we may wind up trying
      to merge a symbol with itself.  Catch that here, to avoid the
@@ -1210,23 +1216,25 @@ _bfd_elf_merge_symbol (bfd *abfd,
 	      vh->root.type = h->root.type;
 	      h->root.type = bfd_link_hash_indirect;
 	      (*bed->elf_backend_copy_indirect_symbol) (info, vh, h);
-	      /* Protected symbols will override the dynamic definition
-		 with default version.  */
-	      if (ELF_ST_VISIBILITY (sym->st_other) == STV_PROTECTED)
+
+	      h->root.u.i.link = (struct bfd_link_hash_entry *) vh;
+	      if (ELF_ST_VISIBILITY (sym->st_other) != STV_PROTECTED)
 		{
-		  h->root.u.i.link = (struct bfd_link_hash_entry *) vh;
-		  vh->dynamic_def = 1;
-		  vh->ref_dynamic = 1;
+		  /* If the new symbol is hidden or internal, completely undo
+		     any dynamic link state.  */
+		  (*bed->elf_backend_hide_symbol) (info, h, TRUE);
+		  h->forced_local = 0;
+		  h->ref_dynamic = 0;
 		}
 	      else
-		{
-		  h->root.type = vh->root.type;
-		  vh->ref_dynamic = 0;
-		  /* We have to hide it here since it was made dynamic
-		     global with extra bits when the symbol info was
-		     copied from the old dynamic definition.  */
-		  (*bed->elf_backend_hide_symbol) (info, vh, TRUE);
-		}
+		h->ref_dynamic = 1;
+
+	      h->def_dynamic = 0;
+	      h->dynamic_def = 0;
+	      /* FIXME: Should we check type and size for protected symbol?  */
+	      h->size = 0;
+	      h->type = 0;
+
 	      h = vh;
 	    }
 	  else
@@ -1660,7 +1668,7 @@ _bfd_elf_add_default_symbol (bfd *abfd,
   size_change_ok = FALSE;
   sec = *psec;
   if (!_bfd_elf_merge_symbol (abfd, info, shortname, sym, &sec, value,
-			      NULL, &hi, &skip, &override,
+			      NULL, NULL, &hi, &skip, &override,
 			      &type_change_ok, &size_change_ok))
     return FALSE;
 
@@ -1769,7 +1777,7 @@ nondefault:
   size_change_ok = FALSE;
   sec = *psec;
   if (!_bfd_elf_merge_symbol (abfd, info, shortname, sym, &sec, value,
-			      NULL, &hi, &skip, &override,
+			      NULL, NULL, &hi, &skip, &override,
 			      &type_change_ok, &size_change_ok))
     return FALSE;
 
@@ -3863,6 +3871,8 @@ error_free_dyn:
       bfd_boolean size_change_ok;
       bfd_boolean type_change_ok;
       bfd_boolean new_weakdef;
+      bfd_boolean new_weak;
+      bfd_boolean old_weak;
       bfd_boolean override;
       bfd_boolean common;
       unsigned int old_alignment;
@@ -3995,6 +4005,7 @@ error_free_dyn:
 
       size_change_ok = FALSE;
       type_change_ok = bed->type_change_ok;
+      old_weak = FALSE;
       old_alignment = 0;
       old_bfd = NULL;
       new_sec = sec;
@@ -4140,7 +4151,7 @@ error_free_dyn:
 	    }
 
 	  if (!_bfd_elf_merge_symbol (abfd, info, name, isym, &sec,
-				      &value, &old_alignment,
+				      &value, &old_weak, &old_alignment,
 				      sym_hash, &skip, &override,
 				      &type_change_ok, &size_change_ok))
 	    goto error_free_vers;
@@ -4202,10 +4213,11 @@ error_free_dyn:
       if (is_elf_hash_table (htab))
 	h->unique_global = (flags & BSF_GNU_UNIQUE) != 0;
 
+      new_weak = (flags & BSF_WEAK) != 0;
       new_weakdef = FALSE;
       if (dynamic
 	  && definition
-	  && (flags & BSF_WEAK) != 0
+	  && new_weak
 	  && !bed->is_function_type (ELF_ST_TYPE (isym->st_info))
 	  && is_elf_hash_table (htab)
 	  && h->u.weakdef == NULL)
@@ -4334,7 +4346,9 @@ error_free_dyn:
 	    h->size = h->root.u.c.size;
 
 	  if (ELF_ST_TYPE (isym->st_info) != STT_NOTYPE
-	      && (definition || h->type == STT_NOTYPE))
+	      && ((definition && !new_weak)
+		  || (old_weak && h->root.type == bfd_link_hash_common)
+		  || h->type == STT_NOTYPE))
 	    {
 	      unsigned int type = ELF_ST_TYPE (isym->st_info);
 
@@ -5553,6 +5567,65 @@ _bfd_elf_size_group_sections (struct bfd_link_info *info)
   return TRUE;
 }
 
+/* Set a default stack segment size.  The value in INFO wins.  If it
+   is unset, LEGACY_SYMBOL's value is used, and if that symbol is
+   undefined it is initialized.  */
+
+bfd_boolean
+bfd_elf_stack_segment_size (bfd *output_bfd,
+			    struct bfd_link_info *info,
+			    const char *legacy_symbol,
+			    bfd_vma default_size)
+{
+  struct elf_link_hash_entry *h = NULL;
+
+  /* Look for legacy symbol.  */
+  if (legacy_symbol)
+    h = elf_link_hash_lookup (elf_hash_table (info), legacy_symbol,
+			      FALSE, FALSE, FALSE);
+  if (h && (h->root.type == bfd_link_hash_defined
+	    || h->root.type == bfd_link_hash_defweak)
+      && h->def_regular
+      && (h->type == STT_NOTYPE || h->type == STT_OBJECT))
+    {
+      /* The symbol has no type if specified on the command line.  */
+      h->type = STT_OBJECT;
+      if (info->stacksize)
+	(*_bfd_error_handler) (_("%B: stack size specified and %s set"),
+			       output_bfd, legacy_symbol);
+      else if (h->root.u.def.section != bfd_abs_section_ptr)
+	(*_bfd_error_handler) (_("%B: %s not absolute"),
+			       output_bfd, legacy_symbol);
+      else
+	info->stacksize = h->root.u.def.value;
+    }
+
+  if (!info->stacksize)
+    /* If the user didn't set a size, or explicitly inhibit the
+       size, set it now.  */
+    info->stacksize = default_size;
+
+  /* Provide the legacy symbol, if it is referenced.  */
+  if (h && (h->root.type == bfd_link_hash_undefined
+	    || h->root.type == bfd_link_hash_undefweak))
+    {
+      struct bfd_link_hash_entry *bh = NULL;
+
+      if (!(_bfd_generic_link_add_one_symbol
+	    (info, output_bfd, legacy_symbol,
+	     BSF_GLOBAL, bfd_abs_section_ptr,
+	     info->stacksize >= 0 ? info->stacksize : 0,
+	     NULL, FALSE, get_elf_backend_data (output_bfd)->collect, &bh)))
+	return FALSE;
+
+      h = (struct elf_link_hash_entry *) bh;
+      h->def_regular = 1;
+      h->type = STT_OBJECT;
+    }
+
+  return TRUE;
+}
+
 /* Set up the sizes and contents of the ELF dynamic sections.  This is
    called by the ELF linker emulation before_allocation routine.  We
    must set the sizes of the sections before the linker sets the
@@ -5582,6 +5655,26 @@ bfd_elf_size_dynamic_sections (bfd *output_bfd,
     return TRUE;
 
   bed = get_elf_backend_data (output_bfd);
+
+  /* Any syms created from now on start with -1 in
+     got.refcount/offset and plt.refcount/offset.  */
+  elf_hash_table (info)->init_got_refcount
+    = elf_hash_table (info)->init_got_offset;
+  elf_hash_table (info)->init_plt_refcount
+    = elf_hash_table (info)->init_plt_offset;
+
+  if (info->relocatable
+      && !_bfd_elf_size_group_sections (info))
+    return FALSE;
+
+  /* The backend may have to create some sections regardless of whether
+     we're dynamic or not.  */
+  if (bed->elf_backend_always_size_sections
+      && ! (*bed->elf_backend_always_size_sections) (output_bfd, info))
+    return FALSE;
+
+  /* Determine any GNU_STACK segment requirements, after the backend
+     has had a chance to set a default segment size.  */
   if (info->execstack)
     elf_tdata (output_bfd)->stack_flags = PF_R | PF_W | PF_X;
   else if (info->noexecstack)
@@ -5611,31 +5704,12 @@ bfd_elf_size_dynamic_sections (bfd *output_bfd,
 	  else if (bed->default_execstack)
 	    exec = PF_X;
 	}
-      if (notesec)
-	{
-	  elf_tdata (output_bfd)->stack_flags = PF_R | PF_W | exec;
-	  if (exec && info->relocatable
-	      && notesec->output_section != bfd_abs_section_ptr)
-	    notesec->output_section->flags |= SEC_CODE;
-	}
+      if (notesec || info->stacksize > 0)
+	elf_tdata (output_bfd)->stack_flags = PF_R | PF_W | exec;
+      if (notesec && exec && info->relocatable
+	  && notesec->output_section != bfd_abs_section_ptr)
+	notesec->output_section->flags |= SEC_CODE;
     }
-
-  /* Any syms created from now on start with -1 in
-     got.refcount/offset and plt.refcount/offset.  */
-  elf_hash_table (info)->init_got_refcount
-    = elf_hash_table (info)->init_got_offset;
-  elf_hash_table (info)->init_plt_refcount
-    = elf_hash_table (info)->init_plt_offset;
-
-  if (info->relocatable
-      && !_bfd_elf_size_group_sections (info))
-    return FALSE;
-
-  /* The backend may have to create some sections regardless of whether
-     we're dynamic or not.  */
-  if (bed->elf_backend_always_size_sections
-      && ! (*bed->elf_backend_always_size_sections) (output_bfd, info))
-    return FALSE;
 
   dynobj = elf_hash_table (info)->dynobj;
 
@@ -7843,31 +7917,49 @@ get_value (bfd_vma size,
 	   bfd *input_bfd,
 	   bfd_byte *location)
 {
+  int shift;
   bfd_vma x = 0;
+
+  /* Sanity checks.  */
+  BFD_ASSERT (chunksz <= sizeof (x)
+	      && size >= chunksz
+	      && chunksz != 0
+	      && (size % chunksz) == 0
+	      && input_bfd != NULL
+	      && location != NULL);
+
+  if (chunksz == sizeof (x))
+    {
+      BFD_ASSERT (size == chunksz);
+
+      /* Make sure that we do not perform an undefined shift operation.
+	 We know that size == chunksz so there will only be one iteration
+	 of the loop below.  */
+      shift = 0;
+    }
+  else
+    shift = 8 * chunksz;
 
   for (; size; size -= chunksz, location += chunksz)
     {
       switch (chunksz)
 	{
-	default:
-	case 0:
-	  abort ();
 	case 1:
-	  x = (x << (8 * chunksz)) | bfd_get_8 (input_bfd, location);
+	  x = (x << shift) | bfd_get_8 (input_bfd, location);
 	  break;
 	case 2:
-	  x = (x << (8 * chunksz)) | bfd_get_16 (input_bfd, location);
+	  x = (x << shift) | bfd_get_16 (input_bfd, location);
 	  break;
 	case 4:
-	  x = (x << (8 * chunksz)) | bfd_get_32 (input_bfd, location);
+	  x = (x << shift) | bfd_get_32 (input_bfd, location);
 	  break;
-	case 8:
 #ifdef BFD64
-	  x = (x << (8 * chunksz)) | bfd_get_64 (input_bfd, location);
-#else
-	  abort ();
-#endif
+	case 8:
+	  x = (x << shift) | bfd_get_64 (input_bfd, location);
 	  break;
+#endif
+	default:
+	  abort ();
 	}
     }
   return x;
@@ -13003,5 +13095,5 @@ elf_append_rel (bfd *abfd, asection *s, Elf_Internal_Rela *rel)
   const struct elf_backend_data *bed = get_elf_backend_data (abfd);
   bfd_byte *loc = s->contents + (s->reloc_count++ * bed->s->sizeof_rel);
   BFD_ASSERT (loc + bed->s->sizeof_rel <= s->contents + s->size);
-  bed->s->swap_reloca_out (abfd, rel, loc);
+  bed->s->swap_reloc_out (abfd, rel, loc);
 }

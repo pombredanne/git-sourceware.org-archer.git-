@@ -1,6 +1,6 @@
 /* Native-dependent code for GNU/Linux x86-64.
 
-   Copyright (C) 2001-2012 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
    Contributed by Jiri Smid, SuSE Labs.
 
    This file is part of GDB.
@@ -443,7 +443,7 @@ ps_err_e
 ps_get_thread_area (const struct ps_prochandle *ph,
                     lwpid_t lwpid, int idx, void **base)
 {
-  if (gdbarch_bfd_arch_info (target_gdbarch)->bits_per_word == 32)
+  if (gdbarch_bfd_arch_info (target_gdbarch ())->bits_per_word == 32)
     {
       /* The full structure is found in <asm-i386/ldt.h>.  The second
 	 integer is the LDT's base_address and that is used to locate

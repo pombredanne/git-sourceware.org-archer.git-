@@ -1,6 +1,6 @@
 /* Generate a core file for the inferior process.
 
-   Copyright (C) 2001-2012 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -75,10 +75,10 @@ write_gcore_file (bfd *obfd)
   /* FIXME: uweigand/2011-10-06: All architectures that support core file
      generation should be converted to gdbarch_make_corefile_notes; at that
      point, the target vector method can be removed.  */
-  if (!gdbarch_make_corefile_notes_p (target_gdbarch))
+  if (!gdbarch_make_corefile_notes_p (target_gdbarch ()))
     note_data = target_make_corefile_notes (obfd, &note_size);
   else
-    note_data = gdbarch_make_corefile_notes (target_gdbarch, obfd, &note_size);
+    note_data = gdbarch_make_corefile_notes (target_gdbarch (), obfd, &note_size);
 
   if (note_data == NULL || note_size == 0)
     error (_("Target does not support core file generation."));
@@ -134,7 +134,8 @@ gcore_command (char *args, int from_tty)
   else
     {
       /* Default corefile name is "core.PID".  */
-      sprintf (corefilename_buffer, "core.%d", PIDGET (inferior_ptid));
+      xsnprintf (corefilename_buffer, sizeof (corefilename_buffer),
+		 "core.%d", PIDGET (inferior_ptid));
       corefilename = corefilename_buffer;
     }
 
@@ -165,7 +166,7 @@ default_gcore_mach (void)
   return 0;
 #else
 
-  const struct bfd_arch_info *bfdarch = gdbarch_bfd_arch_info (target_gdbarch);
+  const struct bfd_arch_info *bfdarch = gdbarch_bfd_arch_info (target_gdbarch ());
 
   if (bfdarch != NULL)
     return bfdarch->mach;
@@ -179,7 +180,7 @@ default_gcore_mach (void)
 static enum bfd_architecture
 default_gcore_arch (void)
 {
-  const struct bfd_arch_info *bfdarch = gdbarch_bfd_arch_info (target_gdbarch);
+  const struct bfd_arch_info *bfdarch = gdbarch_bfd_arch_info (target_gdbarch ());
 
   if (bfdarch != NULL)
     return bfdarch->arch;
@@ -193,8 +194,8 @@ static const char *
 default_gcore_target (void)
 {
   /* The gdbarch may define a target to use for core files.  */
-  if (gdbarch_gcore_bfd_target_p (target_gdbarch))
-    return gdbarch_gcore_bfd_target (target_gdbarch);
+  if (gdbarch_gcore_bfd_target_p (target_gdbarch ()))
+    return gdbarch_gcore_bfd_target (target_gdbarch ());
 
   /* Otherwise, try to fall back to the exec_bfd target.  This will probably
      not work for non-ELF targets.  */
@@ -398,7 +399,7 @@ gcore_create_callback (CORE_ADDR vaddr, unsigned long size, int read,
       if (info_verbose)
         {
           fprintf_filtered (gdb_stdout, "Ignore segment, %s bytes at %s\n",
-                            plongest (size), paddress (target_gdbarch, vaddr));
+                            plongest (size), paddress (target_gdbarch (), vaddr));
         }
 
       return 0;
@@ -458,7 +459,7 @@ gcore_create_callback (CORE_ADDR vaddr, unsigned long size, int read,
   if (info_verbose)
     {
       fprintf_filtered (gdb_stdout, "Save segment, %s bytes at %s\n",
-			plongest (size), paddress (target_gdbarch, vaddr));
+			plongest (size), paddress (target_gdbarch (), vaddr));
     }
 
   bfd_set_section_size (obfd, osec, size);
@@ -554,7 +555,7 @@ gcore_copy_callback (bfd *obfd, asection *osec, void *ignored)
 	  warning (_("Memory read failed for corefile "
 		     "section, %s bytes at %s."),
 		   plongest (size),
-		   paddress (target_gdbarch, bfd_section_vma (obfd, osec)));
+		   paddress (target_gdbarch (), bfd_section_vma (obfd, osec)));
 	  break;
 	}
       if (!bfd_set_section_contents (obfd, osec, memhunk, offset, size))
@@ -575,8 +576,8 @@ static int
 gcore_memory_sections (bfd *obfd)
 {
   /* Try gdbarch method first, then fall back to target method.  */
-  if (!gdbarch_find_memory_regions_p (target_gdbarch)
-      || gdbarch_find_memory_regions (target_gdbarch,
+  if (!gdbarch_find_memory_regions_p (target_gdbarch ())
+      || gdbarch_find_memory_regions (target_gdbarch (),
 				      gcore_create_callback, obfd) != 0)
     {
       if (target_find_memory_regions (gcore_create_callback, obfd) != 0)

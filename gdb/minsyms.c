@@ -1,5 +1,5 @@
 /* GDB routines for manipulating the minimal symbol tables.
-   Copyright (C) 1992-2004, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
    This file is part of GDB.
@@ -937,7 +937,9 @@ prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
   MSYMBOL_TYPE (msymbol) = ms_type;
   MSYMBOL_TARGET_FLAG_1 (msymbol) = 0;
   MSYMBOL_TARGET_FLAG_2 (msymbol) = 0;
-  MSYMBOL_SIZE (msymbol) = 0;
+  /* Do not use the SET_MSYMBOL_SIZE macro to initialize the size,
+     as it would also set the has_size flag.  */
+  msymbol->size = 0;
 
   /* The hash pointers must be cleared! If they're not,
      add_minsym_to_hash_table will NOT add this msymbol to the hash table.  */
@@ -1229,13 +1231,7 @@ install_minimal_symbols (struct objfile *objfile)
          symbol count does *not* include this null symbol, which is why it
          is indexed by mcount and not mcount-1.  */
 
-      SYMBOL_LINKAGE_NAME (&msymbols[mcount]) = NULL;
-      SYMBOL_VALUE_ADDRESS (&msymbols[mcount]) = 0;
-      MSYMBOL_TARGET_FLAG_1 (&msymbols[mcount]) = 0;
-      MSYMBOL_TARGET_FLAG_2 (&msymbols[mcount]) = 0;
-      MSYMBOL_SIZE (&msymbols[mcount]) = 0;
-      MSYMBOL_TYPE (&msymbols[mcount]) = mst_unknown;
-      SYMBOL_SET_LANGUAGE (&msymbols[mcount], language_unknown);
+      memset (&msymbols[mcount], 0, sizeof (struct minimal_symbol));
 
       /* Attach the minimal symbol table to the specified objfile.
          The strings themselves are also located in the objfile_obstack
@@ -1306,9 +1302,11 @@ msymbols_sort (struct objfile *objfile)
   build_minimal_symbol_hash_tables (objfile);
 }
 
-/* See minsyms.h.  */
+/* Check if PC is in a shared library trampoline code stub.
+   Return minimal symbol for the trampoline entry or NULL if PC is not
+   in a trampoline code stub.  */
 
-struct minimal_symbol *
+static struct minimal_symbol *
 lookup_solib_trampoline_symbol_by_pc (CORE_ADDR pc)
 {
   struct obj_section *section = find_pc_section (pc);

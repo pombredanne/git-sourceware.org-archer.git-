@@ -1,6 +1,6 @@
 /* Support routines for manipulating internal types for GDB.
 
-   Copyright (C) 1992-1996, 1998-2012 Free Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -54,11 +54,12 @@ const struct rank INTEGER_CONVERSION_BADNESS = {2,0};
 const struct rank FLOAT_CONVERSION_BADNESS = {2,0};
 const struct rank INT_FLOAT_CONVERSION_BADNESS = {2,0};
 const struct rank VOID_PTR_CONVERSION_BADNESS = {2,0};
-const struct rank BOOL_PTR_CONVERSION_BADNESS = {3,0};
+const struct rank BOOL_CONVERSION_BADNESS = {3,0};
 const struct rank BASE_CONVERSION_BADNESS = {2,0};
 const struct rank REFERENCE_CONVERSION_BADNESS = {2,0};
 const struct rank NULL_POINTER_CONVERSION_BADNESS = {2,0};
 const struct rank NS_POINTER_CONVERSION_BADNESS = {10,0};
+const struct rank NS_INTEGER_POINTER_CONVERSION_BADNESS = {3,0};
 
 /* Floatformat pairs.  */
 const struct floatformat *floatformats_ieee_half[BFD_ENDIAN_UNKNOWN] = {
@@ -110,7 +111,20 @@ const struct floatformat *floatformats_ibm_long_double[BFD_ENDIAN_UNKNOWN] = {
   &floatformat_ibm_long_double
 };
 
-int opaque_type_resolution = 1;
+/* Should opaque types be resolved?  */
+
+static int opaque_type_resolution = 1;
+
+/* A flag to enable printing of debugging information of C++
+   overloading.  */
+
+unsigned int overload_debug = 0;
+
+/* A flag to enable strict type checking.  */
+
+static int strict_type_checking = 1;
+
+/* A function to show whether opaque types are resolved.  */
 
 static void
 show_opaque_type_resolution (struct ui_file *file, int from_tty,
@@ -122,7 +136,7 @@ show_opaque_type_resolution (struct ui_file *file, int from_tty,
 		    value);
 }
 
-unsigned int overload_debug = 0;
+/* A function to show whether C++ overload debugging is enabled.  */
 
 static void
 show_overload_debug (struct ui_file *file, int from_tty,
@@ -132,10 +146,15 @@ show_overload_debug (struct ui_file *file, int from_tty,
 		    value);
 }
 
-static void print_bit_vector (B_TYPE *, int);
-static void print_arg_types (struct field *, int, int);
-static void dump_fn_fieldlists (struct type *, int);
-static void print_cplus_stuff (struct type *, int);
+/* A function to show the status of strict type checking.  */
+
+static void
+show_strict_type_checking (struct ui_file *file, int from_tty,
+			   struct cmd_list_element *c, const char *value)
+{
+  fprintf_filtered (file, _("Strict type checking is %s.\n"), value);
+}
+
 
 /* Allocate a new OBJFILE-associated type structure and fill it
    with some defaults.  Space for the type structure is allocated
@@ -945,7 +964,7 @@ create_array_type (struct type *result_type,
 
 struct type *
 lookup_array_range_type (struct type *element_type,
-			 int low_bound, int high_bound)
+			 LONGEST low_bound, LONGEST high_bound)
 {
   struct gdbarch *gdbarch = get_type_arch (element_type);
   struct type *index_type = builtin_type (gdbarch)->builtin_int;
@@ -981,7 +1000,7 @@ create_string_type (struct type *result_type,
 
 struct type *
 lookup_string_range_type (struct type *string_char_type,
-			  int low_bound, int high_bound)
+			  LONGEST low_bound, LONGEST high_bound)
 {
   struct type *result_type;
 
@@ -1215,7 +1234,7 @@ lookup_signed_typename (const struct language_defn *language,
    visible in lexical block BLOCK.  */
 
 struct type *
-lookup_struct (const char *name, struct block *block)
+lookup_struct (const char *name, const struct block *block)
 {
   struct symbol *sym;
 
@@ -1237,7 +1256,7 @@ lookup_struct (const char *name, struct block *block)
    visible in lexical block BLOCK.  */
 
 struct type *
-lookup_union (const char *name, struct block *block)
+lookup_union (const char *name, const struct block *block)
 {
   struct symbol *sym;
   struct type *t;
@@ -1261,7 +1280,7 @@ lookup_union (const char *name, struct block *block)
    visible in lexical block BLOCK.  */
 
 struct type *
-lookup_enum (const char *name, struct block *block)
+lookup_enum (const char *name, const struct block *block)
 {
   struct symbol *sym;
 
@@ -1283,7 +1302,7 @@ lookup_enum (const char *name, struct block *block)
 
 struct type *
 lookup_template_type (char *name, struct type *type, 
-		      struct block *block)
+		      const struct block *block)
 {
   struct symbol *sym;
   char *nam = (char *) 
@@ -2029,7 +2048,6 @@ is_scalar_type (struct type *type)
     case TYPE_CODE_UNION:
     case TYPE_CODE_SET:
     case TYPE_CODE_STRING:
-    case TYPE_CODE_BITSTRING:
       return 0;
     default:
       return 1;
@@ -2388,7 +2406,7 @@ integer_types_same_name_p (const char *first, const char *second)
 /* Compares type A to type B returns 1 if the represent the same type
    0 otherwise.  */
 
-static int
+int
 types_equal (struct type *a, struct type *b)
 {
   /* Identical type pointers.  */
@@ -2503,12 +2521,20 @@ rank_one_type (struct type *parm, struct type *arg, struct value *value)
 	case TYPE_CODE_FUNC:
 	  return rank_one_type (TYPE_TARGET_TYPE (parm), arg, NULL);
 	case TYPE_CODE_INT:
-	  if (value != NULL && TYPE_CODE (value_type (value)) == TYPE_CODE_INT
-	      && value_as_long (value) == 0)
+	  if (value != NULL && TYPE_CODE (value_type (value)) == TYPE_CODE_INT)
 	    {
-	      /* Null pointer conversion: allow it to be cast to a pointer.
-		 [4.10.1 of C++ standard draft n3290]  */
-	      return NULL_POINTER_CONVERSION_BADNESS;
+	      if (value_as_long (value) == 0)
+		{
+		  /* Null pointer conversion: allow it to be cast to a pointer.
+		     [4.10.1 of C++ standard draft n3290]  */
+		  return NULL_POINTER_CONVERSION_BADNESS;
+		}
+	      else
+		{
+		  /* If type checking is disabled, allow the conversion.  */
+		  if (!strict_type_checking)
+		    return NS_INTEGER_POINTER_CONVERSION_BADNESS;
+		}
 	    }
 	  /* fall through  */
 	case TYPE_CODE_ENUM:
@@ -2692,14 +2718,23 @@ rank_one_type (struct type *parm, struct type *arg, struct value *value)
     case TYPE_CODE_BOOL:
       switch (TYPE_CODE (arg))
 	{
+	  /* n3290 draft, section 4.12.1 (conv.bool):
+
+	     "A prvalue of arithmetic, unscoped enumeration, pointer, or
+	     pointer to member type can be converted to a prvalue of type
+	     bool.  A zero value, null pointer value, or null member pointer
+	     value is converted to false; any other value is converted to
+	     true.  A prvalue of type std::nullptr_t can be converted to a
+	     prvalue of type bool; the resulting value is false."  */
 	case TYPE_CODE_INT:
 	case TYPE_CODE_CHAR:
-	case TYPE_CODE_RANGE:
 	case TYPE_CODE_ENUM:
 	case TYPE_CODE_FLT:
-	  return INCOMPATIBLE_TYPE_BADNESS;
+	case TYPE_CODE_MEMBERPTR:
 	case TYPE_CODE_PTR:
-	  return BOOL_PTR_CONVERSION_BADNESS;
+	  return BOOL_CONVERSION_BADNESS;
+	case TYPE_CODE_RANGE:
+	  return INCOMPATIBLE_TYPE_BADNESS;
 	case TYPE_CODE_BOOL:
 	  return EXACT_MATCH_BADNESS;
 	default:
@@ -3069,9 +3104,6 @@ recursive_dump_type (struct type *type, int spaces)
       break;
     case TYPE_CODE_STRING:
       printf_filtered ("(TYPE_CODE_STRING)");
-      break;
-    case TYPE_CODE_BITSTRING:
-      printf_filtered ("(TYPE_CODE_BITSTRING)");
       break;
     case TYPE_CODE_ERROR:
       printf_filtered ("(TYPE_CODE_ERROR)");
@@ -4067,4 +4099,13 @@ _initialize_gdbtypes (void)
 			   NULL, NULL,
 			   show_opaque_type_resolution,
 			   &setlist, &showlist);
+
+  /* Add an option to permit non-strict type checking.  */
+  add_setshow_boolean_cmd ("type", class_support,
+			   &strict_type_checking,
+			   _("Set strict type checking."),
+			   _("Show strict type checking."),
+			   NULL, NULL,
+			   show_strict_type_checking,
+			   &setchecklist, &showchecklist);
 }

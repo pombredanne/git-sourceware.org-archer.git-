@@ -1,7 +1,6 @@
 /* Ada language support definitions for GDB, the GNU debugger.
 
-   Copyright (C) 1992, 1997-2005, 2007-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -23,6 +22,7 @@
 
 struct frame_info;
 struct inferior;
+struct type_print_options;
 
 #include "value.h"
 #include "gdbtypes.h"
@@ -45,6 +45,7 @@ struct inferior;
 
 #if !defined (ADA_KNOWN_RUNTIME_FILE_NAME_PATTERNS)
 #define ADA_KNOWN_RUNTIME_FILE_NAME_PATTERNS \
+   "^unwind-seh.c$", \
    "^[agis]-.*\\.ad[bs]$",
 #endif
 
@@ -88,7 +89,7 @@ struct ada_symbol_info
   struct symbol *sym;
 
   /* The block where the symbol was found.  */
-  struct block *block;
+  const struct block *block;
 };
 
 /* Denotes a type of renaming symbol (see ada_parse_renaming).  */
@@ -163,7 +164,7 @@ extern void ada_error (char *); /* Defined in ada-exp.y */
 
                         /* Defined in ada-typeprint.c */
 extern void ada_print_type (struct type *, const char *, struct ui_file *, int,
-                            int);
+                            int, const struct type_print_options *);
 
 extern void ada_print_typedef (struct type *type, struct symbol *new_symbol,
 			       struct ui_file *stream);
@@ -276,6 +277,8 @@ extern struct value *ada_value_tag (struct value *);
 
 extern const char *ada_tag_name (struct value *);
 
+extern struct value *ada_tag_value_at_base_address (struct value *obj);
+
 extern int ada_is_parent_field (struct type *, int);
 
 extern int ada_is_wrapper_field (struct type *, int);
@@ -338,7 +341,7 @@ extern struct type *ada_find_parallel_type (struct type *,
 extern LONGEST get_int_var_value (char *, int *);
 
 extern struct symbol *ada_find_renaming_symbol (struct symbol *name_sym,
-                                                struct block *block);
+                                                const struct block *block);
 
 extern int ada_prefer_type (struct type *, struct type *);
 

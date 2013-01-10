@@ -1,7 +1,6 @@
 /* Handle lists of commands, their decoding and documentation, for GDB.
 
-   Copyright (c) 1986, 1989-1991, 1998, 2000-2002, 2004, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (c) 1986-2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -306,6 +305,13 @@ add_alias_cmd (char *name, char *oldname, enum command_class class,
     }
 
   c = add_cmd (name, class, NULL, old->doc, list);
+
+  /* If OLD->DOC can be freed, we should make another copy.  */
+  if ((old->flags & DOC_ALLOCATED) != 0)
+    {
+      c->doc = xstrdup (old->doc);
+      c->flags |= DOC_ALLOCATED;
+    }
   /* NOTE: Both FUNC and all the FUNCTIONs need to be copied.  */
   c->func = old->func;
   c->function = old->function;
@@ -451,6 +457,8 @@ add_setshow_cmd_full (char *name,
     }
   set = add_set_or_show_cmd (name, set_cmd, class, var_type, var,
 			     full_set_doc, set_list);
+  set->flags |= DOC_ALLOCATED;
+
   if (set_func != NULL)
     set_cmd_sfunc (set, set_func);
 
@@ -458,6 +466,7 @@ add_setshow_cmd_full (char *name,
 
   show = add_set_or_show_cmd (name, show_cmd, class, var_type, var,
 			      full_show_doc, show_list);
+  show->flags |= DOC_ALLOCATED;
   show->show_value_func = show_func;
 
   if (set_result != NULL)
@@ -632,7 +641,8 @@ add_setshow_optional_filename_cmd (char *name, enum command_class class,
 /* Add element named NAME to both the set and show command LISTs (the
    list for set/show or some sublist thereof).  CLASS is as in
    add_cmd.  VAR is address of the variable which will contain the
-   value.  SET_DOC and SHOW_DOC are the documentation strings.  */
+   value.  SET_DOC and SHOW_DOC are the documentation strings.  This
+   function is only used in Python API.  Please don't use it elsewhere.  */
 void
 add_setshow_integer_cmd (char *name, enum command_class class,
 			 int *var,
@@ -686,6 +696,25 @@ add_setshow_zinteger_cmd (char *name, enum command_class class,
 			  struct cmd_list_element **show_list)
 {
   add_setshow_cmd_full (name, class, var_zinteger, var,
+			set_doc, show_doc, help_doc,
+			set_func, show_func,
+			set_list, show_list,
+			NULL, NULL);
+}
+
+void
+add_setshow_zuinteger_unlimited_cmd (char *name,
+				     enum command_class class,
+				     unsigned int *var,
+				     const char *set_doc,
+				     const char *show_doc,
+				     const char *help_doc,
+				     cmd_sfunc_ftype *set_func,
+				     show_value_ftype *show_func,
+				     struct cmd_list_element **set_list,
+				     struct cmd_list_element **show_list)
+{
+  add_setshow_cmd_full (name, class, var_zuinteger_unlimited, var,
 			set_doc, show_doc, help_doc,
 			set_func, show_func,
 			set_list, show_list,
@@ -749,6 +778,8 @@ delete_cmd (char *name, struct cmd_list_element **list,
 	  *prehookee = iter->hookee_pre;
 	  if (iter->hookee_post)
 	    iter->hookee_post->hook_post = 0;
+	  if (iter->doc && (iter->flags & DOC_ALLOCATED) != 0)
+	    xfree (iter->doc);
 	  *posthook = iter->hook_post;
 	  *posthookee = iter->hookee_post;
 
@@ -1068,8 +1099,11 @@ print_doc_line (struct ui_file *stream, char *str)
       line_buffer = (char *) xmalloc (line_size);
     }
 
+  /* Keep printing '.' or ',' not followed by a whitespace for embedded strings
+     like '.gdbinit'.  */
   p = str;
-  while (*p && *p != '\n' && *p != '.' && *p != ',')
+  while (*p && *p != '\n'
+	 && ((*p != '.' && *p != ',') || (p[1] && !isspace (p[1]))))
     p++;
   if (p - str > line_size - 1)
     {
@@ -1703,7 +1737,8 @@ lookup_cmd_composition (char *text,
    "oobar"; if WORD is "baz/foo", return "baz/foobar".  */
 
 VEC (char_ptr) *
-complete_on_cmdlist (struct cmd_list_element *list, char *text, char *word)
+complete_on_cmdlist (struct cmd_list_element *list, char *text, char *word,
+		     int ignore_help_classes)
 {
   struct cmd_list_element *ptr;
   VEC (char_ptr) *matchlist = NULL;
@@ -1720,7 +1755,7 @@ complete_on_cmdlist (struct cmd_list_element *list, char *text, char *word)
       for (ptr = list; ptr; ptr = ptr->next)
 	if (!strncmp (ptr->name, text, textlen)
 	    && !ptr->abbrev_flag
-	    && (ptr->func
+	    && (!ignore_help_classes || ptr->func
 		|| ptr->prefixlist))
 	  {
 	    char *match;

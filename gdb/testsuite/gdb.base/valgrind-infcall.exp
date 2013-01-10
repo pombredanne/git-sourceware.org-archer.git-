@@ -1,4 +1,4 @@
-# Copyright 2012 Free Software Foundation, Inc.
+# Copyright 2012-2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -96,7 +96,6 @@ while {$loop && $continue_count < 100} {
     gdb_test_multiple "continue" "" {
 	-re "Invalid free\\(\\).*: main .*\r\n$gdb_prompt $" {
 	    pass $test
-	    # In Ubuntu 10.04.4 environments 'break' does not work here.
 	    set loop 0
 	}
 	-re "Remote connection closed.*\r\n$gdb_prompt $" {

@@ -503,7 +503,7 @@ bfd_check_overflow (enum complain_overflow how,
   fieldmask = N_ONES (bitsize);
   signmask = ~fieldmask;
   addrmask = N_ONES (addrsize) | (fieldmask << rightshift);
-  a = (relocation & addrmask) >> rightshift;;
+  a = (relocation & addrmask) >> rightshift;
 
   switch (how)
     {
@@ -5882,12 +5882,59 @@ ENUM
 ENUMDOC
   This is used to tell the dynamic linker to copy the value out of
   the dynamic object into the runtime process image.
+ENUM
+  BFD_RELOC_MICROBLAZE_64_TLS
+ENUMDOC
+  Unused Reloc
+ENUM
+  BFD_RELOC_MICROBLAZE_64_TLSGD
+ENUMDOC
+  This is a 64 bit reloc that stores the 32 bit GOT relative value
+  of the GOT TLS GD info entry in two words (with an imm instruction). The
+  relocation is GOT offset.
+ENUM
+  BFD_RELOC_MICROBLAZE_64_TLSLD
+ENUMDOC
+  This is a 64 bit reloc that stores the 32 bit GOT relative value
+  of the GOT TLS LD info entry in two words (with an imm instruction). The
+  relocation is GOT offset.
+ENUM
+  BFD_RELOC_MICROBLAZE_32_TLSDTPMOD
+ENUMDOC
+  This is a 32 bit reloc that stores the Module ID to GOT(n).
+ENUM
+  BFD_RELOC_MICROBLAZE_32_TLSDTPREL
+ENUMDOC
+  This is a 32 bit reloc that stores TLS offset to GOT(n+1).
+ENUM
+  BFD_RELOC_MICROBLAZE_64_TLSDTPREL
+ENUMDOC
+  This is a 32 bit reloc for storing TLS offset to two words (uses imm
+  instruction)
+ENUM
+  BFD_RELOC_MICROBLAZE_64_TLSGOTTPREL
+ENUMDOC
+  This is a 64 bit reloc that stores 32-bit thread pointer relative offset
+  to two words (uses imm instruction).
+ENUM
+  BFD_RELOC_MICROBLAZE_64_TLSTPREL
+ENUMDOC
+  This is a 64 bit reloc that stores 32-bit thread pointer relative offset
+  to two words (uses imm instruction).
 
 ENUM
   BFD_RELOC_AARCH64_ADD_LO12
 ENUMDOC
   AArch64 ADD immediate instruction, holding bits 0 to 11 of the address.
   Used in conjunction with BFD_RELOC_AARCH64_ADR_HI21_PCREL.
+ENUM
+  BFD_RELOC_AARCH64_GOT_LD_PREL19
+ENUMDOC
+  AArch64 Load Literal instruction, holding a 19 bit PC relative word
+  offset of the global offset table entry for a symbol.  The lowest two
+  bits must be zero and are not stored in the instruction, giving a 21
+  bit signed byte offset.  This relocation type requires signed overflow
+  checking.
 ENUM
   BFD_RELOC_AARCH64_ADR_GOT_PAGE
 ENUMDOC
@@ -6430,6 +6477,18 @@ ENUMX
 ENUMX
   BFD_RELOC_TILEGX_IMM16_X1_HW0_GOT
 ENUMX
+  BFD_RELOC_TILEGX_IMM16_X0_HW0_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X1_HW0_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X0_HW1_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X1_HW1_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X0_HW2_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X1_HW2_PLT_PCREL
+ENUMX
   BFD_RELOC_TILEGX_IMM16_X0_HW0_LAST_GOT
 ENUMX
   BFD_RELOC_TILEGX_IMM16_X1_HW0_LAST_GOT
@@ -6437,6 +6496,10 @@ ENUMX
   BFD_RELOC_TILEGX_IMM16_X0_HW1_LAST_GOT
 ENUMX
   BFD_RELOC_TILEGX_IMM16_X1_HW1_LAST_GOT
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X0_HW3_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X1_HW3_PLT_PCREL
 ENUMX
   BFD_RELOC_TILEGX_IMM16_X0_HW0_TLS_GD
 ENUMX
@@ -6465,6 +6528,18 @@ ENUMX
   BFD_RELOC_TILEGX_IMM16_X0_HW0_TLS_IE
 ENUMX
   BFD_RELOC_TILEGX_IMM16_X1_HW0_TLS_IE
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X0_HW0_LAST_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X1_HW0_LAST_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X0_HW1_LAST_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X1_HW1_LAST_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X0_HW2_LAST_PLT_PCREL
+ENUMX
+  BFD_RELOC_TILEGX_IMM16_X1_HW2_LAST_PLT_PCREL
 ENUMX
   BFD_RELOC_TILEGX_IMM16_X0_HW0_LAST_TLS_IE
 ENUMX

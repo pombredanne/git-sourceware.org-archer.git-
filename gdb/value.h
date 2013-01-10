@@ -1,6 +1,6 @@
 /* Definitions for values of C expressions, for GDB.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -557,7 +557,8 @@ extern CORE_ADDR address_from_register (struct type *type, int regnum,
 extern struct value *value_of_variable (struct symbol *var,
 					const struct block *b);
 
-extern struct value *address_of_variable (struct symbol *var, struct block *b);
+extern struct value *address_of_variable (struct symbol *var,
+					  const struct block *b);
 
 extern struct value *value_of_register (int regnum, struct frame_info *frame);
 
@@ -587,9 +588,9 @@ extern struct value *value_mark (void);
 
 extern void value_free_to_mark (struct value *mark);
 
-extern struct value *value_cstring (char *ptr, int len,
+extern struct value *value_cstring (char *ptr, ssize_t len,
 				    struct type *char_type);
-extern struct value *value_string (char *ptr, int len,
+extern struct value *value_string (char *ptr, ssize_t len,
 				   struct type *char_type);
 
 extern struct value *value_array (int lowbound, int highbound,
@@ -911,8 +912,6 @@ extern void print_variable_and_value (const char *name,
 				      struct frame_info *frame,
 				      struct ui_file *stream,
 				      int indent);
-
-extern int check_field (struct type *, const char *);
 
 extern void typedef_print (struct type *type, struct symbol *news,
 			   struct ui_file *stream);

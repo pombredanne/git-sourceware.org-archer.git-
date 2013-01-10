@@ -1,5 +1,5 @@
 /* List lines of source files for GDB, the GNU debugger.
-   Copyright (C) 1986-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -384,14 +384,14 @@ init_source_path (void)
 {
   char buf[20];
 
-  sprintf (buf, "$cdir%c$cwd", DIRNAME_SEPARATOR);
+  xsnprintf (buf, sizeof (buf), "$cdir%c$cwd", DIRNAME_SEPARATOR);
   source_path = xstrdup (buf);
   forget_cached_source_info ();
 }
 
 /* Add zero or more directories to the front of the source path.  */
 
-void
+static void
 directory_command (char *dirname, int from_tty)
 {
   dont_repeat ();
@@ -1075,35 +1075,32 @@ open_source_file (struct symtab *s)
 
 /* Finds the fullname that a symtab represents.
 
-   If this functions finds the fullname, it will save it in s->fullname
-   and it will also return the value.
+   This functions finds the fullname and saves it in s->fullname.
+   It will also return the value.
 
    If this function fails to find the file that this symtab represents,
-   NULL will be returned and s->fullname will be set to NULL.  */
+   the expected fullname is used.  Therefore the files does not have to
+   exist.  */
 
-char *
+const char *
 symtab_to_fullname (struct symtab *s)
 {
-  int r;
-
-  if (!s)
-    return NULL;
-
   /* Use cached copy if we have it.
      We rely on forget_cached_source_info being called appropriately
      to handle cases like the file being moved.  */
-  if (s->fullname)
-    return s->fullname;
-
-  r = find_and_open_source (s->filename, s->dirname, &s->fullname);
-
-  if (r >= 0)
+  if (s->fullname == NULL)
     {
-      close (r);
-      return s->fullname;
-    }
+      int fd = find_and_open_source (s->filename, s->dirname, &s->fullname);
 
-  return NULL;
+      if (fd >= 0)
+	close (fd);
+      else if (s->dirname == NULL)
+	s->fullname = xstrdup (s->filename);
+      else
+	s->fullname = concat (s->dirname, SLASH_STRING, s->filename, NULL);
+    } 
+
+  return s->fullname;
 }
 
 /* Create and initialize the table S->line_charpos that records
@@ -1245,10 +1242,9 @@ identify_source_line (struct symtab *s, int line, int mid_statement,
 /* Print source lines from the file of symtab S,
    starting with line number LINE and stopping before line number STOPLINE.  */
 
-static void print_source_lines_base (struct symtab *s, int line, int stopline,
-				     int noerror);
 static void
-print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
+print_source_lines_base (struct symtab *s, int line, int stopline,
+			 enum print_source_lines_flags flags)
 {
   int c;
   int desc;
@@ -1276,13 +1272,13 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
       else
 	{
 	  desc = last_source_error;
-	  noerror = 1;
+	  flags |= PRINT_SOURCE_LINES_NOERROR;
 	}
     }
   else
     {
       desc = last_source_error;
-      noerror = 1;
+	  flags |= PRINT_SOURCE_LINES_NOERROR;
       noprint = 1;
     }
 
@@ -1290,10 +1286,12 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
     {
       last_source_error = desc;
 
-      if (!noerror)
+      if (!(flags & PRINT_SOURCE_LINES_NOERROR))
 	{
-	  char *name = alloca (strlen (s->filename) + 100);
-	  sprintf (name, "%d\t%s", line, s->filename);
+	  int len = strlen (s->filename) + 100;
+	  char *name = alloca (len);
+
+	  xsnprintf (name, len, "%d\t%s", line, s->filename);
 	  print_sys_errmsg (name, errno);
 	}
       else
@@ -1301,6 +1299,12 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
 	  ui_out_field_int (uiout, "line", line);
 	  ui_out_text (uiout, "\tin ");
 	  ui_out_field_string (uiout, "file", s->filename);
+	  if (ui_out_is_mi_like_p (uiout))
+	    {
+	      const char *fullname = symtab_to_fullname (s);
+
+	      ui_out_field_string (uiout, "fullname", fullname);
+	    }
 	  ui_out_text (uiout, "\n");
 	}
 
@@ -1337,13 +1341,18 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
       if (c == EOF)
 	break;
       last_line_listed = current_source_line;
-      sprintf (buf, "%d\t", current_source_line++);
+      if (flags & PRINT_SOURCE_LINES_FILENAME)
+        {
+          ui_out_text (uiout, s->filename);
+          ui_out_text (uiout, ":");
+        }
+      xsnprintf (buf, sizeof (buf), "%d\t", current_source_line++);
       ui_out_text (uiout, buf);
       do
 	{
 	  if (c < 040 && c != '\t' && c != '\n' && c != '\r')
 	    {
-	      sprintf (buf, "^%c", c + 0100);
+	      xsnprintf (buf, sizeof (buf), "^%c", c + 0100);
 	      ui_out_text (uiout, buf);
 	    }
 	  else if (c == 0177)
@@ -1360,7 +1369,7 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
 	    }
 	  else
 	    {
-	      sprintf (buf, "%c", c);
+	      xsnprintf (buf, sizeof (buf), "%c", c);
 	      ui_out_text (uiout, buf);
 	    }
 	}
@@ -1376,9 +1385,10 @@ print_source_lines_base (struct symtab *s, int line, int stopline, int noerror)
    window otherwise it is simply printed.  */
 
 void
-print_source_lines (struct symtab *s, int line, int stopline, int noerror)
+print_source_lines (struct symtab *s, int line, int stopline,
+		    enum print_source_lines_flags flags)
 {
-  print_source_lines_base (s, line, stopline, noerror);
+  print_source_lines_base (s, line, stopline, flags);
 }
 
 /* Print info on range of pc's in a specified line.  */
@@ -1953,6 +1963,7 @@ The address is also stored as the value of \"$_\"."));
 Search for regular expression (see regex(3)) from last line listed.\n\
 The matching line number is also stored as the value of \"$_\"."));
   add_com_alias ("search", "forward-search", class_files, 0);
+  add_com_alias ("fo", "forward-search", class_files, 1);
 
   add_com ("reverse-search", class_files, reverse_search_command, _("\
 Search backward for regular expression (see regex(3)) from last line listed.\n\
@@ -1965,12 +1976,12 @@ The matching line number is also stored as the value of \"$_\"."));
       add_com_alias ("?", "reverse-search", class_files, 0);
     }
 
-  add_setshow_integer_cmd ("listsize", class_support, &lines_to_list, _("\
+  add_setshow_zuinteger_unlimited_cmd ("listsize", class_support,
+				       &lines_to_list, _("\
 Set number of source lines gdb will list by default."), _("\
 Show number of source lines gdb will list by default."), NULL,
-			    NULL,
-			    show_lines_to_list,
-			    &setlist, &showlist);
+				       NULL, show_lines_to_list,
+				       &setlist, &showlist);
 
   add_cmd ("substitute-path", class_files, set_substitute_path_command,
            _("\

@@ -1,6 +1,6 @@
 /* TUI display locator.
 
-   Copyright (C) 1998-2004, 2006-2012 Free Software Foundation, Inc.
+   Copyright (C) 1998-2013 Free Software Foundation, Inc.
 
    Contributed by Hewlett-Packard Company.
 
@@ -94,7 +94,7 @@ tui_make_status_line (struct tui_locator_element *loc)
 
   /* Translate line number and obtain its size.  */
   if (loc->line_no > 0)
-    sprintf (line_buf, "%d", loc->line_no);
+    xsnprintf (line_buf, sizeof (line_buf), "%d", loc->line_no);
   else
     strcpy (line_buf, "??");
   line_width = strlen (line_buf);

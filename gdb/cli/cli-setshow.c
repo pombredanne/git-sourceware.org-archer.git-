@@ -1,6 +1,6 @@
 /* Handle set and show GDB commands.
 
-   Copyright (c) 2000-2003, 2007-2012 Free Software Foundation, Inc.
+   Copyright (c) 2000-2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -379,6 +379,26 @@ do_set_command (char *arg, int from_tty, struct cmd_list_element *c)
 	  }
       }
       break;
+    case var_zuinteger_unlimited:
+      {
+	LONGEST val;
+
+	if (arg == NULL)
+	  error_no_arg (_("integer to set it to."));
+	val = parse_and_eval_long (arg);
+
+	if (val >= INT_MAX)
+	  error (_("integer %s out of range"), plongest (val));
+	else if (val < -1)
+	  error (_("only -1 is allowed to set as unlimited"));
+
+	if (*(int *) c->var != val)
+	  {
+	    *(int *) c->var = val;
+	    option_changed = 1;
+	  }
+      }
+      break;
     default:
       error (_("gdb internal error: bad var_type in do_setshow_command"));
     }
@@ -478,6 +498,7 @@ do_set_command (char *arg, int from_tty, struct cmd_list_element *c)
 	  break;
 	case var_integer:
 	case var_zinteger:
+	case var_zuinteger_unlimited:
 	  {
 	    char s[64];
 
@@ -562,7 +583,14 @@ do_show_command (char *arg, int from_tty, struct cmd_list_element *c)
       else
 	fprintf_filtered (stb, "%d", *(int *) c->var);
       break;
-
+    case var_zuinteger_unlimited:
+      {
+	if (*(int *) c->var == -1)
+	  fputs_filtered ("unlimited", stb);
+	else
+	  fprintf_filtered (stb, "%u", *(int *) c->var);
+      }
+      break;
     default:
       error (_("gdb internal error: bad var_type in do_show_command"));
     }

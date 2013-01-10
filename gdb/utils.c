@@ -1,6 +1,6 @@
 /* General utility routines for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1988-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -122,9 +122,11 @@ static int debug_timestamp = 0;
 
 int job_control;
 
+#ifndef HAVE_PYTHON
 /* Nonzero means a quit has been requested.  */
 
 int quit_flag;
+#endif /* HAVE_PYTHON */
 
 /* Nonzero means quit immediately if Control-C is typed now, rather
    than waiting until QUIT is executed.  Be careful in setting this;
@@ -138,6 +140,41 @@ int quit_flag;
    expect to block), call QUIT after setting immediate_quit.  */
 
 int immediate_quit;
+
+#ifndef HAVE_PYTHON
+
+/* Clear the quit flag.  */
+
+void
+clear_quit_flag (void)
+{
+  quit_flag = 0;
+}
+
+/* Set the quit flag.  */
+
+void
+set_quit_flag (void)
+{
+  quit_flag = 1;
+}
+
+/* Return true if the quit flag has been set, false otherwise.  */
+
+int
+check_quit_flag (void)
+{
+  /* This is written in a particular way to avoid races.  */
+  if (quit_flag)
+    {
+      quit_flag = 0;
+      return 1;
+    }
+
+  return 0;
+}
+
+#endif /* HAVE_PYTHON */
 
 /* Nonzero means that strings with character values >0x7F should be printed
    as octal escapes.  Zero means just print the value (e.g. it's an
@@ -1714,11 +1751,6 @@ init_page_info (void)
 	  lines_per_page = UINT_MAX;
 	}
 
-      /* FIXME: Get rid of this junk.  */
-#if defined(SIGWINCH) && defined(SIGWINCH_HANDLER)
-      SIGWINCH_HANDLER (SIGWINCH);
-#endif
-
       /* If the output is not a terminal, don't paginate it.  */
       if (!ui_file_isatty (gdb_stdout))
 	lines_per_page = UINT_MAX;
@@ -1845,6 +1877,7 @@ prompt_for_continue (void)
   reinitialize_more_filter ();
 
   immediate_quit++;
+  QUIT;
   /* On a real operating system, the user can quit with SIGINT.
      But not on GO32.
 
@@ -1873,7 +1906,7 @@ prompt_for_continue (void)
       while (*p == ' ' || *p == '\t')
 	++p;
       if (p[0] == 'q')
-	async_request_quit (0);
+	quit ();
       xfree (ignore);
     }
   immediate_quit--;
@@ -2743,11 +2776,6 @@ When set, debugging messages will be marked with seconds and microseconds."),
 			   &setdebuglist, &showdebuglist);
 }
 
-/* Machine specific function to handle SIGWINCH signal.  */
-
-#ifdef  SIGWINCH_HANDLER_BODY
-SIGWINCH_HANDLER_BODY
-#endif
 /* Print routines to handle variable size regs, etc.  */
 /* Temporary storage using circular buffer.  */
 #define NUMCELLS 16

@@ -1,7 +1,6 @@
 /* Target-dependent code for GDB, the GNU debugger.
 
-   Copyright (C) 1986-1987, 1989, 1991-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -52,6 +51,7 @@
 
 #include "solib-svr4.h"
 #include "ppc-tdep.h"
+#include "ppc-ravenscar-thread.h"
 
 #include "gdb_assert.h"
 #include "dis-asm.h"
@@ -3084,21 +3084,6 @@ find_variant_by_arch (enum bfd_architecture arch, unsigned long mach)
 static int
 gdb_print_insn_powerpc (bfd_vma memaddr, disassemble_info *info)
 {
-  if (!info->disassembler_options)
-    {
-      /* When debugging E500 binaries and disassembling code containing
-	 E500-specific (SPE) instructions, one sometimes sees AltiVec
-	 instructions instead.  The opcode spaces for SPE instructions
-	 and AltiVec instructions overlap, and specifiying the "any" cpu
-	 looks for AltiVec instructions first.  If we know we're
-	 debugging an E500 binary, however, we can specify the "e500x2"
-	 cpu and get much more sane disassembly output.  */
-      if (info->mach == bfd_mach_ppc_e500)
-	info->disassembler_options = "e500x2";
-      else
-	info->disassembler_options = "any";
-    }
-
   if (info->endian == BFD_ENDIAN_BIG)
     return print_insn_big_powerpc (memaddr, info);
   else
@@ -4167,6 +4152,12 @@ rs6000_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   gdb_assert (gdbarch_num_regs (gdbarch)
 	      + gdbarch_num_pseudo_regs (gdbarch) == cur_reg);
+
+  /* Register the ravenscar_arch_ops.  */
+  if (mach == bfd_mach_ppc_e500)
+    register_e500_ravenscar_ops (gdbarch);
+  else
+    register_ppc_ravenscar_ops (gdbarch);
 
   return gdbarch;
 }

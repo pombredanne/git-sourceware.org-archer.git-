@@ -1,5 +1,5 @@
 /* Tracepoint code for remote server for GDB.
-   Copyright (C) 2009-2012 Free Software Foundation, Inc.
+   Copyright (C) 2009-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -57,7 +57,7 @@
 
 */
 
-static void trace_vdebug (const char *, ...) ATTR_FORMAT (printf, 1, 2);
+static void trace_vdebug (const char *, ...) ATTRIBUTE_PRINTF (1, 2);
 
 static void
 trace_vdebug (const char *fmt, ...)
@@ -3873,15 +3873,9 @@ cmd_qtfv (char *packet)
 static void
 cmd_qtsv (char *packet)
 {
-  trace_debug ("Returning first trace state variable definition");
+  trace_debug ("Returning additional trace state variable definition");
 
-  if (!cur_tpoint)
-    {
-      /* This case would normally never occur, but be prepared for
-	 GDB misbehavior.  */
-      strcpy (packet, "l");
-    }
-  else if (cur_tsv)
+  if (cur_tsv)
     {
       cur_tsv = cur_tsv->next;
       if (cur_tsv)
@@ -6698,7 +6692,7 @@ static int
 run_inferior_command (char *cmd, int len)
 {
   int err = -1;
-  int pid = ptid_get_pid (current_inferior->entry.id);
+  int pid = ptid_get_pid (current_ptid);
 
   trace_debug ("run_inferior_command: running: %s", cmd);
 

@@ -1,5 +1,5 @@
 /* Agent expression code for remote server.
-   Copyright (C) 2009-2012 Free Software Foundation, Inc.
+   Copyright (C) 2009-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -20,7 +20,7 @@
 #include "ax.h"
 #include "format.h"
 
-static void ax_vdebug (const char *, ...) ATTR_FORMAT (printf, 1, 2);
+static void ax_vdebug (const char *, ...) ATTRIBUTE_PRINTF (1, 2);
 
 #ifdef IN_PROCESS_AGENT
 int debug_agent = 0;

@@ -1,6 +1,6 @@
 /* Print and select stack frames for GDB, the GNU debugger.
 
-   Copyright (C) 1986-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -354,14 +354,15 @@ read_frame_arg (struct symbol *sym, struct frame_info *frame,
 
 	  if (val && entryval && !ui_out_is_mi_like_p (current_uiout))
 	    {
-	      unsigned len = TYPE_LENGTH (value_type (val));
+	      struct type *type = value_type (val);
 
 	      if (!value_optimized_out (val) && value_lazy (val))
 		value_fetch_lazy (val);
 	      if (!value_optimized_out (val) && value_lazy (entryval))
 		value_fetch_lazy (entryval);
 	      if (!value_optimized_out (val)
-		  && value_available_contents_eq (val, 0, entryval, 0, len))
+		  && value_available_contents_eq (val, 0, entryval, 0,
+						  TYPE_LENGTH (type)))
 		{
 		  /* Initialize it just to avoid a GCC false warning.  */
 		  struct value *val_deref = NULL, *entryval_deref;
@@ -373,12 +374,12 @@ read_frame_arg (struct symbol *sym, struct frame_info *frame,
 
 		  TRY_CATCH (except, RETURN_MASK_ERROR)
 		    {
-		      unsigned len_deref;
+		      struct type *type_deref;
 
 		      val_deref = coerce_ref (val);
 		      if (value_lazy (val_deref))
 			value_fetch_lazy (val_deref);
-		      len_deref = TYPE_LENGTH (value_type (val_deref));
+		      type_deref = value_type (val_deref);
 
 		      entryval_deref = coerce_ref (entryval);
 		      if (value_lazy (entryval_deref))
@@ -389,7 +390,7 @@ read_frame_arg (struct symbol *sym, struct frame_info *frame,
 		      if (val != val_deref
 			  && value_available_contents_eq (val_deref, 0,
 							  entryval_deref, 0,
-							  len_deref))
+						      TYPE_LENGTH (type_deref)))
 			val_equal = 1;
 		    }
 
@@ -1177,7 +1178,7 @@ print_frame (struct frame_info *frame, int print_level,
       QUIT;
     }
   ui_out_text (uiout, ")");
-  if (sal.symtab && sal.symtab->filename)
+  if (sal.symtab)
     {
       annotate_frame_source_begin ();
       ui_out_wrap_hint (uiout, "   ");
@@ -1188,8 +1189,7 @@ print_frame (struct frame_info *frame, int print_level,
 	{
 	  const char *fullname = symtab_to_fullname (sal.symtab);
 
-	  if (fullname != NULL)
-	    ui_out_field_string (uiout, "fullname", fullname);
+	  ui_out_field_string (uiout, "fullname", fullname);
 	}
       annotate_frame_source_file_end ();
       ui_out_text (uiout, ":");
@@ -1198,7 +1198,7 @@ print_frame (struct frame_info *frame, int print_level,
       annotate_frame_source_end ();
     }
 
-  if (pc_p && (!funname || (!sal.symtab || !sal.symtab->filename)))
+  if (pc_p && (funname == NULL || sal.symtab == NULL))
     {
 #ifdef PC_SOLIB
       char *lib = PC_SOLIB (get_frame_pc (frame));
@@ -1846,6 +1846,8 @@ iterate_over_block_locals (struct block *b,
 	case LOC_STATIC:
 	case LOC_COMPUTED:
 	  if (SYMBOL_IS_ARGUMENT (sym))
+	    break;
+	  if (SYMBOL_DOMAIN (sym) == COMMON_BLOCK_DOMAIN)
 	    break;
 	  (*cb) (SYMBOL_PRINT_NAME (sym), sym, cb_data);
 	  break;
