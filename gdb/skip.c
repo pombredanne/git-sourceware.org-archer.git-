@@ -350,6 +350,11 @@ function_name_is_marked_for_skip (const char *function_name,
 
       if (e->filename != NULL)
 	{
+	  if (function_sal->symtab != NULL
+	      && compare_filenames_for_search (function_sal->symtab->filename_,
+					       e->filename))
+	    return 1;
+
 	  /* Get the filename corresponding to this FUNCTION_SAL, if we haven't
 	     yet.  */
 	  if (!searched_for_fullname)

@@ -173,8 +173,6 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 
   ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, pst)
   {
-    const char *fullname;
-
     /* We can skip shared psymtabs here, because any file name will be
        attached to the unshared psymtab.  */
     if (pst->user != NULL)
@@ -184,9 +182,8 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
     if (pst->anonymous)
       continue;
 
-    fullname = psymtab_to_fullname (pst);
-
-    if (compare_filenames_for_search (fullname, name))
+    if (compare_filenames_for_search (pst->filename, name)
+        || compare_filenames_for_search (psymtab_to_fullname (pst), name))
       {
 	if (partial_map_expand_apply (objfile, name, full_path, real_path,
 				      pst, callback, data))
@@ -203,7 +200,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
        this symtab and use its absolute path.  */
     if (full_path != NULL)
       {
-        char *fp = xfullpath (fullname);
+        char *fp = xfullpath (psymtab_to_fullname (pst));
 	struct cleanup *cleanups = make_cleanup (xfree, fp);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
@@ -1197,10 +1194,25 @@ psymtab_to_fullname (struct partial_symtab *ps)
 
       if (fd >= 0)
 	close (fd);
-      else if (ps->dirname == NULL)
-	ps->fullname = xstrdup (ps->filename);
       else
-	ps->fullname = concat (ps->dirname, SLASH_STRING, ps->filename, NULL);
+	{
+	  char *fullname;
+	  struct cleanup *back_to;
+
+	  /* rewrite_source_path would be applied by find_and_open_source, we
+	     should report the pathname where GDB tried to find the file.  */
+
+	  if (ps->dirname == NULL || IS_ABSOLUTE_PATH (ps->filename))
+	    fullname = xstrdup (ps->filename);
+	  else
+	    fullname = concat (ps->dirname, SLASH_STRING, ps->filename, NULL);
+
+	  back_to = make_cleanup (xfree, fullname);
+	  ps->fullname = rewrite_source_path (fullname);
+	  if (ps->fullname == NULL)
+	    ps->fullname = xstrdup (fullname);
+	  do_cleanups (back_to);
+	}
     } 
 
   return ps->fullname;

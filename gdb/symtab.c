@@ -203,9 +203,8 @@ iterate_over_some_symtabs (const char *name,
 
   for (s = first; s != NULL && s != after_last; s = s->next)
     {
-      const char *fullname = symtab_to_fullname (s);
-
-      if (compare_filenames_for_search (fullname, name))
+      if (compare_filenames_for_search (s->filename_, name)
+	  || compare_filenames_for_search (symtab_to_fullname (s), name))
 	{
 	  if (callback (s, data))
 	    return 1;
@@ -222,7 +221,7 @@ iterate_over_some_symtabs (const char *name,
 
     if (full_path != NULL)
       {
-        char *fp = xfullpath (fullname);
+        char *fp = xfullpath (symtab_to_fullname (s));
 	struct cleanup *cleanups = make_cleanup (xfree, fp);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
@@ -240,7 +239,7 @@ iterate_over_some_symtabs (const char *name,
 
     if (real_path != NULL)
       {
-	char *rp = gdb_realpath (fullname);
+	char *rp = gdb_realpath (symtab_to_fullname (s));
 	struct cleanup *cleanups = make_cleanup (xfree, rp);
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
@@ -4666,6 +4665,17 @@ maybe_add_partial_symtab_filename (const char *filename, const char *fullname,
 
   if (not_interesting_fname (filename))
     return;
+
+  if (!filename_seen (data->filename_seen_cache, filename, 1)
+      && compare_filenames_for_search (filename, data->text))
+    {
+      /* This file matches for a completion; add it to the
+	 current list of matches.  */
+      add_filename_to_list (filename - strlen (data->text),
+			    data->text, data->word, data->list);
+      return;
+    }
+
   if (filename_seen (data->filename_seen_cache, fullname, 1))
     return;
 
