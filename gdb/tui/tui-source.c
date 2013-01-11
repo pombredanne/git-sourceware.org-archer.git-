@@ -99,8 +99,7 @@ tui_set_source_content (struct symtab *s,
                     xfree (TUI_SRC_WIN->generic.title);
                   TUI_SRC_WIN->generic.title = xstrdup (s->filename);
 
-                  if (src->fullname)
-                    xfree (src->fullname);
+		  xfree (src->fullname);
                   src->fullname = xstrdup (symtab_to_fullname (s));
 
 		  /* Determine the threshold for the length of the
