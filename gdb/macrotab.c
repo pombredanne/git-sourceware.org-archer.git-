@@ -499,27 +499,12 @@ macro_include (struct macro_source_file *source,
 
 
 struct macro_source_file *
-macro_lookup_inclusion (struct macro_source_file *source, const char *name)
+macro_lookup_inclusion (struct macro_source_file *source,
+			const char *rawfullname)
 {
-  /* Is SOURCE itself named NAME?  */
-  if (filename_cmp (name, source->rawfullname) == 0)
+  /* Is SOURCE itself named RAWFULLNAME?  */
+  if (filename_cmp (rawfullname, source->rawfullname) == 0)
     return source;
-
-  /* The filename in the source structure is probably a full path, but
-     NAME could be just the final component of the name.  */
-  {
-    int name_len = strlen (name);
-    int src_name_len = strlen (source->rawfullname);
-
-    /* We do mean < here, and not <=; if the lengths are the same,
-       then the filename_cmp above should have triggered, and we need to
-       check for a slash here.  */
-    if (name_len < src_name_len
-        && IS_DIR_SEPARATOR (source->rawfullname[src_name_len - name_len - 1])
-        && filename_cmp (name,
-			 source->rawfullname + src_name_len - name_len) == 0)
-      return source;
-  }
 
   /* It's not us.  Try all our children, and return the lowest.  */
   {
@@ -530,7 +515,7 @@ macro_lookup_inclusion (struct macro_source_file *source, const char *name)
     for (child = source->includes; child; child = child->next_included)
       {
         struct macro_source_file *result
-          = macro_lookup_inclusion (child, name);
+          = macro_lookup_inclusion (child, rawfullname);
 
         if (result)
           {

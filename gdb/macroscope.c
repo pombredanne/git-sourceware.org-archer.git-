@@ -41,6 +41,7 @@ sal_macro_scope (struct symtab_and_line sal)
 {
   struct macro_source_file *main_file, *inclusion;
   struct macro_scope *ms;
+  char *rawfullname;
 
   if (! sal.symtab
       || ! sal.symtab->macro_table)
@@ -49,7 +50,14 @@ sal_macro_scope (struct symtab_and_line sal)
   ms = (struct macro_scope *) xmalloc (sizeof (*ms));
 
   main_file = macro_main (sal.symtab->macro_table);
-  inclusion = macro_lookup_inclusion (main_file, sal.symtab->filename);
+
+  if (IS_ABSOLUTE_PATH (sal.symtab->filename) || sal.symtab->dirname == NULL)
+    rawfullname = xstrdup (sal.symtab->filename);
+  else
+    rawfullname = concat (sal.symtab->dirname, SLASH_STRING,
+			  sal.symtab->filename, NULL);
+  inclusion = macro_lookup_inclusion (main_file, rawfullname);
+  xfree (rawfullname);
 
   if (inclusion)
     {

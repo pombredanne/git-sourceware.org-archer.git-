@@ -1,0 +1,106 @@
+# Copyright 2013 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+standard_testfile lspec.cc
+
+set executable $testfile
+set baseone base/one/thefile.cc
+set basetwo base/two/thefile.cc
+set opts {debug nowarnings c++}
+
+if {[skip_cplus_tests]} {
+    unsupported ${testfile}.exp
+    return
+}
+
+get_compiler_info
+if [test_compiler_info gcc*] {
+    lappend opts additional_flags=-g3
+}
+
+# Ensure the differentiator is in compilation directory name (DW_AT_comp_dir).
+# DW_AT_name for both files will be "thefile.cc".
+
+if { [file pathtype $objdir] == "relative" } {
+    untested "objdir $objdir should be absolute"
+    return
+}
+set saved_pwd [pwd]
+cd $srcdir/${subdir}/base/one
+if { [gdb_compile thefile.cc [standard_output_file ${testfile}-one.o] object $opts] != "" } {
+    untested "${baseone} compilation failed"
+    return -1
+}
+cd $saved_pwd
+cd $srcdir/${subdir}/base/two
+if { [gdb_compile thefile.cc [standard_output_file ${testfile}-two.o] object $opts] != "" } {
+    untested "${basetwo} compilation failed"
+    return -1
+}
+cd $saved_pwd
+
+if { [gdb_compile [list $srcdir/$subdir/$srcfile \
+			[standard_output_file ${testfile}-one.o] \
+			[standard_output_file ${testfile}-two.o]] \
+		  ${binfile} executable $opts] != "" } {
+    untested "linking failed"
+    return -1
+}
+
+clean_restart ${executable}
+
+# Verify the compilation is done as expected:
+gdb_test "list m" "\tint m\\(int x\\)\r\n.*"
+gdb_test "info source" "\r\nCurrent source file is thefile\\.cc\r\nCompilation directory is \[^\r\n\]*/base/one\r\n.*" "info source one"
+gdb_test "list n" "\tint n\\(int y\\)\r\n.*"
+gdb_test "info source" "\r\nCurrent source file is thefile\\.cc\r\nCompilation directory is \[^\r\n\]*/base/two\r\n.*" "info source two"
+
+# Used only if some of the tests fail.
+gdb_test_no_output "set breakpoint pending off"
+
+gdb_test_no_output "set filename-display absolute"
+
+# Check we can differentiate the two breakpoints according to
+# their DW_AT_comp_dir.  Both for "break" and for "clear" below.
+
+set bpone 0
+set test "break $baseone:NameSpace::overload"
+gdb_test_multiple $test $test {
+    -re "\r\nBreakpoint (\[0-9\]+) at 0x\[0-9a-f\]+: file \[^\r\n\]*[string_to_regexp /$subdir/$baseone], line \[0-9\]+\\.\r\n$gdb_prompt $" {
+	set bpone $expect_out(1,string)
+	pass $test
+    }
+}
+
+set bptwo 0
+set test "break $basetwo:NameSpace::overload"
+gdb_test_multiple $test $test {
+    -re "\r\nBreakpoint (\[0-9\]+) at 0x\[0-9a-f\]+: file \[^\r\n\]*[string_to_regexp /$subdir/$basetwo], line \[0-9\]+\\.\r\n$gdb_prompt $" {
+	set bptwo $expect_out(1,string)
+	pass $test
+    }
+}
+
+gdb_test "clear $baseone:NameSpace::overload" "Deleted breakpoint $bpone "
+
+# Test macros also respect DW_AT_comp_dir.
+
+gdb_test "list m" "\tint m\\(int x\\)\r\n.*" "F1 check: list m"
+gdb_test "info macro WANT_F1" "^info macro WANT_F1\r\nDefined at \[^\r\n\]*/${baseone}:\[0-9\]+\r\n#define WANT_F1 " "F1 check: WANT_F1"
+gdb_test "info macro WANT_F2" "^info macro WANT_F2\r\nThe symbol `WANT_F2' has no definition as a C/C\\+\\+ preprocessor macro\r\nat \[^\r\n\]*/${baseone}:\[0-9\]+" "F1 check: WANT_F2"
+
+gdb_test "list n" "\tint n\\(int y\\)\r\n.*" "F2 check: list n"
+gdb_test "info macro WANT_F1" "^info macro WANT_F1\r\nThe symbol `WANT_F1' has no definition as a C/C\\+\\+ preprocessor macro\r\nat \[^\r\n\]*/${basetwo}:\[0-9\]+" "F2 check: WANT_F1"
+gdb_test "info macro WANT_F2" "^info macro WANT_F2\r\nDefined at \[^\r\n\]*/${basetwo}:\[0-9\]+\r\n#define WANT_F2 " "F2 check: WANT_F2"
