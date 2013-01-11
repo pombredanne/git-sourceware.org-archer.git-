@@ -220,15 +220,15 @@ struct macro_source_file *macro_include (struct macro_source_file *source,
 
 void macro_define_special (struct macro_table *table);
 
-/* Find any source file structure for a file named RAWFULLNAME, either
+/* Find any source file structure for a file named NAME, either
    included into SOURCE, or SOURCE itself.  Return zero if we have
-   none.  If NAME appears more than once in the inclusion tree, return the
-   least-nested inclusion --- the one closest to the main source file.
-   Look at macro_source_file->rawfullname description for the RAWFULLNAME
-   format.  */
+   none.  NAME is only the final portion of the filename, not the full
+   path.  e.g., `stdio.h', not `/usr/include/stdio.h'.  If NAME
+   appears more than once in the inclusion tree, return the
+   least-nested inclusion --- the one closest to the main source file.  */
 struct macro_source_file *(macro_lookup_inclusion
                            (struct macro_source_file *source,
-                            const char *rawfullname));
+                            const char *name));
 
 
 /* Record an object-like #definition (i.e., one with no parameter list).
