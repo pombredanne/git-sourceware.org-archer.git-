@@ -1,5 +1,6 @@
-/* BFD support for the CRX processor.
-   Copyright 2004, 2005, 2007 Free Software Foundation, Inc.
+/* Meta support for 32-bit ELF
+   Copyright (C) 2013 Free Software Foundation, Inc.
+   Contributed by Imagination Technologies Ltd.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -18,24 +19,20 @@
    Foundation, Inc., 51 Franklin Street - Fifth Floor, Boston,
    MA 02110-1301, USA.  */
 
-#include "sysdep.h"
-#include "bfd.h"
-#include "libbfd.h"
+#ifndef _ELF32_METAG_H
+#define _ELF32_METAG_H
 
+extern int elf_metag_setup_section_lists
+  (bfd *, struct bfd_link_info *);
 
-const bfd_arch_info_type bfd_crx_arch =
-  {
-    16,		/* 16 bits in a word.  */
-    32,		/* 32 bits in an address.  */
-    8,		/*  8 bits in a byte.  */
-    bfd_arch_crx, /* enum bfd_architecture arch.  */
-    bfd_mach_crx,
-    "crx", 	/* Arch name.  */
-    "crx", 	/* Printable name.  */
-    1,      	/* Unsigned int section alignment power.  */
-    TRUE, 	/* The one and only.  */
-    bfd_default_compatible,
-    bfd_default_scan,
-    bfd_arch_default_fill,
-    0,
-  };
+extern void elf_metag_next_input_section
+  (struct bfd_link_info *, asection *);
+
+extern bfd_boolean elf_metag_size_stubs
+  (bfd *, bfd *, struct bfd_link_info *, bfd_signed_vma,
+   asection * (*) (const char *, asection *), void (*) (void));
+
+extern bfd_boolean elf_metag_build_stubs
+  (struct bfd_link_info *);
+
+#endif  /* _ELF32_METAG_H */
