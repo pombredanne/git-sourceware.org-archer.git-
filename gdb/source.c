@@ -1111,7 +1111,7 @@ symtab_to_fullname (struct symtab *s)
      to handle cases like the file being moved.  */
   if (s->fullname == NULL)
     {
-      int fd = open_source_file (s);
+      int fd = find_and_open_source (s->filename, s->dirname, &s->fullname);
 
       if (fd >= 0)
 	close (fd);
