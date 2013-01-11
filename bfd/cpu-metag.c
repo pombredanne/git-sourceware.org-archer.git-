@@ -1,5 +1,6 @@
-/* BFD support for the CRX processor.
-   Copyright 2004, 2005, 2007 Free Software Foundation, Inc.
+/* BFD support for the Imagination Technologies Meta processor.
+   Copyright (C) 2013 Free Software Foundation, Inc.
+   Contributed by Imagination Technologies Ltd.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -22,20 +23,19 @@
 #include "bfd.h"
 #include "libbfd.h"
 
-
-const bfd_arch_info_type bfd_crx_arch =
-  {
-    16,		/* 16 bits in a word.  */
-    32,		/* 32 bits in an address.  */
-    8,		/*  8 bits in a byte.  */
-    bfd_arch_crx, /* enum bfd_architecture arch.  */
-    bfd_mach_crx,
-    "crx", 	/* Arch name.  */
-    "crx", 	/* Printable name.  */
-    1,      	/* Unsigned int section alignment power.  */
-    TRUE, 	/* The one and only.  */
-    bfd_default_compatible,
-    bfd_default_scan,
-    bfd_arch_default_fill,
-    0,
-  };
+const bfd_arch_info_type bfd_metag_arch =
+{
+  32,				/* Bits per word.  */
+  32,				/* Bits per address.  */
+  8,				/* Bits per byte.  */
+  bfd_arch_metag,		/* Architecture.  */
+  bfd_mach_metag,		/* Machine.  */
+  "metag",			/* Architecture name.  */
+  "metag",			/* Printable name.  */
+  4,				/* Section align power.  */
+  TRUE,				/* The default ?  */
+  bfd_default_compatible,	/* Architecture comparison fn.  */
+  bfd_default_scan,		/* String to architecture convert fn.  */
+  bfd_arch_default_fill,	/* Default fill.  */
+  NULL				/* Next in list.  */
+};
