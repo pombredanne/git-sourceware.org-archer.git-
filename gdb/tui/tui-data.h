@@ -270,7 +270,10 @@ struct tui_source_info
   struct tui_gen_win_info *execution_info;
   int horizontal_offset;	/* Used for horizontal scroll.  */
   struct tui_line_or_address start_line_or_addr;
+
+  /* It is the resolved form as returned by symtab_to_fullname.  */
   char *fullname;
+
   /* Architecture associated with code at this location.  */
   struct gdbarch *gdbarch;
 };
