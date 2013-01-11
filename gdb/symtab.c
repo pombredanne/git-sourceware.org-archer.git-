@@ -221,7 +221,7 @@ iterate_over_some_symtabs (const char *name,
 
     if (full_path != NULL)
       {
-        char *fp = xfullpath (symtab_to_fullname (s));
+	char *fp = xfullpath (symtab_to_fullname (s));
 	struct cleanup *cleanups = make_cleanup (xfree, fp);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
