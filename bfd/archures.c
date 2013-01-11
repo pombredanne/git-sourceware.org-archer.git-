@@ -145,7 +145,7 @@ DESCRIPTION
 .#define bfd_mach_sparc_64bit_p(mach) \
 .  ((mach) >= bfd_mach_sparc_v9 && (mach) != bfd_mach_sparc_v8plusb)
 .  bfd_arch_spu,       {* PowerPC SPU *}
-.#define bfd_mach_spu		256 
+.#define bfd_mach_spu		256
 .  bfd_arch_mips,      {* MIPS Rxxxx *}
 .#define bfd_mach_mips3000		3000
 .#define bfd_mach_mips3900		3900
@@ -365,6 +365,8 @@ DESCRIPTION
 .#define bfd_mach_mep		1
 .#define bfd_mach_mep_h1	0x6831
 .#define bfd_mach_mep_c5	0x6335
+.  bfd_arch_metag,
+.#define bfd_mach_metag		1
 .  bfd_arch_ia64,      {* HP/Intel ia64 *}
 .#define bfd_mach_ia64_elf64	64
 .#define bfd_mach_ia64_elf32	32
@@ -419,7 +421,7 @@ DESCRIPTION
 .  bfd_arch_s390,      {* IBM s390 *}
 .#define bfd_mach_s390_31       31
 .#define bfd_mach_s390_64       64
-.  bfd_arch_score,     {* Sunplus score *} 
+.  bfd_arch_score,     {* Sunplus score *}
 .#define bfd_mach_score3         3
 .#define bfd_mach_score7         7
 .  bfd_arch_openrisc,  {* OpenRISC *}
@@ -548,6 +550,7 @@ extern const bfd_arch_info_type bfd_m68k_arch;
 extern const bfd_arch_info_type bfd_m88k_arch;
 extern const bfd_arch_info_type bfd_mcore_arch;
 extern const bfd_arch_info_type bfd_mep_arch;
+extern const bfd_arch_info_type bfd_metag_arch;
 extern const bfd_arch_info_type bfd_mips_arch;
 extern const bfd_arch_info_type bfd_microblaze_arch;
 extern const bfd_arch_info_type bfd_mmix_arch;
@@ -635,6 +638,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
     &bfd_m88k_arch,
     &bfd_mcore_arch,
     &bfd_mep_arch,
+    &bfd_metag_arch,
     &bfd_microblaze_arch,
     &bfd_mips_arch,
     &bfd_mmix_arch,
