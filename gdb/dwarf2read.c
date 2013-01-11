@@ -4079,12 +4079,6 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
 {
   struct partial_symtab *subpst = allocate_psymtab (name, objfile);
 
-  if (!IS_ABSOLUTE_PATH (subpst->filename))
-    {
-      /* It shares objfile->objfile_obstack.  */
-      subpst->dirname = pst->dirname;
-    }
-
   subpst->section_offsets = pst->section_offsets;
   subpst->textlow = 0;
   subpst->texthigh = 0;
@@ -18020,19 +18014,23 @@ file_full_name (int file, struct line_header *lh, const char *comp_dir)
       else
         {
           const char *dir;
+          int dir_len;
+          char *full_name;
 
-          if (fe->dir_index == 0)
+          if (fe->dir_index)
+            dir = lh->include_dirs[fe->dir_index - 1];
+          else
             dir = comp_dir;
-	  else
-	    {
-	      dir = lh->include_dirs[fe->dir_index - 1];
-	      if (!IS_ABSOLUTE_PATH (dir))
-		return concat (comp_dir, SLASH_STRING, dir, SLASH_STRING,
-			       fe->name, NULL);
-	    }
 
           if (dir)
-	    return concat (dir, SLASH_STRING, fe->name, NULL);
+            {
+              dir_len = strlen (dir);
+              full_name = xmalloc (dir_len + 1 + strlen (fe->name) + 1);
+              strcpy (full_name, dir);
+              full_name[dir_len] = '/';
+              strcpy (full_name + dir_len + 1, fe->name);
+              return full_name;
+            }
           else
             return xstrdup (fe->name);
         }

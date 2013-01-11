@@ -958,7 +958,7 @@ get_substitute_path_rule (const char *path)
    Return NULL if no substitution rule was specified by the user,
    or if no rule applied to the given PATH.  */
    
-char *
+static char *
 rewrite_source_path (const char *path)
 {
   const struct substitute_path_rule *rule = get_substitute_path_rule (path);
