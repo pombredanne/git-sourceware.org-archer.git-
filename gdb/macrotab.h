@@ -125,7 +125,9 @@ struct macro_source_file
      a part of.  */
   struct macro_table *table;
 
-  /* A source file --- possibly a header file.  */
+  /* A source file --- possibly a header file.  This filename is relative to
+     the compilation directory (table->comp_dir), it exactly matches the
+     symtab->filename content.  */
   const char *filename;
 
   /* The location we were #included from, or zero if we are the
@@ -352,7 +354,11 @@ void macro_for_each_in_scope (struct macro_source_file *file, int line,
 /* Return FILE->filename with possibly prepended compilation directory name.
    This is raw concatenation without the "set substitute-path" and gdb_realpath
    applications done by symtab_to_fullname.  Returned string must be freed by
-   xfree.  */
+   xfree.
+
+   THis function ignores the "set filename-display" setting.  Its default
+   setting is "relative" which is backward compatible but the former behavior
+   of macro filenames printing was "absolute".  */
 extern char *macro_source_fullname (struct macro_source_file *file);
 
 #endif /* MACROTAB_H */
