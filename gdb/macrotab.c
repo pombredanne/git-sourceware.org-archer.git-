@@ -503,7 +503,6 @@ macro_lookup_inclusion (struct macro_source_file *source, const char *name)
   /* Is SOURCE itself named NAME?  */
   if (filename_cmp (name, source->filename) == 0)
     return source;
-}
 
   /* The filename in the source structure is probably a full path, but
      NAME could be just the final component of the name.  */
@@ -519,7 +518,6 @@ macro_lookup_inclusion (struct macro_source_file *source, const char *name)
         && filename_cmp (name,
 			 source->filename + src_name_len - name_len) == 0)
       return source;
-}
   }
 
   /* It's not us.  Try all our children, and return the lowest.  */
