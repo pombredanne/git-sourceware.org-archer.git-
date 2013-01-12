@@ -3091,19 +3091,17 @@ elf_add_dt_needed_tag (bfd *abfd,
 		       bfd_boolean do_it)
 {
   struct elf_link_hash_table *hash_table;
-  bfd_size_type oldsize;
   bfd_size_type strindex;
 
   if (!_bfd_elf_link_create_dynstrtab (abfd, info))
     return -1;
 
   hash_table = elf_hash_table (info);
-  oldsize = _bfd_elf_strtab_size (hash_table->dynstr);
   strindex = _bfd_elf_strtab_add (hash_table->dynstr, soname, FALSE);
   if (strindex == (bfd_size_type) -1)
     return -1;
 
-  if (oldsize == _bfd_elf_strtab_size (hash_table->dynstr))
+  if (_bfd_elf_strtab_refcount (hash_table->dynstr, strindex) != 1)
     {
       asection *sdyn;
       const struct elf_backend_data *bed;
@@ -3385,6 +3383,7 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
   struct bfd_link_hash_entry *old_undefs = NULL;
   struct bfd_link_hash_entry *old_undefs_tail = NULL;
   long old_dynsymcount = 0;
+  bfd_size_type old_dynstr_size = 0;
   size_t tabsize = 0;
   size_t hashsize = 0;
 
@@ -3834,6 +3833,7 @@ error_free_dyn:
       old_size = htab->root.table.size;
       old_count = htab->root.table.count;
       old_dynsymcount = htab->dynsymcount;
+      old_dynstr_size = _bfd_elf_strtab_size (htab->dynstr);
 
       for (i = 0; i < htab->root.table.size; i++)
 	{
@@ -4566,6 +4566,7 @@ error_free_dyn:
       memcpy (sym_hash, old_hash, hashsize);
       htab->root.undefs = old_undefs;
       htab->root.undefs_tail = old_undefs_tail;
+      _bfd_elf_strtab_clear_refs (htab->dynstr, old_dynstr_size);
       for (i = 0; i < htab->root.table.size; i++)
 	{
 	  struct bfd_hash_entry *p;
@@ -4578,12 +4579,13 @@ error_free_dyn:
 	      h = (struct elf_link_hash_entry *) p;
 	      if (h->root.type == bfd_link_hash_warning)
 		h = (struct elf_link_hash_entry *) h->root.u.i.link;
-	      if (h->dynindx >= old_dynsymcount)
+	      if (h->dynindx >= old_dynsymcount
+		  && h->dynstr_index < old_dynstr_size)
 		_bfd_elf_strtab_delref (htab->dynstr, h->dynstr_index);
 
 	      /* Preserve the maximum alignment and size for common
 		 symbols even if this dynamic lib isn't on DT_NEEDED
-		 since it can still be loaded at the run-time by another
+		 since it can still be loaded at run time by another
 		 dynamic lib.  */
 	      if (h->root.type == bfd_link_hash_common)
 		{
@@ -4602,8 +4604,9 @@ error_free_dyn:
 		{
 		  memcpy (h->root.u.i.link, old_ent, htab->root.table.entsize);
 		  old_ent = (char *) old_ent + htab->root.table.entsize;
+		  h = (struct elf_link_hash_entry *) h->root.u.i.link;
 		}
-	      else if (h->root.type == bfd_link_hash_common)
+	      if (h->root.type == bfd_link_hash_common)
 		{
 		  if (size > h->root.u.c.size)
 		    h->root.u.c.size = size;
