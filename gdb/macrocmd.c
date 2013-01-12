@@ -131,12 +131,12 @@ show_pp_source_pos (struct ui_file *stream,
                     struct macro_source_file *file,
                     int line)
 {
-  fprintf_filtered (stream, "%s:%d\n", file->rawfullname, line);
+  fprintf_filtered (stream, "%s:%d\n", file->filename, line);
 
   while (file->included_by)
     {
       fprintf_filtered (gdb_stdout, "  included at %s:%d\n",
-                        file->included_by->rawfullname,
+                        file->included_by->filename,
                         file->included_at_line);
       file = file->included_by;
     }
