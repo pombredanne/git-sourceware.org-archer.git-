@@ -501,9 +501,13 @@ macro_include (struct macro_source_file *source,
 struct macro_source_file *
 macro_lookup_inclusion (struct macro_source_file *source, const char *name)
 {
+printf("macro_lookup_inclusion %s %s\n",source->rawfullname, name);
   /* Is SOURCE itself named NAME?  */
   if (filename_cmp (name, source->rawfullname) == 0)
+{
+printf("macro_lookup_inclusion YES1: %s\n",source->rawfullname);
     return source;
+}
 
   /* The filename in the source structure is probably a full path, but
      NAME could be just the final component of the name.  */
@@ -518,7 +522,10 @@ macro_lookup_inclusion (struct macro_source_file *source, const char *name)
         && IS_DIR_SEPARATOR (source->rawfullname[src_name_len - name_len - 1])
         && filename_cmp (name,
 			 source->rawfullname + src_name_len - name_len) == 0)
+{
+printf("macro_lookup_inclusion YES2: %s\n",source->rawfullname);
       return source;
+}
   }
 
   /* It's not us.  Try all our children, and return the lowest.  */
@@ -544,6 +551,7 @@ macro_lookup_inclusion (struct macro_source_file *source, const char *name)
           }
       }
 
+printf("macro_lookup_inclusion BEST: %s\n",best->rawfullname);
     return best;
   }
 }
