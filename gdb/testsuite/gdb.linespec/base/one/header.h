@@ -24,5 +24,6 @@
 void header_two_func (void) {}
 #endif
 #if 1
-# include "base/two/header.h"
+/* #include "header.h" does not work, why?  */
+# include <header.h>
 #endif

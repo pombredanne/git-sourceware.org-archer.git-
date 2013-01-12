@@ -15,15 +15,15 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#if 0
-# define HEADER 1
-#endif
-#if 1
-# undef HEADER
-# define HEADER 2
-void header_two_func (void) {}
-#endif
-#if 0
-/* #include "header.h" does not work, why?  */
-# include <header.h>
-#endif
+/* GCC cannot compile directly a .h file.  */
+
+/* Use trailing "./header.h" to match the #include line in "one/header.h".  */
+
+#include "../one/./header.h"
+
+int
+main (void)
+{
+  header_two_func ();
+  return 0;
+}
