@@ -1,0 +1,29 @@
+# Copyright (C) 2013 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+standard_testfile .c gdbindex-fullpath-func.c
+
+set srcdirabs [file join [pwd] $srcdir]
+
+if { [prepare_for_testing ${testfile}.exp ${testfile} "${srcfile} ${srcfile2}"] } {
+    ${testfile} -1
+}
+
+clean_restart ${testfile}
+
+gdb_test "rbreak $srcdirabs/${subdir}/gdbindex-fullpath-func.c:func" "^rbreak gdbindex-fullpath-real.c:func\r\nBreakpoint 1 at 0x\[0-9a-f\]+: file \[^\r\n\]*/gdbindex-fullpath-link\\.c, line \[0-9\]+\\.\r\nvoid func\\(void\\);"
+
+gdb_test "list func" "\tfunc \\(void\\)\r\n.*"
+gdb_test "info source"
