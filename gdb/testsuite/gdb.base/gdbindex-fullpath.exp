@@ -15,9 +15,18 @@
 
 standard_testfile .c gdbindex-fullpath-func.c
 
-if { [prepare_for_testing ${testfile}.exp ${testfile} "${srcfile} ${srcfile2}"] } {
-    ${testfile} -1
+if { [file pathtype $objdir] != "absolute" } {
+    untested "objdir $objdir is not absolute"
+    return -1
 }
+
+set saved_pwd [pwd]
+cd $srcdir
+if { [gdb_compile "${subdir}/${srcfile} ${subdir}/${srcfile2}" $binfile executable {debug}] != "" } {
+    untested "${srcfile} or ${srcfile2} compilation failed"
+    return -1
+}
+cd $saved_pwd
 
 set result [catch "exec realpath ${srcdir}/${subdir}/${srcfile2}" realsrcfile2]
 if { $result != 0 || $realsrcfile2 == "" } {
@@ -27,8 +36,8 @@ if { $result != 0 || $realsrcfile2 == "" } {
 
 clean_restart ${testfile}
 
-gdb_test "rbreak $realsrcfile2:func" "^rbreak \[^\r\n\]*:func\r\nBreakpoint 1 at 0x\[0-9a-f\]+: file \[^\r\n\]*/${subdir}/${srcfile2}, line \[0-9\]+\\.\r\nvoid func\\(void\\);"
+gdb_test "rbreak $realsrcfile2:func" "^rbreak \[^\r\n\]*:func\r\nBreakpoint 1 at 0x\[0-9a-f\]+: file [string_to_regexp ${subdir}/${srcfile2}], line \[0-9\]+\\.\r\nvoid func\\(void\\);"
 
 # Verify the compilation pathnames are as expected:
 gdb_test "list func" "\tfunc \\(void\\)\r\n.*"
-gdb_test "info source" "^info source\r\nCurrent source file is [string_to_regexp ./${subdir}/${srcfile2}]\r\nCompilation directory is /.*"
+gdb_test "info source" "^info source\r\nCurrent source file is [string_to_regexp ${subdir}/${srcfile2}]\r\nCompilation directory is /.*"
