@@ -3570,7 +3570,16 @@ dw2_expand_symtabs_matching
 
 	  for (j = 0; j < file_data->num_file_names; ++j)
 	    {
+	      const char *this_real_name;
+
 	      if (file_matcher (file_data->file_names[j], data))
+		{
+		  per_cu->v.quick->mark = 1;
+		  break;
+		}
+
+	      this_real_name = dw2_get_real_path (objfile, file_data, j);
+	      if (file_matcher (this_real_name, data))
 		{
 		  per_cu->v.quick->mark = 1;
 		  break;
