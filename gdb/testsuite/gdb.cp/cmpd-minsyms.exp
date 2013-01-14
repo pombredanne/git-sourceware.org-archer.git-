@@ -43,15 +43,12 @@ foreach sym $min_syms {
 gdb_test_no_output "set language c++"
 
 # A list of minimal symbol names to check.
-# Note that GDB<char>::even_harder<int>(char) is quoted and includes
-# the return type.  This is necessary because this is the demangled name
-# of the minimal symbol.
 set min_syms [list \
 		  "GDB<int>::operator ==" \
 		  "GDB<int>::operator==(GDB<int> const&)" \
 		  "GDB<char>::harder(char)" \
 		  "GDB<int>::harder(int)" \
-		  {"int GDB<char>::even_harder<int>(char)"} \
+		  "GDB<char>::even_harder<int>(char)" \
 		  "GDB<int>::simple()"]
 
 foreach sym $min_syms {

@@ -15785,7 +15785,6 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
   name = dwarf2_name (die, cu);
   if (name)
     {
-      const char *linkagename;
       int suppress_add = 0;
 
       if (space)
@@ -15796,16 +15795,47 @@ new_symbol_full (struct die_info *die, struct type *type, struct dwarf2_cu *cu,
 
       /* Cache this symbol's name and the name's demangled form (if any).  */
       SYMBOL_SET_LANGUAGE (sym, cu->language);
-      linkagename = dwarf2_physname (name, die, cu);
-      SYMBOL_SET_NAMES (sym, linkagename, strlen (linkagename), 0, objfile);
 
-      /* Fortran does not have mangling standard and the mangling does differ
-	 between gfortran, iFort etc.  */
-      if (cu->language == language_fortran
-          && symbol_get_demangled_name (&(sym->ginfo)) == NULL)
-	symbol_set_demangled_name (&(sym->ginfo),
-				   dwarf2_full_name (name, die, cu),
-	                           NULL);
+      attr = dwarf2_attr (die, DW_AT_linkage_name, cu);
+      if (attr == NULL)
+	attr = dwarf2_attr (die, DW_AT_MIPS_linkage_name, cu);
+
+      if (cu->language != language_fortran
+	  && (attr != NULL && DW_STRING (attr) != NULL)
+	  /* If this DIE does not need a namespace, but we have a
+	     mangled form, then we may be seeing a static variable in
+	     a method -- but we don't want to use the ordinary
+	     demangler in this case.  */
+	  && die_needs_namespace (die, cu))
+      	{
+	  /* Let the symtab code do the demangling.  The main benefit
+	     of this approach is better caching.  */
+	  SYMBOL_SET_NAMES (sym, DW_STRING (attr), strlen (DW_STRING (attr)),
+			    0, objfile);
+      	}
+      else
+	{
+	  const char *physname;
+
+	  physname = dwarf2_physname (name, die, cu);
+	  /* If we have a mangled form, make sure to preserve it.  */
+	  if (cu->language != language_fortran
+	      && attr != NULL && DW_STRING (attr) != NULL)
+	    {
+	      SYMBOL_LINKAGE_NAME (sym) = DW_STRING (attr);
+	      symbol_set_demangled_name (&(sym->ginfo), physname, objfile);
+	    }
+	  else
+	    SYMBOL_SET_NAMES (sym, physname, strlen (physname), 0, objfile);
+
+	  /* Fortran does not have mangling standard and the mangling
+	     does differ between gfortran, iFort etc.  */
+	  if (cu->language == language_fortran
+	      && symbol_get_demangled_name (&(sym->ginfo)) == NULL)
+	    symbol_set_demangled_name (&(sym->ginfo),
+				       dwarf2_full_name (name, die, cu),
+				       objfile);
+	}
 
       /* Default assumptions.
          Use the passed type or decode it from the die.  */
