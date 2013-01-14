@@ -15,15 +15,20 @@
 
 standard_testfile .c gdbindex-fullpath-func.c
 
-set srcdirabs [file join [pwd] $srcdir]
-
 if { [prepare_for_testing ${testfile}.exp ${testfile} "${srcfile} ${srcfile2}"] } {
     ${testfile} -1
 }
 
+set result [catch "exec realpath ${srcdir}/${subdir}/${srcfile2}" realsrcfile2]
+if { $result != 0 || $realsrcfile2 == "" } {
+    untested "invalid realpath of ${srcfile2}: result $result output $realsrcfile2"
+    return -1
+}
+
 clean_restart ${testfile}
 
-gdb_test "rbreak $srcdirabs/${subdir}/gdbindex-fullpath-func.c:func" "^rbreak gdbindex-fullpath-real.c:func\r\nBreakpoint 1 at 0x\[0-9a-f\]+: file \[^\r\n\]*/gdbindex-fullpath-link\\.c, line \[0-9\]+\\.\r\nvoid func\\(void\\);"
+gdb_test "rbreak $realsrcfile2:func" "^rbreak \[^\r\n\]*:func\r\nBreakpoint 1 at 0x\[0-9a-f\]+: file \[^\r\n\]*/${subdir}/${srcfile2}, line \[0-9\]+\\.\r\nvoid func\\(void\\);"
 
+# Verify the compilation pathnames are as expected:
 gdb_test "list func" "\tfunc \\(void\\)\r\n.*"
-gdb_test "info source"
+gdb_test "info source" "^info source\r\nCurrent source file is [string_to_regexp ./${subdir}/${srcfile2}]\r\nCompilation directory is /.*"
