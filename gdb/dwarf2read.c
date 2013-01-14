@@ -3570,7 +3570,16 @@ dw2_expand_symtabs_matching
 
 	  for (j = 0; j < file_data->num_file_names; ++j)
 	    {
+	      const char *this_real_name;
+
 	      if (file_matcher (file_data->file_names[j], data))
+		{
+		  per_cu->v.quick->mark = 1;
+		  break;
+		}
+
+	      this_real_name = dw2_get_real_path (objfile, file_data, j);
+	      if (file_matcher (this_real_name, data))
 		{
 		  per_cu->v.quick->mark = 1;
 		  break;
@@ -6414,52 +6423,50 @@ locate_pdi_sibling (const struct die_reader_specs *reader,
   return skip_children (reader, info_ptr);
 }
 
-/* Expand this partial symbol table into a full symbol table.  */
+/* Expand this partial symbol table into a full symbol table.  PST is
+   not NULL.  */
 
 static void
 dwarf2_psymtab_to_symtab (struct objfile *objfile, struct partial_symtab *pst)
 {
-  if (pst != NULL)
+  if (pst->readin)
     {
-      if (pst->readin)
+      warning (_("bug: psymtab for %s is already read in."),
+	       pst->filename);
+    }
+  else
+    {
+      if (info_verbose)
 	{
-	  warning (_("bug: psymtab for %s is already read in."),
-		   pst->filename);
+	  printf_filtered (_("Reading in symbols for %s..."),
+			   pst->filename);
+	  gdb_flush (gdb_stdout);
 	}
-      else
+
+      /* Restore our global data.  */
+      dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
+
+      /* If this psymtab is constructed from a debug-only objfile, the
+	 has_section_at_zero flag will not necessarily be correct.  We
+	 can get the correct value for this flag by looking at the data
+	 associated with the (presumably stripped) associated objfile.  */
+      if (objfile->separate_debug_objfile_backlink)
 	{
-	  if (info_verbose)
-	    {
-	      printf_filtered (_("Reading in symbols for %s..."),
-			       pst->filename);
-	      gdb_flush (gdb_stdout);
-	    }
+	  struct dwarf2_per_objfile *dpo_backlink
+	    = objfile_data (objfile->separate_debug_objfile_backlink,
+			    dwarf2_objfile_data_key);
 
-	  /* Restore our global data.  */
-	  dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
-
-	  /* If this psymtab is constructed from a debug-only objfile, the
-	     has_section_at_zero flag will not necessarily be correct.  We
-	     can get the correct value for this flag by looking at the data
-	     associated with the (presumably stripped) associated objfile.  */
-	  if (objfile->separate_debug_objfile_backlink)
-	    {
-	      struct dwarf2_per_objfile *dpo_backlink
-	        = objfile_data (objfile->separate_debug_objfile_backlink,
-		                dwarf2_objfile_data_key);
-
-	      dwarf2_per_objfile->has_section_at_zero
-		= dpo_backlink->has_section_at_zero;
-	    }
-
-	  dwarf2_per_objfile->reading_partial_symbols = 0;
-
-	  psymtab_to_symtab_1 (pst);
-
-	  /* Finish up the debug error message.  */
-	  if (info_verbose)
-	    printf_filtered (_("done.\n"));
+	  dwarf2_per_objfile->has_section_at_zero
+	    = dpo_backlink->has_section_at_zero;
 	}
+
+      dwarf2_per_objfile->reading_partial_symbols = 0;
+
+      psymtab_to_symtab_1 (pst);
+
+      /* Finish up the debug error message.  */
+      if (info_verbose)
+	printf_filtered (_("done.\n"));
     }
 
   process_cu_includes ();
