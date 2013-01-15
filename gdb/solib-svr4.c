@@ -2053,9 +2053,10 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 		 not present.  */
 
 	      if (with_prefix)
-		strncat (name, "rtld_", sizeof (name) - 1);
+		strncat (name, "rtld_", sizeof (name) - strlen (name) - 1);
 
-	      strncat (name, probe_info[i].name, sizeof (name) - 1);
+	      strncat (name, probe_info[i].name,
+		       sizeof (name) - strlen (name) - 1);
 
 	      info->probes[i] = find_probes_in_objfile (os->objfile, "rtld",
 							name);
