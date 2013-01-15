@@ -28,11 +28,12 @@ if { [file pathtype $objdir] == "relative" } {
 }
 set saved_pwd [pwd]
 cd $srcdir/${subdir}/base/two
-if { [gdb_compile "../../${srcfile}" "${binfile}" executable $opts] != "" } {
+set err [gdb_compile "../../${srcfile}" "${binfile}" executable $opts]
+cd $saved_pwd
+if { $err != "" } {
     untested "compilation failed"
     return -1
 }
-cd $saved_pwd
 
 clean_restart ${testfile}
 
