@@ -3843,12 +3843,25 @@ dwarf2_initialize_objfile (struct objfile *objfile)
 void
 dwarf2_build_psymtabs (struct objfile *objfile)
 {
+  volatile struct gdb_exception except;
+
   if (objfile->global_psymbols.size == 0 && objfile->static_psymbols.size == 0)
     {
       init_psymbol_list (objfile, 1024);
     }
 
-  dwarf2_build_psymtabs_hard (objfile);
+  TRY_CATCH (except, RETURN_MASK_ERROR)
+    {
+      /* This isn't really ideal: all the data we allocate on the
+	 objfile's obstack is still uselessly kept around.  However,
+	 freeing it seems unsafe.  */
+      struct cleanup *cleanups = make_cleanup_discard_psymtabs (objfile);
+
+      dwarf2_build_psymtabs_hard (objfile);
+      discard_cleanups (cleanups);
+    }
+  if (except.reason < 0)
+    exception_print (gdb_stderr, except);
 }
 
 /* Return the total length of the CU described by HEADER.  */
@@ -6405,52 +6418,50 @@ locate_pdi_sibling (const struct die_reader_specs *reader,
   return skip_children (reader, info_ptr);
 }
 
-/* Expand this partial symbol table into a full symbol table.  */
+/* Expand this partial symbol table into a full symbol table.  PST is
+   not NULL.  */
 
 static void
 dwarf2_psymtab_to_symtab (struct objfile *objfile, struct partial_symtab *pst)
 {
-  if (pst != NULL)
+  if (pst->readin)
     {
-      if (pst->readin)
+      warning (_("bug: psymtab for %s is already read in."),
+	       pst->filename);
+    }
+  else
+    {
+      if (info_verbose)
 	{
-	  warning (_("bug: psymtab for %s is already read in."),
-		   pst->filename);
+	  printf_filtered (_("Reading in symbols for %s..."),
+			   pst->filename);
+	  gdb_flush (gdb_stdout);
 	}
-      else
+
+      /* Restore our global data.  */
+      dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
+
+      /* If this psymtab is constructed from a debug-only objfile, the
+	 has_section_at_zero flag will not necessarily be correct.  We
+	 can get the correct value for this flag by looking at the data
+	 associated with the (presumably stripped) associated objfile.  */
+      if (objfile->separate_debug_objfile_backlink)
 	{
-	  if (info_verbose)
-	    {
-	      printf_filtered (_("Reading in symbols for %s..."),
-			       pst->filename);
-	      gdb_flush (gdb_stdout);
-	    }
+	  struct dwarf2_per_objfile *dpo_backlink
+	    = objfile_data (objfile->separate_debug_objfile_backlink,
+			    dwarf2_objfile_data_key);
 
-	  /* Restore our global data.  */
-	  dwarf2_per_objfile = objfile_data (objfile, dwarf2_objfile_data_key);
-
-	  /* If this psymtab is constructed from a debug-only objfile, the
-	     has_section_at_zero flag will not necessarily be correct.  We
-	     can get the correct value for this flag by looking at the data
-	     associated with the (presumably stripped) associated objfile.  */
-	  if (objfile->separate_debug_objfile_backlink)
-	    {
-	      struct dwarf2_per_objfile *dpo_backlink
-	        = objfile_data (objfile->separate_debug_objfile_backlink,
-		                dwarf2_objfile_data_key);
-
-	      dwarf2_per_objfile->has_section_at_zero
-		= dpo_backlink->has_section_at_zero;
-	    }
-
-	  dwarf2_per_objfile->reading_partial_symbols = 0;
-
-	  psymtab_to_symtab_1 (pst);
-
-	  /* Finish up the debug error message.  */
-	  if (info_verbose)
-	    printf_filtered (_("done.\n"));
+	  dwarf2_per_objfile->has_section_at_zero
+	    = dpo_backlink->has_section_at_zero;
 	}
+
+      dwarf2_per_objfile->reading_partial_symbols = 0;
+
+      psymtab_to_symtab_1 (pst);
+
+      /* Finish up the debug error message.  */
+      if (info_verbose)
+	printf_filtered (_("done.\n"));
     }
 
   process_cu_includes ();
@@ -12372,6 +12383,24 @@ read_tag_volatile_type (struct die_info *die, struct dwarf2_cu *cu)
   return set_die_type (die, cv_type, cu);
 }
 
+/* Handle DW_TAG_restrict_type.  */
+
+static struct type *
+read_tag_restrict_type (struct die_info *die, struct dwarf2_cu *cu)
+{
+  struct type *base_type, *cv_type;
+
+  base_type = die_type (die, cu);
+
+  /* The die_type call above may have already set the type for this DIE.  */
+  cv_type = get_die_type (die, cu);
+  if (cv_type)
+    return cv_type;
+
+  cv_type = make_restrict_type (base_type);
+  return set_die_type (die, cv_type, cu);
+}
+
 /* Extract all information from a DW_TAG_string_type DIE and add to
    the user defined type vector.  It isn't really a user defined type,
    but it behaves like one, with other DIE's using an AT_user_def_type
@@ -16536,6 +16565,9 @@ read_type_die_1 (struct die_info *die, struct dwarf2_cu *cu)
       break;
     case DW_TAG_volatile_type:
       this_type = read_tag_volatile_type (die, cu);
+      break;
+    case DW_TAG_restrict_type:
+      this_type = read_tag_restrict_type (die, cu);
       break;
     case DW_TAG_string_type:
       this_type = read_tag_string_type (die, cu);
