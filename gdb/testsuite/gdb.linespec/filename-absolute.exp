@@ -25,11 +25,6 @@ if {[skip_cplus_tests]} {
     return
 }
 
-get_compiler_info
-if [test_compiler_info gcc*] {
-    lappend opts additional_flags=-g3
-}
-
 # Ensure the differentiator is in compilation directory name (DW_AT_comp_dir).
 # DW_AT_name for both files will be "thefile.cc".
 
@@ -94,13 +89,3 @@ gdb_test_multiple $test $test {
 }
 
 gdb_test "clear $baseone:NameSpace::overload" "Deleted breakpoint $bpone "
-
-# Test macros also respect DW_AT_comp_dir.
-
-gdb_test "list m" "\tint m\\(int x\\)\r\n.*" "F1 check: list m"
-gdb_test "info macro WANT_F1" "^info macro WANT_F1\r\nDefined at \[^\r\n\]*/${baseone}:\[0-9\]+\r\n#define WANT_F1 " "F1 check: WANT_F1"
-gdb_test "info macro WANT_F2" "^info macro WANT_F2\r\nThe symbol `WANT_F2' has no definition as a C/C\\+\\+ preprocessor macro\r\nat \[^\r\n\]*/${baseone}:\[0-9\]+" "F1 check: WANT_F2"
-
-gdb_test "list n" "\tint n\\(int y\\)\r\n.*" "F2 check: list n"
-gdb_test "info macro WANT_F1" "^info macro WANT_F1\r\nThe symbol `WANT_F1' has no definition as a C/C\\+\\+ preprocessor macro\r\nat \[^\r\n\]*/${basetwo}:\[0-9\]+" "F2 check: WANT_F1"
-gdb_test "info macro WANT_F2" "^info macro WANT_F2\r\nDefined at \[^\r\n\]*/${basetwo}:\[0-9\]+\r\n#define WANT_F2 " "F2 check: WANT_F2"
