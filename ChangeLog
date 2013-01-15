@@ -1,7 +1,30 @@
+2013-01-11  Joel Brobecker  <brobecker@adacore.com>
+
+	Sync with GCC, merge:
+
+	2013-01-09  Jason Merrill  <jason@redhat.com>
+
+	* .gitignore: Import from gdb repository.
+
+2013-01-11  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
+
+	* config.sub: Update from config repo.
+
+2013-01-11  Eric Botcazou  <ebotcazou@adacore.com>
+
+	* Makefile.tpl (BOOT_ADAFLAGS): Remove -gnata.
+	* Makefile.in: Regenerate.
+
+2013-01-09  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* Makefile.def (configure-gcc): Depend on all-gmp.
+	(all-gcc): Remove dependency on all-gmp.
+	* Makefile.in: Regenerated.
+
 2013-01-08  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
 
-	* config.guss: Update from config repo.
-	* config.sub: Dito.
+	* config.guess: Update from config repo.
+	* config.sub: Ditto.
 
 2013-01-07  Jeff Johnston  <jjohnstn@redhat.com>
 
@@ -50,9 +73,9 @@
 2012-11-30  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
 
 	* configure.ac: Merge from GCC.
-	* Makefile.tpl: Dito.
-	* Makefile.in: Dito.
-	* configure: Dito.
+	* Makefile.tpl: Ditto.
+	* Makefile.in: Ditto.
+	* configure: Ditto.
 
 2012-11-28  Jan-Benedict Glaw  <jbglaw@lug-owl.de>
 

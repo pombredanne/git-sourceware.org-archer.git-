@@ -58,7 +58,7 @@ static struct partial_symbol *lookup_partial_symbol (struct objfile *,
 						     const char *, int,
 						     domain_enum);
 
-static char *psymtab_to_fullname (struct partial_symtab *ps);
+static const char *psymtab_to_fullname (struct partial_symtab *ps);
 
 static struct partial_symbol *find_pc_sect_psymbol (struct objfile *,
 						    struct partial_symtab *,
@@ -1174,7 +1174,7 @@ map_symbol_filenames_psymtab (struct objfile *objfile,
    If this function fails to find the file that this partial_symtab represents,
    NULL will be returned and ps->fullname will be set to NULL.  */
 
-static char *
+static const char *
 psymtab_to_fullname (struct partial_symtab *ps)
 {
   int r;
@@ -1702,7 +1702,7 @@ init_psymbol_list (struct objfile *objfile, int total_symbols)
 
   /* Current best guess is that approximately a twentieth
      of the total symbols (in a debugging file) are global or static
-     oriented symbols.  */
+     oriented symbols, then multiply that by slop factor of two.  */
 
   objfile->global_psymbols.size = total_symbols / 10;
   objfile->static_psymbols.size = total_symbols / 10;
@@ -1796,6 +1796,44 @@ discard_psymtab (struct objfile *objfile, struct partial_symtab *pst)
 
   pst->next = objfile->free_psymtabs;
   objfile->free_psymtabs = pst;
+}
+
+/* An object of this type is passed to discard_psymtabs_upto.  */
+
+struct psymtab_state
+{
+  /* The objfile where psymtabs are discarded.  */
+
+  struct objfile *objfile;
+
+  /* The first psymtab to save.  */
+
+  struct partial_symtab *save;
+};
+
+/* A cleanup function used by make_cleanup_discard_psymtabs.  */
+
+static void
+discard_psymtabs_upto (void *arg)
+{
+  struct psymtab_state *state = arg;
+
+  while (state->objfile->psymtabs != state->save)
+    discard_psymtab (state->objfile, state->objfile->psymtabs);
+}
+
+/* Return a new cleanup that discards all psymtabs created in OBJFILE
+   after this function is called.  */
+
+struct cleanup *
+make_cleanup_discard_psymtabs (struct objfile *objfile)
+{
+  struct psymtab_state *state = XNEW (struct psymtab_state);
+
+  state->objfile = objfile;
+  state->save = objfile->psymtabs;
+
+  return make_cleanup_dtor (discard_psymtabs_upto, state, xfree);
 }
 
 
