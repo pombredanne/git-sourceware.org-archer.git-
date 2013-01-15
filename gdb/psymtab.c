@@ -1218,6 +1218,10 @@ psymtab_to_fullname (struct partial_symtab *ps)
   return ps->fullname;
 }
 
+/* Return absolute source filename of partial_symtab PS.
+   While psymtab_to_fullname uses xfullpath psymtab_to_realname uses
+   gdb_realpath.  */
+
 static const char *
 psymtab_to_realname (struct partial_symtab *ps)
 {
