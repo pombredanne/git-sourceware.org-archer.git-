@@ -4664,6 +4664,7 @@ struct add_partial_filename_data
   struct filename_seen_cache *filename_seen_cache;
   char *text;
   char *word;
+  int text_len;
   VEC (char_ptr) **list;
 };
 
@@ -4674,47 +4675,25 @@ maybe_add_partial_symtab_filename (const char *filename, const char *fullname,
 				   void *user_data)
 {
   struct add_partial_filename_data *data = user_data;
-  struct cleanup *back_to;
-  char *fullname_shortened, *fullname_shortener, *fullname_min;
 
   if (not_interesting_fname (filename))
     return;
-
   if (!filename_seen (data->filename_seen_cache, filename, 1)
-      && compare_filenames_for_search (filename, data->text))
+      && filename_ncmp (filename, data->text, data->text_len) == 0)
     {
       /* This file matches for a completion; add it to the
 	 current list of matches.  */
-      add_filename_to_list (filename - strlen (data->text),
-			    data->text, data->word, data->list);
-      return;
+      add_filename_to_list (filename, data->text, data->word, data->list);
     }
-
-  if (filename_seen (data->filename_seen_cache, fullname, 1))
-    return;
-
-  fullname_shortened = xstrdup (fullname);
-  back_to = make_cleanup (xfree, fullname_shortened);
-  fullname_min = &fullname_shortened[strlen (data->text)];
-
-  for (fullname_shortener = &fullname_shortened[strlen (fullname_shortened)];
-       fullname_shortener >= fullname_min;
-       fullname_shortener--)
+  else
     {
-      *fullname_shortener = '\0';
-      
-      if (compare_filenames_for_search (fullname_shortened, data->text))
-	{
-	  /* This file matches for a completion; add it to the
-	     current list of matches.  */
-	  add_filename_to_list ((fullname + strlen (fullname_shortened)
-				 - strlen (data->text)),
-				data->text, data->word, data->list);
-	  break;
-	}
-    }
+      const char *base_name = lbasename (filename);
 
-  do_cleanups (back_to);
+      if (base_name != filename
+	  && !filename_seen (data->filename_seen_cache, base_name, 1)
+	  && filename_ncmp (base_name, data->text, data->text_len) == 0)
+	add_filename_to_list (base_name, data->text, data->word, data->list);
+    }
 }
 
 /* Return a vector of all source files whose names begin with matching
@@ -4727,6 +4706,7 @@ make_source_files_completion_list (char *text, char *word)
 {
   struct symtab *s;
   struct objfile *objfile;
+  size_t text_len = strlen (text);
   VEC (char_ptr) *list = NULL;
   const char *base_name;
   struct add_partial_filename_data datum;
@@ -4742,29 +4722,38 @@ make_source_files_completion_list (char *text, char *word)
   cache_cleanup = make_cleanup (delete_filename_seen_cache,
 				filename_seen_cache);
 
+  ALL_SYMTABS (objfile, s)
+    {
+      if (not_interesting_fname (s->filename))
+	continue;
+      if (!filename_seen (filename_seen_cache, s->filename, 1)
+	  && filename_ncmp (s->filename, text, text_len) == 0)
+	{
+	  /* This file matches for a completion; add it to the current
+	     list of matches.  */
+	  add_filename_to_list (s->filename, text, word, &list);
+	}
+      else
+	{
+	  /* NOTE: We allow the user to type a base name when the
+	     debug info records leading directories, but not the other
+	     way around.  This is what subroutines of breakpoint
+	     command do when they parse file names.  */
+	  base_name = lbasename (s->filename);
+	  if (base_name != s->filename
+	      && !filename_seen (filename_seen_cache, base_name, 1)
+	      && filename_ncmp (base_name, text, text_len) == 0)
+	    add_filename_to_list (base_name, text, word, &list);
+	}
+    }
+
   datum.filename_seen_cache = filename_seen_cache;
   datum.text = text;
   datum.word = word;
+  datum.text_len = text_len;
   datum.list = &list;
-
-  ALL_SYMTABS (objfile, s)
-    {
-      const char *fullname = symtab_to_fullname (s);
-      char *full_path = xfullpath (fullname);
-      struct cleanup *cleanups = make_cleanup (xfree, full_path);
-      char *real_path = gdb_realpath (fullname);
-
-      make_cleanup (xfree, real_path);
-      maybe_add_partial_symtab_filename (s->filename, fullname, &datum);
-      if (strcmp (fullname, full_path) != 0)
-	maybe_add_partial_symtab_filename (s->filename, full_path, &datum);
-      if (strcmp (full_path, real_path) != 0)
-	maybe_add_partial_symtab_filename (s->filename, real_path, &datum);
-      do_cleanups (cleanups);
-    }
-
   map_partial_symbol_filenames (maybe_add_partial_symtab_filename, &datum,
-				1 /*need_fullname*/);
+				0 /*need_fullname*/);
 
   do_cleanups (cache_cleanup);
   discard_cleanups (back_to);
