@@ -80,6 +80,8 @@ skip_file_command (char *arg, int from_tty)
       symtab = get_last_displayed_symtab ();
       if (symtab == NULL)
 	error (_("No default file now."));
+
+      /* It is not a typo, symtab_to_filename woule be needlessly ambiguous.  */
       filename = symtab_to_fullname (symtab);
     }
   else

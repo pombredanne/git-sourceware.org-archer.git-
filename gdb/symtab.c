@@ -221,20 +221,15 @@ iterate_over_some_symtabs (const char *name,
 
     if (full_path != NULL)
       {
-	char *fp = xfullpath (symtab_to_fullname (s));
-	struct cleanup *cleanups = make_cleanup (xfree, fp);
+	/* FP is here in xfullpath form.  */
+	const char *fp = symtab_to_fullname (s);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
-        if (FILENAME_CMP (fp, full_path) == 0
-	    || compare_filenames_for_search (fp, name))
+        if (FILENAME_CMP (full_path, fp) == 0)
           {
 	    if (callback (s, data))
-	      {
-		do_cleanups (cleanups);
-		return 1;
-	      }
+	      return 1;
           }
-	do_cleanups (cleanups);
       }
 
     if (real_path != NULL)
