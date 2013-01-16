@@ -2534,9 +2534,23 @@ find_line_symtab (struct symtab *symtab, int line,
 	struct linetable *l;
 	int ind;
 
-	if (FILENAME_CMP (symtab_to_fullname (symtab),
-			  symtab_to_fullname (s)) != 0)
-	  continue;	
+        if (filename_cmp (symtab->filename, s->filename) != 0
+	    || filename_cmp (symtab_to_fullname (symtab),
+			     symtab_to_fullname (s)) != 0)
+	  {
+	    char *symtab_realname, *s_realname;
+	    int cmpval;
+
+	    if (!basenames_may_differ)
+	      continue;
+	    symtab_realname = gdb_realpath (symtab_to_fullname (symtab));
+	    s_realname = gdb_realpath (symtab_to_fullname (s));
+	    cmpval = filename_cmp (symtab_realname, s_realname);
+	    xfree (s_realname);
+	    xfree (symtab_realname);
+	    if (cmpval != 0)
+	      continue;
+	  }
 	l = LINETABLE (s);
 	ind = find_line_common (l, line, &exact, 0);
 	if (ind >= 0)
