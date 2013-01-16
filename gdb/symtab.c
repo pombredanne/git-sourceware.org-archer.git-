@@ -222,7 +222,7 @@ iterate_over_some_symtabs (const char *name,
     if (full_path != NULL)
       {
 	/* FP is here in xfullpath form.  */
-	const char *fp = symtab_to_fullname (s);
+        const char *fp = symtab_to_fullname (s);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
         if (FILENAME_CMP (full_path, fp) == 0)
