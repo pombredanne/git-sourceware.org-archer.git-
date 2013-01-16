@@ -234,7 +234,8 @@ iterate_over_some_symtabs (const char *name,
 
     if (real_path != NULL)
       {
-	char *rp = gdb_realpath (symtab_to_fullname (s));
+        const char *fullname = symtab_to_fullname (s);
+	char *rp = gdb_realpath (fullname);
 	struct cleanup *cleanups = make_cleanup (xfree, rp);
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
