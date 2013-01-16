@@ -768,6 +768,7 @@ extern const bfd_target bfd_elf64_x86_64_freebsd_vec;
 extern const bfd_target bfd_elf64_x86_64_nacl_vec;
 extern const bfd_target bfd_elf64_x86_64_sol2_vec;
 extern const bfd_target bfd_elf64_x86_64_vec;
+extern const bfd_target bfd_elf64_x86_64_linux_vec;
 extern const bfd_target bfd_elf32_x86_64_nacl_vec;
 extern const bfd_target bfd_elf32_x86_64_vec;
 extern const bfd_target bfd_elf64_l1om_freebsd_vec;
@@ -1148,6 +1149,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf64_x86_64_nacl_vec,
 	&bfd_elf64_x86_64_sol2_vec,
 	&bfd_elf64_x86_64_vec,
+	&bfd_elf64_x86_64_linux_vec,
 	&bfd_elf32_x86_64_nacl_vec,
 	&bfd_elf32_x86_64_vec,
 	&bfd_elf64_l1om_freebsd_vec,

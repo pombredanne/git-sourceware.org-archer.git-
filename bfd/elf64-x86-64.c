@@ -32,7 +32,6 @@
 #include "hashtab.h"
 #include "dwarf2.h"
 #include "libiberty.h"
-#include "elf-psinfo.h"
 
 #include <stdarg.h>
 
@@ -417,6 +416,7 @@ elf_x86_64_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
   return TRUE;
 }
 
+#if 0
 static char *
 elf_x86_64_write_core_note (bfd *abfd, char *buf, int *bufsiz,
 			    int note_type, ...)
@@ -507,6 +507,7 @@ elf_x86_64_write_core_note (bfd *abfd, char *buf, int *bufsiz,
     }
   /* NOTREACHED */
 }
+#endif
 
 
 /* Functions for the x86-64 ELF linker.	 */
@@ -5125,8 +5126,12 @@ static const struct bfd_elf_special_section
   { NULL,	                0,          0, 0,            0 }
 };
 
+#ifndef TARGET_LITTLE_SYM
 #define TARGET_LITTLE_SYM		    bfd_elf64_x86_64_vec
+#endif
+#ifndef TARGET_LITTLE_NAME
 #define TARGET_LITTLE_NAME		    "elf64-x86-64"
+#endif
 #define ELF_ARCH			    bfd_arch_i386
 #define ELF_TARGET_ID			    X86_64_ELF_DATA
 #define ELF_MACHINE_CODE		    EM_X86_64
@@ -5164,7 +5169,7 @@ static const struct bfd_elf_special_section
 #define elf_backend_gc_sweep_hook	    elf_x86_64_gc_sweep_hook
 #define elf_backend_grok_prstatus	    elf_x86_64_grok_prstatus
 #define elf_backend_grok_psinfo		    elf_x86_64_grok_psinfo
-#define elf_backend_write_core_note	    elf_x86_64_write_core_note
+//#define elf_backend_write_core_note	    elf_x86_64_write_core_note
 #define elf_backend_reloc_type_class	    elf_x86_64_reloc_type_class
 #define elf_backend_relocate_section	    elf_x86_64_relocate_section
 #define elf_backend_size_dynamic_sections   elf_x86_64_size_dynamic_sections

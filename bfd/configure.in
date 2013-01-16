@@ -892,6 +892,7 @@ do
     bfd_elf64_x86_64_nacl_vec)	tb="$tb elf64-x86-64.lo elf-ifunc.lo elf-nacl.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf64_x86_64_sol2_vec)  tb="$tb elf64-x86-64.lo elf-ifunc.lo elf-nacl.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf64_x86_64_vec)	tb="$tb elf64-x86-64.lo elf-ifunc.lo elf-nacl.lo elf64.lo $elf"; target_size=64 ;;
+    bfd_elf64_x86_64_linux_vec) tb="$tb elf64-x86-64-linux.lo elf-ifunc.lo elf-nacl.lo elf64.lo $elf"; target_size=64 ;;
     bfd_elf32_x86_64_vec)	tb="$tb elf64-x86-64.lo elf-ifunc.lo elf-nacl.lo elf64.lo elf32.lo $elf"; target_size=64 ;;
     bfd_elf32_x86_64_nacl_vec)	tb="$tb elf64-x86-64.lo elf-ifunc.lo elf-nacl.lo elf64.lo elf32.lo $elf"; target_size=64 ;;
     bfd_elf64_l1om_vec)		tb="$tb elf64-x86-64.lo elf-ifunc.lo elf-nacl.lo elf64.lo $elf"; target_size=64 ;;
