@@ -13864,11 +13864,11 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 	  ui_out_text (uiout, "\n");
 
 	  b->loc->line_number = sal2.line;
-	  b->loc->symtab = sal2.symtab;
+	  b->loc->symtab = sym != NULL ? sal2.symtab : NULL;
 
 	  xfree (b->addr_string);
 	  b->addr_string = xstrprintf ("%s:%d",
-				       b->loc->symtab->filename,
+				       sal2.symtab->filename,
 				       b->loc->line_number);
 
 	  /* Might be nice to check if function changed, and warn if
