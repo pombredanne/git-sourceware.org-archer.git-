@@ -200,6 +200,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
        this symtab and use its absolute path.  */
     if (full_path != NULL)
       {
+	/* FP is here in xfullpath form.  */
 	const char *fp = psymtab_to_fullname (pst);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
@@ -218,7 +219,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
 	gdb_assert (IS_ABSOLUTE_PATH (name));
-	if (FILENAME_CMP (rp, real_path) == 0)
+	if (filename_cmp (rp, real_path) == 0)
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
@@ -1423,22 +1424,12 @@ expand_symtabs_matching_via_partial
 
       if (file_matcher)
 	{
-	  const char *fullname;
-
 	  if (ps->anonymous)
 	    continue;
 
-	  fullname = psymtab_to_fullname (ps);
-	  if (fullname == NULL)
-	    fullname = ps->filename;
-
-	  if (!(*file_matcher) (fullname, data))
-	    {
-	      const char *realname = psymtab_to_realname (ps);
-
-	      if (realname && !(*file_matcher) (realname, data))
-		continue;
-	    }
+	  if (!(*file_matcher) (psymtab_to_fullname (ps), data)
+	      && !(*file_matcher) (psymtab_to_realname (ps), data))
+	    continue;
 	}
 
       if (recursively_search_psymtabs (ps, objfile, kind, name_matcher, data))
