@@ -203,6 +203,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 	const char *fp = psymtab_to_fullname (pst);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
+	gdb_assert (IS_ABSOLUTE_PATH (name));
 	if (filename_cmp (fp, full_path) == 0
 	    || compare_filenames_for_search (fp, name))
 	  {
@@ -217,6 +218,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 	const char *rp = psymtab_to_realname (pst);
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
+	gdb_assert (IS_ABSOLUTE_PATH (name));
 	if (FILENAME_CMP (rp, real_path) == 0
 	    || compare_filenames_for_search (rp, name))
 	  {
