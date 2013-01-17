@@ -4234,6 +4234,31 @@ The loading or unloading of a shared library.  If @var{regexp} is
 given, then the catchpoint will stop only if the regular expression
 matches one of the affected libraries.
 
+@item signal @r{[}@var{signal}@dots{} @r{|} @samp{all}@r{]}
+The delivery of a signal.
+
+With no arguments, this catchpoint will catch any signal that is not
+used internally by @value{GDBN}, specifically, all signals except
+@samp{SIGTRAP} and @samp{SIGINT}.
+
+With the argument @samp{all}, all signals, including those used by
+@value{GDBN}, will be caught.  This argument cannot be used with other
+signal names.
+
+Otherwise, the arguments are a list of signal names as given to
+@code{handle} (@pxref{Signals}).  Only signals specified in this list
+will be caught.
+
+One reason that @code{catch signal} can be more useful than
+@code{handle} is that you can attach commands and conditions to the
+catchpoint.
+
+When a signal is caught by a catchpoint, the signal's @code{stop} and
+@code{print} settings, as specified by @code{handle}, are ignored.
+However, whether the signal is still delivered to the inferior depends
+on the @code{pass} setting; this can be changed in the catchpoint's
+commands.
+
 @end table
 
 @item tcatch @var{event}
@@ -5325,6 +5350,10 @@ the defined types of signals.
 Similar, but print information only about the specified signal number.
 
 @code{info handle} is an alias for @code{info signals}.
+
+@item catch signal @r{[}@var{signal}@dots{} @r{|} @samp{all}@r{]}
+Set a catchpoint for the indicated signals.  @xref{Set Catchpoints},
+for details about this command.
 
 @kindex handle
 @item handle @var{signal} @r{[}@var{keywords}@dots{}@r{]}
@@ -27957,6 +27986,10 @@ of a multi-location breakpoint, this will be a dotted pair, like
 The type of the breakpoint.  For ordinary breakpoints this will be
 @samp{breakpoint}, but many values are possible.
 
+@item catch-type
+If the type of the breakpoint is @samp{catchpoint}, then this
+indicates the exact type of catchpoint.
+
 @item disp
 This is the breakpoint disposition---either @samp{del}, meaning that
 the breakpoint will be deleted at the next stop, or @samp{keep},
@@ -28867,7 +28900,7 @@ The corresponding @value{GDBN} command is @samp{catch load}.
 @smallexample
 -catch-load -t foo.so
 ^done,bkpt=@{number="1",type="catchpoint",disp="del",enabled="y",
-what="load of library matching foo.so",times="0"@}
+what="load of library matching foo.so",catch-type="load",times="0"@}
 (gdb)
 @end smallexample
 
@@ -28896,7 +28929,7 @@ The corresponding @value{GDBN} command is @samp{catch unload}.
 @smallexample
 -catch-unload -d bar.so
 ^done,bkpt=@{number="2",type="catchpoint",disp="keep",enabled="n",
-what="load of library matching bar.so",times="0"@}
+what="load of library matching bar.so",catch-type="unload",times="0"@}
 (gdb)
 @end smallexample
 
@@ -33940,15 +33973,19 @@ Readers can be loaded and unloaded using the @code{jit-reader-load}
 and @code{jit-reader-unload} commands.
 
 @table @code
-@item jit-reader-load @var{reader-name}
-Load the JIT reader named @var{reader-name}.  On a UNIX system, this
-will usually load @file{@var{libdir}/gdb/@var{reader-name}}, where
-@var{libdir} is the system library directory, usually
-@file{/usr/local/lib}.  Only one reader can be active at a time;
-trying to load a second reader when one is already loaded will result
-in @value{GDBN} reporting an error.  A new JIT reader can be loaded by
-first unloading the current one using @code{jit-reader-load} and then
-invoking @code{jit-reader-load}.
+@item jit-reader-load @var{reader}
+Load the JIT reader named @var{reader}.  @var{reader} is a shared
+object specified as either an absolute or a relative file name.  In
+the latter case, @value{GDBN} will try to load the reader from a
+pre-configured directory, usually @file{@var{libdir}/gdb/} on a UNIX
+system (here @var{libdir} is the system library directory, often
+@file{/usr/local/lib}).
+
+Only one reader can be active at a time; trying to load a second
+reader when one is already loaded will result in @value{GDBN}
+reporting an error.  A new JIT reader can be loaded by first unloading
+the current one using @code{jit-reader-unload} and then invoking
+@code{jit-reader-load}.
 
 @item jit-reader-unload
 Unload the currently loaded JIT reader.
