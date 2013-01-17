@@ -241,8 +241,7 @@ iterate_over_some_symtabs (const char *name,
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
 	gdb_assert (IS_ABSOLUTE_PATH (name));
-	if (FILENAME_CMP (rp, real_path) == 0
-	    || compare_filenames_for_search (rp, name))
+	if (FILENAME_CMP (rp, real_path) == 0)
 	  {
 	    if (callback (s, data))
 	      {
