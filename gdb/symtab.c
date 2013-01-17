@@ -223,6 +223,7 @@ iterate_over_some_symtabs (const char *name,
         const char *fp = symtab_to_fullname (s);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
+	gdb_assert (IS_ABSOLUTE_PATH (name));
         if (FILENAME_CMP (full_path, fp) == 0)
           {
 	    if (callback (s, data))
@@ -236,6 +237,7 @@ iterate_over_some_symtabs (const char *name,
 	char *rp = gdb_realpath (fullname);
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
+	gdb_assert (IS_ABSOLUTE_PATH (name));
 	make_cleanup (xfree, rp);
 	if (FILENAME_CMP (real_path, rp) == 0)
 	  {
