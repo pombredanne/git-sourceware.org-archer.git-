@@ -199,6 +199,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
     if (full_path != NULL)
       {
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
+	gdb_assert (IS_ABSOLUTE_PATH (name));
 	psymtab_to_fullname (pst);
 	if (pst->fullname != NULL
 	    && FILENAME_CMP (full_path, pst->fullname) == 0)
@@ -214,6 +215,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
         char *rp = NULL;
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
+	gdb_assert (IS_ABSOLUTE_PATH (name));
 	psymtab_to_fullname (pst);
         if (pst->fullname != NULL)
           {

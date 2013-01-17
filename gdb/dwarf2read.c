@@ -3113,6 +3113,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      gdb_assert (IS_ABSOLUTE_PATH (full_path));
+	      gdb_assert (IS_ABSOLUTE_PATH (name));
 	      if (this_real_name != NULL
 		  && FILENAME_CMP (full_path, this_real_name) == 0)
 		{
@@ -3129,6 +3130,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      gdb_assert (IS_ABSOLUTE_PATH (real_path));
+	      gdb_assert (IS_ABSOLUTE_PATH (name));
 	      if (this_real_name != NULL
 		  && FILENAME_CMP (real_path, this_real_name) == 0)
 		{
