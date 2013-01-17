@@ -15166,7 +15166,7 @@ dwarf_decode_line_header (unsigned int offset, struct dwarf2_cu *cu)
    COMP_DIR is the compilation directory (DW_AT_comp_dir) or NULL if unknown.
    If space for the result is malloc'd, it will be freed by a cleanup.
    Returns NULL if FILE_INDEX should be ignored, i.e., it is pst->filename.
-   
+
    The function creates dangling cleanup registration.  */
 
 static char *
