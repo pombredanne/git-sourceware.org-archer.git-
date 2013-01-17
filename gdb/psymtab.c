@@ -204,8 +204,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
 	gdb_assert (IS_ABSOLUTE_PATH (name));
-	if (filename_cmp (fp, full_path) == 0
-	    || compare_filenames_for_search (fp, name))
+	if (filename_cmp (fp, full_path) == 0)
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
@@ -219,8 +218,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
 	gdb_assert (IS_ABSOLUTE_PATH (name));
-	if (FILENAME_CMP (rp, real_path) == 0
-	    || compare_filenames_for_search (rp, name))
+	if (FILENAME_CMP (rp, real_path) == 0)
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
