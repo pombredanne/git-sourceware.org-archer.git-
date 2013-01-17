@@ -3113,6 +3113,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      gdb_assert (IS_ABSOLUTE_PATH (full_path));
+	      gdb_assert (IS_ABSOLUTE_PATH (name));
 	      if (this_real_name != NULL
 		  && FILENAME_CMP (full_path, this_real_name) == 0)
 		{
@@ -3129,6 +3130,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 							      file_data, j);
 
 	      gdb_assert (IS_ABSOLUTE_PATH (real_path));
+	      gdb_assert (IS_ABSOLUTE_PATH (name));
 	      if (this_real_name != NULL
 		  && FILENAME_CMP (real_path, this_real_name) == 0)
 		{
@@ -15180,7 +15182,7 @@ dwarf_decode_line_header (unsigned int offset, struct dwarf2_cu *cu)
    COMP_DIR is the compilation directory (DW_AT_comp_dir) or NULL if unknown.
    If space for the result is malloc'd, it will be freed by a cleanup.
    Returns NULL if FILE_INDEX should be ignored, i.e., it is pst->filename.
-   
+
    The function creates dangling cleanup registration.  */
 
 static char *

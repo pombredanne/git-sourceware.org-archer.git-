@@ -1,3 +1,88 @@
+2013-01-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.c (iterate_over_some_symtabs): New variable cleanups,
+	initialize it by existing make_cleanup.  Call new do_cleanups.
+
+2013-01-17  Tom Tromey  <tromey@redhat.com>
+
+	* cp-abi.c (cp_abi_completer): New function.
+	(_initialize_cp_abi): Set completer for "set cp-abi".
+
+2013-01-17  Tom Tromey  <tromey@redhat.com>
+
+	* mem-break.c: Remove obsolete comment.
+	* bfin-tdep.c (bfin_breakpoint_from_pc): Fix comment.
+
+2012-01-17  Sanjoy Das <sanjoy@playingwithpointers.com>
+
+	* jit.c (jit_reader_load_command): Interpret the jit reader name
+	as an absolute path if it begins with a forward slash.
+
+2012-01-17  Sanjoy Das <sanjoy@playingwithpointers.com>
+
+	PR gdb/14550
+
+	* jit.c (finalize_symtab): Ensure that only the global block has a
+	NULL superblock.
+
+2013-01-17  Pedro Alves  <palves@redhat.com>
+
+	* acinclude.m4: Include ../config/plugins.m4,
+	../config/largefile.m4 and ../config/lead-dot.m4.  Add comments.
+	* Makefile.in (aclocal_m4_deps): Update.
+	* aclocal.m4: Renegerate.
+
+2013-01-16  Doug Evans  <dje@google.com>
+
+	* contrib/cc-with-tweaks.sh: Add references to Fission docs.
+
+2013-01-16  Pedro Alves  <palves@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	PR cli/7221:
+	* NEWS: Add "catch signal".
+	* breakpoint.c (base_breakpoint_ops): No longer static.
+	(bpstat_explains_signal): New function.
+	(init_catchpoint): No longer static.
+	(base_breakpoint_explains_signal): New function.
+	(base_breakpoint_ops): Initialize new field.
+	* breakpoint.h (enum bpstat_signal_value): New.
+	(struct breakpoint_ops) <explains_signal>: New field.
+	(bpstat_explains_signal): Remove macro, declare as function.
+	(base_breakpoint_ops, init_catchpoint): Declare.
+	* break-catch-sig.c: New file.
+	* inferior.h (signal_catch_update): Declare.
+	* infrun.c (signal_catch): New global.
+	(handle_syscall_event): Update for change to
+	bpstat_explains_signal.
+	(handle_inferior_event): Likewise.  Always handle random signals
+	via bpstats.
+	(signal_cache_update): Check signal_catch.
+	(signal_catch_update): New function.
+	(_initialize_infrun): Initialize signal_catch.
+	* Makefile.in (SFILES): Add break-catch-sig.c.
+	(COMMON_OBS): Add break-catch-sig.o.
+
+2013-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (print_one_catch_fork, print_one_catch_vfork)
+	(print_one_catch_solib, print_one_catch_syscall)
+	(print_one_catch_exec, print_one_exception_catchpoint): Emit
+	"catch-type".
+
+2013-01-16  Yao Qi  <yao@codesourcery.com>
+
+	* printcmd.c (current_display_number): Make it static.
+
+2013-01-16  Yao Qi  <yao@codesourcery.com>
+
+	* infcmd.c (step_once): Don't check '!single_inst' as it was
+	checked before.
+
+2013-01-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (psymtab_include_file_name): Extend the function comment.
+
 2013-01-14  Tom Tromey  <tromey@redhat.com>
 
 	* cli/cli-decode.c (add_setshow_string_noescape_cmd): Return the
