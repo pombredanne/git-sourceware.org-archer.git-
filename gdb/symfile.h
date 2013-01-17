@@ -159,10 +159,11 @@ struct quick_symbol_functions
   /* Expand and iterate over each "partial" symbol table in OBJFILE
      where the source file is named NAME.
 
-     If NAME is not absolute, a match after a '/' in the symbol
-     table's file name will also work.  FULL_PATH, if non-NULL, is the
-     absolute file name resolved via xfullpath.  REAL_PATH, if non-NULL,
-     is the absolute file name resolved via gdb_realpath.
+     If NAME is not absolute, a match after a '/' in the symbol table's
+     file name will also work, both FULL_PATH and REAL_PATH are NULL
+     then.  If NAME is absolute then both FULL_PATH and REAL_PATH are
+     non-NULL absolute file names.  FULL_PATH is NAME resolved via
+     xfullpath, REAL_PATH is NAME resolved via gdb_realpath.
 
      If a match is found, the "partial" symbol table is expanded.
      Then, this calls iterate_over_some_symtabs (or equivalent) over
