@@ -200,21 +200,16 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
        this symtab and use its absolute path.  */
     if (full_path != NULL)
       {
-        char *fp = xfullpath (psymtab_to_fullname (pst));
-	struct cleanup *cleanups = make_cleanup (xfree, fp);
+        const char *fp = psymtab_to_fullname (pst);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
-	if (FILENAME_CMP (fp, full_path) == 0
+	if (filename_cmp (fp, full_path) == 0
 	    || compare_filenames_for_search (fp, name))
 	  {
 	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
 					  pst, callback, data))
-	      {
-		do_cleanups (cleanups);
-		return 1;
-	      }
+	      return 1;
 	  }
-	do_cleanups (cleanups);
       }
 
     if (real_path != NULL)
