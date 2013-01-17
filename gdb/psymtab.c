@@ -200,7 +200,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
        this symtab and use its absolute path.  */
     if (full_path != NULL)
       {
-        const char *fp = psymtab_to_fullname (pst);
+	const char *fp = psymtab_to_fullname (pst);
 
 	gdb_assert (IS_ABSOLUTE_PATH (full_path));
 	if (filename_cmp (fp, full_path) == 0
