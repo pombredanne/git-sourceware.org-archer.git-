@@ -3611,7 +3611,7 @@ search_symbols (char *regexp, enum search_domain kind,
 	    if (file_matches (symtab_to_fullname (real_symtab), files, nfiles))
 	      match = 1;
 	    else if (basenames_may_differ
-                     || file_matches (lbasename (real_symtab->filename), files,
+		     || file_matches (lbasename (real_symtab->filename), files,
 				      nfiles))
 	      {
 		char *symtab_real;
