@@ -1,6 +1,6 @@
 /* TUI display source window.
 
-   Copyright (C) 1998-2004, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1998-2013 Free Software Foundation, Inc.
 
    Contributed by Hewlett-Packard Company.
 
@@ -46,7 +46,7 @@ tui_set_source_content (struct symtab *s,
 {
   enum tui_status ret = TUI_FAILURE;
 
-  if (s != (struct symtab *) NULL && s->filename != (char *) NULL)
+  if (s != (struct symtab *) NULL)
     {
       FILE *stream;
       int i, desc, c, line_width, nlines;
@@ -332,9 +332,10 @@ tui_show_symtab_source (struct gdbarch *gdbarch, struct symtab *s,
 /* Answer whether the source is currently displayed in the source
    window.  */
 int
-tui_source_is_displayed (char *fname)
+tui_source_is_displayed (const char *fname)
 {
-  return (TUI_SRC_WIN->generic.content_in_use 
+  return (TUI_SRC_WIN != NULL
+	  && TUI_SRC_WIN->generic.content_in_use 
 	  && (filename_cmp (((struct tui_win_element *)
 			     (tui_locator_win_info_ptr ())->
 			     content[0])->which_element.locator.file_name,

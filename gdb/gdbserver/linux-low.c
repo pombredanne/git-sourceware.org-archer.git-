@@ -1,5 +1,5 @@
 /* Low level interface to ptrace, for the remote server for GDB.
-   Copyright (C) 1995-1996, 1998-2012 Free Software Foundation, Inc.
+   Copyright (C) 1995-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -21,7 +21,7 @@
 #include "linux-osdata.h"
 #include "agent.h"
 
-#include <sys/wait.h>
+#include "gdb_wait.h"
 #include <stdio.h>
 #include <sys/param.h>
 #include <sys/ptrace.h>
@@ -40,7 +40,7 @@
 #include <pwd.h>
 #include <sys/types.h>
 #include <dirent.h>
-#include <sys/stat.h>
+#include "gdb_stat.h"
 #include <sys/vfs.h>
 #include <sys/uio.h>
 #ifndef ELFMAG0
@@ -659,7 +659,9 @@ linux_create_inferior (char *program, char **allargs)
 	  dup2 (2, 1);
 	  if (write (2, "stdin/stdout redirected\n",
 		     sizeof ("stdin/stdout redirected\n") - 1) < 0)
-	    /* Errors ignored.  */;
+	    {
+	      /* Errors ignored.  */;
+	    }
 	}
 
       execv (program, allargs);
@@ -3190,7 +3192,7 @@ linux_resume_one_lwp (struct lwp_info *lwp,
 	fprintf (stderr, "  pending reinsert at 0x%s\n",
 		 paddress (lwp->bp_reinsert));
 
-      if (lwp->bp_reinsert != 0 && can_hardware_single_step ())
+      if (can_hardware_single_step ())
 	{
 	  if (fast_tp_collecting == 0)
 	    {

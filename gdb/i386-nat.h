@@ -3,7 +3,7 @@
    Low level functions to implement Oeprating System specific
    code to manipulate I386 debug registers.
 
-   Copyright (C) 2009-2012 Free Software Foundation, Inc.
+   Copyright (C) 2009-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -19,8 +19,6 @@
 
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
-
-#include "defs.h"
 
 #ifndef I386_NAT_H
 #define I386_NAT_H 1

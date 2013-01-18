@@ -1,6 +1,6 @@
 /* Definitions for reading symbol files into GDB.
 
-   Copyright (C) 1990-2004, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1990-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -22,7 +22,7 @@
 
 /* This file requires that you first include "bfd.h".  */
 #include "symtab.h"
-#include "gdb_vecs.h"
+#include "probe.h"
 
 /* Opaque declarations.  */
 struct target_section;
@@ -189,16 +189,6 @@ struct quick_symbol_functions
 				   int kind, const char *name,
 				   domain_enum domain);
 
-  /* This is called to expand symbol tables before looking up a
-     symbol.  A backend can choose to implement this and then have its
-     `lookup_symbol' hook always return NULL, or the reverse.  (It
-     doesn't make sense to implement both.)  The arguments are as for
-     `lookup_symbol'.  */
-  void (*pre_expand_symtabs_matching) (struct objfile *objfile,
-				       enum block_enum block_kind,
-				       const char *name,
-				       domain_enum domain);
-
   /* Print statistics about any indices loaded for OBJFILE.  The
      statistics should be printed to gdb_stdout.  This is used for
      "maint print statistics".  */
@@ -320,8 +310,7 @@ struct sym_probe_fns
      have come from a call to this objfile's sym_get_probes method.
      If you provide an implementation of sym_get_probes, you must
      implement this method as well.  */
-  unsigned (*sym_get_probe_argument_count) (struct objfile *objfile,
-					    struct probe *probe);
+  unsigned (*sym_get_probe_argument_count) (struct probe *probe);
 
   /* Evaluate the Nth argument available to PROBE.  PROBE will have
      come from a call to this objfile's sym_get_probes method.  N will
@@ -330,8 +319,7 @@ struct sym_probe_fns
      PC will match the address of the probe.  If you provide an
      implementation of sym_get_probes, you must implement this method
      as well.  */
-  struct value *(*sym_evaluate_probe_argument) (struct objfile *objfile,
-						struct probe *probe,
+  struct value *(*sym_evaluate_probe_argument) (struct probe *probe,
 						unsigned n);
 
   /* Compile the Nth probe argument to an agent expression.  PROBE
@@ -339,8 +327,7 @@ struct sym_probe_fns
      method.  N will be between 0 and the number of arguments
      available to this probe.  EXPR and VALUE are the agent expression
      that is being updated.  */
-  void (*sym_compile_to_ax) (struct objfile *objfile,
-			     struct probe *probe,
+  void (*sym_compile_to_ax) (struct probe *probe,
 			     struct agent_expr *expr,
 			     struct axs_value *value,
 			     unsigned n);
@@ -457,7 +444,8 @@ extern struct symfile_segment_data *default_symfile_segments (bfd *abfd);
 extern bfd_byte *default_symfile_relocate (struct objfile *objfile,
                                            asection *sectp, bfd_byte *buf);
 
-extern struct symtab *allocate_symtab (const char *, struct objfile *);
+extern struct symtab *allocate_symtab (const char *, struct objfile *)
+  ATTRIBUTE_NONNULL (1);
 
 extern void add_symtab_fns (const struct sym_fns *);
 
@@ -553,7 +541,7 @@ extern void find_lowest_section (bfd *, asection *, void *);
 
 extern bfd *symfile_bfd_open (char *);
 
-extern bfd *bfd_open_maybe_remote (const char *);
+extern bfd *gdb_bfd_open_maybe_remote (const char *);
 
 extern int get_section_index (struct objfile *, char *);
 
@@ -676,17 +664,7 @@ extern void dwarf2_build_frame_info (struct objfile *);
 
 void dwarf2_free_objfile (struct objfile *);
 
-/* Whether to use deprecated .gdb_index sections.  */
-extern int use_deprecated_index_sections;
-
 /* From mdebugread.c */
-
-/* Hack to force structures to exist before use in parameter list.  */
-struct ecoff_debug_hack
-{
-  struct ecoff_debug_swap *a;
-  struct ecoff_debug_info *b;
-};
 
 extern void mdebug_build_psymtabs (struct objfile *,
 				   const struct ecoff_debug_swap *,
@@ -695,5 +673,9 @@ extern void mdebug_build_psymtabs (struct objfile *,
 extern void elfmdebug_build_psymtabs (struct objfile *,
 				      const struct ecoff_debug_swap *,
 				      asection *);
+
+/* From minidebug.c.  */
+
+extern bfd *find_separate_debug_file_in_section (struct objfile *);
 
 #endif /* !defined(SYMFILE_H) */

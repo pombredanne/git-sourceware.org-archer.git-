@@ -1,6 +1,6 @@
 /* Virtual tail call frames unwinder for GDB.
 
-   Copyright (C) 2010-2012 Free Software Foundation, Inc.
+   Copyright (C) 2010-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -223,9 +223,9 @@ tailcall_frame_this_id (struct frame_info *this_frame, void **this_cache,
   *this_id = get_frame_id (next_frame);
   (*this_id).code_addr = get_frame_pc (this_frame);
   (*this_id).code_addr_p = 1;
-  (*this_id).inline_depth = (cache->chain_levels
-			     - existing_next_levels (this_frame, cache));
-  gdb_assert ((*this_id).inline_depth > 0);
+  (*this_id).artificial_depth = (cache->chain_levels
+				 - existing_next_levels (this_frame, cache));
+  gdb_assert ((*this_id).artificial_depth > 0);
 }
 
 /* Find PC to be unwound from THIS_FRAME.  THIS_FRAME must be a part of

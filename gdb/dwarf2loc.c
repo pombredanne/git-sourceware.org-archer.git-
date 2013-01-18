@@ -1,6 +1,6 @@
 /* DWARF 2 location expression support for GDB.
 
-   Copyright (C) 2003, 2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2003-2013 Free Software Foundation, Inc.
 
    Contributed by Daniel Jacobowitz, MontaVista Software, Inc.
 
@@ -54,8 +54,8 @@ static const struct dwarf_expr_context_funcs dwarf_expr_ctx_funcs;
 static struct value *dwarf2_evaluate_loc_desc_full (struct type *type,
 						    struct frame_info *frame,
 						    const gdb_byte *data,
-						    unsigned short size,
-					      struct dwarf2_per_cu_data *per_cu,
+						    size_t size,
+						    struct dwarf2_per_cu_data *per_cu,
 						    LONGEST byte_offset);
 
 /* Until these have formal names, we define these here.
@@ -335,11 +335,15 @@ dwarf_expr_frame_base (void *baton, const gdb_byte **start, size_t * length)
      this_base method.  */
   struct symbol *framefunc;
   struct dwarf_expr_baton *debaton = (struct dwarf_expr_baton *) baton;
+  struct block *bl = get_frame_block (debaton->frame, NULL);
+
+  if (bl == NULL)
+    error (_("frame address is not available."));
 
   /* Use block_linkage_function, which returns a real (not inlined)
      function, instead of get_frame_function, which may return an
      inlined function.  */
-  framefunc = block_linkage_function (get_frame_block (debaton->frame, NULL));
+  framefunc = block_linkage_function (bl);
 
   /* If we found a frame-relative symbol then it was certainly within
      some function associated with a frame. If we can't find the frame,
@@ -439,8 +443,7 @@ per_cu_dwarf_call (struct dwarf_expr_context *ctx, cu_offset die_offset,
 {
   struct dwarf2_locexpr_baton block;
 
-  block = dwarf2_fetch_die_location_block (die_offset, per_cu,
-					   get_frame_pc, baton);
+  block = dwarf2_fetch_die_loc_cu_off (die_offset, per_cu, get_frame_pc, baton);
 
   /* DW_OP_call_ref is currently not supported.  */
   gdb_assert (block.per_cu == per_cu);
@@ -551,7 +554,7 @@ dwarf_expr_get_base_type (struct dwarf_expr_context *ctx,
 
 /* See dwarf2loc.h.  */
 
-int entry_values_debug = 0;
+unsigned int entry_values_debug = 0;
 
 /* Helper to set entry_values_debug.  */
 
@@ -1073,16 +1076,24 @@ dwarf_expr_reg_to_entry_parameter (struct frame_info *frame,
 				   union call_site_parameter_u kind_u,
 				   struct dwarf2_per_cu_data **per_cu_return)
 {
-  CORE_ADDR func_addr = get_frame_func (frame);
-  CORE_ADDR caller_pc;
-  struct gdbarch *gdbarch = get_frame_arch (frame);
-  struct frame_info *caller_frame = get_prev_frame (frame);
+  CORE_ADDR func_addr, caller_pc;
+  struct gdbarch *gdbarch;
+  struct frame_info *caller_frame;
   struct call_site *call_site;
   int iparams;
   /* Initialize it just to avoid a GCC false warning.  */
   struct call_site_parameter *parameter = NULL;
   CORE_ADDR target_addr;
 
+  while (get_frame_type (frame) == INLINE_FRAME)
+    {
+      frame = get_prev_frame (frame);
+      gdb_assert (frame != NULL);
+    }
+
+  func_addr = get_frame_func (frame);
+  gdbarch = get_frame_arch (frame);
+  caller_frame = get_prev_frame (frame);
   if (gdbarch != frame_unwind_arch (frame))
     {
       struct minimal_symbol *msym = lookup_minimal_symbol_by_pc (func_addr);
@@ -2206,9 +2217,10 @@ indirect_pieced_value (struct value *value)
   byte_offset = value_as_address (value);
 
   gdb_assert (piece);
-  baton = dwarf2_fetch_die_location_block (piece->v.ptr.die, c->per_cu,
-					   get_frame_address_in_block_wrapper,
-					   frame);
+  baton
+    = dwarf2_fetch_die_loc_sect_off (piece->v.ptr.die, c->per_cu,
+				     get_frame_address_in_block_wrapper,
+				     frame);
 
   return dwarf2_evaluate_loc_desc_full (TYPE_TARGET_TYPE (type), frame,
 					baton.data, baton.size, baton.per_cu,
@@ -2275,7 +2287,7 @@ invalid_synthetic_pointer (void)
 
 static struct value *
 dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
-			       const gdb_byte *data, unsigned short size,
+			       const gdb_byte *data, size_t size,
 			       struct dwarf2_per_cu_data *per_cu,
 			       LONGEST byte_offset)
 {
@@ -2474,7 +2486,7 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
 
 struct value *
 dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
-			  const gdb_byte *data, unsigned short size,
+			  const gdb_byte *data, size_t size,
 			  struct dwarf2_per_cu_data *per_cu)
 {
   return dwarf2_evaluate_loc_desc_full (type, frame, data, size, per_cu, 0);
@@ -2595,7 +2607,7 @@ static const struct dwarf_expr_context_funcs needs_frame_ctx_funcs =
    requires a frame to evaluate.  */
 
 static int
-dwarf2_loc_desc_needs_frame (const gdb_byte *data, unsigned short size,
+dwarf2_loc_desc_needs_frame (const gdb_byte *data, size_t size,
 			     struct dwarf2_per_cu_data *per_cu)
 {
   struct needs_frame_baton baton;
@@ -3028,6 +3040,7 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	    op_ptr = safe_read_sleb128 (op_ptr, op_end, &offset);
 	    dwarf2_compile_expr_to_ax (expr, loc, arch, addr_size, datastart,
 				       datastart + datalen, per_cu);
+	    require_rvalue (expr, loc);
 
 	    if (offset != 0)
 	      {
@@ -3355,8 +3368,8 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	    op_ptr += size;
 
 	    offset.cu_off = uoffset;
-	    block = dwarf2_fetch_die_location_block (offset, per_cu,
-						     get_ax_pc, expr);
+	    block = dwarf2_fetch_die_loc_cu_off (offset, per_cu,
+						 get_ax_pc, expr);
 
 	    /* DW_OP_call_ref is currently not supported.  */
 	    gdb_assert (block.per_cu == per_cu);
@@ -3592,7 +3605,7 @@ locexpr_describe_location_piece (struct symbol *symbol, struct ui_file *stream,
 	   && data[1 + leb128_size] == DW_OP_GNU_push_tls_address
 	   && piece_end_p (data + 2 + leb128_size, end))
     {
-      ULONGEST offset;
+      uint64_t offset;
 
       data = safe_read_uleb128 (data + 1, end, &offset);
       offset = dwarf2_read_addr_index (per_cu, offset);
@@ -3989,7 +4002,7 @@ disassemble_dwarf_expression (struct ui_file *stream,
 static void
 locexpr_describe_location_1 (struct symbol *symbol, CORE_ADDR addr,
 			     struct ui_file *stream,
-			     const gdb_byte *data, int size,
+			     const gdb_byte *data, size_t size,
 			     struct objfile *objfile, unsigned int addr_size,
 			     int offset_size, struct dwarf2_per_cu_data *per_cu)
 {
@@ -4349,16 +4362,16 @@ extern initialize_file_ftype _initialize_dwarf2loc;
 void
 _initialize_dwarf2loc (void)
 {
-  add_setshow_zinteger_cmd ("entry-values", class_maintenance,
-			    &entry_values_debug,
-			    _("Set entry values and tail call frames "
-			      "debugging."),
-			    _("Show entry values and tail call frames "
-			      "debugging."),
-			    _("When non-zero, the process of determining "
-			      "parameter values from function entry point "
-			      "and tail call frames will be printed."),
-			    NULL,
-			    show_entry_values_debug,
-			    &setdebuglist, &showdebuglist);
+  add_setshow_zuinteger_cmd ("entry-values", class_maintenance,
+			     &entry_values_debug,
+			     _("Set entry values and tail call frames "
+			       "debugging."),
+			     _("Show entry values and tail call frames "
+			       "debugging."),
+			     _("When non-zero, the process of determining "
+			       "parameter values from function entry point "
+			       "and tail call frames will be printed."),
+			     NULL,
+			     show_entry_values_debug,
+			     &setdebuglist, &showdebuglist);
 }

@@ -1,6 +1,6 @@
 /* General utility routines for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1988-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -27,6 +27,7 @@
 #include "exceptions.h"
 #include "gdbthread.h"
 #include "fnmatch.h"
+#include "gdb_bfd.h"
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
 #endif /* HAVE_SYS_RESOURCE_H */
@@ -105,6 +106,14 @@ static void prompt_for_continue (void);
 static void set_screen_size (void);
 static void set_width (void);
 
+/* Time spent in prompt_for_continue in the currently executing command
+   waiting for user to respond.
+   Initialized in make_command_stats_cleanup.
+   Modified in prompt_for_continue and defaulted_query.
+   Used in report_command_stats.  */
+
+static struct timeval prompt_for_continue_wait_time;
+
 /* A flag indicating whether to timestamp debugging messages.  */
 
 static int debug_timestamp = 0;
@@ -113,9 +122,11 @@ static int debug_timestamp = 0;
 
 int job_control;
 
+#ifndef HAVE_PYTHON
 /* Nonzero means a quit has been requested.  */
 
 int quit_flag;
+#endif /* HAVE_PYTHON */
 
 /* Nonzero means quit immediately if Control-C is typed now, rather
    than waiting until QUIT is executed.  Be careful in setting this;
@@ -129,6 +140,41 @@ int quit_flag;
    expect to block), call QUIT after setting immediate_quit.  */
 
 int immediate_quit;
+
+#ifndef HAVE_PYTHON
+
+/* Clear the quit flag.  */
+
+void
+clear_quit_flag (void)
+{
+  quit_flag = 0;
+}
+
+/* Set the quit flag.  */
+
+void
+set_quit_flag (void)
+{
+  quit_flag = 1;
+}
+
+/* Return true if the quit flag has been set, false otherwise.  */
+
+int
+check_quit_flag (void)
+{
+  /* This is written in a particular way to avoid races.  */
+  if (quit_flag)
+    {
+      quit_flag = 0;
+      return 1;
+    }
+
+  return 0;
+}
+
+#endif /* HAVE_PYTHON */
 
 /* Nonzero means that strings with character values >0x7F should be printed
    as octal escapes.  Zero means just print the value (e.g. it's an
@@ -198,11 +244,11 @@ make_cleanup_dyn_string_delete (dyn_string_t arg)
 static void
 do_bfd_close_cleanup (void *arg)
 {
-  bfd_close (arg);
+  gdb_bfd_unref (arg);
 }
 
 struct cleanup *
-make_cleanup_bfd_close (bfd *abfd)
+make_cleanup_bfd_unref (bfd *abfd)
 {
   return make_cleanup (do_bfd_close_cleanup, abfd);
 }
@@ -457,6 +503,28 @@ make_cleanup_free_so (struct so_list *so)
   return make_cleanup (do_free_so, so);
 }
 
+/* Helper for make_cleanup_restore_current_language.  */
+
+static void
+do_restore_current_language (void *p)
+{
+  enum language saved_lang = (uintptr_t) p;
+
+  set_language (saved_lang);
+}
+
+/* Remember the current value of CURRENT_LANGUAGE and make it restored when
+   the cleanup is run.  */
+
+struct cleanup *
+make_cleanup_restore_current_language (void)
+{
+  enum language saved_lang = current_language->la_language;
+
+  return make_cleanup (do_restore_current_language,
+		       (void *) (uintptr_t) saved_lang);
+}
+
 /* This function is useful for cleanups.
    Do
 
@@ -536,6 +604,10 @@ report_command_stats (void *arg)
       timeval_sub (&delta_wall_time,
 		   &now_wall_time, &start_stats->start_wall_time);
 
+      /* Subtract time spend in prompt_for_continue from walltime.  */
+      timeval_sub (&delta_wall_time,
+                   &delta_wall_time, &prompt_for_continue_wait_time);
+
       printf_unfiltered (msg_type == 0
 			 ? _("Startup time: %ld.%06ld (cpu), %ld.%06ld (wall)\n")
 			 : _("Command execution time: %ld.%06ld (cpu), %ld.%06ld (wall)\n"),
@@ -569,6 +641,7 @@ report_command_stats (void *arg)
 struct cleanup *
 make_command_stats_cleanup (int msg_type)
 {
+  static const struct timeval zero_timeval = { 0 };
   struct cmd_stats *new_stat = XMALLOC (struct cmd_stats);
   
 #ifdef HAVE_SBRK
@@ -579,6 +652,9 @@ make_command_stats_cleanup (int msg_type)
   new_stat->msg_type = msg_type;
   new_stat->start_cpu_time = get_run_time ();
   gettimeofday (&new_stat->start_wall_time, NULL);
+
+  /* Initalize timer to keep track of how long we waited for the user.  */
+  prompt_for_continue_wait_time = zero_timeval;
 
   return make_cleanup_dtor (report_command_stats, new_stat, xfree);
 }
@@ -1189,6 +1265,9 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
   int def_value;
   char def_answer, not_def_answer;
   char *y_string, *n_string, *question;
+  /* Used to add duration we waited for user to respond to
+     prompt_for_continue_wait_time.  */
+  struct timeval prompt_started, prompt_ended, prompt_delta;
 
   /* Set up according to which answer is the default.  */
   if (defchar == '\0')
@@ -1245,6 +1324,9 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
 
   /* Format the question outside of the loop, to avoid reusing args.  */
   question = xstrvprintf (ctlstr, args);
+
+  /* Used for calculating time spend waiting for user.  */
+  gettimeofday (&prompt_started, NULL);
 
   while (1)
     {
@@ -1322,6 +1404,12 @@ defaulted_query (const char *ctlstr, const char defchar, va_list args)
       printf_filtered (_("Please answer %s or %s.\n"),
 		       y_string, n_string);
     }
+
+  /* Add time spend in this routine to prompt_for_continue_wait_time.  */
+  gettimeofday (&prompt_ended, NULL);
+  timeval_sub (&prompt_delta, &prompt_ended, &prompt_started);
+  timeval_add (&prompt_for_continue_wait_time,
+               &prompt_for_continue_wait_time, &prompt_delta);
 
   xfree (question);
   if (annotation_level > 1)
@@ -1685,11 +1773,6 @@ init_page_info (void)
 	  lines_per_page = UINT_MAX;
 	}
 
-      /* FIXME: Get rid of this junk.  */
-#if defined(SIGWINCH) && defined(SIGWINCH_HANDLER)
-      SIGWINCH_HANDLER (SIGWINCH);
-#endif
-
       /* If the output is not a terminal, don't paginate it.  */
       if (!ui_file_isatty (gdb_stdout))
 	lines_per_page = UINT_MAX;
@@ -1826,6 +1909,11 @@ prompt_for_continue (void)
 {
   char *ignore;
   char cont_prompt[120];
+  /* Used to add duration we waited for user to respond to
+     prompt_for_continue_wait_time.  */
+  struct timeval prompt_started, prompt_ended, prompt_delta;
+
+  gettimeofday (&prompt_started, NULL);
 
   if (annotation_level > 1)
     printf_unfiltered (("\n\032\032pre-prompt-for-continue\n"));
@@ -1841,6 +1929,7 @@ prompt_for_continue (void)
   reinitialize_more_filter ();
 
   immediate_quit++;
+  QUIT;
   /* On a real operating system, the user can quit with SIGINT.
      But not on GO32.
 
@@ -1853,6 +1942,12 @@ prompt_for_continue (void)
      out to DOS.  */
   ignore = gdb_readline_wrapper (cont_prompt);
 
+  /* Add time spend in this routine to prompt_for_continue_wait_time.  */
+  gettimeofday (&prompt_ended, NULL);
+  timeval_sub (&prompt_delta, &prompt_ended, &prompt_started);
+  timeval_add (&prompt_for_continue_wait_time,
+               &prompt_for_continue_wait_time, &prompt_delta);
+
   if (annotation_level > 1)
     printf_unfiltered (("\n\032\032post-prompt-for-continue\n"));
 
@@ -1863,7 +1958,7 @@ prompt_for_continue (void)
       while (*p == ' ' || *p == '\t')
 	++p;
       if (p[0] == 'q')
-	async_request_quit (0);
+	quit ();
       xfree (ignore);
     }
   immediate_quit--;
@@ -2733,11 +2828,6 @@ When set, debugging messages will be marked with seconds and microseconds."),
 			   &setdebuglist, &showdebuglist);
 }
 
-/* Machine specific function to handle SIGWINCH signal.  */
-
-#ifdef  SIGWINCH_HANDLER_BODY
-SIGWINCH_HANDLER_BODY
-#endif
 /* Print routines to handle variable size regs, etc.  */
 /* Temporary storage using circular buffer.  */
 #define NUMCELLS 16
@@ -3666,24 +3756,6 @@ producer_is_gcc_ge_4 (const char *producer)
   return minor;
 }
 
-/* Call xfree for each element of CHAR_PTR_VEC and final VEC_free for
-   CHAR_PTR_VEC itself.
-
-   You must not modify CHAR_PTR_VEC after it got registered with this function
-   by make_cleanup as the CHAR_PTR_VEC base address may change on its updates.
-   Contrary to VEC_free this function does not (cannot) clear the pointer.  */
-
-void
-free_char_ptr_vec (VEC (char_ptr) *char_ptr_vec)
-{
-  int ix;
-  char *name;
-
-  for (ix = 0; VEC_iterate (char_ptr, char_ptr_vec, ix, name); ++ix)
-    xfree (name);
-  VEC_free (char_ptr, char_ptr_vec);
-}
-
 /* Helper for make_cleanup_free_char_ptr_vec.  */
 
 static void
@@ -3705,54 +3777,6 @@ struct cleanup *
 make_cleanup_free_char_ptr_vec (VEC (char_ptr) *char_ptr_vec)
 {
   return make_cleanup (do_free_char_ptr_vec, char_ptr_vec);
-}
-
-/* Extended version of dirnames_to_char_ptr_vec - additionally if *VECP is
-   non-NULL the new list elements from DIRNAMES are appended to the existing
-   *VECP list of entries.  *VECP address will be updated by this call.  */
-
-void
-dirnames_to_char_ptr_vec_append (VEC (char_ptr) **vecp, const char *dirnames)
-{
-  do
-    {
-      size_t this_len;
-      char *next_dir, *this_dir;
-
-      next_dir = strchr (dirnames, DIRNAME_SEPARATOR);
-      if (next_dir == NULL)
-	this_len = strlen (dirnames);
-      else
-	{
-	  this_len = next_dir - dirnames;
-	  next_dir++;
-	}
-
-      this_dir = xmalloc (this_len + 1);
-      memcpy (this_dir, dirnames, this_len);
-      this_dir[this_len] = '\0';
-      VEC_safe_push (char_ptr, *vecp, this_dir);
-
-      dirnames = next_dir;
-    }
-  while (dirnames != NULL);
-}
-
-/* Split DIRNAMES by DIRNAME_SEPARATOR delimiter and return a list of all the
-   elements in their original order.  For empty string ("") DIRNAMES return
-   list of one empty string ("") element.
-   
-   You may modify the returned strings.
-   Read free_char_ptr_vec for its cleanup.  */
-
-VEC (char_ptr) *
-dirnames_to_char_ptr_vec (const char *dirnames)
-{
-  VEC (char_ptr) *retval = NULL;
-  
-  dirnames_to_char_ptr_vec_append (&retval, dirnames);
-
-  return retval;
 }
 
 /* Substitute all occurences of string FROM by string TO in *STRINGP.  *STRINGP

@@ -1,6 +1,6 @@
 /* Target-dependent code for GNU/Linux, architecture independent.
 
-   Copyright (C) 2009-2012 Free Software Foundation, Inc.
+   Copyright (C) 2009-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -30,6 +30,8 @@
 #include "elf-bfd.h"            /* for elfcore_write_* */
 #include "inferior.h"
 #include "cli/cli-utils.h"
+#include "arch-utils.h"
+#include "gdb_obstack.h"
 
 #include <ctype.h>
 
@@ -533,11 +535,149 @@ linux_info_proc (struct gdbarch *gdbarch, char *args,
     }
 }
 
+/* Implement "info proc mappings" for a corefile.  */
+
+static void
+linux_core_info_proc_mappings (struct gdbarch *gdbarch, char *args)
+{
+  asection *section;
+  ULONGEST count, page_size;
+  unsigned char *descdata, *filenames, *descend, *contents;
+  size_t note_size;
+  unsigned int addr_size_bits, addr_size;
+  struct cleanup *cleanup;
+  struct gdbarch *core_gdbarch = gdbarch_from_bfd (core_bfd);
+  /* We assume this for reading 64-bit core files.  */
+  gdb_static_assert (sizeof (ULONGEST) >= 8);
+
+  section = bfd_get_section_by_name (core_bfd, ".note.linuxcore.file");
+  if (section == NULL)
+    {
+      warning (_("unable to find mappings in core file"));
+      return;
+    }
+
+  addr_size_bits = gdbarch_addr_bit (core_gdbarch);
+  addr_size = addr_size_bits / 8;
+  note_size = bfd_get_section_size (section);
+
+  if (note_size < 2 * addr_size)
+    error (_("malformed core note - too short for header"));
+
+  contents = xmalloc (note_size);
+  cleanup = make_cleanup (xfree, contents);
+  if (!bfd_get_section_contents (core_bfd, section, contents, 0, note_size))
+    error (_("could not get core note contents"));
+
+  descdata = contents;
+  descend = descdata + note_size;
+
+  if (descdata[note_size - 1] != '\0')
+    error (_("malformed note - does not end with \\0"));
+
+  count = bfd_get (addr_size_bits, core_bfd, descdata);
+  descdata += addr_size;
+
+  page_size = bfd_get (addr_size_bits, core_bfd, descdata);
+  descdata += addr_size;
+
+  if (note_size < 2 * addr_size + count * 3 * addr_size)
+    error (_("malformed note - too short for supplied file count"));
+
+  printf_filtered (_("Mapped address spaces:\n\n"));
+  if (gdbarch_addr_bit (gdbarch) == 32)
+    {
+      printf_filtered ("\t%10s %10s %10s %10s %s\n",
+		       "Start Addr",
+		       "  End Addr",
+		       "      Size", "    Offset", "objfile");
+    }
+  else
+    {
+      printf_filtered ("  %18s %18s %10s %10s %s\n",
+		       "Start Addr",
+		       "  End Addr",
+		       "      Size", "    Offset", "objfile");
+    }
+
+  filenames = descdata + count * 3 * addr_size;
+  while (--count > 0)
+    {
+      ULONGEST start, end, file_ofs;
+
+      if (filenames == descend)
+	error (_("malformed note - filenames end too early"));
+
+      start = bfd_get (addr_size_bits, core_bfd, descdata);
+      descdata += addr_size;
+      end = bfd_get (addr_size_bits, core_bfd, descdata);
+      descdata += addr_size;
+      file_ofs = bfd_get (addr_size_bits, core_bfd, descdata);
+      descdata += addr_size;
+
+      file_ofs *= page_size;
+
+      if (gdbarch_addr_bit (gdbarch) == 32)
+	printf_filtered ("\t%10s %10s %10s %10s %s\n",
+			 paddress (gdbarch, start),
+			 paddress (gdbarch, end),
+			 hex_string (end - start),
+			 hex_string (file_ofs),
+			 filenames);
+      else
+	printf_filtered ("  %18s %18s %10s %10s %s\n",
+			 paddress (gdbarch, start),
+			 paddress (gdbarch, end),
+			 hex_string (end - start),
+			 hex_string (file_ofs),
+			 filenames);
+
+      filenames += 1 + strlen ((char *) filenames);
+    }
+
+  do_cleanups (cleanup);
+}
+
+/* Implement "info proc" for a corefile.  */
+
+static void
+linux_core_info_proc (struct gdbarch *gdbarch, char *args,
+		      enum info_proc_what what)
+{
+  int exe_f = (what == IP_MINIMAL || what == IP_EXE || what == IP_ALL);
+  int mappings_f = (what == IP_MAPPINGS || what == IP_ALL);
+
+  if (exe_f)
+    {
+      const char *exe;
+
+      exe = bfd_core_file_failing_command (core_bfd);
+      if (exe != NULL)
+	printf_filtered ("exe = '%s'\n", exe);
+      else
+	warning (_("unable to find command name in core file"));
+    }
+
+  if (mappings_f)
+    linux_core_info_proc_mappings (gdbarch, args);
+
+  if (!exe_f && !mappings_f)
+    error (_("unable to handle request"));
+}
+
+typedef int linux_find_memory_region_ftype (ULONGEST vaddr, ULONGEST size,
+					    ULONGEST offset, ULONGEST inode,
+					    int read, int write,
+					    int exec, int modified,
+					    const char *filename,
+					    void *data);
+
 /* List memory regions in the inferior for a corefile.  */
 
 static int
-linux_find_memory_regions (struct gdbarch *gdbarch,
-			   find_memory_region_ftype func, void *obfd)
+linux_find_memory_regions_full (struct gdbarch *gdbarch,
+				linux_find_memory_region_ftype *func,
+				void *obfd)
 {
   char filename[100];
   gdb_byte *data;
@@ -547,19 +687,28 @@ linux_find_memory_regions (struct gdbarch *gdbarch,
     return 1;
 
   xsnprintf (filename, sizeof filename,
-	     "/proc/%d/maps", current_inferior ()->pid);
+	     "/proc/%d/smaps", current_inferior ()->pid);
   data = target_fileio_read_stralloc (filename);
+  if (data == NULL)
+    {
+      /* Older Linux kernels did not support /proc/PID/smaps.  */
+      xsnprintf (filename, sizeof filename,
+		 "/proc/%d/maps", current_inferior ()->pid);
+      data = target_fileio_read_stralloc (filename);
+    }
   if (data)
     {
       struct cleanup *cleanup = make_cleanup (xfree, data);
       char *line;
 
-      for (line = strtok (data, "\n"); line; line = strtok (NULL, "\n"))
+      line = strtok (data, "\n");
+      while (line)
 	{
 	  ULONGEST addr, endaddr, offset, inode;
 	  const char *permissions, *device, *filename;
 	  size_t permissions_len, device_len;
 	  int read, write, exec;
+	  int modified = 0, has_anonymous = 0;
 
 	  read_mapping (line, &addr, &endaddr, &permissions, &permissions_len,
 			&offset, &device, &device_len, &inode, &filename);
@@ -569,8 +718,36 @@ linux_find_memory_regions (struct gdbarch *gdbarch,
 	  write = (memchr (permissions, 'w', permissions_len) != 0);
 	  exec = (memchr (permissions, 'x', permissions_len) != 0);
 
+	  /* Try to detect if region was modified by parsing smaps counters.  */
+	  for (line = strtok (NULL, "\n");
+	       line && line[0] >= 'A' && line[0] <= 'Z';
+	       line = strtok (NULL, "\n"))
+	    {
+	      char keyword[64 + 1];
+	      unsigned long number;
+
+	      if (sscanf (line, "%64s%lu kB\n", keyword, &number) != 2)
+		{
+		  warning (_("Error parsing {s,}maps file '%s'"), filename);
+		  break;
+		}
+	      if (strcmp (keyword, "Anonymous:") == 0)
+		has_anonymous = 1;
+	      if (number != 0 && (strcmp (keyword, "Shared_Dirty:") == 0
+				  || strcmp (keyword, "Private_Dirty:") == 0
+				  || strcmp (keyword, "Swap:") == 0
+				  || strcmp (keyword, "Anonymous:") == 0))
+		modified = 1;
+	    }
+
+	  /* Older Linux kernels did not support the "Anonymous:" counter.
+	     If it is missing, we can't be sure - dump all the pages.  */
+	  if (!has_anonymous)
+	    modified = 1;
+
 	  /* Invoke the callback function to create the corefile segment.  */
-	  func (addr, endaddr - addr, read, write, exec, obfd);
+	  func (addr, endaddr - addr, offset, inode,
+		read, write, exec, modified, filename, obfd);
 	}
 
       do_cleanups (cleanup);
@@ -578,6 +755,51 @@ linux_find_memory_regions (struct gdbarch *gdbarch,
     }
 
   return 1;
+}
+
+/* A structure for passing information through
+   linux_find_memory_regions_full.  */
+
+struct linux_find_memory_regions_data
+{
+  /* The original callback.  */
+
+  find_memory_region_ftype func;
+
+  /* The original datum.  */
+
+  void *obfd;
+};
+
+/* A callback for linux_find_memory_regions that converts between the
+   "full"-style callback and find_memory_region_ftype.  */
+
+static int
+linux_find_memory_regions_thunk (ULONGEST vaddr, ULONGEST size,
+				 ULONGEST offset, ULONGEST inode,
+				 int read, int write, int exec, int modified,
+				 const char *filename, void *arg)
+{
+  struct linux_find_memory_regions_data *data = arg;
+
+  return data->func (vaddr, size, read, write, exec, modified, data->obfd);
+}
+
+/* A variant of linux_find_memory_regions_full that is suitable as the
+   gdbarch find_memory_regions method.  */
+
+static int
+linux_find_memory_regions (struct gdbarch *gdbarch,
+			   find_memory_region_ftype func, void *obfd)
+{
+  struct linux_find_memory_regions_data data;
+
+  data.func = func;
+  data.obfd = obfd;
+
+  return linux_find_memory_regions_full (gdbarch,
+					 linux_find_memory_regions_thunk,
+					 &data);
 }
 
 /* Determine which signal stopped execution.  */
@@ -631,7 +853,7 @@ linux_spu_make_corefile_notes (bfd *obfd, char *note_data, int *note_size)
       "proxydma_info",
    };
 
-  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch);
+  enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
   gdb_byte *spu_ids;
   LONGEST i, j, size;
 
@@ -673,6 +895,112 @@ linux_spu_make_corefile_notes (bfd *obfd, char *note_data, int *note_size)
   if (size > 0)
     xfree (spu_ids);
 
+  return note_data;
+}
+
+/* This is used to pass information from
+   linux_make_mappings_corefile_notes through
+   linux_find_memory_regions_full.  */
+
+struct linux_make_mappings_data
+{
+  /* Number of files mapped.  */
+  ULONGEST file_count;
+
+  /* The obstack for the main part of the data.  */
+  struct obstack *data_obstack;
+
+  /* The filename obstack.  */
+  struct obstack *filename_obstack;
+
+  /* The architecture's "long" type.  */
+  struct type *long_type;
+};
+
+static linux_find_memory_region_ftype linux_make_mappings_callback;
+
+/* A callback for linux_find_memory_regions_full that updates the
+   mappings data for linux_make_mappings_corefile_notes.  */
+
+static int
+linux_make_mappings_callback (ULONGEST vaddr, ULONGEST size,
+			      ULONGEST offset, ULONGEST inode,
+			      int read, int write, int exec, int modified,
+			      const char *filename, void *data)
+{
+  struct linux_make_mappings_data *map_data = data;
+  gdb_byte buf[sizeof (ULONGEST)];
+
+  if (*filename == '\0' || inode == 0)
+    return 0;
+
+  ++map_data->file_count;
+
+  pack_long (buf, map_data->long_type, vaddr);
+  obstack_grow (map_data->data_obstack, buf, TYPE_LENGTH (map_data->long_type));
+  pack_long (buf, map_data->long_type, vaddr + size);
+  obstack_grow (map_data->data_obstack, buf, TYPE_LENGTH (map_data->long_type));
+  pack_long (buf, map_data->long_type, offset);
+  obstack_grow (map_data->data_obstack, buf, TYPE_LENGTH (map_data->long_type));
+
+  obstack_grow_str0 (map_data->filename_obstack, filename);
+
+  return 0;
+}
+
+/* Write the file mapping data to the core file, if possible.  OBFD is
+   the output BFD.  NOTE_DATA is the current note data, and NOTE_SIZE
+   is a pointer to the note size.  Returns the new NOTE_DATA and
+   updates NOTE_SIZE.  */
+
+static char *
+linux_make_mappings_corefile_notes (struct gdbarch *gdbarch, bfd *obfd,
+				    char *note_data, int *note_size)
+{
+  struct cleanup *cleanup;
+  struct obstack data_obstack, filename_obstack;
+  struct linux_make_mappings_data mapping_data;
+  struct type *long_type
+    = arch_integer_type (gdbarch, gdbarch_long_bit (gdbarch), 0, "long");
+  gdb_byte buf[sizeof (ULONGEST)];
+
+  obstack_init (&data_obstack);
+  cleanup = make_cleanup_obstack_free (&data_obstack);
+  obstack_init (&filename_obstack);
+  make_cleanup_obstack_free (&filename_obstack);
+
+  mapping_data.file_count = 0;
+  mapping_data.data_obstack = &data_obstack;
+  mapping_data.filename_obstack = &filename_obstack;
+  mapping_data.long_type = long_type;
+
+  /* Reserve space for the count.  */
+  obstack_blank (&data_obstack, TYPE_LENGTH (long_type));
+  /* We always write the page size as 1 since we have no good way to
+     determine the correct value.  */
+  pack_long (buf, long_type, 1);
+  obstack_grow (&data_obstack, buf, TYPE_LENGTH (long_type));
+
+  linux_find_memory_regions_full (gdbarch, linux_make_mappings_callback,
+				  &mapping_data);
+
+  if (mapping_data.file_count != 0)
+    {
+      /* Write the count to the obstack.  */
+      pack_long (obstack_base (&data_obstack), long_type,
+		 mapping_data.file_count);
+
+      /* Copy the filenames to the data obstack.  */
+      obstack_grow (&data_obstack, obstack_base (&filename_obstack),
+		    obstack_object_size (&filename_obstack));
+
+      note_data = elfcore_write_note (obfd, note_data, note_size,
+				      "CORE", NT_FILE,
+				      obstack_base (&data_obstack),
+				      obstack_object_size (&data_obstack));
+    }
+
+  do_cleanups (cleanup);
   return note_data;
 }
 
@@ -729,6 +1057,44 @@ linux_collect_thread_registers (const struct regcache *regcache,
   return note_data;
 }
 
+/* Fetch the siginfo data for the current thread, if it exists.  If
+   there is no data, or we could not read it, return NULL.  Otherwise,
+   return a newly malloc'd buffer holding the data and fill in *SIZE
+   with the size of the data.  The caller is responsible for freeing
+   the data.  */
+
+static gdb_byte *
+linux_get_siginfo_data (struct gdbarch *gdbarch, LONGEST *size)
+{
+  struct type *siginfo_type;
+  gdb_byte *buf;
+  LONGEST bytes_read;
+  struct cleanup *cleanups;
+
+  if (!gdbarch_get_siginfo_type_p (gdbarch))
+    return NULL;
+  
+  siginfo_type = gdbarch_get_siginfo_type (gdbarch);
+
+  buf = xmalloc (TYPE_LENGTH (siginfo_type));
+  cleanups = make_cleanup (xfree, buf);
+
+  bytes_read = target_read (&current_target, TARGET_OBJECT_SIGNAL_INFO, NULL,
+			    buf, 0, TYPE_LENGTH (siginfo_type));
+  if (bytes_read == TYPE_LENGTH (siginfo_type))
+    {
+      discard_cleanups (cleanups);
+      *size = bytes_read;
+    }
+  else
+    {
+      do_cleanups (cleanups);
+      buf = NULL;
+    }
+
+  return buf;
+}
+
 struct linux_corefile_thread_data
 {
   struct gdbarch *gdbarch;
@@ -753,17 +1119,35 @@ linux_corefile_thread_callback (struct thread_info *info, void *data)
     {
       struct cleanup *old_chain;
       struct regcache *regcache;
+      gdb_byte *siginfo_data;
+      LONGEST siginfo_size;
+
       regcache = get_thread_arch_regcache (info->ptid, args->gdbarch);
 
       old_chain = save_inferior_ptid ();
       inferior_ptid = info->ptid;
       target_fetch_registers (regcache, -1);
+      siginfo_data = linux_get_siginfo_data (args->gdbarch, &siginfo_size);
       do_cleanups (old_chain);
+
+      old_chain = make_cleanup (xfree, siginfo_data);
 
       args->note_data = args->collect (regcache, info->ptid, args->obfd,
 				       args->note_data, args->note_size,
 				       args->stop_signal);
       args->num_notes++;
+
+      if (siginfo_data != NULL)
+	{
+	  args->note_data = elfcore_write_note (args->obfd,
+						args->note_data,
+						args->note_size,
+						"CORE", NT_SIGINFO,
+						siginfo_data, siginfo_size);
+	  args->num_notes++;
+	}
+
+      do_cleanups (old_chain);
     }
 
   return !args->note_data;
@@ -831,6 +1215,10 @@ linux_make_corefile_notes (struct gdbarch *gdbarch, bfd *obfd, int *note_size,
   if (!note_data)
     return NULL;
 
+  /* File mappings.  */
+  note_data = linux_make_mappings_corefile_notes (gdbarch, obfd,
+						  note_data, note_size);
+
   make_cleanup (xfree, note_data);
   return note_data;
 }
@@ -857,6 +1245,7 @@ linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 {
   set_gdbarch_core_pid_to_str (gdbarch, linux_core_pid_to_str);
   set_gdbarch_info_proc (gdbarch, linux_info_proc);
+  set_gdbarch_core_info_proc (gdbarch, linux_core_info_proc);
   set_gdbarch_find_memory_regions (gdbarch, linux_find_memory_regions);
   set_gdbarch_make_corefile_notes (gdbarch, linux_make_corefile_notes_1);
   set_gdbarch_has_shared_address_space (gdbarch,

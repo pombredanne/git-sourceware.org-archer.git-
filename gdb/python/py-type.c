@@ -1,6 +1,6 @@
 /* Python interface to types.
 
-   Copyright (C) 2008-2012 Free Software Foundation, Inc.
+   Copyright (C) 2008-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -30,6 +30,7 @@
 #include "vec.h"
 #include "bcache.h"
 #include "dwarf2loc.h"
+#include "typeprint.h"
 #include "observer.h"
 #include "gdb_assert.h"
 
@@ -95,6 +96,7 @@ static PyObject *typy_make_iter (PyObject *self, enum gdbpy_iter_kind kind);
 
 static struct pyty_code pyty_codes[] =
 {
+  ENTRY (TYPE_CODE_BITSTRING),
   ENTRY (TYPE_CODE_PTR),
   ENTRY (TYPE_CODE_ARRAY),
   ENTRY (TYPE_CODE_STRUCT),
@@ -108,7 +110,6 @@ static struct pyty_code pyty_codes[] =
   ENTRY (TYPE_CODE_SET),
   ENTRY (TYPE_CODE_RANGE),
   ENTRY (TYPE_CODE_STRING),
-  ENTRY (TYPE_CODE_BITSTRING),
   ENTRY (TYPE_CODE_ERROR),
   ENTRY (TYPE_CODE_METHOD),
   ENTRY (TYPE_CODE_METHODPTR),
@@ -132,7 +133,7 @@ field_dealloc (PyObject *obj)
   field_object *f = (field_object *) obj;
 
   Py_XDECREF (f->dict);
-  f->ob_type->tp_free (obj);
+  Py_TYPE (obj)->tp_free (obj);
 }
 
 static PyObject *
@@ -186,7 +187,7 @@ convert_field (struct type *type, int field)
 	}
       else
 	{
-	  arg = PyLong_FromLong (TYPE_FIELD_BITPOS (type, field));
+	  arg = gdb_py_long_from_longest (TYPE_FIELD_BITPOS (type, field));
 	  attrstring = "bitpos";
 	}
 
@@ -196,6 +197,7 @@ convert_field (struct type *type, int field)
       /* At least python-2.4 had the second parameter non-const.  */
       if (PyObject_SetAttrString (result, (char *) attrstring, arg) < 0)
 	goto failarg;
+      Py_DECREF (arg);
     }
 
   if (TYPE_FIELD_NAME (type, field))
@@ -209,11 +211,13 @@ convert_field (struct type *type, int field)
     goto fail;
   if (PyObject_SetAttrString (result, "name", arg) < 0)
     goto failarg;
+  Py_DECREF (arg);
 
   arg = TYPE_FIELD_ARTIFICIAL (type, field) ? Py_True : Py_False;
   Py_INCREF (arg);
   if (PyObject_SetAttrString (result, "artificial", arg) < 0)
     goto failarg;
+  Py_DECREF (arg);
 
   if (TYPE_CODE (type) == TYPE_CODE_CLASS)
     arg = field < TYPE_N_BASECLASSES (type) ? Py_True : Py_False;
@@ -222,12 +226,14 @@ convert_field (struct type *type, int field)
   Py_INCREF (arg);
   if (PyObject_SetAttrString (result, "is_base_class", arg) < 0)
     goto failarg;
+  Py_DECREF (arg);
 
   arg = PyLong_FromLong (TYPE_FIELD_BITSIZE (type, field));
   if (!arg)
     goto fail;
   if (PyObject_SetAttrString (result, "bitsize", arg) < 0)
     goto failarg;
+  Py_DECREF (arg);
 
   /* A field can have a NULL type in some situations.  */
   if (TYPE_FIELD_TYPE (type, field) == NULL)
@@ -241,6 +247,7 @@ convert_field (struct type *type, int field)
     goto fail;
   if (PyObject_SetAttrString (result, "type", arg) < 0)
     goto failarg;
+  Py_DECREF (arg);
 
   return result;
 
@@ -471,10 +478,10 @@ typy_get_composite (struct type *type)
   return type;
 }
 
-/* Return an array type.  */
+/* Helper for typy_array and typy_vector.  */
 
 static PyObject *
-typy_array (PyObject *self, PyObject *args)
+typy_array_1 (PyObject *self, PyObject *args, int is_vector)
 {
   long n1, n2;
   PyObject *n2_obj = NULL;
@@ -513,10 +520,28 @@ typy_array (PyObject *self, PyObject *args)
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       array = lookup_array_range_type (type, n1, n2);
+      if (is_vector)
+	make_vector_type (array);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
   return type_to_type_object (array);
+}
+
+/* Return an array type.  */
+
+static PyObject *
+typy_array (PyObject *self, PyObject *args)
+{
+  return typy_array_1 (self, args, 0);
+}
+
+/* Return a vector type.  */
+
+static PyObject *
+typy_vector (PyObject *self, PyObject *args)
+{
+  return typy_array_1 (self, args, 1);
 }
 
 /* Return a Type object which represents a pointer to SELF.  */
@@ -693,7 +718,7 @@ typy_get_sizeof (PyObject *self, void *closure)
     }
   /* Ignore exceptions.  */
 
-  return PyLong_FromLong (TYPE_LENGTH (type));
+  return gdb_py_long_from_longest (TYPE_LENGTH (type));
 }
 
 static struct type *
@@ -940,7 +965,8 @@ typy_str (PyObject *self)
       stb = mem_fileopen ();
       old_chain = make_cleanup_ui_file_delete (stb);
 
-      type_print (type_object_to_type (self), "", stb, -1);
+      LA_PRINT_TYPE (type_object_to_type (self), "", stb, -1, 0,
+		     &type_print_raw_options);
 
       thetype = ui_file_xstrdup (stb, &length);
       do_cleanups (old_chain);
@@ -1617,6 +1643,14 @@ static PyMethodDef type_object_methods[] =
 Return a type which represents an array of objects of this type.\n\
 The bounds of the array are [LOW_BOUND, HIGH_BOUND] inclusive.\n\
 If LOW_BOUND is omitted, a value of zero is used." },
+  { "vector", typy_vector, METH_VARARGS,
+    "vector ([LOW_BOUND,] HIGH_BOUND) -> Type\n\
+Return a type which represents a vector of objects of this type.\n\
+The bounds of the array are [LOW_BOUND, HIGH_BOUND] inclusive.\n\
+If LOW_BOUND is omitted, a value of zero is used.\n\
+Vectors differ from arrays in that if the current language has C-style\n\
+arrays, vectors don't decay to a pointer to the first element.\n\
+They are first class values." },
    { "__contains__", typy_has_key, METH_VARARGS,
      "T.__contains__(k) -> True if T has a field named k, else False" },
   { "const", typy_const, METH_NOARGS,
@@ -1681,7 +1715,9 @@ static PyNumberMethods type_object_as_number = {
   NULL,			      /* nb_add */
   NULL,			      /* nb_subtract */
   NULL,			      /* nb_multiply */
+#ifndef IS_PY3K
   NULL,			      /* nb_divide */
+#endif
   NULL,			      /* nb_remainder */
   NULL,			      /* nb_divmod */
   NULL,			      /* nb_power */
@@ -1695,12 +1731,19 @@ static PyNumberMethods type_object_as_number = {
   NULL,			      /* nb_and */
   NULL,			      /* nb_xor */
   NULL,			      /* nb_or */
+#ifdef IS_PY3K
+  NULL,			      /* nb_int */
+  NULL,			      /* reserved */
+#else
   NULL,			      /* nb_coerce */
   NULL,			      /* nb_int */
   NULL,			      /* nb_long */
+#endif
   NULL,			      /* nb_float */
+#ifndef IS_PY3K
   NULL,			      /* nb_oct */
   NULL			      /* nb_hex */
+#endif
 };
 
 static PyMappingMethods typy_mapping = {
@@ -1711,8 +1754,7 @@ static PyMappingMethods typy_mapping = {
 
 static PyTypeObject type_object_type =
 {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
+  PyVarObject_HEAD_INIT (NULL, 0)
   "gdb.Type",			  /*tp_name*/
   sizeof (type_object),		  /*tp_basicsize*/
   0,				  /*tp_itemsize*/
@@ -1761,8 +1803,7 @@ static PyGetSetDef field_object_getset[] =
 
 static PyTypeObject field_object_type =
 {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
+  PyVarObject_HEAD_INIT (NULL, 0)
   "gdb.Field",			  /*tp_name*/
   sizeof (field_object),	  /*tp_basicsize*/
   0,				  /*tp_itemsize*/
@@ -1803,8 +1844,7 @@ static PyTypeObject field_object_type =
 };
 
 static PyTypeObject type_iterator_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
+  PyVarObject_HEAD_INIT (NULL, 0)
   "gdb.TypeIterator",		  /*tp_name*/
   sizeof (typy_iterator_object),  /*tp_basicsize*/
   0,				  /*tp_itemsize*/

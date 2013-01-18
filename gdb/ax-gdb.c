@@ -1,7 +1,6 @@
 /* GDB-specific functions for operating on agent expressions.
 
-   Copyright (C) 1998-2001, 2003, 2007-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 1998-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -367,9 +366,9 @@ gen_trace_static_fields (struct gdbarch *gdbarch,
 	    {
 	    case axs_lvalue_memory:
 	      {
-		int length = TYPE_LENGTH (check_typedef (value.type));
-
-		ax_const_l (ax, length);
+	        /* Initialize the TYPE_LENGTH if it is a typedef.  */
+	        check_typedef (value.type);
+		ax_const_l (ax, TYPE_LENGTH (value.type));
 		ax_simple (ax, aop_trace);
 	      }
 	      break;
@@ -425,17 +424,18 @@ gen_traced_pop (struct gdbarch *gdbarch,
 
       case axs_lvalue_memory:
 	{
-	  int length = TYPE_LENGTH (check_typedef (value->type));
-
 	  if (string_trace)
 	    ax_simple (ax, aop_dup);
+
+	  /* Initialize the TYPE_LENGTH if it is a typedef.  */
+	  check_typedef (value->type);
 
 	  /* There's no point in trying to use a trace_quick bytecode
 	     here, since "trace_quick SIZE pop" is three bytes, whereas
 	     "const8 SIZE trace" is also three bytes, does the same
 	     thing, and the simplest code which generates that will also
 	     work correctly for objects with large sizes.  */
-	  ax_const_l (ax, length);
+	  ax_const_l (ax, TYPE_LENGTH (value->type));
 	  ax_simple (ax, aop_trace);
 
 	  if (string_trace)
@@ -2076,11 +2076,53 @@ gen_expr (struct expression *exp, union exp_element **pc,
       }
       break;
 
+    case UNOP_CAST_TYPE:
+      {
+	int offset;
+	struct value *val;
+	struct type *type;
+
+	++*pc;
+	offset = *pc - exp->elts;
+	val = evaluate_subexp (NULL, exp, &offset, EVAL_AVOID_SIDE_EFFECTS);
+	type = value_type (val);
+	*pc = &exp->elts[offset];
+
+	gen_expr (exp, pc, ax, value);
+	gen_cast (ax, value, type);
+      }
+      break;
+
     case UNOP_MEMVAL:
       {
 	struct type *type = check_typedef ((*pc)[1].type);
 
 	(*pc) += 3;
+	gen_expr (exp, pc, ax, value);
+
+	/* If we have an axs_rvalue or an axs_lvalue_memory, then we
+	   already have the right value on the stack.  For
+	   axs_lvalue_register, we must convert.  */
+	if (value->kind == axs_lvalue_register)
+	  require_rvalue (ax, value);
+
+	value->type = type;
+	value->kind = axs_lvalue_memory;
+      }
+      break;
+
+    case UNOP_MEMVAL_TYPE:
+      {
+	int offset;
+	struct value *val;
+	struct type *type;
+
+	++*pc;
+	offset = *pc - exp->elts;
+	val = evaluate_subexp (NULL, exp, &offset, EVAL_AVOID_SIDE_EFFECTS);
+	type = value_type (val);
+	*pc = &exp->elts[offset];
+
 	gen_expr (exp, pc, ax, value);
 
 	/* If we have an axs_rvalue or an axs_lvalue_memory, then we
@@ -2213,6 +2255,8 @@ gen_expr (struct expression *exp, union exp_element **pc,
       break;
 
     case OP_TYPE:
+    case OP_TYPEOF:
+    case OP_DECLTYPE:
       error (_("Attempt to use a type name as an expression."));
 
     default:

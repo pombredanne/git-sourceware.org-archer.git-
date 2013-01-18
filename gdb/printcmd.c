@@ -1,6 +1,6 @@
 /* Print values for GNU debugger GDB.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -123,7 +123,7 @@ show_print_symbol_filename (struct ui_file *file, int from_tty,
    So that we can disable it if we get a signal within it.
    -1 when not doing one.  */
 
-int current_display_number;
+static int current_display_number;
 
 struct display
   {
@@ -146,7 +146,7 @@ struct display
     struct program_space *pspace;
 
     /* Innermost block required by this expression when evaluated.  */
-    struct block *block;
+    const struct block *block;
 
     /* Status of this display (enabled or disabled).  */
     int enabled_p;
@@ -172,8 +172,6 @@ static int display_number;
        B = TMP)
 
 /* Prototypes for exported functions.  */
-
-void output_command (char *, int);
 
 void _initialize_printcmd (void);
 
@@ -347,13 +345,12 @@ float_type_from_length (struct type *type)
 {
   struct gdbarch *gdbarch = get_type_arch (type);
   const struct builtin_type *builtin = builtin_type (gdbarch);
-  unsigned int len = TYPE_LENGTH (type);
 
-  if (len == TYPE_LENGTH (builtin->builtin_float))
+  if (TYPE_LENGTH (type) == TYPE_LENGTH (builtin->builtin_float))
     type = builtin->builtin_float;
-  else if (len == TYPE_LENGTH (builtin->builtin_double))
+  else if (TYPE_LENGTH (type) == TYPE_LENGTH (builtin->builtin_double))
     type = builtin->builtin_double;
-  else if (len == TYPE_LENGTH (builtin->builtin_long_double))
+  else if (TYPE_LENGTH (type) == TYPE_LENGTH (builtin->builtin_long_double))
     type = builtin->builtin_long_double;
 
   return type;
@@ -681,6 +678,7 @@ build_address_symbolic (struct gdbarch *gdbarch,
     }
 
   if (msymbol != NULL
+      && MSYMBOL_HAS_SIZE (msymbol)
       && MSYMBOL_SIZE (msymbol) == 0
       && MSYMBOL_TYPE (msymbol) != mst_text
       && MSYMBOL_TYPE (msymbol) != mst_text_gnu_ifunc
@@ -935,7 +933,7 @@ validate_format (struct format_data fmt, char *cmdname)
    first argument ("/x myvar" for example, to print myvar in hex).  */
 
 static void
-print_command_1 (char *exp, int inspect, int voidprint)
+print_command_1 (char *exp, int voidprint)
 {
   struct expression *expr;
   struct cleanup *old_chain = 0;
@@ -985,17 +983,13 @@ print_command_1 (char *exp, int inspect, int voidprint)
       else
 	annotate_value_begin (value_type (val));
 
-      if (inspect)
-	printf_unfiltered ("\031(gdb-makebuffer \"%s\"  %d '(\"",
-			   exp, histindex);
-      else if (histindex >= 0)
+      if (histindex >= 0)
 	printf_filtered ("$%d = ", histindex);
 
       if (histindex >= 0)
 	annotate_value_history_value ();
 
       get_formatted_print_options (&opts, format);
-      opts.inspect_it = inspect;
       opts.raw = fmt.raw;
 
       print_formatted (val, fmt.size, &opts, gdb_stdout);
@@ -1005,9 +999,6 @@ print_command_1 (char *exp, int inspect, int voidprint)
 	annotate_value_history_end ();
       else
 	annotate_value_end ();
-
-      if (inspect)
-	printf_unfiltered ("\") )\030");
     }
 
   if (cleanup)
@@ -1017,23 +1008,14 @@ print_command_1 (char *exp, int inspect, int voidprint)
 static void
 print_command (char *exp, int from_tty)
 {
-  print_command_1 (exp, 0, 1);
-}
-
-/* Same as print, except in epoch, it gets its own window.  */
-static void
-inspect_command (char *exp, int from_tty)
-{
-  extern int epoch_interface;
-
-  print_command_1 (exp, epoch_interface, 1);
+  print_command_1 (exp, 1);
 }
 
 /* Same as print, except it doesn't print void results.  */
 static void
 call_command (char *exp, int from_tty)
 {
-  print_command_1 (exp, 0, 0);
+  print_command_1 (exp, 0);
 }
 
 void
@@ -1208,8 +1190,7 @@ address_info (char *exp, int from_tty)
   long val;
   struct obj_section *section;
   CORE_ADDR load_addr, context_pc = 0;
-  int is_a_field_of_this;	/* C++: lookup_symbol sets this to nonzero
-				   if exp is a field of `this'.  */
+  struct field_of_this_result is_a_field_of_this;
 
   if (exp == 0)
     error (_("Argument required."));
@@ -1218,7 +1199,7 @@ address_info (char *exp, int from_tty)
 		       &is_a_field_of_this);
   if (sym == NULL)
     {
-      if (is_a_field_of_this)
+      if (is_a_field_of_this.type != NULL)
 	{
 	  printf_filtered ("Symbol \"");
 	  fprintf_symbol_filtered (gdb_stdout, exp,
@@ -2252,7 +2233,7 @@ ui_printf (char *arg, struct ui_file *stream)
 	    error (_("long double not supported in printf"));
 #endif
 	  case long_long_arg:
-#if defined (CC_HAS_LONG_LONG) && defined (PRINTF_HAS_LONG_LONG)
+#ifdef PRINTF_HAS_LONG_LONG
 	    {
 	      long long val = value_as_long (val_args[i]);
 
@@ -2297,7 +2278,6 @@ ui_printf (char *arg, struct ui_file *stream)
 
 	      /* Parameter data.  */
 	      struct type *param_type = value_type (val_args[i]);
-	      unsigned int param_len = TYPE_LENGTH (param_type);
 	      struct gdbarch *gdbarch = get_type_arch (param_type);
 	      enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
 
@@ -2359,8 +2339,8 @@ ui_printf (char *arg, struct ui_file *stream)
 
 	      /* Conversion between different DFP types.  */
 	      if (TYPE_CODE (param_type) == TYPE_CODE_DECFLOAT)
-		decimal_convert (param_ptr, param_len, byte_order,
-				 dec, dfp_len, byte_order);
+		decimal_convert (param_ptr, TYPE_LENGTH (param_type),
+				 byte_order, dec, dfp_len, byte_order);
 	      else
 		/* If this is a non-trivial conversion, just output 0.
 		   A correct converted value can be displayed by explicitly
@@ -2388,7 +2368,7 @@ ui_printf (char *arg, struct ui_file *stream)
 		 handle %p as glibc would: %#x or a literal "(nil)".  */
 
 	      char *p, *fmt, *fmt_p;
-#if defined (CC_HAS_LONG_LONG) && defined (PRINTF_HAS_LONG_LONG)
+#ifdef PRINTF_HAS_LONG_LONG
 	      long long val = value_as_long (val_args[i]);
 #else
 	      long val = value_as_long (val_args[i]);
@@ -2423,7 +2403,7 @@ ui_printf (char *arg, struct ui_file *stream)
 	      gdb_assert (*p == 'p' && *(p + 1) == '\0');
 	      if (val != 0)
 		{
-#if defined (CC_HAS_LONG_LONG) && defined (PRINTF_HAS_LONG_LONG)
+#ifdef PRINTF_HAS_LONG_LONG
 		  *fmt_p++ = 'l';
 #endif
 		  *fmt_p++ = 'l';
@@ -2633,11 +2613,7 @@ EXP may be preceded with /FMT, where FMT is a format letter\n\
 but no count or size letter (see \"x\" command)."));
   set_cmd_completer (c, expression_completer);
   add_com_alias ("p", "print", class_vars, 1);
-
-  c = add_com ("inspect", class_vars, inspect_command, _("\
-Same as \"print\" command, except that if you are running in the epoch\n\
-environment, the value is printed in its own window."));
-  set_cmd_completer (c, expression_completer);
+  add_com_alias ("inspect", "print", class_vars, 1);
 
   add_setshow_uinteger_cmd ("max-symbolic-offset", no_class,
 			    &max_symbolic_offset, _("\

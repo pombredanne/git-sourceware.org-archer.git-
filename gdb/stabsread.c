@@ -1,6 +1,6 @@
 /* Support routines for decoding "stabs" debugging information format.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -2024,11 +2024,9 @@ again:
 	make_vector_type (type);
       break;
 
-    case 'S':			/* Set or bitstring  type */
+    case 'S':			/* Set type */
       type1 = read_type (pp, objfile);
       type = create_set_type ((struct type *) NULL, type1);
-      if (is_string)
-	TYPE_CODE (type) = TYPE_CODE_BITSTRING;
       if (typenums[0] != -1)
 	*dbx_lookup_type (typenums, objfile) = type;
       break;

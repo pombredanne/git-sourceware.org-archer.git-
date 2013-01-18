@@ -1,5 +1,5 @@
 /* Target operations for the remote server for GDB.
-   Copyright (C) 2002-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2002-2013 Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
 
@@ -409,8 +409,7 @@ void set_target_ops (struct target_ops *);
 #define myattach(pid) \
   (*the_target->attach) (pid)
 
-#define kill_inferior(pid) \
-  (*the_target->kill) (pid)
+int kill_inferior (int);
 
 #define detach_inferior(pid) \
   (*the_target->detach) (pid)

@@ -1,7 +1,6 @@
 /* Target-dependent code for GDB, the GNU debugger.
 
-   Copyright (C) 1986-1987, 1989, 1991-1997, 2000-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -390,8 +389,8 @@ static struct insn_pattern ppc64_standard_linkage1[] =
     /* mtctr r11 */
     { insn_xfx (-1, -1, -1, -1), insn_xfx (31, 11, 9, 467), 0 },
 
-    /* ld r11, <any>(r12) */
-    { insn_ds (-1, -1, -1, 0, -1), insn_ds (58, 11, 12, 0, 0), 0 },
+    /* ld r11, <any>(r12) <optional> */
+    { insn_ds (-1, -1, -1, 0, -1), insn_ds (58, 11, 12, 0, 0), 1 },
       
     /* bctr */
     { -1, 0x4e800420, 0 },
@@ -421,8 +420,8 @@ static struct insn_pattern ppc64_standard_linkage2[] =
     /* ld r2, <any>(r12) */
     { insn_ds (-1, -1, -1, 0, -1), insn_ds (58, 2, 12, 0, 0), 0 },
 
-    /* ld r11, <any>(r12) */
-    { insn_ds (-1, -1, -1, 0, -1), insn_ds (58, 11, 12, 0, 0), 0 },
+    /* ld r11, <any>(r12) <optional> */
+    { insn_ds (-1, -1, -1, 0, -1), insn_ds (58, 11, 12, 0, 0), 1 },
       
     /* bctr */
     { -1, 0x4e800420, 0 },
@@ -446,8 +445,8 @@ static struct insn_pattern ppc64_standard_linkage3[] =
     /* mtctr r11 */
     { insn_xfx (-1, -1, -1, -1), insn_xfx (31, 11, 9, 467), 0 },
 
-    /* ld r11, <any>(r2) */
-    { insn_ds (-1, -1, -1, 0, -1), insn_ds (58, 11, 2, 0, 0), 0 },
+    /* ld r11, <any>(r2) <optional> */
+    { insn_ds (-1, -1, -1, 0, -1), insn_ds (58, 11, 2, 0, 0), 1 },
       
     /* ld r2, <any>(r2) */
     { insn_ds (-1, -1, -1, 0, -1), insn_ds (58, 2, 2, 0, 0), 0 },
@@ -648,8 +647,9 @@ powerpc_linux_in_dynsym_resolve_code (CORE_ADDR pc)
 
   /* Check if we are in the resolver.  */
   sym = lookup_minimal_symbol_by_pc (pc);
-  if ((strcmp (SYMBOL_LINKAGE_NAME (sym), "__glink") == 0)
-      || (strcmp (SYMBOL_LINKAGE_NAME (sym), "__glink_PLTresolve") == 0))
+  if (sym != NULL
+      && (strcmp (SYMBOL_LINKAGE_NAME (sym), "__glink") == 0
+	  || strcmp (SYMBOL_LINKAGE_NAME (sym), "__glink_PLTresolve") == 0))
     return 1;
 
   return 0;
@@ -1822,6 +1822,8 @@ ppc_linux_init_abi (struct gdbarch_info info,
       set_gdbarch_displaced_step_location (gdbarch,
 					   ppc_linux_displaced_step_location);
     }
+
+  set_gdbarch_get_siginfo_type (gdbarch, linux_get_siginfo_type);
 }
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */

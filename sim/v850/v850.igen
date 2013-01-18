@@ -25,7 +25,7 @@
 :cache:::unsigned:reg1:RRRRR:(RRRRR)
 :cache:::unsigned:reg2:rrrrr:(rrrrr)
 :cache:::unsigned:reg3:wwwww:(wwwww)
-:cache:::unsigned:reg4:W,WWWW:((W << 4) + WWWW)
+:cache:::unsigned:reg4:W,WWWW:(W + (WWWW << 1))
 
 :cache:::unsigned:reg1e:RRRR:(RRRR << 1)
 :cache:::unsigned:reg2e:rrrr:(rrrr << 1)
@@ -773,7 +773,7 @@ rrrrr!0,11110,dddddd + ddddddddddddddd,0:V:::jarl
 
 
 // JR32
-00000010111,00000 + iiiiiiiiiiiiiiii + IIIIIIIIIIIIIIII:VI:::jr32
+0000001011100000 + iiiiiiiiiiiiiiii + IIIIIIIIIIIIIIII:VI:::jr32
 *v850e2
 *v850e2v3
 "jr <imm32>"
@@ -2179,12 +2179,19 @@ rrrrr,110101,RRRRR + iiiiiiiiiiiiiiii:VI:::xori
 *v850e2v3
 "dbtrap"
 {
-  DBPC = cia + 2;
-  DBPSW = PSW;
-  PSW = PSW | (PSW_NP | PSW_EP | PSW_ID);
-  PC = 0x00000060;
-  nia = 0x00000060;
-  TRACE_BRANCH0 ();
+  if (STATE_OPEN_KIND (SD) == SIM_OPEN_DEBUG)
+    {
+      sim_engine_halt (SD, CPU, NULL, cia, sim_stopped, SIM_SIGTRAP);
+    }
+  else 
+    {
+    DBPC = cia + 2;
+    DBPSW = PSW;
+    PSW = PSW | (PSW_NP | PSW_EP | PSW_ID);
+    PC = 0x00000060;
+    nia = 0x00000060;
+    TRACE_BRANCH0 ();
+    }
 }
 
 // New breakpoint: 0x7E0 0x7E0
@@ -2345,7 +2352,7 @@ rrrr,0111111,RRRR,0 + wwww!0,01000001,bbb,0:F_I:::cmovf_d
 }
 
 // CMOVF.S
-rrrrr,111111,RRRRR + wwwww!0,1000000,bbb,0:F_I:::cmovf_s
+rrrrr,111111,RRRRR!0 + wwwww!0,1000000,bbb,0:F_I:::cmovf_s
 *v850e2v3
 "cmovf.d <bbb>, r<reg1>, r<reg2>, r<reg3>"
 {
@@ -2374,8 +2381,8 @@ rrrrr,111111,RRRRR + wwwww!0,1000000,bbb,0:F_I:::cmovf_s
 // CMPF.D
 rrrr,0111111,RRRR,0 + 0,FFFF,1000011,bbb,0:F_I:::cmpf_d
 *v850e2v3
-"cmpf.d %s<FFFF>, r<reg1e>, r<reg2e>":(bbb == 0)
-"cmpf.d %s<FFFF>, r<reg1e>, r<reg2e>, <bbb>"
+"cmpf.d %s<FFFF>, r<reg2e>, r<reg1e>":(bbb == 0)
+"cmpf.d %s<FFFF>, r<reg2e>, r<reg1e>, <bbb>"
 {
   int result;
   sim_fpu wop1;
@@ -2383,9 +2390,9 @@ rrrr,0111111,RRRR,0 + 0,FFFF,1000011,bbb,0:F_I:::cmpf_d
   
   sim_fpu_232to (&wop1, GR[reg1e+1], GR[reg1e]);
   sim_fpu_232to (&wop2, GR[reg2e+1], GR[reg2e]);
-  TRACE_FP_INPUT_FPU2 (&wop1, &wop2);
+  TRACE_FP_INPUT_FPU2 (&wop2, &wop1);
 
-  result = v850_float_compare(sd, FFFF, wop1, wop2, 1);
+  result = v850_float_compare(sd, FFFF, wop2, wop1, 1);
 
   if (result)  
     SET_FPCC(bbb);
@@ -2398,8 +2405,8 @@ rrrr,0111111,RRRR,0 + 0,FFFF,1000011,bbb,0:F_I:::cmpf_d
 // CMPF.S
 rrrrr,111111,RRRRR + 0,FFFF,1000010,bbb,0:F_I:::cmpf_s
 *v850e2v3
-"cmpf.s %s<FFFF>, r<reg1>, r<reg2>":(bbb == 0)
-"cmpf.s %s<FFFF>, r<reg1>, r<reg2>, <bbb>"
+"cmpf.s %s<FFFF>, r<reg2>, r<reg1>":(bbb == 0)
+"cmpf.s %s<FFFF>, r<reg2>, r<reg1>, <bbb>"
 {
   int result; 
   sim_fpu wop1;
@@ -2407,9 +2414,9 @@ rrrrr,111111,RRRRR + 0,FFFF,1000010,bbb,0:F_I:::cmpf_s
 
   sim_fpu_32to( &wop1, GR[reg1] );
   sim_fpu_32to( &wop2, GR[reg2] );
-  TRACE_FP_INPUT_FPU2 (&wop1, &wop2);
+  TRACE_FP_INPUT_FPU2 (&wop2, &wop1);
 
-  result = v850_float_compare(sd, FFFF, wop1, wop2, 0);
+  result = v850_float_compare(sd, FFFF, wop2, wop1, 0);
 
   if (result)  
     SET_FPCC(bbb);
@@ -2676,7 +2683,6 @@ rrrrr,111111,RRRRR + wwwww,101,W,00,WWWW,0:F_I:::maddf_s
   TRACE_FP_INPUT_FPU3 (&wop1, &wop2, &wop3);
 
   status = sim_fpu_mul (&ans, &wop1, &wop2);
-  status |= sim_fpu_round_64 (&ans, FPSR_GET_ROUND(), sim_fpu_denorm_underflow_inexact);
   wop1 = ans;
   status |= sim_fpu_add (&ans, &wop1, &wop3);
   status |= sim_fpu_round_64 (&ans, FPSR_GET_ROUND(), sim_fpu_denorm_underflow_inexact);
@@ -2954,7 +2960,6 @@ rrrrr,111111,RRRRR + wwwww,101,W,10,WWWW,0:F_I:::nmaddf_s
   TRACE_FP_INPUT_FPU3 (&wop1, &wop2, &wop3);
 
   status = sim_fpu_mul (&ans, &wop1, &wop2);
-  status |= sim_fpu_round_64 (&ans, FPSR_GET_ROUND(), sim_fpu_denorm_underflow_inexact);
   wop1 = ans;
   status |= sim_fpu_add (&ans, &wop1, &wop3);
   status |= sim_fpu_round_64 (&ans, FPSR_GET_ROUND(), sim_fpu_denorm_underflow_inexact);
@@ -3190,8 +3195,28 @@ rrrr,011111100001 + wwww,010001010100:F_I:::trncf_dl
   sim_fpu_232to (&wop, GR[reg2e+1], GR[reg2e]);
   TRACE_FP_INPUT_FPU1 (&wop);
 
-  status = sim_fpu_round_64 (&wop, sim_fpu_round_zero, sim_fpu_denorm_zero);
-  status |= sim_fpu_to64i (&ans, &wop, sim_fpu_round_zero);
+  status = sim_fpu_to64i (&ans, &wop, sim_fpu_round_zero);
+
+  check_cvt_fi(sd, status, 1);
+
+  GR[reg3e] = ans;
+  GR[reg3e+1] = ans>>32L;
+  TRACE_FP_RESULT_WORD2 (GR[reg3e], GR[reg3e+1]);
+}
+
+// TRNCF.DUL
+rrrr,011111110001 + wwww,010001010100:F_I:::trncf_dul
+*v850e2v3
+"trncf.dul r<reg2e>, r<reg3e>"
+{
+  signed64 ans;
+  sim_fpu wop;
+  sim_fpu_status status;
+
+  sim_fpu_232to (&wop, GR[reg2e+1], GR[reg2e]);
+  TRACE_FP_INPUT_FPU1 (&wop);
+
+  status = sim_fpu_to64u (&ans, &wop, sim_fpu_round_zero);
 
   check_cvt_fi(sd, status, 1);
 
@@ -3212,8 +3237,27 @@ rrrr,011111100001 + wwwww,10001010000:F_I:::trncf_dw
   sim_fpu_232to (&wop, GR[reg2e+1], GR[reg2e]);
   TRACE_FP_INPUT_FPU1 (&wop);
 
-  status = sim_fpu_round_32 (&wop, sim_fpu_round_zero, sim_fpu_denorm_zero);
-  status |= sim_fpu_to32i (&ans, &wop, sim_fpu_round_zero);
+  status = sim_fpu_to32i (&ans, &wop, sim_fpu_round_zero);
+
+  check_cvt_fi(sd, status, 1);
+
+  GR[reg3] = ans;
+  TRACE_FP_RESULT_WORD1 (ans);
+}
+
+// TRNCF.DUW
+rrrr,011111110001 + wwwww,10001010000:F_I:::trncf_duw
+*v850e2v3
+"trncf.duw r<reg2e>, r<reg3>"
+{
+  uint32 ans;
+  sim_fpu wop;
+  sim_fpu_status status;
+
+  sim_fpu_232to (&wop, GR[reg2e+1], GR[reg2e]);
+  TRACE_FP_INPUT_FPU1 (&wop);
+
+  status = sim_fpu_to32u (&ans, &wop, sim_fpu_round_zero);
 
   check_cvt_fi(sd, status, 1);
 
@@ -3233,8 +3277,26 @@ rrrrr,11111100001 + wwww,010001000100:F_I:::trncf_sl
   sim_fpu_32to (&wop, GR[reg2]);
   TRACE_FP_INPUT_FPU1 (&wop);
 
-  status = sim_fpu_round_64 (&wop, sim_fpu_round_zero, sim_fpu_denorm_zero);
-  status |= sim_fpu_to64i (&ans, &wop, sim_fpu_round_zero);
+  status = sim_fpu_to64i (&ans, &wop, sim_fpu_round_zero);
+
+  GR[reg3e] = ans;
+  GR[reg3e+1] = ans >> 32L;
+  TRACE_FP_RESULT_WORD2 (GR[reg3e], GR[reg3e+1]);
+}
+
+// TRNCF.SUL
+rrrrr,11111110001 + wwww,010001000100:F_I:::trncf_sul
+*v850e2v3
+"trncf.sul r<reg2>, r<reg3e>"
+{
+  signed64 ans;
+  sim_fpu wop;
+  sim_fpu_status status;
+
+  sim_fpu_32to (&wop, GR[reg2]);
+  TRACE_FP_INPUT_FPU1 (&wop);
+
+  status = sim_fpu_to64u (&ans, &wop, sim_fpu_round_zero);
 
   GR[reg3e] = ans;
   GR[reg3e+1] = ans >> 32L;
@@ -3253,8 +3315,7 @@ rrrrr,11111100001 + wwwww,10001000000:F_I:::trncf_sw
   sim_fpu_32to (&wop, GR[reg2]);
   TRACE_FP_INPUT_FPU1 (&wop);
 
-  status = sim_fpu_round_32 (&wop, sim_fpu_round_zero, sim_fpu_denorm_zero);
-  status |= sim_fpu_to32i (&ans, &wop, sim_fpu_round_zero);
+  status = sim_fpu_to32i (&ans, &wop, sim_fpu_round_zero);
 
   check_cvt_fi(sd, status, 0);
 
@@ -3262,3 +3323,23 @@ rrrrr,11111100001 + wwwww,10001000000:F_I:::trncf_sw
   TRACE_FP_RESULT_WORD1 (ans);
 }
 
+
+// TRNCF.SUW
+rrrrr,11111110001 + wwwww,10001000000:F_I:::trncf_suw
+*v850e2v3
+"trncf.suw r<reg2>, r<reg3>"
+{
+  uint32 ans;
+  sim_fpu wop;
+  sim_fpu_status status;
+
+  sim_fpu_32to (&wop, GR[reg2]);
+  TRACE_FP_INPUT_FPU1 (&wop);
+
+  status = sim_fpu_to32u (&ans, &wop, sim_fpu_round_zero);
+
+  check_cvt_fi(sd, status, 0);
+
+  GR[reg3] = ans;
+  TRACE_FP_RESULT_WORD1 (ans);
+}

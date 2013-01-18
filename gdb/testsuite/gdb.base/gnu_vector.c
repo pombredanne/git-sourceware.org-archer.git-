@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2010-2012 Free Software Foundation, Inc.
+   Copyright 2010-2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -41,6 +41,19 @@ int2 i2 = {1, 2};
 longlong2 ll2 = {1, 2};
 float2 f2 = {1, 2};
 double2 d2 = {1, 2};
+
+union
+{
+  int i;
+  char cv __attribute__ ((vector_size (sizeof (int))));
+} union_with_vector_1;
+
+struct
+{
+  int i;
+  char cv __attribute__ ((vector_size (sizeof (int))));
+  float4 f4;
+} struct_with_vector_1;
 
 int
 main ()

@@ -1,6 +1,6 @@
 /* Python interface to symbol tables.
 
-   Copyright (C) 2008-2012 Free Software Foundation, Inc.
+   Copyright (C) 2008-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -126,17 +126,14 @@ stpy_get_objfile (PyObject *self, void *closure)
 static PyObject *
 stpy_fullname (PyObject *self, PyObject *args)
 {
-  char *fullname;
+  const char *fullname;
   struct symtab *symtab = NULL;
 
   STPY_REQUIRE_VALID (self, symtab);
 
   fullname = symtab_to_fullname (symtab);
-  if (fullname)
-    return PyString_Decode (fullname, strlen (fullname),
-			    host_charset (), NULL);
 
-  Py_RETURN_NONE;
+  return PyString_Decode (fullname, strlen (fullname), host_charset (), NULL);
 }
 
 /* Implementation of gdb.Symtab.is_valid (self) -> Boolean.
@@ -307,7 +304,7 @@ salpy_dealloc (PyObject *self)
 
   Py_DECREF (self_sal->symtab);
   xfree (self_sal->sal);
-  self_sal->ob_type->tp_free (self);
+  Py_TYPE (self)->tp_free (self);
 }
 
 /* Given a sal, and a sal_object that has previously been allocated
@@ -470,7 +467,10 @@ del_objfile_sal (struct objfile *objfile, void *datum)
     {
       sal_object *next = obj->next;
 
-      obj->symtab = NULL;
+      Py_DECREF (obj->symtab);
+      obj->symtab = (symtab_object *) Py_None;
+      Py_INCREF (Py_None);
+
       obj->next = NULL;
       obj->prev = NULL;
       xfree (obj->sal);
@@ -536,8 +536,7 @@ Return the static block of the symbol table." },
 };
 
 static PyTypeObject symtab_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
+  PyVarObject_HEAD_INIT (NULL, 0)
   "gdb.Symtab",			  /*tp_name*/
   sizeof (symtab_object),	  /*tp_basicsize*/
   0,				  /*tp_itemsize*/
@@ -587,8 +586,7 @@ Return true if this symbol table and line is valid, false if not." },
 };
 
 static PyTypeObject sal_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /*ob_size*/
+  PyVarObject_HEAD_INIT (NULL, 0)
   "gdb.Symtab_and_line",	  /*tp_name*/
   sizeof (sal_object),		  /*tp_basicsize*/
   0,				  /*tp_itemsize*/
