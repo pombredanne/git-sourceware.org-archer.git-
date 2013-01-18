@@ -1,6 +1,5 @@
 /* Annotation routines for GDB.
-   Copyright (C) 1986, 1989-1992, 1994, 1998-2000, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -20,7 +19,7 @@
 #include "symtab.h"
 #include "gdbtypes.h"
 
-extern void breakpoints_changed (void);
+extern void annotate_breakpoints_changed (void);
 
 extern void annotate_ignore_count_change (void);
 extern void annotate_breakpoint (int);

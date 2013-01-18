@@ -1,5 +1,5 @@
 /* C preprocessor macro tables for GDB.
-   Copyright (C) 2002, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2002-2013 Free Software Foundation, Inc.
    Contributed by Red Hat, Inc.
 
    This file is part of GDB.
@@ -128,7 +128,7 @@ macro_bcache (struct macro_table *t, const void *addr, int len)
 static const char *
 macro_bcache_str (struct macro_table *t, const char *s)
 {
-  return (char *) macro_bcache (t, s, strlen (s) + 1);
+  return macro_bcache (t, s, strlen (s) + 1);
 }
 
 

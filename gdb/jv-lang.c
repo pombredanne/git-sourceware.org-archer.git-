@@ -1,7 +1,6 @@
 /* Java language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 1997-2000, 2003-2005, 2007-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1997-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1167,7 +1166,6 @@ const struct language_defn java_language_defn =
   "java",			/* Language name */
   language_java,
   range_check_off,
-  type_check_off,
   case_sensitive_on,
   array_row_major,
   macro_expansion_no,

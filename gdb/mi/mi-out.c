@@ -1,7 +1,6 @@
 /* MI Command Set - output generating routines.
 
-   Copyright (C) 2000, 2002-2005, 2007-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 2000-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
 
@@ -198,7 +197,7 @@ mi_field_int (struct ui_out *uiout, int fldno, int width,
   if (data->suppress_output)
     return;
 
-  sprintf (buffer, "%d", value);
+  xsnprintf (buffer, sizeof (buffer), "%d", value);
   mi_field_string (uiout, fldno, width, alignment, fldname, buffer);
 }
 

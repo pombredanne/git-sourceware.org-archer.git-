@@ -1,7 +1,140 @@
 		What has changed in GDB?
 	     (Organized release by release)
 
-*** Changes since GDB 7.4
+*** Changes since GDB 7.5
+
+* New targets
+
+Lynx 178 PowerPC		powerpc-*-lynx*178
+
+* If the configured location of system.gdbinit file (as given by the
+  --with-system-gdbinit option at configure time) is in the
+  data-directory (as specified by --with-gdb-datadir at configure
+  time) or in one of its subdirectories, then GDB will look for the
+  system-wide init file in the directory specified by the
+  --data-directory command-line option.
+
+* New command line options:
+
+-nh   Disables auto-loading of ~/.gdbinit, but still executes all the
+      other initialization files, unlike -nx which disables all of them.
+
+* Removed command line options
+
+-epoch  This was used by the gdb mode in Epoch, an ancient fork of
+        Emacs.
+
+* The 'ptype' and 'whatis' commands now accept an argument to control
+  type formatting.
+
+* 'info proc' now works on some core files.
+
+* Python scripting
+
+  ** Vectors can be created with gdb.Type.vector.
+
+  ** Python's atexit.register now works in GDB.
+
+  ** Types can be pretty-printed via a Python API.
+
+  ** Python 3 is now supported (in addition to Python 2.4 or later)
+
+* New Python-based convenience functions:
+
+  ** $_memeq(buf1, buf2, length)
+  ** $_streq(str1, str2)
+  ** $_strlen(str)
+  ** $_regex(str, regex)
+
+* The 'cd' command now defaults to using '~' (the home directory) if not
+  given an argument.
+
+* The command 'forward-search' can now be abbreviated as 'fo'.
+
+* The command 'info tracepoints' can now display 'installed on target'
+  or 'not installed on target' for each non-pending location of tracepoint.
+
+* New configure options
+
+--enable-libmcheck/--disable-libmcheck
+  By default, development versions are built with -lmcheck on hosts
+  that support it, in order to help track memory corruption issues.
+  Release versions, on the other hand, are built without -lmcheck
+  by default.  The --enable-libmcheck/--disable-libmcheck configure
+  options allow the user to override that default.
+
+* New commands (for set/show, see "New options" below)
+
+catch signal 
+  Catch signals.  This is similar to "handle", but allows commands and
+  conditions to be attached.
+
+maint info bfds
+  List the BFDs known to GDB.
+
+python-interactive [command]
+pi [command]
+  Start a Python interactive prompt, or evaluate the optional command
+  and print the result of expressions.
+
+py [command]
+  "py" is a new alias for "python".
+
+enable type-printer [name]...
+disable type-printer [name]...
+  Enable or disable type printers.
+
+set debug notification
+show debug notification
+  Control display of debugging info for async remote notification.
+
+* Removed commands
+
+  ** For the Renesas Super-H architecture, the "regs" command has been removed
+     (has been deprecated in GDB 7.5), and "info all-registers" should be used
+     instead.
+
+* New options
+
+set print type methods (on|off)
+show print type methods
+  Control whether method declarations are displayed by "ptype".
+  The default is to show them.
+
+set print type typedefs (on|off)
+show print type typedefs
+  Control whether typedef definitions are displayed by "ptype".
+  The default is to show them.
+
+* MI changes
+
+  ** Command parameter changes are now notified using new async record
+     "=cmd-param-changed".
+  ** Trace frame changes caused by command "tfind" are now notified using
+     new async record "=traceframe-changed".
+  ** The creation and deletion of trace state variables are now notified
+     using new async records "=tsv-created" and "=tsv-deleted".
+  ** The start and stop of process record are now notified using new
+     async record "=record-started" and "=record-stopped".
+  ** Memory changes are now notified using new async record
+     "=memory-changed".
+  ** The data-disassemble command response will include a "fullname" field
+     containing the absolute file name when GDB can determine it and source
+     has been requested.
+  ** New optional parameter COUNT added to the "-data-write-memory-bytes" 
+     command, to allow pattern filling of memory areas.
+  ** New commands "-catch-load"/"-catch-unload" added for intercepting
+     library load/unload events.
+  ** The response to breakpoint commands and breakpoint async records
+     includes an "installed" field containing a boolean state about each
+     non-pending tracepoint location is whether installed on target or not.
+
+* GDB now supports the "mini debuginfo" section, .gnu_debugdata.
+  You must have the LZMA library available when configuring GDB for this
+  feature to be enabled.  For more information, see:
+      http://fedoraproject.org/wiki/Features/MiniDebugInfo
+
+*** Changes in GDB 7.5
 
 * GDB now supports x32 ABI.  Visit <http://sites.google.com/site/x32abi/>
   for more x32 ABI info.
@@ -112,11 +245,11 @@
 * The .gdb_index section has been updated to include symbols for
   inlined functions.  GDB will ignore older .gdb_index sections by
   default, which could cause symbol files to be loaded more slowly
-  until their .gdb_index sections can be recreated.  The new option
-  --use-deprecated-index-sections will cause GDB to use any older
-  .gdb_index sections it finds.  This will restore performance, but
-  the ability to set breakpoints on inlined functions will be lost
-  in symbol files with older .gdb_index sections.
+  until their .gdb_index sections can be recreated.  The new command
+  "set use-deprecated-index-sections on" will cause GDB to use any older
+  .gdb_index sections it finds.  This will restore performance, but the
+  ability to set breakpoints on inlined functions will be lost in symbol
+  files with older .gdb_index sections.
 
   The .gdb_index section has also been updated to record more information
   about each symbol.  This speeds up the "info variables", "info functions"
@@ -136,6 +269,10 @@
   ** Output logs ("set logging" and related) now include MI output.
 
 * New commands
+
+  ** "set use-deprecated-index-sections on|off"
+     "show use-deprecated-index-sections on|off"
+     Controls the use of deprecated .gdb_index sections.
 
   ** "catch load" and "catch unload" can be used to stop when a shared
      library is loaded or unloaded, respectively.

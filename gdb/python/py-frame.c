@@ -1,6 +1,6 @@
 /* Python interface to stack frames
 
-   Copyright (C) 2008-2012 Free Software Foundation, Inc.
+   Copyright (C) 2008-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -662,8 +662,7 @@ Return the value of the variable in this frame." },
 };
 
 PyTypeObject frame_object_type = {
-  PyObject_HEAD_INIT (NULL)
-  0,				  /* ob_size */
+  PyVarObject_HEAD_INIT (NULL, 0)
   "gdb.Frame",			  /* tp_name */
   sizeof (frame_object),	  /* tp_basicsize */
   0,				  /* tp_itemsize */

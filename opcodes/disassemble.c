@@ -24,6 +24,7 @@
 #include "dis-asm.h"
 
 #ifdef ARCH_all
+#define ARCH_aarch64
 #define ARCH_alpha
 #define ARCH_arc
 #define ARCH_arm
@@ -57,6 +58,7 @@
 #define ARCH_m88k
 #define ARCH_mcore
 #define ARCH_mep
+#define ARCH_metag
 #define ARCH_microblaze
 #define ARCH_mips
 #define ARCH_mmix
@@ -113,6 +115,11 @@ disassembler (abfd)
     {
       /* If you add a case to this table, also add it to the
 	 ARCH_all definition right above this function.  */
+#ifdef ARCH_aarch64
+    case bfd_arch_aarch64:
+      disassemble = print_insn_aarch64;
+      break;
+#endif
 #ifdef ARCH_alpha
     case bfd_arch_alpha:
       disassemble = print_insn_alpha;
@@ -303,6 +310,11 @@ disassembler (abfd)
       disassemble = print_insn_mep;
       break;
 #endif
+#ifdef ARCH_metag
+    case bfd_arch_metag:
+      disassemble = print_insn_metag;
+      break;
+#endif
 #ifdef ARCH_mips
     case bfd_arch_mips:
       if (bfd_big_endian (abfd))
@@ -430,6 +442,7 @@ disassembler (abfd)
 #endif
 #ifdef ARCH_v850
     case bfd_arch_v850:
+    case bfd_arch_v850_rh850:
       disassemble = print_insn_v850;
       break;
 #endif
@@ -516,6 +529,9 @@ void
 disassembler_usage (stream)
      FILE * stream ATTRIBUTE_UNUSED;
 {
+#ifdef ARCH_aarch64
+  print_aarch64_disassembler_options (stream);
+#endif
 #ifdef ARCH_arm
   print_arm_disassembler_options (stream);
 #endif
@@ -543,6 +559,12 @@ disassemble_init_for_target (struct disassemble_info * info)
 
   switch (info->arch)
     {
+#ifdef ARCH_aarch64
+    case bfd_arch_aarch64:
+      info->symbol_is_valid = aarch64_symbol_is_valid;
+      info->disassembler_needs_relocs = TRUE;
+      break;
+#endif
 #ifdef ARCH_arm
     case bfd_arch_arm:
       info->symbol_is_valid = arm_symbol_is_valid;
@@ -563,6 +585,11 @@ disassemble_init_for_target (struct disassemble_info * info)
     case bfd_arch_mep:
       info->skip_zeroes = 256;
       info->skip_zeroes_at_end = 0;
+      break;
+#endif
+#ifdef ARCH_metag
+    case bfd_arch_metag:
+      info->disassembler_needs_relocs = TRUE;
       break;
 #endif
 #ifdef ARCH_m32c

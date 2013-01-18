@@ -1,7 +1,6 @@
 /* Native-dependent code for the i386.
 
-   Copyright (C) 2001, 2004-2005, 2007-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -18,8 +17,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include "i386-nat.h"
 #include "defs.h"
+#include "i386-nat.h"
 #include "breakpoint.h"
 #include "command.h"
 #include "gdbcmd.h"
@@ -318,7 +317,7 @@ i386_show_dr (struct i386_debug_reg_state *state,
 	      const char *func, CORE_ADDR addr,
 	      int len, enum target_hw_bp_type type)
 {
-  int addr_size = gdbarch_addr_bit (target_gdbarch) / 8;
+  int addr_size = gdbarch_addr_bit (target_gdbarch ()) / 8;
   int i;
 
   puts_unfiltered (func);
@@ -873,7 +872,7 @@ i386_use_watchpoints (struct target_ops *t)
 
   if (i386_inferior_data == NULL)
     i386_inferior_data
-      = register_inferior_data_with_cleanup (i386_inferior_data_cleanup);
+      = register_inferior_data_with_cleanup (NULL, i386_inferior_data_cleanup);
 }
 
 void

@@ -1,7 +1,8 @@
 /* ELF executable support for BFD.
 
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
+   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012,
+   2013
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -545,9 +546,9 @@ setup_group (bfd *abfd, Elf_Internal_Shdr *hdr, asection *newsect)
       shnum = elf_numsections (abfd);
       num_group = 0;
 
-#define IS_VALID_GROUP_SECTION_HEADER(shdr)		\
+#define IS_VALID_GROUP_SECTION_HEADER(shdr, minsize)	\
 	(   (shdr)->sh_type == SHT_GROUP		\
-	 && (shdr)->sh_size >= (2 * GRP_ENTRY_SIZE)	\
+	 && (shdr)->sh_size >= minsize			\
 	 && (shdr)->sh_entsize == GRP_ENTRY_SIZE	\
 	 && ((shdr)->sh_size % GRP_ENTRY_SIZE) == 0)
 
@@ -555,7 +556,7 @@ setup_group (bfd *abfd, Elf_Internal_Shdr *hdr, asection *newsect)
 	{
 	  Elf_Internal_Shdr *shdr = elf_elfsections (abfd)[i];
 
-	  if (IS_VALID_GROUP_SECTION_HEADER (shdr))
+	  if (IS_VALID_GROUP_SECTION_HEADER (shdr, 2 * GRP_ENTRY_SIZE))
 	    num_group += 1;
 	}
 
@@ -581,7 +582,7 @@ setup_group (bfd *abfd, Elf_Internal_Shdr *hdr, asection *newsect)
 	    {
 	      Elf_Internal_Shdr *shdr = elf_elfsections (abfd)[i];
 
-	      if (IS_VALID_GROUP_SECTION_HEADER (shdr))
+	      if (IS_VALID_GROUP_SECTION_HEADER (shdr, 2 * GRP_ENTRY_SIZE))
 		{
 		  unsigned char *src;
 		  Elf_Internal_Group *dest;
@@ -880,45 +881,25 @@ _bfd_elf_make_section_from_shdr (bfd *abfd,
     {
       /* The debugging sections appear to be recognized only by name,
 	 not any sort of flag.  Their SEC_ALLOC bits are cleared.  */
-      static const struct
-	{
-	  const char *name;
-	  int len;
-	} debug_sections [] =
-	{
-	  { STRING_COMMA_LEN ("debug") },	/* 'd' */
-	  { NULL,		 0  },	/* 'e' */
-	  { NULL,		 0  },	/* 'f' */
-	  { STRING_COMMA_LEN ("gnu.linkonce.wi.") },	/* 'g' */
-	  { NULL,		 0  },	/* 'h' */
-	  { NULL,		 0  },	/* 'i' */
-	  { NULL,		 0  },	/* 'j' */
-	  { NULL,		 0  },	/* 'k' */
-	  { STRING_COMMA_LEN ("line") },	/* 'l' */
-	  { NULL,		 0  },	/* 'm' */
-	  { NULL,		 0  },	/* 'n' */
-	  { NULL,		 0  },	/* 'o' */
-	  { NULL,		 0  },	/* 'p' */
-	  { NULL,		 0  },	/* 'q' */
-	  { NULL,		 0  },	/* 'r' */
-	  { STRING_COMMA_LEN ("stab") },	/* 's' */
-	  { NULL,		 0  },	/* 't' */
-	  { NULL,		 0  },	/* 'u' */
-	  { NULL,		 0  },	/* 'v' */
-	  { NULL,		 0  },	/* 'w' */
-	  { NULL,		 0  },	/* 'x' */
-	  { NULL,		 0  },	/* 'y' */
-	  { STRING_COMMA_LEN ("zdebug") }	/* 'z' */
-	};
-
       if (name [0] == '.')
 	{
-	  int i = name [1] - 'd';
-	  if (i >= 0
-	      && i < (int) ARRAY_SIZE (debug_sections)
-	      && debug_sections [i].name != NULL
-	      && strncmp (&name [1], debug_sections [i].name,
-			  debug_sections [i].len) == 0)
+	  const char *p;
+	  int n;
+	  if (name[1] == 'd')
+	    p = ".debug", n = 6;
+	  else if (name[1] == 'g' && name[2] == 'n')
+	    p = ".gnu.linkonce.wi.", n = 17;
+	  else if (name[1] == 'g' && name[2] == 'd')
+	    p = ".gdb_index", n = 11; /* yes we really do mean 11.  */
+	  else if (name[1] == 'l')
+	    p = ".line", n = 5;
+	  else if (name[1] == 's')
+	    p = ".stab", n = 5;
+	  else if (name[1] == 'z')
+	    p = ".zdebug", n = 7;
+	  else
+	    p = NULL, n = 0;
+	  if (p != NULL && strncmp (name, p, n) == 0)
 	    flags |= SEC_DEBUGGING;
 	}
     }
@@ -1929,7 +1910,7 @@ bfd_section_from_shdr (bfd *abfd, unsigned int shindex)
       return TRUE;
 
     case SHT_GROUP:
-      if (! IS_VALID_GROUP_SECTION_HEADER (hdr))
+      if (! IS_VALID_GROUP_SECTION_HEADER (hdr, GRP_ENTRY_SIZE))
 	return FALSE;
       if (!_bfd_elf_make_section_from_shdr (abfd, hdr, name, shindex))
 	return FALSE;
@@ -2081,6 +2062,9 @@ static const struct bfd_elf_special_section special_sections_d[] =
 {
   { STRING_COMMA_LEN (".data"),         -2, SHT_PROGBITS, SHF_ALLOC + SHF_WRITE },
   { STRING_COMMA_LEN (".data1"),         0, SHT_PROGBITS, SHF_ALLOC + SHF_WRITE },
+  /* There are more DWARF sections than these, but they needn't be added here
+     unless you have to cope with broken compilers that don't emit section
+     attributes or you want to help the user writing assembler.  */
   { STRING_COMMA_LEN (".debug"),         0, SHT_PROGBITS, 0 },
   { STRING_COMMA_LEN (".debug_line"),    0, SHT_PROGBITS, 0 },
   { STRING_COMMA_LEN (".debug_info"),    0, SHT_PROGBITS, 0 },
@@ -3264,13 +3248,21 @@ sym_is_global (bfd *abfd, asymbol *sym)
 }
 
 /* Don't output section symbols for sections that are not going to be
-   output, or that are duplicates.  */
+   output, that are duplicates or there is no BFD section.  */
 
 static bfd_boolean
 ignore_section_sym (bfd *abfd, asymbol *sym)
 {
-  return ((sym->flags & BSF_SECTION_SYM) != 0
-	  && !(sym->section->owner == abfd
+  elf_symbol_type *type_ptr;
+
+  if ((sym->flags & BSF_SECTION_SYM) == 0)
+    return FALSE;
+
+  type_ptr = elf_symbol_from (abfd, sym);
+  return ((type_ptr != NULL
+	   && type_ptr->internal_elf_sym.st_shndx != 0
+	   && bfd_is_abs_section (sym->section))
+	  || !(sym->section->owner == abfd
 	       || (sym->section->output_section->owner == abfd
 		   && sym->section->output_offset == 0)
 	       || bfd_is_abs_section (sym->section)));
@@ -3883,6 +3875,7 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 
 	  if (phdr_size == (bfd_size_type) -1)
 	    phdr_size = get_program_header_size (abfd, info);
+	  phdr_size += bed->s->sizeof_ehdr;
 	  if ((abfd->flags & D_PAGED) == 0
 	      || (sections[0]->lma & addr_mask) < phdr_size
 	      || ((sections[0]->lma & addr_mask) % maxpagesize
@@ -4149,7 +4142,14 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 	  m->next = NULL;
 	  m->p_type = PT_GNU_STACK;
 	  m->p_flags = elf_tdata (abfd)->stack_flags;
+	  m->p_align = bed->stack_align;
 	  m->p_flags_valid = 1;
+	  m->p_align_valid = m->p_align != 0;
+	  if (info->stacksize > 0)
+	    {
+	      m->p_size = info->stacksize;
+	      m->p_size_valid = 1;
+	    }
 
 	  *pm = m;
 	  pm = &m->next;
@@ -5030,6 +5030,11 @@ assign_file_positions_for_non_load_sections (bfd *abfd,
 	      memset (p, 0, sizeof *p);
 	      p->p_type = PT_NULL;
 	    }
+	}
+      else if (p->p_type == PT_GNU_STACK)
+	{
+	  if (m->p_size_valid)
+	    p->p_memsz = m->p_size;
 	}
       else if (m->count != 0)
 	{
@@ -6040,7 +6045,7 @@ rewrite_elf_program_header (bfd *ibfd, bfd *obfd)
 		 and carry on looping.  */
 	      amt = sizeof (struct elf_segment_map);
 	      amt += ((bfd_size_type) section_count - 1) * sizeof (asection *);
-	      map = (struct elf_segment_map *) bfd_alloc (obfd, amt);
+	      map = (struct elf_segment_map *) bfd_zalloc (obfd, amt);
 	      if (map == NULL)
 		{
 		  free (sections);
@@ -6175,12 +6180,15 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
       map->p_align_valid = 1;
       map->p_vaddr_offset = 0;
 
-      if (map->p_type == PT_GNU_RELRO)
+      if (map->p_type == PT_GNU_RELRO
+	  || map->p_type == PT_GNU_STACK)
 	{
 	  /* The PT_GNU_RELRO segment may contain the first a few
 	     bytes in the .got.plt section even if the whole .got.plt
 	     section isn't in the PT_GNU_RELRO segment.  We won't
-	     change the size of the PT_GNU_RELRO segment.  */
+	     change the size of the PT_GNU_RELRO segment.
+	     Similarly, PT_GNU_STACK size is significant on uclinux
+	     systems.    */
 	  map->p_size = segment->p_memsz;
 	  map->p_size_valid = 1;
 	}
@@ -6350,6 +6358,26 @@ copy_private_bfd_data (bfd *ibfd, bfd *obfd)
     }
 
 rewrite:
+  if (ibfd->xvec == obfd->xvec)
+    {
+      /* When rewriting program header, set the output maxpagesize to
+	 the maximum alignment of input PT_LOAD segments.  */
+      Elf_Internal_Phdr *segment;
+      unsigned int i;
+      unsigned int num_segments = elf_elfheader (ibfd)->e_phnum;
+      bfd_vma maxpagesize = 0;
+
+      for (i = 0, segment = elf_tdata (ibfd)->phdr;
+	   i < num_segments;
+	   i++, segment++)
+	if (segment->p_type == PT_LOAD
+	    && maxpagesize < segment->p_align)
+	  maxpagesize = segment->p_align;
+
+      if (maxpagesize != get_elf_backend_data (obfd)->maxpagesize)
+	bfd_emul_set_maxpagesize (bfd_get_target (obfd), maxpagesize);
+    }
+
   return rewrite_elf_program_header (ibfd, obfd);
 }
 
@@ -6764,6 +6792,7 @@ swap_out_syms (bfd *abfd,
 		  shndx = elf_tdata (abfd)->symtab_shndx_section;
 		  break;
 		default:
+		  shndx = SHN_ABS;
 		  break;
 		}
 	    }
@@ -7356,7 +7385,7 @@ error_return_verdef:
       Elf_Internal_Verdef *iverdef;
       Elf_Internal_Verdaux *iverdaux;
 
-      iverdef = &elf_tdata (abfd)->verdef[freeidx - 1];;
+      iverdef = &elf_tdata (abfd)->verdef[freeidx - 1];
 
       iverdef->vd_version = VER_DEF_CURRENT;
       iverdef->vd_flags = 0;
@@ -7567,6 +7596,23 @@ _bfd_elf_find_nearest_line (bfd *abfd,
 			    const char **functionname_ptr,
 			    unsigned int *line_ptr)
 {
+  return _bfd_elf_find_nearest_line_discriminator (abfd, section, symbols,
+                                                   offset, filename_ptr,
+                                                   functionname_ptr,
+                                                   line_ptr,
+                                                   NULL);
+}
+
+bfd_boolean
+_bfd_elf_find_nearest_line_discriminator (bfd *abfd,
+                                          asection *section,
+                                          asymbol **symbols,
+                                          bfd_vma offset,
+                                          const char **filename_ptr,
+                                          const char **functionname_ptr,
+                                          unsigned int *line_ptr,
+                                          unsigned int *discriminator_ptr)
+{
   bfd_boolean found;
 
   if (_bfd_dwarf1_find_nearest_line (abfd, section, symbols, offset,
@@ -7584,7 +7630,7 @@ _bfd_elf_find_nearest_line (bfd *abfd,
   if (_bfd_dwarf2_find_nearest_line (abfd, dwarf_debug_sections,
                                      section, symbols, offset,
 				     filename_ptr, functionname_ptr,
-				     line_ptr, 0,
+				     line_ptr, discriminator_ptr, 0,
 				     &elf_tdata (abfd)->dwarf2_find_line_info))
     {
       if (!*functionname_ptr)
@@ -7620,8 +7666,19 @@ bfd_boolean
 _bfd_elf_find_line (bfd *abfd, asymbol **symbols, asymbol *symbol,
 		    const char **filename_ptr, unsigned int *line_ptr)
 {
+  return _bfd_elf_find_line_discriminator (abfd, symbols, symbol,
+		                           filename_ptr, line_ptr,
+                                           NULL);
+}
+
+bfd_boolean
+_bfd_elf_find_line_discriminator (bfd *abfd, asymbol **symbols, asymbol *symbol,
+                                  const char **filename_ptr,
+                                  unsigned int *line_ptr,
+                                  unsigned int *discriminator_ptr)
+{
   return _bfd_dwarf2_find_line (abfd, symbols, symbol,
-				filename_ptr, line_ptr, 0,
+				filename_ptr, line_ptr, discriminator_ptr, 0,
 				&elf_tdata (abfd)->dwarf2_find_line_info);
 }
 
@@ -8106,6 +8163,24 @@ elfcore_grok_arm_vfp (bfd *abfd, Elf_Internal_Note *note)
   return elfcore_make_note_pseudosection (abfd, ".reg-arm-vfp", note);
 }
 
+static bfd_boolean
+elfcore_grok_aarch_tls (bfd *abfd, Elf_Internal_Note *note)
+{
+  return elfcore_make_note_pseudosection (abfd, ".reg-aarch-tls", note);
+}
+
+static bfd_boolean
+elfcore_grok_aarch_hw_break (bfd *abfd, Elf_Internal_Note *note)
+{
+  return elfcore_make_note_pseudosection (abfd, ".reg-aarch-hw-break", note);
+}
+
+static bfd_boolean
+elfcore_grok_aarch_hw_watch (bfd *abfd, Elf_Internal_Note *note)
+{
+  return elfcore_make_note_pseudosection (abfd, ".reg-aarch-hw-watch", note);
+}
+
 #if defined (HAVE_PRPSINFO_T)
 typedef prpsinfo_t   elfcore_psinfo_t;
 #if defined (HAVE_PRPSINFO32_T)		/* Sparc64 cross Sparc32 */
@@ -8546,6 +8621,27 @@ elfcore_grok_note (bfd *abfd, Elf_Internal_Note *note)
       else
 	return TRUE;
 
+    case NT_ARM_TLS:
+      if (note->namesz == 6
+	  && strcmp (note->namedata, "LINUX") == 0)
+	return elfcore_grok_aarch_tls (abfd, note);
+      else
+	return TRUE;
+
+    case NT_ARM_HW_BREAK:
+      if (note->namesz == 6
+	  && strcmp (note->namedata, "LINUX") == 0)
+	return elfcore_grok_aarch_hw_break (abfd, note);
+      else
+	return TRUE;
+
+    case NT_ARM_HW_WATCH:
+      if (note->namesz == 6
+	  && strcmp (note->namedata, "LINUX") == 0)
+	return elfcore_grok_aarch_hw_watch (abfd, note);
+      else
+	return TRUE;
+
     case NT_PRPSINFO:
     case NT_PSINFO:
       if (bed->elf_backend_grok_psinfo)
@@ -8570,6 +8666,14 @@ elfcore_grok_note (bfd *abfd, Elf_Internal_Note *note)
 
 	return TRUE;
       }
+
+    case NT_FILE:
+      return elfcore_make_note_pseudosection (abfd, ".note.linuxcore.file",
+					      note);
+
+    case NT_SIGINFO:
+      return elfcore_make_note_pseudosection (abfd, ".note.linuxcore.siginfo",
+					      note);
     }
 }
 
@@ -9342,6 +9446,42 @@ elfcore_write_arm_vfp (bfd *abfd,
 }
 
 char *
+elfcore_write_aarch_tls (bfd *abfd,
+		       char *buf,
+		       int *bufsiz,
+		       const void *aarch_tls,
+		       int size)
+{
+  char *note_name = "LINUX";
+  return elfcore_write_note (abfd, buf, bufsiz,
+			     note_name, NT_ARM_TLS, aarch_tls, size);
+}
+
+char *
+elfcore_write_aarch_hw_break (bfd *abfd,
+			    char *buf,
+			    int *bufsiz,
+			    const void *aarch_hw_break,
+			    int size)
+{
+  char *note_name = "LINUX";
+  return elfcore_write_note (abfd, buf, bufsiz,
+			     note_name, NT_ARM_HW_BREAK, aarch_hw_break, size);
+}
+
+char *
+elfcore_write_aarch_hw_watch (bfd *abfd,
+			    char *buf,
+			    int *bufsiz,
+			    const void *aarch_hw_watch,
+			    int size)
+{
+  char *note_name = "LINUX";
+  return elfcore_write_note (abfd, buf, bufsiz,
+			     note_name, NT_ARM_HW_WATCH, aarch_hw_watch, size);
+}
+
+char *
 elfcore_write_register_note (bfd *abfd,
 			     char *buf,
 			     int *bufsiz,
@@ -9377,6 +9517,12 @@ elfcore_write_register_note (bfd *abfd,
     return elfcore_write_s390_system_call (abfd, buf, bufsiz, data, size);
   if (strcmp (section, ".reg-arm-vfp") == 0)
     return elfcore_write_arm_vfp (abfd, buf, bufsiz, data, size);
+  if (strcmp (section, ".reg-aarch-tls") == 0)
+    return elfcore_write_aarch_tls (abfd, buf, bufsiz, data, size);
+  if (strcmp (section, ".reg-aarch-hw-break") == 0)
+    return elfcore_write_aarch_hw_break (abfd, buf, bufsiz, data, size);
+  if (strcmp (section, ".reg-aarch-hw-watch") == 0)
+    return elfcore_write_aarch_hw_watch (abfd, buf, bufsiz, data, size);
   return NULL;
 }
 
