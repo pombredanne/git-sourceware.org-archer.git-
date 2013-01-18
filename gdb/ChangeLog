@@ -1,3 +1,41 @@
+2013-01-18  Yao Qi  <yao@codesourcery.com>
+
+	* dbxread.c (dbx_psymtab_to_symtab): Delete the declaration.
+	(dbx_read_symtab): New declaration.
+	(dbx_psymtab_to_symtab): Delete.
+	(dbx_read_symtab): Rename from dbx_psymtab_to_symtab.
+	Rename parameter PST to SELF.  Exchanged two parameters.
+	(start_psymtab): Caller update.
+	* dwarf2read.c (dwarf2_psymtab_to_symtab): Delete the declaration.
+	(dwarf2_read_symtab): New declaration.
+	(dwarf2_psymtab_to_symtab): Delete.
+	(dwarf2_read_symtab): Rename from dwarf2_psymtab_to_symtab.
+	Rename parameter PST to SELF.  Exchanged two parameters.
+	(create_partial_symtab): Caller update.
+	* mdebugread.c (mdebug_psymtab_to_symtab): Delete.
+	(mdebug_read_symtab): Rename from mdebug_psymtab_to_symtab.
+	Rename parameter PST to SELF.  Exchanged two parameters.
+	(parse_partial_symbols, new_psymtab): Caller update.
+	* psympriv.h (struct partial_symtab) <read_symtab>: Exchange
+	two parameters.
+	* psymtab.c (psymtab_to_symtab): Caller update.
+	* xcoffread.c (xcoff_psymtab_to_symtab): Delete.
+	(xcoff_read_symtab): Rename from xcoff_psymtab_to_symtab.
+	Rename parameter PST to SELF.  Exchanged two parameters.
+	(xcoff_start_psymtab): Caller update.
+
+2013-01-18  Yao Qi  <yao@codesourcery.com>
+
+	* infrun.c (proceed): Rename local variable 'oneproc' to
+	'force_step'.
+
+2013-01-17  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dw2_build_type_unit_groups_reader): Delete.
+	(dw2_build_type_unit_groups): Delete.  All uses updated.
+
+	* symtab.h (struct symbol_search): Add comment.
+
 2013-01-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* symtab.c (compare_filenames_for_search): New comment for
