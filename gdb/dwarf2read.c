@@ -1284,8 +1284,8 @@ static void add_partial_subprogram (struct partial_die_info *pdi,
 				    CORE_ADDR *lowpc, CORE_ADDR *highpc,
 				    int need_pc, struct dwarf2_cu *cu);
 
-static void dwarf2_psymtab_to_symtab (struct objfile *,
-				      struct partial_symtab *);
+static void dwarf2_read_symtab (struct partial_symtab *,
+				struct objfile *);
 
 static void psymtab_to_symtab_1 (struct partial_symtab *);
 
@@ -2814,40 +2814,6 @@ dw2_setup (struct objfile *objfile)
   gdb_assert (dwarf2_per_objfile);
 }
 
-/* Reader function for dw2_build_type_unit_groups.  */
-
-static void
-dw2_build_type_unit_groups_reader (const struct die_reader_specs *reader,
-				   gdb_byte *info_ptr,
-				   struct die_info *type_unit_die,
-				   int has_children,
-				   void *data)
-{
-  struct dwarf2_cu *cu = reader->cu;
-  struct attribute *attr;
-  struct type_unit_group *tu_group;
-
-  gdb_assert (data == NULL);
-
-  if (! has_children)
-    return;
-
-  attr = dwarf2_attr_no_follow (type_unit_die, DW_AT_stmt_list);
-  /* Call this for its side-effect of creating the associated
-     struct type_unit_group if it doesn't already exist.  */
-  tu_group = get_type_unit_group (cu, attr);
-}
-
-/* Build dwarf2_per_objfile->type_unit_groups.
-   This function may be called multiple times.  */
-
-static void
-dw2_build_type_unit_groups (void)
-{
-  if (dwarf2_per_objfile->type_unit_groups == NULL)
-    build_type_unit_groups (dw2_build_type_unit_groups_reader, NULL);
-}
-
 /* die_reader_func for dw2_get_file_names.  */
 
 static void
@@ -3072,10 +3038,10 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 
   dw2_setup (objfile);
 
-  dw2_build_type_unit_groups ();
+  /* The rule is CUs specify all the files, including those used by
+     any TU, so there's no need to scan TUs here.  */
 
-  for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		   + dwarf2_per_objfile->n_type_unit_groups); ++i)
+  for (i = 0; i < dwarf2_per_objfile->n_comp_units; ++i)
     {
       int j;
       struct dwarf2_per_cu_data *per_cu = dw2_get_primary_cu (i);
@@ -3528,8 +3494,6 @@ dw2_expand_symtabs_matching
       struct cleanup *cleanup;
       htab_t visited_found, visited_not_found;
 
-      dw2_build_type_unit_groups ();
-
       visited_found = htab_create_alloc (10,
 					 htab_hash_pointer, htab_eq_pointer,
 					 NULL, xcalloc, xfree);
@@ -3539,8 +3503,10 @@ dw2_expand_symtabs_matching
 					     NULL, xcalloc, xfree);
       make_cleanup_htab_delete (visited_not_found);
 
-      for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		       + dwarf2_per_objfile->n_type_unit_groups); ++i)
+      /* The rule is CUs specify all the files, including those used by
+	 any TU, so there's no need to scan TUs here.  */
+
+      for (i = 0; i < dwarf2_per_objfile->n_comp_units; ++i)
 	{
 	  int j;
 	  struct dwarf2_per_cu_data *per_cu = dw2_get_primary_cu (i);
@@ -3713,11 +3679,11 @@ dw2_map_symbol_filenames (struct objfile *objfile, symbol_filename_ftype *fun,
   cleanup = make_cleanup_htab_delete (visited);
   dw2_setup (objfile);
 
-  dw2_build_type_unit_groups ();
+  /* The rule is CUs specify all the files, including those used by
+     any TU, so there's no need to scan TUs here.
+     We can ignore file names coming from already-expanded CUs.  */
 
-  /* We can ignore file names coming from already-expanded CUs.  */
-  for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		   + dwarf2_per_objfile->n_type_units); ++i)
+  for (i = 0; i < dwarf2_per_objfile->n_comp_units; ++i)
     {
       struct dwarf2_per_cu_data *per_cu = dw2_get_cu (i);
 
@@ -3730,8 +3696,7 @@ dw2_map_symbol_filenames (struct objfile *objfile, symbol_filename_ftype *fun,
 	}
     }
 
-  for (i = 0; i < (dwarf2_per_objfile->n_comp_units
-		   + dwarf2_per_objfile->n_type_unit_groups); ++i)
+  for (i = 0; i < dwarf2_per_objfile->n_comp_units; ++i)
     {
       int j;
       struct dwarf2_per_cu_data *per_cu = dw2_get_primary_cu (i);
@@ -4890,7 +4855,7 @@ create_partial_symtab (struct dwarf2_per_cu_data *per_cu, const char *name)
 
   /* This is the glue that links PST into GDB's symbol API.  */
   pst->read_symtab_private = per_cu;
-  pst->read_symtab = dwarf2_psymtab_to_symtab;
+  pst->read_symtab = dwarf2_read_symtab;
   per_cu->v.psymtab = pst;
 
   return pst;
@@ -6418,23 +6383,24 @@ locate_pdi_sibling (const struct die_reader_specs *reader,
   return skip_children (reader, info_ptr);
 }
 
-/* Expand this partial symbol table into a full symbol table.  PST is
+/* Expand this partial symbol table into a full symbol table.  SELF is
    not NULL.  */
 
 static void
-dwarf2_psymtab_to_symtab (struct objfile *objfile, struct partial_symtab *pst)
+dwarf2_read_symtab (struct partial_symtab *self,
+		    struct objfile *objfile)
 {
-  if (pst->readin)
+  if (self->readin)
     {
       warning (_("bug: psymtab for %s is already read in."),
-	       pst->filename);
+	       self->filename);
     }
   else
     {
       if (info_verbose)
 	{
 	  printf_filtered (_("Reading in symbols for %s..."),
-			   pst->filename);
+			   self->filename);
 	  gdb_flush (gdb_stdout);
 	}
 
@@ -6457,7 +6423,7 @@ dwarf2_psymtab_to_symtab (struct objfile *objfile, struct partial_symtab *pst)
 
       dwarf2_per_objfile->reading_partial_symbols = 0;
 
-      psymtab_to_symtab_1 (pst);
+      psymtab_to_symtab_1 (self);
 
       /* Finish up the debug error message.  */
       if (info_verbose)

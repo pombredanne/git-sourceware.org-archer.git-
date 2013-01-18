@@ -1,3 +1,18 @@
+2013-01-18  Hafiz Abid Qadeer<abidh@codesourcery.com>
+
+        PR gdb/13443
+        * gdb.base/checkpoint.exp: Update test messages to make them
+        unique.
+
+2013-01-18  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/infotrace.exp: Check 'traceframe usage' in the
+	output of 'info tracepoints'.
+	* gdb.trace/disconnected-tracing.exp (disconnected_tracing):
+	Likewise.
+	* gdb.trace/tstatus.exp (run_trace_experiment): Likewise.
+	* gdb.trace/disconnected-tracing.c (struct foo): New.
+
 2013-01-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.dwarf2/dw2-dos-drive.S: New file.
