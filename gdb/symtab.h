@@ -120,7 +120,7 @@ struct general_symbol_info
 
     CORE_ADDR address;
 
-    /* A common block.  Used with COMMON_BLOCK_DOMAIN.  */
+    /* A common block.  Used with LOC_COMMON_BLOCK.  */
 
     struct common_block *common_block;
 
@@ -167,7 +167,8 @@ struct general_symbol_info
   struct obj_section *obj_section;
 };
 
-extern void symbol_set_demangled_name (struct general_symbol_info *, char *,
+extern void symbol_set_demangled_name (struct general_symbol_info *,
+				       const char *,
                                        struct objfile *);
 
 extern const char *symbol_get_demangled_name
@@ -414,7 +415,8 @@ typedef enum domain_enum_tag
 
   LABEL_DOMAIN,
 
-  /* Fortran common blocks.  Their naming must be separate from VAR_DOMAIN.  */
+  /* Fortran common blocks.  Their naming must be separate from VAR_DOMAIN.
+     They also always use LOC_COMMON_BLOCK.  */
   COMMON_BLOCK_DOMAIN
 } domain_enum;
 
@@ -533,6 +535,10 @@ enum address_class
   /* The variable's address is computed by a set of location
      functions (see "struct symbol_computed_ops" below).  */
   LOC_COMPUTED,
+
+  /* The variable uses general_symbol_info->value->common_block field.
+     It also always uses COMMON_BLOCK_DOMAIN.  */
+  LOC_COMMON_BLOCK,
 };
 
 /* The methods needed to implement LOC_COMPUTED.  These methods can

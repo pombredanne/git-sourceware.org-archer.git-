@@ -1,3 +1,125 @@
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb_obstack.h (obconcat): Move declaration here, from...
+	* symfile.h (obconcat): ... here.
+	* gdb_obstack.c: New file.
+	(obconcat): Move from...
+	* symfile.c (obconcat): ... here.
+	* Makefile.in (SFILES): Add gdb_obstack.c.
+	(COMMON_OBS): Add gdb_obstack.o.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.h (obsavestring): Don't declare.
+	* symfile.c (obsavestring): Remove.
+	* ada-exp.y: Use obstack_copy0, not obsavestring.
+	* ada-lang.c: Use obstack_copy0, not obsavestring.
+	* coffread.c: Use obstack_copy0, not obsavestring.
+	* cp-namespace.c: Use obstack_copy0, not obsavestring.
+	* dbxread.c: Use obstack_copy0, not obsavestring.
+	* dwarf2read.c: Use obstack_copy0, not obsavestring.
+	* jit.c: Use obstack_copy0, not obsavestring.
+	* mdebugread.c: Use obstack_copy0, not obsavestring.
+	* psymtab.c: Use obstack_copy0, not obsavestring.
+	* stabsread.c: Use obstack_copy0, not obsavestring.
+	* xcoffread.c: Use obstack_copy0, not obsavestring.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (fixup_go_packaging): Save package name
+	on objfile obstack.
+	* gdbtypes.c (init_type): Don't copy name.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (struct partial_die_info) <name, scope>: Now
+	const.
+	(struct attribute) <u.str>: Now const.
+	(struct fnfieldlist) <name>: Now const.
+	(dw2_get_file_names_reader, init_cutu_and_read_dies): Update.
+	(partial_die_parent_scope): Make return type const.
+	(partial_die_full_name, add_partial_symbol): Update.
+	(dwarf2_compute_name, dwarf2_full_name, dwarf2_physname): Make
+	'name' const.
+	(find_file_and_directory): Make 'name' and 'comp_dir' const.
+	(read_file_scope, read_func_scope, dwarf2_add_field)
+	(dwarf2_add_member_fn, read_structure_type)
+	(process_enumeration_scope, read_array_type, read_module_type)
+	(read_base_type, read_subrange_type): Update.
+	(dwarf2_start_symtab): Make 'name' and 'comp_dir' const.
+	(new_symbol_full, guess_full_die_structure_name): Update.
+	(dwarf2_canonicalize_name): Return const type.  Make 'name' const.
+	(dwarf2_name): Return const type.
+	(dwarf_decode_macro_bytes, dwarf_decode_macros): Make 'comp_dir'
+	const.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdbtypes.c (init_type): Make 'name' const.
+	* gdbtypes.h (init_type): Update.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* buildsym.c (patch_subfile_names): Use set_last_source_file.
+	(start_symtab): Make 'name' and 'dirname' const.  Use
+	set_last_source_file.
+	(restart_symtab, reset_symtab_globals): Use set_last_source_file.
+	(last_source_file): Define.  Now static.
+	(set_last_source_file, get_last_source_file): New functions.
+	* buildsym.h (last_source_file): Don't declare.
+	(start_symtab): Update.
+	(set_last_source_file, get_last_source_file): Declare.
+	* coffread.c (complete_symtab): Use set_last_source_file.
+	(coff_end_symtab): Likewise.
+	(coff_symtab_read): Use set_last_source_file, get_last_source_file.
+	* dbxread.c (read_dbx_symtab, read_ofile_symtab): Use
+	set_last_source_file.
+	(process_one_symbol): Use get_last_source_file.
+	* mdebugread.c (parse_partial_symbols): Use set_last_source_file.
+	(psymtab_to_symtab_1): Use get_last_source_file.
+	* xcoffread.c (process_linenos): Use get_last_source_file.
+	(complete_symtab): Use set_last_source_file.
+	(read_xcoff_symtab): Use set_last_source_file, get_last_source_file.
+	(scan_xcoff_symtab): Use set_last_source_file.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (struct demangled_name_entry) <mangled>: Now const.
+	(symbol_set_names): Remove casts.  Handle field const-ness.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (new_symbol_full): Remove cast.
+	* symtab.c (symbol_set_demangled_name): Make 'name' const.
+	* symtab.h (symbol_set_demangled_name): Update.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* main.c (captured_main): Call bfd_init.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* gnu-v2-abi.c (_initialize_gnu_v2_abi): Don't set default ABI.
+	* gnu-v3-abi.c (_initialize_gnu_v3_abi): Set default ABI.
+	* minsyms.c (install_minimal_symbols): Don't check for _Z symbols.
+	* NEWS: Update.
+
+2013-01-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symmisc.c (maintenance_print_msymbols): Check also ST_DEV.
+
+2013-01-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix gdb.fortran/common-block.exp crash in PIE mode.
+	* dwarf2read.c (new_symbol_full) <DW_TAG_common_block>: Use
+	LOC_COMMON_BLOCK.
+	* f-valprint.c (info_common_command_for_block): Expect
+	LOC_COMMON_BLOCK in gdb_assert.
+	* symtab.h (struct general_symbol_info): Update comment for the
+	common_block member.
+	(domain_enum): Extend comment for the COMMON_BLOCK_DOMAIN member.
+	(enum address_class): New member LOC_COMMON_BLOCK.
+
 2013-01-18  David Blaikie  <dblaikie@gmail.com>
 
 	* MAINTAINERS (Write After Approval): Add "David Blaikie".
