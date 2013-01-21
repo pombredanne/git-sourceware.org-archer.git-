@@ -2051,7 +2051,7 @@ Print the rule for substituting FROM in source file names. If FROM\n\
 is not specified, print all substitution rules."),
            &showlist);
 
-  add_setshow_enum_cmd ("filename-display", class_obscure,
+  add_setshow_enum_cmd ("filename-display", class_files,
 			filename_display_kind_names,
 			&filename_display_string, _("\
 Set how to display filenames."), _("\
