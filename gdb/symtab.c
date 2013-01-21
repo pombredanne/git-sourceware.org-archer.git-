@@ -263,6 +263,7 @@ iterate_over_symtabs (const char *name,
     {
       real_path = gdb_realpath (name);
       make_cleanup (xfree, real_path);
+      gdb_assert (IS_ABSOLUTE_PATH (real_path));
     }
 
   ALL_OBJFILES (objfile)
