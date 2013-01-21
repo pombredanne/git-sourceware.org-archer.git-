@@ -131,7 +131,6 @@ require_partial_symbols (struct objfile *objfile, int verbose)
 static int
 partial_map_expand_apply (struct objfile *objfile,
 			  const char *name,
-			  const char *full_path,
 			  const char *real_path,
 			  struct partial_symtab *pst,
 			  int (*callback) (struct symtab *, void *),
@@ -151,7 +150,7 @@ partial_map_expand_apply (struct objfile *objfile,
      all of them.  */
   psymtab_to_symtab (objfile, pst);
 
-  return iterate_over_some_symtabs (name, full_path, real_path, callback, data,
+  return iterate_over_some_symtabs (name, real_path, callback, data,
 				    objfile->symtabs, last_made);
 }
 
@@ -160,7 +159,6 @@ partial_map_expand_apply (struct objfile *objfile,
 static int
 partial_map_symtabs_matching_filename (struct objfile *objfile,
 				       const char *name,
-				       const char *full_path,
 				       const char *real_path,
 				       int (*callback) (struct symtab *,
 							void *),
@@ -183,7 +181,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
     if (compare_filenames_for_search (pst->filename, name)
         || compare_filenames_for_search (psymtab_to_fullname (pst), name))
       {
-	if (partial_map_expand_apply (objfile, name, full_path, real_path,
+	if (partial_map_expand_apply (objfile, name, real_path,
 				      pst, callback, data))
 	  return 1;
       }
@@ -196,35 +194,15 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 
     /* If the user gave us an absolute path, try to find the file in
        this symtab and use its absolute path.  */
-    if (full_path != NULL)
-      {
-	gdb_assert (IS_ABSOLUTE_PATH (full_path));
-	gdb_assert (IS_ABSOLUTE_PATH (name));
-	psymtab_to_fullname (pst);
-	if (pst->fullname != NULL
-	    && FILENAME_CMP (full_path, pst->fullname) == 0)
-	  {
-	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
-					  pst, callback, data))
-	      return 1;
-	  }
-      }
-
     if (real_path != NULL)
       {
-        char *rp = NULL;
-
 	gdb_assert (IS_ABSOLUTE_PATH (real_path));
 	gdb_assert (IS_ABSOLUTE_PATH (name));
 	psymtab_to_fullname (pst);
-        if (pst->fullname != NULL)
-          {
-            rp = gdb_realpath (pst->fullname);
-            make_cleanup (xfree, rp);
-          }
-	if (rp != NULL && FILENAME_CMP (real_path, rp) == 0)
+	if (pst->fullname != NULL
+	    && FILENAME_CMP (real_path, pst->fullname) == 0)
 	  {
-	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
+	    if (partial_map_expand_apply (objfile, name, real_path,
 					  pst, callback, data))
 	      return 1;
 	  }
