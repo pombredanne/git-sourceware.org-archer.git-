@@ -166,6 +166,11 @@ compare_filenames_for_search (const char *filename, const char *search_name)
      preceding the trailing SEARCH_NAME segment of FILENAME must be a
      directory separator.
 
+     The check !IS_ABSOLUTE_PATH ensures SEARCH_NAME "/dir/file.c"
+     cannot match FILENAME "/path//dir/file.c" - as user has requested
+     absolute path.  The sama applies for "c:\file.c" possibly
+     incorrectly hypothetically matching "d:\dir\c:\file.c".
+
      The HAS_DRIVE_SPEC purpose is to make FILENAME "c:file.c"
      compatible with SEARCH_NAME "file.c".  In such case a compiler had
      to put the "c:file.c" name into debug info.  Such compatibility
