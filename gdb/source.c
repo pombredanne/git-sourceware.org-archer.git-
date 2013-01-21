@@ -846,15 +846,11 @@ openp (const char *path, int opts, const char *string,
 done:
   if (filename_opened)
     {
-      /* If a file was opened, canonicalize its filename.  Use xfullpath
-         rather than gdb_realpath to avoid resolving the basename part
-         of filenames when the associated file is a symbolic link.  This
-         fixes a potential inconsistency between the filenames known to
-         GDB and the filenames it prints in the annotations.  */
+      /* If a file was opened, canonicalize its filename.  */
       if (fd < 0)
 	*filename_opened = NULL;
       else if (IS_ABSOLUTE_PATH (filename))
-	*filename_opened = xfullpath (filename);
+	*filename_opened = gdb_realpath (filename);
       else
 	{
 	  /* Beware the // my son, the Emacs barfs, the botch that catch...  */
@@ -864,7 +860,7 @@ done:
 			    ? "" : SLASH_STRING,
 			    filename, (char *)NULL);
 
-	  *filename_opened = xfullpath (f);
+	  *filename_opened = gdb_realpath (f);
 	  xfree (f);
 	}
     }
@@ -1007,9 +1003,7 @@ find_and_open_source (const char *filename,
       result = open (*fullname, OPEN_MODE);
       if (result >= 0)
 	{
-	  /* Call xfullpath here to be consistent with openp
-	     which we use below.  */
-	  char *lpath = xfullpath (*fullname);
+	  char *lpath = gdb_realpath (*fullname);
 
 	  xfree (*fullname);
 	  *fullname = lpath;
