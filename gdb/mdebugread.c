@@ -1052,8 +1052,9 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 					   sizeof (struct symbol)));
 		memset (enum_sym, 0, sizeof (struct symbol));
 		SYMBOL_SET_LINKAGE_NAME
-		  (enum_sym, obsavestring (f->name, strlen (f->name),
-					   &mdebugread_objfile->objfile_obstack));
+		  (enum_sym,
+		   obstack_copy0 (&mdebugread_objfile->objfile_obstack,
+				  f->name, strlen (f->name)));
 		SYMBOL_CLASS (enum_sym) = LOC_CONST;
 		SYMBOL_TYPE (enum_sym) = t;
 		SYMBOL_DOMAIN (enum_sym) = VAR_DOMAIN;
@@ -1697,8 +1698,8 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 	  else if (TYPE_TAG_NAME (tp) == NULL
 		   || strcmp (TYPE_TAG_NAME (tp), name) != 0)
 	    TYPE_TAG_NAME (tp)
-	      = obsavestring (name, strlen (name),
-			      &mdebugread_objfile->objfile_obstack);
+	      = obstack_copy0 (&mdebugread_objfile->objfile_obstack,
+			       name, strlen (name));
 	}
     }
 
@@ -1733,8 +1734,9 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 	    }
 	  if (TYPE_NAME (tp) == NULL
 	      || strcmp (TYPE_NAME (tp), name) != 0)
-	    TYPE_NAME (tp) = obsavestring (name, strlen (name),
-					   &mdebugread_objfile->objfile_obstack);
+	    TYPE_NAME (tp)
+	      = obstack_copy0 (&mdebugread_objfile->objfile_obstack,
+			       name, strlen (name));
 	}
     }
   if (t->bt == btTypedef)
@@ -2394,7 +2396,7 @@ parse_partial_symbols (struct objfile *objfile)
     (struct partial_symtab **) alloca (dependencies_allocated *
 				       sizeof (struct partial_symtab *));
 
-  last_source_file = NULL;
+  set_last_source_file (NULL);
 
   /*
    * Big plan:
@@ -4079,7 +4081,7 @@ psymtab_to_symtab_1 (struct objfile *objfile,
                      would otherwise be ended twice, once in
                      process_one_symbol, and once after this loop.  */
 		  if (type_code == N_SO
-		      && last_source_file
+		      && get_last_source_file ()
 		      && previous_stab_code != (unsigned char) N_SO
 		      && *name == '\000')
 		    {
