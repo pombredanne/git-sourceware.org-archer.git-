@@ -20,12 +20,9 @@ if {![dwarf2_support]} {
 }
 
 standard_testfile
-set executable ${testfile}
-set binfile ${objdir}/${subdir}/${executable}
-set srcfile ${testfile}.c
-set asmsrcfile ${objdir}/${subdir}/${testfile}asm.S
-set asmobjfile ${objdir}/${subdir}/${testfile}asm.o
-set srcabsdir ${objdir}/${subdir}/${testfile}.d
+set asmsrcfile [standard_output_file ${testfile}asm.S]
+set asmobjfile [standard_output_file ${testfile}asm.o]
+set srcabsdir [standard_output_file ${testfile}.d]
 set srctmpfile tmp-${testfile}.c
 
 # $srcdir may be relative.
@@ -330,7 +327,7 @@ remote_exec host "sh -c \"rmdir ${srcabsdir}{/rdir,}{/xdir,}{/compdir,}{/ldir,}{
 remote_exec host "sh -c \"mkdir ${srcabsdir}{,/rdir}{,/xdir}{,/compdir}{,/ldir}{,/fdir}\""
 remote_exec host "sh -c \"for d in ${srcabsdir}{,/rdir}{,/xdir}{,/compdir}{,/ldir}{,/fdir};do cp ${srcdir}/${subdir}/${srcfile} \\\$d/${srctmpfile}; done\""
 
-clean_restart ${executable}
+clean_restart ${testfile}
 
 if ![runto_main] {
     return -1
