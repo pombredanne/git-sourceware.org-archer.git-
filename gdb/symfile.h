@@ -160,10 +160,9 @@ struct quick_symbol_functions
      where the source file is named NAME.
 
      If NAME is not absolute, a match after a '/' in the symbol table's
-     file name will also work, both FULL_PATH and REAL_PATH are NULL
-     then.  If NAME is absolute then both FULL_PATH and REAL_PATH are
-     non-NULL absolute file names.  FULL_PATH is NAME resolved via
-     xfullpath, REAL_PATH is NAME resolved via gdb_realpath.
+     file name will also work, REAL_PATH is NULL then.  If NAME is
+     absolute then REAL_PATH is non-NULL absolute file name as resolved
+     via gdb_realpath from NAME.
 
      If a match is found, the "partial" symbol table is expanded.
      Then, this calls iterate_over_some_symtabs (or equivalent) over
@@ -171,7 +170,6 @@ struct quick_symbol_functions
      The result of this call is returned.  */
   int (*map_symtabs_matching_filename) (struct objfile *objfile,
 					const char *name,
-					const char *full_path,
 					const char *real_path,
 					int (*callback) (struct symtab *,
 							 void *),
