@@ -352,6 +352,8 @@ function_name_is_marked_for_skip (const char *function_name,
 
       if (e->filename != NULL)
 	{
+	  /* Check first sole SYMTAB->FILENAME.  It does not need to be
+	     a substring of symtab_to_fullname as it may contain "./" etc.  */
 	  if (function_sal->symtab != NULL
 	      && compare_filenames_for_search (function_sal->symtab->filename,
 					       e->filename))
