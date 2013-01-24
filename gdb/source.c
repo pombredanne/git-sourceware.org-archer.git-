@@ -1345,7 +1345,11 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
 	  ui_out_field_int (uiout, "line", line);
 	  ui_out_text (uiout, "\tin ");
 	  ui_out_field_string (uiout, "file", symtab_to_filename (s));
-	  if (ui_out_is_mi_like_p (uiout))
+
+	  /* TUI expects the "fullname" field.  While it is
+	     !ui_out_is_mi_like_p compared to CLI it is !ui_source_list.  */
+	  if (ui_out_is_mi_like_p (uiout)
+	      || !ui_out_test_flags (uiout, ui_source_list))
 	    {
 	      const char *fullname = symtab_to_fullname (s);
 
