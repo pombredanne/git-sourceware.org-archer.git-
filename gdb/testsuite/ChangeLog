@@ -1,3 +1,46 @@
+2013-01-24  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	PR gdb/13443
+	* gdb.mi/mi-var-block.exp: Make test messages unique.
+
+2013-01-23  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/dw2-error.exp: Pass test name to "file" test.
+
+2013-01-23  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/converts.cc (main): Initialize 'a'.
+
+2013-01-23  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* testsuite/gdb.python/frame.exp: Add a test for
+	gdb.Frame.architecture() method.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/annota1.exp (signal sent): No longer expect
+	breakpoints-invalid.
+	* gdb.cp/annota2.exp (continue until exit)
+	(watch triggered on a.x): Ditto.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/annota1.exp (breakpoints_invalid): New variable.
+	Adjust tests to breakpoints-invalid changes.
+	* gdb.cp/annota2.exp (breakpoints_invalid, frames_invalid): New
+	variables.
+	Adjust tests to breakpoints-invalid changes.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/annota1.exp (annotate ignore count change): Add
+	expected output for failure case.
+
+2013-01-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.gdb/selftest.exp (do_steps_and_nexts): Handle bfd_init
+	call.
+
 2013-01-21  Marc Khouzam  <marc.khouzam@ericsson.com>
 
 	* gdb.mi/mi-break.exp: Expect new 'thread-groups' field.
