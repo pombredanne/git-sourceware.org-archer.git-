@@ -19,9 +19,6 @@
 #include "symtab.h"
 #include "gdbtypes.h"
 
-extern void annotate_breakpoints_changed (void);
-
-extern void annotate_ignore_count_change (void);
 extern void annotate_breakpoint (int);
 extern void annotate_catchpoint (int);
 extern void annotate_watchpoint (int);
@@ -44,6 +41,8 @@ extern void annotate_breakpoints_table_end (void);
 extern void annotate_frames_invalid (void);
 extern void annotate_new_thread (void);
 extern void annotate_thread_changed (void);
+
+extern void annotate_display_prompt (void);
 
 struct type;
 
