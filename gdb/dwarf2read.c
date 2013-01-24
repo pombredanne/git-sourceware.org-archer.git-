@@ -4040,6 +4040,12 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
 {
   struct partial_symtab *subpst = allocate_psymtab (name, objfile);
 
+  if (!IS_ABSOLUTE_PATH (subpst->filename))
+    {
+      /* It shares objfile->objfile_obstack.  */
+      subpst->dirname = pst->dirname;
+    }
+
   subpst->section_offsets = pst->section_offsets;
   subpst->textlow = 0;
   subpst->texthigh = 0;

@@ -92,6 +92,10 @@ struct partial_symtab
 
   char *fullname;
 
+  /* FULLPATH after conversion by gdb_realpath.  */
+
+  char *realname;
+
   /* Directory in which it was compiled, or NULL if we don't know.  */
 
   const char *dirname;
