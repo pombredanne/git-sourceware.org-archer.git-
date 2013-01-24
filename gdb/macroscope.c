@@ -26,6 +26,7 @@
 #include "frame.h"
 #include "inferior.h"
 #include "complaints.h"
+#include "filenames.h"
 
 /* A table of user-defined macros.  Unlike the macro tables used for
    symtabs, this one uses xmalloc for all its allocation, not an
@@ -77,7 +78,7 @@ sal_macro_scope (struct symtab_and_line sal)
       complaint (&symfile_complaints,
                  _("symtab found for `%s', but that file\n"
                  "is not covered in the compilation unit's macro information"),
-                 sal.symtab->filename);
+                 symtab_to_filename (sal.symtab));
     }
 
   return ms;
