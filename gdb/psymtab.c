@@ -1408,7 +1408,8 @@ expand_symtabs_matching_via_partial
 	  if (ps->anonymous)
 	    continue;
 
-	  if (!(*file_matcher) (psymtab_to_fullname (ps), data)
+	  if (!(*file_matcher) (ps->filename, data)
+	      && !(*file_matcher) (psymtab_to_fullname (ps), data)
 	      && !(*file_matcher) (psymtab_to_realname (ps), data))
 	    continue;
 	}
