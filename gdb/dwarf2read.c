@@ -3072,11 +3072,11 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
       for (j = 0; j < file_data->num_file_names; ++j)
 	{
 	  const char *this_name = file_data->file_names[j];
+	  const char *this_real_name;
 
 	  if (compare_filenames_for_search (this_name, name))
 	    {
-	      if (dw2_map_expand_apply (objfile, per_cu,
-					name, real_path,
+	      if (dw2_map_expand_apply (objfile, per_cu, name, real_path,
 					callback, data))
 		return 1;
 	    }
@@ -3087,11 +3087,16 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 	      && FILENAME_CMP (lbasename (this_name), name_basename) != 0)
 	    continue;
 
+	  this_real_name = dw2_get_real_path (objfile, file_data, j);
+	  if (compare_filenames_for_search (this_real_name, name))
+	    {
+	      if (dw2_map_expand_apply (objfile, per_cu, name, real_path,
+					callback, data))
+		return 1;
+	    }
+
 	  if (real_path != NULL)
 	    {
-	      const char *this_real_name = dw2_get_real_path (objfile,
-							      file_data, j);
-
 	      gdb_assert (IS_ABSOLUTE_PATH (real_path));
 	      gdb_assert (IS_ABSOLUTE_PATH (name));
 	      if (this_real_name != NULL
