@@ -3076,8 +3076,7 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 
 	  if (compare_filenames_for_search (this_name, name))
 	    {
-	      if (dw2_map_expand_apply (objfile, per_cu,
-					name, real_path,
+	      if (dw2_map_expand_apply (objfile, per_cu, name, real_path,
 					callback, data))
 		return 1;
 	    }
