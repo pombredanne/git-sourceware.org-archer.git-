@@ -1,3 +1,66 @@
+2013-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (processing_has_namespace_info): Remove.
+	(struct dwarf2_cu) <processing_has_namespace_info>: New field.
+	(process_die, read_func_scope, dwarf2_start_symtab)
+	(new_symbol_full): Update.
+
+2013-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* cp-namespace.c (cp_set_block_scope): Remove.
+	* cp-support.h (cp_set_block_scope): Remove.
+	* dbxread.c: Include block.h.
+	(cp_set_block_scope): New function.
+	(process_one_symbol): Update.
+	* dwarf2read.c (read_func_scope): Use block_set_scope.
+
+2013-01-25  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (add_current_inferior_and_thread): Tweak comment.
+
+2013-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* cp-namespace.c (cp_scan_for_anonymous_namespaces): Update.
+	(cp_add_using_directive): Add 'copy_names' argument.
+	* cp-support.h (cp_add_using_directive): Update.
+	(struct using_direct) <import_src, import_dest, alias,
+	declaration>: Now const.
+	* dwarf2read.c (read_import_statement): Use obconcat.
+	Don't copy names passed to cp_add_using_directive.
+
+2013-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (qualified_name): Use TYPE_SAFE_NAME.
+
+2013-01-25  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (stop_reply_extract_thread): New.
+	(add_current_inferior_and_thread): New parameter 'wait_status'.
+	Handle it.
+	(remote_start_remote): Pass wait status to
+	add_current_inferior_and_thread.
+	(extended_remote_run): Update comment.
+	(extended_remote_create_inferior_1): Pass wait status to
+	add_current_inferior_and_thread.
+
+2013-01-25  Andrew Burgess  <aburgess@broadcom.com>
+	    Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* valarith.c (value_vector_widen): New function for replicating a
+	scalar into a vector.
+	(value_binop): Use value_vector_widen to widen scalar to vector
+	rather than casting, this better matches gcc C behaviour.
+	* valops.c (value_casst): Update logic for casting between vector
+	types, and for casting from scalar to vector, try to match gcc C
+	behaviour.
+	* value.h (value_vector_widen): Declare.
+	* opencl-lang.c (opencl_value_cast): New opencl specific casting
+	function, handle special case for casting scalar to vector.
+	(opencl_relop): Use opencl_value_cast.
+	(evaluate_subexp_opencl): Use opencl_value_cast instead of
+	value_cast, and handle BINOP_ASSIGN, UNOP_CAST, and UNOP_CAST_TYPE
+	in order to use opencl_value_cast.
+
 2013-01-25  Yao Qi  <yao@codesourcery.com>
 
 	* event-loop.c: Include "queue.h".
