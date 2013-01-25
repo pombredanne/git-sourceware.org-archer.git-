@@ -3547,6 +3547,8 @@ dw2_expand_symtabs_matching
 		  break;
 		}
 
+	      /* BASENAMES_MAY_DIFFER optimization cannot be applied here
+		 as DATA basename cannot be extracted.  */
 	      this_real_name = dw2_get_real_path (objfile, file_data, j);
 	      if (file_matcher (this_real_name, data))
 		{
