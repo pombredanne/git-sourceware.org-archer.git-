@@ -123,38 +123,26 @@ DO_RUNTEST = \
 check-single: all $(abs_builddir)/site.exp
 	$(DO_RUNTEST) $(RUNTESTFLAGS)
 
-# A list of all directories named "gdb.*" which also hold a .exp file.
-# We filter out gdb.base and add fake entries, because that directory
-# takes the longest to process, and so we split it in half.
-TEST_DIRS = gdb.base1 gdb.base2 $(filter-out gdb.base,$(sort $(notdir $(patsubst %/,%,$(dir $(wildcard $(srcdir)/gdb.*/*.exp))))))
-
-TEST_TARGETS = $(addprefix check-,$(TEST_DIRS))
-
-# We explicitly re-invoke make here for two reasons.  First, it lets
-# us add a -k option, which makes the parallel check mimic the
-# behavior of the serial check; and second, it means that we can still
-# regenerate the sum and log files even if a sub-make fails -- which
-# it usually does because dejagnu exits with an error if any test
-# fails.
 check-parallel:
-	$(MAKE) -k $(TEST_TARGETS); \
+	-rm -rf cache
+	$(MAKE) -k do-check-parallel; \
 	$(SHELL) $(srcdir)/dg-extract-results.sh \
-	  $(addsuffix /gdb.sum,$(TEST_DIRS)) > gdb.sum; \
+	  `find outputs -name gdb.sum -print` > gdb.sum; \
 	$(SHELL) $(srcdir)/dg-extract-results.sh -L \
-	  $(addsuffix /gdb.log,$(TEST_DIRS)) > gdb.log
+	  `find outputs -name gdb.log -print` > gdb.log
 
-@GMAKE_TRUE@$(filter-out check-gdb.base%,$(TEST_TARGETS)): check-gdb.%: all $(abs_builddir)/site.exp
-@GMAKE_TRUE@	@if test ! -d gdb.$*; then mkdir gdb.$*; fi
-@GMAKE_TRUE@	$(DO_RUNTEST) --directory=gdb.$* --outdir=gdb.$* $(RUNTESTFLAGS)
+# Turn a list of .exp files into "check/" targets.  Only examine .exp
+# files appearing in a gdb.* directory -- we don't want to pick up
+# lib/ by mistake.  For example, gdb.linespec/linespec.exp becomes
+# check-gdb.linespec/linespec.exp.
+@GMAKE_TRUE@TEST_TARGETS := $(addprefix check/,$(shell cd $(srcdir) && find gdb.* -name '*.exp' -print))
 
-# Each half (roughly) of the .exp files from gdb.base.
-BASE1_FILES = $(patsubst $(srcdir)/%,%,$(wildcard $(srcdir)/gdb.base/[a-m]*.exp))
-BASE2_FILES = $(patsubst $(srcdir)/%,%,$(wildcard $(srcdir)/gdb.base/[n-z]*.exp))
+do-check-parallel: $(TEST_TARGETS)
+	@:
 
-# Handle each half of gdb.base.
-check-gdb.base%: all $(abs_builddir)/site.exp
-	@if test ! -d gdb.base$*; then mkdir gdb.base$*; fi
-	$(DO_RUNTEST) $(BASE$*_FILES) --outdir gdb.base$* $(RUNTESTFLAGS)
+@GMAKE_TRUE@check/%: all $(abs_builddir)/site.exp
+@GMAKE_TRUE@	-mkdir -p outputs/$*
+@GMAKE_TRUE@	@$(DO_RUNTEST) GDB_CACHE_DIR=yes --outdir=outputs/$* $* $(RUNTESTFLAGS)
 
 force:;
 
@@ -162,7 +150,7 @@ clean mostlyclean:
 	-rm -f *~ core *.o a.out xgdb *.x *.grt bigcore.corefile .gdb_history
 	-rm -f core.* *.tf *.cl *.py tracecommandsscript copy1.txt zzz-gdbscript
 	-rm -f *.dwo *.dwp
-	-rm -rf outputs temp
+	-rm -rf outputs temp cache
 
 distclean maintainer-clean realclean: clean
 	-rm -f *~ core
