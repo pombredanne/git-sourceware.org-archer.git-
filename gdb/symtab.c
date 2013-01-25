@@ -3588,24 +3588,14 @@ search_symbols (char *regexp, enum search_domain kind,
 	ALL_BLOCK_SYMBOLS (b, iter, sym)
 	  {
 	    struct symtab *real_symtab = SYMBOL_SYMTAB (sym);
-	    int match = 0;
 
 	    QUIT;
 
-	    if (file_matches (symtab_to_fullname (real_symtab), files, nfiles))
-	      match = 1;
-	    else if (basenames_may_differ
-		     || file_matches (lbasename (real_symtab->filename), files,
-				      nfiles))
-	      {
-		char *symtab_real;
-
-		symtab_real = gdb_realpath (symtab_to_fullname (real_symtab));
-		if (file_matches (symtab_real, files, nfiles))
-		  match = 1;
-		xfree (symtab_real);
-	      }
-	    if (match
+	    /* Check first sole REAL_SYMTAB->FILENAME.  It does not need to be
+	       a substring of symtab_to_fullname as it may contain "./" etc.  */
+	    if ((file_matches (real_symtab->filename, files, nfiles)
+	         || file_matches (symtab_to_fullname (real_symtab),
+				  files, nfiles))
 		&& ((!datum.preg_p
 		     || regexec (&datum.preg, SYMBOL_NATURAL_NAME (sym), 0,
 				 NULL, 0) == 0)
