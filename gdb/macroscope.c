@@ -26,7 +26,6 @@
 #include "frame.h"
 #include "inferior.h"
 #include "complaints.h"
-#include "filenames.h"
 
 /* A table of user-defined macros.  Unlike the macro tables used for
    symtabs, this one uses xmalloc for all its allocation, not an
