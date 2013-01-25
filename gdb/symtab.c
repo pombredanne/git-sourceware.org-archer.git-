@@ -3599,8 +3599,11 @@ search_symbols (char *regexp, enum search_domain kind,
 	    /* Check first sole REAL_SYMTAB->FILENAME.  It does not need to be
 	       a substring of symtab_to_fullname as it may contain "./" etc.  */
 	    if ((file_matches (real_symtab->filename, files, nfiles)
-	         || file_matches (symtab_to_fullname (real_symtab),
-				  files, nfiles))
+		 || ((basenames_may_differ
+		      || file_matches (lbasename (real_symtab->filename),
+				       files, nfiles))
+		     && file_matches (symtab_to_fullname (real_symtab),
+				      files, nfiles)))
 		&& ((!datum.preg_p
 		     || regexec (&datum.preg, SYMBOL_NATURAL_NAME (sym), 0,
 				 NULL, 0) == 0)
