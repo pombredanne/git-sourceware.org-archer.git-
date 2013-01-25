@@ -3596,7 +3596,7 @@ search_symbols (char *regexp, enum search_domain kind,
 
 	    QUIT;
 
-	    if (file_matches (real_symtab->filename, files, nfiles)
+	    if (file_matches (symtab_to_fullname (real_symtab), files, nfiles)
 		&& ((!datum.preg_p
 		     || regexec (&datum.preg, SYMBOL_NATURAL_NAME (sym), 0,
 				 NULL, 0) == 0)
