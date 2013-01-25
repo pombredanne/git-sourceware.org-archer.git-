@@ -178,8 +178,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
     if (pst->anonymous)
       continue;
 
-    if (compare_filenames_for_search (pst->filename, name)
-        || compare_filenames_for_search (psymtab_to_fullname (pst), name))
+    if (compare_filenames_for_search (pst->filename, name))
       {
 	if (partial_map_expand_apply (objfile, name, real_path,
 				      pst, callback, data))
@@ -191,6 +190,13 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
     if (! basenames_may_differ
 	&& FILENAME_CMP (name_basename, lbasename (pst->filename)) != 0)
       continue;
+
+    if (compare_filenames_for_search (psymtab_to_fullname (pst), name))
+      {
+	if (partial_map_expand_apply (objfile, name, real_path,
+				      pst, callback, data))
+	  return 1;
+      }
 
     /* If the user gave us an absolute path, try to find the file in
        this symtab and use its absolute path.  */
