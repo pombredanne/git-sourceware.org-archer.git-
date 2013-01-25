@@ -60,8 +60,6 @@ static struct partial_symbol *lookup_partial_symbol (struct objfile *,
 
 static const char *psymtab_to_fullname (struct partial_symtab *ps);
 
-static const char *psymtab_to_realname (struct partial_symtab *ps);
-
 static struct partial_symbol *find_pc_sect_psymbol (struct objfile *,
 						    struct partial_symtab *,
 						    CORE_ADDR,
@@ -847,11 +845,6 @@ forget_cached_source_info_partial (struct objfile *objfile)
 	  xfree (pst->fullname);
 	  pst->fullname = NULL;
 	}
-      if (pst->realname != NULL)
-	{
-	  xfree (pst->realname);
-	  pst->realname = NULL;
-	}
     }
 }
 
@@ -1195,22 +1188,6 @@ psymtab_to_fullname (struct partial_symtab *ps)
   return ps->fullname;
 }
 
-/* Return absolute source filename of partial_symtab PS.
-   While psymtab_to_fullname uses xfullpath psymtab_to_realname uses
-   gdb_realpath.  */
-
-static const char *
-psymtab_to_realname (struct partial_symtab *ps)
-{
-  if (ps == NULL || ps->anonymous)
-    return NULL;
-
-  if (ps->realname == NULL)
-    ps->realname = gdb_realpath (psymtab_to_fullname (ps)); 
-
-  return ps->realname;
-}
-
 static const char *
 find_symbol_file_from_partial (struct objfile *objfile, const char *name)
 {
@@ -1409,8 +1386,7 @@ expand_symtabs_matching_via_partial
 	    continue;
 
 	  if (!(*file_matcher) (ps->filename, data)
-	      && !(*file_matcher) (psymtab_to_fullname (ps), data)
-	      && !(*file_matcher) (psymtab_to_realname (ps), data))
+	      && !(*file_matcher) (psymtab_to_fullname (ps), data))
 	    continue;
 	}
 
@@ -1945,9 +1921,6 @@ maintenance_info_psymtabs (char *regexp, int from_tty)
 	      printf_filtered ("    fullname %s\n",
 			       psymtab->fullname
 			       ? psymtab->fullname : "(null)");
-	      printf_filtered ("    realname %s\n",
-			       psymtab->realname
-			       ? psymtab->realname : "(null)");
 	      printf_filtered ("    text addresses ");
 	      fputs_filtered (paddress (gdbarch, psymtab->textlow),
 			      gdb_stdout);
