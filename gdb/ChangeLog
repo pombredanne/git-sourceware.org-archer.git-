@@ -1,3 +1,26 @@
+2013-01-25  Maxim Kuvyrkov  <maxim@kugelworks.com>
+
+	* MAINTAINERS: Update my email.
+
+2013-01-25  Yao Qi  <yao@codesourcery.com>
+
+	* main.c (print_gdb_help): Remove "--epoch" from the help
+	message.
+
+2013-01-24  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* symtab.c (skip_prologue_using_sal): Consider a file
+	change the same as an increased line number
+
+2013-01-24  Tiago Stürmer Daitx  <tdaitx@linux.vnet.ibm.com>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list. 
+
+2013-01-24  Tom Tromey  <tromey@redhat.com>
+
+	* ada-lang.h (ada_decode_symbol): Make return type const.
+	* ada-lang.c (ada_decode_symbol): Likewise.
+
 2013-01-23  Doug Evans  <dje@google.com>
 
 	* linespec.c (find_linespec_symbols): Make static.
