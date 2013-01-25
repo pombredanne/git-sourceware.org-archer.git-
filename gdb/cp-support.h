@@ -125,11 +125,11 @@ struct demangle_parse_info
 
 struct using_direct
 {
-  char *import_src;
-  char *import_dest;
+  const char *import_src;
+  const char *import_dest;
 
-  char *alias;
-  char *declaration;
+  const char *alias;
+  const char *declaration;
 
   struct using_direct *next;
 
@@ -186,13 +186,8 @@ extern void cp_add_using_directive (const char *dest,
                                     const char *alias,
 				    const char *declaration,
 				    VEC (const_char_ptr) *excludes,
+				    int copy_names,
                                     struct obstack *obstack);
-
-extern void cp_set_block_scope (const struct symbol *symbol,
-				struct block *block,
-				struct obstack *obstack,
-				const char *processing_current_prefix,
-				int processing_has_namespace_info);
 
 extern void cp_scan_for_anonymous_namespaces (const struct symbol *symbol,
 					      struct objfile *objfile);
