@@ -472,7 +472,8 @@ struct bp_location
 
   int line_number;
 
-  /* Source file name which was used to place this location.  */
+  /* Symtab which was used to place this location.  This is used
+     to find the corresponding source file name.  */
 
   struct symtab *symtab;
 };
