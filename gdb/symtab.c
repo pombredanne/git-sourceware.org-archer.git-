@@ -207,8 +207,7 @@ iterate_over_some_symtabs (const char *name,
 
   for (s = first; s != NULL && s != after_last; s = s->next)
     {
-      if (compare_filenames_for_search (s->filename, name)
-	  || compare_filenames_for_search (symtab_to_fullname (s), name))
+      if (compare_filenames_for_search (s->filename, name))
 	{
 	  if (callback (s, data))
 	    return 1;
@@ -219,6 +218,12 @@ iterate_over_some_symtabs (const char *name,
     if (! basenames_may_differ
 	&& FILENAME_CMP (base_name, lbasename (s->filename)) != 0)
       continue;
+
+    if (compare_filenames_for_search (symtab_to_fullname (s), name))
+      {
+	if (callback (s, data))
+	  return 1;
+      }
 
     /* If the user gave us an absolute path, try to find the file in
        this symtab and use its absolute path.  */
