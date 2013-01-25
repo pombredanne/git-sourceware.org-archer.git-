@@ -96,7 +96,7 @@ cp_scan_for_anonymous_namespaces (const struct symbol *const symbol,
 		 anonymous namespace.  So add symbols in it to the
 		 namespace given by the previous component if there is
 		 one, or to the global namespace if there isn't.  */
-	      cp_add_using_directive (dest, src, NULL, NULL, NULL,
+	      cp_add_using_directive (dest, src, NULL, NULL, NULL, 1,
 	                              &objfile->objfile_obstack);
 	    }
 	  /* The "+ 2" is for the "::".  */
@@ -117,9 +117,10 @@ cp_scan_for_anonymous_namespaces (const struct symbol *const symbol,
    in the current scope.  If ALIAS is NULL then the namespace is known
    by its original name.  DECLARATION is the name if the imported
    varable if this is a declaration import (Eg. using A::x), otherwise
-   it is NULL.  EXCLUDES is a list of names not to import from an imported
-   module or NULL.  The arguments are copied into newly allocated memory so
-   they can be temporaries.  For EXCLUDES the VEC pointers are copied but the
+   it is NULL.  EXCLUDES is a list of names not to import from an
+   imported module or NULL.  If COPY_NAMES is non-zero, then the
+   arguments are copied into newly allocated memory so they can be
+   temporaries.  For EXCLUDES the VEC pointers are copied but the
    pointed to characters are not copied.  */
 
 void
@@ -128,6 +129,7 @@ cp_add_using_directive (const char *dest,
 			const char *alias,
 			const char *declaration,
 			VEC (const_char_ptr) *excludes,
+			int copy_names,
                         struct obstack *obstack)
 {
   struct using_direct *current;
@@ -173,15 +175,27 @@ cp_add_using_directive (const char *dest,
 				    * sizeof (*new->excludes))));
   memset (new, 0, sizeof (*new));
 
-  new->import_src = obstack_copy0 (obstack, src, strlen (src));
-  new->import_dest = obstack_copy0 (obstack, dest, strlen (dest));
+  if (copy_names)
+    {
+      new->import_src = obstack_copy0 (obstack, src, strlen (src));
+      new->import_dest = obstack_copy0 (obstack, dest, strlen (dest));
+    }
+  else
+    {
+      new->import_src = src;
+      new->import_dest = dest;
+    }
 
-  if (alias != NULL)
+  if (alias != NULL && copy_names)
     new->alias = obstack_copy0 (obstack, alias, strlen (alias));
+  else
+    new->alias = alias;
 
-  if (declaration != NULL)
+  if (declaration != NULL && copy_names)
     new->declaration = obstack_copy0 (obstack,
 				      declaration, strlen (declaration));
+  else
+    new->declaration = declaration;
 
   memcpy (new->excludes, VEC_address (const_char_ptr, excludes),
 	  VEC_length (const_char_ptr, excludes) * sizeof (*new->excludes));
@@ -189,43 +203,6 @@ cp_add_using_directive (const char *dest,
 
   new->next = using_directives;
   using_directives = new;
-}
-
-/* Record the namespace that the function defined by SYMBOL was
-   defined in, if necessary.  BLOCK is the associated block; use
-   OBSTACK for allocation.  */
-
-void
-cp_set_block_scope (const struct symbol *symbol,
-		    struct block *block,
-		    struct obstack *obstack,
-		    const char *processing_current_prefix,
-		    int processing_has_namespace_info)
-{
-  if (processing_has_namespace_info)
-    {
-      block_set_scope
-	(block, obstack_copy0 (obstack, processing_current_prefix,
-			       strlen (processing_current_prefix)),
-	 obstack);
-    }
-  else if (SYMBOL_DEMANGLED_NAME (symbol) != NULL)
-    {
-      /* Try to figure out the appropriate namespace from the
-	 demangled name.  */
-
-      /* FIXME: carlton/2003-04-15: If the function in question is
-	 a method of a class, the name will actually include the
-	 name of the class as well.  This should be harmless, but
-	 is a little unfortunate.  */
-
-      const char *name = SYMBOL_DEMANGLED_NAME (symbol);
-      unsigned int prefix_len = cp_entire_prefix_len (name);
-
-      block_set_scope (block,
-		       obstack_copy0 (obstack, name, prefix_len),
-		       obstack);
-    }
 }
 
 /* Test whether or not NAMESPACE looks like it mentions an anonymous
