@@ -1391,6 +1391,8 @@ expand_symtabs_matching_via_partial
 	  if (ps->anonymous)
 	    continue;
 
+	  /* BASENAMES_MAY_DIFFER optimization cannot be applied here as DATA
+	     basename cannot be extracted.  */
 	  if (!(*file_matcher) (ps->filename, data)
 	      && !(*file_matcher) (psymtab_to_fullname (ps), data))
 	    continue;
