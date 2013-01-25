@@ -33,6 +33,7 @@
 #include "exceptions.h"
 #include "breakpoint.h" /* for get_sal_arch () */
 #include "source.h"
+#include "filenames.h"
 
 struct skiplist_entry
 {
@@ -358,6 +359,14 @@ function_name_is_marked_for_skip (const char *function_name,
 	      && compare_filenames_for_search (function_sal->symtab->filename,
 					       e->filename))
 	    return 1;
+
+	  /* Before we invoke realpath, which can get expensive when many
+	     files are involved, do a quick comparison of the basenames.  */
+	  if (!basenames_may_differ
+	      && (function_sal->symtab == NULL
+	          || filename_cmp (lbasename (function_sal->symtab->filename),
+				   lbasename (e->filename)) != 0))
+	    continue;
 
 	  /* Get the filename corresponding to this FUNCTION_SAL, if we haven't
 	     yet.  */
