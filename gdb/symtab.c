@@ -3275,15 +3275,12 @@ sources_info (char *ignore, int from_tty)
 }
 
 /* Compare FILE against all the NFILES entries of FILES.  If BASENAMES is
-   non-zero compare only lbasename of everything.  */
+   non-zero compare only lbasename of FILES.  */
 
 static int
 file_matches (const char *file, char *files[], int nfiles, int basenames)
 {
   int i;
-
-  if (basenames)
-    file = lbasename (file);
 
   if (file != NULL && nfiles != 0)
     {
@@ -3609,7 +3606,8 @@ search_symbols (char *regexp, enum search_domain kind,
 	       a substring of symtab_to_fullname as it may contain "./" etc.  */
 	    if ((file_matches (real_symtab->filename, files, nfiles, 0)
 		 || ((basenames_may_differ
-		      || file_matches (real_symtab->filename, files, nfiles, 1))
+		      || file_matches (lbasename (real_symtab->filename),
+				       files, nfiles, 1))
 		     && file_matches (symtab_to_fullname (real_symtab),
 				      files, nfiles, 0)))
 		&& ((!datum.preg_p
