@@ -1363,7 +1363,7 @@ recursively_search_psymtabs (struct partial_symtab *ps,
 static void
 expand_symtabs_matching_via_partial
   (struct objfile *objfile,
-   int (*file_matcher) (const char *, void *),
+   int (*file_matcher) (const char *, void *, int basenames),
    int (*name_matcher) (const char *, void *),
    enum search_domain kind,
    void *data)
@@ -1391,10 +1391,16 @@ expand_symtabs_matching_via_partial
 	  if (ps->anonymous)
 	    continue;
 
-	  /* BASENAMES_MAY_DIFFER optimization cannot be applied here as DATA
-	     basename cannot be extracted.  */
-	  if (!(*file_matcher) (ps->filename, data)
-	      && !(*file_matcher) (psymtab_to_fullname (ps), data))
+	  if (!(*file_matcher) (ps->filename, data, 0))
+	    continue;
+
+	  /* Before we invoke realpath, which can get expensive when many
+	     files are involved, do a quick comparison of the basenames.  */
+	  if (!basenames_may_differ
+	      && !(*file_matcher) (lbasename (ps->filename), data, 1))
+	    continue;
+
+	  if (!(*file_matcher) (psymtab_to_fullname (ps), data, 0))
 	    continue;
 	}
 

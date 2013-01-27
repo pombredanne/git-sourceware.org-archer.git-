@@ -3473,7 +3473,7 @@ dw2_map_matching_symbols (const char * name, domain_enum namespace,
 static void
 dw2_expand_symtabs_matching
   (struct objfile *objfile,
-   int (*file_matcher) (const char *, void *),
+   int (*file_matcher) (const char *, void *, int basenames),
    int (*name_matcher) (const char *, void *),
    enum search_domain kind,
    void *data)
@@ -3533,7 +3533,7 @@ dw2_expand_symtabs_matching
 
 	  for (j = 0; j < file_data->num_file_names; ++j)
 	    {
-	      if (file_matcher (file_data->file_names[j], data))
+	      if (file_matcher (file_data->file_names[j], data, 0))
 		{
 		  per_cu->v.quick->mark = 1;
 		  break;
