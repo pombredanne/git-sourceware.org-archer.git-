@@ -3391,11 +3391,12 @@ struct search_symbols_data
 /* A callback for expand_symtabs_matching.  */
 
 static int
-search_symbols_file_matches (const char *filename, void *user_data)
+search_symbols_file_matches (const char *filename, void *user_data,
+			     int basenames)
 {
   struct search_symbols_data *data = user_data;
 
-  return file_matches (filename, data->files, data->nfiles, 0);
+  return file_matches (filename, data->files, data->nfiles, basenames);
 }
 
 /* A callback for expand_symtabs_matching.  */
