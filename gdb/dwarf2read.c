@@ -1582,6 +1582,7 @@ static sect_offset dwarf2_get_ref_die_offset (struct attribute *);
 static LONGEST dwarf2_get_attr_constant_value (struct attribute *, int);
 
 static struct die_info *follow_die_offset (sect_offset offset,
+					   int offset_in_dwz,
 					   struct dwarf2_cu **ref_cu);
 
 static struct die_info *follow_die_ref_or_sig (struct die_info *,
@@ -9439,7 +9440,8 @@ dwarf2_fill_in_symbol_body (struct symbol *symbol)
   struct context_stack *new;
 
   dw2_setup (objfile);
-  per_cu = dwarf2_find_containing_comp_unit (die_offset, objfile);
+  per_cu = dwarf2_find_containing_comp_unit (die_offset, /* FIXME */ 0,
+					     objfile);
 
   if (per_cu->cu == NULL)
     load_cu (per_cu);
@@ -9453,7 +9455,7 @@ dwarf2_fill_in_symbol_body (struct symbol *symbol)
   cu->list_in_scope = &local_symbols;
 
   new = push_context (0, 0);
-  die = follow_die_offset (die_offset, &cu);
+  die = follow_die_offset (die_offset, /* FIXME */ 0, &cu);
 
   if (die->child != NULL)
     {
