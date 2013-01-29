@@ -127,7 +127,8 @@ static const char *const filename_display_kind_names[] = {
   NULL
 };
 
-static const char *filename_display_string = filename_display_relative;
+static const char *filename_display_string
+			       = filename_display_relative_with_system_absolute;
 
 static void
 show_filename_display_string (struct ui_file *file, int from_tty,
@@ -2088,7 +2089,7 @@ filename-display can be:\n\
   basename-with-system-absolute - display filenames from files with separate\n\
                                   debug info files as absolute, other files\n\
                                   display only with basename of the filename\n\
-By default, relative filenames are displayed."),
+By default, relative-with-system-absolute is set."),
 			NULL,
 			show_filename_display_string,
 			&setlist, &showlist);

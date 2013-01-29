@@ -6541,7 +6541,7 @@ You can control how file names are displayed.
 @item set filename-display
 @itemx set filename-display relative
 @cindex filename-display
-Display file names relative to the compilation directory.  This is the default.
+Display file names relative to the compilation directory.
 
 @item set filename-display basename
 Display only basename of a filename.
@@ -6553,6 +6553,8 @@ Display an absolute filename.
 Determine whether a source filename comes from file having separate debug
 information file.  In such case display the source filename as absolute one.
 Otherwise display it relative to the compilation directory.
+
+This is the default.
 
 @item set filename-display basename-with-system-absolute
 Determine whether a source filename comes from file having separate debug
