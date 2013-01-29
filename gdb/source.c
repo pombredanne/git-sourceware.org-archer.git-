@@ -113,11 +113,17 @@ show_lines_to_list (struct ui_file *file, int from_tty,
 static const char filename_display_basename[] = "basename";
 static const char filename_display_relative[] = "relative";
 static const char filename_display_absolute[] = "absolute";
+static const char filename_display_relative_with_system_absolute[]
+					      = "relative-with-system-absolute";
+static const char filename_display_basename_with_system_absolute[]
+					      = "basename-with-system-absolute";
 
 static const char *const filename_display_kind_names[] = {
   filename_display_basename,
   filename_display_relative,
   filename_display_absolute,
+  filename_display_relative_with_system_absolute,
+  filename_display_basename_with_system_absolute,
   NULL
 };
 
@@ -1138,14 +1144,24 @@ symtab_to_fullname (struct symtab *s)
 const char *
 symtab_to_filename (struct symtab *symtab)
 {
+  int is_system;
+
   if (filename_display_string == filename_display_basename)
     return lbasename (symtab->filename);
   else if (filename_display_string == filename_display_absolute)
     return symtab_to_fullname (symtab);
   else if (filename_display_string == filename_display_relative)
     return symtab->filename;
-  else
-    internal_error (__FILE__, __LINE__, _("invalid filename_display_string"));
+
+  if (symtab->objfile->separate_debug_objfile != NULL
+      || symtab->objfile->separate_debug_objfile_backlink != NULL)
+    return symtab_to_fullname (symtab);
+
+  if (filename_display_string == filename_display_relative_with_system_absolute)
+    return symtab->filename;
+  if (filename_display_string == filename_display_basename_with_system_absolute)
+    return lbasename (symtab->filename);
+  internal_error (__FILE__, __LINE__, _("invalid filename_display_string"));
 }
 
 /* Create and initialize the table S->line_charpos that records
@@ -2065,6 +2081,13 @@ filename-display can be:\n\
   basename - display only basename of a filename\n\
   relative - display a filename relative to the compilation directory\n\
   absolute - display an absolute filename\n\
+  relative-with-system-absolute - display filenames from files with separate\n\
+                                  debug info files as absolute, other files\n\
+                                  display relative to the compilation directory\
+\n\
+  basename-with-system-absolute - display filenames from files with separate\n\
+                                  debug info files as absolute, other files\n\
+                                  display only with basename of the filename\n\
 By default, relative filenames are displayed."),
 			NULL,
 			show_filename_display_string,

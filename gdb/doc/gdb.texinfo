@@ -6549,6 +6549,16 @@ Display only basename of a filename.
 @item set filename-display absolute
 Display an absolute filename.
 
+@item set filename-display relative-with-system-absolute
+Determine whether a source filename comes from file having separate debug
+information file.  In such case display the source filename as absolute one.
+Otherwise display it relative to the compilation directory.
+
+@item set filename-display basename-with-system-absolute
+Determine whether a source filename comes from file having separate debug
+information file.  In such case display the source filename as absolute one.
+Otherwise display only basename of the filename.
+
 @item show filename-display
 Show the current way to display filenames.
 @end table
