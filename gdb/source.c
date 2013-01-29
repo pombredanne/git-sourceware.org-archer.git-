@@ -127,8 +127,8 @@ static const char *const filename_display_kind_names[] = {
   NULL
 };
 
-static const char *filename_display_string
-			       = filename_display_relative_with_system_absolute;
+static const char *filename_display_string =
+				 filename_display_relative_with_system_absolute;
 
 static void
 show_filename_display_string (struct ui_file *file, int from_tty,
