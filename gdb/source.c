@@ -1145,8 +1145,6 @@ symtab_to_fullname (struct symtab *s)
 const char *
 symtab_to_filename (struct symtab *symtab)
 {
-  int is_system;
-
   if (filename_display_string == filename_display_basename)
     return lbasename (symtab->filename);
   else if (filename_display_string == filename_display_absolute)
