@@ -164,7 +164,12 @@ compare_filenames_for_search (const char *filename, const char *search_name)
 
   /* Either the names must completely match, or the character
      preceding the trailing SEARCH_NAME segment of FILENAME must be a
-     directory separator.  */
+     directory separator.
+
+     The HAS_DRIVE_SPEC purpose is to make FILENAME "c:file.c"
+     compatible with SEARCH_NAME "file.c".  In such case a compiler had
+     to put the "c:file.c" name into debug info.  Such compatibility
+     works only on GDB built for DOS host.  */
   return (len == search_len
 	  || IS_DIR_SEPARATOR (filename[len - search_len - 1])
 	  || (HAS_DRIVE_SPEC (filename)
@@ -241,19 +246,26 @@ iterate_over_some_symtabs (const char *name,
       {
         const char *fullname = symtab_to_fullname (s);
 	char *rp = gdb_realpath (fullname);
+	struct cleanup *cleanups = make_cleanup (xfree, rp);
 
-	make_cleanup (xfree, rp);
 	if (FILENAME_CMP (real_path, rp) == 0)
 	  {
 	    if (callback (s, data))
-	      return 1;
+	      {
+		do_cleanups (cleanups);
+		return 1;
+	      }
 	  }
 
 	if (!is_abs && compare_filenames_for_search (rp, name))
 	  {
 	    if (callback (s, data))
-	      return 1;
+	      {
+		do_cleanups (cleanups);
+		return 1;
+	      }
 	  }
+	do_cleanups (cleanups);
       }
     }
 
@@ -453,7 +465,7 @@ symbol_init_cplus_specific (struct general_symbol_info *gsymbol,
 
 void
 symbol_set_demangled_name (struct general_symbol_info *gsymbol,
-                           char *name,
+                           const char *name,
                            struct objfile *objfile)
 {
   if (gsymbol->language == language_cplus)
@@ -514,7 +526,7 @@ symbol_set_language (struct general_symbol_info *gsymbol,
 /* Objects of this type are stored in the demangled name hash table.  */
 struct demangled_name_entry
 {
-  char *mangled;
+  const char *mangled;
   char demangled[1];
 };
 
@@ -746,7 +758,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
       linkage_name_copy = linkage_name;
     }
 
-  entry.mangled = (char *) lookup_name;
+  entry.mangled = lookup_name;
   slot = ((struct demangled_name_entry **)
 	  htab_find_slot (objfile->demangled_names_hash,
 			  &entry, INSERT));
@@ -777,10 +789,12 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + demangled_len + 1);
-	  (*slot)->mangled = (char *) lookup_name;
+	  (*slot)->mangled = lookup_name;
 	}
       else
 	{
+	  char *mangled_ptr;
+
 	  /* If we must copy the mangled name, put it directly after
 	     the demangled name so we can have a single
 	     allocation.  */
@@ -788,8 +802,9 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + lookup_len + demangled_len + 2);
-	  (*slot)->mangled = &((*slot)->demangled[demangled_len + 1]);
-	  strcpy ((*slot)->mangled, lookup_name);
+	  mangled_ptr = &((*slot)->demangled[demangled_len + 1]);
+	  strcpy (mangled_ptr, lookup_name);
+	  (*slot)->mangled = mangled_ptr;
 	}
 
       if (demangled_name != NULL)
@@ -4889,6 +4904,10 @@ skip_prologue_using_sal (struct gdbarch *gdbarch, CORE_ADDR func_addr)
 	  /* Assume that a consecutive SAL for the same (or larger)
 	     line mark the prologue -> body transition.  */
 	  if (sal.line >= prologue_sal.line)
+	    break;
+	  /* Likewise if we are in a different symtab altogether
+	     (e.g. within a file included via #include).  */
+	  if (sal.symtab != prologue_sal.symtab)
 	    break;
 
 	  /* The line number is smaller.  Check that it's from the

@@ -133,7 +133,9 @@ static reloc_howto_type elf_howto_table[]=
   HOWTO(R_386_TLS_TPOFF32, 0, 2, 32, FALSE, 0, complain_overflow_bitfield,
 	bfd_elf_generic_reloc, "R_386_TLS_TPOFF32",
 	TRUE, 0xffffffff, 0xffffffff, FALSE),
-  EMPTY_HOWTO (38),
+  HOWTO(R_386_SIZE32, 0, 2, 32, FALSE, 0, complain_overflow_unsigned,
+	bfd_elf_generic_reloc, "R_386_SIZE32",
+	TRUE, 0xffffffff, 0xffffffff, FALSE),
   HOWTO(R_386_TLS_GOTDESC, 0, 2, 32, FALSE, 0, complain_overflow_bitfield,
 	bfd_elf_generic_reloc, "R_386_TLS_GOTDESC",
 	TRUE, 0xffffffff, 0xffffffff, FALSE),
@@ -311,6 +313,10 @@ elf_i386_reloc_type_lookup (bfd *abfd ATTRIBUTE_UNUSED,
     case BFD_RELOC_386_TLS_TPOFF32:
       TRACE ("BFD_RELOC_386_TLS_TPOFF32");
       return &elf_howto_table[R_386_TLS_TPOFF32 - R_386_tls_offset];
+
+    case BFD_RELOC_SIZE32:
+      TRACE ("BFD_RELOC_SIZE32");
+      return &elf_howto_table[R_386_SIZE32 - R_386_tls_offset];
 
     case BFD_RELOC_386_TLS_GOTDESC:
       TRACE ("BFD_RELOC_386_TLS_GOTDESC");
@@ -1448,6 +1454,7 @@ elf_i386_check_relocs (bfd *abfd,
       struct elf_link_hash_entry *h;
       Elf_Internal_Sym *isym;
       const char *name;
+      bfd_boolean size_reloc;
 
       r_symndx = ELF32_R_SYM (rel->r_info);
       r_type = ELF32_R_TYPE (rel->r_info);
@@ -1549,6 +1556,10 @@ elf_i386_check_relocs (bfd *abfd,
 	  h->needs_plt = 1;
 	  h->plt.refcount += 1;
 	  break;
+
+	case R_386_SIZE32:
+	  size_reloc = TRUE;
+	  goto do_size;
 
 	case R_386_TLS_IE_32:
 	case R_386_TLS_IE:
@@ -1697,6 +1708,8 @@ elf_i386_check_relocs (bfd *abfd,
 		h->pointer_equality_needed = 1;
 	    }
 
+	  size_reloc = FALSE;
+do_size:
 	  /* If we are creating a shared library, and this is a reloc
 	     against a global symbol, or a non PC relative reloc
 	     against a local symbol, then we need to copy the reloc
@@ -1793,7 +1806,8 @@ elf_i386_check_relocs (bfd *abfd,
 		}
 
 	      p->count += 1;
-	      if (r_type == R_386_PC32)
+	      /* Count size relocation as PC-relative relocation.  */
+	      if (r_type == R_386_PC32 || size_reloc)
 		p->pc_count += 1;
 	    }
 	  break;
@@ -1959,6 +1973,7 @@ elf_i386_gc_sweep_hook (bfd *abfd,
 
 	case R_386_32:
 	case R_386_PC32:
+	case R_386_SIZE32:
 	  if (info->shared
 	      && (h == NULL || h->type != STT_GNU_IFUNC))
 	    break;
@@ -2342,6 +2357,24 @@ elf_i386_allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
 
   if (eh->dyn_relocs == NULL)
     return TRUE;
+
+  /* Since pc_count for TLS symbol can only have size relocations and
+     we always resolve size relocation against non-zero TLS symbol, we
+     clear pc_count for non-zero TLS symbol.  */
+  if (h->type == STT_TLS && h->size != 0)
+    {
+      struct elf_dyn_relocs **pp;
+
+      for (pp = &eh->dyn_relocs; (p = *pp) != NULL; )
+	{
+	  p->count -= p->pc_count;
+	  p->pc_count = 0;
+	  if (p->count == 0)
+	    *pp = p->next;
+	  else
+	    pp = &p->next;
+	}
+    }
 
   /* In the shared -Bsymbolic case, discard space allocated for
      dynamic pc-relative relocs against symbols which turn out to be
@@ -3185,6 +3218,7 @@ elf_i386_relocate_section (bfd *output_bfd,
       bfd_reloc_status_type r;
       unsigned int indx;
       int tls_type;
+      bfd_vma st_size;
 
       r_type = ELF32_R_TYPE (rel->r_info);
       if (r_type == R_386_GNU_VTINHERIT
@@ -3217,6 +3251,7 @@ elf_i386_relocate_section (bfd *output_bfd,
 	  relocation = (sec->output_section->vma
 			+ sec->output_offset
 			+ sym->st_value);
+	  st_size = sym->st_size;
 
 	  if (ELF_ST_TYPE (sym->st_info) == STT_SECTION
 	      && ((sec->flags & SEC_MERGE) != 0
@@ -3309,6 +3344,7 @@ elf_i386_relocate_section (bfd *output_bfd,
 				   r_symndx, symtab_hdr, sym_hashes,
 				   h, sec, relocation,
 				   unresolved_reloc, warned);
+	  st_size = h->size;
 	}
 
       if (sec != NULL && discarded_section (sec))
@@ -3670,6 +3706,17 @@ elf_i386_relocate_section (bfd *output_bfd,
 	  unresolved_reloc = FALSE;
 	  break;
 
+	case R_386_SIZE32:
+	  /* Set to symbol size.  */
+	  relocation = st_size;
+	  if (h && h->type == STT_TLS && st_size != 0)
+	    {
+	      /* Resolve size relocation against non-zero TLS symbol.  */
+	      unresolved_reloc = FALSE;
+	      break;
+	    }
+	  /* Fall through.  */
+
 	case R_386_32:
 	case R_386_PC32:
 	  if ((input_section->flags & SEC_ALLOC) == 0
@@ -3680,7 +3727,7 @@ elf_i386_relocate_section (bfd *output_bfd,
 	       && (h == NULL
 		   || ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
 		   || h->root.type != bfd_link_hash_undefweak)
-	       && (r_type != R_386_PC32
+	       && ((r_type != R_386_PC32 && r_type != R_386_SIZE32)
 		   || !SYMBOL_CALLS_LOCAL (info, h)))
 	      || (ELIMINATE_COPY_RELOCS
 		  && !info->shared

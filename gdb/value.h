@@ -482,6 +482,12 @@ extern void read_value_memory (struct value *val, int embedded_offset,
 			       int stack, CORE_ADDR memaddr,
 			       gdb_byte *buffer, size_t length);
 
+/* Cast SCALAR_VALUE to the element type of VECTOR_TYPE, then replicate
+   into each element of a new vector value with VECTOR_TYPE.  */
+
+struct value *value_vector_widen (struct value *scalar_value,
+				  struct type *vector_type);
+
 
 
 #include "symtab.h"
@@ -645,7 +651,7 @@ enum oload_search_type { NON_METHOD, METHOD, BOTH };
 
 extern int find_overload_match (struct value **args, int nargs,
 				const char *name,
-				enum oload_search_type method, int lax,
+				enum oload_search_type method,
 				struct value **objp, struct symbol *fsym,
 				struct value **valp, struct symbol **symp,
 				int *staticp, const int no_adl);

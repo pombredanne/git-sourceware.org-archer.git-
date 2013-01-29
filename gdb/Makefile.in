@@ -271,6 +271,7 @@ SUBDIR_TUI_CFLAGS= \
 #
 SUBDIR_PYTHON_OBS = \
 	python.o \
+	py-arch.o \
 	py-auto-load.o \
 	py-block.o \
 	py-bpevent.o \
@@ -304,6 +305,7 @@ SUBDIR_PYTHON_OBS = \
 
 SUBDIR_PYTHON_SRCS = \
 	python/python.c \
+	python/py-arch.c \
 	python/py-auto-load.c \
 	python/py-block.c \
 	python/py-bpevent.c \
@@ -699,7 +701,7 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	agent.c \
 	bcache.c \
 	bfd-target.c \
-	block.c blockframe.c breakpoint.c buildsym.c \
+	block.c blockframe.c breakpoint.c break-catch-sig.c buildsym.c \
 	c-exp.y c-lang.c c-typeprint.c c-valprint.c \
 	charset.c cleanups.c cli-out.c coffread.c coff-pe-read.c \
 	complaints.c completer.c continuations.c corefile.c corelow.c \
@@ -713,7 +715,8 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	exceptions.c expprint.c \
 	f-exp.y f-lang.c f-typeprint.c f-valprint.c filesystem.c \
 	findcmd.c findvar.c frame.c frame-base.c frame-unwind.c \
-	gdbarch.c arch-utils.c gdb_bfd.c gdbtypes.c gnu-v2-abi.c gnu-v3-abi.c \
+	gdbarch.c arch-utils.c gdb_bfd.c gdb_obstack.c \
+	gdbtypes.c gnu-v2-abi.c gnu-v3-abi.c \
 	go-exp.y go-lang.c go-typeprint.c go-valprint.c \
 	inf-loop.c \
 	infcall.c \
@@ -866,7 +869,8 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	auto-load.o auxv.o \
 	agent.o \
 	bfd-target.o \
-	blockframe.o breakpoint.o findvar.o regcache.o cleanups.o \
+	blockframe.o breakpoint.o break-catch-sig.o \
+	findvar.o regcache.o cleanups.o \
 	charset.o continuations.o corelow.o disasm.o dummy-frame.o dfp.o \
 	source.o value.o eval.o valops.o valarith.o valprint.o printcmd.o \
 	block.o symtab.o psymtab.o symfile.o symmisc.o linespec.o dictionary.o \
@@ -882,7 +886,8 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	macrotab.o macrocmd.o macroexp.o macroscope.o \
 	mi-common.o \
 	event-loop.o event-top.o inf-loop.o completer.o \
-	gdbarch.o arch-utils.o gdbtypes.o gdb_bfd.o osabi.o copying.o \
+	gdbarch.o arch-utils.o gdbtypes.o gdb_bfd.o gdb_obstack.o \
+	osabi.o copying.o \
 	memattr.o mem-break.o target.o parse.o language.o buildsym.o \
 	findcmd.o \
 	std-regs.o \
@@ -1312,15 +1317,17 @@ config.status: $(srcdir)/configure configure.tgt configure.host
 
 ACLOCAL = aclocal
 ACLOCAL_AMFLAGS = -I ../config
+
+# Keep these in sync with the includes in acinclude.m4.
 aclocal_m4_deps = \
 	configure.ac \
 	acx_configure_dir.m4 \
-	../config/extensions.m4 \
-	../config/lead-dot.m4 \
-	../config/proginstall.m4 \
 	../bfd/bfd.m4 \
 	../config/acinclude.m4 \
+	../config/plugins.m4 \
+	../config/lead-dot.m4 \
 	../config/override.m4 \
+	../config/largefile.m4 \
 	../config/gettext-sister.m4 \
 	../config/lib-ld.m4 \
 	../config/lib-prefix.m4 \
@@ -1329,7 +1336,8 @@ aclocal_m4_deps = \
 	../config/tcl.m4 \
 	../config/depstand.m4 \
 	../config/lcmessage.m4 \
-	../config/codeset.m4
+	../config/codeset.m4 \
+	../config/zlib.m4
 
 $(srcdir)/aclocal.m4: @MAINTAINER_MODE_TRUE@ $(aclocal_m4_deps)
 	cd $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
@@ -2039,6 +2047,10 @@ PYTHON_CFLAGS=@PYTHON_CFLAGS@
 
 python.o: $(srcdir)/python/python.c
 	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/python.c
+	$(POSTCOMPILE)
+
+py-arch.o: $(srcdir)/python/py-arch.c
+	$(COMPILE) $(PYTHON_CFLAGS) $(srcdir)/python/py-arch.c
 	$(POSTCOMPILE)
 
 py-auto-load.o: $(srcdir)/python/py-auto-load.c

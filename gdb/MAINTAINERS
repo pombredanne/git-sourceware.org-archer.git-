@@ -467,6 +467,7 @@ Jon Beniston					jon@beniston.com
 Gary Benson					gbenson@redhat.com
 Jan Beulich					jbeulich@novell.com
 Jim Blandy					jimb@codesourcery.com
+David Blaikie					dblaikie@gmail.com
 Philip Blundell					philb@gnu.org
 Eric Botcazou					ebotcazou@libertysurf.fr
 Per Bothner					per@bothner.com
@@ -487,6 +488,7 @@ Nick Clifton					nickc@redhat.com
 J.T. Conklin					jtc@acorntoolworks.com
 Brendan Conoboy					blc@redhat.com
 Ludovic Courtès					ludo@gnu.org
+Tiago Stürmer Daitx				tdaitx@linux.vnet.ibm.com
 Sanjoy Das					sanjoy@playingwithpointers.com
 Jean-Charles Delay				delay@adacore.com
 DJ Delorie					dj@redhat.com
@@ -542,7 +544,7 @@ Marc Khouzam					marc.khouzam@ericsson.com
 Jim Kingdon					kingdon@panix.com
 Paul Koning					paul_koning@dell.com
 Jan Kratochvil					jan.kratochvil@redhat.com
-Maxim Kuvyrkov					maxim.kuvyrkov@gmail.com
+Maxim Kuvyrkov					maxim@kugelworks.com
 Jonathan Larmour				jifl@ecoscentric.com
 Jeff Law					law@redhat.com
 Justin Lebar					justin.lebar@gmail.com

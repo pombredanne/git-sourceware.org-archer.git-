@@ -270,23 +270,23 @@ static void handle_psymbol_enumerators (struct objfile *, FDR *, int,
 
 static char *mdebug_next_symbol_text (struct objfile *);
 
-/* Exported procedure: Builds a symtab from the PST partial one.
-   Restores the environment in effect when PST was created, delegates
+/* Exported procedure: Builds a symtab from the partial symtab SELF.
+   Restores the environment in effect when SELF was created, delegates
    most of the work to an ancillary procedure, and sorts
-   and reorders the symtab list at the end.  PST is not NULL.  */
+   and reorders the symtab list at the end.  SELF is not NULL.  */
 
 static void
-mdebug_psymtab_to_symtab (struct objfile *objfile, struct partial_symtab *pst)
+mdebug_read_symtab (struct partial_symtab *self, struct objfile *objfile)
 {
   if (info_verbose)
     {
-      printf_filtered (_("Reading in symbols for %s..."), pst->filename);
+      printf_filtered (_("Reading in symbols for %s..."), self->filename);
       gdb_flush (gdb_stdout);
     }
 
   next_symbol_text_func = mdebug_next_symbol_text;
 
-  psymtab_to_symtab_1 (objfile, pst, pst->filename);
+  psymtab_to_symtab_1 (objfile, self, self->filename);
 
   /* Match with global symbols.  This only needs to be done once,
      after all of the symtabs and dependencies have been read in.  */
@@ -1052,8 +1052,9 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 					   sizeof (struct symbol)));
 		memset (enum_sym, 0, sizeof (struct symbol));
 		SYMBOL_SET_LINKAGE_NAME
-		  (enum_sym, obsavestring (f->name, strlen (f->name),
-					   &mdebugread_objfile->objfile_obstack));
+		  (enum_sym,
+		   obstack_copy0 (&mdebugread_objfile->objfile_obstack,
+				  f->name, strlen (f->name)));
 		SYMBOL_CLASS (enum_sym) = LOC_CONST;
 		SYMBOL_TYPE (enum_sym) = t;
 		SYMBOL_DOMAIN (enum_sym) = VAR_DOMAIN;
@@ -1697,8 +1698,8 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 	  else if (TYPE_TAG_NAME (tp) == NULL
 		   || strcmp (TYPE_TAG_NAME (tp), name) != 0)
 	    TYPE_TAG_NAME (tp)
-	      = obsavestring (name, strlen (name),
-			      &mdebugread_objfile->objfile_obstack);
+	      = obstack_copy0 (&mdebugread_objfile->objfile_obstack,
+			       name, strlen (name));
 	}
     }
 
@@ -1733,8 +1734,9 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 	    }
 	  if (TYPE_NAME (tp) == NULL
 	      || strcmp (TYPE_NAME (tp), name) != 0)
-	    TYPE_NAME (tp) = obsavestring (name, strlen (name),
-					   &mdebugread_objfile->objfile_obstack);
+	    TYPE_NAME (tp)
+	      = obstack_copy0 (&mdebugread_objfile->objfile_obstack,
+			       name, strlen (name));
 	}
     }
   if (t->bt == btTypedef)
@@ -2394,7 +2396,7 @@ parse_partial_symbols (struct objfile *objfile)
     (struct partial_symtab **) alloca (dependencies_allocated *
 				       sizeof (struct partial_symtab *));
 
-  last_source_file = NULL;
+  set_last_source_file (NULL);
 
   /*
    * Big plan:
@@ -2696,7 +2698,7 @@ parse_partial_symbols (struct objfile *objfile)
       PENDING_LIST (pst) = pending_list;
 
       /* The way to turn this into a symtab is to call...  */
-      pst->read_symtab = mdebug_psymtab_to_symtab;
+      pst->read_symtab = mdebug_read_symtab;
 
       /* Set up language for the pst.
          The language from the FDR is used if it is unambigious (e.g. cfront
@@ -4079,7 +4081,7 @@ psymtab_to_symtab_1 (struct objfile *objfile,
                      would otherwise be ended twice, once in
                      process_one_symbol, and once after this loop.  */
 		  if (type_code == N_SO
-		      && last_source_file
+		      && get_last_source_file ()
 		      && previous_stab_code != (unsigned char) N_SO
 		      && *name == '\000')
 		    {
@@ -4796,7 +4798,7 @@ new_psymtab (char *name, struct objfile *objfile)
   PENDING_LIST (psymtab) = pending_list;
 
   /* The way to turn this into a symtab is to call...  */
-  psymtab->read_symtab = mdebug_psymtab_to_symtab;
+  psymtab->read_symtab = mdebug_read_symtab;
   return (psymtab);
 }
 

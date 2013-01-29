@@ -55,6 +55,7 @@
 #include "cp-abi.h"
 #include "cp-support.h"
 #include "psympriv.h"
+#include "block.h"
 
 #include "gdb_assert.h"
 #include "gdb_string.h"
@@ -261,7 +262,8 @@ extern void _initialize_dbxread (void);
 
 static void read_ofile_symtab (struct objfile *, struct partial_symtab *);
 
-static void dbx_psymtab_to_symtab (struct objfile *, struct partial_symtab *);
+static void dbx_read_symtab (struct partial_symtab *self,
+			     struct objfile *objfile);
 
 static void dbx_psymtab_to_symtab_1 (struct objfile *, struct partial_symtab *);
 
@@ -1254,7 +1256,7 @@ read_dbx_symtab (struct objfile *objfile)
   init_bincl_list (20, objfile);
   back_to = make_cleanup_free_bincl_list (objfile);
 
-  last_source_file = NULL;
+  set_last_source_file (NULL);
 
   lowest_text_address = (CORE_ADDR) -1;
 
@@ -1705,8 +1707,8 @@ read_dbx_symtab (struct objfile *objfile)
  	      if (new_name != NULL)
  		{
  		  sym_len = strlen (new_name);
- 		  sym_name = obsavestring (new_name, sym_len,
- 					   &objfile->objfile_obstack);
+ 		  sym_name = obstack_copy0 (&objfile->objfile_obstack,
+					    new_name, sym_len);
  		  xfree (new_name);
  		}
               xfree (name);
@@ -2209,7 +2211,7 @@ start_psymtab (struct objfile *objfile, char *filename, CORE_ADDR textlow,
   result->read_symtab_private = obstack_alloc (&objfile->objfile_obstack,
 					       sizeof (struct symloc));
   LDSYMOFF (result) = ldsymoff;
-  result->read_symtab = dbx_psymtab_to_symtab;
+  result->read_symtab = dbx_read_symtab;
   SYMBOL_SIZE (result) = symbol_size;
   SYMBOL_OFFSET (result) = symbol_table_offset;
   STRING_OFFSET (result) = string_table_offset;
@@ -2452,29 +2454,29 @@ dbx_psymtab_to_symtab_1 (struct objfile *objfile, struct partial_symtab *pst)
 }
 
 /* Read in all of the symbols for a given psymtab for real.
-   Be verbose about it if the user wants that.  PST is not NULL.  */
+   Be verbose about it if the user wants that.  SELF is not NULL.  */
 
 static void
-dbx_psymtab_to_symtab (struct objfile *objfile, struct partial_symtab *pst)
+dbx_read_symtab (struct partial_symtab *self, struct objfile *objfile)
 {
   bfd *sym_bfd;
   struct cleanup *back_to = NULL;
 
-  if (pst->readin)
+  if (self->readin)
     {
       fprintf_unfiltered (gdb_stderr, "Psymtab for %s already read in.  "
 			  "Shouldn't happen.\n",
-			  pst->filename);
+			  self->filename);
       return;
     }
 
-  if (LDSYMLEN (pst) || pst->number_of_dependencies)
+  if (LDSYMLEN (self) || self->number_of_dependencies)
     {
       /* Print the message now, before reading the string table,
          to avoid disconcerting pauses.  */
       if (info_verbose)
 	{
-	  printf_filtered ("Reading in symbols for %s...", pst->filename);
+	  printf_filtered ("Reading in symbols for %s...", self->filename);
 	  gdb_flush (gdb_stdout);
 	}
 
@@ -2494,7 +2496,7 @@ dbx_psymtab_to_symtab (struct objfile *objfile, struct partial_symtab *pst)
 				    (void *) &stabs_data);
 	}
 
-      dbx_psymtab_to_symtab_1 (objfile, pst);
+      dbx_psymtab_to_symtab_1 (objfile, self);
 
       if (back_to)
 	do_cleanups (back_to);
@@ -2540,7 +2542,7 @@ read_ofile_symtab (struct objfile *objfile, struct partial_symtab *pst)
   subfile_stack = NULL;
 
   stringtab_global = DBX_STRINGTAB (objfile);
-  last_source_file = NULL;
+  set_last_source_file (NULL);
 
   abfd = objfile->obfd;
   symfile_bfd = objfile->obfd;	/* Implicit param to next_text_symbol.  */
@@ -2705,6 +2707,34 @@ read_ofile_symtab (struct objfile *objfile, struct partial_symtab *pst)
 }
 
 
+/* Record the namespace that the function defined by SYMBOL was
+   defined in, if necessary.  BLOCK is the associated block; use
+   OBSTACK for allocation.  */
+
+static void
+cp_set_block_scope (const struct symbol *symbol,
+		    struct block *block,
+		    struct obstack *obstack)
+{
+  if (SYMBOL_DEMANGLED_NAME (symbol) != NULL)
+    {
+      /* Try to figure out the appropriate namespace from the
+	 demangled name.  */
+
+      /* FIXME: carlton/2003-04-15: If the function in question is
+	 a method of a class, the name will actually include the
+	 name of the class as well.  This should be harmless, but
+	 is a little unfortunate.  */
+
+      const char *name = SYMBOL_DEMANGLED_NAME (symbol);
+      unsigned int prefix_len = cp_entire_prefix_len (name);
+
+      block_set_scope (block,
+		       obstack_copy0 (obstack, name, prefix_len),
+		       obstack);
+    }
+}
+
 /* This handles a single symbol from the symbol-file, building symbols
    into a GDB symtab.  It takes these arguments and an implicit argument.
 
@@ -2764,7 +2794,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
   /* Something is wrong if we see real data before seeing a source
      file name.  */
 
-  if (last_source_file == NULL && type != (unsigned char) N_SO)
+  if (get_last_source_file () == NULL && type != (unsigned char) N_SO)
     {
       /* Ignore any symbols which appear before an N_SO symbol.
          Currently no one puts symbols there, but we should deal
@@ -2812,8 +2842,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 
 	  /* For C++, set the block's scope.  */
 	  if (SYMBOL_LANGUAGE (new->name) == language_cplus)
-	    cp_set_block_scope (new->name, block, &objfile->objfile_obstack,
-				"", 0);
+	    cp_set_block_scope (new->name, block, &objfile->objfile_obstack);
 
 	  /* May be switching to an assembler file which may not be using
 	     block relative stabs, so reset the offset.  */
@@ -2940,7 +2969,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 
       n_opt_found = 0;
 
-      if (last_source_file)
+      if (get_last_source_file ())
 	{
 	  /* Check if previous symbol was also an N_SO (with some
 	     sanity checks).  If so, that one was actually the
@@ -3173,7 +3202,8 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 		  && gdbarch_sofun_address_maybe_missing (gdbarch))
 		{
 		  CORE_ADDR minsym_valu = 
-		    find_stab_function_addr (name, last_source_file, objfile);
+		    find_stab_function_addr (name, get_last_source_file (),
+					     objfile);
 
 		  /* The function find_stab_function_addr will return
 		     0 if the minimal symbol wasn't found.
@@ -3217,8 +3247,7 @@ process_one_symbol (int type, int desc, CORE_ADDR valu, char *name,
 		  /* For C++, set the block's scope.  */
 		  if (SYMBOL_LANGUAGE (new->name) == language_cplus)
 		    cp_set_block_scope (new->name, block,
-					&objfile->objfile_obstack,
-					"", 0);
+					&objfile->objfile_obstack);
 		}
 
 	      new = push_context (0, valu);

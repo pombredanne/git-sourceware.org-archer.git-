@@ -1,3 +1,492 @@
+2013-01-28  Doug Evans  <dje@google.com>
+
+	* dwarf2loc.c (dwarf2_find_location_expression): Don't add base address
+	to addresses from dwo files.
+
+2013-01-25  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* valops.c (find_overload_match): Remove unused argument 'lax'.
+	* value.h: Remove unused argument 'lax' from the declaration of
+	find_overload_match.
+	* eval.c (value_subexp_standard): Do not pass a 'lax' argument
+	to find_overload_match.
+	* valarith.c (value_user_defined_cpp_op): Do not pass a 'lax'
+	argument to find_overload_match.
+
+2013-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (processing_has_namespace_info): Remove.
+	(struct dwarf2_cu) <processing_has_namespace_info>: New field.
+	(process_die, read_func_scope, dwarf2_start_symtab)
+	(new_symbol_full): Update.
+
+2013-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* cp-namespace.c (cp_set_block_scope): Remove.
+	* cp-support.h (cp_set_block_scope): Remove.
+	* dbxread.c: Include block.h.
+	(cp_set_block_scope): New function.
+	(process_one_symbol): Update.
+	* dwarf2read.c (read_func_scope): Use block_set_scope.
+
+2013-01-25  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (add_current_inferior_and_thread): Tweak comment.
+
+2013-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* cp-namespace.c (cp_scan_for_anonymous_namespaces): Update.
+	(cp_add_using_directive): Add 'copy_names' argument.
+	* cp-support.h (cp_add_using_directive): Update.
+	(struct using_direct) <import_src, import_dest, alias,
+	declaration>: Now const.
+	* dwarf2read.c (read_import_statement): Use obconcat.
+	Don't copy names passed to cp_add_using_directive.
+
+2013-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (qualified_name): Use TYPE_SAFE_NAME.
+
+2013-01-25  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (stop_reply_extract_thread): New.
+	(add_current_inferior_and_thread): New parameter 'wait_status'.
+	Handle it.
+	(remote_start_remote): Pass wait status to
+	add_current_inferior_and_thread.
+	(extended_remote_run): Update comment.
+	(extended_remote_create_inferior_1): Pass wait status to
+	add_current_inferior_and_thread.
+
+2013-01-25  Andrew Burgess  <aburgess@broadcom.com>
+	    Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* valarith.c (value_vector_widen): New function for replicating a
+	scalar into a vector.
+	(value_binop): Use value_vector_widen to widen scalar to vector
+	rather than casting, this better matches gcc C behaviour.
+	* valops.c (value_casst): Update logic for casting between vector
+	types, and for casting from scalar to vector, try to match gcc C
+	behaviour.
+	* value.h (value_vector_widen): Declare.
+	* opencl-lang.c (opencl_value_cast): New opencl specific casting
+	function, handle special case for casting scalar to vector.
+	(opencl_relop): Use opencl_value_cast.
+	(evaluate_subexp_opencl): Use opencl_value_cast instead of
+	value_cast, and handle BINOP_ASSIGN, UNOP_CAST, and UNOP_CAST_TYPE
+	in order to use opencl_value_cast.
+
+2013-01-25  Yao Qi  <yao@codesourcery.com>
+
+	* event-loop.c: Include "queue.h".
+	(gdb_event_p): New typedef.
+	(DECLARE_QUEUE_P): Use.
+	(DEFINE_QUEUE_P): Use.
+	(async_queue_event): Remove.
+	(gdb_event_xfree): New.
+	(initialize_event_loop): New.
+	(process_event): Use QUEUE macros.
+	(event_queue): Remove.
+	(gdb_wait_for_event): Caller update.
+	(check_async_event_handlers): Likewise.
+	(poll_timers): Likewise.
+	* event-loop.h (initialize_event_loop): Declare.
+	* event-loop.c (gdb_event_xfree): New.
+	* top.c (gdb_init): Call initialize_event_loop.
+
+2013-01-25  Yao Qi  <yao@codesourcery.com>
+
+	* event-loop.c (async_queue_event): Remove one parameter
+	'position'.  Remove code handling 'position' == TAIL.
+	(gdb_wait_for_event): Caller update.
+	(check_async_event_handlers): Caller update.
+	(poll_timers): Caller update.
+	* event-loop.h (enum queue_position): Remove.
+
+2013-01-25  Maxim Kuvyrkov  <maxim@kugelworks.com>
+
+	* MAINTAINERS: Update my email.
+
+2013-01-25  Yao Qi  <yao@codesourcery.com>
+
+	* main.c (print_gdb_help): Remove "--epoch" from the help
+	message.
+
+2013-01-24  Ulrich Weigand  <uweigand@de.ibm.com>
+
+	* symtab.c (skip_prologue_using_sal): Consider a file
+	change the same as an increased line number
+
+2013-01-24  Tiago Stürmer Daitx  <tdaitx@linux.vnet.ibm.com>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list. 
+
+2013-01-24  Tom Tromey  <tromey@redhat.com>
+
+	* ada-lang.h (ada_decode_symbol): Make return type const.
+	* ada-lang.c (ada_decode_symbol): Likewise.
+
+2013-01-23  Doug Evans  <dje@google.com>
+
+	* linespec.c (find_linespec_symbols): Make static.
+
+2013-01-23  Tiago Stürmer Daitx  <tdaitx@linux.vnet.ibm.com>
+
+	* ppc-sysv-tdep.c (ppc64_sysv_abi_return_value): Set correct
+	type on float conversion for complex type.
+
+2013-01-23  Siva Chandra Reddy  <sivachandra@google.com>
+
+	Add a new class gdb.Architecture which exposes GDB's
+	internal representation of architecture via GDB Python API.
+	* Makefile.in: Add entries corresponding to the new file
+	python/py-arch.c.
+	* NEWS (Python Scripting): Add entries for the new class
+	gdb.Architecture and the new method gdb.Frame.architecture.
+	* python/py-arch.c: Implement gdb.Architecture class.
+	* python/py-frame.c (frapy_arch): Implement the method
+	gdb.Frame.architecture().
+	(frame_object_methods): Add 'architecture' to the method table.
+	* python/python-internal.h: Add declarations of new utility
+	functions.
+	* python/python.c (_initialize_python): Initialize
+	gdb.Architecture class.
+
+2013-01-23  Doug Evans  <dje@google.com>
+
+	Work around binutils/15021.
+	* dwarf2read.c (dwarf2_per_cu_data): Split imported_symtabs and
+	type_unit_group out of union s.  All uses updated.
+	(read_index_from_section): Watch for index version 8.
+	(follow_die_sig): If using .gdb_index version <= 7, record the TU as
+	an imported symtab.
+	(write_psymtabs_to_index): Increment version number to 8.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* annotate.c (breakpoint_changed): Skip if breakpoint is not
+	user-visible.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* annotate.c (annotate_breakpoints_changed): Rename to ...
+	(annotate_breakpoints_invalid): ... this.  Make static.
+	(breakpoint_changed): Adjust.
+	(_initialize_annotate): Always install the observers.  Install a
+	"breakpoint_created" observer.
+	* annotate.h (annotate_breakpoints_changed): Delete declaration.
+	* breakpoint.c (set_breakpoint_condition)
+	(breakpoint_set_commands, do_map_commands_command)
+	(init_raw_breakpoint, clear_command, set_ignore_count)
+	(enable_breakpoint_disp): No longer call
+	annotate_breakpoints_changed.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* annotate.c: Include "inferior.h".
+	(frames_invalid_emitted)
+	(breakpoints_invalid_emitted): New globals.
+	(async_background_execution_p): New function.
+	(annotate_breakpoints_changed, annotate_frames_invalid): Skip
+	emitting the annotation if it has already been emitted.
+	(annotate_display_prompt): New function.
+	* annotate.h (annotate_display_prompt): New declaration.
+	* event-top.c: Include annotate.h.
+	(display_gdb_prompt): Call annotate_display_prompt.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* annotate.c (ignore_count_changed): Delete.
+	(annotate_breakpoints_changed): Don't clear ignore_count_changed.
+	(annotate_ignore_count_change): Delete.
+	(annotate_stopped): Don't emit a delayed breakpoints-changed
+	annotation.
+	* annotate.h (annotate_ignore_count_change): Delete.
+	* breakpoint.c (bpstat_check_breakpoint_conditions): Don't call
+	annotate_ignore_count_change.
+
+2013-01-22  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2loc.c (dwarf2_compile_expr_to_ax) <DW_OP_fbreg>: Only
+	require_rvalue for a register location.
+
+2013-01-21  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* breakpoint.c (print_one_breakpoint_location): Add MI
+	field 'thread-groups' when printing a breakpoint.
+	(output_thread_groups): New function.
+
+2013-01-21  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* python/lib/gdb/commands/explore.py
+	(CompoundExplorer.explore_expr): Correct the name of a method
+	being invoked.
+	(ExploreTypeCommand.invoke): Add a missing 'return'.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb_obstack.h (obconcat): Move declaration here, from...
+	* symfile.h (obconcat): ... here.
+	* gdb_obstack.c: New file.
+	(obconcat): Move from...
+	* symfile.c (obconcat): ... here.
+	* Makefile.in (SFILES): Add gdb_obstack.c.
+	(COMMON_OBS): Add gdb_obstack.o.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.h (obsavestring): Don't declare.
+	* symfile.c (obsavestring): Remove.
+	* ada-exp.y: Use obstack_copy0, not obsavestring.
+	* ada-lang.c: Use obstack_copy0, not obsavestring.
+	* coffread.c: Use obstack_copy0, not obsavestring.
+	* cp-namespace.c: Use obstack_copy0, not obsavestring.
+	* dbxread.c: Use obstack_copy0, not obsavestring.
+	* dwarf2read.c: Use obstack_copy0, not obsavestring.
+	* jit.c: Use obstack_copy0, not obsavestring.
+	* mdebugread.c: Use obstack_copy0, not obsavestring.
+	* psymtab.c: Use obstack_copy0, not obsavestring.
+	* stabsread.c: Use obstack_copy0, not obsavestring.
+	* xcoffread.c: Use obstack_copy0, not obsavestring.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (fixup_go_packaging): Save package name
+	on objfile obstack.
+	* gdbtypes.c (init_type): Don't copy name.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (struct partial_die_info) <name, scope>: Now
+	const.
+	(struct attribute) <u.str>: Now const.
+	(struct fnfieldlist) <name>: Now const.
+	(dw2_get_file_names_reader, init_cutu_and_read_dies): Update.
+	(partial_die_parent_scope): Make return type const.
+	(partial_die_full_name, add_partial_symbol): Update.
+	(dwarf2_compute_name, dwarf2_full_name, dwarf2_physname): Make
+	'name' const.
+	(find_file_and_directory): Make 'name' and 'comp_dir' const.
+	(read_file_scope, read_func_scope, dwarf2_add_field)
+	(dwarf2_add_member_fn, read_structure_type)
+	(process_enumeration_scope, read_array_type, read_module_type)
+	(read_base_type, read_subrange_type): Update.
+	(dwarf2_start_symtab): Make 'name' and 'comp_dir' const.
+	(new_symbol_full, guess_full_die_structure_name): Update.
+	(dwarf2_canonicalize_name): Return const type.  Make 'name' const.
+	(dwarf2_name): Return const type.
+	(dwarf_decode_macro_bytes, dwarf_decode_macros): Make 'comp_dir'
+	const.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdbtypes.c (init_type): Make 'name' const.
+	* gdbtypes.h (init_type): Update.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* buildsym.c (patch_subfile_names): Use set_last_source_file.
+	(start_symtab): Make 'name' and 'dirname' const.  Use
+	set_last_source_file.
+	(restart_symtab, reset_symtab_globals): Use set_last_source_file.
+	(last_source_file): Define.  Now static.
+	(set_last_source_file, get_last_source_file): New functions.
+	* buildsym.h (last_source_file): Don't declare.
+	(start_symtab): Update.
+	(set_last_source_file, get_last_source_file): Declare.
+	* coffread.c (complete_symtab): Use set_last_source_file.
+	(coff_end_symtab): Likewise.
+	(coff_symtab_read): Use set_last_source_file, get_last_source_file.
+	* dbxread.c (read_dbx_symtab, read_ofile_symtab): Use
+	set_last_source_file.
+	(process_one_symbol): Use get_last_source_file.
+	* mdebugread.c (parse_partial_symbols): Use set_last_source_file.
+	(psymtab_to_symtab_1): Use get_last_source_file.
+	* xcoffread.c (process_linenos): Use get_last_source_file.
+	(complete_symtab): Use set_last_source_file.
+	(read_xcoff_symtab): Use set_last_source_file, get_last_source_file.
+	(scan_xcoff_symtab): Use set_last_source_file.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* symtab.c (struct demangled_name_entry) <mangled>: Now const.
+	(symbol_set_names): Remove casts.  Handle field const-ness.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (new_symbol_full): Remove cast.
+	* symtab.c (symbol_set_demangled_name): Make 'name' const.
+	* symtab.h (symbol_set_demangled_name): Update.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* main.c (captured_main): Call bfd_init.
+
+2013-01-21  Tom Tromey  <tromey@redhat.com>
+
+	* gnu-v2-abi.c (_initialize_gnu_v2_abi): Don't set default ABI.
+	* gnu-v3-abi.c (_initialize_gnu_v3_abi): Set default ABI.
+	* minsyms.c (install_minimal_symbols): Don't check for _Z symbols.
+	* NEWS: Update.
+
+2013-01-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symmisc.c (maintenance_print_msymbols): Check also ST_DEV.
+
+2013-01-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Fix gdb.fortran/common-block.exp crash in PIE mode.
+	* dwarf2read.c (new_symbol_full) <DW_TAG_common_block>: Use
+	LOC_COMMON_BLOCK.
+	* f-valprint.c (info_common_command_for_block): Expect
+	LOC_COMMON_BLOCK in gdb_assert.
+	* symtab.h (struct general_symbol_info): Update comment for the
+	common_block member.
+	(domain_enum): Extend comment for the COMMON_BLOCK_DOMAIN member.
+	(enum address_class): New member LOC_COMMON_BLOCK.
+
+2013-01-18  David Blaikie  <dblaikie@gmail.com>
+
+	* MAINTAINERS (Write After Approval): Add "David Blaikie".
+
+2013-01-18  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/14999:
+	* dwarf2loc.c (dwarf2_compile_expr_to_ax) <DW_OP_fbreg>:
+	Call require_rvalue.
+
+2013-01-18  Yao Qi  <yao@codesourcery.com>
+
+	* dbxread.c (dbx_psymtab_to_symtab): Delete the declaration.
+	(dbx_read_symtab): New declaration.
+	(dbx_psymtab_to_symtab): Delete.
+	(dbx_read_symtab): Rename from dbx_psymtab_to_symtab.
+	Rename parameter PST to SELF.  Exchanged two parameters.
+	(start_psymtab): Caller update.
+	* dwarf2read.c (dwarf2_psymtab_to_symtab): Delete the declaration.
+	(dwarf2_read_symtab): New declaration.
+	(dwarf2_psymtab_to_symtab): Delete.
+	(dwarf2_read_symtab): Rename from dwarf2_psymtab_to_symtab.
+	Rename parameter PST to SELF.  Exchanged two parameters.
+	(create_partial_symtab): Caller update.
+	* mdebugread.c (mdebug_psymtab_to_symtab): Delete.
+	(mdebug_read_symtab): Rename from mdebug_psymtab_to_symtab.
+	Rename parameter PST to SELF.  Exchanged two parameters.
+	(parse_partial_symbols, new_psymtab): Caller update.
+	* psympriv.h (struct partial_symtab) <read_symtab>: Exchange
+	two parameters.
+	* psymtab.c (psymtab_to_symtab): Caller update.
+	* xcoffread.c (xcoff_psymtab_to_symtab): Delete.
+	(xcoff_read_symtab): Rename from xcoff_psymtab_to_symtab.
+	Rename parameter PST to SELF.  Exchanged two parameters.
+	(xcoff_start_psymtab): Caller update.
+
+2013-01-18  Yao Qi  <yao@codesourcery.com>
+
+	* infrun.c (proceed): Rename local variable 'oneproc' to
+	'force_step'.
+
+2013-01-17  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (dw2_build_type_unit_groups_reader): Delete.
+	(dw2_build_type_unit_groups): Delete.  All uses updated.
+
+	* symtab.h (struct symbol_search): Add comment.
+
+2013-01-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.c (compare_filenames_for_search): New comment for
+	HAS_DRIVE_SPEC.
+
+2013-01-17  Tom Tromey  <tromey@redhat.com>
+
+	* cp-abi.c (cp_abi_completer): Fix typo in assignment.
+
+2013-01-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* symtab.c (iterate_over_some_symtabs): New variable cleanups,
+	initialize it by existing make_cleanup.  Call new do_cleanups.
+
+2013-01-17  Tom Tromey  <tromey@redhat.com>
+
+	* cp-abi.c (cp_abi_completer): New function.
+	(_initialize_cp_abi): Set completer for "set cp-abi".
+
+2013-01-17  Tom Tromey  <tromey@redhat.com>
+
+	* mem-break.c: Remove obsolete comment.
+	* bfin-tdep.c (bfin_breakpoint_from_pc): Fix comment.
+
+2012-01-17  Sanjoy Das <sanjoy@playingwithpointers.com>
+
+	* jit.c (jit_reader_load_command): Interpret the jit reader name
+	as an absolute path if it begins with a forward slash.
+
+2012-01-17  Sanjoy Das <sanjoy@playingwithpointers.com>
+
+	PR gdb/14550
+
+	* jit.c (finalize_symtab): Ensure that only the global block has a
+	NULL superblock.
+
+2013-01-17  Pedro Alves  <palves@redhat.com>
+
+	* acinclude.m4: Include ../config/plugins.m4,
+	../config/largefile.m4 and ../config/lead-dot.m4.  Add comments.
+	* Makefile.in (aclocal_m4_deps): Update.
+	* aclocal.m4: Renegerate.
+
+2013-01-16  Doug Evans  <dje@google.com>
+
+	* contrib/cc-with-tweaks.sh: Add references to Fission docs.
+
+2013-01-16  Pedro Alves  <palves@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	PR cli/7221:
+	* NEWS: Add "catch signal".
+	* breakpoint.c (base_breakpoint_ops): No longer static.
+	(bpstat_explains_signal): New function.
+	(init_catchpoint): No longer static.
+	(base_breakpoint_explains_signal): New function.
+	(base_breakpoint_ops): Initialize new field.
+	* breakpoint.h (enum bpstat_signal_value): New.
+	(struct breakpoint_ops) <explains_signal>: New field.
+	(bpstat_explains_signal): Remove macro, declare as function.
+	(base_breakpoint_ops, init_catchpoint): Declare.
+	* break-catch-sig.c: New file.
+	* inferior.h (signal_catch_update): Declare.
+	* infrun.c (signal_catch): New global.
+	(handle_syscall_event): Update for change to
+	bpstat_explains_signal.
+	(handle_inferior_event): Likewise.  Always handle random signals
+	via bpstats.
+	(signal_cache_update): Check signal_catch.
+	(signal_catch_update): New function.
+	(_initialize_infrun): Initialize signal_catch.
+	* Makefile.in (SFILES): Add break-catch-sig.c.
+	(COMMON_OBS): Add break-catch-sig.o.
+
+2013-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* breakpoint.c (print_one_catch_fork, print_one_catch_vfork)
+	(print_one_catch_solib, print_one_catch_syscall)
+	(print_one_catch_exec, print_one_exception_catchpoint): Emit
+	"catch-type".
+
+2013-01-16  Yao Qi  <yao@codesourcery.com>
+
+	* printcmd.c (current_display_number): Make it static.
+
+2013-01-16  Yao Qi  <yao@codesourcery.com>
+
+	* infcmd.c (step_once): Don't check '!single_inst' as it was
+	checked before.
+
+2013-01-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (psymtab_include_file_name): Extend the function comment.
+
 2013-01-14  Tom Tromey  <tromey@redhat.com>
 
 	* cli/cli-decode.c (add_setshow_string_noescape_cmd): Return the
