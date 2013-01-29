@@ -113,10 +113,10 @@ show_lines_to_list (struct ui_file *file, int from_tty,
 static const char filename_display_basename[] = "basename";
 static const char filename_display_relative[] = "relative";
 static const char filename_display_absolute[] = "absolute";
-static const char filename_display_relative_with_system_absolute[]
-					      = "relative-with-system-absolute";
-static const char filename_display_basename_with_system_absolute[]
-					      = "basename-with-system-absolute";
+static const char filename_display_relative_with_system_absolute[] =
+						"relative-with-system-absolute";
+static const char filename_display_basename_with_system_absolute[] =
+						"basename-with-system-absolute";
 
 static const char *const filename_display_kind_names[] = {
   filename_display_basename,
