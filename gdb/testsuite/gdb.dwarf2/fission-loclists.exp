@@ -1,4 +1,4 @@
-# Copyright 2012-2013 Free Software Foundation, Inc.
+# Copyright 2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +20,12 @@ if ![dwarf2_support] {
     return 0  
 }
 
-set basename "fission-reread"
+# This test can only be run on x86-64 targets.
+if {![istarget x86_64-*] || ![is_lp64_target]} {
+    return 0
+}
+
+set basename "fission-loclists"
 
 standard_testfile .S
 
@@ -28,11 +33,10 @@ if { [prepare_for_testing "$testfile.exp" "$testfile" "$srcfile" {nodebug}] } {
     return -1
 }
 
-gdb_test "break main" "Breakpoint.*at.*"
+if ![runto_main] {
+    return -1
+}
 
-# If we get this far gdb didn't crash, nor did an error occur.
-pass $testfile
+# Verify gdb can find argc.
 
-gdb_unload
-# If we get this far gdb didn't crash, nor did an error occur.
-pass "$testfile - unload"
+gdb_test "p argc" " = 1"
