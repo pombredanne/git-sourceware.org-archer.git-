@@ -1,3 +1,12 @@
+2013-01-29  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/fission-reread.exp: Add unload test.
+
+2013-01-28  Doug Evans  <dje@google.com>
+
+	* gdb.dwarf2/fission-loclists.exp: New file.
+	* gdb.dwarf2/fission-loclists.S: New file.
+
 2013-01-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	Code cleanup.
