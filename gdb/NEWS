@@ -119,7 +119,9 @@ set filename-display basename|relative|absolute|relative-with-system-absolute
                      |basename-with-system-absolute
 show filename-display
   Control the way in which filenames is displayed.
-  The default is "relative", which preserves previous behavior.
+  Previous behavior was "relative".
+  New default is "relative-with-system-absolute", which prints source filenames
+  from files with present separate debug info in absolute form.
 
 * MI changes
 
