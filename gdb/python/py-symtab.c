@@ -91,7 +91,7 @@ stpy_str (PyObject *self)
 
   STPY_REQUIRE_VALID (self, symtab);
 
-  result = PyString_FromString (symtab_to_filename (symtab));
+  result = PyString_FromString (symtab_to_filename_for_display (symtab));
 
   return result;
 }
@@ -104,7 +104,7 @@ stpy_get_filename (PyObject *self, void *closure)
   const char *filename;
 
   STPY_REQUIRE_VALID (self, symtab);
-  filename = symtab_to_filename (symtab);
+  filename = symtab_to_filename_for_display (symtab);
 
   str_obj = PyString_Decode (filename, strlen (filename),
 			     host_charset (), NULL);
@@ -197,7 +197,7 @@ salpy_str (PyObject *self)
 
   sal_obj = (sal_object *) self;
   filename = (sal_obj->symtab == (symtab_object *) Py_None)
-    ? "<unknown>" : symtab_to_filename (sal_obj->symtab->symtab);
+    ? "<unknown>" : symtab_to_filename_for_display (sal_obj->symtab->symtab);
 
   s = xstrprintf ("symbol and line for %s, line %d", filename,
 		  sal->line);

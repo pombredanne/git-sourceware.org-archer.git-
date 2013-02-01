@@ -725,7 +725,7 @@ build_address_symbolic (struct gdbarch *gdbarch,
 
       if (sal.symtab)
 	{
-	  *filename = xstrdup (symtab_to_filename (sal.symtab));
+	  *filename = xstrdup (symtab_to_filename_for_display (sal.symtab));
 	  *line = sal.line;
 	}
     }
