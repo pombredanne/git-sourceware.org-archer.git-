@@ -1178,8 +1178,9 @@ print_frame (struct frame_info *frame, int print_level,
   ui_out_text (uiout, ")");
   if (sal.symtab)
     {
-      const char *filename_display = symtab_to_filename (sal.symtab);
-
+      const char *filename_display;
+      
+      filename_display = symtab_to_filename_for_display (sal.symtab);
       annotate_frame_source_begin ();
       ui_out_wrap_hint (uiout, "   ");
       ui_out_text (uiout, " at ");
@@ -1459,7 +1460,8 @@ frame_info (char *addr_exp, int from_tty)
     }
   wrap_here ("   ");
   if (sal.symtab)
-    printf_filtered (" (%s:%d)", symtab_to_filename (sal.symtab), sal.line);
+    printf_filtered (" (%s:%d)", symtab_to_filename_for_display (sal.symtab),
+		     sal.line);
   puts_filtered ("; ");
   wrap_here ("    ");
   printf_filtered ("saved %s ", pc_regname);
