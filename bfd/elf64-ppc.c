@@ -4074,7 +4074,7 @@ ppc_stub_name (const asection *input_section,
 	       const Elf_Internal_Rela *rel)
 {
   char *stub_name;
-  bfd_size_type len;
+  ssize_t len;
 
   /* rel->r_addend is actually 64 bit, but who uses more than +/- 2^31
      offsets from a sym as a branch target?  In fact, we could
@@ -4088,10 +4088,10 @@ ppc_stub_name (const asection *input_section,
       if (stub_name == NULL)
 	return stub_name;
 
-      sprintf (stub_name, "%08x.%s+%x",
-	       input_section->id & 0xffffffff,
-	       h->elf.root.root.string,
-	       (int) rel->r_addend & 0xffffffff);
+      len = sprintf (stub_name, "%08x.%s+%x",
+		     input_section->id & 0xffffffff,
+		     h->elf.root.root.string,
+		     (int) rel->r_addend & 0xffffffff);
     }
   else
     {
@@ -4100,13 +4100,13 @@ ppc_stub_name (const asection *input_section,
       if (stub_name == NULL)
 	return stub_name;
 
-      sprintf (stub_name, "%08x.%x:%x+%x",
-	       input_section->id & 0xffffffff,
-	       sym_sec->id & 0xffffffff,
-	       (int) ELF64_R_SYM (rel->r_info) & 0xffffffff,
-	       (int) rel->r_addend & 0xffffffff);
+      len = sprintf (stub_name, "%08x.%x:%x+%x",
+		     input_section->id & 0xffffffff,
+		     sym_sec->id & 0xffffffff,
+		     (int) ELF64_R_SYM (rel->r_info) & 0xffffffff,
+		     (int) rel->r_addend & 0xffffffff);
     }
-  if (stub_name[len - 2] == '+' && stub_name[len - 1] == '0')
+  if (len > 2 && stub_name[len - 2] == '+' && stub_name[len - 1] == '0')
     stub_name[len - 2] = 0;
   return stub_name;
 }
@@ -7056,13 +7056,14 @@ dec_dynrel_count (bfd_vma r_info,
 	  void *vpp = &elf_section_data (sec)->local_dynrel;
 	  pp = (struct elf_dyn_relocs **) vpp;
 	}
-
-      /* elf_gc_sweep may have already removed all dyn relocs associated
-	 with local syms for a given section.  Don't report a dynreloc
-	 miscount.  */
-      if (*pp == NULL)
-	return TRUE;
     }
+
+  /* elf_gc_sweep may have already removed all dyn relocs associated
+     with local syms for a given section.  Also, symbol flags are
+     changed by elf_gc_sweep_symbol, confusing the test above.  Don't
+     report a dynreloc miscount.  */
+  if (*pp == NULL && info->gc_sections)
+    return TRUE;
 
   while ((p = *pp) != NULL)
     {
@@ -9772,7 +9773,7 @@ build_plt_stub (struct ppc_link_hash_table *htab,
     {
       bfd_put_32 (obfd, CMPLDI_R2_0, p),			p += 4;
       bfd_put_32 (obfd, BNECTR_P4, p),				p += 4;
-      bfd_put_32 (obfd, B_DOT + cmp_branch_off, p),		p += 4;
+      bfd_put_32 (obfd, B_DOT | (cmp_branch_off & 0x3fffffc), p), p += 4;
     }
   else
     bfd_put_32 (obfd, BCTR, p),					p += 4;
