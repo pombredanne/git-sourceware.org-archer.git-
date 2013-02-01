@@ -1,3 +1,156 @@
+2013-01-31  Tom Tromey  <tromey@redhat.com>
+
+	* jit.c (jit_program_space_data): Rename from jit_inferior_data;
+	change type.
+	(struct jit_program_space_data): Rename from jit_inferior_data.
+	Update comments.
+	(get_jit_program_space_data): Rename from get_jit_inferior_data.
+	Change return type.  Attach data to program space.
+	(jit_program_space_data_cleanup): Rename from
+	jit_inferior_data_cleanup; change argument type.
+	(jit_read_descriptor): Change 'inf_data' argument to 'ps_data',
+	change type.
+	(jit_register_code): Update.
+	(jit_update_inferior_cache): Remove.
+	(jit_breakpoint_deleted): Get jit data from the location's program
+	space.
+	(jit_breakpoint_re_set_internal): Rename 'inf_data' argument to
+	'ps_data', change type.
+	(jit_inferior_init, jit_breakpoint_re_set_internal)
+	(jit_event_handler): Update.
+	(free_objfile_data): Get data from objfile's program space.
+	(_initialize_jit): Update.
+
+2013-01-31  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/13987:
+	* jit.c (struct jit_inferior_data) <cached_code_address,
+	jit_breakpoint>: New fields.
+	(jit_breakpoint_re_set_internal): Fix logging.  Only create
+	breakpoint if cached address has changed.
+	(jit_update_inferior_cache, jit_breakpoint_deleted): New
+	functions.
+	(_initialize_jit): Register breakpoint deleted observer.
+
+2013-01-31  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* infrun.c (handle_syscall_event): Remove unused gdbarch.
+	(save_infcall_suspend_state): Ifdef out unused inf.
+	(restore_infcall_suspend_state): Ifdef out unused inf.
+	* jit.c (jit_register_code): Remove unused i, b, inf_data.
+	(jit_frame_sniffer): Remove unused inf_data.
+
+2013-01-31  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* c-exp.y (classify_inner_name): Remove unused type.
+	* c-lang.c (c_printstr): Remove unused byte_order, i, things_printed,
+	in_quotes, need_comma, wchar_buf, output, cleanup, iter, finished,
+	need_escape.
+	(c_get_string): Remove unused kind.
+	* c-typeprint.c (c_type_print_args): Remove unused i, len, args, table2.
+
+2013-01-31  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* charset.c (intermediate_encoding): Remove unused i.
+	* completer.c (signal_completer): Remove unused i.
+	* continuations.c (discard_my_continuations_1): Remove unused
+	continuation_ptr.
+	* corelow.c (core_close): Remove unuseD name.
+	(get_core_siginfo): Remove unused pid.
+	* cp-namespace.c (cp_lookup_symbol_imports_or_template): Remove unused
+	i, cps.
+	* dwarf2loc.c (dwarf2_compile_expr_to_ax): Remove unused base_offset.
+	(loclist_describe_location): Remove unused first.
+	* event-top.c (command_line_handler): Remove unused got_eof.
+	* exec.c (exec_close_1): Remove unused need_symtab_cleanup.
+	(resize_section_table): Remove unused old_value.
+	* gdb_bfd.c (gdb_bfd_map_section): Remove unused header.
+	* gnu-v3-abi.c (compute_vtable_size): Remove unused addr.
+	* i386-tdep.c (i386_process_record): Remove unused rex.
+	* infcmd.c (get_return_value): Remove unused uiout.
+	* jv-lang.c (type_from_class): Remove unused is_array.
+	* jv-valprint.c (java_val_print): Remove unused i.
+	* linux-nat.c (linux_nat_stop_lwp): Remove unused ptid.
+	* linux-thread-db.c (thread_db_find_new_threads_2): Remove unuseD pid.
+	* m2-typeprint.c (m2_print_type): Remove unused code.
+	* macroexp.c (get_character_constant): Remove unused body_start.
+	(macro_stringify): Remove unused result.
+	* objc-lang.c (find_methods): Remove unused gdbarch.
+	* objfiles.c (filter_overlapping_sections): Remove unused abfd1, abfd2.
+	* regcache.c (regcache_cooked_read): Remove unused gdbarch.
+	* stack.c (print_frame_args): Remove unused summary.
+	* thread.c (thread_apply_command): Remove unused p.
+	* valarith.c (value_x_unop): Remove unused mangle_ptr.
+	* valops.c (search_struct_method): Remove unused skip.
+	* valprint.c (generic_val_print): Remove unused byte_order.
+	* varobj.c (varobj_update): Remove unused changed.
+	* cli/cli-cmds.c (complete_command): Remove unused next_item.
+	(alias_command): Remove unused c.
+	* mi/mi-cmd-catch.c (mi_catch_load_unload): Remove unused c.
+	* mi/mi-main.c (mi_cmd_data_write_register_values): Remove unused
+	format.
+	(mi_cmd_data_write_memory): Remove unused word_format.
+	(mi_cmd_data_write_memory_bytes): Remove unused r.
+	* python/py-gdb-readline.c (gdbpy_readline_wrapper): Remove unused
+	p_start, p_end.
+	* python/python.c (_initialize_python): Remove unused cmd_name, cmd.
+	* tui/tui-disasm.c (tui_set_disassem_content): Remove unused
+	line_width.
+
+2013-01-31  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* dwarf2-frame.c (dwarf2_compile_cfa_to_ax): Remove unused num_regs.
+	* symtab.c (iterate_over_symtabs): Remove unused s.
+	(find_pc_sect_symtab): Remove unused pspAce.
+	(find_pc_sect_line): Remove unused alt_symtab.
+	(find_pcs_for_symtab_line): Remove unused ix, previous_function.
+	(completion_list_add_name): Remove unused newsize.
+
+2013-01-31  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/14998:
+	* dwarf2read.c (read_tag_ptr_to_member_type): Handle
+	TYPE_CODE_FUNC.
+
+2013-01-31  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* target.c (target_read_string): Remove unused origlen.
+
+2013-01-31  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* auto-load.c (auto_load_expand_dir_vars): Remove unused dir_vec.
+	* ax-gdb.c (gen_printf): Remove unused expr, i, bot, fr, flen, fmt.
+	* ax-general.c (ax_print): Remove unused is_float.
+	* blockframe.c (block_innermost_frame): Remove unused start, end.
+	* break-catch-sig.c (catch_signal_command): Remove unused gdbarch.
+
+2013-01-31  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* solib-svr4.c (svr4_keep_data_in_core): Remove unused lmo.
+	(svr4_read_so_list): Remove unused lmo.
+	* solib-target.c (solib_target_relocate_section_addresses): Remove
+	unused flags.
+
+2013-01-30  Tom Tromey  <tromey@redhat.com>
+
+	* hppa-tdep.c (read_unwind_info): Use SECT_OFF_TEXT, not "0".
+
+2013-01-30  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (get_file_crc): Use bfd_calc_gnu_debuglink_crc32.
+	* utils.c (gnu_debuglink_crc32): Remove.
+	* utils.h (gnu_debuglink_crc32): Don't declare.
+
+2013-01-30  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (compute_delayed_physnames, read_call_site_scope)
+	(read_structure_type, read_enumeration_type): Remove cast.
+
+2013-01-30  Tom Tromey  <tromey@redhat.com>
+
+	* dwarf2read.c (read_namespace_type): Remove cast.
+	(read_typedef): Likewise.
+
 2013-01-29  Tom Tromey  <tromey@redhat.com>
 
 	* dwarf2read.c (free_dwo_file): Remove assert.
