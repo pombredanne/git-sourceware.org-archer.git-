@@ -1656,7 +1656,7 @@ Internal: %s symbol `%s' found in %s psymtab but not in symtab.\n\
 %s may be an inlined function, or may be a template function\n\
 (if a template, try specifying an instantiation: %s<type>)."),
 	       kind == GLOBAL_BLOCK ? "global" : "static",
-	       name, symtab_to_filename (symtab), name, name);
+	       name, symtab_to_filename_for_display (symtab), name, name);
     }
   return fixup_symbol_section (sym, objfile);
 }
@@ -1861,7 +1861,7 @@ basic_lookup_transparent_type_quick (struct objfile *objfile, int kind,
 Internal: global symbol `%s' found in %s psymtab but not in symtab.\n\
 %s may be an inlined function, or may be a template function\n\
 (if a template, try specifying an instantiation: %s<type>)."),
-	       name, symtab_to_filename (symtab), name, name);
+	       name, symtab_to_filename_for_display (symtab), name, name);
     }
   if (!TYPE_IS_OPAQUE (SYMBOL_TYPE (sym)))
     return SYMBOL_TYPE (sym);
@@ -3707,7 +3707,7 @@ print_symbol_info (enum search_domain kind,
 		   struct symtab *s, struct symbol *sym,
 		   int block, const char *last)
 {
-  const char *s_filename = symtab_to_filename (s);
+  const char *s_filename = symtab_to_filename_for_display (s);
 
   if (last == NULL || filename_cmp (last, s_filename) != 0)
     {
@@ -3805,7 +3805,7 @@ symtab_symbol_info (char *regexp, enum search_domain kind, int from_tty)
 			     p->symbol,
 			     p->block,
 			     last_filename);
-	  last_filename = symtab_to_filename (p->symtab);
+	  last_filename = symtab_to_filename_for_display (p->symtab);
 	}
     }
 
@@ -3909,7 +3909,7 @@ rbreak_command (char *regexp, int from_tty)
 			     p->symtab,
 			     p->symbol,
 			     p->block,
-			     symtab_to_filename (p->symtab));
+			     symtab_to_filename_for_display (p->symtab));
 	}
       else
 	{
