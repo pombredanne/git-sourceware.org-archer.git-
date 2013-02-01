@@ -1142,7 +1142,7 @@ symtab_to_fullname (struct symtab *s)
 /* See commentary in source.h.  */
 
 const char *
-symtab_to_filename (struct symtab *symtab)
+symtab_to_filename_for_display (struct symtab *symtab)
 {
   if (filename_display_string == filename_display_basename)
     return lbasename (symtab->filename);
@@ -1181,7 +1181,7 @@ find_source_lines (struct symtab *s, int desc)
   gdb_assert (s);
   line_charpos = (int *) xmalloc (lines_allocated * sizeof (int));
   if (fstat (desc, &st) < 0)
-    perror_with_name (symtab_to_filename (s));
+    perror_with_name (symtab_to_filename_for_display (s));
 
   if (s->objfile && s->objfile->obfd)
     mtime = s->objfile->mtime;
@@ -1206,7 +1206,7 @@ find_source_lines (struct symtab *s, int desc)
     /* Reassign `size' to result of read for systems where \r\n -> \n.  */
     size = myread (desc, data, size);
     if (size < 0)
-      perror_with_name (symtab_to_filename (s));
+      perror_with_name (symtab_to_filename_for_display (s));
     end = data + size;
     p = data;
     line_charpos[0] = 0;
@@ -1347,7 +1347,7 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
 
       if (!(flags & PRINT_SOURCE_LINES_NOERROR))
 	{
-	  const char *filename = symtab_to_filename (s);
+	  const char *filename = symtab_to_filename_for_display (s);
 	  int len = strlen (filename) + 100;
 	  char *name = alloca (len);
 
@@ -1358,7 +1358,8 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
 	{
 	  ui_out_field_int (uiout, "line", line);
 	  ui_out_text (uiout, "\tin ");
-	  ui_out_field_string (uiout, "file", symtab_to_filename (s));
+	  ui_out_field_string (uiout, "file",
+			       symtab_to_filename_for_display (s));
 
 	  /* TUI expects the "fullname" field.  While it is
 	     !ui_out_is_mi_like_p compared to CLI it is !ui_source_list.  */
@@ -1384,13 +1385,13 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
     {
       close (desc);
       error (_("Line number %d out of range; %s has %d lines."),
-	     line, symtab_to_filename (s), s->nlines);
+	     line, symtab_to_filename_for_display (s), s->nlines);
     }
 
   if (lseek (desc, s->line_charpos[line - 1], 0) < 0)
     {
       close (desc);
-      perror_with_name (symtab_to_filename (s));
+      perror_with_name (symtab_to_filename_for_display (s));
     }
 
   stream = fdopen (desc, FDOPEN_MODE);
@@ -1407,7 +1408,7 @@ print_source_lines_base (struct symtab *s, int line, int stopline,
       last_line_listed = current_source_line;
       if (flags & PRINT_SOURCE_LINES_FILENAME)
         {
-          ui_out_text (uiout, symtab_to_filename (s));
+          ui_out_text (uiout, symtab_to_filename_for_display (s));
           ui_out_text (uiout, ":");
         }
       xsnprintf (buf, sizeof (buf), "%d\t", current_source_line++);
@@ -1521,7 +1522,8 @@ line_info (char *arg, int from_tty)
 	  if (start_pc == end_pc)
 	    {
 	      printf_filtered ("Line %d of \"%s\"",
-			       sal.line, symtab_to_filename (sal.symtab));
+			       sal.line,
+			       symtab_to_filename_for_display (sal.symtab));
 	      wrap_here ("  ");
 	      printf_filtered (" is at address ");
 	      print_address (gdbarch, start_pc, gdb_stdout);
@@ -1531,7 +1533,8 @@ line_info (char *arg, int from_tty)
 	  else
 	    {
 	      printf_filtered ("Line %d of \"%s\"",
-			       sal.line, symtab_to_filename (sal.symtab));
+			       sal.line,
+			       symtab_to_filename_for_display (sal.symtab));
 	      wrap_here ("  ");
 	      printf_filtered (" starts at address ");
 	      print_address (gdbarch, start_pc, gdb_stdout);
@@ -1557,7 +1560,7 @@ line_info (char *arg, int from_tty)
 	   which the user would want to see?  If we have debugging symbols
 	   and no line numbers?  */
 	printf_filtered (_("Line number %d is out of range for \"%s\".\n"),
-			 sal.line, symtab_to_filename (sal.symtab));
+			 sal.line, symtab_to_filename_for_display (sal.symtab));
     }
   do_cleanups (cleanups);
 }
@@ -1585,7 +1588,7 @@ forward_search_command (char *regex, int from_tty)
 
   desc = open_source_file (current_source_symtab);
   if (desc < 0)
-    perror_with_name (symtab_to_filename (current_source_symtab));
+    perror_with_name (symtab_to_filename_for_display (current_source_symtab));
   cleanups = make_cleanup_close (desc);
 
   if (current_source_symtab->line_charpos == 0)
@@ -1595,7 +1598,7 @@ forward_search_command (char *regex, int from_tty)
     error (_("Expression not found"));
 
   if (lseek (desc, current_source_symtab->line_charpos[line - 1], 0) < 0)
-    perror_with_name (symtab_to_filename (current_source_symtab));
+    perror_with_name (symtab_to_filename_for_display (current_source_symtab));
 
   discard_cleanups (cleanups);
   stream = fdopen (desc, FDOPEN_MODE);
@@ -1674,7 +1677,7 @@ reverse_search_command (char *regex, int from_tty)
 
   desc = open_source_file (current_source_symtab);
   if (desc < 0)
-    perror_with_name (symtab_to_filename (current_source_symtab));
+    perror_with_name (symtab_to_filename_for_display (current_source_symtab));
   cleanups = make_cleanup_close (desc);
 
   if (current_source_symtab->line_charpos == 0)
@@ -1684,7 +1687,7 @@ reverse_search_command (char *regex, int from_tty)
     error (_("Expression not found"));
 
   if (lseek (desc, current_source_symtab->line_charpos[line - 1], 0) < 0)
-    perror_with_name (symtab_to_filename (current_source_symtab));
+    perror_with_name (symtab_to_filename_for_display (current_source_symtab));
 
   discard_cleanups (cleanups);
   stream = fdopen (desc, FDOPEN_MODE);
@@ -1727,8 +1730,11 @@ reverse_search_command (char *regex, int from_tty)
       line--;
       if (fseek (stream, current_source_symtab->line_charpos[line - 1], 0) < 0)
 	{
+	  const char *filename;
+
 	  do_cleanups (cleanups);
-	  perror_with_name (symtab_to_filename (current_source_symtab));
+	  filename = symtab_to_filename_for_display (current_source_symtab);
+	  perror_with_name (filename);
 	}
     }
 
