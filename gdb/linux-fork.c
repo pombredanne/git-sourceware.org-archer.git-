@@ -584,7 +584,8 @@ info_checkpoints_command (char *arg, int from_tty)
 
       sal = find_pc_line (pc, 0);
       if (sal.symtab)
-	printf_filtered (_(", file %s"), symtab_to_filename (sal.symtab));
+	printf_filtered (_(", file %s"),
+			 symtab_to_filename_for_display (sal.symtab));
       if (sal.line)
 	printf_filtered (_(", line %d"), sal.line);
       if (!sal.symtab && !sal.line)

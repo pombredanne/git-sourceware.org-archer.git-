@@ -63,7 +63,7 @@ tui_set_source_content (struct symtab *s,
 	    {
 	      if (!noerror)
 		{
-		  const char *filename = symtab_to_filename (s);
+		  const char *filename = symtab_to_filename_for_display (s);
 		  char *name = alloca (strlen (filename) + 100);
 
 		  sprintf (name, "%s:%d", filename, line_no);
@@ -81,13 +81,14 @@ tui_set_source_content (struct symtab *s,
 		  close (desc);
 		  printf_unfiltered ("Line number %d out of range; "
 				     "%s has %d lines.\n",
-				     line_no, symtab_to_filename (s),
+				     line_no,
+				     symtab_to_filename_for_display (s),
 				     s->nlines);
 		}
 	      else if (lseek (desc, s->line_charpos[line_no - 1], 0) < 0)
 		{
 		  close (desc);
-		  perror_with_name (symtab_to_filename (s));
+		  perror_with_name (symtab_to_filename_for_display (s));
 		}
 	      else
 		{
@@ -96,10 +97,11 @@ tui_set_source_content (struct symtab *s,
 		    = tui_locator_win_info_ptr ();
                   struct tui_source_info *src
 		    = &TUI_SRC_WIN->detail.source_info;
+		  const char *s_filename = symtab_to_filename_for_display (s);
 
                   if (TUI_SRC_WIN->generic.title)
                     xfree (TUI_SRC_WIN->generic.title);
-                  TUI_SRC_WIN->generic.title = xstrdup (symtab_to_filename (s));
+                  TUI_SRC_WIN->generic.title = xstrdup (s_filename);
 
 		  xfree (src->fullname);
 		  src->fullname = xstrdup (symtab_to_fullname (s));

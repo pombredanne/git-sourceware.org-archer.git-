@@ -5707,7 +5707,8 @@ print_breakpoint_location (struct breakpoint *b,
 	  ui_out_wrap_hint (uiout, wrap_indent_at_field (uiout, "what"));
 	  ui_out_text (uiout, "at ");
 	}
-      ui_out_field_string (uiout, "file", symtab_to_filename (loc->symtab));
+      ui_out_field_string (uiout, "file",
+			   symtab_to_filename_for_display (loc->symtab));
       ui_out_text (uiout, ":");
 
       if (ui_out_is_mi_like_p (uiout))
@@ -9770,7 +9771,7 @@ resolve_sal_pc (struct symtab_and_line *sal)
     {
       if (!find_line_pc (sal->symtab, sal->line, &pc))
 	error (_("No line %d in file \"%s\"."),
-	       sal->line, symtab_to_filename (sal->symtab));
+	       sal->line, symtab_to_filename_for_display (sal->symtab));
       sal->pc = pc;
 
       /* If this SAL corresponds to a breakpoint inserted using a line
@@ -12728,7 +12729,7 @@ say_where (struct breakpoint *b)
 	     more nicely.  */
 	  if (b->loc->next == NULL)
 	    printf_filtered (": file %s, line %d.",
-			     symtab_to_filename (b->loc->symtab),
+			     symtab_to_filename_for_display (b->loc->symtab),
 			     b->loc->line_number);
 	  else
 	    /* This is not ideal, but each location may have a
@@ -13928,7 +13929,8 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 				   SYMBOL_PRINT_NAME (sym));
 	      ui_out_text (uiout, " at ");
 	    }
-	  ui_out_field_string (uiout, "file", symtab_to_filename (sal2.symtab));
+	  ui_out_field_string (uiout, "file",
+			       symtab_to_filename_for_display (sal2.symtab));
 	  ui_out_text (uiout, ":");
 
 	  if (ui_out_is_mi_like_p (uiout))
@@ -13946,7 +13948,7 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 
 	  xfree (b->addr_string);
 	  b->addr_string = xstrprintf ("%s:%d",
-				       symtab_to_filename (sal2.symtab),
+				   symtab_to_filename_for_display (sal2.symtab),
 				       b->loc->line_number);
 
 	  /* Might be nice to check if function changed, and warn if
