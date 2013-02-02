@@ -121,7 +121,7 @@ show filename-display
   Control the way in which filenames is displayed.
   Previous behavior was "relative".
   New default is "relative-with-system-absolute", which prints source filenames
-  from files with present separate debug info in absolute form.
+  from files with separate debug info in absolute form.
 
 * MI changes
 
