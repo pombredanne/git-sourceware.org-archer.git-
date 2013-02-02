@@ -259,6 +259,7 @@ extern int append_callback_event (callback_handler_func *proc,
 extern void delete_callback_event (int id);
 
 extern void start_event_loop (void);
+extern void initialize_event_loop (void);
 
 /* Functions from server.c.  */
 extern int handle_serial_event (int err, gdb_client_data client_data);
@@ -439,11 +440,12 @@ void gdb_agent_about_to_close (int pid);
 #endif
 
 struct traceframe;
+struct eval_agent_expr_context;
 
 /* Do memory copies for bytecodes.  */
 /* Do the recording of memory blocks for actions and bytecodes.  */
 
-int agent_mem_read (struct traceframe *tframe,
+int agent_mem_read (struct eval_agent_expr_context *ctx,
 		    unsigned char *to, CORE_ADDR from,
 		    ULONGEST len);
 
@@ -452,8 +454,8 @@ void agent_set_trace_state_variable_value (int num, LONGEST val);
 
 /* Record the value of a trace state variable.  */
 
-int agent_tsv_read (struct traceframe *tframe, int n);
-int agent_mem_read_string (struct traceframe *tframe,
+int agent_tsv_read (struct eval_agent_expr_context *ctx, int n);
+int agent_mem_read_string (struct eval_agent_expr_context *ctx,
 			   unsigned char *to,
 			   CORE_ADDR from,
 			   ULONGEST len);

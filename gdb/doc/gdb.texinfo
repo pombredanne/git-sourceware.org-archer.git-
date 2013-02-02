@@ -1178,13 +1178,6 @@ and a newline.  The Emacs-to-@value{GDBN} interface program uses the two
 @samp{\032} characters as a signal to display the source code for the
 frame.
 
-@item -epoch
-@cindex @code{--epoch}
-The Epoch Emacs-@value{GDBN} interface sets this option when it runs
-@value{GDBN} as a subprocess.  It tells @value{GDBN} to modify its print
-routines so as to allow Epoch to display values of expressions in a
-separate window.
-
 @item -annotate @var{level}
 @cindex @code{--annotate}
 This option sets the @dfn{annotation level} inside @value{GDBN}.  Its
@@ -4241,6 +4234,31 @@ The loading or unloading of a shared library.  If @var{regexp} is
 given, then the catchpoint will stop only if the regular expression
 matches one of the affected libraries.
 
+@item signal @r{[}@var{signal}@dots{} @r{|} @samp{all}@r{]}
+The delivery of a signal.
+
+With no arguments, this catchpoint will catch any signal that is not
+used internally by @value{GDBN}, specifically, all signals except
+@samp{SIGTRAP} and @samp{SIGINT}.
+
+With the argument @samp{all}, all signals, including those used by
+@value{GDBN}, will be caught.  This argument cannot be used with other
+signal names.
+
+Otherwise, the arguments are a list of signal names as given to
+@code{handle} (@pxref{Signals}).  Only signals specified in this list
+will be caught.
+
+One reason that @code{catch signal} can be more useful than
+@code{handle} is that you can attach commands and conditions to the
+catchpoint.
+
+When a signal is caught by a catchpoint, the signal's @code{stop} and
+@code{print} settings, as specified by @code{handle}, are ignored.
+However, whether the signal is still delivered to the inferior depends
+on the @code{pass} setting; this can be changed in the catchpoint's
+commands.
+
 @end table
 
 @item tcatch @var{event}
@@ -5332,6 +5350,10 @@ the defined types of signals.
 Similar, but print information only about the specified signal number.
 
 @code{info handle} is an alias for @code{info signals}.
+
+@item catch signal @r{[}@var{signal}@dots{} @r{|} @samp{all}@r{]}
+Set a catchpoint for the indicated signals.  @xref{Set Catchpoints},
+for details about this command.
 
 @kindex handle
 @item handle @var{signal} @r{[}@var{keywords}@dots{}@r{]}
@@ -7402,9 +7424,6 @@ instruction.
 @cindex examining data
 @kindex print
 @kindex inspect
-@c "inspect" is not quite a synonym if you are using Epoch, which we do not
-@c document because it is nonstandard...  Under Epoch it displays in a
-@c different window or something like that.
 The usual way to examine data in your program is with the @code{print}
 command (abbreviated @code{p}), or its synonym @code{inspect}.  It
 evaluates and prints the value of an expression of the language your
@@ -17162,7 +17181,7 @@ you must know the actual BFD name.
 Use the @code{show gnutarget} command to display what file format
 @code{gnutarget} is set to read.  If you have not set @code{gnutarget},
 @value{GDBN} will determine the file format for each file automatically,
-and @code{show gnutarget} displays @samp{The current BDF target is "auto"}.
+and @code{show gnutarget} displays @samp{The current BFD target is "auto"}.
 @end table
 
 @cindex common targets
@@ -22804,6 +22823,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Finish Breakpoints in Python:: Setting Breakpoints on function return
                                 using Python.
 * Lazy Strings In Python::      Python representation of lazy strings.
+* Architectures In Python::     Python representation of architectures.
 @end menu
 
 @node Basic Python
@@ -25870,6 +25890,11 @@ Returns the function name of the frame, or @code{None} if it can't be
 obtained.
 @end defun
 
+@defun Frame.architecture ()
+Returns the @code{gdb.Architecture} object corresponding to the frame's
+architecture.  @xref{Architectures In Python}.
+@end defun
+
 @defun Frame.type ()
 Returns the type of the frame.  The value can be one of:
 @table @code
@@ -26731,6 +26756,20 @@ resolve this to the lazy string's character type, use the type's
 @code{target} method.  @xref{Types In Python}.  This attribute is not
 writable.
 @end defvar
+
+@node Architectures In Python
+@subsubsection Python representation of architectures
+@cindex Python architectures
+
+@value{GDBN} uses architecture specific parameters and artifacts in a
+number of its various computations.  An architecture is represented
+by an instance of the @code{gdb.Architecture} class.
+
+A @code{gdb.Architecture} class has the following methods:
+
+@defun Architecture.name ()
+Return the name (string value) of the architecture.
+@end defun
 
 @node Python Auto-loading
 @subsection Python Auto-loading
@@ -27881,21 +27920,6 @@ A more detailed description of Emacs' interaction with @value{GDBN} is
 given in the Emacs manual (@pxref{Debuggers,,, Emacs, The @sc{gnu}
 Emacs Manual}).
 
-@c The following dropped because Epoch is nonstandard.  Reactivate
-@c if/when v19 does something similar. ---doc@cygnus.com 19dec1990
-@ignore
-@kindex Emacs Epoch environment
-@kindex Epoch
-@kindex inspect
-
-Version 18 of @sc{gnu} Emacs has a built-in window system
-called the @code{epoch}
-environment.  Users of this environment can use a new command,
-@code{inspect} which performs identically to @code{print} except that
-each value is printed in its own window.
-@end ignore
-
-
 @node GDB/MI
 @chapter The @sc{gdb/mi} Interface
 
@@ -28761,6 +28785,10 @@ of a multi-location breakpoint, this will be a dotted pair, like
 The type of the breakpoint.  For ordinary breakpoints this will be
 @samp{breakpoint}, but many values are possible.
 
+@item catch-type
+If the type of the breakpoint is @samp{catchpoint}, then this
+indicates the exact type of catchpoint.
+
 @item disp
 This is the breakpoint disposition---either @samp{del}, meaning that
 the breakpoint will be deleted at the next stop, or @samp{keep},
@@ -28860,7 +28888,8 @@ For example, here is what the output of @code{-break-insert}
 -> -break-insert main
 <- ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
     enabled="y",addr="0x08048564",func="main",file="myprog.c",
-    fullname="/home/nickrob/myprog.c",line="68",times="0"@}
+    fullname="/home/nickrob/myprog.c",line="68",thread-groups=["i1"],
+    times="0"@}
 <- (gdb)
 @end smallexample
 
@@ -28955,7 +28984,8 @@ information of the breakpoint.
 -> -break-insert main
 <- ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
     enabled="y",addr="0x08048564",func="main",file="myprog.c",
-    fullname="/home/nickrob/myprog.c",line="68",times="0"@}
+    fullname="/home/nickrob/myprog.c",line="68",thread-groups=["i1"],
+    times="0"@}
 <- (gdb)
 @end smallexample
 
@@ -29079,7 +29109,8 @@ The corresponding @value{GDBN} command is @samp{ignore}.
 -break-insert main
 ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
 enabled="y",addr="0x000100d0",func="main",file="hello.c",
-fullname="/home/foo/hello.c",line="5",times="0"@}
+fullname="/home/foo/hello.c",line="5",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-after 1 3
 ~
@@ -29095,7 +29126,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",times="0",ignore="3"@}]@}
+line="5",thread-groups=["i1"],times="0",ignore="3"@}]@}
 (gdb)
 @end smallexample
 
@@ -29131,7 +29162,8 @@ The corresponding @value{GDBN} command is @samp{commands}.
 -break-insert main
 ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
 enabled="y",addr="0x000100d0",func="main",file="hello.c",
-fullname="/home/foo/hello.c",line="5",times="0"@}
+fullname="/home/foo/hello.c",line="5",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-commands 1 "print v" "continue"
 ^done
@@ -29173,7 +29205,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",cond="1",times="0",ignore="3"@}]@}
+line="5",cond="1",thread-groups=["i1"],times="0",ignore="3"@}]@}
 (gdb)
 @end smallexample
 
@@ -29245,7 +29277,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="2",type="breakpoint",disp="keep",enabled="n",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",times="0"@}]@}
+line="5",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 @end smallexample
 
@@ -29281,7 +29313,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="2",type="breakpoint",disp="keep",enabled="y",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",times="0"@}]@}
+line="5",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 @end smallexample
 
@@ -29377,11 +29409,13 @@ The corresponding @value{GDBN} commands are @samp{break}, @samp{tbreak},
 (gdb)
 -break-insert main
 ^done,bkpt=@{number="1",addr="0x0001072c",file="recursive2.c",
-fullname="/home/foo/recursive2.c,line="4",times="0"@}
+fullname="/home/foo/recursive2.c,line="4",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-insert -t foo
 ^done,bkpt=@{number="2",addr="0x00010774",file="recursive2.c",
-fullname="/home/foo/recursive2.c,line="11",times="0"@}
+fullname="/home/foo/recursive2.c,line="11",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-list
 ^done,BreakpointTable=@{nr_rows="2",nr_cols="6",
@@ -29393,15 +29427,18 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x0001072c", func="main",file="recursive2.c",
-fullname="/home/foo/recursive2.c,"line="4",times="0"@},
+fullname="/home/foo/recursive2.c,"line="4",thread-groups=["i1"],
+times="0"@},
 bkpt=@{number="2",type="breakpoint",disp="del",enabled="y",
 addr="0x00010774",func="foo",file="recursive2.c",
-fullname="/home/foo/recursive2.c",line="11",times="0"@}]@}
+fullname="/home/foo/recursive2.c",line="11",thread-groups=["i1"],
+times="0"@}]@}
 (gdb)
 @c -break-insert -r foo.*
 @c ~int foo(int, int);
 @c ^done,bkpt=@{number="3",addr="0x00010774",file="recursive2.c,
-@c "fullname="/home/foo/recursive2.c",line="11",times="0"@}
+@c "fullname="/home/foo/recursive2.c",line="11",thread-groups=["i1"],
+@c times="0"@}
 @c (gdb)
 @end smallexample
 
@@ -29431,6 +29468,8 @@ memory location at which the breakpoint is set
 @item What
 logical location of the breakpoint, expressed by function name, file
 name, line number
+@item Thread-groups
+list of thread groups to which this breakpoint applies
 @item Times
 number of times the breakpoint has been hit
 @end table
@@ -29455,10 +29494,11 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="10",alignment="-1",col_name="addr",colhdr="Address"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
-addr="0x000100d0",func="main",file="hello.c",line="5",times="0"@},
+addr="0x000100d0",func="main",file="hello.c",line="5",thread-groups=["i1"],
+times="0"@},
 bkpt=@{number="2",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010114",func="foo",file="hello.c",fullname="/home/foo/hello.c",
-line="13",times="0"@}]@}
+line="13",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 @end smallexample
 
@@ -29586,9 +29626,10 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010734",func="callee4",
 file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
-fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c"line="8",times="1"@},
+fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c"line="8",thread-groups=["i1"],
+times="1"@},
 bkpt=@{number="2",type="watchpoint",disp="keep",
-enabled="y",addr="",what="C",times="0"@}]@}
+enabled="y",addr="",what="C",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 -exec-continue
 ^running
@@ -29610,9 +29651,10 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010734",func="callee4",
 file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
-fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",times="1"@},
+fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",thread-groups=["i1"],
+times="1"@},
 bkpt=@{number="2",type="watchpoint",disp="keep",
-enabled="y",addr="",what="C",times="-5"@}]@}
+enabled="y",addr="",what="C",thread-groups=["i1"],times="-5"@}]@}
 (gdb)
 -exec-continue
 ^running
@@ -29634,7 +29676,7 @@ body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010734",func="callee4",
 file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
 fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",
-times="1"@}]@}
+thread-groups=["i1"],times="1"@}]@}
 (gdb)
 @end smallexample
 
@@ -29671,7 +29713,7 @@ The corresponding @value{GDBN} command is @samp{catch load}.
 @smallexample
 -catch-load -t foo.so
 ^done,bkpt=@{number="1",type="catchpoint",disp="del",enabled="y",
-what="load of library matching foo.so",times="0"@}
+what="load of library matching foo.so",catch-type="load",times="0"@}
 (gdb)
 @end smallexample
 
@@ -29700,7 +29742,7 @@ The corresponding @value{GDBN} command is @samp{catch unload}.
 @smallexample
 -catch-unload -d bar.so
 ^done,bkpt=@{number="2",type="catchpoint",disp="keep",enabled="n",
-what="load of library matching bar.so",times="0"@}
+what="load of library matching bar.so",catch-type="unload",times="0"@}
 (gdb)
 @end smallexample
 
@@ -34260,7 +34302,8 @@ No equivalent.
 -break-insert main
 ^done,bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x080484ed",func="main",file="myprog.c",
-fullname="/home/nickrob/myprog.c",line="73",times="0"@},
+fullname="/home/nickrob/myprog.c",line="73",thread-groups=["i1"],
+times="0"@},
 time=@{wallclock="0.05185",user="0.00800",system="0.00000"@}
 (gdb)
 -enable-timings no
@@ -34773,15 +34816,19 @@ Readers can be loaded and unloaded using the @code{jit-reader-load}
 and @code{jit-reader-unload} commands.
 
 @table @code
-@item jit-reader-load @var{reader-name}
-Load the JIT reader named @var{reader-name}.  On a UNIX system, this
-will usually load @file{@var{libdir}/gdb/@var{reader-name}}, where
-@var{libdir} is the system library directory, usually
-@file{/usr/local/lib}.  Only one reader can be active at a time;
-trying to load a second reader when one is already loaded will result
-in @value{GDBN} reporting an error.  A new JIT reader can be loaded by
-first unloading the current one using @code{jit-reader-load} and then
-invoking @code{jit-reader-load}.
+@item jit-reader-load @var{reader}
+Load the JIT reader named @var{reader}.  @var{reader} is a shared
+object specified as either an absolute or a relative file name.  In
+the latter case, @value{GDBN} will try to load the reader from a
+pre-configured directory, usually @file{@var{libdir}/gdb/} on a UNIX
+system (here @var{libdir} is the system library directory, often
+@file{/usr/local/lib}).
+
+Only one reader can be active at a time; trying to load a second
+reader when one is already loaded will result in @value{GDBN}
+reporting an error.  A new JIT reader can be loaded by first unloading
+the current one using @code{jit-reader-unload} and then invoking
+@code{jit-reader-load}.
 
 @item jit-reader-unload
 Unload the currently loaded JIT reader.
@@ -41831,12 +41878,18 @@ unless otherwise noted:
 
 @enumerate
 @item
-The version number, currently 7.  Versions 1, 2 and 3 are obsolete.
+The version number, currently 8.  Versions 1, 2 and 3 are obsolete.
 Version 4 uses a different hashing function from versions 5 and 6.
 Version 6 includes symbols for inlined functions, whereas versions 4
 and 5 do not.  Version 7 adds attributes to the CU indices in the
-symbol table.  @value{GDBN} will only read version 4, 5, or 6 indices
+symbol table.  Version 8 specifies that symbols from DWARF type units
+(@samp{DW_TAG_type_unit}) refer to the type unit's symbol table and not the
+compilation unit (@samp{DW_TAG_comp_unit}) using the type.
+
+@value{GDBN} will only read version 4, 5, or 6 indices
 by specifying @code{set use-deprecated-index-sections on}.
+GDB has a workaround for potentially broken version 7 indices so it is
+currently not flagged as deprecated.
 
 @item
 The offset, from the start of the file, of the CU list.

@@ -189,16 +189,6 @@ struct quick_symbol_functions
 				   int kind, const char *name,
 				   domain_enum domain);
 
-  /* This is called to expand symbol tables before looking up a
-     symbol.  A backend can choose to implement this and then have its
-     `lookup_symbol' hook always return NULL, or the reverse.  (It
-     doesn't make sense to implement both.)  The arguments are as for
-     `lookup_symbol'.  */
-  void (*pre_expand_symtabs_matching) (struct objfile *objfile,
-				       enum block_enum block_kind,
-				       const char *name,
-				       domain_enum domain);
-
   /* Print statistics about any indices loaded for OBJFILE.  The
      statistics should be printed to gdb_stdout.  This is used for
      "maint print statistics".  */
@@ -515,19 +505,6 @@ extern struct section_addr_info
 
 extern void free_section_addr_info (struct section_addr_info *);
 
-
-/* Make a copy of the string at PTR with SIZE characters in the symbol
-   obstack (and add a null character at the end in the copy).  Returns
-   the address of the copy.  */
-
-extern char *obsavestring (const char *, int, struct obstack *);
-
-/* Concatenate NULL terminated variable argument list of `const char
-   *' strings; return the new string.  Space is found in the OBSTACKP.
-   Argument list must be terminated by a sentinel expression `(char *)
-   NULL'.  */
-
-extern char *obconcat (struct obstack *obstackp, ...) ATTRIBUTE_SENTINEL;
 
 			/*   Variables   */
 

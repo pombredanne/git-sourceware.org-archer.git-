@@ -1,5 +1,5 @@
 /* aarch64-asm.c -- AArch64 assembler support.
-   Copyright 2012  Free Software Foundation, Inc.
+   Copyright 2012, 2013  Free Software Foundation, Inc.
    Contributed by ARM Ltd.
 
    This file is part of the GNU opcodes library.
@@ -382,7 +382,11 @@ aarch64_ins_advsimd_imm_modified (const aarch64_operand *self ATTRIBUTE_UNUSED,
     {
       /* AARCH64_MOD_LSL: shift zeros.  */
       int esize = aarch64_get_qualifier_esize (opnd0_qualifier);
-      assert (esize == 4 || esize == 2);
+      assert (esize == 4 || esize == 2 || esize == 1);
+      /* For 8-bit move immediate, the optional LSL #0 does not require
+	 encoding.  */
+      if (esize == 1)
+	return NULL;
       amount >>= 3;
       if (esize == 4)
 	gen_sub_field (FLD_cmode, 1, 2, &field);	/* per word */
@@ -954,6 +958,16 @@ convert_ror_to_extr (aarch64_inst *inst)
   copy_operand_info (inst, 2, 1);
 }
 
+/* UXTL<Q> <Vd>.<Ta>, <Vn>.<Tb>
+     is equivalent to:
+   USHLL<Q> <Vd>.<Ta>, <Vn>.<Tb>, #0.  */
+static void
+convert_xtl_to_shll (aarch64_inst *inst)
+{
+  inst->operands[2].qualifier = inst->operands[1].qualifier;
+  inst->operands[2].imm.value = 0;
+}
+
 /* Convert
      LSR <Xd>, <Xn>, #<shift>
    to
@@ -1162,6 +1176,12 @@ convert_to_real (aarch64_inst *inst, const aarch64_opcode *real)
       break;
     case OP_ROR_IMM:
       convert_ror_to_extr (inst);
+      break;
+    case OP_SXTL:
+    case OP_SXTL2:
+    case OP_UXTL:
+    case OP_UXTL2:
+      convert_xtl_to_shll (inst);
       break;
     default:
       break;

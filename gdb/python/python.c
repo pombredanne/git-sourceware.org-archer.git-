@@ -1444,8 +1444,6 @@ extern initialize_file_ftype _initialize_python;
 void
 _initialize_python (void)
 {
-  char *cmd_name;
-  struct cmd_list_element *cmd;
   char *progname;
 #ifdef IS_PY3K
   int i;
@@ -1628,6 +1626,7 @@ message == an error message without a stack will be printed."),
   gdbpy_initialize_exited_event ();
   gdbpy_initialize_thread_event ();
   gdbpy_initialize_new_objfile_event () ;
+  gdbpy_initialize_arch ();
 
   observer_attach_before_prompt (before_prompt_hook);
 

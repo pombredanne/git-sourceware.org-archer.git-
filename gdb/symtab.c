@@ -164,7 +164,12 @@ compare_filenames_for_search (const char *filename, const char *search_name)
 
   /* Either the names must completely match, or the character
      preceding the trailing SEARCH_NAME segment of FILENAME must be a
-     directory separator.  */
+     directory separator.
+
+     The HAS_DRIVE_SPEC purpose is to make FILENAME "c:file.c"
+     compatible with SEARCH_NAME "file.c".  In such case a compiler had
+     to put the "c:file.c" name into debug info.  Such compatibility
+     works only on GDB built for DOS host.  */
   return (len == search_len
 	  || IS_DIR_SEPARATOR (filename[len - search_len - 1])
 	  || (HAS_DRIVE_SPEC (filename)
@@ -241,19 +246,26 @@ iterate_over_some_symtabs (const char *name,
       {
         const char *fullname = symtab_to_fullname (s);
 	char *rp = gdb_realpath (fullname);
+	struct cleanup *cleanups = make_cleanup (xfree, rp);
 
-	make_cleanup (xfree, rp);
 	if (FILENAME_CMP (real_path, rp) == 0)
 	  {
 	    if (callback (s, data))
-	      return 1;
+	      {
+		do_cleanups (cleanups);
+		return 1;
+	      }
 	  }
 
 	if (!is_abs && compare_filenames_for_search (rp, name))
 	  {
 	    if (callback (s, data))
-	      return 1;
+	      {
+		do_cleanups (cleanups);
+		return 1;
+	      }
 	  }
+	do_cleanups (cleanups);
       }
     }
 
@@ -273,7 +285,6 @@ iterate_over_symtabs (const char *name,
 				       void *data),
 		      void *data)
 {
-  struct symtab *s = NULL;
   struct objfile *objfile;
   char *real_path = NULL;
   char *full_path = NULL;
@@ -453,7 +464,7 @@ symbol_init_cplus_specific (struct general_symbol_info *gsymbol,
 
 void
 symbol_set_demangled_name (struct general_symbol_info *gsymbol,
-                           char *name,
+                           const char *name,
                            struct objfile *objfile)
 {
   if (gsymbol->language == language_cplus)
@@ -514,7 +525,7 @@ symbol_set_language (struct general_symbol_info *gsymbol,
 /* Objects of this type are stored in the demangled name hash table.  */
 struct demangled_name_entry
 {
-  char *mangled;
+  const char *mangled;
   char demangled[1];
 };
 
@@ -746,7 +757,7 @@ symbol_set_names (struct general_symbol_info *gsymbol,
       linkage_name_copy = linkage_name;
     }
 
-  entry.mangled = (char *) lookup_name;
+  entry.mangled = lookup_name;
   slot = ((struct demangled_name_entry **)
 	  htab_find_slot (objfile->demangled_names_hash,
 			  &entry, INSERT));
@@ -777,10 +788,12 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + demangled_len + 1);
-	  (*slot)->mangled = (char *) lookup_name;
+	  (*slot)->mangled = lookup_name;
 	}
       else
 	{
+	  char *mangled_ptr;
+
 	  /* If we must copy the mangled name, put it directly after
 	     the demangled name so we can have a single
 	     allocation.  */
@@ -788,8 +801,9 @@ symbol_set_names (struct general_symbol_info *gsymbol,
 				 offsetof (struct demangled_name_entry,
 					   demangled)
 				 + lookup_len + demangled_len + 2);
-	  (*slot)->mangled = &((*slot)->demangled[demangled_len + 1]);
-	  strcpy ((*slot)->mangled, lookup_name);
+	  mangled_ptr = &((*slot)->demangled[demangled_len + 1]);
+	  strcpy (mangled_ptr, lookup_name);
+	  (*slot)->mangled = mangled_ptr;
 	}
 
       if (demangled_name != NULL)
@@ -1551,10 +1565,6 @@ lookup_symbol_aux_objfile (struct objfile *objfile, int block_index,
   const struct block *block;
   struct symtab *s;
 
-  if (objfile->sf)
-    objfile->sf->qf->pre_expand_symtabs_matching (objfile, block_index,
-						  name, domain);
-
   ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
     {
       bv = BLOCKVECTOR (s);
@@ -1912,11 +1922,6 @@ basic_lookup_transparent_type (const char *name)
 
   ALL_OBJFILES (objfile)
   {
-    if (objfile->sf)
-      objfile->sf->qf->pre_expand_symtabs_matching (objfile,
-						    GLOBAL_BLOCK,
-						    name, STRUCT_DOMAIN);
-
     ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
       {
 	bv = BLOCKVECTOR (s);
@@ -1945,10 +1950,6 @@ basic_lookup_transparent_type (const char *name)
 
   ALL_OBJFILES (objfile)
   {
-    if (objfile->sf)
-      objfile->sf->qf->pre_expand_symtabs_matching (objfile, STATIC_BLOCK,
-						    name, STRUCT_DOMAIN);
-
     ALL_OBJFILE_PRIMARY_SYMTABS (objfile, s)
       {
 	bv = BLOCKVECTOR (s);
@@ -2101,11 +2102,8 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
   struct symtab *s = NULL;
   struct symtab *best_s = NULL;
   struct objfile *objfile;
-  struct program_space *pspace;
   CORE_ADDR distance = 0;
   struct minimal_symbol *msymbol;
-
-  pspace = current_program_space;
 
   /* If we know that this is not a text address, return failure.  This is
      necessary because we loop based on the block's high and low code
@@ -2259,7 +2257,6 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
      we will use a line one less than this,
      with a range from the start of that file to the first line's pc.  */
   struct linetable_entry *alt = NULL;
-  struct symtab *alt_symtab = 0;
 
   /* Info on best line seen in this file.  */
 
@@ -2404,10 +2401,7 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
       /* Is this file's first line closer than the first lines of other files?
          If so, record this file, and its first line, as best alternate.  */
       if (item->pc > pc && (!alt || item->pc < alt->pc))
-	{
-	  alt = item;
-	  alt_symtab = s;
-	}
+	alt = item;
 
       for (i = 0; i < len; i++, item++)
 	{
@@ -2598,8 +2592,7 @@ VEC (CORE_ADDR) *
 find_pcs_for_symtab_line (struct symtab *symtab, int line,
 			  struct linetable_entry **best_item)
 {
-  int start = 0, ix;
-  struct symbol *previous_function = NULL;
+  int start = 0;
   VEC (CORE_ADDR) *result = NULL;
 
   /* First, collect all the PCs that are at this line.  */
@@ -4039,8 +4032,6 @@ completion_list_add_name (const char *symname,
 			  const char *sym_text, int sym_text_len,
 			  const char *text, const char *word)
 {
-  int newsize;
-
   /* Clip symbols that cannot match.  */
   if (!compare_symbol_name (symname, sym_text, sym_text_len))
     return;
@@ -4902,6 +4893,10 @@ skip_prologue_using_sal (struct gdbarch *gdbarch, CORE_ADDR func_addr)
 	  /* Assume that a consecutive SAL for the same (or larger)
 	     line mark the prologue -> body transition.  */
 	  if (sal.line >= prologue_sal.line)
+	    break;
+	  /* Likewise if we are in a different symtab altogether
+	     (e.g. within a file included via #include).  */
+	  if (sal.symtab != prologue_sal.symtab)
 	    break;
 
 	  /* The line number is smaller.  Check that it's from the

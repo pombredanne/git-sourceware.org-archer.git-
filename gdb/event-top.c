@@ -35,6 +35,7 @@
 #include "observer.h"
 #include "continuations.h"
 #include "gdbcmd.h"		/* for dont_repeat() */
+#include "annotate.h"
 
 /* readline include files.  */
 #include "readline/readline.h"
@@ -230,6 +231,8 @@ display_gdb_prompt (char *new_prompt)
 {
   char *actual_gdb_prompt = NULL;
   struct cleanup *old_chain;
+
+  annotate_display_prompt ();
 
   /* Reset the nesting depth used when trace-commands is set.  */
   reset_command_nest_depth ();
@@ -450,8 +453,6 @@ command_line_handler (char *rl)
   char *p;
   char *p1;
   char *nline;
-  char got_eof = 0;
-
   int repeat = (instream == stdin);
 
   if (annotation_level > 1 && instream == stdin)
@@ -496,7 +497,6 @@ command_line_handler (char *rl)
      and exit from gdb.  */
   if (!rl || rl == (char *) EOF)
     {
-      got_eof = 1;
       command_handler (0);
       return;			/* Lint.  */
     }

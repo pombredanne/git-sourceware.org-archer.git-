@@ -196,7 +196,7 @@ struct partial_symtab
   /* Pointer to function which will read in the symtab corresponding to
      this psymtab.  */
 
-  void (*read_symtab) (struct objfile *, struct partial_symtab *);
+  void (*read_symtab) (struct partial_symtab *, struct objfile *);
 
   /* Information that lets read_symtab() locate the part of the symbol table
      that this psymtab corresponds to.  This information is private to the
@@ -230,6 +230,8 @@ extern struct partial_symtab *allocate_psymtab (const char *,
   ATTRIBUTE_NONNULL (1);
 
 extern void discard_psymtab (struct objfile *, struct partial_symtab *);
+
+extern struct cleanup *make_cleanup_discard_psymtabs (struct objfile *);
 
 /* Traverse all psymtabs in one objfile.  */
 

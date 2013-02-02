@@ -357,6 +357,8 @@ captured_main (void *data)
   bindtextdomain (PACKAGE, LOCALEDIR);
   textdomain (PACKAGE);
 
+  bfd_init ();
+
   make_cleanup (VEC_cleanup (cmdarg_s), &cmdarg_vec);
   dirsize = 1;
   dirarg = (char **) xmalloc (dirsize * sizeof (*dirarg));
@@ -451,7 +453,6 @@ captured_main (void *data)
       {"n", no_argument, &inhibit_gdbinit, 1},
       {"batch-silent", no_argument, 0, 'B'},
       {"batch", no_argument, &batch_flag, 1},
-      {"epoch", no_argument, &epoch_interface, 1},
 
     /* This is a synonym for "--annotate=1".  --annotate is now
        preferred, but keep this here for a long time because people
@@ -1087,7 +1088,6 @@ Options:\n\n\
   fputs_unfiltered (_("\
   --dbx              DBX compatibility mode.\n\
   --directory=DIR    Search for source files in DIR.\n\
-  --epoch            Output information used by epoch emacs-GDB interface.\n\
   --exec=EXECFILE    Use EXECFILE as the executable.\n\
   --fullname         Output information used by emacs-GDB interface.\n\
   --help             Print this message.\n\

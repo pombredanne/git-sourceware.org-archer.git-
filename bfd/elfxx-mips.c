@@ -1,6 +1,6 @@
 /* MIPS-specific support for ELF
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013
    Free Software Foundation, Inc.
 
    Most of the information added by Ian Lance Taylor, Cygnus Support,
@@ -5330,7 +5330,7 @@ mips_elf_calculate_relocation (bfd *abfd, bfd *input_bfd,
 	  if (h->call_stub != NULL && h->call_fp_stub != NULL)
 	    {
 	      asection *o;
-	      
+
 	      sec = NULL;
 	      for (o = input_bfd->sections; o != NULL; o = o->next)
 		{
@@ -5919,7 +5919,7 @@ mips_elf_obtain_contents (reloc_howto_type *howto,
 /* It has been determined that the result of the RELOCATION is the
    VALUE.  Use HOWTO to place VALUE into the output file at the
    appropriate position.  The SECTION is the section to which the
-   relocation applies.  
+   relocation applies.
    CROSS_MODE_JUMP_P is true if the relocation field
    is a MIPS16 or microMIPS jump to standard MIPS code, or vice versa.
 
@@ -6293,6 +6293,9 @@ _bfd_elf_mips_mach (flagword flags)
 
     case E_MIPS_MACH_5500:
       return bfd_mach_mips5500;
+
+    case E_MIPS_MACH_5900:
+      return bfd_mach_mips5900;
 
     case E_MIPS_MACH_9000:
       return bfd_mach_mips9000;
@@ -7837,14 +7840,14 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	{
 	  h = ((struct mips_elf_link_hash_entry *)
 	       sym_hashes[r_symndx - extsymoff]);
-	  
+
 	  /* H is the symbol this stub is for.  */
-	  
+
 	  if (CALL_FP_STUB_P (name))
 	    loc = &h->call_fp_stub;
 	  else
 	    loc = &h->call_stub;
-	  
+
 	  /* If we already have an appropriate stub for this function, we
 	     don't need another one, so we can discard this one.  Since
 	     this function is called before the linker maps input sections
@@ -11026,6 +11029,10 @@ mips_set_isa_flags (bfd *abfd)
       val = E_MIPS_ARCH_4 | E_MIPS_MACH_5500;
       break;
 
+    case bfd_mach_mips5900:
+      val = E_MIPS_ARCH_3 | E_MIPS_MACH_5900;
+      break;
+
     case bfd_mach_mips9000:
       val = E_MIPS_ARCH_4 | E_MIPS_MACH_9000;
       break;
@@ -13708,6 +13715,7 @@ static const struct mips_mach_extension mips_mach_extensions[] = {
   { bfd_mach_mips4300, bfd_mach_mips4000 },
   { bfd_mach_mips4100, bfd_mach_mips4000 },
   { bfd_mach_mips4010, bfd_mach_mips4000 },
+  { bfd_mach_mips5900, bfd_mach_mips4000 },
 
   /* MIPS32 extensions.  */
   { bfd_mach_mipsisa32r2, bfd_mach_mipsisa32 },
@@ -14024,7 +14032,7 @@ _bfd_mips_elf_merge_private_bfd_data (bfd *ibfd, bfd *obfd)
 
       if (bfd_get_arch (obfd) == bfd_get_arch (ibfd)
 	  && (bfd_get_arch_info (obfd)->the_default
-	      || mips_mach_extends_p (bfd_get_mach (obfd), 
+	      || mips_mach_extends_p (bfd_get_mach (obfd),
 				      bfd_get_mach (ibfd))))
 	{
 	  if (! bfd_set_arch_mach (obfd, bfd_get_arch (ibfd),

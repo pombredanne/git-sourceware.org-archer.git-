@@ -1,3 +1,43 @@
+2013-01-31  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Target Commands): Fix typo.
+
+2013-01-23  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* doc/gdb.texinfo (Architectures In Python): New sub-sub-section
+	describing the gdb.Architecture class.
+	(Frames In Python): Add description about the new method
+	gdb.Frame.architecture().
+
+2013-01-23  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Index Section Format): Document .gdb_index version 8.
+
+2013-01-21  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* gdb.texinfo (GDB/MI Breakpoint Commands): Document new
+	'thread-groups' field when printing a breakpoint in MI.
+
+2012-01-17  Sanjoy Das <sanjoy@playingwithpointers.com>
+	* gdb.texinfo (Using JIT Debug Info Readers): Change documentation
+	to reflect that jit-reader-load now supports absolute file-names.
+
+2013-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Set Catchpoints): Document "catch signal".
+	(Signals): Likewise.
+
+2013-01-16  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (GDB/MI Breakpoint Information): Document
+	"catch-type" field.
+	(GDB/MI Catchpoint Commands): Add "catch-type" to examples.
+
+2013-01-07  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Mode Options): Don't mention -epoch.
+	(Data, Emacs): Remove obsolete comments.
+
 2013-01-02  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.texinfo (GDB/MI Output Records): Update menu.

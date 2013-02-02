@@ -19,6 +19,11 @@ Lynx 178 PowerPC		powerpc-*-lynx*178
 -nh   Disables auto-loading of ~/.gdbinit, but still executes all the
       other initialization files, unlike -nx which disables all of them.
 
+* Removed command line options
+
+-epoch  This was used by the gdb mode in Epoch, an ancient fork of
+        Emacs.
+
 * The 'ptype' and 'whatis' commands now accept an argument to control
   type formatting.
 
@@ -34,6 +39,12 @@ Lynx 178 PowerPC		powerpc-*-lynx*178
 
   ** Python 3 is now supported (in addition to Python 2.4 or later)
 
+  ** New class gdb.Architecture exposes GDB's internal representation
+     of architecture in the Python API.
+
+  ** New method Frame.architecture returns the gdb.Architecture object
+     corresponding to the frame's architecture.
+
 * New Python-based convenience functions:
 
   ** $_memeq(buf1, buf2, length)
@@ -43,6 +54,9 @@ Lynx 178 PowerPC		powerpc-*-lynx*178
 
 * The 'cd' command now defaults to using '~' (the home directory) if not
   given an argument.
+
+* The C++ ABI now defaults to the GNU v3 ABI.  This has been the
+  default for GCC since November 2000.
 
 * The command 'forward-search' can now be abbreviated as 'fo'.
 
@@ -59,6 +73,10 @@ Lynx 178 PowerPC		powerpc-*-lynx*178
   options allow the user to override that default.
 
 * New commands (for set/show, see "New options" below)
+
+catch signal 
+  Catch signals.  This is similar to "handle", but allows commands and
+  conditions to be attached.
 
 maint info bfds
   List the BFDs known to GDB.

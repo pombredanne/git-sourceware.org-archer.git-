@@ -104,6 +104,8 @@ extern struct cleanup *make_cleanup_value_free (struct value *);
 struct so_list;
 extern struct cleanup *make_cleanup_free_so (struct so_list *so);
 
+extern struct cleanup *make_cleanup_restore_current_language (void);
+
 extern struct cleanup *make_cleanup_htab_delete (htab_t htab);
 
 extern void free_current_contents (void *);
@@ -340,9 +342,6 @@ extern pid_t wait_to_die_with_timeout (pid_t pid, int *status, int timeout);
 #endif
 
 extern int producer_is_gcc_ge_4 (const char *producer);
-
-extern unsigned long gnu_debuglink_crc32 (unsigned long crc,
-                                          unsigned char *buf, size_t len);
 
 extern int myread (int, char *, int);
 

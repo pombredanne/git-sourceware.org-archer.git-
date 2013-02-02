@@ -138,8 +138,6 @@ char gdb_dirbuf[1024];
 
 void (*window_hook) (FILE *, char *);
 
-int epoch_interface;
-
 /* Buffer used for reading command lines, and the size
    allocated for it so far.  */
 
@@ -1715,6 +1713,7 @@ gdb_init (char *argv0)
   initialize_inferiors ();
   initialize_current_architecture ();
   init_cli_cmds();
+  initialize_event_loop ();
   init_main ();			/* But that omits this file!  Do it now.  */
 
   initialize_stdin_serial ();

@@ -655,7 +655,7 @@ process_linenos (CORE_ADDR start, CORE_ADDR end)
 		 start, 0, &main_source_baseline);
 	    }
 
-	  if (strcmp (inclTable[ii].name, last_source_file) == 0)
+	  if (strcmp (inclTable[ii].name, get_last_source_file ()) == 0)
 	    {
               /* The entry in the include table refers to the main source
                  file.  Add the lines to the main subfile.  */
@@ -894,7 +894,7 @@ enter_line_range (struct subfile *subfile, unsigned beginoffset,
    text address for the file, and SIZE is the number of bytes of text.  */
 
 #define complete_symtab(name, start_addr) {	\
-  last_source_file = xstrdup (name);		\
+  set_last_source_file (name);			\
   last_source_start_addr = start_addr;		\
 }
 
@@ -1031,7 +1031,7 @@ read_xcoff_symtab (struct objfile *objfile, struct partial_symtab *pst)
      handling.  */
   local_symesz = coff_data (abfd)->local_symesz;
 
-  last_source_file = NULL;
+  set_last_source_file (NULL);
   last_csect_name = 0;
 
   start_stabs ();
@@ -1119,7 +1119,7 @@ read_xcoff_symtab (struct objfile *objfile, struct partial_symtab *pst)
 
       if (cs->c_symnum == next_file_symnum && cs->c_sclass != C_FILE)
 	{
-	  if (last_source_file)
+	  if (get_last_source_file ())
 	    {
 	      pst->symtab = end_symtab (cur_src_end_addr, objfile,
 					SECT_OFF_TEXT (objfile));
@@ -1488,7 +1488,7 @@ read_xcoff_symtab (struct objfile *objfile, struct partial_symtab *pst)
 	}
     }
 
-  if (last_source_file)
+  if (get_last_source_file ())
     {
       struct symtab *s;
 
@@ -1512,8 +1512,8 @@ read_xcoff_symtab (struct objfile *objfile, struct partial_symtab *pst)
 
 
 #define	SYMNAME_ALLOC(NAME, ALLOCED)	\
-  ((ALLOCED) ? (NAME) : obsavestring ((NAME), strlen (NAME), \
-				      &objfile->objfile_obstack))
+  ((ALLOCED) ? (NAME) : obstack_copy0 (&objfile->objfile_obstack, \
+				       (NAME), strlen (NAME)))
 
 
 /* process one xcoff symbol.  */
@@ -1855,36 +1855,33 @@ xcoff_psymtab_to_symtab_1 (struct objfile *objfile, struct partial_symtab *pst)
 }
 
 /* Read in all of the symbols for a given psymtab for real.
-   Be verbose about it if the user wants that.  */
+   Be verbose about it if the user wants that.  SELF is not NULL.  */
 
 static void
-xcoff_psymtab_to_symtab (struct objfile *objfile, struct partial_symtab *pst)
+xcoff_read_symtab (struct partial_symtab *self, struct objfile *objfile)
 {
-  if (!pst)
-    return;
-
-  if (pst->readin)
+  if (self->readin)
     {
       fprintf_unfiltered
 	(gdb_stderr, "Psymtab for %s already read in.  Shouldn't happen.\n",
-	 pst->filename);
+	 self->filename);
       return;
     }
 
-  if (((struct symloc *) pst->read_symtab_private)->numsyms != 0
-      || pst->number_of_dependencies)
+  if (((struct symloc *) self->read_symtab_private)->numsyms != 0
+      || self->number_of_dependencies)
     {
       /* Print the message now, before reading the string table,
          to avoid disconcerting pauses.  */
       if (info_verbose)
 	{
-	  printf_filtered ("Reading in symbols for %s...", pst->filename);
+	  printf_filtered ("Reading in symbols for %s...", self->filename);
 	  gdb_flush (gdb_stdout);
 	}
 
       next_symbol_text_func = xcoff_next_symbol_text;
 
-      xcoff_psymtab_to_symtab_1 (objfile, pst);
+      xcoff_psymtab_to_symtab_1 (objfile, self);
 
       /* Match with global symbols.  This only needs to be done once,
          after all of the symtabs and dependencies have been read in.   */
@@ -2020,7 +2017,7 @@ xcoff_start_psymtab (struct objfile *objfile,
   result->read_symtab_private = obstack_alloc (&objfile->objfile_obstack,
 					       sizeof (struct symloc));
   ((struct symloc *) result->read_symtab_private)->first_symnum = first_symnum;
-  result->read_symtab = xcoff_psymtab_to_symtab;
+  result->read_symtab = xcoff_read_symtab;
 
   /* Deduce the source language from the filename for this psymtab.  */
   psymtab_language = deduce_language_from_filename (filename);
@@ -2228,7 +2225,7 @@ scan_xcoff_symtab (struct objfile *objfile)
     (struct partial_symtab **) alloca (dependencies_allocated *
 				       sizeof (struct partial_symtab *));
 
-  last_source_file = NULL;
+  set_last_source_file (NULL);
 
   abfd = objfile->obfd;
   next_symbol_text_func = xcoff_next_symbol_text;

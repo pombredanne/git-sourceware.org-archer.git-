@@ -1032,7 +1032,7 @@ step_once (int skip_subroutines, int single_inst, int count, int thread)
 	  CORE_ADDR pc;
 
 	  /* Step at an inlined function behaves like "down".  */
-	  if (!skip_subroutines && !single_inst
+	  if (!skip_subroutines
 	      && inline_skipped_frames (inferior_ptid))
 	    {
 	      ptid_t resume_ptid;
@@ -1450,7 +1450,6 @@ get_return_value (struct value *function, struct type *value_type)
   struct regcache *stop_regs = stop_registers;
   struct gdbarch *gdbarch;
   struct value *value;
-  struct ui_out *uiout = current_uiout;
   struct cleanup *cleanup = make_cleanup (null_cleanup, NULL);
 
   /* If stop_registers were not saved, use the current registers.  */
