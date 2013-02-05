@@ -1,3 +1,403 @@
+2013-02-05  Andreas Tobler  <andreast@fgznet.ch>
+
+	* NEWS: Add PowerPC FreeBSD as a new native configuration.
+
+2013-02-04  Andreas Tobler  <andreast@fgznet.ch>
+
+	* Makefile.in (ALL_TARGET_OBS): Add powerpc FreeBSD files.
+	* configure.host: Add powerpc*-*-freebsd* target.
+	* configure.tgt: Add target info for powerpc*-*-freebsd*.
+	* ppcfbsd-nat.c, ppcfbsd-tdep.h, ppcfbsd-tdep.c: New files.
+	* config/powerpc/fbsd.mh: New file.
+
+2013-02-04  Sergio Durigan Junior  <sergiodj@redhat.com>
+	    Denys Vlasenko  <dvlasenk@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* gdbarch.sh (elfcore_write_linux_prpsinfo): New F hook.
+	(struct elf_internal_linux_prpsinfo): Forward declare.
+	* gdbarch.h, gdbarch.c: Regenerate.
+	* linux-tdep.c: Include `cli/cli-utils.h'.
+	(linux_fill_prpsinfo): New function.
+	(linux_make_corefile_notes): Use linux_fill_prpsinfo.  If there's
+	an elfcore_write_linux_prpsinfo hook, use it, otherwise, use
+	elfcore_write_linux_prpsinfo32 or elfcore_write_linux_prpsinfo64
+	depending on gdbarch pointer bitness.
+	* ppc-linux-tdep.c: Include elf-bfd.h.
+	(ppc_linux_init_abi): Hook in elfcore_write_ppc_linux_prpsinfo32
+	on 32-bit.
+
+2013-02-04  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* configure.tgt (aarch64*-*-linux*): Set build_gdbserver=yes.
+
+2013-02-04  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-newlib-tdep.c: New file.
+	* configure.tgt: Add aarch64-newlib-tdep.o to gdb_target_obs of
+	aarch64*-*-elf.
+	* defs.h (enum gdb_osabi): Add GDB_OSABI_NEWLIB.
+	* Makefile.in (ALL_64_TARGET_OBS): Add aarch64-newlib-tdep.o.
+	(ALLDEPFILES): Add aarch64-newlib-tdep.c.
+	* osabi.c (gdb_osabi_names): Add "Newlib".
+
+2013-02-04  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* Makefile.in (ALL_64_TARGET_OBS): Add aarch64-linux-tdep.o.
+	(ALLDEPFILES): Add aarch64-linux-tdep.c.
+	* aarch64-linux-tdep.c: New file.
+	* aarch64-linux-tdep.h: New file.
+	* aarch64-tdep.h (gdbarch_tdep): Define gregset and fpregset.
+	* configure.tgt: Add aarch64-none-linux-gnu.
+
+2013-02-04  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* Makefile.in (ALL_64_TARGET_OBS): Add arch64-tdep.o.
+	(HFILES_NO_SRCDIR): Add aarch64-tdep.h.
+	(ALLDEPFILES): Add aarch64-tdep.c.
+	* aarch64-tdep.c: New file.
+	* aarch64-tdep.h: New file.
+	* configure.tgt: Add AArch64.
+	* features/Makefile (WHICH): Add aarch64 and aarch64-without-fpu.
+	(aarch64-expedite): New definition.
+	* features/aarch64-core.xml: New file.
+	* features/aarch64-fpu.xml: New file.
+	* features/aarch64-without-fpu.c: New file (generated).
+	* features/aarch64-without-fpu.xml: New file.
+	* features/aarch64.c: New file (generated).
+	* features/aarch64.xml: New file.
+	* regformats/aarch64-without-fpu.dat: New file (generated).
+	* regformats/aarch64.dat: New file (generated).
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* contrib/expect-read1.c: New file.
+	* contrib/expect-read1.sh: New file.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (file_file_name): New function with code from
+	file_full_name.
+	(file_full_name): Move most of the code to file_file_name.
+	(macro_start_file): Rename variable full_name to file_name and use
+	file_file_name for it.  Add comp_dir parameter to new_macro_table.
+	* macrocmd.c (show_pp_source_pos): New variable fullname.  Replace any
+	macro_source_file->filename access by macro_source_fullname call.
+	* macroscope.c (_initialize_macroscope): Update the new_macro_table
+	caller.
+	* macrotab.c (struct macro_table): New field comp_dir.
+	(macro_include): New variables link_fullname and source_fullname.
+	Replace any macro_source_file->filename access by macro_source_fullname
+	call.
+	(macro_lookup_inclusion): Remove the partial filenames checking code.
+	(check_for_redefinition): New variables source_fullname and
+	found_key_fullname.  Replace any macro_source_file->filename access by
+	macro_source_fullname call.
+	(macro_undef): New variables source_fullname and key_fullname.  Replace
+	any macro_source_file->filename access by macro_source_fullname call.
+	(macro_lookup_definition): New variables retval and source_fullname.
+	Replace any macro_source_file->filename access by macro_source_fullname
+	call.
+	(foreach_macro): New variable key_fullname.  Replace any
+	macro_source_file->filename access by macro_source_fullname call.
+	(foreach_macro_in_scope): New variable datum_fullname.  Replace any
+	macro_source_file->filename access by macro_source_fullname call.
+	(new_macro_table): Add parameter comp_dir.  Initialize T with it.
+	(macro_source_fullname): New function.
+	* macrotab.h (struct macro_source_file): Extent the filename field
+	comment.
+	(new_macro_table): New parameter comp_dir, add a comment for it.
+	(macro_source_fullname): new declaration.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dw2_map_symtabs_matching_filename): Move variable
+	this_real_name to outer block.  Use it also for
+	compare_filenames_for_search.
+	(dw2_expand_symtabs_matching): New variable this_real_name.  Use it
+	with dw2_get_real_path for file_matcher, considering also
+	BASENAMES_MAY_DIFFER.
+	(file_full_name): Prepend COMP_DIR even for relative lh->INCLUDE_DIRS.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dw2_expand_symtabs_matching): Add basenames parameter
+	to the file_matcher parameter.  Pass 0 to it.
+	(dwarf2_create_include_psymtab): Copy also DIRNAME.
+	* psymtab.c (partial_map_symtabs_matching_filename): Drop handling of
+	NULL psymtab_to_fullname result.
+	(psymtab_to_fullname): Remove variable r.  Never return NULL, assemble
+	an expected filename instead.
+	(expand_symtabs_matching_via_partial): Add basenames parameter to the
+	file_matcher parameter.  Call also psymtab_to_fullname, after newly
+	considering BASENAMES_MAY_DIFFER.
+	* source.c (rewrite_source_path): Remove static.
+	* source.h (rewrite_source_path): New declaration.
+	* symfile.h (struct quick_symbol_functions): Add basenames parameter to
+	the expand_symtabs_matching field.  Comment it.
+	* symtab.c (file_matches): New function comment.  Add parameter
+	basenames, implement it.
+	(search_symbols_file_matches): Add basenames parameter.  Update the
+	file_matches caller.
+	(search_symbols): Match FILES also against symtab_to_fullname.
+	Optimize it for BASENAMES_MAY_DIFFER.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* source.c (print_source_lines_base): Print for TUI also "fullname".
+	* tui/tui-data.c (init_content_element): Change tui_locator_element
+	field to full_name.
+	* tui/tui-data.h (struct tui_locator_element): Likewise.
+	* tui/tui-disasm.c (tui_show_disassem_and_update_source): Rename
+	tui_update_locator_filename calls to tui_update_locator_fullname.
+	Replace symtab->filename refererence by symtab_to_fullname call.
+	* tui/tui-out.c (tui_field_string): Check for "fullname" now.
+	* tui/tui-source.c (tui_set_source_content): Change tui_locator_element
+	field to full_name.  Replace symtab->filename refererence by
+	symtab_to_fullname call.
+	(tui_show_symtab_source): Rename parameter to fullname.  Change
+	tui_locator_element field to full_name.
+	* tui/tui-stack.c: Include source.h.
+	(tui_set_locator_filename): Rename the declaration to ...
+	(tui_set_locator_fullname): ... here.  Rename its parameter to
+	fullname, updates its comment.
+	(tui_set_locator_info): Rename its parameter to fullname.
+	(tui_set_locator_filename): Rename the definition to ...
+	(tui_set_locator_fullname): ... here.  Rename its parameter to
+	fullname, updates its comment.  Change tui_locator_element field to
+	full_name.
+	(tui_set_locator_info): Rename its parameter to fullname.
+	(tui_set_locator_info): Rename callee to tui_set_locator_fullname.
+	(tui_update_locator_filename): Rename to ...
+	(tui_update_locator_fullname): ... here. Rename callee to
+	tui_set_locator_fullname.
+	(tui_show_frame_info): Replace symtab->filename refererence by
+	symtab_to_fullname call.
+	* tui/tui-stack.h (tui_update_locator_filename): Rename to ...
+	(tui_update_locator_fullname): ... here.
+	* tui/tui-winsource.c (tui_display_main): Rename the callee to
+	tui_update_locator_fullname.  Replace symtab->filename refererence by
+	symtab_to_fullname call.
+	* tui/tui.c (tui_show_source): Rename its parameter to fullname.
+	Rename the callee to tui_update_locator_fullname.
+	* tui/tui.h (tui_show_source): Rename its parameter to fullname.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* ada-lang.c (user_select_syms): Replace symtab->filename refererences
+	by symtab_to_filename_for_display calls.
+	* breakpoint.c (print_breakpoint_location, resolve_sal_pc): Likewise.
+	(clear_command): New variable sal_fullname, initialize it.  Replace
+	compare_filenames_for_search by filename_cmp with sal_fullname.
+	(say_where, update_static_tracepoint): Replace symtab->filename
+	refererences by symtab_to_filename_for_display calls.
+	* cli/cli-cmds.c (edit_command, list_command, ambiguous_line_spec):
+	Likewise.
+	* dwarf2read.c: Include source.h.
+	(fixup_go_packaging): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* linespec.c (add_sal_to_sals): Rename variable filename to fullname.
+	Replace symtab->filename refererences by symtab_to_filename_for_display
+	calls.
+	(create_sals_line_offset, convert_linespec_to_sals): New variable
+	fullname, initialize it, replace symtab->filename reference by the
+	variable.
+	* linux-fork.c: Include source.h.
+	(info_checkpoints_command): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* macroscope.c (sal_macro_scope): Replace symtab->filename refererences
+	by symtab_to_filename_for_display calls.
+	* mdebugread.c: Include source.h.
+	(psymtab_to_symtab_1): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* mi/mi-cmd-file.c (mi_cmd_file_list_exec_source_file)
+	(mi_cmd_file_list_exec_source_files): Likewise.
+	* printcmd.c: Include source.h.
+	(build_address_symbolic): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* psymtab.c (partial_map_symtabs_matching_filename)
+	(read_psymtabs_with_fullname): Call compare_filenames_for_search also
+	with psymtab_to_fullname.
+	* python/py-symtab.c (stpy_str): Replace symtab->filename refererences
+	by symtab_to_filename_for_display calls.
+	(stpy_get_filename): New variable filename, initialize it, use instead
+	of symtab->filename refererences.
+	(salpy_str): Make variable filename const char *.  Replace
+	symtab->filename refererences by symtab_to_filename_for_display calls.
+	* skip.c: Include source.h and filenames.h.
+	(skip_file_command): Remove const from the symtab variable.  Replace
+	symtab->filename refererences by symtab_to_fullname call.
+	(function_name_is_marked_for_skip): New variables searched_for_fullname
+	and fullname.  Use them to search also with symtab's fullname.
+	* source.c (find_source_lines): Replace symtab->filename refererences
+	by symtab_to_filename_for_display calls.
+	(print_source_lines_base): New variable filename, use it instead of
+	symtab->filename.  Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	(line_info, forward_search_command): Replace symtab->filename
+	refererences by symtab_to_filename_for_display calls.
+	(reverse_search_command): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.  New variable filename for it.
+	* stack.c (frame_info): Likewise.
+	* symmisc.c: Include source.h.
+	(dump_objfile, dump_symtab_1, maintenance_print_symbols)
+	(maintenance_info_symtabs): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* symtab.c (iterate_over_some_symtabs): Call
+	compare_filenames_for_search also with symtab_to_fullname.
+	(lookup_symbol_aux_quick, basic_lookup_transparent_type_quick): Replace
+	symtab->filename refererences by symtab_to_filename_for_display calls.
+	(find_line_symtab): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	(file_matches): Replace filename_cmp by compare_filenames_for_search.
+	(print_symbol_info): Make the last parameter const char *.  New
+	variable s_filename.  Use it in the function.
+	(symtab_symbol_info): Make the last_filename variable const char *.
+	Replace symtab->filename refererences by symtab_to_filename_for_display
+	calls.
+	(rbreak_command): New variable fullname.  Use it.  Replace
+	symtab->filename refererence by symtab_to_filename_for_display call.
+	* tracepoint.c (set_traceframe_context, trace_find_line_command)
+	(print_one_static_tracepoint_marker): Replace symtab->filename
+	refererences by symtab_to_filename_for_display calls.
+	* tui/tui-source.c (tui_set_source_content): New variables filename and
+	s_filename.  Replace symtab->filename refererences by this variable.
+	Replace other symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+
+2013-02-03  Eldar Gaynetdinov <hal9000ed2k@gmail.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Add a new variable that controls a way in which filenames are
+	displayed.
+	* NEWS (set filename-display): New entry.
+	* source.c (filename_display_basename, filename_display_relative)
+	(filename_display_absolute, filename_display_kind_names)
+	(filename_display_string, show_filename_display_string)
+	(symtab_to_filename_for_display): New.
+	(_initialize_source): Added initialization of 'filename-display'
+	variable.
+	* source.h (symtab_to_filename_for_display): Added declaration.
+	* stack.c (print_frame): Added new variable and calling of a new
+	function and condition with this variable. Changed third argument of
+	calling of a function.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* tui/tui-data.c (init_win_info, tui_del_window, tui_free_window):
+	Rename field reference filename to fullname.
+	* tui/tui-data.h (struct tui_source_info): Rename field filename to
+	fullname.  New comment for it.
+	* tui/tui-source.c (tui_set_source_content): Rename field reference
+	filename to fullname.  Initialize field by symtab_to_fullname now.
+	* tui/tui-winsource.c (tui_update_breakpoint_info): Rename field
+	reference filename to fullname.  Use symtab_to_fullname during
+	comparison.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dwarf2read.c (dw2_expand_symtabs_with_filename): Rename to ...
+	(dw2_expand_symtabs_with_fullname): ... here.  Rename parameter
+	filename to fullname.  Rename variable this_name to this_fullname.
+	Lowercase FILENAME_CMP call.
+	(dw2_find_symbol_file): New comment for the returned string.
+	(dwarf2_gdb_index_functions): Rename the function to
+	dw2_expand_symtabs_with_fullname.
+	* psymtab.c (read_psymtabs_with_filename): Rename to ...
+	(read_psymtabs_with_fullname): ... here.  Rename parameter filename to
+	fullname.
+	(psym_functions): Rename the function to read_psymtabs_with_fullname.
+	* symfile.h (struct quick_symbol_functions): Rename field
+	expand_symtabs_with_filename to expand_symtabs_with_fullname and its
+	parameter filename to fullname.  Document returned string meaning for
+	find_symbol_file.
+	* symtab.c (find_line_symtab): Rename the called function to
+	expand_symtabs_with_fullname.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* breakpoint.c (clear_command): Remove variable is_abs, unify the
+	call of filename_cmp with compare_filenames_for_search.
+	* dwarf2read.c (dw2_map_symtabs_matching_filename): Remove variable
+	is_abs, unify the call of FILENAME_CMP with
+	compare_filenames_for_search.  New gdb_asserts for real_path and name.
+	Unify the call of compare_filenames_for_search with FILENAME_CMP.
+	* psymtab.c (partial_map_symtabs_matching_filename): Likewise.
+	* symfile.h (struct quick_symbol_functions): Extend the comment for
+	map_symtabs_matching_filename.
+	* symtab.c (compare_filenames_for_search): Remove the function comment
+	relative path requirement.  Handle absolute filenames, with a comment.
+	(iterate_over_some_symtabs): Remove variable is_abs, unify the call of
+	FILENAME_CMP with compare_filenames_for_search.  New gdb_asserts for
+	real_path and name.  Unify the call of compare_filenames_for_search
+	with FILENAME_CMP.
+	(iterate_over_symtabs): New gdb_assert on REAL_PATH.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* breakpoint.c (print_breakpoint_location): Replace bp_location field
+	source_file references by symtab field references.  Remove variables
+	sal and fullname.
+	(momentary_breakpoint_from_master, add_location_to_breakpoint):
+	(clear_command, say_where): Replace bp_location field source_file
+	references by symtab field references.
+	(bp_location_dtor): Remove the source_file reference.
+	(update_static_tracepoint): Replace bp_location field source_file
+	references by symtab field references.
+	(breakpoint_free_objfile): New function.
+	* breakpoint.h (struct bp_location): Extend the comment for line_number.
+	Replace the field source_file by field symtab, extend its comment.
+	(breakpoint_free_objfile): New declaration.
+	* objfiles.c (free_objfile): Call breakpoint_free_objfile.
+	* tui/tui-winsource.c (tui_update_breakpoint_info): Replace bp_location
+	field source_file references by symtab field references.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Replace xfullpath calls by gdb_realpath calls.
+	* cli/cli-cmds.c (find_and_open_script): Remove xfullpath from the
+	function comment.
+	* dwarf2read.c (dw2_map_expand_apply): Remove parameter full_path.
+	Remove it from the iterate_over_some_symtabs call.
+	(dw2_map_symtabs_matching_filename): Remove parameter full_path.
+	Remove it from the dw2_map_expand_apply calls, remove a block handling
+	it.
+	* psymtab.c (partial_map_expand_apply): Remove parameter full_path.
+	Remove it from the iterate_over_some_symtabs call.
+	(partial_map_symtabs_matching_filename): Remove parameter full_path.
+	Remove it from the partial_map_expand_apply calls, remove a block
+	handling it.  Drop gdb_realpath call and cleanups from the real_path
+	handling.
+	* source.c (openp): Drop the comment part about xfullpath.  Replace
+	xfullpath calls by gdb_realpath calls.
+	(find_and_open_source): Replace xfullpath call by gdb_realpath call.
+	* symfile.h (struct quick_symbol_functions): Remove parameter full_path
+	from method map_symtabs_matching_filename and its comment.
+	* symmisc.c (maintenance_print_msymbols): Replace xfullpath call by
+	gdb_realpath call.
+	* symtab.c (iterate_over_some_symtabs): Remove parameter full_path,
+	remove it also from the function comment, remove a block handling it.
+	Drop gdb_realpath call and cleanups from the real_path handling.
+	(iterate_over_symtabs): Drop variable full_path and its use.
+	* symtab.h (iterate_over_some_symtabs): Remove parameter full_path.
+	* utils.c (xfullpath): Remove.
+	* utils.h (xfullpath): Remove.
+
 2013-02-01  Andreas Tobler  <andreast@fgznet.ch>
 
 	* Makefile.in (ALL_TARGET_OBS): Add ppc64-tdep.o.
