@@ -521,6 +521,7 @@ TARGET_OBS = @TARGET_OBS@
 # All target-dependent objects files that require 64-bit CORE_ADDR
 # (used with --enable-targets=all --enable-64-bit-bfd).
 ALL_64_TARGET_OBS = \
+	aarch64-tdep.o aarch64-linux-tdep.o aarch64-newlib-tdep.o \
 	alphabsd-tdep.o alphafbsd-tdep.o alpha-linux-tdep.o alpha-mdebug-tdep.o \
 	alphanbsd-tdep.o alphaobsd-tdep.o alpha-osf1-tdep.o alpha-tdep.o \
 	amd64fbsd-tdep.o amd64-darwin-tdep.o amd64-dicos-tdep.o \
@@ -565,7 +566,7 @@ ALL_TARGET_OBS = \
 	mt-tdep.o \
 	nto-tdep.o \
 	ppc-linux-tdep.o ppcnbsd-tdep.o ppcobsd-tdep.o ppc-sysv-tdep.o \
-	rl78-tdep.o \
+	ppc64-tdep.o rl78-tdep.o \
 	rs6000-aix-tdep.o rs6000-tdep.o ppc-ravenscar-thread.o \
 	rs6000-lynx178-tdep.o \
 	rx-tdep.o \
@@ -771,8 +772,8 @@ LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 HFILES_NO_SRCDIR = \
 common/gdb_signals.h common/gdb_thread_db.h common/gdb_vecs.h \
 common/i386-xstate.h common/linux-ptrace.h \
-proc-utils.h arm-tdep.h ax-gdb.h ppcnbsd-tdep.h	\
-cli-out.h gdb_expat.h breakpoint.h infcall.h obsd-tdep.h \
+proc-utils.h aarch64-tdep.h arm-tdep.h ax-gdb.h ppcfbsd-tdep.h \
+ppcnbsd-tdep.h cli-out.h gdb_expat.h breakpoint.h infcall.h obsd-tdep.h \
 exec.h m32r-tdep.h osabi.h gdbcore.h solib-som.h amd64bsd-nat.h \
 i386bsd-nat.h xml-support.h xml-tdesc.h alphabsd-tdep.h gdb_obstack.h \
 ia64-tdep.h ada-lang.h ada-varobj.h varobj.h frv-tdep.h nto-tdep.h serial.h \
@@ -807,7 +808,7 @@ amd64-linux-tdep.h linespec.h i387-tdep.h mn10300-tdep.h \
 sparc64-tdep.h monitor.h ppcobsd-tdep.h srec.h solib-pa64.h \
 coff-pe-read.h parser-defs.h gdb_ptrace.h mips-linux-tdep.h \
 m68k-tdep.h spu-tdep.h jv-lang.h environ.h solib-irix.h amd64-tdep.h \
-doublest.h regset.h hppa-tdep.h ppc-linux-tdep.h rs6000-tdep.h \
+doublest.h regset.h hppa-tdep.h ppc-linux-tdep.h ppc64-tdep.h rs6000-tdep.h \
 common/gdb_locale.h common/gdb_dirent.h arch-utils.h trad-frame.h gnu-nat.h \
 language.h nbsd-tdep.h solib-svr4.h \
 macroexp.h ui-file.h regcache.h gdb_string.h tracepoint.h i386-tdep.h \
@@ -1420,6 +1421,7 @@ force_update:
 MAKEOVERRIDES=
 
 ALLDEPFILES = \
+	aarch64-tdep.c aarch64-linux-tdep.c aarch64-newlib-tdep.c \
 	aix-thread.c \
 	alpha-nat.c alphabsd-nat.c alpha-linux-nat.c \
 	alpha-tdep.c alpha-mdebug-tdep.c \
@@ -1487,7 +1489,7 @@ ALLDEPFILES = \
 	solib-osf.c \
 	somread.c solib-som.c \
 	posix-hdep.c \
-	ppc-sysv-tdep.c ppc-linux-nat.c ppc-linux-tdep.c \
+	ppc-sysv-tdep.c ppc-linux-nat.c ppc-linux-tdep.c ppc64-tdep.c \
 	ppcnbsd-nat.c ppcnbsd-tdep.c \
 	ppcobsd-nat.c ppcobsd-tdep.c \
 	procfs.c \

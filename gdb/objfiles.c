@@ -479,6 +479,9 @@ add_separate_debug_objfile (struct objfile *objfile, struct objfile *parent)
   /* Must not be already in a list.  */
   gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
   gdb_assert (objfile->separate_debug_objfile_link == NULL);
+  gdb_assert (objfile->separate_debug_objfile == NULL);
+  gdb_assert (parent->separate_debug_objfile_backlink == NULL);
+  gdb_assert (parent->separate_debug_objfile_link == NULL);
 
   objfile->separate_debug_objfile_backlink = parent;
   objfile->separate_debug_objfile_link = parent->separate_debug_objfile;
@@ -565,6 +568,8 @@ free_objfile (struct objfile *objfile)
   /* It still may reference data modules have associated with the objfile and
      the symbol file data.  */
   forget_cached_source_info_for_objfile (objfile);
+
+  breakpoint_free_objfile (objfile);
 
   /* First do any symbol file specific actions required when we are
      finished with a particular symbol file.  Note that if the objfile

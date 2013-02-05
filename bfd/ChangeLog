@@ -1,3 +1,42 @@
+2013-02-04  Sergio Durigan Junior  <sergiodj@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* Makefile.in (SOURCE_HFILES): Add `elf-linux-psinfo.h'.
+	* elf-bfd.h (elf_internal_linux_prpsinfo): New structure
+	declaration.
+	(elfcore_write_linux_prpsinfo32, elfcore_write_linux_prpsinfo64)
+	(elfcore_write_ppc32_linux_prpsinfo32): New declarations.
+	* elf-linux-psinfo.h: New file.
+	* elf.c: Include elf-linux-psinfo.h.
+	(elfcore_write_linux_prpsinfo32, elfcore_write_linux_prpsinfo64):
+	New functions.
+	* elf32-ppc.c: Include `elf-linux-psinfo.h'.
+	(elf_external_ppc_linux_prpsinfo32): New structure declaration.
+	(PPC_LINUX_PRPSINFO32_SWAP_FIELDS): New macro.
+	(elfcore_write_ppc_linux_prpsinfo32): New function.
+
+2013-02-04  Tristan Gingold  <gingold@adacore.com>
+
+	* mach-o.c (bfd_mach_o_scan_start_address): Do not fail if no
+	start address.
+
+2013-02-04  Alan Modra  <amodra@gmail.com>
+
+	* Makefile.am (BFD64_BACKENDS): Remove elf-nacl.lo.
+	(BFD64_BACKENDS_CFILES): Remove elf-nacl.c.
+	* Makefile.in: Regenerate.
+	* po/SRC-POTFILES.in: Regenerate.
+
+2013-02-04  Alan Modra  <amodra@gmail.com>
+
+	* coff-tic54x.c (SWAP_OUT_RELOC_EXTRA): Delete.
+	* coff-tic80.c (SWAP_OUT_RELOC_EXTRA): Delete.
+
+2013-02-01  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (dec_dynrel_count): Don't error when elf_gc_sweep_symbol
+	clears def_regular.
+
 2013-01-31  Tristan Gingold  <gingold@adacore.com>
 
 	* mach-o.c (bfd_mach_o_scan): Call bfd_mach_o_flatten_sections

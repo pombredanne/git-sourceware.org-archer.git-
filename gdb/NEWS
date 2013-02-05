@@ -3,6 +3,10 @@
 
 *** Changes since GDB 7.5
 
+* New native configurations
+
+FreeBSD/powerpc			powerpc*-*-freebsd
+
 * New targets
 
 Lynx 178 PowerPC		powerpc-*-lynx*178
@@ -114,6 +118,11 @@ set print type typedefs (on|off)
 show print type typedefs
   Control whether typedef definitions are displayed by "ptype".
   The default is to show them.
+
+set filename-display basename|relative|absolute
+show filename-display
+  Control the way in which filenames is displayed.
+  The default is "relative", which preserves previous behavior.
 
 * MI changes
 

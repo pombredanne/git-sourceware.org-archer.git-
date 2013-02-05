@@ -1,3 +1,56 @@
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.linespec/base/one/header.h: New file.
+	* gdb.linespec/base/two/header.h: New file.
+	* gdb.linespec/macro-relative.c: New file.
+	* gdb.linespec/macro-relative.exp: New file.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/fullpath-expand-func.c: New file.
+	* gdb.base/fullpath-expand.c: New file.
+	* gdb.base/fullpath-expand.exp: New file.
+	* gdb.base/realname-expand-real.c: New file.
+	* gdb.base/realname-expand.c: New file.
+	* gdb.base/realname-expand.exp: New file.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-dir-file-name.exp: New file.
+	* gdb.dwarf2/dw2-dir-file-name.c: New file.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.mi/mi-fullname-deleted.exp: Use double last slash for $srcfileabs.
+	(compare_filenames_for_search does not match)
+	(compare_filenames_for_search does match): New tests.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.gdb/xfullpath.exp: Replace xfullpath calls by gdb_realpath calls.
+
+2013-02-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/java.exp (compile_java_from_source): Initialize ARGS as a list.
+
+2013-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/gnu-debugdata.exp): Create ${binfile}.debug,
+	${binfile}.mini_debuginfo-debuglink, add -k to xz, use now
+	${binfile}.mini_debuginfo-debuglink and
+	${binfile}.mini_debuginfo-debuglink.xz.
+
+2013-02-01  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/method-ptr.exp: Use correct form for non-string
+	attributes.
+
+2013-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/method-ptr.exp: Link with c++.
+	* lib/dwarf.exp (Dwarf::assemble): Declare _cu_count.
+
 2013-01-31  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.base/jit.exp (compile_jit_test): New proc.
