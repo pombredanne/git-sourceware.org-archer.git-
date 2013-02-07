@@ -1867,8 +1867,10 @@ svr4_handle_solib_event (void)
 
   pc = regcache_read_pc (get_current_regcache ());
   pa = solib_event_probe_at (info, pc);
-  action = solib_event_probe_action (pa);
+  if (pa == NULL)
+    goto error;
 
+  action = solib_event_probe_action (pa);
   if (action == NAMESPACE_TABLE_INVALIDATE)
     goto error;
 
