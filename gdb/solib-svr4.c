@@ -53,9 +53,6 @@ static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
 static struct so_list *namespace_table_flatten (htab_t namespace_table);
-struct svr4_info;
-static struct probe_and_action *solib_event_probe_at (struct svr4_info *info,
-						      CORE_ADDR address);
 
 /* Link map info to include in an allocated so_list entry.  */
 
@@ -124,7 +121,7 @@ static const  char * const main_name_list[] =
 
 /* Actions to take at solib event breakpoint stops.  */
 
-enum solib_event_action
+enum probe_action
   {
     /* Something went seriously wrong.  Stop using probes and
        revert to the older interface.  */
@@ -150,7 +147,7 @@ struct probe_info
   const char *name;
 
   /* What to do with the namespace table when a probe stop occurs.  */
-  enum solib_event_action action;
+  enum probe_action action;
 };
 
 /* A list of named probes and their associated actions.  If all
@@ -1559,7 +1556,7 @@ struct probe_and_action
   struct probe *probe;
 
   /* The action.  */
-  enum solib_event_action action;
+  enum probe_action action;
 };
 
 /* Returns a hash code for the probe_and_action referenced by p.  */
@@ -1587,8 +1584,7 @@ equal_probe_and_action (const void *p1, const void *p2)
 /* XXX.  */
 
 static void
-register_solib_event_probe (struct probe *probe,
-			    enum solib_event_action action)
+register_solib_event_probe (struct probe *probe, enum probe_action action)
 {
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_action lookup, *pa;
@@ -1637,10 +1633,10 @@ solib_event_probe_at (struct svr4_info *info, CORE_ADDR address)
 /* Decide what action to take when the specified solib event probe is
    hit.  */
 
-static enum solib_event_action
+static enum probe_action
 solib_event_probe_action (struct probe_and_action *pa)
 {
-  enum solib_event_action action;
+  enum probe_action action;
   unsigned probe_argc;
 
   action = pa->action;
@@ -1851,13 +1847,14 @@ svr4_handle_solib_event (void)
 {
   struct svr4_info *info = get_svr4_info ();
   struct probe_and_action *pa;
-  enum solib_event_action action;
+  enum probe_action action;
   struct cleanup *old_chain, *usm_chain;
   struct value *val;
   LONGEST lmid;
   CORE_ADDR pc, debug_base, lm = 0;
   int is_initial_ns;
 
+  /* Do nothing if not using the probes interface.  */
   if (info->probes_table == NULL)
     return;
 
@@ -2051,7 +2048,7 @@ svr4_create_probe_breakpoints (struct gdbarch *gdbarch,
 
   for (i = 0; i < NUM_PROBES; i++)
     {
-      enum solib_event_action action = probe_info[i].action;
+      enum probe_action action = probe_info[i].action;
       struct probe *probe;
       int ix;
 
