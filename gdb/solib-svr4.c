@@ -119,23 +119,23 @@ static const  char * const main_name_list[] =
   NULL
 };
 
-/* Actions to take at solib event breakpoint stops.  */
+/* What to do with the namespace table when a probe stop occurs.  */
 
 enum probe_action
   {
     /* Something went seriously wrong.  Stop using probes and
-       revert to the older interface.  */
+       revert to using the older interface.  */
     NAMESPACE_TABLE_INVALIDATE,
 
-    /* No action is required at this stop.  */
+    /* No action is required.  This namespace is still valid.  */
     NAMESPACE_NO_ACTION,
 
-    /* The specified namespace should be reloaded entirely.  */
+    /* This namespace should be reloaded entirely.  */
     NAMESPACE_RELOAD,
 
-    /* Attempt to incrementally update the specified namespace.
-       If the update fails or is not possible, fall back to
-       reloading the namespace in full.  */
+    /* Attempt to incrementally update this namespace. If the
+       update fails or is not possible, fall back to reloading
+       the namespace in full.  */
     NAMESPACE_UPDATE_OR_RELOAD,
   };
 
@@ -174,7 +174,7 @@ struct svr4_info
   CORE_ADDR debug_base;	/* Base of dynamic linker structures.  */
 
   /* Validity flag for debug_loader_offset.  */
-  unsigned int debug_loader_offset_p : 1;
+  int debug_loader_offset_p;
 
   /* Load address for the dynamic linker, inferred.  */
   CORE_ADDR debug_loader_offset;
@@ -1422,13 +1422,9 @@ svr4_current_sos_from_debug_base (void)
 static struct so_list *
 svr4_current_sos (void)
 {
-  struct svr4_info *info = get_svr4_info ();
+  struct svr4_info *info;
   struct svr4_library_list library_list;
   struct so_list *result;
-
-  /* If we have a namespace table then return a flattened copy.  */
-  if (info->namespace_table != NULL)
-    return namespace_table_flatten (info->namespace_table);
 
   /* Fall back to manual examination of the target if the packet is not
      supported or gdbserver failed to find DT_DEBUG.  gdb.server/solib-list.exp
@@ -1448,6 +1444,12 @@ svr4_current_sos (void)
 
       return library_list.head ? library_list.head : svr4_default_sos ();
     }
+
+  info = get_svr4_info ();
+
+  /* If we have a namespace table then return a flattened copy.  */
+  if (info->namespace_table != NULL)
+    return namespace_table_flatten (info->namespace_table);
 
   /* Always locate the debug struct, in case it has moved.  */
   info->debug_base = 0;
@@ -1581,7 +1583,8 @@ equal_probe_and_action (const void *p1, const void *p2)
   return pa1->probe->address == pa2->probe->address;
 }
 
-/* XXX.  */
+/* Register a solib event probe and its associated action in the
+   probes table.  */
 
 static void
 register_solib_event_probe (struct probe *probe, enum probe_action action)
@@ -2038,7 +2041,7 @@ svr4_update_solib_event_breakpoints (void)
     iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
 }
 
-/* XXX.  */
+/* Create and register solib event breakpoints.  */
 
 static void
 svr4_create_probe_breakpoints (struct gdbarch *gdbarch,
