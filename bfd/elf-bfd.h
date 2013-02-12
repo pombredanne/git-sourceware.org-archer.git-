@@ -421,6 +421,7 @@ enum elf_target_id
   MICROBLAZE_ELF_DATA,
   MIPS_ELF_DATA,
   MN10300_ELF_DATA,
+  NIOS2_ELF_DATA,
   PPC32_ELF_DATA,
   PPC64_ELF_DATA,
   S390_ELF_DATA,
@@ -1597,6 +1598,9 @@ struct elf_obj_tdata
   /* A place to stash dwarf2 info for this bfd.  */
   void *dwarf2_find_line_info;
 
+  /* Stash away info for yet another find line/function variant.  */
+  void *elf_find_function_cache;
+
   /* An array of stub sections indexed by symbol number, used by the
      MIPS ELF linker.  FIXME: We should figure out some way to only
      include this field for a MIPS ELF target.  */
@@ -1800,6 +1804,8 @@ extern struct bfd_hash_entry *_bfd_elf_link_hash_newfunc
   (struct bfd_hash_entry *, struct bfd_hash_table *, const char *);
 extern struct bfd_link_hash_table *_bfd_elf_link_hash_table_create
   (bfd *);
+extern void _bfd_elf_link_hash_table_free
+  (struct bfd_link_hash_table *);
 extern void _bfd_elf_link_hash_copy_indirect
   (struct bfd_link_info *, struct elf_link_hash_entry *,
    struct elf_link_hash_entry *);

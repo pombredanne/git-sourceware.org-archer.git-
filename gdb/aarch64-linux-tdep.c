@@ -36,9 +36,9 @@
 #include "regset.h"
 
 /* The general-purpose regset consists of 31 X registers, plus SP, PC,
-   PSTATE and two extra pseudo 64-bit registers, as defined in the
-   AArch64 port of the Linux kernel.  */
-#define AARCH64_LINUX_SIZEOF_GREGSET  (36 * X_REGISTER_SIZE)
+   and PSTATE registers, as defined in the AArch64 port of the Linux
+   kernel.  */
+#define AARCH64_LINUX_SIZEOF_GREGSET  (34 * X_REGISTER_SIZE)
 
 /* The fp regset consists of 32 V registers, plus FPCR and FPSR which
    are 4 bytes wide each, and the whole structure is padded to 128 bit
@@ -272,6 +272,10 @@ aarch64_linux_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 
   set_solib_svr4_fetch_link_map_offsets (gdbarch,
 					 svr4_lp64_fetch_link_map_offsets);
+
+  /* Enable TLS support.  */
+  set_gdbarch_fetch_tls_load_module_address (gdbarch,
+                                             svr4_fetch_objfile_link_map);
 
   /* Shared library handling.  */
   set_gdbarch_skip_trampoline_code (gdbarch, find_solib_trampoline_target);
