@@ -5,10 +5,13 @@
 
 * New native configurations
 
+ARM AArch64 GNU/Linux		aarch64*-*-linux-gnu
 FreeBSD/powerpc			powerpc*-*-freebsd
 
 * New targets
 
+ARM AArch64			aarch64*-*-elf
+ARM AArch64 GNU/Linux		aarch64*-*-linux
 Lynx 178 PowerPC		powerpc-*-lynx*178
 
 * If the configured location of system.gdbinit file (as given by the
@@ -131,8 +134,9 @@ show filename-display
      "=cmd-param-changed".
   ** Trace frame changes caused by command "tfind" are now notified using
      new async record "=traceframe-changed".
-  ** The creation and deletion of trace state variables are now notified
-     using new async records "=tsv-created" and "=tsv-deleted".
+  ** The creation, deletion and modification of trace state variables
+     are now notified using new async records "=tsv-created",
+     "=tsv-deleted" and "=tsv-modified".
   ** The start and stop of process record are now notified using new
      async record "=record-started" and "=record-stopped".
   ** Memory changes are now notified using new async record

@@ -888,7 +888,7 @@ elf_x86_64_link_hash_table_create (bfd *abfd)
   struct elf_x86_64_link_hash_table *ret;
   bfd_size_type amt = sizeof (struct elf_x86_64_link_hash_table);
 
-  ret = (struct elf_x86_64_link_hash_table *) bfd_malloc (amt);
+  ret = (struct elf_x86_64_link_hash_table *) bfd_zmalloc (amt);
   if (ret == NULL)
     return NULL;
 
@@ -900,18 +900,6 @@ elf_x86_64_link_hash_table_create (bfd *abfd)
       free (ret);
       return NULL;
     }
-
-  ret->sdynbss = NULL;
-  ret->srelbss = NULL;
-  ret->plt_eh_frame = NULL;
-  ret->sym_cache.abfd = NULL;
-  ret->tlsdesc_plt = 0;
-  ret->tlsdesc_got = 0;
-  ret->tls_ld_got.refcount = 0;
-  ret->sgotplt_jump_table_size = 0;
-  ret->tls_module_base = NULL;
-  ret->next_jump_slot_index = 0;
-  ret->next_irelative_index = 0;
 
   if (ABI_64_P (abfd))
     {
@@ -956,7 +944,7 @@ elf_x86_64_link_hash_table_free (struct bfd_link_hash_table *hash)
     htab_delete (htab->loc_hash_table);
   if (htab->loc_hash_memory)
     objalloc_free ((struct objalloc *) htab->loc_hash_memory);
-  _bfd_generic_link_hash_table_free (hash);
+  _bfd_elf_link_hash_table_free (hash);
 }
 
 /* Create .plt, .rela.plt, .got, .got.plt, .rela.got, .dynbss, and
@@ -2400,24 +2388,6 @@ elf_x86_64_allocate_dynrelocs (struct elf_link_hash_entry *h, void * inf)
   if (eh->dyn_relocs == NULL)
     return TRUE;
 
-  /* Since pc_count for TLS symbol can only have size relocations and
-     we always resolve size relocation against non-zero TLS symbol, we
-     clear pc_count for non-zero TLS symbol.  */
-  if (h->type == STT_TLS && h->size != 0)
-    {
-      struct elf_dyn_relocs **pp;
-
-      for (pp = &eh->dyn_relocs; (p = *pp) != NULL; )
-	{
-	  p->count -= p->pc_count;
-	  p->pc_count = 0;
-	  if (p->count == 0)
-	    *pp = p->next;
-	  else
-	    pp = &p->next;
-	}
-    }
-
   /* In the shared -Bsymbolic case, discard space allocated for
      dynamic pc-relative relocs against symbols which turn out to be
      defined in regular objects.  For the normal shared case, discard
@@ -3705,12 +3675,6 @@ elf_x86_64_relocate_section (bfd *output_bfd,
 	case R_X86_64_SIZE64:
 	  /* Set to symbol size.  */
 	  relocation = st_size;
-	  if (h && h->type == STT_TLS && st_size != 0)
-	    {
-	      /* Resolve size relocation against non-zero TLS symbol.  */
-	      unresolved_reloc = FALSE;
-	      break;
-	    }
 	  goto direct;
 
 	case R_X86_64_PC8:
