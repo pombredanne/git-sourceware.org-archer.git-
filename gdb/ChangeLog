@@ -1,3 +1,165 @@
+2013-02-14  Pedro Alves  <palves@redhat.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-linux-nat.c (aarch64_init_debug_reg_state): Delete.
+	(aarch64_inferior_data, struct aarch64_inferior_data):
+	Delete.
+	(struct aarch64_process_info): New.
+	(aarch64_process_list): New global.
+	(aarch64_find_process_pid, aarch64_add_process)
+	(aarch64_process_info_get): New functions.
+	(aarch64_inferior_data_get): Delete.
+	(aarch64_process_info_get): New function.
+	(aarch64_forget_process): New function.
+	(aarch64_get_debug_reg_state): New parameter 'pid'.  Reimplement.
+	(aarch64_linux_prepare_to_resume): Pass the lwp's pid to
+	aarch64_get_debug_reg_state.
+	(aarch64_notify_debug_reg_change): Use iterate_over_lwps
+	instead of linux_nat_iterate_watchpoint_lwps.
+	(aarch64_linux_new_fork): New function.
+	(aarch64_linux_child_post_startup_inferior): Use
+	aarch64_forget_process instead of aarch64_init_debug_reg_state.
+	(aarch64_handle_breakpoint, aarch64_linux_insert_hw_breakpoint)
+	(aarch64_linux_remove_hw_breakpoint)
+	(aarch64_handle_aligned_watchpoint)
+	(aarch64_handle_unaligned_watchpoint)
+	(aarch64_linux_insert_watchpoint)
+	(aarch64_linux_remove_watchpoint)
+	(aarch64_linux_stopped_data_address): Adjust to pass the current
+	process id to aarch64_debug_reg_state.
+	(_initialize_aarch64_linux_nat): Install aarch64_linux_new_fork as
+	linux_nat_new_fork hook, and aarch64_forget_process as
+	linux_nat_forget_process hook; remove the call to
+	register_inferior_data_with_cleanup.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* eval.c (evaluate_subexp_for_address) <default_case_after_eval,
+	EVAL_AVOID_SIDE_EFFECTS>: Swap and handle TYPE_CODE_REF before
+	lval_memory.
+
+2013-02-14  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* tracepoint.h (validate_trace_state_variable_name): Declare.
+	* tracepoint.c (validate_trace_state_variable_name): New.
+	(trace_variable_command): Parse the trace state variable's name
+	without using parse_expression.  Do several validations.
+	* mi/mi-main.c (mi_cmd_trace_define_variable): Don't parse the
+	trace state variable's name with parse_expression.  Validate it.
+
+2013-02-14  Yao Qi  <yao@codesourcery.com>
+
+	* infcmd.c (breakpoint_proceeded): Remove it.
+
+2013-02-14  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (end_actions_pseudocommand): Make it static.
+	(while_stepping_pseudocommand): Likewise.
+	* tracepoint.h (end_actions_pseudocommand): Remove the
+	declaration.
+	(while_stepping_pseudocommand): Likewise.
+
+2013-02-14  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-decode.c (help_cmd): Remove the declaration of
+	"cmdlist".
+	(help_all): Likewise.
+
+2013-02-13  Pedro Alves  <palves@redhat.com>
+
+	* amd64-linux-nat.c (update_debug_registers_callback):
+	Update comment.
+	(amd64_linux_dr_set_control, amd64_linux_dr_set_addr): Use
+	iterate_over_lwps.
+	(amd64_linux_prepare_to_resume): Pass the lwp's pid to
+	i386_debug_reg_state.
+	(amd64_linux_new_fork): New function.
+	(_initialize_amd64_linux_nat): Install amd64_linux_new_fork as
+	linux_nat_new_fork hook, and i386_forget_process as
+	linux_nat_forget_process hook.
+	* i386-linux-nat.c (update_debug_registers_callback):
+	Update comment.
+	(i386_linux_dr_set_control, i386_linux_dr_set_addr): Use
+	iterate_over_lwps.
+	(i386_linux_prepare_to_resume): Pass the lwp's pid to
+	i386_debug_reg_state.
+	(i386_linux_new_fork): New function.
+	(_initialize_i386_linux_nat): Install i386_linux_new_fork as
+	linux_nat_new_fork hook, and i386_forget_process as
+	linux_nat_forget_process hook.
+	* i386-nat.c (i386_init_dregs): Delete.
+	(i386_inferior_data, struct i386_inferior_data):
+	Delete.
+	(struct i386_process_info): New.
+	(i386_process_list): New global.
+	(i386_find_process_pid, i386_add_process, i386_process_info_get):
+	New functions.
+	(i386_inferior_data_get): Delete.
+	(i386_process_info_get): New function.
+	(i386_debug_reg_state): New parameter 'pid'.  Reimplement.
+	(i386_forget_process): New function.
+	(i386_cleanup_dregs): Rewrite.
+	(i386_update_inferior_debug_regs, i386_insert_watchpoint)
+	(i386_remove_watchpoint, i386_region_ok_for_watchpoint)
+	(i386_stopped_data_address, i386_insert_hw_breakpoint)
+	(i386_remove_hw_breakpoint): Adjust to pass the current process id
+	to i386_debug_reg_state.
+	(i386_use_watchpoints): Don't register inferior data.
+	* i386-nat.h (i386_debug_reg_state): Add new 'pid' parameter, and
+	adjust comment.
+	(i386_forget_process): Declare.
+	* linux-fork.c (delete_fork): Call linux_nat_forget_process.
+	* linux-nat.c (linux_nat_new_fork, linux_nat_forget_process_hook):
+	New static globals.
+	(linux_child_follow_fork): Don't call linux_nat_new_thread here.
+	(add_initial_lwp): New, factored out from ...
+	(add_lwp): ... this.  Don't check the number of lwps before
+	calling linux_nat_new_thread.
+	(linux_nat_iterate_watchpoint_lwps): Delete.
+	(linux_nat_attach): Use add_initial_lwp instead of add_lwp.
+	(linux_handle_extended_wait): Call the linux_nat_new_fork hook on
+	forks and vforks.
+	(linux_nat_wait_1): Use add_initial_lwp instead of add_lwp for the
+	initial lwp.
+	(linux_nat_kill, linux_nat_mourn_inferior): Call
+	linux_nat_forget_process.
+	(linux_nat_set_new_fork, linux_nat_set_forget_process)
+	(linux_nat_forget_process): New functions.
+	* linux-nat.h (linux_nat_iterate_watchpoint_lwps_ftype): Delete
+	type.
+	(linux_nat_iterate_watchpoint_lwps): Delete declaration.
+	(linux_nat_new_fork_ftype, linux_nat_forget_process_ftype): New
+	types.
+	(linux_nat_set_new_fork, linux_nat_set_forget_process)
+	(linux_nat_forget_process): New declarations.
+
+	* amd64fbsd-nat.c (super_mourn_inferior): New global.
+	(amd64fbsd_mourn_inferior): New function.
+	(_initialize_amd64fbsd_nat): Override to_mourn_inferior.
+	* windows-nat.c (windows_detach): Call i386_cleanup_dregs.
+
+2013-02-13  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-nat.c (aarch64_linux_get_debug_reg_capacity):
+	Adding _().
+
+2013-02-13  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-nat.c (debug_reg_change_callback)
+	(aarch64_linux_get_debug_reg_capacity): ARI fix: Replace %llx with
+	%s and phex().
+
+2013-02-13  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-nat.c (dr_changed_t): ARI fix: Replace long long
+	with LONGEST.
+
+2013-02-13  Pedro Alves  <palves@redhat.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* c-lang.c (c_op_print_tab): Add entry for UNOP_PLUS.
+
 2013-02-12  Tom Tromey  <tromey@redhat.com>
 
 	PR symtab/11464:
