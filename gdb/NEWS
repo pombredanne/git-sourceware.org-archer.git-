@@ -122,11 +122,21 @@ show print type typedefs
   Control whether typedef definitions are displayed by "ptype".
   The default is to show them.
 
-set filename-display basename|relative|absolute|relative-with-system-absolute
-                     |basename-with-system-absolute
+set filename-display basename|relative|absolute
+set filename-display executable basename|relative|absolute
+set filename-display libraries basename|relative|absolute
+set filename-display executable-with-separate-debug-info basename|relative
+							 |absolute
+set filename-display libraries-with-separate-debug-info basename|relative
+							|absolute
 show filename-display
+show filename-display executable
+show filename-display libraries
+show filename-display executable-with-separate-debug-info
+show filename-display libraries-with-separate-debug-info
   Control the way in which filenames is displayed.
-  The default is "relative", which preserves previous behavior.
+  The default is "relative" for all the options, which preserves previous
+  behavior.
 
 * MI changes
 

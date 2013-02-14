@@ -43,6 +43,8 @@
 #include "completer.h"
 #include "ui-out.h"
 #include "readline/readline.h"
+#include "cli/cli-decode.h"
+#include "cli/cli-setshow.h"
 
 #include "psymtab.h"
 
@@ -65,6 +67,10 @@ static void forward_search_command (char *, int);
 static void line_info (char *, int);
 
 static void source_info (char *, int);
+
+static struct cmd_list_element **filename_display_set_cmdlist_get (void);
+
+static struct cmd_list_element **filename_display_show_cmdlist_get (void);
 
 /* Path of directories to search for source files.
    Same format as the PATH environment variable's value.  */
@@ -113,27 +119,63 @@ show_lines_to_list (struct ui_file *file, int from_tty,
 static const char filename_display_basename[] = "basename";
 static const char filename_display_relative[] = "relative";
 static const char filename_display_absolute[] = "absolute";
-static const char filename_display_relative_with_system_absolute[] =
-						"relative-with-system-absolute";
-static const char filename_display_basename_with_system_absolute[] =
-						"basename-with-system-absolute";
 
 static const char *const filename_display_kind_names[] = {
   filename_display_basename,
   filename_display_relative,
   filename_display_absolute,
-  filename_display_relative_with_system_absolute,
-  filename_display_basename_with_system_absolute,
   NULL
 };
 
-static const char *filename_display_string = filename_display_relative;
+static const char *filename_display_executable_string =
+  filename_display_relative;
+static const char *filename_display_libraries_string =
+  filename_display_relative;
+static const char *filename_display_executable_sepdebug_string =
+  filename_display_relative;
+static const char *filename_display_libraries_sepdebug_string =
+  filename_display_relative;
 
 static void
-show_filename_display_string (struct ui_file *file, int from_tty,
-			      struct cmd_list_element *c, const char *value)
+show_filename_display_executable_string (struct ui_file *file, int from_tty,
+					 struct cmd_list_element *c,
+					 const char *value)
 {
-  fprintf_filtered (file, _("Filenames are displayed as \"%s\".\n"), value);
+  fprintf_filtered (file, _("Filenames in executable with embedded "
+			    "debug info are displayed as \"%s\".\n"),
+		    value);
+}
+ 
+static void
+show_filename_display_libraries_string (struct ui_file *file, int from_tty,
+					struct cmd_list_element *c,
+					const char *value)
+{
+  fprintf_filtered (file, _("Filenames in shared libraries with embedded "
+			    "debug info are displayed as \"%s\".\n"),
+		    value);
+}
+
+static void
+show_filename_display_executable_sepdebug_string (struct ui_file *file,
+						  int from_tty,
+						  struct cmd_list_element *c,
+						  const char *value)
+{
+  fprintf_filtered (file, _("Filenames in executable with separate "
+			    "debug info are displayed as \"%s\".\n"),
+		    value);
+}
+ 
+static void
+show_filename_display_libraries_sepdebug_string (struct ui_file *file,
+						 int from_tty,
+						 struct cmd_list_element *c,
+						 const char *value)
+{
+  fprintf_filtered (file, _("Filenames in shared libraries with separate "
+			    "debug info are displayed as \"%s\".\n"),
+		    value);
 }
  
 /* Line number of last line printed.  Default for various commands.
@@ -1144,21 +1186,33 @@ symtab_to_fullname (struct symtab *s)
 const char *
 symtab_to_filename_for_display (struct symtab *symtab)
 {
-  if (filename_display_string == filename_display_basename)
-    return lbasename (symtab->filename);
-  else if (filename_display_string == filename_display_absolute)
-    return symtab_to_fullname (symtab);
-  else if (filename_display_string == filename_display_relative)
-    return symtab->filename;
+  struct objfile *objfile = symtab->objfile;
+  int has_sepdebug, is_executable;
+  const char *setting;
 
-  if (symtab->objfile->separate_debug_objfile != NULL
-      || symtab->objfile->separate_debug_objfile_backlink != NULL)
-    return symtab_to_fullname (symtab);
+  if (objfile->separate_debug_objfile_backlink != NULL)
+    objfile = objfile->separate_debug_objfile_backlink;
+  has_sepdebug = objfile->separate_debug_objfile != NULL;
+  is_executable = objfile == symfile_objfile;
 
-  if (filename_display_string == filename_display_relative_with_system_absolute)
-    return symtab->filename;
-  if (filename_display_string == filename_display_basename_with_system_absolute)
+  if (is_executable && !has_sepdebug)
+    setting = filename_display_executable_string;
+  if (!is_executable && !has_sepdebug)
+    setting = filename_display_libraries_string;
+  if (is_executable && has_sepdebug)
+    setting = filename_display_executable_sepdebug_string;
+  if (!is_executable && has_sepdebug)
+    setting = filename_display_libraries_sepdebug_string;
+  if (setting == NULL)
+    internal_error (__FILE__, __LINE__,
+		    _("symtab_to_filename_for_display setting == NULL"));
+
+  if (setting == filename_display_basename)
     return lbasename (symtab->filename);
+  else if (setting == filename_display_absolute)
+    return symtab_to_fullname (symtab);
+  else if (setting == filename_display_relative)
+    return symtab->filename;
   internal_error (__FILE__, __LINE__, _("invalid filename_display_string"));
 }
 
@@ -1959,6 +2013,107 @@ set_substitute_path_command (char *args, int from_tty)
   forget_cached_source_info ();
 }
 
+/* The only valid "set filename-display" argument is off|0|no|disable.  */
+
+static void
+set_filename_display_cmd (char *args, int from_tty)
+{
+  error (_("Global value \"basename\", \"relative\" or \"absolute\" expected.\n"
+	   "More specific category \"executable\", \"libraries\", "
+	   "\"executable-with-separate-debug-info\" or "
+	   "\"libraries-with-separate-debug-info\" may be also specified."));
+}
+
+static void
+set_filename_display_1 (const char *kind, int from_tty)
+{
+  struct cmd_list_element *list;
+
+  for (list = *filename_display_set_cmdlist_get (); list != NULL; list = list->next)
+    if (list->type == set_cmd)
+      do_set_command ((char *) kind, from_tty, list);
+}
+
+static void
+set_filename_display_basename_string (char *args, int from_tty)
+{
+  if (args != NULL && *args != 0)
+    error (_("Command has no parameters."));
+
+  set_filename_display_1 ("basename", from_tty);
+}
+
+static void
+set_filename_display_relative_string (char *args, int from_tty)
+{
+  if (args != NULL && *args != 0)
+    error (_("Command has no parameters."));
+
+  set_filename_display_1 ("relative", from_tty);
+}
+
+static void
+set_filename_display_absolute_string (char *args, int from_tty)
+{
+  if (args != NULL && *args != 0)
+    error (_("Command has no parameters."));
+
+  set_filename_display_1 ("absolute", from_tty);
+}
+
+/* Initialize "set filename-display " commands prefix and return it.  */
+
+static struct cmd_list_element **
+filename_display_set_cmdlist_get (void)
+{
+  static struct cmd_list_element *retval;
+
+  if (retval == NULL)
+    add_prefix_cmd ("filename-display", class_maintenance, set_filename_display_cmd, _("\
+Auto-loading specific settings.\n\
+Configure various filename-display-specific variables such as\n\
+automatic loading of Python scripts."),
+		    &retval, "set filename-display ",
+		    1/*allow-unknown*/, &setlist);
+
+  return &retval;
+}
+
+/* Command "show filename-display" displays summary of all the current
+   "show filename-display " settings.  */
+
+static void
+show_filename_display_cmd (char *args, int from_tty)
+{
+  if (filename_display_executable_string == filename_display_libraries_string
+      && (filename_display_executable_string
+	  == filename_display_executable_sepdebug_string)
+      && (filename_display_executable_string
+	  == filename_display_libraries_sepdebug_string))
+    fprintf_filtered (gdb_stdout, _("Filenames are displayed as \"%s\".\n"),
+		      filename_display_executable_string);
+  else
+    cmd_show_list (*filename_display_show_cmdlist_get (), from_tty, "");
+}
+
+/* Initialize "show filename-display " commands prefix and return it.  */
+
+static struct cmd_list_element **
+filename_display_show_cmdlist_get (void)
+{
+  static struct cmd_list_element *retval;
+
+  if (retval == NULL)
+    add_prefix_cmd ("filename-display", class_maintenance, show_filename_display_cmd, _("\
+Show filename-displaying specific settings.\n\
+Show configuration of various filename-display-specific variables such as\n\
+automatic loading of Python scripts."),
+		    &retval, "show filename-display ",
+		    0/*allow-unknown*/, &showlist);
+
+  return &retval;
+}
+
 
 void
 _initialize_source (void)
@@ -2076,25 +2231,62 @@ Print the rule for substituting FROM in source file names. If FROM\n\
 is not specified, print all substitution rules."),
            &showlist);
 
-  add_setshow_enum_cmd ("filename-display", class_files,
+  add_setshow_enum_cmd ("executable", class_files,
 			filename_display_kind_names,
-			&filename_display_string, _("\
+			&filename_display_executable_string, _("\
 Set how to display filenames."), _("\
 Show how to display filenames."), _("\
-filename-display can be:\n\
-  basename - display only basename of a filename\n\
-  relative - display a filename relative to the compilation directory\n\
-  absolute - display an absolute filename\n\
-  relative-with-system-absolute - display filenames from files with separate\n\
-                                  debug info files as absolute, other files\n\
-                                  display relative to the compilation directory\
-\n\
-  basename-with-system-absolute - display filenames from files with separate\n\
-                                  debug info files as absolute, other files\n\
-                                  display only with basename of the filename\n\
-By default, relative filenames are displayed."),
+FOO"),
 			NULL,
-			show_filename_display_string,
-			&setlist, &showlist);
+			show_filename_display_executable_string,
+			filename_display_set_cmdlist_get (),
+			filename_display_show_cmdlist_get ());
 
+  add_setshow_enum_cmd ("libraries", class_files,
+			filename_display_kind_names,
+			&filename_display_libraries_string, _("\
+Set how to display filenames."), _("\
+Show how to display filenames."), _("\
+FOO"),
+			NULL,
+			show_filename_display_libraries_string,
+			filename_display_set_cmdlist_get (),
+			filename_display_show_cmdlist_get ());
+
+  add_setshow_enum_cmd ("executable-with-separate-debug-info", class_files,
+			filename_display_kind_names,
+			&filename_display_executable_sepdebug_string, _("\
+Set how to display filenames."), _("\
+Show how to display filenames."), _("\
+FOO"),
+			NULL,
+			show_filename_display_executable_sepdebug_string,
+			filename_display_set_cmdlist_get (),
+			filename_display_show_cmdlist_get ());
+
+  add_setshow_enum_cmd ("libraries-with-separate-debug-info", class_files,
+			filename_display_kind_names,
+			&filename_display_libraries_sepdebug_string, _("\
+Set how to display filenames."), _("\
+Show how to display filenames."), _("\
+FOO"),
+			NULL,
+			show_filename_display_libraries_sepdebug_string,
+			filename_display_set_cmdlist_get (),
+			filename_display_show_cmdlist_get ());
+
+  add_cmd ("basename", class_files, set_filename_display_basename_string,
+           _("\
+FOO"),
+           filename_display_set_cmdlist_get ());
+
+  add_cmd ("relative", class_files, set_filename_display_relative_string,
+           _("\
+FOO"),
+           filename_display_set_cmdlist_get ());
+
+  add_cmd ("absolute", class_files, set_filename_display_absolute_string,
+           _("\
+FOO"),
+           filename_display_set_cmdlist_get ());
 }
