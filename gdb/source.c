@@ -68,10 +68,6 @@ static void line_info (char *, int);
 
 static void source_info (char *, int);
 
-static struct cmd_list_element **filename_display_set_cmdlist_get (void);
-
-static struct cmd_list_element **filename_display_show_cmdlist_get (void);
-
 /* Path of directories to search for source files.
    Same format as the PATH environment variable's value.  */
 
@@ -2013,6 +2009,9 @@ set_substitute_path_command (char *args, int from_tty)
   forget_cached_source_info ();
 }
 
+static struct cmd_list_element *filename_display_set_cmdlist;
+static struct cmd_list_element *filename_display_show_cmdlist;
+
 /* The only valid "set filename-display" argument is off|0|no|disable.  */
 
 static void
@@ -2029,7 +2028,7 @@ set_filename_display_1 (const char *kind, int from_tty)
 {
   struct cmd_list_element *list;
 
-  for (list = *filename_display_set_cmdlist_get (); list != NULL; list = list->next)
+  for (list = filename_display_set_cmdlist; list != NULL; list = list->next)
     if (list->type == set_cmd)
       do_set_command ((char *) kind, from_tty, list);
 }
@@ -2061,24 +2060,6 @@ set_filename_display_absolute_string (char *args, int from_tty)
   set_filename_display_1 ("absolute", from_tty);
 }
 
-/* Initialize "set filename-display " commands prefix and return it.  */
-
-static struct cmd_list_element **
-filename_display_set_cmdlist_get (void)
-{
-  static struct cmd_list_element *retval;
-
-  if (retval == NULL)
-    add_prefix_cmd ("filename-display", class_maintenance, set_filename_display_cmd, _("\
-Auto-loading specific settings.\n\
-Configure various filename-display-specific variables such as\n\
-automatic loading of Python scripts."),
-		    &retval, "set filename-display ",
-		    1/*allow-unknown*/, &setlist);
-
-  return &retval;
-}
-
 /* Command "show filename-display" displays summary of all the current
    "show filename-display " settings.  */
 
@@ -2093,25 +2074,7 @@ show_filename_display_cmd (char *args, int from_tty)
     fprintf_filtered (gdb_stdout, _("Filenames are displayed as \"%s\".\n"),
 		      filename_display_executable_string);
   else
-    cmd_show_list (*filename_display_show_cmdlist_get (), from_tty, "");
-}
-
-/* Initialize "show filename-display " commands prefix and return it.  */
-
-static struct cmd_list_element **
-filename_display_show_cmdlist_get (void)
-{
-  static struct cmd_list_element *retval;
-
-  if (retval == NULL)
-    add_prefix_cmd ("filename-display", class_maintenance, show_filename_display_cmd, _("\
-Show filename-displaying specific settings.\n\
-Show configuration of various filename-display-specific variables such as\n\
-automatic loading of Python scripts."),
-		    &retval, "show filename-display ",
-		    0/*allow-unknown*/, &showlist);
-
-  return &retval;
+    cmd_show_list (filename_display_show_cmdlist, from_tty, "");
 }
 
 
@@ -2231,6 +2194,20 @@ Print the rule for substituting FROM in source file names. If FROM\n\
 is not specified, print all substitution rules."),
            &showlist);
 
+  add_prefix_cmd ("filename-display", class_maintenance, set_filename_display_cmd, _("\
+Auto-loading specific settings.\n\
+Configure various filename-display-specific variables such as\n\
+automatic loading of Python scripts."),
+		  &filename_display_set_cmdlist, "set filename-display ",
+		  1/*allow-unknown*/, &setlist);
+
+  add_prefix_cmd ("filename-display", class_maintenance, show_filename_display_cmd, _("\
+Show filename-displaying specific settings.\n\
+Show configuration of various filename-display-specific variables such as\n\
+automatic loading of Python scripts."),
+		  &filename_display_show_cmdlist, "show filename-display ",
+		  0/*allow-unknown*/, &showlist);
+
   add_setshow_enum_cmd ("executable", class_files,
 			filename_display_kind_names,
 			&filename_display_executable_string, _("\
@@ -2239,8 +2216,8 @@ Show how to display filenames."), _("\
 FOO"),
 			NULL,
 			show_filename_display_executable_string,
-			filename_display_set_cmdlist_get (),
-			filename_display_show_cmdlist_get ());
+			&filename_display_set_cmdlist,
+			&filename_display_show_cmdlist);
 
   add_setshow_enum_cmd ("libraries", class_files,
 			filename_display_kind_names,
@@ -2250,8 +2227,8 @@ Show how to display filenames."), _("\
 FOO"),
 			NULL,
 			show_filename_display_libraries_string,
-			filename_display_set_cmdlist_get (),
-			filename_display_show_cmdlist_get ());
+			&filename_display_set_cmdlist,
+			&filename_display_show_cmdlist);
 
   add_setshow_enum_cmd ("executable-with-separate-debug-info", class_files,
 			filename_display_kind_names,
@@ -2261,8 +2238,8 @@ Show how to display filenames."), _("\
 FOO"),
 			NULL,
 			show_filename_display_executable_sepdebug_string,
-			filename_display_set_cmdlist_get (),
-			filename_display_show_cmdlist_get ());
+			&filename_display_set_cmdlist,
+			&filename_display_show_cmdlist);
 
   add_setshow_enum_cmd ("libraries-with-separate-debug-info", class_files,
 			filename_display_kind_names,
@@ -2272,21 +2249,21 @@ Show how to display filenames."), _("\
 FOO"),
 			NULL,
 			show_filename_display_libraries_sepdebug_string,
-			filename_display_set_cmdlist_get (),
-			filename_display_show_cmdlist_get ());
+			&filename_display_set_cmdlist,
+			&filename_display_show_cmdlist);
 
   add_cmd ("basename", class_files, set_filename_display_basename_string,
            _("\
 FOO"),
-           filename_display_set_cmdlist_get ());
+           &filename_display_set_cmdlist);
 
   add_cmd ("relative", class_files, set_filename_display_relative_string,
            _("\
 FOO"),
-           filename_display_set_cmdlist_get ());
+           &filename_display_set_cmdlist);
 
   add_cmd ("absolute", class_files, set_filename_display_absolute_string,
            _("\
 FOO"),
-           filename_display_set_cmdlist_get ());
+           &filename_display_set_cmdlist);
 }
