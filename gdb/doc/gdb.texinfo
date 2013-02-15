@@ -6539,7 +6539,11 @@ You can control how file names are displayed.
 
 @table @code
 @item set filename-display
-@itemx set filename-display relative
+Set how to display filenames coming from any file.  One can make this setting
+more specific to the inferior file kind below.  Using this command will set the
+same value for all the four kinds of inferior files as described below.
+
+@item set filename-display relative
 @cindex filename-display
 Display file names relative to the compilation directory.  This is the default.
 
@@ -6549,20 +6553,54 @@ Display only basename of a filename.
 @item set filename-display absolute
 Display an absolute filename.
 
-@item set filename-display relative-with-system-absolute
-Display as absolute those source file names that come from files with separate
-debug info, and all the other source file names as relative to their
-compilation directory.
-
-Files having separate debug information file are expected to come from system
-shared libraries.
-
-@item set filename-display basename-with-system-absolute
-Display as absolute those source file names that come from files with separate
-debug info, and all the other source file names only as their basenames.
-
 @item show filename-display
-Show the current way to display filenames.
+Show the current way to display filenames.  Setting for each of the four kinds
+of inferior files (as described below) will be displayed.
+@end table
+
+If you want to set the displayed filenames kind more specifically you can use
+the following option.
+
+Files having separate debug information file usually come from system shared
+libraries where may be more appropriate to display filenames in their absolute
+form.
+
+@table @code
+@item set filename-display executable @{relative|basename|absolute@}
+Set how to display filenames coming from the inferior executable, as set by the
+@ref{file command}.  Inferior executable has to use embedded debug info as is
+usually found in binaries compiled by @value{GDBN} user.
+
+@item show filename-display executable
+Show the current way to display filenames coming from the inferior executable
+with embedded debug info.
+
+@item set filename-display libraries @{relative|basename|absolute@}
+Set how to display filenames coming from inferior shared libraries.  The shared
+libraries have to use embedded debug info as is usually found in shared
+libraries compiled by @value{GDBN} user.
+
+@item show filename-display libraries
+Show the current way to display filenames coming from the inferior shared
+libraries with embedded debug info.
+
+@item set filename-display executable-with-separate-debug-info @{@dots{}@}
+Set how to display filenames coming from the inferior executable, as set by the
+@ref{file command}.  Inferior executable has to use separate debug info file as
+is usually optionally provided by operating system debug info packages.
+
+@item show filename-display executable-with-separate-debug-info
+Show the current way to display filenames coming from the inferior executable
+with separate debug info file.
+
+@item set filename-display libraries-with-separate-debug-info @{@dots{}@}
+Set how to display filenames coming from inferior shared libraries.  The shared
+libraries have to use separate debug info files as are usually found in shared
+libraries optionally provided by operating system debug info packages.
+
+@item show filename-display libraries-with-separate-debug-info
+Show the current way to display filenames coming from the inferior shared
+libraries with separate debug info file.
 @end table
 
 @node Selection
@@ -15953,6 +15991,7 @@ Program}).  In these situations the @value{GDBN} commands to specify
 new files are useful.
 
 @table @code
+@anchor{file command}
 @cindex executable file
 @kindex file
 @item file @var{filename}

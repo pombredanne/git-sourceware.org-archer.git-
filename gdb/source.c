@@ -2090,21 +2090,12 @@ set_filename_display_absolute_string (char *args, int from_tty)
 }
 
 /* Command "show filename-display" displays summary of all the current
-   "show filename-display " settings.  Display them by a single simplified line
-   if they are all set to the same value.  */
+   "show filename-display " settings.  */
 
 static void
 show_filename_display_cmd (char *args, int from_tty)
 {
-  if (filename_display_executable_string == filename_display_libraries_string
-      && (filename_display_executable_string
-	  == filename_display_executable_sepdebug_string)
-      && (filename_display_executable_string
-	  == filename_display_libraries_sepdebug_string))
-    fprintf_filtered (gdb_stdout, _("Filenames are displayed as \"%s\".\n"),
-		      filename_display_executable_string);
-  else
-    cmd_show_list (filename_display_show_cmdlist, from_tty, "");
+  cmd_show_list (filename_display_show_cmdlist, from_tty, "");
 }
 
 
@@ -2112,7 +2103,8 @@ void
 _initialize_source (void)
 {
   struct cmd_list_element *c;
-  const char *filename_display_doc, *doc;
+  const char *filename_display_doc;
+  char *doc;
 
   current_source_symtab = 0;
   init_source_path ();
@@ -2234,33 +2226,28 @@ By default, relative filenames are displayed."),
 
   doc = xstrprintf (_("\
 Set how to display filenames for all categories of files.\n\
-Use the following commands to set a more specific behavior:\n\
-  \"set filename-display \"executable\"\n\
-  \"set filename-display \"libraries\"\n\
-  \"set filename-display \"executable-with-separate-debug-info\"\n\
-  \"set filename-display \"libraries-with-separate-debug-info\"\n\
 %s"),
-		    filename_display_help);
+		    filename_display_doc);
   add_prefix_cmd ("filename-display", class_files, set_filename_display_cmd,
 		  doc, &filename_display_set_cmdlist, "set filename-display ",
 		  0/*allow-unknown*/, &setlist);
   xfree (doc);
 
+  doc = xstrprintf (_("\
+Show how to display filenames for all categories of files.\n\
+%s"),
+		    filename_display_doc);
   add_prefix_cmd ("filename-display", class_files, show_filename_display_cmd,
-		  _("\
-Show filename-displaying specific settings.\n\
-Show configuration of various filename-display-specific variables such as\n\
-automatic loading of Python scripts."),
-		  &filename_display_show_cmdlist, "show filename-display ",
+		  doc, &filename_display_show_cmdlist, "show filename-display ",
 		  0/*allow-unknown*/, &showlist);
+  xfree (doc);
 
   add_setshow_enum_cmd ("executable", class_files,
 			filename_display_kind_names,
 			&filename_display_executable_string, _("\
 Set how to display filenames in executable with embedded debug info."), _("\
-Show how to display filenames in executable with embedded debug info."), _("\
-FOO"),
-			NULL,
+Show how to display filenames in executable with embedded debug info."),
+			filename_display_doc, NULL,
 			show_filename_display_executable_string,
 			&filename_display_set_cmdlist,
 			&filename_display_show_cmdlist);
@@ -2268,10 +2255,9 @@ FOO"),
   add_setshow_enum_cmd ("libraries", class_files,
 			filename_display_kind_names,
 			&filename_display_libraries_string, _("\
-Set how to display filenames."), _("\
-Show how to display filenames."), _("\
-FOO"),
-			NULL,
+Set how to display filenames in libraries with embedded debug info."), _("\
+Show how to display filenames in libraries with embedded debug info."),
+			filename_display_doc, NULL,
 			show_filename_display_libraries_string,
 			&filename_display_set_cmdlist,
 			&filename_display_show_cmdlist);
@@ -2279,10 +2265,9 @@ FOO"),
   add_setshow_enum_cmd ("executable-with-separate-debug-info", class_files,
 			filename_display_kind_names,
 			&filename_display_executable_sepdebug_string, _("\
-Set how to display filenames."), _("\
-Show how to display filenames."), _("\
-FOO"),
-			NULL,
+Set how to display filenames in executable with separate debug info."), _("\
+Show how to display filenames in executable with separate debug info."),
+			filename_display_doc, NULL,
 			show_filename_display_executable_sepdebug_string,
 			&filename_display_set_cmdlist,
 			&filename_display_show_cmdlist);
@@ -2290,26 +2275,29 @@ FOO"),
   add_setshow_enum_cmd ("libraries-with-separate-debug-info", class_files,
 			filename_display_kind_names,
 			&filename_display_libraries_sepdebug_string, _("\
-Set how to display filenames."), _("\
-Show how to display filenames."), _("\
-FOO"),
-			NULL,
+Set how to display filenames in libraries with separate debug info."), _("\
+Show how to display filenames in libraries with separate debug info."),
+			filename_display_doc, NULL,
 			show_filename_display_libraries_sepdebug_string,
 			&filename_display_set_cmdlist,
 			&filename_display_show_cmdlist);
 
   add_cmd ("basename", class_files, set_filename_display_basename_string,
            _("\
-FOO"),
+Set displaying of filenames to basename for all categories of files.\n\
+See \"help set display-filename\" for other options of this setting."),
            &filename_display_set_cmdlist);
 
   add_cmd ("relative", class_files, set_filename_display_relative_string,
            _("\
-FOO"),
+Set displaying of filenames as relative for all categories of files.\n\
+Filename is displayed relative to the compilation directory\n\
+See \"help set display-filename\" for other options of this setting."),
            &filename_display_set_cmdlist);
 
   add_cmd ("absolute", class_files, set_filename_display_absolute_string,
            _("\
-FOO"),
+Set displaying of filenames as absolute for all categories of files.\n\
+See \"help set display-filename\" for other options of this setting."),
            &filename_display_set_cmdlist);
 }
