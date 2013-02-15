@@ -123,14 +123,23 @@ static const char *const filename_display_kind_names[] = {
   NULL
 };
 
+/* Setting for "set filename-display executable".  */
 static const char *filename_display_executable_string =
   filename_display_relative;
+
+/* Setting for "set filename-display libraries".  */
 static const char *filename_display_libraries_string =
   filename_display_relative;
+
+/* Setting for "set filename-display executable-with-separate-debug-info".  */
 static const char *filename_display_executable_sepdebug_string =
   filename_display_relative;
+
+/* Setting for "set filename-display libraries-with-separate-debug-info".  */
 static const char *filename_display_libraries_sepdebug_string =
   filename_display_relative;
+
+/* Implement command "show filename-display executable".  */
 
 static void
 show_filename_display_executable_string (struct ui_file *file, int from_tty,
@@ -142,6 +151,8 @@ show_filename_display_executable_string (struct ui_file *file, int from_tty,
 		    value);
 }
  
+/* Implement command "show filename-display libraries".  */
+
 static void
 show_filename_display_libraries_string (struct ui_file *file, int from_tty,
 					struct cmd_list_element *c,
@@ -151,6 +162,9 @@ show_filename_display_libraries_string (struct ui_file *file, int from_tty,
 			    "debug info are displayed as \"%s\".\n"),
 		    value);
 }
+
+/* Implement command
+   "show filename-display executable-with-separate-debug-info".  */
 
 static void
 show_filename_display_executable_sepdebug_string (struct ui_file *file,
@@ -163,6 +177,9 @@ show_filename_display_executable_sepdebug_string (struct ui_file *file,
 		    value);
 }
  
+/* Implement command
+   "show filename-display libraries-with-separate-debug-info".  */
+
 static void
 show_filename_display_libraries_sepdebug_string (struct ui_file *file,
 						 int from_tty,
@@ -2009,19 +2026,25 @@ set_substitute_path_command (char *args, int from_tty)
   forget_cached_source_info ();
 }
 
+/* The list of commands prefixed by "set filename-display".  */
 static struct cmd_list_element *filename_display_set_cmdlist;
+
+/* The list of commands prefixed by "show filename-display".  */
 static struct cmd_list_element *filename_display_show_cmdlist;
 
-/* The only valid "set filename-display" argument is off|0|no|disable.  */
+/* Implement command "set filename-display" itself.  */
 
 static void
 set_filename_display_cmd (char *args, int from_tty)
 {
-  error (_("Global value \"basename\", \"relative\" or \"absolute\" expected.\n"
+  error (_("Value \"basename\", \"relative\" or \"absolute\" set for all "
+           "sub-categories expected.\n"
 	   "More specific category \"executable\", \"libraries\", "
 	   "\"executable-with-separate-debug-info\" or "
 	   "\"libraries-with-separate-debug-info\" may be also specified."));
 }
+
+/* Set all sub-values of the "set filename-display" setting to KIND.  */
 
 static void
 set_filename_display_1 (const char *kind, int from_tty)
@@ -2033,6 +2056,8 @@ set_filename_display_1 (const char *kind, int from_tty)
       do_set_command ((char *) kind, from_tty, list);
 }
 
+/* Implement command "set filename-display basename".  */
+
 static void
 set_filename_display_basename_string (char *args, int from_tty)
 {
@@ -2042,6 +2067,8 @@ set_filename_display_basename_string (char *args, int from_tty)
   set_filename_display_1 ("basename", from_tty);
 }
 
+/* Implement command "set filename-display relative".  */
+
 static void
 set_filename_display_relative_string (char *args, int from_tty)
 {
@@ -2050,6 +2077,8 @@ set_filename_display_relative_string (char *args, int from_tty)
 
   set_filename_display_1 ("relative", from_tty);
 }
+
+/* Implement command "set filename-display absolute".  */
 
 static void
 set_filename_display_absolute_string (char *args, int from_tty)
@@ -2061,7 +2090,8 @@ set_filename_display_absolute_string (char *args, int from_tty)
 }
 
 /* Command "show filename-display" displays summary of all the current
-   "show filename-display " settings.  */
+   "show filename-display " settings.  Display them by a single simplified line
+   if they are all set to the same value.  */
 
 static void
 show_filename_display_cmd (char *args, int from_tty)
@@ -2082,6 +2112,7 @@ void
 _initialize_source (void)
 {
   struct cmd_list_element *c;
+  const char *filename_display_doc, *doc;
 
   current_source_symtab = 0;
   init_source_path ();
@@ -2194,14 +2225,29 @@ Print the rule for substituting FROM in source file names. If FROM\n\
 is not specified, print all substitution rules."),
            &showlist);
 
-  add_prefix_cmd ("filename-display", class_maintenance, set_filename_display_cmd, _("\
-Auto-loading specific settings.\n\
-Configure various filename-display-specific variables such as\n\
-automatic loading of Python scripts."),
-		  &filename_display_set_cmdlist, "set filename-display ",
-		  1/*allow-unknown*/, &setlist);
+  filename_display_doc = _("\
+filename-display can be:\n\
+  basename - display only basename of a filename\n\
+  relative - display a filename relative to the compilation directory\n\
+  absolute - display an absolute filename\n\
+By default, relative filenames are displayed."),
 
-  add_prefix_cmd ("filename-display", class_maintenance, show_filename_display_cmd, _("\
+  doc = xstrprintf (_("\
+Set how to display filenames for all categories of files.\n\
+Use the following commands to set a more specific behavior:\n\
+  \"set filename-display \"executable\"\n\
+  \"set filename-display \"libraries\"\n\
+  \"set filename-display \"executable-with-separate-debug-info\"\n\
+  \"set filename-display \"libraries-with-separate-debug-info\"\n\
+%s"),
+		    filename_display_help);
+  add_prefix_cmd ("filename-display", class_files, set_filename_display_cmd,
+		  doc, &filename_display_set_cmdlist, "set filename-display ",
+		  0/*allow-unknown*/, &setlist);
+  xfree (doc);
+
+  add_prefix_cmd ("filename-display", class_files, show_filename_display_cmd,
+		  _("\
 Show filename-displaying specific settings.\n\
 Show configuration of various filename-display-specific variables such as\n\
 automatic loading of Python scripts."),
@@ -2211,8 +2257,8 @@ automatic loading of Python scripts."),
   add_setshow_enum_cmd ("executable", class_files,
 			filename_display_kind_names,
 			&filename_display_executable_string, _("\
-Set how to display filenames."), _("\
-Show how to display filenames."), _("\
+Set how to display filenames in executable with embedded debug info."), _("\
+Show how to display filenames in executable with embedded debug info."), _("\
 FOO"),
 			NULL,
 			show_filename_display_executable_string,
