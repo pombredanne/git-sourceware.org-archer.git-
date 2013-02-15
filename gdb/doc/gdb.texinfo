@@ -6535,6 +6535,24 @@ unlimited.
 Display the current limit on backtrace levels.
 @end table
 
+You can control how file names are displayed.
+
+@table @code
+@item set filename-display
+@itemx set filename-display relative
+@cindex filename-display
+Display file names relative to the compilation directory.  This is the default.
+
+@item set filename-display basename
+Display only basename of a filename.
+
+@item set filename-display absolute
+Display an absolute filename.
+
+@item show filename-display
+Show the current way to display filenames.
+@end table
+
 @node Selection
 @section Selecting a Frame
 
@@ -7354,6 +7372,11 @@ Dump of assembler code from 0x400281 to 0x40028b:
    0x0000000000400289:  2e 32 00       xor    %cs:(%rax),%al
 End of assembler dump.
 @end smallexample
+
+Addresses cannot be specified as a linespec (@pxref{Specify Location}).
+So, for example, if you want to disassemble function @code{bar}
+in file @file{foo.c}, you must type @samp{disassemble 'foo.c'::bar}
+and not @samp{disassemble foo.c:bar}.
 
 Some architectures have more than one commonly-used set of instruction
 mnemonics or other syntax.
@@ -17169,7 +17192,7 @@ you must know the actual BFD name.
 Use the @code{show gnutarget} command to display what file format
 @code{gnutarget} is set to read.  If you have not set @code{gnutarget},
 @value{GDBN} will determine the file format for each file automatically,
-and @code{show gnutarget} displays @samp{The current BDF target is "auto"}.
+and @code{show gnutarget} displays @samp{The current BFD target is "auto"}.
 @end table
 
 @cindex common targets
@@ -20675,6 +20698,7 @@ This section describes characteristics of architectures that affect
 all uses of @value{GDBN} with the architecture, both native and cross.
 
 @menu
+* AArch64::
 * i386::
 * Alpha::
 * MIPS::
@@ -20682,6 +20706,24 @@ all uses of @value{GDBN} with the architecture, both native and cross.
 * SPU::                Cell Broadband Engine SPU architecture
 * PowerPC::
 @end menu
+
+@node AArch64
+@subsection AArch64
+@cindex AArch64 support
+
+When @value{GDBN} is debugging the AArch64 architecture, it provides the
+following special commands:
+
+@table @code
+@item set debug aarch64
+@kindex set debug aarch64
+This command determines whether AArch64 architecture-specific debugging
+messages are to be displayed.
+
+@item show debug aarch64
+Show whether AArch64 debugging messages are displayed.
+
+@end table
 
 @node i386
 @subsection x86 Architecture-specific Issues
@@ -21312,6 +21354,7 @@ current ABI.
 @cindex OS ABI
 @kindex set osabi
 @kindex show osabi
+@cindex Newlib OS ABI and its influence on the longjmp handling
 
 One @value{GDBN} configuration can debug binaries for multiple operating
 system targets, either via remote debugging or native emulation.
@@ -21321,6 +21364,11 @@ One example where this is useful is in debugging of binaries which use
 an alternate C library (e.g.@: @sc{uClibc} for @sc{gnu}/Linux) which does
 not have the same identifying marks that the standard C library for your
 platform provides.
+
+When @value{GDBN} is debugging the AArch64 architecture, it provides a
+``Newlib'' OS ABI.  This is useful for handling @code{setjmp} and
+@code{longjmp} when debugging binaries that use the @sc{newlib} C library.
+The ``Newlib'' OS ABI can be selected by @code{set osabi Newlib}.
 
 @table @code
 @item show osabi
@@ -22807,6 +22855,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Finish Breakpoints in Python:: Setting Breakpoints on function return
                                 using Python.
 * Lazy Strings In Python::      Python representation of lazy strings.
+* Architectures In Python::     Python representation of architectures.
 @end menu
 
 @node Basic Python
@@ -25110,6 +25159,11 @@ Returns the function name of the frame, or @code{None} if it can't be
 obtained.
 @end defun
 
+@defun Frame.architecture ()
+Returns the @code{gdb.Architecture} object corresponding to the frame's
+architecture.  @xref{Architectures In Python}.
+@end defun
+
 @defun Frame.type ()
 Returns the type of the frame.  The value can be one of:
 @table @code
@@ -25971,6 +26025,20 @@ resolve this to the lazy string's character type, use the type's
 @code{target} method.  @xref{Types In Python}.  This attribute is not
 writable.
 @end defvar
+
+@node Architectures In Python
+@subsubsection Python representation of architectures
+@cindex Python architectures
+
+@value{GDBN} uses architecture specific parameters and artifacts in a
+number of its various computations.  An architecture is represented
+by an instance of the @code{gdb.Architecture} class.
+
+A @code{gdb.Architecture} class has the following methods:
+
+@defun Architecture.name ()
+Return the name (string value) of the architecture.
+@end defun
 
 @node Python Auto-loading
 @subsection Python Auto-loading
@@ -27925,14 +27993,20 @@ Reports that the trace frame was changed and its new number is
 @var{tfnum}.  The number of the tracepoint associated with this trace
 frame is @var{tpnum}.
 
-@item =tsv-created,name=@var{name},value=@var{value}
+@item =tsv-created,name=@var{name},initial=@var{initial}
 Reports that the new trace state variable @var{name} is created with
-value @var{value}.
+initial value @var{initial}.
 
 @item =tsv-deleted,name=@var{name}
 @itemx =tsv-deleted
 Reports that the trace state variable @var{name} is deleted or all
 trace state variables are deleted.
+
+@item =tsv-modified,name=@var{name},initial=@var{initial}[,current=@var{current}]
+Reports that the trace state variable @var{name} is modified with
+the initial value @var{initial}. The current value @var{current} of
+trace state variable is optional and is reported if the current
+value of trace state variable is known.
 
 @item =breakpoint-created,bkpt=@{...@}
 @itemx =breakpoint-modified,bkpt=@{...@}
@@ -28089,7 +28163,8 @@ For example, here is what the output of @code{-break-insert}
 -> -break-insert main
 <- ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
     enabled="y",addr="0x08048564",func="main",file="myprog.c",
-    fullname="/home/nickrob/myprog.c",line="68",times="0"@}
+    fullname="/home/nickrob/myprog.c",line="68",thread-groups=["i1"],
+    times="0"@}
 <- (gdb)
 @end smallexample
 
@@ -28184,7 +28259,8 @@ information of the breakpoint.
 -> -break-insert main
 <- ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
     enabled="y",addr="0x08048564",func="main",file="myprog.c",
-    fullname="/home/nickrob/myprog.c",line="68",times="0"@}
+    fullname="/home/nickrob/myprog.c",line="68",thread-groups=["i1"],
+    times="0"@}
 <- (gdb)
 @end smallexample
 
@@ -28308,7 +28384,8 @@ The corresponding @value{GDBN} command is @samp{ignore}.
 -break-insert main
 ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
 enabled="y",addr="0x000100d0",func="main",file="hello.c",
-fullname="/home/foo/hello.c",line="5",times="0"@}
+fullname="/home/foo/hello.c",line="5",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-after 1 3
 ~
@@ -28324,7 +28401,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",times="0",ignore="3"@}]@}
+line="5",thread-groups=["i1"],times="0",ignore="3"@}]@}
 (gdb)
 @end smallexample
 
@@ -28360,7 +28437,8 @@ The corresponding @value{GDBN} command is @samp{commands}.
 -break-insert main
 ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
 enabled="y",addr="0x000100d0",func="main",file="hello.c",
-fullname="/home/foo/hello.c",line="5",times="0"@}
+fullname="/home/foo/hello.c",line="5",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-commands 1 "print v" "continue"
 ^done
@@ -28402,7 +28480,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",cond="1",times="0",ignore="3"@}]@}
+line="5",cond="1",thread-groups=["i1"],times="0",ignore="3"@}]@}
 (gdb)
 @end smallexample
 
@@ -28474,7 +28552,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="2",type="breakpoint",disp="keep",enabled="n",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",times="0"@}]@}
+line="5",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 @end smallexample
 
@@ -28510,7 +28588,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="2",type="breakpoint",disp="keep",enabled="y",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",times="0"@}]@}
+line="5",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 @end smallexample
 
@@ -28606,11 +28684,13 @@ The corresponding @value{GDBN} commands are @samp{break}, @samp{tbreak},
 (gdb)
 -break-insert main
 ^done,bkpt=@{number="1",addr="0x0001072c",file="recursive2.c",
-fullname="/home/foo/recursive2.c,line="4",times="0"@}
+fullname="/home/foo/recursive2.c,line="4",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-insert -t foo
 ^done,bkpt=@{number="2",addr="0x00010774",file="recursive2.c",
-fullname="/home/foo/recursive2.c,line="11",times="0"@}
+fullname="/home/foo/recursive2.c,line="11",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-list
 ^done,BreakpointTable=@{nr_rows="2",nr_cols="6",
@@ -28622,15 +28702,18 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x0001072c", func="main",file="recursive2.c",
-fullname="/home/foo/recursive2.c,"line="4",times="0"@},
+fullname="/home/foo/recursive2.c,"line="4",thread-groups=["i1"],
+times="0"@},
 bkpt=@{number="2",type="breakpoint",disp="del",enabled="y",
 addr="0x00010774",func="foo",file="recursive2.c",
-fullname="/home/foo/recursive2.c",line="11",times="0"@}]@}
+fullname="/home/foo/recursive2.c",line="11",thread-groups=["i1"],
+times="0"@}]@}
 (gdb)
 @c -break-insert -r foo.*
 @c ~int foo(int, int);
 @c ^done,bkpt=@{number="3",addr="0x00010774",file="recursive2.c,
-@c "fullname="/home/foo/recursive2.c",line="11",times="0"@}
+@c "fullname="/home/foo/recursive2.c",line="11",thread-groups=["i1"],
+@c times="0"@}
 @c (gdb)
 @end smallexample
 
@@ -28660,6 +28743,8 @@ memory location at which the breakpoint is set
 @item What
 logical location of the breakpoint, expressed by function name, file
 name, line number
+@item Thread-groups
+list of thread groups to which this breakpoint applies
 @item Times
 number of times the breakpoint has been hit
 @end table
@@ -28684,10 +28769,11 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="10",alignment="-1",col_name="addr",colhdr="Address"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
-addr="0x000100d0",func="main",file="hello.c",line="5",times="0"@},
+addr="0x000100d0",func="main",file="hello.c",line="5",thread-groups=["i1"],
+times="0"@},
 bkpt=@{number="2",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010114",func="foo",file="hello.c",fullname="/home/foo/hello.c",
-line="13",times="0"@}]@}
+line="13",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 @end smallexample
 
@@ -28815,9 +28901,10 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010734",func="callee4",
 file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
-fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c"line="8",times="1"@},
+fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c"line="8",thread-groups=["i1"],
+times="1"@},
 bkpt=@{number="2",type="watchpoint",disp="keep",
-enabled="y",addr="",what="C",times="0"@}]@}
+enabled="y",addr="",what="C",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 -exec-continue
 ^running
@@ -28839,9 +28926,10 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010734",func="callee4",
 file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
-fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",times="1"@},
+fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",thread-groups=["i1"],
+times="1"@},
 bkpt=@{number="2",type="watchpoint",disp="keep",
-enabled="y",addr="",what="C",times="-5"@}]@}
+enabled="y",addr="",what="C",thread-groups=["i1"],times="-5"@}]@}
 (gdb)
 -exec-continue
 ^running
@@ -28863,7 +28951,7 @@ body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010734",func="callee4",
 file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
 fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",
-times="1"@}]@}
+thread-groups=["i1"],times="1"@}]@}
 (gdb)
 @end smallexample
 
@@ -32006,6 +32094,10 @@ The value of the disconnected tracing flag.  @code{1} means that
 tracing will continue after @value{GDBN} disconnects, @code{0} means
 that the trace run will stop.
 
+@item trace-file
+The filename of the trace file being examined.  This field is
+optional, and only present when examining a trace file.
+
 @end table
 
 @subsubheading @value{GDBN} Command
@@ -33460,7 +33552,8 @@ No equivalent.
 -break-insert main
 ^done,bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x080484ed",func="main",file="myprog.c",
-fullname="/home/nickrob/myprog.c",line="73",times="0"@},
+fullname="/home/nickrob/myprog.c",line="73",thread-groups=["i1"],
+times="0"@},
 time=@{wallclock="0.05185",user="0.00800",system="0.00000"@}
 (gdb)
 -enable-timings no
@@ -40717,6 +40810,7 @@ of recognizing standard features, but @value{GDBN} will only display
 registers using the capitalization used in the description.
 
 @menu
+* AArch64 Features::
 * ARM Features::
 * i386 Features::
 * MIPS Features::
@@ -40725,6 +40819,18 @@ registers using the capitalization used in the description.
 * TIC6x Features::
 @end menu
 
+
+@node AArch64 Features
+@subsection AArch64 Features
+@cindex target descriptions, AArch64 features
+
+The @samp{org.gnu.gdb.aarch64.core} feature is required for AArch64
+targets.  It should contain registers @samp{x0} through @samp{x30},
+@samp{sp}, @samp{pc}, and @samp{cpsr}.
+
+The @samp{org.gnu.gdb.aarch64.fpu} feature is optional.  If present,
+it should contain registers @samp{v0} through @samp{v31}, @samp{fpsr},
+and @samp{fpcr}.
 
 @node ARM Features
 @subsection ARM Features
@@ -41035,12 +41141,18 @@ unless otherwise noted:
 
 @enumerate
 @item
-The version number, currently 7.  Versions 1, 2 and 3 are obsolete.
+The version number, currently 8.  Versions 1, 2 and 3 are obsolete.
 Version 4 uses a different hashing function from versions 5 and 6.
 Version 6 includes symbols for inlined functions, whereas versions 4
 and 5 do not.  Version 7 adds attributes to the CU indices in the
-symbol table.  @value{GDBN} will only read version 4, 5, or 6 indices
+symbol table.  Version 8 specifies that symbols from DWARF type units
+(@samp{DW_TAG_type_unit}) refer to the type unit's symbol table and not the
+compilation unit (@samp{DW_TAG_comp_unit}) using the type.
+
+@value{GDBN} will only read version 4, 5, or 6 indices
 by specifying @code{set use-deprecated-index-sections on}.
+GDB has a workaround for potentially broken version 7 indices so it is
+currently not flagged as deprecated.
 
 @item
 The offset, from the start of the file, of the CU list.

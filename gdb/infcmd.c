@@ -137,11 +137,6 @@ ptid_t inferior_ptid;
 
 CORE_ADDR stop_pc;
 
-/* Flag indicating that a command has proceeded the inferior past the
-   current breakpoint.  */
-
-int breakpoint_proceeded;
-
 /* Nonzero if stopped due to completion of a stack dummy routine.  */
 
 enum stop_stack_kind stop_stack_dummy;
@@ -1450,7 +1445,6 @@ get_return_value (struct value *function, struct type *value_type)
   struct regcache *stop_regs = stop_registers;
   struct gdbarch *gdbarch;
   struct value *value;
-  struct ui_out *uiout = current_uiout;
   struct cleanup *cleanup = make_cleanup (null_cleanup, NULL);
 
   /* If stop_registers were not saved, use the current registers.  */

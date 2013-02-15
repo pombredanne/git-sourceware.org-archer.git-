@@ -151,56 +151,6 @@ static VEC (sym_fns_ptr) *symtab_fns = NULL;
 int auto_solib_add = 1;
 
 
-/* Make a null terminated copy of the string at PTR with SIZE characters in
-   the obstack pointed to by OBSTACKP .  Returns the address of the copy.
-   Note that the string at PTR does not have to be null terminated, I.e. it
-   may be part of a larger string and we are only saving a substring.  */
-
-char *
-obsavestring (const char *ptr, int size, struct obstack *obstackp)
-{
-  char *p = (char *) obstack_alloc (obstackp, size + 1);
-  /* Open-coded memcpy--saves function call time.  These strings are usually
-     short.  FIXME: Is this really still true with a compiler that can
-     inline memcpy?  */
-  {
-    const char *p1 = ptr;
-    char *p2 = p;
-    const char *end = ptr + size;
-
-    while (p1 != end)
-      *p2++ = *p1++;
-  }
-  p[size] = 0;
-  return p;
-}
-
-/* Concatenate NULL terminated variable argument list of `const char *'
-   strings; return the new string.  Space is found in the OBSTACKP.
-   Argument list must be terminated by a sentinel expression `(char *)
-   NULL'.  */
-
-char *
-obconcat (struct obstack *obstackp, ...)
-{
-  va_list ap;
-
-  va_start (ap, obstackp);
-  for (;;)
-    {
-      const char *s = va_arg (ap, const char *);
-
-      if (s == NULL)
-	break;
-
-      obstack_grow_str (obstackp, s);
-    }
-  va_end (ap);
-  obstack_1grow (obstackp, 0);
-
-  return obstack_finish (obstackp);
-}
-
 /* True if we are reading a symbol table.  */
 
 int currently_reading_symtab = 0;
@@ -873,7 +823,12 @@ static void
 read_symbols (struct objfile *objfile, int add_flags)
 {
   (*objfile->sf->sym_read) (objfile, add_flags);
-  if (!objfile_has_partial_symbols (objfile))
+
+  /* find_separate_debug_file_in_section should be called only if there is
+     single binary with no existing separate debug info file.  */
+  if (!objfile_has_partial_symbols (objfile)
+      && objfile->separate_debug_objfile == NULL
+      && objfile->separate_debug_objfile_backlink == NULL)
     {
       bfd *abfd = find_separate_debug_file_in_section (objfile);
       struct cleanup *cleanup = make_cleanup_bfd_unref (abfd);
@@ -1408,7 +1363,7 @@ get_file_crc (bfd *abfd, unsigned long *file_crc_return)
 	}
       if (count == 0)
 	break;
-      file_crc = gnu_debuglink_crc32 (file_crc, buffer, count);
+      file_crc = bfd_calc_gnu_debuglink_crc32 (file_crc, buffer, count);
     }
 
   *file_crc_return = file_crc;

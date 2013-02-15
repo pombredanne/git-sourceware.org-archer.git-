@@ -1,3 +1,252 @@
+2013-02-15  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* gdb.trace/tfile.exp: Add test for -trace-status command.
+
+2013-02-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/pthread_cond_wait.c (main): Remove variable ts.  Replace
+	nanosleep by sleep.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* gdb.cp/userdef.exp (ptype &*c): Don't expect an &.
+
+2013-02-14  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* gdb.trace/tsv.exp: Adjust tests, and add a few more.
+
+2013-02-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/m-static.cc (gnu_obj_1::~gnu_obj_1): New destructor.
+	* gdb.cp/m-static.exp: Add tests to print quoted destructor.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/catch-signal.c: Update copyright years.
+	* gdb.base/catch-signal.exp: Update copyright years.
+	* gdb.dwarf2/dw2-dir-file-name.c: Update copyright years.
+	* gdb.dwarf2/dw2-dir-file-name.exp: Update copyright years.
+	* gdb.dwarf2/dw2-empty-pc-range.S: Update copyright years.
+	* gdb.dwarf2/dw2-error.S: Update copyright years.
+	* gdb.dwarf2/dw2-error.c: Update copyright years.
+	* gdb.dwarf2/dw2-restrict.S: Update copyright years.
+	* gdb.dwarf2/dw2-restrict.c: Update copyright years.
+	* gdb.dwarf2/dw2-restrict.exp: Update copyright years.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/catch-signal.exp: Correct test file name in "Skipping"
+	message.
+	* gdb.base/sigaltstack.exp: Ditto.
+	* gdb.base/siginfo.exp: Ditto.
+	* gdb.base/sizeof.exp: Ditto.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* gdb.mi/mi-basics.exp: Tweak intro comment.
+	* gdb.mi/mi-break.exp: Tweak intro comment.
+	* gdb.mi/mi-console.exp: Tweak intro comment.
+	* gdb.mi/mi-file.exp: Tweak intro comment.
+	* gdb.mi/mi-read-memory.exp: Tweak intro comment.
+	* gdb.mi/mi-return.exp: Tweak intro comment.
+	* gdb.mi/mi-stepi.exp: Tweak intro comment.
+	* gdb.mi/mi-until.exp: Tweak intro comment.
+	* gdb.mi/mi-watch.exp: Tweak intro comment.
+
+2013-02-12  Sanimir Agovic  <sanimir.agovic@intel.com>
+
+	* gdb.server/no-thread-db.exp: New file.
+	* gdb.server/no-thread-db.c: New file.
+	* gdb.server/Makefile.in (EXECUTABLES): Add no-thread-db.
+
+2013-02-11  Doug Evans  <dje@google.com>
+
+	* gdb.base/printcmds.exp (test_printf_with_dfp): Add test for printing
+	two decfloats.
+
+2013-02-11  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb.base/bitfields.c (struct internalvartest): New declaration.
+	* gdb.base/bitfields.exp (bitfield_internalvar): New function.
+
+2013-02-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/py-prompt.exp: Add to the end a kill of $testpid.
+
+2013-02-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/mi-tsv-changed.exp (test_create_delete_tsv): Rename
+	to ...
+	(test_create_delete_modify_tsv): ... here.  New test on modifying
+	the initial value of a tsv.
+
+2013-02-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-dir-file-name.exp (cd ${srcabsdir}/rdir): Rename to ...
+	(cd .../rdir): ... here.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.linespec/base/one/header.h: New file.
+	* gdb.linespec/base/two/header.h: New file.
+	* gdb.linespec/macro-relative.c: New file.
+	* gdb.linespec/macro-relative.exp: New file.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/fullpath-expand-func.c: New file.
+	* gdb.base/fullpath-expand.c: New file.
+	* gdb.base/fullpath-expand.exp: New file.
+	* gdb.base/realname-expand-real.c: New file.
+	* gdb.base/realname-expand.c: New file.
+	* gdb.base/realname-expand.exp: New file.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-dir-file-name.exp: New file.
+	* gdb.dwarf2/dw2-dir-file-name.c: New file.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.mi/mi-fullname-deleted.exp: Use double last slash for $srcfileabs.
+	(compare_filenames_for_search does not match)
+	(compare_filenames_for_search does match): New tests.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.gdb/xfullpath.exp: Replace xfullpath calls by gdb_realpath calls.
+
+2013-02-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* lib/java.exp (compile_java_from_source): Initialize ARGS as a list.
+
+2013-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/gnu-debugdata.exp): Create ${binfile}.debug,
+	${binfile}.mini_debuginfo-debuglink, add -k to xz, use now
+	${binfile}.mini_debuginfo-debuglink and
+	${binfile}.mini_debuginfo-debuglink.xz.
+
+2013-02-01  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/method-ptr.exp: Use correct form for non-string
+	attributes.
+
+2013-02-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/method-ptr.exp: Link with c++.
+	* lib/dwarf.exp (Dwarf::assemble): Declare _cu_count.
+
+2013-01-31  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/jit.exp (compile_jit_test): New proc.
+	Add PIE tests.
+
+2013-01-31  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/method-ptr.cc: New file.
+	* gdb.dwarf2/method-ptr.exp: New file.
+
+2013-01-31  Tom Tromey  <tromey@redhat.com>
+
+	* lib/dwarf.exp (namespace Dwarf): New.
+
+2013-01-29  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/fission-reread.exp: Add unload test.
+
+2013-01-28  Doug Evans  <dje@google.com>
+
+	* gdb.dwarf2/fission-loclists.exp: New file.
+	* gdb.dwarf2/fission-loclists.S: New file.
+
+2013-01-26  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* gdb.base/restore.exp: Replace gdb_compile, gdb_exit, gdb_start,
+	gdb_reinitialize_dir and gdb_load by standard_testfile, set executable
+	and prepare_for_testing.
+	* gdb.base/store.exp: Likewise.
+
+2013-01-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.python/py-explore.exp: Expect the gdb prompt.
+
+2013-01-25  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.base/gnu_vector.c: New variable for use in tests.
+	* gdb.base/gnu_vector.exp: Update and extend tests to reflect
+	changes in scalar to vector casting and widening.
+	* gdb.python/py-type.c: New variables for use in tests.
+	* gdb.python/py-type.exp: Update vector related tests to reflect
+	changes in scalar to vector casting and widening.
+
+2013-01-24  Tiago Stürmer Daitx  <tdaitx@linux.vnet.ibm.com>
+
+	* gdb.base/prologue-include.c: New file.
+	* gdb.base/prologue-include.exp: New file.
+	* gdb.base/prologue-include.h: New file.
+
+2013-01-24  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	PR gdb/13443
+	* gdb.mi/mi-var-block.exp: Make test messages unique.
+
+2013-01-23  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/dw2-error.exp: Pass test name to "file" test.
+
+2013-01-23  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/converts.cc (main): Initialize 'a'.
+
+2013-01-23  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* testsuite/gdb.python/frame.exp: Add a test for
+	gdb.Frame.architecture() method.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/annota1.exp (signal sent): No longer expect
+	breakpoints-invalid.
+	* gdb.cp/annota2.exp (continue until exit)
+	(watch triggered on a.x): Ditto.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/annota1.exp (breakpoints_invalid): New variable.
+	Adjust tests to breakpoints-invalid changes.
+	* gdb.cp/annota2.exp (breakpoints_invalid, frames_invalid): New
+	variables.
+	Adjust tests to breakpoints-invalid changes.
+
+2013-01-22  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/annota1.exp (annotate ignore count change): Add
+	expected output for failure case.
+
+2013-01-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.gdb/selftest.exp (do_steps_and_nexts): Handle bfd_init
+	call.
+
+2013-01-21  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* gdb.mi/mi-break.exp: Expect new 'thread-groups' field.
+	* gdb.mi/mi-catch-load.exp: Ditto.
+	* gdb.mi/mi-nsmoribund.exp: Expect new 'thread-groups' field.
+	Also handle 'thread' field.
+	* gdb.mi/mi-simplerun.exp: Expect new 'thread-groups' field.
+	* gdb.mi/mi-watch.exp: Ditto.
+	* lib/mi-support.exp: Ditto.
+
+2013-01-21  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* gdb.python/py-explore.exp: Improve a test
+
 2013-01-18  David Blaikie  <dblaikie@gmail.com>
 
 	* gdb.base/label.c (main): Correct the type of the second
@@ -10,9 +259,9 @@
 
 2013-01-18  Hafiz Abid Qadeer<abidh@codesourcery.com>
 
-        PR gdb/13443
-        * gdb.base/checkpoint.exp: Update test messages to make them
-        unique.
+	PR gdb/13443
+	* gdb.base/checkpoint.exp: Update test messages to make them
+	unique.
 
 2013-01-18  Yao Qi  <yao@codesourcery.com>
 
@@ -44,13 +293,13 @@
 	Merge dg-extract-results.sh from upstream (svn 195224).
 
 	2013-01-15  David Blaikie <dblaikie@gmail.com>
-    	* dg-extract-results.sh: Fix order of summary counts.
+	* dg-extract-results.sh: Fix order of summary counts.
 
 	2013-01-15  David Blaikie <dblaikie@gmail.com>
-    	* dg-extract-results.sh: Constrain the start-of-log pattern.
+	* dg-extract-results.sh: Constrain the start-of-log pattern.
 
 	2013-01-15  David Blaikie <dblaikie@gmail.com>
-    	* dg-extract-results.sh: Handle KPASSes.
+	* dg-extract-results.sh: Handle KPASSes.
 
 	2010-05-25  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
 	* dg-extract-results.sh: Redirect grep output to /dev/null instead
@@ -198,7 +447,7 @@
 
 2012-12-14  Tom Tromey  <tromey@redhat.com>
 
-        * gdb.base/info-proc.exp: Add core file tests.
+	* gdb.base/info-proc.exp: Add core file tests.
 
 2012-12-14  Yufeng Zhang  <yufeng.zhang@arm.com>
 

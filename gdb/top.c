@@ -1716,6 +1716,7 @@ gdb_init (char *argv0)
   initialize_inferiors ();
   initialize_current_architecture ();
   init_cli_cmds();
+  initialize_event_loop ();
   init_main ();			/* But that omits this file!  Do it now.  */
 
   initialize_stdin_serial ();

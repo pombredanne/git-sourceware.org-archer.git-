@@ -124,8 +124,6 @@ extern struct cleanup *make_bpstat_clear_actions_cleanup (void);
 
 extern char *gdb_realpath (const char *);
 
-extern char *xfullpath (const char *);
-
 extern int gdb_filename_fnmatch (const char *pattern, const char *string,
 				 int flags);
 
@@ -342,9 +340,6 @@ extern pid_t wait_to_die_with_timeout (pid_t pid, int *status, int timeout);
 #endif
 
 extern int producer_is_gcc_ge_4 (const char *producer);
-
-extern unsigned long gnu_debuglink_crc32 (unsigned long crc,
-                                          unsigned char *buf, size_t len);
 
 extern int myread (int, char *, int);
 

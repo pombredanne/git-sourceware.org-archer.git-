@@ -311,7 +311,7 @@ set_traceframe_context (struct frame_info *trace_frame)
     clear_internalvar (lookup_internalvar ("trace_file"));
   else
     set_internalvar_string (lookup_internalvar ("trace_file"),
-			    traceframe_sal.symtab->filename);
+			symtab_to_filename_for_display (traceframe_sal.symtab));
 }
 
 /* Create a new trace state variable with the given name.  */
@@ -351,15 +351,39 @@ delete_trace_state_variable (const char *name)
   for (ix = 0; VEC_iterate (tsv_s, tvariables, ix, tsv); ++ix)
     if (strcmp (name, tsv->name) == 0)
       {
+	observer_notify_tsv_deleted (tsv);
+
 	xfree ((void *)tsv->name);
 	VEC_unordered_remove (tsv_s, tvariables, ix);
-
-	observer_notify_tsv_deleted (name);
 
 	return;
       }
 
   warning (_("No trace variable named \"$%s\", not deleting"), name);
+}
+
+/* Throws an error if NAME is not valid syntax for a trace state
+   variable's name.  */
+
+void
+validate_trace_state_variable_name (const char *name)
+{
+  const char *p;
+
+  if (*name == '\0')
+    error (_("Must supply a non-empty variable name"));
+
+  /* All digits in the name is reserved for value history
+     references.  */
+  for (p = name; isdigit (*p); p++)
+    ;
+  if (*p == '\0')
+    error (_("$%s is not a valid trace state variable name"), name);
+
+  for (p = name; isalnum (*p) || *p == '_'; p++)
+    ;
+  if (*p != '\0')
+    error (_("$%s is not a valid trace state variable name"), name);
 }
 
 /* The 'tvariable' command collects a name and optional expression to
@@ -368,47 +392,44 @@ delete_trace_state_variable (const char *name)
 static void
 trace_variable_command (char *args, int from_tty)
 {
-  struct expression *expr;
   struct cleanup *old_chain;
-  struct internalvar *intvar = NULL;
   LONGEST initval = 0;
   struct trace_state_variable *tsv;
+  char *name, *p;
 
   if (!args || !*args)
-    error_no_arg (_("trace state variable name"));
-
-  /* All the possible valid arguments are expressions.  */
-  expr = parse_expression (args);
-  old_chain = make_cleanup (free_current_contents, &expr);
-
-  if (expr->nelts == 0)
-    error (_("No expression?"));
+    error_no_arg (_("Syntax is $NAME [ = EXPR ]"));
 
   /* Only allow two syntaxes; "$name" and "$name=value".  */
-  if (expr->elts[0].opcode == OP_INTERNALVAR)
-    {
-      intvar = expr->elts[1].internalvar;
-    }
-  else if (expr->elts[0].opcode == BINOP_ASSIGN
-	   && expr->elts[1].opcode == OP_INTERNALVAR)
-    {
-      intvar = expr->elts[2].internalvar;
-      initval = value_as_long (evaluate_subexpression_type (expr, 4));
-    }
-  else
+  p = skip_spaces (args);
+
+  if (*p++ != '$')
+    error (_("Name of trace variable should start with '$'"));
+
+  name = p;
+  while (isalnum (*p) || *p == '_')
+    p++;
+  name = savestring (name, p - name);
+  old_chain = make_cleanup (xfree, name);
+
+  p = skip_spaces (p);
+  if (*p != '=' && *p != '\0')
     error (_("Syntax must be $NAME [ = EXPR ]"));
 
-  if (!intvar)
-    error (_("No name given"));
+  validate_trace_state_variable_name (name);
 
-  if (strlen (internalvar_name (intvar)) <= 0)
-    error (_("Must supply a non-empty variable name"));
+  if (*p == '=')
+    initval = value_as_long (parse_and_eval (++p));
 
   /* If the variable already exists, just change its initial value.  */
-  tsv = find_trace_state_variable (internalvar_name (intvar));
+  tsv = find_trace_state_variable (name);
   if (tsv)
     {
-      tsv->initial_value = initval;
+      if (tsv->initial_value != initval)
+	{
+	  tsv->initial_value = initval;
+	  observer_notify_tsv_modified (tsv);
+	}
       printf_filtered (_("Trace state variable $%s "
 			 "now has initial value %s.\n"),
 		       tsv->name, plongest (tsv->initial_value));
@@ -417,10 +438,10 @@ trace_variable_command (char *args, int from_tty)
     }
 
   /* Create a new variable.  */
-  tsv = create_trace_state_variable (internalvar_name (intvar));
+  tsv = create_trace_state_variable (name);
   tsv->initial_value = initval;
 
-  observer_notify_tsv_created (tsv->name, initval);
+  observer_notify_tsv_created (tsv);
 
   printf_filtered (_("Trace state variable $%s "
 		     "created, with initial value %s.\n"),
@@ -561,13 +582,13 @@ save_trace_state_variables (struct ui_file *fp)
    it means that somebody issued the "command" at the top level,
    which is always an error.  */
 
-void
+static void
 end_actions_pseudocommand (char *args, int from_tty)
 {
   error (_("This command cannot be used at the top level."));
 }
 
-void
+static void
 while_stepping_pseudocommand (char *args, int from_tty)
 {
   error (_("This command can only be used in a tracepoint actions list."));
@@ -1919,7 +1940,7 @@ trace_status_command (char *args, int from_tty)
 
   if (status == -1)
     {
-      if (ts->from_file)
+      if (ts->filename != NULL)
 	printf_filtered (_("Using a trace file.\n"));
       else
 	{
@@ -2079,16 +2100,19 @@ trace_status_mi (int on_stop)
 
   status = target_get_trace_status (ts);
 
-  if (status == -1 && !ts->from_file)
+  if (status == -1 && ts->filename == NULL)
     {
       ui_out_field_string (uiout, "supported", "0");
       return;
     }
 
-  if (ts->from_file)
+  if (ts->filename != NULL)
     ui_out_field_string (uiout, "supported", "file");
   else if (!on_stop)
     ui_out_field_string (uiout, "supported", "1");
+
+  if (ts->filename != NULL)
+    ui_out_field_string (uiout, "trace-file", ts->filename);
 
   gdb_assert (ts->running_known);
 
@@ -2378,7 +2402,8 @@ trace_find_command (char *args, int from_tty)
 { /* This should only be called with a numeric argument.  */
   int frameno = -1;
 
-  if (current_trace_status ()->running && !current_trace_status ()->from_file)
+  if (current_trace_status ()->running
+      && current_trace_status ()->filename == NULL)
     error (_("May not look at trace frames while trace is running."));
   
   if (args == 0 || *args == 0)
@@ -2429,7 +2454,8 @@ trace_find_pc_command (char *args, int from_tty)
 {
   CORE_ADDR pc;
 
-  if (current_trace_status ()->running && !current_trace_status ()->from_file)
+  if (current_trace_status ()->running
+      && current_trace_status ()->filename == NULL)
     error (_("May not look at trace frames while trace is running."));
 
   if (args == 0 || *args == 0)
@@ -2447,7 +2473,8 @@ trace_find_tracepoint_command (char *args, int from_tty)
   int tdp;
   struct tracepoint *tp;
 
-  if (current_trace_status ()->running && !current_trace_status ()->from_file)
+  if (current_trace_status ()->running
+      && current_trace_status ()->filename == NULL)
     error (_("May not look at trace frames while trace is running."));
 
   if (args == 0 || *args == 0)
@@ -2486,7 +2513,8 @@ trace_find_line_command (char *args, int from_tty)
   struct symtab_and_line sal;
   struct cleanup *old_chain;
 
-  if (current_trace_status ()->running && !current_trace_status ()->from_file)
+  if (current_trace_status ()->running
+      && current_trace_status ()->filename == NULL)
     error (_("May not look at trace frames while trace is running."));
 
   if (args == 0 || *args == 0)
@@ -2512,7 +2540,8 @@ trace_find_line_command (char *args, int from_tty)
       if (start_pc == end_pc)
   	{
 	  printf_filtered ("Line %d of \"%s\"",
-			   sal.line, sal.symtab->filename);
+			   sal.line,
+			   symtab_to_filename_for_display (sal.symtab));
 	  wrap_here ("  ");
 	  printf_filtered (" is at address ");
 	  print_address (get_current_arch (), start_pc, gdb_stdout);
@@ -2533,7 +2562,7 @@ trace_find_line_command (char *args, int from_tty)
        which the user would want to see?  If we have debugging
        symbols and no line numbers?  */
     error (_("Line number %d is out of range for \"%s\"."),
-	   sal.line, sal.symtab->filename);
+	   sal.line, symtab_to_filename_for_display (sal.symtab));
 
   /* Find within range of stated line.  */
   if (args && *args)
@@ -2550,7 +2579,8 @@ trace_find_range_command (char *args, int from_tty)
   static CORE_ADDR start, stop;
   char *tmp;
 
-  if (current_trace_status ()->running && !current_trace_status ()->from_file)
+  if (current_trace_status ()->running
+      && current_trace_status ()->filename == NULL)
     error (_("May not look at trace frames while trace is running."));
 
   if (args == 0 || *args == 0)
@@ -2583,7 +2613,8 @@ trace_find_outside_command (char *args, int from_tty)
   CORE_ADDR start, stop;
   char *tmp;
 
-  if (current_trace_status ()->running && !current_trace_status ()->from_file)
+  if (current_trace_status ()->running
+      && current_trace_status ()->filename == NULL)
     error (_("May not look at trace frames while trace is running."));
 
   if (args == 0 || *args == 0)
@@ -3586,7 +3617,7 @@ create_tsv_from_upload (struct uploaded_tsv *utsv)
   tsv->initial_value = utsv->initial_value;
   tsv->builtin = utsv->builtin;
 
-  observer_notify_tsv_created (tsv->name, tsv->initial_value);
+  observer_notify_tsv_created (tsv);
 
   do_cleanups (old_chain);
 
@@ -3740,8 +3771,8 @@ tfile_open (char *filename, int from_tty)
 
   trace_regblock_size = 0;
   ts = current_trace_status ();
-  /* We know we're working with a file.  */
-  ts->from_file = 1;
+  /* We know we're working with a file.  Record its name.  */
+  ts->filename = trace_filename;
   /* Set defaults in case there is no status line.  */
   ts->running_known = 0;
   ts->stop_reason = trace_stop_reason_unknown;
@@ -4191,8 +4222,7 @@ tfile_close (int quitting)
 static void
 tfile_files_info (struct target_ops *t)
 {
-  /* (it would be useful to mention the name of the file).  */
-  printf_filtered ("Looking at a trace file.\n");
+  printf_filtered ("\t`%s'\n", trace_filename);
 }
 
 /* The trace status for a file is that tracing can never be run.  */
@@ -4860,7 +4890,8 @@ print_one_static_tracepoint_marker (int count,
 
   if (sal.symtab != NULL)
     {
-      ui_out_field_string (uiout, "file", sal.symtab->filename);
+      ui_out_field_string (uiout, "file",
+			   symtab_to_filename_for_display (sal.symtab));
       ui_out_text (uiout, ":");
 
       if (ui_out_is_mi_like_p (uiout))

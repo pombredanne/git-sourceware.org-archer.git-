@@ -1296,11 +1296,11 @@ static struct htab *decoded_names_store;
    const, but nevertheless modified to a semantically equivalent form
    when a decoded name is cached in it.  */
 
-char *
+const char *
 ada_decode_symbol (const struct general_symbol_info *gsymbol)
 {
-  char **resultp =
-    (char **) &gsymbol->language_specific.mangled_lang.demangled_name;
+  const char **resultp =
+    (const char **) &gsymbol->language_specific.mangled_lang.demangled_name;
 
   if (*resultp == NULL)
     {
@@ -1310,8 +1310,8 @@ ada_decode_symbol (const struct general_symbol_info *gsymbol)
         {
 	  struct objfile *objf = gsymbol->obj_section->objfile;
 
-	  *resultp = obsavestring (decoded, strlen (decoded),
-				   &objf->objfile_obstack);
+	  *resultp = obstack_copy0 (&objf->objfile_obstack,
+				    decoded, strlen (decoded));
         }
       /* Sometimes, we can't find a corresponding objfile, in which
          case, we put the result on the heap.  Since we only decode
@@ -3573,7 +3573,8 @@ See set/show multiple-symbol."));
 	  else
 	    printf_unfiltered (_("[%d] %s at %s:%d\n"), i + first_choice,
 			       SYMBOL_PRINT_NAME (syms[i].sym),
-			       sal.symtab->filename, sal.line);
+			       symtab_to_filename_for_display (sal.symtab),
+			       sal.line);
           continue;
         }
       else
@@ -3588,7 +3589,8 @@ See set/show multiple-symbol."));
             printf_unfiltered (_("[%d] %s at %s:%d\n"),
                                i + first_choice,
                                SYMBOL_PRINT_NAME (syms[i].sym),
-                               symtab->filename, SYMBOL_LINE (syms[i].sym));
+			       symtab_to_filename_for_display (symtab),
+			       SYMBOL_LINE (syms[i].sym));
           else if (is_enumeral
                    && TYPE_NAME (SYMBOL_TYPE (syms[i].sym)) != NULL)
             {
@@ -3604,7 +3606,7 @@ See set/show multiple-symbol."));
                                : _("[%d] %s at %s:?\n"),
                                i + first_choice,
                                SYMBOL_PRINT_NAME (syms[i].sym),
-                               symtab->filename);
+                               symtab_to_filename_for_display (symtab));
           else
             printf_unfiltered (is_enumeral
                                ? _("[%d] %s (enumeral)\n")
@@ -9029,7 +9031,6 @@ assign_aggregate (struct value *container,
   int num_specs;
   LONGEST *indices;
   int max_indices, num_indices;
-  int is_array_aggregate;
   int i;
 
   *pos += 3;
@@ -9054,13 +9055,11 @@ assign_aggregate (struct value *container,
       lhs_type = value_type (lhs);
       low_index = TYPE_ARRAY_LOWER_BOUND_VALUE (lhs_type);
       high_index = TYPE_ARRAY_UPPER_BOUND_VALUE (lhs_type);
-      is_array_aggregate = 1;
     }
   else if (TYPE_CODE (lhs_type) == TYPE_CODE_STRUCT)
     {
       low_index = 0;
       high_index = num_visible_fields (lhs_type) - 1;
-      is_array_aggregate = 0;
     }
   else
     error (_("Left-hand side must be array or record."));

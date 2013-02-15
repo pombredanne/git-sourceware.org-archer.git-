@@ -1189,7 +1189,6 @@ mi_cmd_data_write_register_values (char *command, char **argv, int argc)
   struct regcache *regcache;
   struct gdbarch *gdbarch;
   int numregs, i;
-  char format;
 
   /* Note that the test for a valid register must include checking the
      gdbarch_register_name because gdbarch_num_regs may be allocated
@@ -1205,8 +1204,6 @@ mi_cmd_data_write_register_values (char *command, char **argv, int argc)
   if (argc == 0)
     error (_("-data-write-register-values: Usage: -data-write-register-"
 	     "values <format> [<regnum1> <value1>...<regnumN> <valueN>]"));
-
-  format = (int) argv[0][0];
 
   if (!target_has_registers)
     error (_("-data-write-register-values: No registers."));
@@ -1588,7 +1585,6 @@ mi_cmd_data_write_memory (char *command, char **argv, int argc)
   struct gdbarch *gdbarch = get_current_arch ();
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   CORE_ADDR addr;
-  char word_format;
   long word_size;
   /* FIXME: ezannoni 2000-02-17 LONGEST could possibly not be big
      enough when using a compiler other than GCC.  */
@@ -1632,9 +1628,6 @@ mi_cmd_data_write_memory (char *command, char **argv, int argc)
   /* Extract all the arguments.  */
   /* Start address of the memory dump.  */
   addr = parse_and_eval_address (argv[0]);
-  /* The format character to use when displaying a memory word.  See
-     the ``x'' command.  */
-  word_format = argv[1][0];
   /* The size of the memory word.  */
   word_size = atol (argv[2]);
 
@@ -1666,7 +1659,7 @@ mi_cmd_data_write_memory_bytes (char *command, char **argv, int argc)
   char *cdata;
   gdb_byte *data;
   gdb_byte *databuf;
-  size_t len, r, i, steps, remainder;
+  size_t len, i, steps, remainder;
   long int count, j;
   struct cleanup *back_to;
 
@@ -2364,7 +2357,6 @@ void
 mi_cmd_trace_define_variable (char *command, char **argv, int argc)
 {
   struct expression *expr;
-  struct cleanup *back_to;
   LONGEST initval = 0;
   struct trace_state_variable *tsv;
   char *name = 0;
@@ -2372,19 +2364,11 @@ mi_cmd_trace_define_variable (char *command, char **argv, int argc)
   if (argc != 1 && argc != 2)
     error (_("Usage: -trace-define-variable VARIABLE [VALUE]"));
 
-  expr = parse_expression (argv[0]);
-  back_to = make_cleanup (xfree, expr);
+  name = argv[0];
+  if (*name++ != '$')
+    error (_("Name of trace variable should start with '$'"));
 
-  if (expr->nelts == 3 && expr->elts[0].opcode == OP_INTERNALVAR)
-    {
-      struct internalvar *intvar = expr->elts[1].internalvar;
-
-      if (intvar)
-	name = internalvar_name (intvar);
-    }
-
-  if (!name || *name == '\0')
-    error (_("Invalid name of trace variable"));
+  validate_trace_state_variable_name (name);
 
   tsv = find_trace_state_variable (name);
   if (!tsv)
@@ -2394,8 +2378,6 @@ mi_cmd_trace_define_variable (char *command, char **argv, int argc)
     initval = value_as_long (parse_and_eval (argv[1]));
 
   tsv->initial_value = initval;
-
-  do_cleanups (back_to);
 }
 
 void

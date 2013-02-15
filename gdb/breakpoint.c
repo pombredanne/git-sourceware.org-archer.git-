@@ -985,7 +985,6 @@ set_breakpoint_condition (struct breakpoint *b, char *exp,
     }
   mark_breakpoint_modified (b);
 
-  annotate_breakpoints_changed ();
   observer_notify_breakpoint_modified (b);
 }
 
@@ -1217,7 +1216,6 @@ breakpoint_set_commands (struct breakpoint *b,
 
   decref_counted_command_line (&b->commands);
   b->commands = alloc_counted_command_line (commands);
-  annotate_breakpoints_changed ();
   observer_notify_breakpoint_modified (b);
 }
 
@@ -1334,7 +1332,6 @@ do_map_commands_command (struct breakpoint *b, void *data)
       incref_counted_command_line (info->cmd);
       decref_counted_command_line (&b->commands);
       b->commands = info->cmd;
-      annotate_breakpoints_changed ();
       observer_notify_breakpoint_modified (b);
     }
 }
@@ -5137,7 +5134,6 @@ bpstat_check_breakpoint_conditions (bpstat bs, ptid_t ptid)
       else if (b->ignore_count > 0)
 	{
 	  b->ignore_count--;
-	  annotate_ignore_count_change ();
 	  bs->stop = 0;
 	  /* Increase the hit count even though we don't stop.  */
 	  ++(b->hit_count);
@@ -5698,7 +5694,7 @@ print_breakpoint_location (struct breakpoint *b,
 
   if (b->display_canonical)
     ui_out_field_string (uiout, "what", b->addr_string);
-  else if (loc && loc->source_file)
+  else if (loc && loc->symtab)
     {
       struct symbol *sym 
 	= find_pc_sect_function (loc->address, loc->section);
@@ -5711,16 +5707,13 @@ print_breakpoint_location (struct breakpoint *b,
 	  ui_out_wrap_hint (uiout, wrap_indent_at_field (uiout, "what"));
 	  ui_out_text (uiout, "at ");
 	}
-      ui_out_field_string (uiout, "file", loc->source_file);
+      ui_out_field_string (uiout, "file",
+			   symtab_to_filename_for_display (loc->symtab));
       ui_out_text (uiout, ":");
-      
+
       if (ui_out_is_mi_like_p (uiout))
-	{
-	  struct symtab_and_line sal = find_pc_line (loc->address, 0);
-	  const char *fullname = symtab_to_fullname (sal.symtab);
-	  
-	  ui_out_field_string (uiout, "fullname", fullname);
-	}
+	ui_out_field_string (uiout, "fullname",
+			     symtab_to_fullname (loc->symtab));
       
       ui_out_field_int (uiout, "line", loc->line_number);
     }
@@ -5803,6 +5796,51 @@ bptype_string (enum bptype type)
 		    (int) type);
 
   return bptypes[(int) type].description;
+}
+
+DEF_VEC_I(int);
+
+/* For MI, output a field named 'thread-groups' with a list as the value.
+   For CLI, prefix the list with the string 'inf'. */
+
+static void
+output_thread_groups (struct ui_out *uiout,
+		      const char *field_name,
+		      VEC(int) *inf_num,
+		      int mi_only)
+{
+  struct cleanup *back_to = make_cleanup_ui_out_list_begin_end (uiout,
+								field_name);
+  int is_mi = ui_out_is_mi_like_p (uiout);
+  int inf;
+  int i;
+
+  /* For backward compatibility, don't display inferiors in CLI unless
+     there are several.  Always display them for MI. */
+  if (!is_mi && mi_only)
+    return;
+
+  for (i = 0; VEC_iterate (int, inf_num, i, inf); ++i)
+    {
+      if (is_mi)
+	{
+	  char mi_group[10];
+
+	  xsnprintf (mi_group, sizeof (mi_group), "i%d", inf);
+	  ui_out_field_string (uiout, NULL, mi_group);
+	}
+      else
+	{
+	  if (i == 0)
+	    ui_out_text (uiout, " inf ");
+	  else
+	    ui_out_text (uiout, ", ");
+	
+	  ui_out_text (uiout, plongest (inf));
+	}
+    }
+
+  do_cleanups (back_to);
 }
 
 /* Print B to gdb_stdout.  */
@@ -5956,35 +5994,30 @@ print_one_breakpoint_location (struct breakpoint *b,
       }
 
 
-  /* For backward compatibility, don't display inferiors unless there
-     are several.  */
-  if (loc != NULL
-      && !header_of_multiple
-      && (allflag
-	  || (!gdbarch_has_global_breakpoints (target_gdbarch ())
-	      && (number_of_program_spaces () > 1
-		  || number_of_inferiors () > 1)
-	      /* LOC is for existing B, it cannot be in
-		 moribund_locations and thus having NULL OWNER.  */
-	      && loc->owner->type != bp_catchpoint)))
+  if (loc != NULL && !header_of_multiple)
     {
       struct inferior *inf;
-      int first = 1;
+      VEC(int) *inf_num = NULL;
+      int mi_only = 1;
 
-      for (inf = inferior_list; inf != NULL; inf = inf->next)
+      ALL_INFERIORS (inf)
 	{
 	  if (inf->pspace == loc->pspace)
-	    {
-	      if (first)
-		{
-		  first = 0;
-		  ui_out_text (uiout, " inf ");
-		}
-	      else
-		ui_out_text (uiout, ", ");
-	      ui_out_text (uiout, plongest (inf->num));
-	    }
+	    VEC_safe_push (int, inf_num, inf->num);
 	}
+
+        /* For backward compatibility, don't display inferiors in CLI unless
+	   there are several.  Always display for MI. */
+	if (allflag
+	    || (!gdbarch_has_global_breakpoints (target_gdbarch ())
+		&& (number_of_program_spaces () > 1
+		    || number_of_inferiors () > 1)
+		/* LOC is for existing B, it cannot be in
+		   moribund_locations and thus having NULL OWNER.  */
+		&& loc->owner->type != bp_catchpoint))
+	mi_only = 0;
+      output_thread_groups (uiout, "thread-groups", inf_num, mi_only);
+      VEC_free (int, inf_num);
     }
 
   if (!part_of_multiple)
@@ -7033,8 +7066,6 @@ init_raw_breakpoint (struct breakpoint *b, struct gdbarch *gdbarch,
      program space.  */
   if (bptype != bp_breakpoint && bptype != bp_hardware_breakpoint)
     b->pspace = sal.pspace;
-
-  annotate_breakpoints_changed ();
 }
 
 /* set_raw_breakpoint is a low level routine for allocating and
@@ -7969,8 +8000,6 @@ catch_unload_command_1 (char *arg, int from_tty,
   catch_load_or_unload (arg, from_tty, 0, command);
 }
 
-DEF_VEC_I(int);
-
 /* An instance of this type is used to represent a syscall catchpoint.
    It includes a "struct breakpoint" as a kind of base class; users
    downcast to "struct breakpoint *" when needed.  A breakpoint is
@@ -8724,11 +8753,8 @@ momentary_breakpoint_from_master (struct breakpoint *orig,
   copy->loc->section = orig->loc->section;
   copy->loc->pspace = orig->loc->pspace;
   copy->loc->probe = orig->loc->probe;
-
-  if (orig->loc->source_file != NULL)
-    copy->loc->source_file = xstrdup (orig->loc->source_file);
-
   copy->loc->line_number = orig->loc->line_number;
+  copy->loc->symtab = orig->loc->symtab;
   copy->frame_id = orig->frame_id;
   copy->thread = orig->thread;
   copy->pspace = orig->pspace;
@@ -8801,9 +8827,12 @@ add_location_to_breakpoint (struct breakpoint *b,
   adjusted_address = adjust_breakpoint_address (loc_gdbarch,
 						sal->pc, b->type);
 
+  /* Sort the locations by their ADDRESS.  */
   loc = allocate_bp_location (b);
-  for (tmp = &(b->loc); *tmp != NULL; tmp = &((*tmp)->next))
+  for (tmp = &(b->loc); *tmp != NULL && (*tmp)->address <= adjusted_address;
+       tmp = &((*tmp)->next))
     ;
+  loc->next = *tmp;
   *tmp = loc;
 
   loc->requested_address = sal->pc;
@@ -8813,10 +8842,8 @@ add_location_to_breakpoint (struct breakpoint *b,
   gdb_assert (loc->pspace != NULL);
   loc->section = sal->section;
   loc->gdbarch = loc_gdbarch;
-
-  if (sal->symtab != NULL)
-    loc->source_file = xstrdup (sal->symtab->filename);
   loc->line_number = sal->line;
+  loc->symtab = sal->symtab;
 
   set_breakpoint_location_function (loc,
 				    sal->explicit_pc || sal->explicit_line);
@@ -9747,7 +9774,7 @@ resolve_sal_pc (struct symtab_and_line *sal)
     {
       if (!find_line_pc (sal->symtab, sal->line, &pc))
 	error (_("No line %d in file \"%s\"."),
-	       sal->line, sal->symtab->filename);
+	       sal->line, symtab_to_filename_for_display (sal->symtab));
       sal->pc = pc;
 
       /* If this SAL corresponds to a breakpoint inserted using a line
@@ -11918,7 +11945,7 @@ clear_command (char *arg, int from_tty)
   make_cleanup (VEC_cleanup (breakpoint_p), &found);
   for (i = 0; i < sals.nelts; i++)
     {
-      int is_abs;
+      const char *sal_fullname;
 
       /* If exact pc given, clear bpts at that pc.
          If line given (pc == 0), clear all bpts on specified line.
@@ -11933,7 +11960,8 @@ clear_command (char *arg, int from_tty)
          1              0             <can't happen> */
 
       sal = sals.sals[i];
-      is_abs = sal.symtab == NULL ? 1 : IS_ABSOLUTE_PATH (sal.symtab->filename);
+      sal_fullname = (sal.symtab == NULL
+		      ? NULL : symtab_to_fullname (sal.symtab));
 
       /* Find all matching breakpoints and add them to 'found'.  */
       ALL_BREAKPOINTS (b)
@@ -11956,19 +11984,13 @@ clear_command (char *arg, int from_tty)
 		  int line_match = 0;
 
 		  if ((default_match || sal.explicit_line)
-		      && loc->source_file != NULL
-		      && sal.symtab != NULL
+		      && loc->symtab != NULL
+		      && sal_fullname != NULL
 		      && sal.pspace == loc->pspace
-		      && loc->line_number == sal.line)
-		    {
-		      if (filename_cmp (loc->source_file,
-					sal.symtab->filename) == 0)
-			line_match = 1;
-		      else if (!IS_ABSOLUTE_PATH (sal.symtab->filename)
-			       && compare_filenames_for_search (loc->source_file,
-								sal.symtab->filename))
-			line_match = 1;
-		    }
+		      && loc->line_number == sal.line
+		      && filename_cmp (symtab_to_fullname (loc->symtab),
+				       sal_fullname) == 0)
+		    line_match = 1;
 
 		  if (pc_match || line_match)
 		    {
@@ -12016,7 +12038,6 @@ clear_command (char *arg, int from_tty)
       else
 	printf_unfiltered (_("Deleted breakpoints "));
     }
-  annotate_breakpoints_changed ();
 
   for (ix = 0; VEC_iterate(breakpoint_p, found, ix, b); ix++)
     {
@@ -12699,19 +12720,20 @@ say_where (struct breakpoint *b)
     }
   else
     {
-      if (opts.addressprint || b->loc->source_file == NULL)
+      if (opts.addressprint || b->loc->symtab == NULL)
 	{
 	  printf_filtered (" at ");
 	  fputs_filtered (paddress (b->loc->gdbarch, b->loc->address),
 			  gdb_stdout);
 	}
-      if (b->loc->source_file)
+      if (b->loc->symtab != NULL)
 	{
 	  /* If there is a single location, we can print the location
 	     more nicely.  */
 	  if (b->loc->next == NULL)
 	    printf_filtered (": file %s, line %d.",
-			     b->loc->source_file, b->loc->line_number);
+			     symtab_to_filename_for_display (b->loc->symtab),
+			     b->loc->line_number);
 	  else
 	    /* This is not ideal, but each location may have a
 	       different file name, and this at least reflects the
@@ -12739,7 +12761,6 @@ bp_location_dtor (struct bp_location *self)
   if (self->cond_bytecode)
     free_agent_expr (self->cond_bytecode);
   xfree (self->function_name);
-  xfree (self->source_file);
 }
 
 static const struct bp_location_ops bp_location_ops =
@@ -13911,7 +13932,8 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 				   SYMBOL_PRINT_NAME (sym));
 	      ui_out_text (uiout, " at ");
 	    }
-	  ui_out_field_string (uiout, "file", sal2.symtab->filename);
+	  ui_out_field_string (uiout, "file",
+			       symtab_to_filename_for_display (sal2.symtab));
 	  ui_out_text (uiout, ":");
 
 	  if (ui_out_is_mi_like_p (uiout))
@@ -13925,16 +13947,11 @@ update_static_tracepoint (struct breakpoint *b, struct symtab_and_line sal)
 	  ui_out_text (uiout, "\n");
 
 	  b->loc->line_number = sal2.line;
-
-	  xfree (b->loc->source_file);
-	  if (sym)
-	    b->loc->source_file = xstrdup (sal2.symtab->filename);
-	  else
-	    b->loc->source_file = NULL;
+	  b->loc->symtab = sym != NULL ? sal2.symtab : NULL;
 
 	  xfree (b->addr_string);
 	  b->addr_string = xstrprintf ("%s:%d",
-				       sal2.symtab->filename,
+				   symtab_to_filename_for_display (sal2.symtab),
 				       b->loc->line_number);
 
 	  /* Might be nice to check if function changed, and warn if
@@ -14404,7 +14421,6 @@ set_ignore_count (int bptnum, int count, int from_tty)
 			       "crossings of breakpoint %d."),
 			     count, bptnum);
 	}
-      annotate_breakpoints_changed ();
       observer_notify_breakpoint_modified (b);
       return;
     }
@@ -14669,8 +14685,7 @@ enable_breakpoint_disp (struct breakpoint *bpt, enum bpdisp disposition,
   bpt->disposition = disposition;
   bpt->enable_count = count;
   update_global_location_list (1);
-  annotate_breakpoints_changed ();
-  
+
   observer_notify_breakpoint_modified (bpt);
 }
 
@@ -15785,6 +15800,18 @@ pc_at_non_inline_function (struct address_space *aspace, CORE_ADDR pc,
     }
 
   return 0;
+}
+
+/* Remove any references to OBJFILE which is going to be freed.  */
+
+void
+breakpoint_free_objfile (struct objfile *objfile)
+{
+  struct bp_location **locp, *loc;
+
+  ALL_BP_LOCATIONS (loc, locp)
+    if (loc->symtab != NULL && loc->symtab->objfile == objfile)
+      loc->symtab = NULL;
 }
 
 void

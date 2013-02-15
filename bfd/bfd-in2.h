@@ -2061,6 +2061,7 @@ enum bfd_architecture
 #define bfd_mach_v850e1        '1'
 #define bfd_mach_v850e2        0x4532
 #define bfd_mach_v850e2v3      0x45325633
+#define bfd_mach_v850e3v5      0x45335635 /* ('E'|'3'|'V'|'5') */
   bfd_arch_arc,       /* ARC Cores */
 #define bfd_mach_arc_5         5
 #define bfd_mach_arc_6         6
@@ -2198,6 +2199,8 @@ enum bfd_architecture
 #define bfd_mach_tilegx32  2
   bfd_arch_aarch64,   /* AArch64  */
 #define bfd_mach_aarch64 0
+  bfd_arch_nios2,
+#define bfd_mach_nios2 0
   bfd_arch_last
   };
 
@@ -4912,6 +4915,42 @@ a matching LO8XG part.  */
   BFD_RELOC_MSP430_2X_PCREL,
   BFD_RELOC_MSP430_RL_PCREL,
 
+/* Relocations used by the Altera Nios II core.  */
+  BFD_RELOC_NIOS2_S16,
+  BFD_RELOC_NIOS2_U16,
+  BFD_RELOC_NIOS2_CALL26,
+  BFD_RELOC_NIOS2_IMM5,
+  BFD_RELOC_NIOS2_CACHE_OPX,
+  BFD_RELOC_NIOS2_IMM6,
+  BFD_RELOC_NIOS2_IMM8,
+  BFD_RELOC_NIOS2_HI16,
+  BFD_RELOC_NIOS2_LO16,
+  BFD_RELOC_NIOS2_HIADJ16,
+  BFD_RELOC_NIOS2_GPREL,
+  BFD_RELOC_NIOS2_UJMP,
+  BFD_RELOC_NIOS2_CJMP,
+  BFD_RELOC_NIOS2_CALLR,
+  BFD_RELOC_NIOS2_ALIGN,
+  BFD_RELOC_NIOS2_GOT16,
+  BFD_RELOC_NIOS2_CALL16,
+  BFD_RELOC_NIOS2_GOTOFF_LO,
+  BFD_RELOC_NIOS2_GOTOFF_HA,
+  BFD_RELOC_NIOS2_PCREL_LO,
+  BFD_RELOC_NIOS2_PCREL_HA,
+  BFD_RELOC_NIOS2_TLS_GD16,
+  BFD_RELOC_NIOS2_TLS_LDM16,
+  BFD_RELOC_NIOS2_TLS_LDO16,
+  BFD_RELOC_NIOS2_TLS_IE16,
+  BFD_RELOC_NIOS2_TLS_LE16,
+  BFD_RELOC_NIOS2_TLS_DTPMOD,
+  BFD_RELOC_NIOS2_TLS_DTPREL,
+  BFD_RELOC_NIOS2_TLS_TPREL,
+  BFD_RELOC_NIOS2_COPY,
+  BFD_RELOC_NIOS2_GLOB_DAT,
+  BFD_RELOC_NIOS2_JUMP_SLOT,
+  BFD_RELOC_NIOS2_RELATIVE,
+  BFD_RELOC_NIOS2_GOTOFF,
+
 /* IQ2000 Relocations.  */
   BFD_RELOC_IQ2000_OFFSET_16,
   BFD_RELOC_IQ2000_OFFSET_21,
@@ -6245,24 +6284,6 @@ extern bfd_byte *bfd_get_relocated_section_contents
    bfd_boolean, asymbol **);
 
 bfd_boolean bfd_alt_mach_code (bfd *abfd, int alternative);
-
-struct bfd_preserve
-{
-  void *marker;
-  void *tdata;
-  flagword flags;
-  const struct bfd_arch_info *arch_info;
-  struct bfd_section *sections;
-  struct bfd_section *section_last;
-  unsigned int section_count;
-  struct bfd_hash_table section_htab;
-};
-
-bfd_boolean bfd_preserve_save (bfd *, struct bfd_preserve *);
-
-void bfd_preserve_restore (bfd *, struct bfd_preserve *);
-
-void bfd_preserve_finish (bfd *, struct bfd_preserve *);
 
 bfd_vma bfd_emul_get_maxpagesize (const char *);
 

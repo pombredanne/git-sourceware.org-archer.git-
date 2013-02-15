@@ -48,7 +48,13 @@ extern int find_and_open_source (const char *filename,
    negative number for error.  */
 extern int open_source_file (struct symtab *s);
 
+extern char *rewrite_source_path (const char *path);
+
 extern const char *symtab_to_fullname (struct symtab *s);
+
+/* Returns filename without the compile directory part, basename or absolute
+   filename.  It depends on 'set filename-display' value.  */
+extern const char *symtab_to_filename_for_display (struct symtab *symtab);
 
 /* Create and initialize the table S->line_charpos that records the
    positions of the lines in the source file, which is assumed to be
