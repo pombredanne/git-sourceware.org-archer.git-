@@ -1896,18 +1896,6 @@ find_next_tracepoint_by_number (struct tracepoint *prev_tp, int num)
 
 #endif
 
-static char *
-save_string (const char *str, size_t len)
-{
-  char *s;
-
-  s = xmalloc (len + 1);
-  memcpy (s, str, len);
-  s[len] = '\0';
-
-  return s;
-}
-
 /* Append another action to perform when the tracepoint triggers.  */
 
 static void
@@ -2028,7 +2016,7 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 			 * tpoint->num_step_actions));
 	  tpoint->step_actions[tpoint->num_step_actions - 1] = action;
 	  tpoint->step_actions_str[tpoint->num_step_actions - 1]
-	    = save_string (act_start, act - act_start);
+	    = savestring (act_start, act - act_start);
 	}
       else
 	{
@@ -2041,7 +2029,7 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 			sizeof (*tpoint->actions_str) * tpoint->numactions);
 	  tpoint->actions[tpoint->numactions - 1] = action;
 	  tpoint->actions_str[tpoint->numactions - 1]
-	    = save_string (act_start, act - act_start);
+	    = savestring (act_start, act - act_start);
 	}
     }
 }
@@ -4054,6 +4042,7 @@ cmd_qtnotes (char *own_buf)
 	  user[nbytes] = '\0';
 	  ++packet; /* skip the semicolon */
 	  trace_debug ("User is '%s'", user);
+	  xfree (tracing_user_name);
 	  tracing_user_name = user;
 	}
       else if (strncmp ("notes:", packet, strlen ("notes:")) == 0)
@@ -4067,6 +4056,7 @@ cmd_qtnotes (char *own_buf)
 	  notes[nbytes] = '\0';
 	  ++packet; /* skip the semicolon */
 	  trace_debug ("Notes is '%s'", notes);
+	  xfree (tracing_notes);
 	  tracing_notes = notes;
 	}
       else if (strncmp ("tstop:", packet, strlen ("tstop:")) == 0)
@@ -4080,6 +4070,7 @@ cmd_qtnotes (char *own_buf)
 	  stopnote[nbytes] = '\0';
 	  ++packet; /* skip the semicolon */
 	  trace_debug ("tstop note is '%s'", stopnote);
+	  xfree (tracing_stop_note);
 	  tracing_stop_note = stopnote;
 	}
       else
