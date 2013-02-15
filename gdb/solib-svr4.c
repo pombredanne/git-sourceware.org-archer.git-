@@ -1671,7 +1671,7 @@ solib_event_probe_action (struct probe_and_action *pa)
 static int
 namespace_update_full (struct svr4_info *info)
 {
-  svr4_free_library_list (info->solib_list);
+  svr4_free_library_list (&info->solib_list);
   info->solib_list = svr4_current_sos_from_debug_base ();
 
   return 1;
