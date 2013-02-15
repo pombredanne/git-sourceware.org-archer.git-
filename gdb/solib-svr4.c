@@ -52,7 +52,7 @@
 static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
-static struct so_list *namespace_table_flatten (htab_t namespace_table);
+static void svr4_free_library_list (void *p_list);
 
 /* Link map info to include in an allocated so_list entry.  */
 
@@ -73,16 +73,6 @@ struct lm_info
 
     /* Values read in from inferior's fields of the same name.  */
     CORE_ADDR l_ld, l_next, l_prev, l_name;
-
-    /* Numeric link-map ID of the namespace this object is loaded
-       into.  This value is only valid when using the probes-based
-       interface.  */
-    LONGEST lmid;
-
-    /* Nonzero if the namespace list this object is loaded into is the
-       application's initial namespace (LM_ID_BASE).  This value is
-       only valid when using the probes-based interface.  */
-    unsigned int in_initial_ns : 1;
   };
 
 /* On SVR4 systems, a list of symbols in the dynamic linker where
@@ -194,9 +184,9 @@ struct svr4_info
      by the probes-based interface.  */
   htab_t probes_table;
 
-  /* Table of dynamic linker namespaces, used by the probes-based
-     interface.  */
-  htab_t namespace_table;
+  /* List of objects loaded into the inferior, used by the probes-
+     based interface.  */
+  struct so_list *solib_list;
 };
 
 /* Per-program-space data key.  */
@@ -214,16 +204,13 @@ free_probes_table (struct svr4_info *info)
   info->probes_table = NULL;
 }
 
-/* Free the namespace table.  */
+/* Free the solib list.  */
 
 static void
-free_namespace_table (struct svr4_info *info)
+free_solib_list (struct svr4_info *info)
 {
-  if (info->namespace_table == NULL)
-    return;
-
-  htab_delete (info->namespace_table);
-  info->namespace_table = NULL;
+  svr4_free_library_list (&info->solib_list);
+  info->solib_list = NULL;
 }
 
 static void
@@ -236,7 +223,7 @@ svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
     return;
 
   free_probes_table (info);
-  free_namespace_table (info);
+  free_solib_list (info);
 
   xfree (info);
 }
@@ -292,14 +279,6 @@ svr4_same_1 (const char *gdb_so_name, const char *inferior_so_name)
 static int
 svr4_same (struct so_list *gdb, struct so_list *inferior)
 {
-  struct svr4_info *info = get_svr4_info ();
-
-  if (info->probes_table)
-    {
-      if (gdb->lm_info->lmid != inferior->lm_info->lmid)
-	return 0;
-    }
-
   return svr4_same_1 (gdb->so_original_name, inferior->so_original_name);
 }
 
@@ -431,26 +410,19 @@ lm_addr_check (struct so_list *so, bfd *abfd)
 	    }
 	  else
 	    {
-	      struct svr4_info *info = get_svr4_info ();
+	      /* There is no way to verify the library file matches.  prelink
+		 can during prelinking of an unprelinked file (or unprelinking
+		 of a prelinked file) shift the DYNAMIC segment by arbitrary
+		 offset without any page size alignment.  There is no way to
+		 find out the ELF header and/or Program Headers for a limited
+		 verification if it they match.  One could do a verification
+		 of the DYNAMIC segment.  Still the found address is the best
+		 one GDB could find.  */
 
-	      if (!info->probes_table || so->lm_info->in_initial_ns)
-		{
-		  /* There is no way to verify the library file
-		     matches.  prelink can during prelinking of an
-		     unprelinked file (or unprelinking of a prelinked
-		     file) shift the DYNAMIC segment by arbitrary
-		     offset without any page size alignment.  There is
-		     no way to find out the ELF header and/or Program
-		     Headers for a limited verification if it they
-		     match.  One could do a verification of the
-		     DYNAMIC segment.  Still the found address is the
-		     best one GDB could find.  */
-
-		  warning (_(".dynamic section for \"%s\" "
-			     "is not at the expected address "
-			     "(wrong library or version mismatch?)"),
-			   so->so_name);
-		}
+	      warning (_(".dynamic section for \"%s\" "
+			 "is not at the expected address "
+			 "(wrong library or version mismatch?)"),
+		       so->so_name);
 	    }
 	}
 
@@ -1108,6 +1080,36 @@ svr4_free_library_list (void *p_list)
     }
 }
 
+/* Copy library list.  */
+
+static struct so_list *
+svr4_copy_library_list (struct so_list *src)
+{
+  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+  struct so_list *dst = NULL;
+  struct so_list **link = &dst;
+
+  while (src != NULL)
+    {
+      struct so_list *new;
+
+      new = XZALLOC (struct so_list);
+
+      memcpy (new, src, sizeof (struct so_list));
+
+      new->lm_info = xmalloc (lmo->link_map_size);
+      memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
+
+      new->next = NULL;
+      *link = new;
+      link = &new->next;
+
+      src = src->next;
+    }
+
+  return dst;
+}
+
 #ifdef HAVE_LIBEXPAT
 
 #include "xml-support.h"
@@ -1447,9 +1449,9 @@ svr4_current_sos (void)
 
   info = get_svr4_info ();
 
-  /* If we have a namespace table then return a flattened copy.  */
-  if (info->namespace_table != NULL)
-    return namespace_table_flatten (info->namespace_table);
+  /* If we have a solib list then return a flattened copy.  */
+  if (info->solib_list != NULL)
+    return svr4_copy_library_list (info->solib_list);
 
   /* Always locate the debug struct, in case it has moved.  */
   info->debug_base = 0;
@@ -1663,120 +1665,14 @@ solib_event_probe_action (struct probe_and_action *pa)
   return action;
 }
 
-/* A namespace in the dynamic linker.  */
-
-struct namespace
-{
-  /* Numeric link-map ID of the namespace.  */
-  LONGEST lmid;
-
-  /* List of objects loaded into the namespace.  */
-  struct so_list *solist;
-};
-
-/* Returns a hash code for the namespace referenced by p.  */
-
-static hashval_t
-hash_namespace (const void *p)
-{
-  const struct namespace *ns = p;
-
-  return (hashval_t) ns->lmid;
-}
-
-/* Returns non-zero if the namespaces referenced by p1 and p2
-   are equal.  */
-
-static int
-equal_namespace (const void *p1, const void *p2)
-{
-  const struct namespace *ns1 = p1;
-  const struct namespace *ns2 = p2;
-
-  return ns1->lmid == ns2->lmid;
-}
-
-/* Free a namespace.  */
-
-static void
-free_namespace (void *p)
-{
-  struct namespace *ns = p;
-
-  svr4_free_library_list (ns->solist);
-  xfree (ns);
-}
-
 /* Populate this namespace by reading the entire list of shared
    objects from the inferior.  Returns nonzero on success.  */
 
 static int
-namespace_update_full (struct svr4_info *info, LONGEST lmid,
-		       CORE_ADDR debug_base, int is_initial_ns)
+namespace_update_full (struct svr4_info *info)
 {
-  struct so_list *result = NULL, *so;
-  struct namespace lookup, *ns;
-  void **slot;
-
-  /* Read the list of shared objects from the inferior.  The
-     initial namespace requires extra processing and is handled
-     separately.  */
-  if (is_initial_ns)
-    {
-      result = svr4_current_sos_from_debug_base ();
-    }
-  else
-    {
-      CORE_ADDR lm = r_map_from_debug_base (debug_base);
-      struct so_list **link_ptr = &result;
-
-      if (!svr4_read_so_list (lm, 0, &link_ptr, 0))
-	return 0;
-    }
-
-  /* If the namespace is empty then delete it from the table.  */
-  if (result == NULL)
-    {
-      if (info->namespace_table != NULL)
-	{
-	  lookup.lmid = lmid;
-	  htab_remove_elt (info->namespace_table, &lookup);
-	}
-
-      return 1;
-    }
-
-  /* Fill in the link-map IDs and initial namespace flags.  */
-  for (so = result; so; so = so->next)
-    {
-      so->lm_info->lmid = lmid;
-      so->lm_info->in_initial_ns = is_initial_ns;
-    }
-
-  /* Create the namespace table, if necessary.  */
-  if (info->namespace_table == NULL)
-    {
-      info->namespace_table = htab_create_alloc (1, hash_namespace,
-						 equal_namespace,
-						 free_namespace,
-						 xcalloc, xfree);
-    }
-
-  /* Update the namespace table with our new list.  */
-  lookup.lmid = lmid;
-  slot = htab_find_slot (info->namespace_table, &lookup, INSERT);
-  if (*slot == HTAB_EMPTY_ENTRY)
-    {
-      ns = XCNEW (struct namespace);
-      ns->lmid = lmid;
-      *slot = ns;
-    }
-  else
-    {
-      ns = *slot;
-      svr4_free_library_list (ns->solist);
-    }
-  ns->solist = result;
+  svr4_free_library_list (info->solib_list);
+  info->solib_list = svr4_current_sos_from_debug_base ();
 
   return 1;
 }
@@ -1786,41 +1682,20 @@ namespace_update_full (struct svr4_info *info, LONGEST lmid,
    list was successfully updated, or zero to indicate failure.  */
 
 static int
-namespace_update_incremental (struct svr4_info *info, LONGEST lmid,
-			      CORE_ADDR lm, int is_initial_ns)
+namespace_update_incremental (struct svr4_info *info, CORE_ADDR lm)
 {
-  struct namespace lookup, *ns;
-  struct so_list *tail, **link, *so;
-  struct value *val;
+  struct so_list *tail, **link;
 
-  /* Find our namespace in the table.  */
-  if (info->namespace_table == NULL)
-    return 0;
-
-  lookup.lmid = lmid;
-  ns = htab_find (info->namespace_table, &lookup);
-  if (ns == NULL)
+  if (info->solib_list == NULL)
     return 0;
 
   /* Walk to the end of the list.  */
-  tail = ns->solist;
-  if (tail == NULL)
-    return 0;
-
-  while (tail->next)
-    tail = tail->next;
+  for (tail = info->solib_list; tail->next; tail = tail->next);
   link = &tail->next;
 
   /* Read the new objects.  */
   if (!svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0))
     return 0;
-
-  /* Fill in the link-map IDs and initial namespace flags.  */
-  for (so = tail; so; so = so->next)
-    {
-      so->lm_info->lmid = lmid;
-      so->lm_info->in_initial_ns = is_initial_ns;
-    }
 
   return 1;
 }
@@ -1838,10 +1713,10 @@ disable_probes_interface_cleanup (void *arg)
 	     "Reverting to original interface.\n"));
 
   free_probes_table (info);
-  free_namespace_table (info);
+  free_solib_list (info);
 }
 
-/* Update the namespace table as appropriate when using the
+/* Update the solib list as appropriate when using the
    probes-based linker interface.  Do nothing if using the
    standard interface.  */
 
@@ -1853,7 +1728,6 @@ svr4_handle_solib_event (void)
   enum probe_action action;
   struct cleanup *old_chain, *usm_chain;
   struct value *val;
-  LONGEST lmid;
   CORE_ADDR pc, debug_base, lm = 0;
   int is_initial_ns;
 
@@ -1890,12 +1764,6 @@ svr4_handle_solib_event (void)
   inhibit_section_map_updates ();
   usm_chain = make_cleanup (resume_section_map_updates_cleanup, NULL);
 
-  val = evaluate_probe_argument (pa->probe, 0);
-  if (val == NULL)
-    goto error;
-
-  lmid = value_as_long (val);
-
   val = evaluate_probe_argument (pa->probe, 1);
   if (val == NULL)
     goto error;
@@ -1909,7 +1777,9 @@ svr4_handle_solib_event (void)
   if (locate_base (info) == 0)
     goto error;
 
-  is_initial_ns = (debug_base == info->debug_base);
+  /* Do not process namespaces other than the initial one.  */
+  if (debug_base != info->debug_base)
+    action = NAMESPACE_NO_ACTION;
 
   if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
@@ -1926,79 +1796,24 @@ svr4_handle_solib_event (void)
 
   if (action == NAMESPACE_UPDATE_OR_RELOAD)
     {
-      if (namespace_update_incremental (info, lmid, lm, is_initial_ns))
-	{
-	  discard_cleanups (old_chain);
-	  return;
-	}
-
-      action = NAMESPACE_RELOAD;
+      if (!namespace_update_incremental (info, lm))
+	action = NAMESPACE_RELOAD;
     }
 
-  gdb_assert (action == NAMESPACE_RELOAD);
-
-  if (namespace_update_full (info, lmid, debug_base, is_initial_ns))
+  if (action == NAMESPACE_RELOAD)
     {
-      discard_cleanups (old_chain);
-      return;
+      if (!namespace_update_full (info))
+	goto error;
     }
+
+  discard_cleanups (old_chain);
+  return;
 
  error:
   /* We should never reach here, but if we do we disable the
      probes interface and revert to the original interface.  */
 
   do_cleanups (old_chain);
-}
-
-/* Helper function for namespace_table_flatten.  */
-
-static int
-namespace_table_flatten_helper (void **slot, void *arg)
-{
-  struct namespace *ns = (struct namespace *) *slot;
-  struct so_list *src = ns->solist;
-  struct so_list ***tail = (struct so_list ***) arg;
-
-  while (src != NULL)
-    {
-      /* glibc includes an entry for the interpreter in each
-	 namespace, but in all but the initial namespace these
-	 have l_ld == 0.  Returning these "broken" placeholders
-	 makes it impossible to set breakpoints in the runtime
-	 linker when more than one namespace exists.  */
-      if (src->lm_info->l_ld != 0)
-	{
-	  struct so_list *dst;
-
-	  dst = xmalloc (sizeof (struct so_list));
-	  memcpy (dst, src, sizeof (struct so_list));
-
-	  dst->lm_info = xmalloc (sizeof (struct lm_info));
-	  memcpy (dst->lm_info, src->lm_info, sizeof (struct lm_info));
-
-	  **tail = dst;
-	  *tail = &dst->next;
-	}
-
-      src = src->next;
-    }
-
-  **tail = NULL;
-
-  return 1; /* Continue traversal.  */
-}
-
-/* Flatten the namespace table into a single list.  */
-
-static struct so_list *
-namespace_table_flatten (htab_t namespace_table)
-{
-  struct so_list *dst = NULL;
-  struct so_list **tail = &dst;
-
-  htab_traverse (namespace_table, namespace_table_flatten_helper, &tail);
-
-  return dst;
 }
 
 /* Helper function for svr4_update_solib_event_breakpoints.  */
@@ -2962,8 +2777,8 @@ svr4_solib_create_inferior_hook (int from_tty)
 
   info = get_svr4_info ();
 
-  /* Free the probes-based interface's namespace table.  */
-  free_namespace_table (info);
+  /* Free the probes-based interface's solib list.  */
+  free_solib_list (info);
 
   /* Relocate the main executable if necessary.  */
   svr4_relocate_main_executable ();
