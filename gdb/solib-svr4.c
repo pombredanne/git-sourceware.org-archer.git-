@@ -157,94 +157,6 @@ static const struct probe_info probe_info[] =
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
 
-/* Per pspace SVR4 specific data.  */
-
-struct svr4_info
-{
-  CORE_ADDR debug_base;	/* Base of dynamic linker structures.  */
-
-  /* Validity flag for debug_loader_offset.  */
-  int debug_loader_offset_p;
-
-  /* Load address for the dynamic linker, inferred.  */
-  CORE_ADDR debug_loader_offset;
-
-  /* Name of the dynamic linker, valid if debug_loader_offset_p.  */
-  char *debug_loader_name;
-
-  /* Load map address for the main executable.  */
-  CORE_ADDR main_lm_addr;
-
-  CORE_ADDR interp_text_sect_low;
-  CORE_ADDR interp_text_sect_high;
-  CORE_ADDR interp_plt_sect_low;
-  CORE_ADDR interp_plt_sect_high;
-
-  /* Table mapping breakpoint addresses to probes and actions, used
-     by the probes-based interface.  */
-  htab_t probes_table;
-
-  /* List of objects loaded into the inferior, used by the probes-
-     based interface.  */
-  struct so_list *solib_list;
-};
-
-/* Per-program-space data key.  */
-static const struct program_space_data *solib_svr4_pspace_data;
-
-/* Free the probes table.  */
-
-static void
-free_probes_table (struct svr4_info *info)
-{
-  if (info->probes_table == NULL)
-    return;
-
-  htab_delete (info->probes_table);
-  info->probes_table = NULL;
-}
-
-/* Free the solib list.  */
-
-static void
-free_solib_list (struct svr4_info *info)
-{
-  svr4_free_library_list (&info->solib_list);
-  info->solib_list = NULL;
-}
-
-static void
-svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
-{
-  struct svr4_info *info;
-
-  info = program_space_data (pspace, solib_svr4_pspace_data);
-  if (info == NULL)
-    return;
-
-  free_probes_table (info);
-  free_solib_list (info);
-
-  xfree (info);
-}
-
-/* Get the current svr4 data.  If none is found yet, add it now.  This
-   function always returns a valid object.  */
-
-static struct svr4_info *
-get_svr4_info (void)
-{
-  struct svr4_info *info;
-
-  info = program_space_data (current_program_space, solib_svr4_pspace_data);
-  if (info != NULL)
-    return info;
-
-  info = XZALLOC (struct svr4_info);
-  set_program_space_data (current_program_space, solib_svr4_pspace_data, info);
-  return info;
-}
-
 /* Return non-zero if GDB_SO_NAME and INFERIOR_SO_NAME represent
    the same shared library.  */
 
@@ -428,6 +340,94 @@ lm_addr_check (struct so_list *so, bfd *abfd)
     }
 
   return so->lm_info->l_addr;
+}
+
+/* Per pspace SVR4 specific data.  */
+
+struct svr4_info
+{
+  CORE_ADDR debug_base;	/* Base of dynamic linker structures.  */
+
+  /* Validity flag for debug_loader_offset.  */
+  int debug_loader_offset_p;
+
+  /* Load address for the dynamic linker, inferred.  */
+  CORE_ADDR debug_loader_offset;
+
+  /* Name of the dynamic linker, valid if debug_loader_offset_p.  */
+  char *debug_loader_name;
+
+  /* Load map address for the main executable.  */
+  CORE_ADDR main_lm_addr;
+
+  CORE_ADDR interp_text_sect_low;
+  CORE_ADDR interp_text_sect_high;
+  CORE_ADDR interp_plt_sect_low;
+  CORE_ADDR interp_plt_sect_high;
+
+  /* Table mapping breakpoint addresses to probes and actions, used
+     by the probes-based interface.  */
+  htab_t probes_table;
+
+  /* List of objects loaded into the inferior, used by the probes-
+     based interface.  */
+  struct so_list *solib_list;
+};
+
+/* Per-program-space data key.  */
+static const struct program_space_data *solib_svr4_pspace_data;
+
+/* Free the probes table.  */
+
+static void
+free_probes_table (struct svr4_info *info)
+{
+  if (info->probes_table == NULL)
+    return;
+
+  htab_delete (info->probes_table);
+  info->probes_table = NULL;
+}
+
+/* Free the solib list.  */
+
+static void
+free_solib_list (struct svr4_info *info)
+{
+  svr4_free_library_list (&info->solib_list);
+  info->solib_list = NULL;
+}
+
+static void
+svr4_pspace_data_cleanup (struct program_space *pspace, void *arg)
+{
+  struct svr4_info *info;
+
+  info = program_space_data (pspace, solib_svr4_pspace_data);
+  if (info == NULL)
+    return;
+
+  free_probes_table (info);
+  free_solib_list (info);
+
+  xfree (info);
+}
+
+/* Get the current svr4 data.  If none is found yet, add it now.  This
+   function always returns a valid object.  */
+
+static struct svr4_info *
+get_svr4_info (void)
+{
+  struct svr4_info *info;
+
+  info = program_space_data (current_program_space, solib_svr4_pspace_data);
+  if (info != NULL)
+    return info;
+
+  info = XZALLOC (struct svr4_info);
+  set_program_space_data (current_program_space, solib_svr4_pspace_data, info);
+  return info;
 }
 
 /* Local function prototypes */
