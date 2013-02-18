@@ -273,13 +273,10 @@ svr4_same_1 (const char *gdb_so_name, const char *inferior_so_name)
   return 0;
 }
 
-/* Return non-zero if GDB and INFERIOR represent the same shared
-   library.  */
-
 static int
 svr4_same (struct so_list *gdb, struct so_list *inferior)
 {
-  return svr4_same_1 (gdb->so_original_name, inferior->so_original_name);
+  return (svr4_same_1 (gdb->so_original_name, inferior->so_original_name));
 }
 
 static struct lm_info *
@@ -421,8 +418,7 @@ lm_addr_check (struct so_list *so, bfd *abfd)
 
 	      warning (_(".dynamic section for \"%s\" "
 			 "is not at the expected address "
-			 "(wrong library or version mismatch?)"),
-		       so->so_name);
+			 "(wrong library or version mismatch?)"), so->so_name);
 	    }
 	}
 
