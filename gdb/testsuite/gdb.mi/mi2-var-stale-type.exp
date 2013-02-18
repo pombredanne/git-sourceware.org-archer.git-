@@ -44,7 +44,7 @@ set line [gdb_get_line_number "break-here"]
 set func "main"
 
 mi_gdb_test "-break-insert -t $srcfile:$line" \
-  "\\^done,bkpt=\{number=\"\[0-9\]+\",type=\"breakpoint\",disp=\"del\",enabled=\"y\",addr=\"$hex\",func=\"$func\(\\\(.*\\\)\)?\",file=\".*\",line=\"$line\",times=\"0\",original-location=\".*\"\}" \
+  "\\^done,bkpt=\{number=\"\[0-9\]+\",type=\"breakpoint\",disp=\"del\",enabled=\"y\",addr=\"$hex\",func=\"$func\(\\\(.*\\\)\)?\",file=\".*\",fullname=\".*\",line=\"$line\",\[^\r\n\]*,original-location=\".*\"\}" \
   "breakpoint at $func"
 
 if { [mi_run_cmd] < 0 } {
