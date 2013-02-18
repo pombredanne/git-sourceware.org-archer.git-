@@ -1,4 +1,4 @@
-# Copyright (C) 2012 Free Software Foundation, Inc.
+# Copyright (C) 2012, 2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,141 +15,271 @@
 
 import gdb
 
-class FrameWrapper (object):
-    """Interface for a Frame Wrapper."""
+class FrameWrapper(object):
+    """Basic implementation of a Frame Wrapper"""
 
-    """ A frame wrapper wraps a frame and provides additional and
-    convenience methods. """
-    def __init__(self, frame):
-        super(FrameWrapper, self).__init__()
+    """ This base frame wrapper wraps a frame or another frame
+    wrapper, and provides convenience methods.  If this object is
+    wrapping a frame wrapper, defer to that wrapped object's method if
+    it has one.  This allows for frame wrappers that have sub-classed
+    FrameWrapper, but also wrap other frame wrappers on the same
+    frame to correctly execute.
+
+    E.g
+
+    If the result of frame filters running means we have one gdb.Frame
+    wrapped by multiple frame wrappers, all sub-classed from
+    FrameWrapper:
+
+    Wrapper1(Wrapper2(FrameWrapper(gdb.Frame)))
+
+    In this case we have two frame wrappers, both of which are
+    sub-classed from FrameWrapper.  If Wrapper1 just overrides the
+    'function' method, then all of the other methods are carried out
+    by the super-class FrameWrapper.  But Wrapper2 may have
+    overriden other methods, so FrameWrapper will look at the
+    'base' parameter and defer to that class's methods.  And so on,
+    down the chain."""
+
+    # 'base' can refer to a gdb.Frame or another frame filter.  In
+    # the latter case, the child class will have called the super
+    # method and base will be an object conforming to the Frame Filter
+    # class.
+    def __init__(self, base):
+        self.base = base
+
+    @staticmethod
+    def _is_limited_frame(frame):
+        """Internal utility to determine if the frame is special or
+        limited."""
+        sal = frame.find_sal()
+
+        if (not sal.symtab or not sal.symtab.filename
+            or frame == gdb.DUMMY_FRAME
+            or frame == gdb.SIGTRAMP_FRAME):
+
+            return True
+
+        return False
+
+    def elided(self):
+        """Return any elided frames that this class might be
+        wrapping, or None."""
+        if hasattr(self.base, "elided"):
+            return self.base.elided()
+
+        return None
+
+    def function(self):
+        """ Return the name of the frame's function, first determining
+        if it is a special frame.  If not, try to determine filename
+        from GDB's frame internal function API.  Finally, if a name
+        cannot be determined return the address."""
+
+        if not isinstance(self.base, gdb.Frame):
+            if hasattr(self.base, "function"):
+                return self.base.function()
+
+        frame = self.inferior_frame()
+
+        if frame.type() == gdb.DUMMY_FRAME:
+            return "<function called from gdb>"
+        elif frame.type() == gdb.SIGTRAMP_FRAME:
+            return "<signal handler called>"
+
+        func = frame.function()
+        sal = frame.find_sal()
+        pc = frame.pc()
+
+        if func == None:
+            unknown =  format(" 0x%08x in" % pc)
+            return unknown
+
+        return str(func)
+
+    def address(self):
+        """ Return the address of the frame's pc"""
+
+        if hasattr(self.base, "address"):
+            return self.base.address()
+
+        frame = self.inferior_frame()
+        return frame.pc()
+
+    def filename(self):
+        """ Return the filename associated with this frame, detecting
+        and returning the appropriate library name is this is a shared
+        library."""
+
+        if hasattr(self.base, "filename"):
+            return self.base.filename()
+
+        frame = self.inferior_frame()
+        sal = frame.find_sal()
+        if (not sal.symtab or not sal.symtab.filename):
+            pc = frame.pc()
+            return gdb.solib_name(pc)
+        else:
+            return sal.symtab.filename
+
+    def frame_args(self):
+        """ Return an iterator of frame arguments for this frame, if
+        any.  The iterator contains objects conforming with the
+        Symbol/Value interface.  If there are no frame arguments, or
+        if this frame is deemed to be a special case, return None."""
+
+        if hasattr(self.base, "frame_args"):
+            return self.base.frame_args()
+
+        frame = self.inferior_frame()
+        if self._is_limited_frame(frame):
+            return None
+
+        args = FrameVars(frame)
+        return args.fetch_frame_args()
+
+    def frame_locals(self):
+        """ Return an iterator of local variables for this frame, if
+        any.  The iterator contains objects conforming with the
+        Symbol/Value interface.  If there are no frame locals, or if
+        this frame is deemed to be a special case, return None."""
+
+        if hasattr(self.base, "frame_locals"):
+            return self.base.frame_locals()
+
+        frame = self.inferior_frame()
+        if self._is_limited_frame(frame):
+            return None
+
+        args = FrameVars(frame)
+        return args.fetch_frame_locals()
+
+    def line(self):
+        """ Return line number information associated with the frame's
+        pc.  If symbol table/line information does not exist, or if
+        this frame is deemed to be a special case, return None"""
+
+        if hasattr(self.base, "line"):
+            return self.base.line()
+
+        frame = self.inferior_frame()
+        if self._is_limited_frame(frame):
+            return None
+
+        sal = frame.find_sal()
+        if (sal):
+            return sal.line
+        else:
+            return None
+
+    def inferior_frame(self):
+        """ Return the gdb.Frame underpinning this frame wrapper."""
+
+        # If 'base' is a frame wrapper, we want to call its inferior
+        # frame method.  If 'base' is a gdb.Frame, just return that.
+        if hasattr(self.base, "inferior_frame"):
+            return self.base.inferior_frame()
+        return self.base
+
+class SymValueWrapper(object):
+    """A container class conforming to the Symbol/Value interface
+    which holds frame locals or frame arguments."""
+    def __init__(self, symbol, value):
+        self.sym = symbol
+        self.val = value
+
+    def value(self):
+        """ Return the value associated with this symbol, or None"""
+        return self.val
+
+    def symbol(self):
+        """ Return the symbol, or Python text, associated with this
+        symbol, or None"""
+        return self.sym
+
+class FrameVars(object):
+
+    """Utility class to fetch and store frame local variables, or
+    frame arguments."""
+
+    def __init__(self,frame):
         self.frame = frame
 
-    def elided (self):
-        """ The elided method groups frames together in a
-        hierarchical system.  An example would be an interpreter call
-        that occurs over many frames but might be better represented
-        as a group of frames distinct from the other frames.
+    @staticmethod
+    def fetch_b(sym):
+        """ Local utility method to determine if according to Symbol
+        type whether it should be included in the iterator.  Not all
+        symbols are fetched, and only symbols that return
+        True from this method should be fetched."""
 
-        Arguments: None
+        # SYM may be a string instead of a symbol in the case of
+        # synthetic local arguments or locals.  If that is the case,
+        # always fetch.
+        if isinstance(sym, basestring):
+            return True
 
-        Returns: The elided function must return an iterator that
-                 contains the frames that are being elided, or None.
-                 Elided frames are indented from normal frames in a
-                 backtrace, to show affinity with the frame that
-                 elided them.  Note that it is the frame filter's task
-                 to filter out the elided frames from the source
-                 iterator, and also to provide the iterator of elided
-                 frames in this function.  If this function returns a
-                 None, no frames will be elided.
-        """
+        sym_type = sym.addr_class
 
-        pass
+        return {
+            gdb.SYMBOL_LOC_STATIC: True,
+            gdb.SYMBOL_LOC_REGISTER: True,
+            gdb.SYMBOL_LOC_ARG: True,
+            gdb.SYMBOL_LOC_REF_ARG: True,
+            gdb.SYMBOL_LOC_LOCAL: True,
+	    gdb.SYMBOL_LOC_REGPARM_ADDR: True,
+	    gdb.SYMBOL_LOC_COMPUTED: True
+          }.get(sym_type, False)
 
-    def function (self):
-        """ The name of the function in the frame.
+    def fetch_frame_locals(self):
+        """Public utility method to fetch frame local variables for
+        the stored frame.  Frame arguments are not fetched.  If there
+        are no frame local variables, return an empty list."""
+        lvars = []
+        try:
+            block = self.frame.block()
+        except:
+            return None
 
-        Arguments: None.
+        for sym in block:
+            if sym.is_argument:
+                continue;
+            if self.fetch_b(sym):
+                lvars.append(SymValueWrapper(sym, None))
 
-        Returns: A string describing the function.  If this function
-                 returns None, no data will be displayed for this
-                 field at printing.
-        """
-        pass
+        return lvars
 
-    def address (self):
-        """ The address of the frame.
+    def fetch_frame_args(self):
+        """Public utility method to fetch frame arguments for the
+        stored frame.  Frame arguments are the only type fetched.  If
+        there are no frame argument variables, return an empty list."""
 
-        Arguments: None.
+        args = []
+        try:
+            block = self.frame.block()
+        except:
+            return None
 
-        Returns: A numeric integer type of sufficient size to describe
-                 the address of the frame, or None.  If this function
-                 returns a None, no data will be displayed for this
-                 field at printing.
-        """
+        for sym in block:
+            if not sym.is_argument:
+                continue;
+            args.append(SymValueWrapper(sym,None))
 
-        pass
+        return args
 
-    def filename (self):
-        """ The filename associated with the function of this frame.
+    def get_value(self, sym, block):
+        """Public utility method to fetch a value from a symbol."""
+        if len(sym.linkage_name):
+            nsym, is_field_of_this = gdb.lookup_symbol(sym.linkage_name, block)
+            if nsym != None:
+                if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
+                    sym = nsym
 
-        Arguments: None.
+        try:
+            val = sym.value(self.frame)
 
-        Returns: A string containing the filename, and optionally, the
-                 path to the filename of the frame, or None.  If this
-                 function returns a None, no data will be displayed
-                 for this field at printing.
-        """
+        except RuntimeError, text:
+            val = text
+        if val == None:
+            val = "???"
 
-        pass
-
-    def line (self):
-        """ The line number associated with the current position
-        within the function addressed by this frame.
-
-        Arguments: None.
-
-        Returns: An integer type representing the line number, or
-                 None.  If this function returns a None, no data will
-                 be displayed for this field at printing.
-        """
-
-        pass
-
-    def frame_args (self):
-        """ The arguments of the function in this frame.
-
-        Arguments: None.
-
-        Returns: An iterator that conforms to the Python iterator
-                 protocol, or None.  If this method returns a None,
-                 instead of an iterator, then no data will be printed
-                 for frame arguments.  If this method returns an
-                 iterator, it must contain objects that implement two
-                 methods, described here.
-
-                 The object must implement an argument method which
-                 takes no parameters and must return a gdb.Symbol or a
-                 Python string.  It must also implement a value method
-                 which takes no parameters and which must return a
-                 gdb.Value, a Python value, or None.  If the value
-                 method returns a None, and the argument method
-                 returns a gdb.Symbol, GDB will look-up and print the
-                 value of the gdb.Symbol automatically.  If the
-                 argument method contains a string, then the value
-                 method must not return a None.
-        """
-        pass
-
-    def frame_locals (self):
-        """ The local variables of the function in this frame.
-
-        Arguments: None.
-
-        Returns: An iterator that conforms to the Python iterator
-                 protocol, or None.  If this method returns a None,
-                 instead of an iterator, then no data will be printed
-                 for frame locals.  If this method returns an
-                 iterator, it must contain objects that implement two
-                 methods, described here.
-
-                 The object must implement an argument method which
-                 takes no parameters and must return a gdb.Symbol or a
-                 Python string.  It must also implement a value method
-                 which takes no parameters and which must return a
-                 gdb.Value, a Python value, or None.  If the value
-                 method returns a None, and the argument method
-                 returns a gdb.Symbol, GDB will look-up and print the
-                 value of the gdb.Symbol automatically.  If the
-                 argument method contains a string, then the value
-                 method must not return a None.
-        """
-        pass
-
-    def frame (self):
-        """ The gdb.Frame that this wrapper is wrapping.
-
-        Arguments: None.
-
-        Returns: The gdb.Frame that this wrapper is wrapping.
-        """
-        pass
+        return val

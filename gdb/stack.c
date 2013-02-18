@@ -1721,12 +1721,19 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
   if (! raw)
     {
       int flags = PRINT_LEVEL | PRINT_FRAME_INFO | PRINT_ARGS;
+      enum py_frame_args arg_type;
 
       if (show_locals)
 	flags |= PRINT_LOCALS;
 
-      result = apply_frame_filter (trailing, flags, 0,
-				   print_frame_arguments,
+      if (!strcmp (print_frame_arguments, "scalars"))
+	arg_type = CLI_SCALAR_VALUES;
+      else if (!strcmp (print_frame_arguments, "all"))
+	arg_type = CLI_ALL_VALUES;
+      else
+	arg_type = CLI_NO_VALUES;
+
+      result = apply_frame_filter (trailing, flags, arg_type,
 				   current_uiout, count);
 
     }

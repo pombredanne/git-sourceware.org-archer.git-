@@ -29,6 +29,7 @@ mi_getopt (const char *prefix,
 {
   char *arg;
   const struct mi_opt *opt;
+  int olength = 1;
 
   /* We assume that argv/argc are ok.  */
   if (*oind > argc || *oind < 0)
@@ -50,10 +51,15 @@ mi_getopt (const char *prefix,
       *oarg = NULL;
       return -1;
     }
+
+  /* Deal with --foo options.  */
+  if (arg[0] == '-' && arg[1] == '-')
+    olength++;
+
   /* Look the option up.  */
   for (opt = opts; opt->name != NULL; opt++)
     {
-      if (strcmp (opt->name, arg + 1) != 0)
+      if (strcmp (opt->name, arg + olength) != 0)
 	continue;
       if (opt->arg_p)
 	{
@@ -71,7 +77,7 @@ mi_getopt (const char *prefix,
 	  return opt->index;
 	}
     }
-  error (_("%s: Unknown option ``%s''"), prefix, arg + 1);
+  error (_("%s: Unknown option ``%s''"), prefix, arg + olength);
 }
 
 int 

@@ -51,6 +51,34 @@ enum frame_filter_flags
     PRINT_LOCALS = 8,
   };
 
+/* A choice of the different frame argument printing strategies that
+   can occur in different cases of frame filter instantiation.  */
+typedef enum py_frame_args
+{
+  /* Print no values for arguments when invoked from the MI. */
+  MI_PRINT_NO_VALUES = PRINT_NO_VALUES,
+
+  MI_PRINT_ALL_VALUES = PRINT_ALL_VALUES,
+
+  /* Print only simple values (what MI defines as "simple") for
+     arguments when invoked from the MI. */
+  MI_PRINT_SIMPLE_VALUES = PRINT_SIMPLE_VALUES,
+
+  /* Print no values for arguments when invoked from the CLI.  */
+  CLI_NO_VALUES,
+
+  /* Print only scalar values for arguments when invoked from the 
+     CLI. */
+  CLI_SCALAR_VALUES,
+
+  /* Print all values for arguments when invoked from the 
+     CLI. */
+  CLI_ALL_VALUES,
+
+  /* NO_OP for commands that do not print frame arguments */
+  NO_VALUES
+} py_frame_args;
+
 extern void finish_python_initialization (void);
 
 void eval_python_from_control_command (struct command_line *);
@@ -65,8 +93,7 @@ int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			      const struct language_defn *language);
 
 int apply_frame_filter (struct frame_info *frame, int flags,
-			enum print_values mi_print_args_type,
-			const char *cli_print_args_type,
+			enum py_frame_args arg_type,
 			struct ui_out *out, int count);
 
 void preserve_python_values (struct objfile *objfile, htab_t copied_types);

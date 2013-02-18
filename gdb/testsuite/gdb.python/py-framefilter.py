@@ -1,4 +1,4 @@
-# Copyright (C) 2012 Free Software Foundation, Inc.
+# Copyright (C) 2012, 2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -17,10 +17,10 @@
 # frame-filters.
 import gdb
 import itertools
-from gdb.BaseFrameWrapper import BaseFrameWrapper
+from gdb.FrameWrapper import FrameWrapper
 import copy
 
-class Reverse_Function (BaseFrameWrapper):
+class Reverse_Function (FrameWrapper):
 
     def __init__(self, fobj):
         super(Reverse_Function, self).__init__(fobj)
@@ -34,7 +34,7 @@ class Reverse_Function (BaseFrameWrapper):
             fname = fname[::-1]
         return fname
 
-class Dummy (BaseFrameWrapper):
+class Dummy (FrameWrapper):
 
     def __init__(self, fobj):
         super(Dummy, self).__init__(fobj)
@@ -74,7 +74,7 @@ class FrameFilter ():
                                      frame_iter)
         return frame_iter
 
-class ElidingFrameWrapper(BaseFrameWrapper):
+class ElidingFrameWrapper(FrameWrapper):
 
     def __init__(self, frame, elided_frames):
         super(ElidingFrameWrapper, self).__init__(frame)

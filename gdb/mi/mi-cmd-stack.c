@@ -32,6 +32,7 @@
 #include "valprint.h"
 #include "exceptions.h"
 #include "utils.h"
+#include "mi-getopt.h"
 #include "python/python.h"
 #include <ctype.h>
 enum what_to_list { locals, arguments, all };
@@ -74,10 +75,33 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
   struct frame_info *fi;
   int result = 0;
   int raw_arg = 0;
+  enum opt
+    {
+      NO_FRAME_FILTERS
+    };
+  static const struct mi_opt opts[] =
+    {
+      {"no-frame-filters", NO_FRAME_FILTERS, 0},
+      { 0, 0, 0 }
+    };
 
-  if (argc > 0)
-    raw_arg = parse_no_frames_option (argv[0]);
-
+  /* Parse arguments.  In this instance we are just looking for
+     --no-frame-filters.  */
+  while (1)
+    {
+      int oind = 0;
+      char *oarg;
+      int opt = mi_getopt ("-stack-list-frames", argc, argv,
+			   opts, &oind, &oarg);
+      if (opt < 0)
+	break;
+      switch ((enum opt) opt)
+	{
+	case NO_FRAME_FILTERS:
+	  raw_arg = 1;
+	  break;
+	}
+    }
   if ((argc > 3 && ! raw_arg) || (argc == 1 && ! raw_arg)
       || (argc == 2 && raw_arg))
     error (_("-stack-list-frames: Usage: [--no-frame-filters] [FRAME_LOW FRAME_HIGH]"));
@@ -115,7 +139,7 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
       if (frame_high != -1)
 	count = (frame_high - frame_low) + 1;
 
-      result = apply_frame_filter (fi, flags, 0, NULL, current_uiout,
+      result = apply_frame_filter (fi, flags, NO_VALUES,  current_uiout,
 				   count);
     }
 
@@ -204,15 +228,15 @@ mi_cmd_stack_list_locals (char *command, char **argv, int argc)
       || (argc == 1 && raw_arg))
     error (_("-stack-list-locals: Usage: [--no-frame-filters] PRINT_VALUES"));
 
-   frame = get_selected_frame (NULL);
-   print_value = parse_print_values (argv[raw_arg]);
+  frame = get_selected_frame (NULL);
+  print_value = parse_print_values (argv[raw_arg]);
 
    if (! raw_arg && frame_filters)
      {
        int flags = PRINT_LEVEL | PRINT_LOCALS;
 
        result = apply_frame_filter (frame, flags, print_value,
-				    NULL,  current_uiout, 1);
+				    current_uiout, 1);
      }
 
    if (! frame_filters || raw_arg || result == PY_BT_ERROR
@@ -282,7 +306,7 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
       if (frame_high != -1)
 	count = (frame_high - frame_low) + 1;
 
-      result = apply_frame_filter (fi, flags, print_values, NULL,
+      result = apply_frame_filter (fi, flags, print_values,
 				   current_uiout, count);
     }
 
@@ -336,7 +360,7 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
      {
        int flags = PRINT_LEVEL | PRINT_ARGS | PRINT_LOCALS;
 
-       result = apply_frame_filter (frame, flags, print_value, NULL,
+       result = apply_frame_filter (frame, flags, print_value,
 				    current_uiout, 1);
      }
 

@@ -1,4 +1,4 @@
-# Copyright (C) 2012 Free Software Foundation, Inc.
+# Copyright (C) 2012, 2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -41,7 +41,7 @@ class FrameIterator(object):
         return next(itertools.islice(self.frame,index,index+1))
 
     def next (self):
-        """__next__ implementation.
+        """next implementation.
 
         Returns:
             The next oldest frame."""
@@ -49,5 +49,5 @@ class FrameIterator(object):
         result = self.frame
         if result is None:
             raise StopIteration
-        self.frame = result.older ()
+        self.frame = result.older()
         return result
