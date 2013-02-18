@@ -136,9 +136,10 @@ show filename-display executable-with-separate-debug-info
 show filename-display libraries-with-separate-debug-info
   Control the way in which filenames is displayed.
   Previous behavior was "relative" for all the options.
-  New default is changed for the options "executable-with-separate-debug-info"
-  and "libraries-with-separate-debug-info" to "absolute".  This prints source
-  filenames from files with separate debug info in absolute form.
+  The new behavior is to print in absolute form file names recorded in
+  separate debug info.  This corresponds to setting the options
+  "executable-with-separate-debug-info" and
+  "libraries-with-separate-debug-info" to the value "absolute".
 
 * MI changes
 
