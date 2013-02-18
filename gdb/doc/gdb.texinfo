@@ -6568,8 +6568,8 @@ form.
 @table @code
 @item set filename-display executable @{relative|basename|absolute@}
 Set how to display filenames coming from the inferior executable, as set by the
-@ref{file command}.  Inferior executable has to use embedded debug info as is
-usually found in binaries compiled by @value{GDBN} user.
+@ref{file command}, when the inferior executable uses embedded debug info as
+found in binaries compiled normally.
 
 The default for inferior executable with embedded debug info is relative.
 
@@ -6578,9 +6578,9 @@ Show the current way to display filenames coming from the inferior executable
 with embedded debug info.
 
 @item set filename-display libraries @{relative|basename|absolute@}
-Set how to display filenames coming from inferior shared libraries.  The shared
-libraries have to use embedded debug info as is usually found in shared
-libraries compiled by @value{GDBN} user.
+Set how to display filenames coming from inferior shared libraries, when the
+shared libraries use embedded debug info as found in binaries compiled
+normally.
 
 The default for inferior shared libraries with embedded debug info is relative.
 
@@ -6590,8 +6590,8 @@ libraries with embedded debug info.
 
 @item set filename-display executable-with-separate-debug-info @{@dots{}@}
 Set how to display filenames coming from the inferior executable, as set by the
-@ref{file command}.  Inferior executable has to use separate debug info file as
-is usually optionally provided by operating system debug info packages.
+@ref{file command}, when the inferior executable uses separate debug info file
+which is usually optionally provided by operating system debug info packages.
 
 The default for inferior executable with separate debug info file is absolute.
 
@@ -6600,9 +6600,9 @@ Show the current way to display filenames coming from the inferior executable
 with separate debug info file.
 
 @item set filename-display libraries-with-separate-debug-info @{@dots{}@}
-Set how to display filenames coming from inferior shared libraries.  The shared
-libraries have to use separate debug info files as are usually found in shared
-libraries optionally provided by operating system debug info packages.
+Set how to display filenames coming from inferior shared libraries, when the
+shared libraries use separate debug info files which are usually optionally
+provided by operating system debug info packages.
 
 The default for inferior shared libraries with separate debug info file is
 absolute.
