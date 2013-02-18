@@ -379,6 +379,13 @@ _bfd_find_nested_archive (bfd *arch_bfd, const char *filename)
   bfd *abfd;
   const char *target;
 
+  /* PR 15140: Don't allow a nested archive pointing to itself.  */
+  if (filename_cmp (filename, arch_bfd->filename) == 0)
+    {
+      bfd_set_error (bfd_error_malformed_archive);
+      return NULL;
+    }
+
   for (abfd = arch_bfd->nested_archives;
        abfd != NULL;
        abfd = abfd->archive_next)
@@ -617,7 +624,6 @@ _bfd_append_relative_path (bfd *arch, char *elt_name)
 bfd *
 _bfd_get_elt_at_filepos (bfd *archive, file_ptr filepos)
 {
-  static file_ptr prev_filepos;
   struct areltdata *new_areldata;
   bfd *n_nfd;
   char *filename;
@@ -625,12 +631,6 @@ _bfd_get_elt_at_filepos (bfd *archive, file_ptr filepos)
   n_nfd = _bfd_look_for_bfd_in_cache (archive, filepos);
   if (n_nfd)
     return n_nfd;
-  /* PR15140: Prevent an inifnite recursion scanning a malformed nested archive.  */
-  if (filepos == prev_filepos)
-    {
-      bfd_set_error (bfd_error_malformed_archive);
-      return NULL;
-    }
 
   if (0 > bfd_seek (archive, filepos, SEEK_SET))
     return NULL;
@@ -639,7 +639,6 @@ _bfd_get_elt_at_filepos (bfd *archive, file_ptr filepos)
     return NULL;
 
   filename = new_areldata->filename;
-  prev_filepos = filepos;
 
   if (bfd_is_thin_archive (archive))
     {

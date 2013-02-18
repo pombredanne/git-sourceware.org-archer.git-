@@ -4002,15 +4002,17 @@ error_free_dyn:
 	  bfd_boolean skip;
 
 	  /* If this is a definition of a symbol which was previously
-	     referenced in a non-weak manner then make a note of the bfd
-	     that contained the reference.  This is used if we need to
-	     refer to the source of the reference later on.  */
+	     referenced, then make a note of the bfd that contained the
+	     reference.  This is used if we need to refer to the source
+	     of the reference later on.  */
 	  if (! bfd_is_und_section (sec))
 	    {
-	      h = elf_link_hash_lookup (elf_hash_table (info), name, FALSE, FALSE, FALSE);
+	      h = elf_link_hash_lookup (elf_hash_table (info), name,
+					FALSE, FALSE, FALSE);
 
 	      if (h != NULL
-		  && h->root.type == bfd_link_hash_undefined
+		  && (h->root.type == bfd_link_hash_undefined
+		      || h->root.type == bfd_link_hash_undefweak)
 		  && h->root.u.undef.abfd)
 		undef_bfd = h->root.u.undef.abfd;
 	    }
@@ -4123,14 +4125,15 @@ error_free_dyn:
 	    }
 
 	  /* If necessary, make a second attempt to locate the bfd
-	     containing an unresolved, non-weak reference to the
-	     current symbol.  */
+	     containing an unresolved reference to the current symbol.  */
 	  if (! bfd_is_und_section (sec) && undef_bfd == NULL)
 	    {
-	      h = elf_link_hash_lookup (elf_hash_table (info), name, FALSE, FALSE, FALSE);
+	      h = elf_link_hash_lookup (elf_hash_table (info), name,
+					FALSE, FALSE, FALSE);
 
 	      if (h != NULL
-		  && h->root.type == bfd_link_hash_undefined
+		  && (h->root.type == bfd_link_hash_undefined
+		      || h->root.type == bfd_link_hash_undefweak)
 		  && h->root.u.undef.abfd)
 		undef_bfd = h->root.u.undef.abfd;
 	    }
@@ -4477,10 +4480,13 @@ error_free_dyn:
 		break;
 	      }
 
+	  /* Don't add DT_NEEDED for references from the dummy bfd.  */
 	  if (!add_needed
 	      && definition
 	      && ((dynsym
-		   && h->ref_regular)
+		   && h->ref_regular
+		   && (undef_bfd == NULL
+		       || (undef_bfd->flags & BFD_PLUGIN) == 0))
 		  || (h->ref_dynamic
 		      && (elf_dyn_lib_class (abfd) & DYN_AS_NEEDED) != 0
 		      && !on_needed_list (elf_dt_name (abfd), htab->needed))))
@@ -4548,7 +4554,7 @@ error_free_dyn:
       memcpy (sym_hash, old_hash, hashsize);
       htab->root.undefs = old_undefs;
       htab->root.undefs_tail = old_undefs_tail;
-      _bfd_elf_strtab_clear_refs (htab->dynstr, old_dynstr_size);
+      _bfd_elf_strtab_restore_size (htab->dynstr, old_dynstr_size);
       for (i = 0; i < htab->root.table.size; i++)
 	{
 	  struct bfd_hash_entry *p;

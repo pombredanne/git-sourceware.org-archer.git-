@@ -1,3 +1,43 @@
+2013-02-18  Alan Modra  <amodra@gmail.com>
+
+	PR ld/12549
+	* elf-bfd.h (_bfd_elf_strtab_clear_refs): Delete.
+	(_bfd_elf_strtab_clear_all_refs): Declare.
+	(_bfd_elf_strtab_resize): Declare.
+	* elf-strtab.c (_bfd_elf_strtab_clear_refs): Delete.
+	(_bfd_elf_strtab_clear_all_refs): New function.
+	(_bfd_elf_strtab_resize): Likewise.
+	* elflink.c (elf_link_add_object_symbols): Use _bfd_elf_strtab_resize.
+
+2013-02-18  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct elf_obj_tdata): Move find_line_info, local_stubs,
+	local_call_stubs, elf_data_symbol, elf_text_symbol, elf_data_section,
+	and elf_text_section to..
+	* elfxx-mips.c (struct mips_elf_obj_tdata): ..here.  Update all refs.
+	* elf64-alpha.c (struct mips_elf_find_line): Rename to..
+	(struct alpha_elf_find_line): ..this.
+	(struct alpha_elf_obj_tdata): Add find_line_info, update refs.
+
+2013-02-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/15146
+	* elflink.c (elf_link_add_object_symbols): Don't add DT_NEEDED
+	for references from the dummy bfd.
+
+2013-02-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/15149
+	* elflink.c (elf_link_add_object_symbols): Also track weak
+	references.
+
+2013-02-15  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR binutils/15151
+	* archive.c (_bfd_find_nested_archive): Don't allow a nested
+	archive pointing to itself.
+	(_bfd_get_elt_at_filepos): Revert the last 2 changes.
+
 2013-02-15  Nick Clifton  <nickc@redhat.com>
 
 	PR binutils/15140
