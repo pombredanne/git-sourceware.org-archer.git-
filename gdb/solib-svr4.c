@@ -860,25 +860,6 @@ locate_base (struct svr4_info *info)
   return info->debug_base;
 }
 
-/* Read the r_map field from the supplied r_debug structure.  */
-
-static CORE_ADDR
-r_map_from_debug_base (CORE_ADDR debug_base)
-{
-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
-  struct type *ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
-  CORE_ADDR addr = 0;
-  volatile struct gdb_exception ex;
-
-  TRY_CATCH (ex, RETURN_MASK_ERROR)
-    {
-      addr = read_memory_typed_address (debug_base + lmo->r_map_offset,
-                                        ptr_type);
-    }
-  exception_print (gdb_stderr, ex);
-  return addr;
-}
-
 /* Find the first element in the inferior's dynamic link map, and
    return its address in the inferior.  Return zero if the address
    could not be determined.
@@ -890,7 +871,18 @@ r_map_from_debug_base (CORE_ADDR debug_base)
 static CORE_ADDR
 solib_svr4_r_map (struct svr4_info *info)
 {
-  return r_map_from_debug_base (info->debug_base);
+  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
+  struct type *ptr_type = builtin_type (target_gdbarch ())->builtin_data_ptr;
+  CORE_ADDR addr = 0;
+  volatile struct gdb_exception ex;
+
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      addr = read_memory_typed_address (info->debug_base + lmo->r_map_offset,
+                                        ptr_type);
+    }
+  exception_print (gdb_stderr, ex);
+  return addr;
 }
 
 /* Find r_brk from the inferior's debug base.  */
