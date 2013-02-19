@@ -206,6 +206,8 @@ config.status: $(srcdir)/configure
 ACLOCAL = aclocal
 ACLOCAL_AMFLAGS = -I import/m4 -I ../../config
 aclocal_m4_deps = \
+	import/m4/gnulib-cache.m4 \
+	import/m4/gnulib-tool.m4 \
 	configure.ac \
 	import/m4/00gnulib.m4 \
 	import/m4/alloca.m4 \
