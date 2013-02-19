@@ -77,7 +77,7 @@ typedef int socklen_t;
 extern const char version[];
 extern const char host_name[];
 
-static int remote_desc;
+static int remote_desc_in, remote_desc_out;
 
 #ifdef __MINGW32CE__
 
@@ -178,10 +178,56 @@ static void
 remote_close (void)
 {
 #ifdef USE_WIN32API
-  closesocket (remote_desc);
+  closesocket (remote_desc_in);
+  if (remote_desc_in != remote_desc_out)
+    closesocket (remote_desc_out);
 #else
-  close (remote_desc);
+  close (remote_desc_in);
+  if (remote_desc_in != remote_desc_out)
+    close (remote_desc_out);
 #endif
+}
+
+/* Parse the string "fdin=<#>,fdout=<#>" into `remote_desc_in' and
+   `remote_desc_out' file descripts.  Return non-zero for success.  */
+
+static int
+parse_fds (char *name)
+{
+  const char *fdin_string = "fdin=";
+  size_t fdin_string_len = strlen (fdin_string);
+  const char *comma_fdout_string = ",fdout=";
+  size_t comma_fdout_string_len = strlen (comma_fdout_string);
+  long l;
+
+  if (strncmp (name, fdin_string, fdin_string_len) != 0)
+    return 0;
+  name += fdin_string_len;
+
+  if (*name == 0 || *name == ',')
+    return 0;
+  errno = 0;
+  l = strtol (name, &name, 10);
+  remote_desc_in = l;
+  if (errno != 0 || name == NULL || l < 0 || remote_desc_in != l)
+    return 0;
+
+  if (strncmp (name, comma_fdout_string, comma_fdout_string_len) != 0)
+    return 0;
+  name += comma_fdout_string_len;
+
+  if (*name == 0 || *name == ',')
+    return 0;
+  errno = 0;
+  l = strtol (name, &name, 10);
+  remote_desc_out = l;
+  if (errno != 0 || name == NULL || l < 0 || remote_desc_out != l)
+    return 0;
+
+  if (*name != 0)
+    return 0;
+
+  return 1;
 }
 
 /* Open a connection to a remote debugger.
@@ -190,14 +236,22 @@ remote_close (void)
 static void
 remote_open (char *name)
 {
-  if (!strchr (name, ':'))
+  /* "fdin=<#>,fdout=<#>"  */
+  if (parse_fds (name))
     {
-      fprintf (stderr, "%s: Must specify tcp connection as host:addr\n", name);
+      fprintf (stderr, "Remote debugging using file descriptors"
+               " (input = %d, output = %d)\n", remote_desc_in, remote_desc_out);
+    }
+  else if (!strchr (name, ':'))
+    {
+      fprintf (stderr, "%s: Must specify tcp connection as host:addr"
+	       " or use fdin=<fd #>,fdout=<fd #>\n", name);
       fflush (stderr);
       exit (1);
     }
   else
     {
+      int remote_desc;
 #ifdef USE_WIN32API
       static int winsock_initialized;
 #endif
@@ -263,10 +317,13 @@ remote_open (char *name)
 #else
       closesocket (tmp_desc);	/* No longer need this */
 #endif
+      remote_desc_in = remote_desc_out = remote_desc;
     }
 
 #if defined(F_SETFL) && defined (FASYNC)
-  fcntl (remote_desc, F_SETFL, FASYNC);
+  fcntl (remote_desc_in, F_SETFL, FASYNC);
+  if (remote_desc_in != remote_desc_out)
+    fcntl (remote_desc_out, F_SETFL, FASYNC);
 #endif
 
   fprintf (stderr, "Replay logfile using %s\n", name);

@@ -88,6 +88,10 @@
    you don't. */
 #undef HAVE_DECL_ADDR_NO_RANDOMIZE
 
+/* Define to 1 if you have the declaration of `AF_INET6', and to 0 if you
+   don't. */
+#undef HAVE_DECL_AF_INET6
+
 /* Define to 1 if you have the declaration of `free', and to 0 if you don't.
    */
 #undef HAVE_DECL_FREE
@@ -150,8 +154,14 @@
 /* Define if <sys/procfs.h> has fpregset_t. */
 #undef HAVE_FPREGSET_T
 
+/* Define to 1 if you have the `getaddrinfo' function. */
+#undef HAVE_GETADDRINFO
+
 /* Define to 1 if you have the `getgid' function. */
 #undef HAVE_GETGID
+
+/* Define to 1 if you have the `getnameinfo' function. */
+#undef HAVE_GETNAMEINFO
 
 /* Define to 1 if you have the `getpagesize' function. */
 #undef HAVE_GETPAGESIZE

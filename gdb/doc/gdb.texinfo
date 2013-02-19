@@ -17364,6 +17364,8 @@ If you're using a serial line, you may want to give @value{GDBN} the
 
 @item target remote @code{@var{host}:@var{port}}
 @itemx target remote @code{tcp:@var{host}:@var{port}}
+@itemx target remote @code{tcp4:@var{host}:@var{port}}
+@itemx target remote @code{tcp6:@var{host}:@var{port}}
 @cindex @acronym{TCP} port, @code{target remote}
 Debug using a @acronym{TCP} connection to @var{port} on @var{host}.
 The @var{host} may be either a host name or a numeric @acronym{IP}
@@ -17371,6 +17373,9 @@ address; @var{port} must be a decimal number.  The @var{host} could be
 the target machine itself, if it is directly connected to the net, or
 it might be a terminal server which in turn has a serial line to the
 target.
+
+The @code{tcp6:} prefix forces IPv6 network connection while @code{tcp4:}
+forces IPv4, both on the reliable stream TCP connection.
 
 For example, to connect to port 2828 on a terminal server named
 @code{manyfarms}:
@@ -17392,9 +17397,14 @@ target remote :1234
 Note that the colon is still required here.
 
 @item target remote @code{udp:@var{host}:@var{port}}
+@itemx target remote @code{udp6:@var{host}:@var{port}}
+@itemx target remote @code{udp4:@var{host}:@var{port}}
 @cindex @acronym{UDP} port, @code{target remote}
 Debug using @acronym{UDP} packets to @var{port} on @var{host}.  For example, to
 connect to @acronym{UDP} port 2828 on a terminal server named @code{manyfarms}:
+
+The @code{udp6:} prefix forces IPv6 network connection while @code{udp4:}
+forces IPv4, both on the unreliable datagram UDP connection.
 
 @smallexample
 target remote udp:manyfarms:2828
@@ -17575,20 +17585,33 @@ with it.
 To use a TCP connection instead of a serial line:
 
 @smallexample
-target> gdbserver host:2345 emacs foo.txt
+target> socat EXEC:'gdbserver fdin=3,fdout=4 emacs foo.txt',fdin=3,fdout=4 TCP-LISTEN:2345
 @end smallexample
 
-The only difference from the previous example is the first argument,
-specifying that you are communicating with the host @value{GDBN} via
-TCP.  The @samp{host:2345} argument means that @code{gdbserver} is to
-expect a TCP connection from machine @samp{host} to local TCP port 2345.
-(Currently, the @samp{host} part is ignored.)  You can choose any number
-you want for the port number as long as it does not conflict with any
-TCP ports already in use on the target system (for example, @code{23} is
-reserved for @code{telnet}).@footnote{If you choose a port number that
-conflicts with another service, @code{gdbserver} prints an error message
-and exits.}  You must use the same port number with the host @value{GDBN}
-@code{target remote} command.
+This example still debugs the same program just in this case it is specifying
+that you are communicating with the host @value{GDBN} via TCP.
+The @code{gdbserver} specific part @code{fd34} directs @code{gdbserver} to use
+already preopened file descriptor 3 for @value{GDBN} remote serial protocol
+input and file descriptor 4 for the protocol output.  Do not use the file
+descriptors 0, 1 or 2 as the @value{GDBN} protocol communication could get
+corrupted by the inferior program's stdio.
+
+Please check external @code{socat} program documentation for other available
+network options (such as using @code{TCP6-LISTEN} for IPv6 networks).
+
+You can choose any port number you want (@code{2345} here) as long as it does
+not conflict with any TCP ports already in use on the target system (for
+example, @code{23} is reserved for @code{telnet}).@footnote{If you choose
+a port number that conflicts with another service, @code{socat} prints an error
+message and exits.}  You must use the same port number with the host
+@value{GDBN} @code{target remote} command.
+
+@smallexample
+target> gdbserver :2345 emacs foo.txt
+@end smallexample
+
+On IPv4 networks you may also run @code{gdbserver} directly as shown above,
+without the @code{socat} helper there.
 
 The @code{stdio} connection is useful when starting @code{gdbserver}
 with ssh:

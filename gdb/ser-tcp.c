@@ -158,20 +158,23 @@ net_open (struct serial *scb, const char *name)
 {
   char *port_str, hostname[100];
   int n, port, tmp;
-  int use_udp;
-  struct hostent *hostent;
-  struct sockaddr_in sockaddr;
+  struct addrinfo hints;
+  struct addrinfo *addrinfo_base, *addrinfo = NULL;
 #ifdef USE_WIN32API
   u_long ioarg;
 #else
   int ioarg;
 #endif
-  int polls = 0;
+  int polls = 0, retval = -1;
+  struct cleanup *back_to;
 
-  use_udp = 0;
+  memset (&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_flags = AI_ADDRCONFIG;
+  hints.ai_socktype = SOCK_STREAM;
   if (strncmp (name, "udp:", 4) == 0)
     {
-      use_udp = 1;
+      hints.ai_socktype = SOCK_DGRAM;
       name = name + 4;
     }
   else if (strncmp (name, "tcp:", 4) == 0)
@@ -192,36 +195,41 @@ net_open (struct serial *scb, const char *name)
   if (!hostname[0])
     strcpy (hostname, "localhost");
 
-  hostent = gethostbyname (hostname);
-  if (!hostent)
+  if (getaddrinfo (hostname, port_str, &hints, &addrinfo_base) != 0)
     {
-      fprintf_unfiltered (gdb_stderr, "%s: unknown host\n", hostname);
+      fprintf_unfiltered (gdb_stderr, _("%s:%s: cannot resolve: %s\n"),
+			  hostname, port_str, gai_strerror (n));
       errno = ENOENT;
       return -1;
     }
 
-  sockaddr.sin_family = PF_INET;
-  sockaddr.sin_port = htons (port);
-  memcpy (&sockaddr.sin_addr.s_addr, hostent->h_addr,
-	  sizeof (struct in_addr));
+  assert (addrinfo_base != NULL);
+  back_to = make_cleanup_freeaddrinfo (addrinfo_base);
 
  retry:
 
-  if (use_udp)
-    scb->fd = socket (PF_INET, SOCK_DGRAM, 0);
-  else
-    scb->fd = socket (PF_INET, SOCK_STREAM, 0);
+  for (addrinfo = addrinfo_base; addrinfo != NULL; addrinfo = addrinfo->ai_next)
+    {
+      scb->fd = socket (addrinfo->ai_family, addrinfo->ai_socktype,
+			addrinfo->ai_protocol);
+      if (scb->fd >= 0)
+	break;
+    }
+  if (addrinfo == NULL)
+    {
+      fprintf_unfiltered (gdb_stderr, "%s:%s: cannot create socket: %s\n",
+			  hostname, port_str, safe_strerror (errno));
+      do_cleanups (back_to);
+      return -1;
+    }
 
-  if (scb->fd == -1)
-    return -1;
-  
   /* Set socket nonblocking.  */
   ioarg = 1;
   ioctl (scb->fd, FIONBIO, &ioarg);
 
   /* Use Non-blocking connect.  connect() will return 0 if connected
      already.  */
-  n = connect (scb->fd, (struct sockaddr *) &sockaddr, sizeof (sockaddr));
+  n = connect (scb->fd, addrinfo->ai_addr, addrinfo->ai_addrlen);
 
   if (n < 0)
     {
@@ -256,8 +264,7 @@ net_open (struct serial *scb, const char *name)
 	  )
 	{
 	  errno = err;
-	  net_close (scb);
-	  return -1;
+	  goto cleanup_scb;
 	}
 
       /* Looks like we need to wait for the connect.  */
@@ -267,10 +274,7 @@ net_open (struct serial *scb, const char *name)
 	} 
       while (n == 0);
       if (n < 0)
-	{
-	  net_close (scb);
-	  return -1;
-	}
+	goto cleanup_scb;
     }
 
   /* Got something.  Is it an error?  */
@@ -300,8 +304,7 @@ net_open (struct serial *scb, const char *name)
 	  }
 	if (err)
 	  errno = err;
-	net_close (scb);
-	return -1;
+	goto cleanup_scb;
       }
   } 
 
@@ -309,7 +312,7 @@ net_open (struct serial *scb, const char *name)
   ioarg = 0;
   ioctl (scb->fd, FIONBIO, &ioarg);
 
-  if (use_udp == 0)
+  if (prefix == NULL || prefix->socktype == SOCK_STREAM)
     {
       /* Disable Nagle algorithm.  Needed in some cases.  */
       tmp = 1;
@@ -323,7 +326,16 @@ net_open (struct serial *scb, const char *name)
   signal (SIGPIPE, SIG_IGN);
 #endif
 
-  return 0;
+  retval = 0;
+  goto cleanup_addrinfo_base;
+
+cleanup_scb:
+  net_close (scb);
+cleanup_addrinfo_base:
+#ifdef HAVE_GETADDRINFO
+  freeaddrinfo (addrinfo_base);
+#endif  /* HAVE_GETADDRINFO */
+  return retval;
 }
 
 void

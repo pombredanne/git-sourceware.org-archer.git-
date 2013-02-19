@@ -60,6 +60,7 @@
 #if HAVE_ERRNO_H
 #include <errno.h>
 #endif
+#include <ctype.h>
 
 #if USE_WIN32API
 #include <winsock2.h>
