@@ -5292,6 +5292,7 @@ _bfd_elf_write_object_contents (bfd *abfd)
   Elf_Internal_Shdr **i_shdrp;
   bfd_boolean failed;
   unsigned int count, num_sec;
+  struct elf_obj_tdata *t;
 
   if (! abfd->output_has_begun
       && ! _bfd_elf_compute_section_file_positions (abfd, NULL))
@@ -5323,21 +5324,22 @@ _bfd_elf_write_object_contents (bfd *abfd)
     }
 
   /* Write out the section header names.  */
+  t = elf_tdata (abfd);
   if (elf_shstrtab (abfd) != NULL
-      && (bfd_seek (abfd, elf_tdata (abfd)->shstrtab_hdr.sh_offset, SEEK_SET) != 0
+      && (bfd_seek (abfd, t->shstrtab_hdr.sh_offset, SEEK_SET) != 0
 	  || !_bfd_elf_strtab_emit (abfd, elf_shstrtab (abfd))))
     return FALSE;
 
   if (bed->elf_backend_final_write_processing)
-    (*bed->elf_backend_final_write_processing) (abfd,
-						elf_tdata (abfd)->linker);
+    (*bed->elf_backend_final_write_processing) (abfd, t->linker);
 
   if (!bed->s->write_shdrs_and_ehdr (abfd))
     return FALSE;
 
   /* This is last since write_shdrs_and_ehdr can touch i_shdrp[0].  */
-  if (elf_tdata (abfd)->after_write_object_contents)
-    return (*elf_tdata (abfd)->after_write_object_contents) (abfd);
+  if (t->build_id != NULL
+      && t->build_id->u.o.zero == 0)
+    return (*t->build_id->u.o.after_write_object_contents) (abfd);
 
   return TRUE;
 }
@@ -7504,18 +7506,29 @@ elf_find_function (bfd *abfd,
 		   const char **filename_ptr,
 		   const char **functionname_ptr)
 {
-  static asection *last_section;
-  static asymbol *func;
-  static const char *filename;
-  static bfd_size_type func_size;
+  struct elf_find_function_cache
+  {
+    asection *last_section;
+    asymbol *func;
+    const char *filename;
+    bfd_size_type func_size;
+  } *cache;
 
   if (symbols == NULL)
     return FALSE;
 
-  if (last_section != section
-      || func == NULL
-      || offset < func->value
-      || offset >= func->value + func_size)
+  cache = elf_tdata (abfd)->elf_find_function_cache;
+  if (cache == NULL)
+    {
+      cache = bfd_zalloc (abfd, sizeof (*cache));
+      elf_tdata (abfd)->elf_find_function_cache = cache;
+      if (cache == NULL)
+	return FALSE;
+    }
+  if (cache->last_section != section
+      || cache->func == NULL
+      || offset < cache->func->value
+      || offset >= cache->func->value + cache->func_size)
     {
       asymbol *file;
       bfd_vma low_func;
@@ -7531,13 +7544,13 @@ elf_find_function (bfd *abfd,
       enum { nothing_seen, symbol_seen, file_after_symbol_seen } state;
       const struct elf_backend_data *bed = get_elf_backend_data (abfd);
 
-      filename = NULL;
-      func = NULL;
       file = NULL;
       low_func = 0;
       state = nothing_seen;
-      func_size = 0;
-      last_section = section;
+      cache->filename = NULL;
+      cache->func = NULL;
+      cache->func_size = 0;
+      cache->last_section = section;
 
       for (p = symbols; *p != NULL; p++)
 	{
@@ -7558,29 +7571,29 @@ elf_find_function (bfd *abfd,
 	      && code_off <= offset
 	      && (code_off > low_func
 		  || (code_off == low_func
-		      && size > func_size)))
+		      && size > cache->func_size)))
 	    {
-	      func = sym;
-	      func_size = size;
+	      cache->func = sym;
+	      cache->func_size = size;
+	      cache->filename = NULL;
 	      low_func = code_off;
-	      filename = NULL;
 	      if (file != NULL
 		  && ((sym->flags & BSF_LOCAL) != 0
 		      || state != file_after_symbol_seen))
-		filename = bfd_asymbol_name (file);
+		cache->filename = bfd_asymbol_name (file);
 	    }
 	  if (state == nothing_seen)
 	    state = symbol_seen;
 	}
     }
 
-  if (func == NULL)
+  if (cache->func == NULL)
     return FALSE;
 
   if (filename_ptr)
-    *filename_ptr = filename;
+    *filename_ptr = cache->filename;
   if (functionname_ptr)
-    *functionname_ptr = bfd_asymbol_name (func);
+    *functionname_ptr = bfd_asymbol_name (cache->func);
 
   return TRUE;
 }
@@ -8681,12 +8694,18 @@ elfcore_grok_note (bfd *abfd, Elf_Internal_Note *note)
 static bfd_boolean
 elfobj_grok_gnu_build_id (bfd *abfd, Elf_Internal_Note *note)
 {
-  elf_tdata (abfd)->build_id_size = note->descsz;
-  elf_tdata (abfd)->build_id = (bfd_byte *) bfd_alloc (abfd, note->descsz);
-  if (elf_tdata (abfd)->build_id == NULL)
+  struct elf_obj_tdata *t;
+
+  if (note->descsz == 0)
     return FALSE;
 
-  memcpy (elf_tdata (abfd)->build_id, note->descdata, note->descsz);
+  t = elf_tdata (abfd);
+  t->build_id = bfd_alloc (abfd, sizeof (t->build_id->u.i) - 1 + note->descsz);
+  if (t->build_id == NULL)
+    return FALSE;
+
+  t->build_id->u.i.size = note->descsz;
+  memcpy (t->build_id->u.i.data, note->descdata, note->descsz);
 
   return TRUE;
 }

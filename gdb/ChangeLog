@@ -1,3 +1,439 @@
+2013-02-19  Lei Liu  <lei.liu2@windriver.com>
+
+	* mips-linux-nat.c (mips64_linux_regsets_store_registers):
+	Don't check DSP register number if HAVE_DSP is not set.
+
+2013-02-19  Alan Modra  <amodra@gmail.com>
+
+	* elfread.c (struct build_id): Delete.  Use struct elf_build_id
+	throughout file instead.
+	(build_id_bfd_get): Update to use new elf_tdata build_id field.
+	Don't xmalloc return value.
+	(build_id_verify): Similarly.  Don't xfree.
+	(build_id_to_debug_filename): Update.
+	(find_separate_debug_file_by_buildid): Update, don't xfree.
+
+2013-02-18  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/15102:
+	* dwarf2read.c (read_subrange_type): Use result of
+	'check_typedef'.
+
+2013-02-16  Yuanhui Zhang  <asmwarrior@gmail.com>
+
+	* frame.c: Remove one extra white space after #include
+	directive.
+
+2013-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* contrib/cc-with-tweaks.sh: Extend the comment for -p option.
+
+2013-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb-gdb.gdb.in: Wrap set complaints, b internal_error, b info_command
+	and dir commands into an if block.
+
+2013-02-15  Sanimir Agovic  <sanimir.agovic@intel.com>
+
+	* python/py-breakpoint (struct pybp_code):  Use int instead of
+	enum type_code.
+
+2013-02-15  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* NEWS: Mention new field "trace-file".
+	* tracepoint.c (trace_status_mi): Output "trace-file" field.
+	(tfile_open): Record the trace file's filename in the trace
+	status.
+	(tfile_files_info): Mention the name of the trace file.
+	Check the "filename" field explicitely.
+	(trace_status_command): Explicitely check "filename" field.
+	(trace_find_command): Ditto.
+	(trace_find_pc_command): Ditto.
+	(trace_find_tracepoint_command): Ditto.
+	(trace_find_line_command): Ditto.
+	(trace_find_range_command): Ditto.
+	(trace_find_outside_command): Ditto.
+	* tracepoint.h (struct trace_status) <from_file>: Rename it
+	to "filename" and make it hold the trace file's filename
+	instead of a boolean.
+	* remote.c (remote_get_trace_status): Initialize "filename"
+	field with NULL instead	of 0.
+
+2013-02-15  Yao Qi  <yao@codesourcery.com>
+
+	* remote.c: Fix a typo.
+
+2013-02-14  Pierre Muller  <muller@sourceware.org>
+
+	* contrib/ari/gdb_ari.sh (GNU/Linux rule): Remove.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* utils.c (savestring): Don't #undef it.  Move function to
+	common/common-utils.c.
+	* common/common-utils.c: Include gdb_string.h.
+	(savestring): Move here from utils.c.
+	* common/common-utils.h (savestring): Declare.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* utils.c (savestring): Rename parameter 'size' to 'len'.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-linux-nat.c (aarch64_init_debug_reg_state): Delete.
+	(aarch64_inferior_data, struct aarch64_inferior_data):
+	Delete.
+	(struct aarch64_process_info): New.
+	(aarch64_process_list): New global.
+	(aarch64_find_process_pid, aarch64_add_process)
+	(aarch64_process_info_get): New functions.
+	(aarch64_inferior_data_get): Delete.
+	(aarch64_process_info_get): New function.
+	(aarch64_forget_process): New function.
+	(aarch64_get_debug_reg_state): New parameter 'pid'.  Reimplement.
+	(aarch64_linux_prepare_to_resume): Pass the lwp's pid to
+	aarch64_get_debug_reg_state.
+	(aarch64_notify_debug_reg_change): Use iterate_over_lwps
+	instead of linux_nat_iterate_watchpoint_lwps.
+	(aarch64_linux_new_fork): New function.
+	(aarch64_linux_child_post_startup_inferior): Use
+	aarch64_forget_process instead of aarch64_init_debug_reg_state.
+	(aarch64_handle_breakpoint, aarch64_linux_insert_hw_breakpoint)
+	(aarch64_linux_remove_hw_breakpoint)
+	(aarch64_handle_aligned_watchpoint)
+	(aarch64_handle_unaligned_watchpoint)
+	(aarch64_linux_insert_watchpoint)
+	(aarch64_linux_remove_watchpoint)
+	(aarch64_linux_stopped_data_address): Adjust to pass the current
+	process id to aarch64_debug_reg_state.
+	(_initialize_aarch64_linux_nat): Install aarch64_linux_new_fork as
+	linux_nat_new_fork hook, and aarch64_forget_process as
+	linux_nat_forget_process hook; remove the call to
+	register_inferior_data_with_cleanup.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* eval.c (evaluate_subexp_for_address) <default_case_after_eval,
+	EVAL_AVOID_SIDE_EFFECTS>: Swap and handle TYPE_CODE_REF before
+	lval_memory.
+
+2013-02-14  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* tracepoint.h (validate_trace_state_variable_name): Declare.
+	* tracepoint.c (validate_trace_state_variable_name): New.
+	(trace_variable_command): Parse the trace state variable's name
+	without using parse_expression.  Do several validations.
+	* mi/mi-main.c (mi_cmd_trace_define_variable): Don't parse the
+	trace state variable's name with parse_expression.  Validate it.
+
+2013-02-14  Yao Qi  <yao@codesourcery.com>
+
+	* infcmd.c (breakpoint_proceeded): Remove it.
+
+2013-02-14  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (end_actions_pseudocommand): Make it static.
+	(while_stepping_pseudocommand): Likewise.
+	* tracepoint.h (end_actions_pseudocommand): Remove the
+	declaration.
+	(while_stepping_pseudocommand): Likewise.
+
+2013-02-14  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-decode.c (help_cmd): Remove the declaration of
+	"cmdlist".
+	(help_all): Likewise.
+
+2013-02-13  Pedro Alves  <palves@redhat.com>
+
+	* amd64-linux-nat.c (update_debug_registers_callback):
+	Update comment.
+	(amd64_linux_dr_set_control, amd64_linux_dr_set_addr): Use
+	iterate_over_lwps.
+	(amd64_linux_prepare_to_resume): Pass the lwp's pid to
+	i386_debug_reg_state.
+	(amd64_linux_new_fork): New function.
+	(_initialize_amd64_linux_nat): Install amd64_linux_new_fork as
+	linux_nat_new_fork hook, and i386_forget_process as
+	linux_nat_forget_process hook.
+	* i386-linux-nat.c (update_debug_registers_callback):
+	Update comment.
+	(i386_linux_dr_set_control, i386_linux_dr_set_addr): Use
+	iterate_over_lwps.
+	(i386_linux_prepare_to_resume): Pass the lwp's pid to
+	i386_debug_reg_state.
+	(i386_linux_new_fork): New function.
+	(_initialize_i386_linux_nat): Install i386_linux_new_fork as
+	linux_nat_new_fork hook, and i386_forget_process as
+	linux_nat_forget_process hook.
+	* i386-nat.c (i386_init_dregs): Delete.
+	(i386_inferior_data, struct i386_inferior_data):
+	Delete.
+	(struct i386_process_info): New.
+	(i386_process_list): New global.
+	(i386_find_process_pid, i386_add_process, i386_process_info_get):
+	New functions.
+	(i386_inferior_data_get): Delete.
+	(i386_process_info_get): New function.
+	(i386_debug_reg_state): New parameter 'pid'.  Reimplement.
+	(i386_forget_process): New function.
+	(i386_cleanup_dregs): Rewrite.
+	(i386_update_inferior_debug_regs, i386_insert_watchpoint)
+	(i386_remove_watchpoint, i386_region_ok_for_watchpoint)
+	(i386_stopped_data_address, i386_insert_hw_breakpoint)
+	(i386_remove_hw_breakpoint): Adjust to pass the current process id
+	to i386_debug_reg_state.
+	(i386_use_watchpoints): Don't register inferior data.
+	* i386-nat.h (i386_debug_reg_state): Add new 'pid' parameter, and
+	adjust comment.
+	(i386_forget_process): Declare.
+	* linux-fork.c (delete_fork): Call linux_nat_forget_process.
+	* linux-nat.c (linux_nat_new_fork, linux_nat_forget_process_hook):
+	New static globals.
+	(linux_child_follow_fork): Don't call linux_nat_new_thread here.
+	(add_initial_lwp): New, factored out from ...
+	(add_lwp): ... this.  Don't check the number of lwps before
+	calling linux_nat_new_thread.
+	(linux_nat_iterate_watchpoint_lwps): Delete.
+	(linux_nat_attach): Use add_initial_lwp instead of add_lwp.
+	(linux_handle_extended_wait): Call the linux_nat_new_fork hook on
+	forks and vforks.
+	(linux_nat_wait_1): Use add_initial_lwp instead of add_lwp for the
+	initial lwp.
+	(linux_nat_kill, linux_nat_mourn_inferior): Call
+	linux_nat_forget_process.
+	(linux_nat_set_new_fork, linux_nat_set_forget_process)
+	(linux_nat_forget_process): New functions.
+	* linux-nat.h (linux_nat_iterate_watchpoint_lwps_ftype): Delete
+	type.
+	(linux_nat_iterate_watchpoint_lwps): Delete declaration.
+	(linux_nat_new_fork_ftype, linux_nat_forget_process_ftype): New
+	types.
+	(linux_nat_set_new_fork, linux_nat_set_forget_process)
+	(linux_nat_forget_process): New declarations.
+
+	* amd64fbsd-nat.c (super_mourn_inferior): New global.
+	(amd64fbsd_mourn_inferior): New function.
+	(_initialize_amd64fbsd_nat): Override to_mourn_inferior.
+	* windows-nat.c (windows_detach): Call i386_cleanup_dregs.
+
+2013-02-13  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-nat.c (aarch64_linux_get_debug_reg_capacity):
+	Adding _().
+
+2013-02-13  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-nat.c (debug_reg_change_callback)
+	(aarch64_linux_get_debug_reg_capacity): ARI fix: Replace %llx with
+	%s and phex().
+
+2013-02-13  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-nat.c (dr_changed_t): ARI fix: Replace long long
+	with LONGEST.
+
+2013-02-13  Pedro Alves  <palves@redhat.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* c-lang.c (c_op_print_tab): Add entry for UNOP_PLUS.
+
+2013-02-12  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/11464:
+	* c-exp.y (lex_one_token): Initialize other fields of yylval on
+	NAME return.
+	(classify_inner_name): Remove 'first_name' argument, add
+	'context'.  Remove unused variable.
+	(yylex): Explicitly maintain the context type.  Exit loop earlier
+	if NAME result is seen.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* amd64-darwin-tdep.c: Add (C) after Copyright.
+	* cli/cli-cmds.h: Ditto.
+	* cli/cli-decode.c: Ditto.
+	* cli/cli-decode.h: Ditto.
+	* cli/cli-dump.c: Ditto.
+	* cli/cli-dump.h: Ditto.
+	* cli/cli-interp.c: Ditto.
+	* cli/cli-logging.c: Ditto.
+	* cli/cli-script.c: Ditto.
+	* cli/cli-script.h: Ditto.
+	* cli/cli-setshow.c: Ditto.
+	* cli/cli-setshow.h: Ditto.
+	* cli/cli-utils.c: Ditto.
+	* cli/cli-utils.h: Ditto.
+	* config/alpha/nm-osf3.h: Ditto.
+	* config/djgpp/djconfig.sh: Ditto.
+	* config/i386/nm-fbsd.h: Ditto.
+	* config/i386/nm-i386gnu.h: Ditto.
+	* config/nm-linux.h: Ditto.
+	* config/nm-nto.h: Ditto.
+	* config/rs6000/nm-rs6000.h: Ditto.
+	* config/sparc/nm-sol2.h: Ditto.
+	* darwin-nat-info.c: Ditto.
+	* dfp.c: Ditto.
+	* dfp.h: Ditto.
+	* gdb-demangle.h: Ditto.
+	* i386-darwin-nat.c: Ditto.
+	* i386-darwin-tdep.c: Ditto.
+	* linux-fork.h: Ditto.
+	* m32c-tdep.c: Ditto.
+	* microblaze-linux-tdep.c: Ditto.
+	* microblaze-rom.c: Ditto.
+	* microblaze-tdep.c: Ditto.
+	* microblaze-tdep.h: Ditto.
+	* mips-linux-tdep.h: Ditto.
+	* ppc-ravenscar-thread.c: Ditto.
+	* ppc-ravenscar-thread.h: Ditto.
+	* prologue-value.c: Ditto.
+	* prologue-value.h: Ditto.
+	* ravenscar-thread.c: Ditto.
+	* ravenscar-thread.h: Ditto.
+	* sparc-ravenscar-thread.c: Ditto.
+	* sparc-ravenscar-thread.h: Ditto.
+	* tilegx-linux-tdep.c: Ditto.
+	* unwind_stop_reasons.def: Ditto.
+	* windows-nat.h: Ditto.
+	* xtensa-linux-tdep.c: Ditto.
+	* xtensa-xtregs.c: Ditto.
+	* regformats/regdat.sh: Ditto.
+	* regformats/regdef.h: Ditto.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* break-catch-sig.c: Update copyright years.
+
+2013-02-11  Siva Chandra Reddy  <sivachandra@google.com>
+
+	Add support for a destructor for ui_out data and use it to
+	provide a ui_out destructor.
+	* ui-out.h: Declare the new ui_out destructor.
+	(ui_out_impl): Add a field for data destructor in ui_out_impl.
+	* ui-out.c (default_data_destroy): Add a default data destructor
+	which does nothing.
+	(default_ui_out_impl): Set the new data_destroy field to
+	default_data_destroy
+	(uo_data_destroy): Local function which invokes the data
+	destructor if present.
+	(clear_table): Local function which clears the table data of a
+	ui_out object.
+	(ui_out_destroy): Public function which frees a ui_out object.
+	(ui_out_table_end): Use the new clear_table function.
+	* cli-out.c (cli_ui_out_impl): Set the new data_destroy field to
+	NULL.
+	* mi/mi-out.c (mi_ui_out_impl): Set the new data_destroy field
+	to NULL.
+
+2013-02-11  Doug Evans  <dje@google.com>
+
+	* printcmd.c (printf_c_string,printf_wide_c_string): New functions.
+	(printf_decfloat): New function.  Broken out from ui_printf.
+	Remove unnecessary code to shift the entire format string down.
+	(printf_pointer): New function.
+	(ui_printf): Code to print C strings, wide C strings, decfloats,
+	and pointers moved to separate functions.
+
+2013-02-11  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* valops.c (value_assign): Handling bitfield offset in
+	`lval_internalvar_component' case.
+
+2013-02-08  Doug Evans  <dje@google.com>
+
+	* common/format.c (parse_format_string): Fix whitespace.
+
+2013-02-08  Matthew Gretton-Dann  <matthew.gretton-dann@linaro.org>
+
+	* stack.c (return_command): Work around uninitialized variable
+	warning.
+
+2013-02-08  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-linux-tdep.c (AARCH64_LINUX_SIZEOF_GREGSET): Change the
+	number of the registers from 36 to 34.
+
+2013-02-08  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* NEWS: Mention new AArch64 native and target support.
+
+2013-02-08  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* MAINTAINERS (Write After Approval): Add myself.
+
+2013-02-08  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-linux-nat.c: New file.
+	* config/aarch64/linux.mh: New file.
+	* configure.host: Add AArch64.
+	* Makefile.in (ALLDEPFILES): Add aarch64-linux-nat.c.
+
+2013-02-07  Doug Evans  <dje@google.com>
+
+	* cli/cli-cmds.c (_initialize_cli_cmds): Clarify argument to
+	disassemble command.
+
+2013-02-07  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-tdep.c (aarch64_linux_init_abi): Call
+	set_gdbarch_fetch_tls_load_module_address.
+
+2013-02-06  David S. Miller  <davem@davemloft.net>
+
+	* sparc-tdep.c (sparc32_return_value): Handle writing return value when
+	using RETURN_VALUE_ABI_PRESERVES_ADDRESS.
+	* value.c (struct_return_convention): New function.
+	(using_struct_return): Implement in terms of struct_return_convention.
+	* value.h (struct_return_convention): Declare.
+	* stack.c (return_command): Allow successful overriding of the return
+	value when RETURN_VALUE_ABI_PRESERVES_ADDRESS.
+
+2013-02-06  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-type.c (typy_strip_typedefs): Don't call check_typedef
+	outside of TRY_CATCH.
+
+2013-02-06  Yao Qi  <yao@codesourcery.com>
+
+	* mi/mi-interp.c: Include "tracepoint.h".
+	(mi_tsv_modified): Declare.
+	(mi_tsv_created, mi_tsv_deleted): Update declaration.
+	(mi_interpreter_init): Call observer_attach_tsv_modified.
+	(mi_tsv_modified): New.
+	(mi_tsv_created, mi_tsv_deleted): Update.
+	* tracepoint.c (trace_variable_command): Call
+	observer_notify_tsv_modified if the initial value of tsv is
+	changed.
+	(delete_trace_state_variable): Call
+	observer_notify_tsv_deleted earlier.
+	(trace_variable_command): Caller update.
+	(create_tsv_from_upload): Likewise.
+	* observer.sh: Declare "struct trace_state_variable".
+
+	* NEWS: Mention the new MI notification "=tsv-modified".
+
+2013-02-05  Doug Evans  <dje@google.com>
+
+	* completer.c (location_completer): Fix typo in comment.
+
+2013-02-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (add_location_to_breakpoint): Insert the location with
+	ADDRESS sorted.
+
+2013-02-05  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-tdep.c (aarch64_analyze_prologue): ARI fix:
+	Refactor if statement to avoid trailing || operator.
+
 2013-02-05  Andreas Tobler  <andreast@fgznet.ch>
 
 	* NEWS: Add PowerPC FreeBSD as a new native configuration.
@@ -730,7 +1166,7 @@
 
 2013-01-24  Tiago Stürmer Daitx  <tdaitx@linux.vnet.ibm.com>
 
-	* MAINTAINERS (Write After Approval): Add myself to the list. 
+	* MAINTAINERS (Write After Approval): Add myself to the list.
 
 2013-01-24  Tom Tromey  <tromey@redhat.com>
 

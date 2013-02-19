@@ -1,3 +1,96 @@
+2013-02-18  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/subrange.exp: New file.
+
+2013-02-15  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* gdb.trace/tfile.exp: Add test for -trace-status command.
+
+2013-02-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/pthread_cond_wait.c (main): Remove variable ts.  Replace
+	nanosleep by sleep.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* gdb.cp/userdef.exp (ptype &*c): Don't expect an &.
+
+2013-02-14  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* gdb.trace/tsv.exp: Adjust tests, and add a few more.
+
+2013-02-12  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/m-static.cc (gnu_obj_1::~gnu_obj_1): New destructor.
+	* gdb.cp/m-static.exp: Add tests to print quoted destructor.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/catch-signal.c: Update copyright years.
+	* gdb.base/catch-signal.exp: Update copyright years.
+	* gdb.dwarf2/dw2-dir-file-name.c: Update copyright years.
+	* gdb.dwarf2/dw2-dir-file-name.exp: Update copyright years.
+	* gdb.dwarf2/dw2-empty-pc-range.S: Update copyright years.
+	* gdb.dwarf2/dw2-error.S: Update copyright years.
+	* gdb.dwarf2/dw2-error.c: Update copyright years.
+	* gdb.dwarf2/dw2-restrict.S: Update copyright years.
+	* gdb.dwarf2/dw2-restrict.c: Update copyright years.
+	* gdb.dwarf2/dw2-restrict.exp: Update copyright years.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/catch-signal.exp: Correct test file name in "Skipping"
+	message.
+	* gdb.base/sigaltstack.exp: Ditto.
+	* gdb.base/siginfo.exp: Ditto.
+	* gdb.base/sizeof.exp: Ditto.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* gdb.mi/mi-basics.exp: Tweak intro comment.
+	* gdb.mi/mi-break.exp: Tweak intro comment.
+	* gdb.mi/mi-console.exp: Tweak intro comment.
+	* gdb.mi/mi-file.exp: Tweak intro comment.
+	* gdb.mi/mi-read-memory.exp: Tweak intro comment.
+	* gdb.mi/mi-return.exp: Tweak intro comment.
+	* gdb.mi/mi-stepi.exp: Tweak intro comment.
+	* gdb.mi/mi-until.exp: Tweak intro comment.
+	* gdb.mi/mi-watch.exp: Tweak intro comment.
+
+2013-02-12  Sanimir Agovic  <sanimir.agovic@intel.com>
+
+	* gdb.server/no-thread-db.exp: New file.
+	* gdb.server/no-thread-db.c: New file.
+	* gdb.server/Makefile.in (EXECUTABLES): Add no-thread-db.
+
+2013-02-11  Doug Evans  <dje@google.com>
+
+	* gdb.base/printcmds.exp (test_printf_with_dfp): Add test for printing
+	two decfloats.
+
+2013-02-11  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb.base/bitfields.c (struct internalvartest): New declaration.
+	* gdb.base/bitfields.exp (bitfield_internalvar): New function.
+
+2013-02-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.python/py-prompt.exp: Add to the end a kill of $testpid.
+
+2013-02-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/mi-tsv-changed.exp (test_create_delete_tsv): Rename
+	to ...
+	(test_create_delete_modify_tsv): ... here.  New test on modifying
+	the initial value of a tsv.
+
+2013-02-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.dwarf2/dw2-dir-file-name.exp (cd ${srcabsdir}/rdir): Rename to ...
+	(cd .../rdir): ... here.
+
 2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.linespec/base/one/header.h: New file.
@@ -170,9 +263,9 @@
 
 2013-01-18  Hafiz Abid Qadeer<abidh@codesourcery.com>
 
-        PR gdb/13443
-        * gdb.base/checkpoint.exp: Update test messages to make them
-        unique.
+	PR gdb/13443
+	* gdb.base/checkpoint.exp: Update test messages to make them
+	unique.
 
 2013-01-18  Yao Qi  <yao@codesourcery.com>
 
@@ -204,13 +297,13 @@
 	Merge dg-extract-results.sh from upstream (svn 195224).
 
 	2013-01-15  David Blaikie <dblaikie@gmail.com>
-    	* dg-extract-results.sh: Fix order of summary counts.
+	* dg-extract-results.sh: Fix order of summary counts.
 
 	2013-01-15  David Blaikie <dblaikie@gmail.com>
-    	* dg-extract-results.sh: Constrain the start-of-log pattern.
+	* dg-extract-results.sh: Constrain the start-of-log pattern.
 
 	2013-01-15  David Blaikie <dblaikie@gmail.com>
-    	* dg-extract-results.sh: Handle KPASSes.
+	* dg-extract-results.sh: Handle KPASSes.
 
 	2010-05-25  Rainer Orth  <ro@CeBiTec.Uni-Bielefeld.DE>
 	* dg-extract-results.sh: Redirect grep output to /dev/null instead
@@ -358,7 +451,7 @@
 
 2012-12-14  Tom Tromey  <tromey@redhat.com>
 
-        * gdb.base/info-proc.exp: Add core file tests.
+	* gdb.base/info-proc.exp: Add core file tests.
 
 2012-12-14  Yufeng Zhang  <yufeng.zhang@arm.com>
 

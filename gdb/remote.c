@@ -5664,7 +5664,7 @@ Packet: '%s'\n"),
    Obviously, the reply in step #1.6 would be unexpected to a vStopped
    query.
 
-   To solve this, whenever we parse a %Stop notification sucessfully,
+   To solve this, whenever we parse a %Stop notification successfully,
    we mark the REMOTE_ASYNC_GET_PENDING_EVENTS_TOKEN, and carry on
    doing whatever we were doing:
 
@@ -10701,7 +10701,7 @@ remote_get_trace_status (struct trace_status *ts)
     return -1;
 
   /* We're working with a live target.  */
-  ts->from_file = 0;
+  ts->filename = NULL;
 
   if (*p++ != 'T')
     error (_("Bogus trace status reply from target: %s"), target_buf);
