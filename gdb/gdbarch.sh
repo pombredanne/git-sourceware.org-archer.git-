@@ -2,7 +2,7 @@
 
 # Architecture commands for GDB, the GNU debugger.
 #
-# Copyright (C) 1998-2012 Free Software Foundation, Inc.
+# Copyright (C) 1998-2013 Free Software Foundation, Inc.
 #
 # This file is part of GDB.
 #
@@ -47,7 +47,10 @@ do_read ()
 {
     comment=""
     class=""
-    while read line
+    # On some SH's, 'read' trims leading and trailing whitespace by
+    # default (e.g., bash), while on others (e.g., dash), it doesn't.
+    # Set IFS to empty to disable the trimming everywhere.
+    while IFS='' read line
     do
 	if test "${line}" = ""
 	then
@@ -586,7 +589,7 @@ m:CORE_ADDR:addr_bits_remove:CORE_ADDR addr:addr::core_addr_identity::0
 # FIXME/cagney/2001-01-18: The logic is backwards.  It should be asking if the
 # target can single step.  If not, then implement single step using breakpoints.
 #
-# A return value of 1 means that the software_single_step breakpoints 
+# A return value of 1 means that the software_single_step breakpoints
 # were inserted; 0 means they were not.
 F:int:software_single_step:struct frame_info *frame:frame
 
@@ -637,6 +640,13 @@ v:struct core_regset_section *:core_regset_sections:const char *name, int len:::
 
 # Create core file notes
 M:char *:make_corefile_notes:bfd *obfd, int *note_size:obfd, note_size
+
+# The elfcore writer hook to use to write Linux prpsinfo notes to core
+# files.  Most Linux architectures use the same prpsinfo32 or
+# prpsinfo64 layouts, and so won't need to provide this hook, as we
+# call the Linux generic routines in bfd to write prpsinfo notes by
+# default.
+F:char *:elfcore_write_linux_prpsinfo:bfd *obfd, char *note_data, int *note_size, const struct elf_internal_linux_prpsinfo *info:obfd, note_data, note_size, info
 
 # Find core file memory regions
 M:int:find_memory_regions:find_memory_region_ftype func, void *data:func, data
@@ -940,6 +950,11 @@ m:void:gen_return_address:struct agent_expr *ax, struct axs_value *value, CORE_A
 # Implement the "info proc" command.
 M:void:info_proc:char *args, enum info_proc_what what:args, what
 
+# Implement the "info proc" command for core files.  Noe that there
+# are two "info_proc"-like methods on gdbarch -- one for core files,
+# one for live targets.
+M:void:core_info_proc:char *args, enum info_proc_what what:args, what
+
 # Iterate over all objfiles in the order that makes the most sense
 # for the architecture to make global symbol searches.
 #
@@ -955,6 +970,8 @@ M:void:info_proc:char *args, enum info_proc_what what:args, what
 # inspected when the symbol search was requested.
 m:void:iterate_over_objfiles_in_search_order:iterate_over_objfiles_in_search_order_cb_ftype *cb, void *cb_data, struct objfile *current_objfile:cb, cb_data, current_objfile:0:default_iterate_over_objfiles_in_search_order::0
 
+# Ravenscar arch-dependent ops.
+v:struct ravenscar_arch_ops *:ravenscar_ops:::NULL:NULL::0:host_address_to_string (gdbarch->ravenscar_ops)
 EOF
 }
 
@@ -1008,8 +1025,7 @@ cat <<EOF
 
 /* Dynamic architecture support for GDB, the GNU debugger.
 
-   Copyright (C) 1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
-   2007, 2008, 2009 Free Software Foundation, Inc.
+   Copyright (C) 1998-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1072,6 +1088,8 @@ struct syscall;
 struct agent_expr;
 struct axs_value;
 struct stap_parse_info;
+struct ravenscar_arch_ops;
+struct elf_internal_linux_prpsinfo;
 
 /* The architecture associated with the inferior through the
    connection to the target.

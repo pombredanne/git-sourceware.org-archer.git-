@@ -1,6 +1,6 @@
 /* Parser for linespec for the GNU debugger, GDB.
 
-   Copyright (C) 1986-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -319,11 +319,11 @@ static VEC (symbolp) *find_label_symbols (struct linespec_state *self,
 					  VEC (symbolp) **label_funcs_ret,
 					  const char *name);
 
-void find_linespec_symbols (struct linespec_state *self,
-			    VEC (symtab_p) *file_symtabs,
-			    const char *name,
-			    VEC (symbolp) **symbols,
-			    VEC (minsym_and_objfile_d) **minsyms);
+static void find_linespec_symbols (struct linespec_state *self,
+				   VEC (symtab_p) *file_symtabs,
+				   const char *name,
+				   VEC (symbolp) **symbols,
+				   VEC (minsym_and_objfile_d) **minsyms);
 
 static struct line_offset
      linespec_parse_variable (struct linespec_state *self,
@@ -852,21 +852,21 @@ add_sal_to_sals (struct linespec_state *self,
 
       self->canonical_names = xrealloc (self->canonical_names,
 					sals->nelts * sizeof (char *));
-      if (!literal_canonical && sal->symtab && sal->symtab->filename)
+      if (!literal_canonical && sal->symtab)
 	{
-	  char *filename = sal->symtab->filename;
+	  const char *fullname = symtab_to_fullname (sal->symtab);
 
 	  /* Note that the filter doesn't have to be a valid linespec
 	     input.  We only apply the ":LINE" treatment to Ada for
 	     the time being.  */
 	  if (symname != NULL && sal->line != 0
 	      && self->language->la_language == language_ada)
-	    canonical_name = xstrprintf ("%s:%s:%d", filename, symname,
+	    canonical_name = xstrprintf ("%s:%s:%d", fullname, symname,
 					 sal->line);
 	  else if (symname != NULL)
-	    canonical_name = xstrprintf ("%s:%s", filename, symname);
+	    canonical_name = xstrprintf ("%s:%s", fullname, symname);
 	  else
-	    canonical_name = xstrprintf ("%s:%d", filename, sal->line);
+	    canonical_name = xstrprintf ("%s:%d", fullname, sal->line);
 	}
       else if (symname != NULL)
 	canonical_name = xstrdup (symname);
@@ -1729,15 +1729,17 @@ create_sals_line_offset (struct linespec_state *self,
   if (VEC_length (symtab_p, ls->file_symtabs) == 1
       && VEC_index (symtab_p, ls->file_symtabs, 0) == NULL)
     {
+      const char *fullname;
+
       set_current_program_space (self->program_space);
 
       /* Make sure we have at least a default source line.  */
       set_default_source_symtab_and_line ();
       initialize_defaults (&self->default_symtab, &self->default_line);
+      fullname = symtab_to_fullname (self->default_symtab);
       VEC_pop (symtab_p, ls->file_symtabs);
       VEC_free (symtab_p, ls->file_symtabs);
-      ls->file_symtabs
-	= collect_symtabs_from_filename (self->default_symtab->filename);
+      ls->file_symtabs = collect_symtabs_from_filename (fullname);
       use_default = 1;
     }
 
@@ -1939,7 +1941,11 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 
 	/* Make sure we have a filename for canonicalization.  */
 	if (ls->source_filename == NULL)
-	  ls->source_filename = xstrdup (state->default_symtab->filename);
+	  {
+	    const char *fullname = symtab_to_fullname (state->default_symtab);
+
+	    ls->source_filename = xstrdup (fullname);
+	  }
     }
   else
     {
@@ -2948,7 +2954,7 @@ find_function_symbols (struct linespec_state *state,
 /* Find all symbols named NAME in FILE_SYMTABS, returning debug symbols
    in SYMBOLS and minimal symbols in MINSYMS.  */
 
-void
+static void
 find_linespec_symbols (struct linespec_state *state,
 		       VEC (symtab_p) *file_symtabs,
 		       const char *name,

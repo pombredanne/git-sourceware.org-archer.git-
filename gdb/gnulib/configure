@@ -4666,9 +4666,14 @@ fi
   # Code from module errno:
   # Code from module extensions:
 
+<<<<<<< HEAD
   # Code from module extern-inline:
   # Code from module fd-hook:
   # Code from module float:
+||||||| merged common ancestors
+=======
+  # Code from module extern-inline:
+>>>>>>> gdb/master
   # Code from module fnmatch:
   # Code from module fnmatch-gnu:
   # Code from module getaddrinfo:
@@ -5527,12 +5532,217 @@ _ACEOF
 fi
 
 
+<<<<<<< HEAD
   GNULIB_INET_NTOP=0;
   GNULIB_INET_PTON=0;
     HAVE_DECL_INET_NTOP=1;
   HAVE_DECL_INET_PTON=1;
   REPLACE_INET_NTOP=0;
   REPLACE_INET_PTON=0;
+||||||| merged common ancestors
+
+   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for mbstate_t" >&5
+$as_echo_n "checking for mbstate_t... " >&6; }
+if test "${ac_cv_type_mbstate_t+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+$ac_includes_default
+/* Tru64 with Desktop Toolkit C has a bug: <stdio.h> must be included before
+   <wchar.h>.
+   BSD/OS 4.0.1 has a bug: <stddef.h>, <stdio.h> and <time.h> must be
+   included before <wchar.h>.  */
+#include <stddef.h>
+#include <stdio.h>
+#include <time.h>
+#include <wchar.h>
+int
+main ()
+{
+mbstate_t x; return sizeof x;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_cv_type_mbstate_t=yes
+else
+  ac_cv_type_mbstate_t=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_type_mbstate_t" >&5
+$as_echo "$ac_cv_type_mbstate_t" >&6; }
+   if test $ac_cv_type_mbstate_t = yes; then
+
+$as_echo "#define HAVE_MBSTATE_T 1" >>confdefs.h
+
+   else
+
+$as_echo "#define mbstate_t int" >>confdefs.h
+
+   fi
+
+
+
+
+
+  for ac_func in $gl_func_list
+do :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+eval as_val=\$$as_ac_var
+   if test "x$as_val" = x""yes; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+=======
+
+
+
+
+   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for mbstate_t" >&5
+$as_echo_n "checking for mbstate_t... " >&6; }
+if test "${ac_cv_type_mbstate_t+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+$ac_includes_default
+/* Tru64 with Desktop Toolkit C has a bug: <stdio.h> must be included before
+   <wchar.h>.
+   BSD/OS 4.0.1 has a bug: <stddef.h>, <stdio.h> and <time.h> must be
+   included before <wchar.h>.  */
+#include <stddef.h>
+#include <stdio.h>
+#include <time.h>
+#include <wchar.h>
+int
+main ()
+{
+mbstate_t x; return sizeof x;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_cv_type_mbstate_t=yes
+else
+  ac_cv_type_mbstate_t=no
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_type_mbstate_t" >&5
+$as_echo "$ac_cv_type_mbstate_t" >&6; }
+   if test $ac_cv_type_mbstate_t = yes; then
+
+$as_echo "#define HAVE_MBSTATE_T 1" >>confdefs.h
+
+   else
+
+$as_echo "#define mbstate_t int" >>confdefs.h
+
+   fi
+
+
+
+
+
+  for ac_func in $gl_func_list
+do :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+eval as_val=\$$as_ac_var
+   if test "x$as_val" = x""yes; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+>>>>>>> gdb/master
 
 
 
@@ -7115,10 +7325,131 @@ typedef int * int_ptr;
 int
 main ()
 {
+<<<<<<< HEAD
 int s[1];
 	int * $ac_kw t = s;
 	t[0] = 0;
 	return foo(t)
+||||||| merged common ancestors
+
+            int result = !constants;
+            #if HAVE_SYMLINK
+            {
+              static char const sym[] = "conftest.sym";
+              if (symlink (".", sym) != 0)
+                result |= 2;
+              else
+                {
+                  int fd = open (sym, O_RDONLY | O_NOFOLLOW);
+                  if (fd >= 0)
+                    {
+                      close (fd);
+                      result |= 4;
+                    }
+                }
+              unlink (sym);
+            }
+            #endif
+            {
+              static char const file[] = "confdefs.h";
+              int fd = open (file, O_RDONLY | O_NOATIME);
+              if (fd < 0)
+                result |= 8;
+              else
+                {
+                  struct stat st0;
+                  if (fstat (fd, &st0) != 0)
+                    result |= 16;
+                  else
+                    {
+                      char c;
+                      sleep (1);
+                      if (read (fd, &c, 1) != 1)
+                        result |= 24;
+                      else
+                        {
+                          if (close (fd) != 0)
+                            result |= 32;
+                          else
+                            {
+                              struct stat st1;
+                              if (stat (file, &st1) != 0)
+                                result |= 40;
+                              else
+                                if (st0.st_atime != st1.st_atime)
+                                  result |= 64;
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+=======
+
+            int result = !constants;
+            #if HAVE_SYMLINK
+            {
+              static char const sym[] = "conftest.sym";
+              if (symlink ("/dev/null", sym) != 0)
+                result |= 2;
+              else
+                {
+                  int fd = open (sym, O_WRONLY | O_NOFOLLOW | O_CREAT, 0);
+                  if (fd >= 0)
+                    {
+                      close (fd);
+                      result |= 4;
+                    }
+                }
+              if (unlink (sym) != 0 || symlink (".", sym) != 0)
+                result |= 2;
+              else
+                {
+                  int fd = open (sym, O_RDONLY | O_NOFOLLOW);
+                  if (fd >= 0)
+                    {
+                      close (fd);
+                      result |= 4;
+                    }
+                }
+              unlink (sym);
+            }
+            #endif
+            {
+              static char const file[] = "confdefs.h";
+              int fd = open (file, O_RDONLY | O_NOATIME);
+              if (fd < 0)
+                result |= 8;
+              else
+                {
+                  struct stat st0;
+                  if (fstat (fd, &st0) != 0)
+                    result |= 16;
+                  else
+                    {
+                      char c;
+                      sleep (1);
+                      if (read (fd, &c, 1) != 1)
+                        result |= 24;
+                      else
+                        {
+                          if (close (fd) != 0)
+                            result |= 32;
+                          else
+                            {
+                              struct stat st1;
+                              if (stat (file, &st1) != 0)
+                                result |= 40;
+                              else
+                                if (st0.st_atime != st1.st_atime)
+                                  result |= 64;
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+>>>>>>> gdb/master
   ;
   return 0;
 }
@@ -14026,6 +14357,7 @@ $as_echo "#define GNULIB_TEST_MBSRTOWCS 1" >>confdefs.h
 
 
 
+<<<<<<< HEAD
 
 
 
@@ -14047,6 +14379,51 @@ done
 
   fi
 
+||||||| merged common ancestors
+{ $as_echo "$as_me:${as_lineno-$LINENO}: checking for inline" >&5
+$as_echo_n "checking for inline... " >&6; }
+if test "${ac_cv_c_inline+set}" = set; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_cv_c_inline=no
+for ac_kw in inline __inline__ __inline; do
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#ifndef __cplusplus
+typedef int foo_t;
+static $ac_kw foo_t static_foo () {return 0; }
+$ac_kw foo_t foo () {return 0; }
+#endif
+
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  ac_cv_c_inline=$ac_kw
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+  test "$ac_cv_c_inline" != no && break
+done
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_c_inline" >&5
+$as_echo "$ac_cv_c_inline" >&6; }
+
+case $ac_cv_c_inline in
+  inline | yes) ;;
+  *)
+    case $ac_cv_c_inline in
+      no) ac_val=;;
+      *) ac_val=$ac_cv_c_inline;;
+    esac
+    cat >>confdefs.h <<_ACEOF
+#ifndef __cplusplus
+#define inline $ac_val
+#endif
+_ACEOF
+    ;;
+esac
+
+=======
+>>>>>>> gdb/master
 
 
 
@@ -14195,12 +14572,33 @@ done
 
 
 
+<<<<<<< HEAD
   if test $ac_cv_have_decl_memmem = no; then
     HAVE_DECL_MEMMEM=0
   else
             { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether memmem works" >&5
 $as_echo_n "checking whether memmem works... " >&6; }
 if test "${gl_cv_func_memmem_works_always+set}" = set; then :
+||||||| merged common ancestors
+  FNMATCH_H=
+  gl_fnmatch_required_lowercase=`
+    echo $gl_fnmatch_required | LC_ALL=C tr '[A-Z]' '[a-z]'
+  `
+  gl_fnmatch_cache_var="gl_cv_func_fnmatch_${gl_fnmatch_required_lowercase}"
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for working $gl_fnmatch_required fnmatch" >&5
+$as_echo_n "checking for working $gl_fnmatch_required fnmatch... " >&6; }
+if { as_var=$gl_fnmatch_cache_var; eval "test \"\${$as_var+set}\" = set"; }; then :
+=======
+
+  FNMATCH_H=
+  gl_fnmatch_required_lowercase=`
+    echo $gl_fnmatch_required | LC_ALL=C tr '[A-Z]' '[a-z]'
+  `
+  gl_fnmatch_cache_var="gl_cv_func_fnmatch_${gl_fnmatch_required_lowercase}"
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for working $gl_fnmatch_required fnmatch" >&5
+$as_echo_n "checking for working $gl_fnmatch_required fnmatch... " >&6; }
+if { as_var=$gl_fnmatch_cache_var; eval "test \"\${$as_var+set}\" = set"; }; then :
+>>>>>>> gdb/master
   $as_echo_n "(cached) " >&6
 else
   if test "$cross_compiling" = yes; then :
@@ -14309,6 +14707,12 @@ $as_echo "$gl_cv_func_memmem_works_always" >&6; }
 
 $as_echo "#define GNULIB_TEST_MEMMEM 1" >>confdefs.h
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+if test -n "$FNMATCH_H"; then
+=======
+  if test -n "$FNMATCH_H"; then
+>>>>>>> gdb/master
 
 
 
@@ -14372,6 +14776,12 @@ $as_echo "#define HAVE_MSVC_INVALID_PARAMETER_HANDLER 1" >>confdefs.h
 
 
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+fi
+=======
+  fi
+>>>>>>> gdb/master
 
 
      if test $gl_cv_have_include_next = yes; then
@@ -14386,9 +14796,15 @@ else
              if test $ac_cv_header_netdb_h = yes; then
 
 
+<<<<<<< HEAD
                cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 #include <netdb.h>
+||||||| merged common ancestors
+if test -n "$FNMATCH_H"; then
+=======
+  if test -n "$FNMATCH_H"; then
+>>>>>>> gdb/master
 
 _ACEOF
                                                                                                                         case "$host_os" in
@@ -14994,6 +15410,12 @@ $as_echo "$gl_cv_func_printf_positions" >&6; }
 
 
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+LOCALCHARSET_TESTS_ENVIRONMENT="CHARSETALIASDIR=\"\$(abs_top_builddir)/$gl_source_base\""
+=======
+  LOCALCHARSET_TESTS_ENVIRONMENT="CHARSETALIASDIR=\"\$(abs_top_builddir)/$gl_source_base\""
+>>>>>>> gdb/master
 
 
   if test $ac_cv_have_decl_snprintf = no; then
@@ -15461,6 +15883,12 @@ fi
 
 
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+if test $HAVE_MBRTOWC = 0 || test $REPLACE_MBRTOWC = 1; then
+=======
+  if test $HAVE_MBRTOWC = 0 || test $REPLACE_MBRTOWC = 1; then
+>>>>>>> gdb/master
 
 
 
@@ -15507,11 +15935,17 @@ _ACEOF
                       sed -n "$gl_absolute_header_sed"`'"'
 
 
+<<<<<<< HEAD
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gl_cv_next_stddef_h" >&5
 $as_echo "$gl_cv_next_stddef_h" >&6; }
      fi
      NEXT_STDDEF_H=$gl_cv_next_stddef_h
+||||||| merged common ancestors
+fi
+=======
+  fi
+>>>>>>> gdb/master
 
      if test $gl_cv_have_include_next = yes || test $gl_cv_have_include_next = buggy; then
        # INCLUDE_NEXT_AS_FIRST_DIRECTIVE='include_next'
@@ -15730,12 +16164,18 @@ _ACEOF
 fi
 done
 
+<<<<<<< HEAD
     if test $ac_cv_func_shutdown = yes; then
       { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether <sys/socket.h> defines the SHUT_* macros" >&5
 $as_echo_n "checking whether <sys/socket.h> defines the SHUT_* macros... " >&6; }
 if test "${gl_cv_header_sys_socket_h_shut+set}" = set; then :
   $as_echo_n "(cached) " >&6
 else
+||||||| merged common ancestors
+if test $HAVE_MBSINIT = 0 || test $REPLACE_MBSINIT = 1; then
+=======
+  if test $HAVE_MBSINIT = 0 || test $REPLACE_MBSINIT = 1; then
+>>>>>>> gdb/master
 
           cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
@@ -15774,6 +16214,12 @@ $as_echo "$gl_cv_header_sys_socket_h_shut" >&6; }
 
   :
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+fi
+=======
+  fi
+>>>>>>> gdb/master
 
 
 
@@ -16081,6 +16527,12 @@ $as_echo "$gl_cv_next_sys_types_h" >&6; }
      fi
      NEXT_AS_FIRST_DIRECTIVE_SYS_TYPES_H=$gl_next_as_first_directive
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+if test $HAVE_MBSRTOWCS = 0 || test $REPLACE_MBSRTOWCS = 1; then
+=======
+  if test $HAVE_MBSRTOWCS = 0 || test $REPLACE_MBSRTOWCS = 1; then
+>>>>>>> gdb/master
 
 
 
@@ -16102,6 +16554,14 @@ $as_echo "$gl_cv_next_sys_types_h" >&6; }
 
   :
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+fi
+
+=======
+  fi
+
+>>>>>>> gdb/master
 
 
 
@@ -16125,11 +16585,17 @@ else
 /* end confdefs.h.  */
 #include <sys/uio.h>
 
+<<<<<<< HEAD
 _ACEOF
                                                                                                                         case "$host_os" in
                  aix*) gl_absname_cpp="$ac_cpp -C" ;;
                  *)    gl_absname_cpp="$ac_cpp" ;;
                esac
+||||||| merged common ancestors
+if test $HAVE_MEMCHR = 0 || test $REPLACE_MEMCHR = 1; then
+=======
+  if test $HAVE_MEMCHR = 0 || test $REPLACE_MEMCHR = 1; then
+>>>>>>> gdb/master
 
                case "$host_os" in
                  mingw*)
@@ -16184,6 +16650,12 @@ $as_echo "$gl_cv_next_sys_uio_h" >&6; }
 
 
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+fi
+=======
+  fi
+>>>>>>> gdb/master
 
 
 
@@ -16217,10 +16689,68 @@ else
 #include <unistd.h>
 
 _ACEOF
+<<<<<<< HEAD
                                                                                                                         case "$host_os" in
                  aix*) gl_absname_cpp="$ac_cpp -C" ;;
                  *)    gl_absname_cpp="$ac_cpp" ;;
                esac
+||||||| merged common ancestors
+if ac_fn_c_try_run "$LINENO"; then :
+  gl_cv_func_memmem_works_fast=yes
+else
+  gl_cv_func_memmem_works_fast=no
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gl_cv_func_memmem_works_fast" >&5
+$as_echo "$gl_cv_func_memmem_works_fast" >&6; }
+    case "$gl_cv_func_memmem_works_fast" in
+      *yes) ;;
+      *)
+        REPLACE_MEMMEM=1
+        ;;
+    esac
+  fi
+
+if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
+
+
+
+
+
+=======
+if ac_fn_c_try_run "$LINENO"; then :
+  gl_cv_func_memmem_works_fast=yes
+else
+  gl_cv_func_memmem_works_fast=no
+fi
+rm -f core *.core core.conftest.* gmon.out bb.out conftest$ac_exeext \
+  conftest.$ac_objext conftest.beam conftest.$ac_ext
+fi
+
+
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gl_cv_func_memmem_works_fast" >&5
+$as_echo "$gl_cv_func_memmem_works_fast" >&6; }
+    case "$gl_cv_func_memmem_works_fast" in
+      *yes) ;;
+      *)
+        REPLACE_MEMMEM=1
+        ;;
+    esac
+  fi
+
+  if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
+
+
+
+
+
+>>>>>>> gdb/master
 
                case "$host_os" in
                  mingw*)
@@ -16247,11 +16777,17 @@ _ACEOF
              fi
 
 
+<<<<<<< HEAD
 fi
 { $as_echo "$as_me:${as_lineno-$LINENO}: result: $gl_cv_next_unistd_h" >&5
 $as_echo "$gl_cv_next_unistd_h" >&6; }
      fi
      NEXT_UNISTD_H=$gl_cv_next_unistd_h
+||||||| merged common ancestors
+fi
+=======
+  fi
+>>>>>>> gdb/master
 
      if test $gl_cv_have_include_next = yes || test $gl_cv_have_include_next = buggy; then
        # INCLUDE_NEXT_AS_FIRST_DIRECTIVE='include_next'
@@ -16334,6 +16870,12 @@ fi
 
   :
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
+=======
+  if test $HAVE_MEMMEM = 0 || test $REPLACE_MEMMEM = 1; then
+>>>>>>> gdb/master
 
 
 
@@ -16345,6 +16887,12 @@ fi
 
 
 
+<<<<<<< HEAD
+||||||| merged common ancestors
+fi
+=======
+  fi
+>>>>>>> gdb/master
 
 
 

@@ -1,5 +1,5 @@
 \input texinfo      @c -*-texinfo-*-
-@c Copyright (C) 1988-1996, 1998-2012 Free Software Foundation, Inc.
+@c Copyright (C) 1988-2013 Free Software Foundation, Inc.
 @c
 @c %**start of header
 @c makeinfo ignores cmds prev to setfilename, so its arg cannot make use
@@ -47,10 +47,7 @@
 @end direntry
 
 @copying
-Copyright @copyright{} 1988, 1989, 1990, 1991, 1992, 1993, 1994, 1995, 1996,
-1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010
-2011, 2012
-Free Software Foundation, Inc.
+Copyright @copyright{} 1988-2013 Free Software Foundation, Inc.
 
 Permission is granted to copy, distribute and/or modify this document
 under the terms of the GNU Free Documentation License, Version 1.3 or
@@ -119,7 +116,7 @@ This is the @value{EDITION} Edition, for @value{GDBN}
 @end ifset
 Version @value{GDBVN}.
 
-Copyright (C) 1988-2012 Free Software Foundation, Inc.
+Copyright (C) 1988-2013 Free Software Foundation, Inc.
 
 This edition of the GDB manual is dedicated to the memory of Fred
 Fish.  Fred was a long-standing contributor to GDB and to Free
@@ -1180,13 +1177,6 @@ the file name, line number and character position separated by colons,
 and a newline.  The Emacs-to-@value{GDBN} interface program uses the two
 @samp{\032} characters as a signal to display the source code for the
 frame.
-
-@item -epoch
-@cindex @code{--epoch}
-The Epoch Emacs-@value{GDBN} interface sets this option when it runs
-@value{GDBN} as a subprocess.  It tells @value{GDBN} to modify its print
-routines so as to allow Epoch to display values of expressions in a
-separate window.
 
 @item -annotate @var{level}
 @cindex @code{--annotate}
@@ -4244,6 +4234,31 @@ The loading or unloading of a shared library.  If @var{regexp} is
 given, then the catchpoint will stop only if the regular expression
 matches one of the affected libraries.
 
+@item signal @r{[}@var{signal}@dots{} @r{|} @samp{all}@r{]}
+The delivery of a signal.
+
+With no arguments, this catchpoint will catch any signal that is not
+used internally by @value{GDBN}, specifically, all signals except
+@samp{SIGTRAP} and @samp{SIGINT}.
+
+With the argument @samp{all}, all signals, including those used by
+@value{GDBN}, will be caught.  This argument cannot be used with other
+signal names.
+
+Otherwise, the arguments are a list of signal names as given to
+@code{handle} (@pxref{Signals}).  Only signals specified in this list
+will be caught.
+
+One reason that @code{catch signal} can be more useful than
+@code{handle} is that you can attach commands and conditions to the
+catchpoint.
+
+When a signal is caught by a catchpoint, the signal's @code{stop} and
+@code{print} settings, as specified by @code{handle}, are ignored.
+However, whether the signal is still delivered to the inferior depends
+on the @code{pass} setting; this can be changed in the catchpoint's
+commands.
+
 @end table
 
 @item tcatch @var{event}
@@ -5335,6 +5350,10 @@ the defined types of signals.
 Similar, but print information only about the specified signal number.
 
 @code{info handle} is an alias for @code{info signals}.
+
+@item catch signal @r{[}@var{signal}@dots{} @r{|} @samp{all}@r{]}
+Set a catchpoint for the indicated signals.  @xref{Set Catchpoints},
+for details about this command.
 
 @kindex handle
 @item handle @var{signal} @r{[}@var{keywords}@dots{}@r{]}
@@ -6516,6 +6535,24 @@ unlimited.
 Display the current limit on backtrace levels.
 @end table
 
+You can control how file names are displayed.
+
+@table @code
+@item set filename-display
+@itemx set filename-display relative
+@cindex filename-display
+Display file names relative to the compilation directory.  This is the default.
+
+@item set filename-display basename
+Display only basename of a filename.
+
+@item set filename-display absolute
+Display an absolute filename.
+
+@item show filename-display
+Show the current way to display filenames.
+@end table
+
 @node Selection
 @section Selecting a Frame
 
@@ -7336,6 +7373,11 @@ Dump of assembler code from 0x400281 to 0x40028b:
 End of assembler dump.
 @end smallexample
 
+Addresses cannot be specified as a linespec (@pxref{Specify Location}).
+So, for example, if you want to disassemble function @code{bar}
+in file @file{foo.c}, you must type @samp{disassemble 'foo.c'::bar}
+and not @samp{disassemble foo.c:bar}.
+
 Some architectures have more than one commonly-used set of instruction
 mnemonics or other syntax.
 
@@ -7393,9 +7435,6 @@ instruction.
 @cindex examining data
 @kindex print
 @kindex inspect
-@c "inspect" is not quite a synonym if you are using Epoch, which we do not
-@c document because it is nonstandard...  Under Epoch it displays in a
-@c different window or something like that.
 The usual way to examine data in your program is with the @code{print}
 command (abbreviated @code{p}), or its synonym @code{inspect}.  It
 evaluates and prints the value of an expression of the language your
@@ -9951,7 +9990,7 @@ specified, the file name defaults to @file{core.@var{pid}}, where
 @var{pid} is the inferior process ID.
 
 Note that this command is implemented only for some systems (as of
-this writing, @sc{gnu}/Linux, FreeBSD, Solaris, Unixware, and S390).
+this writing, @sc{gnu}/Linux, FreeBSD, Solaris, and S390).
 @end table
 
 @node Character Sets
@@ -11476,6 +11515,9 @@ tracing:
 @itemize @bullet
 @item
 its passcount as given by the @code{passcount @var{n}} command
+
+@item
+the state about installed on target of each location
 @end itemize
 
 @smallexample
@@ -11488,6 +11530,15 @@ Num     Type           Disp Enb Address    What
         collect globfoo2
         end
         pass count 1200 
+2       tracepoint     keep y   <MULTIPLE>
+        collect $eip
+2.1                         y     0x0804859c in func4 at change-loc.h:35
+        installed on target
+2.2                         y     0xb7ffc480 in func4 at change-loc.h:35
+        installed on target
+2.3                         y     <PENDING>  set_tracepoint
+3       tracepoint     keep y   0x080485b1 in foo at change-loc.c:29
+        not installed on target
 (@value{GDBP})
 @end smallexample
 
@@ -17141,7 +17192,7 @@ you must know the actual BFD name.
 Use the @code{show gnutarget} command to display what file format
 @code{gnutarget} is set to read.  If you have not set @code{gnutarget},
 @value{GDBN} will determine the file format for each file automatically,
-and @code{show gnutarget} displays @samp{The current BDF target is "auto"}.
+and @code{show gnutarget} displays @samp{The current BFD target is "auto"}.
 @end table
 
 @cindex common targets
@@ -18672,13 +18723,17 @@ modern FreeBSD systems.
 
 Many versions of SVR4 and compatible systems provide a facility called
 @samp{/proc} that can be used to examine the image of a running
-process using file-system subroutines.  If @value{GDBN} is configured
-for an operating system with this facility, the command @code{info
-proc} is available to report information about the process running
-your program, or about any process running on your system.  @code{info
-proc} works only on SVR4 systems that include the @code{procfs} code.
-This includes, as of this writing, @sc{gnu}/Linux, OSF/1 (Digital
-Unix), Solaris, Irix, and Unixware, but not HP-UX, for example.
+process using file-system subroutines.
+
+If @value{GDBN} is configured for an operating system with this
+facility, the command @code{info proc} is available to report
+information about the process running your program, or about any
+process running on your system.  This includes, as of this writing,
+@sc{gnu}/Linux, OSF/1 (Digital Unix), Solaris, and Irix, but
+not HP-UX, for example.
+
+This command may also work on core files that were created on a system
+that has the @samp{/proc} facility.
 
 @table @code
 @kindex info proc
@@ -20666,6 +20721,7 @@ This section describes characteristics of architectures that affect
 all uses of @value{GDBN} with the architecture, both native and cross.
 
 @menu
+* AArch64::
 * i386::
 * Alpha::
 * MIPS::
@@ -20673,6 +20729,24 @@ all uses of @value{GDBN} with the architecture, both native and cross.
 * SPU::                Cell Broadband Engine SPU architecture
 * PowerPC::
 @end menu
+
+@node AArch64
+@subsection AArch64
+@cindex AArch64 support
+
+When @value{GDBN} is debugging the AArch64 architecture, it provides the
+following special commands:
+
+@table @code
+@item set debug aarch64
+@kindex set debug aarch64
+This command determines whether AArch64 architecture-specific debugging
+messages are to be displayed.
+
+@item show debug aarch64
+Show whether AArch64 debugging messages are displayed.
+
+@end table
 
 @node i386
 @subsection x86 Architecture-specific Issues
@@ -21303,6 +21377,7 @@ current ABI.
 @cindex OS ABI
 @kindex set osabi
 @kindex show osabi
+@cindex Newlib OS ABI and its influence on the longjmp handling
 
 One @value{GDBN} configuration can debug binaries for multiple operating
 system targets, either via remote debugging or native emulation.
@@ -21312,6 +21387,11 @@ One example where this is useful is in debugging of binaries which use
 an alternate C library (e.g.@: @sc{uClibc} for @sc{gnu}/Linux) which does
 not have the same identifying marks that the standard C library for your
 platform provides.
+
+When @value{GDBN} is debugging the AArch64 architecture, it provides a
+``Newlib'' OS ABI.  This is useful for handling @code{setjmp} and
+@code{longjmp} when debugging binaries that use the @sc{newlib} C library.
+The ``Newlib'' OS ABI can be selected by @code{set osabi Newlib}.
 
 @table @code
 @item show osabi
@@ -21990,6 +22070,12 @@ Displays the current state of @value{GDBN} JIT debugging.
 Turns on or off debugging messages from the Linux LWP debug support.
 @item show debug lin-lwp
 Show the current state of Linux LWP debugging messages.
+@item set debug notification
+@cindex remote async notification debugging info
+Turns on or off debugging messages about remote async notification.
+The default is off.
+@item show debug notification
+Displays the current state of remote async notification debugging messages.
 @item set debug observer
 @cindex observer debugging info
 Turns on or off display of @value{GDBN} observer debugging.  This
@@ -22792,6 +22878,7 @@ situation, a Python @code{KeyboardInterrupt} exception is thrown.
 * Finish Breakpoints in Python:: Setting Breakpoints on function return
                                 using Python.
 * Lazy Strings In Python::      Python representation of lazy strings.
+* Architectures In Python::     Python representation of architectures.
 @end menu
 
 @node Basic Python
@@ -24194,7 +24281,8 @@ return an empty tuple.
 Read @var{length} bytes of memory from the inferior, starting at
 @var{address}.  Returns a buffer object, which behaves much like an array
 or a string.  It can be modified and given to the
-@code{Inferior.write_memory} function.
+@code{Inferior.write_memory} function.  In @code{Python} 3, the return
+value is a @code{memoryview} object.
 @end defun
 
 @findex Inferior.write_memory
@@ -25094,6 +25182,11 @@ Returns the function name of the frame, or @code{None} if it can't be
 obtained.
 @end defun
 
+@defun Frame.architecture ()
+Returns the @code{gdb.Architecture} object corresponding to the frame's
+architecture.  @xref{Architectures In Python}.
+@end defun
+
 @defun Frame.type ()
 Returns the type of the frame.  The value can be one of:
 @table @code
@@ -25955,6 +26048,20 @@ resolve this to the lazy string's character type, use the type's
 @code{target} method.  @xref{Types In Python}.  This attribute is not
 writable.
 @end defvar
+
+@node Architectures In Python
+@subsubsection Python representation of architectures
+@cindex Python architectures
+
+@value{GDBN} uses architecture specific parameters and artifacts in a
+number of its various computations.  An architecture is represented
+by an instance of the @code{gdb.Architecture} class.
+
+A @code{gdb.Architecture} class has the following methods:
+
+@defun Architecture.name ()
+Return the name (string value) of the architecture.
+@end defun
 
 @node Python Auto-loading
 @subsection Python Auto-loading
@@ -27105,21 +27212,6 @@ A more detailed description of Emacs' interaction with @value{GDBN} is
 given in the Emacs manual (@pxref{Debuggers,,, Emacs, The @sc{gnu}
 Emacs Manual}).
 
-@c The following dropped because Epoch is nonstandard.  Reactivate
-@c if/when v19 does something similar. ---doc@cygnus.com 19dec1990
-@ignore
-@kindex Emacs Epoch environment
-@kindex Epoch
-@kindex inspect
-
-Version 18 of @sc{gnu} Emacs has a built-in window system
-called the @code{epoch}
-environment.  Users of this environment can use a new command,
-@code{inspect} which performs identically to @code{print} except that
-each value is printed in its own window.
-@end ignore
-
-
 @node GDB/MI
 @chapter The @sc{gdb/mi} Interface
 
@@ -27177,6 +27269,7 @@ may repeat one or more times.
 * GDB/MI Simple Examples::
 * GDB/MI Command Description Format::
 * GDB/MI Breakpoint Commands::
+* GDB/MI Catchpoint Commands::
 * GDB/MI Program Context::
 * GDB/MI Thread Commands::
 * GDB/MI Ada Tasking Commands::
@@ -27690,6 +27783,7 @@ follow development on @email{gdb@@sourceware.org} and
 * GDB/MI Result Records::
 * GDB/MI Stream Records::
 * GDB/MI Async Records::
+* GDB/MI Breakpoint Information::
 * GDB/MI Frame Information::
 * GDB/MI Thread Information::
 * GDB/MI Ada Exception Information::
@@ -27922,14 +28016,20 @@ Reports that the trace frame was changed and its new number is
 @var{tfnum}.  The number of the tracepoint associated with this trace
 frame is @var{tpnum}.
 
-@item =tsv-created,name=@var{name},value=@var{value}
+@item =tsv-created,name=@var{name},initial=@var{initial}
 Reports that the new trace state variable @var{name} is created with
-value @var{value}.
+initial value @var{initial}.
 
 @item =tsv-deleted,name=@var{name}
 @itemx =tsv-deleted
 Reports that the trace state variable @var{name} is deleted or all
 trace state variables are deleted.
+
+@item =tsv-modified,name=@var{name},initial=@var{initial}[,current=@var{current}]
+Reports that the trace state variable @var{name} is modified with
+the initial value @var{initial}. The current value @var{current} of
+trace state variable is optional and is reported if the current
+value of trace state variable is known.
 
 @item =breakpoint-created,bkpt=@{...@}
 @itemx =breakpoint-modified,bkpt=@{...@}
@@ -27965,6 +28065,131 @@ thread group corresponding to the affected inferior.  The optional
 @code{type="code"} part is reported if the memory written to holds
 executable code.
 @end table
+
+@node GDB/MI Breakpoint Information
+@subsection @sc{gdb/mi} Breakpoint Information
+
+When @value{GDBN} reports information about a breakpoint, a
+tracepoint, a watchpoint, or a catchpoint, it uses a tuple with the
+following fields:
+
+@table @code
+@item number
+The breakpoint number.  For a breakpoint that represents one location
+of a multi-location breakpoint, this will be a dotted pair, like
+@samp{1.2}.
+
+@item type
+The type of the breakpoint.  For ordinary breakpoints this will be
+@samp{breakpoint}, but many values are possible.
+
+@item catch-type
+If the type of the breakpoint is @samp{catchpoint}, then this
+indicates the exact type of catchpoint.
+
+@item disp
+This is the breakpoint disposition---either @samp{del}, meaning that
+the breakpoint will be deleted at the next stop, or @samp{keep},
+meaning that the breakpoint will not be deleted.
+
+@item enabled
+This indicates whether the breakpoint is enabled, in which case the
+value is @samp{y}, or disabled, in which case the value is @samp{n}.
+Note that this is not the same as the field @code{enable}.
+
+@item addr
+The address of the breakpoint.  This may be a hexidecimal number,
+giving the address; or the string @samp{<PENDING>}, for a pending
+breakpoint; or the string @samp{<MULTIPLE>}, for a breakpoint with
+multiple locations.  This field will not be present if no address can
+be determined.  For example, a watchpoint does not have an address.
+
+@item func
+If known, the function in which the breakpoint appears.
+If not known, this field is not present.
+
+@item filename
+The name of the source file which contains this function, if known.
+If not known, this field is not present.
+
+@item fullname
+The full file name of the source file which contains this function, if
+known.  If not known, this field is not present.
+
+@item line
+The line number at which this breakpoint appears, if known.
+If not known, this field is not present.
+
+@item at
+If the source file is not known, this field may be provided.  If
+provided, this holds the address of the breakpoint, possibly followed
+by a symbol name.
+
+@item pending
+If this breakpoint is pending, this field is present and holds the
+text used to set the breakpoint, as entered by the user.
+
+@item evaluated-by
+Where this breakpoint's condition is evaluated, either @samp{host} or
+@samp{target}.
+
+@item thread
+If this is a thread-specific breakpoint, then this identifies the
+thread in which the breakpoint can trigger.
+
+@item task
+If this breakpoint is restricted to a particular Ada task, then this
+field will hold the task identifier.
+
+@item cond
+If the breakpoint is conditional, this is the condition expression.
+
+@item ignore
+The ignore count of the breakpoint.
+
+@item enable
+The enable count of the breakpoint.
+
+@item traceframe-usage
+FIXME.
+
+@item static-tracepoint-marker-string-id
+For a static tracepoint, the name of the static tracepoint marker.
+
+@item mask
+For a masked watchpoint, this is the mask.
+
+@item pass
+A tracepoint's pass count.
+
+@item original-location
+The location of the breakpoint as originally specified by the user.
+This field is optional.
+
+@item times
+The number of times the breakpoint has been hit.
+
+@item installed
+This field is only given for tracepoints.  This is either @samp{y},
+meaning that the tracepoint is installed, or @samp{n}, meaning that it
+is not.
+
+@item what
+Some extra data, the exact contents of which are type-dependent.
+
+@end table
+
+For example, here is what the output of @code{-break-insert}
+(@pxref{GDB/MI Breakpoint Commands}) might be:
+
+@smallexample
+-> -break-insert main
+<- ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
+    enabled="y",addr="0x08048564",func="main",file="myprog.c",
+    fullname="/home/nickrob/myprog.c",line="68",thread-groups=["i1"],
+    times="0"@}
+<- (gdb)
+@end smallexample
 
 @node GDB/MI Frame Information
 @subsection @sc{gdb/mi} Frame Information
@@ -28057,7 +28282,8 @@ information of the breakpoint.
 -> -break-insert main
 <- ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
     enabled="y",addr="0x08048564",func="main",file="myprog.c",
-    fullname="/home/nickrob/myprog.c",line="68",times="0"@}
+    fullname="/home/nickrob/myprog.c",line="68",thread-groups=["i1"],
+    times="0"@}
 <- (gdb)
 @end smallexample
 
@@ -28181,7 +28407,8 @@ The corresponding @value{GDBN} command is @samp{ignore}.
 -break-insert main
 ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
 enabled="y",addr="0x000100d0",func="main",file="hello.c",
-fullname="/home/foo/hello.c",line="5",times="0"@}
+fullname="/home/foo/hello.c",line="5",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-after 1 3
 ~
@@ -28197,7 +28424,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",times="0",ignore="3"@}]@}
+line="5",thread-groups=["i1"],times="0",ignore="3"@}]@}
 (gdb)
 @end smallexample
 
@@ -28233,7 +28460,8 @@ The corresponding @value{GDBN} command is @samp{commands}.
 -break-insert main
 ^done,bkpt=@{number="1",type="breakpoint",disp="keep",
 enabled="y",addr="0x000100d0",func="main",file="hello.c",
-fullname="/home/foo/hello.c",line="5",times="0"@}
+fullname="/home/foo/hello.c",line="5",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-commands 1 "print v" "continue"
 ^done
@@ -28275,7 +28503,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",cond="1",times="0",ignore="3"@}]@}
+line="5",cond="1",thread-groups=["i1"],times="0",ignore="3"@}]@}
 (gdb)
 @end smallexample
 
@@ -28347,7 +28575,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="2",type="breakpoint",disp="keep",enabled="n",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",times="0"@}]@}
+line="5",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 @end smallexample
 
@@ -28383,7 +28611,7 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="2",type="breakpoint",disp="keep",enabled="y",
 addr="0x000100d0",func="main",file="hello.c",fullname="/home/foo/hello.c",
-line="5",times="0"@}]@}
+line="5",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 @end smallexample
 
@@ -28398,6 +28626,10 @@ line="5",times="0"@}]@}
 
 @c REDUNDANT???
 Get information about a single breakpoint.
+
+The result is a table of breakpoints.  @xref{GDB/MI Breakpoint
+Information}, for details on the format of each breakpoint in the
+table.
 
 @subsubheading @value{GDBN} Command
 
@@ -28458,23 +28690,8 @@ Restrict the breakpoint to the specified @var{thread-id}.
 
 @subsubheading Result
 
-The result is in the form:
-
-@smallexample
-^done,bkpt=@{number="@var{number}",type="@var{type}",disp="del"|"keep",
-enabled="y"|"n",addr="@var{hex}",func="@var{funcname}",file="@var{filename}",
-fullname="@var{full_filename}",line="@var{lineno}",[thread="@var{threadno},]
-times="@var{times}"@}
-@end smallexample
-
-@noindent
-where @var{number} is the @value{GDBN} number for this breakpoint,
-@var{funcname} is the name of the function where the breakpoint was
-inserted, @var{filename} is the name of the source file which contains
-this function, @var{lineno} is the source line number within that file
-and @var{times} the number of times that the breakpoint has been hit
-(always 0 for -break-insert but may be greater for -break-info or -break-list
-which use the same output).
+@xref{GDB/MI Breakpoint Information}, for details on the format of the
+resulting breakpoint.
 
 Note: this format is open to change.
 @c An out-of-band breakpoint instead of part of the result?
@@ -28490,11 +28707,13 @@ The corresponding @value{GDBN} commands are @samp{break}, @samp{tbreak},
 (gdb)
 -break-insert main
 ^done,bkpt=@{number="1",addr="0x0001072c",file="recursive2.c",
-fullname="/home/foo/recursive2.c,line="4",times="0"@}
+fullname="/home/foo/recursive2.c,line="4",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-insert -t foo
 ^done,bkpt=@{number="2",addr="0x00010774",file="recursive2.c",
-fullname="/home/foo/recursive2.c,line="11",times="0"@}
+fullname="/home/foo/recursive2.c,line="11",thread-groups=["i1"],
+times="0"@}
 (gdb)
 -break-list
 ^done,BreakpointTable=@{nr_rows="2",nr_cols="6",
@@ -28506,15 +28725,18 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x0001072c", func="main",file="recursive2.c",
-fullname="/home/foo/recursive2.c,"line="4",times="0"@},
+fullname="/home/foo/recursive2.c,"line="4",thread-groups=["i1"],
+times="0"@},
 bkpt=@{number="2",type="breakpoint",disp="del",enabled="y",
 addr="0x00010774",func="foo",file="recursive2.c",
-fullname="/home/foo/recursive2.c",line="11",times="0"@}]@}
+fullname="/home/foo/recursive2.c",line="11",thread-groups=["i1"],
+times="0"@}]@}
 (gdb)
 @c -break-insert -r foo.*
 @c ~int foo(int, int);
 @c ^done,bkpt=@{number="3",addr="0x00010774",file="recursive2.c,
-@c "fullname="/home/foo/recursive2.c",line="11",times="0"@}
+@c "fullname="/home/foo/recursive2.c",line="11",thread-groups=["i1"],
+@c times="0"@}
 @c (gdb)
 @end smallexample
 
@@ -28544,6 +28766,8 @@ memory location at which the breakpoint is set
 @item What
 logical location of the breakpoint, expressed by function name, file
 name, line number
+@item Thread-groups
+list of thread groups to which this breakpoint applies
 @item Times
 number of times the breakpoint has been hit
 @end table
@@ -28568,10 +28792,11 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 @{width="10",alignment="-1",col_name="addr",colhdr="Address"@},
 @{width="40",alignment="2",col_name="what",colhdr="What"@}],
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
-addr="0x000100d0",func="main",file="hello.c",line="5",times="0"@},
+addr="0x000100d0",func="main",file="hello.c",line="5",thread-groups=["i1"],
+times="0"@},
 bkpt=@{number="2",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010114",func="foo",file="hello.c",fullname="/home/foo/hello.c",
-line="13",times="0"@}]@}
+line="13",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 @end smallexample
 
@@ -28699,9 +28924,10 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010734",func="callee4",
 file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
-fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c"line="8",times="1"@},
+fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c"line="8",thread-groups=["i1"],
+times="1"@},
 bkpt=@{number="2",type="watchpoint",disp="keep",
-enabled="y",addr="",what="C",times="0"@}]@}
+enabled="y",addr="",what="C",thread-groups=["i1"],times="0"@}]@}
 (gdb)
 -exec-continue
 ^running
@@ -28723,9 +28949,10 @@ hdr=[@{width="3",alignment="-1",col_name="number",colhdr="Num"@},
 body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010734",func="callee4",
 file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
-fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",times="1"@},
+fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",thread-groups=["i1"],
+times="1"@},
 bkpt=@{number="2",type="watchpoint",disp="keep",
-enabled="y",addr="",what="C",times="-5"@}]@}
+enabled="y",addr="",what="C",thread-groups=["i1"],times="-5"@}]@}
 (gdb)
 -exec-continue
 ^running
@@ -28747,9 +28974,76 @@ body=[bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x00010734",func="callee4",
 file="../../../devo/gdb/testsuite/gdb.mi/basics.c",
 fullname="/home/foo/devo/gdb/testsuite/gdb.mi/basics.c",line="8",
-times="1"@}]@}
+thread-groups=["i1"],times="1"@}]@}
 (gdb)
 @end smallexample
+
+
+@c %%%%%%%%%%%%%%%%%%%%%%%%%%%% SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+@node GDB/MI Catchpoint Commands
+@section @sc{gdb/mi} Catchpoint Commands
+
+This section documents @sc{gdb/mi} commands for manipulating
+catchpoints.
+
+@subheading The @code{-catch-load} Command
+@findex -catch-load
+
+@subsubheading Synopsis
+
+@smallexample
+ -catch-load [ -t ] [ -d ] @var{regexp}
+@end smallexample
+
+Add a catchpoint for library load events.  If the @samp{-t} option is used,
+the catchpoint is a temporary one (@pxref{Set Breaks, ,Setting
+Breakpoints}).  If the @samp{-d} option is used, the catchpoint is created
+in a disabled state.  The @samp{regexp} argument is a regular
+expression used to match the name of the loaded library.
+
+
+@subsubheading @value{GDBN} Command
+
+The corresponding @value{GDBN} command is @samp{catch load}.
+
+@subsubheading Example
+
+@smallexample
+-catch-load -t foo.so
+^done,bkpt=@{number="1",type="catchpoint",disp="del",enabled="y",
+what="load of library matching foo.so",catch-type="load",times="0"@}
+(gdb)
+@end smallexample
+
+
+@subheading The @code{-catch-unload} Command
+@findex -catch-unload
+
+@subsubheading Synopsis
+
+@smallexample
+ -catch-unload [ -t ] [ -d ] @var{regexp}
+@end smallexample
+
+Add a catchpoint for library unload events.  If the @samp{-t} option is
+used, the catchpoint is a temporary one (@pxref{Set Breaks, ,Setting
+Breakpoints}).  If the @samp{-d} option is used, the catchpoint is
+created in a disabled state.  The @samp{regexp} argument is a regular
+expression used to match the name of the unloaded library.
+
+@subsubheading @value{GDBN} Command
+
+The corresponding @value{GDBN} command is @samp{catch unload}.
+
+@subsubheading Example
+
+@smallexample
+-catch-unload -d bar.so
+^done,bkpt=@{number="2",type="catchpoint",disp="keep",enabled="n",
+what="load of library matching bar.so",catch-type="unload",times="0"@}
+(gdb)
+@end smallexample
+
 
 @c %%%%%%%%%%%%%%%%%%%%%%%%%%%% SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 @node GDB/MI Program Context
@@ -31016,9 +31310,13 @@ file name or a relative file name depending on the compile command
 used.
 
 @item fullname
-This field is optional.  If it is present it will contain an absolute
-file name of @samp{file}.  If this field is not present then
-@value{GDBN} was unable to determine the absolute file name.
+Absolute file name of @samp{file}.  It is converted to a canonical form
+using the source file search path
+(@pxref{Source Path, ,Specifying Source Directories})
+and after resolving all the symbolic links.
+
+If the source file is not found this field will contain the path as
+present in the debug information.
 
 @item line_asm_insn
 This is a list of tuples containing the disassembly for @samp{line} in
@@ -31819,6 +32117,10 @@ The value of the disconnected tracing flag.  @code{1} means that
 tracing will continue after @value{GDBN} disconnects, @code{0} means
 that the trace run will stop.
 
+@item trace-file
+The filename of the trace file being examined.  This field is
+optional, and only present when examining a trace file.
+
 @end table
 
 @subsubheading @value{GDBN} Command
@@ -32199,8 +32501,8 @@ The @value{GDBN} equivalent is @samp{info source}
 
 List the source files for the current executable.
 
-It will always output the filename, but only when @value{GDBN} can find
-the absolute file name of a source file, will it output the fullname.
+It will always output both the filename and fullname (absolute file
+name) of a source file.
 
 @subsubheading @value{GDBN} Command
 
@@ -33273,7 +33575,8 @@ No equivalent.
 -break-insert main
 ^done,bkpt=@{number="1",type="breakpoint",disp="keep",enabled="y",
 addr="0x080484ed",func="main",file="myprog.c",
-fullname="/home/nickrob/myprog.c",line="73",times="0"@},
+fullname="/home/nickrob/myprog.c",line="73",thread-groups=["i1"],
+times="0"@},
 time=@{wallclock="0.05185",user="0.00800",system="0.00000"@}
 (gdb)
 -enable-timings no
@@ -33786,15 +34089,19 @@ Readers can be loaded and unloaded using the @code{jit-reader-load}
 and @code{jit-reader-unload} commands.
 
 @table @code
-@item jit-reader-load @var{reader-name}
-Load the JIT reader named @var{reader-name}.  On a UNIX system, this
-will usually load @file{@var{libdir}/gdb/@var{reader-name}}, where
-@var{libdir} is the system library directory, usually
-@file{/usr/local/lib}.  Only one reader can be active at a time;
-trying to load a second reader when one is already loaded will result
-in @value{GDBN} reporting an error.  A new JIT reader can be loaded by
-first unloading the current one using @code{jit-reader-load} and then
-invoking @code{jit-reader-load}.
+@item jit-reader-load @var{reader}
+Load the JIT reader named @var{reader}.  @var{reader} is a shared
+object specified as either an absolute or a relative file name.  In
+the latter case, @value{GDBN} will try to load the reader from a
+pre-configured directory, usually @file{@var{libdir}/gdb/} on a UNIX
+system (here @var{libdir} is the system library directory, often
+@file{/usr/local/lib}).
+
+Only one reader can be active at a time; trying to load a second
+reader when one is already loaded will result in @value{GDBN}
+reporting an error.  A new JIT reader can be loaded by first unloading
+the current one using @code{jit-reader-unload} and then invoking
+@code{jit-reader-load}.
 
 @item jit-reader-unload
 Unload the currently loaded JIT reader.
@@ -36091,19 +36398,8 @@ for success (@pxref{Stop Reply Packets})
 @end table
 
 @item vStopped
-@anchor{vStopped packet}
 @cindex @samp{vStopped} packet
-
-In non-stop mode (@pxref{Remote Non-Stop}), acknowledge a previous stop
-reply and prompt for the stub to report another one.
-
-Reply:
-@table @samp
-@item @r{Any stop packet}
-if there is another unreported stop event (@pxref{Stop Reply Packets})
-@item OK
-if there are no unreported stop events
-@end table
+@xref{Notification Packets}.
 
 @item X @var{addr},@var{length}:@var{XX@dots{}}
 @anchor{X packet}
@@ -38424,17 +38720,91 @@ transmit notifications without fear of confusing older clients.  There
 are no notifications defined for @value{GDBN} to send at the moment, but we
 assume that most older stubs would ignore them, as well.)
 
-The following notification packets from the stub to @value{GDBN} are
-defined:
-
+Each notification is comprised of three parts:
 @table @samp
-@item Stop: @var{reply}
-Report an asynchronous stop event in non-stop mode.  
-The @var{reply} has the form of a stop reply, as
+@item @var{name}:@var{event}
+The notification packet is sent by the side that initiates the
+exchange (currently, only the stub does that), with @var{event}
+carrying the specific information about the notification.
+@var{name} is the name of the notification.
+@item @var{ack}
+The acknowledge sent by the other side, usually @value{GDBN}, to
+acknowledge the exchange and request the event.
+@end table
+
+The purpose of an asynchronous notification mechanism is to report to
+@value{GDBN} that something interesting happened in the remote stub.
+
+The remote stub may send notification @var{name}:@var{event}
+at any time, but @value{GDBN} acknowledges the notification when
+appropriate.  The notification event is pending before @value{GDBN}
+acknowledges.  Only one notification at a time may be pending; if
+additional events occur before @value{GDBN} has acknowledged the
+previous notification, they must be queued by the stub for later
+synchronous transmission in response to @var{ack} packets from
+@value{GDBN}.  Because the notification mechanism is unreliable,
+the stub is permitted to resend a notification if it believes
+@value{GDBN} may not have received it.
+
+Specifically, notifications may appear when @value{GDBN} is not
+otherwise reading input from the stub, or when @value{GDBN} is
+expecting to read a normal synchronous response or a
+@samp{+}/@samp{-} acknowledgment to a packet it has sent.
+Notification packets are distinct from any other communication from
+the stub so there is no ambiguity.
+
+After receiving a notification, @value{GDBN} shall acknowledge it by
+sending a @var{ack} packet as a regular, synchronous request to the
+stub.  Such acknowledgment is not required to happen immediately, as
+@value{GDBN} is permitted to send other, unrelated packets to the
+stub first, which the stub should process normally.
+
+Upon receiving a @var{ack} packet, if the stub has other queued
+events to report to @value{GDBN}, it shall respond by sending a
+normal @var{event}.  @value{GDBN} shall then send another @var{ack}
+packet to solicit further responses; again, it is permitted to send
+other, unrelated packets as well which the stub should process
+normally.
+
+If the stub receives a @var{ack} packet and there are no additional
+@var{event} to report, the stub shall return an @samp{OK} response.
+At this point, @value{GDBN} has finished processing a notification
+and the stub has completed sending any queued events.  @value{GDBN}
+won't accept any new notifications until the final @samp{OK} is
+received .  If further notification events occur, the stub shall send
+a new notification, @value{GDBN} shall accept the notification, and
+the process shall be repeated.
+
+The process of asynchronous notification can be illustrated by the
+following example:
+@smallexample
+<- @code{%%Stop:T0505:98e7ffbf;04:4ce6ffbf;08:b1b6e54c;thread:p7526.7526;core:0;}
+@code{...}
+-> @code{vStopped}
+<- @code{T0505:68f37db7;04:40f37db7;08:63850408;thread:p7526.7528;core:0;}
+-> @code{vStopped}
+<- @code{T0505:68e3fdb6;04:40e3fdb6;08:63850408;thread:p7526.7529;core:0;}
+-> @code{vStopped}
+<- @code{OK}
+@end smallexample
+
+The following notifications are defined:
+@multitable @columnfractions 0.12 0.12 0.38 0.38
+
+@item Notification
+@tab Ack
+@tab Event
+@tab Description
+
+@item Stop
+@tab vStopped
+@tab @var{reply}.  The @var{reply} has the form of a stop reply, as
 described in @ref{Stop Reply Packets}.  Refer to @ref{Remote Non-Stop},
 for information on how these notifications are acknowledged by 
 @value{GDBN}.
-@end table
+@tab Report an asynchronous stop event in non-stop mode.
+
+@end multitable
 
 @node Remote Non-Stop
 @section Remote Protocol Support for Non-Stop Mode
@@ -38462,45 +38832,6 @@ of a step operation, hitting a breakpoint, or a fault, only the
 affected thread is stopped; any other still-running threads continue
 to run.  When reporting a @samp{W} or @samp{X} response, all running
 threads belonging to other attached processes continue to run.
-
-Only one stop reply notification at a time may be pending; if
-additional stop events occur before @value{GDBN} has acknowledged the
-previous notification, they must be queued by the stub for later
-synchronous transmission in response to @samp{vStopped} packets from
-@value{GDBN}.  Because the notification mechanism is unreliable, 
-the stub is permitted to resend a stop reply notification
-if it believes @value{GDBN} may not have received it.  @value{GDBN}
-ignores additional stop reply notifications received before it has
-finished processing a previous notification and the stub has completed
-sending any queued stop events.
-
-Otherwise, @value{GDBN} must be prepared to receive a stop reply
-notification at any time.  Specifically, they may appear when
-@value{GDBN} is not otherwise reading input from the stub, or when
-@value{GDBN} is expecting to read a normal synchronous response or a
-@samp{+}/@samp{-} acknowledgment to a packet it has sent.
-Notification packets are distinct from any other communication from
-the stub so there is no ambiguity.
-
-After receiving a stop reply notification, @value{GDBN} shall
-acknowledge it by sending a @samp{vStopped} packet (@pxref{vStopped packet})
-as a regular, synchronous request to the stub.  Such acknowledgment
-is not required to happen immediately, as @value{GDBN} is permitted to
-send other, unrelated packets to the stub first, which the stub should
-process normally.
-
-Upon receiving a @samp{vStopped} packet, if the stub has other queued
-stop events to report to @value{GDBN}, it shall respond by sending a
-normal stop reply response.  @value{GDBN} shall then send another
-@samp{vStopped} packet to solicit further responses; again, it is
-permitted to send other, unrelated packets as well which the stub
-should process normally.
-
-If the stub receives a @samp{vStopped} packet and there are no
-additional stop events to report, the stub shall return an @samp{OK}
-response.  At this point, if further stop events occur, the stub shall
-send a new stop reply notification, @value{GDBN} shall accept the
-notification, and the process shall be repeated.
 
 In non-stop mode, the target shall respond to the @samp{?} packet as
 follows.  First, any incomplete stop reply notification/@samp{vStopped} 
@@ -40502,6 +40833,7 @@ of recognizing standard features, but @value{GDBN} will only display
 registers using the capitalization used in the description.
 
 @menu
+* AArch64 Features::
 * ARM Features::
 * i386 Features::
 * MIPS Features::
@@ -40510,6 +40842,18 @@ registers using the capitalization used in the description.
 * TIC6x Features::
 @end menu
 
+
+@node AArch64 Features
+@subsection AArch64 Features
+@cindex target descriptions, AArch64 features
+
+The @samp{org.gnu.gdb.aarch64.core} feature is required for AArch64
+targets.  It should contain registers @samp{x0} through @samp{x30},
+@samp{sp}, @samp{pc}, and @samp{cpsr}.
+
+The @samp{org.gnu.gdb.aarch64.fpu} feature is optional.  If present,
+it should contain registers @samp{v0} through @samp{v31}, @samp{fpsr},
+and @samp{fpcr}.
 
 @node ARM Features
 @subsection ARM Features
@@ -40820,12 +41164,18 @@ unless otherwise noted:
 
 @enumerate
 @item
-The version number, currently 7.  Versions 1, 2 and 3 are obsolete.
+The version number, currently 8.  Versions 1, 2 and 3 are obsolete.
 Version 4 uses a different hashing function from versions 5 and 6.
 Version 6 includes symbols for inlined functions, whereas versions 4
 and 5 do not.  Version 7 adds attributes to the CU indices in the
-symbol table.  @value{GDBN} will only read version 4, 5, or 6 indices
+symbol table.  Version 8 specifies that symbols from DWARF type units
+(@samp{DW_TAG_type_unit}) refer to the type unit's symbol table and not the
+compilation unit (@samp{DW_TAG_comp_unit}) using the type.
+
+@value{GDBN} will only read version 4, 5, or 6 indices
 by specifying @code{set use-deprecated-index-sections on}.
+GDB has a workaround for potentially broken version 7 indices so it is
+currently not flagged as deprecated.
 
 @item
 The offset, from the start of the file, of the CU list.

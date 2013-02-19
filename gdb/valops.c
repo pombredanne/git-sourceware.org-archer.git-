@@ -1,6 +1,6 @@
 /* Perform non-arithmetic operations on values, for GDB.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -546,28 +546,16 @@ value_cast (struct type *type, struct value *arg2)
 	 minus one, instead of biasing the normal case.  */
       return value_from_longest (type, -1);
     }
-  else if (code1 == TYPE_CODE_ARRAY && TYPE_VECTOR (type) && scalar)
+  else if (code1 == TYPE_CODE_ARRAY && TYPE_VECTOR (type)
+	   && code2 == TYPE_CODE_ARRAY && TYPE_VECTOR (type2)
+	   && TYPE_LENGTH (type) != TYPE_LENGTH (type2))
+    error (_("Cannot convert between vector values of different sizes"));
+  else if (code1 == TYPE_CODE_ARRAY && TYPE_VECTOR (type) && scalar
+	   && TYPE_LENGTH (type) != TYPE_LENGTH (type2))
+    error (_("can only cast scalar to vector of same size"));
+  else if (code1 == TYPE_CODE_VOID)
     {
-      /* Widen the scalar to a vector.  */
-      struct type *eltype;
-      struct value *val;
-      LONGEST low_bound, high_bound;
-      int i;
-
-      if (!get_array_bounds (type, &low_bound, &high_bound))
-	error (_("Could not determine the vector bounds"));
-
-      eltype = check_typedef (TYPE_TARGET_TYPE (type));
-      arg2 = value_cast (eltype, arg2);
-      val = allocate_value (type);
-
-      for (i = 0; i < high_bound - low_bound + 1; i++)
-	{
-	  /* Duplicate the contents of arg2 into the destination vector.  */
-	  memcpy (value_contents_writeable (val) + (i * TYPE_LENGTH (eltype)),
-		  value_contents_all (arg2), TYPE_LENGTH (eltype));
-	}
-      return val;
+      return value_zero (type, not_lval);
     }
   else if (TYPE_LENGTH (type) == TYPE_LENGTH (type2))
     {
@@ -582,10 +570,6 @@ value_cast (struct type *type, struct value *arg2)
     }
   else if (VALUE_LVAL (arg2) == lval_memory)
     return value_at_lazy (type, value_address (arg2));
-  else if (code1 == TYPE_CODE_VOID)
-    {
-      return value_zero (type, not_lval);
-    }
   else
     {
       error (_("Invalid cast."));
@@ -1249,11 +1233,27 @@ value_assign (struct value *toval, struct value *fromval)
 				   VALUE_INTERNALVAR (toval));
 
     case lval_internalvar_component:
-      set_internalvar_component (VALUE_INTERNALVAR (toval),
-				 value_offset (toval),
-				 value_bitpos (toval),
-				 value_bitsize (toval),
-				 fromval);
+      {
+	int offset = value_offset (toval);
+
+	/* Are we dealing with a bitfield?
+
+	   It is important to mention that `value_parent (toval)' is
+	   non-NULL iff `value_bitsize (toval)' is non-zero.  */
+	if (value_bitsize (toval))
+	  {
+	    /* VALUE_INTERNALVAR below refers to the parent value, while
+	       the offset is relative to this parent value.  */
+	    gdb_assert (value_parent (value_parent (toval)) == NULL);
+	    offset += value_offset (value_parent (toval));
+	  }
+
+	set_internalvar_component (VALUE_INTERNALVAR (toval),
+				   offset,
+				   value_bitpos (toval),
+				   value_bitsize (toval),
+				   fromval);
+      }
       break;
 
     case lval_memory:
@@ -1516,7 +1516,7 @@ value_of_variable (struct symbol *var, const struct block *b)
 }
 
 struct value *
-address_of_variable (struct symbol *var, struct block *b)
+address_of_variable (struct symbol *var, const struct block *b)
 {
   struct type *type = SYMBOL_TYPE (var);
   struct value *val;
@@ -2252,7 +2252,6 @@ search_struct_method (const char *name, struct value **arg1p,
   for (i = TYPE_N_BASECLASSES (type) - 1; i >= 0; i--)
     {
       int base_offset;
-      int skip = 0;
       int this_offset;
 
       if (BASETYPE_VIA_VIRTUAL (type, i))
@@ -2532,11 +2531,9 @@ value_find_oload_method_list (struct value **argp, const char *method,
 
 /* Given an array of arguments (ARGS) (which includes an
    entry for "this" in the case of C++ methods), the number of
-   arguments NARGS, the NAME of a function whether it's a method or
-   not (METHOD), and the degree of laxness (LAX) in conforming to
-   overload resolution rules in ANSI C++, find the best function that
-   matches on the argument types according to the overload resolution
-   rules.
+   arguments NARGS, the NAME of a function, and whether it's a method or
+   not (METHOD), find the best function that matches on the argument types
+   according to the overload resolution rules.
 
    METHOD can be one of three values:
      NON_METHOD for non-member functions.
@@ -2575,7 +2572,7 @@ value_find_oload_method_list (struct value **argp, const char *method,
 int
 find_overload_match (struct value **args, int nargs,
 		     const char *name, enum oload_search_type method,
-		     int lax, struct value **objp, struct symbol *fsym,
+		     struct value **objp, struct symbol *fsym,
 		     struct value **valp, struct symbol **symp, 
 		     int *staticp, const int no_adl)
 {
@@ -3177,42 +3174,6 @@ destructor_name_p (const char *name, struct type *type)
       else
 	return 1;
     }
-  return 0;
-}
-
-/* Given TYPE, a structure/union,
-   return 1 if the component named NAME from the ultimate target
-   structure/union is defined, otherwise, return 0.  */
-
-int
-check_field (struct type *type, const char *name)
-{
-  int i;
-
-  /* The type may be a stub.  */
-  CHECK_TYPEDEF (type);
-
-  for (i = TYPE_NFIELDS (type) - 1; i >= TYPE_N_BASECLASSES (type); i--)
-    {
-      const char *t_field_name = TYPE_FIELD_NAME (type, i);
-
-      if (t_field_name && (strcmp_iw (t_field_name, name) == 0))
-	return 1;
-    }
-
-  /* C++: If it was not found as a data field, then try to return it
-     as a pointer to a method.  */
-
-  for (i = TYPE_NFN_FIELDS (type) - 1; i >= 0; --i)
-    {
-      if (strcmp_iw (TYPE_FN_FIELDLIST_NAME (type, i), name) == 0)
-	return 1;
-    }
-
-  for (i = TYPE_N_BASECLASSES (type) - 1; i >= 0; i--)
-    if (check_field (TYPE_BASECLASS (type, i), name))
-      return 1;
-
   return 0;
 }
 

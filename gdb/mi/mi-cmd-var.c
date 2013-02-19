@@ -1,6 +1,5 @@
 /* MI Command Set - varobj commands.
-   Copyright (C) 2000, 2002, 2004-2005, 2007-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 2000-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions (a Red Hat company).
 
@@ -793,14 +792,14 @@ varobj_update_one (struct varobj *var, enum print_values print_values,
 	ui_out_field_int (uiout, "new_num_children", 
 			  varobj_get_num_children (r->varobj));
 
-      display_hint = varobj_get_display_hint (var);
+      display_hint = varobj_get_display_hint (r->varobj);
       if (display_hint)
 	{
 	  ui_out_field_string (uiout, "displayhint", display_hint);
 	  xfree (display_hint);
 	}
 
-      if (varobj_pretty_printed_p (var))
+      if (varobj_pretty_printed_p (r->varobj))
 	ui_out_field_int (uiout, "dynamic", 1);
 
       varobj_get_child_range (r->varobj, &from, &to);

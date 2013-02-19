@@ -1,7 +1,6 @@
 /* Header file for command creation.
 
-   Copyright (C) 1986, 1989-1995, 1999-2000, 2002, 2004, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -292,16 +291,17 @@ extern void add_setshow_string_cmd (char *name,
 				    struct cmd_list_element **set_list,
 				    struct cmd_list_element **show_list);
 
-extern void add_setshow_string_noescape_cmd (char *name,
-					     enum command_class class,
-					     char **var,
-					     const char *set_doc,
-					     const char *show_doc,
-					     const char *help_doc,
-					     cmd_sfunc_ftype *set_func,
-					     show_value_ftype *show_func,
-					     struct cmd_list_element **set_list,
-					     struct cmd_list_element **show_list);
+extern struct cmd_list_element *add_setshow_string_noescape_cmd
+		      (char *name,
+		       enum command_class class,
+		       char **var,
+		       const char *set_doc,
+		       const char *show_doc,
+		       const char *help_doc,
+		       cmd_sfunc_ftype *set_func,
+		       show_value_ftype *show_func,
+		       struct cmd_list_element **set_list,
+		       struct cmd_list_element **show_list);
 
 extern void add_setshow_optional_filename_cmd (char *name,
 					       enum command_class class,

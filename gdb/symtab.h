@@ -1,7 +1,6 @@
 /* Symbol table definitions for GDB.
 
-   Copyright (C) 1986, 1988-2004, 2007-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -23,6 +22,7 @@
 
 #include "vec.h"
 #include "gdb_vecs.h"
+#include "gdbtypes.h"
 
 /* Opaque declarations.  */
 struct ui_file;
@@ -120,7 +120,7 @@ struct general_symbol_info
 
     CORE_ADDR address;
 
-    /* A common block.  Used with COMMON_BLOCK_DOMAIN.  */
+    /* A common block.  Used with LOC_COMMON_BLOCK.  */
 
     struct common_block *common_block;
 
@@ -167,7 +167,8 @@ struct general_symbol_info
   struct obj_section *obj_section;
 };
 
-extern void symbol_set_demangled_name (struct general_symbol_info *, char *,
+extern void symbol_set_demangled_name (struct general_symbol_info *,
+				       const char *,
                                        struct objfile *);
 
 extern const char *symbol_get_demangled_name
@@ -414,7 +415,8 @@ typedef enum domain_enum_tag
 
   LABEL_DOMAIN,
 
-  /* Fortran common blocks.  Their naming must be separate from VAR_DOMAIN.  */
+  /* Fortran common blocks.  Their naming must be separate from VAR_DOMAIN.
+     They also always use LOC_COMMON_BLOCK.  */
   COMMON_BLOCK_DOMAIN
 } domain_enum;
 
@@ -533,6 +535,10 @@ enum address_class
   /* The variable's address is computed by a set of location
      functions (see "struct symbol_computed_ops" below).  */
   LOC_COMPUTED,
+
+  /* The variable uses general_symbol_info->value->common_block field.
+     It also always uses COMMON_BLOCK_DOMAIN.  */
+  LOC_COMMON_BLOCK,
 };
 
 /* The methods needed to implement LOC_COMPUTED.  These methods can
@@ -814,7 +820,7 @@ struct symtab
      all the symtabs in a given compilation unit.  */
   struct macro_table *macro_table;
 
-  /* Name of this source file.  */
+  /* Name of this source file.  This pointer is never NULL.  */
 
   char *filename;
 
@@ -918,19 +924,42 @@ int symbol_matches_domain (enum language symbol_language,
 
 extern struct symtab *lookup_symtab (const char *);
 
+/* An object of this type is passed as the 'is_a_field_of_this'
+   argument to lookup_symbol and lookup_symbol_in_language.  */
+
+struct field_of_this_result
+{
+  /* The type in which the field was found.  If this is NULL then the
+     symbol was not found in 'this'.  If non-NULL, then one of the
+     other fields will be non-NULL as well.  */
+
+  struct type *type;
+
+  /* If the symbol was found as an ordinary field of 'this', then this
+     is non-NULL and points to the particular field.  */
+
+  struct field *field;
+
+  /* If the symbol was found as an function field of 'this', then this
+     is non-NULL and points to the particular field.  */
+
+  struct fn_fieldlist *fn_field;
+};
+
 /* lookup a symbol by name (optional block) in language.  */
 
 extern struct symbol *lookup_symbol_in_language (const char *,
 						 const struct block *,
 						 const domain_enum,
 						 enum language,
-						 int *);
+						 struct field_of_this_result *);
 
 /* lookup a symbol by name (optional block, optional symtab)
    in the current language.  */
 
 extern struct symbol *lookup_symbol (const char *, const struct block *,
-				     const domain_enum, int *);
+				     const domain_enum,
+				     struct field_of_this_result *);
 
 /* A default version of lookup_symbol_nonlocal for use by languages
    that can't think of anything better to do.  */
@@ -980,11 +1009,11 @@ extern struct symbol *lookup_block_symbol (const struct block *, const char *,
 
 /* lookup a [struct, union, enum] by name, within a specified block.  */
 
-extern struct type *lookup_struct (const char *, struct block *);
+extern struct type *lookup_struct (const char *, const struct block *);
 
-extern struct type *lookup_union (const char *, struct block *);
+extern struct type *lookup_union (const char *, const struct block *);
 
-extern struct type *lookup_enum (const char *, struct block *);
+extern struct type *lookup_enum (const char *, const struct block *);
 
 /* from blockframe.c: */
 
@@ -1100,21 +1129,6 @@ struct symtabs_and_lines
 };
 
 
-
-/* Some types and macros needed for exception catchpoints.
-   Can't put these in target.h because symtab_and_line isn't
-   known there.  This file will be included by breakpoint.c,
-   hppa-tdep.c, etc.  */
-
-/* Enums for exception-handling support.  */
-enum exception_event_kind
-{
-  EX_EVENT_THROW,
-  EX_EVENT_CATCH
-};
-
-
-
 /* Given a pc value, return line number it is in.  Second arg nonzero means
    if pc is on the boundary use the previous statement's line number.  */
 
@@ -1133,26 +1147,6 @@ extern int find_line_pc_range (struct symtab_and_line, CORE_ADDR *,
 			       CORE_ADDR *);
 
 extern void resolve_sal_pc (struct symtab_and_line *);
-
-/* Symmisc.c */
-
-void maintenance_print_symbols (char *, int);
-
-void maintenance_print_psymbols (char *, int);
-
-void maintenance_print_msymbols (char *, int);
-
-void maintenance_print_objfiles (char *, int);
-
-void maintenance_info_symtabs (char *, int);
-
-void maintenance_info_psymtabs (char *, int);
-
-void maintenance_check_symtabs (char *, int);
-
-/* maint.c */
-
-void maintenance_print_statistics (char *, int);
 
 /* Symbol-reading stuff in symfile.c and solib.c.  */
 
@@ -1182,9 +1176,13 @@ extern void forget_cached_source_info (void);
 extern void select_source_symtab (struct symtab *);
 
 extern VEC (char_ptr) *default_make_symbol_completion_list_break_on
-  (char *text, char *word, const char *break_on);
-extern VEC (char_ptr) *default_make_symbol_completion_list (char *, char *);
+  (char *text, char *word, const char *break_on,
+   enum type_code code);
+extern VEC (char_ptr) *default_make_symbol_completion_list (char *, char *,
+							    enum type_code);
 extern VEC (char_ptr) *make_symbol_completion_list (char *, char *);
+extern VEC (char_ptr) *make_symbol_completion_type (char *, char *,
+						    enum type_code);
 extern VEC (char_ptr) *make_symbol_completion_list_fn (struct cmd_list_element *,
 						       char *, char *);
 
@@ -1224,6 +1222,8 @@ extern struct symbol *fixup_symbol_section (struct symbol *,
 					    struct objfile *);
 
 /* Symbol searching */
+/* Note: struct symbol_search, search_symbols, et.al. are declared here,
+   instead of making them local to symtab.c, for gdbtk's sake.  */
 
 /* When using search_symbols, a list of the following structs is returned.
    Callers must free the search list using free_search_symbols!  */
@@ -1281,11 +1281,9 @@ extern int symtab_create_debug;
 extern int basenames_may_differ;
 
 int compare_filenames_for_search (const char *filename,
-				  const char *search_name,
-				  int search_len);
+				  const char *search_name);
 
 int iterate_over_some_symtabs (const char *name,
-			       const char *full_path,
 			       const char *real_path,
 			       int (*callback) (struct symtab *symtab,
 						void *data),

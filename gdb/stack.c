@@ -1,6 +1,6 @@
 /* Print and select stack frames for GDB, the GNU debugger.
 
-   Copyright (C) 1986-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -504,8 +504,6 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
   struct ui_file *stb;
   /* True if we should print arguments, false otherwise.  */
   int print_args = strcmp (print_frame_arguments, "none");
-  /* True in "summary" mode, false otherwise.  */
-  int summary = !strcmp (print_frame_arguments, "scalars");
 
   stb = mem_fileopen ();
   old_chain = make_cleanup_ui_file_delete (stb);
@@ -1178,19 +1176,21 @@ print_frame (struct frame_info *frame, int print_level,
       QUIT;
     }
   ui_out_text (uiout, ")");
-  if (sal.symtab && sal.symtab->filename)
+  if (sal.symtab)
     {
+      const char *filename_display;
+      
+      filename_display = symtab_to_filename_for_display (sal.symtab);
       annotate_frame_source_begin ();
       ui_out_wrap_hint (uiout, "   ");
       ui_out_text (uiout, " at ");
       annotate_frame_source_file ();
-      ui_out_field_string (uiout, "file", sal.symtab->filename);
+      ui_out_field_string (uiout, "file", filename_display);
       if (ui_out_is_mi_like_p (uiout))
 	{
 	  const char *fullname = symtab_to_fullname (sal.symtab);
 
-	  if (fullname != NULL)
-	    ui_out_field_string (uiout, "fullname", fullname);
+	  ui_out_field_string (uiout, "fullname", fullname);
 	}
       annotate_frame_source_file_end ();
       ui_out_text (uiout, ":");
@@ -1199,7 +1199,7 @@ print_frame (struct frame_info *frame, int print_level,
       annotate_frame_source_end ();
     }
 
-  if (pc_p && (!funname || (!sal.symtab || !sal.symtab->filename)))
+  if (pc_p && (funname == NULL || sal.symtab == NULL))
     {
 #ifdef PC_SOLIB
       char *lib = PC_SOLIB (get_frame_pc (frame));
@@ -1460,7 +1460,8 @@ frame_info (char *addr_exp, int from_tty)
     }
   wrap_here ("   ");
   if (sal.symtab)
-    printf_filtered (" (%s:%d)", sal.symtab->filename, sal.line);
+    printf_filtered (" (%s:%d)", symtab_to_filename_for_display (sal.symtab),
+		     sal.line);
   puts_filtered ("; ");
   wrap_here ("    ");
   printf_filtered ("saved %s ", pc_regname);
@@ -2277,6 +2278,8 @@ down_command (char *count_exp, int from_tty)
 void
 return_command (char *retval_exp, int from_tty)
 {
+  /* Initialize it just to avoid a GCC false warning.  */
+  enum return_value_convention rv_conv = RETURN_VALUE_STRUCT_CONVENTION;
   struct frame_info *thisframe;
   struct gdbarch *gdbarch;
   struct symbol *thisfun;
@@ -2330,6 +2333,7 @@ return_command (char *retval_exp, int from_tty)
       if (thisfun != NULL)
 	function = read_var_value (thisfun, thisframe);
 
+      rv_conv = RETURN_VALUE_REGISTER_CONVENTION;
       if (TYPE_CODE (return_type) == TYPE_CODE_VOID)
 	/* If the return-type is "void", don't try to find the
            return-value's location.  However, do still evaluate the
@@ -2337,14 +2341,18 @@ return_command (char *retval_exp, int from_tty)
            is discarded, side effects such as "return i++" still
            occur.  */
 	return_value = NULL;
-      else if (thisfun != NULL
-	       && using_struct_return (gdbarch, function, return_type))
+      else if (thisfun != NULL)
 	{
-	  query_prefix = "The location at which to store the "
-	    "function's return value is unknown.\n"
-	    "If you continue, the return value "
-	    "that you specified will be ignored.\n";
-	  return_value = NULL;
+	  rv_conv = struct_return_convention (gdbarch, function, return_type);
+	  if (rv_conv == RETURN_VALUE_STRUCT_CONVENTION
+	      || rv_conv == RETURN_VALUE_ABI_RETURNS_ADDRESS)
+	    {
+	      query_prefix = "The location at which to store the "
+		"function's return value is unknown.\n"
+		"If you continue, the return value "
+		"that you specified will be ignored.\n";
+	      return_value = NULL;
+	    }
 	}
     }
 
@@ -2374,9 +2382,8 @@ return_command (char *retval_exp, int from_tty)
       struct type *return_type = value_type (return_value);
       struct gdbarch *gdbarch = get_regcache_arch (get_current_regcache ());
 
-      gdb_assert (gdbarch_return_value (gdbarch, function, return_type, NULL,
-					NULL, NULL)
-		  == RETURN_VALUE_REGISTER_CONVENTION);
+      gdb_assert (rv_conv != RETURN_VALUE_STRUCT_CONVENTION
+		  && rv_conv != RETURN_VALUE_ABI_RETURNS_ADDRESS);
       gdbarch_return_value (gdbarch, function, return_type,
 			    get_current_regcache (), NULL /*read*/,
 			    value_contents (return_value) /*write*/);

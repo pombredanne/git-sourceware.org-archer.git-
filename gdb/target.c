@@ -1,6 +1,6 @@
 /* Select target systems and architectures at runtime for GDB.
 
-   Copyright (C) 1990-2012 Free Software Foundation, Inc.
+   Copyright (C) 1990-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
 
@@ -1220,7 +1220,7 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 int
 target_read_string (CORE_ADDR memaddr, char **string, int len, int *errnop)
 {
-  int tlen, origlen, offset, i;
+  int tlen, offset, i;
   gdb_byte buf[4];
   int errcode = 0;
   char *buffer;
@@ -1234,8 +1234,6 @@ target_read_string (CORE_ADDR memaddr, char **string, int len, int *errnop)
   buffer_allocated = 4;
   buffer = xmalloc (buffer_allocated);
   bufptr = buffer;
-
-  origlen = len;
 
   while (len > 0)
     {
@@ -3144,7 +3142,7 @@ target_supports_non_stop (void)
 
 /* Implement the "info proc" command.  */
 
-void
+int
 target_info_proc (char *args, enum info_proc_what what)
 {
   struct target_ops *t;
@@ -3167,11 +3165,11 @@ target_info_proc (char *args, enum info_proc_what what)
 	    fprintf_unfiltered (gdb_stdlog,
 				"target_info_proc (\"%s\", %d)\n", args, what);
 
-	  return;
+	  return 1;
 	}
     }
 
-  error (_("Not supported on this target."));
+  return 0;
 }
 
 static int

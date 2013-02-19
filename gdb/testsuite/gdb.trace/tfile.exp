@@ -1,4 +1,4 @@
-#   Copyright 2010-2012 Free Software Foundation, Inc.
+#   Copyright 2010-2013 Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -106,3 +106,7 @@ Not looking at any trace frame.*" \
 gdb_test \
     "interpreter-exec mi \"-target-select tfile basic.tf\"" \
     "\\^connected.*"
+
+gdb_test "interpreter-exec mi \"-trace-status\"" \
+    "\\^done,supported=\"file\",trace-file=\".*basic.tf\",running=\"0\",stop-reason=\"request\",frames=\"${decimal}\",frames-created=\"${decimal}\",buffer-size=\"${decimal}\",buffer-free=\"${decimal}\",disconnected=\".*\",circular=\".*\",user-name=\"\",notes=\"\",start-time=\".*\",stop-time=\".*\"" \
+    "-trace-status"

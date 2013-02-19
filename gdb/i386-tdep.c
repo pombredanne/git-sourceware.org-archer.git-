@@ -1,6 +1,6 @@
 /* Intel 386 target-dependent stuff.
 
-   Copyright (C) 1988-2012 Free Software Foundation, Inc.
+   Copyright (C) 1988-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1582,7 +1582,23 @@ i386_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR start_pc)
   CORE_ADDR pc;
   gdb_byte op;
   int i;
+  CORE_ADDR func_addr;
 
+  if (find_pc_partial_function (start_pc, NULL, &func_addr, NULL))
+    {
+      CORE_ADDR post_prologue_pc
+	= skip_prologue_using_sal (gdbarch, func_addr);
+      struct symtab *s = find_pc_symtab (func_addr);
+
+      /* Clang always emits a line note before the prologue and another
+	 one after.  We trust clang to emit usable line notes.  */
+      if (post_prologue_pc
+	  && (s != NULL
+	      && s->producer != NULL
+	      && strncmp (s->producer, "clang ", sizeof ("clang ") - 1) == 0))
+        return max (start_pc, post_prologue_pc);
+    }
+ 
   cache.locals = -1;
   pc = i386_analyze_prologue (gdbarch, start_pc, 0xffffffff, &cache);
   if (cache.locals < 0)
@@ -3397,11 +3413,9 @@ i386_svr4_sigtramp_p (struct frame_info *this_frame)
   CORE_ADDR pc = get_frame_pc (this_frame);
   const char *name;
 
-  /* UnixWare uses _sigacthandler.  The origin of the other symbols is
-     currently unknown.  */
+  /* The origin of these symbols is currently unknown.  */
   find_pc_partial_function (pc, &name, NULL, NULL);
   return (name && (strcmp ("_sigreturn", name) == 0
-		   || strcmp ("_sigacthandler", name) == 0
 		   || strcmp ("sigvechandler", name) == 0));
 }
 
@@ -4325,7 +4339,6 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
   gdb_byte buf[MAX_REGISTER_SIZE];
   struct i386_record_s ir;
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
-  int rex = 0;
   uint8_t rex_w = -1;
   uint8_t rex_r = 0;
 
@@ -4405,7 +4418,6 @@ i386_process_record (struct gdbarch *gdbarch, struct regcache *regcache,
           if (ir.regmap[X86_RECORD_R8_REGNUM])	/* 64 bit target */
             {
                /* REX */
-               rex = 1;
                rex_w = (opcode8 >> 3) & 1;
                rex_r = (opcode8 & 0x4) << 1;
                ir.rex_x = (opcode8 & 0x2) << 2;

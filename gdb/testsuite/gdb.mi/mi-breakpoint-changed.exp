@@ -1,4 +1,4 @@
-# Copyright 2012 Free Software Foundation, Inc.
+# Copyright 2012-2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -96,7 +96,7 @@ proc test_insert_delete_modify { } {
 	$test
     set test "dprintf marker, \"arg\" \""
     mi_gdb_test $test \
-	{.*=breakpoint-created,bkpt=\{number="6",type="dprintf".*\}.*\n\^done} \
+	{.*=breakpoint-created,bkpt=\{number="6",type="dprintf".*,script=\{\"printf \\\\\"arg\\\\\" \\\\\"\",\"continue\"\}.*\}\r\n\^done} \
 	$test
 
     # 2. when modifying condition

@@ -141,10 +141,17 @@ CONFIG_CLEAN_VPATH_FILES =
 LIBRARIES = $(noinst_LIBRARIES)
 libgnu_a_AR = $(AR) $(ARFLAGS)
 am__DEPENDENCIES_1 =
+<<<<<<< HEAD
 am_libgnu_a_OBJECTS = fd-hook.$(OBJEXT) localcharset.$(OBJEXT) \
 	sockets.$(OBJEXT) stdio.$(OBJEXT) strnlen1.$(OBJEXT) \
 	sys_socket.$(OBJEXT) unistd.$(OBJEXT) wctype-h.$(OBJEXT) \
 	xsize.$(OBJEXT)
+||||||| merged common ancestors
+am_libgnu_a_OBJECTS = localcharset.$(OBJEXT) strnlen1.$(OBJEXT)
+=======
+am_libgnu_a_OBJECTS = localcharset.$(OBJEXT) strnlen1.$(OBJEXT) \
+	wctype-h.$(OBJEXT)
+>>>>>>> gdb/master
 libgnu_a_OBJECTS = $(am_libgnu_a_OBJECTS)
 LTLIBRARIES = $(noinst_LTLIBRARIES)
 DEFAULT_INCLUDES = -I.@am__isrc@ -I$(top_builddir)
@@ -915,9 +922,16 @@ DISTCLEANFILES =
 MAINTAINERCLEANFILES = 
 AM_CPPFLAGS = 
 AM_CFLAGS = 
+<<<<<<< HEAD
 libgnu_a_SOURCES = fd-hook.c gettext.h localcharset.h localcharset.c \
 	size_max.h sockets.h sockets.c stdio.c strnlen1.h strnlen1.c \
 	sys_socket.c unistd.c wctype-h.c xsize.h xsize.c
+||||||| merged common ancestors
+libgnu_a_SOURCES = localcharset.h localcharset.c strnlen1.h strnlen1.c
+=======
+libgnu_a_SOURCES = localcharset.h localcharset.c strnlen1.h strnlen1.c \
+	wctype-h.c
+>>>>>>> gdb/master
 libgnu_a_LIBADD = $(gl_LIBOBJS) @ALLOCA@
 libgnu_a_DEPENDENCIES = $(gl_LIBOBJS) @ALLOCA@
 EXTRA_libgnu_a_SOURCES = alloca.c float.c itold.c fnmatch.c \
@@ -1014,11 +1028,16 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sockets.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/stdio.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/strnlen1.Po@am__quote@
+<<<<<<< HEAD
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sys_socket.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/unistd.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vasnprintf.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wctype-h.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/xsize.Po@am__quote@
+||||||| merged common ancestors
+=======
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/wctype-h.Po@am__quote@
+>>>>>>> gdb/master
 
 .c.o:
 @am__fastdepCC_TRUE@	$(COMPILE) -MT $@ -MD -MP -MF $(DEPDIR)/$*.Tpo -c -o $@ $<

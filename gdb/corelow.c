@@ -1,7 +1,6 @@
 /* Core dump and executable file functions below target vector, for GDB.
 
-   Copyright (C) 1986-1987, 1989, 1991-2001, 2003-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -195,8 +194,6 @@ gdb_check_format (bfd *abfd)
 static void
 core_close (int quitting)
 {
-  char *name;
-
   if (core_bfd)
     {
       int pid = ptid_get_pid (inferior_ptid);
@@ -665,7 +662,6 @@ static LONGEST
 get_core_siginfo (bfd *abfd, gdb_byte *readbuf, ULONGEST offset, LONGEST len)
 {
   asection *section;
-  long pid;
   char *section_name;
   const char *name = ".note.linuxcore.siginfo";
 
@@ -927,6 +923,19 @@ core_has_registers (struct target_ops *ops)
   return (core_bfd != NULL);
 }
 
+/* Implement the to_info_proc method.  */
+
+static void
+core_info_proc (struct target_ops *ops, char *args, enum info_proc_what request)
+{
+  struct gdbarch *gdbarch = get_current_arch ();
+
+  /* Since this is the core file target, call the 'core_info_proc'
+     method on gdbarch, not 'info_proc'.  */
+  if (gdbarch_core_info_proc_p (gdbarch))
+    gdbarch_core_info_proc (gdbarch, args, request);
+}
+
 /* Fill in core_ops with its defined operations and properties.  */
 
 static void
@@ -953,6 +962,7 @@ init_core_ops (void)
   core_ops.to_has_memory = core_has_memory;
   core_ops.to_has_stack = core_has_stack;
   core_ops.to_has_registers = core_has_registers;
+  core_ops.to_info_proc = core_info_proc;
   core_ops.to_magic = OPS_MAGIC;
 
   if (core_target)

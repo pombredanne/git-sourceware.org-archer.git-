@@ -1,7 +1,6 @@
 /* Print in infix form a struct expression.
 
-   Copyright (C) 1986, 1988-1989, 1991-2000, 2003, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -122,7 +121,7 @@ print_subexp_standard (struct expression *exp, int *pos,
 
     case OP_VAR_VALUE:
       {
-	struct block *b;
+	const struct block *b;
 
 	(*pos) += 3;
 	b = exp->elts[pc + 1].block;

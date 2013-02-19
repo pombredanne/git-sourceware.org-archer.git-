@@ -1,8 +1,7 @@
 /* Variables that describe the inferior process running under GDB:
    Where it is, why it stopped, and how to step it.
 
-   Copyright (C) 1986, 1988-1996, 1998-2001, 2003-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -242,19 +241,9 @@ extern void set_inferior_args (char *);
 
 extern void set_inferior_args_vector (int, char **);
 
-extern void all_registers_info (char *, int);
-
 extern void registers_info (char *, int);
 
-extern void nexti_command (char *, int);
-
-extern void stepi_command (char *, int);
-
 extern void continue_1 (int all_threads);
-
-extern void continue_command (char *, int);
-
-extern void interrupt_target_command (char *args, int from_tty);
 
 extern void interrupt_target_1 (int all_threads);
 
@@ -642,6 +631,8 @@ extern struct inferior *add_inferior_with_spaces (void);
 extern void update_observer_mode (void);
 
 extern void update_signals_program_target (void);
+
+extern void signal_catch_update (const unsigned int *);
 
 /* In some circumstances we allow a command to specify a numeric
    signal.  The idea is to keep these circumstances limited so that

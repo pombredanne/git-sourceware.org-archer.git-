@@ -1,8 +1,24 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl
+dnl   Copyright 2012 Free Software Foundation
+dnl
+dnl This file is free software; you can redistribute it and/or modify
+dnl it under the terms of the GNU General Public License as published by
+dnl the Free Software Foundation; either version 3 of the License, or
+dnl (at your option) any later version.
+dnl 
+dnl This program is distributed in the hope that it will be useful,
+dnl but WITHOUT ANY WARRANTY; without even the implied warranty of
+dnl MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+dnl GNU General Public License for more details.
+dnl 
+dnl You should have received a copy of the GNU General Public License
+dnl along with this program; see the file COPYING3.  If not see
+dnl <http://www.gnu.org/licenses/>.
+dnl
 
 AC_PREREQ(2.59)
-AC_INIT([bfd], [2.23.51])
+AC_INIT([bfd], [2.23.52])
 AC_CONFIG_SRCDIR([libbfd.c])
 
 AC_CANONICAL_TARGET
@@ -709,6 +725,7 @@ do
     bfd_elf32_bigmips_vxworks_vec)
 			 	tb="$tb elf32-mips.lo elfxx-mips.lo elf-vxworks.lo elf32.lo $elf ecofflink.lo" ;;
     bfd_elf32_bigmoxie_vec)	tb="$tb elf32-moxie.lo elf32.lo $elf" ;;
+    bfd_elf32_bignios2_vec)	tb="$tb elf32-nios2.lo elf32.lo $elf" ;;
     bfd_elf32_cr16_vec)		tb="$tb elf32-cr16.lo elf32.lo $elf" ;;
     bfd_elf32_cr16c_vec)	tb="$tb elf32-cr16c.lo elf32.lo $elf" ;;
     bfd_elf32_cris_vec)		tb="$tb elf32-cris.lo elf32.lo $elf" ;;
@@ -751,6 +768,7 @@ do
     bfd_elf32_littlemips_vxworks_vec)
 			 	tb="$tb elf32-mips.lo elfxx-mips.lo elf-vxworks.lo elf32.lo $elf ecofflink.lo" ;;
     bfd_elf32_littlemoxie_vec)	tb="$tb elf32-moxie.lo elf32.lo $elf" ;;
+    bfd_elf32_littlenios2_vec)	tb="$tb elf32-nios2.lo elf32.lo $elf" ;;
     bfd_elf32_m32c_vec)         tb="$tb elf32-m32c.lo elf32.lo $elf" ;;
     bfd_elf32_m32r_vec)		tb="$tb elf32-m32r.lo elf32.lo $elf" ;;
     bfd_elf32_m32rle_vec)       tb="$tb elf32-m32r.lo elf32.lo $elf" ;;
@@ -764,6 +782,7 @@ do
     bfd_elf32_mcore_little_vec)	tb="$tb elf32-mcore.lo elf32.lo $elf" ;;
     bfd_elf32_mep_vec)		tb="$tb elf32-mep.lo elf32.lo $elf" ;;
     bfd_elf32_mep_little_vec)	tb="$tb elf32-mep.lo elf32.lo $elf" ;;
+    bfd_elf32_metag_vec)	tb="$tb elf32-metag.lo elf32.lo $elf" ;;
     bfd_elf32_microblazeel_vec)	tb="$tb elf32-microblaze.lo elf32.lo $elf" ;;
     bfd_elf32_microblaze_vec)	tb="$tb elf32-microblaze.lo elf32.lo $elf" ;;
     bfd_elf32_mn10200_vec)	tb="$tb elf-m10200.lo elf32.lo $elf" ;;

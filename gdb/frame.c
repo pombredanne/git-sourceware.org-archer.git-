@@ -1,7 +1,6 @@
 /* Cache and manage frames for GDB, the GNU debugger.
 
-   Copyright (C) 1986-1987, 1989, 1991, 1994-1996, 1998, 2000-2004,
-   2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -43,7 +42,7 @@
 #include "gdbthread.h"
 #include "block.h"
 #include "inline-frame.h"
-#include  "tracepoint.h"
+#include "tracepoint.h"
 
 static struct frame_info *get_prev_frame_1 (struct frame_info *this_frame);
 static struct frame_info *get_prev_frame_raw (struct frame_info *this_frame);

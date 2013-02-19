@@ -1,3 +1,36 @@
+2013-02-06  Sandra Loosemore  <sandra@codesourcery.com>
+            Andrew Jenner <andrew@codesourcery.com>
+
+	Based on patches from Altera Corporation.
+
+	* nios2.h: New file.
+
+2013-01-24  Nick Clifton  <nickc@redhat.com>
+
+	* v850.h: Add support for e3v5 architecture.
+	Reorganize processor selection macros.
+
+2013-01-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386.h (R_386_SIZE32): Fill it.
+	* x86-64.h (R_X86_64_SIZE32): Likewise.
+	(R_X86_64_SIZE64): Likewise.
+
+2013-01-10  Will Newton <will.newton@imgtec.com>
+
+	* common.h: Fix case of "Meta".
+	* metag.h: New file.
+
+2013-01-08  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* common.h (NT_ARM_TLS, NT_ARM_HW_BREAK, NT_ARM_HW_WATCH): New macro
+	definitions.
+
+2013-01-04  Juergen Urban <JuergenUrban@gmx.de>
+
+	* mips.h: Add MIPS machine variant number for r5900 which is
+	compatible with old Playstation 2 software.
+
 2012-11-16  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* common.h (DF_1_CONLFAT): Renamed to ...
@@ -1757,6 +1790,12 @@
 
 For older changes see ChangeLog-9103
 
+Copyright (C) 2004-2012 Free Software Foundation, Inc.
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.
+
 Local Variables:
 mode: change-log
 left-margin: 8

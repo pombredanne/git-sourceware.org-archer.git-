@@ -1,6 +1,6 @@
 /* Top level stuff for GDB, the GNU debugger.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -19,7 +19,6 @@
 
 #include "defs.h"
 #include "gdbcmd.h"
-#include "call-cmds.h"
 #include "cli/cli-cmds.h"
 #include "cli/cli-script.h"
 #include "cli/cli-setshow.h"
@@ -64,6 +63,8 @@
 #include <ctype.h>
 #include "ui-out.h"
 #include "cli-out.h"
+
+extern void initialize_all_files (void);
 
 #define PROMPT(X) the_prompts.prompt_stack[the_prompts.top + X].prompt
 #define PREFIX(X) the_prompts.prompt_stack[the_prompts.top + X].prefix
@@ -136,9 +137,6 @@ char gdb_dirbuf[1024];
    and a prompt string.  */
 
 void (*window_hook) (FILE *, char *);
-
-int epoch_interface;
-int xgdb_verbose;
 
 /* Buffer used for reading command lines, and the size
    allocated for it so far.  */
@@ -1123,7 +1121,7 @@ print_gdb_version (struct ui_file *stream)
   /* Second line is a copyright notice.  */
 
   fprintf_filtered (stream,
-		    "Copyright (C) 2012 Free Software Foundation, Inc.\n");
+		    "Copyright (C) 2013 Free Software Foundation, Inc.\n");
 
   /* Following the copyright is a brief statement that the program is
      free software, that users are free to copy and change it on
@@ -1715,6 +1713,7 @@ gdb_init (char *argv0)
   initialize_inferiors ();
   initialize_current_architecture ();
   init_cli_cmds();
+  initialize_event_loop ();
   init_main ();			/* But that omits this file!  Do it now.  */
 
   initialize_stdin_serial ();

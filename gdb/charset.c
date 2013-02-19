@@ -1,6 +1,6 @@
 /* Character set conversion support for GDB.
 
-   Copyright (C) 2001, 2003, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -965,7 +965,6 @@ intermediate_encoding (void)
   iconv_t desc;
   static const char *stored_result = NULL;
   char *result;
-  int i;
 
   if (stored_result)
     return stored_result;

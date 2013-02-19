@@ -1,6 +1,6 @@
 /* Print values for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1988-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -116,7 +116,6 @@ struct value_print_options user_print_options =
   0,				/* output_format */
   0,				/* format */
   0,				/* stop_print_at_null */
-  0,				/* inspect_it */
   0,				/* print_array_indexes */
   0,				/* deref_ref */
   1,				/* static_field_print */
@@ -371,7 +370,6 @@ generic_val_print (struct type *type, const gdb_byte *valaddr,
 		   const struct generic_val_print_decorations *decorations)
 {
   struct gdbarch *gdbarch = get_type_arch (type);
-  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   unsigned int i = 0;	/* Number of characters printed.  */
   unsigned len;
   struct type *elttype, *unresolved_elttype;
@@ -2211,8 +2209,6 @@ print_converted_chars_to_obstack (struct obstack *obstack,
 		   must output and a comma and a quote.  */
 		if (last != START)
 		  obstack_grow_wstr (obstack, LCST (", "));
-		if (options->inspect_it)
-		  obstack_grow_wstr (obstack, LCST ("\\"));
 		obstack_grow (obstack, &wide_quote_char, sizeof (gdb_wchar_t));
 	      }
 	    /* Output the character.  */
@@ -2240,8 +2236,6 @@ print_converted_chars_to_obstack (struct obstack *obstack,
 	      {
 		/* We were outputting a single string.  Terminate the
 		   string.  */
-		if (options->inspect_it)
-		  obstack_grow_wstr (obstack, LCST ("\\"));
 		obstack_grow (obstack, &wide_quote_char, sizeof (gdb_wchar_t));
 	      }
 	    if (last != START)
@@ -2272,8 +2266,6 @@ print_converted_chars_to_obstack (struct obstack *obstack,
 	    {
 	      /* If we were outputting a string of SINGLE characters,
 		 terminate the quote.  */
-	      if (options->inspect_it)
-		obstack_grow_wstr (obstack, LCST ("\\"));
 	      obstack_grow (obstack, &wide_quote_char, sizeof (gdb_wchar_t));
 	    }
 	  if (last != START)
@@ -2294,11 +2286,7 @@ print_converted_chars_to_obstack (struct obstack *obstack,
 	     characters, the string must be terminated.  Otherwise,
 	     REPEAT and INCOMPLETE are always left properly terminated.  */
 	  if (last == SINGLE)
-	    {
-	      if (options->inspect_it)
-		obstack_grow_wstr (obstack, LCST ("\\"));
-	      obstack_grow (obstack, &wide_quote_char, sizeof (gdb_wchar_t));
-	    }
+	    obstack_grow (obstack, &wide_quote_char, sizeof (gdb_wchar_t));
 
 	  return;
 	}

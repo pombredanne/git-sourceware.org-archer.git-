@@ -1,7 +1,6 @@
 /* Multi-process/thread control for GDB, the GNU debugger.
 
-   Copyright (C) 1986-1988, 1993-2004, 2007-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    Contributed by Lynx Real-Time Systems, Inc.  Los Gatos, CA.
 
@@ -1234,7 +1233,6 @@ thread_apply_command (char *tidlist, int from_tty)
     {
       struct thread_info *tp;
       int start;
-      char *p = tidlist;
 
       start = get_number_or_range (&state);
 

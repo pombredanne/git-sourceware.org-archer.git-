@@ -1,7 +1,6 @@
 /* Handle SVR4 shared libraries for GDB, the GNU Debugger.
 
-   Copyright (C) 1990-1996, 1998-2001, 2003-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1990-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -849,7 +848,6 @@ svr4_keep_data_in_core (CORE_ADDR vaddr, unsigned long size)
   CORE_ADDR ldsomap;
   struct so_list *new;
   struct cleanup *old_chain;
-  struct link_map_offsets *lmo;
   CORE_ADDR name_lm;
 
   info = get_svr4_info ();
@@ -863,7 +861,6 @@ svr4_keep_data_in_core (CORE_ADDR vaddr, unsigned long size)
   if (!ldsomap)
     return 0;
 
-  lmo = svr4_fetch_link_map_offsets ();
   new = XZALLOC (struct so_list);
   old_chain = make_cleanup (xfree, new);
   new->lm_info = lm_info_read (ldsomap);
@@ -1176,7 +1173,6 @@ svr4_read_so_list (CORE_ADDR lm, struct so_list ***link_ptr_ptr,
 
   for (; lm != 0; prev_lm = lm, lm = next_lm)
     {
-      struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
       struct so_list *new;
       struct cleanup *old_chain;
       int errcode;
@@ -1504,7 +1500,7 @@ enable_break (struct svr4_info *info, int from_tty)
 
 	  tmp_bfd = os->objfile->obfd;
 	  load_addr = ANOFFSET (os->objfile->section_offsets,
-				os->objfile->sect_index_text);
+				SECT_OFF_TEXT (os->objfile));
 
 	  interp_sect = bfd_get_section_by_name (tmp_bfd, ".text");
 	  if (interp_sect)
@@ -2212,25 +2208,11 @@ svr4_relocate_main_executable (void)
 
    This function is responsible for discovering those names and
    addresses, and saving sufficient information about them to allow
-   their symbols to be read at a later time.
-
-   FIXME
-
-   Between enable_break() and disable_break(), this code does not
-   properly handle hitting breakpoints which the user might have
-   set in the startup code or in the dynamic linker itself.  Proper
-   handling will probably have to wait until the implementation is
-   changed to use the "breakpoint handler function" method.
-
-   Also, what if child has exit()ed?  Must exit loop somehow.  */
+   their symbols to be read at a later time.  */
 
 static void
 svr4_solib_create_inferior_hook (int from_tty)
 {
-#if defined(_SCO_DS)
-  struct inferior *inf;
-  struct thread_info *tp;
-#endif /* defined(_SCO_DS) */
   struct svr4_info *info;
 
   info = get_svr4_info ();
@@ -2248,31 +2230,6 @@ svr4_solib_create_inferior_hook (int from_tty)
 
   if (!enable_break (info, from_tty))
     return;
-
-#if defined(_SCO_DS)
-  /* SCO needs the loop below, other systems should be using the
-     special shared library breakpoints and the shared library breakpoint
-     service routine.
-
-     Now run the target.  It will eventually hit the breakpoint, at
-     which point all of the libraries will have been mapped in and we
-     can go groveling around in the dynamic linker structures to find
-     out what we need to know about them.  */
-
-  inf = current_inferior ();
-  tp = inferior_thread ();
-
-  clear_proceed_status ();
-  inf->control.stop_soon = STOP_QUIETLY;
-  tp->suspend.stop_signal = GDB_SIGNAL_0;
-  do
-    {
-      target_resume (pid_to_ptid (-1), 0, tp->suspend.stop_signal);
-      wait_for_inferior ();
-    }
-  while (tp->suspend.stop_signal != GDB_SIGNAL_TRAP);
-  inf->control.stop_soon = NO_STOP_QUIETLY;
-#endif /* defined(_SCO_DS) */
 }
 
 static void

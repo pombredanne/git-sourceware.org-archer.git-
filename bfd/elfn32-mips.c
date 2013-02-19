@@ -2149,6 +2149,37 @@ static reloc_howto_type elf_micromips_howto_table_rel[] =
 	 0x0000ffff,		/* src_mask */
 	 0x0000ffff,		/* dst_mask */
 	 FALSE),		/* pcrel_offset */
+
+  /* Section displacement.  */
+  HOWTO (R_MICROMIPS_SCN_DISP,  /* type */
+	 0,			/* rightshift */
+	 2,			/* size (0 = byte, 1 = short, 2 = long) */
+	 32,			/* bitsize */
+	 FALSE,			/* pc_relative */
+	 0,			/* bitpos */
+	 complain_overflow_dont, /* complain_on_overflow */
+	 _bfd_mips_elf_generic_reloc, /* special_function */
+	 "R_MICROMIPS_SCN_DISP", /* name */
+	 TRUE,			/* partial_inplace */
+	 0xffffffff,		/* src_mask */
+	 0xffffffff,		/* dst_mask */
+	 FALSE),		/* pcrel_offset */
+
+  /* Protected jump conversion.  This is an optimization hint.  No
+     relocation is required for correctness.  */
+  HOWTO (R_MICROMIPS_JALR,	/* type */
+	 0,			/* rightshift */
+	 2,			/* size (0 = byte, 1 = short, 2 = long) */
+	 32,			/* bitsize */
+	 FALSE,			/* pc_relative */
+	 0,			/* bitpos */
+	 complain_overflow_dont, /* complain_on_overflow */
+	 _bfd_mips_elf_generic_reloc, /* special_function */
+	 "R_MICROMIPS_JALR",	/* name */
+	 FALSE,			/* partial_inplace */
+	 0,			/* src_mask */
+	 0x00000000,		/* dst_mask */
+	 FALSE),		/* pcrel_offset */
 };
 
 static reloc_howto_type elf_micromips_howto_table_rela[] =
@@ -2459,6 +2490,37 @@ static reloc_howto_type elf_micromips_howto_table_rela[] =
 	 FALSE,			/* partial_inplace */
 	 0,			/* src_mask */
 	 0x0000ffff,		/* dst_mask */
+	 FALSE),		/* pcrel_offset */
+
+  /* Section displacement.  */
+  HOWTO (R_MICROMIPS_SCN_DISP,  /* type */
+	 0,			/* rightshift */
+	 2,			/* size (0 = byte, 1 = short, 2 = long) */
+	 32,			/* bitsize */
+	 FALSE,			/* pc_relative */
+	 0,			/* bitpos */
+	 complain_overflow_dont, /* complain_on_overflow */
+	 _bfd_mips_elf_generic_reloc, /* special_function */
+	 "R_MICROMIPS_SCN_DISP", /* name */
+	 FALSE,			/* partial_inplace */
+	 0,			/* src_mask */
+	 0xffffffff,		/* dst_mask */
+	 FALSE),		/* pcrel_offset */
+
+  /* Protected jump conversion.  This is an optimization hint.  No
+     relocation is required for correctness.  */
+  HOWTO (R_MICROMIPS_JALR,	/* type */
+	 0,			/* rightshift */
+	 2,			/* size (0 = byte, 1 = short, 2 = long) */
+	 32,			/* bitsize */
+	 FALSE,			/* pc_relative */
+	 0,			/* bitpos */
+	 complain_overflow_dont, /* complain_on_overflow */
+	 _bfd_mips_elf_generic_reloc, /* special_function */
+	 "R_MICROMIPS_JALR",	/* name */
+	 FALSE,			/* partial_inplace */
+	 0,			/* src_mask */
+	 0x00000000,		/* dst_mask */
 	 FALSE),		/* pcrel_offset */
 };
 
@@ -2967,6 +3029,8 @@ static const struct elf_reloc_map micromips_reloc_map[] =
   { BFD_RELOC_MICROMIPS_HIGHEST, R_MICROMIPS_HIGHEST - R_MICROMIPS_min },
   { BFD_RELOC_MICROMIPS_CALL_HI16, R_MICROMIPS_CALL_HI16 - R_MICROMIPS_min },
   { BFD_RELOC_MICROMIPS_CALL_LO16, R_MICROMIPS_CALL_LO16 - R_MICROMIPS_min },
+  { BFD_RELOC_MICROMIPS_SCN_DISP, R_MICROMIPS_SCN_DISP - R_MICROMIPS_min },
+  { BFD_RELOC_MICROMIPS_JALR, R_MICROMIPS_JALR - R_MICROMIPS_min },
 };
 
 /* Given a BFD reloc type, return a howto structure.  */
@@ -3165,6 +3229,9 @@ mips_elf_n32_object_p (bfd *abfd)
 {
   unsigned long mach;
 
+  if (!ABI_N32_P (abfd))
+    return FALSE;
+
   /* Irix 5 and 6 are broken.  Object file symbol tables are not always
      sorted correctly such that local symbols precede global symbols,
      and the sh_info field in the symbol table is not always right.  */
@@ -3173,10 +3240,6 @@ mips_elf_n32_object_p (bfd *abfd)
 
   mach = _bfd_elf_mips_mach (elf_elfheader (abfd)->e_flags);
   bfd_default_set_arch_mach (abfd, bfd_arch_mips, mach);
-
-  if (! ABI_N32_P(abfd))
-    return FALSE;
-
   return TRUE;
 }
 
@@ -3381,6 +3444,7 @@ static const struct ecoff_debug_swap mips_elf32_ecoff_debug_swap = {
 #define bfd_elf32_bfd_print_private_bfd_data \
 					_bfd_mips_elf_print_private_bfd_data
 #define bfd_elf32_bfd_relax_section     _bfd_mips_relax_section
+#define bfd_elf32_mkobject		_bfd_mips_elf_mkobject
 
 /* Support for SGI-ish mips targets using n32 ABI.  */
 

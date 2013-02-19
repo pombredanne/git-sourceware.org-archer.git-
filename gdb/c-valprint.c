@@ -1,7 +1,6 @@
 /* Support for printing C values for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1988-1989, 1991-2001, 2003, 2005-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -333,7 +332,7 @@ c_val_print (struct type *type, const gdb_byte *valaddr,
 		  struct symbol *wsym = (struct symbol *) NULL;
 		  struct type *wtype;
 		  struct block *block = (struct block *) NULL;
-		  int is_this_fld;
+		  struct field_of_this_result is_this_fld;
 
 		  if (want_space)
 		    fputs_filtered (" ", stream);

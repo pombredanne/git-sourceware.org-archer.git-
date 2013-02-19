@@ -1,7 +1,7 @@
 /* Abstraction of GNU v3 abi.
    Contributed by Jim Blandy <jimb@redhat.com>
 
-   Copyright (C) 2001-2003, 2005-2012 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -805,7 +805,6 @@ compute_vtable_size (htab_t offset_hash,
   struct type *type = check_typedef (value_type (value));
   void **slot;
   struct value_and_voffset search_vo, *current_vo;
-  CORE_ADDR addr = value_address (value) + value_embedded_offset (value);
 
   /* If the object is not dynamic, then we are done; as it cannot have
      dynamic base types either.  */
@@ -1071,7 +1070,8 @@ gnuv3_pass_by_reference (struct type *type)
 	   with the mangled name.  We don't have a convenient function
 	   to strip off both leading scope qualifiers and trailing
 	   template arguments yet.  */
-	if (!is_constructor_name (TYPE_FN_FIELD_PHYSNAME (fn, fieldelem)))
+	if (!is_constructor_name (TYPE_FN_FIELD_PHYSNAME (fn, fieldelem))
+	    && !TYPE_FN_FIELD_CONSTRUCTOR (fn, fieldelem))
 	  continue;
 
 	/* If this method takes two arguments, and the second argument is
@@ -1133,4 +1133,5 @@ _initialize_gnu_v3_abi (void)
   init_gnuv3_ops ();
 
   register_cp_abi (&gnu_v3_abi_ops);
+  set_cp_abi_as_auto_default (gnu_v3_abi_ops.shortname);
 }

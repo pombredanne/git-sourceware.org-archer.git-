@@ -952,7 +952,7 @@ frvfdpic_elf_link_hash_table_create (bfd *abfd)
   struct frvfdpic_elf_link_hash_table *ret;
   bfd_size_type amt = sizeof (struct frvfdpic_elf_link_hash_table);
 
-  ret = bfd_zalloc (abfd, amt);
+  ret = bfd_zmalloc (amt);
   if (ret == NULL)
     return NULL;
 
@@ -5507,7 +5507,7 @@ elf32_frvfdpic_always_size_sections (bfd *output_bfd,
 static bfd_boolean
 _frvfdpic_check_discarded_relocs (bfd *abfd, asection *sec,
 				  struct bfd_link_info *info,
-				  
+
 				  bfd_boolean *changed)
 {
   Elf_Internal_Shdr *symtab_hdr;
@@ -6744,7 +6744,7 @@ elf32_frv_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
          hardcoded offsets and sizes listed below (and contained within
 	 this lexical block) refer to fields in the target's elf_prstatus
 	 struct.  */
-      case 268:	
+      case 268:
 	/* `pr_cursig' is at offset 12.  */
 	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
 
@@ -6760,7 +6760,7 @@ elf32_frv_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 	   and `pr_interp_fdpic_loadmap', both of which (by design)
 	   immediately follow `pr_reg'.  This will allow these fields to
 	   be viewed by GDB as registers.
-	   
+
 	   `pr_reg' is 184 bytes long.  `pr_exec_fdpic_loadmap' and
 	   `pr_interp_fdpic_loadmap' are 4 bytes each.  */
 	raw_size = 184 + 4 + 4;

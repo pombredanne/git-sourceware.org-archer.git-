@@ -1,6 +1,6 @@
 /* Support routines for manipulating internal types for GDB.
 
-   Copyright (C) 1992-1996, 1998-2012 Free Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -676,6 +676,17 @@ make_cv_type (int cnst, int voltl,
   return ntype;
 }
 
+/* Make a 'restrict'-qualified version of TYPE.  */
+
+struct type *
+make_restrict_type (struct type *type)
+{
+  return make_qualified_type (type,
+			      (TYPE_INSTANCE_FLAGS (type)
+			       | TYPE_INSTANCE_FLAG_RESTRICT),
+			      NULL);
+}
+
 /* Replace the contents of ntype with the type *type.  This changes the
    contents, rather than the pointer for TYPE_MAIN_TYPE (ntype); thus
    the changes are propogated to all types in the TYPE_CHAIN.
@@ -1234,7 +1245,7 @@ lookup_signed_typename (const struct language_defn *language,
    visible in lexical block BLOCK.  */
 
 struct type *
-lookup_struct (const char *name, struct block *block)
+lookup_struct (const char *name, const struct block *block)
 {
   struct symbol *sym;
 
@@ -1256,7 +1267,7 @@ lookup_struct (const char *name, struct block *block)
    visible in lexical block BLOCK.  */
 
 struct type *
-lookup_union (const char *name, struct block *block)
+lookup_union (const char *name, const struct block *block)
 {
   struct symbol *sym;
   struct type *t;
@@ -1280,7 +1291,7 @@ lookup_union (const char *name, struct block *block)
    visible in lexical block BLOCK.  */
 
 struct type *
-lookup_enum (const char *name, struct block *block)
+lookup_enum (const char *name, const struct block *block)
 {
   struct symbol *sym;
 
@@ -1302,7 +1313,7 @@ lookup_enum (const char *name, struct block *block)
 
 struct type *
 lookup_template_type (char *name, struct type *type, 
-		      struct block *block)
+		      const struct block *block)
 {
   struct symbol *sym;
   char *nam = (char *) 
@@ -1939,14 +1950,13 @@ allocate_gnat_aux_type (struct type *type)
 
 /* Helper function to initialize the standard scalar types.
 
-   If NAME is non-NULL, then we make a copy of the string pointed
-   to by name in the objfile_obstack for that objfile, and initialize
-   the type name to that copy.  There are places (mipsread.c in particular),
-   where init_type is called with a NULL value for NAME).  */
+   If NAME is non-NULL, then it is used to initialize the type name.
+   Note that NAME is not copied; it is required to have a lifetime at
+   least as long as OBJFILE.  */
 
 struct type *
 init_type (enum type_code code, int length, int flags,
-	   char *name, struct objfile *objfile)
+	   const char *name, struct objfile *objfile)
 {
   struct type *type;
 
@@ -1980,9 +1990,7 @@ init_type (enum type_code code, int length, int flags,
   if (flags & TYPE_FLAG_GNU_IFUNC)
     TYPE_GNU_IFUNC (type) = 1;
 
-  if (name)
-    TYPE_NAME (type) = obsavestring (name, strlen (name),
-				     &objfile->objfile_obstack);
+  TYPE_NAME (type) = name;
 
   /* C++ fancies.  */
 
@@ -3193,6 +3201,10 @@ recursive_dump_type (struct type *type, int spaces)
   if (TYPE_ADDRESS_CLASS_2 (type))
     {
       puts_filtered (" TYPE_FLAG_ADDRESS_CLASS_2");
+    }
+  if (TYPE_RESTRICT (type))
+    {
+      puts_filtered (" TYPE_FLAG_RESTRICT");
     }
   puts_filtered ("\n");
 

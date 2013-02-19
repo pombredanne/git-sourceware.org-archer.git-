@@ -1,6 +1,6 @@
 /* GDB routines for supporting auto-loaded scripts.
 
-   Copyright (C) 2012 Free Software Foundation, Inc.
+   Copyright (C) 2012-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -178,7 +178,6 @@ auto_load_expand_dir_vars (const char *string)
 static void
 auto_load_safe_path_vec_update (void)
 {
-  VEC (char_ptr) *dir_vec = NULL;
   unsigned len;
   int ix;
 

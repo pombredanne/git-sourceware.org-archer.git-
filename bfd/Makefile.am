@@ -1,4 +1,21 @@
 ## Process this file with automake to generate Makefile.in
+#
+#   Copyright 2012 Free Software Foundation
+#
+# This file is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program; see the file COPYING3.  If not see
+# <http://www.gnu.org/licenses/>.
+#
 
 AUTOMAKE_OPTIONS = 1.11 no-dist foreign
 ACLOCAL_AMFLAGS = -I . -I .. -I ../config
@@ -112,12 +129,14 @@ ALL_MACHINES = \
 	cpu-m88k.lo \
 	cpu-mcore.lo \
 	cpu-mep.lo \
+	cpu-metag.lo \
 	cpu-microblaze.lo \
 	cpu-mips.lo \
 	cpu-mmix.lo \
 	cpu-moxie.lo \
 	cpu-msp430.lo \
 	cpu-mt.lo \
+	cpu-nios2.lo \
 	cpu-ns32k.lo \
 	cpu-openrisc.lo \
 	cpu-or32.lo \
@@ -194,6 +213,7 @@ ALL_MACHINES_CFILES = \
 	cpu-m88k.c \
 	cpu-mcore.c \
 	cpu-mep.c \
+	cpu-metag.c \
 	cpu-microblaze.c \
 	cpu-mips.c \
 	cpu-mmix.c \
@@ -201,6 +221,7 @@ ALL_MACHINES_CFILES = \
 	cpu-msp430.c \
 	cpu-mt.c \
 	cpu-ns32k.c \
+	cpu-nios2.c \
 	cpu-openrisc.c \
 	cpu-or32.c \
 	cpu-pdp11.c \
@@ -323,11 +344,13 @@ BFD32_BACKENDS = \
 	elf32-m88k.lo \
 	elf32-mcore.lo \
 	elf32-mep.lo \
+	elf32-metag.lo \
 	elf32-microblaze.lo \
 	elf32-mips.lo \
 	elf32-moxie.lo \
 	elf32-msp430.lo \
 	elf32-mt.lo \
+	elf32-nios2.lo \
 	elf32-openrisc.lo \
 	elf32-or32.lo \
 	elf32-pj.lo \
@@ -511,11 +534,13 @@ BFD32_BACKENDS_CFILES = \
 	elf32-m88k.c \
 	elf32-mcore.c \
 	elf32-mep.c \
+	elf32-metag.c \
 	elf32-microblaze.c \
 	elf32-mips.c \
 	elf32-moxie.c \
 	elf32-msp430.c \
 	elf32-mt.c \
+	elf32-nios2.c \
 	elf32-openrisc.c \
 	elf32-or32.c \
 	elf32-pj.c \
@@ -624,7 +649,6 @@ BFD64_BACKENDS = \
 	coff-x86_64.lo \
 	coff64-rs6000.lo \
 	demo64.lo \
-	elf-nacl.lo \
 	elf32-ia64.lo \
 	elf32-score.lo \
 	elf32-score7.lo \
@@ -663,7 +687,6 @@ BFD64_BACKENDS_CFILES = \
 	coff-x86_64.c \
 	coff64-rs6000.c \
 	demo64.c \
-	elf-nacl.c \
 	elf32-score.c \
 	elf32-score7.c \
 	elf64-alpha.c \
@@ -748,7 +771,7 @@ CFILES = $(SOURCE_CFILES) $(BUILD_CFILES)
 ## This is a list of all .h files which are in the source tree.
 SOURCE_HFILES = \
 	aout-target.h aoutf1.h aoutx.h coffcode.h coffswap.h ecoffswap.h \
-	elf-bfd.h elf-hppa.h elf32-hppa.h \
+	elf-bfd.h elf-hppa.h elf-linux-psinfo.h elf32-hppa.h \
 	elf64-hppa.h elfcode.h elfcore.h \
 	freebsd.h genlink.h go32stub.h \
 	libaout.h libbfd.h libcoff.h libecoff.h libhppa.h libieee.h \

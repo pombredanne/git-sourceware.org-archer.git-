@@ -1,7 +1,6 @@
 /* Ada language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 1992-1994, 1997-2000, 2003-2005, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -128,7 +127,7 @@ static struct value *resolve_subexp (struct expression **, int *, int,
                                      struct type *);
 
 static void replace_operator_with_call (struct expression **, int, int, int,
-                                        struct symbol *, struct block *);
+                                        struct symbol *, const struct block *);
 
 static int possible_user_operator_p (enum exp_opcode, struct value **);
 
@@ -150,7 +149,7 @@ static enum ada_renaming_category parse_old_style_renaming (struct type *,
 							    const char **);
 
 static struct symbol *find_old_style_renaming_symbol (const char *,
-						      struct block *);
+						      const struct block *);
 
 static struct type *ada_lookup_struct_elt_type (struct type *, char *,
                                                 int, int, int *);
@@ -1297,11 +1296,11 @@ static struct htab *decoded_names_store;
    const, but nevertheless modified to a semantically equivalent form
    when a decoded name is cached in it.  */
 
-char *
+const char *
 ada_decode_symbol (const struct general_symbol_info *gsymbol)
 {
-  char **resultp =
-    (char **) &gsymbol->language_specific.mangled_lang.demangled_name;
+  const char **resultp =
+    (const char **) &gsymbol->language_specific.mangled_lang.demangled_name;
 
   if (*resultp == NULL)
     {
@@ -1311,8 +1310,8 @@ ada_decode_symbol (const struct general_symbol_info *gsymbol)
         {
 	  struct objfile *objf = gsymbol->obj_section->objfile;
 
-	  *resultp = obsavestring (decoded, strlen (decoded),
-				   &objf->objfile_obstack);
+	  *resultp = obstack_copy0 (&objf->objfile_obstack,
+				    decoded, strlen (decoded));
         }
       /* Sometimes, we can't find a corresponding objfile, in which
          case, we put the result on the heap.  Since we only decode
@@ -3574,7 +3573,8 @@ See set/show multiple-symbol."));
 	  else
 	    printf_unfiltered (_("[%d] %s at %s:%d\n"), i + first_choice,
 			       SYMBOL_PRINT_NAME (syms[i].sym),
-			       sal.symtab->filename, sal.line);
+			       symtab_to_filename_for_display (sal.symtab),
+			       sal.line);
           continue;
         }
       else
@@ -3589,7 +3589,8 @@ See set/show multiple-symbol."));
             printf_unfiltered (_("[%d] %s at %s:%d\n"),
                                i + first_choice,
                                SYMBOL_PRINT_NAME (syms[i].sym),
-                               symtab->filename, SYMBOL_LINE (syms[i].sym));
+			       symtab_to_filename_for_display (symtab),
+			       SYMBOL_LINE (syms[i].sym));
           else if (is_enumeral
                    && TYPE_NAME (SYMBOL_TYPE (syms[i].sym)) != NULL)
             {
@@ -3605,7 +3606,7 @@ See set/show multiple-symbol."));
                                : _("[%d] %s at %s:?\n"),
                                i + first_choice,
                                SYMBOL_PRINT_NAME (syms[i].sym),
-                               symtab->filename);
+                               symtab_to_filename_for_display (symtab));
           else
             printf_unfiltered (is_enumeral
                                ? _("[%d] %s (enumeral)\n")
@@ -3719,7 +3720,7 @@ get_selections (int *choices, int n_choices, int max_results,
 static void
 replace_operator_with_call (struct expression **expp, int pc, int nargs,
                             int oplen, struct symbol *sym,
-                            struct block *block)
+                            const struct block *block)
 {
   /* A new expression, with 6 more elements (3 for funcall, 4 for function
      symbol, -oplen for operator being replaced).  */
@@ -4232,7 +4233,7 @@ lookup_cached_symbol (const char *name, domain_enum namespace,
 
 static void
 cache_symbol (const char *name, domain_enum namespace, struct symbol *sym,
-              struct block *block)
+              const struct block *block)
 {
 }
 
@@ -4805,7 +4806,7 @@ remove_irrelevant_renamings (struct ada_symbol_info *syms,
   for (i = 0; i < nsyms; i += 1)
     {
       struct symbol *sym = syms[i].sym;
-      struct block *block = syms[i].block;
+      const struct block *block = syms[i].block;
       const char *name;
       const char *suffix;
 
@@ -5802,7 +5803,7 @@ ada_expand_partial_symbol_name (const char *name, void *user_data)
    the entire command on which completion is made.  */
 
 static VEC (char_ptr) *
-ada_make_symbol_completion_list (char *text0, char *word)
+ada_make_symbol_completion_list (char *text0, char *word, enum type_code code)
 {
   char *text;
   int text_len;
@@ -5816,6 +5817,8 @@ ada_make_symbol_completion_list (char *text0, char *word)
   struct block *b, *surrounding_static_block = 0;
   int i;
   struct block_iterator iter;
+
+  gdb_assert (code == TYPE_CODE_UNDEF);
 
   if (text0[0] == '<')
     {
@@ -7195,7 +7198,7 @@ ada_find_any_type (const char *name)
    Return symbol if found, and NULL otherwise.  */
 
 struct symbol *
-ada_find_renaming_symbol (struct symbol *name_sym, struct block *block)
+ada_find_renaming_symbol (struct symbol *name_sym, const struct block *block)
 {
   const char *name = SYMBOL_LINKAGE_NAME (name_sym);
   struct symbol *sym;
@@ -7217,7 +7220,7 @@ ada_find_renaming_symbol (struct symbol *name_sym, struct block *block)
 }
 
 static struct symbol *
-find_old_style_renaming_symbol (const char *name, struct block *block)
+find_old_style_renaming_symbol (const char *name, const struct block *block)
 {
   const struct symbol *function_sym = block_linkage_function (block);
   char *rename;
@@ -9028,7 +9031,6 @@ assign_aggregate (struct value *container,
   int num_specs;
   LONGEST *indices;
   int max_indices, num_indices;
-  int is_array_aggregate;
   int i;
 
   *pos += 3;
@@ -9053,13 +9055,11 @@ assign_aggregate (struct value *container,
       lhs_type = value_type (lhs);
       low_index = TYPE_ARRAY_LOWER_BOUND_VALUE (lhs_type);
       high_index = TYPE_ARRAY_UPPER_BOUND_VALUE (lhs_type);
-      is_array_aggregate = 1;
     }
   else if (TYPE_CODE (lhs_type) == TYPE_CODE_STRUCT)
     {
       low_index = 0;
       high_index = num_visible_fields (lhs_type) - 1;
-      is_array_aggregate = 0;
     }
   else
     error (_("Left-hand side must be array or record."));
@@ -11082,6 +11082,7 @@ is_known_support_routine (struct frame_info *frame)
   const char *func_name;
   enum language func_lang;
   int i;
+  const char *fullname;
 
   /* If this code does not have any debugging information (no symtab),
      This cannot be any user code.  */
@@ -11096,7 +11097,8 @@ is_known_support_routine (struct frame_info *frame)
      for the user.  This should also take care of case such as VxWorks
      where the kernel has some debugging info provided for a few units.  */
 
-  if (symtab_to_fullname (sal.symtab) == NULL)
+  fullname = symtab_to_fullname (sal.symtab);
+  if (access (fullname, R_OK) != 0)
     return 1;
 
   /* Check the unit filename againt the Ada runtime file naming.
@@ -11790,7 +11792,7 @@ allocate_location_catch_assert (struct breakpoint *self)
 static void
 re_set_catch_assert (struct breakpoint *b)
 {
-  return re_set_exception (ex_catch_assert, b);
+  re_set_exception (ex_catch_assert, b);
 }
 
 static void

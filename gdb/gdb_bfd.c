@@ -1,7 +1,6 @@
 /* Definitions for BFD wrappers used by GDB.
 
-   Copyright (C) 2011, 2012
-   Free Software Foundation, Inc.
+   Copyright (C) 2011-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -346,7 +345,6 @@ const gdb_byte *
 gdb_bfd_map_section (asection *sectp, bfd_size_type *size)
 {
   bfd *abfd;
-  unsigned char header[4];
   struct gdb_bfd_section_data *descriptor;
   bfd_byte *data;
 

@@ -1,6 +1,5 @@
 /* Build symbol tables in GDB's internal format.
-   Copyright (C) 1986-1993, 1995-2000, 2002-2003, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -37,6 +36,7 @@ struct addrmap;
    this technique.  */
 
 struct block;
+struct pending_block;
 
 #ifndef EXTERN
 #define	EXTERN extern
@@ -44,12 +44,6 @@ struct block;
 
 #define HASHSIZE 127		/* Size of things hashed via
 				   hashname().  */
-
-/* Name of source file whose symbol data we are now processing.  This
-   comes from a symbol of type N_SO for stabs.  For Dwarf it comes
-   from the DW_AT_name attribute of a DW_TAG_compile_unit DIE.  */
-
-EXTERN char *last_source_file;
 
 /* Core address of start of text of current source file.  This too
    comes from the N_SO symbol.  For Dwarf it typically comes from the
@@ -177,21 +171,6 @@ EXTERN int context_stack_size;
 
 EXTERN int within_function;
 
-/* List of blocks already made (lexical contexts already closed).
-   This is used at the end to make the blockvector.  */
-
-struct pending_block
-  {
-    struct pending_block *next;
-    struct block *block;
-  };
-
-/* Pointer to the head of a linked list of symbol blocks which have
-   already been finalized (lexical contexts already closed) and which
-   are just waiting to be built into a blockvector when finalizing the
-   associated symtab.  */
-
-EXTERN struct pending_block *pending_blocks;
 
 
 struct subfile_stack
@@ -284,7 +263,8 @@ extern struct context_stack *pop_context (void);
 
 extern void record_line (struct subfile *subfile, int line, CORE_ADDR pc);
 
-extern void start_symtab (char *name, char *dirname, CORE_ADDR start_addr);
+extern void start_symtab (const char *name, const char *dirname,
+			  CORE_ADDR start_addr);
 
 extern void restart_symtab (CORE_ADDR start_addr);
 
@@ -306,6 +286,15 @@ extern void record_producer (const char *producer);
 
 extern void merge_symbol_lists (struct pending **srclist,
 				struct pending **targetlist);
+
+/* Set the name of the last source file.  NAME is copied by this
+   function.  */
+
+extern void set_last_source_file (const char *name);
+
+/* Fetch the name of the last source file.  */
+
+extern const char *get_last_source_file (void);
 
 /* The macro table for the compilation unit whose symbols we're
    currently reading.  All the symtabs for this CU will point to

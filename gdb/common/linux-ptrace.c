@@ -1,5 +1,5 @@
 /* Linux-specific ptrace manipulation routines.
-   Copyright (C) 2012 Free Software Foundation, Inc.
+   Copyright (C) 2012-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -114,7 +114,8 @@ linux_ptrace_test_ret_to_nx (void)
 			".globl linux_ptrace_test_ret_to_nx_instr;"
 			"linux_ptrace_test_ret_to_nx_instr:"
 			"ret"
-			: : "r" (return_address) : "%rsp", "memory");
+			: : "r" ((uint64_t) (uintptr_t) return_address)
+			: "%rsp", "memory");
 #else
 # error "!__i386__ && !__x86_64__"
 #endif

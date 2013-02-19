@@ -1,6 +1,5 @@
 /* Common definitions for remote server for GDB.
-   Copyright (C) 1993, 1995, 1997-2000, 2002-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1993-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -260,12 +259,11 @@ extern int append_callback_event (callback_handler_func *proc,
 extern void delete_callback_event (int id);
 
 extern void start_event_loop (void);
+extern void initialize_event_loop (void);
 
 /* Functions from server.c.  */
 extern int handle_serial_event (int err, gdb_client_data client_data);
 extern int handle_target_event (int err, gdb_client_data client_data);
-
-extern void push_event (ptid_t ptid, struct target_waitstatus *status);
 
 /* Functions from hostio.c.  */
 extern int handle_vFile (char *, int, int *);
@@ -442,11 +440,12 @@ void gdb_agent_about_to_close (int pid);
 #endif
 
 struct traceframe;
+struct eval_agent_expr_context;
 
 /* Do memory copies for bytecodes.  */
 /* Do the recording of memory blocks for actions and bytecodes.  */
 
-int agent_mem_read (struct traceframe *tframe,
+int agent_mem_read (struct eval_agent_expr_context *ctx,
 		    unsigned char *to, CORE_ADDR from,
 		    ULONGEST len);
 
@@ -455,8 +454,8 @@ void agent_set_trace_state_variable_value (int num, LONGEST val);
 
 /* Record the value of a trace state variable.  */
 
-int agent_tsv_read (struct traceframe *tframe, int n);
-int agent_mem_read_string (struct traceframe *tframe,
+int agent_tsv_read (struct eval_agent_expr_context *ctx, int n);
+int agent_mem_read_string (struct eval_agent_expr_context *ctx,
 			   unsigned char *to,
 			   CORE_ADDR from,
 			   ULONGEST len);
@@ -523,8 +522,8 @@ CORE_ADDR get_get_tsv_func_addr (void);
    function in the IPA.  */
 CORE_ADDR get_set_tsv_func_addr (void);
 
-CORE_ADDR current_insn_ptr;
-int emit_error;
+extern CORE_ADDR current_insn_ptr;
+extern int emit_error;
 
 /* Version information, from version.c.  */
 extern const char version[];

@@ -1,6 +1,6 @@
 /* libthread_db assisted debugging support, generic parts.
 
-   Copyright (C) 1999-2001, 2003-2012 Free Software Foundation, Inc.
+   Copyright (C) 1999-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1661,7 +1661,6 @@ thread_db_find_new_threads_2 (ptid_t ptid, int until_no_new)
 {
   td_err_e err = TD_OK;
   struct thread_db_info *info;
-  int pid = ptid_get_pid (ptid);
   int i, loop;
 
   info = get_thread_db_info (GET_PID (ptid));

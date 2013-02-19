@@ -1,6 +1,6 @@
 /* GDB routines for manipulating objfiles.
 
-   Copyright (C) 1992-2004, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -30,7 +30,6 @@
 #include "gdb-stabs.h"
 #include "target.h"
 #include "bcache.h"
-#include "mdebugread.h"
 #include "expression.h"
 #include "parser-defs.h"
 
@@ -324,54 +323,6 @@ get_objfile_arch (struct objfile *objfile)
   return objfile->gdbarch;
 }
 
-/* Initialize entry point information for this objfile.  */
-
-void
-init_entry_point_info (struct objfile *objfile)
-{
-  /* Save startup file's range of PC addresses to help blockframe.c
-     decide where the bottom of the stack is.  */
-
-  if (bfd_get_file_flags (objfile->obfd) & EXEC_P)
-    {
-      /* Executable file -- record its entry point so we'll recognize
-         the startup file because it contains the entry point.  */
-      objfile->ei.entry_point = bfd_get_start_address (objfile->obfd);
-      objfile->ei.entry_point_p = 1;
-    }
-  else if (bfd_get_file_flags (objfile->obfd) & DYNAMIC
-	   && bfd_get_start_address (objfile->obfd) != 0)
-    {
-      /* Some shared libraries may have entry points set and be
-	 runnable.  There's no clear way to indicate this, so just check
-	 for values other than zero.  */
-      objfile->ei.entry_point = bfd_get_start_address (objfile->obfd);
-      objfile->ei.entry_point_p = 1;
-    }
-  else
-    {
-      /* Examination of non-executable.o files.  Short-circuit this stuff.  */
-      objfile->ei.entry_point_p = 0;
-    }
-
-  if (objfile->ei.entry_point_p)
-    {
-      CORE_ADDR entry_point =  objfile->ei.entry_point;
-
-      /* Make certain that the address points at real code, and not a
-	 function descriptor.  */
-      entry_point
-	= gdbarch_convert_from_func_ptr_addr (objfile->gdbarch,
-					      entry_point,
-					      &current_target);
-
-      /* Remove any ISA markers, so that this matches entries in the
-	 symbol table.  */
-      objfile->ei.entry_point
-	= gdbarch_addr_bits_remove (objfile->gdbarch, entry_point);
-    }
-}
-
 /* If there is a valid and known entry point, function fills *ENTRY_P with it
    and returns non-zero; otherwise it returns zero.  */
 
@@ -525,6 +476,9 @@ add_separate_debug_objfile (struct objfile *objfile, struct objfile *parent)
   /* Must not be already in a list.  */
   gdb_assert (objfile->separate_debug_objfile_backlink == NULL);
   gdb_assert (objfile->separate_debug_objfile_link == NULL);
+  gdb_assert (objfile->separate_debug_objfile == NULL);
+  gdb_assert (parent->separate_debug_objfile_backlink == NULL);
+  gdb_assert (parent->separate_debug_objfile_link == NULL);
 
   objfile->separate_debug_objfile_backlink = parent;
   objfile->separate_debug_objfile_link = parent->separate_debug_objfile;
@@ -611,6 +565,8 @@ free_objfile (struct objfile *objfile)
   /* It still may reference data modules have associated with the objfile and
      the symbol file data.  */
   forget_cached_source_info_for_objfile (objfile);
+
+  breakpoint_free_objfile (objfile);
 
   /* First do any symbol file specific actions required when we are
      finished with a particular symbol file.  Note that if the objfile
@@ -930,6 +886,45 @@ objfile_relocate (struct objfile *objfile, struct section_offsets *new_offsets)
   if (changed)
     breakpoint_re_set ();
 }
+
+/* Rebase (add to the offsets) OBJFILE by SLIDE.  SEPARATE_DEBUG_OBJFILE is
+   not touched here.
+   Return non-zero iff any change happened.  */
+
+static int
+objfile_rebase1 (struct objfile *objfile, CORE_ADDR slide)
+{
+  struct section_offsets *new_offsets =
+    ((struct section_offsets *)
+     alloca (SIZEOF_N_SECTION_OFFSETS (objfile->num_sections)));
+  int i;
+
+  for (i = 0; i < objfile->num_sections; ++i)
+    new_offsets->offsets[i] = slide;
+
+  return objfile_relocate1 (objfile, new_offsets);
+}
+
+/* Rebase (add to the offsets) OBJFILE by SLIDE.  Process also OBJFILE's
+   SEPARATE_DEBUG_OBJFILEs.  */
+
+void
+objfile_rebase (struct objfile *objfile, CORE_ADDR slide)
+{
+  struct objfile *debug_objfile;
+  int changed = 0;
+
+  changed |= objfile_rebase1 (objfile, slide);
+
+  for (debug_objfile = objfile->separate_debug_objfile;
+       debug_objfile;
+       debug_objfile = objfile_separate_debug_iterate (objfile, debug_objfile))
+    changed |= objfile_rebase1 (debug_objfile, slide);
+
+  /* Relocate breakpoints as necessary, after things are relocated.  */
+  if (changed)
+    breakpoint_re_set ();
+}
 
 /* Return non-zero if OBJFILE has partial symbols.  */
 
@@ -1243,9 +1238,6 @@ filter_overlapping_sections (struct obj_section **map, int map_size)
 
 	      struct objfile *const objf1 = sect1->objfile;
 	      struct objfile *const objf2 = sect2->objfile;
-
-	      const struct bfd *const abfd1 = objf1->obfd;
-	      const struct bfd *const abfd2 = objf2->obfd;
 
 	      const struct bfd_section *const bfds1 = sect1->the_bfd_section;
 	      const struct bfd_section *const bfds2 = sect2->the_bfd_section;

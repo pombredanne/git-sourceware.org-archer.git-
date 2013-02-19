@@ -1,6 +1,6 @@
 /* Implementation of the GDB variable objects API.
 
-   Copyright (C) 1999-2012 Free Software Foundation, Inc.
+   Copyright (C) 1999-2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -84,7 +84,7 @@ struct varobj_root
   struct expression *exp;
 
   /* Block for which this expression is valid.  */
-  struct block *valid_block;
+  const struct block *valid_block;
 
   /* The frame for this expression.  This field is set iff valid_block is
      not NULL.  */
@@ -1969,7 +1969,6 @@ varobj_value_has_mutated (struct varobj *var, struct value *new_value,
 VEC(varobj_update_result) *
 varobj_update (struct varobj **varp, int explicit)
 {
-  int changed = 0;
   int type_changed = 0;
   int i;
   struct value *new;
@@ -2910,12 +2909,10 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 		       string_print.  Otherwise just return the extracted
 		       string as a value.  */
 
-		    PyObject *py_str
-		      = python_string_to_target_python_string (output);
+		    char *s = python_string_to_target_string (output);
 
-		    if (py_str)
+		    if (s)
 		      {
-			char *s = PyString_AsString (py_str);
 			char *hint;
 
 			hint = gdbpy_get_display_hint (value_formatter);
@@ -2926,10 +2923,10 @@ value_get_print_value (struct value *value, enum varobj_display_formats format,
 			    xfree (hint);
 			  }
 
-			len = PyString_Size (py_str);
+			len = strlen (s);
 			thevalue = xmemdup (s, len + 1, len + 1);
 			type = builtin_type (gdbarch)->builtin_char;
-			Py_DECREF (py_str);
+			xfree (s);
 
 			if (!string_print)
 			  {

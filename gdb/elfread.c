@@ -1,6 +1,6 @@
 /* Read ELF (Executable and Linking Format) object files for GDB.
 
-   Copyright (C) 1991-2012 Free Software Foundation, Inc.
+   Copyright (C) 1991-2013 Free Software Foundation, Inc.
 
    Written by Fred Fish at Cygnus Support.
 
@@ -248,7 +248,7 @@ elf_symtab_read (struct objfile *objfile, int type,
   /* Name of filesym.  This is either a constant string or is saved on
      the objfile's filename cache.  */
   const char *filesymname = "";
-  struct dbx_symfile_info *dbx = objfile->deprecated_sym_stab_info;
+  struct dbx_symfile_info *dbx = DBX_SYMFILE_INFO (objfile);
   int stripped = (bfd_get_symcount (objfile->obfd) == 0);
 
   for (i = 0; i < number_of_symbols; i++)
@@ -1074,38 +1074,27 @@ elf_gnu_ifunc_resolver_return_stop (struct breakpoint *b)
   update_breakpoint_locations (b, sals, sals_end);
 }
 
-struct build_id
-  {
-    size_t size;
-    gdb_byte data[1];
-  };
-
 /* Locate NT_GNU_BUILD_ID from ABFD and return its content.  */
 
-static struct build_id *
+static struct elf_build_id *
 build_id_bfd_get (bfd *abfd)
 {
-  struct build_id *retval;
-
   if (!bfd_check_format (abfd, bfd_object)
       || bfd_get_flavour (abfd) != bfd_target_elf_flavour
-      || elf_tdata (abfd)->build_id == NULL)
+      || elf_tdata (abfd)->build_id == NULL
+      || elf_tdata (abfd)->build_id->u.i.size == 0)
     return NULL;
 
-  retval = xmalloc (sizeof *retval - 1 + elf_tdata (abfd)->build_id_size);
-  retval->size = elf_tdata (abfd)->build_id_size;
-  memcpy (retval->data, elf_tdata (abfd)->build_id, retval->size);
-
-  return retval;
+  return &elf_tdata (abfd)->build_id->u.i;
 }
 
 /* Return if FILENAME has NT_GNU_BUILD_ID matching the CHECK value.  */
 
 static int
-build_id_verify (const char *filename, struct build_id *check)
+build_id_verify (const char *filename, struct elf_build_id *check)
 {
   bfd *abfd;
-  struct build_id *found = NULL;
+  struct elf_build_id *found;
   int retval = 0;
 
   /* We expect to be silent on the non-existing files.  */
@@ -1126,13 +1115,11 @@ build_id_verify (const char *filename, struct build_id *check)
 
   gdb_bfd_unref (abfd);
 
-  xfree (found);
-
   return retval;
 }
 
 static char *
-build_id_to_debug_filename (struct build_id *build_id)
+build_id_to_debug_filename (struct elf_build_id *build_id)
 {
   char *link, *debugdir, *retval = NULL;
   VEC (char_ptr) *debugdir_vec;
@@ -1191,7 +1178,7 @@ build_id_to_debug_filename (struct build_id *build_id)
 static char *
 find_separate_debug_file_by_buildid (struct objfile *objfile)
 {
-  struct build_id *build_id;
+  struct elf_build_id *build_id;
 
   build_id = build_id_bfd_get (objfile->obfd);
   if (build_id != NULL)
@@ -1199,7 +1186,6 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
       char *build_id_name;
 
       build_id_name = build_id_to_debug_filename (build_id);
-      xfree (build_id);
       /* Prevent looping on a stripped .debug file.  */
       if (build_id_name != NULL
 	  && filename_cmp (build_id_name, objfile->name) == 0)
@@ -1251,6 +1237,7 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
   long symcount = 0, dynsymcount = 0, synthcount, storage_needed;
   asymbol **symbol_table = NULL, **dyn_symbol_table = NULL;
   asymbol *synthsyms;
+  struct dbx_symfile_info *dbx;
 
   if (symtab_create_debug)
     {
@@ -1265,16 +1252,13 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
   memset ((char *) &ei, 0, sizeof (ei));
 
   /* Allocate struct to keep track of the symfile.  */
-  objfile->deprecated_sym_stab_info = (struct dbx_symfile_info *)
-    xmalloc (sizeof (struct dbx_symfile_info));
-  memset ((char *) objfile->deprecated_sym_stab_info,
-	  0, sizeof (struct dbx_symfile_info));
+  dbx = XCNEW (struct dbx_symfile_info);
+  set_objfile_data (objfile, dbx_objfile_data_key, dbx);
   make_cleanup (free_elfinfo, (void *) objfile);
 
   /* Process the normal ELF symbol table first.  This may write some
-     chain of info into the dbx_symfile_info in
-     objfile->deprecated_sym_stab_info, which can later be used by
-     elfstab_offset_sections.  */
+     chain of info into the dbx_symfile_info of the objfile, which can
+     later be used by elfstab_offset_sections.  */
 
   storage_needed = bfd_get_symtab_upper_bound (objfile->obfd);
   if (storage_needed < 0)
@@ -1433,8 +1417,18 @@ elf_symfile_read (struct objfile *objfile, int symfile_flags)
   /* If the file has its own symbol tables it has no separate debug
      info.  `.dynsym'/`.symtab' go to MSYMBOLS, `.debug_info' goes to
      SYMTABS/PSYMTABS.  `.gnu_debuglink' may no longer be present with
-     `.note.gnu.build-id'.  */
-  else if (!objfile_has_partial_symbols (objfile))
+     `.note.gnu.build-id'.
+
+     .gnu_debugdata is !objfile_has_partial_symbols because it contains only
+     .symtab, not .debug_* section.  But if we already added .gnu_debugdata as
+     an objfile via find_separate_debug_file_in_section there was no separate
+     debug info available.  Therefore do not attempt to search for another one,
+     objfile->separate_debug_objfile->separate_debug_objfile GDB guarantees to
+     be NULL and we would possibly violate it.  */
+
+  else if (!objfile_has_partial_symbols (objfile)
+	   && objfile->separate_debug_objfile == NULL
+	   && objfile->separate_debug_objfile_backlink == NULL)
     {
       char *debugfile;
 
@@ -1467,15 +1461,14 @@ read_psyms (struct objfile *objfile)
     dwarf2_build_psymtabs (objfile);
 }
 
-/* This cleans up the objfile's deprecated_sym_stab_info pointer, and
-   the chain of stab_section_info's, that might be dangling from
-   it.  */
+/* This cleans up the objfile's dbx symfile info, and the chain of
+   stab_section_info's, that might be dangling from it.  */
 
 static void
 free_elfinfo (void *objp)
 {
   struct objfile *objfile = (struct objfile *) objp;
-  struct dbx_symfile_info *dbxinfo = objfile->deprecated_sym_stab_info;
+  struct dbx_symfile_info *dbxinfo = DBX_SYMFILE_INFO (objfile);
   struct stab_section_info *ssi, *nssi;
 
   ssi = dbxinfo->stab_section_info;
@@ -1512,11 +1505,6 @@ elf_new_init (struct objfile *ignore)
 static void
 elf_symfile_finish (struct objfile *objfile)
 {
-  if (objfile->deprecated_sym_stab_info != NULL)
-    {
-      xfree (objfile->deprecated_sym_stab_info);
-    }
-
   dwarf2_free_objfile (objfile);
 }
 
@@ -1550,7 +1538,7 @@ void
 elfstab_offset_sections (struct objfile *objfile, struct partial_symtab *pst)
 {
   const char *filename = pst->filename;
-  struct dbx_symfile_info *dbx = objfile->deprecated_sym_stab_info;
+  struct dbx_symfile_info *dbx = DBX_SYMFILE_INFO (objfile);
   struct stab_section_info *maybe = dbx->stab_section_info;
   struct stab_section_info *questionable = 0;
   int i;

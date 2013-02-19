@@ -1,7 +1,7 @@
 /* *INDENT-OFF* */ /* ATTRIBUTE_PRINTF confuses indent, avoid running it
 		      for now.  */
 /* I/O, string, cleanup, and other random utilities for GDB.
-   Copyright (C) 1986, 1988-2005, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -107,6 +107,8 @@ extern struct cleanup *make_cleanup_free_so (struct so_list *so);
 struct addrinfo;
 extern struct cleanup *make_cleanup_freeaddrinfo (struct addrinfo *addrinfo);
 
+extern struct cleanup *make_cleanup_restore_current_language (void);
+
 extern struct cleanup *make_cleanup_htab_delete (htab_t htab);
 
 extern void free_current_contents (void *);
@@ -124,8 +126,6 @@ extern struct cleanup *make_bpstat_clear_actions_cleanup (void);
 /* Path utilities.  */
 
 extern char *gdb_realpath (const char *);
-
-extern char *xfullpath (const char *);
 
 extern int gdb_filename_fnmatch (const char *pattern, const char *string,
 				 int flags);
@@ -343,9 +343,6 @@ extern pid_t wait_to_die_with_timeout (pid_t pid, int *status, int timeout);
 #endif
 
 extern int producer_is_gcc_ge_4 (const char *producer);
-
-extern unsigned long gnu_debuglink_crc32 (unsigned long crc,
-                                          unsigned char *buf, size_t len);
 
 extern int myread (int, char *, int);
 

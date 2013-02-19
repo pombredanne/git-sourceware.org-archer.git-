@@ -1,5 +1,5 @@
 /* Darwin support for GDB, the GNU debugger.
-   Copyright (C) 2008-2012 Free Software Foundation, Inc.
+   Copyright (C) 2008-2013 Free Software Foundation, Inc.
 
    Contributed by AdaCore.
 
@@ -79,7 +79,6 @@ static void
 macho_symfile_init (struct objfile *objfile)
 {
   objfile->flags |= OBJF_REORDERED;
-  init_entry_point_info (objfile);
 }
 
 /*  Add a new OSO to the vector of OSO to load.  */

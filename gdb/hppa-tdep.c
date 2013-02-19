@@ -1,7 +1,6 @@
 /* Target-dependent code for the HP PA-RISC architecture.
 
-   Copyright (C) 1986-1987, 1989-1996, 1998-2005, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    Contributed by the Center for Software Science at the
    University of Utah (pa-gdb-bugs@cs.utah.edu).
@@ -328,7 +327,7 @@ read_unwind_info (struct objfile *objfile)
   struct hppa_unwind_info *ui;
   struct hppa_objfile_private *obj_private;
 
-  text_offset = ANOFFSET (objfile->section_offsets, 0);
+  text_offset = ANOFFSET (objfile->section_offsets, SECT_OFF_TEXT (objfile));
   ui = (struct hppa_unwind_info *) obstack_alloc (&objfile->objfile_obstack,
 					   sizeof (struct hppa_unwind_info));
 

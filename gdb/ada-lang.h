@@ -1,7 +1,6 @@
 /* Ada language support definitions for GDB, the GNU debugger.
 
-   Copyright (C) 1992, 1997-2005, 2007-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 1992-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -90,7 +89,7 @@ struct ada_symbol_info
   struct symbol *sym;
 
   /* The block where the symbol was found.  */
-  struct block *block;
+  const struct block *block;
 };
 
 /* Denotes a type of renaming symbol (see ada_parse_renaming).  */
@@ -220,7 +219,7 @@ extern struct value *ada_get_decoded_value (struct value *value);
 
 extern struct type *ada_get_decoded_type (struct type *type);
 
-extern char *ada_decode_symbol (const struct general_symbol_info*);
+extern const char *ada_decode_symbol (const struct general_symbol_info *);
 
 extern const char *ada_decode (const char*);
 
@@ -342,7 +341,7 @@ extern struct type *ada_find_parallel_type (struct type *,
 extern LONGEST get_int_var_value (char *, int *);
 
 extern struct symbol *ada_find_renaming_symbol (struct symbol *name_sym,
-                                                struct block *block);
+                                                const struct block *block);
 
 extern int ada_prefer_type (struct type *, struct type *);
 

@@ -1,5 +1,5 @@
 /* Support for printing Java types for GDB, the GNU debugger.
-   Copyright (C) 1997-2000, 2007-2012 Free Software Foundation, Inc.
+   Copyright (C) 1997-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -239,7 +239,8 @@ java_type_print_base (struct type *type, struct ui_file *stream, int show,
 		  physname[p - real_physname] = '\0';
 
 		  is_full_physname_constructor
-                    = (is_constructor_name (physname)
+                    = (TYPE_FN_FIELD_CONSTRUCTOR (f, j)
+		       || is_constructor_name (physname)
                        || is_destructor_name (physname));
 
 		  QUIT;

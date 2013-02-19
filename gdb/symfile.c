@@ -1,6 +1,6 @@
 /* Generic symbol file reading for the GNU debugger, GDB.
 
-   Copyright (C) 1990-2012 Free Software Foundation, Inc.
+   Copyright (C) 1990-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -82,10 +82,6 @@ static void clear_symtab_users_cleanup (void *ignore);
 /* Global variables owned by this file.  */
 int readnow_symbol_files;	/* Read full symbols immediately.  */
 
-/* External variables and functions referenced.  */
-
-extern void report_transfer_performance (unsigned long, time_t, time_t);
-
 /* Functions this file defines.  */
 
 static void load_command (char *, int);
@@ -103,12 +99,6 @@ static const struct sym_fns *find_sym_fns (bfd *);
 static void decrement_reading_symtab (void *);
 
 static void overlay_invalidate_all (void);
-
-void list_overlays_command (char *, int);
-
-void map_overlay_command (char *, int);
-
-void unmap_overlay_command (char *, int);
 
 static void overlay_auto_command (char *, int);
 
@@ -160,56 +150,6 @@ static VEC (sym_fns_ptr) *symtab_fns = NULL;
 
 int auto_solib_add = 1;
 
-
-/* Make a null terminated copy of the string at PTR with SIZE characters in
-   the obstack pointed to by OBSTACKP .  Returns the address of the copy.
-   Note that the string at PTR does not have to be null terminated, I.e. it
-   may be part of a larger string and we are only saving a substring.  */
-
-char *
-obsavestring (const char *ptr, int size, struct obstack *obstackp)
-{
-  char *p = (char *) obstack_alloc (obstackp, size + 1);
-  /* Open-coded memcpy--saves function call time.  These strings are usually
-     short.  FIXME: Is this really still true with a compiler that can
-     inline memcpy?  */
-  {
-    const char *p1 = ptr;
-    char *p2 = p;
-    const char *end = ptr + size;
-
-    while (p1 != end)
-      *p2++ = *p1++;
-  }
-  p[size] = 0;
-  return p;
-}
-
-/* Concatenate NULL terminated variable argument list of `const char *'
-   strings; return the new string.  Space is found in the OBSTACKP.
-   Argument list must be terminated by a sentinel expression `(char *)
-   NULL'.  */
-
-char *
-obconcat (struct obstack *obstackp, ...)
-{
-  va_list ap;
-
-  va_start (ap, obstackp);
-  for (;;)
-    {
-      const char *s = va_arg (ap, const char *);
-
-      if (s == NULL)
-	break;
-
-      obstack_grow_str (obstackp, s);
-    }
-  va_end (ap);
-  obstack_1grow (obstackp, 0);
-
-  return obstack_finish (obstackp);
-}
 
 /* True if we are reading a symbol table.  */
 
@@ -883,7 +823,12 @@ static void
 read_symbols (struct objfile *objfile, int add_flags)
 {
   (*objfile->sf->sym_read) (objfile, add_flags);
-  if (!objfile_has_partial_symbols (objfile))
+
+  /* find_separate_debug_file_in_section should be called only if there is
+     single binary with no existing separate debug info file.  */
+  if (!objfile_has_partial_symbols (objfile)
+      && objfile->separate_debug_objfile == NULL
+      && objfile->separate_debug_objfile_backlink == NULL)
     {
       bfd *abfd = find_separate_debug_file_in_section (objfile);
       struct cleanup *cleanup = make_cleanup_bfd_unref (abfd);
@@ -897,8 +842,58 @@ read_symbols (struct objfile *objfile, int add_flags)
     require_partial_symbols (objfile, 0);
 }
 
+/* Initialize entry point information for this objfile.  */
+
+static void
+init_entry_point_info (struct objfile *objfile)
+{
+  /* Save startup file's range of PC addresses to help blockframe.c
+     decide where the bottom of the stack is.  */
+
+  if (bfd_get_file_flags (objfile->obfd) & EXEC_P)
+    {
+      /* Executable file -- record its entry point so we'll recognize
+         the startup file because it contains the entry point.  */
+      objfile->ei.entry_point = bfd_get_start_address (objfile->obfd);
+      objfile->ei.entry_point_p = 1;
+    }
+  else if (bfd_get_file_flags (objfile->obfd) & DYNAMIC
+	   && bfd_get_start_address (objfile->obfd) != 0)
+    {
+      /* Some shared libraries may have entry points set and be
+	 runnable.  There's no clear way to indicate this, so just check
+	 for values other than zero.  */
+      objfile->ei.entry_point = bfd_get_start_address (objfile->obfd);
+      objfile->ei.entry_point_p = 1;
+    }
+  else
+    {
+      /* Examination of non-executable.o files.  Short-circuit this stuff.  */
+      objfile->ei.entry_point_p = 0;
+    }
+
+  if (objfile->ei.entry_point_p)
+    {
+      CORE_ADDR entry_point =  objfile->ei.entry_point;
+
+      /* Make certain that the address points at real code, and not a
+	 function descriptor.  */
+      entry_point
+	= gdbarch_convert_from_func_ptr_addr (objfile->gdbarch,
+					      entry_point,
+					      &current_target);
+
+      /* Remove any ISA markers, so that this matches entries in the
+	 symbol table.  */
+      objfile->ei.entry_point
+	= gdbarch_addr_bits_remove (objfile->gdbarch, entry_point);
+    }
+}
+
 /* Process a symbol file, as either the main file or as a dynamically
    loaded file.
+
+   This function does not set the OBJFILE's entry-point info.
 
    OBJFILE is where the symbols are to be read from.
 
@@ -927,12 +922,12 @@ read_symbols (struct objfile *objfile, int add_flags)
    an extra symbol file such as dynamically loaded code, and wether
    breakpoint reset should be deferred.  */
 
-void
-syms_from_objfile (struct objfile *objfile,
-                   struct section_addr_info *addrs,
-                   struct section_offsets *offsets,
-                   int num_offsets,
-		   int add_flags)
+static void
+syms_from_objfile_1 (struct objfile *objfile,
+		     struct section_addr_info *addrs,
+		     struct section_offsets *offsets,
+		     int num_offsets,
+		     int add_flags)
 {
   struct section_addr_info *local_addr = NULL;
   struct cleanup *old_chain;
@@ -940,11 +935,21 @@ syms_from_objfile (struct objfile *objfile,
 
   gdb_assert (! (addrs && offsets));
 
-  init_entry_point_info (objfile);
   objfile->sf = find_sym_fns (objfile->obfd);
 
   if (objfile->sf == NULL)
-    return;	/* No symbols.  */
+    {
+      /* No symbols to load, but we still need to make sure
+	 that the section_offsets table is allocated.  */
+      int num_sections = bfd_count_sections (objfile->obfd);
+      size_t size = SIZEOF_N_SECTION_OFFSETS (num_offsets);
+
+      objfile->num_sections = num_sections;
+      objfile->section_offsets
+        = obstack_alloc (&objfile->objfile_obstack, size);
+      memset (objfile->section_offsets, 0, size);
+      return;
+    }
 
   /* Make sure that partially constructed symbol tables will be cleaned up
      if an error occurs during symbol reading.  */
@@ -1023,6 +1028,20 @@ syms_from_objfile (struct objfile *objfile,
 
   discard_cleanups (old_chain);
   xfree (local_addr);
+}
+
+/* Same as syms_from_objfile_1, but also initializes the objfile
+   entry-point info.  */
+
+void
+syms_from_objfile (struct objfile *objfile,
+		   struct section_addr_info *addrs,
+		   struct section_offsets *offsets,
+		   int num_offsets,
+		   int add_flags)
+{
+  syms_from_objfile_1 (objfile, addrs, offsets, num_offsets, add_flags);
+  init_entry_point_info (objfile);
 }
 
 /* Perform required actions after either reading in the initial
@@ -1344,7 +1363,7 @@ get_file_crc (bfd *abfd, unsigned long *file_crc_return)
 	}
       if (count == 0)
 	break;
-      file_crc = gnu_debuglink_crc32 (file_crc, buffer, count);
+      file_crc = bfd_calc_gnu_debuglink_crc32 (file_crc, buffer, count);
     }
 
   *file_crc_return = file_crc;
@@ -2185,24 +2204,6 @@ generic_load (char *args, int from_tty)
 
 /* Report how fast the transfer went.  */
 
-/* DEPRECATED: cagney/1999-10-18: report_transfer_performance is being
-   replaced by print_transfer_performance (with a very different
-   function signature).  */
-
-void
-report_transfer_performance (unsigned long data_count, time_t start_time,
-			     time_t end_time)
-{
-  struct timeval start, end;
-
-  start.tv_sec = start_time;
-  start.tv_usec = 0;
-  end.tv_sec = end_time;
-  end.tv_usec = 0;
-
-  print_transfer_performance (gdb_stdout, data_count, 0, &start, &end);
-}
-
 void
 print_transfer_performance (struct ui_file *stream,
 			    unsigned long data_count,
@@ -2585,7 +2586,6 @@ reread_symbols (void)
 	  objfile->free_psymtabs = NULL;
 	  objfile->template_symbols = NULL;
 	  objfile->msymbols = NULL;
-	  objfile->deprecated_sym_private = NULL;
 	  objfile->minimal_symbol_count = 0;
 	  memset (&objfile->msymbol_hash, 0,
 		  sizeof (objfile->msymbol_hash));
@@ -3245,7 +3245,7 @@ find_pc_mapped_section (CORE_ADDR pc)
 /* Function: list_overlays_command
    Print a list of mapped sections and their PC ranges.  */
 
-void
+static void
 list_overlays_command (char *args, int from_tty)
 {
   int nmapped = 0;
@@ -3285,7 +3285,7 @@ list_overlays_command (char *args, int from_tty)
 /* Function: map_overlay_command
    Mark the named section as mapped (ie. residing at its VMA address).  */
 
-void
+static void
 map_overlay_command (char *args, int from_tty)
 {
   struct objfile *objfile, *objfile2;
@@ -3330,7 +3330,7 @@ map_overlay_command (char *args, int from_tty)
    Mark the overlay section as unmapped
    (ie. resident in its LMA address range, rather than the VMA range).  */
 
-void
+static void
 unmap_overlay_command (char *args, int from_tty)
 {
   struct objfile *objfile;

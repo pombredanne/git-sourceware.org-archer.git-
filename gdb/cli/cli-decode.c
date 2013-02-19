@@ -1,7 +1,6 @@
 /* Handle lists of commands, their decoding and documentation, for GDB.
 
-   Copyright (c) 1986, 1989-1991, 1998, 2000-2002, 2004, 2007-2012 Free
-   Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -306,6 +305,13 @@ add_alias_cmd (char *name, char *oldname, enum command_class class,
     }
 
   c = add_cmd (name, class, NULL, old->doc, list);
+
+  /* If OLD->DOC can be freed, we should make another copy.  */
+  if ((old->flags & DOC_ALLOCATED) != 0)
+    {
+      c->doc = xstrdup (old->doc);
+      c->flags |= DOC_ALLOCATED;
+    }
   /* NOTE: Both FUNC and all the FUNCTIONs need to be copied.  */
   c->func = old->func;
   c->function = old->function;
@@ -451,6 +457,8 @@ add_setshow_cmd_full (char *name,
     }
   set = add_set_or_show_cmd (name, set_cmd, class, var_type, var,
 			     full_set_doc, set_list);
+  set->flags |= DOC_ALLOCATED;
+
   if (set_func != NULL)
     set_cmd_sfunc (set, set_func);
 
@@ -458,6 +466,7 @@ add_setshow_cmd_full (char *name,
 
   show = add_set_or_show_cmd (name, show_cmd, class, var_type, var,
 			      full_show_doc, show_list);
+  show->flags |= DOC_ALLOCATED;
   show->show_value_func = show_func;
 
   if (set_result != NULL)
@@ -588,7 +597,7 @@ add_setshow_string_cmd (char *name, enum command_class class,
 
 /* Add element named NAME to both the set and show command LISTs (the
    list for set/show or some sublist thereof).  */
-void
+struct cmd_list_element *
 add_setshow_string_noescape_cmd (char *name, enum command_class class,
 				 char **var,
 				 const char *set_doc, const char *show_doc,
@@ -598,11 +607,14 @@ add_setshow_string_noescape_cmd (char *name, enum command_class class,
 				 struct cmd_list_element **set_list,
 				 struct cmd_list_element **show_list)
 {
+  struct cmd_list_element *set_cmd;
+
   add_setshow_cmd_full (name, class, var_string_noescape, var,
 			set_doc, show_doc, help_doc,
 			set_func, show_func,
 			set_list, show_list,
-			NULL, NULL);
+			&set_cmd, NULL);
+  return set_cmd;
 }
 
 /* Add element named NAME to both the set and show command LISTs (the
@@ -769,6 +781,8 @@ delete_cmd (char *name, struct cmd_list_element **list,
 	  *prehookee = iter->hookee_pre;
 	  if (iter->hookee_post)
 	    iter->hookee_post->hook_post = 0;
+	  if (iter->doc && (iter->flags & DOC_ALLOCATED) != 0)
+	    xfree (iter->doc);
 	  *posthook = iter->hook_post;
 	  *posthookee = iter->hookee_post;
 
@@ -903,7 +917,6 @@ void
 help_cmd (char *command, struct ui_file *stream)
 {
   struct cmd_list_element *c;
-  extern struct cmd_list_element *cmdlist;
 
   if (!command)
     {
@@ -1035,7 +1048,6 @@ static void
 help_all (struct ui_file *stream)
 {
   struct cmd_list_element *c;
-  extern struct cmd_list_element *cmdlist;
   int seen_unclassified = 0;
 
   for (c = cmdlist; c; c = c->next)

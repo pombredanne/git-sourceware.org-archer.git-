@@ -1,6 +1,6 @@
 /* Memory-access and commands for "inferior" process, for GDB.
 
-   Copyright (C) 1986-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -56,20 +56,6 @@
 #include "inf-loop.h"
 #include "continuations.h"
 #include "linespec.h"
-
-/* Functions exported for general use, in inferior.h: */
-
-void all_registers_info (char *, int);
-
-void registers_info (char *, int);
-
-void nexti_command (char *, int);
-
-void stepi_command (char *, int);
-
-void continue_command (char *, int);
-
-void interrupt_target_command (char *args, int from_tty);
 
 /* Local functions: */
 
@@ -150,11 +136,6 @@ ptid_t inferior_ptid;
 /* Address at which inferior stopped.  */
 
 CORE_ADDR stop_pc;
-
-/* Flag indicating that a command has proceeded the inferior past the
-   current breakpoint.  */
-
-int breakpoint_proceeded;
 
 /* Nonzero if stopped due to completion of a stack dummy routine.  */
 
@@ -756,7 +737,7 @@ continue_1 (int all_threads)
 }
 
 /* continue [-a] [proceed-count] [&]  */
-void
+static void
 continue_command (char *args, int from_tty)
 {
   int async_exec = 0;
@@ -875,13 +856,13 @@ next_command (char *count_string, int from_tty)
 
 /* Likewise, but step only one instruction.  */
 
-void
+static void
 stepi_command (char *count_string, int from_tty)
 {
   step_1 (0, 1, count_string);
 }
 
-void
+static void
 nexti_command (char *count_string, int from_tty)
 {
   step_1 (1, 1, count_string);
@@ -1046,7 +1027,7 @@ step_once (int skip_subroutines, int single_inst, int count, int thread)
 	  CORE_ADDR pc;
 
 	  /* Step at an inlined function behaves like "down".  */
-	  if (!skip_subroutines && !single_inst
+	  if (!skip_subroutines
 	      && inline_skipped_frames (inferior_ptid))
 	    {
 	      ptid_t resume_ptid;
@@ -1464,7 +1445,6 @@ get_return_value (struct value *function, struct type *value_type)
   struct regcache *stop_regs = stop_registers;
   struct gdbarch *gdbarch;
   struct value *value;
-  struct ui_out *uiout = current_uiout;
   struct cleanup *cleanup = make_cleanup (null_cleanup, NULL);
 
   /* If stop_registers were not saved, use the current registers.  */
@@ -2294,7 +2274,7 @@ registers_info (char *addr_exp, int fpregs)
     }
 }
 
-void
+static void
 all_registers_info (char *addr_exp, int from_tty)
 {
   registers_info (addr_exp, 1);
@@ -2809,7 +2789,7 @@ interrupt_target_1 (int all_threads)
    if the `-a' switch is used.  */
 
 /* interrupt [-a]  */
-void
+static void
 interrupt_target_command (char *args, int from_tty)
 {
   if (target_can_async_p ())
@@ -2883,10 +2863,13 @@ info_proc_cmd_1 (char *args, enum info_proc_what what, int from_tty)
 {
   struct gdbarch *gdbarch = get_current_arch ();
 
-  if (gdbarch_info_proc_p (gdbarch))
-    gdbarch_info_proc (gdbarch, args, what);
-  else
-    target_info_proc (args, what);
+  if (!target_info_proc (args, what))
+    {
+      if (gdbarch_info_proc_p (gdbarch))
+	gdbarch_info_proc (gdbarch, args, what);
+      else
+	error (_("Not supported on this target."));
+    }
 }
 
 /* Implement `info proc' when given without any futher parameters.  */

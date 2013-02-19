@@ -1,7 +1,6 @@
 /* GDB-specific functions for operating on agent expressions.
 
-   Copyright (C) 1998-2001, 2003, 2007-2012 Free Software Foundation,
-   Inc.
+   Copyright (C) 1998-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -2563,13 +2562,11 @@ gen_printf (CORE_ADDR scope, struct gdbarch *gdbarch,
 	    struct format_piece *frags,
 	    int nargs, struct expression **exprs)
 {
-  struct expression *expr;
   struct cleanup *old_chain = 0;
   struct agent_expr *ax = new_agent_expr (gdbarch, scope);
   union exp_element *pc;
   struct axs_value value;
-  int i, tem, bot, fr, flen;
-  char *fmt;
+  int tem;
 
   old_chain = make_cleanup_free_agent_expr (ax);
 

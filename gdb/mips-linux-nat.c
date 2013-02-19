@@ -1,6 +1,6 @@
 /* Native-dependent code for GNU/Linux on MIPS processors.
 
-   Copyright (C) 2001-2012 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -326,7 +326,7 @@ mips64_linux_regsets_store_registers (struct target_ops *ops,
   have_dsp = mips_regnum (gdbarch)->dspctl != -1;
   if (!have_dsp)
     is_dsp = 0;
-  if (regno >= mips_regnum (gdbarch)->dspacc
+  else if (regno >= mips_regnum (gdbarch)->dspacc
       && regno < mips_regnum (gdbarch)->dspacc + 6)
     is_dsp = 1;
   else if (regno == mips_regnum (gdbarch)->dspctl)

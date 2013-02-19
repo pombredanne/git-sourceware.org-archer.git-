@@ -1,4 +1,4 @@
-# Copyright 2012 Free Software Foundation, Inc.
+# Copyright 2012-2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,3 +32,7 @@ gdb_test "break main" "Breakpoint.*at.*"
 
 # If we get this far gdb didn't crash, nor did an error occur.
 pass $testfile
+
+gdb_unload
+# If we get this far gdb didn't crash, nor did an error occur.
+pass "$testfile - unload"

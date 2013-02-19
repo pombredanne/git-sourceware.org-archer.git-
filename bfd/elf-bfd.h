@@ -1,6 +1,6 @@
 /* BFD back-end data structures for ELF files.
    Copyright 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
+   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013
    Free Software Foundation, Inc.
    Written by Cygnus Support.
 
@@ -191,8 +191,8 @@ struct elf_link_hash_entry
      FIXME: There is no real need for this field if def_dynamic is never
      cleared and all places that test def_dynamic also test def_regular.  */
   unsigned int dynamic_def : 1;
-  /* Symbol is weak in all shared objects.  */
-  unsigned int dynamic_weak : 1;
+  /* Symbol has a non-weak reference from a shared object.  */
+  unsigned int ref_dynamic_nonweak : 1;
   /* Symbol is referenced with a relocation where C/C++ pointer equality
      matters.  */
   unsigned int pointer_equality_needed : 1;
@@ -417,9 +417,11 @@ enum elf_target_id
   M32R_ELF_DATA,
   M68HC11_ELF_DATA,
   M68K_ELF_DATA,
+  METAG_ELF_DATA,
   MICROBLAZE_ELF_DATA,
   MIPS_ELF_DATA,
   MN10300_ELF_DATA,
+  NIOS2_ELF_DATA,
   PPC32_ELF_DATA,
   PPC64_ELF_DATA,
   S390_ELF_DATA,
@@ -1510,6 +1512,28 @@ struct sdt_note
   bfd_byte data[1];
 };
 
+/* NT_GNU_BUILD_ID note type info.  */
+struct elf_build_id_info
+{
+  union
+  {
+    /* Used on output bfd by linker.  */
+    struct elf_build_id_out
+    {
+      size_t zero;       /* Always zero */
+      bfd_boolean (*after_write_object_contents) (bfd *);
+      const char *style;
+      asection *sec;
+    } o;
+    /* Used for input bfd.  */
+    struct elf_build_id
+    {
+      size_t size;       /* Always non-zero */
+      bfd_byte data[1];
+    } i;
+  } u;
+};
+
 /* Some private data is stashed away for future use using the tdata pointer
    in the bfd structure.  */
 
@@ -1584,23 +1608,14 @@ struct elf_obj_tdata
   /* Used by find_nearest_line entry point.  */
   void *line_info;
 
-  /* Used by MIPS ELF find_nearest_line entry point.  The structure
-     could be included directly in this one, but there's no point to
-     wasting the memory just for the infrequently called
-     find_nearest_line.  */
-  struct mips_elf_find_line *find_line_info;
-
   /* A place to stash dwarf1 info for this bfd.  */
   struct dwarf1_debug *dwarf1_find_line_info;
 
   /* A place to stash dwarf2 info for this bfd.  */
   void *dwarf2_find_line_info;
 
-  /* An array of stub sections indexed by symbol number, used by the
-     MIPS ELF linker.  FIXME: We should figure out some way to only
-     include this field for a MIPS ELF target.  */
-  asection **local_stubs;
-  asection **local_call_stubs;
+  /* Stash away info for yet another find line/function variant.  */
+  void *elf_find_function_cache;
 
   /* Used to determine if PT_GNU_EH_FRAME segment header should be
      created.  */
@@ -1623,13 +1638,6 @@ struct elf_obj_tdata
 
   /* Symbol version references to external objects.  */
   Elf_Internal_Verneed *verref;
-
-  /* The Irix 5 support uses two virtual sections, which represent
-     text/data symbols defined in dynamic objects.  */
-  asymbol *elf_data_symbol;
-  asymbol *elf_text_symbol;
-  asection *elf_data_section;
-  asection *elf_text_section;
 
   /* A pointer to the .eh_frame section.  */
   asection *eh_frame_section;
@@ -1659,13 +1667,8 @@ struct elf_obj_tdata
   obj_attribute known_obj_attributes[2][NUM_KNOWN_OBJ_ATTRIBUTES];
   obj_attribute_list *other_obj_attributes[2];
 
-  /* Called at the end of _bfd_elf_write_object_contents if not NULL.  */
-  bfd_boolean (*after_write_object_contents) (bfd *);
-  void *after_write_object_contents_info;
-
   /* NT_GNU_BUILD_ID note type.  */
-  bfd_size_type build_id_size;
-  bfd_byte *build_id;
+  struct elf_build_id_info *build_id;
 
   /* Linked-list containing information about every Systemtap section
      found in the object file.  Each section corresponds to one entry
@@ -1799,6 +1802,8 @@ extern struct bfd_hash_entry *_bfd_elf_link_hash_newfunc
   (struct bfd_hash_entry *, struct bfd_hash_table *, const char *);
 extern struct bfd_link_hash_table *_bfd_elf_link_hash_table_create
   (bfd *);
+extern void _bfd_elf_link_hash_table_free
+  (struct bfd_link_hash_table *);
 extern void _bfd_elf_link_hash_copy_indirect
   (struct bfd_link_info *, struct elf_link_hash_entry *,
    struct elf_link_hash_entry *);
@@ -1937,8 +1942,12 @@ extern void _bfd_elf_strtab_addref
   (struct elf_strtab_hash *, bfd_size_type);
 extern void _bfd_elf_strtab_delref
   (struct elf_strtab_hash *, bfd_size_type);
+extern unsigned int _bfd_elf_strtab_refcount
+  (struct elf_strtab_hash *, bfd_size_type);
 extern void _bfd_elf_strtab_clear_all_refs
-  (struct elf_strtab_hash *);
+  (struct elf_strtab_hash *tab);
+extern void _bfd_elf_strtab_restore_size
+  (struct elf_strtab_hash *, bfd_size_type);
 extern bfd_size_type _bfd_elf_strtab_size
   (struct elf_strtab_hash *);
 extern bfd_size_type _bfd_elf_strtab_offset
@@ -2269,10 +2278,52 @@ extern char *elfcore_write_s390_system_call
   (bfd *, char *, int *, const void *, int);
 extern char *elfcore_write_arm_vfp
   (bfd *, char *, int *, const void *, int);
+extern char *elfcore_write_aarch_tls
+  (bfd *, char *, int *, const void *, int);
+extern char *elfcore_write_aarch_hw_break
+  (bfd *, char *, int *, const void *, int);
+extern char *elfcore_write_aarch_hw_watch
+  (bfd *, char *, int *, const void *, int);
 extern char *elfcore_write_lwpstatus
   (bfd *, char *, int *, long, int, const void *);
 extern char *elfcore_write_register_note
   (bfd *, char *, int *, const char *, const void *, int);
+
+/* Internal structure which holds information to be included in the
+   PRPSINFO section of Linux core files.
+
+   This is an "internal" structure in the sense that it should be used
+   to pass information to BFD (via the `elfcore_write_linux_prpsinfo'
+   function), so things like endianess shouldn't be an issue.  This
+   structure will eventually be converted in one of the
+   `elf_external_linux_*' structures and written out to an output bfd
+   by one of the functions declared below.  */
+
+struct elf_internal_linux_prpsinfo
+  {
+    char pr_state;			/* Numeric process state.  */
+    char pr_sname;			/* Char for pr_state.  */
+    char pr_zomb;			/* Zombie.  */
+    char pr_nice;			/* Nice val.  */
+    unsigned long pr_flag;		/* Flags.  */
+    unsigned int pr_uid;
+    unsigned int pr_gid;
+    int pr_pid, pr_ppid, pr_pgrp, pr_sid;
+    char pr_fname[16 + 1];		/* Filename of executable.  */
+    char pr_psargs[80 + 1];		/* Initial part of arg list.  */
+  };
+
+/* Linux/most 32-bit archs.  */
+extern char *elfcore_write_linux_prpsinfo32
+  (bfd *, char *, int *, const struct elf_internal_linux_prpsinfo *);
+
+/* Linux/most 64-bit archs.  */
+extern char *elfcore_write_linux_prpsinfo64
+  (bfd *, char *, int *, const struct elf_internal_linux_prpsinfo *);
+
+/* Linux/PPC32 uses different layout compared to most archs.  */
+extern char *elfcore_write_ppc_linux_prpsinfo32
+  (bfd *, char *, int *, const struct elf_internal_linux_prpsinfo *);
 
 extern bfd *_bfd_elf32_bfd_from_remote_memory
   (bfd *templ, bfd_vma ehdr_vma, bfd_vma *loadbasep,

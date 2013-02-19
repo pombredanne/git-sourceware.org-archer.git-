@@ -1,4 +1,244 @@
-2012-11-28  Markus Metzger <markus.t.metzger@intel.com>
+2013-02-18  Yao Qi  <yao@codesourcery.com>
+
+	* linux-bfin-low.c (the_low_target): Use NULL instead of 0.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	Plug memory leak.
+
+	* tracepoint.c (cmd_qtnotes): Free TRACING_USER_NAME,
+	TRACING_NOTES and TRACING_STOP_NOTE before clobbering.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* tracepoint.c (cmd_qtdpsrc): Use savestring.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* tracepoint.c (save_string): Delete.
+	(add_tracepoint_action): Use savestring instead of save_string.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* linux-xtensa-low.c: Ditto.
+	* xtensa-xtregs.c: Ditto.
+
+2013-02-12  Sanimir Agovic  <sanimir.agovic@intel.com>
+
+	* thread-db.c (thread_db_get_tls_address): NULL pointer check
+	thread_db.
+
+2013-02-07  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* linux-aarch64-low.c (aarch64_arch_setup): Clamp
+	aarch64_num_wp_regs and aarch64_num_bp_regs to
+	AARCH64_HWP_MAX_NUM and AARCH64_HBP_MAX_NUM respectively.
+
+2013-02-07  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* linux-aarch64-low.c (ps_get_thread_area): Replace
+	PTRACE_GET_THREAD_AREA with PTRACE_GETREGSET.
+
+2013-02-04  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* Makefile.in (clean): Remove aarch64.c and aarch64-without-fpu.c.
+	(aarch64.c, aarch64-without-fpu.c): New targets.
+	* configure.srv (aarch64*-*-linux*): New.
+	* linux-aarch64-low.c: New file.
+
+2013-02-04  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* linux-low.c (handle_extended_wait, linux_create_inferior)
+	(linux_attach_lwp_1, linux_kill_one_lwp, linux_attach_one_lwp)
+	(dequeue_one_deferred_signal, linux_resume_one_thread)
+	(fetch_register, linux_write_memory, linux_enable_event_reporting)
+	(linux_tracefork_grandchild, linux_test_for_tracefork)
+	(linux_read_offsets, linux_xfer_siginfo, linux_xfer_siginfo): Add
+	PTRACE_ARG3_TYPE and PTRACE_ARG4_TYPE cast to ptrace arguments
+	where the argument is 0.
+
+2013-01-25  Yao Qi  <yao@codesourcery.com>
+
+	* event-loop.c: Include "queue.h".
+	(gdb_event_p): New typedef.
+	(struct gdb_event) <next_event>: Remove.
+	(event_queue): Change to QUEUE(gdb_event_p).
+	(async_queue_event): Remove.
+	(gdb_event_xfree): New.
+	(initialize_event_loop): New.
+	(process_event): Use API from QUEUE.
+	(wait_for_event): Likewise.
+	* server.c (main): Call initialize_event_loop.
+	* server.h (initialize_event_loop): Declare.
+
+2013-01-18  Yao Qi  <yao@codesourcery.com>
+
+	* ax.h (struct eval_agent_expr_context): New.
+	(gdb_eval_agent_expr): Update declaration.
+	* ax.c (gdb_eval_agent_expr): Remove argument REGCACHE and
+	TFRAME.  Add new argument CTX.
+	* server.h (struct eval_agent_expr_context): Declare.
+	(agent_mem_read, agent_tsv_read): Update declaration.
+	(agent_mem_read_string): Likewise.
+	* tracepoint.c (eval_tracepoint_agent_expr): Remove.
+	(add_traceframe_block): Add new argument TPOINT.
+	Increase TPOINT->traceframe_usage.
+	(do_action_at_tracepoint): Call gdb_eval_agent_expr instead of
+	eval_tracepoint_agent_expr.
+	(condition_true_at_tracepoint): Likewise.
+	(agent_mem_read): Remove argument TFRAME.  Add argument CTX.
+	(agent_mem_read_string, agent_tsv_read): Likewise.
+
+2013-01-16  Yao Qi  <yao@codesourcery.com>
+
+	* linux-low.c (linux_resume_one_lwp): Don't check
+	'lwp->bp_reinsert != 0'.
+
+2013-01-07  Joel Brobecker  <brobecker@adacore.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* lynx-low.c (ptrace_request_to_str): Define a temporary
+	macro and use it to simplify this function's implementation.
+
+2013-01-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* lynx-low.c (lynx_resume): Call perror_with_name if lynx_ptrace
+	sets errno.
+
+2013-01-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.srv (i[34567]86-*-lynxos*): Set srv_xmlfiles.
+
+2013-01-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* configure.srv (powerpc-*-lynxos*): Set srv_xmlfiles.
+
+2013-01-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* lynx-low.c (lynx_resume): Use the resume_info parameter
+	to determine the ptid for the lynx_ptrace call, unless
+	it is equal to minus_one_ptid, in which case we use the
+	ptid of the current_inferior.
+	(lynx_wait_1): After having received a thread create/exit
+	event, resume the inferior's execution using the signaling
+	thread's ptid, rather than the old ptid.
+
+2013-01-07  Joel Brobecker  <brobecker@adacore.com>
+
+	* lynx-low.c (lynx_resume): Delete variable ret.
+
+2013-01-01  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdbreplay.c (gdbreplay_version): Update copyright year.
+	* server.c (gdbserver_version): Likewise.
+
+2012-12-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* lynx-low.c (lynx_wait_1): Add debug trace before adding
+	new thread.
+
+2012-12-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* lynx-low.c (ptrace_request_to_str): Add handling for
+	PTRACE_GETTRACESIG.
+
+2012-12-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* lynx-low.c (lynx_attach): Delete variable new_process.
+
+2012-12-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* lynx-low.c (lynx_create_inferior): Delete variable
+	new_process.
+
+2012-12-17  Joel Brobecker  <brobecker@adacore.com>
+
+	* lynx-low.c (ptrace_request_to_str): Do not handle
+	PTRACE_GETTHREADLIST if this macro does not exist.
+
+2012-12-15  Yao Qi  <yao@codesourcery.com>
+
+	* Makefile.in (OBS): Add notif.o.
+	* notif.c, notif.h: New.
+	* server.c: Include "notif.h".
+	(struct vstop_notif) <next>: Remove.
+	<base>: New field.
+	(queue_stop_reply): Update.
+	(push_event, send_next_stop_reply): Remove.
+	(discard_queued_stop_replies): Update.
+	(notif_stop): New variable.
+	(handle_v_stopped): Remove.
+	(handle_v_requests): Don't call handle_v_stopped.  Call
+	handle_ack_notif instead.
+	(queue_stop_reply_callback): Call notif_event_enque instead
+	of queue_stop_reply.
+	(handle_status): Don't call send_next_stop_reply, call
+	notif_write_event instead.
+	(kill_inferior_callback): Likewise.
+	(detach_or_kill_inferior_callback): Likewise.
+	(main): Call initialize_notif.
+	(process_serial_event): Call QUEUE_is_empty.
+	(handle_target_event): Call notif_push instead of push event.
+	* server.h (push_event): Remove declaration.
+
+2012-12-10  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (DEPMODE, DEPDIR, depcomp, COMPILE.pre)
+	(COMPILE.post, COMPILE, POSTCOMPILE, IPAGENT_COMPILE): New
+	macros.
+	(.c.o): Rewrite.
+	(ax-ipa.o, tracepoint-ipa.o, utils-ipa.o, format-ipa.o)
+	(common-utils-ipa.o, remote-utils-ipa.o, regcache-ipa.o)
+	(i386-linux-ipa.o, linux-i386-ipa.o, linux-amd64-ipa.o)
+	(amd64-linux-ipa.o, ax.o): Rewrite.
+	(event-loop.o, hostio.o, hostio-errno.o, inferiors.o, mem-break.o)
+	(proc-service.o, regcache.o, remote-utils.o, server.o, target.o)
+	(thread-db.o, tracepoint.o, utils.o, gdbreplay.o, dll.o): Remove.
+	(signals.o, linux-procfs.o, linux-ptrace.o, common-utils.o, vec.o)
+	(gdb_vecs.o, xml-utils.o, linux-osdata.o, ptid.o, buffer.o)
+	(format.o, agent.o, vasprintf.o, vsnprintf.o): Rewrite.
+	(i386-low.o, i387-fp.o, linux-low.o, linux-arm-low.o)
+	(linux-bfin-low.o, linux-cris-low.o, linux-crisv32-low.o)
+	(linux-ia64-low.o, linux-m32r-low.o, linux-mips-low.o)
+	(linux-ppc-low.o, linux-s390-low.o, linux-sh-low.o)
+	(linux-tic6x-low.o, linux-x86-low.o, linux-xtensa-low.o)
+	(linux-tile-low.o, lynx-low.o, lynx-ppc-low.o, nto-low.o)
+	(nto-x86-low.o, linux-low.o, win32-low.o, win32-arm-low.o)
+	(win32-i386-low.o, spu-low.o, reg-arm.o, arm-with-iwmmxt.o)
+	(arm-with-vfpv2.o, arm-with-vfpv3.o, arm-with-neon.o, reg-bfin.o)
+	(reg-cris.o, reg-crisv32.o, i386.o, i386-linux.o, i386-avx.o)
+	(i386-avx-linux.o, i386-mmx.o, i386-mmx-linux.o, reg-ia64.o)
+	(reg-m32r.o, reg-m68k.o, reg-cf.o, mips-linux.o, mips-dsp-linux.o)
+	(mips64-linux.o, mips64-dsp-linux.o, powerpc-32.o, powerpc-32l.o)
+	(powerpc-altivec32l.o, powerpc-cell32l.o, powerpc-vsx32l.o)
+	(powerpc-isa205-32l.o, powerpc-isa205-altivec32l.o)
+	(powerpc-isa205-vsx32l.o, powerpc-e500l.o, powerpc-64l.o)
+	(powerpc-altivec64l.o, powerpc-cell64l.o, powerpc-vsx64l.o)
+	(powerpc-isa205-64l.o, powerpc-isa205-altivec64l.o)
+	(powerpc-isa205-vsx64l.o, s390-linux32.o, s390-linux32v1.o)
+	(s390-linux32v2.o, s390-linux64.o, s390-linux64v1.o)
+	(s390-linux64v2.o, s390x-linux64.o, s390x-linux64v1.o)
+	(s390x-linux64v2.o, tic6x-c64xp-linux.o, tic6x-c64x-linux.o)
+	(tic6x-c62x-linux.o, reg-sh.o, reg-sparc64.o, reg-spu.o, amd64.o)
+	(amd64-linux.o, amd64-avx.o, amd64-avx-linux.o, x32.o)
+	(x32-linux.o, x32-avx.o, x32-avx-linux.o, reg-xtensa.o)
+	(reg-tilegx.o): Remove.
+	(all_object_files): New macro.
+	Include .deps files.
+	* aclocal.m4, configure: Rebuild.
+	* acinclude.m4: Include depstand.m4, lead-dot.m4.
+	* configure.ac: Invoke ZW_CREATE_DEPDIR,
+	ZW_PROG_COMPILER_DEPENDENCIES.  Compute GMAKE condition.
+
+2012-12-05  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/14917:
+	* server.h (current_insn_ptr, emit_error): Declare 'extern'.
+
+2012-11-28  Markus Metzger  <markus.t.metzger@intel.com>
 
 	* configure.ac: Check for linux/perf_event.h.
 	* config.in: Regenerated.
@@ -30,7 +270,7 @@
 	instead of <sys/wait.h> header.
 	* spu-low.c: Use "gdb_wait.h" header instead of <sys/wait.h> header.
 
-2012-11-13 Markus Metzger <markus.t.metzger@intel.com>
+2012-11-13 Markus Metzger  <markus.t.metzger@intel.com>
 
 	* Makefile.in: (INTERNAL_CFLAGS): Add -DGDBSERVER
 	(various make rules): Remove -DGDBSERVER
@@ -228,7 +468,7 @@
 
 	PR gdb/7205
 
-        Replace TARGET_SIGNAL_ with GDB_SIGNAL_ throughout.
+	Replace TARGET_SIGNAL_ with GDB_SIGNAL_ throughout.
 
 2012-05-24  Pedro Alves  <palves@redhat.com>
 
@@ -300,27 +540,27 @@
 
 2012-04-19  Pedro Alves  <palves@redhat.com>
 
-        * Makefile.in (GNULIB_BUILDDIR): New.
+	* Makefile.in (GNULIB_BUILDDIR): New.
 	(LIBGNU, INCGNU, GNULIB_H): Adjust.
-        (SUBDIRS, CLEANDIRS, REQUIRED_SUBDIRS): New.
-        (all, install-only, uninstall, clean-info, all-lib, clean): No
-        longer pass GNULIB_FLAGS_TO_PASS.  Use subdir_do.
-        (maintainer-clean realclean distclean): Use subdir_do.
-        (subdir_do): New.
-        (gnulib/import/Makefile): Adjust.  Replace gnulib/import with
+	(SUBDIRS, CLEANDIRS, REQUIRED_SUBDIRS): New.
+	(all, install-only, uninstall, clean-info, all-lib, clean): No
+	longer pass GNULIB_FLAGS_TO_PASS.  Use subdir_do.
+	(maintainer-clean realclean distclean): Use subdir_do.
+	(subdir_do): New.
+	(gnulib/import/Makefile): Adjust.  Replace gnulib/import with
 	$(GNULIB_BUILDDIR).  Don't pass argument to config.status.
-        * acinclude.m4: Include acx_configure_dir.m4.
-        * configure.ac: Remove gl_EARLY, gl_INIT, and AM_INIT_AUTOMAKE
-        calls.  Call AC_PROG_RANLIB.  Configure gnulib using
-        ACX_CONFIGURE_DIR.
-        (GNULIB): New.
-        (GNULIB_STDINT_H): Adjust.
-        (AC_OUTPUT): Don't output gnulib/Makefile anymore.
-        * gdbreplay.c: Include build-gnulib/config.h.
-        * server.h: Likewise.
-        * aclocal.m4: Regenerate.
-        * config.in: Regenerate.
-        * configure: Regenerate.
+	* acinclude.m4: Include acx_configure_dir.m4.
+	* configure.ac: Remove gl_EARLY, gl_INIT, and AM_INIT_AUTOMAKE
+	calls.	Call AC_PROG_RANLIB.  Configure gnulib using
+	ACX_CONFIGURE_DIR.
+	(GNULIB): New.
+	(GNULIB_STDINT_H): Adjust.
+	(AC_OUTPUT): Don't output gnulib/Makefile anymore.
+	* gdbreplay.c: Include build-gnulib/config.h.
+	* server.h: Likewise.
+	* aclocal.m4: Regenerate.
+	* config.in: Regenerate.
+	* configure: Regenerate.
 
 2012-04-19  Pedro Alves  <palves@redhat.com>
 
@@ -890,7 +1130,7 @@
 	and move to ax.c.
 	(eval_tracepoint_agent_expr): New function.
 	(agent_mem_read, agent_mem_read_string, agent_tsv_read): Make
-	non-static. 
+	non-static.
 	(current_insn_ptr, emit_error, struct bytecode_address): Move to
 	ax.c.
 	(emit_prologue, emit_epilogue, emit_add, emit_sub, emit_mul, emit_lsh,
@@ -1485,7 +1725,8 @@
 	(linux_read_loadmap): New function.
 	(linux_target_ops): Add linux_read_loadmap.
 	* server.c (handle_query): Support qXfer:fdpic:read packet.
-	* win32-low.c (win32_target_ops): Initialize field `read_loadmap' to NULL.
+	* win32-low.c (win32_target_ops): Initialize field `read_loadmap'
+	to NULL.
 
 2011-08-05  Eli Zaretskii  <eliz@gnu.org>
 
@@ -1576,16 +1817,16 @@
 
 	* server.c (handle_query): Add EnableDisableTracepoints to the list
 	of supported features.
-	* tracepoint.c (clear_installed_tracepoints): Uninstall	disabled
+	* tracepoint.c (clear_installed_tracepoints): Uninstall disabled
 	tracepoints.
- 	(cmd_qtenable_disable): New.
- 	(cmd_qtstart): Install tracepoints even if disabled.
- 	(handle_tracepoint_general_set): Add call to cmd_qtenable_disable on
- 	receiving a QTEnable or QTDisable packet.
- 	(gdb_collect): Skip data collection if fast tracepoint is disabled.
- 	(ust_marker_to_static_tracepoint): Do not ignore disabled static
- 	tracepoints.
- 	(gdb_probe): Skip data collection if static tracepoint is disabled.
+	(cmd_qtenable_disable): New.
+	(cmd_qtstart): Install tracepoints even if disabled.
+	(handle_tracepoint_general_set): Add call to cmd_qtenable_disable on
+	receiving a QTEnable or QTDisable packet.
+	(gdb_collect): Skip data collection if fast tracepoint is disabled.
+	(ust_marker_to_static_tracepoint): Do not ignore disabled static
+	tracepoints.
+	(gdb_probe): Skip data collection if static tracepoint is disabled.
 
 2011-05-10  Doug Evans  <dje@google.com>
 
@@ -1614,8 +1855,8 @@
 
 2011-04-26  Yao Qi  <yao@codesourcery.com>
 
-        * linux-low.c: Move common macros to linux-ptrace.h.
-        Include linux-ptrace.h.
+	* linux-low.c: Move common macros to linux-ptrace.h.
+	Include linux-ptrace.h.
 	* Makefile.in (linux_ptrace_h): New.
 	(linux-low.o): Depends on linux-ptrace.h.
 
@@ -2568,7 +2809,8 @@
 	(struct collect_static_trace_data_action): Delete.
 	(enum tracepoint_type): New.
 	(struct tracepoint) <type>: New field `type'.
-	<actions_str, step_actions, step_actions_str>: Only include in GDBserver.
+	<actions_str, step_actions, step_actions_str>: Only include in
+	GDBserver.
 	<orig_size, obj_addr_on_target, adjusted_insn_addr>
 	<adjusted_insn_addr_end, jump_pad, jump_pad_end>: New fields.
 	(tracepoints): Use IP_AGENT_EXPORT.
@@ -3648,7 +3890,8 @@
 	(linux_fetch_registers, linux_store_registers): Ditto.
 	* i387-fp.c (i387_cache_to_fsave): Change prototype to take a
 	regcache.  Adjust.
-	(i387_fsave_to_cache, i387_cache_to_fxsave, i387_fxsave_to_cache): Ditto.
+	(i387_fsave_to_cache, i387_cache_to_fxsave, i387_fxsave_to_cache):
+	Ditto.
 	* i387-fp.h (i387_cache_to_fsave, i387_fsave_to_cache): Change
 	prototype to take a regcache.
 	(i387_cache_to_fxsave, i387_fxsave_to_cache): Ditto.
@@ -3691,8 +3934,8 @@
 	(mips_collect_register_32bit, mips_supply_register_32bit)
 	(mips_fill_gregset, mips_store_gregset, mips_fill_fpregset)
 	(mips_store_fpregset): Ditto.
-	* linux-ppc-low.c (ppc_supply_ptrace_register, ppc_supply_ptrace_register):
-	Ditto.
+	* linux-ppc-low.c (ppc_supply_ptrace_register)
+	(ppc_supply_ptrace_register): Ditto.
 	(parse_spufs_run): Adjust.
 	(ppc_get_pc, ppc_set_pc, ppc_fill_gregset, ppc_fill_vsxregset)
 	(ppc_store_vsxregset, ppc_fill_vrregset, ppc_store_vrregset)
@@ -5121,8 +5364,8 @@
 
 2008-04-21  Ulrich Weigand  <uweigand@de.ibm.com>
 
-	* configure.srv (powerpc64-*-linux*, powerpc-*-linux*): Merge into single
-	powerpc*-*-linux* case.
+	* configure.srv (powerpc64-*-linux*, powerpc-*-linux*): Merge into
+	single powerpc*-*-linux* case.
 	(s390-*-linux*, s390x-*-linux*): Merge into single s390*-*-linux* case.
 
 2008-04-17  Ulrich Weigand  <uweigand@de.ibm.com>

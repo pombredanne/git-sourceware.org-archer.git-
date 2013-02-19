@@ -1,6 +1,6 @@
 /* Shared general utility routines for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1988-2012 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -24,6 +24,7 @@
 #endif
 
 #include "gdb_assert.h"
+#include "gdb_string.h"
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -149,4 +150,14 @@ xsnprintf (char *str, size_t size, const char *format, ...)
   va_end (args);
 
   return ret;
+}
+
+char *
+savestring (const char *ptr, size_t len)
+{
+  char *p = (char *) xmalloc (len + 1);
+
+  memcpy (p, ptr, len);
+  p[len] = 0;
+  return p;
 }

@@ -1,3 +1,51 @@
+2013-02-06  Sandra Loosemore  <sandra@codesourcery.com>
+            Andrew Jenner <andrew@codesourcery.com>
+
+	Based on patches from Altera Corporation.
+
+	* nios2.h: New file.
+
+2013-01-30  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64.h (aarch64_op): Add OP_SXTL, OP_SXTL2, OP_UXTL and OP_UXTL2.
+
+2013-01-28  Alexis Deruelle  <alexis.deruelle@gmail.com>
+
+	PR gas/15069
+	* tic6x-opcode-table.h: Fix encoding of BNOP instruction.
+
+2013-01-24  Nick Clifton  <nickc@redhat.com>
+
+	* v850.h: Add e3v5 support.
+
+2013-01-17  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64.h (aarch64_op): Remove OP_V_MOVI_B.
+
+2013-01-10  Peter Bergner <bergner@vnet.ibm.com>
+
+	* ppc.h (PPC_OPCODE_POWER8): New define.
+	(PPC_OPCODE_HTM): Likewise.
+
+2013-01-10  Will Newton <will.newton@imgtec.com>
+
+	* metag.h: New file.
+
+2013-01-07  Kaushik Phatak  <kaushik.phatak@kpitcummins.com>
+
+	* cr16.h (make_instruction): Rename to cr16_make_instruction.
+	(match_opcode): Rename to cr16_match_opcode.
+
+2013-01-04  Juergen Urban <JuergenUrban@gmx.de>
+
+	* mips.h: Add support for r5900 instructions including lq and sq.
+
+2013-01-02  Kaushik Phatak  <kaushik.phatak@kpitcummins.com>
+
+	* cr16.h (dwordU,wordU): Moved typedefs from cr16-dis.c
+	(make_instruction,match_opcode): Added function prototypes.
+	(cr16_words,cr16_allWords,cr16_currInsn): Declare as extern.
+
 2012-11-23  Alan Modra  <amodra@gmail.com>
 
 	* ppc.h (ppc_parse_cpu): Update prototype.
@@ -1587,6 +1635,12 @@
 
 For older changes see ChangeLog-9103
 
+Copyright (C) 2004-2012 Free Software Foundation, Inc.
+
+Copying and distribution of this file, with or without modification,
+are permitted in any medium without royalty provided the copyright
+notice and this notice are preserved.
+
 Local Variables:
 mode: change-log
 left-margin: 8

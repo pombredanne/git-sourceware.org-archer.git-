@@ -1,7 +1,6 @@
 /* Definitions for dealing with stack frames, for GDB, the GNU debugger.
 
-   Copyright (C) 1986, 1988-1994, 1996-2004, 2007-2012 Free Software
-   Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -670,8 +669,6 @@ extern void print_frame_info (struct frame_info *, int print_level,
 			      enum print_what print_what, int args);
 
 extern struct frame_info *block_innermost_frame (const struct block *);
-
-extern int deprecated_pc_in_call_dummy (struct gdbarch *gdbarch, CORE_ADDR pc);
 
 extern int deprecated_frame_register_read (struct frame_info *frame, int regnum,
 				gdb_byte *buf);

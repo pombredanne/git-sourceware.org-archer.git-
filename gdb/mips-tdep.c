@@ -1,6 +1,6 @@
 /* Target-dependent code for the MIPS architecture, for GDB, the GNU Debugger.
 
-   Copyright (C) 1988-2012 Free Software Foundation, Inc.
+   Copyright (C) 1988-2013 Free Software Foundation, Inc.
 
    Contributed by Alessandro Forin(af@cs.cmu.edu) at CMU
    and by Per Bothner(bothner@cs.wisc.edu) at U.Wisconsin.
@@ -3796,7 +3796,8 @@ micromips_deal_with_atomic_sequence (struct gdbarch *gdbarch,
   const int atomic_sequence_length = 16; /* Instruction sequence length.  */
   int last_breakpoint = 0; /* Defaults to 0 (no breakpoints placed).  */
   CORE_ADDR breaks[2] = {-1, -1};
-  CORE_ADDR branch_bp; /* Breakpoint at branch instruction's destination.  */
+  CORE_ADDR branch_bp = 0; /* Breakpoint at branch instruction's
+			      destination.  */
   CORE_ADDR loc = pc;
   int sc_found = 0;
   ULONGEST insn;
