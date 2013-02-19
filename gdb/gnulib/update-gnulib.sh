@@ -29,16 +29,10 @@
 #     regenerate the various scripts and Makefiles are on the PATH.
 
 # The list of gnulib modules we are importing in GDB.
-IMPORTED_GNULIB_MODULES="fnmatch-gnu inttypes memmem update-copyright getaddrinfo"
+IMPORTED_GNULIB_MODULES="fnmatch-gnu inttypes memmem update-copyright"
 
 # The gnulib commit ID to use for the update.
-<<<<<<< HEAD
-GNULIB_COMMIT_SHA1="e657573866e8aded3b3b1461c346cf9ad02a5148"
-||||||| merged common ancestors
-GNULIB_COMMIT_SHA1="a39f53ccb70a613e647e1019fb4c63645220267e"
-=======
 GNULIB_COMMIT_SHA1="8d5bd1402003bd0153984b138735adf537d960b0"
->>>>>>> gdb/master
 
 # The expected version number for the various auto tools we will
 # use after the import.
