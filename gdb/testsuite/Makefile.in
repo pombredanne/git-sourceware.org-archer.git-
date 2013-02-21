@@ -142,7 +142,7 @@ do-check-parallel: $(TEST_TARGETS)
 
 @GMAKE_TRUE@check/%: all $(abs_builddir)/site.exp
 @GMAKE_TRUE@	-mkdir -p outputs/$*
-@GMAKE_TRUE@	@$(DO_RUNTEST) GDB_CACHE_DIR=yes --outdir=outputs/$* $* $(RUNTESTFLAGS)
+@GMAKE_TRUE@	@$(DO_RUNTEST) GDB_PARALLEL=yes --outdir=outputs/$* $* $(RUNTESTFLAGS)
 
 force:;
 
