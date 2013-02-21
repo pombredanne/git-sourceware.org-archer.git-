@@ -134,7 +134,7 @@ check-parallel:
 # Turn a list of .exp files into "check/" targets.  Only examine .exp
 # files appearing in a gdb.* directory -- we don't want to pick up
 # lib/ by mistake.  For example, gdb.linespec/linespec.exp becomes
-# check-gdb.linespec/linespec.exp.
+# check/gdb.linespec/linespec.exp.
 @GMAKE_TRUE@TEST_TARGETS := $(addprefix check/,$(shell cd $(srcdir) && find gdb.* -name '*.exp' -print))
 
 do-check-parallel: $(TEST_TARGETS)
