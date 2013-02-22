@@ -1,0 +1,12 @@
+This branch has some experimental code for making psymtabs for DWARF
+in worker threads.  It has some generic changes to gdb and BFD for
+thread-awareness, and changes to the DWARF reader to make it work in
+the background.
+
+It still has a few issues.  The "complaint" system is not thread-safe
+and the BFD file descriptor cache is still somewhat broken.  There may
+be lurking problems.
+
+The biggest issue is that this didn't really help much for
+performance.  It might in some situations, but it isn't an unqualified
+win.
