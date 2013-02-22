@@ -109,24 +109,25 @@ static const  char * const main_name_list[] =
   NULL
 };
 
-/* What to do with the namespace table when a probe stop occurs.  */
+/* What to do when a probe stop occurs.  */
 
 enum probe_action
   {
     /* Something went seriously wrong.  Stop using probes and
        revert to using the older interface.  */
-    NAMESPACE_TABLE_INVALIDATE,
+    PROBES_INTERFACE_FAILED,
 
-    /* No action is required.  This namespace is still valid.  */
-    NAMESPACE_NO_ACTION,
+    /* No action is required.  The shared object list is still
+       valid.  */
+    DO_NOTHING,
 
-    /* This namespace should be reloaded entirely.  */
-    NAMESPACE_RELOAD,
+    /* The shared object list should be reloaded entirely.  */
+    FULL_RELOAD,
 
-    /* Attempt to incrementally update this namespace. If the
-       update fails or is not possible, fall back to reloading
-       the namespace in full.  */
-    NAMESPACE_UPDATE_OR_RELOAD,
+    /* Attempt to incrementally update the shared object list. If
+       the update fails or is not possible, fall back to reloading
+       the list in full.  */
+    UPDATE_OR_RELOAD,
   };
 
 /* A probe's name and its associated action.  */
@@ -136,7 +137,7 @@ struct probe_info
   /* The name of the probe.  */
   const char *name;
 
-  /* What to do with the namespace table when a probe stop occurs.  */
+  /* What to do when a probe stop occurs.  */
   enum probe_action action;
 };
 
@@ -146,13 +147,13 @@ struct probe_info
 
 static const struct probe_info probe_info[] =
 {
-  { "init_start", NAMESPACE_NO_ACTION },
-  { "init_complete", NAMESPACE_RELOAD },
-  { "map_start", NAMESPACE_NO_ACTION },
-  { "map_failed", NAMESPACE_NO_ACTION },
-  { "reloc_complete", NAMESPACE_UPDATE_OR_RELOAD },
-  { "unmap_start", NAMESPACE_NO_ACTION },
-  { "unmap_complete", NAMESPACE_RELOAD },
+  { "init_start", DO_NOTHING },
+  { "init_complete", FULL_RELOAD },
+  { "map_start", DO_NOTHING },
+  { "map_failed", DO_NOTHING },
+  { "reloc_complete", UPDATE_OR_RELOAD },
+  { "unmap_start", DO_NOTHING },
+  { "unmap_complete", FULL_RELOAD },
 };
 
 #define NUM_PROBES ARRAY_SIZE (probe_info)
@@ -1633,11 +1634,10 @@ solib_event_probe_action (struct probe_and_action *pa)
   unsigned probe_argc;
 
   action = pa->action;
-  if (action == NAMESPACE_NO_ACTION || action == NAMESPACE_TABLE_INVALIDATE)
+  if (action == DO_NOTHING || action == PROBES_INTERFACE_FAILED)
     return action;
 
-  gdb_assert (action == NAMESPACE_RELOAD
-	      || action == NAMESPACE_UPDATE_OR_RELOAD);
+  gdb_assert (action == FULL_RELOAD || action == UPDATE_OR_RELOAD);
 
   /* Check that an appropriate number of arguments has been supplied.
      We expect:
@@ -1646,18 +1646,18 @@ solib_event_probe_action (struct probe_and_action *pa)
        arg2: struct link_map *new (optional, for incremental updates)  */
   probe_argc = get_probe_argument_count (pa->probe);
   if (probe_argc == 2)
-    action = NAMESPACE_RELOAD;
+    action = FULL_RELOAD;
   else if (probe_argc < 2)
-    action = NAMESPACE_TABLE_INVALIDATE;
+    action = PROBES_INTERFACE_FAILED;
 
   return action;
 }
 
-/* Populate this namespace by reading the entire list of shared
-   objects from the inferior.  Returns nonzero on success.  */
+/* Populate the shared object list by reading the entire list of
+   shared objects from the inferior.  Returns nonzero on success.  */
 
 static int
-namespace_update_full (struct svr4_info *info)
+solist_update_full (struct svr4_info *info)
 {
   svr4_free_library_list (&info->solib_list);
   info->solib_list = svr4_current_sos_from_debug_base ();
@@ -1665,12 +1665,13 @@ namespace_update_full (struct svr4_info *info)
   return 1;
 }
 
-/* Update this namespace starting from the link-map entry passed by
-   the linker in the probe's third argument.  Returns nonzero if the
-   list was successfully updated, or zero to indicate failure.  */
+/* Update the shared object list starting from the link-map entry
+   passed by the linker in the probe's third argument.  Returns
+   nonzero if the list was successfully updated, or zero to indicate
+   failure.  */
 
 static int
-namespace_update_incremental (struct svr4_info *info, CORE_ADDR lm)
+solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
 {
   struct so_list *tail, **link;
 
@@ -1733,10 +1734,10 @@ svr4_handle_solib_event (void)
     goto error;
 
   action = solib_event_probe_action (pa);
-  if (action == NAMESPACE_TABLE_INVALIDATE)
+  if (action == PROBES_INTERFACE_FAILED)
     goto error;
 
-  if (action == NAMESPACE_NO_ACTION)
+  if (action == DO_NOTHING)
     return;
 
   /* EVALUATE_PROBE_ARGUMENT looks up symbols in the dynamic linker
@@ -1767,30 +1768,30 @@ svr4_handle_solib_event (void)
 
   /* Do not process namespaces other than the initial one.  */
   if (debug_base != info->debug_base)
-    action = NAMESPACE_NO_ACTION;
+    action = DO_NOTHING;
 
-  if (action == NAMESPACE_UPDATE_OR_RELOAD)
+  if (action == UPDATE_OR_RELOAD)
     {
       val = evaluate_probe_argument (pa->probe, 2);
       if (val != NULL)
 	lm = value_as_address (val);
 
       if (lm == 0)
-	action = NAMESPACE_RELOAD;
+	action = FULL_RELOAD;
     }
 
   /* Resume section map updates.  */
   do_cleanups (usm_chain);
 
-  if (action == NAMESPACE_UPDATE_OR_RELOAD)
+  if (action == UPDATE_OR_RELOAD)
     {
-      if (!namespace_update_incremental (info, lm))
-	action = NAMESPACE_RELOAD;
+      if (!solist_update_incremental (info, lm))
+	action = FULL_RELOAD;
     }
 
-  if (action == NAMESPACE_RELOAD)
+  if (action == FULL_RELOAD)
     {
-      if (!namespace_update_full (info))
+      if (!solist_update_full (info))
 	goto error;
     }
 
@@ -1821,7 +1822,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 
       if (pa != NULL)
 	{
-	  if (pa->action == NAMESPACE_NO_ACTION)
+	  if (pa->action == DO_NOTHING)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
 
