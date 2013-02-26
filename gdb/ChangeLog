@@ -1,3 +1,952 @@
+2013-02-25  Pedro Alves  <palves@redhat.com>
+
+	* common/linux-ptrace.c (linux_ptrace_test_ret_to_nx): Change
+	warning text.
+
+2013-02-24  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips32_scan_prologue): Reset frame_offset to zero
+	if $fp is used as the virtual frame pointer.
+
+2013-02-23  Alan Modra  <amodra@gmail.com>
+
+	* elfread.c (elf_symtab_read): Do not use udata.p here to find
+	symbol size.
+	* ppc64-tdep.c (ppc64_elf_make_msymbol_special): New function.
+	* ppc64-tdep.h (ppc64_elf_make_msymbol_special): Declare.
+	* ppc-linux-tdep.c (ppc_linux_init_abi): Set up to use the above.
+	* ppcfbsd-tdep.c (ppcfbsd_init_abi): Likewise.
+
+2013-02-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* elfread.c (build_id_bfd_get): Make the return type const.
+	(build_id_verify): Make the check parameter const.
+	(build_id_to_debug_filename): Make the build_id parameter and variable
+	data const.
+	(find_separate_debug_file_by_buildid): Make the variable build_id const.
+
+2013-02-21  Alan Modra  <amodra@gmail.com>
+
+	* elfread.c (build_id_bfd_get): Adjust for elf_tdata changes.
+
+2013-02-20  Siva Chandra Reddy  <sivachandra@google.com>
+
+	Add a new method 'disassemble' to gdb.Architecture class.
+	* python/py-arch.c (archpy_disassmble): Implementation of the
+	new method gdb.Architecture.disassemble.
+	(arch_object_methods): Add entry for the new method.
+
+2013-02-20  Jiong Wang  <jiwang@tilera.com>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list.
+
+2013-02-19  Pedro Alves  <palves@redhat.com>
+
+	Garbage collect 'struct monitor_ops'::load_routine.
+
+	* monitor.h (struct monitor_ops) <load_routine>: Remove field.
+	* monitor.c (monitor_load): No longer call
+	current_monitor->load_routine.
+	* dbug-rom.c (init_dbug_cmds): Don't set 'load_routine'.
+	* m32r-rom.c (init_m32r_cmds): Don't set 'load_routine'.
+	* ppcbug-rom.c (init_ppc_cmds): Don't set 'load_routine'.
+
+2013-02-19  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/15161
+
+	Harmonize with generic_load.
+
+	* monitor.c: Include "readline/readline.h".
+	(monitor_load): Rename parameter 'file' to 'args'.  Use build_argv
+	instead of sscanf.  Use CORE_ADDR/strtoulst instead of unsigned
+	long/strtol for the 'load_offset' local.  Error out if no argument
+	is given or if too many arguments are given.  Tilde expand the
+	passed in file name.
+
+2013-02-19  Kai Tietz  <ktietz@redhat.com>
+
+	PR gdb/15161
+	* symfile.c (load_section_data): Change type of load_offset
+	to CORE_ADDR.
+	(generic_load): User strtoulst instead of strtoul for conversion
+	of load_offset.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (tilegx_analyze_prologue): add check for
+	 for return address, "lr" register, saved on stack.
+	* tilegx-tdep.c (tilegx_frame_cache): update "PC" reg
+	after we invoke tilegx_analyze_prologue.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (itilegx_gdbarch_init): char type should be signed.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (tilegx_skip_prologue): Use skip_prologue_using_sal.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (INT_SWINT_1_SIGRETURN): New macro.
+	(tilegx_write_pc): New function.
+	(tilegx_cannot_reference_register): Return zero if REGNO
+	is TILEGX_FAULTNUM_REGNUM.
+	(tilegx_gdbarch_init): Add call to set_gdbarch_write_pc.
+	(tilegx_register_name): Add handling of "faultnum" register.
+	* tilegx-tdep.h (enum tilegx_regnum): Add TILEGX_FAULTNUM_REGNUM.
+	* tilegx-linux-tdep.c (tilegx_linux_supply_regset): Add
+	handling of TILEGX_FAULTNUM_REGNUM.
+	* tilegx-linux-nat.c (regmap): Add entry for TILEGX_FAULTNUM_REGNUM.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (tilegx_push_dummy_call): args pushed on stack
+	should be aligned to 64bit.
+
+2013-02-19  Kai Tietz  <ktietz@redhat.com>
+
+	* windows-nat.c (windows_xfer_memory): Fix debug-output
+	for LLP64.
+
+2013-02-19  Lei Liu  <lei.liu2@windriver.com>
+
+	* mips-linux-nat.c (mips64_linux_regsets_store_registers):
+	Don't check DSP register number if HAVE_DSP is not set.
+
+2013-02-19  Alan Modra  <amodra@gmail.com>
+
+	* elfread.c (struct build_id): Delete.  Use struct elf_build_id
+	throughout file instead.
+	(build_id_bfd_get): Update to use new elf_tdata build_id field.
+	Don't xmalloc return value.
+	(build_id_verify): Similarly.  Don't xfree.
+	(build_id_to_debug_filename): Update.
+	(find_separate_debug_file_by_buildid): Update, don't xfree.
+
+2013-02-18  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/15102:
+	* dwarf2read.c (read_subrange_type): Use result of
+	'check_typedef'.
+
+2013-02-16  Yuanhui Zhang  <asmwarrior@gmail.com>
+
+	* frame.c: Remove one extra white space after #include
+	directive.
+
+2013-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* contrib/cc-with-tweaks.sh: Extend the comment for -p option.
+
+2013-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb-gdb.gdb.in: Wrap set complaints, b internal_error, b info_command
+	and dir commands into an if block.
+
+2013-02-15  Sanimir Agovic  <sanimir.agovic@intel.com>
+
+	* python/py-breakpoint (struct pybp_code):  Use int instead of
+	enum type_code.
+
+2013-02-15  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* NEWS: Mention new field "trace-file".
+	* tracepoint.c (trace_status_mi): Output "trace-file" field.
+	(tfile_open): Record the trace file's filename in the trace
+	status.
+	(tfile_files_info): Mention the name of the trace file.
+	Check the "filename" field explicitely.
+	(trace_status_command): Explicitely check "filename" field.
+	(trace_find_command): Ditto.
+	(trace_find_pc_command): Ditto.
+	(trace_find_tracepoint_command): Ditto.
+	(trace_find_line_command): Ditto.
+	(trace_find_range_command): Ditto.
+	(trace_find_outside_command): Ditto.
+	* tracepoint.h (struct trace_status) <from_file>: Rename it
+	to "filename" and make it hold the trace file's filename
+	instead of a boolean.
+	* remote.c (remote_get_trace_status): Initialize "filename"
+	field with NULL instead	of 0.
+
+2013-02-15  Yao Qi  <yao@codesourcery.com>
+
+	* remote.c: Fix a typo.
+
+2013-02-14  Pierre Muller  <muller@sourceware.org>
+
+	* contrib/ari/gdb_ari.sh (GNU/Linux rule): Remove.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* utils.c (savestring): Don't #undef it.  Move function to
+	common/common-utils.c.
+	* common/common-utils.c: Include gdb_string.h.
+	(savestring): Move here from utils.c.
+	* common/common-utils.h (savestring): Declare.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* utils.c (savestring): Rename parameter 'size' to 'len'.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-linux-nat.c (aarch64_init_debug_reg_state): Delete.
+	(aarch64_inferior_data, struct aarch64_inferior_data):
+	Delete.
+	(struct aarch64_process_info): New.
+	(aarch64_process_list): New global.
+	(aarch64_find_process_pid, aarch64_add_process)
+	(aarch64_process_info_get): New functions.
+	(aarch64_inferior_data_get): Delete.
+	(aarch64_process_info_get): New function.
+	(aarch64_forget_process): New function.
+	(aarch64_get_debug_reg_state): New parameter 'pid'.  Reimplement.
+	(aarch64_linux_prepare_to_resume): Pass the lwp's pid to
+	aarch64_get_debug_reg_state.
+	(aarch64_notify_debug_reg_change): Use iterate_over_lwps
+	instead of linux_nat_iterate_watchpoint_lwps.
+	(aarch64_linux_new_fork): New function.
+	(aarch64_linux_child_post_startup_inferior): Use
+	aarch64_forget_process instead of aarch64_init_debug_reg_state.
+	(aarch64_handle_breakpoint, aarch64_linux_insert_hw_breakpoint)
+	(aarch64_linux_remove_hw_breakpoint)
+	(aarch64_handle_aligned_watchpoint)
+	(aarch64_handle_unaligned_watchpoint)
+	(aarch64_linux_insert_watchpoint)
+	(aarch64_linux_remove_watchpoint)
+	(aarch64_linux_stopped_data_address): Adjust to pass the current
+	process id to aarch64_debug_reg_state.
+	(_initialize_aarch64_linux_nat): Install aarch64_linux_new_fork as
+	linux_nat_new_fork hook, and aarch64_forget_process as
+	linux_nat_forget_process hook; remove the call to
+	register_inferior_data_with_cleanup.
+
+2013-02-14  Pedro Alves  <palves@redhat.com>
+
+	* eval.c (evaluate_subexp_for_address) <default_case_after_eval,
+	EVAL_AVOID_SIDE_EFFECTS>: Swap and handle TYPE_CODE_REF before
+	lval_memory.
+
+2013-02-14  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* tracepoint.h (validate_trace_state_variable_name): Declare.
+	* tracepoint.c (validate_trace_state_variable_name): New.
+	(trace_variable_command): Parse the trace state variable's name
+	without using parse_expression.  Do several validations.
+	* mi/mi-main.c (mi_cmd_trace_define_variable): Don't parse the
+	trace state variable's name with parse_expression.  Validate it.
+
+2013-02-14  Yao Qi  <yao@codesourcery.com>
+
+	* infcmd.c (breakpoint_proceeded): Remove it.
+
+2013-02-14  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (end_actions_pseudocommand): Make it static.
+	(while_stepping_pseudocommand): Likewise.
+	* tracepoint.h (end_actions_pseudocommand): Remove the
+	declaration.
+	(while_stepping_pseudocommand): Likewise.
+
+2013-02-14  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-decode.c (help_cmd): Remove the declaration of
+	"cmdlist".
+	(help_all): Likewise.
+
+2013-02-13  Pedro Alves  <palves@redhat.com>
+
+	* amd64-linux-nat.c (update_debug_registers_callback):
+	Update comment.
+	(amd64_linux_dr_set_control, amd64_linux_dr_set_addr): Use
+	iterate_over_lwps.
+	(amd64_linux_prepare_to_resume): Pass the lwp's pid to
+	i386_debug_reg_state.
+	(amd64_linux_new_fork): New function.
+	(_initialize_amd64_linux_nat): Install amd64_linux_new_fork as
+	linux_nat_new_fork hook, and i386_forget_process as
+	linux_nat_forget_process hook.
+	* i386-linux-nat.c (update_debug_registers_callback):
+	Update comment.
+	(i386_linux_dr_set_control, i386_linux_dr_set_addr): Use
+	iterate_over_lwps.
+	(i386_linux_prepare_to_resume): Pass the lwp's pid to
+	i386_debug_reg_state.
+	(i386_linux_new_fork): New function.
+	(_initialize_i386_linux_nat): Install i386_linux_new_fork as
+	linux_nat_new_fork hook, and i386_forget_process as
+	linux_nat_forget_process hook.
+	* i386-nat.c (i386_init_dregs): Delete.
+	(i386_inferior_data, struct i386_inferior_data):
+	Delete.
+	(struct i386_process_info): New.
+	(i386_process_list): New global.
+	(i386_find_process_pid, i386_add_process, i386_process_info_get):
+	New functions.
+	(i386_inferior_data_get): Delete.
+	(i386_process_info_get): New function.
+	(i386_debug_reg_state): New parameter 'pid'.  Reimplement.
+	(i386_forget_process): New function.
+	(i386_cleanup_dregs): Rewrite.
+	(i386_update_inferior_debug_regs, i386_insert_watchpoint)
+	(i386_remove_watchpoint, i386_region_ok_for_watchpoint)
+	(i386_stopped_data_address, i386_insert_hw_breakpoint)
+	(i386_remove_hw_breakpoint): Adjust to pass the current process id
+	to i386_debug_reg_state.
+	(i386_use_watchpoints): Don't register inferior data.
+	* i386-nat.h (i386_debug_reg_state): Add new 'pid' parameter, and
+	adjust comment.
+	(i386_forget_process): Declare.
+	* linux-fork.c (delete_fork): Call linux_nat_forget_process.
+	* linux-nat.c (linux_nat_new_fork, linux_nat_forget_process_hook):
+	New static globals.
+	(linux_child_follow_fork): Don't call linux_nat_new_thread here.
+	(add_initial_lwp): New, factored out from ...
+	(add_lwp): ... this.  Don't check the number of lwps before
+	calling linux_nat_new_thread.
+	(linux_nat_iterate_watchpoint_lwps): Delete.
+	(linux_nat_attach): Use add_initial_lwp instead of add_lwp.
+	(linux_handle_extended_wait): Call the linux_nat_new_fork hook on
+	forks and vforks.
+	(linux_nat_wait_1): Use add_initial_lwp instead of add_lwp for the
+	initial lwp.
+	(linux_nat_kill, linux_nat_mourn_inferior): Call
+	linux_nat_forget_process.
+	(linux_nat_set_new_fork, linux_nat_set_forget_process)
+	(linux_nat_forget_process): New functions.
+	* linux-nat.h (linux_nat_iterate_watchpoint_lwps_ftype): Delete
+	type.
+	(linux_nat_iterate_watchpoint_lwps): Delete declaration.
+	(linux_nat_new_fork_ftype, linux_nat_forget_process_ftype): New
+	types.
+	(linux_nat_set_new_fork, linux_nat_set_forget_process)
+	(linux_nat_forget_process): New declarations.
+
+	* amd64fbsd-nat.c (super_mourn_inferior): New global.
+	(amd64fbsd_mourn_inferior): New function.
+	(_initialize_amd64fbsd_nat): Override to_mourn_inferior.
+	* windows-nat.c (windows_detach): Call i386_cleanup_dregs.
+
+2013-02-13  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-nat.c (aarch64_linux_get_debug_reg_capacity):
+	Adding _().
+
+2013-02-13  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-nat.c (debug_reg_change_callback)
+	(aarch64_linux_get_debug_reg_capacity): ARI fix: Replace %llx with
+	%s and phex().
+
+2013-02-13  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-nat.c (dr_changed_t): ARI fix: Replace long long
+	with LONGEST.
+
+2013-02-13  Pedro Alves  <palves@redhat.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* c-lang.c (c_op_print_tab): Add entry for UNOP_PLUS.
+
+2013-02-12  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/11464:
+	* c-exp.y (lex_one_token): Initialize other fields of yylval on
+	NAME return.
+	(classify_inner_name): Remove 'first_name' argument, add
+	'context'.  Remove unused variable.
+	(yylex): Explicitly maintain the context type.  Exit loop earlier
+	if NAME result is seen.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* amd64-darwin-tdep.c: Add (C) after Copyright.
+	* cli/cli-cmds.h: Ditto.
+	* cli/cli-decode.c: Ditto.
+	* cli/cli-decode.h: Ditto.
+	* cli/cli-dump.c: Ditto.
+	* cli/cli-dump.h: Ditto.
+	* cli/cli-interp.c: Ditto.
+	* cli/cli-logging.c: Ditto.
+	* cli/cli-script.c: Ditto.
+	* cli/cli-script.h: Ditto.
+	* cli/cli-setshow.c: Ditto.
+	* cli/cli-setshow.h: Ditto.
+	* cli/cli-utils.c: Ditto.
+	* cli/cli-utils.h: Ditto.
+	* config/alpha/nm-osf3.h: Ditto.
+	* config/djgpp/djconfig.sh: Ditto.
+	* config/i386/nm-fbsd.h: Ditto.
+	* config/i386/nm-i386gnu.h: Ditto.
+	* config/nm-linux.h: Ditto.
+	* config/nm-nto.h: Ditto.
+	* config/rs6000/nm-rs6000.h: Ditto.
+	* config/sparc/nm-sol2.h: Ditto.
+	* darwin-nat-info.c: Ditto.
+	* dfp.c: Ditto.
+	* dfp.h: Ditto.
+	* gdb-demangle.h: Ditto.
+	* i386-darwin-nat.c: Ditto.
+	* i386-darwin-tdep.c: Ditto.
+	* linux-fork.h: Ditto.
+	* m32c-tdep.c: Ditto.
+	* microblaze-linux-tdep.c: Ditto.
+	* microblaze-rom.c: Ditto.
+	* microblaze-tdep.c: Ditto.
+	* microblaze-tdep.h: Ditto.
+	* mips-linux-tdep.h: Ditto.
+	* ppc-ravenscar-thread.c: Ditto.
+	* ppc-ravenscar-thread.h: Ditto.
+	* prologue-value.c: Ditto.
+	* prologue-value.h: Ditto.
+	* ravenscar-thread.c: Ditto.
+	* ravenscar-thread.h: Ditto.
+	* sparc-ravenscar-thread.c: Ditto.
+	* sparc-ravenscar-thread.h: Ditto.
+	* tilegx-linux-tdep.c: Ditto.
+	* unwind_stop_reasons.def: Ditto.
+	* windows-nat.h: Ditto.
+	* xtensa-linux-tdep.c: Ditto.
+	* xtensa-xtregs.c: Ditto.
+	* regformats/regdat.sh: Ditto.
+	* regformats/regdef.h: Ditto.
+
+2013-02-12  Pedro Alves  <palves@redhat.com>
+
+	* break-catch-sig.c: Update copyright years.
+
+2013-02-11  Siva Chandra Reddy  <sivachandra@google.com>
+
+	Add support for a destructor for ui_out data and use it to
+	provide a ui_out destructor.
+	* ui-out.h: Declare the new ui_out destructor.
+	(ui_out_impl): Add a field for data destructor in ui_out_impl.
+	* ui-out.c (default_data_destroy): Add a default data destructor
+	which does nothing.
+	(default_ui_out_impl): Set the new data_destroy field to
+	default_data_destroy
+	(uo_data_destroy): Local function which invokes the data
+	destructor if present.
+	(clear_table): Local function which clears the table data of a
+	ui_out object.
+	(ui_out_destroy): Public function which frees a ui_out object.
+	(ui_out_table_end): Use the new clear_table function.
+	* cli-out.c (cli_ui_out_impl): Set the new data_destroy field to
+	NULL.
+	* mi/mi-out.c (mi_ui_out_impl): Set the new data_destroy field
+	to NULL.
+
+2013-02-11  Doug Evans  <dje@google.com>
+
+	* printcmd.c (printf_c_string,printf_wide_c_string): New functions.
+	(printf_decfloat): New function.  Broken out from ui_printf.
+	Remove unnecessary code to shift the entire format string down.
+	(printf_pointer): New function.
+	(ui_printf): Code to print C strings, wide C strings, decfloats,
+	and pointers moved to separate functions.
+
+2013-02-11  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* valops.c (value_assign): Handling bitfield offset in
+	`lval_internalvar_component' case.
+
+2013-02-08  Doug Evans  <dje@google.com>
+
+	* common/format.c (parse_format_string): Fix whitespace.
+
+2013-02-08  Matthew Gretton-Dann  <matthew.gretton-dann@linaro.org>
+
+	* stack.c (return_command): Work around uninitialized variable
+	warning.
+
+2013-02-08  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-linux-tdep.c (AARCH64_LINUX_SIZEOF_GREGSET): Change the
+	number of the registers from 36 to 34.
+
+2013-02-08  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* NEWS: Mention new AArch64 native and target support.
+
+2013-02-08  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* MAINTAINERS (Write After Approval): Add myself.
+
+2013-02-08  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-linux-nat.c: New file.
+	* config/aarch64/linux.mh: New file.
+	* configure.host: Add AArch64.
+	* Makefile.in (ALLDEPFILES): Add aarch64-linux-nat.c.
+
+2013-02-07  Doug Evans  <dje@google.com>
+
+	* cli/cli-cmds.c (_initialize_cli_cmds): Clarify argument to
+	disassemble command.
+
+2013-02-07  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-linux-tdep.c (aarch64_linux_init_abi): Call
+	set_gdbarch_fetch_tls_load_module_address.
+
+2013-02-06  David S. Miller  <davem@davemloft.net>
+
+	* sparc-tdep.c (sparc32_return_value): Handle writing return value when
+	using RETURN_VALUE_ABI_PRESERVES_ADDRESS.
+	* value.c (struct_return_convention): New function.
+	(using_struct_return): Implement in terms of struct_return_convention.
+	* value.h (struct_return_convention): Declare.
+	* stack.c (return_command): Allow successful overriding of the return
+	value when RETURN_VALUE_ABI_PRESERVES_ADDRESS.
+
+2013-02-06  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-type.c (typy_strip_typedefs): Don't call check_typedef
+	outside of TRY_CATCH.
+
+2013-02-06  Yao Qi  <yao@codesourcery.com>
+
+	* mi/mi-interp.c: Include "tracepoint.h".
+	(mi_tsv_modified): Declare.
+	(mi_tsv_created, mi_tsv_deleted): Update declaration.
+	(mi_interpreter_init): Call observer_attach_tsv_modified.
+	(mi_tsv_modified): New.
+	(mi_tsv_created, mi_tsv_deleted): Update.
+	* tracepoint.c (trace_variable_command): Call
+	observer_notify_tsv_modified if the initial value of tsv is
+	changed.
+	(delete_trace_state_variable): Call
+	observer_notify_tsv_deleted earlier.
+	(trace_variable_command): Caller update.
+	(create_tsv_from_upload): Likewise.
+	* observer.sh: Declare "struct trace_state_variable".
+
+	* NEWS: Mention the new MI notification "=tsv-modified".
+
+2013-02-05  Doug Evans  <dje@google.com>
+
+	* completer.c (location_completer): Fix typo in comment.
+
+2013-02-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* breakpoint.c (add_location_to_breakpoint): Insert the location with
+	ADDRESS sorted.
+
+2013-02-05  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* aarch64-tdep.c (aarch64_analyze_prologue): ARI fix:
+	Refactor if statement to avoid trailing || operator.
+
+2013-02-05  Andreas Tobler  <andreast@fgznet.ch>
+
+	* NEWS: Add PowerPC FreeBSD as a new native configuration.
+
+2013-02-04  Andreas Tobler  <andreast@fgznet.ch>
+
+	* Makefile.in (ALL_TARGET_OBS): Add powerpc FreeBSD files.
+	* configure.host: Add powerpc*-*-freebsd* target.
+	* configure.tgt: Add target info for powerpc*-*-freebsd*.
+	* ppcfbsd-nat.c, ppcfbsd-tdep.h, ppcfbsd-tdep.c: New files.
+	* config/powerpc/fbsd.mh: New file.
+
+2013-02-04  Sergio Durigan Junior  <sergiodj@redhat.com>
+	    Denys Vlasenko  <dvlasenk@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* gdbarch.sh (elfcore_write_linux_prpsinfo): New F hook.
+	(struct elf_internal_linux_prpsinfo): Forward declare.
+	* gdbarch.h, gdbarch.c: Regenerate.
+	* linux-tdep.c: Include `cli/cli-utils.h'.
+	(linux_fill_prpsinfo): New function.
+	(linux_make_corefile_notes): Use linux_fill_prpsinfo.  If there's
+	an elfcore_write_linux_prpsinfo hook, use it, otherwise, use
+	elfcore_write_linux_prpsinfo32 or elfcore_write_linux_prpsinfo64
+	depending on gdbarch pointer bitness.
+	* ppc-linux-tdep.c: Include elf-bfd.h.
+	(ppc_linux_init_abi): Hook in elfcore_write_ppc_linux_prpsinfo32
+	on 32-bit.
+
+2013-02-04  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* configure.tgt (aarch64*-*-linux*): Set build_gdbserver=yes.
+
+2013-02-04  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-newlib-tdep.c: New file.
+	* configure.tgt: Add aarch64-newlib-tdep.o to gdb_target_obs of
+	aarch64*-*-elf.
+	* defs.h (enum gdb_osabi): Add GDB_OSABI_NEWLIB.
+	* Makefile.in (ALL_64_TARGET_OBS): Add aarch64-newlib-tdep.o.
+	(ALLDEPFILES): Add aarch64-newlib-tdep.c.
+	* osabi.c (gdb_osabi_names): Add "Newlib".
+
+2013-02-04  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* Makefile.in (ALL_64_TARGET_OBS): Add aarch64-linux-tdep.o.
+	(ALLDEPFILES): Add aarch64-linux-tdep.c.
+	* aarch64-linux-tdep.c: New file.
+	* aarch64-linux-tdep.h: New file.
+	* aarch64-tdep.h (gdbarch_tdep): Define gregset and fpregset.
+	* configure.tgt: Add aarch64-none-linux-gnu.
+
+2013-02-04  Jim MacArthur  <jim.macarthur@arm.com>
+	    Marcus Shawcroft  <marcus.shawcroft@arm.com>
+	    Nigel Stephens  <nigel.stephens@arm.com>
+	    Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* Makefile.in (ALL_64_TARGET_OBS): Add arch64-tdep.o.
+	(HFILES_NO_SRCDIR): Add aarch64-tdep.h.
+	(ALLDEPFILES): Add aarch64-tdep.c.
+	* aarch64-tdep.c: New file.
+	* aarch64-tdep.h: New file.
+	* configure.tgt: Add AArch64.
+	* features/Makefile (WHICH): Add aarch64 and aarch64-without-fpu.
+	(aarch64-expedite): New definition.
+	* features/aarch64-core.xml: New file.
+	* features/aarch64-fpu.xml: New file.
+	* features/aarch64-without-fpu.c: New file (generated).
+	* features/aarch64-without-fpu.xml: New file.
+	* features/aarch64.c: New file (generated).
+	* features/aarch64.xml: New file.
+	* regformats/aarch64-without-fpu.dat: New file (generated).
+	* regformats/aarch64.dat: New file (generated).
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* contrib/expect-read1.c: New file.
+	* contrib/expect-read1.sh: New file.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (file_file_name): New function with code from
+	file_full_name.
+	(file_full_name): Move most of the code to file_file_name.
+	(macro_start_file): Rename variable full_name to file_name and use
+	file_file_name for it.  Add comp_dir parameter to new_macro_table.
+	* macrocmd.c (show_pp_source_pos): New variable fullname.  Replace any
+	macro_source_file->filename access by macro_source_fullname call.
+	* macroscope.c (_initialize_macroscope): Update the new_macro_table
+	caller.
+	* macrotab.c (struct macro_table): New field comp_dir.
+	(macro_include): New variables link_fullname and source_fullname.
+	Replace any macro_source_file->filename access by macro_source_fullname
+	call.
+	(macro_lookup_inclusion): Remove the partial filenames checking code.
+	(check_for_redefinition): New variables source_fullname and
+	found_key_fullname.  Replace any macro_source_file->filename access by
+	macro_source_fullname call.
+	(macro_undef): New variables source_fullname and key_fullname.  Replace
+	any macro_source_file->filename access by macro_source_fullname call.
+	(macro_lookup_definition): New variables retval and source_fullname.
+	Replace any macro_source_file->filename access by macro_source_fullname
+	call.
+	(foreach_macro): New variable key_fullname.  Replace any
+	macro_source_file->filename access by macro_source_fullname call.
+	(foreach_macro_in_scope): New variable datum_fullname.  Replace any
+	macro_source_file->filename access by macro_source_fullname call.
+	(new_macro_table): Add parameter comp_dir.  Initialize T with it.
+	(macro_source_fullname): New function.
+	* macrotab.h (struct macro_source_file): Extent the filename field
+	comment.
+	(new_macro_table): New parameter comp_dir, add a comment for it.
+	(macro_source_fullname): new declaration.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dw2_map_symtabs_matching_filename): Move variable
+	this_real_name to outer block.  Use it also for
+	compare_filenames_for_search.
+	(dw2_expand_symtabs_matching): New variable this_real_name.  Use it
+	with dw2_get_real_path for file_matcher, considering also
+	BASENAMES_MAY_DIFFER.
+	(file_full_name): Prepend COMP_DIR even for relative lh->INCLUDE_DIRS.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2read.c (dw2_expand_symtabs_matching): Add basenames parameter
+	to the file_matcher parameter.  Pass 0 to it.
+	(dwarf2_create_include_psymtab): Copy also DIRNAME.
+	* psymtab.c (partial_map_symtabs_matching_filename): Drop handling of
+	NULL psymtab_to_fullname result.
+	(psymtab_to_fullname): Remove variable r.  Never return NULL, assemble
+	an expected filename instead.
+	(expand_symtabs_matching_via_partial): Add basenames parameter to the
+	file_matcher parameter.  Call also psymtab_to_fullname, after newly
+	considering BASENAMES_MAY_DIFFER.
+	* source.c (rewrite_source_path): Remove static.
+	* source.h (rewrite_source_path): New declaration.
+	* symfile.h (struct quick_symbol_functions): Add basenames parameter to
+	the expand_symtabs_matching field.  Comment it.
+	* symtab.c (file_matches): New function comment.  Add parameter
+	basenames, implement it.
+	(search_symbols_file_matches): Add basenames parameter.  Update the
+	file_matches caller.
+	(search_symbols): Match FILES also against symtab_to_fullname.
+	Optimize it for BASENAMES_MAY_DIFFER.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* source.c (print_source_lines_base): Print for TUI also "fullname".
+	* tui/tui-data.c (init_content_element): Change tui_locator_element
+	field to full_name.
+	* tui/tui-data.h (struct tui_locator_element): Likewise.
+	* tui/tui-disasm.c (tui_show_disassem_and_update_source): Rename
+	tui_update_locator_filename calls to tui_update_locator_fullname.
+	Replace symtab->filename refererence by symtab_to_fullname call.
+	* tui/tui-out.c (tui_field_string): Check for "fullname" now.
+	* tui/tui-source.c (tui_set_source_content): Change tui_locator_element
+	field to full_name.  Replace symtab->filename refererence by
+	symtab_to_fullname call.
+	(tui_show_symtab_source): Rename parameter to fullname.  Change
+	tui_locator_element field to full_name.
+	* tui/tui-stack.c: Include source.h.
+	(tui_set_locator_filename): Rename the declaration to ...
+	(tui_set_locator_fullname): ... here.  Rename its parameter to
+	fullname, updates its comment.
+	(tui_set_locator_info): Rename its parameter to fullname.
+	(tui_set_locator_filename): Rename the definition to ...
+	(tui_set_locator_fullname): ... here.  Rename its parameter to
+	fullname, updates its comment.  Change tui_locator_element field to
+	full_name.
+	(tui_set_locator_info): Rename its parameter to fullname.
+	(tui_set_locator_info): Rename callee to tui_set_locator_fullname.
+	(tui_update_locator_filename): Rename to ...
+	(tui_update_locator_fullname): ... here. Rename callee to
+	tui_set_locator_fullname.
+	(tui_show_frame_info): Replace symtab->filename refererence by
+	symtab_to_fullname call.
+	* tui/tui-stack.h (tui_update_locator_filename): Rename to ...
+	(tui_update_locator_fullname): ... here.
+	* tui/tui-winsource.c (tui_display_main): Rename the callee to
+	tui_update_locator_fullname.  Replace symtab->filename refererence by
+	symtab_to_fullname call.
+	* tui/tui.c (tui_show_source): Rename its parameter to fullname.
+	Rename the callee to tui_update_locator_fullname.
+	* tui/tui.h (tui_show_source): Rename its parameter to fullname.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* ada-lang.c (user_select_syms): Replace symtab->filename refererences
+	by symtab_to_filename_for_display calls.
+	* breakpoint.c (print_breakpoint_location, resolve_sal_pc): Likewise.
+	(clear_command): New variable sal_fullname, initialize it.  Replace
+	compare_filenames_for_search by filename_cmp with sal_fullname.
+	(say_where, update_static_tracepoint): Replace symtab->filename
+	refererences by symtab_to_filename_for_display calls.
+	* cli/cli-cmds.c (edit_command, list_command, ambiguous_line_spec):
+	Likewise.
+	* dwarf2read.c: Include source.h.
+	(fixup_go_packaging): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* linespec.c (add_sal_to_sals): Rename variable filename to fullname.
+	Replace symtab->filename refererences by symtab_to_filename_for_display
+	calls.
+	(create_sals_line_offset, convert_linespec_to_sals): New variable
+	fullname, initialize it, replace symtab->filename reference by the
+	variable.
+	* linux-fork.c: Include source.h.
+	(info_checkpoints_command): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* macroscope.c (sal_macro_scope): Replace symtab->filename refererences
+	by symtab_to_filename_for_display calls.
+	* mdebugread.c: Include source.h.
+	(psymtab_to_symtab_1): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* mi/mi-cmd-file.c (mi_cmd_file_list_exec_source_file)
+	(mi_cmd_file_list_exec_source_files): Likewise.
+	* printcmd.c: Include source.h.
+	(build_address_symbolic): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* psymtab.c (partial_map_symtabs_matching_filename)
+	(read_psymtabs_with_fullname): Call compare_filenames_for_search also
+	with psymtab_to_fullname.
+	* python/py-symtab.c (stpy_str): Replace symtab->filename refererences
+	by symtab_to_filename_for_display calls.
+	(stpy_get_filename): New variable filename, initialize it, use instead
+	of symtab->filename refererences.
+	(salpy_str): Make variable filename const char *.  Replace
+	symtab->filename refererences by symtab_to_filename_for_display calls.
+	* skip.c: Include source.h and filenames.h.
+	(skip_file_command): Remove const from the symtab variable.  Replace
+	symtab->filename refererences by symtab_to_fullname call.
+	(function_name_is_marked_for_skip): New variables searched_for_fullname
+	and fullname.  Use them to search also with symtab's fullname.
+	* source.c (find_source_lines): Replace symtab->filename refererences
+	by symtab_to_filename_for_display calls.
+	(print_source_lines_base): New variable filename, use it instead of
+	symtab->filename.  Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	(line_info, forward_search_command): Replace symtab->filename
+	refererences by symtab_to_filename_for_display calls.
+	(reverse_search_command): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.  New variable filename for it.
+	* stack.c (frame_info): Likewise.
+	* symmisc.c: Include source.h.
+	(dump_objfile, dump_symtab_1, maintenance_print_symbols)
+	(maintenance_info_symtabs): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	* symtab.c (iterate_over_some_symtabs): Call
+	compare_filenames_for_search also with symtab_to_fullname.
+	(lookup_symbol_aux_quick, basic_lookup_transparent_type_quick): Replace
+	symtab->filename refererences by symtab_to_filename_for_display calls.
+	(find_line_symtab): Replace symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+	(file_matches): Replace filename_cmp by compare_filenames_for_search.
+	(print_symbol_info): Make the last parameter const char *.  New
+	variable s_filename.  Use it in the function.
+	(symtab_symbol_info): Make the last_filename variable const char *.
+	Replace symtab->filename refererences by symtab_to_filename_for_display
+	calls.
+	(rbreak_command): New variable fullname.  Use it.  Replace
+	symtab->filename refererence by symtab_to_filename_for_display call.
+	* tracepoint.c (set_traceframe_context, trace_find_line_command)
+	(print_one_static_tracepoint_marker): Replace symtab->filename
+	refererences by symtab_to_filename_for_display calls.
+	* tui/tui-source.c (tui_set_source_content): New variables filename and
+	s_filename.  Replace symtab->filename refererences by this variable.
+	Replace other symtab->filename refererences by
+	symtab_to_filename_for_display calls.
+
+2013-02-03  Eldar Gaynetdinov <hal9000ed2k@gmail.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Add a new variable that controls a way in which filenames are
+	displayed.
+	* NEWS (set filename-display): New entry.
+	* source.c (filename_display_basename, filename_display_relative)
+	(filename_display_absolute, filename_display_kind_names)
+	(filename_display_string, show_filename_display_string)
+	(symtab_to_filename_for_display): New.
+	(_initialize_source): Added initialization of 'filename-display'
+	variable.
+	* source.h (symtab_to_filename_for_display): Added declaration.
+	* stack.c (print_frame): Added new variable and calling of a new
+	function and condition with this variable. Changed third argument of
+	calling of a function.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* tui/tui-data.c (init_win_info, tui_del_window, tui_free_window):
+	Rename field reference filename to fullname.
+	* tui/tui-data.h (struct tui_source_info): Rename field filename to
+	fullname.  New comment for it.
+	* tui/tui-source.c (tui_set_source_content): Rename field reference
+	filename to fullname.  Initialize field by symtab_to_fullname now.
+	* tui/tui-winsource.c (tui_update_breakpoint_info): Rename field
+	reference filename to fullname.  Use symtab_to_fullname during
+	comparison.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* dwarf2read.c (dw2_expand_symtabs_with_filename): Rename to ...
+	(dw2_expand_symtabs_with_fullname): ... here.  Rename parameter
+	filename to fullname.  Rename variable this_name to this_fullname.
+	Lowercase FILENAME_CMP call.
+	(dw2_find_symbol_file): New comment for the returned string.
+	(dwarf2_gdb_index_functions): Rename the function to
+	dw2_expand_symtabs_with_fullname.
+	* psymtab.c (read_psymtabs_with_filename): Rename to ...
+	(read_psymtabs_with_fullname): ... here.  Rename parameter filename to
+	fullname.
+	(psym_functions): Rename the function to read_psymtabs_with_fullname.
+	* symfile.h (struct quick_symbol_functions): Rename field
+	expand_symtabs_with_filename to expand_symtabs_with_fullname and its
+	parameter filename to fullname.  Document returned string meaning for
+	find_symbol_file.
+	* symtab.c (find_line_symtab): Rename the called function to
+	expand_symtabs_with_fullname.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* breakpoint.c (clear_command): Remove variable is_abs, unify the
+	call of filename_cmp with compare_filenames_for_search.
+	* dwarf2read.c (dw2_map_symtabs_matching_filename): Remove variable
+	is_abs, unify the call of FILENAME_CMP with
+	compare_filenames_for_search.  New gdb_asserts for real_path and name.
+	Unify the call of compare_filenames_for_search with FILENAME_CMP.
+	* psymtab.c (partial_map_symtabs_matching_filename): Likewise.
+	* symfile.h (struct quick_symbol_functions): Extend the comment for
+	map_symtabs_matching_filename.
+	* symtab.c (compare_filenames_for_search): Remove the function comment
+	relative path requirement.  Handle absolute filenames, with a comment.
+	(iterate_over_some_symtabs): Remove variable is_abs, unify the call of
+	FILENAME_CMP with compare_filenames_for_search.  New gdb_asserts for
+	real_path and name.  Unify the call of compare_filenames_for_search
+	with FILENAME_CMP.
+	(iterate_over_symtabs): New gdb_assert on REAL_PATH.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* breakpoint.c (print_breakpoint_location): Replace bp_location field
+	source_file references by symtab field references.  Remove variables
+	sal and fullname.
+	(momentary_breakpoint_from_master, add_location_to_breakpoint):
+	(clear_command, say_where): Replace bp_location field source_file
+	references by symtab field references.
+	(bp_location_dtor): Remove the source_file reference.
+	(update_static_tracepoint): Replace bp_location field source_file
+	references by symtab field references.
+	(breakpoint_free_objfile): New function.
+	* breakpoint.h (struct bp_location): Extend the comment for line_number.
+	Replace the field source_file by field symtab, extend its comment.
+	(breakpoint_free_objfile): New declaration.
+	* objfiles.c (free_objfile): Call breakpoint_free_objfile.
+	* tui/tui-winsource.c (tui_update_breakpoint_info): Replace bp_location
+	field source_file references by symtab field references.
+
+2013-02-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Replace xfullpath calls by gdb_realpath calls.
+	* cli/cli-cmds.c (find_and_open_script): Remove xfullpath from the
+	function comment.
+	* dwarf2read.c (dw2_map_expand_apply): Remove parameter full_path.
+	Remove it from the iterate_over_some_symtabs call.
+	(dw2_map_symtabs_matching_filename): Remove parameter full_path.
+	Remove it from the dw2_map_expand_apply calls, remove a block handling
+	it.
+	* psymtab.c (partial_map_expand_apply): Remove parameter full_path.
+	Remove it from the iterate_over_some_symtabs call.
+	(partial_map_symtabs_matching_filename): Remove parameter full_path.
+	Remove it from the partial_map_expand_apply calls, remove a block
+	handling it.  Drop gdb_realpath call and cleanups from the real_path
+	handling.
+	* source.c (openp): Drop the comment part about xfullpath.  Replace
+	xfullpath calls by gdb_realpath calls.
+	(find_and_open_source): Replace xfullpath call by gdb_realpath call.
+	* symfile.h (struct quick_symbol_functions): Remove parameter full_path
+	from method map_symtabs_matching_filename and its comment.
+	* symmisc.c (maintenance_print_msymbols): Replace xfullpath call by
+	gdb_realpath call.
+	* symtab.c (iterate_over_some_symtabs): Remove parameter full_path,
+	remove it also from the function comment, remove a block handling it.
+	Drop gdb_realpath call and cleanups from the real_path handling.
+	(iterate_over_symtabs): Drop variable full_path and its use.
+	* symtab.h (iterate_over_some_symtabs): Remove parameter full_path.
+	* utils.c (xfullpath): Remove.
+	* utils.h (xfullpath): Remove.
+
 2013-02-01  Andreas Tobler  <andreast@fgznet.ch>
 
 	* Makefile.in (ALL_TARGET_OBS): Add ppc64-tdep.o.
@@ -330,7 +1279,7 @@
 
 2013-01-24  Tiago Stürmer Daitx  <tdaitx@linux.vnet.ibm.com>
 
-	* MAINTAINERS (Write After Approval): Add myself to the list. 
+	* MAINTAINERS (Write After Approval): Add myself to the list.
 
 2013-01-24  Tom Tromey  <tromey@redhat.com>
 

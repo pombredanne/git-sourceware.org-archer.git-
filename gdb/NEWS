@@ -3,8 +3,15 @@
 
 *** Changes since GDB 7.5
 
+* New native configurations
+
+ARM AArch64 GNU/Linux		aarch64*-*-linux-gnu
+FreeBSD/powerpc			powerpc*-*-freebsd
+
 * New targets
 
+ARM AArch64			aarch64*-*-elf
+ARM AArch64 GNU/Linux		aarch64*-*-linux
 Lynx 178 PowerPC		powerpc-*-lynx*178
 
 * If the configured location of system.gdbinit file (as given by the
@@ -115,14 +122,20 @@ show print type typedefs
   Control whether typedef definitions are displayed by "ptype".
   The default is to show them.
 
+set filename-display basename|relative|absolute
+show filename-display
+  Control the way in which filenames is displayed.
+  The default is "relative", which preserves previous behavior.
+
 * MI changes
 
   ** Command parameter changes are now notified using new async record
      "=cmd-param-changed".
   ** Trace frame changes caused by command "tfind" are now notified using
      new async record "=traceframe-changed".
-  ** The creation and deletion of trace state variables are now notified
-     using new async records "=tsv-created" and "=tsv-deleted".
+  ** The creation, deletion and modification of trace state variables
+     are now notified using new async records "=tsv-created",
+     "=tsv-deleted" and "=tsv-modified".
   ** The start and stop of process record are now notified using new
      async record "=record-started" and "=record-stopped".
   ** Memory changes are now notified using new async record
@@ -137,6 +150,9 @@ show print type typedefs
   ** The response to breakpoint commands and breakpoint async records
      includes an "installed" field containing a boolean state about each
      non-pending tracepoint location is whether installed on target or not.
+  ** Output of the "-trace-status" command includes a "trace-file" field 
+     containing the name of the trace file being examined.  This field is
+     optional, and only present when examining a trace file.
 
 * GDB now supports the "mini debuginfo" section, .gnu_debugdata.
   You must have the LZMA library available when configuring GDB for this

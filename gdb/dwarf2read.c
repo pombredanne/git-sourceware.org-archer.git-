@@ -67,6 +67,7 @@
 #include <ctype.h>
 #include "gdb_bfd.h"
 #include "f-lang.h"
+#include "source.h"
 
 #include <fcntl.h>
 #include "gdb_string.h"
@@ -3020,8 +3021,7 @@ dw2_forget_cached_source_info (struct objfile *objfile)
 static int
 dw2_map_expand_apply (struct objfile *objfile,
 		      struct dwarf2_per_cu_data *per_cu,
-		      const char *name,
-		      const char *full_path, const char *real_path,
+		      const char *name, const char *real_path,
 		      int (*callback) (struct symtab *, void *),
 		      void *data)
 {
@@ -3035,7 +3035,7 @@ dw2_map_expand_apply (struct objfile *objfile,
      all of them.  */
   dw2_instantiate_symtab (per_cu);
 
-  return iterate_over_some_symtabs (name, full_path, real_path, callback, data,
+  return iterate_over_some_symtabs (name, real_path, callback, data,
 				    objfile->symtabs, last_made);
 }
 
@@ -3043,13 +3043,12 @@ dw2_map_expand_apply (struct objfile *objfile,
 
 static int
 dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
-				   const char *full_path, const char *real_path,
+				   const char *real_path,
 				   int (*callback) (struct symtab *, void *),
 				   void *data)
 {
   int i;
   const char *name_basename = lbasename (name);
-  int is_abs = IS_ABSOLUTE_PATH (name);
 
   dw2_setup (objfile);
 
@@ -3073,12 +3072,11 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
       for (j = 0; j < file_data->num_file_names; ++j)
 	{
 	  const char *this_name = file_data->file_names[j];
+	  const char *this_real_name;
 
-	  if (FILENAME_CMP (name, this_name) == 0
-	      || (!is_abs && compare_filenames_for_search (this_name, name)))
+	  if (compare_filenames_for_search (this_name, name))
 	    {
-	      if (dw2_map_expand_apply (objfile, per_cu,
-					name, full_path, real_path,
+	      if (dw2_map_expand_apply (objfile, per_cu, name, real_path,
 					callback, data))
 		return 1;
 	    }
@@ -3089,37 +3087,22 @@ dw2_map_symtabs_matching_filename (struct objfile *objfile, const char *name,
 	      && FILENAME_CMP (lbasename (this_name), name_basename) != 0)
 	    continue;
 
-	  if (full_path != NULL)
+	  this_real_name = dw2_get_real_path (objfile, file_data, j);
+	  if (compare_filenames_for_search (this_real_name, name))
 	    {
-	      const char *this_real_name = dw2_get_real_path (objfile,
-							      file_data, j);
-
-	      if (this_real_name != NULL
-		  && (FILENAME_CMP (full_path, this_real_name) == 0
-		      || (!is_abs
-			  && compare_filenames_for_search (this_real_name,
-							   name))))
-		{
-		  if (dw2_map_expand_apply (objfile, per_cu,
-					    name, full_path, real_path,
-					    callback, data))
-		    return 1;
-		}
+	      if (dw2_map_expand_apply (objfile, per_cu, name, real_path,
+					callback, data))
+		return 1;
 	    }
 
 	  if (real_path != NULL)
 	    {
-	      const char *this_real_name = dw2_get_real_path (objfile,
-							      file_data, j);
-
+	      gdb_assert (IS_ABSOLUTE_PATH (real_path));
+	      gdb_assert (IS_ABSOLUTE_PATH (name));
 	      if (this_real_name != NULL
-		  && (FILENAME_CMP (real_path, this_real_name) == 0
-		      || (!is_abs
-			  && compare_filenames_for_search (this_real_name,
-							   name))))
+		  && FILENAME_CMP (real_path, this_real_name) == 0)
 		{
-		  if (dw2_map_expand_apply (objfile, per_cu,
-					    name, full_path, real_path,
+		  if (dw2_map_expand_apply (objfile, per_cu, name, real_path,
 					    callback, data))
 		    return 1;
 		}
@@ -3367,8 +3350,8 @@ dw2_expand_all_symtabs (struct objfile *objfile)
 }
 
 static void
-dw2_expand_symtabs_with_filename (struct objfile *objfile,
-				  const char *filename)
+dw2_expand_symtabs_with_fullname (struct objfile *objfile,
+				  const char *fullname)
 {
   int i;
 
@@ -3395,8 +3378,9 @@ dw2_expand_symtabs_with_filename (struct objfile *objfile,
 
       for (j = 0; j < file_data->num_file_names; ++j)
 	{
-	  const char *this_name = file_data->file_names[j];
-	  if (FILENAME_CMP (this_name, filename) == 0)
+	  const char *this_fullname = file_data->file_names[j];
+
+	  if (filename_cmp (this_fullname, fullname) == 0)
 	    {
 	      dw2_instantiate_symtab (per_cu);
 	      break;
@@ -3447,7 +3431,10 @@ dw2_find_symbol_file (struct objfile *objfile, const char *name)
 	  struct symbol *sym = lookup_block_symbol (block, name, VAR_DOMAIN);
 
 	  if (sym)
-	    return SYMBOL_SYMTAB (sym)->filename;
+	    {
+	      /* Only file extension of returned filename is recognized.  */
+	      return SYMBOL_SYMTAB (sym)->filename;
+	    }
 	}
       return NULL;
     }
@@ -3464,11 +3451,15 @@ dw2_find_symbol_file (struct objfile *objfile, const char *name)
   per_cu = dw2_get_cu (GDB_INDEX_CU_VALUE (MAYBE_SWAP (vec[1])));
 
   if (per_cu->v.quick->symtab != NULL)
-    return per_cu->v.quick->symtab->filename;
+    {
+      /* Only file extension of returned filename is recognized.  */
+      return per_cu->v.quick->symtab->filename;
+    }
 
   init_cutu_and_read_dies (per_cu, NULL, 0, 0,
 			   dw2_get_primary_filename_reader, &filename);
 
+  /* Only file extension of returned filename is recognized.  */
   return filename;
 }
 
@@ -3488,7 +3479,7 @@ dw2_map_matching_symbols (const char * name, domain_enum namespace,
 static void
 dw2_expand_symtabs_matching
   (struct objfile *objfile,
-   int (*file_matcher) (const char *, void *),
+   int (*file_matcher) (const char *, void *, int basenames),
    int (*name_matcher) (const char *, void *),
    enum search_domain kind,
    void *data)
@@ -3548,7 +3539,23 @@ dw2_expand_symtabs_matching
 
 	  for (j = 0; j < file_data->num_file_names; ++j)
 	    {
-	      if (file_matcher (file_data->file_names[j], data))
+	      const char *this_real_name;
+
+	      if (file_matcher (file_data->file_names[j], data, 0))
+		{
+		  per_cu->v.quick->mark = 1;
+		  break;
+		}
+
+	      /* Before we invoke realpath, which can get expensive when many
+		 files are involved, do a quick comparison of the basenames.  */
+	      if (!basenames_may_differ
+		  && !file_matcher (lbasename (file_data->file_names[j]),
+				    data, 1))
+		continue;
+
+	      this_real_name = dw2_get_real_path (objfile, file_data, j);
+	      if (file_matcher (this_real_name, data, 0))
 		{
 		  per_cu->v.quick->mark = 1;
 		  break;
@@ -3767,7 +3774,7 @@ const struct quick_symbol_functions dwarf2_gdb_index_functions =
   dw2_relocate,
   dw2_expand_symtabs_for_function,
   dw2_expand_all_symtabs,
-  dw2_expand_symtabs_with_filename,
+  dw2_expand_symtabs_with_fullname,
   dw2_find_symbol_file,
   dw2_map_matching_symbols,
   dw2_expand_symtabs_matching,
@@ -4068,6 +4075,12 @@ dwarf2_create_include_psymtab (char *name, struct partial_symtab *pst,
                                struct objfile *objfile)
 {
   struct partial_symtab *subpst = allocate_psymtab (name, objfile);
+
+  if (!IS_ABSOLUTE_PATH (subpst->filename))
+    {
+      /* It shares objfile->objfile_obstack.  */
+      subpst->dirname = pst->dirname;
+    }
 
   subpst->section_offsets = pst->section_offsets;
   subpst->textlow = 0;
@@ -6806,7 +6819,7 @@ fixup_go_packaging (struct dwarf2_cu *cu)
 		    complaint (&symfile_complaints,
 			       _("Symtab %s has objects from two different Go packages: %s and %s"),
 			       (SYMBOL_SYMTAB (sym)
-				? SYMBOL_SYMTAB (sym)->filename
+			  ? symtab_to_filename_for_display (SYMBOL_SYMTAB (sym))
 				: cu->objfile->name),
 			       this_package_name, package_name);
 		  xfree (this_package_name);
@@ -12723,7 +12736,7 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
 static struct type *
 read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 {
-  struct type *base_type;
+  struct type *base_type, *orig_base_type;
   struct type *range_type;
   struct attribute *attr;
   LONGEST low, high;
@@ -12731,9 +12744,12 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   const char *name;
   LONGEST negative_mask;
 
-  base_type = die_type (die, cu);
-  /* Preserve BASE_TYPE's original type, just set its LENGTH.  */
-  check_typedef (base_type);
+  orig_base_type = die_type (die, cu);
+  /* If ORIG_BASE_TYPE is a typedef, it will not be TYPE_UNSIGNED,
+     whereas the real type might be.  So, we use ORIG_BASE_TYPE when
+     creating the range type, but we use the result of check_typedef
+     when examining properties of the type.  */
+  base_type = check_typedef (orig_base_type);
 
   /* The die_type call above may have already set the type for this DIE.  */
   range_type = get_die_type (die, cu);
@@ -12863,7 +12879,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   if (!TYPE_UNSIGNED (base_type) && (high & negative_mask))
     high |= negative_mask;
 
-  range_type = create_range_type (NULL, base_type, low, high);
+  range_type = create_range_type (NULL, orig_base_type, low, high);
 
   /* Mark arrays with dynamic length at least as an array of unspecified
      length.  GDB could check the boundary but before it gets implemented at
@@ -18021,12 +18037,12 @@ dwarf_alloc_die (struct dwarf2_cu *cu, int num_attrs)
 
 /* Macro support.  */
 
-/* Return the full name of file number I in *LH's file name table.
-   Use COMP_DIR as the name of the current directory of the
-   compilation.  The result is allocated using xmalloc; the caller is
+/* Return file name relative to the compilation directory of file number I in
+   *LH's file name table.  The result is allocated using xmalloc; the caller is
    responsible for freeing it.  */
+
 static char *
-file_full_name (int file, struct line_header *lh, const char *comp_dir)
+file_file_name (int file, struct line_header *lh)
 {
   /* Is the file number a valid index into the line header's file name
      table?  Remember that file numbers start with one, not zero.  */
@@ -18034,31 +18050,10 @@ file_full_name (int file, struct line_header *lh, const char *comp_dir)
     {
       struct file_entry *fe = &lh->file_names[file - 1];
 
-      if (IS_ABSOLUTE_PATH (fe->name))
+      if (IS_ABSOLUTE_PATH (fe->name) || fe->dir_index == 0)
         return xstrdup (fe->name);
-      else
-        {
-          const char *dir;
-          int dir_len;
-          char *full_name;
-
-          if (fe->dir_index)
-            dir = lh->include_dirs[fe->dir_index - 1];
-          else
-            dir = comp_dir;
-
-          if (dir)
-            {
-              dir_len = strlen (dir);
-              full_name = xmalloc (dir_len + 1 + strlen (fe->name) + 1);
-              strcpy (full_name, dir);
-              full_name[dir_len] = '/';
-              strcpy (full_name + dir_len + 1, fe->name);
-              return full_name;
-            }
-          else
-            return xstrdup (fe->name);
-        }
+      return concat (lh->include_dirs[fe->dir_index - 1], SLASH_STRING,
+		     fe->name, NULL);
     }
   else
     {
@@ -18078,6 +18073,27 @@ file_full_name (int file, struct line_header *lh, const char *comp_dir)
     }
 }
 
+/* Return the full name of file number I in *LH's file name table.
+   Use COMP_DIR as the name of the current directory of the
+   compilation.  The result is allocated using xmalloc; the caller is
+   responsible for freeing it.  */
+static char *
+file_full_name (int file, struct line_header *lh, const char *comp_dir)
+{
+  /* Is the file number a valid index into the line header's file name
+     table?  Remember that file numbers start with one, not zero.  */
+  if (1 <= file && file <= lh->num_file_names)
+    {
+      char *relative = file_file_name (file, lh);
+
+      if (IS_ABSOLUTE_PATH (relative) || comp_dir == NULL)
+	return relative;
+      return reconcat (relative, comp_dir, SLASH_STRING, relative, NULL);
+    }
+  else
+    return file_file_name (file, lh);
+}
+
 
 static struct macro_source_file *
 macro_start_file (int file, int line,
@@ -18085,26 +18101,27 @@ macro_start_file (int file, int line,
                   const char *comp_dir,
                   struct line_header *lh, struct objfile *objfile)
 {
-  /* The full name of this source file.  */
-  char *full_name = file_full_name (file, lh, comp_dir);
+  /* File name relative to the compilation directory of this source file.  */
+  char *file_name = file_file_name (file, lh);
 
   /* We don't create a macro table for this compilation unit
      at all until we actually get a filename.  */
   if (! pending_macros)
     pending_macros = new_macro_table (&objfile->per_bfd->storage_obstack,
-                                      objfile->per_bfd->macro_cache);
+				      objfile->per_bfd->macro_cache,
+				      comp_dir);
 
   if (! current_file)
     {
       /* If we have no current file, then this must be the start_file
 	 directive for the compilation unit's main source file.  */
-      current_file = macro_set_main (pending_macros, full_name);
+      current_file = macro_set_main (pending_macros, file_name);
       macro_define_special (pending_macros);
     }
   else
-    current_file = macro_include (current_file, line, full_name);
+    current_file = macro_include (current_file, line, file_name);
 
-  xfree (full_name);
+  xfree (file_name);
 
   return current_file;
 }

@@ -2677,10 +2677,10 @@ ppc64_elf_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
     return FALSE;
 
   /* pr_cursig */
-  elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
+  elf_tdata (abfd)->core->signal = bfd_get_16 (abfd, note->descdata + 12);
 
   /* pr_pid */
-  elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 32);
+  elf_tdata (abfd)->core->lwpid = bfd_get_32 (abfd, note->descdata + 32);
 
   /* pr_reg */
   offset = 112;
@@ -2697,11 +2697,11 @@ ppc64_elf_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
   if (note->descsz != 136)
     return FALSE;
 
-  elf_tdata (abfd)->core_pid
+  elf_tdata (abfd)->core->pid
     = bfd_get_32 (abfd, note->descdata + 24);
-  elf_tdata (abfd)->core_program
+  elf_tdata (abfd)->core->program
     = _bfd_elfcore_strndup (abfd, note->descdata + 40, 16);
-  elf_tdata (abfd)->core_command
+  elf_tdata (abfd)->core->command
     = _bfd_elfcore_strndup (abfd, note->descdata + 56, 80);
 
   return TRUE;
@@ -4043,7 +4043,7 @@ ppc64_elf_link_hash_table_free (struct bfd_link_hash_table *hash)
   bfd_hash_table_free (&htab->branch_hash_table);
   if (htab->tocsave_htab)
     htab_delete (htab->tocsave_htab);
-  _bfd_generic_link_hash_table_free (hash);
+  _bfd_elf_link_hash_table_free (hash);
 }
 
 /* Satisfy the ELF linker by filling in some fields in our fake bfd.  */

@@ -463,10 +463,7 @@ show_script_ext_mode (struct ui_file *file, int from_tty,
    we tried to open.
 
    If SEARCH_PATH is non-zero, and the file isn't found in cwd,
-   search for it in the source search path.
-
-   NOTE: This calls openp which uses xfullpath to compute the full path
-   instead of gdb_realpath.  Symbolic links are not resolved.  */
+   search for it in the source search path.  */
 
 int
 find_and_open_script (const char *script_file, int search_path,
@@ -821,11 +818,13 @@ edit_command (char *arg, int from_tty)
 	    printf_filtered ("%s is in %s (%s:%d).\n",
 			     paddress (gdbarch, sal.pc),
 			     SYMBOL_PRINT_NAME (sym),
-			     sal.symtab->filename, sal.line);
+			     symtab_to_filename_for_display (sal.symtab),
+			     sal.line);
           else
 	    printf_filtered ("%s is at %s:%d.\n",
 			     paddress (gdbarch, sal.pc),
-			     sal.symtab->filename, sal.line);
+			     symtab_to_filename_for_display (sal.symtab),
+			     sal.line);
         }
 
       /* If what was given does not imply a symtab, it must be an
@@ -984,11 +983,11 @@ list_command (char *arg, int from_tty)
 	printf_filtered ("%s is in %s (%s:%d).\n",
 			 paddress (gdbarch, sal.pc),
 			 SYMBOL_PRINT_NAME (sym),
-			 sal.symtab->filename, sal.line);
+			 symtab_to_filename_for_display (sal.symtab), sal.line);
       else
 	printf_filtered ("%s is at %s:%d.\n",
 			 paddress (gdbarch, sal.pc),
-			 sal.symtab->filename, sal.line);
+			 symtab_to_filename_for_display (sal.symtab), sal.line);
     }
 
   /* If line was not specified by just a line number, and it does not
@@ -1448,7 +1447,8 @@ ambiguous_line_spec (struct symtabs_and_lines *sals)
 
   for (i = 0; i < sals->nelts; ++i)
     printf_filtered (_("file: \"%s\", line number: %d\n"),
-		     sals->sals[i].symtab->filename, sals->sals[i].line);
+		     symtab_to_filename_for_display (sals->sals[i].symtab),
+		     sals->sals[i].line);
 }
 
 /* Sort function for filter_sals.  */
@@ -1843,7 +1843,12 @@ With a /m modifier, source lines are included (if available).\n\
 With a /r modifier, raw instructions in hex are included.\n\
 With a single argument, the function surrounding that address is dumped.\n\
 Two arguments (separated by a comma) are taken as a range of memory to dump,\n\
-  in the form of \"start,end\", or \"start,+length\"."));
+  in the form of \"start,end\", or \"start,+length\".\n\
+\n\
+Note that the address is interpreted as an expression, not as a location\n\
+like in the \"break\" command.\n\
+So, for example, if you want to disassemble function bar in file foo.c\n\
+you must type \"disassemble 'foo.c'::bar\" and not \"disassemble foo.c:bar\"."));
   set_cmd_completer (c, location_completer);
   if (xdb_commands)
     add_com_alias ("va", "disassemble", class_xdb, 0);

@@ -131,7 +131,6 @@ require_partial_symbols (struct objfile *objfile, int verbose)
 static int
 partial_map_expand_apply (struct objfile *objfile,
 			  const char *name,
-			  const char *full_path,
 			  const char *real_path,
 			  struct partial_symtab *pst,
 			  int (*callback) (struct symtab *, void *),
@@ -151,7 +150,7 @@ partial_map_expand_apply (struct objfile *objfile,
      all of them.  */
   psymtab_to_symtab (objfile, pst);
 
-  return iterate_over_some_symtabs (name, full_path, real_path, callback, data,
+  return iterate_over_some_symtabs (name, real_path, callback, data,
 				    objfile->symtabs, last_made);
 }
 
@@ -160,7 +159,6 @@ partial_map_expand_apply (struct objfile *objfile,
 static int
 partial_map_symtabs_matching_filename (struct objfile *objfile,
 				       const char *name,
-				       const char *full_path,
 				       const char *real_path,
 				       int (*callback) (struct symtab *,
 							void *),
@@ -168,7 +166,6 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 {
   struct partial_symtab *pst;
   const char *name_basename = lbasename (name);
-  int is_abs = IS_ABSOLUTE_PATH (name);
 
   ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, pst)
   {
@@ -181,10 +178,9 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
     if (pst->anonymous)
       continue;
 
-    if (FILENAME_CMP (name, pst->filename) == 0
-	|| (!is_abs && compare_filenames_for_search (pst->filename, name)))
+    if (compare_filenames_for_search (pst->filename, name))
       {
-	if (partial_map_expand_apply (objfile, name, full_path, real_path,
+	if (partial_map_expand_apply (objfile, name, real_path,
 				      pst, callback, data))
 	  return 1;
       }
@@ -195,36 +191,22 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 	&& FILENAME_CMP (name_basename, lbasename (pst->filename)) != 0)
       continue;
 
-    /* If the user gave us an absolute path, try to find the file in
-       this symtab and use its absolute path.  */
-    if (full_path != NULL)
+    if (compare_filenames_for_search (psymtab_to_fullname (pst), name))
       {
-	psymtab_to_fullname (pst);
-	if (pst->fullname != NULL
-	    && (FILENAME_CMP (full_path, pst->fullname) == 0
-		|| (!is_abs && compare_filenames_for_search (pst->fullname,
-							     name))))
-	  {
-	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
-					  pst, callback, data))
-	      return 1;
-	  }
+	if (partial_map_expand_apply (objfile, name, real_path,
+				      pst, callback, data))
+	  return 1;
       }
 
+    /* If the user gave us an absolute path, try to find the file in
+       this symtab and use its absolute path.  */
     if (real_path != NULL)
       {
-        char *rp = NULL;
-	psymtab_to_fullname (pst);
-        if (pst->fullname != NULL)
-          {
-            rp = gdb_realpath (pst->fullname);
-            make_cleanup (xfree, rp);
-          }
-	if (rp != NULL
-	    && (FILENAME_CMP (real_path, rp) == 0
-		|| (!is_abs && compare_filenames_for_search (real_path, name))))
+	gdb_assert (IS_ABSOLUTE_PATH (real_path));
+	gdb_assert (IS_ABSOLUTE_PATH (name));
+	if (filename_cmp (psymtab_to_fullname (pst), real_path) == 0)
 	  {
-	    if (partial_map_expand_apply (objfile, name, full_path, real_path,
+	    if (partial_map_expand_apply (objfile, name, real_path,
 					  pst, callback, data))
 	      return 1;
 	  }
@@ -1119,7 +1101,7 @@ expand_partial_symbol_tables (struct objfile *objfile)
 }
 
 static void
-read_psymtabs_with_filename (struct objfile *objfile, const char *filename)
+read_psymtabs_with_fullname (struct objfile *objfile, const char *fullname)
 {
   struct partial_symtab *p;
 
@@ -1129,7 +1111,7 @@ read_psymtabs_with_filename (struct objfile *objfile, const char *filename)
       if (p->anonymous)
 	continue;
 
-      if (filename_cmp (filename, p->filename) == 0)
+      if (filename_cmp (fullname, psymtab_to_fullname (p)) == 0)
 	psymtab_to_symtab (objfile, p);
     }
 }
@@ -1177,28 +1159,39 @@ map_symbol_filenames_psymtab (struct objfile *objfile,
 static const char *
 psymtab_to_fullname (struct partial_symtab *ps)
 {
-  int r;
-
-  if (!ps)
-    return NULL;
-  if (ps->anonymous)
-    return NULL;
+  gdb_assert (!ps->anonymous);
 
   /* Use cached copy if we have it.
      We rely on forget_cached_source_info being called appropriately
      to handle cases like the file being moved.  */
-  if (ps->fullname)
-    return ps->fullname;
-
-  r = find_and_open_source (ps->filename, ps->dirname, &ps->fullname);
-
-  if (r >= 0)
+  if (ps->fullname == NULL)
     {
-      close (r);
-      return ps->fullname;
-    }
+      int fd = find_and_open_source (ps->filename, ps->dirname, &ps->fullname);
 
-  return NULL;
+      if (fd >= 0)
+	close (fd);
+      else
+	{
+	  char *fullname;
+	  struct cleanup *back_to;
+
+	  /* rewrite_source_path would be applied by find_and_open_source, we
+	     should report the pathname where GDB tried to find the file.  */
+
+	  if (ps->dirname == NULL || IS_ABSOLUTE_PATH (ps->filename))
+	    fullname = xstrdup (ps->filename);
+	  else
+	    fullname = concat (ps->dirname, SLASH_STRING, ps->filename, NULL);
+
+	  back_to = make_cleanup (xfree, fullname);
+	  ps->fullname = rewrite_source_path (fullname);
+	  if (ps->fullname == NULL)
+	    ps->fullname = xstrdup (fullname);
+	  do_cleanups (back_to);
+	}
+    } 
+
+  return ps->fullname;
 }
 
 static const char *
@@ -1370,7 +1363,7 @@ recursively_search_psymtabs (struct partial_symtab *ps,
 static void
 expand_symtabs_matching_via_partial
   (struct objfile *objfile,
-   int (*file_matcher) (const char *, void *),
+   int (*file_matcher) (const char *, void *, int basenames),
    int (*name_matcher) (const char *, void *),
    enum search_domain kind,
    void *data)
@@ -1397,7 +1390,13 @@ expand_symtabs_matching_via_partial
 	{
 	  if (ps->anonymous)
 	    continue;
-	  if (! (*file_matcher) (ps->filename, data))
+
+	  /* Before we invoke realpath, which can get expensive when many
+	     files are involved, do a quick comparison of the basenames.  */
+	  if (!(*file_matcher) (ps->filename, data, 0)
+	      && (basenames_may_differ
+		  || (*file_matcher) (lbasename (ps->filename), data, 1))
+	      && !(*file_matcher) (psymtab_to_fullname (ps), data, 0))
 	    continue;
 	}
 
@@ -1424,7 +1423,7 @@ const struct quick_symbol_functions psym_functions =
   relocate_psymtabs,
   read_symtabs_for_function,
   expand_partial_symbol_tables,
-  read_psymtabs_with_filename,
+  read_psymtabs_with_fullname,
   find_symbol_file_from_partial,
   map_matching_symbols_psymtab,
   expand_symtabs_matching_via_partial,

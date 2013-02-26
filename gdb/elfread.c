@@ -556,21 +556,14 @@ elf_symtab_read (struct objfile *objfile, int type,
 
 	  if (msym)
 	    {
-	      /* Pass symbol size field in via BFD.  FIXME!!!  */
-	      elf_symbol_type *elf_sym;
-
 	      /* NOTE: uweigand-20071112: A synthetic symbol does not have an
-		 ELF-private part.  However, in some cases (e.g. synthetic
-		 'dot' symbols on ppc64) the udata.p entry is set to point back
-		 to the original ELF symbol it was derived from.  Get the size
-		 from that symbol.  */
+		 ELF-private part.  */
 	      if (type != ST_SYNTHETIC)
-		elf_sym = (elf_symbol_type *) sym;
-	      else
-		elf_sym = (elf_symbol_type *) sym->udata.p;
-
-	      if (elf_sym)
-		SET_MSYMBOL_SIZE (msym, elf_sym->internal_elf_sym.st_size);
+		{
+		  /* Pass symbol size field in via BFD.  FIXME!!!  */
+		  elf_symbol_type *elf_sym = (elf_symbol_type *) sym;
+		  SET_MSYMBOL_SIZE (msym, elf_sym->internal_elf_sym.st_size);
+		}
 
 	      msym->filename = filesymname;
 	      gdbarch_elf_make_msymbol_special (gdbarch, sym, msym);
@@ -1074,38 +1067,26 @@ elf_gnu_ifunc_resolver_return_stop (struct breakpoint *b)
   update_breakpoint_locations (b, sals, sals_end);
 }
 
-struct build_id
-  {
-    size_t size;
-    gdb_byte data[1];
-  };
-
 /* Locate NT_GNU_BUILD_ID from ABFD and return its content.  */
 
-static struct build_id *
+static const struct elf_build_id *
 build_id_bfd_get (bfd *abfd)
 {
-  struct build_id *retval;
-
   if (!bfd_check_format (abfd, bfd_object)
       || bfd_get_flavour (abfd) != bfd_target_elf_flavour
       || elf_tdata (abfd)->build_id == NULL)
     return NULL;
 
-  retval = xmalloc (sizeof *retval - 1 + elf_tdata (abfd)->build_id_size);
-  retval->size = elf_tdata (abfd)->build_id_size;
-  memcpy (retval->data, elf_tdata (abfd)->build_id, retval->size);
-
-  return retval;
+  return elf_tdata (abfd)->build_id;
 }
 
 /* Return if FILENAME has NT_GNU_BUILD_ID matching the CHECK value.  */
 
 static int
-build_id_verify (const char *filename, struct build_id *check)
+build_id_verify (const char *filename, const struct elf_build_id *check)
 {
   bfd *abfd;
-  struct build_id *found = NULL;
+  const struct elf_build_id *found;
   int retval = 0;
 
   /* We expect to be silent on the non-existing files.  */
@@ -1126,13 +1107,11 @@ build_id_verify (const char *filename, struct build_id *check)
 
   gdb_bfd_unref (abfd);
 
-  xfree (found);
-
   return retval;
 }
 
 static char *
-build_id_to_debug_filename (struct build_id *build_id)
+build_id_to_debug_filename (const struct elf_build_id *build_id)
 {
   char *link, *debugdir, *retval = NULL;
   VEC (char_ptr) *debugdir_vec;
@@ -1152,7 +1131,7 @@ build_id_to_debug_filename (struct build_id *build_id)
   for (ix = 0; VEC_iterate (char_ptr, debugdir_vec, ix, debugdir); ++ix)
     {
       size_t debugdir_len = strlen (debugdir);
-      gdb_byte *data = build_id->data;
+      const gdb_byte *data = build_id->data;
       size_t size = build_id->size;
       char *s;
 
@@ -1191,7 +1170,7 @@ build_id_to_debug_filename (struct build_id *build_id)
 static char *
 find_separate_debug_file_by_buildid (struct objfile *objfile)
 {
-  struct build_id *build_id;
+  const struct elf_build_id *build_id;
 
   build_id = build_id_bfd_get (objfile->obfd);
   if (build_id != NULL)
@@ -1199,7 +1178,6 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
       char *build_id_name;
 
       build_id_name = build_id_to_debug_filename (build_id);
-      xfree (build_id);
       /* Prevent looping on a stripped .debug file.  */
       if (build_id_name != NULL
 	  && filename_cmp (build_id_name, objfile->name) == 0)

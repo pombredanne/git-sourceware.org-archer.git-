@@ -57,6 +57,7 @@
 #include "parser-defs.h"
 #include "user-regs.h"
 #include <ctype.h>
+#include "elf-bfd.h"            /* for elfcore_write_* */
 
 #include "features/rs6000/powerpc-32l.c"
 #include "features/rs6000/powerpc-altivec32l.c"
@@ -1335,6 +1336,9 @@ ppc_linux_init_abi (struct gdbarch_info info,
       set_gdbarch_convert_from_func_ptr_addr
 	(gdbarch, ppc64_convert_from_func_ptr_addr);
 
+      set_gdbarch_elf_make_msymbol_special (gdbarch,
+					    ppc64_elf_make_msymbol_special);
+
       /* Shared library handling.  */
       set_gdbarch_skip_trampoline_code (gdbarch, ppc64_skip_trampoline_code);
       set_solib_svr4_fetch_link_map_offsets
@@ -1368,6 +1372,13 @@ ppc_linux_init_abi (struct gdbarch_info info,
 	set_gdbarch_core_regset_sections (gdbarch,
 					  ppc64_linux_fp_regset_sections);
     }
+
+  /* PPC32 uses a different prpsinfo32 compared to most other Linux
+     archs.  */
+  if (tdep->wordsize == 4)
+    set_gdbarch_elfcore_write_linux_prpsinfo (gdbarch,
+					      elfcore_write_ppc_linux_prpsinfo32);
+
   set_gdbarch_regset_from_core_section (gdbarch,
 					ppc_linux_regset_from_core_section);
   set_gdbarch_core_read_description (gdbarch, ppc_linux_core_read_description);
