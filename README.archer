@@ -1,0 +1,9 @@
+This branch was intended to implement objfile splitting.  The approach
+taken here is obsolete, though.  The new approach is to hang shared
+data off the BFD.
+
+This branch also has some I/T-set support, mostly user-interface code.
+
+This branch isn't very useful, but is kept around until some of the
+above features are resolved, in case any of the code here is still
+useful.
