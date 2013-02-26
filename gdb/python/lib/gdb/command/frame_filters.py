@@ -199,9 +199,9 @@ class InfoFrameFilter(gdb.Command):
            specified by GDB user commands.
         """
 
-        sorted_frame_filters = sorted (frame_filters.items(),
-                                       key=lambda i: _get_priority(i[1]),
-                                       reverse=True)
+        sorted_frame_filters = sorted(frame_filters.items(),
+                                      key=lambda i: _get_priority(i[1]),
+                                      reverse=True)
 
         print "  Priority  Enabled  Name"
         print "  ========  =======  ===="
@@ -261,7 +261,7 @@ def _do_enable_frame_filter(command_tuple, flag):
 
     _set_enabled(ff, flag)
 
-def _complete_frame_filter_list (text, word):
+def _complete_frame_filter_list(text, word):
     """Worker for frame filter dictionary name completion.
 
     Arguments:
@@ -294,7 +294,7 @@ def _complete_frame_filter_list (text, word):
     # dictioanries that the previous filter operation returned.
     return flist
 
-def _complete_frame_filter_name (word, printer_dict):
+def _complete_frame_filter_name(word, printer_dict):
     """Worker for frame filter name completion.
 
     Arguments:
@@ -332,13 +332,13 @@ class EnableFrameFilter(gdb.Command):
     def __init__(self):
         super(EnableFrameFilter, self).__init__("enable frame-filter",
                                                  gdb.COMMAND_DATA)
-    def complete (self,text,word):
+    def complete(self,text,word):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text,word)
         else:
-            printer_list = _return_list (text.split()[0].rstrip())
+            printer_list = _return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
@@ -363,13 +363,13 @@ class DisableFrameFilter(gdb.Command):
         super(DisableFrameFilter, self).__init__("disable frame-filter",
                                                   gdb.COMMAND_DATA)
 
-    def complete (self,text,word):
+    def complete(self,text,word):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text,word)
         else:
-            printer_list = _return_list (text.split()[0].rstrip())
+            printer_list = _return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
@@ -443,13 +443,13 @@ class SetFrameFilterPriority(gdb.Command):
 
         _set_priority(ff, priority)
 
-    def complete (self,text,word):
+    def complete(self,text,word):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text,word)
         else:
-            printer_list = _return_list (text.split()[0].rstrip())
+            printer_list = _return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
@@ -525,14 +525,14 @@ class ShowFrameFilterPriority(gdb.Command):
 
         return _get_priority(ff)
 
-    def complete (self,text,word):
+    def complete(self,text,word):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
 
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text,word)
         else:
-            printer_list = _return_list (text.split()[0].rstrip())
+            printer_list = _return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):

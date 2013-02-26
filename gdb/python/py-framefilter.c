@@ -273,7 +273,7 @@ py_print_value (struct ui_out *out, struct value *val,
 	}
       if (except.reason > 0)
 	{
-	  gdbpy_convert_exception(except);
+	  gdbpy_convert_exception (except);
 	  return PY_BT_ERROR;
 	}
     }
@@ -768,7 +768,7 @@ enumerate_locals (PyObject *iter,
       do_cleanups (cleanups);
     }
 
-  if (! item && PyErr_Occurred())
+  if (! item && PyErr_Occurred ())
     goto error;
 
   return 1;
@@ -1332,14 +1332,16 @@ bootstrap_python_frame_filters (struct frame_info *frame, int
 /*  This is the only publicly exported function in this file.  FRAME
     is the source frame to start frame-filter invocation.  FLAGS is an
     integer holding the flags for printing.  The following elements of
-    the FRAME_FILTER_FLAGS enum denotes makeup of FLAGS: PRINT_LEVEL
-    is a flag indicating whether to print the frame's relative level
-    in the output.  PRINT_FRAME_INFO is a flag that indicates whether
-    this function should print the frame information, PRINT_ARGS is a
-    flag that indicates whether to print frame arguments, and
-    PRINT_LOCALS, likewise, with frame local variables.  ARGS_TYPE is
-    an enumerater describing the argument format, OUT is the output
-    stream to print, and COUNT is a the number of frames to print.  */
+    the FRAME_FILTER_FLAGS enum denotes the make-up of FLAGS:
+    PRINT_LEVEL is a flag indicating whether to print the frame's
+    relative level in the output.  PRINT_FRAME_INFO is a flag that
+    indicates whether this function should print the frame
+    information, PRINT_ARGS is a flag that indicates whether to print
+    frame arguments, and PRINT_LOCALS, likewise, with frame local
+    variables.  ARGS_TYPE is an enumerator describing the argument
+    format, OUT is the output stream to print.  FRAME_LOW is the
+    beginning of the slice of frames to print, and FRAME_HIGH is the
+    upper limit of the frames to count.  */
 
 int apply_frame_filter (struct frame_info *frame, int flags,
 			enum py_frame_args args_type,
