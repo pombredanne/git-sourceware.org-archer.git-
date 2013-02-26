@@ -43,15 +43,19 @@ def _parse_arg(cmd_name, arg):
 
 def _get_priority(filter_item):
     """ Internal worker function to return the frame-filter's priority
-    from a frame filter tuple object.
+    from a frame filter object.  This is a fail free function as it is
+    used in sorting and filtering.  If a badly implemented frame
+    filter does not implement the priority attribute, return zero
+    (otherwise sorting/filtering will fail and prevent other frame
+    filters from executing).
 
     Arguments:
-        filter_item: A tuple, with the first element being the name,
-                     and the second being the frame-filter object.
+        filter_item: An object conforming to the frame filter
+                     interface.
 
     Returns:
         The priority of the frame filter from the "priority"
-        attribute.
+        attribute, or zero.
     """
     # Do not fail here, as the sort will fail.  If a filter has not
     # (incorrectly) set a priority, set it to zero.
@@ -67,17 +71,17 @@ def _set_priority(filter_item, priority):
         filter_item: An object conforming to the frame filter
                      interface.
         priority: The priority to assign as an integer.
-
-    Raises:
-        gdb.GdbError: When the priority attribute has not been
-                      implemented.
     """
 
     filter_item.priority = priority
 
 def _get_enabled(filter_item):
-    """ Internal worker function to return the frame-filter's enabled
-    state.
+    """ Internal worker function to return a filter's enabled state
+    from a frame filter object.  This is a fail free function as it is
+    used in sorting and filtering.  If a badly implemented frame
+    filter does not implement the enabled attribute, return False
+    (otherwise sorting/filtering will fail and prevent other frame
+    filters from executing).
 
     Arguments:
         filter_item: An object conforming to the frame filter
@@ -85,11 +89,7 @@ def _get_enabled(filter_item):
 
     Returns:
         The enabled state of the frame filter from the "enabled"
-        attribute.
-
-    Raises:
-        gdb.GdbError: When the enabled attribute has not been
-                      implemented.
+        attribute, or False.
     """
 
     # If the filter class is badly implemented when called from the
@@ -108,10 +108,6 @@ def _set_enabled(filter_item, state):
         filter_item: An object conforming to the frame filter
                      interface.
         state: True or False, depending on desired state.
-
-    Raises:
-        gdb.GdbError: When the enabled attribute has not been
-                      implemented.
     """
 
     filter_item.enabled = state
@@ -128,8 +124,8 @@ def _get_name(frame_filter):
         The name of the frame filter from the "name" attribute.
 
     Raises:
-        gdb.GdbError: When the name attribute has not been
-                      implemented.
+        AttributeError: When the name attribute has not been
+        implemented.
     """
     return frame_filter.name
 
@@ -199,8 +195,8 @@ class InfoFrameFilter(gdb.Command):
         in a dictionary.
 
         Arguments:
-            frame_filters: The name of the dictionary, as
-                           specified by GDB user commands.
+           frame_filters: The name of the dictionary, as
+           specified by GDB user commands.
         """
 
         sorted_frame_filters = sorted (frame_filters.items(),
@@ -265,8 +261,18 @@ def _do_enable_frame_filter(command_tuple, flag):
 
     _set_enabled(ff, flag)
 
-def _complete_frame_filter_list (text,word):
+def _complete_frame_filter_list (text, word):
+    """Worker for frame filter dictionary name completion.
 
+    Arguments:
+        text: The full text of the command line.
+        word: The most recent word of the command line.
+
+    Returns:
+        A list of suggested frame filter dictionary name completions
+        from text/word analysis.  This list can be empty when there
+        are no suggestions for completion.
+    """
     filter_locations = ["global","progspace"]
     for objfile in gdb.objfiles():
         filter_locations.append(objfile.filename)
@@ -277,6 +283,7 @@ def _complete_frame_filter_list (text,word):
     if (text == ""):
         return filter_locations
 
+    # Otherwise filter on what we know.
     flist = filter(lambda x,y=text:x.startswith(y), filter_locations)
 
     # If we only have one completion, complete it and return it.
@@ -287,9 +294,22 @@ def _complete_frame_filter_list (text,word):
     # dictioanries that the previous filter operation returned.
     return flist
 
-def _complete_frame_filter_name (word, printer_list):
+def _complete_frame_filter_name (word, printer_dict):
+    """Worker for frame filter name completion.
 
-    printer_keys = printer_list.keys()
+    Arguments:
+
+        word: The most recent word of the command line.
+
+        printer_dict: The frame filter dictionary to search for frame
+        filter name completions.
+
+        Returns: A list of suggested frame filter name completions
+        from word analysis of the frame filter dictionary.  This list
+        can be empty when there are no suggestions for completion.
+    """
+
+    printer_keys = printer_dict.keys()
     if (word == ""):
         return printer_keys
 
@@ -313,6 +333,8 @@ class EnableFrameFilter(gdb.Command):
         super(EnableFrameFilter, self).__init__("enable frame-filter",
                                                  gdb.COMMAND_DATA)
     def complete (self,text,word):
+        """Completion function for both frame filter dictionary, and
+        frame filter name."""
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text,word)
         else:
@@ -320,7 +342,6 @@ class EnableFrameFilter(gdb.Command):
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
-        """GDB calls this to perform the command."""
         command_tuple = _parse_arg("enable frame-filter", arg)
         _do_enable_frame_filter(command_tuple, True)
 
@@ -343,6 +364,8 @@ class DisableFrameFilter(gdb.Command):
                                                   gdb.COMMAND_DATA)
 
     def complete (self,text,word):
+        """Completion function for both frame filter dictionary, and
+        frame filter name."""
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text,word)
         else:
@@ -350,7 +373,6 @@ class DisableFrameFilter(gdb.Command):
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
-        """GDB calls this to perform the command."""
         command_tuple = _parse_arg("disable frame-filter", arg)
         _do_enable_frame_filter(command_tuple, False)
 
@@ -399,8 +421,8 @@ class SetFrameFilterPriority(gdb.Command):
 
     def _set_filter_priority(self,command_tuple):
         """Internal worker for setting priority of frame-filters, by
-        parsing a tuple and calling _set_filter_priority_1 with the
-        parsed tuple.
+        parsing a tuple and calling _set_priority with the parsed
+        tuple.
 
         Arguments:
             command_tuple: Tuple which contains the arguments from the
@@ -409,7 +431,7 @@ class SetFrameFilterPriority(gdb.Command):
 
         list_op = command_tuple[0]
         frame_filter = command_tuple[1]
-        priority = command_tuple [2]
+        priority = command_tuple[2]
 
         op_list = _return_list(list_op)
 
@@ -421,8 +443,9 @@ class SetFrameFilterPriority(gdb.Command):
 
         _set_priority(ff, priority)
 
-
     def complete (self,text,word):
+        """Completion function for both frame filter dictionary, and
+        frame filter name."""
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text,word)
         else:
@@ -430,8 +453,6 @@ class SetFrameFilterPriority(gdb.Command):
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
-        """GDB calls this to perform the command."""
-
         command_tuple = self._parse_pri_arg(arg)
         try:
             self._set_filter_priority(command_tuple)
@@ -505,6 +526,9 @@ class ShowFrameFilterPriority(gdb.Command):
         return _get_priority(ff)
 
     def complete (self,text,word):
+        """Completion function for both frame filter dictionary, and
+        frame filter name."""
+
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text,word)
         else:
@@ -512,7 +536,6 @@ class ShowFrameFilterPriority(gdb.Command):
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
-        """GDB calls this to perform the command."""
         try:
             command_tuple = self._parse_pri_arg(arg)
         except gdb.GdbError as e:

@@ -50,16 +50,26 @@ def _sort_list():
     return sorted_frame_filters
 
 def execute_frame_filters(frame, frame_low, frame_high):
-    """ Public internal function that will execute the chain of frame
-    filters.  Each filter is executed in priority order.
+    """ Internal function that will execute the chain of frame
+    filters.  Each filter is executed in priority order.  After the
+    execution completes, slice the iterator to frame_low - frame_high
+    range.
 
     Arguments:
         frame: The initial frame.
 
+        frame_low: The low range of the slice.  If this is a negative
+        integer then it indicates a backward slice (ie bt -4) which
+        counts backward from the last frame in the backtrace.
+
+        frame_high:  The high range of the slice.  If this is a negative
+        integer then it indicates all frames until the end of the
+        stack from frame_low.
+
     Returns:
-        frame_iterator: The iterator after all frame filters have
-                        had a change to execute, or None if no frame
-                        filters are registered.
+        frame_iterator: The sliced iterator after all frame
+        filters have had a change to execute, or None if no frame
+        filters are registered.
     """
 
     # Get a sorted list of frame filters.
@@ -72,7 +82,7 @@ def execute_frame_filters(frame, frame_low, frame_high):
 
     frame_iterator = FrameIterator(frame)
 
-    # Apply base filter to all gdb.Frames.  This unifies the
+    # Apply a basic frame wrapper to all gdb.Frames.  This unifies the
     # interface.
     frame_iterator = itertools.imap(FrameWrapper, frame_iterator)
 
@@ -81,10 +91,12 @@ def execute_frame_filters(frame, frame_low, frame_high):
 
     # Slicing
 
-    # Is this a relative offset, ie bt -2?
+    # Is this a slice from the end of the backtrace, ie bt -2?
     if frame_low < 0:
         count = 0
         slice_length = abs(frame_low)
+        # We cannot use MAXLEN argument for deque as it is 2.6 onwards
+        # and some GDB versions might be < 2.6.
         sliced = collections.deque()
 
         for frame_item in frame_iterator:
@@ -95,13 +107,14 @@ def execute_frame_filters(frame, frame_low, frame_high):
 
         return iter(sliced)
 
-    # -1 for frame_high means until the end of the stack frame, and
-    # None means to the end of the iterator to islice.
+    # -1 for frame_high means until the end of the backtrace.  Set to
+    # None if that is the case, to indicate to itertools.islice to
+    # slice to the end of the iterator.
     if frame_high == -1:
         frame_high = None
     else:
         # The end argument for islice is a count, not a position, so
-        # add one as frames start as zero.
+        # add one as frames start at zero.
         frame_high = frame_high + 1;
 
     sliced = itertools.islice(frame_iterator, frame_low, frame_high)
