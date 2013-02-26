@@ -1655,7 +1655,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
   int count;
   int i;
   struct frame_info *trailing;
-  int trailing_level;
+  int trailing_level, py_start = 0, py_end = 0;
   int result = 0;
 
   if (!target_has_stack)
@@ -1675,6 +1675,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
 	{
 	  struct frame_info *current;
 
+	  py_start = count;
 	  count = -count;
 
 	  current = trailing;
@@ -1696,9 +1697,17 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
 
 	  count = -1;
 	}
+      else
+	{
+	  py_start = 0;
+	  py_end = count;
+	}
     }
   else
-    count = -1;
+    {
+      py_end = -1;
+      count = -1;
+    }
 
   if (info_verbose)
     {
@@ -1722,7 +1731,6 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
     {
       int flags = PRINT_LEVEL | PRINT_FRAME_INFO | PRINT_ARGS;
       enum py_frame_args arg_type;
-
       if (show_locals)
 	flags |= PRINT_LOCALS;
 
@@ -1733,8 +1741,8 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
       else
 	arg_type = CLI_NO_VALUES;
 
-      result = apply_frame_filter (trailing, flags, arg_type,
-				   current_uiout, count);
+      result = apply_frame_filter (get_current_frame (), flags, arg_type,
+				   current_uiout, py_start, py_end);
 
     }
   /* Run the inbuilt backtrace if there are no filters registered, or

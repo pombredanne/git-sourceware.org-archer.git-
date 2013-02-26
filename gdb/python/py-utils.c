@@ -57,12 +57,7 @@ py_xdecref (void *p)
 {
   PyObject *py = p;
 
-  /* Note that we need the extra braces in this 'if' to avoid a
-     warning from gcc.  */
-  if (py)
-    {
-      Py_XDECREF (py);
-    }
+  Py_XDECREF (py);
 }
 
 /* Return a new cleanup which will decrement the Python object's
@@ -72,7 +67,7 @@ py_xdecref (void *p)
 struct cleanup *
 make_cleanup_py_xdecref (PyObject *py)
 {
-  return make_cleanup (py_xdecref, (void *) py);
+  return make_cleanup (py_xdecref, py);
 }
 
 /* Converts a Python 8-bit string to a unicode string object.  Assumes the

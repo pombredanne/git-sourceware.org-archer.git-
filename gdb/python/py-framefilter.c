@@ -61,7 +61,7 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
   PyObject *result = PyObject_CallMethod (obj, "symbol", NULL);
   
   if (! result)
-    return 0;
+    return PY_BT_ERROR;
   
   /* For 'symbol' callback, the function can return a symbol or a
      string.  */
@@ -71,7 +71,7 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
       Py_DECREF (result);
       
       if (! *name)
-	return 0;
+	return PY_BT_ERROR;
       *language = python_language;
       *sym = NULL;
     }
@@ -88,7 +88,7 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
 	  PyErr_SetString (PyExc_RuntimeError,
 			   _("Unexpected value.  Expecting a "
 			     "gdb.Symbol or a Python string."));
-	  return 0;
+	  return PY_BT_ERROR;
 	}
       
       /* Duplicate the symbol name, so the caller has consistency
@@ -121,7 +121,7 @@ extract_value (PyObject *obj, struct value **value)
       PyObject *vresult = PyObject_CallMethod (obj, "value", NULL);
 
       if (! vresult)
-	return 0;
+	return PY_BT_ERROR;
 
       /* The Python code has returned 'None' for a value, so we set
 	 value to NULL.  This flags that GDB should read the
@@ -138,7 +138,7 @@ extract_value (PyObject *obj, struct value **value)
 	  Py_DECREF (vresult);
 
 	  if (*value == NULL)
-	    return 0;
+	    return PY_BT_ERROR;
 
 	  return 1;
 	}
@@ -212,7 +212,7 @@ py_print_type (struct ui_out *out, struct value *val)
   if (except.reason > 0)
     {
       gdbpy_convert_exception (except);
-      return 0;
+      return PY_BT_ERROR;
     }
   
   return 1;
@@ -221,10 +221,9 @@ py_print_type (struct ui_out *out, struct value *val)
 /* Helper function which outputs a value's name to an output field in
    a stream.  OUT is the ui-out structure the value will be output to,
    VAL is the value that will be printed, OPTS contains the value
-   printing options, MI_PRINT_TYPE is the value delimiter for MI
-   output and LANGUAGE is the language_defn that the value will be
-   printed with.  If the output is detected to be non-MI,
-   MI_PRINT_TYPE is ignored.  Returns 0 on error, with any GDB
+   printing options, ARGS_TYPE is an enumerater describing the
+   argument format, and LANGUAGE is the language_defn that the value
+   will be printed with.  Returns PY_BT_ERROR on error, with any GDB
    exceptions converted to a Python exception.  */
 
 static int
@@ -273,7 +272,7 @@ py_print_value (struct ui_out *out, struct value *val,
       if (except.reason > 0)
 	{
 	  gdbpy_convert_exception(except);
-	  return 0;
+	  return PY_BT_ERROR;
 	}
     }
 
@@ -338,7 +337,7 @@ py_print_single_arg (struct ui_out *out,
 {
   struct value *val;
   volatile struct gdb_exception except;
-  struct cleanup *inner_cleanup =
+  struct cleanup *cleanups =
     make_cleanup (null_cleanup, NULL);
 
   if (fa)
@@ -351,9 +350,12 @@ py_print_single_arg (struct ui_out *out,
 
   /*  MI has varying rules for tuples, but generally if there is only
       one element in each item in the list, do not start a tuple.  */
-    if (print_args_field || args_type != MI_PRINT_NO_VALUES)
-      make_cleanup_ui_out_tuple_begin_end (out, NULL);
-    
+  if (ui_out_is_mi_like_p (out))
+    {
+      if (print_args_field || args_type != MI_PRINT_NO_VALUES)
+	make_cleanup_ui_out_tuple_begin_end (out, NULL);
+    }
+
     TRY_CATCH (except, RETURN_MASK_ALL)
       {
 	annotate_arg_begin ();
@@ -446,13 +448,13 @@ py_print_single_arg (struct ui_out *out,
 	}
     }
 
-  do_cleanups (inner_cleanup);
+  do_cleanups (cleanups);
 
   return 1;
 
  error:
-  do_cleanups (inner_cleanup);
-  return 0;
+  do_cleanups (cleanups);
+  return PY_BT_ERROR;
 }
 
 /* Helper function to loop over frame arguments provided by the
@@ -462,8 +464,7 @@ py_print_single_arg (struct ui_out *out,
    enumerater describing the argument format, PRINT_ARGS_FIELD is a
    flag which indicates if we output "ARGS=1" in MI output in commands
    where both arguments and locals are printed, and FRAME is the
-   backing frame.  If (all) the frame argument values are provided via
-   the "value" API call, FRAME is not needed.  */
+   backing frame.  */
 
 static int
 enumerate_args (PyObject *iter,
@@ -502,7 +503,7 @@ enumerate_args (PyObject *iter,
       char *sym_name;
       struct symbol *sym;
       struct value *val;
-      int success = 0;
+      int success = PY_BT_ERROR;
       volatile struct gdb_exception except;
 
       success = extract_sym (item, &sym_name, &sym, &language);
@@ -627,19 +628,18 @@ enumerate_args (PyObject *iter,
   return 1;
 
  error:
-  return 0;
+  return PY_BT_ERROR;
 }
 
 
 /* Helper function to loop over variables provided by the
    "frame_locals" Python API.  Elements in the iterator must conform
    to the "Symbol Value" interface.  ITER is the Python iterator
-   object, OUT is the output stream, MI_PRINT_TYPE is an enumerator to
-   the value types that will be printed if the output is MI,
-   PRINT_MI_ARGS_FLAG indicates whether to output the ARGS field in MI
-   output, and FRAME is the backing frame.  If (all) of the variables
-   values are provided via the "value" API call, FRAME is not
-   needed.  */
+   object, OUT is the output stream, INDENT is whether we should
+   indent the output (for CLI), ARGS_TYPE is an enumerater describing
+   the argument format, PRINT_ARGS_FIELD is flag which indicates
+   whether to output the ARGS field in the case of
+   -stack-list-variables and FRAME is the backing frame.  */
 
 static int
 enumerate_locals (PyObject *iter,
@@ -651,6 +651,8 @@ enumerate_locals (PyObject *iter,
 {
   PyObject *item;
   struct value_print_options opts;
+  struct cleanup *cleanups =
+    make_cleanup (null_cleanup, NULL);
 
   get_user_print_options (&opts);
   opts.deref_ref = 1;
@@ -660,12 +662,10 @@ enumerate_locals (PyObject *iter,
       const struct language_defn *language;
       char *sym_name;
       struct value *val;
-      int success = 0;
+      int success = PY_BT_ERROR;
       struct symbol *sym;
       volatile struct gdb_exception except;
-      struct cleanup *inner_cleanup =
-	make_cleanup (null_cleanup, NULL);
-
+    
       success = extract_sym (item, &sym_name, &sym, &language);
       if (! success)
 	{
@@ -704,12 +704,12 @@ enumerate_locals (PyObject *iter,
       /* With PRINT_NO_VALUES, MI does not emit a tuple normally as
 	 each output contains only one field.  The exception is
 	 -stack-list-variables, which always provides a tuple.  */
-      if (print_args_field || args_type != MI_PRINT_NO_VALUES)
-	    {
-	      inner_cleanup =
-		make_cleanup_ui_out_tuple_begin_end (out,
-						     NULL);
-	    }
+
+      if (ui_out_is_mi_like_p (out))
+	{
+	  if (print_args_field || args_type != MI_PRINT_NO_VALUES)
+	    make_cleanup_ui_out_tuple_begin_end (out, NULL);
+	}
       else
 	{
 	  TRY_CATCH (except, RETURN_MASK_ALL)
@@ -761,16 +761,17 @@ enumerate_locals (PyObject *iter,
 	  gdbpy_convert_exception (except);
 	  goto error;
 	}
+      do_cleanups (cleanups);
     }
 
   if (! item && PyErr_Occurred())
     goto error;
 
- done:
   return 1;
 
  error:
-  return 0;
+  do_cleanups (cleanups);
+  return PY_BT_ERROR;
 }
 
 /*  Helper function for -stack-list-variables.  */
@@ -810,7 +811,7 @@ py_mi_print_variables (PyObject *filter, struct ui_out *out,
 
  error:
   do_cleanups (old_chain);
-  return 0;
+  return PY_BT_ERROR;
 }
 
 /* Helper function for printing locals.  This function largely just
@@ -841,7 +842,7 @@ py_print_locals (PyObject *filter,
 
  locals_error:
   do_cleanups (old_chain);
-  return 0;
+  return PY_BT_ERROR;
 }
 
 /* Helper function for printing frame arguments.  This function
@@ -881,7 +882,7 @@ py_print_args (PyObject *filter,
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
       if (! ui_out_is_mi_like_p (out))
-	ui_out_text (out, " )");
+	ui_out_text (out, ")");
     }
   if (except.reason > 0)
     {
@@ -894,7 +895,7 @@ py_print_args (PyObject *filter,
 
  args_error:
   do_cleanups (old_chain);
-  return 0;
+  return PY_BT_ERROR;
 }
 
 /*  Print a single frame to the designated output stream, detecting
@@ -1266,69 +1267,90 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
    frame FRAME.  */
 
 static PyObject *
-bootstrap_python_frame_filters (struct frame_info *frame)
+bootstrap_python_frame_filters (struct frame_info *frame, int
+				frame_low, int frame_high)
+  
 {
-
-  PyObject *module, *sort_func, *iterable, *frame_obj;
+  struct cleanup *cleanups =
+    make_cleanup (null_cleanup, NULL);
+  PyObject *module, *sort_func, *iterable, *frame_obj, *iterator,
+    *py_frame_low, *py_frame_high;
 
   frame_obj = frame_info_to_frame_object (frame);
   if (! frame_obj)
     return NULL;
+  make_cleanup_py_decref (frame_obj);
 
-  module = PyImport_ImportModule ("gdb.command.frame_filters");
+  module = PyImport_ImportModule ("gdb.frames");
   if (! module)
-    {
-      Py_DECREF (frame_obj);
-      return NULL;
-    }
-
-  sort_func = PyObject_GetAttrString (module, "invoke");
+    goto error;
+  make_cleanup_py_decref (module);
+  
+  sort_func = PyObject_GetAttrString (module, "execute_frame_filters");
   if (! sort_func)
-    {
-      Py_DECREF (frame_obj);
-      Py_DECREF (module);
-      return NULL;
-    }
+    goto error;
+  make_cleanup_py_decref (sort_func);
 
-  iterable = PyObject_CallFunctionObjArgs (sort_func, frame_obj, NULL);
+  py_frame_low = PyInt_FromLong (frame_low);
+  if (! py_frame_low)
+    goto error;
+  make_cleanup_py_decref (py_frame_low);
 
-  Py_DECREF (module);
-  Py_DECREF (sort_func);
-  Py_DECREF (frame_obj);
+  py_frame_high = PyInt_FromLong (frame_high);
+  if (! py_frame_high)
+    goto error;
+  make_cleanup_py_decref (py_frame_high);
+
+  iterable = PyObject_CallFunctionObjArgs (sort_func, frame_obj,
+					   py_frame_low,
+					   py_frame_high,
+					   NULL);
+
+  do_cleanups (cleanups);
 
   if (! iterable)
     return NULL;
 
-  return iterable;
+  if (iterable != Py_None)
+    {
+      iterator = PyObject_GetIter (iterable);
+      Py_DECREF (iterable);
+    }
+  else
+    Py_RETURN_NONE;
+  
+  return iterator;
+
+ error:
+  do_cleanups (cleanups);
+  return NULL;
 }
 
-/*  Public and dispatch function for frame filters.  This is the only
-    publicly exported function in this file.  FRAME is the source
-    frame to start frame-filter invocation.  FLAGS is an integer
-    holding the flags for printing.  The following elements of the
-    FRAME_FILTER_FLAGS enum denotes makeup of FLAGS: PRINT_LEVEL is a
-    flag indicating whether to print the frame's relative level in the
-    output.  PRINT_FRAME_INFO is a flag that indicates whether this
-    function should print the frame information, PRINT_ARGS is a flag
-    that indicates whether to print frame arguments, and PRINT_LOCALS,
-    likewise, with frame local variables.  MI_PRINT_ARGS_TYPE is an
-    enum from MI that indicates which values types to print.  This
-    parameter is ignored if the output is detected to be CLI.
-    CLI_PRINT_FRAME_ARGS_TYPE likewise is a an element of what value
-    types to print from CLI.  OUT is the output stream to print, and
-    COUNT is a delimiter (required for MI slices).  */
+/*  This is the only publicly exported function in this file.  FRAME
+    is the source frame to start frame-filter invocation.  FLAGS is an
+    integer holding the flags for printing.  The following elements of
+    the FRAME_FILTER_FLAGS enum denotes makeup of FLAGS: PRINT_LEVEL
+    is a flag indicating whether to print the frame's relative level
+    in the output.  PRINT_FRAME_INFO is a flag that indicates whether
+    this function should print the frame information, PRINT_ARGS is a
+    flag that indicates whether to print frame arguments, and
+    PRINT_LOCALS, likewise, with frame local variables.  ARGS_TYPE is
+    an enumerater describing the argument format, OUT is the output
+    stream to print, and COUNT is a the number of frames to print.  */
 
 int apply_frame_filter (struct frame_info *frame, int flags,
 			enum py_frame_args args_type,
-			struct ui_out *out, int count)
+			struct ui_out *out, int frame_low, 
+			int frame_high)
+
 {
   struct gdbarch *gdbarch = NULL;
   struct cleanup *cleanups;
-  int result = 0;
-  int print_result = 0;
   int success = PY_BT_ERROR;
   PyObject *iterable;
   volatile struct gdb_exception except;
+  PyObject *item;
+  htab_t levels_printed;
 
   cleanups = ensure_python_env (gdbarch, current_language);
 
@@ -1339,65 +1361,49 @@ int apply_frame_filter (struct frame_info *frame, int flags,
   if (except.reason > 0)
     {
       gdbpy_convert_exception (except);
-      goto done;
+      goto error;
     }
 
-  iterable = bootstrap_python_frame_filters (frame);
+  iterable = bootstrap_python_frame_filters (frame, frame_low, frame_high);
 
-  if (!iterable)
-    goto done;
+  if (! iterable)
+    goto error;
 
-  /*  If iterable is None, then there are not any frame filters
-      registered.  If this is the case, defer to default GDB printing
-      routines in MI and CLI.  */
-
+  /* If iterable is None, then there are no frame filters registered.
+     If this is the case, defer to default GDB printing routines in MI
+     and CLI.  */
   make_cleanup_py_decref (iterable);
   if (iterable == Py_None)
     {
-      do_cleanups (cleanups);
-      return PY_BT_NO_FILTERS;
+      success = PY_BT_NO_FILTERS;
+      goto done;
     }
 
-  /* Is it an iterator */
-  if PyIter_Check (iterable)
+  levels_printed = htab_create (20,
+				htab_hash_pointer,
+				htab_eq_pointer,
+				NULL);
+  make_cleanup_htab_delete (levels_printed);
+
+  while ((item = PyIter_Next (iterable)))
     {
-      PyObject *iterator = PyObject_GetIter (iterable);
-      PyObject *item;
-      htab_t levels_printed;
+      success = py_print_frame (item, flags, args_type, out, 0,
+				levels_printed);
+      
+      /* Do not exit on error printing a single frame.  Print the
+	 error and continue with other frames.  */
+      if (success == PY_BT_ERROR)
+	gdbpy_print_stack ();
 
-      if (! iterator)
-	goto done;
-
-      make_cleanup_py_decref (iterator);
-      levels_printed = htab_create (20,
-				    htab_hash_pointer,
-				    htab_eq_pointer,
-				    NULL);
-
-      while ((item = PyIter_Next (iterator)) && count--)
-	{
-	  success =  py_print_frame (item, flags, args_type, out, 0,
-				     levels_printed);
-
-	  /* Do not exit on error printing the frame, continue with
-	     other frames.  */
-	  if (success == PY_BT_ERROR && PyErr_Occurred ())
-	    gdbpy_print_stack ();
-
-	  Py_DECREF (item);
-	}
-
-      htab_delete (levels_printed);
-    }
-  else
-    {
-      Py_DECREF (iterable);
-      error (_("Frame filter must support iteration protocol."));
+      Py_DECREF (item);
     }
 
  done:
-  if (PyErr_Occurred ())
-    gdbpy_print_stack ();
   do_cleanups (cleanups);
   return success;
+  
+ error:
+  gdbpy_print_stack ();
+  do_cleanups (cleanups);
+  return PY_BT_ERROR;
 }

@@ -87,7 +87,6 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
       self->frame_filters = PyDict_New ();
       if (!self->frame_filters)
 	{
-	  Py_DECREF (self->printers);
 	  Py_DECREF (self);
 	  return NULL;
 	}
@@ -95,14 +94,13 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
       self->type_printers = PyList_New (0);
       if (!self->type_printers)
 	{
-	  Py_DECREF (self->printers);
-	  Py_DECREF (self->frame_filters);
 	  Py_DECREF (self);
 	  return NULL;
 	}
     }
   return (PyObject *) self;
 }
+
 
 PyObject *
 objfpy_get_printers (PyObject *o, void *ignore)
@@ -142,6 +140,8 @@ objfpy_set_printers (PyObject *o, PyObject *value, void *ignore)
   return 0;
 }
 
+/* Return the Python dictionary attribute containing frame filters for
+   this object file.  */
 PyObject *
 objfpy_get_frame_filters (PyObject *o, void *ignore)
 {
@@ -151,6 +151,7 @@ objfpy_get_frame_filters (PyObject *o, void *ignore)
   return self->frame_filters;
 }
 
+/* Set this object file's frame filters dictionary to FILTERS.  */
 static int
 objfpy_set_frame_filters (PyObject *o, PyObject *filters, void *ignore)
 {
@@ -279,7 +280,6 @@ objfile_to_objfile_object (struct objfile *objfile)
 	  object->frame_filters = PyDict_New ();
 	  if (!object->frame_filters)
 	    {
-	      Py_DECREF (object->printers);
 	      Py_DECREF (object);
 	      return NULL;
 	    }
@@ -287,8 +287,6 @@ objfile_to_objfile_object (struct objfile *objfile)
 	  object->type_printers = PyList_New (0);
 	  if (!object->type_printers)
 	    {
-	      Py_DECREF (object->printers);
-	      Py_DECREF (object->frame_filters);
 	      Py_DECREF (object);
 	      return NULL;
 	    }

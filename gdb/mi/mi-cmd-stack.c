@@ -133,14 +133,18 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
 
   if (! raw_arg && frame_filters)
     {
-      int count = frame_high;
       int flags = PRINT_LEVEL | PRINT_FRAME_INFO;
+      int py_frame_low = frame_low;
 
-      if (frame_high != -1)
-	count = (frame_high - frame_low) + 1;
+      /* We cannot pass -1 to frame_low, as that would signify a
+      relative backtrace from the tail of the stack.  So, in the case
+      of frame_low == -1, assign and increment it.  */
+      if (py_frame_low == -1)
+	py_frame_low++;
 
-      result = apply_frame_filter (fi, flags, NO_VALUES,  current_uiout,
-				   count);
+      result = apply_frame_filter (get_current_frame (), flags,
+				   NO_VALUES,  current_uiout,
+				   py_frame_low, frame_high);
     }
 
   /* Run the inbuilt backtrace if there are no filters registered, or
@@ -236,7 +240,7 @@ mi_cmd_stack_list_locals (char *command, char **argv, int argc)
        int flags = PRINT_LEVEL | PRINT_LOCALS;
 
        result = apply_frame_filter (frame, flags, print_value,
-				    current_uiout, 1);
+				    current_uiout, 0,0);
      }
 
    if (! frame_filters || raw_arg || result == PY_BT_ERROR
@@ -300,14 +304,18 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
 
   if (! raw_arg && frame_filters)
     {
-      int count = frame_high;
       int flags = PRINT_LEVEL | PRINT_ARGS;
+      int py_frame_low = frame_low;
 
-      if (frame_high != -1)
-	count = (frame_high - frame_low) + 1;
+      /* We cannot pass -1 to frame_low, as that would signify a
+      relative backtrace from the tail of the stack.  So, in the case
+      of frame_low == -1, assign and increment it.  */
+      if (py_frame_low == -1)
+	py_frame_low++;
 
-      result = apply_frame_filter (fi, flags, print_values,
-				   current_uiout, count);
+      result = apply_frame_filter (get_current_frame (), flags,
+				   print_values, current_uiout,
+				   py_frame_low, frame_high);
     }
 
   if (! frame_filters || raw_arg || result == PY_BT_ERROR
@@ -350,7 +358,7 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
 
   if (argc < 1 || argc > 2 || (argc == 2 && ! raw_arg)
       || (argc == 1 && raw_arg))
-    error (_("-stack-list-arguments: Usage: " \
+    error (_("-stack-list-variables: Usage: " \
 	     "[--no-frame-filters] PRINT_VALUES"));
 
    frame = get_selected_frame (NULL);
@@ -361,7 +369,7 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
        int flags = PRINT_LEVEL | PRINT_ARGS | PRINT_LOCALS;
 
        result = apply_frame_filter (frame, flags, print_value,
-				    current_uiout, 1);
+				    current_uiout, 0, 0);
      }
 
    if (! frame_filters || raw_arg || result == PY_BT_ERROR

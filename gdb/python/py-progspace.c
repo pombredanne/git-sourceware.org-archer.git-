@@ -95,7 +95,6 @@ pspy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
       self->frame_filters = PyDict_New ();
       if (!self->frame_filters)
 	{
-	  Py_DECREF (self->printers);
 	  Py_DECREF (self);
 	  return NULL;
 	}
@@ -103,8 +102,6 @@ pspy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
       self->type_printers = PyList_New (0);
       if (!self->type_printers)
 	{
-	  Py_DECREF (self->printers);
-	  Py_DECREF (self->frame_filters);
 	  Py_DECREF (self);
 	  return NULL;
 	}
@@ -150,6 +147,8 @@ pspy_set_printers (PyObject *o, PyObject *value, void *ignore)
   return 0;
 }
 
+/* Return the Python dictionary attribute containing frame filters for
+   this program space.  */
 PyObject *
 pspy_get_frame_filters (PyObject *o, void *ignore)
 {
@@ -159,6 +158,7 @@ pspy_get_frame_filters (PyObject *o, void *ignore)
   return self->frame_filters;
 }
 
+/* Set this object file's frame filters dictionary to FILTERS.  */
 static int
 pspy_set_frame_filters (PyObject *o, PyObject *frame, void *ignore)
 {
@@ -275,7 +275,6 @@ pspace_to_pspace_object (struct program_space *pspace)
 	  object->frame_filters = PyDict_New ();
 	  if (!object->frame_filters)
 	    {
-	      Py_DECREF (object->printers);
 	      Py_DECREF (object);
 	      return NULL;
 	    }
@@ -283,12 +282,9 @@ pspace_to_pspace_object (struct program_space *pspace)
 	  object->type_printers = PyList_New (0);
 	  if (!object->type_printers)
 	    {
-	      Py_DECREF (object->printers);
-	      Py_DECREF (object->frame_filters);
 	      Py_DECREF (object);
 	      return NULL;
 	    }
-
 
 	  set_program_space_data (pspace, pspy_pspace_data_key, object);
 	}
