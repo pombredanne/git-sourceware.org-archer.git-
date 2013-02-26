@@ -1,0 +1,5 @@
+This branch is yet another approach to objfile splitting.  Many of the
+patches here are obsoleted by the obj_section removal series, but a
+few of the remaining changes are probably still useful (with some
+modification).  This branch isn't directly useful but is kept around
+in case the patches can be reused.
