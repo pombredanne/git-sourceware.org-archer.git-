@@ -94,7 +94,7 @@ def execute_frame_filters(frame, frame_low, frame_high):
             sliced.append(frame_item)
 
         return iter(sliced)
-            
+
     # -1 for frame_high means until the end of the stack frame, and
     # None means to the end of the iterator to islice.
     if frame_high == -1:
@@ -103,8 +103,7 @@ def execute_frame_filters(frame, frame_low, frame_high):
         # The end argument for islice is a count, not a position, so
         # add one as frames start as zero.
         frame_high = frame_high + 1;
-    
-        
-    sliced = itertools.islice(frame_iterator, frame_low, frame_high) 
+
+    sliced = itertools.islice(frame_iterator, frame_low, frame_high)
 
     return sliced

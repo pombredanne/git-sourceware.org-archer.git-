@@ -67,11 +67,11 @@ typedef enum py_frame_args
   /* Print no values for arguments when invoked from the CLI.  */
   CLI_NO_VALUES,
 
-  /* Print only scalar values for arguments when invoked from the 
+  /* Print only scalar values for arguments when invoked from the
      CLI. */
   CLI_SCALAR_VALUES,
 
-  /* Print all values for arguments when invoked from the 
+  /* Print all values for arguments when invoked from the
      CLI. */
   CLI_ALL_VALUES,
 
@@ -94,7 +94,7 @@ int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 
 int apply_frame_filter (struct frame_info *frame, int flags,
 			enum py_frame_args args_type,
-			struct ui_out *out, int frame_low, 
+			struct ui_out *out, int frame_low,
 			int frame_high);
 
 void preserve_python_values (struct objfile *objfile, htab_t copied_types);

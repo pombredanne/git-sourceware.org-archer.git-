@@ -28,7 +28,6 @@
 #include "valprint.h"
 #include "annotate.h"
 #include "hashtab.h"
-#include "mi/mi-cmds.h"
 #include "demangle.h"
 #include "mi/mi-cmds.h"
 #include "python-internal.h"
@@ -40,6 +39,7 @@ typedef enum mi_print_types
   MI_PRINT_ARGS,
   MI_PRINT_LOCALS
 } mi_print_types;
+
 
 /* Helper function to extract a symbol, name and language definition
    from a Python object that conforms to the "Symbol Value" interface.
@@ -59,17 +59,17 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
 	     const struct language_defn **language)
 {
   PyObject *result = PyObject_CallMethod (obj, "symbol", NULL);
-  
+
   if (! result)
     return PY_BT_ERROR;
-  
+
   /* For 'symbol' callback, the function can return a symbol or a
      string.  */
   if (PyString_Check (result))
     {
       *name = python_string_to_host_string (result);
       Py_DECREF (result);
-      
+
       if (! *name)
 	return PY_BT_ERROR;
       *language = python_language;
@@ -80,9 +80,9 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
       /* This type checks 'result' during the conversion so we
 	 just call it unconditionally and check the return.  */
       *sym = symbol_object_to_symbol (result);
-      
+
       Py_DECREF (result);
-      
+
       if (! *sym)
 	{
 	  PyErr_SetString (PyExc_RuntimeError,
@@ -90,11 +90,11 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
 			     "gdb.Symbol or a Python string."));
 	  return PY_BT_ERROR;
 	}
-      
+
       /* Duplicate the symbol name, so the caller has consistency
 	 in garbage collection.  */
       *name = xstrdup (SYMBOL_PRINT_NAME (*sym));
-      
+
       if (language_mode == language_mode_auto)
 	*language = language_def (SYMBOL_LANGUAGE (*sym));
       else
@@ -178,7 +178,7 @@ mi_should_print (struct symbol *sym, enum mi_print_types type)
       if (type == MI_PRINT_ALL)
 	print_me = 1;
       else if (type == MI_PRINT_LOCALS)
-	print_me = !SYMBOL_IS_ARGUMENT (sym);
+	print_me = ! SYMBOL_IS_ARGUMENT (sym);
       else
 	print_me = SYMBOL_IS_ARGUMENT (sym);
     }
@@ -214,7 +214,7 @@ py_print_type (struct ui_out *out, struct value *val)
       gdbpy_convert_exception (except);
       return PY_BT_ERROR;
     }
-  
+
   return 1;
 }
 
@@ -237,7 +237,9 @@ py_print_value (struct ui_out *out, struct value *val,
   /* MI does not print certain values, differentiated by type,
      depending on what MI_PRINT_TYPE indicates.  Test
      type against option.  For CLI print all values.  */
-  if (args_type == MI_PRINT_SIMPLE_VALUES || args_type == MI_PRINT_ALL_VALUES)
+  if (args_type == MI_PRINT_SIMPLE_VALUES
+      || args_type == MI_PRINT_ALL_VALUES)
+
     {
       struct type *type;
 
@@ -291,7 +293,7 @@ get_py_iter_from_func (PyObject *filter, char *func)
 {
   PyObject *result = PyObject_CallMethod (filter, func, NULL);
 
-  if (result)    
+  if (result)
     {
       if (result == Py_None)
 	{
@@ -301,9 +303,8 @@ get_py_iter_from_func (PyObject *filter, char *func)
       else
 	{
 	  PyObject *iterator = PyObject_GetIter (result);
-      
+
 	  Py_DECREF (result);
-      
 	  return iterator;
 	}
     }
@@ -349,7 +350,11 @@ py_print_single_arg (struct ui_out *out,
     val = fv;
 
   /*  MI has varying rules for tuples, but generally if there is only
-      one element in each item in the list, do not start a tuple.  */
+      one element in each item in the list, do not start a tuple.  The
+      exception is -stack-list-variables which emits an ARGS="1" field
+      if the value is a frame argument.  This is denoted in this
+      function with PRINT_ARGS_FIELD which is flag from the caller to
+      emit the ARGS field.  */
   if (ui_out_is_mi_like_p (out))
     {
       if (print_args_field || args_type != MI_PRINT_NO_VALUES)
@@ -359,13 +364,13 @@ py_print_single_arg (struct ui_out *out,
     TRY_CATCH (except, RETURN_MASK_ALL)
       {
 	annotate_arg_begin ();
-	
+
 	/* If frame argument is populated, check for entry-values and the
 	   entry value options.  */
 	if (fa)
 	  {
 	    struct ui_file *stb;
-	    
+
 	    stb = mem_fileopen ();
 	    make_cleanup_ui_file_delete (stb);
 	    fprintf_symbol_filtered (stb, SYMBOL_PRINT_NAME (fa->sym),
@@ -391,10 +396,10 @@ py_print_single_arg (struct ui_out *out,
 	  ui_out_field_string (out, "name", sym_name);
 
 	annotate_arg_name_end ();
-	
+
 	if (! ui_out_is_mi_like_p (out))
 	  ui_out_text (out, "=");
-	
+
 	if (print_args_field)
 	  ui_out_field_int (out, "arg", 1);
       }
@@ -404,7 +409,9 @@ py_print_single_arg (struct ui_out *out,
 	goto error;
       }
 
-  /* For MI print the type, but only for simple values.  */
+  /* For MI print the type, but only for simple values.  This seems
+     weird, but this is how MI choose to format the various output
+     types.  */
   if (args_type == MI_PRINT_SIMPLE_VALUES)
     {
       if (! py_print_type (out, val))
@@ -420,10 +427,9 @@ py_print_single_arg (struct ui_out *out,
       gdbpy_convert_exception (except);
       goto error;
     }
-  
 
-    /* If the output is to the CLI, and the user option set print
-     frame-arguments is set to none, just output "...".  */
+  /* If the output is to the CLI, and the user option "set print
+     frame-arguments" is set to none, just output "...".  */
   if (args_type == CLI_NO_VALUES)
     {
       TRY_CATCH (except, RETURN_MASK_ALL)
@@ -438,9 +444,8 @@ py_print_single_arg (struct ui_out *out,
     }
   else
     {
-      /* If CLI, and the first if condition above not true always
-	 print values.  For MI do not print values if the enumerator
-	 is PRINT_NO_VALUES.  */
+      /* Otherwise, print the value for both MI and the CLI, except
+	 for the case of MI_PRINT_NO_VALUES.  */
       if (args_type != MI_PRINT_NO_VALUES)
 	{
 	  if (! py_print_value (out, val, opts, args_type, language))
@@ -665,7 +670,7 @@ enumerate_locals (PyObject *iter,
       int success = PY_BT_ERROR;
       struct symbol *sym;
       volatile struct gdb_exception except;
-    
+
       success = extract_sym (item, &sym_name, &sym, &language);
       if (! success)
 	{
@@ -729,7 +734,7 @@ enumerate_locals (PyObject *iter,
 	{
 	  ui_out_field_string (out, "name", sym_name);
 	  xfree (sym_name);
-	  
+
 	  if (! ui_out_is_mi_like_p (out))
 	    ui_out_text (out, " = ");
 	}
@@ -738,7 +743,6 @@ enumerate_locals (PyObject *iter,
 	  gdbpy_convert_exception (except);
 	  goto error;
 	}
-      
 
       if (args_type == MI_PRINT_SIMPLE_VALUES)
 	{
@@ -889,7 +893,7 @@ py_print_args (PyObject *filter,
       gdbpy_convert_exception (except);
       goto args_error;
     }
-  
+
   do_cleanups (old_chain);
   return 1;
 
@@ -1269,7 +1273,6 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 static PyObject *
 bootstrap_python_frame_filters (struct frame_info *frame, int
 				frame_low, int frame_high)
-  
 {
   struct cleanup *cleanups =
     make_cleanup (null_cleanup, NULL);
@@ -1285,7 +1288,7 @@ bootstrap_python_frame_filters (struct frame_info *frame, int
   if (! module)
     goto error;
   make_cleanup_py_decref (module);
-  
+
   sort_func = PyObject_GetAttrString (module, "execute_frame_filters");
   if (! sort_func)
     goto error;
@@ -1318,7 +1321,7 @@ bootstrap_python_frame_filters (struct frame_info *frame, int
     }
   else
     Py_RETURN_NONE;
-  
+
   return iterator;
 
  error:
@@ -1340,7 +1343,7 @@ bootstrap_python_frame_filters (struct frame_info *frame, int
 
 int apply_frame_filter (struct frame_info *frame, int flags,
 			enum py_frame_args args_type,
-			struct ui_out *out, int frame_low, 
+			struct ui_out *out, int frame_low,
 			int frame_high)
 
 {
@@ -1389,7 +1392,7 @@ int apply_frame_filter (struct frame_info *frame, int flags,
     {
       success = py_print_frame (item, flags, args_type, out, 0,
 				levels_printed);
-      
+
       /* Do not exit on error printing a single frame.  Print the
 	 error and continue with other frames.  */
       if (success == PY_BT_ERROR)
@@ -1401,7 +1404,7 @@ int apply_frame_filter (struct frame_info *frame, int flags,
  done:
   do_cleanups (cleanups);
   return success;
-  
+
  error:
   gdbpy_print_stack ();
   do_cleanups (cleanups);

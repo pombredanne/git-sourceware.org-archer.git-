@@ -203,7 +203,7 @@ class InfoFrameFilter(gdb.Command):
                            specified by GDB user commands.
         """
 
-        sorted_frame_filters = sorted (frame_filters.items(), 
+        sorted_frame_filters = sorted (frame_filters.items(),
                                        key=lambda i: _get_priority(i[1]),
                                        reverse=True)
 
@@ -266,7 +266,7 @@ def _do_enable_frame_filter(command_tuple, flag):
     _set_enabled(ff, flag)
 
 def _complete_frame_filter_list (text,word):
-    
+
     filter_locations = ["global","progspace"]
     for objfile in gdb.objfiles():
         filter_locations.append(objfile.filename)
@@ -288,7 +288,7 @@ def _complete_frame_filter_list (text,word):
     return flist
 
 def _complete_frame_filter_name (word, printer_list):
-    
+
     printer_keys = printer_list.keys()
     if (word == ""):
         return printer_keys
@@ -374,7 +374,7 @@ class SetFrameFilterPriority(gdb.Command):
         super(SetFrameFilterPriority, self).__init__("set python " \
                                                      "frame-filter priority",
                                                      gdb.COMMAND_DATA)
- 
+
     def _parse_pri_arg(self, arg):
         """Internal worker to parse a priority from a tuple.
 
@@ -537,4 +537,3 @@ EnableFrameFilter()
 DisableFrameFilter()
 SetFrameFilterPriority()
 ShowFrameFilterPriority()
-
