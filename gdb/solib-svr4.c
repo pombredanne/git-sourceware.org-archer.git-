@@ -1714,6 +1714,9 @@ svr4_handle_solib_event (void)
   if (info->probes_table == NULL)
     return;
 
+  /* Do nothing if (XXX target) doesn't support incremental.  */
+  //XXX
+
   /* If anything goes wrong we revert to the original linker
      interface.  */
   old_chain = make_cleanup (disable_probes_interface_cleanup, NULL);
