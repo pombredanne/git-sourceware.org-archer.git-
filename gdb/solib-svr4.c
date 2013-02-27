@@ -1069,7 +1069,6 @@ svr4_free_library_list (void *p_list)
     }
 }
 
-#if 0 //XXX
 /* Copy library list.  */
 
 static struct so_list *
@@ -1099,7 +1098,6 @@ svr4_copy_library_list (struct so_list *src)
 
   return dst;
 }
-#endif //XXX
 
 #ifdef HAVE_LIBEXPAT
 
@@ -1367,15 +1365,14 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
   return 1;
 }
 
-/* Implement the "current_sos" target_so_ops method.  */
+/* XXX.  */
 
 static struct so_list *
-svr4_current_sos (void)
+svr4_current_sos_1 (struct svr4_info *info) /* XXX need a better name!  */
 {
   CORE_ADDR lm;
   struct so_list *head = NULL;
   struct so_list **link_ptr = &head;
-  struct svr4_info *info;
   struct cleanup *back_to;
   int ignore_first;
   struct svr4_library_list library_list;
@@ -1391,15 +1388,10 @@ svr4_current_sos (void)
   if (svr4_current_sos_via_xfer_libraries (&library_list))
     {
       if (library_list.main_lm)
-	{
-	  info = get_svr4_info ();
-	  info->main_lm_addr = library_list.main_lm;
-	}
+	info->main_lm_addr = library_list.main_lm;
 
       return library_list.head ? library_list.head : svr4_default_sos ();
     }
-
-  info = get_svr4_info ();
 
   /* Always locate the debug struct, in case it has moved.  */
   info->debug_base = 0;
@@ -1439,6 +1431,22 @@ svr4_current_sos (void)
     return svr4_default_sos ();
 
   return head;
+}
+
+/* Implement the "current_sos" target_so_ops method.  */
+
+static struct so_list *
+svr4_current_sos (void)
+{
+  struct svr4_info *info = get_svr4_info ();
+
+  /* If we are using the probes interface and the solib list has
+     been cached then we simply return that.  */
+  if (info->solib_list != NULL)
+    return svr4_copy_library_list (info->solib_list);
+
+  /* Otherwise XXX.  */
+  return svr4_current_sos_1 (info);
 }
 
 /* Get the address of the link_map for a given OBJFILE.  */
@@ -1642,7 +1650,7 @@ static int
 solist_update_full (struct svr4_info *info)
 {
   svr4_free_library_list (&info->solib_list);
-  //XXX info->solib_list = svr4_current_sos_from_debug_base ();
+  info->solib_list = svr4_current_sos_1 (info);
 
   return 1;
 }
