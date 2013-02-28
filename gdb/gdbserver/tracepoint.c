@@ -3969,7 +3969,7 @@ cmd_qtbuffer (char *own_buf)
   unpack_varlen_hex (packet, &num);
 
   trace_debug ("Want to get trace buffer, %d bytes at offset 0x%s",
-	       (int) num, pulongest (offset));
+	       (int) num, phex_nz (offset, 0));
 
   tot = (trace_buffer_hi - trace_buffer_lo) - free_space ();
 
@@ -4002,7 +4002,6 @@ cmd_qtbuffer (char *own_buf)
     num = (PBUFSIZ - 16) / 2;
 
   convert_int_to_ascii (tbp, own_buf, num);
-  own_buf[num] = '\0';
 }
 
 static void
