@@ -504,6 +504,22 @@ extern int in_plt_section (CORE_ADDR, char *);
    modules.  */
 DECLARE_REGISTRY(objfile);
 
+/* In normal use, the section map will be rebuilt by FIND_PC_SECTION
+   if objfiles have been added, removed or relocated since it was last
+   called.  Calling INHIBIT_SECTION_MAP_UPDATES will inhibit this
+   behavior until RESUME_SECTION_MAP_UPDATES is called.  If you call
+   INHIBIT_SECTION_MAP_UPDATES you must ensure that every call to
+   FIND_PC_SECTION in the inhibited region relates to a section that
+   is already in the section map and has not since been removed or
+   relocated.  */
+extern void inhibit_section_map_updates (void);
+
+/* Resume automatically rebuilding the section map as required.  */
+extern void resume_section_map_updates (void);
+
+/* Version of the above suitable for use as a cleanup.  */
+extern void resume_section_map_updates_cleanup (void *arg);
+
 extern void default_iterate_over_objfiles_in_search_order
   (struct gdbarch *gdbarch,
    iterate_over_objfiles_in_search_order_cb_ftype *cb,

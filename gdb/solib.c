@@ -1206,6 +1206,42 @@ no_shared_libraries (char *ignored, int from_tty)
   objfile_purge_solibs ();
 }
 
+/* See solib.h.  */
+
+void
+update_solib_breakpoints (void)
+{
+  struct target_so_ops *ops = solib_ops (target_gdbarch ());
+
+  if (ops->update_breakpoints != NULL)
+    ops->update_breakpoints ();
+}
+
+/* See solib.h.  */
+
+void
+handle_solib_event (void)
+{
+  struct target_so_ops *ops = solib_ops (target_gdbarch ());
+
+  if (ops->handle_event != NULL)
+    ops->handle_event ();
+
+  clear_program_space_solib_cache (current_inferior ()->pspace);
+
+  /* Check for any newly added shared libraries if we're supposed to
+     be adding them automatically.  Switch terminal for any messages
+     produced by breakpoint_re_set.  */
+  target_terminal_ours_for_output ();
+#ifdef SOLIB_ADD
+  SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
+#else
+  solib_add (NULL, 0, &current_target, auto_solib_add);
+#endif
+  target_terminal_inferior ();
+}
+
+
 /* Reload shared libraries, but avoid reloading the same symbol file
    we already have loaded.  */
 

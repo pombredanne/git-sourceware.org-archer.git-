@@ -69,6 +69,9 @@ struct objfile_pspace_info
   int objfiles_changed_p;
   struct obj_section **sections;
   int num_sections;
+
+  /* Nonzero if section map updates should be inhibited.  */
+  int inhibit_updates;
 };
 
 /* Per-program-space data key.  */
@@ -1353,7 +1356,7 @@ find_pc_section (CORE_ADDR pc)
     return s;
 
   pspace_info = get_objfile_pspace_data (current_program_space);
-  if (pspace_info->objfiles_changed_p != 0)
+  if (pspace_info->objfiles_changed_p && !pspace_info->inhibit_updates)
     {
       update_section_map (current_program_space,
 			  &pspace_info->sections,
@@ -1410,6 +1413,30 @@ objfiles_changed (void)
 {
   /* Rebuild section map next time we need it.  */
   get_objfile_pspace_data (current_program_space)->objfiles_changed_p = 1;
+}
+
+/* See comments in objfiles.h.  */
+
+void
+inhibit_section_map_updates (void)
+{
+  get_objfile_pspace_data (current_program_space)->inhibit_updates = 1;
+}
+
+/* See comments in objfiles.h.  */
+
+void
+resume_section_map_updates (void)
+{
+  get_objfile_pspace_data (current_program_space)->inhibit_updates = 0;
+}
+
+/* See comments in objfiles.h.  */
+
+void
+resume_section_map_updates_cleanup (void *arg)
+{
+  resume_section_map_updates ();
 }
 
 /* The default implementation for the "iterate_over_objfiles_in_search_order"
