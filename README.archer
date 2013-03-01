@@ -1,0 +1,2 @@
+This branch changes the test suite so that each .exp file can be run
+in parallel.  It also removes the testsuite subdir Makefiles.
