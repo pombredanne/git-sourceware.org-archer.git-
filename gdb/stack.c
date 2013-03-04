@@ -1652,7 +1652,7 @@ frame_info (char *addr_exp, int from_tty)
    frames.  */
 
 static void
-backtrace_command_1 (char *count_exp, int show_locals, int raw,
+backtrace_command_1 (char *count_exp, int show_locals, int no_filters,
 		     int from_tty)
 {
   struct frame_info *fi;
@@ -1731,7 +1731,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
 	}
     }
 
-  if (! raw)
+  if (! no_filters)
     {
       int flags = PRINT_LEVEL | PRINT_FRAME_INFO | PRINT_ARGS;
       enum py_frame_args arg_type;
@@ -1751,7 +1751,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int raw,
     }
   /* Run the inbuilt backtrace if there are no filters registered, or
      if there was an error in the Python backtracing output.  */
-  if (raw || result == PY_BT_ERROR || result == PY_BT_NO_FILTERS)
+  if (no_filters || result == PY_BT_ERROR || result == PY_BT_NO_FILTERS)
     {
       for (i = 0, fi = trailing; fi && count--; i++, fi = get_prev_frame (fi))
 	{
@@ -1805,7 +1805,7 @@ static void
 backtrace_command (char *arg, int from_tty)
 {
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
-  int fulltrace_arg = -1, arglen = 0, argc = 0, raw_arg = -1;
+  int fulltrace_arg = -1, arglen = 0, argc = 0, no_filters  = -1;
   int user_arg = 0;
 
   if (arg)
@@ -1823,8 +1823,8 @@ backtrace_command (char *arg, int from_tty)
 	  for (j = 0; j < strlen (argv[i]); j++)
 	    argv[i][j] = tolower (argv[i][j]);
 
-	  if (raw_arg < 0 && subset_compare (argv[i], "raw"))
-	    raw_arg = argc;
+	  if (no_filters < 0 && subset_compare (argv[i], "no-filters"))
+	    no_filters = argc;
 	  else
 	    {
 	      if (fulltrace_arg < 0 && subset_compare (argv[i], "full"))
@@ -1838,7 +1838,7 @@ backtrace_command (char *arg, int from_tty)
 	  argc++;
 	}
       arglen += user_arg;
-      if (fulltrace_arg >= 0 || raw_arg >= 0)
+      if (fulltrace_arg >= 0 || no_filters >= 0)
 	{
 	  if (arglen > 0)
 	    {
@@ -1847,7 +1847,7 @@ backtrace_command (char *arg, int from_tty)
 	      arg[0] = 0;
 	      for (i = 0; i < argc; i++)
 		{
-		  if (i != fulltrace_arg && i != raw_arg)
+		  if (i != fulltrace_arg && i != no_filters)
 		    {
 		      strcat (arg, argv[i]);
 		      strcat (arg, " ");
@@ -1860,7 +1860,7 @@ backtrace_command (char *arg, int from_tty)
     }
 
   backtrace_command_1 (arg, fulltrace_arg >= 0 /* show_locals */,
-		       raw_arg >= 0 /* no frame-filters */, from_tty);
+		       no_filters >= 0 /* no frame-filters */, from_tty);
 
   do_cleanups (old_chain);
 }
@@ -2603,7 +2603,7 @@ It can be a stack frame number or the address of the frame.\n"));
 Print backtrace of all stack frames, or innermost COUNT frames.\n\
 With a negative argument, print outermost -COUNT frames.\nUse of the \
 'full' qualifier also prints the values of the local variables.\n\
-Use of the 'raw' qualifier prohibits frame filters from executing\n\
+Use of the 'no-filters' qualifier prohibits frame filters from executing\n\
 on this backtrace.\n"));
   add_com_alias ("bt", "backtrace", class_stack, 0);
   if (xdb_commands)

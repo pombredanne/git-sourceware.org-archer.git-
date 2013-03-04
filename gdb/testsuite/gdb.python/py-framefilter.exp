@@ -1,4 +1,4 @@
-# Copyright (C) 2012 Free Software Foundation, Inc.
+# Copyright (C) 2012, 2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -81,8 +81,8 @@ gdb_test_no_output  "enable frame-filter global Elider"
 gdb_test "info frame-filter" \
     ".*1000.*Yes.*Elider.*100.*Yes.*Reverse.*10.*.*No.*Object.*1.*"
 
-# Test raw
-gdb_test "bt raw" \
+# Test no-filters
+gdb_test "bt no-filters" \
     ".*#0.*end_func.*#22.*in func1.*#27.*in main \\(\\).*"
 
 # Test reverse
@@ -100,7 +100,7 @@ gdb_test "bt -2" \
 gdb_test "bt 3" \
     ".*#0.*end_func.*#1.*in funca \\(\\).*#2.*in funcb \\(j=10\\).*"
 
-gdb_test "bt raw full" \
+gdb_test "bt no-filter full" \
     ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca \\(\\).*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*"
 
 gdb_test "bt full" \
@@ -109,35 +109,35 @@ gdb_test "bt full" \
 # Test set print frame-arguments
 # none
 gdb_test_no_output "set print frame-arguments none" "turn off frame arguments"
-gdb_test "bt raw 1" \
+gdb_test "bt no-filter 1" \
     "#0.*end_func \\(foo=\.\.\., bar=\.\.\., fb=\.\.\., bf=\.\.\.\\) at .*py-framefilter.c.*" \
-    "bt raw no args"
+    "bt no-filter no args"
 gdb_test "bt 1" \
     "#0.*end_func \\(foo=\.\.\., bar=\.\.\., fb=\.\.\., bf=\.\.\.\\) at .*py-framefilter.c.*" \
     "bt full no args"
 # scalars
 gdb_test_no_output "set print frame-arguments scalars" "turn off frame arguments"
-gdb_test "bt raw 1" \
+gdb_test "bt no-filter 1" \
     "#0.*end_func \\(foo=21, bar=$hex \"Param\", fb=$hex, bf=\.\.\.\\) at .*py-framefilter.c.*" \
-    "bt raw scalars"
+    "bt no-filter scalars"
 
 gdb_test "bt 1" \
     "#0.*end_func \\(foo=21, bar=$hex \"Param\", fb=$hex, bf=\.\.\.\\) at .*py-framefilter.c.*" \
     "bt scalars"
 # all
 gdb_test_no_output "set print frame-arguments all" "turn off frame arguments"
-gdb_test "bt raw 1" \
+gdb_test "bt no-filter 1" \
     "#0.*end_func \\(foo=21, bar=$hex \"Param\", fb=$hex, bf=\{nothing = $hex \"Foo Bar\", f = 42, s = 19\}\\) at .*py-framefilter.c.*" \
-    "bt raw all args"
+    "bt no-filter all args"
 gdb_test "bt 1" \
     "#0.*end_func \\(foo=21, bar=$hex \"Param\", fb=$hex, bf=\{nothing = $hex \"Foo Bar\", f = 42, s = 19\}\\) at .*py-framefilter.c.*" \
     "bt all args"
 
 # set print address off
 gdb_test_no_output "set print address off" "turn off address printing"
-gdb_test "bt raw 1" \
+gdb_test "bt no-filter 1" \
     "#0  end_func \\(foo=21, bar=\"Param\", fb=, bf=\{nothing = \"Foo Bar\", f = 42, s = 19\}\\) at .*py-framefilter.c.*" \
-    "bt raw no address"
+    "bt no-filter no address"
 gdb_test "bt 1" \
     "#0  end_func \\(foo=21, bar=\"Param\", fb=, bf=\{nothing = \"Foo Bar\", f = 42, s = 19\}\\) at .*py-framefilter.c.*" \
     "bt no addresss"
