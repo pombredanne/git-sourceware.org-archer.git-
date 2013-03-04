@@ -22,25 +22,6 @@ from gdb.FrameIterator import FrameIterator
 from gdb.FrameWrapper import FrameWrapper
 import itertools
 
-def _parse_arg(cmd_name, arg):
-    """ Internal worker function to take an argument and return a
-    tuple of arguments.
-
-    Arguments:
-        cmd_name: Name of the command invoking this function.
-        args: The argument as a string.
-
-    Returns:
-        A tuple containing the dictionary, and the argument.
-    """
-
-    argv = gdb.string_to_argv(arg);
-    argc = len(argv)
-    if argc != 2:
-        raise gdb.GdbError(cmd_name + " takes exactly two arguments.")
-
-    return argv
-
 def _get_priority(filter_item):
     """ Internal worker function to return the frame-filter's priority
     from a frame filter object.  This is a fail free function as it is
@@ -139,11 +120,24 @@ def _return_list(name):
         name: The name of the list, as specified by GDB user commands.
 
     Returns:
-        A dictionary object.
+        A dictionary object for a single specified dictionary, or a
+        list containing all the items for "alldicts"
 
     Raises:
         gdb.GdbError:  A dictionary of that name cannot be found.
     """
+
+    # If all dictionaries are wanted in the case of "all" we
+    # cannot return a combined dictionary as keys() may clash in
+    # between different dictionaries.  As we just want all the frame
+    # filters to enable/disable them all, just return the combined
+    # items() as a list.
+    if name == "all":
+        all_dicts = gdb.frame_filters.values()
+        all_dicts = all_dicts + gdb.current_progspace().frame_filters.values()
+        for objfile in gdb.objfiles():
+            all_dicts = all_dicts + objfile.frame_filters.values()
+            return all_dicts
 
     if name == "global":
         return gdb.frame_filters
@@ -238,6 +232,30 @@ class InfoFrameFilter(gdb.Command):
 
 # Internal enable/disable functions.
 
+def _enable_parse_arg(cmd_name, arg):
+    """ Internal worker function to take an argument from
+    enable/disable and return a tuple of arguments.
+
+    Arguments:
+        cmd_name: Name of the command invoking this function.
+        args: The argument as a string.
+
+    Returns:
+        A tuple containing the dictionary, and the argument, or just
+        the dictionary in the case of "all".
+    """
+
+    argv = gdb.string_to_argv(arg);
+    argc = len(argv)
+    if argv[0] == "all" and argc > 1:
+        raise gdb.GdbError(cmd_name + " with 'all' " \
+                          "you may not specify a filter.")
+    else:
+        if argv[0] != "all" and argc != 2:
+            raise gdb.GdbError(cmd_name + " takes exactly two arguments.")
+
+    return argv
+
 def _do_enable_frame_filter(command_tuple, flag):
     """Worker for enabling/disabling frame_filters.
 
@@ -249,31 +267,37 @@ def _do_enable_frame_filter(command_tuple, flag):
     """
 
     list_op = command_tuple[0]
-    frame_filter = command_tuple[1]
-
     op_list = _return_list(list_op)
 
-    try:
-        ff = op_list[frame_filter]
-    except KeyError:
-        msg = "frame-filter '" + str(name) + "' not found."
-        raise gdb.GdbError(msg)
+    if list_op == "all":
+        for item in op_list:
+            _set_enabled(item, flag)
+    else:
+        frame_filter = command_tuple[1]
+        try:
+            ff = op_list[frame_filter]
+        except KeyError:
+            msg = "frame-filter '" + str(name) + "' not found."
+            raise gdb.GdbError(msg)
 
-    _set_enabled(ff, flag)
+        _set_enabled(ff, flag)
 
-def _complete_frame_filter_list(text, word):
+def _complete_frame_filter_list(text, word, all_flag):
     """Worker for frame filter dictionary name completion.
 
     Arguments:
         text: The full text of the command line.
         word: The most recent word of the command line.
-
+        all_flag: Whether to include the word "all" in completion.
     Returns:
         A list of suggested frame filter dictionary name completions
         from text/word analysis.  This list can be empty when there
         are no suggestions for completion.
-    """
-    filter_locations = ["global","progspace"]
+        """
+    if all_flag == True:
+        filter_locations = ["all", "global","progspace"]
+    else:
+        filter_locations = ["global","progspace"]
     for objfile in gdb.objfiles():
         filter_locations.append(objfile.filename)
 
@@ -336,13 +360,13 @@ class EnableFrameFilter(gdb.Command):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
         if text.count(" ") == 0:
-            return _complete_frame_filter_list(text,word)
+            return _complete_frame_filter_list(text, word, True)
         else:
             printer_list = _return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
-        command_tuple = _parse_arg("enable frame-filter", arg)
+        command_tuple = _enable_parse_arg("enable frame-filter", arg)
         _do_enable_frame_filter(command_tuple, True)
 
 
@@ -367,13 +391,13 @@ class DisableFrameFilter(gdb.Command):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
         if text.count(" ") == 0:
-            return _complete_frame_filter_list(text,word)
+            return _complete_frame_filter_list(text, word, True)
         else:
             printer_list = _return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
-        command_tuple = _parse_arg("disable frame-filter", arg)
+        command_tuple = _enable_parse_arg("disable frame-filter", arg)
         _do_enable_frame_filter(command_tuple, False)
 
 class SetFrameFilterPriority(gdb.Command):
@@ -447,7 +471,7 @@ class SetFrameFilterPriority(gdb.Command):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
         if text.count(" ") == 0:
-            return _complete_frame_filter_list(text,word)
+            return _complete_frame_filter_list(text, word, False)
         else:
             printer_list = _return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
@@ -530,7 +554,7 @@ class ShowFrameFilterPriority(gdb.Command):
         frame filter name."""
 
         if text.count(" ") == 0:
-            return _complete_frame_filter_list(text,word)
+            return _complete_frame_filter_list(text, word, False)
         else:
             printer_list = _return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
