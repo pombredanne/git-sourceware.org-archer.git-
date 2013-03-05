@@ -197,11 +197,10 @@ class InfoFrameFilter(gdb.Command):
                                       key=lambda i: _get_priority(i[1]),
                                       reverse=True)
 
-        print "  Priority  Enabled  Name"
-        print "  ========  =======  ===="
         if len(sorted_frame_filters) == 0:
             print "  No frame filters registered."
         else:
+            print "  Priority  Enabled  Name"
             for frame_filter in sorted_frame_filters:
                 name = frame_filter[0]
                 try:
@@ -214,21 +213,22 @@ class InfoFrameFilter(gdb.Command):
                 else:
                     print "  %s  %s  %s" % (priority, enabled, name)
 
-    def print_list(self, title, filter_list):
-        if filter_list:
-            print title
-            self.list_frame_filters(filter_list)
+    def print_list(self, title, filter_list, blank_line):
+        print title
+        self.list_frame_filters(filter_list)
+        if (blank_line):
+            print ""
 
     def invoke(self, arg, from_tty):
-        self.print_list("global frame-filters:", gdb.frame_filters)
+        self.print_list("global frame-filters:", gdb.frame_filters, True)
 
         cp = gdb.current_progspace()
         self.print_list("progspace %s frame-filters:" % cp.filename,
-                        cp.frame_filters)
+                        cp.frame_filters, True)
 
         for objfile in gdb.objfiles():
             self.print_list("objfile %s frame-filters:" % objfile.filename,
-                            objfile.frame_filters)
+                            objfile.frame_filters, False)
 
 # Internal enable/disable functions.
 
