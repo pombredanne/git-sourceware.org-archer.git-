@@ -343,6 +343,10 @@ struct remote_state
   /* True if the stub can collect strings using tracenz bytecode.  */
   int string_tracing;
 
+  /* True if the stub supports qXfer:libraries-svr4:read with a
+     non-empty annex.  */
+  int augmented_libraries_svr4_read;
+
   /* Nonzero if the user has pressed Ctrl-C, but the target hasn't
      responded to that.  */
   int ctrlc_pending_p;
@@ -1250,7 +1254,6 @@ enum {
   PACKET_qXfer_features,
   PACKET_qXfer_libraries,
   PACKET_qXfer_libraries_svr4,
-  PACKET_qXfer_libraries_svr4_XXX,
   PACKET_qXfer_memory_map,
   PACKET_qXfer_spu_read,
   PACKET_qXfer_spu_write,
@@ -3929,6 +3932,16 @@ remote_string_tracing_feature (const struct protocol_feature *feature,
   rs->string_tracing = (support == PACKET_ENABLE);
 }
 
+static void
+remote_augmented_libraries_svr4_read_feature
+  (const struct protocol_feature *feature,
+   enum packet_support support, const char *value)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  rs->augmented_libraries_svr4_read = (support == PACKET_ENABLE);
+}
+
 static struct protocol_feature remote_protocol_features[] = {
   { "PacketSize", PACKET_DISABLE, remote_packet_size, -1 },
   { "qXfer:auxv:read", PACKET_DISABLE, remote_supported_packet,
@@ -3939,8 +3952,8 @@ static struct protocol_feature remote_protocol_features[] = {
     PACKET_qXfer_libraries },
   { "qXfer:libraries-svr4:read", PACKET_DISABLE, remote_supported_packet,
     PACKET_qXfer_libraries_svr4 },
-  { "qXfer:libraries-svr4:read:XXX", PACKET_DISABLE, remote_supported_packet,
-    PACKET_qXfer_libraries_svr4_XXX },
+  { "augmented-libraries-svr4-read", PACKET_DISABLE,
+    remote_augmented_libraries_svr4_read_feature, -1 },
   { "qXfer:memory-map:read", PACKET_DISABLE, remote_supported_packet,
     PACKET_qXfer_memory_map },
   { "qXfer:spu:read", PACKET_DISABLE, remote_supported_packet,

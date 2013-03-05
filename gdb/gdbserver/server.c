@@ -1581,10 +1581,8 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	       PBUFSIZ - 1);
 
       if (the_target->qxfer_libraries_svr4 != NULL)
-	{
-	  strcat (own_buf, ";qXfer:libraries-svr4:read+");
-	  strcat (own_buf, ";qXfer:libraries-svr4:read:XXX+");
-	}
+	strcat (own_buf, ";qXfer:libraries-svr4:read+"
+		";augmented-libraries-svr4-read+");
       else
 	{
 	  /* We do not have any hook to indicate whether the non-SVR4 target
