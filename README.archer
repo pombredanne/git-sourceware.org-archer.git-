@@ -1,0 +1,12 @@
+This branch implements a new runtime linker interface using
+SystemTap probes.
+
+The glibc side of the interface was committed in this patch:
+http://sourceware.org/ml/libc-alpha/2012-07/txt00005.txt
+
+For a description of the interface, please look in the file
+elf/rtld-debugger-interface.txt in the above patch.
+
+For details of why this interface was created, this mail is
+a good starting point:
+http://www.cygwin.com/ml/gdb-patches/2012-07/msg00155.html
