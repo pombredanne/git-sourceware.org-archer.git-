@@ -433,6 +433,8 @@ tilegx_analyze_prologue (struct gdbarch* gdbarch,
 
 	  if (instbuf_size > size_on_same_page)
 	    instbuf_size = size_on_same_page;
+
+	  instbuf_size = min (instbuf_size, (end_addr - next_addr));
 	  instbuf_start = next_addr;
 
 	  status = safe_frame_unwind_memory (next_frame, instbuf_start,
@@ -745,7 +747,8 @@ tilegx_analyze_prologue (struct gdbarch* gdbarch,
 static CORE_ADDR
 tilegx_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR start_pc)
 {
-  CORE_ADDR func_start;
+  CORE_ADDR func_start, end_pc;
+  struct obj_section *s;
 
   /* This is the preferred method, find the end of the prologue by
      using the debugging information.  */
@@ -758,10 +761,16 @@ tilegx_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR start_pc)
         return max (start_pc, post_prologue_pc);
     }
 
+  /* Don't straddle a section boundary.  */
+  s = find_pc_section (start_pc);
+  end_pc = start_pc + 8 * TILEGX_BUNDLE_SIZE_IN_BYTES;
+  if (s != NULL)
+    end_pc = min (end_pc, obj_section_endaddr (s));
+
   /* Otherwise, try to skip prologue the hard way.  */
   return tilegx_analyze_prologue (gdbarch,
 				  start_pc,
-				  start_pc + 8 * TILEGX_BUNDLE_SIZE_IN_BYTES,
+				  end_pc,
 				  NULL, NULL);
 }
 
@@ -783,6 +792,29 @@ tilegx_in_function_epilogue_p (struct gdbarch *gdbarch, CORE_ADDR pc)
 	return 1;
     }
   return 0;
+}
+
+/* This is the implementation of gdbarch method get_longjmp_target.  */
+
+static int
+tilegx_get_longjmp_target (struct frame_info *frame, CORE_ADDR *pc)
+{
+  struct gdbarch *gdbarch = get_frame_arch (frame);
+  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
+  CORE_ADDR jb_addr;
+  gdb_byte buf[8];
+
+  jb_addr = get_frame_register_unsigned (frame, TILEGX_R0_REGNUM);
+
+  /* TileGX jmp_buf contains 32 elements of type __uint_reg_t which
+     has a size of 8 bytes.  The return address is stored in the 25th
+     slot.  */
+  if (target_read_memory (jb_addr + 25 * 8, buf, 8))
+    return 0;
+
+  *pc = extract_unsigned_integer (buf, 8, byte_order);
+
+  return 1;
 }
 
 /* by assigning the 'faultnum' reg in kernel pt_regs with this value,
@@ -1030,6 +1062,7 @@ tilegx_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 
   /* These values and methods are used when gdb calls a target function.  */
   set_gdbarch_push_dummy_call (gdbarch, tilegx_push_dummy_call);
+  set_gdbarch_get_longjmp_target (gdbarch, tilegx_get_longjmp_target);
   set_gdbarch_write_pc (gdbarch, tilegx_write_pc);
   set_gdbarch_breakpoint_from_pc (gdbarch, tilegx_breakpoint_from_pc);
   set_gdbarch_return_value (gdbarch, tilegx_return_value);
