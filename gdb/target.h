@@ -857,6 +857,10 @@ struct target_ops
     /* Is the target able to use agent in current state?  */
     int (*to_can_use_agent) (void);
 
+    /* Nonzero if TARGET_OBJECT_LIBRARIES_SVR4 may be read with a
+       non-empty annex.  */
+    int (*to_augmented_libraries_svr4_read) (void);
+
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
      */
@@ -1723,6 +1727,9 @@ extern char *target_fileio_read_stralloc (const char *filename);
 
 #define target_can_use_agent() \
   (*current_target.to_can_use_agent) ()
+
+#define target_augmented_libraries_svr4_read() \
+  (*current_target.to_augmented_libraries_svr4_read) ()
 
 /* Command logging facility.  */
 

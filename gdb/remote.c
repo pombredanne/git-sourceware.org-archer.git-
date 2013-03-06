@@ -11131,6 +11131,14 @@ remote_can_use_agent (void)
   return (remote_protocol_packets[PACKET_QAgent].support != PACKET_DISABLE);
 }
 
+static int
+remote_augmented_libraries_svr4_read (void)
+{
+  struct remote_state *rs = get_remote_state ();
+
+  return rs->augmented_libraries_svr4_read;
+}
+
 static void
 init_remote_ops (void)
 {
@@ -11247,6 +11255,8 @@ Specify the serial device it is connected to\n\
   remote_ops.to_traceframe_info = remote_traceframe_info;
   remote_ops.to_use_agent = remote_use_agent;
   remote_ops.to_can_use_agent = remote_can_use_agent;
+  remote_ops.to_augmented_libraries_svr4_read =
+    remote_augmented_libraries_svr4_read;
 }
 
 /* Set up the extended remote vector by making a copy of the standard
