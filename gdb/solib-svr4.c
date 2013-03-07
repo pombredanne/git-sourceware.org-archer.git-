@@ -1676,6 +1676,7 @@ static int
 solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
 {
   struct so_list *tail, **link;
+  CORE_ADDR prev_lm;
 
   /* Fall back to a full update if we haven't read anything yet.  */
   if (info->solib_list == NULL)
@@ -1689,16 +1690,25 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
   /* Walk to the end of the list.  */
   for (tail = info->solib_list; tail->next; tail = tail->next);
   link = &tail->next;
+  prev_lm = tail->lm_info->lm_addr;
 
   /* Read the new objects.  */
   if (info->using_xfer)
     {
-      // XXX
+      struct svr4_library_list library_list;
+      char annex[64];
+
+      xsnprintf (annex, sizeof (annex), "start=%lx;prev=%lx", lm, prev_lm);
+      if (!svr4_current_sos_via_xfer_libraries (&library_list, annex))
 	return 0;
+
+      // XXX
+      printf_unfiltered ("got incremental transfer, now what?\n");
+      return 0;
     }
   else
     {
-      if (!svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0))
+      if (!svr4_read_so_list (lm, prev_lm, &link, 0))
 	return 0;
     }
 
