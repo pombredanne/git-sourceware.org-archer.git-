@@ -945,7 +945,7 @@ update_current_target (void)
 	    return_zero);
   de_fault (to_augmented_libraries_svr4_read,
 	    (int (*) (void))
-	    return_one);
+	    return_zero);
   de_fault (to_execution_direction, default_execution_direction);
 
 #undef de_fault

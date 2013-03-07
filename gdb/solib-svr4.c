@@ -1218,14 +1218,19 @@ svr4_parse_libraries (const char *document, struct svr4_library_list *list)
   return 0;
 }
 
-/* Attempt to get so_list from target via qXfer:libraries:read packet.
+/* Attempt to get so_list from target via qXfer:libraries-svr4:read packet.
 
    Return 0 if packet not supported, *SO_LIST_RETURN is not modified in such
    case.  Return 1 if *SO_LIST_RETURN contains the library list, it may be
-   empty, caller is responsible for freeing all its entries.  */
+   empty, caller is responsible for freeing all its entries.
+
+   Note that ANNEX must be NULL if the remote does not explicitly allow
+   qXfer:libraries-svr4:read packets with non-empty annexes.  Support for
+   this can be checked using target_augmented_libraries_svr4_read ().  */
 
 static int
-svr4_current_sos_via_xfer_libraries (struct svr4_library_list *list)
+svr4_current_sos_via_xfer_libraries (struct svr4_library_list *list,
+				     const char *annex)
 {
   char *svr4_library_document;
   int result;
@@ -1234,7 +1239,7 @@ svr4_current_sos_via_xfer_libraries (struct svr4_library_list *list)
   /* Fetch the list of shared libraries.  */
   svr4_library_document = target_read_stralloc (&current_target,
 						TARGET_OBJECT_LIBRARIES_SVR4,
-						NULL);
+						annex);
   if (svr4_library_document == NULL)
     return 0;
 
@@ -1248,7 +1253,8 @@ svr4_current_sos_via_xfer_libraries (struct svr4_library_list *list)
 #else
 
 static int
-svr4_current_sos_via_xfer_libraries (struct svr4_library_list *list)
+svr4_current_sos_via_xfer_libraries (struct svr4_library_list *list,
+				     const char *annex)
 {
   return 0;
 }
@@ -1389,7 +1395,8 @@ svr4_current_sos_1 (struct svr4_info *info) /* XXX need a better name!  */
      Unfortunately statically linked inferiors will also fall back through this
      suboptimal code path.  */
 
-  info->using_xfer = svr4_current_sos_via_xfer_libraries (&library_list);
+  info->using_xfer = svr4_current_sos_via_xfer_libraries (&library_list,
+							  NULL);
   if (info->using_xfer)
     {
       if (library_list.main_lm)
