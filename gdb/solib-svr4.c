@@ -366,6 +366,10 @@ struct svr4_info
   CORE_ADDR interp_plt_sect_low;
   CORE_ADDR interp_plt_sect_high;
 
+  /* Nonzero if the list of objects was last obtained from the target
+     via qXfer:libraries-svr4:read.  */
+  int using_xfer;
+
   /* Table mapping breakpoint addresses to probes and actions, used
      by the probes-based interface.  */
   htab_t probes_table;
@@ -1385,7 +1389,8 @@ svr4_current_sos_1 (struct svr4_info *info) /* XXX need a better name!  */
      Unfortunately statically linked inferiors will also fall back through this
      suboptimal code path.  */
 
-  if (svr4_current_sos_via_xfer_libraries (&library_list))
+  info->using_xfer = svr4_current_sos_via_xfer_libraries (&library_list);
+  if (info->using_xfer)
     {
       if (library_list.main_lm)
 	info->main_lm_addr = library_list.main_lm;
@@ -1665,7 +1670,13 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
 {
   struct so_list *tail, **link;
 
+  /* Fall back to a full update if we haven't read anything yet.  */
   if (info->solib_list == NULL)
+    return 0;
+
+  /* Fall back to a full update if we are using a remote target
+     that does not support incremental transfers.  */
+  if (info->using_xfer && !target_augmented_libraries_svr4_read())
     return 0;
 
   /* Walk to the end of the list.  */
@@ -1673,8 +1684,16 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
   link = &tail->next;
 
   /* Read the new objects.  */
-  if (!svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0))
-    return 0;
+  if (info->using_xfer)
+    {
+      // XXX
+	return 0;
+    }
+  else
+    {
+      if (!svr4_read_so_list (lm, tail->lm_info->lm_addr, &link, 0))
+	return 0;
+    }
 
   return 1;
 }
@@ -1713,9 +1732,6 @@ svr4_handle_solib_event (void)
   /* Do nothing if not using the probes interface.  */
   if (info->probes_table == NULL)
     return;
-
-  /* Do nothing if (XXX target) doesn't support incremental.  */
-  //XXX
 
   /* If anything goes wrong we revert to the original linker
      interface.  */
