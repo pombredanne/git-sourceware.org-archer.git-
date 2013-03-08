@@ -157,6 +157,21 @@ struct linespec
 };
 typedef struct linespec *linespec_p;
 
+/* A canonical linespec represented as a symtab-related string.
+
+   Each entry represents the "SYMTAB:SUFFIX" linespec string.
+   SYMTAB can be converted for example by symtab_to_fullname or
+   symtab_to_filename_for_display as needed.  */
+
+struct linespec_canonical_name
+{
+  /* Remaining text part of the linespec string.  */
+  char *suffix;
+
+  /* If NULL then SUFFIX is the whole linespec string.  */
+  struct symtab *symtab;
+};
+
 /* An instance of this is used to keep all state while linespec
    operates.  This instance is passed around as a 'this' pointer to
    the various implementation methods.  */
@@ -186,7 +201,7 @@ struct linespec_state
   struct linespec_result *canonical;
 
   /* Canonical strings that mirror the symtabs_and_lines result.  */
-  char **canonical_names;
+  struct linespec_canonical_name *canonical_names;
 
   /* This is a set of address_entry objects which is used to prevent
      duplicate symbols from being entered into the result.  */
@@ -302,6 +317,11 @@ struct ls_parser
 typedef struct ls_parser linespec_parser;
 
 /* Prototypes for local functions.  */
+
+static void iterate_over_file_blocks (struct symtab *symtab,
+				      const char *name, domain_enum domain,
+				      symbol_found_callback_ftype *callback,
+				      void *data);
 
 static void initialize_defaults (struct symtab **default_symtab,
 				 int *default_line);
@@ -848,10 +868,12 @@ add_sal_to_sals (struct linespec_state *self,
 
   if (self->canonical)
     {
-      char *canonical_name = NULL;
+      struct linespec_canonical_name *canonical;
 
       self->canonical_names = xrealloc (self->canonical_names,
-					sals->nelts * sizeof (char *));
+					(sals->nelts
+					 * sizeof (*self->canonical_names)));
+      canonical = &self->canonical_names[sals->nelts - 1];
       if (!literal_canonical && sal->symtab)
 	{
 	  const char *fullname = symtab_to_fullname (sal->symtab);
@@ -861,17 +883,21 @@ add_sal_to_sals (struct linespec_state *self,
 	     the time being.  */
 	  if (symname != NULL && sal->line != 0
 	      && self->language->la_language == language_ada)
-	    canonical_name = xstrprintf ("%s:%s:%d", fullname, symname,
-					 sal->line);
+	    canonical->suffix = xstrprintf ("%s:%d", symname, sal->line);
 	  else if (symname != NULL)
-	    canonical_name = xstrprintf ("%s:%s", fullname, symname);
+	    canonical->suffix = xstrdup (symname);
 	  else
-	    canonical_name = xstrprintf ("%s:%d", fullname, sal->line);
+	    canonical->suffix = xstrprintf ("%d", sal->line);
+	  canonical->symtab = sal->symtab;
 	}
-      else if (symname != NULL)
-	canonical_name = xstrdup (symname);
-
-      self->canonical_names[sals->nelts - 1] = canonical_name;
+      else
+	{
+	  if (symname != NULL)
+	    canonical->suffix = xstrdup (symname);
+	  else
+	    canonical->suffix = NULL;
+	  canonical->symtab = NULL;
+	}
     }
 }
 
@@ -1018,15 +1044,12 @@ iterate_over_all_matching_symtabs (struct linespec_state *state,
 
       ALL_OBJFILE_PRIMARY_SYMTABS (objfile, symtab)
 	{
-	  struct block *block;
-
-	  block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), STATIC_BLOCK);
-	  state->language->la_iterate_over_symbols (block, name, domain,
-						    callback, data);
+	  iterate_over_file_blocks (symtab, name, domain, callback, data);
 
 	  if (include_inline)
 	    {
 	      struct symbol_and_data_callback cad = { callback, data };
+	      struct block *block;
 	      int i;
 
 	      for (i = FIRST_LOCAL_BLOCK;
@@ -1042,28 +1065,37 @@ iterate_over_all_matching_symtabs (struct linespec_state *state,
   }
 }
 
-/* Returns the block to be used for symbol searches for the given SYMTAB,
-   which may be NULL.  */
+/* Returns the block to be used for symbol searches from
+   the current location.  */
 
 static struct block *
-get_search_block (struct symtab *symtab)
+get_current_search_block (void)
+{
+  struct block *block;
+  enum language save_language;
+
+  /* get_selected_block can change the current language when there is
+     no selected frame yet.  */
+  save_language = current_language->la_language;
+  block = get_selected_block (0);
+  set_language (save_language);
+
+  return block;
+}
+
+/* Iterate over static and global blocks.  */
+
+static void
+iterate_over_file_blocks (struct symtab *symtab,
+			  const char *name, domain_enum domain,
+			  symbol_found_callback_ftype *callback, void *data)
 {
   struct block *block;
 
-  if (symtab != NULL)
-    block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), STATIC_BLOCK);
-  else
-    {
-      enum language save_language;
-
-      /* get_selected_block can change the current language when there is
-	 no selected frame yet.  */
-      save_language = current_language->la_language;
-      block = get_selected_block (0);
-      set_language (save_language);
-    }
-
-  return block;
+  for (block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (symtab), STATIC_BLOCK);
+       block != NULL;
+       block = BLOCK_SUPERBLOCK (block))
+    LA_ITERATE_OVER_SYMBOLS (block, name, domain, callback, data);
 }
 
 /* A helper for find_method.  This finds all methods in type T which
@@ -1200,6 +1232,19 @@ find_toplevel_string (const char *haystack, const char *needle)
   return NULL;
 }
 
+/* Convert CANONICAL to its string representation using
+   symtab_to_fullname for SYMTAB.  The caller must xfree the result.  */
+
+static char *
+canonical_to_fullform (const struct linespec_canonical_name *canonical)
+{
+  if (canonical->symtab == NULL)
+    return xstrdup (canonical->suffix);
+  else
+    return xstrprintf ("%s:%s", symtab_to_fullname (canonical->symtab),
+		       canonical->suffix);
+}
+
 /* Given FILTERS, a list of canonical names, filter the sals in RESULT
    and store the result in SELF->CANONICAL.  */
 
@@ -1220,8 +1265,18 @@ filter_results (struct linespec_state *self,
 
       for (j = 0; j < result->nelts; ++j)
 	{
-	  if (strcmp (name, self->canonical_names[j]) == 0)
+	  const struct linespec_canonical_name *canonical;
+	  char *fullform;
+	  struct cleanup *cleanup;
+
+	  canonical = &self->canonical_names[j];
+	  fullform = canonical_to_fullform (canonical);
+	  cleanup = make_cleanup (xfree, fullform);
+
+	  if (strcmp (name, fullform) == 0)
 	    add_sal_to_sals_basic (&lsal.sals, &result->sals[j]);
+
+	  do_cleanups (cleanup);
 	}
 
       if (lsal.sals.nelts > 0)
@@ -1247,6 +1302,44 @@ convert_results_to_lsals (struct linespec_state *self,
   VEC_safe_push (linespec_sals, self->canonical->sals, &lsal);
 }
 
+/* A structure that contains two string representations of a struct
+   linespec_canonical_name:
+     - one where the the symtab's fullname is used;
+     - one where the filename followed the "set filename-display"
+       setting.  */
+
+struct decode_line_2_item
+{
+  /* The form using symtab_to_fullname.
+     It must be xfree'ed after use.  */
+  char *fullform;
+
+  /* The form using symtab_to_filename_for_display.
+     It must be xfree'ed after use.  */
+  char *displayform;
+
+  /* Field is initialized to zero and it is set to one if the user
+     requested breakpoint for this entry.  */
+  unsigned int selected : 1;
+};
+
+/* Helper for qsort to sort decode_line_2_item entries by DISPLAYFORM and
+   secondarily by FULLFORM.  */
+
+static int
+decode_line_2_compare_items (const void *ap, const void *bp)
+{
+  const struct decode_line_2_item *a = ap;
+  const struct decode_line_2_item *b = bp;
+  int retval;
+
+  retval = strcmp (a->displayform, b->displayform);
+  if (retval != 0)
+    return retval;
+
+  return strcmp (a->fullform, b->fullform);
+}
+
 /* Handle multiple results in RESULT depending on SELECT_MODE.  This
    will either return normally, throw an exception on multiple
    results, or present a menu to the user.  On return, the SALS vector
@@ -1257,58 +1350,80 @@ decode_line_2 (struct linespec_state *self,
 	       struct symtabs_and_lines *result,
 	       const char *select_mode)
 {
-  const char *iter;
   char *args, *prompt;
   int i;
   struct cleanup *old_chain;
-  VEC (const_char_ptr) *item_names = NULL, *filters = NULL;
+  VEC (const_char_ptr) *filters = NULL;
   struct get_number_or_range_state state;
+  struct decode_line_2_item *items;
+  int items_count;
 
   gdb_assert (select_mode != multiple_symbols_all);
   gdb_assert (self->canonical != NULL);
+  gdb_assert (result->nelts >= 1);
 
-  old_chain = make_cleanup (VEC_cleanup (const_char_ptr), &item_names);
-  make_cleanup (VEC_cleanup (const_char_ptr), &filters);
-  for (i = 0; i < result->nelts; ++i)
+  old_chain = make_cleanup (VEC_cleanup (const_char_ptr), &filters);
+
+  /* Prepare ITEMS array.  */
+  items_count = result->nelts;
+  items = xmalloc (sizeof (*items) * items_count);
+  make_cleanup (xfree, items);
+  for (i = 0; i < items_count; ++i)
     {
-      int j, found = 0;
-      const char *iter;
+      const struct linespec_canonical_name *canonical;
+      struct decode_line_2_item *item;
 
-      gdb_assert (self->canonical_names[i] != NULL);
-      for (j = 0; VEC_iterate (const_char_ptr, item_names, j, iter); ++j)
+      canonical = &self->canonical_names[i];
+      gdb_assert (canonical->suffix != NULL);
+      item = &items[i];
+
+      item->fullform = canonical_to_fullform (canonical);
+      make_cleanup (xfree, item->fullform);
+
+      if (canonical->symtab == NULL)
+	item->displayform = canonical->suffix;
+      else
 	{
-	  if (strcmp (iter, self->canonical_names[i]) == 0)
-	    {
-	      found = 1;
-	      break;
-	    }
+	  const char *fn_for_display;
+
+	  fn_for_display = symtab_to_filename_for_display (canonical->symtab);
+	  item->displayform = xstrprintf ("%s:%s", fn_for_display,
+					  canonical->suffix);
+	  make_cleanup (xfree, item->displayform);
 	}
 
-      if (!found)
-	VEC_safe_push (const_char_ptr, item_names, self->canonical_names[i]);
+      item->selected = 0;
     }
 
-  if (select_mode == multiple_symbols_cancel
-      && VEC_length (const_char_ptr, item_names) > 1)
+  /* Sort the list of method names.  */
+  qsort (items, items_count, sizeof (*items), decode_line_2_compare_items);
+
+  /* Remove entries with the same FULLFORM.  */
+  if (items_count >= 2)
+    {
+      struct decode_line_2_item *dst, *src;
+
+      dst = items;
+      for (src = &items[1]; src < &items[items_count]; src++)
+	if (strcmp (src->fullform, dst->fullform) != 0)
+	  *++dst = *src;
+      items_count = dst + 1 - items;
+    }
+
+  if (select_mode == multiple_symbols_cancel && items_count > 1)
     error (_("canceled because the command is ambiguous\n"
 	     "See set/show multiple-symbol."));
   
-  if (select_mode == multiple_symbols_all
-      || VEC_length (const_char_ptr, item_names) == 1)
+  if (select_mode == multiple_symbols_all || items_count == 1)
     {
       do_cleanups (old_chain);
       convert_results_to_lsals (self, result);
       return;
     }
 
-  /* Sort the list of method names alphabetically.  */
-  qsort (VEC_address (const_char_ptr, item_names),
-	 VEC_length (const_char_ptr, item_names),
-	 sizeof (const_char_ptr), compare_strings);
-
   printf_unfiltered (_("[0] cancel\n[1] all\n"));
-  for (i = 0; VEC_iterate (const_char_ptr, item_names, i, iter); ++i)
-    printf_unfiltered ("[%d] %s\n", i + 2, iter);
+  for (i = 0; i < items_count; i++)
+    printf_unfiltered ("[%d] %s\n", i + 2, items[i].displayform);
 
   prompt = getenv ("PS2");
   if (prompt == NULL)
@@ -1343,21 +1458,21 @@ decode_line_2 (struct linespec_state *self,
 	}
 
       num -= 2;
-      if (num >= VEC_length (const_char_ptr, item_names))
+      if (num >= items_count)
 	printf_unfiltered (_("No choice number %d.\n"), num);
       else
 	{
-	  const char *elt = VEC_index (const_char_ptr, item_names, num);
+	  struct decode_line_2_item *item = &items[num];
 
-	  if (elt != NULL)
+	  if (!item->selected)
 	    {
-	      VEC_safe_push (const_char_ptr, filters, elt);
-	      VEC_replace (const_char_ptr, item_names, num, NULL);
+	      VEC_safe_push (const_char_ptr, filters, item->fullform);
+	      item->selected = 1;
 	    }
 	  else
 	    {
 	      printf_unfiltered (_("duplicate request for %d ignored.\n"),
-				 num);
+				 num + 2);
 	    }
 	}
     }
@@ -2326,8 +2441,8 @@ decode_line_full (char **argptr, int flags,
       make_cleanup (xfree, state->canonical_names);
       for (i = 0; i < result.nelts; ++i)
 	{
-	  gdb_assert (state->canonical_names[i] != NULL);
-	  make_cleanup (xfree, state->canonical_names[i]);
+	  gdb_assert (state->canonical_names[i].suffix != NULL);
+	  make_cleanup (xfree, state->canonical_names[i].suffix);
 	}
     }
 
@@ -2607,17 +2722,14 @@ lookup_prefix_sym (struct linespec_state *state, VEC (symtab_p) *file_symtabs,
 	}
       else
 	{
-	  struct block *search_block;
-
 	  /* Program spaces that are executing startup should have
 	     been filtered out earlier.  */
 	  gdb_assert (!SYMTAB_PSPACE (elt)->executing_startup);
 	  set_current_program_space (SYMTAB_PSPACE (elt));
-	  search_block = get_search_block (elt);
-	  LA_ITERATE_OVER_SYMBOLS (search_block, class_name, STRUCT_DOMAIN,
-				   collect_one_symbol, &collector);
-	  LA_ITERATE_OVER_SYMBOLS (search_block, class_name, VAR_DOMAIN,
-				   collect_one_symbol, &collector);
+	  iterate_over_file_blocks (elt, class_name, STRUCT_DOMAIN,
+				    collect_one_symbol, &collector);
+	  iterate_over_file_blocks (elt, class_name, VAR_DOMAIN,
+				    collect_one_symbol, &collector);
 	}
     }
 
@@ -3072,7 +3184,7 @@ find_label_symbols (struct linespec_state *self,
   if (function_symbols == NULL)
     {
       set_current_program_space (self->program_space);
-      block = get_search_block (NULL);
+      block = get_current_search_block ();
 
       for (;
 	   block && !BLOCK_FUNCTION (block);
@@ -3476,9 +3588,8 @@ add_matching_symbols_to_info (const char *name,
 	     been filtered out earlier.  */
 	  gdb_assert (!SYMTAB_PSPACE (elt)->executing_startup);
 	  set_current_program_space (SYMTAB_PSPACE (elt));
-	  LA_ITERATE_OVER_SYMBOLS (get_search_block (elt), name,
-				   VAR_DOMAIN, collect_symbols,
-				   info);
+	  iterate_over_file_blocks (elt, name, VAR_DOMAIN,
+				    collect_symbols, info);
 	}
     }
 }

@@ -1,3 +1,210 @@
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* target.c (target_read_stralloc, target_fileio_read_alloc):
+	*Cast pointer to 'gdb_byte *' in target call.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* corefile.c (read_memory_string): Cast pointer to gdb_byte* in
+	call.
+
+2013-03-07  Keith Seitz  <keiths@redhat.com>
+
+	* breakpoint.c (catch_syscall_split_args): Use skip_spaces.
+	(trace_pass_command): Likewise.
+	* cli/cli-cmds.c: Include cli/cli-utils.h.
+	(source_command): Use skip-spaces.
+	(disassemble_command): Likewise.
+	* findcmd.c: Include cli/cli-utils.h.
+	(parse_find_args): Use skip_spaces.
+	* go32-nat.c: Include cli/cli-utils.h.
+	(go32_sldt): Use skip_spaces.
+	(go32_sgdt): Likewise.
+	(go32_sidt): Likewise.
+	(go32_pde): Likewise.
+	(go32_pte): Likewise.
+	(go32_pte_for_address): Likewise.
+	* infcmd.c: Include cli/cli-utils.h.
+	(registers_info): Use skip_spaces.
+	* linux-tdep.c (read_mapping): Use skip_spaces_const.
+	(linux_info_proc): Likewise.
+	* linux-thread-db.c: Include cli/cli-utils.h.
+	(info_auto_load_libthread_db): Use skip_spaces_const.
+	* m32r-rom.c: Include cli/cli-utils.h.
+	(m32r_upload_command): Use skip_spaces.
+	* maint.c: Include cli/cli-utils.h.
+	(maintenance_translate_address): Use skip_spaces.
+	* mi/mi-parse.c: Include cli/cli-utils.h.
+	(mi_parse_argv): Use skip_spaces.
+	(mi_parse): Likewise.
+	* minsyms.c: Include cli/cli-utils.h.
+	(msymbol_hash_iw): Use skip_spaces_const.
+	* objc-lang.c: Include cli/cli-utils.h.
+	(parse_selector): Use skip_spaces.
+	(parse_method): Likewise.
+	* python/python.c: Include cli/cli-utils.h.
+	(python_interactive_command)[HAVE_PYTHON]: Use skip_spaces.
+	(python_command)[HAVE_PYTHON]: Likewise.
+	(python_interactive_command)[!HAVE_PYTHON]: Likewise.
+	* remote-m32r-sdi.c: Include cli/cli-utils.h.
+	(m32r_load): Use skip_spaces.
+	* serial.c: Include cli/cli-utils.h.
+	(serial_open): Use skip_spaces_const.
+	* stack.c: Include cli/cli-utils.h.
+	(parse_frame_specification_1): Use skip_spaces_const.
+	* symfile.c: Include cli/cli-utils.h.
+	(set_ext_lang_command): Use skip_spaces.
+	* symtab.c: Include cli/cli-utils.h.
+	(rbreak_command): Use skip_spaces.
+	* thread.c (thread_name_command): Use skip_spaces.
+	* tracepoint.c (validate_actionline): Use skip_spaces.
+	(encode_actions_1): Likewise.
+	(trace_find_range_command): Likewise.
+	(trace_find_outside_command): Likewise.
+	(trace_dump_actions): Likewise.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* c-lang.c (parse_one_string): Cast argument to gdb_byte *.
+	* expprint.c (print_subexp_standard): Likewise.
+	* utils.c (host_char_to_target): Likewise.
+	* valprint.c (generic_emit_char, generic_printstr): Likewise.
+	* varobj.c (value_get_print_value): Change type of local to char*.
+	Cast it gdb_byte * in call to language printer.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* charset.c (struct wchar_iterator) <input>: Change type to 'const
+	gdb_byte *'.
+	(make_wchar_iterator): Remove cast to char*.
+	(wchar_iterate): Change type of local.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* regcache.c (regcache_xmalloc_1): Call XCALLOC with signed char
+	for 'regcache->register_status'.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* breakpoint.c (breakpoint_xfer_memory): Change type of local to
+	int.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* stap-probe.c (handle_stap_probe): Add cast to char*.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* linux-record.c (record_linux_system_call) <gdb_sys_msgrcv,
+	RECORD_MSGRCV>: Pass a signed variable to
+	regcache_raw_read_signed, instead of an unsigned one.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* remote-notif.c (notif_debug): Change type to int.
+	* remote-notif.h (notif_debug): Likewise.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* ser-tcp.c (tcp_retry_limit): Change type to unsigned int.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (hex2bin, bin2hex): Move extern declarations to ...
+	* remote.h (hex2bin, bin2hex): ... here.
+	* tracepoint.c (hex2bin, bin2hex): Remove extern declarations.
+
+2013-03-07  Eli Zaretskii  <eliz@gnu.org>
+
+	* utils.c (initialize_utils): Improve doc strings of "set/show
+	width", "set/show height", and "set/show pagination".
+
+2013-03-06  Keith Seitz  <keiths@redhat.com>
+
+	* ax-gdb.c (gen_printf): Make FORMAT const.
+	* ax-gdb.h (gen_printf): Likewise.
+	* ax-general.c (ax_string): Make STR const.
+	* ax.h (ax_string): Likewise.
+
+2013-03-06  Doug Evans  <dje@google.com>
+
+	* elfread.c (elf_symfile_read): Move debugging printf to more
+	logical location.
+
+2013-03-06  Pedro Alves  <palves@redhat.com>
+
+	* python/py-utils.c (target_string_to_unicode): Delete function.
+	* python/python-internal.h (target_string_to_unicode): Delete
+	declaration.
+
+2013-03-06  Pierre Muller  <muller@sourceware.org>
+
+	* linespec.c (get_current_search_block): ARI fix, use (void)
+	for empty parameter list.
+
+2013-03-05  Doug Evans  <dje@google.com>
+
+	* ada-lang.c (ada_lookup_symbol_list_worker): New function, contents
+	of old ada_lookup_symbol_list.  In !full_search case, don't
+	search superblocks.
+	(ada_lookup_symbol_list): Delete arg full_search, all callers
+	updated.  Call ada_lookup_symbol_list_worker.
+	(ada_iterate_over_symbols): Call ada_lookup_symbol_list_worker.
+	* ada-lang.h (ada_lookup_symbol_list): Update.
+	* language.h (language_defn): Update comment for
+	la_iterate_over_symbols.
+	* linespec.c (iterate_over_file_blocks): New function.
+	(iterate_over_all_matching_symtabs): Call it.
+	(lookup_prefix_sym): Ditto.
+	(get_current_search_block): New function.
+	(get_search_block): Delete.
+	(find_label_symbols): Call get_current_search_block.
+	(add_matching_symbols_to_info): Call iterate_over_file_blocks.
+	* symtab.c (iterate_over_symbols): Don't search superblocks.
+
+2013-03-05  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-decode.c (add_setshow_zuinteger_unlimited_cmd): Change
+	parameter VAR's type from "unsigned int" to "int".
+	* command.h (var_zuinteger_unlimited): Update its comments.
+	(add_setshow_zuinteger_unlimited_cmd): Update the declaration.
+
+2013-03-05  Corinna Vinschen  <vinschen@redhat.de>
+
+	* NEWS: Mention new target x86_64-*-cygwin*.
+
+2013-03-05  Corinna Vinschen  <vinschen@redhat.de>
+
+	* configure.host: Add x86_64-*-cygwin* as host.
+	* configure.tgt: Add x86_64-*-cygwin* as target.
+	* config/i386/cygwin64.mh: New file.
+
+2013-03-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linespec.c (decode_line_2): Fix duplicate request off by two message.
+
+2013-03-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linespec.c (struct linespec_canonical_name): New.
+	(struct linespec_state): Change canonical_names type to it.
+	(add_sal_to_sals): Change variable canonical_name to canonical.  Change
+	xrealloc element size.  Initialize the different CANONICAL fields.
+	(canonical_to_fullform): New.
+	(filter_results): Use it.  Add variables canonical, fullform and
+	cleanup.
+	(struct decode_line_2_item, decode_line_2_compare_items): New.
+	(decode_line_2): Remove variables iter and item_names, add variables
+	items and items_count.  Modify the code for these new variables.
+
+2013-03-04  Corinna Vinschen  <vinschen@redhat.com>
+
+	* coff-pe-read.c (read_pe_exported_syms): Don't return without
+	calling do_cleanup.
+
+2013-03-04  Luis Machado  <lgustavo@codesourcery.com>
+
+	* tracepoint.c (build_traceframe_info): Add code for byte order.
+
 2013-03-02  Kevin Buettner  <kevinb@redhat.com>
 
 	* v850-tdep.c: (v850e2_register_name): Revise system register
