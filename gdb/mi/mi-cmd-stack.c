@@ -35,6 +35,7 @@
 #include "mi-getopt.h"
 #include "python/python.h"
 #include <ctype.h>
+
 enum what_to_list { locals, arguments, all };
 
 static void list_args_or_locals (enum what_to_list what, 
@@ -45,8 +46,10 @@ static void list_args_or_locals (enum what_to_list what,
 static int frame_filters = 0;
 
 void
-stack_enable_frame_filters (void)
+mi_cmd_enable_frame_filters (char *command, char **argv, int argc)
 {
+  if (argc != 0)
+    error (_("-enable-frame-filters: no arguments allowed"));
   frame_filters = 1;
 }
 
@@ -152,7 +155,6 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
      frame-filters are disabled.  */
   if (! frame_filters || raw_arg || result == PY_BT_ERROR
       || result == PY_BT_NO_FILTERS)
-
     {
       /* Now let's print the frames up to frame_high, or until there are
 	 frames in the stack.  */

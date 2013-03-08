@@ -19,7 +19,7 @@
 import gdb
 import copy
 from gdb.FrameIterator import FrameIterator
-from gdb.FrameWrapper import FrameWrapper
+from gdb.FrameDecorator import FrameDecorator
 import itertools
 
 def _get_priority(filter_item):

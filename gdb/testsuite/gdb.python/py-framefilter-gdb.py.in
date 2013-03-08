@@ -17,7 +17,7 @@
 # frame-filters.
 import gdb
 import itertools
-from gdb.FrameWrapper import FrameWrapper
+from gdb.FrameDecorator import FrameDecorator
 
 
 class FrameObjFile ():

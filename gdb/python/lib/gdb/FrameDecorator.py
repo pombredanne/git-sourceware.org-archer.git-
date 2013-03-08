@@ -1,4 +1,4 @@
-# Copyright (C) 2012, 2013 Free Software Foundation, Inc.
+# Copyright (C) 2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -15,33 +15,36 @@
 
 import gdb
 
-class FrameWrapper(object):
-    """Basic implementation of a Frame Wrapper"""
+class FrameDecorator(object):
+    """Basic implementation of a Frame Decorator"""
 
-    """ This base frame wrapper wraps a frame or another frame
-    wrapper, and provides convenience methods.  If this object is
-    wrapping a frame wrapper, defer to that wrapped object's method if
-    it has one.  This allows for frame wrappers that have sub-classed
-    FrameWrapper, but also wrap other frame wrappers on the same
-    frame to correctly execute.
+    """ This base frame decorator decorates a frame or another frame
+    decorator, and provides convenience methods.  If this object is
+    wrapping a frame decorator, defer to that wrapped object's method
+    if it has one.  This allows for frame decorators that have
+    sub-classed FrameDecorators, but also wrap other frame decorators
+    on the same frame to correctly execute.
 
     E.g
 
     If the result of frame filters running means we have one gdb.Frame
-    wrapped by multiple frame wrappers, all sub-classed from
-    FrameWrapper:
+    wrapped by multiple frame decorators, all sub-classed from
+    FrameDecorator, the resulting hierarchy will be:
 
-    Wrapper1(Wrapper2(FrameWrapper(gdb.Frame)))
+    Decorator1
+      -- (wraps) Decorator2
+        -- (wraps) FrameDecorator
+          -- (wraps) gdb.Frame
 
-    In this case we have two frame wrappers, both of which are
-    sub-classed from FrameWrapper.  If Wrapper1 just overrides the
+    In this case we have two frame decorators, both of which are
+    sub-classed from FrameDecorator.  If Decorator1 just overrides the
     'function' method, then all of the other methods are carried out
-    by the super-class FrameWrapper.  But Wrapper2 may have
-    overriden other methods, so FrameWrapper will look at the
+    by the super-class FrameDecorator.  But Decorator2 may have
+    overriden other methods, so FrameDecorator will look at the
     'base' parameter and defer to that class's methods.  And so on,
     down the chain."""
 
-    # 'base' can refer to a gdb.Frame or another frame filter.  In
+    # 'base' can refer to a gdb.Frame or another frame decorator.  In
     # the latter case, the child class will have called the super
     # method and base will be an object conforming to the Frame Filter
     # class.
@@ -173,9 +176,9 @@ class FrameWrapper(object):
             return None
 
     def inferior_frame(self):
-        """ Return the gdb.Frame underpinning this frame wrapper."""
+        """ Return the gdb.Frame underpinning this frame decorator."""
 
-        # If 'base' is a frame wrapper, we want to call its inferior
+        # If 'base' is a frame decorator, we want to call its inferior
         # frame method.  If 'base' is a gdb.Frame, just return that.
         if hasattr(self.base, "inferior_frame"):
             return self.base.inferior_frame()

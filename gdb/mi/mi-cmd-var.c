@@ -844,15 +844,6 @@ mi_cmd_enable_pretty_printing (char *command, char **argv, int argc)
 }
 
 void
-mi_cmd_enable_frame_filters (char *command, char **argv, int argc)
-{
-  if (argc != 0)
-    error (_("-enable-frame-filters: no arguments allowed"));
-
-  stack_enable_frame_filters ();
-}
-
-void
 mi_cmd_var_set_update_range (char *command, char **argv, int argc)
 {
   struct varobj *var;

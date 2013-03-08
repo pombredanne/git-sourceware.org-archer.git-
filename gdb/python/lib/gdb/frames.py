@@ -18,7 +18,7 @@
 
 import gdb
 from gdb.FrameIterator import FrameIterator
-from gdb.FrameWrapper import FrameWrapper
+from gdb.FrameDecorator import FrameDecorator
 import itertools
 import gdb.command.frame_filters as ffc
 import collections
@@ -82,9 +82,9 @@ def execute_frame_filters(frame, frame_low, frame_high):
 
     frame_iterator = FrameIterator(frame)
 
-    # Apply a basic frame wrapper to all gdb.Frames.  This unifies the
+    # Apply a basic frame decorator to all gdb.Frames.  This unifies the
     # interface.
-    frame_iterator = itertools.imap(FrameWrapper, frame_iterator)
+    frame_iterator = itertools.imap(FrameDecorator, frame_iterator)
 
     for ff in sorted_list:
         frame_iterator = ff.filter(frame_iterator)

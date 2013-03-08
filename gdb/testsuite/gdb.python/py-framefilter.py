@@ -17,10 +17,10 @@
 # frame-filters.
 import gdb
 import itertools
-from gdb.FrameWrapper import FrameWrapper
+from gdb.FrameDecorator import FrameDecorator
 import copy
 
-class Reverse_Function (FrameWrapper):
+class Reverse_Function (FrameDecorator):
 
     def __init__(self, fobj):
         super(Reverse_Function, self).__init__(fobj)
@@ -34,7 +34,7 @@ class Reverse_Function (FrameWrapper):
             fname = fname[::-1]
         return fname
 
-class Dummy (FrameWrapper):
+class Dummy (FrameDecorator):
 
     def __init__(self, fobj):
         super(Dummy, self).__init__(fobj)
@@ -74,10 +74,10 @@ class FrameFilter ():
                                      frame_iter)
         return frame_iter
 
-class ElidingFrameWrapper(FrameWrapper):
+class ElidingFrameDecorator(FrameDecorator):
 
     def __init__(self, frame, elided_frames):
-        super(ElidingFrameWrapper, self).__init__(frame)
+        super(ElidingFrameDecorator, self).__init__(frame)
         self.elided_frames = elided_frames
 
     def elided(self):
@@ -100,7 +100,7 @@ class ElidingIterator:
         # two C frames to implement, and the first one we see is the
         # "sentinel".
         elided = next(self.input_iterator)
-        return ElidingFrameWrapper(frame, [elided])
+        return ElidingFrameDecorator(frame, [elided])
 
 class FrameElider ():
 
