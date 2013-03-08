@@ -24381,7 +24381,7 @@ should be taken that some frame filters may have been executed before,
 and that some frame filters will be executed after.
 
 The Python dictionary @code{gdb.frame_filters} contains key/object
-pairings that comprise a frame filter.  FrameAsn filters in this
+pairings that comprise a frame filter.  Frame filters in this
 dictionary are called @code{global} frame filters, and they are
 available when debugging all inferiors.  These frame filters must
 register with the dictionary directly.  In addition to the
@@ -24394,7 +24394,7 @@ object which also contains a @code{frame_filters} dictionary
 attribute.
 
 Each frame filter object in these dictionaries must conform to the
-frame filter interface definition (@pxref{Frame Filter API}).
+frame filter interface definition defined below.
 
 When a command is executed from @value{GDBN} that is compatible with
 frame filters, @value{GDBN} combines the @code{global},
@@ -24435,19 +24435,20 @@ The order that the frame filters will be called is:
 Filter3 -> Filter2 -> Filter1 -> Filter4
 @end smallexample
 
-Note that the output (a Python iterator) from @code{Filter3} is passed
-to the input of @code{Filter2}, and so on.
+Note that the output from @code{Filter3} is passed to the input of
+@code{Filter2}, and so on.
 
 This @code{filter} method is passed a Python iterator.  This iterator
-contains a sequence of frame decorators that wrap each @code{gdb.Frame},
-or another frame decorator that wraps a frame decorator.  The first filter
-that is executed in the sequence of frame filters will receive an
-iterator entirely comprised of @code{FrameDecorator} objects.
-However, after each frame filter is executed, the previous frame
-filter may have wrapped some or all of the frame decorators with their
-own frame decorator.  As frame decorators must also conform to a mandatory
-interface, these decorators can be assumed to act in a uniform manner
-(@pxref{Frame Decorator API}).
+contains a sequence of frame decorators that wrap each
+@code{gdb.Frame}, or a frame decorator that wraps another frame
+decorator.  The first filter that is executed in the sequence of frame
+filters will receive an iterator entirely comprised of default
+@code{FrameDecorator} objects.  However, after each frame filter is
+executed, the previous frame filter may have wrapped some or all of
+the frame decorators with their own frame decorator.  As frame
+decorators must also conform to a mandatory interface, these
+decorators can be assumed to act in a uniform manner (@pxref{Frame
+Decorator API}).
 
 This method must return an object conforming to the Python iterator
 protocol.  Each item in the iterator must be an object conforming to
@@ -24480,7 +24481,7 @@ filter will not be executed.  This attribute is mandatory.
 @defvar FrameFilter.priority
 The @code{priority} attribute must be Python integer.  This attribute
 controls the order of execution in relation to other frame filters.
-There is no imposed limits on the range of @code{priority} other than
+There are no imposed limits on the range of @code{priority} other than
 it must be a valid integer.  The higher the @code{priority} attribute,
 the sooner the frame filter will be executed in relation to other
 frame filters.  Although @code{priority} can be negative, it is
@@ -24501,11 +24502,11 @@ only be used in conjunction with frame filters.
 The purpose of a frame decorator is to customize the printed content
 of each @code{gdb.Frame} in commands where frame filters are executed.
 This concept is called decorating a frame.  Frame decorators decorate
-a @code{gdb.Frame} with customized data operation contained with each
-API call.  This separates the actual data contained in a
-@code{gdb.Frame} from the decorated data produced by a frame
-decorator.  This abstraction is necessary to maintain integrity of the
-data contained in each @code{gdb.Frame}.
+a @code{gdb.Frame} with Python code contained with each API call.
+This separates the actual data contained in a @code{gdb.Frame} from
+the decorated data produced by a frame decorator.  This abstraction is
+necessary to maintain integrity of the data contained in each
+@code{gdb.Frame}.
 
 Frame decorators have a mandatory interface, defined below.
 
@@ -24539,8 +24540,8 @@ the source iterator.  This will avoid printing the frame twice.
 This method returns the name of the function in the frame that is to
 be printed.
 
-This method must return a Python string describing the function, or a
-Python @code{None}.
+This method must return a Python string describing the function, or
+@code{None}.
 
 If this function returns @code{None}, @value{GDBN} will not print any
 data for this field.
@@ -24551,10 +24552,10 @@ data for this field.
 This method returns the address of the frame that is to be printed.
 
 This method must return a Python numeric integer type of sufficient
-size to describe the address of the frame, @code{None}.
+size to describe the address of the frame, or @code{None}.
 
-If this function returns @code{None}, @value{GDBN} will not print any
-data for this field.
+If this function returns a @code{None}, @value{GDBN} will not print
+any data for this field.
 @end defun
 
 @defun FrameDecorator.filename ()
@@ -24564,8 +24565,8 @@ This method returns the filename and path associated with this frame.
 This method must return a Python string containing the filename and
 the path to the object file backing the frame, or @code{None}.
 
-If this function returns @code{None}, @value{GDBN} will not print any
-data for this field.
+If this function returns a @code{None}, @value{GDBN} will not print
+any data for this field.
 @end defun
 
 
@@ -24574,18 +24575,17 @@ data for this field.
 This method returns the line number associated with the current
 position within the function addressed by this frame.
 
-This method must return a Python integer type, or a Python
-@code{None}.
+This method must return a Python integer type, or @code{None}.
 
-If this function returns @code{None}, @value{GDBN} will not print any
-data for this field.
+If this function returns a @code{None}, @value{GDBN} will not print
+any data for this field.
 @end defun
 
 @defun FrameDecorator.frame_args ()
 @anchor{frame_args}
 
-This method must return an iterable @code{None}.  This iterable must
-contain objects that implement two methods, described here.
+This method must return an iterable or @code{None}.  This iterable
+must contain objects that implement two methods, described here.
 
 The object must implement an @code{argument} method which takes no
 parameters and must return a @code{gdb.Symbol} (@pxref{Symbols In
@@ -24599,17 +24599,16 @@ look-up and print the value of the @code{gdb.Symbol} automatically.
 A brief example:
 
 @smallexample
-class SymValueWrapper ():
+class SymValueWrapper():
 
     def __init__(self, symbol, value):
         self.sym = symbol
         self.val = value
 
-    def value (self):
+    def value(self):
         return self.val
 
-    def symbol (self):
-
+    def symbol(self):
         return self.sym
 
 class SomeFrameDecorator()
@@ -24622,6 +24621,8 @@ class SomeFrameDecorator()
         except:
             return None
 
+        # Iterate over all symbols in a block.  Only add
+        # symbols that are arguments.
         for sym in block:
             if not sym.is_argument:
                 continue
@@ -24634,7 +24635,7 @@ class SomeFrameDecorator()
 @end smallexample
 
 Even if the @code{frame_args} method returns only a single object, it
-must be wrapped in an iterable.
+must be iterable.
 
 If this function returns @code{None}, @value{GDBN} will not print
 arguments for this frame.
@@ -24659,6 +24660,8 @@ class SomeFrameDecorator()
         except:
             return None
 
+        # Iterate over all symbols in a block.  Add all
+        # symbols, except arguments.
         for sym in block:
             if sym.is_argument:
                 continue
@@ -24682,7 +24685,7 @@ locals for this frame.
 This method must return the underlying @code{gdb.Frame} that this
 frame decorate is decorating.  @value{GDBN} requires the underlying
 frame for internal frame information to determine how to print certain
-values in frame printing
+values in frame printing.
 @end defun
 
 @node Writing a Frame Filter/Decorator
@@ -24696,13 +24699,13 @@ it must decide if it is to work on the data provided by
 @value{GDBN}.  In all cases, whether it works on the iterator or not,
 each frame filter must return an iterator.  A bare-bones frame filter
 follows the pattern in the following example.
-g
+
 @smallexample
 import gdb
 
-class FrameFilter ():
+class FrameFilter():
 
-    def __init__ (self):
+    def __init__(self):
         # Frame filter attribute creation.
         #
         # 'name' is the name of the filter that GDB will display.
@@ -24719,9 +24722,9 @@ class FrameFilter ():
 
         # Register this frame filter with the global frame_filters
         # dictionary.
-        gdb.frame_filters [self.name] = self
+        gdb.frame_filters[self.name] = self
 
-    def filter (self, frame_iter):
+    def filter(self, frame_iter):
         # Just return the iterator.
         return frame_iter
 @end smallexample
@@ -24746,10 +24749,10 @@ important consideration.  Generally, if a filter is specific to a set
 of code, it should be registered either in the @code{objfile} or
 @code{progspace} dictionaries as they are specific to the program
 currently loaded in @value{GDBN}.  The global dictionary is always
-present, and so will be the frame filters registered in it.  To avoid
+present, and so will the frame filters registered in it.  To avoid
 filters that may conflict, it is generally better to register frame
 filters against the dictionaries that more closely align with the
-usage of the filter currently in question
+usage of the filter currently in question.
 
 @value{GDBN} takes a hands-off approach to frame filter registration,
 therefore it is the frame filter's responsibility to ensure
@@ -24762,7 +24765,7 @@ Management}), the names @value{GDBN} will display are those contained
 in the @code{name} attribute.
 
 The final step of this example is the implementation of the
-@code{filter} method. As shown in the example comments, we define the
+@code{filter} method.  As shown in the example comments, we define the
 @code{filter} method and note that the method must take an iterator,
 and also must return an iterator.  In this bare-bones example, the
 frame filter is not very useful as it just returns the iterator
@@ -24807,17 +24810,17 @@ can substantially delay the printing of the backtrace which will
 result in large memory usage, and a poor user experience.
 
 @smallexample
-class InlineFilter ():
+class InlineFilter():
 
-    def __init__ (self):
+    def __init__(self):
         self.name = "Inlined Frame Class"
         self.priority = 100
         self.enabled = True
-        gdb.frame_filters [self.name] = self
+        gdb.frame_filters[self.name] = self
 
-    def filter (self, frame_iter):
-        frame_iter = itertools.imap (InlinedFrameDecorator,
-                                     frame_iter)
+    def filter(self, frame_iter):
+        frame_iter = itertools.imap(InlinedFrameDecorator,
+                                    frame_iter)
         return frame_iter
 @end smallexample
 
@@ -24831,13 +24834,13 @@ wraps the existing one.
 Below is the frame decorator for this example.
 
 @smallexample
-class InlinedFrameDecorator (FrameDecorator):
+class InlinedFrameDecorator(FrameDecorator):
 
     def __init__(self, fobj):
         super(InlinedFrameDecorator, self).__init__(fobj)
         self.fobj = fobj
 
-    def function (self):
+    def function(self):
         frame = self.inferior_frame()
         name = str(frame.name())
         function = str(frame.function())
@@ -24886,16 +24889,16 @@ example illustrates the approach an author might use.
 This example comprises of three sections.
 
 @smallexample
-class InlineFrameFilter ():
+class InlineFrameFilter():
 
-    def __init__ (self):
+    def __init__(self):
         self.name = "Inlined Frame Class"
         self.priority = 100
         self.enabled = True
-        gdb.frame_filters [self.name] = self
+        gdb.frame_filters[self.name] = self
 
-    def filter (self, frame_iter):
-        return ElidingInlineIterator (frame_iter)
+    def filter(self, frame_iter):
+        return ElidingInlineIterator(frame_iter)
 @end smallexample
 
 This frame filter is very similar to the other examples.  The only
