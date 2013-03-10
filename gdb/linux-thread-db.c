@@ -42,6 +42,7 @@
 #include "linux-procfs.h"
 #include "linux-osdata.h"
 #include "auto-load.h"
+#include "cli/cli-utils.h"
 
 #include <signal.h>
 #include <ctype.h>
@@ -1661,7 +1662,6 @@ thread_db_find_new_threads_2 (ptid_t ptid, int until_no_new)
 {
   td_err_e err = TD_OK;
   struct thread_db_info *info;
-  int pid = ptid_get_pid (ptid);
   int i, loop;
 
   info = get_thread_db_info (GET_PID (ptid));
@@ -1927,8 +1927,7 @@ info_auto_load_libthread_db (char *args, int from_tty)
   char *pids;
   int i;
 
-  while (isspace (*cs))
-    cs++;
+  cs = skip_spaces_const (cs);
   if (*cs)
     error (_("'info auto-load libthread-db' does not accept any parameters"));
 

@@ -252,9 +252,14 @@ dwarf2_find_location_expression (struct dwarf2_loclist_baton *baton,
 	  gdb_assert_not_reached ("bad debug_loc_kind");
 	}
 
-      /* Otherwise, a location expression entry.  */
-      low += base_address;
-      high += base_address;
+      /* Otherwise, a location expression entry.
+	 If the entry is from a DWO, don't add base address: the entry is
+	 from .debug_addr which has absolute addresses.  */
+      if (! baton->from_dwo)
+	{
+	  low += base_address;
+	  high += base_address;
+	}
 
       length = extract_unsigned_integer (loc_ptr, 2, byte_order);
       loc_ptr += 2;
@@ -788,6 +793,7 @@ static struct call_site_chain *
 call_site_find_chain_1 (struct gdbarch *gdbarch, CORE_ADDR caller_pc,
 			CORE_ADDR callee_pc)
 {
+  CORE_ADDR save_callee_pc = callee_pc;
   struct obstack addr_obstack;
   struct cleanup *back_to_retval, *back_to_workdata;
   struct call_site_chain *retval = NULL;
@@ -806,7 +812,7 @@ call_site_find_chain_1 (struct gdbarch *gdbarch, CORE_ADDR caller_pc,
   callee_pc = get_pc_function_start (callee_pc);
   if (callee_pc == 0)
     throw_error (NO_ENTRY_VALUE_ERROR, _("Unable to find function for PC %s"),
-		 paddress (gdbarch, callee_pc));
+		 paddress (gdbarch, save_callee_pc));
 
   back_to_retval = make_cleanup (free_current_contents, &retval);
 
@@ -2860,7 +2866,6 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	    size_t datalen;
 	    struct block *b;
 	    struct symbol *framefunc;
-	    LONGEST base_offset = 0;
 
 	    b = block_for_pc (expr->scope);
 
@@ -2878,7 +2883,8 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	    op_ptr = safe_read_sleb128 (op_ptr, op_end, &offset);
 	    dwarf2_compile_expr_to_ax (expr, loc, arch, addr_size, datastart,
 				       datastart + datalen, per_cu);
-	    require_rvalue (expr, loc);
+	    if (loc->kind == axs_lvalue_register)
+	      require_rvalue (expr, loc);
 
 	    if (offset != 0)
 	      {
@@ -4045,7 +4051,6 @@ loclist_describe_location (struct symbol *symbol, CORE_ADDR addr,
 {
   struct dwarf2_loclist_baton *dlbaton = SYMBOL_LOCATION_BATON (symbol);
   const gdb_byte *loc_ptr, *buf_end;
-  int first = 1;
   struct objfile *objfile = dwarf2_per_cu_objfile (dlbaton->per_cu);
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);

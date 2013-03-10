@@ -370,7 +370,6 @@ generic_val_print (struct type *type, const gdb_byte *valaddr,
 		   const struct generic_val_print_decorations *decorations)
 {
   struct gdbarch *gdbarch = get_type_arch (type);
-  enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   unsigned int i = 0;	/* Number of characters printed.  */
   unsigned len;
   struct type *elttype, *unresolved_elttype;
@@ -2072,7 +2071,7 @@ generic_emit_char (int c, struct type *type, struct ui_file *stream,
   make_cleanup_obstack_free (&output);
 
   convert_between_encodings (INTERMEDIATE_ENCODING, host_charset (),
-			     obstack_base (&wchar_buf),
+			     (gdb_byte *) obstack_base (&wchar_buf),
 			     obstack_object_size (&wchar_buf),
 			     sizeof (gdb_wchar_t), &output, translit_char);
   obstack_1grow (&output, '\0');
@@ -2427,7 +2426,7 @@ generic_printstr (struct ui_file *stream, struct type *type,
   make_cleanup_obstack_free (&output);
 
   convert_between_encodings (INTERMEDIATE_ENCODING, host_charset (),
-			     obstack_base (&wchar_buf),
+			     (gdb_byte *) obstack_base (&wchar_buf),
 			     obstack_object_size (&wchar_buf),
 			     sizeof (gdb_wchar_t), &output, translit_char);
   obstack_1grow (&output, '\0');

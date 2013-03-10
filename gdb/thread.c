@@ -1233,7 +1233,6 @@ thread_apply_command (char *tidlist, int from_tty)
     {
       struct thread_info *tp;
       int start;
-      char *p = tidlist;
 
       start = get_number_or_range (&state);
 
@@ -1301,8 +1300,7 @@ thread_name_command (char *arg, int from_tty)
   if (ptid_equal (inferior_ptid, null_ptid))
     error (_("No thread selected"));
 
-  while (arg && isspace (*arg))
-    ++arg;
+  arg = skip_spaces (arg);
 
   info = inferior_thread ();
   xfree (info->name);

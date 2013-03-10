@@ -163,10 +163,22 @@
   QLF2(X,X),			\
 }
 
+/* e.g. CRC32B <Wd>, <Wn>, <Wm>.  */
+#define QL_I3SAMEW		\
+{				\
+  QLF3(W,W,W),			\
+}
+
 /* e.g. SMULH <Xd>, <Xn>, <Xm>.  */
 #define QL_I3SAMEX		\
 {				\
   QLF3(X,X,X),			\
+}
+
+/* e.g. CRC32X <Wd>, <Wn>, <Xm>.  */
+#define QL_I3WWX		\
+{				\
+  QLF3(W,W,X),			\
 }
 
 /* e.g. UDIV <Xd>, <Xn>, <Xm>.  */
@@ -1199,11 +1211,14 @@ static const aarch64_feature_set aarch64_feature_simd =
   AARCH64_FEATURE (AARCH64_FEATURE_SIMD, 0);
 static const aarch64_feature_set aarch64_feature_crypto =
   AARCH64_FEATURE (AARCH64_FEATURE_CRYPTO, 0);
+static const aarch64_feature_set aarch64_feature_crc =
+  AARCH64_FEATURE (AARCH64_FEATURE_CRC, 0);
 
 #define CORE	&aarch64_feature_v8
 #define FP	&aarch64_feature_fp
 #define SIMD	&aarch64_feature_simd
 #define CRYPTO	&aarch64_feature_crypto
+#define CRC	&aarch64_feature_crc
 
 struct aarch64_opcode aarch64_opcode_table[] =
 {
@@ -1534,8 +1549,10 @@ struct aarch64_opcode aarch64_opcode_table[] =
   {"sqshrn2", 0x4f009400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFTN2, 0},
   {"sqrshrn", 0xf009c00, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFTN, 0},
   {"sqrshrn2", 0x4f009c00, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFTN2, 0},
-  {"sshll", 0xf00a400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSL), QL_VSHIFTL, 0},
-  {"sshll2", 0x4f00a400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSL), QL_VSHIFTL2, 0},
+  {"sshll", 0xf00a400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSL), QL_VSHIFTL, F_HAS_ALIAS},
+  {"sxtl", 0xf00a400, 0xff87fc00, asimdshf, OP_SXTL, SIMD, OP2 (Vd, Vn), QL_V2LONGBHS, F_ALIAS | F_CONV},
+  {"sshll2", 0x4f00a400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSL), QL_VSHIFTL2, F_HAS_ALIAS},
+  {"sxtl2", 0x4f00a400, 0xff87fc00, asimdshf, OP_SXTL2, SIMD, OP2 (Vd, Vn), QL_V2LONGBHS2, F_ALIAS | F_CONV},
   {"scvtf", 0xf00e400, 0xbf80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFT_SD, 0},
   {"fcvtzs", 0xf00fc00, 0xbf80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFT_SD, 0},
   {"ushr", 0x2f000400, 0xbf80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFT, 0},
@@ -1554,8 +1571,10 @@ struct aarch64_opcode aarch64_opcode_table[] =
   {"uqshrn2", 0x6f009400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFTN2, 0},
   {"uqrshrn", 0x2f009c00, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFTN, 0},
   {"uqrshrn2", 0x6f009c00, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFTN2, 0},
-  {"ushll", 0x2f00a400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSL), QL_VSHIFTL, 0},
-  {"ushll2", 0x6f00a400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSL), QL_VSHIFTL2, 0},
+  {"ushll", 0x2f00a400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSL), QL_VSHIFTL, F_HAS_ALIAS},
+  {"uxtl", 0x2f00a400, 0xff87fc00, asimdshf, OP_UXTL, SIMD, OP2 (Vd, Vn), QL_V2LONGBHS, F_ALIAS | F_CONV},
+  {"ushll2", 0x6f00a400, 0xff80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSL), QL_VSHIFTL2, F_HAS_ALIAS},
+  {"uxtl2", 0x6f00a400, 0xff87fc00, asimdshf, OP_UXTL2, SIMD, OP2 (Vd, Vn), QL_V2LONGBHS2, F_ALIAS | F_CONV},
   {"ucvtf", 0x2f00e400, 0xbf80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFT_SD, 0},
   {"fcvtzu", 0x2f00fc00, 0xbf80fc00, asimdshf, 0, SIMD, OP3 (Vd, Vn, IMM_VLSR), QL_VSHIFT_SD, 0},
   /* AdvSIMD TBL/TBX.  */
@@ -1806,6 +1825,15 @@ struct aarch64_opcode aarch64_opcode_table[] =
   {"asr", 0x1ac02800, 0x7fe0fc00, dp_2src, 0, CORE, OP3 (Rd, Rn, Rm), QL_I3SAMER, F_SF | F_ALIAS},
   {"rorv", 0x1ac02c00, 0x7fe0fc00, dp_2src, 0, CORE, OP3 (Rd, Rn, Rm), QL_I3SAMER, F_SF | F_HAS_ALIAS},
   {"ror", 0x1ac02c00, 0x7fe0fc00, dp_2src, 0, CORE, OP3 (Rd, Rn, Rm), QL_I3SAMER, F_SF | F_ALIAS},
+  /* CRC instructions.  */
+  {"crc32b", 0x1ac04000, 0xffe0fc00, dp_2src, 0, CRC, OP3 (Rd, Rn, Rm), QL_I3SAMEW, 0},
+  {"crc32h", 0x1ac04400, 0xffe0fc00, dp_2src, 0, CRC, OP3 (Rd, Rn, Rm), QL_I3SAMEW, 0},
+  {"crc32w", 0x1ac04800, 0xffe0fc00, dp_2src, 0, CRC, OP3 (Rd, Rn, Rm), QL_I3SAMEW, 0},
+  {"crc32x", 0x9ac04c00, 0xffe0fc00, dp_2src, 0, CRC, OP3 (Rd, Rn, Rm), QL_I3WWX, 0},
+  {"crc32cb", 0x1ac05000, 0xffe0fc00, dp_2src, 0, CRC, OP3 (Rd, Rn, Rm), QL_I3SAMEW, 0},
+  {"crc32ch", 0x1ac05400, 0xffe0fc00, dp_2src, 0, CRC, OP3 (Rd, Rn, Rm), QL_I3SAMEW, 0},
+  {"crc32cw", 0x1ac05800, 0xffe0fc00, dp_2src, 0, CRC, OP3 (Rd, Rn, Rm), QL_I3SAMEW, 0},
+  {"crc32cx", 0x9ac05c00, 0xffe0fc00, dp_2src, 0, CRC, OP3 (Rd, Rn, Rm), QL_I3WWX, 0},
   /* Data-processing (3 source).  */
   {"madd", 0x1b000000, 0x7fe08000, dp_3src, 0, CORE, OP4 (Rd, Rn, Rm, Ra), QL_I4SAMER, F_HAS_ALIAS | F_SF},
   {"mul", 0x1b007c00, 0x7fe0fc00, dp_3src, 0, CORE, OP3 (Rd, Rn, Rm), QL_I3SAMER, F_ALIAS | F_SF},

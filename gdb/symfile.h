@@ -159,9 +159,10 @@ struct quick_symbol_functions
   /* Expand and iterate over each "partial" symbol table in OBJFILE
      where the source file is named NAME.
 
-     If NAME is not absolute, a match after a '/' in the symbol
-     table's file name will also work.  FULL_PATH is the absolute file
-     name, and REAL_PATH is the same, run through gdb_realpath.
+     If NAME is not absolute, a match after a '/' in the symbol table's
+     file name will also work, REAL_PATH is NULL then.  If NAME is
+     absolute then REAL_PATH is non-NULL absolute file name as resolved
+     via gdb_realpath from NAME.
 
      If a match is found, the "partial" symbol table is expanded.
      Then, this calls iterate_over_some_symtabs (or equivalent) over
@@ -169,7 +170,6 @@ struct quick_symbol_functions
      The result of this call is returned.  */
   int (*map_symtabs_matching_filename) (struct objfile *objfile,
 					const char *name,
-					const char *full_path,
 					const char *real_path,
 					int (*callback) (struct symtab *,
 							 void *),
@@ -212,16 +212,17 @@ struct quick_symbol_functions
   /* Read all symbol tables associated with OBJFILE.  */
   void (*expand_all_symtabs) (struct objfile *objfile);
 
-  /* Read all symbol tables associated with OBJFILE which have the
-     file name FILENAME.
+  /* Read all symbol tables associated with OBJFILE which have
+     symtab_to_fullname equal to FULLNAME.
      This is for the purposes of examining code only, e.g., expand_line_sal.
      The routine may ignore debug info that is known to not be useful with
      code, e.g., DW_TAG_type_unit for dwarf debug info.  */
-  void (*expand_symtabs_with_filename) (struct objfile *objfile,
-					const char *filename);
+  void (*expand_symtabs_with_fullname) (struct objfile *objfile,
+					const char *fullname);
 
   /* Return the file name of the file holding the global symbol in OBJFILE
-     named NAME.  If no such symbol exists in OBJFILE, return NULL.  */
+     named NAME.  If no such symbol exists in OBJFILE, return NULL.
+     Only file extension of returned filename is recognized.  */
   const char *(*find_symbol_file) (struct objfile *objfile, const char *name);
 
   /* Find global or static symbols in all tables that are in NAMESPACE 
@@ -254,6 +255,8 @@ struct quick_symbol_functions
      FILE_MATCHER is called for each file in OBJFILE.  The file name
      and the DATA argument are passed to it.  If it returns zero, this
      file is skipped.  If FILE_MATCHER is NULL such file is not skipped.
+     If BASENAMES is non-zero the function should consider only base name of
+     DATA (passed file name is already only the lbasename part).
 
      Otherwise, if KIND does not match this symbol is skipped.
 
@@ -269,7 +272,7 @@ struct quick_symbol_functions
      functions.  */
   void (*expand_symtabs_matching)
     (struct objfile *objfile,
-     int (*file_matcher) (const char *, void *),
+     int (*file_matcher) (const char *, void *, int basenames),
      int (*name_matcher) (const char *, void *),
      enum search_domain kind,
      void *data);
@@ -505,19 +508,6 @@ extern struct section_addr_info
 
 extern void free_section_addr_info (struct section_addr_info *);
 
-
-/* Make a copy of the string at PTR with SIZE characters in the symbol
-   obstack (and add a null character at the end in the copy).  Returns
-   the address of the copy.  */
-
-extern char *obsavestring (const char *, int, struct obstack *);
-
-/* Concatenate NULL terminated variable argument list of `const char
-   *' strings; return the new string.  Space is found in the OBSTACKP.
-   Argument list must be terminated by a sentinel expression `(char *)
-   NULL'.  */
-
-extern char *obconcat (struct obstack *obstackp, ...) ATTRIBUTE_SENTINEL;
 
 			/*   Variables   */
 

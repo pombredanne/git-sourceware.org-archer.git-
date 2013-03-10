@@ -2558,17 +2558,15 @@ gen_trace_for_return_address (CORE_ADDR scope, struct gdbarch *gdbarch)
 struct agent_expr *
 gen_printf (CORE_ADDR scope, struct gdbarch *gdbarch,
 	    CORE_ADDR function, LONGEST channel,
-	    char *format, int fmtlen,
+	    const char *format, int fmtlen,
 	    struct format_piece *frags,
 	    int nargs, struct expression **exprs)
 {
-  struct expression *expr;
   struct cleanup *old_chain = 0;
   struct agent_expr *ax = new_agent_expr (gdbarch, scope);
   union exp_element *pc;
   struct axs_value value;
-  int i, tem, bot, fr, flen;
-  char *fmt;
+  int tem;
 
   old_chain = make_cleanup_free_agent_expr (ax);
 

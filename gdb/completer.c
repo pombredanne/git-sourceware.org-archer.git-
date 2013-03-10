@@ -199,7 +199,7 @@ location_completer (struct cmd_list_element *ignore,
   char *orig_text = text;
   size_t text_len;
 
-  /* Do we have an unquoted colon, as in "break foo.c::bar"?  */
+  /* Do we have an unquoted colon, as in "break foo.c:bar"?  */
   for (p = text; *p != '\0'; ++p)
     {
       if (*p == '\\' && p[1] == '\'')
@@ -787,7 +787,6 @@ VEC (char_ptr) *
 signal_completer (struct cmd_list_element *ignore,
 		  char *text, char *word)
 {
-  int i;
   VEC (char_ptr) *return_val = NULL;
   size_t len = strlen (word);
   enum gdb_signal signum;

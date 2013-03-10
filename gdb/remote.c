@@ -183,10 +183,6 @@ static void record_currthread (ptid_t currthread);
 
 static int fromhex (int a);
 
-extern int hex2bin (const char *hex, gdb_byte *bin, int count);
-
-extern int bin2hex (const gdb_byte *bin, char *hex, int count);
-
 static int putpkt_binary (char *buf, int cnt);
 
 static void check_binary_download (CORE_ADDR addr);
@@ -1284,6 +1280,7 @@ enum {
   PACKET_qXfer_fdpic,
   PACKET_QDisableRandomization,
   PACKET_QAgent,
+  PACKET_QTBuffer_size,
   PACKET_MAX
 };
 
@@ -3224,22 +3221,77 @@ send_interrupt_sequence (void)
 		    interrupt_sequence_mode);
 }
 
+
+/* If STOP_REPLY is a T stop reply, look for the "thread" register,
+   and extract the PTID.  Returns NULL_PTID if not found.  */
+
+static ptid_t
+stop_reply_extract_thread (char *stop_reply)
+{
+  if (stop_reply[0] == 'T' && strlen (stop_reply) > 3)
+    {
+      char *p;
+
+      /* Txx r:val ; r:val (...)  */
+      p = &stop_reply[3];
+
+      /* Look for "register" named "thread".  */
+      while (*p != '\0')
+	{
+	  char *p1;
+
+	  p1 = strchr (p, ':');
+	  if (p1 == NULL)
+	    return null_ptid;
+
+	  if (strncmp (p, "thread", p1 - p) == 0)
+	    return read_ptid (++p1, &p);
+
+	  p1 = strchr (p, ';');
+	  if (p1 == NULL)
+	    return null_ptid;
+	  p1++;
+
+	  p = p1;
+	}
+    }
+
+  return null_ptid;
+}
+
 /* Query the remote target for which is the current thread/process,
    add it to our tables, and update INFERIOR_PTID.  The caller is
    responsible for setting the state such that the remote end is ready
-   to return the current thread.  */
+   to return the current thread.
+
+   This function is called after handling the '?' or 'vRun' packets,
+   whose response is a stop reply from which we can also try
+   extracting the thread.  If the target doesn't support the explicit
+   qC query, we infer the current thread from that stop reply, passed
+   in in WAIT_STATUS, which may be NULL.  */
 
 static void
-add_current_inferior_and_thread (void)
+add_current_inferior_and_thread (char *wait_status)
 {
   struct remote_state *rs = get_remote_state ();
   int fake_pid_p = 0;
-  ptid_t ptid;
+  ptid_t ptid = null_ptid;
 
   inferior_ptid = null_ptid;
 
-  /* Now, if we have thread information, update inferior_ptid.  */
-  ptid = remote_current_thread (inferior_ptid);
+  /* Now, if we have thread information, update inferior_ptid.  First
+     if we have a stop reply handy, maybe it's a T stop reply with a
+     "thread" register we can extract the current thread from.  If
+     not, ask the remote which is the current thread, with qC.  The
+     former method avoids a roundtrip.  Note we don't use
+     remote_parse_stop_reply as that makes use of the target
+     architecture, which we haven't yet fully determined at this
+     point.  */
+  if (wait_status != NULL)
+    ptid = stop_reply_extract_thread (wait_status);
+  if (ptid_equal (ptid, null_ptid))
+    ptid = remote_current_thread (inferior_ptid);
+
   if (!ptid_equal (ptid, null_ptid))
     {
       if (!remote_multi_process_p (rs))
@@ -3400,7 +3452,7 @@ remote_start_remote (int from_tty, struct target_ops *target, int extended_p)
       /* Let the stub know that we want it to return the thread.  */
       set_continue_thread (minus_one_ptid);
 
-      add_current_inferior_and_thread ();
+      add_current_inferior_and_thread (wait_status);
 
       /* init_wait_for_inferior should be called before get_offsets in order
 	 to manage `inserted' flag in bp loc in a correct state.
@@ -3938,6 +3990,8 @@ static struct protocol_feature remote_protocol_features[] = {
   { "QDisableRandomization", PACKET_DISABLE, remote_supported_packet,
     PACKET_QDisableRandomization },
   { "QAgent", PACKET_DISABLE, remote_supported_packet, PACKET_QAgent},
+  { "QTBuffer:size", PACKET_DISABLE,
+    remote_supported_packet, PACKET_QTBuffer_size},
   { "tracenz", PACKET_DISABLE,
     remote_string_tracing_feature, -1 },
 };
@@ -5609,7 +5663,7 @@ Packet: '%s'\n"),
    Obviously, the reply in step #1.6 would be unexpected to a vStopped
    query.
 
-   To solve this, whenever we parse a %Stop notification sucessfully,
+   To solve this, whenever we parse a %Stop notification successfully,
    we mark the REMOTE_ASYNC_GET_PENDING_EVENTS_TOKEN, and carry on
    doing whatever we were doing:
 
@@ -7836,7 +7890,7 @@ extended_remote_run (char *args)
 
   if (packet_ok (rs->buf, &remote_protocol_packets[PACKET_vRun]) == PACKET_OK)
     {
-      /* We have a wait response; we don't need it, though.  All is well.  */
+      /* We have a wait response.  All is well.  */
       return 0;
     }
   else if (remote_protocol_packets[PACKET_vRun].support == PACKET_DISABLE)
@@ -7863,6 +7917,10 @@ static void
 extended_remote_create_inferior_1 (char *exec_file, char *args,
 				   char **env, int from_tty)
 {
+  int run_worked;
+  char *stop_reply;
+  struct remote_state *rs = get_remote_state ();
+
   /* If running asynchronously, register the target file descriptor
      with the event loop.  */
   if (target_can_async_p ())
@@ -7873,7 +7931,8 @@ extended_remote_create_inferior_1 (char *exec_file, char *args,
     extended_remote_disable_randomization (disable_randomization);
 
   /* Now restart the remote server.  */
-  if (extended_remote_run (args) == -1)
+  run_worked = extended_remote_run (args) != -1;
+  if (!run_worked)
     {
       /* vRun was not supported.  Fail if we need it to do what the
 	 user requested.  */
@@ -7895,7 +7954,9 @@ extended_remote_create_inferior_1 (char *exec_file, char *args,
       init_wait_for_inferior ();
     }
 
-  add_current_inferior_and_thread ();
+  /* vRun's success return is a stop reply.  */
+  stop_reply = run_worked ? rs->buf : NULL;
+  add_current_inferior_and_thread (stop_reply);
 
   /* Get updated offsets, if the stub uses qOffsets.  */
   get_offsets ();
@@ -10639,7 +10700,7 @@ remote_get_trace_status (struct trace_status *ts)
     return -1;
 
   /* We're working with a live target.  */
-  ts->from_file = 0;
+  ts->filename = NULL;
 
   if (*p++ != 'T')
     error (_("Bogus trace status reply from target: %s"), target_buf);
@@ -10980,6 +11041,38 @@ remote_get_min_fast_tracepoint_insn_len (void)
     }
 }
 
+static void
+remote_set_trace_buffer_size (LONGEST val)
+{
+  if (remote_protocol_packets[PACKET_QTBuffer_size].support !=
+      PACKET_DISABLE)
+    {
+      struct remote_state *rs = get_remote_state ();
+      char *buf = rs->buf;
+      char *endbuf = rs->buf + get_remote_packet_size ();
+      enum packet_result result;
+
+      gdb_assert (val >= 0 || val == -1);
+      buf += xsnprintf (buf, endbuf - buf, "QTBuffer:size:");
+      /* Send -1 as literal "-1" to avoid host size dependency.  */
+      if (val < 0)
+	{
+	  *buf++ = '-';
+          buf += hexnumstr (buf, (ULONGEST) -val);
+	}
+      else
+	buf += hexnumstr (buf, (ULONGEST) val);
+
+      putpkt (rs->buf);
+      remote_get_noisy_reply (&rs->buf, &rs->buf_size);
+      result = packet_ok (rs->buf,
+		  &remote_protocol_packets[PACKET_QTBuffer_size]);
+
+      if (result != PACKET_OK)
+	warning (_("Bogus reply from target: %s"), rs->buf);
+    }
+}
+
 static int
 remote_set_trace_notes (char *user, char *notes, char *stop_notes)
 {
@@ -11157,6 +11250,7 @@ Specify the serial device it is connected to\n\
   remote_ops.to_get_min_fast_tracepoint_insn_len = remote_get_min_fast_tracepoint_insn_len;
   remote_ops.to_set_disconnected_tracing = remote_set_disconnected_tracing;
   remote_ops.to_set_circular_trace_buffer = remote_set_circular_trace_buffer;
+  remote_ops.to_set_trace_buffer_size = remote_set_trace_buffer_size;
   remote_ops.to_set_trace_notes = remote_set_trace_notes;
   remote_ops.to_core_of_thread = remote_core_of_thread;
   remote_ops.to_verify_memory = remote_verify_memory;
@@ -11692,6 +11786,9 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_QAgent],
 			 "QAgent", "agent", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_QTBuffer_size],
+			 "QTBuffer:size", "trace-buffer-size", 0);
 
   /* Keep the old ``set remote Z-packet ...'' working.  Each individual
      Z sub-packet has its own set and show commands, but users may

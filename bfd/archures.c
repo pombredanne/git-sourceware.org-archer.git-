@@ -330,6 +330,7 @@ DESCRIPTION
 .#define bfd_mach_v850e1        '1'
 .#define bfd_mach_v850e2        0x4532
 .#define bfd_mach_v850e2v3      0x45325633
+.#define bfd_mach_v850e3v5      0x45335635 {* ('E'|'3'|'V'|'5') *}
 .  bfd_arch_arc,       {* ARC Cores *}
 .#define bfd_mach_arc_5         5
 .#define bfd_mach_arc_6         6
@@ -467,6 +468,8 @@ DESCRIPTION
 .#define bfd_mach_tilegx32  2
 .  bfd_arch_aarch64,   {* AArch64  *}
 .#define bfd_mach_aarch64 0
+.  bfd_arch_nios2,
+.#define bfd_mach_nios2	0
 .  bfd_arch_last
 .  };
 */
@@ -559,6 +562,7 @@ extern const bfd_arch_info_type bfd_mn10300_arch;
 extern const bfd_arch_info_type bfd_moxie_arch;
 extern const bfd_arch_info_type bfd_msp430_arch;
 extern const bfd_arch_info_type bfd_mt_arch;
+extern const bfd_arch_info_type bfd_nios2_arch;
 extern const bfd_arch_info_type bfd_ns32k_arch;
 extern const bfd_arch_info_type bfd_openrisc_arch;
 extern const bfd_arch_info_type bfd_or32_arch;
@@ -647,6 +651,7 @@ static const bfd_arch_info_type * const bfd_archures_list[] =
     &bfd_moxie_arch,
     &bfd_msp430_arch,
     &bfd_mt_arch,
+    &bfd_nios2_arch,
     &bfd_ns32k_arch,
     &bfd_openrisc_arch,
     &bfd_or32_arch,

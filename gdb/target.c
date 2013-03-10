@@ -693,6 +693,7 @@ update_current_target (void)
       INHERIT (to_get_min_fast_tracepoint_insn_len, t);
       INHERIT (to_set_disconnected_tracing, t);
       INHERIT (to_set_circular_trace_buffer, t);
+      INHERIT (to_set_trace_buffer_size, t);
       INHERIT (to_set_trace_notes, t);
       INHERIT (to_get_tib_address, t);
       INHERIT (to_set_permissions, t);
@@ -911,6 +912,9 @@ update_current_target (void)
 	    target_ignore);
   de_fault (to_set_circular_trace_buffer,
 	    (void (*) (int))
+	    target_ignore);
+  de_fault (to_set_trace_buffer_size,
+	    (void (*) (LONGEST))
 	    target_ignore);
   de_fault (to_set_trace_notes,
 	    (int (*) (char *, char *, char *))
@@ -1220,7 +1224,7 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 int
 target_read_string (CORE_ADDR memaddr, char **string, int len, int *errnop)
 {
-  int tlen, origlen, offset, i;
+  int tlen, offset, i;
   gdb_byte buf[4];
   int errcode = 0;
   char *buffer;
@@ -1234,8 +1238,6 @@ target_read_string (CORE_ADDR memaddr, char **string, int len, int *errnop)
   buffer_allocated = 4;
   buffer = xmalloc (buffer_allocated);
   bufptr = buffer;
-
-  origlen = len;
 
   while (len > 0)
     {
@@ -2361,10 +2363,11 @@ char *
 target_read_stralloc (struct target_ops *ops, enum target_object object,
 		      const char *annex)
 {
-  gdb_byte *buffer;
+  char *buffer;
   LONGEST i, transferred;
 
-  transferred = target_read_alloc_1 (ops, object, annex, &buffer, 1);
+  transferred = target_read_alloc_1 (ops, object, annex,
+				     (gdb_byte **) &buffer, 1);
 
   if (transferred < 0)
     return NULL;
@@ -2384,7 +2387,7 @@ target_read_stralloc (struct target_ops *ops, enum target_object object,
 	break;
       }
 
-  return (char *) buffer;
+  return buffer;
 }
 
 /* Memory transfer methods.  */
@@ -3524,10 +3527,11 @@ target_fileio_read_alloc (const char *filename, gdb_byte **buf_p)
 char *
 target_fileio_read_stralloc (const char *filename)
 {
-  gdb_byte *buffer;
+  char *buffer;
   LONGEST i, transferred;
 
-  transferred = target_fileio_read_alloc_1 (filename, &buffer, 1);
+  transferred = target_fileio_read_alloc_1 (filename,
+					    (gdb_byte **) &buffer, 1);
 
   if (transferred < 0)
     return NULL;
@@ -3547,7 +3551,7 @@ target_fileio_read_stralloc (const char *filename)
 	break;
       }
 
-  return (char *) buffer;
+  return buffer;
 }
 
 
@@ -3959,7 +3963,7 @@ debug_print_register (const char * func,
     {
       enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
       int i, size = register_size (gdbarch, regno);
-      unsigned char buf[MAX_REGISTER_SIZE];
+      gdb_byte buf[MAX_REGISTER_SIZE];
 
       regcache_raw_collect (regcache, regno, buf);
       fprintf_unfiltered (gdb_stdlog, " = ");

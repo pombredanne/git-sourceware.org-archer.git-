@@ -1,6 +1,6 @@
 /* Everything about signal catchpoints, for GDB.
 
-   Copyright (C) 2011, 2012 Free Software Foundation, Inc.
+   Copyright (C) 2011-2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -444,7 +444,6 @@ catch_signal_command (char *arg, int from_tty,
 {
   int tempflag, catch_all = 0;
   VEC (gdb_signal_type) *filter;
-  struct gdbarch *gdbarch = get_current_arch ();
 
   tempflag = get_cmd_context (command) == CATCH_TEMPORARY;
 

@@ -1,6 +1,6 @@
 /* Handle lists of commands, their decoding and documentation, for GDB.
 
-   Copyright (c) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -708,7 +708,7 @@ add_setshow_zinteger_cmd (char *name, enum command_class class,
 void
 add_setshow_zuinteger_unlimited_cmd (char *name,
 				     enum command_class class,
-				     unsigned int *var,
+				     int *var,
 				     const char *set_doc,
 				     const char *show_doc,
 				     const char *help_doc,
@@ -917,7 +917,6 @@ void
 help_cmd (char *command, struct ui_file *stream)
 {
   struct cmd_list_element *c;
-  extern struct cmd_list_element *cmdlist;
 
   if (!command)
     {
@@ -1049,7 +1048,6 @@ static void
 help_all (struct ui_file *stream)
 {
   struct cmd_list_element *c;
-  extern struct cmd_list_element *cmdlist;
   int seen_unclassified = 0;
 
   for (c = cmdlist; c; c = c->next)

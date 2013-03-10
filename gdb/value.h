@@ -90,8 +90,6 @@ extern void set_value_offset (struct value *, int offset);
    not_lval and be done with it?  */
 
 extern int deprecated_value_modifiable (struct value *value);
-extern void deprecated_set_value_modifiable (struct value *value,
-					     int modifiable);
 
 /* If a value represents a C++ object, then the `type' field gives the
    object's compile-time type.  If the object actually belongs to some
@@ -482,6 +480,12 @@ extern void read_value_memory (struct value *val, int embedded_offset,
 			       int stack, CORE_ADDR memaddr,
 			       gdb_byte *buffer, size_t length);
 
+/* Cast SCALAR_VALUE to the element type of VECTOR_TYPE, then replicate
+   into each element of a new vector value with VECTOR_TYPE.  */
+
+struct value *value_vector_widen (struct value *scalar_value,
+				  struct type *vector_type);
+
 
 
 #include "symtab.h"
@@ -645,7 +649,7 @@ enum oload_search_type { NON_METHOD, METHOD, BOTH };
 
 extern int find_overload_match (struct value **args, int nargs,
 				const char *name,
-				enum oload_search_type method, int lax,
+				enum oload_search_type method,
 				struct value **objp, struct symbol *fsym,
 				struct value **valp, struct symbol **symp,
 				int *staticp, const int no_adl);
@@ -691,6 +695,10 @@ extern int value_in (struct value *element, struct value *set);
 
 extern int value_bit_index (struct type *type, const gdb_byte *addr,
 			    int index);
+
+extern enum return_value_convention
+struct_return_convention (struct gdbarch *gdbarch, struct value *function,
+			  struct type *value_type);
 
 extern int using_struct_return (struct gdbarch *gdbarch,
 				struct value *function,

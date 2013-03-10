@@ -219,7 +219,7 @@ extern struct value *ada_get_decoded_value (struct value *value);
 
 extern struct type *ada_get_decoded_type (struct type *type);
 
-extern char *ada_decode_symbol (const struct general_symbol_info*);
+extern const char *ada_decode_symbol (const struct general_symbol_info *);
 
 extern const char *ada_decode (const char*);
 
@@ -228,8 +228,7 @@ extern enum language ada_update_initial_language (enum language);
 extern void clear_ada_sym_cache (void);
 
 extern int ada_lookup_symbol_list (const char *, const struct block *,
-                                   domain_enum, struct ada_symbol_info**,
-				   int);
+                                   domain_enum, struct ada_symbol_info**);
 
 extern char *ada_fold_name (const char *);
 

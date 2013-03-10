@@ -44,6 +44,7 @@
 #include "infcall.h"
 #include "valprint.h"
 #include "gdb_assert.h"
+#include "cli/cli-utils.h"
 
 #include <ctype.h>
 
@@ -812,15 +813,13 @@ parse_selector (char *method, char **selector)
 
   s1 = method;
 
-  while (isspace (*s1))
-    s1++;
+  s1 = skip_spaces (s1);
   if (*s1 == '\'') 
     {
       found_quote = 1;
       s1++;
     }
-  while (isspace (*s1))
-    s1++;
+  s1 = skip_spaces (s1);
    
   nselector = s1;
   s2 = s1;
@@ -839,14 +838,12 @@ parse_selector (char *method, char **selector)
     }
   *s1++ = '\0';
 
-  while (isspace (*s2))
-    s2++;
+  s2 = skip_spaces (s2);
   if (found_quote)
     {
       if (*s2 == '\'') 
 	s2++;
-      while (isspace (*s2))
-	s2++;
+      s2 = skip_spaces (s2);
     }
 
   if (selector != NULL)
@@ -875,21 +872,18 @@ parse_method (char *method, char *type, char **class,
   
   s1 = method;
 
-  while (isspace (*s1))
-    s1++;
+  s1 = skip_spaces (s1);
   if (*s1 == '\'') 
     {
       found_quote = 1;
       s1++;
     }
-  while (isspace (*s1))
-    s1++;
+  s1 = skip_spaces (s1);
   
   if ((s1[0] == '+') || (s1[0] == '-'))
     ntype = *s1++;
 
-  while (isspace (*s1))
-    s1++;
+  s1 = skip_spaces (s1);
 
   if (*s1 != '[')
     return NULL;
@@ -900,14 +894,12 @@ parse_method (char *method, char *type, char **class,
     s1++;
   
   s2 = s1;
-  while (isspace (*s2))
-    s2++;
+  s2 = skip_spaces (s2);
   
   if (*s2 == '(')
     {
       s2++;
-      while (isspace (*s2))
-	s2++;
+      s2 = skip_spaces (s2);
       ncategory = s2;
       while (isalnum (*s2) || (*s2 == '_'))
 	s2++;
@@ -935,15 +927,13 @@ parse_method (char *method, char *type, char **class,
   *s1++ = '\0';
   s2++;
 
-  while (isspace (*s2))
-    s2++;
+  s2 = skip_spaces (s2);
   if (found_quote)
     {
       if (*s2 != '\'') 
 	return NULL;
       s2++;
-      while (isspace (*s2))
-	s2++;
+      s2 = skip_spaces (s2);
     }
 
   if (type != NULL)
@@ -996,8 +986,6 @@ find_methods (char type, const char *class, const char *category,
 
       ALL_OBJFILE_MSYMBOLS (objfile, msymbol)
 	{
-	  struct gdbarch *gdbarch = get_objfile_arch (objfile);
-
 	  QUIT;
 
 	  /* Check the symbol name first as this can be done entirely without

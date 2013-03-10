@@ -56,6 +56,7 @@
 #include "inf-loop.h"
 #include "continuations.h"
 #include "linespec.h"
+#include "cli/cli-utils.h"
 
 /* Local functions: */
 
@@ -136,11 +137,6 @@ ptid_t inferior_ptid;
 /* Address at which inferior stopped.  */
 
 CORE_ADDR stop_pc;
-
-/* Flag indicating that a command has proceeded the inferior past the
-   current breakpoint.  */
-
-int breakpoint_proceeded;
 
 /* Nonzero if stopped due to completion of a stack dummy routine.  */
 
@@ -1450,7 +1446,6 @@ get_return_value (struct value *function, struct type *value_type)
   struct regcache *stop_regs = stop_registers;
   struct gdbarch *gdbarch;
   struct value *value;
-  struct ui_out *uiout = current_uiout;
   struct cleanup *cleanup = make_cleanup (null_cleanup, NULL);
 
   /* If stop_registers were not saved, use the current registers.  */
@@ -2191,12 +2186,8 @@ registers_info (char *addr_exp, int fpregs)
       char *start;
       const char *end;
 
-      /* Keep skipping leading white space.  */
-      if (isspace ((*addr_exp)))
-	{
-	  addr_exp++;
-	  continue;
-	}
+      /* Skip leading white space.  */
+      addr_exp = skip_spaces (addr_exp);
 
       /* Discard any leading ``$''.  Check that there is something
          resembling a register following it.  */

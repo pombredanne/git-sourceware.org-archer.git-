@@ -1,3 +1,89 @@
+2013-03-09  Eli Zaretskii  <eliz@gnu.org>
+
+	* gdb.texinfo (General Query Packets, Tracepoint Packets): Don't
+	use colons in @anchor and @cindex entries.
+
+2013-03-09  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* gdb.texinfo (QTBuffer:size): Add cindex and anchor.
+
+2013-03-08  Stan Shebs  <stan@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* gdb.texinfo (Starting and Stopping Trace Experiments): Document
+	trace-buffer-size set and show commands.
+	(Tracepoint Packets): Document QTBuffer:size.
+	(General Query Packets): Document QTBuffer:size.
+
+2013-02-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo: Remove bad @syncodeindex.
+	(Values From Inferior, Types In Python, Inferiors In Python)
+	(Events In Python, Threads In Python, Frames In Python, Blocks In
+	Python, Symbols In Python, Symbol Tables In Python): Remove
+	@tables.
+	(Packets, General Query Packets, Tracepoint Packets)
+	(Host I/O Packets): Use @w{} for empty @item.
+
+2013-02-20  Siva Chandra Reddy <sivachandra@google.com>
+
+	* gdb.texinfo (Architectures In Python): Add description about
+	the new method gdb.Architecture.disassemble.
+
+2013-02-15  Pedro Alves  <pedro@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Tracepoint Commands) <-trace-status>:
+	Document the "trace-file" field.
+
+2013-02-07  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Machine Code): Clarify argument to disassemble
+	command.
+
+2013-02-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Async Records): Document new MI
+	notification "=tsv-modified".  Update the document of MI
+	notification "=tsv-created".
+	* observer.texi (GDB Observers): New observer tsv_modified.
+	Update observer tsv_created and tsv_delete.
+
+2013-02-05  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* gdb.texinfo (AArch64 Features): New section; document
+	org.gnu.gdb.aarch64.core and org.gnu.gdb.aarch64.fpu.
+	(Architectures): Add new AArch64 section to document AArch64
+	architecture specific commands.
+	(ABI): Add description of the new OS ABI "Newlib" and its influence
+	on the longjmp handling.
+
+2013-02-03  Eldar Gaynetdinov <hal9000ed2k@gmail.com>
+	    Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.texinfo (Backtrace): Added description of 'filename-display'
+	variable in 'set/show backtrace' section.
+
+2013-01-31  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Target Commands): Fix typo.
+
+2013-01-23  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* doc/gdb.texinfo (Architectures In Python): New sub-sub-section
+	describing the gdb.Architecture class.
+	(Frames In Python): Add description about the new method
+	gdb.Frame.architecture().
+
+2013-01-23  Doug Evans  <dje@google.com>
+
+	* gdb.texinfo (Index Section Format): Document .gdb_index version 8.
+
+2013-01-21  Marc Khouzam  <marc.khouzam@ericsson.com>
+
+	* gdb.texinfo (GDB/MI Breakpoint Commands): Document new
+	'thread-groups' field when printing a breakpoint in MI.
+
 2012-01-17  Sanjoy Das <sanjoy@playingwithpointers.com>
 	* gdb.texinfo (Using JIT Debug Info Readers): Change documentation
 	to reflect that jit-reader-load now supports absolute file-names.

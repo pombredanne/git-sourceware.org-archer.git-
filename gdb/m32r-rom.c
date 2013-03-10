@@ -40,6 +40,7 @@
 #include <ctype.h>
 #include "regcache.h"
 #include "gdb_bfd.h"
+#include "cli/cli-utils.h"
 
 /*
  * All this stuff just to get my host computer's IP address!
@@ -348,7 +349,6 @@ init_m32r_cmds (void)
   					/* register_pattern */
   m32r_cmds.register_pattern = "\\(\\w+\\) += \\([0-9a-fA-F]+\\b\\)";
   m32r_cmds.supply_register = m32r_supply_register;
-  m32r_cmds.load_routine = NULL;	/* load_routine (defaults to SRECs) */
   m32r_cmds.load = NULL;	/* download command */
   m32r_cmds.loadresp = NULL;	/* load response */
   m32r_cmds.prompt = "ok ";	/* monitor command prompt */
@@ -409,7 +409,6 @@ init_mon2000_cmds (void)
 						/* register_pattern */
   mon2000_cmds.register_pattern = "\\(\\w+\\) += \\([0-9a-fA-F]+\\b\\)";
   mon2000_cmds.supply_register = m32r_supply_register;
-  mon2000_cmds.load_routine = NULL;	/* load_routine (defaults to SRECs) */
   mon2000_cmds.load = NULL;	/* download command */
   mon2000_cmds.loadresp = NULL;	/* load response */
   mon2000_cmds.prompt = "Mon2000>";	/* monitor command prompt */
@@ -450,8 +449,7 @@ m32r_upload_command (char *args, int from_tty)
       /* Scan second colon in the output from the "ust" command.  */
       char *myIPaddress = strchr (strchr (buf, ':') + 1, ':') + 1;
 
-      while (isspace (*myIPaddress))
-	myIPaddress++;
+      myIPaddress = skip_spaces (myIPaddress);
 
       if (!strncmp (myIPaddress, "0.0.", 4))	/* empty */
 	error (_("Please use 'set board-address' to "

@@ -425,10 +425,10 @@ elf_i386_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
  	return FALSE;
 
       /* pr_cursig */
-      elf_tdata (abfd)->core_signal = bfd_get_32 (abfd, note->descdata + 20);
+      elf_tdata (abfd)->core->signal = bfd_get_32 (abfd, note->descdata + 20);
 
       /* pr_pid */
-      elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 24);
+      elf_tdata (abfd)->core->lwpid = bfd_get_32 (abfd, note->descdata + 24);
 
       /* pr_reg */
       offset = 28;
@@ -443,10 +443,10 @@ elf_i386_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 
 	case 144:		/* Linux/i386 */
 	  /* pr_cursig */
-	  elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
+	  elf_tdata (abfd)->core->signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	  /* pr_pid */
-	  elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 24);
+	  elf_tdata (abfd)->core->lwpid = bfd_get_32 (abfd, note->descdata + 24);
 
 	  /* pr_reg */
 	  offset = 72;
@@ -471,9 +471,9 @@ elf_i386_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
       if (pr_version != 1)
 	return FALSE;
 
-      elf_tdata (abfd)->core_program
+      elf_tdata (abfd)->core->program
 	= _bfd_elfcore_strndup (abfd, note->descdata + 8, 17);
-      elf_tdata (abfd)->core_command
+      elf_tdata (abfd)->core->command
 	= _bfd_elfcore_strndup (abfd, note->descdata + 25, 81);
     }
   else
@@ -484,11 +484,11 @@ elf_i386_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
 	  return FALSE;
 
 	case 124:		/* Linux/i386 elf_prpsinfo.  */
-	  elf_tdata (abfd)->core_pid
+	  elf_tdata (abfd)->core->pid
 	    = bfd_get_32 (abfd, note->descdata + 12);
-	  elf_tdata (abfd)->core_program
+	  elf_tdata (abfd)->core->program
 	    = _bfd_elfcore_strndup (abfd, note->descdata + 28, 16);
-	  elf_tdata (abfd)->core_command
+	  elf_tdata (abfd)->core->command
 	    = _bfd_elfcore_strndup (abfd, note->descdata + 44, 80);
 	}
     }
@@ -497,7 +497,7 @@ elf_i386_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
      onto the end of the args in some (at least one anyway)
      implementations, so strip it off if it exists.  */
   {
-    char *command = elf_tdata (abfd)->core_command;
+    char *command = elf_tdata (abfd)->core->command;
     int n = strlen (command);
 
     if (0 < n && command[n - 1] == ' ')
@@ -937,7 +937,7 @@ elf_i386_link_hash_table_create (bfd *abfd)
   struct elf_i386_link_hash_table *ret;
   bfd_size_type amt = sizeof (struct elf_i386_link_hash_table);
 
-  ret = (struct elf_i386_link_hash_table *) bfd_malloc (amt);
+  ret = (struct elf_i386_link_hash_table *) bfd_zmalloc (amt);
   if (ret == NULL)
     return NULL;
 
@@ -949,18 +949,6 @@ elf_i386_link_hash_table_create (bfd *abfd)
       free (ret);
       return NULL;
     }
-
-  ret->sdynbss = NULL;
-  ret->srelbss = NULL;
-  ret->plt_eh_frame = NULL;
-  ret->tls_ldm_got.refcount = 0;
-  ret->next_tls_desc_index = 0;
-  ret->sgotplt_jump_table_size = 0;
-  ret->sym_cache.abfd = NULL;
-  ret->srelplt2 = NULL;
-  ret->tls_module_base = NULL;
-  ret->next_jump_slot_index = 0;
-  ret->next_irelative_index = 0;
 
   ret->loc_hash_table = htab_try_create (1024,
 					 elf_i386_local_htab_hash,
@@ -988,7 +976,7 @@ elf_i386_link_hash_table_free (struct bfd_link_hash_table *hash)
     htab_delete (htab->loc_hash_table);
   if (htab->loc_hash_memory)
     objalloc_free ((struct objalloc *) htab->loc_hash_memory);
-  _bfd_generic_link_hash_table_free (hash);
+  _bfd_elf_link_hash_table_free (hash);
 }
 
 /* Create .plt, .rel.plt, .got, .got.plt, .rel.got, .dynbss, and

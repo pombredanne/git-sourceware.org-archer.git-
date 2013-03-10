@@ -880,7 +880,7 @@ write_object_renaming (const struct block *orig_left_context,
   if (orig_left_context == NULL)
     orig_left_context = get_selected_block (NULL);
 
-  name = obsavestring (renamed_entity, renamed_entity_len, &temp_parse_space);
+  name = obstack_copy0 (&temp_parse_space, renamed_entity, renamed_entity_len);
   ada_lookup_encoded_symbol (name, orig_left_context, VAR_DOMAIN, &sym_info);
   if (sym_info.sym == NULL)
     error (_("Could not find renamed variable: %s"), ada_decode (name));
@@ -949,8 +949,8 @@ write_object_renaming (const struct block *orig_left_context,
 	      end = renaming_expr + strlen (renaming_expr);
 
 	    index_name =
-	      obsavestring (renaming_expr, end - renaming_expr,
-			    &temp_parse_space);
+	      obstack_copy0 (&temp_parse_space, renaming_expr,
+			     end - renaming_expr);
 	    renaming_expr = end;
 
 	    ada_lookup_encoded_symbol (index_name, NULL, VAR_DOMAIN,
@@ -1025,7 +1025,7 @@ block_lookup (struct block *context, char *raw_name)
   else
     name = ada_encode (raw_name);
 
-  nsyms = ada_lookup_symbol_list (name, context, VAR_DOMAIN, &syms, 1);
+  nsyms = ada_lookup_symbol_list (name, context, VAR_DOMAIN, &syms);
   if (context == NULL
       && (nsyms == 0 || SYMBOL_CLASS (syms[0].sym) != LOC_BLOCK))
     symtab = lookup_symtab (name);
@@ -1166,7 +1166,7 @@ write_ambiguous_var (const struct block *block, char *name, int len)
     obstack_alloc (&temp_parse_space, sizeof (struct symbol));
   memset (sym, 0, sizeof (struct symbol));
   SYMBOL_DOMAIN (sym) = UNDEF_DOMAIN;
-  SYMBOL_LINKAGE_NAME (sym) = obsavestring (name, len, &temp_parse_space);
+  SYMBOL_LINKAGE_NAME (sym) = obstack_copy0 (&temp_parse_space, name, len);
   SYMBOL_LANGUAGE (sym) = language_ada;
 
   write_exp_elt_opcode (OP_VAR_VALUE);
@@ -1263,7 +1263,7 @@ write_var_or_type (const struct block *block, struct stoken name0)
 
   encoded_name = ada_encode (name0.ptr);
   name_len = strlen (encoded_name);
-  encoded_name = obsavestring (encoded_name, name_len, &temp_parse_space);
+  encoded_name = obstack_copy0 (&temp_parse_space, encoded_name, name_len);
   for (depth = 0; depth < MAX_RENAMING_CHAIN_LENGTH; depth += 1)
     {
       int tail_index;
@@ -1282,7 +1282,7 @@ write_var_or_type (const struct block *block, struct stoken name0)
 
 	  encoded_name[tail_index] = '\0';
 	  nsyms = ada_lookup_symbol_list (encoded_name, block,
-					  VAR_DOMAIN, &syms, 1);
+					  VAR_DOMAIN, &syms);
 	  encoded_name[tail_index] = terminator;
 
 	  /* A single symbol may rename a package or object. */
@@ -1430,7 +1430,7 @@ write_name_assoc (struct stoken name)
     {
       struct ada_symbol_info *syms;
       int nsyms = ada_lookup_symbol_list (name.ptr, expression_context_block,
-					  VAR_DOMAIN, &syms, 1);
+					  VAR_DOMAIN, &syms);
       if (nsyms != 1 || SYMBOL_CLASS (syms[0].sym) == LOC_TYPEDEF)
 	write_exp_op_with_string (OP_NAME, name);
       else
