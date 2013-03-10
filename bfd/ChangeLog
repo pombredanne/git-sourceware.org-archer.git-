@@ -1,3 +1,186 @@
+2013-03-08  Venkataramanan Kumar  <venkataramanan.kumar@linaro.org>
+
+        * elf64-aarch64.c (elf_backend_can_gc_sections): Enable gc-section
+	support.
+        (elf64_aarch64_gc_sweep_hook): Handle GOT, TLS and PLT related
+	relocs.
+
+2013-03-08  Andreas Arnez  <arnez@linux.vnet.ibm.com>
+
+	* elf-bfd.h (elfcore_write_s390_tdb): Add prototype.
+	* elf.c (elfcore_write_s390_tdb): New function.
+	(elfcore_write_register_note): Call it.
+	(elfcore_grok_s390_tdb): New function.
+	(elfcore_grok_note): Call it.
+
+2013-03-08  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c (mips_elf_allocate_lazy_stub): Correct data type.
+
+2013-03-05  Corinna Vinschen  <vinschen@redhat.com>
+
+	* config.bfd: Add x86_64-*-cygwin to list of supported targets.
+
+2013-03-04  Alan Modra  <amodra@gmail.com>
+
+	* elf32-ppc.c (ppc_elf_relocate_section <R_PPC_PLTREL24>): Adjust
+	non-zero addends when relocatable, rather than addends >= 32768.
+	Always zero "addend" before applying relocation.
+
+2013-03-04  Nick Clifton  <nickc@redhat.com>
+
+	* archive64.c (bfd_elf64_archive_write_armap): Fix calculation of
+	file pointer offsets for thin archives.
+
+2013-02-28  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_size_dynamic_sections): Don't call
+	elf32_arm_allocate_dynrelocs for source reloc for non-dynamic link.
+
+2013-02-27  DJ Delorie  <dj@redhat.com>
+
+	* reloc.c (BFD_RELOC_RL78_CODE): Add.
+	* libbfd.h: Regenerate.
+	* bfd-in2.h: Regenerate.
+	* elf32-rl78.c (rl78_elf_relocate_section): Handle weak code
+	references in compuated relocs.
+
+2013-02-26  Anthony Green  <green@moxielogic.com>
+
+	* config.bfd: Extend moxie-rtems target triplet name support.
+
+2013-02-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/15167
+	* elf64-ia64-vms.c (elf64_vms_link_add_object_symbols): Set
+	unique_global only for definition.
+	* elflink.c (_bfd_elf_merge_symbol): Don't set unique_global
+	here.
+	(elf_link_add_object_symbols): Set unique_global only
+	for definition.
+
+2013-02-21  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct elf_build_id): Extracted from..
+	(struct elf_build_id_info): ..here.  Delete.
+	(struct output_elf_obj_tdata): New, extracted from..
+	(struct elf_obj_tdata): ..here.  Reorganize for better packing.
+	Add "o" field.
+	(elf_program_header_size): Reference tdata->o.
+	(elf_seg_map, elf_next_file_pos, elf_eh_frame_hdr, elf_linker,
+	elf_stack_flags, elf_shstrtab, elf_strtab_sec, elf_shstrtab_sec,
+	elf_section_syms, elf_num_section_syms, elf_flags_init): Likewise.
+	* elf.c (bfd_elf_allocate_object): Allocate output_elf_obj_tdata
+	when opening bfd in any mode that might write.
+	(_bfd_elf_write_object_contents): Use build_id field in
+	output_elf_obj_tdata.
+	(_bfd_elf_close_and_cleanup): Tweak elf_shstrtab test.
+	(elfobj_grok_gnu_build_id): Adjust for elf_tdata changes.
+
+2013-02-21  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct core_elf_obj_tdata): New.
+	(struct elf_obj_tdata): Delete core_signal, core_pid, core_lwpid,
+	core_program, and core_command.  Add "core".
+	* elf.c (bfd_elf_mkcorefile): Allocate "core" struct.
+	Update all refs to tdata core fields.
+	* elf32-am33lin.c, * elf32-arm.c, * elf32-cris.c, * elf32-frv.c,
+	* elf32-hppa.c, * elf32-i386.c, * elf32-m68k.c, * elf32-mips.c,
+	* elf32-nios2.c, * elf32-ppc.c, * elf32-s390.c, * elf32-score.c,
+	* elf32-score7.c, * elf32-sh.c, * elf32-sparc.c, * elf32-tilegx.c,
+	* elf32-tilepro.c, * elf32-xtensa.c, * elf64-aarch64.c,
+	* elf64-hppa.c, * elf64-mips.c, * elf64-ppc.c, * elf64-tilegx.c,
+	* elf64-x86-64.c, * elfcore.h, * elfn32-mips.c: Update all refs
+	to tdata core fields.
+
+2013-02-21  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct elf_obj_tdata): Rename segment_map to seg_map.
+	Delete num_locals and num_globals.
+	(elf_num_locals, elf_num_globals): Don't define.
+	(elf_seg_map, elf_next_file_pos, elf_eh_frame_hdr, elf_linker,
+	elf_stack_flags, elf_strtab_sec, elf_shstrtab_sec): Define.
+	* bfd.c, * elf-eh-frame.c, * elf-nacl.c, * elf-vxworks.c, * elf.c,
+	* elf32-arm.c, * elf32-lm32.c, * elf32-ppc.c, * elf32-rx.c,
+	* elf32-spu.c, * elf64-hppa.c, * elfcode.h, * elflink.c,
+	* elfnn-ia64.c, * elfxx-mips.c: Use newly defined elf_obj_tdata
+	accessor macros.
+	* elf.c (elf_map_symbols): Add pnum_locals param.  Return
+	number of locals syms via new param.
+	(swap_out_syms): Adjust to suit elf_map_symbols change.
+
+2013-02-19  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c (_bfd_mips_elf_finish_dynamic_symbol): Also clear
+	STO_MICROMIPS annotation.
+
+2013-02-19  Alan Modra  <amodra@gmail.com>
+
+	* configure.in: Bump version to 2.23.52.
+	* elf-bfd.h (struct elf_build_id_info): New.
+	(struct elf_obj_tdata): Delete after_write_object_contents,
+	after_write_object_contents_info and build_id_size.  Make build_id
+	a pointer to struct elf_build_id_info.
+	* elf.c (_bfd_elf_write_object_contents): Style.  Update
+	after_write_ibject_contents invocation.
+	(elfobj_grok_gnu_build_id): Update for new build_id struct.  Don't
+	allow zero size notes.
+	* configure: Regenerate.
+
+2013-02-18  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elf64-mips.c (micromips_elf64_howto_table_rel): Add
+	R_MICROMIPS_SCN_DISP and R_MICROMIPS_JALR.
+	(micromips_elf64_howto_table_rela): Likewise.
+	(micromips_reloc_map): Add BFD_RELOC_MICROMIPS_JALR.
+	* elfn32-mips.c (elf_micromips_howto_table_rel): Add
+	R_MICROMIPS_SCN_DISP and R_MICROMIPS_JALR.
+	(elf_micromips_howto_table_rela): Likewise.
+	(micromips_reloc_map): Add BFD_RELOC_MICROMIPS_JALR.
+
+2013-02-18  Paul Brook  <paul@codesourcery.com>
+
+	* elfxx-mips.c (MICROMIPS_P): New macro.
+	(_bfd_mips_elf_symbol_processing): Use it.
+
+2013-02-18  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c (_bfd_mips_elf_create_dynamic_sections): Clarify
+	comment on _PROCEDURE_LINKAGE_TABLE_ creation.
+
+2013-02-18  Alan Modra  <amodra@gmail.com>
+
+	PR ld/12549
+	* elf-bfd.h (_bfd_elf_strtab_clear_refs): Delete.
+	(_bfd_elf_strtab_clear_all_refs): Declare.
+	(_bfd_elf_strtab_resize): Declare.
+	* elf-strtab.c (_bfd_elf_strtab_clear_refs): Delete.
+	(_bfd_elf_strtab_clear_all_refs): New function.
+	(_bfd_elf_strtab_resize): Likewise.
+	* elflink.c (elf_link_add_object_symbols): Use _bfd_elf_strtab_resize.
+
+2013-02-18  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct elf_obj_tdata): Move find_line_info, local_stubs,
+	local_call_stubs, elf_data_symbol, elf_text_symbol, elf_data_section,
+	and elf_text_section to..
+	* elfxx-mips.c (struct mips_elf_obj_tdata): ..here.  Update all refs.
+	* elf64-alpha.c (struct mips_elf_find_line): Rename to..
+	(struct alpha_elf_find_line): ..this.
+	(struct alpha_elf_obj_tdata): Add find_line_info, update refs.
+
+2013-02-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/15146
+	* elflink.c (elf_link_add_object_symbols): Don't add DT_NEEDED
+	for references from the dummy bfd.
+
+2013-02-16  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/15149
+	* elflink.c (elf_link_add_object_symbols): Also track weak
+	references.
+
 2013-02-15  H.J. Lu  <hongjiu.lu@intel.com>
 
 	PR binutils/15151
@@ -863,8 +1046,8 @@
 2013-01-07  Tom Tromey  <tromey@redhat.com>
 
 	* section.c (_bfd_std_section): Rename from std_section.
-        (bfd_com_section_ptr, bfd_und_section_ptr, bfd_abs_section_ptr)
-        (STD_SECTION): Update.
+	(bfd_com_section_ptr, bfd_und_section_ptr, bfd_abs_section_ptr)
+	(STD_SECTION): Update.
 	* bfd-in2.h: Rebuild.
 
 2013-01-04  Juergen Urban <JuergenUrban@gmx.de>

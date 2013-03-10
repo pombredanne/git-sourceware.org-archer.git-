@@ -1567,7 +1567,7 @@ breakpoint_xfer_memory (gdb_byte *readbuf, gdb_byte *writebuf,
 	struct gdbarch *gdbarch = bl->gdbarch;
 	const unsigned char *bp;
 	CORE_ADDR placed_address = bl->target_info.placed_address;
-	unsigned placed_size = bl->target_info.placed_size;
+	int placed_size = bl->target_info.placed_size;
 
 	/* Update the shadow with what we want to write to memory.  */
 	memcpy (bl->target_info.shadow_contents + bptoffset,
@@ -11768,8 +11768,7 @@ catch_syscall_split_args (char *arg)
       struct syscall s;
 
       /* Skip whitespace.  */
-      while (isspace (*arg))
-	arg++;
+      arg = skip_spaces (arg);
 
       for (i = 0; i < 127 && arg[i] && !isspace (arg[i]); ++i)
 	cur_name[i] = arg[i];
@@ -15370,9 +15369,7 @@ trace_pass_command (char *args, int from_tty)
 
   count = strtoul (args, &args, 10);	/* Count comes first, then TP num.  */
 
-  while (*args && isspace ((int) *args))
-    args++;
-
+  args = skip_spaces (args);
   if (*args && strncasecmp (args, "all", 3) == 0)
     {
       struct breakpoint *b;

@@ -499,6 +499,22 @@ struct mips_elf_obj_tdata
 
   /* The GOT requirements of input bfds.  */
   struct mips_got_info *got;
+
+  /* Used by _bfd_mips_elf_find_nearest_line.  The structure could be
+     included directly in this one, but there's no point to wasting
+     the memory just for the infrequently called find_nearest_line.  */
+  struct mips_elf_find_line *find_line_info;
+
+  /* An array of stub sections indexed by symbol number.  */
+  asection **local_stubs;
+  asection **local_call_stubs;
+
+  /* The Irix 5 support uses two virtual sections, which represent
+     text/data symbols defined in dynamic objects.  */
+  asymbol *elf_data_symbol;
+  asymbol *elf_text_symbol;
+  asection *elf_data_section;
+  asection *elf_text_section;
 };
 
 /* Get MIPS ELF private object data from BFD's tdata.  */
@@ -720,6 +736,10 @@ static bfd *reldyn_sorting_bfd;
 
 /* Nonzero if ABFD is using NewABI conventions.  */
 #define NEWABI_P(abfd) (ABI_N32_P (abfd) || ABI_64_P (abfd))
+
+/* Nonzero if ABFD has microMIPS code.  */
+#define MICROMIPS_P(abfd) \
+  ((elf_elfheader (abfd)->e_flags & EF_MIPS_ARCH_ASE_MICROMIPS) != 0)
 
 /* The IRIX compatibility level we are striving for.  */
 #define IRIX_COMPAT(abfd) \
@@ -5180,8 +5200,8 @@ mips_elf_calculate_relocation (bfd *abfd, bfd *input_bfd,
 	   && h->fn_stub != NULL
 	   && (r_type != R_MIPS16_CALL16 || h->need_fn_stub))
 	  || (local_p
-	      && elf_tdata (input_bfd)->local_stubs != NULL
-	      && elf_tdata (input_bfd)->local_stubs[r_symndx] != NULL))
+	      && mips_elf_tdata (input_bfd)->local_stubs != NULL
+	      && mips_elf_tdata (input_bfd)->local_stubs[r_symndx] != NULL))
       && !section_allows_mips16_refs_p (input_section))
     {
       /* This is a 32- or 64-bit call to a 16-bit function.  We should
@@ -5189,7 +5209,7 @@ mips_elf_calculate_relocation (bfd *abfd, bfd *input_bfd,
 	 stub.  */
       if (local_p)
 	{
-	  sec = elf_tdata (input_bfd)->local_stubs[r_symndx];
+	  sec = mips_elf_tdata (input_bfd)->local_stubs[r_symndx];
 	  value = 0;
 	}
       else
@@ -5220,12 +5240,12 @@ mips_elf_calculate_relocation (bfd *abfd, bfd *input_bfd,
   else if (r_type == R_MIPS16_26 && !info->relocatable
 	   && ((h != NULL && (h->call_stub != NULL || h->call_fp_stub != NULL))
 	       || (local_p
-		   && elf_tdata (input_bfd)->local_call_stubs != NULL
-		   && elf_tdata (input_bfd)->local_call_stubs[r_symndx] != NULL))
+		   && mips_elf_tdata (input_bfd)->local_call_stubs != NULL
+		   && mips_elf_tdata (input_bfd)->local_call_stubs[r_symndx] != NULL))
 	   && !target_is_16_bit_code_p)
     {
       if (local_p)
-	sec = elf_tdata (input_bfd)->local_call_stubs[r_symndx];
+	sec = mips_elf_tdata (input_bfd)->local_call_stubs[r_symndx];
       else
 	{
 	  /* If both call_stub and call_fp_stub are defined, we can figure
@@ -6407,7 +6427,7 @@ _bfd_mips_elf_symbol_processing (bfd *abfd, asymbol *asym)
       && (asym->value & 1) != 0)
     {
       asym->value--;
-      if (elf_elfheader (abfd)->e_flags & EF_MIPS_ARCH_ASE_MICROMIPS)
+      if (MICROMIPS_P (abfd))
 	elfsym->internal_elf_sym.st_other
 	  = ELF_ST_SET_MICROMIPS (elfsym->internal_elf_sym.st_other);
       else
@@ -7009,7 +7029,7 @@ _bfd_mips_elf_add_symbol_hook (bfd *abfd, struct bfd_link_info *info,
 
     case SHN_MIPS_TEXT:
       /* This section is used in a shared object.  */
-      if (elf_tdata (abfd)->elf_text_section == NULL)
+      if (mips_elf_tdata (abfd)->elf_text_section == NULL)
 	{
 	  asymbol *elf_text_symbol;
 	  asection *elf_text_section;
@@ -7026,11 +7046,11 @@ _bfd_mips_elf_add_symbol_hook (bfd *abfd, struct bfd_link_info *info,
 
 	  /* Initialize the section.  */
 
-	  elf_tdata (abfd)->elf_text_section = elf_text_section;
-	  elf_tdata (abfd)->elf_text_symbol = elf_text_symbol;
+	  mips_elf_tdata (abfd)->elf_text_section = elf_text_section;
+	  mips_elf_tdata (abfd)->elf_text_symbol = elf_text_symbol;
 
 	  elf_text_section->symbol = elf_text_symbol;
-	  elf_text_section->symbol_ptr_ptr = &elf_tdata (abfd)->elf_text_symbol;
+	  elf_text_section->symbol_ptr_ptr = &mips_elf_tdata (abfd)->elf_text_symbol;
 
 	  elf_text_section->name = ".text";
 	  elf_text_section->flags = SEC_NO_FLAGS;
@@ -7043,14 +7063,14 @@ _bfd_mips_elf_add_symbol_hook (bfd *abfd, struct bfd_link_info *info,
       /* This code used to do *secp = bfd_und_section_ptr if
          info->shared.  I don't know why, and that doesn't make sense,
          so I took it out.  */
-      *secp = elf_tdata (abfd)->elf_text_section;
+      *secp = mips_elf_tdata (abfd)->elf_text_section;
       break;
 
     case SHN_MIPS_ACOMMON:
       /* Fall through. XXX Can we treat this as allocated data?  */
     case SHN_MIPS_DATA:
       /* This section is used in a shared object.  */
-      if (elf_tdata (abfd)->elf_data_section == NULL)
+      if (mips_elf_tdata (abfd)->elf_data_section == NULL)
 	{
 	  asymbol *elf_data_symbol;
 	  asection *elf_data_section;
@@ -7067,11 +7087,11 @@ _bfd_mips_elf_add_symbol_hook (bfd *abfd, struct bfd_link_info *info,
 
 	  /* Initialize the section.  */
 
-	  elf_tdata (abfd)->elf_data_section = elf_data_section;
-	  elf_tdata (abfd)->elf_data_symbol = elf_data_symbol;
+	  mips_elf_tdata (abfd)->elf_data_section = elf_data_section;
+	  mips_elf_tdata (abfd)->elf_data_symbol = elf_data_symbol;
 
 	  elf_data_section->symbol = elf_data_symbol;
-	  elf_data_section->symbol_ptr_ptr = &elf_tdata (abfd)->elf_data_symbol;
+	  elf_data_section->symbol_ptr_ptr = &mips_elf_tdata (abfd)->elf_data_symbol;
 
 	  elf_data_section->name = ".data";
 	  elf_data_section->flags = SEC_NO_FLAGS;
@@ -7084,7 +7104,7 @@ _bfd_mips_elf_add_symbol_hook (bfd *abfd, struct bfd_link_info *info,
       /* This code used to do *secp = bfd_und_section_ptr if
          info->shared.  I don't know why, and that doesn't make sense,
          so I took it out.  */
-      *secp = elf_tdata (abfd)->elf_data_section;
+      *secp = mips_elf_tdata (abfd)->elf_data_section;
       break;
 
     case SHN_MIPS_SUNDEFINED:
@@ -7308,7 +7328,7 @@ _bfd_mips_elf_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
     }
 
   /* Create the .plt, .rel(a).plt, .dynbss and .rel(a).bss sections.
-     Also create the _PROCEDURE_LINKAGE_TABLE symbol.  */
+     Also, on VxWorks, create the _PROCEDURE_LINKAGE_TABLE_ symbol.  */
   if (!_bfd_elf_create_dynamic_sections (abfd, info))
     return FALSE;
 
@@ -7590,7 +7610,7 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 
 	  /* Record this stub in an array of local symbol stubs for
              this BFD.  */
-	  if (elf_tdata (abfd)->local_stubs == NULL)
+	  if (mips_elf_tdata (abfd)->local_stubs == NULL)
 	    {
 	      unsigned long symcount;
 	      asection **n;
@@ -7604,11 +7624,11 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	      n = bfd_zalloc (abfd, amt);
 	      if (n == NULL)
 		return FALSE;
-	      elf_tdata (abfd)->local_stubs = n;
+	      mips_elf_tdata (abfd)->local_stubs = n;
 	    }
 
 	  sec->flags |= SEC_KEEP;
-	  elf_tdata (abfd)->local_stubs[r_symndx] = sec;
+	  mips_elf_tdata (abfd)->local_stubs[r_symndx] = sec;
 
 	  /* We don't need to set mips16_stubs_seen in this case.
              That flag is used to see whether we need to look through
@@ -7715,7 +7735,7 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 
 	  /* Record this stub in an array of local symbol call_stubs for
              this BFD.  */
-	  if (elf_tdata (abfd)->local_call_stubs == NULL)
+	  if (mips_elf_tdata (abfd)->local_call_stubs == NULL)
 	    {
 	      unsigned long symcount;
 	      asection **n;
@@ -7729,11 +7749,11 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	      n = bfd_zalloc (abfd, amt);
 	      if (n == NULL)
 		return FALSE;
-	      elf_tdata (abfd)->local_call_stubs = n;
+	      mips_elf_tdata (abfd)->local_call_stubs = n;
 	    }
 
 	  sec->flags |= SEC_KEEP;
-	  elf_tdata (abfd)->local_call_stubs[r_symndx] = sec;
+	  mips_elf_tdata (abfd)->local_call_stubs[r_symndx] = sec;
 
 	  /* We don't need to set mips16_stubs_seen in this case.
              That flag is used to see whether we need to look through
@@ -8900,7 +8920,7 @@ mips_elf_estimate_stub_size (bfd *output_bfd, struct bfd_link_info *info)
    allocate an entry in the stubs section.  */
 
 static bfd_boolean
-mips_elf_allocate_lazy_stub (struct mips_elf_link_hash_entry *h, void **data)
+mips_elf_allocate_lazy_stub (struct mips_elf_link_hash_entry *h, void *data)
 {
   struct mips_elf_link_hash_table *htab;
 
@@ -10098,12 +10118,17 @@ _bfd_mips_elf_finish_dynamic_symbol (bfd *output_bfd,
   if (IRIX_COMPAT (output_bfd) == ict_irix6)
     mips_elf_irix6_finish_dynamic_symbol (output_bfd, name, sym);
 
-  /* Keep dynamic MIPS16 symbols odd.  This allows the dynamic linker to
-     treat MIPS16 symbols like any other.  */
+  /* Keep dynamic compressed symbols odd.  This allows the dynamic linker
+     to treat compressed symbols like any other.  */
   if (ELF_ST_IS_MIPS16 (sym->st_other))
     {
       BFD_ASSERT (sym->st_value & 1);
       sym->st_other -= STO_MIPS16;
+    }
+  else if (ELF_ST_IS_MICROMIPS (sym->st_other))
+    {
+      BFD_ASSERT (sym->st_value & 1);
+      sym->st_other -= STO_MICROMIPS;
     }
 
   return TRUE;
@@ -11116,7 +11141,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
   s = bfd_get_section_by_name (abfd, ".reginfo");
   if (s != NULL && (s->flags & SEC_LOAD) != 0)
     {
-      for (m = elf_tdata (abfd)->segment_map; m != NULL; m = m->next)
+      for (m = elf_seg_map (abfd); m != NULL; m = m->next)
 	if (m->p_type == PT_MIPS_REGINFO)
 	  break;
       if (m == NULL)
@@ -11131,7 +11156,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
 	  m->sections[0] = s;
 
 	  /* We want to put it after the PHDR and INTERP segments.  */
-	  pm = &elf_tdata (abfd)->segment_map;
+	  pm = &elf_seg_map (abfd);
 	  while (*pm != NULL
 		 && ((*pm)->p_type == PT_PHDR
 		     || (*pm)->p_type == PT_INTERP))
@@ -11161,7 +11186,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
 	{
 	  struct elf_segment_map *options_segment;
 
-	  pm = &elf_tdata (abfd)->segment_map;
+	  pm = &elf_seg_map (abfd);
 	  while (*pm != NULL
 		 && ((*pm)->p_type == PT_PHDR
 		     || (*pm)->p_type == PT_INTERP))
@@ -11191,7 +11216,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
 	      && bfd_get_section_by_name (abfd, ".dynamic") != NULL
 	      && bfd_get_section_by_name (abfd, ".mdebug") != NULL)
 	    {
-	      for (m = elf_tdata (abfd)->segment_map; m != NULL; m = m->next)
+	      for (m = elf_seg_map (abfd); m != NULL; m = m->next)
 		if (m->p_type == PT_MIPS_RTPROC)
 		  break;
 	      if (m == NULL)
@@ -11217,7 +11242,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
 		    }
 
 		  /* We want to put it after the DYNAMIC segment.  */
-		  pm = &elf_tdata (abfd)->segment_map;
+		  pm = &elf_seg_map (abfd);
 		  while (*pm != NULL && (*pm)->p_type != PT_DYNAMIC)
 		    pm = &(*pm)->next;
 		  if (*pm != NULL)
@@ -11231,7 +11256,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
       /* On IRIX5, the PT_DYNAMIC segment includes the .dynamic,
 	 .dynstr, .dynsym, and .hash sections, and everything in
 	 between.  */
-      for (pm = &elf_tdata (abfd)->segment_map; *pm != NULL;
+      for (pm = &elf_seg_map (abfd); *pm != NULL;
 	   pm = &(*pm)->next)
 	if ((*pm)->p_type == PT_DYNAMIC)
 	  break;
@@ -11338,7 +11363,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
       && !SGI_COMPAT (abfd)
       && bfd_get_section_by_name (abfd, ".dynamic"))
     {
-      for (pm = &elf_tdata (abfd)->segment_map; *pm != NULL; pm = &(*pm)->next)
+      for (pm = &elf_seg_map (abfd); *pm != NULL; pm = &(*pm)->next)
 	if ((*pm)->p_type == PT_NULL)
 	  break;
       if (*pm == NULL)
@@ -11649,7 +11674,7 @@ _bfd_mips_elf_find_nearest_line (bfd *abfd, asection *section,
       if (elf_section_data (msec)->this_hdr.sh_type != SHT_NOBITS)
 	msec->flags |= SEC_HAS_CONTENTS;
 
-      fi = elf_tdata (abfd)->find_line_info;
+      fi = mips_elf_tdata (abfd)->find_line_info;
       if (fi == NULL)
 	{
 	  bfd_size_type external_fdr_size;
@@ -11687,7 +11712,7 @@ _bfd_mips_elf_find_nearest_line (bfd *abfd, asection *section,
 	  for (; fraw_src < fraw_end; fraw_src += external_fdr_size, fdr_ptr++)
 	    (*swap->swap_fdr_in) (abfd, fraw_src, fdr_ptr);
 
-	  elf_tdata (abfd)->find_line_info = fi;
+	  mips_elf_tdata (abfd)->find_line_info = fi;
 
 	  /* Note that we don't bother to ever free this information.
              find_nearest_line is either called all the time, as in

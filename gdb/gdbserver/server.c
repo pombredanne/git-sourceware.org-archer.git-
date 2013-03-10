@@ -1637,6 +1637,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	  strcat (own_buf, ";qXfer:statictrace:read+");
 	  strcat (own_buf, ";qXfer:traceframe-info:read+");
 	  strcat (own_buf, ";EnableDisableTracepoints+");
+	  strcat (own_buf, ";QTBuffer:size+");
 	  strcat (own_buf, ";tracenz+");
 	}
 
@@ -1808,12 +1809,12 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
     {
       /* CRC check (compare-section).  */
       char *comma;
-      CORE_ADDR base;
+      ULONGEST base;
       int len;
       unsigned long long crc;
 
       require_running (own_buf);
-      base = strtoul (own_buf + 5, &comma, 16);
+      comma = unpack_varlen_hex (own_buf + 5, &base);
       if (*comma++ != ',')
 	{
 	  write_enn (own_buf);
@@ -2860,7 +2861,8 @@ process_point_options (CORE_ADDR point_addr, char **packet)
       if (*dataptr == 'X')
 	{
 	  /* Conditional expression.  */
-	  fprintf (stderr, "Found breakpoint condition.\n");
+	  if (debug_threads)
+	    fprintf (stderr, "Found breakpoint condition.\n");
 	  add_breakpoint_condition (point_addr, &dataptr);
 	}
       else if (strncmp (dataptr, "cmds:", strlen ("cmds:")) == 0)
@@ -3192,13 +3194,16 @@ process_serial_event (void)
       /* Fallthrough.  */
     case 'z':  /* remove_ ... */
       {
-	char *lenptr;
 	char *dataptr;
-	CORE_ADDR addr = strtoul (&own_buf[3], &lenptr, 16);
-	int len = strtol (lenptr + 1, &dataptr, 16);
+	ULONGEST addr;
+	int len;
 	char type = own_buf[1];
 	int res;
 	const int insert = ch == 'Z';
+	char *p = &own_buf[3];
+
+	p = unpack_varlen_hex (p, &addr);
+	len = strtol (p + 1, &dataptr, 16);
 
 	/* Default to unrecognized/unsupported.  */
 	res = 1;

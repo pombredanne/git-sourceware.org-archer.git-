@@ -225,14 +225,14 @@ regcache_xmalloc_1 (struct gdbarch *gdbarch, struct address_space *aspace,
       regcache->registers
 	= XCALLOC (descr->sizeof_cooked_registers, gdb_byte);
       regcache->register_status
-	= XCALLOC (descr->sizeof_cooked_register_status, gdb_byte);
+	= XCALLOC (descr->sizeof_cooked_register_status, signed char);
     }
   else
     {
       regcache->registers
 	= XCALLOC (descr->sizeof_raw_registers, gdb_byte);
       regcache->register_status
-	= XCALLOC (descr->sizeof_raw_register_status, gdb_byte);
+	= XCALLOC (descr->sizeof_raw_register_status, signed char);
     }
   regcache->aspace = aspace;
   regcache->ptid = minus_one_ptid;
@@ -1092,7 +1092,7 @@ reg_flush_command (char *command, int from_tty)
 
 static void
 dump_endian_bytes (struct ui_file *file, enum bfd_endian endian,
-		   const unsigned char *buf, long len)
+		   const gdb_byte *buf, long len)
 {
   int i;
 
@@ -1130,7 +1130,7 @@ regcache_dump (struct regcache *regcache, struct ui_file *file,
   int footnote_register_offset = 0;
   int footnote_register_type_name_null = 0;
   long register_offset = 0;
-  unsigned char buf[MAX_REGISTER_SIZE];
+  gdb_byte buf[MAX_REGISTER_SIZE];
 
 #if 0
   fprintf_unfiltered (file, "nr_raw_registers %d\n",

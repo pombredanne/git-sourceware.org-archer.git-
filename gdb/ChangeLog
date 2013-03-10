@@ -1,3 +1,562 @@
+2013-03-08  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (_initialize_tracepoint): Indent the code.
+
+2013-03-08  Pedro Alves  <palves@redhat.com>
+
+	* findcmd.c (put_bits): Change type of parameter to 'gdb_byte *'.
+	(parse_find_args, find_command): Change type of pattern buffer
+	locals to 'gdb_byte *'.
+
+2013-03-08  Stan Shebs  <stan@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* NEWS: Mention set and show trace-buffer-size commands.
+	Mention new packet.
+	* target.h (struct target_ops): New method
+	to_set_trace_buffer_size.
+	(target_set_trace_buffer_size): New macro.
+	* target.c (update_current_target): Set up new method.
+	* tracepoint.c (trace_buffer_size): New global.
+	(start_tracing): Send it to the target.
+	(set_trace_buffer_size): New function.
+	(_initialize_tracepoint): Add new setshow for trace-buffer-size.
+	* remote.c (remote_set_trace_buffer_size): New function.
+	(_initialize_remote): Use it.
+	(QTBuffer:size) New remote command.
+	(PACKET_QTBuffer_size): New enum.
+	(remote_protocol_features): Add an entry for
+	PACKET_QTBuffer_size.
+
+2013-03-08  Tom Tromey  <tromey@redhat.com>
+
+	* remote-m32r-sdi.c (m32r_load): Call skip_spaces on correct
+	variable.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* target.c (target_read_stralloc, target_fileio_read_alloc):
+	*Cast pointer to 'gdb_byte *' in target call.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* corefile.c (read_memory_string): Cast pointer to gdb_byte* in
+	call.
+
+2013-03-07  Keith Seitz  <keiths@redhat.com>
+
+	* breakpoint.c (catch_syscall_split_args): Use skip_spaces.
+	(trace_pass_command): Likewise.
+	* cli/cli-cmds.c: Include cli/cli-utils.h.
+	(source_command): Use skip-spaces.
+	(disassemble_command): Likewise.
+	* findcmd.c: Include cli/cli-utils.h.
+	(parse_find_args): Use skip_spaces.
+	* go32-nat.c: Include cli/cli-utils.h.
+	(go32_sldt): Use skip_spaces.
+	(go32_sgdt): Likewise.
+	(go32_sidt): Likewise.
+	(go32_pde): Likewise.
+	(go32_pte): Likewise.
+	(go32_pte_for_address): Likewise.
+	* infcmd.c: Include cli/cli-utils.h.
+	(registers_info): Use skip_spaces.
+	* linux-tdep.c (read_mapping): Use skip_spaces_const.
+	(linux_info_proc): Likewise.
+	* linux-thread-db.c: Include cli/cli-utils.h.
+	(info_auto_load_libthread_db): Use skip_spaces_const.
+	* m32r-rom.c: Include cli/cli-utils.h.
+	(m32r_upload_command): Use skip_spaces.
+	* maint.c: Include cli/cli-utils.h.
+	(maintenance_translate_address): Use skip_spaces.
+	* mi/mi-parse.c: Include cli/cli-utils.h.
+	(mi_parse_argv): Use skip_spaces.
+	(mi_parse): Likewise.
+	* minsyms.c: Include cli/cli-utils.h.
+	(msymbol_hash_iw): Use skip_spaces_const.
+	* objc-lang.c: Include cli/cli-utils.h.
+	(parse_selector): Use skip_spaces.
+	(parse_method): Likewise.
+	* python/python.c: Include cli/cli-utils.h.
+	(python_interactive_command)[HAVE_PYTHON]: Use skip_spaces.
+	(python_command)[HAVE_PYTHON]: Likewise.
+	(python_interactive_command)[!HAVE_PYTHON]: Likewise.
+	* remote-m32r-sdi.c: Include cli/cli-utils.h.
+	(m32r_load): Use skip_spaces.
+	* serial.c: Include cli/cli-utils.h.
+	(serial_open): Use skip_spaces_const.
+	* stack.c: Include cli/cli-utils.h.
+	(parse_frame_specification_1): Use skip_spaces_const.
+	* symfile.c: Include cli/cli-utils.h.
+	(set_ext_lang_command): Use skip_spaces.
+	* symtab.c: Include cli/cli-utils.h.
+	(rbreak_command): Use skip_spaces.
+	* thread.c (thread_name_command): Use skip_spaces.
+	* tracepoint.c (validate_actionline): Use skip_spaces.
+	(encode_actions_1): Likewise.
+	(trace_find_range_command): Likewise.
+	(trace_find_outside_command): Likewise.
+	(trace_dump_actions): Likewise.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* c-lang.c (parse_one_string): Cast argument to gdb_byte *.
+	* expprint.c (print_subexp_standard): Likewise.
+	* utils.c (host_char_to_target): Likewise.
+	* valprint.c (generic_emit_char, generic_printstr): Likewise.
+	* varobj.c (value_get_print_value): Change type of local to char*.
+	Cast it gdb_byte * in call to language printer.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* charset.c (struct wchar_iterator) <input>: Change type to 'const
+	gdb_byte *'.
+	(make_wchar_iterator): Remove cast to char*.
+	(wchar_iterate): Change type of local.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* regcache.c (regcache_xmalloc_1): Call XCALLOC with signed char
+	for 'regcache->register_status'.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* breakpoint.c (breakpoint_xfer_memory): Change type of local to
+	int.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* stap-probe.c (handle_stap_probe): Add cast to char*.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* linux-record.c (record_linux_system_call) <gdb_sys_msgrcv,
+	RECORD_MSGRCV>: Pass a signed variable to
+	regcache_raw_read_signed, instead of an unsigned one.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* remote-notif.c (notif_debug): Change type to int.
+	* remote-notif.h (notif_debug): Likewise.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* ser-tcp.c (tcp_retry_limit): Change type to unsigned int.
+
+2013-03-07  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (hex2bin, bin2hex): Move extern declarations to ...
+	* remote.h (hex2bin, bin2hex): ... here.
+	* tracepoint.c (hex2bin, bin2hex): Remove extern declarations.
+
+2013-03-07  Eli Zaretskii  <eliz@gnu.org>
+
+	* utils.c (initialize_utils): Improve doc strings of "set/show
+	width", "set/show height", and "set/show pagination".
+
+2013-03-06  Keith Seitz  <keiths@redhat.com>
+
+	* ax-gdb.c (gen_printf): Make FORMAT const.
+	* ax-gdb.h (gen_printf): Likewise.
+	* ax-general.c (ax_string): Make STR const.
+	* ax.h (ax_string): Likewise.
+
+2013-03-06  Doug Evans  <dje@google.com>
+
+	* elfread.c (elf_symfile_read): Move debugging printf to more
+	logical location.
+
+2013-03-06  Pedro Alves  <palves@redhat.com>
+
+	* python/py-utils.c (target_string_to_unicode): Delete function.
+	* python/python-internal.h (target_string_to_unicode): Delete
+	declaration.
+
+2013-03-06  Pierre Muller  <muller@sourceware.org>
+
+	* linespec.c (get_current_search_block): ARI fix, use (void)
+	for empty parameter list.
+
+2013-03-05  Doug Evans  <dje@google.com>
+
+	* ada-lang.c (ada_lookup_symbol_list_worker): New function, contents
+	of old ada_lookup_symbol_list.  In !full_search case, don't
+	search superblocks.
+	(ada_lookup_symbol_list): Delete arg full_search, all callers
+	updated.  Call ada_lookup_symbol_list_worker.
+	(ada_iterate_over_symbols): Call ada_lookup_symbol_list_worker.
+	* ada-lang.h (ada_lookup_symbol_list): Update.
+	* language.h (language_defn): Update comment for
+	la_iterate_over_symbols.
+	* linespec.c (iterate_over_file_blocks): New function.
+	(iterate_over_all_matching_symtabs): Call it.
+	(lookup_prefix_sym): Ditto.
+	(get_current_search_block): New function.
+	(get_search_block): Delete.
+	(find_label_symbols): Call get_current_search_block.
+	(add_matching_symbols_to_info): Call iterate_over_file_blocks.
+	* symtab.c (iterate_over_symbols): Don't search superblocks.
+
+2013-03-05  Yao Qi  <yao@codesourcery.com>
+
+	* cli/cli-decode.c (add_setshow_zuinteger_unlimited_cmd): Change
+	parameter VAR's type from "unsigned int" to "int".
+	* command.h (var_zuinteger_unlimited): Update its comments.
+	(add_setshow_zuinteger_unlimited_cmd): Update the declaration.
+
+2013-03-05  Corinna Vinschen  <vinschen@redhat.de>
+
+	* NEWS: Mention new target x86_64-*-cygwin*.
+
+2013-03-05  Corinna Vinschen  <vinschen@redhat.de>
+
+	* configure.host: Add x86_64-*-cygwin* as host.
+	* configure.tgt: Add x86_64-*-cygwin* as target.
+	* config/i386/cygwin64.mh: New file.
+
+2013-03-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linespec.c (decode_line_2): Fix duplicate request off by two message.
+
+2013-03-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linespec.c (struct linespec_canonical_name): New.
+	(struct linespec_state): Change canonical_names type to it.
+	(add_sal_to_sals): Change variable canonical_name to canonical.  Change
+	xrealloc element size.  Initialize the different CANONICAL fields.
+	(canonical_to_fullform): New.
+	(filter_results): Use it.  Add variables canonical, fullform and
+	cleanup.
+	(struct decode_line_2_item, decode_line_2_compare_items): New.
+	(decode_line_2): Remove variables iter and item_names, add variables
+	items and items_count.  Modify the code for these new variables.
+
+2013-03-04  Corinna Vinschen  <vinschen@redhat.com>
+
+	* coff-pe-read.c (read_pe_exported_syms): Don't return without
+	calling do_cleanup.
+
+2013-03-04  Luis Machado  <lgustavo@codesourcery.com>
+
+	* tracepoint.c (build_traceframe_info): Add code for byte order.
+
+2013-03-02  Kevin Buettner  <kevinb@redhat.com>
+
+	* v850-tdep.c: (v850e2_register_name): Revise system register
+	names to match current V850E2M architecture specifications.
+	Update register number enum comments too.
+	
+2013-03-01  Jiong Wang  <jiwang@tilera.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* tilegx-tdep.c (tilegx_analyze_prologue): Limit bundle reading
+	to END_ADDR.
+	(tilegx_skip_prologue): Limit prologue analysis to section end.
+
+2013-03-01  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* dwarf2loc.c (call_site_find_chain_1): New variable save_callee_pc,
+	use it.
+
+2013-03-01  Pedro Alves  <palves@redhat.com>
+
+	Use gdb_byte for bytes from the program being debugged.
+
+	* arm-tdep.c (arm_store_return_value, arm_get_longjmp_target):
+	Change type of local 'buf' to gdb_byte.
+	* avr-tdep.c (avr_frame_prev_register, avr_push_dummy_call): Likewise.
+	* bfin-tdep.c (bfin_push_dummy_call): Likewise.
+	* cris-tdep.c (cris_sigcontext_addr)
+	(cris_sigtramp_frame_unwind_cache): Likewise.
+	* frv-linux-tdep.c (frv_linux_pc_in_sigtramp)
+	(frv_linux_sigcontext_reg_addr, frv_linux_sigtramp_frame_cache):
+	Likewise.
+	* frv-tdep.c (frv_pseudo_register_write, frv_analyze_prologue): Likewise.
+	* hppa-hpux-tdep.c (hppa32_hpux_find_global_pointer)
+	(hppa32_hpux_search_dummy_call_sequence)
+	(hppa_hpux_supply_save_state): Likewise.
+	* hppa-linux-tdep.c (insns_match_pattern)
+	(hppa_linux_find_global_pointer): Likewise.
+	* hppa-tdep.c (hppa_in_function_epilogue_p)
+	(skip_prologue_hard_way, hppa_frame_cache): Likewise.
+	* i386-nto-tdep.c (i386nto_sigcontext_addr): Likewise.
+	* i386fbsd-tdep.c (i386fbsd_supply_uthread)
+	(i386fbsd_collect_uthread): Likewise.
+	* ia64-hpux-tdep.c (ia64_hpux_push_dummy_code): Likewise.
+	* ia64-linux-tdep.c (ia64_linux_sigcontext_register_address): Likewise.
+	* ia64-tdep.c (examine_prologue, ia64_frame_cache)
+	(ia64_frame_prev_register, ia64_sigtramp_frame_cache)
+	(ia64_sigtramp_frame_prev_register, ia64_access_reg)
+	(ia64_access_rse_reg, ia64_libunwind_frame_this_id)
+	(ia64_libunwind_frame_prev_register)
+	(ia64_libunwind_sigtramp_frame_this_id)
+	(ia64_find_global_pointer_from_dynamic_section)
+	(find_extant_func_descr, find_func_descr, ia64_dummy_id)
+	(ia64_unwind_pc): Likewise.
+	* iq2000-tdep.c (iq2000_store_return_value): Likewise.
+	* m68hc11-tdep.c (m68hc11_push_dummy_call)
+	(m68hc11_extract_return_value): Likewise.
+	* m68klinux-nat.c (fetch_register, store_register): Likewise.
+	* mep-tdep.c (mep_pseudo_cr32_read, mep_pseudo_cr32_write)
+	(mep_get_insn, mep_push_dummy_call): Likewise.
+	* mips-linux-tdep.c (mips_linux_get_longjmp_target)
+	(mips_linux_in_dynsym_stub): Likewise.
+	* mn10300-tdep.c (mep_pseudo_cr32_write): Likewise.
+	* ppc-linux-nat.c (fetch_register, store_register): Likewise.
+	* regcache.c (dump_endian_bytes): Change type of parameter 'buf'
+	to gdb_byte.
+	* remote-mips.c (mips_set_register): Likewise.
+	* remote-sim.c (gdbsim_fetch_register): Likewise.
+	* score-tdep.c (score7_fetch_inst): Change type of parameter
+	'memblock' and local 'buf' to gdb_byte.
+	(score7_malloc_and_get_memblock): Change return type to gdb_byte.
+	Change type of local 'buf' to gdb_byte.  Adjust.
+	(score7_adjust_memblock_ptr): Change type of parameter 'memblock'
+	to gdb_byte**.
+	(score7_analyze_prologue): Change type of 'memblock' and
+	'memblock_ptr' locals to gdb_byte*.
+	* sh64-tdep.c (sh64_extract_return_value)
+	(sh64_store_return_value): Change type of local 'buf' to gdb_byte.
+	* solib-darwin.c (darwin_current_sos, darwin_read_exec_load_addr):
+	* solib-pa64.c (pa64_solib_create_inferior_hook)
+	(pa64_open_symbol_file_object): Remove local 'buf'.
+	* solib-som.c (som_solib_create_inferior_hook, link_map_start)
+	(som_open_symbol_file_object): Likewise.
+	* solib-spu.c (spu_current_sos): Likewise.
+	* spu-linux-nat.c (spu_fetch_inferior_registers): Likewise.
+	* spu-multiarch.c (parse_spufs_run, spu_fetch_registers)
+	(spu_store_registers): Likewise.
+	* target.c (debug_print_register): Likewise.
+	* tic6x-tdep.c (tic6x_get_longjmp_target): Likewise.
+	* xstormy16-tdep.c (xstormy16_store_return_value)
+	(xstormy16_push_dummy_call, xstormy16_resolve_jmp_table_entry)
+	(xstormy16_find_jmp_table_entry): Likewise.
+
+2013-03-01  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (tilegx_get_longjmp_target): New function.
+	(tilegx_gdbarch_init): Install it.
+
+2013-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-arch.c (archpy_disassemble): Use PyInt_Check and
+	PyLong_Check.
+
+2013-02-28  Doug Evans  <dje@google.com>
+
+	* python/py-finishbreakpoint.c (bpfinishpy_init): gcc -Wall lint.
+	* python/python.c (gdbpy_find_pc_line): Ditto.
+
+2013-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* contrib/excheck.py: New file.
+	* contrib/exsummary.py: New file.
+	* contrib/gcc-with-excheck: New file.
+
+2013-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_print_stack): Call begin_line and
+	fprintf_filtered inside TRY_CATCH.
+
+2013-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_find_pc_line): Call find_pc_line
+	inside TRY_CATCH.
+
+2013-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* py-finishbreakpoint.c (bpfinishpy_init): Reorganize to call
+	frame_object_to_frame_info inside TRY_CATCH.
+
+2013-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* py-block.c (gdbpy_block_for_pc): Call block_for_pc inside
+	TRY_CATCH.
+
+2013-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* objfiles.h (ALL_PSPACE_OBJFILES): Remove trailing backlash.
+
+2013-02-27  Corinna Vinschen  <vinschen@redhat.com>
+
+	* windows-nat.c: Throughout, fix format strings and casts of
+	printf-like functions to avoid type related warnings on all
+	platforms.
+	(handle_output_debug_string): Fetch context information address
+	from debug string using string_to_core_addr.
+
+2013-02-27  Jiong Wang  <jiwang@tilera.com>
+
+	* regformats/reg-tilegx.dat (name): Change abi name to "tilegx".
+	* regformats/reg-tilegx32.dat: New.
+
+2013-02-27  Jiong Wang  <jiwang@tilera.com>
+
+	* configure.tgt (tilegx-*-linux*): Enable gdbserver.
+
+2013-02-27  Jiong Wang  <jiwang@tilera.com>
+
+	* configure.tgt (tilegx-*-linux*): Replace whitespace with tab.
+
+2013-02-27  Yao Qi  <yao@codesourcery.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* tracepoint.c (tfile_trace_find): For tfind
+    	pc/tp/range/outside, look for the next trace frame instead of
+    	always starting from frame 0.
+
+2013-02-26  Anthony Green  <green@moxielogic.com>
+
+	* configure.tgt: Add support for moxie-*-rtems* target.
+
+2013-02-25  Pedro Alves  <palves@redhat.com>
+
+	* common/linux-ptrace.c (linux_ptrace_test_ret_to_nx): Change
+	warning text.
+
+2013-02-24  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-tdep.c (mips32_scan_prologue): Reset frame_offset to zero
+	if $fp is used as the virtual frame pointer.
+
+2013-02-23  Alan Modra  <amodra@gmail.com>
+
+	* elfread.c (elf_symtab_read): Do not use udata.p here to find
+	symbol size.
+	* ppc64-tdep.c (ppc64_elf_make_msymbol_special): New function.
+	* ppc64-tdep.h (ppc64_elf_make_msymbol_special): Declare.
+	* ppc-linux-tdep.c (ppc_linux_init_abi): Set up to use the above.
+	* ppcfbsd-tdep.c (ppcfbsd_init_abi): Likewise.
+
+2013-02-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* elfread.c (build_id_bfd_get): Make the return type const.
+	(build_id_verify): Make the check parameter const.
+	(build_id_to_debug_filename): Make the build_id parameter and variable
+	data const.
+	(find_separate_debug_file_by_buildid): Make the variable build_id const.
+
+2013-02-21  Alan Modra  <amodra@gmail.com>
+
+	* elfread.c (build_id_bfd_get): Adjust for elf_tdata changes.
+
+2013-02-20  Siva Chandra Reddy  <sivachandra@google.com>
+
+	Add a new method 'disassemble' to gdb.Architecture class.
+	* python/py-arch.c (archpy_disassmble): Implementation of the
+	new method gdb.Architecture.disassemble.
+	(arch_object_methods): Add entry for the new method.
+
+2013-02-20  Jiong Wang  <jiwang@tilera.com>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list.
+
+2013-02-19  Pedro Alves  <palves@redhat.com>
+
+	Garbage collect 'struct monitor_ops'::load_routine.
+
+	* monitor.h (struct monitor_ops) <load_routine>: Remove field.
+	* monitor.c (monitor_load): No longer call
+	current_monitor->load_routine.
+	* dbug-rom.c (init_dbug_cmds): Don't set 'load_routine'.
+	* m32r-rom.c (init_m32r_cmds): Don't set 'load_routine'.
+	* ppcbug-rom.c (init_ppc_cmds): Don't set 'load_routine'.
+
+2013-02-19  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/15161
+
+	Harmonize with generic_load.
+
+	* monitor.c: Include "readline/readline.h".
+	(monitor_load): Rename parameter 'file' to 'args'.  Use build_argv
+	instead of sscanf.  Use CORE_ADDR/strtoulst instead of unsigned
+	long/strtol for the 'load_offset' local.  Error out if no argument
+	is given or if too many arguments are given.  Tilde expand the
+	passed in file name.
+
+2013-02-19  Kai Tietz  <ktietz@redhat.com>
+
+	PR gdb/15161
+	* symfile.c (load_section_data): Change type of load_offset
+	to CORE_ADDR.
+	(generic_load): User strtoulst instead of strtoul for conversion
+	of load_offset.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (tilegx_analyze_prologue): add check for
+	 for return address, "lr" register, saved on stack.
+	* tilegx-tdep.c (tilegx_frame_cache): update "PC" reg
+	after we invoke tilegx_analyze_prologue.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (itilegx_gdbarch_init): char type should be signed.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (tilegx_skip_prologue): Use skip_prologue_using_sal.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (INT_SWINT_1_SIGRETURN): New macro.
+	(tilegx_write_pc): New function.
+	(tilegx_cannot_reference_register): Return zero if REGNO
+	is TILEGX_FAULTNUM_REGNUM.
+	(tilegx_gdbarch_init): Add call to set_gdbarch_write_pc.
+	(tilegx_register_name): Add handling of "faultnum" register.
+	* tilegx-tdep.h (enum tilegx_regnum): Add TILEGX_FAULTNUM_REGNUM.
+	* tilegx-linux-tdep.c (tilegx_linux_supply_regset): Add
+	handling of TILEGX_FAULTNUM_REGNUM.
+	* tilegx-linux-nat.c (regmap): Add entry for TILEGX_FAULTNUM_REGNUM.
+
+2013-02-19  Jiong Wang  <jiwang@tilera.com>
+
+	* tilegx-tdep.c (tilegx_push_dummy_call): args pushed on stack
+	should be aligned to 64bit.
+
+2013-02-19  Kai Tietz  <ktietz@redhat.com>
+
+	* windows-nat.c (windows_xfer_memory): Fix debug-output
+	for LLP64.
+
+2013-02-19  Lei Liu  <lei.liu2@windriver.com>
+
+	* mips-linux-nat.c (mips64_linux_regsets_store_registers):
+	Don't check DSP register number if HAVE_DSP is not set.
+
+2013-02-19  Alan Modra  <amodra@gmail.com>
+
+	* elfread.c (struct build_id): Delete.  Use struct elf_build_id
+	throughout file instead.
+	(build_id_bfd_get): Update to use new elf_tdata build_id field.
+	Don't xmalloc return value.
+	(build_id_verify): Similarly.  Don't xfree.
+	(build_id_to_debug_filename): Update.
+	(find_separate_debug_file_by_buildid): Update, don't xfree.
+
+2013-02-18  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/15102:
+	* dwarf2read.c (read_subrange_type): Use result of
+	'check_typedef'.
+
+2013-02-16  Yuanhui Zhang  <asmwarrior@gmail.com>
+
+	* frame.c: Remove one extra white space after #include
+	directive.
+
+2013-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* contrib/cc-with-tweaks.sh: Extend the comment for -p option.
+
+2013-02-15  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb-gdb.gdb.in: Wrap set complaints, b internal_error, b info_command
+	and dir commands into an if block.
+
 2013-02-15  Sanimir Agovic  <sanimir.agovic@intel.com>
 
 	* python/py-breakpoint (struct pybp_code):  Use int instead of
@@ -1131,7 +1690,7 @@
 
 2013-01-24  Tiago Stürmer Daitx  <tdaitx@linux.vnet.ibm.com>
 
-	* MAINTAINERS (Write After Approval): Add myself to the list. 
+	* MAINTAINERS (Write After Approval): Add myself to the list.
 
 2013-01-24  Tom Tromey  <tromey@redhat.com>
 

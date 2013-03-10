@@ -69,9 +69,6 @@
 #define O_LARGEFILE 0
 #endif
 
-extern int hex2bin (const char *hex, gdb_byte *bin, int count);
-extern int bin2hex (const gdb_byte *bin, char *hex, int count);
-
 /* Maximum length of an agent aexpression.
    This accounts for the fact that packets are limited to 400 bytes
    (which includes everything -- including the checksum), and assumes
@@ -172,6 +169,11 @@ static int disconnected_tracing;
    circular trace buffer.  */
 
 static int circular_trace_buffer;
+
+/* This variable is the requested trace buffer size, or -1 to indicate
+   that we don't care and leave it up to the target to set a size.  */
+
+static int trace_buffer_size = -1;
 
 /* Textual notes applying to the current and/or future trace runs.  */
 
@@ -712,8 +714,7 @@ validate_actionline (char **line, struct breakpoint *b)
   if (*line == NULL)
     return;
 
-  for (p = *line; isspace ((int) *p);)
-    p++;
+  p = skip_spaces (*line);
 
   /* Symbol lookup etc.  */
   if (*p == '\0')	/* empty line: just prompt for another line.  */
@@ -735,8 +736,7 @@ validate_actionline (char **line, struct breakpoint *b)
       do
 	{			/* Repeat over a comma-separated list.  */
 	  QUIT;			/* Allow user to bail out with ^C.  */
-	  while (isspace ((int) *p))
-	    p++;
+	  p = skip_spaces (p);
 
 	  if (*p == '$')	/* Look for special pseudo-symbols.  */
 	    {
@@ -801,8 +801,7 @@ validate_actionline (char **line, struct breakpoint *b)
       do
 	{			/* Repeat over a comma-separated list.  */
 	  QUIT;			/* Allow user to bail out with ^C.  */
-	  while (isspace ((int) *p))
-	    p++;
+	  p = skip_spaces (p);
 
 	  tmp_p = p;
 	  for (loc = t->base.loc; loc; loc = loc->next)
@@ -835,8 +834,7 @@ validate_actionline (char **line, struct breakpoint *b)
     {
       char *steparg;		/* In case warning is necessary.  */
 
-      while (isspace ((int) *p))
-	p++;
+      p = skip_spaces (p);
       steparg = p;
 
       if (*p == '\0' || (t->step_count = strtol (p, &p, 0)) == 0)
@@ -1382,8 +1380,7 @@ encode_actions_1 (struct command_line *action,
     {
       QUIT;			/* Allow user to bail out with ^C.  */
       action_exp = action->line;
-      while (isspace ((int) *action_exp))
-	action_exp++;
+      action_exp = skip_spaces (action_exp);
 
       cmd = lookup_cmd (&action_exp, cmdlist, "", -1, 1);
       if (cmd == 0)
@@ -1398,8 +1395,7 @@ encode_actions_1 (struct command_line *action,
 	  do
 	    {			/* Repeat over a comma-separated list.  */
 	      QUIT;		/* Allow user to bail out with ^C.  */
-	      while (isspace ((int) *action_exp))
-		action_exp++;
+	      action_exp = skip_spaces (action_exp);
 
 	      if (0 == strncasecmp ("$reg", action_exp, 4))
 		{
@@ -1560,8 +1556,7 @@ encode_actions_1 (struct command_line *action,
 	  do
 	    {			/* Repeat over a comma-separated list.  */
 	      QUIT;		/* Allow user to bail out with ^C.  */
-	      while (isspace ((int) *action_exp))
-		action_exp++;
+	      action_exp = skip_spaces (action_exp);
 
 		{
 		  struct cleanup *old_chain = NULL;
@@ -1829,6 +1824,7 @@ start_tracing (char *notes)
   /* Set some mode flags.  */
   target_set_disconnected_tracing (disconnected_tracing);
   target_set_circular_trace_buffer (circular_trace_buffer);
+  target_set_trace_buffer_size (trace_buffer_size);
 
   if (!notes)
     notes = trace_notes;
@@ -2592,8 +2588,7 @@ trace_find_range_command (char *args, int from_tty)
   if (0 != (tmp = strchr (args, ',')))
     {
       *tmp++ = '\0';	/* Terminate start address.  */
-      while (isspace ((int) *tmp))
-	tmp++;
+      tmp = skip_spaces (tmp);
       start = parse_and_eval_address (args);
       stop = parse_and_eval_address (tmp);
     }
@@ -2626,8 +2621,7 @@ trace_find_outside_command (char *args, int from_tty)
   if (0 != (tmp = strchr (args, ',')))
     {
       *tmp++ = '\0';	/* Terminate start address.  */
-      while (isspace ((int) *tmp))
-	tmp++;
+      tmp = skip_spaces (tmp);
       start = parse_and_eval_address (args);
       stop = parse_and_eval_address (tmp);
     }
@@ -2822,8 +2816,7 @@ trace_dump_actions (struct command_line *action,
 
       QUIT;			/* Allow user to bail out with ^C.  */
       action_exp = action->line;
-      while (isspace ((int) *action_exp))
-	action_exp++;
+      action_exp = skip_spaces (action_exp);
 
       /* The collection actions to be done while stepping are
          bracketed by the commands "while-stepping" and "end".  */
@@ -2861,8 +2854,7 @@ trace_dump_actions (struct command_line *action,
 		  QUIT;		/* Allow user to bail out with ^C.  */
 		  if (*action_exp == ',')
 		    action_exp++;
-		  while (isspace ((int) *action_exp))
-		    action_exp++;
+		  action_exp = skip_spaces (action_exp);
 
 		  next_comma = strchr (action_exp, ',');
 
@@ -3228,6 +3220,13 @@ set_circular_trace_buffer (char *args, int from_tty,
 			   struct cmd_list_element *c)
 {
   target_set_circular_trace_buffer (circular_trace_buffer);
+}
+
+static void
+set_trace_buffer_size (char *args, int from_tty,
+			   struct cmd_list_element *c)
+{
+  target_set_trace_buffer_size (trace_buffer_size);
 }
 
 static void
@@ -4316,35 +4315,46 @@ tfile_trace_find (enum trace_find_type type, int num,
                                      ((gdb_byte *) &data_size, 4,
 				      gdbarch_byte_order (target_gdbarch ()));
       offset += 4;
-      switch (type)
+
+      if (type == tfind_number)
 	{
-	case tfind_number:
+	  /* Looking for a specific trace frame.  */
 	  if (tfnum == num)
 	    found = 1;
-	  break;
-	case tfind_pc:
-	  tfaddr = tfile_get_traceframe_address (tframe_offset);
-	  if (tfaddr == addr1)
-	    found = 1;
-	  break;
-	case tfind_tp:
-	  tp = get_tracepoint (num);
-	  if (tp && tpnum == tp->number_on_target)
-	    found = 1;
-	  break;
-	case tfind_range:
-	  tfaddr = tfile_get_traceframe_address (tframe_offset);
-	  if (addr1 <= tfaddr && tfaddr <= addr2)
-	    found = 1;
-	  break;
-	case tfind_outside:
-	  tfaddr = tfile_get_traceframe_address (tframe_offset);
-	  if (!(addr1 <= tfaddr && tfaddr <= addr2))
-	    found = 1;
-	  break;
-	default:
-	  internal_error (__FILE__, __LINE__, _("unknown tfind type"));
 	}
+      else
+	{
+	  /* Start from the _next_ trace frame.  */
+	  if (tfnum > traceframe_number)
+	    {
+	      switch (type)
+		{
+		case tfind_pc:
+		  tfaddr = tfile_get_traceframe_address (tframe_offset);
+		  if (tfaddr == addr1)
+		    found = 1;
+		  break;
+		case tfind_tp:
+		  tp = get_tracepoint (num);
+		  if (tp && tpnum == tp->number_on_target)
+		    found = 1;
+		  break;
+		case tfind_range:
+		  tfaddr = tfile_get_traceframe_address (tframe_offset);
+		  if (addr1 <= tfaddr && tfaddr <= addr2)
+		    found = 1;
+		  break;
+		case tfind_outside:
+		  tfaddr = tfile_get_traceframe_address (tframe_offset);
+		  if (!(addr1 <= tfaddr && tfaddr <= addr2))
+		    found = 1;
+		  break;
+		default:
+		  internal_error (__FILE__, __LINE__, _("unknown tfind type"));
+		}
+	    }
+	}
+
       if (found)
 	{
 	  if (tpp)
@@ -4705,7 +4715,14 @@ build_traceframe_info (char blocktype, void *data)
 	unsigned short mlen;
 
 	tfile_read ((gdb_byte *) &maddr, 8);
+	maddr = extract_unsigned_integer ((gdb_byte *) &maddr, 8,
+					  gdbarch_byte_order
+					  (target_gdbarch ()));
 	tfile_read ((gdb_byte *) &mlen, 2);
+	mlen = (unsigned short)
+		extract_unsigned_integer ((gdb_byte *) &mlen,
+					  2, gdbarch_byte_order
+					  (target_gdbarch ()));
 
 	r = VEC_safe_push (mem_range_s, info->memory, NULL);
 
@@ -5404,6 +5421,16 @@ up and stopping the trace run."),
 			   NULL,
 			   &setlist,
 			   &showlist);
+
+  add_setshow_zuinteger_unlimited_cmd ("trace-buffer-size", no_class,
+				       &trace_buffer_size, _("\
+Set requested size of trace buffer."), _("\
+Show requested size of trace buffer."), _("\
+Use this to choose a size for the trace buffer.  Some targets\n\
+may have fixed or limited buffer sizes.  A value of -1 disables\n\
+any attempt to set the buffer size and lets the target choose."),
+				       set_trace_buffer_size, NULL,
+				       &setlist, &showlist);
 
   add_setshow_string_cmd ("trace-user", class_trace,
 			  &trace_user, _("\

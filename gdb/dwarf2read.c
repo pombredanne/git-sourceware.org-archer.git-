@@ -12855,7 +12855,7 @@ read_base_type (struct die_info *die, struct dwarf2_cu *cu)
 static struct type *
 read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
 {
-  struct type *base_type;
+  struct type *base_type, *orig_base_type;
   struct type *range_type;
   struct attribute *attr;
   LONGEST low;
@@ -12863,9 +12863,12 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
   const char *name;
   LONGEST negative_mask;
 
-  base_type = die_type (die, cu);
-  /* Preserve BASE_TYPE's original type, just set its LENGTH.  */
-  check_typedef (base_type);
+  orig_base_type = die_type (die, cu);
+  /* If ORIG_BASE_TYPE is a typedef, it will not be TYPE_UNSIGNED,
+     whereas the real type might be.  So, we use ORIG_BASE_TYPE when
+     creating the range type, but we use the result of check_typedef
+     when examining properties of the type.  */
+  base_type = check_typedef (orig_base_type);
 
   /* The die_type call above may have already set the type for this DIE.  */
   range_type = get_die_type (die, cu);
@@ -12953,7 +12956,7 @@ read_subrange_type (struct die_info *die, struct dwarf2_cu *cu)
     }
 
   /* LOW_BOUND and HIGH_BOUND are set for real below.  */
-  range_type = create_range_type (NULL, base_type, 0, -1);
+  range_type = create_range_type (NULL, orig_base_type, 0, -1);
   TYPE_UNSIGNED (range_type) = 0;
 
   negative_mask = 

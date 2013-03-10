@@ -1945,10 +1945,10 @@ elf32_arm_nabi_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 
       case 148:		/* Linux/ARM 32-bit.  */
 	/* pr_cursig */
-	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
+	elf_tdata (abfd)->core->signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 24);
+	elf_tdata (abfd)->core->lwpid = bfd_get_32 (abfd, note->descdata + 24);
 
 	/* pr_reg */
 	offset = 72;
@@ -1971,11 +1971,11 @@ elf32_arm_nabi_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
 	return FALSE;
 
       case 124:		/* Linux/ARM elf_prpsinfo.  */
-	elf_tdata (abfd)->core_pid
+	elf_tdata (abfd)->core->pid
 	 = bfd_get_32 (abfd, note->descdata + 12);
-	elf_tdata (abfd)->core_program
+	elf_tdata (abfd)->core->program
 	 = _bfd_elfcore_strndup (abfd, note->descdata + 28, 16);
-	elf_tdata (abfd)->core_command
+	elf_tdata (abfd)->core->command
 	 = _bfd_elfcore_strndup (abfd, note->descdata + 44, 80);
     }
 
@@ -1983,7 +1983,7 @@ elf32_arm_nabi_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
      onto the end of the args in some (at least one anyway)
      implementations, so strip it off if it exists.  */
   {
-    char *command = elf_tdata (abfd)->core_command;
+    char *command = elf_tdata (abfd)->core->command;
     int n = strlen (command);
 
     if (0 < n && command[n - 1] == ' ')
@@ -13648,14 +13648,18 @@ elf32_arm_size_dynamic_sections (bfd * output_bfd ATTRIBUTE_UNUSED,
 		  && (local_iplt == NULL
 		      || local_iplt->arm.noncall_refcount == 0))
 		elf32_arm_allocate_irelocs (info, srel, 1);
-	      else if ((info->shared && !(*local_tls_type & GOT_TLS_GDESC))
-		       || *local_tls_type & GOT_TLS_GD)
-		elf32_arm_allocate_dynrelocs (info, srel, 1);
-
-	      if (info->shared && *local_tls_type & GOT_TLS_GDESC)
+	      else if (info->shared || output_bfd->flags & DYNAMIC)
 		{
-		  elf32_arm_allocate_dynrelocs (info, htab->root.srelplt, 1);
-		  htab->tls_trampoline = -1;
+		  if ((info->shared && !(*local_tls_type & GOT_TLS_GDESC))
+		      || *local_tls_type & GOT_TLS_GD)
+		    elf32_arm_allocate_dynrelocs (info, srel, 1);
+		  
+		  if (info->shared && *local_tls_type & GOT_TLS_GDESC)
+		    {
+		      elf32_arm_allocate_dynrelocs (info,
+						    htab->root.srelplt, 1);
+		      htab->tls_trampoline = -1;
+		    }
 		}
 	    }
 	  else
@@ -15531,7 +15535,7 @@ elf32_arm_modify_segment_map (bfd *abfd,
       /* If there is already a PT_ARM_EXIDX header, then we do not
 	 want to add another one.  This situation arises when running
 	 "strip"; the input binary already has the header.  */
-      m = elf_tdata (abfd)->segment_map;
+      m = elf_seg_map (abfd);
       while (m && m->p_type != PT_ARM_EXIDX)
 	m = m->next;
       if (!m)
@@ -15544,8 +15548,8 @@ elf32_arm_modify_segment_map (bfd *abfd,
 	  m->count = 1;
 	  m->sections[0] = sec;
 
-	  m->next = elf_tdata (abfd)->segment_map;
-	  elf_tdata (abfd)->segment_map = m;
+	  m->next = elf_seg_map (abfd);
+	  elf_seg_map (abfd) = m;
 	}
     }
 
@@ -16138,15 +16142,15 @@ elf32_arm_symbian_modify_segment_map (bfd *abfd,
   dynsec = bfd_get_section_by_name (abfd, ".dynamic");
   if (dynsec)
     {
-      for (m = elf_tdata (abfd)->segment_map; m != NULL; m = m->next)
+      for (m = elf_seg_map (abfd); m != NULL; m = m->next)
 	if (m->p_type == PT_DYNAMIC)
 	  break;
 
       if (m == NULL)
 	{
 	  m = _bfd_elf_make_dynamic_segment (abfd, dynsec);
-	  m->next = elf_tdata (abfd)->segment_map;
-	  elf_tdata (abfd)->segment_map = m;
+	  m->next = elf_seg_map (abfd);
+	  elf_seg_map (abfd) = m;
 	}
     }
 

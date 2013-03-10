@@ -2216,10 +2216,10 @@ ppc_elf_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 
     case 268:		/* Linux/PPC.  */
       /* pr_cursig */
-      elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
+      elf_tdata (abfd)->core->signal = bfd_get_16 (abfd, note->descdata + 12);
 
       /* pr_pid */
-      elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 24);
+      elf_tdata (abfd)->core->lwpid = bfd_get_32 (abfd, note->descdata + 24);
 
       /* pr_reg */
       offset = 72;
@@ -2242,11 +2242,11 @@ ppc_elf_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
       return FALSE;
 
     case 128:		/* Linux/PPC elf_prpsinfo.  */
-      elf_tdata (abfd)->core_pid
+      elf_tdata (abfd)->core->pid
 	= bfd_get_32 (abfd, note->descdata + 16);
-      elf_tdata (abfd)->core_program
+      elf_tdata (abfd)->core->program
 	= _bfd_elfcore_strndup (abfd, note->descdata + 32, 16);
-      elf_tdata (abfd)->core_command
+      elf_tdata (abfd)->core->command
 	= _bfd_elfcore_strndup (abfd, note->descdata + 48, 80);
     }
 
@@ -2255,7 +2255,7 @@ ppc_elf_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
      implementations, so strip it off if it exists.  */
 
   {
-    char *command = elf_tdata (abfd)->core_command;
+    char *command = elf_tdata (abfd)->core->command;
     int n = strlen (command);
 
     if (0 < n && command[n - 1] == ' ')
@@ -2436,7 +2436,7 @@ ppc_elf_modify_segment_map (bfd *abfd,
      If we find that case, we split the segment.
      We maintain the original output section order.  */
 
-  for (m = elf_tdata (abfd)->segment_map; m != NULL; m = m->next)
+  for (m = elf_seg_map (abfd); m != NULL; m = m->next)
     {
       if (m->count == 0)
 	continue;
@@ -7472,7 +7472,7 @@ ppc_elf_relocate_section (bfd *output_bfd,
 	{
 	  if (got2 != NULL
 	      && r_type == R_PPC_PLTREL24
-	      && rel->r_addend >= 32768)
+	      && rel->r_addend != 0)
 	    {
 	      /* R_PPC_PLTREL24 is rather special.  If non-zero, the
 		 addend specifies the GOT pointer offset within .got2.  */
@@ -8477,33 +8477,37 @@ ppc_elf_relocate_section (bfd *output_bfd,
 	  break;
 
 	case R_PPC_PLTREL24:
-	  if (h == NULL || ifunc != NULL)
-	    break;
-	  /* Relocation is to the entry for this symbol in the
-	     procedure linkage table.  */
-	  {
-	    struct plt_entry *ent = find_plt_ent (&h->plt.plist, got2,
-						  info->shared ? addend : 0);
-	    addend = 0;
-	    if (ent == NULL
-		|| htab->plt == NULL)
-	      {
-		/* We didn't make a PLT entry for this symbol.  This
-		   happens when statically linking PIC code, or when
-		   using -Bsymbolic.  */
-		break;
-	      }
+	  if (h != NULL && ifunc == NULL)
+	    {
+	      struct plt_entry *ent = find_plt_ent (&h->plt.plist, got2,
+						    info->shared ? addend : 0);
+	      if (ent == NULL
+		  || htab->plt == NULL)
+		{
+		  /* We didn't make a PLT entry for this symbol.  This
+		     happens when statically linking PIC code, or when
+		     using -Bsymbolic.  */
+		}
+	      else
+		{
+		  /* Relocation is to the entry for this symbol in the
+		     procedure linkage table.  */
+		  unresolved_reloc = FALSE;
+		  if (htab->plt_type == PLT_NEW)
+		    relocation = (htab->glink->output_section->vma
+				  + htab->glink->output_offset
+				  + ent->glink_offset);
+		  else
+		    relocation = (htab->plt->output_section->vma
+				  + htab->plt->output_offset
+				  + ent->plt.offset);
+		}
+	    }
 
-	    unresolved_reloc = FALSE;
-	    if (htab->plt_type == PLT_NEW)
-	      relocation = (htab->glink->output_section->vma
-			    + htab->glink->output_offset
-			    + ent->glink_offset);
-	    else
-	      relocation = (htab->plt->output_section->vma
-			    + htab->plt->output_offset
-			    + ent->plt.offset);
-	  }
+	  /* R_PPC_PLTREL24 is rather special.  If non-zero, the
+	     addend specifies the GOT pointer offset within .got2.
+	     Don't apply it to the relocation field.  */
+	  addend = 0;
 	  break;
 
 	  /* Relocate against _SDA_BASE_.  */

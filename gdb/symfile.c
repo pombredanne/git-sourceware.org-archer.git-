@@ -56,6 +56,7 @@
 #include "remote.h"
 #include "stack.h"
 #include "gdb_bfd.h"
+#include "cli/cli-utils.h"
 
 #include <sys/types.h>
 #include <fcntl.h>
@@ -1948,7 +1949,7 @@ add_section_size_callback (bfd *abfd, asection *asec, void *data)
 
 /* Opaque data for load_section_callback.  */
 struct load_section_data {
-  unsigned long load_offset;
+  CORE_ADDR load_offset;
   struct load_progress_data *progress_data;
   VEC(memory_write_request_s) *requests;
 };
@@ -2126,9 +2127,9 @@ generic_load (char *args, int from_tty)
 
   if (argv[1] != NULL)
     {
-      char *endptr;
+      const char *endptr;
 
-      cbdata.load_offset = strtoul (argv[1], &endptr, 0);
+      cbdata.load_offset = strtoulst (argv[1], &endptr, 0);
 
       /* If the last word was not a valid number then
          treat it as a file name with spaces in.  */
@@ -2738,8 +2739,7 @@ set_ext_lang_command (char *args, int from_tty, struct cmd_list_element *e)
   *cp++ = '\0';
 
   /* Find beginning of second arg, which should be a source language.  */
-  while (*cp && isspace (*cp))
-    cp++;
+  cp = skip_spaces (cp);
 
   if (*cp == '\0')
     error (_("'%s': two arguments required -- "

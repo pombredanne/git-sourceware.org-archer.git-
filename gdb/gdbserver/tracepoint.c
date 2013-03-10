@@ -30,6 +30,8 @@
 
 #include "ax.h"
 
+#define DEFAULT_TRACE_BUFFER_SIZE 5242880 /* 5*1024*1024 */
+
 /* This file is built for both GDBserver, and the in-process
    agent (IPA), a shared library that includes a tracing agent that is
    loaded by the inferior to support fast tracepoints.  Fast
@@ -992,6 +994,10 @@ int current_traceframe = -1;
 static int circular_trace_buffer;
 #endif
 
+/* Size of the trace buffer.  */
+
+static LONGEST trace_buffer_size;
+
 /* Pointer to the block of memory that traceframes all go into.  */
 
 static unsigned char *trace_buffer_lo;
@@ -1478,9 +1484,13 @@ clear_inferior_trace_buffer (void)
 #endif
 
 static void
-init_trace_buffer (unsigned char *buf, int bufsize)
+init_trace_buffer (LONGEST bufsize)
 {
-  trace_buffer_lo = buf;
+  trace_buffer_size = bufsize;
+
+  /* If we already have a trace buffer, try realloc'ing.  */
+  trace_buffer_lo = xrealloc (trace_buffer_lo, bufsize);
+
   trace_buffer_hi = trace_buffer_lo + bufsize;
 
   clear_trace_buffer ();
@@ -3684,8 +3694,8 @@ cmd_qtp (char *own_buf)
 
 /* State variables to help return all the tracepoint bits.  */
 static struct tracepoint *cur_tpoint;
-static int cur_action;
-static int cur_step_action;
+static unsigned int cur_action;
+static unsigned int cur_step_action;
 static struct source_string *cur_source_string;
 static struct trace_state_variable *cur_tsv;
 
@@ -3759,7 +3769,7 @@ cmd_qtfp (char *packet)
   trace_debug ("Returning first tracepoint definition piece");
 
   cur_tpoint = tracepoints;
-  cur_action = cur_step_action = -1;
+  cur_action = cur_step_action = 0;
   cur_source_string = NULL;
 
   if (cur_tpoint)
@@ -3784,17 +3794,17 @@ cmd_qtsp (char *packet)
 	 GDB misbehavior.  */
       strcpy (packet, "l");
     }
-  else if (cur_action < cur_tpoint->numactions - 1)
+  else if (cur_action < cur_tpoint->numactions)
     {
-      ++cur_action;
       response_action (packet, cur_tpoint,
 		       cur_tpoint->actions_str[cur_action], 0);
+      ++cur_action;
     }
-  else if (cur_step_action < cur_tpoint->num_step_actions - 1)
+  else if (cur_step_action < cur_tpoint->num_step_actions)
     {
-      ++cur_step_action;
       response_action (packet, cur_tpoint,
 		       cur_tpoint->step_actions_str[cur_step_action], 1);
+      ++cur_step_action;
     }
   else if ((cur_source_string
 	    ? cur_source_string->next
@@ -3809,7 +3819,7 @@ cmd_qtsp (char *packet)
   else
     {
       cur_tpoint = cur_tpoint->next;
-      cur_action = cur_step_action = -1;
+      cur_action = cur_step_action = 0;
       cur_source_string = NULL;
       if (cur_tpoint)
 	response_tracepoint (packet, cur_tpoint);
@@ -3969,7 +3979,7 @@ cmd_qtbuffer (char *own_buf)
   unpack_varlen_hex (packet, &num);
 
   trace_debug ("Want to get trace buffer, %d bytes at offset 0x%s",
-	       (int) num, pulongest (offset));
+	       (int) num, phex_nz (offset, 0));
 
   tot = (trace_buffer_hi - trace_buffer_lo) - free_space ();
 
@@ -4002,7 +4012,6 @@ cmd_qtbuffer (char *own_buf)
     num = (PBUFSIZ - 16) / 2;
 
   convert_int_to_ascii (tbp, own_buf, num);
-  own_buf[num] = '\0';
 }
 
 static void
@@ -4017,6 +4026,37 @@ cmd_bigqtbuffer_circular (char *own_buf)
   circular_trace_buffer = val;
   trace_debug ("Trace buffer is now %s",
 	       circular_trace_buffer ? "circular" : "linear");
+  write_ok (own_buf);
+}
+
+static void
+cmd_bigqtbuffer_size (char *own_buf)
+{
+  ULONGEST val;
+  LONGEST sval;
+  char *packet = own_buf;
+
+  /* Can't change the size during a tracing run.  */
+  if (tracing)
+    {
+      write_enn (own_buf);
+      return;
+    }
+
+  packet += strlen ("QTBuffer:size:");
+
+  /* -1 is sent as literal "-1".  */
+  if (strcmp (packet, "-1") == 0)
+    sval = DEFAULT_TRACE_BUFFER_SIZE;
+  else
+    {
+      unpack_varlen_hex (packet, &val);
+      sval = (LONGEST) val;
+    }
+
+  init_trace_buffer (sval);
+  trace_debug ("Trace buffer is now %s bytes",
+	       plongest (trace_buffer_size));
   write_ok (own_buf);
 }
 
@@ -4142,6 +4182,11 @@ handle_tracepoint_general_set (char *packet)
   else if (strncmp ("QTBuffer:circular:", packet, strlen ("QTBuffer:circular:")) == 0)
     {
       cmd_bigqtbuffer_circular (packet);
+      return 1;
+    }
+  else if (strncmp ("QTBuffer:size:", packet, strlen ("QTBuffer:size:")) == 0)
+    {
+      cmd_bigqtbuffer_size (packet);
       return 1;
     }
   else if (strncmp ("QTNotes:", packet, strlen ("QTNotes:")) == 0)
@@ -7229,10 +7274,8 @@ get_timestamp (void)
 void
 initialize_tracepoint (void)
 {
-  /* There currently no way to change the buffer size.  */
-  const int sizeOfBuffer = 5 * 1024 * 1024;
-  unsigned char *buf = xmalloc (sizeOfBuffer);
-  init_trace_buffer (buf, sizeOfBuffer);
+  /* Start with the default size.  */
+  init_trace_buffer (DEFAULT_TRACE_BUFFER_SIZE);
 
   /* Wire trace state variable 1 to be the timestamp.  This will be
      uploaded to GDB upon connection and become one of its trace state

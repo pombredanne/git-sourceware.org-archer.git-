@@ -32,6 +32,7 @@
 #include "serial.h"
 #include "readline/tilde.h"
 #include "python.h"
+#include "cli/cli-utils.h"
 
 #include <ctype.h>
 
@@ -222,8 +223,7 @@ python_interactive_command (char *arg, int from_tty)
   cleanup = make_cleanup_restore_integer (&interpreter_async);
   interpreter_async = 0;
 
-  while (arg && *arg && isspace (*arg))
-    ++arg;
+  arg = skip_spaces (arg);
 
   ensure_python_env (get_current_arch (), current_language);
 
@@ -367,8 +367,7 @@ python_command (char *arg, int from_tty)
   make_cleanup_restore_integer (&interpreter_async);
   interpreter_async = 0;
 
-  while (arg && *arg && isspace (*arg))
-    ++arg;
+  arg = skip_spaces (arg);
   if (arg && *arg)
     {
       if (PyRun_SimpleString (arg))
@@ -738,16 +737,25 @@ gdbpy_parse_and_eval (PyObject *self, PyObject *args)
 static PyObject *
 gdbpy_find_pc_line (PyObject *self, PyObject *args)
 {
-  struct symtab_and_line sal;
-  CORE_ADDR pc;
   gdb_py_ulongest pc_llu;
+  volatile struct gdb_exception except;
+  PyObject *result = NULL; /* init for gcc -Wall */
 
   if (!PyArg_ParseTuple (args, GDB_PY_LLU_ARG, &pc_llu))
     return NULL;
 
-  pc = (CORE_ADDR) pc_llu;
-  sal = find_pc_line (pc, 0);
-  return symtab_and_line_to_sal_object (sal);
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      struct symtab_and_line sal;
+      CORE_ADDR pc;
+
+      pc = (CORE_ADDR) pc_llu;
+      sal = find_pc_line (pc, 0);
+      result = symtab_and_line_to_sal_object (sal);
+    }
+  GDB_PY_HANDLE_EXCEPTION (except);
+
+  return result;
 }
 
 /* Read a file as Python code.
@@ -1034,6 +1042,8 @@ gdbpy_flush (PyObject *self, PyObject *args, PyObject *kw)
 void
 gdbpy_print_stack (void)
 {
+  volatile struct gdb_exception except;
+
   /* Print "none", just clear exception.  */
   if (gdbpy_should_print_stack == python_excp_none)
     {
@@ -1046,7 +1056,10 @@ gdbpy_print_stack (void)
       /* PyErr_Print doesn't necessarily end output with a newline.
 	 This works because Python's stdout/stderr is fed through
 	 printf_filtered.  */
-      begin_line ();
+      TRY_CATCH (except, RETURN_MASK_ALL)
+	{
+	  begin_line ();
+	}
     }
   /* Print "message", just error print message.  */
   else
@@ -1059,17 +1072,21 @@ gdbpy_print_stack (void)
       /* Fetch the error message contained within ptype, pvalue.  */
       msg = gdbpy_exception_to_string (ptype, pvalue);
       type = gdbpy_obj_to_string (ptype);
-      if (msg == NULL)
+
+      TRY_CATCH (except, RETURN_MASK_ALL)
 	{
-	  /* An error occurred computing the string representation of the
-	     error message.  */
-	  fprintf_filtered (gdb_stderr,
-			    _("Error occurred computing Python error"	\
-			      "message.\n"));
+	  if (msg == NULL)
+	    {
+	      /* An error occurred computing the string representation of the
+		 error message.  */
+	      fprintf_filtered (gdb_stderr,
+				_("Error occurred computing Python error" \
+				  "message.\n"));
+	    }
+	  else
+	    fprintf_filtered (gdb_stderr, "Python Exception %s %s: \n",
+			      type, msg);
 	}
-      else
-	fprintf_filtered (gdb_stderr, "Python Exception %s %s: \n",
-			  type, msg);
 
       Py_XDECREF (ptype);
       Py_XDECREF (pvalue);
@@ -1315,8 +1332,7 @@ free_type_printers (void *arg)
 static void
 python_interactive_command (char *arg, int from_tty)
 {
-  while (arg && *arg && isspace (*arg))
-    ++arg;
+  arg = skip_spaces (arg);
   if (arg && *arg)
     error (_("Python scripting is not supported in this copy of GDB."));
   else

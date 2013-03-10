@@ -1,3 +1,88 @@
+2013-03-08  Stan Shebs  <stan@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* tracepoint.c (trace_buffer_size): New global.
+	(DEFAULT_TRACE_BUFFER_SIZE): New define.
+	(init_trace_buffer): Change to one-argument function. Allocate
+	trace buffer memory.
+	(handle_tracepoint_general_set): Call cmd_bigqtbuffer_size to
+	handle QTBuffer:size packet.
+	(cmd_bigqtbuffer_size): New function.
+	(initialize_tracepoint): Call init_trace_buffer with
+	DEFAULT_TRACE_BUFFER_SIZE.
+	* server.c (handle_query): Add QTBuffer:size in the
+	supported packets.
+
+2013-03-07  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (cur_action, cur_step_action): Make them unsigned.
+	(cmd_qtfp): Initialize cur_action and cur_step_action 0 instead
+	of -1.
+	(cmd_qtsp): Adjust condition.  Do post increment.
+	Set cur_action and cur_step_action back to 0.
+
+2013-03-07  Jeremy Bennett  <jeremy.bennett@embecosm.com>
+
+	PR server/15236
+	* linux-low.c (linux_write_memory): Return early success if LEN is
+	zero.
+
+2013-03-05  Corinna Vinschen  <vinschen@redhat.de>
+
+	* configure.srv: Add x86_64-*-cygwin* as target.
+
+2013-02-28  Tom Tromey  <tromey@redhat.com>
+
+	* configure.ac: Invoke AC_SYS_LARGEFILE.
+	* configure, config.in: Rebuild.
+
+2013-02-28  Corinna Vinschen  <vinschen@redhat.com>
+
+	* win32-low.c: Throughout, fix format strings and casts of
+	printf-like functions to avoid type related warnings on all
+	platforms.
+	(get_child_debug_event): Print dwDebugEventCode as hex since
+	that's how it's usually documented.
+
+2013-02-28  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (cmd_qtbuffer): Call phex_nz instead of
+	pulongest.
+
+2013-02-27  Jiong Wang  <jiwang@tilera.com>
+
+	* Makefile.in (clean): Remove reg-tilegx.c, reg-tilegx32.c.
+	(reg-tilegx32.c): New rule.
+	* configure.srv (tilegx-*-linux*): Add reg-tilegx32.o to srv_regobj.
+	* linux-tile-low.c (tile_arch_setup): New function.  Invoke
+	different register info initializer according to elf class.
+	(init_registers_tilgx32): New function.  The tilegx32 register info
+	initializer.
+	(tile_fill_gregset): Use "uint_reg_t" to represent register size.
+	(tile_store_gregset): Likewise.
+
+2013-02-27  Yao Qi  <yao@codesourcery.com>
+
+	* server.c (process_point_options): Print debug message when
+	debug_threads is true.
+
+2013-02-26  Yao Qi  <yao@codesourcery.com>
+
+	* tracepoint.c (cmd_qtbuffer): Don't set '\0' in OWN_BUF.
+
+2013-02-19  Pedro Alves  <palves@redhat.com>
+	    Kai Tietz <ktietz@redhat.com>
+
+	PR gdb/15161
+
+	* server.c (handle_query) <CRC check>: Use unpack_varlen_hex
+	instead of strtoul to extract address from packet.
+	(process_serial_event) <'z'>: Likewise.
+
+2013-02-18  Yao Qi  <yao@codesourcery.com>
+
+	* linux-bfin-low.c (the_low_target): Use NULL instead of 0.
+
 2013-02-14  Pedro Alves  <palves@redhat.com>
 
 	Plug memory leak.

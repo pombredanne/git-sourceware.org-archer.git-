@@ -1,3 +1,68 @@
+2013-03-08  Stan Shebs  <stan@codesourcery.com>
+	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	gdb/testsuite/
+	* gdb.trace/trace-buffer-size.exp: New file.
+	* gdb.trace/trace-buffer-size.c: New file.
+
+2013-03-06  Pedro Alves  <palves@redhat.com>
+
+	* gdb.trace/tstatus.exp (run_trace_experiment): When the target
+	doesn't support the tested optional feature, call "unsupported"
+	with the same test message as the "pass" case, instead of calling
+	"pass" with a different message.  Use the same text for the "fail"
+	cases too.
+
+2013-03-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/tstatus.exp: Remove the invocation of
+	gdb_load_shlibs, gdb_compile, clean_restart and runto_main.
+	(test_tracepoints): Don't set fast tracepoint.
+	(top level): Don't check agent library is loaded or not.
+
+2013-03-06  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/tstatus.exp (run_trace_experiment): Escape
+	parentheses by "\\".
+
+2013-03-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.linespec/base/one/thefile.cc (twodup): New.
+	(m): Call it.
+	* gdb.linespec/base/two/thefile.cc (dupname): New.
+	(n): Call it.
+	* gdb.linespec/break-ask.exp: New file.
+	* gdb.linespec/lspec.cc (body_elsewhere): New comment marker.
+
+2013-02-28  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/report.exp: Move some code to ...
+	(use_collected_data): New.
+	(top level): Call use_collected_data once on the live target.
+	Save at file of the current trace session, load it with target
+	tfile, and call use_collected_data again.
+
+2013-02-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.threads/fork-thread-pending.c (main): Add alarm.
+
+2013-02-27  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/valgrind-infcall.exp (valgrind_pid): New variable.
+	Add final kill of ${valgrind_pid}.
+
+2013-02-20  Siva Chandra Reddy  <sivachandra@google.com>
+
+	* gdb.python/py-arch.c: New test case
+	* gdb.python/py-arch.exp: New tests to test
+	gdb.Architecture.disassemble
+	* gdb.python/Makefile.in: Add py-arch to the list of
+	EXECUTABLES.
+
+2013-02-18  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/subrange.exp: New file.
+
 2013-02-15  Pedro Alves  <pedro@codesourcery.com>
 	    Hafiz Abid Qadeer  <abidh@codesourcery.com>
 
