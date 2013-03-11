@@ -1,6 +1,6 @@
 /* Python frame filters
 
-   Copyright (C) 2012, 2013 Free Software Foundation, Inc.
+   Copyright (C) 2013 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -45,7 +45,7 @@ typedef enum mi_print_types
    from a Python object that conforms to the "Symbol Value" interface.
    OBJ is the Python object to extract the values from.  NAME is a
    pass-through argument where the name of the symbol will be written.
-   *NAME is allocated in this function, but the caller is responsible
+   NAME is allocated in this function, but the caller is responsible
    for clean up.  SYM is a pass-through argument where the symbol
    will be written.  In the case of the API returning a string, this
    will be set to NULL.  LANGUAGE is also a pass-through argument
@@ -106,9 +106,9 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
 
 /* Helper function to extract a value from an object that conforms to
    the "Symbol Value" interface.  OBJ is the Python object to extract
-   the value from.  **VALUE is a pass-through argument where the value
+   the value from.  VALUE is a pass-through argument where the value
    will be written.  If the object does not have the value attribute,
-   or provides the Python None for a value, **VALUE will be set to
+   or provides the Python None for a value, VALUE will be set to
    NULL and this function will return as successful.  Returns 0 on
    error with the appropriate Python exception set, and 1 on
    success.  */
@@ -185,11 +185,11 @@ mi_should_print (struct symbol *sym, enum mi_print_types type)
   return print_me;
 }
 
-/* Helper function which outputs a type name to a "type" field in a
-   stream.  OUT is the ui-out structure the type name will be output
-   too, and VAL is the value that the type will be extracted from.
-   Returns 0 on error, with any GDB exceptions converted to a Python
-   exception.  */
+/* Helper function which outputs a type name extracted from VAL to a
+   "type" field in the output stream OUT.  OUT is the ui-out structure
+   the type name will be output too, and VAL is the value that the
+   type will be extracted from.  Returns 0 on error, with any GDB
+   exceptions converted to a Python exception.  */
 
 static int
 py_print_type (struct ui_out *out, struct value *val)
@@ -218,8 +218,8 @@ py_print_type (struct ui_out *out, struct value *val)
   return 1;
 }
 
-/* Helper function which outputs a value's name to an output field in
-   a stream.  OUT is the ui-out structure the value will be output to,
+/* Helper function which outputs a value to an output field in a
+   stream.  OUT is the ui-out structure the value will be output to,
    VAL is the value that will be printed, OPTS contains the value
    printing options, ARGS_TYPE is an enumerater describing the
    argument format, and LANGUAGE is the language_defn that the value
@@ -235,8 +235,8 @@ py_print_value (struct ui_out *out, struct value *val,
   int should_print = 0;
 
   /* MI does not print certain values, differentiated by type,
-     depending on what MI_PRINT_TYPE indicates.  Test
-     type against option.  For CLI print all values.  */
+     depending on what ARGS_TYPE indicates.  Test type against option.
+     For CLI print all values.  */
   if (args_type == MI_PRINT_SIMPLE_VALUES
       || args_type == MI_PRINT_ALL_VALUES)
 
@@ -465,7 +465,7 @@ py_print_single_arg (struct ui_out *out,
 /* Helper function to loop over frame arguments provided by the
    "frame_arguments" Python API.  Elements in the iterator must
    conform to the "Symbol Value" interface.  ITER is the Python
-   iterator object, OUT is the output stream, ARGS_TYPE is an
+   iterable object, OUT is the output stream, ARGS_TYPE is an
    enumerater describing the argument format, PRINT_ARGS_FIELD is a
    flag which indicates if we output "ARGS=1" in MI output in commands
    where both arguments and locals are printed, and FRAME is the
@@ -480,7 +480,8 @@ enumerate_args (PyObject *iter,
 {
   PyObject *item;
   struct value_print_options opts;
-
+  volatile struct gdb_exception except;
+  
   get_user_print_options (&opts);
 
   if (args_type == CLI_SCALAR_VALUES)
@@ -491,8 +492,15 @@ enumerate_args (PyObject *iter,
 
   opts.deref_ref = 1;
 
-
-  annotate_frame_args ();
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      annotate_frame_args ();
+    }
+  if (except.reason > 0)
+    {
+      gdbpy_convert_exception (except);
+      goto error;
+    }
 
   /*  Collect the first argument outside of the loop, so output of
       commas in the argument output is correct.  At the end of the
@@ -509,7 +517,6 @@ enumerate_args (PyObject *iter,
       struct symbol *sym;
       struct value *val;
       int success = PY_BT_ERROR;
-      volatile struct gdb_exception except;
 
       success = extract_sym (item, &sym_name, &sym, &language);
       if (! success)
@@ -619,15 +626,15 @@ enumerate_args (PyObject *iter,
       else if (PyErr_Occurred ())
 	goto error;
 
-	  TRY_CATCH (except, RETURN_MASK_ALL)
-	    {
-	      annotate_arg_end ();
-	    }
-	  if (except.reason > 0)
-	    {
-	      gdbpy_convert_exception (except);
-	      goto error;
-	    }
+      TRY_CATCH (except, RETURN_MASK_ALL)
+	{
+	  annotate_arg_end ();
+	}
+      if (except.reason > 0)
+	{
+	  gdbpy_convert_exception (except);
+	  goto error;
+	}
     }
 
   return 1;
@@ -638,8 +645,8 @@ enumerate_args (PyObject *iter,
 
 
 /* Helper function to loop over variables provided by the
-   "frame_locals" Python API.  Elements in the iterator must conform
-   to the "Symbol Value" interface.  ITER is the Python iterator
+   "frame_locals" Python API.  Elements in the iterable must conform
+   to the "Symbol Value" interface.  ITER is the Python iterable
    object, OUT is the output stream, INDENT is whether we should
    indent the output (for CLI), ARGS_TYPE is an enumerater describing
    the argument format, PRINT_ARGS_FIELD is flag which indicates
@@ -729,7 +736,6 @@ enumerate_locals (PyObject *iter,
 	    }
 	}
 
-
       TRY_CATCH (except, RETURN_MASK_ALL)
 	{
 	  ui_out_field_string (out, "name", sym_name);
@@ -754,7 +760,6 @@ enumerate_locals (PyObject *iter,
 	{
 	  py_print_value (out, val, &opts, args_type, language);
 	}
-
 
       TRY_CATCH (except, RETURN_MASK_ALL)
 	{
@@ -867,10 +872,10 @@ py_print_args (PyObject *filter,
     goto args_error;
 
   make_cleanup_ui_out_list_begin_end (out, "args");
-  annotate_frame_args ();
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
+      annotate_frame_args ();
       if (! ui_out_is_mi_like_p (out))
 	ui_out_text (out, " (");
     }
@@ -909,11 +914,11 @@ py_print_args (PyObject *filter,
     describing the various print options.  The FLAGS variables is
     described in "apply_frame_filter" function.  ARGS_TYPE is an
     enumerater describing the argument format.  OUT is the output
-    stream to print too, INDENT is the level of indention for this
-    frame (in the case of elided frames), and LEVELS_PRINTED is a
-    hash-table containing all the frames level that have already been
-    printed.  If a frame level has been printed, do not print it again
-    (in the case of elided frames).  */
+    stream to print, INDENT is the level of indention for this frame
+    (in the case of elided frames), and LEVELS_PRINTED is a hash-table
+    containing all the frames level that have already been printed.
+    If a frame level has been printed, do not print it again (in the
+    case of elided frames).  */
 
 static int
 py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
@@ -942,9 +947,9 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
   architecture, and also, in the cases of frame variables/arguments to
   read them if they returned filter object requires us to do so.  */
   result = PyObject_CallMethod (filter, "inferior_frame", NULL);
-
   if (! result)
     goto error;
+
   frame = frame_object_to_frame_info (result);
   if (! frame)
     {
@@ -996,6 +1001,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 	    goto error;
 	  }
 	}
+
       /* The address is required for frame annotations, and also for
 	 address printing.  */
       if (PyObject_HasAttrString (filter, "address"))
@@ -1013,7 +1019,6 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 	  else
 	    goto error;
 	}
-
     }
 
   /* Print frame level.  MI does not require the level if
@@ -1073,7 +1078,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 	    }
 	}
 
-      /* Print frame function.  */
+      /* Print frame function name.  */
       if (PyObject_HasAttrString (filter, "function"))
 	{
 	  PyObject *result = PyObject_CallMethod (filter, "function", NULL);
@@ -1097,6 +1102,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 		    }
 		  if (except.reason > 0)
 		    {
+		      Py_DECREF (result);
 		      gdbpy_convert_exception (except);
 		      goto error;
 		    }
@@ -1107,7 +1113,6 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 	    goto error;
 	}
     }
-
 
   /* Frame arguments.  Check the result, and error if something went
      wrong.  */
@@ -1155,6 +1160,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 		    }
 		  if (except.reason > 0)
 		    {
+		      Py_DECREF (result);
 		      gdbpy_convert_exception (except);
 		      goto error;
 		    }
@@ -1183,6 +1189,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 		    }
 		  if (except.reason > 0)
 		    {
+		      Py_DECREF (result);
 		      gdbpy_convert_exception (except);
 		      goto error;
 		    }
@@ -1308,7 +1315,6 @@ bootstrap_python_frame_filters (struct frame_info *frame, int
 					   py_frame_low,
 					   py_frame_high,
 					   NULL);
-
   do_cleanups (cleanups);
 
   if (! iterable)

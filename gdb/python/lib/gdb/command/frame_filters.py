@@ -1,5 +1,5 @@
 # Frame-filter commands.
-# Copyright (C) 2012, 2013 Free Software Foundation, Inc.
+# Copyright (C) 2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -103,25 +103,21 @@ def _get_name(frame_filter):
 
     Returns:
         The name of the frame filter from the "name" attribute.
-
-    Raises:
-        AttributeError: When the name attribute has not been
-        implemented.
     """
     return frame_filter.name
 
 def _return_list(name):
     """ Internal Worker function to return the frame filter
     dictionary, depending on the name supplied as an argument.  If the
-    name is not "global" or "progspace", it is assumed to name an
-    object-file.
+    name is not "all", "global" or "progspace", it is assumed to name
+    an object-file.
 
     Arguments:
         name: The name of the list, as specified by GDB user commands.
 
     Returns:
         A dictionary object for a single specified dictionary, or a
-        list containing all the items for "alldicts"
+        list containing all the items for "all"
 
     Raises:
         gdb.GdbError:  A dictionary of that name cannot be found.
@@ -289,6 +285,7 @@ def _complete_frame_filter_list(text, word, all_flag):
         text: The full text of the command line.
         word: The most recent word of the command line.
         all_flag: Whether to include the word "all" in completion.
+
     Returns:
         A list of suggested frame filter dictionary name completions
         from text/word analysis.  This list can be empty when there
@@ -346,12 +343,15 @@ class EnableFrameFilter(gdb.Command):
     Usage: enable frame-filter enable [dictionary] [name]
 
     DICTIONARY is the name of the frame filter dictionary on which to
-    operate.  Named dictionaries are: "global" for the global frame
-    filter dictionary, "progspace" for the program space's framefilter
-    dictionary.  If either of these two are not specified, the
-    dictionary name is assumed to be the name of the object-file name.
+    operate.  If dictionary is set to "all", perform operations on all
+    dictionaries.  Named dictionaries are: "global" for the global
+    frame filter dictionary, "progspace" for the program space's frame
+    filter dictionary.  If either all, or the two named dictionaries
+    are not specified, the dictionary name is assumed to be the name
+    of the object-file name.
 
-    NAME matches the name of the frame-filter to operate on.
+    NAME matches the name of the frame-filter to operate on.  If
+    DICTIONARY is "all", NAME is ignored.
     """
     def __init__(self):
         super(EnableFrameFilter, self).__init__("enable frame-filter",
@@ -376,12 +376,15 @@ class DisableFrameFilter(gdb.Command):
     Usage: disable frame-filter disable [dictionary] [name]
 
     DICTIONARY is the name of the frame filter dictionary on which to
-    operate.  Named dictionaries are: "global" for the global frame
-    filter dictionary, "progspace" for the program space's framefilter
-    dictionary.  If either of these two are not specified, the
-    dictionary name is assumed to be the name of the object-file name.
+    operate.  If dictionary is set to "all", perform operations on all
+    dictionaries.  Named dictionaries are: "global" for the global
+    frame filter dictionary, "progspace" for the program space's frame
+    filter dictionary.  If either all, or the two named dictionaries
+    are not specified, the dictionary name is assumed to be the name
+    of the object-file name.
 
-    NAME matches the name of the frame-filter to operate on.
+    NAME matches the name of the frame-filter to operate on.  If
+    DICTIONARY is "all", NAME is ignored.
     """
     def __init__(self):
         super(DisableFrameFilter, self).__init__("disable frame-filter",

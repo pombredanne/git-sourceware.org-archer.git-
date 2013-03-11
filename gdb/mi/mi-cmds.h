@@ -148,8 +148,6 @@ struct mi_cmd
   int *suppress_notification;
 };
 
-extern void
-stack_enable_frame_filters (void);
 
 /* Lookup a command in the MI command table.  */
 

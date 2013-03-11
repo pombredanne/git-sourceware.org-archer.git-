@@ -22,8 +22,8 @@ class FrameDecorator(object):
     decorator, and provides convenience methods.  If this object is
     wrapping a frame decorator, defer to that wrapped object's method
     if it has one.  This allows for frame decorators that have
-    sub-classed FrameDecorators, but also wrap other frame decorators
-    on the same frame to correctly execute.
+    sub-classed FrameDecorator object, but also wrap other frame
+    decorators on the same frame to correctly execute.
 
     E.g
 

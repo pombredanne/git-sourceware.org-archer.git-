@@ -1,4 +1,4 @@
-# Copyright (C) 2012, 2013 Free Software Foundation, Inc.
+# Copyright (C) 2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -20,7 +20,7 @@ class FrameIterator(object):
     """A gdb.Frame iterator.  Iterates over gdb.Frames or objects that
     conform to that interface."""
 
-    def __init__ (self, frame_obj):
+    def __init__(self, frame_obj):
         """Initialize a FrameIterator.
 
         Arguments:
@@ -29,7 +29,7 @@ class FrameIterator(object):
         super(FrameIterator, self).__init__()
         self.frame = frame_obj
 
-    def __iter__ (self):
+    def __iter__(self):
         return self
 
     def __getitem__(self,index):
@@ -40,7 +40,7 @@ class FrameIterator(object):
 
         return next(itertools.islice(self.frame,index,index+1))
 
-    def next (self):
+    def next(self):
         """next implementation.
 
         Returns:
