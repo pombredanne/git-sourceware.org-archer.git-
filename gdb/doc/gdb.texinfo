@@ -24920,15 +24920,15 @@ class ElidingInlineIterator:
         return self
 
     def next(self):
-        try:
-            frame = next(self.input_iterator)
-        except StopIteration:
-            raise
-
+        frame = next(self.input_iterator)
+    
         if frame.inferior_frame().type() != gdb.INLINE_FRAME:
             return frame
 
-        eliding_frame = next(self.input_iterator)
+        try:
+            eliding_frame = next(self.input_iterator)
+        except StopIteration:
+            return frame
         return ElidingFrameDecorator(eliding_frame, [frame])
 @end smallexample
 
