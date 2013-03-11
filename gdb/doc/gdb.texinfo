@@ -24683,9 +24683,9 @@ locals for this frame.
 @defun FrameDecorator.frame ():
 
 This method must return the underlying @code{gdb.Frame} that this
-frame decorate is decorating.  @value{GDBN} requires the underlying
+frame decorator is decorating.  @value{GDBN} requires the underlying
 frame for internal frame information to determine how to print certain
-values in frame printing.
+values when printing a frame.
 @end defun
 
 @node Writing a Frame Filter/Decorator
@@ -24693,12 +24693,12 @@ values in frame printing.
 @cindex writing a frame filter/decorator
 
 There are three basic elements that a frame filter must implement: it
-must correctly implement the documented interface (@pxref{Frame
-Filter API}), it must register itself with @value{GDBN}, and finally,
-it must decide if it is to work on the data provided by
-@value{GDBN}.  In all cases, whether it works on the iterator or not,
-each frame filter must return an iterator.  A bare-bones frame filter
-follows the pattern in the following example.
+must correctly implement the documented interface (@pxref{Frame Filter
+API}), it must register itself with @value{GDBN}, and finally, it must
+decide if it is to work on the data provided by @value{GDBN}.  In all
+cases, whether it works on the iterator or not, each frame filter must
+return an iterator.  A bare-bones frame filter follows the pattern in
+the following example.
 
 @smallexample
 import gdb
@@ -24803,8 +24803,8 @@ to iterate through them all.  This ends up duplicating effort as
 In this example decision making can be deferred to the printing step.
 As each frame is printed, the frame decorator can examine each frame
 in turn when @value{GDBN} iterates.  From a performance viewpoint,
-this is the most appropriate decision to make.  A backtrace from large
-or complex programs can constitute many thousands of frames.  Also, if
+this is the most appropriate decision to make as it avoids duplicating
+the effort that the printing step would undertake anyway.  Also, if
 there are many frame filters unwinding the stack during filtering, it
 can substantially delay the printing of the backtrace which will
 result in large memory usage, and a poor user experience.
@@ -24813,7 +24813,7 @@ result in large memory usage, and a poor user experience.
 class InlineFilter():
 
     def __init__(self):
-        self.name = "Inlined Frame Class"
+        self.name = "InlinedFrameFilter"
         self.priority = 100
         self.enabled = True
         gdb.frame_filters[self.name] = self
@@ -24892,7 +24892,7 @@ This example comprises of three sections.
 class InlineFrameFilter():
 
     def __init__(self):
-        self.name = "Inlined Frame Class"
+        self.name = "InlinedFrameFilter"
         self.priority = 100
         self.enabled = True
         gdb.frame_filters[self.name] = self
@@ -24920,7 +24920,11 @@ class ElidingInlineIterator:
         return self
 
     def next(self):
-        frame = next(self.input_iterator)
+        try:
+            frame = next(self.input_iterator)
+        except StopIteration:
+            raise
+
         if frame.inferior_frame().type() != gdb.INLINE_FRAME:
             return frame
 
