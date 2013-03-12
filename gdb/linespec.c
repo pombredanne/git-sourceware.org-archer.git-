@@ -1068,7 +1068,7 @@ iterate_over_all_matching_symtabs (struct linespec_state *state,
 /* Returns the block to be used for symbol searches from
    the current location.  */
 
-static struct block *
+static const struct block *
 get_current_search_block (void)
 {
   struct block *block;
@@ -3190,7 +3190,7 @@ find_label_symbols (struct linespec_state *self,
 		    VEC (symbolp) **label_funcs_ret, const char *name)
 {
   int ix;
-  struct block *block;
+  const struct block *block;
   struct symbol *sym;
   struct symbol *fn_sym;
   VEC (symbolp) *result = NULL;

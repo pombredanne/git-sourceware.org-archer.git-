@@ -148,7 +148,7 @@ static char * uptok (char *, int);
     struct ttype tsym;
     struct symtoken ssym;
     int voidval;
-    struct block *bval;
+    const struct block *bval;
     enum exp_opcode opcode;
     struct internalvar *ivar;
 

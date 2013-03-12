@@ -151,7 +151,7 @@ void yyerror (char *);
     struct ttype tsym;
     struct symtoken ssym;
     int voidval;
-    struct block *bval;
+    const struct block *bval;
     enum exp_opcode opcode;
 
     struct stoken_vector svec;

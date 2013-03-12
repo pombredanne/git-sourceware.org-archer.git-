@@ -512,7 +512,7 @@ print_frame_args (struct symbol *func, struct frame_info *frame,
 
   if (func)
     {
-      struct block *b = SYMBOL_BLOCK_VALUE (func);
+      const struct block *b = SYMBOL_BLOCK_VALUE (func);
       struct block_iterator iter;
       struct symbol *sym;
 
@@ -1833,7 +1833,7 @@ backtrace_full_command (char *arg, int from_tty)
    CB_DATA.  */
 
 static void
-iterate_over_block_locals (struct block *b,
+iterate_over_block_locals (const struct block *b,
 			   iterate_over_block_arg_local_vars_cb cb,
 			   void *cb_data)
 {
@@ -1916,7 +1916,7 @@ print_block_frame_labels (struct gdbarch *gdbarch, struct block *b,
    superblocks, stopping when the top-level block is reached.  */
 
 void
-iterate_over_block_local_vars (struct block *block,
+iterate_over_block_local_vars (const struct block *block,
 			       iterate_over_block_arg_local_vars_cb cb,
 			       void *cb_data)
 {
@@ -2023,7 +2023,7 @@ locals_info (char *args, int from_tty)
    Returns 1 if any argument was walked; 0 otherwise.  */
 
 void
-iterate_over_block_arg_vars (struct block *b,
+iterate_over_block_arg_vars (const struct block *b,
 			     iterate_over_block_arg_local_vars_cb cb,
 			     void *cb_data)
 {

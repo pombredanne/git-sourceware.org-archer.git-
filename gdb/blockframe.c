@@ -87,7 +87,7 @@ get_frame_block (struct frame_info *frame, CORE_ADDR *addr_in_block)
 CORE_ADDR
 get_pc_function_start (CORE_ADDR pc)
 {
-  struct block *bl;
+  const struct block *bl;
   struct minimal_symbol *msymbol;
 
   bl = block_for_pc (pc);
