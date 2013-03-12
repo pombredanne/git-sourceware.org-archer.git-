@@ -4056,7 +4056,7 @@ parse_old_style_renaming (struct type *type,
 
 static struct value *
 ada_read_renaming_var_value (struct symbol *renaming_sym,
-			     struct block *block)
+			     const struct block *block)
 {
   const char *sym_name;
   struct expression *expr;
@@ -5841,7 +5841,7 @@ ada_make_symbol_completion_list (const char *text0, const char *word,
   struct symtab *s;
   struct minimal_symbol *msymbol;
   struct objfile *objfile;
-  struct block *b, *surrounding_static_block = 0;
+  const struct block *b, *surrounding_static_block = 0;
   int i;
   struct block_iterator iter;
 
@@ -12732,7 +12732,7 @@ ada_get_symbol_name_cmp (const char *lookup_name)
 static struct value *
 ada_read_var_value (struct symbol *var, struct frame_info *frame)
 {
-  struct block *frame_block = NULL;
+  const struct block *frame_block = NULL;
   struct symbol *renaming_sym = NULL;
 
   /* The only case where default_read_var_value is not sufficient

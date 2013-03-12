@@ -1071,7 +1071,7 @@ iterate_over_all_matching_symtabs (struct linespec_state *state,
 static const struct block *
 get_current_search_block (void)
 {
-  struct block *block;
+  const struct block *block;
   enum language save_language;
 
   /* get_selected_block can change the current language when there is
@@ -1887,7 +1887,7 @@ create_sals_line_offset (struct linespec_state *self,
     {
       struct linetable_entry *best_entry = NULL;
       int *filter;
-      struct block **blocks;
+      const struct block **blocks;
       struct cleanup *cleanup;
       struct symtabs_and_lines intermediate_results;
       int i, j;
@@ -1915,7 +1915,7 @@ create_sals_line_offset (struct linespec_state *self,
 
       filter = XNEWVEC (int, intermediate_results.nelts);
       make_cleanup (xfree, filter);
-      blocks = XNEWVEC (struct block *, intermediate_results.nelts);
+      blocks = XNEWVEC (const struct block *, intermediate_results.nelts);
       make_cleanup (xfree, blocks);
 
       for (i = 0; i < intermediate_results.nelts; ++i)

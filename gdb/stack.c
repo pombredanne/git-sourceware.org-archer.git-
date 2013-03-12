@@ -1978,7 +1978,7 @@ print_frame_local_vars (struct frame_info *frame, int num_tabs,
 			struct ui_file *stream)
 {
   struct print_variable_and_value_data cb_data;
-  struct block *block;
+  const struct block *block;
   CORE_ADDR pc;
 
   if (!get_frame_pc_if_available (frame, &pc))
@@ -2126,7 +2126,7 @@ select_and_print_frame (struct frame_info *frame)
    code address within the block returned.  We use this to decide
    which macros are in scope.  */
 
-struct block *
+const struct block *
 get_selected_block (CORE_ADDR *addr_in_block)
 {
   if (!has_stack_frames ())
