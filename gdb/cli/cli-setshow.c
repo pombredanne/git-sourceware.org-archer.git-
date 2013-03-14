@@ -167,7 +167,7 @@ do_set_command (char *arg, int from_tty, struct cmd_list_element *c)
 		   right before a newline.  */
 		if (*p == 0)
 		  break;
-		ch = parse_escape (get_current_arch (), &p);
+		ch = parse_escape (get_current_arch (), p, &p);
 		if (ch == 0)
 		  break;	/* C loses */
 		else if (ch > 0)

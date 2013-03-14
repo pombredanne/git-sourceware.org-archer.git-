@@ -1190,7 +1190,7 @@ yylex (void)
       lexptr++;
       c = *lexptr++;
       if (c == '\\')
-	c = parse_escape (parse_gdbarch, &lexptr);
+	c = parse_escape (parse_gdbarch, lexptr, &lexptr);
       else if (c == '\'')
 	error (_("Empty character constant."));
 
@@ -1362,7 +1362,7 @@ yylex (void)
 	    break;
 	  case '\\':
 	    tokptr++;
-	    c = parse_escape (parse_gdbarch, &tokptr);
+	    c = parse_escape (parse_gdbarch, tokptr, &tokptr);
 	    if (c == -1)
 	      {
 		continue;
