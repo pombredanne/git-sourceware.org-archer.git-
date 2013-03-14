@@ -289,6 +289,18 @@ extract_arg (char **arg)
 
 /* See documentation in cli-utils.h.  */
 
+char *
+extract_arg_const (const char **arg)
+{
+  char *tem = (char *) *arg;
+  char *result = extract_arg (&tem);
+
+  *arg = tem;
+  return result;
+}
+
+/* See documentation in cli-utils.h.  */
+
 int
 check_for_argument (char **str, char *arg, int arg_len)
 {

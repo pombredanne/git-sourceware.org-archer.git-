@@ -118,6 +118,12 @@ extern char *remove_trailing_whitespace (const char *start, char *s);
 
 extern char *extract_arg (char **arg);
 
+/* A helper function to extract an argument from *ARG.  An argument is
+   delimited by whitespace.  The return value is either NULL if no
+   argument was found, or an xmalloc'd string.  */
+
+extern char *extract_arg_const (const char **arg);
+
 /* A helper function that looks for an argument at the start of a
    string.  The argument must also either be at the end of the string,
    or be followed by whitespace.  Returns 1 if it finds the argument,

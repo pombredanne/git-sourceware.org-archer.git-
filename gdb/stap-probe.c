@@ -18,13 +18,13 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "stap-probe.h"
 #include "probe.h"
 #include "vec.h"
 #include "ui-out.h"
 #include "objfiles.h"
 #include "arch-utils.h"
-#include "command.h"
 #include "gdbcmd.h"
 #include "filenames.h"
 #include "value.h"
@@ -1532,7 +1532,7 @@ static const struct probe_ops stap_probe_ops =
 /* Implementation of the `info probes stap' command.  */
 
 static void
-info_probes_stap_command (char *arg, int from_tty)
+info_probes_stap_command (const char *arg, int from_tty)
 {
   info_probes_for_ops (arg, from_tty, &stap_probe_ops);
 }
