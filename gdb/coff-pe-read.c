@@ -28,7 +28,7 @@
 #include "bfd.h"
 #include "gdbtypes.h"
 
-#include "command.h"
+#include "const-command.h"
 #include "gdbcmd.h"
 #include "symtab.h"
 #include "symfile.h"
