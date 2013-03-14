@@ -19,7 +19,7 @@
 
 #include "defs.h"
 #include "probe.h"
-#include "command.h"
+#include "const-command.h"
 #include "cli/cli-cmds.h"
 #include "cli/cli-utils.h"
 #include "objfiles.h"
@@ -626,7 +626,7 @@ info_probes_for_ops (const char *arg, int from_tty,
 /* Implementation of the `info probes' command.  */
 
 static void
-info_probes_command (char *arg, int from_tty)
+info_probes_command (const char *arg, int from_tty)
 {
   info_probes_for_ops (arg, from_tty, NULL);
 }
