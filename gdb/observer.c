@@ -51,7 +51,7 @@
 
 #include "defs.h"
 #include "observer.h"
-#include "command.h"
+#include "const-command.h"
 #include "gdbcmd.h"
 
 static unsigned int observer_debug;
