@@ -20,7 +20,7 @@
 #include "defs.h"
 #include "opcode/i386.h"
 #include "arch-utils.h"
-#include "command.h"
+#include "const-command.h"
 #include "dummy-frame.h"
 #include "dwarf2-frame.h"
 #include "doublest.h"
