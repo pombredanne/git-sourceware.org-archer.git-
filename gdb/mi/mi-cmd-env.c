@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "inferior.h"
 #include "value.h"
 #include "mi-out.h"
@@ -27,7 +28,6 @@
 #include "symtab.h"
 #include "target.h"
 #include "environ.h"
-#include "command.h"
 #include "ui-out.h"
 #include "top.h"
 
