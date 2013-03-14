@@ -28,8 +28,6 @@
    reading off the end of the section.
    E.g., load_partial_dies, read_partial_die.  */
 
-#define CLI_CONST const
-
 #include "defs.h"
 #include "bfd.h"
 #include "elf-bfd.h"
@@ -50,7 +48,7 @@
 #include "dwarf2loc.h"
 #include "cp-support.h"
 #include "hashtab.h"
-#include "command.h"
+#include "const-command.h"
 #include "gdbcmd.h"
 #include "block.h"
 #include "addrmap.h"

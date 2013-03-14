@@ -17,9 +17,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#define CLI_CONST const
-
 #include "defs.h"
+#include "const-command.h"
 #include "gdb_bfd.h"
 #include "gdb_assert.h"
 #include "gdb_string.h"

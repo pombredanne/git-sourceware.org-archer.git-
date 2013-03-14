@@ -17,8 +17,6 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#define CLI_CONST const
-
 #include "defs.h"
 #include "auto-load.h"
 #include "progspace.h"
@@ -26,7 +24,7 @@
 #include "gdb_regex.h"
 #include "ui-out.h"
 #include "filenames.h"
-#include "command.h"
+#include "const-command.h"
 #include "observer.h"
 #include "objfiles.h"
 #include "exceptions.h"

@@ -23,10 +23,8 @@
 /*  This file contains support code for C++ demangling that is common
    to a styles of demangling, and GDB specific.  */
 
-#define CLI_CONST const
-
 #include "defs.h"
-#include "command.h"
+#include "const-command.h"
 #include "gdbcmd.h"
 #include "demangle.h"
 #include "gdb-demangle.h"
