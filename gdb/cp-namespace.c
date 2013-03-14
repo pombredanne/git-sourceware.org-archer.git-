@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "cp-support.h"
 #include "gdb_obstack.h"
 #include "symtab.h"
@@ -28,7 +29,6 @@
 #include "objfiles.h"
 #include "gdbtypes.h"
 #include "dictionary.h"
-#include "command.h"
 #include "frame.h"
 #include "buildsym.h"
 #include "language.h"
@@ -898,7 +898,7 @@ cp_lookup_transparent_type_loop (const char *name,
    obsolete.  */
 
 static void
-maintenance_cplus_namespace (char *args, int from_tty)
+maintenance_cplus_namespace (const char *args, int from_tty)
 {
   printf_unfiltered (_("The `maint namespace' command was removed.\n"));
 }
