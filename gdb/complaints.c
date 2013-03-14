@@ -20,7 +20,7 @@
 #include "defs.h"
 #include "complaints.h"
 #include "gdb_assert.h"
-#include "command.h"
+#include "const-command.h"
 #include "gdbcmd.h"
 
 extern void _initialize_complaints (void);
