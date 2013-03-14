@@ -19,6 +19,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "symtab.h"
 #include "bfd.h"
 #include "objfiles.h"
@@ -31,7 +32,6 @@
 #include "regcache.h"
 #include "gdb_assert.h"
 #include "dummy-frame.h"
-#include "command.h"
 #include "gdbcmd.h"
 #include "block.h"
 #include "inline-frame.h"
