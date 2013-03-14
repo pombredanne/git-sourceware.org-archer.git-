@@ -133,7 +133,7 @@ deprecated_show_value_hack (struct ui_file *ignore_file,
    other command).  C is the command list element for the command.  */
 
 void
-do_set_command (char *arg, int from_tty, struct cmd_list_element *c)
+do_set_command (const char *arg, int from_tty, struct cmd_list_element *c)
 {
   /* A flag to indicate the option is changed or not.  */
   int option_changed = 0;
@@ -145,7 +145,7 @@ do_set_command (char *arg, int from_tty, struct cmd_list_element *c)
     case var_string:
       {
 	char *new;
-	char *p;
+	const char *p;
 	char *q;
 	int ch;
 
@@ -158,6 +158,8 @@ do_set_command (char *arg, int from_tty, struct cmd_list_element *c)
 	  {
 	    if (ch == '\\')
 	      {
+		char *tem;
+
 		/* \ at end of argument is used after spaces
 		   so they won't be lost.  */
 		/* This is obsolete now that we no longer strip
@@ -167,7 +169,8 @@ do_set_command (char *arg, int from_tty, struct cmd_list_element *c)
 		   right before a newline.  */
 		if (*p == 0)
 		  break;
-		ch = parse_escape (get_current_arch (), p, &p);
+		ch = parse_escape (get_current_arch (), p, &tem);
+		p = tem;
 		if (ch == 0)
 		  break;	/* C loses */
 		else if (ch > 0)
@@ -218,13 +221,15 @@ do_set_command (char *arg, int from_tty, struct cmd_list_element *c)
 	if (arg != NULL)
 	  {
 	    /* Clear trailing whitespace of filename.  */
-	    char *ptr = arg + strlen (arg) - 1;
+	    const char *ptr = arg + strlen (arg) - 1;
+	    char *copy;
 
 	    while (ptr >= arg && (*ptr == ' ' || *ptr == '\t'))
 	      ptr--;
-	    *(ptr + 1) = '\0';
 
-	    val = tilde_expand (arg);
+	    copy = savestring (arg, ptr - arg);
+	    val = tilde_expand (copy);
+	    xfree (copy);
 	  }
 	else
 	  val = xstrdup ("");
@@ -529,7 +534,7 @@ do_set_command (char *arg, int from_tty, struct cmd_list_element *c)
    other command).  C is the command list element for the command.  */
 
 void
-do_show_command (char *arg, int from_tty, struct cmd_list_element *c)
+do_show_command (const char *arg, int from_tty, struct cmd_list_element *c)
 {
   struct ui_out *uiout = current_uiout;
   struct cleanup *old_chain;
@@ -633,7 +638,7 @@ do_show_command (char *arg, int from_tty, struct cmd_list_element *c)
 /* Show all the settings in a list of show commands.  */
 
 void
-cmd_show_list (struct cmd_list_element *list, int from_tty, char *prefix)
+cmd_show_list (struct cmd_list_element *list, int from_tty, const char *prefix)
 {
   struct cleanup *showlist_chain;
   struct ui_out *uiout = current_uiout;
