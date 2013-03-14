@@ -48,7 +48,7 @@ extern void load_auto_scripts_for_objfile (struct objfile *objfile);
 extern int
   script_not_found_warning_print (struct auto_load_pspace_info *pspace_info);
 extern char auto_load_info_scripts_pattern_nl[];
-extern void auto_load_info_scripts (char *pattern, int from_tty,
+extern void auto_load_info_scripts (const char *pattern, int from_tty,
 				    const struct script_language *language);
 
 extern struct cmd_list_element **auto_load_set_cmdlist_get (void);

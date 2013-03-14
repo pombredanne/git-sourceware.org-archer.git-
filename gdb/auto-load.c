@@ -17,6 +17,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+#define CLI_CONST const
+
 #include "defs.h"
 #include "auto-load.h"
 #include "progspace.h"
@@ -118,7 +120,7 @@ static char *auto_load_dir;
 /* "set" command for the auto_load_dir configuration variable.  */
 
 static void
-set_auto_load_dir (char *args, int from_tty, struct cmd_list_element *c)
+set_auto_load_dir (const char *args, int from_tty, struct cmd_list_element *c)
 {
   /* Setting the variable to "" resets it to the compile time defaults.  */
   if (auto_load_dir[0] == '\0')
@@ -242,7 +244,8 @@ auto_load_gdb_datadir_changed (void)
 /* "set" command for the auto_load_safe_path configuration variable.  */
 
 static void
-set_auto_load_safe_path (char *args, int from_tty, struct cmd_list_element *c)
+set_auto_load_safe_path (const char *args, int from_tty,
+			 struct cmd_list_element *c)
 {
   /* Setting the variable to "" resets it to the compile time defaults.  */
   if (auto_load_safe_path[0] == '\0')
@@ -281,7 +284,7 @@ show_auto_load_safe_path (struct ui_file *file, int from_tty,
    variable.  */
 
 static void
-add_auto_load_safe_path (char *args, int from_tty)
+add_auto_load_safe_path (const char *args, int from_tty)
 {
   char *s;
 
@@ -941,7 +944,7 @@ char auto_load_info_scripts_pattern_nl[] = "";
    PATTERN.  FROM_TTY is the usual GDB boolean for user interactivity.  */
 
 void
-auto_load_info_scripts (char *pattern, int from_tty,
+auto_load_info_scripts (const char *pattern, int from_tty,
 			const struct script_language *language)
 {
   struct ui_out *uiout = current_uiout;
@@ -1023,7 +1026,7 @@ auto_load_info_scripts (char *pattern, int from_tty,
 /* Wrapper for "info auto-load gdb-scripts".  */
 
 static void
-info_auto_load_gdb_scripts (char *pattern, int from_tty)
+info_auto_load_gdb_scripts (const char *pattern, int from_tty)
 {
   auto_load_info_scripts (pattern, from_tty, &script_language_gdb);
 }
@@ -1031,7 +1034,7 @@ info_auto_load_gdb_scripts (char *pattern, int from_tty)
 /* Implement 'info auto-load local-gdbinit'.  */
 
 static void
-info_auto_load_local_gdbinit (char *args, int from_tty)
+info_auto_load_local_gdbinit (const char *args, int from_tty)
 {
   if (auto_load_local_gdbinit_pathname == NULL)
     printf_filtered (_("Local .gdbinit file was not found.\n"));
@@ -1060,7 +1063,7 @@ script_not_found_warning_print (struct auto_load_pspace_info *pspace_info)
 /* The only valid "set auto-load" argument is off|0|no|disable.  */
 
 static void
-set_auto_load_cmd (char *args, int from_tty)
+set_auto_load_cmd (const char *args, int from_tty)
 {
   struct cmd_list_element *list;
   size_t length;
@@ -1109,7 +1112,7 @@ automatic loading of Python scripts."),
    "show auto-load " settings.  */
 
 static void
-show_auto_load_cmd (char *args, int from_tty)
+show_auto_load_cmd (const char *args, int from_tty)
 {
   cmd_show_list (*auto_load_show_cmdlist_get (), from_tty, "");
 }
@@ -1137,7 +1140,7 @@ automatic loading of Python scripts."),
    newlines at proper places.  */
 
 static void
-info_auto_load_cmd (char *args, int from_tty)
+info_auto_load_cmd (const char *args, int from_tty)
 {
   struct cmd_list_element *list;
   struct cleanup *infolist_chain;
