@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "frame.h"
 #include "solib-svr4.h"
 #include "symtab.h"
@@ -46,7 +47,6 @@
 #include "remote.h"
 #include "serial.h"
 
-#include "command.h"
 #include "gdbcmd.h"
 #include "gdb_assert.h"
 
