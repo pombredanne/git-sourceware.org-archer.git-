@@ -17,6 +17,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+#define CLI_CONST const
+
 #include "defs.h"
 #include "value.h"
 #include "cp-abi.h"
@@ -302,7 +304,7 @@ list_cp_abis (int from_tty)
    argument is given.  */
 
 static void
-set_cp_abi_cmd (char *args, int from_tty)
+set_cp_abi_cmd (const char *args, int from_tty)
 {
   if (args == NULL)
     {
@@ -338,7 +340,7 @@ cp_abi_completer (struct cmd_list_element *ignore,
 /* Show the currently selected C++ ABI.  */
 
 static void
-show_cp_abi_cmd (char *args, int from_tty)
+show_cp_abi_cmd (const char *args, int from_tty)
 {
   struct ui_out *uiout = current_uiout;
 
