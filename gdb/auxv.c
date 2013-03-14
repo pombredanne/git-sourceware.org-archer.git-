@@ -20,7 +20,7 @@
 #include "defs.h"
 #include "target.h"
 #include "gdbtypes.h"
-#include "command.h"
+#include "const-command.h"
 #include "inferior.h"
 #include "valprint.h"
 #include "gdb_assert.h"
@@ -503,7 +503,7 @@ fprint_target_auxv (struct ui_file *file, struct target_ops *ops)
 }
 
 static void
-info_auxv_command (char *cmd, int from_tty)
+info_auxv_command (const char *cmd, int from_tty)
 {
   if (! target_has_stack)
     error (_("The program has no auxiliary information now."));
