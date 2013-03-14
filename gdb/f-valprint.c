@@ -21,6 +21,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "gdb_string.h"
 #include "symtab.h"
 #include "gdbtypes.h"
@@ -31,14 +32,12 @@
 #include "f-lang.h"
 #include "frame.h"
 #include "gdbcore.h"
-#include "command.h"
 #include "block.h"
 #include "dictionary.h"
 #include "gdb_assert.h"
 #include "exceptions.h"
 
 extern void _initialize_f_valprint (void);
-static void info_common_command (char *, int);
 static void f77_create_arrayprint_offset_tbl (struct type *,
 					      struct ui_file *);
 static void f77_get_dynamic_length_of_aggregate (struct type *);
@@ -469,7 +468,7 @@ info_common_command_for_block (const struct block *block, const char *comname,
    given name.  */
 
 static void
-info_common_command (char *comname, int from_tty)
+info_common_command (const char *comname, int from_tty)
 {
   struct frame_info *fi;
   const struct block *block;
