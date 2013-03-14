@@ -17,6 +17,8 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
+#define CLI_CONST const
+
 #include "defs.h"
 #include "arch-utils.h"
 #include "command.h"
@@ -215,7 +217,7 @@ eval_python_command (const char *command)
 /* Implementation of the gdb "python-interactive" command.  */
 
 static void
-python_interactive_command (char *arg, int from_tty)
+python_interactive_command (const char *arg, int from_tty)
 {
   struct cleanup *cleanup;
   int err;
@@ -223,7 +225,7 @@ python_interactive_command (char *arg, int from_tty)
   cleanup = make_cleanup_restore_integer (&interpreter_async);
   interpreter_async = 0;
 
-  arg = skip_spaces (arg);
+  arg = skip_spaces_const (arg);
 
   ensure_python_env (get_current_arch (), current_language);
 
@@ -358,7 +360,7 @@ eval_python_from_control_command (struct command_line *cmd)
 /* Implementation of the gdb "python" command.  */
 
 static void
-python_command (char *arg, int from_tty)
+python_command (const char *arg, int from_tty)
 {
   struct cleanup *cleanup;
 
@@ -367,7 +369,7 @@ python_command (char *arg, int from_tty)
   make_cleanup_restore_integer (&interpreter_async);
   interpreter_async = 0;
 
-  arg = skip_spaces (arg);
+  arg = skip_spaces_const (arg);
   if (arg && *arg)
     {
       if (PyRun_SimpleString (arg))
@@ -1326,7 +1328,7 @@ free_type_printers (void *arg)
    command. */
 
 static void
-python_interactive_command (char *arg, int from_tty)
+python_interactive_command (const char *arg, int from_tty)
 {
   arg = skip_spaces (arg);
   if (arg && *arg)
@@ -1342,7 +1344,7 @@ python_interactive_command (char *arg, int from_tty)
 }
 
 static void
-python_command (char *arg, int from_tty)
+python_command (const char *arg, int from_tty)
 {
   python_interactive_command (arg, from_tty);
 }
@@ -1405,7 +1407,7 @@ static struct cmd_list_element *user_show_python_list;
 /* Function for use by 'set python' prefix command.  */
 
 static void
-user_set_python (char *args, int from_tty)
+user_set_python (const char *args, int from_tty)
 {
   help_list (user_set_python_list, "set python ", all_commands,
 	     gdb_stdout);
@@ -1414,7 +1416,7 @@ user_set_python (char *args, int from_tty)
 /* Function for use by 'show python' prefix command.  */
 
 static void
-user_show_python (char *args, int from_tty)
+user_show_python (const char *args, int from_tty)
 {
   cmd_show_list (user_show_python_list, from_tty, "");
 }
