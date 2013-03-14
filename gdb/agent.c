@@ -16,7 +16,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
-#include "command.h"
+#include "const-command.h"
 #include "gdbcmd.h"
 #include "target.h"
 #include "agent.h"
@@ -44,7 +44,7 @@ show_can_use_agent (struct ui_file *file, int from_tty,
 }
 
 static void
-set_can_use_agent (char *args, int from_tty, struct cmd_list_element *c)
+set_can_use_agent (const char *args, int from_tty, struct cmd_list_element *c)
 {
   if (target_use_agent (can_use_agent == can_use_agent_on) == 0)
     /* Something wrong during setting, set flag to default value.  */
