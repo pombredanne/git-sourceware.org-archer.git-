@@ -261,41 +261,37 @@ remove_trailing_whitespace (const char *start, char *s)
 /* See documentation in cli-utils.h.  */
 
 char *
-extract_arg (char **arg)
+extract_arg_const (const char **arg)
 {
-  char *result, *copy;
+  const char *result;
 
   if (!*arg)
     return NULL;
 
   /* Find the start of the argument.  */
-  *arg = skip_spaces (*arg);
+  *arg = skip_spaces_const (*arg);
   if (!**arg)
     return NULL;
   result = *arg;
 
   /* Find the end of the argument.  */
-  *arg = skip_to_space (*arg + 1);
+  *arg = skip_to_space_const (*arg + 1);
 
   if (result == *arg)
     return NULL;
 
-  copy = xmalloc (*arg - result + 1);
-  memcpy (copy, result, *arg - result);
-  copy[*arg - result] = '\0';
-
-  return copy;
+  return savestring (result, *arg - result);
 }
 
 /* See documentation in cli-utils.h.  */
 
 char *
-extract_arg_const (const char **arg)
+extract_arg (char **arg)
 {
-  char *tem = (char *) *arg;
-  char *result = extract_arg (&tem);
+  const char *tem = *arg;
+  char *result = extract_arg_const (&tem);
 
-  *arg = tem;
+  *arg = (char *) tem;
   return result;
 }
 
