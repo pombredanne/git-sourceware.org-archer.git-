@@ -662,7 +662,7 @@ stdio_fileopen (FILE *file)
 }
 
 struct ui_file *
-gdb_fopen (char *name, char *mode)
+gdb_fopen (const char *name, const char *mode)
 {
   FILE *f = fopen (name, mode);
 
