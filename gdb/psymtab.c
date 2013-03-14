@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "symtab.h"
 #include "psympriv.h"
 #include "objfiles.h"
@@ -29,7 +30,6 @@
 #include "gdbtypes.h"
 #include "bcache.h"
 #include "ui-out.h"
-#include "command.h"
 #include "readline/readline.h"
 #include "gdb_regex.h"
 #include "dictionary.h"
@@ -1841,7 +1841,7 @@ make_cleanup_discard_psymtabs (struct objfile *objfile)
 
 
 static void
-maintenance_print_psymbols (char *args, int from_tty)
+maintenance_print_psymbols (const char *args, int from_tty)
 {
   char **argv;
   struct ui_file *outfile;
@@ -1890,7 +1890,7 @@ print-psymbols takes an output file name and optional symbol file name"));
 
 /* List all the partial symbol tables whose names match REGEXP (optional).  */
 static void
-maintenance_info_psymtabs (char *regexp, int from_tty)
+maintenance_info_psymtabs (const char *regexp, int from_tty)
 {
   struct program_space *pspace;
   struct objfile *objfile;
@@ -1996,7 +1996,7 @@ maintenance_info_psymtabs (char *regexp, int from_tty)
 /* Check consistency of psymtabs and symtabs.  */
 
 static void
-maintenance_check_symtabs (char *ignore, int from_tty)
+maintenance_check_symtabs (const char *ignore, int from_tty)
 {
   struct symbol *sym;
   struct partial_symbol **psym;
