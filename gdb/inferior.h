@@ -177,8 +177,6 @@ extern void default_print_registers_info (struct gdbarch *gdbarch,
 
 extern void child_terminal_info (const char *, int);
 
-extern void term_info (char *, int);
-
 extern void terminal_ours_for_output (void);
 
 extern void terminal_inferior (void);

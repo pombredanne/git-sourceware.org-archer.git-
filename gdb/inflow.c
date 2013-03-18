@@ -17,9 +17,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "frame.h"
 #include "inferior.h"
-#include "command.h"
 #include "serial.h"
 #include "terminal.h"
 #include "target.h"
@@ -556,8 +556,8 @@ copy_terminal_info (struct inferior *to, struct inferior *from)
       = serial_copy_tty_state (stdin_serial, tinfo_from->ttystate);
 }
 
-void
-term_info (char *arg, int from_tty)
+static void
+term_info (const char *arg, int from_tty)
 {
   target_terminal_info (arg, from_tty);
 }
