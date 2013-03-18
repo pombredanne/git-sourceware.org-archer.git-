@@ -18,9 +18,9 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "symtab.h"
 #include "inferior.h"
-#include "command.h"
 #include "bfd.h"
 #include "symfile.h"
 #include "objfiles.h"
