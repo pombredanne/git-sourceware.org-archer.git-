@@ -23,13 +23,13 @@
 /* This module defines communication with the Renesas m32r monitor.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "gdbcore.h"
 #include "target.h"
 #include "exceptions.h"
 #include "monitor.h"
 #include "serial.h"
 #include "symtab.h"
-#include "command.h"
 #include "gdbcmd.h"
 #include "symfile.h"		/* for generic load */
 #include <sys/time.h>
@@ -120,7 +120,7 @@ m32r_load_1 (void *dummy)
  */
 
 static void
-m32r_load (char *filename, int from_tty)
+m32r_load (const char *filename, int from_tty)
 {
   bfd *abfd;
   unsigned int data_count = 0;
@@ -427,7 +427,7 @@ mon2000_open (char *args, int from_tty)
 }
 
 static void
-m32r_upload_command (char *args, int from_tty)
+m32r_upload_command (const char *args, int from_tty)
 {
   bfd *abfd;
   asection *s;
