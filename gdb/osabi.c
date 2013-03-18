@@ -19,13 +19,14 @@
 
 #include "defs.h"
 
+#include "const-command.h"
+
 #include "gdb_assert.h"
 #include "gdb_string.h"
 
 #include "osabi.h"
 #include "arch-utils.h"
 #include "gdbcmd.h"
-#include "command.h"
 
 #include "elf-bfd.h"
 
@@ -587,7 +588,7 @@ generic_elf_osabi_sniffer (bfd *abfd)
 }
 
 static void
-set_osabi (char *args, int from_tty, struct cmd_list_element *c)
+set_osabi (const char *args, int from_tty, struct cmd_list_element *c)
 {
   struct gdbarch_info info;
 
