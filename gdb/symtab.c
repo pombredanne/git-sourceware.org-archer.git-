@@ -3815,14 +3815,6 @@ types_info (char *regexp, int from_tty)
   symtab_symbol_info (regexp, TYPES_DOMAIN, from_tty);
 }
 
-/* Breakpoint all functions matching regular expression.  */
-
-void
-rbreak_command_wrapper (char *regexp, int from_tty)
-{
-  rbreak_command (regexp, from_tty);
-}
-
 /* A cleanup function that calls end_rbreak_breakpoints.  */
 
 static void
