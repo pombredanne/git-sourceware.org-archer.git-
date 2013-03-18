@@ -18,10 +18,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "exec.h"
 #include "inferior.h"
 #include "target.h"
-#include "command.h"
 #include "completer.h"
 #include "gdbcmd.h"
 #include "gdbthread.h"
@@ -539,7 +539,7 @@ inferior_pid_to_str (int pid)
    printed.  */
 
 static void
-print_inferior (struct ui_out *uiout, char *requested_inferiors)
+print_inferior (struct ui_out *uiout, const char *requested_inferiors)
 {
   struct inferior *inf;
   struct cleanup *old_chain;
@@ -615,7 +615,7 @@ print_inferior (struct ui_out *uiout, char *requested_inferiors)
 }
 
 static void
-detach_inferior_command (char *args, int from_tty)
+detach_inferior_command (const char *args, int from_tty)
 {
   int num, pid;
   struct thread_info *tp;
@@ -651,7 +651,7 @@ detach_inferior_command (char *args, int from_tty)
 }
 
 static void
-kill_inferior_command (char *args, int from_tty)
+kill_inferior_command (const char *args, int from_tty)
 {
   int num, pid;
   struct thread_info *tp;
@@ -689,7 +689,7 @@ kill_inferior_command (char *args, int from_tty)
 }
 
 static void
-inferior_command (char *args, int from_tty)
+inferior_command (const char *args, int from_tty)
 {
   struct inferior *inf;
   int num;
@@ -746,7 +746,7 @@ inferior_command (char *args, int from_tty)
 /* Print information about currently known inferiors.  */
 
 static void
-info_inferiors_command (char *args, int from_tty)
+info_inferiors_command (const char *args, int from_tty)
 {
   print_inferior (current_uiout, args);
 }
@@ -754,7 +754,7 @@ info_inferiors_command (char *args, int from_tty)
 /* remove-inferior ID */
 
 static void
-remove_inferior_command (char *args, int from_tty)
+remove_inferior_command (const char *args, int from_tty)
 {
   int num;
   struct inferior *inf;
@@ -822,7 +822,7 @@ add_inferior_with_spaces (void)
 /* add-inferior [-copies N] [-exec FILENAME]  */
 
 static void
-add_inferior_command (char *args, int from_tty)
+add_inferior_command (const char *args, int from_tty)
 {
   int i, copies = 1;
   char *exec = NULL;
@@ -885,7 +885,7 @@ add_inferior_command (char *args, int from_tty)
 /* clone-inferior [-copies N] [ID] */
 
 static void
-clone_inferior_command (char *args, int from_tty)
+clone_inferior_command (const char *args, int from_tty)
 {
   int i, copies = 1;
   char **argv;
