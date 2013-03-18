@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "gdb_string.h"
 #include "top.h"
 #include "exceptions.h"
@@ -233,7 +234,7 @@ gdbpy_load_auto_scripts_for_objfile (struct objfile *objfile)
 /* Wrapper for "info auto-load python-scripts".  */
 
 static void
-info_auto_load_python_scripts (char *pattern, int from_tty)
+info_auto_load_python_scripts (const char *pattern, int from_tty)
 {
   auto_load_info_scripts (pattern, from_tty, &script_language_python);
 }

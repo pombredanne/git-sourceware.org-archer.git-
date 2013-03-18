@@ -21,7 +21,7 @@
 #define GDB_PY_EVENT_H
 
 #include "py-events.h"
-#include "command.h"
+#include "const-command.h"
 #include "python-internal.h"
 #include "inferior.h"
 

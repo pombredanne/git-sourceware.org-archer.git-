@@ -361,7 +361,7 @@ call_doc_function (PyObject *obj, PyObject *method, PyObject *arg)
    neither exist, insert a string indicating the Parameter is not
    documented.  */
 static void
-get_set_value (char *args, int from_tty,
+get_set_value (const char *args, int from_tty,
 	       struct cmd_list_element *c)
 {
   PyObject *obj = (PyObject *) get_cmd_context (c);
@@ -464,8 +464,9 @@ get_show_value (struct ui_file *file, int from_tty,
    function.  */
 static void
 add_setshow_generic (int parmclass, enum command_class cmdclass,
-		     char *cmd_name, parmpy_object *self,
-		     char *set_doc, char *show_doc, char *help_doc,
+		     const char *cmd_name, parmpy_object *self,
+		     const char *set_doc, const char *show_doc,
+		     const char *help_doc,
 		     struct cmd_list_element **set_list,
 		     struct cmd_list_element **show_list)
 {

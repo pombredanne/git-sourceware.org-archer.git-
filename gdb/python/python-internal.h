@@ -135,7 +135,7 @@ typedef unsigned long gdb_py_ulongest;
 #include "symtab.h"
 
 /* Also needed to parse enum var_types. */
-#include "command.h"
+#include "const-command.h"
 #include "breakpoint.h"
 
 #include "exceptions.h"

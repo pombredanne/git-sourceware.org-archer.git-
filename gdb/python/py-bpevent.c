@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "py-stopevent.h"
 
 static PyTypeObject breakpoint_event_object_type;
