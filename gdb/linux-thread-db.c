@@ -19,13 +19,13 @@
 
 #include "defs.h"
 
+#include "const-command.h"
 #include "gdb_assert.h"
 #include <dlfcn.h>
 #include "gdb_proc_service.h"
 #include "gdb_thread_db.h"
 #include "gdb_vecs.h"
 #include "bfd.h"
-#include "command.h"
 #include "exceptions.h"
 #include "gdbcmd.h"
 #include "gdbthread.h"
@@ -91,7 +91,7 @@ show_auto_load_thread_db (struct ui_file *file, int from_tty,
 }
 
 static void
-set_libthread_db_search_path (char *ignored, int from_tty,
+set_libthread_db_search_path (const char *ignored, int from_tty,
 			      struct cmd_list_element *c)
 {
   if (*libthread_db_search_path == '\0')
@@ -1916,7 +1916,7 @@ info_auto_load_libthread_db_compare (const void *ap, const void *bp)
 /* Implement 'info auto-load libthread-db'.  */
 
 static void
-info_auto_load_libthread_db (char *args, int from_tty)
+info_auto_load_libthread_db (const char *args, int from_tty)
 {
   struct ui_out *uiout = current_uiout;
   const char *cs = args ? args : "";
