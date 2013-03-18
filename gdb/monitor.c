@@ -38,6 +38,7 @@
    it's not an issue right now.  -sts 4/18/96  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "gdbcore.h"
 #include "target.h"
 #include "exceptions.h"
@@ -45,7 +46,6 @@
 #include <ctype.h>
 #include "gdb_string.h"
 #include <sys/types.h>
-#include "command.h"
 #include "serial.h"
 #include "monitor.h"
 #include "gdbcmd.h"
