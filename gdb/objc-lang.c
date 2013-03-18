@@ -1071,7 +1071,7 @@ uniquify_strings (VEC (const_char_ptr) **strings)
 }
 
 /* 
- * Function: find_imps (char *selector, struct symbol **sym_arr)
+ * Function: find_imps (const char *selector, struct symbol **sym_arr)
  *
  * Input:  a string representing a selector
  *         a pointer to an array of symbol pointers
@@ -1100,8 +1100,8 @@ uniquify_strings (VEC (const_char_ptr) **strings)
  *       be the index of the first non-debuggable one).
  */
 
-char *
-find_imps (char *method, VEC (const_char_ptr) **symbol_names)
+const char *
+find_imps (const char *method, VEC (const_char_ptr) **symbol_names)
 {
   char type = '\0';
   char *class = NULL;

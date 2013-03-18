@@ -2606,7 +2606,8 @@ decode_objc (struct linespec_state *self, linespec_p ls, char **argptr)
   values.nelts = 0;
   values.sals = NULL;
 
-  new_argptr = find_imps (*argptr, &symbol_names); 
+  /* FIXME: remove the cast.  */
+  new_argptr = (char *) find_imps (*argptr, &symbol_names);
   if (VEC_empty (const_char_ptr, symbol_names))
     {
       do_cleanups (cleanup);
@@ -3039,7 +3040,7 @@ find_function_symbols (struct linespec_state *state,
   info.file_symtabs = file_symtabs;
 
   /* Try NAME as an Objective-C selector.  */
-  find_imps ((char *) name, &symbol_names);
+  find_imps (name, &symbol_names);
   if (!VEC_empty (const_char_ptr, symbol_names))
     add_all_symbol_names_from_pspace (&info, NULL, symbol_names);
   else
