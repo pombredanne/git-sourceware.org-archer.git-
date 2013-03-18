@@ -20,12 +20,12 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "arch-utils.h"
 #include "reggroups.h"
 #include "gdbtypes.h"
 #include "gdb_assert.h"
 #include "regcache.h"
-#include "command.h"
 #include "gdbcmd.h"		/* For maintenanceprintlist.  */
 
 /* Individual register groups.  */
@@ -233,7 +233,7 @@ reggroups_dump (struct gdbarch *gdbarch, struct ui_file *file)
 }
 
 static void
-maintenance_print_reggroups (char *args, int from_tty)
+maintenance_print_reggroups (const char *args, int from_tty)
 {
   struct gdbarch *gdbarch = get_current_arch ();
 
