@@ -20,10 +20,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "target.h"
 #include "event-loop.h"
 #include "event-top.h"
-#include "command.h"
 #include "top.h"
 #include "tui/tui.h"
 #include "tui/tui-data.h"
