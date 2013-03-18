@@ -1151,7 +1151,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	       obstack_alloc (&mdebugread_objfile->objfile_obstack,
 			      sizeof (struct mdebug_extra_func_info)));
 	  memset (e, 0, sizeof (struct mdebug_extra_func_info));
-	  SYMBOL_VALUE_BYTES (s) = (gdb_byte *) e;
+	  SYMBOL_LOCATION_BATON (s) = e;
 	  e->numargs = top_stack->numargs;
 	  e->pdr.framereg = -1;
 	  add_symbol (s, top_stack->cur_st, top_stack->cur_block);
@@ -2035,7 +2035,7 @@ parse_procedure (PDR *pr, struct symtab *search_symtab,
     {
       struct mdebug_extra_func_info *e;
       
-      e = (struct mdebug_extra_func_info *) SYMBOL_VALUE_BYTES (i);
+      e = SYMBOL_LOCATION_BATON (i);
       e->pdr = *pr;
 
       /* GDB expects the absolute function start address for the
@@ -4121,7 +4121,7 @@ psymtab_to_symtab_1 (struct objfile *objfile,
 		  SYMBOL_DOMAIN (s) = LABEL_DOMAIN;
 		  SYMBOL_ACLASS_INDEX (s) = LOC_CONST;
 		  SYMBOL_TYPE (s) = objfile_type (objfile)->builtin_void;
-		  SYMBOL_VALUE_BYTES (s) = (gdb_byte *) e;
+		  SYMBOL_LOCATION_BATON (s) = e;
 		  e->pdr.framereg = -1;
 		  add_symbol_to_list (s, &local_symbols);
 		}
