@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "symtab.h"
 #include "gdbtypes.h"
 #include "bfd.h"
@@ -25,7 +26,6 @@
 #include "symfile.h"
 #include "objfiles.h"
 #include "breakpoint.h"
-#include "command.h"
 #include "gdb_obstack.h"
 #include "exceptions.h"
 #include "language.h"
@@ -404,7 +404,7 @@ dump_symtab (struct objfile *objfile, struct symtab *symtab,
 }
 
 static void
-maintenance_print_symbols (char *args, int from_tty)
+maintenance_print_symbols (const char *args, int from_tty)
 {
   char **argv;
   struct ui_file *outfile;
@@ -630,7 +630,7 @@ print_symbol (void *args)
 }
 
 static void
-maintenance_print_msymbols (char *args, int from_tty)
+maintenance_print_msymbols (const char *args, int from_tty)
 {
   char **argv;
   struct ui_file *outfile;
@@ -687,7 +687,7 @@ maintenance_print_msymbols (char *args, int from_tty)
 }
 
 static void
-maintenance_print_objfiles (char *ignore, int from_tty)
+maintenance_print_objfiles (const char *ignore, int from_tty)
 {
   struct program_space *pspace;
   struct objfile *objfile;
@@ -705,7 +705,7 @@ maintenance_print_objfiles (char *ignore, int from_tty)
 /* List all the symbol tables whose names match REGEXP (optional).  */
 
 static void
-maintenance_info_symtabs (char *regexp, int from_tty)
+maintenance_info_symtabs (const char *regexp, int from_tty)
 {
   struct program_space *pspace;
   struct objfile *objfile;
