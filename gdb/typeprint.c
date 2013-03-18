@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "gdb_obstack.h"
 #include "bfd.h"		/* Binary File Description */
 #include "symtab.h"
@@ -25,7 +26,6 @@
 #include "expression.h"
 #include "value.h"
 #include "gdbcore.h"
-#include "command.h"
 #include "gdbcmd.h"
 #include "target.h"
 #include "language.h"
@@ -41,12 +41,6 @@
 #include "completer.h"
 
 extern void _initialize_typeprint (void);
-
-static void ptype_command (char *, int);
-
-static void whatis_command (char *, int);
-
-static void whatis_exp (char *, int);
 
 const struct type_print_options type_print_raw_options =
 {
@@ -397,7 +391,7 @@ type_to_string (struct type *type)
    show is passed to type_print.  */
 
 static void
-whatis_exp (char *exp, int show)
+whatis_exp (const char *exp, int show)
 {
   struct expression *expr;
   struct value *val;
@@ -447,7 +441,7 @@ whatis_exp (char *exp, int show)
 	    error (_("flag expected"));
 	  if (!isspace (*exp))
 	    error (_("expected space after format"));
-	  exp = skip_spaces (exp);
+	  exp = skip_spaces_const (exp);
 	}
 
       expr = parse_expression (exp);
@@ -491,7 +485,7 @@ whatis_exp (char *exp, int show)
 }
 
 static void
-whatis_command (char *exp, int from_tty)
+whatis_command (const char *exp, int from_tty)
 {
   /* Most of the time users do not want to see all the fields
      in a structure.  If they do they can use the "ptype" command.
@@ -502,7 +496,7 @@ whatis_command (char *exp, int from_tty)
 /* TYPENAME is either the name of a type, or an expression.  */
 
 static void
-ptype_command (char *typename, int from_tty)
+ptype_command (const char *typename, int from_tty)
 {
   whatis_exp (typename, 1);
 }
@@ -632,7 +626,7 @@ struct cmd_list_element *setprinttypelist;
 struct cmd_list_element *showprinttypelist;
 
 static void
-set_print_type (char *arg, int from_tty)
+set_print_type (const char *arg, int from_tty)
 {
   printf_unfiltered (
      "\"set print type\" must be followed by the name of a subcommand.\n");
@@ -640,7 +634,7 @@ set_print_type (char *arg, int from_tty)
 }
 
 static void
-show_print_type (char *args, int from_tty)
+show_print_type (const char *args, int from_tty)
 {
   cmd_show_list (showprinttypelist, from_tty, "");
 }
@@ -648,7 +642,8 @@ show_print_type (char *args, int from_tty)
 static int print_methods = 1;
 
 static void
-set_print_type_methods (char *args, int from_tty, struct cmd_list_element *c)
+set_print_type_methods (const char *args, int from_tty,
+			struct cmd_list_element *c)
 {
   default_ptype_flags.print_methods = print_methods;
 }
@@ -664,7 +659,8 @@ show_print_type_methods (struct ui_file *file, int from_tty,
 static int print_typedefs = 1;
 
 static void
-set_print_type_typedefs (char *args, int from_tty, struct cmd_list_element *c)
+set_print_type_typedefs (const char *args, int from_tty,
+			 struct cmd_list_element *c)
 {
   default_ptype_flags.print_typedefs = print_typedefs;
 }
