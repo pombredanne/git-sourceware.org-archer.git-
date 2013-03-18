@@ -18,6 +18,7 @@
 
 
 #include "defs.h"
+#include "const-command.h"
 #include "gdb_string.h"
 #include "inferior.h"
 #include "gdbcore.h"
@@ -27,7 +28,6 @@
 #include "objfiles.h"
 #include "symtab.h"
 #include "language.h"
-#include "command.h"
 #include "gdbcmd.h"
 #include "elf/frv.h"
 #include "exceptions.h"
