@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 
 #include <sys/types.h>
 #include <fcntl.h>
@@ -28,7 +29,6 @@
 #include "objfiles.h"
 #include "exceptions.h"
 #include "gdbcore.h"
-#include "command.h"
 #include "target.h"
 #include "frame.h"
 #include "gdb_regex.h"
@@ -947,7 +947,7 @@ solib_add (const char *pattern, int from_tty,
    all.  */
 
 static void
-info_sharedlibrary_command (char *pattern, int from_tty)
+info_sharedlibrary_command (const char *pattern, int from_tty)
 {
   struct so_list *so = NULL;	/* link map state variable */
   int so_missing_debug_info = 0;
@@ -1183,7 +1183,7 @@ in_solib_dynsym_resolve_code (CORE_ADDR pc)
 /* Implements the "sharedlibrary" command.  */
 
 static void
-sharedlibrary_command (char *args, int from_tty)
+sharedlibrary_command (const char *args, int from_tty)
 {
   dont_repeat ();
   solib_add (args, from_tty, (struct target_ops *) 0, 1);
@@ -1195,7 +1195,7 @@ sharedlibrary_command (char *args, int from_tty)
    are not discarded.  Also called from remote.c.  */
 
 void
-no_shared_libraries (char *ignored, int from_tty)
+no_shared_libraries (const char *ignored, int from_tty)
 {
   /* The order of the two routines below is important: clear_solib notifies
      the solib_unloaded observers, and some of these observers might need
@@ -1270,7 +1270,7 @@ reload_shared_libraries_1 (int from_tty)
 }
 
 static void
-reload_shared_libraries (char *ignored, int from_tty,
+reload_shared_libraries (const char *ignored, int from_tty,
 			 struct cmd_list_element *e)
 {
   struct target_so_ops *ops;
