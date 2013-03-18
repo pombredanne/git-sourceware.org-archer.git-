@@ -30,6 +30,7 @@
    come first in the result.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include <ctype.h>
 #include "arch-utils.h"
 #include "gdb_string.h"
@@ -38,7 +39,6 @@
 #include "frame.h"
 #include "expression.h"
 #include "value.h"
-#include "command.h"
 #include "language.h"
 #include "f-lang.h"
 #include "parser-defs.h"
