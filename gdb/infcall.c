@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "breakpoint.h"
 #include "tracepoint.h"
 #include "target.h"
@@ -29,7 +30,6 @@
 #include "language.h"
 #include "objfiles.h"
 #include "gdbcmd.h"
-#include "command.h"
 #include "gdb_string.h"
 #include "infcall.h"
 #include "dummy-frame.h"
