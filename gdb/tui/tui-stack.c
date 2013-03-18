@@ -20,10 +20,10 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "symtab.h"
 #include "breakpoint.h"
 #include "frame.h"
-#include "command.h"
 #include "inferior.h"
 #include "target.h"
 #include "top.h"
@@ -54,7 +54,7 @@ static void tui_set_locator_info (struct gdbarch *gdbarch,
 				  const char *procname,
                                   int lineno, CORE_ADDR addr);
 
-static void tui_update_command (char *, int);
+static void tui_update_command (const char *, int);
 
 
 /* Create the status line to display as much information as we can on
@@ -462,7 +462,7 @@ _initialize_tui_stack (void)
 
 /* Command to update the display with the current execution point.  */
 static void
-tui_update_command (char *arg, int from_tty)
+tui_update_command (const char *arg, int from_tty)
 {
   char cmd[sizeof("frame 0")];
 
