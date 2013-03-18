@@ -20,6 +20,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "gdb_string.h"
 #include "inferior.h"
 #include "terminal.h"
@@ -29,7 +30,6 @@
 #include "gdbcore.h"
 #include "terminal.h"
 #include "gdbthread.h"
-#include "command.h" /* for dont_repeat () */
 #include "gdbcmd.h"
 #include "solib.h"
 
@@ -524,7 +524,7 @@ startup_inferior (int ntraps)
 /* Implement the "unset exec-wrapper" command.  */
 
 static void
-unset_exec_wrapper_command (char *args, int from_tty)
+unset_exec_wrapper_command (const char *args, int from_tty)
 {
   xfree (exec_wrapper);
   exec_wrapper = NULL;
