@@ -20,8 +20,8 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "arch-utils.h"
-#include "command.h"
 #include "symtab.h"
 #include "frame.h"
 #include "source.h"
@@ -64,9 +64,9 @@ static void show_source_disasm_command (void);
 static void show_data (enum tui_layout_type);
 static enum tui_layout_type next_layout (void);
 static enum tui_layout_type prev_layout (void);
-static void tui_layout_command (char *, int);
-static void tui_toggle_layout_command (char *, int);
-static void tui_toggle_split_layout_command (char *, int);
+static void tui_layout_command (const char *, int);
+static void tui_toggle_layout_command (const char *, int);
+static void tui_toggle_split_layout_command (const char *, int);
 static void extract_display_start_addr (struct gdbarch **, CORE_ADDR *);
 static void tui_handle_xdb_layout (struct tui_layout_def *);
 
@@ -574,7 +574,7 @@ tui_handle_xdb_layout (struct tui_layout_def *layout_def)
 
 
 static void
-tui_toggle_layout_command (char *arg, int from_tty)
+tui_toggle_layout_command (const char *arg, int from_tty)
 {
   struct tui_layout_def *layout_def = tui_layout_def ();
 
@@ -591,7 +591,7 @@ tui_toggle_layout_command (char *arg, int from_tty)
 
 
 static void
-tui_toggle_split_layout_command (char *arg, int from_tty)
+tui_toggle_split_layout_command (const char *arg, int from_tty)
 {
   struct tui_layout_def *layout_def = tui_layout_def ();
 
@@ -603,7 +603,7 @@ tui_toggle_split_layout_command (char *arg, int from_tty)
 
 
 static void
-tui_layout_command (char *arg, int from_tty)
+tui_layout_command (const char *arg, int from_tty)
 {
   /* Make sure the curses mode is enabled.  */
   tui_enable ();
