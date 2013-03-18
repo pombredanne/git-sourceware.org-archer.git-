@@ -938,6 +938,10 @@ struct target_ops
        (inclusive) to function END (exclusive).  */
     void (*to_call_history_range) (ULONGEST begin, ULONGEST end, int flags);
 
+    /* This unwinder is tried before any other arch unwinders.  Use NULL if it
+       is not used.  */
+    const struct frame_unwind *to_get_unwinder;
+
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
      */
@@ -1815,6 +1819,9 @@ extern char *target_fileio_read_stralloc (const char *filename);
 
 
 extern int target_core_of_thread (ptid_t ptid);
+
+/* See to_get_unwinder in struct target_ops.  */
+extern const struct frame_unwind *target_get_unwinder (void);
 
 /* Verify that the memory in the [MEMADDR, MEMADDR+SIZE) range matches
    the contents of [DATA,DATA+SIZE).  Returns 1 if there's a match, 0
