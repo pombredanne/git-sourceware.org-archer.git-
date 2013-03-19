@@ -96,8 +96,20 @@ extern struct cleanup *
 /* Decode a linespec using the provided default symtab and line.  */
 
 extern struct symtabs_and_lines
-	decode_line_1 (char **argptr, int flags,
-		       struct symtab *default_symtab, int default_line);
+	decode_line_1_const (const char **argptr, int flags,
+			     struct symtab *default_symtab, int default_line);
+
+static inline struct symtabs_and_lines
+decode_line_1 (char **argptr, int flags,
+	       struct symtab *default_symtab, int default_line)
+{
+  const char *arg = *argptr;
+  struct symtabs_and_lines result
+    = decode_line_1_const (&arg, flags, default_symtab, default_line);
+
+  *argptr = (char *) arg;
+  return result;
+}
 
 /* Parse *ARGPTR as a linespec and return results.  This is the "full"
    interface to this module, which handles multiple results
@@ -135,21 +147,39 @@ extern struct symtabs_and_lines
    strcmp sense) to FILTER will be returned; all others will be
    filtered out.  */
 
-extern void decode_line_full (char **argptr, int flags,
-			      struct symtab *default_symtab, int default_line,
-			      struct linespec_result *canonical,
-			      const char *select_mode,
-			      const char *filter);
+extern void decode_line_full_const (const char **argptr, int flags,
+				    struct symtab *default_symtab,
+				    int default_line,
+				    struct linespec_result *canonical,
+				    const char *select_mode,
+				    const char *filter);
+
+static inline void
+decode_line_full (char **argptr, int flags,
+		  struct symtab *default_symtab,
+		  int default_line,
+		  struct linespec_result *canonical,
+		  const char *select_mode,
+		  const char *filter)
+{
+  const char *arg = *argptr;
+
+  decode_line_full_const (&arg, flags, default_symtab, default_line,
+			  canonical, select_mode, filter);
+  *argptr = (char *) arg;
+}
 
 /* Given a string, return the line specified by it, using the current
    source symtab and line as defaults.
    This is for commands like "list" and "breakpoint".  */
 
-extern struct symtabs_and_lines decode_line_with_current_source (char *, int);
+extern struct symtabs_and_lines decode_line_with_current_source (const char *,
+								 int);
 
 /* Given a string, return the line specified by it, using the last displayed
    codepoint's values as defaults, or nothing if they aren't valid.  */
 
-extern struct symtabs_and_lines decode_line_with_last_displayed (char *, int);
+extern struct symtabs_and_lines decode_line_with_last_displayed (const char *,
+								 int);
 
 #endif /* defined (LINESPEC_H) */

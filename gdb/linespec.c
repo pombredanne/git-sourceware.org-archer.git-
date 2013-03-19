@@ -258,6 +258,15 @@ typedef enum ls_token_type linespec_token_type;
 
 static const char * const linespec_keywords[] = { "if", "thread", "task" };
 
+/* Like struct stoken, but has a 'const' member.  Hopefully this is
+   temporary. */
+
+struct stoken_const
+{
+  const char *ptr;
+  int length;
+};
+
 /* A token of the linespec lexer  */
 
 struct ls_token
@@ -269,7 +278,7 @@ struct ls_token
   union
   {
     /* A string, given as a stoken  */
-    struct stoken string;
+    struct stoken_const string;
 
     /* A keyword  */
     const char *keyword;
@@ -288,10 +297,10 @@ struct ls_parser
   struct
   {
     /* Save head of input stream.  */
-    char *saved_arg;
+    const char *saved_arg;
 
     /* Head of the input stream.  */
-    char **stream;
+    const char **stream;
 #define PARSER_STREAM(P) (*(P)->lexer.stream)
 
     /* The current token.  */
@@ -330,7 +339,7 @@ static CORE_ADDR linespec_expression_to_pc (const char **exp_ptr);
 
 static struct symtabs_and_lines decode_objc (struct linespec_state *self,
 					     linespec_p ls,
-					     char **argptr);
+					     const char **argptr);
 
 static VEC (symtab_p) *symtabs_from_filename (const char *);
 
@@ -525,12 +534,12 @@ is_closing_quote_enclosed (const char *p)
    This helper function assists with lexing string segments
    which might contain valid (non-terminating) commas.  */
 
-static char *
-find_parameter_list_end (char *input)
+static const char *
+find_parameter_list_end (const char *input)
 {
   char end_char, start_char;
   int depth;
-  char *p;
+  const char *p;
 
   start_char = *input;
   if (start_char == '(')
@@ -567,7 +576,7 @@ static linespec_token
 linespec_lexer_lex_string (linespec_parser *parser)
 {
   linespec_token token;
-  char *start = PARSER_STREAM (parser);
+  const char *start = PARSER_STREAM (parser);
 
   token.type = LSTOKEN_STRING;
 
@@ -617,7 +626,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
     }
   else
     {
-      char *p;
+      const char *p;
 
       /* Otherwise, only identifier characters are permitted.
 	 Spaces are the exception.  In general, we keep spaces,
@@ -631,7 +640,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	{
 	  if (isspace (*PARSER_STREAM (parser)))
 	    {
-	      p = skip_spaces (PARSER_STREAM (parser));
+	      p = skip_spaces_const (PARSER_STREAM (parser));
 	      /* When we get here we know we've found something followed by
 		 a space (we skip over parens and templates below).
 		 So if we find a keyword now, we know it is a keyword and not,
@@ -691,7 +700,7 @@ linespec_lexer_lex_string (linespec_parser *parser)
 	  else if (*PARSER_STREAM (parser) == '<'
 		   || *PARSER_STREAM (parser) == '(')
 	    {
-	      char *p;
+	      const char *p;
 
 	      p = find_parameter_list_end (PARSER_STREAM (parser));
 	      if (p != NULL)
@@ -743,7 +752,7 @@ linespec_lexer_lex_one (linespec_parser *parser)
   if (parser->lexer.current.type == LSTOKEN_CONSUMED)
     {
       /* Skip any whitespace.  */
-      PARSER_STREAM (parser) = skip_spaces (PARSER_STREAM (parser));
+      PARSER_STREAM (parser) = skip_spaces_const (PARSER_STREAM (parser));
 
       /* Check for a keyword, they end the linespec.  */
       keyword = NULL;
@@ -829,7 +838,7 @@ static linespec_token
 linespec_lexer_peek_token (linespec_parser *parser)
 {
   linespec_token next;
-  char *saved_stream = PARSER_STREAM (parser);
+  const char *saved_stream = PARSER_STREAM (parser);
   linespec_token saved_token = parser->lexer.current;
 
   next = linespec_lexer_consume_token (parser);
@@ -2130,7 +2139,7 @@ convert_linespec_to_sals (struct linespec_state *state, linespec_p ls)
 /* Parse the linespec in ARGPTR.  */
 
 static struct symtabs_and_lines
-parse_linespec (linespec_parser *parser, char **argptr)
+parse_linespec (linespec_parser *parser, const char **argptr)
 {
   linespec_token token;
   struct symtabs_and_lines values;
@@ -2401,11 +2410,11 @@ linespec_parser_delete (void *arg)
 /* See linespec.h.  */
 
 void
-decode_line_full (char **argptr, int flags,
-		  struct symtab *default_symtab,
-		  int default_line, struct linespec_result *canonical,
-		  const char *select_mode,
-		  const char *filter)
+decode_line_full_const (const char **argptr, int flags,
+			struct symtab *default_symtab,
+			int default_line, struct linespec_result *canonical,
+			const char *select_mode,
+			const char *filter)
 {
   struct symtabs_and_lines result;
   struct cleanup *cleanups;
@@ -2475,9 +2484,9 @@ decode_line_full (char **argptr, int flags,
 /* See linespec.h.  */
 
 struct symtabs_and_lines
-decode_line_1 (char **argptr, int flags,
-	       struct symtab *default_symtab,
-	       int default_line)
+decode_line_1_const (const char **argptr, int flags,
+		     struct symtab *default_symtab,
+		     int default_line)
 {
   struct symtabs_and_lines result;
   linespec_parser parser;
@@ -2497,7 +2506,7 @@ decode_line_1 (char **argptr, int flags,
 /* See linespec.h.  */
 
 struct symtabs_and_lines
-decode_line_with_current_source (char *string, int flags)
+decode_line_with_current_source (const char *string, int flags)
 {
   struct symtabs_and_lines sals;
   struct symtab_and_line cursal;
@@ -2509,8 +2518,7 @@ decode_line_with_current_source (char *string, int flags)
      and get a default source symtab+line or it will recursively call us!  */
   cursal = get_current_source_symtab_and_line ();
 
-  sals = decode_line_1 (&string, flags,
-			cursal.symtab, cursal.line);
+  sals = decode_line_1_const (&string, flags, cursal.symtab, cursal.line);
 
   if (*string)
     error (_("Junk at end of line specification: %s"), string);
@@ -2520,7 +2528,7 @@ decode_line_with_current_source (char *string, int flags)
 /* See linespec.h.  */
 
 struct symtabs_and_lines
-decode_line_with_last_displayed (char *string, int flags)
+decode_line_with_last_displayed (const char *string, int flags)
 {
   struct symtabs_and_lines sals;
 
@@ -2528,11 +2536,11 @@ decode_line_with_last_displayed (char *string, int flags)
     error (_("Empty line specification."));
 
   if (last_displayed_sal_is_valid ())
-    sals = decode_line_1 (&string, flags,
-			  get_last_displayed_symtab (),
-			  get_last_displayed_line ());
+    sals = decode_line_1_const (&string, flags,
+				get_last_displayed_symtab (),
+				get_last_displayed_line ());
   else
-    sals = decode_line_1 (&string, flags, (struct symtab *) NULL, 0);
+    sals = decode_line_1_const (&string, flags, (struct symtab *) NULL, 0);
 
   if (*string)
     error (_("Junk at end of line specification: %s"), string);
@@ -2588,7 +2596,7 @@ linespec_expression_to_pc (const char **exp_ptr)
    the existing C++ code to let the user choose one.  */
 
 static struct symtabs_and_lines
-decode_objc (struct linespec_state *self, linespec_p ls, char **argptr)
+decode_objc (struct linespec_state *self, linespec_p ls, const char **argptr)
 {
   struct collect_info info;
   VEC (const_char_ptr) *symbol_names = NULL;
