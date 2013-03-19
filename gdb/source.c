@@ -17,6 +17,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "arch-utils.h"
 #include "symtab.h"
 #include "expression.h"
@@ -57,14 +58,6 @@ void _initialize_source (void);
 /* Prototypes for local functions.  */
 
 static int get_filename_and_charpos (struct symtab *, char **);
-
-static void reverse_search_command (char *, int);
-
-static void forward_search_command (char *, int);
-
-static void line_info (char *, int);
-
-static void source_info (char *, int);
 
 /* Path of directories to search for source files.
    Same format as the PATH environment variable's value.  */
@@ -317,7 +310,8 @@ select_source_symtab (struct symtab *s)
    path list.  The theory is that set(show(dir)) should be a no-op.  */
 
 static void
-set_directories_command (char *args, int from_tty, struct cmd_list_element *c)
+set_directories_command (const char *args, int from_tty,
+			 struct cmd_list_element *c)
 {
   /* This is the value that was set.
      It needs to be processed to maintain $cdir:$cwd and remove dups.  */
@@ -339,7 +333,7 @@ set_directories_command (char *args, int from_tty, struct cmd_list_element *c)
    function.  */
 
 static void
-show_directories_1 (char *ignore, int from_tty)
+show_directories_1 (const char *ignore, int from_tty)
 {
   puts_filtered ("Source directories searched: ");
   puts_filtered (source_path);
@@ -413,7 +407,7 @@ init_source_path (void)
 /* Add zero or more directories to the front of the source path.  */
 
 static void
-directory_command (char *dirname, int from_tty)
+directory_command (const char *dirname, int from_tty)
 {
   dont_repeat ();
   /* FIXME, this goes to "delete dir"...  */
@@ -438,7 +432,7 @@ directory_command (char *dirname, int from_tty)
    This will not be quoted so we must not treat spaces as separators.  */
 
 void
-directory_switch (char *dirname, int from_tty)
+directory_switch (const char *dirname, int from_tty)
 {
   add_path (dirname, &source_path, 0);
 }
@@ -446,7 +440,7 @@ directory_switch (char *dirname, int from_tty)
 /* Add zero or more directories to the front of an arbitrary path.  */
 
 void
-mod_path (char *dirname, char **which_path)
+mod_path (const char *dirname, char **which_path)
 {
   add_path (dirname, which_path, 1);
 }
@@ -458,7 +452,7 @@ mod_path (char *dirname, char **which_path)
    as space or tab.  */
 
 void
-add_path (char *dirname, char **which_path, int parse_separators)
+add_path (const char *dirname, char **which_path, int parse_separators)
 {
   char *old = *which_path;
   int prefix = 0;
@@ -625,7 +619,7 @@ add_path (char *dirname, char **which_path, int parse_separators)
 
 
 static void
-source_info (char *ignore, int from_tty)
+source_info (const char *ignore, int from_tty)
 {
   struct symtab *s = current_source_symtab;
 
@@ -1457,7 +1451,7 @@ print_source_lines (struct symtab *s, int line, int stopline,
 /* Print info on range of pc's in a specified line.  */
 
 static void
-line_info (char *arg, int from_tty)
+line_info (const char *arg, int from_tty)
 {
   struct symtabs_and_lines sals;
   struct symtab_and_line sal;
@@ -1566,7 +1560,7 @@ line_info (char *arg, int from_tty)
 /* Commands to search the source file for a regexp.  */
 
 static void
-forward_search_command (char *regex, int from_tty)
+forward_search_command (const char *regex, int from_tty)
 {
   int c;
   int desc;
@@ -1655,7 +1649,7 @@ forward_search_command (char *regex, int from_tty)
 }
 
 static void
-reverse_search_command (char *regex, int from_tty)
+reverse_search_command (const char *regex, int from_tty)
 {
   int c;
   int desc;
@@ -1834,7 +1828,7 @@ delete_substitute_path_rule (struct substitute_path_rule *rule)
 /* Implement the "show substitute-path" command.  */
 
 static void
-show_substitute_path_command (char *args, int from_tty)
+show_substitute_path_command (const char *args, int from_tty)
 {
   struct substitute_path_rule *rule = substitute_path_rules;
   char **argv;
@@ -1870,7 +1864,7 @@ show_substitute_path_command (char *args, int from_tty)
 /* Implement the "unset substitute-path" command.  */
 
 static void
-unset_substitute_path_command (char *args, int from_tty)
+unset_substitute_path_command (const char *args, int from_tty)
 {
   struct substitute_path_rule *rule = substitute_path_rules;
   char **argv = gdb_buildargv (args);
@@ -1922,7 +1916,7 @@ unset_substitute_path_command (char *args, int from_tty)
 /* Add a new source path substitution rule.  */
 
 static void
-set_substitute_path_command (char *args, int from_tty)
+set_substitute_path_command (const char *args, int from_tty)
 {
   char **argv;
   struct substitute_path_rule *rule;

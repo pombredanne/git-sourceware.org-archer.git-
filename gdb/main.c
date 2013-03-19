@@ -915,7 +915,9 @@ captured_main (void *data)
     }
 
   for (i = 0; i < ndir; i++)
-    catch_command_errors (directory_switch, dirarg[i], 0, RETURN_MASK_ALL);
+    catch_command_errors (/* FIXME: remove the cast */
+			  (cmd_cfunc_ftype *)
+			  directory_switch, dirarg[i], 0, RETURN_MASK_ALL);
   xfree (dirarg);
 
   /* Skip auto-loading section-specified scripts until we've sourced
