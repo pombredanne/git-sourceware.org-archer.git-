@@ -589,7 +589,7 @@ print_type_scalar (struct type *type, LONGEST val, struct ui_file *stream)
    and whatis_command().  */
 
 void
-maintenance_print_type (char *typename, int from_tty)
+maintenance_print_type (const char *typename, int from_tty)
 {
   struct value *val;
   struct type *type;
