@@ -957,7 +957,9 @@ captured_main (void *data)
 	     "a core file at the same time."));
 
   if (corearg != NULL)
-    catch_command_errors (core_file_command, corearg,
+    catch_command_errors (/* FIXME remove cast */
+			  (cmd_cfunc_ftype *)
+			  core_file_command, corearg,
 			  !batch_flag, RETURN_MASK_ALL);
   else if (pidarg != NULL)
     catch_command_errors (attach_command, pidarg,
@@ -972,11 +974,15 @@ captured_main (void *data)
 	{
 	  if (catch_command_errors (attach_command, pid_or_core_arg,
 				    !batch_flag, RETURN_MASK_ALL) == 0)
-	    catch_command_errors (core_file_command, pid_or_core_arg,
+	    catch_command_errors (/* FIXME remove cast */
+				  (cmd_cfunc_ftype *)
+				  core_file_command, pid_or_core_arg,
 				  !batch_flag, RETURN_MASK_ALL);
 	}
       else /* Can't be a pid, better be a corefile.  */
-	catch_command_errors (core_file_command, pid_or_core_arg,
+	catch_command_errors (/* FIXME remove cast */
+			      (cmd_cfunc_ftype *)
+			      core_file_command, pid_or_core_arg,
 			      !batch_flag, RETURN_MASK_ALL);
     }
 
