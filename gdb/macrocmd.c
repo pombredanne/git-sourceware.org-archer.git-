@@ -19,11 +19,11 @@
 
 
 #include "defs.h"
+#include "const-command.h"
 #include "macrotab.h"
 #include "macroexp.h"
 #include "macroscope.h"
 #include "cli/cli-utils.h"
-#include "command.h"
 #include "gdbcmd.h"
 #include "gdb_string.h"
 #include "linespec.h"
@@ -34,7 +34,7 @@
 static struct cmd_list_element *macrolist;
 
 static void
-macro_command (char *arg, int from_tty)
+macro_command (const char *arg, int from_tty)
 {
   printf_unfiltered
     ("\"macro\" must be followed by the name of a macro command.\n");
@@ -53,7 +53,7 @@ static void macro_inform_no_debuginfo()
 }
 
 static void
-macro_expand_command (char *exp, int from_tty)
+macro_expand_command (const char *exp, int from_tty)
 {
   struct macro_scope *ms = NULL;
   char *expanded = NULL;
@@ -88,7 +88,7 @@ macro_expand_command (char *exp, int from_tty)
 
 
 static void
-macro_expand_once_command (char *exp, int from_tty)
+macro_expand_once_command (const char *exp, int from_tty)
 {
   struct macro_scope *ms = NULL;
   char *expanded = NULL;
@@ -202,13 +202,13 @@ print_macro_callback (const char *name, const struct macro_definition *macro,
 
 /* The implementation of the `info macro' command.  */
 static void
-info_macro_command (char *args, int from_tty)
+info_macro_command (const char *args, int from_tty)
 {
   struct macro_scope *ms = NULL;
   struct cleanup *cleanup_chain;
-  char *name;
+  const char *name;
   int show_all_macros_named = 0;
-  char *arg_start = args;
+  const char *arg_start = args;
   int processing_args = 1;
 
   while (processing_args
@@ -248,7 +248,7 @@ info_macro_command (char *args, int from_tty)
   if (! ms)
     macro_inform_no_debuginfo ();
   else if (show_all_macros_named)
-    macro_for_each (ms->file->table, print_macro_callback, name);
+    macro_for_each (ms->file->table, print_macro_callback, (void *) name);
   else
     {
       struct macro_definition *d;
@@ -277,7 +277,7 @@ info_macro_command (char *args, int from_tty)
 
 /* Implementation of the "info macros" command. */
 static void
-info_macros_command (char *args, int from_tty)
+info_macros_command (const char *args, int from_tty)
 {
   struct macro_scope *ms = NULL;
   struct cleanup *cleanup_chain = make_cleanup (free_current_contents, &ms);
@@ -305,7 +305,7 @@ info_macros_command (char *args, int from_tty)
 /* User-defined macros.  */
 
 static void
-skip_ws (char **expp)
+skip_ws (const char **expp)
 {
   while (macro_is_whitespace (**expp))
     ++*expp;
@@ -319,10 +319,10 @@ skip_ws (char **expp)
    parameters.  */
 
 static char *
-extract_identifier (char **expp, int is_parameter)
+extract_identifier (const char **expp, int is_parameter)
 {
   char *result;
-  char *p = *expp;
+  const char *p = *expp;
   unsigned int len;
 
   if (is_parameter && !strncmp (p, "...", 3))
@@ -365,7 +365,7 @@ free_macro_definition_ptr (void *ptr)
 }
 
 static void
-macro_define_command (char *exp, int from_tty)
+macro_define_command (const char *exp, int from_tty)
 {
   struct macro_definition new_macro;
   char *name = NULL;
@@ -447,7 +447,7 @@ macro_define_command (char *exp, int from_tty)
 
 
 static void
-macro_undef_command (char *exp, int from_tty)
+macro_undef_command (const char *exp, int from_tty)
 {
   char *name;
 
@@ -484,7 +484,7 @@ print_one_macro (const char *name, const struct macro_definition *macro,
 
 
 static void
-macro_list_command (char *exp, int from_tty)
+macro_list_command (const char *exp, int from_tty)
 {
   macro_for_each (macro_user_macros, print_one_macro, NULL);
 }
