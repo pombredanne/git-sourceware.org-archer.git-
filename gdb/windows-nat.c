@@ -1943,7 +1943,7 @@ windows_files_info (struct target_ops *ignore)
 }
 
 static void
-windows_open (char *arg, int from_tty)
+windows_open (const char *arg, int from_tty)
 {
   error (_("Use the \"run\" command to start a Unix child process."));
 }

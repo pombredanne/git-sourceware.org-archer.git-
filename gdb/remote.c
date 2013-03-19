@@ -102,11 +102,8 @@ static void remote_files_info (struct target_ops *ignore);
 
 static void remote_prepare_to_store (struct regcache *regcache);
 
-static void remote_open (char *name, int from_tty);
-
-static void extended_remote_open (char *name, int from_tty);
-
-static void remote_open_1 (char *, int, struct target_ops *, int extended_p);
+static void remote_open_1 (const char *, int, struct target_ops *,
+			   int extended_p);
 
 static void remote_close (void);
 
@@ -3594,7 +3591,7 @@ remote_start_remote (int from_tty, struct target_ops *target, int extended_p)
    NAME is the filename used for communication.  */
 
 static void
-remote_open (char *name, int from_tty)
+remote_open (const char *name, int from_tty)
 {
   remote_open_1 (name, from_tty, &remote_ops, 0);
 }
@@ -3603,7 +3600,7 @@ remote_open (char *name, int from_tty)
    remote gdb protocol.  NAME is the filename used for communication.  */
 
 static void
-extended_remote_open (char *name, int from_tty)
+extended_remote_open (const char *name, int from_tty)
 {
   remote_open_1 (name, from_tty, &extended_remote_ops, 1 /*extended_p */);
 }
@@ -3685,7 +3682,7 @@ remote_check_symbols (struct objfile *objfile)
 }
 
 static struct serial *
-remote_serial_open (char *name)
+remote_serial_open (const char *name)
 {
   static int udp_warning = 0;
 
@@ -4194,7 +4191,7 @@ remote_unpush_target (void)
 }
 
 static void
-remote_open_1 (char *name, int from_tty,
+remote_open_1 (const char *name, int from_tty,
 	       struct target_ops *target, int extended_p)
 {
   struct remote_state *rs = get_remote_state ();

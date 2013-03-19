@@ -364,7 +364,7 @@ static struct {
 };
 
 static void
-go32_open (char *name, int from_tty)
+go32_open (const char *name, int from_tty)
 {
   printf_unfiltered ("Done.  Use the \"run\" command to run the program.\n");
 }

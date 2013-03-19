@@ -81,8 +81,6 @@ static struct core_fns *sniff_core_bfd (bfd *);
 
 static int gdb_check_format (bfd *);
 
-static void core_open (char *, int);
-
 static void core_close (int);
 
 static void core_close_cleanup (void *ignore);
@@ -272,7 +270,7 @@ add_to_thread_list (bfd *abfd, asection *asect, void *reg_sect_arg)
 /* This routine opens and sets up the core file bfd.  */
 
 static void
-core_open (char *filename, int from_tty)
+core_open (const char *arg, int from_tty)
 {
   const char *p;
   int siggy;
@@ -282,9 +280,10 @@ core_open (char *filename, int from_tty)
   int scratch_chan;
   int flags;
   volatile struct gdb_exception except;
+  char *filename;
 
   target_preopen (from_tty);
-  if (!filename)
+  if (!arg)
     {
       if (core_bfd)
 	error (_("No core file specified.  (Use `detach' "
@@ -293,7 +292,7 @@ core_open (char *filename, int from_tty)
 	error (_("No core file specified."));
     }
 
-  filename = tilde_expand (filename);
+  filename = tilde_expand (arg);
   if (!IS_ABSOLUTE_PATH (filename))
     {
       temp = concat (current_directory, "/",

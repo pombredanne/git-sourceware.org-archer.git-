@@ -94,8 +94,6 @@ static void init_dummy_target (void);
 
 static struct target_ops debug_target;
 
-static void debug_to_open (char *, int);
-
 static void debug_to_prepare_to_store (struct regcache *);
 
 static void debug_to_files_info (struct target_ops *);
@@ -429,7 +427,10 @@ Remaining arguments are interpreted by the target protocol.  For more\n\
 information on the arguments for a particular protocol, type\n\
 `help target ' followed by the protocol name."),
 		    &targetlist, "target ", 0, &cmdlist);
-  add_cmd (t->to_shortname, no_class, t->to_open, t->to_doc, &targetlist);
+  add_cmd (t->to_shortname, no_class,
+	   /* FIXME: remove the cast */
+	   (cmd_cfunc_ftype *)
+	   t->to_open, t->to_doc, &targetlist);
 }
 
 /* See target.h.  */
@@ -442,7 +443,10 @@ add_deprecated_target_alias (struct target_ops *t, char *alias)
 
   /* If we use add_alias_cmd, here, we do not get the deprecated warning,
      see PR cli/15104.  */
-  c = add_cmd (alias, no_class, t->to_open, t->to_doc, &targetlist);
+  c = add_cmd (alias, no_class,
+	       /* FIXME remove the cast */
+	       (cmd_cfunc_ftype *)
+	       t->to_open, t->to_doc, &targetlist);
   alt = xstrprintf ("target %s", t->to_shortname);
   deprecate_cmd (c, alt);
 }
@@ -733,7 +737,7 @@ update_current_target (void)
     current_target.field = value
 
   de_fault (to_open,
-	    (void (*) (char *, int))
+	    (void (*) (const char *, int))
 	    tcomplain);
   de_fault (to_close,
 	    (void (*) (void))
@@ -3765,7 +3769,7 @@ init_dummy_target (void)
 }
 
 static void
-debug_to_open (char *args, int from_tty)
+debug_to_open (const char *args, int from_tty)
 {
   debug_target.to_open (args, from_tty);
 

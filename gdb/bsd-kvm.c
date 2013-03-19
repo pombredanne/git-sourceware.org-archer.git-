@@ -63,7 +63,7 @@ static struct target_ops bsd_kvm_ops;
 static ptid_t bsd_kvm_ptid;
 
 static void
-bsd_kvm_open (char *filename, int from_tty)
+bsd_kvm_open (const char *filename, int from_tty)
 {
   char errbuf[_POSIX2_LINE_MAX];
   char *execfile = NULL;

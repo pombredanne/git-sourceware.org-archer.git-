@@ -933,7 +933,9 @@ captured_main (void *data)
       /* The exec file and the symbol-file are the same.  If we can't
          open it, better only print one error message.
          catch_command_errors returns non-zero on success!  */
-      if (catch_command_errors (exec_file_attach, execarg,
+      if (catch_command_errors (/* FIXME */
+				(cmd_cfunc_ftype *)
+				exec_file_attach, execarg,
 				!batch_flag, RETURN_MASK_ALL))
 	catch_command_errors (symbol_file_add_main, symarg,
 			      !batch_flag, RETURN_MASK_ALL);
@@ -941,7 +943,9 @@ captured_main (void *data)
   else
     {
       if (execarg != NULL)
-	catch_command_errors (exec_file_attach, execarg,
+	catch_command_errors (/* FIXME */
+			      (cmd_cfunc_ftype *)
+			      exec_file_attach, execarg,
 			      !batch_flag, RETURN_MASK_ALL);
       if (symarg != NULL)
 	catch_command_errors (symbol_file_add_main, symarg,

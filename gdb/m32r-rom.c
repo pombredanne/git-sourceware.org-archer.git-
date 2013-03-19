@@ -200,9 +200,6 @@ m32r_load_gen (char *filename, int from_tty)
   generic_load (filename, from_tty);
 }
 
-static void m32r_open (char *args, int from_tty);
-static void mon2000_open (char *args, int from_tty);
-
 /* This array of registers needs to match the indexes used by GDB.  The
    whole reason this exists is because the various ROM monitors use
    different names than GDB does, and don't support all the registers
@@ -361,7 +358,7 @@ init_m32r_cmds (void)
 }				/* init_m32r_cmds */
 
 static void
-m32r_open (char *args, int from_tty)
+m32r_open (const char *args, int from_tty)
 {
   monitor_open (args, &m32r_cmds, from_tty);
 }
@@ -421,7 +418,7 @@ init_mon2000_cmds (void)
 }				/* init_mon2000_cmds */
 
 static void
-mon2000_open (char *args, int from_tty)
+mon2000_open (const char *args, int from_tty)
 {
   monitor_open (args, &mon2000_cmds, from_tty);
 }

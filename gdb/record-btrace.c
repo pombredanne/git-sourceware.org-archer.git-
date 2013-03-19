@@ -135,7 +135,7 @@ record_btrace_auto_disable (void)
 /* The to_open method of target record-btrace.  */
 
 static void
-record_btrace_open (char *args, int from_tty)
+record_btrace_open (const char *args, int from_tty)
 {
   struct cleanup *disable_chain;
   struct thread_info *tp;

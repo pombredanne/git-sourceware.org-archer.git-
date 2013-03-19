@@ -107,7 +107,7 @@ inf_child_prepare_to_store (struct regcache *regcache)
 }
 
 static void
-inf_child_open (char *arg, int from_tty)
+inf_child_open (const char *arg, int from_tty)
 {
   error (_("Use the \"run\" command to start a Unix child process."));
 }
