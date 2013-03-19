@@ -816,7 +816,7 @@ gdbsim_close (void)
    Use this when you want to detach and do something else with your gdb.  */
 
 static void
-gdbsim_detach (struct target_ops *ops, char *args, int from_tty)
+gdbsim_detach (struct target_ops *ops, const char *args, int from_tty)
 {
   if (remote_debug)
     printf_filtered ("gdbsim_detach: args \"%s\"\n", args);
