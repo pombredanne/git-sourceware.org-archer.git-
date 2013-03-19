@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "frame.h"
 #include "target.h"
 #include "value.h"
@@ -34,7 +35,6 @@
 #include "language.h"
 #include "frame-unwind.h"
 #include "frame-base.h"
-#include "command.h"
 #include "gdbcmd.h"
 #include "observer.h"
 #include "objfiles.h"
@@ -2435,13 +2435,13 @@ static struct cmd_list_element *set_backtrace_cmdlist;
 static struct cmd_list_element *show_backtrace_cmdlist;
 
 static void
-set_backtrace_cmd (char *args, int from_tty)
+set_backtrace_cmd (const char *args, int from_tty)
 {
   help_list (set_backtrace_cmdlist, "set backtrace ", -1, gdb_stdout);
 }
 
 static void
-show_backtrace_cmd (char *args, int from_tty)
+show_backtrace_cmd (const char *args, int from_tty)
 {
   cmd_show_list (show_backtrace_cmdlist, from_tty, "");
 }
