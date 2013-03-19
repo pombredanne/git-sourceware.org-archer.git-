@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "arch-utils.h"
 #include "gdb_string.h"
 #include <errno.h>
@@ -29,7 +30,6 @@
 #include "frame.h"		/* required by inferior.h */
 #include "inferior.h"
 #include "symtab.h"
-#include "command.h"
 #include "bfd.h"
 #include "target.h"
 #include "gdbcore.h"
@@ -80,8 +80,6 @@ static void core_files_info (struct target_ops *);
 static struct core_fns *sniff_core_bfd (bfd *);
 
 static int gdb_check_format (bfd *);
-
-static void core_close (int);
 
 static void core_close_cleanup (void *ignore);
 
