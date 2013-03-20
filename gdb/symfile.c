@@ -56,6 +56,7 @@
 #include "remote.h"
 #include "stack.h"
 #include "gdb_bfd.h"
+#include "cli/cli-utils.h"
 
 #include <sys/types.h>
 #include <fcntl.h>
@@ -1303,73 +1304,6 @@ symbol_file_clear (int from_tty)
     printf_unfiltered (_("No symbol file now.\n"));
 }
 
-static char *
-get_debug_link_info (struct objfile *objfile, unsigned long *crc32_out)
-{
-  asection *sect;
-  bfd_size_type debuglink_size;
-  unsigned long crc32;
-  char *contents;
-  int crc_offset;
-
-  sect = bfd_get_section_by_name (objfile->obfd, ".gnu_debuglink");
-
-  if (sect == NULL)
-    return NULL;
-
-  debuglink_size = bfd_section_size (objfile->obfd, sect);
-
-  contents = xmalloc (debuglink_size);
-  bfd_get_section_contents (objfile->obfd, sect, contents,
-			    (file_ptr)0, (bfd_size_type)debuglink_size);
-
-  /* Crc value is stored after the filename, aligned up to 4 bytes.  */
-  crc_offset = strlen (contents) + 1;
-  crc_offset = (crc_offset + 3) & ~3;
-
-  crc32 = bfd_get_32 (objfile->obfd, (bfd_byte *) (contents + crc_offset));
-
-  *crc32_out = crc32;
-  return contents;
-}
-
-/* Return 32-bit CRC for ABFD.  If successful store it to *FILE_CRC_RETURN and
-   return 1.  Otherwise print a warning and return 0.  ABFD seek position is
-   not preserved.  */
-
-static int
-get_file_crc (bfd *abfd, unsigned long *file_crc_return)
-{
-  unsigned long file_crc = 0;
-
-  if (bfd_seek (abfd, 0, SEEK_SET) != 0)
-    {
-      warning (_("Problem reading \"%s\" for CRC: %s"),
-	       bfd_get_filename (abfd), bfd_errmsg (bfd_get_error ()));
-      return 0;
-    }
-
-  for (;;)
-    {
-      gdb_byte buffer[8 * 1024];
-      bfd_size_type count;
-
-      count = bfd_bread (buffer, sizeof (buffer), abfd);
-      if (count == (bfd_size_type) -1)
-	{
-	  warning (_("Problem reading \"%s\" for CRC: %s"),
-		   bfd_get_filename (abfd), bfd_errmsg (bfd_get_error ()));
-	  return 0;
-	}
-      if (count == 0)
-	break;
-      file_crc = bfd_calc_gnu_debuglink_crc32 (file_crc, buffer, count);
-    }
-
-  *file_crc_return = file_crc;
-  return 1;
-}
-
 static int
 separate_debug_file_exists (const char *name, unsigned long crc,
 			    struct objfile *parent_objfile)
@@ -1419,7 +1353,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
   else
     verified_as_different = 0;
 
-  file_crc_p = get_file_crc (abfd, &file_crc);
+  file_crc_p = gdb_bfd_crc (abfd, &file_crc);
 
   gdb_bfd_unref (abfd);
 
@@ -1428,19 +1362,19 @@ separate_debug_file_exists (const char *name, unsigned long crc,
 
   if (crc != file_crc)
     {
+      unsigned long parent_crc;
+
       /* If one (or both) the files are accessed for example the via "remote:"
 	 gdbserver way it does not support the bfd_stat operation.  Verify
 	 whether those two files are not the same manually.  */
 
-      if (!verified_as_different && !parent_objfile->crc32_p)
+      if (!verified_as_different)
 	{
-	  parent_objfile->crc32_p = get_file_crc (parent_objfile->obfd,
-						  &parent_objfile->crc32);
-	  if (!parent_objfile->crc32_p)
+	  if (!gdb_bfd_crc (parent_objfile->obfd, &parent_crc))
 	    return 0;
 	}
 
-      if (verified_as_different || parent_objfile->crc32 != file_crc)
+      if (verified_as_different || parent_crc != file_crc)
 	warning (_("the debug information found in \"%s\""
 		   " does not match \"%s\" (CRC mismatch).\n"),
 		 name, parent_objfile->name);
@@ -1583,7 +1517,7 @@ find_separate_debug_file_by_debuglink (struct objfile *objfile)
   unsigned long crc32;
   struct cleanup *cleanups;
 
-  debuglink = get_debug_link_info (objfile, &crc32);
+  debuglink = bfd_get_debug_link_info (objfile->obfd, &crc32);
 
   if (debuglink == NULL)
     {
@@ -2738,8 +2672,7 @@ set_ext_lang_command (char *args, int from_tty, struct cmd_list_element *e)
   *cp++ = '\0';
 
   /* Find beginning of second arg, which should be a source language.  */
-  while (*cp && isspace (*cp))
-    cp++;
+  cp = skip_spaces (cp);
 
   if (*cp == '\0')
     error (_("'%s': two arguments required -- "

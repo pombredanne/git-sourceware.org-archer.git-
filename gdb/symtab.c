@@ -40,6 +40,7 @@
 #include "go-lang.h"
 #include "p-lang.h"
 #include "addrmap.h"
+#include "cli/cli-utils.h"
 
 #include "hashtab.h"
 
@@ -211,6 +212,7 @@ iterate_over_some_symtabs (const char *name,
 	{
 	  if (callback (s, data))
 	    return 1;
+	  continue;
 	}
 
     /* Before we invoke realpath, which can get expensive when many
@@ -223,6 +225,7 @@ iterate_over_some_symtabs (const char *name,
       {
 	if (callback (s, data))
 	  return 1;
+	continue;
       }
 
     /* If the user gave us an absolute path, try to find the file in
@@ -238,6 +241,7 @@ iterate_over_some_symtabs (const char *name,
 	  {
 	    if (callback (s, data))
 	      return 1;
+	    continue;
 	  }
       }
     }
@@ -1612,6 +1616,20 @@ lookup_symbol_in_objfile_from_linkage_name (struct objfile *objfile,
   return NULL;
 }
 
+/* A helper function that throws an exception when a symbol was found
+   in a psymtab but not in a symtab.  */
+
+static void ATTRIBUTE_NORETURN
+error_in_psymtab_expansion (int kind, const char *name, struct symtab *symtab)
+{
+  error (_("\
+Internal: %s symbol `%s' found in %s psymtab but not in symtab.\n\
+%s may be an inlined function, or may be a template function\n	 \
+(if a template, try specifying an instantiation: %s<type>)."),
+	 kind == GLOBAL_BLOCK ? "global" : "static",
+	 name, symtab_to_filename_for_display (symtab), name, name);
+}
+
 /* A helper function for lookup_symbol_aux that interfaces with the
    "quick" symbol table functions.  */
 
@@ -1634,30 +1652,7 @@ lookup_symbol_aux_quick (struct objfile *objfile, int kind,
   block = BLOCKVECTOR_BLOCK (bv, kind);
   sym = lookup_block_symbol (block, name, domain);
   if (!sym)
-    {
-      /* This shouldn't be necessary, but as a last resort try
-	 looking in the statics even though the psymtab claimed
-	 the symbol was global, or vice-versa.  It's possible
-	 that the psymtab gets it wrong in some cases.  */
-
-      /* FIXME: carlton/2002-09-30: Should we really do that?
-	 If that happens, isn't it likely to be a GDB error, in
-	 which case we should fix the GDB error rather than
-	 silently dealing with it here?  So I'd vote for
-	 removing the check for the symbol in the other
-	 block.  */
-      block = BLOCKVECTOR_BLOCK (bv,
-				 kind == GLOBAL_BLOCK ?
-				 STATIC_BLOCK : GLOBAL_BLOCK);
-      sym = lookup_block_symbol (block, name, domain);
-      if (!sym)
-	error (_("\
-Internal: %s symbol `%s' found in %s psymtab but not in symtab.\n\
-%s may be an inlined function, or may be a template function\n\
-(if a template, try specifying an instantiation: %s<type>)."),
-	       kind == GLOBAL_BLOCK ? "global" : "static",
-	       name, symtab_to_filename_for_display (symtab), name, name);
-    }
+    error_in_psymtab_expansion (kind, name, symtab);
   return fixup_symbol_section (sym, objfile);
 }
 
@@ -1845,24 +1840,8 @@ basic_lookup_transparent_type_quick (struct objfile *objfile, int kind,
   block = BLOCKVECTOR_BLOCK (bv, kind);
   sym = lookup_block_symbol (block, name, STRUCT_DOMAIN);
   if (!sym)
-    {
-      int other_kind = kind == GLOBAL_BLOCK ? STATIC_BLOCK : GLOBAL_BLOCK;
+    error_in_psymtab_expansion (kind, name, symtab);
 
-      /* This shouldn't be necessary, but as a last resort
-       * try looking in the 'other kind' even though the psymtab
-       * claimed the symbol was one thing.  It's possible that
-       * the psymtab gets it wrong in some cases.
-       */
-      block = BLOCKVECTOR_BLOCK (bv, other_kind);
-      sym = lookup_block_symbol (block, name, STRUCT_DOMAIN);
-      if (!sym)
-	/* FIXME; error is wrong in one case.  */
-	error (_("\
-Internal: global symbol `%s' found in %s psymtab but not in symtab.\n\
-%s may be an inlined function, or may be a template function\n\
-(if a template, try specifying an instantiation: %s<type>)."),
-	       name, symtab_to_filename_for_display (symtab), name, name);
-    }
   if (!TYPE_IS_OPAQUE (SYMBOL_TYPE (sym)))
     return SYMBOL_TYPE (sym);
 
@@ -3879,8 +3858,7 @@ rbreak_command (char *regexp, int from_tty)
 	    file_name[colon_index--] = 0; 
 	  files = &file_name;
 	  nfiles = 1;
-	  regexp = colon + 1;
-	  while (isspace (*regexp))  regexp++; 
+	  regexp = skip_spaces (colon + 1);
 	}
     }
 
@@ -4108,8 +4086,8 @@ completion_list_objc_symbol (struct minimal_symbol *msymbol,
 /* Break the non-quoted text based on the characters which are in
    symbols.  FIXME: This should probably be language-specific.  */
 
-static char *
-language_search_unquoted_string (char *text, char *p)
+static const char *
+language_search_unquoted_string (const char *text, const char *p)
 {
   for (; p > text; --p)
     {
@@ -4125,7 +4103,7 @@ language_search_unquoted_string (char *text, char *p)
 		p -= 2;             /* Beginning of a method name.  */
 	      else if (p[-1] == ' ' || p[-1] == '(' || p[-1] == ')')
 		{                   /* Might be part of a method name.  */
-		  char *t = p;
+		  const char *t = p;
 
 		  /* Seeing a ' ' or a '(' is not conclusive evidence
 		     that we are in the middle of a method name.  However,
@@ -4152,8 +4130,9 @@ language_search_unquoted_string (char *text, char *p)
 }
 
 static void
-completion_list_add_fields (struct symbol *sym, char *sym_text,
-			    int sym_text_len, char *text, char *word)
+completion_list_add_fields (struct symbol *sym, const char *sym_text,
+			    int sym_text_len, const char *text,
+			    const char *word)
 {
   if (SYMBOL_CLASS (sym) == LOC_TYPEDEF)
     {
@@ -4174,10 +4153,10 @@ completion_list_add_fields (struct symbol *sym, char *sym_text,
    needed by completion_list_add_name.  */
 struct add_name_data
 {
-  char *sym_text;
+  const char *sym_text;
   int sym_text_len;
-  char *text;
-  char *word;
+  const char *text;
+  const char *word;
 };
 
 /* A callback used with macro_for_each and macro_for_each_in_scope.
@@ -4206,7 +4185,8 @@ expand_partial_symbol_name (const char *name, void *user_data)
 }
 
 VEC (char_ptr) *
-default_make_symbol_completion_list_break_on (char *text, char *word,
+default_make_symbol_completion_list_break_on (const char *text,
+					      const char *word,
 					      const char *break_on,
 					      enum type_code code)
 {
@@ -4222,7 +4202,7 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
   const struct block *surrounding_static_block, *surrounding_global_block;
   struct block_iterator iter;
   /* The symbol we are completing on.  Points in same buffer as text.  */
-  char *sym_text;
+  const char *sym_text;
   /* Length of sym_text.  */
   int sym_text_len;
   struct add_name_data datum;
@@ -4230,9 +4210,9 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
 
   /* Now look for the symbol we are supposed to complete on.  */
   {
-    char *p;
+    const char *p;
     char quote_found;
-    char *quote_pos = NULL;
+    const char *quote_pos = NULL;
 
     /* First see if this is a quoted string.  */
     quote_found = '\0';
@@ -4437,7 +4417,7 @@ default_make_symbol_completion_list_break_on (char *text, char *word,
 }
 
 VEC (char_ptr) *
-default_make_symbol_completion_list (char *text, char *word,
+default_make_symbol_completion_list (const char *text, const char *word,
 				     enum type_code code)
 {
   return default_make_symbol_completion_list_break_on (text, word, "", code);
@@ -4448,7 +4428,7 @@ default_make_symbol_completion_list (char *text, char *word,
    is NULL.  */
 
 VEC (char_ptr) *
-make_symbol_completion_list (char *text, char *word)
+make_symbol_completion_list (const char *text, const char *word)
 {
   return current_language->la_make_symbol_completion_list (text, word,
 							   TYPE_CODE_UNDEF);
@@ -4458,7 +4438,8 @@ make_symbol_completion_list (char *text, char *word)
    symbols whose type code is CODE.  */
 
 VEC (char_ptr) *
-make_symbol_completion_type (char *text, char *word, enum type_code code)
+make_symbol_completion_type (const char *text, const char *word,
+			     enum type_code code)
 {
   gdb_assert (code == TYPE_CODE_UNION
 	      || code == TYPE_CODE_STRUCT
@@ -4472,7 +4453,7 @@ make_symbol_completion_type (char *text, char *word, enum type_code code)
 
 VEC (char_ptr) *
 make_symbol_completion_list_fn (struct cmd_list_element *ignore,
-				char *text, char *word)
+				const char *text, const char *word)
 {
   return make_symbol_completion_list (text, word);
 }
@@ -4481,23 +4462,24 @@ make_symbol_completion_list_fn (struct cmd_list_element *ignore,
    defined in a source file FILE.  */
 
 VEC (char_ptr) *
-make_file_symbol_completion_list (char *text, char *word, char *srcfile)
+make_file_symbol_completion_list (const char *text, const char *word,
+				  const char *srcfile)
 {
   struct symbol *sym;
   struct symtab *s;
   struct block *b;
   struct block_iterator iter;
   /* The symbol we are completing on.  Points in same buffer as text.  */
-  char *sym_text;
+  const char *sym_text;
   /* Length of sym_text.  */
   int sym_text_len;
 
   /* Now look for the symbol we are supposed to complete on.
      FIXME: This should be language-specific.  */
   {
-    char *p;
+    const char *p;
     char quote_found;
-    char *quote_pos = NULL;
+    const char *quote_pos = NULL;
 
     /* First see if this is a quoted string.  */
     quote_found = '\0';
@@ -4579,7 +4561,7 @@ make_file_symbol_completion_list (char *text, char *word, char *srcfile)
    list as necessary.  */
 
 static void
-add_filename_to_list (const char *fname, char *text, char *word,
+add_filename_to_list (const char *fname, const char *text, const char *word,
 		      VEC (char_ptr) **list)
 {
   char *new;
@@ -4630,8 +4612,8 @@ not_interesting_fname (const char *fname)
 struct add_partial_filename_data
 {
   struct filename_seen_cache *filename_seen_cache;
-  char *text;
-  char *word;
+  const char *text;
+  const char *word;
   int text_len;
   VEC (char_ptr) **list;
 };
@@ -4670,7 +4652,7 @@ maybe_add_partial_symtab_filename (const char *filename, const char *fullname,
    NULL.  */
 
 VEC (char_ptr) *
-make_source_files_completion_list (char *text, char *word)
+make_source_files_completion_list (const char *text, const char *word)
 {
   struct symtab *s;
   struct objfile *objfile;

@@ -331,7 +331,7 @@ read_memory_string (CORE_ADDR memaddr, char *buffer, int max_len)
       cnt = max_len - (cp - buffer);
       if (cnt > 8)
 	cnt = 8;
-      read_memory (memaddr + (int) (cp - buffer), cp, cnt);
+      read_memory (memaddr + (int) (cp - buffer), (gdb_byte *) cp, cnt);
       for (i = 0; i < cnt && *cp; i++, cp++)
 	;			/* null body */
 
@@ -434,7 +434,8 @@ set_gnutarget_command (char *ignore, int from_tty,
 /* A completion function for "set gnutarget".  */
 
 static VEC (char_ptr) *
-complete_set_gnutarget (struct cmd_list_element *cmd, char *text, char *word)
+complete_set_gnutarget (struct cmd_list_element *cmd,
+			const char *text, const char *word)
 {
   static const char **bfd_targets;
 

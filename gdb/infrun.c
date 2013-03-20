@@ -49,6 +49,7 @@
 #include "mi/mi-common.h"
 #include "event-top.h"
 #include "record.h"
+#include "record-full.h"
 #include "inline-frame.h"
 #include "jit.h"
 #include "tracepoint.h"
@@ -3020,7 +3021,7 @@ adjust_pc_after_break (struct execution_control_state *ecs)
       struct cleanup *old_cleanups = NULL;
 
       if (RECORD_IS_USED)
-	old_cleanups = record_gdb_operation_disable_set ();
+	old_cleanups = record_full_gdb_operation_disable_set ();
 
       /* When using hardware single-step, a SIGTRAP is reported for both
 	 a completed single-step and a software breakpoint.  Need to
@@ -6480,7 +6481,7 @@ Are you sure you want to change it? "),
 
 static VEC (char_ptr) *
 handle_completer (struct cmd_list_element *ignore,
-		  char *text, char *word)
+		  const char *text, const char *word)
 {
   VEC (char_ptr) *vec_signals, *vec_keywords, *return_val;
   static const char * const keywords[] =

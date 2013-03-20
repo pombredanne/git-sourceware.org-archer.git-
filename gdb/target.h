@@ -62,6 +62,7 @@ struct expression;
 #include "memattr.h"
 #include "vec.h"
 #include "gdb_signals.h"
+#include "btrace.h"
 
 enum strata
   {
@@ -286,7 +287,9 @@ enum target_object
   /* Darwin dynamic linker info data.  */
   TARGET_OBJECT_DARWIN_DYLD_INFO,
   /* OpenVMS Unwind Information Block.  */
-  TARGET_OBJECT_OPENVMS_UIB
+  TARGET_OBJECT_OPENVMS_UIB,
+  /* Branch trace data, in XML format.  */
+  TARGET_OBJECT_BTRACE
   /* Possible future objects: TARGET_OBJECT_FILE, ...  */
 };
 
@@ -806,6 +809,8 @@ struct target_ops
        disconnection - set VAL to 1 to keep tracing, 0 to stop.  */
     void (*to_set_disconnected_tracing) (int val);
     void (*to_set_circular_trace_buffer) (int val);
+    /* Set the size of trace buffer in the target.  */
+    void (*to_set_trace_buffer_size) (LONGEST val);
 
     /* Add/change textual notes about the trace run, returning 1 if
        successful, 0 otherwise.  */
@@ -856,6 +861,81 @@ struct target_ops
 
     /* Is the target able to use agent in current state?  */
     int (*to_can_use_agent) (void);
+
+    /* Check whether the target supports branch tracing.  */
+    int (*to_supports_btrace) (void);
+
+    /* Enable branch tracing for PTID and allocate a branch trace target
+       information struct for reading and for disabling branch trace.  */
+    struct btrace_target_info *(*to_enable_btrace) (ptid_t ptid);
+
+    /* Disable branch tracing and deallocate TINFO.  */
+    void (*to_disable_btrace) (struct btrace_target_info *tinfo);
+
+    /* Disable branch tracing and deallocate TINFO.  This function is similar
+       to to_disable_btrace, except that it is called during teardown and is
+       only allowed to perform actions that are safe.  A counter-example would
+       be attempting to talk to a remote target.  */
+    void (*to_teardown_btrace) (struct btrace_target_info *tinfo);
+
+    /* Read branch trace data.  */
+    VEC (btrace_block_s) *(*to_read_btrace) (struct btrace_target_info *,
+					     enum btrace_read_type);
+
+    /* Stop trace recording.  */
+    void (*to_stop_recording) (void);
+
+    /* Print information about the recording.  */
+    void (*to_info_record) (void);
+
+    /* Save the recorded execution trace into a file.  */
+    void (*to_save_record) (char *filename);
+
+    /* Delete the recorded execution trace from the current position onwards.  */
+    void (*to_delete_record) (void);
+
+    /* Query if the record target is currently replaying.  */
+    int (*to_record_is_replaying) (void);
+
+    /* Go to the begin of the execution trace.  */
+    void (*to_goto_record_begin) (void);
+
+    /* Go to the end of the execution trace.  */
+    void (*to_goto_record_end) (void);
+
+    /* Go to a specific location in the recorded execution trace.  */
+    void (*to_goto_record) (ULONGEST insn);
+
+    /* Disassemble SIZE instructions in the recorded execution trace from
+       the current position.
+       If SIZE < 0, disassemble abs (SIZE) preceding instructions; otherwise,
+       disassemble SIZE succeeding instructions.  */
+    void (*to_insn_history) (int size, int flags);
+
+    /* Disassemble SIZE instructions in the recorded execution trace around
+       FROM.
+       If SIZE < 0, disassemble abs (SIZE) instructions before FROM; otherwise,
+       disassemble SIZE instructions after FROM.  */
+    void (*to_insn_history_from) (ULONGEST from, int size, int flags);
+
+    /* Disassemble a section of the recorded execution trace from instruction
+       BEGIN (inclusive) to instruction END (exclusive).  */
+    void (*to_insn_history_range) (ULONGEST begin, ULONGEST end, int flags);
+
+    /* Print a function trace of the recorded execution trace.
+       If SIZE < 0, print abs (SIZE) preceding functions; otherwise, print SIZE
+       succeeding functions.  */
+    void (*to_call_history) (int size, int flags);
+
+    /* Print a function trace of the recorded execution trace starting
+       at function FROM.
+       If SIZE < 0, print abs (SIZE) functions before FROM; otherwise, print
+       SIZE functions after FROM.  */
+    void (*to_call_history_from) (ULONGEST begin, int size, int flags);
+
+    /* Print a function trace of an execution trace section from function BEGIN
+       (inclusive) to function END (exclusive).  */
+    void (*to_call_history_range) (ULONGEST begin, ULONGEST end, int flags);
 
     /* Nonzero if TARGET_OBJECT_LIBRARIES_SVR4 may be read with a
        non-empty annex.  */
@@ -1704,6 +1784,9 @@ extern char *target_fileio_read_stralloc (const char *filename);
 #define	target_set_circular_trace_buffer(val)	\
   (*current_target.to_set_circular_trace_buffer) (val)
 
+#define	target_set_trace_buffer_size(val)	\
+  (*current_target.to_set_trace_buffer_size) (val)
+
 #define	target_set_trace_notes(user,notes,stopnotes)		\
   (*current_target.to_set_trace_notes) ((user), (notes), (stopnotes))
 
@@ -1766,6 +1849,11 @@ int target_verify_memory (const gdb_byte *data,
    pop_target:   Remove the top thing on the stack of current targets.  */
 
 extern void add_target (struct target_ops *);
+
+/* Adds a command ALIAS for target T and marks it deprecated.  This is useful
+   for maintaining backwards compatibility when renaming targets.  */
+
+extern void add_deprecated_target_alias (struct target_ops *t, char *alias);
 
 extern void push_target (struct target_ops *);
 
@@ -1903,5 +1991,66 @@ extern void update_target_permissions (void);
 
 /* Blank target vector entries are initialized to target_ignore.  */
 void target_ignore (void);
+
+/* See to_supports_btrace in struct target_ops.  */
+extern int target_supports_btrace (void);
+
+/* See to_enable_btrace in struct target_ops.  */
+extern struct btrace_target_info *target_enable_btrace (ptid_t ptid);
+
+/* See to_disable_btrace in struct target_ops.  */
+extern void target_disable_btrace (struct btrace_target_info *btinfo);
+
+/* See to_teardown_btrace in struct target_ops.  */
+extern void target_teardown_btrace (struct btrace_target_info *btinfo);
+
+/* See to_read_btrace in struct target_ops.  */
+extern VEC (btrace_block_s) *target_read_btrace (struct btrace_target_info *,
+						 enum btrace_read_type);
+
+/* See to_stop_recording in struct target_ops.  */
+extern void target_stop_recording (void);
+
+/* See to_info_record in struct target_ops.  */
+extern void target_info_record (void);
+
+/* See to_save_record in struct target_ops.  */
+extern void target_save_record (char *filename);
+
+/* Query if the target supports deleting the execution log.  */
+extern int target_supports_delete_record (void);
+
+/* See to_delete_record in struct target_ops.  */
+extern void target_delete_record (void);
+
+/* See to_record_is_replaying in struct target_ops.  */
+extern int target_record_is_replaying (void);
+
+/* See to_goto_record_begin in struct target_ops.  */
+extern void target_goto_record_begin (void);
+
+/* See to_goto_record_end in struct target_ops.  */
+extern void target_goto_record_end (void);
+
+/* See to_goto_record in struct target_ops.  */
+extern void target_goto_record (ULONGEST insn);
+
+/* See to_insn_history.  */
+extern void target_insn_history (int size, int flags);
+
+/* See to_insn_history_from.  */
+extern void target_insn_history_from (ULONGEST from, int size, int flags);
+
+/* See to_insn_history_range.  */
+extern void target_insn_history_range (ULONGEST begin, ULONGEST end, int flags);
+
+/* See to_call_history.  */
+extern void target_call_history (int size, int flags);
+
+/* See to_call_history_from.  */
+extern void target_call_history_from (ULONGEST begin, int size, int flags);
+
+/* See to_call_history_range.  */
+extern void target_call_history_range (ULONGEST begin, ULONGEST end, int flags);
 
 #endif /* !defined (TARGET_H) */

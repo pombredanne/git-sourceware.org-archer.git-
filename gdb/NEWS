@@ -1,7 +1,47 @@
 		What has changed in GDB?
 	     (Organized release by release)
 
-*** Changes since GDB 7.5
+*** Changes since GDB 7.6
+
+* The command 'tsave' can now support new option '-ctf' to save trace
+  buffer in Common Trace Format.
+
+* MI changes
+
+  ** The -trace-save MI command can optionally save trace buffer in Common
+     Trace Format now.
+
+*** Changes in GDB 7.6
+
+* Target record has been renamed to record-full.
+  Record/replay is now enabled with the "record full" command.
+  This also affects settings that are associated with full record/replay
+  that have been moved from "set/show record" to "set/show record full":
+
+set|show record full insn-number-max
+set|show record full stop-at-limit
+set|show record full memory-query
+
+* A new record target "record-btrace" has been added.  The new target
+  uses hardware support to record the control-flow of a process.  It
+  does not support replaying the execution, but it implements the
+  below new commands for investigating the recorded execution log.
+  This new recording method can be enabled using:
+
+record btrace
+
+  The "record-btrace" target is only available on Intel Atom processors
+  and requires a Linux kernel 2.6.32 or later.
+
+* Two new commands have been added for record/replay to give information
+  about the recorded execution without having to replay the execution.
+  The commands are only supported by "record btrace".
+
+record instruction-history      prints the execution history at
+                                instruction granularity
+
+record function-call-history    prints the execution history at
+                                function granularity
 
 * New native configurations
 
@@ -105,6 +145,10 @@ set debug notification
 show debug notification
   Control display of debugging info for async remote notification.
 
+set trace-buffer-size
+show trace-buffer-size
+  Request target to change the size of trace buffer.
+
 * Removed commands
 
   ** For the Renesas Super-H architecture, the "regs" command has been removed
@@ -159,6 +203,12 @@ show filename-display
   You must have the LZMA library available when configuring GDB for this
   feature to be enabled.  For more information, see:
       http://fedoraproject.org/wiki/Features/MiniDebugInfo
+
+* New remote packets
+
+QTBuffer:size
+   Set the size of trace buffer.  The remote stub reports support for this
+   packet to gdb's qSupported query.
 
 *** Changes in GDB 7.5
 

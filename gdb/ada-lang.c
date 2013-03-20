@@ -1299,8 +1299,10 @@ static struct htab *decoded_names_store;
 const char *
 ada_decode_symbol (const struct general_symbol_info *gsymbol)
 {
-  const char **resultp =
-    (const char **) &gsymbol->language_specific.mangled_lang.demangled_name;
+  struct general_symbol_info *gsymbol_rw
+    = (struct general_symbol_info *) gsymbol;
+  const char **resultp
+    = &gsymbol_rw->language_specific.mangled_lang.demangled_name;
 
   if (*resultp == NULL)
     {
@@ -4056,15 +4058,14 @@ static struct value *
 ada_read_renaming_var_value (struct symbol *renaming_sym,
 			     struct block *block)
 {
-  char *sym_name;
+  const char *sym_name;
   struct expression *expr;
   struct value *value;
   struct cleanup *old_chain = NULL;
 
-  sym_name = xstrdup (SYMBOL_LINKAGE_NAME (renaming_sym));
-  old_chain = make_cleanup (xfree, sym_name);
+  sym_name = SYMBOL_LINKAGE_NAME (renaming_sym);
   expr = parse_exp_1 (&sym_name, 0, block, 0);
-  make_cleanup (free_current_contents, &expr);
+  old_chain = make_cleanup (free_current_contents, &expr);
   value = evaluate_expression (expr);
 
   do_cleanups (old_chain);
@@ -5806,10 +5807,10 @@ symbol_completion_add (VEC(char_ptr) **sv,
 struct add_partial_datum
 {
   VEC(char_ptr) **completions;
-  char *text;
+  const char *text;
   int text_len;
-  char *text0;
-  char *word;
+  const char *text0;
+  const char *word;
   int wild_match;
   int encoded;
 };
@@ -5828,7 +5829,8 @@ ada_expand_partial_symbol_name (const char *name, void *user_data)
    the entire command on which completion is made.  */
 
 static VEC (char_ptr) *
-ada_make_symbol_completion_list (char *text0, char *word, enum type_code code)
+ada_make_symbol_completion_list (const char *text0, const char *word,
+				 enum type_code code)
 {
   char *text;
   int text_len;
@@ -11385,7 +11387,7 @@ create_excep_cond_exprs (struct ada_catchpoint *c)
       if (!bl->shlib_disabled)
 	{
 	  volatile struct gdb_exception e;
-	  char *s;
+	  const char *s;
 
 	  s = cond_string;
 	  TRY_CATCH (e, RETURN_MASK_ERROR)
