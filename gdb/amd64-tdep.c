@@ -1365,6 +1365,22 @@ amd64_absolute_jmp_p (const struct amd64_insn *details)
 }
 
 static int
+amd64_jmp_p (const struct amd64_insn *details)
+{
+  const gdb_byte *insn = &details->raw_insn[details->opcode_offset];
+
+  /* jump short, relative.  */
+  if (insn[0] == 0xeb)
+    return 1;
+
+  /* jump near, relative.  */
+  if (insn[0] == 0xe9)
+    return 1;
+
+  return amd64_absolute_jmp_p (details);
+}
+
+static int
 amd64_absolute_call_p (const struct amd64_insn *details)
 {
   const gdb_byte *insn = &details->raw_insn[details->opcode_offset];
@@ -1433,6 +1449,53 @@ amd64_syscall_p (const struct amd64_insn *details, int *lengthp)
     }
 
   return 0;
+}
+
+/* Classify the instruction at ADDR using PRED.  */
+
+static int
+amd64_classify_insn_at (struct gdbarch *gdbarch, CORE_ADDR addr,
+			int (*pred) (const struct amd64_insn *))
+{
+  struct amd64_insn details;
+  gdb_byte *buf;
+  int len, classification;
+
+  len = gdbarch_max_insn_length (gdbarch);
+  buf = xzalloc (len);
+
+  read_memory (addr, buf, len);
+  amd64_get_insn_details (buf, &details);
+
+  classification = pred (&details);
+
+  xfree (buf);
+
+  return classification;
+}
+
+/* The gdbarch insn_call_p method.  */
+
+static int
+amd64_insn_call_p (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  return amd64_classify_insn_at (gdbarch, addr, amd64_call_p);
+}
+
+/* The gdbarch insn_ret_p method.  */
+
+static int
+amd64_insn_ret_p (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  return amd64_classify_insn_at (gdbarch, addr, amd64_ret_p);
+}
+
+/* The gdbarch insn_jump_p method.  */
+
+static int
+amd64_insn_jump_p (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  return amd64_classify_insn_at (gdbarch, addr, amd64_jmp_p);
 }
 
 /* Fix up the state of registers and memory after having single-stepped
@@ -2968,6 +3031,9 @@ amd64_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 				      i386_stap_is_single_operand);
   set_gdbarch_stap_parse_special_token (gdbarch,
 					i386_stap_parse_special_token);
+  set_gdbarch_insn_call_p (gdbarch, amd64_insn_call_p);
+  set_gdbarch_insn_ret_p (gdbarch, amd64_insn_ret_p);
+  set_gdbarch_insn_jump_p (gdbarch, amd64_insn_jump_p);
 }
 
 

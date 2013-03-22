@@ -473,6 +473,20 @@ i386_absolute_jmp_p (const gdb_byte *insn)
 }
 
 static int
+i386_jmp_p (const gdb_byte *insn)
+{
+  /* jump short, relative.  */
+  if (insn[0] == 0xeb)
+    return 1;
+
+  /* jump near, relative.  */
+  if (insn[0] == 0xe9)
+    return 1;
+
+  return i386_absolute_jmp_p (insn);
+}
+
+static int
 i386_absolute_call_p (const gdb_byte *insn)
 {
   /* call far, absolute.  */
@@ -541,6 +555,45 @@ i386_syscall_p (const gdb_byte *insn, int *lengthp)
     }
 
   return 0;
+}
+
+/* The gdbarch insn_call_p method.  */
+
+static int
+i386_insn_call_p (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  gdb_byte buf[I386_MAX_INSN_LEN], *insn;
+
+  read_memory (addr, buf, I386_MAX_INSN_LEN);
+  insn = i386_skip_prefixes (buf, I386_MAX_INSN_LEN);
+
+  return i386_call_p (insn);
+}
+
+/* The gdbarch insn_ret_p method.  */
+
+static int
+i386_insn_ret_p (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  gdb_byte buf[I386_MAX_INSN_LEN], *insn;
+
+  read_memory (addr, buf, I386_MAX_INSN_LEN);
+  insn = i386_skip_prefixes (buf, I386_MAX_INSN_LEN);
+
+  return i386_ret_p (insn);
+}
+
+/* The gdbarch insn_jump_p method.  */
+
+static int
+i386_insn_jump_p (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  gdb_byte buf[I386_MAX_INSN_LEN], *insn;
+
+  read_memory (addr, buf, I386_MAX_INSN_LEN);
+  insn = i386_skip_prefixes (buf, I386_MAX_INSN_LEN);
+
+  return i386_jmp_p (insn);
 }
 
 /* Some kernels may run one past a syscall insn, so we have to cope.
@@ -7773,6 +7826,10 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   set_gdbarch_relocate_instruction (gdbarch, i386_relocate_instruction);
 
   set_gdbarch_gen_return_address (gdbarch, i386_gen_return_address);
+
+  set_gdbarch_insn_call_p (gdbarch, i386_insn_call_p);
+  set_gdbarch_insn_ret_p (gdbarch, i386_insn_ret_p);
+  set_gdbarch_insn_jump_p (gdbarch, i386_insn_jump_p);
 
   /* Hook in ABI-specific overrides, if they have been registered.  */
   info.tdep_info = (void *) tdesc_data;

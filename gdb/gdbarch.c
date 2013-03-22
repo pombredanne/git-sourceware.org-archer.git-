@@ -286,6 +286,9 @@ struct gdbarch
   gdbarch_core_info_proc_ftype *core_info_proc;
   gdbarch_iterate_over_objfiles_in_search_order_ftype *iterate_over_objfiles_in_search_order;
   struct ravenscar_arch_ops * ravenscar_ops;
+  gdbarch_insn_call_p_ftype *insn_call_p;
+  gdbarch_insn_ret_p_ftype *insn_ret_p;
+  gdbarch_insn_jump_p_ftype *insn_jump_p;
 };
 
 
@@ -457,6 +460,9 @@ struct gdbarch startup_gdbarch =
   0,  /* core_info_proc */
   default_iterate_over_objfiles_in_search_order,  /* iterate_over_objfiles_in_search_order */
   NULL,  /* ravenscar_ops */
+  0,  /* insn_call_p */
+  0,  /* insn_ret_p */
+  0,  /* insn_jump_p */
   /* startup_gdbarch() */
 };
 
@@ -760,6 +766,9 @@ verify_gdbarch (struct gdbarch *gdbarch)
   /* Skip verify of core_info_proc, has predicate.  */
   /* Skip verify of iterate_over_objfiles_in_search_order, invalid_p == 0 */
   /* Skip verify of ravenscar_ops, invalid_p == 0 */
+  /* Skip verify of insn_call_p, has predicate.  */
+  /* Skip verify of insn_ret_p, has predicate.  */
+  /* Skip verify of insn_jump_p, has predicate.  */
   buf = ui_file_xstrdup (log, &length);
   make_cleanup (xfree, buf);
   if (length > 0)
@@ -1080,6 +1089,24 @@ gdbarch_dump (struct gdbarch *gdbarch, struct ui_file *file)
   fprintf_unfiltered (file,
                       "gdbarch_dump: inner_than = <%s>\n",
                       host_address_to_string (gdbarch->inner_than));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: gdbarch_insn_call_p_p() = %d\n",
+                      gdbarch_insn_call_p_p (gdbarch));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: insn_call_p = <%s>\n",
+                      host_address_to_string (gdbarch->insn_call_p));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: gdbarch_insn_jump_p_p() = %d\n",
+                      gdbarch_insn_jump_p_p (gdbarch));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: insn_jump_p = <%s>\n",
+                      host_address_to_string (gdbarch->insn_jump_p));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: gdbarch_insn_ret_p_p() = %d\n",
+                      gdbarch_insn_ret_p_p (gdbarch));
+  fprintf_unfiltered (file,
+                      "gdbarch_dump: insn_ret_p = <%s>\n",
+                      host_address_to_string (gdbarch->insn_ret_p));
   fprintf_unfiltered (file,
                       "gdbarch_dump: int_bit = %s\n",
                       plongest (gdbarch->int_bit));
@@ -4354,6 +4381,78 @@ set_gdbarch_ravenscar_ops (struct gdbarch *gdbarch,
                            struct ravenscar_arch_ops * ravenscar_ops)
 {
   gdbarch->ravenscar_ops = ravenscar_ops;
+}
+
+int
+gdbarch_insn_call_p_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->insn_call_p != NULL;
+}
+
+int
+gdbarch_insn_call_p (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->insn_call_p != NULL);
+  if (gdbarch_debug >= 2)
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_insn_call_p called\n");
+  return gdbarch->insn_call_p (gdbarch, addr);
+}
+
+void
+set_gdbarch_insn_call_p (struct gdbarch *gdbarch,
+                         gdbarch_insn_call_p_ftype insn_call_p)
+{
+  gdbarch->insn_call_p = insn_call_p;
+}
+
+int
+gdbarch_insn_ret_p_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->insn_ret_p != NULL;
+}
+
+int
+gdbarch_insn_ret_p (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->insn_ret_p != NULL);
+  if (gdbarch_debug >= 2)
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_insn_ret_p called\n");
+  return gdbarch->insn_ret_p (gdbarch, addr);
+}
+
+void
+set_gdbarch_insn_ret_p (struct gdbarch *gdbarch,
+                        gdbarch_insn_ret_p_ftype insn_ret_p)
+{
+  gdbarch->insn_ret_p = insn_ret_p;
+}
+
+int
+gdbarch_insn_jump_p_p (struct gdbarch *gdbarch)
+{
+  gdb_assert (gdbarch != NULL);
+  return gdbarch->insn_jump_p != NULL;
+}
+
+int
+gdbarch_insn_jump_p (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  gdb_assert (gdbarch != NULL);
+  gdb_assert (gdbarch->insn_jump_p != NULL);
+  if (gdbarch_debug >= 2)
+    fprintf_unfiltered (gdb_stdlog, "gdbarch_insn_jump_p called\n");
+  return gdbarch->insn_jump_p (gdbarch, addr);
+}
+
+void
+set_gdbarch_insn_jump_p (struct gdbarch *gdbarch,
+                         gdbarch_insn_jump_p_ftype insn_jump_p)
+{
+  gdbarch->insn_jump_p = insn_jump_p;
 }
 
 

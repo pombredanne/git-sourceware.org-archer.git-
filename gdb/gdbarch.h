@@ -1239,6 +1239,30 @@ extern void set_gdbarch_iterate_over_objfiles_in_search_order (struct gdbarch *g
 extern struct ravenscar_arch_ops * gdbarch_ravenscar_ops (struct gdbarch *gdbarch);
 extern void set_gdbarch_ravenscar_ops (struct gdbarch *gdbarch, struct ravenscar_arch_ops * ravenscar_ops);
 
+/* Return non-zero if the instruction at ADDR is a call; zero otherwise. */
+
+extern int gdbarch_insn_call_p_p (struct gdbarch *gdbarch);
+
+typedef int (gdbarch_insn_call_p_ftype) (struct gdbarch *gdbarch, CORE_ADDR addr);
+extern int gdbarch_insn_call_p (struct gdbarch *gdbarch, CORE_ADDR addr);
+extern void set_gdbarch_insn_call_p (struct gdbarch *gdbarch, gdbarch_insn_call_p_ftype *insn_call_p);
+
+/* Return non-zero if the instruction at ADDR is a return; zero otherwise. */
+
+extern int gdbarch_insn_ret_p_p (struct gdbarch *gdbarch);
+
+typedef int (gdbarch_insn_ret_p_ftype) (struct gdbarch *gdbarch, CORE_ADDR addr);
+extern int gdbarch_insn_ret_p (struct gdbarch *gdbarch, CORE_ADDR addr);
+extern void set_gdbarch_insn_ret_p (struct gdbarch *gdbarch, gdbarch_insn_ret_p_ftype *insn_ret_p);
+
+/* Return non-zero if the instruction at ADDR is a jump; zero otherwise. */
+
+extern int gdbarch_insn_jump_p_p (struct gdbarch *gdbarch);
+
+typedef int (gdbarch_insn_jump_p_ftype) (struct gdbarch *gdbarch, CORE_ADDR addr);
+extern int gdbarch_insn_jump_p (struct gdbarch *gdbarch, CORE_ADDR addr);
+extern void set_gdbarch_insn_jump_p (struct gdbarch *gdbarch, gdbarch_insn_jump_p_ftype *insn_jump_p);
+
 /* Definition for an unknown syscall, used basically in error-cases.  */
 #define UNKNOWN_SYSCALL (-1)
 
