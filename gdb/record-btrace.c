@@ -1006,6 +1006,47 @@ static const struct frame_unwind record_btrace_frame_unwind =
   NULL,
   record_btrace_frame_sniffer
 };
+
+/* The to_resume method of target record-btrace.  */
+
+static void
+record_btrace_resume (struct target_ops *ops, ptid_t ptid, int step,
+		      enum gdb_signal signal)
+{
+  struct thread_info *tp;
+  struct target_ops *t;
+
+  if (record_btrace_is_replaying ())
+    error (_("You can't do this from here.  Do 'record goto end', first."));
+
+  for (t = ops->beneath; t != NULL; t = t->beneath)
+    if (t->to_resume != NULL)
+      break;
+
+  if (t == NULL)
+    error (_("Cannot find target for stepping."));
+
+  t->to_resume (t, ptid, step, signal);
+}
+
+/* The to_wait method of target record-btrace.  */
+
+static ptid_t
+record_btrace_wait (struct target_ops *ops, ptid_t ptid,
+		    struct target_waitstatus *status, int options)
+{
+  struct target_ops *t;
+
+  for (t = ops->beneath; t != NULL; t = t->beneath)
+    if (t->to_wait != NULL)
+      break;
+
+  if (t == NULL)
+    error (_("Cannot find target for stepping."));
+
+  return t->to_wait (t, ptid, status, options);
+}
+
 /* Initialize the record-btrace target ops.  */
 
 static void
@@ -1038,6 +1079,8 @@ init_record_btrace_ops (void)
   ops->to_store_registers = record_btrace_store_registers;
   ops->to_prepare_to_store = record_btrace_prepare_to_store;
   ops->to_get_unwinder = &record_btrace_frame_unwind;
+  ops->to_resume = record_btrace_resume;
+  ops->to_wait = record_btrace_wait;
   ops->to_stratum = record_stratum;
   ops->to_magic = OPS_MAGIC;
 }
