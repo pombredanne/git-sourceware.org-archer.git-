@@ -5729,8 +5729,32 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
     }
   else
     {
-      // XXX
-      printf ("annex = \"%s\"\n", annex);
+      while (annex[0] != '\0')
+	{
+	  const char *sep;
+	  CORE_ADDR *addrp;
+	  int len;
+
+	  sep = strchr (annex, '=');
+	  if (!sep)
+	    break;
+
+	  len = sep - annex;
+	  if (len == 5 && !strncmp (annex, "start", 5))
+	    addrp = &lm_addr;
+	  else if (len == 4 && !strncmp (annex, "prev", 4))
+	    addrp = &lm_prev;
+	  else
+	    {
+	      annex = strchr (sep, ';');
+	      if (!annex)
+		break;
+	      annex++;
+	      continue;
+	    }
+
+	  annex = decode_address_to_semicolon (addrp, sep + 1);
+	}
     }
 
   document = xmalloc (allocated);
