@@ -1696,10 +1696,10 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
   if (info->using_xfer)
     {
       struct svr4_library_list library_list;
-      char buf[64];
+      char annex[64];
 
-      xsnprintf (buf, sizeof (buf), "start=0x%lx&prev=0x%lx", lm, prev_lm);
-      if (!svr4_current_sos_via_xfer_libraries (&library_list, buf))
+      xsnprintf (annex, sizeof (annex), "start=%lx;prev=%lx", lm, prev_lm);
+      if (!svr4_current_sos_via_xfer_libraries (&library_list, annex))
 	return 0;
 
       // XXX
