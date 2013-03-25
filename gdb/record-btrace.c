@@ -1047,6 +1047,94 @@ record_btrace_wait (struct target_ops *ops, ptid_t ptid,
   return t->to_wait (t, ptid, status, options);
 }
 
+/* Set the replay branch trace instruction iterator.  */
+
+static void
+record_btrace_set_replay (struct btrace_thread_info *btinfo,
+			  const struct btrace_insn_iterator *it)
+{
+  if (it == NULL || it->function == NULL)
+    {
+      if (btinfo->replay == NULL)
+	return;
+
+      xfree (btinfo->replay);
+      btinfo->replay = NULL;
+    }
+  else
+    {
+      if (btinfo->replay == NULL)
+	btinfo->replay = xzalloc (sizeof (*btinfo->replay));
+      else if (btrace_insn_cmp (btinfo->replay, it) == 0)
+	return;
+
+      *btinfo->replay = *it;
+    }
+
+  /* Clear the function call and instruction histories so we start anew
+     from the new replay position.  */
+  xfree (btinfo->insn_history);
+  xfree (btinfo->call_history);
+
+  btinfo->insn_history = NULL;
+  btinfo->call_history = NULL;
+
+  registers_changed ();
+  reinit_frame_cache ();
+  print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
+}
+
+/* The to_goto_record_begin method of target record-btrace.  */
+
+static void
+record_btrace_goto_begin (void)
+{
+  struct btrace_thread_info *btinfo;
+  struct btrace_insn_iterator begin;
+
+  btinfo = require_btrace ();
+
+  btrace_insn_begin (&begin, btinfo);
+  record_btrace_set_replay (btinfo, &begin);
+}
+
+/* The to_goto_record_end method of target record-btrace.  */
+
+static void
+record_btrace_goto_end (void)
+{
+  struct btrace_thread_info *btinfo;
+
+  btinfo = require_btrace ();
+
+  record_btrace_set_replay (btinfo, NULL);
+}
+
+/* The to_goto_record method of target record-btrace.  */
+
+static void
+record_btrace_goto (ULONGEST insn)
+{
+  struct btrace_thread_info *btinfo;
+  struct btrace_insn_iterator it;
+  unsigned int number;
+  int found;
+
+  number = (unsigned int) insn;
+
+  /* Check for wrap-arounds.  */
+  if (number != insn)
+    error (_("Instruction number out of range."));
+
+  btinfo = require_btrace ();
+
+  found = btrace_find_insn_by_number (&it, btinfo, number);
+  if (found == 0)
+    error (_("No such instruction."));
+
+  record_btrace_set_replay (btinfo, &it);
+}
+
 /* Initialize the record-btrace target ops.  */
 
 static void
@@ -1081,6 +1169,9 @@ init_record_btrace_ops (void)
   ops->to_get_unwinder = &record_btrace_frame_unwind;
   ops->to_resume = record_btrace_resume;
   ops->to_wait = record_btrace_wait;
+  ops->to_goto_record_begin = record_btrace_goto_begin;
+  ops->to_goto_record_end = record_btrace_goto_end;
+  ops->to_goto_record = record_btrace_goto;
   ops->to_stratum = record_stratum;
   ops->to_magic = OPS_MAGIC;
 }

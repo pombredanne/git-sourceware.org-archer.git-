@@ -3,6 +3,8 @@
 
 *** Changes since GDB 7.6
 
+* The btrace record target supports the 'record goto' command.
+
 * The command 'record function-call-history' supports a new modifier '/c' to
   indent the function names based on their call stack depth.
   The fields for the '/i' and '/l' modifier have been reordered.

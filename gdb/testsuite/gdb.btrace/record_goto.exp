@@ -1,0 +1,153 @@
+# This testcase is part of GDB, the GNU debugger.
+#
+# Copyright 2013 Free Software Foundation, Inc.
+#
+# Contributed by Intel Corp. <markus.t.metzger@intel.com>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+# check for btrace support
+if { [skip_btrace_tests] } { return -1 }
+
+# start inferior
+standard_testfile x86-record_goto.S
+if [prepare_for_testing tailcall.exp $testfile $srcfile] {
+    return -1
+}
+if ![runto_main] {
+    return -1
+}
+
+# we want a small context sizes to simplify the test
+gdb_test_no_output "set record instruction-history-size 3"
+gdb_test_no_output "set record function-call-history-size 3"
+
+# trace the call to the test function
+gdb_test_no_output "record btrace"
+gdb_test "next"
+
+# start by listing all functions
+gdb_test "record function-call-history /ci 0, +20" "
+0\t  fun4\tinst 0,2\r
+1\t    fun1\tinst 3,6\r
+2\t  fun4\tinst 7,7\r
+3\t    fun2\tinst 8,10\r
+4\t      fun1\tinst 11,14\r
+5\t    fun2\tinst 15,16\r
+6\t  fun4\tinst 17,17\r
+7\t    fun3\tinst 18,20\r
+8\t      fun1\tinst 21,24\r
+9\t    fun3\tinst 25,25\r
+10\t      fun2\tinst 26,28\r
+11\t        fun1\tinst 29,32\r
+12\t      fun2\tinst 33,34\r
+13\t    fun3\tinst 35,36\r
+14\t  fun4\tinst 37,38\r
+15\tmain\tinst 39,39" "record_goto - list all functions"
+
+# let's see if we can go back in history
+gdb_test "record goto 17" "
+.*fun4 \\(\\) at record_goto.c:43.*" "record_goto - goto 17"
+
+# the function call history should start at the new location
+gdb_test "record function-call-history /ci" "
+6\t  fun4\tinst 17,17\r
+7\t    fun3\tinst 18,20\r
+8\t      fun1\tinst 21,24" "record_goto - function-call-history from 17 forwards"
+
+# the instruciton history should start at the new location
+gdb_test "record instruction-history" "
+17.*\r
+18.*\r
+19.*\r" "record_goto - instruciton-history from 17 forwards"
+
+# let's go to another place in the history
+gdb_test "record goto 25" "
+.*fun3 \\(\\) at record_goto.c:35.*" "record_goto - goto 25"
+
+# the function call history should start at the new location
+gdb_test "record function-call-history /ci -" "
+7\t    fun3\tinst 18,20\r
+8\t      fun1\tinst 21,24\r
+9\t    fun3\tinst 25,25" "record_goto - function-call-history from 25 backwards"
+
+# the instruciton history should start at the new location
+gdb_test "record instruction-history -" "
+23.*\r
+24.*\r
+25.*\r" "record_goto - instruciton-history from 25 backwards"
+
+# test that we can go to the begin of the trace
+gdb_test "record goto begin" "
+.*fun4 \\(\\) at record_goto.c:40.*" "record_goto - goto begin"
+
+# check that we're filling up the context correctly
+gdb_test "record function-call-history /ci -" "
+0\t  fun4\tinst 0,2\r
+1\t    fun1\tinst 3,6\r
+2\t  fun4\tinst 7,7" "record_goto - function-call-history from begin backwards"
+
+# check that we're filling up the context correctly
+gdb_test "record instruction-history -" "
+0.*\r
+1.*\r
+2.*\r" "record_goto - instruciton-history from begin backwards"
+
+# we should get the exact same history from the first instruction
+gdb_test "record goto 1" "
+.*fun4 \\(\\) at record_goto.c:40.*" "record_goto - goto 1"
+
+# check that we're filling up the context correctly
+gdb_test "record function-call-history /ci -" "
+0\t  fun4\tinst 0,2\r
+1\t    fun1\tinst 3,6\r
+2\t  fun4\tinst 7,7" "record_goto - function-call-history from 1 backwards"
+
+# check that we're filling up the context correctly
+gdb_test "record instruction-history -" "
+0.*\r
+1.*\r
+2.*\r" "record_goto - instruciton-history from 1 backwards"
+
+# check that we can go to the end of the trace
+gdb_test "record goto end" "
+.*main \\(\\) at record_goto.c:50.*" "record_goto - goto end"
+
+# check that we're filling up the context correctly
+gdb_test "record function-call-history /ci" "
+13\t    fun3\tinst 35,36\r
+14\t  fun4\tinst 37,38\r
+15\tmain\tinst 39,39" "record_goto - function-call-history from end forwards"
+
+# check that we're filling up the context correctly
+gdb_test "record instruction-history" "
+37.*\r
+38.*\r
+39.*\r" "record_goto - instruciton-history from end forwards"
+
+# we should get the exact same history from the second to last instruction
+gdb_test "record goto 38" "
+.*fun4 \\(\\) at record_goto.c:44.*" "record_goto - goto 38"
+
+# check that we're filling up the context correctly
+gdb_test "record function-call-history /ci" "
+13\t    fun3\tinst 35,36\r
+14\t  fun4\tinst 37,38\r
+15\tmain\tinst 39,39" "record_goto - function-call-history from 38 forwards"
+
+# check that we're filling up the context correctly
+gdb_test "record instruction-history" "
+37.*\r
+38.*\r
+39.*\r" "record_goto - instruciton-history from 38 forwards"
