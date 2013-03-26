@@ -1675,7 +1675,7 @@ solist_update_full (struct svr4_info *info)
 static int
 solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
 {
-  struct so_list *tail, **link;
+  struct so_list *tail;
   CORE_ADDR prev_lm;
 
   /* Fall back to a full update if we haven't read anything yet.  */
@@ -1689,7 +1689,6 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
 
   /* Walk to the end of the list.  */
   for (tail = info->solib_list; tail->next; tail = tail->next);
-  link = &tail->next;
   prev_lm = tail->lm_info->lm_addr;
 
   /* Read the new objects.  */
@@ -1702,12 +1701,12 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
       if (!svr4_current_sos_via_xfer_libraries (&library_list, annex))
 	return 0;
 
-      // XXX
-      printf_unfiltered ("got incremental transfer, now what?\n");
-      return 0;
+      tail->next = library_list.head;
     }
   else
     {
+      struct so_list **link = &tail->next;
+
       if (!svr4_read_so_list (lm, prev_lm, &link, 0))
 	return 0;
     }
