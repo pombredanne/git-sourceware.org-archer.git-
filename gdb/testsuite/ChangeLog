@@ -1,3 +1,56 @@
+2013-03-26  Markus Metzger  <markus.t.metzger@intel.com>
+
+	* gdb.btrace/enable.exp: Add regression test.
+
+2013-03-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/m-static.exp: Add destructor-printing tests.
+
+2013-03-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/m-static.exp: Add constructor ptype tests.
+	* gdb.cp/m-static.cc (single_constructor): New class.
+	(main): Make instance of single_constructor.
+
+2013-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* gdb.server/server-kill.c: New file.
+	* gdb.server/server-kill.exp: New file.
+
+2013-03-21  Pedro Alves  <palves@redhat.com>
+
+	* gdb.trace/trace-buffer-size.exp (get default buffer size):
+	Expect $gdb_prompt in gdb_test_multiple.
+
+2013-03-21  Doug Evans  <dje@google.com>
+
+	* gdb.base/maint.exp: Update tests for per-command stats.
+
+2013-03-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/cpexprs.exp: Add test for FILENAME:: case.
+	* gdb.cp/misc.exp: Add test for FILENAME:: case.
+
+2013-03-20  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/15289
+
+	* gdb.base/remote.exp: Test
+	"set remote hardware-watchpoint-limit -1",
+	"set remote hardware-breakpoint-limit -1",
+	"set remote hardware-watchpoint-limit 2147483647" and
+	"set remote hardware-breakpoint-limit 2147483647".
+
+2013-03-20  Pedro Alves  <palves@redhat.com>
+	    Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/tfile.c: Add comments.
+	(nonconstglob): New global.
+	* gdb.trace/tfile.exp: Add comments.  Test printing a non-const
+	global that is not covered by the trace frame.  Test
+	disassembling.
+
 2013-03-17  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* gdb.base/valgrind-infcall.exp

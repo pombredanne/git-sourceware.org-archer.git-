@@ -612,9 +612,11 @@ teval_pseudocommand (char *args, int from_tty)
 /* Parse any collection options, such as /s for strings.  */
 
 const char *
-decode_agent_options (const char *exp)
+decode_agent_options (const char *exp, int *trace_string)
 {
   struct value_print_options opts;
+
+  *trace_string = 0;
 
   if (*exp != '/')
     return exp;
@@ -631,10 +633,10 @@ decode_agent_options (const char *exp)
 	  /* Allow an optional decimal number giving an explicit maximum
 	     string length, defaulting it to the "print elements" value;
 	     so "collect/s80 mystr" gets at most 80 bytes of string.  */
-	  trace_string_kludge = opts.print_max;
+	  *trace_string = opts.print_max;
 	  exp++;
 	  if (*exp >= '0' && *exp <= '9')
-	    trace_string_kludge = atoi (exp);
+	    *trace_string = atoi (exp);
 	  while (*exp >= '0' && *exp <= '9')
 	    exp++;
 	}
@@ -731,9 +733,10 @@ validate_actionline (const char *line, struct breakpoint *b)
 
   if (cmd_cfunc_eq (c, collect_pseudocommand))
     {
-      trace_string_kludge = 0;
+      int trace_string = 0;
+
       if (*p == '/')
-	p = decode_agent_options (p);
+	p = decode_agent_options (p, &trace_string);
 
       do
 	{			/* Repeat over a comma-separated list.  */
@@ -782,7 +785,7 @@ validate_actionline (const char *line, struct breakpoint *b)
 	      /* We have something to collect, make sure that the expr to
 		 bytecode translator can handle it and that it's not too
 		 long.  */
-	      aexpr = gen_trace_for_expr (loc->address, exp);
+	      aexpr = gen_trace_for_expr (loc->address, exp, trace_string);
 	      make_cleanup_free_agent_expr (aexpr);
 
 	      if (aexpr->len > MAX_AGENT_EXPR_LEN)
@@ -989,7 +992,8 @@ collect_symbol (struct collection_list *collect,
 		struct symbol *sym,
 		struct gdbarch *gdbarch,
 		long frame_regno, long frame_offset,
-		CORE_ADDR scope)
+		CORE_ADDR scope,
+		int trace_string)
 {
   unsigned long len;
   unsigned int reg;
@@ -1100,7 +1104,7 @@ collect_symbol (struct collection_list *collect,
       struct agent_expr *aexpr;
       struct cleanup *old_chain1 = NULL;
 
-      aexpr = gen_trace_for_var (scope, gdbarch, sym);
+      aexpr = gen_trace_for_var (scope, gdbarch, sym, trace_string);
 
       /* It can happen that the symbol is recorded as a computed
 	 location, but it's been optimized away and doesn't actually
@@ -1153,6 +1157,7 @@ struct add_local_symbols_data
   long frame_regno;
   long frame_offset;
   int count;
+  int trace_string;
 };
 
 /* The callback for the locals and args iterators.  */
@@ -1165,7 +1170,7 @@ do_collect_symbol (const char *print_name,
   struct add_local_symbols_data *p = cb_data;
 
   collect_symbol (p->collect, sym, p->gdbarch, p->frame_regno,
-		  p->frame_offset, p->pc);
+		  p->frame_offset, p->pc, p->trace_string);
   p->count++;
 }
 
@@ -1173,7 +1178,8 @@ do_collect_symbol (const char *print_name,
 static void
 add_local_symbols (struct collection_list *collect,
 		   struct gdbarch *gdbarch, CORE_ADDR pc,
-		   long frame_regno, long frame_offset, int type)
+		   long frame_regno, long frame_offset, int type,
+		   int trace_string)
 {
   struct block *block;
   struct add_local_symbols_data cb_data;
@@ -1184,6 +1190,7 @@ add_local_symbols (struct collection_list *collect,
   cb_data.frame_regno = frame_regno;
   cb_data.frame_offset = frame_offset;
   cb_data.count = 0;
+  cb_data.trace_string = trace_string;
 
   if (type == 'L')
     {
@@ -1391,9 +1398,10 @@ encode_actions_1 (struct command_line *action,
 
       if (cmd_cfunc_eq (cmd, collect_pseudocommand))
 	{
-	  trace_string_kludge = 0;
+	  int trace_string = 0;
+
 	  if (*action_exp == '/')
-	    action_exp = decode_agent_options (action_exp);
+	    action_exp = decode_agent_options (action_exp, &trace_string);
 
 	  do
 	    {			/* Repeat over a comma-separated list.  */
@@ -1413,7 +1421,8 @@ encode_actions_1 (struct command_line *action,
 				     tloc->address,
 				     frame_reg,
 				     frame_offset,
-				     'A');
+				     'A',
+				     trace_string);
 		  action_exp = strchr (action_exp, ',');	/* more? */
 		}
 	      else if (0 == strncasecmp ("$loc", action_exp, 4))
@@ -1423,7 +1432,8 @@ encode_actions_1 (struct command_line *action,
 				     tloc->address,
 				     frame_reg,
 				     frame_offset,
-				     'L');
+				     'L',
+				     trace_string);
 		  action_exp = strchr (action_exp, ',');	/* more? */
 		}
 	      else if (0 == strncasecmp ("$_ret", action_exp, 5))
@@ -1431,7 +1441,8 @@ encode_actions_1 (struct command_line *action,
 		  struct cleanup *old_chain1 = NULL;
 
 		  aexpr = gen_trace_for_return_address (tloc->address,
-							tloc->gdbarch);
+							tloc->gdbarch,
+							trace_string);
 
 		  old_chain1 = make_cleanup_free_agent_expr (aexpr);
 
@@ -1512,11 +1523,13 @@ encode_actions_1 (struct command_line *action,
 				      tloc->gdbarch,
 				      frame_reg,
 				      frame_offset,
-				      tloc->address);
+				      tloc->address,
+				      trace_string);
 		      break;
 
 		    default:	/* Full-fledged expression.  */
-		      aexpr = gen_trace_for_expr (tloc->address, exp);
+		      aexpr = gen_trace_for_expr (tloc->address, exp,
+						  trace_string);
 
 		      old_chain1 = make_cleanup_free_agent_expr (aexpr);
 
@@ -2678,101 +2691,107 @@ scope_info (char *args, int from_tty)
 	  gdbarch = get_objfile_arch (SYMBOL_SYMTAB (sym)->objfile);
 
 	  printf_filtered ("Symbol %s is ", symname);
-	  switch (SYMBOL_CLASS (sym))
-	    {
-	    default:
-	    case LOC_UNDEF:	/* Messed up symbol?  */
-	      printf_filtered ("a bogus symbol, class %d.\n",
-			       SYMBOL_CLASS (sym));
-	      count--;		/* Don't count this one.  */
-	      continue;
-	    case LOC_CONST:
-	      printf_filtered ("a constant with value %s (%s)",
-			       plongest (SYMBOL_VALUE (sym)),
-			       hex_string (SYMBOL_VALUE (sym)));
-	      break;
-	    case LOC_CONST_BYTES:
-	      printf_filtered ("constant bytes: ");
-	      if (SYMBOL_TYPE (sym))
-		for (j = 0; j < TYPE_LENGTH (SYMBOL_TYPE (sym)); j++)
-		  fprintf_filtered (gdb_stdout, " %02x",
-				    (unsigned) SYMBOL_VALUE_BYTES (sym)[j]);
-	      break;
-	    case LOC_STATIC:
-	      printf_filtered ("in static storage at address ");
-	      printf_filtered ("%s", paddress (gdbarch,
-					       SYMBOL_VALUE_ADDRESS (sym)));
-	      break;
-	    case LOC_REGISTER:
-	      /* GDBARCH is the architecture associated with the objfile
-		 the symbol is defined in; the target architecture may be
-		 different, and may provide additional registers.  However,
-		 we do not know the target architecture at this point.
-		 We assume the objfile architecture will contain all the
-		 standard registers that occur in debug info in that
-		 objfile.  */
-	      regno = SYMBOL_REGISTER_OPS (sym)->register_number (sym,
-								  gdbarch);
 
-	      if (SYMBOL_IS_ARGUMENT (sym))
-		printf_filtered ("an argument in register $%s",
-				 gdbarch_register_name (gdbarch, regno));
-	      else
-		printf_filtered ("a local variable in register $%s",
-				 gdbarch_register_name (gdbarch, regno));
-	      break;
-	    case LOC_ARG:
-	      printf_filtered ("an argument at stack/frame offset %s",
-			       plongest (SYMBOL_VALUE (sym)));
-	      break;
-	    case LOC_LOCAL:
-	      printf_filtered ("a local variable at frame offset %s",
-			       plongest (SYMBOL_VALUE (sym)));
-	      break;
-	    case LOC_REF_ARG:
-	      printf_filtered ("a reference argument at offset %s",
-			       plongest (SYMBOL_VALUE (sym)));
-	      break;
-	    case LOC_REGPARM_ADDR:
-	      /* Note comment at LOC_REGISTER.  */
-	      regno = SYMBOL_REGISTER_OPS (sym)->register_number (sym,
-								  gdbarch);
-	      printf_filtered ("the address of an argument, in register $%s",
-			       gdbarch_register_name (gdbarch, regno));
-	      break;
-	    case LOC_TYPEDEF:
-	      printf_filtered ("a typedef.\n");
-	      continue;
-	    case LOC_LABEL:
-	      printf_filtered ("a label at address ");
-	      printf_filtered ("%s", paddress (gdbarch,
-					       SYMBOL_VALUE_ADDRESS (sym)));
-	      break;
-	    case LOC_BLOCK:
-	      printf_filtered ("a function at address ");
-	      printf_filtered ("%s",
-		paddress (gdbarch, BLOCK_START (SYMBOL_BLOCK_VALUE (sym))));
-	      break;
-	    case LOC_UNRESOLVED:
-	      msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (sym),
-					    NULL, NULL);
-	      if (msym == NULL)
-		printf_filtered ("Unresolved Static");
-	      else
+	  if (SYMBOL_COMPUTED_OPS (sym) != NULL)
+	    SYMBOL_COMPUTED_OPS (sym)->describe_location (sym,
+							  BLOCK_START (block),
+							  gdb_stdout);
+	  else
+	    {
+	      switch (SYMBOL_CLASS (sym))
 		{
-		  printf_filtered ("static storage at address ");
+		default:
+		case LOC_UNDEF:	/* Messed up symbol?  */
+		  printf_filtered ("a bogus symbol, class %d.\n",
+				   SYMBOL_CLASS (sym));
+		  count--;		/* Don't count this one.  */
+		  continue;
+		case LOC_CONST:
+		  printf_filtered ("a constant with value %s (%s)",
+				   plongest (SYMBOL_VALUE (sym)),
+				   hex_string (SYMBOL_VALUE (sym)));
+		  break;
+		case LOC_CONST_BYTES:
+		  printf_filtered ("constant bytes: ");
+		  if (SYMBOL_TYPE (sym))
+		    for (j = 0; j < TYPE_LENGTH (SYMBOL_TYPE (sym)); j++)
+		      fprintf_filtered (gdb_stdout, " %02x",
+					(unsigned) SYMBOL_VALUE_BYTES (sym)[j]);
+		  break;
+		case LOC_STATIC:
+		  printf_filtered ("in static storage at address ");
+		  printf_filtered ("%s", paddress (gdbarch,
+						   SYMBOL_VALUE_ADDRESS (sym)));
+		  break;
+		case LOC_REGISTER:
+		  /* GDBARCH is the architecture associated with the objfile
+		     the symbol is defined in; the target architecture may be
+		     different, and may provide additional registers.  However,
+		     we do not know the target architecture at this point.
+		     We assume the objfile architecture will contain all the
+		     standard registers that occur in debug info in that
+		     objfile.  */
+		  regno = SYMBOL_REGISTER_OPS (sym)->register_number (sym,
+								      gdbarch);
+
+		  if (SYMBOL_IS_ARGUMENT (sym))
+		    printf_filtered ("an argument in register $%s",
+				     gdbarch_register_name (gdbarch, regno));
+		  else
+		    printf_filtered ("a local variable in register $%s",
+				     gdbarch_register_name (gdbarch, regno));
+		  break;
+		case LOC_ARG:
+		  printf_filtered ("an argument at stack/frame offset %s",
+				   plongest (SYMBOL_VALUE (sym)));
+		  break;
+		case LOC_LOCAL:
+		  printf_filtered ("a local variable at frame offset %s",
+				   plongest (SYMBOL_VALUE (sym)));
+		  break;
+		case LOC_REF_ARG:
+		  printf_filtered ("a reference argument at offset %s",
+				   plongest (SYMBOL_VALUE (sym)));
+		  break;
+		case LOC_REGPARM_ADDR:
+		  /* Note comment at LOC_REGISTER.  */
+		  regno = SYMBOL_REGISTER_OPS (sym)->register_number (sym,
+								      gdbarch);
+		  printf_filtered ("the address of an argument, in register $%s",
+				   gdbarch_register_name (gdbarch, regno));
+		  break;
+		case LOC_TYPEDEF:
+		  printf_filtered ("a typedef.\n");
+		  continue;
+		case LOC_LABEL:
+		  printf_filtered ("a label at address ");
+		  printf_filtered ("%s", paddress (gdbarch,
+						   SYMBOL_VALUE_ADDRESS (sym)));
+		  break;
+		case LOC_BLOCK:
+		  printf_filtered ("a function at address ");
 		  printf_filtered ("%s",
-		    paddress (gdbarch, SYMBOL_VALUE_ADDRESS (msym)));
+				   paddress (gdbarch, BLOCK_START (SYMBOL_BLOCK_VALUE (sym))));
+		  break;
+		case LOC_UNRESOLVED:
+		  msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (sym),
+						NULL, NULL);
+		  if (msym == NULL)
+		    printf_filtered ("Unresolved Static");
+		  else
+		    {
+		      printf_filtered ("static storage at address ");
+		      printf_filtered ("%s",
+				       paddress (gdbarch,
+						 SYMBOL_VALUE_ADDRESS (msym)));
+		    }
+		  break;
+		case LOC_OPTIMIZED_OUT:
+		  printf_filtered ("optimized out.\n");
+		  continue;
+		case LOC_COMPUTED:
+		  gdb_assert_not_reached (_("LOC_COMPUTED variable missing a method"));
 		}
-	      break;
-	    case LOC_OPTIMIZED_OUT:
-	      printf_filtered ("optimized out.\n");
-	      continue;
-	    case LOC_COMPUTED:
-	      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym,
-							    BLOCK_START (block),
-							    gdb_stdout);
-	      break;
 	    }
 	  if (SYMBOL_TYPE (sym))
 	    printf_filtered (", length %d.\n",
@@ -2840,9 +2859,10 @@ trace_dump_actions (struct command_line *action,
 	      char *cmd = NULL;
 	      struct cleanup *old_chain
 		= make_cleanup (free_current_contents, &cmd);
+	      int trace_string = 0;
 
 	      if (*action_exp == '/')
-		action_exp = decode_agent_options (action_exp);
+		action_exp = decode_agent_options (action_exp, &trace_string);
 
 	      do
 		{		/* Repeat over a comma-separated list.  */
@@ -4625,7 +4645,7 @@ parse_tsv_definition (char *line, struct uploaded_tsv **utsvp)
 /* Close the trace file and generally clean up.  */
 
 static void
-tfile_close (int quitting)
+tfile_close (void)
 {
   int pid;
 

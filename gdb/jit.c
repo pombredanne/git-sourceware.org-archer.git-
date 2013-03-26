@@ -693,7 +693,7 @@ finalize_symtab (struct gdb_symtab *stab, struct objfile *objfile)
       /* The name.  */
       memset (block_name, 0, sizeof (struct symbol));
       SYMBOL_DOMAIN (block_name) = VAR_DOMAIN;
-      SYMBOL_CLASS (block_name) = LOC_BLOCK;
+      SYMBOL_ACLASS_INDEX (block_name) = LOC_BLOCK;
       SYMBOL_SYMTAB (block_name) = symtab;
       SYMBOL_TYPE (block_name) = lookup_function_type (block_type);
       SYMBOL_BLOCK_VALUE (block_name) = new_block;
@@ -923,6 +923,7 @@ JITed symbol file is not an object file, ignoring it.\n"));
         sai->other[i].sectindex = sec->index;
         ++i;
       }
+  sai->num_sections = i;
 
   /* This call does not take ownership of SAI.  */
   make_cleanup_bfd_unref (nbfd);

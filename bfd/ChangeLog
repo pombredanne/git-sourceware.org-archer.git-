@@ -1,3 +1,110 @@
+2013-03-26  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_add_default_symbol): Preserve section
+	over _bfd_elf_merge_symbol calls.
+
+2013-03-26  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (elf_link_add_object_symbols): Add assertion for
+	common override alignment check code.  Formatting.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_merge_symbol): Set old_alignment for
+	usual common symbols as well as for dynamic.  Add poldbfd param.
+	Save old bfd.  Adjust callers.
+	(_bfd_elf_add_default_symbol): Add poldbfd param.  Pass "section"
+	and "value" by value, not pointer.  Adjust caller.
+	(elf_link_add_object_symbols): Combine undef_bfd and old_bfd vars.
+	Delete code to set same.  Use old_bfd and old_alignment from
+	_bfd_elf_merge_symbol instead.  Add default symbol before
+	alignment and size checks.  Wrap overlong lines.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_add_default_symbol): Delete "override" param.
+	(elf_link_add_object_symbols): Don't call _bfd_elf_add_default_symbol
+	when override is true.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_merge_symbol): Use local var holding value
+	of *sym_hash.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_merge_symbol): Don't discard TLS symbols here.
+	Wrap long lines.
+	(elf_link_add_object_symbols): Discard TLS symbols for --just-syms
+	early in symbol loop.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct elf_backend_data <merge_symbol>): Update proto.
+	(_bfd_elf_init_reloc_shdr): Delete.
+	* elf.c (_bfd_elf_init_reloc_shdr): Make static.
+	* elf64-x86-64.c (elf_x86_64_merge_symbol): Trim parameters to
+	just what is needed.
+	* elflink.c (_bfd_elf_merge_symbol): Update bed->merge_symbol call.
+
+2013-03-23  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (_bfd_elf_merge_symbol): Delete declaration.
+	* elflink.c (_bfd_elf_merge_symbol): Make static.
+	* elf32-sh-symbian.c (sh_symbian_relocate_section): Don't call
+	_bfd_elf_merge_symbol, call _bfd_generic_link_add_one_symbol.
+
+2013-03-23  Alan Modra  <amodra@gmail.com>
+
+	PR ld/15270
+	* elflink.c (elf_link_add_object_symbols): Don't set def_regular
+	or ref_regular for BFD_PLUGIN owned syms, or have them affect
+	def_dynamic/ref_dynamic.
+	(_bfd_elf_fix_symbol_flags): Don't set def_regular for BFD_PLUGIN
+	owned syms.
+
+2013-03-22  David S. Miller  <davem@davemloft.net>
+
+	* elfxx-sparc.c (_bfd_sparc_elf_merge_private_bfd_data): Set type of
+	hwcaps attribute.
+
+2013-03-22  Achille Fouilleul  <achille.fouilleul+binutils@gadz.org>
+
+	PR ld/14902
+	* elf32-h8300.c (elf32_h8_relax_delete_bytes): Fix off by one
+	errors adjusting relocs and symbols.
+
+2013-03-21  Michael Schewe  <michael.schewe@gmx.net>
+
+	* elf32-h8300 (h8_relax_section): Add new relaxation of mov
+	@(disp:32,ERx) to mov @(disp:16,ERx).
+	(R_H8_DISP32A16): New reloc.
+	Comments added and corrected.
+	* reloc.c (BFD_RELOC_H8_DISP32A16): New reloc.
+	* bfd-in2.h: Regenerate.
+	* libbfd.h: Regenerate.
+
+2013-03-21  Kai Tietz  <ktietz@redhat.com>
+
+	* coffgen.c (coff_real_object_p): Make global.
+	* peicode.h (coff_real_object_p): Add prototype.
+	(FILHDR): Defined for COFF_IMAGE_WITH_PE as
+	external_PEI_IMAGE_hdr structure.
+	(coff_swap_filehdr_in): Handle variable header-size.
+	* peXXigen.c (_bfd_XXi_swap_aouthdr_in): Just handle amount
+	of directory-entiries as specified in pe-header.
+
+2013-03-21  Nick Clifton  <nickc@redhat.com>
+
+	PR sim/15286
+	* elf32-arm.c (bfd_arm_get_mach_from_attributes): Identify XScale,
+	iWMMXt and iWMMXt2 processors from attributes.
+
+2013-03-20  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_make_dynamic_reloc_section): Override
+	sh_type according to is_rela.
+
 2013-03-18  Alan Modra  <amodra@gmail.com>
 
 	PR ld/12549

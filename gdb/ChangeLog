@@ -1,3 +1,378 @@
+2013-03-26  Markus Metzger  <markus.t.metzger@intel.com>
+
+	* record-btrace.c (record_btrace_close): Call
+	record_btrace_auto_disable.
+
+2013-03-25  Joel Brobecker  <brobecker@adacore.com>
+
+	* rs6000-nat.c (fixup_breakpoints): Delete declaration.
+
+2013-03-25  Doug Evans  <dje@google.com>
+
+	* contrib/cc-with-tweaks.sh: Check exit code of dwp.
+
+2013-03-25  Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/11462:
+	* c-exp.y (exp): Add new productions for destructors after '.' and
+	'->'.
+	(write_destructor_name): New function.
+
+2013-03-25  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/9197:
+	* opencl-lang.c (evaluate_subexp_opencl) <STRUCTOP_STRUCT>: Use
+	value_struct_elt, not lookup_struct_elt_type.
+	* eval.c (evaluate_subexp_standard) <STRUCTOP_STRUCT,
+	STRUCTOP_PTR>: Use value_struct_elt, not lookup_struct_elt_type.
+	* expression.h (EVAL_AVOID_SIDE_EFFECTS): Update comment.
+
+2013-03-25  Yao Qi  <yao@codesourcery.com>
+
+	* ctf.c [USE_WIN32API]: Undef 'mkdir' and use 'mkdir'
+	instead of '_mkdir'.
+
+2013-03-23  Eli Zaretskii  <eliz@gnu.org>
+
+	* windows-nat.c (windows_get_absolute_argv0): New function.
+	* windows-nat.h: Add its prototype.
+
+	* main.c (get_init_files): Use filename_ncmp instead of strncmp.
+	Use IS_DIR_SEPARATOR instead of looking for a character inside
+	SLASH_STRING.  Include filenames.h.
+	(captured_main) [__MINGW32__]: Make argv[0] absolute, so that
+	relocate_gdb_directory works when passed gdb_program_name.
+	Include windows-nat.h.
+
+2013-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* exceptions.h (enum errors): New entry TARGET_CLOSE_ERROR.
+	* remote.c (trace_error): Remove the special handling of '2'.
+	(readchar) <SERIAL_EOF>
+	(readchar) <SERIAL_ERROR>
+	(getpkt_or_notif_sane_1): Use TARGET_CLOSE_ERROR for them.
+	(remote_get_trace_status): Call throw_exception if EX is
+	TARGET_CLOSE_ERROR.
+	* utils.c (perror_with_name): Rename to ...
+	(throw_perror_with_name): ... here.  New parameter errcode, describe it
+	in the function comment.
+	(perror_with_name): New function wrapper.
+	* utils.h (enum errors): New stub declaration.
+	(throw_perror_with_name): New declaration.
+
+2013-03-22  Pedro Alves  <palves@redhat.com>
+	    Yao Qi  <yao@codesourcery.com>
+	    Mark Kettenis  <kettenis@gnu.org>
+
+	* cli/cli-setshow.c (do_set_command) <var_uinteger>:
+	Don't let the user set the value to UINT_MAX directly.
+	<var_integer>: Don't let the user set the value to INT_MAX
+	directly.
+
+2013-03-22  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* remote.c (remote_unpush_target): New function.
+	(remote_open_1): Remove two pop_target calls, update one comment, add
+	comment to target_preopen call.  Replace pop_target call by
+	remote_unpush_target call.
+	(interrupt_query, readchar, getpkt_or_notif_sane_1): Replace
+	pop_target calls by remote_unpush_target calls.
+
+2013-03-22  Pedro Alves  <palves@redhat.com>
+
+	* linux-nat.c (linux_child_follow_fork): Don't call
+	linux_enable_event_reporting.
+	(linux_handle_extended_wait): Don't call
+	linux_enable_event_reporting.
+
+2013-03-22  Pedro Alves  <palves@redhat.com>
+
+	* hppa-hpux-tdep.c (hppa_hpux_push_dummy_code): Define INSN macro,
+	use it to rewrite the trampoline buffers with type gdb_byte[], and
+	undefine the macro.  Remove char* cast.
+
+2013-03-21  Doug Evans  <dje@google.com>
+
+	New commands "mt set per-command {space,time,symtab} {on,off}".
+	* NEWS: Add entry.
+	* event-top.c: #include "maint.h".
+	* main.c: #include "maint.h".
+	* maint.c: #include <sys/time.h>, <time.h>, block.h, top.h,
+	timeval-utils.h, maint.h, cli/cli-setshow.h.
+	(per_command_time, per_command_space): New static globals.
+	(per_command_symtab): New static global.
+	(per_command_setlist, per_command_showlist): New static globals.
+	(struct cmd_stats): Move here from utils.c.
+	(set_per_command_time): Renamed from set_display_time in utils.c
+	and moved here.  All callers updated.
+	(set_per_command_space): Renamed from set_display_space in utils.c
+	and moved here.  All callers updated.
+	(count_symtabs_and_blocks): New function.
+	(report_command_stats): Moved here from utils.c.  Add support for
+	printing symtab stats.  Only print data if enabled before command
+	executed.
+	(make_command_stats_cleanup): Ditto.
+	(sert_per_command_cmd, show_per_command_cmd): New functions.
+	(_initialize_maint_cmds): Add new commands
+	mt set per-command {space,time,symtab} {on,off}.
+	* maint.h: New file.
+	* top.c: #include "maint.h".
+	* utils.c (reset_prompt_for_continue_wait_time): New function.
+	(get_prompt_for_continue_wait_time): New function.
+	* utils.h (reset_prompt_for_continue_wait_time): Declare
+	(get_prompt_for_continue_wait_time): Declare.
+	(make_command_stats_cleanup): Moved to maint.h.
+	(set_display_time, set_display_space): Moved to maint.h and renamed
+	to set_per_command_time, set_per_command_space.
+	* cli/cli-setshow.c (parse_cli_boolean_value): Renamed from
+	parse_binary_operation and made non-static.  Don't call error,
+	just return an error marker.  All callers updated.
+	* cli/cli-setshow.h (parse_cli_boolean_value): Declare.
+
+2013-03-21  Tom Tromey  <tromey@redhat.com>
+
+	* symfile.c (alloc_section_addr_info): Update header.  Don't set
+	'num_sections' field.
+	(build_section_addr_info_from_section_table): Set 'num_sections'.
+	(build_section_addr_info_from_bfd): Likewise.
+	(build_section_addr_info_from_objfile): Remove dead loop
+	condition.
+	(free_section_addr_info): Unconditionally call xfree.
+	(relative_addr_info_to_section_offsets, addrs_section_sort)
+	(addr_info_make_relative, syms_from_objfile_1): Remove dead loop
+	condition.
+	(syms_from_objfile_1): Remove dead 'if' condition.  Check
+	'num_sections'.
+	(add_symbol_file_command): Set 'num_sections'.
+	* symfile-mem.c (symbol_file_add_from_memory): Set
+	'num_sections'.
+	* somread.c (som_symfile_offsets): Remove dead loop condition.
+	* machoread.c (macho_symfile_offsets): Remove dead 'if'.
+	* jit.c (jit_bfd_try_read_symtab): Set 'num_sections'.
+
+2013-03-21  Tom Tromey  <tromey@redhat.com>
+
+	* tracepoint.h (decode_agent_options): Add 'trace_string'
+	argument.
+	* tracepoint.c (decode_agent_options): Add 'trace_string'
+	argument.
+	(validate_actionline): Update.
+	(collect_symbol): Add 'trace_string' argument.
+	(struct add_local_symbols_data) <trace_string>: New field.
+	(do_collect_symbol): Update.
+	(add_local_symbols): Add 'trace_string' argument.
+	(encode_actions_1): Update.
+	(trace_dump_actions): Update.
+	* dwarf2loc.c (access_memory): Update.
+	* ax.h (struct agent_expr) <tracing, trace_string>: New fields.
+	* ax-general.c (new_agent_expr): Update.
+	* ax-gdb.h (gen_trace_for_expr, gen_trace_for_var)
+	(gen_trace_for_return_address): Add argument.
+	(trace_kludge, trace_string_kludge): Remove.
+	* ax-gdb.c (trace_kludge, trace_string_kludge): Remove.
+	(gen_traced_pop, gen_fetch, gen_bitfield_ref, gen_expr): Update.
+	(gen_trace_for_var): Add 'trace_string' argument.
+	(gen_trace_for_expr, gen_trace_for_return_address): Likewise.
+	(gen_printf, agent_eval_command_one): Update.
+
+2013-03-21  Tom Tromey  <tromey@redhat.com>
+
+	PR exp/15109:
+	* c-exp.y (yylex): Rewrite to push all tokens onto the FIFO.
+	Handle FILENAME token.
+
+2013-03-21  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (YYPRINT): Define.
+	(c_print_token): New function.
+
+2013-03-21  Tom Tromey  <tromey@redhat.com>
+
+	* c-exp.y (%union) <sym, ivar, ivec>: Remove.
+
+2013-03-21  Yao Qi  <yao@codesourcery.com>
+
+	* ctf.c: Include "gdb_stat.h".
+	[USE_WIN32API]: New macro 'mkdir'.
+	(ctf_start): Use permission bits macros if they are defined.
+
+2013-03-20  Keith Seitz  <keiths@redhat.com>
+
+	* breakpoint.h (struct breakpoint): Add comment to
+	extra_string indicating that this member is mallod'd.
+	* breakpoint.c (base_breakpoint_dtor): Free extra_string.
+
+2013-03-20  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/15289
+
+	* cli/cli-setshow.c (do_set_command)
+	<var_uinteger, var_zuinteger>: Use LONGEST for variable holding
+	the result of parsing the command argument.  Throw error if the
+	value is greater than UINT_MAX.  Print the invalid value with
+	plongest.
+	<var_integer, var_zinteger>: Use LONGEST for variable holding the
+	result of parsing the command argument.  Throw error if the value
+	is greater than INT_MAX, not greater or equal.  Also throw error
+	if the value is less than INT_MIN.  Print the invalid value with
+	plongest.
+	<var_zuinteger_unlimited>: Throw error if the value is greater
+	than INT_MAX, not greater or equal.
+	(do_show_command) <var_integer, var_zinteger,
+	var_zuinteger_unlimited>: Use %d for printing int, not %u.
+
+2013-03-20  Tom Tromey  <tromey@redhat.com>
+
+	* ax-gdb.c (gen_var_ref): Unconditionally call via computed ops,
+	if possible.
+	* dwarf2read.c (read_func_scope): Remove old FIXME.
+	* eval.c (evaluate_subexp_standard): Check SYMBOL_COMPUTED_OPS,
+	not LOC_COMPUTED.
+	* findvar.c (symbol_read_needs_frame, default_read_var_value):
+	Unconditionally call via computed ops, if possible.
+	* printcmd.c (address_info): Unconditionally call via computed ops,
+	if possible.
+	* stack.c (read_frame_arg): Unconditionally call via computed ops,
+	if possible.
+	* symtab.c (register_symbol_computed_impl): Sanity check 'ops'.
+	* tracepoint.c (scope_info): Unconditionally call via computed ops,
+	if possible.
+
+2013-03-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+	    Tom Tromey  <tromey@redhat.com>
+
+	PR symtab/8421:
+	* coffread.c (coff_register_index): New global.
+	(process_coff_symbol, coff_read_enum_type): Set
+	SYMBOL_ACLASS_INDEX.
+	(_initialize_coffread): Initialize new global.
+	* dwarf2loc.c (locexpr_find_frame_base_location)
+	(dwarf2_block_frame_base_locexpr_funcs)
+	(loclist_find_frame_base_location)
+	(dwarf2_block_frame_base_loclist_funcs): New.
+	(dwarf_expr_frame_base_1): Call SYMBOL_BLOCK_OPS, remove internal_error.
+	(dwarf2_locexpr_funcs, dwarf2_loclist_funcs): Add location_has_loclist.
+	* dwarf2loc.h (dwarf2_block_frame_base_locexpr_funcs)
+	(dwarf2_block_frame_base_loclist_funcs): New.
+	* dwarf2read.c (dwarf2_locexpr_index, dwarf2_loclist_index)
+	(dwarf2_locexpr_block_index, dwarf2_loclist_block_index): New
+	globals.
+	(read_func_scope): Update.
+	(fixup_go_packaging, mark_common_block_symbol_computed)
+	(var_decode_location, new_symbol_full, dwarf2_const_value):
+	Set SYMBOL_ACLASS_INDEX.
+	(dwarf2_symbol_mark_computed): Likewise.  Add 'is_block' argument.
+	(_initialize_dwarf2_read): Initialize new globals.
+	* jit.c (finalize_symtab): Set SYMBOL_ACLASS_INDEX.
+	* jv-lang.c (add_class_symbol): Set SYMBOL_ACLASS_INDEX.
+	* mdebugread.c (mdebug_register_index, mdebug_regparm_index): New
+	globals.
+	(parse_symbol, psymtab_to_symtab_1): Set SYMBOL_ACLASS_INDEX.
+	(_initialize_mdebugread): Initialize new globals.
+	* psympriv.h (struct partial_symbol) <aclass>: Update comment.
+	* stabsread.c (patch_block_stabs): Set SYMBOL_ACLASS_INDEX.
+	(stab_register_index, stab_regparm_index): New globals.
+	(define_symbol, read_enum_type, common_block_end): Set
+	SYMBOL_ACLASS_INDEX.
+	(_initialize_stabsread): Initialize new globals.
+	* symtab.c (next_aclass_value, symbol_impl, symbol_impls): New
+	globals.
+	(MAX_SYMBOL_IMPLS): New define.
+	(register_symbol_computed_impl, register_symbol_block_impl)
+	(register_symbol_register_impl)
+	(initialize_ordinary_address_classes): New functions.
+	(_initialize_symtab): Call initialize_ordinary_address_classes.
+	* symtab.h (enum address_class) <LOC_FINAL_VALUE>: New constant.
+	(struct symbol_impl): New.
+	(SYMBOL_ACLASS_BITS): New define.
+	(struct symbol) <aclass, ops>: Remove fields.
+	<aclass_index>: New field.
+	(symbol_impls): Declare.
+	(SYMBOL_CLASS, SYMBOL_COMPUTED_OPS, SYMBOL_REGISTER_OPS): Redefine.
+	(SYMBOL_IMPL, SYMBOL_ACLASS_INDEX): New defines.
+	(register_symbol_computed_impl, register_symbol_block_impl)
+	(register_symbol_register_impl): Declare.
+	(struct symbol_computed_ops): Add location_has_loclist.
+	(struct symbol_block_ops): New.
+	(SYMBOL_BLOCK_OPS): New.
+	* xcoffread.c (process_xcoff_symbol): Set SYMBOL_ACLASS_INDEX.
+
+2013-03-20  Tom Tromey  <tromey@redhat.com>
+
+	* psymtab.c (find_pc_sect_psymbol, fixup_psymbol_section)
+	(print_partial_symbols, recursively_search_psymtabs): Use
+	PSYMBOL_CLASS.
+
+2013-03-20  Pierre Muller  <muller@sourceware.org>
+
+	* contrib/ari/gdb_ari.sh (OP eol rule): Also check
+	addtion, subtraction, multiplication and division binary operator.
+
+2013-03-20  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup.
+	* bfd-target.c (target_bfd_xclose): Remove parameter quitting.
+	* bsd-kvm.c (bsd_kvm_close): Likewise.
+	* bsd-uthread.c (bsd_uthread_close): Likewise.
+	* corelow.c (core_close): Likewise.
+	(core_close_cleanup): Remove parameter quitting from a caller.
+	* event-top.c (async_disconnect): Likewise.
+	* exec.c (exec_close_1): Remove parameter quitting.
+	* go32-nat.c (go32_close): Likewise.
+	* linux-nat.c (linux_nat_close): Remove parameter quitting.  Remove
+	parameter quitting from a caller.
+	* mips-linux-nat.c (super_close): Remove parameter quitting from the
+	variable.
+	(mips_linux_close): Remove parameter quitting.  Remove parameter
+	quitting from a caller.
+	* monitor.c (monitor_close): Remove parameter quitting.
+	* monitor.h (monitor_close): Likewise.
+	* record-btrace.c (record_btrace_close): Likewise.
+	* record-full.c (record_full_close): Likewise.
+	* remote-m32r-sdi.c (m32r_close): Remove parameter quitting and remove
+	it also from fprintf_unfiltered.
+	* remote-mips.c (mips_close): Remove parameter quitting.
+	(mips_detach): Remove parameter quitting from a caller.
+	* remote-sim.c (gdbsim_close): Remove parameter quitting.
+	(gdbsim_close): Remove duplicate function comment.  Remove parameter
+	quitting and remove it also from printf_filtered.
+	* remote.c (remote_close): Remove parameter quitting.
+	* solib-svr4.c (enable_break): Remove parameter quitting from a caller.
+	* target.c (update_current_target): Remove parameter int from to_close
+	de_fault.
+	(push_target, unpush_target, pop_target): Remove parameter quitting from
+	a caller.
+	(pop_all_targets_above, pop_all_targets): Remove parameter quitting.
+	Remove parameter quitting from a caller.
+	(target_preopen): Remove parameter quitting from a caller.
+	(target_close): Remove parameter quitting.  Remove parameter quitting
+	from a caller two times.  Remove parameter quitting also from
+	fprintf_unfiltered.
+	* target.h (struct target_ops): Remove parameter quitting and as int
+	from fields to_xclose and to_close.
+	(extern struct target_ops current_target):
+	(target_close, pop_all_targets): Remove parameter quitting.  Update the
+	comment.
+	(pop_all_targets_above): Remove parameter quitting.
+	* top.c (quit_target): Remove parameter quitting from a caller.
+	* tracepoint.c (tfile_close): Remove parameter quitting.
+	* windows-nat.c (windows_close): Remove parameter quitting.
+
+2013-03-20  Corinna Vinschen  <vinschen@redhat.com>
+
+	* windows-nat.c (handle_output_debug_string): Replace call
+	to string_to_core_addr with call to strtoull.
+
+2013-03-20  Yao Qi  <yao@codesourcery.com>
+
+	* ctf.c (ctf_save_metadata_header): Define macro HOST_ENDIANNESS
+	and write it to CTF metadata.
+
+2013-03-19  Corinna Vinschen  <vinschen@redhat.com>
+
+	* windows-nat.c (handle_output_debug_string): Change type of n to
+	SIZE_T to avoid crash on 64 bit systems.
+
 2013-03-17  Eli Zaretskii  <eliz@gnu.org>
 
 	* python/python-internal.h (HAVE_SNPRINTF)

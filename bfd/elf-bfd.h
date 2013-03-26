@@ -1207,19 +1207,10 @@ struct elf_backend_data
   asection *(*common_section) (asection *);
 
   /* Return TRUE if we can merge 2 definitions.  */
-  bfd_boolean (*merge_symbol) (struct bfd_link_info *,
-			       struct elf_link_hash_entry **,
-			       struct elf_link_hash_entry *,
-			       Elf_Internal_Sym *, asection **,
-			       bfd_vma *, unsigned int *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd *, asection **,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd *, asection **);
+  bfd_boolean (*merge_symbol) (struct elf_link_hash_entry *,
+			       const Elf_Internal_Sym *, asection **,
+			       bfd_boolean, bfd_boolean,
+			       bfd *, const asection *);
 
   /* Return TRUE if symbol should be hashed in the `.gnu.hash' section.  */
   bfd_boolean (*elf_hash_symbol) (struct elf_link_hash_entry *);
@@ -1919,8 +1910,6 @@ extern int _bfd_elf_sizeof_headers
   (bfd *, struct bfd_link_info *);
 extern bfd_boolean _bfd_elf_new_section_hook
   (bfd *, asection *);
-extern bfd_boolean _bfd_elf_init_reloc_shdr
-  (bfd *, struct bfd_elf_section_reloc_data *, asection *, bfd_boolean);
 extern const struct bfd_elf_special_section *_bfd_elf_get_special_section
   (const char *, const struct bfd_elf_special_section *, unsigned int);
 extern const struct bfd_elf_special_section *_bfd_elf_get_sec_type_attr
@@ -1992,12 +1981,6 @@ extern bfd_boolean _bfd_elf_eh_frame_present
   (struct bfd_link_info *);
 extern bfd_boolean _bfd_elf_maybe_strip_eh_frame_hdr
   (struct bfd_link_info *);
-
-extern bfd_boolean _bfd_elf_merge_symbol
-  (bfd *, struct bfd_link_info *, const char *, Elf_Internal_Sym *,
-   asection **, bfd_vma *, bfd_boolean *, unsigned int *,
-   struct elf_link_hash_entry **, bfd_boolean *,
-   bfd_boolean *, bfd_boolean *, bfd_boolean *);
 
 extern bfd_boolean _bfd_elf_hash_symbol (struct elf_link_hash_entry *);
 

@@ -597,6 +597,18 @@ failed:
   return 0;		/* failure */
 }
 
+/* Return an absolute file name of the running GDB, if possible, or
+   ARGV0 if not.  The return value is in malloc'ed storage.  */
+char *
+windows_get_absolute_argv0 (const char *argv0)
+{
+  char full_name[PATH_MAX];
+
+  if (GetModuleFileName (NULL, full_name, PATH_MAX))
+    return xstrdup (full_name);
+  return xstrdup (argv0);
+}
+
 /* Encapsulate the information required in a call to
    symbol_file_add_args.  */
 struct safe_symbol_file_add_args
@@ -973,12 +985,12 @@ handle_output_debug_string (struct target_waitstatus *ourstatus)
       if (gotasig)
 	{
 	  LPCVOID x;
-	  DWORD n;
+	  SIZE_T n;
 	  ourstatus->kind = TARGET_WAITKIND_STOPPED;
 	  retval = strtoul (p, &p, 0);
 	  if (!retval)
 	    retval = main_thread_id;
-	  else if ((x = (LPCVOID) string_to_core_addr (p))
+	  else if ((x = (LPCVOID) strtoull (p, NULL, 0))
 		   && ReadProcessMemory (current_process_handle, x,
 					 &saved_context,
 					 __COPY_CONTEXT_SIZE, &n)
@@ -2367,7 +2379,7 @@ windows_can_run (void)
 }
 
 static void
-windows_close (int x)
+windows_close (void)
 {
   DEBUG_EVENTS (("gdb: windows_close, inferior_ptid=%d\n",
 		PIDGET (inferior_ptid)));

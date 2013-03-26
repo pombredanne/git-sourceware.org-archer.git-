@@ -23,6 +23,7 @@
 #include "ctf.h"
 #include "tracepoint.h"
 #include "regcache.h"
+#include "gdb_stat.h"
 
 #include <ctype.h>
 
@@ -218,9 +219,17 @@ ctf_save_metadata_header (struct trace_write_handler *handler)
 			   " := uint64_t;\n");
   ctf_save_write_metadata (handler, "\n");
 
+  /* Get the byte order of the host and write CTF data in this byte
+     order.  */
+#if WORDS_BIGENDIAN
+#define HOST_ENDIANNESS "be"
+#else
+#define HOST_ENDIANNESS "le"
+#endif
+
   ctf_save_write_metadata (handler, metadata_fmt,
 			   CTF_SAVE_MAJOR, CTF_SAVE_MINOR,
-			   BYTE_ORDER == LITTLE_ENDIAN ? "le" : "be");
+			   HOST_ENDIANNESS);
   ctf_save_write_metadata (handler, "\n");
 }
 
@@ -262,6 +271,11 @@ ctf_target_save (struct trace_file_writer *self,
   return 0;
 }
 
+#ifdef USE_WIN32API
+#undef mkdir
+#define mkdir(pathname, mode) mkdir (pathname)
+#endif
+
 /* This is the implementation of trace_file_write_ops method
    start.  It creates the directory DIRNAME, metadata and datastream
    in the directory.  */
@@ -274,10 +288,21 @@ ctf_start (struct trace_file_writer *self, const char *dirname)
   struct ctf_trace_file_writer *writer
     = (struct ctf_trace_file_writer *) self;
   int i;
+  mode_t hmode = S_IRUSR | S_IWUSR | S_IXUSR
+#ifdef S_IRGRP
+    | S_IRGRP
+#endif
+#ifdef S_IXGRP
+    | S_IXGRP
+#endif
+    | S_IROTH /* Defined in common/gdb_stat.h if not defined.  */
+#ifdef S_IXOTH
+    | S_IXOTH
+#endif
+    ;
 
   /* Create DIRNAME.  */
-  if (mkdir (dirname, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH)
-      && errno != EEXIST)
+  if (mkdir (dirname, hmode) && errno != EEXIST)
     error (_("Unable to open directory '%s' for saving trace data (%s)"),
 	   dirname, safe_strerror (errno));
 
