@@ -74,8 +74,6 @@ static void gdb_os_error (host_callback *, const char *, ...)
 
 static void gdbsim_kill (struct target_ops *);
 
-static void gdbsim_load (char *prog, int fromtty);
-
 static void gdbsim_close (void);
 
 static void gdbsim_prepare_to_store (struct regcache *regcache);
@@ -556,7 +554,7 @@ gdbsim_kill (struct target_ops *ops)
    GDB's symbol tables to match.  */
 
 static void
-gdbsim_load (char *args, int fromtty)
+gdbsim_load (const char *args, int fromtty)
 {
   char **argv;
   char *prog;

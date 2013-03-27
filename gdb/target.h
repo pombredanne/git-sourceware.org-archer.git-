@@ -498,7 +498,7 @@ struct target_ops
     void (*to_terminal_save_ours) (void);
     void (*to_terminal_info) (const char *, int);
     void (*to_kill) (struct target_ops *);
-    void (*to_load) (char *, int);
+    void (*to_load) (const char *, int);
     void (*to_create_inferior) (struct target_ops *, 
 				char *, char *, char **, int);
     void (*to_post_startup_inferior) (ptid_t);
@@ -1237,7 +1237,7 @@ extern void target_kill (void);
    sections.  The target may define switches, or other non-switch
    arguments, as it pleases.  */
 
-extern void target_load (char *arg, int from_tty);
+extern void target_load (const char *arg, int from_tty);
 
 /* Start an inferior process and set inferior_ptid to its pid.
    EXEC_FILE is the file to run.

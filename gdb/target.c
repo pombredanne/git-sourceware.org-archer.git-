@@ -140,8 +140,6 @@ static void debug_to_terminal_save_ours (void);
 
 static void debug_to_terminal_ours (void);
 
-static void debug_to_load (char *, int);
-
 static int debug_to_can_run (void);
 
 static void debug_to_stop (ptid_t);
@@ -477,7 +475,7 @@ target_kill (void)
 }
 
 void
-target_load (char *arg, int from_tty)
+target_load (const char *arg, int from_tty)
 {
   target_dcache_invalidate ();
   (*current_target.to_load) (arg, from_tty);
@@ -805,7 +803,7 @@ update_current_target (void)
   de_fault (to_terminal_info,
 	    default_terminal_info);
   de_fault (to_load,
-	    (void (*) (char *, int))
+	    (void (*) (const char *, int))
 	    tcomplain);
   de_fault (to_post_startup_inferior,
 	    (void (*) (ptid_t))
@@ -4782,7 +4780,7 @@ debug_to_terminal_info (const char *arg, int from_tty)
 }
 
 static void
-debug_to_load (char *args, int from_tty)
+debug_to_load (const char *args, int from_tty)
 {
   debug_target.to_load (args, from_tty);
 
