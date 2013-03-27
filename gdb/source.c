@@ -22,7 +22,6 @@
 #include "symtab.h"
 #include "expression.h"
 #include "language.h"
-#include "command.h"
 #include "source.h"
 #include "gdbcmd.h"
 #include "frame.h"

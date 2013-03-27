@@ -25,7 +25,6 @@
 #include "language.h"
 #include "value.h"
 #include "expression.h"
-#include "command.h"
 #include "gdbcmd.h"
 #include "frame.h"
 #include "target.h"

@@ -27,7 +27,6 @@
 #include <signal.h>
 #include <sys/time.h>
 #include <time.h>
-#include "command.h"
 #include "gdbcmd.h"
 #include "symtab.h"
 #include "block.h"
