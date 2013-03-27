@@ -936,7 +936,7 @@ async_float_handler (gdb_client_data arg)
 
 /* Called by do_setshow_command.  */
 void
-set_async_editing_command (char *args, int from_tty,
+set_async_editing_command (const char *args, int from_tty,
 			   struct cmd_list_element *c)
 {
   change_line_handler ();

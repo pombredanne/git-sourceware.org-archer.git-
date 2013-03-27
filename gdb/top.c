@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "gdbcmd.h"
 #include "cli/cli-cmds.h"
 #include "cli/cli-script.h"
@@ -1356,7 +1357,7 @@ input_from_terminal_p (void)
 }
 
 static void
-dont_repeat_command (char *ignored, int from_tty)
+dont_repeat_command (const char *ignored, int from_tty)
 {
   /* Can't call dont_repeat here because we're not necessarily reading
      from stdin.  */
@@ -1430,7 +1431,8 @@ show_commands (char *args, int from_tty)
 
 /* Called by do_setshow_command.  */
 static void
-set_history_size_command (char *args, int from_tty, struct cmd_list_element *c)
+set_history_size_command (const char *args, int from_tty,
+			  struct cmd_list_element *c)
 {
   /* Readline's history interface works with 'int', so it can only
      handle history sizes up to INT_MAX.  The command itself is
@@ -1585,7 +1587,7 @@ show_exec_done_display_p (struct ui_file *file, int from_tty,
 /* "set" command for the gdb_datadir configuration variable.  */
 
 static void
-set_gdb_datadir (char *args, int from_tty, struct cmd_list_element *c)
+set_gdb_datadir (const char *args, int from_tty, struct cmd_list_element *c)
 {
   observer_notify_gdb_datadir_changed ();
 }
