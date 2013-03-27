@@ -302,7 +302,7 @@ extract_arg (char **arg)
 /* See documentation in cli-utils.h.  */
 
 int
-check_for_argument (char **str, char *arg, int arg_len)
+check_for_argument_const (const char **str, const char *arg, int arg_len)
 {
   if (strncmp (*str, arg, arg_len) == 0
       && ((*str)[arg_len] == '\0' || isspace ((*str)[arg_len])))
@@ -311,4 +311,18 @@ check_for_argument (char **str, char *arg, int arg_len)
       return 1;
     }
   return 0;
+}
+
+/* See documentation in cli-utils.h.  */
+
+int
+check_for_argument (char **str, const char *arg, int arg_len)
+{
+  const char *cstr = *str;
+  int result = check_for_argument_const (&cstr, arg, arg_len);
+
+  if (result)
+    *str = (char *) cstr;
+
+  return result;
 }

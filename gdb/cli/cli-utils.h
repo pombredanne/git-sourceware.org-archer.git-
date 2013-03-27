@@ -128,6 +128,10 @@ extern char *extract_arg_const (const char **arg);
    string.  The argument must also either be at the end of the string,
    or be followed by whitespace.  Returns 1 if it finds the argument,
    0 otherwise.  If the argument is found, it updates *STR.  */
-extern int check_for_argument (char **str, char *arg, int arg_len);
+extern int check_for_argument_const (const char **str, const char *arg,
+				     int arg_len);
+
+/* The same, but for non-const STR.  */
+extern int check_for_argument (char **str, const char *arg, int arg_len);
 
 #endif /* CLI_UTILS_H */
