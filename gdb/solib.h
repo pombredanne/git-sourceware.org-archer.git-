@@ -90,4 +90,8 @@ extern CORE_ADDR gdb_bfd_lookup_symbol_from_symtab (bfd *abfd,
 								      void *),
 						    void *data);
 
+/* Default validation always returns 1.  */
+
+extern int default_solib_validate (const struct so_list *so);
+
 #endif /* SOLIB_H */

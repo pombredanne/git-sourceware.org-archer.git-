@@ -47,6 +47,8 @@
 #include "exceptions.h"
 #include "gdb_bfd.h"
 
+#define NOTE_GNU_BUILD_ID_NAME  ".note.gnu.build-id"
+
 static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
 static int svr4_have_link_map_offsets (void);
 static void svr4_relocate_main_executable (void);
@@ -871,6 +873,118 @@ svr4_keep_data_in_core (CORE_ADDR vaddr, unsigned long size)
   return (name_lm >= vaddr && name_lm < vaddr + size);
 }
 
+/* Validate SO by comparing build-id from the associated bfd and
+   corresponding build-id from target memory.  */
+
+static int
+svr4_validate (const struct so_list *const so)
+{
+  gdb_byte *build_id;
+  size_t build_idsz;
+  size_t abfd_build_idsz;
+
+  gdb_assert (so != NULL);
+
+  if (so->abfd == NULL)
+    return 1;
+
+  if (!bfd_check_format (so->abfd, bfd_object)
+      || bfd_get_flavour (so->abfd) != bfd_target_elf_flavour
+      || elf_tdata (so->abfd)->build_id == NULL)
+    return 1;
+
+  build_id = so->build_id;
+  build_idsz = so->build_idsz;
+  abfd_build_idsz = elf_tdata (so->abfd)->build_id->size;
+
+  if (build_id == NULL)
+    {
+      /* Get build_id from NOTE_GNU_BUILD_ID_NAME section.
+         This is a fallback mechanism for targets that do not
+	 implement TARGET_OBJECT_SOLIB_SVR4.  */
+
+      const asection *const asec
+	= bfd_get_section_by_name (so->abfd, NOTE_GNU_BUILD_ID_NAME);
+      ULONGEST bfd_sect_size;
+
+      if (asec == NULL)
+	return 1;
+
+      bfd_sect_size = bfd_get_section_size (asec);
+
+      if ((asec->flags & SEC_LOAD) == SEC_LOAD
+	  && bfd_sect_size != 0
+	  && strcmp (bfd_section_name (asec->bfd, asec),
+		     NOTE_GNU_BUILD_ID_NAME) == 0)
+	{
+	  const enum bfd_endian byte_order
+	    = gdbarch_byte_order (target_gdbarch ());
+	  Elf_External_Note *const note = xmalloc (bfd_sect_size);
+	  gdb_byte *const note_raw = (void *) note;
+	  struct cleanup *cleanups = make_cleanup (xfree, note);
+
+	  if (target_read_memory (bfd_get_section_vma (so->abfd, asec)
+				  + lm_addr_check (so, so->abfd),
+				  note_raw, bfd_sect_size) == 0)
+	    {
+	      build_idsz
+		= extract_unsigned_integer ((gdb_byte *) note->descsz,
+					    sizeof (note->descsz),
+					    byte_order);
+
+	      if (build_idsz == abfd_build_idsz)
+		{
+		  const char gnu[4] = "GNU\0";
+
+		  if (memcmp (note->name, gnu, 4) == 0)
+		    {
+		      ULONGEST namesz
+			= extract_unsigned_integer ((gdb_byte *) note->namesz,
+						    sizeof (note->namesz),
+						    byte_order);
+		      CORE_ADDR build_id_offs;
+
+		      /* Rounded to next sizeof (ElfXX_Word).  */
+		      namesz = ((namesz + (sizeof (note->namesz) - 1))
+				& ~((ULONGEST) (sizeof (note->namesz) - 1)));
+		      build_id_offs = (offsetof (Elf_External_Note, name)
+				       + namesz);
+		      build_id = xmalloc (build_idsz);
+		      memcpy (build_id, note_raw + build_id_offs, build_idsz);
+		    }
+		}
+
+	      if (build_id == NULL)
+		{
+		  /* If we are here, it means target memory read succeeded
+		     but note was not where it was expected according to the
+		     abfd.  Allow the logic below to perform the check
+		     with an impossible build-id and fail validation.  */
+		  build_idsz = 0;
+		  build_id = xstrdup ("");
+		}
+
+	    }
+	  do_cleanups (cleanups);
+	}
+    }
+
+  if (build_id != NULL)
+    {
+      const int match
+	= (abfd_build_idsz == build_idsz
+	   && memcmp (build_id, elf_tdata (so->abfd)->build_id->data,
+		      build_idsz) == 0);
+
+      if (build_id != so->build_id)
+	xfree (build_id);
+
+      return match;
+    }
+
+  return 1;
+}
+
 /* Implement the "open_symbol_file_object" target_so_ops method.
 
    If no open symbol file, attempt to locate and open the main symbol
@@ -999,6 +1113,9 @@ library_list_start_library (struct gdb_xml_parser *parser,
   ULONGEST *lmp = xml_find_attribute (attributes, "lm")->value;
   ULONGEST *l_addrp = xml_find_attribute (attributes, "l_addr")->value;
   ULONGEST *l_ldp = xml_find_attribute (attributes, "l_ld")->value;
+  const struct gdb_xml_value *const att_build_id
+    = xml_find_attribute (attributes, "build-id");
+  const char *const hex_build_id = att_build_id ? att_build_id->value : NULL;
   struct so_list *new_elem;
 
   new_elem = XZALLOC (struct so_list);
@@ -1010,6 +1127,25 @@ library_list_start_library (struct gdb_xml_parser *parser,
   strncpy (new_elem->so_name, name, sizeof (new_elem->so_name) - 1);
   new_elem->so_name[sizeof (new_elem->so_name) - 1] = 0;
   strcpy (new_elem->so_original_name, new_elem->so_name);
+  if (hex_build_id != NULL)
+    {
+      const size_t hex_build_id_len = strlen (hex_build_id);
+
+      if (hex_build_id_len > 0 && (hex_build_id_len & 1U) == 0)
+	{
+	  const size_t build_idsz = hex_build_id_len / 2;
+
+	  new_elem->build_id = xmalloc (build_idsz);
+	  new_elem->build_idsz = hex2bin (hex_build_id, new_elem->build_id,
+					  build_idsz);
+	  if (new_elem->build_idsz != build_idsz)
+	    {
+	      xfree (new_elem->build_id);
+	      new_elem->build_id = NULL;
+	      new_elem->build_idsz = 0;
+	    }
+	}
+    }
 
   *list->tailp = new_elem;
   list->tailp = &new_elem->next;
@@ -1044,6 +1180,7 @@ static const struct gdb_xml_attribute svr4_library_attributes[] =
   { "lm", GDB_XML_AF_NONE, gdb_xml_parse_attr_ulongest, NULL },
   { "l_addr", GDB_XML_AF_NONE, gdb_xml_parse_attr_ulongest, NULL },
   { "l_ld", GDB_XML_AF_NONE, gdb_xml_parse_attr_ulongest, NULL },
+  { "build-id", GDB_XML_AF_OPTIONAL, NULL, NULL },
   { NULL, GDB_XML_AF_NONE, NULL, NULL }
 };
 
@@ -2458,4 +2595,5 @@ _initialize_svr4_solib (void)
   svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;
   svr4_so_ops.same = svr4_same;
   svr4_so_ops.keep_data_in_core = svr4_keep_data_in_core;
+  svr4_so_ops.validate = svr4_validate;
 }

@@ -75,6 +75,16 @@ struct so_list
        There may not be just one (e.g. if two segments are relocated
        differently); but this is only used for "info sharedlibrary".  */
     CORE_ADDR addr_low, addr_high;
+
+    /* Build id in raw format, contains verbatim contents of
+       .note.gnu.build-id including note header.  This is actual
+       BUILD_ID which comes either from the remote target via qXfer
+       packet or via reading target memory.  Therefore, it may differ
+       from the build-id of the associated bfd.  In a normal
+       scenario, this so would soon lose its abfd due to failed
+       validation.  */
+    size_t build_idsz;
+    gdb_byte *build_id;
   };
 
 struct target_so_ops
@@ -148,6 +158,10 @@ struct target_so_ops
        core file (in particular, for readonly sections).  */
     int (*keep_data_in_core) (CORE_ADDR vaddr,
 			      unsigned long size);
+
+    /* Return 0 if SO does not match target SO it is supposed to
+       represent.  Return 1 otherwise.  */
+    int (*validate) (const struct so_list *so);
   };
 
 /* Free the memory associated with a (so_list *).  */

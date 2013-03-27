@@ -465,6 +465,17 @@ solib_map_sections (struct so_list *so)
   /* Leave bfd open, core_xfer_memory and "info files" need it.  */
   so->abfd = abfd;
 
+  gdb_assert (ops->validate != NULL);
+
+  if (!ops->validate (so))
+    {
+      warning (_("Shared object \"%s\" could not be validated "
+		 "and will be ignored."), so->so_name);
+      gdb_bfd_unref (so->abfd);
+      so->abfd = NULL;
+      return 0;
+    }
+
   if (build_section_table (abfd, &so->sections, &so->sections_end))
     {
       error (_("Can't find the file sections in `%s': %s"),
@@ -545,6 +556,7 @@ free_so (struct so_list *so)
 {
   struct target_so_ops *ops = solib_ops (target_gdbarch ());
 
+  xfree (so->build_id);
   free_so_symbols (so);
   ops->free_so (so);
 
@@ -1440,6 +1452,14 @@ gdb_bfd_lookup_symbol (bfd *abfd,
     symaddr = bfd_lookup_symbol_from_dyn_symtab (abfd, match_sym, data);
 
   return symaddr;
+}
+
+/* Default implementation does not perform any validation.  */
+
+int
+default_solib_validate (const struct so_list *const so)
+{
+  return 1; /* No validation.  */
 }
 
 extern initialize_file_ftype _initialize_solib; /* -Wmissing-prototypes */
