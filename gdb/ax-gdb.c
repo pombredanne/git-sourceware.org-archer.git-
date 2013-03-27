@@ -18,6 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "symtab.h"
 #include "symfile.h"
 #include "gdbtypes.h"
@@ -164,8 +165,6 @@ static void gen_expr_binop_rest (struct expression *exp,
 				 struct axs_value *value,
 				 struct axs_value *value1,
 				 struct axs_value *value2);
-
-static void agent_command (char *exp, int from_tty);
 
 
 /* Detecting constant expressions.  */
@@ -2625,7 +2624,7 @@ agent_eval_command_one (const char *exp, int eval, CORE_ADDR pc)
 }
 
 static void
-agent_command_1 (char *exp, int eval)
+agent_command_1 (const char *exp, int eval)
 {
   /* We don't deal with overlay debugging at the moment.  We need to
      think more carefully about this.  If you copy this code into
@@ -2637,24 +2636,24 @@ agent_command_1 (char *exp, int eval)
   if (exp == 0)
     error_no_arg (_("expression to translate"));
 
-  if (check_for_argument (&exp, "-at", sizeof ("-at") - 1))
+  if (check_for_argument_const (&exp, "-at", sizeof ("-at") - 1))
     {
       struct linespec_result canonical;
       int ix;
       struct linespec_sals *iter;
       struct cleanup *old_chain;
 
-      exp = skip_spaces (exp);
+      exp = skip_spaces_const (exp);
       init_linespec_result (&canonical);
-      decode_line_full (&exp, DECODE_LINE_FUNFIRSTLINE,
-			(struct symtab *) NULL, 0, &canonical,
-			NULL, NULL);
+      decode_line_full_const (&exp, DECODE_LINE_FUNFIRSTLINE,
+			      (struct symtab *) NULL, 0, &canonical,
+			      NULL, NULL);
       old_chain = make_cleanup_destroy_linespec_result (&canonical);
-      exp = skip_spaces (exp);
+      exp = skip_spaces_const (exp);
       if (exp[0] == ',')
         {
 	  exp++;
-	  exp = skip_spaces (exp);
+	  exp = skip_spaces_const (exp);
 	}
       for (ix = 0; VEC_iterate (linespec_sals, canonical.sals, ix, iter); ++ix)
         {
@@ -2672,7 +2671,7 @@ agent_command_1 (char *exp, int eval)
 }
 
 static void
-agent_command (char *exp, int from_tty)
+agent_command (const char *exp, int from_tty)
 {
   agent_command_1 (exp, 0);
 }
@@ -2682,7 +2681,7 @@ agent_command (char *exp, int from_tty)
    expression.  */
 
 static void
-agent_eval_command (char *exp, int from_tty)
+agent_eval_command (const char *exp, int from_tty)
 {
   agent_command_1 (exp, 1);
 }
@@ -2691,7 +2690,7 @@ agent_eval_command (char *exp, int from_tty)
    that does a printf, and display the resulting expression.  */
 
 static void
-maint_agent_printf_command (char *exp, int from_tty)
+maint_agent_printf_command (const char *exp, int from_tty)
 {
   struct cleanup *old_chain = 0;
   struct expression *expr;
