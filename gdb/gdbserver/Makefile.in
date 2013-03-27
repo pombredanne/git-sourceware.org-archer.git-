@@ -167,7 +167,7 @@ TAGFILES = $(SOURCES) ${HFILES} ${ALLPARAM} ${POSSLIBS}
 OBS = agent.o ax.o inferiors.o regcache.o remote-utils.o server.o signals.o target.o \
 	utils.o version.o vec.o gdb_vecs.o \
 	mem-break.o hostio.o event-loop.o tracepoint.o \
-	xml-utils.o common-utils.o ptid.o buffer.o format.o \
+	xml-utils.o common-target.o common-utils.o ptid.o buffer.o format.o \
 	dll.o notif.o \
 	$(XML_BUILTIN) \
 	$(DEPFILES) $(LIBOBJS)
@@ -510,10 +510,16 @@ ax.o: ax.c
 signals.o: ../common/signals.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
+linux-maps.o: ../common/linux-maps.c
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 linux-procfs.o: ../common/linux-procfs.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 linux-ptrace.o: ../common/linux-ptrace.c
+	$(COMPILE) $<
+	$(POSTCOMPILE)
+common-target.o: ../common/common-target.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 common-utils.o: ../common/common-utils.c

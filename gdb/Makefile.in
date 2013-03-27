@@ -779,7 +779,7 @@ LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 
 HFILES_NO_SRCDIR = \
 common/gdb_signals.h common/gdb_thread_db.h common/gdb_vecs.h \
-common/i386-xstate.h common/linux-ptrace.h \
+common/i386-xstate.h common/linux-maps.h common/linux-ptrace.h \
 proc-utils.h aarch64-tdep.h arm-tdep.h ax-gdb.h ppcfbsd-tdep.h \
 ppcnbsd-tdep.h cli-out.h gdb_expat.h breakpoint.h infcall.h obsd-tdep.h \
 exec.h m32r-tdep.h osabi.h gdbcore.h solib-som.h amd64bsd-nat.h \
@@ -845,7 +845,9 @@ common/common-utils.h common/xml-utils.h common/buffer.h common/ptid.h \
 common/format.h common/host-defs.h utils.h common/queue.h common/gdb_string.h \
 common/linux-osdata.h gdb-dlfcn.h auto-load.h probe.h stap-probe.h \
 gdb_bfd.h sparc-ravenscar-thread.h ppc-ravenscar-thread.h common/linux-btrace.h \
-ctf.h
+ctf.h \
+common/common-target.h
+
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -938,6 +940,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	inferior.o osdata.o gdb_usleep.o record.o record-full.o gcore.o \
 	gdb_vecs.o jit.o progspace.o skip.o probe.o \
 	common-utils.o buffer.o ptid.o gdb-dlfcn.o common-agent.o \
+	common-target.o \
 	format.o registry.o btrace.o record-btrace.o
 
 TSOBS = inflow.o
@@ -1973,6 +1976,10 @@ format.o: ${srcdir}/common/format.c
 	$(COMPILE) $(srcdir)/common/format.c
 	$(POSTCOMPILE)
 
+linux-maps.o: ${srcdir}/common/linux-maps.c
+	$(COMPILE) $(srcdir)/common/linux-maps.c
+	$(POSTCOMPILE)
+
 linux-osdata.o: ${srcdir}/common/linux-osdata.c
 	$(COMPILE) $(srcdir)/common/linux-osdata.c
 	$(POSTCOMPILE)
@@ -1987,6 +1994,10 @@ linux-ptrace.o: $(srcdir)/common/linux-ptrace.c
 
 common-agent.o: $(srcdir)/common/agent.c
 	$(COMPILE) $(srcdir)/common/agent.c
+	$(POSTCOMPILE)
+
+common-target.o: ${srcdir}/common/common-target.c
+	$(COMPILE) $(srcdir)/common/common-target.c
 	$(POSTCOMPILE)
 
 vec.o: ${srcdir}/common/vec.c
