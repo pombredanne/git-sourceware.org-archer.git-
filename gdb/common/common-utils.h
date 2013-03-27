@@ -25,6 +25,25 @@
 #include <stddef.h>
 #include <stdarg.h>
 
+/* Static target-system-dependent parameters for GDB.  */
+
+/* Number of bits in a char or unsigned char for the target machine.
+   Just like CHAR_BIT in <limits.h> but describes the target machine.  */
+#if !defined (TARGET_CHAR_BIT)
+#define TARGET_CHAR_BIT 8
+#endif
+
+/* If we picked up a copy of CHAR_BIT from a configuration file
+   (which may get it by including <limits.h>) then use it to set
+   the number of bits in a host char.  If not, use the same size
+   as the target.  */
+
+#if defined (CHAR_BIT)
+#define HOST_CHAR_BIT CHAR_BIT
+#else
+#define HOST_CHAR_BIT TARGET_CHAR_BIT
+#endif
+
 extern void malloc_failure (long size) ATTRIBUTE_NORETURN;
 extern void internal_error (const char *file, int line, const char *, ...)
      ATTRIBUTE_NORETURN ATTRIBUTE_PRINTF (3, 4);
@@ -52,5 +71,20 @@ int xsnprintf (char *str, size_t size, const char *format, ...)
    Uses malloc to get the space.  Returns the address of the copy.  */
 
 char *savestring (const char *ptr, size_t len);
+
+ULONGEST strtoulst (const char *num, const char **trailer, int base);
+
+extern int hex2bin (const char *hex, gdb_byte *bin, int count);
+
+extern int bin2hex (const gdb_byte *bin, char *hex, int count);
+
+/* Skip leading whitespace characters in INP, returning an updated
+   pointer.  If INP is NULL, return NULL.  */
+
+extern char *skip_spaces (char *inp);
+
+/* A const-correct version of the above.  */
+
+extern const char *skip_spaces_const (const char *inp);
 
 #endif

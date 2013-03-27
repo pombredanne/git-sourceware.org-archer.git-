@@ -4569,25 +4569,6 @@ fromhex (int a)
     error (_("Reply contains invalid hex digit %d"), a);
 }
 
-int
-hex2bin (const char *hex, gdb_byte *bin, int count)
-{
-  int i;
-
-  for (i = 0; i < count; i++)
-    {
-      if (hex[0] == 0 || hex[1] == 0)
-	{
-	  /* Hex string is short, or of uneven length.
-	     Return the count that has been converted so far.  */
-	  return i;
-	}
-      *bin++ = fromhex (hex[0]) * 16 + fromhex (hex[1]);
-      hex += 2;
-    }
-  return i;
-}
-
 /* Convert number NIB to a hex digit.  */
 
 static int
@@ -4599,23 +4580,6 @@ tohex (int nib)
     return 'a' + nib - 10;
 }
 
-int
-bin2hex (const gdb_byte *bin, char *hex, int count)
-{
-  int i;
-
-  /* May use a length, or a nul-terminated string as input.  */
-  if (count == 0)
-    count = strlen ((char *) bin);
-
-  for (i = 0; i < count; i++)
-    {
-      *hex++ = tohex ((*bin >> 4) & 0xf);
-      *hex++ = tohex (*bin++ & 0xf);
-    }
-  *hex = 0;
-  return i;
-}
 
 /* Check for the availability of vCont.  This function should also check
    the response.  */

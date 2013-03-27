@@ -28,6 +28,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <ctype.h>
 
 /* The xmalloc() (libiberty.h) family of memory management routines.
 
@@ -160,4 +161,190 @@ savestring (const char *ptr, size_t len)
   memcpy (p, ptr, len);
   p[len] = 0;
   return p;
+}
+
+/* The bit offset of the highest byte in a ULONGEST, for overflow
+   checking.  */
+
+#define HIGH_BYTE_POSN ((sizeof (ULONGEST) - 1) * HOST_CHAR_BIT)
+
+/* True (non-zero) iff DIGIT is a valid digit in radix BASE,
+   where 2 <= BASE <= 36.  */
+
+static int
+is_digit_in_base (unsigned char digit, int base)
+{
+  if (!isalnum (digit))
+    return 0;
+  if (base <= 10)
+    return (isdigit (digit) && digit < base + '0');
+  else
+    return (isdigit (digit) || tolower (digit) < base - 10 + 'a');
+}
+
+static int
+digit_to_int (unsigned char c)
+{
+  if (isdigit (c))
+    return c - '0';
+  else
+    return tolower (c) - 'a' + 10;
+}
+
+/* As for strtoul, but for ULONGEST results.  */
+
+ULONGEST
+strtoulst (const char *num, const char **trailer, int base)
+{
+  unsigned int high_part;
+  ULONGEST result;
+  int minus = 0;
+  int i = 0;
+
+  /* Skip leading whitespace.  */
+  while (isspace (num[i]))
+    i++;
+
+  /* Handle prefixes.  */
+  if (num[i] == '+')
+    i++;
+  else if (num[i] == '-')
+    {
+      minus = 1;
+      i++;
+    }
+
+  if (base == 0 || base == 16)
+    {
+      if (num[i] == '0' && (num[i + 1] == 'x' || num[i + 1] == 'X'))
+	{
+	  i += 2;
+	  if (base == 0)
+	    base = 16;
+	}
+    }
+
+  if (base == 0 && num[i] == '0')
+    base = 8;
+
+  if (base == 0)
+    base = 10;
+
+  if (base < 2 || base > 36)
+    {
+      errno = EINVAL;
+      return 0;
+    }
+
+  result = high_part = 0;
+  for (; is_digit_in_base (num[i], base); i += 1)
+    {
+      result = result * base + digit_to_int (num[i]);
+      high_part = high_part * base + (unsigned int) (result >> HIGH_BYTE_POSN);
+      result &= ((ULONGEST) 1 << HIGH_BYTE_POSN) - 1;
+      if (high_part > 0xff)
+	{
+	  errno = ERANGE;
+	  result = ~ (ULONGEST) 0;
+	  high_part = 0;
+	  minus = 0;
+	  break;
+	}
+    }
+
+  if (trailer != NULL)
+    *trailer = &num[i];
+
+  result = result + ((ULONGEST) high_part << HIGH_BYTE_POSN);
+  if (minus)
+    return -result;
+  else
+    return result;
+}
+
+/* Convert hex digit A to a number.  */
+
+static int
+fromhex (int a)
+{
+  if (a >= '0' && a <= '9')
+    return a - '0';
+  else if (a >= 'a' && a <= 'f')
+    return a - 'a' + 10;
+  else if (a >= 'A' && a <= 'F')
+    return a - 'A' + 10;
+  else
+    error (_("Reply contains invalid hex digit %d"), a);
+}
+
+int
+hex2bin (const char *hex, gdb_byte *bin, int count)
+{
+  int i;
+
+  for (i = 0; i < count; i++)
+    {
+      if (hex[0] == 0 || hex[1] == 0)
+	{
+	  /* Hex string is short, or of uneven length.
+	     Return the count that has been converted so far.  */
+	  return i;
+	}
+      *bin++ = fromhex (hex[0]) * 16 + fromhex (hex[1]);
+      hex += 2;
+    }
+  return i;
+}
+
+/* Convert number NIB to a hex digit.  */
+
+static int
+tohex (int nib)
+{
+  if (nib < 10)
+    return '0' + nib;
+  else
+    return 'a' + nib - 10;
+}
+
+int
+bin2hex (const gdb_byte *bin, char *hex, int count)
+{
+  int i;
+
+  /* May use a length, or a nul-terminated string as input.  */
+  if (count == 0)
+    count = strlen ((char *) bin);
+
+  for (i = 0; i < count; i++)
+    {
+      *hex++ = tohex ((*bin >> 4) & 0xf);
+      *hex++ = tohex (*bin++ & 0xf);
+    }
+  *hex = 0;
+  return i;
+}
+
+/* See documentation in cli-utils.h.  */
+
+char *
+skip_spaces (char *chp)
+{
+  if (chp == NULL)
+    return NULL;
+  while (*chp && isspace (*chp))
+    chp++;
+  return chp;
+}
+
+/* A const-correct version of the above.  */
+
+const char *
+skip_spaces_const (const char *chp)
+{
+  if (chp == NULL)
+    return NULL;
+  while (*chp && isspace (*chp))
+    chp++;
+  return chp;
 }
