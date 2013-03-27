@@ -322,8 +322,6 @@ int decode_search_memory_packet (const char *buf, int packet_len,
 				 gdb_byte *pattern,
 				 unsigned int *pattern_lenp);
 
-int unhexify (char *bin, const char *hex, int count);
-int hexify (char *hex, const char *bin, int count);
 int remote_escape_output (const gdb_byte *buffer, int len,
 			  gdb_byte *out_buf, int *out_len,
 			  int out_maxlen);

@@ -74,6 +74,10 @@ char *savestring (const char *ptr, size_t len);
 
 ULONGEST strtoulst (const char *num, const char **trailer, int base);
 
+extern int fromhex (int a);
+
+extern int tohex (int nib);
+
 extern int hex2bin (const char *hex, gdb_byte *bin, int count);
 
 extern int bin2hex (const gdb_byte *bin, char *hex, int count);

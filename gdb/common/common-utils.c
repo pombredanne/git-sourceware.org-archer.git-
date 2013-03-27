@@ -264,7 +264,7 @@ strtoulst (const char *num, const char **trailer, int base)
 
 /* Convert hex digit A to a number.  */
 
-static int
+int
 fromhex (int a)
 {
   if (a >= '0' && a <= '9')
@@ -274,7 +274,7 @@ fromhex (int a)
   else if (a >= 'A' && a <= 'F')
     return a - 'A' + 10;
   else
-    error (_("Reply contains invalid hex digit %d"), a);
+    error (_("Invalid hex digit %d"), a);
 }
 
 int
@@ -298,7 +298,7 @@ hex2bin (const char *hex, gdb_byte *bin, int count)
 
 /* Convert number NIB to a hex digit.  */
 
-static int
+int
 tohex (int nib)
 {
   if (nib < 10)

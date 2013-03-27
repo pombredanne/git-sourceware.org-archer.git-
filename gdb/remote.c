@@ -126,8 +126,6 @@ static void remote_serial_write (const char *str, int len);
 
 static void remote_kill (struct target_ops *ops);
 
-static int tohex (int nib);
-
 static int remote_can_async_p (void);
 
 static int remote_is_async_p (void);
@@ -183,8 +181,6 @@ static ptid_t remote_current_thread (ptid_t oldptid);
 static void remote_find_new_threads (void);
 
 static void record_currthread (ptid_t currthread);
-
-static int fromhex (int a);
 
 static int putpkt_binary (char *buf, int cnt);
 
@@ -4552,32 +4548,6 @@ static void
 extended_remote_attach (struct target_ops *ops, char *args, int from_tty)
 {
   extended_remote_attach_1 (ops, args, from_tty);
-}
-
-/* Convert hex digit A to a number.  */
-
-static int
-fromhex (int a)
-{
-  if (a >= '0' && a <= '9')
-    return a - '0';
-  else if (a >= 'a' && a <= 'f')
-    return a - 'a' + 10;
-  else if (a >= 'A' && a <= 'F')
-    return a - 'A' + 10;
-  else
-    error (_("Reply contains invalid hex digit %d"), a);
-}
-
-/* Convert number NIB to a hex digit.  */
-
-static int
-tohex (int nib)
-{
-  if (nib < 10)
-    return '0' + nib;
-  else
-    return 'a' + nib - 10;
 }
 
 

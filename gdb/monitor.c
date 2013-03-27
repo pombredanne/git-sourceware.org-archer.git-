@@ -226,21 +226,6 @@ monitor_error (char *function, char *message,
 	   message, safe_string);
 }
 
-/* Convert hex digit A to a number.  */
-
-static int
-fromhex (int a)
-{
-  if (a >= '0' && a <= '9')
-    return a - '0';
-  else if (a >= 'a' && a <= 'f')
-    return a - 'a' + 10;
-  else if (a >= 'A' && a <= 'F')
-    return a - 'A' + 10;
-  else
-    error (_("Invalid hex digit %d"), a);
-}
-
 /* monitor_vsprintf - similar to vsprintf but handles 64-bit addresses
 
    This function exists to get around the problem that many host platforms

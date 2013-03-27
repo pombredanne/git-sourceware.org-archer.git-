@@ -416,20 +416,6 @@ remote_close (void)
   reset_readchar ();
 }
 
-/* Convert hex digit A to a number.  */
-
-static int
-fromhex (int a)
-{
-  if (a >= '0' && a <= '9')
-    return a - '0';
-  else if (a >= 'a' && a <= 'f')
-    return a - 'a' + 10;
-  else
-    error ("Reply contains invalid hex digit");
-  return 0;
-}
-
 #endif
 
 static const char hexchars[] = "0123456789abcdef";
@@ -456,25 +442,6 @@ ishex (int ch, int *val)
 }
 
 #ifndef IN_PROCESS_AGENT
-
-int
-unhexify (char *bin, const char *hex, int count)
-{
-  int i;
-
-  for (i = 0; i < count; i++)
-    {
-      if (hex[0] == 0 || hex[1] == 0)
-	{
-	  /* Hex string is short, or of uneven length.
-	     Return the count that has been converted so far. */
-	  return i;
-	}
-      *bin++ = fromhex (hex[0]) * 16 + fromhex (hex[1]);
-      hex += 2;
-    }
-  return i;
-}
 
 void
 decode_address (CORE_ADDR *addrp, const char *start, int len)
@@ -511,36 +478,7 @@ decode_address_to_semicolon (CORE_ADDR *addrp, const char *start)
 
 #endif
 
-/* Convert number NIB to a hex digit.  */
-
-static int
-tohex (int nib)
-{
-  if (nib < 10)
-    return '0' + nib;
-  else
-    return 'a' + nib - 10;
-}
-
 #ifndef IN_PROCESS_AGENT
-
-int
-hexify (char *hex, const char *bin, int count)
-{
-  int i;
-
-  /* May use a length, or a nul-terminated string as input. */
-  if (count == 0)
-    count = strlen (bin);
-
-  for (i = 0; i < count; i++)
-    {
-      *hex++ = tohex ((*bin >> 4) & 0xf);
-      *hex++ = tohex (*bin++ & 0xf);
-    }
-  *hex = 0;
-  return i;
-}
 
 /* Convert BUFFER, binary data at least LEN bytes long, into escaped
    binary data in OUT_BUF.  Set *OUT_LEN to the length of the data
@@ -1608,7 +1546,8 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
 
   /* Send the request.  */
   strcpy (own_buf, "qSymbol:");
-  hexify (own_buf + strlen ("qSymbol:"), name, strlen (name));
+  bin2hex ((const gdb_byte *) name, own_buf + strlen ("qSymbol:"),
+	   strlen (name));
   if (putpkt (own_buf) < 0)
     return -1;
 
@@ -1770,7 +1709,7 @@ monitor_output (const char *msg)
   char *buf = xmalloc (strlen (msg) * 2 + 2);
 
   buf[0] = 'O';
-  hexify (buf + 1, msg, 0);
+  bin2hex ((const gdb_byte *) msg, buf + 1, 0);
 
   putpkt (buf);
   free (buf);
