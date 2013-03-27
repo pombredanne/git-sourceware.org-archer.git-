@@ -76,11 +76,7 @@ static void gdbsim_kill (struct target_ops *);
 
 static void gdbsim_load (char *prog, int fromtty);
 
-static void gdbsim_open (char *args, int from_tty);
-
 static void gdbsim_close (void);
-
-static void gdbsim_detach (struct target_ops *ops, char *args, int from_tty);
 
 static void gdbsim_prepare_to_store (struct regcache *regcache);
 
