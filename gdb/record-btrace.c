@@ -34,6 +34,7 @@
 #include "filenames.h"
 #include "regcache.h"
 #include "frame-unwind.h"
+#include "hashtab.h"
 
 /* The target_ops of record-btrace.  */
 static struct target_ops record_btrace_ops;
@@ -500,6 +501,25 @@ btrace_call_history_src_line (struct ui_out *uiout,
   ui_out_field_int (uiout, "max line", end);
 }
 
+/* Get the name of a branch trace function.  */
+
+static const char *
+btrace_get_bfun_name (const struct btrace_function *bfun)
+{
+  struct minimal_symbol *msym;
+  struct symbol *sym;
+
+  msym = bfun->msym;
+  sym = bfun->sym;
+
+  if (sym != NULL)
+    return SYMBOL_PRINT_NAME (sym);
+  else if (msym != NULL)
+    return SYMBOL_PRINT_NAME (msym);
+  else
+    return "<unknown>";
+}
+
 /* Disassemble a section of the recorded function trace.  */
 
 static void
@@ -515,12 +535,6 @@ btrace_call_history (struct ui_out *uiout,
 
   for (bfun = begin; bfun != end; bfun = bfun->flow.next)
     {
-      struct minimal_symbol *msym;
-      struct symbol *sym;
-
-      msym = bfun->msym;
-      sym = bfun->sym;
-
       /* Print the function index.  */
       ui_out_field_uint (uiout, "index", bfun->number);
       ui_out_text (uiout, "\t");
@@ -533,12 +547,7 @@ btrace_call_history (struct ui_out *uiout,
 	    ui_out_text (uiout, "  ");
 	}
 
-      if (sym != NULL)
-	ui_out_field_string (uiout, "function", SYMBOL_PRINT_NAME (sym));
-      else if (msym != NULL)
-	ui_out_field_string (uiout, "function", SYMBOL_PRINT_NAME (msym));
-      else
-	ui_out_field_string (uiout, "function", "<unknown>");
+      ui_out_field_string (uiout, "function", btrace_get_bfun_name (bfun));
 
       if ((flags & record_print_insn_range) != 0)
 	{
@@ -942,13 +951,114 @@ record_btrace_prepare_to_store (struct target_ops *ops,
       }
 }
 
+/* A collection of branch trace frame flags.  */
+
+enum btrace_frame_flag
+  {
+    /* The PC when unwinding into this frame points to the first insn.  */
+    pc_is_first = 1 << 0,
+
+    /* The PC when unwinding into this frame points to the last insn.  */
+    pc_is_last = 1 << 1,
+
+    /* The PC when unwinding into this frame points to the instruction
+       following the last insn.  */
+    pc_is_next = 1 << 2
+  };
+
+/* The branch trace frame cache.  */
+
+struct btrace_frame_cache
+{
+  /* The thread.  */
+  struct thread_info *tp;
+
+  /* The frame info.  */
+  struct frame_info *frame;
+
+  /* The branch trace function segment.  */
+  struct btrace_function *bfun;
+
+  /* A bit-vector of btrace frame flags.  */
+  unsigned int flags;
+};
+
+/* A struct btrace_frame_cache hash table indexed by NEXT.  */
+
+static htab_t bfcache;
+
+/* hash_f for htab_create_alloc of bfcache.  */
+
+static hashval_t
+bfcache_hash (const void *arg)
+{
+  const struct btrace_frame_cache *cache = arg;
+
+  return htab_hash_pointer (cache->frame);
+}
+
+/* eq_f for htab_create_alloc of bfcache.  */
+
+static int
+bfcache_eq (const void *arg1, const void *arg2)
+{
+  const struct btrace_frame_cache *cache1 = arg1;
+  const struct btrace_frame_cache *cache2 = arg2;
+
+  return cache1->frame == cache2->frame;
+}
+
+/* Create a new btrace frame cache.  */
+
+static struct btrace_frame_cache *
+bfcache_new (struct frame_info *frame)
+{
+  struct btrace_frame_cache *cache;
+  void **slot;
+
+  cache = FRAME_OBSTACK_ZALLOC (struct btrace_frame_cache);
+  cache->frame = frame;
+
+  slot = htab_find_slot (bfcache, cache, INSERT);
+  gdb_assert (*slot == NULL);
+  *slot = cache;
+
+  return cache;
+}
+
+/* Extract the branch trace function from a branch trace frame.  */
+
+static struct btrace_function *
+btrace_get_frame_function (struct frame_info *frame)
+{
+  struct btrace_frame_cache *cache, pattern;
+  struct btrace_function *bfun;
+  void **slot;
+
+  pattern.frame = frame;
+
+  slot = htab_find_slot (bfcache, &pattern, NO_INSERT);
+  if (slot == NULL)
+    return NULL;
+
+  cache = *slot;
+  return cache->bfun;
+}
+
 /* Implement stop_reason method for record_btrace_frame_unwind.  */
 
 static enum unwind_stop_reason
 record_btrace_frame_unwind_stop_reason (struct frame_info *this_frame,
 					void **this_cache)
 {
-  return UNWIND_UNAVAILABLE;
+  struct btrace_frame_cache *cache;
+
+  cache = *this_cache;
+
+  if (cache->bfun == NULL)
+    return UNWIND_UNAVAILABLE;
+
+  return UNWIND_NO_REASON;
 }
 
 /* Implement this_id method for record_btrace_frame_unwind.  */
@@ -957,7 +1067,22 @@ static void
 record_btrace_frame_this_id (struct frame_info *this_frame, void **this_cache,
 			     struct frame_id *this_id)
 {
-  /* Leave there the outer_frame_id value.  */
+  struct btrace_frame_cache *cache;
+
+  cache = *this_cache;
+
+  memset (this_id, 0, sizeof (*this_id));
+
+  this_id->code_addr = get_frame_pc (this_frame);
+  this_id->code_addr_p = 1;
+
+  /* GDB requires frame id's to provide a stack address.  */
+  this_id->stack_addr_p = 1;
+
+  /* We encode the btrace function pointer into the frame id to get
+     frame ids unique.  */
+  this_id->special_addr = (CORE_ADDR) cache->bfun;
+  this_id->special_addr_p = 1;
 }
 
 /* Implement prev_register method for record_btrace_frame_unwind.  */
@@ -967,8 +1092,46 @@ record_btrace_frame_prev_register (struct frame_info *this_frame,
 				   void **this_cache,
 				   int regnum)
 {
-  throw_error (NOT_AVAILABLE_ERROR,
-              _("Registers are not available in btrace record history"));
+  struct btrace_frame_cache *cache;
+  struct btrace_function *bfun;
+  struct btrace_insn *insn;
+  struct gdbarch *gdbarch;
+  CORE_ADDR pc;
+  int pcreg;
+
+  gdbarch = get_frame_arch (this_frame);
+  pcreg = gdbarch_pc_regnum (gdbarch);
+  if (pcreg < 0 || regnum != pcreg)
+    throw_error (NOT_AVAILABLE_ERROR,
+		 _("Registers are not available in btrace record history"));
+
+  cache = *this_cache;
+  bfun = cache->bfun;
+  gdb_assert (bfun != NULL);
+
+  if (VEC_empty (btrace_insn_s, bfun->insn))
+    throw_error (NOT_AVAILABLE_ERROR,
+		 _("Registers are not available in btrace record history"));
+
+  if ((cache->flags & pc_is_first) != 0)
+    {
+      insn = VEC_index (btrace_insn_s, bfun->insn, 0);
+      pc = insn->pc;
+    }
+  else
+    {
+      insn = VEC_last (btrace_insn_s, bfun->insn);
+      pc = insn->pc;
+
+      if ((cache->flags & pc_is_next) != 0)
+	pc += gdb_insn_length (gdbarch, pc);
+    }
+
+  DEBUG ("[frame] unwound PC for %s on level %d: %s",
+	 btrace_get_bfun_name (bfun), bfun->level,
+	 core_addr_to_string_nz (pc));
+
+  return frame_unwind_got_address (this_frame, regnum, pc);
 }
 
 /* Implement sniffer method for record_btrace_frame_unwind.  */
@@ -981,6 +1144,10 @@ record_btrace_frame_sniffer (const struct frame_unwind *self,
   struct thread_info *tp;
   struct btrace_thread_info *btinfo;
   struct btrace_insn_iterator *replay;
+  struct btrace_frame_cache *cache;
+  struct btrace_function *bfun;
+  struct frame_info *next;
+  unsigned int flags;
 
   /* This doesn't seem right.  Yet, I don't see how I could get from a frame
      to its thread.  */
@@ -988,7 +1155,72 @@ record_btrace_frame_sniffer (const struct frame_unwind *self,
   if (tp == NULL)
     return 0;
 
-  return btrace_is_replaying (tp);
+  replay = tp->btrace.replay;
+  if (replay == NULL)
+    return 0;
+
+  /* Find the next frame's branch trace function.  */
+  flags = 0;
+  next = get_next_frame (this_frame);
+  if (next == NULL)
+    {
+      /* The sentinel frame below corresponds to our replay position.  */
+      bfun = replay->function;
+      flags |= pc_is_last;
+    }
+  else
+    {
+      /* This is an outer frame.  It must be the predecessor of another
+	 branch trace frame.  Let's get this frame's branch trace function
+	 so we can compute our own.  */
+      bfun = btrace_get_frame_function (next);
+
+      if (bfun != NULL)
+	{
+	  if ((bfun->flags & bfun_up_links_to_ret) != 0)
+	    flags |= pc_is_first;
+	  else if ((bfun->flags & bfun_up_links_to_tailcall) != 0)
+	    flags |= pc_is_last;
+	  else
+	    flags |= pc_is_next;
+	}
+    }
+
+  /* If we did not find a branch trace function, this is not our frame.  */
+  if (bfun == NULL)
+    return 0;
+
+  /* Go up to the calling function segment.  */
+  bfun = bfun->up;
+
+  if (bfun != NULL)
+    DEBUG ("[frame] sniffed frame for %s on level %d",
+	   btrace_get_bfun_name (bfun), bfun->level);
+  else
+    DEBUG ("[frame] sniffed top btrace frame");
+
+  /* This is our frame.  Initialize the frame cache.  */
+  cache = bfcache_new (this_frame);
+  cache->tp = tp;
+  cache->bfun = bfun;
+  cache->flags = flags;
+
+  *this_cache = cache;
+  return 1;
+}
+
+static void
+record_btrace_frame_dealloc_cache (struct frame_info *self, void *this_cache)
+{
+  struct btrace_frame_cache *cache;
+  void **slot;
+
+  cache = this_cache;
+
+  slot = htab_find_slot (bfcache, cache, NO_INSERT);
+  gdb_assert (slot != NULL);
+
+  htab_remove_elt (bfcache, cache);
 }
 
 /* btrace recording does not store previous memory content, neither the stack
@@ -999,12 +1231,13 @@ record_btrace_frame_sniffer (const struct frame_unwind *self,
 
 static const struct frame_unwind record_btrace_frame_unwind =
 {
-  NORMAL_FRAME,
+  BTRACE_FRAME,
   record_btrace_frame_unwind_stop_reason,
   record_btrace_frame_this_id,
   record_btrace_frame_prev_register,
   NULL,
-  record_btrace_frame_sniffer
+  record_btrace_frame_sniffer,
+  record_btrace_frame_dealloc_cache
 };
 
 /* The to_resume method of target record-btrace.  */
@@ -1201,4 +1434,7 @@ _initialize_record_btrace (void)
 
   init_record_btrace_ops ();
   add_target (&record_btrace_ops);
+
+  bfcache = htab_create_alloc (50, bfcache_hash, bfcache_eq, NULL,
+			       xcalloc, xfree);
 }

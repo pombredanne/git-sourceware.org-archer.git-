@@ -216,7 +216,9 @@ enum frame_type
   ARCH_FRAME,
   /* Sentinel or registers frame.  This frame obtains register values
      direct from the inferior's registers.  */
-  SENTINEL_FRAME
+  SENTINEL_FRAME,
+  /* A branch tracing frame.  */
+  BTRACE_FRAME
 };
 
 /* For every stopped thread, GDB tracks two frames: current and

@@ -47,3 +47,20 @@ gdb_test "record function-call-history /c 0" "
 0\t  foo\r
 1\t    bar\r
 2\tmain" "tailcall - calls indented"
+
+# go into bar
+gdb_test "record goto 2" "
+.*bar \\(\\) at .*x86-tailcall.c:24.*" "go to bar"
+
+# check the backtrace
+gdb_test "backtrace" "
+#0.*bar.*at .*x86-tailcall.c:24.*\r
+#1.*foo.*at .*x86-tailcall.c:29.*\r
+#2.*main.*at .*x86-tailcall.c:37.*\r
+Backtrace stopped: not enough registers or memory available to unwind further" "backtrace in bar"
+
+# walk the backtrace
+gdb_test "up" "
+.*foo \\(\\) at .*x86-tailcall.c:29.*" "up to foo"
+gdb_test "up" "
+.*main \\(\\) at .*x86-tailcall.c:37.*" "up to main"

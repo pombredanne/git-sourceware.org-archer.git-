@@ -4,6 +4,8 @@
 *** Changes since GDB 7.6
 
 * The btrace record target supports the 'record goto' command.
+  For locations inside the execution trace, the back trace is computed
+  based on the information stored in the execution trace.
 
 * The command 'record function-call-history' supports a new modifier '/c' to
   indent the function names based on their call stack depth.
