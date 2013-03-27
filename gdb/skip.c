@@ -16,6 +16,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "skip.h"
 #include "value.h"
 #include "valprint.h"
@@ -23,7 +24,6 @@
 #include "gdb_string.h"
 #include "symtab.h"
 #include "gdbcmd.h"
-#include "command.h"
 #include "completer.h"
 #include "stack.h"
 #include "cli/cli-utils.h"
@@ -68,7 +68,7 @@ static int skiplist_entry_count;
        E = TMP)
 
 static void
-skip_file_command (char *arg, int from_tty)
+skip_file_command (const char *arg, int from_tty)
 {
   struct skiplist_entry *e;
   struct symtab *symtab;
@@ -111,7 +111,7 @@ Ignore file pending future shared library load? ")))
 }
 
 static void
-skip_function_command (char *arg, int from_tty)
+skip_function_command (const char *arg, int from_tty)
 {
   const char *name = NULL;
 
@@ -152,7 +152,7 @@ Ignore function pending future shared library load? ")))
 }
 
 static void
-skip_info (char *arg, int from_tty)
+skip_info (const char *arg, int from_tty)
 {
   struct skiplist_entry *e;
   int num_printable_entries = 0;
@@ -227,7 +227,7 @@ Skiplist entry should have either a filename or a function name."));
 }
 
 static void
-skip_enable_command (char *arg, int from_tty)
+skip_enable_command (const char *arg, int from_tty)
 {
   struct skiplist_entry *e;
   int found = 0;
@@ -244,7 +244,7 @@ skip_enable_command (char *arg, int from_tty)
 }
 
 static void
-skip_disable_command (char *arg, int from_tty)
+skip_disable_command (const char *arg, int from_tty)
 {
   struct skiplist_entry *e;
   int found = 0;
@@ -261,7 +261,7 @@ skip_disable_command (char *arg, int from_tty)
 }
 
 static void
-skip_delete_command (char *arg, int from_tty)
+skip_delete_command (const char *arg, int from_tty)
 {
   struct skiplist_entry *e, *temp, *b_prev;
   int found = 0;
