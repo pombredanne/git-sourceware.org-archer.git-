@@ -27,7 +27,7 @@
    this code too.  */
 
 #include "defs.h"
-#include "command.h"
+#include "const-command.h"
 #include "gdbcore.h"
 #include "inferior.h"
 #include "target.h"
