@@ -20,6 +20,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "arch-utils.h"
 #include "gdbcmd.h"
 #include "gdbtypes.h"
@@ -1548,25 +1549,25 @@ static struct cmd_list_element *tdesc_unset_cmdlist;
 /* Helper functions for the CLI commands.  */
 
 static void
-set_tdesc_cmd (char *args, int from_tty)
+set_tdesc_cmd (const char *args, int from_tty)
 {
   help_list (tdesc_set_cmdlist, "set tdesc ", -1, gdb_stdout);
 }
 
 static void
-show_tdesc_cmd (char *args, int from_tty)
+show_tdesc_cmd (const char *args, int from_tty)
 {
   cmd_show_list (tdesc_show_cmdlist, from_tty, "");
 }
 
 static void
-unset_tdesc_cmd (char *args, int from_tty)
+unset_tdesc_cmd (const char *args, int from_tty)
 {
   help_list (tdesc_unset_cmdlist, "unset tdesc ", -1, gdb_stdout);
 }
 
 static void
-set_tdesc_filename_cmd (char *args, int from_tty,
+set_tdesc_filename_cmd (const char *args, int from_tty,
 			struct cmd_list_element *c)
 {
   xfree (target_description_filename);
@@ -1592,7 +1593,7 @@ show_tdesc_filename_cmd (struct ui_file *file, int from_tty,
 }
 
 static void
-unset_tdesc_filename_cmd (char *args, int from_tty)
+unset_tdesc_filename_cmd (const char *args, int from_tty)
 {
   xfree (target_description_filename);
   target_description_filename = NULL;
@@ -1601,7 +1602,7 @@ unset_tdesc_filename_cmd (char *args, int from_tty)
 }
 
 static void
-maint_print_c_tdesc_cmd (char *args, int from_tty)
+maint_print_c_tdesc_cmd (const char *args, int from_tty)
 {
   const struct target_desc *tdesc;
   const struct bfd_arch_info *compatible;
