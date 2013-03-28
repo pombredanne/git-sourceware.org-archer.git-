@@ -1419,9 +1419,11 @@ do_captured_thread_select (struct ui_out *uiout, void *tidstr)
 }
 
 enum gdb_rc
-gdb_thread_select (struct ui_out *uiout, char *tidstr, char **error_message)
+gdb_thread_select (struct ui_out *uiout, const char *tidstr,
+		   char **error_message)
 {
-  if (catch_exceptions_with_msg (uiout, do_captured_thread_select, tidstr,
+  if (catch_exceptions_with_msg (uiout, do_captured_thread_select,
+				 (void *) tidstr,
 				 error_message, RETURN_MASK_ALL) < 0)
     return GDB_RC_FAIL;
   return GDB_RC_OK;

@@ -48,7 +48,7 @@ enum gdb_rc gdb_breakpoint_query (struct ui_out *uiout, int bnum,
 				  char **error_message);
 
 /* Switch thread and print notification.  */
-enum gdb_rc gdb_thread_select (struct ui_out *uiout, char *tidstr,
+enum gdb_rc gdb_thread_select (struct ui_out *uiout, const char *tidstr,
 			       char **error_message);
 
 /* Print a list of known thread ids.  */
