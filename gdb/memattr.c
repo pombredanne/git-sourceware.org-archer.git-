@@ -18,7 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
-#include "command.h"
+#include "const-command.h"
 #include "gdbcmd.h"
 #include "memattr.h"
 #include "target.h"
@@ -313,11 +313,12 @@ mem_clear (void)
 
 
 static void
-mem_command (char *args, int from_tty)
+mem_command (const char *args, int from_tty)
 {
   CORE_ADDR lo, hi;
   char *tok;
   struct mem_attrib attrib;
+  struct cleanup *cleanup;
 
   if (!args)
     error_no_arg (_("No mem"));
@@ -340,19 +341,23 @@ mem_command (char *args, int from_tty)
 
   require_user_regions (from_tty);
 
-  tok = strtok (args, " \t");
+  tok = extract_arg_const (&args);
   if (!tok)
     error (_("no lo address"));
+  cleanup = make_cleanup (xfree, tok);
   lo = parse_and_eval_address (tok);
 
-  tok = strtok (NULL, " \t");
+  tok = extract_arg_const (&args);
   if (!tok)
     error (_("no hi address"));
+  make_cleanup (xfree, tok);
   hi = parse_and_eval_address (tok);
 
   attrib = default_mem_attrib;
-  while ((tok = strtok (NULL, " \t")) != NULL)
+  while ((tok = extract_arg_const (&args)) != NULL)
     {
+      make_cleanup (xfree, tok);
+
       if (strcmp (tok, "rw") == 0)
 	attrib.mode = MEM_RW;
       else if (strcmp (tok, "ro") == 0)
@@ -405,11 +410,13 @@ mem_command (char *args, int from_tty)
     }
 
   create_mem_region (lo, hi, &attrib);
+
+  do_cleanups (cleanup);
 }
 
 
 static void
-mem_info_command (char *args, int from_tty)
+mem_info_command (const char *args, int from_tty)
 {
   struct mem_region *m;
   struct mem_attrib *attrib;
@@ -561,7 +568,7 @@ mem_enable (int num)
 }
 
 static void
-mem_enable_command (char *args, int from_tty)
+mem_enable_command (const char *args, int from_tty)
 {
   int num;
   struct mem_region *m;
@@ -608,7 +615,7 @@ mem_disable (int num)
 }
 
 static void
-mem_disable_command (char *args, int from_tty)
+mem_disable_command (const char *args, int from_tty)
 {
   int num;
   struct mem_region *m;
@@ -664,7 +671,7 @@ mem_delete (int num)
 }
 
 static void
-mem_delete_command (char *args, int from_tty)
+mem_delete_command (const char *args, int from_tty)
 {
   int num;
   struct get_number_or_range_state state;
@@ -692,7 +699,7 @@ mem_delete_command (char *args, int from_tty)
 }
 
 static void
-dummy_cmd (char *args, int from_tty)
+dummy_cmd (const char *args, int from_tty)
 {
 }
 
