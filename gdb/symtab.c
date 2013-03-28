@@ -2940,8 +2940,8 @@ skip_prologue_sal (struct symtab_and_line *sal)
    beginning of the substring of the operator text.
    Otherwise, return "".  */
 
-static char *
-operator_chars (char *p, char **end)
+static const char *
+operator_chars (const char *p, const char **end)
 {
   *end = "";
   if (strncmp (p, "operator", 8))
@@ -2961,7 +2961,7 @@ operator_chars (char *p, char **end)
 
   if (isalpha (*p) || *p == '_' || *p == '$')
     {
-      char *q = p + 1;
+      const char *q = p + 1;
 
       while (isalnum (*q) || *q == '_' || *q == '$')
 	q++;
@@ -3384,7 +3384,7 @@ search_symbols_name_matches (const char *symname, void *user_data)
    separately alphabetized.  */
 
 void
-search_symbols (char *regexp, enum search_domain kind,
+search_symbols (const char *regexp, enum search_domain kind,
 		int nfiles, char *files[],
 		struct symbol_search **matches)
 {
@@ -3436,8 +3436,8 @@ search_symbols (char *regexp, enum search_domain kind,
          This is just a courtesy to make the matching less sensitive
          to how many spaces the user leaves between 'operator'
          and <TYPENAME> or <OPERATOR>.  */
-      char *opend;
-      char *opname = operator_chars (regexp, &opend);
+      const char *opend;
+      const char *opname = operator_chars (regexp, &opend);
       int errcode;
 
       if (*opname)
