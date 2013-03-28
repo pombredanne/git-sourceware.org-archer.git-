@@ -30,6 +30,7 @@
    them take over the input in their resume proc.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "gdbcmd.h"
 #include "ui-out.h"
 #include "event-loop.h"
@@ -401,7 +402,7 @@ initialize_interps (void)
 }
 
 static void
-interpreter_exec_cmd (char *args, int from_tty)
+interpreter_exec_cmd (const char *args, int from_tty)
 {
   struct interp *old_interp, *interp_to_use;
   char **prules = NULL;
