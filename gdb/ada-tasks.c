@@ -16,6 +16,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
+#include "const-command.h"
 #include "observer.h"
 #include "gdbcmd.h"
 #include "target.h"
@@ -1151,7 +1152,7 @@ print_ada_task_info (struct ui_out *uiout,
    for the given inferior (INF).  */
 
 static void
-info_task (struct ui_out *uiout, char *taskno_str, struct inferior *inf)
+info_task (struct ui_out *uiout, const char *taskno_str, struct inferior *inf)
 {
   const int taskno = value_as_long (parse_and_eval (taskno_str));
   struct ada_task_info *task_info;
@@ -1242,7 +1243,7 @@ info_task (struct ui_out *uiout, char *taskno_str, struct inferior *inf)
    Does nothing if the program doesn't use Ada tasking.  */
 
 static void
-info_tasks_command (char *arg, int from_tty)
+info_tasks_command (const char *arg, int from_tty)
 {
   struct ui_out *uiout = current_uiout;
 
@@ -1270,7 +1271,7 @@ display_current_task_id (void)
    that task.  Print an error message if the task switch failed.  */
 
 static void
-task_command_1 (char *taskno_str, int from_tty, struct inferior *inf)
+task_command_1 (const char *taskno_str, int from_tty, struct inferior *inf)
 {
   const int taskno = value_as_long (parse_and_eval (taskno_str));
   struct ada_task_info *task_info;
@@ -1318,7 +1319,7 @@ task_command_1 (char *taskno_str, int from_tty, struct inferior *inf)
    Otherwise, switch to the task indicated by TASKNO_STR.  */
 
 static void
-task_command (char *taskno_str, int from_tty)
+task_command (const char *taskno_str, int from_tty)
 {
   struct ui_out *uiout = current_uiout;
 
