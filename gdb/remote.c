@@ -101,7 +101,8 @@ void async_remote_interrupt_twice (gdb_client_data);
 
 static void remote_files_info (struct target_ops *ignore);
 
-static void remote_prepare_to_store (struct regcache *regcache);
+static void remote_prepare_to_store (struct target_ops *ops,
+				     struct regcache *regcache);
 
 static void remote_open (char *name, int from_tty);
 
@@ -6270,7 +6271,7 @@ remote_fetch_registers (struct target_ops *ops,
    first.  */
 
 static void
-remote_prepare_to_store (struct regcache *regcache)
+remote_prepare_to_store (struct target_ops *ops, struct regcache *regcache)
 {
   struct remote_arch_state *rsa = get_remote_arch_state ();
   int i;

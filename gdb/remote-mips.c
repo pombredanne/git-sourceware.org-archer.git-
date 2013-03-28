@@ -92,7 +92,8 @@ static int mips_map_regno (struct gdbarch *, int);
 
 static void mips_set_register (int regno, ULONGEST value);
 
-static void mips_prepare_to_store (struct regcache *regcache);
+static void mips_prepare_to_store (struct target_ops *ops,
+				   struct regcache *regcache);
 
 static int mips_fetch_word (CORE_ADDR addr, unsigned int *valp);
 
@@ -2058,7 +2059,7 @@ mips_fetch_registers (struct target_ops *ops,
    registers, so this function doesn't have to do anything.  */
 
 static void
-mips_prepare_to_store (struct regcache *regcache)
+mips_prepare_to_store (struct target_ops *ops, struct regcache *regcache)
 {
 }
 

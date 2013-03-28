@@ -96,8 +96,6 @@ static struct target_ops debug_target;
 
 static void debug_to_open (char *, int);
 
-static void debug_to_prepare_to_store (struct regcache *);
-
 static void debug_to_files_info (struct target_ops *);
 
 static int debug_to_insert_breakpoint (struct gdbarch *,
@@ -626,7 +624,7 @@ update_current_target (void)
       /* Do not inherit to_wait.  */
       /* Do not inherit to_fetch_registers.  */
       /* Do not inherit to_store_registers.  */
-      INHERIT (to_prepare_to_store, t);
+      /* Do not inherit to_prepare_to_store.  */
       INHERIT (deprecated_xfer_memory, t);
       INHERIT (to_files_info, t);
       INHERIT (to_insert_breakpoint, t);
@@ -759,9 +757,6 @@ update_current_target (void)
   de_fault (to_post_attach,
 	    (void (*) (int))
 	    target_ignore);
-  de_fault (to_prepare_to_store,
-	    (void (*) (struct regcache *))
-	    noprocess);
   de_fault (deprecated_xfer_memory,
 	    (int (*) (CORE_ADDR, gdb_byte *, int, int,
 		      struct mem_attrib *, struct target_ops *))
@@ -4056,6 +4051,26 @@ target_store_registers (struct regcache *regcache, int regno)
   noprocess ();
 }
 
+/* See target.h.  */
+
+void
+target_prepare_to_store (struct regcache *regcache)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_prepare_to_store != NULL)
+	{
+	  t->to_prepare_to_store (t, regcache);
+	  if (targetdebug)
+	    fprintf_unfiltered (gdb_stdlog, "target_prepare_to_store");
+
+	  return;
+	}
+    }
+}
+
 int
 target_core_of_thread (ptid_t ptid)
 {
@@ -4506,14 +4521,6 @@ target_call_history_range (ULONGEST begin, ULONGEST end, int flags)
       }
 
   tcomplain ();
-}
-
-static void
-debug_to_prepare_to_store (struct regcache *regcache)
-{
-  debug_target.to_prepare_to_store (regcache);
-
-  fprintf_unfiltered (gdb_stdlog, "target_prepare_to_store ()\n");
 }
 
 static int
@@ -4967,7 +4974,6 @@ setup_target_debug (void)
 
   current_target.to_open = debug_to_open;
   current_target.to_post_attach = debug_to_post_attach;
-  current_target.to_prepare_to_store = debug_to_prepare_to_store;
   current_target.deprecated_xfer_memory = deprecated_debug_xfer_memory;
   current_target.to_files_info = debug_to_files_info;
   current_target.to_insert_breakpoint = debug_to_insert_breakpoint;
