@@ -1,3 +1,103 @@
+2013-03-28  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/15294
+
+	* source.c (_initialize_source): Change back "set listsize" to an
+	integer command.
+
+2013-03-27  Gareth McMullin  <gareth@blacksphere.co.nz>
+
+	PR gdb/15275
+	* remote.c (remote_get_trace_status): Include putpkt in TRY_CATCH.
+
+2013-03-27  Pedro Alves  <palves@redhat.com>
+
+	* top.c (history_size): Rename to ...
+	(history_size_setshow_var): ... this.  Add comment.
+	(show_commands): Use readline's 'history_length' instead of
+	computing the history length by calling history_get in a loop.
+	(set_history_size_command): Error out for sizes over INT_MAX.
+	Restore previous history size on invalid size.
+	(init_history): If HISTSIZE is negative, leave the history size as
+	zero.  Add comments.
+	(init_main): Adjust.
+
+2013-03-27  Pedro Alves  <palves@redhat.com>
+
+	* coff-pe-read.c (_initialize_coff_pe_read): Rename "set debug
+	coff_pe_read" command to "set debug coff-pe-read".
+
+2013-03-27  Markus Metzger  <markus.t.metzger@intel.com>
+
+	* record.c (command_size_to_target_size): Fix size comparison.
+	Change parameter type from pointer to integer to integer.
+	Update all users.
+
+2013-03-27  Pierre Muller  <muller@sourceware.org>
+
+	* windows-nat.c (handle_output_debug_string): Avoid typecast
+	from integer of different size warning.
+
+2013-03-26  Joel Brobecker  <brobecker@adacore.com>
+
+	* windows-nat.c (handle_output_debug_string): Add empty line
+	after local block variable definition.
+
+2013-03-26  Pedro Alves  <palves@redhat.com>
+
+	* ser-tcp.c (wait_for_connect): Make 'polls' parameter unsigned.
+	(net_open): Make 'polls' local unsigned.
+
+2013-03-26  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (_initialize_remote): Make "set remoteaddresssize"
+	a zuinteger command instead of uinteger.
+
+2013-03-26  Pedro Alves  <palves@redhat.com>
+
+	* record-full.c (record_full_insn_num): Make it unsigned.
+	(record_full_check_insn_num, record_full_message)
+	(record_full_registers_change, record_full_xfer_partial): Remove
+	record_full_insn_max_num check (it's always != 0).
+	(record_full_info, record_full_restore): Use %u as format string.
+	(): Use %u as format string.
+	(set_record_full_insn_max_num): Remove record_full_insn_max_num
+	check (it's always != 0).
+
+2013-03-26  Pedro Alves  <palves@redhat.com>
+
+	* dcache.c (_initialize_dcache): Make the "set dcache line-size"
+	and "set dcache size" commands zuinteger instead of uinteger.
+
+2013-03-26  Pedro Alves  <palves@redhat.com>
+
+	* cris-tdep.c (_initialize_cris_tdep): Make the "set cris-version"
+	command zuinteger instead of uinteger.
+
+2013-03-26  Pedro Alves  <palves@redhat.com>
+
+	* coff-pe-read.c (_initialize_coff_pe_read): Make the command
+	zuinteger instead of uinteger.
+
+2013-03-26  Pedro Alves  <palves@redhat.com>
+
+	* record.c (record_insn_history_size_setshow_var)
+	(record_call_history_size_setshow_var): New globals.
+	(command_size_to_target_size): New function.
+	(cmd_record_insn_history, cmd_record_call_history): Use
+	command_size_to_target_size instead of cast.
+	(validate_history_size, set_record_insn_history_size)
+	(set_record_call_history_size): New functions.
+	(_initialize_record): Install set_record_insn_history_size and
+	set_record_call_history_size as "set" hooks of "set record
+	instruction-history-size" and "set record
+	function-call-history-size".
+
+2013-03-26  Pedro Alves  <palves@redhat.com>
+
+	* top.c (gdb_rl_operate_and_get_next): Replace max_input_history
+	use with history_max_entries use.  Remove FIXME note.
+
 2013-03-26  Markus Metzger  <markus.t.metzger@intel.com>
 
 	* record-btrace.c (record_btrace_close): Call

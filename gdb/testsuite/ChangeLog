@@ -1,3 +1,47 @@
+2013-03-28  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/15294
+
+	* gdb.base/list.exp (set_listsize): Adjust to accept $arg == 0 to
+	mean unlimited instead of $arg < 0.
+	(test_listsize): Remove "listsize of 0 suppresses output" test.
+	Test that "set listsize 0" ends up with an unlimited listsize.
+
+2013-03-28  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/list.exp (last_line): New global.
+	(last_line_re): New global.
+	(test_listsize, test_list_function, test_list_forward)
+	(test_repeat_list_command, test_list_range)
+	(test_list_filename_and_function): Use them.
+	* gdb.base/list0.c: Comment the last line of the file with "last
+	line".
+
+2013-03-28  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/list.exp (test_listsize): Adjust test to make sure we
+	list the whole file.
+
+2013-03-28  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/list.exp (set_listsize): Use gdb_test_no_output for
+	"set listsize".
+
+2013-03-26  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.base/dprintf.exp: Fix typo preventing "dprintf info 2"
+	from passing.
+
+2013-03-26  Pedro Alves  <palves@redhat.com>
+
+	* lib/gdb.exp (skip_btrace_tests): Delay deleting the source file
+	until after GDB has run.
+
+2013-03-26  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/actions.c, gdb.trace/circ.c: Add license header.
+	* gdb.trace/collection.c, gdb.trace/tfile.c: Likewise.
+
 2013-03-26  Markus Metzger  <markus.t.metzger@intel.com>
 
 	* gdb.btrace/enable.exp: Add regression test.

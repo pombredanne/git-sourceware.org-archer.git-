@@ -10708,10 +10708,9 @@ remote_get_trace_status (struct trace_status *ts)
 
   trace_regblock_size = get_remote_arch_state ()->sizeof_g_packet;
 
-  putpkt ("qTStatus");
-
   TRY_CATCH (ex, RETURN_MASK_ERROR)
     {
+      putpkt ("qTStatus");
       p = remote_get_noisy_reply (&target_buf, &target_buf_size);
     }
   if (ex.reason < 0)
@@ -11799,13 +11798,13 @@ Specify a negative limit for unlimited."),
 					   breakpoints is %s.  */
 			    &remote_set_cmdlist, &remote_show_cmdlist);
 
-  add_setshow_uinteger_cmd ("remoteaddresssize", class_obscure,
-			    &remote_address_size, _("\
+  add_setshow_zuinteger_cmd ("remoteaddresssize", class_obscure,
+			     &remote_address_size, _("\
 Set the maximum size of the address (in bits) in a memory packet."), _("\
 Show the maximum size of the address (in bits) in a memory packet."), NULL,
-			    NULL,
-			    NULL, /* FIXME: i18n: */
-			    &setlist, &showlist);
+			     NULL,
+			     NULL, /* FIXME: i18n: */
+			     &setlist, &showlist);
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_X],
 			 "X", "binary-download", 1);
