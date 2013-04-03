@@ -20,8 +20,121 @@ import gdb
 from gdb.FrameIterator import FrameIterator
 from gdb.FrameDecorator import FrameDecorator
 import itertools
-import gdb.command.frame_filters as ffc
 import collections
+
+def get_priority(filter_item):
+    """ Internal worker function to return the frame-filter's priority
+    from a frame filter object.  This is a fail free function as it is
+    used in sorting and filtering.  If a badly implemented frame
+    filter does not implement the priority attribute, return zero
+    (otherwise sorting/filtering will fail and prevent other frame
+    filters from executing).
+
+    Arguments:
+        filter_item: An object conforming to the frame filter
+                     interface.
+
+    Returns:
+        The priority of the frame filter from the "priority"
+        attribute, or zero.
+    """
+    # Do not fail here, as the sort will fail.  If a filter has not
+    # (incorrectly) set a priority, set it to zero.
+    if hasattr(filter_item, "priority"):
+        return filter_item.priority
+    else:
+        return 0
+
+def set_priority(filter_item, priority):
+    """ Internal worker function to set the frame-filter's priority.
+
+    Arguments:
+        filter_item: An object conforming to the frame filter
+                     interface.
+        priority: The priority to assign as an integer.
+    """
+
+    filter_item.priority = priority
+
+def get_enabled(filter_item):
+    """ Internal worker function to return a filter's enabled state
+    from a frame filter object.  This is a fail free function as it is
+    used in sorting and filtering.  If a badly implemented frame
+    filter does not implement the enabled attribute, return False
+    (otherwise sorting/filtering will fail and prevent other frame
+    filters from executing).
+
+    Arguments:
+        filter_item: An object conforming to the frame filter
+                     interface.
+
+    Returns:
+        The enabled state of the frame filter from the "enabled"
+        attribute, or False.
+    """
+
+    # If the filter class is badly implemented when called from the
+    # Python filter command, do not cease filter operations, just set
+    # enabled to False.
+    if hasattr(filter_item, "enabled"):
+        return filter_item.enabled
+    else:
+        return False
+
+def set_enabled(filter_item, state):
+    """ Internal Worker function to set the frame-filter's enabled
+    state.
+
+    Arguments:
+        filter_item: An object conforming to the frame filter
+                     interface.
+        state: True or False, depending on desired state.
+    """
+
+    filter_item.enabled = state
+
+def return_list(name):
+    """ Internal Worker function to return the frame filter
+    dictionary, depending on the name supplied as an argument.  If the
+    name is not "all", "global" or "progspace", it is assumed to name
+    an object-file.
+
+    Arguments:
+        name: The name of the list, as specified by GDB user commands.
+
+    Returns:
+        A dictionary object for a single specified dictionary, or a
+        list containing all the items for "all"
+
+    Raises:
+        gdb.GdbError:  A dictionary of that name cannot be found.
+    """
+
+    # If all dictionaries are wanted in the case of "all" we
+    # cannot return a combined dictionary as keys() may clash in
+    # between different dictionaries.  As we just want all the frame
+    # filters to enable/disable them all, just return the combined
+    # items() as a list.
+    if name == "all":
+        all_dicts = gdb.frame_filters.values()
+        all_dicts = all_dicts + gdb.current_progspace().frame_filters.values()
+        for objfile in gdb.objfiles():
+            all_dicts = all_dicts + objfile.frame_filters.values()
+            return all_dicts
+
+    if name == "global":
+        return gdb.frame_filters
+    else:
+        if name == "progspace":
+            cp = gdb.current_progspace()
+            return cp.frame_filters
+        else:
+            for objfile in gdb.objfiles():
+                if name == objfile.filename:
+                    return objfile.frame_filters
+
+    msg = "Cannot find frame-filter dictionary for '" + name + "'"
+    raise gdb.GdbError(msg)
 
 def _sort_list():
     """ Internal Worker function to merge all known frame-filter
@@ -41,19 +154,19 @@ def _sort_list():
     all_filters = all_filters + cp.frame_filters.values()
     all_filters = all_filters + gdb.frame_filters.values()
 
-    sorted_frame_filters = sorted(all_filters, key = ffc._get_priority,
+    sorted_frame_filters = sorted(all_filters, key = get_priority,
                                   reverse = True)
 
-    sorted_frame_filters = filter(ffc._get_enabled,
+    sorted_frame_filters = filter(get_enabled,
                                   sorted_frame_filters)
 
     return sorted_frame_filters
 
 def execute_frame_filters(frame, frame_low, frame_high):
-    """ Internal function that will execute the chain of frame
-    filters.  Each filter is executed in priority order.  After the
-    execution completes, slice the iterator to frame_low - frame_high
-    range.
+    """ Internal function called from GDB that will execute the chain
+    of frame filters.  Each filter is executed in priority order.
+    After the execution completes, slice the iterator to frame_low -
+    frame_high range.
 
     Arguments:
         frame: The initial frame.
@@ -62,9 +175,9 @@ def execute_frame_filters(frame, frame_low, frame_high):
         integer then it indicates a backward slice (ie bt -4) which
         counts backward from the last frame in the backtrace.
 
-        frame_high:  The high range of the slice.  If this is a negative
-        integer then it indicates all frames until the end of the
-        stack from frame_low.
+        frame_high: The high range of the slice.  If this is -1 then
+        it indicates all frames until the end of the stack from
+        frame_low.
 
     Returns:
         frame_iterator: The sliced iterator after all frame
@@ -113,8 +226,8 @@ def execute_frame_filters(frame, frame_low, frame_high):
     if frame_high == -1:
         frame_high = None
     else:
-        # The end argument for islice is a count, not a position, so
-        # add one as frames start at zero.
+        # As frames start from 0, add one to frame_high so islice
+        # correctly finds the end
         frame_high = frame_high + 1;
 
     sliced = itertools.islice(frame_iterator, frame_low, frame_high)

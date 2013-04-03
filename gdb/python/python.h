@@ -29,10 +29,25 @@ struct breakpoint_object;
    E.g. When the program loads libfoo.so, look for libfoo-gdb.py.  */
 #define GDBPY_AUTO_FILE_NAME "-gdb.py"
 
-/* Python frame-filter status returns constants.  */
-static const int PY_BT_ERROR = 0;
-static const int PY_BT_COMPLETED = 1;
-static const int PY_BT_NO_FILTERS = 2;
+/* Python frame-filter status return values.  */
+enum py_bt_status
+  {
+    /* Return when an error has occurred in processing frame filters,
+       or when printing the stack.  */
+    PY_BT_ERROR,
+
+    /* Return from internal routines to indicate that the function
+       succeeded.  */
+    PY_BT_OK,
+
+    /* Return when the frame filter process is complete, and all
+       operations have succeeded.  */
+    PY_BT_COMPLETED,
+
+    /* Return when the frame filter process is complete, but there
+       were no filter registered and enabled to process. */
+    PY_BT_NO_FILTERS
+  };
 
 /* Flags to pass to apply_frame_filter.  */
 
@@ -56,7 +71,7 @@ enum frame_filter_flags
 typedef enum py_frame_args
 {
   /* Print no values for arguments when invoked from the MI. */
-  MI_PRINT_NO_VALUES = PRINT_NO_VALUES,
+  NO_VALUES = PRINT_NO_VALUES,
 
   MI_PRINT_ALL_VALUES = PRINT_ALL_VALUES,
 
@@ -64,8 +79,6 @@ typedef enum py_frame_args
      arguments when invoked from the MI. */
   MI_PRINT_SIMPLE_VALUES = PRINT_SIMPLE_VALUES,
 
-  /* Print no values for arguments when invoked from the CLI.  */
-  CLI_NO_VALUES,
 
   /* Print only scalar values for arguments when invoked from the
      CLI. */
@@ -73,10 +86,7 @@ typedef enum py_frame_args
 
   /* Print all values for arguments when invoked from the
      CLI. */
-  CLI_ALL_VALUES,
-
-  /* NO_OP for commands that do not print frame arguments */
-  NO_VALUES
+  CLI_ALL_VALUES
 } py_frame_args;
 
 extern void finish_python_initialization (void);

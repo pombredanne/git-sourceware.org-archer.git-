@@ -53,8 +53,10 @@ mi_cmd_enable_frame_filters (char *command, char **argv, int argc)
   frame_filters = 1;
 }
 
+/* Parse the --no-frame-filters option in commands where we cannot use
+   mi_getopt. */
 static int
-parse_no_frames_option (char *arg)
+parse_no_frames_option (const char *arg)
 {
   if (arg && (strcmp (arg, "--no-frame-filters") == 0))
     return 1;
@@ -76,15 +78,16 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
   int i;
   struct cleanup *cleanup_stack;
   struct frame_info *fi;
-  int result = 0;
+  int result = PY_BT_ERROR;
   int raw_arg = 0;
+  int oind = 0;
   enum opt
     {
       NO_FRAME_FILTERS
     };
   static const struct mi_opt opts[] =
     {
-      {"no-frame-filters", NO_FRAME_FILTERS, 0},
+      {"-no-frame-filters", NO_FRAME_FILTERS, 0},
       { 0, 0, 0 }
     };
 
@@ -92,7 +95,6 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
      --no-frame-filters.  */
   while (1)
     {
-      int oind = 0;
       char *oarg;
       int opt = mi_getopt ("-stack-list-frames", argc, argv,
 			   opts, &oind, &oarg);
@@ -101,7 +103,7 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
       switch ((enum opt) opt)
 	{
 	case NO_FRAME_FILTERS:
-	  raw_arg = 1;
+	  raw_arg = oind;
 	  break;
 	}
     }
@@ -151,10 +153,8 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
     }
 
   /* Run the inbuilt backtrace if there are no filters registered, or
-     if there was an error in the Python backtracing output, or if
-     frame-filters are disabled.  */
-  if (! frame_filters || raw_arg || result == PY_BT_ERROR
-      || result == PY_BT_NO_FILTERS)
+     if "--no-frame-filters" has been specified from the command.  */
+  if (! frame_filters || raw_arg  || result == PY_BT_NO_FILTERS)
     {
       /* Now let's print the frames up to frame_high, or until there are
 	 frames in the stack.  */
@@ -224,7 +224,7 @@ mi_cmd_stack_list_locals (char *command, char **argv, int argc)
 {
   struct frame_info *frame;
   int raw_arg = 0;
-  int result = 0;
+  int result = PY_BT_ERROR;
   int print_value;
 
   if (argc > 0)
@@ -242,11 +242,12 @@ mi_cmd_stack_list_locals (char *command, char **argv, int argc)
        int flags = PRINT_LEVEL | PRINT_LOCALS;
 
        result = apply_frame_filter (frame, flags, print_value,
-				    current_uiout, 0,0);
+				    current_uiout, 0, 0);
      }
 
-   if (! frame_filters || raw_arg || result == PY_BT_ERROR
-       || result == PY_BT_NO_FILTERS)
+   /* Run the inbuilt backtrace if there are no filters registered, or
+      if "--no-frame-filters" has been specified from the command.  */
+   if (! frame_filters || raw_arg  || result == PY_BT_NO_FILTERS)
      {
        list_args_or_locals (locals, print_value, frame);
      }
@@ -267,7 +268,7 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
   enum print_values print_values;
   struct ui_out *uiout = current_uiout;
   int raw_arg = 0;
-  int result = 0;
+  int result = PY_BT_ERROR;
 
   if (argc > 0)
     raw_arg = parse_no_frames_option (argv[0]);
@@ -320,10 +321,10 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
 				   py_frame_low, frame_high);
     }
 
-  if (! frame_filters || raw_arg || result == PY_BT_ERROR
-      || result == PY_BT_NO_FILTERS)
-    {
-
+     /* Run the inbuilt backtrace if there are no filters registered, or
+      if "--no-frame-filters" has been specified from the command.  */
+   if (! frame_filters || raw_arg  || result == PY_BT_NO_FILTERS)
+     {
       /* Now let's print the frames up to frame_high, or until there are
 	 frames in the stack.  */
       for (;
@@ -352,7 +353,7 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
 {
   struct frame_info *frame;
   int raw_arg = 0;
-  int result = 0;
+  int result = PY_BT_ERROR;
   int print_value;
 
   if (argc > 0)
@@ -374,10 +375,10 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
 				    current_uiout, 0, 0);
      }
 
-   if (! frame_filters || raw_arg || result == PY_BT_ERROR
-       || result == PY_BT_NO_FILTERS)
+   /* Run the inbuilt backtrace if there are no filters registered, or
+      if "--no-frame-filters" has been specified from the command.  */
+   if (! frame_filters || raw_arg  || result == PY_BT_NO_FILTERS)
      {
-
        list_args_or_locals (all, print_value, frame);
      }
 }

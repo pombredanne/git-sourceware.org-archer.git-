@@ -20,134 +20,8 @@ import gdb
 import copy
 from gdb.FrameIterator import FrameIterator
 from gdb.FrameDecorator import FrameDecorator
+import gdb.frames
 import itertools
-
-def _get_priority(filter_item):
-    """ Internal worker function to return the frame-filter's priority
-    from a frame filter object.  This is a fail free function as it is
-    used in sorting and filtering.  If a badly implemented frame
-    filter does not implement the priority attribute, return zero
-    (otherwise sorting/filtering will fail and prevent other frame
-    filters from executing).
-
-    Arguments:
-        filter_item: An object conforming to the frame filter
-                     interface.
-
-    Returns:
-        The priority of the frame filter from the "priority"
-        attribute, or zero.
-    """
-    # Do not fail here, as the sort will fail.  If a filter has not
-    # (incorrectly) set a priority, set it to zero.
-    if hasattr(filter_item, "priority"):
-        return filter_item.priority
-    else:
-        return 0
-
-def _set_priority(filter_item, priority):
-    """ Internal worker function to set the frame-filter's priority.
-
-    Arguments:
-        filter_item: An object conforming to the frame filter
-                     interface.
-        priority: The priority to assign as an integer.
-    """
-
-    filter_item.priority = priority
-
-def _get_enabled(filter_item):
-    """ Internal worker function to return a filter's enabled state
-    from a frame filter object.  This is a fail free function as it is
-    used in sorting and filtering.  If a badly implemented frame
-    filter does not implement the enabled attribute, return False
-    (otherwise sorting/filtering will fail and prevent other frame
-    filters from executing).
-
-    Arguments:
-        filter_item: An object conforming to the frame filter
-                     interface.
-
-    Returns:
-        The enabled state of the frame filter from the "enabled"
-        attribute, or False.
-    """
-
-    # If the filter class is badly implemented when called from the
-    # Python filter command, do not cease filter operations, just set
-    # enabled to False.
-    if hasattr(filter_item, "enabled"):
-        return filter_item.enabled
-    else:
-        return False
-
-def _set_enabled(filter_item, state):
-    """ Internal Worker function to set the frame-filter's enabled
-    state.
-
-    Arguments:
-        filter_item: An object conforming to the frame filter
-                     interface.
-        state: True or False, depending on desired state.
-    """
-
-    filter_item.enabled = state
-
-def _get_name(frame_filter):
-    """ Internal Worker function to return the name of the
-    frame-filter.
-
-    Arguments:
-        filter_item: An object conforming to the frame filter
-                     interface.
-
-    Returns:
-        The name of the frame filter from the "name" attribute.
-    """
-    return frame_filter.name
-
-def _return_list(name):
-    """ Internal Worker function to return the frame filter
-    dictionary, depending on the name supplied as an argument.  If the
-    name is not "all", "global" or "progspace", it is assumed to name
-    an object-file.
-
-    Arguments:
-        name: The name of the list, as specified by GDB user commands.
-
-    Returns:
-        A dictionary object for a single specified dictionary, or a
-        list containing all the items for "all"
-
-    Raises:
-        gdb.GdbError:  A dictionary of that name cannot be found.
-    """
-
-    # If all dictionaries are wanted in the case of "all" we
-    # cannot return a combined dictionary as keys() may clash in
-    # between different dictionaries.  As we just want all the frame
-    # filters to enable/disable them all, just return the combined
-    # items() as a list.
-    if name == "all":
-        all_dicts = gdb.frame_filters.values()
-        all_dicts = all_dicts + gdb.current_progspace().frame_filters.values()
-        for objfile in gdb.objfiles():
-            all_dicts = all_dicts + objfile.frame_filters.values()
-            return all_dicts
-
-    if name == "global":
-        return gdb.frame_filters
-    else:
-        if name == "progspace":
-            cp = gdb.current_progspace()
-            return cp.frame_filters
-        else:
-            for objfile in gdb.objfiles():
-                if name == objfile.filename:
-                    return objfile.frame_filters
-
-    msg = "Cannot find frame-filter dictionary for '" + name + "'"
-    raise gdb.GdbError(msg)
 
 # GDB Commands.
 class SetFilterPrefixCmd(gdb.Command):
@@ -190,30 +64,30 @@ class InfoFrameFilter(gdb.Command):
         """
 
         sorted_frame_filters = sorted(frame_filters.items(),
-                                      key=lambda i: _get_priority(i[1]),
+                                      key=lambda i: gdb.frames.get_priority(i[1]),
                                       reverse=True)
 
         if len(sorted_frame_filters) == 0:
-            print "  No frame filters registered."
+            print("  No frame filters registered.")
         else:
-            print "  Priority  Enabled  Name"
+            print("  Priority  Enabled  Name")
             for frame_filter in sorted_frame_filters:
                 name = frame_filter[0]
                 try:
                     priority = '{:<8}'.format(
-                        str(_get_priority(frame_filter[1])))
+                        str(gdb.frames.get_priority(frame_filter[1])))
                     enabled = '{:<7}'.format(
-                        self.enabled_string(_get_enabled(frame_filter[1])))
+                        self.enabled_string(gdb.frames.get_enabled(frame_filter[1])))
                 except Exception as e:
-                    print "  Error printing filter '"+name+"': ",e
+                    print("  Error printing filter '"+name+"': "+str(e))
                 else:
-                    print "  %s  %s  %s" % (priority, enabled, name)
+                    print("  %s  %s  %s" % (priority, enabled, name))
 
     def print_list(self, title, filter_list, blank_line):
-        print title
+        print(title)
         self.list_frame_filters(filter_list)
-        if (blank_line):
-            print ""
+        if blank_line:
+            print("")
 
     def invoke(self, arg, from_tty):
         self.print_list("global frame-filters:", gdb.frame_filters, True)
@@ -244,7 +118,7 @@ def _enable_parse_arg(cmd_name, arg):
     argv = gdb.string_to_argv(arg);
     argc = len(argv)
     if argv[0] == "all" and argc > 1:
-        raise gdb.GdbError(cmd_name + " with 'all' " \
+        raise gdb.GdbError(cmd_name + ": with 'all' " \
                           "you may not specify a filter.")
     else:
         if argv[0] != "all" and argc != 2:
@@ -263,11 +137,11 @@ def _do_enable_frame_filter(command_tuple, flag):
     """
 
     list_op = command_tuple[0]
-    op_list = _return_list(list_op)
+    op_list = gdb.frames.return_list(list_op)
 
     if list_op == "all":
         for item in op_list:
-            _set_enabled(item, flag)
+            gdb.frames.set_enabled(item, flag)
     else:
         frame_filter = command_tuple[1]
         try:
@@ -276,7 +150,7 @@ def _do_enable_frame_filter(command_tuple, flag):
             msg = "frame-filter '" + str(name) + "' not found."
             raise gdb.GdbError(msg)
 
-        _set_enabled(ff, flag)
+        gdb.frames.set_enabled(ff, flag)
 
 def _complete_frame_filter_list(text, word, all_flag):
     """Worker for frame filter dictionary name completion.
@@ -292,9 +166,9 @@ def _complete_frame_filter_list(text, word, all_flag):
         are no suggestions for completion.
         """
     if all_flag == True:
-        filter_locations = ["all", "global","progspace"]
+        filter_locations = ["all", "global", "progspace"]
     else:
-        filter_locations = ["global","progspace"]
+        filter_locations = ["global", "progspace"]
     for objfile in gdb.objfiles():
         filter_locations.append(objfile.filename)
 
@@ -312,7 +186,7 @@ def _complete_frame_filter_list(text, word, all_flag):
         flist[0] = flist[0][len(text)-len(word):]
 
     # Otherwise, return an empty list, or a list of frame filter
-    # dictioanries that the previous filter operation returned.
+    # dictionaries that the previous filter operation returned.
     return flist
 
 def _complete_frame_filter_name(word, printer_dict):
@@ -340,7 +214,7 @@ def _complete_frame_filter_name(word, printer_dict):
 class EnableFrameFilter(gdb.Command):
     """GDB command to disable the specified frame-filter.
 
-    Usage: enable frame-filter enable [dictionary] [name]
+    Usage: enable frame-filter enable DICTIONARY [NAME]
 
     DICTIONARY is the name of the frame filter dictionary on which to
     operate.  If dictionary is set to "all", perform operations on all
@@ -356,13 +230,13 @@ class EnableFrameFilter(gdb.Command):
     def __init__(self):
         super(EnableFrameFilter, self).__init__("enable frame-filter",
                                                  gdb.COMMAND_DATA)
-    def complete(self,text,word):
+    def complete(self, text, word):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text, word, True)
         else:
-            printer_list = _return_list(text.split()[0].rstrip())
+            printer_list = gdb.frames.return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
@@ -373,7 +247,7 @@ class EnableFrameFilter(gdb.Command):
 class DisableFrameFilter(gdb.Command):
     """GDB command to disable the specified frame-filter.
 
-    Usage: disable frame-filter disable [dictionary] [name]
+    Usage: disable frame-filter disable DICTIONARY [NAME]
 
     DICTIONARY is the name of the frame filter dictionary on which to
     operate.  If dictionary is set to "all", perform operations on all
@@ -390,13 +264,13 @@ class DisableFrameFilter(gdb.Command):
         super(DisableFrameFilter, self).__init__("disable frame-filter",
                                                   gdb.COMMAND_DATA)
 
-    def complete(self,text,word):
+    def complete(self, text, word):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text, word, True)
         else:
-            printer_list = _return_list(text.split()[0].rstrip())
+            printer_list = gdb.frames.return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
@@ -406,7 +280,7 @@ class DisableFrameFilter(gdb.Command):
 class SetFrameFilterPriority(gdb.Command):
     """GDB command to set the priority of the specified frame-filter.
 
-    Usage: set python frame-filter priority dictionary name priority
+    Usage: set python frame-filter priority DICTIONARY NAME PRIORITY
 
     DICTIONARY is the name of the frame filter dictionary on which to
     operate.  Named dictionaries are: "global" for the global frame
@@ -416,7 +290,8 @@ class SetFrameFilterPriority(gdb.Command):
 
     NAME matches the name of the frame filter to operate on.
 
-    PRIORITY is the new priority to set the frame filter.
+    PRIORITY is the an integer to assign the new priority to the frame
+    filter.
     """
 
     def __init__(self):
@@ -446,7 +321,7 @@ class SetFrameFilterPriority(gdb.Command):
 
         return argv
 
-    def _set_filter_priority(self,command_tuple):
+    def _set_filter_priority(self, command_tuple):
         """Internal worker for setting priority of frame-filters, by
         parsing a tuple and calling _set_priority with the parsed
         tuple.
@@ -460,7 +335,7 @@ class SetFrameFilterPriority(gdb.Command):
         frame_filter = command_tuple[1]
         priority = command_tuple[2]
 
-        op_list = _return_list(list_op)
+        op_list = gdb.frames.return_list(list_op)
 
         try:
             ff = op_list[frame_filter]
@@ -468,35 +343,31 @@ class SetFrameFilterPriority(gdb.Command):
             msg = "frame-filter '" + str(name) + "' not found."
             raise gdb.GdbError(msg)
 
-        _set_priority(ff, priority)
+        gdb.frames.set_priority(ff, priority)
 
-    def complete(self,text,word):
+    def complete(self, text, word):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text, word, False)
         else:
-            printer_list = _return_list(text.split()[0].rstrip())
+            printer_list = gdb.frames.return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
         command_tuple = self._parse_pri_arg(arg)
-        try:
-            self._set_filter_priority(command_tuple)
-        except gdb.GdbError as e:
-            # Print the error, instead of raising it.
-            gdb.write(e.message+"\n")
+        self._set_filter_priority(command_tuple)
 
 class ShowFrameFilterPriority(gdb.Command):
     """GDB command to show the priority of the specified frame-filter.
 
-    Usage: show python frame-filter priority list name
+    Usage: show python frame-filter priority DICTIONARY NAME
 
-    LIST is the name of the frame-filter list to operate.  Named lists
-    are: "global" for the global frame-filter list, "progspace" for
-    the program space's file frame-filter list.  If either of these
-    two are not specified, the list name is assumed to be the name of
-    the object-file name.
+    DICTIONARY is the name of the frame filter dictionary on which to
+    operate.  Named dictionaries are: "global" for the global frame
+    filter dictionary, "progspace" for the program space's framefilter
+    dictionary.  If either of these two are not specified, the
+    dictionary name is assumed to be the name of the object-file name.
 
     NAME matches the name of the frame-filter to operate on.
     """
@@ -542,7 +413,7 @@ class ShowFrameFilterPriority(gdb.Command):
             gdb.GdbError: A frame filter cannot be found.
         """
 
-        op_list = _return_list(frame_filters)
+        op_list = gdb.frames.return_list(frame_filters)
 
         try:
             ff = op_list[name]
@@ -550,34 +421,29 @@ class ShowFrameFilterPriority(gdb.Command):
             msg = "frame-filter '" + str(name) + "' not found."
             raise gdb.GdbError(msg)
 
-        return _get_priority(ff)
+        return gdb.frames.get_priority(ff)
 
-    def complete(self,text,word):
+    def complete(self, text, word):
         """Completion function for both frame filter dictionary, and
         frame filter name."""
 
         if text.count(" ") == 0:
             return _complete_frame_filter_list(text, word, False)
         else:
-            printer_list = _return_list(text.split()[0].rstrip())
+            printer_list = frame._return_list(text.split()[0].rstrip())
             return _complete_frame_filter_name(word, printer_list)
 
     def invoke(self, arg, from_tty):
-        try:
-            command_tuple = self._parse_pri_arg(arg)
-        except gdb.GdbError as e:
-            # Print the error instead of raising it.
-            gdb.write(e.message+"\n")
-            return
+        command_tuple = self._parse_pri_arg(arg)
         filter_name = command_tuple[1]
         list_name = command_tuple[0]
         try:
             priority = self.get_filter_priority(list_name, filter_name);
         except Exception as e:
-            print "Error printing filter priority for '"+name+"':",e
+            print("Error printing filter priority for '"+name+"':"+str(e))
         else:
-            print "Priority of filter '" + filter_name + "' in list '" \
-                + list_name + "' is: " + str(priority)
+            print("Priority of filter '" + filter_name + "' in list '" \
+                + list_name + "' is: " + str(priority))
 
 
 InfoFrameFilter()

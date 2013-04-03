@@ -103,9 +103,8 @@ gdb_test "bt 3" \
 
 gdb_test "bt no-filter full" \
     ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca \\(\\).*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*"
-
 gdb_test "bt full" \
-    ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca \\(\\).*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*#22.*in func1 \\(\\).*#23.*in func2 \\(\\).*"
+    ".*#0.*end_func.*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*#1.*in funca \\(\\).*#2.*in funcb \\(j=10\\).*bar = \{a = 42, b = 84\}.*#22.*in func1 \\(\\).*#23.*in func2 \\(f=3\\).*elided = $hex \"Elided frame\".*fb = \{nothing = $hex \"Elided Foo Bar\", f = 84, s = 38\}.*bf = $hex.*"
 
 # Test set print frame-arguments
 # none
@@ -144,3 +143,56 @@ gdb_test "bt 1" \
     "bt no addresss"
 
 remote_file host delete ${remote_python_file}
+
+# Test with no debuginfo
+
+# We cannot use prepare_for_testing as we have to set the safe-patch
+# to check objfile and progspace printers.
+if {[build_executable $testfile.exp $testfile $srcfile {nodebug}] == -1} {
+    return -1
+}
+
+# Start with a fresh gdb.
+gdb_exit
+gdb_start
+
+# Skip all tests if Python scripting is not enabled.
+if { [skip_python_tests] } { continue }
+
+# Make the -gdb.py script available to gdb, it is automagically loaded by gdb.
+# Care is taken to put it in the same directory as the binary so that
+# gdb will find it.
+set remote_obj_python_file \
+    [remote_download \
+	 host ${srcdir}/${subdir}/${testfile}-gdb.py.in \
+	 ${subdir}/${testfile}-gdb.py]
+
+gdb_reinitialize_dir $srcdir/$subdir
+gdb_test_no_output "set auto-load safe-path ${remote_obj_python_file}" \
+    "set auto-load safe-path"
+gdb_load ${binfile}
+
+# Verify gdb loaded the script.
+gdb_test "info auto-load python-scripts" "Yes.*/${testfile}-gdb.py.*"
+
+if ![runto_main] then {
+    perror "couldn't run to breakpoint"
+    return
+}
+
+gdb_test_no_output "set python print-stack full"
+
+# Load global frame-filters
+set remote_python_file [remote_download host ${srcdir}/${subdir}/${testfile}.py]
+gdb_test_no_output "python execfile ('${remote_python_file}')"
+
+# Disable Reverse
+gdb_test_no_output "disable frame-filter global Reverse"
+gdb_test "bt" \
+    ".*#0..*in main \\(\\).*"
+gdb_test "bt full" \
+    ".*#0..*in main \\(\\).*"
+gdb_test "bt no-filters" \
+    ".*#0..*in main \\(\\).*"
+gdb_test "bt no-filters full" \
+    ".*#0..*in main \\(\\).*"

@@ -32,13 +32,13 @@ class FrameIterator(object):
     def __iter__(self):
         return self
 
-    def __getitem__(self,index):
+    def __getitem__(self, index):
         """__getitem__ implementation.
 
         Arguments:
             index: A specific index to fetch."""
 
-        return next(itertools.islice(self.frame,index,index+1))
+        return next(itertools.islice(self.frame, index, index+1))
 
     def next(self):
         """next implementation.

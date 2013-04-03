@@ -58,8 +58,8 @@ class FrameDecorator(object):
         sal = frame.find_sal()
 
         if (not sal.symtab or not sal.symtab.filename
-            or frame == gdb.DUMMY_FRAME
-            or frame == gdb.SIGTRAMP_FRAME):
+            or frame.type() == gdb.DUMMY_FRAME
+            or frame.type() == gdb.SIGTRAMP_FRAME):
 
             return True
 
@@ -74,13 +74,21 @@ class FrameDecorator(object):
         return None
 
     def function(self):
-        """ Return the name of the frame's function, first determining
-        if it is a special frame.  If not, try to determine filename
-        from GDB's frame internal function API.  Finally, if a name
-        cannot be determined return the address."""
+        """ Return the name of the frame's function or an address of
+        the function of the frame.  First determine if this is a
+        special frame.  If not, try to determine filename from GDB's
+        frame internal function API.  Finally, if a name cannot be
+        determined return the address.  If this function returns an
+        address, GDB will attempt to determine the function name from
+        its internal minimal symbols store (for example, for inferiors
+        without debug-info)."""
 
+        # Both gdb.Frame, and FrameDecorator have a method called
+        # "function", so determine which object this is.
         if not isinstance(self.base, gdb.Frame):
             if hasattr(self.base, "function"):
+                # If it is not a gdb.Frame, and there is already a
+                # "function" method, use that.
                 return self.base.function()
 
         frame = self.inferior_frame()
@@ -91,13 +99,15 @@ class FrameDecorator(object):
             return "<signal handler called>"
 
         func = frame.function()
-        sal = frame.find_sal()
-        pc = frame.pc()
 
+        # If we cannot determine the function name, return the
+        # address.  If GDB detects an integer value from this function
+        # it will attempt to find the function name from minimal
+        # symbols via its own internal functions.
         if func == None:
-            unknown =  format(" 0x%08x in" % pc)
-            return unknown
-
+            pc = frame.pc()
+            return pc
+        
         return str(func)
 
     def address(self):
@@ -119,15 +129,15 @@ class FrameDecorator(object):
 
         frame = self.inferior_frame()
         sal = frame.find_sal()
-        if (not sal.symtab or not sal.symtab.filename):
+        if not sal.symtab or not sal.symtab.filename:
             pc = frame.pc()
             return gdb.solib_name(pc)
         else:
             return sal.symtab.filename
 
     def frame_args(self):
-        """ Return an iterator of frame arguments for this frame, if
-        any.  The iterator contains objects conforming with the
+        """ Return an iterable of frame arguments for this frame, if
+        any.  The iterable object contains objects conforming with the
         Symbol/Value interface.  If there are no frame arguments, or
         if this frame is deemed to be a special case, return None."""
 
@@ -142,8 +152,8 @@ class FrameDecorator(object):
         return args.fetch_frame_args()
 
     def frame_locals(self):
-        """ Return an iterator of local variables for this frame, if
-        any.  The iterator contains objects conforming with the
+        """ Return an iterable of local variables for this frame, if
+        any.  The iterable object contains objects conforming with the
         Symbol/Value interface.  If there are no frame locals, or if
         this frame is deemed to be a special case, return None."""
 
@@ -205,11 +215,19 @@ class FrameVars(object):
     """Utility class to fetch and store frame local variables, or
     frame arguments."""
 
-    def __init__(self,frame):
+    def __init__(self, frame):
         self.frame = frame
+        self.symbol_class = {
+            gdb.SYMBOL_LOC_STATIC: True,
+            gdb.SYMBOL_LOC_REGISTER: True,
+            gdb.SYMBOL_LOC_ARG: True,
+            gdb.SYMBOL_LOC_REF_ARG: True,
+            gdb.SYMBOL_LOC_LOCAL: True,
+	    gdb.SYMBOL_LOC_REGPARM_ADDR: True,
+	    gdb.SYMBOL_LOC_COMPUTED: True
+            }
 
-    @staticmethod
-    def fetch_b(sym):
+    def fetch_b(self, sym):
         """ Local utility method to determine if according to Symbol
         type whether it should be included in the iterator.  Not all
         symbols are fetched, and only symbols that return
@@ -223,32 +241,27 @@ class FrameVars(object):
 
         sym_type = sym.addr_class
 
-        return {
-            gdb.SYMBOL_LOC_STATIC: True,
-            gdb.SYMBOL_LOC_REGISTER: True,
-            gdb.SYMBOL_LOC_ARG: True,
-            gdb.SYMBOL_LOC_REF_ARG: True,
-            gdb.SYMBOL_LOC_LOCAL: True,
-	    gdb.SYMBOL_LOC_REGPARM_ADDR: True,
-	    gdb.SYMBOL_LOC_COMPUTED: True
-          }.get(sym_type, False)
+        return self.symbol_class.get(sym_type, False)
 
     def fetch_frame_locals(self):
         """Public utility method to fetch frame local variables for
         the stored frame.  Frame arguments are not fetched.  If there
         are no frame local variables, return an empty list."""
         lvars = []
-        try:
-            block = self.frame.block()
-        except:
-            return None
+        
+        block = self.frame.block()
 
-        for sym in block:
-            if sym.is_argument:
-                continue;
-            if self.fetch_b(sym):
-                lvars.append(SymValueWrapper(sym, None))
+        while block != None:
+            if block.is_global or block.is_static:
+                break
+            for sym in block:
+                if sym.is_argument:
+                    continue;
+                if self.fetch_b(sym):
+                    lvars.append(SymValueWrapper(sym, None))
 
+            block = block.superblock
+            
         return lvars
 
     def fetch_frame_args(self):
@@ -257,32 +270,16 @@ class FrameVars(object):
         there are no frame argument variables, return an empty list."""
 
         args = []
-        try:
-            block = self.frame.block()
-        except:
-            return None
+        block = self.frame.block()
+        while block != None:
+            if block.function != None:
+                break
+            block = block.superblock
 
-        for sym in block:
-            if not sym.is_argument:
-                continue;
-            args.append(SymValueWrapper(sym,None))
+        if block != None:
+            for sym in block:
+                if not sym.is_argument:
+                    continue;
+                args.append(SymValueWrapper(sym, None))
 
         return args
-
-    def get_value(self, sym, block):
-        """Public utility method to fetch a value from a symbol."""
-        if len(sym.linkage_name):
-            nsym, is_field_of_this = gdb.lookup_symbol(sym.linkage_name, block)
-            if nsym != None:
-                if nsym.addr_class != gdb.SYMBOL_LOC_REGISTER:
-                    sym = nsym
-
-        try:
-            val = sym.value(self.frame)
-
-        except RuntimeError, text:
-            val = text
-        if val == None:
-            val = "???"
-
-        return val

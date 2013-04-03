@@ -39,6 +39,8 @@ x86_64/Cygwin			x86_64-*-cygwin*
 
 * Python scripting
 
+** Frame filters and frame decorators have been added.
+
   ** Vectors can be created with gdb.Type.vector.
 
   ** Python's atexit.register now works in GDB.

@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2008-2012 Free Software Foundation, Inc.
+   Copyright 2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -34,6 +34,19 @@ void end_func (int foo, char *bar, foobar *fb, foobar bf)
   int b = 12;
   short c = 5;
 
+  {
+    int d = 15;
+    int e = 14;
+    const char *foo = "Inside block";
+    {
+      int f = 42;
+      int g = 19;
+      const char *bar = "Inside block x2";
+
+      g = g +1;  /* Inner test breakpoint  */
+    }
+  }
+	
   return; /* Backtrace end breakpoint */
 }
 
@@ -86,15 +99,30 @@ void func1(void)
   return;
 }
 
-int func2(void)
+int func2(int f)
 {
+  int c;
+  const char *elided = "Elided frame";
+  foobar fb;
+  foobar *bf = NULL;
+
+  fb.nothing = "Elided Foo Bar";
+  fb.f = 84;
+  fb.s = 38;
+
+  bf = alloca (sizeof (foobar));
+  bf->nothing = alloca (128);
+  bf->nothing = "Elided Bar Foo";
+  bf->f = 48;
+  bf->s = 182;
+  
   func1();
   return 1;
 }
 
 void func3(int i)
 {
-  func2();
+  func2(i);
 
   return;
 }
@@ -118,5 +146,8 @@ int func5(int f, int d)
 
 main()
 {
+  int z = 32;
+  int y = 44;
+  const char *foo1 = "Test";
   func5(3,5);
 }

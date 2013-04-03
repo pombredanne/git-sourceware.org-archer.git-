@@ -1743,15 +1743,15 @@ backtrace_command_1 (char *count_exp, int show_locals, int no_filters,
       else if (!strcmp (print_frame_arguments, "all"))
 	arg_type = CLI_ALL_VALUES;
       else
-	arg_type = CLI_NO_VALUES;
+	arg_type = NO_VALUES;
 
       result = apply_frame_filter (get_current_frame (), flags, arg_type,
 				   current_uiout, py_start, py_end);
 
     }
   /* Run the inbuilt backtrace if there are no filters registered, or
-     if there was an error in the Python backtracing output.  */
-  if (no_filters || result == PY_BT_ERROR || result == PY_BT_NO_FILTERS)
+     "no-filters" has been specified from the command.  */
+  if (no_filters ||  result == PY_BT_NO_FILTERS)
     {
       for (i = 0, fi = trailing; fi && count--; i++, fi = get_prev_frame (fi))
 	{

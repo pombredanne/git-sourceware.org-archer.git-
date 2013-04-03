@@ -101,7 +101,6 @@ objfpy_new (PyTypeObject *type, PyObject *args, PyObject *keywords)
   return (PyObject *) self;
 }
 
-
 PyObject *
 objfpy_get_printers (PyObject *o, void *ignore)
 {
