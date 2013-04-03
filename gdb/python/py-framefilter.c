@@ -38,18 +38,18 @@ enum mi_print_types
   MI_PRINT_LOCALS
 };
 
-/* Helper function to extract a symbol, name and language definition
-   from a Python object that conforms to the "Symbol Value" interface.
-   OBJ is the Python object to extract the values from.  NAME is a
-   pass-through argument where the name of the symbol will be written.
-   NAME is allocated in this function, but the caller is responsible
-   for clean up.  SYM is a pass-through argument where the symbol
-   will be written.  In the case of the API returning a string, this
-   will be set to NULL.  LANGUAGE is also a pass-through argument
-   denoting the language attributed to the Symbol.  In the case of
-   SYM being NULL, this will be set to the current language.
-   Returns 0 on error with the appropriate Python exception set, and 1
-   on success.  */
+/* Helper function to extract a symbol, a name and a language
+   definition from a Python object that conforms to the "Symbol Value"
+   interface.  OBJ is the Python object to extract the values from.
+   NAME is a pass-through argument where the name of the symbol will
+   be written.  NAME is allocated in this function, but the caller is
+   responsible for clean up.  SYM is a pass-through argument where the
+   symbol will be written.  In the case of the API returning a string,
+   this will be set to NULL.  LANGUAGE is also a pass-through argument
+   denoting the language attributed to the Symbol.  In the case of SYM
+   being NULL, this will be set to the current language.  Returns 0 on
+   error with the appropriate Python exception set, and 1 on
+   success.  */
 
 static enum py_bt_status
 extract_sym (PyObject *obj, char **name, struct symbol **sym,
