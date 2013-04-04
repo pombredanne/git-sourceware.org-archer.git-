@@ -122,6 +122,8 @@ static void remote_send (char **buf, long *sizeof_buf_p);
 
 static int readchar (int timeout);
 
+static void remote_serial_write (const char *str, int len);
+
 static void remote_kill (struct target_ops *ops);
 
 static int tohex (int nib);
@@ -1260,6 +1262,7 @@ enum {
   PACKET_qGetTIBAddr,
   PACKET_qGetTLSAddr,
   PACKET_qSupported,
+  PACKET_qTStatus,
   PACKET_QPassSignals,
   PACKET_QProgramSignals,
   PACKET_qSearch_memory,
@@ -3213,13 +3216,13 @@ static void
 send_interrupt_sequence (void)
 {
   if (interrupt_sequence_mode == interrupt_sequence_control_c)
-    serial_write (remote_desc, "\x03", 1);
+    remote_serial_write ("\x03", 1);
   else if (interrupt_sequence_mode == interrupt_sequence_break)
     serial_send_break (remote_desc);
   else if (interrupt_sequence_mode == interrupt_sequence_break_g)
     {
       serial_send_break (remote_desc);
-      serial_write (remote_desc, "g", 1);
+      remote_serial_write ("g", 1);
     }
   else
     internal_error (__FILE__, __LINE__,
@@ -7076,6 +7079,21 @@ readchar (int timeout)
   return ch;
 }
 
+/* Wrapper for serial_write that closes the target and throws if
+   writing fails.  */
+
+static void
+remote_serial_write (const char *str, int len)
+{
+  if (serial_write (remote_desc, str, len))
+    {
+      remote_unpush_target ();
+      throw_perror_with_name (TARGET_CLOSE_ERROR,
+			      _("Remote communication error.  "
+				"Target disconnected."));
+    }
+}
+
 /* Send the command in *BUF to the remote machine, and read the reply
    into *BUF.  Report an error if we get an error reply.  Resize
    *BUF using xrealloc if necessary to hold the result, and update
@@ -7196,8 +7214,7 @@ putpkt_binary (char *buf, int cnt)
 	  gdb_flush (gdb_stdlog);
 	  do_cleanups (old_chain);
 	}
-      if (serial_write (remote_desc, buf2, p - buf2))
-	perror_with_name (_("putpkt: write failed"));
+      remote_serial_write (buf2, p - buf2);
 
       /* If this is a no acks version of the remote protocol, send the
 	 packet and move on.  */
@@ -7252,7 +7269,7 @@ putpkt_binary (char *buf, int cnt)
 		   doesn't get retransmitted when we resend this
 		   packet.  */
 		skip_frame ();
-		serial_write (remote_desc, "+", 1);
+		remote_serial_write ("+", 1);
 		continue;	/* Now, go look for +.  */
 	      }
 
@@ -7607,7 +7624,7 @@ getpkt_or_notif_sane_1 (char **buf, long *sizeof_buf, int forever,
 		break;
 	    }
 
-	  serial_write (remote_desc, "-", 1);
+	  remote_serial_write ("-", 1);
 	}
 
       if (tries > MAX_TRIES)
@@ -7618,7 +7635,7 @@ getpkt_or_notif_sane_1 (char **buf, long *sizeof_buf, int forever,
 
 	  /* Skip the ack char if we're in no-ack mode.  */
 	  if (!rs->noack_mode)
-	    serial_write (remote_desc, "+", 1);
+	    remote_serial_write ("+", 1);
 	  return -1;
 	}
 
@@ -7638,7 +7655,7 @@ getpkt_or_notif_sane_1 (char **buf, long *sizeof_buf, int forever,
 
 	  /* Skip the ack char if we're in no-ack mode.  */
 	  if (!rs->noack_mode)
-	    serial_write (remote_desc, "+", 1);
+	    remote_serial_write ("+", 1);
 	  if (is_notif != NULL)
 	    *is_notif = 0;
 	  return val;
@@ -10705,12 +10722,17 @@ remote_get_trace_status (struct trace_status *ts)
   /* FIXME we need to get register block size some other way.  */
   extern int trace_regblock_size;
   volatile struct gdb_exception ex;
+  enum packet_result result;
+
+  if (remote_protocol_packets[PACKET_qTStatus].support == PACKET_DISABLE)
+    return -1;
 
   trace_regblock_size = get_remote_arch_state ()->sizeof_g_packet;
 
+  putpkt ("qTStatus");
+
   TRY_CATCH (ex, RETURN_MASK_ERROR)
     {
-      putpkt ("qTStatus");
       p = remote_get_noisy_reply (&target_buf, &target_buf_size);
     }
   if (ex.reason < 0)
@@ -10723,8 +10745,10 @@ remote_get_trace_status (struct trace_status *ts)
       throw_exception (ex);
     }
 
+  result = packet_ok (p, &remote_protocol_packets[PACKET_qTStatus]);
+
   /* If the remote target doesn't do tracing, flag it.  */
-  if (*p == '\0')
+  if (result == PACKET_UNKNOWN)
     return -1;
 
   /* We're working with a live target.  */
@@ -11901,6 +11925,9 @@ Show the maximum size of the address (in bits) in a memory packet."), NULL,
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_qSearch_memory],
 			 "qSearch:memory", "search-memory", 0);
+
+  add_packet_config_cmd (&remote_protocol_packets[PACKET_qTStatus],
+			 "qTStatus", "trace-status", 0);
 
   add_packet_config_cmd (&remote_protocol_packets[PACKET_vFile_open],
 			 "vFile:open", "hostio-open", 0);

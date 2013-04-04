@@ -1,3 +1,43 @@
+2013-04-04  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.server/server-kill.exp: Use command 'tstatus' instead of
+	'step'.
+
+2013-04-03  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/mi-traceframe-changed.exp: Update tfile name to
+	"tfile-basic.tf".
+	(test_tfind_tfile): Likewise.
+
+2013-04-03  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/tfile.c (write_basic_trace_file): Pass argument
+	"tfile-basic.tf" instead of "basic.tf".
+	(write_error_trace_file): Pass argument "tfile-error.tf"
+	instead of "error.tf".
+	* gdb.trace/tfile.exp: Update tfile names to
+	"tfile-basic.tf" and "tfile-error.tf".
+
+2013-04-02  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* gdb.cp/ovsrch.exp (test_class): Correct regexp to allow
+	empty directory in file for breakpoint hit.
+
+2013-03-29  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/completion.exp: Test completion of commands
+	"target core", "target tfile" and "target exec".
+	* gdb.trace/tfile.exp: Test completion of command
+	"target tfile".
+
+2013-03-28  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/win_fu_syms: New testcase.
+
+2013-03-28  Doug Evans  <dje@google.com>
+
+	* gdb.base/maint.exp (maint print statistics): Update expected output.
+
 2013-03-28  Pedro Alves  <palves@redhat.com>
 
 	PR gdb/15294

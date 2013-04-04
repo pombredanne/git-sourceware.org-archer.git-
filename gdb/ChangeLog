@@ -1,3 +1,213 @@
+2013-04-03  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (read_die_and_siblings_1): Renamed from
+	read_die_and_siblings.
+	(read_die_and_siblings): New function.
+	(read_cutu_die_from_dwo): Dump die if requested.
+	(read_die_and_children): Call read_full_die_1 and
+	read_die_and_siblings_1.
+	(read_full_die): Dump die if requested.
+
+	* dwarf2read.c (read_comp_units_from_section): Add debugging printf.
+
+	* dwarf2read.c (struct dwo_file): New member comp_dir.
+	Rename member name to dwo_name.  All uses updated.
+	(hash_dwo_file): Include comp_dir in computation.
+	(eq_dwo_file): Ditto.
+	(lookup_dwo_file_slot): New arg comp_dir.  All callers updated.
+	(create_dwo_in_dwp, lookup_dwo_in_dwp, open_and_init_dwo_file): Ditto.
+
+	* psymtab.c (read_psymtabs_with_fullname): Don't call
+	psymtab_to_fullname if the basenames are different.
+
+2013-04-03  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* NEWS (Changes in GDB 7.6): Update the data-disassemble for "fullname".
+	New entry about "fullname" presence.
+
+2013-04-03  Pedro Alves  <palves@redhat.com>
+
+	* NEWS: Mention x86_64/Cygwin as new native configuration.
+
+2013-04-02  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (read_structure_type): Fix typo in comment.
+
+2013-04-02  Pedro Alves  <palves@redhat.com>
+
+	* NEWS: Mention "set/show debug aarch64", "set/show debug
+	coff-pe-read" and "set/show debug mach-o".
+
+2013-04-02  Pedro Alves  <palves@redhat.com>
+
+	* NEWS: Mention "set/show remote trace-buffer-size-packet".
+
+2013-04-02  Eli Zaretskii  <eliz@gnu.org>
+
+	* Makefile.in (HFILES_NO_SRCDIR): Remove call-cmds.h.
+	gdb_string.h is now in common/.
+
+2013-04-02  Pedro Alves  <palves@redhat.com>
+
+	* NEWS: Move "set debug notification" and "set trace-buffer-size"
+	under "New options".
+
+2013-04-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Revert this patch:
+	PR gdb/15275
+	* remote.c (remote_get_trace_status): Include putpkt in TRY_CATCH.
+
+2013-04-02  Pedro Alves  <palves@redhat.com>
+
+	PR gdb/15275
+
+	* remote.c (send_interrupt_sequence): Use remote_serial_write.
+	(remote_serial_write): New function.
+	(putpkt_binary, getpkt_or_notif_sane_1): Use remote_serial_write.
+
+2013-04-01  Jiong Wang  <jiwang@tilera.com>
+
+	* NEWS: Mention TILE-Gx in "New native configurations" and
+	"New targets" sections. 
+
+2013-04-01  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (lookup_signatured_type_at_offset): Delete.
+	(process_enumeration_scope): Simplify.
+
+	* dwarf2read.c (struct dwarf2_per_cu_data): Move member
+	type_unit_group ...
+	(struct signatured_type): ... to here.
+	(sig_type_ptr): New typedef.
+	(type_unit_group): Delete member 't.first_cu'.  Move member 'tus'
+	out of union 't'.  All uses updated.
+	(dw2_get_file_names_reader): Assert not called for a type unit.
+	(dw2_get_file_names): Assert not called for a type unit or type
+	unit group.
+	(build_type_psymtabs_reader): Assert called for a type unit.
+	(build_type_psymtab_dependencies): Assert called for a type unit group.
+
+	* dwarf2read.c (free_dwo_file): Add comment.
+	(dwarf2_per_objfile_free): Unref dwp bfd.
+
+2013-04-01  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* coff-pe-read.c (add_pe_exported_sym): Remove unused 'dll_name_len'.
+	(add_pe_forwarded_sym): Remove unused 'section', 'dll_name_len'.
+	(read_pe_exported_syms): Remove unused 'exportix'.
+	(pe_text_section_offset): Remove unused 'opthdr_ofs', 'num_entries',
+	'export_rva', 'export_size', 'expptr', 'exp_funcbase', 'expdata',
+	'erva', 'name_rvas', 'ordinals', 'nexp', 'ordbase', 'dll_name'.
+
+2013-04-01  Aleksandar Ristovski  <aristovski@qnx.com>
+
+	* breakpoint.c (parse_cond_to_aexpr): Remove unused 'old_chain'.
+	(print_it_watchpoint): Remove unused 'bl'.
+	(say_where): Remove unused 'uiout'.
+	(bpstat_remove_breakpoint_callback): Remove unused 'uiout'.
+	(bkpt_breakpoint_hit): Remove unused 'b'.
+	(internal_bkpt_print_it): Remove unused 'uiout'.
+	* buildsym.c (augment_type_symtab): Remove unused 'i'.
+
+2013-03-31  Tiago Stürmer Daitx  <tdaitx@linux.vnet.ibm.com>
+
+	* ppc-sysv-tdep.c (ppc64_sysv_abi_push_float): New function.
+	(ppc64_sysv_abi_push_dummy_call): Handle complex arguments.
+
+2013-03-29  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (open_dwo_file): Renamed from open_dwop_file.
+	Delete arg is_dwp.  All callers updated.
+	(open_dwp_file): New function.
+	(open_and_init_dwp_file): Call it.
+	(get_dwp_file): New function.
+	(lookup_dwo_cutu): Call it.
+
+	* dwarf2read.c (open_and_init_dwp_file): Remove incorrect, and
+	unnecessary, cleanup.
+
+	* dwarf2read.c (lookup_dwo_cutu): Improve complaint text.
+
+	* dwarf2read.c (read_cutu_die_from_dwo): New function.
+	(lookup_dwo_unit): New function.
+	(init_cutu_and_read_dies): Move DWO handling to new functions.
+
+	* dwarf2read.c (struct signatured_type): Tweak comment.
+	(struct dwo_unit): Tweak comment.
+	(create_debug_types_hash_table): Tweak comment.  Reformat long line.
+	(create_dwo_debug_info_hash_table): Tweak comment.
+	(dwarf2_per_cu_offset_and_type): Tweak comment.
+
+	* dwarf2read.c (lookup_signatured_type): Remove complaint about
+	missing .debug_types section.
+
+2013-03-29  Yao Qi  <yao@codesourcery.com>
+
+	* corelow.c: Include "completer.h".
+	(_initialize_corelow): Call add_target_with_completer with
+	argument 'filename_completer'.
+	* tracepoint.c: Likewise.
+	* exec.c (_initialize_exec): Likewise.
+	* target.c (add_target): Rename to ...
+	(add_target_with_completer): ... this.  Call set_cmd_completer
+	if parameter completer is not NULL.
+	(add_target): New.
+	* target.h: Include "command.h".
+	(add_target_with_completer): Declare it.
+
+2013-03-28  Joel Brobecker  <brobecker@adacore.com>
+
+	* coffread.c (is_import_fixup_symbol): New function.
+	(record_minimal_symbol): Use is_import_fixup_symbol to
+	detect import fixup symbols, and discard them.
+
+2013-03-28  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (create_debug_types_hash_table): Don't allocate the
+	types hash table until we know we need it.
+
+	* dwarf2read.c (create_addrmap_from_index): Complain about bad CU
+	index numbers.
+
+	* dwarf2read.c (dw2_get_file_names): Delete arg "objfile".
+	All callers updated.
+	(dw2_print_stats): Print #read CUs too.
+	(dump_die_shallow): Print signatured types better.
+
+	* dwarf2read.c (struct dwarf2_per_cu_data): Rename member
+	info_or_types_section to section.  All uses updated.
+	(struct dwo_unit): Ditto.
+
+2013-03-28  Pedro Alves  <palves@redhat.com>
+
+	* NEWS (New options): New section.
+	(New options): Mention set/show remote trace-status-packet.
+	* remote.c (PACKET_qTStatus): New enumeration value.
+	(remote_get_trace_status): Skip sending qTStatus if the packet is
+	disabled.  Use packet_ok.
+	(_initialize_remote): Register a configuration command for
+	qTStatus packet.
+
+2013-03-28  Doug Evans  <dje@google.com>
+
+	* symfile.c (find_separate_debug_file): Add comment.
+	(terminate_after_last_dir_separator): Tweak comment.
+
+	* dwarf2read.c (create_partial_symtab): Add forward decl.
+	(create_partial_symtab): Move to be closer to other psymtab functions.
+	(process_psymtab_comp_unit_reader, process_psymtab_comp_unit): Ditto.
+
+	* dwarf2read.c (dwarf2_physname): Move declaration to better spot.
+	(compute_symtab_includes): Remove unnecessary forward declaration.
+	(die_needs_namespace): Add comment marking group of functions for
+	dwarf2 name computation.
+
+	* typeprint.c (_initialize_typeprint): Improve type help text.
+
+	* python/python.c (finish_python_initialization): Provide suggestion
+	for how to tell gdb to find its python files.
+
 2013-03-28  Pedro Alves  <palves@redhat.com>
 
 	PR gdb/15294
