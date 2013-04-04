@@ -644,6 +644,7 @@ free_objfile (struct objfile *objfile)
   obstack_free (&objfile->objfile_obstack, 0);
 
   /* Rebuild section map next time we need it.  */
+  gdb_assert (!get_objfile_pspace_data (objfile->pspace)->inhibit_updates);
   get_objfile_pspace_data (objfile->pspace)->objfiles_changed_p = 1;
 
   xfree (objfile);
@@ -1344,6 +1345,21 @@ bsearch_cmp (const void *key, const void *elt)
   return 1;
 }
 
+static void
+update_space_info_sections (struct objfile_pspace_info *pspace_info)
+{
+  if (pspace_info->objfiles_changed_p && !pspace_info->inhibit_updates)
+    {
+      update_section_map (current_program_space,
+			  &pspace_info->sections,
+			  &pspace_info->num_sections);
+
+      /* Don't need updates to section map until objfiles are added,
+         removed or relocated.  */
+      pspace_info->objfiles_changed_p = 0;
+    }
+}
+
 /* Returns a section whose range includes PC or NULL if none found.   */
 
 struct obj_section *
@@ -1358,16 +1374,7 @@ find_pc_section (CORE_ADDR pc)
     return s;
 
   pspace_info = get_objfile_pspace_data (current_program_space);
-  if (pspace_info->objfiles_changed_p && !pspace_info->inhibit_updates)
-    {
-      update_section_map (current_program_space,
-			  &pspace_info->sections,
-			  &pspace_info->num_sections);
-
-      /* Don't need updates to section map until objfiles are added,
-         removed or relocated.  */
-      pspace_info->objfiles_changed_p = 0;
-    }
+  update_space_info_sections (pspace_info);
 
   /* The C standard (ISO/IEC 9899:TC2) requires the BASE argument to
      bsearch be non-NULL.  */
@@ -1422,6 +1429,7 @@ objfiles_changed (void)
 void
 inhibit_section_map_updates (void)
 {
+  update_space_info_sections (get_objfile_pspace_data (current_program_space));
   get_objfile_pspace_data (current_program_space)->inhibit_updates = 1;
 }
 
