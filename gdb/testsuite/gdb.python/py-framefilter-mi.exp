@@ -1,4 +1,4 @@
-# Copyright (C) 2012 Free Software Foundation, Inc.
+# Copyright (C) 2013 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -49,10 +49,22 @@ set remote_python_file [remote_download host ${srcdir}/${subdir}/${pyfile}]
 
 mi_gdb_test "python execfile ('${remote_python_file}')" ""
 
+# Multiple blocks test
+mi_continue_to_line [gdb_get_line_number {Inner test breakpoint} ${srcfile}] \
+  "step to breakpoint"
+
+mi_gdb_test "-stack-list-locals --all-values" \
+    "\\^done,locals=\\\[{name=\"h\",value=\"9\"},{name=\"f\",value=\"42\"},{name=\"g\",value=\"19\"},{name=\"bar\",value=\"$hex \\\\\"Inside block x2\\\\\"\"},{name=\"d\",value=\"15\"},{name=\"e\",value=\"14\"},{name=\"foo\",value=\"$hex \\\\\"Inside block\\\\\"\"},{name=\"str\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",value=\"12\"},{name=\"c\",value=\"5\"}\\\]" \
+    "stack-list-locals --all-values"
+
+mi_gdb_test "-enable-frame-filters" ""
+mi_gdb_test "-stack-list-locals --all-values" \
+    "\\^done,locals=\\\[{name=\"h\",value=\"9\"},{name=\"f\",value=\"42\"},{name=\"g\",value=\"19\"},{name=\"bar\",value=\"$hex \\\\\"Inside block x2\\\\\"\"},{name=\"d\",value=\"15\"},{name=\"e\",value=\"14\"},{name=\"foo\",value=\"$hex \\\\\"Inside block\\\\\"\"},{name=\"str\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",value=\"12\"},{name=\"c\",value=\"5\"}\\\]" \
+    "stack-list-locals --all-values"
+
 mi_continue_to_line [gdb_get_line_number {Backtrace end breakpoint} ${srcfile}] \
   "step to breakpoint"
 
-mi_gdb_test "-stack-list-frames" ""
 mi_gdb_test "-enable-frame-filters" ""
 mi_gdb_test "-stack-list-frames" \
     "\\^done,stack=\\\[frame={level=\"0\",addr=\"$hex\",func=\"cnuf_dne\".*},frame={level=\"1\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"2\",addr=\"$hex\",func=\"bcnuf\".*},frame={level=\"3\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"22\",addr=\"$hex\",func=\"1cnuf\".*,children=\\\[frame={level=\"23\",addr=\"$hex\",func=\"func2\".*}\\\]},frame={level=\"24\",addr=\"$hex\",func=\"3cnuf\".*},frame={level=\"27\",addr=\"$hex\",func=\"niam\".*}\\\].*" \
@@ -166,5 +178,3 @@ mi_gdb_test "-stack-list-variables --no-frame-filters 0" \
 mi_gdb_test "-stack-list-variables 0" \
     "\\^done,variables=\\\[{name=\"foo\",arg=\"1\"},{name=\"bar\",arg=\"1\"},{name=\"fb\",arg=\"1\"},{name=\"bf\",arg=\"1\"},{name=\"str\"},{name=\"st2\"},{name=\"b\"},{name=\"c\"}\\\]" \
     "stack-list-variables 0"
-
-remote_file host delete ${remote_python_file}

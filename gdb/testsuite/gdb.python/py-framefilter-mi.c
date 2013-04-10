@@ -1,6 +1,6 @@
 /* This testcase is part of GDB, the GNU debugger.
 
-   Copyright 2008-2012 Free Software Foundation, Inc.
+   Copyright 2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -33,7 +33,21 @@ void end_func (int foo, char *bar, foobar *fb, foobar bf)
   const char *st2 = "Is Near";
   int b = 12;
   short c = 5;
-
+  {
+    int d = 15;
+    int e = 14;
+    const char *foo = "Inside block";
+    {
+      int f = 42;
+      int g = 19;
+      const char *bar = "Inside block x2";
+      {
+	short h = 9;
+	h = h +1;  /* Inner test breakpoint  */
+      }
+    }
+  }
+  
   return; /* Backtrace end breakpoint */
 }
 

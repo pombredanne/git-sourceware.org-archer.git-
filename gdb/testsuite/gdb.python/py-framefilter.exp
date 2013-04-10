@@ -59,6 +59,16 @@ set remote_python_file [remote_download host ${srcdir}/${subdir}/${testfile}.py]
 gdb_test_no_output "python execfile ('${remote_python_file}')"
 
 gdb_breakpoint [gdb_get_line_number "Backtrace end breakpoint"]
+gdb_breakpoint [gdb_get_line_number "Inner test breakpoint"]
+gdb_continue_to_breakpoint "Inner test breakpoint"
+
+# Test multiple local blocks.
+gdb_test "bt full no-filters" \
+    ".*#0.*end_func.*h = 9.*f = 42.*g = 19.*bar = $hex \"Inside block x2\".*d = 15.*e = 14.*foo = $hex \"Inside block\".*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*"
+
+gdb_test "bt full" \
+    ".*#0.*cnuf_dne.*h = 9.*f = 42.*g = 19.*bar = $hex \"Inside block x2\".*d = 15.*e = 14.*foo = $hex \"Inside block\".*str = $hex \"The End\".*st2 = $hex \"Is Near\".*b = 12.*c = 5.*"
+
 gdb_continue_to_breakpoint "Backtrace end breakpoint"
 
 gdb_test "info frame-filter" \

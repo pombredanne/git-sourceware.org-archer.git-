@@ -42,8 +42,10 @@ void end_func (int foo, char *bar, foobar *fb, foobar bf)
       int f = 42;
       int g = 19;
       const char *bar = "Inside block x2";
-
-      g = g +1;  /* Inner test breakpoint  */
+      {
+	short h = 9;
+	h = h +1;  /* Inner test breakpoint  */
+      }
     }
   }
 	
