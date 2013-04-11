@@ -28,15 +28,16 @@ class SetFilterPrefixCmd(gdb.Command):
     """Prefix command for 'set' frame-filter related operations."""
 
     def __init__(self):
-        super(SetFilterPrefixCmd, self).__init__("set python frame-filter",
-                                                 gdb.COMMAND_DATA,
-                                                 gdb.COMPLETE_COMMAND, True)
+        super(SetFilterPrefixCmd, self).__init__("set frame-filter",
+                                                 gdb.COMMAND_OBSCURE,
+                                                 gdb.COMPLETE_NONE, True)
+
 class ShowFilterPrefixCmd(gdb.Command):
     """Prefix command for 'show' frame-filter related operations."""
     def __init__(self):
-        super(ShowFilterPrefixCmd, self).__init__("show python frame-filter",
-                                                  gdb.COMMAND_DATA,
-                                                  gdb.COMPLETE_COMMAND, True)
+        super(ShowFilterPrefixCmd, self).__init__("show frame-filter",
+                                                  gdb.COMMAND_OBSCURE,
+                                                  gdb.COMPLETE_NONE, True)
 class InfoFrameFilter(gdb.Command):
     """List all registered Python frame-filters.
 
@@ -280,7 +281,7 @@ class DisableFrameFilter(gdb.Command):
 class SetFrameFilterPriority(gdb.Command):
     """GDB command to set the priority of the specified frame-filter.
 
-    Usage: set python frame-filter priority DICTIONARY NAME PRIORITY
+    Usage: set frame-filter priority DICTIONARY NAME PRIORITY
 
     DICTIONARY is the name of the frame filter dictionary on which to
     operate.  Named dictionaries are: "global" for the global frame
@@ -295,8 +296,8 @@ class SetFrameFilterPriority(gdb.Command):
     """
 
     def __init__(self):
-        super(SetFrameFilterPriority, self).__init__("set python " \
-                                                     "frame-filter priority",
+        super(SetFrameFilterPriority, self).__init__("set frame-filter " \
+                                                     "priority",
                                                      gdb.COMMAND_DATA)
 
     def _parse_pri_arg(self, arg):
@@ -316,8 +317,8 @@ class SetFrameFilterPriority(gdb.Command):
         argv = gdb.string_to_argv(arg);
         argc = len(argv)
         if argc != 3:
-            raise gdb.GdbError("set python frame-filter priority " \
-                              "takes exactly three arguments.")
+            raise gdb.GdbError("set frame-filter priority " \
+                               "takes exactly three arguments.")
 
         return argv
 
@@ -361,7 +362,7 @@ class SetFrameFilterPriority(gdb.Command):
 class ShowFrameFilterPriority(gdb.Command):
     """GDB command to show the priority of the specified frame-filter.
 
-    Usage: show python frame-filter priority DICTIONARY NAME
+    Usage: show frame-filter priority DICTIONARY NAME
 
     DICTIONARY is the name of the frame filter dictionary on which to
     operate.  Named dictionaries are: "global" for the global frame
@@ -373,8 +374,8 @@ class ShowFrameFilterPriority(gdb.Command):
     """
 
     def __init__(self):
-        super(ShowFrameFilterPriority, self).__init__("show python " \
-                                                      "frame-filter priority",
+        super(ShowFrameFilterPriority, self).__init__("show frame-filter " \
+                                                      "priority",
                                                       gdb.COMMAND_DATA)
 
     def _parse_pri_arg(self, arg):
@@ -394,8 +395,8 @@ class ShowFrameFilterPriority(gdb.Command):
         argv = gdb.string_to_argv(arg);
         argc = len(argv)
         if argc != 2:
-            raise gdb.GdbError("show python frame-filter priority " \
-                              "takes exactly two arguments.")
+            raise gdb.GdbError("show frame-filter priority " \
+                               "takes exactly two arguments.")
 
         return argv
 
@@ -445,10 +446,10 @@ class ShowFrameFilterPriority(gdb.Command):
             print("Priority of filter '" + filter_name + "' in list '" \
                 + list_name + "' is: " + str(priority))
 
-
-InfoFrameFilter()
+# Register commands
 SetFilterPrefixCmd()
 ShowFilterPrefixCmd()
+InfoFrameFilter()
 EnableFrameFilter()
 DisableFrameFilter()
 SetFrameFilterPriority()
