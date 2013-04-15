@@ -76,7 +76,7 @@ typedef int socklen_t;
 extern const char version[];
 extern const char host_name[];
 
-static int remote_desc_in, remote_desc_out;
+static int remote_desc;
 
 #ifdef __MINGW32CE__
 
@@ -177,56 +177,10 @@ static void
 remote_close (void)
 {
 #ifdef USE_WIN32API
-  closesocket (remote_desc_in);
-  if (remote_desc_in != remote_desc_out)
-    closesocket (remote_desc_out);
+  closesocket (remote_desc);
 #else
-  close (remote_desc_in);
-  if (remote_desc_in != remote_desc_out)
-    close (remote_desc_out);
+  close (remote_desc);
 #endif
-}
-
-/* Parse the string "fdin=<#>,fdout=<#>" into `remote_desc_in' and
-   `remote_desc_out' file descripts.  Return non-zero for success.  */
-
-static int
-parse_fds (char *name)
-{
-  const char *fdin_string = "fdin=";
-  size_t fdin_string_len = strlen (fdin_string);
-  const char *comma_fdout_string = ",fdout=";
-  size_t comma_fdout_string_len = strlen (comma_fdout_string);
-  long l;
-
-  if (strncmp (name, fdin_string, fdin_string_len) != 0)
-    return 0;
-  name += fdin_string_len;
-
-  if (*name == 0 || *name == ',')
-    return 0;
-  errno = 0;
-  l = strtol (name, &name, 10);
-  remote_desc_in = l;
-  if (errno != 0 || name == NULL || l < 0 || remote_desc_in != l)
-    return 0;
-
-  if (strncmp (name, comma_fdout_string, comma_fdout_string_len) != 0)
-    return 0;
-  name += comma_fdout_string_len;
-
-  if (*name == 0 || *name == ',')
-    return 0;
-  errno = 0;
-  l = strtol (name, &name, 10);
-  remote_desc_out = l;
-  if (errno != 0 || name == NULL || l < 0 || remote_desc_out != l)
-    return 0;
-
-  if (*name != 0)
-    return 0;
-
-  return 1;
 }
 
 /* Open a connection to a remote debugger.
@@ -235,94 +189,102 @@ parse_fds (char *name)
 static void
 remote_open (char *name)
 {
-  /* "fdin=<#>,fdout=<#>"  */
-  if (parse_fds (name))
+  char *port_str = strrchr (name, ':');
+#ifdef USE_WIN32API
+  static int winsock_initialized;
+#endif
+  struct sockaddr_in sockaddr;
+  socklen_t socklen;
+  int tmp_desc, n, i;
+  struct addrinfo hints;
+  struct addrinfo *addrinfo_base, *addrinfo;
+
+  if (port_str == NULL)
     {
-      fprintf (stderr, "Remote debugging using file descriptors"
-               " (input = %d, output = %d)\n", remote_desc_in, remote_desc_out);
-    }
-  else if (!strchr (name, ':'))
-    {
-      fprintf (stderr, "%s: Must specify tcp connection as host:addr"
-	       " or use fdin=<fd #>,fdout=<fd #>\n", name);
+      fprintf (stderr, "%s: Must specify tcp connection as host:addr\n", name);
       fflush (stderr);
       exit (1);
     }
-  else
+
+#ifdef USE_WIN32API
+  if (!winsock_initialized)
     {
-      int remote_desc;
-#ifdef USE_WIN32API
-      static int winsock_initialized;
-#endif
-      char *port_str;
-      int port;
-      struct sockaddr_in sockaddr;
-      socklen_t tmp;
-      int tmp_desc;
+      WSADATA wsad;
 
-      port_str = strchr (name, ':');
-
-      port = atoi (port_str + 1);
-
-#ifdef USE_WIN32API
-      if (!winsock_initialized)
-	{
-	  WSADATA wsad;
-
-	  WSAStartup (MAKEWORD (1, 0), &wsad);
-	  winsock_initialized = 1;
-	}
+      WSAStartup (MAKEWORD (1, 0), &wsad);
+      winsock_initialized = 1;
+    }
 #endif
 
-      tmp_desc = socket (PF_INET, SOCK_STREAM, 0);
-      if (tmp_desc == -1)
-	perror_with_name ("Can't open socket");
+  memset (&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG | AI_PASSIVE;
+  hints.ai_socktype = SOCK_STREAM;
 
-      /* Allow rapid reuse of this port. */
-      tmp = 1;
-      setsockopt (tmp_desc, SOL_SOCKET, SO_REUSEADDR, (char *) &tmp,
-		  sizeof (tmp));
-
-      sockaddr.sin_family = PF_INET;
-      sockaddr.sin_port = htons (port);
-      sockaddr.sin_addr.s_addr = INADDR_ANY;
-
-      if (bind (tmp_desc, (struct sockaddr *) &sockaddr, sizeof (sockaddr))
-	  || listen (tmp_desc, 1))
-	perror_with_name ("Can't bind address");
-
-      tmp = sizeof (sockaddr);
-      remote_desc = accept (tmp_desc, (struct sockaddr *) &sockaddr, &tmp);
-      if (remote_desc == -1)
-	perror_with_name ("Accept failed");
-
-      /* Enable TCP keep alive process. */
-      tmp = 1;
-      setsockopt (tmp_desc, SOL_SOCKET, SO_KEEPALIVE,
-		  (char *) &tmp, sizeof (tmp));
-
-      /* Tell TCP not to delay small packets.  This greatly speeds up
-	 interactive response. */
-      tmp = 1;
-      setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY,
-		  (char *) &tmp, sizeof (tmp));
-
-#ifndef USE_WIN32API
-      close (tmp_desc);		/* No longer need this */
-
-      signal (SIGPIPE, SIG_IGN);	/* If we don't do this, then
-					   gdbreplay simply exits when
-					   the remote side dies.  */
-#else
-      closesocket (tmp_desc);	/* No longer need this */
-#endif
-      remote_desc_in = remote_desc_out = remote_desc;
+  *port_str = 0;
+  n = getaddrinfo (name, port_str, &hints, &addrinfo_base);
+  if (n != 0)
+    {
+      fprintf (stderr, "%s:%s: cannot resolve: %s\n",
+	       name, port_str, gai_strerror (n));
+      exit (1);
     }
 
+  for (addrinfo = addrinfo_base; addrinfo != NULL;
+       addrinfo = addrinfo->ai_next)
+    {
+      tmp_desc = socket (addrinfo->ai_family, addrinfo->ai_socktype,
+			 addrinfo->ai_protocol);
+      if (tmp_desc == -1)
+	{
+	  if (addrinfo->ai_next != NULL)
+	    continue;
+	  perror_with_name ("Can't open socket");
+	}
+
+      /* Allow rapid reuse of this port. */
+      i = 1;
+      setsockopt (tmp_desc, SOL_SOCKET, SO_REUSEADDR, &i, sizeof (i));
+
+      if (bind (tmp_desc, addrinfo->ai_addr, addrinfo->ai_addrlen) != 0
+	  || listen (tmp_desc, 1) != 0)
+	{
+	  if (addrinfo->ai_next != NULL)
+	    {
+	      close (tmp_desc);
+	      continue;
+	    }
+	  perror_with_name ("Can't bind address");
+	}
+      break;
+    }
+
+  socklen = sizeof (sockaddr);
+  remote_desc = accept (tmp_desc, (struct sockaddr *) &sockaddr, &socklen);
+  if (remote_desc == -1)
+    perror_with_name ("Accept failed");
+
+  /* Enable TCP keep alive process. */
+  i = 1;
+  setsockopt (tmp_desc, SOL_SOCKET, SO_KEEPALIVE, &i, sizeof (i));
+
+  /* Tell TCP not to delay small packets.  This greatly speeds up
+     interactive response. */
+  i = 1;
+  setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY, &i, sizeof (i));
+
+#ifndef USE_WIN32API
+  close (tmp_desc);		/* No longer need this */
+
+  signal (SIGPIPE, SIG_IGN);	/* If we don't do this, then
+				   gdbreplay simply exits when
+				   the remote side dies.  */
+#else
+  closesocket (tmp_desc);	/* No longer need this */
+#endif
+
 #if defined(F_SETFL) && defined (FASYNC)
-  fcntl (remote_desc_in, F_SETFL, FASYNC);
-  if (remote_desc_in != remote_desc_out)
-    fcntl (remote_desc_out, F_SETFL, FASYNC);
+  fcntl (remote_desc, F_SETFL, FASYNC);
 #endif
 
   fprintf (stderr, "Replay logfile using %s\n", name);

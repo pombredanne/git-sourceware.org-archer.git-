@@ -60,7 +60,6 @@
 #if HAVE_ERRNO_H
 #include <errno.h>
 #endif
-#include <ctype.h>
 
 #if USE_WIN32API
 #include <winsock2.h>
@@ -221,16 +220,16 @@ handle_accept_event (int err, gdb_client_data client_data)
    NAME is the filename used for communication.  */
 
 void
-remote_prepare (char *name)
+remote_prepare (const char *name)
 {
-  char *port_str;
+  const char *port_str;
+  char *hostname;
+  int n;
+  struct addrinfo hints;
+  struct addrinfo *addrinfo_base, *addrinfo;
 #ifdef USE_WIN32API
   static int winsock_initialized;
 #endif
-  int port;
-  struct sockaddr_in sockaddr;
-  socklen_t tmp;
-  char *port_end;
 
   remote_is_stdio = 0;
   if (strcmp (name, STDIO_CONNECTION_NAME) == 0)
@@ -243,16 +242,12 @@ remote_prepare (char *name)
       return;
     }
 
-  port_str = strchr (name, ':');
+  port_str = strrchr (name, ':');
   if (port_str == NULL)
     {
       transport_is_reliable = 0;
       return;
     }
-
-  port = strtoul (port_str + 1, &port_end, 10);
-  if (port_str[1] == '\0' || *port_end != '\0')
-    fatal ("Bad port argument: %s", name);
 
 #ifdef USE_WIN32API
   if (!winsock_initialized)
@@ -264,22 +259,56 @@ remote_prepare (char *name)
     }
 #endif
 
-  listen_desc = socket (PF_INET, SOCK_STREAM, IPPROTO_TCP);
-  if (listen_desc == -1)
-    perror_with_name ("Can't open socket");
+  memset (&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG | AI_PASSIVE;
+  hints.ai_socktype = SOCK_STREAM;
 
-  /* Allow rapid reuse of this port. */
-  tmp = 1;
-  setsockopt (listen_desc, SOL_SOCKET, SO_REUSEADDR, (char *) &tmp,
-	      sizeof (tmp));
+  hostname = xstrdup (name);
+  hostname[port_str - name] = 0;
+  port_str++;
+  if (*hostname == 0)
+    hostname = NULL;
 
-  sockaddr.sin_family = PF_INET;
-  sockaddr.sin_port = htons (port);
-  sockaddr.sin_addr.s_addr = INADDR_ANY;
+  n = getaddrinfo (hostname, port_str, &hints, &addrinfo_base);
+  if (n != 0)
+    {
+      fprintf (stderr, _("%s:%s: cannot resolve: %s\n"),
+	       hostname, port_str, gai_strerror (n));
+      transport_is_reliable = 0;
+      return;
+    }
 
-  if (bind (listen_desc, (struct sockaddr *) &sockaddr, sizeof (sockaddr))
-      || listen (listen_desc, 1))
-    perror_with_name ("Can't bind address");
+  for (addrinfo = addrinfo_base; addrinfo != NULL; addrinfo = addrinfo->ai_next)
+    {
+      int i;
+
+printf("ai_family=%d,ai_socktype=%d\n",addrinfo->ai_family,addrinfo->ai_socktype);
+      listen_desc = socket (addrinfo->ai_family, addrinfo->ai_socktype,
+			    addrinfo->ai_protocol);
+      if (listen_desc == -1)
+	{
+	  if (addrinfo->ai_next != NULL)
+	    continue;
+	  perror_with_name ("Can't open socket");
+	}
+
+      /* Allow rapid reuse of this port. */
+      i = 1;
+      setsockopt (listen_desc, SOL_SOCKET, SO_REUSEADDR, &i, sizeof (i));
+
+      if (bind (listen_desc, addrinfo->ai_addr, addrinfo->ai_addrlen) != 0
+	  || listen (listen_desc, 1) != 0)
+	{
+	  if (addrinfo->ai_next != NULL)
+	    {
+	      close (listen_desc);
+	      continue;
+	    }
+	  perror_with_name ("Can't bind address");
+	}
+      break;
+    }
 
   transport_is_reliable = 1;
 }
@@ -288,11 +317,11 @@ remote_prepare (char *name)
    NAME is the filename used for communication.  */
 
 void
-remote_open (char *name)
+remote_open (const char *name)
 {
-  char *port_str;
+  const char *port_str;
 
-  port_str = strchr (name, ':');
+  port_str = strrchr (name, ':');
 #ifdef USE_WIN32API
   if (port_str == NULL)
     error ("Only <host>:<port> is supported on this platform.");
