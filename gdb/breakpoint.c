@@ -950,7 +950,7 @@ set_breakpoint_condition (struct breakpoint *b, char *exp,
     }
   else
     {
-      char *arg = exp;
+      const char *arg = exp;
 
       /* I don't know if it matters whether this is the string the user
 	 typed in or the decompiled expression.  */
@@ -991,12 +991,13 @@ set_breakpoint_condition (struct breakpoint *b, char *exp,
 /* Completion for the "condition" command.  */
 
 static VEC (char_ptr) *
-condition_completer (struct cmd_list_element *cmd, char *text, char *word)
+condition_completer (struct cmd_list_element *cmd,
+		     const char *text, const char *word)
 {
-  char *space;
+  const char *space;
 
-  text = skip_spaces (text);
-  space = skip_to_space (text);
+  text = skip_spaces_const (text);
+  space = skip_to_space_const (text);
   if (*space == '\0')
     {
       int len;
@@ -1041,7 +1042,7 @@ condition_completer (struct cmd_list_element *cmd, char *text, char *word)
     }
 
   /* We're completing the expression part.  */
-  text = skip_spaces (space);
+  text = skip_spaces_const (space);
   return expression_completer (cmd, text, word);
 }
 
@@ -1141,12 +1142,25 @@ validate_commands_for_breakpoint (struct breakpoint *b,
 {
   if (is_tracepoint (b))
     {
-      /* We need to verify that each top-level element of commands is
-	 valid for tracepoints, that there's at most one
-	 while-stepping element, and that while-stepping's body has
-	 valid tracing commands excluding nested while-stepping.  */
+      struct tracepoint *t = (struct tracepoint *) b;
       struct command_line *c;
       struct command_line *while_stepping = 0;
+
+      /* Reset the while-stepping step count.  The previous commands
+         might have included a while-stepping action, while the new
+         ones might not.  */
+      t->step_count = 0;
+
+      /* We need to verify that each top-level element of commands is
+	 valid for tracepoints, that there's at most one
+	 while-stepping element, and that the while-stepping's body
+	 has valid tracing commands excluding nested while-stepping.
+	 We also need to validate the tracepoint action line in the
+	 context of the tracepoint --- validate_actionline actually
+	 has side effects, like setting the tracepoint's
+	 while-stepping STEP_COUNT, in addition to checking if the
+	 collect/teval actions parse and make sense in the
+	 tracepoint's context.  */
       for (c = commands; c; c = c->next)
 	{
 	  if (c->control_type == while_stepping_control)
@@ -1164,6 +1178,8 @@ validate_commands_for_breakpoint (struct breakpoint *b,
 	      else
 		while_stepping = c;
 	    }
+
+	  validate_actionline (c->line, b);
 	}
       if (while_stepping)
 	{
@@ -1264,7 +1280,7 @@ check_tracepoint_command (char *line, void *closure)
 {
   struct breakpoint *b = closure;
 
-  validate_actionline (&line, b);
+  validate_actionline (line, b);
 }
 
 /* A structure used to pass information through
@@ -1567,7 +1583,7 @@ breakpoint_xfer_memory (gdb_byte *readbuf, gdb_byte *writebuf,
 	struct gdbarch *gdbarch = bl->gdbarch;
 	const unsigned char *bp;
 	CORE_ADDR placed_address = bl->target_info.placed_address;
-	unsigned placed_size = bl->target_info.placed_size;
+	int placed_size = bl->target_info.placed_size;
 
 	/* Update the shadow with what we want to write to memory.  */
 	memcpy (bl->target_info.shadow_contents + bptoffset,
@@ -1759,7 +1775,7 @@ update_watchpoint (struct watchpoint *b, int reparse)
 
   if (within_current_scope && reparse)
     {
-      char *s;
+      const char *s;
 
       if (b->exp)
 	{
@@ -2046,7 +2062,6 @@ static struct agent_expr *
 parse_cond_to_aexpr (CORE_ADDR scope, struct expression *cond)
 {
   struct agent_expr *aexpr = NULL;
-  struct cleanup *old_chain = NULL;
   volatile struct gdb_exception ex;
 
   if (!cond)
@@ -2184,10 +2199,9 @@ parse_cmd_to_aexpr (CORE_ADDR scope, char *cmd)
   struct cleanup *old_cleanups = 0;
   struct expression *expr, **argvec;
   struct agent_expr *aexpr = NULL;
-  struct cleanup *old_chain = NULL;
   volatile struct gdb_exception ex;
-  char *cmdrest;
-  char *format_start, *format_end;
+  const char *cmdrest;
+  const char *format_start, *format_end;
   struct format_piece *fpieces;
   int nargs;
   struct gdbarch *gdbarch = get_current_arch ();
@@ -2199,7 +2213,7 @@ parse_cmd_to_aexpr (CORE_ADDR scope, char *cmd)
 
   if (*cmdrest == ',')
     ++cmdrest;
-  cmdrest = skip_spaces (cmdrest);
+  cmdrest = skip_spaces_const (cmdrest);
 
   if (*cmdrest++ != '"')
     error (_("No format string following the location"));
@@ -2215,14 +2229,14 @@ parse_cmd_to_aexpr (CORE_ADDR scope, char *cmd)
   if (*cmdrest++ != '"')
     error (_("Bad format string, non-terminated '\"'."));
   
-  cmdrest = skip_spaces (cmdrest);
+  cmdrest = skip_spaces_const (cmdrest);
 
   if (!(*cmdrest == ',' || *cmdrest == '\0'))
     error (_("Invalid argument syntax"));
 
   if (*cmdrest == ',')
     cmdrest++;
-  cmdrest = skip_spaces (cmdrest);
+  cmdrest = skip_spaces_const (cmdrest);
 
   /* For each argument, make an expression.  */
 
@@ -2232,7 +2246,7 @@ parse_cmd_to_aexpr (CORE_ADDR scope, char *cmd)
   nargs = 0;
   while (*cmdrest != '\0')
     {
-      char *cmd1;
+      const char *cmd1;
 
       cmd1 = cmdrest;
       expr = parse_exp_1 (&cmd1, scope, block_for_pc (scope), 1);
@@ -9103,7 +9117,8 @@ init_breakpoint_sal (struct breakpoint *b, struct gdbarch *gdbarch,
 
       if (b->cond_string)
 	{
-	  char *arg = b->cond_string;
+	  const char *arg = b->cond_string;
+
 	  loc->cond = parse_exp_1 (&arg, loc->address,
 				   block_for_pc (loc->address), 0);
 	  if (*arg)
@@ -9374,7 +9389,7 @@ invalid_thread_id_error (int id)
    If no thread is found, *THREAD is set to -1.  */
 
 static void
-find_condition_and_thread (char *tok, CORE_ADDR pc,
+find_condition_and_thread (const char *tok, CORE_ADDR pc,
 			   char **cond_string, int *thread, int *task,
 			   char **rest)
 {
@@ -9385,12 +9400,12 @@ find_condition_and_thread (char *tok, CORE_ADDR pc,
 
   while (tok && *tok)
     {
-      char *end_tok;
+      const char *end_tok;
       int toklen;
-      char *cond_start = NULL;
-      char *cond_end = NULL;
+      const char *cond_start = NULL;
+      const char *cond_end = NULL;
 
-      tok = skip_spaces (tok);
+      tok = skip_spaces_const (tok);
 
       if ((*tok == '"' || *tok == ',') && rest)
 	{
@@ -9398,7 +9413,7 @@ find_condition_and_thread (char *tok, CORE_ADDR pc,
 	  return;
 	}
 
-      end_tok = skip_to_space (tok);
+      end_tok = skip_to_space_const (tok);
 
       toklen = end_tok - tok;
 
@@ -9417,24 +9432,24 @@ find_condition_and_thread (char *tok, CORE_ADDR pc,
 	  char *tmptok;
 
 	  tok = end_tok + 1;
-	  tmptok = tok;
-	  *thread = strtol (tok, &tok, 0);
+	  *thread = strtol (tok, &tmptok, 0);
 	  if (tok == tmptok)
 	    error (_("Junk after thread keyword."));
 	  if (!valid_thread_id (*thread))
 	    invalid_thread_id_error (*thread);
+	  tok = tmptok;
 	}
       else if (toklen >= 1 && strncmp (tok, "task", toklen) == 0)
 	{
 	  char *tmptok;
 
 	  tok = end_tok + 1;
-	  tmptok = tok;
-	  *task = strtol (tok, &tok, 0);
+	  *task = strtol (tok, &tmptok, 0);
 	  if (tok == tmptok)
 	    error (_("Junk after task keyword."));
 	  if (!valid_task_id (*task))
 	    error (_("Unknown task %d."), *task);
+	  tok = tmptok;
 	}
       else if (rest)
 	{
@@ -9495,20 +9510,20 @@ decode_static_tracepoint_spec (char **arg_p)
 
 /* Set a breakpoint.  This function is shared between CLI and MI
    functions for setting a breakpoint.  This function has two major
-   modes of operations, selected by the PARSE_CONDITION_AND_THREAD
-   parameter.  If non-zero, the function will parse arg, extracting
-   breakpoint location, address and thread.  Otherwise, ARG is just
-   the location of breakpoint, with condition and thread specified by
-   the COND_STRING and THREAD parameters.  If INTERNAL is non-zero,
-   the breakpoint number will be allocated from the internal
-   breakpoint count.  Returns true if any breakpoint was created;
-   false otherwise.  */
+   modes of operations, selected by the PARSE_ARG parameter.  If
+   non-zero, the function will parse ARG, extracting location,
+   condition, thread and extra string.  Otherwise, ARG is just the
+   breakpoint's location, with condition, thread, and extra string
+   specified by the COND_STRING, THREAD and EXTRA_STRING parameters.
+   If INTERNAL is non-zero, the breakpoint number will be allocated
+   from the internal breakpoint count.  Returns true if any breakpoint
+   was created; false otherwise.  */
 
 int
 create_breakpoint (struct gdbarch *gdbarch,
 		   char *arg, char *cond_string,
 		   int thread, char *extra_string,
-		   int parse_condition_and_thread,
+		   int parse_arg,
 		   int tempflag, enum bptype type_wanted,
 		   int ignore_count,
 		   enum auto_boolean pending_break_support,
@@ -9626,7 +9641,7 @@ create_breakpoint (struct gdbarch *gdbarch,
 
       lsal = VEC_index (linespec_sals, canonical.sals, 0);
 
-      if (parse_condition_and_thread)
+      if (parse_arg)
         {
 	    char *rest;
             /* Here we only parse 'arg' to separate condition
@@ -9645,6 +9660,9 @@ create_breakpoint (struct gdbarch *gdbarch,
         }
       else
         {
+	    if (*arg != '\0')
+	      error (_("Garbage '%s' at end of location"), arg);
+
             /* Create a private copy of condition string.  */
             if (cond_string)
             {
@@ -9684,7 +9702,7 @@ create_breakpoint (struct gdbarch *gdbarch,
       init_raw_breakpoint_without_location (b, gdbarch, type_wanted, ops);
 
       b->addr_string = copy_arg;
-      if (parse_condition_and_thread)
+      if (parse_arg)
 	b->cond_string = NULL;
       else
 	{
@@ -9796,7 +9814,7 @@ resolve_sal_pc (struct symtab_and_line *sal)
 	  if (sym != NULL)
 	    {
 	      fixup_symbol_section (sym, sal->symtab->objfile);
-	      sal->section = SYMBOL_OBJ_SECTION (sym);
+	      sal->section = SYMBOL_OBJ_SECTION (sal->symtab->objfile, sym);
 	    }
 	  else
 	    {
@@ -9805,14 +9823,14 @@ resolve_sal_pc (struct symtab_and_line *sal)
 	         if we have line numbers but no functions (as can
 	         happen in assembly source).  */
 
-	      struct minimal_symbol *msym;
+	      struct bound_minimal_symbol msym;
 	      struct cleanup *old_chain = save_current_space_and_thread ();
 
 	      switch_to_program_space_and_thread (sal->pspace);
 
 	      msym = lookup_minimal_symbol_by_pc (sal->pc);
-	      if (msym)
-		sal->section = SYMBOL_OBJ_SECTION (msym);
+	      if (msym.minsym)
+		sal->section = SYMBOL_OBJ_SECTION (msym.objfile, msym.minsym);
 
 	      do_cleanups (old_chain);
 	    }
@@ -10483,7 +10501,6 @@ print_it_watchpoint (bpstat bs)
 {
   struct cleanup *old_chain;
   struct breakpoint *b;
-  const struct bp_location *bl;
   struct ui_file *stb;
   enum print_stop_action result;
   struct watchpoint *w;
@@ -10491,7 +10508,6 @@ print_it_watchpoint (bpstat bs)
 
   gdb_assert (bs->bp_location_at != NULL);
 
-  bl = bs->bp_location_at;
   b = bs->breakpoint_at;
   w = (struct watchpoint *) b;
 
@@ -10836,7 +10852,7 @@ is_masked_watchpoint (const struct breakpoint *b)
                 hw_read:   watch read, 
 		hw_access: watch access (read or write) */
 static void
-watch_command_1 (char *arg, int accessflag, int from_tty,
+watch_command_1 (const char *arg, int accessflag, int from_tty,
 		 int just_location, int internal)
 {
   volatile struct gdb_exception e;
@@ -10845,12 +10861,12 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   const struct block *exp_valid_block = NULL, *cond_exp_valid_block = NULL;
   struct value *val, *mark, *result;
   struct frame_info *frame;
-  char *exp_start = NULL;
-  char *exp_end = NULL;
-  char *tok, *end_tok;
+  const char *exp_start = NULL;
+  const char *exp_end = NULL;
+  const char *tok, *end_tok;
   int toklen = -1;
-  char *cond_start = NULL;
-  char *cond_end = NULL;
+  const char *cond_start = NULL;
+  const char *cond_end = NULL;
   enum bptype bp_type;
   int thread = -1;
   int pc = 0;
@@ -10859,15 +10875,19 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   int use_mask = 0;
   CORE_ADDR mask = 0;
   struct watchpoint *w;
+  char *expression;
+  struct cleanup *back_to;
 
   /* Make sure that we actually have parameters to parse.  */
   if (arg != NULL && arg[0] != '\0')
     {
-      char *value_start;
+      const char *value_start;
+
+      exp_end = arg + strlen (arg);
 
       /* Look for "parameter value" pairs at the end
 	 of the arguments string.  */
-      for (tok = arg + strlen (arg) - 1; tok > arg; tok--)
+      for (tok = exp_end - 1; tok > arg; tok--)
 	{
 	  /* Skip whitespace at the end of the argument list.  */
 	  while (tok > arg && (*tok == ' ' || *tok == '\t'))
@@ -10937,13 +10957,19 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
 
 	  /* Truncate the string and get rid of the "parameter value" pair before
 	     the arguments string is parsed by the parse_exp_1 function.  */
-	  *tok = '\0';
+	  exp_end = tok;
 	}
     }
+  else
+    exp_end = arg;
 
-  /* Parse the rest of the arguments.  */
+  /* Parse the rest of the arguments.  From here on out, everything
+     is in terms of a newly allocated string instead of the original
+     ARG.  */
   innermost_block = NULL;
-  exp_start = arg;
+  expression = savestring (arg, exp_end - arg);
+  back_to = make_cleanup (xfree, expression);
+  exp_start = arg = expression;
   exp = parse_exp_1 (&arg, 0, 0, 0);
   exp_end = arg;
   /* Remove trailing whitespace from the expression before saving it.
@@ -10989,8 +11015,8 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
   else if (val != NULL)
     release_value (val);
 
-  tok = skip_spaces (arg);
-  end_tok = skip_to_space (tok);
+  tok = skip_spaces_const (arg);
+  end_tok = skip_to_space_const (tok);
 
   toklen = end_tok - tok;
   if (toklen >= 1 && strncmp (tok, "if", toklen) == 0)
@@ -11142,6 +11168,7 @@ watch_command_1 (char *arg, int accessflag, int from_tty,
     }
 
   install_breakpoint (internal, b, 1);
+  do_cleanups (back_to);
 }
 
 /* Return count of debug registers needed to watch the given expression.
@@ -11768,8 +11795,7 @@ catch_syscall_split_args (char *arg)
       struct syscall s;
 
       /* Skip whitespace.  */
-      while (isspace (*arg))
-	arg++;
+      arg = skip_spaces (arg);
 
       for (i = 0; i < 127 && arg[i] && !isspace (arg[i]); ++i)
 	cur_name[i] = arg[i];
@@ -12707,7 +12733,6 @@ bpstat_remove_breakpoint_callback (struct thread_info *th, void *data)
 static void
 say_where (struct breakpoint *b)
 {
-  struct ui_out *uiout = current_uiout;
   struct value_print_options opts;
 
   get_user_print_options (&opts);
@@ -12776,6 +12801,7 @@ base_breakpoint_dtor (struct breakpoint *self)
 {
   decref_counted_command_line (&self->commands);
   xfree (self->cond_string);
+  xfree (self->extra_string);
   xfree (self->addr_string);
   xfree (self->filter);
   xfree (self->addr_string_range_end);
@@ -12975,8 +13001,6 @@ bkpt_breakpoint_hit (const struct bp_location *bl,
 		     struct address_space *aspace, CORE_ADDR bp_addr,
 		     const struct target_waitstatus *ws)
 {
-  struct breakpoint *b = bl->owner;
-
   if (ws->kind != TARGET_WAITKIND_STOPPED
       || ws->value.sig != GDB_SIGNAL_TRAP)
     return 0;
@@ -13170,7 +13194,6 @@ internal_bkpt_check_status (bpstat bs)
 static enum print_stop_action
 internal_bkpt_print_it (bpstat bs)
 {
-  struct ui_out *uiout = current_uiout;
   struct breakpoint *b;
 
   b = bs->breakpoint_at;
@@ -13488,6 +13511,35 @@ tracepoint_probe_decode_linespec (struct breakpoint *b, char **s,
 }
 
 static struct breakpoint_ops tracepoint_probe_breakpoint_ops;
+
+/* Dprintf breakpoint_ops methods.  */
+
+static void
+dprintf_re_set (struct breakpoint *b)
+{
+  breakpoint_re_set_default (b);
+
+  /* This breakpoint could have been pending, and be resolved now, and
+     if so, we should now have the extra string.  If we don't, the
+     dprintf was malformed when created, but we couldn't tell because
+     we can't extract the extra string until the location is
+     resolved.  */
+  if (b->loc != NULL && b->extra_string == NULL)
+    error (_("Format string required"));
+
+  /* 1 - connect to target 1, that can run breakpoint commands.
+     2 - create a dprintf, which resolves fine.
+     3 - disconnect from target 1
+     4 - connect to target 2, that can NOT run breakpoint commands.
+
+     After steps #3/#4, you'll want the dprintf command list to
+     be updated, because target 1 and 2 may well return different
+     answers for target_can_run_breakpoint_commands().
+     Given absence of finer grained resetting, we get to do
+     it all the time.  */
+  if (b->extra_string != NULL)
+    update_dprintf_command_list (b);
+}
 
 /* The breakpoint_ops structure to be used on static tracepoints with
    markers (`-m').  */
@@ -14037,7 +14089,7 @@ update_breakpoint_locations (struct breakpoint *b,
 	 old symtab.  */
       if (b->cond_string != NULL)
 	{
-	  char *s;
+	  const char *s;
 	  volatile struct gdb_exception e;
 
 	  s = b->cond_string;
@@ -15073,7 +15125,7 @@ catching_syscall_number (int syscall_number)
 /* Complete syscall names.  Used by "catch syscall".  */
 static VEC (char_ptr) *
 catch_syscall_completer (struct cmd_list_element *cmd,
-                         char *text, char *word)
+                         const char *text, const char *word)
 {
   const char **list = get_syscall_names ();
   VEC (char_ptr) *retlist
@@ -15370,9 +15422,7 @@ trace_pass_command (char *args, int from_tty)
 
   count = strtoul (args, &args, 10);	/* Count comes first, then TP num.  */
 
-  while (*args && isspace ((int) *args))
-    args++;
-
+  args = skip_spaces (args);
   if (*args && strncasecmp (args, "all", 3) == 0)
     {
       struct breakpoint *b;
@@ -15990,7 +16040,7 @@ initialize_breakpoint_ops (void)
 
   ops = &dprintf_breakpoint_ops;
   *ops = bkpt_base_breakpoint_ops;
-  ops->re_set = bkpt_re_set;
+  ops->re_set = dprintf_re_set;
   ops->resources_needed = bkpt_resources_needed;
   ops->print_it = bkpt_print_it;
   ops->print_mention = bkpt_print_mention;

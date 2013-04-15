@@ -237,7 +237,7 @@ sh64_elf_make_msymbol_special (asymbol *sym, struct minimal_symbol *msym)
 static int
 pc_is_isa32 (bfd_vma memaddr)
 {
-  struct minimal_symbol *sym;
+  struct bound_minimal_symbol sym;
 
   /* If bit 0 of the address is set, assume this is a
      ISA32 (shmedia) address.  */
@@ -248,8 +248,8 @@ pc_is_isa32 (bfd_vma memaddr)
      the high bit of the info field.  Use this to decide if the function is
      ISA16 or ISA32.  */
   sym = lookup_minimal_symbol_by_pc (memaddr);
-  if (sym)
-    return MSYMBOL_IS_SPECIAL (sym);
+  if (sym.minsym)
+    return MSYMBOL_IS_SPECIAL (sym.minsym);
   else
     return 0;
 }
@@ -1261,7 +1261,7 @@ sh64_extract_return_value (struct type *type, struct regcache *regcache,
       if (len <= 8)
 	{
 	  int offset;
-	  char buf[8];
+	  gdb_byte buf[8];
 	  /* Result is in register 2.  If smaller than 8 bytes, it is padded 
 	     at the most significant end.  */
 	  regcache_raw_read (regcache, DEFAULT_RETURN_REGNUM, buf);
@@ -1290,7 +1290,7 @@ sh64_store_return_value (struct type *type, struct regcache *regcache,
 			 const void *valbuf)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
-  char buf[64];	/* more than enough...  */
+  gdb_byte buf[64];	/* more than enough...  */
   int len = TYPE_LENGTH (type);
 
   if (TYPE_CODE (type) == TYPE_CODE_FLT)

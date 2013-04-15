@@ -1,6 +1,6 @@
 /* Intel 80386/80486-specific support for 32-bit ELF
    Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002,
-   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012
+   2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013
    Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -425,10 +425,10 @@ elf_i386_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
  	return FALSE;
 
       /* pr_cursig */
-      elf_tdata (abfd)->core_signal = bfd_get_32 (abfd, note->descdata + 20);
+      elf_tdata (abfd)->core->signal = bfd_get_32 (abfd, note->descdata + 20);
 
       /* pr_pid */
-      elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 24);
+      elf_tdata (abfd)->core->lwpid = bfd_get_32 (abfd, note->descdata + 24);
 
       /* pr_reg */
       offset = 28;
@@ -443,10 +443,10 @@ elf_i386_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 
 	case 144:		/* Linux/i386 */
 	  /* pr_cursig */
-	  elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
+	  elf_tdata (abfd)->core->signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	  /* pr_pid */
-	  elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 24);
+	  elf_tdata (abfd)->core->lwpid = bfd_get_32 (abfd, note->descdata + 24);
 
 	  /* pr_reg */
 	  offset = 72;
@@ -471,9 +471,9 @@ elf_i386_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
       if (pr_version != 1)
 	return FALSE;
 
-      elf_tdata (abfd)->core_program
+      elf_tdata (abfd)->core->program
 	= _bfd_elfcore_strndup (abfd, note->descdata + 8, 17);
-      elf_tdata (abfd)->core_command
+      elf_tdata (abfd)->core->command
 	= _bfd_elfcore_strndup (abfd, note->descdata + 25, 81);
     }
   else
@@ -484,11 +484,11 @@ elf_i386_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
 	  return FALSE;
 
 	case 124:		/* Linux/i386 elf_prpsinfo.  */
-	  elf_tdata (abfd)->core_pid
+	  elf_tdata (abfd)->core->pid
 	    = bfd_get_32 (abfd, note->descdata + 12);
-	  elf_tdata (abfd)->core_program
+	  elf_tdata (abfd)->core->program
 	    = _bfd_elfcore_strndup (abfd, note->descdata + 28, 16);
-	  elf_tdata (abfd)->core_command
+	  elf_tdata (abfd)->core->command
 	    = _bfd_elfcore_strndup (abfd, note->descdata + 44, 80);
 	}
     }
@@ -497,7 +497,7 @@ elf_i386_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
      onto the end of the args in some (at least one anyway)
      implementations, so strip it off if it exists.  */
   {
-    char *command = elf_tdata (abfd)->core_command;
+    char *command = elf_tdata (abfd)->core->command;
     int n = strlen (command);
 
     if (0 < n && command[n - 1] == ' ')
@@ -1514,6 +1514,7 @@ elf_i386_check_relocs (bfd *abfd,
 
 	  /* It is referenced by a non-shared object. */
 	  h->ref_regular = 1;
+	  h->root.non_ir_ref = 1;
 	}
 
       if (! elf_i386_tls_transition (info, abfd, sec, NULL,
@@ -4718,7 +4719,9 @@ elf_i386_finish_local_dynamic_symbol (void **slot, void *inf)
    dynamic linker, before writing them out.  */
 
 static enum elf_reloc_type_class
-elf_i386_reloc_type_class (const Elf_Internal_Rela *rela)
+elf_i386_reloc_type_class (const struct bfd_link_info *info ATTRIBUTE_UNUSED,
+			   const asection *rel_sec ATTRIBUTE_UNUSED,
+			   const Elf_Internal_Rela *rela)
 {
   switch (ELF32_R_TYPE (rela->r_info))
     {

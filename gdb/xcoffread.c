@@ -278,7 +278,7 @@ find_targ_sec (bfd *abfd, asection *sect, void *obj)
       else if (bfd_get_section_flags (abfd, sect) & SEC_LOAD)
 	*args->resultp = SECT_OFF_DATA (objfile);
       else
-	*args->resultp = sect->index;
+	*args->resultp = gdb_bfd_section_index (abfd, sect);
       *args->bfd_sect = sect;
     }
 }
@@ -922,15 +922,12 @@ record_minimal_symbol (const char *name, CORE_ADDR address,
 		       int n_scnum,
 		       struct objfile *objfile)
 {
-  int secnum;
-  asection *bfd_sect;
-
   if (name[0] == '.')
     ++name;
 
-  xcoff_secnum_to_sections (n_scnum, objfile, &bfd_sect, &secnum);
   prim_record_minimal_symbol_and_info (name, address, ms_type,
-				       secnum, bfd_sect, objfile);
+				       secnum_to_section (n_scnum, objfile),
+				       objfile);
 }
 
 /* xcoff has static blocks marked in `.bs', `.es' pairs.  They cannot be
@@ -1546,7 +1543,7 @@ process_xcoff_symbol (struct coff_symbol *cs, struct objfile *objfile)
   if (name[0] == '.')
     ++name;
 
-  memset (sym, '\0', sizeof (struct symbol));
+  initialize_symbol (sym);
 
   /* default assumptions */
   SYMBOL_VALUE_ADDRESS (sym) = cs->c_value + off;
@@ -1562,7 +1559,7 @@ process_xcoff_symbol (struct coff_symbol *cs, struct objfile *objfile)
       SYMBOL_SET_LINKAGE_NAME (sym, SYMNAME_ALLOC (name, symname_alloced));
       SYMBOL_TYPE (sym) = objfile_type (objfile)->nodebug_text_symbol;
 
-      SYMBOL_CLASS (sym) = LOC_BLOCK;
+      SYMBOL_ACLASS_INDEX (sym) = LOC_BLOCK;
       SYMBOL_DUP (sym, sym2);
 
       if (cs->c_sclass == C_EXT)
@@ -2346,7 +2343,6 @@ scan_xcoff_symtab (struct objfile *objfile)
 			(namestring, symbol.n_value,
 			 sclass == C_HIDEXT ? mst_file_data : mst_data,
 			 secnum_to_section (symbol.n_scnum, objfile),
-			 secnum_to_bfd_section (symbol.n_scnum, objfile),
 			 objfile);
 		    break;
 
@@ -2424,7 +2420,6 @@ scan_xcoff_symtab (struct objfile *objfile)
 			(namestring, symbol.n_value,
 			 sclass == C_HIDEXT ? mst_file_data : mst_data,
 			 secnum_to_section (symbol.n_scnum, objfile),
-			 secnum_to_bfd_section (symbol.n_scnum, objfile),
 			 objfile);
 		    break;
 		  }
@@ -2442,7 +2437,6 @@ scan_xcoff_symtab (struct objfile *objfile)
 			(namestring, symbol.n_value,
 			 sclass == C_HIDEXT ? mst_file_bss : mst_bss,
 			 secnum_to_section (symbol.n_scnum, objfile),
-			 secnum_to_bfd_section (symbol.n_scnum, objfile),
 			 objfile);
 		    break;
 		  }

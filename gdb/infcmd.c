@@ -56,6 +56,7 @@
 #include "inf-loop.h"
 #include "continuations.h"
 #include "linespec.h"
+#include "cli/cli-utils.h"
 
 /* Local functions: */
 
@@ -1169,8 +1170,8 @@ jump_command (char *arg, int from_tty)
   if (sfn != NULL)
     {
       fixup_symbol_section (sfn, 0);
-      if (section_is_overlay (SYMBOL_OBJ_SECTION (sfn)) &&
-	  !section_is_mapped (SYMBOL_OBJ_SECTION (sfn)))
+      if (section_is_overlay (SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (sfn), sfn)) &&
+	  !section_is_mapped (SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (sfn), sfn)))
 	{
 	  if (!query (_("WARNING!!!  Destination is in "
 			"unmapped overlay!  Jump anyway? ")))
@@ -1331,12 +1332,12 @@ until_next_command (int from_tty)
 
   if (!func)
     {
-      struct minimal_symbol *msymbol = lookup_minimal_symbol_by_pc (pc);
+      struct bound_minimal_symbol msymbol = lookup_minimal_symbol_by_pc (pc);
 
-      if (msymbol == NULL)
+      if (msymbol.minsym == NULL)
 	error (_("Execution is not within a known function."));
 
-      tp->control.step_range_start = SYMBOL_VALUE_ADDRESS (msymbol);
+      tp->control.step_range_start = SYMBOL_VALUE_ADDRESS (msymbol.minsym);
       tp->control.step_range_end = pc;
     }
   else
@@ -2185,12 +2186,8 @@ registers_info (char *addr_exp, int fpregs)
       char *start;
       const char *end;
 
-      /* Keep skipping leading white space.  */
-      if (isspace ((*addr_exp)))
-	{
-	  addr_exp++;
-	  continue;
-	}
+      /* Skip leading white space.  */
+      addr_exp = skip_spaces (addr_exp);
 
       /* Discard any leading ``$''.  Check that there is something
          resembling a register following it.  */
@@ -2724,7 +2721,9 @@ detach_command (char *args, int from_tty)
   if (ptid_equal (inferior_ptid, null_ptid))
     error (_("The program is not being run."));
 
-  disconnect_tracing (from_tty);
+  query_if_trace_running (from_tty);
+
+  disconnect_tracing ();
 
   target_detach (args, from_tty);
 
@@ -2754,7 +2753,8 @@ static void
 disconnect_command (char *args, int from_tty)
 {
   dont_repeat ();		/* Not for the faint of heart.  */
-  disconnect_tracing (from_tty);
+  query_if_trace_running (from_tty);
+  disconnect_tracing ();
   target_disconnect (args, from_tty);
   no_shared_libraries (NULL, from_tty);
   init_thread_list ();
@@ -2941,7 +2941,7 @@ _initialize_infcmd (void)
 {
   static struct cmd_list_element *info_proc_cmdlist;
   struct cmd_list_element *c = NULL;
-  char *cmd_name;
+  const char *cmd_name;
 
   /* Add the filename of the terminal connected to inferior I/O.  */
   add_setshow_filename_cmd ("inferior-tty", class_run,

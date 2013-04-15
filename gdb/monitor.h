@@ -102,8 +102,6 @@ struct monitor_ops
 				   from reg dump */
     void (*supply_register) (struct regcache *regcache, char *name,
 			     int namelen, char *val, int vallen);
-    void (*load_routine) (struct serial *desc, char *file,
-			  int hashmark);	/* Download routine */
     int (*dumpregs) (struct regcache *);	/* Dump all registers */
     int (*continue_hook) (void);	/* Emit the continue command */
     int (*wait_filter) (char *buf,	/* Maybe contains registers */
@@ -242,7 +240,7 @@ struct monitor_ops
 #define SREC_SIZE 160
 
 extern void monitor_open (char *args, struct monitor_ops *ops, int from_tty);
-extern void monitor_close (int quitting);
+extern void monitor_close (void);
 extern char *monitor_supply_register (struct regcache *regcache,
 				      int regno, char *valstr);
 extern int monitor_expect (char *prompt, char *buf, int buflen);

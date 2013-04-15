@@ -944,11 +944,11 @@ tilepro_elf_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
     return FALSE;
 
   /* pr_cursig */
-  elf_tdata (abfd)->core_signal =
+  elf_tdata (abfd)->core->signal =
     bfd_get_16 (abfd, note->descdata + TILEPRO_PRSTATUS_OFFSET_PR_CURSIG);
 
   /* pr_pid */
-  elf_tdata (abfd)->core_pid =
+  elf_tdata (abfd)->core->pid =
     bfd_get_32 (abfd, note->descdata + TILEPRO_PRSTATUS_OFFSET_PR_PID);
 
   /* pr_reg */
@@ -966,11 +966,11 @@ tilepro_elf_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
   if (note->descsz != TILEPRO_PRPSINFO_SIZEOF)
     return FALSE;
 
-  elf_tdata (abfd)->core_program
+  elf_tdata (abfd)->core->program
     = _bfd_elfcore_strndup (abfd,
 			    note->descdata + TILEPRO_PRPSINFO_OFFSET_PR_FNAME,
 			    16);
-  elf_tdata (abfd)->core_command
+  elf_tdata (abfd)->core->command
     = _bfd_elfcore_strndup (abfd,
 			    note->descdata + TILEPRO_PRPSINFO_OFFSET_PR_PSARGS,
 			    ELF_PR_PSARGS_SIZE);
@@ -980,7 +980,7 @@ tilepro_elf_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
      onto the end of the args in some (at least one anyway)
      implementations, so strip it off if it exists.  */
   {
-    char *command = elf_tdata (abfd)->core_command;
+    char *command = elf_tdata (abfd)->core->command;
     int n = strlen (command);
 
     if (0 < n && command[n - 1] == ' ')
@@ -1521,6 +1521,10 @@ tilepro_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	  while (h->root.type == bfd_link_hash_indirect
 		 || h->root.type == bfd_link_hash_warning)
 	    h = (struct elf_link_hash_entry *) h->root.u.i.link;
+
+	  /* PR15323, ref flags aren't set for references in the same
+	     object.  */
+	  h->root.non_ir_ref = 1;
 	}
 
       r_type = tilepro_elf_tls_transition (info, r_type, h == NULL);
@@ -3964,7 +3968,9 @@ tilepro_elf_plt_sym_val (bfd_vma i, const asection *plt,
 }
 
 static enum elf_reloc_type_class
-tilepro_reloc_type_class (const Elf_Internal_Rela *rela)
+tilepro_reloc_type_class (const struct bfd_link_info *info ATTRIBUTE_UNUSED,
+			  const asection *rel_sec ATTRIBUTE_UNUSED,
+			  const Elf_Internal_Rela *rela)
 {
   switch ((int) ELF32_R_TYPE (rela->r_info))
     {

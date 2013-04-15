@@ -218,7 +218,7 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
   index = 0;
   ALL_OBJFILE_MSYMBOLS (objfile, msymbol)
     {
-      struct obj_section *section = SYMBOL_OBJ_SECTION (msymbol);
+      struct obj_section *section = SYMBOL_OBJ_SECTION (objfile, msymbol);
 
       switch (MSYMBOL_TYPE (msymbol))
 	{
@@ -261,9 +261,15 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
 		      outfile);
       fprintf_filtered (outfile, " %s", SYMBOL_LINKAGE_NAME (msymbol));
       if (section)
-	fprintf_filtered (outfile, " section %s",
-			  bfd_section_name (objfile->obfd,
-					    section->the_bfd_section));
+	{
+	  if (section->the_bfd_section != NULL)
+	    fprintf_filtered (outfile, " section %s",
+			      bfd_section_name (objfile->obfd,
+						section->the_bfd_section));
+	  else
+	    fprintf_filtered (outfile, " spurious section %ld",
+			      (long) (section - objfile->sections));
+	}
       if (SYMBOL_DEMANGLED_NAME (msymbol) != NULL)
 	{
 	  fprintf_filtered (outfile, "  %s", SYMBOL_DEMANGLED_NAME (msymbol));
@@ -464,7 +470,8 @@ print_symbol (void *args)
   struct symbol *symbol = ((struct print_symbol_args *) args)->symbol;
   int depth = ((struct print_symbol_args *) args)->depth;
   struct ui_file *outfile = ((struct print_symbol_args *) args)->outfile;
-  struct obj_section *section = SYMBOL_OBJ_SECTION (symbol);
+  struct obj_section *section = SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (symbol),
+						    symbol);
 
   print_spaces (depth, outfile);
   if (SYMBOL_DOMAIN (symbol) == LABEL_DOMAIN)

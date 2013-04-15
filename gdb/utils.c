@@ -563,117 +563,6 @@ free_current_contents (void *ptr)
       *location = NULL;
     }
 }
-
-/* If nonzero, display time usage both at startup and for each command.  */
-
-static int display_time;
-
-/* If nonzero, display space usage both at startup and for each command.  */
-
-static int display_space;
-
-/* Records a run time and space usage to be used as a base for
-   reporting elapsed time or change in space.  In addition,
-   the msg_type field indicates whether the saved time is from the
-   beginning of GDB execution (0) or the beginning of an individual 
-   command execution (1).  */
-struct cmd_stats 
-{
-  int msg_type;
-  long start_cpu_time;
-  struct timeval start_wall_time;
-  long start_space;
-};
-
-/* Set whether to display time statistics to NEW_VALUE (non-zero 
-   means true).  */
-void
-set_display_time (int new_value)
-{
-  display_time = new_value;
-}
-
-/* Set whether to display space statistics to NEW_VALUE (non-zero
-   means true).  */
-void
-set_display_space (int new_value)
-{
-  display_space = new_value;
-}
-
-/* As indicated by display_time and display_space, report GDB's elapsed time
-   and space usage from the base time and space provided in ARG, which
-   must be a pointer to a struct cmd_stat.  This function is intended
-   to be called as a cleanup.  */
-static void
-report_command_stats (void *arg)
-{
-  struct cmd_stats *start_stats = (struct cmd_stats *) arg;
-  int msg_type = start_stats->msg_type;
-
-  if (display_time)
-    {
-      long cmd_time = get_run_time () - start_stats->start_cpu_time;
-      struct timeval now_wall_time, delta_wall_time;
-
-      gettimeofday (&now_wall_time, NULL);
-      timeval_sub (&delta_wall_time,
-		   &now_wall_time, &start_stats->start_wall_time);
-
-      /* Subtract time spend in prompt_for_continue from walltime.  */
-      timeval_sub (&delta_wall_time,
-                   &delta_wall_time, &prompt_for_continue_wait_time);
-
-      printf_unfiltered (msg_type == 0
-			 ? _("Startup time: %ld.%06ld (cpu), %ld.%06ld (wall)\n")
-			 : _("Command execution time: %ld.%06ld (cpu), %ld.%06ld (wall)\n"),
-			 cmd_time / 1000000, cmd_time % 1000000,
-			 (long) delta_wall_time.tv_sec,
-			 (long) delta_wall_time.tv_usec);
-    }
-
-  if (display_space)
-    {
-#ifdef HAVE_SBRK
-      char *lim = (char *) sbrk (0);
-
-      long space_now = lim - lim_at_start;
-      long space_diff = space_now - start_stats->start_space;
-
-      printf_unfiltered (msg_type == 0
-			 ? _("Space used: %ld (%s%ld during startup)\n")
-			 : _("Space used: %ld (%s%ld for this command)\n"),
-			 space_now,
-			 (space_diff >= 0 ? "+" : ""),
-			 space_diff);
-#endif
-    }
-}
-
-/* Create a cleanup that reports time and space used since its
-   creation.  Precise messages depend on MSG_TYPE:
-      0:  Initial time/space
-      1:  Individual command time/space.  */
-struct cleanup *
-make_command_stats_cleanup (int msg_type)
-{
-  static const struct timeval zero_timeval = { 0 };
-  struct cmd_stats *new_stat = XMALLOC (struct cmd_stats);
-  
-#ifdef HAVE_SBRK
-  char *lim = (char *) sbrk (0);
-  new_stat->start_space = lim - lim_at_start;
-#endif
-
-  new_stat->msg_type = msg_type;
-  new_stat->start_cpu_time = get_run_time ();
-  gettimeofday (&new_stat->start_wall_time, NULL);
-
-  /* Initalize timer to keep track of how long we waited for the user.  */
-  prompt_for_continue_wait_time = zero_timeval;
-
-  return make_cleanup_dtor (report_command_stats, new_stat, xfree);
-}
 
 
 
@@ -1096,11 +985,11 @@ add_internal_problem_command (struct internal_problem *problem)
 }
 
 /* Print the system error message for errno, and also mention STRING
-   as the file name for which the error was encountered.
-   Then return to command level.  */
+   as the file name for which the error was encountered.  Use ERRCODE
+   for the thrown exception.  Then return to command level.  */
 
 void
-perror_with_name (const char *string)
+throw_perror_with_name (enum errors errcode, const char *string)
 {
   char *err;
   char *combined;
@@ -1117,7 +1006,15 @@ perror_with_name (const char *string)
   bfd_set_error (bfd_error_no_error);
   errno = 0;
 
-  error (_("%s."), combined);
+  throw_error (errcode, _("%s."), combined);
+}
+
+/* See throw_perror_with_name, ERRCODE defaults here to GENERIC_ERROR.  */
+
+void
+perror_with_name (const char *string)
+{
+  throw_perror_with_name (GENERIC_ERROR, string);
 }
 
 /* Print the system error message for ERRCODE, and also mention STRING
@@ -1490,7 +1387,8 @@ host_char_to_target (struct gdbarch *gdbarch, int c, int *target_c)
   cleanups = make_cleanup_obstack_free (&host_data);
 
   convert_between_encodings (target_charset (gdbarch), host_charset (),
-			     &the_char, 1, 1, &host_data, translit_none);
+			     (gdb_byte *) &the_char, 1, 1,
+			     &host_data, translit_none);
 
   if (obstack_object_size (&host_data) == 1)
     {
@@ -1940,6 +1838,24 @@ prompt_for_continue (void)
   reinitialize_more_filter ();
 
   dont_repeat ();		/* Forget prev cmd -- CR won't repeat it.  */
+}
+
+/* Initalize timer to keep track of how long we waited for the user.  */
+
+void
+reset_prompt_for_continue_wait_time (void)
+{
+  static const struct timeval zero_timeval = { 0 };
+
+  prompt_for_continue_wait_time = zero_timeval;
+}
+
+/* Fetch the cumulative time spent in prompt_for_continue.  */
+
+struct timeval
+get_prompt_for_continue_wait_time (void)
+{
+  return prompt_for_continue_wait_time;
 }
 
 /* Reinitialize filter; ie. tell it to reset to original values.  */
@@ -2751,15 +2667,20 @@ void
 initialize_utils (void)
 {
   add_setshow_uinteger_cmd ("width", class_support, &chars_per_line, _("\
-Set number of characters gdb thinks are in a line."), _("\
-Show number of characters gdb thinks are in a line."), NULL,
+Set number of characters where GDB should wrap lines of its output."), _("\
+Show number of characters where GDB should wrap lines of its output."), _("\
+This affects where GDB wraps its output to fit the screen width.\n\
+Setting this to \"unlimited\" or zero prevents GDB from wrapping its output."),
 			    set_width_command,
 			    show_chars_per_line,
 			    &setlist, &showlist);
 
   add_setshow_uinteger_cmd ("height", class_support, &lines_per_page, _("\
-Set number of lines gdb thinks are in a page."), _("\
-Show number of lines gdb thinks are in a page."), NULL,
+Set number of lines in a page for GDB output pagination."), _("\
+Show number of lines in a page for GDB output pagination."), _("\
+This affects the number of lines after which GDB will pause\n\
+its output and ask you whether to continue.\n\
+Setting this to \"unlimited\" or zero causes GDB never pause during output."),
 			    set_height_command,
 			    show_lines_per_page,
 			    &setlist, &showlist);
@@ -2768,8 +2689,11 @@ Show number of lines gdb thinks are in a page."), NULL,
 
   add_setshow_boolean_cmd ("pagination", class_support,
 			   &pagination_enabled, _("\
-Set state of pagination."), _("\
-Show state of pagination."), NULL,
+Set state of GDB output pagination."), _("\
+Show state of GDB output pagination."), _("\
+When pagination is ON, GDB pauses at end of each screenful of\n\
+its output and asks you whether to continue.\n\
+Turning pagination off is an alternative to \"set height unlimited\"."),
 			   NULL,
 			   show_pagination_enabled,
 			   &setlist, &showlist);

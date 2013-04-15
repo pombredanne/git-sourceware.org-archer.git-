@@ -1,6 +1,6 @@
 /* X86-64 specific support for ELF
    Copyright 2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009,
-   2010, 2011, 2012
+   2010, 2011, 2012, 2013
    Free Software Foundation, Inc.
    Contributed by Jan Hubicka <jh@suse.cz>.
 
@@ -348,10 +348,10 @@ elf_x86_64_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 
       case 296:		/* sizeof(istruct elf_prstatus) on Linux/x32 */
 	/* pr_cursig */
-	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
+	elf_tdata (abfd)->core->signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 24);
+	elf_tdata (abfd)->core->lwpid = bfd_get_32 (abfd, note->descdata + 24);
 
 	/* pr_reg */
 	offset = 72;
@@ -361,11 +361,11 @@ elf_x86_64_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 
       case 336:		/* sizeof(istruct elf_prstatus) on Linux/x86_64 */
 	/* pr_cursig */
-	elf_tdata (abfd)->core_signal
+	elf_tdata (abfd)->core->signal
 	  = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_lwpid
+	elf_tdata (abfd)->core->lwpid
 	  = bfd_get_32 (abfd, note->descdata + 32);
 
 	/* pr_reg */
@@ -389,20 +389,20 @@ elf_x86_64_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
 	return FALSE;
 
       case 124:		/* sizeof(struct elf_prpsinfo) on Linux/x32 */
-	elf_tdata (abfd)->core_pid
+	elf_tdata (abfd)->core->pid
 	  = bfd_get_32 (abfd, note->descdata + 12);
-	elf_tdata (abfd)->core_program
+	elf_tdata (abfd)->core->program
 	  = _bfd_elfcore_strndup (abfd, note->descdata + 28, 16);
-	elf_tdata (abfd)->core_command
+	elf_tdata (abfd)->core->command
 	  = _bfd_elfcore_strndup (abfd, note->descdata + 44, 80);
 	break;
 
       case 136:		/* sizeof(struct elf_prpsinfo) on Linux/x86_64 */
-	elf_tdata (abfd)->core_pid
+	elf_tdata (abfd)->core->pid
 	  = bfd_get_32 (abfd, note->descdata + 24);
-	elf_tdata (abfd)->core_program
+	elf_tdata (abfd)->core->program
 	 = _bfd_elfcore_strndup (abfd, note->descdata + 40, 16);
-	elf_tdata (abfd)->core_command
+	elf_tdata (abfd)->core->command
 	 = _bfd_elfcore_strndup (abfd, note->descdata + 56, 80);
     }
 
@@ -411,7 +411,7 @@ elf_x86_64_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
      implementations, so strip it off if it exists.  */
 
   {
-    char *command = elf_tdata (abfd)->core_command;
+    char *command = elf_tdata (abfd)->core->command;
     int n = strlen (command);
 
     if (0 < n && command[n - 1] == ' ')
@@ -1519,6 +1519,7 @@ elf_x86_64_check_relocs (bfd *abfd, struct bfd_link_info *info,
 
 	  /* It is referenced by a non-shared object. */
 	  h->ref_regular = 1;
+	  h->root.non_ir_ref = 1;
 	}
 
       if (! elf_x86_64_tls_transition (info, abfd, sec, NULL,
@@ -4666,7 +4667,9 @@ elf_x86_64_finish_local_dynamic_symbol (void **slot, void *inf)
    dynamic linker, before writing them out.  */
 
 static enum elf_reloc_type_class
-elf_x86_64_reloc_type_class (const Elf_Internal_Rela *rela)
+elf_x86_64_reloc_type_class (const struct bfd_link_info *info ATTRIBUTE_UNUSED,
+			     const asection *rel_sec ATTRIBUTE_UNUSED,
+			     const Elf_Internal_Rela *rela)
 {
   switch ((int) ELF32_R_TYPE (rela->r_info))
     {
@@ -5038,49 +5041,33 @@ elf_x86_64_common_section (asection *sec)
 }
 
 static bfd_boolean
-elf_x86_64_merge_symbol (struct bfd_link_info *info ATTRIBUTE_UNUSED,
-			 struct elf_link_hash_entry **sym_hash ATTRIBUTE_UNUSED,
-			 struct elf_link_hash_entry *h,
-			 Elf_Internal_Sym *sym,
+elf_x86_64_merge_symbol (struct elf_link_hash_entry *h,
+			 const Elf_Internal_Sym *sym,
 			 asection **psec,
-			 bfd_vma *pvalue ATTRIBUTE_UNUSED,
-			 unsigned int *pold_alignment ATTRIBUTE_UNUSED,
-			 bfd_boolean *skip ATTRIBUTE_UNUSED,
-			 bfd_boolean *override ATTRIBUTE_UNUSED,
-			 bfd_boolean *type_change_ok ATTRIBUTE_UNUSED,
-			 bfd_boolean *size_change_ok ATTRIBUTE_UNUSED,
-			 bfd_boolean *newdyn ATTRIBUTE_UNUSED,
-			 bfd_boolean *newdef,
-			 bfd_boolean *newdyncommon ATTRIBUTE_UNUSED,
-			 bfd_boolean *newweak ATTRIBUTE_UNUSED,
-			 bfd *abfd ATTRIBUTE_UNUSED,
-			 asection **sec,
-			 bfd_boolean *olddyn ATTRIBUTE_UNUSED,
-			 bfd_boolean *olddef,
-			 bfd_boolean *olddyncommon ATTRIBUTE_UNUSED,
-			 bfd_boolean *oldweak ATTRIBUTE_UNUSED,
+			 bfd_boolean newdef,
+			 bfd_boolean olddef,
 			 bfd *oldbfd,
-			 asection **oldsec)
+			 const asection *oldsec)
 {
   /* A normal common symbol and a large common symbol result in a
      normal common symbol.  We turn the large common symbol into a
      normal one.  */
-  if (!*olddef
+  if (!olddef
       && h->root.type == bfd_link_hash_common
-      && !*newdef
-      && bfd_is_com_section (*sec)
-      && *oldsec != *sec)
+      && !newdef
+      && bfd_is_com_section (*psec)
+      && oldsec != *psec)
     {
       if (sym->st_shndx == SHN_COMMON
-	  && (elf_section_flags (*oldsec) & SHF_X86_64_LARGE) != 0)
+	  && (elf_section_flags (oldsec) & SHF_X86_64_LARGE) != 0)
 	{
 	  h->root.u.c.p->section
 	    = bfd_make_section_old_way (oldbfd, "COMMON");
 	  h->root.u.c.p->section->flags = SEC_ALLOC;
 	}
       else if (sym->st_shndx == SHN_X86_64_LCOMMON
-	       && (elf_section_flags (*oldsec) & SHF_X86_64_LARGE) == 0)
-	*psec = *sec = bfd_com_section_ptr;
+	       && (elf_section_flags (oldsec) & SHF_X86_64_LARGE) == 0)
+	*psec = bfd_com_section_ptr;
     }
 
   return TRUE;

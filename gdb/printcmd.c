@@ -191,10 +191,10 @@ static void do_one_display (struct display *);
    past the specification and past all whitespace following it.  */
 
 static struct format_data
-decode_format (char **string_ptr, int oformat, int osize)
+decode_format (const char **string_ptr, int oformat, int osize)
 {
   struct format_data val;
-  char *p = *string_ptr;
+  const char *p = *string_ptr;
 
   val.format = '?';
   val.size = '?';
@@ -658,7 +658,7 @@ build_address_symbolic (struct gdbarch *gdbarch,
      save some memory, but for many debug format--ELF/DWARF or
      anything/stabs--it would be inconvenient to eliminate those minimal
      symbols anyway).  */
-  msymbol = lookup_minimal_symbol_by_pc_section (addr, section);
+  msymbol = lookup_minimal_symbol_by_pc_section (addr, section).minsym;
   symbol = find_pc_sect_function (addr, section);
 
   if (symbol)
@@ -933,7 +933,7 @@ validate_format (struct format_data fmt, char *cmdname)
    first argument ("/x myvar" for example, to print myvar in hex).  */
 
 static void
-print_command_1 (char *exp, int voidprint)
+print_command_1 (const char *exp, int voidprint)
 {
   struct expression *expr;
   struct cleanup *old_chain = 0;
@@ -1013,8 +1013,18 @@ call_command (char *exp, int from_tty)
   print_command_1 (exp, 0);
 }
 
-void
+/* Implementation of the "output" command.  */
+
+static void
 output_command (char *exp, int from_tty)
+{
+  output_command_const (exp, from_tty);
+}
+
+/* Like output_command, but takes a const string as argument.  */
+
+void
+output_command_const (const char *exp, int from_tty)
 {
   struct expression *expr;
   struct cleanup *old_chain;
@@ -1105,7 +1115,8 @@ sym_info (char *arg, int from_tty)
 
     if (obj_section_addr (osect) <= sect_addr
 	&& sect_addr < obj_section_endaddr (osect)
-	&& (msymbol = lookup_minimal_symbol_by_pc_section (sect_addr, osect)))
+	&& (msymbol
+	    = lookup_minimal_symbol_by_pc_section (sect_addr, osect).minsym))
       {
 	const char *obj_name, *mapped, *sec_name, *msym_name;
 	char *loc_string;
@@ -1208,7 +1219,9 @@ address_info (char *exp, int from_tty)
 
       if (msymbol != NULL)
 	{
-	  gdbarch = get_objfile_arch (msymbol_objfile (msymbol));
+	  struct objfile *objfile = msymbol_objfile (msymbol);
+
+	  gdbarch = get_objfile_arch (objfile);
 	  load_addr = SYMBOL_VALUE_ADDRESS (msymbol);
 
 	  printf_filtered ("Symbol \"");
@@ -1217,7 +1230,7 @@ address_info (char *exp, int from_tty)
 	  printf_filtered ("\" is at ");
 	  fputs_filtered (paddress (gdbarch, load_addr), gdb_stdout);
 	  printf_filtered (" in a file compiled without debugging");
-	  section = SYMBOL_OBJ_SECTION (msymbol);
+	  section = SYMBOL_OBJ_SECTION (objfile, msymbol);
 	  if (section_is_overlay (section))
 	    {
 	      load_addr = overlay_unmapped_address (load_addr, section);
@@ -1238,8 +1251,16 @@ address_info (char *exp, int from_tty)
 			   current_language->la_language, DMGL_ANSI);
   printf_filtered ("\" is ");
   val = SYMBOL_VALUE (sym);
-  section = SYMBOL_OBJ_SECTION (sym);
+  section = SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (sym), sym);
   gdbarch = get_objfile_arch (SYMBOL_SYMTAB (sym)->objfile);
+
+  if (SYMBOL_COMPUTED_OPS (sym) != NULL)
+    {
+      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym, context_pc,
+						    gdb_stdout);
+      printf_filtered (".\n");
+      return;
+    }
 
   switch (SYMBOL_CLASS (sym))
     {
@@ -1263,14 +1284,7 @@ address_info (char *exp, int from_tty)
       break;
 
     case LOC_COMPUTED:
-      /* FIXME: cagney/2004-01-26: It should be possible to
-	 unconditionally call the SYMBOL_COMPUTED_OPS method when available.
-	 Unfortunately DWARF 2 stores the frame-base (instead of the
-	 function) location in a function's symbol.  Oops!  For the
-	 moment enable this when/where applicable.  */
-      SYMBOL_COMPUTED_OPS (sym)->describe_location (sym, context_pc,
-						    gdb_stdout);
-      break;
+      gdb_assert_not_reached (_("LOC_COMPUTED variable missing a method"));
 
     case LOC_REGISTER:
       /* GDBARCH is the architecture associated with the objfile the symbol
@@ -1342,15 +1356,15 @@ address_info (char *exp, int from_tty)
 
     case LOC_UNRESOLVED:
       {
-	struct minimal_symbol *msym;
+	struct bound_minimal_symbol msym;
 
-	msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (sym), NULL, NULL);
-	if (msym == NULL)
+	msym = lookup_minimal_symbol_and_objfile (SYMBOL_LINKAGE_NAME (sym));
+	if (msym.minsym == NULL)
 	  printf_filtered ("unresolved");
 	else
 	  {
-	    section = SYMBOL_OBJ_SECTION (msym);
-	    load_addr = SYMBOL_VALUE_ADDRESS (msym);
+	    section = SYMBOL_OBJ_SECTION (msym.objfile, msym.minsym);
+	    load_addr = SYMBOL_VALUE_ADDRESS (msym.minsym);
 
 	    if (section
 		&& (section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
@@ -1402,8 +1416,10 @@ x_command (char *exp, int from_tty)
 
   if (exp && *exp == '/')
     {
-      exp++;
-      fmt = decode_format (&exp, last_format, last_size);
+      const char *tmp = exp + 1;
+
+      fmt = decode_format (&tmp, last_format, last_size);
+      exp = (char *) tmp;
     }
 
   /* If we have an expression, evaluate it and use it as the address.  */
@@ -1473,12 +1489,13 @@ x_command (char *exp, int from_tty)
    Specify the expression.  */
 
 static void
-display_command (char *exp, int from_tty)
+display_command (char *arg, int from_tty)
 {
   struct format_data fmt;
   struct expression *expr;
   struct display *new;
   int display_it = 1;
+  const char *exp = arg;
 
 #if defined(TUI)
   /* NOTE: cagney/2003-02-13 The `tui_active' was previously
@@ -2215,10 +2232,10 @@ printf_pointer (struct ui_file *stream, const char *format,
 /* printf "printf format string" ARG to STREAM.  */
 
 static void
-ui_printf (char *arg, struct ui_file *stream)
+ui_printf (const char *arg, struct ui_file *stream)
 {
   struct format_piece *fpieces;
-  char *s = arg;
+  const char *s = arg;
   struct value **val_args;
   int allocated_args = 20;
   struct cleanup *old_cleanups;
@@ -2229,7 +2246,7 @@ ui_printf (char *arg, struct ui_file *stream)
   if (s == 0)
     error_no_arg (_("format-control string and values to print"));
 
-  s = skip_spaces (s);
+  s = skip_spaces_const (s);
 
   /* A format string should follow, enveloped in double quotes.  */
   if (*s++ != '"')
@@ -2242,14 +2259,14 @@ ui_printf (char *arg, struct ui_file *stream)
   if (*s++ != '"')
     error (_("Bad format string, non-terminated '\"'."));
   
-  s = skip_spaces (s);
+  s = skip_spaces_const (s);
 
   if (*s != ',' && *s != 0)
     error (_("Invalid argument syntax"));
 
   if (*s == ',')
     s++;
-  s = skip_spaces (s);
+  s = skip_spaces_const (s);
 
   {
     int nargs = 0;
@@ -2267,7 +2284,7 @@ ui_printf (char *arg, struct ui_file *stream)
 
     while (*s != '\0')
       {
-	char *s1;
+	const char *s1;
 
 	if (nargs == allocated_args)
 	  val_args = (struct value **) xrealloc ((char *) val_args,
@@ -2598,7 +2615,12 @@ but no count or size letter (see \"x\" command)."));
   add_setshow_uinteger_cmd ("max-symbolic-offset", no_class,
 			    &max_symbolic_offset, _("\
 Set the largest offset that will be printed in <symbol+1234> form."), _("\
-Show the largest offset that will be printed in <symbol+1234> form."), NULL,
+Show the largest offset that will be printed in <symbol+1234> form."), _("\
+Tell GDB to only display the symbolic form of an address if the\n\
+offset between the closest earlier symbol and the address is less than\n\
+the specified maximum offset.  The default is \"unlimited\", which tells GDB\n\
+to always print the symbolic form of an address if any symbol precedes\n\
+it.  Zero is equivalent to \"unlimited\"."),
 			    NULL,
 			    show_max_symbolic_offset,
 			    &setprintlist, &showprintlist);

@@ -7814,10 +7814,16 @@ _bfd_mips_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
       else
 	{
 	  h = sym_hashes[r_symndx - extsymoff];
-	  while (h != NULL
-		 && (h->root.type == bfd_link_hash_indirect
-		     || h->root.type == bfd_link_hash_warning))
-	    h = (struct elf_link_hash_entry *) h->root.u.i.link;
+	  if (h != NULL)
+	    {
+	      while (h->root.type == bfd_link_hash_indirect
+		     || h->root.type == bfd_link_hash_warning)
+		h = (struct elf_link_hash_entry *) h->root.u.i.link;
+
+	      /* PR15323, ref flags aren't set for references in the
+		 same object.  */
+	      h->root.non_ir_ref = 1;
+	    }
 	}
 
       /* Set CAN_MAKE_DYNAMIC_P to true if we can convert this
@@ -8920,7 +8926,7 @@ mips_elf_estimate_stub_size (bfd *output_bfd, struct bfd_link_info *info)
    allocate an entry in the stubs section.  */
 
 static bfd_boolean
-mips_elf_allocate_lazy_stub (struct mips_elf_link_hash_entry *h, void **data)
+mips_elf_allocate_lazy_stub (struct mips_elf_link_hash_entry *h, void *data)
 {
   struct mips_elf_link_hash_table *htab;
 
@@ -10118,12 +10124,17 @@ _bfd_mips_elf_finish_dynamic_symbol (bfd *output_bfd,
   if (IRIX_COMPAT (output_bfd) == ict_irix6)
     mips_elf_irix6_finish_dynamic_symbol (output_bfd, name, sym);
 
-  /* Keep dynamic MIPS16 symbols odd.  This allows the dynamic linker to
-     treat MIPS16 symbols like any other.  */
+  /* Keep dynamic compressed symbols odd.  This allows the dynamic linker
+     to treat compressed symbols like any other.  */
   if (ELF_ST_IS_MIPS16 (sym->st_other))
     {
       BFD_ASSERT (sym->st_value & 1);
       sym->st_other -= STO_MIPS16;
+    }
+  else if (ELF_ST_IS_MICROMIPS (sym->st_other))
+    {
+      BFD_ASSERT (sym->st_value & 1);
+      sym->st_other -= STO_MICROMIPS;
     }
 
   return TRUE;
@@ -11136,7 +11147,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
   s = bfd_get_section_by_name (abfd, ".reginfo");
   if (s != NULL && (s->flags & SEC_LOAD) != 0)
     {
-      for (m = elf_tdata (abfd)->segment_map; m != NULL; m = m->next)
+      for (m = elf_seg_map (abfd); m != NULL; m = m->next)
 	if (m->p_type == PT_MIPS_REGINFO)
 	  break;
       if (m == NULL)
@@ -11151,7 +11162,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
 	  m->sections[0] = s;
 
 	  /* We want to put it after the PHDR and INTERP segments.  */
-	  pm = &elf_tdata (abfd)->segment_map;
+	  pm = &elf_seg_map (abfd);
 	  while (*pm != NULL
 		 && ((*pm)->p_type == PT_PHDR
 		     || (*pm)->p_type == PT_INTERP))
@@ -11181,7 +11192,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
 	{
 	  struct elf_segment_map *options_segment;
 
-	  pm = &elf_tdata (abfd)->segment_map;
+	  pm = &elf_seg_map (abfd);
 	  while (*pm != NULL
 		 && ((*pm)->p_type == PT_PHDR
 		     || (*pm)->p_type == PT_INTERP))
@@ -11211,7 +11222,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
 	      && bfd_get_section_by_name (abfd, ".dynamic") != NULL
 	      && bfd_get_section_by_name (abfd, ".mdebug") != NULL)
 	    {
-	      for (m = elf_tdata (abfd)->segment_map; m != NULL; m = m->next)
+	      for (m = elf_seg_map (abfd); m != NULL; m = m->next)
 		if (m->p_type == PT_MIPS_RTPROC)
 		  break;
 	      if (m == NULL)
@@ -11237,7 +11248,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
 		    }
 
 		  /* We want to put it after the DYNAMIC segment.  */
-		  pm = &elf_tdata (abfd)->segment_map;
+		  pm = &elf_seg_map (abfd);
 		  while (*pm != NULL && (*pm)->p_type != PT_DYNAMIC)
 		    pm = &(*pm)->next;
 		  if (*pm != NULL)
@@ -11251,7 +11262,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
       /* On IRIX5, the PT_DYNAMIC segment includes the .dynamic,
 	 .dynstr, .dynsym, and .hash sections, and everything in
 	 between.  */
-      for (pm = &elf_tdata (abfd)->segment_map; *pm != NULL;
+      for (pm = &elf_seg_map (abfd); *pm != NULL;
 	   pm = &(*pm)->next)
 	if ((*pm)->p_type == PT_DYNAMIC)
 	  break;
@@ -11358,7 +11369,7 @@ _bfd_mips_elf_modify_segment_map (bfd *abfd,
       && !SGI_COMPAT (abfd)
       && bfd_get_section_by_name (abfd, ".dynamic"))
     {
-      for (pm = &elf_tdata (abfd)->segment_map; *pm != NULL; pm = &(*pm)->next)
+      for (pm = &elf_seg_map (abfd); *pm != NULL; pm = &(*pm)->next)
 	if ((*pm)->p_type == PT_NULL)
 	  break;
       if (*pm == NULL)

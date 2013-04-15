@@ -28,6 +28,7 @@
 #include <signal.h>
 #endif
 #include "gdb_wait.h"
+#include "btrace-common.h"
 
 /* The thread set with an `Hc' packet.  `Hc' is deprecated in favor of
    `vCont'.  Note the multi-process extensions made `vCont' a
@@ -396,6 +397,88 @@ write_qxfer_response (char *buf, const void *data, int len, int is_more)
 			       PBUFSIZ - 2) + 1;
 }
 
+/* Handle btrace enabling.  */
+
+static const char *
+handle_btrace_enable (struct thread_info *thread)
+{
+  if (thread->btrace != NULL)
+    return "E.Btrace already enabled.";
+
+  thread->btrace = target_enable_btrace (thread->entry.id);
+  if (thread->btrace == NULL)
+    return "E.Could not enable btrace.";
+
+  return NULL;
+}
+
+/* Handle btrace disabling.  */
+
+static const char *
+handle_btrace_disable (struct thread_info *thread)
+{
+
+  if (thread->btrace == NULL)
+    return "E.Branch tracing not enabled.";
+
+  if (target_disable_btrace (thread->btrace) != 0)
+    return "E.Could not disable branch tracing.";
+
+  thread->btrace = NULL;
+  return NULL;
+}
+
+/* Handle the "Qbtrace" packet.  */
+
+static int
+handle_btrace_general_set (char *own_buf)
+{
+  struct thread_info *thread;
+  const char *err;
+  char *op;
+
+  if (strncmp ("Qbtrace:", own_buf, strlen ("Qbtrace:")) != 0)
+    return 0;
+
+  op = own_buf + strlen ("Qbtrace:");
+
+  if (!target_supports_btrace ())
+    {
+      strcpy (own_buf, "E.Target does not support branch tracing.");
+      return -1;
+    }
+
+  if (ptid_equal (general_thread, null_ptid)
+      || ptid_equal (general_thread, minus_one_ptid))
+    {
+      strcpy (own_buf, "E.Must select a single thread.");
+      return -1;
+    }
+
+  thread = find_thread_ptid (general_thread);
+  if (thread == NULL)
+    {
+      strcpy (own_buf, "E.No such thread.");
+      return -1;
+    }
+
+  err = NULL;
+
+  if (strcmp (op, "bts") == 0)
+    err = handle_btrace_enable (thread);
+  else if (strcmp (op, "off") == 0)
+    err = handle_btrace_disable (thread);
+  else
+    err = "E.Bad Qbtrace operation. Use bts or off.";
+
+  if (err != 0)
+    strcpy (own_buf, err);
+  else
+    write_ok (own_buf);
+
+  return 1;
+}
+
 /* Handle all of the extended 'Q' packets.  */
 
 static void
@@ -551,6 +634,9 @@ handle_general_set (char *own_buf)
       write_ok (own_buf);
       return;
     }
+
+  if (handle_btrace_general_set (own_buf))
+    return;
 
   /* Otherwise we didn't know what packet it was.  Say we didn't
      understand it.  */
@@ -892,10 +978,10 @@ struct qxfer
      data-specific information to the target.
 
      Return the number of bytes actually transfered, zero when no
-     further transfer is possible, -1 on error, and -2 when the
-     transfer is not supported.  Return of a positive value smaller
-     than LEN does not indicate the end of the object, only the end of
-     the transfer.
+     further transfer is possible, -1 on error, -2 when the transfer
+     is not supported, and -3 on a verbose error message that should
+     be preserved.  Return of a positive value smaller than LEN does
+     not indicate the end of the object, only the end of the transfer.
 
      One, and only one, of readbuf or writebuf must be non-NULL.  */
   int (*xfer) (const char *annex,
@@ -1251,9 +1337,77 @@ handle_qxfer_fdpic (const char *annex, gdb_byte *readbuf,
   return (*the_target->read_loadmap) (annex, offset, readbuf, len);
 }
 
+/* Handle qXfer:btrace:read.  */
+
+static int
+handle_qxfer_btrace (const char *annex,
+		     gdb_byte *readbuf, const gdb_byte *writebuf,
+		     ULONGEST offset, LONGEST len)
+{
+  static struct buffer cache;
+  struct thread_info *thread;
+  int type;
+
+  if (the_target->read_btrace == NULL || writebuf != NULL)
+    return -2;
+
+  if (!target_running ())
+    return -1;
+
+  if (ptid_equal (general_thread, null_ptid)
+      || ptid_equal (general_thread, minus_one_ptid))
+    {
+      strcpy (own_buf, "E.Must select a single thread.");
+      return -3;
+    }
+
+  thread = find_thread_ptid (general_thread);
+  if (thread == NULL)
+    {
+      strcpy (own_buf, "E.No such thread.");
+      return -3;
+    }
+
+  if (thread->btrace == NULL)
+    {
+      strcpy (own_buf, "E.Btrace not enabled.");
+      return -3;
+    }
+
+  if (strcmp (annex, "all") == 0)
+    type = btrace_read_all;
+  else if (strcmp (annex, "new") == 0)
+    type = btrace_read_new;
+  else
+    {
+      strcpy (own_buf, "E.Bad annex.");
+      return -3;
+    }
+
+  if (offset == 0)
+    {
+      buffer_free (&cache);
+
+      target_read_btrace (thread->btrace, &cache, type);
+    }
+  else if (offset > cache.used_size)
+    {
+      buffer_free (&cache);
+      return -3;
+    }
+
+  if (len > cache.used_size - offset)
+    len = cache.used_size - offset;
+
+  memcpy (readbuf, cache.buffer + offset, len);
+
+  return len;
+}
+
 static const struct qxfer qxfer_packets[] =
   {
     { "auxv", handle_qxfer_auxv },
+    { "btrace", handle_qxfer_btrace },
     { "fdpic", handle_qxfer_fdpic},
     { "features", handle_qxfer_features },
     { "libraries", handle_qxfer_libraries },
@@ -1323,6 +1477,10 @@ handle_qxfer (char *own_buf, int packet_len, int *new_packet_len_p)
 		  free (data);
 		  return 0;
 		}
+	      else if (n == -3)
+		{
+		  /* Preserve error message.  */
+		}
 	      else if (n < 0)
 		write_enn (own_buf);
 	      else if (n > len)
@@ -1360,6 +1518,10 @@ handle_qxfer (char *own_buf, int packet_len, int *new_packet_len_p)
 		{
 		  free (data);
 		  return 0;
+		}
+	      else if (n == -3)
+		{
+		  /* Preserve error message.  */
 		}
 	      else if (n < 0)
 		write_enn (own_buf);
@@ -1637,6 +1799,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	  strcat (own_buf, ";qXfer:statictrace:read+");
 	  strcat (own_buf, ";qXfer:traceframe-info:read+");
 	  strcat (own_buf, ";EnableDisableTracepoints+");
+	  strcat (own_buf, ";QTBuffer:size+");
 	  strcat (own_buf, ";tracenz+");
 	}
 
@@ -1646,6 +1809,13 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       if (target_supports_agent ())
 	strcat (own_buf, ";QAgent+");
+
+      if (target_supports_btrace ())
+	{
+	  strcat (own_buf, ";Qbtrace:bts+");
+	  strcat (own_buf, ";Qbtrace:off+");
+	  strcat (own_buf, ";qXfer:btrace:read+");
+	}
 
       return;
     }
@@ -1808,12 +1978,12 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
     {
       /* CRC check (compare-section).  */
       char *comma;
-      CORE_ADDR base;
+      ULONGEST base;
       int len;
       unsigned long long crc;
 
       require_running (own_buf);
-      base = strtoul (own_buf + 5, &comma, 16);
+      comma = unpack_varlen_hex (own_buf + 5, &base);
       if (*comma++ != ',')
 	{
 	  write_enn (own_buf);
@@ -2860,7 +3030,8 @@ process_point_options (CORE_ADDR point_addr, char **packet)
       if (*dataptr == 'X')
 	{
 	  /* Conditional expression.  */
-	  fprintf (stderr, "Found breakpoint condition.\n");
+	  if (debug_threads)
+	    fprintf (stderr, "Found breakpoint condition.\n");
 	  add_breakpoint_condition (point_addr, &dataptr);
 	}
       else if (strncmp (dataptr, "cmds:", strlen ("cmds:")) == 0)
@@ -3192,13 +3363,16 @@ process_serial_event (void)
       /* Fallthrough.  */
     case 'z':  /* remove_ ... */
       {
-	char *lenptr;
 	char *dataptr;
-	CORE_ADDR addr = strtoul (&own_buf[3], &lenptr, 16);
-	int len = strtol (lenptr + 1, &dataptr, 16);
+	ULONGEST addr;
+	int len;
 	char type = own_buf[1];
 	int res;
 	const int insert = ch == 'Z';
+	char *p = &own_buf[3];
+
+	p = unpack_varlen_hex (p, &addr);
+	len = strtol (p + 1, &dataptr, 16);
 
 	/* Default to unrecognized/unsupported.  */
 	res = 1;

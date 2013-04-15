@@ -158,7 +158,6 @@ add_pe_exported_sym (const char *sym_name,
   char *qualified_name, *bare_name;
   /* Add the stored offset to get the loaded address of the symbol.  */
   CORE_ADDR vma = func_rva + section_data->vma_offset;
-  int dll_name_len = strlen (dll_name);
 
   /* Generate a (hopefully unique) qualified name using the first part
      of the dll name, e.g. KERNEL32!AddAtomA.  This matches the style
@@ -203,11 +202,8 @@ add_pe_forwarded_sym (const char *sym_name, const char *forward_dll_name,
 		      const char *dll_name, struct objfile *objfile)
 {
   CORE_ADDR vma;
-  struct objfile *forward_objfile;
-  struct minimal_symbol *msymbol;
-  short section;
+  struct bound_minimal_symbol msymbol;
   enum minimal_symbol_type msymtype;
-  int dll_name_len = strlen (dll_name);
   char *qualified_name, *bare_name;
   int forward_dll_name_len = strlen (forward_dll_name);
   int forward_func_name_len = strlen (forward_func_name);
@@ -218,20 +214,18 @@ add_pe_forwarded_sym (const char *sym_name, const char *forward_dll_name,
 	     forward_func_name);
 
 
-  msymbol = lookup_minimal_symbol_and_objfile (forward_qualified_name,
-					       &forward_objfile);
+  msymbol = lookup_minimal_symbol_and_objfile (forward_qualified_name);
 
-  if (!msymbol)
+  if (!msymbol.minsym)
     {
       int i;
 
       for (i = 0; i < forward_dll_name_len; i++)
 	forward_qualified_name[i] = tolower (forward_qualified_name[i]);
-      msymbol = lookup_minimal_symbol_and_objfile (forward_qualified_name,
-						   &forward_objfile);
+      msymbol = lookup_minimal_symbol_and_objfile (forward_qualified_name);
     }
 
-  if (!msymbol)
+  if (!msymbol.minsym)
     {
       if (debug_coff_pe_read)
 	fprintf_unfiltered (gdb_stdlog, _("Unable to find function \"%s\" in"
@@ -246,9 +240,8 @@ add_pe_forwarded_sym (const char *sym_name, const char *forward_dll_name,
 			" \"%s\" in dll \"%s\", pointing to \"%s\"\n"),
 			sym_name, dll_name, forward_qualified_name);
 
-  vma = SYMBOL_VALUE_ADDRESS (msymbol);
-  section = SYMBOL_SECTION (msymbol);
-  msymtype = MSYMBOL_TYPE (msymbol);
+  vma = SYMBOL_VALUE_ADDRESS (msymbol.minsym);
+  msymtype = MSYMBOL_TYPE (msymbol.minsym);
 
   /* Generate a (hopefully unique) qualified name using the first part
      of the dll name, e.g. KERNEL32!AddAtomA.  This matches the style
@@ -336,7 +329,6 @@ read_pe_exported_syms (struct objfile *objfile)
   unsigned long name_rvas, ordinals, nexp, ordbase;
   char *dll_name = (char *) dll->filename;
   int otherix = PE_SECTION_TABLE_SIZE;
-  int exportix = -1;
   int is_pe64 = 0;
   int is_pe32 = 0;
 
@@ -379,6 +371,7 @@ read_pe_exported_syms (struct objfile *objfile)
       /* This is not a recognized PE format file.  Abort now, because
 	 the code is untested on anything else.  *FIXME* test on
 	 further architectures and loosen or remove this test.  */
+      do_cleanups (back_to);
       return;
     }
 
@@ -392,6 +385,7 @@ read_pe_exported_syms (struct objfile *objfile)
 
   if (num_entries < 1)		/* No exports.  */
     {
+      do_cleanups (back_to);
       return;
     }
   if (is_pe64)
@@ -437,7 +431,6 @@ read_pe_exported_syms (struct objfile *objfile)
 				" for dll \"%s\": 0x%lx instead of 0x%lx\n"),
 				dll_name, export_opthdrrva, vaddr);
 	  expptr = fptr + (export_opthdrrva - vaddr);
-	  exportix = i;
 	  break;
 	}
     }
@@ -448,6 +441,7 @@ read_pe_exported_syms (struct objfile *objfile)
   if (export_size == 0)
     {
       /* Empty export table.  */
+      do_cleanups (back_to);
       return;
     }
 
@@ -632,12 +626,8 @@ CORE_ADDR
 pe_text_section_offset (struct bfd *abfd)
 
 {
-  unsigned long pe_header_offset, opthdr_ofs, num_entries, i;
-  unsigned long export_rva, export_size, nsections, secptr, expptr;
-  unsigned long exp_funcbase;
-  unsigned char *expdata, *erva;
-  unsigned long name_rvas, ordinals, nexp, ordbase;
-  char *dll_name;
+  unsigned long pe_header_offset, i;
+  unsigned long nsections, secptr;
   int is_pe64 = 0;
   int is_pe32 = 0;
   char const *target;
@@ -664,7 +654,6 @@ pe_text_section_offset (struct bfd *abfd)
 
   /* Get pe_header, optional header and numbers of sections.  */
   pe_header_offset = pe_get32 (abfd, 0x3c);
-  opthdr_ofs = pe_header_offset + 4 + 20;
   nsections = pe_get16 (abfd, pe_header_offset + 4 + 2);
   secptr = (pe_header_offset + 4 + 20 +
 	    pe_get16 (abfd, pe_header_offset + 4 + 16));
@@ -704,12 +693,12 @@ void _initialize_coff_pe_read (void);
 void
 _initialize_coff_pe_read (void)
 {
-  add_setshow_uinteger_cmd ("coff_pe_read", class_maintenance,
-			    &debug_coff_pe_read,
-			    _("Set coff PE read debugging."),
-			    _("Show coff PE read debugging."),
-			    _("When set, debugging messages for coff reading "
-			      "of exported symbols are displayed."),
-			    NULL, show_debug_coff_pe_read,
-			    &setdebuglist, &showdebuglist);
+  add_setshow_zuinteger_cmd ("coff-pe-read", class_maintenance,
+			     &debug_coff_pe_read,
+			     _("Set coff PE read debugging."),
+			     _("Show coff PE read debugging."),
+			     _("When set, debugging messages for coff reading "
+			       "of exported symbols are displayed."),
+			     NULL, show_debug_coff_pe_read,
+			     &setdebuglist, &showdebuglist);
 }

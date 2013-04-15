@@ -609,7 +609,11 @@ BEGIN { doc["OP eol"] = "\
 Do not use &&, or || at the end of a line"
     category["OP eol"] = ari_code
 }
-/(\|\||\&\&|==|!=)[[:space:]]*$/ {
+# * operator needs a special treatment as it can be a
+# valid end of line for a pointer type definition
+# Only catch case where an assignment or an opening brace is present
+/(\|\||\&\&|==|!=|[[:space:]][+\-\/])[[:space:]]*$/ \
+|| /(\(|=)[[:space:]].*[[:space:]]\*[[:space:]]*$/ {
     fail("OP eol")
 }
 
@@ -1036,7 +1040,6 @@ a DECR_PC_AFTER_BREAK"
     category["write_pc"] = ari_deprecate
 }
 /(^|[^_[:alnum:]])write_pc[[:space:]]*\(/ || \
-/(^|[^_[:alnum:]])set_gdbarch_write_pc[[:space:]]*\(/ || \
 /(^|[^_[:alnum:]])TARGET_WRITE_PC[[:space:]]*\(/ {
     fail("write_pc")
 }

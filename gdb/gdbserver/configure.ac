@@ -27,6 +27,7 @@ AM_MAINTAINER_MODE
 
 AC_PROG_CC
 AC_GNU_SOURCE
+AC_SYS_LARGEFILE
 
 AC_CANONICAL_SYSTEM
 
@@ -289,6 +290,11 @@ if test "${srv_linux_regsets}" = "yes"; then
 	      [Define if the target supports PTRACE_GETFPXREGS for extended ]
 	      [register access.])
   fi
+fi
+
+if test "${srv_linux_btrace}" = "yes"; then
+  AC_DEFINE(HAVE_LINUX_BTRACE, 1,
+	    [Define if the target supports branch tracing.])
 fi
 
 if test "$ac_cv_header_sys_procfs_h" = yes; then

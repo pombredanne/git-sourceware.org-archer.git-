@@ -1,3 +1,431 @@
+2013-04-15  Alan Modra  <amodra@gmail.com>
+
+	* archive.c (_bfd_archive_close_and_cleanup): Clear parent
+	cache slot for archives.
+
+2013-04-14  Hans-Peter Nilsson  <hp@bitrange.com>
+
+	* mmo.c (mmo_write_chunk): Break out abfd->tdata.mmo_data to new
+	local variable mmop.
+
+2013-04-09  Senthil Kumar Selvaraj  <senthil_kumar.selvaraj@atmel.com>
+
+	PR ld/12494
+	* bfd/elf32-avr.c: Consider all sections to determine if linker
+	relaxation can safely delete a ret after a call/jmp
+
+2013-04-09  Mingjie Xing  <mingjie.xing@gmail.com>
+
+	* bfd.c (typedef bfd, Error reporting, Miscellaneous): Add
+	INODEs.
+
+2013-04-08  Tom Tromey  <tromey@redhat.com>
+
+	* som.c (bfd_section_from_som_symbol): No longer static.
+	* som.h (bfd_section_from_som_symbol): Declare.
+
+2013-04-06  Alan Modra  <amodra@gmail.com>
+
+	* elf32-ppc.c (ppc_elf_check_relocs): Use SYMBOLIC_BIND.
+	* elf64-ppc.c (ppc64_elf_check_relocs, dec_dynrel_count): Likewise.
+
+2013-04-05  Nick Clifton  <nickc@redhat.com>
+
+	* elflink.c (elf_link_add_object_symbols): Revert accidental commit.
+
+2013-04-04  Alan Modra  <amodra@gmail.com>
+
+	* bfd.c (bfd_error_type, bfd_errmsgs): Add bfd_error_missing_dso.
+	* bfd-in2.h: Regenerate.
+	* elflink.c (elf_link_add_object_symbols): Use new error.
+
+2013-04-03  Nick Clifton  <nickc@redhat.com>
+
+	* elf32-v850.c (v850_elf_is_target_special_symbol): New function.
+	(bfd_elf32_bfd_is_target_special_symbol): Define.
+
+2013-04-03   Venkataramanan Kumar  <venkataramanan.kumar@linaro.org>
+
+	* elf64-aarch64.c (elf64_aarch64_gc_sweep_hook): Use
+	elf64_aarch64_locals to get local GOT reference counts.
+
+2013-04-02  DJ Delorie  <dj@redhat.com>
+
+	* elf32-rl78.c (GET_RELOC): Assert that there are relocs to get.
+	(rl78_elf_relax_section): Only fetch the next reloc if there is
+	one expected.
+
+2013-03-30  Alan Modra  <amodra@gmail.com>
+
+	PR ld/15323
+	* elf-m10300.c (mn10300_elf_check_relocs): Set non_ir_ref for
+	global symbols referenced by relocs.
+	* elf32-arm.c (elf32_arm_check_relocs): Likewise.
+	* elf32-bfin.c (bfin_check_relocs): Likewise.
+	* elf32-cr16.c (cr16_elf_check_relocs): Likewise.
+	* elf32-cris.c (cris_elf_check_relocs): Likewise.
+	* elf32-d10v.c (elf32_d10v_check_relocs): Likewise.
+	* elf32-dlx.c (elf32_dlx_check_relocs): Likewise.
+	* elf32-fr30.c (fr30_elf_check_relocs): Likewise.
+	* elf32-frv.c (elf32_frv_check_relocs): Likewise.
+	* elf32-hppa.c (elf32_hppa_check_relocs): Likewise.
+	* elf32-i370.c (i370_elf_check_relocs): Likewise.
+	* elf32-iq2000.c (iq2000_elf_check_relocs): Likewise.
+	* elf32-lm32.c (lm32_elf_check_relocs): Likewise.
+	* elf32-m32c.c (m32c_elf_check_relocs): Likewise.
+	* elf32-m32r.c (m32r_elf_check_relocs): Likewise.
+	* elf32-m68hc1x.c (elf32_m68hc11_check_relocs): Likewise.
+	* elf32-m68k.c (elf_m68k_check_relocs): Likewise.
+	* elf32-mcore.c (mcore_elf_check_relocs): Likewise.
+	* elf32-metag.c (elf_metag_check_relocs): Likewise.
+	* elf32-microblaze.c (microblaze_elf_check_relocs): Likewise.
+	* elf32-moxie.c (moxie_elf_check_relocs): Likewise.
+	* elf32-msp430.c (elf32_msp430_check_relocs): Likewise.
+	* elf32-mt.c (mt_elf_check_relocs): Likewise.
+	* elf32-nios2.c (nios2_elf32_check_relocs): Likewise.
+	* elf32-openrisc.c (openrisc_elf_check_relocs): Likewise.
+	* elf32-ppc.c (ppc_elf_check_relocs): Likewise.
+	* elf32-rl78.c (rl78_elf_check_relocs): Likewise.
+	* elf32-s390.c (elf_s390_check_relocs): Likewise.
+	* elf32-score.c (s3_bfd_score_elf_check_relocs): Likewise.
+	* elf32-score7.c (s7_bfd_score_elf_check_relocs): Likewise.
+	* elf32-sh.c (sh_elf_check_relocs): Likewise.
+	* elf32-tic6x.c (elf32_tic6x_check_relocs): Likewise.
+	* elf32-tilepro.c (tilepro_elf_check_relocs): Likewise.
+	* elf32-v850.c (v850_elf_check_relocs): Likewise.
+	* elf32-vax.c (elf_vax_check_relocs): Likewise.
+	* elf32-xstormy16.c (xstormy16_elf_check_relocs): Likewise.
+	* elf32-xtensa.c (elf_xtensa_check_relocs): Likewise.
+	* elf64-aarch64.c (elf64_aarch64_check_relocs): Likewise.
+	* elf64-alpha.c (elf64_alpha_check_relocs): Likewise.
+	* elf64-hppa.c (elf64_hppa_check_relocs): Likewise.
+	* elf64-ia64-vms.c (elf64_ia64_check_relocs): Likewise.
+	* elf64-mmix.c (mmix_elf_check_relocs): Likewise.
+	* elf64-ppc.c (ppc64_elf_check_relocs): Likewise.
+	* elf64-s390.c (elf_s390_check_relocs): Likewise.
+	* elf64-sh64.c (sh_elf64_check_relocs): Likewise.
+	* elfnn-ia64.c (elfNN_ia64_check_relocs): Likewise.
+	* elfxx-sparc.c (_bfd_sparc_elf_check_relocs): Likewise.
+	* elfxx-tilegx.c (tilegx_elf_check_relocs): Likewise.
+	* elfxx-mips.c (_bfd_mips_elf_check_relocs): Likewise.  Don't
+	test indirect/warning links for NULL.
+
+2013-03-29  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/15323
+	* elf32-i386.c (elf_i386_check_relocs): Set non_ir_ref if a
+	symbol is referenced by a non-shared object.
+	* elf64-x86-64.c (elf_x86_64_check_relocs): Likewise.
+
+2013-03-28  Joe Seymour  <jseymour@codesourcery.com>
+
+	* elf32-sh.c (sh_elf_relocate_section): Suppress warnings for
+	R_SH_REL32 relocations against undefined weak symbols.
+
+2013-03-28  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (struct ppc_dyn_relocs): New.
+	(ppc64_elf_check_relocs): Separate dynrel counts for local syms
+	into ifunc and non-ifunc.
+	(dec_dynrel_count): Pass in sym rather than sym_sec.  Handle
+	separate ifunc/non-ifunc dynrel counts.
+	(allocate_got): Always use reliplt for ifunc.
+	(allocate_dynrelocs): Likewise.
+	(ppc64_elf_size_dynamic_sections): Likewise.
+	(ppc64_elf_layout_multitoc): Likewise.
+	(ppc64_elf_relocate_section): Likewise.
+
+2013-03-28  Alan Modra  <amodra@gmail.com>
+
+	* elf32-ppc.c (struct ppc_dyn_relocs): New.
+	(ppc_elf_check_relocs): Separate dynrel counts for local syms
+	into ifunc and non-ifunc.
+	(allocate_dynrelocs): Always put ifunc relocs into reliplt.
+	(ppc_elf_size_dynamic_sections): Likewise.
+	(ppc_elf_relocate_section): Likewise.
+
+2013-03-28  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (enum elf_reloc_type_class): Add reloc_class_ifunc.
+	(struct elf_backend_data <elf_backed_reloc_type_class>): Add
+	bfd_link_info* and asection* params.
+	(_bfd_elf_reloc_type_class): Likewise.
+	* elf.c (_bfd_elf_reloc_type_class): Likewise.
+	* elflink.c (elf_link_sort_cmp2): Sort first on reloc class.
+	(elf_link_sort_relocs): Update elf_backed_reloc_type_class call.
+	* elf32-ppc.c (ppc_elf_reloc_type_class): Return reloc_class_ifunc
+	for any reliplt reloc.  Don't return reloc_class_plt for
+	R_PPC_REL24 and R_PPC_ADDR24.
+	* elf64-ppc.c (allocate_got): Formatting.
+	(ppc64_elf_reloc_type_class): Return reloc_class_ifunc for any
+	reliplt reloc.
+	* elf-m10300.c, * elf32-arm.c, * elf32-bfin.c, * elf32-cr16.c,
+	* elf32-cris.c, * elf32-hppa.c, * elf32-i386.c, * elf32-lm32.c,
+	* elf32-m32r.c, * elf32-m68k.c, * elf32-metag.c, * elf32-nios2.c,
+	* elf32-s390.c, * elf32-sh.c, * elf32-sparc.c, * elf32-tilepro.c,
+	* elf32-vax.c, * elf32-xtensa.c, * elf64-aarch64.c, * elf64-alpha.c,
+	* elf64-hppa.c, * elf64-ia64-vms.c, * elf64-s390.c, * elf64-sparc.c,
+	* elf64-x86-64.c, * elfnn-ia64.c, * elfxx-tilegx.c, * elfxx-tilegx.h:
+	Add extra params to the various reloc_type_class functions.
+
+2013-03-27  Alan Modra  <amodra@gmail.com>
+
+	* elf32-ppc.c (ppc_elf_check_relocs): Set PLT_IFUNC in local got
+	masks for all local ifunc syms.
+	(allocate_dynrelocs): Don't use htab->relgot for ifunc.
+	(ppc_elf_size_dynamic_sections): Likewise.
+	(ppc_elf_relocate_section): Likewise.
+
+2013-03-27  Will Newton  <will.newton@linaro.org>
+
+	* elf32-arm.c (elf32_arm_final_link_relocate): Avoid emitting a
+	dynamic reloc for symbols with dynindx == -1.
+	(allocate_dynrelocs_for_symbol): Avoid allocating space for a
+	dynamic reloc for symbols with dynindx == -1.
+
+2013-03-27  Will Newton  <will.newton@linaro.org>
+
+	* elf32-arm.c (elf32_arm_final_link_relocate): Avoid emitting a
+	dynamic reloc for non-default visibility undefined weaks.
+	(allocate_dynrelocs_for_symbol): Avoid allocating space for a
+	dynamic reloc for non-default visibility undefined weaks.
+
+2013-03-26  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_add_default_symbol): Preserve section
+	over _bfd_elf_merge_symbol calls.
+
+2013-03-26  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (elf_link_add_object_symbols): Add assertion for
+	common override alignment check code.  Formatting.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_merge_symbol): Set old_alignment for
+	usual common symbols as well as for dynamic.  Add poldbfd param.
+	Save old bfd.  Adjust callers.
+	(_bfd_elf_add_default_symbol): Add poldbfd param.  Pass "section"
+	and "value" by value, not pointer.  Adjust caller.
+	(elf_link_add_object_symbols): Combine undef_bfd and old_bfd vars.
+	Delete code to set same.  Use old_bfd and old_alignment from
+	_bfd_elf_merge_symbol instead.  Add default symbol before
+	alignment and size checks.  Wrap overlong lines.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_add_default_symbol): Delete "override" param.
+	(elf_link_add_object_symbols): Don't call _bfd_elf_add_default_symbol
+	when override is true.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_merge_symbol): Use local var holding value
+	of *sym_hash.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_merge_symbol): Don't discard TLS symbols here.
+	Wrap long lines.
+	(elf_link_add_object_symbols): Discard TLS symbols for --just-syms
+	early in symbol loop.
+
+2013-03-25  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct elf_backend_data <merge_symbol>): Update proto.
+	(_bfd_elf_init_reloc_shdr): Delete.
+	* elf.c (_bfd_elf_init_reloc_shdr): Make static.
+	* elf64-x86-64.c (elf_x86_64_merge_symbol): Trim parameters to
+	just what is needed.
+	* elflink.c (_bfd_elf_merge_symbol): Update bed->merge_symbol call.
+
+2013-03-23  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (_bfd_elf_merge_symbol): Delete declaration.
+	* elflink.c (_bfd_elf_merge_symbol): Make static.
+	* elf32-sh-symbian.c (sh_symbian_relocate_section): Don't call
+	_bfd_elf_merge_symbol, call _bfd_generic_link_add_one_symbol.
+
+2013-03-23  Alan Modra  <amodra@gmail.com>
+
+	PR ld/15270
+	* elflink.c (elf_link_add_object_symbols): Don't set def_regular
+	or ref_regular for BFD_PLUGIN owned syms, or have them affect
+	def_dynamic/ref_dynamic.
+	(_bfd_elf_fix_symbol_flags): Don't set def_regular for BFD_PLUGIN
+	owned syms.
+
+2013-03-22  David S. Miller  <davem@davemloft.net>
+
+	* elfxx-sparc.c (_bfd_sparc_elf_merge_private_bfd_data): Set type of
+	hwcaps attribute.
+
+2013-03-22  Achille Fouilleul  <achille.fouilleul+binutils@gadz.org>
+
+	PR ld/14902
+	* elf32-h8300.c (elf32_h8_relax_delete_bytes): Fix off by one
+	errors adjusting relocs and symbols.
+
+2013-03-21  Michael Schewe  <michael.schewe@gmx.net>
+
+	* elf32-h8300 (h8_relax_section): Add new relaxation of mov
+	@(disp:32,ERx) to mov @(disp:16,ERx).
+	(R_H8_DISP32A16): New reloc.
+	Comments added and corrected.
+	* reloc.c (BFD_RELOC_H8_DISP32A16): New reloc.
+	* bfd-in2.h: Regenerate.
+	* libbfd.h: Regenerate.
+
+2013-03-21  Kai Tietz  <ktietz@redhat.com>
+
+	* coffgen.c (coff_real_object_p): Make global.
+	* peicode.h (coff_real_object_p): Add prototype.
+	(FILHDR): Defined for COFF_IMAGE_WITH_PE as
+	external_PEI_IMAGE_hdr structure.
+	(coff_swap_filehdr_in): Handle variable header-size.
+	* peXXigen.c (_bfd_XXi_swap_aouthdr_in): Just handle amount
+	of directory-entiries as specified in pe-header.
+
+2013-03-21  Nick Clifton  <nickc@redhat.com>
+
+	PR sim/15286
+	* elf32-arm.c (bfd_arm_get_mach_from_attributes): Identify XScale,
+	iWMMXt and iWMMXt2 processors from attributes.
+
+2013-03-20  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (_bfd_elf_make_dynamic_reloc_section): Override
+	sh_type according to is_rela.
+
+2013-03-18  Alan Modra  <amodra@gmail.com>
+
+	PR ld/12549
+	* elflink.c (elf_link_add_object_symbols): Exclude weak refs when
+	considering whether an --as-needed library is needed.
+
+2013-03-14  Tom Tromey  <tromey@redhat.com>
+
+	* opncls.c (bfd_get_debug_link_info): Rename from
+	get_debug_link_info.  Export.  Update comment.
+	(find_separate_debug_file): Update.
+	* bfd-in2.h: Rebuild.
+
+2013-03-08  Venkataramanan Kumar  <venkataramanan.kumar@linaro.org>
+
+	* elf64-aarch64.c (elf_backend_can_gc_sections): Enable gc-section
+	support.
+	(elf64_aarch64_gc_sweep_hook): Handle GOT, TLS and PLT related
+	relocs.
+
+2013-03-08  Andreas Arnez  <arnez@linux.vnet.ibm.com>
+
+	* elf-bfd.h (elfcore_write_s390_tdb): Add prototype.
+	* elf.c (elfcore_write_s390_tdb): New function.
+	(elfcore_write_register_note): Call it.
+	(elfcore_grok_s390_tdb): New function.
+	(elfcore_grok_note): Call it.
+
+2013-03-08  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c (mips_elf_allocate_lazy_stub): Correct data type.
+
+2013-03-05  Corinna Vinschen  <vinschen@redhat.com>
+
+	* config.bfd: Add x86_64-*-cygwin to list of supported targets.
+
+2013-03-04  Alan Modra  <amodra@gmail.com>
+
+	* elf32-ppc.c (ppc_elf_relocate_section <R_PPC_PLTREL24>): Adjust
+	non-zero addends when relocatable, rather than addends >= 32768.
+	Always zero "addend" before applying relocation.
+
+2013-03-04  Nick Clifton  <nickc@redhat.com>
+
+	* archive64.c (bfd_elf64_archive_write_armap): Fix calculation of
+	file pointer offsets for thin archives.
+
+2013-02-28  Nathan Sidwell  <nathan@codesourcery.com>
+
+	* elf32-arm.c (elf32_arm_size_dynamic_sections): Don't call
+	elf32_arm_allocate_dynrelocs for source reloc for non-dynamic link.
+
+2013-02-27  DJ Delorie  <dj@redhat.com>
+
+	* reloc.c (BFD_RELOC_RL78_CODE): Add.
+	* libbfd.h: Regenerate.
+	* bfd-in2.h: Regenerate.
+	* elf32-rl78.c (rl78_elf_relocate_section): Handle weak code
+	references in compuated relocs.
+
+2013-02-26  Anthony Green  <green@moxielogic.com>
+
+	* config.bfd: Extend moxie-rtems target triplet name support.
+
+2013-02-21  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/15167
+	* elf64-ia64-vms.c (elf64_vms_link_add_object_symbols): Set
+	unique_global only for definition.
+	* elflink.c (_bfd_elf_merge_symbol): Don't set unique_global
+	here.
+	(elf_link_add_object_symbols): Set unique_global only
+	for definition.
+
+2013-02-21  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct elf_build_id): Extracted from..
+	(struct elf_build_id_info): ..here.  Delete.
+	(struct output_elf_obj_tdata): New, extracted from..
+	(struct elf_obj_tdata): ..here.  Reorganize for better packing.
+	Add "o" field.
+	(elf_program_header_size): Reference tdata->o.
+	(elf_seg_map, elf_next_file_pos, elf_eh_frame_hdr, elf_linker,
+	elf_stack_flags, elf_shstrtab, elf_strtab_sec, elf_shstrtab_sec,
+	elf_section_syms, elf_num_section_syms, elf_flags_init): Likewise.
+	* elf.c (bfd_elf_allocate_object): Allocate output_elf_obj_tdata
+	when opening bfd in any mode that might write.
+	(_bfd_elf_write_object_contents): Use build_id field in
+	output_elf_obj_tdata.
+	(_bfd_elf_close_and_cleanup): Tweak elf_shstrtab test.
+	(elfobj_grok_gnu_build_id): Adjust for elf_tdata changes.
+
+2013-02-21  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct core_elf_obj_tdata): New.
+	(struct elf_obj_tdata): Delete core_signal, core_pid, core_lwpid,
+	core_program, and core_command.  Add "core".
+	* elf.c (bfd_elf_mkcorefile): Allocate "core" struct.
+	Update all refs to tdata core fields.
+	* elf32-am33lin.c, * elf32-arm.c, * elf32-cris.c, * elf32-frv.c,
+	* elf32-hppa.c, * elf32-i386.c, * elf32-m68k.c, * elf32-mips.c,
+	* elf32-nios2.c, * elf32-ppc.c, * elf32-s390.c, * elf32-score.c,
+	* elf32-score7.c, * elf32-sh.c, * elf32-sparc.c, * elf32-tilegx.c,
+	* elf32-tilepro.c, * elf32-xtensa.c, * elf64-aarch64.c,
+	* elf64-hppa.c, * elf64-mips.c, * elf64-ppc.c, * elf64-tilegx.c,
+	* elf64-x86-64.c, * elfcore.h, * elfn32-mips.c: Update all refs
+	to tdata core fields.
+
+2013-02-21  Alan Modra  <amodra@gmail.com>
+
+	* elf-bfd.h (struct elf_obj_tdata): Rename segment_map to seg_map.
+	Delete num_locals and num_globals.
+	(elf_num_locals, elf_num_globals): Don't define.
+	(elf_seg_map, elf_next_file_pos, elf_eh_frame_hdr, elf_linker,
+	elf_stack_flags, elf_strtab_sec, elf_shstrtab_sec): Define.
+	* bfd.c, * elf-eh-frame.c, * elf-nacl.c, * elf-vxworks.c, * elf.c,
+	* elf32-arm.c, * elf32-lm32.c, * elf32-ppc.c, * elf32-rx.c,
+	* elf32-spu.c, * elf64-hppa.c, * elfcode.h, * elflink.c,
+	* elfnn-ia64.c, * elfxx-mips.c: Use newly defined elf_obj_tdata
+	accessor macros.
+	* elf.c (elf_map_symbols): Add pnum_locals param.  Return
+	number of locals syms via new param.
+	(swap_out_syms): Adjust to suit elf_map_symbols change.
+
+2013-02-19  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.c (_bfd_mips_elf_finish_dynamic_symbol): Also clear
+	STO_MICROMIPS annotation.
+
 2013-02-19  Alan Modra  <amodra@gmail.com>
 
 	* configure.in: Bump version to 2.23.52.
@@ -930,8 +1358,8 @@
 2013-01-07  Tom Tromey  <tromey@redhat.com>
 
 	* section.c (_bfd_std_section): Rename from std_section.
-        (bfd_com_section_ptr, bfd_und_section_ptr, bfd_abs_section_ptr)
-        (STD_SECTION): Update.
+	(bfd_com_section_ptr, bfd_und_section_ptr, bfd_abs_section_ptr)
+	(STD_SECTION): Update.
 	* bfd-in2.h: Rebuild.
 
 2013-01-04  Juergen Urban <JuergenUrban@gmx.de>

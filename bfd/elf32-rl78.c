@@ -778,6 +778,8 @@ rl78_elf_relocate_section
 			       + sec->output_section->vma
 			       + sec->output_offset
 			       + rel->r_addend);
+	      else if (h->root.type == bfd_link_hash_undefweak)
+		RL78_STACK_PUSH (0);
 	      else
 		_bfd_error_handler (_("Warning: RL78_SYM reloc with an unknown symbol"));
 	    }
@@ -1196,6 +1198,10 @@ rl78_elf_check_relocs
 	  while (h->root.type == bfd_link_hash_indirect
 		 || h->root.type == bfd_link_hash_warning)
 	    h = (struct elf_link_hash_entry *) h->root.u.i.link;
+
+	  /* PR15323, ref flags aren't set for references in the same
+	     object.  */
+	  h->root.non_ir_ref = 1;
 	}
 
       switch (ELF32_R_TYPE (rel->r_info))
@@ -2187,6 +2193,7 @@ rl78_elf_relax_section
 	+ srel->r_offset;
 
 #define GET_RELOC \
+      BFD_ASSERT (nrelocs > 0);			       \
       symval = OFFSET_FOR_RELOC (srel, &srel, &scale); \
       pcrel = symval - pc + srel->r_addend; \
       nrelocs --;
@@ -2227,7 +2234,13 @@ rl78_elf_relax_section
 
       if (irel->r_addend & RL78_RELAXA_BRA)
 	{
-	  GET_RELOC;
+	  /* SKIP opcodes that skip non-branches will have a relax tag
+	     but no corresponding symbol to relax against; we just
+	     skip those.  */
+	  if (irel->r_addend & RL78_RELAXA_RNUM)
+	    {
+	      GET_RELOC;
+	    }
 
 	  switch (insn[0])
 	    {
@@ -2296,6 +2309,9 @@ rl78_elf_relax_section
 	      /* For SKIP/BR, we change the BR opcode and delete the
 		 SKIP.  That way, we don't have to find and change the
 		 relocation for the BR.  */
+	      /* Note that, for the case where we're skipping some
+		 other insn, we have no "other" reloc but that's safe
+		 here anyway. */
 	      switch (insn[1])
 		{
 		case 0xc8: /* SKC */

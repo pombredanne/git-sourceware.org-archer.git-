@@ -41,7 +41,7 @@ infodir = @infodir@
 htmldir = $(prefix)/html
 includedir = @includedir@
 
-SHELL = /bin/sh
+SHELL = @SHELL@
 EXEEXT = @EXEEXT@
 
 INSTALL = @INSTALL@
@@ -155,7 +155,7 @@ SFILES=	$(srcdir)/gdbreplay.c $(srcdir)/inferiors.c $(srcdir)/dll.c \
 	$(srcdir)/common/vec.c $(srcdir)/common/gdb_vecs.c \
 	$(srcdir)/common/common-utils.c $(srcdir)/common/xml-utils.c \
 	$(srcdir)/common/linux-osdata.c $(srcdir)/common/ptid.c \
-	$(srcdir)/common/buffer.c
+	$(srcdir)/common/buffer.c $(srcdir)/common/linux-btrace.c
 
 DEPFILES = @GDBSERVER_DEPFILES@
 
@@ -251,9 +251,7 @@ install-only:
 		$(INSTALL_PROGRAM) $(IPA_LIB) $(DESTDIR)$(libdir)/$(IPA_LIB); \
 	fi; \
 	$(SHELL) $(srcdir)/../../mkinstalldirs $(DESTDIR)$(bindir); \
-	$(INSTALL_PROGRAM) gdbserver$(EXEEXT) $(DESTDIR)$(bindir)/$$n$(EXEEXT); \
-	$(SHELL) $(srcdir)/../../mkinstalldirs $(DESTDIR)$(man1dir); \
-	$(INSTALL_DATA) $(srcdir)/gdbserver.1 $(DESTDIR)$(man1dir)/$$n.1
+	$(INSTALL_PROGRAM) gdbserver$(EXEEXT) $(DESTDIR)$(bindir)/$$n$(EXEEXT)
 	@$(MAKE) $(FLAGS_TO_PASS) DO=$@ "DODIRS=$(SUBDIRS)" subdir_do
 
 uninstall: force
@@ -320,6 +318,7 @@ clean:
 	rm -f reg-arm.c reg-bfin.c i386.c reg-ia64.c reg-m32r.c reg-m68k.c
 	rm -f reg-sh.c reg-sparc.c reg-spu.c amd64.c i386-linux.c
 	rm -f reg-cris.c reg-crisv32.c amd64-linux.c reg-xtensa.c
+	rm -f reg-tilegx.c reg-tilegx32.c
 	rm -f arm-with-iwmmxt.c
 	rm -f arm-with-vfpv2.c arm-with-vfpv3.c arm-with-neon.c
 	rm -f mips-linux.c mips64-linux.c
@@ -424,6 +423,8 @@ signals_h = $(srcdir)/../../include/gdb/signals.h $(signals_def)
 ptid_h = $(srcdir)/../common/ptid.h
 ax_h = $(srcdir)/ax.h
 agent_h = $(srcdir)/../common/agent.h
+linux_btrace_h = $(srcdir)/../common/linux-btrace.h \
+		$(srcdir)/../common/btrace-common.h $(vec_h) $(ptid_h)
 linux_osdata_h = $(srcdir)/../common/linux-osdata.h
 vec_h = $(srcdir)/../common/vec.h
 gdb_vecs_h = $(srcdir)/../common/gdb_vecs.h
@@ -542,6 +543,9 @@ format.o: ../common/format.c
 agent.o: ../common/agent.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
+
+linux-btrace.o: ../common/linux-btrace.c $(linux_btrace_h) $(server_h)
+	$(CC) -c $(CPPFLAGS) $(INTERNAL_CFLAGS) $<
 
 # We build vasprintf with -DHAVE_CONFIG_H because we want that unit to
 # include our config.h file.  Otherwise, some system headers do not get
@@ -694,6 +698,8 @@ reg-xtensa.c : $(srcdir)/../regformats/reg-xtensa.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/reg-xtensa.dat reg-xtensa.c
 reg-tilegx.c : $(srcdir)/../regformats/reg-tilegx.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/reg-tilegx.dat reg-tilegx.c
+reg-tilegx32.c : $(srcdir)/../regformats/reg-tilegx32.dat $(regdat_sh)
+	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/reg-tilegx32.dat reg-tilegx32.c
 
 #
 # Dependency tracking.  Most of this is conditional on GNU Make being

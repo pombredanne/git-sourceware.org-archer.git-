@@ -10600,6 +10600,8 @@ static const struct dis386 rm_table[][8] = {
     /* RM_0F01_REG_1 */
     { "monitor",	{ { OP_Monitor, 0 } } },
     { "mwait",		{ { OP_Mwait, 0 } } },
+    { "clac",		{ Skip_MODRM } },
+    { "stac",		{ Skip_MODRM } },
   },
   {
     /* RM_0F01_REG_2 */
@@ -11283,11 +11285,11 @@ get_valid_dis386 (const struct dis386 *dp, disassemble_info *info)
 }
 
 static void
-get_sib (disassemble_info *info)
+get_sib (disassemble_info *info, int sizeflag)
 {
   /* If modrm.mod == 3, operand must be register.  */
   if (need_modrm
-      && address_mode != mode_16bit
+      && ((sizeflag & AFLAG) || address_mode == mode_64bit)
       && modrm.mod != 3
       && modrm.rm == 4)
     {
@@ -11572,7 +11574,7 @@ print_insn (bfd_vma pc, disassemble_info *info)
 
   if (dp->name == NULL && dp->op[0].bytemode == FLOATCODE)
     {
-      get_sib (info);
+      get_sib (info, sizeflag);
       dofloat (sizeflag);
     }
   else
@@ -11580,7 +11582,7 @@ print_insn (bfd_vma pc, disassemble_info *info)
       dp = get_valid_dis386 (dp, info);
       if (dp != NULL && putop (dp->name, sizeflag) == 0)
 	{
-	  get_sib (info);
+	  get_sib (info, sizeflag);
 	  for (i = 0; i < MAX_OPERANDS; ++i)
 	    {
 	      obufp = op_out[i];

@@ -351,7 +351,7 @@ frv_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
 
       int raw_regnum = accg0123_regnum + (reg - accg0_regnum) / 4;
       int byte_num = (reg - accg0_regnum) % 4;
-      char buf[4];
+      gdb_byte buf[4];
 
       regcache_raw_read (regcache, raw_regnum, buf);
       buf[byte_num] = ((bfd_byte *) buffer)[0];
@@ -602,7 +602,7 @@ frv_analyze_prologue (struct gdbarch *gdbarch, CORE_ADDR pc,
   /* Scan the prologue.  */
   while (pc < lim_pc)
     {
-      char buf[frv_instr_size];
+      gdb_byte buf[frv_instr_size];
       LONGEST op;
 
       if (target_read_memory (pc, buf, sizeof buf) != 0)
@@ -1072,7 +1072,7 @@ frv_skip_main_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
     {
       LONGEST displ;
       CORE_ADDR call_dest;
-      struct minimal_symbol *s;
+      struct bound_minimal_symbol s;
 
       displ = ((op & 0xfe000000) >> 7) | (op & 0x0003ffff);
       if ((displ & 0x00800000) != 0)
@@ -1081,9 +1081,9 @@ frv_skip_main_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
       call_dest = pc + 4 * displ;
       s = lookup_minimal_symbol_by_pc (call_dest);
 
-      if (s != NULL
-          && SYMBOL_LINKAGE_NAME (s) != NULL
-	  && strcmp (SYMBOL_LINKAGE_NAME (s), "__main") == 0)
+      if (s.minsym != NULL
+          && SYMBOL_LINKAGE_NAME (s.minsym) != NULL
+	  && strcmp (SYMBOL_LINKAGE_NAME (s.minsym), "__main") == 0)
 	{
 	  pc += 4;
 	  return pc;

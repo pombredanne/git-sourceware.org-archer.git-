@@ -225,8 +225,7 @@ read_mapping (const char *line,
     p++;
   *endaddr = strtoulst (p, &p, 16);
 
-  while (*p && isspace (*p))
-    p++;
+  p = skip_spaces_const (p);
   *permissions = p;
   while (*p && !isspace (*p))
     p++;
@@ -234,8 +233,7 @@ read_mapping (const char *line,
 
   *offset = strtoulst (p, &p, 16);
 
-  while (*p && isspace (*p))
-    p++;
+  p = skip_spaces_const (p);
   *device = p;
   while (*p && !isspace (*p))
     p++;
@@ -243,8 +241,7 @@ read_mapping (const char *line,
 
   *inode = strtoulst (p, &p, 10);
 
-  while (*p && isspace (*p))
-    p++;
+  p = skip_spaces_const (p);
   *filename = p;
 }
 
@@ -409,8 +406,7 @@ linux_info_proc (struct gdbarch *gdbarch, char *args,
 	  printf_filtered (_("Process: %s\n"),
 			   pulongest (strtoulst (p, &p, 10)));
 
-	  while (*p && isspace (*p))
-	    p++;
+	  p = skip_spaces_const (p);
 	  if (*p == '(')
 	    {
 	      const char *ep = strchr (p, ')');
@@ -422,8 +418,7 @@ linux_info_proc (struct gdbarch *gdbarch, char *args,
 		}
 	    }
 
-	  while (*p && isspace (*p))
-	    p++;
+	  p = skip_spaces_const (p);
 	  if (*p)
 	    printf_filtered (_("State: %c\n"), *p++);
 
@@ -680,22 +675,22 @@ linux_find_memory_regions_full (struct gdbarch *gdbarch,
 				linux_find_memory_region_ftype *func,
 				void *obfd)
 {
-  char filename[100];
+  char mapsfilename[100];
   gdb_byte *data;
 
   /* We need to know the real target PID to access /proc.  */
   if (current_inferior ()->fake_pid_p)
     return 1;
 
-  xsnprintf (filename, sizeof filename,
+  xsnprintf (mapsfilename, sizeof mapsfilename,
 	     "/proc/%d/smaps", current_inferior ()->pid);
-  data = target_fileio_read_stralloc (filename);
+  data = target_fileio_read_stralloc (mapsfilename);
   if (data == NULL)
     {
       /* Older Linux kernels did not support /proc/PID/smaps.  */
-      xsnprintf (filename, sizeof filename,
+      xsnprintf (mapsfilename, sizeof mapsfilename,
 		 "/proc/%d/maps", current_inferior ()->pid);
-      data = target_fileio_read_stralloc (filename);
+      data = target_fileio_read_stralloc (mapsfilename);
     }
   if (data)
     {
@@ -725,20 +720,30 @@ linux_find_memory_regions_full (struct gdbarch *gdbarch,
 	       line = strtok (NULL, "\n"))
 	    {
 	      char keyword[64 + 1];
-	      unsigned long number;
 
-	      if (sscanf (line, "%64s%lu kB\n", keyword, &number) != 2)
+	      if (sscanf (line, "%64s", keyword) != 1)
 		{
-		  warning (_("Error parsing {s,}maps file '%s'"), filename);
+		  warning (_("Error parsing {s,}maps file '%s'"), mapsfilename);
 		  break;
 		}
 	      if (strcmp (keyword, "Anonymous:") == 0)
 		has_anonymous = 1;
-	      if (number != 0 && (strcmp (keyword, "Shared_Dirty:") == 0
-				  || strcmp (keyword, "Private_Dirty:") == 0
-				  || strcmp (keyword, "Swap:") == 0
-				  || strcmp (keyword, "Anonymous:") == 0))
-		modified = 1;
+	      if (strcmp (keyword, "Shared_Dirty:") == 0
+		  || strcmp (keyword, "Private_Dirty:") == 0
+		  || strcmp (keyword, "Swap:") == 0
+		  || strcmp (keyword, "Anonymous:") == 0)
+		{
+		  unsigned long number;
+
+		  if (sscanf (line, "%*s%lu", &number) != 1)
+		    {
+		      warning (_("Error parsing {s,}maps file '%s' number"),
+			       mapsfilename);
+		      break;
+		    }
+		  if (number != 0)
+		    modified = 1;
+		}
 	    }
 
 	  /* Older Linux kernels did not support the "Anonymous:" counter.

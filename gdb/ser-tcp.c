@@ -72,7 +72,7 @@ static int tcp_auto_retry = 1;
 
 /* Timeout period for connections, in seconds.  */
 
-static int tcp_retry_limit = 15;
+static unsigned int tcp_retry_limit = 15;
 
 /* How many times per second to poll deprecated_ui_loop_hook.  */
 
@@ -83,7 +83,7 @@ static int tcp_retry_limit = 15;
    Returns -1 on timeout or interrupt, otherwise the value of select.  */
 
 static int
-wait_for_connect (struct serial *scb, int *polls)
+wait_for_connect (struct serial *scb, unsigned int *polls)
 {
   struct timeval t;
   int n;
@@ -164,7 +164,7 @@ net_open (struct serial *scb, const char *name)
 #else
   int ioarg;
 #endif
-  int polls = 0, retval = -1;
+  unsigned int polls = 0, retval = -1;
   struct cleanup *back_to;
 
   memset (&hints, 0, sizeof hints);
@@ -436,8 +436,11 @@ Show auto-retry on socket connect"),
 
   add_setshow_uinteger_cmd ("connect-timeout", class_obscure,
 			    &tcp_retry_limit, _("\
-Set timeout limit for socket connection"), _("\
-Show timeout limit for socket connection"),
-			   NULL, NULL, NULL,
-			   &tcp_set_cmdlist, &tcp_show_cmdlist);
+Set timeout limit in seconds for socket connection"), _("\
+Show timeout limit in seconds for socket connection"), _("\
+If set to \"unlimited\", GDB will keep attempting to establish a\n\
+connection forever, unless interrupted with Ctrl-c.\n\
+The default is 15 seconds."),
+			    NULL, NULL,
+			    &tcp_set_cmdlist, &tcp_show_cmdlist);
 }

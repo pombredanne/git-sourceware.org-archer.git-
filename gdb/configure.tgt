@@ -6,6 +6,7 @@
 #  gdb_sim		simulator library for target
 #  gdb_osabi		default OS ABI to use with target
 #  build_gdbserver	set to "yes" if gdbserver supports target
+#  gdb_have_gcore	set to "true"/"false" if this target can run gcore
 
 # NOTE: Every file added to a gdb_target_obs variable for any target here
 #       must also be added to either ALL_TARGET_OBS or ALL_64_TARGET_OBS
@@ -139,7 +140,7 @@ frv-*-*)
 	gdb_sim=../sim/frv/libsim.a
 	;;
 
-moxie-*-elf)
+moxie-*-elf | moxie-*-rtems*)
 	gdb_target_obs="moxie-tdep.o"
 	gdb_sim=../sim/moxie/libsim.a
 	;;
@@ -418,7 +419,7 @@ powerpc-*-openbsd*)
 powerpc-*-aix* | rs6000-*-*)
 	# Target: PowerPC running AIX
 	gdb_target_obs="rs6000-tdep.o rs6000-aix-tdep.o xcoffread.o \
-			ppc-sysv-tdep.o solib-svr4.o \
+			ppc-sysv-tdep.o \
 			ravenscar-thread.o ppc-ravenscar-thread.o"
 	;;
 powerpc-*-linux* | powerpc64-*-linux*)
@@ -596,10 +597,11 @@ tic6x-*-*)
 	;;
 
 tilegx-*-linux*)
-        # Target: TILE-Gx
-        gdb_target_obs="tilegx-tdep.o tilegx-linux-tdep.o solib-svr4.o \
+	# Target: TILE-Gx
+	gdb_target_obs="tilegx-tdep.o tilegx-linux-tdep.o solib-svr4.o \
 			symfile-mem.o glibc-tdep.o linux-tdep.o"
-        ;;
+	build_gdbserver=yes
+	;;
 
 xstormy16-*-*)
 	# Target: Sanyo Xstormy16a processor
@@ -651,7 +653,7 @@ x86_64-*-freebsd* | x86_64-*-kfreebsd*-gnu)
 			i387-tdep.o i386bsd-tdep.o i386fbsd-tdep.o \
 			bsd-uthread.o solib-svr4.o"
 	;;
-x86_64-*-mingw*)
+x86_64-*-mingw* | x86_64-*-cygwin*)
         # Target: MingW/amd64
 	gdb_target_obs="amd64-tdep.o amd64-windows-tdep.o \
                         i386-tdep.o i386-cygwin-tdep.o i387-tdep.o \
@@ -702,3 +704,12 @@ m68*-*-openbsd* | m88*-*-openbsd* | vax-*-openbsd*) ;;
 *-*-symbianelf*)
 		gdb_osabi=GDB_OSABI_SYMBIAN ;;
 esac
+
+# Check whether this target supports gcore.
+# Such target has to call set_gdbarch_find_memory_regions.
+gdb_have_gcore=false
+for t in x ${gdb_target_obs}; do
+  if test "$t" = linux-tdep.o; then
+    gdb_have_gcore=true
+  fi
+done

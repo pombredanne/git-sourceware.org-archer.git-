@@ -24,6 +24,7 @@
 #include "symfile.h"		/* For struct psymbol_allocation_list.  */
 #include "progspace.h"
 #include "registry.h"
+#include "gdb_bfd.h"
 
 struct bcache;
 struct htab;
@@ -123,7 +124,7 @@ struct obj_section
 
 /* Relocation offset applied to S.  */
 #define obj_section_offset(s)						\
-  (((s)->objfile->section_offsets)->offsets[(s)->the_bfd_section->index])
+  (((s)->objfile->section_offsets)->offsets[gdb_bfd_section_index ((s)->objfile->obfd, (s)->the_bfd_section)])
 
 /* The memory address of section S (vma + offset).  */
 #define obj_section_addr(s)				      		\
@@ -259,11 +260,6 @@ struct objfile
 
     long mtime;
 
-    /* Cached 32-bit CRC as computed by gnu_debuglink_crc32.  CRC32 is valid
-       iff CRC32_P.  */
-    unsigned long crc32;
-    int crc32_p;
-
     /* Obstack to hold objects that should be freed when we load a new symbol
        table from this object file.  */
 
@@ -354,9 +350,10 @@ struct objfile
        among other things, is used to map pc addresses into sections.
        SECTIONS points to the first entry in the table, and
        SECTIONS_END points to the first location past the last entry
-       in the table.  The table is stored on the objfile_obstack.
-       There is no particular order to the sections in this table, and it
-       only contains sections we care about (e.g. non-empty, SEC_ALLOC).  */
+       in the table.  The table is stored on the objfile_obstack.  The
+       sections are indexed by the BFD section index; but the
+       structure data is only valid for certain sections
+       (e.g. non-empty, SEC_ALLOC).  */
 
     struct obj_section *sections, *sections_end;
 
@@ -517,7 +514,7 @@ extern void default_iterate_over_objfiles_in_search_order
 /* Traverse all object files in program space SS.  */
 
 #define ALL_PSPACE_OBJFILES(ss, obj)					\
-  for ((obj) = ss->objfiles; (obj) != NULL; (obj) = (obj)->next)	\
+  for ((obj) = ss->objfiles; (obj) != NULL; (obj) = (obj)->next)
 
 #define ALL_PSPACE_OBJFILES_SAFE(ss, obj, nxt)		\
   for ((obj) = ss->objfiles;			\
@@ -581,7 +578,12 @@ extern void default_iterate_over_objfiles_in_search_order
     ALL_OBJFILE_MSYMBOLS (objfile, m)
 
 #define ALL_OBJFILE_OSECTIONS(objfile, osect)	\
-  for (osect = objfile->sections; osect < objfile->sections_end; osect++)
+  for (osect = objfile->sections; osect < objfile->sections_end; osect++) \
+    if (osect->the_bfd_section == NULL)					\
+      {									\
+	/* Nothing.  */							\
+      }									\
+    else
 
 /* Traverse all obj_sections in all objfiles in the current program
    space.
@@ -617,9 +619,7 @@ extern void default_iterate_over_objfiles_in_search_order
 	? ((objfile) = (objfile)->next,					\
 	   (objfile) != NULL ? (osect) = (objfile)->sections_end : 0)	\
 	: 0))								\
-    for ((osect) = (objfile)->sections;					\
-	 (osect) < (objfile)->sections_end;				\
-	 (osect)++)
+    ALL_OBJFILE_OSECTIONS (objfile, osect)
 
 #define SECT_OFF_DATA(objfile) \
      ((objfile->sect_index_data == -1) \

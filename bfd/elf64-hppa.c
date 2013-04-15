@@ -194,9 +194,6 @@ static bfd_boolean elf64_hppa_finish_dynamic_symbol
   (bfd *, struct bfd_link_info *,
    struct elf_link_hash_entry *, Elf_Internal_Sym *);
 
-static enum elf_reloc_type_class elf64_hppa_reloc_type_class
-  (const Elf_Internal_Rela *);
-
 static bfd_boolean elf64_hppa_finish_dynamic_sections
   (bfd *, struct bfd_link_info *);
 
@@ -647,6 +644,9 @@ elf64_hppa_check_relocs (bfd *abfd,
 		 || hh->eh.root.type == bfd_link_hash_warning)
 	    hh = hppa_elf_hash_entry (hh->eh.root.u.i.link);
 
+	  /* PR15323, ref flags aren't set for references in the same
+	     object.  */
+	  hh->eh.root.non_ir_ref = 1;
 	  hh->eh.ref_regular = 1;
 	}
       else
@@ -2446,7 +2446,9 @@ elf64_hppa_finalize_dynreloc (struct elf_link_hash_entry *eh,
    dynamic linker, before writing them out.  */
 
 static enum elf_reloc_type_class
-elf64_hppa_reloc_type_class (const Elf_Internal_Rela *rela)
+elf64_hppa_reloc_type_class (const struct bfd_link_info *info ATTRIBUTE_UNUSED,
+			     const asection *rel_sec ATTRIBUTE_UNUSED,
+			     const Elf_Internal_Rela *rela)
 {
   if (ELF64_R_SYM (rela->r_info) == STN_UNDEF)
     return reloc_class_relative;
@@ -2591,10 +2593,10 @@ elf64_hppa_grok_prstatus (bfd *abfd, Elf_Internal_Note *note)
 
       case 760:		/* Linux/hppa */
 	/* pr_cursig */
-	elf_tdata (abfd)->core_signal = bfd_get_16 (abfd, note->descdata + 12);
+	elf_tdata (abfd)->core->signal = bfd_get_16 (abfd, note->descdata + 12);
 
 	/* pr_pid */
-	elf_tdata (abfd)->core_lwpid = bfd_get_32 (abfd, note->descdata + 32);
+	elf_tdata (abfd)->core->lwpid = bfd_get_32 (abfd, note->descdata + 32);
 
 	/* pr_reg */
 	offset = 112;
@@ -2620,16 +2622,16 @@ elf64_hppa_grok_psinfo (bfd *abfd, Elf_Internal_Note *note)
       return FALSE;
 
     case 136:		/* Linux/hppa elf_prpsinfo.  */
-      elf_tdata (abfd)->core_program
+      elf_tdata (abfd)->core->program
 	= _bfd_elfcore_strndup (abfd, note->descdata + 40, 16);
-      elf_tdata (abfd)->core_command
+      elf_tdata (abfd)->core->command
 	= _bfd_elfcore_strndup (abfd, note->descdata + 56, 80);
     }
 
   /* Note that for some reason, a spurious space is tacked
      onto the end of the args in some (at least one anyway)
      implementations, so strip it off if it exists.  */
-  command = elf_tdata (abfd)->core_command;
+  command = elf_tdata (abfd)->core->command;
   n = strlen (command);
 
   if (0 < n && command[n - 1] == ' ')
@@ -2687,7 +2689,7 @@ elf64_hppa_modify_segment_map (bfd *abfd,
   s = bfd_get_section_by_name (abfd, ".interp");
   if (! s)
     {
-      for (m = elf_tdata (abfd)->segment_map; m != NULL; m = m->next)
+      for (m = elf_seg_map (abfd); m != NULL; m = m->next)
 	if (m->p_type == PT_PHDR)
 	  break;
       if (m == NULL)
@@ -2703,12 +2705,12 @@ elf64_hppa_modify_segment_map (bfd *abfd,
 	  m->p_paddr_valid = 1;
 	  m->includes_phdrs = 1;
 
-	  m->next = elf_tdata (abfd)->segment_map;
-	  elf_tdata (abfd)->segment_map = m;
+	  m->next = elf_seg_map (abfd);
+	  elf_seg_map (abfd) = m;
 	}
     }
 
-  for (m = elf_tdata (abfd)->segment_map; m != NULL; m = m->next)
+  for (m = elf_seg_map (abfd); m != NULL; m = m->next)
     if (m->p_type == PT_LOAD)
       {
 	unsigned int i;
@@ -2772,7 +2774,7 @@ elf64_hppa_section_from_phdr (bfd *abfd, Elf_Internal_Phdr *hdr, int sec_index,
       if (bfd_bread (&sig, 4, abfd) != 4)
 	return FALSE;
 
-      elf_tdata (abfd)->core_signal = sig;
+      elf_tdata (abfd)->core->signal = sig;
 
       if (!_bfd_elf_make_section_from_phdr (abfd, hdr, sec_index, typename))
 	return FALSE;

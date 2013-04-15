@@ -100,6 +100,7 @@
 #include "regcache.h"
 #include "gdb_string.h"
 #include "top.h"
+#include "cli/cli-utils.h"
 
 #include <stdio.h>		/* might be required for __DJGPP_MINOR__ */
 #include <stdlib.h>
@@ -233,7 +234,7 @@ static int dr_ref_count[4];
 
 static int prog_has_started = 0;
 static void go32_open (char *name, int from_tty);
-static void go32_close (int quitting);
+static void go32_close (void);
 static void go32_attach (struct target_ops *ops, char *args, int from_tty);
 static void go32_detach (struct target_ops *ops, char *args, int from_tty);
 static void go32_resume (struct target_ops *ops,
@@ -369,7 +370,7 @@ go32_open (char *name, int from_tty)
 }
 
 static void
-go32_close (int quitting)
+go32_close (void)
 {
 }
 
@@ -1702,8 +1703,7 @@ go32_sldt (char *arg, int from_tty)
 
   if (arg && *arg)
     {
-      while (*arg && isspace(*arg))
-	arg++;
+      arg = skip_spaces (arg);
 
       if (*arg)
 	{
@@ -1773,8 +1773,7 @@ go32_sgdt (char *arg, int from_tty)
 
   if (arg && *arg)
     {
-      while (*arg && isspace(*arg))
-	arg++;
+      arg = skip_spaces (arg);
 
       if (*arg)
 	{
@@ -1815,8 +1814,7 @@ go32_sidt (char *arg, int from_tty)
 
   if (arg && *arg)
     {
-      while (*arg && isspace(*arg))
-	arg++;
+      arg = skip_spaces (arg);
 
       if (*arg)
 	{
@@ -1986,8 +1984,7 @@ go32_pde (char *arg, int from_tty)
 
   if (arg && *arg)
     {
-      while (*arg && isspace(*arg))
-	arg++;
+      arg = skip_spaces (arg);
 
       if (*arg)
 	{
@@ -2037,8 +2034,7 @@ go32_pte (char *arg, int from_tty)
 
   if (arg && *arg)
     {
-      while (*arg && isspace(*arg))
-	arg++;
+      arg = skip_spaces (arg);
 
       if (*arg)
 	{
@@ -2065,8 +2061,7 @@ go32_pte_for_address (char *arg, int from_tty)
 
   if (arg && *arg)
     {
-      while (*arg && isspace(*arg))
-	arg++;
+      arg = skip_spaces (arg);
 
       if (*arg)
 	addr = parse_and_eval_address (arg);

@@ -643,9 +643,6 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
     parent_pid = ptid_get_pid (inferior_ptid);
   child_pid = PIDGET (inferior_thread ()->pending_follow.value.related_pid);
 
-  if (!detach_fork)
-    linux_enable_event_reporting (pid_to_ptid (child_pid));
-
   if (has_vforked
       && !non_stop /* Non-stop always resumes both branches.  */
       && (!target_is_async_p () || sync_execution)
@@ -2316,7 +2313,6 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 	     this fork.  We're actually doing an infcall in
 	     linux-fork.c.  */
 	  ourstatus->kind = TARGET_WAITKIND_SPURIOUS;
-	  linux_enable_event_reporting (pid_to_ptid (new_pid));
 
 	  /* Report the stop to the core.  */
 	  return 0;
@@ -5022,14 +5018,14 @@ linux_nat_stop (ptid_t ptid)
 }
 
 static void
-linux_nat_close (int quitting)
+linux_nat_close (void)
 {
   /* Unregister from the event loop.  */
   if (linux_nat_is_async_p ())
     linux_nat_async (NULL, 0);
 
   if (linux_ops->to_close)
-    linux_ops->to_close (quitting);
+    linux_ops->to_close ();
 }
 
 /* When requests are passed down from the linux-nat layer to the

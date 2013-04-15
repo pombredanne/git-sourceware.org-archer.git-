@@ -2071,7 +2071,7 @@ generic_emit_char (int c, struct type *type, struct ui_file *stream,
   make_cleanup_obstack_free (&output);
 
   convert_between_encodings (INTERMEDIATE_ENCODING, host_charset (),
-			     obstack_base (&wchar_buf),
+			     (gdb_byte *) obstack_base (&wchar_buf),
 			     obstack_object_size (&wchar_buf),
 			     sizeof (gdb_wchar_t), &output, translit_char);
   obstack_1grow (&output, '\0');
@@ -2426,7 +2426,7 @@ generic_printstr (struct ui_file *stream, struct type *type,
   make_cleanup_obstack_free (&output);
 
   convert_between_encodings (INTERMEDIATE_ENCODING, host_charset (),
-			     obstack_base (&wchar_buf),
+			     (gdb_byte *) obstack_base (&wchar_buf),
 			     obstack_object_size (&wchar_buf),
 			     sizeof (gdb_wchar_t), &output, translit_char);
   obstack_1grow (&output, '\0');
@@ -2707,7 +2707,7 @@ _initialize_valprint (void)
 			    &user_print_options.print_max, _("\
 Set limit on string chars or array elements to print."), _("\
 Show limit on string chars or array elements to print."), _("\
-\"set print elements 0\" causes there to be no limit."),
+\"set print elements unlimited\" causes there to be no limit."),
 			    NULL,
 			    show_print_max,
 			    &setprintlist, &showprintlist);
@@ -2724,7 +2724,7 @@ Show printing of char arrays to stop at first null char."), NULL,
 			    &user_print_options.repeat_count_threshold, _("\
 Set threshold for repeated print elements."), _("\
 Show threshold for repeated print elements."), _("\
-\"set print repeats 0\" causes all elements to be individually printed."),
+\"set print repeats unlimited\" causes all elements to be individually printed."),
 			    NULL,
 			    show_repeat_count_threshold,
 			    &setprintlist, &showprintlist);
