@@ -1,3 +1,156 @@
+2013-04-16  Pedro Alves  <palves@redhat.com>
+	    Eli Zaretskii  <eliz@gnu.org>
+
+	* NEWS: Mention "set foo unlimited".
+
+2013-04-15  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (struct dwo_file): Replace member "cus" with "cu".
+	(struct create_dwo_cu_data): Renamed from create_dwo_info_table_data.
+	(create_dwo_cu_reader): Renamed from
+	create_dwo_debug_info_hash_table_reader.
+	(create_dwo_cu): Renamed from create_dwo_debug_info_hash_table.
+	Remove support for multiple CUs in a DWO file.
+	(open_and_init_dwo_file, lookup_dwo_cutu): Update.
+
+	* dwarf2read.c (create_debug_types_hash_table): Use hex_string
+	instead of phex.
+	(lookup_dwo_unit, create_dwo_debug_info_hash_table_reader): Ditto.
+	(create_dwo_in_dwp): Ditto.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* NEWS: Move recent entries into "since 7.6" section.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/13588:
+	* NEWS: Update.
+	* break-catch-throw.c (struct exception_catchpoint)
+	<exception_rx, pattern>: New fields.
+	(fetch_probe_arguments, dtor_exception_catchpoint)
+	(check_status_exception_catchpoint)
+	(print_one_detail_exception_catchpoint): New functions.
+	(handle_gnu_v3_exceptions): Add "except_rx" argument.
+	Compile regular expression if needed.
+	(extract_exception_regexp): New function.
+	(catch_exception_command_1): Use extract_exception_regexp.
+	(compute_exception): Use fetch_probe_arguments.
+	(initialize_throw_catchpoint_ops): Set dtor, print_one_detail,
+	and check_status fields.
+	* cp-abi.c (cplus_typename_from_type_info): New function.
+	* cp-abi.h (cplus_typename_from_type_info): Declare.
+	(struct cp_abi_ops) <get_typename_from_type_info>: New field.
+	* gdb_regex.h (compile_rx_or_error): Declare.
+	* gnu-v3-abi.c (gnuv3_get_typename_from_type_info): Update
+	comment.
+	(init_gnuv3_ops): Set get_type_from_type_info field.
+	* probe.c (compile_rx_or_error): Move...
+	* utils.c (compile_rx_or_error): ... here.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/15176:
+	* NEWS: Update.
+	* break-catch-throw.c (compute_exception): New function.
+	(exception_funcs): New global.
+	(_initialize_break_catch_throw): Create $_exception.
+	* cp-abi.c (cplus_type_from_type_info): New function.
+	* cp-abi.h (cplus_type_from_type_info): Declare.
+	(struct cp_abi_ops) <get_type_from_type_info>: New field.
+	* gnu-v3-abi.c (gnuv3_get_typename_from_type_info)
+	(gnuv3_get_type_from_type_info): New functions.
+	(init_gnuv3_ops): Set get_type_from_type_info ABI field.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* break-catch-throw.c (struct exception_names): New.
+	(exception_functions): Change type.
+	(re_set_exception_catchpoint): Look for SDT probes.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/10119:
+	* break-catch-throw.c (exception_functions): New global.
+	(gnu_v3_exception_catchpoint_ops): Move earlier.
+	(struct exception_catchpoint): New.
+	(classify_exception_breakpoint): Rewrite.
+	(re_set_exception_catchpoint): New function.
+	(handle_gnu_v3_exceptions): Return void.  Use init_catchpoint.
+	Allocate a struct exception_catchpoint.
+	(catch_exception_command_1): Update.
+	(initialize_throw_catchpoint_ops): Set 're_set' method.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (SFILES): Add break-catch-throw.c
+	(COMMON_OBS): Add break-catch-throw.o.
+	* break-catch-throw.c: New file.
+	* breakpoint.c: Move exception-catching code to new file.
+	(ep_parse_optional_if_clause): No longer static.
+	* breakpoint.h (ep_parse_optional_if_clause): Declare.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/9065:
+	* NEWS: Update.
+	* breakpoint.c (watchpoint_exp_is_const): Add OP_TYPEID.
+	* c-exp.y (TYPEID): New token.
+	(exp): Add new TYPEID productions.
+	(ident_tokens): Add "typeid".
+	* cp-abi.c (cplus_typeid, cplus_typeid_type): New functions.
+	* cp-abi.h (cplus_typeid, cplus_typeid_type): Declare.
+	(struct cp_abi_ops) <get_typeid, get_typeid_type>: New fields.
+	* eval.c (evaluate_subexp_standard) <OP_TYPEID>: New case.
+	* expprint.c (dump_subexp_body_standard) <OP_TYPEID>: New
+	case.
+	* gnu-v3-abi.c (std_type_info_gdbarch_data): New global.
+	(build_std_type_info_type, gnuv3_get_typeid_type)
+	(gnuv3_get_typeid): New functions.
+	(init_gnuv3_ops): Initialize std_type_info_gdbarch_data.  Set
+	new fields on ABI object.
+	* parse.c (operator_length_standard) <OP_TYPEID>: New case.
+	* std-operator.def (OP_TYPEID): New.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* elfread.c (elf_symtab_read): Install versioned symbol under
+	unversioned name as well.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/11990:
+	* c-lang.c (cplus_language_defn): Use gdb_demangle.
+	* c-typeprint.c (c_type_print_base): Use gdb_demangle.
+	* cp-support.c (mangled_name_to_comp): Use gdb_demangle.
+	(gdb_demangle): New function.
+	* cp-support.h (gdb_demangle): Declare.
+	* dwarf2read.c (dwarf2_physname, fixup_partial_die)
+	(dwarf2_name): Use gdb_demangle.
+	* gdbtypes.c (check_stub_method): Use gdb_demangle.
+	* gnu-v3-abi.c (gnuv3_rtti_type): Strip @plt and version
+	suffixes from name.
+	(gnuv3_print_method_ptr): Use gdb_demangle.
+	* jv-lang.c (java_demangle): Use gdb_demangle.
+	* jv-typeprint.c (java_type_print_base): Use gdb_demangle.
+	* language.c (unk_lang_demangle): Use gdb_demangle.
+	* symtab.c (symbol_find_demangled_name)
+	(demangle_for_lookup): Use gdb_demangle.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/12824:
+	* NEWS: Update.
+	* breakpoint.c (enum exception_event_kind) <EX_EVENT_RETHROW>:
+	New constant.
+	(classify_exception_breakpoint): New function.
+	(print_it_exception_catchpoint, print_one_exception_catchpoint)
+	(print_mention_exception_catchpoint)
+	(print_recreate_exception_catchpoint, handle_gnu_v3_exceptions)
+	(catch_exception_command_1): Handle "rethrow" catchpoint.
+	(catch_rethrow_command): New function.
+	(_initialize_breakpoint): Add "catch rethrow" command.
+
 2013-04-15  Pierre Muller  <muller@sourceware.org>
 
 	* contrib/ari/gdb_ari.sh (write_pc rule): Do not consider

@@ -4,6 +4,9 @@
 *** Changes since GDB 7.6
 
 * New commands:
+catch rethrow
+  Like "catch throw", but catches a re-thrown exception.
+
 show configuration
   Display the details of GDB configure-time options.
 
@@ -19,6 +22,12 @@ set remote trace-status-packet
 show remote trace-status-packet
   Set/show the use of remote protocol qTStatus packet.
 
+* You can now use a literal value 'unlimited' for options that
+  interpret 0 or -1 as meaning "unlimited".  E.g., "set
+  trace-buffer-size unlimited" is now an alias for "set
+  trace-buffer-size -1" and "set height unlimited" is now an alias for
+  "set height 0".
+
 * New command-line options
 --configuration
   Display the details of GDB configure-time options.
@@ -28,6 +37,14 @@ show remote trace-status-packet
 
 * Newly installed $prefix/bin/gcore acts as a shell interface for the
   GDB command gcore.
+
+* GDB now implements the the C++ 'typeid' operator.
+
+* The new convenience variable $_exception holds the exception being
+  thrown or caught at an exception-related catchpoint.
+
+* The exception-related catchpoints, like "catch throw", now accept a
+  regular expression which can be used to filter exceptions by type.
 
 * MI changes
 

@@ -1,7 +1,6 @@
-/* Portable <regex.h>.
-   Copyright (C) 2000-2013 Free Software Foundation, Inc.
+/* This testcase is part of GDB, the GNU debugger.
 
-   This file is part of GDB.
+   Copyright 2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,21 +15,51 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef GDB_REGEX_H
-#define GDB_REGEX_H 1
+template<typename T>
+void
+throwit (T val)
+{
+  throw val;
+}
 
-#ifdef USE_INCLUDED_REGEX
-# include "xregex.h"
-#else
-/* Request 4.2 BSD regex functions.  */
-# define _REGEX_RE_COMP
-# include <regex.h>
-#endif
+template<typename T>
+void
+rethrowit (T val)
+{
+  try
+    {
+      try
+	{
+	  throwit (val);
+	}
+      catch (...)
+	{
+	  throw;
+	}
+    }
+  catch (...)
+    {
+      // Ignore.
+    }
+}
 
-/* From utils.c.  */
-struct cleanup *make_regfree_cleanup (regex_t *);
-char *get_regcomp_error (int, regex_t *);
-struct cleanup *compile_rx_or_error (regex_t *pattern, const char *rx,
-				     const char *message);
+struct maude
+{
+  int mv;
 
-#endif /* not GDB_REGEX_H */
+  maude (int x) : mv (x) { }
+};
+
+int
+main (int argc, char **argv)
+{
+  maude mm (77);
+  maude &mmm (mm);
+
+  rethrowit ("hi bob");
+  rethrowit (23);
+  rethrowit (mm);
+  rethrowit (mmm);
+
+  return 0;
+}

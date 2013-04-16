@@ -4072,13 +4072,66 @@ shared library.  Use the @code{catch} command to set a catchpoint.
 @kindex catch
 @item catch @var{event}
 Stop when @var{event} occurs.  @var{event} can be any of the following:
-@table @code
-@item throw
-@cindex stop on C@t{++} exceptions
-The throwing of a C@t{++} exception.
 
-@item catch
-The catching of a C@t{++} exception.
+@table @code
+@item throw @r{[}@var{regexp}@r{]}
+@itemx rethrow @r{[}@var{regexp}@r{]}
+@itemx catch @r{[}@var{regexp}@r{]}
+@cindex stop on C@t{++} exceptions
+The throwing, re-throwing, or catching of a C@t{++} exception.
+
+If @var{regexp} is given, then only exceptions whose type matches the
+regular expression will be caught.
+
+@vindex $_exception@r{, convenience variable}
+The convenience variable @code{$_exception} is available at an
+exception-related catchpoint, on some systems.  This holds the
+exception being thrown.
+
+There are currently some limitations to C@t{++} exception handling in
+@value{GDBN}:
+
+@itemize @bullet
+@item
+The support for these commands is system-dependent.  Currently, only
+systems using the @samp{gnu-v3} C@t{++} ABI (@pxref{ABI}) are
+supported.
+
+@item
+The regular expression feature and the @code{$_exception} convenience
+variable rely on the presence of some SDT probes in @code{libstdc++}.
+If these probes are not present, then these features cannot be used.
+These probes were first available in the GCC 4.8 release, but whether
+or not they are available in your GCC also depends on how it was
+built.
+
+@item
+The @code{$_exception} convenience variable is only valid at the
+instruction at which an exception-related catchpoint is set.
+
+@item
+When an exception-related catchpoint is hit, @value{GDBN} stops at a
+location in the system library which implements runtime exception
+support for C@t{++}, usually @code{libstdc++}.  You can use @code{up}
+(@pxref{Selection}) to get to your code.
+
+@item
+If you call a function interactively, @value{GDBN} normally returns
+control to you when the function has finished executing.  If the call
+raises an exception, however, the call may bypass the mechanism that
+returns control to you and cause your program either to abort or to
+simply continue running until it hits a breakpoint, catches a signal
+that @value{GDBN} is listening for, or exits.  This is the case even if
+you set a catchpoint for the exception; catchpoints on exceptions are
+disabled within interactive calls.  @xref{Calling}, for information on
+controlling this with @code{set unwind-on-terminating-exception}.
+
+@item
+You cannot raise an exception interactively.
+
+@item
+You cannot install an exception handler interactively.
+@end itemize
 
 @item exception
 @cindex Ada exception catching
@@ -4287,57 +4340,6 @@ automatically deleted after the first time the event is caught.
 @end table
 
 Use the @code{info break} command to list the current catchpoints.
-
-There are currently some limitations to C@t{++} exception handling
-(@code{catch throw} and @code{catch catch}) in @value{GDBN}:
-
-@itemize @bullet
-@item
-If you call a function interactively, @value{GDBN} normally returns
-control to you when the function has finished executing.  If the call
-raises an exception, however, the call may bypass the mechanism that
-returns control to you and cause your program either to abort or to
-simply continue running until it hits a breakpoint, catches a signal
-that @value{GDBN} is listening for, or exits.  This is the case even if
-you set a catchpoint for the exception; catchpoints on exceptions are
-disabled within interactive calls.
-
-@item
-You cannot raise an exception interactively.
-
-@item
-You cannot install an exception handler interactively.
-@end itemize
-
-@cindex raise exceptions
-Sometimes @code{catch} is not the best way to debug exception handling:
-if you need to know exactly where an exception is raised, it is better to
-stop @emph{before} the exception handler is called, since that way you
-can see the stack before any unwinding takes place.  If you set a
-breakpoint in an exception handler instead, it may not be easy to find
-out where the exception was raised.
-
-To stop just before an exception handler is called, you need some
-knowledge of the implementation.  In the case of @sc{gnu} C@t{++}, exceptions are
-raised by calling a library function named @code{__raise_exception}
-which has the following ANSI C interface:
-
-@smallexample
-    /* @var{addr} is where the exception identifier is stored.
-       @var{id} is the exception identifier.  */
-    void __raise_exception (void **addr, void *id);
-@end smallexample
-
-@noindent
-To make the debugger catch all exceptions before any stack
-unwinding takes place, set a breakpoint on @code{__raise_exception}
-(@pxref{Breakpoints, ,Breakpoints; Watchpoints; and Exceptions}).
-
-With a conditional breakpoint (@pxref{Conditions, ,Break Conditions})
-that depends on the value of @var{id}, you can stop your program when
-a specific exception is raised.  You can use multiple conditional
-breakpoints to stop your program when any of a number of exceptions are
-raised.
 
 
 @node Delete Breaks
@@ -9528,6 +9530,10 @@ to match the format in which the data was printed.
 The variable @code{$_exitcode} is automatically set to the exit code when
 the program being debugged terminates.
 
+@item $_exception
+The variable @code{$_exception} is set to the exception object being
+thrown at an exception-related catchpoint.  @xref{Set Catchpoints}.
+
 @item $_probe_argc
 @itemx $_probe_arg0@dots{}$_probe_arg11
 Arguments to a static probe.  @xref{Static Probe Points}.
@@ -13538,6 +13544,7 @@ classes.
 
 @cindex C@t{++} exception handling
 @item catch throw
+@itemx catch rethrow
 @itemx catch catch
 Debug C@t{++} exception handling using these commands.  @xref{Set
 Catchpoints, , Setting Catchpoints}.
