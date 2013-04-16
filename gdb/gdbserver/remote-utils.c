@@ -283,13 +283,13 @@ remote_prepare (const char *name)
     {
       int i;
 
-printf("ai_family=%d,ai_socktype=%d\n",addrinfo->ai_family,addrinfo->ai_socktype);
       listen_desc = socket (addrinfo->ai_family, addrinfo->ai_socktype,
 			    addrinfo->ai_protocol);
       if (listen_desc == -1)
 	{
 	  if (addrinfo->ai_next != NULL)
 	    continue;
+	  freeaddrinfo (addrinfo_base);
 	  perror_with_name ("Can't open socket");
 	}
 
@@ -305,11 +305,13 @@ printf("ai_family=%d,ai_socktype=%d\n",addrinfo->ai_family,addrinfo->ai_socktype
 	      close (listen_desc);
 	      continue;
 	    }
+	  freeaddrinfo (addrinfo_base);
 	  perror_with_name ("Can't bind address");
 	}
       break;
     }
 
+  freeaddrinfo (addrinfo_base);
   transport_is_reliable = 1;
 }
 

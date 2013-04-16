@@ -259,6 +259,8 @@ remote_open (char *name)
       break;
     }
 
+  freeaddrinfo (addrinfo_base);
+
   socklen = sizeof (sockaddr);
   remote_desc = accept (tmp_desc, (struct sockaddr *) &sockaddr, &socklen);
   if (remote_desc == -1)

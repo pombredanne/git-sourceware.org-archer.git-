@@ -331,11 +331,8 @@ net_open (struct serial *scb, const char *name)
   strncpy (hostname, name, tmp);	/* Don't want colon.  */
   hostname[tmp] = '\000';	/* Tie off host name.  */
 
-  /* Default hostname is localhost.  */
-  if (!hostname[0])
-    strcpy (hostname, "localhost");
-
-  n = getaddrinfo (hostname, port_str, &hints, &addrinfo_base);
+  n = getaddrinfo (hostname[0] == 0 ? NULL : hostname, port_str, &hints,
+		   &addrinfo_base);
   if (n != 0)
     {
       fprintf_unfiltered (gdb_stderr, _("%s:%s: cannot resolve: %s\n"),
