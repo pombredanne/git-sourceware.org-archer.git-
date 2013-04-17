@@ -222,9 +222,9 @@ set expected_range "3\tinc\r
 9\tinc\r"
 
 # show functions in instruction range
-gdb_test "record function-call-history 3,10" $expected_range "absolute instruction range"
+gdb_test "record function-call-history 3,9" $expected_range "absolute instruction range"
 gdb_test "record function-call-history 3,+7" $expected_range "relative positive instruction range"
-gdb_test "record function-call-history 10,-7" $expected_range "relative negative instruction range"
+gdb_test "record function-call-history 9,-7" $expected_range "relative negative instruction range"
 
 # set bp after fib recursion and continue
 set bp_location [gdb_get_line_number "bp.2" $testfile.c]
