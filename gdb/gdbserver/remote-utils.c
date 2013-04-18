@@ -267,17 +267,18 @@ remote_prepare (const char *name)
   hostname = xstrdup (name);
   hostname[port_str - name] = 0;
   port_str++;
-  if (*hostname == 0)
-    hostname = NULL;
 
-  n = getaddrinfo (hostname, port_str, &hints, &addrinfo_base);
+  n = getaddrinfo (hostname[0] == 0 ? NULL : hostname, port_str, &hints,
+		   &addrinfo_base);
   if (n != 0)
     {
       fprintf (stderr, _("%s:%s: cannot resolve: %s\n"),
 	       hostname, port_str, gai_strerror (n));
+      xfree (hostname);
       transport_is_reliable = 0;
       return;
     }
+  xfree (hostname);
 
   for (addrinfo = addrinfo_base; addrinfo != NULL; addrinfo = addrinfo->ai_next)
     {

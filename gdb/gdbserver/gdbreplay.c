@@ -221,8 +221,9 @@ remote_open (char *name)
   hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG | AI_PASSIVE;
   hints.ai_socktype = SOCK_STREAM;
 
-  *port_str = 0;
-  n = getaddrinfo (name, port_str, &hints, &addrinfo_base);
+  *port_str++ = 0;
+  n = getaddrinfo (name[0] == 0 ? NULL : name, port_str, &hints,
+		   &addrinfo_base);
   if (n != 0)
     {
       fprintf (stderr, "%s:%s: cannot resolve: %s\n",

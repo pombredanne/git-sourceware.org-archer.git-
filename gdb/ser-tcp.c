@@ -311,7 +311,7 @@ net_open (struct serial *scb, const char *name)
 
   memset (&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
-  hints.ai_flags = AI_ADDRCONFIG;
+  hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG;
   hints.ai_socktype = SOCK_STREAM;
   if (strncmp (name, "udp:", 4) == 0)
     {
@@ -331,6 +331,7 @@ net_open (struct serial *scb, const char *name)
   strncpy (hostname, name, tmp);	/* Don't want colon.  */
   hostname[tmp] = '\000';	/* Tie off host name.  */
 
+  port_str++;
   n = getaddrinfo (hostname[0] == 0 ? NULL : hostname, port_str, &hints,
 		   &addrinfo_base);
   if (n != 0)
