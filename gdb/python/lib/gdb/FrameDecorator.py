@@ -46,10 +46,10 @@ class FrameDecorator(object):
 
     # 'base' can refer to a gdb.Frame or another frame decorator.  In
     # the latter case, the child class will have called the super
-    # method and base will be an object conforming to the Frame Filter
+    # method and _base will be an object conforming to the Frame Filter
     # class.
     def __init__(self, base):
-        self.base = base
+        self._base = base
 
     @staticmethod
     def _is_limited_frame(frame):
@@ -68,8 +68,8 @@ class FrameDecorator(object):
     def elided(self):
         """Return any elided frames that this class might be
         wrapping, or None."""
-        if hasattr(self.base, "elided"):
-            return self.base.elided()
+        if hasattr(self._base, "elided"):
+            return self._base.elided()
 
         return None
 
@@ -85,11 +85,11 @@ class FrameDecorator(object):
 
         # Both gdb.Frame, and FrameDecorator have a method called
         # "function", so determine which object this is.
-        if not isinstance(self.base, gdb.Frame):
-            if hasattr(self.base, "function"):
+        if not isinstance(self._base, gdb.Frame):
+            if hasattr(self._base, "function"):
                 # If it is not a gdb.Frame, and there is already a
                 # "function" method, use that.
-                return self.base.function()
+                return self._base.function()
 
         frame = self.inferior_frame()
 
@@ -113,8 +113,8 @@ class FrameDecorator(object):
     def address(self):
         """ Return the address of the frame's pc"""
 
-        if hasattr(self.base, "address"):
-            return self.base.address()
+        if hasattr(self._base, "address"):
+            return self._base.address()
 
         frame = self.inferior_frame()
         return frame.pc()
@@ -124,8 +124,8 @@ class FrameDecorator(object):
         and returning the appropriate library name is this is a shared
         library."""
 
-        if hasattr(self.base, "filename"):
-            return self.base.filename()
+        if hasattr(self._base, "filename"):
+            return self._base.filename()
 
         frame = self.inferior_frame()
         sal = frame.find_sal()
@@ -141,8 +141,8 @@ class FrameDecorator(object):
         Symbol/Value interface.  If there are no frame arguments, or
         if this frame is deemed to be a special case, return None."""
 
-        if hasattr(self.base, "frame_args"):
-            return self.base.frame_args()
+        if hasattr(self._base, "frame_args"):
+            return self._base.frame_args()
 
         frame = self.inferior_frame()
         if self._is_limited_frame(frame):
@@ -157,8 +157,8 @@ class FrameDecorator(object):
         Symbol/Value interface.  If there are no frame locals, or if
         this frame is deemed to be a special case, return None."""
 
-        if hasattr(self.base, "frame_locals"):
-            return self.base.frame_locals()
+        if hasattr(self._base, "frame_locals"):
+            return self._base.frame_locals()
 
         frame = self.inferior_frame()
         if self._is_limited_frame(frame):
@@ -172,8 +172,8 @@ class FrameDecorator(object):
         pc.  If symbol table/line information does not exist, or if
         this frame is deemed to be a special case, return None"""
 
-        if hasattr(self.base, "line"):
-            return self.base.line()
+        if hasattr(self._base, "line"):
+            return self._base.line()
 
         frame = self.inferior_frame()
         if self._is_limited_frame(frame):
@@ -189,10 +189,10 @@ class FrameDecorator(object):
         """ Return the gdb.Frame underpinning this frame decorator."""
 
         # If 'base' is a frame decorator, we want to call its inferior
-        # frame method.  If 'base' is a gdb.Frame, just return that.
-        if hasattr(self.base, "inferior_frame"):
-            return self.base.inferior_frame()
-        return self.base
+        # frame method.  If '_base' is a gdb.Frame, just return that.
+        if hasattr(self._base, "inferior_frame"):
+            return self._base.inferior_frame()
+        return self._base
 
 class SymValueWrapper(object):
     """A container class conforming to the Symbol/Value interface
