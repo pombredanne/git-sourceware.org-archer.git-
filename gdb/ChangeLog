@@ -1,3 +1,57 @@
+2013-04-17  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (struct signatured_type): New member type.
+	(struct attribute): Replace member signatured_type with signature.
+	(DW_SIGNATURE): Replaces DW_SIGNATURE_TYPE.
+	(read_call_site_scope): Call follow_die_ref instead of
+	follow_die_ref_or_sig.
+	(read_structure_type): Rewrite handling of signatured types.
+	(read_enumeration_type): Ditto.
+	(read_attribute_value): Update.
+	(build_error_marker_type): New function.
+	(lookup_die_type): Add assert.  Rewrite handling of signatured types.
+	Don't call error for bad types, just build an error marker type.
+	(dump_die_shallow): Update.
+	(follow_die_sig_1): Renamed from follow_die_sig.
+	Don't call error for bad types, instead return NULL.
+	(follow_die_sig): New function.
+	(get_signatured_type, get_DW_AT_signature_type): New functions.
+
+2013-04-17  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-tdep.c (aarch64_write_pc): Removed.
+	(aarch64_gdbarch_init): Remove set_gdbarch_write_pc of the above
+	function.
+
+2013-04-17  Yao Qi  <yao@codesourcery.com>
+
+	* top.c (print_gdb_configuration): Print configure-time
+	parameter on using libbabeltrace or not.
+
+2013-04-16  Pedro Alves  <palves@redhat.com>
+
+	* copyright.py (EXCLUDE_LIST): Add gdb/common/glibc_thread_db.h.
+
+2013-04-16  Pedro Alves  <palves@redhat.com>
+
+	* common/glibc_thread_db.h: Update from upstream glibc
+	(git 568035b7874a099087b77f7bba3e36a1173787b0).
+
+2013-04-16  Pedro Alves  <palves@redhat.com>
+
+	* common/gdb_thread_db.h [!HAVE_THREAD_DB_H]: Factor out to ...
+	* common/glibc_thread_db.h: ... this new file ...
+	* common/gdb_thread_db.h [!HAVE_THREAD_DB_H]: ... and include it.
+
+2013-04-16  Will Newton  <will.newton@gmail.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	PR build/11881
+
+	* common/gdb_thread_db.h (LIBTHREAD_DB_SO)
+	(LIBTHREAD_DB_SEARCH_PATH): Move outside of #ifdef
+	HAVE_THREAD_DB_H.
+
 2013-04-16  Pedro Alves  <palves@redhat.com>
 	    Eli Zaretskii  <eliz@gnu.org>
 

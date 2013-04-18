@@ -1,3 +1,25 @@
+2013-04-17  Pedro Alves  <palves@redhat.com>
+
+	* configure.ac (USE_THREAD_DB): Delete variable.
+	(if test "$srv_linux_thread_db" = "yes"): AC_DEFINE USE_THREAD_DB.
+	Don't AC_SUBST USE_THREAD_DB.
+	* Makefile.in (INTERNAL_CFLAGS): Remove @USE_THREAD_DB@.
+	* config.in, configure: Regenerate.
+
+2013-04-16  Pedro Alves  <palves@redhat.com>
+
+	* linux-low.h (struct lwp_info) <thread_known>: Move under
+	the USE_THREAD_DB #ifdef.
+
+2013-04-16  Pedro Alves  <palves@redhat.com>
+
+	* Makefile.in (INTERNAL_CFLAGS): Add @USE_THREAD_DB@.
+	(linux-low.o): Delete rule.
+	* linux-low.h: Always include "gdb_thread_db.h" instead of
+	conditionally including thread_db.h.
+	(struct lwp_info) <th>: Guard with #ifdef USE_THREAD_DB instead of
+	HAVE_THREAD_DB_H.
+
 2013-04-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
 
 	* Makefile.in (install-only): Fix make install regression.

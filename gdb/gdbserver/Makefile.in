@@ -559,11 +559,6 @@ vsnprintf.o: $(srcdir)/../../libiberty/vsnprintf.c
 	$(POSTCOMPILE)
 
 i386_low_h = $(srcdir)/i386-low.h
-
-linux-low.o: linux-low.c
-	$(COMPILE) $< @USE_THREAD_DB@
-	$(POSTCOMPILE)
-
 win32_low_h = $(srcdir)/win32-low.h
 
 aarch64.c : $(srcdir)/../regformats/aarch64.dat $(regdat_sh)
