@@ -109,6 +109,9 @@ extern struct cleanup *make_cleanup_value_free (struct value *);
 struct so_list;
 extern struct cleanup *make_cleanup_free_so (struct so_list *so);
 
+struct addrinfo;
+extern struct cleanup *make_cleanup_freeaddrinfo (struct addrinfo *addrinfo);
+
 extern struct cleanup *make_cleanup_restore_current_language (void);
 
 extern struct cleanup *make_cleanup_htab_delete (htab_t htab);

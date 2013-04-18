@@ -183,86 +183,129 @@ remote_close (void)
 #endif
 }
 
+/* Bind new socket to first address from the ADDRINFO_BASE list matching
+   FAMILY.  Return -1 otherwise.  */
+
+static int
+bind_socket (struct addrinfo *addrinfo_base, int family)
+{
+  struct addrinfo *addrinfo;
+
+  for (addrinfo = addrinfo_base; addrinfo != NULL; addrinfo = addrinfo->ai_next)
+    {
+      int i, fd;
+
+      if (addrinfo->ai_family != family)
+	continue;
+
+      fd = socket (addrinfo->ai_family, addrinfo->ai_socktype,
+		   addrinfo->ai_protocol);
+      if (fd == -1)
+	continue;
+
+      /* Allow rapid reuse of this port. */
+      i = 1;
+      setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &i, sizeof (i));
+
+      if (bind (fd, addrinfo->ai_addr, addrinfo->ai_addrlen) == 0
+	  && listen (fd, 1) == 0)
+	return fd;
+
+      close (fd);
+    }
+
+  return -1;
+}
+
 /* Open a connection to a remote debugger.
    NAME is the filename used for communication.  */
 
 static void
 remote_open (char *name)
 {
-  if (!strchr (name, ':'))
+  char *port_str = strrchr (name, ':');
+#ifdef USE_WIN32API
+  static int winsock_initialized;
+#endif
+  struct sockaddr sockaddr;
+  socklen_t socklen;
+  int tmp_desc, n, i;
+  struct addrinfo hints;
+  struct addrinfo *addrinfo_base;
+
+  if (port_str == NULL)
     {
       fprintf (stderr, "%s: Must specify tcp connection as host:addr\n", name);
       fflush (stderr);
       exit (1);
     }
-  else
+
+#ifdef USE_WIN32API
+  if (!winsock_initialized)
     {
-#ifdef USE_WIN32API
-      static int winsock_initialized;
-#endif
-      char *port_str;
-      int port;
-      struct sockaddr_in sockaddr;
-      socklen_t tmp;
-      int tmp_desc;
+      WSADATA wsad;
 
-      port_str = strchr (name, ':');
-
-      port = atoi (port_str + 1);
-
-#ifdef USE_WIN32API
-      if (!winsock_initialized)
-	{
-	  WSADATA wsad;
-
-	  WSAStartup (MAKEWORD (1, 0), &wsad);
-	  winsock_initialized = 1;
-	}
+      WSAStartup (MAKEWORD (1, 0), &wsad);
+      winsock_initialized = 1;
+    }
 #endif
 
-      tmp_desc = socket (PF_INET, SOCK_STREAM, 0);
-      if (tmp_desc == -1)
-	perror_with_name ("Can't open socket");
+  memset (&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_flags = AI_PASSIVE;
+  hints.ai_socktype = SOCK_STREAM;
 
-      /* Allow rapid reuse of this port. */
-      tmp = 1;
-      setsockopt (tmp_desc, SOL_SOCKET, SO_REUSEADDR, (char *) &tmp,
-		  sizeof (tmp));
+  /* Strip also optional square brackets for IPv6 numeric address.  */
+  if (*name == '[')
+    name++;
+  if (port_str > name && port_str[-1] == ']')
+    port_str[-1] = 0;
+  *port_str++ = 0;
 
-      sockaddr.sin_family = PF_INET;
-      sockaddr.sin_port = htons (port);
-      sockaddr.sin_addr.s_addr = INADDR_ANY;
+  n = getaddrinfo (name[0] == 0 ? NULL : name, port_str, &hints,
+		   &addrinfo_base);
+  if (n != 0)
+    {
+      fprintf (stderr, "%s:%s: cannot resolve: %s\n",
+	       name, port_str, gai_strerror (n));
+      exit (1);
+    }
 
-      if (bind (tmp_desc, (struct sockaddr *) &sockaddr, sizeof (sockaddr))
-	  || listen (tmp_desc, 1))
-	perror_with_name ("Can't bind address");
+  /* IPV6_V6ONLY false is assumed here - that AF_INET6 binds to both IPv6 and
+     IPv4 address.  getaddrinfo in glibc unfortunately returns AF_INET as the
+     first entry.  */
+  errno = 0;
+  tmp_desc = bind_socket (addrinfo_base, AF_INET6);
+  if (tmp_desc == -1)
+    tmp_desc = bind_socket (addrinfo_base, AF_INET);
+  if (tmp_desc == -1)
+    perror_with_name ("Can't bind socket");
 
-      tmp = sizeof (sockaddr);
-      remote_desc = accept (tmp_desc, (struct sockaddr *) &sockaddr, &tmp);
-      if (remote_desc == -1)
-	perror_with_name ("Accept failed");
+  freeaddrinfo (addrinfo_base);
 
-      /* Enable TCP keep alive process. */
-      tmp = 1;
-      setsockopt (tmp_desc, SOL_SOCKET, SO_KEEPALIVE,
-		  (char *) &tmp, sizeof (tmp));
+  socklen = sizeof (sockaddr);
+  remote_desc = accept (tmp_desc, &sockaddr, &socklen);
+  if (remote_desc == -1)
+    perror_with_name ("Accept failed");
 
-      /* Tell TCP not to delay small packets.  This greatly speeds up
-	 interactive response. */
-      tmp = 1;
-      setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY,
-		  (char *) &tmp, sizeof (tmp));
+  /* Enable TCP keep alive process. */
+  i = 1;
+  setsockopt (tmp_desc, SOL_SOCKET, SO_KEEPALIVE, &i, sizeof (i));
+
+  /* Tell TCP not to delay small packets.  This greatly speeds up
+     interactive response. */
+  i = 1;
+  setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY, &i, sizeof (i));
 
 #ifndef USE_WIN32API
-      close (tmp_desc);		/* No longer need this */
+  close (tmp_desc);		/* No longer need this */
 
-      signal (SIGPIPE, SIG_IGN);	/* If we don't do this, then
-					   gdbreplay simply exits when
-					   the remote side dies.  */
+  signal (SIGPIPE, SIG_IGN);	/* If we don't do this, then
+				   gdbreplay simply exits when
+				   the remote side dies.  */
 #else
-      closesocket (tmp_desc);	/* No longer need this */
+  closesocket (tmp_desc);	/* No longer need this */
 #endif
-    }
 
 #if defined(F_SETFL) && defined (FASYNC)
   fcntl (remote_desc, F_SETFL, FASYNC);
