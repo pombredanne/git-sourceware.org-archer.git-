@@ -40,13 +40,23 @@ AC_DEFUN([gl_EARLY],
   AC_REQUIRE([gl_PROG_AR_RANLIB])
   # Code from module alloca:
   # Code from module alloca-opt:
+  # Code from module arpa_inet:
+  # Code from module c-ctype:
   # Code from module configmake:
+  # Code from module errno:
   # Code from module extensions:
   AC_REQUIRE([gl_USE_SYSTEM_EXTENSIONS])
   # Code from module extern-inline:
+  # Code from module fd-hook:
+  # Code from module float:
   # Code from module fnmatch:
   # Code from module fnmatch-gnu:
+  # Code from module getaddrinfo:
+  # Code from module gettext-h:
+  # Code from module hostent:
   # Code from module include_next:
+  # Code from module inet_ntop:
+  # Code from module inet_pton:
   # Code from module inttypes:
   # Code from module inttypes-incomplete:
   # Code from module localcharset:
@@ -56,20 +66,39 @@ AC_DEFUN([gl_EARLY],
   # Code from module memchr:
   # Code from module memmem:
   # Code from module memmem-simple:
+  # Code from module msvc-inval:
+  # Code from module msvc-nothrow:
   # Code from module multiarch:
+  # Code from module netdb:
+  # Code from module netinet_in:
+  # Code from module servent:
+  # Code from module size_max:
   # Code from module snippet/arg-nonnull:
   # Code from module snippet/c++defs:
   # Code from module snippet/warn-on-use:
+  # Code from module snprintf:
+  # Code from module socketlib:
+  # Code from module sockets:
+  # Code from module socklen:
+  # Code from module ssize_t:
+  # Code from module stdalign:
   # Code from module stdbool:
   # Code from module stddef:
   # Code from module stdint:
+  # Code from module stdio:
   # Code from module streq:
   # Code from module string:
   # Code from module strnlen1:
+  # Code from module sys_socket:
+  # Code from module sys_types:
+  # Code from module sys_uio:
+  # Code from module unistd:
   # Code from module update-copyright:
+  # Code from module vasnprintf:
   # Code from module verify:
   # Code from module wchar:
   # Code from module wctype-h:
+  # Code from module xsize:
 ])
 
 # This macro should be invoked from ./configure.ac, in the section
@@ -89,8 +118,18 @@ AC_DEFUN([gl_INIT],
   gl_COMMON
   gl_source_base='import'
   gl_FUNC_ALLOCA
+  gl_HEADER_ARPA_INET
+  AC_PROG_MKDIR_P
   gl_CONFIGMAKE_PREP
+  gl_HEADER_ERRNO_H
   AC_REQUIRE([gl_EXTERN_INLINE])
+  gl_FLOAT_H
+  if test $REPLACE_FLOAT_LDBL = 1; then
+    AC_LIBOBJ([float])
+  fi
+  if test $REPLACE_ITOLD = 1; then
+    AC_LIBOBJ([itold])
+  fi
   gl_FUNC_FNMATCH_POSIX
   if test -n "$FNMATCH_H"; then
     AC_LIBOBJ([fnmatch])
@@ -101,6 +140,29 @@ AC_DEFUN([gl_INIT],
     AC_LIBOBJ([fnmatch])
     gl_PREREQ_FNMATCH
   fi
+  gl_GETADDRINFO
+  if test $HAVE_GETADDRINFO = 0; then
+    AC_LIBOBJ([getaddrinfo])
+  fi
+  if test $HAVE_DECL_GAI_STRERROR = 0 || test $REPLACE_GAI_STRERROR = 1; then
+    AC_LIBOBJ([gai_strerror])
+  fi
+  gl_NETDB_MODULE_INDICATOR([getaddrinfo])
+  AC_SUBST([LIBINTL])
+  AC_SUBST([LTLIBINTL])
+  gl_HOSTENT
+  gl_FUNC_INET_NTOP
+  if test $HAVE_INET_NTOP = 0 || test $REPLACE_INET_NTOP = 1; then
+    AC_LIBOBJ([inet_ntop])
+    gl_PREREQ_INET_NTOP
+  fi
+  gl_ARPA_INET_MODULE_INDICATOR([inet_ntop])
+  gl_FUNC_INET_PTON
+  if test $HAVE_INET_PTON = 0 || test $REPLACE_INET_NTOP = 1; then
+    AC_LIBOBJ([inet_pton])
+    gl_PREREQ_INET_PTON
+  fi
+  gl_ARPA_INET_MODULE_INDICATOR([inet_pton])
   gl_INTTYPES_H
   gl_INTTYPES_INCOMPLETE
   gl_LOCALCHARSET
@@ -140,13 +202,44 @@ AC_DEFUN([gl_INIT],
     AC_LIBOBJ([memmem])
   fi
   gl_STRING_MODULE_INDICATOR([memmem])
+  gl_MSVC_INVAL
+  if test $HAVE_MSVC_INVALID_PARAMETER_HANDLER = 1; then
+    AC_LIBOBJ([msvc-inval])
+  fi
+  gl_MSVC_NOTHROW
+  if test $HAVE_MSVC_INVALID_PARAMETER_HANDLER = 1; then
+    AC_LIBOBJ([msvc-nothrow])
+  fi
   gl_MULTIARCH
+  gl_HEADER_NETDB
+  gl_HEADER_NETINET_IN
+  AC_PROG_MKDIR_P
+  gl_SERVENT
+  gl_SIZE_MAX
+  gl_FUNC_SNPRINTF
+  gl_STDIO_MODULE_INDICATOR([snprintf])
+  gl_MODULE_INDICATOR([snprintf])
+  gl_SOCKETLIB
+  gl_SOCKETS
+  gl_TYPE_SOCKLEN_T
+  gt_TYPE_SSIZE_T
+  gl_STDALIGN_H
   AM_STDBOOL_H
   gl_STDDEF_H
   gl_STDINT_H
+  gl_STDIO_H
   gl_HEADER_STRING_H
+  gl_HEADER_SYS_SOCKET
+  AC_PROG_MKDIR_P
+  gl_SYS_TYPES_H
+  AC_PROG_MKDIR_P
+  gl_HEADER_SYS_UIO
+  AC_PROG_MKDIR_P
+  gl_UNISTD_H
+  gl_FUNC_VASNPRINTF
   gl_WCHAR_H
   gl_WCTYPE_H
+  gl_XSIZE
   # End of code from modules
   m4_ifval(gl_LIBSOURCES_LIST, [
     m4_syscmd([test ! -d ]m4_defn([gl_LIBSOURCES_DIR])[ ||
@@ -293,11 +386,27 @@ AC_DEFUN([gl_FILE_LIST], [
   build-aux/update-copyright
   lib/alloca.c
   lib/alloca.in.h
+  lib/arpa_inet.in.h
+  lib/asnprintf.c
+  lib/c-ctype.c
+  lib/c-ctype.h
   lib/config.charset
+  lib/errno.in.h
+  lib/fd-hook.c
+  lib/fd-hook.h
+  lib/float+.h
+  lib/float.c
+  lib/float.in.h
   lib/fnmatch.c
   lib/fnmatch.in.h
   lib/fnmatch_loop.c
+  lib/gai_strerror.c
+  lib/getaddrinfo.c
+  lib/gettext.h
+  lib/inet_ntop.c
+  lib/inet_pton.c
   lib/inttypes.in.h
+  lib/itold.c
   lib/localcharset.c
   lib/localcharset.h
   lib/mbrtowc.c
@@ -308,38 +417,76 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/memchr.c
   lib/memchr.valgrind
   lib/memmem.c
+  lib/msvc-inval.c
+  lib/msvc-inval.h
+  lib/msvc-nothrow.c
+  lib/msvc-nothrow.h
+  lib/netdb.in.h
+  lib/netinet_in.in.h
+  lib/printf-args.c
+  lib/printf-args.h
+  lib/printf-parse.c
+  lib/printf-parse.h
   lib/ref-add.sin
   lib/ref-del.sin
+  lib/size_max.h
+  lib/snprintf.c
+  lib/sockets.c
+  lib/sockets.h
+  lib/stdalign.in.h
   lib/stdbool.in.h
   lib/stddef.in.h
   lib/stdint.in.h
+  lib/stdio.in.h
   lib/str-two-way.h
   lib/streq.h
   lib/string.in.h
   lib/strnlen1.c
   lib/strnlen1.h
+  lib/sys_socket.c
+  lib/sys_socket.in.h
+  lib/sys_types.in.h
+  lib/sys_uio.in.h
+  lib/unistd.c
+  lib/unistd.in.h
+  lib/vasnprintf.c
+  lib/vasnprintf.h
   lib/verify.h
+  lib/w32sock.h
   lib/wchar.in.h
   lib/wctype-h.c
   lib/wctype.in.h
+  lib/xsize.c
+  lib/xsize.h
   m4/00gnulib.m4
   m4/alloca.m4
+  m4/arpa_inet_h.m4
   m4/codeset.m4
   m4/configmake.m4
+  m4/errno_h.m4
+  m4/exponentd.m4
   m4/extensions.m4
   m4/extern-inline.m4
   m4/fcntl-o.m4
+  m4/float_h.m4
   m4/fnmatch.m4
+  m4/getaddrinfo.m4
   m4/glibc21.m4
   m4/gnulib-common.m4
+  m4/hostent.m4
   m4/include_next.m4
+  m4/inet_ntop.m4
+  m4/inet_pton.m4
+  m4/intmax_t.m4
   m4/inttypes-pri.m4
   m4/inttypes.m4
+  m4/inttypes_h.m4
   m4/localcharset.m4
   m4/locale-fr.m4
   m4/locale-ja.m4
   m4/locale-zh.m4
   m4/longlong.m4
+  m4/math_h.m4
   m4/mbrtowc.m4
   m4/mbsinit.m4
   m4/mbsrtowcs.m4
@@ -347,14 +494,37 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/memchr.m4
   m4/memmem.m4
   m4/mmap-anon.m4
+  m4/msvc-inval.m4
+  m4/msvc-nothrow.m4
   m4/multiarch.m4
+  m4/netdb_h.m4
+  m4/netinet_in_h.m4
+  m4/off_t.m4
+  m4/printf.m4
+  m4/servent.m4
+  m4/size_max.m4
+  m4/snprintf.m4
+  m4/socketlib.m4
+  m4/sockets.m4
+  m4/socklen.m4
+  m4/sockpfaf.m4
+  m4/ssize_t.m4
+  m4/stdalign.m4
   m4/stdbool.m4
   m4/stddef_h.m4
   m4/stdint.m4
+  m4/stdint_h.m4
+  m4/stdio_h.m4
   m4/string_h.m4
+  m4/sys_socket_h.m4
+  m4/sys_types_h.m4
+  m4/sys_uio_h.m4
+  m4/unistd_h.m4
+  m4/vasnprintf.m4
   m4/warn-on-use.m4
   m4/wchar_h.m4
   m4/wchar_t.m4
   m4/wctype_h.m4
   m4/wint_t.m4
+  m4/xsize.m4
 ])

@@ -30,6 +30,7 @@
 
 # The list of gnulib modules we are importing in GDB.
 IMPORTED_GNULIB_MODULES="fnmatch-gnu inttypes memmem update-copyright"
+IMPORTED_GNULIB_MODULES="$IMPORTED_GNULIB_MODULES getaddrinfo inet_pton"
 
 # The gnulib commit ID to use for the update.
 GNULIB_COMMIT_SHA1="92f3a4c8e52e64c233e260431d095dbf88554c14"
