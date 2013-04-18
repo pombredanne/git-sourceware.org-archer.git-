@@ -311,7 +311,7 @@ net_open (struct serial *scb, const char *name)
 
   memset (&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
-  hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG;
+  hints.ai_flags = 0;
   hints.ai_socktype = SOCK_STREAM;
   if (strncmp (name, "udp:", 4) == 0)
     {
@@ -326,12 +326,17 @@ net_open (struct serial *scb, const char *name)
   if (!port_str)
     error (_("net_open: No colon in host name!"));  /* Shouldn't ever
 						       happen.  */
-
+  /* Strip also optional square brackets for IPv6 numeric address.  */
+  if (name[0] == '[')
+    name++;
   tmp = min (port_str - name, (int) sizeof hostname - 1);
   strncpy (hostname, name, tmp);	/* Don't want colon.  */
-  hostname[tmp] = '\000';	/* Tie off host name.  */
-
+  if (tmp > 0 && hostname[tmp - 1] == ']')
+    hostname[tmp - 1] = 0;
+  else
+    hostname[tmp] = 0;
   port_str++;
+
   n = getaddrinfo (hostname[0] == 0 ? NULL : hostname, port_str, &hints,
 		   &addrinfo_base);
   if (n != 0)

@@ -183,6 +183,40 @@ remote_close (void)
 #endif
 }
 
+/* Bind new socket to first address from the ADDRINFO_BASE list matching
+   FAMILY.  Return -1 otherwise.  */
+
+static int
+bind_socket (struct addrinfo *addrinfo_base, int family)
+{
+  struct addrinfo *addrinfo;
+
+  for (addrinfo = addrinfo_base; addrinfo != NULL; addrinfo = addrinfo->ai_next)
+    {
+      int i, fd;
+
+      if (addrinfo->ai_family != family)
+	continue;
+
+      fd = socket (addrinfo->ai_family, addrinfo->ai_socktype,
+		   addrinfo->ai_protocol);
+      if (fd == -1)
+	continue;
+
+      /* Allow rapid reuse of this port. */
+      i = 1;
+      setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &i, sizeof (i));
+
+      if (bind (fd, addrinfo->ai_addr, addrinfo->ai_addrlen) == 0
+	  && listen (fd, 1) == 0)
+	return fd;
+
+      close (fd);
+    }
+
+  return -1;
+}
+
 /* Open a connection to a remote debugger.
    NAME is the filename used for communication.  */
 
@@ -193,11 +227,11 @@ remote_open (char *name)
 #ifdef USE_WIN32API
   static int winsock_initialized;
 #endif
-  struct sockaddr_in sockaddr;
+  struct sockaddr sockaddr;
   socklen_t socklen;
   int tmp_desc, n, i;
   struct addrinfo hints;
-  struct addrinfo *addrinfo_base, *addrinfo;
+  struct addrinfo *addrinfo_base;
 
   if (port_str == NULL)
     {
@@ -218,10 +252,16 @@ remote_open (char *name)
 
   memset (&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
-  hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG | AI_PASSIVE;
+  hints.ai_flags = AI_PASSIVE;
   hints.ai_socktype = SOCK_STREAM;
 
+  /* Strip also optional square brackets for IPv6 numeric address.  */
+  if (*name == '[')
+    name++;
+  if (port_str > name && port_str[-1] == ']')
+    port_str[-1] = 0;
   *port_str++ = 0;
+
   n = getaddrinfo (name[0] == 0 ? NULL : name, port_str, &hints,
 		   &addrinfo_base);
   if (n != 0)
@@ -231,39 +271,20 @@ remote_open (char *name)
       exit (1);
     }
 
-  for (addrinfo = addrinfo_base; addrinfo != NULL;
-       addrinfo = addrinfo->ai_next)
-    {
-      tmp_desc = socket (addrinfo->ai_family, addrinfo->ai_socktype,
-			 addrinfo->ai_protocol);
-      if (tmp_desc == -1)
-	{
-	  if (addrinfo->ai_next != NULL)
-	    continue;
-	  perror_with_name ("Can't open socket");
-	}
-
-      /* Allow rapid reuse of this port. */
-      i = 1;
-      setsockopt (tmp_desc, SOL_SOCKET, SO_REUSEADDR, &i, sizeof (i));
-
-      if (bind (tmp_desc, addrinfo->ai_addr, addrinfo->ai_addrlen) != 0
-	  || listen (tmp_desc, 1) != 0)
-	{
-	  if (addrinfo->ai_next != NULL)
-	    {
-	      close (tmp_desc);
-	      continue;
-	    }
-	  perror_with_name ("Can't bind address");
-	}
-      break;
-    }
+  /* IPV6_V6ONLY false is assumed here - that AF_INET6 binds to both IPv6 and
+     IPv4 address.  getaddrinfo in glibc unfortunately returns AF_INET as the
+     first entry.  */
+  errno = 0;
+  tmp_desc = bind_socket (addrinfo_base, AF_INET6);
+  if (tmp_desc == -1)
+    tmp_desc = bind_socket (addrinfo_base, AF_INET);
+  if (tmp_desc == -1)
+    perror_with_name ("Can't bind socket");
 
   freeaddrinfo (addrinfo_base);
 
   socklen = sizeof (sockaddr);
-  remote_desc = accept (tmp_desc, (struct sockaddr *) &sockaddr, &socklen);
+  remote_desc = accept (tmp_desc, &sockaddr, &socklen);
   if (remote_desc == -1)
     perror_with_name ("Accept failed");
 

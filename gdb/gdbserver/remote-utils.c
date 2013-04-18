@@ -156,27 +156,28 @@ enable_async_notification (int fd)
 static int
 handle_accept_event (int err, gdb_client_data client_data)
 {
-  struct sockaddr_in sockaddr;
-  socklen_t tmp;
+  struct sockaddr sockaddr;
+  socklen_t sockaddr_len;
+  int i;
+  char remote_host[NI_MAXHOST];
+  void *addr;
 
   if (debug_threads)
     fprintf (stderr, "handling possible accept event\n");
 
-  tmp = sizeof (sockaddr);
-  remote_desc = accept (listen_desc, (struct sockaddr *) &sockaddr, &tmp);
+  sockaddr_len = sizeof (sockaddr);
+  remote_desc = accept (listen_desc, &sockaddr, &sockaddr_len);
   if (remote_desc == -1)
     perror_with_name ("Accept failed");
 
   /* Enable TCP keep alive process. */
-  tmp = 1;
-  setsockopt (remote_desc, SOL_SOCKET, SO_KEEPALIVE,
-	      (char *) &tmp, sizeof (tmp));
+  i = 1;
+  setsockopt (remote_desc, SOL_SOCKET, SO_KEEPALIVE, &i, sizeof (i));
 
   /* Tell TCP not to delay small packets.  This greatly speeds up
      interactive response. */
-  tmp = 1;
-  setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY,
-	      (char *) &tmp, sizeof (tmp));
+  i = 1;
+  setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY, &i, sizeof (i));
 
 #ifndef USE_WIN32API
   signal (SIGPIPE, SIG_IGN);	/* If we don't do this, then gdbserver simply
@@ -196,9 +197,27 @@ handle_accept_event (int err, gdb_client_data client_data)
      descriptor open for add_file_handler to wait for a new connection.  */
   delete_file_handler (listen_desc);
 
-  /* Convert IP address to string.  */
-  fprintf (stderr, "Remote debugging from host %s\n",
-	   inet_ntoa (sockaddr.sin_addr));
+  /* Convert IP address to string.  getnameinfo produces %number suffixes with
+     NI_NUMERICHOST for IPv6.  */
+  switch (sockaddr.sa_family)
+    {
+    case AF_INET:
+      addr = &((struct sockaddr_in *) &sockaddr)->sin_addr;
+      break;
+    case AF_INET6:
+      addr = &((struct sockaddr_in6 *) &sockaddr)->sin6_addr;
+      break;
+    default:
+      addr = NULL;
+      break;
+    }
+
+  if (addr == NULL || inet_ntop (sockaddr.sa_family, addr, remote_host,
+				 sizeof (remote_host)) == NULL)
+    fprintf (stderr, "Remote debugging host name resolving error %s!\n",
+	     strerror (errno));
+  else
+    fprintf (stderr, "Remote debugging from host %s\n", remote_host);
 
   enable_async_notification (remote_desc);
 
@@ -216,6 +235,40 @@ handle_accept_event (int err, gdb_client_data client_data)
   return 0;
 }
 
+/* Bind new socket to first address from the ADDRINFO_BASE list matching
+   FAMILY.  Return -1 otherwise.  */
+
+static int
+bind_socket (struct addrinfo *addrinfo_base, int family)
+{
+  struct addrinfo *addrinfo;
+
+  for (addrinfo = addrinfo_base; addrinfo != NULL; addrinfo = addrinfo->ai_next)
+    {
+      int i, fd;
+
+      if (addrinfo->ai_family != family)
+	continue;
+
+      fd = socket (addrinfo->ai_family, addrinfo->ai_socktype,
+		   addrinfo->ai_protocol);
+      if (fd == -1)
+	continue;
+
+      /* Allow rapid reuse of this port. */
+      i = 1;
+      setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &i, sizeof (i));
+
+      if (bind (fd, addrinfo->ai_addr, addrinfo->ai_addrlen) == 0
+	  && listen (fd, 1) == 0)
+	return fd;
+
+      close (fd);
+    }
+
+  return -1;
+}
+
 /* Prepare for a later connection to a remote debugger.
    NAME is the filename used for communication.  */
 
@@ -226,7 +279,7 @@ remote_prepare (const char *name)
   char *hostname;
   int n;
   struct addrinfo hints;
-  struct addrinfo *addrinfo_base, *addrinfo;
+  struct addrinfo *addrinfo_base;
 #ifdef USE_WIN32API
   static int winsock_initialized;
 #endif
@@ -261,11 +314,17 @@ remote_prepare (const char *name)
 
   memset (&hints, 0, sizeof hints);
   hints.ai_family = AF_UNSPEC;
-  hints.ai_flags = AI_V4MAPPED | AI_ADDRCONFIG | AI_PASSIVE;
+  hints.ai_flags = AI_PASSIVE;
   hints.ai_socktype = SOCK_STREAM;
 
+  /* Strip also optional square brackets for IPv6 numeric address.  */
+  if (*name == '[')
+    name++;
   hostname = xstrdup (name);
-  hostname[port_str - name] = 0;
+  if (port_str > name && port_str[-1] == ']')
+    hostname[port_str - name - 1] = 0;
+  else
+    hostname[port_str - name] = 0;
   port_str++;
 
   n = getaddrinfo (hostname[0] == 0 ? NULL : hostname, port_str, &hints,
@@ -280,39 +339,17 @@ remote_prepare (const char *name)
     }
   xfree (hostname);
 
-  for (addrinfo = addrinfo_base; addrinfo != NULL; addrinfo = addrinfo->ai_next)
-    {
-      int i;
-
-      listen_desc = socket (addrinfo->ai_family, addrinfo->ai_socktype,
-			    addrinfo->ai_protocol);
-      if (listen_desc == -1)
-	{
-	  if (addrinfo->ai_next != NULL)
-	    continue;
-	  freeaddrinfo (addrinfo_base);
-	  perror_with_name ("Can't open socket");
-	}
-
-      /* Allow rapid reuse of this port. */
-      i = 1;
-      setsockopt (listen_desc, SOL_SOCKET, SO_REUSEADDR, &i, sizeof (i));
-
-      if (bind (listen_desc, addrinfo->ai_addr, addrinfo->ai_addrlen) != 0
-	  || listen (listen_desc, 1) != 0)
-	{
-	  if (addrinfo->ai_next != NULL)
-	    {
-	      close (listen_desc);
-	      continue;
-	    }
-	  freeaddrinfo (addrinfo_base);
-	  perror_with_name ("Can't bind address");
-	}
-      break;
-    }
-
+  /* IPV6_V6ONLY false is assumed here - that AF_INET6 binds to both IPv6 and
+     IPv4 address.  getaddrinfo in glibc unfortunately returns AF_INET as the
+     first entry.  */
+  errno = 0;
+  listen_desc = bind_socket (addrinfo_base, AF_INET6);
+  if (listen_desc == -1)
+    listen_desc = bind_socket (addrinfo_base, AF_INET);
   freeaddrinfo (addrinfo_base);
+  if (listen_desc == -1)
+    perror_with_name (_("Can't bind socket"));
+
   transport_is_reliable = 1;
 }
 
@@ -414,18 +451,22 @@ remote_open (const char *name)
 #endif /* USE_WIN32API */
   else
     {
-      int port;
       socklen_t len;
-      struct sockaddr_in sockaddr;
+      struct sockaddr sockaddr;
+      char portstr[NI_MAXSERV];
+      int i;
 
       len = sizeof (sockaddr);
-      if (getsockname (listen_desc,
-		       (struct sockaddr *) &sockaddr, &len) < 0
-	  || len < sizeof (sockaddr))
+      if (getsockname (listen_desc, &sockaddr, &len) < 0)
 	perror_with_name ("Can't determine port");
-      port = ntohs (sockaddr.sin_port);
 
-      fprintf (stderr, "Listening on port %d\n", port);
+      i = getnameinfo (&sockaddr, len, NULL, 0, portstr, sizeof (portstr),
+		       NI_NUMERICSERV);
+      if (i != 0)
+	fprintf (stderr, "Listening port name resolving error %s!\n",
+		 gai_strerror (i));
+      else
+	fprintf (stderr, "Listening on port %s\n", portstr);
       fflush (stderr);
 
       /* Register the event loop handler.  */
