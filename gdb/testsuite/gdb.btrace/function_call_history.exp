@@ -62,6 +62,30 @@ gdb_test "record function-call-history" "
 19\tinc\r
 20\tmain\r" "record function-call-history - with size unlimited"
 
+# show indented function call history with unlimited size
+gdb_test "record function-call-history /c 0" "
+0\tmain\r
+1\t  inc\r
+2\tmain\r
+3\t  inc\r
+4\tmain\r
+5\t  inc\r
+6\tmain\r
+7\t  inc\r
+8\tmain\r
+9\t  inc\r
+10\tmain\r
+11\t  inc\r
+12\tmain\r
+13\t  inc\r
+14\tmain\r
+15\t  inc\r
+16\tmain\r
+17\t  inc\r
+18\tmain\r
+19\t  inc\r
+20\tmain\r" "indented record function-call-history - with size unlimited"
+
 # show function call history with size of 21, we expect to see all 21 entries
 gdb_test_no_output "set record function-call-history-size 21"
 # show function call history
@@ -155,32 +179,35 @@ gdb_test "record function-call-history -" "At the start of the branch trace reco
 # make sure we cannot move any further back
 gdb_test "record function-call-history -" "At the start of the branch trace record\\." "record function-call-history - at the start (2)"
 
+# don't mess around with path names
+gdb_test_no_output "set filename-display basename"
+
 # moving forward again, but this time with file and line number, expected to see the first 15 entries
 gdb_test "record function-call-history /l +" "
-.*$srcfile:40-41\tmain\r
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-41\tmain\r
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-41\tmain\r
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-41\tmain\r
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-41\tmain\r
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-41\tmain\r
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-41\tmain\r
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-41\tmain\r" "record function-call-history /l - show first 15 entries"
+\[0-9\]*\tmain\tat $srcfile:40,41\r
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,41\r
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,41\r
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,41\r
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,41\r
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,41\r
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,41\r
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,41\r" "record function-call-history /l - show first 15 entries"
 
 # moving forward and expect to see the latest 6 entries
 gdb_test "record function-call-history /l +" "
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-41\tmain\r
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-41\tmain\r
-.*$srcfile:22-24\tinc\r
-.*$srcfile:40-43\tmain\r" "record function-call-history /l - show last 6 entries"
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,41\r
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,41\r
+\[0-9\]*\tinc\tat $srcfile:22,24\r
+\[0-9\]*\tmain\tat $srcfile:40,43\r" "record function-call-history /l - show last 6 entries"
 
 # moving further forward shouldn't work
 gdb_test "record function-call-history /l +" "At the end of the branch trace record\\." "record function-call-history /l - at the end (1)"
@@ -219,3 +246,46 @@ gdb_test "record function-call-history" "
 28\tfib\r
 29\tfib\r
 30\tmain" "show recursive function call history"
+
+# show indented function call history for fib
+gdb_test "record function-call-history /c 20, +11" "
+20\tmain\r
+21\t  fib\r
+22\t    fib\r
+23\t  fib\r
+24\t    fib\r
+25\t      fib\r
+26\t    fib\r
+27\t      fib\r
+28\t    fib\r
+29\t  fib\r
+30\tmain\r" "indented record function-call-history - fib"
+
+# make sure we can handle incomplete trace with respect to indentation
+if ![runto_main] {
+    return -1
+}
+# navigate to the fib in line 24 above
+gdb_breakpoint fib
+gdb_continue_to_breakpoint "cont to fib.1"
+gdb_continue_to_breakpoint "cont to fib.2"
+gdb_continue_to_breakpoint "cont to fib.3"
+gdb_continue_to_breakpoint "cont to fib.4"
+
+# start tracing
+gdb_test_no_output "record btrace"
+
+# continue until line 30 above
+delete_breakpoints
+set bp_location [gdb_get_line_number "bp.2" $testfile.c]
+gdb_breakpoint $bp_location
+gdb_continue_to_breakpoint "cont to $bp_location" ".*$testfile.c:$bp_location.*"
+
+# let's look at the trace. we expect to see the tail of the above listing.
+gdb_test "record function-call-history /c" "
+0\t      fib\r
+1\t    fib\r
+2\t      fib\r
+3\t    fib\r
+4\t  fib\r
+5\tmain\r" "indented record function-call-history - fib"

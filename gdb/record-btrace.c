@@ -428,7 +428,7 @@ btrace_call_history_insn_range (struct ui_out *uiout,
   end = begin + size - 1;
 
   ui_out_field_uint (uiout, "insn begin", begin);
-  ui_out_text (uiout, "-");
+  ui_out_text (uiout, ",");
   ui_out_field_uint (uiout, "insn end", end);
 }
 
@@ -460,7 +460,7 @@ btrace_call_history_src_line (struct ui_out *uiout,
   if (end == begin)
     return;
 
-  ui_out_text (uiout, "-");
+  ui_out_text (uiout, ",");
   ui_out_field_int (uiout, "max line", end);
 }
 
@@ -468,6 +468,7 @@ btrace_call_history_src_line (struct ui_out *uiout,
 
 static void
 btrace_call_history (struct ui_out *uiout,
+		     const struct btrace_thread_info *btinfo,
 		     const struct btrace_function *begin,
 		     const struct btrace_function *end,
 		     enum record_print_flag flags)
@@ -488,22 +489,32 @@ btrace_call_history (struct ui_out *uiout,
       ui_out_field_uint (uiout, "index", bfun->number);
       ui_out_text (uiout, "\t");
 
-      if ((flags & record_print_insn_range) != 0)
+      if ((flags & record_print_indent_calls) != 0)
 	{
-	  btrace_call_history_insn_range (uiout, bfun);
-	  ui_out_text (uiout, "\t");
-	}
+	  int level = bfun->level + btinfo->level, i;
 
-      if ((flags & record_print_src_line) != 0)
-	{
-	  btrace_call_history_src_line (uiout, bfun);
-	  ui_out_text (uiout, "\t");
+	  for (i = 0; i < level; ++i)
+	    ui_out_text (uiout, "  ");
 	}
 
       if (sym != NULL)
 	ui_out_field_string (uiout, "function", SYMBOL_PRINT_NAME (sym));
       else if (msym != NULL)
 	ui_out_field_string (uiout, "function", SYMBOL_PRINT_NAME (msym));
+      else
+	ui_out_field_string (uiout, "function", "<unknown>");
+
+      if ((flags & record_print_insn_range) != 0)
+	{
+	  ui_out_text (uiout, "\tinst ");
+	  btrace_call_history_insn_range (uiout, bfun);
+	}
+
+      if ((flags & record_print_src_line) != 0)
+	{
+	  ui_out_text (uiout, "\tat ");
+	  btrace_call_history_src_line (uiout, bfun);
+	}
 
       ui_out_text (uiout, "\n");
     }
@@ -615,7 +626,7 @@ record_btrace_call_history (int size, int flags)
     }
 
   if (covered > 0)
-    btrace_call_history (uiout, begin, end, flags);
+    btrace_call_history (uiout, btinfo, begin, end, flags);
   else
     {
       if (size < 0)
@@ -666,7 +677,7 @@ record_btrace_call_history_range (ULONGEST from, ULONGEST to, int flags)
   if (end == NULL)
     end = btinfo->end;
 
-  btrace_call_history (uiout, begin, end, flags);
+  btrace_call_history (uiout, btinfo, begin, end, flags);
   btrace_set_call_history (btinfo, begin, end);
 
   do_cleanups (uiout_cleanup);

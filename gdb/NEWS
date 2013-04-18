@@ -3,6 +3,12 @@
 
 *** Changes since GDB 7.6
 
+* The command 'record function-call-history' supports a new modifier '/c' to
+  indent the function names based on their call stack depth.
+  The fields for the '/i' and '/l' modifier have been reordered.
+  The instruction range is now prefixed with 'insn'.
+  The source line range is now prefixed with 'at'.
+
 * New commands:
 catch rethrow
   Like "catch throw", but catches a re-thrown exception.

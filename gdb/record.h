@@ -40,6 +40,9 @@ enum record_print_flag
 
   /* Print the instruction number range (if applicable).  */
   record_print_insn_range = (1 << 1),
+
+  /* Indent based on call stack depth (if applicable).  */
+  record_print_indent_calls = (1 << 2)
 };
 
 /* Wrapper for target_read_memory that prints a debug message if
