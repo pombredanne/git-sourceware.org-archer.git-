@@ -22,7 +22,6 @@
 #include "gdbthread.h"
 #include <stdio.h>
 #include <string.h>
-#include <sys/select.h>
 #if HAVE_SYS_IOCTL_H
 #include <sys/ioctl.h>
 #endif
