@@ -54,6 +54,9 @@
 /* Define to 1 when the gnulib module close should be tested. */
 #undef GNULIB_TEST_CLOSE
 
+/* Define to 1 when the gnulib module dup2 should be tested. */
+#undef GNULIB_TEST_DUP2
+
 /* Define to 1 when the gnulib module getaddrinfo should be tested. */
 #undef GNULIB_TEST_GETADDRINFO
 
@@ -80,6 +83,9 @@
 
 /* Define to 1 when the gnulib module recv should be tested. */
 #undef GNULIB_TEST_RECV
+
+/* Define to 1 when the gnulib module select should be tested. */
+#undef GNULIB_TEST_SELECT
 
 /* Define to 1 when the gnulib module send should be tested. */
 #undef GNULIB_TEST_SEND
@@ -173,6 +179,9 @@
 /* Define to 1 if you have the declaration of `_snprintf', and to 0 if you
    don't. */
 #undef HAVE_DECL__SNPRINTF
+
+/* Define to 1 if you have the 'dup2' function. */
+#undef HAVE_DUP2
 
 /* Define to 1 if you have the <features.h> header file. */
 #undef HAVE_FEATURES_H

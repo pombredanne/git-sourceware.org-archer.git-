@@ -46,6 +46,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module c-ctype:
   # Code from module close:
   # Code from module configmake:
+  # Code from module dup2:
   # Code from module errno:
   # Code from module extensions:
   AC_REQUIRE([gl_USE_SYSTEM_EXTENSIONS])
@@ -77,6 +78,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module netdb:
   # Code from module netinet_in:
   # Code from module recv:
+  # Code from module select:
   # Code from module send:
   # Code from module servent:
   # Code from module setsockopt:
@@ -148,6 +150,12 @@ AC_DEFUN([gl_INIT],
   fi
   gl_UNISTD_MODULE_INDICATOR([close])
   gl_CONFIGMAKE_PREP
+  gl_FUNC_DUP2
+  if test $HAVE_DUP2 = 0 || test $REPLACE_DUP2 = 1; then
+    AC_LIBOBJ([dup2])
+    gl_PREREQ_DUP2
+  fi
+  gl_UNISTD_MODULE_INDICATOR([dup2])
   gl_HEADER_ERRNO_H
   AC_REQUIRE([gl_EXTERN_INLINE])
   gl_FLOAT_H
@@ -256,6 +264,11 @@ AC_DEFUN([gl_INIT],
     AC_LIBOBJ([recv])
   fi
   gl_SYS_SOCKET_MODULE_INDICATOR([recv])
+  gl_FUNC_SELECT
+  if test $REPLACE_SELECT = 1; then
+    AC_LIBOBJ([select])
+  fi
+  gl_SYS_SELECT_MODULE_INDICATOR([select])
   AC_REQUIRE([gl_HEADER_SYS_SOCKET])
   if test "$ac_cv_header_winsock2_h" = yes; then
     AC_LIBOBJ([send])
@@ -465,6 +478,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/c-ctype.h
   lib/close.c
   lib/config.charset
+  lib/dup2.c
   lib/errno.in.h
   lib/fd-hook.c
   lib/fd-hook.h
@@ -506,6 +520,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/recv.c
   lib/ref-add.sin
   lib/ref-del.sin
+  lib/select.c
   lib/send.c
   lib/setsockopt.c
   lib/signal.in.h
@@ -547,6 +562,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/close.m4
   m4/codeset.m4
   m4/configmake.m4
+  m4/dup2.m4
   m4/errno_h.m4
   m4/exponentd.m4
   m4/extensions.m4
@@ -585,6 +601,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/netinet_in_h.m4
   m4/off_t.m4
   m4/printf.m4
+  m4/select.m4
   m4/servent.m4
   m4/signal_h.m4
   m4/size_max.m4
