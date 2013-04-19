@@ -80,6 +80,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module send:
   # Code from module servent:
   # Code from module setsockopt:
+  # Code from module signal-h:
   # Code from module size_max:
   # Code from module snippet/arg-nonnull:
   # Code from module snippet/c++defs:
@@ -98,6 +99,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module streq:
   # Code from module string:
   # Code from module strnlen1:
+  # Code from module sys_select:
   # Code from module sys_socket:
   # Code from module sys_time:
   # Code from module sys_types:
@@ -265,6 +267,7 @@ AC_DEFUN([gl_INIT],
     AC_LIBOBJ([setsockopt])
   fi
   gl_SYS_SOCKET_MODULE_INDICATOR([setsockopt])
+  gl_SIGNAL_H
   gl_SIZE_MAX
   gl_FUNC_SNPRINTF
   gl_STDIO_MODULE_INDICATOR([snprintf])
@@ -293,6 +296,8 @@ AC_DEFUN([gl_INIT],
   gl_STDINT_H
   gl_STDIO_H
   gl_HEADER_STRING_H
+  gl_HEADER_SYS_SELECT
+  AC_PROG_MKDIR_P
   gl_HEADER_SYS_SOCKET
   AC_PROG_MKDIR_P
   gl_HEADER_SYS_TIME_H
@@ -503,6 +508,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/ref-del.sin
   lib/send.c
   lib/setsockopt.c
+  lib/signal.in.h
   lib/size_max.h
   lib/snprintf.c
   lib/socket.c
@@ -518,6 +524,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/string.in.h
   lib/strnlen1.c
   lib/strnlen1.h
+  lib/sys_select.in.h
   lib/sys_socket.c
   lib/sys_socket.in.h
   lib/sys_time.in.h
@@ -579,6 +586,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/off_t.m4
   m4/printf.m4
   m4/servent.m4
+  m4/signal_h.m4
   m4/size_max.m4
   m4/snprintf.m4
   m4/socketlib.m4
@@ -593,6 +601,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/stdint_h.m4
   m4/stdio_h.m4
   m4/string_h.m4
+  m4/sys_select_h.m4
   m4/sys_socket_h.m4
   m4/sys_time_h.m4
   m4/sys_types_h.m4
