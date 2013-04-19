@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <string.h>
 #include <sys/time.h>
+#include <sys/select.h>
 
 #ifdef USE_WIN32API
 #include <windows.h>

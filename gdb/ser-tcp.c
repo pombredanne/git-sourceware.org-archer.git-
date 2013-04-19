@@ -57,6 +57,7 @@
 #include <signal.h>
 #include "gdb_string.h"
 #include "gdb_select.h"
+#include <sys/select.h>
 
 #ifndef HAVE_SOCKLEN_T
 typedef int socklen_t;
