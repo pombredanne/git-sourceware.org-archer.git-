@@ -41,6 +41,7 @@
 #ifndef ETIMEDOUT
 #define ETIMEDOUT WSAETIMEDOUT
 #endif
+#undef close
 #define close(fd) closesocket (fd)
 #define ioctl ioctlsocket
 #ifdef HAVE_WS2TCPIP_H
