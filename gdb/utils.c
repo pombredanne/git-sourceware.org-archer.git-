@@ -32,6 +32,9 @@
 #include <sys/resource.h>
 #endif /* HAVE_SYS_RESOURCE_H */
 #include <netdb.h>
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
+#endif
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_get_command_dimension.   */

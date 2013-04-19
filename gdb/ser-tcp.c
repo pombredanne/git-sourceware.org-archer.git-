@@ -43,6 +43,9 @@
 #endif
 #define close(fd) closesocket (fd)
 #define ioctl ioctlsocket
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
+#endif
 #else
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -286,7 +289,7 @@ scb_connect (struct serial *scb, const struct addrinfo *addrinfo)
       /* Disable Nagle algorithm.  Needed in some cases.  */
       tmp = 1;
       setsockopt (scb->fd, IPPROTO_TCP, TCP_NODELAY,
-		  (char *)&tmp, sizeof (tmp));
+		  (const void *) &tmp, sizeof (tmp));
     }
 
 #ifdef SIGPIPE

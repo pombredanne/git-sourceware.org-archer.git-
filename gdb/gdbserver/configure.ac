@@ -67,8 +67,8 @@ AC_CHECK_HEADERS(sgtty.h termio.h termios.h sys/reg.h string.h dnl
 		 proc_service.h sys/procfs.h thread_db.h linux/elf.h dnl
 		 stdlib.h unistd.h dnl
 		 errno.h fcntl.h signal.h sys/file.h malloc.h dnl
-		 sys/ioctl.h netinet/in.h sys/socket.h netdb.h dnl
-		 netinet/tcp.h arpa/inet.h sys/wait.h wait.h sys/un.h dnl
+		 sys/ioctl.h netinet/in.h sys/socket.h ws2tcpip.h netdb.h dnl
+		 netinet/tcp.h sys/wait.h wait.h sys/un.h dnl
 		 linux/perf_event.h)
 AC_CHECK_FUNCS(pread pwrite pread64 readlink)
 AC_REPLACE_FUNCS(vasprintf vsnprintf)

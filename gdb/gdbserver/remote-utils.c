@@ -53,9 +53,7 @@
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#if HAVE_ARPA_INET_H
 #include <arpa/inet.h>
-#endif
 #include "gdb_stat.h"
 #if HAVE_ERRNO_H
 #include <errno.h>
@@ -63,6 +61,9 @@
 
 #if USE_WIN32API
 #include <winsock2.h>
+#endif
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
 #endif
 
 #if __QNX__
@@ -172,12 +173,14 @@ handle_accept_event (int err, gdb_client_data client_data)
 
   /* Enable TCP keep alive process. */
   i = 1;
-  setsockopt (remote_desc, SOL_SOCKET, SO_KEEPALIVE, &i, sizeof (i));
+  setsockopt (remote_desc, SOL_SOCKET, SO_KEEPALIVE, (const void *) &i,
+	      sizeof (i));
 
   /* Tell TCP not to delay small packets.  This greatly speeds up
      interactive response. */
   i = 1;
-  setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY, &i, sizeof (i));
+  setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY, (const void *) &i,
+	      sizeof (i));
 
 #ifndef USE_WIN32API
   signal (SIGPIPE, SIG_IGN);	/* If we don't do this, then gdbserver simply
@@ -257,7 +260,7 @@ bind_socket (struct addrinfo *addrinfo_base, int family)
 
       /* Allow rapid reuse of this port. */
       i = 1;
-      setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, &i, sizeof (i));
+      setsockopt (fd, SOL_SOCKET, SO_REUSEADDR, (const void *) &i, sizeof (i));
 
       if (bind (fd, addrinfo->ai_addr, addrinfo->ai_addrlen) == 0
 	  && listen (fd, 1) == 0)
