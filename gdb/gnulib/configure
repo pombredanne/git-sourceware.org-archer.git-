@@ -589,8 +589,8 @@ ac_includes_default="\
 #endif"
 
 gl_header_list=
-gl_fnmatch_required=POSIX
 gl_func_list=
+gl_fnmatch_required=POSIX
 ac_subst_vars='am__EXEEXT_FALSE
 am__EXEEXT_TRUE
 gltests_LTLIBOBJS
@@ -795,7 +795,6 @@ NETINET_IN_H
 HAVE_NETINET_IN_H
 NEXT_AS_FIRST_DIRECTIVE_NETINET_IN_H
 NEXT_NETINET_IN_H
-HAVE_MSVC_INVALID_PARAMETER_HANDLER
 UNDEFINE_STRTOK_R
 REPLACE_STRTOK_R
 REPLACE_STRSIGNAL
@@ -1049,6 +1048,7 @@ NEXT_AS_FIRST_DIRECTIVE_ERRNO_H
 NEXT_ERRNO_H
 pkglibexecdir
 lispdir
+HAVE_MSVC_INVALID_PARAMETER_HANDLER
 MKDIR_P
 HAVE_FEATURES_H
 NEXT_AS_FIRST_DIRECTIVE_ARPA_INET_H
@@ -2969,6 +2969,7 @@ fi
 gl_header_list="$gl_header_list sys/socket.h"
 gl_header_list="$gl_header_list arpa/inet.h"
 gl_header_list="$gl_header_list features.h"
+gl_func_list="$gl_func_list _set_invalid_parameter_handler"
 gl_func_list="$gl_func_list btowc"
 gl_func_list="$gl_func_list isblank"
 gl_func_list="$gl_func_list iswctype"
@@ -2990,7 +2991,6 @@ gl_func_list="$gl_func_list mbsinit"
 gl_func_list="$gl_func_list mbrtowc"
 gl_header_list="$gl_header_list sys/mman.h"
 gl_func_list="$gl_func_list mprotect"
-gl_func_list="$gl_func_list _set_invalid_parameter_handler"
 gl_func_list="$gl_func_list snprintf"
 gl_header_list="$gl_header_list sys/time.h"
 gl_header_list="$gl_header_list sys/uio.h"
@@ -4622,6 +4622,7 @@ fi
   # Code from module arpa_inet:
   # Code from module bind:
   # Code from module c-ctype:
+  # Code from module close:
   # Code from module configmake:
   # Code from module errno:
   # Code from module extensions:
@@ -6280,6 +6281,45 @@ $as_echo "$MKDIR_P" >&6; }
 
 
 
+
+
+  for ac_func in $gl_func_list
+do :
+  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
+ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
+eval as_val=\$$as_ac_var
+   if test "x$as_val" = x""yes; then :
+  cat >>confdefs.h <<_ACEOF
+#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
+_ACEOF
+
+fi
+done
+
+
+
+
+
+
+
+  :
+
+
+
+
+
+  if test $ac_cv_func__set_invalid_parameter_handler = yes; then
+    HAVE_MSVC_INVALID_PARAMETER_HANDLER=1
+
+$as_echo "#define HAVE_MSVC_INVALID_PARAMETER_HANDLER 1" >>confdefs.h
+
+  else
+    HAVE_MSVC_INVALID_PARAMETER_HANDLER=0
+  fi
+
+
+
+
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for complete errno.h" >&5
 $as_echo_n "checking for complete errno.h... " >&6; }
 if test "${gl_cv_header_errno_h_complete+set}" = set; then :
@@ -6698,22 +6738,6 @@ $as_echo "#define mbstate_t int" >>confdefs.h
 
    fi
 
-
-
-
-
-  for ac_func in $gl_func_list
-do :
-  as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`
-ac_fn_c_check_func "$LINENO" "$ac_func" "$as_ac_var"
-eval as_val=\$$as_ac_var
-   if test "x$as_val" = x""yes; then :
-  cat >>confdefs.h <<_ACEOF
-#define `$as_echo "HAVE_$ac_func" | $as_tr_cpp` 1
-_ACEOF
-
-fi
-done
 
 
 
@@ -9855,11 +9879,6 @@ $as_echo "$gl_cv_func_memmem_works_always" >&6; }
   :
 
 
-
-
-
-
-
   GNULIB_DPRINTF=0;
   GNULIB_FCLOSE=0;
   GNULIB_FDOPEN=0;
@@ -11672,6 +11691,79 @@ fi
 
 
 $as_echo "#define GNULIB_TEST_BIND 1" >>confdefs.h
+
+
+
+
+
+
+  if test $HAVE_MSVC_INVALID_PARAMETER_HANDLER = 1; then
+    REPLACE_CLOSE=1
+  fi
+
+
+
+
+
+  :
+
+
+
+
+
+  if test $ac_cv_header_sys_socket_h != yes; then
+                    for ac_header in winsock2.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "winsock2.h" "ac_cv_header_winsock2_h" "$ac_includes_default"
+if test "x$ac_cv_header_winsock2_h" = x""yes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_WINSOCK2_H 1
+_ACEOF
+
+fi
+
+done
+
+  fi
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    HAVE_WINSOCK2_H=1
+    UNISTD_H_HAVE_WINSOCK2_H=1
+    SYS_IOCTL_H_HAVE_WINSOCK2_H=1
+  else
+    HAVE_WINSOCK2_H=0
+  fi
+
+
+    if test $UNISTD_H_HAVE_WINSOCK2_H = 1; then
+                        REPLACE_CLOSE=1
+    fi
+
+
+
+  if test $REPLACE_CLOSE = 1; then
+
+
+
+
+
+
+
+
+  gl_LIBOBJS="$gl_LIBOBJS close.$ac_objext"
+
+  fi
+
+
+
+
+
+          GNULIB_CLOSE=1
+
+
+
+
+
+$as_echo "#define GNULIB_TEST_CLOSE 1" >>confdefs.h
 
 
 

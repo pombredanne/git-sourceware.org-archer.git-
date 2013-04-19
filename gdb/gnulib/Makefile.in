@@ -210,6 +210,7 @@ aclocal_m4_deps = \
 	import/m4/00gnulib.m4 \
 	import/m4/alloca.m4 \
 	import/m4/arpa_inet_h.m4 \
+	import/m4/close.m4 \
 	import/m4/codeset.m4 \
 	import/m4/configmake.m4 \
 	import/m4/errno_h.m4 \
