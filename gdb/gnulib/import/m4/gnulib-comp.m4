@@ -38,9 +38,11 @@ AC_DEFUN([gl_EARLY],
   m4_pattern_allow([^gl_LIBOBJS$])dnl a variable
   m4_pattern_allow([^gl_LTLIBOBJS$])dnl a variable
   AC_REQUIRE([gl_PROG_AR_RANLIB])
+  # Code from module accept:
   # Code from module alloca:
   # Code from module alloca-opt:
   # Code from module arpa_inet:
+  # Code from module bind:
   # Code from module c-ctype:
   # Code from module configmake:
   # Code from module errno:
@@ -52,6 +54,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module fnmatch:
   # Code from module fnmatch-gnu:
   # Code from module getaddrinfo:
+  # Code from module getsockname:
   # Code from module gettext-h:
   # Code from module hostent:
   # Code from module include_next:
@@ -59,6 +62,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module inet_pton:
   # Code from module inttypes:
   # Code from module inttypes-incomplete:
+  # Code from module listen:
   # Code from module localcharset:
   # Code from module mbrtowc:
   # Code from module mbsinit:
@@ -71,12 +75,16 @@ AC_DEFUN([gl_EARLY],
   # Code from module multiarch:
   # Code from module netdb:
   # Code from module netinet_in:
+  # Code from module recv:
+  # Code from module send:
   # Code from module servent:
+  # Code from module setsockopt:
   # Code from module size_max:
   # Code from module snippet/arg-nonnull:
   # Code from module snippet/c++defs:
   # Code from module snippet/warn-on-use:
   # Code from module snprintf:
+  # Code from module socket:
   # Code from module socketlib:
   # Code from module sockets:
   # Code from module socklen:
@@ -90,6 +98,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module string:
   # Code from module strnlen1:
   # Code from module sys_socket:
+  # Code from module sys_time:
   # Code from module sys_types:
   # Code from module sys_uio:
   # Code from module unistd:
@@ -117,9 +126,19 @@ AC_DEFUN([gl_INIT],
   m4_pushdef([gl_LIBSOURCES_DIR], [])
   gl_COMMON
   gl_source_base='import'
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([accept])
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([accept])
   gl_FUNC_ALLOCA
   gl_HEADER_ARPA_INET
   AC_PROG_MKDIR_P
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([bind])
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([bind])
   gl_CONFIGMAKE_PREP
   gl_HEADER_ERRNO_H
   AC_REQUIRE([gl_EXTERN_INLINE])
@@ -148,6 +167,11 @@ AC_DEFUN([gl_INIT],
     AC_LIBOBJ([gai_strerror])
   fi
   gl_NETDB_MODULE_INDICATOR([getaddrinfo])
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([getsockname])
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([getsockname])
   AC_SUBST([LIBINTL])
   AC_SUBST([LTLIBINTL])
   gl_HOSTENT
@@ -165,6 +189,11 @@ AC_DEFUN([gl_INIT],
   gl_ARPA_INET_MODULE_INDICATOR([inet_pton])
   gl_INTTYPES_H
   gl_INTTYPES_INCOMPLETE
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([listen])
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([listen])
   gl_LOCALCHARSET
   LOCALCHARSET_TESTS_ENVIRONMENT="CHARSETALIASDIR=\"\$(abs_top_builddir)/$gl_source_base\""
   AC_SUBST([LOCALCHARSET_TESTS_ENVIRONMENT])
@@ -214,11 +243,40 @@ AC_DEFUN([gl_INIT],
   gl_HEADER_NETDB
   gl_HEADER_NETINET_IN
   AC_PROG_MKDIR_P
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([recv])
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([recv])
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([send])
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([send])
   gl_SERVENT
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([setsockopt])
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([setsockopt])
   gl_SIZE_MAX
   gl_FUNC_SNPRINTF
   gl_STDIO_MODULE_INDICATOR([snprintf])
   gl_MODULE_INDICATOR([snprintf])
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([socket])
+  fi
+  # When this module is used, sockets may actually occur as file descriptors,
+  # hence it is worth warning if the modules 'close' and 'ioctl' are not used.
+  m4_ifdef([gl_UNISTD_H_DEFAULTS], [AC_REQUIRE([gl_UNISTD_H_DEFAULTS])])
+  m4_ifdef([gl_SYS_IOCTL_H_DEFAULTS], [AC_REQUIRE([gl_SYS_IOCTL_H_DEFAULTS])])
+  AC_REQUIRE([gl_PREREQ_SYS_H_WINSOCK2])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    UNISTD_H_HAVE_WINSOCK2_H_AND_USE_SOCKETS=1
+    SYS_IOCTL_H_HAVE_WINSOCK2_H_AND_USE_SOCKETS=1
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([socket])
   gl_SOCKETLIB
   gl_SOCKETS
   gl_TYPE_SOCKLEN_T
@@ -230,6 +288,8 @@ AC_DEFUN([gl_INIT],
   gl_STDIO_H
   gl_HEADER_STRING_H
   gl_HEADER_SYS_SOCKET
+  AC_PROG_MKDIR_P
+  gl_HEADER_SYS_TIME_H
   AC_PROG_MKDIR_P
   gl_SYS_TYPES_H
   AC_PROG_MKDIR_P
@@ -384,10 +444,12 @@ AC_DEFUN([gl_FILE_LIST], [
   build-aux/snippet/c++defs.h
   build-aux/snippet/warn-on-use.h
   build-aux/update-copyright
+  lib/accept.c
   lib/alloca.c
   lib/alloca.in.h
   lib/arpa_inet.in.h
   lib/asnprintf.c
+  lib/bind.c
   lib/c-ctype.c
   lib/c-ctype.h
   lib/config.charset
@@ -402,11 +464,13 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/fnmatch_loop.c
   lib/gai_strerror.c
   lib/getaddrinfo.c
+  lib/getsockname.c
   lib/gettext.h
   lib/inet_ntop.c
   lib/inet_pton.c
   lib/inttypes.in.h
   lib/itold.c
+  lib/listen.c
   lib/localcharset.c
   lib/localcharset.h
   lib/mbrtowc.c
@@ -427,10 +491,14 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/printf-args.h
   lib/printf-parse.c
   lib/printf-parse.h
+  lib/recv.c
   lib/ref-add.sin
   lib/ref-del.sin
+  lib/send.c
+  lib/setsockopt.c
   lib/size_max.h
   lib/snprintf.c
+  lib/socket.c
   lib/sockets.c
   lib/sockets.h
   lib/stdalign.in.h
@@ -445,6 +513,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/strnlen1.h
   lib/sys_socket.c
   lib/sys_socket.in.h
+  lib/sys_time.in.h
   lib/sys_types.in.h
   lib/sys_uio.in.h
   lib/unistd.c
@@ -517,6 +586,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/stdio_h.m4
   m4/string_h.m4
   m4/sys_socket_h.m4
+  m4/sys_time_h.m4
   m4/sys_types_h.m4
   m4/sys_uio_h.m4
   m4/unistd_h.m4
