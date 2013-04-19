@@ -25096,7 +25096,7 @@ class ElidingInlineIterator:
 
     def next(self):
         frame = next(self.input_iterator)
-    
+
         if frame.inferior_frame().type() != gdb.INLINE_FRAME:
             return frame
 

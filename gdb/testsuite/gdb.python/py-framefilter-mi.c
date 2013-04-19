@@ -47,7 +47,7 @@ void end_func (int foo, char *bar, foobar *fb, foobar bf)
       }
     }
   }
-  
+
   return; /* Backtrace end breakpoint */
 }
 

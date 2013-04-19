@@ -247,7 +247,7 @@ py_print_value (struct ui_out *out, struct value *val,
   /* Never set an indent level for common_val_print if MI.  */
   if (ui_out_is_mi_like_p (out))
       local_indent = 0;
-      
+
   /* MI does not print certain values, differentiated by type,
      depending on what ARGS_TYPE indicates.  Test type against option.
      For CLI print all values.  */
@@ -266,7 +266,7 @@ py_print_value (struct ui_out *out, struct value *val,
 	  gdbpy_convert_exception (except);
 	  return PY_BT_ERROR;
 	}
-      
+
       if (args_type == MI_PRINT_ALL_VALUES)
 	should_print = 1;
       else if (args_type == MI_PRINT_SIMPLE_VALUES
@@ -314,7 +314,7 @@ get_py_iter_from_func (PyObject *filter, char *func)
   if (PyObject_HasAttrString (filter, func))
     {
       PyObject *result = PyObject_CallMethod (filter, func, NULL);
-      
+
       if (result != NULL)
 	{
 	  if (result == Py_None)
@@ -324,7 +324,7 @@ get_py_iter_from_func (PyObject *filter, char *func)
 	  else
 	    {
 	      PyObject *iterator = PyObject_GetIter (result);
-	      
+
 	      Py_DECREF (result);
 	      return iterator;
 	    }
@@ -505,7 +505,7 @@ enumerate_args (PyObject *iter,
   PyObject *item;
   struct value_print_options opts;
   volatile struct gdb_exception except;
-  
+
   get_user_print_options (&opts);
 
   if (args_type == CLI_SCALAR_VALUES)
@@ -631,7 +631,7 @@ enumerate_args (PyObject *iter,
 		      goto error;
 		    }
 		}
-	      
+
 	      if (py_print_single_arg (out, NULL, &entryarg, NULL,
 				      &opts, args_type,
 				      print_args_field, NULL) == PY_BT_ERROR)
@@ -735,7 +735,7 @@ enumerate_locals (PyObject *iter,
       struct symbol *sym;
       volatile struct gdb_exception except;
       int local_indent = 8 + (8 * indent);
-      
+
       make_cleanup (null_cleanup, NULL);
 
       success = extract_sym (item, &sym_name, &sym, &language);
@@ -816,7 +816,7 @@ enumerate_locals (PyObject *iter,
 	}
 
       xfree (sym_name);
-      
+
       if (args_type == MI_PRINT_SIMPLE_VALUES)
 	{
 	  if (! py_print_type (out, val))
@@ -1037,7 +1037,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
   frame = frame_object_to_frame_info (py_inf_frame);;
 
   Py_DECREF (py_inf_frame);
-  
+
   if (frame == NULL)
     goto error;
 
@@ -1168,7 +1168,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 	  if (py_func != NULL)
 	    {
 	      const char *function = NULL;
-	      
+
 	      if (gdbpy_is_string (py_func))
 		{
 		  function = PyString_AsString (py_func);
@@ -1200,7 +1200,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 		  goto error;
 		}
 
-	    
+
 	      TRY_CATCH (except, RETURN_MASK_ALL)
 		{
 		  annotate_frame_function_name ();
@@ -1337,7 +1337,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
   elided  = get_py_iter_from_func (filter, "elided");
   if (elided == NULL)
     goto error;
-  
+
   make_cleanup_py_decref (elided);
   if (elided != Py_None)
     {
@@ -1514,7 +1514,7 @@ apply_frame_filter (struct frame_info *frame, int flags,
 
   if (item == NULL && PyErr_Occurred ())
     goto error;
-  
+
  done:
   do_cleanups (cleanups);
   return success;

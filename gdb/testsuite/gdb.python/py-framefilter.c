@@ -48,7 +48,7 @@ void end_func (int foo, char *bar, foobar *fb, foobar bf)
       }
     }
   }
-	
+
   return; /* Backtrace end breakpoint */
 }
 
@@ -117,7 +117,7 @@ int func2(int f)
   bf->nothing = "Elided Bar Foo";
   bf->f = 48;
   bf->s = 182;
-  
+
   func1();
   return 1;
 }

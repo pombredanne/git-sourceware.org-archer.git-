@@ -107,7 +107,7 @@ class FrameDecorator(object):
         if func == None:
             pc = frame.pc()
             return pc
-        
+
         return str(func)
 
     def address(self):
@@ -248,7 +248,7 @@ class FrameVars(object):
         the stored frame.  Frame arguments are not fetched.  If there
         are no frame local variables, return an empty list."""
         lvars = []
-        
+
         block = self.frame.block()
 
         while block != None:
@@ -261,7 +261,7 @@ class FrameVars(object):
                     lvars.append(SymValueWrapper(sym, None))
 
             block = block.superblock
-            
+
         return lvars
 
     def fetch_frame_args(self):
