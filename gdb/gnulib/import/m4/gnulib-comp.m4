@@ -44,6 +44,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module arpa_inet:
   # Code from module bind:
   # Code from module c-ctype:
+  # Code from module close:
   # Code from module configmake:
   # Code from module errno:
   # Code from module extensions:
@@ -139,6 +140,11 @@ AC_DEFUN([gl_INIT],
     AC_LIBOBJ([bind])
   fi
   gl_SYS_SOCKET_MODULE_INDICATOR([bind])
+  gl_FUNC_CLOSE
+  if test $REPLACE_CLOSE = 1; then
+    AC_LIBOBJ([close])
+  fi
+  gl_UNISTD_MODULE_INDICATOR([close])
   gl_CONFIGMAKE_PREP
   gl_HEADER_ERRNO_H
   AC_REQUIRE([gl_EXTERN_INLINE])
@@ -452,6 +458,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/bind.c
   lib/c-ctype.c
   lib/c-ctype.h
+  lib/close.c
   lib/config.charset
   lib/errno.in.h
   lib/fd-hook.c
@@ -530,6 +537,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/00gnulib.m4
   m4/alloca.m4
   m4/arpa_inet_h.m4
+  m4/close.m4
   m4/codeset.m4
   m4/configmake.m4
   m4/errno_h.m4
