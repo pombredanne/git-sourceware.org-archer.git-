@@ -594,7 +594,6 @@ extra_libraries
 IPA_DEPFILES
 srv_xmlfiles
 srv_xmlbuiltin
-USE_THREAD_DB
 GDBSERVER_LIBS
 GDBSERVER_DEPFILES
 RDYNAMIC
@@ -5344,6 +5343,12 @@ $as_echo "#define HAVE_PTRACE_GETFPXREGS 1" >>confdefs.h
   fi
 fi
 
+if test "${srv_linux_btrace}" = "yes"; then
+
+$as_echo "#define HAVE_LINUX_BTRACE 1" >>confdefs.h
+
+fi
+
 if test "$ac_cv_header_sys_procfs_h" = yes; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for lwpid_t in sys/procfs.h" >&5
 $as_echo_n "checking for lwpid_t in sys/procfs.h... " >&6; }
@@ -5619,7 +5624,6 @@ LIBS="$old_LIBS"
 
 srv_thread_depfiles=
 srv_libs=
-USE_THREAD_DB=
 
 if test "$srv_linux_thread_db" = "yes"; then
   if test "$ac_cv_lib_dl_dlopen" = "yes"; then
@@ -5679,7 +5683,9 @@ $as_echo "$found" >&6; }
   fi
 
   srv_thread_depfiles="thread-db.o proc-service.o"
-  USE_THREAD_DB="-DUSE_THREAD_DB"
+
+$as_echo "#define USE_THREAD_DB 1" >>confdefs.h
+
   { $as_echo "$as_me:${as_lineno-$LINENO}: checking for TD_VERSION" >&5
 $as_echo_n "checking for TD_VERSION... " >&6; }
 if test "${gdbsrv_cv_have_td_version+set}" = set; then :
@@ -5904,7 +5910,6 @@ if $want_ipa ; then
      as_fn_error "inprocess agent not supported for this target" "$LINENO" 5
    fi
 fi
-
 
 
 

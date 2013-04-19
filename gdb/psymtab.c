@@ -183,6 +183,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 	if (partial_map_expand_apply (objfile, name, real_path,
 				      pst, callback, data))
 	  return 1;
+	continue;
       }
 
     /* Before we invoke realpath, which can get expensive when many
@@ -196,6 +197,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 	if (partial_map_expand_apply (objfile, name, real_path,
 				      pst, callback, data))
 	  return 1;
+	continue;
       }
 
     /* If the user gave us an absolute path, try to find the file in
@@ -209,6 +211,7 @@ partial_map_symtabs_matching_filename (struct objfile *objfile,
 	    if (partial_map_expand_apply (objfile, name, real_path,
 					  pst, callback, data))
 	      return 1;
+	    continue;
 	  }
       }
   }
@@ -417,7 +420,7 @@ find_pc_sect_psymbol (struct objfile *objfile,
     {
       p = *pp;
       if (SYMBOL_DOMAIN (p) == VAR_DOMAIN
-	  && SYMBOL_CLASS (p) == LOC_BLOCK
+	  && PSYMBOL_CLASS (p) == LOC_BLOCK
 	  && pc >= SYMBOL_VALUE_ADDRESS (p)
 	  && (SYMBOL_VALUE_ADDRESS (p) > best_pc
 	      || (psymtab->textlow == 0
@@ -426,7 +429,8 @@ find_pc_sect_psymbol (struct objfile *objfile,
 	  if (section)		/* Match on a specific section.  */
 	    {
 	      fixup_psymbol_section (p, objfile);
-	      if (!matching_obj_sections (SYMBOL_OBJ_SECTION (p), section))
+	      if (!matching_obj_sections (SYMBOL_OBJ_SECTION (objfile, p),
+					  section))
 		continue;
 	    }
 	  best_pc = SYMBOL_VALUE_ADDRESS (p);
@@ -441,7 +445,7 @@ find_pc_sect_psymbol (struct objfile *objfile,
     {
       p = *pp;
       if (SYMBOL_DOMAIN (p) == VAR_DOMAIN
-	  && SYMBOL_CLASS (p) == LOC_BLOCK
+	  && PSYMBOL_CLASS (p) == LOC_BLOCK
 	  && pc >= SYMBOL_VALUE_ADDRESS (p)
 	  && (SYMBOL_VALUE_ADDRESS (p) > best_pc
 	      || (psymtab->textlow == 0
@@ -450,7 +454,8 @@ find_pc_sect_psymbol (struct objfile *objfile,
 	  if (section)		/* Match on a specific section.  */
 	    {
 	      fixup_psymbol_section (p, objfile);
-	      if (!matching_obj_sections (SYMBOL_OBJ_SECTION (p), section))
+	      if (!matching_obj_sections (SYMBOL_OBJ_SECTION (objfile, p),
+					  section))
 		continue;
 	    }
 	  best_pc = SYMBOL_VALUE_ADDRESS (p);
@@ -466,12 +471,15 @@ fixup_psymbol_section (struct partial_symbol *psym, struct objfile *objfile)
 {
   CORE_ADDR addr;
 
-  if (psym == NULL || SYMBOL_OBJ_SECTION (psym) != NULL)
+  if (!psym)
+    return;
+
+  if (SYMBOL_SECTION (psym) >= 0)
     return;
 
   gdb_assert (objfile);
 
-  switch (SYMBOL_CLASS (psym))
+  switch (PSYMBOL_CLASS (psym))
     {
     case LOC_STATIC:
     case LOC_LABEL:
@@ -887,7 +895,7 @@ print_partial_symbols (struct gdbarch *gdbarch,
 	  fputs_filtered ("<invalid domain>, ", outfile);
 	  break;
 	}
-      switch (SYMBOL_CLASS (*p))
+      switch (PSYMBOL_CLASS (*p))
 	{
 	case LOC_UNDEF:
 	  fputs_filtered ("undefined", outfile);
@@ -1111,7 +1119,11 @@ read_psymtabs_with_fullname (struct objfile *objfile, const char *fullname)
       if (p->anonymous)
 	continue;
 
-      if (filename_cmp (fullname, psymtab_to_fullname (p)) == 0)
+      /* psymtab_to_fullname tries to open the file which is slow.
+	 Don't call it if we know the basenames don't match.  */
+      if ((basenames_may_differ
+	   || filename_cmp (lbasename (fullname), lbasename (p->filename)) == 0)
+	  && filename_cmp (fullname, psymtab_to_fullname (p)) == 0)
 	psymtab_to_symtab (objfile, p);
     }
 }
@@ -1340,12 +1352,12 @@ recursively_search_psymtabs (struct partial_symtab *ps,
 
 	  if ((kind == ALL_DOMAIN
 	       || (kind == VARIABLES_DOMAIN
-		   && SYMBOL_CLASS (*psym) != LOC_TYPEDEF
-		   && SYMBOL_CLASS (*psym) != LOC_BLOCK)
+		   && PSYMBOL_CLASS (*psym) != LOC_TYPEDEF
+		   && PSYMBOL_CLASS (*psym) != LOC_BLOCK)
 	       || (kind == FUNCTIONS_DOMAIN
-		   && SYMBOL_CLASS (*psym) == LOC_BLOCK)
+		   && PSYMBOL_CLASS (*psym) == LOC_BLOCK)
 	       || (kind == TYPES_DOMAIN
-		   && SYMBOL_CLASS (*psym) == LOC_TYPEDEF))
+		   && PSYMBOL_CLASS (*psym) == LOC_TYPEDEF))
 	      && (*name_matcher) (SYMBOL_SEARCH_NAME (*psym), data))
 	    {
 	      /* Found a match, so notify our caller.  */
@@ -1582,10 +1594,10 @@ add_psymbol_to_bcache (const char *name, int namelength, int copy_name,
 {
   struct partial_symbol psymbol;
 
-  /* We must ensure that the entire 'value' field has been zeroed
-     before assigning to it, because an assignment may not write the
-     entire field.  */
-  memset (&psymbol.ginfo.value, 0, sizeof (psymbol.ginfo.value));
+  /* We must ensure that the entire struct has been zeroed before
+     assigning to it, because an assignment may not touch some of the
+     holes.  */
+  memset (&psymbol, 0, sizeof (psymbol));
 
   /* val and coreaddr are mutually exclusive, one of them *will* be zero.  */
   if (val != 0)
@@ -1596,9 +1608,8 @@ add_psymbol_to_bcache (const char *name, int namelength, int copy_name,
     {
       SYMBOL_VALUE_ADDRESS (&psymbol) = coreaddr;
     }
-  SYMBOL_SECTION (&psymbol) = 0;
-  SYMBOL_OBJ_SECTION (&psymbol) = NULL;
-  SYMBOL_SET_LANGUAGE (&psymbol, language);
+  SYMBOL_SECTION (&psymbol) = -1;
+  SYMBOL_SET_LANGUAGE (&psymbol, language, &objfile->objfile_obstack);
   PSYMBOL_DOMAIN (&psymbol) = domain;
   PSYMBOL_CLASS (&psymbol) = class;
 

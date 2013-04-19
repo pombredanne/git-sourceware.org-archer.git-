@@ -73,6 +73,9 @@
 /* Define to 1 if you have the `dl' library (-ldl). */
 #undef HAVE_LIBDL
 
+/* Define if the target supports branch tracing. */
+#undef HAVE_LINUX_BTRACE
+
 /* Define to 1 if you have the <linux/elf.h> header file. */
 #undef HAVE_LINUX_ELF_H
 
@@ -285,6 +288,9 @@
 # undef __EXTENSIONS__
 #endif
 
+
+/* Define if we should use libthread_db. */
+#undef USE_THREAD_DB
 
 /* Define if we should use the Windows API, instead of the POSIX API. On
    Windows, we use the Windows API when building for MinGW, but the POSIX API

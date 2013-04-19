@@ -197,7 +197,9 @@ find_lowest_section (bfd *abfd, asection *sect, void *obj)
     *lowest = sect;
 }
 
-/* Create a new section_addr_info, with room for NUM_SECTIONS.  */
+/* Create a new section_addr_info, with room for NUM_SECTIONS.  The
+   new object's 'num_sections' field is set to 0; it must be updated
+   by the caller.  */
 
 struct section_addr_info *
 alloc_section_addr_info (size_t num_sections)
@@ -209,7 +211,6 @@ alloc_section_addr_info (size_t num_sections)
 	  +  sizeof (struct other_sections) * (num_sections - 1));
   sap = (struct section_addr_info *) xmalloc (size);
   memset (sap, 0, size);
-  sap->num_sections = num_sections;
 
   return sap;
 }
@@ -236,10 +237,13 @@ build_section_addr_info_from_section_table (const struct target_section *start,
 	  sap->other[oidx].addr = stp->addr;
 	  sap->other[oidx].name
 	    = xstrdup (bfd_section_name (stp->bfd, stp->the_bfd_section));
-	  sap->other[oidx].sectindex = stp->the_bfd_section->index;
+	  sap->other[oidx].sectindex
+	    = gdb_bfd_section_index (stp->bfd, stp->the_bfd_section);
 	  oidx++;
 	}
     }
+
+  sap->num_sections = oidx;
 
   return sap;
 }
@@ -259,9 +263,12 @@ build_section_addr_info_from_bfd (bfd *abfd)
       {
 	sap->other[i].addr = bfd_get_section_vma (abfd, sec);
 	sap->other[i].name = xstrdup (bfd_get_section_name (abfd, sec));
-	sap->other[i].sectindex = sec->index;
+	sap->other[i].sectindex = gdb_bfd_section_index (abfd, sec);
 	i++;
       }
+
+  sap->num_sections = i;
+
   return sap;
 }
 
@@ -277,7 +284,7 @@ build_section_addr_info_from_objfile (const struct objfile *objfile)
      gdb_assert (objfile->num_sections == bfd_count_sections (objfile->obfd));
      */
   sap = build_section_addr_info_from_bfd (objfile->obfd);
-  for (i = 0; i < sap->num_sections && sap->other[i].name; i++)
+  for (i = 0; i < sap->num_sections; i++)
     {
       int sectindex = sap->other[i].sectindex;
 
@@ -294,8 +301,7 @@ free_section_addr_info (struct section_addr_info *sap)
   int idx;
 
   for (idx = 0; idx < sap->num_sections; idx++)
-    if (sap->other[idx].name)
-      xfree (sap->other[idx].name);
+    xfree (sap->other[idx].name);
   xfree (sap);
 }
 
@@ -384,7 +390,7 @@ place_section (bfd *abfd, asection *sect, void *obj)
     return;
 
   /* If the user specified an offset, honor it.  */
-  if (offsets[sect->index] != 0)
+  if (offsets[gdb_bfd_section_index (abfd, sect)] != 0)
     return;
 
   /* Otherwise, let's try to find a place for the section.  */
@@ -428,7 +434,7 @@ place_section (bfd *abfd, asection *sect, void *obj)
     }
   while (!done);
 
-  offsets[sect->index] = start_addr;
+  offsets[gdb_bfd_section_index (abfd, sect)] = start_addr;
   arg->lowest = start_addr + bfd_get_section_size (sect);
 }
 
@@ -446,7 +452,7 @@ relative_addr_info_to_section_offsets (struct section_offsets *section_offsets,
   memset (section_offsets, 0, SIZEOF_N_SECTION_OFFSETS (num_sections));
 
   /* Now calculate offsets for section that were specified by the caller.  */
-  for (i = 0; i < addrs->num_sections && addrs->other[i].name; i++)
+  for (i = 0; i < addrs->num_sections; i++)
     {
       struct other_sections *osp;
 
@@ -506,7 +512,7 @@ addrs_section_sort (struct section_addr_info *addrs)
 
   /* `+ 1' for the NULL terminator.  */
   array = xmalloc (sizeof (*array) * (addrs->num_sections + 1));
-  for (i = 0; i < addrs->num_sections && addrs->other[i].name; i++)
+  for (i = 0; i < addrs->num_sections; i++)
     array[i] = &addrs->other[i];
   array[i] = NULL;
 
@@ -605,7 +611,7 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
      (the loadable section directly below it in memory).
      this_offset = lower_offset = lower_addr - lower_orig_addr */
 
-  for (i = 0; i < addrs->num_sections && addrs->other[i].name; i++)
+  for (i = 0; i < addrs->num_sections; i++)
     {
       struct other_sections *sect = addrs_to_abfd_addrs[i];
 
@@ -997,7 +1003,7 @@ syms_from_objfile_1 (struct objfile *objfile,
 
      We no longer warn if the lowest section is not a text segment (as
      happens for the PA64 port.  */
-  if (addrs && addrs->other[0].name)
+  if (addrs && addrs->num_sections > 0)
     addr_info_make_relative (addrs, objfile->obfd);
 
   /* Initialize symbol reading routines for this objfile, allow complaints to
@@ -1304,73 +1310,6 @@ symbol_file_clear (int from_tty)
     printf_unfiltered (_("No symbol file now.\n"));
 }
 
-static char *
-get_debug_link_info (struct objfile *objfile, unsigned long *crc32_out)
-{
-  asection *sect;
-  bfd_size_type debuglink_size;
-  unsigned long crc32;
-  char *contents;
-  int crc_offset;
-
-  sect = bfd_get_section_by_name (objfile->obfd, ".gnu_debuglink");
-
-  if (sect == NULL)
-    return NULL;
-
-  debuglink_size = bfd_section_size (objfile->obfd, sect);
-
-  contents = xmalloc (debuglink_size);
-  bfd_get_section_contents (objfile->obfd, sect, contents,
-			    (file_ptr)0, (bfd_size_type)debuglink_size);
-
-  /* Crc value is stored after the filename, aligned up to 4 bytes.  */
-  crc_offset = strlen (contents) + 1;
-  crc_offset = (crc_offset + 3) & ~3;
-
-  crc32 = bfd_get_32 (objfile->obfd, (bfd_byte *) (contents + crc_offset));
-
-  *crc32_out = crc32;
-  return contents;
-}
-
-/* Return 32-bit CRC for ABFD.  If successful store it to *FILE_CRC_RETURN and
-   return 1.  Otherwise print a warning and return 0.  ABFD seek position is
-   not preserved.  */
-
-static int
-get_file_crc (bfd *abfd, unsigned long *file_crc_return)
-{
-  unsigned long file_crc = 0;
-
-  if (bfd_seek (abfd, 0, SEEK_SET) != 0)
-    {
-      warning (_("Problem reading \"%s\" for CRC: %s"),
-	       bfd_get_filename (abfd), bfd_errmsg (bfd_get_error ()));
-      return 0;
-    }
-
-  for (;;)
-    {
-      gdb_byte buffer[8 * 1024];
-      bfd_size_type count;
-
-      count = bfd_bread (buffer, sizeof (buffer), abfd);
-      if (count == (bfd_size_type) -1)
-	{
-	  warning (_("Problem reading \"%s\" for CRC: %s"),
-		   bfd_get_filename (abfd), bfd_errmsg (bfd_get_error ()));
-	  return 0;
-	}
-      if (count == 0)
-	break;
-      file_crc = bfd_calc_gnu_debuglink_crc32 (file_crc, buffer, count);
-    }
-
-  *file_crc_return = file_crc;
-  return 1;
-}
-
 static int
 separate_debug_file_exists (const char *name, unsigned long crc,
 			    struct objfile *parent_objfile)
@@ -1420,7 +1359,7 @@ separate_debug_file_exists (const char *name, unsigned long crc,
   else
     verified_as_different = 0;
 
-  file_crc_p = get_file_crc (abfd, &file_crc);
+  file_crc_p = gdb_bfd_crc (abfd, &file_crc);
 
   gdb_bfd_unref (abfd);
 
@@ -1429,19 +1368,19 @@ separate_debug_file_exists (const char *name, unsigned long crc,
 
   if (crc != file_crc)
     {
+      unsigned long parent_crc;
+
       /* If one (or both) the files are accessed for example the via "remote:"
 	 gdbserver way it does not support the bfd_stat operation.  Verify
 	 whether those two files are not the same manually.  */
 
-      if (!verified_as_different && !parent_objfile->crc32_p)
+      if (!verified_as_different)
 	{
-	  parent_objfile->crc32_p = get_file_crc (parent_objfile->obfd,
-						  &parent_objfile->crc32);
-	  if (!parent_objfile->crc32_p)
+	  if (!gdb_bfd_crc (parent_objfile->obfd, &parent_crc))
 	    return 0;
 	}
 
-      if (verified_as_different || parent_objfile->crc32 != file_crc)
+      if (verified_as_different || parent_crc != file_crc)
 	warning (_("the debug information found in \"%s\""
 		   " does not match \"%s\" (CRC mismatch).\n"),
 		 name, parent_objfile->name);
@@ -1470,7 +1409,9 @@ show_debug_file_directory (struct ui_file *file, int from_tty,
 /* Find a separate debuginfo file for OBJFILE, using DIR as the directory
    where the original file resides (may not be the same as
    dirname(objfile->name) due to symlinks), and DEBUGLINK as the file we are
-   looking for.  Returns the name of the debuginfo, of NULL.  */
+   looking for.  CANON_DIR is the "realpath" form of DIR.
+   DIR must contain a trailing '/'.
+   Returns the path of the file with separate debug info, of NULL.  */
 
 static char *
 find_separate_debug_file (const char *dir,
@@ -1553,7 +1494,7 @@ find_separate_debug_file (const char *dir,
   return NULL;
 }
 
-/* Modify PATH to contain only "directory/" part of PATH.
+/* Modify PATH to contain only "[/]directory/" part of PATH.
    If there were no directory separators in PATH, PATH will be empty
    string on return.  */
 
@@ -1584,7 +1525,7 @@ find_separate_debug_file_by_debuglink (struct objfile *objfile)
   unsigned long crc32;
   struct cleanup *cleanups;
 
-  debuglink = get_debug_link_info (objfile, &crc32);
+  debuglink = bfd_get_debug_link_info (objfile->obfd, &crc32);
 
   if (debuglink == NULL)
     {
@@ -2408,6 +2349,7 @@ add_symbol_file_command (char *args, int from_tty)
 	 At this point, we don't know what file type this is,
 	 so we can't determine what section names are valid.  */
     }
+  section_addrs->num_sections = sec_num;
 
   if (from_tty && (!query ("%s", "")))
     error (_("Not confirmed."));

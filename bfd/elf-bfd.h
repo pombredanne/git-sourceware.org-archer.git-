@@ -1,7 +1,5 @@
 /* BFD back-end data structures for ELF files.
-   Copyright 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013
-   Free Software Foundation, Inc.
+   Copyright 1992-2013 Free Software Foundation, Inc.
    Written by Cygnus Support.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -643,7 +641,8 @@ enum elf_reloc_type_class {
   reloc_class_normal,
   reloc_class_relative,
   reloc_class_plt,
-  reloc_class_copy
+  reloc_class_copy,
+  reloc_class_ifunc
 };
 
 struct elf_reloc_cookie
@@ -1130,7 +1129,7 @@ struct elf_backend_data
 
   /* This function returns class of a reloc type.  */
   enum elf_reloc_type_class (*elf_backend_reloc_type_class)
-    (const Elf_Internal_Rela *);
+  (const struct bfd_link_info *, const asection *, const Elf_Internal_Rela *);
 
   /* This function, if defined, removes information about discarded functions
      from other sections which mention them.  */
@@ -1209,19 +1208,10 @@ struct elf_backend_data
   asection *(*common_section) (asection *);
 
   /* Return TRUE if we can merge 2 definitions.  */
-  bfd_boolean (*merge_symbol) (struct bfd_link_info *,
-			       struct elf_link_hash_entry **,
-			       struct elf_link_hash_entry *,
-			       Elf_Internal_Sym *, asection **,
-			       bfd_vma *, unsigned int *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd *, asection **,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd_boolean *, bfd_boolean *,
-			       bfd *, asection **);
+  bfd_boolean (*merge_symbol) (struct elf_link_hash_entry *,
+			       const Elf_Internal_Sym *, asection **,
+			       bfd_boolean, bfd_boolean,
+			       bfd *, const asection *);
 
   /* Return TRUE if symbol should be hashed in the `.gnu.hash' section.  */
   bfd_boolean (*elf_hash_symbol) (struct elf_link_hash_entry *);
@@ -1788,7 +1778,8 @@ extern bfd_boolean _bfd_elf_can_make_relative
   (bfd *input_bfd, struct bfd_link_info *info, asection *eh_frame_section);
 
 extern enum elf_reloc_type_class _bfd_elf_reloc_type_class
-  (const Elf_Internal_Rela *);
+  (const struct bfd_link_info *, const asection *,
+   const Elf_Internal_Rela *);
 extern bfd_vma _bfd_elf_rela_local_sym
   (bfd *, Elf_Internal_Sym *, asection **, Elf_Internal_Rela *);
 extern bfd_vma _bfd_elf_rel_local_sym
@@ -1921,8 +1912,6 @@ extern int _bfd_elf_sizeof_headers
   (bfd *, struct bfd_link_info *);
 extern bfd_boolean _bfd_elf_new_section_hook
   (bfd *, asection *);
-extern bfd_boolean _bfd_elf_init_reloc_shdr
-  (bfd *, struct bfd_elf_section_reloc_data *, asection *, bfd_boolean);
 extern const struct bfd_elf_special_section *_bfd_elf_get_special_section
   (const char *, const struct bfd_elf_special_section *, unsigned int);
 extern const struct bfd_elf_special_section *_bfd_elf_get_sec_type_attr
@@ -1994,12 +1983,6 @@ extern bfd_boolean _bfd_elf_eh_frame_present
   (struct bfd_link_info *);
 extern bfd_boolean _bfd_elf_maybe_strip_eh_frame_hdr
   (struct bfd_link_info *);
-
-extern bfd_boolean _bfd_elf_merge_symbol
-  (bfd *, struct bfd_link_info *, const char *, Elf_Internal_Sym *,
-   asection **, bfd_vma *, bfd_boolean *, unsigned int *,
-   struct elf_link_hash_entry **, bfd_boolean *,
-   bfd_boolean *, bfd_boolean *, bfd_boolean *);
 
 extern bfd_boolean _bfd_elf_hash_symbol (struct elf_link_hash_entry *);
 
@@ -2290,6 +2273,8 @@ extern char *elfcore_write_s390_prefix
 extern char *elfcore_write_s390_last_break
   (bfd *, char *, int *, const void *, int);
 extern char *elfcore_write_s390_system_call
+  (bfd *, char *, int *, const void *, int);
+extern char *elfcore_write_s390_tdb
   (bfd *, char *, int *, const void *, int);
 extern char *elfcore_write_arm_vfp
   (bfd *, char *, int *, const void *, int);

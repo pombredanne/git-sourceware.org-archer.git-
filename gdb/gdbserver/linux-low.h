@@ -16,9 +16,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifdef HAVE_THREAD_DB_H
-#include <thread_db.h>
-#endif
+#include "gdb_thread_db.h"
 #include <signal.h>
 
 #include "gdbthread.h"
@@ -269,8 +267,8 @@ struct lwp_info
      stepping over later when it is resumed.  */
   int need_step_over;
 
+#ifdef USE_THREAD_DB
   int thread_known;
-#ifdef HAVE_THREAD_DB_H
   /* The thread handle, used for e.g. TLS access.  Only valid if
      THREAD_KNOWN is set.  */
   td_thrhandle_t th;

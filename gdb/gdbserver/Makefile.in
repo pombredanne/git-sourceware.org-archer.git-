@@ -41,7 +41,7 @@ infodir = @infodir@
 htmldir = $(prefix)/html
 includedir = @includedir@
 
-SHELL = /bin/sh
+SHELL = @SHELL@
 EXEEXT = @EXEEXT@
 
 INSTALL = @INSTALL@
@@ -155,7 +155,7 @@ SFILES=	$(srcdir)/gdbreplay.c $(srcdir)/inferiors.c $(srcdir)/dll.c \
 	$(srcdir)/common/vec.c $(srcdir)/common/gdb_vecs.c \
 	$(srcdir)/common/common-utils.c $(srcdir)/common/xml-utils.c \
 	$(srcdir)/common/linux-osdata.c $(srcdir)/common/ptid.c \
-	$(srcdir)/common/buffer.c
+	$(srcdir)/common/buffer.c $(srcdir)/common/linux-btrace.c
 
 DEPFILES = @GDBSERVER_DEPFILES@
 
@@ -251,9 +251,7 @@ install-only:
 		$(INSTALL_PROGRAM) $(IPA_LIB) $(DESTDIR)$(libdir)/$(IPA_LIB); \
 	fi; \
 	$(SHELL) $(srcdir)/../../mkinstalldirs $(DESTDIR)$(bindir); \
-	$(INSTALL_PROGRAM) gdbserver$(EXEEXT) $(DESTDIR)$(bindir)/$$n$(EXEEXT); \
-	$(SHELL) $(srcdir)/../../mkinstalldirs $(DESTDIR)$(man1dir); \
-	$(INSTALL_DATA) $(srcdir)/gdbserver.1 $(DESTDIR)$(man1dir)/$$n.1
+	$(INSTALL_PROGRAM) gdbserver$(EXEEXT) $(DESTDIR)$(bindir)/$$n$(EXEEXT)
 	@$(MAKE) $(FLAGS_TO_PASS) DO=$@ "DODIRS=$(SUBDIRS)" subdir_do
 
 uninstall: force
@@ -425,6 +423,8 @@ signals_h = $(srcdir)/../../include/gdb/signals.h $(signals_def)
 ptid_h = $(srcdir)/../common/ptid.h
 ax_h = $(srcdir)/ax.h
 agent_h = $(srcdir)/../common/agent.h
+linux_btrace_h = $(srcdir)/../common/linux-btrace.h \
+		$(srcdir)/../common/btrace-common.h $(vec_h) $(ptid_h)
 linux_osdata_h = $(srcdir)/../common/linux-osdata.h
 vec_h = $(srcdir)/../common/vec.h
 gdb_vecs_h = $(srcdir)/../common/gdb_vecs.h
@@ -544,6 +544,9 @@ agent.o: ../common/agent.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
 
+linux-btrace.o: ../common/linux-btrace.c $(linux_btrace_h) $(server_h)
+	$(CC) -c $(CPPFLAGS) $(INTERNAL_CFLAGS) $<
+
 # We build vasprintf with -DHAVE_CONFIG_H because we want that unit to
 # include our config.h file.  Otherwise, some system headers do not get
 # included, and the compiler emits a warning about implicitly defined
@@ -556,11 +559,6 @@ vsnprintf.o: $(srcdir)/../../libiberty/vsnprintf.c
 	$(POSTCOMPILE)
 
 i386_low_h = $(srcdir)/i386-low.h
-
-linux-low.o: linux-low.c
-	$(COMPILE) $< @USE_THREAD_DB@
-	$(POSTCOMPILE)
-
 win32_low_h = $(srcdir)/win32-low.h
 
 aarch64.c : $(srcdir)/../regformats/aarch64.dat $(regdat_sh)

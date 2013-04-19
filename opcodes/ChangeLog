@@ -1,3 +1,100 @@
+2013-04-17  Wei-chen Wang  <cole945@gmail.com>
+
+	PR binutils/15369
+	* cgen-dis.c (hash_insn_array): Use CGEN_CPU_INSN_ENDIAN instead
+	of CGEN_CPU_ENDIAN.
+	(hash_insns_list): Likewise.
+
+2013-04-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* rl78-dis.c (print_insn_rl78): Use alternative form as a GCC false
+	warning workaround.
+
+2013-04-08  Jan Beulich <jbeulich@suse.com>
+
+	* i386-opc.tbl: Fold 64-bit and non-64-bit jecxz entries.
+	* i386-tbl.h: Re-generate.
+
+2013-04-06  David S. Miller  <davem@davemloft.net>
+
+	* sparc-dis.c (compare_opcodes): When encountering multiple aliases
+	of an opcode, prefer the one with F_PREFERRED set.
+	* sparc-opc.c (sparc_opcodes): Add ldtw, ldtwa, sttw, sttwa,
+	lzcnt, flush with '[address]' syntax, and missing cbcond pseudo
+	ops.  Make 64-bit VIS logical ops have "d" suffix in their names,
+	mark existing mnenomics as aliases.  Add "cc" suffix to edge
+	instructions generating condition codes, mark existing mnenomics
+	as aliases.  Add "fp" prefix to VIS compare instructions, mark
+	existing mnenomics as aliases.
+
+2013-04-03  Nick Clifton  <nickc@redhat.com>
+
+	* v850-dis.c (print_value): With V850_INVERSE_PCREL compute the
+	destination address by subtracting the operand from the current
+	address.
+	* v850-opc.c (insert_u16_loop): Disallow negative offsets.  Store
+	a positive value in the insn.
+	(extract_u16_loop): Do not negate the returned value.
+	(D16_LOOP): Add V850_INVERSE_PCREL flag.
+
+	(ceilf.sw): Remove duplicate entry.
+	(cvtf.hs): New entry.
+	(cvtf.sh): Likewise.
+	(fmaf.s): Likewise.
+	(fmsf.s): Likewise.
+	(fnmaf.s): Likewise.
+	(fnmsf.s): Likewise.
+	(maddf.s): Restrict to E3V5 architectures.
+	(msubf.s): Likewise.
+	(nmaddf.s): Likewise.
+	(nmsubf.s): Likewise.
+
+2013-03-27  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* i386-dis.c (get_sib): Add the sizeflag argument.  Properly
+	check address mode.
+	(print_insn): Pass sizeflag to get_sib.
+
+2013-03-27  Alexis Deruelle  <alexis.deruelle@gmail.com>
+
+	PR binutils/15068
+	* tic6x-dis.c: Add support for displaying 16-bit insns.
+
+2013-03-20  Alexis Deruelle  <alexis.deruelle@gmail.com>
+
+	PR gas/15095
+	* tic6x-dis.c (print_insn_tic6x): Decode opcodes that have
+	individual msb and lsb halves in src1 & src2 fields.  Discard the
+	src1 (lsb) value and only use src2 (msb), discarding bit 0, to
+	follow what Ti SDK does in that case as any value in the src1
+	field yields the same output with SDK disassembler.
+
+2013-03-12  Michael Eager <eager@eagercon.com>
+
+	* opcodes/mips-dis.c (print_insn_args): Modify def of reg.
+
+2013-03-11  Sebastian Huber <sebastian.huber@embedded-brains.de>
+
+	* nios2-opc.c (nios2_builtin_opcodes): Add entry for wrprs.
+
+2013-03-11  Sebastian Huber <sebastian.huber@embedded-brains.de>
+
+	* nios2-opc.c (nios2_builtin_opcodes): Add entry for rdprs.
+
+2013-03-11  Sebastian Huber <sebastian.huber@embedded-brains.de>
+
+	* nios2-opc.c (nios2_builtin_regs): Add sstatus alias for ba register.
+
+2013-03-11  Kyrylo Tkachov  <kyrylo.tkachov@arm.com>
+
+	* arm-dis.c (arm_opcodes): Add entries for CRC instructions.
+	(thumb32_opcodes): Likewise.
+	(print_insn_thumb32): Handle 'S' control char.
+
+2013-03-08  Yann Sionneau  <yann.sionneau@gmail.com>
+
+	* lm32-desc.c: Regenerate.
+
 2013-03-01  H.J. Lu  <hongjiu.lu@intel.com>
 
 	* i386-reg.tbl (riz): Add RegRex64.

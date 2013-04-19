@@ -969,16 +969,18 @@ handle_output_debug_string (struct target_waitstatus *ourstatus)
       char *p;
       int sig = strtol (s + sizeof (_CYGWIN_SIGNAL_STRING) - 1, &p, 0);
       int gotasig = gdb_signal_from_host (sig);
+
       ourstatus->value.sig = gotasig;
       if (gotasig)
 	{
 	  LPCVOID x;
-	  DWORD n;
+	  SIZE_T n;
+
 	  ourstatus->kind = TARGET_WAITKIND_STOPPED;
 	  retval = strtoul (p, &p, 0);
 	  if (!retval)
 	    retval = main_thread_id;
-	  else if ((x = (LPCVOID) string_to_core_addr (p))
+	  else if ((x = (LPCVOID) (uintptr_t) strtoull (p, NULL, 0))
 		   && ReadProcessMemory (current_process_handle, x,
 					 &saved_context,
 					 __COPY_CONTEXT_SIZE, &n)
@@ -2367,7 +2369,7 @@ windows_can_run (void)
 }
 
 static void
-windows_close (int x)
+windows_close (void)
 {
   DEBUG_EVENTS (("gdb: windows_close, inferior_ptid=%d\n",
 		PIDGET (inferior_ptid)));

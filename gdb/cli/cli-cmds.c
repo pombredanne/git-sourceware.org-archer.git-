@@ -314,6 +314,12 @@ show_version (char *args, int from_tty)
   printf_filtered ("\n");
 }
 
+static void
+show_configuration (char *args, int from_tty)
+{
+  print_gdb_configuration (gdb_stdout);
+}
+
 /* Handle the quit command.  */
 
 void
@@ -322,7 +328,7 @@ quit_command (char *args, int from_tty)
   if (!quit_confirm ())
     error (_("Not confirmed."));
 
-  disconnect_tracing (from_tty);
+  query_if_trace_running (from_tty);
 
   quit_force (args, from_tty);
 }
@@ -1113,20 +1119,22 @@ disassemble_command (char *arg, int from_tty)
   const char *name;
   CORE_ADDR pc;
   int flags;
+  const char *p;
 
+  p = arg;
   name = NULL;
   flags = 0;
 
-  if (arg && *arg == '/')
+  if (p && *p == '/')
     {
-      ++arg;
+      ++p;
 
-      if (*arg == '\0')
+      if (*p == '\0')
 	error (_("Missing modifier."));
 
-      while (*arg && ! isspace (*arg))
+      while (*p && ! isspace (*p))
 	{
-	  switch (*arg++)
+	  switch (*p++)
 	    {
 	    case 'm':
 	      flags |= DISASSEMBLY_SOURCE;
@@ -1139,20 +1147,20 @@ disassemble_command (char *arg, int from_tty)
 	    }
 	}
 
-      arg = skip_spaces (arg);
+      p = skip_spaces_const (p);
     }
 
-  if (! arg || ! *arg)
+  if (! p || ! *p)
     {
       flags |= DISASSEMBLY_OMIT_FNAME;
       disassemble_current_function (flags);
       return;
     }
 
-  pc = value_as_address (parse_to_comma_and_eval (&arg));
-  if (arg[0] == ',')
-    ++arg;
-  if (arg[0] == '\0')
+  pc = value_as_address (parse_to_comma_and_eval (&p));
+  if (p[0] == ',')
+    ++p;
+  if (p[0] == '\0')
     {
       /* One argument.  */
       if (find_pc_partial_function (pc, &name, &low, &high) == 0)
@@ -1172,13 +1180,13 @@ disassemble_command (char *arg, int from_tty)
       /* Two arguments.  */
       int incl_flag = 0;
       low = pc;
-      arg = skip_spaces (arg);
-      if (arg[0] == '+')
+      p = skip_spaces_const (p);
+      if (p[0] == '+')
 	{
-	  ++arg;
+	  ++p;
 	  incl_flag = 1;
 	}
-      high = parse_and_eval_address (arg);
+      high = parse_and_eval_address (p);
       if (incl_flag)
 	high += low;
     }
@@ -1211,7 +1219,7 @@ show_user (char *args, int from_tty)
 
   if (args)
     {
-      char *comname = args;
+      const char *comname = args;
 
       c = lookup_cmd (&comname, cmdlist, "", 0, 1);
       /* c->user_commands would be NULL if it's a python command.  */
@@ -1289,7 +1297,7 @@ argv_to_dyn_string (char **argv, int n)
    Return TRUE if COMMAND exists, unambiguously.  Otherwise FALSE.  */
 
 static int
-valid_command_p (char *command)
+valid_command_p (const char *command)
 {
   struct cmd_list_element *c;
 
@@ -1398,7 +1406,7 @@ alias_command (char *args, int from_tty)
   else
     {
       dyn_string_t alias_prefix_dyn_string, command_prefix_dyn_string;
-      char *alias_prefix, *command_prefix;
+      const char *alias_prefix, *command_prefix;
       struct cmd_list_element *c_alias, *c_command;
 
       if (alias_argc != command_argc)
@@ -1753,6 +1761,9 @@ the previous command number shown."),
 
   add_cmd ("version", no_set_class, show_version,
 	   _("Show what version of GDB this is."), &showlist);
+
+  add_cmd ("configuration", no_set_class, show_configuration,
+	   _("Show how GDB was configured at build time."), &showlist);
 
   /* If target is open when baud changes, it doesn't take effect until
      the next open (I think, not sure).  */

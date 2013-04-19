@@ -42,6 +42,9 @@
 #include "python/python.h"
 #include "objfiles.h"
 #include "auto-load.h"
+#include "maint.h"
+
+#include "filenames.h"
 
 /* The selected interpreter.  This will be used as a set command
    variable, so it should always be malloc'ed - since
@@ -180,15 +183,15 @@ get_init_files (char **system_gdbinit,
 	     has been provided, search for SYSTEM_GDBINIT there.  */
 	  if (gdb_datadir_provided
 	      && datadir_len < sys_gdbinit_len
-	      && strncmp (SYSTEM_GDBINIT, GDB_DATADIR, datadir_len) == 0
-	      && strchr (SLASH_STRING, SYSTEM_GDBINIT[datadir_len]) != NULL)
+	      && filename_ncmp (SYSTEM_GDBINIT, GDB_DATADIR, datadir_len) == 0
+	      && IS_DIR_SEPARATOR (SYSTEM_GDBINIT[datadir_len]))
 	    {
 	      /* Append the part of SYSTEM_GDBINIT that follows GDB_DATADIR
 		 to gdb_datadir.  */
 	      char *tmp_sys_gdbinit = xstrdup (SYSTEM_GDBINIT + datadir_len);
 	      char *p;
 
-	      for (p = tmp_sys_gdbinit; strchr (SLASH_STRING, *p); ++p)
+	      for (p = tmp_sys_gdbinit; IS_DIR_SEPARATOR (*p); ++p)
 		continue;
 	      relocated_sysgdbinit = concat (gdb_datadir, SLASH_STRING, p,
 					     NULL);
@@ -318,6 +321,7 @@ captured_main (void *data)
      initializer.  */
   static int print_help;
   static int print_version;
+  static int print_configuration;
 
   /* Pointers to all arguments of --command option.  */
   VEC (cmdarg_s) *cmdarg_vec = NULL;
@@ -377,7 +381,13 @@ captured_main (void *data)
   gdb_stdtargerr = gdb_stderr;	/* for moment */
   gdb_stdtargin = gdb_stdin;	/* for moment */
 
+#ifdef __MINGW32__
+  /* On Windows, argv[0] is not necessarily set to absolute form when
+     GDB is found along PATH, without which relocation doesn't work.  */
+  gdb_program_name = windows_get_absolute_argv0 (argv[0]);
+#else
   gdb_program_name = xstrdup (argv[0]);
+#endif
 
   if (! getcwd (gdb_dirbuf, sizeof (gdb_dirbuf)))
     /* Don't use *_filtered or warning() (which relies on
@@ -411,7 +421,7 @@ captured_main (void *data)
 
 #ifdef RELOC_SRCDIR
   add_substitute_path_rule (RELOC_SRCDIR,
-			    make_relative_prefix (argv[0], BINDIR,
+			    make_relative_prefix (gdb_program_name, BINDIR,
 						  RELOC_SRCDIR));
 #endif
 
@@ -474,6 +484,7 @@ captured_main (void *data)
       {"command", required_argument, 0, 'x'},
       {"eval-command", required_argument, 0, 'X'},
       {"version", no_argument, &print_version, 1},
+      {"configuration", no_argument, &print_configuration, 1},
       {"x", required_argument, 0, 'x'},
       {"ex", required_argument, 0, 'X'},
       {"init-command", required_argument, 0, OPT_IX},
@@ -538,8 +549,8 @@ captured_main (void *data)
 	    break;
 	  case OPT_STATISTICS:
 	    /* Enable the display of both time and space usage.  */
-	    set_display_time (1);
-	    set_display_space (1);
+	    set_per_command_time (1);
+	    set_per_command_space (1);
 	    break;
 	  case OPT_TUI:
 	    /* --tui is equivalent to -i=tui.  */
@@ -717,8 +728,9 @@ captured_main (void *data)
 	  }
       }
 
-    /* If --help or --version, disable window interface.  */
-    if (print_help || print_version)
+    /* If --help or --version or --configuration, disable window
+       interface.  */
+    if (print_help || print_version || print_configuration)
       {
 	use_windows = 0;
       }
@@ -729,7 +741,7 @@ captured_main (void *data)
 
   /* Initialize all files.  Give the interpreter a chance to take
      control of the console via the deprecated_init_ui_hook ().  */
-  gdb_init (argv[0]);
+  gdb_init (gdb_program_name);
 
   /* Now that gdb_init has created the initial inferior, we're in
      position to set args for that inferior.  */
@@ -806,6 +818,14 @@ captured_main (void *data)
     {
       print_gdb_help (gdb_stdout);
       fputs_unfiltered ("\n", gdb_stdout);
+      exit (0);
+    }
+
+  if (print_configuration)
+    {
+      print_gdb_configuration (gdb_stdout);
+      wrap_here ("");
+      printf_filtered ("\n");
       exit (0);
     }
 
@@ -1120,6 +1140,7 @@ Options:\n\n\
 #endif
   fputs_unfiltered (_("\
   --version          Print version information and then exit.\n\
+  --configuration    Print details about GDB configuration and then exit.\n\
   -w                 Use a window interface.\n\
   --write            Set writing into executable and core files.\n\
   --xdb              XDB compatibility mode.\n\

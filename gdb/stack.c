@@ -324,7 +324,8 @@ read_frame_arg (struct symbol *sym, struct frame_info *frame,
 	}
     }
 
-  if (SYMBOL_CLASS (sym) == LOC_COMPUTED
+  if (SYMBOL_COMPUTED_OPS (sym) != NULL
+      && SYMBOL_COMPUTED_OPS (sym)->read_variable_at_entry != NULL
       && print_entry_values != print_entry_values_no
       && (print_entry_values != print_entry_values_if_needed
 	  || !val || value_optimized_out (val)))
@@ -1037,23 +1038,25 @@ find_frame_funname (struct frame_info *frame, const char **funname,
          changed (and we'll create a find_pc_minimal_function or some
          such).  */
 
-      struct minimal_symbol *msymbol = NULL;
+      struct bound_minimal_symbol msymbol;
 
       /* Don't attempt to do this for inlined functions, which do not
 	 have a corresponding minimal symbol.  */
       if (!block_inlined_p (SYMBOL_BLOCK_VALUE (func)))
 	msymbol
 	  = lookup_minimal_symbol_by_pc (get_frame_address_in_block (frame));
+      else
+	memset (&msymbol, 0, sizeof (msymbol));
 
-      if (msymbol != NULL
-	  && (SYMBOL_VALUE_ADDRESS (msymbol)
+      if (msymbol.minsym != NULL
+	  && (SYMBOL_VALUE_ADDRESS (msymbol.minsym)
 	      > BLOCK_START (SYMBOL_BLOCK_VALUE (func))))
 	{
 	  /* We also don't know anything about the function besides
 	     its address and name.  */
 	  func = 0;
-	  *funname = SYMBOL_PRINT_NAME (msymbol);
-	  *funlang = SYMBOL_LANGUAGE (msymbol);
+	  *funname = SYMBOL_PRINT_NAME (msymbol.minsym);
+	  *funlang = SYMBOL_LANGUAGE (msymbol.minsym);
 	}
       else
 	{
@@ -1080,17 +1083,17 @@ find_frame_funname (struct frame_info *frame, const char **funname,
     }
   else
     {
-      struct minimal_symbol *msymbol;
+      struct bound_minimal_symbol msymbol;
       CORE_ADDR pc;
 
       if (!get_frame_address_in_block_if_available (frame, &pc))
 	return;
 
       msymbol = lookup_minimal_symbol_by_pc (pc);
-      if (msymbol != NULL)
+      if (msymbol.minsym != NULL)
 	{
-	  *funname = SYMBOL_PRINT_NAME (msymbol);
-	  *funlang = SYMBOL_LANGUAGE (msymbol);
+	  *funname = SYMBOL_PRINT_NAME (msymbol.minsym);
+	  *funlang = SYMBOL_LANGUAGE (msymbol.minsym);
 	}
     }
 }
@@ -1424,13 +1427,13 @@ frame_info (char *addr_exp, int from_tty)
     }
   else if (frame_pc_p)
     {
-      struct minimal_symbol *msymbol;
+      struct bound_minimal_symbol msymbol;
 
       msymbol = lookup_minimal_symbol_by_pc (frame_pc);
-      if (msymbol != NULL)
+      if (msymbol.minsym != NULL)
 	{
-	  funname = SYMBOL_PRINT_NAME (msymbol);
-	  funlang = SYMBOL_LANGUAGE (msymbol);
+	  funname = SYMBOL_PRINT_NAME (msymbol.minsym);
+	  funlang = SYMBOL_LANGUAGE (msymbol.minsym);
 	}
     }
   calling_frame_info = get_prev_frame (fi);

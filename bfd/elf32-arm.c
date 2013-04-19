@@ -9139,7 +9139,7 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	    {
 	      Elf_Internal_Rela outrel;
 
-	      if (!SYMBOL_REFERENCES_LOCAL (info, h))
+	      if (h->dynindx != -1 && !SYMBOL_REFERENCES_LOCAL (info, h))
 		{
 		  /* If the symbol doesn't resolve locally in a static
 		     object, we have an undefined reference.  If the
@@ -9158,7 +9158,9 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 		{
 		  if (dynreloc_st_type == STT_GNU_IFUNC)
  		    outrel.r_info = ELF32_R_INFO (0, R_ARM_IRELATIVE);
-		  else if (info->shared)
+		  else if (info->shared &&
+			   (ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
+			    || h->root.type != bfd_link_hash_undefweak))
  		    outrel.r_info = ELF32_R_INFO (0, R_ARM_RELATIVE);
  		  else
  		    outrel.r_info = 0;
@@ -10958,6 +10960,20 @@ bfd_arm_get_mach_from_attributes (bfd * abfd)
 
 	    if (strcmp (name, "IWMMXT") == 0)
 	      return bfd_mach_arm_iWMMXt;
+
+	    if (strcmp (name, "XSCALE") == 0)
+	      {
+		int wmmx;
+
+		BFD_ASSERT (Tag_WMMX_arch < NUM_KNOWN_OBJ_ATTRIBUTES);
+		wmmx = elf_known_obj_attributes (abfd) [OBJ_ATTR_PROC][Tag_WMMX_arch].i;
+		switch (wmmx)
+		  {
+		  case 1: return bfd_mach_arm_iWMMXt;
+		  case 2: return bfd_mach_arm_iWMMXt2;
+		  default: return bfd_mach_arm_XScale;
+		  }
+	      }
 	  }
 
 	return bfd_mach_arm_5TE;
@@ -12449,6 +12465,10 @@ elf32_arm_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	      while (h->root.type == bfd_link_hash_indirect
 		     || h->root.type == bfd_link_hash_warning)
 		h = (struct elf_link_hash_entry *) h->root.u.i.link;
+
+	      /* PR15323, ref flags aren't set for references in the
+		 same object.  */
+	      h->root.non_ir_ref = 1;
 	    }
 	}
 
@@ -13258,7 +13278,7 @@ allocate_dynrelocs_for_symbol (struct elf_link_hash_entry *h, void * inf)
 	      if ((tls_type & GOT_TLS_GD) && indx != 0)
 		elf32_arm_allocate_dynrelocs (info, htab->root.srelgot, 1);
 	    }
-	  else if (!SYMBOL_REFERENCES_LOCAL (info, h))
+	  else if (indx != -1 && !SYMBOL_REFERENCES_LOCAL (info, h))
 	    {
 	      if (htab->root.dynamic_sections_created)
 		/* Reserve room for the GOT entry's R_ARM_GLOB_DAT relocation.  */
@@ -13270,7 +13290,8 @@ allocate_dynrelocs_for_symbol (struct elf_link_hash_entry *h, void * inf)
 	       they all resolve dynamically instead.  Reserve room for the
 	       GOT entry's R_ARM_IRELATIVE relocation.  */
 	    elf32_arm_allocate_irelocs (info, htab->root.srelgot, 1);
-	  else if (info->shared)
+	  else if (info->shared && (ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
+				    || h->root.type != bfd_link_hash_undefweak))
 	    /* Reserve room for the GOT entry's R_ARM_RELATIVE relocation.  */
 	    elf32_arm_allocate_dynrelocs (info, htab->root.srelgot, 1);
 	}
@@ -14415,7 +14436,9 @@ elf32_arm_post_process_headers (bfd * abfd, struct bfd_link_info * link_info ATT
 }
 
 static enum elf_reloc_type_class
-elf32_arm_reloc_type_class (const Elf_Internal_Rela *rela)
+elf32_arm_reloc_type_class (const struct bfd_link_info *info ATTRIBUTE_UNUSED,
+			    const asection *rel_sec ATTRIBUTE_UNUSED,
+			    const Elf_Internal_Rela *rela)
 {
   switch ((int) ELF32_R_TYPE (rela->r_info))
     {

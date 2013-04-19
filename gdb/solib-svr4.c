@@ -189,7 +189,7 @@ has_lm_dynamic_from_link_map (void)
 }
 
 static CORE_ADDR
-lm_addr_check (struct so_list *so, bfd *abfd)
+lm_addr_check (const struct so_list *so, bfd *abfd)
 {
   if (!so->lm_info->l_addr_p)
     {
@@ -1675,7 +1675,7 @@ enable_break (struct svr4_info *info, int from_tty)
       /* We're done with both the temporary bfd and target.  Closing
          the target closes the underlying bfd, because it holds the
          only remaining reference.  */
-      target_close (tmp_bfd_target, 0);
+      target_close (tmp_bfd_target);
 
       if (sym_addr != 0)
 	{

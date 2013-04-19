@@ -1,6 +1,5 @@
 /* 32-bit ELF support for TI C6X
-   Copyright 2010, 2011, 2012
-   Free Software Foundation, Inc.
+   Copyright 2010-2013 Free Software Foundation, Inc.
    Contributed by Joseph Myers <joseph@codesourcery.com>
    		  Bernd Schmidt  <bernds@codesourcery.com>
 
@@ -2832,6 +2831,10 @@ elf32_tic6x_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	  while (h->root.type == bfd_link_hash_indirect
 		 || h->root.type == bfd_link_hash_warning)
 	    h = (struct elf_link_hash_entry *) h->root.u.i.link;
+
+	  /* PR15323, ref flags aren't set for references in the same
+	     object.  */
+	  h->root.non_ir_ref = 1;
 	}
 
       switch (r_type)
@@ -3034,7 +3037,7 @@ elf32_tic6x_add_symbol_hook (bfd *abfd,
       *secp = bfd_make_section_old_way (abfd, ".scommon");
       (*secp)->flags |= SEC_IS_COMMON;
       *valp = sym->st_size;
-      bfd_set_section_alignment (abfd, *secp, bfd_log2 (sym->st_value));
+      (void) bfd_set_section_alignment (abfd, *secp, bfd_log2 (sym->st_value));
       break;
     }
 

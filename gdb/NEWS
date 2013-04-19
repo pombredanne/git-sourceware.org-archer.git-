@@ -1,12 +1,94 @@
 		What has changed in GDB?
 	     (Organized release by release)
 
-*** Changes since GDB 7.5
+*** Changes since GDB 7.6
+
+* New commands:
+catch rethrow
+  Like "catch throw", but catches a re-thrown exception.
+
+show configuration
+  Display the details of GDB configure-time options.
+
+maint set|show per-command
+maint set|show per-command space
+maint set|show per-command time
+maint set|show per-command symtab
+  Enable display of per-command gdb resource usage.
+
+* New options
+
+set remote trace-status-packet
+show remote trace-status-packet
+  Set/show the use of remote protocol qTStatus packet.
+
+* You can now use a literal value 'unlimited' for options that
+  interpret 0 or -1 as meaning "unlimited".  E.g., "set
+  trace-buffer-size unlimited" is now an alias for "set
+  trace-buffer-size -1" and "set height unlimited" is now an alias for
+  "set height 0".
+
+* New command-line options
+--configuration
+  Display the details of GDB configure-time options.
+
+* The command 'tsave' can now support new option '-ctf' to save trace
+  buffer in Common Trace Format.
+
+* Newly installed $prefix/bin/gcore acts as a shell interface for the
+  GDB command gcore.
+
+* GDB now implements the the C++ 'typeid' operator.
+
+* The new convenience variable $_exception holds the exception being
+  thrown or caught at an exception-related catchpoint.
+
+* The exception-related catchpoints, like "catch throw", now accept a
+  regular expression which can be used to filter exceptions by type.
+
+* MI changes
+
+  ** The -trace-save MI command can optionally save trace buffer in Common
+     Trace Format now.
+
+*** Changes in GDB 7.6
+
+* Target record has been renamed to record-full.
+  Record/replay is now enabled with the "record full" command.
+  This also affects settings that are associated with full record/replay
+  that have been moved from "set/show record" to "set/show record full":
+
+set|show record full insn-number-max
+set|show record full stop-at-limit
+set|show record full memory-query
+
+* A new record target "record-btrace" has been added.  The new target
+  uses hardware support to record the control-flow of a process.  It
+  does not support replaying the execution, but it implements the
+  below new commands for investigating the recorded execution log.
+  This new recording method can be enabled using:
+
+record btrace
+
+  The "record-btrace" target is only available on Intel Atom processors
+  and requires a Linux kernel 2.6.32 or later.
+
+* Two new commands have been added for record/replay to give information
+  about the recorded execution without having to replay the execution.
+  The commands are only supported by "record btrace".
+
+record instruction-history      prints the execution history at
+                                instruction granularity
+
+record function-call-history    prints the execution history at
+                                function granularity
 
 * New native configurations
 
 ARM AArch64 GNU/Linux		aarch64*-*-linux-gnu
 FreeBSD/powerpc			powerpc*-*-freebsd
+x86_64/Cygwin			x86_64-*-cygwin*
+Tilera TILE-Gx GNU/Linux	tilegx*-*-linux-gnu
 
 * New targets
 
@@ -14,6 +96,7 @@ ARM AArch64			aarch64*-*-elf
 ARM AArch64 GNU/Linux		aarch64*-*-linux
 Lynx 178 PowerPC		powerpc-*-lynx*178
 x86_64/Cygwin			x86_64-*-cygwin*
+Tilera TILE-Gx GNU/Linux	tilegx*-*-linux
 
 * If the configured location of system.gdbinit file (as given by the
   --with-system-gdbinit option at configure time) is in the
@@ -81,6 +164,9 @@ x86_64/Cygwin			x86_64-*-cygwin*
   Release versions, on the other hand, are built without -lmcheck
   by default.  The --enable-libmcheck/--disable-libmcheck configure
   options allow the user to override that default.
+--with-babeltrace/--with-babeltrace-include/--with-babeltrace-lib
+  This configure option allows the user to build GDB with
+  libbabeltrace using which GDB can read Common Trace Format data.
 
 * New commands (for set/show, see "New options" below)
 
@@ -102,10 +188,6 @@ py [command]
 enable type-printer [name]...
 disable type-printer [name]...
   Enable or disable type printers.
-
-set debug notification
-show debug notification
-  Control display of debugging info for async remote notification.
 
 * Removed commands
 
@@ -130,6 +212,33 @@ show filename-display
   Control the way in which filenames is displayed.
   The default is "relative", which preserves previous behavior.
 
+set trace-buffer-size
+show trace-buffer-size
+  Request target to change the size of trace buffer.
+
+set remote trace-buffer-size-packet auto|on|off
+show remote trace-buffer-size-packet
+  Control the use of the remote protocol `QTBuffer:size' packet.
+
+set debug aarch64
+show debug aarch64
+  Control display of debugging messages related to ARM AArch64.
+  The default is off.
+
+set debug coff-pe-read
+show debug coff-pe-read
+  Control display of debugging messages related to reading of COFF/PE
+  exported symbols.
+
+set debug mach-o
+show debug mach-o
+  Control display of debugging messages related to Mach-O symbols
+  processing.
+
+set debug notification
+show debug notification
+  Control display of debugging info for async remote notification.
+
 * MI changes
 
   ** Command parameter changes are now notified using new async record
@@ -144,8 +253,7 @@ show filename-display
   ** Memory changes are now notified using new async record
      "=memory-changed".
   ** The data-disassemble command response will include a "fullname" field
-     containing the absolute file name when GDB can determine it and source
-     has been requested.
+     containing the absolute file name when source has been requested.
   ** New optional parameter COUNT added to the "-data-write-memory-bytes" 
      command, to allow pattern filling of memory areas.
   ** New commands "-catch-load"/"-catch-unload" added for intercepting
@@ -156,11 +264,32 @@ show filename-display
   ** Output of the "-trace-status" command includes a "trace-file" field 
      containing the name of the trace file being examined.  This field is
      optional, and only present when examining a trace file.
+  ** The "fullname" field is now always present along with the "file" field,
+     even if the file cannot be found by GDB.
 
 * GDB now supports the "mini debuginfo" section, .gnu_debugdata.
   You must have the LZMA library available when configuring GDB for this
   feature to be enabled.  For more information, see:
       http://fedoraproject.org/wiki/Features/MiniDebugInfo
+
+* New remote packets
+
+QTBuffer:size
+   Set the size of trace buffer.  The remote stub reports support for this
+   packet to gdb's qSupported query.
+
+Qbtrace:bts
+  Enable Branch Trace Store (BTS)-based branch tracing for the current
+  thread.  The remote stub reports support for this packet to gdb's
+  qSupported query.
+
+Qbtrace:off
+  Disable branch tracing for the current thread.  The remote stub reports
+  support for this packet to gdb's qSupported query.
+
+qXfer:btrace:read
+  Read the traced branches for the current thread.  The remote stub
+  reports support for this packet to gdb's qSupported query.
 
 *** Changes in GDB 7.5
 

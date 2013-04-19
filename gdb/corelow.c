@@ -46,6 +46,7 @@
 #include "progspace.h"
 #include "objfiles.h"
 #include "gdb_bfd.h"
+#include "completer.h"
 
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
@@ -85,7 +86,7 @@ static void core_open (char *, int);
 
 static void core_detach (struct target_ops *ops, char *, int);
 
-static void core_close (int);
+static void core_close (void);
 
 static void core_close_cleanup (void *ignore);
 
@@ -192,7 +193,7 @@ gdb_check_format (bfd *abfd)
    stack spaces as empty.  */
 
 static void
-core_close (int quitting)
+core_close (void)
 {
   if (core_bfd)
     {
@@ -223,7 +224,7 @@ core_close (int quitting)
 static void
 core_close_cleanup (void *ignore)
 {
-  core_close (0/*ignored*/);
+  core_close ();
 }
 
 /* Look for sections whose names start with `.reg/' so that we can
@@ -977,5 +978,5 @@ _initialize_corelow (void)
 {
   init_core_ops ();
 
-  add_target (&core_ops);
+  add_target_with_completer (&core_ops, filename_completer);
 }

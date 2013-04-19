@@ -326,7 +326,7 @@ static void iterate_over_file_blocks (struct symtab *symtab,
 static void initialize_defaults (struct symtab **default_symtab,
 				 int *default_line);
 
-static CORE_ADDR linespec_expression_to_pc (char **exp_ptr);
+static CORE_ADDR linespec_expression_to_pc (const char **exp_ptr);
 
 static struct symtabs_and_lines decode_objc (struct linespec_state *self,
 					     linespec_p ls,
@@ -2181,7 +2181,8 @@ parse_linespec (linespec_parser *parser, char **argptr)
   /* It must be either LSTOKEN_STRING or LSTOKEN_NUMBER.  */
   if (token.type == LSTOKEN_STRING && *LS_TOKEN_STOKEN (token).ptr == '*')
     {
-      char *expr, *copy;
+      char *expr;
+      const char *copy;
 
       /* User specified an expression, *EXPR.  */
       copy = expr = copy_token_string (token);
@@ -2565,7 +2566,7 @@ initialize_defaults (struct symtab **default_symtab, int *default_line)
    advancing EXP_PTR past any parsed text.  */
 
 static CORE_ADDR
-linespec_expression_to_pc (char **exp_ptr)
+linespec_expression_to_pc (const char **exp_ptr)
 {
   if (current_program_space->executing_startup)
     /* The error message doesn't really matter, because this case
@@ -3073,10 +3074,9 @@ find_linespec_symbols (struct linespec_state *state,
 		       VEC (symbolp) **symbols,
 		       VEC (minsym_and_objfile_d) **minsyms)
 {
-  char *klass, *method, *canon;
-  const char *lookup_name, *last, *p, *scope_op;
   struct cleanup *cleanup;
-  VEC (symbolp) *classes;
+  char *canon;
+  const char *lookup_name;
   volatile struct gdb_exception except;
 
   cleanup = demangle_for_lookup (name, state->language->la_language,
@@ -3096,75 +3096,89 @@ find_linespec_symbols (struct linespec_state *state,
       cleanup = make_cleanup (xfree, canon);
     }
 
-  /* See if we can find a scope operator and break this symbol
-     name into namespaces${SCOPE_OPERATOR}class_name and method_name.  */
-  scope_op = "::";
-  p = find_toplevel_string (lookup_name, scope_op);
-  if (p == NULL)
+  /* It's important to not call expand_symtabs_matching unnecessarily
+     as it can really slow things down (by unnecessarily expanding
+     potentially 1000s of symtabs, which when debugging some apps can
+     cost 100s of seconds).  Avoid this to some extent by *first* calling
+     find_function_symbols, and only if that doesn't find anything
+     *then* call find_method.  This handles two important cases:
+     1) break (anonymous namespace)::foo
+     2) break class::method where method is in class (and not a baseclass)  */
+
+  find_function_symbols (state, file_symtabs, lookup_name,
+			 symbols, minsyms);
+
+  /* If we were unable to locate a symbol of the same name, try dividing
+     the name into class and method names and searching the class and its
+     baseclasses.  */
+  if (VEC_empty (symbolp, *symbols)
+      && VEC_empty (minsym_and_objfile_d, *minsyms))
     {
-      /* No C++ scope operator.  Try Java.  */
-      scope_op = ".";
+      char *klass, *method;
+      const char *last, *p, *scope_op;
+      VEC (symbolp) *classes;
+
+      /* See if we can find a scope operator and break this symbol
+	 name into namespaces${SCOPE_OPERATOR}class_name and method_name.  */
+      scope_op = "::";
       p = find_toplevel_string (lookup_name, scope_op);
-    }
-
-  last = NULL;
-  while (p != NULL)
-    {
-      last = p;
-      p = find_toplevel_string (p + strlen (scope_op), scope_op);
-    }
-
-  /* If no scope operator was found, lookup the name as a symbol.  */
-  if (last == NULL)
-    {
-      find_function_symbols (state, file_symtabs, lookup_name,
-			     symbols, minsyms);
-      do_cleanups (cleanup);
-      return;
-    }
-
-  /* NAME points to the class name.
-     LAST points to the method name.  */
-  klass = xmalloc ((last - lookup_name + 1) * sizeof (char));
-  make_cleanup (xfree, klass);
-  strncpy (klass, lookup_name, last - lookup_name);
-  klass[last - lookup_name] = '\0';
-
-  /* Skip past the scope operator.  */
-  last += strlen (scope_op);
-  method = xmalloc ((strlen (last) + 1) * sizeof (char));
-  make_cleanup (xfree, method);
-  strcpy (method, last);
-
-  /* Find a list of classes named KLASS.  */
-  classes = lookup_prefix_sym (state, file_symtabs, klass);
-  make_cleanup (VEC_cleanup (symbolp), &classes);
-  if (!VEC_empty (symbolp, classes))
-    {
-      /* Now locate a list of suitable methods named METHOD.  */
-      TRY_CATCH (except, RETURN_MASK_ERROR)
+      if (p == NULL)
 	{
-	  find_method (state, file_symtabs, klass, method, classes,
-		       symbols, minsyms);
+	  /* No C++ scope operator.  Try Java.  */
+	  scope_op = ".";
+	  p = find_toplevel_string (lookup_name, scope_op);
 	}
 
-      /* If successful, we're done.  If NOT_FOUND_ERROR
-	 was not thrown, rethrow the exception that we did get.
-	 Otherwise, fall back to looking up the entire name as a symbol.
-	 This can happen with namespace::function.  */
-      if (except.reason >= 0)
+      last = NULL;
+      while (p != NULL)
+	{
+	  last = p;
+	  p = find_toplevel_string (p + strlen (scope_op), scope_op);
+	}
+
+      /* If no scope operator was found, there is nothing more we can do;
+	 we already attempted to lookup the entire name as a symbol
+	 and failed.  */
+      if (last == NULL)
 	{
 	  do_cleanups (cleanup);
 	  return;
 	}
-      else if (except.error != NOT_FOUND_ERROR)
-	throw_exception (except);
+
+      /* LOOKUP_NAME points to the class name.
+	 LAST points to the method name.  */
+      klass = xmalloc ((last - lookup_name + 1) * sizeof (char));
+      make_cleanup (xfree, klass);
+      strncpy (klass, lookup_name, last - lookup_name);
+      klass[last - lookup_name] = '\0';
+
+      /* Skip past the scope operator.  */
+      last += strlen (scope_op);
+      method = xmalloc ((strlen (last) + 1) * sizeof (char));
+      make_cleanup (xfree, method);
+      strcpy (method, last);
+
+      /* Find a list of classes named KLASS.  */
+      classes = lookup_prefix_sym (state, file_symtabs, klass);
+      make_cleanup (VEC_cleanup (symbolp), &classes);
+
+      if (!VEC_empty (symbolp, classes))
+	{
+	  /* Now locate a list of suitable methods named METHOD.  */
+	  TRY_CATCH (except, RETURN_MASK_ERROR)
+	    {
+	      find_method (state, file_symtabs, klass, method, classes,
+			   symbols, minsyms);
+	    }
+
+	  /* If successful, we're done.  If NOT_FOUND_ERROR
+	     was not thrown, rethrow the exception that we did get.  */
+	  if (except.reason < 0 && except.error != NOT_FOUND_ERROR)
+	    throw_exception (except);
+	}
     }
 
-  /* We couldn't find a class, so we check the entire name as a symbol
-     instead.  */
-   find_function_symbols (state, file_symtabs, lookup_name, symbols, minsyms);
-   do_cleanups (cleanup);
+  do_cleanups (cleanup);
 }
 
 /* Return all labels named NAME in FUNCTION_SYMBOLS.  Return the
@@ -3385,7 +3399,7 @@ minsym_found (struct linespec_state *self, struct objfile *objfile,
 
   sal = find_pc_sect_line (SYMBOL_VALUE_ADDRESS (msymbol),
 			   (struct obj_section *) 0, 0);
-  sal.section = SYMBOL_OBJ_SECTION (msymbol);
+  sal.section = SYMBOL_OBJ_SECTION (objfile, msymbol);
 
   /* The minimal symbol might point to a function descriptor;
      resolve it to the actual code address instead.  */

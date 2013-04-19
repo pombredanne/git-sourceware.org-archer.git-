@@ -1,9 +1,6 @@
 /* ELF executable support for BFD.
 
-   Copyright 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000, 2001,
-   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012,
-   2013
-   Free Software Foundation, Inc.
+   Copyright 1993-2013 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -2524,7 +2521,7 @@ _bfd_elf_single_rel_hdr (asection *sec)
    USE_RELA_P is TRUE, we use RELA relocations; otherwise, we use REL
    relocations.  */
 
-bfd_boolean
+static bfd_boolean
 _bfd_elf_init_reloc_shdr (bfd *abfd,
 			  struct bfd_elf_section_reloc_data *reldata,
 			  asection *asect,
@@ -8175,6 +8172,12 @@ elfcore_grok_s390_system_call (bfd *abfd, Elf_Internal_Note *note)
 }
 
 static bfd_boolean
+elfcore_grok_s390_tdb (bfd *abfd, Elf_Internal_Note *note)
+{
+  return elfcore_make_note_pseudosection (abfd, ".reg-s390-tdb", note);
+}
+
+static bfd_boolean
 elfcore_grok_arm_vfp (bfd *abfd, Elf_Internal_Note *note)
 {
   return elfcore_make_note_pseudosection (abfd, ".reg-arm-vfp", note);
@@ -8628,6 +8631,13 @@ elfcore_grok_note (bfd *abfd, Elf_Internal_Note *note)
       if (note->namesz == 6
           && strcmp (note->namedata, "LINUX") == 0)
         return elfcore_grok_s390_system_call (abfd, note);
+      else
+        return TRUE;
+
+    case NT_S390_TDB:
+      if (note->namesz == 6
+          && strcmp (note->namedata, "LINUX") == 0)
+        return elfcore_grok_s390_tdb (abfd, note);
       else
         return TRUE;
 
@@ -9485,6 +9495,18 @@ elfcore_write_s390_system_call (bfd *abfd,
 }
 
 char *
+elfcore_write_s390_tdb (bfd *abfd,
+			char *buf,
+			int *bufsiz,
+			const void *s390_tdb,
+			int size)
+{
+  char *note_name = "LINUX";
+  return elfcore_write_note (abfd, buf, bufsiz,
+                             note_name, NT_S390_TDB, s390_tdb, size);
+}
+
+char *
 elfcore_write_arm_vfp (bfd *abfd,
 		       char *buf,
 		       int *bufsiz,
@@ -9566,6 +9588,8 @@ elfcore_write_register_note (bfd *abfd,
     return elfcore_write_s390_last_break (abfd, buf, bufsiz, data, size);
   if (strcmp (section, ".reg-s390-system-call") == 0)
     return elfcore_write_s390_system_call (abfd, buf, bufsiz, data, size);
+  if (strcmp (section, ".reg-s390-tdb") == 0)
+    return elfcore_write_s390_tdb (abfd, buf, bufsiz, data, size);
   if (strcmp (section, ".reg-arm-vfp") == 0)
     return elfcore_write_arm_vfp (abfd, buf, bufsiz, data, size);
   if (strcmp (section, ".reg-aarch-tls") == 0)
@@ -9732,7 +9756,9 @@ bfd_get_elf_phdrs (bfd *abfd, void *phdrs)
 }
 
 enum elf_reloc_type_class
-_bfd_elf_reloc_type_class (const Elf_Internal_Rela *rela ATTRIBUTE_UNUSED)
+_bfd_elf_reloc_type_class (const struct bfd_link_info *info ATTRIBUTE_UNUSED,
+			   const asection *rel_sec ATTRIBUTE_UNUSED,
+			   const Elf_Internal_Rela *rela ATTRIBUTE_UNUSED)
 {
   return reloc_class_normal;
 }

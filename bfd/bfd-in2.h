@@ -1049,6 +1049,8 @@ void *bfd_zalloc (bfd *abfd, bfd_size_type wanted);
 unsigned long bfd_calc_gnu_debuglink_crc32
    (unsigned long crc, const unsigned char *buf, bfd_size_type len);
 
+char *bfd_get_debug_link_info (bfd *abfd, unsigned long *crc32_out);
+
 char *bfd_follow_gnu_debuglink (bfd *abfd, const char *dir);
 
 struct bfd_section *bfd_create_gnu_debuglink_section
@@ -4867,6 +4869,7 @@ a matching LO8XG part.  */
   BFD_RELOC_H8_DIR24A8,
   BFD_RELOC_H8_DIR24R8,
   BFD_RELOC_H8_DIR32A16,
+  BFD_RELOC_H8_DISP32A16,
 
 /* Sony Xstormy16 Relocations.  */
   BFD_RELOC_XSTORMY16_REL_12,
@@ -6108,6 +6111,7 @@ typedef enum bfd_error
   bfd_error_no_armap,
   bfd_error_no_more_archived_files,
   bfd_error_malformed_archive,
+  bfd_error_missing_dso,
   bfd_error_file_not_recognized,
   bfd_error_file_ambiguously_recognized,
   bfd_error_no_contents,

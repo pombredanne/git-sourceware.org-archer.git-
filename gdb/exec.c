@@ -115,7 +115,7 @@ exec_close (void)
    sections and closes all executable bfds from all program spaces.  */
 
 static void
-exec_close_1 (int quitting)
+exec_close_1 (void)
 {
   struct vmap *vp, *nxt;
 
@@ -943,7 +943,7 @@ Show writing into executable and core files."), NULL,
 			   show_write_files,
 			   &setlist, &showlist);
 
-  add_target (&exec_ops);
+  add_target_with_completer (&exec_ops, filename_completer);
 }
 
 static char *

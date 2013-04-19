@@ -720,11 +720,7 @@ gdbpy_parse_and_eval (PyObject *self, PyObject *args)
 
   TRY_CATCH (except, RETURN_MASK_ALL)
     {
-      char *copy = xstrdup (expr_str);
-      struct cleanup *cleanup = make_cleanup (xfree, copy);
-
-      result = parse_and_eval (copy);
-      do_cleanups (cleanup);
+      result = parse_and_eval (expr_str);
     }
   GDB_PY_HANDLE_EXCEPTION (except);
 
@@ -1723,9 +1719,13 @@ finish_python_initialization (void)
   if (gdb_python_module == NULL)
     {
       gdbpy_print_stack ();
-      warning (_("Could not load the Python gdb module from `%s'."),
+      /* This is passed in one call to warning so that blank lines aren't
+	 inserted between each line of text.  */
+      warning (_("\n"
+		 "Could not load the Python gdb module from `%s'.\n"
+		 "Limited Python support is available from the _gdb module.\n"
+		 "Suggest passing --data-directory=/path/to/gdb/data-directory.\n"),
 		 gdb_pythondir);
-      warning (_("Limited Python support is available from the _gdb module."));
       do_cleanups (cleanup);
       return;
     }

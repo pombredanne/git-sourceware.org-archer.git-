@@ -726,7 +726,8 @@ struct breakpoint
        there is no condition.  */
     char *cond_string;
 
-    /* String form of extra parameters, or NULL if there are none.  */
+    /* String form of extra parameters, or NULL if there are none.
+     Malloc'd.  */
     char *extra_string;
 
     /* Holds the address of the related watchpoint_scope breakpoint
@@ -1268,7 +1269,7 @@ enum breakpoint_create_flags
 extern int create_breakpoint (struct gdbarch *gdbarch, char *arg,
 			      char *cond_string, int thread,
 			      char *extra_string,
-			      int parse_condition_and_thread,
+			      int parse_arg,
 			      int tempflag, enum bptype wanted_type,
 			      int ignore_count,
 			      enum auto_boolean pending_break_support,
@@ -1555,5 +1556,7 @@ extern struct gdbarch *get_sal_arch (struct symtab_and_line sal);
 extern void handle_solib_event (void);
 
 extern void breakpoint_free_objfile (struct objfile *objfile);
+
+extern char *ep_parse_optional_if_clause (char **arg);
 
 #endif /* !defined (BREAKPOINT_H) */
