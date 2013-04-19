@@ -54,6 +54,7 @@
 #include <unistd.h>
 #endif
 #include <arpa/inet.h>
+#include <sys/select.h>
 #include "gdb_stat.h"
 #if HAVE_ERRNO_H
 #include <errno.h>
