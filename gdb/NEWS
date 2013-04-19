@@ -3,6 +3,10 @@
 
 *** Changes since GDB 7.6
 
+* Python scripting
+
+  ** Frame filters and frame decorators have been added.
+
 * New commands:
 catch rethrow
   Like "catch throw", but catches a re-thrown exception.
@@ -121,8 +125,6 @@ Tilera TILE-Gx GNU/Linux	tilegx*-*-linux
 * 'info proc' now works on some core files.
 
 * Python scripting
-
-** Frame filters and frame decorators have been added.
 
   ** Vectors can be created with gdb.Type.vector.
 
