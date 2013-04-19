@@ -270,6 +270,7 @@ aclocal_m4_deps = \
 	import/m4/stdio_h.m4 \
 	import/m4/string_h.m4 \
 	import/m4/sys_socket_h.m4 \
+	import/m4/sys_time_h.m4 \
 	import/m4/sys_types_h.m4 \
 	import/m4/sys_uio_h.m4 \
 	import/m4/unistd_h.m4 \

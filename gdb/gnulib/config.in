@@ -45,8 +45,20 @@
    whether the gnulib module snprintf shall be considered present. */
 #undef GNULIB_SNPRINTF
 
+/* Define to 1 when the gnulib module accept should be tested. */
+#undef GNULIB_TEST_ACCEPT
+
+/* Define to 1 when the gnulib module bind should be tested. */
+#undef GNULIB_TEST_BIND
+
 /* Define to 1 when the gnulib module getaddrinfo should be tested. */
 #undef GNULIB_TEST_GETADDRINFO
+
+/* Define to 1 when the gnulib module getsockname should be tested. */
+#undef GNULIB_TEST_GETSOCKNAME
+
+/* Define to 1 when the gnulib module listen should be tested. */
+#undef GNULIB_TEST_LISTEN
 
 /* Define to 1 when the gnulib module mbrtowc should be tested. */
 #undef GNULIB_TEST_MBRTOWC
@@ -63,8 +75,20 @@
 /* Define to 1 when the gnulib module memmem should be tested. */
 #undef GNULIB_TEST_MEMMEM
 
+/* Define to 1 when the gnulib module recv should be tested. */
+#undef GNULIB_TEST_RECV
+
+/* Define to 1 when the gnulib module send should be tested. */
+#undef GNULIB_TEST_SEND
+
+/* Define to 1 when the gnulib module setsockopt should be tested. */
+#undef GNULIB_TEST_SETSOCKOPT
+
 /* Define to 1 when the gnulib module snprintf should be tested. */
 #undef GNULIB_TEST_SNPRINTF
+
+/* Define to 1 when the gnulib module socket should be tested. */
+#undef GNULIB_TEST_SOCKET
 
 /* Define to 1 if you have 'alloca' after including <alloca.h>, a header that
    may be supplied by this distribution. */
@@ -359,6 +383,9 @@
 
 /* Define to 1 if getsockopt is declared even after undefining macros. */
 #undef HAVE_RAW_DECL_GETSOCKOPT
+
+/* Define to 1 if gettimeofday is declared even after undefining macros. */
+#undef HAVE_RAW_DECL_GETTIMEOFDAY
 
 /* Define to 1 if getusershell is declared even after undefining macros. */
 #undef HAVE_RAW_DECL_GETUSERSHELL
@@ -743,6 +770,9 @@
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
+
+/* Define to 1 if you have the <sys/time.h> header file. */
+#undef HAVE_SYS_TIME_H
 
 /* Define to 1 if you have the <sys/types.h> header file. */
 #undef HAVE_SYS_TYPES_H
