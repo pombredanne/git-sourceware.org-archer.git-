@@ -261,7 +261,7 @@ linux_info_proc (struct gdbarch *gdbarch, char *args,
   int status_f = (what == IP_STATUS || what == IP_ALL);
   int stat_f = (what == IP_STAT || what == IP_ALL);
   char filename[100];
-  gdb_byte *data;
+  char *data;
   int target_errno;
 
   if (args && isdigit (args[0]))
@@ -676,7 +676,7 @@ linux_find_memory_regions_full (struct gdbarch *gdbarch,
 				void *obfd)
 {
   char mapsfilename[100];
-  gdb_byte *data;
+  char *data;
 
   /* We need to know the real target PID to access /proc.  */
   if (current_inferior ()->fake_pid_p)
@@ -993,8 +993,8 @@ linux_make_mappings_corefile_notes (struct gdbarch *gdbarch, bfd *obfd,
   if (mapping_data.file_count != 0)
     {
       /* Write the count to the obstack.  */
-      pack_long (obstack_base (&data_obstack), long_type,
-		 mapping_data.file_count);
+      pack_long ((gdb_byte *) obstack_base (&data_obstack),
+		 long_type, mapping_data.file_count);
 
       /* Copy the filenames to the data obstack.  */
       obstack_grow (&data_obstack, obstack_base (&filename_obstack),
