@@ -31,6 +31,10 @@
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
 #endif /* HAVE_SYS_RESOURCE_H */
+#include <netdb.h>
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
+#endif
 
 #ifdef TUI
 #include "tui/tui.h"		/* For tui_get_command_dimension.   */
@@ -498,6 +502,24 @@ struct cleanup *
 make_cleanup_free_so (struct so_list *so)
 {
   return make_cleanup (do_free_so, so);
+}
+
+/* Helper for make_cleanup_freeaddrinfo.  */
+
+static void
+do_freeaddrinfo_cleanup (void *arg)
+{
+  struct addrinfo *addrinfo = arg;
+
+  freeaddrinfo (addrinfo);
+}
+
+/* Make cleanup handler calling freeaddrinfo for ADDRINFO.  */
+
+struct cleanup *
+make_cleanup_freeaddrinfo (struct addrinfo *addrinfo)
+{
+  return make_cleanup (do_freeaddrinfo_cleanup, addrinfo);
 }
 
 /* Helper for make_cleanup_restore_current_language.  */

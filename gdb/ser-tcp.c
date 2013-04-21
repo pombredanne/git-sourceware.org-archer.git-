@@ -41,8 +41,12 @@
 #ifndef ETIMEDOUT
 #define ETIMEDOUT WSAETIMEDOUT
 #endif
+#undef close
 #define close(fd) closesocket (fd)
 #define ioctl ioctlsocket
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
+#endif
 #else
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -150,77 +154,47 @@ wait_for_connect (struct serial *scb, unsigned int *polls)
   return n;
 }
 
-/* Open a tcp socket.  */
+/* make_cleanup stub for net_close.  */
 
-int
-net_open (struct serial *scb, const char *name)
+static void
+net_close_cleanup (void *arg)
 {
-  char *port_str, hostname[100];
-  int n, port, tmp;
-  int use_udp;
-  struct hostent *hostent;
-  struct sockaddr_in sockaddr;
+  struct serial *scb = arg;
+
+  net_close (scb);
+}
+
+/* Create socket and connect it to ADDRINFO.  On return SCB->FD is -1 on error
+   (and errno is set) or SCB->FD is a connected file descriptor.  */
+
+static void
+scb_connect (struct serial *scb, const struct addrinfo *addrinfo)
+{
 #ifdef USE_WIN32API
   u_long ioarg;
 #else
   int ioarg;
 #endif
+  int n, tmp;
   unsigned int polls = 0;
+  struct cleanup *scb_cleanup;
 
-  use_udp = 0;
-  if (strncmp (name, "udp:", 4) == 0)
-    {
-      use_udp = 1;
-      name = name + 4;
-    }
-  else if (strncmp (name, "tcp:", 4) == 0)
-    name = name + 4;
+  gdb_assert (scb->fd == -1);
 
-  port_str = strchr (name, ':');
-
-  if (!port_str)
-    error (_("net_open: No colon in host name!"));  /* Shouldn't ever
-						       happen.  */
-
-  tmp = min (port_str - name, (int) sizeof hostname - 1);
-  strncpy (hostname, name, tmp);	/* Don't want colon.  */
-  hostname[tmp] = '\000';	/* Tie off host name.  */
-  port = atoi (port_str + 1);
-
-  /* Default hostname is localhost.  */
-  if (!hostname[0])
-    strcpy (hostname, "localhost");
-
-  hostent = gethostbyname (hostname);
-  if (!hostent)
-    {
-      fprintf_unfiltered (gdb_stderr, "%s: unknown host\n", hostname);
-      errno = ENOENT;
-      return -1;
-    }
-
-  sockaddr.sin_family = PF_INET;
-  sockaddr.sin_port = htons (port);
-  memcpy (&sockaddr.sin_addr.s_addr, hostent->h_addr,
-	  sizeof (struct in_addr));
-
- retry:
-
-  if (use_udp)
-    scb->fd = socket (PF_INET, SOCK_DGRAM, 0);
-  else
-    scb->fd = socket (PF_INET, SOCK_STREAM, 0);
-
+  scb->fd = socket (addrinfo->ai_family, addrinfo->ai_socktype,
+		    addrinfo->ai_protocol);
   if (scb->fd == -1)
-    return -1;
-  
+    return;
+
+  scb_cleanup = make_cleanup (net_close_cleanup, scb);
+
   /* Set socket nonblocking.  */
   ioarg = 1;
   ioctl (scb->fd, FIONBIO, &ioarg);
 
   /* Use Non-blocking connect.  connect() will return 0 if connected
      already.  */
-  n = connect (scb->fd, (struct sockaddr *) &sockaddr, sizeof (sockaddr));
+  n = connect (scb->fd, addrinfo->ai_addr, addrinfo->ai_addrlen);
 
   if (n < 0)
     {
@@ -240,8 +214,10 @@ net_open (struct serial *scb, const char *name)
 #endif
 	  && wait_for_connect (NULL, &polls) >= 0)
 	{
-	  close (scb->fd);
-	  goto retry;
+	  do_cleanups (scb_cleanup);
+
+	  /* Retry connection to the same address.  */
+	  return scb_connect (scb, addrinfo);
 	}
 
       if (
@@ -254,9 +230,9 @@ net_open (struct serial *scb, const char *name)
 #endif
 	  )
 	{
+	  do_cleanups (scb_cleanup);
 	  errno = err;
-	  net_close (scb);
-	  return -1;
+	  return;
 	}
 
       /* Looks like we need to wait for the connect.  */
@@ -267,8 +243,8 @@ net_open (struct serial *scb, const char *name)
       while (n == 0);
       if (n < 0)
 	{
-	  net_close (scb);
-	  return -1;
+	  do_cleanups (scb_cleanup);
+	  return;
 	}
     }
 
@@ -294,26 +270,27 @@ net_open (struct serial *scb, const char *name)
 #endif
 	    && wait_for_connect (NULL, &polls) >= 0)
 	  {
-	    close (scb->fd);
-	    goto retry;
+	    do_cleanups (scb_cleanup);
+
+	    /* Retry connection to the same address.  */
+	    return scb_connect (scb, addrinfo);
 	  }
-	if (err)
-	  errno = err;
-	net_close (scb);
-	return -1;
+	do_cleanups (scb_cleanup);
+	errno = err;
+	return;
       }
-  } 
+  }
 
   /* Turn off nonblocking.  */
   ioarg = 0;
   ioctl (scb->fd, FIONBIO, &ioarg);
 
-  if (use_udp == 0)
+  if (addrinfo->ai_socktype == SOCK_STREAM)
     {
       /* Disable Nagle algorithm.  Needed in some cases.  */
       tmp = 1;
       setsockopt (scb->fd, IPPROTO_TCP, TCP_NODELAY,
-		  (char *)&tmp, sizeof (tmp));
+		  (const void *) &tmp, sizeof (tmp));
     }
 
 #ifdef SIGPIPE
@@ -321,6 +298,78 @@ net_open (struct serial *scb, const char *name)
      when the remote side dies.  */
   signal (SIGPIPE, SIG_IGN);
 #endif
+
+  discard_cleanups (scb_cleanup);
+}
+
+/* Open a tcp socket.  */
+
+int
+net_open (struct serial *scb, const char *name)
+{
+  char *port_str, hostname[100];
+  int n, tmp;
+  struct addrinfo hints;
+  struct addrinfo *addrinfo_base, *addrinfo;
+  struct cleanup *addrinfo_cleanup;
+
+  memset (&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_flags = 0;
+  hints.ai_socktype = SOCK_STREAM;
+  if (strncmp (name, "udp:", 4) == 0)
+    {
+      hints.ai_socktype = SOCK_DGRAM;
+      name = name + 4;
+    }
+  else if (strncmp (name, "tcp:", 4) == 0)
+    name = name + 4;
+
+  port_str = strrchr (name, ':');
+
+  if (!port_str)
+    error (_("net_open: No colon in host name!"));  /* Shouldn't ever
+						       happen.  */
+  /* Strip also optional square brackets for IPv6 numeric address.  */
+  if (name[0] == '[')
+    name++;
+  tmp = min (port_str - name, (int) sizeof hostname - 1);
+  strncpy (hostname, name, tmp);	/* Don't want colon.  */
+  if (tmp > 0 && hostname[tmp - 1] == ']')
+    hostname[tmp - 1] = 0;
+  else
+    hostname[tmp] = 0;
+  port_str++;
+
+  n = getaddrinfo (hostname[0] == 0 ? NULL : hostname, port_str, &hints,
+		   &addrinfo_base);
+  if (n != 0)
+    {
+      fprintf_unfiltered (gdb_stderr, _("%s:%s: cannot resolve: %s\n"),
+			  hostname, port_str, gai_strerror (n));
+      errno = ENOENT;
+      return -1;
+    }
+
+  gdb_assert (addrinfo_base != NULL);
+  addrinfo_cleanup = make_cleanup_freeaddrinfo (addrinfo_base);
+
+  scb->fd = -1;
+  for (addrinfo = addrinfo_base; addrinfo != NULL; addrinfo = addrinfo->ai_next)
+    {
+      scb_connect (scb, addrinfo);
+      if (scb->fd != -1)
+	break;
+    }
+  if (scb->fd == -1)
+    {
+      fprintf_unfiltered (gdb_stderr, "%s:%s: cannot create socket: %s\n",
+			  hostname, port_str, safe_strerror (errno));
+      do_cleanups (addrinfo_cleanup);
+      return -1;
+    }
+
+  do_cleanups (addrinfo_cleanup);
 
   return 0;
 }
