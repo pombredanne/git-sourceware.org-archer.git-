@@ -58,6 +58,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module getaddrinfo:
   # Code from module getsockname:
   # Code from module gettext-h:
+  # Code from module gettimeofday:
   # Code from module hostent:
   # Code from module include_next:
   # Code from module inet_ntop:
@@ -190,6 +191,12 @@ AC_DEFUN([gl_INIT],
   gl_SYS_SOCKET_MODULE_INDICATOR([getsockname])
   AC_SUBST([LIBINTL])
   AC_SUBST([LTLIBINTL])
+  gl_FUNC_GETTIMEOFDAY
+  if test $HAVE_GETTIMEOFDAY = 0 || test $REPLACE_GETTIMEOFDAY = 1; then
+    AC_LIBOBJ([gettimeofday])
+    gl_PREREQ_GETTIMEOFDAY
+  fi
+  gl_SYS_TIME_MODULE_INDICATOR([gettimeofday])
   gl_HOSTENT
   gl_FUNC_INET_NTOP
   if test $HAVE_INET_NTOP = 0 || test $REPLACE_INET_NTOP = 1; then
@@ -492,6 +499,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/getaddrinfo.c
   lib/getsockname.c
   lib/gettext.h
+  lib/gettimeofday.c
   lib/inet_ntop.c
   lib/inet_pton.c
   lib/inttypes.in.h
@@ -571,6 +579,7 @@ AC_DEFUN([gl_FILE_LIST], [
   m4/float_h.m4
   m4/fnmatch.m4
   m4/getaddrinfo.m4
+  m4/gettimeofday.m4
   m4/glibc21.m4
   m4/gnulib-common.m4
   m4/hostent.m4

@@ -27,7 +27,7 @@
 
 
 # Specification in the form of a command-line invocation:
-#   gnulib-tool --import --dir=. --lib=libgnu --source-base=import --m4-base=import/m4 --doc-base=doc --tests-base=tests --aux-dir=import/extra --no-conditional-dependencies --no-libtool --macro-prefix=gl --no-vc-files accept bind close fnmatch-gnu getaddrinfo getsockname inet_pton inttypes listen memmem recv select send setsockopt socket sys_select update-copyright
+#   gnulib-tool --import --dir=. --lib=libgnu --source-base=import --m4-base=import/m4 --doc-base=doc --tests-base=tests --aux-dir=import/extra --no-conditional-dependencies --no-libtool --macro-prefix=gl --no-vc-files accept bind close fnmatch-gnu getaddrinfo getsockname gettimeofday inet_pton inttypes listen memmem recv select send setsockopt socket sys_select update-copyright
 
 # Specification in the form of a few gnulib-tool.m4 macro invocations:
 gl_LOCAL_DIR([])
@@ -38,6 +38,7 @@ gl_MODULES([
   fnmatch-gnu
   getaddrinfo
   getsockname
+  gettimeofday
   inet_pton
   inttypes
   listen

@@ -222,6 +222,7 @@ aclocal_m4_deps = \
 	import/m4/float_h.m4 \
 	import/m4/fnmatch.m4 \
 	import/m4/getaddrinfo.m4 \
+	import/m4/gettimeofday.m4 \
 	import/m4/glibc21.m4 \
 	import/m4/gnulib-cache.m4 \
 	import/m4/gnulib-common.m4 \

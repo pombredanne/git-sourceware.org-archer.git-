@@ -33,6 +33,13 @@
 /* Define as the word index where to find the exponent of 'double'. */
 #undef DBL_EXPBIT0_WORD
 
+/* Define if gettimeofday clobbers the localtime buffer. */
+#undef GETTIMEOFDAY_CLOBBERS_LOCALTIME
+
+/* Define this to 'void' or 'struct timezone' to match the system's
+   declaration of the second argument to gettimeofday. */
+#undef GETTIMEOFDAY_TIMEZONE
+
 /* Define to a C preprocessor expression that evaluates to 1 or 0, depending
    whether the gnulib module fscanf shall be considered present. */
 #undef GNULIB_FSCANF
@@ -62,6 +69,9 @@
 
 /* Define to 1 when the gnulib module getsockname should be tested. */
 #undef GNULIB_TEST_GETSOCKNAME
+
+/* Define to 1 when the gnulib module gettimeofday should be tested. */
+#undef GNULIB_TEST_GETTIMEOFDAY
 
 /* Define to 1 when the gnulib module listen should be tested. */
 #undef GNULIB_TEST_LISTEN
@@ -191,6 +201,9 @@
 
 /* Define to 1 if you have the `getservbyname' function. */
 #undef HAVE_GETSERVBYNAME
+
+/* Define to 1 if you have the 'gettimeofday' function. */
+#undef HAVE_GETTIMEOFDAY
 
 /* Define to 1 if you have the `inet_ntop' function. */
 #undef HAVE_INET_NTOP
@@ -822,6 +835,9 @@
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #undef HAVE_SYS_STAT_H
 
+/* Define to 1 if you have the <sys/timeb.h> header file. */
+#undef HAVE_SYS_TIMEB_H
+
 /* Define to 1 if you have the <sys/time.h> header file. */
 #undef HAVE_SYS_TIME_H
 
@@ -887,6 +903,9 @@
 
 /* Define to 1 if the system has the type `_Bool'. */
 #undef HAVE__BOOL
+
+/* Define to 1 if you have the `_ftime' function. */
+#undef HAVE__FTIME
 
 /* Define to 1 if you have the '_set_invalid_parameter_handler' function. */
 #undef HAVE__SET_INVALID_PARAMETER_HANDLER
@@ -1106,6 +1125,9 @@
 /* Define to `int' if <sys/types.h> doesn't define. */
 #undef gid_t
 
+/* Define to rpl_gmtime if the replacement function should be used. */
+#undef gmtime
+
 /* Define to `__inline__' or `__inline' if that's what the C compiler
    calls it, or to nothing if 'inline' is not supported under any name.  */
 #ifndef __cplusplus
@@ -1124,6 +1146,9 @@
 #if defined __APPLE__ && defined __MACH__ && __APPLE_CC__ >= 5465 && !defined __cplusplus && __STDC_VERSION__ >= 199901L && !defined __GNUC_STDC_INLINE__
 # define __GNUC_STDC_INLINE__ 1
 #endif
+
+/* Define to rpl_localtime if the replacement function should be used. */
+#undef localtime
 
 /* Define to a type if <wchar.h> does not define. */
 #undef mbstate_t
