@@ -292,20 +292,6 @@ extern void symbol_file_command (char *, int);
 /* Remote targets may wish to use this as their load function.  */
 extern void generic_load (char *name, int from_tty);
 
-/* Report on STREAM the performance of memory transfer operation,
-   such as 'load'.
-   DATA_COUNT is the number of bytes transferred.
-   WRITE_COUNT is the number of separate write operations, or 0,
-   if that information is not available.
-   START_TIME is the time at which an operation was started.
-   END_TIME is the time at which an operation ended.  */
-struct timeval;
-extern void print_transfer_performance (struct ui_file *stream,
-					unsigned long data_count,
-					unsigned long write_count,
-					const struct timeval *start_time,
-					const struct timeval *end_time);
-
 /* From top.c */
 
 typedef void initialize_file_ftype (void);

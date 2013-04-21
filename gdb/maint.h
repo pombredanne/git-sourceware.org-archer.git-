@@ -19,6 +19,9 @@
 #ifndef MAINT_H
 #define MAINT_H
 
+/* struct timeval needs its full definition on MinGW64.  */
+#include <sys/time.h>
+
 extern void set_per_command_time (int);
 
 extern void set_per_command_space (int);
@@ -28,4 +31,14 @@ extern void set_per_command_space (int);
 
 extern struct cleanup *make_command_stats_cleanup (int);
 
+/* This function is from utils.c.  As it needs struct timeval definition we
+   need to include <sys/time.h>.  But that conflicts with keywords like INT
+   defined on MinGW64 both through <sys/time.h> and by c-exp.y.  This file
+   maint.h is not included from c-exp.y.  */
+
+/* Reset the prompt_for_continue clock.  */
+void reset_prompt_for_continue_wait_time (void);
+/* Return the time spent in prompt_for_continue.  */
+struct timeval get_prompt_for_continue_wait_time (void);
+
 #endif /* MAINT_H */

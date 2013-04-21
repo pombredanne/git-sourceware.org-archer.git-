@@ -3379,12 +3379,12 @@ overlay_command (char *args, int from_tty)
    In this simple implementation, the target data structures are as follows:
    unsigned _novlys;            /# number of overlay sections #/
    unsigned _ovly_table[_novlys][4] = {
-   {VMA, SIZE, LMA, MAPPED},    /# one entry per overlay section #/
+   {VMA, OVLYSIZE, LMA, MAPPED},    /# one entry per overlay section #/
    {..., ...,  ..., ...},
    }
    unsigned _novly_regions;     /# number of overlay regions #/
    unsigned _ovly_region_table[_novly_regions][3] = {
-   {VMA, SIZE, MAPPED_TO_LMA},  /# one entry per overlay region #/
+   {VMA, OVLYSIZE, MAPPED_TO_LMA},  /# one entry per overlay region #/
    {..., ...,  ...},
    }
    These functions will attempt to update GDB's mappedness state in the
@@ -3402,7 +3402,7 @@ static unsigned cache_novlys = 0;
 static CORE_ADDR cache_ovly_table_base = 0;
 enum ovly_index
   {
-    VMA, SIZE, LMA, MAPPED
+    VMA, OVLYSIZE, LMA, MAPPED
   };
 
 /* Throw away the cached copy of _ovly_table.  */
@@ -3416,7 +3416,7 @@ simple_free_overlay_table (void)
   cache_ovly_table_base = 0;
 }
 
-/* Read an array of ints of size SIZE from the target into a local buffer.
+/* Read an array of ints of size OVLYSIZE from the target into a local buffer.
    Convert to host order.  int LEN is number of ints.  */
 static void
 read_target_long_array (CORE_ADDR memaddr, unsigned int *myaddr,
@@ -3498,14 +3498,14 @@ simple_overlay_update_1 (struct obj_section *osect)
   for (i = 0; i < cache_novlys; i++)
     if (cache_ovly_table[i][VMA] == bfd_section_vma (obfd, bsect)
 	&& cache_ovly_table[i][LMA] == bfd_section_lma (obfd, bsect)
-	/* && cache_ovly_table[i][SIZE] == size */ )
+	/* && cache_ovly_table[i][OVLYSIZE] == size */ )
       {
 	read_target_long_array (cache_ovly_table_base + i * word_size,
 				(unsigned int *) cache_ovly_table[i],
 				4, word_size, byte_order);
 	if (cache_ovly_table[i][VMA] == bfd_section_vma (obfd, bsect)
 	    && cache_ovly_table[i][LMA] == bfd_section_lma (obfd, bsect)
-	    /* && cache_ovly_table[i][SIZE] == size */ )
+	    /* && cache_ovly_table[i][OVLYSIZE] == size */ )
 	  {
 	    osect->ovly_mapped = cache_ovly_table[i][MAPPED];
 	    return 1;
@@ -3571,7 +3571,7 @@ simple_overlay_update (struct obj_section *osect)
       for (i = 0; i < cache_novlys; i++)
 	if (cache_ovly_table[i][VMA] == bfd_section_vma (obfd, bsect)
 	    && cache_ovly_table[i][LMA] == bfd_section_lma (obfd, bsect)
-	    /* && cache_ovly_table[i][SIZE] == size */ )
+	    /* && cache_ovly_table[i][OVLYSIZE] == size */ )
 	  { /* obj_section matches i'th entry in ovly_table.  */
 	    osect->ovly_mapped = cache_ovly_table[i][MAPPED];
 	    break;		/* finished with inner for loop: break out.  */

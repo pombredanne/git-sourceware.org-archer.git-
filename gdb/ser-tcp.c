@@ -36,6 +36,7 @@
 
 #include <sys/time.h>
 
+#include <sys/socket.h>
 #ifdef USE_WIN32API
 #include <winsock2.h>
 #ifndef ETIMEDOUT
@@ -51,7 +52,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <sys/socket.h>
 #include <netinet/tcp.h>
 #endif
 
