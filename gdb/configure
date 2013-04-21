@@ -4722,6 +4722,13 @@ $as_echo "$as_me: running $SHELL $ac_sub_configure $ac_sub_configure_args --cach
   cd "$ac_popdir"
 
 
+# include/timeval-utils.h needs this definition as other projects using
+# include/ may not use gnulib and <sys/time.h> may not be available in the host
+# include files.
+
+$as_echo "#define HAVE_SYS_TIME_H 1" >>confdefs.h
+
+
 
 CONFIG_OBS=
 CONFIG_DEPS=

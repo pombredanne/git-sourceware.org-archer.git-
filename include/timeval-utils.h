@@ -24,6 +24,11 @@ Boston, MA 02110-1301, USA.  */
 extern "C" {
 #endif /* __cplusplus */
 
+#ifdef HAVE_SYS_TIME_H
+/* struct timeval needs its full definition on MinGW64.  */
+#include <sys/time.h>
+#endif
+
 /* forward decl */
 struct timeval;
 

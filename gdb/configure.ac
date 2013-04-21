@@ -58,6 +58,11 @@ AC_PROG_MAKE_SET
 # in the source dir.
 ACX_CONFIGURE_DIR(["gnulib"], ["build-gnulib"])
 
+# include/timeval-utils.h needs this definition as other projects using
+# include/ may not use gnulib and <sys/time.h> may not be available in the host
+# include files.
+AC_DEFINE(HAVE_SYS_TIME_H, 1, [<sys/time.h> is provided by gnulib.])
+
 dnl List of object files and targets accumulated by configure.
 
 CONFIG_OBS=
