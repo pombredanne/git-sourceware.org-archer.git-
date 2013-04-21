@@ -4653,6 +4653,7 @@ fi
   # Code from module c-ctype:
   # Code from module close:
   # Code from module configmake:
+  # Code from module connect:
   # Code from module dup2:
   # Code from module errno:
   # Code from module extensions:
@@ -4664,6 +4665,7 @@ fi
   # Code from module fnmatch-gnu:
   # Code from module getaddrinfo:
   # Code from module getsockname:
+  # Code from module getsockopt:
   # Code from module gettext-h:
   # Code from module gettimeofday:
   # Code from module hostent:
@@ -12381,6 +12383,34 @@ $as_echo "#define GNULIB_TEST_CLOSE 1" >>confdefs.h
 
 
 
+  if test "$ac_cv_header_winsock2_h" = yes; then
+
+
+
+
+
+
+
+
+  gl_LIBOBJS="$gl_LIBOBJS connect.$ac_objext"
+
+  fi
+
+
+
+
+
+          GNULIB_CONNECT=1
+
+
+
+
+
+$as_echo "#define GNULIB_TEST_CONNECT 1" >>confdefs.h
+
+
+
+
 
 
 
@@ -13462,6 +13492,34 @@ $as_echo "#define GNULIB_TEST_GETADDRINFO 1" >>confdefs.h
 
 
 $as_echo "#define GNULIB_TEST_GETSOCKNAME 1" >>confdefs.h
+
+
+
+
+  if test "$ac_cv_header_winsock2_h" = yes; then
+
+
+
+
+
+
+
+
+  gl_LIBOBJS="$gl_LIBOBJS getsockopt.$ac_objext"
+
+  fi
+
+
+
+
+
+          GNULIB_GETSOCKOPT=1
+
+
+
+
+
+$as_echo "#define GNULIB_TEST_GETSOCKOPT 1" >>confdefs.h
 
 
 

@@ -61,6 +61,9 @@
 /* Define to 1 when the gnulib module close should be tested. */
 #undef GNULIB_TEST_CLOSE
 
+/* Define to 1 when the gnulib module connect should be tested. */
+#undef GNULIB_TEST_CONNECT
+
 /* Define to 1 when the gnulib module dup2 should be tested. */
 #undef GNULIB_TEST_DUP2
 
@@ -69,6 +72,9 @@
 
 /* Define to 1 when the gnulib module getsockname should be tested. */
 #undef GNULIB_TEST_GETSOCKNAME
+
+/* Define to 1 when the gnulib module getsockopt should be tested. */
+#undef GNULIB_TEST_GETSOCKOPT
 
 /* Define to 1 when the gnulib module gettimeofday should be tested. */
 #undef GNULIB_TEST_GETTIMEOFDAY
