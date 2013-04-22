@@ -41,6 +41,7 @@
 #include "regcache.h"
 #include "gdb_bfd.h"
 #include "cli/cli-utils.h"
+#include "remote.h"
 
 /*
  * All this stuff just to get my host computer's IP address!
