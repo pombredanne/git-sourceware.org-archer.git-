@@ -226,6 +226,9 @@
 /* Define to 1 if you have the <wait.h> header file. */
 #undef HAVE_WAIT_H
 
+/* Define to 1 if you have the <ws2tcpip.h> header file. */
+#undef HAVE_WS2TCPIP_H
+
 /* Checking if errno must be defined */
 #undef MUST_DEFINE_ERRNO
 

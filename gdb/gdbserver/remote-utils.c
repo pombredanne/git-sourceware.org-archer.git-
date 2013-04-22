@@ -53,9 +53,8 @@
 #if HAVE_UNISTD_H
 #include <unistd.h>
 #endif
-#if HAVE_ARPA_INET_H
 #include <arpa/inet.h>
-#endif
+#include <sys/select.h>
 #include "gdb_stat.h"
 #if HAVE_ERRNO_H
 #include <errno.h>
@@ -63,6 +62,9 @@
 
 #if USE_WIN32API
 #include <winsock2.h>
+#endif
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
 #endif
 
 #if __QNX__

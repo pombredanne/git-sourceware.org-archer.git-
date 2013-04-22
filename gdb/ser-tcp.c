@@ -36,18 +36,22 @@
 
 #include <sys/time.h>
 
+#include <sys/socket.h>
 #ifdef USE_WIN32API
 #include <winsock2.h>
 #ifndef ETIMEDOUT
 #define ETIMEDOUT WSAETIMEDOUT
 #endif
+#undef close
 #define close(fd) closesocket (fd)
 #define ioctl ioctlsocket
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
+#endif
 #else
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include <sys/socket.h>
 #include <netinet/tcp.h>
 #endif
 

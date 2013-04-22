@@ -64,6 +64,9 @@
 #if USE_WIN32API
 #include <winsock2.h>
 #endif
+#ifdef HAVE_WS2TCPIP_H
+#include <ws2tcpip.h>
+#endif
 
 #ifndef HAVE_SOCKLEN_T
 typedef int socklen_t;
