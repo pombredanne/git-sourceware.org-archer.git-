@@ -148,7 +148,6 @@ struct mi_cmd
   int *suppress_notification;
 };
 
-
 /* Lookup a command in the MI command table.  */
 
 extern struct mi_cmd *mi_lookup (const char *command);

@@ -1182,14 +1182,14 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 	      else if (PyLong_Check (py_func))
 		{
 		  CORE_ADDR addr = PyLong_AsUnsignedLongLong (py_func);
-		  struct minimal_symbol *msymbol;
+		  struct bound_minimal_symbol msymbol;
 
 		  if (PyErr_Occurred ())
 		    goto error;
 
 		  msymbol = lookup_minimal_symbol_by_pc (addr);
-		  if (msymbol != NULL)
-		    function = SYMBOL_PRINT_NAME (msymbol);
+		  if (msymbol.minsym != NULL)
+		    function = SYMBOL_PRINT_NAME (msymbol.minsym);
 		}
 	      else if (py_func != Py_None)
 		{

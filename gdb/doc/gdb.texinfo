@@ -24557,7 +24557,7 @@ iterate through them all.  This ends up duplicating effort as
 the filter can defer unwinding frames until frame decorators are
 executed, after the last filter has executed, it should.  @xref{Frame
 Decorator API}, for more information on decorators.  Also, there are
-example for both frame decorators and filters in later chapters.
+examples for both frame decorators and filters in later chapters.
 @xref{Writing a Frame Filter}, for more information.
 
 The Python dictionary @code{gdb.frame_filters} contains key/object
@@ -24572,9 +24572,6 @@ can be found are: @code{gdb.Progspace} which contains a
 @code{frame_filters} dictionary attribute, and each @code{gdb.Objfile}
 object which also contains a @code{frame_filters} dictionary
 attribute.
-
-Each frame filter object in these dictionaries must conform to the
-frame filter interface definition defined below.
 
 When a command is executed from @value{GDBN} that is compatible with
 frame filters, @value{GDBN} combines the @code{global},
@@ -24682,7 +24679,7 @@ only be used in conjunction with frame filters.
 The purpose of a frame decorator is to customize the printed content
 of each @code{gdb.Frame} in commands where frame filters are executed.
 This concept is called decorating a frame.  Frame decorators decorate
-a @code{gdb.Frame} with Python code contained with each API call.
+a @code{gdb.Frame} with Python code contained within each API call.
 This separates the actual data contained in a @code{gdb.Frame} from
 the decorated data produced by a frame decorator.  This abstraction is
 necessary to maintain integrity of the data contained in each
@@ -24765,10 +24762,10 @@ any data for this field.
 @defun FrameDecorator.frame_args (self)
 @anchor{frame_args}
 
-This method must return an iterable (an empty iterable is permitted),
-or @code{None}.  Returning an empty iterable, or @code{None} means
-frame arguments will not be printed for this frame.  This iterable
-must contain objects that implement two methods, described here.
+This method must return an iterable, or @code{None}.  Returning an
+empty iterable, or @code{None} means frame arguments will not be
+printed for this frame.  This iterable must contain objects that
+implement two methods, described here.
 
 This object must implement a @code{argument} method which takes a
 single @code{self} parameter and must return a @code{gdb.Symbol}
@@ -24821,9 +24818,9 @@ class SomeFrameDecorator()
 
 @defun FrameDecorator.frame_locals (self)
 
-This method must return an iterable (an empty iterable is permitted),
-or @code{None}.  Returning an empty iterable, or @code{None} means
-frame local arguments will not be printed for this frame.
+This method must return an iterable or @code{None}.  Returning an
+empty iterable, or @code{None} means frame local arguments will not be
+printed for this frame.
 
 The object interface, the description of the various strategies for
 reading frame locals, and the example are largely similar to those
@@ -24855,7 +24852,7 @@ class SomeFrameDecorator()
 @end smallexample
 @end defun
 
-@defun FrameDecorator.frame (self):
+@defun FrameDecorator.inferior_frame (self):
 
 This method must return the underlying @code{gdb.Frame} that this
 frame decorator is decorating.  @value{GDBN} requires the underlying
@@ -24956,11 +24953,10 @@ utilizes a frame decorator to perform some work on the frames.
 decorator interface.
 
 This example works on inlined frames.  It highlights frames which are
-inlined by adding the function in which they are inlined into.  By
-applying a frame decorator to all frames with the Python
-@code{itertools imap} method, the example defers actions to the frame
-decorator.  Frame decorators are only processed when @value{GDBN}
-prints the backtrace.
+inlined by tagging them with an ``[inlined]'' tag.  By applying a
+frame decorator to all frames with the Python @code{itertools imap}
+method, the example defers actions to the frame decorator.  Frame
+decorators are only processed when @value{GDBN} prints the backtrace.
 
 This introduces a new decision making topic: whether to perform
 decision making operations at the filtering step, or at the printing
@@ -25017,7 +25013,7 @@ class InlinedFrameDecorator(FrameDecorator):
         super(InlinedFrameDecorator, self).__init__(fobj)
 
     def function(self):
-        frame = super.base()
+        frame = fobj.inferior_frame()
         name = str(frame.name())
 
         if frame.type() == gdb.INLINE_FRAME:
