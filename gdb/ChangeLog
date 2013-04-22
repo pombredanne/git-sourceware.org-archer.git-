@@ -1,3 +1,323 @@
+2013-04-22  Yao Qi  <yao@codesourcery.com>
+
+	* infrun.c: Fix typo in comment.
+
+2013-04-22  Andrew Haley  <aph@redhat.com>
+
+	* arm-tdep.c (BranchDest): Cast result as "unsigned long",
+	instead of "long".
+
+2013-04-20  Yao Qi  <yao@codesourcery.com>
+
+	* ctf.c (ctf_fetch_registers): Change the type of 'regs' from
+	'char *' to 'gdb_byte *'.  Cast the return value of
+	'bt_ctf_get_char_array' to 'gdb_byte *'.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* configure.ac (build_warnings): Replace -Wno-pointer-sign with
+	-Wpointer-sign.
+	* configure: Regenerate.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* ser-tcp.c (net_read_prim): Cast second argument to recv to
+	'void *'.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* monitor.c (monitor_write_memory, monitor_write_memory_bytes):
+	Change type of 'myaddr' parameter to gdb_byte pointer.
+	(monitor_write_memory_longlongs): Likewise.  Cast 'myaddr' pointer
+	to 'long long' pointer instead of to 'unsigned long long'.
+	(monitor_write_memory_block, monitor_read_memory_single)
+	(monitor_read_memory): Change type of 'myaddr' parameter to
+	gdb_byte pointer.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* record.c (validate_history_size): Make parameter 'setting'
+	unsigned.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* ctf.c (ctf_write_uploaded_tsv, ctf_write_uploaded_tp): Add casts
+	to 'gdb_byte *'.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* cp-valprint.c (cp_print_class_member): Change type of 'fieldno'
+	local to int.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* ada-lang.c (print_it_exception): Add cast to gdb_byte *.
+	* ada-tasks.c (read_fat_string_value): Likewise.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* dwarf2-frame.c (execute_cfa_program): Make 'bytes_read' local
+	unsigned.  Pass 'tmp' to safe_read_uleb128 instead of the signed
+	'offset', and adjust.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* dwarf2read.c (dwarf2_get_dwz_file): Add cast to const char *.
+	(read_index_from_section): Add cast to 'char *'.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* xcoffread.c (xcoff_initial_scan): Add cast to 'char *'.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* coff-pe-read.c (read_pe_exported_syms): Handle strings as char.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* record-full.c (record_full_get_bookmark): Change local 'ret'
+	type to char * and add cast to gdb_byte *.
+	(record_full_goto_bookmark): Handle 'bookmark' argument as a
+	string.
+	* reverse.c (goto_bookmark_command): Add casts to gdb_byte *.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* python/py-inferior.c (infpy_write_memory): Add cast to gdb_byte
+	* python/py-prettyprint.c (print_string_repr): Change type of
+	'output' local to char *.  Add cast to gdb_byte * in
+	LA_PRINT_STRING call.
+	(print_children): Change type of 'output' local to char *.
+	* python/py-value.c (valpy_string): Add cast to const char * in
+	PyUnicode_Decode call.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* remote-mips.c (mips_cksum): Rename 'data' parameter to 'datastr'
+	and change its type to 'const char *'.  Adjust.
+	(mips_send_packet): Add cast to 'char *', and remove cast to
+	'unsigned char *'.
+	(mips_receive_packet): Remove cast to 'unsigned char *'.
+	(mips_load_srec): Use bfd_byte.
+	(pmon_makeb64, pmon_zeroset): Make 'chksum' parameter unsigned.
+	(pmon_checkset): Make 'value' parameter unsigned.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* common/agent.c (agent_run_command): Add cast to gdb_byte *.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* remote.c (remote_write_bytes_aux, compare_sections_command)
+	(remote_read_qxfer)
+	(remote_search_memory, remote_hostio_pwrite, remote_hostio_pread)
+	(remote_hostio_readlink, remote_bfd_iovec_pread)
+	(remote_set_trace_notes): Use gdb_byte when RSP buffer is used as
+	binary buffer, and char when buffer is used as string.
+	* tracepoint.c (encode_source_string, tfile_write_uploaded_tp)
+	(trace_save, tfile_open, traceframe_walk_blocks)
+	(tfile_fetch_registers): Likewise.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* ser-base.c (ser_base_write): Change prototype -- take 'void *'
+	buffer and size_t size.  Adjust.
+	* ser-base.h (ser_base_write): Adjust.
+	* ser-go32.c (cnts): Change type to size_t.
+	(dos_write): Change prototype -- take 'void *'
+	buffer and size_t size.  Adjust.
+	(dos_info): Print elements of 'cnts' as unsigned long.
+	* serial.c (serial_write): Likewise.
+	* serial.h (serial_write): Adjust.
+	(struct serial_ops) <write>: Change prototype -- take 'void *'
+	buffer and size_t size.  Adjust.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* c-lang.c (evaluate_subexp_c): Cast result of obstack_base to
+	gdb_byte *.
+	* linux-tdep.c (linux_make_mappings_corefile_notes): Likewise.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* alpha-tdep.c (alpha_extract_return_value): Use
+	regcache_cooked_read_unsigned to read 'v0'.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* xtensa-tdep.c (execute_l32e, execute_s32e): Change type of
+	parameters 'at', 'as' and 'offset' to uint32_t.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* aarch64-tdep.c (aarch64_analyze_prologue): Change type of local
+	'is64' to signed 'int'.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* s390-tdep.c (is_rs, is_rsy, is_rx, is_rxy): Change type of 'd2'
+	parameter to int *.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* ppc-linux-tdep.c (ppc_skip_trampoline_code): Change local
+	'insnbuf' buffer type to unsigned int[].
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* mips-tdep.c (mips_read_pc): Change local 'pc' type to LONGEST.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* mep-tdep.c (mep_get_insn): Change 'insn' parameter type to
+	unsigned long *.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* alpha-tdep.c (heuristic_fence_post): Change type to int.
+	(alpha_heuristic_proc_start): Adjust to check -1 instead of
+	UINT_MAX.
+	* mips-tdep.c (heuristic_fence_post): Change type to int.
+	(heuristic_proc_start): Adjust to check -1 instead of UINT_MAX.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* cris-tdep.c (usr_cmd_cris_version): Make unsigned.
+	(struct gdbarch_tdep) <cris_version>: Make unsigned.
+	(cris_spec_reg_applicable, cris_gdbarch_init): Adjust locals.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* avr-tdep.c (avr_io_reg_read_command): New local 'bufstr'.  Use
+	it to get a string view of the byte buffer.
+	* i386-cygwin-tdep.c (core_process_module_section): Change local 'buf'
+	type to gdb_byte *.  Adjust.
+	* linux-tdep.c (linux_info_proc, linux_find_memory_regions_full):
+	Change local to char *.
+	* solib-darwin.c (find_program_interpreter): Change return type to
+	char *.  Adjust.
+	(darwin_solib_get_all_image_info_addr_at_init): Adjust.
+	* solib-dsbt.c (enable_break2): Change local 'buf' to char *.
+	* solib-frv.c (enable_break2): Change local 'buf' to char *.
+	* solib-spu.c (spu_current_sos): Add gdb_byte * cast.
+	* solib-svr4.c (find_program_interpreter): Change return type to
+	char *.  Adjust.
+	(enable_break): Change local 'interp_name' to char *.
+	* spu-multiarch.c (spu_xfer_partial): Add cast to 'char *'.
+	* spu-tdep.c (spu_pseudo_register_read_spu): Add cast to 'char *'.
+	(spu_pseudo_register_write_spu): Use char for string buffer.
+	Adjust.
+	(info_spu_event_command, info_spu_signal_command): Add casts to
+	'char *'.
+
+2013-04-19  Pedro Alves  <palves@redhat.com>
+
+	* aarch64-tdep.c (aarch64_default_breakpoint): Change type to
+	gdb_byte[].
+	(aarch64_breakpoint_from_pc): Change return type to gdb_byte *.
+	* ada-lang.c (ada_value_assign): Use gdb_byte.
+	* alphanbsd-tdep.c (sigtramp_retcode): Change type to gdb_byte[].
+	(alphanbsd_sigtramp_offset): Use gdb_byte.
+	* arm-linux-tdep.c (arm_linux_arm_le_breakpoint)
+	(arm_linux_arm_be_breakpoint, eabi_linux_arm_le_breakpoint)
+	(eabi_linux_arm_be_breakpoint, arm_linux_thumb_be_breakpoint)
+	(arm_linux_thumb_le_breakpoint, arm_linux_thumb2_be_breakpoint)
+	(arm_linux_thumb2_le_breakpoint): Change type to gdb_byte[].
+	* arm-tdep.c (arm_stub_unwind_sniffer)
+	(arm_displaced_init_closure): Use gdb_byte.
+	(arm_default_arm_le_breakpoint, arm_default_arm_be_breakpoint)
+	(arm_default_thumb_le_breakpoint)
+	(arm_default_thumb_be_breakpoint): Change type to gdb_byte[].
+	* arm-tdep.h (struct gdbarch_tdep) <arm_breakpoint,
+	thumb_breakpoint, thumb2_breakpoint>: Change type to gdb_byte *.
+	* arm-wince-tdep.c (arm_wince_le_breakpoint)
+	(arm_wince_thumb_le_breakpoint): Change type to gdb_byte[].
+	* armnbsd-tdep.c (arm_nbsd_arm_le_breakpoint)
+	(arm_nbsd_arm_be_breakpoint, arm_nbsd_thumb_le_breakpoint)
+	(arm_nbsd_thumb_be_breakpoint): Change type to gdb_byte[].
+	* armobsd-tdep.c (arm_obsd_thumb_le_breakpoint)
+	(arm_obsd_thumb_be_breakpoint): Change type to gdb_byte[].
+	* cris-tdep.c (push_stack_item, cris_push_dummy_call)
+	(cris_store_return_value, cris_extract_return_value): Use
+	gdb_byte.
+	(constraint): Change type of parameter to char * from signed
+	char*.  Use gdb_byte.
+	* dwarf2loc.c (read_pieced_value, write_pieced_value): Change type
+	of local buffer to gdb_byte *.
+	* dwarf2read.c (read_index_from_section): Use gdb_byte.
+	(create_dwp_hash_table): Change type of locals to gdb_byte *.
+	(add_address_entry): Change type of local buffer to gdb_byte[].
+	* frv-tdep.c (frv_adjust_breakpoint_address, find_func_descr)
+	(frv_push_dummy_call): Use gdb_byte.
+	* hppa-hpux-tdep.c (hppa_hpux_push_dummy_code)
+	(hppa_hpux_supply_ss_fpblock, hppa_hpux_supply_ss_wide)
+	(hppa_hpux_supply_save_state): Use gdb_byte.
+	* hppa-tdep.c (hppa32_push_dummy_call)
+	(hppa64_convert_code_addr_to_fptr): Use gdb_byte.
+	* ia64-tdep.c (extract_bit_field, replace_bit_field)
+	(slotN_contents, replace_slotN_contents): Change type of parameter
+	to gdb_byte *.
+	(fetch_instruction, ia64_pseudo_register_write)
+	(ia64_register_to_value, ia64_value_to_register)
+	(ia64_extract_return_value, ia64_store_return_value)
+	(ia64_push_dummy_call): Use gdb_byte.
+	* m32c-tdep.c (m32c_return_value): Remove cast.
+	* m68hc11-tdep.c (m68hc11_pseudo_register_write)
+	(m68hc11_push_dummy_call, m68hc11_store_return_value): Use
+	gdb_byte.
+	* mipsnbsd-tdep.c (mipsnbsd_get_longjmp_target): Use gdb_byte.
+	* mn10300-tdep.c (mn10300_store_return_value)
+	(mn10300_breakpoint_from_pc, mn10300_push_dummy_call): Use
+	gdb_byte.
+	* moxie-tdep.c (moxie_process_readu): Use gdb_byte.
+	(moxie_process_record): Remove casts.
+	* ppc-ravenscar-thread.c (supply_register_at_address)
+	(ppc_ravenscar_generic_store_registers): Use gdb_byte.
+	* ravenscar-thread.c (get_running_thread_id): Use gdb_byte.
+	* remote-m32r-sdi.c (m32r_fetch_register): Use gdb_byte.
+	* remote-mips.c (mips_xfer_memory): Use gdb_byte.
+	* remote.c (compare_sections_command): Use gdb_byte.
+	* score-tdep.c (score7_free_memblock): Change type of parameter to
+	gdb_byte *.
+	* sh-tdep.c (sh_justify_value_in_reg): Change return type to
+	gdb_byte *.  Use gdb_byte.
+	(sh_push_dummy_call_fpu): Use gdb_byte.
+	(sh_extract_return_value_nofpu, sh_extract_return_value_fpu)
+	(sh_store_return_value_nofpu, sh_store_return_value_fpu)
+	(sh_register_convert_to_virtual, sh_register_convert_to_raw):
+	Change parameter type to 'gdb_byte *'.  Use gdb_byte.
+	(sh_pseudo_register_read, sh_pseudo_register_write): Use gdb_byte.
+	* sh64-tdep.c (sh64_push_dummy_call): Use gdb_byte.
+	(sh64_store_return_value, sh64_register_convert_to_virtual):
+	Change parameter type to 'gdb_byte *'.  Use gdb_byte.
+	(sh64_pseudo_register_write): Use gdb_byte.
+	* solib-darwin.c (darwin_current_sos): Add casts to 'gdb_byte *'.
+	* solib-irix.c (fetch_lm_info): Likewise.  Use gdb_byte for byte
+	buffer.
+	(irix_current_sos): Use gdb_byte.
+	* solib-som.c (som_current_sos): Use gdb_byte.
+	* sparc-ravenscar-thread.c (supply_register_at_address)
+	(sparc_ravenscar_generic_store_registers): Use gdb_byte.
+	* spu-multiarch.c (spu_xfer_partial): Add cast to 'char *'.
+	* spu-tdep.c (spu_get_overlay_table): Use gdb_byte.
+	* tic6x-tdep.c (tic6x_breakpoint_from_pc): Change return type to
+	'gdb_byte *'.
+	* tic6x-tdep.h (struct gdbarch_tdep) <breakpoint>: Change type to
+	'gdb_byte *'.
+	* tracepoint.c (tfile_fetch_registers): Use gdb_byte.
+	* xstormy16-tdep.c (xstormy16_extract_return_value)
+	(xstormy16_store_return_value): Change parameter type to
+	'gdb_byte *'.  Adjust.
+	(xstormy16_push_dummy_call): Use gdb_byte.
+	* xtensa-tdep.c (xtensa_scan_prologue, call0_ret)
+	(call0_analyze_prologue, execute_code): Use gdb_byte.
+
+2013-04-19  Vladimir Kargov <kargov@gmail.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* i387-tdep.c (i387_print_float_info): Use gdb_byte for pointer to
+	value contents.
+
 2013-04-17  Doug Evans  <dje@google.com>
 
 	* dwarf2read.c (struct signatured_type): New member type.

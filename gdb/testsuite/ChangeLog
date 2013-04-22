@@ -1,3 +1,19 @@
+2013-04-22  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb.arch/arm-bl-branch-dest.exp: Replace additional_flags by
+	ldflags.
+
+2013-04-22  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb.arch/arm-bl-branch-dest.c: New file.
+	* gdb.arch/arm-bl-branch-dest.exp: Likewise.
+
+2013-04-19  Vladimir Kargov  <kargov@gmail.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* gdb.arch/i386-float.S: New file.
+	* gdb.arch/i386-float.exp: New file.
+
 2013-04-18  Luis Machado  <lgustavo@codesourcery.com>
 
 	* gdb.mi/mi-var-create-rtti.exp: Create a variable of

@@ -2518,7 +2518,7 @@ ada_value_assign (struct value *toval, struct value *fromval)
       int len = (value_bitpos (toval)
 		 + bits + HOST_CHAR_BIT - 1) / HOST_CHAR_BIT;
       int from_size;
-      char *buffer = (char *) alloca (len);
+      gdb_byte *buffer = alloca (len);
       struct value *val;
       CORE_ADDR to_addr = value_address (toval);
 
@@ -11532,7 +11532,8 @@ print_it_exception (enum exception_catchpoint_kind ex, bpstat bs)
 
 	  if (addr != 0)
 	    {
-	      read_memory (addr, exception_name, sizeof (exception_name) - 1);
+	      read_memory (addr, (gdb_byte *) exception_name,
+			   sizeof (exception_name) - 1);
 	      exception_name [sizeof (exception_name) - 1] = '\0';
 	    }
 	  else
