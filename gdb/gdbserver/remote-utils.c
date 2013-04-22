@@ -158,7 +158,7 @@ handle_accept_event (int err, gdb_client_data client_data)
 {
   struct sockaddr_in sockaddr;
   socklen_t sockaddr_len;
-  i;
+  int i;
 
   if (debug_threads)
     fprintf (stderr, "handling possible accept event\n");
@@ -230,7 +230,6 @@ remote_prepare (char *name)
 #endif
   int port, i;
   struct sockaddr_in sockaddr;
-  socklen_t sockaddr_len;
   char *port_end;
 
   remote_is_stdio = 0;
