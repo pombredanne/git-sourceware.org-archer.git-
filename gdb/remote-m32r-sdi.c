@@ -41,7 +41,7 @@
 #include <time.h>
 #include "gdb_bfd.h"
 #include "cli/cli-utils.h"
-
+#include "remote.h"
 #include "serial.h"
 
 /* Descriptor for I/O to remote machine.  */

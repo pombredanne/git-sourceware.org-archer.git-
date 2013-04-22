@@ -24,6 +24,7 @@
 #include "gdb_assert.h"
 #include "gdb_string.h"
 #include "gdb_bfd.h"
+#include "remote.h"
 
 extern int remote_debug;
 
