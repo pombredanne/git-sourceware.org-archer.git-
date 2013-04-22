@@ -63,6 +63,7 @@
 #include "top.h"
 #include "main.h"
 #include "solist.h"
+#include "maint.h"
 
 #include "inferior.h"		/* for signed_pointer_to_address */
 

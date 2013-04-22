@@ -54,11 +54,6 @@ extern char *safe_strerror (int);
 
 extern const char *gdb_bfd_errmsg (bfd_error_type error_tag, char **matching);
 
-/* Reset the prompt_for_continue clock.  */
-void reset_prompt_for_continue_wait_time (void);
-/* Return the time spent in prompt_for_continue.  */
-struct timeval get_prompt_for_continue_wait_time (void);
-
 /* Parsing utilites.  */
 
 extern int parse_pid_to_attach (char *args);
