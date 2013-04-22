@@ -310,10 +310,12 @@ net_open (struct serial *scb, const char *name)
 
   if (use_udp == 0)
     {
+      int i;
+
       /* Disable Nagle algorithm.  Needed in some cases.  */
-      tmp = 1;
-      setsockopt (scb->fd, IPPROTO_TCP, TCP_NODELAY,
-		  (char *)&tmp, sizeof (tmp));
+      i = 1;
+      setsockopt (scb->fd, IPPROTO_TCP, TCP_NODELAY, (const void *) &i,
+		  sizeof (i));
     }
 
 #ifdef SIGPIPE

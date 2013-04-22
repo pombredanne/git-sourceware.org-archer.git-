@@ -201,9 +201,9 @@ remote_open (char *name)
       static int winsock_initialized;
 #endif
       char *port_str;
-      int port;
+      int port, i;
       struct sockaddr_in sockaddr;
-      socklen_t tmp;
+      socklen_t sockaddr_len;
       int tmp_desc;
 
       port_str = strchr (name, ':');
@@ -225,9 +225,9 @@ remote_open (char *name)
 	perror_with_name ("Can't open socket");
 
       /* Allow rapid reuse of this port. */
-      tmp = 1;
-      setsockopt (tmp_desc, SOL_SOCKET, SO_REUSEADDR, (char *) &tmp,
-		  sizeof (tmp));
+      i = 1;
+      setsockopt (tmp_desc, SOL_SOCKET, SO_REUSEADDR, (const void *) &i,
+		  sizeof (i));
 
       sockaddr.sin_family = PF_INET;
       sockaddr.sin_port = htons (port);
@@ -237,21 +237,22 @@ remote_open (char *name)
 	  || listen (tmp_desc, 1))
 	perror_with_name ("Can't bind address");
 
-      tmp = sizeof (sockaddr);
-      remote_desc = accept (tmp_desc, (struct sockaddr *) &sockaddr, &tmp);
+      sockaddr_len = sizeof (sockaddr);
+      remote_desc = accept (tmp_desc, (struct sockaddr *) &sockaddr,
+			    &sockaddr_len);
       if (remote_desc == -1)
 	perror_with_name ("Accept failed");
 
       /* Enable TCP keep alive process. */
-      tmp = 1;
-      setsockopt (tmp_desc, SOL_SOCKET, SO_KEEPALIVE,
-		  (char *) &tmp, sizeof (tmp));
+      i = 1;
+      setsockopt (tmp_desc, SOL_SOCKET, SO_KEEPALIVE, (const void *) &i,
+		  sizeof (i));
 
       /* Tell TCP not to delay small packets.  This greatly speeds up
 	 interactive response. */
-      tmp = 1;
-      setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY,
-		  (char *) &tmp, sizeof (tmp));
+      i = 1;
+      setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY, (const void *) &i,
+		  sizeof (i));
 
 #ifndef USE_WIN32API
       close (tmp_desc);		/* No longer need this */

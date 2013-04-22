@@ -157,26 +157,28 @@ static int
 handle_accept_event (int err, gdb_client_data client_data)
 {
   struct sockaddr_in sockaddr;
-  socklen_t tmp;
+  socklen_t sockaddr_len;
+  i;
 
   if (debug_threads)
     fprintf (stderr, "handling possible accept event\n");
 
-  tmp = sizeof (sockaddr);
-  remote_desc = accept (listen_desc, (struct sockaddr *) &sockaddr, &tmp);
+  sockaddr_len = sizeof (sockaddr);
+  remote_desc = accept (listen_desc, (struct sockaddr *) &sockaddr,
+			&sockaddr_len);
   if (remote_desc == -1)
     perror_with_name ("Accept failed");
 
   /* Enable TCP keep alive process. */
-  tmp = 1;
-  setsockopt (remote_desc, SOL_SOCKET, SO_KEEPALIVE,
-	      (char *) &tmp, sizeof (tmp));
+  i = 1;
+  setsockopt (remote_desc, SOL_SOCKET, SO_KEEPALIVE, (const void *) &i,
+	      sizeof (i));
 
   /* Tell TCP not to delay small packets.  This greatly speeds up
      interactive response. */
-  tmp = 1;
-  setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY,
-	      (char *) &tmp, sizeof (tmp));
+  i = 1;
+  setsockopt (remote_desc, IPPROTO_TCP, TCP_NODELAY, (const void *) &i,
+	      sizeof (i));
 
 #ifndef USE_WIN32API
   signal (SIGPIPE, SIG_IGN);	/* If we don't do this, then gdbserver simply
@@ -226,9 +228,9 @@ remote_prepare (char *name)
 #ifdef USE_WIN32API
   static int winsock_initialized;
 #endif
-  int port;
+  int port, i;
   struct sockaddr_in sockaddr;
-  socklen_t tmp;
+  socklen_t sockaddr_len;
   char *port_end;
 
   remote_is_stdio = 0;
@@ -268,9 +270,9 @@ remote_prepare (char *name)
     perror_with_name ("Can't open socket");
 
   /* Allow rapid reuse of this port. */
-  tmp = 1;
-  setsockopt (listen_desc, SOL_SOCKET, SO_REUSEADDR, (char *) &tmp,
-	      sizeof (tmp));
+  i = 1;
+  setsockopt (listen_desc, SOL_SOCKET, SO_REUSEADDR, (const void *) &i,
+	      sizeof (i));
 
   sockaddr.sin_family = PF_INET;
   sockaddr.sin_port = htons (port);
