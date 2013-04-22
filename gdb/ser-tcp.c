@@ -24,6 +24,7 @@
 #include "gdbcmd.h"
 #include "cli/cli-decode.h"
 #include "cli/cli-setshow.h"
+#include "filestuff.h"
 
 #include <sys/types.h>
 
@@ -181,12 +182,10 @@ scb_connect (struct serial *scb, const struct addrinfo *addrinfo)
 
   gdb_assert (scb->fd == -1);
 
-  scb->fd = socket (addrinfo->ai_family, addrinfo->ai_socktype,
-		    addrinfo->ai_protocol);
+  scb->fd = gdb_socket_cloexec (addrinfo->ai_family, addrinfo->ai_socktype,
+				addrinfo->ai_protocol);
   if (scb->fd == -1)
     return;
-
-  scb_cleanup = make_cleanup (net_close_cleanup, scb);
 
   /* Set socket nonblocking.  */
   ioarg = 1;
