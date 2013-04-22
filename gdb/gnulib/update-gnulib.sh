@@ -30,9 +30,14 @@
 
 # The list of gnulib modules we are importing in GDB.
 IMPORTED_GNULIB_MODULES="fnmatch-gnu inttypes memmem update-copyright"
+IMPORTED_GNULIB_MODULES="$IMPORTED_GNULIB_MODULES getaddrinfo inet_pton accept"
+IMPORTED_GNULIB_MODULES="$IMPORTED_GNULIB_MODULES bind getsockname listen recv"
+IMPORTED_GNULIB_MODULES="$IMPORTED_GNULIB_MODULES send setsockopt socket close"
+IMPORTED_GNULIB_MODULES="$IMPORTED_GNULIB_MODULES sys_select select"
+IMPORTED_GNULIB_MODULES="$IMPORTED_GNULIB_MODULES gettimeofday"
 
 # The gnulib commit ID to use for the update.
-GNULIB_COMMIT_SHA1="8d5bd1402003bd0153984b138735adf537d960b0"
+GNULIB_COMMIT_SHA1="92f3a4c8e52e64c233e260431d095dbf88554c14"
 
 # The expected version number for the various auto tools we will
 # use after the import.
