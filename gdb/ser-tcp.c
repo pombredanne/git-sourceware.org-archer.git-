@@ -187,6 +187,8 @@ scb_connect (struct serial *scb, const struct addrinfo *addrinfo)
   if (scb->fd == -1)
     return;
 
+  scb_cleanup = make_cleanup (net_close_cleanup, scb);
+
   /* Set socket nonblocking.  */
   ioarg = 1;
   ioctl (scb->fd, FIONBIO, &ioarg);
