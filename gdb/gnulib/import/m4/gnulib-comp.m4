@@ -46,6 +46,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module c-ctype:
   # Code from module close:
   # Code from module configmake:
+  # Code from module connect:
   # Code from module dup2:
   # Code from module errno:
   # Code from module extensions:
@@ -57,6 +58,7 @@ AC_DEFUN([gl_EARLY],
   # Code from module fnmatch-gnu:
   # Code from module getaddrinfo:
   # Code from module getsockname:
+  # Code from module getsockopt:
   # Code from module gettext-h:
   # Code from module gettimeofday:
   # Code from module hostent:
@@ -151,6 +153,11 @@ AC_DEFUN([gl_INIT],
   fi
   gl_UNISTD_MODULE_INDICATOR([close])
   gl_CONFIGMAKE_PREP
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([connect])
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([connect])
   gl_FUNC_DUP2
   if test $HAVE_DUP2 = 0 || test $REPLACE_DUP2 = 1; then
     AC_LIBOBJ([dup2])
@@ -189,6 +196,11 @@ AC_DEFUN([gl_INIT],
     AC_LIBOBJ([getsockname])
   fi
   gl_SYS_SOCKET_MODULE_INDICATOR([getsockname])
+  AC_REQUIRE([gl_HEADER_SYS_SOCKET])
+  if test "$ac_cv_header_winsock2_h" = yes; then
+    AC_LIBOBJ([getsockopt])
+  fi
+  gl_SYS_SOCKET_MODULE_INDICATOR([getsockopt])
   AC_SUBST([LIBINTL])
   AC_SUBST([LTLIBINTL])
   gl_FUNC_GETTIMEOFDAY
@@ -485,6 +497,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/c-ctype.h
   lib/close.c
   lib/config.charset
+  lib/connect.c
   lib/dup2.c
   lib/errno.in.h
   lib/fd-hook.c
@@ -498,6 +511,7 @@ AC_DEFUN([gl_FILE_LIST], [
   lib/gai_strerror.c
   lib/getaddrinfo.c
   lib/getsockname.c
+  lib/getsockopt.c
   lib/gettext.h
   lib/gettimeofday.c
   lib/inet_ntop.c
