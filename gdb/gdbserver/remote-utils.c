@@ -222,7 +222,7 @@ handle_accept_event (int err, gdb_client_data client_data)
    NAME is the filename used for communication.  */
 
 void
-remote_prepare (char *name)
+remote_prepare (const char *name)
 {
   char *port_str;
 #ifdef USE_WIN32API
@@ -288,7 +288,7 @@ remote_prepare (char *name)
    NAME is the filename used for communication.  */
 
 void
-remote_open (char *name)
+remote_open (const char *name)
 {
   char *port_str;
 

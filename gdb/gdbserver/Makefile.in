@@ -283,7 +283,7 @@ all-lib: $(GNULIB_BUILDDIR)/Makefile
 gdbreplay$(EXEEXT): $(GDBREPLAY_OBS)
 	rm -f gdbreplay$(EXEEXT)
 	${CC-LD} $(INTERNAL_CFLAGS) $(INTERNAL_LDFLAGS) -o gdbreplay$(EXEEXT) $(GDBREPLAY_OBS) \
-	  $(XM_CLIBS)
+	  $(LIBGNU) $(XM_CLIBS)
 
 IPA_OBJS=ax-ipa.o tracepoint-ipa.o format-ipa.o utils-ipa.o regcache-ipa.o remote-utils-ipa.o common-utils-ipa.o ${IPA_DEPFILES}
 
