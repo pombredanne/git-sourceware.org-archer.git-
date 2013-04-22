@@ -287,10 +287,12 @@ scb_connect (struct serial *scb, const struct addrinfo *addrinfo)
 
   if (addrinfo->ai_socktype == SOCK_STREAM)
     {
+      int i;
+
       /* Disable Nagle algorithm.  Needed in some cases.  */
-      tmp = 1;
-      setsockopt (scb->fd, IPPROTO_TCP, TCP_NODELAY,
-		  (const void *) &tmp, sizeof (tmp));
+      i = 1;
+      setsockopt (scb->fd, IPPROTO_TCP, TCP_NODELAY, (const void *) &i,
+		  sizeof (i));
     }
 
 #ifdef SIGPIPE
