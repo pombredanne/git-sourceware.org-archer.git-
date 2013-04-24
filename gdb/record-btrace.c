@@ -791,6 +791,64 @@ record_btrace_is_replaying (void)
   return 0;
 }
 
+/* The to_xfer_partial method of target record-btrace.  */
+
+static LONGEST
+record_btrace_xfer_partial (struct target_ops *ops, enum target_object object,
+			    const char *annex, gdb_byte *readbuf,
+			    const gdb_byte *writebuf, ULONGEST offset,
+			    LONGEST len)
+{
+  struct target_ops *t;
+
+  /* Normalize the request so len is positive.  */
+  if (len < 0)
+    {
+      offset += len;
+      len = - len;
+    }
+
+  /* Filter out requests that don't make sense during replay.  */
+  if (record_btrace_is_replaying ())
+    {
+      switch (object)
+	{
+	case TARGET_OBJECT_MEMORY:
+	case TARGET_OBJECT_RAW_MEMORY:
+	case TARGET_OBJECT_STACK_MEMORY:
+	  {
+	    /* We allow reading readonly memory.  */
+	    struct target_section *section;
+
+	    section = target_section_by_addr (ops, offset);
+	    if (section != NULL)
+	      {
+		/* Check if the section we found is readonly.  */
+		if ((bfd_get_section_flags (section->bfd,
+					    section->the_bfd_section)
+		     & SEC_READONLY) != 0)
+		  {
+		    /* Truncate the request to fit into this section.  */
+		    len = min (len, section->endaddr - offset);
+		    break;
+		  }
+	      }
+
+	    throw_error (NOT_AVAILABLE_ERROR,
+			 _("This record target does not trace memory."));
+	  }
+	}
+    }
+
+  /* Forward the request.  */
+  for (t = ops->beneath; t != NULL; t = t->beneath)
+    if (t->to_xfer_partial != NULL)
+      return t->to_xfer_partial (t, object, annex, readbuf, writebuf,
+				 offset, len);
+
+  return -1;
+}
+
 /* The to_fetch_registers method of target record-btrace.  */
 
 static void
@@ -975,6 +1033,7 @@ init_record_btrace_ops (void)
   ops->to_call_history_from = record_btrace_call_history_from;
   ops->to_call_history_range = record_btrace_call_history_range;
   ops->to_record_is_replaying = record_btrace_is_replaying;
+  ops->to_xfer_partial = record_btrace_xfer_partial;
   ops->to_fetch_registers = record_btrace_fetch_registers;
   ops->to_store_registers = record_btrace_store_registers;
   ops->to_prepare_to_store = record_btrace_prepare_to_store;
