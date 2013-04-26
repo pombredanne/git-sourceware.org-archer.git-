@@ -160,6 +160,9 @@ struct btrace_thread_info
 
   /* The function call history iterator.  */
   struct btrace_call_history *call_history;
+
+  /* The current replay position.  NULL if not replaying.  */
+  struct btrace_insn_iterator *replay;
 };
 
 /* Enable branch tracing for a thread.  */
@@ -241,5 +244,8 @@ extern void btrace_set_insn_history (struct btrace_thread_info *,
 extern void btrace_set_call_history (struct btrace_thread_info *,
 				     struct btrace_function *begin,
 				     struct btrace_function *end);
+
+/* Determine if branch tracing is currently replaying TP.  */
+extern int btrace_is_replaying (struct thread_info *tp);
 
 #endif /* BTRACE_H */
