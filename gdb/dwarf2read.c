@@ -68,6 +68,7 @@
 #include "gdb_bfd.h"
 #include "f-lang.h"
 #include "source.h"
+#include "filestuff.h"
 
 #include <fcntl.h>
 #include "gdb_string.h"
@@ -7131,8 +7132,7 @@ process_full_comp_unit (struct dwarf2_per_cu_data *per_cu,
   get_scope_pc_bounds (cu->dies, &lowpc, &highpc, cu);
 
   static_block
-    = end_symtab_get_static_block (highpc + baseaddr, objfile, 0,
-				   per_cu->imported_symtabs != NULL);
+    = end_symtab_get_static_block (highpc + baseaddr, objfile, 0, 1);
 
   /* If the comp unit has DW_AT_ranges, it may have discontiguous ranges.
      Also, DW_AT_ranges may record ranges not belonging to any child DIEs
@@ -8053,7 +8053,7 @@ find_file_and_directory (struct die_info *die, struct dwarf2_cu *cu,
 
 static void
 handle_DW_AT_stmt_list (struct die_info *die, struct dwarf2_cu *cu,
-			const char *comp_dir)
+			const char *comp_dir) /* ARI: editCase function */
 {
   struct attribute *attr;
 
@@ -8185,7 +8185,7 @@ setup_type_unit_groups (struct die_info *die, struct dwarf2_cu *cu)
   attr = dwarf2_attr (die, DW_AT_stmt_list, cu);
 
   /* If we're using .gdb_index (includes -readnow) then
-     per_cu->s.type_unit_group may not have been set up yet.  */
+     per_cu->type_unit_group may not have been set up yet.  */
   if (sig_type->type_unit_group == NULL)
     sig_type->type_unit_group = get_type_unit_group (cu, attr);
   tu_group = sig_type->type_unit_group;
@@ -17925,7 +17925,7 @@ get_signatured_type (struct die_info *die, ULONGEST signature,
 
 static struct type *
 get_DW_AT_signature_type (struct die_info *die, struct attribute *attr,
-			  struct dwarf2_cu *cu)
+			  struct dwarf2_cu *cu) /* ARI: editCase function */
 {
   /* Yes, DW_AT_signature can use a non-ref_sig8 reference.  */
   if (is_ref_attr (attr))
@@ -20698,7 +20698,7 @@ write_psymtabs_to_index (struct objfile *objfile, const char *dir)
 		     INDEX_SUFFIX, (char *) NULL);
   cleanup = make_cleanup (xfree, filename);
 
-  out_file = fopen (filename, "wb");
+  out_file = gdb_fopen_cloexec (filename, "wb");
   if (!out_file)
     error (_("Can't open `%s' for writing"), filename);
 

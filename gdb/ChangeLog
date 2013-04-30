@@ -1,3 +1,164 @@
+2013-04-30  Samuel Thibault  <samuel.thibault@gnu.org>
+
+	* i386gnu-nat.c (CREG_OFFSET): New macro.
+	(creg_offset): New array.
+	(CREG_ADDR): Use creg_offset instead of reg_offset.
+
+2013-04-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* mep-tdep.c (mep_write_pc): Delete.
+	(mep_gdbarch_init): Remove call to set_gdbarch_write_pc.
+	Add call to set_gdbarch_pc_regnum.
+
+2013-04-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* common/filestuff.c: Replace #include <dirent.h> by
+	#include "gdb_dirent.h".
+
+2013-04-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* common/filestuff.c: Replace #include <sys/stat.h> by
+	#include "gdb_stat.h".
+
+2013-04-29  Pierre Muller  <muller@sourceware.org>
+
+	* dwarf2read.c (handle_DW_AT_stmt_list): Avoid ARI warning for
+	editCase function rule.
+	(get_DW_AT_signature_type): Likewise.
+
+2013-04-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* m32r-tdep.c (m32r_write_pc): Delete.
+	(m32r_gdbarch_init): Remove call to set_gdbarch_write_pc.
+	Add call to set_gdbarch_pc_regnum.
+
+2013-04-29  Pierre Muller  <muller@sourceware.org>
+
+	* ./contrib/ari/gdb_ari.sh (editCase rule): Fix spelling error.
+
+2013-04-29  Joel Brobecker  <brobecker@adacore.com>
+
+	* dwarf2read.c (get_DW_AT_signature_type): Add ARI marker.
+
+2013-04-28  Yao Qi  <yao@codesourcery.com>
+
+	* solib-dsbt.c (fetch_loadmap): Re-indent.
+	(displacement_from_map, enable_break2): Likewise.
+	(dsbt_relocate_section_addresses): Likewise.
+
+2013-04-26  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB 7.6 released.
+
+2013-04-25  Andreas Kaufmann  <Andreas.Kaufmann@synopsys.com>
+
+	PR corefiles/14983:
+	* dwarf2read.c (process_full_comp_unit): Always create a static
+	block.
+
+2013-04-25  Hui Zhu  <hui@codesourcery.com>
+
+	* breakpoint.c (build_target_command_list): Change loc->cond_bytecode
+	to loc->cmd_bytecode.
+
+2013-04-24  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (setup_type_unit_groups): Fix comment.
+
+2013-04-22  Keith Seitz  <keiths@redhat.com>
+
+	* tracepoint.c (trace_save):  Call the writer's start method.
+
+2013-04-24  Muhammad Bilal  <mbilal@codesourcery.com>
+
+	PR gdb/10462
+	* cli/cli-decode.c (lookup_command): Show an error if there is no space
+	before argument.
+
+2013-04-23  Tom Tromey  <tromey@redhat.com>
+
+	* common/filestuff.c: Check USE_WIN32API before including
+	sys/socket.h.
+	(HAVE_F_GETFD): New define.
+	(mark_cloexec): Check HAVE_F_GETFD.
+	(gdb_open_cloexec): Change 'mode' to unsigned long.
+	(gdb_socketpair_cloexec): Check HAVE_SOCKETPAIR.
+	(gdb_pipe_cloexec): Check HAVE_PIPE.
+	* common/filestuff.h (gdb_open_cloexec): Change 'mode' to unsigned
+	long.
+
+2013-04-23  Hui Zhu  <hui@codesourcery.com>
+
+	PR gdb/15293
+	* breakpoint.c (bpstat_what): Add BPSTAT_WHAT_SINGLE to bp_dprintf.
+
+2013-04-23  Hui Zhu  <hui@codesourcery.com>
+
+	PR gdb/15165
+	* breakpoint.c (dprintf_print_recreate): New.
+	(save_breakpoints): Let it not save dprintf commands.
+	(initialize_breakpoint_ops): Set dprintf_print_recreate.
+
+2013-04-22  Tom Tromey  <tromey@redhat.com>
+
+	PR gdb/7912:
+	* Makefile.in (SFILES): Add filestuff.c
+	(COMMON_OBS): Add filestuff.o.
+	(filestuff.o): New target.
+	* auto-load.c (auto_load_objfile_script_1): Use
+	gdb_fopen_cloexec.
+	* auxv.c (procfs_xfer_auxv): Use gdb_open_cloexec.
+	* cli/cli-cmds.c (shell_escape): Call close_most_fds.
+	* cli/cli-dump.c (fopen_with_cleanup): Use gdb_fopen_cloexec.
+	* common/agent.c (gdb_connect_sync_socket): Use
+	gdb_socket_cloexec.
+	* common/filestuff.c: New file.
+	* common/filestuff.h: New file.
+	* common/linux-osdata.c (linux_common_core_of_thread)
+	(command_from_pid, commandline_from_pid, print_source_lines)
+	(linux_xfer_osdata_shm, linux_xfer_osdata_sem)
+	(linux_xfer_osdata_msg, linux_xfer_osdata_modules): Use
+	gdb_fopen_cloexec.
+	* common/linux-procfs.c (linux_proc_get_int)
+	(linux_proc_pid_has_state): Use gdb_fopen_cloexec.
+	* config.in, configure: Rebuild.
+	* configure.ac: Don't check for sys/socket.h.  Check for
+	fdwalk, pipe2.
+	* corelow.c (core_open): Use gdb_open_cloexec.
+	* dwarf2read.c (write_psymtabs_to_index): Use gdb_fopen_cloexec.
+	* fork-child.c (fork_inferior): Call close_most_fds.
+	* gdb_bfd.c (gdb_bfd_open): Use gdb_open_cloexec.
+	* inf-child.c (inf_child_fileio_readlink): Use gdb_open_cloexec.
+	* linux-nat.c (linux_nat_thread_name, linux_proc_pending_signals):
+	Use gdb_fopen_cloexec.
+	(linux_proc_xfer_partial, linux_proc_xfer_spu): Use
+	gdb_open_cloexec.
+	(linux_async_pipe): Use gdb_pipe_cloexec.
+	* remote-fileio.c (remote_fileio_func_open): Use
+	gdb_open_cloexec.
+	* remote.c (remote_file_put, remote_file_get): Use
+	gdb_fopen_cloexec.
+	* ser-pipe.c (pipe_open): Use gdb_socketpair_cloexec,
+	close_most_fds.
+	* ser-tcp.c (net_open): Use gdb_socket_cloexec.
+	* ser-unix.c (hardwire_open): Use gdb_open_cloexec.
+	* solib.c (solib_find): Use gdb_open_cloexec.
+	* source.c (openp, find_and_open_source): Use gdb_open_cloexec.
+	* tracepoint.c (tfile_start): Use gdb_fopen_cloexec.
+	(tfile_open): Use gdb_open_cloexec.
+	* tui/tui-io.c (tui_initialize_io): Use gdb_pipe_cloexec.
+	* ui-file.c (gdb_fopen): Use gdb_fopen_cloexec.
+	* xml-support.c (xml_fetch_content_from_file): Use
+	gdb_fopen_cloexec.
+	* main.c (captured_main): Call notice_open_fds.
+
+2013-04-22  Edjunior Machado  <emachado@linux.vnet.ibm.com>
+
+	* remote-sim.c (dump_mem): Change the type of 'buf' parameter from
+	'char *' to 'gdb_byte *'.
+	(gdbsim_store_register): Change the type of 'tmp' from 'char' to
+	'gdb_byte'.
+
 2013-04-22  Yao Qi  <yao@codesourcery.com>
 
 	* infrun.c: Fix typo in comment.

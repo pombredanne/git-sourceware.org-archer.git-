@@ -1,3 +1,27 @@
+2013-04-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/nostaticblock.exp: New file.
+
+2013-04-24  Muhammad Bilal  <mbilal@codesourcery.com>
+
+	PR gdb/10462
+	* gdb.base/setshow.exp: Add test case.
+
+2013-04-23  Hui Zhu  <hui@codesourcery.com>
+
+	PR gdb/15293
+	* gdb.base/dprintf.exp: Add ignore command.
+
+2013-04-23  Hui Zhu  <hui@codesourcery.com>
+
+	PR gdb/15165
+	* gdb.base/save-bp.exp: Add test for dprintf.
+
+2013-04-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.gdb/selftest.exp (do_steps_and_nexts): Check for
+	notice_open_fds.
+
 2013-04-22  Sergio Durigan Junior  <sergiodj@redhat.com>
 
 	* gdb.arch/arm-bl-branch-dest.exp: Replace additional_flags by

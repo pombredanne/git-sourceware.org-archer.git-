@@ -2343,11 +2343,11 @@ build_target_command_list (struct bp_location *bl)
 	    {
 	      /* Only go as far as the first NULL bytecode is
 		 located.  */
-	      if (!loc->cond_bytecode)
+	      if (loc->cmd_bytecode == NULL)
 		return;
 
-	      free_agent_expr (loc->cond_bytecode);
-	      loc->cond_bytecode = NULL;
+	      free_agent_expr (loc->cmd_bytecode);
+	      loc->cmd_bytecode = NULL;
 	    }
 	}
     }
@@ -5529,7 +5529,10 @@ bpstat_what (bpstat bs_head)
 	  break;
 
 	case bp_dprintf:
-	  this_action = BPSTAT_WHAT_STOP_SILENT;
+	  if (bs->stop)
+	    this_action = BPSTAT_WHAT_STOP_SILENT;
+	  else
+	    this_action = BPSTAT_WHAT_SINGLE;
 	  break;
 
 	default:
@@ -13364,6 +13367,16 @@ dprintf_re_set (struct breakpoint *b)
     update_dprintf_command_list (b);
 }
 
+/* Implement the "print_recreate" breakpoint_ops method for dprintf.  */
+
+static void
+dprintf_print_recreate (struct breakpoint *tp, struct ui_file *fp)
+{
+  fprintf_unfiltered (fp, "dprintf %s%s", tp->addr_string,
+		      tp->extra_string);
+  print_recreate_thread (tp, fp);
+}
+
 /* The breakpoint_ops structure to be used on static tracepoints with
    markers (`-m').  */
 
@@ -15453,7 +15466,7 @@ save_breakpoints (char *filename, int from_tty,
     if (tp->ignore_count)
       fprintf_unfiltered (fp, "  ignore $bpnum %d\n", tp->ignore_count);
 
-    if (tp->commands)
+    if (tp->type != bp_dprintf && tp->commands)
       {
 	volatile struct gdb_exception ex;	
 
@@ -15859,7 +15872,7 @@ initialize_breakpoint_ops (void)
   ops->resources_needed = bkpt_resources_needed;
   ops->print_it = bkpt_print_it;
   ops->print_mention = bkpt_print_mention;
-  ops->print_recreate = bkpt_print_recreate;
+  ops->print_recreate = dprintf_print_recreate;
 }
 
 /* Chain containing all defined "enable breakpoint" subcommands.  */
