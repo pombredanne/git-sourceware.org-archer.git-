@@ -782,7 +782,7 @@ ps_pglobal_lookup (gdb_ps_prochandle_t ph, const char *ld_object_name,
 
 static ps_err_e
 rw_common (int dowrite, const struct ps_prochandle *ph, gdb_ps_addr_t addr,
-	   char *buf, int size)
+	   gdb_byte *buf, int size)
 {
   int ret;
   struct cleanup *old_chain;
@@ -831,7 +831,7 @@ ps_err_e
 ps_pdwrite (gdb_ps_prochandle_t ph, gdb_ps_addr_t addr,
 	    gdb_ps_write_buf_t buf, gdb_ps_size_t size)
 {
-  return rw_common (1, ph, addr, (char *) buf, size);
+  return rw_common (1, ph, addr, (gdb_byte *) buf, size);
 }
 
 /* Copies SIZE bytes from target process .text segment to debugger memory.  */
@@ -849,7 +849,7 @@ ps_err_e
 ps_ptwrite (gdb_ps_prochandle_t ph, gdb_ps_addr_t addr,
 	    gdb_ps_write_buf_t buf, gdb_ps_size_t size)
 {
-  return rw_common (1, ph, addr, (char *) buf, size);
+  return rw_common (1, ph, addr, (gdb_byte *) buf, size);
 }
 
 /* Get general-purpose registers for LWP.  */
@@ -1115,11 +1115,12 @@ info_cb (const td_thrhandle_t *th, void *s)
       /* Print thr_create start function.  */
       if (ti.ti_startfunc != 0)
 	{
-	  struct minimal_symbol *msym;
-	  msym = lookup_minimal_symbol_by_pc (ti.ti_startfunc);
-	  if (msym)
+	  const struct bound_minimal_symbol msym
+	    = lookup_minimal_symbol_by_pc (ti.ti_startfunc);
+
+	  if (msym.minsym)
 	    printf_filtered ("   startfunc: %s\n",
-			     SYMBOL_PRINT_NAME (msym));
+			     SYMBOL_PRINT_NAME (msym.minsym));
 	  else
 	    printf_filtered ("   startfunc: %s\n",
 			     paddress (target_gdbarch (), ti.ti_startfunc));
@@ -1128,11 +1129,12 @@ info_cb (const td_thrhandle_t *th, void *s)
       /* If thread is asleep, print function that went to sleep.  */
       if (ti.ti_state == TD_THR_SLEEP)
 	{
-	  struct minimal_symbol *msym;
-	  msym = lookup_minimal_symbol_by_pc (ti.ti_pc);
-	  if (msym)
+	  const struct bound_minimal_symbol msym
+	    = lookup_minimal_symbol_by_pc (ti.ti_pc);
+
+	  if (msym.minsym)
 	    printf_filtered (" - Sleep func: %s\n",
-			     SYMBOL_PRINT_NAME (msym));
+			     SYMBOL_PRINT_NAME (msym.minsym));
 	  else
 	    printf_filtered (" - Sleep func: %s\n",
 			     paddress (target_gdbarch (), ti.ti_startfunc));
