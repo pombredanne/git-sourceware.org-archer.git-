@@ -145,7 +145,7 @@ extract_value (PyObject *obj, struct value **value)
 	  if (*value == NULL)
 	    return PY_BT_ERROR;
 
-	  return 1;
+	  return PY_BT_OK;
 	}
     }
   else
@@ -246,14 +246,13 @@ py_print_value (struct ui_out *out, struct value *val,
 
   /* Never set an indent level for common_val_print if MI.  */
   if (ui_out_is_mi_like_p (out))
-      local_indent = 0;
+    local_indent = 0;
 
   /* MI does not print certain values, differentiated by type,
      depending on what ARGS_TYPE indicates.  Test type against option.
      For CLI print all values.  */
   if (args_type == MI_PRINT_SIMPLE_VALUES
       || args_type == MI_PRINT_ALL_VALUES)
-
     {
       struct type *type = NULL;
 
@@ -362,8 +361,6 @@ py_print_single_arg (struct ui_out *out,
 {
   struct value *val;
   volatile struct gdb_exception except;
-  struct cleanup *cleanups =
-    make_cleanup (null_cleanup, NULL);
 
   if (fa != NULL)
     {
@@ -373,78 +370,96 @@ py_print_single_arg (struct ui_out *out,
   else
     val = fv;
 
-  /*  MI has varying rules for tuples, but generally if there is only
+  TRY_CATCH (except, RETURN_MASK_ALL)
+    {
+      struct cleanup *cleanups = make_cleanup (null_cleanup, NULL);
+
+      /*  MI has varying rules for tuples, but generally if there is only
       one element in each item in the list, do not start a tuple.  The
       exception is -stack-list-variables which emits an ARGS="1" field
       if the value is a frame argument.  This is denoted in this
       function with PRINT_ARGS_FIELD which is flag from the caller to
       emit the ARGS field.  */
-  if (ui_out_is_mi_like_p (out))
-    {
-      if (print_args_field || args_type != NO_VALUES)
-	make_cleanup_ui_out_tuple_begin_end (out, NULL);
-    }
+      if (ui_out_is_mi_like_p (out))
+	{
+	  if (print_args_field || args_type != NO_VALUES)
+	    make_cleanup_ui_out_tuple_begin_end (out, NULL);
+	}
 
-    TRY_CATCH (except, RETURN_MASK_ALL)
-      {
-	annotate_arg_begin ();
+      annotate_arg_begin ();
 
-	/* If frame argument is populated, check for entry-values and the
-	   entry value options.  */
-	if (fa != NULL)
-	  {
-	    struct ui_file *stb;
+      /* If frame argument is populated, check for entry-values and the
+	 entry value options.  */
+      if (fa != NULL)
+	{
+	  struct ui_file *stb;
 
-	    stb = mem_fileopen ();
-	    make_cleanup_ui_file_delete (stb);
-	    fprintf_symbol_filtered (stb, SYMBOL_PRINT_NAME (fa->sym),
-				     SYMBOL_LANGUAGE (fa->sym),
-				     DMGL_PARAMS | DMGL_ANSI);
-	    if (fa->entry_kind == print_entry_values_compact)
-	      {
-		fputs_filtered ("=", stb);
+	  stb = mem_fileopen ();
+	  make_cleanup_ui_file_delete (stb);
+	  fprintf_symbol_filtered (stb, SYMBOL_PRINT_NAME (fa->sym),
+				   SYMBOL_LANGUAGE (fa->sym),
+				   DMGL_PARAMS | DMGL_ANSI);
+	  if (fa->entry_kind == print_entry_values_compact)
+	    {
+	      fputs_filtered ("=", stb);
 
-		fprintf_symbol_filtered (stb, SYMBOL_PRINT_NAME (fa->sym),
-					 SYMBOL_LANGUAGE (fa->sym),
-					 DMGL_PARAMS | DMGL_ANSI);
-	      }
-	    if (fa->entry_kind == print_entry_values_only
-		|| fa->entry_kind == print_entry_values_compact)
-	      {
-		fputs_filtered ("@entry", stb);
-	      }
-	    ui_out_field_stream (out, "name", stb);
-	  }
-	else
-	  /* Otherwise, just output the name.  */
-	  ui_out_field_string (out, "name", sym_name);
+	      fprintf_symbol_filtered (stb, SYMBOL_PRINT_NAME (fa->sym),
+				       SYMBOL_LANGUAGE (fa->sym),
+				       DMGL_PARAMS | DMGL_ANSI);
+	    }
+	  if (fa->entry_kind == print_entry_values_only
+	      || fa->entry_kind == print_entry_values_compact)
+	    {
+	      fputs_filtered ("@entry", stb);
+	    }
+	  ui_out_field_stream (out, "name", stb);
+	}
+      else
+	/* Otherwise, just output the name.  */
+	ui_out_field_string (out, "name", sym_name);
 
-	annotate_arg_name_end ();
+      annotate_arg_name_end ();
 
-	if (! ui_out_is_mi_like_p (out))
-	  ui_out_text (out, "=");
+      if (! ui_out_is_mi_like_p (out))
+	ui_out_text (out, "=");
 
-	if (print_args_field)
-	  ui_out_field_int (out, "arg", 1);
-      }
-    if (except.reason < 0)
-      {
-	gdbpy_convert_exception (except);
-	goto error;
-      }
+      if (print_args_field)
+	ui_out_field_int (out, "arg", 1);
 
-  /* For MI print the type, but only for simple values.  This seems
-     weird, but this is how MI choose to format the various output
-     types.  */
-  if (args_type == MI_PRINT_SIMPLE_VALUES)
-    {
-      if (! py_print_type (out, val))
-	goto error;
-    }
+      /* For MI print the type, but only for simple values.  This seems
+	 weird, but this is how MI choose to format the various output
+	 types.  */
+      if (args_type == MI_PRINT_SIMPLE_VALUES)
+	{
+	  if (py_print_type (out, val) == PY_BT_ERROR)
+	    {
+	      do_cleanups (cleanups);
+	      goto error;
+	    }
+	}
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
-    {
       annotate_arg_value (value_type (val));
+
+      /* If the output is to the CLI, and the user option "set print
+	 frame-arguments" is set to none, just output "...".  */
+      if (! ui_out_is_mi_like_p (out) && args_type == NO_VALUES)
+	ui_out_field_string (out, "value", "...");
+      else
+	{
+	  /* Otherwise, print the value for both MI and the CLI, except
+	     for the case of MI_PRINT_NO_VALUES.  */
+	  if (args_type != NO_VALUES)
+	    {
+	      if (py_print_value (out, val, opts, 0, args_type, language)
+		  == PY_BT_ERROR)
+		{
+		  do_cleanups (cleanups);
+		  goto error;
+		}
+	    }
+	}
+
+      do_cleanups (cleanups);
     }
   if (except.reason < 0)
     {
@@ -452,37 +467,10 @@ py_print_single_arg (struct ui_out *out,
       goto error;
     }
 
-  /* If the output is to the CLI, and the user option "set print
-     frame-arguments" is set to none, just output "...".  */
-  if (! ui_out_is_mi_like_p (out) && args_type == NO_VALUES)
-    {
-      TRY_CATCH (except, RETURN_MASK_ALL)
-	{
-	  ui_out_field_string (out, "value", "...");
-	}
-      if (except.reason < 0)
-	{
-	  gdbpy_convert_exception (except);
-	  goto error;
-	}
-    }
-  else
-    {
-      /* Otherwise, print the value for both MI and the CLI, except
-	 for the case of MI_PRINT_NO_VALUES.  */
-      if (args_type != NO_VALUES)
-	{
-	  if (! py_print_value (out, val, opts, 0, args_type, language))
-	    goto error;
-	}
-    }
-
-  do_cleanups (cleanups);
-
   return PY_BT_OK;
 
  error:
-  do_cleanups (cleanups);
+  //do_cleanups (cleanups);
   return PY_BT_ERROR;
 }
 
@@ -540,7 +528,7 @@ enumerate_args (PyObject *iter,
       char *sym_name;
       struct symbol *sym;
       struct value *val;
-      int success = PY_BT_ERROR;
+      enum py_bt_status success = PY_BT_ERROR;
 
       success = extract_sym (item, &sym_name, &sym, &language);
       if (success == PY_BT_ERROR)
@@ -721,7 +709,6 @@ enumerate_locals (PyObject *iter,
 {
   PyObject *item;
   struct value_print_options opts;
-  struct cleanup *cleanups = make_cleanup (null_cleanup, NULL);
 
   get_user_print_options (&opts);
   opts.deref_ref = 1;
@@ -731,34 +718,34 @@ enumerate_locals (PyObject *iter,
       const struct language_defn *language;
       char *sym_name;
       struct value *val;
-      int success = PY_BT_ERROR;
+      enum py_bt_status  success = PY_BT_ERROR;
       struct symbol *sym;
       volatile struct gdb_exception except;
       int local_indent = 8 + (8 * indent);
+      struct cleanup *locals_cleanups;
 
-      make_cleanup (null_cleanup, NULL);
+      locals_cleanups = make_cleanup_py_decref (item);
 
       success = extract_sym (item, &sym_name, &sym, &language);
       if (success == PY_BT_ERROR)
 	{
-	  Py_DECREF (item);
+	  do_cleanups (locals_cleanups);
 	  goto error;
 	}
+
+      make_cleanup (xfree, sym_name);
 
       success = extract_value (item, &val);
       if (success == PY_BT_ERROR)
 	{
-	  xfree (sym_name);
-	  Py_DECREF (item);
+	  do_cleanups (locals_cleanups);
 	  goto error;
 	}
-
-      Py_DECREF (item);
 
       if (sym != NULL && ui_out_is_mi_like_p (out)
 	  && ! mi_should_print (sym, MI_PRINT_LOCALS))
 	{
-	  xfree (sym_name);
+	  do_cleanups (locals_cleanups);
 	  continue;
 	}
 
@@ -771,8 +758,8 @@ enumerate_locals (PyObject *iter,
 	    }
 	  if (except.reason < 0)
 	    {
-	      xfree (sym_name);
 	      gdbpy_convert_exception (except);
+	      do_cleanups (locals_cleanups);
 	      goto error;
 	    }
 	}
@@ -780,29 +767,19 @@ enumerate_locals (PyObject *iter,
       /* With PRINT_NO_VALUES, MI does not emit a tuple normally as
 	 each output contains only one field.  The exception is
 	 -stack-list-variables, which always provides a tuple.  */
-
       if (ui_out_is_mi_like_p (out))
 	{
 	  if (print_args_field || args_type != NO_VALUES)
 	    make_cleanup_ui_out_tuple_begin_end (out, NULL);
 	}
-      else
+      TRY_CATCH (except, RETURN_MASK_ALL)
 	{
-	  TRY_CATCH (except, RETURN_MASK_ALL)
+	  if (! ui_out_is_mi_like_p (out))
 	    {
 	      /* If the output is not MI we indent locals.  */
 	      ui_out_spaces (out, local_indent);
 	    }
-	  if (except.reason < 0)
-	    {
-	      xfree (sym_name);
-	      gdbpy_convert_exception (except);
-	      goto error;
-	    }
-	}
 
-      TRY_CATCH (except, RETURN_MASK_ALL)
-	{
 	  ui_out_field_string (out, "name", sym_name);
 
 	  if (! ui_out_is_mi_like_p (out))
@@ -810,17 +787,18 @@ enumerate_locals (PyObject *iter,
 	}
       if (except.reason < 0)
 	{
-	  xfree (sym_name);
 	  gdbpy_convert_exception (except);
+	  do_cleanups (locals_cleanups);
 	  goto error;
 	}
 
-      xfree (sym_name);
-
       if (args_type == MI_PRINT_SIMPLE_VALUES)
 	{
-	  if (! py_print_type (out, val))
-	    goto error;
+	  if (py_print_type (out, val) == PY_BT_ERROR)
+	    {
+	      do_cleanups (locals_cleanups);
+	      goto error;
+	    }
 	}
 
       /* CLI always prints values for locals.  MI uses the
@@ -831,7 +809,10 @@ enumerate_locals (PyObject *iter,
 
 	  if (py_print_value (out, val, &opts, val_indent, args_type,
 			      language) ==  PY_BT_ERROR)
-	    goto error;
+	    {
+	      do_cleanups (locals_cleanups);
+	      goto error;
+	    }
 	}
       else
 	{
@@ -839,9 +820,14 @@ enumerate_locals (PyObject *iter,
 	    {
 	      if (py_print_value (out, val, &opts, 0, args_type,
 				  language) ==  PY_BT_ERROR)
-		goto error;
+		{
+		  do_cleanups (locals_cleanups);
+		  goto error;
+		}
 	    }
 	}
+
+      do_cleanups (locals_cleanups);
 
       TRY_CATCH (except, RETURN_MASK_ALL)
 	{
@@ -852,7 +838,6 @@ enumerate_locals (PyObject *iter,
 	  gdbpy_convert_exception (except);
 	  goto error;
 	}
-      do_cleanups (cleanups);
     }
 
   if (item == NULL && PyErr_Occurred ())
@@ -861,7 +846,6 @@ enumerate_locals (PyObject *iter,
   return PY_BT_OK;
 
  error:
-  do_cleanups (cleanups);
   return PY_BT_ERROR;
 }
 
@@ -890,12 +874,12 @@ py_mi_print_variables (PyObject *filter, struct ui_out *out,
   make_cleanup_ui_out_list_begin_end (out, "variables");
 
   if (args_iter != Py_None)
-    if (! enumerate_args (args_iter, out, args_type, 1, frame))
+    if (enumerate_args (args_iter, out, args_type, 1, frame) == PY_BT_ERROR)
       goto error;
 
   if (locals_iter != Py_None)
-    if (! enumerate_locals (locals_iter, out, 1, args_type, 1,
-			    frame))
+    if (enumerate_locals (locals_iter, out, 1, args_type, 1, frame)
+	== PY_BT_ERROR)
       goto error;
 
   do_cleanups (old_chain);
@@ -926,8 +910,8 @@ py_print_locals (PyObject *filter,
   make_cleanup_ui_out_list_begin_end (out, "locals");
 
   if (locals_iter != Py_None)
-    if (! enumerate_locals (locals_iter, out, indent, args_type,
-			    0, frame))
+    if (enumerate_locals (locals_iter, out, indent, args_type,
+			  0, frame) == PY_BT_ERROR)
       goto locals_error;
 
   do_cleanups (old_chain);
@@ -970,7 +954,7 @@ py_print_args (PyObject *filter,
     }
 
   if (args_iter != Py_None)
-    if (! enumerate_args (args_iter, out, args_type, 0, frame))
+    if (enumerate_args (args_iter, out, args_type, 0, frame) == PY_BT_ERROR)
       goto args_error;
 
   TRY_CATCH (except, RETURN_MASK_ALL)
@@ -1055,11 +1039,14 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
   /* stack-list-variables.  */
   if (print_locals && print_args && ! print_frame_info)
     {
-      if (! py_mi_print_variables (filter, out, &opts,
-				   args_type, frame))
+      if (py_mi_print_variables (filter, out, &opts,
+				 args_type, frame) == PY_BT_ERROR)
 	goto error;
       else
-	return PY_BT_COMPLETED;
+	{
+	  do_cleanups (cleanup_stack);
+	  return PY_BT_COMPLETED;
+	}
     }
 
   /* -stack-list-locals does not require a
@@ -1227,7 +1214,7 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
      wrong.  */
   if (print_args)
     {
-      if (! py_print_args (filter, out, args_type, frame))
+      if (py_print_args (filter, out, args_type, frame) == PY_BT_ERROR)
 	goto error;
     }
 
@@ -1328,8 +1315,8 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 
   if (print_locals)
     {
-      if (! py_print_locals (filter, out, args_type, indent,
-			     frame))
+      if (py_print_locals (filter, out, args_type, indent,
+			   frame) == PY_BT_ERROR)
 	goto error;
     }
 
@@ -1350,10 +1337,12 @@ py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
 
       while ((item = PyIter_Next (elided)))
 	{
-	  int success = py_print_frame (item, flags, args_type, out, indent,
-					 levels_printed);
+	  enum py_bt_status success = py_print_frame (item, flags,
+						      args_type, out,
+						      indent,
+						      levels_printed);
 
-	  if (success == PY_BT_ERROR && PyErr_Occurred ())
+	  if (success == PY_BT_ERROR)
 	    {
 	      Py_DECREF (item);
 	      goto error;
@@ -1451,7 +1440,7 @@ bootstrap_python_frame_filters (struct frame_info *frame,
     beginning of the slice of frames to print, and FRAME_HIGH is the
     upper limit of the frames to count.  */
 
-int
+enum py_bt_status
 apply_frame_filter (struct frame_info *frame, int flags,
 		    enum py_frame_args args_type,
 		    struct ui_out *out, int frame_low,
@@ -1460,7 +1449,7 @@ apply_frame_filter (struct frame_info *frame, int flags,
 {
   struct gdbarch *gdbarch = NULL;
   struct cleanup *cleanups;
-  int success = PY_BT_ERROR;
+  enum py_bt_status success = PY_BT_ERROR;
   PyObject *iterable;
   volatile struct gdb_exception except;
   PyObject *item;

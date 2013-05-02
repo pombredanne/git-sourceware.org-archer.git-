@@ -1663,7 +1663,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int no_filters,
   int i;
   struct frame_info *trailing;
   int trailing_level, py_start = 0, py_end = 0;
-  int result = 0;
+  enum py_bt_status result = PY_BT_ERROR;
 
   if (!target_has_stack)
     error (_("No stack."));
@@ -1738,6 +1738,7 @@ backtrace_command_1 (char *count_exp, int show_locals, int no_filters,
     {
       int flags = PRINT_LEVEL | PRINT_FRAME_INFO | PRINT_ARGS;
       enum py_frame_args arg_type;
+
       if (show_locals)
 	flags |= PRINT_LOCALS;
 

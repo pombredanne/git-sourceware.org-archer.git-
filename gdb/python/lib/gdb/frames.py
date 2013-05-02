@@ -40,10 +40,7 @@ def get_priority(filter_item):
     """
     # Do not fail here, as the sort will fail.  If a filter has not
     # (incorrectly) set a priority, set it to zero.
-    if hasattr(filter_item, "priority"):
-        return filter_item.priority
-    else:
-        return 0
+    return getattr(filter_item, "priority", 0)
 
 def set_priority(filter_item, priority):
     """ Internal worker function to set the frame-filter's priority.
@@ -76,10 +73,7 @@ def get_enabled(filter_item):
     # If the filter class is badly implemented when called from the
     # Python filter command, do not cease filter operations, just set
     # enabled to False.
-    if hasattr(filter_item, "enabled"):
-        return filter_item.enabled
-    else:
-        return False
+    return getattr(filter_item, "enabled", False)
 
 def set_enabled(filter_item, state):
     """ Internal Worker function to set the frame-filter's enabled

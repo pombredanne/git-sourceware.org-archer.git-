@@ -78,7 +78,7 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
   int i;
   struct cleanup *cleanup_stack;
   struct frame_info *fi;
-  int result = PY_BT_ERROR;
+  enum py_bt_status result = PY_BT_ERROR;
   int raw_arg = 0;
   int oind = 0;
   enum opt
@@ -107,14 +107,14 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
 	  break;
 	}
     }
-  if ((argc > 3 && ! raw_arg) || (argc == 1 && ! raw_arg)
-      || (argc == 2 && raw_arg))
+
+  if ((argc > 3) || (argc == 2 && oind) || (argc == 1 && ! oind))
     error (_("-stack-list-frames: Usage: [--no-frame-filters] [FRAME_LOW FRAME_HIGH]"));
 
   if (argc == 3 || argc == 2)
     {
-      frame_low = atoi (argv[0 + raw_arg]);
-      frame_high = atoi (argv[1 + raw_arg]);
+      frame_low = atoi (argv[0 + oind]);
+      frame_high = atoi (argv[1 + oind]);
     }
   else
     {
@@ -224,7 +224,7 @@ mi_cmd_stack_list_locals (char *command, char **argv, int argc)
 {
   struct frame_info *frame;
   int raw_arg = 0;
-  int result = PY_BT_ERROR;
+  enum py_bt_status result = PY_BT_ERROR;
   int print_value;
 
   if (argc > 0)
@@ -268,7 +268,7 @@ mi_cmd_stack_list_args (char *command, char **argv, int argc)
   enum print_values print_values;
   struct ui_out *uiout = current_uiout;
   int raw_arg = 0;
-  int result = PY_BT_ERROR;
+  enum py_bt_status result = PY_BT_ERROR;
 
   if (argc > 0)
     raw_arg = parse_no_frames_option (argv[0]);
@@ -353,7 +353,7 @@ mi_cmd_stack_list_variables (char *command, char **argv, int argc)
 {
   struct frame_info *frame;
   int raw_arg = 0;
-  int result = PY_BT_ERROR;
+  enum py_bt_status result = PY_BT_ERROR;
   int print_value;
 
   if (argc > 0)

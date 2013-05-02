@@ -34,19 +34,19 @@ enum py_bt_status
   {
     /* Return when an error has occurred in processing frame filters,
        or when printing the stack.  */
-    PY_BT_ERROR,
+    PY_BT_ERROR = -1,
 
     /* Return from internal routines to indicate that the function
        succeeded.  */
-    PY_BT_OK,
+    PY_BT_OK = 1,
 
     /* Return when the frame filter process is complete, and all
        operations have succeeded.  */
-    PY_BT_COMPLETED,
+    PY_BT_COMPLETED = 2,
 
     /* Return when the frame filter process is complete, but there
        were no filter registered and enabled to process. */
-    PY_BT_NO_FILTERS
+    PY_BT_NO_FILTERS = 3
   };
 
 /* Flags to pass to apply_frame_filter.  */
@@ -102,10 +102,10 @@ int apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
 			      const struct value_print_options *options,
 			      const struct language_defn *language);
 
-int apply_frame_filter (struct frame_info *frame, int flags,
-			enum py_frame_args args_type,
-			struct ui_out *out, int frame_low,
-			int frame_high);
+enum py_bt_status apply_frame_filter (struct frame_info *frame, int flags,
+				      enum py_frame_args args_type,
+				      struct ui_out *out, int frame_low,
+				      int frame_high);
 
 void preserve_python_values (struct objfile *objfile, htab_t copied_types);
 

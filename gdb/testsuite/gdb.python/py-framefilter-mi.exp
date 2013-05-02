@@ -19,7 +19,6 @@ load_lib mi-support.exp
 load_lib gdb-python.exp
 
 set MIFLAGS "-i=mi2"
-global hex
 
 gdb_exit
 if [mi_gdb_start] {
@@ -47,7 +46,8 @@ mi_runto main
 
 set remote_python_file [remote_download host ${srcdir}/${subdir}/${pyfile}]
 
-mi_gdb_test "python execfile ('${remote_python_file}')" ""
+mi_gdb_test "python execfile ('${remote_python_file}')" ".*\\^done." \
+    "Load python file"
 
 # Multiple blocks test
 mi_continue_to_line [gdb_get_line_number {Inner test breakpoint} ${srcfile}] \
@@ -57,15 +57,14 @@ mi_gdb_test "-stack-list-locals --all-values" \
     "\\^done,locals=\\\[{name=\"h\",value=\"9\"},{name=\"f\",value=\"42\"},{name=\"g\",value=\"19\"},{name=\"bar\",value=\"$hex \\\\\"Inside block x2\\\\\"\"},{name=\"d\",value=\"15\"},{name=\"e\",value=\"14\"},{name=\"foo\",value=\"$hex \\\\\"Inside block\\\\\"\"},{name=\"str\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",value=\"12\"},{name=\"c\",value=\"5\"}\\\]" \
     "stack-list-locals --all-values"
 
-mi_gdb_test "-enable-frame-filters" ""
+mi_gdb_test "-enable-frame-filters" ".*\\^done." "enable frame filters"
 mi_gdb_test "-stack-list-locals --all-values" \
     "\\^done,locals=\\\[{name=\"h\",value=\"9\"},{name=\"f\",value=\"42\"},{name=\"g\",value=\"19\"},{name=\"bar\",value=\"$hex \\\\\"Inside block x2\\\\\"\"},{name=\"d\",value=\"15\"},{name=\"e\",value=\"14\"},{name=\"foo\",value=\"$hex \\\\\"Inside block\\\\\"\"},{name=\"str\",value=\"$hex \\\\\"The End\\\\\"\"},{name=\"st2\",value=\"$hex \\\\\"Is Near\\\\\"\"},{name=\"b\",value=\"12\"},{name=\"c\",value=\"5\"}\\\]" \
-    "stack-list-locals --all-values"
+    "stack-list-locals --all-values frame filters enabled"
 
 mi_continue_to_line [gdb_get_line_number {Backtrace end breakpoint} ${srcfile}] \
   "step to breakpoint"
 
-mi_gdb_test "-enable-frame-filters" ""
 mi_gdb_test "-stack-list-frames" \
     "\\^done,stack=\\\[frame={level=\"0\",addr=\"$hex\",func=\"cnuf_dne\".*},frame={level=\"1\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"2\",addr=\"$hex\",func=\"bcnuf\".*},frame={level=\"3\",addr=\"$hex\",func=\"acnuf\".*},frame={level=\"22\",addr=\"$hex\",func=\"1cnuf\".*,children=\\\[frame={level=\"23\",addr=\"$hex\",func=\"func2\".*}\\\]},frame={level=\"24\",addr=\"$hex\",func=\"3cnuf\".*},frame={level=\"27\",addr=\"$hex\",func=\"niam\".*}\\\].*" \
     "filtered stack listing"
