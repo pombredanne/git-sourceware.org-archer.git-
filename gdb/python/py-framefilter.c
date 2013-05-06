@@ -38,18 +38,18 @@ enum mi_print_types
   MI_PRINT_LOCALS
 };
 
-/* Helper function to extract a symbol, a name and a language
+/* Helper  function  to  extract  a  symbol, a  name  and  a  language
    definition from a Python object that conforms to the "Symbol Value"
-   interface.  OBJ is the Python object to extract the values from.
-   NAME is a pass-through argument where the name of the symbol will
-   be written.  NAME is allocated in this function, but the caller is
+   interface.  OBJ  is the Python  object to extract the  values from.
+   NAME is a  pass-through argument where the name of  the symbol will
+   be written.  NAME is allocated in  this function, but the caller is
    responsible for clean up.  SYM is a pass-through argument where the
    symbol will be written.  In the case of the API returning a string,
    this will be set to NULL.  LANGUAGE is also a pass-through argument
    denoting the language attributed to the Symbol.  In the case of SYM
-   being NULL, this will be set to the current language.  Returns 0 on
-   error with the appropriate Python exception set, and 1 on
-   success.  */
+   being  NULL, this  will be  set to  the current  language.  Returns
+   PY_BT_ERROR on error with the appropriate Python exception set, and
+   PY_BT_OK on success.  */
 
 static enum py_bt_status
 extract_sym (PyObject *obj, char **name, struct symbol **sym,
@@ -113,9 +113,9 @@ extract_sym (PyObject *obj, char **name, struct symbol **sym,
    the "Symbol Value" interface.  OBJ is the Python object to extract
    the value from.  VALUE is a pass-through argument where the value
    will be written.  If the object does not have the value attribute,
-   or provides the Python None for a value, VALUE will be set to
-   NULL and this function will return as successful.  Returns 0 on
-   error with the appropriate Python exception set, and 1 on
+   or provides the Python None for a value, VALUE will be set to NULL
+   and this function will return as successful.  Returns PY_BT_ERROR
+   on error with the appropriate Python exception set, and PY_BT_OK on
    success.  */
 
 static enum py_bt_status
@@ -195,8 +195,9 @@ mi_should_print (struct symbol *sym, enum mi_print_types type)
 /* Helper function which outputs a type name extracted from VAL to a
    "type" field in the output stream OUT.  OUT is the ui-out structure
    the type name will be output too, and VAL is the value that the
-   type will be extracted from.  Returns 0 on error, with any GDB
-   exceptions converted to a Python exception.  */
+   type will be extracted from.  Returns PY_BT_ERROR on error, with
+   any GDB exceptions converted to a Python exception, or PY_BT_OK on
+   success.  */
 
 static enum py_bt_status
 py_print_type (struct ui_out *out, struct value *val)
@@ -228,10 +229,11 @@ py_print_type (struct ui_out *out, struct value *val)
 /* Helper function which outputs a value to an output field in a
    stream.  OUT is the ui-out structure the value will be output to,
    VAL is the value that will be printed, OPTS contains the value
-   printing options, ARGS_TYPE is an enumerater describing the
+   printing options, ARGS_TYPE is an enumerator describing the
    argument format, and LANGUAGE is the language_defn that the value
    will be printed with.  Returns PY_BT_ERROR on error, with any GDB
-   exceptions converted to a Python exception.  */
+   exceptions converted to a Python exception, or PY_BT_OK on
+   success. */
 
 static enum py_bt_status
 py_print_value (struct ui_out *out, struct value *val,
@@ -345,10 +347,12 @@ get_py_iter_from_func (PyObject *filter, char *func)
     it must have an accompanying value in the parameter FV.  FA is a
     frame argument structure.  If FA is populated, both SYM_NAME and
     FV are ignored.  OPTS contains the value printing options,
-    ARGS_TYPE is an enumerater describing the argument format,
+    ARGS_TYPE is an enumerator describing the argument format,
     PRINT_ARGS_FIELD is a flag which indicates if we output "ARGS=1"
     in MI output in commands where both arguments and locals are
-    printed. */
+    printed.  Returns PY_BT_ERROR on error, with any GDB exceptions
+    converted to a Python exception, or PY_BT_OK on success.  */
+
 static enum py_bt_status
 py_print_single_arg (struct ui_out *out,
 		     const char *sym_name,
@@ -470,7 +474,6 @@ py_print_single_arg (struct ui_out *out,
   return PY_BT_OK;
 
  error:
-  //do_cleanups (cleanups);
   return PY_BT_ERROR;
 }
 
@@ -478,10 +481,12 @@ py_print_single_arg (struct ui_out *out,
    "frame_arguments" Python API.  Elements in the iterator must
    conform to the "Symbol Value" interface.  ITER is the Python
    iterable object, OUT is the output stream, ARGS_TYPE is an
-   enumerater describing the argument format, PRINT_ARGS_FIELD is a
+   enumerator describing the argument format, PRINT_ARGS_FIELD is a
    flag which indicates if we output "ARGS=1" in MI output in commands
    where both arguments and locals are printed, and FRAME is the
-   backing frame.  */
+   backing frame.  Returns PY_BT_ERROR on error, with any GDB
+   exceptions converted to a Python exception, or PY_BT_OK on
+   success.  */
 
 static enum py_bt_status
 enumerate_args (PyObject *iter,
@@ -694,10 +699,12 @@ enumerate_args (PyObject *iter,
    "frame_locals" Python API.  Elements in the iterable must conform
    to the "Symbol Value" interface.  ITER is the Python iterable
    object, OUT is the output stream, INDENT is whether we should
-   indent the output (for CLI), ARGS_TYPE is an enumerater describing
+   indent the output (for CLI), ARGS_TYPE is an enumerator describing
    the argument format, PRINT_ARGS_FIELD is flag which indicates
    whether to output the ARGS field in the case of
-   -stack-list-variables and FRAME is the backing frame.  */
+   -stack-list-variables and FRAME is the backing frame.  Returns
+   PY_BT_ERROR on error, with any GDB exceptions converted to a Python
+   exception, or PY_BT_OK on success.  */
 
 static enum py_bt_status
 enumerate_locals (PyObject *iter,
@@ -849,7 +856,8 @@ enumerate_locals (PyObject *iter,
   return PY_BT_ERROR;
 }
 
-/*  Helper function for -stack-list-variables.  */
+/*  Helper function for -stack-list-variables.  Returns PY_BT_ERROR on
+    error, or PY_BT_OK on success.  */
 
 static enum py_bt_status
 py_mi_print_variables (PyObject *filter, struct ui_out *out,
@@ -891,7 +899,8 @@ py_mi_print_variables (PyObject *filter, struct ui_out *out,
 }
 
 /* Helper function for printing locals.  This function largely just
-   creates the wrapping tuple, and calls enumerate_locals.  */
+   creates the wrapping tuple, and calls enumerate_locals.  Returns
+   PY_BT_ERROR on error, or PY_BT_OK on success.*/
 
 static enum py_bt_status
 py_print_locals (PyObject *filter,
@@ -923,8 +932,9 @@ py_print_locals (PyObject *filter,
 }
 
 /* Helper function for printing frame arguments.  This function
-   largely just creates the wrapping tuple, and calls
-   enumerate_args.  */
+   largely just creates the wrapping tuple, and calls enumerate_args.
+   Returns PY_BT_ERROR on error, with any GDB exceptions converted to
+   a Python exception, or PY_BT_OK on success.  */
 
 static enum py_bt_status
 py_print_args (PyObject *filter,
@@ -982,12 +992,14 @@ py_print_args (PyObject *filter,
     frame-filter associated with this frame.  FLAGS is an integer
     describing the various print options.  The FLAGS variables is
     described in "apply_frame_filter" function.  ARGS_TYPE is an
-    enumerater describing the argument format.  OUT is the output
+    enumerator describing the argument format.  OUT is the output
     stream to print, INDENT is the level of indention for this frame
     (in the case of elided frames), and LEVELS_PRINTED is a hash-table
     containing all the frames level that have already been printed.
     If a frame level has been printed, do not print it again (in the
-    case of elided frames).  */
+    case of elided frames).  Returns PY_BT_ERROR on error, with any
+    GDB exceptions converted to a Python exception, or PY_BT_COMPLETED
+    on success.  */
 
 static enum py_bt_status
 py_print_frame (PyObject *filter, int flags, enum py_frame_args args_type,
@@ -1438,7 +1450,8 @@ bootstrap_python_frame_filters (struct frame_info *frame,
     variables.  ARGS_TYPE is an enumerator describing the argument
     format, OUT is the output stream to print.  FRAME_LOW is the
     beginning of the slice of frames to print, and FRAME_HIGH is the
-    upper limit of the frames to count.  */
+    upper limit of the frames to count.  Returns PY_BT_ERROR on error,
+    or PY_BT_COMPLETED on success.*/
 
 enum py_bt_status
 apply_frame_filter (struct frame_info *frame, int flags,
