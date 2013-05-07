@@ -208,6 +208,7 @@ static void coff_symtab_read (long, unsigned int, struct objfile *);
    section flags to specify what kind of debug section it is
    -kingdon).  */
 
+DANGLING_CLEANUP
 static void
 coff_locate_sections (bfd *abfd, asection *sectp, void *csip)
 {

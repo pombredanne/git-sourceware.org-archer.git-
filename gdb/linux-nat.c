@@ -4301,6 +4301,7 @@ linux_nat_thread_name (struct thread_info *thr)
 /* Accepts an integer PID; Returns a string representing a file that
    can be opened to get the symbols for the child process.  */
 
+DANGLING_CLEANUP
 static char *
 linux_child_pid_to_exec_file (int pid)
 {

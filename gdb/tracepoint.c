@@ -2905,6 +2905,7 @@ trace_dump_actions (struct command_line *action,
    T.  It constructs cleanups into the chain, and leaves the caller to
    handle them (call do_cleanups).  */
 
+DANGLING_CLEANUP
 static struct command_line *
 all_tracepoint_actions_and_cleanup (struct breakpoint *t)
 {

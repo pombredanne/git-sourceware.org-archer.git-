@@ -2246,6 +2246,7 @@ stabs_method_name_from_physname (const char *physname)
 
    Returns 1 for success, 0 for failure.  */
 
+DANGLING_CLEANUP
 static int
 read_member_functions (struct field_info *fip, char **pp, struct type *type,
 		       struct objfile *objfile)
@@ -2972,6 +2973,7 @@ read_one_struct_field (struct field_info *fip, char **pp, char *p,
 
    Returns 1 for success, 0 for failure.  */
 
+DANGLING_CLEANUP
 static int
 read_struct_fields (struct field_info *fip, char **pp, struct type *type,
 		    struct objfile *objfile)
@@ -3070,6 +3072,7 @@ read_struct_fields (struct field_info *fip, char **pp, struct type *type,
 
 
 
+DANGLING_CLEANUP
 static int
 read_baseclasses (struct field_info *fip, char **pp, struct type *type,
 		  struct objfile *objfile)

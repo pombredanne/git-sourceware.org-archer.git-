@@ -98,6 +98,16 @@
 #include "libiberty.h"
 #include "hashtab.h"
 
+/* The cleanup checker (see contrib/cleanup_check.py) defines
+   WITH_ATTRIBUTE_DANGLING_CLEANUP.  If this is defined then we can
+   use the 'dangling_cleanup' attribute to mark functions which are
+   known to leak a cleanup.  */
+#ifdef WITH_ATTRIBUTE_DANGLING_CLEANUP
+#define DANGLING_CLEANUP __attribute__((dangling_cleanup))
+#else
+#define DANGLING_CLEANUP
+#endif
+
 /* Rather than duplicate all the logic in BFD for figuring out what
    types to use (which can be pretty complicated), symply define them
    in terms of the corresponding type from BFD.  */

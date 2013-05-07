@@ -59,6 +59,14 @@ special_names = set(['do_final_cleanups', 'discard_final_cleanups',
 def needs_special_treatment(decl):
     return decl.name in special_names
 
+leaks_cleanup = { }
+
+def note_dangling_cleanup(*args):
+    leaks_cleanup[str(args[0].name)] = 1
+
+def leaves_dangling_cleanup(name):
+    return name in leaks_cleanup
+
 # Sometimes we need a new placeholder object that isn't the same as
 # anything else.
 class Dummy(object):
@@ -218,6 +226,10 @@ class CleanupChecker:
             if stmt.loc:
                 curloc = stmt.loc
             if isinstance(stmt, gcc.GimpleCall) and stmt.fndecl:
+                # The below used to also have:
+                #  or leaves_dangling_cleanup(str(stmt.fndecl.name))
+                # but this yields a lot of noise when the point
+                # is really just to pretend that these functions are ok.
                 if is_constructor(stmt.fndecl):
                     log('saw constructor %s in bb=%d' % (str(stmt.fndecl), bb.index), 2)
                     self.cleanup_aware = True
@@ -240,7 +252,7 @@ class CleanupChecker:
                     if not master_cleanup.verify(curloc, stmt.retval):
                         gcc.permerror(curloc,
                                       'constructor does not return master cleanup')
-                elif not self.is_special_constructor:
+                elif not self.is_special_constructor and not leaves_dangling_cleanup(str(self.fun.decl.name)):
                     if not master_cleanup.isempty():
                         if curloc not in self.bad_returns:
                             gcc.permerror(curloc, 'cleanup stack is not empty at return')
@@ -299,8 +311,8 @@ class CleanupChecker:
         if str(self.fun.decl.name) == 'gdb_xml_create_parser_and_cleanup_1':
             self.is_special_constructor = True
 
-        if self.is_special_constructor:
-            gcc.inform(self.fun.start, 'function %s is a special constructor' % (self.fun.decl.name))
+        # if self.is_special_constructor:
+        #     gcc.inform(self.fun.start, 'function %s is a special constructor' % (self.fun.decl.name))
 
         # If we only see do_cleanups calls, and this function is not
         # itself a constructor, then we can convert it easily to RAII.
@@ -329,6 +341,13 @@ class CheckerPass(gcc.GimplePass):
         what = checker.check_cleanups()
         if fun.decl:
             log(fun.decl.name + ': ' + what, 2)
+
+def register_attributes():
+    gcc.register_attribute('dangling_cleanup', 0, 0, True, False, False,
+                           note_dangling_cleanup)
+    gcc.define_macro('WITH_ATTRIBUTE_DANGLING_CLEANUP')
+
+gcc.register_callback(gcc.PLUGIN_ATTRIBUTES, register_attributes)
 
 ps = CheckerPass(name = 'check-cleanups')
 # We need the cfg, but we want a relatively high-level Gimple.

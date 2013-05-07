@@ -1362,6 +1362,7 @@ linux_fill_prpsinfo (struct elf_internal_linux_prpsinfo *p)
 /* Fills the "to_make_corefile_note" target vector.  Builds the note
    section for a corefile, and returns it in a malloc buffer.  */
 
+DANGLING_CLEANUP
 char *
 linux_make_corefile_notes (struct gdbarch *gdbarch, bfd *obfd, int *note_size,
 			   linux_collect_thread_registers_ftype collect)

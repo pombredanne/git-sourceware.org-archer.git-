@@ -401,6 +401,7 @@ py_restore_tstate (void *p)
 
 /* Create a dummy PyFrameObject, needed to work around
    a Python-2.4 bug with generators.  */
+DANGLING_CLEANUP
 static PyObject *
 push_dummy_python_frame (void)
 {

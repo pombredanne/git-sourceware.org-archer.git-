@@ -14060,6 +14060,7 @@ addr_string_to_sals (struct breakpoint *b, char *addr_string, int *found)
    breakpoints.  Reevaluate the breakpoint and recreate its
    locations.  */
 
+DANGLING_CLEANUP
 static void
 breakpoint_re_set_default (struct breakpoint *b)
 {

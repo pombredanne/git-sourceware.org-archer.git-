@@ -1646,6 +1646,7 @@ write_destructor_name (struct stoken token)
 
 /* Returns a stoken of the operator name given by OP (which does not
    include the string "operator").  */ 
+DANGLING_CLEANUP
 static struct stoken
 operator_stoken (const char *op)
 {

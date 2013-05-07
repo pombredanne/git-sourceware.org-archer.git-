@@ -4636,6 +4636,7 @@ init_cu_die_reader (struct die_reader_specs *reader,
    provided an abbrev table to use.
    The result is non-zero if a valid (non-dummy) DIE was found.  */
 
+DANGLING_CLEANUP
 static int
 read_cutu_die_from_dwo (struct dwarf2_per_cu_data *this_cu,
 			struct dwo_unit *dwo_unit,
@@ -8384,6 +8385,7 @@ find_file_and_directory (struct die_info *die, struct dwarf2_cu *cu,
    COMP_DIR is the compilation directory.
    WANT_LINE_INFO is non-zero if the pc/line-number mapping is needed.  */
 
+DANGLING_CLEANUP
 static void
 handle_DW_AT_stmt_list (struct die_info *die, struct dwarf2_cu *cu,
 			const char *comp_dir) /* ARI: editCase function */
@@ -8500,6 +8502,7 @@ read_file_scope (struct die_info *die, struct dwarf2_cu *cu)
    then restore those symtabs in the line header.
    We don't need the pc/line-number mapping for type units.  */
 
+DANGLING_CLEANUP
 static void
 setup_type_unit_groups (struct die_info *die, struct dwarf2_cu *cu)
 {
@@ -11057,6 +11060,7 @@ handle_data_member_location (struct die_info *die, struct dwarf2_cu *cu,
 
 /* Add an aggregate field to the field list.  */
 
+DANGLING_CLEANUP
 static void
 dwarf2_add_field (struct field_info *fip, struct die_info *die,
 		  struct dwarf2_cu *cu)
@@ -11244,6 +11248,7 @@ dwarf2_add_field (struct field_info *fip, struct die_info *die,
 
 /* Add a typedef defined in the scope of the FIP's class.  */
 
+DANGLING_CLEANUP
 static void
 dwarf2_add_typedef (struct field_info *fip, struct die_info *die,
 		    struct dwarf2_cu *cu)
@@ -11407,6 +11412,7 @@ dwarf2_is_constructor (struct die_info *die, struct dwarf2_cu *cu)
 
 /* Add a member function to the proper fieldlist.  */
 
+DANGLING_CLEANUP
 static void
 dwarf2_add_member_fn (struct field_info *fip, struct die_info *die,
 		      struct type *type, struct dwarf2_cu *cu)
@@ -15736,6 +15742,7 @@ dwarf_decode_line_header (unsigned int offset, struct dwarf2_cu *cu)
 
    The function creates dangling cleanup registration.  */
 
+DANGLING_CLEANUP
 static const char *
 psymtab_include_file_name (const struct line_header *lh, int file_index,
 			   const struct partial_symtab *pst,
@@ -16137,6 +16144,7 @@ dwarf_decode_lines_1 (struct line_header *lh, const char *comp_dir,
    E.g. expand_line_sal requires this when finding psymtabs to expand.
    A good testcase for this is mb-inline.exp.  */
 
+DANGLING_CLEANUP
 static void
 dwarf_decode_lines (struct line_header *lh, const char *comp_dir,
 		    struct dwarf2_cu *cu, struct partial_symtab *pst,
