@@ -108,10 +108,13 @@ mi_cmd_stack_list_frames (char *command, char **argv, int argc)
 	}
     }
 
-  if ((argc > 3) || (argc == 2 && oind) || (argc == 1 && ! oind))
+  /* After the last option is parsed, there should either be low -
+     high range, or no further arguments.  */
+  if ((argc - oind != 0) && (argc - oind !=2))
     error (_("-stack-list-frames: Usage: [--no-frame-filters] [FRAME_LOW FRAME_HIGH]"));
 
-  if (argc == 3 || argc == 2)
+  /* If there is a range, set it.  */
+  if (argc - oind == 2)
     {
       frame_low = atoi (argv[0 + oind]);
       frame_high = atoi (argv[1 + oind]);
