@@ -807,9 +807,9 @@ rw_common (int dowrite, const struct ps_prochandle *ph, gdb_ps_addr_t addr,
 #endif
 
   if (dowrite)
-    ret = target_write_memory (addr, buf, size);
+    ret = target_write_memory (addr, (gdb_byte *) buf, size);
   else
-    ret = target_read_memory (addr, buf, size);
+    ret = target_read_memory (addr, (gdb_byte *) buf, size);
 
   do_cleanups (old_chain);
 
@@ -1118,12 +1118,10 @@ info_cb (const td_thrhandle_t *th, void *s)
 	  const struct bound_minimal_symbol msym
 	    = lookup_minimal_symbol_by_pc (ti.ti_startfunc);
 
-	  if (msym.minsym)
-	    printf_filtered ("   startfunc: %s\n",
-			     SYMBOL_PRINT_NAME (msym.minsym));
-	  else
-	    printf_filtered ("   startfunc: %s\n",
-			     paddress (target_gdbarch (), ti.ti_startfunc));
+	  printf_filtered ("   startfunc=%s",
+			   msym.minsym
+			   ? SYMBOL_PRINT_NAME (msym.minsym)
+			   : paddress (target_gdbarch (), ti.ti_startfunc));
 	}
 
       /* If thread is asleep, print function that went to sleep.  */
@@ -1132,17 +1130,13 @@ info_cb (const td_thrhandle_t *th, void *s)
 	  const struct bound_minimal_symbol msym
 	    = lookup_minimal_symbol_by_pc (ti.ti_pc);
 
-	  if (msym.minsym)
-	    printf_filtered (" - Sleep func: %s\n",
-			     SYMBOL_PRINT_NAME (msym.minsym));
-	  else
-	    printf_filtered (" - Sleep func: %s\n",
-			     paddress (target_gdbarch (), ti.ti_startfunc));
+	  printf_filtered ("   sleepfunc=%s",
+			   msym.minsym
+			   ? SYMBOL_PRINT_NAME (msym.minsym)
+			   : paddress (target_gdbarch (), ti.ti_pc));
 	}
 
-      /* Wrap up line, if necessary.  */
-      if (ti.ti_state != TD_THR_SLEEP && ti.ti_startfunc == 0)
-	printf_filtered ("\n");	/* don't you hate counting newlines?  */
+      printf_filtered ("\n");
     }
   else
     warning (_("info sol-thread: failed to get info for thread."));

@@ -1,3 +1,84 @@
+2013-05-07  Tom Tromey  <tromey@redhat.com>
+
+	* lib/selftest-support.exp: New file.
+	* gdb.gdb/complaints.exp: Load selftest-support.exp.  Use
+	do_self_tests.
+	(setup_test, find_gdb): Remove.
+	* gdb.gdb/observer.exp: Load selftest-support.exp.  Use
+	do_self_tests.
+	(setup_test, find_gdb): Remove.
+	(test_observer): Don't call setup_test.  Remove argument.
+	* gdb.gdb/selftest.exp: Load selftest-support.exp.
+	(find_gdb): Remove.
+	* gdb.gdb/complaints.exp: Load selftest-support.exp.  Use
+	do_self_tests.
+	(setup_test, find_gdb): Remove.
+	(test_with_self): Don't call setup_test.  Remove argument.
+
+2013-05-07  Andreas Arnez  <arnez@linux.vnet.ibm.com>
+
+	* gdb.arch/system-gcore.exp: Remove.
+	* gdb.arch/gcore.c: Remove.
+	* gdb.base/gcore.exp: Add "info reg system".
+
+2013-05-07  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	PR breakpoints/15413:
+	* gdb.base/pending.exp: Add test for completion of the "condition"
+	command for pending breakpoints.
+	* gdb.linespec/linespec.ex: Add test for completion of the
+	"condition" command when dealing with multiple locations.
+
+2013-05-07  Luis Machado  <lgustavo@codesourcery.com>
+
+	* gdb.threads/wp-replication.c: New file.
+	* gdb.threads/wp-replication.exp: New file.
+
+2013-05-06  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* gdb.xml/tdesc-regs.exp: Add case for nios2.
+
+2013-05-06  Doug Evans  <dje@google.com>
+
+	* gdb.base/solib-search-lib1.c: New file.
+	* gdb.base/solib-search-lib2.c: New file.
+	* gdb.base/solib-search.c: New file.
+	* gdb.base/solib-search.h: New file.
+	* gdb.base/solib-search.exp: New file.
+
+	* lib/gdb.exp (gdb_core_cmd): New function.
+	* gdb.arch/system-gcore.exp: Use it.
+	* gdb.arch/vsx-regs.exp: Ditto.
+	* gdb.base/gcore.exp: Ditto.
+	* gdb.threads/gcore-thread.exp: Ditto.
+
+	* gdb.reverse/shr.h: New file.
+	* gdb.reverse/shr1.c: New file.
+	* gdb.reverse/shr2.c: #include "shr.h".
+	* gdb.reverse/solib-reverse.c: Remove #include <stdio.h>.
+	#include "shr.h".  Replace calls to printf,sleep to call shr1 instead.
+	* gdb.reverse/solib-precsave.exp: Build shr2.sl.
+	Update tests using sleep/printf to use shr2.sl instead.
+	* gdb.reverse/solib-reverse.exp: Ditto.
+
+2013-05-06  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/implptrconst.c: New file.
+	* gdb.dwarf2/implptrconst.exp: New file.
+	* lib/dwarf.exp (Dwarf::_nz_quote): New proc.
+	(Dwarf::_handle_DW_FORM): Handle DW_FORM_block1.
+	(Dwarf::_location): Handle DW_OP_GNU_implicit_pointer.
+
+2013-05-03  Philippe Waroquiers  <philippe.waroquiers@skynet.be>
+
+	* gdb.base/catch-sig.c (main): Raise SIGINT.
+	* gdb.base/catch-sig.exp: Test "catch signal SIGINT".
+
+2013-05-03  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* status-stop.exp (test_tstart_tstart): Check for error
+	returned by the second 'tstart' command.
+
 2013-03-27  Walfred Tedeschi  <walfred.tedeschi@intel.com>
 
 	* gdb.xml/maint_print_struct.exp: New file.
