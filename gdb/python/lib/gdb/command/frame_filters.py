@@ -317,8 +317,9 @@ class SetFrameFilterPriority(gdb.Command):
         argv = gdb.string_to_argv(arg);
         argc = len(argv)
         if argc != 3:
-            raise gdb.GdbError("set frame-filter priority " \
-                               "takes exactly three arguments.")
+            print("set frame-filter priority " \
+                  "takes exactly three arguments.")
+            return None
 
         return argv
 
@@ -357,7 +358,8 @@ class SetFrameFilterPriority(gdb.Command):
 
     def invoke(self, arg, from_tty):
         command_tuple = self._parse_pri_arg(arg)
-        self._set_filter_priority(command_tuple)
+        if command_tuple != None:
+            self._set_filter_priority(command_tuple)
 
 class ShowFrameFilterPriority(gdb.Command):
     """GDB command to show the priority of the specified frame-filter.
@@ -395,8 +397,9 @@ class ShowFrameFilterPriority(gdb.Command):
         argv = gdb.string_to_argv(arg);
         argc = len(argv)
         if argc != 2:
-            raise gdb.GdbError("show frame-filter priority " \
-                               "takes exactly two arguments.")
+            print("show frame-filter priority " \
+                  "takes exactly two arguments.")
+            return None
 
         return argv
 
@@ -436,6 +439,8 @@ class ShowFrameFilterPriority(gdb.Command):
 
     def invoke(self, arg, from_tty):
         command_tuple = self._parse_pri_arg(arg)
+        if command_tuple == None:
+            return
         filter_name = command_tuple[1]
         list_name = command_tuple[0]
         try:
