@@ -35,9 +35,10 @@
    free that memory.  This function will be called both when the cleanup
    is executed and when it's discarded.  */
 
-struct cleanup
+struct real_cleanup
 {
-  struct cleanup *next;
+  struct cleanup base;
+
   void (*function) (void *);
   void (*free_arg) (void *);
   void *arg;
@@ -53,7 +54,7 @@ struct cleanup
    This is const for a bit of extra robustness.
    It is initialized to coax gcc into putting it into .rodata.
    All fields are initialized to survive -Wextra.  */
-static const struct cleanup sentinel_cleanup = { 0, 0, 0, 0 };
+static const struct real_cleanup sentinel_cleanup = { { 0, 0, 0 }, 0, 0, 0 };
 
 /* Handy macro to use when referring to sentinel_cleanup.  */
 #define SENTINEL_CLEANUP ((struct cleanup *) &sentinel_cleanup)
@@ -79,15 +80,15 @@ static struct cleanup *
 make_my_cleanup2 (struct cleanup **pmy_chain, make_cleanup_ftype *function,
 		  void *arg,  void (*free_arg) (void *))
 {
-  struct cleanup *new
-    = (struct cleanup *) xmalloc (sizeof (struct cleanup));
+  struct real_cleanup *new = XNEW (struct real_cleanup);
   struct cleanup *old_chain = *pmy_chain;
 
-  new->next = *pmy_chain;
+  new->base.next = *pmy_chain;
+  new->base.scoped = 0;
   new->function = function;
   new->free_arg = free_arg;
   new->arg = arg;
-  *pmy_chain = new;
+  *pmy_chain = &new->base;
 
   gdb_assert (old_chain != NULL);
   return old_chain;
@@ -152,10 +153,17 @@ do_my_cleanups (struct cleanup **pmy_chain,
   while ((ptr = *pmy_chain) != old_chain)
     {
       *pmy_chain = ptr->next;	/* Do this first in case of recursion.  */
-      (*ptr->function) (ptr->arg);
-      if (ptr->free_arg)
-	(*ptr->free_arg) (ptr->arg);
-      xfree (ptr);
+      if (ptr->scoped)
+	ptr->cleaned_up = 1;
+      else
+	{
+	  struct real_cleanup *rc = (struct real_cleanup *) ptr;
+
+	  (*rc->function) (rc->arg);
+	  if (rc->free_arg)
+	    (*rc->free_arg) (rc->arg);
+	  xfree (ptr);
+	}
     }
 }
 
@@ -200,9 +208,16 @@ discard_my_cleanups (struct cleanup **pmy_chain,
   while ((ptr = *pmy_chain) != old_chain)
     {
       *pmy_chain = ptr->next;
-      if (ptr->free_arg)
-	(*ptr->free_arg) (ptr->arg);
-      xfree (ptr);
+      if (ptr->scoped)
+	ptr->cleaned_up = 1;
+      else
+	{
+	  struct real_cleanup *rc = (struct real_cleanup *) ptr;
+
+	  if (rc->free_arg)
+	    (*rc->free_arg) (rc->arg);
+	  xfree (ptr);
+	}
     }
 }
 
@@ -295,3 +310,32 @@ void
 null_cleanup (void *arg)
 {
 }
+
+/* Initialize a scoped cleanup.  */
+
+struct cleanup *
+init_scoped_cleanup (struct scoped_cleanup *cl)
+{
+  struct cleanup *old_chain = cleanup_chain;
+
+  cl->base.next = cleanup_chain;
+  cleanup_chain = &cl->base;
+
+  cl->base.scoped = 1;
+  cl->base.cleaned_up = 0;
+
+  return old_chain;
+}
+
+#ifdef SCOPED_CLEANUP_CHECKING
+
+/* Verify that a scoped cleanup was in fact handled.  */
+
+void
+cleanup_close_scope (struct scoped_cleanup *cl)
+{
+  if (!cl->base.cleaned_up)
+    internal_warning (__FILE__, __LINE__, "scoped cleanup leaked");
+}
+
+#endif /* SCOPED_CLEANUP_CHECKING */

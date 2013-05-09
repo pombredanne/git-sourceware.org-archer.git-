@@ -54,7 +54,7 @@ special_names = set(['do_final_cleanups', 'discard_final_cleanups',
                      'restore_cleanups', 'restore_final_cleanups',
                      'exceptions_state_mc_init',
                      'make_my_cleanup2', 'make_final_cleanup', 'all_cleanups',
-                     'save_my_cleanups', 'quit_target'])
+                     'save_my_cleanups', 'quit_target', 'init_scoped_cleanup'])
 
 def needs_special_treatment(decl):
     return decl.name in special_names

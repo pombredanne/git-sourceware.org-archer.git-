@@ -66,4 +66,59 @@ extern void restore_final_cleanups (struct cleanup *);
    to pass to do_cleanups.  */
 extern void null_cleanup (void *);
 
+
+/* You should continue to treat this as opaque.  It is defined here
+   so that scoped cleanups can be stack-allocated and specially
+   treated.  */
+
+struct cleanup
+{
+  struct cleanup *next;
+
+  /* True if this is a scoped cleanup.  */
+  unsigned scoped : 1;
+
+  /* True if this is scoped cleanup has been cleaned up or discarded.
+     Not used for ordinary cleanups.  */
+
+  unsigned cleaned_up : 1;
+};
+
+/* This is used for scoped cleanups.  It should be treated as
+   opaque.  */
+
+struct scoped_cleanup
+{
+  struct cleanup base;
+};
+
+extern struct cleanup *init_scoped_cleanup (struct scoped_cleanup *);
+
+#if defined (__GNUC__) && __GNUC__ >= 4
+
+/* Define this to consolidate #if checking with the
+   implementation.  */
+
+#define SCOPED_CLEANUP_CHECKING
+
+#define SCOPED_CLEANUP_ATTRIBUTE \
+  __attribute__ ((cleanup (cleanup_close_scope)))
+
+extern void cleanup_close_scope (struct scoped_cleanup *);
+
+#else
+
+#define SCOPED_CLEANUP_ATTRIBUTE
+
+#endif
+
+/* Use this to declare a scoped cleanup.  A scoped cleanup must be
+   cleaned up or discarded whenever the scope is exited.  When
+   possible, this is checked at runtime.  */
+
+#define SCOPED_CLEANUP(name)						\
+  struct scoped_cleanup name ## __LINE__				\
+    SCOPED_CLEANUP_ATTRIBUTE;						\
+  struct cleanup *name = init_scoped_cleanup (& (name ## __LINE__))
+
 #endif /* CLEANUPS_H */
