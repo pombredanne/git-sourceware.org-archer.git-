@@ -1,3 +1,62 @@
+2013-05-06  Sandra Loosemore  <sandra@codesourcery.com>
+	    Andrew Jenner  <andrew@codesourcery.com>
+
+	* Makefile.in (SFILES): Add linux-nios2-low.c.
+	(clean): Add action to delete nios2-linux.c.
+	(nios2-linux.c): New rule.
+	* configure.srv: Add nios2*-*-linux*.
+	* linux-nios2-low.c: New.
+
+2013-05-03  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* tracepoint.c (cmd_qtinit): Call 'stop_tracing'.
+
+2013-04-25  Hui Zhu  <hui@codesourcery.com>
+
+	PR gdb/15186
+	* ax.c (ax_printf): Add fflush.
+
+2013-04-22  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (SFILES): Add filestuff.c.
+	(OBS): Add filestuff.o.
+	(filestuff.o): New target.
+	* config.in, configure: Rebuild.
+	* configure.ac: Check for fdwalk, pipe2.
+
+2013-04-17  Pedro Alves  <palves@redhat.com>
+
+	* configure.ac (USE_THREAD_DB): Delete variable.
+	(if test "$srv_linux_thread_db" = "yes"): AC_DEFINE USE_THREAD_DB.
+	Don't AC_SUBST USE_THREAD_DB.
+	* Makefile.in (INTERNAL_CFLAGS): Remove @USE_THREAD_DB@.
+	* config.in, configure: Regenerate.
+
+2013-04-16  Pedro Alves  <palves@redhat.com>
+
+	* linux-low.h (struct lwp_info) <thread_known>: Move under
+	the USE_THREAD_DB #ifdef.
+
+2013-04-16  Pedro Alves  <palves@redhat.com>
+
+	* Makefile.in (INTERNAL_CFLAGS): Add @USE_THREAD_DB@.
+	(linux-low.o): Delete rule.
+	* linux-low.h: Always include "gdb_thread_db.h" instead of
+	conditionally including thread_db.h.
+	(struct lwp_info) <th>: Guard with #ifdef USE_THREAD_DB instead of
+	HAVE_THREAD_DB_H.
+
+2013-04-07  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* Makefile.in (install-only): Fix make install regression.
+
+2013-04-05  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Convert man pages to texinfo, new gdbinit.5 texinfo page.
+	* Makefile.in (install-only): Remove $(man1dir) and gdbserver.1
+	installation.
+	* gdbserver.1: Remove.
+
 2013-03-22  Pedro Alves  <palves@redhat.com>
 
 	* linux-low.c (handle_extended_wait): Don't call

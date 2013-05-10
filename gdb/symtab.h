@@ -116,7 +116,7 @@ struct general_symbol_info
 
     struct block *block;
 
-    gdb_byte *bytes;
+    const gdb_byte *bytes;
 
     CORE_ADDR address;
 
@@ -135,6 +135,11 @@ struct general_symbol_info
 
   union
   {
+    /* A pointer to an obstack that can be used for storage associated
+       with this symbol.  This is only used by Ada, and only when the
+       'ada_mangled' field is zero.  */
+    struct obstack *obstack;
+
     /* This is used by languages which wish to store a demangled name.
        currently used by Ada, Java, and Objective C.  */
     struct mangled_lang
@@ -153,23 +158,21 @@ struct general_symbol_info
 
   ENUM_BITFIELD(language) language : 8;
 
+  /* This is only used by Ada.  If set, then the 'mangled_lang' field
+     of language_specific is valid.  Otherwise, the 'obstack' field is
+     valid.  */
+  unsigned int ada_mangled : 1;
+
   /* Which section is this symbol in?  This is an index into
      section_offsets for this objfile.  Negative means that the symbol
-     does not get relocated relative to a section.
-     Disclaimer: currently this is just used for xcoff, so don't
-     expect all symbol-reading code to set it correctly (the ELF code
-     also tries to set it correctly).  */
+     does not get relocated relative to a section.  */
 
   short section;
-
-  /* The section associated with this symbol.  It can be NULL.  */
-
-  struct obj_section *obj_section;
 };
 
 extern void symbol_set_demangled_name (struct general_symbol_info *,
 				       const char *,
-                                       struct objfile *);
+                                       struct obstack *);
 
 extern const char *symbol_get_demangled_name
   (const struct general_symbol_info *);
@@ -192,14 +195,18 @@ extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 #define SYMBOL_VALUE_CHAIN(symbol)	(symbol)->ginfo.value.chain
 #define SYMBOL_LANGUAGE(symbol)		(symbol)->ginfo.language
 #define SYMBOL_SECTION(symbol)		(symbol)->ginfo.section
-#define SYMBOL_OBJ_SECTION(symbol)	(symbol)->ginfo.obj_section
+#define SYMBOL_OBJ_SECTION(objfile, symbol)			\
+  (((symbol)->ginfo.section >= 0)				\
+   ? (&(((objfile)->sections)[(symbol)->ginfo.section]))	\
+   : NULL)
 
 /* Initializes the language dependent portion of a symbol
    depending upon the language for the symbol.  */
-#define SYMBOL_SET_LANGUAGE(symbol,language) \
-  (symbol_set_language (&(symbol)->ginfo, (language)))
+#define SYMBOL_SET_LANGUAGE(symbol,language,obstack)	\
+  (symbol_set_language (&(symbol)->ginfo, (language), (obstack)))
 extern void symbol_set_language (struct general_symbol_info *symbol,
-                                 enum language language);
+                                 enum language language,
+				 struct obstack *obstack);
 
 /* Set just the linkage name of a symbol; do not try to demangle
    it.  Used for constructs which do not have a mangled name,
@@ -720,6 +727,7 @@ extern const struct symbol_impl *symbol_impls;
 #define SYMBOL_BLOCK_OPS(symbol)	(SYMBOL_IMPL (symbol).ops_block)
 #define SYMBOL_REGISTER_OPS(symbol)	(SYMBOL_IMPL (symbol).ops_register)
 #define SYMBOL_LOCATION_BATON(symbol)   (symbol)->aux_value
+#define SYMBOL_OBJFILE(symbol) 		(SYMBOL_SYMTAB (symbol)->objfile)
 
 extern int register_symbol_computed_impl (enum address_class,
 					  const struct symbol_computed_ops *);
@@ -1362,5 +1370,11 @@ void iterate_over_symbols (const struct block *block, const char *name,
 
 struct cleanup *demangle_for_lookup (const char *name, enum language lang,
 				     const char **result_name);
+
+struct symbol *allocate_symbol (struct objfile *);
+
+void initialize_symbol (struct symbol *);
+
+struct template_symbol *allocate_template_symbol (struct objfile *);
 
 #endif /* !defined(SYMTAB_H) */

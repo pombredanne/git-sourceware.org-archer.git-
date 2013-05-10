@@ -1,3 +1,228 @@
+2013-05-09  Joel Brobecker  <brobecker@adacore.com>
+
+	* bfd.c (_bfd_default_error_handler): Replace use of putc
+	by fputc.  Add comment explaining why.
+
+2013-05-09  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (elf_link_add_object_symbols): Don't omit reading
+	of symbols when hashes already exist.
+
+2013-05-07  Will Newton  <will.newton@linaro.org>
+
+	* elf-ifunc.c (_bfd_elf_allocate_ifunc_dyn_relocs): Add a
+	plt_header_size argument for ports where it differs from
+	plt_entry_size.
+	* elf-bfd.h: Likewise.
+	* elf32-i386.c: Pass plt_header_size to
+	_bfd_elf_allocate_ifunc_dyn_relocs.
+	* elf64-x86-64.c: Likewise.
+
+2013-05-07  Will Newton  <will.newton@linaro.org>
+
+	* elf-ifunc.c (_bfd_elf_create_ifunc_dyn_reloc): Remove unused
+	function.
+	* elf-bfd.h: Likewise.
+
+2013-05-06  Paul Brook  <paul@codesourcery.com>
+
+	* elf64-mips.c (elf_mips_gnu_pcrel32): New.
+	(bfd_elf64_bfd_reloc_type_lookup, bfd_elf64_bfd_reloc_name_lookup,
+	mips_elf64_rtype_to_howto): Handle R_MIPS_PC32.
+	* elfn32-mips.c (elf_mips_gnu_pcrel32): New.
+	(bfd_elfn32_bfd_reloc_type_lookup, bfd_elfn32_bfd_reloc_name_lookup,
+	mips_elfn32_rtype_to_howto): Handle R_MIPS_PC32.
+
+2013-05-06  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (opd_entry_value): Handle case where symbol
+	hashes are not available.
+
+2013-05-06  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (elf_link_add_object_symbols): Don't save symbol
+	hashes around loading as-needed library.  Zero them on allocation,
+	and restore to initial all-zero state if library not needed.
+	Arrange to reuse hashes if we load library again later.
+
+2013-05-04  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* elf32-mips.c (elf_mips_copy_howto, elf_mips_jump_slot_howto):
+	Use _bfd_mips_elf_generic_reloc instead of bfd_elf_generic_reloc.
+	* elfn32-mips.c: Likewise.
+	* elf64-mips.c: Likewise.
+
+2013-05-02  Nick Clifton  <nickc@redhat.com>
+
+	* archures.c: Add some more MSP430 machine numbers.
+	* config.bfd (msp430): Define targ_selvecs.
+	* configure.in: Add bfd_elf32_msp430_ti_vec.
+	* cpu-msp430.c: Add some more MSP430 machine numbers.
+	* elf32-msp430.c Add support for MSP430X relocations.
+	Add support for TI compiler generated relocations.
+	Add support for sym_diff relocations.
+	Add support for relaxing out of range short branches into long
+	branches.
+	Add support for MSP430 attribute section.
+	* reloc.c: Add MSP430X relocations.
+	* targets.c: Add bfd_elf32_msp430_ti_vec.
+	* bfd-in2.h: Regenerate.
+	* configure: Regenerate.
+	* libbfd.h: Regenerate.
+
+2013-05-01  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* config.bfd: Replace alpha*-*-linuxecoff* pattern with
+	alpha*-*-linux*ecoff*.
+
+2013-04-30  Olaf Flebbe  <o.flebbe@science-computing.de>
+
+	PR binutils/15417
+	* elflink.c (elf_link_add_object_symbols): Initialise 'idx' to
+	zero.
+
+2013-04-30  Alan Modra  <amodra@gmail.com>
+
+	* elflink.c (bfd_elf_record_link_assignment): Dont make
+	STV_INTERNAL symbols STV_HIDDEN.
+
+2013-04-29  Nick Clifton  <nickc@redhat.com>
+
+	* elflink.c (_bfd_elf_gc_mark_extra_sections): Remove mark from
+	fragmented .debug_line sections associated with unmarked code
+	sections.
+
+2013-04-29  Will Newton  <will.newton@linaro.org>
+
+	* elf32-arm.c (elf32_arm_populate_plt_entry): Call
+	elf32_arm_add_dynreloc when emitting R_ARM_IRELATIVE relocs.
+
+2013-04-29  Will Newton  <will.newton@linaro.org>
+
+	* elf64-aarch64.c (elf64_aarch64_check_relocs): Move relocation
+	error check up and add error message.
+
+2013-04-26  Will Newton  <will.newton@linaro.org>
+
+	* elf64-aarch64.c (elf64_aarch64_check_relocs): Remove dead code.
+
+2013-04-25  Alan Modra  <amodra@gmail.com>
+
+	* config.bfd: Add powerpc64le-linux.
+
+2013-04-24  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* config.bfd (targ_selvecs): Add bfd_elf32_x86_64_vec for
+	x86_64-*-elf*.
+
+2013-04-24  Roland McGrath  <mcgrathr@google.com>
+
+	* elf32-arm.c (elf32_arm_allocate_plt_entry): If HTAB->nacl_p,
+	allocate space for PLT header even if IS_IPLT_ENTRY.
+	(arm_nacl_put_plt0): New function, broken out of ...
+	(elf32_arm_finish_dynamic_sections): ... here.  Call it.
+	If HTAB->nacl_p, set up the PLT header in .iplt too.
+	(elf32_arm_output_arch_local_syms): If HTAB->nacl_p, write
+	a mapping symbol for the start of .iplt too.
+
+2013-04-19  Luca Pizzamiglio  <luca.pizzamiglio@gmail.com>
+
+	* ecoff.c (_bfd_ecoff_sizeof_headers): Cast the return value of
+	BFD_ALIGN to int.
+	* elf32-tic6x.c (elf32_tic6x_size_dynamic_sections): Remove unused
+	variables.
+	* elf32-v850.c (v850_elf_relax_section): Redefine the type of 'i'
+	to bfd_vma.
+	* vms-alpha.c (evax_bfd_print_etir): Initialize sec_len.
+
+2013-04-22  Alan Modra  <amodra@gmail.com>
+
+	PR ld/15382
+	* elf-bfd.h (RELOC_AGAINST_DISCARDED_SECTION): Don't multiply
+	sh_size or reloc_count adjustment by count.
+
+2013-04-22  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_check_relocs): Don't call
+	create_linkage_sections here..
+	(ppc64_elf_init_stub_bfd): ..do so here.  Return status.
+	(create_linkage_sections): Move earlier in file.
+	(ppc64_elf_setup_section_lists): Remove now useless htab->brlt test.
+	* elf64-ppc.h (ppc64_elf_init_stub_bfd): Update proto.
+
+2013-04-19  Nick Clifton  <nickc@redhat.com>
+
+	PR binutils/15356
+	* compress.c (decompress_contents): Always call inflateEnd, even
+	when another inflation operation fails.
+
+2013-04-17  H.J. Lu  <hongjiu.lu@intel.com>
+
+	* elf-ifunc.c: Update copyright year.
+
+2013-04-17 Luca Pizzamiglio  <luca.pizzamiglio@gmail.com>
+
+	* coffcode.h: Added a cast to void when a bfd_set_section_*()
+	macro's return value is ignored.
+	* elf32-hppa.c: Likewise.
+	* elf32-tic6x.c: Likewise.
+	* mach-o.c: Likewise.
+	* mmo.c: Likewise.
+	* opncls.c: Likewise.
+	* peicode.h: Likewise.
+	* elf32-m32r.c: Check return value of bfd_set_section_*().
+	* elfnn-ia64.c: Likewise.
+	* elfxx-mips.c: Likewise.
+	* vms-alpha.c: Likewise.
+
+2013-04-15  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/15371
+	* elf-ifunc.c (_bfd_elf_allocate_ifunc_dyn_relocs): Check
+	regular reference without non-GOT reference when building
+	shared library.
+
+2013-04-15  Alan Modra  <amodra@gmail.com>
+
+	* archive.c (_bfd_archive_close_and_cleanup): Clear parent
+	cache slot for archives.
+
+2013-04-14  Hans-Peter Nilsson  <hp@bitrange.com>
+
+	* mmo.c (mmo_write_chunk): Break out abfd->tdata.mmo_data to new
+	local variable mmop.
+
+2013-04-09  Senthil Kumar Selvaraj  <senthil_kumar.selvaraj@atmel.com>
+
+	PR ld/12494
+	* bfd/elf32-avr.c: Consider all sections to determine if linker
+	relaxation can safely delete a ret after a call/jmp
+
+2013-04-09  Mingjie Xing  <mingjie.xing@gmail.com>
+
+	* bfd.c (typedef bfd, Error reporting, Miscellaneous): Add
+	INODEs.
+
+2013-04-08  Tom Tromey  <tromey@redhat.com>
+
+	* som.c (bfd_section_from_som_symbol): No longer static.
+	* som.h (bfd_section_from_som_symbol): Declare.
+
+2013-04-06  Alan Modra  <amodra@gmail.com>
+
+	* elf32-ppc.c (ppc_elf_check_relocs): Use SYMBOLIC_BIND.
+	* elf64-ppc.c (ppc64_elf_check_relocs, dec_dynrel_count): Likewise.
+
+2013-04-05  Nick Clifton  <nickc@redhat.com>
+
+	* elflink.c (elf_link_add_object_symbols): Revert accidental commit.
+
+2013-04-04  Alan Modra  <amodra@gmail.com>
+
+	* bfd.c (bfd_error_type, bfd_errmsgs): Add bfd_error_missing_dso.
+	* bfd-in2.h: Regenerate.
+	* elflink.c (elf_link_add_object_symbols): Use new error.
+
 2013-04-03  Nick Clifton  <nickc@redhat.com>
 
 	* elf32-v850.c (v850_elf_is_target_special_symbol): New function.
@@ -5,8 +230,8 @@
 
 2013-04-03   Venkataramanan Kumar  <venkataramanan.kumar@linaro.org>
 
-         * elf64-aarch64.c (elf64_aarch64_gc_sweep_hook): Use
-        elf64_aarch64_locals to get local GOT reference counts.
+	* elf64-aarch64.c (elf64_aarch64_gc_sweep_hook): Use
+	elf64_aarch64_locals to get local GOT reference counts.
 
 2013-04-02  DJ Delorie  <dj@redhat.com>
 
@@ -271,9 +496,9 @@
 
 2013-03-08  Venkataramanan Kumar  <venkataramanan.kumar@linaro.org>
 
-        * elf64-aarch64.c (elf_backend_can_gc_sections): Enable gc-section
+	* elf64-aarch64.c (elf_backend_can_gc_sections): Enable gc-section
 	support.
-        (elf64_aarch64_gc_sweep_hook): Handle GOT, TLS and PLT related
+	(elf64_aarch64_gc_sweep_hook): Handle GOT, TLS and PLT related
 	relocs.
 
 2013-03-08  Andreas Arnez  <arnez@linux.vnet.ibm.com>

@@ -658,7 +658,7 @@ build_address_symbolic (struct gdbarch *gdbarch,
      save some memory, but for many debug format--ELF/DWARF or
      anything/stabs--it would be inconvenient to eliminate those minimal
      symbols anyway).  */
-  msymbol = lookup_minimal_symbol_by_pc_section (addr, section);
+  msymbol = lookup_minimal_symbol_by_pc_section (addr, section).minsym;
   symbol = find_pc_sect_function (addr, section);
 
   if (symbol)
@@ -1115,7 +1115,8 @@ sym_info (char *arg, int from_tty)
 
     if (obj_section_addr (osect) <= sect_addr
 	&& sect_addr < obj_section_endaddr (osect)
-	&& (msymbol = lookup_minimal_symbol_by_pc_section (sect_addr, osect)))
+	&& (msymbol
+	    = lookup_minimal_symbol_by_pc_section (sect_addr, osect).minsym))
       {
 	const char *obj_name, *mapped, *sec_name, *msym_name;
 	char *loc_string;
@@ -1218,7 +1219,9 @@ address_info (char *exp, int from_tty)
 
       if (msymbol != NULL)
 	{
-	  gdbarch = get_objfile_arch (msymbol_objfile (msymbol));
+	  struct objfile *objfile = msymbol_objfile (msymbol);
+
+	  gdbarch = get_objfile_arch (objfile);
 	  load_addr = SYMBOL_VALUE_ADDRESS (msymbol);
 
 	  printf_filtered ("Symbol \"");
@@ -1227,7 +1230,7 @@ address_info (char *exp, int from_tty)
 	  printf_filtered ("\" is at ");
 	  fputs_filtered (paddress (gdbarch, load_addr), gdb_stdout);
 	  printf_filtered (" in a file compiled without debugging");
-	  section = SYMBOL_OBJ_SECTION (msymbol);
+	  section = SYMBOL_OBJ_SECTION (objfile, msymbol);
 	  if (section_is_overlay (section))
 	    {
 	      load_addr = overlay_unmapped_address (load_addr, section);
@@ -1248,7 +1251,7 @@ address_info (char *exp, int from_tty)
 			   current_language->la_language, DMGL_ANSI);
   printf_filtered ("\" is ");
   val = SYMBOL_VALUE (sym);
-  section = SYMBOL_OBJ_SECTION (sym);
+  section = SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (sym), sym);
   gdbarch = get_objfile_arch (SYMBOL_SYMTAB (sym)->objfile);
 
   if (SYMBOL_COMPUTED_OPS (sym) != NULL)
@@ -1353,15 +1356,15 @@ address_info (char *exp, int from_tty)
 
     case LOC_UNRESOLVED:
       {
-	struct minimal_symbol *msym;
+	struct bound_minimal_symbol msym;
 
-	msym = lookup_minimal_symbol (SYMBOL_LINKAGE_NAME (sym), NULL, NULL);
-	if (msym == NULL)
+	msym = lookup_minimal_symbol_and_objfile (SYMBOL_LINKAGE_NAME (sym));
+	if (msym.minsym == NULL)
 	  printf_filtered ("unresolved");
 	else
 	  {
-	    section = SYMBOL_OBJ_SECTION (msym);
-	    load_addr = SYMBOL_VALUE_ADDRESS (msym);
+	    section = SYMBOL_OBJ_SECTION (msym.objfile, msym.minsym);
+	    load_addr = SYMBOL_VALUE_ADDRESS (msym.minsym);
 
 	    if (section
 		&& (section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
@@ -2612,7 +2615,12 @@ but no count or size letter (see \"x\" command)."));
   add_setshow_uinteger_cmd ("max-symbolic-offset", no_class,
 			    &max_symbolic_offset, _("\
 Set the largest offset that will be printed in <symbol+1234> form."), _("\
-Show the largest offset that will be printed in <symbol+1234> form."), NULL,
+Show the largest offset that will be printed in <symbol+1234> form."), _("\
+Tell GDB to only display the symbolic form of an address if the\n\
+offset between the closest earlier symbol and the address is less than\n\
+the specified maximum offset.  The default is \"unlimited\", which tells GDB\n\
+to always print the symbolic form of an address if any symbol precedes\n\
+it.  Zero is equivalent to \"unlimited\"."),
 			    NULL,
 			    show_max_symbolic_offset,
 			    &setprintlist, &showprintlist);

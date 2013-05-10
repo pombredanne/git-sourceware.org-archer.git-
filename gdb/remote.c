@@ -44,6 +44,7 @@
 #include "cli/cli-setshow.h"
 #include "target-descriptions.h"
 #include "gdb_bfd.h"
+#include "filestuff.h"
 
 #include <ctype.h>
 #include <sys/time.h>
@@ -6760,8 +6761,8 @@ remote_write_bytes_aux (const char *header, CORE_ADDR memaddr,
       /* Binary mode.  Send target system values byte by byte, in
 	 increasing byte addresses.  Only escape certain critical
 	 characters.  */
-      payload_length = remote_escape_output (myaddr, todo, p, &nr_bytes,
-					     payload_size);
+      payload_length = remote_escape_output (myaddr, todo, (gdb_byte *) p,
+					     &nr_bytes, payload_size);
 
       /* If not all TODO bytes fit, then we'll need another packet.  Make
 	 a second try to keep the end of the packet aligned.  Don't do
@@ -6774,7 +6775,7 @@ remote_write_bytes_aux (const char *header, CORE_ADDR memaddr,
 			  - memaddr);
 	  if (new_nr_bytes != nr_bytes)
 	    payload_length = remote_escape_output (myaddr, new_nr_bytes,
-						   p, &nr_bytes,
+						   (gdb_byte *) p, &nr_bytes,
 						   payload_size);
 	}
 
@@ -7049,6 +7050,22 @@ remote_files_info (struct target_ops *ignore)
 /* Stuff for dealing with the packets which are part of this protocol.
    See comment at top of file for details.  */
 
+/* Close/unpush the remote target, and throw a TARGET_CLOSE_ERROR
+   error to higher layers.  Called when a serial error is detected.
+   The exception message is STRING, followed by a colon and a blank,
+   the system error message for errno at function entry and final dot
+   for output compatibility with throw_perror_with_name.  */
+
+static void
+unpush_and_perror (const char *string)
+{
+  int saved_errno = errno;
+
+  remote_unpush_target ();
+  throw_error (TARGET_CLOSE_ERROR, "%s: %s.", string,
+	       safe_strerror (saved_errno));
+}
+
 /* Read a single character from the remote end.  */
 
 static int
@@ -7068,10 +7085,8 @@ readchar (int timeout)
       throw_error (TARGET_CLOSE_ERROR, _("Remote connection closed"));
       /* no return */
     case SERIAL_ERROR:
-      remote_unpush_target ();
-      throw_perror_with_name (TARGET_CLOSE_ERROR,
-			      _("Remote communication error.  "
-				"Target disconnected."));
+      unpush_and_perror (_("Remote communication error.  "
+			   "Target disconnected."));
       /* no return */
     case SERIAL_TIMEOUT:
       break;
@@ -7087,10 +7102,8 @@ remote_serial_write (const char *str, int len)
 {
   if (serial_write (remote_desc, str, len))
     {
-      remote_unpush_target ();
-      throw_perror_with_name (TARGET_CLOSE_ERROR,
-			      _("Remote communication error.  "
-				"Target disconnected."));
+      unpush_and_perror (_("Remote communication error.  "
+			   "Target disconnected."));
     }
 }
 
@@ -8494,7 +8507,7 @@ compare_sections_command (char *args, int from_tty)
 {
   asection *s;
   struct cleanup *old_chain;
-  char *sectdata;
+  gdb_byte *sectdata;
   const char *sectname;
   bfd_size_type size;
   bfd_vma lma;
@@ -8579,7 +8592,7 @@ remote_write_qxfer (struct target_ops *ops, const char *object_name,
 
   /* Escape as much data as fits into rs->buf.  */
   buf_len = remote_escape_output 
-    (writebuf, len, (rs->buf + i), &max_size, max_size);
+    (writebuf, len, (gdb_byte *) rs->buf + i, &max_size, max_size);
 
   if (putpkt_binary (rs->buf, i + buf_len) < 0
       || getpkt_sane (&rs->buf, &rs->buf_size, 0) < 0
@@ -8658,7 +8671,8 @@ remote_read_qxfer (struct target_ops *ops, const char *object_name,
     error (_("Remote qXfer reply contained no data."));
 
   /* Got some data.  */
-  i = remote_unescape_input (rs->buf + 1, packet_len - 1, readbuf, n);
+  i = remote_unescape_input ((gdb_byte *) rs->buf + 1,
+			     packet_len - 1, readbuf, n);
 
   /* 'l' is an EOF marker, possibly including a final block of data,
      or possibly empty.  If we have the final block of a non-empty
@@ -8939,7 +8953,7 @@ remote_search_memory (struct target_ops* ops,
 
   /* Escape as much data as fits into rs->buf.  */
   escaped_pattern_len =
-    remote_escape_output (pattern, pattern_len, (rs->buf + i),
+    remote_escape_output (pattern, pattern_len, (gdb_byte *) rs->buf + i,
 			  &used_pattern_len, max_size);
 
   /* Bail if the pattern is too large.  */
@@ -9713,7 +9727,7 @@ remote_hostio_pwrite (int fd, const gdb_byte *write_buf, int len,
   remote_buffer_add_int (&p, &left, offset);
   remote_buffer_add_string (&p, &left, ",");
 
-  p += remote_escape_output (write_buf, len, p, &out_len,
+  p += remote_escape_output (write_buf, len, (gdb_byte *) p, &out_len,
 			     get_remote_packet_size () - (p - rs->buf));
 
   return remote_hostio_send_command (p - rs->buf, PACKET_vFile_pwrite,
@@ -9752,7 +9766,7 @@ remote_hostio_pread (int fd, gdb_byte *read_buf, int len,
   if (ret < 0)
     return ret;
 
-  read_len = remote_unescape_input (attachment, attachment_len,
+  read_len = remote_unescape_input ((gdb_byte *) attachment, attachment_len,
 				    read_buf, len);
   if (read_len != ret)
     error (_("Read returned %d, but %d bytes."), ret, (int) read_len);
@@ -9826,8 +9840,8 @@ remote_hostio_readlink (const char *filename, int *remote_errno)
 
   ret = xmalloc (len + 1);
 
-  read_len = remote_unescape_input (attachment, attachment_len,
-				    ret, len);
+  read_len = remote_unescape_input ((gdb_byte *) attachment, attachment_len,
+				    (gdb_byte *) ret, len);
   if (read_len != len)
     error (_("Readlink returned %d, but %d bytes."), len, read_len);
 
@@ -9941,7 +9955,8 @@ remote_bfd_iovec_close (struct bfd *abfd, void *stream)
      connection was already torn down.  */
   remote_hostio_close (fd, &remote_errno);
 
-  return 1;
+  /* Zero means success.  */
+  return 0;
 }
 
 static file_ptr
@@ -9955,7 +9970,7 @@ remote_bfd_iovec_pread (struct bfd *abfd, void *stream, void *buf,
   pos = 0;
   while (nbytes > pos)
     {
-      bytes = remote_hostio_pread (fd, (char *)buf + pos, nbytes - pos,
+      bytes = remote_hostio_pread (fd, (gdb_byte *) buf + pos, nbytes - pos,
 				   offset + pos, &remote_errno);
       if (bytes == 0)
         /* Success, but no bytes, means end-of-file.  */
@@ -10013,7 +10028,7 @@ remote_file_put (const char *local_file, const char *remote_file, int from_tty)
   if (!remote_desc)
     error (_("command can only be used with remote target"));
 
-  file = fopen (local_file, "rb");
+  file = gdb_fopen_cloexec (local_file, "rb");
   if (file == NULL)
     perror_with_name (local_file);
   back_to = make_cleanup_fclose (file);
@@ -10105,7 +10120,7 @@ remote_file_get (const char *remote_file, const char *local_file, int from_tty)
   if (fd == -1)
     remote_hostio_error (remote_errno);
 
-  file = fopen (local_file, "wb");
+  file = gdb_fopen_cloexec (local_file, "wb");
   if (file == NULL)
     perror_with_name (local_file);
   back_to = make_cleanup_fclose (file);
@@ -10824,7 +10839,7 @@ remote_trace_stop (void)
 
 static int
 remote_trace_find (enum trace_find_type type, int num,
-		   ULONGEST addr1, ULONGEST addr2,
+		   CORE_ADDR addr1, CORE_ADDR addr2,
 		   int *tpp)
 {
   struct remote_state *rs = get_remote_state ();
@@ -11138,21 +11153,21 @@ remote_set_trace_notes (char *user, char *notes, char *stop_notes)
   if (user)
     {
       buf += xsnprintf (buf, endbuf - buf, "user:");
-      nbytes = bin2hex (user, buf, 0);
+      nbytes = bin2hex ((gdb_byte *) user, buf, 0);
       buf += 2 * nbytes;
       *buf++ = ';';
     }
   if (notes)
     {
       buf += xsnprintf (buf, endbuf - buf, "notes:");
-      nbytes = bin2hex (notes, buf, 0);
+      nbytes = bin2hex ((gdb_byte *) notes, buf, 0);
       buf += 2 * nbytes;
       *buf++ = ';';
     }
   if (stop_notes)
     {
       buf += xsnprintf (buf, endbuf - buf, "tstop:");
-      nbytes = bin2hex (stop_notes, buf, 0);
+      nbytes = bin2hex ((gdb_byte *) stop_notes, buf, 0);
       buf += 2 * nbytes;
       *buf++ = ';';
     }

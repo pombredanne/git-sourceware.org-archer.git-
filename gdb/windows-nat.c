@@ -386,7 +386,7 @@ windows_init_thread_list (void)
 
 /* Delete a thread from the list of threads.  */
 static void
-windows_delete_thread (ptid_t ptid)
+windows_delete_thread (ptid_t ptid, DWORD exit_code)
 {
   thread_info *th;
   DWORD id;
@@ -397,6 +397,9 @@ windows_delete_thread (ptid_t ptid)
 
   if (info_verbose)
     printf_unfiltered ("[Deleting %s]\n", target_pid_to_str (ptid));
+  else if (print_thread_events && id != main_thread_id)
+    printf_unfiltered (_("[%s exited with code %u]\n"),
+		       target_pid_to_str (ptid), (unsigned)exit_code);
   delete_thread (ptid);
 
   for (th = &thread_head;
@@ -595,18 +598,6 @@ get_module_name (LPVOID base_address, char *dll_name_ret)
 failed:
   dll_name_ret[0] = '\0';
   return 0;		/* failure */
-}
-
-/* Return an absolute file name of the running GDB, if possible, or
-   ARGV0 if not.  The return value is in malloc'ed storage.  */
-char *
-windows_get_absolute_argv0 (const char *argv0)
-{
-  char full_name[PATH_MAX];
-
-  if (GetModuleFileName (NULL, full_name, PATH_MAX))
-    return xstrdup (full_name);
-  return xstrdup (argv0);
 }
 
 /* Encapsulate the information required in a call to
@@ -1510,7 +1501,8 @@ get_windows_debug_event (struct target_ops *ops,
       if (current_event.dwThreadId != main_thread_id)
 	{
 	  windows_delete_thread (ptid_build (current_event.dwProcessId, 0,
-					   current_event.dwThreadId));
+					     current_event.dwThreadId),
+				 current_event.u.ExitThread.dwExitCode);
 	  th = &dummy_thread_info;
 	}
       break;
@@ -1527,7 +1519,8 @@ get_windows_debug_event (struct target_ops *ops,
       current_process_handle = current_event.u.CreateProcessInfo.hProcess;
       if (main_thread_id)
 	windows_delete_thread (ptid_build (current_event.dwProcessId, 0,
-					   main_thread_id));
+					   main_thread_id),
+			       0);
       main_thread_id = current_event.dwThreadId;
       /* Add the main thread.  */
       th = windows_add_thread (ptid_build (current_event.dwProcessId, 0,

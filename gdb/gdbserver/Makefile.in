@@ -143,6 +143,7 @@ SFILES=	$(srcdir)/gdbreplay.c $(srcdir)/inferiors.c $(srcdir)/dll.c \
 	$(srcdir)/linux-ia64-low.c $(srcdir)/linux-low.c \
 	$(srcdir)/linux-m32r-low.c \
 	$(srcdir)/linux-m68k-low.c $(srcdir)/linux-mips-low.c \
+	$(srcdir)/linux-nios2-low.c \
 	$(srcdir)/linux-ppc-low.c \
 	$(srcdir)/linux-s390-low.c \
 	$(srcdir)/linux-sh-low.c $(srcdir)/linux-sparc-low.c \
@@ -155,7 +156,8 @@ SFILES=	$(srcdir)/gdbreplay.c $(srcdir)/inferiors.c $(srcdir)/dll.c \
 	$(srcdir)/common/vec.c $(srcdir)/common/gdb_vecs.c \
 	$(srcdir)/common/common-utils.c $(srcdir)/common/xml-utils.c \
 	$(srcdir)/common/linux-osdata.c $(srcdir)/common/ptid.c \
-	$(srcdir)/common/buffer.c $(srcdir)/common/linux-btrace.c
+	$(srcdir)/common/buffer.c $(srcdir)/common/linux-btrace.c \
+	$(srcdir)/common/filestuff.c
 
 DEPFILES = @GDBSERVER_DEPFILES@
 
@@ -167,7 +169,7 @@ TAGFILES = $(SOURCES) ${HFILES} ${ALLPARAM} ${POSSLIBS}
 OBS = agent.o ax.o inferiors.o regcache.o remote-utils.o server.o signals.o target.o \
 	utils.o version.o vec.o gdb_vecs.o \
 	mem-break.o hostio.o event-loop.o tracepoint.o \
-	xml-utils.o common-utils.o ptid.o buffer.o format.o \
+	xml-utils.o common-utils.o ptid.o buffer.o format.o filestuff.o \
 	dll.o notif.o \
 	$(XML_BUILTIN) \
 	$(DEPFILES) $(LIBOBJS)
@@ -251,9 +253,7 @@ install-only:
 		$(INSTALL_PROGRAM) $(IPA_LIB) $(DESTDIR)$(libdir)/$(IPA_LIB); \
 	fi; \
 	$(SHELL) $(srcdir)/../../mkinstalldirs $(DESTDIR)$(bindir); \
-	$(INSTALL_PROGRAM) gdbserver$(EXEEXT) $(DESTDIR)$(bindir)/$$n$(EXEEXT); \
-	$(SHELL) $(srcdir)/../../mkinstalldirs $(DESTDIR)$(man1dir); \
-	$(INSTALL_DATA) $(srcdir)/gdbserver.1 $(DESTDIR)$(man1dir)/$$n.1
+	$(INSTALL_PROGRAM) gdbserver$(EXEEXT) $(DESTDIR)$(bindir)/$$n$(EXEEXT)
 	@$(MAKE) $(FLAGS_TO_PASS) DO=$@ "DODIRS=$(SUBDIRS)" subdir_do
 
 uninstall: force
@@ -324,6 +324,7 @@ clean:
 	rm -f arm-with-iwmmxt.c
 	rm -f arm-with-vfpv2.c arm-with-vfpv3.c arm-with-neon.c
 	rm -f mips-linux.c mips64-linux.c
+	rm -f nios2-linux.c
 	rm -f powerpc-32.c powerpc-32l.c powerpc-64l.c powerpc-e500l.c
 	rm -f powerpc-altivec32l.c powerpc-cell32l.c powerpc-vsx32l.c
 	rm -f powerpc-altivec64l.c powerpc-cell64l.c powerpc-vsx64l.c
@@ -542,6 +543,9 @@ buffer.o: ../common/buffer.c
 format.o: ../common/format.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
+filestuff.o: ../common/filestuff.c
+	$(COMPILE) $<
+	$(POSTCOMPILE)
 agent.o: ../common/agent.c
 	$(COMPILE) $<
 	$(POSTCOMPILE)
@@ -561,11 +565,6 @@ vsnprintf.o: $(srcdir)/../../libiberty/vsnprintf.c
 	$(POSTCOMPILE)
 
 i386_low_h = $(srcdir)/i386-low.h
-
-linux-low.o: linux-low.c
-	$(COMPILE) $< @USE_THREAD_DB@
-	$(POSTCOMPILE)
-
 win32_low_h = $(srcdir)/win32-low.h
 
 aarch64.c : $(srcdir)/../regformats/aarch64.dat $(regdat_sh)
@@ -616,6 +615,8 @@ mips64-linux.c : $(srcdir)/../regformats/mips64-linux.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/mips64-linux.dat mips64-linux.c
 mips64-dsp-linux.c : $(srcdir)/../regformats/mips64-dsp-linux.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/mips64-dsp-linux.dat mips64-dsp-linux.c
+nios2-linux.c :	$(srcdir)/../regformats/nios2-linux.dat $(regdat_sh)
+	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/nios2-linux.dat nios2-linux.c
 powerpc-32.c : $(srcdir)/../regformats/rs6000/powerpc-32.dat $(regdat_sh)
 	$(SHELL) $(regdat_sh) $(srcdir)/../regformats/rs6000/powerpc-32.dat powerpc-32.c
 powerpc-32l.c : $(srcdir)/../regformats/rs6000/powerpc-32l.dat $(regdat_sh)

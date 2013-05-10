@@ -782,7 +782,7 @@ ps_pglobal_lookup (gdb_ps_prochandle_t ph, const char *ld_object_name,
 
 static ps_err_e
 rw_common (int dowrite, const struct ps_prochandle *ph, gdb_ps_addr_t addr,
-	   char *buf, int size)
+	   gdb_byte *buf, int size)
 {
   int ret;
   struct cleanup *old_chain;
@@ -807,9 +807,9 @@ rw_common (int dowrite, const struct ps_prochandle *ph, gdb_ps_addr_t addr,
 #endif
 
   if (dowrite)
-    ret = target_write_memory (addr, buf, size);
+    ret = target_write_memory (addr, (gdb_byte *) buf, size);
   else
-    ret = target_read_memory (addr, buf, size);
+    ret = target_read_memory (addr, (gdb_byte *) buf, size);
 
   do_cleanups (old_chain);
 
@@ -831,7 +831,7 @@ ps_err_e
 ps_pdwrite (gdb_ps_prochandle_t ph, gdb_ps_addr_t addr,
 	    gdb_ps_write_buf_t buf, gdb_ps_size_t size)
 {
-  return rw_common (1, ph, addr, (char *) buf, size);
+  return rw_common (1, ph, addr, (gdb_byte *) buf, size);
 }
 
 /* Copies SIZE bytes from target process .text segment to debugger memory.  */
@@ -849,7 +849,7 @@ ps_err_e
 ps_ptwrite (gdb_ps_prochandle_t ph, gdb_ps_addr_t addr,
 	    gdb_ps_write_buf_t buf, gdb_ps_size_t size)
 {
-  return rw_common (1, ph, addr, (char *) buf, size);
+  return rw_common (1, ph, addr, (gdb_byte *) buf, size);
 }
 
 /* Get general-purpose registers for LWP.  */
@@ -1115,32 +1115,28 @@ info_cb (const td_thrhandle_t *th, void *s)
       /* Print thr_create start function.  */
       if (ti.ti_startfunc != 0)
 	{
-	  struct minimal_symbol *msym;
-	  msym = lookup_minimal_symbol_by_pc (ti.ti_startfunc);
-	  if (msym)
-	    printf_filtered ("   startfunc: %s\n",
-			     SYMBOL_PRINT_NAME (msym));
-	  else
-	    printf_filtered ("   startfunc: %s\n",
-			     paddress (target_gdbarch (), ti.ti_startfunc));
+	  const struct bound_minimal_symbol msym
+	    = lookup_minimal_symbol_by_pc (ti.ti_startfunc);
+
+	  printf_filtered ("   startfunc=%s",
+			   msym.minsym
+			   ? SYMBOL_PRINT_NAME (msym.minsym)
+			   : paddress (target_gdbarch (), ti.ti_startfunc));
 	}
 
       /* If thread is asleep, print function that went to sleep.  */
       if (ti.ti_state == TD_THR_SLEEP)
 	{
-	  struct minimal_symbol *msym;
-	  msym = lookup_minimal_symbol_by_pc (ti.ti_pc);
-	  if (msym)
-	    printf_filtered (" - Sleep func: %s\n",
-			     SYMBOL_PRINT_NAME (msym));
-	  else
-	    printf_filtered (" - Sleep func: %s\n",
-			     paddress (target_gdbarch (), ti.ti_startfunc));
+	  const struct bound_minimal_symbol msym
+	    = lookup_minimal_symbol_by_pc (ti.ti_pc);
+
+	  printf_filtered ("   sleepfunc=%s",
+			   msym.minsym
+			   ? SYMBOL_PRINT_NAME (msym.minsym)
+			   : paddress (target_gdbarch (), ti.ti_pc));
 	}
 
-      /* Wrap up line, if necessary.  */
-      if (ti.ti_state != TD_THR_SLEEP && ti.ti_startfunc == 0)
-	printf_filtered ("\n");	/* don't you hate counting newlines?  */
+      printf_filtered ("\n");
     }
   else
     warning (_("info sol-thread: failed to get info for thread."));

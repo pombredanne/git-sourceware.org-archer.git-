@@ -203,6 +203,7 @@ fi
 
 TARGET_OBS=
 all_targets=
+HAVE_NATIVE_GCORE_TARGET=
 
 for targ_alias in `echo $target_alias $enable_targets | sed 's/,/ /g'`
 do
@@ -236,6 +237,12 @@ do
     if test x${want64} = xfalse; then
       . ${srcdir}/../bfd/config.bfd
     fi
+
+    # Check whether this target is native and supports gcore.
+    if test $gdb_native = yes -a "$targ_alias" = "$target_alias" \
+       && $gdb_have_gcore; then
+      HAVE_NATIVE_GCORE_TARGET=1
+    fi
   fi
 done
 
@@ -264,6 +271,7 @@ if test x${all_targets} = xtrue; then
 fi
 
 AC_SUBST(TARGET_OBS)
+AC_SUBST(HAVE_NATIVE_GCORE_TARGET)
 
 # For other settings, only the main target counts.
 gdb_sim=
@@ -1082,7 +1090,7 @@ AC_CHECK_HEADERS([nlist.h machine/reg.h poll.h sys/poll.h proc_service.h \
 		  sys/reg.h sys/debugreg.h sys/select.h sys/syscall.h \
 		  sys/types.h sys/wait.h wait.h termios.h termio.h \
 		  sgtty.h unistd.h elf_hp.h locale.h \
-		  dlfcn.h sys/socket.h sys/un.h linux/perf_event.h])
+		  dlfcn.h sys/un.h linux/perf_event.h])
 AC_CHECK_HEADERS(link.h, [], [],
 [#if HAVE_SYS_TYPES_H
 # include <sys/types.h>
@@ -1164,7 +1172,8 @@ AC_CHECK_FUNCS([canonicalize_file_name realpath getrusage getuid getgid \
 		sbrk setpgid setpgrp setsid \
 		sigaction sigprocmask sigsetmask socketpair syscall \
 		ttrace wborder wresize setlocale iconvlist libiconvlist btowc \
-		setrlimit getrlimit posix_madvise waitpid lstat])
+		setrlimit getrlimit posix_madvise waitpid lstat \
+		fdwalk pipe2])
 AM_LANGINFO_CODESET
 
 # Check the return and argument types of ptrace.  No canned test for
@@ -1917,7 +1926,7 @@ fi
 # NOTE: If you change this list, remember to update
 # gdb/doc/gdbint.texinfo.
 build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
--Wformat-nonliteral -Wno-pointer-sign \
+-Wformat-nonliteral -Wpointer-sign \
 -Wno-unused -Wunused-value -Wunused-function \
 -Wno-switch -Wno-char-subscripts -Wmissing-prototypes \
 -Wdeclaration-after-statement -Wempty-body"
@@ -2321,6 +2330,47 @@ if test "$enable_gdbserver" = "yes" -a "$gdbserver_build_enabled" != "yes"; then
   AC_MSG_ERROR(Automatic gdbserver build is not supported for this configuration)
 fi
 
+# Check for babeltrace and babeltrace-ctf
+AC_ARG_WITH(babeltrace,
+  AC_HELP_STRING([--with-babeltrace], [include babeltrace support (auto/yes/no)]),
+  [], [with_babeltrace=auto])
+AC_MSG_CHECKING([whether to use babeltrace])
+AC_MSG_RESULT([$with_babeltrace])
+
+if test "x$with_babeltrace" = "xno"; then
+  AC_MSG_WARN([babletrace support disabled; GDB is unable to read CTF data.])
+else
+  # Append -Werror to CFLAGS so that configure can catch the warning
+  # "assignment from incompatible pointer type", which is related to
+  # the babeltrace change from 1.0.3 to 1.1.0.  Babeltrace 1.1.0 works
+  # in GDB, while babeltrace 1.0.3 is broken.
+  # AC_LIB_HAVE_LINKFLAGS may modify CPPFLAGS in it, so it should be
+  # safe to save and restore CFLAGS here.
+  saved_CFLAGS=$CFLAGS
+  CFLAGS="$CFLAGS -Werror"
+  AC_LIB_HAVE_LINKFLAGS([babeltrace], [babeltrace-ctf],
+			[#include <babeltrace/babeltrace.h>
+			 #include <babeltrace/ctf/events.h>
+			 #include <babeltrace/ctf/iterator.h>],
+			[struct bt_iter_pos *pos = bt_iter_get_pos (bt_ctf_get_iter (NULL));
+			struct bt_ctf_event *event = NULL;
+			const struct bt_definition *scope;
+
+			scope = bt_ctf_get_top_level_scope (event, 
+			      				   BT_STREAM_EVENT_HEADER);
+		        bt_ctf_get_uint64 (bt_ctf_get_field (event, scope, "id"));
+			])
+  CFLAGS=$saved_CFLAGS
+
+  if test "$HAVE_LIBBABELTRACE" != yes; then
+     if test "$with_babeltrace" = yes; then
+       AC_MSG_ERROR([babeltrace is missing or unusable])
+     else
+       AC_MSG_WARN([babeltrace is missing or unusable; GDB is unable to read CTF data.])
+     fi
+  fi
+fi
+
 # If nativefile (NAT_FILE) is not set in config/*/*.m[ht] files, we link
 # to an empty version.
 
@@ -2348,6 +2398,20 @@ dnl  Detect the character set used by this host.
 dnl  At the moment, we just assume it's UTF-8.
 AC_DEFINE(GDB_DEFAULT_HOST_CHARSET, "UTF-8",
           [Define to be a string naming the default host character set.])
+
+# Undo the $ec_script escaping suitable for Makefile.
+transform=`echo "$program_transform_name" | sed -e 's/[\\$][\\$]/\\$/g'`
+GDB_TRANSFORM_NAME=`echo gdb | sed -e "$transform"`
+if test "x$GDB_TRANSFORM_NAME" = x; then
+  GDB_TRANSFORM_NAME=gdb
+fi
+AC_SUBST(GDB_TRANSFORM_NAME)
+GCORE_TRANSFORM_NAME=`echo gcore | sed -e "$transform"`
+if test "x$GCORE_TRANSFORM_NAME" = x; then
+  GCORE_TRANSFORM_NAME=gcore
+fi
+AC_SUBST(GCORE_TRANSFORM_NAME)
+AC_CONFIG_FILES([gcore], [chmod +x gcore])
 
 AC_OUTPUT(Makefile gdb-gdb.gdb doc/Makefile data-directory/Makefile,
 [

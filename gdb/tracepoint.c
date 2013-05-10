@@ -55,6 +55,7 @@
 #include "probe.h"
 #include "ctf.h"
 #include "completer.h"
+#include "filestuff.h"
 
 /* readline include files */
 #include "readline/readline.h"
@@ -126,14 +127,6 @@ extern void (*deprecated_readline_end_hook) (void);
 
 typedef struct trace_state_variable tsv_s;
 DEF_VEC_O(tsv_s);
-
-/* An object describing the contents of a traceframe.  */
-
-struct traceframe_info
-{
-  /* Collected memory.  */
-  VEC(mem_range_s) *memory;
-};
 
 static VEC(tsv_s) *tvariables;
 
@@ -2212,12 +2205,15 @@ trace_status_mi (int on_stop)
   }
 }
 
-/* This function handles the details of what to do about an ongoing
-   tracing run if the user has asked to detach or otherwise disconnect
-   from the target.  */
+/* Check if a trace run is ongoing.  If so, and FROM_TTY, query the
+   user if she really wants to detach.  */
+
 void
-disconnect_tracing (int from_tty)
+query_if_trace_running (int from_tty)
 {
+  if (!from_tty)
+    return;
+
   /* It can happen that the target that was tracing went away on its
      own, and we didn't notice.  Get a status update, and if the
      current target doesn't even do tracing, then assume it's not
@@ -2230,7 +2226,7 @@ disconnect_tracing (int from_tty)
      just going to disconnect and let the target deal with it,
      according to how it's been instructed previously via
      disconnected-tracing.  */
-  if (current_trace_status ()->running && from_tty)
+  if (current_trace_status ()->running)
     {
       process_tracepoint_on_disconnect ();
 
@@ -2247,7 +2243,15 @@ disconnect_tracing (int from_tty)
 	    error (_("Not confirmed."));
 	}
     }
+}
 
+/* This function handles the details of what to do about an ongoing
+   tracing run if the user has asked to detach or otherwise disconnect
+   from the target.  */
+
+void
+disconnect_tracing (void)
+{
   /* Also we want to be out of tfind mode, otherwise things can get
      confusing upon reconnection.  Just use these calls instead of
      full tfind_1 behavior because we're in the middle of detaching,
@@ -2260,7 +2264,7 @@ disconnect_tracing (int from_tty)
 /* Worker function for the various flavors of the tfind command.  */
 void
 tfind_1 (enum trace_find_type type, int num,
-	 ULONGEST addr1, ULONGEST addr2,
+	 CORE_ADDR addr1, CORE_ADDR addr2,
 	 int from_tty)
 {
   int target_frameno = -1, target_tracept = -1;
@@ -2997,7 +3001,7 @@ encode_source_string (int tpnum, ULONGEST addr,
 	   srctype, 0, (int) strlen (src));
   if (strlen (buf) + strlen (src) * 2 >= buf_size)
     error (_("Source string too long for buffer"));
-  bin2hex (src, buf + strlen (buf), 0);
+  bin2hex ((gdb_byte *) src, buf + strlen (buf), 0);
   return -1;
 }
 
@@ -3063,7 +3067,7 @@ tfile_start (struct trace_file_writer *self, const char *filename)
     = (struct tfile_trace_file_writer *) self;
 
   writer->pathname = tilde_expand (filename);
-  writer->fp = fopen (writer->pathname, "wb");
+  writer->fp = gdb_fopen_cloexec (writer->pathname, "wb");
   if (writer->fp == NULL)
     error (_("Unable to open file '%s' for saving trace data (%s)"),
 	   filename, safe_strerror (errno));
@@ -3187,7 +3191,7 @@ tfile_write_uploaded_tp (struct trace_file_writer *self,
     = (struct tfile_trace_file_writer *) self;
   int a;
   char *act;
-  gdb_byte buf[MAX_TRACE_UPLOAD];
+  char buf[MAX_TRACE_UPLOAD];
 
   fprintf (writer->fp, "tp T%x:%s:%c:%x:%x",
 	   utp->number, phex_nz (utp->addr, sizeof (utp->addr)),
@@ -3303,8 +3307,6 @@ static const struct trace_file_write_ops tfile_write_ops =
 #define TRACE_WRITE_V_BLOCK(writer, num, val)	\
   writer->ops->frame_ops->write_v_block ((writer), (num), (val))
 
-extern int trace_regblock_size;
-
 /* Save tracepoint data to file named FILENAME through WRITER.  WRITER
    determines the trace file format.  If TARGET_DOES_SAVE is non-zero,
    the save is performed on the target, otherwise GDB obtains all trace
@@ -3321,6 +3323,7 @@ trace_save (const char *filename, struct trace_file_writer *writer,
 
   ULONGEST offset = 0;
   gdb_byte buf[MAX_TRACE_UPLOAD];
+#define MAX_TRACE_UPLOAD 2000
   int written;
   enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
 
@@ -3741,6 +3744,12 @@ get_traceframe_number (void)
   return traceframe_number;
 }
 
+int
+get_tracepoint_number (void)
+{
+  return tracepoint_number;
+}
+
 /* Make the traceframe NUM be the current trace frame.  Does nothing
    if NUM is already current.  */
 
@@ -3859,7 +3868,7 @@ free_uploaded_tps (struct uploaded_tp **utpp)
 /* Given a number and address, return an uploaded tracepoint with that
    number, creating if necessary.  */
 
-static struct uploaded_tsv *
+struct uploaded_tsv *
 get_uploaded_tsv (int num, struct uploaded_tsv **utsvp)
 {
   struct uploaded_tsv *utsv;
@@ -4168,7 +4177,7 @@ tfile_open (char *filename, int from_tty)
   int scratch_chan;
   char header[TRACE_HEADER_SIZE];
   char linebuf[1000]; /* Should be max remote packet size or so.  */
-  char byte;
+  gdb_byte byte;
   int bytes, i;
   struct trace_status *ts;
   struct uploaded_tp *uploaded_tps = NULL;
@@ -4190,7 +4199,7 @@ tfile_open (char *filename, int from_tty)
 
   flags = O_BINARY | O_LARGEFILE;
   flags |= O_RDONLY;
-  scratch_chan = open (filename, flags, 0);
+  scratch_chan = gdb_open_cloexec (filename, flags, 0);
   if (scratch_chan < 0)
     perror_with_name (filename);
 
@@ -4287,8 +4296,8 @@ tfile_open (char *filename, int from_tty)
    file.  */
 
 static void
-tfile_interp_line (char *line,
-		   struct uploaded_tp **utpp, struct uploaded_tsv **utsvp)
+tfile_interp_line (char *line, struct uploaded_tp **utpp,
+		   struct uploaded_tsv **utsvp)
 {
   char *p = line;
 
@@ -4380,7 +4389,7 @@ Status line: '%s'\n"), p, line);
 	  else if (p2 != p1)
 	    {
 	      ts->stop_desc = xmalloc (strlen (line));
-	      end = hex2bin (p1, ts->stop_desc, (p2 - p1) / 2);
+	      end = hex2bin (p1, (gdb_byte *) ts->stop_desc, (p2 - p1) / 2);
 	      ts->stop_desc[end] = '\0';
 	    }
 	  else
@@ -4400,7 +4409,7 @@ Status line: '%s'\n"), p, line);
 	  if (p2 != p1)
 	    {
 	      ts->stop_desc = xmalloc ((p2 - p1) / 2 + 1);
-	      end = hex2bin (p1, ts->stop_desc, (p2 - p1) / 2);
+	      end = hex2bin (p1, (gdb_byte *) ts->stop_desc, (p2 - p1) / 2);
 	      ts->stop_desc[end] = '\0';
 	    }
 	  else
@@ -4454,7 +4463,7 @@ Status line: '%s'\n"), p, line);
 	{
 	  ++p1;
 	  ts->user_name = xmalloc (strlen (p) / 2);
-	  end = hex2bin (p1, ts->user_name, (p3 - p1)  / 2);
+	  end = hex2bin (p1, (gdb_byte *) ts->user_name, (p3 - p1)  / 2);
 	  ts->user_name[end] = '\0';
 	  p = p3;
 	}
@@ -4462,7 +4471,7 @@ Status line: '%s'\n"), p, line);
 	{
 	  ++p1;
 	  ts->notes = xmalloc (strlen (p) / 2);
-	  end = hex2bin (p1, ts->notes, (p3 - p1) / 2);
+	  end = hex2bin (p1, (gdb_byte *) ts->notes, (p3 - p1) / 2);
 	  ts->notes[end] = '\0';
 	  p = p3;
 	}
@@ -4692,10 +4701,10 @@ tfile_get_tracepoint_status (struct breakpoint *tp, struct uploaded_tp *utp)
    value of a collected PC register, but if not available, we
    improvise.  */
 
-static ULONGEST
+static CORE_ADDR
 tfile_get_traceframe_address (off_t tframe_offset)
 {
-  ULONGEST addr = 0;
+  CORE_ADDR addr = 0;
   short tpnum;
   struct tracepoint *tp;
   off_t saved_offset = cur_offset;
@@ -4727,14 +4736,14 @@ tfile_get_traceframe_address (off_t tframe_offset)
 
 static int
 tfile_trace_find (enum trace_find_type type, int num,
-		  ULONGEST addr1, ULONGEST addr2, int *tpp)
+		  CORE_ADDR addr1, CORE_ADDR addr2, int *tpp)
 {
   short tpnum;
   int tfnum = 0, found = 0;
   unsigned int data_size;
   struct tracepoint *tp;
   off_t offset, tframe_offset;
-  ULONGEST tfaddr;
+  CORE_ADDR tfaddr;
 
   if (num == -1)
     {
@@ -4858,7 +4867,7 @@ traceframe_walk_blocks (walk_blocks_callback_func callback,
       unsigned short mlen;
       char block_type;
 
-      tfile_read (&block_type, 1);
+      tfile_read ((gdb_byte *) &block_type, 1);
 
       ++pos;
 
@@ -4914,7 +4923,7 @@ tfile_fetch_registers (struct target_ops *ops,
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
   int offset, regn, regsize, pc_regno;
-  char *regs;
+  gdb_byte *regs;
 
   /* An uninitialized reg size says we're not going to be
      successful at getting register blocks.  */
@@ -5877,8 +5886,8 @@ up and stopping the trace run."),
 Set requested size of trace buffer."), _("\
 Show requested size of trace buffer."), _("\
 Use this to choose a size for the trace buffer.  Some targets\n\
-may have fixed or limited buffer sizes.  A value of -1 disables\n\
-any attempt to set the buffer size and lets the target choose."),
+may have fixed or limited buffer sizes.  Specifying \"unlimited\" or -1\n\
+disables any attempt to set the buffer size and lets the target choose."),
 				       set_trace_buffer_size, NULL,
 				       &setlist, &showlist);
 

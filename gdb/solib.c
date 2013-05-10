@@ -47,6 +47,7 @@
 #include "interps.h"
 #include "filesystem.h"
 #include "gdb_bfd.h"
+#include "filestuff.h"
 
 /* Architecture-specific operations.  */
 
@@ -246,7 +247,7 @@ solib_find (char *in_pathname, int *fd)
     }
 
   /* Now see if we can open it.  */
-  found_file = open (temp_pathname, O_RDONLY | O_BINARY, 0);
+  found_file = gdb_open_cloexec (temp_pathname, O_RDONLY | O_BINARY, 0);
   if (found_file < 0)
     xfree (temp_pathname);
 
@@ -269,7 +270,7 @@ solib_find (char *in_pathname, int *fd)
 			      in_pathname + 2, (char *) NULL);
       xfree (drive);
 
-      found_file = open (temp_pathname, O_RDONLY | O_BINARY, 0);
+      found_file = gdb_open_cloexec (temp_pathname, O_RDONLY | O_BINARY, 0);
       if (found_file < 0)
 	{
 	  xfree (temp_pathname);
@@ -284,7 +285,7 @@ solib_find (char *in_pathname, int *fd)
 				  need_dir_separator ? SLASH_STRING : "",
 				  in_pathname + 2, (char *) NULL);
 
-	  found_file = open (temp_pathname, O_RDONLY | O_BINARY, 0);
+	  found_file = gdb_open_cloexec (temp_pathname, O_RDONLY | O_BINARY, 0);
 	  if (found_file < 0)
 	    xfree (temp_pathname);
 	}
@@ -465,12 +466,6 @@ solib_map_sections (struct so_list *so)
   /* Leave bfd open, core_xfer_memory and "info files" need it.  */
   so->abfd = abfd;
 
-  /* copy full path name into so_name, so that later symbol_file_add
-     can find it.  */
-  if (strlen (bfd_get_filename (abfd)) >= SO_NAME_MAX_PATH_SIZE)
-    error (_("Shared library file name is too long."));
-  strcpy (so->so_name, bfd_get_filename (abfd));
-
   if (build_section_table (abfd, &so->sections, &so->sections_end))
     {
       error (_("Can't find the file sections in `%s': %s"),
@@ -504,17 +499,20 @@ solib_map_sections (struct so_list *so)
   return 1;
 }
 
-/* Free symbol-file related contents of SO.  If we have opened a BFD
-   for SO, close it.  If we have placed SO's sections in some target's
-   section table, the caller is responsible for removing them.
+/* Free symbol-file related contents of SO and reset for possible reloading
+   of SO.  If we have opened a BFD for SO, close it.  If we have placed SO's
+   sections in some target's section table, the caller is responsible for
+   removing them.
 
    This function doesn't mess with objfiles at all.  If there is an
    objfile associated with SO that needs to be removed, the caller is
    responsible for taking care of that.  */
 
 static void
-free_so_symbols (struct so_list *so)
+clear_so (struct so_list *so)
 {
+  struct target_so_ops *ops = solib_ops (target_gdbarch ());
+
   if (so->sections)
     {
       xfree (so->sections);
@@ -533,6 +531,10 @@ free_so_symbols (struct so_list *so)
   /* Restore the target-supplied file name.  SO_NAME may be the path
      of the symbol file.  */
   strcpy (so->so_name, so->so_original_name);
+
+  /* Do the same for target-specific data.  */
+  if (ops->clear_so != NULL)
+    ops->clear_so (so);
 }
 
 /* Free the storage associated with the `struct so_list' object SO.
@@ -551,7 +553,7 @@ free_so (struct so_list *so)
 {
   struct target_so_ops *ops = solib_ops (target_gdbarch ());
 
-  free_so_symbols (so);
+  clear_so (so);
   ops->free_so (so);
 
   xfree (so);
@@ -1233,11 +1235,7 @@ handle_solib_event (void)
      be adding them automatically.  Switch terminal for any messages
      produced by breakpoint_re_set.  */
   target_terminal_ours_for_output ();
-#ifdef SOLIB_ADD
-  SOLIB_ADD (NULL, 0, &current_target, auto_solib_add);
-#else
   solib_add (NULL, 0, &current_target, auto_solib_add);
-#endif
   target_terminal_inferior ();
 }
 
@@ -1279,7 +1277,7 @@ reload_shared_libraries_1 (int from_tty)
 	      && !solib_used (so))
 	    free_objfile (so->objfile);
 	  remove_target_sections (so, so->abfd);
-	  free_so_symbols (so);
+	  clear_so (so);
 	}
 
       /* If this shared library is now associated with a new symbol
@@ -1335,11 +1333,7 @@ reload_shared_libraries (char *ignored, int from_tty,
 	 we're not really starting up the inferior here.  */
       remove_solib_event_breakpoints ();
 
-#ifdef SOLIB_CREATE_INFERIOR_HOOK
-      SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
-#else
       solib_create_inferior_hook (from_tty);
-#endif
     }
 
   /* Sometimes the platform-specific hook loads initial shared

@@ -241,7 +241,7 @@ has_lm_dynamic_from_link_map (void)
 }
 
 static CORE_ADDR
-lm_addr_check (struct so_list *so, bfd *abfd)
+lm_addr_check (const struct so_list *so, bfd *abfd)
 {
   if (!so->lm_info->l_addr_p)
     {
@@ -587,7 +587,7 @@ read_program_header (int type, int *p_sect_size, int *p_arch_size)
 
 
 /* Return program interpreter string.  */
-static gdb_byte *
+static char *
 find_program_interpreter (void)
 {
   gdb_byte *buf = NULL;
@@ -612,7 +612,7 @@ find_program_interpreter (void)
   if (!buf)
     buf = read_program_header (PT_INTERP, NULL, NULL);
 
-  return buf;
+  return (char *) buf;
 }
 
 
@@ -1055,6 +1055,14 @@ static void
 svr4_free_so (struct so_list *so)
 {
   xfree (so->lm_info);
+}
+
+/* Implement target_so_ops.clear_so.  */
+
+static void
+svr4_clear_so (struct so_list *so)
+{
+  so->lm_info->l_addr_p = 0;
 }
 
 /* Free so_list built so far (called via cleanup).  */
@@ -2017,7 +2025,7 @@ enable_break (struct svr4_info *info, int from_tty)
   struct minimal_symbol *msymbol;
   const char * const *bkpt_namep;
   asection *interp_sect;
-  gdb_byte *interp_name;
+  char *interp_name;
   CORE_ADDR sym_addr;
 
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
@@ -3025,6 +3033,7 @@ _initialize_svr4_solib (void)
 
   svr4_so_ops.relocate_section_addresses = svr4_relocate_section_addresses;
   svr4_so_ops.free_so = svr4_free_so;
+  svr4_so_ops.clear_so = svr4_clear_so;
   svr4_so_ops.clear_solib = svr4_clear_solib;
   svr4_so_ops.solib_create_inferior_hook = svr4_solib_create_inferior_hook;
   svr4_so_ops.special_symbol_handling = svr4_special_symbol_handling;

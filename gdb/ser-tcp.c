@@ -24,6 +24,7 @@
 #include "gdbcmd.h"
 #include "cli/cli-decode.h"
 #include "cli/cli-setshow.h"
+#include "filestuff.h"
 
 #include <sys/types.h>
 
@@ -207,9 +208,9 @@ net_open (struct serial *scb, const char *name)
  retry:
 
   if (use_udp)
-    scb->fd = socket (PF_INET, SOCK_DGRAM, 0);
+    scb->fd = gdb_socket_cloexec (PF_INET, SOCK_DGRAM, 0);
   else
-    scb->fd = socket (PF_INET, SOCK_STREAM, 0);
+    scb->fd = gdb_socket_cloexec (PF_INET, SOCK_STREAM, 0);
 
   if (scb->fd == -1)
     return -1;
@@ -338,7 +339,10 @@ net_close (struct serial *scb)
 int
 net_read_prim (struct serial *scb, size_t count)
 {
-  return recv (scb->fd, scb->buf, count, 0);
+  /* Need to cast to silence -Wpointer-sign on MinGW, as Winsock's
+     'recv' takes 'char *' as second argument, while 'scb->buf' is
+     'unsigned char *'.  */
+  return recv (scb->fd, (void *) scb->buf, count, 0);
 }
 
 int
@@ -424,8 +428,11 @@ Show auto-retry on socket connect"),
 
   add_setshow_uinteger_cmd ("connect-timeout", class_obscure,
 			    &tcp_retry_limit, _("\
-Set timeout limit for socket connection"), _("\
-Show timeout limit for socket connection"),
-			   NULL, NULL, NULL,
-			   &tcp_set_cmdlist, &tcp_show_cmdlist);
+Set timeout limit in seconds for socket connection"), _("\
+Show timeout limit in seconds for socket connection"), _("\
+If set to \"unlimited\", GDB will keep attempting to establish a\n\
+connection forever, unless interrupted with Ctrl-c.\n\
+The default is 15 seconds."),
+			    NULL, NULL,
+			    &tcp_set_cmdlist, &tcp_show_cmdlist);
 }

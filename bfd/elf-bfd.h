@@ -2378,12 +2378,9 @@ struct elf_dyn_relocs
 
 extern bfd_boolean _bfd_elf_create_ifunc_sections
   (bfd *, struct bfd_link_info *);
-extern asection * _bfd_elf_create_ifunc_dyn_reloc
-  (bfd *, struct bfd_link_info *, asection *sec, asection *sreloc,
-   struct elf_dyn_relocs **);
 extern bfd_boolean _bfd_elf_allocate_ifunc_dyn_relocs
   (struct bfd_link_info *, struct elf_link_hash_entry *,
-   struct elf_dyn_relocs **, unsigned int, unsigned int);
+   struct elf_dyn_relocs **, unsigned int, unsigned int, unsigned int);
 
 extern void elf_append_rela (bfd *, asection *, Elf_Internal_Rela *);
 extern void elf_append_rel (bfd *, asection *, Elf_Internal_Rela *);
@@ -2497,16 +2494,16 @@ extern asection _bfd_elf_large_com_section;
 	rel_hdr = _bfd_elf_single_rel_hdr (input_section->output_section); \
 									\
 	/* Avoid empty output section.  */				\
-	if (rel_hdr->sh_size > count * rel_hdr->sh_entsize)		\
+	if (rel_hdr->sh_size > rel_hdr->sh_entsize)			\
 	  {								\
-	    rel_hdr->sh_size -= count * rel_hdr->sh_entsize;		\
+	    rel_hdr->sh_size -= rel_hdr->sh_entsize;			\
 	    rel_hdr = _bfd_elf_single_rel_hdr (input_section);		\
-	    rel_hdr->sh_size -= count * rel_hdr->sh_entsize;		\
+	    rel_hdr->sh_size -= rel_hdr->sh_entsize;			\
 									\
 	    memmove (rel, rel + count,					\
 		     (relend - rel - count) * sizeof (*rel));		\
 									\
-	    input_section->reloc_count -= count;			\
+	    input_section->reloc_count--;				\
 	    relend -= count;						\
 	    rel--;							\
 	    continue;							\

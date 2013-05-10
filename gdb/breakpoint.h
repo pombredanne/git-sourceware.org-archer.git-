@@ -1269,7 +1269,7 @@ enum breakpoint_create_flags
 extern int create_breakpoint (struct gdbarch *gdbarch, char *arg,
 			      char *cond_string, int thread,
 			      char *extra_string,
-			      int parse_condition_and_thread,
+			      int parse_arg,
 			      int tempflag, enum bptype wanted_type,
 			      int ignore_count,
 			      enum auto_boolean pending_break_support,
@@ -1554,5 +1554,7 @@ extern int user_breakpoint_p (struct breakpoint *);
 extern struct gdbarch *get_sal_arch (struct symtab_and_line sal);
 
 extern void breakpoint_free_objfile (struct objfile *objfile);
+
+extern char *ep_parse_optional_if_clause (char **arg);
 
 #endif /* !defined (BREAKPOINT_H) */

@@ -45,9 +45,7 @@
 #include "maint.h"
 
 #include "filenames.h"
-#ifdef __MINGW32__
-# include "windows-nat.h"
-#endif
+#include "filestuff.h"
 
 /* The selected interpreter.  This will be used as a set command
    variable, so it should always be malloc'ed - since
@@ -324,6 +322,7 @@ captured_main (void *data)
      initializer.  */
   static int print_help;
   static int print_version;
+  static int print_configuration;
 
   /* Pointers to all arguments of --command option.  */
   VEC (cmdarg_s) *cmdarg_vec = NULL;
@@ -364,6 +363,7 @@ captured_main (void *data)
   textdomain (PACKAGE);
 
   bfd_init ();
+  notice_open_fds ();
 
   make_cleanup (VEC_cleanup (cmdarg_s), &cmdarg_vec);
   dirsize = 1;
@@ -486,6 +486,7 @@ captured_main (void *data)
       {"command", required_argument, 0, 'x'},
       {"eval-command", required_argument, 0, 'X'},
       {"version", no_argument, &print_version, 1},
+      {"configuration", no_argument, &print_configuration, 1},
       {"x", required_argument, 0, 'x'},
       {"ex", required_argument, 0, 'X'},
       {"init-command", required_argument, 0, OPT_IX},
@@ -729,8 +730,9 @@ captured_main (void *data)
 	  }
       }
 
-    /* If --help or --version, disable window interface.  */
-    if (print_help || print_version)
+    /* If --help or --version or --configuration, disable window
+       interface.  */
+    if (print_help || print_version || print_configuration)
       {
 	use_windows = 0;
       }
@@ -818,6 +820,14 @@ captured_main (void *data)
     {
       print_gdb_help (gdb_stdout);
       fputs_unfiltered ("\n", gdb_stdout);
+      exit (0);
+    }
+
+  if (print_configuration)
+    {
+      print_gdb_configuration (gdb_stdout);
+      wrap_here ("");
+      printf_filtered ("\n");
       exit (0);
     }
 
@@ -1132,6 +1142,7 @@ Options:\n\n\
 #endif
   fputs_unfiltered (_("\
   --version          Print version information and then exit.\n\
+  --configuration    Print details about GDB configuration and then exit.\n\
   -w                 Use a window interface.\n\
   --write            Set writing into executable and core files.\n\
   --xdb              XDB compatibility mode.\n\

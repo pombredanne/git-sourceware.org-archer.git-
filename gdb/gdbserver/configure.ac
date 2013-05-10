@@ -70,7 +70,7 @@ AC_CHECK_HEADERS(sgtty.h termio.h termios.h sys/reg.h string.h dnl
 		 sys/ioctl.h netinet/in.h sys/socket.h netdb.h dnl
 		 netinet/tcp.h arpa/inet.h sys/wait.h wait.h sys/un.h dnl
 		 linux/perf_event.h)
-AC_CHECK_FUNCS(pread pwrite pread64 readlink)
+AC_CHECK_FUNCS(pread pwrite pread64 readlink fdwalk pipe2)
 AC_REPLACE_FUNCS(vasprintf vsnprintf)
 
 # Check for UST
@@ -322,7 +322,6 @@ LIBS="$old_LIBS"
 
 srv_thread_depfiles=
 srv_libs=
-USE_THREAD_DB=
 
 if test "$srv_linux_thread_db" = "yes"; then
   if test "$ac_cv_lib_dl_dlopen" = "yes"; then
@@ -350,7 +349,7 @@ if test "$srv_linux_thread_db" = "yes"; then
   fi
 
   srv_thread_depfiles="thread-db.o proc-service.o"
-  USE_THREAD_DB="-DUSE_THREAD_DB"
+  AC_DEFINE(USE_THREAD_DB, 1, [Define if we should use libthread_db.])
   AC_CACHE_CHECK([for TD_VERSION], gdbsrv_cv_have_td_version,
   [AC_TRY_COMPILE([#include <thread_db.h>], [TD_VERSION;],
 		  [gdbsrv_cv_have_td_version=yes],
@@ -459,7 +458,6 @@ fi
 
 AC_SUBST(GDBSERVER_DEPFILES)
 AC_SUBST(GDBSERVER_LIBS)
-AC_SUBST(USE_THREAD_DB)
 AC_SUBST(srv_xmlbuiltin)
 AC_SUBST(srv_xmlfiles)
 AC_SUBST(IPA_DEPFILES)

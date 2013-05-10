@@ -1,7 +1,5 @@
 /* ELF linking support for BFD.
-   Copyright 1995, 1996, 1997, 1998, 1999, 2000, 2001, 2002, 2003, 2004,
-   2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013
-   Free Software Foundation, Inc.
+   Copyright 1995-2013 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -575,7 +573,8 @@ bfd_elf_record_link_assignment (bfd *output_bfd,
   if (hidden)
     {
       bed = get_elf_backend_data (output_bfd);
-      h->other = (h->other & ~ELF_ST_VISIBILITY (-1)) | STV_HIDDEN;
+      if (ELF_ST_VISIBILITY (h->other) != STV_INTERNAL)
+	h->other = (h->other & ~ELF_ST_VISIBILITY (-1)) | STV_HIDDEN;
       (*bed->elf_backend_hide_symbol) (info, h, TRUE);
     }
 
@@ -3339,14 +3338,12 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
   unsigned int old_size = 0;
   unsigned int old_count = 0;
   void *old_tab = NULL;
-  void *old_hash;
   void *old_ent;
   struct bfd_link_hash_entry *old_undefs = NULL;
   struct bfd_link_hash_entry *old_undefs_tail = NULL;
   long old_dynsymcount = 0;
   bfd_size_type old_dynstr_size = 0;
   size_t tabsize = 0;
-  size_t hashsize = 0;
 
   htab = elf_hash_table (info);
   bed = get_elf_backend_data (abfd);
@@ -3701,7 +3698,7 @@ error_free_dyn:
       extsymoff = hdr->sh_info;
     }
 
-  sym_hash = NULL;
+  sym_hash = elf_sym_hashes (abfd);
   if (extsymcount != 0)
     {
       isymbuf = bfd_elf_get_elf_syms (abfd, hdr, extsymcount, extsymoff,
@@ -3709,13 +3706,16 @@ error_free_dyn:
       if (isymbuf == NULL)
 	goto error_return;
 
-      /* We store a pointer to the hash table entry for each external
-	 symbol.  */
-      amt = extsymcount * sizeof (struct elf_link_hash_entry *);
-      sym_hash = (struct elf_link_hash_entry **) bfd_alloc (abfd, amt);
       if (sym_hash == NULL)
-	goto error_free_sym;
-      elf_sym_hashes (abfd) = sym_hash;
+	{
+	  /* We store a pointer to the hash table entry for each
+	     external symbol.  */
+	  amt = extsymcount * sizeof (struct elf_link_hash_entry *);
+	  sym_hash = (struct elf_link_hash_entry **) bfd_zalloc (abfd, amt);
+	  if (sym_hash == NULL)
+	    goto error_free_sym;
+	  elf_sym_hashes (abfd) = sym_hash;
+	}
     }
 
   if (dynamic)
@@ -3765,8 +3765,7 @@ error_free_dyn:
 	}
 
       tabsize = htab->root.table.size * sizeof (struct bfd_hash_entry *);
-      hashsize = extsymcount * sizeof (struct elf_link_hash_entry *);
-      old_tab = bfd_malloc (tabsize + entsize + hashsize);
+      old_tab = bfd_malloc (tabsize + entsize);
       if (old_tab == NULL)
 	goto error_free_vers;
 
@@ -3782,12 +3781,10 @@ error_free_dyn:
 				       notice_as_needed, 0, NULL))
 	goto error_free_vers;
 
-      /* Clone the symbol table and sym hashes.  Remember some
-	 pointers into the symbol table, and dynamic symbol count.  */
-      old_hash = (char *) old_tab + tabsize;
-      old_ent = (char *) old_hash + hashsize;
+      /* Clone the symbol table.  Remember some pointers into the
+	 symbol table, and dynamic symbol count.  */
+      old_ent = (char *) old_tab + tabsize;
       memcpy (old_tab, htab->root.table.table, tabsize);
-      memcpy (old_hash, sym_hash, hashsize);
       old_undefs = htab->root.undefs;
       old_undefs_tail = htab->root.undefs_tail;
       old_table = htab->root.table.table;
@@ -3844,7 +3841,6 @@ error_free_dyn:
       flags = BSF_NO_FLAGS;
       sec = NULL;
       value = isym->st_value;
-      *sym_hash = NULL;
       common = bed->common_definition (isym);
 
       bind = ELF_ST_BIND (isym->st_info);
@@ -4437,17 +4433,12 @@ error_free_dyn:
 		 --no-add-needed is used and the reference was not
 		 a weak one.  */
 	      if (old_bfd != NULL
-		  && h->ref_regular_nonweak
 		  && (elf_dyn_lib_class (abfd) & DYN_NO_NEEDED) != 0)
 		{
 		  (*_bfd_error_handler)
 		    (_("%B: undefined reference to symbol '%s'"),
 		     old_bfd, name);
-		  (*_bfd_error_handler)
-		    (_("note: '%s' is defined in DSO %B"
-		       " so try adding it to the linker command line"),
-		     abfd, name);
-		  bfd_set_error (bfd_error_invalid_operation);
+		  bfd_set_error (bfd_error_missing_dso);
 		  goto error_free_vers;
 		}
 
@@ -4483,14 +4474,13 @@ error_free_dyn:
       /* Restore the symbol table.  */
       if (bed->as_needed_cleanup)
 	(*bed->as_needed_cleanup) (abfd, info);
-      old_hash = (char *) old_tab + tabsize;
-      old_ent = (char *) old_hash + hashsize;
-      sym_hash = elf_sym_hashes (abfd);
+      old_ent = (char *) old_tab + tabsize;
+      memset (elf_sym_hashes (abfd), 0,
+	      extsymcount * sizeof (struct elf_link_hash_entry *));
       htab->root.table.table = old_table;
       htab->root.table.size = old_size;
       htab->root.table.count = old_count;
       memcpy (htab->root.table.table, old_tab, tabsize);
-      memcpy (sym_hash, old_hash, hashsize);
       htab->root.undefs = old_undefs;
       htab->root.undefs_tail = old_undefs_tail;
       _bfd_elf_strtab_restore_size (htab->dynstr, old_dynstr_size);
@@ -4671,7 +4661,7 @@ error_free_dyn:
 	  struct elf_link_hash_entry *hlook;
 	  asection *slook;
 	  bfd_vma vlook;
-	  size_t i, j, idx;
+	  size_t i, j, idx = 0;
 
 	  hlook = weaks;
 	  weaks = hlook->u.weakdef;
@@ -11821,23 +11811,30 @@ _bfd_elf_gc_mark_extra_sections (struct bfd_link_info *info,
     {
       asection *isec;
       bfd_boolean some_kept;
+      bfd_boolean debug_frag_seen;
 
       if (bfd_get_flavour (ibfd) != bfd_target_elf_flavour)
 	continue;
 
-      /* Ensure all linker created sections are kept, and see whether
-	 any other section is already marked.  */
-      some_kept = FALSE;
+      /* Ensure all linker created sections are kept,
+	 see if any other section is already marked,
+	 and note if we have any fragmented debug sections.  */
+      debug_frag_seen = some_kept = FALSE;
       for (isec = ibfd->sections; isec != NULL; isec = isec->next)
 	{
 	  if ((isec->flags & SEC_LINKER_CREATED) != 0)
 	    isec->gc_mark = 1;
 	  else if (isec->gc_mark)
 	    some_kept = TRUE;
+
+	  if (debug_frag_seen == FALSE
+	      && (isec->flags & SEC_DEBUGGING)
+	      && CONST_STRNEQ (isec->name, ".debug_line."))
+	    debug_frag_seen = TRUE;
 	}
 
       /* If no section in this file will be kept, then we can
-	 toss out debug sections.  */
+	 toss out the debug and special sections.  */
       if (!some_kept)
 	continue;
 
@@ -11849,6 +11846,45 @@ _bfd_elf_gc_mark_extra_sections (struct bfd_link_info *info,
 	    && ((isec->flags & SEC_DEBUGGING) != 0
 		|| (isec->flags & (SEC_ALLOC | SEC_LOAD | SEC_RELOC)) == 0))
 	  isec->gc_mark = 1;
+
+      if (! debug_frag_seen)
+	continue;
+
+      /* Look for CODE sections which are going to be discarded,
+	 and find and discard any fragmented debug sections which
+	 are associated with that code section.  */
+      for (isec = ibfd->sections; isec != NULL; isec = isec->next)
+	if ((isec->flags & SEC_CODE) != 0
+	    && isec->gc_mark == 0)
+	  {
+	    unsigned int ilen;
+	    asection *dsec;
+
+	    ilen = strlen (isec->name);
+
+	    /* Association is determined by the name of the debug section
+	       containing the name of the code section as a suffix.  For
+	       example .debug_line.text.foo is a debug section associated
+	       with .text.foo.  */
+	    for (dsec = ibfd->sections; dsec != NULL; dsec = dsec->next)
+	      {
+		unsigned int dlen;
+
+		if (dsec->gc_mark == 0
+		    || (dsec->flags & SEC_DEBUGGING) == 0)
+		  continue;
+
+		dlen = strlen (dsec->name);
+
+		if (dlen > ilen
+		    && strncmp (dsec->name + (dlen - ilen),
+				isec->name, ilen) == 0)
+		  {
+		    dsec->gc_mark = 0;
+		    break;
+		  }
+	      }
+	  }
     }
   return TRUE;
 }

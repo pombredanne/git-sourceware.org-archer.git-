@@ -1,3 +1,59 @@
+2013-05-09  Andrew Pinski  <apinski@cavium.com>
+
+	* mips-dis.c (mips_arch_choices): Add INSN_VIRT to mips32r2.
+	Add INSN_VIRT and INSN_VIRT64 to mips64r2.
+	(parse_mips_dis_option): Handle the virt option.
+	(print_insn_args): Handle "+J".
+	(print_mips_disassembler_options): Print out message about virt64.
+	* mips-opc.c (IVIRT): New define.
+	(IVIRT64): New define.
+	(mips_builtin_opcodes): Add dmfgc0, dmtgc0, hypcall, mfgc0, mtgc0,
+	tlbgr, tlbgwi, tlbginv, tlbginvf, tlbgwr, tlbgp VIRT instructions.
+	Move rfe to the bottom as it conflicts with tlbgp.
+
+2013-05-09  Alan Modra  <amodra@gmail.com>
+
+	* ppc-opc.c (extract_vlesi): Properly sign extend.
+	(extract_vlensi): Likewise.  Comment reason for setting invalid.
+
+2013-05-02  Nick Clifton  <nickc@redhat.com>
+
+	* msp430-dis.c: Add support for MSP430X instructions.
+
+2013-04-24  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* nios2-opc.c (nios2_builtin_reg): Rename "fstatus" control register
+	to "eccinj".
+
+2013-04-17  Wei-chen Wang  <cole945@gmail.com>
+
+	PR binutils/15369
+	* cgen-dis.c (hash_insn_array): Use CGEN_CPU_INSN_ENDIAN instead
+	of CGEN_CPU_ENDIAN.
+	(hash_insns_list): Likewise.
+
+2013-04-10  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* rl78-dis.c (print_insn_rl78): Use alternative form as a GCC false
+	warning workaround.
+
+2013-04-08  Jan Beulich <jbeulich@suse.com>
+
+	* i386-opc.tbl: Fold 64-bit and non-64-bit jecxz entries.
+	* i386-tbl.h: Re-generate.
+
+2013-04-06  David S. Miller  <davem@davemloft.net>
+
+	* sparc-dis.c (compare_opcodes): When encountering multiple aliases
+	of an opcode, prefer the one with F_PREFERRED set.
+	* sparc-opc.c (sparc_opcodes): Add ldtw, ldtwa, sttw, sttwa,
+	lzcnt, flush with '[address]' syntax, and missing cbcond pseudo
+	ops.  Make 64-bit VIS logical ops have "d" suffix in their names,
+	mark existing mnenomics as aliases.  Add "cc" suffix to edge
+	instructions generating condition codes, mark existing mnenomics
+	as aliases.  Add "fp" prefix to VIS compare instructions, mark
+	existing mnenomics as aliases.
+
 2013-04-03  Nick Clifton  <nickc@redhat.com>
 
 	* v850-dis.c (print_value): With V850_INVERSE_PCREL compute the

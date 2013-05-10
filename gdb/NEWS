@@ -3,7 +3,18 @@
 
 *** Changes since GDB 7.6
 
+* New targets
+
+Nios II ELF 			nios2*-*-elf
+Nios II GNU/Linux		nios2*-*-linux
+
 * New commands:
+catch rethrow
+  Like "catch throw", but catches a re-thrown exception.
+
+show configuration
+  Display the details of GDB configure-time options.
+
 maint set|show per-command
 maint set|show per-command space
 maint set|show per-command time
@@ -16,8 +27,33 @@ set remote trace-status-packet
 show remote trace-status-packet
   Set/show the use of remote protocol qTStatus packet.
 
+set debug nios2
+show debug nios2
+  Control display of debugging messages related to Nios II targets.
+
+* You can now use a literal value 'unlimited' for options that
+  interpret 0 or -1 as meaning "unlimited".  E.g., "set
+  trace-buffer-size unlimited" is now an alias for "set
+  trace-buffer-size -1" and "set height unlimited" is now an alias for
+  "set height 0".
+
+* New command-line options
+--configuration
+  Display the details of GDB configure-time options.
+
 * The command 'tsave' can now support new option '-ctf' to save trace
   buffer in Common Trace Format.
+
+* Newly installed $prefix/bin/gcore acts as a shell interface for the
+  GDB command gcore.
+
+* GDB now implements the the C++ 'typeid' operator.
+
+* The new convenience variable $_exception holds the exception being
+  thrown or caught at an exception-related catchpoint.
+
+* The exception-related catchpoints, like "catch throw", now accept a
+  regular expression which can be used to filter exceptions by type.
 
 * MI changes
 
@@ -135,6 +171,9 @@ Tilera TILE-Gx GNU/Linux	tilegx*-*-linux
   Release versions, on the other hand, are built without -lmcheck
   by default.  The --enable-libmcheck/--disable-libmcheck configure
   options allow the user to override that default.
+--with-babeltrace/--with-babeltrace-include/--with-babeltrace-lib
+  This configure option allows the user to build GDB with
+  libbabeltrace using which GDB can read Common Trace Format data.
 
 * New commands (for set/show, see "New options" below)
 
@@ -245,6 +284,19 @@ show debug notification
 QTBuffer:size
    Set the size of trace buffer.  The remote stub reports support for this
    packet to gdb's qSupported query.
+
+Qbtrace:bts
+  Enable Branch Trace Store (BTS)-based branch tracing for the current
+  thread.  The remote stub reports support for this packet to gdb's
+  qSupported query.
+
+Qbtrace:off
+  Disable branch tracing for the current thread.  The remote stub reports
+  support for this packet to gdb's qSupported query.
+
+qXfer:btrace:read
+  Read the traced branches for the current thread.  The remote stub
+  reports support for this packet to gdb's qSupported query.
 
 *** Changes in GDB 7.5
 

@@ -39,6 +39,7 @@
 #include "source.h"
 #include "disasm.h"
 #include "tracepoint.h"
+#include "filestuff.h"
 
 #include "ui-out.h"
 
@@ -314,6 +315,12 @@ show_version (char *args, int from_tty)
   printf_filtered ("\n");
 }
 
+static void
+show_configuration (char *args, int from_tty)
+{
+  print_gdb_configuration (gdb_stdout);
+}
+
 /* Handle the quit command.  */
 
 void
@@ -322,7 +329,7 @@ quit_command (char *args, int from_tty)
   if (!quit_confirm ())
     error (_("Not confirmed."));
 
-  disconnect_tracing (from_tty);
+  query_if_trace_running (from_tty);
 
   quit_force (args, from_tty);
 }
@@ -720,6 +727,8 @@ shell_escape (char *arg, int from_tty)
   if ((pid = vfork ()) == 0)
     {
       const char *p, *user_shell;
+
+      close_most_fds ();
 
       if ((user_shell = (char *) getenv ("SHELL")) == NULL)
 	user_shell = "/bin/sh";
@@ -1755,6 +1764,9 @@ the previous command number shown."),
 
   add_cmd ("version", no_set_class, show_version,
 	   _("Show what version of GDB this is."), &showlist);
+
+  add_cmd ("configuration", no_set_class, show_configuration,
+	   _("Show how GDB was configured at build time."), &showlist);
 
   /* If target is open when baud changes, it doesn't take effect until
      the next open (I think, not sure).  */

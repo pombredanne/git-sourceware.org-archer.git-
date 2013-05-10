@@ -1297,30 +1297,28 @@ static struct htab *decoded_names_store;
    when a decoded name is cached in it.  */
 
 const char *
-ada_decode_symbol (const struct general_symbol_info *gsymbol)
+ada_decode_symbol (const struct general_symbol_info *arg)
 {
-  struct general_symbol_info *gsymbol_rw
-    = (struct general_symbol_info *) gsymbol;
-  const char **resultp
-    = &gsymbol_rw->language_specific.mangled_lang.demangled_name;
+  struct general_symbol_info *gsymbol = (struct general_symbol_info *) arg;
+  const char **resultp =
+    &gsymbol->language_specific.mangled_lang.demangled_name;
 
-  if (*resultp == NULL)
+  if (!gsymbol->ada_mangled)
     {
       const char *decoded = ada_decode (gsymbol->name);
+      struct obstack *obstack = gsymbol->language_specific.obstack;
 
-      if (gsymbol->obj_section != NULL)
-        {
-	  struct objfile *objf = gsymbol->obj_section->objfile;
+      gsymbol->ada_mangled = 1;
 
-	  *resultp = obstack_copy0 (&objf->objfile_obstack,
-				    decoded, strlen (decoded));
-        }
-      /* Sometimes, we can't find a corresponding objfile, in which
-         case, we put the result on the heap.  Since we only decode
-         when needed, we hope this usually does not cause a
-         significant memory leak (FIXME).  */
-      if (*resultp == NULL)
+      if (obstack != NULL)
+	*resultp = obstack_copy0 (obstack, decoded, strlen (decoded));
+      else
         {
+	  /* Sometimes, we can't find a corresponding objfile, in
+	     which case, we put the result on the heap.  Since we only
+	     decode when needed, we hope this usually does not cause a
+	     significant memory leak (FIXME).  */
+
           char **slot = (char **) htab_find_slot (decoded_names_store,
                                                   decoded, INSERT);
 
@@ -2327,7 +2325,6 @@ ada_value_primitive_packed_val (struct value *obj, const gdb_byte *valaddr,
       /* Also set the parent value.  This is needed when trying to
 	 assign a new value (in inferior memory).  */
       set_value_parent (v, obj);
-      value_incref (obj);
     }
   else
     set_value_bitsize (v, bit_size);
@@ -2520,7 +2517,7 @@ ada_value_assign (struct value *toval, struct value *fromval)
       int len = (value_bitpos (toval)
 		 + bits + HOST_CHAR_BIT - 1) / HOST_CHAR_BIT;
       int from_size;
-      char *buffer = (char *) alloca (len);
+      gdb_byte *buffer = alloca (len);
       struct value *val;
       CORE_ADDR to_addr = value_address (toval);
 
@@ -11534,7 +11531,8 @@ print_it_exception (enum exception_catchpoint_kind ex, bpstat bs)
 
 	  if (addr != 0)
 	    {
-	      read_memory (addr, exception_name, sizeof (exception_name) - 1);
+	      read_memory (addr, (gdb_byte *) exception_name,
+			   sizeof (exception_name) - 1);
 	      exception_name [sizeof (exception_name) - 1] = '\0';
 	    }
 	  else

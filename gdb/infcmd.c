@@ -432,11 +432,7 @@ post_create_inferior (struct target_ops *target, int from_tty)
 
       /* Create the hooks to handle shared library load and unload
 	 events.  */
-#ifdef SOLIB_CREATE_INFERIOR_HOOK
-      SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
-#else
       solib_create_inferior_hook (from_tty);
-#endif
 
       if (current_program_space->solib_add_generation == solib_add_generation)
 	{
@@ -452,13 +448,7 @@ post_create_inferior (struct target_ops *target, int from_tty)
 	  /* If the solist is global across processes, there's no need to
 	     refetch it here.  */
 	  if (!gdbarch_has_global_solist (target_gdbarch ()))
-	    {
-#ifdef SOLIB_ADD
-	      SOLIB_ADD (NULL, 0, target, auto_solib_add);
-#else
-	      solib_add (NULL, 0, target, auto_solib_add);
-#endif
-	    }
+	    solib_add (NULL, 0, target, auto_solib_add);
 	}
     }
 
@@ -1170,8 +1160,8 @@ jump_command (char *arg, int from_tty)
   if (sfn != NULL)
     {
       fixup_symbol_section (sfn, 0);
-      if (section_is_overlay (SYMBOL_OBJ_SECTION (sfn)) &&
-	  !section_is_mapped (SYMBOL_OBJ_SECTION (sfn)))
+      if (section_is_overlay (SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (sfn), sfn)) &&
+	  !section_is_mapped (SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (sfn), sfn)))
 	{
 	  if (!query (_("WARNING!!!  Destination is in "
 			"unmapped overlay!  Jump anyway? ")))
@@ -1332,12 +1322,12 @@ until_next_command (int from_tty)
 
   if (!func)
     {
-      struct minimal_symbol *msymbol = lookup_minimal_symbol_by_pc (pc);
+      struct bound_minimal_symbol msymbol = lookup_minimal_symbol_by_pc (pc);
 
-      if (msymbol == NULL)
+      if (msymbol.minsym == NULL)
 	error (_("Execution is not within a known function."));
 
-      tp->control.step_range_start = SYMBOL_VALUE_ADDRESS (msymbol);
+      tp->control.step_range_start = SYMBOL_VALUE_ADDRESS (msymbol.minsym);
       tp->control.step_range_end = pc;
     }
   else
@@ -1452,7 +1442,7 @@ get_return_value (struct value *function, struct type *value_type)
   if (!stop_regs)
     {
       stop_regs = regcache_dup (get_current_regcache ());
-      cleanup = make_cleanup_regcache_xfree (stop_regs);
+      make_cleanup_regcache_xfree (stop_regs);
     }
 
   gdbarch = get_regcache_arch (stop_regs);
@@ -2721,7 +2711,9 @@ detach_command (char *args, int from_tty)
   if (ptid_equal (inferior_ptid, null_ptid))
     error (_("The program is not being run."));
 
-  disconnect_tracing (from_tty);
+  query_if_trace_running (from_tty);
+
+  disconnect_tracing ();
 
   target_detach (args, from_tty);
 
@@ -2751,7 +2743,8 @@ static void
 disconnect_command (char *args, int from_tty)
 {
   dont_repeat ();		/* Not for the faint of heart.  */
-  disconnect_tracing (from_tty);
+  query_if_trace_running (from_tty);
+  disconnect_tracing ();
   target_disconnect (args, from_tty);
   no_shared_libraries (NULL, from_tty);
   init_thread_list ();

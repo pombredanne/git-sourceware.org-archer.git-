@@ -64,6 +64,7 @@
 #include <ctype.h>
 #include "ui-out.h"
 #include "cli-out.h"
+#include "tracepoint.h"
 
 extern void initialize_all_files (void);
 
@@ -1147,14 +1148,109 @@ and \"show warranty\" for details.\n");
     {
       fprintf_filtered (stream, "%s", host_name);
     }
-  fprintf_filtered (stream, "\".");
+  fprintf_filtered (stream, "\".\n\
+Type \"show configuration\" for configuration details.");
 
   if (REPORT_BUGS_TO[0])
     {
-      fprintf_filtered (stream, 
+      fprintf_filtered (stream,
 			_("\nFor bug reporting instructions, please see:\n"));
       fprintf_filtered (stream, "%s.", REPORT_BUGS_TO);
     }
+}
+
+/* Print the details of GDB build-time configuration.  */
+void
+print_gdb_configuration (struct ui_file *stream)
+{
+  fprintf_filtered (stream, _("\
+This GDB was configured as follows:\n\
+   configure --host=%s --target=%s\n\
+"), host_name, target_name);
+  fprintf_filtered (stream, _("\
+             --with-auto-load-dir=%s\n\
+             --with-auto-load-safe-path=%s\n\
+"), AUTO_LOAD_DIR, AUTO_LOAD_SAFE_PATH);
+#if HAVE_LIBEXPAT
+  fprintf_filtered (stream, _("\
+             --with-expat\n\
+"));
+#else
+  fprintf_filtered (stream, _("\
+             --without-expat\n\
+"));
+#endif
+  if (GDB_DATADIR[0])
+    fprintf_filtered (stream, _("\
+             --with-gdb-datadir=%s%s\n\
+"), GDB_DATADIR, GDB_DATADIR_RELOCATABLE ? " (relocatable)" : "");
+#ifdef ICONV_BIN
+  fprintf_filtered (stream, _("\
+             --with-iconv-bin=%s%s\n\
+"), ICONV_BIN, ICONV_BIN_RELOCATABLE ? " (relocatable)" : "");
+#endif
+  if (JIT_READER_DIR[0])
+    fprintf_filtered (stream, _("\
+             --with-jit-reader-dir=%s%s\n\
+"), JIT_READER_DIR, JIT_READER_DIR_RELOCATABLE ? " (relocatable)" : "");
+#if HAVE_LIBUNWIND_IA64_H
+  fprintf_filtered (stream, _("\
+             --with-libunwind-ia64\n\
+"));
+#else
+  fprintf_filtered (stream, _("\
+             --without-libunwind-ia64\n\
+"));
+#endif
+#if HAVE_LIBLZMA
+  fprintf_filtered (stream, _("\
+             --with-lzma\n\
+"));
+#else
+  fprintf_filtered (stream, _("\
+             --without-lzma\n\
+"));
+#endif
+#ifdef WITH_PYTHON_PATH
+  fprintf_filtered (stream, _("\
+             --with-python=%s%s\n\
+"), WITH_PYTHON_PATH, PYTHON_PATH_RELOCATABLE ? " (relocatable)" : "");
+#endif
+#ifdef RELOC_SRCDIR
+  fprintf_filtered (stream, _("\
+             --with-relocated-sources=%s\n\
+"), RELOC_SRCDIR);
+#endif
+  if (DEBUGDIR[0])
+    fprintf_filtered (stream, _("\
+             --with-separate-debug-dir=%s%s\n\
+"), DEBUGDIR, DEBUGDIR_RELOCATABLE ? " (relocatable)" : "");
+  if (TARGET_SYSTEM_ROOT[0])
+    fprintf_filtered (stream, _("\
+             --with-sysroot=%s%s\n\
+"), TARGET_SYSTEM_ROOT, TARGET_SYSTEM_ROOT_RELOCATABLE ? " (relocatable)" : "");
+  if (SYSTEM_GDBINIT[0])
+    fprintf_filtered (stream, _("\
+             --with-system-gdbinit=%s%s\n\
+"), SYSTEM_GDBINIT, SYSTEM_GDBINIT_RELOCATABLE ? " (relocatable)" : "");
+#if HAVE_ZLIB_H
+  fprintf_filtered (stream, _("\
+             --with-zlib\n\
+"));
+#else
+  fprintf_filtered (stream, _("\
+             --without-zlib\n\
+"));
+#endif
+#if HAVE_LIBBABELTRACE
+    fprintf_filtered (stream, _("\
+             --with-babeltrace\n\
+"));
+#else
+    fprintf_filtered (stream, _("\
+             --without-babeltrace\n\
+"));
+#endif
 }
 
 
@@ -1282,29 +1378,6 @@ quit_confirm (void)
   return qr;
 }
 
-/* Helper routine for quit_force that requires error handling.  */
-
-static int
-quit_target (void *arg)
-{
-  struct qt_args *qt = (struct qt_args *)arg;
-
-  /* Kill or detach all inferiors.  */
-  iterate_over_inferiors (kill_or_detach, qt);
-
-  /* Give all pushed targets a chance to do minimal cleanup, and pop
-     them all out.  */
-  pop_all_targets ();
-
-  /* Save the history information if it is appropriate to do so.  */
-  if (write_history_p && history_filename)
-    write_history (history_filename);
-
-  do_final_cleanups (all_cleanups ());    /* Do any final cleanups before
-					     exiting.  */
-  return 0;
-}
-
 /* Quit without asking for confirmation.  */
 
 void
@@ -1312,6 +1385,7 @@ quit_force (char *args, int from_tty)
 {
   int exit_code = 0;
   struct qt_args qt;
+  volatile struct gdb_exception ex;
 
   /* An optional expression may be used to cause gdb to terminate with the 
      value of that expression.  */
@@ -1327,9 +1401,46 @@ quit_force (char *args, int from_tty)
   qt.args = args;
   qt.from_tty = from_tty;
 
+  /* Wrappers to make the code below a bit more readable.  */
+#define DO_TRY \
+  TRY_CATCH (ex, RETURN_MASK_ALL)
+
+#define DO_PRINT_EX \
+  if (ex.reason < 0) \
+    exception_print (gdb_stderr, ex)
+
   /* We want to handle any quit errors and exit regardless.  */
-  catch_errors (quit_target, &qt,
-	        "Quitting: ", RETURN_MASK_ALL);
+
+  /* Get out of tfind mode, and kill or detach all inferiors.  */
+  DO_TRY
+    {
+      disconnect_tracing ();
+      iterate_over_inferiors (kill_or_detach, &qt);
+    }
+  DO_PRINT_EX;
+
+  /* Give all pushed targets a chance to do minimal cleanup, and pop
+     them all out.  */
+  DO_TRY
+    {
+      pop_all_targets ();
+    }
+  DO_PRINT_EX;
+
+  /* Save the history information if it is appropriate to do so.  */
+  DO_TRY
+    {
+      if (write_history_p && history_filename)
+	write_history (history_filename);
+    }
+  DO_PRINT_EX;
+
+  /* Do any final cleanups before exiting.  */
+  DO_TRY
+    {
+      do_final_cleanups (all_cleanups ());
+    }
+  DO_PRINT_EX;
 
   exit (exit_code);
 }
@@ -1654,7 +1765,10 @@ Without an argument, saving is enabled."),
   add_setshow_uinteger_cmd ("size", no_class, &history_size_setshow_var, _("\
 Set the size of the command history,"), _("\
 Show the size of the command history,"), _("\
-ie. the number of previous commands to keep a record of."),
+ie. the number of previous commands to keep a record of.\n\
+If set to \"unlimited\", the number of commands kept in the history\n\
+list is unlimited.  This defaults to the value of the environment\n\
+variable \"HISTSIZE\", or to 256 if this variable is not set."),
 			    set_history_size_command,
 			    show_history_size,
 			    &sethistlist, &showhistlist);

@@ -323,7 +323,7 @@ darwin_check_new_threads (struct inferior *inf)
       thread_t old_id = old ? old->gdb_port : THREAD_NULL;
 
       inferior_debug
-	(12, _(" new_ix:%d/%d, old_ix:%d/%d, new_id:%x old_id:%x\n"),
+	(12, _(" new_ix:%d/%d, old_ix:%d/%d, new_id:0x%x old_id:0x%x\n"),
 	 new_ix, new_nbr, old_ix, old_nbr, new_id, old_id);
 
       if (old_id == new_id)
@@ -708,7 +708,7 @@ darwin_resume_thread (struct inferior *inf, darwin_thread_t *thread,
       /* Set or reset single step.  */
       if (step != thread->single_step)
 	{
-	  inferior_debug (4, _("darwin_set_sstep (thread=%x, enable=%d)\n"),
+	  inferior_debug (4, _("darwin_set_sstep (thread=0x%x, enable=%d)\n"),
 			  thread->gdb_port, step);
 	  darwin_set_sstep (thread->gdb_port, step);
 	  thread->single_step = step;
@@ -878,8 +878,8 @@ darwin_decode_message (mach_msg_header_t *hdr,
       if (res < 0)
 	{
 	  /* Should not happen...  */
-	  printf_unfiltered (_("darwin_wait: ill-formatted message (id=%x)\n"),
-			     hdr->msgh_id);
+	  printf_unfiltered
+	    (_("darwin_wait: ill-formatted message (id=0x%x)\n"), hdr->msgh_id);
 	  /* FIXME: send a failure reply?  */
 	  status->kind = TARGET_WAITKIND_SPURIOUS;
 	  return minus_one_ptid;
@@ -891,7 +891,7 @@ darwin_decode_message (mach_msg_header_t *hdr,
       status->kind = TARGET_WAITKIND_STOPPED;
       thread->msg_state = DARWIN_MESSAGE;
 
-      inferior_debug (4, _("darwin_wait: thread=%x, got %s\n"),
+      inferior_debug (4, _("darwin_wait: thread=0x%x, got %s\n"),
 		      thread->gdb_port,
 		      unparse_exception_type (thread->event.ex_type));
 
@@ -975,7 +975,7 @@ darwin_decode_message (mach_msg_header_t *hdr,
 	      status->value.sig = WTERMSIG (wstatus);
 	    }
 
-	  inferior_debug (4, _("darwin_wait: pid=%d exit, status=%x\n"),
+	  inferior_debug (4, _("darwin_wait: pid=%d exit, status=0x%x\n"),
 			  res, wstatus);
 
 	  /* Looks necessary on Leopard and harmless...  */
@@ -992,7 +992,7 @@ darwin_decode_message (mach_msg_header_t *hdr,
 	}
     }
 
-  printf_unfiltered (_("Bad local-port: %x\n"), hdr->msgh_local_port);
+  printf_unfiltered (_("Bad local-port: 0x%x\n"), hdr->msgh_local_port);
   status->kind = TARGET_WAITKIND_SPURIOUS;
   return minus_one_ptid;
 }
@@ -1015,7 +1015,7 @@ cancel_breakpoint (ptid_t ptid)
   pc = regcache_read_pc (regcache) - gdbarch_decr_pc_after_break (gdbarch);
   if (breakpoint_inserted_here_p (get_regcache_aspace (regcache), pc))
     {
-      inferior_debug (4, "cancel_breakpoint for thread %x\n",
+      inferior_debug (4, "cancel_breakpoint for thread 0x%x\n",
 		      ptid_get_tid (ptid));
 
       /* Back up the PC if necessary.  */
@@ -1076,7 +1076,7 @@ darwin_wait (ptid_t ptid, struct target_waitstatus *status)
 
       if (kret != MACH_MSG_SUCCESS)
 	{
-	  inferior_debug (5, _("mach_msg: ret=%x\n"), kret);
+	  inferior_debug (5, _("mach_msg: ret=0x%x\n"), kret);
 	  status->kind = TARGET_WAITKIND_SPURIOUS;
 	  return minus_one_ptid;
 	}
@@ -1110,7 +1110,7 @@ darwin_wait (ptid_t ptid, struct target_waitstatus *status)
       if (kret != MACH_MSG_SUCCESS)
 	{
 	  inferior_debug
-	    (5, _("darwin_wait: mach_msg(pending) ret=%x\n"), kret);
+	    (5, _("darwin_wait: mach_msg(pending) ret=0x%x\n"), kret);
 	  break;
 	}
 
@@ -1128,7 +1128,7 @@ darwin_wait (ptid_t ptid, struct target_waitstatus *status)
 	    }
 	  else
 	    inferior_debug
-	      (3, _("darwin_wait: thread %x hit a non-gdb breakpoint\n"),
+	      (3, _("darwin_wait: thread 0x%x hit a non-gdb breakpoint\n"),
 	       thread->gdb_port);
 	}
       else
@@ -1182,7 +1182,7 @@ darwin_mourn_inferior (struct target_ops *ops)
 
   kret = mach_port_move_member (gdb_task,
 				inf->private->notify_port, MACH_PORT_NULL);
-  gdb_assert (kret == KERN_SUCCESS);
+  MACH_CHECK_ERROR (kret);
 
   kret = mach_port_request_notification (gdb_task, inf->private->task,
 					 MACH_NOTIFY_DEAD_NAME, 0,
@@ -1190,7 +1190,7 @@ darwin_mourn_inferior (struct target_ops *ops)
 					 MACH_MSG_TYPE_MAKE_SEND_ONCE,
 					 &prev);
   /* This can fail if the task is dead.  */
-  inferior_debug (4, "task=%x, prev=%x, notify_port=%x\n",
+  inferior_debug (4, "task=0x%x, prev=0x%x, notify_port=0x%x\n",
 		  inf->private->task, prev, inf->private->notify_port);
 
   if (kret == KERN_SUCCESS)
@@ -1371,40 +1371,76 @@ darwin_attach_pid (struct inferior *inf)
       /* Create a port to get exceptions.  */
       kret = mach_port_allocate (gdb_task, MACH_PORT_RIGHT_RECEIVE,
 				 &darwin_ex_port);
-      gdb_assert (kret == KERN_SUCCESS);
+      if (kret != KERN_SUCCESS)
+	error (_("Unable to create exception port, mach_port_allocate "
+		 "returned: %d"),
+	       kret);
 
       kret = mach_port_insert_right (gdb_task, darwin_ex_port, darwin_ex_port,
 				     MACH_MSG_TYPE_MAKE_SEND);
-      gdb_assert (kret == KERN_SUCCESS);
+      if (kret != KERN_SUCCESS)
+	error (_("Unable to create exception port, mach_port_insert_right "
+		 "returned: %d"),
+	       kret);
 
       /* Create a port set and put ex_port in it.  */
       kret = mach_port_allocate (gdb_task, MACH_PORT_RIGHT_PORT_SET,
 				 &darwin_port_set);
-      gdb_assert (kret == KERN_SUCCESS);
+      if (kret != KERN_SUCCESS)
+	error (_("Unable to create port set, mach_port_allocate "
+		 "returned: %d"),
+	       kret);
 
       kret = mach_port_move_member (gdb_task, darwin_ex_port, darwin_port_set);
-      gdb_assert (kret == KERN_SUCCESS);
+      if (kret != KERN_SUCCESS)
+	error (_("Unable to move exception port into new port set, "
+		 "mach_port_move_member\n"
+		 "returned: %d"),
+	       kret);
     }
 
   /* Create a port to be notified when the child task terminates.  */
   kret = mach_port_allocate (gdb_task, MACH_PORT_RIGHT_RECEIVE,
 			     &inf->private->notify_port);
-  gdb_assert (kret == KERN_SUCCESS);
+  if (kret != KERN_SUCCESS)
+    error (_("Unable to create notification port, mach_port_allocate "
+	     "returned: %d"),
+	   kret);
 
   kret = mach_port_move_member (gdb_task,
 				inf->private->notify_port, darwin_port_set);
-  gdb_assert (kret == KERN_SUCCESS);
+  if (kret != KERN_SUCCESS)
+    error (_("Unable to move notification port into new port set, "
+	     "mach_port_move_member\n"
+	     "returned: %d"),
+	   kret);
 
   kret = mach_port_request_notification (gdb_task, inf->private->task,
 					 MACH_NOTIFY_DEAD_NAME, 0,
 					 inf->private->notify_port,
 					 MACH_MSG_TYPE_MAKE_SEND_ONCE,
 					 &prev_not);
-  gdb_assert (kret == KERN_SUCCESS);
-  gdb_assert (prev_not == MACH_PORT_NULL);
+  if (kret != KERN_SUCCESS)
+    error (_("Termination notification request failed, "
+	     "mach_port_request_notification\n"
+	     "returned: %d"),
+	   kret);
+  if (prev_not != MACH_PORT_NULL)
+    {
+      /* This is unexpected, as there should not be any previously
+	 registered notification request.  But this is not a fatal
+	 issue, so just emit a warning.  */
+      warning (_("\
+A task termination request was registered before the debugger registered\n\
+its own.  This is unexpected, but should otherwise not have any actual\n\
+impact on the debugging session."));
+    }
 
   kret = darwin_save_exception_ports (inf->private);
-  gdb_assert (kret == KERN_SUCCESS);
+  if (kret != KERN_SUCCESS)
+    error (_("Unable to save exception ports, task_get_exception_ports"
+	     "returned: %d"),
+	   kret);
 
   /* Set exception port.  */
   if (enable_mach_exceptions)
@@ -1413,7 +1449,10 @@ darwin_attach_pid (struct inferior *inf)
     mask = EXC_MASK_SOFTWARE | EXC_MASK_BREAKPOINT;
   kret = task_set_exception_ports (inf->private->task, mask, darwin_ex_port,
 				   EXCEPTION_DEFAULT, THREAD_STATE_NONE);
-  gdb_assert (kret == KERN_SUCCESS);
+  if (kret != KERN_SUCCESS)
+    error (_("Unable to set exception ports, task_set_exception_ports"
+	     "returned: %d"),
+	   kret);
 
   push_target (darwin_ops);
 }
@@ -1453,7 +1492,8 @@ darwin_ptrace_me (void)
 
   /* Wait until gdb is ready.  */
   res = read (ptrace_fds[0], &c, 1);
-  gdb_assert (res == 0);
+  if (res != 0)
+    error (_("unable to read from pipe, read returned: %d"), res);
   close (ptrace_fds[0]);
 
   /* Get rid of privileges.  */
@@ -1546,6 +1586,32 @@ darwin_create_inferior (struct target_ops *ops, char *exec_file,
 }
 
 
+/* Set things up such that the next call to darwin_wait will immediately
+   return a fake stop event for inferior INF.
+
+   This assumes that the inferior's thread list has been initialized,
+   as it will suspend the inferior's first thread.  */
+
+static void
+darwin_setup_fake_stop_event (struct inferior *inf)
+{
+  darwin_thread_t *thread;
+  kern_return_t kret;
+
+  gdb_assert (darwin_inf_fake_stop == NULL);
+  darwin_inf_fake_stop = inf;
+
+  /* When detecting a fake pending stop event, darwin_wait returns
+     an event saying that the first thread is in a DARWIN_STOPPED
+     state.  To make that accurate, we need to suspend that thread
+     as well.  Otherwise, we'll try resuming it when resuming the
+     inferior, and get a warning because the thread's suspend count
+     is already zero, making the resume request useless.  */
+  thread = VEC_index (darwin_thread_t, inf->private->threads, 0);
+  kret = thread_suspend (thread->gdb_port);
+  MACH_CHECK_ERROR (kret);
+}
+
 /* Attach to process PID, then initialize for debugging it
    and wait for the trace-trap that results from attaching.  */
 static void
@@ -1597,8 +1663,8 @@ darwin_attach (struct target_ops *ops, char *args, int from_tty)
 
   darwin_check_osabi (inf->private, ptid_get_tid (inferior_ptid));
 
-  gdb_assert (darwin_inf_fake_stop == NULL);
-  darwin_inf_fake_stop = inf;
+  darwin_setup_fake_stop_event (inf);
+
   inf->private->no_ptrace = 1;
 }
 
@@ -1688,19 +1754,20 @@ darwin_thread_alive (struct target_ops *ops, ptid_t ptid)
    Return 0 on failure; number of bytes read / writen otherwise.  */
 static int
 darwin_read_write_inferior (task_t task, CORE_ADDR addr,
-			    char *rdaddr, const char *wraddr, int length)
+			    gdb_byte *rdaddr, const gdb_byte *wraddr,
+			    int length)
 {
   kern_return_t kret;
   mach_vm_address_t offset = addr & (mach_page_size - 1);
   mach_vm_address_t low_address = (mach_vm_address_t) (addr - offset);
   mach_vm_size_t aligned_length = (mach_vm_size_t) PAGE_ROUND (offset + length);
   pointer_t copied;
-  int copy_count;
+  mach_msg_type_number_t copy_count;
   mach_vm_size_t remaining_length;
   mach_vm_address_t region_address;
   mach_vm_size_t region_length;
 
-  inferior_debug (8, _("darwin_read_write_inferior(task=%x, %s, len=%d)\n"),
+  inferior_debug (8, _("darwin_read_write_inferior(task=0x%x, %s, len=%d)\n"),
 		  task, core_addr_to_string (addr), length);
 
   /* Get memory from inferior with page aligned addresses.  */
@@ -1821,7 +1888,8 @@ out:
 #ifdef TASK_DYLD_INFO_COUNT
 /* This is not available in Darwin 9.  */
 static int
-darwin_read_dyld_info (task_t task, CORE_ADDR addr, char *rdaddr, int length)
+darwin_read_dyld_info (task_t task, CORE_ADDR addr, gdb_byte *rdaddr,
+		       int length)
 {
   struct task_dyld_info task_dyld_info;
   mach_msg_type_number_t count = TASK_DYLD_INFO_COUNT;

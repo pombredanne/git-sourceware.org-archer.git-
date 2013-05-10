@@ -297,7 +297,7 @@ cs_to_section (struct coff_symbol *cs, struct objfile *objfile)
 
   if (sect == NULL)
     return SECT_OFF_TEXT (objfile);
-  return sect->index;
+  return gdb_bfd_section_index (objfile->obfd, sect);
 }
 
 /* Return the address of the section of a COFF symbol.  */
@@ -456,8 +456,6 @@ record_minimal_symbol (struct coff_symbol *cs, CORE_ADDR address,
 		       enum minimal_symbol_type type, int section, 
 		       struct objfile *objfile)
 {
-  struct bfd_section *bfd_section;
-
   /* We don't want TDESC entry points in the minimal symbol table.  */
   if (cs->c_name[0] == '@')
     return NULL;
@@ -472,10 +470,8 @@ record_minimal_symbol (struct coff_symbol *cs, CORE_ADDR address,
       return NULL;
     }
 
-  bfd_section = cs_to_bfd_section (cs, objfile);
   return prim_record_minimal_symbol_and_info (cs->c_name, address,
-					      type, section,
-					      bfd_section, objfile);
+					      type, section, objfile);
 }
 
 /* coff_symfile_init ()
@@ -1581,15 +1577,13 @@ process_coff_symbol (struct coff_symbol *cs,
 		     union internal_auxent *aux,
 		     struct objfile *objfile)
 {
-  struct symbol *sym
-    = (struct symbol *) obstack_alloc (&objfile->objfile_obstack,
-				       sizeof (struct symbol));
+  struct symbol *sym = allocate_symbol (objfile);
   char *name;
 
-  memset (sym, 0, sizeof (struct symbol));
   name = cs->c_name;
   name = EXTERNAL_NAME (name, objfile->obfd);
-  SYMBOL_SET_LANGUAGE (sym, current_subfile->language);
+  SYMBOL_SET_LANGUAGE (sym, current_subfile->language,
+		       &objfile->objfile_obstack);
   SYMBOL_SET_NAMES (sym, name, strlen (name), 1, objfile);
 
   /* default assumptions */
@@ -2142,9 +2136,7 @@ coff_read_enum_type (int index, int length, int lastsym,
       switch (ms->c_sclass)
 	{
 	case C_MOE:
-	  sym = (struct symbol *) obstack_alloc
-	    (&objfile->objfile_obstack, sizeof (struct symbol));
-	  memset (sym, 0, sizeof (struct symbol));
+	  sym = allocate_symbol (objfile);
 
 	  SYMBOL_SET_LINKAGE_NAME (sym,
 				   obstack_copy0 (&objfile->objfile_obstack,

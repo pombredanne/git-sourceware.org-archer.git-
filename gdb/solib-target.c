@@ -339,7 +339,7 @@ solib_target_relocate_section_addresses (struct so_list *so,
      it any earlier, since we need to open the file first.  */
   if (so->lm_info->offsets == NULL)
     {
-      int num_sections = bfd_count_sections (so->abfd);
+      int num_sections = gdb_bfd_count_sections (so->abfd);
 
       so->lm_info->offsets = xzalloc (SIZEOF_N_SECTION_OFFSETS (num_sections));
 
@@ -456,7 +456,8 @@ Could not relocate shared library \"%s\": bad offsets"), so->so_name);
 	}
     }
 
-  offset = so->lm_info->offsets->offsets[sec->the_bfd_section->index];
+  offset = so->lm_info->offsets->offsets[gdb_bfd_section_index (sec->bfd,
+								sec->the_bfd_section)];
   sec->addr += offset;
   sec->endaddr += offset;
 }

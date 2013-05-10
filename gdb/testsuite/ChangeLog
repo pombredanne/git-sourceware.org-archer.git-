@@ -1,3 +1,266 @@
+2013-05-08  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/solib-search.exp: Set test name for "set
+	solib-search-path" test.
+
+2013-05-08  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* gdb.trace/circ.exp: Remove unnecessary 'if then' checks.
+	(set_a_tracepoint): Set tracepoint before prologue.
+	(run_trace_experiment): Test setup_tracepoints and 'break end'
+	in it.
+	(trace_buffer_normal): Remove.
+	(gdb_trace_circular_tests): Remove.  Move tests to...
+	(top level): ...here.  Call 'runto_main' before checking for
+	trace support.  Use commands to check the support for circular
+	trace buffer and changing of trace buffer size.  Add test
+	to calculate size of single frame.  Use this size to
+	calculate the size of trace buffer.  Use 'tfind pc func9'
+	instead of 'tfind 9'.  Use 'with_test_prefix'.
+
+2013-05-07  Tom Tromey  <tromey@redhat.com>
+
+	* lib/selftest-support.exp: New file.
+	* gdb.gdb/complaints.exp: Load selftest-support.exp.  Use
+	do_self_tests.
+	(setup_test, find_gdb): Remove.
+	* gdb.gdb/observer.exp: Load selftest-support.exp.  Use
+	do_self_tests.
+	(setup_test, find_gdb): Remove.
+	(test_observer): Don't call setup_test.  Remove argument.
+	* gdb.gdb/selftest.exp: Load selftest-support.exp.
+	(find_gdb): Remove.
+	* gdb.gdb/complaints.exp: Load selftest-support.exp.  Use
+	do_self_tests.
+	(setup_test, find_gdb): Remove.
+	(test_with_self): Don't call setup_test.  Remove argument.
+
+2013-05-07  Andreas Arnez  <arnez@linux.vnet.ibm.com>
+
+	* gdb.arch/system-gcore.exp: Remove.
+	* gdb.arch/gcore.c: Remove.
+	* gdb.base/gcore.exp: Add "info reg system".
+
+2013-05-07  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	PR breakpoints/15413:
+	* gdb.base/pending.exp: Add test for completion of the "condition"
+	command for pending breakpoints.
+	* gdb.linespec/linespec.ex: Add test for completion of the
+	"condition" command when dealing with multiple locations.
+
+2013-05-07  Luis Machado  <lgustavo@codesourcery.com>
+
+	* gdb.threads/wp-replication.c: New file.
+	* gdb.threads/wp-replication.exp: New file.
+
+2013-05-06  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* gdb.xml/tdesc-regs.exp: Add case for nios2.
+
+2013-05-06  Doug Evans  <dje@google.com>
+
+	* gdb.base/solib-search-lib1.c: New file.
+	* gdb.base/solib-search-lib2.c: New file.
+	* gdb.base/solib-search.c: New file.
+	* gdb.base/solib-search.h: New file.
+	* gdb.base/solib-search.exp: New file.
+
+	* lib/gdb.exp (gdb_core_cmd): New function.
+	* gdb.arch/system-gcore.exp: Use it.
+	* gdb.arch/vsx-regs.exp: Ditto.
+	* gdb.base/gcore.exp: Ditto.
+	* gdb.threads/gcore-thread.exp: Ditto.
+
+	* gdb.reverse/shr.h: New file.
+	* gdb.reverse/shr1.c: New file.
+	* gdb.reverse/shr2.c: #include "shr.h".
+	* gdb.reverse/solib-reverse.c: Remove #include <stdio.h>.
+	#include "shr.h".  Replace calls to printf,sleep to call shr1 instead.
+	* gdb.reverse/solib-precsave.exp: Build shr2.sl.
+	Update tests using sleep/printf to use shr2.sl instead.
+	* gdb.reverse/solib-reverse.exp: Ditto.
+
+2013-05-06  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/implptrconst.c: New file.
+	* gdb.dwarf2/implptrconst.exp: New file.
+	* lib/dwarf.exp (Dwarf::_nz_quote): New proc.
+	(Dwarf::_handle_DW_FORM): Handle DW_FORM_block1.
+	(Dwarf::_location): Handle DW_OP_GNU_implicit_pointer.
+
+2013-05-03  Philippe Waroquiers  <philippe.waroquiers@skynet.be>
+
+	* gdb.base/catch-sig.c (main): Raise SIGINT.
+	* gdb.base/catch-sig.exp: Test "catch signal SIGINT".
+
+2013-05-03  Hafiz Abid Qadeer  <abidh@codesourcery.com>
+
+	* status-stop.exp (test_tstart_tstart): Check for error
+	returned by the second 'tstart' command.
+
+2013-03-27  Walfred Tedeschi  <walfred.tedeschi@intel.com>
+
+	* gdb.xml/maint_print_struct.exp: New file.
+	* gdb.xml/maint_print_struct.xml: New file.
+
+2013-04-25  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/nostaticblock.exp: New file.
+
+2013-04-24  Muhammad Bilal  <mbilal@codesourcery.com>
+
+	PR gdb/10462
+	* gdb.base/setshow.exp: Add test case.
+
+2013-04-23  Hui Zhu  <hui@codesourcery.com>
+
+	PR gdb/15293
+	* gdb.base/dprintf.exp: Add ignore command.
+
+2013-04-23  Hui Zhu  <hui@codesourcery.com>
+
+	PR gdb/15165
+	* gdb.base/save-bp.exp: Add test for dprintf.
+
+2013-04-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.gdb/selftest.exp (do_steps_and_nexts): Check for
+	notice_open_fds.
+
+2013-04-22  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb.arch/arm-bl-branch-dest.exp: Replace additional_flags by
+	ldflags.
+
+2013-04-22  Sergio Durigan Junior  <sergiodj@redhat.com>
+
+	* gdb.arch/arm-bl-branch-dest.c: New file.
+	* gdb.arch/arm-bl-branch-dest.exp: Likewise.
+
+2013-04-19  Vladimir Kargov  <kargov@gmail.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* gdb.arch/i386-float.S: New file.
+	* gdb.arch/i386-float.exp: New file.
+
+2013-04-18  Luis Machado  <lgustavo@codesourcery.com>
+
+	* gdb.mi/mi-var-create-rtti.exp: Create a variable of
+	type void *.
+
+2013-04-17  Doug Evans  <dje@google.com>
+
+	* lib/dwarf.exp (Dwarf): New proc "tu".
+	* gdb.dwarf2/missing-sig-type.exp: New file.
+
+2013-04-15  Siva Chandra Reddy  <sivachandra@google.com>
+
+	Add option to link testcases with Pthreads library when
+	using 'prepare_for_testing' in tests.
+
+	* lib/gdb.exp (build_executable_from_specs): Use
+	gdb_compile_pthreads to compile if option "pthreads" is
+	specified.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/exceptprint.exp: Add regexp catchpoint tests.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/default.exp: Update for $_exception.
+	* gdb.cp/exceptprint.cc: New file.
+	* gdb.cp/exceptprint.exp: New file.
+	* lib/gdb.exp (skip_libstdcxx_probe_tests): New proc.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/typeid.cc: New file.
+	* gdb.cp/typeid.exp: New file.
+
+2013-04-15  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/exception.exp: Add "catch rethrow" tests.
+
+2013-04-13  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/completion.exp: Test completion of command
+	'target ctf' if target ctf is supported.
+
+2013-04-10  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/completion.exp: Test "set height", "set listsize" and
+	"set trace-buffer-size" completion.
+	* gdb.base/setshow.exp: Test "set height unlimited".
+	* gdb.trace/trace-buffer-size.exp: Test "set trace-buffer-size
+	unlimited".
+
+2013-04-10  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/actions.exp: Save trace data to CTF.
+	Change to ctf target if GDB supports, read CTF data in ctf
+	target, and check the actions of tracepoints.
+	* gdb.trace/while-stepping.exp: Likewise.
+	* gdb.trace/report.exp: Test GDB saves trace data to CTF
+	format and read CTF trace file if GDB supports.
+	* gdb.trace/tstatus.exp: Save trace data to CTF.  If ctf
+	target is supported, change to ctf target, read trace data and
+	check output of command "tstatus".
+	* gdb.trace/tsv.exp: Save trace frame to CTF.  If GDB supports,
+	read CTF data by target ctf and call check_tsv.
+
+2013-04-10  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/actions.exp (check_tracepoint): New.
+	(top level): Start the tracing and check the actions of
+	tracepoints.  Save trace data to tfile format.  Restart GDB
+	and read trace file in tfile target.  Check the actions of
+	tracepoints again.
+	* gdb.trace/while-stepping.exp: Likewise.
+
+2013-04-10  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/report.exp: Use standard_output_file for saved
+	trace file.
+
+2013-04-10  Hui Zhu  <hui@codesourcery.com>
+
+	* gdb.base/Makefile.in (EXECUTABLES): Add dprintf-pending.
+	(MISCELLANEOUS): Add dprintf-pendshr.sl.
+	* gdb.base/dprintf-pending.c, gdb.base/dprintf-pending.exp: New.
+
+2013-04-09  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.server/server-kill.exp (tstatus): Permit also ECONNRESET
+	response.
+
+2013-04-08  Pedro Alves  <palves@redhat.com>
+
+	* gdb.mi/mi-break.exp (test_error): Add tests with garbage after
+	the location.
+
+2013-04-04  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* gdb.cp/cplabel.exp: Allow empty directory in file reported
+	for breakpoint location.
+
+2013-04-04  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* gdb.linespec/linespec.exp: Make dir/file:line tests
+	conditional for non-remote hosts only.
+
+2013-04-04  Stan Shebs  <stan@codesourcery.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* gdb.trace/Makefile.in (PROGS): Add actions-changed.
+	* gdb.trace/actions-changed.c: New file.
+	* gdb.trace/actions-changed.exp: New file.
+	* lib/trace-support.exp (gdb_trace_setactions): Rename to ...
+	(gdb_trace_setactions_command): ... this.  Add "actions_command"
+	parameter, and handle it.
+	(gdb_trace_setactions, gdb_trace_setcommands): New procedures.
+
 2013-04-04  Yao Qi  <yao@codesourcery.com>
 
 	* gdb.server/server-kill.exp: Use command 'tstatus' instead of

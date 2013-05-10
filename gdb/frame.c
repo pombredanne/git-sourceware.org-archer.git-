@@ -1678,7 +1678,7 @@ get_prev_frame_1 (struct frame_info *this_frame)
       
       /* gcc -fsplit-stack __morestack can continue the stack anywhere.  */
       this_pc_in_block = get_frame_address_in_block (this_frame);
-      morestack_msym = lookup_minimal_symbol_by_pc (this_pc_in_block);
+      morestack_msym = lookup_minimal_symbol_by_pc (this_pc_in_block).minsym;
       if (morestack_msym)
 	morestack_name = SYMBOL_LINKAGE_NAME (morestack_msym);
       if (!morestack_name || strcmp (morestack_name, "__morestack") != 0)
@@ -2495,7 +2495,7 @@ the rest of the stack trace."),
 Set an upper bound on the number of backtrace levels."), _("\
 Show the upper bound on the number of backtrace levels."), _("\
 No more than the specified number of frames can be displayed or examined.\n\
-Zero is unlimited."),
+Literal \"unlimited\" or zero means no limit."),
 			    NULL,
 			    show_backtrace_limit,
 			    &set_backtrace_cmdlist,

@@ -27,6 +27,7 @@
 #include "frame.h"
 #include "value.h"
 #include "gdb_assert.h"
+#include "filestuff.h"
 
 #include <sys/types.h>
 #include "gdb_string.h"
@@ -737,7 +738,7 @@ openp (const char *path, int opts, const char *string,
 	{
 	  filename = alloca (strlen (string) + 1);
 	  strcpy (filename, string);
-	  fd = open (filename, mode);
+	  fd = gdb_open_cloexec (filename, mode, 0);
 	  if (fd >= 0)
 	    goto done;
 	}
@@ -835,7 +836,7 @@ openp (const char *path, int opts, const char *string,
 
       if (is_regular_file (filename))
 	{
-	  fd = open (filename, mode);
+	  fd = gdb_open_cloexec (filename, mode, 0);
 	  if (fd >= 0)
 	    break;
 	}
@@ -1000,7 +1001,7 @@ find_and_open_source (const char *filename,
           *fullname = rewritten_fullname;
         }
 
-      result = open (*fullname, OPEN_MODE);
+      result = gdb_open_cloexec (*fullname, OPEN_MODE, 0);
       if (result >= 0)
 	{
 	  char *lpath = gdb_realpath (*fullname);
@@ -1612,7 +1613,7 @@ forward_search_command (char *regex, int from_tty)
       buf = xmalloc (cursize);
       p = buf;
 
-      c = getc (stream);
+      c = fgetc (stream);
       if (c == EOF)
 	break;
       do
@@ -1626,7 +1627,7 @@ forward_search_command (char *regex, int from_tty)
 	      cursize = newsize;
 	    }
 	}
-      while (c != '\n' && (c = getc (stream)) >= 0);
+      while (c != '\n' && (c = fgetc (stream)) >= 0);
 
       /* Remove the \r, if any, at the end of the line, otherwise
          regular expressions that end with $ or \n won't work.  */
@@ -1697,14 +1698,14 @@ reverse_search_command (char *regex, int from_tty)
       char buf[4096];		/* Should be reasonable???  */
       char *p = buf;
 
-      c = getc (stream);
+      c = fgetc (stream);
       if (c == EOF)
 	break;
       do
 	{
 	  *p++ = c;
 	}
-      while (c != '\n' && (c = getc (stream)) >= 0);
+      while (c != '\n' && (c = fgetc (stream)) >= 0);
 
       /* Remove the \r, if any, at the end of the line, otherwise
          regular expressions that end with $ or \n won't work.  */
@@ -2046,7 +2047,10 @@ The matching line number is also stored as the value of \"$_\"."));
 
   add_setshow_integer_cmd ("listsize", class_support, &lines_to_list, _("\
 Set number of source lines gdb will list by default."), _("\
-Show number of source lines gdb will list by default."), NULL,
+Show number of source lines gdb will list by default."), _("\
+Use this to choose how many source lines the \"list\" displays (unless\n\
+the \"list\" argument explicitly specifies some other number).\n\
+A value of \"unlimited\", or zero, means there's no limit."),
 			    NULL,
 			    show_lines_to_list,
 			    &setlist, &showlist);

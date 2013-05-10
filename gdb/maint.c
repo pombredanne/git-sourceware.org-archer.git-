@@ -329,6 +329,7 @@ print_bfd_section_info (bfd *abfd,
 
       addr = bfd_section_vma (abfd, asect);
       endaddr = addr + bfd_section_size (abfd, asect);
+      printf_filtered (" [%d] ", gdb_bfd_section_index (abfd, asect));
       maint_print_section_info (name, flags, addr, endaddr,
 				asect->filepos, addr_size);
     }
@@ -452,7 +453,7 @@ maintenance_translate_address (char *arg, int from_tty)
   CORE_ADDR address;
   struct obj_section *sect;
   char *p;
-  struct minimal_symbol *sym;
+  struct bound_minimal_symbol sym;
   struct objfile *objfile;
 
   if (arg == NULL || *arg == 0)
@@ -487,13 +488,13 @@ maintenance_translate_address (char *arg, int from_tty)
   else
     sym = lookup_minimal_symbol_by_pc (address);
 
-  if (sym)
+  if (sym.minsym)
     {
-      const char *symbol_name = SYMBOL_PRINT_NAME (sym);
+      const char *symbol_name = SYMBOL_PRINT_NAME (sym.minsym);
       const char *symbol_offset
-	= pulongest (address - SYMBOL_VALUE_ADDRESS (sym));
+	= pulongest (address - SYMBOL_VALUE_ADDRESS (sym.minsym));
 
-      sect = SYMBOL_OBJ_SECTION(sym);
+      sect = SYMBOL_OBJ_SECTION(sym.objfile, sym.minsym);
       if (sect != NULL)
 	{
 	  const char *section_name;

@@ -202,8 +202,7 @@ add_pe_forwarded_sym (const char *sym_name, const char *forward_dll_name,
 		      const char *dll_name, struct objfile *objfile)
 {
   CORE_ADDR vma;
-  struct objfile *forward_objfile;
-  struct minimal_symbol *msymbol;
+  struct bound_minimal_symbol msymbol;
   enum minimal_symbol_type msymtype;
   char *qualified_name, *bare_name;
   int forward_dll_name_len = strlen (forward_dll_name);
@@ -215,20 +214,18 @@ add_pe_forwarded_sym (const char *sym_name, const char *forward_dll_name,
 	     forward_func_name);
 
 
-  msymbol = lookup_minimal_symbol_and_objfile (forward_qualified_name,
-					       &forward_objfile);
+  msymbol = lookup_minimal_symbol_and_objfile (forward_qualified_name);
 
-  if (!msymbol)
+  if (!msymbol.minsym)
     {
       int i;
 
       for (i = 0; i < forward_dll_name_len; i++)
 	forward_qualified_name[i] = tolower (forward_qualified_name[i]);
-      msymbol = lookup_minimal_symbol_and_objfile (forward_qualified_name,
-						   &forward_objfile);
+      msymbol = lookup_minimal_symbol_and_objfile (forward_qualified_name);
     }
 
-  if (!msymbol)
+  if (!msymbol.minsym)
     {
       if (debug_coff_pe_read)
 	fprintf_unfiltered (gdb_stdlog, _("Unable to find function \"%s\" in"
@@ -243,8 +240,8 @@ add_pe_forwarded_sym (const char *sym_name, const char *forward_dll_name,
 			" \"%s\" in dll \"%s\", pointing to \"%s\"\n"),
 			sym_name, dll_name, forward_qualified_name);
 
-  vma = SYMBOL_VALUE_ADDRESS (msymbol);
-  msymtype = MSYMBOL_TYPE (msymbol);
+  vma = SYMBOL_VALUE_ADDRESS (msymbol.minsym);
+  msymtype = MSYMBOL_TYPE (msymbol.minsym);
 
   /* Generate a (hopefully unique) qualified name using the first part
      of the dll name, e.g. KERNEL32!AddAtomA.  This matches the style
@@ -508,7 +505,7 @@ read_pe_exported_syms (struct objfile *objfile)
   exp_funcbase = pe_as32 (expdata + 28);
 
   /* Use internal dll name instead of full pathname.  */
-  dll_name = pe_as32 (expdata + 12) + erva;
+  dll_name = (char *) (pe_as32 (expdata + 12) + erva);
 
   pe_sections_info.nb_sections = otherix;
   pe_sections_info.sections = section_data;
@@ -582,9 +579,10 @@ read_pe_exported_syms (struct objfile *objfile)
 	  if ((func_rva >= section_data[sectix].rva_start)
 	      && (func_rva < section_data[sectix].rva_end))
 	    {
+	      char *sym_name = (char *) (erva + name_rva);
+
 	      section_found = 1;
-	      add_pe_exported_sym (erva + name_rva,
-				   func_rva, ordinal,
+	      add_pe_exported_sym (sym_name, func_rva, ordinal,
 				   section_data + sectix, dll_name, objfile);
 	      ++nbnormal;
 	      break;

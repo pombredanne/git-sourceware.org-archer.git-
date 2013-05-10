@@ -816,7 +816,7 @@ handle_vfork_child_exec_or_exit (int exec)
     }
 }
 
-/* Enum strings for "set|show displaced-stepping".  */
+/* Enum strings for "set|show follow-exec-mode".  */
 
 static const char follow_exec_mode_new[] = "new";
 static const char follow_exec_mode_same[] = "same";
@@ -968,11 +968,7 @@ follow_exec (ptid_t pid, char *execd_pathname)
      registers.  */
   target_find_description ();
 
-#ifdef SOLIB_CREATE_INFERIOR_HOOK
-  SOLIB_CREATE_INFERIOR_HOOK (PIDGET (inferior_ptid));
-#else
   solib_create_inferior_hook (0);
-#endif
 
   jit_inferior_created_hook ();
 
