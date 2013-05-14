@@ -1,6 +1,6 @@
-/* Copyright (C) 2012-2013 Free Software Foundation, Inc.
+/* This testcase is part of GDB, the GNU debugger.
 
-   This file is part of GDB.
+   Copyright 2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,29 +15,19 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#include "defs.h"
-#include <proc_service.h>
-
-/* Get size of extra register set.  Currently a noop.  */
-
-ps_err_e
-ps_lgetxregsize (struct ps_prochandle *ph, lwpid_t lwpid, int *xregsize)
+void
+subr (int parm)
 {
-  return PS_OK;
 }
 
-/* Get extra register set.  Currently a noop.  */
-
-ps_err_e
-ps_lgetxregs (struct ps_prochandle *ph, lwpid_t lwpid, caddr_t xregset)
+void
+end (void)
 {
-  return PS_OK;
 }
 
-/* Set extra register set.  Currently a noop.  */
-
-ps_err_e
-ps_lsetxregs (struct ps_prochandle *ph, lwpid_t lwpid, caddr_t xregset)
+int
+main ()
 {
-  return PS_OK;
+  subr (1);
+  end ();
 }

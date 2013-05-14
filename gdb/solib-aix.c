@@ -411,23 +411,27 @@ solib_aix_relocate_section_addresses (struct so_list *so,
     }
   else if (strcmp (section_name, ".bss") == 0)
     {
-      sec->addr = bfd_section_vma (abfd, bfd_sect) + info->data_addr;
+      /* The information provided by the loader does not include
+	 the address of the .bss section, but we know that it gets
+	 relocated by the same offset as the .data section.  So,
+	 compute the relocation offset for the .data section, and
+	 apply it to the .bss section as well.  If the .data section
+	 is not defined (which seems highly unlikely), do our best
+	 by assuming no relocation.  */
+      struct bfd_section *data_sect
+	= bfd_get_section_by_name (abfd, ".data");
+      CORE_ADDR data_offset = 0;
+
+      if (data_sect != NULL)
+	data_offset = info->data_addr - bfd_section_vma (abfd, data_sect);
+
+      sec->addr = bfd_section_vma (abfd, bfd_sect) + data_offset;
       sec->addr += solib_aix_bss_data_overlap (abfd);
       sec->endaddr = sec->addr + bfd_section_size (abfd, bfd_sect);
     }
   else
     {
       /* All other sections should not be relocated.  */
-      /* FIXME: GDB complains that the .loader section sometimes
-	 overlaps with other sections (Eg: the .data section).
-	 As far as I can tell, the loader section had the LOAD flag
-	 set, but not the RELOC.  So it should not be relocated.
-	 There seems to be a problem there, and maybe it has to do
-	 with setting sec->addr to 0 (when the vma is indeed 0).
-	 But even if there wasn't, the problem then becomes the fact
-	 that many shared objects inside shared libraries have
-	 a .loader section whose vma is 0, thus also triggering
-	 an overlap warning.  */
       sec->addr = bfd_section_vma (abfd, bfd_sect);
       sec->endaddr = sec->addr + bfd_section_size (abfd, bfd_sect);
     }

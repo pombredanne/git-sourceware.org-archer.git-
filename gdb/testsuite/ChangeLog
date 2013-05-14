@@ -1,3 +1,34 @@
+2013-05-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/implptrconst.exp: Create a CU with 4 byte address
+	size and change type sizes to 4 bytes.
+
+2013-05-13  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/exprs.exp (test_expr): Add regression test.
+	* gdb.base/exprs.c (null_t_struct): New global.
+
+2013-05-13  Muhammad Bilal  <mbilal@codesourcery.com>
+
+       * gdb.base/default.exp: Disable history saving.
+       * gdb.base/setshow.exp: Likewise.
+
+2013-05-10  Pedro Alves  <palves@redhat.com>
+
+	PR remote/15455
+
+	* gdb.trace/qtro.c: New file.
+	* gdb.trace/qtro.exp: New file.
+
+2013-05-10  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* gdb.python/py-framefilter.py: New File.
+	* gdb.python/py-framefilter-mi.exp: Ditto.
+	* gdb.python/py-framefilter.c: Ditto.
+	* gdb.python/py-framefilter-mi.exp: Ditto.
+	* gdb.python/py-framefilter-mi.c: Ditto,
+	* gdb.python/py-framefilter-gdb.py.in: Ditto.
+
 2013-05-08  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.base/solib-search.exp: Set test name for "set

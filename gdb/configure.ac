@@ -1742,13 +1742,6 @@ if test ${build} = ${host} -a ${host} = ${target} ; then
          [Define if using Solaris thread debugging.])
          CONFIG_OBS="${CONFIG_OBS} sol-thread.o"
          CONFIG_SRCS="${CONFIG_SRCS} sol-thread.c"
-         # On SPARC CPUs, we also need to build sparc-sol-thread.
-         case ${host_cpu} in
-           sparc*)
-             CONFIG_OBS="${CONFIG_OBS} sparc-sol-thread.o"
-             CONFIG_SRCS="${CONFIG_SRCS} sparc-sol-thread.c"
-             ;;
-         esac
          AC_CHECK_LIB(dl, dlopen)
 	 CONFIG_LDFLAGS="${CONFIG_LDFLAGS} $RDYNAMIC"
 	 # Sun randomly tweaked the prototypes in <proc_service.h>
@@ -1926,7 +1919,7 @@ fi
 # NOTE: If you change this list, remember to update
 # gdb/doc/gdbint.texinfo.
 build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
--Wformat-nonliteral -Wpointer-sign \
+-Wpointer-sign \
 -Wno-unused -Wunused-value -Wunused-function \
 -Wno-switch -Wno-char-subscripts -Wmissing-prototypes \
 -Wdeclaration-after-statement -Wempty-body"
@@ -1935,6 +1928,7 @@ build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
 # GCC versions complain about %I64.
 case "${host}" in
   *-*-mingw32*) build_warnings="$build_warnings -Wno-format" ;;
+  *) build_warnings="$build_warnings -Wformat-nonliteral" ;;
 esac
 
 AC_ARG_ENABLE(build-warnings,
