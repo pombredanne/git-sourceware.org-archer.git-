@@ -67,11 +67,17 @@ struct objfile *rt_common_objfile;	/* For runtime common symbols */
 
 struct objfile_pspace_info
 {
-  int objfiles_changed_p;
   struct obj_section **sections;
   int num_sections;
 
-  /* Nonzero if section map updates should be inhibited.  */
+  /* Nonzero if object files have been added since the section map
+     was last updated.  */
+  int new_objfiles_available;
+
+  /* Nonzero if the section map MUST be updated before use.  */
+  int section_map_dirty;
+
+  /* Nonzero if section map updates should be inhibited if possible.  */
   int inhibit_updates;
 };
 
@@ -320,7 +326,7 @@ allocate_objfile (bfd *abfd, int flags)
   objfile->flags |= flags;
 
   /* Rebuild section map next time we need it.  */
-  get_objfile_pspace_data (objfile->pspace)->objfiles_changed_p = 1;
+  get_objfile_pspace_data (objfile->pspace)->new_objfiles_available = 1;
 
   return objfile;
 }
@@ -649,8 +655,7 @@ free_objfile (struct objfile *objfile)
   obstack_free (&objfile->objfile_obstack, 0);
 
   /* Rebuild section map next time we need it.  */
-  gdb_assert (!get_objfile_pspace_data (objfile->pspace)->inhibit_updates);
-  get_objfile_pspace_data (objfile->pspace)->objfiles_changed_p = 1;
+  get_objfile_pspace_data (objfile->pspace)->section_map_dirty = 1;
 
   xfree (objfile);
 }
@@ -830,7 +835,7 @@ objfile_relocate1 (struct objfile *objfile,
   }
 
   /* Rebuild section map next time we need it.  */
-  get_objfile_pspace_data (objfile->pspace)->objfiles_changed_p = 1;
+  get_objfile_pspace_data (objfile->pspace)->section_map_dirty = 1;
 
   /* Update the table in exec_ops, used to read memory.  */
   ALL_OBJFILE_OSECTIONS (objfile, s)
@@ -1295,11 +1300,14 @@ static void
 update_section_map (struct program_space *pspace,
 		    struct obj_section ***pmap, int *pmap_size)
 {
+  struct objfile_pspace_info *pspace_info;
   int alloc_size, map_size, i;
   struct obj_section *s, **map;
   struct objfile *objfile;
 
-  gdb_assert (get_objfile_pspace_data (pspace)->objfiles_changed_p != 0);
+  pspace_info = get_objfile_pspace_data (current_program_space);
+  gdb_assert (pspace_info->section_map_dirty != 0
+	      || pspace_info->new_objfiles_available != 0);
 
   map = *pmap;
   xfree (map);
@@ -1355,21 +1363,6 @@ bsearch_cmp (const void *key, const void *elt)
   return 1;
 }
 
-static void
-update_space_info_sections (struct objfile_pspace_info *pspace_info)
-{
-  if (pspace_info->objfiles_changed_p && !pspace_info->inhibit_updates)
-    {
-      update_section_map (current_program_space,
-			  &pspace_info->sections,
-			  &pspace_info->num_sections);
-
-      /* Don't need updates to section map until objfiles are added,
-         removed or relocated.  */
-      pspace_info->objfiles_changed_p = 0;
-    }
-}
-
 /* Returns a section whose range includes PC or NULL if none found.   */
 
 struct obj_section *
@@ -1384,7 +1377,19 @@ find_pc_section (CORE_ADDR pc)
     return s;
 
   pspace_info = get_objfile_pspace_data (current_program_space);
-  update_space_info_sections (pspace_info);
+  if (pspace_info->section_map_dirty
+      || (pspace_info->new_objfiles_available
+	  && !pspace_info->inhibit_updates))
+    {
+      update_section_map (current_program_space,
+			  &pspace_info->sections,
+			  &pspace_info->num_sections);
+
+      /* Don't need updates to section map until objfiles are added,
+         removed or relocated.  */
+      pspace_info->new_objfiles_available = 0;
+      pspace_info->section_map_dirty = 0;
+    }
 
   /* The C standard (ISO/IEC 9899:TC2) requires the BASE argument to
      bsearch be non-NULL.  */
@@ -1424,14 +1429,14 @@ in_plt_section (CORE_ADDR pc, char *name)
 }
 
 
-/* Set objfiles_changed_p so section map will be rebuilt next time it
+/* Set section_map_dirty so section map will be rebuilt next time it
    is used.  Called by reread_symbols.  */
 
 void
 objfiles_changed (void)
 {
   /* Rebuild section map next time we need it.  */
-  get_objfile_pspace_data (current_program_space)->objfiles_changed_p = 1;
+  get_objfile_pspace_data (current_program_space)->section_map_dirty = 1;
 }
 
 /* See comments in objfiles.h.  */
@@ -1439,7 +1444,6 @@ objfiles_changed (void)
 void
 inhibit_section_map_updates (void)
 {
-  update_space_info_sections (get_objfile_pspace_data (current_program_space));
   get_objfile_pspace_data (current_program_space)->inhibit_updates = 1;
 }
 
