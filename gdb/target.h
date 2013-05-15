@@ -499,7 +499,7 @@ struct target_ops
     void (*to_terminal_ours_for_output) (void);
     void (*to_terminal_ours) (void);
     void (*to_terminal_save_ours) (void);
-    void (*to_terminal_info) (char *, int);
+    void (*to_terminal_info) (const char *, int);
     void (*to_kill) (struct target_ops *);
     void (*to_load) (char *, int);
     void (*to_create_inferior) (struct target_ops *, 
@@ -817,7 +817,8 @@ struct target_ops
 
     /* Add/change textual notes about the trace run, returning 1 if
        successful, 0 otherwise.  */
-    int (*to_set_trace_notes) (char *user, char *notes, char* stopnotes);
+    int (*to_set_trace_notes) (const char *user, const char *notes,
+			       const char *stopnotes);
 
     /* Return the processor core that thread PTID was last seen on.
        This information is updated only when:
@@ -892,7 +893,7 @@ struct target_ops
     void (*to_info_record) (void);
 
     /* Save the recorded execution trace into a file.  */
-    void (*to_save_record) (char *filename);
+    void (*to_save_record) (const char *filename);
 
     /* Delete the recorded execution trace from the current position onwards.  */
     void (*to_delete_record) (void);
@@ -2015,7 +2016,7 @@ extern void target_stop_recording (void);
 extern void target_info_record (void);
 
 /* See to_save_record in struct target_ops.  */
-extern void target_save_record (char *filename);
+extern void target_save_record (const char *filename);
 
 /* Query if the target supports deleting the execution log.  */
 extern int target_supports_delete_record (void);

@@ -46,7 +46,7 @@
 
 static void target_info (char *, int);
 
-static void default_terminal_info (char *, int);
+static void default_terminal_info (const char *, int);
 
 static int default_watchpoint_addr_within_range (struct target_ops *,
 						 CORE_ADDR, CORE_ADDR, int);
@@ -141,8 +141,6 @@ static void debug_to_terminal_ours_for_output (void);
 static void debug_to_terminal_save_ours (void);
 
 static void debug_to_terminal_ours (void);
-
-static void debug_to_terminal_info (char *, int);
 
 static void debug_to_load (char *, int);
 
@@ -557,7 +555,7 @@ noprocess (void)
 }
 
 static void
-default_terminal_info (char *args, int from_tty)
+default_terminal_info (const char *args, int from_tty)
 {
   printf_unfiltered (_("No saved terminal information.\n"));
 }
@@ -949,7 +947,7 @@ update_current_target (void)
 	    (void (*) (LONGEST))
 	    target_ignore);
   de_fault (to_set_trace_notes,
-	    (int (*) (char *, char *, char *))
+	    (int (*) (const char *, const char *, const char *))
 	    return_zero);
   de_fault (to_get_tib_address,
 	    (int (*) (ptid_t, CORE_ADDR *))
@@ -4300,7 +4298,7 @@ target_info_record (void)
 /* See target.h.  */
 
 void
-target_save_record (char *filename)
+target_save_record (const char *filename)
 {
   struct target_ops *t;
 
@@ -4791,7 +4789,7 @@ debug_to_terminal_save_ours (void)
 }
 
 static void
-debug_to_terminal_info (char *arg, int from_tty)
+debug_to_terminal_info (const char *arg, int from_tty)
 {
   debug_target.to_terminal_info (arg, from_tty);
 

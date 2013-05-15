@@ -1,3 +1,59 @@
+2013-05-15  Markus Metzger  <markus.t.metzger@intel.com>
+
+	* record.c (record_goto_cmdlist): New.
+	(cmd_record_goto): Split into this ...
+	(cmd_record_goto_begin): ... this
+	(cmd_record_goto_end): ... and this.
+	(_initialize_record): Change "record goto" to prefix command.
+	Add commands for "record goto begin" and "record goto end".
+	Add an alias for "record goto start" to "record goto begin".
+
+2013-05-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* linespec.c (convert_linespec_to_sals): New comment for
+	SOURCE_FILENAME assignment.
+
+2013-05-14  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* cleanups.c (restore_my_cleanups): Replace gdb_assert by
+	internal_warning.
+
+2013-05-14  Tom Tromey  <tromey@redhat.com>
+
+	* eval.c (parse_and_eval_long): Make 'exp' const.
+	* value.h (parse_and_eval_long): Update.
+
+2013-05-14  Tom Tromey  <tromey@redhat.com>
+
+	* ui-file.c (gdb_fopen): Make arguments const.
+	* ui-file.h (gdb_fopen): Make arguments const.
+
+2013-05-14  Tom Tromey  <tromey@redhat.com>
+
+	* remote.c (remote_set_trace_notes): Make arguments const.
+	* target.c (update_current_target): Update cast.
+	* target.h (to_set_trace_notes): Make arguments const.
+
+2013-05-14  Tom Tromey  <tromey@redhat.com>
+
+	* go32-nat.c (go32_terminal_info): Make 'args' const.
+	* inferior.h (child_terminal_info): Update.
+	* inflow.c (child_terminal_info): Make 'args' const.
+	* target.c (default_terminal_info): Make 'args' const.
+	(debug_to_terminal_save_ours): Likewise.
+	* target.h (struct target_ops) <to_terminal_info>: Make argument
+	const.
+
+2013-05-13  Tom Tromey  <tromey@redhat.com>
+
+	* gcore.c (create_gcore_bfd): Make 'filename' const.
+	* gcore.h (create_gcore_bfd): Make 'filename' const.
+	* record-full.c (record_full_save): Make 'recfilename' const.
+	* target.c (target_save_record): Make 'filename' const.
+	* target.h (struct target_ops) <to_save_record>: Make 'filename'
+	const.
+	(target_save_record): Likewise.
+
 2013-05-13  Tom Tromey  <tromey@redhat.com>
 
     	PR gdb/15338:
