@@ -1383,10 +1383,11 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
   return 1;
 }
 
-/* XXX.  */
+/* Read the full list of currently loaded shared objects directly from
+   the inferior.  */
 
 static struct so_list *
-svr4_current_sos_1 (struct svr4_info *info) /* XXX need a better name!  */
+svr4_current_sos_direct (struct svr4_info *info)
 {
   CORE_ADDR lm;
   struct so_list *head = NULL;
@@ -1465,8 +1466,8 @@ svr4_current_sos (void)
   if (info->solib_list != NULL)
     return svr4_copy_library_list (info->solib_list);
 
-  /* Otherwise XXX.  */
-  return svr4_current_sos_1 (info);
+  /* Otherwise obtain the solib list directly from the inferior.  */
+  return svr4_current_sos_direct (info);
 }
 
 /* Get the address of the link_map for a given OBJFILE.  */
@@ -1670,7 +1671,7 @@ static int
 solist_update_full (struct svr4_info *info)
 {
   svr4_free_library_list (&info->solib_list);
-  info->solib_list = svr4_current_sos_1 (info);
+  info->solib_list = svr4_current_sos_direct (info);
 
   return 1;
 }
