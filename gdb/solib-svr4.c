@@ -1086,7 +1086,6 @@ svr4_free_library_list (void *p_list)
 static struct so_list *
 svr4_copy_library_list (struct so_list *src)
 {
-  struct link_map_offsets *lmo = svr4_fetch_link_map_offsets ();
   struct so_list *dst = NULL;
   struct so_list **link = &dst;
 
@@ -1098,8 +1097,11 @@ svr4_copy_library_list (struct so_list *src)
 
       memcpy (new, src, sizeof (struct so_list));
 
-      new->lm_info = xmalloc (lmo->link_map_size);
-      memcpy (new->lm_info, src->lm_info, lmo->link_map_size);
+      if (src->lm_info != NULL)
+	{
+	  new->lm_info = xmalloc (sizeof (struct lm_info));
+	  memcpy (new->lm_info, src->lm_info, sizeof (struct lm_info));
+	}
 
       new->next = NULL;
       *link = new;
