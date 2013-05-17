@@ -1030,6 +1030,7 @@ dsbt_free_so (struct so_list *so)
 {
   xfree (so->lm_info->map);
   xfree (so->lm_info);
+  xfree (so);
 }
 
 static void

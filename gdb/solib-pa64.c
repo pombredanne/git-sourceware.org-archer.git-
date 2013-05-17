@@ -106,6 +106,7 @@ static void
 pa64_free_so (struct so_list *so)
 {
   xfree (so->lm_info);
+  xfree (so);
 }
 
 static void

@@ -270,6 +270,7 @@ osf_free_so (struct so_list *so)
 	xfree ((void *) name);
     }
   xfree (so->lm_info);
+  //XXX xfree (so);
 }
 
 /* target_so_ops callback.  Discard information accumulated by this file and

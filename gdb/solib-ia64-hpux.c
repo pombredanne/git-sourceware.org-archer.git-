@@ -371,6 +371,7 @@ static void
 ia64_hpux_free_so (struct so_list *so)
 {
   xfree (so->lm_info);
+  xfree (so);
 }
 
 /* The "clear_solib" target_so_ops routine for ia64-hpux.  */
@@ -386,7 +387,6 @@ ia64_hpux_clear_solib (void)
       so_list_head = so_list_head->next;
 
       ia64_hpux_free_so (so);
-      xfree (so);
     }
 }
 

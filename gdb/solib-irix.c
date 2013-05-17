@@ -617,6 +617,7 @@ static void
 irix_free_so (struct so_list *so)
 {
   xfree (so->lm_info);
+  xfree (so);
 }
 
 /* Clear backend specific state.  */

@@ -555,8 +555,6 @@ free_so (struct so_list *so)
 
   clear_so (so);
   ops->free_so (so);
-
-  xfree (so);
 }
 
 

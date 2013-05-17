@@ -1055,6 +1055,7 @@ static void
 svr4_free_so (struct so_list *so)
 {
   xfree (so->lm_info);
+  xfree (so);
 }
 
 /* Implement target_so_ops.clear_so.  */

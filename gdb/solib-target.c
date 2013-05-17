@@ -327,6 +327,7 @@ solib_target_free_so (struct so_list *so)
   xfree (so->lm_info->offsets);
   VEC_free (CORE_ADDR, so->lm_info->segment_bases);
   xfree (so->lm_info);
+  xfree (so);
 }
 
 static void

@@ -563,6 +563,7 @@ darwin_clear_solib (void)
 static void
 darwin_free_so (struct so_list *so)
 {
+  xfree (so);
 }
 
 /* The section table is built from bfd sections using bfd VMAs.
