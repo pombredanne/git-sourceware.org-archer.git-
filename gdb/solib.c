@@ -1239,7 +1239,6 @@ handle_solib_event (void)
   target_terminal_inferior ();
 }
 
-
 /* Reload shared libraries, but avoid reloading the same symbol file
    we already have loaded.  */
 

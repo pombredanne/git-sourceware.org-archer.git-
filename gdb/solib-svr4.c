@@ -46,7 +46,6 @@
 #include "auxv.h"
 #include "exceptions.h"
 #include "gdb_bfd.h"
-
 #include "probe.h"
 
 static struct link_map_offsets *svr4_fetch_link_map_offsets (void);
@@ -112,23 +111,23 @@ static const  char * const main_name_list[] =
 /* What to do when a probe stop occurs.  */
 
 enum probe_action
-  {
-    /* Something went seriously wrong.  Stop using probes and
-       revert to using the older interface.  */
-    PROBES_INTERFACE_FAILED,
+{
+  /* Something went seriously wrong.  Stop using probes and
+     revert to using the older interface.  */
+  PROBES_INTERFACE_FAILED,
 
-    /* No action is required.  The shared object list is still
-       valid.  */
-    DO_NOTHING,
+  /* No action is required.  The shared object list is still
+     valid.  */
+  DO_NOTHING,
 
-    /* The shared object list should be reloaded entirely.  */
-    FULL_RELOAD,
+  /* The shared object list should be reloaded entirely.  */
+  FULL_RELOAD,
 
-    /* Attempt to incrementally update the shared object list. If
-       the update fails or is not possible, fall back to reloading
-       the list in full.  */
-    UPDATE_OR_RELOAD,
-  };
+  /* Attempt to incrementally update the shared object list. If
+     the update fails or is not possible, fall back to reloading
+     the list in full.  */
+  UPDATE_OR_RELOAD,
+};
 
 /* A probe's name and its associated action.  */
 
@@ -370,8 +369,10 @@ struct svr4_info
      via qXfer:libraries-svr4:read.  */
   int using_xfer;
 
-  /* Table mapping breakpoint addresses to probes and actions, used
-     by the probes-based interface.  */
+  /* Table of struct probe_and_action instances, used by the
+     probes-based interface to map breakpoint addresses to probes
+     and their associated actions.  Lookup is performed using
+     probe_and_action->probe->address.  */
   htab_t probes_table;
 
   /* List of objects loaded into the inferior, used by the probes-
@@ -1093,8 +1094,7 @@ svr4_copy_library_list (struct so_list *src)
     {
       struct so_list *new;
 
-      new = XZALLOC (struct so_list);
-
+      new = xmalloc (struct so_list);
       memcpy (new, src, sizeof (struct so_list));
 
       if (src->lm_info != NULL)
@@ -1246,6 +1246,8 @@ svr4_current_sos_via_xfer_libraries (struct svr4_library_list *list,
   int result;
   struct cleanup *back_to;
 
+  gdb_assert (annex == NULL || target_augmented_libraries_svr4_read());
+
   /* Fetch the list of shared libraries.  */
   svr4_library_document = target_read_stralloc (&current_target,
 						TARGET_OBJECT_LIBRARIES_SVR4,
@@ -1302,7 +1304,9 @@ svr4_default_sos (void)
    Expect the first entry in the chain's previous entry to be PREV_LM.
    Add the entries to the tail referenced by LINK_PTR_PTR.  Ignore the
    first entry if IGNORE_FIRST and set global MAIN_LM_ADDR according
-   to it.  Returns nonzero upon success.  */
+   to it.  Returns nonzero upon success.  If zero is returned the
+   entries stored to LINK_PTR_PTR are still valid although they may
+   represent only part of the inferior library list.  */
 
 static int
 svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
@@ -1385,8 +1389,9 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
   return 1;
 }
 
-/* Read the full list of currently loaded shared objects directly from
-   the inferior.  */
+/* Read the full list of currently loaded shared objects directly
+   from the inferior, without referring to any libraries read and
+   stored by the probes interface.  */
 
 static struct so_list *
 svr4_current_sos_direct (struct svr4_info *info)
@@ -1463,8 +1468,8 @@ svr4_current_sos (void)
 {
   struct svr4_info *info = get_svr4_info ();
 
-  /* If we are using the probes interface and the solib list has
-     been cached then we simply return that.  */
+  /* If the solib list has been read and stored by the probes
+     interface then we return a copy of the stored list.  */
   if (info->solib_list != NULL)
     return svr4_copy_library_list (info->solib_list);
 
@@ -1599,11 +1604,9 @@ register_solib_event_probe (struct probe *probe, enum probe_action action)
 
   /* Create the probes table, if necessary.  */
   if (info->probes_table == NULL)
-    {
-      info->probes_table = htab_create_alloc (1, hash_probe_and_action,
-					      equal_probe_and_action,
-					      xfree, xcalloc, xfree);
-    }
+    info->probes_table = htab_create_alloc (1, hash_probe_and_action,
+					    equal_probe_and_action,
+					    xfree, xcalloc, xfree);
 
   lookup.probe = probe;
   slot = htab_find_slot (info->probes_table, &lookup, INSERT);
@@ -1672,7 +1675,7 @@ solib_event_probe_action (struct probe_and_action *pa)
 static int
 solist_update_full (struct svr4_info *info)
 {
-  svr4_free_library_list (&info->solib_list);
+  free_solib_list (info);
   info->solib_list = svr4_current_sos_direct (info);
 
   return 1;
@@ -1699,7 +1702,8 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
     return 0;
 
   /* Walk to the end of the list.  */
-  for (tail = info->solib_list; tail->next; tail = tail->next);
+  for (tail = info->solib_list; tail->next; tail = tail->next)
+    /* Nothing.  */;
   prev_lm = tail->lm_info->lm_addr;
 
   /* Read the new objects.  */
@@ -1708,7 +1712,9 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
       struct svr4_library_list library_list;
       char annex[64];
 
-      xsnprintf (annex, sizeof (annex), "start=%lx;prev=%lx", lm, prev_lm);
+      xsnprintf (annex, sizeof (annex), "start=%s;prev=%s",
+		 phex_nz (lm, sizeof (lm)),
+		 phex_nz (prev_lm, sizeof (prev_lm)));
       if (!svr4_current_sos_via_xfer_libraries (&library_list, annex))
 	return 0;
 
@@ -1767,43 +1773,64 @@ svr4_handle_solib_event (void)
   pc = regcache_read_pc (get_current_regcache ());
   pa = solib_event_probe_at (info, pc);
   if (pa == NULL)
-    goto error;
+    {
+      do_cleanups (old_chain);
+      return;
+    }
 
   action = solib_event_probe_action (pa);
   if (action == PROBES_INTERFACE_FAILED)
-    goto error;
+    {
+      do_cleanups (old_chain);
+      return;
+    }
 
   if (action == DO_NOTHING)
-    return;
+    {
+      discard_cleanups (old_chain);
+      return;
+    }
 
-  /* EVALUATE_PROBE_ARGUMENT looks up symbols in the dynamic linker
-     using FIND_PC_SECTION.  FIND_PC_SECTION is accelerated by a cache
+  /* evaluate_probe_argument looks up symbols in the dynamic linker
+     using find_pc_section.  find_pc_section is accelerated by a cache
      called the section map.  The section map is invalidated every
      time a shared library is loaded or unloaded, and if the inferior
      is generating a lot of shared library events then the section map
-     will be updated every time SVR4_HANDLE_SOLIB_EVENT is called.
-     We called FIND_PC_SECTION in SVR4_CREATE_SOLIB_EVENT_BREAKPOINTS,
+     will be updated every time svr4_handle_solib_event is called.
+     We called find_pc_section in svr4_create_solib_event_breakpoints,
      so we can guarantee that the dynamic linker's sections are in the
      section map.  We can therefore inhibit section map updates across
-     these calls to EVALUATE_PROBE_ARGUMENT and save a lot of time.  */
+     these calls to evaluate_probe_argument and save a lot of time.  */
   inhibit_section_map_updates (current_program_space);
   usm_chain = make_cleanup (resume_section_map_updates_cleanup,
 			    current_program_space);
 
   val = evaluate_probe_argument (pa->probe, 1);
   if (val == NULL)
-    goto error;
+    {
+      do_cleanups (old_chain);
+      return;
+    }
 
   debug_base = value_as_address (val);
   if (debug_base == 0)
-    goto error;
+    {
+      do_cleanups (old_chain);
+      return;
+    }
 
   /* Always locate the debug struct, in case it moved.  */
   info->debug_base = 0;
   if (locate_base (info) == 0)
-    goto error;
+    {
+      do_cleanups (old_chain);
+      return;
+    }
 
-  /* Do not process namespaces other than the initial one.  */
+  /* GDB does not currently support libraries loaded via dlmopen
+     into namespaces other than the initial one.  We must ignore
+     any namespace other than the initial namespace here until
+     support for this is added to GDB.  */
   if (debug_base != info->debug_base)
     action = DO_NOTHING;
 
@@ -1829,17 +1856,13 @@ svr4_handle_solib_event (void)
   if (action == FULL_RELOAD)
     {
       if (!solist_update_full (info))
-	goto error;
+	{
+	  do_cleanups (old_chain);
+	  return;
+	}
     }
 
   discard_cleanups (old_chain);
-  return;
-
- error:
-  /* We should never reach here, but if we do we disable the
-     probes interface and revert to the original interface.  */
-
-  do_cleanups (old_chain);
 }
 
 /* Helper function for svr4_update_solib_event_breakpoints.  */
@@ -1851,7 +1874,10 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
   struct bp_location *loc;
 
   if (b->type != bp_shlib_event)
-    return 0; /* Continue iterating.  */
+    {
+      /* Continue iterating.  */
+      return 0;
+    }
 
   for (loc = b->loc; loc; loc = loc->next)
     {
@@ -1863,11 +1889,13 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 	    b->enable_state = (stop_on_solib_events
 			       ? bp_enabled : bp_disabled);
 
-	  return 0; /* Continue iterating.  */
+	  /* Continue iterating.  */
+	  return 0;
 	}
     }
 
-  return 0; /* Continue iterating.  */
+  /* Continue iterating.  */
+  return 0;
 }
 
 /* Enable or disable optional solib event breakpoints as appropriate.
@@ -1878,11 +1906,16 @@ svr4_update_solib_event_breakpoints (void)
 {
   struct svr4_info *info = get_svr4_info ();
 
-  if (info->probes_table)
+  if (info->probes_table != NULL)
     iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
+
+  update_global_location_list (1);
 }
 
-/* Create and register solib event breakpoints.  */
+/* Create and register solib event breakpoints.  PROBES is an array
+   of NUM_PROBES elements, each of which is vector of probes.  A
+   solib event breakpoint will be created and registered for each
+   probe.  */
 
 static void
 svr4_create_probe_breakpoints (struct gdbarch *gdbarch,
@@ -1924,7 +1957,6 @@ static void
 svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 				     CORE_ADDR address)
 {
-  struct svr4_info *info = get_svr4_info ();
   struct obj_section *os;
 
   os = find_pc_section (address);
@@ -1943,13 +1975,13 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 	    {
 	      char name[32] = { '\0' };
 
-	      /* Fedora 17, RHEL 6.2, and RHEL 6.3 shipped with an
-		 early version of the probes code in which the probes'
-		 names were prefixed with "rtld_" and the "map_failed"
-		 probe did not exist.  The locations of the probes are
-		 otherwise the same, so we check for probes with
-		 prefixed names if probes with unprefixed names are
-		 not present.  */
+	      /* Fedora 17 and Red Hat Enterprise Linux 6.2-6.4
+		 shipped with an early version of the probes code in
+		 which the probes' names were prefixed with "rtld_"
+		 and the "map_failed" probe did not exist.  The
+		 locations of the probes are otherwise the same, so
+		 we check for probes with prefixed names if probes
+		 with unprefixed names are not present.  */
 
 	      if (with_prefix)
 		strncat (name, "rtld_", sizeof (name) - strlen (name) - 1);
@@ -1959,10 +1991,13 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 
 	      probes[i] = find_probes_in_objfile (os->objfile, "rtld", name);
 
-	      if (!strcmp (name, "rtld_map_failed"))
+	      /* The "map_failed" probe did not exist in early
+		 versions of the probes code in which the probes'
+		 names were prefixed with "rtld_".  */
+	      if (!strcmp (name,"rtld_map_failed"))
 		continue;
 
-	      if (!VEC_length (probe_p, probes[i]))
+	      if (VEC_empty (probe_p, probes[i]))
 		{
 		  all_probes_found = 0;
 		  break;
