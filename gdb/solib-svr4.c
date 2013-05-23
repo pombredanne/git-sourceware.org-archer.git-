@@ -1094,7 +1094,7 @@ svr4_copy_library_list (struct so_list *src)
     {
       struct so_list *new;
 
-      new = xmalloc (struct so_list);
+      new = xmalloc (sizeof (struct so_list));
       memcpy (new, src, sizeof (struct so_list));
 
       if (src->lm_info != NULL)
