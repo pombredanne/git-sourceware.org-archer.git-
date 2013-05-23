@@ -1213,7 +1213,7 @@ no_shared_libraries (char *ignored, int from_tty)
 void
 update_solib_breakpoints (void)
 {
-  struct target_so_ops *ops = solib_ops (target_gdbarch ());
+  const struct target_so_ops *ops = solib_ops (target_gdbarch ());
 
   if (ops->update_breakpoints != NULL)
     ops->update_breakpoints ();
@@ -1224,7 +1224,7 @@ update_solib_breakpoints (void)
 void
 handle_solib_event (void)
 {
-  struct target_so_ops *ops = solib_ops (target_gdbarch ());
+  const struct target_so_ops *ops = solib_ops (target_gdbarch ());
 
   if (ops->handle_event != NULL)
     ops->handle_event ();
