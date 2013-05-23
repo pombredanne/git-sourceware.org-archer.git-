@@ -1786,8 +1786,9 @@ svr4_handle_solib_event (void)
      so we can guarantee that the dynamic linker's sections are in the
      section map.  We can therefore inhibit section map updates across
      these calls to EVALUATE_PROBE_ARGUMENT and save a lot of time.  */
-  inhibit_section_map_updates ();
-  usm_chain = make_cleanup (resume_section_map_updates_cleanup, NULL);
+  inhibit_section_map_updates (current_program_space);
+  usm_chain = make_cleanup (resume_section_map_updates_cleanup,
+			    current_program_space);
 
   val = evaluate_probe_argument (pa->probe, 1);
   if (val == NULL)

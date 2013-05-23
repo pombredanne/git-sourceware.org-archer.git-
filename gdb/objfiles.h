@@ -509,10 +509,10 @@ DECLARE_REGISTRY(objfile);
    FIND_PC_SECTION in the inhibited region relates to a section that
    is already in the section map and has not since been removed or
    relocated.  */
-extern void inhibit_section_map_updates (void);
+extern void inhibit_section_map_updates (struct program_space *pspace);
 
 /* Resume automatically rebuilding the section map as required.  */
-extern void resume_section_map_updates (void);
+extern void resume_section_map_updates (struct program_space *pspace);
 
 /* Version of the above suitable for use as a cleanup.  */
 extern void resume_section_map_updates_cleanup (void *arg);

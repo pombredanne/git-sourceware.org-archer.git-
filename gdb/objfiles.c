@@ -1442,17 +1442,17 @@ objfiles_changed (void)
 /* See comments in objfiles.h.  */
 
 void
-inhibit_section_map_updates (void)
+inhibit_section_map_updates (struct program_space *pspace)
 {
-  get_objfile_pspace_data (current_program_space)->inhibit_updates = 1;
+  get_objfile_pspace_data (pspace)->inhibit_updates = 1;
 }
 
 /* See comments in objfiles.h.  */
 
 void
-resume_section_map_updates (void)
+resume_section_map_updates (struct program_space *pspace)
 {
-  get_objfile_pspace_data (current_program_space)->inhibit_updates = 0;
+  get_objfile_pspace_data (pspace)->inhibit_updates = 0;
 }
 
 /* See comments in objfiles.h.  */
@@ -1460,7 +1460,7 @@ resume_section_map_updates (void)
 void
 resume_section_map_updates_cleanup (void *arg)
 {
-  resume_section_map_updates ();
+  resume_section_map_updates (arg);
 }
 
 /* The default implementation for the "iterate_over_objfiles_in_search_order"
