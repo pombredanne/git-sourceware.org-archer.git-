@@ -5695,7 +5695,34 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
   lmo = is_elf64 ? &lmo_64bit_offsets : &lmo_32bit_offsets;
   ptr_size = is_elf64 ? 8 : 4;
 
-  if (annex[0] == '\0')
+  while (annex[0] != '\0')
+    {
+      const char *sep;
+      CORE_ADDR *addrp;
+      int len;
+
+      sep = strchr (annex, '=');
+      if (!sep)
+	break;
+
+      len = sep - annex;
+      if (len == 5 && !strncmp (annex, "start", 5))
+	addrp = &lm_addr;
+      else if (len == 4 && !strncmp (annex, "prev", 4))
+	addrp = &lm_prev;
+      else
+	{
+	  annex = strchr (sep, ';');
+	  if (!annex)
+	    break;
+	  annex++;
+	  continue;
+	}
+
+      annex = decode_address_to_semicolon (addrp, sep + 1);
+    }
+
+  if (lm_addr == 0)
     {
       int r_version = 0;
 
@@ -5723,35 +5750,6 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
 	      warning ("unable to read r_map from 0x%lx",
 		       (long) priv->r_debug + lmo->r_map_offset);
 	    }
-	}
-    }
-  else
-    {
-      while (annex[0] != '\0')
-	{
-	  const char *sep;
-	  CORE_ADDR *addrp;
-	  int len;
-
-	  sep = strchr (annex, '=');
-	  if (!sep)
-	    break;
-
-	  len = sep - annex;
-	  if (len == 5 && !strncmp (annex, "start", 5))
-	    addrp = &lm_addr;
-	  else if (len == 4 && !strncmp (annex, "prev", 4))
-	    addrp = &lm_prev;
-	  else
-	    {
-	      annex = strchr (sep, ';');
-	      if (!annex)
-		break;
-	      annex++;
-	      continue;
-	    }
-
-	  annex = decode_address_to_semicolon (addrp, sep + 1);
 	}
     }
 
