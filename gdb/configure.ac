@@ -486,8 +486,15 @@ AC_CHECK_TOOL(AR, ar)
 AC_CHECK_TOOL(DLLTOOL, dlltool)
 AC_CHECK_TOOL(WINDRES, windres)
 
-# Needed for GNU/Hurd.
-AC_CHECK_TOOL(MIG, mig)
+case $host_os in
+  gnu*)
+    # Needed for GNU Hurd hosts.
+    AC_CHECK_TOOL(MIG, mig)
+    if test x"$MIG" = x; then
+      AC_MSG_ERROR([MIG not found but required for $host hosts])
+    fi
+    ;;
+esac
 
 # ---------------------- #
 # Checks for libraries.  #
@@ -2029,7 +2036,7 @@ if test $gdb_cv_var_elf = yes; then
 	    [Define if ELF support should be included.])
   # -ldl is provided by bfd/Makfile.am (LIBDL) <PLUGINS>.
   if test "$plugins" = "yes"; then
-    LIBS="-ldl $LIBS"
+    AC_SEARCH_LIBS(dlopen, dl)
   fi
 fi
 

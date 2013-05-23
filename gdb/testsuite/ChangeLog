@@ -1,3 +1,99 @@
+2013-05-22  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.cp/class2.cc (main): New local 'aref'.
+	* gdb.cp/class2.exp: Check printing of 'aref'.
+
+2013-05-22  Doug Evans  <dje@google.com>
+
+	* gdb.threads/wp-replication.c (main): Insert some code at the start
+	to ensure the breakpoint on main is only hit once.  Fix comment.
+
+2013-05-21  Keith Seitz  <keiths@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/filesym.exp: Use gdb_test_multiple instead of
+	gdb_expect.
+	Add test to flush the remaining input buffer so that this
+	file passes testsuite/12649.
+
+2013-05-21  Philippe Waroquiers  <philippe.waroquiers@skynet.be>
+
+	* gdb.base/catch-signal-fork.exp: New file.
+	* gdb.base/catch-signal-fork.c: New file.
+
+2013-05-21  Sterling Augustine  <saugustine@google.com>
+
+	* boards/remote-stdio-gdbserver.exp: New file.
+
+2013-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	PR testsuite/12649
+	* gdb.mi/mi-dprintf.exp (mi_continue_dprintf): Fix expect strings for
+	racy matches.
+
+2013-05-21  Christian Groessler  <chris@groessler.org>
+
+	* gdb.dwarf2/dw2-dir-file-name.exp: Don't use brace expansion,
+	since it's not supported in all shells.
+
+2013-05-21  Hui Zhu  <hui@codesourcery.com>
+
+	* gdb.mi/Makefile.in (PROGS): Add "mi-dprintf".
+	* gdb.mi/mi-dprintf.exp, gdb.mi/mi-dprintf.c: New.
+
+2013-05-20  Doug Evans  <dje@google.com>
+
+	* lib/dwarf.exp (Dwarf): New variable _abbrev_section.
+	(_handle_DW_TAG): Use it.
+	(cu, tu): Replace parameters is_64, version, addr_size with options.
+	All callers updated.  Add Fission support.
+	* gdb.dwarf2/implptrconst.exp: Update callers of "cu".
+	* gdb.dwarf2/method-ptr.exp: Ditto.
+	* gdb.dwarf2/nostaticblock.exp: Ditto.
+	* gdb.dwarf2/subrange.exp: Ditto.
+	* gdb.dwarf2/missing-sig-type.exp: Update callers of "cu", "tu".
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.gdb/python-selftest.exp: New file.
+
+2013-05-20  Doug Evans  <dje@google.com>
+
+	* gdb.base/maint.exp: Fix test for "mt expand-symtabs" to account for
+	-fdebug-types-section.
+
+2013-05-20  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/float_param: New testcase.
+
+2013-05-17  Doug Evans  <dje@google.com>
+
+	* gdb.base/maint.exp: Update test for "maint check-psymtabs".
+	Add tests for "maint check-symtabs", "maint expand-symtabs".
+
+	* gdb.base/maint.exp: Remove testing of individual maint command
+	help output.
+
+2013-05-16  Pedro Alves  <palves@redhat.com>
+
+	* gdb.ada/complete.exp (test_gdb_no_completion): Fix typo in
+	comment.  Use gdb_test_no_output.
+
+2013-05-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* gdb.ada/complete.exp: Add test verifying completion using
+	the "tab" key.
+
+2013-05-15  Keith Seitz  <keiths@redhat.com>
+
+	* gdb.base/filesym.exp: New completer test.
+	* gdb.base/filesym.c: New file.
+
+2013-05-15  Pedro Alves  <palves@redhat.com>
+
+	* gdb.base/fixsection.c: Remove attribution.
+	* gdb.base/watch-read.exp: Ditto.
+
 2013-05-13  Tom Tromey  <tromey@redhat.com>
 
 	* gdb.dwarf2/implptrconst.exp: Create a CU with 4 byte address

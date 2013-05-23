@@ -69,6 +69,7 @@ search_pp_list (PyObject *list, PyObject *value)
 	  if (!attr)
 	    return NULL;
 	  cmp = PyObject_IsTrue (attr);
+	  Py_DECREF (attr);
 	  if (cmp == -1)
 	    return NULL;
 
@@ -708,6 +709,9 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   if (!value_bytes_available (val, embedded_offset, TYPE_LENGTH (type)))
     return 0;
 
+  if (!gdb_python_initialized)
+    return 0;
+
   cleanups = ensure_python_env (gdbarch, language);
 
   /* Instantiate the printer.  */
@@ -731,8 +735,12 @@ apply_val_pretty_printer (struct type *type, const gdb_byte *valaddr,
   /* Find the constructor.  */
   printer = find_pretty_printer (val_obj);
   Py_DECREF (val_obj);
+
+  if (printer == NULL)
+    goto done;
+
   make_cleanup_py_decref (printer);
-  if (! printer || printer == Py_None)
+  if (printer == Py_None)
     goto done;
 
   /* If we are printing a map, we want some special formatting.  */

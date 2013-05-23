@@ -15,6 +15,12 @@ Nios II GNU/Linux		nios2*-*-linux
 * New commands:
 catch rethrow
   Like "catch throw", but catches a re-thrown exception.
+maint check-psymtabs
+  Renamed from old "maint check-symtabs".
+maint check-symtabs
+  Perform consistency checks on symtabs.
+maint expand-symtabs
+  Expand symtabs matching an optional regexp.
 
 show configuration
   Display the details of GDB configure-time options.
@@ -63,6 +69,14 @@ show debug nios2
 
   ** The -trace-save MI command can optionally save trace buffer in Common
      Trace Format now.
+
+  ** The new command -dprintf-insert sets a dynamic printf breakpoint.
+
+* New system-wide configuration scripts
+  A GDB installation now provides scripts suitable for use as system-wide
+  configuration scripts for the following systems:
+    ** ElinOS
+    ** Wind River Linux
 
 *** Changes in GDB 7.6
 

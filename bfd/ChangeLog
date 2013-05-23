@@ -1,3 +1,51 @@
+2013-05-23  Alan Modra  <amodra@gmail.com>
+
+	* format.c (bfd_check_format_matches): Don't match a target in
+	targ_selvecs if some other target is a better match.  If
+	targets implement match priority, fall back to the first of
+	the best matches.
+
+2013-05-22  Eric Herman  <eric@freesa.org>
+
+	PR binutils/15462
+	* elfxx-mips.c (_bfd_mips_elf_relocate_section): Warning fix.
+
+2013-05-22  Ralf Dreesen  <gamma@dreesen.net>
+
+	PR binutils/15474
+	* srec.c (srec_set_section_contents): Properly convert size
+	and offset to address when octets_per_byte is not unity.
+
+2013-05-20  Maciej W. Rozycki  <macro@linux-mips.org>
+
+	* elf32-vax.c (elf_vax_instantiate_got_entries): Only set the
+	refcount member of the gotplt_union when resetting the reference
+	count.  Adjust comment.
+
+2013-05-20  Will Newton  <will.newton@linaro.org>
+
+	* elf64-aarch64.c (elf64_aarch64_link_hash_entry): Remove
+	relocs_copied member.
+	(elf64_aarch64_link_hash_newfunc): Remove initialization of
+	relocs_copied member.
+	(elf64_aarch64_copy_indirect_symbol): Remove code to copy
+	relocs_copied member.
+
+2013-05-19  Maciej W. Rozycki  <macro@linux-mips.org>
+
+	* elf32-vax.c (elf_vax_adjust_dynamic_symbol): Convert K&R
+	function definition.
+
+2013-05-16  Cary Coutant  <ccoutant@google.com>
+
+	* ecoff.c (ecoff_link_check_archive_element): Add initializers for
+	external_ext_size and esize.
+
+2013-05-16  Tristan Gingold  <gingold@adacore.com>
+
+	* coff-rs6000.c (_bfd_xcoff_reloc_type_lookup): Handle BFD_RELOC_16.
+	* coff64-rs6000.c (xcoff64_reloc_type_lookup): Likewise.
+
 2013-05-15  Andreas Schwab  <schwab@suse.de>
 
 	* elf64-aarch64.c (elf_backend_default_execstack): Define to 0.

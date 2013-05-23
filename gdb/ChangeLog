@@ -1,3 +1,580 @@
+2013-05-23  Joel Brobecker  <brobecker@adacore.com>
+
+	* mi/mi-cmd-break.c (mi_argv_to_format): Use xsnprintf instead
+	of sprintf.
+
+2013-05-22  Keith Seitz  <keiths@redhat.com>
+
+	* ada-lang.c (is_known_support_routine): Add explicit free of
+	'func_name' from find_frame_funname.
+	(ada_unhandled_exception_name_addr_from_raise): Add cleanups
+	for func_name from find_frame_funname.
+	* python/py-frame.c (frapy_name): Add explicit free of
+	'name' from find_frame_funname.
+	* stack.c (find_frame_funname): Add comment explaining that
+	funcp must be freed by the caller.
+	Return copy of symbol names instead of pointers.
+	(print_frame): Add a cleanup for 'funname' from
+	find_frame_funname.
+	* stack.h (find_frame_funname): Remove "const" from
+	'funname' parameter.
+
+2013-05-22  Tom Tromey  <tromey@redhat.com>
+
+	PR c++/15401:
+	* c-valprint.c (c_value_print): Use value_addr for
+	references.  Convert back to reference type with value_ref.
+
+2013-05-22  Eli Zaretskii  <eliz@gnu.org>
+
+	* windows-nat.c (handle_unload_dll): Don't call solib_add for the
+	unloaded DLL, it will be done by handle_solib_event.  See
+	http://sourceware.org/ml/gdb-patches/2013-05/msg00713.html for the
+	details.
+
+2013-05-22  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* ui-out.c: Create typedef ui_out_level_p and define vector
+	operations for that type.
+	(struct ui_out): Use a vector instead of an array.
+	(current_level): Return level from a vector.
+	(push_level): Create a level in a vector.
+	(pop_level): Delete a level in a vector.
+	(ui_out_new): Create initial level zero level, and store in a
+	vector.
+	(ui_out_destroy): Add vector cleanup.
+
+2013-05-22  Pedro Alves  <palves@redhat.com>
+
+	* python/python-internal.h (gdb_Py_DECREF): Tag with
+	"ARI: editCase function".
+
+2013-05-21  Paul Pluzhnikov  <ppluzhnikov@google.com>
+
+	* solib-svr4.c (svr4_free_so): Protect against NULL dereference.
+
+2013-05-21  Pedro Alves  <palves@redhat.com>
+
+	* python/py-prettyprint.c (apply_val_pretty_printer): Check
+	whether PRINTER is NULL before installing a Py_DECREF cleanup.
+	* python/py-utils.c (py_decref): Don't check for NULL before
+	calling Py_DECREF.
+
+2013-05-21  Pedro Alves  <palves@redhat.com>
+
+	* python/py-utils.c (py_decref): Remove extra braces.
+	(gdb_pymodule_addobject): Remove extra braces.
+	* python-internal.h (gdb_Py_DECREF): New static inline function.
+	(Py_DECREF): Redefine as calling gdb_Py_DECREF.
+
+2013-05-21  Philippe Waroquiers  <philippe.waroquiers@skynet.be>
+
+	* breakpoints.c (detach_breakpoints): Do not
+	detach breakpoints locations with loc_type bp_loc_other.
+
+2013-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Workaround Python 2.6.
+	* python/py-utils.c (gdb_pymodule_addobject): Wrap Py_DECREF into
+	a block.
+
+2013-05-21  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup: constification.
+	* solib.c (solib_ops): Make return type and ops variable type const.
+	(set_solib_ops): Make the new_ops parameter and ops variable const.
+	(solib_find, solib_map_sections, clear_so, free_so, update_solib_list)
+	(solib_add, solib_keep_data_in_core, clear_solib)
+	(solib_create_inferior_hook, in_solib_dynsym_resolve_code)
+	(reload_shared_libraries, solib_global_lookup): Make the ops variable
+	const.
+	* solib.h (set_solib_ops): Make the new_ops parameter const.
+
+2013-05-21  Joel Brobecker  <brobecker@adacore.com>
+
+	* data-directory/Makefile.in (SYSTEM_GDBINIT_SRCDIR): New
+	variable.
+	(VPATH): Add SYSTEM_GDBINIT_SRCDIR.
+	(SYSTEM_GDBINIT_DIR, SYSTEM_GDBINIT_INSTALL_DIR)
+	(SYSTEM_GDBINIT_FILES): New variables.
+	(all): Add stamp-system-gdbinit.
+	(stamp-system-gdbinit): New rule.
+	(clean-system-gdbinit, install-system-gdbinit)
+	(uninstall-system-gdbinit): New rules.  Make them .PHONY.
+	(install-only): Add dependency on install-system-gdbinit.
+	(uninstall): Add dependency on uninstall-system-gdbinit.
+	(clean): Add dependency on clean-system-gdbinit.
+	* system-gdbinit/elinos.py: New file.
+	* system-gdbinit/wrs-linux.py: New file.
+
+2013-05-21  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (old_renaming_is_invisible): Fix cleanup leak.
+
+2013-05-21  Hui Zhu  <hui@codesourcery.com>
+
+	* breakpoint.c (dprintf_breakpoint_ops): Remove its static.
+	* breakpoint.h (dprintf_breakpoint_ops): Add extern.
+	* mi/mi-cmd-break.c (ctype.h): New include.
+	(gdb_obstack.h): New include.
+	(mi_argv_to_format, mi_cmd_break_insert_1): New.
+	(mi_cmd_break_insert): Call mi_cmd_break_insert_1.
+	(mi_cmd_dprintf_insert): New.
+	* mi/mi-cmds.c (mi_cmds): Add "dprintf-insert".
+	* mi/mi-cmds.h (mi_cmd_dprintf_insert): New extern.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-prettyprint.c (search_pp_list): Decref 'attr'.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-value.c (valpy_get_dynamic_type): Simplify
+	dynamic_type assignment.  Use Py_XINCREF.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-type.c (typy_fields): Unconditionally decref 'r'.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-frame.c (frapy_older, frapy_newer, gdbpy_newest_frame)
+	(gdbpy_selected_frame): Move object-construction code
+	out of TRY_CATCH.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-arch.c (gdbpy_initialize_arch): Use
+	gdb_pymodule_addobject.
+	* python/py-block.c (gdbpy_initialize_blocks): Use
+	gdb_pymodule_addobject.
+	* python/py-breakpoint.c (gdbpy_initialize_breakpoints): Use
+	gdb_pymodule_addobject.
+	* python/py-cmd.c (gdbpy_initialize_breakpoints): Use
+	gdb_pymodule_addobject.
+	* python/py-event.c (gdbpy_initialize_event_generic): Use
+	gdb_pymodule_addobject.
+	* python/py-evtregistry.c (gdbpy_initialize_eventregistry): Use
+	gdb_pymodule_addobject.
+	* python/py-evts.c (add_new_registry): Use
+	gdb_pymodule_addobject.
+	(gdbpy_initialize_py_events): Likewise.
+	* python/py-finishbreakpoint.c
+	(gdbpy_initialize_finishbreakpoints): Use
+	gdb_pymodule_addobject.
+	* python/py-frame.c (gdbpy_initialize_frames): Use
+	gdb_pymodule_addobject.
+	* python/py-function.c (gdbpy_initialize_functions): Use
+	gdb_pymodule_addobject.
+	* python/py-inferior.c (gdbpy_initialize_inferior): Use
+	gdb_pymodule_addobject.
+	* python/py-infthread.c (gdbpy_initialize_thread): Use
+	gdb_pymodule_addobject.
+	* python/py-objfile.c (gdbpy_initialize_objfile): Use
+	gdb_pymodule_addobject.
+	* python/py-param.c (gdbpy_initialize_parameters): Use
+	gdb_pymodule_addobject.
+	* python/py-progspace.c (gdbpy_initialize_pspace): Use
+	gdb_pymodule_addobject.
+	* python/py-symbol.c (gdbpy_initialize_symbols): Use
+	gdb_pymodule_addobject.
+	* python/py-symtab.c (gdbpy_initialize_symtabs): Use
+	gdb_pymodule_addobject.
+	* python/py-type.c (gdbpy_initialize_types): Use
+	gdb_pymodule_addobject.
+	* python/py-utils.c (gdb_pymodule_addobject): New function.
+	* python/py-value.c (gdbpy_initialize_values): Use
+	gdb_pymodule_addobject.
+	* python/python-internal.h (gdb_pymodule_addobject): Declare.
+	* python/python.c (_initialize_python): Use
+	gdb_pymodule_addobject.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-cmd.c (cmdpy_completer): Use explicit decref.
+	* python/py-param.c (get_set_value, get_show_value): Use
+	explicit decrefs.
+	* python/python.c (start_type_printers, apply_type_printers):
+	Use explicit decrefs.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-evts.c (gdbpy_initialize_py_events): Don't
+	incref the module.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (gdbpy_run_events): Decref the result
+	of PyObject_CallObject.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-symtab.c (set_sal): Use
+	CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION.  Return -1 on error.
+	(symtab_and_line_to_sal_object): Update.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-param.c (compute_enum_values): Decref 'item'.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* mi/mi-main.c: Include python-internal.h.
+	(mi_cmd_list_features): Check gdb_python_initialized.
+	* python/py-inferior.c (python_on_normal_stop, python_on_resume)
+	(python_inferior_exit, python_new_objfile, add_thread_object)
+	(delete_thread_object, py_free_inferior): Check
+	gdb_python_initialized.
+	* python/py-prettyprint.c (apply_val_pretty_printer): Check
+	gdb_python_initialized.
+	* python/py-type.c (save_objfile_types): Check
+	gdb_python_initialized.
+	* python/python-internal.h (gdb_python_initialized): Declare.
+	* python/python.c (ensure_python_env): Throw exception if
+	Python not initialized.
+	(before_prompt_hook, source_python_script_for_objfile)
+	(start_type_printers, apply_type_printers,
+	free_type_printers): Check gdb_python_initialized.
+	* varobj.c (varobj_get_display_hint)
+	(dynamic_varobj_has_child_method, update_dynamic_varobj_children)
+	(install_new_value_visualizer, varobj_set_visualizer)
+	(value_get_print_value): Check gdb_python_initialized.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-arch.c (gdbpy_initialize_arch): Return 'int'.
+	Check errors.
+	* python/py-auto-load.c (gdbpy_initialize_auto_load): Return 'int'.
+	* python/py-block.c (gdbpy_initialize_blocks): Return 'int'.
+	Check errors.
+	* python/py-breakpoint.c (gdbpy_initialize_breakpoints): Return 'int'.
+	Check errors.
+	* python/py-cmd.c (gdbpy_initialize_commands): Return 'int'.
+	Check errors.
+	* python/py-event.c (gdbpy_initialize_event): Return 'int'.
+	Check errors.
+	* python/py-event.h (GDBPY_NEW_EVENT_TYPE): Change generated
+	init function to return 'int'.
+	* python/py-evtregistry.c (gdbpy_initialize_eventregistry):
+	Return 'int'.  Check errors.
+	* python/py-evts.c (gdbpy_initialize_py_events): Return 'int'.
+	Check errors.
+	* python/py-finishbreakpoint.c (gdbpy_initialize_finishbreakpoints):
+	Return 'int'.  Check errors.
+	* python/py-frame.c (gdbpy_initialize_frames): Return 'int'.
+	Check errors.
+	* python/py-function.c (gdbpy_initialize_functions): Return 'int'.
+	Check errors.
+	* python/py-gdb-readline.c (gdbpy_initialize_gdb_readline):
+	Check errors.
+	* python/py-inferior.c (gdbpy_initialize_inferior): Return 'int'.
+	Check errors.
+	* python/py-infthread.c (gdbpy_initialize_thread): Return 'int'.
+	Check errors.
+	* python/py-lazy-string.c (gdbpy_initialize_lazy_string): Return 'int'.
+	Check errors.
+	* python/py-objfile.c (gdbpy_initialize_objfile): Return 'int'.
+	Check errors.
+	* python/py-param.c (gdbpy_initialize_parameters): Return 'int'.
+	Check errors.
+	* python/py-progspace.c (gdbpy_initialize_pspace): Return 'int'.
+	Check errors.
+	* python/py-symbol.c (gdbpy_initialize_symbols): Return 'int'.
+	Check errors.
+	* python/py-symtab.c (gdbpy_initialize_symtabs): Return 'int'.
+	Check errors.
+	* python/py-type.c (gdbpy_initialize_types): Return 'int'.
+	Check errors.
+	* python/py-value.c (gdbpy_initialize_values): Return 'int'.
+	Check errors.
+	* python/python-internal.h (gdbpy_initialize_auto_load,
+	gdbpy_initialize_values, gdbpy_initialize_frames,
+	gdbpy_initialize_symtabs, gdbpy_initialize_commands,
+	gdbpy_initialize_symbols, gdbpy_initialize_symtabs,
+	gdbpy_initialize_blocks, gdbpy_initialize_types,
+	gdbpy_initialize_functions, gdbpy_initialize_pspace,
+	gdbpy_initialize_objfile, gdbpy_initialize_breakpoints,
+	gdbpy_initialize_finishbreakpoints,
+	gdbpy_initialize_lazy_string, gdbpy_initialize_parameters,
+	gdbpy_initialize_thread, gdbpy_initialize_inferior,
+	gdbpy_initialize_eventregistry, gdbpy_initialize_event,
+	gdbpy_initialize_py_events, gdbpy_initialize_stop_event,
+	gdbpy_initialize_signal_event,
+	gdbpy_initialize_breakpoint_event,
+	gdbpy_initialize_continue_event,
+	gdbpy_initialize_exited_event, gdbpy_initialize_thread_event,
+	gdbpy_initialize_new_objfile_event, gdbpy_initialize_arch):
+	Update.  Use CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION.
+	* python/python.c (gdb_python_initialized): New global.
+	(gdbpy_initialize_events): Return 'int'.  Check errors.
+	(_initialize_python): Check errors.  Set
+	gdb_python_initialized.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-finishbreakpoint.c (bpfinishpy_out_of_scope):
+	Decref the reslut of PyObject_CallMethod.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-event.c (gdbpy_initialize_event_generic): Return
+	early if PyType_Ready fails.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-type.c (make_fielditem): Add gdb_assert_not_reached
+	as 'default' in the switch.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-inferior.c (gdbpy_inferiors): Update.  Hoist
+	get_addr_from_python calls out of TRY_CATCH.
+	(infpy_write_memory, infpy_search_memory): Likewise.
+	* python/py-utils.c (get_addr_from_python): Return negative
+	value on error.  Use TRY_CATCH.
+	* python/python-internal.h (get_addr_from_python): Use
+	CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-event.c (evpy_emit_event): Decref the
+	result of PyObject_CallFunctionObjArgs.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-cmd.c (cmdpy_completer): Use iterator protocol.
+	Correctly decref.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-cmd.c (cmdpy_init): Decref 'ds_obj'.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-event.h (gdbpy_initialize_event_generic): Use
+	CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION.
+	* python/py-evts.c (add_new_registry): Use
+	CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION.
+	* python/python-internal.h
+	(CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION): New macro.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-arch.c (archpy_disassemble): Update.
+	* python/py-type.c (typy_get_composite, typy_lookup_typename)
+	(typy_lookup_type): Use GDB_PY_HANDLE_EXCEPTION.
+	* python/py-utils.c (gdbpy_convert_exception): Return 'void'.
+	* python/python-internal.h (CPYCHECKER_SETS_EXCEPTION): New
+	macro.
+	(GDB_PY_HANDLE_EXCEPTION): Update.
+	(gdbpy_convert_exception): Update.  Use CPYCHECKER_SETS_EXCEPTION.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/python-internal.h (events_object_type): Remove.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+        * python/py-event.h (evpy_emit_event): Use
+        CPYCHECKER_STEALS_REFERENCE_TO_ARG.
+        * python/python-internal.h (CPYCHECKER_STEALS_REFERENCE_TO_ARG):
+        New macro.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* py-evtregistry.c (create_event_object): Decref
+	eventregistry_object if PyList_New fails.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* py-cmd.c (gdbpy_string_to_argv): Check result of
+	PyList_New.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/python.c (before_prompt_hook): Add cleanup to
+	decref 'hook'.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-function.c (fnpy_init): Decref result of
+	PyObject_GetAttrString.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-threadevent.c (get_event_thread): Use
+	CPYCHECKER_RETURNS_BORROWED_REF.
+	* python/python-internal.h (CPYCHECKER_RETURNS_BORROWED_REF):
+	New define.
+	(pspace_to_pspace_object, objfile_to_objfile_object)
+	(find_thread_object): Use it.
+
+2013-05-20  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-arch.c (arch_object_type): Use
+	CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-block.c (block_syms_iterator_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-bpevent.c (breakpoint_event_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-cmd.c (cmdpy_object_type): Use
+	CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-continueevent.c (continue_event_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-event.h (GDBPY_NEW_EVENT_TYPE):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-events.h (thread_event_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-evtregistry.c (eventregistry_object_type): Use
+	CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-exitedevent.c (exited_event_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-finishbreakpoint.c (finish_breakpoint_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-function.c (fnpy_object_type): Use
+	CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-inferior.c (inferior_object_type, membuf_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-infthread.c (thread_object_type): Use
+	CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-lazy-string.c (lazy_string_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-newobjfileevent.c (new_objfile_event_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-objfile.c (objfile_object_type): Use
+	CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-param.c (parmpy_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-progspace.c (pspace_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-signalevent.c (signal_event_object_type):
+	Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-symtab.c (symtab_object_type, sal_object_type): Use
+	CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-type.c (type_object_type, field_object_type)
+	(type_iterator_object_type): Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+	* python/py-internal.h (CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF): New
+	define.
+	(value_object_type, block_object_type, symbol_object_type)
+	(event_object_type, stop_event_object_type, breakpoint_object_type)
+	(frame_object_type): Use CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF.
+
+2013-05-20  Andreas Tobler  <andreas@fgznet.ch>
+
+	* Makefile.in (ALL_TARGET_OBS): Add ppcfbsd-tdep.o.
+	(ALLDEPFILES): Add ppcfbsd-nat.c and ppcfbsd-tdep.c.
+
+2013-05-20  Doug Evans  <dje@google.com>
+
+	When reading CU, stay in DWO.  Be more tolerent of bad debug info.
+	For Fission.
+	* dwarf2read.c (struct dwarf2_per_cu_data): New member
+	reading_dwo_directly.
+	(struct signatured_type): New member dwo_unit.
+	(struct die_reader_specs): New member comp_dir.
+	(create_signatured_type_table_from_index): Use malloc for
+	all_type_units instead of objfile's obstack.
+	(create_all_type_units): Ditto.
+	(fill_in_sig_entry_from_dwo_entry): New function.
+	(add_type_unit): New function.
+	(lookup_dwo_signatured_type): New function.
+	(lookup_dwp_signatured_type): New function.
+	(lookup_signatured_type): New arg cu.  All callers updated.
+	(init_cu_die_reader): Initialize comp_dir.
+	(read_cutu_die_from_dwo): New arg stub_comp_dir.  All callers updated.
+	Change assert of matching type signatures to call error on mismatch.
+	(lookup_dwo_unit): Add assert.
+	(init_tu_and_read_dwo_dies): New function.
+	(init_cutu_and_read_dies): Call it.
+	(build_type_unit_groups): Handle case of no type unit groups created.
+	(hash_dwo_file, eq_dwo_file): Handle missing comp_dir.
+	(lookup_dwo_cutu): Tweak complaint.
+	(dwarf2_free_abbrev_table): Check for NULL abbrev_table.
+	(dwarf2_per_objfile_free): Free all_type_units.
+
+2013-05-20  Joel Brobecker  <brobecker@adacore.com>
+
+	* windows-nat.c (handle_unload_dll): Add missing empty line.
+
+2013-05-20  Joel Brobecker  <brobecker@adacore.com>
+
+	* dwarf2read.c (prototyped_function_p): New function.
+	(read_subroutine_type): Use it.
+
+2013-05-20  Joel Brobecker  <brobecker@adacore.com>
+
+	* rs6000-aix-tdep.c: De-indent some example code provided
+	as a comment.
+
+2013-05-17  Edjunior Machado  <emachado@linux.vnet.ibm.com>
+
+	* ppc-linux-nat.c (ppc_linux_region_ok_for_hw_watchpoint): Check if the
+	region is ok for a hardware watchpoint using the new ptrace interface
+	on Power servers.
+
+2013-05-17  Doug Evans  <dje@google.com>
+
+	* NEWS: Mention new maintenance commands check-symtabs, and
+	expand-symtabs, and renamed check-psymtabs.
+	* psymtab.c (maintenance_check_psymtabs): Renamed from
+	maintenance_check_symtabs.  Only process already-expanded symbol
+	tables.
+	(_initialize_psymtab): Update.
+	* symmisc.c (maintenance_check_symtabs): New function.
+	(maintenance_expand_name_matcher): New function
+	(maintenance_expand_file_matcher): New function
+	(maintenance_expand_symtabs): New function.
+	(_initialize_symmisc): Add "mt check-symtabs" and "mt expand-symtabs"
+	commands.
+
+2013-05-17  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-inferior.c (infpy_read_memory): Don't call
+	PyErr_SetString if PyObject_New fails.
+	* python/py-frame.c (frame_info_to_frame_object): Don't call
+	PyErr_SetString if PyObject_New fails.
+
+2013-05-17  Pavel Chupin  <pavel.v.chupin@intel.com>
+
+	* acinclude.m4: Add check for dlopen in libdl.
+	* configure.ac: Ditto.
+	* configure: Regenerate.
+
+2013-05-17  Phil Muldoon  <pmuldoon@redhat.com>
+
+	* frame.c (frame_stash): Convert to htab.
+	(frame_addr_hash): New function.
+	(frame_addr_hash_eq): New function.
+	(frame_stash_create): Convert function to create
+	a hash table.
+	(frame_stash_add): Convert function to add an entry to a hash
+	table.
+	(frame_stash_find): Convert function to search the hash table.
+	(frame_stash_invalidate): Convert function to empty the hash
+	table.
+	(get_frame_id): Only add to stash if a frame_id is created.
+	(_initialize_frame): Call frame_stash_create.
+
+2013-05-16  Yue Lu  <hacklu.newborn@gmail.com>  (tiny change)
+
+	* configure.ac: Ensure MIG is available when building for GNU Hurd
+	hosts.
+	* configure: Regenerate.
+
+2013-05-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* dwarf2read.c (set_cu_language): Add DW_LANG_UPC handling.
+
+2013-05-16  Joel Brobecker  <brobecker@adacore.com>
+
+	* ada-lang.c (ada_make_symbol_completion_list): Make sure
+	all cleanups are done before returning from this function.
+
+2013-05-15  Joel Brobecker  <brobecker@adacore.com>
+
+	* utils.h: #include "exceptions.h".
+	(enum errors): Remove partial declaration.
+
 2013-05-15  Joel Brobecker  <brobecker@adacore.com>
 
 	* gdbarch.sh (core_xfer_shared_libraries_aix): New method.
