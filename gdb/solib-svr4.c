@@ -1886,8 +1886,12 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
       if (pa != NULL)
 	{
 	  if (pa->action == DO_NOTHING)
-	    b->enable_state = (stop_on_solib_events
-			       ? bp_enabled : bp_disabled);
+	    {
+	      if (b->enable_state == bp_disabled && stop_on_solib_events)
+		enable_breakpoint (b);
+	      else if (b->enable_state == bp_enabled && !stop_on_solib_events)
+		disable_breakpoint (b);
+	    }
 
 	  /* Continue iterating.  */
 	  return 0;
@@ -1908,8 +1912,6 @@ svr4_update_solib_event_breakpoints (void)
 
   if (info->probes_table != NULL)
     iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
-
-  update_global_location_list (1);
 }
 
 /* Create and register solib event breakpoints.  PROBES is an array
