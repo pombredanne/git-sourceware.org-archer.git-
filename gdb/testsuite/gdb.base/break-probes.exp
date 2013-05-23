@@ -33,7 +33,7 @@ if { [gdb_compile_shlib $srcfile_lib $binfile_lib \
 }
 
 if { [prepare_for_testing $testfile.exp $testfile $srcfile \
-	  [list additional_flags=-DSHLIB_NAME\=\"$binfile_lib\" libs=-ldl]] } {
+	  [list additional_flags=-DSHLIB_NAME=\"$binfile_lib\" libs=-ldl]] } {
     return -1
 }
 
@@ -49,7 +49,7 @@ set test "ensure using probes"
 set using_probes 0
 gdb_test_multiple "bt" $test {
     -re "#0 +\[^\r\n\]*\\m(__GI_)?$normal_bp\\M.*$gdb_prompt $" {
-	xfail $test
+	untested "probes not present on this system"
     }
     -re "#0 +\[^\r\n\]*\\m(__GI_)?$probes_bp\\M.*$gdb_prompt $" {
 	pass $test
@@ -60,14 +60,15 @@ gdb_test_multiple "bt" $test {
 if { $using_probes } {
     # Run til it loads our library
     set test "run til our library loads"
-    set loaded_library 0
-    while { !$loaded_library } {
+    set not_loaded_library 1
+    while { $not_loaded_library } {
+	set not_loaded_library 0
 	gdb_test_multiple "c" $test {
 	    -re "Inferior loaded $binfile_lib\\M.*$gdb_prompt $" {
 		pass $test
-		set loaded_library 1
 	    }
 	    -re "Stopped due to shared library event\\M.*$gdb_prompt $" {
+		set not_loaded_library 1
 	    }
 	}
     }

@@ -14,22 +14,26 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include <dlfcn.h>
+#include <assert.h>
+#include <stddef.h>
 
 void
-stop ()
+stop (void)
 {
 }
 
 int
-main ()
+main (void)
 {
   void *handle1, *handle2;
   void (*func)(int);
 
   handle1 = dlopen (SHLIB1_NAME, RTLD_LAZY);
+  assert (handle1 != NULL);
   stop ();
 
   handle2 = dlopen (SHLIB2_NAME, RTLD_LAZY);
+  assert (handle2 != NULL);
   stop ();
 
   func = (void (*)(int)) dlsym (handle1, "foo");

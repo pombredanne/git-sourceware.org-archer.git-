@@ -14,11 +14,15 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include <dlfcn.h>
+#include <assert.h>
+#include <stddef.h>
 
 int
-main ()
+main (void)
 {
   void *handle = dlopen (SHLIB_NAME, RTLD_LAZY);
+
+  assert (handle != NULL);
 
   dlclose (handle);
 
