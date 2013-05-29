@@ -2082,8 +2082,6 @@ enable_break (struct svr4_info *info, int from_tty)
   info->interp_text_sect_low = info->interp_text_sect_high = 0;
   info->interp_plt_sect_low = info->interp_plt_sect_high = 0;
 
-  free_probes_table (info);
-
   /* If we already have a shared library list in the target, and
      r_debug contains r_brk, set the breakpoint there - this should
      mean r_brk has already been relocated.  Assume the dynamic linker
@@ -2850,7 +2848,8 @@ svr4_solib_create_inferior_hook (int from_tty)
 
   info = get_svr4_info ();
 
-  /* Free the probes-based interface's solib list.  */
+  /* Clear the probes-based interface's state.  */
+  free_probes_table (info);
   free_solib_list (info);
 
   /* Relocate the main executable if necessary.  */
