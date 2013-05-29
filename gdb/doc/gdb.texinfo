@@ -39046,13 +39046,13 @@ arguments.  The currently supported arguments are:
 
 @table @code
 @item start=@var{address}
-A hexidecimal number specifying the address of the @samp{struct
+A hexadecimal number specifying the address of the @samp{struct
 link_map} to start reading the library list from.  If unset or zero
 then the first @samp{struct link_map} in the library list will be
 chosen as the starting point.
 
 @item prev=@var{address}
-A hexidecimal number specifying the address of the @samp{struct
+A hexadecimal number specifying the address of the @samp{struct
 link_map} immediately preceding the @samp{struct link_map}
 specified by the @samp{start} argument.  If unset or zero then
 the remote stub will expect that no @samp{struct link_map}
