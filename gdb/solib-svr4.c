@@ -1392,7 +1392,8 @@ svr4_read_so_list (CORE_ADDR lm, CORE_ADDR prev_lm,
 
 /* Read the full list of currently loaded shared objects directly
    from the inferior, without referring to any libraries read and
-   stored by the probes interface.  */
+   stored by the probes interface.  Handle special cases relating
+   to the first elements of the list.  */
 
 static struct so_list *
 svr4_current_sos_direct (struct svr4_info *info)
@@ -1671,7 +1672,8 @@ solib_event_probe_action (struct probe_and_action *pa)
 }
 
 /* Populate the shared object list by reading the entire list of
-   shared objects from the inferior.  Returns nonzero on success.  */
+   shared objects from the inferior.  Handle special cases relating
+   to the first elements of the list.  Returns nonzero on success.  */
 
 static int
 solist_update_full (struct svr4_info *info)
@@ -1693,7 +1695,10 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
   struct so_list *tail;
   CORE_ADDR prev_lm;
 
-  /* Fall back to a full update if we haven't read anything yet.  */
+  /* svr4_current_sos_direct contains logic to handle a number of
+     special cases relating to the first elements of the list.  To
+     avoid duplicating this logic we defer to solist_update_full
+     if the list is empty.  */
   if (info->solib_list == NULL)
     return 0;
 
@@ -1725,6 +1730,10 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
     {
       struct so_list **link = &tail->next;
 
+      /* IGNORE_FIRST may safely be set to zero here because the
+	 above check and deferral to solist_update_full ensures
+	 that this call to svr4_read_so_list will never see the
+	 first element.  */
       if (!svr4_read_so_list (lm, prev_lm, &link, 0))
 	return 0;
     }
