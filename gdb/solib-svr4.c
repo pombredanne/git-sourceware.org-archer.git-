@@ -1244,7 +1244,7 @@ svr4_current_sos_via_xfer_libraries (struct svr4_library_list *list,
   int result;
   struct cleanup *back_to;
 
-  gdb_assert (annex == NULL || target_augmented_libraries_svr4_read());
+  gdb_assert (annex == NULL || target_augmented_libraries_svr4_read ());
 
   /* Fetch the list of shared libraries.  */
   svr4_library_document = target_read_stralloc (&current_target,
@@ -1701,7 +1701,7 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
 
   /* Fall back to a full update if we are using a remote target
      that does not support incremental transfers.  */
-  if (info->using_xfer && !target_augmented_libraries_svr4_read())
+  if (info->using_xfer && !target_augmented_libraries_svr4_read ())
     return 0;
 
   /* Walk to the end of the list.  */
