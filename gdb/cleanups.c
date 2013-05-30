@@ -20,30 +20,6 @@
 #include "defs.h"
 #include "gdb_assert.h"
 
-/* The cleanup list records things that have to be undone
-   if an error happens (descriptors to be closed, memory to be freed, etc.)
-   Each link in the chain records a function to call and an
-   argument to give it.
-
-   Use make_cleanup to add an element to the cleanup chain.
-   Use do_cleanups to do all cleanup actions back to a given
-   point in the chain.  Use discard_cleanups to remove cleanups
-   from the chain back to a given point, not doing them.
-
-   If the argument is pointer to allocated memory, then you need
-   to additionally set the 'free_arg' member to a function that will
-   free that memory.  This function will be called both when the cleanup
-   is executed and when it's discarded.  */
-
-struct real_cleanup
-{
-  struct cleanup base;
-
-  void (*function) (void *);
-  void (*free_arg) (void *);
-  void *arg;
-};
-
 /* Used to mark the end of a cleanup chain.
    The value is chosen so that it:
    - is non-NULL so that make_cleanup never returns NULL,
@@ -54,7 +30,7 @@ struct real_cleanup
    This is const for a bit of extra robustness.
    It is initialized to coax gcc into putting it into .rodata.
    All fields are initialized to survive -Wextra.  */
-static const struct real_cleanup sentinel_cleanup = { { 0, 0, 0 }, 0, 0, 0 };
+static const struct cleanup sentinel_cleanup = { 0, 0, 0, 0, 0, 0 };
 
 /* Handy macro to use when referring to sentinel_cleanup.  */
 #define SENTINEL_CLEANUP ((struct cleanup *) &sentinel_cleanup)
@@ -80,15 +56,16 @@ static struct cleanup *
 make_my_cleanup2 (struct cleanup **pmy_chain, make_cleanup_ftype *function,
 		  void *arg,  void (*free_arg) (void *))
 {
-  struct real_cleanup *new = XNEW (struct real_cleanup);
+  struct cleanup *new
+    = (struct cleanup *) xmalloc (sizeof (struct cleanup));
   struct cleanup *old_chain = *pmy_chain;
 
-  new->base.next = *pmy_chain;
-  new->base.scoped = 0;
+  new->next = *pmy_chain;
+  new->stack = 0;
   new->function = function;
   new->free_arg = free_arg;
   new->arg = arg;
-  *pmy_chain = &new->base;
+  *pmy_chain = new;
 
   gdb_assert (old_chain != NULL);
   return old_chain;
@@ -153,17 +130,13 @@ do_my_cleanups (struct cleanup **pmy_chain,
   while ((ptr = *pmy_chain) != old_chain)
     {
       *pmy_chain = ptr->next;	/* Do this first in case of recursion.  */
-      if (ptr->scoped)
+      (*ptr->function) (ptr->arg);
+      if (ptr->free_arg)
+	(*ptr->free_arg) (ptr->arg);
+      if (ptr->stack)
 	ptr->cleaned_up = 1;
       else
-	{
-	  struct real_cleanup *rc = (struct real_cleanup *) ptr;
-
-	  (*rc->function) (rc->arg);
-	  if (rc->free_arg)
-	    (*rc->free_arg) (rc->arg);
-	  xfree (ptr);
-	}
+	xfree (ptr);
     }
 }
 
@@ -208,16 +181,12 @@ discard_my_cleanups (struct cleanup **pmy_chain,
   while ((ptr = *pmy_chain) != old_chain)
     {
       *pmy_chain = ptr->next;
-      if (ptr->scoped)
+      if (ptr->free_arg)
+	(*ptr->free_arg) (ptr->arg);
+      if (ptr->stack)
 	ptr->cleaned_up = 1;
       else
-	{
-	  struct real_cleanup *rc = (struct real_cleanup *) ptr;
-
-	  if (rc->free_arg)
-	    (*rc->free_arg) (rc->arg);
-	  xfree (ptr);
-	}
+	xfree (ptr);
     }
 }
 
@@ -314,15 +283,19 @@ null_cleanup (void *arg)
 /* Initialize a scoped cleanup.  */
 
 struct cleanup *
-init_scoped_cleanup (struct scoped_cleanup *cl)
+init_stack_cleanup (struct cleanup *cl, make_cleanup_ftype *func,
+		    void *datum, make_cleanup_dtor_ftype *dtor)
 {
   struct cleanup *old_chain = cleanup_chain;
 
-  cl->base.next = cleanup_chain;
-  cleanup_chain = &cl->base;
+  cl->next = cleanup_chain;
+  cleanup_chain = cl;
 
-  cl->base.scoped = 1;
-  cl->base.cleaned_up = 0;
+  cl->function = func;
+  cl->free_arg = dtor;
+  cl->arg = datum;
+  cl->stack = 1;
+  cl->cleaned_up = 0;
 
   return old_chain;
 }
@@ -332,9 +305,10 @@ init_scoped_cleanup (struct scoped_cleanup *cl)
 /* Verify that a scoped cleanup was in fact handled.  */
 
 void
-cleanup_close_scope (struct scoped_cleanup *cl)
+cleanup_close_scope (struct cleanup *cl)
 {
-  if (!cl->base.cleaned_up)
+  gdb_assert (cl->stack);
+  if (!cl->cleaned_up)
     internal_warning (__FILE__, __LINE__, "scoped cleanup leaked");
 }
 

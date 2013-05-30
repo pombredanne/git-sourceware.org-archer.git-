@@ -113,6 +113,8 @@ extern struct cleanup *make_cleanup_free_so (struct so_list *so);
 
 extern struct cleanup *make_cleanup_restore_current_language (void);
 
+extern void htab_delete_cleanup (void *htab);
+
 extern struct cleanup *make_cleanup_htab_delete (htab_t htab);
 
 extern void free_current_contents (void *);

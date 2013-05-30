@@ -45,6 +45,15 @@ extern struct cleanup *make_cleanup_dtor (make_cleanup_ftype *, void *,
 
 extern struct cleanup *make_final_cleanup (make_cleanup_ftype *, void *);
 
+/* Allocate a cleanup on the stack, with alloca, and initialize
+   it.  Use like make_cleanup.  */
+
+#define make_stack_cleanup(FUNC, ARG) \
+  (init_stack_cleanup (alloca (sizeof (struct cleanup)), (FUNC), (ARG), NULL))
+
+#define make_stack_cleanup_dtor(FUNC, ARG, DTOR) \
+  (init_stack_cleanup (alloca (sizeof (struct cleanup)), (FUNC), (ARG), (DTOR)))
+
 /* A special value to pass to do_cleanups and do_final_cleanups
    to tell them to do all cleanups.  */
 extern struct cleanup *all_cleanups (void);
@@ -67,16 +76,33 @@ extern void restore_final_cleanups (struct cleanup *);
 extern void null_cleanup (void *);
 
 
-/* You should continue to treat this as opaque.  It is defined here
-   so that scoped cleanups can be stack-allocated and specially
-   treated.  */
+/* You should continue to treat this as opaque.  It is defined here so
+   that scoped cleanups can be stack-allocated and specially treated.
+
+   The cleanup list records things that have to be undone
+   if an error happens (descriptors to be closed, memory to be freed, etc.)
+   Each link in the chain records a function to call and an
+   argument to give it.
+
+   Use make_cleanup to add an element to the cleanup chain.
+   Use do_cleanups to do all cleanup actions back to a given
+   point in the chain.  Use discard_cleanups to remove cleanups
+   from the chain back to a given point, not doing them.
+
+   If the argument is pointer to allocated memory, then you need
+   to additionally set the 'free_arg' member to a function that will
+   free that memory.  This function will be called both when the cleanup
+   is executed and when it's discarded.  */
 
 struct cleanup
 {
+  void (*function) (void *);
+  void (*free_arg) (void *);
+  void *arg;
   struct cleanup *next;
 
-  /* True if this is a scoped cleanup.  */
-  unsigned scoped : 1;
+  /* True if this is a stack-allocated cleanup.  */
+  unsigned stack : 1;
 
   /* True if this is scoped cleanup has been cleaned up or discarded.
      Not used for ordinary cleanups.  */
@@ -84,15 +110,10 @@ struct cleanup
   unsigned cleaned_up : 1;
 };
 
-/* This is used for scoped cleanups.  It should be treated as
-   opaque.  */
-
-struct scoped_cleanup
-{
-  struct cleanup base;
-};
-
-extern struct cleanup *init_scoped_cleanup (struct scoped_cleanup *);
+extern struct cleanup *init_stack_cleanup (struct cleanup *,
+					   make_cleanup_ftype *,
+					   void *,
+					   make_cleanup_dtor_ftype *);
 
 #if defined (__GNUC__) && __GNUC__ >= 4
 
@@ -104,7 +125,7 @@ extern struct cleanup *init_scoped_cleanup (struct scoped_cleanup *);
 #define SCOPED_CLEANUP_ATTRIBUTE \
   __attribute__ ((cleanup (cleanup_close_scope)))
 
-extern void cleanup_close_scope (struct scoped_cleanup *);
+extern void cleanup_close_scope (struct cleanup *);
 
 #else
 
@@ -116,9 +137,14 @@ extern void cleanup_close_scope (struct scoped_cleanup *);
    cleaned up or discarded whenever the scope is exited.  When
    possible, this is checked at runtime.  */
 
-#define SCOPED_CLEANUP(name)						\
-  struct scoped_cleanup name ## __LINE__				\
-    SCOPED_CLEANUP_ATTRIBUTE;						\
-  struct cleanup *name = init_scoped_cleanup (& (name ## __LINE__))
+#define SCOPED_CLEANUP_DTOR(NAME, FUNC, DATA, DTOR)			\
+  struct cleanup NAME ## __LINE__ SCOPED_CLEANUP_ATTRIBUTE;		\
+  struct cleanup *NAME = init_stack_cleanup (& (NAME ## __LINE__),	\
+					     (FUNC), (DATA), (DTOR))
+
+#define SCOPED_CLEANUP(NAME, FUNC, DATA)				\
+  SCOPED_CLEANUP_DTOR(NAME, (FUNC), (DATA), NULL)
+
+#define SCOPED_NULL_CLEANUP(NAME) SCOPED_CLEANUP (NAME, null_cleanup, NULL)
 
 #endif /* CLEANUPS_H */

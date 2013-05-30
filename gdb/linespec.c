@@ -1267,11 +1267,11 @@ filter_results (struct linespec_state *self,
 	{
 	  const struct linespec_canonical_name *canonical;
 	  char *fullform;
-	  struct cleanup *cleanup;
+	  SCOPED_NULL_CLEANUP (cleanup);
 
 	  canonical = &self->canonical_names[j];
 	  fullform = canonical_to_fullform (canonical);
-	  cleanup = make_cleanup (xfree, fullform);
+	  make_cleanup (xfree, fullform);
 
 	  if (strcmp (name, fullform) == 0)
 	    add_sal_to_sals_basic (&lsal.sals, &result->sals[j]);
@@ -1352,8 +1352,8 @@ decode_line_2 (struct linespec_state *self,
 {
   char *args, *prompt;
   int i;
-  struct cleanup *old_chain;
   VEC (const_char_ptr) *filters = NULL;
+  SCOPED_CLEANUP (old_chain, VEC_cleanup (const_char_ptr), &filters);
   struct get_number_or_range_state state;
   struct decode_line_2_item *items;
   int items_count;
@@ -1362,12 +1362,10 @@ decode_line_2 (struct linespec_state *self,
   gdb_assert (self->canonical != NULL);
   gdb_assert (result->nelts >= 1);
 
-  old_chain = make_cleanup (VEC_cleanup (const_char_ptr), &filters);
-
   /* Prepare ITEMS array.  */
   items_count = result->nelts;
   items = xmalloc (sizeof (*items) * items_count);
-  make_cleanup (xfree, items);
+  make_stack_cleanup (xfree, items);
   for (i = 0; i < items_count; ++i)
     {
       const struct linespec_canonical_name *canonical;
@@ -1545,10 +1543,9 @@ unexpected_linespec_error (linespec_parser *parser)
       || token.type == LSTOKEN_KEYWORD)
     {
       char *string;
-      struct cleanup *cleanup;
 
       string = copy_token_string (token);
-      cleanup = make_cleanup (xfree, string);
+      make_stack_cleanup (xfree, string);
       throw_error (GENERIC_ERROR,
 		   _("malformed linespec error: unexpected %s, \"%s\""),
 		   token_type_strings[token.type], string);
@@ -1604,7 +1601,7 @@ linespec_parse_basic (linespec_parser *parser)
     {
       /* Record the line offset and get the next token.  */
       name = copy_token_string (token);
-      cleanup = make_cleanup (xfree, name);
+      cleanup = make_stack_cleanup (xfree, name);
       PARSER_RESULT (parser)->line_offset = linespec_parse_line_offset (name);
       do_cleanups (cleanup);
 
@@ -1631,7 +1628,7 @@ linespec_parse_basic (linespec_parser *parser)
   /* The current token will contain the name of a function, method,
      or label.  */
   name  = copy_token_string (token);
-  cleanup = make_cleanup (xfree, name);
+  cleanup = make_stack_cleanup (xfree, name);
 
   /* Try looking it up as a function/method.  */
   find_linespec_symbols (PARSER_STATE (parser),
@@ -1685,7 +1682,7 @@ linespec_parse_basic (linespec_parser *parser)
 	  /* User specified an offset.  Record the line offset and
 	     get the next token.  */
 	  name = copy_token_string (token);
-	  cleanup = make_cleanup (xfree, name);
+	  cleanup = make_stack_cleanup (xfree, name);
 	  PARSER_RESULT (parser)->line_offset
 	    = linespec_parse_line_offset (name);
 	  do_cleanups (cleanup);
@@ -1697,7 +1694,7 @@ linespec_parse_basic (linespec_parser *parser)
 	{
 	  /* Grab a copy of the label's name and look it up.  */
 	  name = copy_token_string (token);
-	  cleanup = make_cleanup (xfree, name);
+	  cleanup = make_stack_cleanup (xfree, name);
 	  labels = find_label_symbols (PARSER_STATE (parser),
 				       PARSER_RESULT (parser)->function_symbols,
 				       &symbols, name);
@@ -1731,7 +1728,7 @@ linespec_parse_basic (linespec_parser *parser)
 
 	      /* Record the lione offset and get the next token.  */
 	      name = copy_token_string (token);
-	      cleanup = make_cleanup (xfree, name);
+	      cleanup = make_stack_cleanup (xfree, name);
 
 	      PARSER_RESULT (parser)->line_offset
 		= linespec_parse_line_offset (name);
@@ -1901,7 +1898,7 @@ create_sals_line_offset (struct linespec_state *self,
 	decode_digits_ordinary (self, ls, best_entry->line,
 				&intermediate_results, &best_entry);
 
-      cleanup = make_cleanup (xfree, intermediate_results.sals);
+      cleanup = make_stack_cleanup (xfree, intermediate_results.sals);
 
       /* For optimized code, the compiler can scatter one source line
 	 across disjoint ranges of PC values, even when no duplicate
@@ -1914,9 +1911,9 @@ create_sals_line_offset (struct linespec_state *self,
 	 block.  If yes, the other PCs are filtered out.  */
 
       filter = XNEWVEC (int, intermediate_results.nelts);
-      make_cleanup (xfree, filter);
+      make_stack_cleanup (xfree, filter);
       blocks = XNEWVEC (struct block *, intermediate_results.nelts);
-      make_cleanup (xfree, blocks);
+      make_stack_cleanup (xfree, blocks);
 
       for (i = 0; i < intermediate_results.nelts; ++i)
 	{
@@ -2190,7 +2187,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
 
       /* User specified an expression, *EXPR.  */
       copy = expr = copy_token_string (token);
-      cleanup = make_cleanup (xfree, expr);
+      cleanup = make_stack_cleanup (xfree, expr);
       PARSER_RESULT (parser)->expr_pc = linespec_expression_to_pc (&copy);
       discard_cleanups (cleanup);
       PARSER_RESULT (parser)->expression = expr;
@@ -2218,7 +2215,7 @@ parse_linespec (linespec_parser *parser, char **argptr)
 
       /* User specified a convenience variable or history value.  */
       var = copy_token_string (token);
-      cleanup = make_cleanup (xfree, var);
+      cleanup = make_stack_cleanup (xfree, var);
       PARSER_RESULT (parser)->line_offset
 	= linespec_parse_variable (PARSER_STATE (parser), var);
       do_cleanups (cleanup);
@@ -2412,7 +2409,7 @@ decode_line_full (char **argptr, int flags,
 		  const char *filter)
 {
   struct symtabs_and_lines result;
-  struct cleanup *cleanups;
+  SCOPED_NULL_CLEANUP (cleanups);
   VEC (const_char_ptr) *filters = NULL;
   linespec_parser parser;
   struct linespec_state *state;
@@ -2428,7 +2425,7 @@ decode_line_full (char **argptr, int flags,
 
   linespec_parser_new (&parser, flags, current_language, default_symtab,
 		       default_line, canonical);
-  cleanups = make_cleanup (linespec_parser_delete, &parser);
+  make_stack_cleanup (linespec_parser_delete, &parser);
   save_current_program_space ();
 
   result = parse_linespec (&parser, argptr);
@@ -2443,7 +2440,7 @@ decode_line_full (char **argptr, int flags,
     {
       int i;
 
-      make_cleanup (xfree, state->canonical_names);
+      make_stack_cleanup (xfree, state->canonical_names);
       for (i = 0; i < result.nelts; ++i)
 	{
 	  gdb_assert (state->canonical_names[i].suffix != NULL);
@@ -2463,7 +2460,7 @@ decode_line_full (char **argptr, int flags,
     {
       if (filter != NULL)
 	{
-	  make_cleanup (VEC_cleanup (const_char_ptr), &filters);
+	  make_stack_cleanup (VEC_cleanup (const_char_ptr), &filters);
 	  VEC_safe_push (const_char_ptr, filters, filter);
 	  filter_results (state, &result, filters);
 	}
@@ -2485,11 +2482,11 @@ decode_line_1 (char **argptr, int flags,
 {
   struct symtabs_and_lines result;
   linespec_parser parser;
-  struct cleanup *cleanups;
+  SCOPED_NULL_CLEANUP (cleanups);
 
   linespec_parser_new (&parser, flags, current_language, default_symtab,
 		       default_line, NULL);
-  cleanups = make_cleanup (linespec_parser_delete, &parser);
+  make_stack_cleanup (linespec_parser_delete, &parser);
   save_current_program_space ();
 
   result = parse_linespec (&parser, argptr);
@@ -2598,13 +2595,12 @@ decode_objc (struct linespec_state *self, linespec_p ls, char **argptr)
   VEC (const_char_ptr) *symbol_names = NULL;
   struct symtabs_and_lines values;
   char *new_argptr;
-  struct cleanup *cleanup = make_cleanup (VEC_cleanup (const_char_ptr),
-					  &symbol_names);
+  SCOPED_CLEANUP (cleanup, VEC_cleanup (const_char_ptr), &symbol_names);
 
   info.state = self;
   info.file_symtabs = NULL;
   VEC_safe_push (symtab_p, info.file_symtabs, NULL);
-  make_cleanup (VEC_cleanup (symtab_p), &info.file_symtabs);
+  make_stack_cleanup (VEC_cleanup (symtab_p), &info.file_symtabs);
   info.result.symbols = NULL;
   info.result.minimal_symbols = NULL;
   values.nelts = 0;
@@ -2703,16 +2699,14 @@ lookup_prefix_sym (struct linespec_state *state, VEC (symtab_p) *file_symtabs,
   int ix;
   struct symtab *elt;
   struct decode_compound_collector collector;
-  struct cleanup *outer;
+  SCOPED_CLEANUP (outer, VEC_cleanup (symbolp), &collector.symbols);
   struct cleanup *cleanup;
 
   collector.symbols = NULL;
-  outer = make_cleanup (VEC_cleanup (symbolp), &collector.symbols);
-
   collector.unique_syms = htab_create_alloc (1, htab_hash_pointer,
 					     htab_eq_pointer, NULL,
 					     xcalloc, xfree);
-  cleanup = make_cleanup_htab_delete (collector.unique_syms);
+  cleanup = make_stack_cleanup (htab_delete_cleanup, collector.unique_syms);
 
   for (ix = 0; VEC_iterate (symtab_p, file_symtabs, ix, elt); ++ix)
     {
@@ -2825,7 +2819,7 @@ find_superclass_methods (VEC (typep) *superclasses,
 {
   int old_len = VEC_length (const_char_ptr, *result_names);
   VEC (typep) *iter_classes;
-  SCOPED_CLEANUP (cleanup);
+  SCOPED_NULL_CLEANUP (cleanup);
 
   iter_classes = superclasses;
   while (1)
@@ -2859,7 +2853,7 @@ find_method (struct linespec_state *self, VEC (symtab_p) *file_symtabs,
 	     VEC (minsym_and_objfile_d) **minsyms)
 {
   struct symbol *sym;
-  SCOPED_CLEANUP (cleanup);
+  SCOPED_NULL_CLEANUP (cleanup);
   int ix;
   int last_result_len;
   VEC (typep) *superclass_vec;
@@ -2888,9 +2882,9 @@ find_method (struct linespec_state *self, VEC (symtab_p) *file_symtabs,
      because we collect data across the program space before deciding
      what to do.  */
   superclass_vec = NULL;
-  make_cleanup (VEC_cleanup (typep), &superclass_vec);
+  make_stack_cleanup (VEC_cleanup (typep), &superclass_vec);
   result_names = NULL;
-  make_cleanup (VEC_cleanup (const_char_ptr), &result_names);
+  make_stack_cleanup (VEC_cleanup (const_char_ptr), &result_names);
   last_result_len = 0;
   for (ix = 0; VEC_iterate (symbolp, sym_classes, ix, sym); ++ix)
     {
@@ -2979,13 +2973,13 @@ static VEC (symtab_p) *
 collect_symtabs_from_filename (const char *file)
 {
   struct symtab_collector collector;
-  struct cleanup *cleanups;
+  SCOPED_NULL_CLEANUP (cleanups);
   struct program_space *pspace;
 
   collector.symtabs = NULL;
   collector.symtab_table = htab_create (1, htab_hash_pointer, htab_eq_pointer,
 					NULL);
-  cleanups = make_cleanup_htab_delete (collector.symtab_table);
+  make_stack_cleanup (htab_delete_cleanup, collector.symtab_table);
 
   /* Find that file's data.  */
   ALL_PSPACES (pspace)
@@ -3034,8 +3028,7 @@ find_function_symbols (struct linespec_state *state,
 {
   struct collect_info info;
   VEC (const_char_ptr) *symbol_names = NULL;
-  struct cleanup *cleanup = make_cleanup (VEC_cleanup (const_char_ptr),
-					  &symbol_names);
+  SCOPED_CLEANUP (cleanup, VEC_cleanup (const_char_ptr), &symbol_names);
 
   info.state = state;
   info.result.symbols = NULL;
@@ -3078,26 +3071,25 @@ find_linespec_symbols (struct linespec_state *state,
 		       VEC (symbolp) **symbols,
 		       VEC (minsym_and_objfile_d) **minsyms)
 {
-  struct cleanup *cleanup;
+  SCOPED_NULL_CLEANUP (cleanup);
   char *canon;
   const char *lookup_name;
   volatile struct gdb_exception except;
 
-  cleanup = demangle_for_lookup (name, state->language->la_language,
-				 &lookup_name);
+  demangle_for_lookup (name, state->language->la_language, &lookup_name);
   if (state->language->la_language == language_ada)
     {
       /* In Ada, the symbol lookups are performed using the encoded
          name rather than the demangled name.  */
       lookup_name = ada_name_for_lookup (name);
-      make_cleanup (xfree, (void *) lookup_name);
+      make_stack_cleanup (xfree, (void *) lookup_name);
     }
 
   canon = cp_canonicalize_string_no_typedefs (lookup_name);
   if (canon != NULL)
     {
       lookup_name = canon;
-      make_cleanup (xfree, canon);
+      make_stack_cleanup (xfree, canon);
     }
 
   /* It's important to not call expand_symtabs_matching unnecessarily
@@ -3152,19 +3144,19 @@ find_linespec_symbols (struct linespec_state *state,
       /* LOOKUP_NAME points to the class name.
 	 LAST points to the method name.  */
       klass = xmalloc ((last - lookup_name + 1) * sizeof (char));
-      make_cleanup (xfree, klass);
+      make_stack_cleanup (xfree, klass);
       strncpy (klass, lookup_name, last - lookup_name);
       klass[last - lookup_name] = '\0';
 
       /* Skip past the scope operator.  */
       last += strlen (scope_op);
       method = xmalloc ((strlen (last) + 1) * sizeof (char));
-      make_cleanup (xfree, method);
+      make_stack_cleanup (xfree, method);
       strcpy (method, last);
 
       /* Find a list of classes named KLASS.  */
       classes = lookup_prefix_sym (state, file_symtabs, klass);
-      make_cleanup (VEC_cleanup (symbolp), &classes);
+      make_stack_cleanup (VEC_cleanup (symbolp), &classes);
 
       if (!VEC_empty (symbolp, classes))
 	{
@@ -3524,7 +3516,7 @@ search_minsyms_for_name (struct collect_info *info, const char *name,
   ALL_PSPACES (pspace)
   {
     struct collect_minsyms local;
-    struct cleanup *cleanup;
+    SCOPED_NULL_CLEANUP (cleanup);
 
     if (search_pspace != NULL && search_pspace != pspace)
       continue;
@@ -3537,8 +3529,7 @@ search_minsyms_for_name (struct collect_info *info, const char *name,
     local.funfirstline = info->state->funfirstline;
     local.list_mode = info->state->list_mode;
 
-    cleanup = make_cleanup (VEC_cleanup (minsym_and_objfile_d),
-			    &local.msyms);
+    make_cleanup (VEC_cleanup (minsym_and_objfile_d), &local.msyms);
 
     ALL_OBJFILES (objfile)
     {

@@ -403,10 +403,10 @@ make_cleanup_unpush_target (struct target_ops *ops)
   return make_cleanup (do_unpush_target, ops);
 }
 
-/* Helper for make_cleanup_htab_delete compile time checking the types.  */
+/* A cleanup function that deletes an htab_t.  */
 
-static void
-do_htab_delete_cleanup (void *htab_voidp)
+void
+htab_delete_cleanup (void *htab_voidp)
 {
   htab_t htab = htab_voidp;
 
@@ -418,7 +418,7 @@ do_htab_delete_cleanup (void *htab_voidp)
 struct cleanup *
 make_cleanup_htab_delete (htab_t htab)
 {
-  return make_cleanup (do_htab_delete_cleanup, htab);
+  return make_cleanup (htab_delete_cleanup, htab);
 }
 
 struct restore_ui_file_closure
