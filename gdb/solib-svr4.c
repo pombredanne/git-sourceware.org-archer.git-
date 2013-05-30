@@ -2003,7 +2003,7 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 	      /* The "map_failed" probe did not exist in early
 		 versions of the probes code in which the probes'
 		 names were prefixed with "rtld_".  */
-	      if (strcmp (name,"rtld_map_failed") == 0)
+	      if (strcmp (name, "rtld_map_failed") == 0)
 		continue;
 
 	      if (VEC_empty (probe_p, probes[i]))
