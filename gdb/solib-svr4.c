@@ -1877,7 +1877,6 @@ svr4_handle_solib_event (void)
 static int
 svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 {
-  struct svr4_info *info = get_svr4_info ();
   struct bp_location *loc;
 
   if (b->type != bp_shlib_event)
@@ -1888,21 +1887,26 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 
   for (loc = b->loc; loc != NULL; loc = loc->next)
     {
-      struct probe_and_action *pa = solib_event_probe_at (info, loc->address);
+      struct svr4_info *info;
+      struct probe_and_action *pa;
 
-      if (pa != NULL)
+      info = program_space_data (loc->pspace, solib_svr4_pspace_data);
+      if (info == NULL || info->probes_table == NULL)
+	continue;
+
+      pa = solib_event_probe_at (info, loc->address);
+      if (pa == NULL)
+	continue;
+
+      if (pa->action == DO_NOTHING)
 	{
-	  if (pa->action == DO_NOTHING)
-	    {
-	      if (b->enable_state == bp_disabled && stop_on_solib_events)
-		enable_breakpoint (b);
-	      else if (b->enable_state == bp_enabled && !stop_on_solib_events)
-		disable_breakpoint (b);
-	    }
-
-	  /* Continue iterating.  */
-	  return 0;
+	  if (b->enable_state == bp_disabled && stop_on_solib_events)
+	    enable_breakpoint (b);
+	  else if (b->enable_state == bp_enabled && !stop_on_solib_events)
+	    disable_breakpoint (b);
 	}
+
+      break;
     }
 
   /* Continue iterating.  */
@@ -1915,10 +1919,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
 static void
 svr4_update_solib_event_breakpoints (void)
 {
-  struct svr4_info *info = get_svr4_info ();
-
-  if (info->probes_table != NULL)
-    iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
+  iterate_over_breakpoints (svr4_update_solib_event_breakpoint, NULL);
 }
 
 /* Create and register solib event breakpoints.  PROBES is an array
