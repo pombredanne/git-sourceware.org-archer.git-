@@ -5713,18 +5713,18 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
       int len;
 
       sep = strchr (annex, '=');
-      if (!sep)
+      if (sep == NULL)
 	break;
 
       len = sep - annex;
-      if (len == 5 && !strncmp (annex, "start", 5))
+      if (len == 5 && strncmp (annex, "start", 5) == 0)
 	addrp = &lm_addr;
-      else if (len == 4 && !strncmp (annex, "prev", 4))
+      else if (len == 4 && strncmp (annex, "prev", 4) == 0)
 	addrp = &lm_prev;
       else
 	{
 	  annex = strchr (sep, ';');
-	  if (!annex)
+	  if (annex == NULL)
 	    break;
 	  annex++;
 	  continue;
