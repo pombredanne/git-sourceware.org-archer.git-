@@ -1305,7 +1305,7 @@ update_section_map (struct program_space *pspace,
   struct obj_section *s, **map;
   struct objfile *objfile;
 
-  pspace_info = get_objfile_pspace_data (current_program_space);
+  pspace_info = get_objfile_pspace_data (pspace);
   gdb_assert (pspace_info->section_map_dirty != 0
 	      || pspace_info->new_objfiles_available != 0);
 
