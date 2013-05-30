@@ -1705,7 +1705,7 @@ solist_update_incremental (struct svr4_info *info, CORE_ADDR lm)
     return 0;
 
   /* Walk to the end of the list.  */
-  for (tail = info->solib_list; tail->next; tail = tail->next)
+  for (tail = info->solib_list; tail->next != NULL; tail = tail->next)
     /* Nothing.  */;
   prev_lm = tail->lm_info->lm_addr;
 
@@ -1886,7 +1886,7 @@ svr4_update_solib_event_breakpoint (struct breakpoint *b, void *arg)
       return 0;
     }
 
-  for (loc = b->loc; loc; loc = loc->next)
+  for (loc = b->loc; loc != NULL; loc = loc->next)
     {
       struct probe_and_action *pa = solib_event_probe_at (info, loc->address);
 
