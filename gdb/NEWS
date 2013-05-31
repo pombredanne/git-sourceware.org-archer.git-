@@ -78,11 +78,15 @@ show debug nios2
     ** ElinOS
     ** Wind River Linux
 
-* New features in the GDB remote stub, GDBserver
+* New remote packets
 
-  ** GDBserver now supports the passing of an argument list in the
-     annex field of qXfer:libraries-svr4:read.  The remote stub
-     reports support for this argument list to gdb's qSupported query.
+qXfer:libraries-svr4:read's annex
+  The previously unused annex of the qXfer:libraries-svr4:read packet
+  is now used to support passing an argument list.  The remote stub
+  reports support for this argument list to GDB's qSupported query.
+  The defined arguments are "start" and "prev", used to reduce work
+  necessary for library list updating, resulting in significant
+  speedup.
 
 *** Changes in GDB 7.6
 
