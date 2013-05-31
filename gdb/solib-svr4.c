@@ -1983,7 +1983,8 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 	  memset (probes, 0, sizeof (probes));
 	  for (i = 0; i < NUM_PROBES; i++)
 	    {
-	      char name[32] = { '\0' };
+	      const char *name = probe_info[i].name;
+	      char buf[32];
 
 	      /* Fedora 17 and Red Hat Enterprise Linux 6.2-6.4
 		 shipped with an early version of the probes code in
@@ -1992,12 +1993,11 @@ svr4_create_solib_event_breakpoints (struct gdbarch *gdbarch,
 		 locations of the probes are otherwise the same, so
 		 we check for probes with prefixed names if probes
 		 with unprefixed names are not present.  */
-
 	      if (with_prefix)
-		strncat (name, "rtld_", sizeof (name) - strlen (name) - 1);
-
-	      strncat (name, probe_info[i].name,
-		       sizeof (name) - strlen (name) - 1);
+		{
+		  xsnprintf (buf, sizeof (buf), "rtld_%s", name);
+		  name = buf;
+		}
 
 	      probes[i] = find_probes_in_objfile (os->objfile, "rtld", name);
 
