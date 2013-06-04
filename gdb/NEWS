@@ -41,6 +41,10 @@ set debug nios2
 show debug nios2
   Control display of debugging messages related to Nios II targets.
 
+set range-stepping
+show range-stepping
+  Control whether target-assisted range stepping is enabled.
+
 * You can now use a literal value 'unlimited' for options that
   interpret 0 or -1 as meaning "unlimited".  E.g., "set
   trace-buffer-size unlimited" is now an alias for "set
@@ -78,7 +82,18 @@ show debug nios2
     ** ElinOS
     ** Wind River Linux
 
+* GDB now supports target-assigned range stepping with remote targets.
+  This improves the performance of stepping source lines by reducing
+  the number of control packets from/to GDB.  See "New remote packets"
+  below.
+
 * New remote packets
+
+vCont;r
+
+  The vCont packet supports a new 'r' action, that tells the remote
+  stub to step through an address range itself, without GDB
+  involvemement at each single-step.
 
 qXfer:libraries-svr4:read's annex
   The previously unused annex of the qXfer:libraries-svr4:read packet
@@ -87,6 +102,11 @@ qXfer:libraries-svr4:read's annex
   The defined arguments are "start" and "prev", used to reduce work
   necessary for library list updating, resulting in significant
   speedup.
+
+* New features in the GDB remote stub, GDBserver
+
+  ** GDBserver now supports target-assisted range stepping.  Currently
+     enabled on x86/x86_64 GNU/Linux targets.
 
 *** Changes in GDB 7.6
 
