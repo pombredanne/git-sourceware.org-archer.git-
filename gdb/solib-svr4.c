@@ -72,6 +72,12 @@ struct lm_info
 
     /* Values read in from inferior's fields of the same name.  */
     CORE_ADDR l_ld, l_next, l_prev, l_name;
+
+    /* XXX.  */
+    struct so_list *copy;
+
+    /* XXX.  */
+    unsigned int acquired : 1;
   };
 
 /* On SVR4 systems, a list of symbols in the dynamic linker where
@@ -1055,7 +1061,29 @@ struct svr4_library_list
 static void
 svr4_free_so (struct so_list *so)
 {
+  if (so->lm_info)
+    {
+      /* If this library is an acquired copy then release it. */
+      if (so->lm_info->acquired)
+	{
+	  so->lm_info->acquired = 0;
+	  return;
+	}
+
+      /* If the library has an acquired copy then unhook it.  */
+      if (so->lm_info->copy && so->lm_info->copy->lm_info->acquired)
+	{
+	  so->lm_info->copy->lm_info->acquired = 0;
+	  so->lm_info->copy = NULL;
+	}
+
+      /* If the library has an unacquired copy then free it.  */
+      if (so->lm_info->copy)
+	svr4_free_so (so->lm_info->copy);
+    }
+
   xfree (so->lm_info);
+  xfree (so);
 }
 
 /* Implement target_so_ops.clear_so.  */
@@ -1081,34 +1109,6 @@ svr4_free_library_list (void *p_list)
       free_so (list);
       list = next;
     }
-}
-
-/* Copy library list.  */
-
-static struct so_list *
-svr4_copy_library_list (struct so_list *src)
-{
-  struct so_list *dst = NULL;
-  struct so_list **link = &dst;
-
-  while (src != NULL)
-    {
-      struct so_list *new;
-
-      new = xmalloc (sizeof (struct so_list));
-      memcpy (new, src, sizeof (struct so_list));
-
-      new->lm_info = xmalloc (sizeof (struct lm_info));
-      memcpy (new->lm_info, src->lm_info, sizeof (struct lm_info));
-
-      new->next = NULL;
-      *link = new;
-      link = &new->next;
-
-      src = src->next;
-    }
-
-  return dst;
 }
 
 #ifdef HAVE_LIBEXPAT
@@ -1468,9 +1468,47 @@ svr4_current_sos (void)
   struct svr4_info *info = get_svr4_info ();
 
   /* If the solib list has been read and stored by the probes
-     interface then we return a copy of the stored list.  */
+     interface then XXX.  */
   if (info->solib_list != NULL)
-    return svr4_copy_library_list (info->solib_list);
+    {
+      struct so_list *so, *result, **link = &result;
+
+      for (so = info->solib_list; so; so = so->next)
+	{
+	  gdb_assert (so->lm_info != NULL);
+
+	  /* If the library has an acquired copy then unhook it.  */
+	  if (so->lm_info->copy && so->lm_info->copy->lm_info->acquired)
+	    {
+	      so->lm_info->copy->lm_info->acquired = 0;
+	      so->lm_info->copy = NULL;
+	    }
+
+	  /* If this library does not have a copy then create one.  */
+	  if (so->lm_info->copy == NULL)
+	    {
+	      struct so_list *copy;
+
+	      copy = XZALLOC (struct so_list);
+	      memcpy (copy, so, sizeof (struct so_list));
+
+	      copy->lm_info = xmalloc (sizeof (struct lm_info));
+	      memcpy (copy->lm_info, so->lm_info, sizeof (struct lm_info));
+
+	      so->lm_info->copy = copy;
+	    }
+
+	  /* Mark the copy as acquired and link it into the result.  */
+	  gdb_assert (!so->lm_info->copy->lm_info->acquired);
+	  so->lm_info->copy->lm_info->acquired = 1;
+
+	  so->lm_info->copy->next = NULL;
+	  *link = so->lm_info->copy;
+	  link = &so->lm_info->copy->next;
+	}
+
+      return result;
+    }
 
   /* Otherwise obtain the solib list directly from the inferior.  */
   return svr4_current_sos_direct (info);

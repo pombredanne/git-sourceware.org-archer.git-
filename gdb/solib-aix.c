@@ -446,6 +446,7 @@ solib_aix_free_so (struct so_list *so)
     fprintf_unfiltered (gdb_stdlog, "DEBUG: solib_aix_free_so (%s)\n",
 			so->so_name);
   solib_aix_xfree_lm_info (so->lm_info);
+  xfree (so);
 }
 
 /* Implement the "clear_solib" target_so_ops method.  */

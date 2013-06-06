@@ -738,6 +738,7 @@ static void
 som_free_so (struct so_list *so)
 {
   xfree (so->lm_info);
+  //XXX xfree (so);
 }
 
 static CORE_ADDR

@@ -714,6 +714,7 @@ sunos_free_so (struct so_list *so)
 {
   xfree (so->lm_info->lm);
   xfree (so->lm_info);
+  //XXX xfree (so);
 }
 
 static void
