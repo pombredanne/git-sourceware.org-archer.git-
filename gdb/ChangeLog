@@ -1,3 +1,129 @@
+2013-06-05  Doug Evans  <dje@google.com>
+	    Keith Seitz  <keiths@redhat.com>
+
+	PR 15519
+	* cp-namespace.c (find_symbol_in_baseclass): Call
+	cp_lookup_symbol_in_namespace instead of cp_lookup_symbol_namespace.
+	Check result of call to lookup_symbol_static.
+	Call lookup_static_symbol_aux unconditionally.
+	Call check_typedef on base types before accessing them.
+	(cp_lookup_nested_symbol): Fix comment.
+
+2013-06-05  Luis Machado  <lgustavo@codesourcery.com>
+
+	* gnu-v3-abi.c (gnuv3_skip_trampoline): Handle thunk
+	minimal symbols pointing to function descriptors.
+
+2013-06-05  Tom Tromey  <tromey@redhat.com>
+
+	* python/py-utils.c (gdb_pymodule_addobject): Cast away const.
+
+2013-06-04  Sergio Durigan Junior  <sergiodj@redhat.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	* remote.c (remote_wait_as): Restore signal handler before returning
+	when GDB gets a notification.
+
+2013-06-04  Gary Benson  <gbenson@redhat.com>
+
+	* breakpoint.h (handle_solib_event): Moved function declaration
+	to solib.h.
+	* breakpoint.c (handle_solib_event): Moved function to solib.c.
+	(bpstat_stop_status): Pass new argument to handle_solib_event.
+	* solib.h (update_solib_breakpoints): New function declaration.
+	(handle_solib_event): Moved function declaration from
+	breakpoint.h.
+	* solib.c (update_solib_breakpoints): New function.
+	(handle_solib_event): Moved function from breakpoint.c.
+	Updated to call solib_ops->handle_event if not NULL.
+	* solist.h (target_so_ops): New fields "update_breakpoints" and
+	"handle_event".
+	* infrun.c (set_stop_on_solib_events): New function.
+	(_initialize_infrun): Use the above for "set
+	stop-on-solib-events".
+	(handle_inferior_event): Pass new argument to handle_solib_event.
+	* solib-svr4.c (probe.h): New include.
+	(svr4_free_library_list): New forward declaration.
+	(probe_action): New enum.
+	(probe_info): New struct.
+	(probe_info): New static variable.
+	(NUM_PROBES): New definition.
+	(svr4_info): New fields "using_xfer", "probes_table" and
+	"solib_list".
+	(free_probes_table): New function.
+	(free_solib_list): New function.
+	(svr4_pspace_data_cleanup): Free probes table and solib list.
+	(svr4_copy_library_list): New function.
+	(svr4_current_sos_via_xfer_libraries): New parameter "annex".
+	(svr4_read_so_list): New parameter "prev_lm".
+	(svr4_current_sos_direct): Renamed from "svr4_current_sos".
+	(svr4_current_sos): New function.
+	(probe_and_action): New struct.
+	(hash_probe_and_action): New function.
+	(equal_probe_and_action): Likewise.
+	(register_solib_event_probe): Likewise.
+	(solib_event_probe_at): Likewise.
+	(solib_event_probe_action): Likewise.
+	(solist_update_full): Likewise.
+	(solist_update_incremental): Likewise.
+	(disable_probes_interface_cleanup): Likewise.
+	(svr4_handle_solib_event): Likewise.
+	(svr4_update_solib_event_breakpoint): Likewise.
+	(svr4_update_solib_event_breakpoints): Likewise.
+	(svr4_create_solib_event_breakpoints): Likewise.
+	(enable_break): Free probes table before creating breakpoints.
+	Use svr4_create_solib_event_breakpoints to create breakpoints.
+	(svr4_solib_create_inferior_hook): Free the solib list.
+	(_initialize_svr4_solib): Initialise
+	svr4_so_ops.handle_solib_event and svr4_so_ops.update_breakpoints.
+
+2013-06-04  Gary Benson  <gbenson@redhat.com>
+
+	* target.h (target_ops): New field
+	"to_augmented_libraries_svr4_read".
+	(target_augmented_libraries_svr4_read): New macro.
+	* target.c (update_current_target): Handle
+	to_augmented_libraries_svr4_read.
+	* remote.c (remote_state): New field
+	"augmented_libraries_svr4_read".
+	(remote_augmented_libraries_svr4_read_feature): New function.
+	(remote_protocol_features): Add entry for
+	"augmented-libraries-svr4-read".
+	(remote_augmented_libraries_svr4_read): New function.
+	(init_remote_ops): Initialize
+	remote_ops.to_augmented_libraries_svr4_read.
+
+2013-06-04  Gary Benson  <gbenson@redhat.com>
+
+	* NEWS: Update.
+
+2013-06-04  Gary Benson  <gbenson@redhat.com>
+
+	* objfiles.h (inhibit_section_map_updates): New function
+	declaration.
+	(resume_section_map_updates): Likewise.
+	(resume_section_map_updates_cleanup): Likewise.
+	* objfiles.c (objfile_pspace_info): Removed field
+	"objfiles_changed_p".  New fields "new_objfiles_available",
+	"section_map_dirty" and "inhibit_updates".
+	(allocate_objfile): Set new_objfiles_available.
+	(free_objfile): Set section_map_dirty.
+	(objfile_relocate1): Likewise.
+	(in_plt_section): Likewise.
+	(find_pc_section): Update the conditions under which the
+	section map will be updated.
+	(inhibit_section_map_updates): New function.
+	(resume_section_map_updates): Likewise.
+	(resume_section_map_updates_cleanup): Likewise.
+
+2013-06-04  Gary Benson  <gbenson@redhat.com>
+
+	* probe.h (get_probe_argument_count): New declaration.
+	(evaluate_probe_argument): Likewise.
+	* probe.c (get_probe_argument_count): New function.
+	(evaluate_probe_argument): Likewise.
+	(probe_safe_evaluate_at_pc): Use the above new functions.
+
 2013-06-04  Alan Modra  <amodra@gmail.com>
 
 	* ppc-tdep.h (ppc_insns_match_pattern): Update prototype.
