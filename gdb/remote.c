@@ -396,6 +396,16 @@ struct remote_state
   char *finished_object;
   char *finished_annex;
   ULONGEST finished_offset;
+
+  /* Should we try the 'ThreadInfo' query packet?
+
+     This variable (NOT available to the user: auto-detect only!)
+     determines whether GDB will use the new, simpler "ThreadInfo"
+     query or the older, more complex syntax for thread queries.
+     This is an auto-detect variable (set to true at each connect,
+     and set to false when the target fails to recognize it).  */
+  int use_threadinfo_query;
+  int use_threadextra_query;
 };
 
 /* Private data that we'll store in (struct thread_info)->private.  */
@@ -1438,17 +1448,6 @@ show_remote_protocol_Z_packet_cmd (struct ui_file *file, int from_tty,
       show_packet_config_cmd (&remote_protocol_packets[PACKET_Z0 + i]);
     }
 }
-
-/* Should we try the 'ThreadInfo' query packet?
-
-   This variable (NOT available to the user: auto-detect only!)
-   determines whether GDB will use the new, simpler "ThreadInfo"
-   query or the older, more complex syntax for thread queries.
-   This is an auto-detect variable (set to true at each connect,
-   and set to false when the target fails to recognize it).  */
-
-static int use_threadinfo_query;
-static int use_threadextra_query;
 
 /* Tokens for use by the asynchronous signal handlers for SIGINT.  */
 static struct async_signal_handler *sigint_remote_twice_token;
@@ -2799,7 +2798,7 @@ remote_threads_info (struct target_ops *ops)
     }
 #endif
 
-  if (use_threadinfo_query)
+  if (rs->use_threadinfo_query)
     {
       putpkt ("qfThreadInfo");
       getpkt (&rs->buf, &rs->buf_size, 0);
@@ -2847,7 +2846,7 @@ remote_threads_info (struct target_ops *ops)
     return;
 
   /* Else fall back to old method based on jmetzler protocol.  */
-  use_threadinfo_query = 0;
+  rs->use_threadinfo_query = 0;
   remote_find_new_threads ();
   return;
 }
@@ -2892,7 +2891,7 @@ remote_threads_extra_info (struct thread_info *tp)
 	return NULL;
     }
 
-  if (use_threadextra_query)
+  if (rs->use_threadextra_query)
     {
       char *b = rs->buf;
       char *endb = rs->buf + get_remote_packet_size ();
@@ -2913,7 +2912,7 @@ remote_threads_extra_info (struct thread_info *tp)
     }
 
   /* If the above query fails, fall back to the old method.  */
-  use_threadextra_query = 0;
+  rs->use_threadextra_query = 0;
   set = TAG_THREADID | TAG_EXISTS | TAG_THREADNAME
     | TAG_MOREDISPLAY | TAG_DISPLAY;
   int_to_threadref (&id, ptid_get_tid (tp->ptid));
@@ -4360,8 +4359,8 @@ remote_open_1 (char *name, int from_tty,
   rs->remote_traceframe_number = -1;
 
   /* Probe for ability to use "ThreadInfo" query, as required.  */
-  use_threadinfo_query = 1;
-  use_threadextra_query = 1;
+  rs->use_threadinfo_query = 1;
+  rs->use_threadextra_query = 1;
 
   if (target_async_permitted)
     {
