@@ -380,6 +380,8 @@ struct remote_state
   /* This is the traceframe which we last selected on the remote system.
      It will be -1 if no traceframe is selected.  */
   int remote_traceframe_number;
+
+  char *last_pass_packet;
 };
 
 /* Private data that we'll store in (struct thread_info)->private.  */
@@ -1654,8 +1656,6 @@ record_currthread (struct remote_state *rs, ptid_t currthread)
   rs->general_thread = currthread;
 }
 
-static char *last_pass_packet;
-
 /* If 'QPassSignals' is supported, tell the remote stub what signals
    it can simply pass through to the inferior without reporting.  */
 
@@ -1666,6 +1666,7 @@ remote_pass_signals (int numsigs, unsigned char *pass_signals)
     {
       char *pass_packet, *p;
       int count = 0, i;
+      struct remote_state *rs = get_remote_state ();
 
       gdb_assert (numsigs < 256);
       for (i = 0; i < numsigs; i++)
@@ -1691,17 +1692,16 @@ remote_pass_signals (int numsigs, unsigned char *pass_signals)
 	    }
 	}
       *p = 0;
-      if (!last_pass_packet || strcmp (last_pass_packet, pass_packet))
+      if (!rs->last_pass_packet || strcmp (rs->last_pass_packet, pass_packet))
 	{
-	  struct remote_state *rs = get_remote_state ();
 	  char *buf = rs->buf;
 
 	  putpkt (pass_packet);
 	  getpkt (&rs->buf, &rs->buf_size, 0);
 	  packet_ok (buf, &remote_protocol_packets[PACKET_QPassSignals]);
-	  if (last_pass_packet)
-	    xfree (last_pass_packet);
-	  last_pass_packet = pass_packet;
+	  if (rs->last_pass_packet)
+	    xfree (rs->last_pass_packet);
+	  rs->last_pass_packet = pass_packet;
 	}
       else
 	xfree (pass_packet);
@@ -4285,8 +4285,8 @@ remote_open_1 (char *name, int from_tty,
   target_preopen (from_tty);
 
   /* Make sure we send the passed signals list the next time we resume.  */
-  xfree (last_pass_packet);
-  last_pass_packet = NULL;
+  xfree (rs->last_pass_packet);
+  rs->last_pass_packet = NULL;
 
   /* Make sure we send the program signals list the next time we
      resume.  */
