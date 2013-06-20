@@ -382,6 +382,12 @@ struct remote_state
   int remote_traceframe_number;
 
   char *last_pass_packet;
+
+  /* The last QProgramSignals packet sent to the target.  We bypass
+     sending a new program signals list down to the target if the new
+     packet is exactly the same as the last we sent.  IOW, we only let
+     the target know about program signals list changes.  */
+  char *last_program_signals_packet;
 };
 
 /* Private data that we'll store in (struct thread_info)->private.  */
@@ -1708,13 +1714,6 @@ remote_pass_signals (int numsigs, unsigned char *pass_signals)
     }
 }
 
-/* The last QProgramSignals packet sent to the target.  We bypass
-   sending a new program signals list down to the target if the new
-   packet is exactly the same as the last we sent.  IOW, we only let
-   the target know about program signals list changes.  */
-
-static char *last_program_signals_packet;
-
 /* If 'QProgramSignals' is supported, tell the remote stub what
    signals it should pass through to the inferior when detaching.  */
 
@@ -1725,6 +1724,7 @@ remote_program_signals (int numsigs, unsigned char *signals)
     {
       char *packet, *p;
       int count = 0, i;
+      struct remote_state *rs = get_remote_state ();
 
       gdb_assert (numsigs < 256);
       for (i = 0; i < numsigs; i++)
@@ -1750,17 +1750,16 @@ remote_program_signals (int numsigs, unsigned char *signals)
 	    }
 	}
       *p = 0;
-      if (!last_program_signals_packet
-	  || strcmp (last_program_signals_packet, packet) != 0)
+      if (!rs->last_program_signals_packet
+	  || strcmp (rs->last_program_signals_packet, packet) != 0)
 	{
-	  struct remote_state *rs = get_remote_state ();
 	  char *buf = rs->buf;
 
 	  putpkt (packet);
 	  getpkt (&rs->buf, &rs->buf_size, 0);
 	  packet_ok (buf, &remote_protocol_packets[PACKET_QProgramSignals]);
-	  xfree (last_program_signals_packet);
-	  last_program_signals_packet = packet;
+	  xfree (rs->last_program_signals_packet);
+	  rs->last_program_signals_packet = packet;
 	}
       else
 	xfree (packet);
@@ -4290,8 +4289,8 @@ remote_open_1 (char *name, int from_tty,
 
   /* Make sure we send the program signals list the next time we
      resume.  */
-  xfree (last_program_signals_packet);
-  last_program_signals_packet = NULL;
+  xfree (rs->last_program_signals_packet);
+  rs->last_program_signals_packet = NULL;
 
   remote_fileio_reset ();
   reopen_exec_file ();
