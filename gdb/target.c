@@ -148,13 +148,11 @@ static int debug_to_can_run (void);
 
 static void debug_to_stop (ptid_t);
 
-/* Pointer to array of target architecture structures; the size of the
-   array; the current index into the array; the allocated size of the
-   array.  */
-struct target_ops **target_structs;
-unsigned target_struct_size;
-unsigned target_struct_allocsize;
-#define	DEFAULT_ALLOCSIZE	10
+typedef struct target_ops *target_ops_ptr;
+DEF_VEC_P (target_ops_ptr);
+
+/* Array of target architecture structures.  */
+static VEC (target_ops_ptr) *target_structs;
 
 /* The initial current target, so that there is always a semi-valid
    current target.  */
@@ -419,20 +417,7 @@ add_target_with_completer (struct target_ops *t,
 
   complete_target_initialization (t);
 
-  if (!target_structs)
-    {
-      target_struct_allocsize = DEFAULT_ALLOCSIZE;
-      target_structs = (struct target_ops **) xmalloc
-	(target_struct_allocsize * sizeof (*target_structs));
-    }
-  if (target_struct_size >= target_struct_allocsize)
-    {
-      target_struct_allocsize *= 2;
-      target_structs = (struct target_ops **)
-	xrealloc ((char *) target_structs,
-		  target_struct_allocsize * sizeof (*target_structs));
-    }
-  target_structs[target_struct_size++] = t;
+  VEC_safe_push (target_ops_ptr, target_structs, t);
 
   if (targetlist == NULL)
     add_prefix_cmd ("target", class_run, target_command, _("\
@@ -3072,18 +3057,17 @@ target_require_runnable (void)
 static struct target_ops *
 find_default_run_target (char *do_mesg)
 {
-  struct target_ops **t;
+  struct target_ops *iter;
   struct target_ops *runable = NULL;
-  int count;
+  int count, ix;
 
   count = 0;
 
-  for (t = target_structs; t < target_structs + target_struct_size;
-       ++t)
+  for (ix = 0; VEC_iterate (target_ops_ptr, target_structs, ix, iter); ++ix)
     {
-      if ((*t)->to_can_run && target_can_run (*t))
+      if (iter->to_can_run && target_can_run (iter))
 	{
-	  runable = *t;
+	  runable = iter;
 	  ++count;
 	}
     }
