@@ -1203,7 +1203,7 @@ sol_get_ada_task_ptid (long lwp, long thread)
     {
       /* The list of threads is probably not up to date.  Find any
          thread that is missing from the list, and try again.  */
-      sol_find_new_threads (&current_target);
+      sol_find_new_threads (current_target);
       thread_info = iterate_over_threads (thread_db_find_thread_from_tid,
                                           &thread);
     }

@@ -1241,7 +1241,7 @@ value_assign (struct value *toval, struct value *fromval)
     case lval_register:
     case lval_computed:
 
-      observer_notify_target_changed (&current_target);
+      observer_notify_target_changed (current_target);
 
       /* Having destroyed the frame cache, restore the selected
 	 frame.  */

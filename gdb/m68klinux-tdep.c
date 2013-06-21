@@ -235,8 +235,8 @@ m68k_linux_get_sigtramp_info (struct frame_info *this_frame)
       CORE_ADDR dummy;
 
       target_is_uclinux
-        = (target_auxv_search (&current_target, AT_NULL, &dummy) > 0
-	   && target_auxv_search (&current_target, AT_PAGESZ, &dummy) == 0);
+        = (target_auxv_search (current_target, AT_NULL, &dummy) > 0
+	   && target_auxv_search (current_target, AT_PAGESZ, &dummy) == 0);
     }
 
   sp = get_frame_register_unsigned (this_frame, M68K_SP_REGNUM);

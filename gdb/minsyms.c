@@ -1345,7 +1345,7 @@ find_solib_trampoline_target (struct frame_info *frame, CORE_ADDR pc)
 	    func = gdbarch_convert_from_func_ptr_addr
 		    (get_objfile_arch (objfile),
 		     SYMBOL_VALUE_ADDRESS (msymbol),
-		     &current_target);
+		     current_target);
 
 	    /* Ignore data symbols that are not function descriptors.  */
 	    if (func != SYMBOL_VALUE_ADDRESS (msymbol))

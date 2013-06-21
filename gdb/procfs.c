@@ -4695,7 +4695,7 @@ procfs_inferior_created (struct target_ops *ops, int from_tty)
      the inferior ourselves, there is nothing to do when the inferior
      was created by attaching to an already running process, or when
      debugging a core file.  */
-  if (current_inferior ()->attach_flag || !target_can_run (&current_target))
+  if (current_inferior ()->attach_flag || !target_can_run (current_target))
     return;
 
   proc_trace_syscalls_1 (find_procinfo_or_die (PIDGET (inferior_ptid), 0),
@@ -5525,7 +5525,7 @@ procfs_make_note_section (bfd *obfd, int *note_size)
   gdb_assert (thread_args.note_data != note_data);
   note_data = thread_args.note_data;
 
-  auxv_len = target_read_alloc (&current_target, TARGET_OBJECT_AUXV,
+  auxv_len = target_read_alloc (current_target, TARGET_OBJECT_AUXV,
 				NULL, &auxv);
   if (auxv_len > 0)
     {

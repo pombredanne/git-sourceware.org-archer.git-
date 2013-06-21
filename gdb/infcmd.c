@@ -600,7 +600,7 @@ run_command_1 (char *args, int from_tty, int tbreak_at_main)
 
   /* Pass zero for FROM_TTY, because at this point the "run" command
      has done its thing; now we are setting up the running program.  */
-  post_create_inferior (&current_target, 0);
+  post_create_inferior (current_target, 0);
 
   /* Start the target running.  Do not use -1 continuation as it would skip
      breakpoint right at the entry point.  */
@@ -2439,7 +2439,7 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
   /* Take any necessary post-attaching actions for this platform.  */
   target_post_attach (PIDGET (inferior_ptid));
 
-  post_create_inferior (&current_target, from_tty);
+  post_create_inferior (current_target, from_tty);
 
   /* Install inferior's terminal modes.  */
   target_terminal_inferior ();

@@ -1358,7 +1358,7 @@ ppc_linux_get_hwcap (void)
 {
   CORE_ADDR field;
 
-  if (target_auxv_search (&current_target, AT_HWCAP, &field))
+  if (target_auxv_search (current_target, AT_HWCAP, &field))
     return (unsigned long) field;
 
   return 0;
@@ -2286,7 +2286,7 @@ static int
 ppc_linux_stopped_by_watchpoint (void)
 {
   CORE_ADDR addr;
-  return ppc_linux_stopped_data_address (&current_target, &addr);
+  return ppc_linux_stopped_data_address (current_target, &addr);
 }
 
 static int

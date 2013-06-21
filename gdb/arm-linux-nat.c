@@ -1174,7 +1174,7 @@ static int
 arm_linux_stopped_by_watchpoint (void)
 {
   CORE_ADDR addr;
-  return arm_linux_stopped_data_address (&current_target, &addr);
+  return arm_linux_stopped_data_address (current_target, &addr);
 }
 
 static int

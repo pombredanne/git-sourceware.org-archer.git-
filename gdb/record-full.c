@@ -921,7 +921,7 @@ record_full_open (char *name, int from_tty)
     fprintf_unfiltered (gdb_stdlog, "Process record: record_full_open\n");
 
   /* Check if record target is already running.  */
-  if (current_target.to_stratum == record_stratum)
+  if (current_target->to_stratum == record_stratum)
     error (_("Process record target already running.  Use \"record stop\" to "
              "stop record target first."));
 
@@ -941,7 +941,7 @@ record_full_open (char *name, int from_tty)
   tmp_to_async = NULL;
 
   /* Set the beneath function pointers.  */
-  for (t = current_target.beneath; t != NULL; t = t->beneath)
+  for (t = current_target->beneath; t != NULL; t = t->beneath)
     {
       if (!tmp_to_resume)
         {

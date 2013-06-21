@@ -510,7 +510,7 @@ info_auxv_command (char *cmd, int from_tty)
     error (_("The program has no auxiliary information now."));
   else
     {
-      int ents = fprint_target_auxv (gdb_stdout, &current_target);
+      int ents = fprint_target_auxv (gdb_stdout, current_target);
 
       if (ents < 0)
 	error (_("No auxiliary vector found, or failed reading it."));

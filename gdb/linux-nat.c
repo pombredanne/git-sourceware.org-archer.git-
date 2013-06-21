@@ -2760,7 +2760,7 @@ save_sigtrap (struct lwp_info *lp)
     {
       if (linux_ops->to_stopped_data_address != NULL)
 	lp->stopped_data_address_p =
-	  linux_ops->to_stopped_data_address (&current_target,
+	  linux_ops->to_stopped_data_address (current_target,
 					      &lp->stopped_data_address);
       else
 	lp->stopped_data_address_p = 0;

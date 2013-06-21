@@ -64,7 +64,7 @@ find_record_target (void)
 {
   struct target_ops *t;
 
-  for (t = current_target.beneath; t != NULL; t = t->beneath)
+  for (t = current_target->beneath; t != NULL; t = t->beneath)
     if (t->to_stratum == record_stratum)
       return t;
 

@@ -672,7 +672,7 @@ static int
 ia64_linux_stopped_by_watchpoint (void)
 {
   CORE_ADDR addr;
-  return ia64_linux_stopped_data_address (&current_target, &addr);
+  return ia64_linux_stopped_data_address (current_target, &addr);
 }
 
 static int

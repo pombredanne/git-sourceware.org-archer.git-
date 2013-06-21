@@ -1476,7 +1476,7 @@ aarch64_linux_stopped_by_watchpoint (void)
 {
   CORE_ADDR addr;
 
-  return aarch64_linux_stopped_data_address (&current_target, &addr);
+  return aarch64_linux_stopped_data_address (current_target, &addr);
 }
 
 /* Implement the "to_watchpoint_addr_within_range" target_ops method.  */

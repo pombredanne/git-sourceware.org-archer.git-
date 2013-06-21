@@ -335,7 +335,7 @@ osf_solib_create_inferior_hook (int from_tty)
      of the inferior.  But this is actually not an issue, because
      shared libraries have already been mapped anyways, which means
      we have nothing more to do.  */
-  if (!target_can_run (&current_target))
+  if (!target_can_run (current_target))
     return;
 
   tp = inferior_thread ();

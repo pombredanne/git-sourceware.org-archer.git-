@@ -747,13 +747,13 @@ ppc_linux_displaced_step_location (struct gdbarch *gdbarch)
       CORE_ADDR addr;
 
       /* Determine entry point from target auxiliary vector.  */
-      if (target_auxv_search (&current_target, AT_ENTRY, &addr) <= 0)
+      if (target_auxv_search (current_target, AT_ENTRY, &addr) <= 0)
 	error (_("Cannot find AT_ENTRY auxiliary vector entry."));
 
       /* Make certain that the address points at real code, and not a
 	 function descriptor.  */
       addr = gdbarch_convert_from_func_ptr_addr (gdbarch, addr,
-						 &current_target);
+						 current_target);
 
       /* Inferior calls also use the entry point as a breakpoint location.
 	 We don't want displaced stepping to interfere with those
@@ -1030,7 +1030,7 @@ ppc_linux_spe_context (int wordsize, enum bfd_endian byte_order,
   /* Look up cached address of thread-local variable.  */
   if (!ptid_equal (spe_context_cache_ptid, inferior_ptid))
     {
-      struct target_ops *target = &current_target;
+      struct target_ops *target = current_target;
       volatile struct gdb_exception ex;
 
       while (target && !target->to_get_thread_local_address)
@@ -1197,7 +1197,7 @@ ppu2spu_sniffer (const struct frame_unwind *self,
 	return 0;
 
       xsnprintf (annex, sizeof annex, "%d/regs", data.id);
-      if (target_read (&current_target, TARGET_OBJECT_SPU, annex,
+      if (target_read (current_target, TARGET_OBJECT_SPU, annex,
 		       data.gprs, 0, sizeof data.gprs)
 	  == sizeof data.gprs)
 	{

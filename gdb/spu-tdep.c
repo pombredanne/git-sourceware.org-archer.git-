@@ -199,7 +199,7 @@ spu_pseudo_register_read_spu (struct regcache *regcache, const char *regname,
     return status;
   xsnprintf (annex, sizeof annex, "%d/%s", (int) id, regname);
   memset (reg, 0, sizeof reg);
-  target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  target_read (current_target, TARGET_OBJECT_SPU, annex,
 	       reg, 0, sizeof reg);
 
   ul = strtoulst ((char *) reg, NULL, 16);
@@ -230,7 +230,7 @@ spu_pseudo_register_read (struct gdbarch *gdbarch, struct regcache *regcache,
       if (status != REG_VALID)
 	return status;
       xsnprintf (annex, sizeof annex, "%d/fpcr", (int) id);
-      target_read (&current_target, TARGET_OBJECT_SPU, annex, buf, 0, 16);
+      target_read (current_target, TARGET_OBJECT_SPU, annex, buf, 0, 16);
       return status;
 
     case SPU_SRR0_REGNUM:
@@ -264,7 +264,7 @@ spu_pseudo_register_write_spu (struct regcache *regcache, const char *regname,
   xsnprintf (annex, sizeof annex, "%d/%s", (int) id, regname);
   xsnprintf (reg, sizeof reg, "0x%s",
 	     phex_nz (extract_unsigned_integer (buf, 4, byte_order), 4));
-  target_write (&current_target, TARGET_OBJECT_SPU, annex,
+  target_write (current_target, TARGET_OBJECT_SPU, annex,
 		(gdb_byte *) reg, 0, strlen (reg));
 }
 
@@ -287,7 +287,7 @@ spu_pseudo_register_write (struct gdbarch *gdbarch, struct regcache *regcache,
     case SPU_FPSCR_REGNUM:
       regcache_raw_read_unsigned (regcache, SPU_ID_REGNUM, &id);
       xsnprintf (annex, sizeof annex, "%d/fpcr", (int) id);
-      target_write (&current_target, TARGET_OBJECT_SPU, annex, buf, 0, 16);
+      target_write (current_target, TARGET_OBJECT_SPU, annex, buf, 0, 16);
       break;
 
     case SPU_SRR0_REGNUM:
@@ -2042,7 +2042,7 @@ info_spu_event_command (char *args, int from_tty)
   id = get_frame_register_unsigned (frame, SPU_ID_REGNUM);
 
   xsnprintf (annex, sizeof annex, "%d/event_status", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex,
 		     buf, 0, (sizeof (buf) - 1));
   if (len <= 0)
     error (_("Could not read event_status."));
@@ -2050,7 +2050,7 @@ info_spu_event_command (char *args, int from_tty)
   event_status = strtoulst ((char *) buf, NULL, 16);
  
   xsnprintf (annex, sizeof annex, "%d/event_mask", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex,
 		     buf, 0, (sizeof (buf) - 1));
   if (len <= 0)
     error (_("Could not read event_mask."));
@@ -2099,7 +2099,7 @@ info_spu_signal_command (char *args, int from_tty)
   id = get_frame_register_unsigned (frame, SPU_ID_REGNUM);
 
   xsnprintf (annex, sizeof annex, "%d/signal1", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex, buf, 0, 4);
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex, buf, 0, 4);
   if (len < 0)
     error (_("Could not read signal1."));
   else if (len == 4)
@@ -2109,7 +2109,7 @@ info_spu_signal_command (char *args, int from_tty)
     }
     
   xsnprintf (annex, sizeof annex, "%d/signal1_type", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex,
 		     buf, 0, (sizeof (buf) - 1));
   if (len <= 0)
     error (_("Could not read signal1_type."));
@@ -2117,7 +2117,7 @@ info_spu_signal_command (char *args, int from_tty)
   signal1_type = strtoulst ((char *) buf, NULL, 16);
 
   xsnprintf (annex, sizeof annex, "%d/signal2", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex, buf, 0, 4);
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex, buf, 0, 4);
   if (len < 0)
     error (_("Could not read signal2."));
   else if (len == 4)
@@ -2127,7 +2127,7 @@ info_spu_signal_command (char *args, int from_tty)
     }
     
   xsnprintf (annex, sizeof annex, "%d/signal2_type", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex,
 		     buf, 0, (sizeof (buf) - 1));
   if (len <= 0)
     error (_("Could not read signal2_type."));
@@ -2222,7 +2222,7 @@ info_spu_mailbox_command (char *args, int from_tty)
   chain = make_cleanup_ui_out_tuple_begin_end (current_uiout, "SPUInfoMailbox");
 
   xsnprintf (annex, sizeof annex, "%d/mbox_info", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex,
 		     buf, 0, sizeof buf);
   if (len < 0)
     error (_("Could not read mbox_info."));
@@ -2231,7 +2231,7 @@ info_spu_mailbox_command (char *args, int from_tty)
 			 "mbox", "SPU Outbound Mailbox");
 
   xsnprintf (annex, sizeof annex, "%d/ibox_info", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex,
 		     buf, 0, sizeof buf);
   if (len < 0)
     error (_("Could not read ibox_info."));
@@ -2240,7 +2240,7 @@ info_spu_mailbox_command (char *args, int from_tty)
 			 "ibox", "SPU Outbound Interrupt Mailbox");
 
   xsnprintf (annex, sizeof annex, "%d/wbox_info", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex,
 		     buf, 0, sizeof buf);
   if (len < 0)
     error (_("Could not read wbox_info."));
@@ -2462,7 +2462,7 @@ info_spu_dma_command (char *args, int from_tty)
   id = get_frame_register_unsigned (frame, SPU_ID_REGNUM);
 
   xsnprintf (annex, sizeof annex, "%d/dma_info", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex,
 		     buf, 0, 40 + 16 * 32);
   if (len <= 0)
     error (_("Could not read dma_info."));
@@ -2541,7 +2541,7 @@ info_spu_proxydma_command (char *args, int from_tty)
   id = get_frame_register_unsigned (frame, SPU_ID_REGNUM);
 
   xsnprintf (annex, sizeof annex, "%d/proxydma_info", id);
-  len = target_read (&current_target, TARGET_OBJECT_SPU, annex,
+  len = target_read (current_target, TARGET_OBJECT_SPU, annex,
 		     buf, 0, 24 + 8 * 32);
   if (len <= 0)
     error (_("Could not read proxydma_info."));

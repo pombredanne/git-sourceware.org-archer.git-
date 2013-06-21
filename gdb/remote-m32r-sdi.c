@@ -1480,7 +1480,7 @@ m32r_stopped_by_watchpoint (void)
 {
   CORE_ADDR addr;
 
-  return m32r_stopped_data_address (&current_target, &addr);
+  return m32r_stopped_data_address (current_target, &addr);
 }
 
 /* Check to see if a thread is still alive.  */

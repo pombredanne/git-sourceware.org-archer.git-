@@ -2753,7 +2753,7 @@ remote_threads_info (struct target_ops *ops)
 #if defined(HAVE_LIBEXPAT)
   if (remote_protocol_packets[PACKET_qXfer_threads].support == PACKET_ENABLE)
     {
-      char *xml = target_read_stralloc (&current_target,
+      char *xml = target_read_stralloc (current_target,
 					 TARGET_OBJECT_THREADS, NULL);
 
       struct cleanup *back_to = make_cleanup (xfree, xml);
@@ -3732,7 +3732,7 @@ remote_check_symbols (void)
 	     instead of any data function descriptor.  */
 	  sym_addr = gdbarch_convert_from_func_ptr_addr (target_gdbarch (),
 							 sym_addr,
-							 &current_target);
+							 current_target);
 
 	  xsnprintf (msg, get_remote_packet_size (), "qSymbol:%s:%s",
 		     phex_nz (sym_addr, addr_size), &reply[8]);
@@ -9163,7 +9163,7 @@ static VEC(mem_region_s) *
 remote_memory_map (struct target_ops *ops)
 {
   VEC(mem_region_s) *result = NULL;
-  char *text = target_read_stralloc (&current_target,
+  char *text = target_read_stralloc (current_target,
 				     TARGET_OBJECT_MEMORY_MAP, NULL);
 
   if (text)
@@ -11162,7 +11162,7 @@ remote_traceframe_info (void)
 {
   char *text;
 
-  text = target_read_stralloc (&current_target,
+  text = target_read_stralloc (current_target,
 			       TARGET_OBJECT_TRACEFRAME_INFO, NULL);
   if (text != NULL)
     {
@@ -11448,7 +11448,7 @@ remote_read_btrace (struct btrace_target_info *tinfo,
 		      (unsigned int) type);
     }
 
-  xml = target_read_stralloc (&current_target,
+  xml = target_read_stralloc (current_target,
                               TARGET_OBJECT_BTRACE, annex);
   if (xml != NULL)
     {
