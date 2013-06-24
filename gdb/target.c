@@ -3621,6 +3621,14 @@ find_target_beneath (struct target_ops *t)
   return NULL;
 }
 
+/* Find the target at a given target stratum.  */
+
+struct target_ops *
+find_target_at (enum strata where)
+{
+  return target_stack->ops[where];
+}
+
 
 /* The inferior process has died.  Long live the inferior!  */
 
