@@ -1408,7 +1408,7 @@ mi_cmd_data_read_memory (char *command, char **argv, int argc)
 
   /* Dispatch memory reads to the topmost target, not the flattened
      current_target->  */
-  nr_bytes = target_read (current_target->beneath,
+  nr_bytes = target_read (find_target_beneath (current_target),
 			  TARGET_OBJECT_MEMORY, NULL, mbuf,
 			  addr, total_bytes);
   if (nr_bytes <= 0)
@@ -1539,7 +1539,8 @@ mi_cmd_data_read_memory_bytes (char *command, char **argv, int argc)
   addr = parse_and_eval_address (argv[0]) + offset;
   length = atol (argv[1]);
 
-  result = read_memory_robust (current_target->beneath, addr, length);
+  result = read_memory_robust (find_target_beneath (current_target),
+			       addr, length);
 
   cleanups = make_cleanup (free_memory_read_result_vector, result);
 

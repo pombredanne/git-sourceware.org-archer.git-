@@ -340,9 +340,11 @@ bsd_uthread_xfer_partial (struct target_ops *ops, enum target_object object,
 			  const gdb_byte *writebuf,
 			  ULONGEST offset, LONGEST len)
 {
-  gdb_assert (ops->beneath->to_xfer_partial);
-  return ops->beneath->to_xfer_partial (ops->beneath, object, annex, readbuf,
-					writebuf, offset, len);
+  struct target_ops *beneath = find_target_beneath (ops);
+
+  gdb_assert (beneath->to_xfer_partial);
+  return beneath->to_xfer_partial (beneath, object, annex, readbuf,
+				   writebuf, offset, len);
 }
 
 static ptid_t

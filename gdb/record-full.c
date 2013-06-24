@@ -941,7 +941,9 @@ record_full_open (char *name, int from_tty)
   tmp_to_async = NULL;
 
   /* Set the beneath function pointers.  */
-  for (t = current_target->beneath; t != NULL; t = t->beneath)
+  for (t = find_target_beneath (current_target);
+       t != NULL;
+       t = find_target_beneath (t))
     {
       if (!tmp_to_resume)
         {

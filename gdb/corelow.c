@@ -822,11 +822,15 @@ core_xfer_partial (struct target_ops *ops, enum target_object object,
       return -1;
 
     default:
-      if (ops->beneath != NULL)
-	return ops->beneath->to_xfer_partial (ops->beneath, object,
-					      annex, readbuf,
-					      writebuf, offset, len);
-      return -1;
+      {
+	struct target_ops *beneath = find_target_beneath (ops);
+
+	if (beneath != NULL)
+	  return beneath->to_xfer_partial (beneath, object,
+					   annex, readbuf,
+					   writebuf, offset, len);
+	return -1;
+      }
     }
 }
 
