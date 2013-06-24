@@ -168,6 +168,14 @@ struct target_stack
      stratum.  */
 
   struct target_ops *ops[MAX_TARGET_STRATUM + 1];
+
+  /* Reference count.  */
+
+  int refc;
+
+  /* The "smashed" target_ops.  */
+
+  struct target_ops *smashed;
 };
 
 /* Top of target stack.  */
@@ -182,7 +190,8 @@ static struct target_stack *target_stack;
        (T) = find_target_beneath (T))
 
 /* The target structure we are currently using to talk to a process
-   or file or whatever "inferior" we have.  */
+   or file or whatever "inferior" we have.  This is always equal to
+   TARGET_STACK->smashed.  */
 
 struct target_ops *current_target;
 
@@ -4939,6 +4948,53 @@ setup_target_debug (void)
 }
 
 
+struct target_stack *
+target_stack_incref (void)
+{
+  ++target_stack->refc;
+  return target_stack;
+}
+
+void
+target_stack_decref (struct target_stack *target_stack)
+{
+  --target_stack->refc;
+  /* FIXME */
+}
+
+void
+target_stack_set_current (struct target_stack *tstack)
+{
+  target_stack = tstack;
+  current_target = tstack->smashed;
+}
+
+struct target_stack *
+new_target_stack (void)
+{
+  struct target_stack *save = target_stack;
+  struct target_stack *result;
+
+  /* Overwrite the globals so that push_target can work.  */
+  current_target = XCNEW (struct target_ops);
+  target_stack = XCNEW (struct target_stack);
+  target_stack->refc = 1;
+  target_stack->smashed = current_target;
+
+  push_target (&dummy_target);
+
+  result = target_stack;
+  target_stack = save;
+  if (target_stack == NULL)
+    current_target = NULL;
+  else
+    current_target = save->smashed;
+
+  return result;
+}
+
+
+
 static char targ_desc[] =
 "Names of targets and files being debugged.\nShows the entire \
 stack of targets currently in use (including the exec-file,\n\
@@ -5061,11 +5117,10 @@ set_write_memory_permission (char *args, int from_tty,
 void
 initialize_targets (void)
 {
-  current_target = XCNEW (struct target_ops);
-  target_stack = XCNEW (struct target_stack);
-
   init_dummy_target ();
-  push_target (&dummy_target);
+
+  target_stack = new_target_stack ();
+  current_target = target_stack->smashed;
 
   add_info ("target", target_info, targ_desc);
   add_info ("files", target_info, targ_desc);

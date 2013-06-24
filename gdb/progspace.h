@@ -201,6 +201,10 @@ struct program_space
        This is so we can properly report solib changes to the user.  */
     VEC (char_ptr) *deleted_solibs;
 
+    /* The target stack.  Each program space owns a reference to
+       it.  */
+    struct target_stack *target_stack;
+
     /* Per pspace data-pointers required by other GDB modules.  */
     REGISTRY_FIELDS;
   };

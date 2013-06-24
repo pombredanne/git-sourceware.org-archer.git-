@@ -37,6 +37,7 @@ struct uploaded_tp;
 struct static_tracepoint_marker;
 struct traceframe_info;
 struct expression;
+struct target_stack;
 
 /* This include file defines the interface between the main part
    of the debugger, and the part which is target-specific, or
@@ -871,6 +872,24 @@ struct target_ops
    places that initialize one.  */
 
 #define	OPS_MAGIC	3840
+
+/* Acquire a reference to the target stack.  */
+
+extern struct target_stack *target_stack_incref (void);
+
+/* Release a reference to the target stack.  */
+
+extern void target_stack_decref (struct target_stack *);
+
+/* Set target_stack and current_target from TSTACK.  */
+
+extern void target_stack_set_current (struct target_stack *tstack);
+
+/* Create a new "empty" target stack and return it.  The current
+   target stack is not changed.  The new stack is initialized with a
+   single reference count, which is owned by the caller.  */
+
+extern struct target_stack *new_target_stack (void);
 
 /* The ops structure for our "current" target process.  This should
    never be NULL.  If there is no target, it points to the dummy_target.  */
