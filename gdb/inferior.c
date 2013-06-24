@@ -820,12 +820,19 @@ add_inferior_with_spaces (void)
   return inf;
 }
 
-/* add-inferior [-copies N] [-exec FILENAME]  */
+static void
+target_stack_decref_cleanup (void *arg)
+{
+  target_stack_decref (arg);
+}
+
+/* add-inferior [-new-target] [-copies N] [-exec FILENAME]  */
 
 static void
 add_inferior_command (char *args, int from_tty)
 {
   int i, copies = 1;
+  int new_target = 0;
   char *exec = NULL;
   char **argv;
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
@@ -854,6 +861,8 @@ add_inferior_command (char *args, int from_tty)
 		  exec = tilde_expand (*argv);
 		  make_cleanup (xfree, exec);
 		}
+	      else if (strcmp (*argv, "-new-target") == 0)
+		new_target = 1;
 	    }
 	  else
 	    error (_("Invalid argument"));
@@ -861,6 +870,14 @@ add_inferior_command (char *args, int from_tty)
     }
 
   save_current_space_and_thread ();
+
+  if (new_target)
+    {
+      struct target_stack *tstack = new_target_stack ();
+
+      make_cleanup (target_stack_decref_cleanup, tstack);
+      target_stack_set_current (tstack);
+    }
 
   for (i = 0; i < copies; ++i)
     {
