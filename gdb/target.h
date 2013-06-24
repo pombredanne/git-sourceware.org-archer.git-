@@ -73,7 +73,9 @@ enum strata
     process_stratum,		/* Executing processes or core dump files */
     thread_stratum,		/* Executing threads */
     record_stratum,		/* Support record debugging */
-    arch_stratum		/* Architecture overrides */
+    arch_stratum,		/* Architecture overrides */
+
+    MAX_TARGET_STRATUM = arch_stratum
   };
 
 enum thread_control_capabilities
@@ -308,7 +310,6 @@ struct thread_info;		/* fwd decl for parameter list below: */
 
 struct target_ops
   {
-    struct target_ops *beneath;	/* To the target under this one.  */
     char *to_shortname;		/* Name this target type */
     char *to_longname;		/* Name for printing */
     char *to_doc;		/* Documentation.  Does not include trailing
