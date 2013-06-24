@@ -403,6 +403,11 @@ target_has_execution_current (void)
 void
 complete_target_initialization (struct target_ops *t)
 {
+  struct cmd_list_element *c;
+
+  if (t->to_identification == NULL)
+    t->to_identification = t;
+
   /* Provide default values for all "must have" methods.  */
   if (t->to_xfer_partial == NULL)
     t->to_xfer_partial = default_xfer_partial;

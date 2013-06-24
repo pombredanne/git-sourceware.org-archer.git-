@@ -71,6 +71,10 @@
 #include "agent.h"
 #include "btrace.h"
 
+static struct target_ops remote_ops;
+
+static struct target_ops extended_remote_ops;
+
 /* Temp hacks for tracepoint encoding migration.  */
 static char *target_buf;
 static long target_buf_size;
@@ -108,8 +112,6 @@ static void remote_open (char *name, int from_tty);
 static void extended_remote_open (char *name, int from_tty);
 
 static void remote_open_1 (char *, int, struct target_ops *, int extended_p);
-
-static void remote_close (void);
 
 static void remote_mourn (struct target_ops *ops);
 
@@ -432,6 +434,19 @@ struct remote_state
   threadref resultthreadlist[MAXTHREADLISTRESULTS];
 };
 
+/* A subclass of target_ops that also holds a struct remote_state.  */
+
+struct remote_ops_with_data
+{
+  /* The base class.  */
+
+  struct target_ops base;
+
+  /* The remote state.  */
+
+  struct remote_state state;
+};
+
 /* Private data that we'll store in (struct thread_info)->private.  */
 struct private_thread_info
 {
@@ -453,34 +468,44 @@ remote_multi_process_p (struct remote_state *rs)
   return rs->multi_process_aware;
 }
 
-/* This data could be associated with a target, but we do not always
-   have access to the current target when we need it, so for now it is
-   static.  This will be fine for as long as only one target is in use
-   at a time.  */
-static struct remote_state *remote_state;
+#define REMOTE_TARGET_STRATUM process_stratum
 
 static struct remote_state *
 get_remote_state_raw (void)
 {
-  return remote_state;
+  struct remote_ops_with_data *self
+    = (struct remote_ops_with_data *) find_target_at (REMOTE_TARGET_STRATUM);
+
+  if (self == NULL
+      || (self->base.to_identification != &remote_ops
+	  && self->base.to_identification != &extended_remote_ops))
+    return NULL;
+
+  return &self->state;
 }
 
 /* Allocate a new struct remote_state with xmalloc, initialize it, and
    return it.  */
 
-static struct remote_state *
-new_remote_state (void)
+static void
+new_remote_state (struct remote_state *state)
 {
-  struct remote_state *result = XCNEW (struct remote_state);
-
   /* The default buffer size is unimportant; it will be expanded
      whenever a larger buffer is needed. */
-  result->buf_size = 400;
-  result->buf = xmalloc (result->buf_size);
-  result->remote_traceframe_number = -1;
-  result->last_sent_signal = GDB_SIGNAL_0;
+  state->buf_size = 400;
+  state->buf = xmalloc (state->buf_size);
+  state->remote_traceframe_number = -1;
+  state->last_sent_signal = GDB_SIGNAL_0;
+}
 
-  return result;
+/* Tear down remote state.  */
+
+static void
+destroy_remote_state (struct remote_state *state)
+{
+  xfree (state->last_pass_packet);
+  xfree (state->last_program_signals_packet);
+  /* FIXME */
 }
 
 /* Description of the remote protocol for a given architecture.  */
@@ -623,6 +648,11 @@ get_remote_arch_state (void)
 static struct remote_state *
 get_remote_state (void)
 {
+  struct remote_state *result = get_remote_state_raw ();
+
+  if (result == NULL)
+    return NULL;
+
   /* Make sure that the remote architecture state has been
      initialized, because doing so might reallocate rs->buf.  Any
      function which calls getpkt also needs to be mindful of changes
@@ -630,7 +660,7 @@ get_remote_state (void)
      into trouble.  */
   get_remote_arch_state ();
 
-  return get_remote_state_raw ();
+  return result;
 }
 
 static int
@@ -813,10 +843,6 @@ packet_reg_from_pnum (struct remote_arch_state *rsa, LONGEST pnum)
     }
   return NULL;
 }
-
-static struct target_ops remote_ops;
-
-static struct target_ops extended_remote_ops;
 
 /* FIXME: cagney/1999-09-23: Even though getpkt was called with
    ``forever'' still use the normal timeout mechanism.  This is
@@ -2747,7 +2773,7 @@ remote_threads_info (struct target_ops *ops)
   char *bufp;
   ptid_t new_thread;
 
-  if (rs->remote_desc == 0)		/* paranoia */
+  if (rs == NULL || rs->remote_desc == 0) /* paranoia */
     error (_("Command can only be used when connected to the remote target."));
 
 #if defined(HAVE_LIBEXPAT)
@@ -2873,7 +2899,7 @@ remote_threads_extra_info (struct thread_info *tp)
   static char display_buf[100];	/* arbitrary...  */
   int n = 0;                    /* position in display_buf */
 
-  if (rs->remote_desc == 0)		/* paranoia */
+  if (rs == NULL || rs->remote_desc == 0) /* paranoia */
     internal_error (__FILE__, __LINE__,
 		    _("remote_threads_extra_info"));
 
@@ -3048,9 +3074,12 @@ extended_remote_restart (void)
 /* Clean up connection to a remote debugger.  */
 
 static void
-remote_close (void)
+remote_xclose (struct target_ops *ops)
 {
-  struct remote_state *rs = get_remote_state ();
+  /* Downcast.  */
+  struct remote_ops_with_data *rops
+    = (struct remote_ops_with_data *) ops;
+  struct remote_state *rs = &rops->state;
 
   if (rs->remote_desc == NULL)
     return; /* already closed */
@@ -3081,6 +3110,9 @@ remote_close (void)
   remote_notif_unregister_async_event_handler ();
 
   trace_reset_local_state ();
+
+  destroy_remote_state (rs);
+  xfree (ops);
 }
 
 /* Query the remote side for the text, data and bss offsets.  */
@@ -4262,7 +4294,7 @@ remote_query_supported (void)
 static void
 remote_unpush_target (void)
 {
-  pop_all_targets_above (process_stratum - 1);
+  pop_all_targets_above (REMOTE_TARGET_STRATUM - 1);
 }
 
 static void
@@ -4270,6 +4302,7 @@ remote_open_1 (char *name, int from_tty,
 	       struct target_ops *target, int extended_p)
 {
   struct remote_state *rs = get_remote_state ();
+  struct remote_ops_with_data *rops;
 
   if (name == 0)
     error (_("To open a remote debug connection, you need to specify what\n"
@@ -4283,7 +4316,7 @@ remote_open_1 (char *name, int from_tty,
   /* If we're connected to a running target, target_preopen will kill it.
      Ask this question first, before target_preopen has a chance to kill
      anything.  */
-  if (rs->remote_desc != NULL && !have_inferiors ())
+  if (rs != NULL && rs->remote_desc != NULL && !have_inferiors ())
     {
       if (from_tty
 	  && !query (_("Already connected to a remote target.  Disconnect? ")))
@@ -4293,18 +4326,15 @@ remote_open_1 (char *name, int from_tty,
   /* Here the possibly existing remote target gets unpushed.  */
   target_preopen (from_tty);
 
-  /* Make sure we send the passed signals list the next time we resume.  */
-  xfree (rs->last_pass_packet);
-  rs->last_pass_packet = NULL;
-
-  /* Make sure we send the program signals list the next time we
-     resume.  */
-  xfree (rs->last_program_signals_packet);
-  rs->last_program_signals_packet = NULL;
-
   remote_fileio_reset ();
   reopen_exec_file ();
   reread_symbols ();
+
+  rops = XCNEW (struct remote_ops_with_data);
+  memcpy (&rops->base, target, sizeof (rops->base));
+  new_remote_state (&rops->state);
+  /* Paranoia.  */
+  target = NULL;
 
   rs->remote_desc = remote_serial_open (name);
   if (!rs->remote_desc)
@@ -4336,7 +4366,7 @@ remote_open_1 (char *name, int from_tty,
       puts_filtered (name);
       puts_filtered ("\n");
     }
-  push_target (target);		/* Switch to using remote target now.  */
+  push_target (&rops->base);	/* Switch to using remote target now.  */
 
   /* Register extra event sources in the event loop.  */
   remote_async_inferior_event_token
@@ -4405,7 +4435,7 @@ remote_open_1 (char *name, int from_tty,
 
     TRY_CATCH (ex, RETURN_MASK_ALL)
       {
-	remote_start_remote (from_tty, target, extended_p);
+	remote_start_remote (from_tty, &rops->base, extended_p);
       }
     if (ex.reason < 0)
       {
@@ -7894,7 +7924,7 @@ remote_mourn_1 (struct target_ops *target)
 {
   unpush_target (target);
 
-  /* remote_close takes care of doing most of the clean up.  */
+  /* remote_xclose takes care of doing most of the clean up.  */
   generic_mourn_inferior ();
 }
 
@@ -9182,7 +9212,7 @@ packet_command (char *args, int from_tty)
 {
   struct remote_state *rs = get_remote_state ();
 
-  if (!rs->remote_desc)
+  if (rs == NULL || !rs->remote_desc)
     error (_("command can only be used with remote target"));
 
   if (!args)
@@ -10125,7 +10155,7 @@ remote_file_put (const char *local_file, const char *remote_file, int from_tty)
   ULONGEST offset;
   struct remote_state *rs = get_remote_state ();
 
-  if (!rs->remote_desc)
+  if (rs == NULL || !rs->remote_desc)
     error (_("command can only be used with remote target"));
 
   file = gdb_fopen_cloexec (local_file, "rb");
@@ -10214,7 +10244,7 @@ remote_file_get (const char *remote_file, const char *local_file, int from_tty)
   ULONGEST offset;
   struct remote_state *rs = get_remote_state ();
 
-  if (!rs->remote_desc)
+  if (rs == NULL || !rs->remote_desc)
     error (_("command can only be used with remote target"));
 
   fd = remote_hostio_open (remote_file, FILEIO_O_RDONLY, 0, &remote_errno);
@@ -10266,7 +10296,7 @@ remote_file_delete (const char *remote_file, int from_tty)
   int retcode, remote_errno;
   struct remote_state *rs = get_remote_state ();
 
-  if (!rs->remote_desc)
+  if (rs == NULL || !rs->remote_desc)
     error (_("command can only be used with remote target"));
 
   retcode = remote_hostio_unlink (remote_file, &remote_errno);
@@ -11479,7 +11509,7 @@ init_remote_ops (void)
 Specify the serial device it is connected to\n\
 (e.g. /dev/ttyS0, /dev/ttya, COM1, etc.).";
   remote_ops.to_open = remote_open;
-  remote_ops.to_close = remote_close;
+  remote_ops.to_xclose = remote_xclose;
   remote_ops.to_detach = remote_detach;
   remote_ops.to_disconnect = remote_disconnect;
   remote_ops.to_resume = remote_resume;
@@ -11517,7 +11547,7 @@ Specify the serial device it is connected to\n\
   remote_ops.to_rcmd = remote_rcmd;
   remote_ops.to_log_command = serial_log_command;
   remote_ops.to_get_thread_local_address = remote_get_thread_local_address;
-  remote_ops.to_stratum = process_stratum;
+  remote_ops.to_stratum = REMOTE_TARGET_STRATUM;
   remote_ops.to_has_all_memory = default_child_has_all_memory;
   remote_ops.to_has_memory = default_child_has_memory;
   remote_ops.to_has_stack = default_child_has_stack;
@@ -11732,7 +11762,7 @@ remote_new_objfile (struct objfile *objfile)
 {
   struct remote_state *rs = get_remote_state ();
 
-  if (rs->remote_desc != 0)		/* Have a remote connection.  */
+  if (rs != NULL && rs->remote_desc != 0) /* Have a remote connection.  */
     remote_check_symbols ();
 }
 
@@ -11807,7 +11837,7 @@ set_range_stepping (char *ignore_args, int from_tty,
      supported by the target, and warn if not.  */
   if (use_range_stepping)
     {
-      if (rs->remote_desc != NULL)
+      if (rs != NULL && rs->remote_desc != NULL)
 	{
 	  if (remote_protocol_packets[PACKET_vCont].support == PACKET_SUPPORT_UNKNOWN)
 	    remote_vcont_probe (rs);
@@ -11824,7 +11854,6 @@ set_range_stepping (char *ignore_args, int from_tty,
 void
 _initialize_remote (void)
 {
-  struct remote_state *rs;
   struct cmd_list_element *cmd;
   const char *cmd_name;
 
@@ -11833,11 +11862,6 @@ _initialize_remote (void)
     gdbarch_data_register_post_init (init_remote_state);
   remote_g_packet_data_handle =
     gdbarch_data_register_pre_init (remote_g_packet_data_init);
-
-  /* Initialize the per-target state.  At the moment there is only one
-     of these, not one per target.  Only one target is active at a
-     time.  */
-  remote_state = new_remote_state ();
 
   init_remote_ops ();
   add_target (&remote_ops);
