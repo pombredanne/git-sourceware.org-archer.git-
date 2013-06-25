@@ -205,6 +205,9 @@ struct program_space
        it.  */
     struct target_stack *target_stack;
 
+    /* Binary file diddling handle for the core file.  */
+    bfd *cbfd;
+
     /* Per pspace data-pointers required by other GDB modules.  */
     REGISTRY_FIELDS;
   };

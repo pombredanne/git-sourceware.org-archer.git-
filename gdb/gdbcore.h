@@ -114,7 +114,7 @@ extern void specify_exec_file_hook (void (*hook) (char *filename));
 
 /* Binary File Diddler for the core file.  */
 
-extern bfd *core_bfd;
+#define core_bfd (current_program_space->cbfd)
 
 extern struct target_ops *core_target;
 
