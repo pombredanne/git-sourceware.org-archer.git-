@@ -4335,6 +4335,7 @@ remote_open_1 (char *name, int from_tty,
   new_remote_state (&rops->state);
   /* Paranoia.  */
   target = NULL;
+  rs = &rops->state;
 
   rs->remote_desc = remote_serial_open (name);
   if (!rs->remote_desc)
