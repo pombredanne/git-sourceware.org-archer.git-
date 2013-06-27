@@ -388,7 +388,7 @@ make_cleanup_restore_uinteger (unsigned int *variable)
 static void
 do_unpush_target (void *arg)
 {
-  struct target_ops *ops = arg;
+  struct gdb_target *ops = arg;
 
   unpush_target (ops);
 }
@@ -396,7 +396,7 @@ do_unpush_target (void *arg)
 /* Return a new cleanup that unpushes OPS.  */
 
 struct cleanup *
-make_cleanup_unpush_target (struct target_ops *ops)
+make_cleanup_unpush_target (struct gdb_target *ops)
 {
   return make_cleanup (do_unpush_target, ops);
 }
@@ -1032,7 +1032,7 @@ quit (void)
   if (job_control
       /* If there is no terminal switching for this target, then we can't
          possibly get screwed by the lack of job control.  */
-      || current_target->to_terminal_ours == NULL)
+      || current_target->ops->to_terminal_ours == NULL)
     fatal ("Quit");
   else
     fatal ("Quit (expect signal SIGINT when the program is resumed)");

@@ -19,7 +19,7 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-struct target_ops;
+struct gdb_target;
 struct target_desc;
 
 /* Read an XML target description from FILENAME.  Parse it, and return
@@ -30,4 +30,4 @@ const struct target_desc *file_read_description_xml (const char *filename);
 /* Read an XML target description using OPS.  Parse it, and return the
    parsed description.  */
 
-const struct target_desc *target_read_description_xml (struct target_ops *);
+const struct target_desc *target_read_description_xml (struct gdb_target *);

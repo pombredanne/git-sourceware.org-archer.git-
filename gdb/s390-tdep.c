@@ -761,7 +761,7 @@ s390_regset_from_core_section (struct gdbarch *gdbarch,
 
 static const struct target_desc *
 s390_core_read_description (struct gdbarch *gdbarch,
-			    struct target_ops *target, bfd *abfd)
+			    struct gdb_target *target, bfd *abfd)
 {
   asection *high_gprs = bfd_get_section_by_name (abfd, ".reg-s390-high-gprs");
   asection *v1 = bfd_get_section_by_name (abfd, ".reg-s390-last-break");

@@ -54,22 +54,22 @@ static const char ravenscar_runtime_initializer[] =
 
 static struct observer *update_target_observer = NULL;
 
-static void ravenscar_find_new_threads (struct target_ops *ops);
+static void ravenscar_find_new_threads (struct gdb_target *ops);
 static ptid_t ravenscar_running_thread (void);
 static char *ravenscar_extra_thread_info (struct thread_info *tp);
-static int ravenscar_thread_alive (struct target_ops *ops, ptid_t ptid);
-static void ravenscar_fetch_registers (struct target_ops *ops,
+static int ravenscar_thread_alive (struct gdb_target *ops, ptid_t ptid);
+static void ravenscar_fetch_registers (struct gdb_target *ops,
                                        struct regcache *regcache, int regnum);
-static void ravenscar_store_registers (struct target_ops *ops,
+static void ravenscar_store_registers (struct gdb_target *ops,
                                        struct regcache *regcache, int regnum);
 static void ravenscar_prepare_to_store (struct regcache *regcache);
-static void ravenscar_resume (struct target_ops *ops, ptid_t ptid, int step,
+static void ravenscar_resume (struct gdb_target *ops, ptid_t ptid, int step,
 			      enum gdb_signal siggnal);
-static void ravenscar_mourn_inferior (struct target_ops *ops);
+static void ravenscar_mourn_inferior (struct gdb_target *ops);
 static void ravenscar_update_inferior_ptid (void);
 static int has_ravenscar_runtime (void);
 static int ravenscar_runtime_initialized (void);
-static void ravenscar_inferior_created (struct target_ops *target,
+static void ravenscar_inferior_created (struct gdb_target *target,
 					int from_tty);
 
 /* Fetch the ravenscar running thread from target memory and
@@ -172,24 +172,24 @@ get_running_thread_id (void)
 }
 
 static void
-ravenscar_resume (struct target_ops *ops, ptid_t ptid, int step,
+ravenscar_resume (struct gdb_target *ops, ptid_t ptid, int step,
 		  enum gdb_signal siggnal)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   inferior_ptid = base_ptid;
-  beneath->to_resume (beneath, base_ptid, step, siggnal);
+  beneath->ops->to_resume (beneath, base_ptid, step, siggnal);
 }
 
 static ptid_t
-ravenscar_wait (struct target_ops *ops, ptid_t ptid,
+ravenscar_wait (struct gdb_target *ops, ptid_t ptid,
                 struct target_waitstatus *status,
                 int options)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   inferior_ptid = base_ptid;
-  beneath->to_wait (beneath, base_ptid, status, 0);
+  beneath->ops->to_wait (beneath, base_ptid, status, 0);
   /* Find any new threads that might have been created, and update
      inferior_ptid to the active thread.
 
@@ -217,7 +217,7 @@ ravenscar_add_thread (struct ada_task_info *task)
 }
 
 static void
-ravenscar_find_new_threads (struct target_ops *ops)
+ravenscar_find_new_threads (struct gdb_target *ops)
 {
   ada_build_task_list ();
 
@@ -247,14 +247,14 @@ ravenscar_extra_thread_info (struct thread_info *tp)
 }
 
 static int
-ravenscar_thread_alive (struct target_ops *ops, ptid_t ptid)
+ravenscar_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   /* Ravenscar tasks are non-terminating.  */
   return 1;
 }
 
 static char *
-ravenscar_pid_to_str (struct target_ops *ops, ptid_t ptid)
+ravenscar_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[30];
 
@@ -263,15 +263,15 @@ ravenscar_pid_to_str (struct target_ops *ops, ptid_t ptid)
 }
 
 static void
-ravenscar_fetch_registers (struct target_ops *ops,
+ravenscar_fetch_registers (struct gdb_target *ops,
                            struct regcache *regcache, int regnum)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   if (!ravenscar_runtime_initialized ()
       || ptid_equal (inferior_ptid, base_magic_null_ptid)
       || ptid_equal (inferior_ptid, ravenscar_running_thread ()))
-    beneath->to_fetch_registers (beneath, regcache, regnum);
+    beneath->ops->to_fetch_registers (beneath, regcache, regnum);
   else
     {
       struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -283,15 +283,15 @@ ravenscar_fetch_registers (struct target_ops *ops,
 }
 
 static void
-ravenscar_store_registers (struct target_ops *ops,
+ravenscar_store_registers (struct gdb_target *ops,
                            struct regcache *regcache, int regnum)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   if (!ravenscar_runtime_initialized ()
       || ptid_equal (inferior_ptid, base_magic_null_ptid)
       || ptid_equal (inferior_ptid, ravenscar_running_thread ()))
-    beneath->to_store_registers (beneath, regcache, regnum);
+    beneath->ops->to_store_registers (beneath, regcache, regnum);
   else
     {
       struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -305,12 +305,13 @@ ravenscar_store_registers (struct target_ops *ops,
 static void
 ravenscar_prepare_to_store (struct regcache *regcache)
 {
-  struct target_ops *beneath = find_target_beneath (&ravenscar_ops);
+  struct gdb_target *beneath
+    = find_target_beneath (find_target_ops (&ravenscar_ops));
 
   if (!ravenscar_runtime_initialized ()
       || ptid_equal (inferior_ptid, base_magic_null_ptid)
       || ptid_equal (inferior_ptid, ravenscar_running_thread ()))
-    beneath->to_prepare_to_store (regcache);
+    beneath->ops->to_prepare_to_store (regcache);
   else
     {
       struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -322,19 +323,20 @@ ravenscar_prepare_to_store (struct regcache *regcache)
 }
 
 static void
-ravenscar_mourn_inferior (struct target_ops *ops)
+ravenscar_mourn_inferior (struct gdb_target *ops)
 {
-  struct target_ops *beneath = find_target_beneath (&ravenscar_ops);
+  struct gdb_target *self = find_target_ops (&ravenscar_ops);
+  struct gdb_target *beneath = find_target_beneath (self);
 
   base_ptid = null_ptid;
-  beneath->to_mourn_inferior (beneath);
-  unpush_target (&ravenscar_ops);
+  beneath->ops->to_mourn_inferior (beneath);
+  unpush_target (self);
 }
 
 /* Observer on inferior_created: push ravenscar thread stratum if needed.  */
 
 static void
-ravenscar_inferior_created (struct target_ops *target, int from_tty)
+ravenscar_inferior_created (struct gdb_target *target, int from_tty)
 {
   struct ravenscar_arch_ops *ops;
 

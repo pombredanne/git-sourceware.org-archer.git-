@@ -394,10 +394,10 @@ dec_thread_add_gdb_thread (struct thread_info *info, void *context)
   return 0;
 }
 
-/* Implement the find_new_thread target_ops method.  */
+/* Implement the find_new_thread gdb_target method.  */
 
 static void
-dec_thread_find_new_threads (struct target_ops *ops)
+dec_thread_find_new_threads (struct gdb_target *ops)
 {
   int i;
   struct dec_thread_info *info;
@@ -416,7 +416,7 @@ dec_thread_find_new_threads (struct target_ops *ops)
    list of threads reported by libpthread_debug.  */
 
 static void
-resync_thread_list (struct target_ops *ops)
+resync_thread_list (struct gdb_target *ops)
 {
   int i;
   int num_gdb_threads = 0;
@@ -444,14 +444,14 @@ resync_thread_list (struct target_ops *ops)
 /* The "to_detach" method of the dec_thread_ops.  */
 
 static void
-dec_thread_detach (struct target_ops *ops, char *args, int from_tty)
+dec_thread_detach (struct gdb_target *ops, char *args, int from_tty)
 {   
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   debug ("dec_thread_detach");
 
   disable_dec_thread ();
-  beneath->to_detach (beneath, args, from_tty);
+  beneath->ops->to_detach (beneath, args, from_tty);
 }
 
 /* Return the ptid of the thread that is currently active.  */
@@ -475,15 +475,15 @@ get_active_ptid (void)
 /* The "to_wait" method of the dec_thread_ops.  */
 
 static ptid_t
-dec_thread_wait (struct target_ops *ops,
+dec_thread_wait (struct gdb_target *ops,
 		 ptid_t ptid, struct target_waitstatus *status, int options)
 {
   ptid_t active_ptid;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   debug ("dec_thread_wait");
 
-  ptid = beneath->to_wait (beneath, ptid, status, options);
+  ptid = beneath->ops->to_wait (beneath, ptid, status, options);
 
   /* The ptid returned by the target beneath us is the ptid of the process.
      We need to find which thread is currently active and return its ptid.  */
@@ -532,7 +532,7 @@ dec_thread_get_regsets (pthreadDebugId_t tid, gdb_gregset_t *gregset,
    registers.  */
 
 static void
-dec_thread_fetch_registers (struct target_ops *ops,
+dec_thread_fetch_registers (struct gdb_target *ops,
                             struct regcache *regcache, int regno)
 {
   pthreadDebugId_t tid = ptid_get_tid (inferior_ptid);
@@ -545,9 +545,9 @@ dec_thread_fetch_registers (struct target_ops *ops,
 
   if (tid == 0 || ptid_equal (inferior_ptid, get_active_ptid ()))
     {
-      struct target_ops *beneath = find_target_beneath (ops);
+      struct gdb_target *beneath = find_target_beneath (ops);
 
-      beneath->to_fetch_registers (beneath, regcache, regno);
+      beneath->ops->to_fetch_registers (beneath, regcache, regno);
       return;
     }
 
@@ -596,7 +596,7 @@ dec_thread_set_regsets (pthreadDebugId_t tid, gdb_gregset_t gregset,
    just one register, we store all the registers.  */
 
 static void
-dec_thread_store_registers (struct target_ops *ops,
+dec_thread_store_registers (struct gdb_target *ops,
                             struct regcache *regcache, int regno)
 {
   pthreadDebugId_t tid = ptid_get_tid (inferior_ptid);
@@ -608,9 +608,9 @@ dec_thread_store_registers (struct target_ops *ops,
 
   if (tid == 0 || ptid_equal (inferior_ptid, get_active_ptid ()))
     {
-      struct target_ops *beneath = find_target_beneath (ops);
+      struct gdb_target *beneath = find_target_beneath (ops);
 
-      beneath->to_store_registers (beneath, regcache, regno);
+      beneath->ops->to_store_registers (beneath, regcache, regno);
       return;
     }
 
@@ -629,19 +629,19 @@ dec_thread_store_registers (struct target_ops *ops,
 /* The "to_mourn_inferior" method of the dec_thread_ops.  */
 
 static void
-dec_thread_mourn_inferior (struct target_ops *ops)
+dec_thread_mourn_inferior (struct gdb_target *ops)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   debug ("dec_thread_mourn_inferior");
 
   disable_dec_thread ();
-  beneath->to_mourn_inferior (beneath);
+  beneath->ops->to_mourn_inferior (beneath);
 }
 
 /* The "to_thread_alive" method of the dec_thread_ops.  */
 static int
-dec_thread_thread_alive (struct target_ops *ops, ptid_t ptid)
+dec_thread_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   debug ("dec_thread_thread_alive (tid=%ld)", ptid_get_tid (ptid));
 
@@ -653,15 +653,15 @@ dec_thread_thread_alive (struct target_ops *ops, ptid_t ptid)
 /* The "to_pid_to_str" method of the dec_thread_ops.  */
 
 static char *
-dec_thread_pid_to_str (struct target_ops *ops, ptid_t ptid)
+dec_thread_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char *ret = NULL;
 
   if (ptid_get_tid (ptid) == 0)
     {
-      struct target_ops *beneath = find_target_beneath (ops);
+      struct gdb_target *beneath = find_target_beneath (ops);
 
-      return beneath->to_pid_to_str (beneath, ptid);
+      return beneath->ops->to_pid_to_str (beneath, ptid);
     }
 
   /* Free previous return value; a new one will be allocated by

@@ -4303,7 +4303,7 @@ tfile_open (char *filename, int from_tty)
   /* Looks semi-reasonable.  Toss the old trace file and work on the new.  */
 
   discard_cleanups (old_chain);	/* Don't free filename any more.  */
-  unpush_target (&tfile_ops);
+  unpush_target (find_target_ops (&tfile_ops));
 
   trace_filename = xstrdup (filename);
   trace_fd = scratch_chan;
@@ -4762,7 +4762,7 @@ tfile_close (void)
 }
 
 static void
-tfile_files_info (struct target_ops *t)
+tfile_files_info (struct gdb_target *t)
 {
   printf_filtered ("\t`%s'\n", trace_filename);
 }
@@ -5007,7 +5007,7 @@ traceframe_find_block_type (char type_wanted, int pos)
    requested register from it.  */
 
 static void
-tfile_fetch_registers (struct target_ops *ops,
+tfile_fetch_registers (struct gdb_target *ops,
 		       struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -5091,7 +5091,7 @@ tfile_fetch_registers (struct target_ops *ops,
 }
 
 static LONGEST
-tfile_xfer_partial (struct target_ops *ops, enum target_object object,
+tfile_xfer_partial (struct gdb_target *ops, enum target_object object,
 		    const char *annex, gdb_byte *readbuf,
 		    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
@@ -5216,25 +5216,25 @@ tfile_get_trace_state_variable_value (int tsvnum, LONGEST *val)
 }
 
 static int
-tfile_has_all_memory (struct target_ops *ops)
+tfile_has_all_memory (struct gdb_target *ops)
 {
   return 1;
 }
 
 static int
-tfile_has_memory (struct target_ops *ops)
+tfile_has_memory (struct gdb_target *ops)
 {
   return 1;
 }
 
 static int
-tfile_has_stack (struct target_ops *ops)
+tfile_has_stack (struct gdb_target *ops)
 {
   return traceframe_number != -1;
 }
 
 static int
-tfile_has_registers (struct target_ops *ops)
+tfile_has_registers (struct gdb_target *ops)
 {
   return traceframe_number != -1;
 }

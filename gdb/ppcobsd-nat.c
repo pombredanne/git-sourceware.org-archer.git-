@@ -72,7 +72,7 @@ getfpregs_supplies (struct gdbarch *gdbarch, int regnum)
    for all registers.  */
 
 static void
-ppcobsd_fetch_registers (struct target_ops *ops,
+ppcobsd_fetch_registers (struct gdb_target *ops,
 			 struct regcache *regcache, int regnum)
 {
   struct reg regs;
@@ -108,7 +108,7 @@ ppcobsd_fetch_registers (struct target_ops *ops,
    this for all registers.  */
 
 static void
-ppcobsd_store_registers (struct target_ops *ops,
+ppcobsd_store_registers (struct gdb_target *ops,
 			 struct regcache *regcache, int regnum)
 {
   struct reg regs;

@@ -1282,7 +1282,7 @@ amd64_linux_record_signal (struct gdbarch *gdbarch,
 
 static const struct target_desc *
 amd64_linux_core_read_description (struct gdbarch *gdbarch,
-				  struct target_ops *target,
+				  struct gdb_target *target,
 				  bfd *abfd)
 {
   /* Linux/x86-64.  */

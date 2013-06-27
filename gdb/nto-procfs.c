@@ -61,7 +61,7 @@ static int procfs_can_run (void);
 
 static int procfs_xfer_memory (CORE_ADDR, gdb_byte *, int, int,
 			       struct mem_attrib *attrib,
-			       struct target_ops *);
+			       struct gdb_target *);
 
 static void init_procfs_ops (void);
 
@@ -217,7 +217,7 @@ procfs_set_thread (ptid_t ptid)
 
 /*  Return nonzero if the thread TH is still alive.  */
 static int
-procfs_thread_alive (struct target_ops *ops, ptid_t ptid)
+procfs_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   pid_t tid;
   pid_t pid;
@@ -313,7 +313,7 @@ update_thread_private_data (struct thread_info *new_thread,
 }
 
 static void
-procfs_find_new_threads (struct target_ops *ops)
+procfs_find_new_threads (struct gdb_target *ops)
 {
   procfs_status status;
   pid_t pid;
@@ -594,7 +594,7 @@ procfs_meminfo (char *args, int from_tty)
 
 /* Print status information about what we're accessing.  */
 static void
-procfs_files_info (struct target_ops *ignore)
+procfs_files_info (struct gdb_target *ignore)
 {
   struct inferior *inf = current_inferior ();
 
@@ -613,7 +613,7 @@ procfs_can_run (void)
 
 /* Attach to process PID, then initialize for debugging it.  */
 static void
-procfs_attach (struct target_ops *ops, char *args, int from_tty)
+procfs_attach (struct gdb_target *ops, char *args, int from_tty)
 {
   char *exec_file;
   int pid;
@@ -719,7 +719,7 @@ nto_interrupt (int signo)
 }
 
 static ptid_t
-procfs_wait (struct target_ops *ops,
+procfs_wait (struct gdb_target *ops,
 	     ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   sigset_t set;
@@ -822,7 +822,7 @@ procfs_wait (struct target_ops *ops,
    general register set and floating point registers (if supported)
    and update gdb's idea of their current values.  */
 static void
-procfs_fetch_registers (struct target_ops *ops,
+procfs_fetch_registers (struct gdb_target *ops,
 			struct regcache *regcache, int regno)
 {
   union
@@ -855,7 +855,7 @@ procfs_fetch_registers (struct target_ops *ops,
    anyway.  */
 static int
 procfs_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int dowrite,
-		    struct mem_attrib *attrib, struct target_ops *target)
+		    struct mem_attrib *attrib, struct gdb_target *target)
 {
   int nbytes = 0;
 
@@ -876,7 +876,7 @@ procfs_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int dowrite,
    on signals, etc.  We'd better not have left any breakpoints
    in the program or it'll die when it hits one.  */
 static void
-procfs_detach (struct target_ops *ops, char *args, int from_tty)
+procfs_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   int siggnal = 0;
   int pid;
@@ -951,7 +951,7 @@ procfs_remove_hw_breakpoint (struct gdbarch *gdbarch,
 }
 
 static void
-procfs_resume (struct target_ops *ops,
+procfs_resume (struct gdb_target *ops,
 	       ptid_t ptid, int step, enum gdb_signal signo)
 {
   int signal_to_pass;
@@ -1012,7 +1012,7 @@ procfs_resume (struct target_ops *ops,
 }
 
 static void
-procfs_mourn_inferior (struct target_ops *ops)
+procfs_mourn_inferior (struct gdb_target *ops)
 {
   if (!ptid_equal (inferior_ptid, null_ptid))
     {
@@ -1086,7 +1086,7 @@ breakup_args (char *scratch, char **argv)
 }
 
 static void
-procfs_create_inferior (struct target_ops *ops, char *exec_file,
+procfs_create_inferior (struct gdb_target *ops, char *exec_file,
 			char *allargs, char **env, int from_tty)
 {
   struct inheritance inherit;
@@ -1220,7 +1220,7 @@ procfs_stop (ptid_t ptid)
 }
 
 static void
-procfs_kill_inferior (struct target_ops *ops)
+procfs_kill_inferior (struct gdb_target *ops)
 {
   target_mourn_inferior ();
 }
@@ -1266,7 +1266,7 @@ get_regset (int regset, char *buf, int bufsize, int *regsize)
 }
 
 void
-procfs_store_registers (struct target_ops *ops,
+procfs_store_registers (struct gdb_target *ops,
 			struct regcache *regcache, int regno)
 {
   union
@@ -1354,7 +1354,7 @@ procfs_thread_info (pid_t pid, short tid)
 }
 
 static char *
-procfs_pid_to_str (struct target_ops *ops, ptid_t ptid)
+procfs_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[1024];
   int pid, tid, n;

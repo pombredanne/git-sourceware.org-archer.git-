@@ -401,7 +401,7 @@ strip_bg_char (char **args)
    should be stopped.  */
 
 void
-post_create_inferior (struct target_ops *target, int from_tty)
+post_create_inferior (struct gdb_target *target, int from_tty)
 {
   volatile struct gdb_exception ex;
 

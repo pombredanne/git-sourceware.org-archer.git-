@@ -264,7 +264,7 @@ store_xtregs (struct regcache *regcache, int regnum)
 }
 
 void
-xtensa_linux_fetch_inferior_registers (struct target_ops *ops,
+xtensa_linux_fetch_inferior_registers (struct gdb_target *ops,
 				       struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
@@ -279,7 +279,7 @@ xtensa_linux_fetch_inferior_registers (struct target_ops *ops,
 }
 
 void
-xtensa_linux_store_inferior_registers (struct target_ops *ops,
+xtensa_linux_store_inferior_registers (struct gdb_target *ops,
 				       struct regcache *regcache, int regnum)
 {
   if (regnum == -1)

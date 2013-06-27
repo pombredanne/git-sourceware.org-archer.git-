@@ -748,7 +748,7 @@ monitor_open (char *args, struct monitor_ops *mon_ops, int from_tty)
     compile_pattern (mon_ops->setreg.resp_delim, &setreg_resp_delim_pattern,
                      setreg_resp_delim_fastmap);
   
-  unpush_target (targ_ops);
+  unpush_target (find_target_ops (targ_ops));
 
   if (dev_name)
     xfree (dev_name);
@@ -875,7 +875,7 @@ monitor_close (void)
    when you want to detach and do something else with your gdb.  */
 
 static void
-monitor_detach (struct target_ops *ops, char *args, int from_tty)
+monitor_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   unpush_target (ops);		/* calls monitor_close to do the real work.  */
   if (from_tty)
@@ -935,7 +935,7 @@ monitor_supply_register (struct regcache *regcache, int regno, char *valstr)
 /* Tell the remote machine to resume.  */
 
 static void
-monitor_resume (struct target_ops *ops,
+monitor_resume (struct gdb_target *ops,
 		ptid_t ptid, int step, enum gdb_signal sig)
 {
   /* Some monitors require a different command when starting a program.  */
@@ -1091,7 +1091,7 @@ monitor_wait_filter (char *buf,
    status just as `wait' would.  */
 
 static ptid_t
-monitor_wait (struct target_ops *ops,
+monitor_wait (struct gdb_target *ops,
 	      ptid_t ptid, struct target_waitstatus *status, int options)
 {
   int old_timeout = timeout;
@@ -1324,7 +1324,7 @@ monitor_dump_regs (struct regcache *regcache)
 }
 
 static void
-monitor_fetch_registers (struct target_ops *ops,
+monitor_fetch_registers (struct gdb_target *ops,
 			 struct regcache *regcache, int regno)
 {
   monitor_debug ("MON fetchregs\n");
@@ -1406,7 +1406,7 @@ monitor_store_register (struct regcache *regcache, int regno)
 /* Store the remote registers.  */
 
 static void
-monitor_store_registers (struct target_ops *ops,
+monitor_store_registers (struct gdb_target *ops,
 			 struct regcache *regcache, int regno)
 {
   if (regno >= 0)
@@ -1433,7 +1433,7 @@ monitor_prepare_to_store (struct regcache *regcache)
 }
 
 static void
-monitor_files_info (struct target_ops *ops)
+monitor_files_info (struct gdb_target *ops)
 {
   printf_unfiltered (_("\tAttached to %s at %d baud.\n"), dev_name, baud_rate);
 }
@@ -2021,7 +2021,7 @@ monitor_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len)
 
 static int
 monitor_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
-		     struct mem_attrib *attrib, struct target_ops *target)
+		     struct mem_attrib *attrib, struct gdb_target *target)
 {
   int res;
 
@@ -2041,7 +2041,7 @@ monitor_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
 }
 
 static void
-monitor_kill (struct target_ops *ops)
+monitor_kill (struct gdb_target *ops)
 {
   return;			/* Ignore attempts to kill target system.  */
 }
@@ -2049,7 +2049,7 @@ monitor_kill (struct target_ops *ops)
 /* All we actually do is set the PC to the start address of exec_bfd.  */
 
 static void
-monitor_create_inferior (struct target_ops *ops, char *exec_file,
+monitor_create_inferior (struct gdb_target *ops, char *exec_file,
 			 char *args, char **env, int from_tty)
 {
   if (args && (*args != '\000'))
@@ -2067,9 +2067,9 @@ monitor_create_inferior (struct target_ops *ops, char *exec_file,
    instructions.  */
 
 static void
-monitor_mourn_inferior (struct target_ops *ops)
+monitor_mourn_inferior (struct gdb_target *ops)
 {
-  unpush_target (targ_ops);
+  unpush_target (find_target_ops (targ_ops));
   generic_mourn_inferior ();	/* Do all the proper things now.  */
   delete_thread_silent (monitor_ptid);
 }
@@ -2306,7 +2306,7 @@ monitor_get_dev_name (void)
 /* Check to see if a thread is still alive.  */
 
 static int
-monitor_thread_alive (struct target_ops *ops, ptid_t ptid)
+monitor_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   if (ptid_equal (ptid, monitor_ptid))
     /* The monitor's task is always alive.  */
@@ -2319,7 +2319,7 @@ monitor_thread_alive (struct target_ops *ops, ptid_t ptid)
    buffer.  */
 
 static char *
-monitor_pid_to_str (struct target_ops *ops, ptid_t ptid)
+monitor_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[64];
 

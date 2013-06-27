@@ -86,7 +86,7 @@ static void lsi_open (char *name, int from_tty);
 
 static void mips_close (void);
 
-static void mips_detach (struct target_ops *ops, char *args, int from_tty);
+static void mips_detach (struct gdb_target *ops, char *args, int from_tty);
 
 static int mips_map_regno (struct gdbarch *, int);
 
@@ -102,11 +102,11 @@ static int mips_store_word (CORE_ADDR addr, unsigned int value,
 static int mips_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 			     int write, 
 			     struct mem_attrib *attrib,
-			     struct target_ops *target);
+			     struct gdb_target *target);
 
-static void mips_files_info (struct target_ops *ignore);
+static void mips_files_info (struct gdb_target *ignore);
 
-static void mips_mourn_inferior (struct target_ops *ops);
+static void mips_mourn_inferior (struct gdb_target *ops);
 
 static int pmon_makeb64 (unsigned long v, char *p, int n, unsigned int *chksum);
 
@@ -1580,7 +1580,7 @@ seen from the board via TFTP, specify that name as the third parameter.\n"));
   target_preopen (from_tty);
 
   if (mips_is_open)
-    unpush_target (current_ops);
+    unpush_target (find_target_ops (ops));
 
   /* Open and initialize the serial port.  */
   mips_desc = serial_open (serial_port_name);
@@ -1750,7 +1750,7 @@ mips_close (void)
 /* Detach from the remote board.  */
 
 static void
-mips_detach (struct target_ops *ops, char *args, int from_tty)
+mips_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   if (args)
     error (_("Argument given to \"detach\" when remotely debugging."));
@@ -1766,7 +1766,7 @@ mips_detach (struct target_ops *ops, char *args, int from_tty)
    where PMON does return a reply.  */
 
 static void
-mips_resume (struct target_ops *ops,
+mips_resume (struct gdb_target *ops,
 	     ptid_t ptid, int step, enum gdb_signal siggnal)
 {
   int err;
@@ -1829,7 +1829,7 @@ mips_set_register (int regno, ULONGEST value)
 /* Wait until the remote stops, and return a wait status.  */
 
 static ptid_t
-mips_wait (struct target_ops *ops,
+mips_wait (struct gdb_target *ops,
 	   ptid_t ptid, struct target_waitstatus *status, int options)
 {
   int rstatus;
@@ -2015,7 +2015,7 @@ mips_map_regno (struct gdbarch *gdbarch, int regno)
 /* Fetch the remote registers.  */
 
 static void
-mips_fetch_registers (struct target_ops *ops,
+mips_fetch_registers (struct gdb_target *ops,
 		      struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -2074,7 +2074,7 @@ mips_prepare_to_store (struct regcache *regcache)
 /* Store remote register(s).  */
 
 static void
-mips_store_registers (struct target_ops *ops,
+mips_store_registers (struct gdb_target *ops,
 		      struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -2154,7 +2154,7 @@ static int mask_address_p = 1;
 
 static int
 mips_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
-		  struct mem_attrib *attrib, struct target_ops *target)
+		  struct mem_attrib *attrib, struct gdb_target *target)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
   int i;
@@ -2253,7 +2253,7 @@ mips_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
 /* Print info on this target.  */
 
 static void
-mips_files_info (struct target_ops *ignore)
+mips_files_info (struct gdb_target *ignore)
 {
   printf_unfiltered ("Debugging a MIPS board over a serial line.\n");
 }
@@ -2264,7 +2264,7 @@ mips_files_info (struct target_ops *ignore)
    right port, we could interrupt the process with a break signal.  */
 
 static void
-mips_kill (struct target_ops *ops)
+mips_kill (struct gdb_target *ops)
 {
   if (!mips_wait_flag)
     {
@@ -2322,7 +2322,7 @@ Give up (and stop debugging it)? ")))
 /* Start running on the target board.  */
 
 static void
-mips_create_inferior (struct target_ops *ops, char *execfile,
+mips_create_inferior (struct gdb_target *ops, char *execfile,
 		      char *args, char **env, int from_tty)
 {
   CORE_ADDR entry_pt;
@@ -2349,10 +2349,10 @@ Can't pass arguments to remote MIPS board; arguments ignored."));
    which is called when unpushing the target.  */
 
 static void
-mips_mourn_inferior (struct target_ops *ops)
+mips_mourn_inferior (struct gdb_target *ops)
 {
   if (current_ops != NULL)
-    unpush_target (current_ops);
+    unpush_target (find_target_ops (current_ops));
 }
 
 /* We can write a breakpoint and read the shadow contents in one
@@ -3562,7 +3562,7 @@ mips_load (char *file, int from_tty)
 /* Check to see if a thread is still alive.  */
  
 static int
-mips_thread_alive (struct target_ops *ops, ptid_t ptid)
+mips_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   if (ptid_equal (ptid, remote_mips_ptid))
     /* The monitor's task is always alive.  */
@@ -3575,7 +3575,7 @@ mips_thread_alive (struct target_ops *ops, ptid_t ptid)
    buffer.  */
 
 static char *
-mips_pid_to_str (struct target_ops *ops, ptid_t ptid)
+mips_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[64];
 

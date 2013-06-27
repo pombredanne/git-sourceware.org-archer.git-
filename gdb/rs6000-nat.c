@@ -80,7 +80,7 @@
 static void exec_one_dummy_insn (struct regcache *);
 
 static LONGEST rs6000_xfer_shared_libraries
-  (struct target_ops *ops, enum target_object object,
+  (struct gdb_target *ops, enum target_object object,
    const char *annex, gdb_byte *readbuf, const gdb_byte *writebuf,
    ULONGEST offset, LONGEST len);
 
@@ -286,7 +286,7 @@ store_register (struct regcache *regcache, int regno)
    REGNO otherwise.  */
 
 static void
-rs6000_fetch_inferior_registers (struct target_ops *ops,
+rs6000_fetch_inferior_registers (struct gdb_target *ops,
 				 struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -329,7 +329,7 @@ rs6000_fetch_inferior_registers (struct target_ops *ops,
    Otherwise, REGNO specifies which register (so we can save time).  */
 
 static void
-rs6000_store_inferior_registers (struct target_ops *ops,
+rs6000_store_inferior_registers (struct gdb_target *ops,
 				 struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -373,7 +373,7 @@ rs6000_store_inferior_registers (struct target_ops *ops,
    Return the number of bytes actually transferred.  */
 
 static LONGEST
-rs6000_xfer_partial (struct target_ops *ops, enum target_object object,
+rs6000_xfer_partial (struct gdb_target *ops, enum target_object object,
 		     const char *annex, gdb_byte *readbuf,
 		     const gdb_byte *writebuf,
 		     ULONGEST offset, LONGEST len)
@@ -478,7 +478,7 @@ rs6000_xfer_partial (struct target_ops *ops, enum target_object object,
    the status in *OURSTATUS.  */
 
 static ptid_t
-rs6000_wait (struct target_ops *ops,
+rs6000_wait (struct gdb_target *ops,
 	     ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   pid_t pid;
@@ -580,10 +580,10 @@ exec_one_dummy_insn (struct regcache *regcache)
 /* Set the current architecture from the host running GDB.  Called when
    starting a child process.  */
 
-static void (*super_create_inferior) (struct target_ops *,char *exec_file, 
+static void (*super_create_inferior) (struct gdb_target *,char *exec_file, 
 				      char *allargs, char **env, int from_tty);
 static void
-rs6000_create_inferior (struct target_ops * ops, char *exec_file,
+rs6000_create_inferior (struct gdb_target * ops, char *exec_file,
 			char *allargs, char **env, int from_tty)
 {
   enum bfd_architecture arch;
@@ -671,12 +671,12 @@ rs6000_ptrace_ldinfo (ptid_t ptid)
   return ldi;
 }
 
-/* Implement the to_xfer_partial target_ops method for
+/* Implement the to_xfer_partial gdb_target method for
    TARGET_OBJECT_LIBRARIES_AIX objects.  */
 
 static LONGEST
 rs6000_xfer_shared_libraries
-  (struct target_ops *ops, enum target_object object,
+  (struct gdb_target *ops, enum target_object object,
    const char *annex, gdb_byte *readbuf, const gdb_byte *writebuf,
    ULONGEST offset, LONGEST len)
 {

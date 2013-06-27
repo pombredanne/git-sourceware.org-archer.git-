@@ -1443,7 +1443,7 @@ struct inf *waiting_inf;
 
 /* Wait for something to happen in the inferior, returning what in STATUS.  */
 static ptid_t
-gnu_wait (struct target_ops *ops,
+gnu_wait (struct gdb_target *ops,
 	  ptid_t ptid, struct target_waitstatus *status, int options)
 {
   struct msg
@@ -1973,7 +1973,7 @@ port_msgs_queued (mach_port_t port)
    in multiple events returned by wait).  */
 
 static void
-gnu_resume (struct target_ops *ops,
+gnu_resume (struct gdb_target *ops,
 	    ptid_t ptid, int step, enum gdb_signal sig)
 {
   struct proc *step_thread = 0;
@@ -2049,7 +2049,7 @@ gnu_resume (struct target_ops *ops,
 
 
 static void
-gnu_kill_inferior (struct target_ops *ops)
+gnu_kill_inferior (struct gdb_target *ops)
 {
   struct proc *task = gnu_current_inf->task;
 
@@ -2064,7 +2064,7 @@ gnu_kill_inferior (struct target_ops *ops)
 
 /* Clean up after the inferior dies.  */
 static void
-gnu_mourn_inferior (struct target_ops *ops)
+gnu_mourn_inferior (struct gdb_target *ops)
 {
   inf_debug (gnu_current_inf, "rip");
   inf_detach (gnu_current_inf);
@@ -2096,7 +2096,7 @@ cur_inf (void)
 }
 
 static void
-gnu_create_inferior (struct target_ops *ops, 
+gnu_create_inferior (struct gdb_target *ops, 
 		     char *exec_file, char *allargs, char **env,
 		     int from_tty)
 {
@@ -2153,7 +2153,7 @@ gnu_create_inferior (struct target_ops *ops,
 /* Attach to process PID, then initialize for debugging it
    and wait for the trace-trap that results from attaching.  */
 static void
-gnu_attach (struct target_ops *ops, char *args, int from_tty)
+gnu_attach (struct gdb_target *ops, char *args, int from_tty)
 {
   int pid;
   char *exec_file;
@@ -2217,7 +2217,7 @@ gnu_attach (struct target_ops *ops, char *args, int from_tty)
    previously attached.  It *might* work if the program was
    started via fork.  */
 static void
-gnu_detach (struct target_ops *ops, char *args, int from_tty)
+gnu_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   int pid;
 
@@ -2257,7 +2257,7 @@ gnu_stop (ptid_t ptid)
 }
 
 static int
-gnu_thread_alive (struct target_ops *ops, ptid_t ptid)
+gnu_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   inf_update_procs (gnu_current_inf);
   return !!inf_tid_to_thread (gnu_current_inf,
@@ -2476,7 +2476,7 @@ out:
 static int
 gnu_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
 		 struct mem_attrib *attrib,
-		 struct target_ops *target)
+		 struct gdb_target *target)
 {
   task_t task = (gnu_current_inf
 		 ? (gnu_current_inf->task
@@ -2593,7 +2593,7 @@ proc_string (struct proc *proc)
 }
 
 static char *
-gnu_pid_to_str (struct target_ops *ops, ptid_t ptid)
+gnu_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   struct inf *inf = gnu_current_inf;
   int tid = ptid_get_tid (ptid);

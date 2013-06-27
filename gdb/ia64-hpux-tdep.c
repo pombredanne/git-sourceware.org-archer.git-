@@ -189,7 +189,7 @@ ia64_hpux_can_store_ar_register (int regnum)
     }
 }
 
-/* The "cannot_store_register" target_ops method.  */
+/* The "cannot_store_register" gdb_target method.  */
 
 static int
 ia64_hpux_cannot_store_register (struct gdbarch *gdbarch, int regnum)
@@ -218,7 +218,7 @@ static int
 ia64_hpux_stopped_in_syscall (struct gdbarch *gdbarch)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  struct target_ops *ops = current_target;
+  struct gdb_target *ops = current_target;
   gdb_byte buf[8];
   int len;
 
@@ -391,7 +391,7 @@ ia64_hpux_find_global_pointer_from_solib (struct gdbarch *gdbarch,
 					  CORE_ADDR faddr)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  struct target_ops *ops = current_target;
+  struct gdb_target *ops = current_target;
   gdb_byte buf[8];
   LONGEST len;
 

@@ -28,7 +28,7 @@
    Return 0 if *READPTR is already at the end of the buffer.
    Return -1 if there is insufficient buffer for a whole entry.
    Return 1 if an entry was read into *TYPEP and *VALP.  */
-extern int target_auxv_parse (struct target_ops *ops,
+extern int target_auxv_parse (struct gdb_target *ops,
 			      gdb_byte **readptr, gdb_byte *endptr,
 			      CORE_ADDR *typep, CORE_ADDR *valp);
 
@@ -36,13 +36,13 @@ extern int target_auxv_parse (struct target_ops *ops,
    Return zero if no such entry was found, or -1 if there was
    an error getting the information.  On success, return 1 after
    storing the entry's value field in *VALP.  */
-extern int target_auxv_search (struct target_ops *ops,
+extern int target_auxv_search (struct gdb_target *ops,
 			       CORE_ADDR match, CORE_ADDR *valp);
 
 /* Print the contents of the target's AUXV on the specified file.  */
-extern int fprint_target_auxv (struct ui_file *file, struct target_ops *ops);
+extern int fprint_target_auxv (struct ui_file *file, struct gdb_target *ops);
 
-extern LONGEST memory_xfer_auxv (struct target_ops *ops,
+extern LONGEST memory_xfer_auxv (struct gdb_target *ops,
 				 enum target_object object,
 				 const char *annex,
 				 gdb_byte *readbuf,

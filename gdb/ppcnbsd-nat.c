@@ -79,7 +79,7 @@ getfpregs_supplies (struct gdbarch *gdbarch, int regnum)
 }
 
 static void
-ppcnbsd_fetch_inferior_registers (struct target_ops *ops,
+ppcnbsd_fetch_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -110,7 +110,7 @@ ppcnbsd_fetch_inferior_registers (struct target_ops *ops,
 }
 
 static void
-ppcnbsd_store_inferior_registers (struct target_ops *ops,
+ppcnbsd_store_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);

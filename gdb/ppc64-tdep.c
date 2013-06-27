@@ -352,7 +352,7 @@ ppc64_skip_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
 CORE_ADDR
 ppc64_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
 					CORE_ADDR addr,
-					struct target_ops *targ)
+					struct gdb_target *targ)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   struct target_section *s = target_section_by_addr (targ, addr);

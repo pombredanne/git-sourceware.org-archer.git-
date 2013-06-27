@@ -1139,7 +1139,7 @@ ctf_read_tp (struct uploaded_tp **uploaded_tps)
     }
 }
 
-/* This is the implementation of target_ops method to_open.  Open CTF
+/* This is the implementation of gdb_target method to_open.  Open CTF
    trace data, read trace status, trace state variables and tracepoint
    definitions from the first packet.  Set the start position at the
    second packet which contains events on trace blocks.  */
@@ -1203,7 +1203,7 @@ ctf_open (char *dirname, int from_tty)
   merge_uploaded_tracepoints (&uploaded_tps);
 }
 
-/* This is the implementation of target_ops method to_close.  Destroy
+/* This is the implementation of gdb_target method to_close.  Destroy
    CTF iterator and context.  */
 
 static void
@@ -1216,22 +1216,22 @@ ctf_close (void)
   trace_reset_local_state ();
 }
 
-/* This is the implementation of target_ops method to_files_info.
+/* This is the implementation of gdb_target method to_files_info.
    Print the directory name of CTF trace data.  */
 
 static void
-ctf_files_info (struct target_ops *t)
+ctf_files_info (struct gdb_target *t)
 {
   printf_filtered ("\t`%s'\n", trace_dirname);
 }
 
-/* This is the implementation of target_ops method to_fetch_registers.
+/* This is the implementation of gdb_target method to_fetch_registers.
    Iterate over events whose name is "register" in current frame,
    extract contents from events, and set REGCACHE with the contents.
    If no matched events are found, mark registers unavailable.  */
 
 static void
-ctf_fetch_registers (struct target_ops *ops,
+ctf_fetch_registers (struct gdb_target *ops,
 		     struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -1350,14 +1350,14 @@ ctf_fetch_registers (struct target_ops *ops,
     }
 }
 
-/* This is the implementation of target_ops method to_xfer_partial.
+/* This is the implementation of gdb_target method to_xfer_partial.
    Iterate over events whose name is "memory" in
    current frame, extract the address and length from events.  If
    OFFSET is within the range, read the contents from events to
    READBUF.  */
 
 static LONGEST
-ctf_xfer_partial (struct target_ops *ops, enum target_object object,
+ctf_xfer_partial (struct gdb_target *ops, enum target_object object,
 		  const char *annex, gdb_byte *readbuf,
 		  const gdb_byte *writebuf, ULONGEST offset,
 		  LONGEST len)
@@ -1493,7 +1493,7 @@ ctf_xfer_partial (struct target_ops *ops, enum target_object object,
   return -1;
 }
 
-/* This is the implementation of target_ops method
+/* This is the implementation of gdb_target method
    to_get_trace_state_variable_value.
    Iterate over events whose name is "tsv" in current frame.  When the
    trace variable is found, set the value of it to *VAL and return
@@ -1612,7 +1612,7 @@ ctf_get_traceframe_address (void)
   return addr;
 }
 
-/* This is the implementation of target_ops method to_trace_find.
+/* This is the implementation of gdb_target method to_trace_find.
    Iterate the events whose name is "frame", extract the tracepoint
    number in it.  Return traceframe number when matched.  */
 
@@ -1716,27 +1716,27 @@ ctf_trace_find (enum trace_find_type type, int num,
   return -1;
 }
 
-/* This is the implementation of target_ops method to_has_stack.
+/* This is the implementation of gdb_target method to_has_stack.
    The target has a stack when GDB has already selected one trace
    frame.  */
 
 static int
-ctf_has_stack (struct target_ops *ops)
+ctf_has_stack (struct gdb_target *ops)
 {
   return get_traceframe_number () != -1;
 }
 
-/* This is the implementation of target_ops method to_has_registers.
+/* This is the implementation of gdb_target method to_has_registers.
    The target has registers when GDB has already selected one trace
    frame.  */
 
 static int
-ctf_has_registers (struct target_ops *ops)
+ctf_has_registers (struct gdb_target *ops)
 {
   return get_traceframe_number () != -1;
 }
 
-/* This is the implementation of target_ops method to_traceframe_info.
+/* This is the implementation of gdb_target method to_traceframe_info.
    Iterate the events whose name is "memory", in current
    frame, extract memory range information, and return them in
    traceframe_info.  */
@@ -1808,7 +1808,7 @@ ctf_traceframe_info (void)
   return info;
 }
 
-/* This is the implementation of target_ops method to_get_trace_status.
+/* This is the implementation of gdb_target method to_get_trace_status.
    The trace status for a file is that tracing can never be run.  */
 
 static int

@@ -330,14 +330,14 @@ lwp_to_thread (ptid_t lwp)
    program was started via the normal ptrace (PTRACE_TRACEME).  */
 
 static void
-sol_thread_detach (struct target_ops *ops, char *args, int from_tty)
+sol_thread_detach (struct gdb_target *ops, char *args, int from_tty)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   sol_thread_active = 0;
   inferior_ptid = pid_to_ptid (PIDGET (main_ph.ptid));
   unpush_target (ops);
-  beneath->to_detach (beneath, args, from_tty);
+  beneath->ops->to_detach (beneath, args, from_tty);
 }
 
 /* Resume execution of process PTID.  If STEP is nozero, then just
@@ -346,11 +346,11 @@ sol_thread_detach (struct target_ops *ops, char *args, int from_tty)
    ID for procfs.  */
 
 static void
-sol_thread_resume (struct target_ops *ops,
+sol_thread_resume (struct gdb_target *ops,
 		   ptid_t ptid, int step, enum gdb_signal signo)
 {
   struct cleanup *old_chain;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   old_chain = save_inferior_ptid ();
 
@@ -370,7 +370,7 @@ sol_thread_resume (struct target_ops *ops,
 		 GET_THREAD (save_ptid));
     }
 
-  beneath->to_resume (beneath, ptid, step, signo);
+  beneath->ops->to_resume (beneath, ptid, step, signo);
 
   do_cleanups (old_chain);
 }
@@ -379,12 +379,12 @@ sol_thread_resume (struct target_ops *ops,
    thread ID to an LWP ID, and vice versa on the way out.  */
 
 static ptid_t
-sol_thread_wait (struct target_ops *ops,
+sol_thread_wait (struct gdb_target *ops,
 		 ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   ptid_t rtnval;
   ptid_t save_ptid;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
   struct cleanup *old_chain;
 
   save_ptid = inferior_ptid;
@@ -406,7 +406,7 @@ sol_thread_wait (struct target_ops *ops,
 		 GET_THREAD (save_ptid));
     }
 
-  rtnval = beneath->to_wait (beneath, ptid, ourstatus, options);
+  rtnval = beneath->ops->to_wait (beneath, ptid, ourstatus, options);
 
   if (ourstatus->kind != TARGET_WAITKIND_EXITED)
     {
@@ -433,7 +433,7 @@ sol_thread_wait (struct target_ops *ops,
 }
 
 static void
-sol_thread_fetch_registers (struct target_ops *ops,
+sol_thread_fetch_registers (struct gdb_target *ops,
 			    struct regcache *regcache, int regnum)
 {
   thread_t thread;
@@ -443,12 +443,12 @@ sol_thread_fetch_registers (struct target_ops *ops,
   prfpregset_t fpregset;
   gdb_gregset_t *gregset_p = &gregset;
   gdb_fpregset_t *fpregset_p = &fpregset;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   if (!is_thread (inferior_ptid))
     {
       /* It's an LWP; pass the request on to the layer beneath.  */
-      beneath->to_fetch_registers (beneath, regcache, regnum);
+      beneath->ops->to_fetch_registers (beneath, regcache, regnum);
       return;
     }
 
@@ -488,7 +488,7 @@ sol_thread_fetch_registers (struct target_ops *ops,
 }
 
 static void
-sol_thread_store_registers (struct target_ops *ops,
+sol_thread_store_registers (struct gdb_target *ops,
 			    struct regcache *regcache, int regnum)
 {
   thread_t thread;
@@ -499,10 +499,10 @@ sol_thread_store_registers (struct target_ops *ops,
 
   if (!is_thread (inferior_ptid))
     {
-      struct target_ops *beneath = find_target_beneath (ops);
+      struct gdb_target *beneath = find_target_beneath (ops);
 
       /* It's an LWP; pass the request on to the layer beneath.  */
-      beneath->to_store_registers (beneath, regcache, regnum);
+      beneath->ops->to_store_registers (beneath, regcache, regnum);
       return;
     }
 
@@ -553,14 +553,14 @@ sol_thread_store_registers (struct target_ops *ops,
    one, of readbuf or writebuf must be non-NULL.  */
 
 static LONGEST
-sol_thread_xfer_partial (struct target_ops *ops, enum target_object object,
+sol_thread_xfer_partial (struct gdb_target *ops, enum target_object object,
 			  const char *annex, gdb_byte *readbuf,
 			  const gdb_byte *writebuf,
 			 ULONGEST offset, LONGEST len)
 {
   int retval;
   struct cleanup *old_chain;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   old_chain = save_inferior_ptid ();
 
@@ -574,8 +574,8 @@ sol_thread_xfer_partial (struct target_ops *ops, enum target_object object,
       inferior_ptid = procfs_first_available ();
     }
 
-  retval = beneath->to_xfer_partial (beneath, object, annex,
-				     readbuf, writebuf, offset, len);
+  retval = beneath->ops->to_xfer_partial (beneath, object, annex,
+					  readbuf, writebuf, offset, len);
 
   do_cleanups (old_chain);
 
@@ -654,21 +654,21 @@ sol_thread_new_objfile (struct objfile *objfile)
 /* Clean up after the inferior dies.  */
 
 static void
-sol_thread_mourn_inferior (struct target_ops *ops)
+sol_thread_mourn_inferior (struct gdb_target *ops)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   sol_thread_active = 0;
 
   unpush_target (ops);
 
-  beneath->to_mourn_inferior (beneath);
+  beneath->ops->to_mourn_inferior (beneath);
 }
 
 /* Return true if PTID is still active in the inferior.  */
 
 static int
-sol_thread_alive (struct target_ops *ops, ptid_t ptid)
+sol_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   if (is_thread (ptid))
     {
@@ -686,10 +686,10 @@ sol_thread_alive (struct target_ops *ops, ptid_t ptid)
     }
   else
     {
-      struct target_ops *beneath = find_target_beneath (ops);
+      struct gdb_target *beneath = find_target_beneath (ops);
 
       /* It's an LPW; pass the request on to the layer below.  */
-      return beneath->to_thread_alive (beneath, ptid);
+      return beneath->ops->to_thread_alive (beneath, ptid);
     }
 }
 
@@ -1030,7 +1030,7 @@ ps_lgetLDT (gdb_ps_prochandle_t ph, lwpid_t lwpid,
 /* Convert PTID to printable form.  */
 
 static char *
-solaris_pid_to_str (struct target_ops *ops, ptid_t ptid)
+solaris_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[100];
 
@@ -1080,13 +1080,13 @@ sol_find_new_threads_callback (const td_thrhandle_t *th, void *ignored)
 }
 
 static void
-sol_find_new_threads (struct target_ops *ops)
+sol_find_new_threads (struct gdb_target *ops)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   /* First Find any new LWP's.  */
-  if (beneath->to_find_new_threads != NULL)
-    beneath->to_find_new_threads (beneath);
+  if (beneath->ops->to_find_new_threads != NULL)
+    beneath->ops->to_find_new_threads (beneath);
 
   /* Then find any new user-level threads.  */
   p_td_ta_thr_iter (main_ta, sol_find_new_threads_callback, (void *) 0,

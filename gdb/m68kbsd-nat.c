@@ -109,7 +109,7 @@ m68kbsd_collect_fpregset (struct regcache *regcache,
    for all registers (including the floating-point registers).  */
 
 static void
-m68kbsd_fetch_inferior_registers (struct target_ops *ops,
+m68kbsd_fetch_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int regnum)
 {
   if (regnum == -1 || m68kbsd_gregset_supplies_p (regnum))
@@ -139,7 +139,7 @@ m68kbsd_fetch_inferior_registers (struct target_ops *ops,
    this for all registers (including the floating-point registers).  */
 
 static void
-m68kbsd_store_inferior_registers (struct target_ops *ops,
+m68kbsd_store_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int regnum)
 {
   if (regnum == -1 || m68kbsd_gregset_supplies_p (regnum))

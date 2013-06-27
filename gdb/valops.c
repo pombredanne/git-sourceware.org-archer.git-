@@ -971,7 +971,7 @@ read_value_memory (struct value *val, int embedded_offset,
 	  int i;
 
 	  /* Fallback to reading from read-only sections.  */
-	  table = target_get_section_table (&exec_ops);
+	  table = target_get_section_table (find_target_ops (&exec_ops));
 	  available_memory =
 	    section_table_available_memory (available_memory,
 					    memaddr, length,

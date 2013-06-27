@@ -1182,7 +1182,7 @@ find_func_descr (struct gdbarch *gdbarch, CORE_ADDR entry_point)
 
 static CORE_ADDR
 frv_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
-                                struct target_ops *targ)
+                                struct gdb_target *targ)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   CORE_ADDR entry_point;

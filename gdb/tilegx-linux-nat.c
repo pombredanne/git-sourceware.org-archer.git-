@@ -128,7 +128,7 @@ fill_fpregset (const struct regcache *regcache,
    for all registers.  */
 
 static void
-fetch_inferior_registers (struct target_ops *ops,
+fetch_inferior_registers (struct gdb_target *ops,
 			  struct regcache *regcache, int regnum)
 {
   elf_gregset_t regs;
@@ -148,7 +148,7 @@ fetch_inferior_registers (struct target_ops *ops,
    this for all registers.  */
 
 static void
-store_inferior_registers (struct target_ops *ops,
+store_inferior_registers (struct gdb_target *ops,
 			  struct regcache *regcache, int regnum)
 {
   elf_gregset_t regs;

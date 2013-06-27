@@ -600,7 +600,7 @@ file_read_description_xml (const char *filename)
 static char *
 fetch_available_features_from_target (const char *name, void *baton_)
 {
-  struct target_ops *ops = baton_;
+  struct gdb_target *ops = baton_;
 
   /* Read this object as a string.  This ensures that a NUL
      terminator is added.  */
@@ -614,7 +614,7 @@ fetch_available_features_from_target (const char *name, void *baton_)
    parsed description.  */
 
 const struct target_desc *
-target_read_description_xml (struct target_ops *ops)
+target_read_description_xml (struct gdb_target *ops)
 {
   struct target_desc *tdesc;
   char *tdesc_str;

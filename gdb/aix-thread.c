@@ -945,30 +945,30 @@ new_objfile (struct objfile *objfile)
 /* Attach to process specified by ARGS.  */
 
 static void
-aix_thread_attach (struct target_ops *ops, char *args, int from_tty)
+aix_thread_attach (struct gdb_target *ops, char *args, int from_tty)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
   
-  beneath->to_attach (beneath, args, from_tty);
+  beneath->ops->to_attach (beneath, args, from_tty);
   pd_activate (1);
 }
 
 /* Detach from the process attached to by aix_thread_attach().  */
 
 static void
-aix_thread_detach (struct target_ops *ops, char *args, int from_tty)
+aix_thread_detach (struct gdb_target *ops, char *args, int from_tty)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   pd_disable ();
-  beneath->to_detach (beneath, args, from_tty);
+  beneath->ops->to_detach (beneath, args, from_tty);
 }
 
 /* Tell the inferior process to continue running thread PID if != -1
    and all threads otherwise.  */
 
 static void
-aix_thread_resume (struct target_ops *ops,
+aix_thread_resume (struct gdb_target *ops,
                    ptid_t ptid, int step, enum gdb_signal sig)
 {
   struct thread_info *thread;
@@ -977,10 +977,10 @@ aix_thread_resume (struct target_ops *ops,
   if (!PD_TID (ptid))
     {
       struct cleanup *cleanup = save_inferior_ptid ();
-      struct target_ops *beneath = find_target_beneath (ops);
+      struct gdb_target *beneath = find_target_beneath (ops);
       
       inferior_ptid = pid_to_ptid (PIDGET (inferior_ptid));
-      beneath->to_resume (beneath, ptid, step, sig);
+      beneath->ops->to_resume (beneath, ptid, step, sig);
       do_cleanups (cleanup);
     }
   else
@@ -1010,11 +1010,11 @@ aix_thread_resume (struct target_ops *ops,
    thread.  */
 
 static ptid_t
-aix_thread_wait (struct target_ops *ops,
+aix_thread_wait (struct gdb_target *ops,
 		 ptid_t ptid, struct target_waitstatus *status, int options)
 {
   struct cleanup *cleanup = save_inferior_ptid ();
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   pid_to_prc (&ptid);
 
@@ -1292,15 +1292,15 @@ fetch_regs_kernel_thread (struct regcache *regcache, int regno,
    thread/process specified by inferior_ptid.  */
 
 static void
-aix_thread_fetch_registers (struct target_ops *ops,
+aix_thread_fetch_registers (struct gdb_target *ops,
                             struct regcache *regcache, int regno)
 {
   struct thread_info *thread;
   pthdb_tid_t tid;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   if (!PD_TID (inferior_ptid))
-    beneath->to_fetch_registers (beneath, regcache, regno);
+    beneath->ops->to_fetch_registers (beneath, regcache, regno);
   else
     {
       thread = find_thread_ptid (inferior_ptid);
@@ -1646,15 +1646,15 @@ store_regs_kernel_thread (const struct regcache *regcache, int regno,
    thread/process specified by inferior_ptid.  */
 
 static void
-aix_thread_store_registers (struct target_ops *ops,
+aix_thread_store_registers (struct gdb_target *ops,
                             struct regcache *regcache, int regno)
 {
   struct thread_info *thread;
   pthdb_tid_t tid;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   if (!PD_TID (inferior_ptid))
-    beneath->to_store_registers (beneath, regcache, regno);
+    beneath->ops->to_store_registers (beneath, regcache, regno);
   else
     {
       thread = find_thread_ptid (inferior_ptid);
@@ -1672,18 +1672,18 @@ aix_thread_store_registers (struct target_ops *ops,
    Return the number of bytes actually transferred.  */
 
 static LONGEST
-aix_thread_xfer_partial (struct target_ops *ops, enum target_object object,
+aix_thread_xfer_partial (struct gdb_target *ops, enum target_object object,
 			 const char *annex, gdb_byte *readbuf,
 			 const gdb_byte *writebuf,
 			 ULONGEST offset, LONGEST len)
 {
   struct cleanup *old_chain = save_inferior_ptid ();
   LONGEST xfer;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   inferior_ptid = pid_to_ptid (PIDGET (inferior_ptid));
-  xfer = beneath->to_xfer_partial (beneath, object, annex,
-				   readbuf, writebuf, offset, len);
+  xfer = beneath->ops->to_xfer_partial (beneath, object, annex,
+					 readbuf, writebuf, offset, len);
 
   do_cleanups (old_chain);
   return xfer;
@@ -1692,23 +1692,23 @@ aix_thread_xfer_partial (struct target_ops *ops, enum target_object object,
 /* Clean up after the inferior exits.  */
 
 static void
-aix_thread_mourn_inferior (struct target_ops *ops)
+aix_thread_mourn_inferior (struct gdb_target *ops)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   pd_deactivate ();
-  beneath->to_mourn_inferior (beneath);
+  beneath->ops->to_mourn_inferior (beneath);
 }
 
 /* Return whether thread PID is still valid.  */
 
 static int
-aix_thread_thread_alive (struct target_ops *ops, ptid_t ptid)
+aix_thread_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   if (!PD_TID (ptid))
-    return beneath->to_thread_alive (beneath, ptid);
+    return beneath->ops->to_thread_alive (beneath, ptid);
 
   /* We update the thread list every time the child stops, so all
      valid threads should be in the thread list.  */
@@ -1719,13 +1719,13 @@ aix_thread_thread_alive (struct target_ops *ops, ptid_t ptid)
    "info threads" output.  */
 
 static char *
-aix_thread_pid_to_str (struct target_ops *ops, ptid_t ptid)
+aix_thread_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char *ret = NULL;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   if (!PD_TID (ptid))
-    return beneath->to_pid_to_str (beneath, ptid);
+    return beneath->ops->to_pid_to_str (beneath, ptid);
 
   /* Free previous return value; a new one will be allocated by
      xstrprintf().  */

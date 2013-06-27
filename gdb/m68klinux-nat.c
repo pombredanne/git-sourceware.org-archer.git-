@@ -406,7 +406,7 @@ static void store_fpregs (const struct regcache *regcache, int tid, int regno)
    registers).  */
 
 static void
-m68k_linux_fetch_inferior_registers (struct target_ops *ops,
+m68k_linux_fetch_inferior_registers (struct gdb_target *ops,
 				     struct regcache *regcache, int regno)
 {
   int tid;
@@ -463,7 +463,7 @@ m68k_linux_fetch_inferior_registers (struct target_ops *ops,
    do this for all registers (including the floating point and SSE
    registers).  */
 static void
-m68k_linux_store_inferior_registers (struct target_ops *ops,
+m68k_linux_store_inferior_registers (struct gdb_target *ops,
 				     struct regcache *regcache, int regno)
 {
   int tid;

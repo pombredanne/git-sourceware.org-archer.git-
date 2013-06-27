@@ -216,20 +216,20 @@ static struct cmd_list_element *show_record_full_cmdlist;
 static struct cmd_list_element *record_full_cmdlist;
 
 /* The beneath function pointers.  */
-static struct target_ops *record_full_beneath_to_resume_ops;
-static void (*record_full_beneath_to_resume) (struct target_ops *, ptid_t, int,
+static struct gdb_target *record_full_beneath_to_resume_ops;
+static void (*record_full_beneath_to_resume) (struct gdb_target *, ptid_t, int,
 					      enum gdb_signal);
-static struct target_ops *record_full_beneath_to_wait_ops;
-static ptid_t (*record_full_beneath_to_wait) (struct target_ops *, ptid_t,
+static struct gdb_target *record_full_beneath_to_wait_ops;
+static ptid_t (*record_full_beneath_to_wait) (struct gdb_target *, ptid_t,
 					      struct target_waitstatus *,
 					      int);
-static struct target_ops *record_full_beneath_to_store_registers_ops;
-static void (*record_full_beneath_to_store_registers) (struct target_ops *,
+static struct gdb_target *record_full_beneath_to_store_registers_ops;
+static void (*record_full_beneath_to_store_registers) (struct gdb_target *,
 						       struct regcache *,
 						       int regno);
-static struct target_ops *record_full_beneath_to_xfer_partial_ops;
+static struct gdb_target *record_full_beneath_to_xfer_partial_ops;
 static LONGEST
-  (*record_full_beneath_to_xfer_partial) (struct target_ops *ops,
+  (*record_full_beneath_to_xfer_partial) (struct gdb_target *ops,
 					  enum target_object object,
 					  const char *annex,
 					  gdb_byte *readbuf,
@@ -243,7 +243,7 @@ static int
   (*record_full_beneath_to_remove_breakpoint) (struct gdbarch *,
 					       struct bp_target_info *);
 static int (*record_full_beneath_to_stopped_by_watchpoint) (void);
-static int (*record_full_beneath_to_stopped_data_address) (struct target_ops *,
+static int (*record_full_beneath_to_stopped_data_address) (struct gdb_target *,
 							   CORE_ADDR *);
 static void
   (*record_full_beneath_to_async) (void (*) (enum inferior_event_type, void *),
@@ -795,19 +795,19 @@ record_full_exec_insn (struct regcache *regcache,
     }
 }
 
-static struct target_ops *tmp_to_resume_ops;
-static void (*tmp_to_resume) (struct target_ops *, ptid_t, int,
+static struct gdb_target *tmp_to_resume_ops;
+static void (*tmp_to_resume) (struct gdb_target *, ptid_t, int,
 			      enum gdb_signal);
-static struct target_ops *tmp_to_wait_ops;
-static ptid_t (*tmp_to_wait) (struct target_ops *, ptid_t,
+static struct gdb_target *tmp_to_wait_ops;
+static ptid_t (*tmp_to_wait) (struct gdb_target *, ptid_t,
 			      struct target_waitstatus *,
 			      int);
-static struct target_ops *tmp_to_store_registers_ops;
-static void (*tmp_to_store_registers) (struct target_ops *,
+static struct gdb_target *tmp_to_store_registers_ops;
+static void (*tmp_to_store_registers) (struct gdb_target *,
 				       struct regcache *,
 				       int regno);
-static struct target_ops *tmp_to_xfer_partial_ops;
-static LONGEST (*tmp_to_xfer_partial) (struct target_ops *ops,
+static struct gdb_target *tmp_to_xfer_partial_ops;
+static LONGEST (*tmp_to_xfer_partial) (struct gdb_target *ops,
 				       enum target_object object,
 				       const char *annex,
 				       gdb_byte *readbuf,
@@ -819,8 +819,8 @@ static int (*tmp_to_insert_breakpoint) (struct gdbarch *,
 static int (*tmp_to_remove_breakpoint) (struct gdbarch *,
 					struct bp_target_info *);
 static int (*tmp_to_stopped_by_watchpoint) (void);
-static int (*tmp_to_stopped_data_address) (struct target_ops *, CORE_ADDR *);
-static int (*tmp_to_stopped_data_address) (struct target_ops *, CORE_ADDR *);
+static int (*tmp_to_stopped_data_address) (struct gdb_target *, CORE_ADDR *);
+static int (*tmp_to_stopped_data_address) (struct gdb_target *, CORE_ADDR *);
 static void (*tmp_to_async) (void (*) (enum inferior_event_type, void *), void *);
 
 static void record_full_restore (void);
@@ -915,13 +915,13 @@ static void record_full_init_record_breakpoints (void);
 static void
 record_full_open (char *name, int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   if (record_debug)
     fprintf_unfiltered (gdb_stdlog, "Process record: record_full_open\n");
 
   /* Check if record target is already running.  */
-  if (current_target->to_stratum == record_stratum)
+  if (current_target->ops->to_stratum == record_stratum)
     error (_("Process record target already running.  Use \"record stop\" to "
              "stop record target first."));
 
@@ -947,34 +947,34 @@ record_full_open (char *name, int from_tty)
     {
       if (!tmp_to_resume)
         {
-	  tmp_to_resume = t->to_resume;
+	  tmp_to_resume = t->ops->to_resume;
 	  tmp_to_resume_ops = t;
         }
       if (!tmp_to_wait)
         {
-	  tmp_to_wait = t->to_wait;
+	  tmp_to_wait = t->ops->to_wait;
 	  tmp_to_wait_ops = t;
         }
       if (!tmp_to_store_registers)
         {
-	  tmp_to_store_registers = t->to_store_registers;
+	  tmp_to_store_registers = t->ops->to_store_registers;
 	  tmp_to_store_registers_ops = t;
         }
       if (!tmp_to_xfer_partial)
         {
-	  tmp_to_xfer_partial = t->to_xfer_partial;
+	  tmp_to_xfer_partial = t->ops->to_xfer_partial;
 	  tmp_to_xfer_partial_ops = t;
         }
       if (!tmp_to_insert_breakpoint)
-	tmp_to_insert_breakpoint = t->to_insert_breakpoint;
+	tmp_to_insert_breakpoint = t->ops->to_insert_breakpoint;
       if (!tmp_to_remove_breakpoint)
-	tmp_to_remove_breakpoint = t->to_remove_breakpoint;
+	tmp_to_remove_breakpoint = t->ops->to_remove_breakpoint;
       if (!tmp_to_stopped_by_watchpoint)
-	tmp_to_stopped_by_watchpoint = t->to_stopped_by_watchpoint;
+	tmp_to_stopped_by_watchpoint = t->ops->to_stopped_by_watchpoint;
       if (!tmp_to_stopped_data_address)
-	tmp_to_stopped_data_address = t->to_stopped_data_address;
+	tmp_to_stopped_data_address = t->ops->to_stopped_data_address;
       if (!tmp_to_async)
-	tmp_to_async = t->to_async;
+	tmp_to_async = t->ops->to_async;
     }
   if (!tmp_to_xfer_partial)
     error (_("Could not find 'to_xfer_partial' method on the target stack."));
@@ -1076,7 +1076,7 @@ static enum exec_direction_kind record_full_execution_dir = EXEC_FORWARD;
 /* "to_resume" target method.  Resume the process record target.  */
 
 static void
-record_full_resume (struct target_ops *ops, ptid_t ptid, int step,
+record_full_resume (struct gdb_target *ops, ptid_t ptid, int step,
 		    enum gdb_signal signal)
 {
   record_full_resume_step = step;
@@ -1182,7 +1182,7 @@ record_full_wait_cleanups (void *ignore)
    where to stop.  */
 
 static ptid_t
-record_full_wait_1 (struct target_ops *ops,
+record_full_wait_1 (struct gdb_target *ops,
 		    ptid_t ptid, struct target_waitstatus *status,
 		    int options)
 {
@@ -1209,7 +1209,7 @@ record_full_wait_1 (struct target_ops *ops,
   record_full_get_sig = 0;
   signal (SIGINT, record_full_sig_handler);
 
-  if (!RECORD_FULL_IS_REPLAY && ops != &record_full_core_ops)
+  if (!RECORD_FULL_IS_REPLAY && ops->ops != &record_full_core_ops)
     {
       if (record_full_resume_step)
 	{
@@ -1494,7 +1494,7 @@ replay_out:
 }
 
 static ptid_t
-record_full_wait (struct target_ops *ops,
+record_full_wait (struct gdb_target *ops,
 		  ptid_t ptid, struct target_waitstatus *status,
 		  int options)
 {
@@ -1521,7 +1521,7 @@ record_full_stopped_by_watchpoint (void)
 }
 
 static int
-record_full_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
+record_full_stopped_data_address (struct gdb_target *ops, CORE_ADDR *addr_p)
 {
   if (RECORD_FULL_IS_REPLAY)
     return 0;
@@ -1579,7 +1579,7 @@ record_full_registers_change (struct regcache *regcache, int regnum)
 /* "to_store_registers" method for process record target.  */
 
 static void
-record_full_store_registers (struct target_ops *ops,
+record_full_store_registers (struct gdb_target *ops,
 			     struct regcache *regcache,
 			     int regno)
 {
@@ -1639,7 +1639,7 @@ record_full_store_registers (struct target_ops *ops,
    invalidate the record/replay log from this point forward.  */
 
 static LONGEST
-record_full_xfer_partial (struct target_ops *ops, enum target_object object,
+record_full_xfer_partial (struct gdb_target *ops, enum target_object object,
 			  const char *annex, gdb_byte *readbuf,
 			  const gdb_byte *writebuf, ULONGEST offset,
 			  LONGEST len)
@@ -2097,7 +2097,7 @@ init_record_full_ops (void)
 /* "to_resume" method for prec over corefile.  */
 
 static void
-record_full_core_resume (struct target_ops *ops, ptid_t ptid, int step,
+record_full_core_resume (struct gdb_target *ops, ptid_t ptid, int step,
 			 enum gdb_signal signal)
 {
   record_full_resume_step = step;
@@ -2118,18 +2118,18 @@ record_full_core_resume (struct target_ops *ops, ptid_t ptid, int step,
 /* "to_kill" method for prec over corefile.  */
 
 static void
-record_full_core_kill (struct target_ops *ops)
+record_full_core_kill (struct gdb_target *ops)
 {
   if (record_debug)
     fprintf_unfiltered (gdb_stdlog, "Process record: record_full_core_kill\n");
 
-  unpush_target (&record_full_core_ops);
+  unpush_target (find_target_ops (&record_full_core_ops));
 }
 
 /* "to_fetch_registers" method for prec over corefile.  */
 
 static void
-record_full_core_fetch_registers (struct target_ops *ops,
+record_full_core_fetch_registers (struct gdb_target *ops,
 				  struct regcache *regcache,
 				  int regno)
 {
@@ -2157,7 +2157,7 @@ record_full_core_prepare_to_store (struct regcache *regcache)
 /* "to_store_registers" method for prec over corefile.  */
 
 static void
-record_full_core_store_registers (struct target_ops *ops,
+record_full_core_store_registers (struct gdb_target *ops,
                              struct regcache *regcache,
                              int regno)
 {
@@ -2171,7 +2171,7 @@ record_full_core_store_registers (struct target_ops *ops,
 /* "to_xfer_partial" method for prec over corefile.  */
 
 static LONGEST
-record_full_core_xfer_partial (struct target_ops *ops,
+record_full_core_xfer_partial (struct gdb_target *ops,
 			       enum target_object object,
 			       const char *annex, gdb_byte *readbuf,
 			       const gdb_byte *writebuf, ULONGEST offset,
@@ -2284,7 +2284,7 @@ record_full_core_remove_breakpoint (struct gdbarch *gdbarch,
 /* "to_has_execution" method for prec over corefile.  */
 
 static int
-record_full_core_has_execution (struct target_ops *ops, ptid_t the_ptid)
+record_full_core_has_execution (struct gdb_target *ops, ptid_t the_ptid)
 {
   return 1;
 }

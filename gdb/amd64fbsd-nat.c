@@ -142,10 +142,10 @@ amd64fbsd_supply_pcb (struct regcache *regcache, struct pcb *pcb)
 }
 
 
-static void (*super_mourn_inferior) (struct target_ops *ops);
+static void (*super_mourn_inferior) (struct gdb_target *ops);
 
 static void
-amd64fbsd_mourn_inferior (struct target_ops *ops)
+amd64fbsd_mourn_inferior (struct gdb_target *ops)
 {
 #ifdef HAVE_PT_GETDBREGS
   i386_cleanup_dregs ();

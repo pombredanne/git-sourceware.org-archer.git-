@@ -72,7 +72,7 @@ static void gdb_os_evprintf_filtered (host_callback *, const char *, va_list);
 static void gdb_os_error (host_callback *, const char *, ...)
      ATTRIBUTE_NORETURN;
 
-static void gdbsim_kill (struct target_ops *);
+static void gdbsim_kill (struct gdb_target *);
 
 static void gdbsim_load (char *prog, int fromtty);
 
@@ -80,13 +80,13 @@ static void gdbsim_open (char *args, int from_tty);
 
 static void gdbsim_close (void);
 
-static void gdbsim_detach (struct target_ops *ops, char *args, int from_tty);
+static void gdbsim_detach (struct gdb_target *ops, char *args, int from_tty);
 
 static void gdbsim_prepare_to_store (struct regcache *regcache);
 
-static void gdbsim_files_info (struct target_ops *target);
+static void gdbsim_files_info (struct gdb_target *target);
 
-static void gdbsim_mourn_inferior (struct target_ops *target);
+static void gdbsim_mourn_inferior (struct gdb_target *target);
 
 static void gdbsim_stop (ptid_t ptid);
 
@@ -424,7 +424,7 @@ one2one_register_sim_regno (struct gdbarch *gdbarch, int regnum)
 }
 
 static void
-gdbsim_fetch_register (struct target_ops *ops,
+gdbsim_fetch_register (struct gdb_target *ops,
 		       struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -499,7 +499,7 @@ gdbsim_fetch_register (struct target_ops *ops,
 
 
 static void
-gdbsim_store_register (struct target_ops *ops,
+gdbsim_store_register (struct gdb_target *ops,
 		       struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -545,7 +545,7 @@ gdbsim_store_register (struct target_ops *ops,
    and releasing other resources acquired by the simulated program.  */
 
 static void
-gdbsim_kill (struct target_ops *ops)
+gdbsim_kill (struct gdb_target *ops)
 {
   if (remote_debug)
     printf_filtered ("gdbsim_kill\n");
@@ -603,7 +603,7 @@ gdbsim_load (char *args, int fromtty)
    user types "run" after having attached.  */
 
 static void
-gdbsim_create_inferior (struct target_ops *target, char *exec_file, char *args,
+gdbsim_create_inferior (struct gdb_target *target, char *exec_file, char *args,
 			char **env, int from_tty)
 {
   struct sim_inferior_data *sim_data
@@ -816,7 +816,7 @@ gdbsim_close (void)
    Use this when you want to detach and do something else with your gdb.  */
 
 static void
-gdbsim_detach (struct target_ops *ops, char *args, int from_tty)
+gdbsim_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   if (remote_debug)
     printf_filtered ("gdbsim_detach: args \"%s\"\n", args);
@@ -860,7 +860,7 @@ gdbsim_resume_inferior (struct inferior *inf, void *arg)
 }
 
 static void
-gdbsim_resume (struct target_ops *ops,
+gdbsim_resume (struct gdb_target *ops,
 	       ptid_t ptid, int step, enum gdb_signal siggnal)
 {
   struct resume_data rd;
@@ -963,7 +963,7 @@ gdbsim_cntrl_c (int signo)
 }
 
 static ptid_t
-gdbsim_wait (struct target_ops *ops,
+gdbsim_wait (struct gdb_target *ops,
 	     ptid_t ptid, struct target_waitstatus *status, int options)
 {
   struct sim_inferior_data *sim_data;
@@ -1063,7 +1063,7 @@ gdbsim_prepare_to_store (struct regcache *regcache)
 static int
 gdbsim_xfer_inferior_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 			     int write, struct mem_attrib *attrib,
-			     struct target_ops *target)
+			     struct gdb_target *target)
 {
   struct sim_inferior_data *sim_data
     = get_sim_inferior_data (current_inferior (), SIM_INSTANCE_NOT_NEEDED);
@@ -1110,7 +1110,7 @@ gdbsim_xfer_inferior_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 }
 
 static void
-gdbsim_files_info (struct target_ops *target)
+gdbsim_files_info (struct gdb_target *target)
 {
   struct sim_inferior_data *sim_data
     = get_sim_inferior_data (current_inferior (), SIM_INSTANCE_NEEDED);
@@ -1133,7 +1133,7 @@ gdbsim_files_info (struct target_ops *target)
 /* Clear the simulator's notion of what the break points are.  */
 
 static void
-gdbsim_mourn_inferior (struct target_ops *target)
+gdbsim_mourn_inferior (struct gdb_target *target)
 {
   struct sim_inferior_data *sim_data
     = get_sim_inferior_data (current_inferior (), SIM_INSTANCE_NOT_NEEDED);
@@ -1216,7 +1216,7 @@ sim_command_completer (struct cmd_list_element *ignore, const char *text,
 /* Check to see if a thread is still alive.  */
 
 static int
-gdbsim_thread_alive (struct target_ops *ops, ptid_t ptid)
+gdbsim_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   struct sim_inferior_data *sim_data
     = get_sim_inferior_data_by_ptid (ptid, SIM_INSTANCE_NOT_NEEDED);
@@ -1235,7 +1235,7 @@ gdbsim_thread_alive (struct target_ops *ops, ptid_t ptid)
    buffer.  */
 
 static char *
-gdbsim_pid_to_str (struct target_ops *ops, ptid_t ptid)
+gdbsim_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   return normal_pid_to_str (ptid);
 }
@@ -1243,7 +1243,7 @@ gdbsim_pid_to_str (struct target_ops *ops, ptid_t ptid)
 /* Simulator memory may be accessed after the program has been loaded.  */
 
 static int
-gdbsim_has_all_memory (struct target_ops *ops)
+gdbsim_has_all_memory (struct gdb_target *ops)
 {
   struct sim_inferior_data *sim_data
     = get_sim_inferior_data (current_inferior (), SIM_INSTANCE_NOT_NEEDED);
@@ -1255,7 +1255,7 @@ gdbsim_has_all_memory (struct target_ops *ops)
 }
 
 static int
-gdbsim_has_memory (struct target_ops *ops)
+gdbsim_has_memory (struct gdb_target *ops)
 {
   struct sim_inferior_data *sim_data
     = get_sim_inferior_data (current_inferior (), SIM_INSTANCE_NOT_NEEDED);

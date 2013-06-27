@@ -22,7 +22,7 @@
 
 /* Forward decl's for prototypes */
 struct so_list;
-struct target_ops;
+struct gdb_target;
 struct target_so_ops;
 struct program_space;
 
@@ -33,7 +33,7 @@ extern void clear_solib (void);
 
 /* Called to add symbols from a shared library to gdb's symbol table.  */
 
-extern void solib_add (char *, int, struct target_ops *, int);
+extern void solib_add (char *, int, struct gdb_target *, int);
 extern int solib_read_symbols (struct so_list *, int);
 
 /* Function to be called when the inferior starts up, to discover the

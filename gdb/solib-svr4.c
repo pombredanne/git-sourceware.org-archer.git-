@@ -1540,7 +1540,7 @@ svr4_in_dynsym_resolve_code (CORE_ADDR pc)
    address.  */
 
 static CORE_ADDR
-exec_entry_point (struct bfd *abfd, struct target_ops *targ)
+exec_entry_point (struct bfd *abfd, struct gdb_target *targ)
 {
   CORE_ADDR addr;
 
@@ -2178,7 +2178,7 @@ enable_break (struct svr4_info *info, int from_tty)
       int loader_found_in_list = 0;
       struct so_list *so;
       bfd *tmp_bfd = NULL;
-      struct target_ops *tmp_bfd_target;
+      struct gdb_target *tmp_bfd_target;
       volatile struct gdb_exception ex;
 
       sym_addr = 0;

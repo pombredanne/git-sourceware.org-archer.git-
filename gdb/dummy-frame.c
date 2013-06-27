@@ -176,7 +176,7 @@ dummy_frame_discard (struct frame_id dummy_id)
    them up at least once whenever we start a new inferior.  */
 
 static void
-cleanup_dummy_frames (struct target_ops *target, int from_tty)
+cleanup_dummy_frames (struct gdb_target *target, int from_tty)
 {
   while (dummy_frame_stack != NULL)
     remove_dummy_frame (&dummy_frame_stack);

@@ -44,9 +44,9 @@ extern int sparc32_fpregset_supplies_p (struct gdbarch *gdbarch, int regnum);
 
 extern struct target_ops *sparc_target (void);
 
-extern void sparc_fetch_inferior_registers (struct target_ops *,
+extern void sparc_fetch_inferior_registers (struct gdb_target *,
 					    struct regcache *, int);
-extern void sparc_store_inferior_registers (struct target_ops *,
+extern void sparc_store_inferior_registers (struct gdb_target *,
 					    struct regcache *, int);
 
 #endif /* sparc-nat.h */

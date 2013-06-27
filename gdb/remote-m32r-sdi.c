@@ -320,7 +320,7 @@ check_mmu_status (void)
 /* This is called not only when we first attach, but also when the
    user types "run" after having attached.  */
 static void
-m32r_create_inferior (struct target_ops *ops, char *execfile,
+m32r_create_inferior (struct gdb_target *ops, char *execfile,
 		      char *args, char **env, int from_tty)
 {
   CORE_ADDR entry_pt;
@@ -450,7 +450,7 @@ m32r_close (void)
 /* Tell the remote machine to resume.  */
 
 static void
-m32r_resume (struct target_ops *ops,
+m32r_resume (struct gdb_target *ops,
 	     ptid_t ptid, int step, enum gdb_signal sig)
 {
   unsigned long pc_addr, bp_addr, ab_addr;
@@ -698,7 +698,7 @@ gdb_cntrl_c (int signo)
 }
 
 static ptid_t
-m32r_wait (struct target_ops *ops,
+m32r_wait (struct gdb_target *ops,
 	   ptid_t ptid, struct target_waitstatus *status, int options)
 {
   static RETSIGTYPE (*prev_sigint) ();
@@ -878,7 +878,7 @@ m32r_wait (struct target_ops *ops,
    Use this when you want to detach and do something else
    with your gdb.  */
 static void
-m32r_detach (struct target_ops *ops, char *args, int from_tty)
+m32r_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_detach(%d)\n", from_tty);
@@ -917,7 +917,7 @@ get_reg_id (int regno)
 /* Fetch register REGNO, or all registers if REGNO is -1.
    Returns errno value.  */
 static void
-m32r_fetch_register (struct target_ops *ops,
+m32r_fetch_register (struct gdb_target *ops,
 		     struct regcache *regcache, int regno)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -961,7 +961,7 @@ m32r_fetch_register (struct target_ops *ops,
 /* Store register REGNO, or all if REGNO == 0.
    Return errno value.  */
 static void
-m32r_store_register (struct target_ops *ops,
+m32r_store_register (struct gdb_target *ops,
 		     struct regcache *regcache, int regno)
 {
   int regid;
@@ -1021,7 +1021,7 @@ m32r_prepare_to_store (struct regcache *regcache)
 }
 
 static void
-m32r_files_info (struct target_ops *target)
+m32r_files_info (struct gdb_target *target)
 {
   const char *file = "nothing";
 
@@ -1037,7 +1037,7 @@ m32r_files_info (struct target_ops *target)
 static int
 m32r_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 		  int write,
-		  struct mem_attrib *attrib, struct target_ops *target)
+		  struct mem_attrib *attrib, struct gdb_target *target)
 {
   unsigned long taddr;
   unsigned char buf[0x2000];
@@ -1117,7 +1117,7 @@ m32r_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 }
 
 static void
-m32r_kill (struct target_ops *ops)
+m32r_kill (struct gdb_target *ops)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_kill()\n");
@@ -1135,7 +1135,7 @@ m32r_kill (struct target_ops *ops)
    instructions.  */
 
 static void
-m32r_mourn_inferior (struct target_ops *ops)
+m32r_mourn_inferior (struct gdb_target *ops)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_mourn_inferior()\n");
@@ -1463,7 +1463,7 @@ m32r_remove_watchpoint (CORE_ADDR addr, int len, int type,
 }
 
 static int
-m32r_stopped_data_address (struct target_ops *target, CORE_ADDR *addr_p)
+m32r_stopped_data_address (struct gdb_target *target, CORE_ADDR *addr_p)
 {
   int rc = 0;
 
@@ -1486,7 +1486,7 @@ m32r_stopped_by_watchpoint (void)
 /* Check to see if a thread is still alive.  */
 
 static int
-m32r_thread_alive (struct target_ops *ops, ptid_t ptid)
+m32r_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   if (ptid_equal (ptid, remote_m32r_ptid))
     /* The main task is always alive.  */
@@ -1499,7 +1499,7 @@ m32r_thread_alive (struct target_ops *ops, ptid_t ptid)
    buffer.  */
 
 static char *
-m32r_pid_to_str (struct target_ops *ops, ptid_t ptid)
+m32r_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[64];
 
@@ -1600,7 +1600,7 @@ use_dbt_breakpoints_command (char *args, int from_tty)
 }
 
 static int
-m32r_return_one (struct target_ops *target)
+m32r_return_one (struct gdb_target *target)
 {
   return 1;
 }
@@ -1608,7 +1608,7 @@ m32r_return_one (struct target_ops *target)
 /* Implementation of the to_has_execution method.  */
 
 static int
-m32r_has_execution (struct target_ops *target, ptid_t the_ptid)
+m32r_has_execution (struct gdb_target *target, ptid_t the_ptid)
 {
   return 1;
 }

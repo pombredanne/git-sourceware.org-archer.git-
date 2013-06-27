@@ -485,7 +485,7 @@ dcache_init (void)
    positive values less than LEN mean further transfers may be possible.  */
 
 int
-dcache_xfer_memory (struct target_ops *ops, DCACHE *dcache,
+dcache_xfer_memory (struct gdb_target *ops, DCACHE *dcache,
 		    CORE_ADDR memaddr, gdb_byte *myaddr,
 		    int len, int should_write)
 {

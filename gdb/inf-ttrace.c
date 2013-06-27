@@ -409,7 +409,7 @@ inf_ttrace_stopped_by_watchpoint (void)
 static pid_t inf_ttrace_vfork_ppid = -1;
 
 static int
-inf_ttrace_follow_fork (struct target_ops *ops, int follow_child)
+inf_ttrace_follow_fork (struct gdb_target *ops, int follow_child)
 {
   pid_t pid, fpid;
   lwpid_t lwpid, flwpid;
@@ -611,7 +611,7 @@ inf_ttrace_me (void)
 /* Start tracing PID.  */
 
 static void
-inf_ttrace_him (struct target_ops *ops, int pid)
+inf_ttrace_him (struct gdb_target *ops, int pid)
 {
   struct cleanup *old_chain = make_cleanup (do_cleanup_pfds, 0);
   ttevent_t tte;
@@ -652,7 +652,7 @@ inf_ttrace_him (struct target_ops *ops, int pid)
 }
 
 static void
-inf_ttrace_create_inferior (struct target_ops *ops, char *exec_file, 
+inf_ttrace_create_inferior (struct gdb_target *ops, char *exec_file, 
 			    char *allargs, char **env, int from_tty)
 {
   int pid;
@@ -670,7 +670,7 @@ inf_ttrace_create_inferior (struct target_ops *ops, char *exec_file,
 }
 
 static void
-inf_ttrace_mourn_inferior (struct target_ops *ops)
+inf_ttrace_mourn_inferior (struct gdb_target *ops)
 {
   const int num_buckets = ARRAY_SIZE (inf_ttrace_page_dict.buckets);
   int bucket;
@@ -745,7 +745,7 @@ inf_ttrace_create_threads_after_attach (int pid)
 }
 
 static void
-inf_ttrace_attach (struct target_ops *ops, char *args, int from_tty)
+inf_ttrace_attach (struct gdb_target *ops, char *args, int from_tty)
 {
   char *exec_file;
   pid_t pid;
@@ -800,7 +800,7 @@ inf_ttrace_attach (struct target_ops *ops, char *args, int from_tty)
 }
 
 static void
-inf_ttrace_detach (struct target_ops *ops, char *args, int from_tty)
+inf_ttrace_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   pid_t pid = ptid_get_pid (inferior_ptid);
   int sig = 0;
@@ -839,7 +839,7 @@ inf_ttrace_detach (struct target_ops *ops, char *args, int from_tty)
 }
 
 static void
-inf_ttrace_kill (struct target_ops *ops)
+inf_ttrace_kill (struct gdb_target *ops)
 {
   pid_t pid = ptid_get_pid (inferior_ptid);
 
@@ -918,7 +918,7 @@ inf_ttrace_resume_callback (struct thread_info *info, void *arg)
 }
 
 static void
-inf_ttrace_resume (struct target_ops *ops,
+inf_ttrace_resume (struct gdb_target *ops,
 		   ptid_t ptid, int step, enum gdb_signal signal)
 {
   int resume_all;
@@ -943,7 +943,7 @@ inf_ttrace_resume (struct target_ops *ops,
 }
 
 static ptid_t
-inf_ttrace_wait (struct target_ops *ops,
+inf_ttrace_wait (struct gdb_target *ops,
 		 ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   pid_t pid = ptid_get_pid (ptid);
@@ -1225,7 +1225,7 @@ inf_ttrace_xfer_memory (CORE_ADDR addr, ULONGEST len,
 }
 
 static LONGEST
-inf_ttrace_xfer_partial (struct target_ops *ops, enum target_object object,
+inf_ttrace_xfer_partial (struct gdb_target *ops, enum target_object object,
 			 const char *annex, gdb_byte *readbuf,
 			 const gdb_byte *writebuf,
 			 ULONGEST offset, LONGEST len)
@@ -1252,7 +1252,7 @@ inf_ttrace_xfer_partial (struct target_ops *ops, enum target_object object,
 /* Print status information about what we're accessing.  */
 
 static void
-inf_ttrace_files_info (struct target_ops *ignore)
+inf_ttrace_files_info (struct gdb_target *ignore)
 {
   struct inferior *inf = current_inferior ();
   printf_filtered (_("\tUsing the running image of %s %s.\n"),
@@ -1261,7 +1261,7 @@ inf_ttrace_files_info (struct target_ops *ignore)
 }
 
 static int
-inf_ttrace_thread_alive (struct target_ops *ops, ptid_t ptid)
+inf_ttrace_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   return 1;
 }
@@ -1282,7 +1282,7 @@ inf_ttrace_extra_thread_info (struct thread_info *info)
 }
 
 static char *
-inf_ttrace_pid_to_str (struct target_ops *ops, ptid_t ptid)
+inf_ttrace_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   pid_t pid = ptid_get_pid (ptid);
   lwpid_t lwpid = ptid_get_lwp (ptid);
@@ -1298,7 +1298,7 @@ inf_ttrace_pid_to_str (struct target_ops *ops, ptid_t ptid)
 }
 
 
-/* Implement the get_ada_task_ptid target_ops method.  */
+/* Implement the get_ada_task_ptid gdb_target method.  */
 
 static ptid_t
 inf_ttrace_get_ada_task_ptid (long lwp, long thread)

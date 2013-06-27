@@ -21,11 +21,11 @@
 #define BFD_TARGET_H
 
 struct bfd;
-struct target_ops;
+struct gdb_target;
 
-/* Given an existing BFD, re-open it as a "struct target_ops".  This
+/* Given an existing BFD, re-open it as a "struct gdb_target".  This
    acquires a new reference to the BFD.  This reference will be
    released when the target is closed.  */
-struct target_ops *target_bfd_reopen (struct bfd *bfd);
+struct gdb_target *target_bfd_reopen (struct bfd *bfd);
 
 #endif

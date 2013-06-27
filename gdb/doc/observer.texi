@@ -94,7 +94,7 @@ the breakpoints were are stopped at, if any.  Second argument
 inferior has stopped.
 @end deftypefun
 
-@deftypefun void target_changed (struct target_ops *@var{target})
+@deftypefun void target_changed (struct gdb_target *@var{target})
 The target's register contents have changed.
 @end deftypefun
 
@@ -105,7 +105,7 @@ been modified since being loaded by the debugger (by being recompiled,
 for instance).
 @end deftypefun
 
-@deftypefun void inferior_created (struct target_ops *@var{objfile}, int @var{from_tty})
+@deftypefun void inferior_created (struct gdb_target *@var{objfile}, int @var{from_tty})
 @value{GDBN} has just connected to an inferior.  For @samp{run},
 @value{GDBN} calls this observer while the inferior is still stopped
 at the entry-point instruction.  For @samp{attach} and @samp{core},

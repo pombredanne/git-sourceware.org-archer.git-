@@ -131,7 +131,7 @@ bsd_kvm_xfer_memory (CORE_ADDR addr, ULONGEST len,
 }
 
 static LONGEST
-bsd_kvm_xfer_partial (struct target_ops *ops, enum target_object object,
+bsd_kvm_xfer_partial (struct gdb_target *ops, enum target_object object,
 		      const char *annex, gdb_byte *readbuf,
 		      const gdb_byte *writebuf,
 		      ULONGEST offset, LONGEST len)
@@ -147,7 +147,7 @@ bsd_kvm_xfer_partial (struct target_ops *ops, enum target_object object,
 }
 
 static void
-bsd_kvm_files_info (struct target_ops *ops)
+bsd_kvm_files_info (struct gdb_target *ops)
 {
   if (bsd_kvm_corefile && strcmp (bsd_kvm_corefile, _PATH_MEM) != 0)
     printf_filtered (_("\tUsing the kernel crash dump %s.\n"),
@@ -171,7 +171,7 @@ bsd_kvm_fetch_pcb (struct regcache *regcache, struct pcb *paddr)
 }
 
 static void
-bsd_kvm_fetch_registers (struct target_ops *ops,
+bsd_kvm_fetch_registers (struct gdb_target *ops,
 			 struct regcache *regcache, int regnum)
 {
   struct nlist nl[2];
@@ -310,14 +310,14 @@ bsd_kvm_pcb_cmd (char *arg, int fromtty)
 }
 
 static int
-bsd_kvm_thread_alive (struct target_ops *ops,
+bsd_kvm_thread_alive (struct gdb_target *ops,
 		      ptid_t ptid)
 {
   return 1;
 }
 
 static char *
-bsd_kvm_pid_to_str (struct target_ops *ops, ptid_t ptid)
+bsd_kvm_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[64];
   xsnprintf (buf, sizeof buf, "<kvm>");
@@ -325,7 +325,7 @@ bsd_kvm_pid_to_str (struct target_ops *ops, ptid_t ptid)
 }
 
 static int
-bsd_kvm_return_one (struct target_ops *ops)
+bsd_kvm_return_one (struct gdb_target *ops)
 {
   return 1;
 }

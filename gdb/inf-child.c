@@ -63,7 +63,7 @@ store_waitstatus (struct target_waitstatus *ourstatus, int hoststatus)
    for all registers.  */
 
 static void
-inf_child_fetch_inferior_registers (struct target_ops *ops,
+inf_child_fetch_inferior_registers (struct gdb_target *ops,
 				    struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
@@ -81,7 +81,7 @@ inf_child_fetch_inferior_registers (struct target_ops *ops,
    this for all registers (including the floating point registers).  */
 
 static void
-inf_child_store_inferior_registers (struct target_ops *ops,
+inf_child_store_inferior_registers (struct gdb_target *ops,
 				    struct regcache *regcache, int regnum)
 {
 }
@@ -118,7 +118,7 @@ inf_child_post_startup_inferior (ptid_t ptid)
 }
 
 static int
-inf_child_follow_fork (struct target_ops *ops, int follow_child)
+inf_child_follow_fork (struct gdb_target *ops, int follow_child)
 {
   /* This version of Unix doesn't support following fork or vfork
      events.  */

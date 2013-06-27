@@ -860,7 +860,7 @@ fetch_ppc_registers (struct regcache *regcache, int tid)
    regno == -1, otherwise fetch all general registers or all floating
    point registers depending upon the value of regno.  */
 static void
-ppc_linux_fetch_inferior_registers (struct target_ops *ops,
+ppc_linux_fetch_inferior_registers (struct gdb_target *ops,
 				    struct regcache *regcache, int regno)
 {
   /* Overload thread id onto process id.  */
@@ -1661,7 +1661,7 @@ hwdebug_remove_point (struct ppc_hw_breakpoint *b, int tid)
 /* Return the number of registers needed for a ranged breakpoint.  */
 
 static int
-ppc_linux_ranged_break_num_registers (struct target_ops *target)
+ppc_linux_ranged_break_num_registers (struct gdb_target *target)
 {
   return ((have_ptrace_hwdebug_interface ()
 	   && hwdebug_info.features & PPC_DEBUG_FEATURE_INSN_BP_RANGE)?
@@ -1764,7 +1764,7 @@ get_trigger_type (int rw)
    an error on failure.  */
 
 static int
-ppc_linux_insert_mask_watchpoint (struct target_ops *ops, CORE_ADDR addr,
+ppc_linux_insert_mask_watchpoint (struct gdb_target *ops, CORE_ADDR addr,
 				  CORE_ADDR mask, int rw)
 {
   struct lwp_info *lp;
@@ -1792,7 +1792,7 @@ ppc_linux_insert_mask_watchpoint (struct target_ops *ops, CORE_ADDR addr,
    an error on failure.  */
 
 static int
-ppc_linux_remove_mask_watchpoint (struct target_ops *ops, CORE_ADDR addr,
+ppc_linux_remove_mask_watchpoint (struct gdb_target *ops, CORE_ADDR addr,
 				  CORE_ADDR mask, int rw)
 {
   struct lwp_info *lp;
@@ -2244,7 +2244,7 @@ ppc_linux_thread_exit (struct thread_info *tp, int silent)
 }
 
 static int
-ppc_linux_stopped_data_address (struct target_ops *target, CORE_ADDR *addr_p)
+ppc_linux_stopped_data_address (struct gdb_target *target, CORE_ADDR *addr_p)
 {
   siginfo_t siginfo;
 
@@ -2290,7 +2290,7 @@ ppc_linux_stopped_by_watchpoint (void)
 }
 
 static int
-ppc_linux_watchpoint_addr_within_range (struct target_ops *target,
+ppc_linux_watchpoint_addr_within_range (struct gdb_target *target,
 					CORE_ADDR addr,
 					CORE_ADDR start, int length)
 {
@@ -2313,7 +2313,7 @@ ppc_linux_watchpoint_addr_within_range (struct target_ops *target,
 /* Return the number of registers needed for a masked hardware watchpoint.  */
 
 static int
-ppc_linux_masked_watch_num_registers (struct target_ops *target,
+ppc_linux_masked_watch_num_registers (struct gdb_target *target,
 				      CORE_ADDR addr, CORE_ADDR mask)
 {
   if (!have_ptrace_hwdebug_interface ()
@@ -2331,7 +2331,7 @@ ppc_linux_masked_watch_num_registers (struct target_ops *target,
 }
 
 static void
-ppc_linux_store_inferior_registers (struct target_ops *ops,
+ppc_linux_store_inferior_registers (struct gdb_target *ops,
 				    struct regcache *regcache, int regno)
 {
   /* Overload thread id onto process id.  */
@@ -2415,7 +2415,7 @@ ppc_linux_target_wordsize (void)
 }
 
 static int
-ppc_linux_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
+ppc_linux_auxv_parse (struct gdb_target *ops, gdb_byte **readptr,
                       gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
 {
   int sizeof_auxv_field = ppc_linux_target_wordsize ();
@@ -2438,7 +2438,7 @@ ppc_linux_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
 }
 
 static const struct target_desc *
-ppc_linux_read_description (struct target_ops *ops)
+ppc_linux_read_description (struct gdb_target *ops)
 {
   int altivec = 0;
   int vsx = 0;

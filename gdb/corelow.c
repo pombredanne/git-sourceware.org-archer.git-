@@ -59,14 +59,14 @@
 
 static struct core_fns *core_file_fns = NULL;
 
-/* A subclass of target_ops that also holds data for a core
+/* A subclass of gdb_target that also holds data for a core
    target.  */
 
-struct core_target_ops_with_data
+struct core_gdb_target_with_data
 {
   /* The base class.  */
 
-  struct target_ops base;
+  struct gdb_target base;
 
   /* The core_fns for a core file handler that is prepared to read the
      core file currently open on core_bfd.  */
@@ -86,13 +86,13 @@ struct core_target_ops_with_data
   struct target_section_table core_data;
 };
 
-static void core_files_info (struct target_ops *);
+static void core_files_info (struct gdb_target *);
 
 static int gdb_check_format (bfd *);
 
 static void core_open (char *, int);
 
-static void core_detach (struct target_ops *ops, char *, int);
+static void core_detach (struct gdb_target *ops, char *, int);
 
 static void core_close_cleanup (void *ignore);
 
@@ -197,30 +197,30 @@ gdb_check_format (bfd *abfd)
 
 
 
-/* Return the core_target_ops_with_data for the current target stack,
+/* Return the core_gdb_target_with_data for the current target stack,
    if any.  */
 
-static struct core_target_ops_with_data *
-get_core_target_ops (void)
+static struct core_gdb_target_with_data *
+get_core_gdb_target (void)
 {
-  struct target_ops *targ = find_target_at (process_stratum);
+  struct gdb_target *targ = find_target_at (process_stratum);
 
-  if (targ == NULL || targ->to_identification != &core_ops)
+  if (targ == NULL || targ->ops != &core_ops)
     return NULL;
 
   /* Downcast.  */
-  return (struct core_target_ops_with_data *) targ;
+  return (struct core_gdb_target_with_data *) targ;
 }
 
 /* Discard all vestiges of any previous core file and mark data and
    stack spaces as empty.  */
 
 static void
-core_xclose (struct target_ops *targ)
+core_xclose (struct gdb_target *targ)
 {
   /* Downcast.  */
-  struct core_target_ops_with_data *cops
-    = (struct core_target_ops_with_data *) targ;
+  struct core_gdb_target_with_data *cops
+    = (struct core_gdb_target_with_data *) targ;
 
   if (core_bfd)
     {
@@ -307,7 +307,7 @@ core_open (char *filename, int from_tty)
   int scratch_chan;
   int flags;
   volatile struct gdb_exception except;
-  struct core_target_ops_with_data *cops;
+  struct core_gdb_target_with_data *cops;
 
   target_preopen (from_tty);
   if (!filename)
@@ -361,11 +361,11 @@ core_open (char *filename, int from_tty)
      new.  */
 
   do_cleanups (old_chain);
-  unpush_target (&core_ops);
+  unpush_target (find_target_ops (&core_ops));
   core_bfd = temp_bfd;
 
-  cops = XCNEW (struct core_target_ops_with_data);
-  memcpy (&cops->base, &core_ops, sizeof (cops->base));
+  cops = XCNEW (struct core_gdb_target_with_data);
+  cops->base.ops = &core_ops;
   old_chain = make_cleanup (core_close_cleanup, cops);
 
   cops->core_gdbarch = gdbarch_from_bfd (core_bfd);
@@ -389,7 +389,7 @@ core_open (char *filename, int from_tty)
   if (!exec_bfd)
     set_gdbarch_from_file (core_bfd);
 
-  push_target (&cops->base);
+  push_gdb_target (&cops->base);
   discard_cleanups (old_chain);
 
   /* Do this before acknowledging the inferior, so if
@@ -480,7 +480,7 @@ core_open (char *filename, int from_tty)
 }
 
 static void
-core_detach (struct target_ops *ops, char *args, int from_tty)
+core_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   if (args)
     error (_("Too many arguments"));
@@ -518,7 +518,7 @@ get_core_register_section (struct regcache *regcache,
   struct bfd_section *section;
   bfd_size_type size;
   char *contents;
-  struct core_target_ops_with_data *cops = get_core_target_ops ();
+  struct core_gdb_target_with_data *cops = get_core_gdb_target ();
 
   xfree (section_name);
 
@@ -581,12 +581,12 @@ get_core_register_section (struct regcache *regcache,
 /* We just get all the registers, so we don't use regno.  */
 
 static void
-get_core_registers (struct target_ops *ops,
+get_core_registers (struct gdb_target *ops,
 		    struct regcache *regcache, int regno)
 {
   struct core_regset_section *sect_list;
   int i;
-  struct core_target_ops_with_data *cops = get_core_target_ops ();
+  struct core_gdb_target_with_data *cops = get_core_gdb_target ();
 
   if (!(cops->core_gdbarch
 	&& gdbarch_regset_from_core_section_p (cops->core_gdbarch))
@@ -630,9 +630,9 @@ get_core_registers (struct target_ops *ops,
 }
 
 static void
-core_files_info (struct target_ops *t)
+core_files_info (struct gdb_target *t)
 {
-  struct core_target_ops_with_data *cops = get_core_target_ops ();
+  struct core_gdb_target_with_data *cops = get_core_gdb_target ();
 
   print_section_info (&cops->core_data, core_bfd);
 }
@@ -697,12 +697,12 @@ get_core_siginfo (bfd *abfd, gdb_byte *readbuf, ULONGEST offset, LONGEST len)
 }
 
 static LONGEST
-core_xfer_partial (struct target_ops *ops, enum target_object object,
+core_xfer_partial (struct gdb_target *ops, enum target_object object,
 		   const char *annex, gdb_byte *readbuf,
 		   const gdb_byte *writebuf, ULONGEST offset,
 		   LONGEST len)
 {
-  struct core_target_ops_with_data *cops = get_core_target_ops ();
+  struct core_gdb_target_with_data *cops = get_core_gdb_target ();
 
   switch (object)
     {
@@ -855,12 +855,12 @@ core_xfer_partial (struct target_ops *ops, enum target_object object,
 
     default:
       {
-	struct target_ops *beneath = find_target_beneath (ops);
+	struct gdb_target *beneath = find_target_beneath (ops);
 
 	if (beneath != NULL)
-	  return beneath->to_xfer_partial (beneath, object,
-					   annex, readbuf,
-					   writebuf, offset, len);
+	  return beneath->ops->to_xfer_partial (beneath, object,
+						annex, readbuf,
+						writebuf, offset, len);
 	return -1;
       }
     }
@@ -885,7 +885,7 @@ ignore (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
    behaviour.
  */
 static int
-core_thread_alive (struct target_ops *ops, ptid_t ptid)
+core_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   return 1;
 }
@@ -896,9 +896,9 @@ core_thread_alive (struct target_ops *ops, ptid_t ptid)
    core_ops.  */
 
 static const struct target_desc *
-core_read_description (struct target_ops *target)
+core_read_description (struct gdb_target *target)
 {
-  struct core_target_ops_with_data *cops = get_core_target_ops ();
+  struct core_gdb_target_with_data *cops = get_core_gdb_target ();
 
   if (cops->core_gdbarch
       && gdbarch_core_read_description_p (cops->core_gdbarch))
@@ -909,12 +909,12 @@ core_read_description (struct target_ops *target)
 }
 
 static char *
-core_pid_to_str (struct target_ops *ops, ptid_t ptid)
+core_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[64];
   struct inferior *inf;
   int pid;
-  struct core_target_ops_with_data *cops = get_core_target_ops ();
+  struct core_gdb_target_with_data *cops = get_core_gdb_target ();
 
   /* The preferred way is to have a gdbarch/OS specific
      implementation.  */
@@ -942,19 +942,19 @@ core_pid_to_str (struct target_ops *ops, ptid_t ptid)
 }
 
 static int
-core_has_memory (struct target_ops *ops)
+core_has_memory (struct gdb_target *ops)
 {
   return (core_bfd != NULL);
 }
 
 static int
-core_has_stack (struct target_ops *ops)
+core_has_stack (struct gdb_target *ops)
 {
   return (core_bfd != NULL);
 }
 
 static int
-core_has_registers (struct target_ops *ops)
+core_has_registers (struct gdb_target *ops)
 {
   return (core_bfd != NULL);
 }
@@ -962,7 +962,7 @@ core_has_registers (struct target_ops *ops)
 /* Implement the to_info_proc method.  */
 
 static void
-core_info_proc (struct target_ops *ops, char *args, enum info_proc_what request)
+core_info_proc (struct gdb_target *ops, char *args, enum info_proc_what request)
 {
   struct gdbarch *gdbarch = get_current_arch ();
 

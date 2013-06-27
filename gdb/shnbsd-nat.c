@@ -42,7 +42,7 @@
 #define SHNBSD_SIZEOF_GREGS	(21 * 4)
 
 static void
-shnbsd_fetch_inferior_registers (struct target_ops *ops,
+shnbsd_fetch_inferior_registers (struct gdb_target *ops,
 				 struct regcache *regcache, int regno)
 {
   if (regno == -1 || GETREGS_SUPPLIES (get_regcache_arch (regcache), regno))
@@ -63,7 +63,7 @@ shnbsd_fetch_inferior_registers (struct target_ops *ops,
 }
 
 static void
-shnbsd_store_inferior_registers (struct target_ops *ops,
+shnbsd_store_inferior_registers (struct gdb_target *ops,
 				 struct regcache *regcache, int regno)
 {
   if (regno == -1 || GETREGS_SUPPLIES (get_regcache_arch (regcache), regno))

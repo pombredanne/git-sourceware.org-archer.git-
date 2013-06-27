@@ -22,14 +22,14 @@
 
 struct gdbarch;
 struct frame_info;
-struct target_ops;
+struct gdb_target;
 
 extern CORE_ADDR ppc64_skip_trampoline_code (struct frame_info *frame,
 					     CORE_ADDR pc);
 
 extern CORE_ADDR ppc64_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
 						   CORE_ADDR addr,
-						   struct target_ops *targ);
+						   struct gdb_target *targ);
 
 extern void ppc64_elf_make_msymbol_special (asymbol *,
 					    struct minimal_symbol *);

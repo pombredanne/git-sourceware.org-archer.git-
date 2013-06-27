@@ -517,7 +517,7 @@ store_vfp_regs (const struct regcache *regcache)
    point registers depending upon the value of regno.  */
 
 static void
-arm_linux_fetch_inferior_registers (struct target_ops *ops,
+arm_linux_fetch_inferior_registers (struct gdb_target *ops,
 				    struct regcache *regcache, int regno)
 {
   if (-1 == regno)
@@ -550,7 +550,7 @@ arm_linux_fetch_inferior_registers (struct target_ops *ops,
    point registers depending upon the value of regno.  */
 
 static void
-arm_linux_store_inferior_registers (struct target_ops *ops,
+arm_linux_store_inferior_registers (struct gdb_target *ops,
 				    struct regcache *regcache, int regno)
 {
   if (-1 == regno)
@@ -628,7 +628,7 @@ ps_get_thread_area (const struct ps_prochandle *ph,
 }
 
 static const struct target_desc *
-arm_linux_read_description (struct target_ops *ops)
+arm_linux_read_description (struct gdb_target *ops)
 {
   CORE_ADDR arm_hwcap = 0;
   arm_linux_has_wmmx_registers = 0;
@@ -1141,7 +1141,7 @@ arm_linux_remove_watchpoint (CORE_ADDR addr, int len, int rw,
 
 /* What was the data address the target was stopped on accessing.  */
 static int
-arm_linux_stopped_data_address (struct target_ops *target, CORE_ADDR *addr_p)
+arm_linux_stopped_data_address (struct gdb_target *target, CORE_ADDR *addr_p)
 {
   siginfo_t siginfo;
   int slot;
@@ -1178,7 +1178,7 @@ arm_linux_stopped_by_watchpoint (void)
 }
 
 static int
-arm_linux_watchpoint_addr_within_range (struct target_ops *target,
+arm_linux_watchpoint_addr_within_range (struct gdb_target *target,
 					CORE_ADDR addr,
 					CORE_ADDR start, int length)
 {

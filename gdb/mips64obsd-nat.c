@@ -77,7 +77,7 @@ mips64obsd_collect_gregset (const struct regcache *regcache,
    for all registers.  */
 
 static void
-mips64obsd_fetch_inferior_registers (struct target_ops *ops,
+mips64obsd_fetch_inferior_registers (struct gdb_target *ops,
 				     struct regcache *regcache, int regnum)
 {
   struct reg regs;
@@ -93,7 +93,7 @@ mips64obsd_fetch_inferior_registers (struct target_ops *ops,
    this for all registers.  */
 
 static void
-mips64obsd_store_inferior_registers (struct target_ops *ops,
+mips64obsd_store_inferior_registers (struct gdb_target *ops,
 				     struct regcache *regcache, int regnum)
 {
   struct reg regs;

@@ -40,7 +40,7 @@
    for all registers (including the floating-point registers).  */
 
 static void
-amd64bsd_fetch_inferior_registers (struct target_ops *ops,
+amd64bsd_fetch_inferior_registers (struct gdb_target *ops,
 				   struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -74,7 +74,7 @@ amd64bsd_fetch_inferior_registers (struct target_ops *ops,
    this for all registers (including the floating-point registers).  */
 
 static void
-amd64bsd_store_inferior_registers (struct target_ops *ops,
+amd64bsd_store_inferior_registers (struct gdb_target *ops,
 				   struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);

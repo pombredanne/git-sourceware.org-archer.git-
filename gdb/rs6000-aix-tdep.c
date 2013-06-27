@@ -566,7 +566,7 @@ rs6000_return_value (struct gdbarch *gdbarch, struct value *function,
 static CORE_ADDR
 rs6000_convert_from_func_ptr_addr (struct gdbarch *gdbarch,
 				   CORE_ADDR addr,
-				   struct target_ops *targ)
+				   struct gdb_target *targ)
 {
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
@@ -955,8 +955,8 @@ rs6000_aix_shared_library_to_xml (struct ld_info *ldi,
    format.
 
    LDI_BUF is a buffer containing the ld_info data.
-   READBUF, OFFSET and LEN follow the same semantics as target_ops'
-   to_xfer_partial target_ops method.
+   READBUF, OFFSET and LEN follow the same semantics as gdb_target'
+   to_xfer_partial gdb_target method.
 
    If CLOSE_LDINFO_FD is nonzero, then this routine also closes
    the ldinfo_fd file descriptor.  This is useful when the ldinfo

@@ -231,7 +231,7 @@ void set_step_info (struct frame_info *frame, struct symtab_and_line sal);
 
 /* From infcmd.c */
 
-extern void post_create_inferior (struct target_ops *, int);
+extern void post_create_inferior (struct gdb_target *, int);
 
 extern void attach_command (char *, int);
 

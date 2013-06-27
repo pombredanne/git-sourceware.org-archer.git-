@@ -194,7 +194,7 @@ fill_fpregset (const struct regcache *regcache,
    registers).  */
 
 static void
-m32r_linux_fetch_inferior_registers (struct target_ops *ops,
+m32r_linux_fetch_inferior_registers (struct gdb_target *ops,
 				     struct regcache *regcache, int regno)
 {
   int tid;
@@ -221,7 +221,7 @@ m32r_linux_fetch_inferior_registers (struct target_ops *ops,
    do this for all registers (including the floating point and SSE
    registers).  */
 static void
-m32r_linux_store_inferior_registers (struct target_ops *ops,
+m32r_linux_store_inferior_registers (struct gdb_target *ops,
 				     struct regcache *regcache, int regno)
 {
   int tid;

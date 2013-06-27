@@ -159,7 +159,7 @@ hppanbsd_collect_fpregset (struct regcache *regcache,
    for all registers (including the floating-point registers).  */
 
 static void
-hppanbsd_fetch_registers (struct target_ops *ops,
+hppanbsd_fetch_registers (struct gdb_target *ops,
 			  struct regcache *regcache, int regnum)
 
 {
@@ -190,7 +190,7 @@ hppanbsd_fetch_registers (struct target_ops *ops,
    this for all registers (including the floating-point registers).  */
 
 static void
-hppanbsd_store_registers (struct target_ops *ops,
+hppanbsd_store_registers (struct gdb_target *ops,
 			  struct regcache *regcache, int regnum)
 {
   if (regnum == -1 || hppanbsd_gregset_supplies_p (regnum))

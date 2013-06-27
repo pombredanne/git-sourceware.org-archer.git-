@@ -157,7 +157,7 @@ fill_fpregset (const struct regcache *regcache,
    registers).  */
 
 static void
-amd64_linux_fetch_inferior_registers (struct target_ops *ops,
+amd64_linux_fetch_inferior_registers (struct gdb_target *ops,
 				      struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -212,7 +212,7 @@ amd64_linux_fetch_inferior_registers (struct target_ops *ops,
    registers).  */
 
 static void
-amd64_linux_store_inferior_registers (struct target_ops *ops,
+amd64_linux_store_inferior_registers (struct gdb_target *ops,
 				      struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -1036,7 +1036,7 @@ amd64_linux_siginfo_fixup (siginfo_t *native, gdb_byte *inf, int direction)
 #define AMD64_LINUX_X32_DS	0x2b
 
 static const struct target_desc *
-amd64_linux_read_description (struct target_ops *ops)
+amd64_linux_read_description (struct gdb_target *ops)
 {
   unsigned long cs;
   unsigned long ds;

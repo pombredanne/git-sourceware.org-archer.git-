@@ -2974,7 +2974,7 @@ set_gdbarch_frame_red_zone_size (struct gdbarch *gdbarch,
 }
 
 CORE_ADDR
-gdbarch_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr, struct target_ops *targ)
+gdbarch_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr, struct gdb_target *targ)
 {
   gdb_assert (gdbarch != NULL);
   gdb_assert (gdbarch->convert_from_func_ptr_addr != NULL);
@@ -3770,7 +3770,7 @@ gdbarch_core_read_description_p (struct gdbarch *gdbarch)
 }
 
 const struct target_desc *
-gdbarch_core_read_description (struct gdbarch *gdbarch, struct target_ops *target, bfd *abfd)
+gdbarch_core_read_description (struct gdbarch *gdbarch, struct gdb_target *target, bfd *abfd)
 {
   gdb_assert (gdbarch != NULL);
   gdb_assert (gdbarch->core_read_description != NULL);

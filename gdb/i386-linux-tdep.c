@@ -637,7 +637,7 @@ i386_linux_core_read_xcr0 (bfd *abfd)
 
 static const struct target_desc *
 i386_linux_core_read_description (struct gdbarch *gdbarch,
-				  struct target_ops *target,
+				  struct gdb_target *target,
 				  bfd *abfd)
 {
   /* Linux/i386.  */

@@ -203,7 +203,7 @@ ld_so_xfer_auxv (gdb_byte *readbuf,
    called with TARGET_OBJECT_AUXV.  It handles access to AUXV.  */
 
 LONGEST
-memory_xfer_auxv (struct target_ops *ops,
+memory_xfer_auxv (struct gdb_target *ops,
 		  enum target_object object,
 		  const char *annex,
 		  gdb_byte *readbuf,
@@ -238,7 +238,7 @@ memory_xfer_auxv (struct target_ops *ops,
    Return -1 if there is insufficient buffer for a whole entry.
    Return 1 if an entry was read into *TYPEP and *VALP.  */
 static int
-default_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
+default_auxv_parse (struct gdb_target *ops, gdb_byte **readptr,
 		   gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
 {
   const int sizeof_auxv_field = gdbarch_ptr_bit (target_gdbarch ())
@@ -266,14 +266,14 @@ default_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
    Return -1 if there is insufficient buffer for a whole entry.
    Return 1 if an entry was read into *TYPEP and *VALP.  */
 int
-target_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
+target_auxv_parse (struct gdb_target *ops, gdb_byte **readptr,
                   gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   for (t = ops; t != NULL; t = find_target_beneath (t))
-    if (t->to_auxv_parse != NULL)
-      return t->to_auxv_parse (t, readptr, endptr, typep, valp);
+    if (t->ops->to_auxv_parse != NULL)
+      return t->ops->to_auxv_parse (t, readptr, endptr, typep, valp);
   
   return default_auxv_parse (ops, readptr, endptr, typep, valp);
 }
@@ -333,7 +333,7 @@ invalidate_auxv_cache (void)
    target and cache it.  This function always returns a valid INFO pointer.  */
 
 static struct auxv_info *
-get_auxv_inferior_data (struct target_ops *ops)
+get_auxv_inferior_data (struct gdb_target *ops)
 {
   struct auxv_info *info;
   struct inferior *inf = current_inferior ();
@@ -355,7 +355,7 @@ get_auxv_inferior_data (struct target_ops *ops)
    an error getting the information.  On success, return 1 after
    storing the entry's value field in *VALP.  */
 int
-target_auxv_search (struct target_ops *ops, CORE_ADDR match, CORE_ADDR *valp)
+target_auxv_search (struct gdb_target *ops, CORE_ADDR match, CORE_ADDR *valp)
 {
   CORE_ADDR type, val;
   gdb_byte *data;
@@ -392,7 +392,7 @@ target_auxv_search (struct target_ops *ops, CORE_ADDR match, CORE_ADDR *valp)
 
 /* Print the contents of the target's AUXV on the specified file.  */
 int
-fprint_target_auxv (struct ui_file *file, struct target_ops *ops)
+fprint_target_auxv (struct ui_file *file, struct gdb_target *ops)
 {
   CORE_ADDR type, val;
   gdb_byte *data;

@@ -129,7 +129,7 @@ i386bsd_collect_gregset (const struct regcache *regcache,
    for all registers (including the floating point registers).  */
 
 static void
-i386bsd_fetch_inferior_registers (struct target_ops *ops,
+i386bsd_fetch_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int regnum)
 {
   if (regnum == -1 || GETREGS_SUPPLIES (regnum))
@@ -180,7 +180,7 @@ i386bsd_fetch_inferior_registers (struct target_ops *ops,
    this for all registers (including the floating point registers).  */
 
 static void
-i386bsd_store_inferior_registers (struct target_ops *ops,
+i386bsd_store_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int regnum)
 {
   if (regnum == -1 || GETREGS_SUPPLIES (regnum))

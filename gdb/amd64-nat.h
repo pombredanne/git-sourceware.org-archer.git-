@@ -52,6 +52,6 @@ extern void amd64_collect_native_gregset (const struct regcache *regcache,
 /* Create a prototype *BSD/amd64 target.  The client can override it
    with local methods.  */
 
-extern struct target_ops *amd64bsd_target (void);
+extern struct gdb_target *amd64bsd_target (void);
 
 #endif /* amd64-nat.h */

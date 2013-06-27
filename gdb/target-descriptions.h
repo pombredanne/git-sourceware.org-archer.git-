@@ -27,7 +27,6 @@ struct tdesc_arch_data;
 struct tdesc_type;
 struct tdesc_reg;
 struct target_desc;
-struct target_ops;
 struct target_desc;
 /* An inferior's target description info is stored in this opaque
    object.  There's one such object per inferior.  */

@@ -566,7 +566,7 @@ M:CORE_ADDR:frame_align:CORE_ADDR address:address
 m:int:stabs_argument_has_addr:struct type *type:type::default_stabs_argument_has_addr::0
 v:int:frame_red_zone_size
 #
-m:CORE_ADDR:convert_from_func_ptr_addr:CORE_ADDR addr, struct target_ops *targ:addr, targ::convert_from_func_ptr_addr_identity::0
+m:CORE_ADDR:convert_from_func_ptr_addr:CORE_ADDR addr, struct gdb_target *targ:addr, targ::convert_from_func_ptr_addr_identity::0
 # On some machines there are bits in addresses which are not really
 # part of the address, but are used by the kernel, the hardware, etc.
 # for special purposes.  gdbarch_addr_bits_remove takes out any such bits so
@@ -773,7 +773,7 @@ M:void:relocate_instruction:CORE_ADDR *to, CORE_ADDR from:to, from::NULL
 # Refresh overlay mapped state for section OSECT.
 F:void:overlay_update:struct obj_section *osect:osect
 
-M:const struct target_desc *:core_read_description:struct target_ops *target, bfd *abfd:target, abfd
+M:const struct target_desc *:core_read_description:struct gdb_target *target, bfd *abfd:target, abfd
 
 # Handle special encoding of static variables in stabs debug info.
 F:const char *:static_transform_name:const char *name:name
@@ -1082,7 +1082,7 @@ struct regcache;
 struct reggroup;
 struct regset;
 struct disassemble_info;
-struct target_ops;
+struct gdb_target;
 struct obstack;
 struct bp_target_info;
 struct target_desc;

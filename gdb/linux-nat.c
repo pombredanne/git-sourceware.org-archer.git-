@@ -203,7 +203,7 @@ static int (*linux_nat_siginfo_fixup) (siginfo_t *,
 
 /* The saved to_xfer_partial method, inherited from inf-ptrace.c.
    Called by our to_xfer_partial.  */
-static LONGEST (*super_xfer_partial) (struct target_ops *, 
+static LONGEST (*super_xfer_partial) (struct gdb_target *, 
 				      enum target_object,
 				      const char *, gdb_byte *, 
 				      const gdb_byte *,
@@ -628,7 +628,7 @@ delete_lwp_cleanup (void *lp_voidp)
 }
 
 static int
-linux_child_follow_fork (struct target_ops *ops, int follow_child)
+linux_child_follow_fork (struct gdb_target *ops, int follow_child)
 {
   sigset_t prev_mask;
   int has_vforked;
@@ -1547,7 +1547,7 @@ lin_lwp_attach_lwp (ptid_t ptid)
 }
 
 static void
-linux_nat_create_inferior (struct target_ops *ops, 
+linux_nat_create_inferior (struct gdb_target *ops, 
 			   char *exec_file, char *allargs, char **env,
 			   int from_tty)
 {
@@ -1593,7 +1593,7 @@ linux_nat_create_inferior (struct target_ops *ops,
 }
 
 static void
-linux_nat_attach (struct target_ops *ops, char *args, int from_tty)
+linux_nat_attach (struct gdb_target *ops, char *args, int from_tty)
 {
   struct lwp_info *lp;
   int status;
@@ -1820,7 +1820,7 @@ detach_callback (struct lwp_info *lp, void *data)
 }
 
 static void
-linux_nat_detach (struct target_ops *ops, char *args, int from_tty)
+linux_nat_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   int pid;
   int status;
@@ -1907,7 +1907,7 @@ resume_lwp (struct lwp_info *lp, int step, enum gdb_signal signo)
 
 	  if (linux_nat_prepare_to_resume != NULL)
 	    linux_nat_prepare_to_resume (lp);
-	  linux_ops->to_resume (linux_ops,
+	  linux_ops->to_resume (find_target_ops (linux_ops),
 				pid_to_ptid (GET_LWP (lp->ptid)),
 				step, signo);
 	  lp->stopped = 0;
@@ -1972,7 +1972,7 @@ resume_set_callback (struct lwp_info *lp, void *data)
 }
 
 static void
-linux_nat_resume (struct target_ops *ops,
+linux_nat_resume (struct gdb_target *ops,
 		  ptid_t ptid, int step, enum gdb_signal signo)
 {
   sigset_t prev_mask;
@@ -2069,7 +2069,7 @@ linux_nat_resume (struct target_ops *ops,
 
   if (linux_nat_prepare_to_resume != NULL)
     linux_nat_prepare_to_resume (lp);
-  linux_ops->to_resume (linux_ops, ptid, step, signo);
+  linux_ops->to_resume (find_target_ops (linux_ops), ptid, step, signo);
   lp->stopped_by_watchpoint = 0;
 
   if (debug_linux_nat)
@@ -2239,7 +2239,8 @@ linux_handle_syscall_trap (struct lwp_info *lp, int stopping)
   registers_changed ();
   if (linux_nat_prepare_to_resume != NULL)
     linux_nat_prepare_to_resume (lp);
-  linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
+  linux_ops->to_resume (find_target_ops (linux_ops),
+			pid_to_ptid (GET_LWP (lp->ptid)),
 			lp->step, GDB_SIGNAL_0);
   return 1;
 }
@@ -2436,7 +2437,8 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 					GET_LWP (new_lp->ptid));
 		  if (linux_nat_prepare_to_resume != NULL)
 		    linux_nat_prepare_to_resume (new_lp);
-		  linux_ops->to_resume (linux_ops, pid_to_ptid (new_pid),
+		  linux_ops->to_resume (find_target_ops (linux_ops),
+					pid_to_ptid (new_pid),
 					0, GDB_SIGNAL_0);
 		  new_lp->stopped = 0;
 		}
@@ -2447,7 +2449,8 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 				"LHEW: resuming parent LWP %d\n", pid);
 	  if (linux_nat_prepare_to_resume != NULL)
 	    linux_nat_prepare_to_resume (lp);
-	  linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
+	  linux_ops->to_resume (find_target_ops (linux_ops),
+				pid_to_ptid (GET_LWP (lp->ptid)),
 				0, GDB_SIGNAL_0);
 
 	  return 1;
@@ -2782,7 +2785,7 @@ linux_nat_stopped_by_watchpoint (void)
 }
 
 static int
-linux_nat_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
+linux_nat_stopped_data_address (struct gdb_target *ops, CORE_ADDR *addr_p)
 {
   struct lwp_info *lp = find_lwp_pid (inferior_ptid);
 
@@ -3330,8 +3333,9 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
 
 	  if (linux_nat_prepare_to_resume != NULL)
 	    linux_nat_prepare_to_resume (lp);
-	  linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
-			    lp->step, GDB_SIGNAL_0);
+	  linux_ops->to_resume (find_target_ops (linux_ops),
+				pid_to_ptid (GET_LWP (lp->ptid)),
+				lp->step, GDB_SIGNAL_0);
 	  if (debug_linux_nat)
 	    fprintf_unfiltered (gdb_stdlog,
 				"LLW: %s %s, 0, 0 (discard SIGSTOP)\n",
@@ -3363,7 +3367,8 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
       registers_changed ();
       if (linux_nat_prepare_to_resume != NULL)
 	linux_nat_prepare_to_resume (lp);
-      linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
+      linux_ops->to_resume (find_target_ops (linux_ops),
+			    pid_to_ptid (GET_LWP (lp->ptid)),
 			    lp->step, GDB_SIGNAL_0);
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -3451,7 +3456,7 @@ check_zombie_leaders (void)
 }
 
 static ptid_t
-linux_nat_wait_1 (struct target_ops *ops,
+linux_nat_wait_1 (struct gdb_target *ops,
 		  ptid_t ptid, struct target_waitstatus *ourstatus,
 		  int target_options)
 {
@@ -3742,7 +3747,8 @@ retry:
 	  registers_changed ();
 	  if (linux_nat_prepare_to_resume != NULL)
 	    linux_nat_prepare_to_resume (lp);
-	  linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
+	  linux_ops->to_resume (find_target_ops (linux_ops),
+				pid_to_ptid (GET_LWP (lp->ptid)),
 				lp->step, signo);
 	  if (debug_linux_nat)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3900,7 +3906,8 @@ resume_stopped_resumed_lwps (struct lwp_info *lp, void *data)
       registers_changed ();
       if (linux_nat_prepare_to_resume != NULL)
 	linux_nat_prepare_to_resume (lp);
-      linux_ops->to_resume (linux_ops, pid_to_ptid (GET_LWP (lp->ptid)),
+      linux_ops->to_resume (find_target_ops (linux_ops),
+			    pid_to_ptid (GET_LWP (lp->ptid)),
 			    lp->step, GDB_SIGNAL_0);
       lp->stopped = 0;
       lp->stopped_by_watchpoint = 0;
@@ -3910,7 +3917,7 @@ resume_stopped_resumed_lwps (struct lwp_info *lp, void *data)
 }
 
 static ptid_t
-linux_nat_wait (struct target_ops *ops,
+linux_nat_wait (struct gdb_target *ops,
 		ptid_t ptid, struct target_waitstatus *ourstatus,
 		int target_options)
 {
@@ -4042,7 +4049,7 @@ kill_wait_callback (struct lwp_info *lp, void *data)
 }
 
 static void
-linux_nat_kill (struct target_ops *ops)
+linux_nat_kill (struct gdb_target *ops)
 {
   struct target_waitstatus last;
   ptid_t last_ptid;
@@ -4089,7 +4096,7 @@ linux_nat_kill (struct target_ops *ops)
 }
 
 static void
-linux_nat_mourn_inferior (struct target_ops *ops)
+linux_nat_mourn_inferior (struct gdb_target *ops)
 {
   int pid = ptid_get_pid (inferior_ptid);
 
@@ -4131,7 +4138,7 @@ siginfo_fixup (siginfo_t *siginfo, gdb_byte *inf_siginfo, int direction)
 }
 
 static LONGEST
-linux_xfer_siginfo (struct target_ops *ops, enum target_object object,
+linux_xfer_siginfo (struct gdb_target *ops, enum target_object object,
                     const char *annex, gdb_byte *readbuf,
 		    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
@@ -4184,7 +4191,7 @@ linux_xfer_siginfo (struct target_ops *ops, enum target_object object,
 }
 
 static LONGEST
-linux_nat_xfer_partial (struct target_ops *ops, enum target_object object,
+linux_nat_xfer_partial (struct gdb_target *ops, enum target_object object,
 			const char *annex, gdb_byte *readbuf,
 			const gdb_byte *writebuf,
 			ULONGEST offset, LONGEST len)
@@ -4239,13 +4246,13 @@ linux_thread_alive (ptid_t ptid)
 }
 
 static int
-linux_nat_thread_alive (struct target_ops *ops, ptid_t ptid)
+linux_nat_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   return linux_thread_alive (ptid);
 }
 
 static char *
-linux_nat_pid_to_str (struct target_ops *ops, ptid_t ptid)
+linux_nat_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[64];
 
@@ -4379,7 +4386,7 @@ linux_nat_make_corefile_notes (bfd *obfd, int *note_size)
    but it doesn't support writes.  */
 
 static LONGEST
-linux_proc_xfer_partial (struct target_ops *ops, enum target_object object,
+linux_proc_xfer_partial (struct gdb_target *ops, enum target_object object,
 			 const char *annex, gdb_byte *readbuf,
 			 const gdb_byte *writebuf,
 			 ULONGEST offset, LONGEST len)
@@ -4473,7 +4480,7 @@ spu_enumerate_spu_ids (int pid, gdb_byte *buf, ULONGEST offset, LONGEST len)
 /* Implement the to_xfer_partial interface for the TARGET_OBJECT_SPU
    object type, using the /proc file system.  */
 static LONGEST
-linux_proc_xfer_spu (struct target_ops *ops, enum target_object object,
+linux_proc_xfer_spu (struct gdb_target *ops, enum target_object object,
 		     const char *annex, gdb_byte *readbuf,
 		     const gdb_byte *writebuf,
 		     ULONGEST offset, LONGEST len)
@@ -4597,7 +4604,7 @@ linux_proc_pending_signals (int pid, sigset_t *pending,
 }
 
 static LONGEST
-linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
+linux_nat_xfer_osdata (struct gdb_target *ops, enum target_object object,
 		       const char *annex, gdb_byte *readbuf,
 		       const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
@@ -4607,7 +4614,7 @@ linux_nat_xfer_osdata (struct target_ops *ops, enum target_object object,
 }
 
 static LONGEST
-linux_xfer_partial (struct target_ops *ops, enum target_object object,
+linux_xfer_partial (struct gdb_target *ops, enum target_object object,
                     const char *annex, gdb_byte *readbuf,
 		    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
@@ -5036,7 +5043,7 @@ linux_nat_close (void)
    look up the "main" process id from the lwp here.  */
 
 static struct address_space *
-linux_nat_thread_address_space (struct target_ops *t, ptid_t ptid)
+linux_nat_thread_address_space (struct gdb_target *t, ptid_t ptid)
 {
   struct lwp_info *lwp;
   struct inferior *inf;
@@ -5064,7 +5071,7 @@ linux_nat_thread_address_space (struct target_ops *t, ptid_t ptid)
 /* Return the cached value of the processor core for thread PTID.  */
 
 static int
-linux_nat_core_of_thread (struct target_ops *ops, ptid_t ptid)
+linux_nat_core_of_thread (struct gdb_target *ops, ptid_t ptid)
 {
   struct lwp_info *info = find_lwp_pid (ptid);
 

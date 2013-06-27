@@ -167,8 +167,8 @@ static int windows_initialization_done;
 #define DEBUG_EXCEPT(x)	if (debug_exceptions)	printf_unfiltered x
 
 static void windows_stop (ptid_t);
-static int windows_thread_alive (struct target_ops *, ptid_t);
-static void windows_kill_inferior (struct target_ops *);
+static int windows_thread_alive (struct gdb_target *, ptid_t);
+static void windows_kill_inferior (struct gdb_target *);
 
 static void cygwin_set_dr (int i, CORE_ADDR addr);
 static void cygwin_set_dr7 (unsigned long val);
@@ -491,7 +491,7 @@ do_windows_fetch_inferior_registers (struct regcache *regcache, int r)
 }
 
 static void
-windows_fetch_inferior_registers (struct target_ops *ops,
+windows_fetch_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int r)
 {
   current_thread = thread_rec (ptid_get_tid (inferior_ptid), TRUE);
@@ -518,7 +518,7 @@ do_windows_store_inferior_registers (const struct regcache *regcache, int r)
 
 /* Store a new register value into the current thread context.  */
 static void
-windows_store_inferior_registers (struct target_ops *ops,
+windows_store_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int r)
 {
   current_thread = thread_rec (ptid_get_tid (inferior_ptid), TRUE);
@@ -1319,7 +1319,7 @@ fake_create_process (void)
 }
 
 static void
-windows_resume (struct target_ops *ops,
+windows_resume (struct gdb_target *ops,
 		ptid_t ptid, int step, enum gdb_signal sig)
 {
   thread_info *th;
@@ -1440,7 +1440,7 @@ ctrl_c_handler (DWORD event_type)
 /* Get the next event from the child.  Return 1 if the event requires
    handling by WFI (or whatever).  */
 static int
-get_windows_debug_event (struct target_ops *ops,
+get_windows_debug_event (struct gdb_target *ops,
 			 int pid, struct target_waitstatus *ourstatus)
 {
   BOOL debug_event;
@@ -1641,7 +1641,7 @@ out:
 
 /* Wait for interesting events to occur in the target process.  */
 static ptid_t
-windows_wait (struct target_ops *ops,
+windows_wait (struct gdb_target *ops,
 	      ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   int pid = -1;
@@ -1704,7 +1704,7 @@ windows_wait (struct target_ops *ops,
 }
 
 static void
-do_initial_windows_stuff (struct target_ops *ops, DWORD pid, int attaching)
+do_initial_windows_stuff (struct gdb_target *ops, DWORD pid, int attaching)
 {
   extern int stop_after_trap;
   int i;
@@ -1813,7 +1813,7 @@ out:
 
 /* Attach to process PID, then initialize for debugging it.  */
 static void
-windows_attach (struct target_ops *ops, char *args, int from_tty)
+windows_attach (struct gdb_target *ops, char *args, int from_tty)
 {
   BOOL ok;
   DWORD pid;
@@ -1866,7 +1866,7 @@ windows_attach (struct target_ops *ops, char *args, int from_tty)
 }
 
 static void
-windows_detach (struct target_ops *ops, char *args, int from_tty)
+windows_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   int detached = 1;
 
@@ -1927,7 +1927,7 @@ windows_pid_to_exec_file (int pid)
 /* Print status information about what we're accessing.  */
 
 static void
-windows_files_info (struct target_ops *ignore)
+windows_files_info (struct gdb_target *ignore)
 {
   struct inferior *inf = current_inferior ();
 
@@ -2027,7 +2027,7 @@ clear_win32_environment (char **env)
    ENV is the environment vector to pass.  Errors reported with error().  */
 
 static void
-windows_create_inferior (struct target_ops *ops, char *exec_file,
+windows_create_inferior (struct gdb_target *ops, char *exec_file,
 		       char *allargs, char **in_env, int from_tty)
 {
   STARTUPINFO si;
@@ -2291,7 +2291,7 @@ windows_create_inferior (struct target_ops *ops, char *exec_file,
 }
 
 static void
-windows_mourn_inferior (struct target_ops *ops)
+windows_mourn_inferior (struct gdb_target *ops)
 {
   (void) windows_continue (DBG_CONTINUE, -1);
   i386_cleanup_dregs();
@@ -2318,7 +2318,7 @@ windows_stop (ptid_t ptid)
 static int
 windows_xfer_memory (CORE_ADDR memaddr, gdb_byte *our, int len,
 		   int write, struct mem_attrib *mem,
-		   struct target_ops *target)
+		   struct gdb_target *target)
 {
   SIZE_T done = 0;
   if (write)
@@ -2345,7 +2345,7 @@ windows_xfer_memory (CORE_ADDR memaddr, gdb_byte *our, int len,
 }
 
 static void
-windows_kill_inferior (struct target_ops *ops)
+windows_kill_inferior (struct gdb_target *ops)
 {
   CHECK (TerminateProcess (current_process_handle, 0));
 
@@ -2383,7 +2383,7 @@ windows_close (void)
 
 /* Convert pid to printable format.  */
 static char *
-windows_pid_to_str (struct target_ops *ops, ptid_t ptid)
+windows_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[80];
 
@@ -2398,7 +2398,7 @@ windows_pid_to_str (struct target_ops *ops, ptid_t ptid)
 }
 
 static LONGEST
-windows_xfer_shared_libraries (struct target_ops *ops,
+windows_xfer_shared_libraries (struct gdb_target *ops,
 			     enum target_object object, const char *annex,
 			     gdb_byte *readbuf, const gdb_byte *writebuf,
 			     ULONGEST offset, LONGEST len)
@@ -2435,7 +2435,7 @@ windows_xfer_shared_libraries (struct target_ops *ops,
 }
 
 static LONGEST
-windows_xfer_partial (struct target_ops *ops, enum target_object object,
+windows_xfer_partial (struct gdb_target *ops, enum target_object object,
 		    const char *annex, gdb_byte *readbuf,
 		    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
@@ -2702,7 +2702,7 @@ cygwin_get_dr7 (void)
    by "polling" it.  If WaitForSingleObject returns WAIT_OBJECT_0
    it means that the thread has died.  Otherwise it is assumed to be alive.  */
 static int
-windows_thread_alive (struct target_ops *ops, ptid_t ptid)
+windows_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   int tid;
 

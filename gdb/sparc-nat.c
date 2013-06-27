@@ -136,7 +136,7 @@ sparc32_fpregset_supplies_p (struct gdbarch *gdbarch, int regnum)
    for all registers (including the floating-point registers).  */
 
 void
-sparc_fetch_inferior_registers (struct target_ops *ops,
+sparc_fetch_inferior_registers (struct gdb_target *ops,
 				struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -191,7 +191,7 @@ sparc_fetch_inferior_registers (struct target_ops *ops,
 }
 
 void
-sparc_store_inferior_registers (struct target_ops *ops,
+sparc_store_inferior_registers (struct gdb_target *ops,
 				struct regcache *regcache, int regnum)
 {
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
@@ -259,7 +259,7 @@ sparc_store_inferior_registers (struct target_ops *ops,
 /* Fetch StackGhost Per-Process XOR cookie.  */
 
 static LONGEST
-sparc_xfer_wcookie (struct target_ops *ops, enum target_object object,
+sparc_xfer_wcookie (struct gdb_target *ops, enum target_object object,
 		    const char *annex, gdb_byte *readbuf,
 		    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
@@ -313,12 +313,12 @@ sparc_xfer_wcookie (struct target_ops *ops, enum target_object object,
   return len;
 }
 
-LONGEST (*inf_ptrace_xfer_partial) (struct target_ops *, enum target_object,
+LONGEST (*inf_ptrace_xfer_partial) (struct gdb_target *, enum target_object,
 				    const char *, gdb_byte *, const gdb_byte *,
 				    ULONGEST, LONGEST);
 
 static LONGEST
-sparc_xfer_partial (struct target_ops *ops, enum target_object object,
+sparc_xfer_partial (struct gdb_target *ops, enum target_object object,
 		    const char *annex, gdb_byte *readbuf,
 		    const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {

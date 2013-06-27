@@ -495,7 +495,7 @@ store_fpxregs (const struct regcache *regcache, int tid, int regno)
    registers).  */
 
 static void
-i386_linux_fetch_inferior_registers (struct target_ops *ops,
+i386_linux_fetch_inferior_registers (struct gdb_target *ops,
 				     struct regcache *regcache, int regno)
 {
   int tid;
@@ -576,7 +576,7 @@ i386_linux_fetch_inferior_registers (struct target_ops *ops,
    do this for all registers (including the floating point and SSE
    registers).  */
 static void
-i386_linux_store_inferior_registers (struct target_ops *ops,
+i386_linux_store_inferior_registers (struct gdb_target *ops,
 				     struct regcache *regcache, int regno)
 {
   int tid;
@@ -914,7 +914,7 @@ static const unsigned char linux_syscall[] = { 0xcd, 0x80 };
    If SIGNAL is nonzero, give it that signal.  */
 
 static void
-i386_linux_resume (struct target_ops *ops,
+i386_linux_resume (struct gdb_target *ops,
 		   ptid_t ptid, int step, enum gdb_signal signal)
 {
   int pid = PIDGET (ptid);
@@ -994,7 +994,7 @@ i386_linux_child_post_startup_inferior (ptid_t ptid)
 /* Get Linux/x86 target description from running target.  */
 
 static const struct target_desc *
-i386_linux_read_description (struct target_ops *ops)
+i386_linux_read_description (struct gdb_target *ops)
 {
   int tid;
   static uint64_t xcr0;

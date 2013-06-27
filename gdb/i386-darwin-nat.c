@@ -48,7 +48,7 @@
    If REGNO is -1, do this for all registers.
    Otherwise, REGNO specifies which register (so we can save time).  */
 static void
-i386_darwin_fetch_inferior_registers (struct target_ops *ops,
+i386_darwin_fetch_inferior_registers (struct gdb_target *ops,
 				      struct regcache *regcache, int regno)
 {
   thread_t current_thread = ptid_get_tid (inferior_ptid);
@@ -160,7 +160,7 @@ i386_darwin_fetch_inferior_registers (struct target_ops *ops,
    Otherwise, REGNO specifies which register (so we can save time).  */
 
 static void
-i386_darwin_store_inferior_registers (struct target_ops *ops,
+i386_darwin_store_inferior_registers (struct gdb_target *ops,
 				      struct regcache *regcache, int regno)
 {
   thread_t current_thread = ptid_get_tid (inferior_ptid);

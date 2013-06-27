@@ -26,7 +26,6 @@
 #include "gdb_vecs.h"
 #include "registry.h"
 
-struct target_ops;
 struct bfd;
 struct objfile;
 struct inferior;

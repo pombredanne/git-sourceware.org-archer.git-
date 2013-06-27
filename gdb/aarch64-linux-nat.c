@@ -567,10 +567,10 @@ store_fpregs_to_thread (const struct regcache *regcache)
     perror_with_name (_("Unable to store FP/SIMD registers."));
 }
 
-/* Implement the "to_fetch_register" target_ops method.  */
+/* Implement the "to_fetch_register" gdb_target method.  */
 
 static void
-aarch64_linux_fetch_inferior_registers (struct target_ops *ops,
+aarch64_linux_fetch_inferior_registers (struct gdb_target *ops,
 					struct regcache *regcache,
 					int regno)
 {
@@ -585,10 +585,10 @@ aarch64_linux_fetch_inferior_registers (struct target_ops *ops,
     fetch_fpregs_from_thread (regcache);
 }
 
-/* Implement the "to_store_register" target_ops method.  */
+/* Implement the "to_store_register" gdb_target method.  */
 
 static void
-aarch64_linux_store_inferior_registers (struct target_ops *ops,
+aarch64_linux_store_inferior_registers (struct gdb_target *ops,
 					struct regcache *regcache,
 					int regno)
 {
@@ -826,7 +826,7 @@ aarch64_linux_get_debug_reg_capacity (void)
 
 static void (*super_post_startup_inferior) (ptid_t ptid);
 
-/* Implement the "to_post_startup_inferior" target_ops method.  */
+/* Implement the "to_post_startup_inferior" gdb_target method.  */
 
 static void
 aarch64_linux_child_post_startup_inferior (ptid_t ptid)
@@ -836,10 +836,10 @@ aarch64_linux_child_post_startup_inferior (ptid_t ptid)
   super_post_startup_inferior (ptid);
 }
 
-/* Implement the "to_read_description" target_ops method.  */
+/* Implement the "to_read_description" gdb_target method.  */
 
 static const struct target_desc *
-aarch64_linux_read_description (struct target_ops *ops)
+aarch64_linux_read_description (struct gdb_target *ops)
 {
   initialize_tdesc_aarch64 ();
   return tdesc_aarch64;
@@ -1326,7 +1326,7 @@ aarch64_handle_watchpoint (int type, CORE_ADDR addr, int len, int is_insert)
     return aarch64_handle_unaligned_watchpoint (type, addr, len, is_insert);
 }
 
-/* Implement the "to_insert_watchpoint" target_ops method.
+/* Implement the "to_insert_watchpoint" gdb_target method.
 
    Insert a watchpoint to watch a memory region which starts at
    address ADDR and whose length is LEN bytes.  Watch memory accesses
@@ -1359,7 +1359,7 @@ aarch64_linux_insert_watchpoint (CORE_ADDR addr, int len, int type,
   return ret;
 }
 
-/* Implement the "to_remove_watchpoint" target_ops method.
+/* Implement the "to_remove_watchpoint" gdb_target method.
    Remove a watchpoint that watched the memory region which starts at
    address ADDR, whose length is LEN bytes, and for accesses of the
    type TYPE.  Return 0 on success, -1 on failure.  */
@@ -1391,7 +1391,7 @@ aarch64_linux_remove_watchpoint (CORE_ADDR addr, int len, int type,
   return ret;
 }
 
-/* Implement the "to_region_ok_for_hw_watchpoint" target_ops method.  */
+/* Implement the "to_region_ok_for_hw_watchpoint" gdb_target method.  */
 
 static int
 aarch64_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
@@ -1430,10 +1430,10 @@ aarch64_linux_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
   return 1;
 }
 
-/* Implement the "to_stopped_data_address" target_ops method.  */
+/* Implement the "to_stopped_data_address" gdb_target method.  */
 
 static int
-aarch64_linux_stopped_data_address (struct target_ops *target,
+aarch64_linux_stopped_data_address (struct gdb_target *target,
 				    CORE_ADDR *addr_p)
 {
   siginfo_t siginfo;
@@ -1469,7 +1469,7 @@ aarch64_linux_stopped_data_address (struct target_ops *target,
   return 0;
 }
 
-/* Implement the "to_stopped_by_watchpoint" target_ops method.  */
+/* Implement the "to_stopped_by_watchpoint" gdb_target method.  */
 
 static int
 aarch64_linux_stopped_by_watchpoint (void)
@@ -1479,10 +1479,10 @@ aarch64_linux_stopped_by_watchpoint (void)
   return aarch64_linux_stopped_data_address (current_target, &addr);
 }
 
-/* Implement the "to_watchpoint_addr_within_range" target_ops method.  */
+/* Implement the "to_watchpoint_addr_within_range" gdb_target method.  */
 
 static int
-aarch64_linux_watchpoint_addr_within_range (struct target_ops *target,
+aarch64_linux_watchpoint_addr_within_range (struct gdb_target *target,
 					    CORE_ADDR addr,
 					    CORE_ADDR start, int length)
 {

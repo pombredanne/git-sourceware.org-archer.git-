@@ -118,7 +118,7 @@ getfpregs_supplies (struct gdbarch *gdbarch, int regno)
    for all registers.  */
 
 static void
-ppcfbsd_fetch_inferior_registers (struct target_ops *ops,
+ppcfbsd_fetch_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int regno)
 {
   gdb_gregset_t regs;
@@ -146,7 +146,7 @@ ppcfbsd_fetch_inferior_registers (struct target_ops *ops,
    do this for all registers.  */
 
 static void
-ppcfbsd_store_inferior_registers (struct target_ops *ops,
+ppcfbsd_store_inferior_registers (struct gdb_target *ops,
 				  struct regcache *regcache, int regno)
 {
   gdb_gregset_t regs;

@@ -669,7 +669,7 @@ solib_used (const struct so_list *const known)
    processes we've just attached to, so that's okay.  */
 
 static void
-update_solib_list (int from_tty, struct target_ops *target)
+update_solib_list (int from_tty, struct gdb_target *target)
 {
   const struct target_so_ops *ops = solib_ops (target_gdbarch ());
   struct so_list *inferior = ops->current_sos();
@@ -872,7 +872,7 @@ libpthread_solib_p (struct so_list *so)
 
 void
 solib_add (char *pattern, int from_tty,
-	   struct target_ops *target, int readsyms)
+	   struct gdb_target *target, int readsyms)
 {
   struct so_list *gdb;
 
@@ -1188,7 +1188,7 @@ static void
 sharedlibrary_command (char *args, int from_tty)
 {
   dont_repeat ();
-  solib_add (args, from_tty, (struct target_ops *) 0, 1);
+  solib_add (args, from_tty, (struct gdb_target *) 0, 1);
 }
 
 /* Implements the command "nosharedlibrary", which discards symbols

@@ -680,7 +680,7 @@ i386_region_ok_for_watchpoint (CORE_ADDR addr, int len)
    Otherwise, return zero.  */
 
 static int
-i386_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
+i386_stopped_data_address (struct gdb_target *ops, CORE_ADDR *addr_p)
 {
   struct i386_debug_reg_state *state
     = i386_debug_reg_state (ptid_get_pid (inferior_ptid));

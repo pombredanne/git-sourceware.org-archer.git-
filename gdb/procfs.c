@@ -105,41 +105,41 @@
 /* Prototypes for supply_gregset etc.  */
 #include "gregset.h"
 
-/* =================== TARGET_OPS "MODULE" =================== */
+/* =================== GDB_TARGET "MODULE" =================== */
 
 /* This module defines the GDB target vector and its methods.  */
 
-static void procfs_attach (struct target_ops *, char *, int);
-static void procfs_detach (struct target_ops *, char *, int);
-static void procfs_resume (struct target_ops *,
+static void procfs_attach (struct gdb_target *, char *, int);
+static void procfs_detach (struct gdb_target *, char *, int);
+static void procfs_resume (struct gdb_target *,
 			   ptid_t, int, enum gdb_signal);
 static void procfs_stop (ptid_t);
-static void procfs_files_info (struct target_ops *);
-static void procfs_fetch_registers (struct target_ops *,
+static void procfs_files_info (struct gdb_target *);
+static void procfs_fetch_registers (struct gdb_target *,
 				    struct regcache *, int);
-static void procfs_store_registers (struct target_ops *,
+static void procfs_store_registers (struct gdb_target *,
 				    struct regcache *, int);
 static void procfs_pass_signals (int, unsigned char *);
-static void procfs_kill_inferior (struct target_ops *ops);
-static void procfs_mourn_inferior (struct target_ops *ops);
-static void procfs_create_inferior (struct target_ops *, char *,
+static void procfs_kill_inferior (struct gdb_target *ops);
+static void procfs_mourn_inferior (struct gdb_target *ops);
+static void procfs_create_inferior (struct gdb_target *, char *,
 				    char *, char **, int);
-static ptid_t procfs_wait (struct target_ops *,
+static ptid_t procfs_wait (struct gdb_target *,
 			   ptid_t, struct target_waitstatus *, int);
 static int procfs_xfer_memory (CORE_ADDR, gdb_byte *, int, int,
 			       struct mem_attrib *attrib,
-			       struct target_ops *);
-static LONGEST procfs_xfer_partial (struct target_ops *ops,
+			       struct gdb_target *);
+static LONGEST procfs_xfer_partial (struct gdb_target *ops,
 				    enum target_object object,
 				    const char *annex,
 				    gdb_byte *readbuf,
 				    const gdb_byte *writebuf,
 				    ULONGEST offset, LONGEST len);
 
-static int procfs_thread_alive (struct target_ops *ops, ptid_t);
+static int procfs_thread_alive (struct gdb_target *ops, ptid_t);
 
-static void procfs_find_new_threads (struct target_ops *ops);
-static char *procfs_pid_to_str (struct target_ops *, ptid_t);
+static void procfs_find_new_threads (struct gdb_target *ops);
+static char *procfs_pid_to_str (struct gdb_target *, ptid_t);
 
 static int proc_find_memory_regions (find_memory_region_ftype, void *);
 
@@ -147,7 +147,7 @@ static char * procfs_make_note_section (bfd *, int *);
 
 static int procfs_can_use_hw_breakpoint (int, int, int);
 
-static void procfs_info_proc (struct target_ops *, char *,
+static void procfs_info_proc (struct gdb_target *, char *,
 			      enum info_proc_what);
 
 #if defined (PR_MODEL_NATIVE) && (PR_MODEL_NATIVE == PR_MODEL_LP64)
@@ -155,7 +155,7 @@ static void procfs_info_proc (struct target_ops *, char *,
    is presented in 64-bit format.  We need to provide a custom parser
    to handle that.  */
 static int
-procfs_auxv_parse (struct target_ops *ops, gdb_byte **readptr,
+procfs_auxv_parse (struct gdb_target *ops, gdb_byte **readptr,
 		   gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (target_gdbarch ());
@@ -221,7 +221,7 @@ procfs_target (void)
   return t;
 }
 
-/* =================== END, TARGET_OPS "MODULE" =================== */
+/* =================== END, GDB_TARGET "MODULE" =================== */
 
 /* World Unification:
 
@@ -3043,7 +3043,7 @@ procfs_debug_inferior (procinfo *pi)
 }
 
 static void
-procfs_attach (struct target_ops *ops, char *args, int from_tty)
+procfs_attach (struct gdb_target *ops, char *args, int from_tty)
 {
   char *exec_file;
   int   pid;
@@ -3071,7 +3071,7 @@ procfs_attach (struct target_ops *ops, char *args, int from_tty)
 }
 
 static void
-procfs_detach (struct target_ops *ops, char *args, int from_tty)
+procfs_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   int sig = 0;
   int pid = PIDGET (inferior_ptid);
@@ -3228,7 +3228,7 @@ do_detach (int signo)
    when the process is resumed.  */
 
 static void
-procfs_fetch_registers (struct target_ops *ops,
+procfs_fetch_registers (struct gdb_target *ops,
 			struct regcache *regcache, int regnum)
 {
   gdb_gregset_t *gregs;
@@ -3277,7 +3277,7 @@ procfs_fetch_registers (struct target_ops *ops,
    writing one register might affect the value of others, etc.  */
 
 static void
-procfs_store_registers (struct target_ops *ops,
+procfs_store_registers (struct gdb_target *ops,
 			struct regcache *regcache, int regnum)
 {
   gdb_gregset_t *gregs;
@@ -3566,7 +3566,7 @@ insert_dbx_link_breakpoint (procinfo *pi)
    event.  Event codes are returned through a pointer parameter.  */
 
 static ptid_t
-procfs_wait (struct target_ops *ops,
+procfs_wait (struct gdb_target *ops,
 	     ptid_t ptid, struct target_waitstatus *status, int options)
 {
   /* First cut: loosely based on original version 2.1.  */
@@ -3975,7 +3975,7 @@ wait_again:
    memory transfers, fall back to the old memory xfer functions.  */
 
 static LONGEST
-procfs_xfer_partial (struct target_ops *ops, enum target_object object,
+procfs_xfer_partial (struct gdb_target *ops, enum target_object object,
 		     const char *annex, gdb_byte *readbuf,
 		     const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
@@ -4017,7 +4017,7 @@ procfs_xfer_partial (struct target_ops *ops, enum target_object object,
 
 static int
 procfs_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int dowrite,
-		    struct mem_attrib *attrib, struct target_ops *target)
+		    struct mem_attrib *attrib, struct gdb_target *target)
 {
   procinfo *pi;
   int nbytes = 0;
@@ -4143,7 +4143,7 @@ make_signal_thread_runnable (procinfo *process, procinfo *pi, void *ptr)
    indicated thread to run.  (not implemented yet).  */
 
 static void
-procfs_resume (struct target_ops *ops,
+procfs_resume (struct gdb_target *ops,
 	       ptid_t ptid, int step, enum gdb_signal signo)
 {
   procinfo *pi, *thread;
@@ -4247,7 +4247,7 @@ procfs_pass_signals (int numsigs, unsigned char *pass_signals)
 /* Print status information about the child process.  */
 
 static void
-procfs_files_info (struct target_ops *ignore)
+procfs_files_info (struct gdb_target *ignore)
 {
   struct inferior *inf = current_inferior ();
 
@@ -4330,7 +4330,7 @@ unconditionally_kill_inferior (procinfo *pi)
    GDB to forget all about it.  */
 
 static void
-procfs_kill_inferior (struct target_ops *ops)
+procfs_kill_inferior (struct gdb_target *ops)
 {
   if (!ptid_equal (inferior_ptid, null_ptid)) /* ? */
     {
@@ -4346,7 +4346,7 @@ procfs_kill_inferior (struct target_ops *ops)
 /* Forget we ever debugged this thing!  */
 
 static void
-procfs_mourn_inferior (struct target_ops *ops)
+procfs_mourn_inferior (struct gdb_target *ops)
 {
   procinfo *pi;
 
@@ -4375,7 +4375,7 @@ procfs_mourn_inferior (struct target_ops *ops)
    then wait for the child to synchronize.  */
 
 static void
-procfs_init_inferior (struct target_ops *ops, int pid)
+procfs_init_inferior (struct gdb_target *ops, int pid)
 {
   procinfo *pi;
   gdb_sigset_t signals;
@@ -4598,7 +4598,7 @@ procfs_set_exec_trap (void)
    inf-ptrace?  */
 
 static void
-procfs_create_inferior (struct target_ops *ops, char *exec_file,
+procfs_create_inferior (struct gdb_target *ops, char *exec_file,
 			char *allargs, char **env, int from_tty)
 {
   char *shell_file = getenv ("SHELL");
@@ -4682,7 +4682,7 @@ procfs_create_inferior (struct target_ops *ops, char *exec_file,
 /* An observer for the "inferior_created" event.  */
 
 static void
-procfs_inferior_created (struct target_ops *ops, int from_tty)
+procfs_inferior_created (struct gdb_target *ops, int from_tty)
 {
 #ifdef SYS_syssgi
   /* Make sure to cancel the syssgi() syscall-exit notifications.
@@ -4720,7 +4720,7 @@ procfs_notice_thread (procinfo *pi, procinfo *thread, void *ptr)
    back to GDB to add to its list.  */
 
 static void
-procfs_find_new_threads (struct target_ops *ops)
+procfs_find_new_threads (struct gdb_target *ops)
 {
   procinfo *pi;
 
@@ -4735,7 +4735,7 @@ procfs_find_new_threads (struct target_ops *ops)
    when a thread is really gone.  */
 
 static int
-procfs_thread_alive (struct target_ops *ops, ptid_t ptid)
+procfs_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   int proc, thread;
   procinfo *pi;
@@ -4762,7 +4762,7 @@ procfs_thread_alive (struct target_ops *ops, ptid_t ptid)
    buffer.  */
 
 static char *
-procfs_pid_to_str (struct target_ops *ops, ptid_t ptid)
+procfs_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[80];
 
@@ -4888,7 +4888,7 @@ procfs_stopped_by_watchpoint (void)
    done.  The function also assumes that ADDR is not NULL.  */
 
 static int
-procfs_stopped_data_address (struct target_ops *targ, CORE_ADDR *addr)
+procfs_stopped_data_address (struct gdb_target *targ, CORE_ADDR *addr)
 {
   procinfo *pi;
 
@@ -5150,7 +5150,7 @@ info_proc_mappings (procinfo *pi, int summary)
 /* Implement the "info proc" command.  */
 
 static void
-procfs_info_proc (struct target_ops *ops, char *args,
+procfs_info_proc (struct gdb_target *ops, char *args,
 		  enum info_proc_what what)
 {
   struct cleanup *old_chain;

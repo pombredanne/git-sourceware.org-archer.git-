@@ -515,7 +515,7 @@ get_current_regcache (void)
 /* Observer for the target_changed event.  */
 
 static void
-regcache_observer_target_changed (struct target_ops *target)
+regcache_observer_target_changed (struct gdb_target *target)
 {
   registers_changed ();
 }

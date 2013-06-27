@@ -26,6 +26,7 @@ struct objfile;
 struct ui_file;
 struct mem_attrib;
 struct target_ops;
+struct gdb_target;
 struct bp_location;
 struct bp_target_info;
 struct regcache;
@@ -226,7 +227,7 @@ DEF_VEC_P(static_tracepoint_marker_p);
    Unlike the raw to_xfer_partial interface, callers of these
    functions do not need to retry partial transfers.  */
 
-extern LONGEST target_read (struct target_ops *ops,
+extern LONGEST target_read (struct gdb_target *ops,
 			    enum target_object object,
 			    const char *annex, gdb_byte *buf,
 			    ULONGEST offset, LONGEST len);
@@ -245,11 +246,11 @@ DEF_VEC_O(memory_read_result_s);
 
 extern void free_memory_read_result_vector (void *);
 
-extern VEC(memory_read_result_s)* read_memory_robust (struct target_ops *ops,
+extern VEC(memory_read_result_s)* read_memory_robust (struct gdb_target *ops,
 						      ULONGEST offset,
 						      LONGEST len);
   
-extern LONGEST target_write (struct target_ops *ops,
+extern LONGEST target_write (struct gdb_target *ops,
 			     enum target_object object,
 			     const char *annex, const gdb_byte *buf,
 			     ULONGEST offset, LONGEST len);
@@ -261,7 +262,7 @@ extern LONGEST target_write (struct target_ops *ops,
    data.  To abort the transfer, the progress callback can throw an
    exception.  */
 
-LONGEST target_write_with_progress (struct target_ops *ops,
+LONGEST target_write_with_progress (struct gdb_target *ops,
 				    enum target_object object,
 				    const char *annex, const gdb_byte *buf,
 				    ULONGEST offset, LONGEST len,
@@ -280,7 +281,7 @@ LONGEST target_write_with_progress (struct target_ops *ops,
    size is known in advance.  Don't try to read TARGET_OBJECT_MEMORY
    through this function.  */
 
-extern LONGEST target_read_alloc (struct target_ops *ops,
+extern LONGEST target_read_alloc (struct gdb_target *ops,
 				  enum target_object object,
 				  const char *annex, gdb_byte **buf_p);
 
@@ -290,7 +291,7 @@ extern LONGEST target_read_alloc (struct target_ops *ops,
    are returned as allocated but empty strings.  A warning is issued
    if the result contains any embedded NUL bytes.  */
 
-extern char *target_read_stralloc (struct target_ops *ops,
+extern char *target_read_stralloc (struct gdb_target *ops,
 				   enum target_object object,
 				   const char *annex);
 
@@ -301,9 +302,9 @@ extern char *target_read_stralloc (struct target_ops *ops,
    "frame.h".  The parameter order is lifted from get_frame_memory,
    which in turn lifted it from read_memory.  */
 
-extern void get_target_memory (struct target_ops *ops, CORE_ADDR addr,
+extern void get_target_memory (struct gdb_target *ops, CORE_ADDR addr,
 			       gdb_byte *buf, LONGEST len);
-extern ULONGEST get_target_memory_unsigned (struct target_ops *ops,
+extern ULONGEST get_target_memory_unsigned (struct gdb_target *ops,
 					    CORE_ADDR addr, int len,
 					    enum bfd_endian byte_order);
 
@@ -317,12 +318,6 @@ struct target_ops
 				   newline, and starts with a one-line descrip-
 				   tion (probably similar to to_longname).  */
 
-    /* An identifying pointer.  Usually this points to the target_ops
-       object itself, but to_xclose targets may choose to point it
-       elsewhere, so that the target can be identified even if
-       dynamically allocated.  */
-    void *to_identification;
-
     /* The open routine takes the rest of the parameters from the
        command, and (if successful) pushes a new target onto the
        stack.  Targets should supply this routine, if only to provide
@@ -330,18 +325,18 @@ struct target_ops
     void (*to_open) (char *, int);
     /* Old targets with a static target vector provide "to_close".
        New re-entrant targets provide "to_xclose" and that is expected
-       to xfree everything (including the "struct target_ops").  */
-    void (*to_xclose) (struct target_ops *targ);
+       to xfree everything (including the "struct gdb_target").  */
+    void (*to_xclose) (struct gdb_target *targ);
     void (*to_close) (void);
-    void (*to_attach) (struct target_ops *ops, char *, int);
+    void (*to_attach) (struct gdb_target *ops, char *, int);
     void (*to_post_attach) (int);
-    void (*to_detach) (struct target_ops *ops, char *, int);
-    void (*to_disconnect) (struct target_ops *, char *, int);
-    void (*to_resume) (struct target_ops *, ptid_t, int, enum gdb_signal);
-    ptid_t (*to_wait) (struct target_ops *,
+    void (*to_detach) (struct gdb_target *ops, char *, int);
+    void (*to_disconnect) (struct gdb_target *, char *, int);
+    void (*to_resume) (struct gdb_target *, ptid_t, int, enum gdb_signal);
+    ptid_t (*to_wait) (struct gdb_target *,
 		       ptid_t, struct target_waitstatus *, int);
-    void (*to_fetch_registers) (struct target_ops *, struct regcache *, int);
-    void (*to_store_registers) (struct target_ops *, struct regcache *, int);
+    void (*to_fetch_registers) (struct gdb_target *, struct regcache *, int);
+    void (*to_store_registers) (struct gdb_target *, struct regcache *, int);
     void (*to_prepare_to_store) (struct regcache *);
 
     /* Transfer LEN bytes of memory between GDB address MYADDR and
@@ -368,13 +363,13 @@ struct target_ops
     int (*deprecated_xfer_memory) (CORE_ADDR memaddr, gdb_byte *myaddr,
 				   int len, int write,
 				   struct mem_attrib *attrib,
-				   struct target_ops *target);
+				   struct gdb_target *target);
 
-    void (*to_files_info) (struct target_ops *);
+    void (*to_files_info) (struct gdb_target *);
     int (*to_insert_breakpoint) (struct gdbarch *, struct bp_target_info *);
     int (*to_remove_breakpoint) (struct gdbarch *, struct bp_target_info *);
     int (*to_can_use_hw_breakpoint) (int, int, int);
-    int (*to_ranged_break_num_registers) (struct target_ops *);
+    int (*to_ranged_break_num_registers) (struct gdb_target *);
     int (*to_insert_hw_breakpoint) (struct gdbarch *, struct bp_target_info *);
     int (*to_remove_hw_breakpoint) (struct gdbarch *, struct bp_target_info *);
 
@@ -383,15 +378,15 @@ struct target_ops
     int (*to_remove_watchpoint) (CORE_ADDR, int, int, struct expression *);
     int (*to_insert_watchpoint) (CORE_ADDR, int, int, struct expression *);
 
-    int (*to_insert_mask_watchpoint) (struct target_ops *,
+    int (*to_insert_mask_watchpoint) (struct gdb_target *,
 				      CORE_ADDR, CORE_ADDR, int);
-    int (*to_remove_mask_watchpoint) (struct target_ops *,
+    int (*to_remove_mask_watchpoint) (struct gdb_target *,
 				      CORE_ADDR, CORE_ADDR, int);
     int (*to_stopped_by_watchpoint) (void);
     int to_have_steppable_watchpoint;
     int to_have_continuable_watchpoint;
-    int (*to_stopped_data_address) (struct target_ops *, CORE_ADDR *);
-    int (*to_watchpoint_addr_within_range) (struct target_ops *,
+    int (*to_stopped_data_address) (struct gdb_target *, CORE_ADDR *);
+    int (*to_watchpoint_addr_within_range) (struct gdb_target *,
 					    CORE_ADDR, CORE_ADDR, int);
 
     /* Documentation of this routine is provided with the corresponding
@@ -400,7 +395,7 @@ struct target_ops
 
     int (*to_can_accel_watchpoint_condition) (CORE_ADDR, int, int,
 					      struct expression *);
-    int (*to_masked_watch_num_registers) (struct target_ops *,
+    int (*to_masked_watch_num_registers) (struct gdb_target *,
 					  CORE_ADDR, CORE_ADDR);
     void (*to_terminal_init) (void);
     void (*to_terminal_inferior) (void);
@@ -408,21 +403,21 @@ struct target_ops
     void (*to_terminal_ours) (void);
     void (*to_terminal_save_ours) (void);
     void (*to_terminal_info) (const char *, int);
-    void (*to_kill) (struct target_ops *);
+    void (*to_kill) (struct gdb_target *);
     void (*to_load) (char *, int);
-    void (*to_create_inferior) (struct target_ops *, 
+    void (*to_create_inferior) (struct gdb_target *, 
 				char *, char *, char **, int);
     void (*to_post_startup_inferior) (ptid_t);
     int (*to_insert_fork_catchpoint) (int);
     int (*to_remove_fork_catchpoint) (int);
     int (*to_insert_vfork_catchpoint) (int);
     int (*to_remove_vfork_catchpoint) (int);
-    int (*to_follow_fork) (struct target_ops *, int);
+    int (*to_follow_fork) (struct gdb_target *, int);
     int (*to_insert_exec_catchpoint) (int);
     int (*to_remove_exec_catchpoint) (int);
     int (*to_set_syscall_catchpoint) (int, int, int, int, int *);
     int (*to_has_exited) (int, int, int *);
-    void (*to_mourn_inferior) (struct target_ops *);
+    void (*to_mourn_inferior) (struct gdb_target *);
     int (*to_can_run) (void);
 
     /* Documentation of this routine is provided with the corresponding
@@ -433,22 +428,22 @@ struct target_ops
        corresponding target_* function.  */
     void (*to_program_signals) (int, unsigned char *);
 
-    int (*to_thread_alive) (struct target_ops *, ptid_t ptid);
-    void (*to_find_new_threads) (struct target_ops *);
-    char *(*to_pid_to_str) (struct target_ops *, ptid_t);
+    int (*to_thread_alive) (struct gdb_target *, ptid_t ptid);
+    void (*to_find_new_threads) (struct gdb_target *);
+    char *(*to_pid_to_str) (struct gdb_target *, ptid_t);
     char *(*to_extra_thread_info) (struct thread_info *);
     char *(*to_thread_name) (struct thread_info *);
     void (*to_stop) (ptid_t);
     void (*to_rcmd) (char *command, struct ui_file *output);
     char *(*to_pid_to_exec_file) (int pid);
     void (*to_log_command) (const char *);
-    struct target_section_table *(*to_get_section_table) (struct target_ops *);
+    struct target_section_table *(*to_get_section_table) (struct gdb_target *);
     enum strata to_stratum;
-    int (*to_has_all_memory) (struct target_ops *);
-    int (*to_has_memory) (struct target_ops *);
-    int (*to_has_stack) (struct target_ops *);
-    int (*to_has_registers) (struct target_ops *);
-    int (*to_has_execution) (struct target_ops *, ptid_t);
+    int (*to_has_all_memory) (struct gdb_target *);
+    int (*to_has_memory) (struct gdb_target *);
+    int (*to_has_stack) (struct gdb_target *);
+    int (*to_has_registers) (struct gdb_target *);
+    int (*to_has_execution) (struct gdb_target *, ptid_t);
     int to_has_thread_control;	/* control thread execution */
     int to_attach_no_wait;
     /* ASYNC target controls */
@@ -469,7 +464,7 @@ struct target_ops
        or executable file given by OBJFILE.  If that block of
        thread-local storage hasn't been allocated yet, this function
        may return an error.  */
-    CORE_ADDR (*to_get_thread_local_address) (struct target_ops *ops,
+    CORE_ADDR (*to_get_thread_local_address) (struct gdb_target *ops,
 					      ptid_t ptid,
 					      CORE_ADDR load_module_addr,
 					      CORE_ADDR offset);
@@ -501,7 +496,7 @@ struct target_ops
        See target_read and target_write for more information.  One,
        and only one, of readbuf or writebuf must be non-NULL.  */
 
-    LONGEST (*to_xfer_partial) (struct target_ops *ops,
+    LONGEST (*to_xfer_partial) (struct gdb_target *ops,
 				enum target_object object, const char *annex,
 				gdb_byte *readbuf, const gdb_byte *writebuf,
 				ULONGEST offset, LONGEST len);
@@ -519,26 +514,26 @@ struct target_ops
        This method should not cache data; if the memory map could
        change unexpectedly, it should be invalidated, and higher
        layers will re-fetch it.  */
-    VEC(mem_region_s) *(*to_memory_map) (struct target_ops *);
+    VEC(mem_region_s) *(*to_memory_map) (struct gdb_target *);
 
     /* Erases the region of flash memory starting at ADDRESS, of
        length LENGTH.
 
        Precondition: both ADDRESS and ADDRESS+LENGTH should be aligned
        on flash block boundaries, as reported by 'to_memory_map'.  */
-    void (*to_flash_erase) (struct target_ops *,
+    void (*to_flash_erase) (struct gdb_target *,
                            ULONGEST address, LONGEST length);
 
     /* Finishes a flash memory write sequence.  After this operation
        all flash memory should be available for writing and the result
        of reading from areas written by 'to_flash_write' should be
        equal to what was written.  */
-    void (*to_flash_done) (struct target_ops *);
+    void (*to_flash_done) (struct gdb_target *);
 
     /* Describe the architecture-specific features of this target.
        Returns the description found, or NULL if no description
        was available.  */
-    const struct target_desc *(*to_read_description) (struct target_ops *ops);
+    const struct target_desc *(*to_read_description) (struct gdb_target *ops);
 
     /* Build the PTID of the thread on which a given task is running,
        based on LWP and THREAD.  These values are extracted from the
@@ -550,7 +545,7 @@ struct target_ops
        Return 0 if *READPTR is already at the end of the buffer.
        Return -1 if there is insufficient buffer for a whole entry.
        Return 1 if an entry was read into *TYPEP and *VALP.  */
-    int (*to_auxv_parse) (struct target_ops *ops, gdb_byte **readptr,
+    int (*to_auxv_parse) (struct gdb_target *ops, gdb_byte **readptr,
                          gdb_byte *endptr, CORE_ADDR *typep, CORE_ADDR *valp);
 
     /* Search SEARCH_SPACE_LEN bytes beginning at START_ADDR for the
@@ -559,7 +554,7 @@ struct target_ops
        The result is 1 if found, 0 if not found, and -1 if there was an error
        requiring halting of the search (e.g. memory read error).
        If the pattern is found the address is recorded in FOUND_ADDRP.  */
-    int (*to_search_memory) (struct target_ops *ops,
+    int (*to_search_memory) (struct gdb_target *ops,
 			     CORE_ADDR start_addr, ULONGEST search_space_len,
 			     const gdb_byte *pattern, ULONGEST pattern_len,
 			     CORE_ADDR *found_addrp);
@@ -604,13 +599,13 @@ struct target_ops
        ptrace operations need to operate according to target_gdbarch ().
 
        The default implementation always returns target_gdbarch ().  */
-    struct gdbarch *(*to_thread_architecture) (struct target_ops *, ptid_t);
+    struct gdbarch *(*to_thread_architecture) (struct gdb_target *, ptid_t);
 
     /* Determine current address space of thread PTID.
 
        The default implementation always returns the inferior's
        address space.  */
-    struct address_space *(*to_thread_address_space) (struct target_ops *,
+    struct address_space *(*to_thread_address_space) (struct gdb_target *,
 						      ptid_t);
 
     /* Target file operations.  */
@@ -648,7 +643,7 @@ struct target_ops
 
 
     /* Implement the "info proc" command.  */
-    void (*to_info_proc) (struct target_ops *, char *, enum info_proc_what);
+    void (*to_info_proc) (struct gdb_target *, char *, enum info_proc_what);
 
     /* Tracepoint-related operations.  */
 
@@ -735,13 +730,13 @@ struct target_ops
        If the core cannot be determined -- either for the specified
        thread, or right now, or in this debug session, or for this
        target -- return -1.  */
-    int (*to_core_of_thread) (struct target_ops *, ptid_t ptid);
+    int (*to_core_of_thread) (struct gdb_target *, ptid_t ptid);
 
     /* Verify that the memory in the [MEMADDR, MEMADDR+SIZE) range
        matches the contents of [DATA,DATA+SIZE).  Returns 1 if there's
        a match, 0 if there's a mismatch, and -1 if an error is
        encountered while reading memory.  */
-    int (*to_verify_memory) (struct target_ops *, const gdb_byte *data,
+    int (*to_verify_memory) (struct gdb_target *, const gdb_byte *data,
 			     CORE_ADDR memaddr, ULONGEST size);
 
     /* Return the address of the start of the Thread Information Block
@@ -873,6 +868,11 @@ struct target_ops
 
 #define	OPS_MAGIC	3840
 
+struct gdb_target
+{
+  struct target_ops *ops;
+};
+
 /* Acquire a reference to the target stack.  */
 
 extern struct target_stack *target_stack_incref (void);
@@ -894,12 +894,12 @@ extern struct target_stack *new_target_stack (void);
 /* The ops structure for our "current" target process.  This should
    never be NULL.  If there is no target, it points to the dummy_target.  */
 
-extern struct target_ops *current_target;
+extern struct gdb_target *current_target;
 
 /* Define easy words for doing these operations on our current target.  */
 
-#define	target_shortname	(current_target->to_shortname)
-#define	target_longname		(current_target->to_longname)
+#define	target_shortname	(current_target->ops->to_shortname)
+#define	target_longname		(current_target->ops->to_longname)
 
 /* Does whatever cleanup is required for a target that we are no
    longer going to be calling.  This routine is automatically always
@@ -908,7 +908,7 @@ extern struct target_ops *current_target;
    Closing file descriptors and freeing all memory allocated memory are
    typical things it should do.  */
 
-void target_close (struct target_ops *targ);
+void target_close (struct gdb_target *targ);
 
 /* Attaches to a process on the target side.  Arguments are as passed
    to the `attach' command by the user.  This routine can be called
@@ -925,7 +925,7 @@ void target_attach (char *, int);
    These targets must set to_attach_no_wait.  */
 
 #define target_attach_no_wait \
-     (current_target->to_attach_no_wait)
+     (current_target->ops->to_attach_no_wait)
 
 /* The target_attach operation places a process under debugger control,
    and stops the process.
@@ -933,7 +933,7 @@ void target_attach (char *, int);
    This operation provides a target-specific hook that allows the
    necessary bookkeeping to be performed after an attach completes.  */
 #define target_post_attach(pid) \
-     (*current_target->to_post_attach) (pid)
+     (*current_target->ops->to_post_attach) (pid)
 
 /* Takes a program previously attached to and detaches it.
    The program may resume execution (some targets do, some don't) and will
@@ -991,7 +991,7 @@ extern void target_store_registers (struct regcache *regcache, int regs);
    debugged.  */
 
 #define	target_prepare_to_store(regcache)	\
-     (*current_target->to_prepare_to_store) (regcache)
+     (*current_target->ops->to_prepare_to_store) (regcache)
 
 /* Determine current address space of thread PTID.  */
 
@@ -1008,7 +1008,7 @@ int target_info_proc (char *, enum info_proc_what);
    simultaneously.  */
 
 #define	target_supports_multi_process()	\
-     (*current_target->to_supports_multi_process) ()
+     (*current_target->ops->to_supports_multi_process) ()
 
 /* Returns true if this target can disable address space randomization.  */
 
@@ -1018,22 +1018,22 @@ int target_supports_disable_randomization (void);
    while a trace experiment is running.  */
 
 #define target_supports_enable_disable_tracepoint() \
-  (*current_target->to_supports_enable_disable_tracepoint) ()
+  (*current_target->ops->to_supports_enable_disable_tracepoint) ()
 
 #define target_supports_string_tracing() \
-  (*current_target->to_supports_string_tracing) ()
+  (*current_target->ops->to_supports_string_tracing) ()
 
 /* Returns true if this target can handle breakpoint conditions
    on its end.  */
 
 #define target_supports_evaluation_of_breakpoint_conditions() \
-  (*current_target->to_supports_evaluation_of_breakpoint_conditions) ()
+  (*current_target->ops->to_supports_evaluation_of_breakpoint_conditions) ()
 
 /* Returns true if this target can handle breakpoint commands
    on its end.  */
 
 #define target_can_run_breakpoint_commands() \
-  (*current_target->to_can_run_breakpoint_commands) ()
+  (*current_target->ops->to_can_run_breakpoint_commands) ()
 
 /* Invalidate all target dcaches.  */
 extern void target_dcache_invalidate (void);
@@ -1108,7 +1108,7 @@ int target_write_memory_blocks (VEC(memory_write_request_s) *requests,
 /* Print a line about the current target.  */
 
 #define	target_files_info()	\
-     (*current_target->to_files_info) (current_target)
+     (*current_target->ops->to_files_info) (current_target)
 
 /* Insert a breakpoint at address BP_TGT->placed_address in the target
    machine.  Result is 0 for success, or an errno value.  */
@@ -1126,7 +1126,7 @@ extern int target_remove_breakpoint (struct gdbarch *gdbarch,
    before we actually run the inferior.  */
 
 #define target_terminal_init() \
-     (*current_target->to_terminal_init) ()
+     (*current_target->ops->to_terminal_init) ()
 
 /* Put the inferior's terminal settings into effect.
    This is preparation for starting or resuming the inferior.  */
@@ -1142,14 +1142,14 @@ extern void target_terminal_inferior (void);
    should be called to get back to a normal state of affairs.  */
 
 #define target_terminal_ours_for_output() \
-     (*current_target->to_terminal_ours_for_output) ()
+     (*current_target->ops->to_terminal_ours_for_output) ()
 
 /* Put our terminal settings into effect.
    First record the inferior's terminal settings
    so they can be restored properly later.  */
 
 #define target_terminal_ours() \
-     (*current_target->to_terminal_ours) ()
+     (*current_target->ops->to_terminal_ours) ()
 
 /* Save our terminal settings.
    This is called from TUI after entering or leaving the curses
@@ -1157,13 +1157,13 @@ extern void target_terminal_inferior (void);
    to take this change into account.  */
 
 #define target_terminal_save_ours() \
-     (*current_target->to_terminal_save_ours) ()
+     (*current_target->ops->to_terminal_save_ours) ()
 
 /* Print useful information about our terminal status, if such a thing
    exists.  */
 
 #define target_terminal_info(arg, from_tty) \
-     (*current_target->to_terminal_info) (arg, from_tty)
+     (*current_target->ops->to_terminal_info) (arg, from_tty)
 
 /* Kill the inferior process.   Make it go away.  */
 
@@ -1202,7 +1202,7 @@ void target_create_inferior (char *exec_file, char *args,
    Such targets will supply an appropriate definition for this function.  */
 
 #define target_post_startup_inferior(ptid) \
-     (*current_target->to_post_startup_inferior) (ptid)
+     (*current_target->ops->to_post_startup_inferior) (ptid)
 
 /* On some targets, we can catch an inferior fork or vfork event when
    it occurs.  These functions insert/remove an already-created
@@ -1210,16 +1210,16 @@ void target_create_inferior (char *exec_file, char *args,
    catchpoint type is not supported and -1 for failure.  */
 
 #define target_insert_fork_catchpoint(pid) \
-     (*current_target->to_insert_fork_catchpoint) (pid)
+     (*current_target->ops->to_insert_fork_catchpoint) (pid)
 
 #define target_remove_fork_catchpoint(pid) \
-     (*current_target->to_remove_fork_catchpoint) (pid)
+     (*current_target->ops->to_remove_fork_catchpoint) (pid)
 
 #define target_insert_vfork_catchpoint(pid) \
-     (*current_target->to_insert_vfork_catchpoint) (pid)
+     (*current_target->ops->to_insert_vfork_catchpoint) (pid)
 
 #define target_remove_vfork_catchpoint(pid) \
-     (*current_target->to_remove_vfork_catchpoint) (pid)
+     (*current_target->ops->to_remove_vfork_catchpoint) (pid)
 
 /* If the inferior forks or vforks, this function will be called at
    the next resume in order to perform any bookkeeping and fiddling
@@ -1237,10 +1237,10 @@ int target_follow_fork (int follow_child);
    catchpoint type is not supported and -1 for failure.  */
 
 #define target_insert_exec_catchpoint(pid) \
-     (*current_target->to_insert_exec_catchpoint) (pid)
+     (*current_target->ops->to_insert_exec_catchpoint) (pid)
 
 #define target_remove_exec_catchpoint(pid) \
-     (*current_target->to_remove_exec_catchpoint) (pid)
+     (*current_target->ops->to_remove_exec_catchpoint) (pid)
 
 /* Syscall catch.
 
@@ -1263,14 +1263,14 @@ int target_follow_fork (int follow_child);
    for failure.  */
 
 #define target_set_syscall_catchpoint(pid, needed, any_count, table_size, table) \
-     (*current_target->to_set_syscall_catchpoint) (pid, needed, any_count, \
+     (*current_target->ops->to_set_syscall_catchpoint) (pid, needed, any_count, \
 						  table_size, table)
 
 /* Returns TRUE if PID has exited.  And, also sets EXIT_STATUS to the
    exit code of PID, if any.  */
 
 #define target_has_exited(pid,wait_status,exit_status) \
-     (*current_target->to_has_exited) (pid,wait_status,exit_status)
+     (*current_target->ops->to_has_exited) (pid,wait_status,exit_status)
 
 /* The debugger has completed a blocking wait() call.  There is now
    some process event that must be processed.  This function should
@@ -1284,7 +1284,7 @@ void target_mourn_inferior (void);
 /* Does target have enough data to do a run or attach command? */
 
 #define target_can_run(t) \
-     ((t)->to_can_run) ()
+     ((t)->ops->to_can_run) ()
 
 /* Set list of signals to be handled in the target.
 
@@ -1335,7 +1335,7 @@ extern void target_stop (ptid_t ptid);
    placed in OUTBUF.  */
 
 #define target_rcmd(command, outbuf) \
-     (*current_target->to_rcmd) (command, outbuf)
+     (*current_target->ops->to_rcmd) (command, outbuf)
 
 
 /* Does the target include all of memory, or only part of it?  This
@@ -1380,37 +1380,37 @@ extern int target_has_execution_current (void);
 /* Default implementations for process_stratum targets.  Return true
    if there's a selected inferior, false otherwise.  */
 
-extern int default_child_has_all_memory (struct target_ops *ops);
-extern int default_child_has_memory (struct target_ops *ops);
-extern int default_child_has_stack (struct target_ops *ops);
-extern int default_child_has_registers (struct target_ops *ops);
-extern int default_child_has_execution (struct target_ops *ops,
+extern int default_child_has_all_memory (struct gdb_target *ops);
+extern int default_child_has_memory (struct gdb_target *ops);
+extern int default_child_has_stack (struct gdb_target *ops);
+extern int default_child_has_registers (struct gdb_target *ops);
+extern int default_child_has_execution (struct gdb_target *ops,
 					ptid_t the_ptid);
 
 /* Can the target support the debugger control of thread execution?
    Can it lock the thread scheduler?  */
 
 #define target_can_lock_scheduler \
-     (current_target->to_has_thread_control & tc_schedlock)
+     (current_target->ops->to_has_thread_control & tc_schedlock)
 
 /* Should the target enable async mode if it is supported?  Temporary
    cludge until async mode is a strict superset of sync mode.  */
 extern int target_async_permitted;
 
 /* Can the target support asynchronous execution?  */
-#define target_can_async_p() (current_target->to_can_async_p ())
+#define target_can_async_p() (current_target->ops->to_can_async_p ())
 
 /* Is the target in asynchronous execution mode?  */
-#define target_is_async_p() (current_target->to_is_async_p ())
+#define target_is_async_p() (current_target->ops->to_is_async_p ())
 
 int target_supports_non_stop (void);
 
 /* Put the target in async mode with the specified callback function.  */
 #define target_async(CALLBACK,CONTEXT) \
-     (current_target->to_async ((CALLBACK), (CONTEXT)))
+     (current_target->ops->to_async ((CALLBACK), (CONTEXT)))
 
 #define target_execution_direction() \
-  (current_target->to_execution_direction ())
+  (current_target->ops->to_execution_direction ())
 
 /* Converts a process id to a string.  Usually, the string just contains
    `process xyz', but on some systems it may contain
@@ -1425,7 +1425,7 @@ extern char *normal_pid_to_str (ptid_t ptid);
    is okay.  */
 
 #define target_extra_thread_info(TP) \
-     (current_target->to_extra_thread_info (TP))
+     (current_target->ops->to_extra_thread_info (TP))
 
 /* Return the thread's name.  A NULL result means that the target
    could not determine this thread's name.  */
@@ -1445,12 +1445,12 @@ extern char *target_thread_name (struct thread_info *);
    it must persist.  */
 
 #define target_pid_to_exec_file(pid) \
-     (current_target->to_pid_to_exec_file) (pid)
+     (current_target->ops->to_pid_to_exec_file) (pid)
 
-/* See the to_thread_architecture description in struct target_ops.  */
+/* See the to_thread_architecture description in struct gdb_target.  */
 
 #define target_thread_architecture(ptid) \
-     (current_target->to_thread_architecture (current_target, ptid))
+     (current_target->ops->to_thread_architecture (current_target, ptid))
 
 /*
  * Iterator function for target memory regions.
@@ -1460,21 +1460,21 @@ extern char *target_thread_name (struct thread_info *);
  */
 
 #define target_find_memory_regions(FUNC, DATA) \
-     (current_target->to_find_memory_regions) (FUNC, DATA)
+     (current_target->ops->to_find_memory_regions) (FUNC, DATA)
 
 /*
  * Compose corefile .note section.
  */
 
 #define target_make_corefile_notes(BFD, SIZE_P) \
-     (current_target->to_make_corefile_notes) (BFD, SIZE_P)
+     (current_target->ops->to_make_corefile_notes) (BFD, SIZE_P)
 
 /* Bookmark interfaces.  */
 #define target_get_bookmark(ARGS, FROM_TTY) \
-     (current_target->to_get_bookmark) (ARGS, FROM_TTY)
+     (current_target->ops->to_get_bookmark) (ARGS, FROM_TTY)
 
 #define target_goto_bookmark(ARG, FROM_TTY) \
-     (current_target->to_goto_bookmark) (ARG, FROM_TTY)
+     (current_target->ops->to_goto_bookmark) (ARG, FROM_TTY)
 
 /* Hardware watchpoint interfaces.  */
 
@@ -1482,17 +1482,17 @@ extern char *target_thread_name (struct thread_info *);
    write).  Only the INFERIOR_PTID task is being queried.  */
 
 #define target_stopped_by_watchpoint \
-   (*current_target->to_stopped_by_watchpoint)
+   (*current_target->ops->to_stopped_by_watchpoint)
 
 /* Non-zero if we have steppable watchpoints  */
 
 #define target_have_steppable_watchpoint \
-   (current_target->to_have_steppable_watchpoint)
+   (current_target->ops->to_have_steppable_watchpoint)
 
 /* Non-zero if we have continuable watchpoints  */
 
 #define target_have_continuable_watchpoint \
-   (current_target->to_have_continuable_watchpoint)
+   (current_target->ops->to_have_continuable_watchpoint)
 
 /* Provide defaults for hardware watchpoint functions.  */
 
@@ -1505,13 +1505,13 @@ extern char *target_thread_name (struct thread_info *);
    (including this one?).  OTHERTYPE is who knows what...  */
 
 #define target_can_use_hardware_watchpoint(TYPE,CNT,OTHERTYPE) \
- (*current_target->to_can_use_hw_breakpoint) (TYPE, CNT, OTHERTYPE);
+ (*current_target->ops->to_can_use_hw_breakpoint) (TYPE, CNT, OTHERTYPE);
 
 /* Returns the number of debug registers needed to watch the given
    memory region, or zero if not supported.  */
 
 #define target_region_ok_for_hw_watchpoint(addr, len) \
-    (*current_target->to_region_ok_for_hw_watchpoint) (addr, len)
+    (*current_target->ops->to_region_ok_for_hw_watchpoint) (addr, len)
 
 
 /* Set/clear a hardware watchpoint starting at ADDR, for LEN bytes.
@@ -1521,10 +1521,10 @@ extern char *target_thread_name (struct thread_info *);
    -1 for failure.  */
 
 #define	target_insert_watchpoint(addr, len, type, cond) \
-     (*current_target->to_insert_watchpoint) (addr, len, type, cond)
+     (*current_target->ops->to_insert_watchpoint) (addr, len, type, cond)
 
 #define	target_remove_watchpoint(addr, len, type, cond) \
-     (*current_target->to_remove_watchpoint) (addr, len, type, cond)
+     (*current_target->ops->to_remove_watchpoint) (addr, len, type, cond)
 
 /* Insert a new masked watchpoint at ADDR using the mask MASK.
    RW may be hw_read for a read watchpoint, hw_write for a write watchpoint
@@ -1541,10 +1541,10 @@ extern int target_insert_mask_watchpoint (CORE_ADDR, CORE_ADDR, int);
 extern int target_remove_mask_watchpoint (CORE_ADDR, CORE_ADDR, int);
 
 #define target_insert_hw_breakpoint(gdbarch, bp_tgt) \
-     (*current_target->to_insert_hw_breakpoint) (gdbarch, bp_tgt)
+     (*current_target->ops->to_insert_hw_breakpoint) (gdbarch, bp_tgt)
 
 #define target_remove_hw_breakpoint(gdbarch, bp_tgt) \
-     (*current_target->to_remove_hw_breakpoint) (gdbarch, bp_tgt)
+     (*current_target->ops->to_remove_hw_breakpoint) (gdbarch, bp_tgt)
 
 /* Return number of debug registers needed for a ranged breakpoint,
    or -1 if ranged breakpoints are not supported.  */
@@ -1555,12 +1555,12 @@ extern int target_ranged_break_num_registers (void);
    target_stopped_by_watchpoint, in such case place it to *ADDR_P.  Only the
    INFERIOR_PTID task is being queried.  */
 #define target_stopped_data_address(target, addr_p) \
-    (*target->to_stopped_data_address) (target, addr_p)
+    (*target->ops->to_stopped_data_address) (target, addr_p)
 
 /* Return non-zero if ADDR is within the range of a watchpoint spanning
    LENGTH bytes beginning at START.  */
 #define target_watchpoint_addr_within_range(target, addr, start, length) \
-  (*target->to_watchpoint_addr_within_range) (target, addr, start, length)
+  (*target->ops->to_watchpoint_addr_within_range) (target, addr, start, length)
 
 /* Return non-zero if the target is capable of using hardware to evaluate
    the condition expression.  In this case, if the condition is false when
@@ -1573,7 +1573,7 @@ extern int target_ranged_break_num_registers (void);
    For this reason, GDB will still evaluate the condition expression when
    the watchpoint triggers.  */
 #define target_can_accel_watchpoint_condition(addr, len, type, cond) \
-  (*current_target->to_can_accel_watchpoint_condition) (addr, len, type, cond)
+  (*current_target->ops->to_can_accel_watchpoint_condition) (addr, len, type, cond)
 
 /* Return number of debug registers needed for a masked watchpoint,
    -1 if masked watchpoints are not supported or -2 if the given address
@@ -1583,16 +1583,16 @@ extern int target_masked_watch_num_registers (CORE_ADDR addr, CORE_ADDR mask);
 
 /* Target can execute in reverse?  */
 #define target_can_execute_reverse \
-     (current_target->to_can_execute_reverse ? \
-      current_target->to_can_execute_reverse () : 0)
+     (current_target->ops->to_can_execute_reverse ? \
+      current_target->ops->to_can_execute_reverse () : 0)
 
-extern const struct target_desc *target_read_description (struct target_ops *);
+extern const struct target_desc *target_read_description (struct gdb_target *);
 
 #define target_get_ada_task_ptid(lwp, tid) \
-     (*current_target->to_get_ada_task_ptid) (lwp,tid)
+     (*current_target->ops->to_get_ada_task_ptid) (lwp,tid)
 
 /* Utility implementation of searching memory.  */
-extern int simple_search_memory (struct target_ops* ops,
+extern int simple_search_memory (struct gdb_target* ops,
                                  CORE_ADDR start_addr,
                                  ULONGEST search_space_len,
                                  const gdb_byte *pattern,
@@ -1662,101 +1662,101 @@ extern char *target_fileio_read_stralloc (const char *filename);
 /* Tracepoint-related operations.  */
 
 #define target_trace_init() \
-  (*current_target->to_trace_init) ()
+  (*current_target->ops->to_trace_init) ()
 
 #define target_download_tracepoint(t) \
-  (*current_target->to_download_tracepoint) (t)
+  (*current_target->ops->to_download_tracepoint) (t)
 
 #define target_can_download_tracepoint() \
-  (*current_target->to_can_download_tracepoint) ()
+  (*current_target->ops->to_can_download_tracepoint) ()
 
 #define target_download_trace_state_variable(tsv) \
-  (*current_target->to_download_trace_state_variable) (tsv)
+  (*current_target->ops->to_download_trace_state_variable) (tsv)
 
 #define target_enable_tracepoint(loc) \
-  (*current_target->to_enable_tracepoint) (loc)
+  (*current_target->ops->to_enable_tracepoint) (loc)
 
 #define target_disable_tracepoint(loc) \
-  (*current_target->to_disable_tracepoint) (loc)
+  (*current_target->ops->to_disable_tracepoint) (loc)
 
 #define target_trace_start() \
-  (*current_target->to_trace_start) ()
+  (*current_target->ops->to_trace_start) ()
 
 #define target_trace_set_readonly_regions() \
-  (*current_target->to_trace_set_readonly_regions) ()
+  (*current_target->ops->to_trace_set_readonly_regions) ()
 
 #define target_get_trace_status(ts) \
-  (*current_target->to_get_trace_status) (ts)
+  (*current_target->ops->to_get_trace_status) (ts)
 
 #define target_get_tracepoint_status(tp,utp)		\
-  (*current_target->to_get_tracepoint_status) (tp, utp)
+  (*current_target->ops->to_get_tracepoint_status) (tp, utp)
 
 #define target_trace_stop() \
-  (*current_target->to_trace_stop) ()
+  (*current_target->ops->to_trace_stop) ()
 
 #define target_trace_find(type,num,addr1,addr2,tpp) \
-  (*current_target->to_trace_find) ((type), (num), (addr1), (addr2), (tpp))
+  (*current_target->ops->to_trace_find) ((type), (num), (addr1), (addr2), (tpp))
 
 #define target_get_trace_state_variable_value(tsv,val) \
-  (*current_target->to_get_trace_state_variable_value) ((tsv), (val))
+  (*current_target->ops->to_get_trace_state_variable_value) ((tsv), (val))
 
 #define target_save_trace_data(filename) \
-  (*current_target->to_save_trace_data) (filename)
+  (*current_target->ops->to_save_trace_data) (filename)
 
 #define target_upload_tracepoints(utpp) \
-  (*current_target->to_upload_tracepoints) (utpp)
+  (*current_target->ops->to_upload_tracepoints) (utpp)
 
 #define target_upload_trace_state_variables(utsvp) \
-  (*current_target->to_upload_trace_state_variables) (utsvp)
+  (*current_target->ops->to_upload_trace_state_variables) (utsvp)
 
 #define target_get_raw_trace_data(buf,offset,len) \
-  (*current_target->to_get_raw_trace_data) ((buf), (offset), (len))
+  (*current_target->ops->to_get_raw_trace_data) ((buf), (offset), (len))
 
 #define target_get_min_fast_tracepoint_insn_len() \
-  (*current_target->to_get_min_fast_tracepoint_insn_len) ()
+  (*current_target->ops->to_get_min_fast_tracepoint_insn_len) ()
 
 #define target_set_disconnected_tracing(val) \
-  (*current_target->to_set_disconnected_tracing) (val)
+  (*current_target->ops->to_set_disconnected_tracing) (val)
 
 #define	target_set_circular_trace_buffer(val)	\
-  (*current_target->to_set_circular_trace_buffer) (val)
+  (*current_target->ops->to_set_circular_trace_buffer) (val)
 
 #define	target_set_trace_buffer_size(val)	\
-  (*current_target->to_set_trace_buffer_size) (val)
+  (*current_target->ops->to_set_trace_buffer_size) (val)
 
 #define	target_set_trace_notes(user,notes,stopnotes)		\
-  (*current_target->to_set_trace_notes) ((user), (notes), (stopnotes))
+  (*current_target->ops->to_set_trace_notes) ((user), (notes), (stopnotes))
 
 #define target_get_tib_address(ptid, addr) \
-  (*current_target->to_get_tib_address) ((ptid), (addr))
+  (*current_target->ops->to_get_tib_address) ((ptid), (addr))
 
 #define target_set_permissions() \
-  (*current_target->to_set_permissions) ()
+  (*current_target->ops->to_set_permissions) ()
 
 #define target_static_tracepoint_marker_at(addr, marker) \
-  (*current_target->to_static_tracepoint_marker_at) (addr, marker)
+  (*current_target->ops->to_static_tracepoint_marker_at) (addr, marker)
 
 #define target_static_tracepoint_markers_by_strid(marker_id) \
-  (*current_target->to_static_tracepoint_markers_by_strid) (marker_id)
+  (*current_target->ops->to_static_tracepoint_markers_by_strid) (marker_id)
 
 #define target_traceframe_info() \
-  (*current_target->to_traceframe_info) ()
+  (*current_target->ops->to_traceframe_info) ()
 
 #define target_use_agent(use) \
-  (*current_target->to_use_agent) (use)
+  (*current_target->ops->to_use_agent) (use)
 
 #define target_can_use_agent() \
-  (*current_target->to_can_use_agent) ()
+  (*current_target->ops->to_can_use_agent) ()
 
 #define target_augmented_libraries_svr4_read() \
-  (*current_target->to_augmented_libraries_svr4_read) ()
+  (*current_target->ops->to_augmented_libraries_svr4_read) ()
 
 /* Command logging facility.  */
 
 #define target_log_command(p)						\
   do									\
-    if (current_target->to_log_command)					\
-      (*current_target->to_log_command) (p);				\
+    if (current_target->ops->to_log_command)					\
+      (*current_target->ops->to_log_command) (p);				\
   while (0)
 
 
@@ -1800,7 +1800,9 @@ extern void add_deprecated_target_alias (struct target_ops *t, char *alias);
 
 extern void push_target (struct target_ops *);
 
-extern int unpush_target (struct target_ops *);
+extern void push_gdb_target (struct gdb_target *);
+
+extern int unpush_target (struct gdb_target *);
 
 extern void target_pre_inferior (int);
 
@@ -1846,14 +1848,14 @@ struct target_section_table
 };
 
 /* Return the "section" containing the specified address.  */
-struct target_section *target_section_by_addr (struct target_ops *target,
+struct target_section *target_section_by_addr (struct gdb_target *target,
 					       CORE_ADDR addr);
 
 /* Return the target section table this target (or the targets
    beneath) currently manipulate.  */
 
 extern struct target_section_table *target_get_section_table
-  (struct target_ops *target);
+  (struct gdb_target *target);
 
 /* From mem-break.c */
 
@@ -1878,14 +1880,16 @@ extern void noprocess (void) ATTRIBUTE_NORETURN;
 
 extern void target_require_runnable (void);
 
-extern void find_default_attach (struct target_ops *, char *, int);
+extern void find_default_attach (struct gdb_target *, char *, int);
 
-extern void find_default_create_inferior (struct target_ops *,
+extern void find_default_create_inferior (struct gdb_target *,
 					  char *, char *, char **, int);
 
-extern struct target_ops *find_target_beneath (struct target_ops *);
+extern struct gdb_target *find_target_beneath (struct gdb_target *);
 
-extern struct target_ops *find_target_at (enum strata);
+extern struct gdb_target *find_target_at (enum strata);
+
+extern struct gdb_target *find_target_ops (struct target_ops *);
 
 /* Read OS data object of type TYPE from the target, and return it in
    XML format.  The result is NUL-terminated and returned as a string,
@@ -1928,47 +1932,47 @@ extern void update_target_permissions (void);
 /* Blank target vector entries are initialized to target_ignore.  */
 void target_ignore (void);
 
-/* See to_supports_btrace in struct target_ops.  */
+/* See to_supports_btrace in struct gdb_target.  */
 extern int target_supports_btrace (void);
 
-/* See to_enable_btrace in struct target_ops.  */
+/* See to_enable_btrace in struct gdb_target.  */
 extern struct btrace_target_info *target_enable_btrace (ptid_t ptid);
 
-/* See to_disable_btrace in struct target_ops.  */
+/* See to_disable_btrace in struct gdb_target.  */
 extern void target_disable_btrace (struct btrace_target_info *btinfo);
 
-/* See to_teardown_btrace in struct target_ops.  */
+/* See to_teardown_btrace in struct gdb_target.  */
 extern void target_teardown_btrace (struct btrace_target_info *btinfo);
 
-/* See to_read_btrace in struct target_ops.  */
+/* See to_read_btrace in struct gdb_target.  */
 extern VEC (btrace_block_s) *target_read_btrace (struct btrace_target_info *,
 						 enum btrace_read_type);
 
-/* See to_stop_recording in struct target_ops.  */
+/* See to_stop_recording in struct gdb_target.  */
 extern void target_stop_recording (void);
 
-/* See to_info_record in struct target_ops.  */
+/* See to_info_record in struct gdb_target.  */
 extern void target_info_record (void);
 
-/* See to_save_record in struct target_ops.  */
+/* See to_save_record in struct gdb_target.  */
 extern void target_save_record (const char *filename);
 
 /* Query if the target supports deleting the execution log.  */
 extern int target_supports_delete_record (void);
 
-/* See to_delete_record in struct target_ops.  */
+/* See to_delete_record in struct gdb_target.  */
 extern void target_delete_record (void);
 
-/* See to_record_is_replaying in struct target_ops.  */
+/* See to_record_is_replaying in struct gdb_target.  */
 extern int target_record_is_replaying (void);
 
-/* See to_goto_record_begin in struct target_ops.  */
+/* See to_goto_record_begin in struct gdb_target.  */
 extern void target_goto_record_begin (void);
 
-/* See to_goto_record_end in struct target_ops.  */
+/* See to_goto_record_end in struct gdb_target.  */
 extern void target_goto_record_end (void);
 
-/* See to_goto_record in struct target_ops.  */
+/* See to_goto_record in struct gdb_target.  */
 extern void target_goto_record (ULONGEST insn);
 
 /* See to_insn_history.  */

@@ -190,7 +190,7 @@ symbol_file_add_from_memory_wrapper (struct ui_out *uiout, void *data)
    This function is called via the inferior_created observer.  */
 
 static void
-add_vsyscall_page (struct target_ops *target, int from_tty)
+add_vsyscall_page (struct gdb_target *target, int from_tty)
 {
   CORE_ADDR sysinfo_ehdr;
 

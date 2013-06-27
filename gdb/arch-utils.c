@@ -156,7 +156,7 @@ core_addr_identity (struct gdbarch *gdbarch, CORE_ADDR addr)
 
 CORE_ADDR
 convert_from_func_ptr_addr_identity (struct gdbarch *gdbarch, CORE_ADDR addr,
-				     struct target_ops *targ)
+				     struct gdb_target *targ)
 {
   return addr;
 }

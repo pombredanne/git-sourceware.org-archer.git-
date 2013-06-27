@@ -59,15 +59,15 @@ struct cmd_list_element *info_record_cmdlist = NULL;
 
 /* Find the record target in the target stack.  */
 
-static struct target_ops *
+static struct gdb_target *
 find_record_target (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   for (t = find_target_beneath (current_target);
        t != NULL;
        t = find_target_beneath (t))
-    if (t->to_stratum == record_stratum)
+    if (t->ops->to_stratum == record_stratum)
       return t;
 
   return NULL;
@@ -75,10 +75,10 @@ find_record_target (void)
 
 /* Check that recording is active.  Throw an error, if it isn't.  */
 
-static struct target_ops *
+static struct gdb_target *
 require_record_target (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   t = find_record_target ();
   if (t == NULL)
@@ -107,20 +107,20 @@ record_read_memory (struct gdbarch *gdbarch,
 /* Stop recording.  */
 
 static void
-record_stop (struct target_ops *t)
+record_stop (struct gdb_target *t)
 {
-  DEBUG ("stop %s", t->to_shortname);
+  DEBUG ("stop %s", t->ops->to_shortname);
 
-  if (t->to_stop_recording != NULL)
-    t->to_stop_recording ();
+  if (t->ops->to_stop_recording != NULL)
+    t->ops->to_stop_recording ();
 }
 
 /* Unpush the record target.  */
 
 static void
-record_unpush (struct target_ops *t)
+record_unpush (struct gdb_target *t)
 {
-  DEBUG ("unpush %s", t->to_shortname);
+  DEBUG ("unpush %s", t->ops->to_shortname);
 
   unpush_target (t);
 }
@@ -128,11 +128,11 @@ record_unpush (struct target_ops *t)
 /* See record.h.  */
 
 void
-record_disconnect (struct target_ops *t, char *args, int from_tty)
+record_disconnect (struct gdb_target *t, char *args, int from_tty)
 {
-  gdb_assert (t->to_stratum == record_stratum);
+  gdb_assert (t->ops->to_stratum == record_stratum);
 
-  DEBUG ("disconnect %s", t->to_shortname);
+  DEBUG ("disconnect %s", t->ops->to_shortname);
 
   record_stop (t);
   record_unpush (t);
@@ -143,11 +143,11 @@ record_disconnect (struct target_ops *t, char *args, int from_tty)
 /* See record.h.  */
 
 void
-record_detach (struct target_ops *t, char *args, int from_tty)
+record_detach (struct gdb_target *t, char *args, int from_tty)
 {
-  gdb_assert (t->to_stratum == record_stratum);
+  gdb_assert (t->ops->to_stratum == record_stratum);
 
-  DEBUG ("detach %s", t->to_shortname);
+  DEBUG ("detach %s", t->ops->to_shortname);
 
   record_stop (t);
   record_unpush (t);
@@ -158,11 +158,11 @@ record_detach (struct target_ops *t, char *args, int from_tty)
 /* See record.h.  */
 
 void
-record_mourn_inferior (struct target_ops *t)
+record_mourn_inferior (struct gdb_target *t)
 {
-  gdb_assert (t->to_stratum == record_stratum);
+  gdb_assert (t->ops->to_stratum == record_stratum);
 
-  DEBUG ("mourn inferior %s", t->to_shortname);
+  DEBUG ("mourn inferior %s", t->ops->to_shortname);
 
   /* It is safer to not stop recording.  Resources will be freed when
      threads are discarded.  */
@@ -174,11 +174,11 @@ record_mourn_inferior (struct target_ops *t)
 /* See record.h.  */
 
 void
-record_kill (struct target_ops *t)
+record_kill (struct gdb_target *t)
 {
-  gdb_assert (t->to_stratum == record_stratum);
+  gdb_assert (t->ops->to_stratum == record_stratum);
 
-  DEBUG ("kill %s", t->to_shortname);
+  DEBUG ("kill %s", t->ops->to_shortname);
 
   /* It is safer to not stop recording.  Resources will be freed when
      threads are discarded.  */
@@ -237,7 +237,7 @@ cmd_record_delete (char *args, int from_tty)
 static void
 cmd_record_stop (char *args, int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   t = require_record_target ();
 
@@ -273,7 +273,7 @@ show_record_command (char *args, int from_tty)
 static void
 info_record_command (char *args, int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   t = find_record_target ();
   if (t == NULL)
@@ -282,9 +282,9 @@ info_record_command (char *args, int from_tty)
       return;
     }
 
-  printf_filtered (_("Active record target: %s\n"), t->to_shortname);
-  if (t->to_info_record != NULL)
-    t->to_info_record ();
+  printf_filtered (_("Active record target: %s\n"), t->ops->to_shortname);
+  if (t->ops->to_info_record != NULL)
+    t->ops->to_info_record ();
 }
 
 /* The "record save" command.  */

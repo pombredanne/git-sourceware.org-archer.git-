@@ -734,7 +734,7 @@ static struct tramp_frame ppc64_linux_sighandler_tramp_frame = {
 static CORE_ADDR ppc_linux_entry_point_addr = 0;
 
 static void
-ppc_linux_inferior_created (struct target_ops *target, int from_tty)
+ppc_linux_inferior_created (struct gdb_target *target, int from_tty)
 {
   ppc_linux_entry_point_addr = 0;
 }
@@ -839,7 +839,7 @@ ppc_linux_spu_section (bfd *abfd, asection *asect, void *user_data)
 
 static const struct target_desc *
 ppc_linux_core_read_description (struct gdbarch *gdbarch,
-				 struct target_ops *target,
+				 struct gdb_target *target,
 				 bfd *abfd)
 {
   asection *cell = bfd_sections_find_if (abfd, ppc_linux_spu_section, NULL);
@@ -986,7 +986,7 @@ ppc_linux_spe_context_lookup (struct objfile *objfile)
 }
 
 static void
-ppc_linux_spe_context_inferior_created (struct target_ops *t, int from_tty)
+ppc_linux_spe_context_inferior_created (struct gdb_target *t, int from_tty)
 {
   struct objfile *objfile;
 
@@ -1030,10 +1030,10 @@ ppc_linux_spe_context (int wordsize, enum bfd_endian byte_order,
   /* Look up cached address of thread-local variable.  */
   if (!ptid_equal (spe_context_cache_ptid, inferior_ptid))
     {
-      struct target_ops *target = current_target;
+      struct gdb_target *target = current_target;
       volatile struct gdb_exception ex;
 
-      while (target && !target->to_get_thread_local_address)
+      while (target && !target->ops->to_get_thread_local_address)
 	target = find_target_beneath (target);
       if (!target)
 	return 0;
@@ -1047,9 +1047,9 @@ ppc_linux_spe_context (int wordsize, enum bfd_endian byte_order,
 	     Instead, we have cached the lm_addr value, and use that to
 	     directly call the target's to_get_thread_local_address.  */
 	  spe_context_cache_address
-	    = target->to_get_thread_local_address (target, inferior_ptid,
-						   spe_context_lm_addr,
-						   spe_context_offset);
+	    = target->ops->to_get_thread_local_address (target, inferior_ptid,
+							spe_context_lm_addr,
+							spe_context_offset);
 	  spe_context_cache_ptid = inferior_ptid;
 	}
 

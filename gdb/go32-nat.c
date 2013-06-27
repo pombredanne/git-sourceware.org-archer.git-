@@ -236,26 +236,26 @@ static int dr_ref_count[4];
 static int prog_has_started = 0;
 static void go32_open (char *name, int from_tty);
 static void go32_close (void);
-static void go32_attach (struct target_ops *ops, char *args, int from_tty);
-static void go32_detach (struct target_ops *ops, char *args, int from_tty);
-static void go32_resume (struct target_ops *ops,
+static void go32_attach (struct gdb_target *ops, char *args, int from_tty);
+static void go32_detach (struct gdb_target *ops, char *args, int from_tty);
+static void go32_resume (struct gdb_target *ops,
 			 ptid_t ptid, int step,
 			 enum gdb_signal siggnal);
-static void go32_fetch_registers (struct target_ops *ops,
+static void go32_fetch_registers (struct gdb_target *ops,
 				  struct regcache *, int regno);
 static void store_register (const struct regcache *, int regno);
-static void go32_store_registers (struct target_ops *ops,
+static void go32_store_registers (struct gdb_target *ops,
 				  struct regcache *, int regno);
 static void go32_prepare_to_store (struct regcache *);
 static int go32_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
 			     int write,
 			     struct mem_attrib *attrib,
-			     struct target_ops *target);
-static void go32_files_info (struct target_ops *target);
-static void go32_kill_inferior (struct target_ops *ops);
-static void go32_create_inferior (struct target_ops *ops, char *exec_file,
+			     struct gdb_target *target);
+static void go32_files_info (struct gdb_target *target);
+static void go32_kill_inferior (struct gdb_target *ops);
+static void go32_create_inferior (struct gdb_target *ops, char *exec_file,
 				  char *args, char **env, int from_tty);
-static void go32_mourn_inferior (struct target_ops *ops);
+static void go32_mourn_inferior (struct gdb_target *ops);
 static int go32_can_run (void);
 
 static struct target_ops go32_ops;
@@ -376,7 +376,7 @@ go32_close (void)
 }
 
 static void
-go32_attach (struct target_ops *ops, char *args, int from_tty)
+go32_attach (struct gdb_target *ops, char *args, int from_tty)
 {
   error (_("\
 You cannot attach to a running program on this platform.\n\
@@ -384,7 +384,7 @@ Use the `run' command to run DJGPP programs."));
 }
 
 static void
-go32_detach (struct target_ops *ops, char *args, int from_tty)
+go32_detach (struct gdb_target *ops, char *args, int from_tty)
 {
 }
 
@@ -392,7 +392,7 @@ static int resume_is_step;
 static int resume_signal = -1;
 
 static void
-go32_resume (struct target_ops *ops,
+go32_resume (struct gdb_target *ops,
 	     ptid_t ptid, int step, enum gdb_signal siggnal)
 {
   int i;
@@ -417,7 +417,7 @@ go32_resume (struct target_ops *ops,
 static char child_cwd[FILENAME_MAX];
 
 static ptid_t
-go32_wait (struct target_ops *ops,
+go32_wait (struct gdb_target *ops,
 	   ptid_t ptid, struct target_waitstatus *status, int options)
 {
   int i;
@@ -551,7 +551,7 @@ fetch_register (struct regcache *regcache, int regno)
 }
 
 static void
-go32_fetch_registers (struct target_ops *ops,
+go32_fetch_registers (struct gdb_target *ops,
 		      struct regcache *regcache, int regno)
 {
   if (regno >= 0)
@@ -582,7 +582,7 @@ store_register (const struct regcache *regcache, int regno)
 }
 
 static void
-go32_store_registers (struct target_ops *ops,
+go32_store_registers (struct gdb_target *ops,
 		      struct regcache *regcache, int regno)
 {
   unsigned r;
@@ -604,7 +604,7 @@ go32_prepare_to_store (struct regcache *regcache)
 
 static int
 go32_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
-		  struct mem_attrib *attrib, struct target_ops *target)
+		  struct mem_attrib *attrib, struct gdb_target *target)
 {
   if (write)
     {
@@ -633,19 +633,19 @@ go32_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
 static cmdline_t child_cmd;	/* Parsed child's command line kept here.  */
 
 static void
-go32_files_info (struct target_ops *target)
+go32_files_info (struct gdb_target *target)
 {
   printf_unfiltered ("You are running a DJGPP V2 program.\n");
 }
 
 static void
-go32_kill_inferior (struct target_ops *ops)
+go32_kill_inferior (struct gdb_target *ops)
 {
   go32_mourn_inferior (ops);
 }
 
 static void
-go32_create_inferior (struct target_ops *ops, char *exec_file,
+go32_create_inferior (struct gdb_target *ops, char *exec_file,
 		      char *args, char **env, int from_tty)
 {
   extern char **environ;
@@ -733,7 +733,7 @@ go32_create_inferior (struct target_ops *ops, char *exec_file,
 }
 
 static void
-go32_mourn_inferior (struct target_ops *ops)
+go32_mourn_inferior (struct gdb_target *ops)
 {
   ptid_t ptid;
 
@@ -955,13 +955,13 @@ go32_terminal_ours (void)
 }
 
 static int
-go32_thread_alive (struct target_ops *ops, ptid_t ptid)
+go32_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   return !ptid_equal (inferior_ptid, null_ptid);
 }
 
 static char *
-go32_pid_to_str (struct target_ops *ops, ptid_t ptid)
+go32_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   return normal_pid_to_str (ptid);
 }

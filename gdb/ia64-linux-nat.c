@@ -646,7 +646,7 @@ ia64_linux_new_thread (struct lwp_info *lp)
 }
 
 static int
-ia64_linux_stopped_data_address (struct target_ops *ops, CORE_ADDR *addr_p)
+ia64_linux_stopped_data_address (struct gdb_target *ops, CORE_ADDR *addr_p)
 {
   CORE_ADDR psr;
   siginfo_t siginfo;
@@ -762,7 +762,7 @@ ia64_linux_fetch_register (struct regcache *regcache, int regnum)
    for all registers.  */
 
 static void
-ia64_linux_fetch_registers (struct target_ops *ops,
+ia64_linux_fetch_registers (struct gdb_target *ops,
 			    struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
@@ -820,7 +820,7 @@ ia64_linux_store_register (const struct regcache *regcache, int regnum)
    this for all registers.  */
 
 static void
-ia64_linux_store_registers (struct target_ops *ops,
+ia64_linux_store_registers (struct gdb_target *ops,
 			    struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
@@ -833,12 +833,12 @@ ia64_linux_store_registers (struct target_ops *ops,
 }
 
 
-static LONGEST (*super_xfer_partial) (struct target_ops *, enum target_object,
+static LONGEST (*super_xfer_partial) (struct gdb_target *, enum target_object,
 				      const char *, gdb_byte *,
 				      const gdb_byte *, ULONGEST, LONGEST);
 
 static LONGEST 
-ia64_linux_xfer_partial (struct target_ops *ops,
+ia64_linux_xfer_partial (struct gdb_target *ops,
 			 enum target_object object,
 			 const char *annex,
 			 gdb_byte *readbuf, const gdb_byte *writebuf,

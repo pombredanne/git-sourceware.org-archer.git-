@@ -34,7 +34,7 @@
    GDB_NOTIFIER keeps track of the file descriptor based event
    sources.  ASYNC_EVENT_HANDLER_LIST keeps track of asynchronous
    event sources that are signalled by some component of gdb, usually
-   a target_ops instance.  Event sources for gdb are currently the UI
+   a gdb_target instance.  Event sources for gdb are currently the UI
    and the target.  Gdb communicates with the command line user
    interface via the readline library and usually communicates with
    remote targets via a serial port.  Serial ports are represented in

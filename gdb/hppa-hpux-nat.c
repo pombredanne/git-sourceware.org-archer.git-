@@ -144,7 +144,7 @@ hppa_hpux_fetch_register (struct regcache *regcache, int regnum)
 }
 
 static void
-hppa_hpux_fetch_inferior_registers (struct target_ops *ops,
+hppa_hpux_fetch_inferior_registers (struct gdb_target *ops,
 				    struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
@@ -222,7 +222,7 @@ hppa_hpux_store_register (struct regcache *regcache, int regnum)
    this for all registers (including the floating point registers).  */
 
 static void
-hppa_hpux_store_inferior_registers (struct target_ops *ops,
+hppa_hpux_store_inferior_registers (struct gdb_target *ops,
 				    struct regcache *regcache, int regnum)
 {
   if (regnum == -1)

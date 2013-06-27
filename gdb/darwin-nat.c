@@ -89,31 +89,31 @@ extern boolean_t exc_server (mach_msg_header_t *in, mach_msg_header_t *out);
 
 static void darwin_stop (ptid_t);
 
-static void darwin_resume_to (struct target_ops *ops, ptid_t ptid, int step,
+static void darwin_resume_to (struct gdb_target *ops, ptid_t ptid, int step,
                               enum gdb_signal signal);
 static void darwin_resume (ptid_t ptid, int step,
 			   enum gdb_signal signal);
 
-static ptid_t darwin_wait_to (struct target_ops *ops, ptid_t ptid,
+static ptid_t darwin_wait_to (struct gdb_target *ops, ptid_t ptid,
                               struct target_waitstatus *status, int options);
 static ptid_t darwin_wait (ptid_t ptid, struct target_waitstatus *status);
 
-static void darwin_mourn_inferior (struct target_ops *ops);
+static void darwin_mourn_inferior (struct gdb_target *ops);
 
-static void darwin_kill_inferior (struct target_ops *ops);
+static void darwin_kill_inferior (struct gdb_target *ops);
 
 static void darwin_ptrace_me (void);
 
 static void darwin_ptrace_him (int pid);
 
-static void darwin_create_inferior (struct target_ops *ops, char *exec_file,
+static void darwin_create_inferior (struct gdb_target *ops, char *exec_file,
 				    char *allargs, char **env, int from_tty);
 
-static void darwin_files_info (struct target_ops *ops);
+static void darwin_files_info (struct gdb_target *ops);
 
-static char *darwin_pid_to_str (struct target_ops *ops, ptid_t tpid);
+static char *darwin_pid_to_str (struct gdb_target *ops, ptid_t tpid);
 
-static int darwin_thread_alive (struct target_ops *ops, ptid_t tpid);
+static int darwin_thread_alive (struct gdb_target *ops, ptid_t tpid);
 
 /* Target operations for Darwin.  */
 static struct target_ops *darwin_ops;
@@ -851,7 +851,7 @@ darwin_resume (ptid_t ptid, int step, enum gdb_signal signal)
 }
 
 static void
-darwin_resume_to (struct target_ops *ops, ptid_t ptid, int step,
+darwin_resume_to (struct gdb_target *ops, ptid_t ptid, int step,
                   enum gdb_signal signal)
 {
   return darwin_resume (ptid, step, signal);
@@ -1137,7 +1137,7 @@ darwin_wait (ptid_t ptid, struct target_waitstatus *status)
 }
 
 static ptid_t
-darwin_wait_to (struct target_ops *ops, 
+darwin_wait_to (struct gdb_target *ops, 
                 ptid_t ptid, struct target_waitstatus *status, int options)
 {
   return darwin_wait (ptid, status);
@@ -1154,7 +1154,7 @@ darwin_stop (ptid_t t)
 }
 
 static void
-darwin_mourn_inferior (struct target_ops *ops)
+darwin_mourn_inferior (struct gdb_target *ops)
 {
   struct inferior *inf = current_inferior ();
   kern_return_t kret;
@@ -1301,7 +1301,7 @@ darwin_restore_exception_ports (darwin_inferior *inf)
 }
 
 static void
-darwin_kill_inferior (struct target_ops *ops)
+darwin_kill_inferior (struct gdb_target *ops)
 {
   struct inferior *inf = current_inferior ();
   struct target_waitstatus wstatus;
@@ -1578,7 +1578,7 @@ darwin_execvp (const char *file, char * const argv[], char * const env[])
 }
 
 static void
-darwin_create_inferior (struct target_ops *ops, char *exec_file,
+darwin_create_inferior (struct gdb_target *ops, char *exec_file,
 			char *allargs, char **env, int from_tty)
 {
   /* Do the hard work.  */
@@ -1620,7 +1620,7 @@ darwin_setup_fake_stop_event (struct inferior *inf)
 /* Attach to process PID, then initialize for debugging it
    and wait for the trace-trap that results from attaching.  */
 static void
-darwin_attach (struct target_ops *ops, char *args, int from_tty)
+darwin_attach (struct gdb_target *ops, char *args, int from_tty)
 {
   pid_t pid;
   pid_t pid2;
@@ -1681,7 +1681,7 @@ darwin_attach (struct target_ops *ops, char *args, int from_tty)
    previously attached.  It *might* work if the program was
    started via fork.  */
 static void
-darwin_detach (struct target_ops *ops, char *args, int from_tty)
+darwin_detach (struct gdb_target *ops, char *args, int from_tty)
 {
   pid_t pid = ptid_get_pid (inferior_ptid);
   struct inferior *inf = current_inferior ();
@@ -1726,12 +1726,12 @@ darwin_detach (struct target_ops *ops, char *args, int from_tty)
 }
 
 static void
-darwin_files_info (struct target_ops *ops)
+darwin_files_info (struct gdb_target *ops)
 {
 }
 
 static char *
-darwin_pid_to_str (struct target_ops *ops, ptid_t ptid)
+darwin_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   static char buf[80];
   long tid = ptid_get_tid (ptid);
@@ -1747,7 +1747,7 @@ darwin_pid_to_str (struct target_ops *ops, ptid_t ptid)
 }
 
 static int
-darwin_thread_alive (struct target_ops *ops, ptid_t ptid)
+darwin_thread_alive (struct gdb_target *ops, ptid_t ptid)
 {
   return 1;
 }
@@ -1921,7 +1921,7 @@ darwin_read_dyld_info (task_t task, CORE_ADDR addr, gdb_byte *rdaddr,
    is ignored.  */
 static int
 darwin_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
-		    struct mem_attrib *attrib, struct target_ops *target)
+		    struct mem_attrib *attrib, struct gdb_target *target)
 {
   struct inferior *inf = current_inferior ();
   task_t task = inf->private->task;
@@ -1939,7 +1939,7 @@ darwin_xfer_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len, int write,
 }
 
 static LONGEST
-darwin_xfer_partial (struct target_ops *ops,
+darwin_xfer_partial (struct gdb_target *ops,
 		     enum target_object object, const char *annex,
 		     gdb_byte *readbuf, const gdb_byte *writebuf,
 		     ULONGEST offset, LONGEST len)

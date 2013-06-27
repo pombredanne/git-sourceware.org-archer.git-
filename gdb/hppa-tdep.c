@@ -1246,7 +1246,7 @@ hppa64_return_value (struct gdbarch *gdbarch, struct value *function,
 
 static CORE_ADDR
 hppa32_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
-				   struct target_ops *targ)
+				   struct gdb_target *targ)
 {
   if (addr & 2)
     {

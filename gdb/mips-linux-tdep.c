@@ -645,7 +645,7 @@ mips_linux_regset_from_core_section (struct gdbarch *gdbarch,
 
 static const struct target_desc *
 mips_linux_core_read_description (struct gdbarch *gdbarch,
-				  struct target_ops *target,
+				  struct gdb_target *target,
 				  bfd *abfd)
 {
   asection *section = bfd_get_section_by_name (abfd, ".reg");

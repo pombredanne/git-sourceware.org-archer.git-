@@ -48,14 +48,14 @@ static void target_info (char *, int);
 
 static void default_terminal_info (const char *, int);
 
-static int default_watchpoint_addr_within_range (struct target_ops *,
+static int default_watchpoint_addr_within_range (struct gdb_target *,
 						 CORE_ADDR, CORE_ADDR, int);
 
 static int default_region_ok_for_hw_watchpoint (CORE_ADDR, int);
 
 static void tcomplain (void) ATTRIBUTE_NORETURN;
 
-static int nomemory (CORE_ADDR, char *, int, int, struct target_ops *);
+static int nomemory (CORE_ADDR, char *, int, int, struct gdb_target *);
 
 static int return_zero (void);
 
@@ -67,27 +67,27 @@ void target_ignore (void);
 
 static void target_command (char *, int);
 
-static struct target_ops *find_default_run_target (char *);
+static struct gdb_target *find_default_run_target (char *);
 
-static LONGEST default_xfer_partial (struct target_ops *ops,
+static LONGEST default_xfer_partial (struct gdb_target *ops,
 				     enum target_object object,
 				     const char *annex, gdb_byte *readbuf,
 				     const gdb_byte *writebuf,
 				     ULONGEST offset, LONGEST len);
 
-static LONGEST current_xfer_partial (struct target_ops *ops,
+static LONGEST current_xfer_partial (struct gdb_target *ops,
 				     enum target_object object,
 				     const char *annex, gdb_byte *readbuf,
 				     const gdb_byte *writebuf,
 				     ULONGEST offset, LONGEST len);
 
-static LONGEST target_xfer_partial (struct target_ops *ops,
+static LONGEST target_xfer_partial (struct gdb_target *ops,
 				    enum target_object object,
 				    const char *annex,
 				    void *readbuf, const void *writebuf,
 				    ULONGEST offset, LONGEST len);
 
-static struct gdbarch *default_thread_architecture (struct target_ops *ops,
+static struct gdbarch *default_thread_architecture (struct gdb_target *ops,
 						    ptid_t ptid);
 
 static void init_dummy_target (void);
@@ -98,7 +98,7 @@ static void debug_to_open (char *, int);
 
 static void debug_to_prepare_to_store (struct regcache *);
 
-static void debug_to_files_info (struct target_ops *);
+static void debug_to_files_info (struct gdb_target *);
 
 static int debug_to_insert_breakpoint (struct gdbarch *,
 				       struct bp_target_info *);
@@ -122,9 +122,9 @@ static int debug_to_remove_watchpoint (CORE_ADDR, int, int,
 
 static int debug_to_stopped_by_watchpoint (void);
 
-static int debug_to_stopped_data_address (struct target_ops *, CORE_ADDR *);
+static int debug_to_stopped_data_address (struct gdb_target *, CORE_ADDR *);
 
-static int debug_to_watchpoint_addr_within_range (struct target_ops *,
+static int debug_to_watchpoint_addr_within_range (struct gdb_target *,
 						  CORE_ADDR, CORE_ADDR, int);
 
 static int debug_to_region_ok_for_hw_watchpoint (CORE_ADDR, int);
@@ -167,15 +167,15 @@ struct target_stack
      stratum.  An entry may be NULL if there is no entry at that
      stratum.  */
 
-  struct target_ops *ops[MAX_TARGET_STRATUM + 1];
+  struct gdb_target *ops[MAX_TARGET_STRATUM + 1];
 
   /* Reference count.  */
 
   int refc;
 
-  /* The "smashed" target_ops.  */
+  /* The "smashed" gdb_target.  */
 
-  struct target_ops *smashed;
+  struct gdb_target *smashed;
 };
 
 /* Top of target stack.  */
@@ -193,7 +193,7 @@ static struct target_stack *target_stack;
    or file or whatever "inferior" we have.  This is always equal to
    TARGET_STACK->smashed.  */
 
-struct target_ops *current_target;
+struct gdb_target *current_target;
 
 /* Command list for target.  */
 
@@ -289,7 +289,7 @@ target_command (char *arg, int from_tty)
 /* Default target_has_* methods for process_stratum targets.  */
 
 int
-default_child_has_all_memory (struct target_ops *ops)
+default_child_has_all_memory (struct gdb_target *ops)
 {
   /* If no inferior selected, then we can't read memory here.  */
   if (ptid_equal (inferior_ptid, null_ptid))
@@ -299,7 +299,7 @@ default_child_has_all_memory (struct target_ops *ops)
 }
 
 int
-default_child_has_memory (struct target_ops *ops)
+default_child_has_memory (struct gdb_target *ops)
 {
   /* If no inferior selected, then we can't read memory here.  */
   if (ptid_equal (inferior_ptid, null_ptid))
@@ -309,7 +309,7 @@ default_child_has_memory (struct target_ops *ops)
 }
 
 int
-default_child_has_stack (struct target_ops *ops)
+default_child_has_stack (struct gdb_target *ops)
 {
   /* If no inferior selected, there's no stack.  */
   if (ptid_equal (inferior_ptid, null_ptid))
@@ -319,7 +319,7 @@ default_child_has_stack (struct target_ops *ops)
 }
 
 int
-default_child_has_registers (struct target_ops *ops)
+default_child_has_registers (struct gdb_target *ops)
 {
   /* Can't read registers from no inferior.  */
   if (ptid_equal (inferior_ptid, null_ptid))
@@ -329,7 +329,7 @@ default_child_has_registers (struct target_ops *ops)
 }
 
 int
-default_child_has_execution (struct target_ops *ops, ptid_t the_ptid)
+default_child_has_execution (struct gdb_target *ops, ptid_t the_ptid)
 {
   /* If there's no thread selected, then we can't make it run through
      hoops.  */
@@ -343,10 +343,10 @@ default_child_has_execution (struct target_ops *ops, ptid_t the_ptid)
 int
 target_has_all_memory_1 (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_has_all_memory (t))
+    if (t->ops->to_has_all_memory (t))
       return 1;
 
   return 0;
@@ -355,10 +355,10 @@ target_has_all_memory_1 (void)
 int
 target_has_memory_1 (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_has_memory (t))
+    if (t->ops->to_has_memory (t))
       return 1;
 
   return 0;
@@ -367,10 +367,10 @@ target_has_memory_1 (void)
 int
 target_has_stack_1 (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_has_stack (t))
+    if (t->ops->to_has_stack (t))
       return 1;
 
   return 0;
@@ -379,10 +379,10 @@ target_has_stack_1 (void)
 int
 target_has_registers_1 (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_has_registers (t))
+    if (t->ops->to_has_registers (t))
       return 1;
 
   return 0;
@@ -391,10 +391,10 @@ target_has_registers_1 (void)
 int
 target_has_execution_1 (ptid_t the_ptid)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_has_execution (t, the_ptid))
+    if (t->ops->to_has_execution (t, the_ptid))
       return 1;
 
   return 0;
@@ -414,27 +414,24 @@ complete_target_initialization (struct target_ops *t)
 {
   struct cmd_list_element *c;
 
-  if (t->to_identification == NULL)
-    t->to_identification = t;
-
   /* Provide default values for all "must have" methods.  */
   if (t->to_xfer_partial == NULL)
     t->to_xfer_partial = default_xfer_partial;
 
   if (t->to_has_all_memory == NULL)
-    t->to_has_all_memory = (int (*) (struct target_ops *)) return_zero;
+    t->to_has_all_memory = (int (*) (struct gdb_target *)) return_zero;
 
   if (t->to_has_memory == NULL)
-    t->to_has_memory = (int (*) (struct target_ops *)) return_zero;
+    t->to_has_memory = (int (*) (struct gdb_target *)) return_zero;
 
   if (t->to_has_stack == NULL)
-    t->to_has_stack = (int (*) (struct target_ops *)) return_zero;
+    t->to_has_stack = (int (*) (struct gdb_target *)) return_zero;
 
   if (t->to_has_registers == NULL)
-    t->to_has_registers = (int (*) (struct target_ops *)) return_zero;
+    t->to_has_registers = (int (*) (struct gdb_target *)) return_zero;
 
   if (t->to_has_execution == NULL)
-    t->to_has_execution = (int (*) (struct target_ops *, ptid_t)) return_zero;
+    t->to_has_execution = (int (*) (struct gdb_target *, ptid_t)) return_zero;
 }
 
 /* Add possible target architecture T to the list and add a new
@@ -498,15 +495,15 @@ target_ignore (void)
 void
 target_kill (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_kill != NULL)
+    if (t->ops->to_kill != NULL)
       {
 	if (targetdebug)
 	  fprintf_unfiltered (gdb_stdlog, "target_kill ()\n");
 
-        t->to_kill (t);
+        t->ops->to_kill (t);
 	return;
       }
 
@@ -517,20 +514,20 @@ void
 target_load (char *arg, int from_tty)
 {
   target_dcache_invalidate ();
-  (*current_target->to_load) (arg, from_tty);
+  (*current_target->ops->to_load) (arg, from_tty);
 }
 
 void
 target_create_inferior (char *exec_file, char *args,
 			char **env, int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_create_inferior != NULL)	
+      if (t->ops->to_create_inferior != NULL)	
 	{
-	  t->to_create_inferior (t, exec_file, args, env, from_tty);
+	  t->ops->to_create_inferior (t, exec_file, args, env, from_tty);
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
 				"target_create_inferior (%s, %s, xxx, %d)\n",
@@ -555,12 +552,12 @@ target_terminal_inferior (void)
 
   /* If GDB is resuming the inferior in the foreground, install
      inferior's terminal modes.  */
-  (*current_target->to_terminal_inferior) ();
+  (*current_target->ops->to_terminal_inferior) ();
 }
 
 static int
 nomemory (CORE_ADDR memaddr, char *myaddr, int len, int write,
-	  struct target_ops *t)
+	  struct gdb_target *t)
 {
   errno = EIO;			/* Can't read/write this location.  */
   return 0;			/* No bytes handled.  */
@@ -570,7 +567,7 @@ static void
 tcomplain (void)
 {
   error (_("You can't do that when your target is `%s'"),
-	 current_target->to_shortname);
+	 current_target->ops->to_shortname);
 }
 
 void
@@ -624,15 +621,15 @@ to_execution_direction must be implemented for reverse async");
 static void
 update_current_target (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
   int i;
 
   /* First, reset current's contents.  */
-  memset (current_target, 0, sizeof (*current_target));
+  memset (current_target->ops, 0, sizeof (struct target_ops));
 
 #define INHERIT(FIELD, TARGET) \
-      if (!current_target->FIELD) \
-	current_target->FIELD = (TARGET)->FIELD
+      if (!current_target->ops->FIELD) \
+	current_target->ops->FIELD = (TARGET)->ops->FIELD
 
   for (i = MAX_TARGET_STRATUM; i >= 0; --i)
     {
@@ -776,8 +773,8 @@ update_current_target (void)
      others are hard-wired to a standard recursive default.  */
 
 #define de_fault(field, value) \
-  if (!current_target->field)               \
-    current_target->field = value
+  if (!current_target->ops->field)               \
+    current_target->ops->field = value
 
   de_fault (to_open,
 	    (void (*) (char *, int))
@@ -793,10 +790,10 @@ update_current_target (void)
 	    noprocess);
   de_fault (deprecated_xfer_memory,
 	    (int (*) (CORE_ADDR, gdb_byte *, int, int,
-		      struct mem_attrib *, struct target_ops *))
+		      struct mem_attrib *, struct gdb_target *))
 	    nomemory);
   de_fault (to_files_info,
-	    (void (*) (struct target_ops *))
+	    (void (*) (struct gdb_target *))
 	    target_ignore);
   de_fault (to_insert_breakpoint,
 	    memory_insert_breakpoint);
@@ -821,7 +818,7 @@ update_current_target (void)
 	    (int (*) (void))
 	    return_zero);
   de_fault (to_stopped_data_address,
-	    (int (*) (struct target_ops *, CORE_ADDR *))
+	    (int (*) (struct gdb_target *, CORE_ADDR *))
 	    return_zero);
   de_fault (to_watchpoint_addr_within_range,
 	    default_watchpoint_addr_within_range);
@@ -888,7 +885,7 @@ update_current_target (void)
   de_fault (to_stop,
 	    (void (*) (ptid_t))
 	    target_ignore);
-  current_target->to_xfer_partial = current_xfer_partial;
+  current_target->ops->to_xfer_partial = current_xfer_partial;
   de_fault (to_rcmd,
 	    (void (*) (char *, struct ui_file *))
 	    tcomplain);
@@ -900,7 +897,7 @@ update_current_target (void)
 	    tcomplain);
   de_fault (to_thread_architecture,
 	    default_thread_architecture);
-  current_target->to_read_description = NULL;
+  current_target->ops->to_read_description = NULL;
   de_fault (to_get_ada_task_ptid,
             (ptid_t (*) (long, long))
             default_get_ada_task_ptid);
@@ -1025,15 +1022,15 @@ update_current_target (void)
    checking them.  */
 
 void
-push_target (struct target_ops *t)
+push_gdb_target (struct gdb_target *t)
 {
   /* Check magic number.  If wrong, it probably means someone changed
      the struct definition, but not all the places that initialize one.  */
-  if (t->to_magic != OPS_MAGIC)
+  if (t->ops->to_magic != OPS_MAGIC)
     {
       fprintf_unfiltered (gdb_stderr,
 			  "Magic number of %s target struct wrong\n",
-			  t->to_shortname);
+			  t->ops->to_shortname);
       internal_error (__FILE__, __LINE__,
 		      _("failed internal consistency check"));
     }
@@ -1041,32 +1038,45 @@ push_target (struct target_ops *t)
   /* If there's already a target at this stratum, remove them.  */
   /* FIXME: cagney/2003-10-15: I think this should be popping all
      targets to CUR, and not just those at this stratum level.  */
-  if (target_stack->ops[t->to_stratum] != NULL)
-    target_close (target_stack->ops[t->to_stratum]);
+  if (target_stack->ops[t->ops->to_stratum] != NULL)
+    target_close (target_stack->ops[t->ops->to_stratum]);
 
   /* We have removed all targets in our stratum, now add the new one.  */
-  target_stack->ops[t->to_stratum] = t;
+  target_stack->ops[t->ops->to_stratum] = t;
 
   update_current_target ();
+}
+
+void
+push_target (struct target_ops *t)
+{
+  /* FIXME: freeing.  */
+  struct gdb_target *targ = XNEW (struct gdb_target);
+
+  targ->ops = t;
+  push_gdb_target (targ);
 }
 
 /* Remove a target_ops vector from the stack, wherever it may be.
    Return how many times it was removed (0 or 1).  */
 
 int
-unpush_target (struct target_ops *t)
+unpush_target (struct gdb_target *t)
 {
-  if (t->to_stratum == dummy_stratum)
+  if (t == NULL)
+    return 0;
+
+  if (t->ops->to_stratum == dummy_stratum)
     internal_error (__FILE__, __LINE__,
 		    _("Attempt to unpush the dummy target"));
 
   /* Look for the specified target.  If we don't find it, quit.  Only
      open targets should be closed.  */
 
-  if (target_stack->ops[t->to_stratum] != t)
+  if (target_stack->ops[t->ops->to_stratum] != t)
     return 0;
 
-  target_stack->ops[t->to_stratum] = NULL;
+  target_stack->ops[t->ops->to_stratum] = NULL;
 
   update_current_target ();
 
@@ -1081,15 +1091,15 @@ unpush_target (struct target_ops *t)
 void
 pop_all_targets_above (enum strata above_stratum)
 {
-  while ((int) (current_target->to_stratum) > (int) above_stratum)
+  while ((int) (current_target->ops->to_stratum) > (int) above_stratum)
     {
-      struct target_ops *targ = find_target_beneath (current_target);
+      struct gdb_target *targ = find_target_beneath (current_target);
 
       if (!unpush_target (targ))
 	{
 	  fprintf_unfiltered (gdb_stderr,
 			      "pop_all_targets couldn't find target %s\n",
-			      targ->to_shortname);
+			      targ->ops->to_shortname);
 	  internal_error (__FILE__, __LINE__,
 			  _("failed internal consistency check"));
 	  break;
@@ -1119,7 +1129,8 @@ target_is_pushed (struct target_ops *t)
 		      _("failed internal consistency check"));
     }
 
-  return target_stack->ops[t->to_stratum] == t;
+  return (target_stack->ops[t->to_stratum] != NULL
+	  && target_stack->ops[t->to_stratum]->ops == t);
 }
 
 /* Using the objfile specified in OBJFILE, find the address for the
@@ -1128,11 +1139,11 @@ CORE_ADDR
 target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 {
   volatile CORE_ADDR addr = 0;
-  struct target_ops *target;
+  struct gdb_target *target;
 
   FOREACH_TARGET (target)
     {
-      if (target->to_get_thread_local_address != NULL)
+      if (target->ops->to_get_thread_local_address != NULL)
 	break;
     }
 
@@ -1154,8 +1165,8 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 	    throw_error (TLS_LOAD_MODULE_NOT_FOUND_ERROR,
 			 _("TLS load module not found"));
 
-	  addr = target->to_get_thread_local_address (target, ptid,
-						      lm_addr, offset);
+	  addr = target->ops->to_get_thread_local_address (target, ptid,
+							   lm_addr, offset);
 	}
       /* If an error occurred, print TLS related messages here.  Otherwise,
          throw the error to some higher catcher.  */
@@ -1294,16 +1305,16 @@ done:
 }
 
 struct target_section_table *
-target_get_section_table (struct target_ops *target)
+target_get_section_table (struct gdb_target *target)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   if (targetdebug)
     fprintf_unfiltered (gdb_stdlog, "target_get_section_table ()\n");
 
   for (t = target; t != NULL; t = find_target_beneath (t))
-    if (t->to_get_section_table != NULL)
-      return (*t->to_get_section_table) (t);
+    if (t->ops->to_get_section_table != NULL)
+      return (*t->ops->to_get_section_table) (t);
 
   return NULL;
 }
@@ -1311,7 +1322,7 @@ target_get_section_table (struct target_ops *target)
 /* Find a section containing ADDR.  */
 
 struct target_section *
-target_section_by_addr (struct target_ops *target, CORE_ADDR addr)
+target_section_by_addr (struct gdb_target *target, CORE_ADDR addr)
 {
   struct target_section_table *table = target_get_section_table (target);
   struct target_section *secp;
@@ -1359,7 +1370,7 @@ target_read_live_memory (enum target_object object,
    to_xfer_partial.  */
 
 static LONGEST
-memory_xfer_live_readonly_partial (struct target_ops *ops,
+memory_xfer_live_readonly_partial (struct gdb_target *ops,
 				   enum target_object object,
 				   gdb_byte *readbuf, ULONGEST memaddr,
 				   LONGEST len)
@@ -1411,7 +1422,7 @@ memory_xfer_live_readonly_partial (struct target_ops *ops,
    For docs see target.h, to_xfer_partial.  */
 
 static LONGEST
-memory_xfer_partial_1 (struct target_ops *ops, enum target_object object,
+memory_xfer_partial_1 (struct gdb_target *ops, enum target_object object,
 		       void *readbuf, const void *writebuf, ULONGEST memaddr,
 		       LONGEST len)
 {
@@ -1586,14 +1597,14 @@ memory_xfer_partial_1 (struct target_ops *ops, enum target_object object,
 
   do
     {
-      res = ops->to_xfer_partial (ops, TARGET_OBJECT_MEMORY, NULL,
-				  readbuf, writebuf, memaddr, reg_len);
+      res = ops->ops->to_xfer_partial (ops, TARGET_OBJECT_MEMORY, NULL,
+				       readbuf, writebuf, memaddr, reg_len);
       if (res > 0)
 	break;
 
       /* We want to continue past core files to executables, but not
 	 past a running target's memory.  */
-      if (ops->to_has_all_memory (ops))
+      if (ops->ops->to_has_all_memory (ops))
 	break;
 
       ops = find_target_beneath (ops);
@@ -1623,7 +1634,7 @@ memory_xfer_partial_1 (struct target_ops *ops, enum target_object object,
    to_xfer_partial.  */
 
 static LONGEST
-memory_xfer_partial (struct target_ops *ops, enum target_object object,
+memory_xfer_partial (struct gdb_target *ops, enum target_object object,
 		     void *readbuf, const void *writebuf, ULONGEST memaddr,
 		     LONGEST len)
 {
@@ -1680,14 +1691,14 @@ make_show_memory_breakpoints_cleanup (int show)
 /* For docs see target.h, to_xfer_partial.  */
 
 static LONGEST
-target_xfer_partial (struct target_ops *ops,
+target_xfer_partial (struct gdb_target *ops,
 		     enum target_object object, const char *annex,
 		     void *readbuf, const void *writebuf,
 		     ULONGEST offset, LONGEST len)
 {
   LONGEST retval;
 
-  gdb_assert (ops->to_xfer_partial != NULL);
+  gdb_assert (ops->ops->to_xfer_partial != NULL);
 
   if (writebuf && !may_write_memory)
     error (_("Writing to memory is not allowed (addr %s, len %s)"),
@@ -1708,8 +1719,8 @@ target_xfer_partial (struct target_ops *ops,
       if (raw_object == TARGET_OBJECT_RAW_MEMORY)
 	raw_object = TARGET_OBJECT_MEMORY;
 
-      retval = ops->to_xfer_partial (ops, raw_object, annex, readbuf,
-				     writebuf, offset, len);
+      retval = ops->ops->to_xfer_partial (ops, raw_object, annex, readbuf,
+					  writebuf, offset, len);
     }
 
   if (targetdebug)
@@ -1719,7 +1730,7 @@ target_xfer_partial (struct target_ops *ops,
       fprintf_unfiltered (gdb_stdlog,
 			  "%s:target_xfer_partial "
 			  "(%d, %s, %s, %s, %s, %s) = %s",
-			  ops->to_shortname,
+			  ops->ops->to_shortname,
 			  (int) object,
 			  (annex ? annex : "(null)"),
 			  host_address_to_string (readbuf),
@@ -1772,7 +1783,7 @@ int
 target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
 {
   /* Dispatch to the topmost target, not the flattened current_target->
-     Memory accesses check target->to_has_(all_)memory, and the
+     Memory accesses check target->ops->to_has_(all_)memory, and the
      flattened target doesn't inherit those.  */
   if (target_read (find_target_beneath (current_target),
 		   TARGET_OBJECT_MEMORY, NULL,
@@ -1789,7 +1800,7 @@ int
 target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
 {
   /* Dispatch to the topmost target, not the flattened current_target->
-     Memory accesses check target->to_has_(all_)memory, and the
+     Memory accesses check target->ops->to_has_(all_)memory, and the
      flattened target doesn't inherit those.  */
 
   if (target_read (find_target_beneath (current_target),
@@ -1809,7 +1820,7 @@ int
 target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
 {
   /* Dispatch to the topmost target, not the flattened current_target->
-     Memory accesses check target->to_has_(all_)memory, and the
+     Memory accesses check target->ops->to_has_(all_)memory, and the
      flattened target doesn't inherit those.  */
   if (target_write (find_target_beneath (current_target),
 		    TARGET_OBJECT_MEMORY, NULL,
@@ -1829,7 +1840,7 @@ int
 target_write_raw_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
 {
   /* Dispatch to the topmost target, not the flattened current_target->
-     Memory accesses check target->to_has_(all_)memory, and the
+     Memory accesses check target->ops->to_has_(all_)memory, and the
      flattened target doesn't inherit those.  */
   if (target_write (find_target_beneath (current_target),
 		    TARGET_OBJECT_RAW_MEMORY, NULL,
@@ -1847,19 +1858,19 @@ target_memory_map (void)
   VEC(mem_region_s) *result;
   struct mem_region *last_one, *this_one;
   int ix;
-  struct target_ops *t;
+  struct gdb_target *t;
 
   if (targetdebug)
     fprintf_unfiltered (gdb_stdlog, "target_memory_map ()\n");
 
   FOREACH_TARGET (t)
-    if (t->to_memory_map != NULL)
+    if (t->ops->to_memory_map != NULL)
       break;
 
   if (t == NULL)
     return NULL;
 
-  result = t->to_memory_map (t);
+  result = t->ops->to_memory_map (t);
   if (result == NULL)
     return NULL;
 
@@ -1890,15 +1901,15 @@ target_memory_map (void)
 void
 target_flash_erase (ULONGEST address, LONGEST length)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_flash_erase != NULL)
+    if (t->ops->to_flash_erase != NULL)
       {
 	if (targetdebug)
 	  fprintf_unfiltered (gdb_stdlog, "target_flash_erase (%s, %s)\n",
 			      hex_string (address), phex (length, 0));
-	t->to_flash_erase (t, address, length);
+	t->ops->to_flash_erase (t, address, length);
 	return;
       }
 
@@ -1908,14 +1919,14 @@ target_flash_erase (ULONGEST address, LONGEST length)
 void
 target_flash_done (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_flash_done != NULL)
+    if (t->ops->to_flash_done != NULL)
       {
 	if (targetdebug)
 	  fprintf_unfiltered (gdb_stdlog, "target_flash_done\n");
-	t->to_flash_done (t);
+	t->ops->to_flash_done (t);
 	return;
       }
 
@@ -1934,12 +1945,12 @@ show_trust_readonly (struct ui_file *file, int from_tty,
 /* More generic transfers.  */
 
 static LONGEST
-default_xfer_partial (struct target_ops *ops, enum target_object object,
+default_xfer_partial (struct gdb_target *ops, enum target_object object,
 		      const char *annex, gdb_byte *readbuf,
 		      const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
   if (object == TARGET_OBJECT_MEMORY
-      && ops->deprecated_xfer_memory != NULL)
+      && ops->ops->deprecated_xfer_memory != NULL)
     /* If available, fall back to the target's
        "deprecated_xfer_memory" method.  */
     {
@@ -1952,13 +1963,13 @@ default_xfer_partial (struct target_ops *ops, enum target_object object,
 	  struct cleanup *cleanup = make_cleanup (xfree, buffer);
 
 	  memcpy (buffer, writebuf, len);
-	  xfered = ops->deprecated_xfer_memory (offset, buffer, len,
-						1/*write*/, NULL, ops);
+	  xfered = ops->ops->deprecated_xfer_memory (offset, buffer, len,
+						     1/*write*/, NULL, ops);
 	  do_cleanups (cleanup);
 	}
       if (readbuf != NULL)
-	xfered = ops->deprecated_xfer_memory (offset, readbuf, len, 
-					      0/*read*/, NULL, ops);
+	xfered = ops->ops->deprecated_xfer_memory (offset, readbuf, len, 
+						   0/*read*/, NULL, ops);
       if (xfered > 0)
 	return xfered;
       else if (xfered == 0 && errno == 0)
@@ -1970,13 +1981,13 @@ default_xfer_partial (struct target_ops *ops, enum target_object object,
     }
   else
     {
-      struct target_ops *beneath = find_target_beneath (ops);
+      struct gdb_target *beneath = find_target_beneath (ops);
 
       if (beneath == NULL)
 	return -1;
       else
-	return beneath->to_xfer_partial (beneath, object, annex,
-					 readbuf, writebuf, offset, len);
+	return beneath->ops->to_xfer_partial (beneath, object, annex,
+					      readbuf, writebuf, offset, len);
     }
 }
 
@@ -1985,15 +1996,15 @@ default_xfer_partial (struct target_ops *ops, enum target_object object,
    requests down the stack.  */
 
 static LONGEST
-current_xfer_partial (struct target_ops *ops, enum target_object object,
+current_xfer_partial (struct gdb_target *ops, enum target_object object,
 		      const char *annex, gdb_byte *readbuf,
 		      const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
   if (beneath != NULL)
-    return beneath->to_xfer_partial (beneath, object, annex,
-				     readbuf, writebuf, offset, len);
+    return beneath->ops->to_xfer_partial (beneath, object, annex,
+					  readbuf, writebuf, offset, len);
   else
     return -1;
 }
@@ -2001,7 +2012,7 @@ current_xfer_partial (struct target_ops *ops, enum target_object object,
 /* Target vector read/write partial wrapper functions.  */
 
 static LONGEST
-target_read_partial (struct target_ops *ops,
+target_read_partial (struct gdb_target *ops,
 		     enum target_object object,
 		     const char *annex, gdb_byte *buf,
 		     ULONGEST offset, LONGEST len)
@@ -2010,7 +2021,7 @@ target_read_partial (struct target_ops *ops,
 }
 
 static LONGEST
-target_write_partial (struct target_ops *ops,
+target_write_partial (struct gdb_target *ops,
 		      enum target_object object,
 		      const char *annex, const gdb_byte *buf,
 		      ULONGEST offset, LONGEST len)
@@ -2023,7 +2034,7 @@ target_write_partial (struct target_ops *ops,
 /* For docs on target_read see target.h.  */
 
 LONGEST
-target_read (struct target_ops *ops,
+target_read (struct gdb_target *ops,
 	     enum target_object object,
 	     const char *annex, gdb_byte *buf,
 	     ULONGEST offset, LONGEST len)
@@ -2069,7 +2080,7 @@ target_read (struct target_ops *ops,
    take care of reading multiple ranges then.  */
 
 static void
-read_whatever_is_readable (struct target_ops *ops,
+read_whatever_is_readable (struct gdb_target *ops,
 			   ULONGEST begin, ULONGEST end,
 			   VEC(memory_read_result_s) **result)
 {
@@ -2195,7 +2206,7 @@ free_memory_read_result_vector (void *x)
 }
 
 VEC(memory_read_result_s) *
-read_memory_robust (struct target_ops *ops, ULONGEST offset, LONGEST len)
+read_memory_robust (struct gdb_target *ops, ULONGEST offset, LONGEST len)
 {
   VEC(memory_read_result_s) *result = 0;
 
@@ -2257,7 +2268,7 @@ read_memory_robust (struct target_ops *ops, ULONGEST offset, LONGEST len)
 /* An alternative to target_write with progress callbacks.  */
 
 LONGEST
-target_write_with_progress (struct target_ops *ops,
+target_write_with_progress (struct gdb_target *ops,
 			    enum target_object object,
 			    const char *annex, const gdb_byte *buf,
 			    ULONGEST offset, LONGEST len,
@@ -2292,7 +2303,7 @@ target_write_with_progress (struct target_ops *ops,
 /* For docs on target_write see target.h.  */
 
 LONGEST
-target_write (struct target_ops *ops,
+target_write (struct gdb_target *ops,
 	      enum target_object object,
 	      const char *annex, const gdb_byte *buf,
 	      ULONGEST offset, LONGEST len)
@@ -2308,7 +2319,7 @@ target_write (struct target_ops *ops,
    information.  */
 
 static LONGEST
-target_read_alloc_1 (struct target_ops *ops, enum target_object object,
+target_read_alloc_1 (struct gdb_target *ops, enum target_object object,
 		     const char *annex, gdb_byte **buf_p, int padding)
 {
   size_t buf_alloc, buf_pos;
@@ -2365,7 +2376,7 @@ target_read_alloc_1 (struct target_ops *ops, enum target_object object,
    function for more information about the return value.  */
 
 LONGEST
-target_read_alloc (struct target_ops *ops, enum target_object object,
+target_read_alloc (struct gdb_target *ops, enum target_object object,
 		   const char *annex, gdb_byte **buf_p)
 {
   return target_read_alloc_1 (ops, object, annex, buf_p, 0);
@@ -2378,7 +2389,7 @@ target_read_alloc (struct target_ops *ops, enum target_object object,
    if the result contains any embedded NUL bytes.  */
 
 char *
-target_read_stralloc (struct target_ops *ops, enum target_object object,
+target_read_stralloc (struct gdb_target *ops, enum target_object object,
 		      const char *annex)
 {
   gdb_byte *buffer;
@@ -2412,7 +2423,7 @@ target_read_stralloc (struct target_ops *ops, enum target_object object,
 /* Memory transfer methods.  */
 
 void
-get_target_memory (struct target_ops *ops, CORE_ADDR addr, gdb_byte *buf,
+get_target_memory (struct gdb_target *ops, CORE_ADDR addr, gdb_byte *buf,
 		   LONGEST len)
 {
   /* This method is used to read from an alternate, non-current
@@ -2425,7 +2436,7 @@ get_target_memory (struct target_ops *ops, CORE_ADDR addr, gdb_byte *buf,
 }
 
 ULONGEST
-get_target_memory_unsigned (struct target_ops *ops, CORE_ADDR addr,
+get_target_memory_unsigned (struct gdb_target *ops, CORE_ADDR addr,
 			    int len, enum bfd_endian byte_order)
 {
   gdb_byte buf[sizeof (ULONGEST)];
@@ -2445,7 +2456,7 @@ target_insert_breakpoint (struct gdbarch *gdbarch,
       return 1;
     }
 
-  return (*current_target->to_insert_breakpoint) (gdbarch, bp_tgt);
+  return (*current_target->ops->to_insert_breakpoint) (gdbarch, bp_tgt);
 }
 
 int
@@ -2462,13 +2473,13 @@ target_remove_breakpoint (struct gdbarch *gdbarch,
       return 1;
     }
 
-  return (*current_target->to_remove_breakpoint) (gdbarch, bp_tgt);
+  return (*current_target->ops->to_remove_breakpoint) (gdbarch, bp_tgt);
 }
 
 static void
 target_info (char *args, int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
   int has_all_mem = 0;
 
   if (symfile_objfile != NULL)
@@ -2476,18 +2487,18 @@ target_info (char *args, int from_tty)
 
   FOREACH_TARGET (t)
     {
-      if (!(*t->to_has_memory) (t))
+      if (!(*t->ops->to_has_memory) (t))
 	continue;
 
       /* FIXME: can this ever trigger?  */
-      if ((int) (t->to_stratum) <= (int) dummy_stratum)
+      if ((int) (t->ops->to_stratum) <= (int) dummy_stratum)
 	continue;
       if (has_all_mem)
 	printf_unfiltered (_("\tWhile running this, "
 			     "GDB does not access memory from...\n"));
-      printf_unfiltered ("%s:\n", t->to_longname);
-      (t->to_files_info) (t);
-      has_all_mem = (*t->to_has_all_memory) (t);
+      printf_unfiltered ("%s:\n", t->ops->to_longname);
+      (t->ops->to_files_info) (t);
+      has_all_mem = (*t->ops->to_has_all_memory) (t);
     }
 }
 
@@ -2587,7 +2598,7 @@ target_preopen (int from_tty)
 void
 target_detach (char *args, int from_tty)
 {
-  struct target_ops* t;
+  struct gdb_target* t;
   
   if (gdbarch_has_global_breakpoints (target_gdbarch ()))
     /* Don't remove global breakpoints here.  They're removed on
@@ -2602,9 +2613,9 @@ target_detach (char *args, int from_tty)
 
   FOREACH_TARGET (t)
     {
-      if (t->to_detach != NULL)
+      if (t->ops->to_detach != NULL)
 	{
-	  t->to_detach (t, args, from_tty);
+	  t->ops->to_detach (t, args, from_tty);
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_detach (%s, %d)\n",
 				args, from_tty);
@@ -2618,7 +2629,7 @@ target_detach (char *args, int from_tty)
 void
 target_disconnect (char *args, int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   /* If we're in breakpoints-always-inserted mode or if breakpoints
      are global across processes, we have to remove them before
@@ -2626,12 +2637,12 @@ target_disconnect (char *args, int from_tty)
   remove_breakpoints ();
 
   FOREACH_TARGET (t)
-    if (t->to_disconnect != NULL)
+    if (t->ops->to_disconnect != NULL)
 	{
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_disconnect (%s, %d)\n",
 				args, from_tty);
-	  t->to_disconnect (t, args, from_tty);
+	  t->ops->to_disconnect (t, args, from_tty);
 	  return;
 	}
 
@@ -2641,13 +2652,13 @@ target_disconnect (char *args, int from_tty)
 ptid_t
 target_wait (ptid_t ptid, struct target_waitstatus *status, int options)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_wait != NULL)
+      if (t->ops->to_wait != NULL)
 	{
-	  ptid_t retval = (*t->to_wait) (t, ptid, status, options);
+	  ptid_t retval = (*t->ops->to_wait) (t, ptid, status, options);
 
 	  if (targetdebug)
 	    {
@@ -2675,12 +2686,12 @@ target_wait (ptid_t ptid, struct target_waitstatus *status, int options)
 char *
 target_pid_to_str (ptid_t ptid)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_pid_to_str != NULL)
-	return (*t->to_pid_to_str) (t, ptid);
+      if (t->ops->to_pid_to_str != NULL)
+	return (*t->ops->to_pid_to_str) (t, ptid);
     }
 
   return normal_pid_to_str (ptid);
@@ -2689,12 +2700,12 @@ target_pid_to_str (ptid_t ptid)
 char *
 target_thread_name (struct thread_info *info)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_thread_name != NULL)
-	return (*t->to_thread_name) (info);
+      if (t->ops->to_thread_name != NULL)
+	return (*t->ops->to_thread_name) (info);
     }
 
   return NULL;
@@ -2703,15 +2714,15 @@ target_thread_name (struct thread_info *info)
 void
 target_resume (ptid_t ptid, int step, enum gdb_signal signal)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   target_dcache_invalidate ();
 
   FOREACH_TARGET (t)
     {
-      if (t->to_resume != NULL)
+      if (t->ops->to_resume != NULL)
 	{
-	  t->to_resume (t, ptid, step, signal);
+	  t->ops->to_resume (t, ptid, step, signal);
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_resume (%d, %s, %s)\n",
 				PIDGET (ptid),
@@ -2732,11 +2743,11 @@ target_resume (ptid_t ptid, int step, enum gdb_signal signal)
 void
 target_pass_signals (int numsigs, unsigned char *pass_signals)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_pass_signals != NULL)
+      if (t->ops->to_pass_signals != NULL)
 	{
 	  if (targetdebug)
 	    {
@@ -2753,7 +2764,7 @@ target_pass_signals (int numsigs, unsigned char *pass_signals)
 	      fprintf_unfiltered (gdb_stdlog, " })\n");
 	    }
 
-	  (*t->to_pass_signals) (numsigs, pass_signals);
+	  (*t->ops->to_pass_signals) (numsigs, pass_signals);
 	  return;
 	}
     }
@@ -2762,11 +2773,11 @@ target_pass_signals (int numsigs, unsigned char *pass_signals)
 void
 target_program_signals (int numsigs, unsigned char *program_signals)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_program_signals != NULL)
+      if (t->ops->to_program_signals != NULL)
 	{
 	  if (targetdebug)
 	    {
@@ -2783,7 +2794,7 @@ target_program_signals (int numsigs, unsigned char *program_signals)
 	      fprintf_unfiltered (gdb_stdlog, " })\n");
 	    }
 
-	  (*t->to_program_signals) (numsigs, program_signals);
+	  (*t->ops->to_program_signals) (numsigs, program_signals);
 	  return;
 	}
     }
@@ -2795,13 +2806,13 @@ target_program_signals (int numsigs, unsigned char *program_signals)
 int
 target_follow_fork (int follow_child)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_follow_fork != NULL)
+      if (t->ops->to_follow_fork != NULL)
 	{
-	  int retval = t->to_follow_fork (t, follow_child);
+	  int retval = t->ops->to_follow_fork (t, follow_child);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_follow_fork (%d) = %d\n",
@@ -2818,13 +2829,13 @@ target_follow_fork (int follow_child)
 void
 target_mourn_inferior (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_mourn_inferior != NULL)	
+      if (t->ops->to_mourn_inferior != NULL)	
 	{
-	  t->to_mourn_inferior (t);
+	  t->ops->to_mourn_inferior (t);
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_mourn_inferior ()\n");
 
@@ -2845,16 +2856,16 @@ target_mourn_inferior (void)
    from TARGET.  If we find one, return its description.  */
 
 const struct target_desc *
-target_read_description (struct target_ops *target)
+target_read_description (struct gdb_target *target)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_read_description != NULL)
+    if (t->ops->to_read_description != NULL)
       {
 	const struct target_desc *tdesc;
 
-	tdesc = t->to_read_description (t);
+	tdesc = t->ops->to_read_description (t);
 	if (tdesc)
 	  return tdesc;
       }
@@ -2868,7 +2879,7 @@ target_read_description (struct target_ops *target)
    target side with, for example, gdbserver).  */
 
 int
-simple_search_memory (struct target_ops *ops,
+simple_search_memory (struct gdb_target *ops,
 		      CORE_ADDR start_addr, ULONGEST search_space_len,
 		      const gdb_byte *pattern, ULONGEST pattern_len,
 		      CORE_ADDR *found_addrp)
@@ -2982,10 +2993,10 @@ target_search_memory (CORE_ADDR start_addr, ULONGEST search_space_len,
 		      const gdb_byte *pattern, ULONGEST pattern_len,
 		      CORE_ADDR *found_addrp)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
   int found;
 
-  /* We don't use INHERIT to set current_target->to_search_memory,
+  /* We don't use INHERIT to set current_target->ops->to_search_memory,
      so we have to scan the target stack and handle targetdebug
      ourselves.  */
 
@@ -2994,13 +3005,13 @@ target_search_memory (CORE_ADDR start_addr, ULONGEST search_space_len,
 			hex_string (start_addr));
 
   FOREACH_TARGET (t)
-    if (t->to_search_memory != NULL)
+    if (t->ops->to_search_memory != NULL)
       break;
 
   if (t != NULL)
     {
-      found = t->to_search_memory (t, start_addr, search_space_len,
-				   pattern, pattern_len, found_addrp);
+      found = t->ops->to_search_memory (t, start_addr, search_space_len,
+					pattern, pattern_len, found_addrp);
     }
   else
     {
@@ -3024,7 +3035,7 @@ target_search_memory (CORE_ADDR start_addr, ULONGEST search_space_len,
 void
 target_require_runnable (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
@@ -3032,19 +3043,19 @@ target_require_runnable (void)
 	 assume we will still be able to after killing the current
 	 one.  Either killing and mourning will not pop T, or else
 	 find_default_run_target will find it again.  */
-      if (t->to_create_inferior != NULL)
+      if (t->ops->to_create_inferior != NULL)
 	return;
 
       /* Do not worry about thread_stratum targets that can not
 	 create inferiors.  Assume they will be pushed again if
 	 necessary, and continue to the process_stratum.  */
-      if (t->to_stratum == thread_stratum
-	  || t->to_stratum == arch_stratum)
+      if (t->ops->to_stratum == thread_stratum
+	  || t->ops->to_stratum == arch_stratum)
 	continue;
 
       error (_("The \"%s\" target does not support \"run\".  "
 	       "Try \"help target\" or \"continue\"."),
-	     t->to_shortname);
+	     t->ops->to_shortname);
     }
 
   /* This function is only called if the target is running.  In that
@@ -3060,18 +3071,20 @@ target_require_runnable (void)
    If DO_MESG is not NULL, the result is always valid (error() is
    called for errors); else, return NULL on error.  */
 
-static struct target_ops *
+static struct gdb_target *
 find_default_run_target (char *do_mesg)
 {
   struct target_ops *iter;
   struct target_ops *runable = NULL;
   int count, ix;
 
+  static struct gdb_target target;
+
   count = 0;
 
   for (ix = 0; VEC_iterate (target_ops_ptr, target_structs, ix, iter); ++ix)
     {
-      if (iter->to_can_run && target_can_run (iter))
+      if (iter->to_can_run && iter->to_can_run ())
 	{
 	  runable = iter;
 	  ++count;
@@ -3086,80 +3099,82 @@ find_default_run_target (char *do_mesg)
 	return NULL;
     }
 
-  return runable;
+  target.ops = runable;
+  /* FIXME: assert that the target doesn't require extra state.  */
+  return &target;
 }
 
 void
-find_default_attach (struct target_ops *ops, char *args, int from_tty)
+find_default_attach (struct gdb_target *ops, char *args, int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   t = find_default_run_target ("attach");
-  (t->to_attach) (t, args, from_tty);
+  (t->ops->to_attach) (t, args, from_tty);
   return;
 }
 
 void
-find_default_create_inferior (struct target_ops *ops,
+find_default_create_inferior (struct gdb_target *ops,
 			      char *exec_file, char *allargs, char **env,
 			      int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   t = find_default_run_target ("run");
-  (t->to_create_inferior) (t, exec_file, allargs, env, from_tty);
+  (t->ops->to_create_inferior) (t, exec_file, allargs, env, from_tty);
   return;
 }
 
 static int
 find_default_can_async_p (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   /* This may be called before the target is pushed on the stack;
      look for the default process stratum.  If there's none, gdb isn't
      configured with a native debugger, and target remote isn't
      connected yet.  */
   t = find_default_run_target (NULL);
-  if (t && t->to_can_async_p)
-    return (t->to_can_async_p) ();
+  if (t && t->ops->to_can_async_p)
+    return (t->ops->to_can_async_p) ();
   return 0;
 }
 
 static int
 find_default_is_async_p (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   /* This may be called before the target is pushed on the stack;
      look for the default process stratum.  If there's none, gdb isn't
      configured with a native debugger, and target remote isn't
      connected yet.  */
   t = find_default_run_target (NULL);
-  if (t && t->to_is_async_p)
-    return (t->to_is_async_p) ();
+  if (t && t->ops->to_is_async_p)
+    return (t->ops->to_is_async_p) ();
   return 0;
 }
 
 static int
 find_default_supports_non_stop (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   t = find_default_run_target (NULL);
-  if (t && t->to_supports_non_stop)
-    return (t->to_supports_non_stop) ();
+  if (t && t->ops->to_supports_non_stop)
+    return (t->ops->to_supports_non_stop) ();
   return 0;
 }
 
 int
 target_supports_non_stop (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_supports_non_stop)
-      return t->to_supports_non_stop ();
+    if (t->ops->to_supports_non_stop)
+      return t->ops->to_supports_non_stop ();
 
   return 0;
 }
@@ -3169,21 +3184,21 @@ target_supports_non_stop (void)
 int
 target_info_proc (char *args, enum info_proc_what what)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   /* If we're already connected to something that can get us OS
      related data, use it.  Otherwise, try using the native
      target.  */
-  if (current_target->to_stratum >= process_stratum)
+  if (current_target->ops->to_stratum >= process_stratum)
     t = find_target_beneath (current_target);
   else
     t = find_default_run_target (NULL);
 
   for (; t != NULL; t = find_target_beneath (t))
     {
-      if (t->to_info_proc != NULL)
+      if (t->ops->to_info_proc != NULL)
 	{
-	  t->to_info_proc (t, args, what);
+	  t->ops->to_info_proc (t, args, what);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3199,22 +3214,22 @@ target_info_proc (char *args, enum info_proc_what what)
 static int
 find_default_supports_disable_randomization (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   t = find_default_run_target (NULL);
-  if (t && t->to_supports_disable_randomization)
-    return (t->to_supports_disable_randomization) ();
+  if (t && t->ops->to_supports_disable_randomization)
+    return (t->ops->to_supports_disable_randomization) ();
   return 0;
 }
 
 int
 target_supports_disable_randomization (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_supports_disable_randomization)
-      return t->to_supports_disable_randomization ();
+    if (t->ops->to_supports_disable_randomization)
+      return t->ops->to_supports_disable_randomization ();
 
   return 0;
 }
@@ -3222,12 +3237,12 @@ target_supports_disable_randomization (void)
 char *
 target_get_osdata (const char *type)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   /* If we're already connected to something that can get us OS
      related data, use it.  Otherwise, try using the native
      target.  */
-  if (current_target->to_stratum >= process_stratum)
+  if (current_target->ops->to_stratum >= process_stratum)
     t = find_target_beneath (current_target);
   else
     t = find_default_run_target ("get OS data");
@@ -3245,13 +3260,13 @@ target_thread_address_space (ptid_t ptid)
 {
   struct address_space *aspace;
   struct inferior *inf;
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_thread_address_space != NULL)
+      if (t->ops->to_thread_address_space != NULL)
 	{
-	  aspace = t->to_thread_address_space (t, ptid);
+	  aspace = t->ops->to_thread_address_space (t, ptid);
 	  gdb_assert (aspace);
 
 	  if (targetdebug)
@@ -3278,12 +3293,12 @@ target_thread_address_space (ptid_t ptid)
 
 /* Target file operations.  */
 
-static struct target_ops *
+static struct gdb_target *
 default_fileio_target (void)
 {
   /* If we're already connected to something that can perform
      file I/O, use it. Otherwise, try using the native target.  */
-  if (current_target->to_stratum >= process_stratum)
+  if (current_target->ops->to_stratum >= process_stratum)
     return find_target_beneath (current_target);
   else
     return find_default_run_target ("file I/O");
@@ -3296,13 +3311,13 @@ int
 target_fileio_open (const char *filename, int flags, int mode,
 		    int *target_errno)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   for (t = default_fileio_target (); t != NULL; t = find_target_beneath (t))
     {
-      if (t->to_fileio_open != NULL)
+      if (t->ops->to_fileio_open != NULL)
 	{
-	  int fd = t->to_fileio_open (filename, flags, mode, target_errno);
+	  int fd = t->ops->to_fileio_open (filename, flags, mode, target_errno);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3324,14 +3339,14 @@ int
 target_fileio_pwrite (int fd, const gdb_byte *write_buf, int len,
 		      ULONGEST offset, int *target_errno)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   for (t = default_fileio_target (); t != NULL; t = find_target_beneath (t))
     {
-      if (t->to_fileio_pwrite != NULL)
+      if (t->ops->to_fileio_pwrite != NULL)
 	{
-	  int ret = t->to_fileio_pwrite (fd, write_buf, len, offset,
-					 target_errno);
+	  int ret = t->ops->to_fileio_pwrite (fd, write_buf, len, offset,
+					      target_errno);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3354,14 +3369,14 @@ int
 target_fileio_pread (int fd, gdb_byte *read_buf, int len,
 		     ULONGEST offset, int *target_errno)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   for (t = default_fileio_target (); t != NULL; t = find_target_beneath (t))
     {
-      if (t->to_fileio_pread != NULL)
+      if (t->ops->to_fileio_pread != NULL)
 	{
-	  int ret = t->to_fileio_pread (fd, read_buf, len, offset,
-					target_errno);
+	  int ret = t->ops->to_fileio_pread (fd, read_buf, len, offset,
+					     target_errno);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3382,13 +3397,13 @@ target_fileio_pread (int fd, gdb_byte *read_buf, int len,
 int
 target_fileio_close (int fd, int *target_errno)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   for (t = default_fileio_target (); t != NULL; t = find_target_beneath (t))
     {
-      if (t->to_fileio_close != NULL)
+      if (t->ops->to_fileio_close != NULL)
 	{
-	  int ret = t->to_fileio_close (fd, target_errno);
+	  int ret = t->ops->to_fileio_close (fd, target_errno);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3407,13 +3422,13 @@ target_fileio_close (int fd, int *target_errno)
 int
 target_fileio_unlink (const char *filename, int *target_errno)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   for (t = default_fileio_target (); t != NULL; t = find_target_beneath (t))
     {
-      if (t->to_fileio_unlink != NULL)
+      if (t->ops->to_fileio_unlink != NULL)
 	{
-	  int ret = t->to_fileio_unlink (filename, target_errno);
+	  int ret = t->ops->to_fileio_unlink (filename, target_errno);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3433,13 +3448,13 @@ target_fileio_unlink (const char *filename, int *target_errno)
 char *
 target_fileio_readlink (const char *filename, int *target_errno)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   for (t = default_fileio_target (); t != NULL; t = find_target_beneath (t))
     {
-      if (t->to_fileio_readlink != NULL)
+      if (t->ops->to_fileio_readlink != NULL)
 	{
-	  char *ret = t->to_fileio_readlink (filename, target_errno);
+	  char *ret = t->ops->to_fileio_readlink (filename, target_errno);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3582,7 +3597,7 @@ default_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
 }
 
 static int
-default_watchpoint_addr_within_range (struct target_ops *target,
+default_watchpoint_addr_within_range (struct gdb_target *target,
 				      CORE_ADDR addr,
 				      CORE_ADDR start, int length)
 {
@@ -3590,7 +3605,7 @@ default_watchpoint_addr_within_range (struct target_ops *target,
 }
 
 static struct gdbarch *
-default_thread_architecture (struct target_ops *ops, ptid_t ptid)
+default_thread_architecture (struct gdb_target *ops, ptid_t ptid)
 {
   return target_gdbarch ();
 }
@@ -3617,18 +3632,18 @@ return_minus_one (void)
  * Find the next target down the stack from the specified target.
  */
 
-struct target_ops *
-find_target_beneath (struct target_ops *t)
+struct gdb_target *
+find_target_beneath (struct gdb_target *t)
 {
   int i;
 
   if (t == current_target)
     {
-      gdb_assert (target_stack->ops[t->to_stratum] != NULL);
-      return target_stack->ops[t->to_stratum];
+      gdb_assert (target_stack->ops[t->ops->to_stratum] != NULL);
+      return target_stack->ops[t->ops->to_stratum];
     }
 
-  for (i = t->to_stratum - 1; i >= 0; --i)
+  for (i = t->ops->to_stratum - 1; i >= 0; --i)
     if (target_stack->ops[i] != NULL)
       return target_stack->ops[i];
 
@@ -3637,10 +3652,20 @@ find_target_beneath (struct target_ops *t)
 
 /* Find the target at a given target stratum.  */
 
-struct target_ops *
+struct gdb_target *
 find_target_at (enum strata where)
 {
   return target_stack->ops[where];
+}
+
+struct gdb_target *
+find_target_ops (struct target_ops *ops)
+{
+  struct gdb_target *result = target_stack->ops[ops->to_stratum];
+
+  if (result != NULL && result->ops == ops)
+    return result;
+  return NULL;
 }
 
 
@@ -3692,7 +3717,7 @@ normal_pid_to_str (ptid_t ptid)
 }
 
 static char *
-dummy_pid_to_str (struct target_ops *ops, ptid_t ptid)
+dummy_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   return normal_pid_to_str (ptid);
 }
@@ -3739,7 +3764,7 @@ init_dummy_target (void)
   dummy_target.to_doc = "";
   dummy_target.to_attach = find_default_attach;
   dummy_target.to_detach = 
-    (void (*)(struct target_ops *, char *, int))target_ignore;
+    (void (*)(struct gdb_target *, char *, int))target_ignore;
   dummy_target.to_create_inferior = find_default_create_inferior;
   dummy_target.to_can_async_p = find_default_can_async_p;
   dummy_target.to_is_async_p = find_default_is_async_p;
@@ -3753,15 +3778,15 @@ init_dummy_target (void)
   dummy_target.to_get_bookmark = dummy_get_bookmark;
   dummy_target.to_goto_bookmark = dummy_goto_bookmark;
   dummy_target.to_xfer_partial = default_xfer_partial;
-  dummy_target.to_has_all_memory = (int (*) (struct target_ops *)) return_zero;
-  dummy_target.to_has_memory = (int (*) (struct target_ops *)) return_zero;
-  dummy_target.to_has_stack = (int (*) (struct target_ops *)) return_zero;
-  dummy_target.to_has_registers = (int (*) (struct target_ops *)) return_zero;
+  dummy_target.to_has_all_memory = (int (*) (struct gdb_target *)) return_zero;
+  dummy_target.to_has_memory = (int (*) (struct gdb_target *)) return_zero;
+  dummy_target.to_has_stack = (int (*) (struct gdb_target *)) return_zero;
+  dummy_target.to_has_registers = (int (*) (struct gdb_target *)) return_zero;
   dummy_target.to_has_execution
-    = (int (*) (struct target_ops *, ptid_t)) return_zero;
+    = (int (*) (struct gdb_target *, ptid_t)) return_zero;
   dummy_target.to_stopped_by_watchpoint = return_zero;
   dummy_target.to_stopped_data_address =
-    (int (*) (struct target_ops *, CORE_ADDR *)) return_zero;
+    (int (*) (struct gdb_target *, CORE_ADDR *)) return_zero;
   dummy_target.to_magic = OPS_MAGIC;
 }
 
@@ -3774,14 +3799,14 @@ debug_to_open (char *args, int from_tty)
 }
 
 void
-target_close (struct target_ops *targ)
+target_close (struct gdb_target *targ)
 {
-  gdb_assert (!target_is_pushed (targ));
+  gdb_assert (!target_is_pushed (targ->ops));
 
-  if (targ->to_xclose != NULL)
-    targ->to_xclose (targ);
-  else if (targ->to_close != NULL)
-    targ->to_close ();
+  if (targ->ops->to_xclose != NULL)
+    targ->ops->to_xclose (targ);
+  else if (targ->ops->to_close != NULL)
+    targ->ops->to_close ();
 
   if (targetdebug)
     fprintf_unfiltered (gdb_stdlog, "target_close ()\n");
@@ -3790,13 +3815,13 @@ target_close (struct target_ops *targ)
 void
 target_attach (char *args, int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_attach != NULL)	
+      if (t->ops->to_attach != NULL)	
 	{
-	  t->to_attach (t, args, from_tty);
+	  t->ops->to_attach (t, args, from_tty);
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_attach (%s, %d)\n",
 				args, from_tty);
@@ -3811,15 +3836,15 @@ target_attach (char *args, int from_tty)
 int
 target_thread_alive (ptid_t ptid)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_thread_alive != NULL)
+      if (t->ops->to_thread_alive != NULL)
 	{
 	  int retval;
 
-	  retval = t->to_thread_alive (t, ptid);
+	  retval = t->ops->to_thread_alive (t, ptid);
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_thread_alive (%d) = %d\n",
 				PIDGET (ptid), retval);
@@ -3834,13 +3859,13 @@ target_thread_alive (ptid_t ptid)
 void
 target_find_new_threads (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_find_new_threads != NULL)
+      if (t->ops->to_find_new_threads != NULL)
 	{
-	  t->to_find_new_threads (t);
+	  t->ops->to_find_new_threads (t);
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_find_new_threads ()\n");
 
@@ -3858,7 +3883,7 @@ target_stop (ptid_t ptid)
       return;
     }
 
-  (*current_target->to_stop) (ptid);
+  (*current_target->ops->to_stop) (ptid);
 }
 
 static void
@@ -3957,13 +3982,13 @@ debug_print_register (const char * func,
 void
 target_fetch_registers (struct regcache *regcache, int regno)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_fetch_registers != NULL)
+      if (t->ops->to_fetch_registers != NULL)
 	{
-	  t->to_fetch_registers (t, regcache, regno);
+	  t->ops->to_fetch_registers (t, regcache, regno);
 	  if (targetdebug)
 	    debug_print_register ("target_fetch_registers", regcache, regno);
 	  return;
@@ -3974,16 +3999,16 @@ target_fetch_registers (struct regcache *regcache, int regno)
 void
 target_store_registers (struct regcache *regcache, int regno)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   if (!may_write_registers)
     error (_("Writing to registers is not allowed (regno %d)"), regno);
 
   FOREACH_TARGET (t)
     {
-      if (t->to_store_registers != NULL)
+      if (t->ops->to_store_registers != NULL)
 	{
-	  t->to_store_registers (t, regcache, regno);
+	  t->ops->to_store_registers (t, regcache, regno);
 	  if (targetdebug)
 	    {
 	      debug_print_register ("target_store_registers", regcache, regno);
@@ -3998,13 +4023,13 @@ target_store_registers (struct regcache *regcache, int regno)
 int
 target_core_of_thread (ptid_t ptid)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_core_of_thread != NULL)
+      if (t->ops->to_core_of_thread != NULL)
 	{
-	  int retval = t->to_core_of_thread (t, ptid);
+	  int retval = t->ops->to_core_of_thread (t, ptid);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -4020,13 +4045,13 @@ target_core_of_thread (ptid_t ptid)
 int
 target_verify_memory (const gdb_byte *data, CORE_ADDR memaddr, ULONGEST size)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
     {
-      if (t->to_verify_memory != NULL)
+      if (t->ops->to_verify_memory != NULL)
 	{
-	  int retval = t->to_verify_memory (t, data, memaddr, size);
+	  int retval = t->ops->to_verify_memory (t, data, memaddr, size);
 
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -4047,14 +4072,14 @@ target_verify_memory (const gdb_byte *data, CORE_ADDR memaddr, ULONGEST size)
 int
 target_insert_mask_watchpoint (CORE_ADDR addr, CORE_ADDR mask, int rw)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_insert_mask_watchpoint != NULL)
+    if (t->ops->to_insert_mask_watchpoint != NULL)
       {
 	int ret;
 
-	ret = t->to_insert_mask_watchpoint (t, addr, mask, rw);
+	ret = t->ops->to_insert_mask_watchpoint (t, addr, mask, rw);
 
 	if (targetdebug)
 	  fprintf_unfiltered (gdb_stdlog, "\
@@ -4074,14 +4099,14 @@ target_insert_mask_watchpoint (%s, %s, %d) = %d\n",
 int
 target_remove_mask_watchpoint (CORE_ADDR addr, CORE_ADDR mask, int rw)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_remove_mask_watchpoint != NULL)
+    if (t->ops->to_remove_mask_watchpoint != NULL)
       {
 	int ret;
 
-	ret = t->to_remove_mask_watchpoint (t, addr, mask, rw);
+	ret = t->ops->to_remove_mask_watchpoint (t, addr, mask, rw);
 
 	if (targetdebug)
 	  fprintf_unfiltered (gdb_stdlog, "\
@@ -4101,11 +4126,11 @@ target_remove_mask_watchpoint (%s, %s, %d) = %d\n",
 int
 target_masked_watch_num_registers (CORE_ADDR addr, CORE_ADDR mask)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_masked_watch_num_registers != NULL)
-      return t->to_masked_watch_num_registers (t, addr, mask);
+    if (t->ops->to_masked_watch_num_registers != NULL)
+      return t->ops->to_masked_watch_num_registers (t, addr, mask);
 
   return -1;
 }
@@ -4116,11 +4141,11 @@ target_masked_watch_num_registers (CORE_ADDR addr, CORE_ADDR mask)
 int
 target_ranged_break_num_registers (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_ranged_break_num_registers != NULL)
-      return t->to_ranged_break_num_registers (t);
+    if (t->ops->to_ranged_break_num_registers != NULL)
+      return t->ops->to_ranged_break_num_registers (t);
 
   return -1;
 }
@@ -4130,11 +4155,11 @@ target_ranged_break_num_registers (void)
 int
 target_supports_btrace (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_supports_btrace != NULL)
-      return t->to_supports_btrace ();
+    if (t->ops->to_supports_btrace != NULL)
+      return t->ops->to_supports_btrace ();
 
   return 0;
 }
@@ -4144,11 +4169,11 @@ target_supports_btrace (void)
 struct btrace_target_info *
 target_enable_btrace (ptid_t ptid)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_enable_btrace != NULL)
-      return t->to_enable_btrace (ptid);
+    if (t->ops->to_enable_btrace != NULL)
+      return t->ops->to_enable_btrace (ptid);
 
   tcomplain ();
   return NULL;
@@ -4159,11 +4184,11 @@ target_enable_btrace (ptid_t ptid)
 void
 target_disable_btrace (struct btrace_target_info *btinfo)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_disable_btrace != NULL)
-      return t->to_disable_btrace (btinfo);
+    if (t->ops->to_disable_btrace != NULL)
+      return t->ops->to_disable_btrace (btinfo);
 
   tcomplain ();
 }
@@ -4173,11 +4198,11 @@ target_disable_btrace (struct btrace_target_info *btinfo)
 void
 target_teardown_btrace (struct btrace_target_info *btinfo)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_teardown_btrace != NULL)
-      return t->to_teardown_btrace (btinfo);
+    if (t->ops->to_teardown_btrace != NULL)
+      return t->ops->to_teardown_btrace (btinfo);
 
   tcomplain ();
 }
@@ -4188,11 +4213,11 @@ VEC (btrace_block_s) *
 target_read_btrace (struct btrace_target_info *btinfo,
 		    enum btrace_read_type type)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_read_btrace != NULL)
-      return t->to_read_btrace (btinfo, type);
+    if (t->ops->to_read_btrace != NULL)
+      return t->ops->to_read_btrace (btinfo, type);
 
   tcomplain ();
   return NULL;
@@ -4203,12 +4228,12 @@ target_read_btrace (struct btrace_target_info *btinfo,
 void
 target_stop_recording (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_stop_recording != NULL)
+    if (t->ops->to_stop_recording != NULL)
       {
-	t->to_stop_recording ();
+	t->ops->to_stop_recording ();
 	return;
       }
 
@@ -4220,12 +4245,12 @@ target_stop_recording (void)
 void
 target_info_record (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_info_record != NULL)
+    if (t->ops->to_info_record != NULL)
       {
-	t->to_info_record ();
+	t->ops->to_info_record ();
 	return;
       }
 
@@ -4237,12 +4262,12 @@ target_info_record (void)
 void
 target_save_record (const char *filename)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_save_record != NULL)
+    if (t->ops->to_save_record != NULL)
       {
-	t->to_save_record (filename);
+	t->ops->to_save_record (filename);
 	return;
       }
 
@@ -4254,10 +4279,10 @@ target_save_record (const char *filename)
 int
 target_supports_delete_record (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_delete_record != NULL)
+    if (t->ops->to_delete_record != NULL)
       return 1;
 
   return 0;
@@ -4268,12 +4293,12 @@ target_supports_delete_record (void)
 void
 target_delete_record (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_delete_record != NULL)
+    if (t->ops->to_delete_record != NULL)
       {
-	t->to_delete_record ();
+	t->ops->to_delete_record ();
 	return;
       }
 
@@ -4285,11 +4310,11 @@ target_delete_record (void)
 int
 target_record_is_replaying (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_record_is_replaying != NULL)
-	return t->to_record_is_replaying ();
+    if (t->ops->to_record_is_replaying != NULL)
+	return t->ops->to_record_is_replaying ();
 
   return 0;
 }
@@ -4299,12 +4324,12 @@ target_record_is_replaying (void)
 void
 target_goto_record_begin (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_goto_record_begin != NULL)
+    if (t->ops->to_goto_record_begin != NULL)
       {
-	t->to_goto_record_begin ();
+	t->ops->to_goto_record_begin ();
 	return;
       }
 
@@ -4316,12 +4341,12 @@ target_goto_record_begin (void)
 void
 target_goto_record_end (void)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_goto_record_end != NULL)
+    if (t->ops->to_goto_record_end != NULL)
       {
-	t->to_goto_record_end ();
+	t->ops->to_goto_record_end ();
 	return;
       }
 
@@ -4333,12 +4358,12 @@ target_goto_record_end (void)
 void
 target_goto_record (ULONGEST insn)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_goto_record != NULL)
+    if (t->ops->to_goto_record != NULL)
       {
-	t->to_goto_record (insn);
+	t->ops->to_goto_record (insn);
 	return;
       }
 
@@ -4350,12 +4375,12 @@ target_goto_record (ULONGEST insn)
 void
 target_insn_history (int size, int flags)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_insn_history != NULL)
+    if (t->ops->to_insn_history != NULL)
       {
-	t->to_insn_history (size, flags);
+	t->ops->to_insn_history (size, flags);
 	return;
       }
 
@@ -4367,12 +4392,12 @@ target_insn_history (int size, int flags)
 void
 target_insn_history_from (ULONGEST from, int size, int flags)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_insn_history_from != NULL)
+    if (t->ops->to_insn_history_from != NULL)
       {
-	t->to_insn_history_from (from, size, flags);
+	t->ops->to_insn_history_from (from, size, flags);
 	return;
       }
 
@@ -4384,12 +4409,12 @@ target_insn_history_from (ULONGEST from, int size, int flags)
 void
 target_insn_history_range (ULONGEST begin, ULONGEST end, int flags)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_insn_history_range != NULL)
+    if (t->ops->to_insn_history_range != NULL)
       {
-	t->to_insn_history_range (begin, end, flags);
+	t->ops->to_insn_history_range (begin, end, flags);
 	return;
       }
 
@@ -4401,12 +4426,12 @@ target_insn_history_range (ULONGEST begin, ULONGEST end, int flags)
 void
 target_call_history (int size, int flags)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_call_history != NULL)
+    if (t->ops->to_call_history != NULL)
       {
-	t->to_call_history (size, flags);
+	t->ops->to_call_history (size, flags);
 	return;
       }
 
@@ -4418,12 +4443,12 @@ target_call_history (int size, int flags)
 void
 target_call_history_from (ULONGEST begin, int size, int flags)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_call_history_from != NULL)
+    if (t->ops->to_call_history_from != NULL)
       {
-	t->to_call_history_from (begin, size, flags);
+	t->ops->to_call_history_from (begin, size, flags);
 	return;
       }
 
@@ -4435,12 +4460,12 @@ target_call_history_from (ULONGEST begin, int size, int flags)
 void
 target_call_history_range (ULONGEST begin, ULONGEST end, int flags)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   FOREACH_TARGET (t)
-    if (t->to_call_history_range != NULL)
+    if (t->ops->to_call_history_range != NULL)
       {
-	t->to_call_history_range (begin, end, flags);
+	t->ops->to_call_history_range (begin, end, flags);
 	return;
       }
 
@@ -4458,7 +4483,7 @@ debug_to_prepare_to_store (struct regcache *regcache)
 static int
 deprecated_debug_xfer_memory (CORE_ADDR memaddr, bfd_byte *myaddr, int len,
 			      int write, struct mem_attrib *attrib,
-			      struct target_ops *target)
+			      struct gdb_target *target)
 {
   int retval;
 
@@ -4497,7 +4522,7 @@ deprecated_debug_xfer_memory (CORE_ADDR memaddr, bfd_byte *myaddr, int len,
 }
 
 static void
-debug_to_files_info (struct target_ops *target)
+debug_to_files_info (struct gdb_target *target)
 {
   debug_target.to_files_info (target);
 
@@ -4595,7 +4620,7 @@ debug_to_stopped_by_watchpoint (void)
 }
 
 static int
-debug_to_stopped_data_address (struct target_ops *target, CORE_ADDR *addr)
+debug_to_stopped_data_address (struct gdb_target *target, CORE_ADDR *addr)
 {
   int retval;
 
@@ -4609,7 +4634,7 @@ debug_to_stopped_data_address (struct target_ops *target, CORE_ADDR *addr)
 }
 
 static int
-debug_to_watchpoint_addr_within_range (struct target_ops *target,
+debug_to_watchpoint_addr_within_range (struct gdb_target *target,
 				       CORE_ADDR addr,
 				       CORE_ADDR start, int length)
 {
@@ -4855,7 +4880,7 @@ debug_to_can_run (void)
 }
 
 static struct gdbarch *
-debug_to_thread_architecture (struct target_ops *ops, ptid_t ptid)
+debug_to_thread_architecture (struct gdb_target *ops, ptid_t ptid)
 {
   struct gdbarch *retval;
 
@@ -4902,49 +4927,60 @@ debug_to_pid_to_exec_file (int pid)
 static void
 setup_target_debug (void)
 {
-  memcpy (&debug_target, current_target, sizeof debug_target);
+  memcpy (&debug_target, current_target->ops, sizeof debug_target);
 
-  current_target->to_open = debug_to_open;
-  current_target->to_post_attach = debug_to_post_attach;
-  current_target->to_prepare_to_store = debug_to_prepare_to_store;
-  current_target->deprecated_xfer_memory = deprecated_debug_xfer_memory;
-  current_target->to_files_info = debug_to_files_info;
-  current_target->to_insert_breakpoint = debug_to_insert_breakpoint;
-  current_target->to_remove_breakpoint = debug_to_remove_breakpoint;
-  current_target->to_can_use_hw_breakpoint = debug_to_can_use_hw_breakpoint;
-  current_target->to_insert_hw_breakpoint = debug_to_insert_hw_breakpoint;
-  current_target->to_remove_hw_breakpoint = debug_to_remove_hw_breakpoint;
-  current_target->to_insert_watchpoint = debug_to_insert_watchpoint;
-  current_target->to_remove_watchpoint = debug_to_remove_watchpoint;
-  current_target->to_stopped_by_watchpoint = debug_to_stopped_by_watchpoint;
-  current_target->to_stopped_data_address = debug_to_stopped_data_address;
-  current_target->to_watchpoint_addr_within_range
+  current_target->ops->to_open = debug_to_open;
+  current_target->ops->to_post_attach = debug_to_post_attach;
+  current_target->ops->to_prepare_to_store = debug_to_prepare_to_store;
+  current_target->ops->deprecated_xfer_memory = deprecated_debug_xfer_memory;
+  current_target->ops->to_files_info = debug_to_files_info;
+  current_target->ops->to_insert_breakpoint = debug_to_insert_breakpoint;
+  current_target->ops->to_remove_breakpoint = debug_to_remove_breakpoint;
+  current_target->ops->to_can_use_hw_breakpoint
+    = debug_to_can_use_hw_breakpoint;
+  current_target->ops->to_insert_hw_breakpoint
+    = debug_to_insert_hw_breakpoint;
+  current_target->ops->to_remove_hw_breakpoint
+    = debug_to_remove_hw_breakpoint;
+  current_target->ops->to_insert_watchpoint = debug_to_insert_watchpoint;
+  current_target->ops->to_remove_watchpoint = debug_to_remove_watchpoint;
+  current_target->ops->to_stopped_by_watchpoint
+    = debug_to_stopped_by_watchpoint;
+  current_target->ops->to_stopped_data_address = debug_to_stopped_data_address;
+  current_target->ops->to_watchpoint_addr_within_range
     = debug_to_watchpoint_addr_within_range;
-  current_target->to_region_ok_for_hw_watchpoint
+  current_target->ops->to_region_ok_for_hw_watchpoint
     = debug_to_region_ok_for_hw_watchpoint;
-  current_target->to_can_accel_watchpoint_condition
+  current_target->ops->to_can_accel_watchpoint_condition
     = debug_to_can_accel_watchpoint_condition;
-  current_target->to_terminal_init = debug_to_terminal_init;
-  current_target->to_terminal_inferior = debug_to_terminal_inferior;
-  current_target->to_terminal_ours_for_output
+  current_target->ops->to_terminal_init = debug_to_terminal_init;
+  current_target->ops->to_terminal_inferior = debug_to_terminal_inferior;
+  current_target->ops->to_terminal_ours_for_output
     = debug_to_terminal_ours_for_output;
-  current_target->to_terminal_ours = debug_to_terminal_ours;
-  current_target->to_terminal_save_ours = debug_to_terminal_save_ours;
-  current_target->to_terminal_info = debug_to_terminal_info;
-  current_target->to_load = debug_to_load;
-  current_target->to_post_startup_inferior = debug_to_post_startup_inferior;
-  current_target->to_insert_fork_catchpoint = debug_to_insert_fork_catchpoint;
-  current_target->to_remove_fork_catchpoint = debug_to_remove_fork_catchpoint;
-  current_target->to_insert_vfork_catchpoint = debug_to_insert_vfork_catchpoint;
-  current_target->to_remove_vfork_catchpoint = debug_to_remove_vfork_catchpoint;
-  current_target->to_insert_exec_catchpoint = debug_to_insert_exec_catchpoint;
-  current_target->to_remove_exec_catchpoint = debug_to_remove_exec_catchpoint;
-  current_target->to_has_exited = debug_to_has_exited;
-  current_target->to_can_run = debug_to_can_run;
-  current_target->to_stop = debug_to_stop;
-  current_target->to_rcmd = debug_to_rcmd;
-  current_target->to_pid_to_exec_file = debug_to_pid_to_exec_file;
-  current_target->to_thread_architecture = debug_to_thread_architecture;
+  current_target->ops->to_terminal_ours = debug_to_terminal_ours;
+  current_target->ops->to_terminal_save_ours = debug_to_terminal_save_ours;
+  current_target->ops->to_terminal_info = debug_to_terminal_info;
+  current_target->ops->to_load = debug_to_load;
+  current_target->ops->to_post_startup_inferior
+    = debug_to_post_startup_inferior;
+  current_target->ops->to_insert_fork_catchpoint
+    = debug_to_insert_fork_catchpoint;
+  current_target->ops->to_remove_fork_catchpoint
+    = debug_to_remove_fork_catchpoint;
+  current_target->ops->to_insert_vfork_catchpoint
+    = debug_to_insert_vfork_catchpoint;
+  current_target->ops->to_remove_vfork_catchpoint
+    = debug_to_remove_vfork_catchpoint;
+  current_target->ops->to_insert_exec_catchpoint
+    = debug_to_insert_exec_catchpoint;
+  current_target->ops->to_remove_exec_catchpoint
+    = debug_to_remove_exec_catchpoint;
+  current_target->ops->to_has_exited = debug_to_has_exited;
+  current_target->ops->to_can_run = debug_to_can_run;
+  current_target->ops->to_stop = debug_to_stop;
+  current_target->ops->to_rcmd = debug_to_rcmd;
+  current_target->ops->to_pid_to_exec_file = debug_to_pid_to_exec_file;
+  current_target->ops->to_thread_architecture = debug_to_thread_architecture;
 }
 
 
@@ -4976,7 +5012,8 @@ new_target_stack (void)
   struct target_stack *result;
 
   /* Overwrite the globals so that push_target can work.  */
-  current_target = XCNEW (struct target_ops);
+  current_target = XCNEW (struct gdb_target);
+  current_target->ops = XCNEW (struct target_ops);
   target_stack = XCNEW (struct target_stack);
   target_stack->refc = 1;
   target_stack->smashed = current_target;
@@ -5004,9 +5041,9 @@ static void
 do_monitor_command (char *cmd,
 		 int from_tty)
 {
-  if ((current_target->to_rcmd
+  if ((current_target->ops->to_rcmd
        == (void (*) (char *, struct ui_file *)) tcomplain)
-      || (current_target->to_rcmd == debug_to_rcmd
+      || (current_target->ops->to_rcmd == debug_to_rcmd
 	  && (debug_target.to_rcmd
 	      == (void (*) (char *, struct ui_file *)) tcomplain)))
     error (_("\"monitor\" command not supported by this target."));
@@ -5018,13 +5055,14 @@ do_monitor_command (char *cmd,
 static void
 maintenance_print_target_stack (char *cmd, int from_tty)
 {
-  struct target_ops *t;
+  struct gdb_target *t;
 
   printf_filtered (_("The current target stack is:\n"));
 
   FOREACH_TARGET (t)
     {
-      printf_filtered ("  - %s (%s)\n", t->to_shortname, t->to_longname);
+      printf_filtered ("  - %s (%s)\n", t->ops->to_shortname,
+		       t->ops->to_longname);
     }
 }
 

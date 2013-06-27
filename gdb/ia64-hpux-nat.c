@@ -136,13 +136,13 @@ static const char f1_value[16] = {0x00, 0x00, 0x00, 0x00,
 
 /* The "to_wait" routine from the "inf-ttrace" layer.  */
 
-static ptid_t (*super_to_wait) (struct target_ops *, ptid_t,
+static ptid_t (*super_to_wait) (struct gdb_target *, ptid_t,
 				struct target_waitstatus *, int);
 
-/* The "to_wait" target_ops routine routine for ia64-hpux.  */
+/* The "to_wait" gdb_target routine routine for ia64-hpux.  */
 
 static ptid_t
-ia64_hpux_wait (struct target_ops *ops, ptid_t ptid,
+ia64_hpux_wait (struct gdb_target *ops, ptid_t ptid,
 		struct target_waitstatus *ourstatus, int options)
 {
   ptid_t new_ptid;
@@ -258,10 +258,10 @@ ia64_hpux_fetch_register (struct regcache *regcache, int regnum)
   regcache_raw_supply (regcache, regnum, buf);
 }
 
-/* The "to_fetch_registers" target_ops routine for ia64-hpux.  */
+/* The "to_fetch_registers" gdb_target routine for ia64-hpux.  */
 
 static void
-ia64_hpux_fetch_registers (struct target_ops *ops,
+ia64_hpux_fetch_registers (struct gdb_target *ops,
 			   struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
@@ -316,10 +316,10 @@ ia64_hpux_store_register (const struct regcache *regcache, int regnum)
            gdbarch_register_name (gdbarch, regnum));
 }
 
-/* The "to_store_registers" target_ops routine for ia64-hpux.  */
+/* The "to_store_registers" gdb_target routine for ia64-hpux.  */
 
 static void
-ia64_hpux_store_registers (struct target_ops *ops,
+ia64_hpux_store_registers (struct gdb_target *ops,
 			   struct regcache *regcache, int regnum)
 {
   if (regnum == -1)
@@ -337,7 +337,7 @@ ia64_hpux_store_registers (struct target_ops *ops,
    need to be handled manually.  So we override this routine and
    delegate back if we detect that we are not in a special case.  */
 
-static LONGEST (*super_xfer_partial) (struct target_ops *, enum target_object,
+static LONGEST (*super_xfer_partial) (struct gdb_target *, enum target_object,
 				      const char *, gdb_byte *,
 				      const gdb_byte *, ULONGEST, LONGEST);
 
@@ -345,7 +345,7 @@ static LONGEST (*super_xfer_partial) (struct target_ops *, enum target_object,
    outside of the backing-store region.  */
 
 static LONGEST
-ia64_hpux_xfer_memory_no_bs (struct target_ops *ops, const char *annex,
+ia64_hpux_xfer_memory_no_bs (struct gdb_target *ops, const char *annex,
 			     gdb_byte *readbuf, const gdb_byte *writebuf,
 			     CORE_ADDR addr, LONGEST len)
 {
@@ -468,7 +468,7 @@ ia64_hpux_write_memory_bs (const gdb_byte *buf, CORE_ADDR addr, int len)
    inside of the backing-store region.  */
 
 static LONGEST
-ia64_hpux_xfer_memory_bs (struct target_ops *ops, const char *annex,
+ia64_hpux_xfer_memory_bs (struct gdb_target *ops, const char *annex,
 			  gdb_byte *readbuf, const gdb_byte *writebuf,
 			  CORE_ADDR addr, LONGEST len)
 {
@@ -516,11 +516,11 @@ ia64_hpux_get_register_from_save_state_t (int regnum, int reg_size)
   return extract_unsigned_integer (buf, reg_size, BFD_ENDIAN_BIG);
 }
 
-/* The "xfer_partial" target_ops routine for ia64-hpux, in the case
+/* The "xfer_partial" gdb_target routine for ia64-hpux, in the case
    where the requested object is TARGET_OBJECT_MEMORY.  */
 
 static LONGEST
-ia64_hpux_xfer_memory (struct target_ops *ops, const char *annex,
+ia64_hpux_xfer_memory (struct gdb_target *ops, const char *annex,
 		       gdb_byte *readbuf, const gdb_byte *writebuf,
 		       CORE_ADDR addr, LONGEST len)
 {
@@ -622,7 +622,7 @@ ia64_hpux_xfer_memory (struct target_ops *ops, const char *annex,
    a failed assertion if WRITEBUF is not NULL.  */
 
 static LONGEST
-ia64_hpux_xfer_uregs (struct target_ops *ops, const char *annex,
+ia64_hpux_xfer_uregs (struct gdb_target *ops, const char *annex,
 		      gdb_byte *readbuf, const gdb_byte *writebuf,
 		      ULONGEST offset, LONGEST len)
 {
@@ -643,7 +643,7 @@ ia64_hpux_xfer_uregs (struct target_ops *ops, const char *annex,
    a failed assertion if WRITEBUF is not NULL.  */
 
 static LONGEST
-ia64_hpux_xfer_solib_got (struct target_ops *ops, const char *annex,
+ia64_hpux_xfer_solib_got (struct gdb_target *ops, const char *annex,
 			  gdb_byte *readbuf, const gdb_byte *writebuf,
 			  ULONGEST offset, LONGEST len)
 {
@@ -670,10 +670,10 @@ ia64_hpux_xfer_solib_got (struct target_ops *ops, const char *annex,
   return len;
 }
 
-/* The "to_xfer_partial" target_ops routine for ia64-hpux.  */
+/* The "to_xfer_partial" gdb_target routine for ia64-hpux.  */
 
 static LONGEST
-ia64_hpux_xfer_partial (struct target_ops *ops, enum target_object object,
+ia64_hpux_xfer_partial (struct gdb_target *ops, enum target_object object,
 			const char *annex, gdb_byte *readbuf,
 			const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
 {
@@ -693,7 +693,7 @@ ia64_hpux_xfer_partial (struct target_ops *ops, enum target_object object,
   return val;
 }
 
-/* The "to_can_use_hw_breakpoint" target_ops routine for ia64-hpux.  */
+/* The "to_can_use_hw_breakpoint" gdb_target routine for ia64-hpux.  */
 
 static int
 ia64_hpux_can_use_hw_breakpoint (int type, int cnt, int othertype)
@@ -702,14 +702,14 @@ ia64_hpux_can_use_hw_breakpoint (int type, int cnt, int othertype)
   return 0;
 }
 
-/* The "to_mourn_inferior" routine from the "inf-ttrace" target_ops layer.  */
+/* The "to_mourn_inferior" routine from the "inf-ttrace" gdb_target layer.  */
 
-static void (*super_mourn_inferior) (struct target_ops *);
+static void (*super_mourn_inferior) (struct gdb_target *);
 
-/* The "to_mourn_inferior" target_ops routine for ia64-hpux.  */
+/* The "to_mourn_inferior" gdb_target routine for ia64-hpux.  */
 
 static void
-ia64_hpux_mourn_inferior (struct target_ops *ops)
+ia64_hpux_mourn_inferior (struct gdb_target *ops)
 {
   const int pid = ptid_get_pid (inferior_ptid);
   int status;

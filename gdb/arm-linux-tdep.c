@@ -744,7 +744,7 @@ static struct core_regset_section arm_linux_vfp_regset_sections[] =
 
 static const struct target_desc *
 arm_linux_core_read_description (struct gdbarch *gdbarch,
-                                 struct target_ops *target,
+                                 struct gdb_target *target,
                                  bfd *abfd)
 {
   CORE_ADDR arm_hwcap = 0;

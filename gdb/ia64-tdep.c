@@ -3621,7 +3621,7 @@ find_func_descr (struct regcache *regcache, CORE_ADDR faddr, CORE_ADDR *fdaptr)
    function descriptor.  */
 static CORE_ADDR
 ia64_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr,
-				 struct target_ops *targ)
+				 struct gdb_target *targ)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   struct obj_section *s;

@@ -46,7 +46,7 @@ struct regcache;
 struct reggroup;
 struct regset;
 struct disassemble_info;
-struct target_ops;
+struct gdb_target;
 struct obstack;
 struct bp_target_info;
 struct target_desc;
@@ -583,8 +583,8 @@ extern void set_gdbarch_stabs_argument_has_addr (struct gdbarch *gdbarch, gdbarc
 extern int gdbarch_frame_red_zone_size (struct gdbarch *gdbarch);
 extern void set_gdbarch_frame_red_zone_size (struct gdbarch *gdbarch, int frame_red_zone_size);
 
-typedef CORE_ADDR (gdbarch_convert_from_func_ptr_addr_ftype) (struct gdbarch *gdbarch, CORE_ADDR addr, struct target_ops *targ);
-extern CORE_ADDR gdbarch_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr, struct target_ops *targ);
+typedef CORE_ADDR (gdbarch_convert_from_func_ptr_addr_ftype) (struct gdbarch *gdbarch, CORE_ADDR addr, struct gdb_target *targ);
+extern CORE_ADDR gdbarch_convert_from_func_ptr_addr (struct gdbarch *gdbarch, CORE_ADDR addr, struct gdb_target *targ);
 extern void set_gdbarch_convert_from_func_ptr_addr (struct gdbarch *gdbarch, gdbarch_convert_from_func_ptr_addr_ftype *convert_from_func_ptr_addr);
 
 /* On some machines there are bits in addresses which are not really
@@ -942,8 +942,8 @@ extern void set_gdbarch_overlay_update (struct gdbarch *gdbarch, gdbarch_overlay
 
 extern int gdbarch_core_read_description_p (struct gdbarch *gdbarch);
 
-typedef const struct target_desc * (gdbarch_core_read_description_ftype) (struct gdbarch *gdbarch, struct target_ops *target, bfd *abfd);
-extern const struct target_desc * gdbarch_core_read_description (struct gdbarch *gdbarch, struct target_ops *target, bfd *abfd);
+typedef const struct target_desc * (gdbarch_core_read_description_ftype) (struct gdbarch *gdbarch, struct gdb_target *target, bfd *abfd);
+extern const struct target_desc * gdbarch_core_read_description (struct gdbarch *gdbarch, struct gdb_target *target, bfd *abfd);
 extern void set_gdbarch_core_read_description (struct gdbarch *gdbarch, gdbarch_core_read_description_ftype *core_read_description);
 
 /* Handle special encoding of static variables in stabs debug info. */

@@ -52,7 +52,7 @@ static void file_command (char *, int);
 
 static void set_section_command (char *, int);
 
-static void exec_files_info (struct target_ops *);
+static void exec_files_info (struct gdb_target *);
 
 static void init_exec_ops (void);
 
@@ -466,7 +466,7 @@ remove_target_sections (void *owner)
 		!= pspace->target_sections.sections_end)
 	      return;
 
-	  unpush_target (&exec_ops);
+	  unpush_target (find_target_ops (&exec_ops));
 	}
     }
 }
@@ -574,13 +574,13 @@ section_table_xfer_memory_partial (gdb_byte *readbuf, const gdb_byte *writebuf,
 }
 
 static struct target_section_table *
-exec_get_section_table (struct target_ops *ops)
+exec_get_section_table (struct gdb_target *ops)
 {
   return current_target_sections;
 }
 
 static LONGEST
-exec_xfer_partial (struct target_ops *ops, enum target_object object,
+exec_xfer_partial (struct gdb_target *ops, enum target_object object,
 		   const char *annex, gdb_byte *readbuf,
 		   const gdb_byte *writebuf,
 		   ULONGEST offset, LONGEST len)
@@ -668,7 +668,7 @@ print_section_info (struct target_section_table *t, bfd *abfd)
 }
 
 static void
-exec_files_info (struct target_ops *t)
+exec_files_info (struct gdb_target *t)
 {
   if (exec_bfd)
     print_section_info (current_target_sections, exec_bfd);
@@ -708,7 +708,7 @@ set_section_command (char *args, int from_tty)
 	  p->addr += offset;
 	  p->endaddr += offset;
 	  if (from_tty)
-	    exec_files_info (&exec_ops);
+	    exec_files_info (find_target_ops (&exec_ops));
 	  return;
 	}
     }
@@ -751,7 +751,7 @@ ignore (struct gdbarch *gdbarch, struct bp_target_info *bp_tgt)
 }
 
 static int
-exec_has_memory (struct target_ops *ops)
+exec_has_memory (struct gdb_target *ops)
 {
   /* We can provide memory if we have any file/target sections to read
      from.  */

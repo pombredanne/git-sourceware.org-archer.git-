@@ -123,7 +123,7 @@ supply_fpregset (struct regcache *regcache, const gdb_fpregset_t *fpregs)
 
 /* Fetch register REGNO, or all regs if REGNO is -1.  */
 static void
-gnu_fetch_registers (struct target_ops *ops,
+gnu_fetch_registers (struct gdb_target *ops,
 		     struct regcache *regcache, int regno)
 {
   struct proc *thread;
@@ -215,7 +215,7 @@ store_fpregs (const struct regcache *regcache, struct proc *thread, int regno)
 
 /* Store at least register REGNO, or all regs if REGNO == -1.  */
 static void
-gnu_store_registers (struct target_ops *ops,
+gnu_store_registers (struct gdb_target *ops,
 		     struct regcache *regcache, int regno)
 {
   struct proc *thread;

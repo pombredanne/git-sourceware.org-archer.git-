@@ -84,7 +84,7 @@ getregs_supplies (int regno)
    for all registers (including the floating point registers).  */
 
 static void
-alphabsd_fetch_inferior_registers (struct target_ops *ops,
+alphabsd_fetch_inferior_registers (struct gdb_target *ops,
 				   struct regcache *regcache, int regno)
 {
   if (regno == -1 || getregs_supplies (regno))
@@ -117,7 +117,7 @@ alphabsd_fetch_inferior_registers (struct target_ops *ops,
    this for all registers (including the floating point registers).  */
 
 static void
-alphabsd_store_inferior_registers (struct target_ops *ops,
+alphabsd_store_inferior_registers (struct gdb_target *ops,
 				   struct regcache *regcache, int regno)
 {
   if (regno == -1 || getregs_supplies (regno))

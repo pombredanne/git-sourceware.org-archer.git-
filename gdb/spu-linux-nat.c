@@ -431,7 +431,7 @@ spu_child_post_attach (int pid)
 /* Wait for child PTID to do something.  Return id of the child,
    minus_one_ptid in case of error; store status into *OURSTATUS.  */
 static ptid_t
-spu_child_wait (struct target_ops *ops,
+spu_child_wait (struct gdb_target *ops,
 		ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   int save_errno;
@@ -479,7 +479,7 @@ spu_child_wait (struct target_ops *ops,
 
 /* Override the fetch_inferior_register routine.  */
 static void
-spu_fetch_inferior_registers (struct target_ops *ops,
+spu_fetch_inferior_registers (struct gdb_target *ops,
 			      struct regcache *regcache, int regno)
 {
   int fd;
@@ -523,7 +523,7 @@ spu_fetch_inferior_registers (struct target_ops *ops,
 
 /* Override the store_inferior_register routine.  */
 static void
-spu_store_inferior_registers (struct target_ops *ops,
+spu_store_inferior_registers (struct gdb_target *ops,
 			      struct regcache *regcache, int regno)
 {
   int fd;
@@ -558,7 +558,7 @@ spu_store_inferior_registers (struct target_ops *ops,
 
 /* Override the to_xfer_partial routine.  */
 static LONGEST 
-spu_xfer_partial (struct target_ops *ops,
+spu_xfer_partial (struct gdb_target *ops,
 		  enum target_object object, const char *annex,
 		  gdb_byte *readbuf, const gdb_byte *writebuf,
 		  ULONGEST offset, LONGEST len)

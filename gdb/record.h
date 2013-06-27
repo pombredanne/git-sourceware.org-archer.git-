@@ -22,7 +22,7 @@
 
 struct cmd_list_element;
 
-#define RECORD_IS_USED	(current_target->to_stratum == record_stratum)
+#define RECORD_IS_USED	(current_target->ops->to_stratum == record_stratum)
 
 extern unsigned int record_debug;
 
@@ -52,15 +52,15 @@ extern int record_read_memory (struct gdbarch *gdbarch,
 extern void cmd_record_goto (char *arg, int from_tty);
 
 /* The default "to_disconnect" target method for record targets.  */
-extern void record_disconnect (struct target_ops *, char *, int);
+extern void record_disconnect (struct gdb_target *, char *, int);
 
 /* The default "to_detach" target method for record targets.  */
-extern void record_detach (struct target_ops *, char *, int);
+extern void record_detach (struct gdb_target *, char *, int);
 
 /* The default "to_mourn_inferior" target method for record targets.  */
-extern void record_mourn_inferior (struct target_ops *);
+extern void record_mourn_inferior (struct gdb_target *);
 
 /* The default "to_kill" target method for record targets.  */
-extern void record_kill (struct target_ops *);
+extern void record_kill (struct gdb_target *);
 
 #endif /* _RECORD_H_ */

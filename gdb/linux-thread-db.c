@@ -1208,7 +1208,7 @@ thread_db_new_objfile (struct objfile *objfile)
    This handles the case of debugging statically linked executables.  */
 
 static void
-thread_db_inferior_created (struct target_ops *target, int from_tty)
+thread_db_inferior_created (struct gdb_target *target, int from_tty)
 {
   check_for_thread_db ();
 }
@@ -1336,9 +1336,9 @@ detach_thread (ptid_t ptid)
 }
 
 static void
-thread_db_detach (struct target_ops *ops, char *args, int from_tty)
+thread_db_detach (struct gdb_target *ops, char *args, int from_tty)
 {
-  struct target_ops *target_beneath = find_target_beneath (ops);
+  struct gdb_target *target_beneath = find_target_beneath (ops);
   struct thread_db_info *info;
 
   info = get_thread_db_info (GET_PID (inferior_ptid));
@@ -1360,14 +1360,14 @@ thread_db_detach (struct target_ops *ops, char *args, int from_tty)
       delete_thread_db_info (GET_PID (inferior_ptid));
     }
 
-  target_beneath->to_detach (target_beneath, args, from_tty);
+  target_beneath->ops->to_detach (target_beneath, args, from_tty);
 
   /* NOTE: From this point on, inferior_ptid is null_ptid.  */
 
   /* If there are no more processes using libpthread, detach the
      thread_db target ops.  */
   if (!thread_db_list)
-    unpush_target (&thread_db_ops);
+    unpush_target (find_target_ops (&thread_db_ops));
 }
 
 /* Check if PID is currently stopped at the location of a thread event
@@ -1464,14 +1464,14 @@ check_event (ptid_t ptid)
 }
 
 static ptid_t
-thread_db_wait (struct target_ops *ops,
+thread_db_wait (struct gdb_target *ops,
 		ptid_t ptid, struct target_waitstatus *ourstatus,
 		int options)
 {
   struct thread_db_info *info;
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
 
-  ptid = beneath->to_wait (beneath, ptid, ourstatus, options);
+  ptid = beneath->ops->to_wait (beneath, ptid, ourstatus, options);
 
   if (ourstatus->kind == TARGET_WAITKIND_IGNORE)
     return ptid;
@@ -1492,7 +1492,7 @@ thread_db_wait (struct target_ops *ops,
 	 not unless we find otherwise.  */
       delete_thread_db_info (GET_PID (ptid));
       if (!thread_db_list)
- 	unpush_target (&thread_db_ops);
+ 	unpush_target (find_target_ops (&thread_db_ops));
 
       /* Thread event breakpoints are deleted by
 	 update_breakpoints_after_exec.  */
@@ -1520,13 +1520,13 @@ thread_db_wait (struct target_ops *ops,
 }
 
 static void
-thread_db_mourn_inferior (struct target_ops *ops)
+thread_db_mourn_inferior (struct gdb_target *ops)
 {
-  struct target_ops *target_beneath = find_target_beneath (ops);
+  struct gdb_target *target_beneath = find_target_beneath (ops);
 
   delete_thread_db_info (GET_PID (inferior_ptid));
 
-  target_beneath->to_mourn_inferior (target_beneath);
+  target_beneath->ops->to_mourn_inferior (target_beneath);
 
   /* Delete the old thread event breakpoints.  Do this after mourning
      the inferior, so that we don't try to uninsert them.  */
@@ -1703,7 +1703,7 @@ update_thread_core (struct lwp_info *info, void *closure)
 }
 
 static void
-thread_db_find_new_threads (struct target_ops *ops)
+thread_db_find_new_threads (struct gdb_target *ops)
 {
   struct thread_db_info *info;
   struct inferior *inf;
@@ -1732,10 +1732,10 @@ thread_db_find_new_threads (struct target_ops *ops)
 }
 
 static char *
-thread_db_pid_to_str (struct target_ops *ops, ptid_t ptid)
+thread_db_pid_to_str (struct gdb_target *ops, ptid_t ptid)
 {
   struct thread_info *thread_info = find_thread_ptid (ptid);
-  struct target_ops *beneath;
+  struct gdb_target *beneath;
 
   if (thread_info != NULL && thread_info->private != NULL)
     {
@@ -1750,8 +1750,8 @@ thread_db_pid_to_str (struct target_ops *ops, ptid_t ptid)
     }
 
   beneath = find_target_beneath (ops);
-  if (beneath->to_pid_to_str (beneath, ptid))
-    return beneath->to_pid_to_str (beneath, ptid);
+  if (beneath->ops->to_pid_to_str (beneath, ptid))
+    return beneath->ops->to_pid_to_str (beneath, ptid);
 
   return normal_pid_to_str (ptid);
 }
@@ -1775,13 +1775,13 @@ thread_db_extra_thread_info (struct thread_info *info)
    is stored at OFFSET within the thread local storage for thread PTID.  */
 
 static CORE_ADDR
-thread_db_get_thread_local_address (struct target_ops *ops,
+thread_db_get_thread_local_address (struct gdb_target *ops,
 				    ptid_t ptid,
 				    CORE_ADDR lm,
 				    CORE_ADDR offset)
 {
   struct thread_info *thread_info;
-  struct target_ops *beneath;
+  struct gdb_target *beneath;
 
   /* If we have not discovered any threads yet, check now.  */
   if (!have_threads (ptid))
@@ -1838,8 +1838,9 @@ thread_db_get_thread_local_address (struct target_ops *ops,
     }
 
   beneath = find_target_beneath (ops);
-  if (beneath->to_get_thread_local_address)
-    return beneath->to_get_thread_local_address (beneath, ptid, lm, offset);
+  if (beneath->ops->to_get_thread_local_address)
+    return beneath->ops->to_get_thread_local_address (beneath, ptid, lm,
+						      offset);
   else
     throw_error (TLS_GENERIC_ERROR,
 	         _("TLS not supported on this target"));
@@ -1875,10 +1876,10 @@ thread_db_get_ada_task_ptid (long lwp, long thread)
 }
 
 static void
-thread_db_resume (struct target_ops *ops,
+thread_db_resume (struct gdb_target *ops,
 		  ptid_t ptid, int step, enum gdb_signal signo)
 {
-  struct target_ops *beneath = find_target_beneath (ops);
+  struct gdb_target *beneath = find_target_beneath (ops);
   struct thread_db_info *info;
 
   if (ptid_equal (ptid, minus_one_ptid))
@@ -1892,7 +1893,7 @@ thread_db_resume (struct target_ops *ops,
   if (info)
     info->need_stale_parent_threads_check = 0;
 
-  beneath->to_resume (beneath, ptid, step, signo);
+  beneath->ops->to_resume (beneath, ptid, step, signo);
 }
 
 /* qsort helper function for info_auto_load_libthread_db, sort the
