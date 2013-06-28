@@ -2455,10 +2455,15 @@ windows_xfer_partial (struct gdb_target *ops, enum target_object object,
 					  writebuf, offset, len);
 
     default:
-      if (ops->beneath != NULL)
-	return ops->beneath->to_xfer_partial (ops->beneath, object, annex,
-					      readbuf, writebuf, offset, len);
-      return -1;
+      {
+	struct gdb_target *beneath = find_target_beneath (ops);
+
+	if (beneath != NULL)
+	  return beneath->ops->to_xfer_partial (beneath, object, annex,
+						readbuf, writebuf,
+						offset, len);
+	return -1;
+      }
     }
 }
 
