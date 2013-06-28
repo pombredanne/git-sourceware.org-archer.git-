@@ -3805,8 +3805,12 @@ target_close (struct gdb_target *targ)
 
   if (targ->ops->to_xclose != NULL)
     targ->ops->to_xclose (targ);
-  else if (targ->ops->to_close != NULL)
-    targ->ops->to_close ();
+  else
+    {
+      if (targ->ops->to_close != NULL)
+	targ->ops->to_close ();
+      xfree (targ);
+    }
 
   if (targetdebug)
     fprintf_unfiltered (gdb_stdlog, "target_close ()\n");
