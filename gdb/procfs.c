@@ -3998,8 +3998,9 @@ procfs_xfer_partial (struct gdb_target *ops, enum target_object object,
 
     default:
       if (ops->beneath != NULL)
-	return ops->beneath->to_xfer_partial (ops->beneath, object, annex,
-					      readbuf, writebuf, offset, len);
+	return ops->beneath->ops->to_xfer_partial (ops->beneath, object, annex,
+						   readbuf, writebuf,
+						   offset, len);
       return -1;
     }
 }

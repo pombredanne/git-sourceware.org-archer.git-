@@ -1019,7 +1019,7 @@ aix_thread_wait (struct gdb_target *ops,
   pid_to_prc (&ptid);
 
   inferior_ptid = pid_to_ptid (PIDGET (inferior_ptid));
-  ptid = beneath->to_wait (beneath, ptid, status, options);
+  ptid = beneath->ops->to_wait (beneath, ptid, status, options);
   do_cleanups (cleanup);
 
   if (PIDGET (ptid) == -1)

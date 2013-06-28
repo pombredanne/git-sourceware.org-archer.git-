@@ -1071,7 +1071,7 @@ gdbsim_xfer_inferior_memory (CORE_ADDR memaddr, gdb_byte *myaddr, int len,
   /* If this target doesn't have memory yet, return 0 causing the
      request to be passed to a lower target, hopefully an exec
      file.  */
-  if (!target->to_has_memory (target))
+  if (!target->ops->to_has_memory (target))
     return 0;
 
   if (!sim_data->program_loaded)
