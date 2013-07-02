@@ -4996,10 +4996,27 @@ target_stack_incref (void)
 }
 
 void
-target_stack_decref (struct target_stack *target_stack)
+target_stack_decref (struct target_stack *tstack)
 {
-  --target_stack->refc;
-  /* FIXME */
+  --tstack->refc;
+  if (tstack->refc == 0)
+    {
+      /* It is ok to delete any random target stack as long as it only
+	 has the dummy target.  If any other target has been pushed,
+	 then the target stack being deleted must be the current
+	 target stack.  */
+      if (tstack->smashed->ops->to_stratum != dummy_stratum)
+	{
+	  gdb_assert (tstack == target_stack);
+
+	  pop_all_targets ();
+	  target_stack = NULL;
+	  current_target = NULL;
+	}
+
+      xfree (tstack->smashed);
+      xfree (tstack);
+    }
 }
 
 void
