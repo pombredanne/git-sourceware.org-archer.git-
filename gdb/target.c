@@ -92,8 +92,6 @@ static struct gdbarch *default_thread_architecture (struct gdb_target *ops,
 
 static void init_dummy_target (void);
 
-static struct target_ops debug_target;
-
 static void debug_to_open (char *, int);
 
 static void debug_to_prepare_to_store (struct regcache *);
@@ -172,6 +170,10 @@ struct target_stack
   /* Reference count.  */
 
   int refc;
+
+  /* The debug target_ops for this target.  */
+
+  struct target_ops debug_target;
 
   /* The "smashed" gdb_target.  */
 
@@ -3793,7 +3795,7 @@ init_dummy_target (void)
 static void
 debug_to_open (char *args, int from_tty)
 {
-  debug_target.to_open (args, from_tty);
+  target_stack->debug_target.to_open (args, from_tty);
 
   fprintf_unfiltered (gdb_stdlog, "target_open (%s, %d)\n", args, from_tty);
 }
@@ -3893,7 +3895,7 @@ target_stop (ptid_t ptid)
 static void
 debug_to_post_attach (int pid)
 {
-  debug_target.to_post_attach (pid);
+  target_stack->debug_target.to_post_attach (pid);
 
   fprintf_unfiltered (gdb_stdlog, "target_post_attach (%d)\n", pid);
 }
@@ -4479,7 +4481,7 @@ target_call_history_range (ULONGEST begin, ULONGEST end, int flags)
 static void
 debug_to_prepare_to_store (struct regcache *regcache)
 {
-  debug_target.to_prepare_to_store (regcache);
+  target_stack->debug_target.to_prepare_to_store (regcache);
 
   fprintf_unfiltered (gdb_stdlog, "target_prepare_to_store ()\n");
 }
@@ -4491,8 +4493,10 @@ deprecated_debug_xfer_memory (CORE_ADDR memaddr, bfd_byte *myaddr, int len,
 {
   int retval;
 
-  retval = debug_target.deprecated_xfer_memory (memaddr, myaddr, len, write,
-						attrib, target);
+  retval
+    = target_stack->debug_target.deprecated_xfer_memory (memaddr,
+							 myaddr, len, write,
+							 attrib, target);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_xfer_memory (%s, xxx, %d, %s, xxx) = %d",
@@ -4528,7 +4532,7 @@ deprecated_debug_xfer_memory (CORE_ADDR memaddr, bfd_byte *myaddr, int len,
 static void
 debug_to_files_info (struct gdb_target *target)
 {
-  debug_target.to_files_info (target);
+  target_stack->debug_target.to_files_info (target);
 
   fprintf_unfiltered (gdb_stdlog, "target_files_info (xxx)\n");
 }
@@ -4539,7 +4543,7 @@ debug_to_insert_breakpoint (struct gdbarch *gdbarch,
 {
   int retval;
 
-  retval = debug_target.to_insert_breakpoint (gdbarch, bp_tgt);
+  retval = target_stack->debug_target.to_insert_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_insert_breakpoint (%s, xxx) = %ld\n",
@@ -4554,7 +4558,7 @@ debug_to_remove_breakpoint (struct gdbarch *gdbarch,
 {
   int retval;
 
-  retval = debug_target.to_remove_breakpoint (gdbarch, bp_tgt);
+  retval = target_stack->debug_target.to_remove_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_remove_breakpoint (%s, xxx) = %ld\n",
@@ -4568,7 +4572,8 @@ debug_to_can_use_hw_breakpoint (int type, int cnt, int from_tty)
 {
   int retval;
 
-  retval = debug_target.to_can_use_hw_breakpoint (type, cnt, from_tty);
+  retval = target_stack->debug_target.to_can_use_hw_breakpoint (type, cnt,
+								from_tty);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_can_use_hw_breakpoint (%ld, %ld, %ld) = %ld\n",
@@ -4584,7 +4589,8 @@ debug_to_region_ok_for_hw_watchpoint (CORE_ADDR addr, int len)
 {
   CORE_ADDR retval;
 
-  retval = debug_target.to_region_ok_for_hw_watchpoint (addr, len);
+  retval = target_stack->debug_target.to_region_ok_for_hw_watchpoint (addr,
+								      len);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_region_ok_for_hw_watchpoint (%s, %ld) = %s\n",
@@ -4599,8 +4605,9 @@ debug_to_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
 {
   int retval;
 
-  retval = debug_target.to_can_accel_watchpoint_condition (addr, len,
-							   rw, cond);
+  retval
+    = target_stack->debug_target.to_can_accel_watchpoint_condition (addr, len,
+								    rw, cond);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_can_accel_watchpoint_condition "
@@ -4615,7 +4622,7 @@ debug_to_stopped_by_watchpoint (void)
 {
   int retval;
 
-  retval = debug_target.to_stopped_by_watchpoint ();
+  retval = target_stack->debug_target.to_stopped_by_watchpoint ();
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_stopped_by_watchpoint () = %ld\n",
@@ -4628,7 +4635,7 @@ debug_to_stopped_data_address (struct gdb_target *target, CORE_ADDR *addr)
 {
   int retval;
 
-  retval = debug_target.to_stopped_data_address (target, addr);
+  retval = target_stack->debug_target.to_stopped_data_address (target, addr);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_stopped_data_address ([%s]) = %ld\n",
@@ -4644,8 +4651,10 @@ debug_to_watchpoint_addr_within_range (struct gdb_target *target,
 {
   int retval;
 
-  retval = debug_target.to_watchpoint_addr_within_range (target, addr,
-							 start, length);
+  retval
+    = target_stack->debug_target.to_watchpoint_addr_within_range (target, addr,
+								  start,
+								  length);
 
   fprintf_filtered (gdb_stdlog,
 		    "target_watchpoint_addr_within_range (%s, %s, %d) = %d\n",
@@ -4660,7 +4669,7 @@ debug_to_insert_hw_breakpoint (struct gdbarch *gdbarch,
 {
   int retval;
 
-  retval = debug_target.to_insert_hw_breakpoint (gdbarch, bp_tgt);
+  retval = target_stack->debug_target.to_insert_hw_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_insert_hw_breakpoint (%s, xxx) = %ld\n",
@@ -4675,7 +4684,7 @@ debug_to_remove_hw_breakpoint (struct gdbarch *gdbarch,
 {
   int retval;
 
-  retval = debug_target.to_remove_hw_breakpoint (gdbarch, bp_tgt);
+  retval = target_stack->debug_target.to_remove_hw_breakpoint (gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_remove_hw_breakpoint (%s, xxx) = %ld\n",
@@ -4690,7 +4699,8 @@ debug_to_insert_watchpoint (CORE_ADDR addr, int len, int type,
 {
   int retval;
 
-  retval = debug_target.to_insert_watchpoint (addr, len, type, cond);
+  retval = target_stack->debug_target.to_insert_watchpoint (addr, len, type,
+							    cond);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_insert_watchpoint (%s, %d, %d, %s) = %ld\n",
@@ -4705,7 +4715,8 @@ debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type,
 {
   int retval;
 
-  retval = debug_target.to_remove_watchpoint (addr, len, type, cond);
+  retval = target_stack->debug_target.to_remove_watchpoint (addr, len, type,
+							    cond);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_remove_watchpoint (%s, %d, %d, %s) = %ld\n",
@@ -4717,7 +4728,7 @@ debug_to_remove_watchpoint (CORE_ADDR addr, int len, int type,
 static void
 debug_to_terminal_init (void)
 {
-  debug_target.to_terminal_init ();
+  target_stack->debug_target.to_terminal_init ();
 
   fprintf_unfiltered (gdb_stdlog, "target_terminal_init ()\n");
 }
@@ -4725,7 +4736,7 @@ debug_to_terminal_init (void)
 static void
 debug_to_terminal_inferior (void)
 {
-  debug_target.to_terminal_inferior ();
+  target_stack->debug_target.to_terminal_inferior ();
 
   fprintf_unfiltered (gdb_stdlog, "target_terminal_inferior ()\n");
 }
@@ -4733,7 +4744,7 @@ debug_to_terminal_inferior (void)
 static void
 debug_to_terminal_ours_for_output (void)
 {
-  debug_target.to_terminal_ours_for_output ();
+  target_stack->debug_target.to_terminal_ours_for_output ();
 
   fprintf_unfiltered (gdb_stdlog, "target_terminal_ours_for_output ()\n");
 }
@@ -4741,7 +4752,7 @@ debug_to_terminal_ours_for_output (void)
 static void
 debug_to_terminal_ours (void)
 {
-  debug_target.to_terminal_ours ();
+  target_stack->debug_target.to_terminal_ours ();
 
   fprintf_unfiltered (gdb_stdlog, "target_terminal_ours ()\n");
 }
@@ -4749,7 +4760,7 @@ debug_to_terminal_ours (void)
 static void
 debug_to_terminal_save_ours (void)
 {
-  debug_target.to_terminal_save_ours ();
+  target_stack->debug_target.to_terminal_save_ours ();
 
   fprintf_unfiltered (gdb_stdlog, "target_terminal_save_ours ()\n");
 }
@@ -4757,7 +4768,7 @@ debug_to_terminal_save_ours (void)
 static void
 debug_to_terminal_info (const char *arg, int from_tty)
 {
-  debug_target.to_terminal_info (arg, from_tty);
+  target_stack->debug_target.to_terminal_info (arg, from_tty);
 
   fprintf_unfiltered (gdb_stdlog, "target_terminal_info (%s, %d)\n", arg,
 		      from_tty);
@@ -4766,7 +4777,7 @@ debug_to_terminal_info (const char *arg, int from_tty)
 static void
 debug_to_load (char *args, int from_tty)
 {
-  debug_target.to_load (args, from_tty);
+  target_stack->debug_target.to_load (args, from_tty);
 
   fprintf_unfiltered (gdb_stdlog, "target_load (%s, %d)\n", args, from_tty);
 }
@@ -4774,7 +4785,7 @@ debug_to_load (char *args, int from_tty)
 static void
 debug_to_post_startup_inferior (ptid_t ptid)
 {
-  debug_target.to_post_startup_inferior (ptid);
+  target_stack->debug_target.to_post_startup_inferior (ptid);
 
   fprintf_unfiltered (gdb_stdlog, "target_post_startup_inferior (%d)\n",
 		      PIDGET (ptid));
@@ -4785,7 +4796,7 @@ debug_to_insert_fork_catchpoint (int pid)
 {
   int retval;
 
-  retval = debug_target.to_insert_fork_catchpoint (pid);
+  retval = target_stack->debug_target.to_insert_fork_catchpoint (pid);
 
   fprintf_unfiltered (gdb_stdlog, "target_insert_fork_catchpoint (%d) = %d\n",
 		      pid, retval);
@@ -4798,7 +4809,7 @@ debug_to_remove_fork_catchpoint (int pid)
 {
   int retval;
 
-  retval = debug_target.to_remove_fork_catchpoint (pid);
+  retval = target_stack->debug_target.to_remove_fork_catchpoint (pid);
 
   fprintf_unfiltered (gdb_stdlog, "target_remove_fork_catchpoint (%d) = %d\n",
 		      pid, retval);
@@ -4811,7 +4822,7 @@ debug_to_insert_vfork_catchpoint (int pid)
 {
   int retval;
 
-  retval = debug_target.to_insert_vfork_catchpoint (pid);
+  retval = target_stack->debug_target.to_insert_vfork_catchpoint (pid);
 
   fprintf_unfiltered (gdb_stdlog, "target_insert_vfork_catchpoint (%d) = %d\n",
 		      pid, retval);
@@ -4824,7 +4835,7 @@ debug_to_remove_vfork_catchpoint (int pid)
 {
   int retval;
 
-  retval = debug_target.to_remove_vfork_catchpoint (pid);
+  retval = target_stack->debug_target.to_remove_vfork_catchpoint (pid);
 
   fprintf_unfiltered (gdb_stdlog, "target_remove_vfork_catchpoint (%d) = %d\n",
 		      pid, retval);
@@ -4837,7 +4848,7 @@ debug_to_insert_exec_catchpoint (int pid)
 {
   int retval;
 
-  retval = debug_target.to_insert_exec_catchpoint (pid);
+  retval = target_stack->debug_target.to_insert_exec_catchpoint (pid);
 
   fprintf_unfiltered (gdb_stdlog, "target_insert_exec_catchpoint (%d) = %d\n",
 		      pid, retval);
@@ -4850,7 +4861,7 @@ debug_to_remove_exec_catchpoint (int pid)
 {
   int retval;
 
-  retval = debug_target.to_remove_exec_catchpoint (pid);
+  retval = target_stack->debug_target.to_remove_exec_catchpoint (pid);
 
   fprintf_unfiltered (gdb_stdlog, "target_remove_exec_catchpoint (%d) = %d\n",
 		      pid, retval);
@@ -4863,7 +4874,8 @@ debug_to_has_exited (int pid, int wait_status, int *exit_status)
 {
   int has_exited;
 
-  has_exited = debug_target.to_has_exited (pid, wait_status, exit_status);
+  has_exited = target_stack->debug_target.to_has_exited (pid, wait_status,
+							 exit_status);
 
   fprintf_unfiltered (gdb_stdlog, "target_has_exited (%d, %d, %d) = %d\n",
 		      pid, wait_status, *exit_status, has_exited);
@@ -4876,7 +4888,7 @@ debug_to_can_run (void)
 {
   int retval;
 
-  retval = debug_target.to_can_run ();
+  retval = target_stack->debug_target.to_can_run ();
 
   fprintf_unfiltered (gdb_stdlog, "target_can_run () = %d\n", retval);
 
@@ -4888,7 +4900,7 @@ debug_to_thread_architecture (struct gdb_target *ops, ptid_t ptid)
 {
   struct gdbarch *retval;
 
-  retval = debug_target.to_thread_architecture (ops, ptid);
+  retval = target_stack->debug_target.to_thread_architecture (ops, ptid);
 
   fprintf_unfiltered (gdb_stdlog, 
 		      "target_thread_architecture (%s) = %s [%s]\n",
@@ -4901,7 +4913,7 @@ debug_to_thread_architecture (struct gdb_target *ops, ptid_t ptid)
 static void
 debug_to_stop (ptid_t ptid)
 {
-  debug_target.to_stop (ptid);
+  target_stack->debug_target.to_stop (ptid);
 
   fprintf_unfiltered (gdb_stdlog, "target_stop (%s)\n",
 		      target_pid_to_str (ptid));
@@ -4911,7 +4923,7 @@ static void
 debug_to_rcmd (char *command,
 	       struct ui_file *outbuf)
 {
-  debug_target.to_rcmd (command, outbuf);
+  target_stack->debug_target.to_rcmd (command, outbuf);
   fprintf_unfiltered (gdb_stdlog, "target_rcmd (%s, ...)\n", command);
 }
 
@@ -4920,7 +4932,7 @@ debug_to_pid_to_exec_file (int pid)
 {
   char *exec_file;
 
-  exec_file = debug_target.to_pid_to_exec_file (pid);
+  exec_file = target_stack->debug_target.to_pid_to_exec_file (pid);
 
   fprintf_unfiltered (gdb_stdlog, "target_pid_to_exec_file (%d) = %s\n",
 		      pid, exec_file);
@@ -4931,7 +4943,8 @@ debug_to_pid_to_exec_file (int pid)
 static void
 setup_target_debug (void)
 {
-  memcpy (&debug_target, current_target->ops, sizeof debug_target);
+  memcpy (&target_stack->debug_target, current_target->ops,
+	  sizeof (struct target_ops));
 
   current_target->ops->to_open = debug_to_open;
   current_target->ops->to_post_attach = debug_to_post_attach;
@@ -5064,7 +5077,7 @@ do_monitor_command (char *cmd,
   if ((current_target->ops->to_rcmd
        == (void (*) (char *, struct ui_file *)) tcomplain)
       || (current_target->ops->to_rcmd == debug_to_rcmd
-	  && (debug_target.to_rcmd
+	  && (target_stack->debug_target.to_rcmd
 	      == (void (*) (char *, struct ui_file *)) tcomplain)))
     error (_("\"monitor\" command not supported by this target."));
   target_rcmd (cmd, gdb_stdtarg);
