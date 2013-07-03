@@ -32,6 +32,7 @@ extern char *current_token;
 
 extern int running_result_record_printed;
 extern int mi_proceeded;
+extern int mi_last_was_cli;
 
 struct mi_suppress_notification
 {

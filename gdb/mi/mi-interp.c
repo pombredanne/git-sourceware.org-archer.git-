@@ -226,6 +226,16 @@ mi_interpreter_exec (void *data, const char *command)
 static int
 mi_interpreter_prompt_p (void *data)
 {
+  if (!interp_quiet_p (NULL))
+    {
+      if (!target_is_async_p ()
+	  || (!sync_execution && (!target_async_permitted || !mi_last_was_cli)))
+	{
+	  fputs_unfiltered ("(gdb) \n", raw_stdout);
+	  gdb_flush (raw_stdout);
+	}
+    }
+
   return 0;
 }
 
@@ -250,6 +260,8 @@ mi_cmd_interpreter_exec (char *command, char **argv, int argc)
     error (_("-interpreter-exec: interpreter \"%s\" "
 	     "does not support command execution"),
 	      argv[0]);
+
+  mi_last_was_cli = strcmp (argv[0], "console") == 0;
 
   /* Note that unlike the CLI version of this command, we don't
      actually set INTERP_TO_USE as the current interpreter, as we
@@ -322,8 +334,17 @@ mi_execute_command_input_handler (char *cmd)
 {
   mi_execute_command_wrapper (cmd);
 
-  fputs_unfiltered ("(gdb) \n", raw_stdout);
-  gdb_flush (raw_stdout);
+  /* MI generally prints a prompt after a command.  However, if target
+     is async, and a synchronous command was issued, then we will
+     print the prompt elsewhere, after printing "*running".
+     target_is_async_p checks whether the target is async;
+     sync_execution checks whether a synchronous command was
+     issued.  */
+  if (!target_is_async_p () || !sync_execution)
+    {
+      fputs_unfiltered ("(gdb) \n", raw_stdout);
+      gdb_flush (raw_stdout);
+    }
 }
 
 static void
@@ -853,10 +874,10 @@ mi_on_resume (ptid_t ptid)
       running_result_record_printed = 1;
       /* This is what gdb used to do historically -- printing prompt even if
 	 it cannot actually accept any input.  This will be surely removed
-	 for MI3, and may be removed even earler.  */
-      /* FIXME: review the use of target_is_async_p here -- is that
-	 what we want? */
-      if (!target_is_async_p ())
+	 for MI3, and may be removed even earler.  SYNC_EXECUTION is
+	 checked here because we only need to emit a prompt if a
+	 synchronous command was issued when the target is async.  */
+      if (!target_is_async_p () || sync_execution)
 	fputs_unfiltered ("(gdb) \n", raw_stdout);
     }
   gdb_flush (raw_stdout);

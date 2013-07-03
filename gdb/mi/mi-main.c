@@ -94,6 +94,10 @@ int running_result_record_printed = 1;
    command was issued.  */
 int mi_proceeded;
 
+/* Flag indicating whether the most recent command was executed via
+   the CLI interpreter.  */
+int mi_last_was_cli;
+
 extern void _initialize_mi_main (void);
 static void mi_cmd_execute (struct mi_parse *parse);
 
@@ -105,6 +109,15 @@ static int register_changed_p (int regnum, struct regcache *,
 			       struct regcache *);
 static void output_register (struct frame_info *, int regnum, int format,
 			     int skip_unavailable);
+
+/* A wrapper for target_can_async_p that takes the MI setting into
+   account.  */
+
+static int
+mi_target_can_async_p (void)
+{
+  return target_async_permitted && target_can_async_p ();
+}
 
 /* Command implementations.  FIXME: Is this libgdb?  No.  This is the MI
    layer that calls libgdb.  Any operation used in the below should be
@@ -262,6 +275,11 @@ exec_continue (char **argv, int argc)
     {
       struct cleanup *back_to = make_cleanup_restore_integer (&sched_multi);
 
+      /* If MI is in sync mode but the target is async, then
+	 normal_stop enabled stdin.  We undo the change here.  */
+      if (!target_async_permitted && target_can_async_p ())
+	async_disable_stdin ();
+
       if (current_context->all)
 	{
 	  sched_multi = 1;
@@ -386,8 +404,8 @@ run_one_inferior (struct inferior *inf, void *arg)
       switch_to_thread (null_ptid);
       set_current_program_space (inf->pspace);
     }
-  mi_execute_cli_command ("run", target_can_async_p (),
-			  target_can_async_p () ? "&" : NULL);
+  mi_execute_cli_command ("run", mi_target_can_async_p (),
+			  mi_target_can_async_p () ? "&" : NULL);
   return 0;
 }
 
@@ -403,8 +421,8 @@ mi_cmd_exec_run (char *command, char **argv, int argc)
     }
   else
     {
-      mi_execute_cli_command ("run", target_can_async_p (),
-			      target_can_async_p () ? "&" : NULL);
+      mi_execute_cli_command ("run", mi_target_can_async_p (),
+			      mi_target_can_async_p () ? "&" : NULL);
     }
 }
 
@@ -1789,7 +1807,7 @@ mi_cmd_list_target_features (char *command, char **argv, int argc)
       struct ui_out *uiout = current_uiout;
 
       cleanup = make_cleanup_ui_out_list_begin_end (uiout, "features");      
-      if (target_can_async_p ())
+      if (mi_target_can_async_p ())
 	ui_out_field_string (uiout, NULL, "async");
       if (target_can_execute_reverse)
 	ui_out_field_string (uiout, NULL, "reverse");
@@ -1886,6 +1904,7 @@ captured_mi_execute_command (struct ui_out *uiout, struct mi_parse *context)
 
   running_result_record_printed = 0;
   mi_proceeded = 0;
+  mi_last_was_cli = 0;
   switch (context->op)
     {
     case MI_COMMAND:
@@ -2204,7 +2223,7 @@ mi_execute_async_cli_command (char *cli_command, char **argv, int argc)
   struct cleanup *old_cleanups;
   char *run;
 
-  if (target_can_async_p ())
+  if (mi_target_can_async_p ())
     run = xstrprintf ("%s %s&", cli_command, argc ? *argv : "");
   else
     run = xstrprintf ("%s %s", cli_command, argc ? *argv : "");

@@ -4252,8 +4252,7 @@ remote_open_1 (char *name, int from_tty,
 	   "(e.g. /dev/ttyS0, /dev/ttya, COM1, etc.)."));
 
   /* See FIXME above.  */
-  if (!target_async_permitted)
-    wait_forever_enabled_p = 1;
+  wait_forever_enabled_p = 1;
 
   /* If we're connected to a running target, target_preopen will kill it.
      Ask this question first, before target_preopen has a chance to kill
@@ -4339,20 +4338,17 @@ remote_open_1 (char *name, int from_tty,
   use_threadinfo_query = 1;
   use_threadextra_query = 1;
 
-  if (target_async_permitted)
-    {
-      /* With this target we start out by owning the terminal.  */
-      remote_async_terminal_ours_p = 1;
+  /* With this target we start out by owning the terminal.  */
+  remote_async_terminal_ours_p = 1;
 
-      /* FIXME: cagney/1999-09-23: During the initial connection it is
-	 assumed that the target is already ready and able to respond to
-	 requests.  Unfortunately remote_start_remote() eventually calls
-	 wait_for_inferior() with no timeout.  wait_forever_enabled_p gets
-	 around this.  Eventually a mechanism that allows
-	 wait_for_inferior() to expect/get timeouts will be
-	 implemented.  */
-      wait_forever_enabled_p = 0;
-    }
+  /* FIXME: cagney/1999-09-23: During the initial connection it is
+     assumed that the target is already ready and able to respond to
+     requests.  Unfortunately remote_start_remote() eventually calls
+     wait_for_inferior() with no timeout.  wait_forever_enabled_p gets
+     around this.  Eventually a mechanism that allows
+     wait_for_inferior() to expect/get timeouts will be
+     implemented.  */
+  wait_forever_enabled_p = 0;
 
   /* First delete any symbols previously loaded from shared libraries.  */
   no_shared_libraries (NULL, 0);
@@ -4388,14 +4384,12 @@ remote_open_1 (char *name, int from_tty,
 	   already before throwing the exception.  */
 	if (remote_desc != NULL)
 	  remote_unpush_target ();
-	if (target_async_permitted)
-	  wait_forever_enabled_p = 1;
+	wait_forever_enabled_p = 1;
 	throw_exception (ex);
       }
   }
 
-  if (target_async_permitted)
-    wait_forever_enabled_p = 1;
+  wait_forever_enabled_p = 1;
 }
 
 /* This takes a program previously attached to and detaches it.  After
@@ -5190,10 +5184,6 @@ Give up (and stop debugging it)? ")))
 static void
 remote_terminal_inferior (void)
 {
-  if (!target_async_permitted)
-    /* Nothing to do.  */
-    return;
-
   /* FIXME: cagney/1999-09-27: Make calls to target_terminal_*()
      idempotent.  The event-loop GDB talking to an asynchronous target
      with a synchronous command calls this function from both
@@ -5213,10 +5203,6 @@ remote_terminal_inferior (void)
 static void
 remote_terminal_ours (void)
 {
-  if (!target_async_permitted)
-    /* Nothing to do.  */
-    return;
-
   /* See FIXME in remote_terminal_inferior.  */
   if (remote_async_terminal_ours_p)
     return;
@@ -11625,10 +11611,6 @@ Specify the serial device it is connected to (e.g. /dev/ttya).";
 static int
 remote_can_async_p (struct target_ops *ops)
 {
-  if (!target_async_permitted)
-    /* We only enable async when the user specifically asks for it.  */
-    return 0;
-
   /* We're async whenever the serial device is.  */
   return serial_can_async_p (remote_desc);
 }
@@ -11636,10 +11618,6 @@ remote_can_async_p (struct target_ops *ops)
 static int
 remote_is_async_p (struct target_ops *ops)
 {
-  if (!target_async_permitted)
-    /* We only enable async when the user specifically asks for it.  */
-    return 0;
-
   /* We're async whenever the serial device is.  */
   return serial_is_async_p (remote_desc);
 }

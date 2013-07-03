@@ -4764,10 +4764,7 @@ linux_trad_target (CORE_ADDR (*register_u_offset)(struct gdbarch *, int, int))
 static int
 linux_nat_is_async_p (struct target_ops *ops)
 {
-  /* NOTE: palves 2008-03-21: We're only async when the user requests
-     it explicitly with the "set target-async" command.
-     Someday, linux will always be async.  */
-  return target_async_permitted;
+  return 1;
 }
 
 /* target_can_async_p implementation.  */
@@ -4775,10 +4772,7 @@ linux_nat_is_async_p (struct target_ops *ops)
 static int
 linux_nat_can_async_p (struct target_ops *ops)
 {
-  /* NOTE: palves 2008-03-21: We're only async when the user requests
-     it explicitly with the "set target-async" command.
-     Someday, linux will always be async.  */
-  return target_async_permitted;
+  return 1;
 }
 
 static int
