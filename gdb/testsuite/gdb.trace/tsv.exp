@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-load_lib "trace-support.exp";
+load_lib "trace-support.exp"
 
 
 gdb_exit
@@ -111,11 +111,11 @@ if { ![gdb_target_supports_trace] } then {
 }
 
 gdb_delete_tracepoints
-set trcpt1 [gdb_gettpnum gdb_c_test];
+set trcpt1 [gdb_gettpnum gdb_c_test]
 
 if { $trcpt1 <= 0 } then {
     fail "setting tracepoints"
-    return;
+    return
 }
 
 gdb_test "tvariable \$tvar5 = 15" \
@@ -187,4 +187,26 @@ gdb_test_multiple "target ctf ${tracefile}.ctf" "" {
     -re ".*\r\n$gdb_prompt $" {
 	check_tsv "ctf"
     }
+}
+
+# Restart.
+clean_restart ${binfile}
+
+if ![runto_main] then {
+    fail "Can't run to main"
+    return
+}
+
+# If there are predefined TSVs, test these predefined TSVs are correctly
+# uploaded.
+if [target_info exists gdb,predefined_tsv] {
+    set tsv [target_info gdb,predefined_tsv]
+
+    # Test predefined TSVs are uploaded.
+    gdb_test "info tvariables" ".*${tsv}.*" "predefined tsvs are uploaded"
+} else {
+    # Otherwise (the predefined TSVs are not defined in the board file),
+    # test there is no TSVs in GDB.
+    gdb_test "info tvariables" "No trace state variables\." \
+	"no predefined tsvs"
 }

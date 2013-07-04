@@ -736,6 +736,7 @@ extern const bfd_target bfd_elf64_alpha_vec;
 extern const bfd_target bfd_elf64_big_generic_vec;
 extern const bfd_target bfd_elf64_bigmips_vec;
 extern const bfd_target bfd_elf64_bigaarch64_vec;
+extern const bfd_target bfd_elf32_bigaarch64_vec;
 extern const bfd_target bfd_elf64_hppa_linux_vec;
 extern const bfd_target bfd_elf64_hppa_vec;
 extern const bfd_target bfd_elf64_ia64_big_vec;
@@ -745,6 +746,7 @@ extern const bfd_target bfd_elf64_ia64_vms_vec;
 extern const bfd_target bfd_elf64_little_generic_vec;
 extern const bfd_target bfd_elf64_littlemips_vec;
 extern const bfd_target bfd_elf64_littleaarch64_vec;
+extern const bfd_target bfd_elf32_littleaarch64_vec;
 extern const bfd_target bfd_elf64_mmix_vec;
 extern const bfd_target bfd_elf64_powerpc_vec;
 extern const bfd_target bfd_elf64_powerpcle_vec;
@@ -982,8 +984,10 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_bigarm_vec,
 	&bfd_elf32_bigarm_symbian_vec,
 	&bfd_elf32_bigarm_vxworks_vec,
+#ifdef BFD64
 	&bfd_elf32_bigmips_vec,
 	&bfd_elf32_bigmips_vxworks_vec,
+#endif
  	&bfd_elf32_bigmoxie_vec,
  	&bfd_elf32_bignios2_vec,
 	&bfd_elf32_cr16_vec,
@@ -1024,8 +1028,10 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_littlearm_vec,
 	&bfd_elf32_littlearm_symbian_vec,
 	&bfd_elf32_littlearm_vxworks_vec,
+#ifdef BFD64
 	&bfd_elf32_littlemips_vec,
 	&bfd_elf32_littlemips_vxworks_vec,
+#endif
  	&bfd_elf32_littlemoxie_vec,
  	&bfd_elf32_littlenios2_vec,
 	&bfd_elf32_m32c_vec,
@@ -1100,10 +1106,12 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf32_tilegx_be_vec,
 	&bfd_elf32_tilegx_le_vec,
 	&bfd_elf32_tilepro_vec,
+#ifdef BFD64
 	&bfd_elf32_tradbigmips_vec,
 	&bfd_elf32_tradlittlemips_vec,
 	&bfd_elf32_tradbigmips_freebsd_vec,
 	&bfd_elf32_tradlittlemips_freebsd_vec,
+#endif
 	&bfd_elf32_us_cris_vec,
 	&bfd_elf32_v850_vec,
 	&bfd_elf32_v850_rh850_vec,
@@ -1119,6 +1127,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf64_big_generic_vec,
 	&bfd_elf64_bigmips_vec,
 	&bfd_elf64_bigaarch64_vec,
+	&bfd_elf32_bigaarch64_vec,
 	&bfd_elf64_hppa_linux_vec,
 	&bfd_elf64_hppa_vec,
 	&bfd_elf64_ia64_big_vec,
@@ -1128,6 +1137,7 @@ static const bfd_target * const _bfd_target_vector[] =
 	&bfd_elf64_little_generic_vec,
 	&bfd_elf64_littlemips_vec,
 	&bfd_elf64_littleaarch64_vec,
+	&bfd_elf32_littleaarch64_vec,
 	&bfd_elf64_mmix_vec,
 	&bfd_elf64_powerpc_vec,
 	&bfd_elf64_powerpcle_vec,

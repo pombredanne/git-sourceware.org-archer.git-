@@ -1,3 +1,97 @@
+2013-07-04  Alan Modra  <amodra@gmail.com>
+
+	* ppc-opc.c (powerpc_opcodes): Add tdui, twui, tdu, twu, tui, tu.
+
+2013-06-26  Nick Clifton  <nickc@redhat.com>
+
+	* rx-decode.opc (rx_decode_opcode): Check sd field as well as ss
+	field when checking for type 2 nop.
+	* rx-decode.c: Regenerate.
+
+2013-06-25  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* micromips-opc.c (micromips_opcodes): Add "jraddiusp", "jrc"
+	and "movep" macros.
+
+2013-06-24  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* mips-dis.c (is_mips16_plt_tail): New function.
+	(print_insn_mips16): Handle MIPS16 PLT entry's GOT slot address
+	word.
+	(is_compressed_mode_p): Handle MIPS16/microMIPS PLT entries.
+
+2013-06-21  DJ Delorie  <dj@redhat.com>
+
+	* msp430-decode.opc: New.
+	* msp430-decode.c: New/generated.
+	* Makefile.am (TARGET_LIBOPCODES_CFILES): Add msp430-decode.c.
+	(MAINTAINER_CLEANFILES): Likewise.
+	Add rule to build msp430-decode.c frommsp430decode.opc
+        using the opc2c program.
+	* Makefile.in: Regenerate.
+	* configure.in: Add msp430-decode.lo to msp430 architecture files.
+	* configure: Regenerate.
+
+2013-06-20  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* aarch64-dis.c (EMBEDDED_ENV): Remove the check on it.
+	(SYMTAB_AVAILABLE): Removed.
+	(#include "elf/aarch64.h): Ditto.
+
+2013-06-17  Catherine Moore  <clm@codesourcery.com>
+	    Maciej W. Rozycki  <macro@codesourcery.com>
+	    Chao-Ying Fu  <fu@mips.com>
+
+	* micromips-opc.c (EVA): Define.
+	(TLBINV): Define.
+	(micromips_opcodes): Add EVA opcodes.
+	* mips-dis.c (mips_arch_choices): Update for ASE_EVA.
+	(print_insn_args): Handle EVA offsets.
+	(print_insn_micromips): Likewise.
+	* mips-opc.c (EVA): Define.
+	(TLBINV): Define.
+	(mips_builtin_opcodes): Add EVA opcodes.
+
+2013-06-17  Alan Modra  <amodra@gmail.com>
+
+	* Makefile.am (mips-opc.lo): Add rules to create automatic
+	dependency files.  Pass archdefs.
+	(micromips-opc.lo, mips16-opc.lo): Likewise.
+	* Makefile.in: Regenerate.
+
+2013-06-14  DJ Delorie  <dj@redhat.com>
+
+	* rx-decode.opc (rx_decode_opcode): Bit operations on
+	registers are 32-bit operations, not 8-bit operations.
+	* rx-decode.c: Regenerate.
+
+2013-06-13  Chao-ying Fu  <Chao-ying.Fu@imgtec.com>
+
+	* micromips-opc.c (IVIRT): New define.
+	(IVIRT64): New define.
+	(micromips_opcodes): Add dmfgc0, dmtgc0, hypcall, mfgc0, mtgc0,
+ 	tlbginv, tlbginvf, tlbgp, tlbgr, tlbgwi, tlbgwr VIRT instructions.
+
+	* mips-dis.c (print_insn_micromips): Handle mfgc0, mtgc0, dmfgc0,
+	dmtgc0 to print cp0 names.
+
+2013-06-09  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* nios2-opc.c (nios2_builtin_opcodes): Give "trap" a type-"b"
+	argument.
+
+2013-06-08  Catherine Moore  <clm@codesourcery.com>
+	    Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* micromips-opc.c (D32, D33, MC): Update definitions.
+ 	(micromips_opcodes):  Initialize ase field.
+	* mips-dis.c (mips_arch_choice): Add ase field.
+	(mips_arch_choices): Initialize ase field.
+	(set_default_mips_dis_options): Declare and setup mips_ase.
+	* mips-opc.c (M3D, SMT, MX, IVIRT, IVIRT64, D32, D33, D64,
+	MT32, MC): Update definitions.
+	(mips_builtin_opcodes): Initialize ase field.
+
 2013-05-24  Richard Sandiford  <rsandifo@linux.vnet.ibm.com>
 
 	* s390-opc.txt (flogr): Require a register pair destination.

@@ -330,6 +330,10 @@
 #define OP_MASK_IMMY		0
 #define OP_SH_IMMY		0
 
+/* Enhanced VA Scheme */
+#define OP_SH_EVAOFFSET		7
+#define OP_MASK_EVAOFFSET	0x1ff
+
 /* This structure holds information for a particular instruction.  */
 
 struct mips_opcode
@@ -357,6 +361,9 @@ struct mips_opcode
   /* A collection of bits describing the instruction sets of which this
      instruction or macro is a member. */
   unsigned long membership;
+  /* A collection of bits describing the ASE of which this instruction
+     or macro is a member.  */
+  unsigned long ase;
   /* A collection of bits describing the instruction sets of which this
      instruction or macro is not a member.  */
   unsigned long exclusions;
@@ -370,7 +377,7 @@ struct mips_opcode
 
    Each of these characters corresponds to a mask field defined above.
 
-   "1" 5 bit sync type (OP_*_SHAMT)
+   "1" 5 bit sync type (OP_*_STYPE)
    "<" 5 bit shift amount (OP_*_SHAMT)
    ">" shift amount between 32 and 63, stored after subtracting 32 (OP_*_SHAMT)
    "a" 26 bit target address (OP_*_TARGET)
@@ -518,6 +525,9 @@ struct mips_opcode
    "+z" 5-bit rz register (OP_*_RZ)
    "+Z" 5-bit fz register (OP_*_FZ)
 
+   Enhanced VA Scheme:
+   "+j" 9-bit signed offset in bit 7 (OP_*_EVAOFFSET)
+
    Other:
    "()" parens surrounding optional value
    ","  separates operands
@@ -534,7 +544,7 @@ struct mips_opcode
    following), for quick reference when adding more:
    "1234"
    "ABCDEFGHIJPQSTXZ"
-   "abcpstxz"
+   "abcjpstxz"
 */
 
 /* These are the bits which may be set in the pinfo field of an
@@ -730,22 +740,8 @@ static const unsigned int mips_isa_table[] =
 #define INSN_OCTEONP		  0x00000200
 #define INSN_OCTEON2		  0x00000100
 
-/* Masks used for MIPS-defined ASEs.  */
-#define INSN_ASE_MASK		  0x3c00f0d0
-
-/* DSP ASE */ 
-#define INSN_DSP                  0x00001000
-#define INSN_DSP64                0x00002000
-
 /* MIPS R5900 instruction */
 #define INSN_5900                 0x00004000
-
-/* Virtualization ASE */
-#define INSN_VIRT		  0x00000080
-#define INSN_VIRT64		  0x00000040
-
-/* MIPS-3D ASE */
-#define INSN_MIPS3D               0x00008000
 
 /* MIPS R4650 instruction.  */
 #define INSN_4650                 0x00010000
@@ -768,14 +764,6 @@ static const unsigned int mips_isa_table[] =
 /* NEC VR5500 instruction.  */
 #define INSN_5500		  0x02000000
 
-/* MDMX ASE */ 
-#define INSN_MDMX                 0x04000000
-/* MT ASE */
-#define INSN_MT                   0x08000000
-/* SmartMIPS ASE  */
-#define INSN_SMARTMIPS            0x10000000
-/* DSP R2 ASE  */
-#define INSN_DSPR2                0x20000000
 /* ST Microelectronics Loongson 2E.  */
 #define INSN_LOONGSON_2E          0x40000000
 /* ST Microelectronics Loongson 2F.  */
@@ -783,10 +771,28 @@ static const unsigned int mips_isa_table[] =
 /* Loongson 3A.  */
 #define INSN_LOONGSON_3A          0x00000400
 /* RMI Xlr instruction */
-#define INSN_XLR              	  0x00000020
+#define INSN_XLR                 0x00000020
 
+/* DSP ASE */
+#define ASE_DSP			0x00000001
+#define ASE_DSP64		0x00000002
+/* DSP R2 ASE  */
+#define ASE_DSPR2		0x00000004
+/* Enhanced VA Scheme */
+#define ASE_EVA			0x00000008
 /* MCU (MicroController) ASE */
-#define INSN_MCU		  0x00000010
+#define ASE_MCU			0x00000010
+/* MDMX ASE */
+#define ASE_MDMX		0x00000020
+/* MIPS-3D ASE */
+#define ASE_MIPS3D		0x00000040
+/* MT ASE */
+#define ASE_MT			0x00000080
+/* SmartMIPS ASE  */
+#define ASE_SMARTMIPS		0x00000100
+/* Virtualization ASE */
+#define ASE_VIRT		0x00000200
+#define ASE_VIRT64		0x00000400
 
 /* MIPS ISA defines, use instead of hardcoding ISA level.  */
 
@@ -923,7 +929,7 @@ cpu_is_member (int cpu, unsigned int mask)
    if instruction INSN is available to the given ISA and CPU. */
 
 static inline bfd_boolean
-opcode_is_member (const struct mips_opcode *insn, int isa, int cpu)
+opcode_is_member (const struct mips_opcode *insn, int isa, int ase, int cpu)
 {
   if (!cpu_is_member (cpu, insn->exclusions))
     {
@@ -935,7 +941,7 @@ opcode_is_member (const struct mips_opcode *insn, int isa, int cpu)
 	return TRUE;
 
       /* Test for ASE compatibility.  */
-      if (((isa & ~INSN_ISA_MASK) & (insn->membership & ~INSN_ISA_MASK)) != 0)
+      if ((ase & insn->ase) != 0)
 	return TRUE;
 
       /* Test for processor-specific extensions.  */
@@ -1020,6 +1026,8 @@ enum
   M_BNEL_I,
   M_CACHE_AB,
   M_CACHE_OB,
+  M_CACHEE_AB,
+  M_CACHEE_OB,
   M_DABS,
   M_DADD_I,
   M_DADDU_I,
@@ -1056,13 +1064,19 @@ enum
   M_JALS_1,
   M_JALS_2,
   M_JALS_A,
+  M_JRADDIUSP,
+  M_JRC,
   M_L_DOB,
   M_L_DAB,
   M_LA_AB,
   M_LB_A,
   M_LB_AB,
+  M_LBE_OB,
+  M_LBE_AB,
   M_LBU_A,
   M_LBU_AB,
+  M_LBUE_OB,
+  M_LBUE_AB,
   M_LCA_AB,
   M_LD_A,
   M_LD_OB,
@@ -1082,8 +1096,12 @@ enum
   M_LDR_OB,
   M_LH_A,
   M_LH_AB,
+  M_LHE_OB,
+  M_LHE_AB,
   M_LHU_A,
   M_LHU_AB,
+  M_LHUE_OB,
+  M_LHUE_AB,
   M_LI,
   M_LI_D,
   M_LI_DD,
@@ -1093,10 +1111,14 @@ enum
   M_LL_OB,
   M_LLD_AB,
   M_LLD_OB,
+  M_LLE_AB,
+  M_LLE_OB,
   M_LQ_AB,
   M_LS_A,
   M_LW_A,
   M_LW_AB,
+  M_LWE_OB,
+  M_LWE_AB,
   M_LWC0_A,
   M_LWC0_AB,
   M_LWC1_A,
@@ -1109,6 +1131,8 @@ enum
   M_LWL_A,
   M_LWL_AB,
   M_LWL_OB,
+  M_LWLE_AB,
+  M_LWLE_OB,
   M_LWM_AB,
   M_LWM_OB,
   M_LWP_AB,
@@ -1116,6 +1140,8 @@ enum
   M_LWR_A,
   M_LWR_AB,
   M_LWR_OB,
+  M_LWRE_AB,
+  M_LWRE_OB,
   M_LWU_AB,
   M_LWU_OB,
   M_MSGSND,
@@ -1124,6 +1150,7 @@ enum
   M_MSGWAIT,
   M_MSGWAIT_T,
   M_MOVE,
+  M_MOVEP,
   M_MUL,
   M_MUL_I,
   M_MULO,
@@ -1134,6 +1161,8 @@ enum
   M_OR_I,
   M_PREF_AB,
   M_PREF_OB,
+  M_PREFE_AB,
+  M_PREFE_OB,
   M_REM_3,
   M_REM_3I,
   M_REMU_3,
@@ -1158,6 +1187,8 @@ enum
   M_SC_OB,
   M_SCD_AB,
   M_SCD_OB,
+  M_SCE_AB,
+  M_SCE_OB,
   M_SD_A,
   M_SD_OB,
   M_SD_AB,
@@ -1194,11 +1225,17 @@ enum
   M_SNE_I,
   M_SB_A,
   M_SB_AB,
+  M_SBE_OB,
+  M_SBE_AB,
   M_SH_A,
   M_SH_AB,
+  M_SHE_OB,
+  M_SHE_AB,
   M_SQ_AB,
   M_SW_A,
   M_SW_AB,
+  M_SWE_OB,
+  M_SWE_AB,
   M_SWC0_A,
   M_SWC0_AB,
   M_SWC1_A,
@@ -1211,6 +1248,8 @@ enum
   M_SWL_A,
   M_SWL_AB,
   M_SWL_OB,
+  M_SWLE_AB,
+  M_SWLE_OB,
   M_SWM_AB,
   M_SWM_OB,
   M_SWP_AB,
@@ -1218,6 +1257,8 @@ enum
   M_SWR_A,
   M_SWR_AB,
   M_SWR_OB,
+  M_SWRE_AB,
+  M_SWRE_OB,
   M_SUB_I,
   M_SUBU_I,
   M_SUBU_I_2,
@@ -1638,6 +1679,10 @@ extern const int bfd_mips16_num_opcodes;
 #define MICROMIPSOP_SH_FZ		0
 #define MICROMIPSOP_MASK_FZ		0
 
+/* microMIPS Enhanced VA Scheme */
+#define MICROMIPSOP_SH_EVAOFFSET	0
+#define MICROMIPSOP_MASK_EVAOFFSET	0x1ff
+
 /* These are the characters which may appears in the args field of a microMIPS
    instruction.  They appear in the order in which the fields appear
    when the instruction is used.  Commas and parentheses in the args
@@ -1697,7 +1742,7 @@ extern const int bfd_mips16_num_opcodes;
    others too).
 
    "." 10-bit signed offset/number (MICROMIPSOP_*_OFFSET10)
-   "1" 5-bit sync type (MICROMIPSOP_*_SHAMT)
+   "1" 5-bit sync type (MICROMIPSOP_*_STYPE)
    "<" 5-bit shift amount (MICROMIPSOP_*_SHAMT)
    ">" shift amount between 32 and 63, stored after subtracting 32
        (MICROMIPSOP_*_SHAMT)
@@ -1769,9 +1814,9 @@ extern const int bfd_mips16_num_opcodes;
 
    Coprocessor instructions:
    "E" 5-bit target register (MICROMIPSOP_*_RT)
-   "G" 5-bit destination register (MICROMIPSOP_*_RD)
+   "G" 5-bit source register (MICROMIPSOP_*_RS)
    "H" 3-bit sel field for (D)MTC* and (D)MFC* (MICROMIPSOP_*_SEL)
-   "+D" combined destination register ("G") and sel ("H") for CP0 ops,
+   "+D" combined source register ("G") and sel ("H") for CP0 ops,
 	for pretty-printing in disassembly only
 
    Macro instructions:
@@ -1795,6 +1840,9 @@ extern const int bfd_mips16_num_opcodes;
    "@" 10-bit signed immediate (MICROMIPSOP_*_IMM10)
    "^" 5-bit unsigned immediate (MICROMIPSOP_*_RD)
 
+   microMIPS Enhanced VA Scheme:
+   "+j" 9-bit signed offset in bit 0 (OP_*_EVAOFFSET)
+
    Other:
    "()" parens surrounding optional value
    ","  separates operands
@@ -1809,7 +1857,7 @@ extern const int bfd_mips16_num_opcodes;
 
    Extension character sequences used so far ("+" followed by the
    following), for quick reference when adding more:
-   ""
+   "j"
    ""
    "ABCDEFGHI"
    ""

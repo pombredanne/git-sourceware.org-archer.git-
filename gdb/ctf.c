@@ -1212,6 +1212,8 @@ ctf_close (void)
   ctf_destroy ();
   xfree (trace_dirname);
   trace_dirname = NULL;
+
+  trace_reset_local_state ();
 }
 
 /* This is the implementation of target_ops method to_files_info.
@@ -1775,6 +1777,18 @@ ctf_traceframe_info (void)
 
 	  def = bt_ctf_get_field (event, scope, "length");
 	  r->length = (uint16_t) bt_ctf_get_uint64 (def);
+	}
+      else if (strcmp (name, "tsv") == 0)
+	{
+	  int vnum;
+	  const struct bt_definition *scope
+	    = bt_ctf_get_top_level_scope (event,
+					  BT_EVENT_FIELDS);
+	  const struct bt_definition *def;
+
+	  def = bt_ctf_get_field (event, scope, "num");
+	  vnum = (int) bt_ctf_get_int64 (def);
+	  VEC_safe_push (int, info->tvars, vnum);
 	}
       else
 	{

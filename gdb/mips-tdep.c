@@ -343,8 +343,9 @@ make_compact_addr (CORE_ADDR addr)
    "special", i.e. refers to a MIPS16 or microMIPS function, and sets
    one of the "special" bits in a minimal symbol to mark it accordingly.
    The test checks an ELF-private flag that is valid for true function
-   symbols only; in particular synthetic symbols such as for PLT stubs
-   have no ELF-private part at all.
+   symbols only; for synthetic symbols such as for PLT stubs that have
+   no ELF-private part at all the MIPS BFD backend arranges for this
+   information to be carried in the asymbol's udata field instead.
 
    msymbol_is_mips16 and msymbol_is_micromips test the "special" bit
    in a minimal symbol.  */
@@ -353,13 +354,18 @@ static void
 mips_elf_make_msymbol_special (asymbol * sym, struct minimal_symbol *msym)
 {
   elf_symbol_type *elfsym = (elf_symbol_type *) sym;
+  unsigned char st_other;
 
-  if ((sym->flags & BSF_SYNTHETIC) != 0)
+  if ((sym->flags & BSF_SYNTHETIC) == 0)
+    st_other = elfsym->internal_elf_sym.st_other;
+  else if ((sym->flags & BSF_FUNCTION) != 0)
+    st_other = sym->udata.i;
+  else
     return;
 
-  if (ELF_ST_IS_MICROMIPS (elfsym->internal_elf_sym.st_other))
+  if (ELF_ST_IS_MICROMIPS (st_other))
     MSYMBOL_TARGET_FLAG_2 (msym) = 1;
-  else if (ELF_ST_IS_MIPS16 (elfsym->internal_elf_sym.st_other))
+  else if (ELF_ST_IS_MIPS16 (st_other))
     MSYMBOL_TARGET_FLAG_1 (msym) = 1;
 }
 
@@ -2036,7 +2042,8 @@ fetch_mips_16 (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
   gdb_byte buf[8];
-  pc &= 0xfffffffe;		/* Clear the low order bit.  */
+
+  pc = unmake_compact_addr (pc);	/* Clear the low order bit.  */
   target_read_memory (pc, buf, 2);
   return extract_unsigned_integer (buf, 2, byte_order);
 }
@@ -2236,7 +2243,7 @@ mips16_next_pc (struct frame_info *frame, CORE_ADDR pc)
 /* The mips_next_pc function supports single_step when the remote
    target monitor or stub is not developed enough to do a single_step.
    It works by decoding the current instruction and predicting where a
-   branch will go.  This isnt hard because all the data is available.
+   branch will go.  This isn't hard because all the data is available.
    The MIPS32, MIPS16 and microMIPS variants are quite different.  */
 static CORE_ADDR
 mips_next_pc (struct frame_info *frame, CORE_ADDR pc)
@@ -2905,7 +2912,7 @@ micromips_scan_prologue (struct gdbarch *gdbarch,
 	      break;
 
 	    /* LUI $v1 is used for larger $sp adjustments.  */
-	    /* Discard LUI $gp is used for PIC code.  */
+	    /* Discard LUI $gp used for PIC code.  */
 	    case 0x10: /* POOL32I: bits 010000 */
 	      if (b5s5_op (insn >> 16) == 0xd
 				/* LUI: bits 010000 001101 */
@@ -3588,15 +3595,7 @@ mips_stub_frame_sniffer (const struct frame_unwind *self,
   if (target_read_memory (get_frame_pc (this_frame), dummy, 4) != 0)
     return 1;
 
-  if (in_plt_section (pc, NULL))
-    return 1;
-
-  /* Binutils for MIPS puts lazy resolution stubs into .MIPS.stubs.  */
-  s = find_pc_section (pc);
-
-  if (s != NULL
-      && strcmp (bfd_get_section_name (s->objfile->obfd, s->the_bfd_section),
-		 ".MIPS.stubs") == 0)
+  if (in_plt_section (pc) || in_mips_stubs_section (pc))
     return 1;
 
   /* Calling a PIC function from a non-PIC function passes through a

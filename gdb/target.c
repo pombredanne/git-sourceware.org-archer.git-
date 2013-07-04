@@ -153,7 +153,6 @@ static void debug_to_stop (ptid_t);
    array.  */
 struct target_ops **target_structs;
 unsigned target_struct_size;
-unsigned target_struct_index;
 unsigned target_struct_allocsize;
 #define	DEFAULT_ALLOCSIZE	10
 
@@ -3626,30 +3625,6 @@ static int
 return_minus_one (void)
 {
   return -1;
-}
-
-/* Find a single runnable target in the stack and return it.  If for
-   some reason there is more than one, return NULL.  */
-
-struct target_ops *
-find_run_target (void)
-{
-  struct target_ops **t;
-  struct target_ops *runable = NULL;
-  int count;
-
-  count = 0;
-
-  for (t = target_structs; t < target_structs + target_struct_size; ++t)
-    {
-      if ((*t)->to_can_run && target_can_run (*t))
-	{
-	  runable = *t;
-	  ++count;
-	}
-    }
-
-  return (count == 1 ? runable : NULL);
 }
 
 /*

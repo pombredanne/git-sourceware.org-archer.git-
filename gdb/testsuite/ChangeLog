@@ -1,3 +1,483 @@
+2013-07-04  Andrew Burgess  <aburgess@broadcom.com>
+
+	* gdb.dwarf2/dw2-reg-undefined.exp: New file.
+	* gdb.dwarf2/dw2-reg-undefined.c: Likewise.
+	* gdb.dwarf2/dw2-reg-undefined.S: Likewise.
+
+2013-07-02  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/break-on-linker-gcd-function.exp: Replace
+	prepare_for_testing by build_executable_from_specs and clean_restart.
+
+2013-06-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/testenv.exp, gdb.base/tui-layout.exp,
+	gdb.base/twice.exp, gdb.base/type-opaque.exp, gdb.base/unload.exp,
+	gdb.base/unwindonsignal.exp, gdb.base/valgrind-db-attach.exp,
+	gdb.base/valgrind-infcall.exp, gdb.base/value-double-free.exp,
+	gdb.base/varargs.exp, gdb.base/watch-cond-infcall.exp,
+	gdb.base/watch-cond.exp, gdb.base/watch-non-mem.exp,
+	gdb.base/watch-read.exp, gdb.base/watch-vfork.exp,
+	gdb.base/watch_thread_num.exp, gdb.base/watchpoint-cond-gone.exp,
+	gdb.base/watchpoint-delete.exp, gdb.base/watchpoint-hw.exp,
+	gdb.base/watchpoint-solib.exp, gdb.base/watchpoint.exp,
+	gdb.base/watchpoints.exp, gdb.base/wchar.exp, gdb.base/whatis.exp:
+	Use standard_testfile, standard_output_file, prepare_for_testing,
+	clean_restart.
+
+2013-06-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/save-bp.exp, gdb.base/savedregs.exp,
+	gdb.base/scope.exp, gdb.base/sep.exp, gdb.base/sepsymtab.exp,
+	gdb.base/set-lang-auto.exp, gdb.base/setshow.exp,
+	gdb.base/setvar.exp, gdb.base/shlib-call.exp,
+	gdb.base/shreloc.exp, gdb.base/sigall.exp,
+	gdb.base/sigaltstack.exp, gdb.base/sigbpt.exp,
+	gdb.base/sigchld.exp, gdb.base/siginfo-addr.exp,
+	gdb.base/siginfo-infcall.exp, gdb.base/siginfo-obj.exp,
+	gdb.base/siginfo.exp, gdb.base/signals.exp, gdb.base/signest.exp,
+	gdb.base/signull.exp, gdb.base/sigrepeat.exp,
+	gdb.base/sigstep.exp, gdb.base/sizeof.exp,
+	gdb.base/skip-solib.exp, gdb.base/so-impl-ld.exp,
+	gdb.base/solib-display.exp, gdb.base/solib-nodir.exp,
+	gdb.base/solib-overlap.exp, gdb.base/solib-symbol.exp,
+	gdb.base/solib-weak.exp, gdb.base/source.exp,
+	gdb.base/stack-checking.exp, gdb.base/stale-infcall.exp,
+	gdb.base/stap-probe.exp, gdb.base/start.exp,
+	gdb.base/step-break.exp, gdb.base/step-bt.exp,
+	gdb.base/step-line.exp, gdb.base/step-resume-infcall.exp,
+	gdb.base/step-test.exp, gdb.base/structs.exp,
+	gdb.base/structs2.exp, gdb.base/structs3.exp,
+	gdb.base/symbol-without-target_section.exp: Use standard_testfile,
+	standard_output_file, prepare_for_testing, clean_restart.
+
+2013-06-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/nextoverexit.exp, gdb.base/nextoverexit.exp,
+	gdb.base/nodebug.exp, gdb.base/nofield.exp, gdb.base/nostdlib.exp,
+	gdb.base/opaque.exp, gdb.base/overlays.exp, gdb.base/pc-fp.exp,
+	gdb.base/pending.exp, gdb.base/permissions.exp,
+	gdb.base/pie-execl.exp, gdb.base/pointers.exp,
+	gdb.base/pr11022.exp, gdb.base/print-file-var.exp,
+	gdb.base/printcmds.exp, gdb.base/prologue.exp,
+	gdb.base/psymtab.exp, gdb.base/ptr-typedef.exp,
+	gdb.base/ptype.exp, gdb.base/randomize.exp,
+	gdb.base/readline-ask.exp, gdb.base/recpar.exp,
+	gdb.base/recurse.exp, gdb.base/relativedebug.exp,
+	gdb.base/relocate.exp, gdb.base/remote.exp, gdb.base/reread.exp,
+	gdb.base/return-nodebug.exp, gdb.base/return2.exp: Use
+	standard_testfile, standard_output_file, prepare_for_testing,
+	clean_restart.
+
+2013-06-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/hook-stop-continue.exp, gdb.base/hook-stop-frame.exp,
+	gdb.base/huge.exp, gdb.base/included.exp,
+	gdb.base/inferior-died.exp, gdb.base/infnan.exp,
+	gdb.base/info-fun.exp, gdb.base/info-macros.exp,
+	gdb.base/info-os.exp, gdb.base/info-proc.exp,
+	gdb.base/info-target.exp, gdb.base/infoline.exp,
+	gdb.base/interp.exp, gdb.base/interrupt.exp,
+	gdb.base/jit-simple.exp, gdb.base/jit-so.exp, gdb.base/jump.exp,
+	gdb.base/kill-after-signal.exp, gdb.base/label.exp,
+	gdb.base/langs.exp, gdb.base/lineinc.exp, gdb.base/list.exp,
+	gdb.base/logical.exp, gdb.base/long_long.exp,
+	gdb.base/longjmp.exp, gdb.base/macscp.exp, gdb.base/maint.exp,
+	gdb.base/memattr.exp, gdb.base/mips_pro.exp,
+	gdb.base/miscexprs.exp, gdb.base/morestack.exp,
+	gdb.base/moribund-step.exp, gdb.base/multi-forks.exp: Use
+	standard_testfile, standard_output_file, prepare_for_testing,
+	clean_restart.
+
+2013-06-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/ena-dis-br.exp, gdb.base/enum_cond.exp,
+	gdb.base/enumval.exp, gdb.base/environ.exp,
+	gdb.base/eu-strip-infcall.exp, gdb.base/eval-skip.exp,
+	gdb.base/exe-lock.exp, gdb.base/expand-psymtabs.exp,
+	gdb.base/exprs.exp, gdb.base/fileio.exp, gdb.base/find.exp,
+	gdb.base/fixsection.exp, gdb.base/foll-exec.exp,
+	gdb.base/foll-fork.exp, gdb.base/fortran-sym-case.exp,
+	gdb.base/frame-args.exp, gdb.base/freebpcmd.exp,
+	gdb.base/fullname.exp, gdb.base/funcargs.exp,
+	gdb.base/gcore-buffer-overflow.exp, gdb.base/gcore.exp,
+	gdb.base/gdb1090.exp, gdb.base/gdb11530.exp,
+	gdb.base/gdb11531.exp, gdb.base/gdb1250.exp, gdb.base/gdb1555.exp,
+	gdb.base/gdb1821.exp, gdb.base/gdbindex-stabs.exp,
+	gdb.base/gdbvars.exp, gdb.base/gnu-ifunc.exp,
+	gdb.base/gnu_vector.exp: Use standard_testfile,
+	standard_output_file, prepare_for_testing, clean_restart.
+
+2013-06-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/call-ar-st.exp, gdb.base/call-rt-st.exp,
+	gdb.base/call-sc.exp, gdb.base/call-signal-resume.exp,
+	gdb.base/call-strs.exp, gdb.base/callexit.exp,
+	gdb.base/callfuncs.exp, gdb.base/catch-load.exp,
+	gdb.base/catch-syscall.exp, gdb.base/charset.exp,
+	gdb.base/checkpoint.exp, gdb.base/chng-syms.exp,
+	gdb.base/code-expr.exp, gdb.base/code_elim.exp,
+	gdb.base/commands.exp, gdb.base/completion.exp,
+	gdb.base/complex.exp, gdb.base/cond-expr.exp,
+	gdb.base/condbreak.exp, gdb.base/consecutive.exp,
+	gdb.base/constvars.exp, gdb.base/corefile.exp,
+	gdb.base/ctxobj.exp, gdb.base/cursal.exp, gdb.base/cvexpr.exp,
+	gdb.base/dbx.exp, gdb.base/default.exp, gdb.base/define.exp,
+	gdb.base/del.exp, gdb.base/detach.exp, gdb.base/dfp-test.exp,
+	gdb.base/display.exp, gdb.base/dmsym.exp, gdb.base/dump.exp,
+	gdb.base/dup-sect.exp: Use standard_testfile,
+	standard_output_file, prepare_for_testing, clean_restart.
+
+2013-06-27  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/a2-run.exp, gdb.base/all-bin.exp, gdb.base/annota1.exp,
+	gdb.base/annota3.exp, gdb.base/anon.exp, gdb.base/args.exp,
+	gdb.base/arithmet.exp, gdb.base/arrayidx.exp, gdb.base/assign.exp,
+	gdb.base/async-shell.exp, gdb.base/async.exp,
+	gdb.base/attach-pie-misread.exp, gdb.base/attach-pie-noexec.exp,
+	gdb.base/attach-twice.exp, gdb.base/attach.exp, gdb.base/auxv.exp,
+	gdb.base/bang.exp, gdb.base/bfp-test.exp, gdb.base/bigcore.exp,
+	gdb.base/bitfields.exp, gdb.base/bitfields2.exp,
+	gdb.base/break-entry.exp, gdb.base/break-interp.exp,
+	gdb.base/break-on-linker-gcd-function.exp,
+	gdb.base/breakpoint-shadow.exp: Use standard_testfile,
+	standard_output_file, prepare_for_testing, clean_restart.
+
+2013-06-26  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/mi-trace-frame-collected.exp: New.
+
+2013-06-25  Yao Qi  <yao@codesourcery.com>
+
+	* boards/native-extended-gdbserver.exp: Set board_info
+	'gdb,predefined_tsv'.
+	* boards/native-gdbserver.exp: Likewise.
+	* boards/native-stdio-gdbserver.exp: Likewise.
+	* gdb.server/ext-attach.exp: Load trace-support.exp.  Check
+	uploaded TSVs if target supports tracing.
+	* gdb.trace/tsv.exp: Check uploaded TSVs if target supports
+	tracing and target has predefined tsv.
+
+2013-06-25  Yao Qi  <yao@codesourcery.com>
+	    Hui Zhu  <hui@codesourcery.com>
+	    Pedro Alves  <palves@redhat.com>
+
+	PR breakpoints/15075
+	PR breakpoints/15434
+	* gdb.base/dprintf-next.c: New file.
+	* gdb.base/dprintf-next.exp: New file.
+	* gdb.base/dprintf-non-stop.c: New file.
+	* gdb.base/dprintf-non-stop.exp: New file.
+	* gdb.base/dprintf.exp: Don't check "continue" in the output
+	of "info breakpoints".
+	* gdb.mi/mi-breakpoint-changed.exp (test_insert_delete_modify):
+	Don't check "continue" in script field.
+
+2013-06-21  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.trace/actions.exp (check_tracepoint): Don't use a full file
+	name in a test name.
+
+2013-06-20  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/mi-trace-unavailable.exp: Set tracepoint on 'foo'
+	and set an action.
+	(test_trace_unavailable): Test command -data-list-register-values
+	in the context of traceframe and with option --skip-unavailable.
+	* gdb.trace/trace-unavailable.c (foo): New.
+	(main): Call it.
+	* gdb.mi/gdb2549.exp: Update matching pattern.
+
+2013-06-19  Mike Frysinger  <vapier@gentoo.org>
+
+	* gdb.arch/i386-avx.c (have_avx): Change __get_cpuid call to i386_cpuid.
+	* gdb.arch/i386-avx.exp (additional_flags): Add -I${srcdir}/../common.
+	* gdb.arch/i386-cpuid.h: Moved to ../common/i386-gcc-cpuid.h.
+	* gdb.arch/i386-sse.c: Call new i386_cpuid function.
+	* gdb.arch/i386-see.exp (additional_flags): Add -I${srcdir}/../common.
+
+2013-06-19  Luis Machado  <lgustavo@codesourcery.com>
+
+	* gdb.base/subst.exp: Delete default rules before further
+	tests.
+
+2013-06-19  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.base/maint.exp: Make the test to command 'maint dump-me'
+	unsupported if it is not registered.
+
+2013-06-18  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/random-signal.c: New file.
+	* gdb.base/random-signal.exp: New file.
+
+2013-06-18  Will Newton  <will.newton@linaro.org>
+
+	* gdb.base/skip.c: Use comma to evaluate results of foo()
+	and bar() before passing to baz().
+	* gdb.base/skip.c: baz() now takes one argument instead of
+	two.
+
+2013-06-18  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.dwarf2/implptrpiece.exp: New file.
+	* gdb.dwarf2/implptrconst.exp (d): New variable.
+	Print d.
+	* lib/dwarf2.exp (Dwarf::_location): Handle DW_OP_piece.
+
+2013-06-18  Tom Tromey  <tromey@redhat.com>
+
+	* lib/selftest-support.exp (do_self_tests): Reject remote or
+	non-native targets.
+	* gdb.gdb/complaints.exp: Remove check.
+	* gdb.gdb/observer.exp: Remove check.
+	* gdb.gdb/xfullpath.exp: Remove check.
+	* gdb.gdb/complaints.exp: Remove check.
+
+2013-06-07  Pedro Alves  <palves@redhat.com>
+
+	* boards/native-extended-gdbserver.exp: Remove semicolon.
+	* config/arm-ice.exp: Likewise.
+	* config/bfin.exp: Likewise.
+	* config/cygmon.exp: Likewise.
+	* config/h8300.exp: Likewise.
+	* config/monitor.exp: Likewise.
+	* config/sid.exp: Likewise.
+	* config/sim.exp: Likewise.
+	* config/slite.exp: Likewise.
+	* config/vx.exp: Likewise.
+	* gdb.arch/i386-bp_permanent.exp: Likewise.
+	* gdb.asm/asm-source.exp: Likewise.
+	* gdb.base/args.exp: Likewise.
+	* gdb.base/attach-pie-misread.exp: Likewise.
+	* gdb.base/auxv.exp: Likewise.
+	* gdb.base/bigcore.exp: Likewise.
+	* gdb.base/bitfields2.exp: Likewise.
+	* gdb.base/bitfields.exp: Likewise.
+	* gdb.base/break.exp: Likewise.
+	* gdb.base/break-interp.exp: Likewise.
+	* gdb.base/callfuncs.exp: Likewise.
+	* gdb.base/call-sc.exp: Likewise.
+	* gdb.base/commands.exp: Likewise.
+	* gdb.base/corefile.exp: Likewise.
+	* gdb.base/dbx.exp: Likewise.
+	* gdb.base/ending-run.exp: Likewise.
+	* gdb.base/exprs.exp: Likewise.
+	* gdb.base/funcargs.exp: Likewise.
+	* gdb.base/hbreak2.exp: Likewise.
+	* gdb.base/huge.exp: Likewise.
+	* gdb.base/list.exp: Likewise.
+	* gdb.base/memattr.exp: Likewise.
+	* gdb.base/overlays.exp: Likewise.
+	* gdb.base/printcmds.exp: Likewise.
+	* gdb.base/recurse.exp: Likewise.
+	* gdb.base/remotetimeout.exp: Likewise.
+	* gdb.base/reread.exp: Likewise.
+	* gdb.base/savedregs.exp: Likewise.
+	* gdb.base/scope.exp: Likewise.
+	* gdb.base/sepdebug.exp: Likewise.
+	* gdb.base/setshow.exp: Likewise.
+	* gdb.base/setvar.exp: Likewise.
+	* gdb.base/sigaltstack.exp: Likewise.
+	* gdb.base/siginfo-addr.exp: Likewise.
+	* gdb.base/siginfo.exp: Likewise.
+	* gdb.base/siginfo-obj.exp: Likewise.
+	* gdb.base/sigrepeat.exp: Likewise.
+	* gdb.base/sigstep.exp: Likewise.
+	* gdb.base/structs.exp: Likewise.
+	* gdb.base/testenv.exp: Likewise.
+	* gdb.base/twice.exp: Likewise.
+	* gdb.base/valgrind-db-attach.exp: Likewise.
+	* gdb.base/valgrind-infcall.exp: Likewise.
+	* gdb.base/varargs.exp: Likewise.
+	* gdb.base/watchpoint.exp: Likewise.
+	* gdb.cp/gdb1355.exp: Likewise.
+	* gdb.cp/misc.exp: Likewise.
+	* gdb.disasm/hppa.exp: Likewise.
+	* gdb.disasm/t01_mov.exp: Likewise.
+	* gdb.disasm/t02_mova.exp: Likewise.
+	* gdb.disasm/t03_add.exp: Likewise.
+	* gdb.disasm/t04_sub.exp: Likewise.
+	* gdb.disasm/t05_cmp.exp: Likewise.
+	* gdb.disasm/t06_ari2.exp: Likewise.
+	* gdb.disasm/t07_ari3.exp: Likewise.
+	* gdb.disasm/t08_or.exp: Likewise.
+	* gdb.disasm/t09_xor.exp: Likewise.
+	* gdb.disasm/t10_and.exp: Likewise.
+	* gdb.disasm/t11_logs.exp: Likewise.
+	* gdb.disasm/t12_bit.exp: Likewise.
+	* gdb.disasm/t13_otr.exp: Likewise.
+	* gdb.gdb/selftest.exp: Likewise.
+	* gdb.hp/gdb.base-hp/callfwmall.exp: Likewise.
+	* gdb.mi/mi-reverse.exp: Likewise.
+	* gdb.pascal/floats.exp: Likewise.
+	* gdb.python/py-inferior.exp: Likewise.
+	* gdb.threads/attach-into-signal.exp: Likewise.
+	* gdb.threads/pthreads.exp: Likewise.
+	* gdb.threads/thread_events.exp: Likewise.
+	* gdb.threads/watchthreads.exp: Likewise.
+	* gdb.trace/actions-changed.exp: Likewise.
+	* gdb.trace/actions.exp: Likewise.
+	* gdb.trace/ax.exp: Likewise.
+	* gdb.trace/backtrace.exp: Likewise.
+	* gdb.trace/change-loc.exp: Likewise.
+	* gdb.trace/deltrace.exp: Likewise.
+	* gdb.trace/disconnected-tracing.exp: Likewise.
+	* gdb.trace/ftrace.exp: Likewise.
+	* gdb.trace/infotrace.exp: Likewise.
+	* gdb.trace/passc-dyn.exp: Likewise.
+	* gdb.trace/passcount.exp: Likewise.
+	* gdb.trace/pending.exp: Likewise.
+	* gdb.trace/qtro.exp: Likewise.
+	* gdb.trace/range-stepping.exp: Likewise.
+	* gdb.trace/report.exp: Likewise.
+	* gdb.trace/save-trace.exp: Likewise.
+	* gdb.trace/status-stop.exp: Likewise.
+	* gdb.trace/strace.exp: Likewise.
+	* gdb.trace/tfile.exp: Likewise.
+	* gdb.trace/tfind.exp: Likewise.
+	* gdb.trace/trace-break.exp: Likewise.
+	* gdb.trace/tracecmd.exp: Likewise.
+	* gdb.trace/trace-mt.exp: Likewise.
+	* gdb.trace/tspeed.exp: Likewise.
+	* gdb.trace/tsv.exp: Likewise.
+	* gdb.trace/while-stepping.exp: Likewise.
+	* lib/gdb.exp: Likewise.
+	* lib/gdbserver-support.exp: Likewise.
+	* lib/java.exp: Likewise.
+	* lib/mi-support.exp: Likewise.
+	* lib/pascal.exp: Likewise.
+	* lib/prompt.exp: Likewise.
+	* lib/trace-support.exp: Likewise.
+
+2013-06-07  Pedro Alves  <palves@redhat.com>
+
+	* gdb.ada/info_types.c: Fix formating in copyright header.
+	* gdb.base/break-on-linker-gcd-function.cc: Likewise.
+	* gdb.base/float.c: Likewise.
+	* gdb.base/inferior-died.c: Likewise.
+	* gdb.base/interp.c: Likewise.
+	* gdb.base/jit-main.c: Likewise.
+	* gdb.base/jit-solib.c: Likewise.
+	* gdb.base/long_long.c: Likewise.
+	* gdb.base/longjmp.c: Likewise.
+	* gdb.base/nextoverexit.c: Likewise.
+	* gdb.base/pr11022.c: Likewise.
+	* gdb.base/prelink-lib.c: Likewise.
+	* gdb.base/prelink.c: Likewise.
+	* gdb.base/prologue.c: Likewise.
+	* gdb.base/restore.c: Likewise.
+	* gdb.base/sigchld.c: Likewise.
+	* gdb.base/solib-search-lib1.c: Likewise.
+	* gdb.base/solib-search-lib2.c: Likewise.
+	* gdb.base/solib-search.c: Likewise.
+	* gdb.base/solib-search.h: Likewise.
+	* gdb.base/whatis.c: Likewise.
+	* gdb.cp/abstract-origin.cc: Likewise.
+	* gdb.cp/anon-struct.cc: Likewise.
+	* gdb.cp/baseenum.cc: Likewise.
+	* gdb.cp/bs15503.cc: Likewise.
+	* gdb.cp/call-c-1.c: Likewise.
+	* gdb.cp/call-c.cc: Likewise.
+	* gdb.cp/class2.cc: Likewise.
+	* gdb.cp/classes.cc: Likewise.
+	* gdb.cp/cttiadd.cc: Likewise.
+	* gdb.cp/cttiadd1.cc: Likewise.
+	* gdb.cp/cttiadd2.cc: Likewise.
+	* gdb.cp/cttiadd3.cc: Likewise.
+	* gdb.cp/derivation.cc: Likewise.
+	* gdb.cp/derivation2.cc: Likewise.
+	* gdb.cp/dispcxx.cc: Likewise.
+	* gdb.cp/exception.cc: Likewise.
+	* gdb.cp/gdb2384-base.cc: Likewise.
+	* gdb.cp/gdb2384-base.h: Likewise.
+	* gdb.cp/gdb2384.cc: Likewise.
+	* gdb.cp/gdb2495.cc: Likewise.
+	* gdb.cp/mb-inline.h: Likewise.
+	* gdb.cp/mb-inline1.cc: Likewise.
+	* gdb.cp/mb-inline2.cc: Likewise.
+	* gdb.cp/member-name.cc: Likewise.
+	* gdb.cp/member-ptr.cc: Likewise.
+	* gdb.cp/misc.cc: Likewise.
+	* gdb.cp/namespace1.cc: Likewise.
+	* gdb.cp/nextoverthrow.cc: Likewise.
+	* gdb.cp/pr-574.cc: Likewise.
+	* gdb.cp/pr9631.cc: Likewise.
+	* gdb.cp/printmethod.cc: Likewise.
+	* gdb.cp/psmang1.cc: Likewise.
+	* gdb.cp/psmang2.cc: Likewise.
+	* gdb.cp/psymtab-parameter.cc: Likewise.
+	* gdb.cp/ptype-flags.cc: Likewise.
+	* gdb.cp/ref-params.cc: Likewise.
+	* gdb.cp/ref-types.cc: Likewise.
+	* gdb.cp/smartp.cc: Likewise.
+	* gdb.cp/try_catch.cc: Likewise.
+	* gdb.cp/userdef.cc: Likewise.
+	* gdb.cp/using-crash.cc: Likewise.
+	* gdb.cp/virtfunc.cc: Likewise.
+	* gdb.cp/virtfunc2.cc: Likewise.
+	* gdb.dwarf2/callframecfa.S: Likewise.
+	* gdb.dwarf2/dw2-ranges.c: Likewise.
+	* gdb.dwarf2/dw2-ranges2.c: Likewise.
+	* gdb.dwarf2/dw2-ranges3.c: Likewise.
+	* gdb.dwarf2/dw2-restore.S: Likewise.
+	* gdb.dwarf2/pieces.S: Likewise.
+	* gdb.dwarf2/valop.S: Likewise.
+	* gdb.java/jnpe.java: Likewise.
+	* gdb.mi/mi-stepn.c: Likewise.
+	* gdb.mi/mi-var-cp.cc: Likewise.
+	* gdb.mi/mi-var-rtti.cc: Likewise.
+	* gdb.mi/ns-stale-regcache.c: Likewise.
+	* gdb.mi/pr11022.c: Likewise.
+	* gdb.mi/solib-lib.c: Likewise.
+	* gdb.mi/solib-main.c: Likewise.
+	* gdb.python/py-arch.c: Likewise.
+	* gdb.python/py-block.c: Likewise.
+	* gdb.python/py-breakpoint.c: Likewise.
+	* gdb.python/py-events.c: Likewise.
+	* gdb.python/py-evthreads.c: Likewise.
+	* gdb.python/py-explore.c: Likewise.
+	* gdb.python/py-explore.cc: Likewise.
+	* gdb.python/py-finish-breakpoint.c: Likewise.
+	* gdb.python/py-finish-breakpoint2.cc: Likewise.
+	* gdb.python/py-symbol.c: Likewise.
+	* gdb.threads/execl.c: Likewise.
+	* gdb.threads/execl1.c: Likewise.
+
+2013-06-07  Will Newton  <will.newton@linaro.org>
+
+	* gdb.base/long_long.exp: Fix ARM EABI target glob.
+
+2013-06-07  Will Newton  <will.newton@linaro.org>
+
+	* gdb.cp/annota2.exp: Add empty line between "post-prompt"
+	and "starting".
+
+2013-06-07  Will Newton  <will.newton@linaro.org>
+
+	* gdb.cp/anon-struct.exp: Conditionalize constructor and
+	destructor prototypes for ARM ABI.
+	* gdb.cp/m-static.exp: Likewise.
+
+2013-06-07  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.trace/mi-trace-unavailable.exp: New.
+	* gdb.trace/trace-unavailable.c: New.
+
+2013-06-06  Doug Evans  <dje@google.com>
+
+	* gdb.cp/derivation.exp: Make tests have unique names.
+
+2013-06-06  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/dump.exp (capture_value): Don't put expression into
+	test name if arguments passed in.
+	Rename a couple more tests to make them unique.
+
+2013-06-06  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.base/break-always.exp: Explicitly specify test name.
+
 2013-06-05  Doug Evans  <dje@google.com>
 	    Keith Seitz  <keiths@redhat.com>
 

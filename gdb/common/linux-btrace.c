@@ -31,6 +31,7 @@
 #include "regcache.h"
 #include "gdbthread.h"
 #include "gdb_wait.h"
+#include "i386-cpuid.h"
 
 #if HAVE_LINUX_PERF_EVENT_H
 
@@ -339,13 +340,10 @@ kernel_supports_btrace (void)
 static int
 intel_supports_btrace (void)
 {
-#if defined __i386__ || defined __x86_64__
   unsigned int cpuid, model, family;
 
-  __asm__ __volatile__ ("movl   $1, %%eax;"
-			"cpuid;"
-			: "=a" (cpuid)
-			:: "%ebx", "%ecx", "%edx");
+  if (!i386_cpuid (1, &cpuid, NULL, NULL, NULL))
+    return 0;
 
   family = (cpuid >> 8) & 0xf;
   model = (cpuid >> 4) & 0xf;
@@ -376,12 +374,6 @@ intel_supports_btrace (void)
     }
 
   return 1;
-
-#else /* !defined __i386__ && !defined __x86_64__ */
-
-  return 0;
-
-#endif /* !defined __i386__ && !defined __x86_64__ */
 }
 
 /* Check whether the cpu supports branch tracing.  */
@@ -389,35 +381,17 @@ intel_supports_btrace (void)
 static int
 cpu_supports_btrace (void)
 {
-#if defined __i386__ || defined __x86_64__
-  char vendor[13];
+  unsigned int ebx, ecx, edx;
 
-  __asm__ __volatile__ ("xorl   %%ebx, %%ebx;"
-			"xorl   %%ecx, %%ecx;"
-			"xorl   %%edx, %%edx;"
-			"movl   $0,    %%eax;"
-			"cpuid;"
-			"movl   %%ebx,  %0;"
-			"movl   %%edx,  %1;"
-			"movl   %%ecx,  %2;"
-			: "=m" (vendor[0]),
-			  "=m" (vendor[4]),
-			  "=m" (vendor[8])
-			:
-			: "%eax", "%ebx", "%ecx", "%edx");
-  vendor[12] = '\0';
+  if (!i386_cpuid (0, NULL, &ebx, &ecx, &edx))
+    return 0;
 
-  if (strcmp (vendor, "GenuineIntel") == 0)
+  if (ebx == signature_INTEL_ebx && ecx == signature_INTEL_ecx
+      && edx == signature_INTEL_edx)
     return intel_supports_btrace ();
 
   /* Don't know about others.  Let's assume they do.  */
   return 1;
-
-#else /* !defined __i386__ && !defined __x86_64__ */
-
-  return 0;
-
-#endif /* !defined __i386__ && !defined __x86_64__ */
 }
 
 /* See linux-btrace.h.  */

@@ -181,63 +181,36 @@ set_disable_randomization (char *args, int from_tty,
 	     "this platform."));
 }
 
+/* User interface for non-stop mode.  */
 
-/* If the program uses ELF-style shared libraries, then calls to
-   functions in shared libraries go through stubs, which live in a
-   table called the PLT (Procedure Linkage Table).  The first time the
-   function is called, the stub sends control to the dynamic linker,
-   which looks up the function's real address, patches the stub so
-   that future calls will go directly to the function, and then passes
-   control to the function.
+int non_stop = 0;
+static int non_stop_1 = 0;
 
-   If we are stepping at the source level, we don't want to see any of
-   this --- we just want to skip over the stub and the dynamic linker.
-   The simple approach is to single-step until control leaves the
-   dynamic linker.
+static void
+set_non_stop (char *args, int from_tty,
+	      struct cmd_list_element *c)
+{
+  if (target_has_execution)
+    {
+      non_stop_1 = non_stop;
+      error (_("Cannot change this setting while the inferior is running."));
+    }
 
-   However, on some systems (e.g., Red Hat's 5.2 distribution) the
-   dynamic linker calls functions in the shared C library, so you
-   can't tell from the PC alone whether the dynamic linker is still
-   running.  In this case, we use a step-resume breakpoint to get us
-   past the dynamic linker, as if we were using "next" to step over a
-   function call.
+  non_stop = non_stop_1;
+}
 
-   in_solib_dynsym_resolve_code() says whether we're in the dynamic
-   linker code or not.  Normally, this means we single-step.  However,
-   if SKIP_SOLIB_RESOLVER then returns non-zero, then its value is an
-   address where we can place a step-resume breakpoint to get past the
-   linker's symbol resolution function.
-
-   in_solib_dynsym_resolve_code() can generally be implemented in a
-   pretty portable way, by comparing the PC against the address ranges
-   of the dynamic linker's sections.
-
-   SKIP_SOLIB_RESOLVER is generally going to be system-specific, since
-   it depends on internal details of the dynamic linker.  It's usually
-   not too hard to figure out where to put a breakpoint, but it
-   certainly isn't portable.  SKIP_SOLIB_RESOLVER should do plenty of
-   sanity checking.  If it can't figure things out, returning zero and
-   getting the (possibly confusing) stepping behavior is better than
-   signalling an error, which will obscure the change in the
-   inferior's state.  */
-
-/* This function returns TRUE if pc is the address of an instruction
-   that lies within the dynamic linker (such as the event hook, or the
-   dld itself).
-
-   This function must be used only when a dynamic linker event has
-   been caught, and the inferior is being stepped out of the hook, or
-   undefined results are guaranteed.  */
-
-#ifndef SOLIB_IN_DYNAMIC_LINKER
-#define SOLIB_IN_DYNAMIC_LINKER(pid,pc) 0
-#endif
+static void
+show_non_stop (struct ui_file *file, int from_tty,
+	       struct cmd_list_element *c, const char *value)
+{
+  fprintf_filtered (file,
+		    _("Controlling the inferior in non-stop mode is %s.\n"),
+		    value);
+}
 
 /* "Observer mode" is somewhat like a more extreme version of
    non-stop, in which all GDB operations that might affect the
    target's execution have been disabled.  */
-
-static int non_stop_1 = 0;
 
 int observer_mode = 0;
 static int observer_mode_1 = 0;
@@ -246,8 +219,6 @@ static void
 set_observer_mode (char *args, int from_tty,
 		   struct cmd_list_element *c)
 {
-  extern int pagination_enabled;
-
   if (target_has_execution)
     {
       observer_mode_1 = observer_mode;
@@ -3124,7 +3095,8 @@ handle_syscall_event (struct execution_control_state *ecs)
 	= bpstat_stop_status (get_regcache_aspace (regcache),
 			      stop_pc, ecs->ptid, &ecs->ws);
 
-      sval = bpstat_explains_signal (ecs->event_thread->control.stop_bpstat);
+      sval = bpstat_explains_signal (ecs->event_thread->control.stop_bpstat,
+				     GDB_SIGNAL_TRAP);
       ecs->random_signal = sval == BPSTAT_SIGNAL_NO;
 
       if (!ecs->random_signal)
@@ -3374,7 +3346,8 @@ handle_inferior_event (struct execution_control_state *ecs)
 				  stop_pc, ecs->ptid, &ecs->ws);
 
 	  sval
-	    = bpstat_explains_signal (ecs->event_thread->control.stop_bpstat);
+	    = bpstat_explains_signal (ecs->event_thread->control.stop_bpstat,
+				      GDB_SIGNAL_TRAP);
 	  ecs->random_signal = sval == BPSTAT_SIGNAL_NO;
 
 	  if (!ecs->random_signal)
@@ -3673,7 +3646,8 @@ handle_inferior_event (struct execution_control_state *ecs)
 	= bpstat_stop_status (get_regcache_aspace (get_current_regcache ()),
 			      stop_pc, ecs->ptid, &ecs->ws);
       ecs->random_signal
-	= (bpstat_explains_signal (ecs->event_thread->control.stop_bpstat)
+	= (bpstat_explains_signal (ecs->event_thread->control.stop_bpstat,
+				   GDB_SIGNAL_TRAP)
 	   == BPSTAT_SIGNAL_NO);
 
       /* Note that this may be referenced from inside
@@ -4248,7 +4222,8 @@ handle_inferior_event (struct execution_control_state *ecs)
 
   if (debug_infrun
       && ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP
-      && (bpstat_explains_signal (ecs->event_thread->control.stop_bpstat)
+      && (bpstat_explains_signal (ecs->event_thread->control.stop_bpstat,
+				  GDB_SIGNAL_TRAP)
 	  == BPSTAT_SIGNAL_NO)
       && stopped_by_watchpoint)
     fprintf_unfiltered (gdb_stdlog,
@@ -4277,7 +4252,8 @@ handle_inferior_event (struct execution_control_state *ecs)
 
   if (ecs->event_thread->suspend.stop_signal == GDB_SIGNAL_TRAP)
     ecs->random_signal
-      = !((bpstat_explains_signal (ecs->event_thread->control.stop_bpstat)
+      = !((bpstat_explains_signal (ecs->event_thread->control.stop_bpstat,
+				   GDB_SIGNAL_TRAP)
 	   != BPSTAT_SIGNAL_NO)
 	  || stopped_by_watchpoint
 	  || ecs->event_thread->control.trap_expected
@@ -4288,7 +4264,8 @@ handle_inferior_event (struct execution_control_state *ecs)
     {
       enum bpstat_signal_value sval;
 
-      sval = bpstat_explains_signal (ecs->event_thread->control.stop_bpstat);
+      sval = bpstat_explains_signal (ecs->event_thread->control.stop_bpstat,
+				     ecs->event_thread->suspend.stop_signal);
       ecs->random_signal = (sval == BPSTAT_SIGNAL_NO);
 
       if (sval == BPSTAT_SIGNAL_HIDE)
@@ -7129,32 +7106,6 @@ show_exec_direction_func (struct ui_file *out, int from_tty,
 		    _("bogus execution_direction value: %d"),
 		    (int) execution_direction);
   }
-}
-
-/* User interface for non-stop mode.  */
-
-int non_stop = 0;
-
-static void
-set_non_stop (char *args, int from_tty,
-	      struct cmd_list_element *c)
-{
-  if (target_has_execution)
-    {
-      non_stop_1 = non_stop;
-      error (_("Cannot change this setting while the inferior is running."));
-    }
-
-  non_stop = non_stop_1;
-}
-
-static void
-show_non_stop (struct ui_file *file, int from_tty,
-	       struct cmd_list_element *c, const char *value)
-{
-  fprintf_filtered (file,
-		    _("Controlling the inferior in non-stop mode is %s.\n"),
-		    value);
 }
 
 static void

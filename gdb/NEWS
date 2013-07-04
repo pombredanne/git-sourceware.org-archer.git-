@@ -11,6 +11,7 @@
 
 Nios II ELF 			nios2*-*-elf
 Nios II GNU/Linux		nios2*-*-linux
+Texas Instruments MSP430	msp430*-*-elf
 
 * New commands:
 catch rethrow
@@ -76,6 +77,13 @@ show range-stepping
 
   ** The new command -dprintf-insert sets a dynamic printf breakpoint.
 
+  ** The command -data-list-register-values now accepts an optional
+     "--skip-unavailable" option.  When used, only the available registers
+     are displayed.
+
+  ** The new command -trace-frame-collected dumps collected variables,
+     computed expressions, tvars, memory and registers in a traceframe.
+
 * New system-wide configuration scripts
   A GDB installation now provides scripts suitable for use as system-wide
   configuration scripts for the following systems:
@@ -86,6 +94,9 @@ show range-stepping
   This improves the performance of stepping source lines by reducing
   the number of control packets from/to GDB.  See "New remote packets"
   below.
+
+* GDB now understands the element 'tvar' in the XML traceframe info.
+  It has the id of the collected trace state variables.
 
 * New remote packets
 
@@ -107,6 +118,10 @@ qXfer:libraries-svr4:read's annex
 
   ** GDBserver now supports target-assisted range stepping.  Currently
      enabled on x86/x86_64 GNU/Linux targets.
+
+  ** GDBserver now adds element 'tvar' in the XML in the reply to
+     'qXfer:traceframe-info:read'.  It has the id of the collected
+     trace state variables.
 
 *** Changes in GDB 7.6
 

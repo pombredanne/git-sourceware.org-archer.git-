@@ -119,7 +119,6 @@ static void create_sals_from_address_default (char **,
 
 static void create_breakpoints_sal_default (struct gdbarch *,
 					    struct linespec_result *,
-					    struct linespec_sals *,
 					    char *, char *, enum bptype,
 					    enum bpdisp, int, int,
 					    int,
@@ -4153,7 +4152,7 @@ bpstat_find_breakpoint (bpstat bsp, struct breakpoint *breakpoint)
 /* See breakpoint.h.  */
 
 enum bpstat_signal_value
-bpstat_explains_signal (bpstat bsp)
+bpstat_explains_signal (bpstat bsp, enum gdb_signal sig)
 {
   enum bpstat_signal_value result = BPSTAT_SIGNAL_NO;
 
@@ -4161,10 +4160,20 @@ bpstat_explains_signal (bpstat bsp)
     {
       /* Ensure that, if we ever entered this loop, then we at least
 	 return BPSTAT_SIGNAL_HIDE.  */
-      enum bpstat_signal_value newval = BPSTAT_SIGNAL_HIDE;
+      enum bpstat_signal_value newval;
 
-      if (bsp->breakpoint_at != NULL)
-	newval = bsp->breakpoint_at->ops->explains_signal (bsp->breakpoint_at);
+      if (bsp->breakpoint_at == NULL)
+	{
+	  /* A moribund location can never explain a signal other than
+	     GDB_SIGNAL_TRAP.  */
+	  if (sig == GDB_SIGNAL_TRAP)
+	    newval = BPSTAT_SIGNAL_HIDE;
+	  else
+	    newval = BPSTAT_SIGNAL_NO;
+	}
+      else
+	newval = bsp->breakpoint_at->ops->explains_signal (bsp->breakpoint_at,
+							   sig);
 
       if (newval > result)
 	result = newval;
@@ -5299,6 +5308,8 @@ bpstat_stop_status (struct address_space *aspace,
 	      if (command_line_is_silent (bs->commands
 					  ? bs->commands->commands : NULL))
 		bs->print = 0;
+
+	      b->ops->after_condition_true (bs);
 	    }
 
 	}
@@ -5787,8 +5798,6 @@ bptype_string (enum bptype type)
 
   return bptypes[(int) type].description;
 }
-
-DEF_VEC_I(int);
 
 /* For MI, output a field named 'thread-groups' with a list as the value.
    For CLI, prefix the list with the string 'inf'. */
@@ -8934,25 +8943,16 @@ update_dprintf_command_list (struct breakpoint *b)
 		    _("Invalid dprintf style."));
 
   gdb_assert (printf_line != NULL);
-  /* Manufacture a printf/continue sequence.  */
+  /* Manufacture a printf sequence.  */
   {
-    struct command_line *printf_cmd_line, *cont_cmd_line = NULL;
-
-    if (strcmp (dprintf_style, dprintf_style_agent) != 0)
-      {
-	cont_cmd_line = xmalloc (sizeof (struct command_line));
-	cont_cmd_line->control_type = simple_control;
-	cont_cmd_line->body_count = 0;
-	cont_cmd_line->body_list = NULL;
-	cont_cmd_line->next = NULL;
-	cont_cmd_line->line = xstrdup ("continue");
-      }
+    struct command_line *printf_cmd_line
+      = xmalloc (sizeof (struct command_line));
 
     printf_cmd_line = xmalloc (sizeof (struct command_line));
     printf_cmd_line->control_type = simple_control;
     printf_cmd_line->body_count = 0;
     printf_cmd_line->body_list = NULL;
-    printf_cmd_line->next = cont_cmd_line;
+    printf_cmd_line->next = NULL;
     printf_cmd_line->line = printf_line;
 
     breakpoint_set_commands (b, printf_cmd_line);
@@ -9616,38 +9616,38 @@ create_breakpoint (struct gdbarch *gdbarch,
 
       if (parse_arg)
         {
-	    char *rest;
-            /* Here we only parse 'arg' to separate condition
-               from thread number, so parsing in context of first
-               sal is OK.  When setting the breakpoint we'll 
-               re-parse it in context of each sal.  */
+	  char *rest;
+	  /* Here we only parse 'arg' to separate condition
+	     from thread number, so parsing in context of first
+	     sal is OK.  When setting the breakpoint we'll
+	     re-parse it in context of each sal.  */
 
-            find_condition_and_thread (arg, lsal->sals.sals[0].pc, &cond_string,
-                                       &thread, &task, &rest);
-            if (cond_string)
-                make_cleanup (xfree, cond_string);
-	    if (rest)
-	      make_cleanup (xfree, rest);
-	    if (rest)
-	      extra_string = rest;
+	  find_condition_and_thread (arg, lsal->sals.sals[0].pc, &cond_string,
+				     &thread, &task, &rest);
+	  if (cond_string)
+	    make_cleanup (xfree, cond_string);
+	  if (rest)
+	    make_cleanup (xfree, rest);
+	  if (rest)
+	    extra_string = rest;
         }
       else
         {
-	    if (*arg != '\0')
-	      error (_("Garbage '%s' at end of location"), arg);
+	  if (*arg != '\0')
+	    error (_("Garbage '%s' at end of location"), arg);
 
-            /* Create a private copy of condition string.  */
-            if (cond_string)
-            {
-                cond_string = xstrdup (cond_string);
-                make_cleanup (xfree, cond_string);
-            }
-            /* Create a private copy of any extra string.  */
-            if (extra_string)
-	      {
-                extra_string = xstrdup (extra_string);
-                make_cleanup (xfree, extra_string);
-	      }
+	  /* Create a private copy of condition string.  */
+	  if (cond_string)
+	    {
+	      cond_string = xstrdup (cond_string);
+	      make_cleanup (xfree, cond_string);
+	    }
+	  /* Create a private copy of any extra string.  */
+	  if (extra_string)
+	    {
+	      extra_string = xstrdup (extra_string);
+	      make_cleanup (xfree, extra_string);
+	    }
         }
 
       ops->create_breakpoints_sal (gdbarch, &canonical, lsal,
@@ -10628,6 +10628,20 @@ print_recreate_watchpoint (struct breakpoint *b, struct ui_file *fp)
 
   fprintf_unfiltered (fp, " %s", w->exp_string);
   print_recreate_thread (b, fp);
+}
+
+/* Implement the "explains_signal" breakpoint_ops method for
+   watchpoints.  */
+
+static enum bpstat_signal_value
+explains_signal_watchpoint (struct breakpoint *b, enum gdb_signal sig)
+{
+  /* A software watchpoint cannot cause a signal other than
+     GDB_SIGNAL_TRAP.  */
+  if (b->type == bp_watchpoint && sig != GDB_SIGNAL_TRAP)
+    return BPSTAT_SIGNAL_NO;
+
+  return BPSTAT_SIGNAL_HIDE;
 }
 
 /* The breakpoint_ops structure to be used in hardware watchpoints.  */
@@ -12733,9 +12747,17 @@ base_breakpoint_decode_linespec (struct breakpoint *b, char **s,
 /* The default 'explains_signal' method.  */
 
 static enum bpstat_signal_value
-base_breakpoint_explains_signal (struct breakpoint *b)
+base_breakpoint_explains_signal (struct breakpoint *b, enum gdb_signal sig)
 {
   return BPSTAT_SIGNAL_HIDE;
+}
+
+/* The default "after_condition_true" method.  */
+
+static void
+base_breakpoint_after_condition_true (struct bpstats *bs)
+{
+  /* Nothing to do.   */
 }
 
 struct breakpoint_ops base_breakpoint_ops =
@@ -12757,7 +12779,8 @@ struct breakpoint_ops base_breakpoint_ops =
   base_breakpoint_create_sals_from_address,
   base_breakpoint_create_breakpoints_sal,
   base_breakpoint_decode_linespec,
-  base_breakpoint_explains_signal
+  base_breakpoint_explains_signal,
+  base_breakpoint_after_condition_true,
 };
 
 /* Default breakpoint_ops methods.  */
@@ -12933,7 +12956,7 @@ bkpt_create_breakpoints_sal (struct gdbarch *gdbarch,
 			     int from_tty, int enabled,
 			     int internal, unsigned flags)
 {
-  create_breakpoints_sal_default (gdbarch, canonical, lsal,
+  create_breakpoints_sal_default (gdbarch, canonical,
 				  cond_string, extra_string,
 				  type_wanted,
 				  disposition, thread, task,
@@ -13271,7 +13294,7 @@ tracepoint_create_breakpoints_sal (struct gdbarch *gdbarch,
 				   int from_tty, int enabled,
 				   int internal, unsigned flags)
 {
-  create_breakpoints_sal_default (gdbarch, canonical, lsal,
+  create_breakpoints_sal_default (gdbarch, canonical,
 				  cond_string, extra_string,
 				  type_wanted,
 				  disposition, thread, task,
@@ -13349,6 +13372,44 @@ dprintf_print_recreate (struct breakpoint *tp, struct ui_file *fp)
   fprintf_unfiltered (fp, "dprintf %s%s", tp->addr_string,
 		      tp->extra_string);
   print_recreate_thread (tp, fp);
+}
+
+/* Implement the "after_condition_true" breakpoint_ops method for
+   dprintf.
+
+   dprintf's are implemented with regular commands in their command
+   list, but we run the commands here instead of before presenting the
+   stop to the user, as dprintf's don't actually cause a stop.  This
+   also makes it so that the commands of multiple dprintfs at the same
+   address are all handled.  */
+
+static void
+dprintf_after_condition_true (struct bpstats *bs)
+{
+  struct cleanup *old_chain;
+  struct bpstats tmp_bs = { NULL };
+  struct bpstats *tmp_bs_p = &tmp_bs;
+
+  /* dprintf's never cause a stop.  This wasn't set in the
+     check_status hook instead because that would make the dprintf's
+     condition not be evaluated.  */
+  bs->stop = 0;
+
+  /* Run the command list here.  Take ownership of it instead of
+     copying.  We never want these commands to run later in
+     bpstat_do_actions, if a breakpoint that causes a stop happens to
+     be set at same address as this dprintf, or even if running the
+     commands here throws.  */
+  tmp_bs.commands = bs->commands;
+  bs->commands = NULL;
+  old_chain = make_cleanup_decref_counted_command_line (&tmp_bs.commands);
+
+  bpstat_do_actions_1 (&tmp_bs_p);
+
+  /* 'tmp_bs.commands' will usually be NULL by now, but
+     bpstat_do_actions_1 may return early without processing the whole
+     list.  */
+  do_cleanups (old_chain);
 }
 
 /* The breakpoint_ops structure to be used on static tracepoints with
@@ -14107,7 +14168,6 @@ create_sals_from_address_default (char **arg,
 static void
 create_breakpoints_sal_default (struct gdbarch *gdbarch,
 				struct linespec_result *canonical,
-				struct linespec_sals *lsal,
 				char *cond_string,
 				char *extra_string,
 				enum bptype type_wanted,
@@ -15743,6 +15803,7 @@ initialize_breakpoint_ops (void)
   ops->print_it = print_it_watchpoint;
   ops->print_mention = print_mention_watchpoint;
   ops->print_recreate = print_recreate_watchpoint;
+  ops->explains_signal = explains_signal_watchpoint;
 
   /* Masked watchpoints.  */
   ops = &masked_watchpoint_breakpoint_ops;
@@ -15847,6 +15908,7 @@ initialize_breakpoint_ops (void)
   ops->print_it = bkpt_print_it;
   ops->print_mention = bkpt_print_mention;
   ops->print_recreate = dprintf_print_recreate;
+  ops->after_condition_true = dprintf_after_condition_true;
 }
 
 /* Chain containing all defined "enable breakpoint" subcommands.  */
@@ -16428,8 +16490,7 @@ Set a dynamic printf at specified line or function.\n\
 dprintf location,format string,arg1,arg2,...\n\
 location may be a line number, function name, or \"*\" and an address.\n\
 If a line number is specified, break at start of code for that line.\n\
-If a function is specified, break at start of code for that function.\n\
-"));
+If a function is specified, break at start of code for that function."));
   set_cmd_completer (c, location_completer);
 
   add_setshow_enum_cmd ("dprintf-style", class_support,

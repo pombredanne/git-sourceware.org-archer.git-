@@ -66,8 +66,6 @@
 
 #include "inferior.h"		/* for signed_pointer_to_address */
 
-#include <sys/param.h>		/* For MAXPATHLEN */
-
 #include "gdb_curses.h"
 
 #include "readline/readline.h"
@@ -3130,22 +3128,14 @@ gdb_realpath (const char *filename)
      path.  Use that and realpath() to canonicalize the name.  This is
      the most common case.  Note that, if there isn't a compile time
      upper bound, you want to avoid realpath() at all costs.  */
-#if defined(HAVE_REALPATH)
+#if defined (HAVE_REALPATH) && defined (PATH_MAX)
   {
-# if defined (PATH_MAX)
     char buf[PATH_MAX];
-#  define USE_REALPATH
-# elif defined (MAXPATHLEN)
-    char buf[MAXPATHLEN];
-#  define USE_REALPATH
-# endif
-# if defined (USE_REALPATH)
     const char *rp = realpath (filename, buf);
 
     if (rp == NULL)
       rp = filename;
     return xstrdup (rp);
-# endif
   }
 #endif /* HAVE_REALPATH */
 
@@ -3179,7 +3169,7 @@ gdb_realpath (const char *filename)
      pathconf()) making it impossible to pass a correctly sized buffer
      to realpath() (it could always overflow).  On those systems, we
      skip this.  */
-#if defined (HAVE_REALPATH) && defined (HAVE_UNISTD_H) && defined(HAVE_ALLOCA)
+#if defined (HAVE_REALPATH) && defined (_PC_PATH_MAX) && defined(HAVE_ALLOCA)
   {
     /* Find out the max path size.  */
     long path_max = pathconf ("/", _PC_PATH_MAX);
@@ -3232,6 +3222,23 @@ align_down (ULONGEST v, int n)
   /* Check that N is really a power of two.  */
   gdb_assert (n && (n & (n-1)) == 0);
   return (v & -n);
+}
+
+/* See utils.h.  */
+
+LONGEST
+gdb_sign_extend (LONGEST value, int bit)
+{
+  gdb_assert (bit >= 1 && bit <= 8 * sizeof (LONGEST));
+
+  if (((value >> (bit - 1)) & 1) != 0)
+    {
+      LONGEST signbit = ((LONGEST) 1) << (bit - 1);
+
+      value = (value ^ signbit) - signbit;
+    }
+
+  return value;
 }
 
 /* Allocation function for the libiberty hash table which uses an

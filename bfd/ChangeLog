@@ -1,3 +1,486 @@
+2013-07-03  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* elfnn-aarch64.c (elfNN_aarch64_final_link_relocate): Reorder case
+	values.
+	(elfNN_aarch64_relocate_section): Likewise.
+	(elfNN_aarch64_gc_sweep_hook): Likewise.
+	(elfNN_aarch64_check_relocs): Likewise.
+
+2013-07-03  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_func_desc_adjust): Don't hide .TOC.
+	when relocatable.  Don't change root.type or type here.
+	(ppc64_elf_set_toc): Set type of .TOC. to STT_OBJECT.
+
+2013-07-03  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (struct ppc_stub_hash_entry): Delete "addend".
+	(ppc64_elf_size_stubs): Don't set "addend".
+	(ppc64_elf_relocate_section): Don't allow calls via
+	toc-adjusting stubs without a following nop even in an
+	executable, except for self-calls and both libc_start_main
+	and .libc_start_main.
+
+2013-07-03  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_func_desc_adjust): Hide ".TOC.".
+
+2013-07-02  Tristan Gingold  <gingold@adacore.com>
+
+	* coff-rs6000.c (xcoff_find_nearest_line_discriminator): Add missing
+	line.
+
+2013-07-02  Tristan Gingold  <gingold@adacore.com>
+
+	* vms-alpha.c (_bfd_generic_find_nearest_line_discriminator): Define.
+	(_bfd_vms_find_nearest_line_discriminator): New function.
+
+2013-07-02  Tristan Gingold  <gingold@adacore.com>
+
+	* coff-rs6000.c (xcoff_create_csect_from_smclas): Handle more smclas.
+
+2013-07-02  Tristan Gingold  <gingold@adacore.com>
+
+	* coff-rs6000.c (xcoff_find_nearest_line_discriminator): New function.
+	(rs6000coff_vec): Reference it.
+
+2013-07-02  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* elfnn-aarch64.c (aarch64_elf_create_got_section): New.
+	(elfNN_aarch64_check_relocs): Use aarch64_elf_create_got_section.
+	(elfNN_aarch64_create_dynamic_sections): Do not define
+	_GLOBAL_OFFSET_TABLE_; call aarch64_elf_create_got_section.
+
+2013-07-02  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* ld-aarch64/emit-relocs-309-low.d: Adjust .text address.
+	* ld-aarch64/emit-relocs-309-up.d: Adjust .got address.
+	* ld-aarch64/emit-relocs-312.d: Adjust offsets into .got.
+	* ld-aarch64/tls-relax-all.d: Likewise.
+	* ld-aarch64/gc-got-relocs.d: Adjust expected .got content.
+	* ld-aarch64/gc-tls-relocs.d: Likewise.
+	* ld-aarch64/tls-relax-gd-ie.d: Likewise.
+	* ld-aarch64/tls-relax-gdesc-ie-2.d: Likewise.
+	* ld-aarch64/tls-relax-gdesc-ie.d: Likewise.
+
+2013-07-02  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.c (ppc64_elf_relocate_section): Set "relocation" for
+	.TOC. after relocatable check.
+
+2013-07-01  Alan Modra  <amodra@gmail.com>
+
+	* elf64-ppc.h (ppc64_elf_toc): Delete.
+	(ppc64_elf_set_toc): Declare.
+	* elf64-ppc.c (ppc64_elf_toc_reloc): Replace call to ppc64_elf_toc
+	with call the ppc64_elf_set_toc.
+	(ppc64_elf_toc_ha_reloc, ppc64_elf_toc64_reloc): Likewise.
+	(ppc64_elf_start_multitoc_partition): Likewise.
+	(struct ppc_link_hash_table): Delete dot_toc_dot.  Replace all uses
+	with elf.hgot.
+	(ppc64_elf_process_dot_syms): Don't make a fake function descriptor
+	for ".TOC.".
+	(ppc64_elf_check_relocs): Mark sections with a reference to .TOC.
+	as needing a toc pointer.
+	(ppc64_elf_size_stubs): Don't set dot_toc_dot here.
+	(ppc64_elf_set_toc): Rename from ppc64_elf_toc.  Add info param.
+	Set elf.hgot value.
+
+2013-06-28  H.J. Lu  <hongjiu.lu@intel.com>
+
+	PR ld/15685
+	* elf64-x86-64.c (elf_x86_64_relocate_section): Handle
+	R_X86_64_DTPOFF64.
+
+2013-06-28  Nick Clifton  <nickc@redhat.com>
+
+	PR ld/15302
+	* elf32-arm.c (allocate_dynrelocs_for_symbol): Revert previous patch.
+
+2013-06-27  Marcus Shawcroft  <marcus.shawcroft@arm.com>
+
+	* elfnn-aarch64.c (elfNN_aarch64_check_relocs): Reserve one slot
+	in sgot.
+	(elfNN_aarch64_finish_dynamic_sections): Place the &_DYNAMIC reference
+	in sgot[0] rather than sgotplt[0].
+
+2013-06-26  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* Makefile.am (elf32-aarch64.c): Add a #line cpp directive at the
+	beginning of the generated file.
+	(elf64-aarch64.c): Likewise.
+	* Makefile.in: Re-generated.
+
+2013-06-26  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* Makefile.am (BFD64_BACKENDS): Add elfxx-aarch64.c.
+	(BFD64_BACKENDS_CFILES): Add elfxx-aarch64.lo.
+	* Makefile.in: Re-generated.
+	* configure.in (bfd_elf64_bigaarch64_vec): Add elfxx-aarch64.lo.
+	(bfd_elf64_littleaarch64_vec): Likewise.
+	(bfd_elf32_bigaarch64_vec): Likewise.
+	(bfd_elf32_littleaarch64_vec): Likewise.
+	* configure: Re-generated.
+	* elfxx-aarch64.c: New file; split from elf64-aarch64.c.
+	* elfxx-aarch64.h: New file.
+	* elfnn-aarch64.c: Include "elfxx-aarch64.h"; move the following
+	stuff to elfxx-aarch64.c.
+	(bfd_elf_aarch64_put_addend): Removed.
+	(PG_OFFSET, PG): Likewise.
+	(elfNN_aarch64_small_plt0_entry): Support ELF32.
+	(elfNN_aarch64_tlsdesc_small_plt_entry): Likewise.
+	(elf64_aarch64_grok_prstatus): Removed.
+	(elf_backend_grok_prstatus): Removed.
+	(insn32): Likewise.
+	(aarch64_unsigned_overflow): Likewise.
+	(aarch64_signed_overflow): Likewise.
+	(aarch64_resolve_relocation): Likewise.
+	(MASK): Likewise.
+	(decode_branch_ofs_26): Likewise.
+	(decode_cond_branch_ofs_19): Likewise.
+	(decode_ld_lit_ofs_19): Likewise.
+	(decode_tst_branch_ofs_14): Likewise.
+	(decode_movw_imm): Likewise.
+	(decode_adr_imm): Likewise.
+	(decode_add_imm): Likewise.
+	(reencode_branch_ofs_26): Likewise.
+	(reencode_cond_branch_ofs_19): Likewise.
+	(reencode_ld_lit_ofs_19): Likewise.
+	(reencode_tst_branch_ofs_14): Likewise.
+	(reencode_movw_imm): Likewise.
+	(reencode_adr_imm): Likewise.
+	(reencode_ldst_pos_imm): Likewise.
+	(reencode_add_imm): Likewise.
+	(reencode_movzn_to_movz): Likewise.
+	(reencode_movzn_to_movn): Likewise.
+	(aarch64_relocate): Update to call the new function names in
+	elfxx-aarch64.c.
+	(aarch64_calculate_got_entry_vma): Likewise.
+	(elfNN_aarch64_final_link_relocate): Likewise.
+	(elf64_aarch64_update_plt_entry): Likewise; change the type of the
+	parameter 'r_type' to bfd_reloc_code_real_type; rename to ...
+	(elf_aarch64_update_plt_entry): ... this.
+	(elfNN_aarch64_create_small_pltn_entry): Update.
+	(elfNN_aarch64_init_small_plt0_entry): Remove plt_got_base; add
+	bfd_vma plt_got_2nd_ent; update to call elf_aarch64_update_plt_entry.
+	(elfNN_aarch64_finish_dynamic_sections): Add plt_entry; update to
+	call elf_aarch64_update_plt_entry.
+
+2013-06-26  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* bfd-in2.h: Re-generated.
+	* elfnn-aarch64.c (HOWTO64, HOWTO32): New define.
+	(IS_AARCH64_TLS_RELOC): Change to be based on the
+	bfd reloc enumerators.
+	(IS_AARCH64_TLSDESC_RELOC): Likewise.
+	(PG, PG_OFFSET): Cast literal to bfd_vma.
+	(elf64_aarch64_howto_table): Removed.
+	(elf64_aarch64_howto_dynrelocs): Removed.
+	(elf64_aarch64_tls_howto_table): Removed.
+	(elf64_aarch64_tlsdesc_howto_table): Removed.
+	(elfNN_aarch64_howto_table): New table to host all howto entires..
+	(R_AARCH64_*): Replaced by AARCH64_R (*) and AARCH64_R_STR (*).
+	(elfNN_aarch64_bfd_reloc_from_howto): New function.
+	(elfNN_aarch64_bfd_reloc_from_type): Ditto.
+	(struct elf_aarch64_reloc_map): New.
+	(elf_aarch64_reloc_map): New table.
+	(elfNN_aarch64_howto_from_bfd_reloc): New function.
+	(elfNN_aarch64_howto_from_type): Update to look up the new table
+	elfNN_aarch64_howto_table.
+	(struct elf64_aarch64_reloc_map): Remove.
+	(elf64_aarch64_reloc_map): Remove.
+	(elfNN_aarch64_reloc_type_lookup): Change to call
+	elfNN_aarch64_howto_from_bfd_reloc.
+	(elfNN_aarch64_reloc_name_lookup): Change to look up the new table
+	elfNN_aarch64_howto_table.
+	(aarch64_resolve_relocation): Refactor to switch on the bfd
+	reloc enumerators.
+	(bfd_elf_aarch64_put_addend): Likewise.
+	(elfNN_aarch64_final_link_relocate): Likewise.
+	(aarch64_tls_transition_without_check): Likewise.
+	(aarch64_reloc_got_type): Likewise.
+	(aarch64_can_relax_tls): Likewise.
+	(aarch64_tls_transition): Likewise.
+	(elfNN_aarch64_tls_relax): Likewise.
+	(elfNN_aarch64_final_link_relocate): Likewise.
+	(elfNN_aarch64_relocate_section): Likewise.
+	(elfNN_aarch64_gc_sweep_hook): Likewise.
+	(elfNN_aarch64_check_relocs): Likewise.
+	(aarch64_tls_transition): Change to return a bfd reloc enumerator.
+	* libbfd.h: Re-generated.
+	* reloc.c: Re-order the AArch64 bfd reloc enumerators.
+	(BFD_RELOC_AARCH64_RELOC_START)
+	(BFD_RELOC_AARCH64_RELOC_END)
+	(BFD_RELOC_AARCH64_LD_GOT_LO12_NC)
+	(BFD_RELOC_AARCH64_LD32_GOT_LO12_NC)
+	(BFD_RELOC_AARCH64_TLSDESC_LD_LO12_NC)
+	(BFD_RELOC_AARCH64_TLSDESC_LD32_LO12_NC)
+	(BFD_RELOC_AARCH64_TLSIE_LD_GOTTPREL_LO12_NC)
+	(BFD_RELOC_AARCH64_TLSIE_LD32_GOTTPREL_LO12_NC)
+	(BFD_RELOC_AARCH64_IRELATIVE): New relocs.
+
+2013-06-26  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* Makefile.am (BFD64_BACKENDS): Add elf32-aarch64.lo.
+	(BUILD_CFILES): Add elf32-aarch64.c.
+	(elf32-aarch64.c): New rule for generating from elfnn-aarch64.c.
+	* Makefile.in: Re-generated.
+	* archures.c (bfd_mach_aarch64_ilp32): New define.
+	* bfd-in.h (bfd_elf32_aarch64_init_maps): New declaration.
+	(bfd_elf32_aarch64_set_options): Ditto.
+	(elf32_aarch64_setup_section_lists): Ditto.
+	(elf32_aarch64_next_input_section): Ditto.
+	(elf32_aarch64_size_stubs): Ditto.
+	(elf32_aarch64_build_stubs): Ditto.
+	* bfd-in2.h: Re-generated.
+	* config.bfd (aarch64-*-elf): Add bfd_elf32_littleaarch64_vec
+	and bfd_elf32_bigaarch64_vec.
+	(aarch64-*-linux*): Likewise.
+	(aarch64_be-*-elf): Likewise.
+	(aarch64_be-*-linux*): Likewise.
+	* configure.in (bfd_elf32_bigaarch64_vec)
+	(bfd_elf32_littleaarch64_vec): New.
+	* configure: Re-generated.
+	* cpu-aarch64.c (compatible): Don't allow mixing ilp32 objects with
+	lp64 ones.
+	(bfd_aarch64_arch_ilp32): New.
+	(bfd_aarch64_arch): Link to bfd_aarch64_arch_ilp32.
+	* elfnn-aarch64.c (ARCH_SIZE): New define.
+	(AARCH64_R, AARCH64_R_STR, LOG_FILE_ALIGN): New defines.
+	(GOT_ENTRY_SIZE): Re-define as (ARCH_SIZE / 8).
+	(elf64_aarch64_*): Rename to elfNN_aarch64_*.
+	(ELF64_R_*): Rename to ELFNN_R_*.
+	Plus other paramaterization.
+	* targets.c (bfd_elf32_bigaarch64_vec, bfd_elf32_littleaarch64_vec):
+	New declarations.
+	(_bfd_target_vector): Add bfd_elf32_bigaarch64_vec and
+	bfd_elf32_littleaarch64_vec.
+
+2013-06-26  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* Makefile.am (BFD64_BACKENDS_CFILES): Remove elf64-aarch64.c.
+	(BUILD_CFILES): Add elf64-aarch64.c.
+	(elf64-aarch64.c): New rule for generating from elfnn-aarch64.c.
+	* Makefile.in: Re-generated.
+	* elf64-aarch64.c: Rename to ...
+	* elfnn-aarch64.c: ... this.
+
+2013-06-25  Maciej W. Rozycki  <macro@codesourcery.com>
+            Paul Brook  <paul@codesourcery.com>
+
+	* elfxx-mips.h (_bfd_mips_elf_insn32): New prototype.
+	* elfxx-mips.c (mips_elf_link_hash_table): Add insn32 member.
+	(STUB_MOVE32_MICROMIPS, STUB_JALR32_MICROMIPS): New macros.
+	(MICROMIPS_INSN32_FUNCTION_STUB_NORMAL_SIZE): Likewise.
+	(MICROMIPS_INSN32_FUNCTION_STUB_BIG_SIZE): Likewise.
+	(micromips_insn32_o32_exec_plt0_entry): New variable.
+	(micromips_insn32_o32_exec_plt_entry): Likewise.
+	(_bfd_mips_elf_adjust_dynamic_symbol): Handle insn32 mode.
+	(mips_elf_estimate_stub_size): Likewise.
+	(_bfd_mips_elf_size_dynamic_sections): Likewise.
+	(_bfd_mips_elf_finish_dynamic_symbol): Likewise.
+	(mips_finish_exec_plt): Likewise.
+	(_bfd_mips_elf_relax_section): Likewise.
+	(_bfd_mips_elf_insn32): New function.
+	(_bfd_mips_elf_get_synthetic_symtab): Handle insn32 PLT.
+
+2013-06-24  Maciej W. Rozycki  <macro@codesourcery.com>
+
+	* elfxx-mips.h (_bfd_mips_elf_get_synthetic_symtab): New
+	prototype.
+	* elf32-mips.c (elf_backend_plt_sym_val): Remove macro.
+	(bfd_elf32_get_synthetic_symtab): New macro.
+	* elfxx-mips.c (plt_entry): New structure.
+	(mips_elf_link_hash_entry): Add use_plt_entry member.
+	(mips_elf_link_hash_table): Rename plt_entry_size member to
+	plt_mips_entry_size.  Add plt_comp_entry_size, plt_mips_offset,
+	plt_comp_offset, plt_got_index entries and plt_header_is_comp
+	members.
+	(STUB_LW_MICROMIPS, STUB_MOVE_MICROMIPS): New macros.
+	(STUB_LUI_MICROMIPS, STUB_JALR_MICROMIPS): Likewise.
+	(STUB_ORI_MICROMIPS, STUB_LI16U_MICROMIPS): Likewise.
+	(STUB_LI16S_MICROMIPS): Likewise.
+	(MICROMIPS_FUNCTION_STUB_NORMAL_SIZE): Likewise.
+	(MICROMIPS_FUNCTION_STUB_BIG_SIZE): Likewise.
+	(micromips_o32_exec_plt0_entry): New variable.
+	(mips16_o32_exec_plt_entry): Likewise.
+	(micromips_o32_exec_plt_entry): Likewise.
+	(mips_elf_link_hash_newfunc): Initialize use_plt_entry.
+	(mips_elf_output_extsym): Update to use gotplt_union's plist
+	member rather than offset.
+	(mips_elf_gotplt_index): Likewise.  Remove the VxWorks
+	restriction.  Use MIPS_ELF_GOT_SIZE to calculate GOT address.
+	(mips_elf_count_got_symbols): Update to use gotplt_union's plist
+	member rather than offset.
+	(mips_elf_calculate_relocation): Handle MIPS16/microMIPS PLT
+	entries.
+	(_bfd_mips_elf_create_dynamic_sections): Don't set PLT sizes
+	here.
+	(mips_elf_make_plt_record): New function.
+	(_bfd_mips_elf_check_relocs): Update comment.  Record occurences
+	of JAL relocations that might need a PLT entry.
+	(_bfd_mips_elf_adjust_dynamic_symbol): Update to use
+	gotplt_union's plist member rather than offset.  Set individual
+	PLT entry sizes here.  Handle MIPS16/microMIPS PLT entries.
+	Don't set the symbol's value in the symbol table for PLT
+	references here.  Don't set the PLT or PLT GOT section sizes
+	here.
+	(mips_elf_estimate_stub_size): Handle microMIPS stubs.
+	(mips_elf_allocate_lazy_stub): Likewise.
+	(mips_elf_lay_out_lazy_stubs): Likewise.  Define a _MIPS_STUBS_
+	magic symbol.
+	(mips_elf_set_plt_sym_value): New function.
+	(_bfd_mips_elf_size_dynamic_sections): Set PLT header size and
+	PLT and PLT GOT section sizes here.  Set the symbol values in
+	the symbol table for PLT references here.  Handle microMIPS
+	annotation of the _PROCEDURE_LINKAGE_TABLE_ magic symbol.
+	(_bfd_mips_elf_finish_dynamic_symbol): Update to use
+	gotplt_union's plist member rather than offset.  Handle
+	MIPS16/microMIPS PLT entries.  Handle microMIPS stubs.
+	(_bfd_mips_vxworks_finish_dynamic_symbol): Update to use
+	gotplt_union's plist member rather than offset.  Use
+	MIPS_ELF_GOT_SIZE to calculate GOT address.
+	(mips_finish_exec_plt): Handle microMIPS PLT.  Return status.
+	(_bfd_mips_elf_finish_dynamic_sections): Handle result from
+	mips_finish_exec_plt.
+	(_bfd_mips_elf_link_hash_table_create): Update to use
+	gotplt_union's plist member rather than offset.
+	(_bfd_mips_elf_get_synthetic_symtab): New function.
+
+2013-06-24  Wawa  <caojinyu@msn.com>
+
+	PR 15657
+	* hash.c (_bfd_stringtab_add): Copy the string if COPY is true.
+
+2013-06-23  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* Makefile.am (BFD32_BACKENDS, BFD32_BACKENDS_CFILES): Move MIPS ELF
+	files to...
+	(BFD64_BACKENDS, BFD64_BACKENDS_CFILES): ...here.
+	* Makefile.in: Regenerate.
+	* config.bfd: Enclose all MIPS ELF targets in #ifdef BFD64.
+	Set want64 to true for them at the end.
+	* targets.c (_bfd_target_vector): Protect MIPS ELF targets with
+	#ifdef BFD64.
+
+2013-06-22  Sandra Loosemore  <sandra@codesourcery.com>
+
+	* elf32-nios2.c (nios2_elf32_finish_dynamic_sections): Don't
+	set sh_entsize for PLT section.
+
+2013-06-20  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* bfd-in.h (bfd_elf64_aarch64_set_options): Add 'extern'.
+	* bfd-in2.h: Re-generated.
+	* elf64-aarch64.c (RELOC_SECTION): Removed.
+	(SWAP_RELOC_IN, SWAP_RELOC_OUT): Ditto.
+	(AARCH64_ELF_OS_ABI_VERSION): Ditto.
+	(elf64_aarch64_link_hash_traverse): Ditto.
+	(elf64_aarch64_size_stubs): Change 'Aarch64' to 'AArch64' in the
+	comment.
+
+2013-06-19  Will Newton  <will.newton@linaro.org>
+
+	* configure: Regenerated.
+	* configure.in: Remove aarch64 dependency on elf-ifunc.c.
+	* elf64-aarch64.c: Remove objalloc.h include.
+	(elf64_aarch64_howto_dynrelocs): Remove R_AARCH64_IRELATIVE howto.
+	(struct elf64_aarch64_link_hash_table): Remove ifunc related
+	members. (elf_aarch64_local_htab_hash): Remove function.
+	(elf_aarch64_local_htab_eq): Remove function.
+	(elf_aarch64_get_local_sym_hash): Remove function.
+	(elf64_aarch64_link_hash_table_create): Remove local hash
+	table initialization.
+	(elf64_aarch64_final_link_relocate): Remove sym argument and
+	handling of ifunc symbols.
+	(elf64_aarch64_relocate_section): Don't pass sym argument to
+	elf64_aarch64_final_link_relocate.
+	(elf64_aarch64_gc_sweep_hook): Remove handling of ifunc symbols.
+	(elf64_aarch64_adjust_dynamic_symbol): Likewise.
+	(elf64_aarch64_check_relocs): Likewise.
+	(elf64_aarch64_post_process_headers): Remove call to
+	_bfd_elf_set_osabi.
+	(elf64_aarch64_is_function_type): New function.
+	(elf64_aarch64_allocate_dynrelocs): Remove handling of ifunc
+	symbols. (elf_aarch64_allocate_local_dynrelocs): Remove function.
+	(elf64_aarch64_size_dynamic_sections): Remove call to
+	elf_aarch64_allocate_local_dynrelocs.
+	(elf64_aarch64_create_small_pltn_entry): Remove info argument.
+	Remove creation of R_AARCH64_IRELATIVE dynamic relocs.
+	(elf64_aarch64_finish_dynamic_symbol): Remove handling of ifunc
+	symbols. (elf_aarch64_finish_local_dynamic_symbol): Remove
+	function. (elf64_aarch64_finish_dynamic_sections): Remove call to
+	elf_aarch64_finish_local_dynamic_symbol.
+	(elf64_aarch64_add_symbol_hook): Remove function.
+
+2013-06-14  Yufeng Zhang  <yufeng.zhang@arm.com>
+
+	* elf64-aarch64.c (elf64_aarch64_final_link_relocate): Call
+	aarch64_resolve_relocation and bfd_elf_aarch64_put_addend to
+	handle the relocations of R_AARCH64_JUMP26, R_AARCH64_CALL26,
+	R_AARCH64_LD64_GOT_LO12_NC, R_AARCH64_ADR_GOT_PAGE and
+	R_AARCH64_GOT_LD_PREL19.
+
+2013-06-13  Terry Guo  <terry.guo@arm.com>
+
+	PR ld/15302
+	* elf32-arm.c (allocate_dynrelocs_for_symbol): Transform
+	ST_BRANCH_TO_ARM into ST_BRANCH_TO_THUMB if the target only
+	supports thumb instructions.
+
+2013-06-11  DJ Delorie  <dj@redhat.com>
+
+	* elf32-rl78.c (rl78_elf_relocate_section): Fix OPsub math.
+
+2013-06-11  Will Newton  <will.newton@linaro.org>
+
+	* elf64-aarch64.c (elf_aarch64_get_local_sym_hash): Use
+	ELF64_R_SYM instead of ELF32_R_SYM.
+
+2013-06-11  Nick Clifton  <nickc@redhat.com>
+
+	* elf32-rl78.c (rl78_elf_finish_dynamic_sections): Onlly run
+	checks if the dynamic sections have been created and relaxation
+	has not been performed.
+
+2013-06-07  Will Newton  <will.newton@linaro.org>
+
+	* configure: Regenerate.
+	* configure.in: Build elf-ifunc.o for AArch64.
+	* elf64-aarch64.c: Include objalloc.h.
+	(elf64_aarch64_howto_dynrelocs): Add R_AARCH64_IRELATIVE howto.
+	(struct elf64_aarch64_link_hash_table): Add members for handling
+	R_AARCH64_IRELATIVE relocations.
+	(elf_aarch64_local_htab_hash): New function.
+	(elf_aarch64_local_htab_eq): New function.
+	(elf_aarch64_get_local_sym_hash): New function.
+	(elf64_aarch64_link_hash_table_create): Initialize local STT_GNU_IFUNC
+	symbol hash.
+	(elf64_aarch64_hash_table_free): Free local STT_GNU_IFUNC symbol hash.
+	(elf64_aarch64_final_link_relocate): Add sym argument.  Add support
+	for handling STT_GNU_IFUNC symbols.
+	(elf64_aarch64_gc_sweep_hook): Add support for garbage collecting
+	references to STT_GNU_IFUNC symbols.
+	(elf64_aarch64_adjust_dynamic_symbol): Add support for handling
+	STT_GNU_IFUNC symbols.
+	(elf64_aarch64_check_relocs): Add support for handling STT_GNU_IFUNC
+	symbols.  Ensure we don't increase plt.refcount from -1 to 0.
+	(elf64_aarch64_post_process_headers): Call _bfd_elf_set_osabi.
+	(elf64_aarch64_is_function_type): Remove function.
+	(elf64_aarch64_allocate_dynrelocs): Call
+	_bfd_elf_allocate_ifunc_dyn_relocs for STT_GNU_IFUNC symbols.
+	(elf_aarch64_allocate_local_dynrelocs): New function.
+	(elf64_aarch64_size_dynamic_sections): Call
+	elf_aarch64_allocate_local_dynrelocs.  Initialize next_irelative_index.
+	(elf64_aarch64_create_small_pltn_entry): Add info argument.
+	Add support for creating .iplt entries for STT_GNU_IFUNC symbols.
+	(elf64_aarch64_finish_dynamic_symbol): Add support for handling
+	STT_GNU_IFUNC symbols and .iplt.
+	(elf_aarch64_finish_local_dynamic_symbol): New function.
+	(elf64_aarch64_finish_dynamic_sections): Call
+	elf_aarch64_finish_local_dynamic_symbol.
+	(elf64_aarch64_add_symbol_hook): New function.
+
 2013-06-03  Alan Modra  <amodra@gmail.com>
 
 	* syms.c (_bfd_stab_section_find_nearest_line): Add last_str

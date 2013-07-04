@@ -1,3 +1,59 @@
+2013-07-02  Tom Tromey  <tromey@redhat.com>
+
+	* gdb.texinfo (Target Commands): Don't mention "target nrom".
+
+2013-06-28  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (version.subst): Use version.in, not
+	common/version.in.
+	* gdbint.texinfo (Versions and Branches, Releasing GDB):
+	Likewise.
+
+2013-06-27  Pedro Alves  <palves@redhat.com>
+
+	* gdbint.texinfo (Algorithms) <Stepping over runtime loader
+	dynamic symbol resolution code>: New section, based on infrun.c
+	comment.
+
+2013-06-26  Tom Tromey  <tromey@redhat.com>
+
+	* gdbint.texinfo (Versions and Branches): Use common/version.in.
+	Update.
+	(Releasing GDB): Likewise.
+
+2013-06-26  Pedro Alves  <pedro@codesourcery.com>
+	    Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Tracepoint Commands): Document
+	-trace-frame-collected.
+
+2013-06-26  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (Traceframe Info Format): Document tvar element
+	and its attributes.
+
+2013-06-25  Yao Qi  <yao@codesourcery.com>
+
+	* gdbint.texinfo (Testsuite): Document 'gdb,predefined_tsv'.
+
+2013-06-24  Tom Tromey  <tromey@redhat.com>
+
+	* Makefile.in (POD2MAN1, POD2MAN5): Use version.subst.
+	(GDBvn.texi): Use version.subst.
+	(version.subst): New target.
+	(mostlyclean): Remove version.subst.
+
+2013-06-20  Pedro Alves  <pedro@codesourcery.com>
+
+	* gdb.texinfo (GDB/MI Data Manipulation)
+	<-data-list-register-values>: Document the --skip-unavailable
+	option.
+
+2013-06-07  Yao Qi  <yao@codesourcery.com>
+
+	* gdb.texinfo (Symbols): Add kindex and cindex for
+	'maint print msymbols'.
+
 2013-06-05  Simon Marchi  <simon.marchi@ericsson.com>  (tiny change)
 
 	* gdb.texinfo (Miscellaneous gdb/mi Commands): Fix -add-inferior

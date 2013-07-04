@@ -2472,7 +2472,7 @@ ppc64_elf_toc_reloc (bfd *abfd, arelent *reloc_entry, asymbol *symbol,
 
   TOCstart = _bfd_get_gp_value (input_section->output_section->owner);
   if (TOCstart == 0)
-    TOCstart = ppc64_elf_toc (input_section->output_section->owner);
+    TOCstart = ppc64_elf_set_toc (NULL, input_section->output_section->owner);
 
   /* Subtract the TOC base address.  */
   reloc_entry->addend -= TOCstart + TOC_BASE_OFF;
@@ -2495,7 +2495,7 @@ ppc64_elf_toc_ha_reloc (bfd *abfd, arelent *reloc_entry, asymbol *symbol,
 
   TOCstart = _bfd_get_gp_value (input_section->output_section->owner);
   if (TOCstart == 0)
-    TOCstart = ppc64_elf_toc (input_section->output_section->owner);
+    TOCstart = ppc64_elf_set_toc (NULL, input_section->output_section->owner);
 
   /* Subtract the TOC base address.  */
   reloc_entry->addend -= TOCstart + TOC_BASE_OFF;
@@ -2522,7 +2522,7 @@ ppc64_elf_toc64_reloc (bfd *abfd, arelent *reloc_entry, asymbol *symbol,
 
   TOCstart = _bfd_get_gp_value (input_section->output_section->owner);
   if (TOCstart == 0)
-    TOCstart = ppc64_elf_toc (input_section->output_section->owner);
+    TOCstart = ppc64_elf_set_toc (NULL, input_section->output_section->owner);
 
   octets = reloc_entry->address * bfd_octets_per_byte (abfd);
   bfd_put_64 (abfd, TOCstart + TOC_BASE_OFF, (bfd_byte *) data + octets);
@@ -3618,9 +3618,6 @@ struct ppc_stub_hash_entry {
   struct ppc_link_hash_entry *h;
   struct plt_entry *plt_ent;
 
-  /* And the reloc addend that this was derived from.  */
-  bfd_vma addend;
-
   /* Where this stub is being called from, or, in the case of combined
      stub sections, the first input section in the group.  */
   asection *id_sec;
@@ -3771,9 +3768,6 @@ struct ppc_link_hash_table
   /* Shortcut to .__tls_get_addr and __tls_get_addr.  */
   struct ppc_link_hash_entry *tls_get_addr;
   struct ppc_link_hash_entry *tls_get_addr_fd;
-
-  /* The special .TOC. symbol.  */
-  struct ppc_link_hash_entry *dot_toc_dot;
 
   /* The size of reliplt used by got entry relocs.  */
   bfd_size_type got_reli_size;
@@ -4774,7 +4768,12 @@ ppc64_elf_process_dot_syms (bfd *ibfd, struct bfd_link_info *info)
       while ((eh = *p) != NULL)
 	{
 	  *p = NULL;
-	  if (!add_symbol_adjust (eh, info))
+	  if (&eh->elf == htab->elf.hgot)
+	    ;
+	  else if (htab->elf.hgot == NULL
+		   && strcmp (eh->elf.root.root.string, ".TOC.") == 0)
+	    htab->elf.hgot = &eh->elf;
+	  else if (!add_symbol_adjust (eh, info))
 	    return FALSE;
 	  p = &eh->u.next_dot_sym;
 	}
@@ -5007,6 +5006,9 @@ ppc64_elf_check_relocs (bfd *abfd, struct bfd_link_info *info,
 	  /* PR15323, ref flags aren't set for references in the same
 	     object.  */
 	  h->root.non_ir_ref = 1;
+
+	  if (h == htab->elf.hgot)
+	    sec->has_toc_reloc = 1;
 	}
 
       tls_type = 0;
@@ -6544,6 +6546,10 @@ ppc64_elf_func_desc_adjust (bfd *obfd ATTRIBUTE_UNUSED,
   htab = ppc_hash_table (info);
   if (htab == NULL)
     return FALSE;
+
+  if (!info->relocatable
+      && htab->elf.hgot != NULL)
+    _bfd_elf_link_hash_hide_symbol (info, htab->elf.hgot, TRUE);
 
   if (htab->sfpr == NULL)
     /* We don't have any relocs.  */
@@ -10617,8 +10623,7 @@ ppc64_elf_start_multitoc_partition (struct bfd_link_info *info)
 {
   struct ppc_link_hash_table *htab = ppc_hash_table (info);
 
-  elf_gp (info->output_bfd) = ppc64_elf_toc (info->output_bfd);
-  htab->toc_curr = elf_gp (info->output_bfd);
+  htab->toc_curr = ppc64_elf_set_toc (info, info->output_bfd);
   htab->toc_bfd = NULL;
   htab->toc_first_sec = NULL;
 }
@@ -11450,9 +11455,6 @@ ppc64_elf_size_stubs (struct bfd_link_info *info, bfd_signed_vma group_size,
 	}
     }
   htab->plt_thread_safe = plt_thread_safe;
-  htab->dot_toc_dot = ((struct ppc_link_hash_entry *)
-		       elf_link_hash_lookup (&htab->elf, ".TOC.",
-					     FALSE, FALSE, TRUE));
   stubs_always_before_branch = group_size < 0;
   if (group_size < 0)
     stub_group_size = -group_size;
@@ -11744,7 +11746,6 @@ ppc64_elf_size_stubs (struct bfd_link_info *info, bfd_signed_vma group_size,
 		    }
 		  stub_entry->h = hash;
 		  stub_entry->plt_ent = plt_ent;
-		  stub_entry->addend = irela->r_addend;
 
 		  if (stub_entry->h != NULL)
 		    htab->stub_globals += 1;
@@ -11853,7 +11854,7 @@ ppc64_elf_size_stubs (struct bfd_link_info *info, bfd_signed_vma group_size,
    move, we'll be called again.  Provide a value for TOCstart.  */
 
 bfd_vma
-ppc64_elf_toc (bfd *obfd)
+ppc64_elf_set_toc (struct bfd_link_info *info, bfd *obfd)
 {
   asection *s;
   bfd_vma TOCstart;
@@ -11904,6 +11905,21 @@ ppc64_elf_toc (bfd *obfd)
   if (s != NULL)
     TOCstart = s->output_section->vma + s->output_offset;
 
+  _bfd_set_gp_value (obfd, TOCstart);
+
+  if (info != NULL && s != NULL && is_ppc64_elf (obfd))
+    {
+      struct ppc_link_hash_table *htab = ppc_hash_table (info);
+
+      if (htab != NULL
+	  && htab->elf.hgot != NULL)
+	{
+	  htab->elf.hgot->type = STT_OBJECT;
+	  htab->elf.hgot->root.type = bfd_link_hash_defined;
+	  htab->elf.hgot->root.u.def.value = TOC_BASE_OFF;
+	  htab->elf.hgot->root.u.def.section = s;
+	}
+    }
   return TOCstart;
 }
 
@@ -12452,13 +12468,6 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 		      }
 		  }
 	    }
-	  if (h_elf == &htab->dot_toc_dot->elf)
-	    {
-	      relocation = (TOCstart
-			    + htab->stub_group[input_section->id].toc_off);
-	      sec = bfd_abs_section_ptr;
-	      unresolved_reloc = FALSE;
-	    }
 	}
       h = (struct ppc_link_hash_entry *) h_elf;
 
@@ -12470,6 +12479,14 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 
       if (info->relocatable)
 	continue;
+
+      if (h != NULL && &h->elf == htab->elf.hgot)
+	{
+	  relocation = (TOCstart
+			+ htab->stub_group[input_section->id].toc_off);
+	  sec = bfd_abs_section_ptr;
+	  unresolved_reloc = FALSE;
+	}
 
       /* TLS optimizations.  Replace instruction sequences and relocs
 	 based on information we collected in tls_optimize.  We edit
@@ -12992,60 +13009,89 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 	    {
 	      bfd_boolean can_plt_call = FALSE;
 
+	      /* All of these stubs will modify r2, so there must be a
+		 branch and link followed by a nop.  The nop is
+		 replaced by an insn to restore r2.  */
 	      if (rel->r_offset + 8 <= input_section->size)
 		{
-		  unsigned long nop;
-		  nop = bfd_get_32 (input_bfd, contents + rel->r_offset + 4);
-		  if (nop == NOP
-		      || nop == CROR_151515 || nop == CROR_313131)
+		  unsigned long br;
+
+		  br = bfd_get_32 (input_bfd,
+				   contents + rel->r_offset);
+		  if ((br & 1) != 0)
 		    {
-		      if (h != NULL
-			  && (h == htab->tls_get_addr_fd
-			      || h == htab->tls_get_addr)
-			  && !htab->no_tls_get_addr_opt)
+		      unsigned long nop;
+
+		      nop = bfd_get_32 (input_bfd,
+					contents + rel->r_offset + 4);
+		      if (nop == NOP
+			  || nop == CROR_151515 || nop == CROR_313131)
 			{
-			  /* Special stub used, leave nop alone.  */
+			  if (h != NULL
+			      && (h == htab->tls_get_addr_fd
+				  || h == htab->tls_get_addr)
+			      && !htab->no_tls_get_addr_opt)
+			    {
+			      /* Special stub used, leave nop alone.  */
+			    }
+			  else
+			    bfd_put_32 (input_bfd, LD_R2_40R1,
+					contents + rel->r_offset + 4);
+			  can_plt_call = TRUE;
 			}
-		      else
-			bfd_put_32 (input_bfd, LD_R2_40R1,
-				    contents + rel->r_offset + 4);
+		    }
+		}
+
+	      if (!can_plt_call && h != NULL)
+		{
+		  const char *name = h->elf.root.root.string;
+
+		  if (*name == '.')
+		    ++name;
+
+		  if (strncmp (name, "__libc_start_main", 17) == 0
+		      && (name[17] == 0 || name[17] == '@'))
+		    {
+		      /* Allow crt1 branch to go via a toc adjusting
+			 stub.  Other calls that never return could do
+			 the same, if we could detect such.  */
 		      can_plt_call = TRUE;
 		    }
 		}
 
 	      if (!can_plt_call)
 		{
-		  if (stub_entry->stub_type == ppc_stub_plt_call
-		      || stub_entry->stub_type == ppc_stub_plt_call_r2save)
-		    {
-		      /* If this is a plain branch rather than a branch
-			 and link, don't require a nop.  However, don't
-			 allow tail calls in a shared library as they
-			 will result in r2 being corrupted.  */
-		      unsigned long br;
-		      br = bfd_get_32 (input_bfd, contents + rel->r_offset);
-		      if (info->executable && (br & 1) == 0)
-			can_plt_call = TRUE;
-		      else
-			stub_entry = NULL;
-		    }
-		  else if (h != NULL
-			   && strcmp (h->elf.root.root.string,
-				      ".__libc_start_main") == 0)
-		    {
-		      /* Allow crt1 branch to go via a toc adjusting stub.  */
-		      can_plt_call = TRUE;
-		    }
-		  else
-		    {
-		      info->callbacks->einfo
-			(_("%P: %H: call to `%T' lacks nop, can't restore toc; "
-			   "recompile with -fPIC"),
-			   input_bfd, input_section, rel->r_offset, sym_name);
+		  /* g++ as of 20130507 emits self-calls without a
+		     following nop.  This is arguably wrong since we
+		     have conflicting information.  On the one hand a
+		     global symbol and on the other a local call
+		     sequence, but don't error for this special case.
+		     It isn't possible to cheaply verify we have
+		     exactly such a call.  Allow all calls to the same
+		     section.  */
+		  asection *code_sec = sec;
 
-		      bfd_set_error (bfd_error_bad_value);
-		      ret = FALSE;
+		  if (get_opd_info (sec) != NULL)
+		    {
+		      bfd_vma off = (relocation + addend
+				     - sec->output_section->vma
+				     - sec->output_offset);
+
+		      opd_entry_value (sec, off, &code_sec, NULL, FALSE);
 		    }
+		  if (code_sec == input_section)
+		    can_plt_call = TRUE;
+		}
+
+	      if (!can_plt_call)
+		{
+		  info->callbacks->einfo
+		    (_("%P: %H: call to `%T' lacks nop, can't restore toc; "
+		       "recompile with -fPIC"),
+		     input_bfd, input_section, rel->r_offset, sym_name);
+
+		  bfd_set_error (bfd_error_bad_value);
+		  ret = FALSE;
 		}
 
 	      if (can_plt_call

@@ -255,6 +255,12 @@ extern int catch_errors (catch_errors_ftype *, void *, char *, return_mask);
 
 typedef void (catch_command_errors_ftype) (char *, int);
 extern int catch_command_errors (catch_command_errors_ftype *func,
-				 char *command, int from_tty, return_mask);
+				 char *arg, int from_tty, return_mask);
+
+/* Like catch_command_errors, but works with const command and args.  */
+
+typedef void (catch_command_errors_const_ftype) (const char *, int);
+extern int catch_command_errors_const (catch_command_errors_const_ftype *func,
+				       const char *arg, int from_tty, return_mask);
 
 #endif

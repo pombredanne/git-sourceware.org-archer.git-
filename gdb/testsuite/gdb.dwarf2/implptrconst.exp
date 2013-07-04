@@ -73,6 +73,14 @@ Dwarf::assemble $asm_file {
 		    GNU_implicit_pointer $var_label 0
 		} SPECIAL_expr}
 	    }
+
+	    DW_TAG_variable {
+		{name d}
+		{type :$ptr_label}
+		{location {
+		    GNU_implicit_pointer $var_label 2
+		} SPECIAL_expr}
+	    }
 	}
     }
 }
@@ -103,3 +111,4 @@ if ![runto_main] {
 }
 
 gdb_test "print *c" " = 114 'r'"
+gdb_test "print d\[-2\]" " = 114 'r'"

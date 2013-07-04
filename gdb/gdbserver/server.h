@@ -28,6 +28,7 @@
 
 #include "libiberty.h"
 #include "ansidecl.h"
+#include "version.h"
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -36,6 +37,9 @@
 #include <errno.h>
 #endif
 #include <setjmp.h>
+
+/* For gnulib's PATH_MAX.  */
+#include "pathmax.h"
 
 #ifdef HAVE_STRING_H
 #include <string.h>
@@ -112,6 +116,7 @@ struct inferior_list_entry
 struct thread_info;
 struct process_info;
 struct regcache;
+struct target_desc;
 
 #include "regcache.h"
 #include "gdb/signals.h"
@@ -156,6 +161,8 @@ struct process_info
 
   /* The list of installed fast tracepoints.  */
   struct fast_tracepoint_jump *fast_tracepoint_jumps;
+
+  const struct target_desc *tdesc;
 
   /* Private target data.  */
   struct process_info_private *private;
@@ -431,6 +438,9 @@ void supply_static_tracepoint_registers (struct regcache *regcache,
 					 CORE_ADDR pc);
 void set_trampoline_buffer_space (CORE_ADDR begin, CORE_ADDR end,
 				  char *errmsg);
+
+extern const struct target_desc *ipa_tdesc;
+
 #else
 void stop_tracing (void);
 
@@ -524,9 +534,5 @@ CORE_ADDR get_set_tsv_func_addr (void);
 
 extern CORE_ADDR current_insn_ptr;
 extern int emit_error;
-
-/* Version information, from version.c.  */
-extern const char version[];
-extern const char host_name[];
 
 #endif /* SERVER_H */

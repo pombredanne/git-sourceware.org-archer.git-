@@ -64,9 +64,7 @@
 /* readline defines this.  */
 #undef savestring
 
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
 
 #ifndef O_LARGEFILE
 #define O_LARGEFILE 0
@@ -86,10 +84,6 @@
 
 void (*deprecated_trace_find_hook) (char *arg, int from_tty);
 void (*deprecated_trace_start_stop_hook) (int start, int from_tty);
-
-extern void (*deprecated_readline_begin_hook) (char *, ...);
-extern char *(*deprecated_readline_hook) (char *);
-extern void (*deprecated_readline_end_hook) (void);
 
 /* 
    Tracepoint.c:
@@ -235,6 +229,7 @@ free_traceframe_info (struct traceframe_info *info)
   if (info != NULL)
     {
       VEC_free (mem_range_s, info->memory);
+      VEC_free (int, info->tvars);
 
       xfree (info);
     }
@@ -334,6 +329,22 @@ find_trace_state_variable (const char *name)
 
   for (ix = 0; VEC_iterate (tsv_s, tvariables, ix, tsv); ++ix)
     if (strcmp (name, tsv->name) == 0)
+      return tsv;
+
+  return NULL;
+}
+
+/* Look for a trace state variable of the given number.  Return NULL if
+   not found.  */
+
+struct trace_state_variable *
+find_trace_state_variable_by_number (int number)
+{
+  struct trace_state_variable *tsv;
+  int ix;
+
+  for (ix = 0; VEC_iterate (tsv_s, tvariables, ix, tsv); ++ix)
+    if (tsv->number == number)
       return tsv;
 
   return NULL;
@@ -852,30 +863,6 @@ enum {
   memrange_absolute = -1
 };
 
-struct memrange
-{
-  int type;		/* memrange_absolute for absolute memory range,
-                           else basereg number.  */
-  bfd_signed_vma start;
-  bfd_signed_vma end;
-};
-
-struct collection_list
-  {
-    unsigned char regs_mask[32];	/* room for up to 256 regs */
-    long listsize;
-    long next_memrange;
-    struct memrange *list;
-    long aexpr_listsize;	/* size of array pointed to by expr_list elt */
-    long next_aexpr_elt;
-    struct agent_expr **aexpr_list;
-
-    /* True is the user requested a collection of "$_sdata", "static
-       tracepoint data".  */
-    int strace_data;
-  }
-tracepoint_list, stepping_list;
-
 /* MEMRANGE functions: */
 
 static int memrange_cmp (const void *, const void *);
@@ -1166,6 +1153,9 @@ do_collect_symbol (const char *print_name,
   collect_symbol (p->collect, sym, p->gdbarch, p->frame_regno,
 		  p->frame_offset, p->pc, p->trace_string);
   p->count++;
+
+  VEC_safe_push (char_ptr, p->collect->wholly_collected,
+		 xstrdup (print_name));
 }
 
 /* Add all locals (or args) symbols to collection list.  */
@@ -1239,6 +1229,38 @@ clear_collection_list (struct collection_list *list)
   list->next_aexpr_elt = 0;
   memset (list->regs_mask, 0, sizeof (list->regs_mask));
   list->strace_data = 0;
+
+  xfree (list->aexpr_list);
+  xfree (list->list);
+
+  VEC_free (char_ptr, list->wholly_collected);
+  VEC_free (char_ptr, list->computed);
+}
+
+/* A cleanup wrapper for function clear_collection_list.  */
+
+static void
+do_clear_collection_list (void *list)
+{
+  struct collection_list *l = list;
+
+  clear_collection_list (l);
+}
+
+/* Initialize collection_list CLIST.  */
+
+static void
+init_collection_list (struct collection_list *clist)
+{
+  memset (clist, 0, sizeof *clist);
+
+  clist->listsize = 128;
+  clist->list = xcalloc (clist->listsize,
+			 sizeof (struct memrange));
+
+  clist->aexpr_listsize = 128;
+  clist->aexpr_list = xcalloc (clist->aexpr_listsize,
+			       sizeof (struct agent_expr *));
 }
 
 /* Reduce a collection list to string form (for gdb protocol).  */
@@ -1363,6 +1385,21 @@ stringify_collection_list (struct collection_list *list)
     return *str_list;
 }
 
+/* Add the printed expression EXP to *LIST.  */
+
+static void
+append_exp (struct expression *exp, VEC(char_ptr) **list)
+{
+  struct ui_file *tmp_stream = mem_fileopen ();
+  char *text;
+
+  print_expression (exp, tmp_stream);
+
+  text = ui_file_xstrdup (tmp_stream, NULL);
+
+  VEC_safe_push (char_ptr, *list, text);
+  ui_file_delete (tmp_stream);
+}
 
 static void
 encode_actions_1 (struct command_line *action,
@@ -1508,16 +1545,25 @@ encode_actions_1 (struct command_line *action,
 		      check_typedef (exp->elts[1].type);
 		      add_memrange (collect, memrange_absolute, addr,
 				    TYPE_LENGTH (exp->elts[1].type));
+		      append_exp (exp, &collect->computed);
 		      break;
 
 		    case OP_VAR_VALUE:
-		      collect_symbol (collect,
-				      exp->elts[2].symbol,
-				      tloc->gdbarch,
-				      frame_reg,
-				      frame_offset,
-				      tloc->address,
-				      trace_string);
+		      {
+			struct symbol *sym = exp->elts[2].symbol;
+			char_ptr name = (char_ptr) SYMBOL_NATURAL_NAME (sym);
+
+			collect_symbol (collect,
+					exp->elts[2].symbol,
+					tloc->gdbarch,
+					frame_reg,
+					frame_offset,
+					tloc->address,
+					trace_string);
+			VEC_safe_push (char_ptr,
+				       collect->wholly_collected,
+				       name);
+		      }
 		      break;
 
 		    default:	/* Full-fledged expression.  */
@@ -1553,6 +1599,8 @@ encode_actions_1 (struct command_line *action,
 				}
 			    }
 			}
+
+		      append_exp (exp, &collect->computed);
 		      break;
 		    }		/* switch */
 		  do_cleanups (old_chain);
@@ -1606,42 +1654,64 @@ encode_actions_1 (struct command_line *action,
     }				/* for */
 }
 
-/* Render all actions into gdb protocol.  */
+/* Encode actions of tracepoint TLOC->owner and fill TRACEPOINT_LIST
+   and STEPPING_LIST.  Return a cleanup pointer to clean up both
+   TRACEPOINT_LIST and STEPPING_LIST.  */
 
-void
-encode_actions (struct bp_location *tloc, char ***tdp_actions,
-		char ***stepping_actions)
+struct cleanup *
+encode_actions_and_make_cleanup (struct bp_location *tloc,
+				 struct collection_list *tracepoint_list,
+				 struct collection_list *stepping_list)
 {
   char *default_collect_line = NULL;
   struct command_line *actions;
   struct command_line *default_collect_action = NULL;
   int frame_reg;
   LONGEST frame_offset;
-  struct cleanup *back_to;
+  struct cleanup *back_to, *return_chain;
+
+  return_chain = make_cleanup (null_cleanup, NULL);
+  init_collection_list (tracepoint_list);
+  init_collection_list (stepping_list);
+
+  make_cleanup (do_clear_collection_list, tracepoint_list);
+  make_cleanup (do_clear_collection_list, stepping_list);
 
   back_to = make_cleanup (null_cleanup, NULL);
-
-  clear_collection_list (&tracepoint_list);
-  clear_collection_list (&stepping_list);
-
-  *tdp_actions = NULL;
-  *stepping_actions = NULL;
-
   gdbarch_virtual_frame_pointer (tloc->gdbarch,
 				 tloc->address, &frame_reg, &frame_offset);
 
   actions = all_tracepoint_actions_and_cleanup (tloc->owner);
 
   encode_actions_1 (actions, tloc, frame_reg, frame_offset,
-		    &tracepoint_list, &stepping_list);
+		    tracepoint_list, stepping_list);
 
-  memrange_sortmerge (&tracepoint_list);
-  memrange_sortmerge (&stepping_list);
+  memrange_sortmerge (tracepoint_list);
+  memrange_sortmerge (stepping_list);
+
+  do_cleanups (back_to);
+  return return_chain;
+}
+
+/* Render all actions into gdb protocol.  */
+
+void
+encode_actions_rsp (struct bp_location *tloc, char ***tdp_actions,
+		    char ***stepping_actions)
+{
+  struct collection_list tracepoint_list, stepping_list;
+  struct cleanup *cleanup;
+
+  *tdp_actions = NULL;
+  *stepping_actions = NULL;
+
+  cleanup = encode_actions_and_make_cleanup (tloc, &tracepoint_list,
+					     &stepping_list);
 
   *tdp_actions = stringify_collection_list (&tracepoint_list);
   *stepping_actions = stringify_collection_list (&stepping_list);
 
-  do_cleanups (back_to);
+  do_cleanups (cleanup);
 }
 
 static void
@@ -1700,6 +1770,16 @@ process_tracepoint_on_disconnect (void)
 	       " GDB is disconnected\n"));
 }
 
+/* Reset local state of tracing.  */
+
+void
+trace_reset_local_state (void)
+{
+  set_traceframe_num (-1);
+  set_tracepoint_num (-1);
+  set_traceframe_context (NULL);
+  clear_traceframe_info ();
+}
 
 void
 start_tracing (char *notes)
@@ -1822,11 +1902,8 @@ start_tracing (char *notes)
   target_trace_start ();
 
   /* Reset our local state.  */
-  set_traceframe_num (-1);
-  set_tracepoint_num (-1);
-  set_traceframe_context (NULL);
+  trace_reset_local_state ();
   current_trace_status()->running = 1;
-  clear_traceframe_info ();
 }
 
 /* The tstart command requests the target to start a new trace run.
@@ -2042,20 +2119,20 @@ trace_status_command (char *args, int from_tty)
 
 	  /* Reporting a run time is more readable than two long numbers.  */
 	  printf_filtered (_("Trace started at %ld.%06ld secs, stopped %ld.%06ld secs later.\n"),
-			   (long int) ts->start_time / 1000000,
-			   (long int) ts->start_time % 1000000,
-			   (long int) run_time / 1000000,
-			   (long int) run_time % 1000000);
+			   (long int) (ts->start_time / 1000000),
+			   (long int) (ts->start_time % 1000000),
+			   (long int) (run_time / 1000000),
+			   (long int) (run_time % 1000000));
 	}
       else
 	printf_filtered (_("Trace started at %ld.%06ld secs.\n"),
-			 (long int) ts->start_time / 1000000,
-			 (long int) ts->start_time % 1000000);
+			 (long int) (ts->start_time / 1000000),
+			 (long int) (ts->start_time % 1000000));
     }
   else if (ts->stop_time)
     printf_filtered (_("Trace stopped at %ld.%06ld secs.\n"),
-		     (long int) ts->stop_time / 1000000,
-		     (long int) ts->stop_time % 1000000);
+		     (long int) (ts->stop_time / 1000000),
+		     (long int) (ts->stop_time % 1000000));
 
   /* Now report any per-tracepoint status available.  */
   tp_vec = all_tracepoints ();
@@ -2173,12 +2250,12 @@ trace_status_mi (int on_stop)
     char buf[100];
 
     xsnprintf (buf, sizeof buf, "%ld.%06ld",
-	       (long int) ts->start_time / 1000000,
-	       (long int) ts->start_time % 1000000);
+	       (long int) (ts->start_time / 1000000),
+	       (long int) (ts->start_time % 1000000));
     ui_out_field_string (uiout, "start-time", buf);
     xsnprintf (buf, sizeof buf, "%ld.%06ld",
-	       (long int) ts->stop_time / 1000000,
-	       (long int) ts->stop_time % 1000000);
+	       (long int) (ts->stop_time / 1000000),
+	       (long int) (ts->stop_time % 1000000));
     ui_out_field_string (uiout, "stop-time", buf);
   }
 }
@@ -2234,9 +2311,7 @@ disconnect_tracing (void)
      confusing upon reconnection.  Just use these calls instead of
      full tfind_1 behavior because we're in the middle of detaching,
      and there's no point to updating current stack frame etc.  */
-  set_current_traceframe (-1);
-  set_tracepoint_num (-1);
-  set_traceframe_context (NULL);
+  trace_reset_local_state ();
 }
 
 /* Worker function for the various flavors of the tfind command.  */
@@ -2896,6 +2971,48 @@ trace_dump_actions (struct command_line *action,
     }
 }
 
+/* Return bp_location of the tracepoint associated with the current
+   traceframe.  Set *STEPPING_FRAME_P to 1 if the current traceframe
+   is a stepping traceframe.  */
+
+struct bp_location *
+get_traceframe_location (int *stepping_frame_p)
+{
+  struct tracepoint *t;
+  struct bp_location *tloc;
+  struct regcache *regcache;
+
+  if (tracepoint_number == -1)
+    error (_("No current trace frame."));
+
+  t = get_tracepoint (tracepoint_number);
+
+  if (t == NULL)
+    error (_("No known tracepoint matches 'current' tracepoint #%d."),
+	   tracepoint_number);
+
+  /* The current frame is a trap frame if the frame PC is equal to the
+     tracepoint PC.  If not, then the current frame was collected
+     during single-stepping.  */
+  regcache = get_current_regcache ();
+
+  /* If the traceframe's address matches any of the tracepoint's
+     locations, assume it is a direct hit rather than a while-stepping
+     frame.  (FIXME this is not reliable, should record each frame's
+     type.)  */
+  for (tloc = t->base.loc; tloc; tloc = tloc->next)
+    if (tloc->address == regcache_read_pc (regcache))
+      {
+	*stepping_frame_p = 0;
+	return tloc;
+      }
+
+  /* If this is a stepping frame, we don't know which location
+     triggered.  The first is as good (or bad) a guess as any...  */
+  *stepping_frame_p = 1;
+  return t->base.loc;
+}
+
 /* Return all the actions, including default collect, of a tracepoint
    T.  It constructs cleanups into the chain, and leaves the caller to
    handle them (call do_cleanups).  */
@@ -2936,46 +3053,19 @@ all_tracepoint_actions_and_cleanup (struct breakpoint *t)
 static void
 trace_dump_command (char *args, int from_tty)
 {
-  struct regcache *regcache;
-  struct tracepoint *t;
   int stepping_frame = 0;
   struct bp_location *loc;
-  char *default_collect_line = NULL;
-  struct command_line *actions, *default_collect_action = NULL;
   struct cleanup *old_chain;
+  struct command_line *actions;
 
-  if (tracepoint_number == -1)
-    {
-      warning (_("No current trace frame."));
-      return;
-    }
-
-  old_chain = make_cleanup (null_cleanup, NULL);
-  t = get_tracepoint (tracepoint_number);
-
-  if (t == NULL)
-    error (_("No known tracepoint matches 'current' tracepoint #%d."),
-	   tracepoint_number);
+  /* This throws an error is not inspecting a trace frame.  */
+  loc = get_traceframe_location (&stepping_frame);
 
   printf_filtered ("Data collected at tracepoint %d, trace frame %d:\n",
 		   tracepoint_number, traceframe_number);
 
-  /* The current frame is a trap frame if the frame PC is equal
-     to the tracepoint PC.  If not, then the current frame was
-     collected during single-stepping.  */
-
-  regcache = get_current_regcache ();
-
-  /* If the traceframe's address matches any of the tracepoint's
-     locations, assume it is a direct hit rather than a while-stepping
-     frame.  (FIXME this is not reliable, should record each frame's
-     type.)  */
-  stepping_frame = 1;
-  for (loc = t->base.loc; loc; loc = loc->next)
-    if (loc->address == regcache_read_pc (regcache))
-      stepping_frame = 0;
-
-  actions = all_tracepoint_actions_and_cleanup (&t->base);
+  old_chain = make_cleanup (null_cleanup, NULL);
+  actions = all_tracepoint_actions_and_cleanup (loc->owner);
 
   trace_dump_actions (actions, 0, stepping_frame, from_tty);
 
@@ -3133,6 +3223,16 @@ tfile_write_status (struct trace_file_writer *self,
     fprintf (writer->fp, ";disconn:%x", ts->disconnected_tracing);
   if (ts->circular_buffer)
     fprintf (writer->fp, ";circular:%x", ts->circular_buffer);
+  if (ts->start_time)
+    {
+      fprintf (writer->fp, ";starttime:%s",
+      phex_nz (ts->start_time, sizeof (ts->start_time)));
+    }
+  if (ts->stop_time)
+    {
+      fprintf (writer->fp, ";stoptime:%s",
+      phex_nz (ts->stop_time, sizeof (ts->stop_time)));
+    }
   if (ts->notes != NULL)
     {
       char *buf = (char *) alloca (strlen (ts->notes) * 2 + 1);
@@ -4657,6 +4757,8 @@ tfile_close (void)
   trace_fd = -1;
   xfree (trace_filename);
   trace_filename = NULL;
+
+  trace_reset_local_state ();
 }
 
 static void
@@ -5170,6 +5272,12 @@ build_traceframe_info (char blocktype, void *data)
 	break;
       }
     case 'V':
+      {
+	int vnum;
+
+	tfile_read ((gdb_byte *) &vnum, 4);
+	VEC_safe_push (int, info->tvars, vnum);
+      }
     case 'R':
     case 'S':
       {
@@ -5527,6 +5635,21 @@ traceframe_info_start_memory (struct gdb_xml_parser *parser,
   r->length = *length_p;
 }
 
+/* Handle the start of a <tvar> element.  */
+
+static void
+traceframe_info_start_tvar (struct gdb_xml_parser *parser,
+			     const struct gdb_xml_element *element,
+			     void *user_data,
+			     VEC(gdb_xml_value_s) *attributes)
+{
+  struct traceframe_info *info = user_data;
+  const char *id_attrib = xml_find_attribute (attributes, "id")->value;
+  int id = gdb_xml_parse_ulongest (parser, id_attrib);
+
+  VEC_safe_push (int, info->tvars, id);
+}
+
 /* Discard the constructed trace frame info (if an error occurs).  */
 
 static void
@@ -5545,10 +5668,18 @@ static const struct gdb_xml_attribute memory_attributes[] = {
   { NULL, GDB_XML_AF_NONE, NULL, NULL }
 };
 
+static const struct gdb_xml_attribute tvar_attributes[] = {
+  { "id", GDB_XML_AF_NONE, NULL, NULL },
+  { NULL, GDB_XML_AF_NONE, NULL, NULL }
+};
+
 static const struct gdb_xml_element traceframe_info_children[] = {
   { "memory", memory_attributes, NULL,
     GDB_XML_EF_REPEATABLE | GDB_XML_EF_OPTIONAL,
     traceframe_info_start_memory, NULL },
+  { "tvar", tvar_attributes, NULL,
+    GDB_XML_EF_REPEATABLE | GDB_XML_EF_OPTIONAL,
+    traceframe_info_start_tvar, NULL },
   { NULL, NULL, NULL, GDB_XML_EF_NONE, NULL, NULL }
 };
 
@@ -5589,7 +5720,7 @@ parse_traceframe_info (const char *tframe_info)
    This is where we avoid re-fetching the object from the target if we
    already have it cached.  */
 
-static struct traceframe_info *
+struct traceframe_info *
 get_traceframe_info (void)
 {
   if (traceframe_info == NULL)
@@ -5665,33 +5796,6 @@ _initialize_tracepoint (void)
 
   traceframe_number = -1;
   tracepoint_number = -1;
-
-  if (tracepoint_list.list == NULL)
-    {
-      tracepoint_list.listsize = 128;
-      tracepoint_list.list = xmalloc
-	(tracepoint_list.listsize * sizeof (struct memrange));
-    }
-  if (tracepoint_list.aexpr_list == NULL)
-    {
-      tracepoint_list.aexpr_listsize = 128;
-      tracepoint_list.aexpr_list = xmalloc
-	(tracepoint_list.aexpr_listsize * sizeof (struct agent_expr *));
-    }
-
-  if (stepping_list.list == NULL)
-    {
-      stepping_list.listsize = 128;
-      stepping_list.list = xmalloc
-	(stepping_list.listsize * sizeof (struct memrange));
-    }
-
-  if (stepping_list.aexpr_list == NULL)
-    {
-      stepping_list.aexpr_listsize = 128;
-      stepping_list.aexpr_list = xmalloc
-	(stepping_list.aexpr_listsize * sizeof (struct agent_expr *));
-    }
 
   add_info ("scope", scope_info,
 	    _("List the variables local to a scope"));

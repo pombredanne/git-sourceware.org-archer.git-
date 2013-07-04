@@ -67,7 +67,7 @@ static struct core_fns *core_vec = NULL;
 /* FIXME: kettenis/20031023: Eventually this variable should
    disappear.  */
 
-struct gdbarch *core_gdbarch = NULL;
+static struct gdbarch *core_gdbarch = NULL;
 
 /* Per-core data.  Currently, only the section table.  Note that these
    target sections are *not* mapped in the current address spaces' set
@@ -444,8 +444,8 @@ core_open (char *filename, int from_tty)
 							       siggy)
 			     : gdb_signal_from_host (siggy));
 
-      printf_filtered (_("Program terminated with signal %d, %s.\n"),
-		       siggy, gdb_signal_to_string (sig));
+      printf_filtered (_("Program terminated with signal %s, %s.\n"),
+		       gdb_signal_to_name (sig), gdb_signal_to_string (sig));
     }
 
   /* Fetch all registers from core file.  */
