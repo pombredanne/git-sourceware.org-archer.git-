@@ -92,7 +92,8 @@
   gdb/solib-svr4.c:	svr4_free_so (so->lm_info->copy);
   gdb/solib-svr4.c:svr4_free_so (struct so_list *so)
   gdb/solib-svr4.c:  svr4_so_ops.free_so = svr4_free_so;
-    # XXX needs documentation
+    # Never called directly except by itself
+    # This is the special one
 
   gdb/solib-target.c:solib_target_free_so (struct so_list *so)
   gdb/solib-target.c:  solib_target_so_ops.free_so = solib_target_free_so;
