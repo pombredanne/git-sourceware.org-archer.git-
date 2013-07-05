@@ -10,6 +10,8 @@
 
   gdb/solib-frv.c:  frv_so_ops.free_so = frv_free_so;
 
+  gdb/solib-ia64-hpux.c:  ops->free_so = ia64_hpux_free_so;
+
   gdb/solib-irix.c:  irix_so_ops.free_so = irix_free_so;
 
   gdb/solib-osf.c:  osf_so_ops.free_so = osf_free_so;
@@ -26,3 +28,54 @@
   gdb/solib-svr4.c:  svr4_so_ops.free_so = svr4_free_so;
 
   gdb/solib-target.c:  solib_target_so_ops.free_so = solib_target_free_so;
+
+3. Here is everything called *_free_so:
+
+  gdb/solib-aix.c:solib_aix_free_so (struct so_list *so)
+  gdb/solib-aix.c:  solib_aix_so_ops.free_so = solib_aix_free_so;
+
+  gdb/solib-darwin.c:darwin_free_so (struct so_list *so)
+  gdb/solib-darwin.c:  darwin_so_ops.free_so = darwin_free_so;
+
+  gdb/solib-dsbt.c:dsbt_free_so (struct so_list *so)
+  gdb/solib-dsbt.c:  dsbt_so_ops.free_so = dsbt_free_so;
+
+  gdb/solib-frv.c:frv_free_so (struct so_list *so)
+  gdb/solib-frv.c:  frv_so_ops.free_so = frv_free_so;
+
+  gdb/solib-ia64-hpux.c:      ia64_hpux_free_so (so);
+  gdb/solib-ia64-hpux.c:ia64_hpux_free_so (struct so_list *so)
+  gdb/solib-ia64-hpux.c:  ops->free_so = ia64_hpux_free_so;
+
+  gdb/solib-irix.c:irix_free_so (struct so_list *so)
+  gdb/solib-irix.c:  irix_so_ops.free_so = irix_free_so;
+
+  gdb/solib-osf.c:   not freed by osf_free_so().  */
+  gdb/solib-osf.c:      osf_free_so (&so);
+  gdb/solib-osf.c:  osf_free_so (so);
+  gdb/solib-osf.c:	  osf_free_so (&so);
+  gdb/solib-osf.c:osf_free_so (struct so_list *so)
+  gdb/solib-osf.c:  osf_so_ops.free_so = osf_free_so;
+
+  gdb/solib-pa64.c:pa64_free_so (struct so_list *so)
+  gdb/solib-pa64.c:  pa64_so_ops.free_so = pa64_free_so;
+
+  gdb/solib-som.c:som_free_so (struct so_list *so)
+  gdb/solib-som.c:  som_so_ops.free_so = som_free_so;
+
+  gdb/solib-spu.c:spu_free_so (struct so_list *so)
+  gdb/solib-spu.c:      spu_so_ops.free_so = spu_free_so;
+
+  gdb/solib-sunos.c:sunos_free_so (struct so_list *so)
+  gdb/solib-sunos.c:  sunos_so_ops.free_so = sunos_free_so;
+
+  gdb/solib-svr4.c:	svr4_free_so (so->lm_info->copy);
+  gdb/solib-svr4.c:svr4_free_so (struct so_list *so)
+  gdb/solib-svr4.c:  svr4_so_ops.free_so = svr4_free_so;
+
+  gdb/solib-target.c:solib_target_free_so (struct so_list *so)
+  gdb/solib-target.c:  solib_target_so_ops.free_so = solib_target_free_so;
+
+  gdb/windows-nat.c:	windows_free_so (sodel);
+  gdb/windows-nat.c:windows_free_so (struct so_list *so)
+    # not using the same framework as everything else
