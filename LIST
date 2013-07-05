@@ -1,0 +1,28 @@
+1. free_so (in solib.c) ALWAYS calls ops->free_so (so);
+
+2. Here are the places ops->free_so are set:
+
+  gdb/solib-aix.c:  solib_aix_so_ops.free_so = solib_aix_free_so;
+
+  gdb/solib-darwin.c:  darwin_so_ops.free_so = darwin_free_so;
+
+  gdb/solib-dsbt.c:  dsbt_so_ops.free_so = dsbt_free_so;
+
+  gdb/solib-frv.c:  frv_so_ops.free_so = frv_free_so;
+
+  gdb/solib-irix.c:  irix_so_ops.free_so = irix_free_so;
+
+  gdb/solib-osf.c:  osf_so_ops.free_so = osf_free_so;
+
+  gdb/solib-pa64.c:  pa64_so_ops.free_so = pa64_free_so;
+
+  gdb/solib-som.c:  som_so_ops.free_so = som_free_so;
+
+  gdb/solib-spu.c:      spu_so_ops.free_so = spu_free_so;
+  gdb/solib-spu.c:    svr4_so_ops.free_so (so);
+
+  gdb/solib-sunos.c:  sunos_so_ops.free_so = sunos_free_so;
+
+  gdb/solib-svr4.c:  svr4_so_ops.free_so = svr4_free_so;
+
+  gdb/solib-target.c:  solib_target_so_ops.free_so = solib_target_free_so;
