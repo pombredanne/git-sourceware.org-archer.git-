@@ -1468,11 +1468,28 @@ svr4_current_sos (void)
   struct svr4_info *info = get_svr4_info ();
 
   /* If the solib list has been read and stored by the probes
-     interface then XXX.  */
+     interface then we return a copy of the stored list.  */
   if (info->solib_list != NULL)
     {
       struct so_list *so, *result, **link = &result;
 
+      /* To avoid copying each solib each time the list is updated,
+	 we retain pointers to the copies and mark each copy as
+	 "acquired" before returning the list to update_solib_list.
+	 Then, for each copy:
+
+         - If the solib has already been added to the program space's
+           so_list then update_solib_list will free the copy we
+           returned using free_so.  This releases the acquired copy
+           for re-use by the next call to svr4_current_sos.
+
+         - If the solib has not been added to the program space's
+           so_list then update_solib_list will not free the copy we
+           returned.  The next call to svr4_current_sos will note that
+           the copy is still acquired and create a fresh copy to
+           return.
+
+         This ensures no solib is copied more than twice. */
       for (so = info->solib_list; so; so = so->next)
 	{
 	  gdb_assert (so->lm_info != NULL);
