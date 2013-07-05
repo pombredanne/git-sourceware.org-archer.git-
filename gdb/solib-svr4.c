@@ -73,10 +73,13 @@ struct lm_info
     /* Values read in from inferior's fields of the same name.  */
     CORE_ADDR l_ld, l_next, l_prev, l_name;
 
-    /* XXX.  */
+    /* A copy of the solib containing this lm_info, if one exists.
+       See comment in svr4_current_sos for more information.  */
     struct so_list *copy;
 
-    /* XXX.  */
+    /* Nonzero if the solib containing this lm_info is an acquired
+       copy of another solib.  See comment in svr4_current_sos for
+       more information.  */
     unsigned int acquired : 1;
   };
 
