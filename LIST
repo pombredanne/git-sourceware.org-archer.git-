@@ -79,15 +79,17 @@
   gdb/solib-som.c:som_free_so (struct so_list *so)
   gdb/solib-som.c:  som_so_ops.free_so = som_free_so;
     # Never called directly
-    # XXX
+    # xfree(so) added
 
   gdb/solib-spu.c:spu_free_so (struct so_list *so)
   gdb/solib-spu.c:      spu_so_ops.free_so = spu_free_so;
-    # XXX
+    # Never called directly
+    # xfree(so) added
 
   gdb/solib-sunos.c:sunos_free_so (struct so_list *so)
   gdb/solib-sunos.c:  sunos_so_ops.free_so = sunos_free_so;
-    # XXX
+    # Never called directly
+    # xfree(so) added
 
   gdb/solib-svr4.c:	svr4_free_so (so->lm_info->copy);
   gdb/solib-svr4.c:svr4_free_so (struct so_list *so)
