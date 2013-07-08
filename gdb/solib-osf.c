@@ -255,10 +255,10 @@ osf_relocate_section_addresses (struct so_list *so,
     }
 }
 
-/* target_so_ops callback.  Free parts of SO allocated by this file.  */
+/* Free parts of SO allocated by this file.  */
 
 static void
-osf_free_so (struct so_list *so)
+osf_free_so_local (struct so_list *so)
 {
   int i;
   const char *name;
@@ -270,7 +270,15 @@ osf_free_so (struct so_list *so)
 	xfree ((void *) name);
     }
   xfree (so->lm_info);
-  //XXX xfree (so);
+}
+
+/* target_so_ops callback.  */
+
+static void
+osf_free_so (struct so_list *so)
+{
+  osf_free_so_local (so);
+  xfree (so);
 }
 
 /* target_so_ops callback.  Discard information accumulated by this file and
@@ -518,7 +526,7 @@ read_map (struct read_map_ctxt *ctxt, struct so_list *so)
   return 1;
 
  err:
-  osf_free_so (so);
+  osf_free_so_local (so);
   return 0;
 }
 
@@ -555,7 +563,7 @@ osf_current_sos (void)
          /sbin/loader.  */
       if (!so.lm_info->isloader && !skipped_main)
 	{
-	  osf_free_so (&so);
+	  osf_free_so_local (&so);
 	  skipped_main = 1;
 	  continue;
 	}
@@ -597,7 +605,7 @@ osf_open_symbol_file_object (void *from_ttyp)
       if (!read_map (&ctxt, &so))
 	break;
       found = !so.lm_info->isloader;
-      osf_free_so (&so);
+      osf_free_so_local (&so);
     }
   close_map (&ctxt);
 
