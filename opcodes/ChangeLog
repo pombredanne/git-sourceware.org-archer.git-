@@ -1,3 +1,67 @@
+2013-07-07  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* mips-opc.c (mips_builtin_opcodes): Remove o(b) macros.  Move LD
+	and SD A(B) macros up.
+	* micromips-opc.c (micromips_opcodes): Likewise.
+
+2013-07-07  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* mips16-opc.c: Add entries for argumentless "entry" and "exit"
+	instructions.
+
+2013-07-07  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* mips-opc.c (mips_builtin_opcodes): Use "Q" for the INSN_5400
+	MDMX-like instructions.
+	* mips-dis.c (print_insn_arg): Use "$f" rather than "$v" when
+	printing "Q" operands for INSN_5400 instructions.
+
+2013-07-07  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* mips-opc.c (mips_builtin_opcodes): Use "+s" for "cins32" and
+	"+S" for "cins".
+	* mips-dis.c (print_mips_arg): Update "+s" and "+S" comments.
+	Combine cases.
+
+2013-07-07  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* mips-opc.c (mips_builtin_opcodes): Use "+i" rather than "a" for
+	"jalx".
+	* mips16-opc.c (mips16_opcodes): Likewise.
+	* micromips-opc.c (micromips_opcodes): Likewise.
+	* mips-dis.c (print_insn_args, print_mips16_insn_arg)
+	(print_insn_mips16): Handle "+i".
+	(print_insn_micromips): Likewise.  Conditionally preserve the
+	ISA bit for "a" but not for "+i".
+
+2013-07-07  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* micromips-opc.c (WR_mhi): Rename to..
+	(WR_mh): ...this.
+	(micromips_opcodes): Update "movep" entry accordingly.  Replace
+	"mh,mi" with "mh".
+	* mips-dis.c (micromips_to_32_reg_h_map): Rename to...
+	(micromips_to_32_reg_h_map1): ...this.
+	(micromips_to_32_reg_i_map): Rename to...
+	(micromips_to_32_reg_h_map2): ...this.
+	(print_micromips_insn): Remove "mi" case.  Print both registers
+	in the pair for "mh".
+
+2013-07-07  Richard Sandiford  <rdsandiford@googlemail.com>
+
+	* mips-opc.c (mips_builtin_opcodes): Remove "+D" and "+T" entries.
+	* micromips-opc.c (micromips_opcodes): Likewise.
+	* mips-dis.c (print_insn_args, print_insn_micromips): Remove "+D"
+	and "+T" handling.  Check for a "0" suffix when deciding whether to
+	use coprocessor 0 names.  In that case, also check for ",H" selectors.
+
+2013-07-05  Andreas Krebbel  <Andreas.Krebbel@de.ibm.com>
+
+	* s390-opc.c (J12_12, J24_24): New macros.
+	(INSTR_MII_UPI): Rename to INSTR_MII_UPP.
+	(MASK_MII_UPI): Rename to MASK_MII_UPP.
+	* s390-opc.txt: Rename MII_UPI to MII_UPP for bprp instruction.
+
 2013-07-04  Alan Modra  <amodra@gmail.com>
 
 	* ppc-opc.c (powerpc_opcodes): Add tdui, twui, tdu, twu, tui, tu.

@@ -1,3 +1,51 @@
+2013-07-08  Andrew Burgess  <aburgess@broadcom.com>
+            Pedro Alves  <palves@redhat.com>
+
+	* value.c (value_bits_valid): If the value is not lval_computed
+	or has no check validity handler then the answer is the
+	optimized_out flag, otherwise defer to the handler.
+
+2013-07-06  Eli Zaretskii  <eliz@gnu.org>
+
+	* top.c (print_gdb_configuration): Explain in output of
+	--configuration what does "relocatable" mean.
+
+	* main.c (print_gdb_help): Regroup options in the --help text.
+	See http://sourceware.org/ml/gdb-patches/2013-04/msg00362.html for
+	the relevant discussions.
+
+2013-07-06  Yao Qi  <yao@codesourcery.com>
+
+	* breakpoint.h (struct breakpoint_ops) <create_breakpoints_sal>:
+	Remove parameter 'lsal'.
+	* breakpoint.c (create_breakpoint): Move local variable 'lsal'
+	to inner block.  Caller update.
+	(base_breakpoint_create_breakpoints_sal): Update.
+	(bkpt_create_breakpoints_sal): Likewise.
+	(tracepoint_create_breakpoints_sal): Likewise.
+	(strace_marker_create_breakpoints_sal): Get 'lsal' from the
+	element 0 of vector 'canonical->sals'.
+
+2013-07-05  Luis Machado  <lgustavo@codesourcery.com>
+
+	* rs6000-tdep.c (rs6000_stab_reg_to_regnum): Return the real
+	register number instead of the pseudo register one.
+	(rs6000_dwarf2_reg_to_regnum): Likewise.
+
+2013-07-04  Pedro Alves  <palves@redhat.com>
+
+	* findvar.c (value_of_register): Use allocate_optimized_out_value
+	if the register has been optimized out, instead of
+	set_value_optimized_out.
+	* frame-unwind.c (frame_unwind_got_optimized): Use
+	allocate_optimized_out_value.
+
+2013-07-04  Pedro Alves  <palves@redhat.com>
+
+	* value.c (value_bits_valid): If the value is not lval_computed,
+	or doesn't have a check_validity hook, assume the value is entirely
+	valid.
+
 2013-07-04  Andrew Burgess  <aburgess@broadcom.com>
 
 	* stack.c (read_frame_arg): No longer fetch lazy values.
