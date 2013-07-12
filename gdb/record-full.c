@@ -60,8 +60,8 @@
 
 #define DEFAULT_RECORD_FULL_INSN_MAX_NUM	200000
 
-#define RECORD_FULL_IS_REPLAY \
-     (record_full_list->next || execution_direction == EXEC_REVERSE)
+#define RECORD_FULL_IS_REPLAY(OPS)					\
+  ((OPS)->record_full_list->next || execution_direction == EXEC_REVERSE)
 
 #define RECORD_FULL_FILE_MAGIC	netorder32(0x20091016)
 
@@ -165,44 +165,89 @@ struct record_full_core_buf_entry
   bfd_byte *buf;
 };
 
-/* Record buf with core target.  */
-static gdb_byte *record_full_core_regbuf = NULL;
-static struct target_section *record_full_core_start;
-static struct target_section *record_full_core_end;
-static struct record_full_core_buf_entry *record_full_core_buf_list = NULL;
+/* A subclass of gdb_target that holds state for the record-full
+   target.  */
 
-/* The following variables are used for managing the linked list that
-   represents the execution log.
+struct record_full_gdb_target
+{
+  /* The base class.  */
 
-   record_full_first is the anchor that holds down the beginning of
-   the list.
+  struct gdb_target base;
 
-   record_full_list serves two functions:
+  /* Record buf with core target.  */
+  gdb_byte *record_full_core_regbuf;
+  struct target_section *record_full_core_start;
+  struct target_section *record_full_core_end;
+  struct record_full_core_buf_entry *record_full_core_buf_list;
+
+  /* The following variables are used for managing the linked list that
+     represents the execution log.
+
+     record_full_first is the anchor that holds down the beginning of
+     the list.
+
+     record_full_list serves two functions:
      1) In record mode, it anchors the end of the list.
      2) In replay mode, it traverses the list and points to
-        the next instruction that must be emulated.
+     the next instruction that must be emulated.
 
-   record_full_arch_list_head and record_full_arch_list_tail are used
-   to manage a separate list, which is used to build up the change
-   elements of the currently executing instruction during record mode.
-   When this instruction has been completely annotated in the "arch
-   list", it will be appended to the main execution log.  */
+     record_full_arch_list_head and record_full_arch_list_tail are used
+     to manage a separate list, which is used to build up the change
+     elements of the currently executing instruction during record mode.
+     When this instruction has been completely annotated in the "arch
+     list", it will be appended to the main execution log.  */
 
-static struct record_full_entry record_full_first;
-static struct record_full_entry *record_full_list = &record_full_first;
-static struct record_full_entry *record_full_arch_list_head = NULL;
-static struct record_full_entry *record_full_arch_list_tail = NULL;
+  struct record_full_entry record_full_first;
+  struct record_full_entry *record_full_list;
+  struct record_full_entry *record_full_arch_list_head;
+  struct record_full_entry *record_full_arch_list_tail;
+
+  /* Actual count of insns presently in execution log.  */
+  unsigned int record_full_insn_num;
+
+  /* Count of insns logged so far (may be larger
+     than count of insns presently in execution log).  */
+  ULONGEST record_full_insn_count;
+
+  /* Asynchronous signal handle registered as event loop source for when
+     we have pending events ready to be passed to the core.  */
+
+  struct async_event_handler *record_full_async_inferior_event_token;
+
+  int record_full_resume_step;
+
+  /* True if we've been resumed, and so each record_full_wait call should
+     advance execution.  If this is false, record_full_wait will return a
+     TARGET_WAITKIND_IGNORE.  */
+  int record_full_resumed;
+
+  /* The execution direction of the last resume we got.  This is
+     necessary for async mode.  Vis (order is not strictly accurate):
+
+     1. user has the global execution direction set to forward
+     2. user does a reverse-step command
+     3. record_full_resume is called with global execution direction
+     temporarily switched to reverse
+     4. GDB's execution direction is reverted back to forward
+     5. target record notifies event loop there's an event to handle
+     6. infrun asks the target which direction was it going, and switches
+     the global execution direction accordingly (to reverse)
+     7. infrun polls an event out of the record target, and handles it
+     8. GDB goes back to the event loop, and goto #4.
+  */
+  enum exec_direction_kind record_full_execution_dir;
+
+  /* Set to 1 if record_full_store_registers and record_full_xfer_partial
+     doesn't need record.  */
+
+  int record_full_gdb_operation_disable;
+};
 
 /* 1 ask user. 0 auto delete the last struct record_full_entry.  */
 static int record_full_stop_at_limit = 1;
 /* Maximum allowed number of insns in execution log.  */
 static unsigned int record_full_insn_max_num
 	= DEFAULT_RECORD_FULL_INSN_MAX_NUM;
-/* Actual count of insns presently in execution log.  */
-static unsigned int record_full_insn_num = 0;
-/* Count of insns logged so far (may be larger
-   than count of insns presently in execution log).  */
-static ULONGEST record_full_insn_count;
 
 /* The target_ops of process record.  */
 static struct target_ops record_full_ops;
@@ -215,7 +260,8 @@ static struct cmd_list_element *show_record_full_cmdlist;
 /* Command list for "record full".  */
 static struct cmd_list_element *record_full_cmdlist;
 
-static void record_full_goto_insn (struct record_full_entry *entry,
+static void record_full_goto_insn (struct record_full_gdb_target *self, 
+				   struct record_full_entry *entry,
 				   enum exec_direction_kind dir);
 static void record_full_save (const char *recfilename);
 
@@ -325,7 +371,8 @@ record_full_entry_release (struct record_full_entry *rec)
 /* Free all record entries in list pointed to by REC.  */
 
 static void
-record_full_list_release (struct record_full_entry *rec)
+record_full_list_release (struct record_full_gdb_target *self,
+			  struct record_full_entry *rec)
 {
   if (!rec)
     return;
@@ -339,10 +386,10 @@ record_full_list_release (struct record_full_entry *rec)
       record_full_entry_release (rec->next);
     }
 
-  if (rec == &record_full_first)
+  if (rec == &self->record_full_first)
     {
-      record_full_insn_num = 0;
-      record_full_first.next = NULL;
+      self->record_full_insn_num = 0;
+      self->record_full_first.next = NULL;
     }
   else
     record_full_entry_release (rec);
@@ -351,7 +398,8 @@ record_full_list_release (struct record_full_entry *rec)
 /* Free all record entries forward of the given list position.  */
 
 static void
-record_full_list_release_following (struct record_full_entry *rec)
+record_full_list_release_following (struct record_full_gdb_target *self,
+				    struct record_full_entry *rec)
 {
   struct record_full_entry *tmp = rec->next;
 
@@ -361,8 +409,8 @@ record_full_list_release_following (struct record_full_entry *rec)
       rec = tmp->next;
       if (record_full_entry_release (tmp) == record_full_end)
 	{
-	  record_full_insn_num--;
-	  record_full_insn_count--;
+	  self->record_full_insn_num--;
+	  self->record_full_insn_count--;
 	}
       tmp = rec;
     }
@@ -374,28 +422,28 @@ record_full_list_release_following (struct record_full_entry *rec)
    Note -- this function does not modify record_full_insn_num.  */
 
 static void
-record_full_list_release_first (void)
+record_full_list_release_first (struct record_full_gdb_target *self)
 {
   struct record_full_entry *tmp;
 
-  if (!record_full_first.next)
+  if (!self->record_full_first.next)
     return;
 
   /* Loop until a record_full_end.  */
   while (1)
     {
       /* Cut record_full_first.next out of the linked list.  */
-      tmp = record_full_first.next;
-      record_full_first.next = tmp->next;
-      tmp->next->prev = &record_full_first;
+      tmp = self->record_full_first.next;
+      self->record_full_first.next = tmp->next;
+      tmp->next->prev = &self->record_full_first;
 
       /* tmp is now isolated, and can be deleted.  */
       if (record_full_entry_release (tmp) == record_full_end)
 	break;	/* End loop at first record_full_end.  */
 
-      if (!record_full_first.next)
+      if (!self->record_full_first.next)
 	{
-	  gdb_assert (record_full_insn_num == 1);
+	  gdb_assert (self->record_full_insn_num == 1);
 	  break;	/* End loop when list is empty.  */
 	}
     }
@@ -404,23 +452,24 @@ record_full_list_release_first (void)
 /* Add a struct record_full_entry to record_full_arch_list.  */
 
 static void
-record_full_arch_list_add (struct record_full_entry *rec)
+record_full_arch_list_add (struct record_full_gdb_target *self,
+			   struct record_full_entry *rec)
 {
   if (record_debug > 1)
     fprintf_unfiltered (gdb_stdlog,
 			"Process record: record_full_arch_list_add %s.\n",
 			host_address_to_string (rec));
 
-  if (record_full_arch_list_tail)
+  if (self->record_full_arch_list_tail)
     {
-      record_full_arch_list_tail->next = rec;
-      rec->prev = record_full_arch_list_tail;
-      record_full_arch_list_tail = rec;
+      self->record_full_arch_list_tail->next = rec;
+      rec->prev = self->record_full_arch_list_tail;
+      self->record_full_arch_list_tail = rec;
     }
   else
     {
-      record_full_arch_list_head = rec;
-      record_full_arch_list_tail = rec;
+      self->record_full_arch_list_head = rec;
+      self->record_full_arch_list_tail = rec;
     }
 }
 
@@ -452,6 +501,8 @@ int
 record_full_arch_list_add_reg (struct regcache *regcache, int regnum)
 {
   struct record_full_entry *rec;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
   if (record_debug > 1)
     fprintf_unfiltered (gdb_stdlog,
@@ -463,7 +514,7 @@ record_full_arch_list_add_reg (struct regcache *regcache, int regnum)
 
   regcache_raw_read (regcache, regnum, record_full_get_loc (rec));
 
-  record_full_arch_list_add (rec);
+  record_full_arch_list_add (self, rec);
 
   return 0;
 }
@@ -475,6 +526,8 @@ int
 record_full_arch_list_add_mem (CORE_ADDR addr, int len)
 {
   struct record_full_entry *rec;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
   if (record_debug > 1)
     fprintf_unfiltered (gdb_stdlog,
@@ -494,7 +547,7 @@ record_full_arch_list_add_mem (CORE_ADDR addr, int len)
       return -1;
     }
 
-  record_full_arch_list_add (rec);
+  record_full_arch_list_add (self, rec);
 
   return 0;
 }
@@ -506,6 +559,8 @@ int
 record_full_arch_list_add_end (void)
 {
   struct record_full_entry *rec;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
   if (record_debug > 1)
     fprintf_unfiltered (gdb_stdlog,
@@ -513,17 +568,18 @@ record_full_arch_list_add_end (void)
 
   rec = record_full_end_alloc ();
   rec->u.end.sigval = GDB_SIGNAL_0;
-  rec->u.end.insn_num = ++record_full_insn_count;
+  rec->u.end.insn_num = ++self->record_full_insn_count;
 
-  record_full_arch_list_add (rec);
+  record_full_arch_list_add (self, rec);
 
   return 0;
 }
 
 static void
-record_full_check_insn_num (int set_terminal)
+record_full_check_insn_num (struct record_full_gdb_target *self,
+			    int set_terminal)
 {
-  if (record_full_insn_num == record_full_insn_max_num)
+  if (self->record_full_insn_num >= record_full_insn_max_num)
     {
       /* Ask user what to do.  */
       if (record_full_stop_at_limit)
@@ -546,9 +602,11 @@ record_full_check_insn_num (int set_terminal)
 }
 
 static void
-record_full_arch_list_cleanups (void *ignore)
+record_full_arch_list_cleanups (void *arg)
 {
-  record_full_list_release (record_full_arch_list_tail);
+  struct record_full_gdb_target *self = arg;
+
+  record_full_list_release (self, self->record_full_arch_list_tail);
 }
 
 /* Before inferior step (when GDB record the running message, inferior
@@ -562,14 +620,16 @@ record_full_message (struct regcache *regcache, enum gdb_signal signal)
 {
   int ret;
   struct gdbarch *gdbarch = get_regcache_arch (regcache);
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
   struct cleanup *old_cleanups
-    = make_cleanup (record_full_arch_list_cleanups, 0);
+    = make_cleanup (record_full_arch_list_cleanups, self);
 
-  record_full_arch_list_head = NULL;
-  record_full_arch_list_tail = NULL;
+  self->record_full_arch_list_head = NULL;
+  self->record_full_arch_list_tail = NULL;
 
   /* Check record_full_insn_num.  */
-  record_full_check_insn_num (1);
+  record_full_check_insn_num (self, 1);
 
   /* If gdb sends a signal value to target_resume,
      save it in the 'end' field of the previous instruction.
@@ -594,10 +654,10 @@ record_full_message (struct regcache *regcache, enum gdb_signal signal)
      if we delivered it during the recording.  Therefore we should
      record the signal during record_full_wait, not
      record_full_resume.  */
-  if (record_full_list != &record_full_first)  /* FIXME better way to check */
+  if (self->record_full_list != &self->record_full_first)  /* FIXME better way to check */
     {
-      gdb_assert (record_full_list->type == record_full_end);
-      record_full_list->u.end.sigval = signal;
+      gdb_assert (self->record_full_list->type == record_full_end);
+      self->record_full_list->u.end.sigval = signal;
     }
 
   if (signal == GDB_SIGNAL_0
@@ -617,14 +677,14 @@ record_full_message (struct regcache *regcache, enum gdb_signal signal)
 
   discard_cleanups (old_cleanups);
 
-  record_full_list->next = record_full_arch_list_head;
-  record_full_arch_list_head->prev = record_full_list;
-  record_full_list = record_full_arch_list_tail;
+  self->record_full_list->next = self->record_full_arch_list_head;
+  self->record_full_arch_list_head->prev = self->record_full_list;
+  self->record_full_list = self->record_full_arch_list_tail;
 
-  if (record_full_insn_num == record_full_insn_max_num)
-    record_full_list_release_first ();
+  if (self->record_full_insn_num >= record_full_insn_max_num)
+    record_full_list_release_first (self);
   else
-    record_full_insn_num++;
+    self->record_full_insn_num++;
 
   return 1;
 }
@@ -656,19 +716,16 @@ record_full_message_wrapper_safe (struct regcache *regcache,
 		       RETURN_MASK_ALL);
 }
 
-/* Set to 1 if record_full_store_registers and record_full_xfer_partial
-   doesn't need record.  */
-
-static int record_full_gdb_operation_disable = 0;
-
 struct cleanup *
 record_full_gdb_operation_disable_set (void)
 {
   struct cleanup *old_cleanups = NULL;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
   old_cleanups =
-    make_cleanup_restore_integer (&record_full_gdb_operation_disable);
-  record_full_gdb_operation_disable = 1;
+    make_cleanup_restore_integer (&self->record_full_gdb_operation_disable);
+  self->record_full_gdb_operation_disable = 1;
 
   return old_cleanups;
 }
@@ -763,52 +820,69 @@ record_full_exec_insn (struct regcache *regcache,
 
 static void record_full_restore (void);
 
-/* Asynchronous signal handle registered as event loop source for when
-   we have pending events ready to be passed to the core.  */
-
-static struct async_event_handler *record_full_async_inferior_event_token;
-
 static void
 record_full_async_inferior_event_handler (gdb_client_data data)
 {
   inferior_event_handler (INF_REG_EVENT, NULL);
 }
 
+static struct record_full_gdb_target *
+allocate_record_full_gdb_target (void)
+{
+  struct record_full_gdb_target *self;
+
+  self = XCNEW (struct record_full_gdb_target);
+
+  self->record_full_first.type = record_full_end;
+  self->record_full_list = &self->record_full_first;
+  self->record_full_execution_dir = EXEC_FORWARD;
+
+  return self;
+}
+
 /* Open the process record target.  */
 
-static void
+static struct record_full_gdb_target *
 record_full_core_open_1 (char *name, int from_tty)
 {
   struct regcache *regcache = get_current_regcache ();
   int regnum = gdbarch_num_regs (get_regcache_arch (regcache));
   int i;
+  struct record_full_gdb_target *self;
+
+  self = allocate_record_full_gdb_target ();
 
   /* Get record_full_core_regbuf.  */
   target_fetch_registers (regcache, -1);
-  record_full_core_regbuf = xmalloc (MAX_REGISTER_SIZE * regnum);
+  self->record_full_core_regbuf = xmalloc (MAX_REGISTER_SIZE * regnum);
   for (i = 0; i < regnum; i ++)
     regcache_raw_collect (regcache, i,
-			  record_full_core_regbuf + MAX_REGISTER_SIZE * i);
+			  self->record_full_core_regbuf
+			  + MAX_REGISTER_SIZE * i);
 
   /* Get record_full_core_start and record_full_core_end.  */
-  if (build_section_table (core_bfd, &record_full_core_start,
-			   &record_full_core_end))
+  if (build_section_table (core_bfd, &self->record_full_core_start,
+			   &self->record_full_core_end))
     {
-      xfree (record_full_core_regbuf);
-      record_full_core_regbuf = NULL;
+      xfree (self->record_full_core_regbuf);
+      xfree (self);
       error (_("\"%s\": Can't find sections: %s"),
 	     bfd_get_filename (core_bfd), bfd_errmsg (bfd_get_error ()));
     }
 
-  push_target (&record_full_core_ops);
+  push_gdb_target (&self->base);
   record_full_restore ();
+
+  return self;
 }
 
 /* "to_open" target method for 'live' processes.  */
 
-static void
+static struct record_full_gdb_target *
 record_full_open_1 (char *name, int from_tty)
 {
+  struct record_full_gdb_target *self;
+
   if (record_debug)
     fprintf_unfiltered (gdb_stdlog, "Process record: record_full_open\n");
 
@@ -823,7 +897,10 @@ record_full_open_1 (char *name, int from_tty)
     error (_("Process record: the current architecture doesn't support "
 	     "record function."));
 
-  push_target (&record_full_ops);
+  self = allocate_record_full_gdb_target ();
+  push_gdb_target (&self->base);
+
+  return self;
 }
 
 static void record_full_init_record_breakpoints (void);
@@ -834,6 +911,7 @@ static void
 record_full_open (char *name, int from_tty)
 {
   struct gdb_target *t;
+  struct record_full_gdb_target *self;
 
   if (record_debug)
     fprintf_unfiltered (gdb_stdlog, "Process record: record_full_open\n");
@@ -843,19 +921,13 @@ record_full_open (char *name, int from_tty)
     error (_("Process record target already running.  Use \"record stop\" to "
              "stop record target first."));
 
-  /* Reset */
-  record_full_insn_num = 0;
-  record_full_insn_count = 0;
-  record_full_list = &record_full_first;
-  record_full_list->next = NULL;
-
   if (core_bfd)
-    record_full_core_open_1 (name, from_tty);
+    self = record_full_core_open_1 (name, from_tty);
   else
-    record_full_open_1 (name, from_tty);
+    self = record_full_open_1 (name, from_tty);
 
   /* Register extra event sources in the event loop.  */
-  record_full_async_inferior_event_token
+  self->record_full_async_inferior_event_token
     = create_async_event_handler (record_full_async_inferior_event_handler,
 				  NULL);
 
@@ -867,60 +939,33 @@ record_full_open (char *name, int from_tty)
 /* "to_close" target method.  Close the process record target.  */
 
 static void
-record_full_close (void)
+record_full_xclose (struct gdb_target *s)
 {
   struct record_full_core_buf_entry *entry;
+  struct record_full_gdb_target *self = (struct record_full_gdb_target *) s;
 
   if (record_debug)
     fprintf_unfiltered (gdb_stdlog, "Process record: record_full_close\n");
 
-  record_full_list_release (record_full_list);
+  record_full_list_release (self, self->record_full_list);
 
   /* Release record_full_core_regbuf.  */
-  if (record_full_core_regbuf)
-    {
-      xfree (record_full_core_regbuf);
-      record_full_core_regbuf = NULL;
-    }
+  xfree (self->record_full_core_regbuf);
 
   /* Release record_full_core_buf_list.  */
-  if (record_full_core_buf_list)
+  if (self->record_full_core_buf_list)
     {
-      for (entry = record_full_core_buf_list->prev; entry;
+      for (entry = self->record_full_core_buf_list->prev; entry;
 	   entry = entry->prev)
 	{
-	  xfree (record_full_core_buf_list);
-	  record_full_core_buf_list = entry;
+	  xfree (self->record_full_core_buf_list);
+	  self->record_full_core_buf_list = entry;
 	}
-      record_full_core_buf_list = NULL;
     }
 
-  if (record_full_async_inferior_event_token)
-    delete_async_event_handler (&record_full_async_inferior_event_token);
+  if (self->record_full_async_inferior_event_token)
+    delete_async_event_handler (&self->record_full_async_inferior_event_token);
 }
-
-static int record_full_resume_step = 0;
-
-/* True if we've been resumed, and so each record_full_wait call should
-   advance execution.  If this is false, record_full_wait will return a
-   TARGET_WAITKIND_IGNORE.  */
-static int record_full_resumed = 0;
-
-/* The execution direction of the last resume we got.  This is
-   necessary for async mode.  Vis (order is not strictly accurate):
-
-   1. user has the global execution direction set to forward
-   2. user does a reverse-step command
-   3. record_full_resume is called with global execution direction
-      temporarily switched to reverse
-   4. GDB's execution direction is reverted back to forward
-   5. target record notifies event loop there's an event to handle
-   6. infrun asks the target which direction was it going, and switches
-      the global execution direction accordingly (to reverse)
-   7. infrun polls an event out of the record target, and handles it
-   8. GDB goes back to the event loop, and goto #4.
-*/
-static enum exec_direction_kind record_full_execution_dir = EXEC_FORWARD;
 
 /* "to_resume" target method.  Resume the process record target.  */
 
@@ -928,11 +973,14 @@ static void
 record_full_resume (struct gdb_target *ops, ptid_t ptid, int step,
 		    enum gdb_signal signal)
 {
-  record_full_resume_step = step;
-  record_full_resumed = 1;
-  record_full_execution_dir = execution_direction;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) ops;
 
-  if (!RECORD_FULL_IS_REPLAY)
+  self->record_full_resume_step = step;
+  self->record_full_resumed = 1;
+  self->record_full_execution_dir = execution_direction;
+
+  if (!RECORD_FULL_IS_REPLAY (self))
     {
       struct gdbarch *gdbarch = target_thread_architecture (ptid);
 
@@ -952,7 +1000,7 @@ record_full_resume (struct gdb_target *ops, ptid_t ptid, int step,
               if (single_step_breakpoints_inserted ())
                 {
                   /* This is a soft single step.  */
-                  record_full_resume_step = 1;
+                  self->record_full_resume_step = 1;
                 }
               else
                 {
@@ -982,11 +1030,14 @@ record_full_resume (struct gdb_target *ops, ptid_t ptid, int step,
       target_async (inferior_event_handler, 0);
       /* Notify the event loop there's an event to wait for.  We do
 	 most of the work in record_full_wait.  */
-      mark_async_event_handler (record_full_async_inferior_event_token);
+      mark_async_event_handler (self->record_full_async_inferior_event_token);
     }
 }
 
 static int record_full_get_sig = 0;
+
+/* This is set just for out SIGINT handler's use.  */
+static struct record_full_gdb_target *target_for_sigint;
 
 /* SIGINT signal handler, registered by "to_wait" method.  */
 
@@ -997,7 +1048,7 @@ record_full_sig_handler (int signo)
     fprintf_unfiltered (gdb_stdlog, "Process record: get a signal\n");
 
   /* It will break the running inferior in replay mode.  */
-  record_full_resume_step = 1;
+  target_for_sigint->record_full_resume_step = 1;
 
   /* It will let record_full_wait set inferior status to get the signal
      SIGINT.  */
@@ -1007,13 +1058,23 @@ record_full_sig_handler (int signo)
 static void
 record_full_wait_cleanups (void *ignore)
 {
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
+
   if (execution_direction == EXEC_REVERSE)
     {
-      if (record_full_list->next)
-	record_full_list = record_full_list->next;
+      if (self->record_full_list->next)
+	self->record_full_list = self->record_full_list->next;
     }
   else
-    record_full_list = record_full_list->prev;
+    self->record_full_list = self->record_full_list->prev;
+}
+
+static void
+restore_sigint_handler (void *ignore)
+{
+  signal (SIGINT, handle_sigint);
+  target_for_sigint = NULL;
 }
 
 /* "to_wait" target method for process record target.
@@ -1035,34 +1096,44 @@ record_full_wait_1 (struct gdb_target *ops,
 		    int options)
 {
   struct cleanup *set_cleanups = record_full_gdb_operation_disable_set ();
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) ops;
 
   if (record_debug)
     fprintf_unfiltered (gdb_stdlog,
 			"Process record: record_full_wait "
 			"record_full_resume_step = %d, "
 			"record_full_resumed = %d, direction=%s\n",
-			record_full_resume_step, record_full_resumed,
-			record_full_execution_dir == EXEC_FORWARD
+			self->record_full_resume_step,
+			self->record_full_resumed,
+			self->record_full_execution_dir == EXEC_FORWARD
 			? "forward" : "reverse");
 
-  if (!record_full_resumed)
+  if (!self->record_full_resumed)
     {
       gdb_assert ((options & TARGET_WNOHANG) != 0);
 
       /* No interesting event.  */
       status->kind = TARGET_WAITKIND_IGNORE;
+      do_cleanups (set_cleanups);
       return minus_one_ptid;
     }
 
   record_full_get_sig = 0;
   signal (SIGINT, record_full_sig_handler);
+  target_for_sigint = self;
+  make_cleanup (restore_sigint_handler, NULL);
 
-  if (!RECORD_FULL_IS_REPLAY && ops->ops != &record_full_core_ops)
+  if (!RECORD_FULL_IS_REPLAY (self) && ops->ops != &record_full_core_ops)
     {
-      if (record_full_resume_step)
+      if (self->record_full_resume_step)
 	{
+	  ptid_t result;
+
 	  /* This is a single step.  */
-	  return target_delegate_wait (ops, ptid, status, options);
+	  result = target_delegate_wait (ops, ptid, status, options);
+	  do_cleanups (set_cleanups);
+	  return result;
 	}
       else
 	{
@@ -1080,14 +1151,18 @@ record_full_wait_1 (struct gdb_target *ops,
 		    fprintf_unfiltered (gdb_stdlog,
 					"Process record: record_full_wait "
 					"target beneath not done yet\n");
+		  do_cleanups (set_cleanups);
 		  return ret;
 		}
 
               if (single_step_breakpoints_inserted ())
                 remove_single_step_breakpoints ();
 
-	      if (record_full_resume_step)
-		return ret;
+	      if (self->record_full_resume_step)
+		{
+		  do_cleanups (set_cleanups);
+		  return ret;
+		}
 
 	      /* Is this a SIGTRAP?  */
 	      if (status->kind == TARGET_WAITKIND_STOPPED
@@ -1166,6 +1241,7 @@ record_full_wait_1 (struct gdb_target *ops,
 	      break;
 	    }
 
+	  do_cleanups (set_cleanups);
 	  return ret;
 	}
     }
@@ -1197,7 +1273,7 @@ record_full_wait_1 (struct gdb_target *ops,
 				    paddress (gdbarch, tmp_pc));
 
 	      if (decr_pc_after_break
-		  && !record_full_resume_step
+		  && !self->record_full_resume_step
 		  && software_breakpoint_inserted_here_p (aspace, tmp_pc))
 		regcache_write_pc (regcache,
 				   tmp_pc + decr_pc_after_break);
@@ -1213,8 +1289,8 @@ record_full_wait_1 (struct gdb_target *ops,
 
       /* In EXEC_FORWARD mode, record_full_list points to the tail of prev
          instruction.  */
-      if (execution_direction == EXEC_FORWARD && record_full_list->next)
-	record_full_list = record_full_list->next;
+      if (execution_direction == EXEC_FORWARD && self->record_full_list->next)
+	self->record_full_list = self->record_full_list->next;
 
       /* Loop over the record_full_list, looking for the next place to
 	 stop.  */
@@ -1222,28 +1298,29 @@ record_full_wait_1 (struct gdb_target *ops,
 	{
 	  /* Check for beginning and end of log.  */
 	  if (execution_direction == EXEC_REVERSE
-	      && record_full_list == &record_full_first)
+	      && self->record_full_list == &self->record_full_first)
 	    {
 	      /* Hit beginning of record log in reverse.  */
 	      status->kind = TARGET_WAITKIND_NO_HISTORY;
 	      break;
 	    }
-	  if (execution_direction != EXEC_REVERSE && !record_full_list->next)
+	  if (execution_direction != EXEC_REVERSE
+	      && !self->record_full_list->next)
 	    {
 	      /* Hit end of record log going forward.  */
 	      status->kind = TARGET_WAITKIND_NO_HISTORY;
 	      break;
 	    }
 
-          record_full_exec_insn (regcache, gdbarch, record_full_list);
+          record_full_exec_insn (regcache, gdbarch, self->record_full_list);
 
-	  if (record_full_list->type == record_full_end)
+	  if (self->record_full_list->type == record_full_end)
 	    {
 	      if (record_debug > 1)
 		fprintf_unfiltered (gdb_stdlog,
 				    "Process record: record_full_end %s to "
 				    "inferior.\n",
-				    host_address_to_string (record_full_list));
+				    host_address_to_string (self->record_full_list));
 
 	      if (first_record_full_end && execution_direction == EXEC_REVERSE)
 		{
@@ -1258,7 +1335,7 @@ record_full_wait_1 (struct gdb_target *ops,
 		     In EXEC_FORWARD mode, this is the record_full_end of
 		     current instruction.  */
 		  /* step */
-		  if (record_full_resume_step)
+		  if (self->record_full_resume_step)
 		    {
 		      if (record_debug > 1)
 			fprintf_unfiltered (gdb_stdlog,
@@ -1280,7 +1357,7 @@ record_full_wait_1 (struct gdb_target *ops,
 					    paddress (gdbarch, tmp_pc));
 		      if (decr_pc_after_break
 			  && execution_direction == EXEC_FORWARD
-			  && !record_full_resume_step
+			  && !self->record_full_resume_step
 			  && software_breakpoint_inserted_here_p (aspace,
 								  tmp_pc))
 			regcache_write_pc (regcache,
@@ -1297,7 +1374,7 @@ record_full_wait_1 (struct gdb_target *ops,
 		      continue_flag = 0;
 		    }
 		  /* Check target signal */
-		  if (record_full_list->u.end.sigval != GDB_SIGNAL_0)
+		  if (self->record_full_list->u.end.sigval != GDB_SIGNAL_0)
 		    /* FIXME: better way to check */
 		    continue_flag = 0;
 		}
@@ -1307,13 +1384,13 @@ record_full_wait_1 (struct gdb_target *ops,
 	    {
 	      if (execution_direction == EXEC_REVERSE)
 		{
-		  if (record_full_list->prev)
-		    record_full_list = record_full_list->prev;
+		  if (self->record_full_list->prev)
+		    self->record_full_list = self->record_full_list->prev;
 		}
 	      else
 		{
-		  if (record_full_list->next)
-		    record_full_list = record_full_list->next;
+		  if (self->record_full_list->next)
+		    self->record_full_list = self->record_full_list->next;
 		}
 	    }
 	}
@@ -1322,16 +1399,14 @@ record_full_wait_1 (struct gdb_target *ops,
 replay_out:
       if (record_full_get_sig)
 	status->value.sig = GDB_SIGNAL_INT;
-      else if (record_full_list->u.end.sigval != GDB_SIGNAL_0)
+      else if (self->record_full_list->u.end.sigval != GDB_SIGNAL_0)
 	/* FIXME: better way to check */
-	status->value.sig = record_full_list->u.end.sigval;
+	status->value.sig = self->record_full_list->u.end.sigval;
       else
 	status->value.sig = GDB_SIGNAL_TRAP;
 
       discard_cleanups (old_cleanups);
     }
-
-  signal (SIGINT, handle_sigint);
 
   do_cleanups (set_cleanups);
   return inferior_ptid;
@@ -1343,6 +1418,7 @@ record_full_wait (struct gdb_target *ops,
 		  int options)
 {
   ptid_t return_ptid;
+  struct record_full_gdb_target *self = (struct record_full_gdb_target *) ops;
 
   return_ptid = record_full_wait_1 (ops, ptid, status, options);
   if (status->kind != TARGET_WAITKIND_IGNORE)
@@ -1350,7 +1426,7 @@ record_full_wait (struct gdb_target *ops,
       /* We're reporting a stop.  Make sure any spurious
 	 target_wait(WNOHANG) doesn't advance the target until the
 	 core wants us resumed again.  */
-      record_full_resumed = 0;
+      self->record_full_resumed = 0;
     }
   return return_ptid;
 }
@@ -1358,16 +1434,21 @@ record_full_wait (struct gdb_target *ops,
 static int
 record_full_stopped_by_watchpoint (void)
 {
-  if (RECORD_FULL_IS_REPLAY)
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
+
+  if (RECORD_FULL_IS_REPLAY (self))
     return record_full_hw_watchpoint;
   else
-    return target_delegate_stopped_by_watchpoint (find_target_at (record_stratum));
+    return target_delegate_stopped_by_watchpoint (&self->base);
 }
 
 static int
 record_full_stopped_data_address (struct gdb_target *ops, CORE_ADDR *addr_p)
 {
-  if (RECORD_FULL_IS_REPLAY)
+  struct record_full_gdb_target *self = (struct record_full_gdb_target *) ops;
+
+  if (RECORD_FULL_IS_REPLAY (self))
     return 0;
   else
     return target_delegate_stopped_data_address (ops, addr_p);
@@ -1378,11 +1459,14 @@ record_full_stopped_data_address (struct gdb_target *ops, CORE_ADDR *addr_p)
 static void
 record_full_registers_change (struct regcache *regcache, int regnum)
 {
-  /* Check record_full_insn_num.  */
-  record_full_check_insn_num (0);
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
-  record_full_arch_list_head = NULL;
-  record_full_arch_list_tail = NULL;
+  /* Check record_full_insn_num.  */
+  record_full_check_insn_num (self, 0);
+
+  self->record_full_arch_list_head = NULL;
+  self->record_full_arch_list_tail = NULL;
 
   if (regnum < 0)
     {
@@ -1392,7 +1476,7 @@ record_full_registers_change (struct regcache *regcache, int regnum)
 	{
 	  if (record_full_arch_list_add_reg (regcache, i))
 	    {
-	      record_full_list_release (record_full_arch_list_tail);
+	      record_full_list_release (self, self->record_full_arch_list_tail);
 	      error (_("Process record: failed to record execution log."));
 	    }
 	}
@@ -1401,23 +1485,23 @@ record_full_registers_change (struct regcache *regcache, int regnum)
     {
       if (record_full_arch_list_add_reg (regcache, regnum))
 	{
-	  record_full_list_release (record_full_arch_list_tail);
+	  record_full_list_release (self, self->record_full_arch_list_tail);
 	  error (_("Process record: failed to record execution log."));
 	}
     }
   if (record_full_arch_list_add_end ())
     {
-      record_full_list_release (record_full_arch_list_tail);
+      record_full_list_release (self, self->record_full_arch_list_tail);
       error (_("Process record: failed to record execution log."));
     }
-  record_full_list->next = record_full_arch_list_head;
-  record_full_arch_list_head->prev = record_full_list;
-  record_full_list = record_full_arch_list_tail;
+  self->record_full_list->next = self->record_full_arch_list_head;
+  self->record_full_arch_list_head->prev = self->record_full_list;
+  self->record_full_list = self->record_full_arch_list_tail;
 
-  if (record_full_insn_num == record_full_insn_max_num)
-    record_full_list_release_first ();
+  if (self->record_full_insn_num >= record_full_insn_max_num)
+    record_full_list_release_first (self);
   else
-    record_full_insn_num++;
+    self->record_full_insn_num++;
 }
 
 /* "to_store_registers" method for process record target.  */
@@ -1427,9 +1511,12 @@ record_full_store_registers (struct gdb_target *ops,
 			     struct regcache *regcache,
 			     int regno)
 {
-  if (!record_full_gdb_operation_disable)
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) ops;
+
+  if (!self->record_full_gdb_operation_disable)
     {
-      if (RECORD_FULL_IS_REPLAY)
+      if (RECORD_FULL_IS_REPLAY (self))
 	{
 	  int n;
 
@@ -1468,7 +1555,7 @@ record_full_store_registers (struct gdb_target *ops,
 	    }
 
 	  /* Destroy the record from here forward.  */
-	  record_full_list_release_following (record_full_list);
+	  record_full_list_release_following (self, self->record_full_list);
 	}
 
       record_full_registers_change (regcache, regno);
@@ -1487,11 +1574,13 @@ record_full_xfer_partial (struct gdb_target *ops, enum target_object object,
 			  const gdb_byte *writebuf, ULONGEST offset,
 			  LONGEST len)
 {
-  if (!record_full_gdb_operation_disable
+  struct record_full_gdb_target *self = (struct record_full_gdb_target *) ops;
+
+  if (!self->record_full_gdb_operation_disable
       && (object == TARGET_OBJECT_MEMORY
 	  || object == TARGET_OBJECT_RAW_MEMORY) && writebuf)
     {
-      if (RECORD_FULL_IS_REPLAY)
+      if (RECORD_FULL_IS_REPLAY (self))
 	{
 	  /* Let user choose if he wants to write memory or not.  */
 	  if (!query (_("Because GDB is in replay mode, writing to memory "
@@ -1501,18 +1590,18 @@ record_full_xfer_partial (struct gdb_target *ops, enum target_object object,
 	    error (_("Process record canceled the operation."));
 
 	  /* Destroy the record from here forward.  */
-	  record_full_list_release_following (record_full_list);
+	  record_full_list_release_following (self, self->record_full_list);
 	}
 
       /* Check record_full_insn_num */
-      record_full_check_insn_num (0);
+      record_full_check_insn_num (self, 0);
 
       /* Record registers change to list as an instruction.  */
-      record_full_arch_list_head = NULL;
-      record_full_arch_list_tail = NULL;
+      self->record_full_arch_list_head = NULL;
+      self->record_full_arch_list_tail = NULL;
       if (record_full_arch_list_add_mem (offset, len))
 	{
-	  record_full_list_release (record_full_arch_list_tail);
+	  record_full_list_release (self, self->record_full_arch_list_tail);
 	  if (record_debug)
 	    fprintf_unfiltered (gdb_stdlog,
 				"Process record: failed to record "
@@ -1521,21 +1610,21 @@ record_full_xfer_partial (struct gdb_target *ops, enum target_object object,
 	}
       if (record_full_arch_list_add_end ())
 	{
-	  record_full_list_release (record_full_arch_list_tail);
+	  record_full_list_release (self, self->record_full_arch_list_tail);
 	  if (record_debug)
 	    fprintf_unfiltered (gdb_stdlog,
 				"Process record: failed to record "
 				"execution log.");
 	  return -1;
 	}
-      record_full_list->next = record_full_arch_list_head;
-      record_full_arch_list_head->prev = record_full_list;
-      record_full_list = record_full_arch_list_tail;
+      self->record_full_list->next = self->record_full_arch_list_head;
+      self->record_full_arch_list_head->prev = self->record_full_list;
+      self->record_full_list = self->record_full_arch_list_tail;
 
-      if (record_full_insn_num == record_full_insn_max_num)
-	record_full_list_release_first ();
+      if (self->record_full_insn_num >= record_full_insn_max_num)
+	record_full_list_release_first (self);
       else
-	record_full_insn_num++;
+	self->record_full_insn_num++;
     }
 
   return target_delegate_xfer_partial (ops, object, annex,
@@ -1607,8 +1696,10 @@ record_full_insert_breakpoint (struct gdbarch *gdbarch,
 {
   struct record_full_breakpoint *bp;
   int in_target_beneath = 0;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
-  if (!RECORD_FULL_IS_REPLAY)
+  if (!RECORD_FULL_IS_REPLAY (self))
     {
       /* When recording, we currently always single-step, so we don't
 	 really need to install regular breakpoints in the inferior.
@@ -1690,11 +1781,13 @@ record_full_can_execute_reverse (void)
 static gdb_byte *
 record_full_get_bookmark (char *args, int from_tty)
 {
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
   char *ret = NULL;
 
   /* Return stringified form of instruction count.  */
-  if (record_full_list && record_full_list->type == record_full_end)
-    ret = xstrdup (pulongest (record_full_list->u.end.insn_num));
+  if (self->record_full_list && self->record_full_list->type == record_full_end)
+    ret = xstrdup (pulongest (self->record_full_list->u.end.insn_num));
 
   if (record_debug)
     {
@@ -1762,21 +1855,27 @@ record_full_is_async_p (void)
 static enum exec_direction_kind
 record_full_execution_direction (void)
 {
-  return record_full_execution_dir;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
+
+  return self->record_full_execution_dir;
 }
 
 static void
 record_full_info (void)
 {
   struct record_full_entry *p;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
+  int is_replay = RECORD_FULL_IS_REPLAY (self);
 
-  if (RECORD_FULL_IS_REPLAY)
+  if (is_replay)
     printf_filtered (_("Replay mode:\n"));
   else
     printf_filtered (_("Record mode:\n"));
 
   /* Find entry for first actual instruction in the log.  */
-  for (p = record_full_first.next;
+  for (p = self->record_full_first.next;
        p != NULL && p->type != record_full_end;
        p = p->next)
     ;
@@ -1789,17 +1888,17 @@ record_full_info (void)
 		       pulongest (p->u.end.insn_num));
 
       /* If in replay mode, display where we are in the log.  */
-      if (RECORD_FULL_IS_REPLAY)
+      if (is_replay)
 	printf_filtered (_("Current instruction number is %s.\n"),
-			 pulongest (record_full_list->u.end.insn_num));
+			 pulongest (self->record_full_list->u.end.insn_num));
 
       /* Display instruction number for last instruction in the log.  */
       printf_filtered (_("Highest recorded instruction number is %s.\n"),
-		       pulongest (record_full_insn_count));
+		       pulongest (self->record_full_insn_count));
 
       /* Display log count.  */
       printf_filtered (_("Log contains %u instructions.\n"),
-		       record_full_insn_num);
+		       self->record_full_insn_num);
     }
   else
     printf_filtered (_("No instructions have been logged.\n"));
@@ -1814,7 +1913,10 @@ record_full_info (void)
 static void
 record_full_delete (void)
 {
-  record_full_list_release_following (record_full_list);
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
+
+  record_full_list_release_following (self, self->record_full_list);
 }
 
 /* The "to_record_is_replaying" target method.  */
@@ -1822,7 +1924,10 @@ record_full_delete (void)
 static int
 record_full_is_replaying (void)
 {
-  return RECORD_FULL_IS_REPLAY;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
+
+  return RECORD_FULL_IS_REPLAY (self);
 }
 
 /* Go to a specific entry.  */
@@ -1830,21 +1935,24 @@ record_full_is_replaying (void)
 static void
 record_full_goto_entry (struct record_full_entry *p)
 {
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
+
   if (p == NULL)
     error (_("Target insn not found."));
-  else if (p == record_full_list)
+  else if (p == self->record_full_list)
     error (_("Already at target insn."));
-  else if (p->u.end.insn_num > record_full_list->u.end.insn_num)
+  else if (p->u.end.insn_num > self->record_full_list->u.end.insn_num)
     {
       printf_filtered (_("Go forward to insn number %s\n"),
 		       pulongest (p->u.end.insn_num));
-      record_full_goto_insn (p, EXEC_FORWARD);
+      record_full_goto_insn (self, p, EXEC_FORWARD);
     }
   else
     {
       printf_filtered (_("Go backward to insn number %s\n"),
 		       pulongest (p->u.end.insn_num));
-      record_full_goto_insn (p, EXEC_REVERSE);
+      record_full_goto_insn (self, p, EXEC_REVERSE);
     }
 
   registers_changed ();
@@ -1858,8 +1966,10 @@ static void
 record_full_goto_begin (void)
 {
   struct record_full_entry *p = NULL;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
-  for (p = &record_full_first; p != NULL; p = p->next)
+  for (p = &self->record_full_first; p != NULL; p = p->next)
     if (p->type == record_full_end)
       break;
 
@@ -1872,8 +1982,10 @@ static void
 record_full_goto_end (void)
 {
   struct record_full_entry *p = NULL;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
-  for (p = record_full_list; p->next != NULL; p = p->next)
+  for (p = self->record_full_list; p->next != NULL; p = p->next)
     ;
   for (; p!= NULL; p = p->prev)
     if (p->type == record_full_end)
@@ -1888,8 +2000,10 @@ static void
 record_full_goto (ULONGEST target_insn)
 {
   struct record_full_entry *p = NULL;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
-  for (p = &record_full_first; p != NULL; p = p->next)
+  for (p = &self->record_full_first; p != NULL; p = p->next)
     if (p->type == record_full_end && p->u.end.insn_num == target_insn)
       break;
 
@@ -1904,7 +2018,7 @@ init_record_full_ops (void)
   record_full_ops.to_doc =
     "Log program while executing and replay execution from log.";
   record_full_ops.to_open = record_full_open;
-  record_full_ops.to_close = record_full_close;
+  record_full_ops.to_xclose = record_full_xclose;
   record_full_ops.to_resume = record_full_resume;
   record_full_ops.to_wait = record_full_wait;
   record_full_ops.to_disconnect = record_disconnect;
@@ -1943,9 +2057,11 @@ static void
 record_full_core_resume (struct gdb_target *ops, ptid_t ptid, int step,
 			 enum gdb_signal signal)
 {
-  record_full_resume_step = step;
-  record_full_resumed = 1;
-  record_full_execution_dir = execution_direction;
+  struct record_full_gdb_target *self = (struct record_full_gdb_target *) ops;
+
+  self->record_full_resume_step = step;
+  self->record_full_resumed = 1;
+  self->record_full_execution_dir = execution_direction;
 
   /* We are about to start executing the inferior (or simulate it),
      let's register it with the event loop.  */
@@ -1954,7 +2070,7 @@ record_full_core_resume (struct gdb_target *ops, ptid_t ptid, int step,
       target_async (inferior_event_handler, 0);
 
       /* Notify the event loop there's an event to wait for.  */
-      mark_async_event_handler (record_full_async_inferior_event_token);
+      mark_async_event_handler (self->record_full_async_inferior_event_token);
     }
 }
 
@@ -1976,6 +2092,8 @@ record_full_core_fetch_registers (struct gdb_target *ops,
 				  struct regcache *regcache,
 				  int regno)
 {
+  struct record_full_gdb_target *self = (struct record_full_gdb_target *) ops;
+
   if (regno < 0)
     {
       int num = gdbarch_num_regs (get_regcache_arch (regcache));
@@ -1983,11 +2101,13 @@ record_full_core_fetch_registers (struct gdb_target *ops,
 
       for (i = 0; i < num; i ++)
         regcache_raw_supply (regcache, i,
-                             record_full_core_regbuf + MAX_REGISTER_SIZE * i);
+                             self->record_full_core_regbuf
+			     + MAX_REGISTER_SIZE * i);
     }
   else
     regcache_raw_supply (regcache, regno,
-                         record_full_core_regbuf + MAX_REGISTER_SIZE * regno);
+                         self->record_full_core_regbuf
+			 + MAX_REGISTER_SIZE * regno);
 }
 
 /* "to_prepare_to_store" method for prec over corefile.  */
@@ -2004,9 +2124,12 @@ record_full_core_store_registers (struct gdb_target *ops,
                              struct regcache *regcache,
                              int regno)
 {
-  if (record_full_gdb_operation_disable)
+  struct record_full_gdb_target *self = (struct record_full_gdb_target *) ops;
+
+  if (self->record_full_gdb_operation_disable)
     regcache_raw_collect (regcache, regno,
-                          record_full_core_regbuf + MAX_REGISTER_SIZE * regno);
+                          self->record_full_core_regbuf
+			  + MAX_REGISTER_SIZE * regno);
   else
     error (_("You can't do that without a process to debug."));
 }
@@ -2020,13 +2143,17 @@ record_full_core_xfer_partial (struct gdb_target *ops,
 			       const gdb_byte *writebuf, ULONGEST offset,
 			       LONGEST len)
 {
+  struct record_full_gdb_target *self = (struct record_full_gdb_target *) ops;
+
   if (object == TARGET_OBJECT_MEMORY)
     {
-      if (record_full_gdb_operation_disable || !writebuf)
+      if (self->record_full_gdb_operation_disable || !writebuf)
 	{
 	  struct target_section *p;
 
-	  for (p = record_full_core_start; p < record_full_core_end; p++)
+	  for (p = self->record_full_core_start;
+	       p < self->record_full_core_end;
+	       p++)
 	    {
 	      if (offset >= p->addr)
 		{
@@ -2051,7 +2178,7 @@ record_full_core_xfer_partial (struct gdb_target *ops,
 		      return len;
 		    }
 		  /* Get record_full_core_buf_entry.  */
-		  for (entry = record_full_core_buf_list; entry;
+		  for (entry = self->record_full_core_buf_list; entry;
 		       entry = entry->prev)
 		    if (entry->p == p)
 		      break;
@@ -2072,8 +2199,8 @@ record_full_core_xfer_partial (struct gdb_target *ops,
 			      xfree (entry);
 			      return 0;
 			    }
-			  entry->prev = record_full_core_buf_list;
-			  record_full_core_buf_list = entry;
+			  entry->prev = self->record_full_core_buf_list;
+			  self->record_full_core_buf_list = entry;
 			}
 
 		      memcpy (entry->buf + sec_offset, writebuf,
@@ -2139,7 +2266,7 @@ init_record_full_core_ops (void)
   record_full_core_ops.to_doc =
     "Log program while executing and replay execution from log.";
   record_full_core_ops.to_open = record_full_open;
-  record_full_core_ops.to_close = record_full_close;
+  record_full_core_ops.to_xclose = record_full_xclose;
   record_full_core_ops.to_resume = record_full_core_resume;
   record_full_core_ops.to_wait = record_full_wait;
   record_full_core_ops.to_kill = record_full_core_kill;
@@ -2274,6 +2401,8 @@ record_full_restore (void)
   uint32_t osec_size;
   int bfd_offset = 0;
   struct regcache *regcache;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
   /* We restore the execution log from the open core bfd,
      if there is one.  */
@@ -2281,7 +2410,7 @@ record_full_restore (void)
     return;
 
   /* "record_full_restore" can only be called when record list is empty.  */
-  gdb_assert (record_full_first.next == NULL);
+  gdb_assert (self->record_full_first.next == NULL);
  
   if (record_debug)
     fprintf_unfiltered (gdb_stdlog, "Restoring recording from core file.\n");
@@ -2310,9 +2439,9 @@ record_full_restore (void)
 
   /* Restore the entries in recfd into record_full_arch_list_head and
      record_full_arch_list_tail.  */
-  record_full_arch_list_head = NULL;
-  record_full_arch_list_tail = NULL;
-  record_full_insn_num = 0;
+  self->record_full_arch_list_head = NULL;
+  self->record_full_arch_list_tail = NULL;
+  self->record_full_insn_num = 0;
   old_cleanups = make_cleanup (record_full_arch_list_cleanups, 0);
   regcache = get_current_regcache ();
 
@@ -2380,7 +2509,7 @@ record_full_restore (void)
 
         case record_full_end: /* end */
           rec = record_full_end_alloc ();
-          record_full_insn_num ++;
+          self->record_full_insn_num ++;
 
 	  /* Get signal value.  */
 	  bfdcore_read (core_bfd, osec, &signal, 
@@ -2393,7 +2522,7 @@ record_full_restore (void)
 			sizeof (count), &bfd_offset);
 	  count = netorder32 (count);
 	  rec->u.end.insn_num = count;
-	  record_full_insn_count = count + 1;
+	  self->record_full_insn_count = count + 1;
 	  if (record_debug)
 	    fprintf_unfiltered (gdb_stdlog,
 				"  Reading record_full_end (1 + "
@@ -2411,21 +2540,21 @@ record_full_restore (void)
         }
 
       /* Add rec to record arch list.  */
-      record_full_arch_list_add (rec);
+      record_full_arch_list_add (self, rec);
     }
 
   discard_cleanups (old_cleanups);
 
   /* Add record_full_arch_list_head to the end of record list.  */
-  record_full_first.next = record_full_arch_list_head;
-  record_full_arch_list_head->prev = &record_full_first;
-  record_full_arch_list_tail->next = NULL;
-  record_full_list = &record_full_first;
+  self->record_full_first.next = self->record_full_arch_list_head;
+  self->record_full_arch_list_head->prev = &self->record_full_first;
+  self->record_full_arch_list_tail->next = NULL;
+  self->record_full_list = &self->record_full_first;
 
   /* Update record_full_insn_max_num.  */
-  if (record_full_insn_num > record_full_insn_max_num)
+  if (self->record_full_insn_num > record_full_insn_max_num)
     {
-      record_full_insn_max_num = record_full_insn_num;
+      record_full_insn_max_num = self->record_full_insn_num;
       warning (_("Auto increase record/replay buffer limit to %u."),
                record_full_insn_max_num);
     }
@@ -2489,6 +2618,8 @@ record_full_save (const char *recfilename)
   int save_size = 0;
   asection *osec = NULL;
   int bfd_offset = 0;
+  struct record_full_gdb_target *self
+    = (struct record_full_gdb_target *) find_target_at (record_stratum);
 
   /* Open the save file.  */
   if (record_debug)
@@ -2500,7 +2631,7 @@ record_full_save (const char *recfilename)
   old_cleanups = make_cleanup (record_full_save_cleanups, obfd);
 
   /* Save the current record entry to "cur_record_full_list".  */
-  cur_record_full_list = record_full_list;
+  cur_record_full_list = self->record_full_list;
 
   /* Get the values of regcache and gdbarch.  */
   regcache = get_current_regcache ();
@@ -2513,29 +2644,30 @@ record_full_save (const char *recfilename)
   while (1)
     {
       /* Check for beginning and end of log.  */
-      if (record_full_list == &record_full_first)
+      if (self->record_full_list == &self->record_full_first)
         break;
 
-      record_full_exec_insn (regcache, gdbarch, record_full_list);
+      record_full_exec_insn (regcache, gdbarch, self->record_full_list);
 
-      if (record_full_list->prev)
-        record_full_list = record_full_list->prev;
+      if (self->record_full_list->prev)
+        self->record_full_list = self->record_full_list->prev;
     }
 
   /* Compute the size needed for the extra bfd section.  */
   save_size = 4;	/* magic cookie */
-  for (record_full_list = record_full_first.next; record_full_list;
-       record_full_list = record_full_list->next)
-    switch (record_full_list->type)
+  for (self->record_full_list = self->record_full_first.next;
+       self->record_full_list;
+       self->record_full_list = self->record_full_list->next)
+    switch (self->record_full_list->type)
       {
       case record_full_end:
 	save_size += 1 + 4 + 4;
 	break;
       case record_full_reg:
-	save_size += 1 + 4 + record_full_list->u.reg.len;
+	save_size += 1 + 4 + self->record_full_list->u.reg.len;
 	break;
       case record_full_mem:
-	save_size += 1 + 4 + 8 + record_full_list->u.mem.len;
+	save_size += 1 + 4 + 8 + self->record_full_list->u.mem.len;
 	break;
       }
 
@@ -2567,39 +2699,39 @@ record_full_save (const char *recfilename)
 
   /* Save the entries to recfd and forward execute to the end of
      record list.  */
-  record_full_list = &record_full_first;
+  self->record_full_list = &self->record_full_first;
   while (1)
     {
       /* Save entry.  */
-      if (record_full_list != &record_full_first)
+      if (self->record_full_list != &self->record_full_first)
         {
 	  uint8_t type;
 	  uint32_t regnum, len, signal, count;
           uint64_t addr;
 
-	  type = record_full_list->type;
+	  type = self->record_full_list->type;
           bfdcore_write (obfd, osec, &type, sizeof (type), &bfd_offset);
 
-          switch (record_full_list->type)
+          switch (self->record_full_list->type)
             {
             case record_full_reg: /* reg */
 	      if (record_debug)
 		fprintf_unfiltered (gdb_stdlog,
 				    "  Writing register %d (1 "
 				    "plus %lu plus %d bytes)\n",
-				    record_full_list->u.reg.num,
+				    self->record_full_list->u.reg.num,
 				    (unsigned long) sizeof (regnum),
-				    record_full_list->u.reg.len);
+				    self->record_full_list->u.reg.len);
 
               /* Write regnum.  */
-              regnum = netorder32 (record_full_list->u.reg.num);
+              regnum = netorder32 (self->record_full_list->u.reg.num);
               bfdcore_write (obfd, osec, &regnum,
 			     sizeof (regnum), &bfd_offset);
 
               /* Write regval.  */
               bfdcore_write (obfd, osec,
-			     record_full_get_loc (record_full_list),
-			     record_full_list->u.reg.len, &bfd_offset);
+			     record_full_get_loc (self->record_full_list),
+			     self->record_full_list->u.reg.len, &bfd_offset);
               break;
 
             case record_full_mem: /* mem */
@@ -2608,24 +2740,24 @@ record_full_save (const char *recfilename)
 				    "  Writing memory %s (1 plus "
 				    "%lu plus %lu plus %d bytes)\n",
 				    paddress (gdbarch,
-					      record_full_list->u.mem.addr),
+					      self->record_full_list->u.mem.addr),
 				    (unsigned long) sizeof (addr),
 				    (unsigned long) sizeof (len),
-				    record_full_list->u.mem.len);
+				    self->record_full_list->u.mem.len);
 
 	      /* Write memlen.  */
-	      len = netorder32 (record_full_list->u.mem.len);
+	      len = netorder32 (self->record_full_list->u.mem.len);
 	      bfdcore_write (obfd, osec, &len, sizeof (len), &bfd_offset);
 
 	      /* Write memaddr.  */
-	      addr = netorder64 (record_full_list->u.mem.addr);
+	      addr = netorder64 (self->record_full_list->u.mem.addr);
 	      bfdcore_write (obfd, osec, &addr, 
 			     sizeof (addr), &bfd_offset);
 
 	      /* Write memval.  */
 	      bfdcore_write (obfd, osec,
-			     record_full_get_loc (record_full_list),
-			     record_full_list->u.mem.len, &bfd_offset);
+			     record_full_get_loc (self->record_full_list),
+			     self->record_full_list->u.mem.len, &bfd_offset);
               break;
 
               case record_full_end:
@@ -2636,12 +2768,12 @@ record_full_save (const char *recfilename)
 				      (unsigned long) sizeof (signal),
 				      (unsigned long) sizeof (count));
 		/* Write signal value.  */
-		signal = netorder32 (record_full_list->u.end.sigval);
+		signal = netorder32 (self->record_full_list->u.end.sigval);
 		bfdcore_write (obfd, osec, &signal,
 			       sizeof (signal), &bfd_offset);
 
 		/* Write insn count.  */
-		count = netorder32 (record_full_list->u.end.insn_num);
+		count = netorder32 (self->record_full_list->u.end.insn_num);
 		bfdcore_write (obfd, osec, &count,
 			       sizeof (count), &bfd_offset);
                 break;
@@ -2649,10 +2781,10 @@ record_full_save (const char *recfilename)
         }
 
       /* Execute entry.  */
-      record_full_exec_insn (regcache, gdbarch, record_full_list);
+      record_full_exec_insn (regcache, gdbarch, self->record_full_list);
 
-      if (record_full_list->next)
-        record_full_list = record_full_list->next;
+      if (self->record_full_list->next)
+        self->record_full_list = self->record_full_list->next;
       else
         break;
     }
@@ -2661,13 +2793,13 @@ record_full_save (const char *recfilename)
   while (1)
     {
       /* Check for beginning and end of log.  */
-      if (record_full_list == cur_record_full_list)
+      if (self->record_full_list == cur_record_full_list)
         break;
 
-      record_full_exec_insn (regcache, gdbarch, record_full_list);
+      record_full_exec_insn (regcache, gdbarch, self->record_full_list);
 
-      if (record_full_list->prev)
-        record_full_list = record_full_list->prev;
+      if (self->record_full_list->prev)
+        self->record_full_list = self->record_full_list->prev;
     }
 
   do_cleanups (set_cleanups);
@@ -2684,7 +2816,8 @@ record_full_save (const char *recfilename)
    correspondingly.  */
 
 static void
-record_full_goto_insn (struct record_full_entry *entry,
+record_full_goto_insn (struct record_full_gdb_target *self,
+		       struct record_full_entry *entry,
 		       enum exec_direction_kind dir)
 {
   struct cleanup *set_cleanups = record_full_gdb_operation_disable_set ();
@@ -2695,16 +2828,16 @@ record_full_goto_insn (struct record_full_entry *entry,
      and we will not hit the end of the recording.  */
 
   if (dir == EXEC_FORWARD)
-    record_full_list = record_full_list->next;
+    self->record_full_list = self->record_full_list->next;
 
   do
     {
-      record_full_exec_insn (regcache, gdbarch, record_full_list);
+      record_full_exec_insn (regcache, gdbarch, self->record_full_list);
       if (dir == EXEC_REVERSE)
-	record_full_list = record_full_list->prev;
+	self->record_full_list = self->record_full_list->prev;
       else
-	record_full_list = record_full_list->next;
-    } while (record_full_list != entry);
+	self->record_full_list = self->record_full_list->next;
+    } while (self->record_full_list != entry);
   do_cleanups (set_cleanups);
 }
 
@@ -2720,15 +2853,6 @@ static void
 set_record_full_insn_max_num (char *args, int from_tty,
 			      struct cmd_list_element *c)
 {
-  if (record_full_insn_num > record_full_insn_max_num)
-    {
-      /* Count down record_full_insn_num while releasing records from list.  */
-      while (record_full_insn_num > record_full_insn_max_num)
-       {
-         record_full_list_release_first ();
-         record_full_insn_num--;
-       }
-    }
 }
 
 /* The "set record full" command.  */
@@ -2757,11 +2881,6 @@ void
 _initialize_record_full (void)
 {
   struct cmd_list_element *c;
-
-  /* Init record_full_first.  */
-  record_full_first.prev = NULL;
-  record_full_first.next = NULL;
-  record_full_first.type = record_full_end;
 
   init_record_full_ops ();
   add_target (&record_full_ops);
