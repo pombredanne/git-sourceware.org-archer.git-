@@ -22,7 +22,7 @@
 
 struct cmd_list_element;
 
-#define RECORD_IS_USED	(current_target.to_stratum == record_stratum)
+#define RECORD_IS_USED	(find_target_at (record_stratum) != NULL)
 
 extern unsigned int record_debug;
 

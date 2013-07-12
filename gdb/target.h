@@ -937,6 +937,12 @@ extern void target_disconnect (char *, int);
 
 extern void target_resume (ptid_t ptid, int step, enum gdb_signal signal);
 
+/* Delegate "target_resume" to a target beneath SELF.  */
+
+extern void target_delegate_resume (struct target_ops *self,
+				    ptid_t ptid, int step,
+				    enum gdb_signal signal);
+
 /* Wait for process pid to do something.  PTID = -1 to wait for any
    pid to do something.  Return pid of child, or -1 in case of error;
    store status through argument pointer STATUS.  Note that it is
@@ -949,6 +955,13 @@ extern void target_resume (ptid_t ptid, int step, enum gdb_signal signal);
 extern ptid_t target_wait (ptid_t ptid, struct target_waitstatus *status,
 			   int options);
 
+/* Delegate "target_wait" to a target beneath SELF.  */
+
+extern ptid_t target_delegate_wait (struct target_ops *self,
+				    ptid_t ptid,
+				    struct target_waitstatus *status,
+				    int options);
+
 /* Fetch at least register REGNO, or all regs if regno == -1.  No result.  */
 
 extern void target_fetch_registers (struct regcache *regcache, int regno);
@@ -958,6 +971,12 @@ extern void target_fetch_registers (struct regcache *regcache, int regno);
    must have been previously called.  Calls error() if there are problems.  */
 
 extern void target_store_registers (struct regcache *regcache, int regs);
+
+/* Delegate "target_store_registers" to a target beneath SELF.  */
+
+extern void target_delegate_store_registers (struct target_ops *self,
+					     struct regcache *regcache,
+					     int regno);
 
 /* Get ready to modify the registers array.  On machines which store
    individual registers, this doesn't need to do anything.  On machines
@@ -1091,11 +1110,23 @@ int target_write_memory_blocks (VEC(memory_write_request_s) *requests,
 extern int target_insert_breakpoint (struct gdbarch *gdbarch,
 				     struct bp_target_info *bp_tgt);
 
+/* Delegate "target_insert_breakpoint" to a target beneath SELF.  */
+
+extern int target_delegate_insert_breakpoint (struct target_ops *self,
+					      struct gdbarch *gdbarch,
+					      struct bp_target_info *bp_tgt);
+
 /* Remove a breakpoint at address BP_TGT->placed_address in the target
    machine.  Result is 0 for success, or an errno value.  */
 
 extern int target_remove_breakpoint (struct gdbarch *gdbarch,
 				     struct bp_target_info *bp_tgt);
+
+/* Delegate "target_remove_breakpoint" to a target beneath SELF.  */
+
+extern int target_delegate_remove_breakpoint (struct target_ops *self,
+					      struct gdbarch *gdbarch,
+					      struct bp_target_info *bp_tgt);
 
 /* Initialize the terminal settings we record for the inferior,
    before we actually run the inferior.  */
@@ -1375,14 +1406,28 @@ extern int target_async_permitted;
 /* Can the target support asynchronous execution?  */
 #define target_can_async_p() (current_target.to_can_async_p ())
 
+/* Delegate "target_can_async_p" to a target beneath SELF.  */
+
+extern int target_delegate_can_async_p (struct target_ops *self);
+
 /* Is the target in asynchronous execution mode?  */
 #define target_is_async_p() (current_target.to_is_async_p ())
+
+/* Delegate "target_is_async_p" to a target beneath SELF.  */
+
+extern int target_delegate_is_async_p (struct target_ops *self);
 
 int target_supports_non_stop (void);
 
 /* Put the target in async mode with the specified callback function.  */
 #define target_async(CALLBACK,CONTEXT) \
      (current_target.to_async ((CALLBACK), (CONTEXT)))
+
+/* Delegate "target_async" to a target beneath SELF.  */
+
+extern void target_delegate_async (struct target_ops *,
+				   void (*) (enum inferior_event_type, void *),
+				   void *);
 
 #define target_execution_direction() \
   (current_target.to_execution_direction ())
@@ -1459,6 +1504,10 @@ extern char *target_thread_name (struct thread_info *);
 #define target_stopped_by_watchpoint \
    (*current_target.to_stopped_by_watchpoint)
 
+/* Delegate "target_stopped_by_watchpoint" to a target beneath SELF.  */
+
+extern int target_delegate_stopped_by_watchpoint (struct target_ops *self);
+
 /* Non-zero if we have steppable watchpoints  */
 
 #define target_have_steppable_watchpoint \
@@ -1531,6 +1580,11 @@ extern int target_ranged_break_num_registers (void);
    INFERIOR_PTID task is being queried.  */
 #define target_stopped_data_address(target, addr_p) \
     (*target.to_stopped_data_address) (target, addr_p)
+
+/* Delegate "target_stopped_data_address" to a target beneath SELF.  */
+
+extern int target_delegate_stopped_data_address (struct target_ops *self,
+						 CORE_ADDR *addr_p);
 
 /* Return non-zero if ADDR is within the range of a watchpoint spanning
    LENGTH bytes beginning at START.  */
@@ -1860,6 +1914,11 @@ extern void find_default_create_inferior (struct target_ops *,
 
 extern struct target_ops *find_target_beneath (struct target_ops *);
 
+/* Find the target at STRATUM.  If no target is at that stratum,
+   return NULL.  */
+
+struct target_ops *find_target_at (enum strata stratum);
+
 /* Read OS data object of type TYPE from the target, and return it in
    XML format.  The result is NUL-terminated and returned as a string,
    allocated using xmalloc.  If an error occurs or the transfer is
@@ -1961,5 +2020,14 @@ extern void target_call_history_from (ULONGEST begin, int size, int flags);
 
 /* See to_call_history_range.  */
 extern void target_call_history_range (ULONGEST begin, ULONGEST end, int flags);
+
+/* Delegate "target_xfer_partial" to a target beneath SELF.  */
+
+extern LONGEST target_delegate_xfer_partial (struct target_ops *ops,
+					     enum target_object object,
+					     const char *annex,
+					     gdb_byte *readbuf,
+					     const gdb_byte *writebuf,
+					     ULONGEST offset, LONGEST len);
 
 #endif /* !defined (TARGET_H) */

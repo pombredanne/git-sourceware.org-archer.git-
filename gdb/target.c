@@ -75,12 +75,6 @@ static LONGEST default_xfer_partial (struct target_ops *ops,
 				     const gdb_byte *writebuf,
 				     ULONGEST offset, LONGEST len);
 
-static LONGEST current_xfer_partial (struct target_ops *ops,
-				     enum target_object object,
-				     const char *annex, gdb_byte *readbuf,
-				     const gdb_byte *writebuf,
-				     ULONGEST offset, LONGEST len);
-
 static LONGEST target_xfer_partial (struct target_ops *ops,
 				    enum target_object object,
 				    const char *annex,
@@ -866,7 +860,7 @@ update_current_target (void)
   de_fault (to_stop,
 	    (void (*) (ptid_t))
 	    target_ignore);
-  current_target.to_xfer_partial = current_xfer_partial;
+  current_target.to_xfer_partial = target_delegate_xfer_partial;
   de_fault (to_rcmd,
 	    (void (*) (char *, struct ui_file *))
 	    tcomplain);
@@ -1992,20 +1986,67 @@ default_xfer_partial (struct target_ops *ops, enum target_object object,
     return -1;
 }
 
-/* The xfer_partial handler for the topmost target.  Unlike the default,
-   it does not need to handle memory specially; it just passes all
-   requests down the stack.  */
+/* See target.h.  */
 
-static LONGEST
-current_xfer_partial (struct target_ops *ops, enum target_object object,
-		      const char *annex, gdb_byte *readbuf,
-		      const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
+LONGEST
+target_delegate_xfer_partial (struct target_ops *ops,
+			      enum target_object object,
+			      const char *annex, gdb_byte *readbuf,
+			      const gdb_byte *writebuf,
+			      ULONGEST offset, LONGEST len)
 {
   if (ops->beneath != NULL)
     return ops->beneath->to_xfer_partial (ops->beneath, object, annex,
 					  readbuf, writebuf, offset, len);
   else
     return -1;
+}
+
+/* See target.h.  */
+
+void
+target_delegate_async (struct target_ops *self,
+		       void (*callback) (enum inferior_event_type, void *),
+		       void *datum)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_async)
+	{
+	  t->to_async (callback, datum);
+	  break;
+	}
+    }
+}
+
+/* See target.h.  */
+
+int
+target_delegate_is_async_p (struct target_ops *self)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    if (t->to_is_async_p != NULL)
+      return t->to_is_async_p ();
+
+  gdb_assert_not_reached (_("reached end of target stack during delegation"));
+}
+
+/* See target.h.  */
+
+int
+target_delegate_can_async_p (struct target_ops *self)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    if (t->to_can_async_p != NULL)
+      return t->to_can_async_p ();
+
+  gdb_assert_not_reached (_("reached end of target stack during delegation"));
 }
 
 /* Target vector read/write partial wrapper functions.  */
@@ -2458,6 +2499,24 @@ target_insert_breakpoint (struct gdbarch *gdbarch,
   return (*current_target.to_insert_breakpoint) (gdbarch, bp_tgt);
 }
 
+/* See target.h.  */
+
+int
+target_delegate_insert_breakpoint (struct target_ops *self,
+				   struct gdbarch *gdbarch,
+				   struct bp_target_info *bp_tgt)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_insert_breakpoint)
+	return t->to_insert_breakpoint (gdbarch, bp_tgt);
+    }
+
+  gdb_assert_not_reached (_("reached end of target stack during delegation"));
+}
+
 int
 target_remove_breakpoint (struct gdbarch *gdbarch,
 			  struct bp_target_info *bp_tgt)
@@ -2473,6 +2532,24 @@ target_remove_breakpoint (struct gdbarch *gdbarch,
     }
 
   return (*current_target.to_remove_breakpoint) (gdbarch, bp_tgt);
+}
+
+/* See target.h.  */
+
+int
+target_delegate_remove_breakpoint (struct target_ops *self,
+				   struct gdbarch *gdbarch,
+				   struct bp_target_info *bp_tgt)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_remove_breakpoint)
+	return t->to_remove_breakpoint (gdbarch, bp_tgt);
+    }
+
+  gdb_assert_not_reached (_("reached end of target stack during delegation"));
 }
 
 static void
@@ -2681,6 +2758,24 @@ target_wait (ptid_t ptid, struct target_waitstatus *status, int options)
   noprocess ();
 }
 
+/* See target.h.  */
+
+ptid_t
+target_delegate_wait (struct target_ops *self,
+		      ptid_t ptid, struct target_waitstatus *status,
+		      int options)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_wait)
+	return t->to_wait (t, ptid, status, options);
+    }
+
+  gdb_assert_not_reached (_("reached end of target stack during delegation"));
+}
+
 char *
 target_pid_to_str (ptid_t ptid)
 {
@@ -2736,6 +2831,24 @@ target_resume (ptid_t ptid, int step, enum gdb_signal signal)
     }
 
   noprocess ();
+}
+
+/* See target.h.  */
+
+void
+target_delegate_resume (struct target_ops *self,
+			ptid_t ptid, int step, enum gdb_signal signal)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_resume)
+	{
+	  t->to_resume (t, ptid, step, signal);
+	  break;
+	}
+    }
 }
 
 void
@@ -3633,6 +3746,20 @@ find_target_beneath (struct target_ops *t)
   return t->beneath;
 }
 
+/* See target.h.  */
+
+struct target_ops *
+find_target_at (enum strata stratum)
+{
+  struct target_ops *t;
+
+  for (t = current_target.beneath; t != NULL; t = t->beneath)
+    if (t->to_stratum == stratum)
+      return t;
+
+  return NULL;
+}
+
 
 /* The inferior process has died.  Long live the inferior!  */
 
@@ -3985,6 +4112,24 @@ target_store_registers (struct regcache *regcache, int regno)
   noprocess ();
 }
 
+/* See target.h.  */
+
+void
+target_delegate_store_registers (struct target_ops *self,
+				 struct regcache *regcache, int regno)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_store_registers)
+	{
+	  t->to_store_registers (t, regcache, regno);
+	  break;
+	}
+    }
+}
+
 int
 target_core_of_thread (ptid_t ptid)
 {
@@ -4113,6 +4258,39 @@ target_ranged_break_num_registers (void)
       return t->to_ranged_break_num_registers (t);
 
   return -1;
+}
+
+/* See target.h.  */
+
+int
+target_delegate_stopped_by_watchpoint (struct target_ops *self)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_stopped_by_watchpoint)
+	return t->to_stopped_by_watchpoint ();
+    }
+
+  gdb_assert_not_reached (_("reached end of target stack during delegation"));
+}
+
+/* See target.h.  */
+
+int
+target_delegate_stopped_data_address (struct target_ops *self,
+				      CORE_ADDR *addr_p)
+{
+  struct target_ops *t;
+
+  for (t = self->beneath; t != NULL; t = t->beneath)
+    {
+      if (t->to_stopped_data_address)
+	return t->to_stopped_data_address (t, addr_p);
+    }
+
+  gdb_assert_not_reached (_("reached end of target stack during delegation"));
 }
 
 /* See target.h.  */
