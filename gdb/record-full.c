@@ -917,7 +917,7 @@ record_full_open (char *name, int from_tty)
     fprintf_unfiltered (gdb_stdlog, "Process record: record_full_open\n");
 
   /* Check if record target is already running.  */
-  if (current_target->ops->to_stratum == record_stratum)
+  if (RECORD_IS_USED)
     error (_("Process record target already running.  Use \"record stop\" to "
              "stop record target first."));
 
