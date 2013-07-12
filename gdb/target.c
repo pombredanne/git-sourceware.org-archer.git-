@@ -75,12 +75,6 @@ static LONGEST default_xfer_partial (struct gdb_target *ops,
 				     const gdb_byte *writebuf,
 				     ULONGEST offset, LONGEST len);
 
-static LONGEST current_xfer_partial (struct gdb_target *ops,
-				     enum target_object object,
-				     const char *annex, gdb_byte *readbuf,
-				     const gdb_byte *writebuf,
-				     ULONGEST offset, LONGEST len);
-
 static LONGEST target_xfer_partial (struct gdb_target *ops,
 				    enum target_object object,
 				    const char *annex,
@@ -184,12 +178,17 @@ struct target_stack
 
 static struct target_stack *target_stack;
 
+/* Iterate over all targets beneath INIT.  */
+
+#define FOREACH_TARGET_UNDER(INIT, T)		\
+  for ((T) = find_target_beneath (INIT);	\
+       (T) != NULL;				\
+       (T) = find_target_beneath (T))
+
 /* Iterate over all targets currently in the stack.  */
 
 #define FOREACH_TARGET(T) \
-  for ((T) = find_target_beneath (current_target); \
-       (T) != NULL;				   \
-       (T) = find_target_beneath (T))
+  FOREACH_TARGET_UNDER (current_target, T)
 
 /* The target structure we are currently using to talk to a process
    or file or whatever "inferior" we have.  This is always equal to
@@ -887,7 +886,7 @@ update_current_target (void)
   de_fault (to_stop,
 	    (void (*) (ptid_t))
 	    target_ignore);
-  current_target->ops->to_xfer_partial = current_xfer_partial;
+  current_target->ops->to_xfer_partial = target_delegate_xfer_partial;
   de_fault (to_rcmd,
 	    (void (*) (char *, struct ui_file *))
 	    tcomplain);
@@ -1997,10 +1996,12 @@ default_xfer_partial (struct gdb_target *ops, enum target_object object,
    it does not need to handle memory specially; it just passes all
    requests down the stack.  */
 
-static LONGEST
-current_xfer_partial (struct gdb_target *ops, enum target_object object,
-		      const char *annex, gdb_byte *readbuf,
-		      const gdb_byte *writebuf, ULONGEST offset, LONGEST len)
+LONGEST
+target_delegate_xfer_partial (struct gdb_target *ops,
+			      enum target_object object,
+			      const char *annex, gdb_byte *readbuf,
+			      const gdb_byte *writebuf,
+			      ULONGEST offset, LONGEST len)
 {
   struct gdb_target *beneath = find_target_beneath (ops);
 
@@ -2010,6 +2011,25 @@ current_xfer_partial (struct gdb_target *ops, enum target_object object,
   else
     return -1;
 }
+
+void
+target_delegate_async (struct gdb_target *self,
+		       void (*callback) (enum inferior_event_type, void *),
+		       void *datum)
+{
+  struct gdb_target *t;
+
+  FOREACH_TARGET_UNDER (self, t)
+    {
+      if (t->ops->to_async)
+	{
+	  t->ops->to_async (callback, datum);
+	  break;
+	}
+    }
+}
+
+
 
 /* Target vector read/write partial wrapper functions.  */
 
@@ -2462,6 +2482,22 @@ target_insert_breakpoint (struct gdbarch *gdbarch,
 }
 
 int
+target_delegate_insert_breakpoint (struct gdb_target *self,
+				   struct gdbarch *gdbarch,
+				   struct bp_target_info *bp_tgt)
+{
+  struct gdb_target *t;
+
+  FOREACH_TARGET_UNDER (self, t)
+    {
+      if (t->ops->to_insert_breakpoint)
+	return t->ops->to_insert_breakpoint (gdbarch, bp_tgt);
+    }
+
+  gdb_assert_not_reached ("fixme?");
+}
+
+int
 target_remove_breakpoint (struct gdbarch *gdbarch,
 			  struct bp_target_info *bp_tgt)
 {
@@ -2476,6 +2512,22 @@ target_remove_breakpoint (struct gdbarch *gdbarch,
     }
 
   return (*current_target->ops->to_remove_breakpoint) (gdbarch, bp_tgt);
+}
+
+int
+target_delegate_remove_breakpoint (struct gdb_target *self,
+				   struct gdbarch *gdbarch,
+				   struct bp_target_info *bp_tgt)
+{
+  struct gdb_target *t;
+
+  FOREACH_TARGET_UNDER (self, t)
+    {
+      if (t->ops->to_remove_breakpoint)
+	return t->ops->to_remove_breakpoint (gdbarch, bp_tgt);
+    }
+
+  gdb_assert_not_reached ("fixme?");
 }
 
 static void
@@ -2685,6 +2737,22 @@ target_wait (ptid_t ptid, struct target_waitstatus *status, int options)
   noprocess ();
 }
 
+ptid_t
+target_delegate_wait (struct gdb_target *self,
+		      ptid_t ptid, struct target_waitstatus *status,
+		      int options)
+{
+  struct gdb_target *t;
+
+  FOREACH_TARGET_UNDER (self, t)
+    {
+      if (t->ops->to_wait)
+	return t->ops->to_wait (t, ptid, status, options);
+    }
+
+  gdb_assert_not_reached ("fixme?");
+}
+
 char *
 target_pid_to_str (ptid_t ptid)
 {
@@ -2740,6 +2808,22 @@ target_resume (ptid_t ptid, int step, enum gdb_signal signal)
     }
 
   noprocess ();
+}
+
+void
+target_delegate_resume (struct gdb_target *self,
+			ptid_t ptid, int step, enum gdb_signal signal)
+{
+  struct gdb_target *t;
+
+  FOREACH_TARGET_UNDER (self, t)
+    {
+      if (t->ops->to_resume)
+	{
+	  t->ops->to_resume (t, ptid, step, signal);
+	  break;
+	}
+    }
 }
 
 void
@@ -4026,6 +4110,22 @@ target_store_registers (struct regcache *regcache, int regno)
   noprocess ();
 }
 
+void
+target_delegate_store_registers (struct gdb_target *self,
+				 struct regcache *regcache, int regno)
+{
+  struct gdb_target *t;
+
+  FOREACH_TARGET_UNDER (self, t)
+    {
+      if (t->ops->to_store_registers)
+	{
+	  t->ops->to_store_registers (t, regcache, regno);
+	  break;
+	}
+    }
+}
+
 int
 target_core_of_thread (ptid_t ptid)
 {
@@ -4154,6 +4254,35 @@ target_ranged_break_num_registers (void)
       return t->ops->to_ranged_break_num_registers (t);
 
   return -1;
+}
+
+int
+target_delegate_stopped_by_watchpoint (struct gdb_target *self)
+{
+  struct gdb_target *t;
+
+  FOREACH_TARGET_UNDER (self, t)
+    {
+      if (t->ops->to_stopped_by_watchpoint)
+	return t->ops->to_stopped_by_watchpoint ();
+    }
+
+  gdb_assert_not_reached ("fixme?");
+}
+
+int
+target_delegate_stopped_data_address (struct gdb_target *self,
+				      CORE_ADDR *addr_p)
+{
+  struct gdb_target *t;
+
+  FOREACH_TARGET_UNDER (self, t)
+    {
+      if (t->ops->to_stopped_data_address)
+	return t->ops->to_stopped_data_address (t, addr_p);
+    }
+
+  gdb_assert_not_reached ("fixme?");
 }
 
 /* See target.h.  */

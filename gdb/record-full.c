@@ -215,40 +215,6 @@ static struct cmd_list_element *show_record_full_cmdlist;
 /* Command list for "record full".  */
 static struct cmd_list_element *record_full_cmdlist;
 
-/* The beneath function pointers.  */
-static struct gdb_target *record_full_beneath_to_resume_ops;
-static void (*record_full_beneath_to_resume) (struct gdb_target *, ptid_t, int,
-					      enum gdb_signal);
-static struct gdb_target *record_full_beneath_to_wait_ops;
-static ptid_t (*record_full_beneath_to_wait) (struct gdb_target *, ptid_t,
-					      struct target_waitstatus *,
-					      int);
-static struct gdb_target *record_full_beneath_to_store_registers_ops;
-static void (*record_full_beneath_to_store_registers) (struct gdb_target *,
-						       struct regcache *,
-						       int regno);
-static struct gdb_target *record_full_beneath_to_xfer_partial_ops;
-static LONGEST
-  (*record_full_beneath_to_xfer_partial) (struct gdb_target *ops,
-					  enum target_object object,
-					  const char *annex,
-					  gdb_byte *readbuf,
-					  const gdb_byte *writebuf,
-					  ULONGEST offset,
-					  LONGEST len);
-static int
-  (*record_full_beneath_to_insert_breakpoint) (struct gdbarch *,
-					       struct bp_target_info *);
-static int
-  (*record_full_beneath_to_remove_breakpoint) (struct gdbarch *,
-					       struct bp_target_info *);
-static int (*record_full_beneath_to_stopped_by_watchpoint) (void);
-static int (*record_full_beneath_to_stopped_data_address) (struct gdb_target *,
-							   CORE_ADDR *);
-static void
-  (*record_full_beneath_to_async) (void (*) (enum inferior_event_type, void *),
-				   void *);
-
 static void record_full_goto_insn (struct record_full_entry *entry,
 				   enum exec_direction_kind dir);
 static void record_full_save (const char *recfilename);
@@ -795,34 +761,6 @@ record_full_exec_insn (struct regcache *regcache,
     }
 }
 
-static struct gdb_target *tmp_to_resume_ops;
-static void (*tmp_to_resume) (struct gdb_target *, ptid_t, int,
-			      enum gdb_signal);
-static struct gdb_target *tmp_to_wait_ops;
-static ptid_t (*tmp_to_wait) (struct gdb_target *, ptid_t,
-			      struct target_waitstatus *,
-			      int);
-static struct gdb_target *tmp_to_store_registers_ops;
-static void (*tmp_to_store_registers) (struct gdb_target *,
-				       struct regcache *,
-				       int regno);
-static struct gdb_target *tmp_to_xfer_partial_ops;
-static LONGEST (*tmp_to_xfer_partial) (struct gdb_target *ops,
-				       enum target_object object,
-				       const char *annex,
-				       gdb_byte *readbuf,
-				       const gdb_byte *writebuf,
-				       ULONGEST offset,
-				       LONGEST len);
-static int (*tmp_to_insert_breakpoint) (struct gdbarch *,
-					struct bp_target_info *);
-static int (*tmp_to_remove_breakpoint) (struct gdbarch *,
-					struct bp_target_info *);
-static int (*tmp_to_stopped_by_watchpoint) (void);
-static int (*tmp_to_stopped_data_address) (struct gdb_target *, CORE_ADDR *);
-static int (*tmp_to_stopped_data_address) (struct gdb_target *, CORE_ADDR *);
-static void (*tmp_to_async) (void (*) (enum inferior_event_type, void *), void *);
-
 static void record_full_restore (void);
 
 /* Asynchronous signal handle registered as event loop source for when
@@ -885,26 +823,6 @@ record_full_open_1 (char *name, int from_tty)
     error (_("Process record: the current architecture doesn't support "
 	     "record function."));
 
-  if (!tmp_to_resume)
-    error (_("Could not find 'to_resume' method on the target stack."));
-  if (!tmp_to_wait)
-    error (_("Could not find 'to_wait' method on the target stack."));
-  if (!tmp_to_store_registers)
-    error (_("Could not find 'to_store_registers' "
-	     "method on the target stack."));
-  if (!tmp_to_insert_breakpoint)
-    error (_("Could not find 'to_insert_breakpoint' "
-	     "method on the target stack."));
-  if (!tmp_to_remove_breakpoint)
-    error (_("Could not find 'to_remove_breakpoint' "
-	     "method on the target stack."));
-  if (!tmp_to_stopped_by_watchpoint)
-    error (_("Could not find 'to_stopped_by_watchpoint' "
-	     "method on the target stack."));
-  if (!tmp_to_stopped_data_address)
-    error (_("Could not find 'to_stopped_data_address' "
-	     "method on the target stack."));
-
   push_target (&record_full_ops);
 }
 
@@ -925,80 +843,11 @@ record_full_open (char *name, int from_tty)
     error (_("Process record target already running.  Use \"record stop\" to "
              "stop record target first."));
 
-  /* Reset the tmp beneath pointers.  */
-  tmp_to_resume_ops = NULL;
-  tmp_to_resume = NULL;
-  tmp_to_wait_ops = NULL;
-  tmp_to_wait = NULL;
-  tmp_to_store_registers_ops = NULL;
-  tmp_to_store_registers = NULL;
-  tmp_to_xfer_partial_ops = NULL;
-  tmp_to_xfer_partial = NULL;
-  tmp_to_insert_breakpoint = NULL;
-  tmp_to_remove_breakpoint = NULL;
-  tmp_to_stopped_by_watchpoint = NULL;
-  tmp_to_stopped_data_address = NULL;
-  tmp_to_async = NULL;
-
-  /* Set the beneath function pointers.  */
-  for (t = find_target_beneath (current_target);
-       t != NULL;
-       t = find_target_beneath (t))
-    {
-      if (!tmp_to_resume)
-        {
-	  tmp_to_resume = t->ops->to_resume;
-	  tmp_to_resume_ops = t;
-        }
-      if (!tmp_to_wait)
-        {
-	  tmp_to_wait = t->ops->to_wait;
-	  tmp_to_wait_ops = t;
-        }
-      if (!tmp_to_store_registers)
-        {
-	  tmp_to_store_registers = t->ops->to_store_registers;
-	  tmp_to_store_registers_ops = t;
-        }
-      if (!tmp_to_xfer_partial)
-        {
-	  tmp_to_xfer_partial = t->ops->to_xfer_partial;
-	  tmp_to_xfer_partial_ops = t;
-        }
-      if (!tmp_to_insert_breakpoint)
-	tmp_to_insert_breakpoint = t->ops->to_insert_breakpoint;
-      if (!tmp_to_remove_breakpoint)
-	tmp_to_remove_breakpoint = t->ops->to_remove_breakpoint;
-      if (!tmp_to_stopped_by_watchpoint)
-	tmp_to_stopped_by_watchpoint = t->ops->to_stopped_by_watchpoint;
-      if (!tmp_to_stopped_data_address)
-	tmp_to_stopped_data_address = t->ops->to_stopped_data_address;
-      if (!tmp_to_async)
-	tmp_to_async = t->ops->to_async;
-    }
-  if (!tmp_to_xfer_partial)
-    error (_("Could not find 'to_xfer_partial' method on the target stack."));
-
   /* Reset */
   record_full_insn_num = 0;
   record_full_insn_count = 0;
   record_full_list = &record_full_first;
   record_full_list->next = NULL;
-
-  /* Set the tmp beneath pointers to beneath pointers.  */
-  record_full_beneath_to_resume_ops = tmp_to_resume_ops;
-  record_full_beneath_to_resume = tmp_to_resume;
-  record_full_beneath_to_wait_ops = tmp_to_wait_ops;
-  record_full_beneath_to_wait = tmp_to_wait;
-  record_full_beneath_to_store_registers_ops = tmp_to_store_registers_ops;
-  record_full_beneath_to_store_registers = tmp_to_store_registers;
-  record_full_beneath_to_xfer_partial_ops = tmp_to_xfer_partial_ops;
-  record_full_beneath_to_xfer_partial = tmp_to_xfer_partial;
-  record_full_beneath_to_insert_breakpoint = tmp_to_insert_breakpoint;
-  record_full_beneath_to_remove_breakpoint = tmp_to_remove_breakpoint;
-  record_full_beneath_to_stopped_by_watchpoint = tmp_to_stopped_by_watchpoint;
-  record_full_beneath_to_stopped_data_address = tmp_to_stopped_data_address;
-  record_full_beneath_to_async = tmp_to_async;
 
   if (core_bfd)
     record_full_core_open_1 (name, from_tty);
@@ -1123,8 +972,7 @@ record_full_resume (struct gdb_target *ops, ptid_t ptid, int step,
       /* Make sure the target beneath reports all signals.  */
       target_pass_signals (0, NULL);
 
-      record_full_beneath_to_resume (record_full_beneath_to_resume_ops,
-				     ptid, step, signal);
+      target_delegate_resume (ops, ptid, step, signal);
     }
 
   /* We are about to start executing the inferior (or simulate it),
@@ -1214,8 +1062,7 @@ record_full_wait_1 (struct gdb_target *ops,
       if (record_full_resume_step)
 	{
 	  /* This is a single step.  */
-	  return record_full_beneath_to_wait (record_full_beneath_to_wait_ops,
-					      ptid, status, options);
+	  return target_delegate_wait (ops, ptid, status, options);
 	}
       else
 	{
@@ -1226,8 +1073,7 @@ record_full_wait_1 (struct gdb_target *ops,
 
 	  while (1)
 	    {
-	      ret = record_full_beneath_to_wait
-		(record_full_beneath_to_wait_ops, ptid, status, options);
+	      ret = target_delegate_wait (ops, ptid, status, options);
 	      if (status->kind == TARGET_WAITKIND_IGNORE)
 		{
 		  if (record_debug)
@@ -1311,9 +1157,7 @@ record_full_wait_1 (struct gdb_target *ops,
 					    "Process record: record_full_wait "
 					    "issuing one more step in the "
 					    "target beneath\n");
-		      record_full_beneath_to_resume
-			(record_full_beneath_to_resume_ops, ptid, step,
-			 GDB_SIGNAL_0);
+		      target_delegate_resume (ops, ptid, step, GDB_SIGNAL_0);
 		      continue;
 		    }
 		}
@@ -1517,7 +1361,7 @@ record_full_stopped_by_watchpoint (void)
   if (RECORD_FULL_IS_REPLAY)
     return record_full_hw_watchpoint;
   else
-    return record_full_beneath_to_stopped_by_watchpoint ();
+    return target_delegate_stopped_by_watchpoint (find_target_at (record_stratum));
 }
 
 static int
@@ -1526,7 +1370,7 @@ record_full_stopped_data_address (struct gdb_target *ops, CORE_ADDR *addr_p)
   if (RECORD_FULL_IS_REPLAY)
     return 0;
   else
-    return record_full_beneath_to_stopped_data_address (ops, addr_p);
+    return target_delegate_stopped_data_address (ops, addr_p);
 }
 
 /* Record registers change (by user or by GDB) to list as an instruction.  */
@@ -1629,8 +1473,7 @@ record_full_store_registers (struct gdb_target *ops,
 
       record_full_registers_change (regcache, regno);
     }
-  record_full_beneath_to_store_registers
-    (record_full_beneath_to_store_registers_ops, regcache, regno);
+  target_delegate_store_registers (ops, regcache, regno);
 }
 
 /* "to_xfer_partial" method.  Behavior is conditional on
@@ -1695,9 +1538,8 @@ record_full_xfer_partial (struct gdb_target *ops, enum target_object object,
 	record_full_insn_num++;
     }
 
-  return record_full_beneath_to_xfer_partial
-    (record_full_beneath_to_xfer_partial_ops, object, annex,
-     readbuf, writebuf, offset, len);
+  return target_delegate_xfer_partial (ops, object, annex,
+				       readbuf, writebuf, offset, len);
 }
 
 /* This structure represents a breakpoint inserted while the record
@@ -1777,7 +1619,8 @@ record_full_insert_breakpoint (struct gdbarch *gdbarch,
       int ret;
 
       old_cleanups = record_full_gdb_operation_disable_set ();
-      ret = record_full_beneath_to_insert_breakpoint (gdbarch, bp_tgt);
+      ret = target_delegate_insert_breakpoint (find_target_at (record_stratum),
+					       gdbarch, bp_tgt);
       do_cleanups (old_cleanups);
 
       if (ret != 0)
@@ -1817,7 +1660,8 @@ record_full_remove_breakpoint (struct gdbarch *gdbarch,
 	      int ret;
 
 	      old_cleanups = record_full_gdb_operation_disable_set ();
-	      ret = record_full_beneath_to_remove_breakpoint (gdbarch, bp_tgt);
+	      ret = target_delegate_remove_breakpoint (find_target_at (record_stratum),
+						       gdbarch, bp_tgt);
 	      do_cleanups (old_cleanups);
 
 	      if (ret != 0)
@@ -1898,8 +1742,7 @@ record_full_async (void (*callback) (enum inferior_event_type event_type,
   /* If we're on top of a line target (e.g., linux-nat, remote), then
      set it to async mode as well.  Will be NULL if we're sitting on
      top of the core target, for "record restore".  */
-  if (record_full_beneath_to_async != NULL)
-    record_full_beneath_to_async (callback, context);
+  target_delegate_async (find_target_at (record_stratum), callback, context);
 }
 
 static int
@@ -2239,10 +2082,10 @@ record_full_core_xfer_partial (struct gdb_target *ops,
 		  else
 		    {
 		      if (!entry)
-			return record_full_beneath_to_xfer_partial
-			  (record_full_beneath_to_xfer_partial_ops,
-			   object, annex, readbuf, writebuf,
-			   offset, len);
+			return target_delegate_xfer_partial (ops,
+							     object, annex,
+							     readbuf, writebuf,
+							     offset, len);
 
 		      memcpy (readbuf, entry->buf + sec_offset,
 			      (size_t) len);
@@ -2258,9 +2101,8 @@ record_full_core_xfer_partial (struct gdb_target *ops,
 	error (_("You can't do that without a process to debug."));
     }
 
-  return record_full_beneath_to_xfer_partial
-    (record_full_beneath_to_xfer_partial_ops, object, annex,
-     readbuf, writebuf, offset, len);
+  return target_delegate_xfer_partial (ops, object, annex,
+				       readbuf, writebuf, offset, len);
 }
 
 /* "to_insert_breakpoint" method for prec over corefile.  */
