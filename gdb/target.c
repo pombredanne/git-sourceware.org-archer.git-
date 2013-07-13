@@ -140,6 +140,8 @@ static int debug_to_can_run (void);
 
 static void debug_to_stop (ptid_t);
 
+static int currently_multi_target (void);
+
 typedef struct target_ops *target_ops_ptr;
 DEF_VEC_P (target_ops_ptr);
 
@@ -1015,6 +1017,34 @@ update_current_target (void)
     setup_target_debug ();
 }
 
+/* Return true if target T is multi-target-compatible.  */
+
+static int
+multi_target_compatible (struct target_ops *t)
+{
+  /* The main sentinel is the existence of to_xclose.  Ideally all
+     targets would be converted to this approach.  */
+  if (t->to_xclose != NULL)
+    return 1;
+
+  /* Dummy target is always ok.  */
+  if (t == &dummy_target)
+    return 1;
+
+  /* "child" targets are native and thus always ok.  Super hack.  */
+  return strcmp (t->to_shortname, "child") == 0;
+}
+
+/* Require T to be multi-target-compatible.  */
+
+static void
+ensure_multi_target_ok (struct target_ops *t)
+{
+  if (!multi_target_compatible (t))
+    error (_("Target %s cannot be used in multi-target mode"),
+	   t->to_shortname);
+}
+
 /* Push a new target type into the stack of the existing target accessors,
    possibly superseding some of the existing accessors.
 
@@ -1035,6 +1065,9 @@ push_gdb_target (struct gdb_target *t)
       internal_error (__FILE__, __LINE__,
 		      _("failed internal consistency check"));
     }
+
+  if (currently_multi_target ())
+    ensure_multi_target_ok (t->ops);
 
   /* If there's already a target at this stratum, remove them.  */
   /* FIXME: cagney/2003-10-15: I think this should be popping all
@@ -5131,6 +5164,16 @@ setup_target_debug (void)
 }
 
 
+/* A set of all current target stacks.  */
+
+static htab_t target_stack_set;
+
+static int
+currently_multi_target (void)
+{
+  return htab_elements (target_stack_set) > 1;
+}
+
 struct target_stack *
 target_stack_incref (void)
 {
@@ -5157,6 +5200,7 @@ target_stack_decref (struct target_stack *tstack)
 	  current_target = NULL;
 	}
 
+      htab_remove_elt (target_stack_set, tstack);
       xfree (tstack->smashed.ops);
       xfree (tstack);
     }
@@ -5174,12 +5218,25 @@ new_target_stack (void)
 {
   struct target_stack *save = target_stack;
   struct target_stack *result;
+  void **slot;
+
+  if (!currently_multi_target () && target_stack != NULL)
+    {
+      struct gdb_target *t;
+
+      FOREACH_TARGET (t)
+	ensure_multi_target_ok (t->ops);
+    }
 
   /* Overwrite the globals so that push_target can work.  */
   target_stack = XCNEW (struct target_stack);
   target_stack->refc = 1;
   target_stack->smashed.ops = XCNEW (struct target_ops);
   current_target = &target_stack->smashed;
+
+  slot = htab_find_slot (target_stack_set, target_stack, INSERT);
+  gdb_assert (*slot == NULL);
+  *slot = target_stack;
 
   push_target (&dummy_target);
 
@@ -5319,6 +5376,10 @@ void
 initialize_targets (void)
 {
   init_dummy_target ();
+
+  target_stack_set = htab_create_alloc (1, htab_hash_pointer,
+					htab_eq_pointer, NULL,
+					xcalloc, xfree);
 
   target_stack = new_target_stack ();
   current_target = &target_stack->smashed;
