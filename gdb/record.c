@@ -62,15 +62,7 @@ struct cmd_list_element *info_record_cmdlist = NULL;
 static struct gdb_target *
 find_record_target (void)
 {
-  struct gdb_target *t;
-
-  for (t = find_target_beneath (current_target);
-       t != NULL;
-       t = find_target_beneath (t))
-    if (t->ops->to_stratum == record_stratum)
-      return t;
-
-  return NULL;
+  return find_target_at (record_stratum);
 }
 
 /* Check that recording is active.  Throw an error, if it isn't.  */
