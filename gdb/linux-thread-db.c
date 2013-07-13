@@ -2039,12 +2039,22 @@ info_auto_load_libthread_db (char *args, int from_tty)
     ui_out_message (uiout, 0, _("No auto-loaded libthread-db.\n"));
 }
 
+/* The to_xclose method for the thread_db target.  */
+
+static void
+thread_db_xclose (struct gdb_target *targ)
+{
+  /* We don't need to do anything here, but we need the method to
+     exist as it advertises multi-target capability.  */
+}
+
 static void
 init_thread_db_ops (void)
 {
   thread_db_ops.to_shortname = "multi-thread";
   thread_db_ops.to_longname = "multi-threaded child process.";
   thread_db_ops.to_doc = "Threads and pthreads support.";
+  thread_db_ops.to_xclose = thread_db_xclose;
   thread_db_ops.to_detach = thread_db_detach;
   thread_db_ops.to_wait = thread_db_wait;
   thread_db_ops.to_resume = thread_db_resume;
