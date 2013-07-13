@@ -5256,6 +5256,40 @@ new_target_stack (void)
   return result;
 }
 
+/* Print a single target stack.  */
+
+static int
+print_one_target_stack (void **slot, void *arg)
+{
+  struct target_stack *t = *slot;
+  int i;
+
+  printf_filtered (_("Target stack %s"), host_address_to_string (t));
+  if (t == target_stack)
+    printf_filtered (_(" (current)"));
+  printf_filtered (_("\n"));
+
+  /* Mildly hacky, but we can't walk the target in the normal way.  */
+  for (i = MAX_TARGET_STRATUM; i >= dummy_stratum; --i)
+    {
+      struct gdb_target *gt = t->ops[i];
+
+      if (gt != NULL)
+	printf_filtered ("  - %s (%s)\n", gt->ops->to_shortname,
+			 gt->ops->to_longname);
+    }
+
+  return 1;
+}
+
+/* Print the name of each layers of our target stack.  */
+
+static void
+maintenance_print_target_stack (char *cmd, int from_tty)
+{
+  htab_traverse (target_stack_set, print_one_target_stack, NULL);
+}
+
 
 
 static char targ_desc[] =
@@ -5274,22 +5308,6 @@ do_monitor_command (char *cmd,
 	      == (void (*) (char *, struct ui_file *)) tcomplain)))
     error (_("\"monitor\" command not supported by this target."));
   target_rcmd (cmd, gdb_stdtarg);
-}
-
-/* Print the name of each layers of our target stack.  */
-
-static void
-maintenance_print_target_stack (char *cmd, int from_tty)
-{
-  struct gdb_target *t;
-
-  printf_filtered (_("The current target stack is:\n"));
-
-  FOREACH_TARGET (t)
-    {
-      printf_filtered ("  - %s (%s)\n", t->ops->to_shortname,
-		       t->ops->to_longname);
-    }
 }
 
 /* Controls if async mode is permitted.  */
