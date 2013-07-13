@@ -102,11 +102,11 @@ exec_close (void)
     }
 }
 
-/* This is the target_close implementation.  Clears all target
+/* This is the to_xclose implementation.  Clears all target
    sections and closes all executable bfds from all program spaces.  */
 
 static void
-exec_close_1 (void)
+exec_close_1 (struct gdb_target *target)
 {
   struct program_space *ss;
   struct cleanup *old_chain;
@@ -774,7 +774,7 @@ init_exec_ops (void)
   exec_ops.to_doc = "Use an executable file as a target.\n\
 Specify the filename of the executable file.";
   exec_ops.to_open = exec_open;
-  exec_ops.to_close = exec_close_1;
+  exec_ops.to_xclose = exec_close_1;
   exec_ops.to_attach = find_default_attach;
   exec_ops.to_xfer_partial = exec_xfer_partial;
   exec_ops.to_get_section_table = exec_get_section_table;
