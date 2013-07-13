@@ -751,13 +751,17 @@ exec_has_memory (struct gdb_target *ops)
 
 /* Find mapped memory.  */
 
-extern void
+void
 exec_set_find_memory_regions (int (*func) (find_memory_region_ftype, void *))
 {
   exec_ops.to_find_memory_regions = func;
 }
 
-static char *exec_make_note_section (bfd *, int *);
+static char *
+exec_make_note_section (bfd *obfd, int *note_size)
+{
+  error (_("Can't create a corefile"));
+}
 
 /* Fill in the exec file target vector.  Very few entries need to be
    defined.  */
@@ -825,10 +829,4 @@ Show writing into executable and core files."), NULL,
 			   &setlist, &showlist);
 
   add_target_with_completer (&exec_ops, filename_completer);
-}
-
-static char *
-exec_make_note_section (bfd *obfd, int *note_size)
-{
-  error (_("Can't create a corefile"));
 }
