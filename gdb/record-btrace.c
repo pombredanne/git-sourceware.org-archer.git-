@@ -187,10 +187,10 @@ record_btrace_stop_recording (void)
       btrace_disable (tp);
 }
 
-/* The to_close method of target record-btrace.  */
+/* The to_xclose method of target record-btrace.  */
 
 static void
-record_btrace_close (void)
+record_btrace_xclose (struct gdb_target *targ)
 {
   /* Make sure automatic recording gets disabled even if we did not stop
      recording before closing the record-btrace target.  */
@@ -650,7 +650,7 @@ init_record_btrace_ops (void)
   ops->to_longname = "Branch tracing target";
   ops->to_doc = "Collect control-flow trace and provide the execution history.";
   ops->to_open = record_btrace_open;
-  ops->to_close = record_btrace_close;
+  ops->to_xclose = record_btrace_xclose;
   ops->to_detach = record_detach;
   ops->to_disconnect = record_disconnect;
   ops->to_mourn_inferior = record_mourn_inferior;
