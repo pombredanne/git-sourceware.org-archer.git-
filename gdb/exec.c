@@ -110,10 +110,17 @@ exec_close_1 (struct gdb_target *target)
 {
   struct program_space *ss;
   struct cleanup *old_chain;
+  struct target_stack *tstack = target_stack_incref ();
 
   old_chain = save_current_program_space ();
+  make_cleanup (target_stack_decref_cleanup, tstack);
   ALL_PSPACES (ss)
   {
+    /* Skip program spaces that are associated with some other
+       target.  */
+    if (ss->target_stack != tstack)
+      continue;
+
     set_current_program_space (ss);
 
     /* Delete all target sections.  */

@@ -820,12 +820,6 @@ add_inferior_with_spaces (void)
   return inf;
 }
 
-static void
-target_stack_decref_cleanup (void *arg)
-{
-  target_stack_decref (arg);
-}
-
 /* add-inferior [-new-target] [-copies N] [-exec FILENAME]  */
 
 static void
