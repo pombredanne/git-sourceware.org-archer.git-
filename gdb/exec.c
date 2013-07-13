@@ -62,9 +62,6 @@ void _initialize_exec (void);
 
 struct target_ops exec_ops;
 
-/* True if the exec target is pushed on the stack.  */
-static int using_exec_ops;
-
 /* Whether to open exec and core files read-only or read-write.  */
 
 int write_files = 0;
@@ -111,27 +108,23 @@ exec_close (void)
 static void
 exec_close_1 (void)
 {
-  using_exec_ops = 0;
+  struct program_space *ss;
+  struct cleanup *old_chain;
 
+  old_chain = save_current_program_space ();
+  ALL_PSPACES (ss)
   {
-    struct program_space *ss;
-    struct cleanup *old_chain;
+    set_current_program_space (ss);
 
-    old_chain = save_current_program_space ();
-    ALL_PSPACES (ss)
-    {
-      set_current_program_space (ss);
+    /* Delete all target sections.  */
+    resize_section_table
+      (current_target_sections,
+       -resize_section_table (current_target_sections, 0));
 
-      /* Delete all target sections.  */
-      resize_section_table
-	(current_target_sections,
-	 -resize_section_table (current_target_sections, 0));
-
-      exec_close ();
-    }
-
-    do_cleanups (old_chain);
+    exec_close ();
   }
+
+  do_cleanups (old_chain);
 }
 
 void
@@ -419,11 +412,8 @@ add_target_sections (void *owner,
 
       /* If these are the first file sections we can provide memory
 	 from, push the file_stratum target.  */
-      if (!using_exec_ops)
-	{
-	  using_exec_ops = 1;
-	  push_target (&exec_ops);
-	}
+      if (!target_is_pushed (&exec_ops))
+	push_target (&exec_ops);
     }
 }
 
