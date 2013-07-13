@@ -1051,11 +1051,12 @@ push_gdb_target (struct gdb_target *t)
 void
 push_target (struct target_ops *t)
 {
-  /* FIXME: freeing.  */
   struct gdb_target *targ = XNEW (struct gdb_target);
+  struct cleanup *cleanup = make_cleanup (xfree, targ);
 
   targ->ops = t;
   push_gdb_target (targ);
+  discard_cleanups (cleanup);
 }
 
 /* Remove a target_ops vector from the stack, wherever it may be.
