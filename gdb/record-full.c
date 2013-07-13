@@ -936,7 +936,7 @@ record_full_open (char *name, int from_tty)
   observer_notify_record_changed (current_inferior (),  1);
 }
 
-/* "to_close" target method.  Close the process record target.  */
+/* "to_xclose" target method.  Close the process record target.  */
 
 static void
 record_full_xclose (struct gdb_target *s)
