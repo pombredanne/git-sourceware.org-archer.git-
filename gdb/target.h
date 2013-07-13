@@ -318,6 +318,12 @@ struct target_ops
 				   newline, and starts with a one-line descrip-
 				   tion (probably similar to to_longname).  */
 
+    /* Return an xstrdup'd string that gives the name of a particular
+       instance of the target.  This need not be defined; and
+       ordinarily only targets that are ones that the user adds and
+       that have some "name" concept should implement this.  */
+    char *(*to_full_name) (struct gdb_target *targ);
+
     /* The open routine takes the rest of the parameters from the
        command, and (if successful) pushes a new target onto the
        stack.  Targets should supply this routine, if only to provide
@@ -895,6 +901,10 @@ extern void target_stack_set_current (struct target_stack *tstack);
 
 extern struct target_stack *new_target_stack (void);
 
+/* Return true if gdb is currently in multi-target mode.  */
+
+extern int currently_multi_target (void);
+
 /* The ops structure for our "current" target process.  This should
    never be NULL.  If there is no target, it points to the dummy_target.  */
 
@@ -904,6 +914,10 @@ extern struct gdb_target *current_target;
 
 #define	target_shortname	(current_target->ops->to_shortname)
 #define	target_longname		(current_target->ops->to_longname)
+
+/* Wrapper for to_full_name.  */
+
+char *target_full_name (struct target_stack *);
 
 /* Does whatever cleanup is required for a target that we are no
    longer going to be calling.  This routine is automatically always

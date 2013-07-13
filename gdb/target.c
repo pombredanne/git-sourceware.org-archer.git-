@@ -140,8 +140,6 @@ static int debug_to_can_run (void);
 
 static void debug_to_stop (ptid_t);
 
-static int currently_multi_target (void);
-
 typedef struct target_ops *target_ops_ptr;
 DEF_VEC_P (target_ops_ptr);
 
@@ -5168,7 +5166,7 @@ setup_target_debug (void)
 
 static htab_t target_stack_set;
 
-static int
+int
 currently_multi_target (void)
 {
   return htab_elements (target_stack_set) > 1;
@@ -5288,6 +5286,32 @@ static void
 maintenance_print_target_stack (char *cmd, int from_tty)
 {
   htab_traverse (target_stack_set, print_one_target_stack, NULL);
+}
+
+char *
+target_full_name (struct target_stack *tstack)
+{
+  int i;
+  const char *top_found = NULL;
+
+  for (i = MAX_TARGET_STRATUM; i >= dummy_stratum; --i)
+    {
+      struct gdb_target *gt = tstack->ops[i];
+
+      if (gt != NULL)
+	{
+	  if (top_found == NULL)
+	    top_found = gt->ops->to_shortname;
+
+	  if (gt->ops->to_full_name != NULL)
+	    return gt->ops->to_full_name (gt);
+	}
+    }
+
+  if (tstack->ops[process_stratum] != NULL)
+    return xstrdup (tstack->ops[process_stratum]->ops->to_shortname);
+
+  return xstrdup (top_found);
 }
 
 

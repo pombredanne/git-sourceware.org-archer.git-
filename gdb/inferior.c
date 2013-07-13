@@ -608,6 +608,16 @@ print_inferior (struct ui_out *uiout, char *requested_inferiors)
 	  ui_out_field_int (uiout, "vfork-child", inf->vfork_child->num);
 	}
 
+      if (currently_multi_target ())
+	{
+	  char *name = target_full_name (inf->pspace->target_stack);
+
+	  ui_out_text (uiout, _("\n\ton target "));
+	  ui_out_field_string (uiout, "target-name", name);
+
+	  xfree (name);
+	}
+
       ui_out_text (uiout, "\n");
       do_cleanups (chain2);
     }
