@@ -1515,11 +1515,8 @@ svr4_current_sos (void)
 	    {
 	      struct so_list *copy;
 
-	      copy = XZALLOC (struct so_list);
-	      memcpy (copy, so, sizeof (struct so_list));
-
-	      copy->lm_info = xmalloc (sizeof (struct lm_info));
-	      memcpy (copy->lm_info, so->lm_info, sizeof (struct lm_info));
+	      copy = XDUP (struct so_list, so);
+	      copy->lm_info = XDUP (struct lm_info, so->lm_info);
 
 	      so->lm_info->copy = copy;
 	    }
