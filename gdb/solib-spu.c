@@ -241,7 +241,8 @@ spu_free_so (struct so_list *so)
 {
   if (so->so_original_name[0] != '@')
     svr4_so_ops.free_so (so);
-  xfree (so);
+  else
+    xfree (so);
 }
 
 /* Relocate section addresses.  */
