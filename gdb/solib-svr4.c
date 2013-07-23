@@ -1064,25 +1064,30 @@ struct svr4_library_list
 static void
 svr4_free_so (struct so_list *so)
 {
-  if (so->lm_info)
+  if (so->lm_info != NULL)
     {
-      /* If this library is an acquired copy then release it. */
       if (so->lm_info->acquired)
 	{
+	  /* This so_list is an acquired copy: release it for
+	     re-use by the next call to svr4_current_sos.  */
 	  so->lm_info->acquired = 0;
 	  return;
 	}
 
-      /* If the library has an acquired copy then unhook it.  */
-      if (so->lm_info->copy && so->lm_info->copy->lm_info->acquired)
+      if (so->lm_info->copy != NULL)
 	{
-	  so->lm_info->copy->lm_info->acquired = 0;
-	  so->lm_info->copy = NULL;
+	  if (so->lm_info->copy->lm_info->acquired)
+	    {
+	      /* This so_list has an acquired copy: release it
+		 so it can be freed by whatever acquired it.  */
+	      so->lm_info->acquired = 0;
+	    }
+	  else
+	    {
+	      /* This so_list has an unacquired copy: free it.  */
+	      svr4_free_so (so->lm_info->copy);
+	    }
 	}
-
-      /* If the library has an unacquired copy then free it.  */
-      if (so->lm_info->copy)
-	svr4_free_so (so->lm_info->copy);
     }
 
   xfree (so->lm_info);
