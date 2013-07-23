@@ -1503,7 +1503,8 @@ svr4_current_sos (void)
 	  gdb_assert (so->lm_info != NULL);
 
 	  /* If the library has an acquired copy then unhook it.  */
-	  if (so->lm_info->copy && so->lm_info->copy->lm_info->acquired)
+	  if (so->lm_info->copy != NULL
+	      && so->lm_info->copy->lm_info->acquired)
 	    {
 	      so->lm_info->copy->lm_info->acquired = 0;
 	      so->lm_info->copy = NULL;
