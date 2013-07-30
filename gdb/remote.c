@@ -129,12 +129,14 @@ static void remote_kill (struct target_ops *ops);
 
 static int tohex (int nib);
 
-static int remote_can_async_p (void);
+static int remote_can_async_p (struct target_ops *);
 
-static int remote_is_async_p (void);
+static int remote_is_async_p (struct target_ops *);
 
-static void remote_async (void (*callback) (enum inferior_event_type event_type,
-					    void *context), void *context);
+static void remote_async (struct target_ops *ops,
+			  void (*callback) (enum inferior_event_type event_type,
+					    void *context),
+			  void *context);
 
 static void remote_detach (struct target_ops *ops, char *args, int from_tty);
 
@@ -8158,7 +8160,8 @@ remote_add_target_side_commands (struct gdbarch *gdbarch,
    which don't, we insert a traditional memory breakpoint.  */
 
 static int
-remote_insert_breakpoint (struct gdbarch *gdbarch,
+remote_insert_breakpoint (struct target_ops *ops,
+			  struct gdbarch *gdbarch,
 			  struct bp_target_info *bp_tgt)
 {
   /* Try the "Z" s/w breakpoint packet if it is not already disabled.
@@ -8214,11 +8217,12 @@ remote_insert_breakpoint (struct gdbarch *gdbarch,
 	}
     }
 
-  return memory_insert_breakpoint (gdbarch, bp_tgt);
+  return memory_insert_breakpoint (ops, gdbarch, bp_tgt);
 }
 
 static int
-remote_remove_breakpoint (struct gdbarch *gdbarch,
+remote_remove_breakpoint (struct target_ops *ops,
+			  struct gdbarch *gdbarch,
 			  struct bp_target_info *bp_tgt)
 {
   CORE_ADDR addr = bp_tgt->placed_address;
@@ -8248,7 +8252,7 @@ remote_remove_breakpoint (struct gdbarch *gdbarch,
       return (rs->buf[0] == 'E');
     }
 
-  return memory_remove_breakpoint (gdbarch, bp_tgt);
+  return memory_remove_breakpoint (ops, gdbarch, bp_tgt);
 }
 
 static int
@@ -8402,7 +8406,7 @@ remote_check_watch_resources (int type, int cnt, int ot)
 }
 
 static int
-remote_stopped_by_watchpoint (void)
+remote_stopped_by_watchpoint (struct target_ops *ops)
 {
   return remote_stopped_by_watchpoint_p;
 }
@@ -8412,7 +8416,7 @@ remote_stopped_data_address (struct target_ops *target, CORE_ADDR *addr_p)
 {
   int rc = 0;
 
-  if (remote_stopped_by_watchpoint ())
+  if (remote_stopped_by_watchpoint (target))
     {
       *addr_p = remote_watch_data_address;
       rc = 1;
@@ -11619,7 +11623,7 @@ Specify the serial device it is connected to (e.g. /dev/ttya).";
 }
 
 static int
-remote_can_async_p (void)
+remote_can_async_p (struct target_ops *ops)
 {
   if (!target_async_permitted)
     /* We only enable async when the user specifically asks for it.  */
@@ -11630,7 +11634,7 @@ remote_can_async_p (void)
 }
 
 static int
-remote_is_async_p (void)
+remote_is_async_p (struct target_ops *ops)
 {
   if (!target_async_permitted)
     /* We only enable async when the user specifically asks for it.  */
@@ -11664,8 +11668,10 @@ remote_async_inferior_event_handler (gdb_client_data data)
 }
 
 static void
-remote_async (void (*callback) (enum inferior_event_type event_type,
-				void *context), void *context)
+remote_async (struct target_ops *ops,
+	      void (*callback) (enum inferior_event_type event_type,
+				void *context),
+	      void *context)
 {
   if (callback != NULL)
     {

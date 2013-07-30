@@ -94,12 +94,6 @@ static void debug_to_prepare_to_store (struct regcache *);
 
 static void debug_to_files_info (struct target_ops *);
 
-static int debug_to_insert_breakpoint (struct gdbarch *,
-				       struct bp_target_info *);
-
-static int debug_to_remove_breakpoint (struct gdbarch *,
-				       struct bp_target_info *);
-
 static int debug_to_can_use_hw_breakpoint (int, int, int);
 
 static int debug_to_insert_hw_breakpoint (struct gdbarch *,
@@ -113,8 +107,6 @@ static int debug_to_insert_watchpoint (CORE_ADDR, int, int,
 
 static int debug_to_remove_watchpoint (CORE_ADDR, int, int,
 				       struct expression *);
-
-static int debug_to_stopped_by_watchpoint (void);
 
 static int debug_to_stopped_data_address (struct target_ops *, CORE_ADDR *);
 
@@ -790,7 +782,7 @@ update_current_target (void)
 	    (int (*) (CORE_ADDR, int, int, struct expression *))
 	    return_minus_one);
   de_fault (to_stopped_by_watchpoint,
-	    (int (*) (void))
+	    (int (*) (struct target_ops *))
 	    return_zero);
   de_fault (to_stopped_data_address,
 	    (int (*) (struct target_ops *, CORE_ADDR *))
@@ -868,7 +860,9 @@ update_current_target (void)
 	    (char *(*) (int))
 	    return_zero);
   de_fault (to_async,
-	    (void (*) (void (*) (enum inferior_event_type, void*), void*))
+	    (void (*) (struct target_ops *,
+		       void (*) (enum inferior_event_type, void*),
+		       void*))
 	    tcomplain);
   de_fault (to_thread_architecture,
 	    default_thread_architecture);
@@ -2015,7 +2009,7 @@ target_delegate_async (struct target_ops *self,
     {
       if (t->to_async)
 	{
-	  t->to_async (callback, datum);
+	  t->to_async (t, callback, datum);
 	  break;
 	}
     }
@@ -2030,7 +2024,7 @@ target_delegate_is_async_p (struct target_ops *self)
 
   for (t = self->beneath; t != NULL; t = t->beneath)
     if (t->to_is_async_p != NULL)
-      return t->to_is_async_p ();
+      return t->to_is_async_p (t);
 
   gdb_assert_not_reached (_("reached end of target stack during delegation"));
 }
@@ -2044,7 +2038,7 @@ target_delegate_can_async_p (struct target_ops *self)
 
   for (t = self->beneath; t != NULL; t = t->beneath)
     if (t->to_can_async_p != NULL)
-      return t->to_can_async_p ();
+      return t->to_can_async_p (t);
 
   gdb_assert_not_reached (_("reached end of target stack during delegation"));
 }
@@ -2496,7 +2490,8 @@ target_insert_breakpoint (struct gdbarch *gdbarch,
       return 1;
     }
 
-  return (*current_target.to_insert_breakpoint) (gdbarch, bp_tgt);
+  return (*current_target.to_insert_breakpoint) (&current_target,
+						 gdbarch, bp_tgt);
 }
 
 /* See target.h.  */
@@ -2511,7 +2506,7 @@ target_delegate_insert_breakpoint (struct target_ops *self,
   for (t = self->beneath; t != NULL; t = t->beneath)
     {
       if (t->to_insert_breakpoint)
-	return t->to_insert_breakpoint (gdbarch, bp_tgt);
+	return t->to_insert_breakpoint (t, gdbarch, bp_tgt);
     }
 
   gdb_assert_not_reached (_("reached end of target stack during delegation"));
@@ -2531,7 +2526,8 @@ target_remove_breakpoint (struct gdbarch *gdbarch,
       return 1;
     }
 
-  return (*current_target.to_remove_breakpoint) (gdbarch, bp_tgt);
+  return (*current_target.to_remove_breakpoint) (&current_target,
+						 gdbarch, bp_tgt);
 }
 
 /* See target.h.  */
@@ -2546,7 +2542,7 @@ target_delegate_remove_breakpoint (struct target_ops *self,
   for (t = self->beneath; t != NULL; t = t->beneath)
     {
       if (t->to_remove_breakpoint)
-	return t->to_remove_breakpoint (gdbarch, bp_tgt);
+	return t->to_remove_breakpoint (t, gdbarch, bp_tgt);
     }
 
   gdb_assert_not_reached (_("reached end of target stack during delegation"));
@@ -3235,7 +3231,7 @@ find_default_create_inferior (struct target_ops *ops,
 }
 
 static int
-find_default_can_async_p (void)
+find_default_can_async_p (struct target_ops *ignore)
 {
   struct target_ops *t;
 
@@ -3245,12 +3241,12 @@ find_default_can_async_p (void)
      connected yet.  */
   t = find_default_run_target (NULL);
   if (t && t->to_can_async_p)
-    return (t->to_can_async_p) ();
+    return (t->to_can_async_p) (t);
   return 0;
 }
 
 static int
-find_default_is_async_p (void)
+find_default_is_async_p (struct target_ops *ignore)
 {
   struct target_ops *t;
 
@@ -3260,7 +3256,7 @@ find_default_is_async_p (void)
      connected yet.  */
   t = find_default_run_target (NULL);
   if (t && t->to_is_async_p)
-    return (t->to_is_async_p) ();
+    return (t->to_is_async_p) (t);
   return 0;
 }
 
@@ -3876,7 +3872,8 @@ init_dummy_target (void)
   dummy_target.to_has_registers = (int (*) (struct target_ops *)) return_zero;
   dummy_target.to_has_execution
     = (int (*) (struct target_ops *, ptid_t)) return_zero;
-  dummy_target.to_stopped_by_watchpoint = return_zero;
+  dummy_target.to_stopped_by_watchpoint
+    = (int (*) (struct target_ops *)) return_zero;
   dummy_target.to_stopped_data_address =
     (int (*) (struct target_ops *, CORE_ADDR *)) return_zero;
   dummy_target.to_magic = OPS_MAGIC;
@@ -4270,7 +4267,7 @@ target_delegate_stopped_by_watchpoint (struct target_ops *self)
   for (t = self->beneath; t != NULL; t = t->beneath)
     {
       if (t->to_stopped_by_watchpoint)
-	return t->to_stopped_by_watchpoint ();
+	return t->to_stopped_by_watchpoint (t);
     }
 
   gdb_assert_not_reached (_("reached end of target stack during delegation"));
@@ -4673,12 +4670,13 @@ debug_to_files_info (struct target_ops *target)
 }
 
 static int
-debug_to_insert_breakpoint (struct gdbarch *gdbarch,
+debug_to_insert_breakpoint (struct target_ops *ops,
+			    struct gdbarch *gdbarch,
 			    struct bp_target_info *bp_tgt)
 {
   int retval;
 
-  retval = debug_target.to_insert_breakpoint (gdbarch, bp_tgt);
+  retval = debug_target.to_insert_breakpoint (&debug_target, gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_insert_breakpoint (%s, xxx) = %ld\n",
@@ -4688,12 +4686,13 @@ debug_to_insert_breakpoint (struct gdbarch *gdbarch,
 }
 
 static int
-debug_to_remove_breakpoint (struct gdbarch *gdbarch,
+debug_to_remove_breakpoint (struct target_ops *ops,
+			    struct gdbarch *gdbarch,
 			    struct bp_target_info *bp_tgt)
 {
   int retval;
 
-  retval = debug_target.to_remove_breakpoint (gdbarch, bp_tgt);
+  retval = debug_target.to_remove_breakpoint (&debug_target, gdbarch, bp_tgt);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_remove_breakpoint (%s, xxx) = %ld\n",
@@ -4750,11 +4749,11 @@ debug_to_can_accel_watchpoint_condition (CORE_ADDR addr, int len, int rw,
 }
 
 static int
-debug_to_stopped_by_watchpoint (void)
+debug_to_stopped_by_watchpoint (struct target_ops *ops)
 {
   int retval;
 
-  retval = debug_target.to_stopped_by_watchpoint ();
+  retval = debug_target.to_stopped_by_watchpoint (&debug_target);
 
   fprintf_unfiltered (gdb_stdlog,
 		      "target_stopped_by_watchpoint () = %ld\n",

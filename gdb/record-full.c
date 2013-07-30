@@ -1356,12 +1356,12 @@ record_full_wait (struct target_ops *ops,
 }
 
 static int
-record_full_stopped_by_watchpoint (void)
+record_full_stopped_by_watchpoint (struct target_ops *ops)
 {
   if (RECORD_FULL_IS_REPLAY)
     return record_full_hw_watchpoint;
   else
-    return target_delegate_stopped_by_watchpoint (find_target_at (record_stratum));
+    return target_delegate_stopped_by_watchpoint (ops);
 }
 
 static int
@@ -1602,7 +1602,8 @@ record_full_init_record_breakpoints (void)
    when recording.  */
 
 static int
-record_full_insert_breakpoint (struct gdbarch *gdbarch,
+record_full_insert_breakpoint (struct target_ops *ops,
+			       struct gdbarch *gdbarch,
 			       struct bp_target_info *bp_tgt)
 {
   struct record_full_breakpoint *bp;
@@ -1619,8 +1620,7 @@ record_full_insert_breakpoint (struct gdbarch *gdbarch,
       int ret;
 
       old_cleanups = record_full_gdb_operation_disable_set ();
-      ret = target_delegate_insert_breakpoint (find_target_at (record_stratum),
-					       gdbarch, bp_tgt);
+      ret = target_delegate_insert_breakpoint (ops, gdbarch, bp_tgt);
       do_cleanups (old_cleanups);
 
       if (ret != 0)
@@ -1640,7 +1640,8 @@ record_full_insert_breakpoint (struct gdbarch *gdbarch,
 /* "to_remove_breakpoint" method for process record target.  */
 
 static int
-record_full_remove_breakpoint (struct gdbarch *gdbarch,
+record_full_remove_breakpoint (struct target_ops *ops,
+			       struct gdbarch *gdbarch,
 			       struct bp_target_info *bp_tgt)
 {
   struct record_full_breakpoint *bp;
@@ -1660,8 +1661,7 @@ record_full_remove_breakpoint (struct gdbarch *gdbarch,
 	      int ret;
 
 	      old_cleanups = record_full_gdb_operation_disable_set ();
-	      ret = target_delegate_remove_breakpoint (find_target_at (record_stratum),
-						       gdbarch, bp_tgt);
+	      ret = target_delegate_remove_breakpoint (ops, gdbarch, bp_tgt);
 	      do_cleanups (old_cleanups);
 
 	      if (ret != 0)
@@ -1736,25 +1736,26 @@ record_full_goto_bookmark (gdb_byte *raw_bookmark, int from_tty)
 }
 
 static void
-record_full_async (void (*callback) (enum inferior_event_type event_type,
+record_full_async (struct target_ops *ops,
+		   void (*callback) (enum inferior_event_type event_type,
 				     void *context), void *context)
 {
   /* If we're on top of a line target (e.g., linux-nat, remote), then
      set it to async mode as well.  Will be NULL if we're sitting on
      top of the core target, for "record restore".  */
-  target_delegate_async (find_target_at (record_stratum), callback, context);
+  target_delegate_async (ops, callback, context);
 }
 
 static int
-record_full_can_async_p (void)
+record_full_can_async_p (struct target_ops *ops)
 {
-  return target_delegate_can_async_p (find_target_at (record_stratum));
+  return target_delegate_can_async_p (ops);
 }
 
 static int
-record_full_is_async_p (void)
+record_full_is_async_p (struct target_ops *ops)
 {
-  return target_delegate_is_async_p (find_target_at (record_stratum));
+  return target_delegate_is_async_p (ops);
 }
 
 static enum exec_direction_kind
@@ -2106,7 +2107,8 @@ record_full_core_xfer_partial (struct target_ops *ops,
 /* "to_insert_breakpoint" method for prec over corefile.  */
 
 static int
-record_full_core_insert_breakpoint (struct gdbarch *gdbarch,
+record_full_core_insert_breakpoint (struct target_ops *ops,
+				    struct gdbarch *gdbarch,
 				    struct bp_target_info *bp_tgt)
 {
   return 0;
@@ -2115,7 +2117,8 @@ record_full_core_insert_breakpoint (struct gdbarch *gdbarch,
 /* "to_remove_breakpoint" method for prec over corefile.  */
 
 static int
-record_full_core_remove_breakpoint (struct gdbarch *gdbarch,
+record_full_core_remove_breakpoint (struct target_ops *ops,
+				    struct gdbarch *gdbarch,
 				    struct bp_target_info *bp_tgt)
 {
   return 0;

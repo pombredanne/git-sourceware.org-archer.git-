@@ -75,7 +75,7 @@ static int procfs_insert_hw_watchpoint (CORE_ADDR addr, int len, int type,
 static int procfs_remove_hw_watchpoint (CORE_ADDR addr, int len, int type,
 					struct expression *cond);
 
-static int procfs_stopped_by_watchpoint (void);
+static int procfs_stopped_by_watchpoint (struct target_ops *ops);
 
 /* These two globals are only ever set in procfs_open(), but are
    referenced elsewhere.  'nto_procfs_node' is a flag used to say
@@ -921,14 +921,16 @@ procfs_breakpoint (CORE_ADDR addr, int type, int size)
 }
 
 static int
-procfs_insert_breakpoint (struct gdbarch *gdbarch,
+procfs_insert_breakpoint (struct target_ops *ops,
+			  struct gdbarch *gdbarch,
 			  struct bp_target_info *bp_tgt)
 {
   return procfs_breakpoint (bp_tgt->placed_address, _DEBUG_BREAK_EXEC, 0);
 }
 
 static int
-procfs_remove_breakpoint (struct gdbarch *gdbarch,
+procfs_remove_breakpoint (struct target_ops *ops,
+			  struct gdbarch *gdbarch,
 			  struct bp_target_info *bp_tgt)
 {
   return procfs_breakpoint (bp_tgt->placed_address, _DEBUG_BREAK_EXEC, -1);
@@ -1507,7 +1509,7 @@ procfs_insert_hw_watchpoint (CORE_ADDR addr, int len, int type,
 }
 
 static int
-procfs_stopped_by_watchpoint (void)
+procfs_stopped_by_watchpoint (struct target_ops *ops)
 {
   return 0;
 }

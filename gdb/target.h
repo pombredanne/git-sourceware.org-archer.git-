@@ -364,8 +364,10 @@ struct target_ops
 				   struct target_ops *target);
 
     void (*to_files_info) (struct target_ops *);
-    int (*to_insert_breakpoint) (struct gdbarch *, struct bp_target_info *);
-    int (*to_remove_breakpoint) (struct gdbarch *, struct bp_target_info *);
+    int (*to_insert_breakpoint) (struct target_ops *, struct gdbarch *,
+				 struct bp_target_info *);
+    int (*to_remove_breakpoint) (struct target_ops *, struct gdbarch *,
+				 struct bp_target_info *);
     int (*to_can_use_hw_breakpoint) (int, int, int);
     int (*to_ranged_break_num_registers) (struct target_ops *);
     int (*to_insert_hw_breakpoint) (struct gdbarch *, struct bp_target_info *);
@@ -380,7 +382,7 @@ struct target_ops
 				      CORE_ADDR, CORE_ADDR, int);
     int (*to_remove_mask_watchpoint) (struct target_ops *,
 				      CORE_ADDR, CORE_ADDR, int);
-    int (*to_stopped_by_watchpoint) (void);
+    int (*to_stopped_by_watchpoint) (struct target_ops *);
     int to_have_steppable_watchpoint;
     int to_have_continuable_watchpoint;
     int (*to_stopped_data_address) (struct target_ops *, CORE_ADDR *);
@@ -445,9 +447,10 @@ struct target_ops
     int to_has_thread_control;	/* control thread execution */
     int to_attach_no_wait;
     /* ASYNC target controls */
-    int (*to_can_async_p) (void);
-    int (*to_is_async_p) (void);
-    void (*to_async) (void (*) (enum inferior_event_type, void *), void *);
+    int (*to_can_async_p) (struct target_ops *);
+    int (*to_is_async_p) (struct target_ops *);
+    void (*to_async) (struct target_ops *,
+		      void (*) (enum inferior_event_type, void *), void *);
     int (*to_supports_non_stop) (void);
     /* find_memory_regions support method for gcore */
     int (*to_find_memory_regions) (find_memory_region_ftype func, void *data);
@@ -1404,14 +1407,14 @@ extern int default_child_has_execution (struct target_ops *ops,
 extern int target_async_permitted;
 
 /* Can the target support asynchronous execution?  */
-#define target_can_async_p() (current_target.to_can_async_p ())
+#define target_can_async_p() (target_delegate_can_async_p (&current_target))
 
 /* Delegate "target_can_async_p" to a target beneath SELF.  */
 
 extern int target_delegate_can_async_p (struct target_ops *self);
 
 /* Is the target in asynchronous execution mode?  */
-#define target_is_async_p() (current_target.to_is_async_p ())
+#define target_is_async_p() (target_delegate_is_async_p (&current_target))
 
 /* Delegate "target_is_async_p" to a target beneath SELF.  */
 
@@ -1421,7 +1424,7 @@ int target_supports_non_stop (void);
 
 /* Put the target in async mode with the specified callback function.  */
 #define target_async(CALLBACK,CONTEXT) \
-     (current_target.to_async ((CALLBACK), (CONTEXT)))
+     (current_target.to_async (&current_target, (CALLBACK), (CONTEXT)))
 
 /* Delegate "target_async" to a target beneath SELF.  */
 
@@ -1501,8 +1504,8 @@ extern char *target_thread_name (struct thread_info *);
 /* Returns non-zero if we were stopped by a hardware watchpoint (memory read or
    write).  Only the INFERIOR_PTID task is being queried.  */
 
-#define target_stopped_by_watchpoint \
-   (*current_target.to_stopped_by_watchpoint)
+#define target_stopped_by_watchpoint()		\
+  ((*current_target.to_stopped_by_watchpoint) (&current_target))
 
 /* Delegate "target_stopped_by_watchpoint" to a target beneath SELF.  */
 
@@ -1886,10 +1889,12 @@ extern struct target_section_table *target_get_section_table
 
 /* From mem-break.c */
 
-extern int memory_remove_breakpoint (struct gdbarch *,
+extern int memory_remove_breakpoint (struct target_ops *,
+				     struct gdbarch *,
 				     struct bp_target_info *);
 
-extern int memory_insert_breakpoint (struct gdbarch *,
+extern int memory_insert_breakpoint (struct target_ops *,
+				     struct gdbarch *,
 				     struct bp_target_info *);
 
 extern int default_memory_remove_breakpoint (struct gdbarch *,
