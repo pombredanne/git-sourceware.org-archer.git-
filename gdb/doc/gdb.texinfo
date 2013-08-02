@@ -1221,6 +1221,16 @@ for remote debugging.
 Run using @var{device} for your program's standard input and output.
 @c FIXME: kingdon thinks there is more to -tty.  Investigate.
 
+@item -P
+@cindex @code{-P}
+@itemx --python
+@cindex @code{--python}
+Change interpretation of command line so that the argument immediately
+following this switch is taken to be the name of a Python script file.
+This option stops option processing; subsequent options are passed to
+Python as @code{sys.argv}.  This option is only available if Python
+scripting support was enabled when @value{GDBN} was configured.
+
 @c resolve the situation of these eventually
 @item -tui
 @cindex @code{--tui}
@@ -23189,8 +23199,6 @@ containing @code{end}.  For example:
 
 @smallexample
 (@value{GDBP}) python
-Type python script
-End with a line saying just "end".
 >print 23
 >end
 23
@@ -23204,6 +23212,14 @@ controlled using @code{set python print-stack}: if @code{full}, then
 full Python stack printing is enabled; if @code{none}, then Python stack
 and message printing is disabled; if @code{message}, the default, only
 the message component of the error is printed.
+
+@kindex maint set python auto-load
+@item maint set python auto-load
+By default, @value{GDBN} will attempt to automatically load Python
+code when an object file is opened.  This can be controlled using
+@code{maint set python auto-load}: if @code{on}, the default, then
+Python auto-loading is enabled; if @code{off}, then Python
+auto-loading is disabled.
 @end table
 
 It is also possible to execute a Python script from the @value{GDBN}
