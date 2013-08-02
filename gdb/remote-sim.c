@@ -46,7 +46,7 @@
 
 extern void _initialize_remote_sim (void);
 
-static void dump_mem (char *buf, int len);
+static void dump_mem (gdb_byte *buf, int len);
 
 static void init_callbacks (void);
 
@@ -78,7 +78,7 @@ static void gdbsim_load (char *prog, int fromtty);
 
 static void gdbsim_open (char *args, int from_tty);
 
-static void gdbsim_close (int quitting);
+static void gdbsim_close (void);
 
 static void gdbsim_detach (struct target_ops *ops, char *args, int from_tty);
 
@@ -271,7 +271,7 @@ sim_inferior_data_cleanup (struct inferior *inf, void *data)
 }
 
 static void
-dump_mem (char *buf, int len)
+dump_mem (gdb_byte *buf, int len)
 {
   printf_filtered ("\t");
 
@@ -514,7 +514,7 @@ gdbsim_store_register (struct target_ops *ops,
     }
   else if (gdbarch_register_sim_regno (gdbarch, regno) >= 0)
     {
-      char tmp[MAX_REGISTER_SIZE];
+      gdb_byte tmp[MAX_REGISTER_SIZE];
       int nr_bytes;
 
       regcache_cooked_read (regcache, regno, tmp);
@@ -782,23 +782,16 @@ gdbsim_close_inferior (struct inferior *inf, void *arg)
   return 0;
 }
 
-/* Does whatever cleanup is required for a target that we are no longer
-   going to be calling.  Argument says whether we are quitting gdb and
-   should not get hung in case of errors, or whether we want a clean
-   termination even if it takes a while.  This routine is automatically
-   always called just before a routine is popped off the target stack.
-   Closing file descriptors and freeing memory are typical things it should
-   do.  */
 /* Close out all files and local state before this target loses control.  */
 
 static void
-gdbsim_close (int quitting)
+gdbsim_close (void)
 {
   struct sim_inferior_data *sim_data
     = get_sim_inferior_data (current_inferior (), SIM_INSTANCE_NOT_NEEDED);
 
   if (remote_debug)
-    printf_filtered ("gdbsim_close: quitting %d\n", quitting);
+    printf_filtered ("gdbsim_close\n");
 
   iterate_over_inferiors (gdbsim_close_inferior, NULL);
 
@@ -828,7 +821,7 @@ gdbsim_detach (struct target_ops *ops, char *args, int from_tty)
   if (remote_debug)
     printf_filtered ("gdbsim_detach: args \"%s\"\n", args);
 
-  pop_target ();		/* calls gdbsim_close to do the real work */
+  unpush_target (ops);		/* calls gdbsim_close to do the real work */
   if (from_tty)
     printf_filtered ("Ending simulator %s debugging\n", target_shortname);
 }
@@ -1196,7 +1189,8 @@ simulator_command (char *args, int from_tty)
 }
 
 static VEC (char_ptr) *
-sim_command_completer (struct cmd_list_element *ignore, char *text, char *word)
+sim_command_completer (struct cmd_list_element *ignore, const char *text,
+		       const char *word)
 {
   struct sim_inferior_data *sim_data;
   char **tmp;

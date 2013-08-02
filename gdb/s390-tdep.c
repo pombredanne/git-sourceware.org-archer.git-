@@ -964,7 +964,7 @@ is_rre (bfd_byte *insn, int op, unsigned int *r1, unsigned int *r2)
 
 static int
 is_rs (bfd_byte *insn, int op,
-       unsigned int *r1, unsigned int *r3, unsigned int *d2, unsigned int *b2)
+       unsigned int *r1, unsigned int *r3, int *d2, unsigned int *b2)
 {
   if (insn[0] == op)
     {
@@ -981,7 +981,7 @@ is_rs (bfd_byte *insn, int op,
 
 static int
 is_rsy (bfd_byte *insn, int op1, int op2,
-        unsigned int *r1, unsigned int *r3, unsigned int *d2, unsigned int *b2)
+        unsigned int *r1, unsigned int *r3, int *d2, unsigned int *b2)
 {
   if (insn[0] == op1
       && insn[5] == op2)
@@ -1036,7 +1036,7 @@ is_rie (bfd_byte *insn, int op1, int op2,
 
 static int
 is_rx (bfd_byte *insn, int op,
-       unsigned int *r1, unsigned int *d2, unsigned int *x2, unsigned int *b2)
+       unsigned int *r1, int *d2, unsigned int *x2, unsigned int *b2)
 {
   if (insn[0] == op)
     {
@@ -1053,7 +1053,7 @@ is_rx (bfd_byte *insn, int op,
 
 static int
 is_rxy (bfd_byte *insn, int op1, int op2,
-        unsigned int *r1, unsigned int *d2, unsigned int *x2, unsigned int *b2)
+        unsigned int *r1, int *d2, unsigned int *x2, unsigned int *b2)
 {
   if (insn[0] == op1
       && insn[5] == op2)
@@ -1179,7 +1179,8 @@ s390_load (struct s390_prologue_data *data,
       struct target_section *secp;
       secp = target_section_by_addr (&current_target, addr.k);
       if (secp != NULL
-          && (bfd_get_section_flags (secp->bfd, secp->the_bfd_section)
+          && (bfd_get_section_flags (secp->the_bfd_section->owner,
+				     secp->the_bfd_section)
               & SEC_READONLY))
         return pv_constant (read_memory_integer (addr.k, size,
 						 data->byte_order));
@@ -2116,7 +2117,7 @@ s390_stub_frame_sniffer (const struct frame_unwind *self,
      have trapped due to an invalid function pointer call.  We handle
      the non-existing current function like a PLT stub.  */
   addr_in_block = get_frame_address_in_block (this_frame);
-  if (in_plt_section (addr_in_block, NULL)
+  if (in_plt_section (addr_in_block)
       || s390_readinstruction (insn, get_frame_pc (this_frame)) < 0)
     return 1;
   return 0;

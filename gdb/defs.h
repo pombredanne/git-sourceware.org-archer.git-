@@ -52,9 +52,10 @@
 #include <stddef.h>
 #endif
 
-#ifdef HAVE_UNISTD_H
 #include <unistd.h>
-#endif
+
+/* For gnulib's PATH_MAX.  */
+#include "pathmax.h"
 
 #include <fcntl.h>
 
@@ -482,18 +483,18 @@ extern char *current_directory;
 extern unsigned input_radix;
 extern unsigned output_radix;
 
-/* Possibilities for prettyprint parameters to routines which print
+/* Possibilities for prettyformat parameters to routines which print
    things.  Like enum language, this should be in value.h, but needs
    to be here for the same reason.  FIXME:  If we can eliminate this
    as an arg to LA_VAL_PRINT, then we can probably move it back to
    value.h.  */
 
-enum val_prettyprint
+enum val_prettyformat
   {
-    Val_no_prettyprint = 0,
-    Val_prettyprint,
+    Val_no_prettyformat = 0,
+    Val_prettyformat,
     /* Use the default setting which the user has specified.  */
-    Val_pretty_default
+    Val_prettyformat_default
   };
 
 /* Optional native machine support.  Non-native (and possibly pure
@@ -764,17 +765,6 @@ extern int use_windows;
 #define PIDGET(PTID) (ptid_get_pid (PTID))
 #define TIDGET(PTID) (ptid_get_lwp (PTID))
 #define MERGEPID(PID, TID) ptid_build (PID, TID, 0)
-#endif
-
-/* Define well known filenos if the system does not define them.  */
-#ifndef STDIN_FILENO
-#define STDIN_FILENO   0
-#endif
-#ifndef STDOUT_FILENO
-#define STDOUT_FILENO  1
-#endif
-#ifndef STDERR_FILENO
-#define STDERR_FILENO  2
 #endif
 
 /* If this definition isn't overridden by the header files, assume

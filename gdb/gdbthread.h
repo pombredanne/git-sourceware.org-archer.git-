@@ -27,6 +27,7 @@ struct symtab;
 #include "frame.h"
 #include "ui-out.h"
 #include "inferior.h"
+#include "btrace.h"
 
 /* Frontend view of the thread state.  Possible extensions: stepping,
    finishing, until(ling),...  */
@@ -63,6 +64,14 @@ struct thread_control_state
      not).  */
   CORE_ADDR step_range_start;	/* Inclusive */
   CORE_ADDR step_range_end;	/* Exclusive */
+
+  /* If GDB issues a target step request, and this is nonzero, the
+     target should single-step this thread once, and then continue
+     single-stepping it without GDB core involvement as long as the
+     thread stops in the step range above.  If this is zero, the
+     target should ignore the step range, and only issue one single
+     step.  */
+  int may_range_step;
 
   /* Stack frame address as of when stepping command was issued.
      This is how we know when we step into a subroutine call, and how
@@ -226,6 +235,9 @@ struct thread_info
   /* Function that is called to free PRIVATE.  If this is NULL, then
      xfree will be called on PRIVATE.  */
   void (*private_dtor) (struct private_thread_info *);
+
+  /* Branch trace information for this thread.  */
+  struct btrace_thread_info btrace;
 };
 
 /* Create an empty thread list, or empty the existing one.  */
@@ -394,6 +406,10 @@ extern struct cleanup *make_cleanup_restore_current_thread (void);
 extern struct thread_info* inferior_thread (void);
 
 extern void update_thread_list (void);
+
+/* Return true if PC is in the stepping range of THREAD.  */
+
+int pc_in_thread_step_range (CORE_ADDR pc, struct thread_info *thread);
 
 extern struct thread_info *thread_list;
 

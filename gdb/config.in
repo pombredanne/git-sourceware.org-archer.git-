@@ -37,6 +37,9 @@
    language is requested. */
 #undef ENABLE_NLS
 
+/* The .gdbinit filename. */
+#undef GDBINIT
+
 /* look for global separate data files in this path [DATADIR/gdb] */
 #undef GDB_DATADIR
 
@@ -141,6 +144,9 @@
 /* Define to 1 if your system has the etext variable. */
 #undef HAVE_ETEXT
 
+/* Define to 1 if you have the `fdwalk' function. */
+#undef HAVE_FDWALK
+
 /* Define to 1 if you have the `fork' function. */
 #undef HAVE_FORK
 
@@ -179,6 +185,9 @@
 
 /* Define if your <locale.h> file defines LC_MESSAGES. */
 #undef HAVE_LC_MESSAGES
+
+/* Define if you have the babeltrace library. */
+#undef HAVE_LIBBABELTRACE
 
 /* Define to 1 if you have the `dl' library (-ldl). */
 #undef HAVE_LIBDL
@@ -266,6 +275,9 @@
 
 /* Define to 1 if you have the `pipe' function. */
 #undef HAVE_PIPE
+
+/* Define to 1 if you have the `pipe2' function. */
+#undef HAVE_PIPE2
 
 /* Define to 1 if you have the `poll' function. */
 #undef HAVE_POLL

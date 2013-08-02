@@ -57,11 +57,14 @@ struct expression;
    it goes into the file stratum, which is always below the process
    stratum.  */
 
+#include "target-common.h"
 #include "bfd.h"
 #include "symtab.h"
 #include "memattr.h"
 #include "vec.h"
 #include "gdb_signals.h"
+#include "btrace.h"
+#include "command.h"
 
 enum strata
   {
@@ -78,106 +81,6 @@ enum thread_control_capabilities
     tc_none = 0,		/* Default: can't control thread execution.  */
     tc_schedlock = 1,		/* Can lock the thread scheduler.  */
   };
-
-/* Stuff for target_wait.  */
-
-/* Generally, what has the program done?  */
-enum target_waitkind
-  {
-    /* The program has exited.  The exit status is in value.integer.  */
-    TARGET_WAITKIND_EXITED,
-
-    /* The program has stopped with a signal.  Which signal is in
-       value.sig.  */
-    TARGET_WAITKIND_STOPPED,
-
-    /* The program has terminated with a signal.  Which signal is in
-       value.sig.  */
-    TARGET_WAITKIND_SIGNALLED,
-
-    /* The program is letting us know that it dynamically loaded something
-       (e.g. it called load(2) on AIX).  */
-    TARGET_WAITKIND_LOADED,
-
-    /* The program has forked.  A "related" process' PTID is in
-       value.related_pid.  I.e., if the child forks, value.related_pid
-       is the parent's ID.  */
-
-    TARGET_WAITKIND_FORKED,
-
-    /* The program has vforked.  A "related" process's PTID is in
-       value.related_pid.  */
-
-    TARGET_WAITKIND_VFORKED,
-
-    /* The program has exec'ed a new executable file.  The new file's
-       pathname is pointed to by value.execd_pathname.  */
-
-    TARGET_WAITKIND_EXECD,
-
-    /* The program had previously vforked, and now the child is done
-       with the shared memory region, because it exec'ed or exited.
-       Note that the event is reported to the vfork parent.  This is
-       only used if GDB did not stay attached to the vfork child,
-       otherwise, a TARGET_WAITKIND_EXECD or
-       TARGET_WAITKIND_EXIT|SIGNALLED event associated with the child
-       has the same effect.  */
-    TARGET_WAITKIND_VFORK_DONE,
-
-    /* The program has entered or returned from a system call.  On
-       HP-UX, this is used in the hardware watchpoint implementation.
-       The syscall's unique integer ID number is in value.syscall_id.  */
-
-    TARGET_WAITKIND_SYSCALL_ENTRY,
-    TARGET_WAITKIND_SYSCALL_RETURN,
-
-    /* Nothing happened, but we stopped anyway.  This perhaps should be handled
-       within target_wait, but I'm not sure target_wait should be resuming the
-       inferior.  */
-    TARGET_WAITKIND_SPURIOUS,
-
-    /* An event has occured, but we should wait again.
-       Remote_async_wait() returns this when there is an event
-       on the inferior, but the rest of the world is not interested in
-       it.  The inferior has not stopped, but has just sent some output
-       to the console, for instance.  In this case, we want to go back
-       to the event loop and wait there for another event from the
-       inferior, rather than being stuck in the remote_async_wait()
-       function. sThis way the event loop is responsive to other events,
-       like for instance the user typing.  */
-    TARGET_WAITKIND_IGNORE,
-
-    /* The target has run out of history information,
-       and cannot run backward any further.  */
-    TARGET_WAITKIND_NO_HISTORY,
-
-    /* There are no resumed children left in the program.  */
-    TARGET_WAITKIND_NO_RESUMED
-  };
-
-struct target_waitstatus
-  {
-    enum target_waitkind kind;
-
-    /* Forked child pid, execd pathname, exit status, signal number or
-       syscall number.  */
-    union
-      {
-	int integer;
-	enum gdb_signal sig;
-	ptid_t related_pid;
-	char *execd_pathname;
-	int syscall_number;
-      }
-    value;
-  };
-
-/* Options that can be passed to target_wait.  */
-
-/* Return immediately if there's no event already queued.  If this
-   options is not requested, target_wait blocks waiting for an
-   event.  */
-#define TARGET_WNOHANG 1
 
 /* The structure below stores information about a system call.
    It is basically used in the "catch syscall" command, and in
@@ -259,6 +162,8 @@ enum target_object
   TARGET_OBJECT_LIBRARIES,
   /* Currently loaded libraries specific for SVR4 systems, in XML format.  */
   TARGET_OBJECT_LIBRARIES_SVR4,
+  /* Currently loaded libraries specific to AIX systems, in XML format.  */
+  TARGET_OBJECT_LIBRARIES_AIX,
   /* Get OS specific data.  The ANNEX specifies the type (running
      processes, etc.).  The data being transfered is expected to follow
      the DTD specified in features/osdata.dtd.  */
@@ -286,7 +191,9 @@ enum target_object
   /* Darwin dynamic linker info data.  */
   TARGET_OBJECT_DARWIN_DYLD_INFO,
   /* OpenVMS Unwind Information Block.  */
-  TARGET_OBJECT_OPENVMS_UIB
+  TARGET_OBJECT_OPENVMS_UIB,
+  /* Branch trace data, in XML format.  */
+  TARGET_OBJECT_BTRACE
   /* Possible future objects: TARGET_OBJECT_FILE, ...  */
 };
 
@@ -417,8 +324,8 @@ struct target_ops
     /* Old targets with a static target vector provide "to_close".
        New re-entrant targets provide "to_xclose" and that is expected
        to xfree everything (including the "struct target_ops").  */
-    void (*to_xclose) (struct target_ops *targ, int quitting);
-    void (*to_close) (int);
+    void (*to_xclose) (struct target_ops *targ);
+    void (*to_close) (void);
     void (*to_attach) (struct target_ops *ops, char *, int);
     void (*to_post_attach) (int);
     void (*to_detach) (struct target_ops *ops, char *, int);
@@ -493,7 +400,7 @@ struct target_ops
     void (*to_terminal_ours_for_output) (void);
     void (*to_terminal_ours) (void);
     void (*to_terminal_save_ours) (void);
-    void (*to_terminal_info) (char *, int);
+    void (*to_terminal_info) (const char *, int);
     void (*to_kill) (struct target_ops *);
     void (*to_load) (char *, int);
     void (*to_create_inferior) (struct target_ops *, 
@@ -780,7 +687,7 @@ struct target_ops
       TPP.  If no trace frame matches, return -1.  May throw if the
       operation fails.  */
     int (*to_trace_find) (enum trace_find_type type, int num,
-			  ULONGEST addr1, ULONGEST addr2, int *tpp);
+			  CORE_ADDR addr1, CORE_ADDR addr2, int *tpp);
 
     /* Get the value of the trace state variable number TSV, returning
        1 if the value is known and writing the value itself into the
@@ -811,7 +718,8 @@ struct target_ops
 
     /* Add/change textual notes about the trace run, returning 1 if
        successful, 0 otherwise.  */
-    int (*to_set_trace_notes) (char *user, char *notes, char* stopnotes);
+    int (*to_set_trace_notes) (const char *user, const char *notes,
+			       const char *stopnotes);
 
     /* Return the processor core that thread PTID was last seen on.
        This information is updated only when:
@@ -847,9 +755,18 @@ struct target_ops
       (const char *id);
 
     /* Return a traceframe info object describing the current
-       traceframe's contents.  This method should not cache data;
-       higher layers take care of caching, invalidating, and
-       re-fetching when necessary.  */
+       traceframe's contents.  If the target doesn't support
+       traceframe info, return NULL.  If the current traceframe is not
+       selected (the current traceframe number is -1), the target can
+       choose to return either NULL or an empty traceframe info.  If
+       NULL is returned, for example in remote target, GDB will read
+       from the live inferior.  If an empty traceframe info is
+       returned, for example in tfile target, which means the
+       traceframe info is available, but the requested memory is not
+       available in it.  GDB will try to see if the requested memory
+       is available in the read-only sections.  This method should not
+       cache data; higher layers take care of caching, invalidating,
+       and re-fetching when necessary.  */
     struct traceframe_info *(*to_traceframe_info) (void);
 
     /* Ask the target to use or not to use agent according to USE.  Return 1
@@ -858,6 +775,85 @@ struct target_ops
 
     /* Is the target able to use agent in current state?  */
     int (*to_can_use_agent) (void);
+
+    /* Check whether the target supports branch tracing.  */
+    int (*to_supports_btrace) (void);
+
+    /* Enable branch tracing for PTID and allocate a branch trace target
+       information struct for reading and for disabling branch trace.  */
+    struct btrace_target_info *(*to_enable_btrace) (ptid_t ptid);
+
+    /* Disable branch tracing and deallocate TINFO.  */
+    void (*to_disable_btrace) (struct btrace_target_info *tinfo);
+
+    /* Disable branch tracing and deallocate TINFO.  This function is similar
+       to to_disable_btrace, except that it is called during teardown and is
+       only allowed to perform actions that are safe.  A counter-example would
+       be attempting to talk to a remote target.  */
+    void (*to_teardown_btrace) (struct btrace_target_info *tinfo);
+
+    /* Read branch trace data.  */
+    VEC (btrace_block_s) *(*to_read_btrace) (struct btrace_target_info *,
+					     enum btrace_read_type);
+
+    /* Stop trace recording.  */
+    void (*to_stop_recording) (void);
+
+    /* Print information about the recording.  */
+    void (*to_info_record) (void);
+
+    /* Save the recorded execution trace into a file.  */
+    void (*to_save_record) (const char *filename);
+
+    /* Delete the recorded execution trace from the current position onwards.  */
+    void (*to_delete_record) (void);
+
+    /* Query if the record target is currently replaying.  */
+    int (*to_record_is_replaying) (void);
+
+    /* Go to the begin of the execution trace.  */
+    void (*to_goto_record_begin) (void);
+
+    /* Go to the end of the execution trace.  */
+    void (*to_goto_record_end) (void);
+
+    /* Go to a specific location in the recorded execution trace.  */
+    void (*to_goto_record) (ULONGEST insn);
+
+    /* Disassemble SIZE instructions in the recorded execution trace from
+       the current position.
+       If SIZE < 0, disassemble abs (SIZE) preceding instructions; otherwise,
+       disassemble SIZE succeeding instructions.  */
+    void (*to_insn_history) (int size, int flags);
+
+    /* Disassemble SIZE instructions in the recorded execution trace around
+       FROM.
+       If SIZE < 0, disassemble abs (SIZE) instructions before FROM; otherwise,
+       disassemble SIZE instructions after FROM.  */
+    void (*to_insn_history_from) (ULONGEST from, int size, int flags);
+
+    /* Disassemble a section of the recorded execution trace from instruction
+       BEGIN (inclusive) to instruction END (exclusive).  */
+    void (*to_insn_history_range) (ULONGEST begin, ULONGEST end, int flags);
+
+    /* Print a function trace of the recorded execution trace.
+       If SIZE < 0, print abs (SIZE) preceding functions; otherwise, print SIZE
+       succeeding functions.  */
+    void (*to_call_history) (int size, int flags);
+
+    /* Print a function trace of the recorded execution trace starting
+       at function FROM.
+       If SIZE < 0, print abs (SIZE) functions before FROM; otherwise, print
+       SIZE functions after FROM.  */
+    void (*to_call_history_from) (ULONGEST begin, int size, int flags);
+
+    /* Print a function trace of an execution trace section from function BEGIN
+       (inclusive) to function END (exclusive).  */
+    void (*to_call_history_range) (ULONGEST begin, ULONGEST end, int flags);
+
+    /* Nonzero if TARGET_OBJECT_LIBRARIES_SVR4 may be read with a
+       non-empty annex.  */
+    int (*to_augmented_libraries_svr4_read) (void);
 
     int to_magic;
     /* Need sub-structure for target machine related rather than comm related?
@@ -881,15 +877,13 @@ extern struct target_ops current_target;
 #define	target_longname		(current_target.to_longname)
 
 /* Does whatever cleanup is required for a target that we are no
-   longer going to be calling.  QUITTING indicates that GDB is exiting
-   and should not get hung on an error (otherwise it is important to
-   perform clean termination, even if it takes a while).  This routine
-   is automatically always called after popping the target off the
-   target stack - the target's own methods are no longer available
-   through the target vector.  Closing file descriptors and freeing all
-   memory allocated memory are typical things it should do.  */
+   longer going to be calling.  This routine is automatically always
+   called after popping the target off the target stack - the target's
+   own methods are no longer available through the target vector.
+   Closing file descriptors and freeing all memory allocated memory are
+   typical things it should do.  */
 
-void target_close (struct target_ops *targ, int quitting);
+void target_close (struct target_ops *targ);
 
 /* Attaches to a process on the target side.  Arguments are as passed
    to the `attach' command by the user.  This routine can be called
@@ -1729,6 +1723,9 @@ extern char *target_fileio_read_stralloc (const char *filename);
 #define target_can_use_agent() \
   (*current_target.to_can_use_agent) ()
 
+#define target_augmented_libraries_svr4_read() \
+  (*current_target.to_augmented_libraries_svr4_read) ()
+
 /* Command logging facility.  */
 
 #define target_log_command(p)						\
@@ -1750,6 +1747,9 @@ int target_verify_memory (const gdb_byte *data,
 
 /* Routines for maintenance of the target structures...
 
+   complete_target_initialization: Finalize a target_ops by filling in
+   any fields needed by the target implementation.
+
    add_target:   Add a target to the list of all possible targets.
 
    push_target:  Make this target the top of the stack of currently used
@@ -1759,11 +1759,19 @@ int target_verify_memory (const gdb_byte *data,
 
    unpush_target: Remove this from the stack of currently used targets,
    no matter where it is on the list.  Returns 0 if no
-   change, 1 if removed from stack.
-
-   pop_target:   Remove the top thing on the stack of current targets.  */
+   change, 1 if removed from stack.  */
 
 extern void add_target (struct target_ops *);
+
+extern void add_target_with_completer (struct target_ops *t,
+				       completer_ftype *completer);
+
+extern void complete_target_initialization (struct target_ops *t);
+
+/* Adds a command ALIAS for target T and marks it deprecated.  This is useful
+   for maintaining backwards compatibility when renaming targets.  */
+
+extern void add_deprecated_target_alias (struct target_ops *t, char *alias);
 
 extern void push_target (struct target_ops *);
 
@@ -1773,18 +1781,12 @@ extern void target_pre_inferior (int);
 
 extern void target_preopen (int);
 
-extern void pop_target (void);
-
-/* Does whatever cleanup is required to get rid of all pushed targets.
-   QUITTING is propagated to target_close; it indicates that GDB is
-   exiting and should not get hung on an error (otherwise it is
-   important to perform clean termination, even if it takes a
-   while).  */
-extern void pop_all_targets (int quitting);
+/* Does whatever cleanup is required to get rid of all pushed targets.  */
+extern void pop_all_targets (void);
 
 /* Like pop_all_targets, but pops only targets whose stratum is
    strictly above ABOVE_STRATUM.  */
-extern void pop_all_targets_above (enum strata above_stratum, int quitting);
+extern void pop_all_targets_above (enum strata above_stratum);
 
 extern int target_is_pushed (struct target_ops *t);
 
@@ -1802,13 +1804,12 @@ struct target_section
 
     struct bfd_section *the_bfd_section;
 
-    /* A given BFD may appear multiple times in the target section
-       list, so each BFD is associated with a given key.  The key is
-       just some convenient pointer that can be used to differentiate
-       the BFDs.  These are managed only by convention.  */
-    void *key;
-
-    bfd *bfd;			/* BFD file pointer */
+    /* The "owner" of the section.
+       It can be any unique value.  It is set by add_target_sections
+       and used by remove_target_sections.
+       For example, for executables it is a pointer to exec_bfd and
+       for shlibs it is the so_list pointer.  */
+    void *owner;
   };
 
 /* Holds an array of target sections.  Defined by [SECTIONS..SECTIONS_END[.  */
@@ -1857,8 +1858,6 @@ extern void find_default_attach (struct target_ops *, char *, int);
 extern void find_default_create_inferior (struct target_ops *,
 					  char *, char *, char **, int);
 
-extern struct target_ops *find_run_target (void);
-
 extern struct target_ops *find_target_beneath (struct target_ops *);
 
 /* Read OS data object of type TYPE from the target, and return it in
@@ -1901,5 +1900,66 @@ extern void update_target_permissions (void);
 
 /* Blank target vector entries are initialized to target_ignore.  */
 void target_ignore (void);
+
+/* See to_supports_btrace in struct target_ops.  */
+extern int target_supports_btrace (void);
+
+/* See to_enable_btrace in struct target_ops.  */
+extern struct btrace_target_info *target_enable_btrace (ptid_t ptid);
+
+/* See to_disable_btrace in struct target_ops.  */
+extern void target_disable_btrace (struct btrace_target_info *btinfo);
+
+/* See to_teardown_btrace in struct target_ops.  */
+extern void target_teardown_btrace (struct btrace_target_info *btinfo);
+
+/* See to_read_btrace in struct target_ops.  */
+extern VEC (btrace_block_s) *target_read_btrace (struct btrace_target_info *,
+						 enum btrace_read_type);
+
+/* See to_stop_recording in struct target_ops.  */
+extern void target_stop_recording (void);
+
+/* See to_info_record in struct target_ops.  */
+extern void target_info_record (void);
+
+/* See to_save_record in struct target_ops.  */
+extern void target_save_record (const char *filename);
+
+/* Query if the target supports deleting the execution log.  */
+extern int target_supports_delete_record (void);
+
+/* See to_delete_record in struct target_ops.  */
+extern void target_delete_record (void);
+
+/* See to_record_is_replaying in struct target_ops.  */
+extern int target_record_is_replaying (void);
+
+/* See to_goto_record_begin in struct target_ops.  */
+extern void target_goto_record_begin (void);
+
+/* See to_goto_record_end in struct target_ops.  */
+extern void target_goto_record_end (void);
+
+/* See to_goto_record in struct target_ops.  */
+extern void target_goto_record (ULONGEST insn);
+
+/* See to_insn_history.  */
+extern void target_insn_history (int size, int flags);
+
+/* See to_insn_history_from.  */
+extern void target_insn_history_from (ULONGEST from, int size, int flags);
+
+/* See to_insn_history_range.  */
+extern void target_insn_history_range (ULONGEST begin, ULONGEST end, int flags);
+
+/* See to_call_history.  */
+extern void target_call_history (int size, int flags);
+
+/* See to_call_history_from.  */
+extern void target_call_history_from (ULONGEST begin, int size, int flags);
+
+/* See to_call_history_range.  */
+extern void target_call_history_range (ULONGEST begin, ULONGEST end, int flags);
 
 #endif /* !defined (TARGET_H) */

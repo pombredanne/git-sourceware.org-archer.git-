@@ -36,6 +36,7 @@
 #include "continuations.h"
 #include "gdbcmd.h"		/* for dont_repeat() */
 #include "annotate.h"
+#include "maint.h"
 
 /* readline include files.  */
 #include "readline/readline.h"
@@ -268,6 +269,7 @@ display_gdb_prompt (char *new_prompt)
 	     rl_callback_handler_remove(), does the job.  */
 
 	  rl_callback_handler_remove ();
+	  do_cleanups (old_chain);
 	  return;
 	}
       else
@@ -867,7 +869,7 @@ async_disconnect (gdb_client_data arg)
 
   TRY_CATCH (exception, RETURN_MASK_ALL)
     {
-      pop_all_targets (1);
+      pop_all_targets ();
     }
 
   signal (SIGHUP, SIG_DFL);	/*FIXME: ???????????  */

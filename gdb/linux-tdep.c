@@ -261,7 +261,7 @@ linux_info_proc (struct gdbarch *gdbarch, char *args,
   int status_f = (what == IP_STATUS || what == IP_ALL);
   int stat_f = (what == IP_STAT || what == IP_ALL);
   char filename[100];
-  gdb_byte *data;
+  char *data;
   int target_errno;
 
   if (args && isdigit (args[0]))
@@ -675,22 +675,22 @@ linux_find_memory_regions_full (struct gdbarch *gdbarch,
 				linux_find_memory_region_ftype *func,
 				void *obfd)
 {
-  char filename[100];
-  gdb_byte *data;
+  char mapsfilename[100];
+  char *data;
 
   /* We need to know the real target PID to access /proc.  */
   if (current_inferior ()->fake_pid_p)
     return 1;
 
-  xsnprintf (filename, sizeof filename,
+  xsnprintf (mapsfilename, sizeof mapsfilename,
 	     "/proc/%d/smaps", current_inferior ()->pid);
-  data = target_fileio_read_stralloc (filename);
+  data = target_fileio_read_stralloc (mapsfilename);
   if (data == NULL)
     {
       /* Older Linux kernels did not support /proc/PID/smaps.  */
-      xsnprintf (filename, sizeof filename,
+      xsnprintf (mapsfilename, sizeof mapsfilename,
 		 "/proc/%d/maps", current_inferior ()->pid);
-      data = target_fileio_read_stralloc (filename);
+      data = target_fileio_read_stralloc (mapsfilename);
     }
   if (data)
     {
@@ -720,20 +720,30 @@ linux_find_memory_regions_full (struct gdbarch *gdbarch,
 	       line = strtok (NULL, "\n"))
 	    {
 	      char keyword[64 + 1];
-	      unsigned long number;
 
-	      if (sscanf (line, "%64s%lu kB\n", keyword, &number) != 2)
+	      if (sscanf (line, "%64s", keyword) != 1)
 		{
-		  warning (_("Error parsing {s,}maps file '%s'"), filename);
+		  warning (_("Error parsing {s,}maps file '%s'"), mapsfilename);
 		  break;
 		}
 	      if (strcmp (keyword, "Anonymous:") == 0)
 		has_anonymous = 1;
-	      if (number != 0 && (strcmp (keyword, "Shared_Dirty:") == 0
-				  || strcmp (keyword, "Private_Dirty:") == 0
-				  || strcmp (keyword, "Swap:") == 0
-				  || strcmp (keyword, "Anonymous:") == 0))
-		modified = 1;
+	      if (strcmp (keyword, "Shared_Dirty:") == 0
+		  || strcmp (keyword, "Private_Dirty:") == 0
+		  || strcmp (keyword, "Swap:") == 0
+		  || strcmp (keyword, "Anonymous:") == 0)
+		{
+		  unsigned long number;
+
+		  if (sscanf (line, "%*s%lu", &number) != 1)
+		    {
+		      warning (_("Error parsing {s,}maps file '%s' number"),
+			       mapsfilename);
+		      break;
+		    }
+		  if (number != 0)
+		    modified = 1;
+		}
 	    }
 
 	  /* Older Linux kernels did not support the "Anonymous:" counter.
@@ -983,8 +993,8 @@ linux_make_mappings_corefile_notes (struct gdbarch *gdbarch, bfd *obfd,
   if (mapping_data.file_count != 0)
     {
       /* Write the count to the obstack.  */
-      pack_long (obstack_base (&data_obstack), long_type,
-		 mapping_data.file_count);
+      pack_long ((gdb_byte *) obstack_base (&data_obstack),
+		 long_type, mapping_data.file_count);
 
       /* Copy the filenames to the data obstack.  */
       obstack_grow (&data_obstack, obstack_base (&filename_obstack),

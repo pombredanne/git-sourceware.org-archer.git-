@@ -592,6 +592,51 @@ but @code{placed_size} may be.
 
 @section Single Stepping
 
+@section Stepping over runtime loader dynamic symbol resolution code
+@cindex Procedure Linkage Table, stepping over
+@cindex PLT, stepping over
+@cindex resolver, stepping over
+
+If the program uses ELF-style shared libraries, then calls to
+functions in shared libraries go through stubs, which live in a table
+called the PLT (@dfn{Procedure Linkage Table}).  The first time the
+function is called, the stub sends control to the dynamic linker,
+which looks up the function's real address, patches the stub so that
+future calls will go directly to the function, and then passes control
+to the function.
+
+If we are stepping at the source level, we don't want to see any of
+this --- we just want to skip over the stub and the dynamic linker.
+The simple approach is to single-step until control leaves the dynamic
+linker.
+
+However, on some systems (e.g., Red Hat's 5.2 distribution) the
+dynamic linker calls functions in the shared C library, so you can't
+tell from the PC alone whether the dynamic linker is still running.
+In this case, we use a step-resume breakpoint to get us past the
+dynamic linker, as if we were using @code{next} to step over a
+function call.
+
+The @code{in_solib_dynsym_resolve_code} function says whether we're in
+the dynamic linker code or not.  Normally, this means we single-step.
+However, if @code{gdbarch_skip_solib_resolver} then returns non-zero,
+then its value is an address where we can place a step-resume
+breakpoint to get past the linker's symbol resolution function.
+
+The @code{in_dynsym_resolve_code} hook of the @code{target_so_ops}
+vector can generally be implemented in a pretty portable way, by
+comparing the PC against the address ranges of the dynamic linker's
+sections.
+
+The @code{gdbarch_skip_solib_resolver} implementation is generally
+going to be system-specific, since it depends on internal details of
+the dynamic linker.  It's usually not too hard to figure out where to
+put a breakpoint, but it certainly isn't portable.
+@code{gdbarch_skip_solib_resolver} should do plenty of sanity
+checking.  If it can't figure things out, returning zero and getting
+the (possibly confusing) stepping behavior is better than signaling an
+error, which will obscure the change in the inferior's state.  */
+
 @section Signal Handling
 
 @section Thread Handling
@@ -4666,13 +4711,6 @@ offset into the @code{jmp_buf}.  (While we might like to get the offset
 from the target's @file{jmpbuf.h}, that header file cannot be assumed
 to be available when building a cross-debugger.)
 
-@item DEPRECATED_IBM6000_TARGET
-@findex DEPRECATED_IBM6000_TARGET
-Shows that we are configured for an IBM RS/6000 system.  This
-conditional should be eliminated (FIXME) and replaced by
-feature-specific macros.  It was introduced in haste and we are
-repenting at leisure.
-
 @item I386_USE_GENERIC_WATCHPOINTS
 An x86-based target can define this to use the generic x86 watchpoint
 support; see @ref{Algorithms, I386_USE_GENERIC_WATCHPOINTS}.
@@ -5398,6 +5436,77 @@ the Unix @code{ptrace} call in a vanilla way.
 
 @section shared libraries
 
+@subsection AIX Shared Library Support
+
+Shared library support on AIX is based on reading some data provided
+by the loader.  With a live process, this information is accessed
+via a @code{ptrace} call (@code{PT_LDINFO}), while it is obtained
+by reading the @samp{.ldinfo} section when debugging from a core file.
+In both cases, the data has the same format, provided by the
+@file{sys/ldr.h} system header file.
+
+Internally, the relevant portions of the loader information is
+transformed into an XML representation, which lists all objects
+currently mapped in memory.  The associated DTD can be found in
+@file{gdb/features/library-list-aix.dtd}.  For each library element,
+the following parameters are reported:
+
+@itemize @minus
+
+@item
+@code{name}, the path name of an object.  This is usually the name
+of an archive, or the name of the main executable.
+
+@item
+If the @code{name} parameter refers to an archive, @code{member} provides
+the name of the object inside the archive on which the program depends.
+Otherwise, this field should be omitted.
+
+@item
+@code{text_addr}, the address where the @code{.text} section was mapped
+in memory.
+
+@item
+@code{text_size}, the size of the @code{.text} section.
+
+@item
+@code{data_addr}, the address where the @code{.data} section was mapped
+in memory.
+
+@item
+@code{data_size}, the size of the @code{.data} section.
+
+@end itemize
+
+By convention, the library list always has at least one element, and
+the first entry always refers to the main executable.
+
+Below is an example of such XML representation for a small program:
+
+@smallexample
+<library-list-aix version="1.0">
+  <library name="simple"
+           text_addr="0x0000000010000000"
+           text_size="128720"
+           data_addr="0x0000000020000f00"
+           data_size="31148">
+  </library>
+  <library name="/lib/libc.a"
+           member="shr.o"
+           text_addr="0x00000000d0100700"
+           text_size="4152684"
+           data_addr="0x00000000f0633e50"
+           data_size="875944">
+  </library>
+</library-list-aix>
+@end smallexample
+
+In that example, the list shows that the main executable is named
+@file{simple}, and its text section was loaded at 0x10000000.
+This program depends on member @file{shr.o} from the @file{/lib/libc.a}
+archive, whose text and data sections were loaded at (resp.)
+0xd0100700 and 0xf0633e50.
+
 @section Native Conditionals
 @cindex native conditionals
 
@@ -5411,18 +5520,6 @@ undefined) in @file{nm-@var{system}.h}.
 @item I386_USE_GENERIC_WATCHPOINTS
 An x86-based machine can define this to use the generic x86 watchpoint
 support; see @ref{Algorithms, I386_USE_GENERIC_WATCHPOINTS}.
-
-@item SOLIB_ADD (@var{filename}, @var{from_tty}, @var{targ}, @var{readsyms})
-@findex SOLIB_ADD
-Define this to expand into an expression that will cause the symbols in
-@var{filename} to be added to @value{GDBN}'s symbol table.  If
-@var{readsyms} is zero symbols are not read but any necessary low level
-processing for @var{filename} is still done.
-
-@item SOLIB_CREATE_INFERIOR_HOOK
-@findex SOLIB_CREATE_INFERIOR_HOOK
-Define this to expand into any shared-library-relocation code that you
-want to be run just after the child process has been forked.
 
 @item START_INFERIOR_TRAPS_EXPECTED
 @findex START_INFERIOR_TRAPS_EXPECTED
@@ -6339,13 +6436,12 @@ Since @value{GDBN} uses the @code{format printf} attribute on all
 @code{printf} like functions this checks not just @code{printf} calls
 but also calls to functions such as @code{fprintf_unfiltered}.
 
-@item -Wno-pointer-sign
-In version 4.0, GCC began warning about pointer argument passing or
-assignment even when the source and destination differed only in
-signedness.  However, most @value{GDBN} code doesn't distinguish
-carefully between @code{char} and @code{unsigned char}.  In early 2006
-the @value{GDBN} developers decided correcting these warnings wasn't
-worth the time it would take.
+@item -Wpointer-sign
+This helps make sure @value{GDBN} code uses @code{gdb_byte} which is
+really @code{unsigned char} for raw bytes instead of @code{char},
+whose signedness is host-dependent.  @sc{gcc} enables this with
+@code{-Wall} since version 4.0.  We enable it explicitly too to be
+decoupled from future @sc{gcc} (or other compiler)'s defaults.
 
 @item -Wno-unused-parameter
 Due to the way that @value{GDBN} is implemented many functions have
@@ -6587,15 +6683,15 @@ Specific Information, gdb, Debugging with @value{GDBN}}).
 @item @var{major}.@var{minor}
 @itemx @var{major}.@var{minor}.@var{patchlevel}
 an official release (e.g., 6.2 or 6.2.1)
-@item @var{major}.@var{minor}.@var{patchlevel}.@var{YYYY}@var{MM}@var{DD}
-a snapshot taken at @var{YYYY}-@var{MM}-@var{DD}-gmt (e.g.,
-6.1.50.20020302, 6.1.90.20020304, or 6.1.0.20020308)
-@item @var{major}.@var{minor}.@var{patchlevel}.@var{YYYY}@var{MM}@var{DD}-cvs
-a @sc{cvs} check out drawn on @var{YYYY}-@var{MM}-@var{DD} (e.g.,
-6.1.50.20020302-cvs, 6.1.90.20020304-cvs, or 6.1.0.20020308-cvs)
-@item @var{major}.@var{minor}.@var{patchlevel}.@var{YYYY}@var{MM}@var{DD} (@var{vendor})
+@item @var{major}.@var{minor}.@var{patchlevel}.DATE
+a snapshot; the string @samp{DATE} is replace with the date from
+@file{bfd/version.h}
+@item @var{major}.@var{minor}.@var{patchlevel}.DATE-cvs
+a @sc{cvs} check out; the string @samp{DATE} is replace with the date from
+@file{bfd/version.h}
+@item @var{major}.@var{minor}.@var{patchlevel}.DATE (@var{vendor})
 a vendor specific release of @value{GDBN}, that while based on@*
-@var{major}.@var{minor}.@var{patchlevel}.@var{YYYY}@var{MM}@var{DD},
+@var{major}.@var{minor}.@var{patchlevel}.DATE,
 may include additional changes
 @end table
 
@@ -7018,16 +7114,16 @@ cvs -f -d :ext:sourceware.org:/cvs/src co
 $  ^echo ^^
 U src/gdb/version.in
 $  cd src/gdb
-$  echo $u.90-0000-00-00-cvs > version.in
+$  echo $u.90-DATE-cvs > version.in
 $  cat version.in
-5.1.90-0000-00-00-cvs
+5.1.90-DATE-cvs
 $  cvs -f commit version.in
 @end smallexample
 
 @itemize @bullet
 @item
-@file{0000-00-00} is used as a date to pump prime the version.in update
-mechanism.
+The string @samp{DATE} is used to substitute the checkout date at
+build time; the date comes from @file{bfd/version.h}.
 @item
 @file{.90} and the previous branch version are used as fairly arbitrary
 initial branch version number.
@@ -7045,7 +7141,7 @@ This file needs to be updated so that:
 
 @itemize @bullet
 @item
-A daily timestamp is added to the file @file{version.in}.
+A daily timestamp is added to the file @file{bfd/version.h}.
 @item
 The new branch is included in the snapshot process.
 @end itemize
@@ -7262,8 +7358,7 @@ done
 @subsubheading Check the source files
 
 You're looking for files that have mysteriously disappeared.
-@kbd{distclean} has the habit of deleting files it shouldn't.  Watch out
-for the @file{version.in} update @kbd{cronjob}.
+@kbd{distclean} has the habit of deleting files it shouldn't.
 
 @smallexample
 $  ( cd gdb/src && cvs -f -q -n update )
@@ -7274,7 +7369,6 @@ M djunpack.bat
 M gdb/ChangeLog
 M gdb/NEWS
 M gdb/README
-M gdb/version.in
 @dots{} lots of generated files @dots{}
 $
 @end smallexample
@@ -7345,7 +7439,7 @@ If this is a release candidate then the only remaining steps are:
 Commit @file{version.in} and @file{ChangeLog}
 @item
 Tweak @file{version.in} (and @file{ChangeLog} to read
-@var{L}.@var{M}.@var{N}-0000-00-00-cvs so that the version update
+@var{L}.@var{M}.@var{N}-DATE-cvs so that the version substitution
 process can restart.
 @item
 Make the release candidate available in
@@ -7508,11 +7602,10 @@ indicates when the release was made.
 
 @subsubheading Restart @file{gdb/version.in}
 
-If @file{gdb/version.in} does not contain an ISO date such as
-@kbd{2002-01-24} then the daily @code{cronjob} won't update it.  Having
-committed all the release changes it can be set to
-@file{5.2.0_0000-00-00-cvs} which will restart things (yes the @kbd{_}
-is important - it affects the snapshot process).
+If @file{gdb/version.in} does not have the string @samp{DATE} then
+builds will not include the checkout date in their resulting version.
+Having committed all the release changes it can be set to
+@file{5.2.0_DATE-cvs} which will restart things.
 
 Don't forget the @file{ChangeLog}.
 
@@ -7932,6 +8025,9 @@ The board does not support type @code{long long}.
 @c NEED DOCUMENT.
 @item use_gdb_stub
 The tests are running with gdb stub.
+@item gdb,predefined_tsv
+The predefined trace state variables the board has.
+
 @end table
 
 @node Hints

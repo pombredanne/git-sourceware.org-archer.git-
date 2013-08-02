@@ -28,11 +28,12 @@
 #include "format.h"
 
 struct format_piece *
-parse_format_string (char **arg)
+parse_format_string (const char **arg)
 {
-  char *s, *f, *string;
-  char *prev_start;
-  char *percent_loc;
+  const char *s;
+  char *f, *string;
+  const char *prev_start;
+  const char *percent_loc;
   char *sub_start, *current_substring;
   struct format_piece *pieces;
   int next_frag;
@@ -155,7 +156,7 @@ parse_format_string (char **arg)
 
 	/* The first part of a format specifier is a set of flag
 	   characters.  */
-	while (strchr ("0-+ #", *f))
+	while (*f != '\0' && strchr ("0-+ #", *f))
 	  {
 	    if (*f == '#')
 	      seen_hash = 1;
@@ -169,7 +170,7 @@ parse_format_string (char **arg)
 	  }
 
 	/* The next part of a format specifier is a width.  */
-	while (strchr ("0123456789", *f))
+	while (*f != '\0' && strchr ("0123456789", *f))
 	  f++;
 
 	/* The next part of a format specifier is a precision.  */
@@ -177,7 +178,7 @@ parse_format_string (char **arg)
 	  {
 	    seen_prec = 1;
 	    f++;
-	    while (strchr ("0123456789", *f))
+	    while (*f != '\0' && strchr ("0123456789", *f))
 	      f++;
 	  }
 

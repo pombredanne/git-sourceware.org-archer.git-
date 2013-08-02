@@ -319,9 +319,15 @@ extern int value_fetch_lazy (struct value *val);
 extern int value_contents_equal (struct value *val1, struct value *val2);
 
 /* If nonzero, this is the value of a variable which does not actually
-   exist in the program.  */
+   exist in the program, at least partially.  If the value is lazy,
+   this may fetch it now.  */
 extern int value_optimized_out (struct value *value);
 extern void set_value_optimized_out (struct value *value, int val);
+
+/* Like value_optimized_out, but don't fetch the value even if it is
+   lazy.  Mainly useful for constructing other values using VALUE as
+   template.  */
+extern int value_optimized_out_const (const struct value *value);
 
 /* Like value_optimized_out, but return false if any bit in the object
    is valid.  */
@@ -463,7 +469,12 @@ extern void mark_value_bytes_unavailable (struct value *value,
    value_available_contents_eq(val, 4, val, 12, 2) => 1
    value_available_contents_eq(val, 4, val, 12, 4) => 0
    value_available_contents_eq(val, 3, val, 4, 4) => 0
-*/
+
+   We only know whether a value chunk is available if we've tried to
+   read it.  As this routine is used by printing routines, which may
+   be printing values in the value history, long after the inferior is
+   gone, it works with const values.  Therefore, this routine must not
+   be called with lazy values.  */
 
 extern int value_available_contents_eq (const struct value *val1, int offset1,
 					const struct value *val2, int offset2,
@@ -724,15 +735,15 @@ extern char *extract_field_op (struct expression *exp, int *subexp);
 extern struct value *evaluate_subexp_with_coercion (struct expression *,
 						    int *, enum noside);
 
-extern struct value *parse_and_eval (char *exp);
+extern struct value *parse_and_eval (const char *exp);
 
-extern struct value *parse_to_comma_and_eval (char **expp);
+extern struct value *parse_to_comma_and_eval (const char **expp);
 
 extern struct type *parse_and_eval_type (char *p, int length);
 
-extern CORE_ADDR parse_and_eval_address (char *exp);
+extern CORE_ADDR parse_and_eval_address (const char *exp);
 
-extern LONGEST parse_and_eval_long (char *exp);
+extern LONGEST parse_and_eval_long (const char *exp);
 
 extern void unop_promote (const struct language_defn *language,
 			  struct gdbarch *gdbarch,
@@ -894,7 +905,7 @@ extern void value_print (struct value *val, struct ui_file *stream,
 
 extern void value_print_array_elements (struct value *val,
 					struct ui_file *stream, int format,
-					enum val_prettyprint pretty);
+					enum val_prettyformat pretty);
 
 extern struct value *value_release_to_mark (struct value *mark);
 

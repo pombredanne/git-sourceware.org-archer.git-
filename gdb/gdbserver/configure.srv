@@ -43,7 +43,7 @@ srv_amd64_linux_xmlfiles="i386/amd64-linux.xml i386/amd64-avx-linux.xml i386/64b
 
 case "${target}" in
   aarch64*-*-linux*)
-			srv_regobj="aarch64.o aarch64-without-fpu.o"
+			srv_regobj="aarch64.o"
 			srv_tgtobj="linux-aarch64-low.o"
 			srv_tgtobj="${srv_tgtobj} linux-low.o"
 			srv_tgtobj="${srv_tgtobj} linux-osdata.o"
@@ -52,7 +52,6 @@ case "${target}" in
 			srv_xmlfiles="aarch64.xml"
 			srv_xmlfiles="${srv_xmlfiles} aarch64-core.xml"
 			srv_xmlfiles="${srv_xmlfiles} aarch64-fpu.xml"
-			srv_xmlfiles="${srv_xmlfiles} aarch64-without-fpu.xml"
 			srv_linux_usrregs=yes
 			srv_linux_regsets=yes
 			srv_linux_thread_db=yes
@@ -112,10 +111,11 @@ case "${target}" in
 			    srv_xmlfiles="${srv_xmlfiles} $srv_amd64_linux_xmlfiles"
 			fi
 			srv_tgtobj="linux-low.o linux-osdata.o linux-x86-low.o i386-low.o i387-fp.o linux-procfs.o"
-			srv_tgtobj="${srv_tgtobj} linux-ptrace.o"
+			srv_tgtobj="${srv_tgtobj} linux-ptrace.o linux-btrace.o"
 			srv_linux_usrregs=yes
 			srv_linux_regsets=yes
 			srv_linux_thread_db=yes
+			srv_linux_btrace=yes
 			ipa_obj="${ipa_i386_linux_regobj} linux-i386-ipa.o"
 			;;
   i[34567]86-*-lynxos*)	srv_regobj="i386.o"
@@ -184,6 +184,7 @@ case "${target}" in
 			srv_regobj="${srv_regobj} mips64-dsp-linux.o"
 			srv_tgtobj="linux-low.o linux-osdata.o linux-mips-low.o linux-procfs.o"
 			srv_tgtobj="${srv_tgtobj} linux-ptrace.o"
+			srv_tgtobj="${srv_tgtobj} mips-linux-watch.o"
 			srv_xmlfiles="mips-linux.xml"
 			srv_xmlfiles="${srv_xmlfiles} mips-dsp-linux.xml"
 			srv_xmlfiles="${srv_xmlfiles} mips-cpu.xml"
@@ -196,6 +197,15 @@ case "${target}" in
 			srv_xmlfiles="${srv_xmlfiles} mips64-cp0.xml"
 			srv_xmlfiles="${srv_xmlfiles} mips64-fpu.xml"
 			srv_xmlfiles="${srv_xmlfiles} mips64-dsp.xml"
+			srv_linux_regsets=yes
+			srv_linux_usrregs=yes
+			srv_linux_thread_db=yes
+			;;
+  nios2*-*-linux*)	srv_regobj="nios2-linux.o"
+			srv_tgtobj="linux-low.o linux-osdata.o linux-nios2-low.o linux-procfs.o"
+			srv_tgtobj="${srv_tgtobj} linux-ptrace.o"
+			srv_xmlfiles="nios2-linux.xml"
+			srv_xmlfiles="${srv_xmlfiles} nios2-cpu.xml"
 			srv_linux_regsets=yes
 			srv_linux_usrregs=yes
 			srv_linux_thread_db=yes
@@ -314,11 +324,12 @@ case "${target}" in
 			;;
   x86_64-*-linux*)	srv_regobj="$srv_amd64_linux_regobj $srv_i386_linux_regobj"
 			srv_tgtobj="linux-low.o linux-osdata.o linux-x86-low.o i386-low.o i387-fp.o linux-procfs.o"
-			srv_tgtobj="${srv_tgtobj} linux-ptrace.o"
+			srv_tgtobj="${srv_tgtobj} linux-ptrace.o linux-btrace.o"
 			srv_xmlfiles="$srv_i386_linux_xmlfiles $srv_amd64_linux_xmlfiles"
 			srv_linux_usrregs=yes # This is for i386 progs.
 			srv_linux_regsets=yes
 			srv_linux_thread_db=yes
+			srv_linux_btrace=yes
 			ipa_obj="${ipa_amd64_linux_regobj} linux-amd64-ipa.o"
 			;;
   x86_64-*-mingw*)	srv_regobj="$srv_amd64_regobj"

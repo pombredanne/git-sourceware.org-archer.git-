@@ -1,7 +1,5 @@
 /* Support for the generic parts of most COFF variants, for BFD.
-   Copyright 1990, 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011
-   Free Software Foundation, Inc.
+   Copyright 1990-2013 Free Software Foundation, Inc.
    Written by Cygnus Support.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -797,6 +795,12 @@ styp_to_sec_flags (bfd *abfd ATTRIBUTE_UNUSED,
   else if (styp_flags & STYP_PAD)
     sec_flags = 0;
 #ifdef RS6000COFF_C
+  else if (styp_flags & STYP_EXCEPT)
+    sec_flags |= SEC_LOAD;
+  else if (styp_flags & STYP_LOADER)
+    sec_flags |= SEC_LOAD;
+  else if (styp_flags & STYP_TYPCHK)
+    sec_flags |= SEC_LOAD;
   else if (styp_flags & STYP_DWARF)
     sec_flags |= SEC_DEBUGGING;
 #endif
@@ -3447,7 +3451,7 @@ coff_compute_section_file_positions (bfd * abfd)
 	 incremented in coff_set_section_contents.  This is right for
 	 SVR3.2.  */
       if (strcmp (current->name, _LIB) == 0)
-	bfd_set_section_vma (abfd, current, 0);
+	(void) bfd_set_section_vma (abfd, current, 0);
 #endif
 
 #ifdef ALIGN_SECTIONS_IN_FILE
@@ -3949,7 +3953,7 @@ coff_write_object_contents (bfd * abfd)
 	  bfd_size_type amt;
 
 	  internal_f.f_nscns++;
-	  strncpy (&(scnhdr.s_name[0]), current->name, 8);
+	  memcpy (scnhdr.s_name, ".ovrflo", 8);
 	  scnhdr.s_paddr = current->reloc_count;
 	  scnhdr.s_vaddr = current->lineno_count;
 	  scnhdr.s_size = 0;

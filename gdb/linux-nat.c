@@ -39,7 +39,6 @@
 #include "inf-child.h"
 #include "inf-ptrace.h"
 #include "auxv.h"
-#include <sys/param.h>		/* for MAXPATHLEN */
 #include <sys/procfs.h>		/* for elf_gregset etc.  */
 #include "elf-bfd.h"		/* for elfcore_write_* */
 #include "gregset.h"		/* for gregset */
@@ -67,6 +66,7 @@
 #include "linux-ptrace.h"
 #include "buffer.h"
 #include "target-descriptions.h"
+#include "filestuff.h"
 
 #ifndef SPUFS_MAGIC
 #define SPUFS_MAGIC 0x23c9b64e
@@ -642,9 +642,6 @@ linux_child_follow_fork (struct target_ops *ops, int follow_child)
   if (parent_pid == 0)
     parent_pid = ptid_get_pid (inferior_ptid);
   child_pid = PIDGET (inferior_thread ()->pending_follow.value.related_pid);
-
-  if (!detach_fork)
-    linux_enable_event_reporting (pid_to_ptid (child_pid));
 
   if (has_vforked
       && !non_stop /* Non-stop always resumes both branches.  */
@@ -2316,7 +2313,6 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 	     this fork.  We're actually doing an infcall in
 	     linux-fork.c.  */
 	  ourstatus->kind = TARGET_WAITKIND_SPURIOUS;
-	  linux_enable_event_reporting (pid_to_ptid (new_pid));
 
 	  /* Report the stop to the core.  */
 	  return 0;
@@ -4275,7 +4271,7 @@ linux_nat_thread_name (struct thread_info *thr)
   char *result = NULL;
 
   snprintf (buf, sizeof (buf), FORMAT, pid, lwp);
-  comm_file = fopen (buf, "r");
+  comm_file = gdb_fopen_cloexec (buf, "r");
   if (comm_file)
     {
       /* Not exported by the kernel, so we define it here.  */
@@ -4309,14 +4305,14 @@ linux_child_pid_to_exec_file (int pid)
 {
   char *name1, *name2;
 
-  name1 = xmalloc (MAXPATHLEN);
-  name2 = xmalloc (MAXPATHLEN);
+  name1 = xmalloc (PATH_MAX);
+  name2 = xmalloc (PATH_MAX);
   make_cleanup (xfree, name1);
   make_cleanup (xfree, name2);
-  memset (name2, 0, MAXPATHLEN);
+  memset (name2, 0, PATH_MAX);
 
   sprintf (name1, "/proc/%d/exe", pid);
-  if (readlink (name1, name2, MAXPATHLEN - 1) > 0)
+  if (readlink (name1, name2, PATH_MAX - 1) > 0)
     return name2;
   else
     return name1;
@@ -4402,7 +4398,7 @@ linux_proc_xfer_partial (struct target_ops *ops, enum target_object object,
   /* We could keep this file open and cache it - possibly one per
      thread.  That requires some juggling, but is even faster.  */
   sprintf (filename, "/proc/%d/mem", PIDGET (inferior_ptid));
-  fd = open (filename, O_RDONLY | O_LARGEFILE);
+  fd = gdb_open_cloexec (filename, O_RDONLY | O_LARGEFILE, 0);
   if (fd == -1)
     return 0;
 
@@ -4496,7 +4492,7 @@ linux_proc_xfer_spu (struct target_ops *ops, enum target_object object,
     }
 
   xsnprintf (buf, sizeof buf, "/proc/%d/fd/%s", pid, annex);
-  fd = open (buf, writebuf? O_WRONLY : O_RDONLY);
+  fd = gdb_open_cloexec (buf, writebuf? O_WRONLY : O_RDONLY, 0);
   if (fd <= 0)
     return -1;
 
@@ -4565,19 +4561,19 @@ linux_proc_pending_signals (int pid, sigset_t *pending,
 			    sigset_t *blocked, sigset_t *ignored)
 {
   FILE *procfile;
-  char buffer[MAXPATHLEN], fname[MAXPATHLEN];
+  char buffer[PATH_MAX], fname[PATH_MAX];
   struct cleanup *cleanup;
 
   sigemptyset (pending);
   sigemptyset (blocked);
   sigemptyset (ignored);
   sprintf (fname, "/proc/%d/status", pid);
-  procfile = fopen (fname, "r");
+  procfile = gdb_fopen_cloexec (fname, "r");
   if (procfile == NULL)
     error (_("Could not open %s"), fname);
   cleanup = make_cleanup_fclose (procfile);
 
-  while (fgets (buffer, MAXPATHLEN, procfile) != NULL)
+  while (fgets (buffer, PATH_MAX, procfile) != NULL)
     {
       /* Normal queued signals are on the SigPnd line in the status
 	 file.  However, 2.6 kernels also have a "shared" pending
@@ -4915,7 +4911,7 @@ linux_async_pipe (int enable)
 
       if (enable)
 	{
-	  if (pipe (linux_nat_event_pipe) == -1)
+	  if (gdb_pipe_cloexec (linux_nat_event_pipe) == -1)
 	    internal_error (__FILE__, __LINE__,
 			    "creating event pipe failed.");
 
@@ -5022,14 +5018,14 @@ linux_nat_stop (ptid_t ptid)
 }
 
 static void
-linux_nat_close (int quitting)
+linux_nat_close (void)
 {
   /* Unregister from the event loop.  */
   if (linux_nat_is_async_p ())
     linux_nat_async (NULL, 0);
 
   if (linux_ops->to_close)
-    linux_ops->to_close (quitting);
+    linux_ops->to_close ();
 }
 
 /* When requests are passed down from the linux-nat layer to the
