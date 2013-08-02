@@ -60,10 +60,14 @@ struct mi_parse
    the TOKEN field of the resultant mi_parse object, to be freed by
    mi_parse_free.  */
 
-extern struct mi_parse *mi_parse (char *cmd, char **token);
+extern struct mi_parse *mi_parse (const char *cmd, char **token);
 
 /* Free a command returned by mi_parse_command.  */
 
 extern void mi_parse_free (struct mi_parse *cmd);
+
+/* Parse a string argument into a print_values value.  */
+
+enum print_values mi_parse_print_values (const char *name);
 
 #endif

@@ -581,7 +581,7 @@ coerce_unspec_val_to_type (struct value *val, struct type *type)
       set_value_bitsize (result, value_bitsize (val));
       set_value_bitpos (result, value_bitpos (val));
       set_value_address (result, value_address (val));
-      set_value_optimized_out (result, value_optimized_out (val));
+      set_value_optimized_out (result, value_optimized_out_const (val));
       return result;
     }
 }
@@ -1297,28 +1297,28 @@ static struct htab *decoded_names_store;
    when a decoded name is cached in it.  */
 
 const char *
-ada_decode_symbol (const struct general_symbol_info *gsymbol)
+ada_decode_symbol (const struct general_symbol_info *arg)
 {
+  struct general_symbol_info *gsymbol = (struct general_symbol_info *) arg;
   const char **resultp =
-    (const char **) &gsymbol->language_specific.mangled_lang.demangled_name;
+    &gsymbol->language_specific.mangled_lang.demangled_name;
 
-  if (*resultp == NULL)
+  if (!gsymbol->ada_mangled)
     {
       const char *decoded = ada_decode (gsymbol->name);
+      struct obstack *obstack = gsymbol->language_specific.obstack;
 
-      if (gsymbol->obj_section != NULL)
-        {
-	  struct objfile *objf = gsymbol->obj_section->objfile;
+      gsymbol->ada_mangled = 1;
 
-	  *resultp = obstack_copy0 (&objf->objfile_obstack,
-				    decoded, strlen (decoded));
-        }
-      /* Sometimes, we can't find a corresponding objfile, in which
-         case, we put the result on the heap.  Since we only decode
-         when needed, we hope this usually does not cause a
-         significant memory leak (FIXME).  */
-      if (*resultp == NULL)
+      if (obstack != NULL)
+	*resultp = obstack_copy0 (obstack, decoded, strlen (decoded));
+      else
         {
+	  /* Sometimes, we can't find a corresponding objfile, in
+	     which case, we put the result on the heap.  Since we only
+	     decode when needed, we hope this usually does not cause a
+	     significant memory leak (FIXME).  */
+
           char **slot = (char **) htab_find_slot (decoded_names_store,
                                                   decoded, INSERT);
 
@@ -2325,7 +2325,6 @@ ada_value_primitive_packed_val (struct value *obj, const gdb_byte *valaddr,
       /* Also set the parent value.  This is needed when trying to
 	 assign a new value (in inferior memory).  */
       set_value_parent (v, obj);
-      value_incref (obj);
     }
   else
     set_value_bitsize (v, bit_size);
@@ -2518,7 +2517,7 @@ ada_value_assign (struct value *toval, struct value *fromval)
       int len = (value_bitpos (toval)
 		 + bits + HOST_CHAR_BIT - 1) / HOST_CHAR_BIT;
       int from_size;
-      char *buffer = (char *) alloca (len);
+      gdb_byte *buffer = alloca (len);
       struct value *val;
       CORE_ADDR to_addr = value_address (toval);
 
@@ -4056,15 +4055,14 @@ static struct value *
 ada_read_renaming_var_value (struct symbol *renaming_sym,
 			     struct block *block)
 {
-  char *sym_name;
+  const char *sym_name;
   struct expression *expr;
   struct value *value;
   struct cleanup *old_chain = NULL;
 
-  sym_name = xstrdup (SYMBOL_LINKAGE_NAME (renaming_sym));
-  old_chain = make_cleanup (xfree, sym_name);
+  sym_name = SYMBOL_LINKAGE_NAME (renaming_sym);
   expr = parse_exp_1 (&sym_name, 0, block, 0);
-  make_cleanup (free_current_contents, &expr);
+  old_chain = make_cleanup (free_current_contents, &expr);
   value = evaluate_expression (expr);
 
   do_cleanups (old_chain);
@@ -4728,17 +4726,20 @@ static int
 old_renaming_is_invisible (const struct symbol *sym, const char *function_name)
 {
   char *scope;
+  struct cleanup *old_chain;
 
   if (SYMBOL_CLASS (sym) != LOC_TYPEDEF)
     return 0;
 
   scope = xget_renaming_scope (SYMBOL_TYPE (sym));
-
-  make_cleanup (xfree, scope);
+  old_chain = make_cleanup (xfree, scope);
 
   /* If the rename has been defined in a package, then it is visible.  */
   if (is_package_name (scope))
-    return 0;
+    {
+      do_cleanups (old_chain);
+      return 0;
+    }
 
   /* Check that the rename is in the current function scope by checking
      that its name starts with SCOPE.  */
@@ -4750,7 +4751,12 @@ old_renaming_is_invisible (const struct symbol *sym, const char *function_name)
   if (strncmp (function_name, "_ada_", 5) == 0)
     function_name += 5;
 
-  return (strncmp (function_name, scope, strlen (scope)) != 0);
+  {
+    int is_invisible = strncmp (function_name, scope, strlen (scope)) != 0;
+
+    do_cleanups (old_chain);
+    return is_invisible;
+  }
 }
 
 /* Remove entries from SYMS that corresponds to a renaming entity that
@@ -5806,10 +5812,10 @@ symbol_completion_add (VEC(char_ptr) **sv,
 struct add_partial_datum
 {
   VEC(char_ptr) **completions;
-  char *text;
+  const char *text;
   int text_len;
-  char *text0;
-  char *word;
+  const char *text0;
+  const char *word;
   int wild_match;
   int encoded;
 };
@@ -5828,7 +5834,8 @@ ada_expand_partial_symbol_name (const char *name, void *user_data)
    the entire command on which completion is made.  */
 
 static VEC (char_ptr) *
-ada_make_symbol_completion_list (char *text0, char *word, enum type_code code)
+ada_make_symbol_completion_list (const char *text0, const char *word,
+				 enum type_code code)
 {
   char *text;
   int text_len;
@@ -5842,6 +5849,7 @@ ada_make_symbol_completion_list (char *text0, char *word, enum type_code code)
   struct block *b, *surrounding_static_block = 0;
   int i;
   struct block_iterator iter;
+  struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
 
   gdb_assert (code == TYPE_CODE_UNDEF);
 
@@ -5942,6 +5950,7 @@ ada_make_symbol_completion_list (char *text0, char *word, enum type_code code)
     }
   }
 
+  do_cleanups (old_chain);
   return completions;
 }
 
@@ -11104,7 +11113,7 @@ static int
 is_known_support_routine (struct frame_info *frame)
 {
   struct symtab_and_line sal;
-  const char *func_name;
+  char *func_name;
   enum language func_lang;
   int i;
   const char *fullname;
@@ -11151,9 +11160,13 @@ is_known_support_routine (struct frame_info *frame)
     {
       re_comp (known_auxiliary_function_name_patterns[i]);
       if (re_exec (func_name))
-        return 1;
+	{
+	  xfree (func_name);
+	  return 1;
+	}
     }
 
+  xfree (func_name);
   return 0;
 }
 
@@ -11197,6 +11210,7 @@ ada_unhandled_exception_name_addr_from_raise (void)
   int frame_level;
   struct frame_info *fi;
   struct ada_inferior_data *data = get_ada_inferior_data (current_inferior ());
+  struct cleanup *old_chain;
 
   /* To determine the name of this exception, we need to select
      the frame corresponding to RAISE_SYM_NAME.  This frame is
@@ -11207,17 +11221,24 @@ ada_unhandled_exception_name_addr_from_raise (void)
     if (fi != NULL)
       fi = get_prev_frame (fi); 
 
+  old_chain = make_cleanup (null_cleanup, NULL);
   while (fi != NULL)
     {
-      const char *func_name;
+      char *func_name;
       enum language func_lang;
 
       find_frame_funname (fi, &func_name, &func_lang, NULL);
-      if (func_name != NULL
-          && strcmp (func_name, data->exception_info->catch_exception_sym) == 0)
-        break; /* We found the frame we were looking for...  */
-      fi = get_prev_frame (fi);
+      if (func_name != NULL)
+	{
+	  make_cleanup (xfree, func_name);
+
+          if (strcmp (func_name,
+		      data->exception_info->catch_exception_sym) == 0)
+	    break; /* We found the frame we were looking for...  */
+	  fi = get_prev_frame (fi);
+	}
     }
+  do_cleanups (old_chain);
 
   if (fi == NULL)
     return 0;
@@ -11385,7 +11406,7 @@ create_excep_cond_exprs (struct ada_catchpoint *c)
       if (!bl->shlib_disabled)
 	{
 	  volatile struct gdb_exception e;
-	  char *s;
+	  const char *s;
 
 	  s = cond_string;
 	  TRY_CATCH (e, RETURN_MASK_ERROR)
@@ -11532,7 +11553,8 @@ print_it_exception (enum exception_catchpoint_kind ex, bpstat bs)
 
 	  if (addr != 0)
 	    {
-	      read_memory (addr, exception_name, sizeof (exception_name) - 1);
+	      read_memory (addr, (gdb_byte *) exception_name,
+			   sizeof (exception_name) - 1);
 	      exception_name [sizeof (exception_name) - 1] = '\0';
 	    }
 	  else

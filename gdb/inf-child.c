@@ -30,10 +30,8 @@
 #include "gdb/fileio.h"
 #include "agent.h"
 #include "gdb_wait.h"
+#include "filestuff.h"
 
-#ifdef HAVE_SYS_PARAM_H
-#include <sys/param.h>		/* for MAXPATHLEN */
-#endif
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -245,7 +243,7 @@ inf_child_fileio_open (const char *filename, int flags, int mode,
 
   /* We do not need to convert MODE, since the fileio protocol uses
      the standard values.  */
-  fd = open (filename, nat_flags, mode);
+  fd = gdb_open_cloexec (filename, nat_flags, mode);
   if (fd == -1)
     *target_errno = inf_child_errno_to_fileio_error (errno);
 
@@ -343,9 +341,9 @@ static char *
 inf_child_fileio_readlink (const char *filename, int *target_errno)
 {
   /* We support readlink only on systems that also provide a compile-time
-     maximum path length (MAXPATHLEN), at least for now.  */
-#if defined (HAVE_READLINK) && defined (MAXPATHLEN)
-  char buf[MAXPATHLEN - 1];
+     maximum path length (PATH_MAX), at least for now.  */
+#if defined (HAVE_READLINK) && defined (PATH_MAX)
+  char buf[PATH_MAX];
   int len;
   char *ret;
 

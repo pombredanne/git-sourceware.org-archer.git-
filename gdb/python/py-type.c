@@ -54,7 +54,8 @@ typedef struct pyty_type_object
 static type_object *pyty_objects_discardable;
 #endif
 
-static PyTypeObject type_object_type;
+static PyTypeObject type_object_type
+    CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF ("type_object");
 
 /* A Field object.  */
 typedef struct pyty_field_object
@@ -65,7 +66,8 @@ typedef struct pyty_field_object
   PyObject *dict;
 } field_object;
 
-static PyTypeObject field_object_type;
+static PyTypeObject field_object_type
+    CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF ("field_object");
 
 /* A type iterator object.  */
 typedef struct {
@@ -78,7 +80,8 @@ typedef struct {
   struct pyty_type_object *source;
 } typy_iterator_object;
 
-static PyTypeObject type_iterator_object_type;
+static PyTypeObject type_iterator_object_type
+    CPYCHECKER_TYPE_OBJECT_FOR_TYPEDEF ("typy_iterator_object");
 
 /* This is used to initialize various gdb.TYPE_ constants.  */
 struct pyty_code
@@ -308,6 +311,8 @@ make_fielditem (struct type *type, int i, enum gdbpy_iter_kind kind)
     case iter_values:
       item =  convert_field (type, i);
       break;
+    default:
+      gdb_assert_not_reached ("invalid gdbpy_iter_kind");
     }
   return item;
   
@@ -384,10 +389,7 @@ typy_fields (PyObject *self, PyObject *args)
     return NULL;
   
   rl = Py_BuildValue ("[O]", r);
-  if (rl == NULL)
-    {
-      Py_DECREF (r);
-    }
+  Py_DECREF (r);
 
   return rl;
 }
@@ -450,13 +452,7 @@ typy_get_composite (struct type *type)
 	{
 	  CHECK_TYPEDEF (type);
 	}
-      /* Don't use GDB_PY_HANDLE_EXCEPTION here because that returns
-	 a (NULL) pointer of the wrong type.  */
-      if (except.reason < 0)
-	{
-	  gdbpy_convert_exception (except);
-	  return NULL;
-	}
+      GDB_PY_HANDLE_EXCEPTION (except);
 
       if (TYPE_CODE (type) != TYPE_CODE_PTR
 	  && TYPE_CODE (type) != TYPE_CODE_REF)
@@ -739,11 +735,7 @@ typy_lookup_typename (const char *type_name, const struct block *block)
 	type = lookup_typename (python_language, python_gdbarch,
 				type_name, block, 0);
     }
-  if (except.reason < 0)
-    {
-      gdbpy_convert_exception (except);
-      return NULL;
-    }
+  GDB_PY_HANDLE_EXCEPTION (except);
 
   return type;
 }
@@ -792,11 +784,7 @@ typy_lookup_type (struct demangle_component *demangled,
 	      break;
 	    }
 	}
-      if (except.reason < 0)
-	{
-	  gdbpy_convert_exception (except);
-	  return NULL;
-	}
+      GDB_PY_HANDLE_EXCEPTION (except);
     }
   
   /* If we have a type from the switch statement above, just return
@@ -1266,6 +1254,9 @@ save_objfile_types (struct objfile *objfile, void *datum)
   htab_t copied_types;
   struct cleanup *cleanup;
 
+  if (!gdb_python_initialized)
+    return;
+
   /* This prevents another thread from freeing the objects we're
      operating on.  */
   cleanup = ensure_python_env (get_objfile_arch (objfile), current_language);
@@ -1584,7 +1575,7 @@ gdbpy_lookup_type (PyObject *self, PyObject *args, PyObject *kw)
   return (PyObject *) type_to_type_object (type);
 }
 
-void
+int
 gdbpy_initialize_types (void)
 {
   int i;
@@ -1593,11 +1584,11 @@ gdbpy_initialize_types (void)
     = register_objfile_data_with_cleanup (save_objfile_types, NULL);
 
   if (PyType_Ready (&type_object_type) < 0)
-    return;
+    return -1;
   if (PyType_Ready (&field_object_type) < 0)
-    return;
+    return -1;
   if (PyType_Ready (&type_iterator_object_type) < 0)
-    return;
+    return -1;
 
   for (i = 0; pyty_codes[i].name; ++i)
     {
@@ -1605,22 +1596,19 @@ gdbpy_initialize_types (void)
 				   /* Cast needed for Python 2.4.  */
 				   (char *) pyty_codes[i].name,
 				   pyty_codes[i].code) < 0)
-	return;
+	return -1;
     }
 
-  Py_INCREF (&type_object_type);
-  PyModule_AddObject (gdb_module, "Type", (PyObject *) &type_object_type);
+  if (gdb_pymodule_addobject (gdb_module, "Type",
+			      (PyObject *) &type_object_type) < 0)
+    return -1;
 
-  Py_INCREF (&type_iterator_object_type);
-  PyModule_AddObject (gdb_module, "TypeIterator",
-		      (PyObject *) &type_iterator_object_type);
+  if (gdb_pymodule_addobject (gdb_module, "TypeIterator",
+			      (PyObject *) &type_iterator_object_type) < 0)
+    return -1;
 
-  Py_INCREF (&field_object_type);
-  PyModule_AddObject (gdb_module, "Field", (PyObject *) &field_object_type);
-
-#if 0
-  observer_attach_mark_used (typy_types_mark_used);
-#endif
+  return gdb_pymodule_addobject (gdb_module, "Field",
+				 (PyObject *) &field_object_type);
 }
 
 

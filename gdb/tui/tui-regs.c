@@ -661,8 +661,6 @@ _initialize_tui_regs (void)
 ** STATIC LOCAL FUNCTIONS                 **
 ******************************************/
 
-extern int pagination_enabled;
-
 static void
 tui_restore_gdbout (void *ui)
 {
@@ -731,6 +729,13 @@ tui_get_register (struct frame_info *frame,
 	{
 	  struct gdbarch *gdbarch = get_frame_arch (frame);
 	  int size = register_size (gdbarch, regnum);
+
+	  /* We only know whether a value chunk is available if we've
+	     tried to read it.  */
+	  if (value_lazy (data->value))
+	    value_fetch_lazy (data->value);
+	  if (value_lazy (old_val))
+	    value_fetch_lazy (old_val);
 
 	  if (value_optimized_out (data->value) != value_optimized_out (old_val)
 	      || !value_available_contents_eq (data->value, 0,

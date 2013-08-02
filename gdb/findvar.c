@@ -267,6 +267,7 @@ value_of_register (int regnum, struct frame_info *frame)
   int optim;
   int unavail;
   struct value *reg_val;
+  struct type *reg_type;
   int realnum;
   gdb_byte raw_buffer[MAX_REGISTER_SIZE];
   enum lval_type lval;
@@ -280,7 +281,11 @@ value_of_register (int regnum, struct frame_info *frame)
   frame_register (frame, regnum, &optim, &unavail,
 		  &lval, &addr, &realnum, raw_buffer);
 
-  reg_val = allocate_value (register_type (gdbarch, regnum));
+  reg_type = register_type (gdbarch, regnum);
+  if (optim)
+    reg_val = allocate_optimized_out_value (reg_type);
+  else
+    reg_val = allocate_value (reg_type);
 
   if (!optim && !unavail)
     memcpy (value_contents_raw (reg_val), raw_buffer,
@@ -292,7 +297,6 @@ value_of_register (int regnum, struct frame_info *frame)
   VALUE_LVAL (reg_val) = lval;
   set_value_address (reg_val, addr);
   VALUE_REGNUM (reg_val) = regnum;
-  set_value_optimized_out (reg_val, optim);
   if (unavail)
     mark_value_bytes_unavailable (reg_val, 0, register_size (gdbarch, regnum));
   VALUE_FRAME_ID (reg_val) = get_frame_id (frame);
@@ -368,17 +372,15 @@ address_to_signed_pointer (struct gdbarch *gdbarch, struct type *type,
 int
 symbol_read_needs_frame (struct symbol *sym)
 {
+  if (SYMBOL_COMPUTED_OPS (sym) != NULL)
+    return SYMBOL_COMPUTED_OPS (sym)->read_needs_frame (sym);
+
   switch (SYMBOL_CLASS (sym))
     {
       /* All cases listed explicitly so that gcc -Wall will detect it if
          we failed to consider one.  */
     case LOC_COMPUTED:
-      /* FIXME: cagney/2004-01-26: It should be possible to
-	 unconditionally call the SYMBOL_COMPUTED_OPS method when available.
-	 Unfortunately DWARF 2 stores the frame-base (instead of the
-	 function) location in a function's symbol.  Oops!  For the
-	 moment enable this when/where applicable.  */
-      return SYMBOL_COMPUTED_OPS (sym)->read_needs_frame (sym);
+      gdb_assert_not_reached (_("LOC_COMPUTED variable missing a method"));
 
     case LOC_REGISTER:
     case LOC_ARG:
@@ -417,6 +419,9 @@ struct minsym_lookup_data
      if found.  It should be initialized to NULL before the search
      is started.  */
   struct minimal_symbol *result;
+
+  /* The objfile in which the symbol was found.  */
+  struct objfile *objfile;
 };
 
 /* A callback function for gdbarch_iterate_over_objfiles_in_search_order.
@@ -432,6 +437,7 @@ minsym_lookup_iterator_cb (struct objfile *objfile, void *cb_data)
   gdb_assert (data->result == NULL);
 
   data->result = lookup_minimal_symbol (data->name, NULL, objfile);
+  data->objfile = objfile;
 
   /* The iterator should stop iff a match was found.  */
   return (data->result != NULL);
@@ -453,6 +459,9 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
   if (symbol_read_needs_frame (var))
     gdb_assert (frame);
 
+  if (SYMBOL_COMPUTED_OPS (var) != NULL)
+    return SYMBOL_COMPUTED_OPS (var)->read_variable (var, frame);
+
   switch (SYMBOL_CLASS (var))
     {
     case LOC_CONST:
@@ -471,7 +480,8 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
 	{
 	  CORE_ADDR addr
 	    = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
-					SYMBOL_OBJ_SECTION (var));
+					SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (var),
+							    var));
 
 	  store_typed_address (value_contents_raw (v), type, addr);
 	}
@@ -491,7 +501,8 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
     case LOC_STATIC:
       if (overlay_debugging)
 	addr = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (var),
-					 SYMBOL_OBJ_SECTION (var));
+					 SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (var),
+							     var));
       else
 	addr = SYMBOL_VALUE_ADDRESS (var);
       break;
@@ -532,7 +543,8 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
     case LOC_BLOCK:
       if (overlay_debugging)
 	addr = symbol_overlayed_address
-	  (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_OBJ_SECTION (var));
+	  (BLOCK_START (SYMBOL_BLOCK_VALUE (var)), SYMBOL_OBJ_SECTION (SYMBOL_OBJFILE (var),
+								       var));
       else
 	addr = BLOCK_START (SYMBOL_BLOCK_VALUE (var));
       break;
@@ -569,12 +581,7 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
       break;
 
     case LOC_COMPUTED:
-      /* FIXME: cagney/2004-01-26: It should be possible to
-	 unconditionally call the SYMBOL_COMPUTED_OPS method when available.
-	 Unfortunately DWARF 2 stores the frame-base (instead of the
-	 function) location in a function's symbol.  Oops!  For the
-	 moment enable this when/where applicable.  */
-      return SYMBOL_COMPUTED_OPS (var)->read_variable (var, frame);
+      gdb_assert_not_reached (_("LOC_COMPUTED variable missing a method"));
 
     case LOC_UNRESOLVED:
       {
@@ -595,11 +602,12 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
 	  error (_("No global symbol \"%s\"."), SYMBOL_LINKAGE_NAME (var));
 	if (overlay_debugging)
 	  addr = symbol_overlayed_address (SYMBOL_VALUE_ADDRESS (msym),
-					   SYMBOL_OBJ_SECTION (msym));
+					   SYMBOL_OBJ_SECTION (lookup_data.objfile,
+							       msym));
 	else
 	  addr = SYMBOL_VALUE_ADDRESS (msym);
 
-	obj_section = SYMBOL_OBJ_SECTION (msym);
+	obj_section = SYMBOL_OBJ_SECTION (lookup_data.objfile, msym);
 	if (obj_section
 	    && (obj_section->the_bfd_section->flags & SEC_THREAD_LOCAL) != 0)
 	  addr = target_translate_tls_address (obj_section->objfile, addr);

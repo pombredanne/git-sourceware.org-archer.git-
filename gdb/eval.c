@@ -77,7 +77,7 @@ evaluate_subexp (struct type *expect_type, struct expression *exp,
    and return the result as a number.  */
 
 CORE_ADDR
-parse_and_eval_address (char *exp)
+parse_and_eval_address (const char *exp)
 {
   struct expression *expr = parse_expression (exp);
   CORE_ADDR addr;
@@ -92,7 +92,7 @@ parse_and_eval_address (char *exp)
 /* Like parse_and_eval_address, but treats the value of the expression
    as an integer, not an address, returns a LONGEST, not a CORE_ADDR.  */
 LONGEST
-parse_and_eval_long (char *exp)
+parse_and_eval_long (const char *exp)
 {
   struct expression *expr = parse_expression (exp);
   LONGEST retval;
@@ -105,7 +105,7 @@ parse_and_eval_long (char *exp)
 }
 
 struct value *
-parse_and_eval (char *exp)
+parse_and_eval (const char *exp)
 {
   struct expression *expr = parse_expression (exp);
   struct value *val;
@@ -122,7 +122,7 @@ parse_and_eval (char *exp)
    EXPP is advanced to point to the comma.  */
 
 struct value *
-parse_to_comma_and_eval (char **expp)
+parse_to_comma_and_eval (const char **expp)
 {
   struct expression *expr = parse_exp_1 (expp, 0, (struct block *) 0, 1);
   struct value *val;
@@ -984,7 +984,7 @@ evaluate_subexp_standard (struct type *expect_type,
 	if (noside == EVAL_AVOID_SIDE_EFFECTS)
 	  return value_zero (SYMBOL_TYPE (sym), not_lval);
 
-	if (SYMBOL_CLASS (sym) != LOC_COMPUTED
+	if (SYMBOL_COMPUTED_OPS (sym) == NULL
 	    || SYMBOL_COMPUTED_OPS (sym)->read_variable_at_entry == NULL)
 	  error (_("Symbol \"%s\" does not have any specific entry value"),
 		 SYMBOL_PRINT_NAME (sym));
@@ -2031,18 +2031,11 @@ evaluate_subexp_standard (struct type *expect_type,
       arg1 = evaluate_subexp (NULL_TYPE, exp, pos, noside);
       if (noside == EVAL_SKIP)
 	goto nosideret;
+      arg3 = value_struct_elt (&arg1, NULL, &exp->elts[pc + 2].string,
+			       NULL, "structure");
       if (noside == EVAL_AVOID_SIDE_EFFECTS)
-	return value_zero (lookup_struct_elt_type (value_type (arg1),
-						   &exp->elts[pc + 2].string,
-						   0),
-			   lval_memory);
-      else
-	{
-	  struct value *temp = arg1;
-
-	  return value_struct_elt (&temp, NULL, &exp->elts[pc + 2].string,
-				   NULL, "structure");
-	}
+	arg3 = value_zero (value_type (arg3), not_lval);
+      return arg3;
 
     case STRUCTOP_PTR:
       tem = longest_to_int (exp->elts[pc + 1].longconst);
@@ -2092,18 +2085,11 @@ evaluate_subexp_standard (struct type *expect_type,
           }
       }
 
+      arg3 = value_struct_elt (&arg1, NULL, &exp->elts[pc + 2].string,
+			       NULL, "structure pointer");
       if (noside == EVAL_AVOID_SIDE_EFFECTS)
-	return value_zero (lookup_struct_elt_type (value_type (arg1),
-						   &exp->elts[pc + 2].string,
-						   0),
-			   lval_memory);
-      else
-	{
-	  struct value *temp = arg1;
-
-	  return value_struct_elt (&temp, NULL, &exp->elts[pc + 2].string,
-				   NULL, "structure pointer");
-	}
+	arg3 = value_zero (value_type (arg3), not_lval);
+      return arg3;
 
     case STRUCTOP_MEMBER:
     case STRUCTOP_MPTR:
@@ -2975,6 +2961,23 @@ evaluate_subexp_standard (struct type *expect_type,
 	}
       else
         error (_("Attempt to use a type as an expression"));
+
+    case OP_TYPEID:
+      {
+	struct value *result;
+	enum exp_opcode sub_op = exp->elts[*pos].opcode;
+
+	if (sub_op == OP_TYPE || sub_op == OP_DECLTYPE || sub_op == OP_TYPEOF)
+	  result = evaluate_subexp (NULL_TYPE, exp, pos,
+				    EVAL_AVOID_SIDE_EFFECTS);
+	else
+	  result = evaluate_subexp (NULL_TYPE, exp, pos, noside);
+
+	if (noside != EVAL_NORMAL)
+	  return allocate_value (cplus_typeid_type (exp->gdbarch));
+
+	return cplus_typeid (result);
+      }
 
     default:
       /* Removing this case and compiling with gcc -Wall reveals that

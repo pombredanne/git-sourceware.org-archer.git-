@@ -35,7 +35,6 @@
 #endif
 #include <paths.h>
 #include "readline/readline.h"
-#include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 
@@ -105,7 +104,7 @@ bsd_kvm_open (char *filename, int from_tty)
 }
 
 static void
-bsd_kvm_close (int quitting)
+bsd_kvm_close (void)
 {
   if (core_kd)
     {

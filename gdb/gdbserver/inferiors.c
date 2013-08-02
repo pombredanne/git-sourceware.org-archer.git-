@@ -102,7 +102,6 @@ add_thread (ptid_t thread_id, void *target_data)
     current_inferior = new_thread;
 
   new_thread->target_data = target_data;
-  set_inferior_regcache_data (new_thread, new_register_cache ());
 }
 
 ptid_t
@@ -161,6 +160,9 @@ free_one_thread (struct inferior_list_entry *inf)
 void
 remove_thread (struct thread_info *thread)
 {
+  if (thread->btrace != NULL)
+    target_disable_btrace (thread->btrace);
+
   remove_inferior (&all_threads, (struct inferior_list_entry *) thread);
   free_one_thread (&thread->entry);
 }

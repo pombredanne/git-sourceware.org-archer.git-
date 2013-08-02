@@ -201,8 +201,8 @@ struct quick_symbol_functions
   /* This is called by objfile_relocate to relocate any indices loaded
      for OBJFILE.  */
   void (*relocate) (struct objfile *objfile,
-		    struct section_offsets *new_offsets,
-		    struct section_offsets *delta);
+		    const struct section_offsets *new_offsets,
+		    const struct section_offsets *delta);
 
   /* Find all the symbols in OBJFILE named FUNC_NAME, and ensure that
      the corresponding symbol tables are loaded.  */
@@ -315,6 +315,14 @@ struct sym_probe_fns
      implement this method as well.  */
   unsigned (*sym_get_probe_argument_count) (struct probe *probe);
 
+  /* Return 1 if the probe interface can evaluate the arguments of probe
+     PROBE, zero otherwise.  This function can be probe-specific, informing
+     whether only the arguments of PROBE can be evaluated, of generic,
+     informing whether the probe interface is able to evaluate any kind of
+     argument.  If you provide an implementation of sym_get_probes, you must
+     implement this method as well.  */
+  int (*can_evaluate_probe_arguments) (struct probe *probe);
+
   /* Evaluate the Nth argument available to PROBE.  PROBE will have
      come from a call to this objfile's sym_get_probes method.  N will
      be between 0 and the number of arguments available to this probe.
@@ -337,8 +345,8 @@ struct sym_probe_fns
 
   /* Relocate the probe section of OBJFILE.  */
   void (*sym_relocate_probe) (struct objfile *objfile,
-			      struct section_offsets *new_offsets,
-			      struct section_offsets *delta);
+			      const struct section_offsets *new_offsets,
+			      const struct section_offsets *delta);
 };
 
 /* Structure to keep track of symbol reading functions for various
@@ -391,7 +399,7 @@ struct sym_fns
      probably be changed to a string, where NULL means the default,
      and others are parsed in a file dependent way.  */
 
-  void (*sym_offsets) (struct objfile *, struct section_addr_info *);
+  void (*sym_offsets) (struct objfile *, const struct section_addr_info *);
 
   /* This function produces a format-independent description of
      the segments of ABFD.  Each segment is a unit of the file
@@ -425,7 +433,7 @@ extern struct section_addr_info *
 
 extern void relative_addr_info_to_section_offsets
   (struct section_offsets *section_offsets, int num_sections,
-   struct section_addr_info *addrs);
+   const struct section_addr_info *addrs);
 
 extern void addr_info_make_relative (struct section_addr_info *addrs,
 				     bfd *abfd);
@@ -434,7 +442,7 @@ extern void addr_info_make_relative (struct section_addr_info *addrs,
    do anything special.  */
 
 extern void default_symfile_offsets (struct objfile *objfile,
-				     struct section_addr_info *);
+				     const struct section_addr_info *);
 
 /* The default version of sym_fns.sym_segments for readers that don't
    do anything special.  */
@@ -453,7 +461,7 @@ extern struct symtab *allocate_symtab (const char *, struct objfile *)
 extern void add_symtab_fns (const struct sym_fns *);
 
 /* This enum encodes bit-flags passed as ADD_FLAGS parameter to
-   syms_from_objfile, symbol_file_add, etc.  */
+   symbol_file_add, etc.  */
 
 enum symfile_add_flags
   {
@@ -471,10 +479,6 @@ enum symfile_add_flags
        symbols are read when the objfile is created.  */
     SYMFILE_NO_READ = 1 << 4
   };
-
-extern void syms_from_objfile (struct objfile *,
-			       struct section_addr_info *,
-			       struct section_offsets *, int, int);
 
 extern void new_symfile_objfile (struct objfile *, int);
 
@@ -585,7 +589,7 @@ extern bfd_byte *symfile_relocate_debug_section (struct objfile *, asection *,
 						 bfd_byte *);
 
 extern int symfile_map_offsets_to_segments (bfd *,
-					    struct symfile_segment_data *,
+					    const struct symfile_segment_data *,
 					    struct section_offsets *,
 					    int, const CORE_ADDR *);
 struct symfile_segment_data *get_symfile_segment_data (bfd *abfd);
@@ -645,7 +649,7 @@ enum dwarf2_section_enum {
 
 extern void dwarf2_get_section_info (struct objfile *,
                                      enum dwarf2_section_enum,
-				     asection **, gdb_byte **,
+				     asection **, const gdb_byte **,
 				     bfd_size_type *);
 
 extern int dwarf2_initialize_objfile (struct objfile *);
