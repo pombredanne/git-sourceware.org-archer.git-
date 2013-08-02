@@ -593,8 +593,12 @@ value_f90_subarray (struct value *array, struct expression *exp, int *pos,
   if (VALUE_LVAL (array) != lval_internalvar)
     set_value_address (array, value_byte_address + value_byte_offset);
 
-  if (!value_lazy (saved_array))
+  if (!value_lazy (saved_array)
+      && TYPE_LENGTH (value_type (saved_array)) > 0
+      && TYPE_LENGTH (new_array_type) > 0)
     {
+      gdb_assert (TYPE_LENGTH (new_array_type)
+		  <= TYPE_LENGTH (value_type (saved_array)));
       allocate_value_contents (array);
       set_value_lazy (array, 0);
 
