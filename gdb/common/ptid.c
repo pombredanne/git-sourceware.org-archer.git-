@@ -20,28 +20,29 @@
 #include "ptid.h"
 
 /* Oft used ptids */
-ptid_t null_ptid = { 0, 0, 0 };
-ptid_t minus_one_ptid = { -1, 0, 0 };
+ptid_t null_ptid = { 0, 0, 0, 0 };
+ptid_t minus_one_ptid = { -1, 0, 0, 0 };
 
 /* Create a ptid given the necessary PID, LWP, and TID components.  */
 
 ptid_t
-ptid_build (int pid, long lwp, long tid)
+ptid_build_target (int pid, long lwp, long tid, int target)
 {
   ptid_t ptid;
 
   ptid.pid = pid;
   ptid.lwp = lwp;
   ptid.tid = tid;
+  ptid.target = target;
   return ptid;
 }
 
 /* Create a ptid from just a pid.  */
 
 ptid_t
-pid_to_ptid (int pid)
+pid_to_ptid_target (int pid, int target)
 {
-  return ptid_build (pid, 0, 0);
+  return ptid_build_target (pid, 0, 0, target);
 }
 
 /* Fetch the pid (process id) component from a ptid.  */
@@ -75,7 +76,8 @@ ptid_equal (ptid_t ptid1, ptid_t ptid2)
 {
   return (ptid1.pid == ptid2.pid
 	  && ptid1.lwp == ptid2.lwp
-	  && ptid1.tid == ptid2.tid);
+	  && ptid1.tid == ptid2.tid
+	  && ptid1.target == ptid2.target);
 }
 
 /* Returns true if PTID represents a process.  */

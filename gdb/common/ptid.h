@@ -48,6 +48,11 @@ struct ptid
 
     /* Thread id */
     long tid;
+
+    /* Target id.  This is often 0, but it can be set if the ptid user
+       allows multiple targets.  It is just an arbitrary target
+       identifier.  */
+    int target;
   };
 
 typedef struct ptid ptid_t;
@@ -59,13 +64,19 @@ extern ptid_t null_ptid;
    or a "don't care" condition, i.e, "run all threads."  */
 extern ptid_t minus_one_ptid;
 
-/* Attempt to find and return an existing ptid with the given PID, LWP,
-   and TID components.  If none exists, create a new one and return
-   that.  */
-ptid_t ptid_build (int pid, long lwp, long tid);
+/* Attempt to find and return an existing ptid with the given PID,
+   LWP, TID, and TARGET components.  If none exists, create a new one
+   and return that.  */
+ptid_t ptid_build_target (int pid, long lwp, long tid, int target);
 
-/* Find/Create a ptid from just a pid. */
-ptid_t pid_to_ptid (int pid);
+/* Like ptid_build_target, but use 0 for TARGET.  */
+#define ptid_build(PID, LWP, TID) ptid_build_target ((PID), (LWP), (TID), 0)
+
+/* Find/Create a ptid from just a pid and target. */
+ptid_t pid_to_ptid_target (int pid, int target);
+
+/* Like pid_to_ptid_target, but supply 0 for TARGET.  */
+#define pid_to_ptid(PID) pid_to_ptid_target ((PID), 0)
 
 /* Fetch the pid (process id) component from a ptid. */
 int ptid_get_pid (ptid_t ptid);
