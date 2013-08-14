@@ -151,6 +151,10 @@ static VEC (target_ops_ptr) *target_structs;
 
 static struct target_ops dummy_target;
 
+/* The last assigned target id.  */
+
+static int last_assigned_target_id;
+
 /* The type of the target stack.  */
 
 struct target_stack
@@ -164,6 +168,10 @@ struct target_stack
   /* Reference count.  */
 
   int refc;
+
+  /* Target id.  */
+
+  int id;
 
   /* The debug target_ops for this target.  */
 
@@ -5235,6 +5243,7 @@ new_target_stack (void)
   /* Overwrite the globals so that push_target can work.  */
   target_stack = XCNEW (struct target_stack);
   target_stack->refc = 1;
+  target_stack->id = last_assigned_target_id++;
   target_stack->smashed.ops = XCNEW (struct target_ops);
   current_target = &target_stack->smashed;
 
@@ -5252,6 +5261,12 @@ new_target_stack (void)
     current_target = &save->smashed;
 
   return result;
+}
+
+int
+target_stack_id (const struct target_stack *ts)
+{
+  return ts->id;
 }
 
 /* Print a single target stack.  */

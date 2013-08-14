@@ -901,6 +901,8 @@ extern void target_stack_set_current (struct target_stack *tstack);
 
 extern struct target_stack *new_target_stack (void);
 
+extern int target_stack_id (const struct target_stack *);
+
 /* Return true if gdb is currently in multi-target mode.  */
 
 extern int currently_multi_target (void);

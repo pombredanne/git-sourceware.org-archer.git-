@@ -584,6 +584,10 @@ extern struct inferior *find_inferior_id (int num);
 extern struct inferior *
   find_inferior_for_program_space (struct program_space *pspace);
 
+/* Inferior's target stack id.  */
+#define inferior_target_stack_id(INF) \
+  (target_stack_id ((INF)->pspace->target_stack))
+
 /* Inferior iterator function.
 
    Calls a callback function once for each inferior, so long as the
