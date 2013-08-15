@@ -695,7 +695,8 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 	    }
 
 	  old_chain = save_inferior_ptid ();
-	  inferior_ptid = ptid_build (child_pid, child_pid, 0);
+	  inferior_ptid = ptid_build_target (child_pid, child_pid, 0,
+					     target_stack_id ());
 
 	  child_lp = add_lwp (inferior_ptid);
 	  child_lp->stopped = 1;
@@ -725,7 +726,8 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 	  old_chain = save_inferior_ptid ();
 	  save_current_program_space ();
 
-	  inferior_ptid = ptid_build (child_pid, child_pid, 0);
+	  inferior_ptid = ptid_build_target (child_pid, child_pid, 0,
+					     target_stack_id ());
 	  add_thread (inferior_ptid);
 	  child_lp = add_lwp (inferior_ptid);
 	  child_lp->stopped = 1;
@@ -787,7 +789,8 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 	  parent_inf->waiting_for_vfork_done = detach_fork;
 	  parent_inf->pspace->breakpoints_not_allowed = detach_fork;
 
-	  parent_lp = find_lwp_pid (pid_to_ptid (parent_pid));
+	  parent_lp = find_lwp_pid (pid_to_ptid_target (parent_pid,
+							target_stack_id ()));
 	  gdb_assert (linux_supports_tracefork_flag >= 0);
 
 	  if (linux_supports_tracevforkdone (0))
@@ -919,7 +922,8 @@ holding the child stopped.  Try \"set detach-on-fork\" or \
 	 this new thread, before cloning the program space, and
 	 informing the solib layer about this new process.  */
 
-      inferior_ptid = ptid_build (child_pid, child_pid, 0);
+      inferior_ptid = ptid_build_target (child_pid, child_pid, 0,
+					 target_stack_id ());
       add_thread (inferior_ptid);
       child_lp = add_lwp (inferior_ptid);
       child_lp->stopped = 1;
@@ -1833,17 +1837,20 @@ linux_nat_detach (struct gdb_target *ops, char *args, int from_tty)
 
   /* Stop all threads before detaching.  ptrace requires that the
      thread is stopped to sucessfully detach.  */
-  iterate_over_lwps (pid_to_ptid (pid), stop_callback, NULL);
+  iterate_over_lwps (pid_to_ptid_target (pid, target_stack_id ()),
+		     stop_callback, NULL);
   /* ... and wait until all of them have reported back that
      they're no longer running.  */
-  iterate_over_lwps (pid_to_ptid (pid), stop_wait_callback, NULL);
+  iterate_over_lwps (pid_to_ptid_target (pid, target_stack_id ()),
+		     stop_wait_callback, NULL);
 
-  iterate_over_lwps (pid_to_ptid (pid), detach_callback, NULL);
+  iterate_over_lwps (pid_to_ptid_target (pid, target_stack_id ()),
+		     detach_callback, NULL);
 
   /* Only the initial process should be left right now.  */
   gdb_assert (num_lwps (GET_PID (inferior_ptid)) == 1);
 
-  main_lwp = find_lwp_pid (pid_to_ptid (pid));
+  main_lwp = find_lwp_pid (pid_to_ptid_target (pid, target_stack_id ()));
 
   /* Pass on any pending signal for the last LWP.  */
   if ((args == NULL || *args == '\0')
@@ -1908,7 +1915,8 @@ resume_lwp (struct lwp_info *lp, int step, enum gdb_signal signo)
 	  if (linux_nat_prepare_to_resume != NULL)
 	    linux_nat_prepare_to_resume (lp);
 	  linux_ops->to_resume (find_target_ops (linux_ops),
-				pid_to_ptid (GET_LWP (lp->ptid)),
+				pid_to_ptid_target (GET_LWP (lp->ptid),
+						    target_stack_id ()),
 				step, signo);
 	  lp->stopped = 0;
 	  lp->step = step;
@@ -2065,7 +2073,7 @@ linux_nat_resume (struct gdb_target *ops,
     iterate_over_lwps (ptid, linux_nat_resume_callback, NULL);
 
   /* Convert to something the lower layer understands.  */
-  ptid = pid_to_ptid (GET_LWP (lp->ptid));
+  ptid = pid_to_ptid_target (GET_LWP (lp->ptid), target_stack_id ());
 
   if (linux_nat_prepare_to_resume != NULL)
     linux_nat_prepare_to_resume (lp);
@@ -2240,7 +2248,8 @@ linux_handle_syscall_trap (struct lwp_info *lp, int stopping)
   if (linux_nat_prepare_to_resume != NULL)
     linux_nat_prepare_to_resume (lp);
   linux_ops->to_resume (find_target_ops (linux_ops),
-			pid_to_ptid (GET_LWP (lp->ptid)),
+			pid_to_ptid_target (GET_LWP (lp->ptid),
+					    target_stack_id ()),
 			lp->step, GDB_SIGNAL_0);
   return 1;
 }
@@ -2284,7 +2293,8 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 			    _("wait returned unexpected status 0x%x"), status);
 	}
 
-      ourstatus->value.related_pid = ptid_build (new_pid, new_pid, 0);
+      ourstatus->value.related_pid = ptid_build_target (new_pid, new_pid, 0,
+							target_stack_id ());
 
       if (event == PTRACE_EVENT_FORK || event == PTRACE_EVENT_VFORK)
 	{
@@ -2304,7 +2314,8 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 
 	  /* This won't actually modify the breakpoint list, but will
 	     physically remove the breakpoints from the child.  */
-	  detach_breakpoints (ptid_build (new_pid, new_pid, 0));
+	  detach_breakpoints (ptid_build_target (new_pid, new_pid, 0,
+						 target_stack_id ()));
 
 	  /* Retain child fork in ptrace (stopped) state.  */
 	  if (!find_fork_pid (new_pid))
@@ -2438,7 +2449,8 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 		  if (linux_nat_prepare_to_resume != NULL)
 		    linux_nat_prepare_to_resume (new_lp);
 		  linux_ops->to_resume (find_target_ops (linux_ops),
-					pid_to_ptid (new_pid),
+					pid_to_ptid_target (new_pid,
+							    target_stack_id ()),
 					0, GDB_SIGNAL_0);
 		  new_lp->stopped = 0;
 		}
@@ -2450,7 +2462,8 @@ linux_handle_extended_wait (struct lwp_info *lp, int status,
 	  if (linux_nat_prepare_to_resume != NULL)
 	    linux_nat_prepare_to_resume (lp);
 	  linux_ops->to_resume (find_target_ops (linux_ops),
-				pid_to_ptid (GET_LWP (lp->ptid)),
+				pid_to_ptid_target (GET_LWP (lp->ptid),
+						    target_stack_id ()),
 				0, GDB_SIGNAL_0);
 
 	  return 1;
@@ -3186,7 +3199,7 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
 
   *new_pending_p = 0;
 
-  lp = find_lwp_pid (pid_to_ptid (lwpid));
+  lp = find_lwp_pid (pid_to_ptid_target (lwpid, target_stack_id ()));
 
   /* Check for stop events reported by a process we didn't already
      know about - anything not already in our LWP list.
@@ -3272,7 +3285,8 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
       if (GET_PID (lp->ptid) == GET_LWP (lp->ptid))
 	{
 	  lp->stopped = 1;
-	  iterate_over_lwps (pid_to_ptid (GET_PID (lp->ptid)),
+	  iterate_over_lwps (pid_to_ptid_target (GET_PID (lp->ptid),
+						 target_stack_id ()),
 			     stop_and_resume_callback, new_pending_p);
 	}
 
@@ -3297,7 +3311,8 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
      stopped.  A similar check is made in stop_wait_callback().  */
   if (num_lwps (GET_PID (lp->ptid)) > 1 && !linux_thread_alive (lp->ptid))
     {
-      ptid_t ptid = pid_to_ptid (GET_PID (lp->ptid));
+      ptid_t ptid = pid_to_ptid_target (GET_PID (lp->ptid),
+					target_stack_id ());
 
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -3334,7 +3349,8 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
 	  if (linux_nat_prepare_to_resume != NULL)
 	    linux_nat_prepare_to_resume (lp);
 	  linux_ops->to_resume (find_target_ops (linux_ops),
-				pid_to_ptid (GET_LWP (lp->ptid)),
+				pid_to_ptid_target (GET_LWP (lp->ptid),
+						    target_stack_id ()),
 				lp->step, GDB_SIGNAL_0);
 	  if (debug_linux_nat)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3368,7 +3384,8 @@ linux_nat_filter_event (int lwpid, int status, int *new_pending_p)
       if (linux_nat_prepare_to_resume != NULL)
 	linux_nat_prepare_to_resume (lp);
       linux_ops->to_resume (find_target_ops (linux_ops),
-			    pid_to_ptid (GET_LWP (lp->ptid)),
+			    pid_to_ptid_target (GET_LWP (lp->ptid),
+						target_stack_id ()),
 			    lp->step, GDB_SIGNAL_0);
       if (debug_linux_nat)
 	fprintf_unfiltered (gdb_stdlog,
@@ -3405,7 +3422,8 @@ check_zombie_leaders (void)
       if (inf->pid == 0)
 	continue;
 
-      leader_lp = find_lwp_pid (pid_to_ptid (inf->pid));
+      leader_lp = find_lwp_pid (pid_to_ptid_target (inf->pid,
+						    target_stack_id ()));
       if (leader_lp != NULL
 	  /* Check if there are other threads in the group, as we may
 	     have raced with the inferior simply exiting.  */
@@ -3748,7 +3766,8 @@ retry:
 	  if (linux_nat_prepare_to_resume != NULL)
 	    linux_nat_prepare_to_resume (lp);
 	  linux_ops->to_resume (find_target_ops (linux_ops),
-				pid_to_ptid (GET_LWP (lp->ptid)),
+				pid_to_ptid_target (GET_LWP (lp->ptid),
+						    target_stack_id ()),
 				lp->step, signo);
 	  if (debug_linux_nat)
 	    fprintf_unfiltered (gdb_stdlog,
@@ -3775,7 +3794,8 @@ retry:
 		 will receive it - unless they're using CLONE_THREAD to
 		 share signals.  Since we only want to report it once, we
 		 mark it as ignored for all LWPs except this one.  */
-	      iterate_over_lwps (pid_to_ptid (ptid_get_pid (ptid)),
+	      iterate_over_lwps (pid_to_ptid_target (ptid_get_pid (ptid),
+						     target_stack_id ()),
 					      set_ignore_sigint, NULL);
 	      lp->ignore_sigint = 0;
 	    }
@@ -3907,7 +3927,8 @@ resume_stopped_resumed_lwps (struct lwp_info *lp, void *data)
       if (linux_nat_prepare_to_resume != NULL)
 	linux_nat_prepare_to_resume (lp);
       linux_ops->to_resume (find_target_ops (linux_ops),
-			    pid_to_ptid (GET_LWP (lp->ptid)),
+			    pid_to_ptid_target (GET_LWP (lp->ptid),
+						target_stack_id ()),
 			    lp->step, GDB_SIGNAL_0);
       lp->stopped = 0;
       lp->stopped_by_watchpoint = 0;
@@ -4076,7 +4097,8 @@ linux_nat_kill (struct gdb_target *ops)
     linux_fork_killall ();
   else
     {
-      ptid_t ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+      ptid_t ptid = pid_to_ptid_target (ptid_get_pid (inferior_ptid),
+					target_stack_id ());
 
       /* Stop all threads before killing them, since ptrace requires
 	 that the thread is stopped to sucessfully PTRACE_KILL.  */
@@ -4212,7 +4234,8 @@ linux_nat_xfer_partial (struct gdb_target *ops, enum target_object object,
   old_chain = save_inferior_ptid ();
 
   if (is_lwp (inferior_ptid))
-    inferior_ptid = pid_to_ptid (GET_LWP (inferior_ptid));
+    inferior_ptid = pid_to_ptid_target (GET_LWP (inferior_ptid),
+					target_stack_id ());
 
   xfer = linux_ops->to_xfer_partial (ops, object, annex, readbuf, writebuf,
 				     offset, len);
@@ -4675,7 +4698,7 @@ linux_child_static_tracepoint_markers_by_strid (const char *strid)
   VEC(static_tracepoint_marker_p) *markers = NULL;
   struct static_tracepoint_marker *marker = NULL;
   char *p = s;
-  ptid_t ptid = ptid_build (pid, 0, 0);
+  ptid_t ptid = ptid_build_target (pid, 0, 0, target_stack_id ());
 
   /* Pause all */
   target_stop (ptid);
