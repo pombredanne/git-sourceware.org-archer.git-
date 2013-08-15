@@ -5243,7 +5243,7 @@ new_target_stack (void)
   /* Overwrite the globals so that push_target can work.  */
   target_stack = XCNEW (struct target_stack);
   target_stack->refc = 1;
-  target_stack->id = last_assigned_target_id++;
+  target_stack->id = ++last_assigned_target_id;
   target_stack->smashed.ops = XCNEW (struct target_ops);
   current_target = &target_stack->smashed;
 
