@@ -76,7 +76,7 @@ inf_ptrace_follow_fork (struct gdb_target *ops, int follow_child)
 	perror_with_name (("ptrace"));
 
       /* Switch inferior_ptid out of the parent's way.  */
-      inferior_ptid = pid_to_ptid (fpid);
+      inferior_ptid = pid_to_ptid_target (fpid, target_stack_id ());
 
       /* Delete the parent.  */
       detach_inferior (pid);
@@ -143,7 +143,7 @@ inf_ptrace_create_inferior (struct gdb_target *ops,
 
   /* On some targets, there must be some explicit actions taken after
      the inferior has been started up.  */
-  target_post_startup_inferior (pid_to_ptid (pid));
+  target_post_startup_inferior (pid_to_ptid_target (pid, target_stack_id ()));
 }
 
 #ifdef PT_GET_PROCESS_STATE
@@ -236,7 +236,7 @@ inf_ptrace_attach (struct gdb_target *ops, char *args, int from_tty)
   inf = current_inferior ();
   inferior_appeared (inf, pid);
   inf->attach_flag = 1;
-  inferior_ptid = pid_to_ptid (pid);
+  inferior_ptid = pid_to_ptid_target (pid, target_stack_id ());
 
   /* Always add a main thread.  If some target extends the ptrace
      target, it should decorate the ptid later with more info.  */
@@ -429,7 +429,8 @@ inf_ptrace_wait (struct gdb_target *ops,
 	{
 	case PTRACE_FORK:
 	  ourstatus->kind = TARGET_WAITKIND_FORKED;
-	  ourstatus->value.related_pid = pid_to_ptid (pe.pe_other_pid);
+	  ourstatus->value.related_pid
+	    = pid_to_ptid_target (pe.pe_other_pid, target_stack_id ());
 
 	  /* Make sure the other end of the fork is stopped too.  */
 	  fpid = waitpid (pe.pe_other_pid, &status, 0);
@@ -444,17 +445,18 @@ inf_ptrace_wait (struct gdb_target *ops,
 	  gdb_assert (pe.pe_other_pid == pid);
 	  if (fpid == ptid_get_pid (inferior_ptid))
 	    {
-	      ourstatus->value.related_pid = pid_to_ptid (pe.pe_other_pid);
-	      return pid_to_ptid (fpid);
+	      ourstatus->value.related_pid
+		= pid_to_ptid_target (pe.pe_other_pid, target_stack_id ());
+	      return pid_to_ptid_target (fpid, target_stack_id ());
 	    }
 
-	  return pid_to_ptid (pid);
+	  return pid_to_ptid_target (pid, target_stack_id ());
 	}
     }
 #endif
 
   store_waitstatus (ourstatus, status);
-  return pid_to_ptid (pid);
+  return pid_to_ptid_target (pid, target_stack_id ());
 }
 
 /* Attempt a transfer all LEN bytes starting at OFFSET between the
