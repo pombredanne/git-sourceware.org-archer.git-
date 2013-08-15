@@ -283,8 +283,7 @@ add_to_thread_list (bfd *abfd, asection *asect, void *reg_sect_arg)
       inf->fake_pid_p = fake_pid_p;
     }
 
-  ptid = ptid_build_target (pid, lwpid, 0,
-			    inferior_target_stack_id (current_inferior ()));
+  ptid = ptid_build_target (pid, lwpid, 0, target_stack_id ());
 
   add_thread (ptid);
 
@@ -428,8 +427,7 @@ core_open (char *filename, int from_tty)
       if (thread == NULL)
 	{
 	  inferior_appeared (current_inferior (), CORELOW_PID);
-	  inferior_ptid = pid_to_ptid_target (CORELOW_PID,
-					      inferior_target_stack_id (current_inferior ()));
+	  inferior_ptid = pid_to_ptid_target (CORELOW_PID, target_stack_id ());
 	  add_thread_silent (inferior_ptid);
 	}
       else

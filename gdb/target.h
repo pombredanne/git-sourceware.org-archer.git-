@@ -901,7 +901,9 @@ extern void target_stack_set_current (struct target_stack *tstack);
 
 extern struct target_stack *new_target_stack (void);
 
-extern int target_stack_id (const struct target_stack *);
+/* Return the ID of the current target stack.  */
+
+extern int target_stack_id (void);
 
 /* Return true if gdb is currently in multi-target mode.  */
 
