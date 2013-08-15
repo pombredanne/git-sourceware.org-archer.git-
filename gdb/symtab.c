@@ -1006,18 +1006,18 @@ struct symtab *
 find_pc_sect_symtab_via_partial (CORE_ADDR pc, struct obj_section *section)
 {
   struct objfile *objfile;
-  struct minimal_symbol *msymbol;
+  struct bound_minimal_symbol msymbol;
 
   /* If we know that this is not a text address, return failure.  This is
      necessary because we loop based on texthigh and textlow, which do
      not include the data ranges.  */
-  msymbol = lookup_minimal_symbol_by_pc_section (pc, section).minsym;
-  if (msymbol
-      && (MSYMBOL_TYPE (msymbol) == mst_data
-	  || MSYMBOL_TYPE (msymbol) == mst_bss
-	  || MSYMBOL_TYPE (msymbol) == mst_abs
-	  || MSYMBOL_TYPE (msymbol) == mst_file_data
-	  || MSYMBOL_TYPE (msymbol) == mst_file_bss))
+  msymbol = lookup_minimal_symbol_by_pc_section (pc, section);
+  if (msymbol.minsym
+      && (MSYMBOL_TYPE (msymbol.minsym) == mst_data
+	  || MSYMBOL_TYPE (msymbol.minsym) == mst_bss
+	  || MSYMBOL_TYPE (msymbol.minsym) == mst_abs
+	  || MSYMBOL_TYPE (msymbol.minsym) == mst_file_data
+	  || MSYMBOL_TYPE (msymbol.minsym) == mst_file_bss))
     return NULL;
 
   ALL_OBJFILES (objfile)
@@ -2081,20 +2081,20 @@ find_pc_sect_symtab (CORE_ADDR pc, struct obj_section *section)
   struct symtab *best_s = NULL;
   struct objfile *objfile;
   CORE_ADDR distance = 0;
-  struct minimal_symbol *msymbol;
+  struct bound_minimal_symbol msymbol;
 
   /* If we know that this is not a text address, return failure.  This is
      necessary because we loop based on the block's high and low code
      addresses, which do not include the data ranges, and because
      we call find_pc_sect_psymtab which has a similar restriction based
      on the partial_symtab's texthigh and textlow.  */
-  msymbol = lookup_minimal_symbol_by_pc_section (pc, section).minsym;
-  if (msymbol
-      && (MSYMBOL_TYPE (msymbol) == mst_data
-	  || MSYMBOL_TYPE (msymbol) == mst_bss
-	  || MSYMBOL_TYPE (msymbol) == mst_abs
-	  || MSYMBOL_TYPE (msymbol) == mst_file_data
-	  || MSYMBOL_TYPE (msymbol) == mst_file_bss))
+  msymbol = lookup_minimal_symbol_by_pc_section (pc, section);
+  if (msymbol.minsym
+      && (MSYMBOL_TYPE (msymbol.minsym) == mst_data
+	  || MSYMBOL_TYPE (msymbol.minsym) == mst_bss
+	  || MSYMBOL_TYPE (msymbol.minsym) == mst_abs
+	  || MSYMBOL_TYPE (msymbol.minsym) == mst_file_data
+	  || MSYMBOL_TYPE (msymbol.minsym) == mst_file_bss))
     return NULL;
 
   /* Search all symtabs for the one whose file contains our address, and which
@@ -2221,7 +2221,6 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
   struct symtab_and_line val;
   struct blockvector *bv;
   struct bound_minimal_symbol msymbol;
-  struct minimal_symbol *mfunsym;
   struct objfile *objfile;
 
   /* Info on best line seen so far, and where it starts, and its file.  */
@@ -2309,10 +2308,11 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
   if (msymbol.minsym != NULL)
     if (MSYMBOL_TYPE (msymbol.minsym) == mst_solib_trampoline)
       {
-	mfunsym
+	struct bound_minimal_symbol mfunsym
 	  = lookup_minimal_symbol_text (MSYMBOL_LINKAGE_NAME (msymbol.minsym),
-					NULL).minsym;
-	if (mfunsym == NULL)
+					NULL);
+
+	if (mfunsym.minsym == NULL)
 	  /* I eliminated this warning since it is coming out
 	   * in the following situation:
 	   * gdb shmain // test program with shared libraries
@@ -2326,8 +2326,8 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
 	     SYMBOL_LINKAGE_NAME (msymbol)); */
 	  ;
 	/* fall through */
-	else if (MSYMBOL_VALUE_ADDRESS (mfunsym)
-		 == MSYMBOL_VALUE_ADDRESS (msymbol.minsym))
+	else if (BMSYMBOL_VALUE_ADDRESS (mfunsym)
+		 == BMSYMBOL_VALUE_ADDRESS (msymbol))
 	  /* Avoid infinite recursion */
 	  /* See above comment about why warning is commented out.  */
 	  /* warning ("In stub for %s; unable to find real function/line info",
@@ -2335,7 +2335,7 @@ find_pc_sect_line (CORE_ADDR pc, struct obj_section *section, int notcurrent)
 	  ;
 	/* fall through */
 	else
-	  return find_pc_line (MSYMBOL_VALUE_ADDRESS (mfunsym), 0);
+	  return find_pc_line (BMSYMBOL_VALUE_ADDRESS (mfunsym), 0);
       }
 
 
@@ -2849,7 +2849,7 @@ skip_prologue_sal (struct symtab_and_line *sal)
 	}
 
       objfile = msymbol.objfile;
-      pc = MSYMBOL_VALUE_ADDRESS (msymbol.minsym);
+      pc = BMSYMBOL_VALUE_ADDRESS (msymbol);
       section = MSYMBOL_OBJ_SECTION (objfile, msymbol.minsym);
       name = MSYMBOL_LINKAGE_NAME (msymbol.minsym);
     }
@@ -3601,7 +3601,8 @@ search_symbols (char *regexp, enum search_domain kind,
 		   is to expand the symbol table if msymbol is found, for the
 		   benefit of the next loop on ALL_PRIMARY_SYMTABS.  */
 		if (kind == FUNCTIONS_DOMAIN
-		    ? find_pc_symtab (MSYMBOL_VALUE_ADDRESS (msymbol)) == NULL
+		    ? find_pc_symtab (MSYMBOL_VALUE_ADDRESS (objfile,
+							     msymbol)) == NULL
 		    : (lookup_symbol_in_objfile_from_linkage_name
 		       (objfile, MSYMBOL_LINKAGE_NAME (msymbol), VAR_DOMAIN)
 		       == NULL))
@@ -3703,7 +3704,8 @@ search_symbols (char *regexp, enum search_domain kind,
 		/* For functions we can do a quick check of whether the
 		   symbol might be found via find_pc_symtab.  */
 		if (kind != FUNCTIONS_DOMAIN
-		    || find_pc_symtab (MSYMBOL_VALUE_ADDRESS (msymbol)) == NULL)
+		    || find_pc_symtab (MSYMBOL_VALUE_ADDRESS (objfile,
+							      msymbol)) == NULL)
 		  {
 		    if (lookup_symbol_in_objfile_from_linkage_name
 			(objfile, MSYMBOL_LINKAGE_NAME (msymbol), VAR_DOMAIN)
@@ -3784,11 +3786,11 @@ print_msymbol_info (struct bound_minimal_symbol msymbol)
   char *tmp;
 
   if (gdbarch_addr_bit (gdbarch) <= 32)
-    tmp = hex_string_custom (MSYMBOL_VALUE_ADDRESS (msymbol.minsym)
+    tmp = hex_string_custom (BMSYMBOL_VALUE_ADDRESS (msymbol)
 			     & (CORE_ADDR) 0xffffffff,
 			     8);
   else
-    tmp = hex_string_custom (MSYMBOL_VALUE_ADDRESS (msymbol.minsym),
+    tmp = hex_string_custom (BMSYMBOL_VALUE_ADDRESS (msymbol),
 			     16);
   printf_filtered ("%s  %s\n",
 		   tmp, MSYMBOL_PRINT_NAME (msymbol.minsym));

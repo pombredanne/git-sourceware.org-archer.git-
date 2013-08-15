@@ -815,7 +815,7 @@ ada_main_name (void)
       CORE_ADDR main_program_name_addr;
       int err_code;
 
-      main_program_name_addr = MSYMBOL_VALUE_ADDRESS (msym.minsym);
+      main_program_name_addr = BMSYMBOL_VALUE_ADDRESS (msym);
       if (main_program_name_addr == 0)
         error (_("Invalid address for Ada main program name."));
 

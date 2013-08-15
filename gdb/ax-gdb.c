@@ -42,6 +42,7 @@
 #include "arch-utils.h"
 #include "cli/cli-utils.h"
 #include "linespec.h"
+#include "objfiles.h"
 
 #include "valprint.h"
 #include "c-lang.h"
@@ -720,7 +721,7 @@ gen_var_ref (struct gdbarch *gdbarch, struct agent_expr *ax,
 	  error (_("Couldn't resolve symbol `%s'."), SYMBOL_PRINT_NAME (var));
 
 	/* Push the address of the variable.  */
-	ax_const_l (ax, MSYMBOL_VALUE_ADDRESS (msym.minsym));
+	ax_const_l (ax, BMSYMBOL_VALUE_ADDRESS (msym));
 	value->kind = axs_lvalue_memory;
       }
       break;
