@@ -1,8 +1,6 @@
 A project to make remote.c not have global state, and then to make
 multiple targets possible.
 
-The remote fixes were sent upstream.
-
 See this note for a to-do list for remote.c:
 
     http://sourceware.org/ml/gdb-patches/2013-06/msg00605.html
@@ -12,10 +10,13 @@ TO DO:
 
 we need some kind of to_instantiate so that find_default_run_target
 can work properly
+[ hacked around this a little.  maybe the hack is sufficient ]
 
 fix up target-descriptions.[ch] stuff
 
  - must require target-async to connect to multiple
+   [ patch series pending ]
+
  - it would be nice if at least all targets available on
    a linux host were async-able.
    this may just prevent sim?
@@ -45,14 +46,8 @@ DONE:
   ALL_PSPACES -vs- targets
   e.g., exec_close
 
-fix up remove_target_sections ??
-how will this interact with the BFD-sharing code?
-
 how does breakpoint insertion work?
 
-
-If user makes a new target then tries run, make sure gdb chooses the
-currently-existing native target instead of trying to open a new one.
 
 target to_name stuff should be const
 but needs add_cmd
@@ -158,4 +153,11 @@ static struct symtab_and_line traceframe_sal;
 static struct traceframe_info *traceframe_info;
 
 
+
+================================================================
+
+test this:
+
+If user makes a new target then tries run, make sure gdb chooses the
+currently-existing native target instead of trying to open a new one.
 
