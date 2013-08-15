@@ -3230,12 +3230,25 @@ find_default_run_target (char *do_mesg)
   return &target;
 }
 
+/* Like find_default_run_target, but instantiates the target.  */
+
+static struct gdb_target *
+find_default_run_target_instance (char *do_mesg)
+{
+  struct gdb_target *result = find_default_run_target (do_mesg);
+
+  if (result != NULL)
+    result = XDUP (struct gdb_target, result);
+
+  return result;
+}
+
 void
 find_default_attach (struct gdb_target *ops, char *args, int from_tty)
 {
   struct gdb_target *t;
 
-  t = find_default_run_target ("attach");
+  t = find_default_run_target_instance ("attach");
   (t->ops->to_attach) (t, args, from_tty);
   return;
 }
@@ -3247,7 +3260,7 @@ find_default_create_inferior (struct gdb_target *ops,
 {
   struct gdb_target *t;
 
-  t = find_default_run_target ("run");
+  t = find_default_run_target_instance ("run");
   (t->ops->to_create_inferior) (t, exec_file, allargs, env, from_tty);
   return;
 }
