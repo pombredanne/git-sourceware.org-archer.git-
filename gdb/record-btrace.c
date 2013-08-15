@@ -484,7 +484,8 @@ btrace_func_history (struct btrace_thread_info *btinfo, struct ui_out *uiout,
       if (bfun->sym != NULL)
 	ui_out_field_string (uiout, "function", SYMBOL_PRINT_NAME (bfun->sym));
       else if (bfun->msym != NULL)
-	ui_out_field_string (uiout, "function", SYMBOL_PRINT_NAME (bfun->msym));
+	ui_out_field_string (uiout, "function",
+			     MSYMBOL_PRINT_NAME (bfun->msym));
       ui_out_text (uiout, "\n");
     }
 }

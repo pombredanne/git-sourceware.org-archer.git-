@@ -2841,7 +2841,7 @@ scope_info (char *args, int from_tty)
 		      printf_filtered ("static storage at address ");
 		      printf_filtered ("%s",
 				       paddress (gdbarch,
-						 SYMBOL_VALUE_ADDRESS (msym)));
+						 MSYMBOL_VALUE_ADDRESS (msym)));
 		    }
 		  break;
 		case LOC_OPTIMIZED_OUT:
