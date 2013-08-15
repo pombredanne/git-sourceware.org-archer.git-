@@ -196,7 +196,7 @@ fork_id_to_ptid (int num)
   if (fork)
     return fork->ptid;
   else
-    return pid_to_ptid (-1);
+    return minus_one_ptid;
 }
 
 static void
