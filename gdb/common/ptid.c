@@ -37,6 +37,18 @@ ptid_build_target (int pid, long lwp, long tid, int target)
   return ptid;
 }
 
+/* See ptid.h.  */
+
+ptid_t
+ptid_build_just_pid (ptid_t old_ptid)
+{
+  ptid_t result = old_ptid;
+
+  result.lwp = 0;
+  result.tid = 0;
+  return result;
+}
+
 /* Create a ptid from just a pid.  */
 
 ptid_t

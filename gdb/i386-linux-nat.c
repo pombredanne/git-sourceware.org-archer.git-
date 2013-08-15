@@ -737,7 +737,7 @@ update_debug_registers_callback (struct lwp_info *lwp, void *arg)
 static void
 i386_linux_dr_set_control (unsigned long control)
 {
-  ptid_t pid_ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+  ptid_t pid_ptid = ptid_build_just_pid (inferior_ptid);
 
   iterate_over_lwps (pid_ptid, update_debug_registers_callback, NULL);
 }
@@ -748,7 +748,7 @@ i386_linux_dr_set_control (unsigned long control)
 static void
 i386_linux_dr_set_addr (int regnum, CORE_ADDR addr)
 {
-  ptid_t pid_ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+  ptid_t pid_ptid = ptid_build_just_pid (inferior_ptid);
 
   gdb_assert (regnum >= 0 && regnum <= DR_LASTADDR - DR_FIRSTADDR);
 
@@ -928,7 +928,8 @@ i386_linux_resume (struct gdb_target *ops,
 
   if (step)
     {
-      struct regcache *regcache = get_thread_regcache (pid_to_ptid (pid));
+      struct regcache *regcache
+	= get_thread_regcache (pid_to_ptid_target (pid, target_stack_id ()));
       struct gdbarch *gdbarch = get_regcache_arch (regcache);
       enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
       ULONGEST pc;

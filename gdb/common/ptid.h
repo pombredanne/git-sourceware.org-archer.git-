@@ -72,6 +72,9 @@ ptid_t ptid_build_target (int pid, long lwp, long tid, int target);
 /* Like ptid_build_target, but use 0 for TARGET.  */
 #define ptid_build(PID, LWP, TID) ptid_build_target ((PID), (LWP), (TID), 0)
 
+/* Given OLD_PTID, create a new PTID that represents just its PID.  */
+ptid_t ptid_build_just_pid (ptid_t old_ptid);
+
 /* Find/Create a ptid from just a pid and target. */
 ptid_t pid_to_ptid_target (int pid, int target);
 

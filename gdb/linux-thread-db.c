@@ -420,7 +420,7 @@ thread_get_info_callback (const td_thrhandle_t *thp, void *argp)
 	   thread_db_err_str (err));
 
   /* Fill the cache.  */
-  thread_ptid = ptid_build (info->pid, ti.ti_lid, 0);
+  thread_ptid = ptid_build_target (info->pid, ti.ti_lid, 0, target_stack_id ());
   inout->thread_info = find_thread_ptid (thread_ptid);
 
   if (inout->thread_info == NULL)
@@ -1436,7 +1436,8 @@ check_event (ptid_t ptid)
       if (err != TD_OK)
 	error (_("Cannot get thread info: %s"), thread_db_err_str (err));
 
-      ptid = ptid_build (GET_PID (ptid), ti.ti_lid, 0);
+      ptid = ptid_build_target (GET_PID (ptid), ti.ti_lid, 0,
+				target_stack_id ());
 
       switch (msg.event)
 	{
@@ -1592,7 +1593,7 @@ find_new_threads_callback (const td_thrhandle_t *th_p, void *data)
 	return 0;
     }
 
-  ptid = ptid_build (info->pid, ti.ti_lid, 0);
+  ptid = ptid_build_target (info->pid, ti.ti_lid, 0, target_stack_id ());
   tp = find_thread_ptid (ptid);
   if (tp == NULL || tp->private == NULL)
     {

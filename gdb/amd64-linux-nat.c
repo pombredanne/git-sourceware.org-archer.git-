@@ -366,7 +366,7 @@ update_debug_registers_callback (struct lwp_info *lwp, void *arg)
 static void
 amd64_linux_dr_set_control (unsigned long control)
 {
-  ptid_t pid_ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+  ptid_t pid_ptid = ptid_build_just_pid (inferior_ptid);
 
   iterate_over_lwps (pid_ptid, update_debug_registers_callback, NULL);
 }
@@ -377,7 +377,7 @@ amd64_linux_dr_set_control (unsigned long control)
 static void
 amd64_linux_dr_set_addr (int regnum, CORE_ADDR addr)
 {
-  ptid_t pid_ptid = pid_to_ptid (ptid_get_pid (inferior_ptid));
+  ptid_t pid_ptid = ptid_build_just_pid (inferior_ptid);
 
   gdb_assert (regnum >= 0 && regnum <= DR_LASTADDR - DR_FIRSTADDR);
 

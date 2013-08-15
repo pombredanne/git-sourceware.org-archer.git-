@@ -474,7 +474,7 @@ spu_child_wait (struct gdb_target *ops,
     }
 
   store_waitstatus (ourstatus, status);
-  return pid_to_ptid (pid);
+  return pid_to_ptid_target (pid, target_stack_id ());
 }
 
 /* Override the fetch_inferior_register routine.  */

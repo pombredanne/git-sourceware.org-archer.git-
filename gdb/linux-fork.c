@@ -82,7 +82,7 @@ add_fork (pid_t pid)
     }
 
   fp = XZALLOC (struct fork_info);
-  fp->ptid = ptid_build (pid, pid, 0);
+  fp->ptid = ptid_build_target (pid, pid, 0, target_stack_id ());
   fp->num = ++highest_fork_num;
   fp->next = fork_list;
   fork_list = fp;
