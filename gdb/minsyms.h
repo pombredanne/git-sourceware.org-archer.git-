@@ -249,4 +249,9 @@ void iterate_over_minimal_symbols (struct objfile *objf,
 						     void *),
 				   void *user_data);
 
+/* Try to compute the upper bound of MINSYM.  The upper bound is the
+   last address thought to be part of the symbol.  */
+
+CORE_ADDR minimal_symbol_upper_bound (struct bound_minimal_symbol minsym);
+
 #endif /* MINSYMS_H */
