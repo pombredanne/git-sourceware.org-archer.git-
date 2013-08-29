@@ -1079,7 +1079,12 @@ push_gdb_target (struct gdb_target *t)
   /* FIXME: cagney/2003-10-15: I think this should be popping all
      targets to CUR, and not just those at this stratum level.  */
   if (target_stack->ops[t->ops->to_stratum] != NULL)
-    target_close (target_stack->ops[t->ops->to_stratum]);
+    {
+      struct gdb_target *old = target_stack->ops[t->ops->to_stratum];
+
+      target_stack->ops[t->ops->to_stratum] = NULL;
+      target_close (old);
+    }
 
   /* We have removed all targets in our stratum, now add the new one.  */
   target_stack->ops[t->ops->to_stratum] = t;
