@@ -827,12 +827,13 @@ record_full_async_inferior_event_handler (gdb_client_data data)
 }
 
 static struct record_full_gdb_target *
-allocate_record_full_gdb_target (void)
+allocate_record_full_gdb_target (struct target_ops *ops)
 {
   struct record_full_gdb_target *self;
 
   self = XCNEW (struct record_full_gdb_target);
 
+  self->base.ops = ops;
   self->record_full_first.type = record_full_end;
   self->record_full_list = &self->record_full_first;
   self->record_full_execution_dir = EXEC_FORWARD;
@@ -850,7 +851,7 @@ record_full_core_open_1 (char *name, int from_tty)
   int i;
   struct record_full_gdb_target *self;
 
-  self = allocate_record_full_gdb_target ();
+  self = allocate_record_full_gdb_target (&record_full_core_ops);
 
   /* Get record_full_core_regbuf.  */
   target_fetch_registers (regcache, -1);
@@ -897,7 +898,7 @@ record_full_open_1 (char *name, int from_tty)
     error (_("Process record: the current architecture doesn't support "
 	     "record function."));
 
-  self = allocate_record_full_gdb_target ();
+  self = allocate_record_full_gdb_target (&record_full_ops);
   push_gdb_target (&self->base);
 
   return self;
