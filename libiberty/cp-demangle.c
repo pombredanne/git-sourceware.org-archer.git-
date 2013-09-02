@@ -304,6 +304,8 @@ struct d_print_info
   unsigned long int flush_count;
 };
 
+#define CP_DEMANGLE_DEBUG
+
 #ifdef CP_DEMANGLE_DEBUG
 static void d_dump (struct demangle_component *, int);
 #endif
@@ -505,6 +507,8 @@ d_dump (struct demangle_component *dc, int indent)
 
   for (i = 0; i < indent; ++i)
     putchar (' ');
+
+  printf ("dc:%p ", dc);
 
   switch (dc->type)
     {
