@@ -3437,6 +3437,9 @@ d_add_substitution (struct d_info *di, struct demangle_component *dc)
     return 0;
   if (di->next_sub >= di->num_subs)
     return 0;
+#ifdef CP_DEMANGLE_DEBUG
+  printf ("SUB %2d: %p\n", di->next_sub, dc);
+#endif
   di->subs[di->next_sub] = dc;
   ++di->next_sub;
   return 1;
@@ -5439,7 +5442,9 @@ d_demangle_callback (const char *mangled, int options,
       dc = NULL;
 
 #ifdef CP_DEMANGLE_DEBUG
+    putchar ('\n');
     d_dump (dc, 0);
+    putchar ('\n');
 #endif
 
     status = (dc != NULL)
