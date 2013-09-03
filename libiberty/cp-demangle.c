@@ -5444,7 +5444,6 @@ d_demangle_callback (const char *mangled, int options,
 #ifdef CP_DEMANGLE_DEBUG
     putchar ('\n');
     d_dump (dc, 0);
-    putchar ('\n');
 #endif
 
     status = (dc != NULL)
