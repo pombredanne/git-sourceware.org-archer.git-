@@ -1,0 +1,95 @@
+blade:[src]$ gdb test
+[/var/tmp/gdb/pr14963-x86_64/build/gdb/gdb]
+GNU gdb (GDB) 7.6.50.20130830-cvs
+Copyright (C) 2013 Free Software Foundation, Inc.
+License GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.  Type "show copying"
+and "show warranty" for details.
+This GDB was configured as "x86_64-unknown-linux-gnu".
+Type "show configuration" for configuration details.
+For bug reporting instructions, please see:
+<http://www.gnu.org/software/gdb/bugs/>.
+Find the GDB manual and other documentation resources online at:
+<http://www.gnu.org/software/gdb/documentation/>.
+For help, type "help".
+Type "apropos word" to search for commands related to "word"...
+Reading symbols from /home/gary/work/archer/pr14963/src/test...done.
+(gdb) b d_print_comp
+Breakpoint 1 at 0x40f6e0: file /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c, line 3928.
+(gdb) r
+Starting program: /home/gary/work/archer/pr14963/src/test 
+warning: Skipping deprecated .gdb_index section in /usr/lib/debug/lib64/ld-2.12.so.debug.
+Do "set use-deprecated-index-sections on" before the file is read
+to use the section anyway.
+dc:0x7fffffff9f40 typed name
+  dc:0x7fffffff9e08 template
+    dc:0x7fffffff9400 qualified name
+      dc:0x7fffffff93e8 name 'std'
+      dc:0x7fffffff93d0 name 'forward'
+    dc:0x7fffffff9df0 template argument list
+      dc:0x7fffffff9dd8 reference
+        dc:0x7fffffff9dc0 template
+...
+                        dc:0x7fffffff9cd0 name 'make_multipart_default_discarder'
+                      dc:0x7fffffff9d00 template argument list
+                        dc:0x7fffffff9bb0 rvalue reference
+                          dc:0x7fffffff9b98 template parameter 0
+          dc:0x7fffffff9ec8 name 'type'
+
+Breakpoint 1, d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9f40) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3928
+3928	  const struct demangle_component *mod_inner = NULL;
+(gdb) n
+3930	  if (dc == NULL)
+(gdb) c
+Continuing.
+
+Breakpoint 1, d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9f28) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3928
+3928	  const struct demangle_component *mod_inner = NULL;
+(gdb) c
+Continuing.
+
+Breakpoint 1, d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9e38) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3928
+3928	  const struct demangle_component *mod_inner = NULL;
+(gdb) c
+Continuing.
+
+Breakpoint 1, d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9dc0) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3928
+3928	  const struct demangle_component *mod_inner = NULL;
+(gdb) n
+3930	  if (dc == NULL)
+(gdb) b cp-demangle.c:3930 if dc==0x7fffffff9dc0
+Breakpoint 2 at 0x40f6eb: file /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c, line 3930.
+(gdb) d 1
+(gdb) c
+Continuing.
+
+Breakpoint 2, d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9dc0) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3930
+3930	  if (dc == NULL)
+(gdb) bt
+#0  d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9dc0) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3930
+#1  0x00000000004107cf in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9dd8) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4342
+#2  0x0000000000410e77 in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9d00) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4520
+#3  0x000000000040ff57 in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9d18) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4119
+#4  0x0000000000410e77 in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9d30) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4520
+#5  0x0000000000410f10 in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9cb8) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4532
+#6  0x000000000040ff57 in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9d48) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4119
+#7  0x0000000000410e77 in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9d60) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4520
+#8  0x000000000040ff57 in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9d90) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4119
+#9  0x0000000000410e77 in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9da8) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4520
+#10 0x000000000040ff57 in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9dc0) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4119
+#11 0x00000000004107cf in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9dd8) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4342
+#12 0x00000000004109dc in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9f28) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4390
+#13 0x000000000040fd5b in d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9f40) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:4066
+#14 0x000000000040f35a in cplus_demangle_print_callback (options=259, dc=0x7fffffff9f40, callback=0x40f041 <d_growable_string_callback_adapter>, opaque=0x7fffffffe420)
+    at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3759
+#15 0x0000000000412eac in d_demangle_callback (
+    mangled=0x4135d0 "_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_4mime30multipart_section_processorObjIZ15get_body_parserIZZN14mime_processor21make_section_iteratorERKNS2_INS3_10sectionObjENS0_10ptrrefBaseEEEbENKUlvE_c"..., options=259, callback=0x40f041 <d_growable_string_callback_adapter>, opaque=0x7fffffffe420) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:5446
+#16 0x0000000000412f0b in d_demangle (
+    mangled=0x4135d0 "_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_4mime30multipart_section_processorObjIZ15get_body_parserIZZN14mime_processor21make_section_iteratorERKNS2_INS3_10sectionObjENS0_10ptrrefBaseEEEbENKUlvE_c"..., options=259, palc=0x7fffffffe488) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:5468
+#17 0x0000000000412f7a in cplus_demangle_v3 (
+    mangled=0x4135d0 "_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_4mime30multipart_section_processorObjIZ15get_body_parserIZZN14mime_processor21make_section_iteratorERKNS2_INS3_10sectionObjENS0_10ptrrefBaseEEEbENKUlvE_c"..., options=259) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:5625
+#18 0x00000000004019a3 in cplus_demangle (
+    mangled=0x4135d0 "_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_4mime30multipart_section_processorObjIZ15get_body_parserIZZN14mime_processor21make_section_iteratorERKNS2_INS3_10sectionObjENS0_10ptrrefBaseEEEbENKUlvE_c"..., options=259) at /home/gary/work/archer/pr14963/src/libiberty/cplus-dem.c:858
+#19 0x0000000000400db7 in main ()
+(gdb) 
