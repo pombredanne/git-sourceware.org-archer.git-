@@ -1,8 +1,8 @@
-class DemangleError(ValueError):
-    def __init__(self, buf, maxlen = 56):
+class DemangleError(Exception):
+    def __init__(self, buf, maxlen = 65):
         if len(buf) > maxlen:
             buf = buf[:maxlen - 3] + "..."
-        ValueError.__init__(self, buf)
+        self.buffer = buf
 
 class Demangler:
     def __init__(self, symbol, prefix="_Z"):
@@ -11,7 +11,7 @@ class Demangler:
         self.out_cont(1, symbol, 2, "<mangled-name>")
 
     def out_cont(self, indent, buffer, split, what):
-        print "%-32s" % ("  " * self.indent + buffer[:split]), what
+        print ("%-48s %s" % (("  " * self.indent + buffer[:split]), what))[:80]
         self.indent += indent
         self.demangle(buffer[split:])
 
@@ -31,11 +31,16 @@ class Demangler:
             return self.out_cont(1, buf, 1, "# reference to")
         if buf[0] == "N":
             return self.out_cont(1, buf, 1, "<nested-name>")
+        if buf[0] == "S":
+            limit = buf.find("_")
+            assert limit >= 0
+            return self.out_cont(0, buf, limit + 1, "<substitution>")
         raise DemangleError(buf)
 
 demangle = Demangler
 
 if __name__ == "__main__":
+  try:
     demangle("_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_4mime30mul"
              "tipart_section_processorObjIZ15get_body_parserIZZN14mime_"
              "processor21make_section_iteratorERKNS2_INS3_10sectionObjE"
@@ -44,3 +49,6 @@ if __name__ == "__main__":
              "putrefiteratorObjIiEES8_EEEERKSsSB_OT_OT0_EUlmE_NS3_32mak"
              "e_multipart_default_discarderISP_EEEES8_EEEEEOT_RNSt16rem"
              "ove_referenceISW_E4typeE")
+  except DemangleError, e:
+      print
+      print "DemangleError" + ":", e.buffer
