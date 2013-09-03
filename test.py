@@ -7,15 +7,30 @@ class DemangleError(ValueError):
 class Demangler:
     def __init__(self, symbol, prefix="_Z"):
         assert symbol.startswith(prefix)
-        self.output_continue(symbol, 2, "(start of mangled symbol)")
+        self.indent = 0
+        self.out_cont(1, symbol, 2, "<mangled-name>")
 
-    def output_continue(self, buffer, split, what):
-        print buffer[:split], what
+    def out_cont(self, indent, buffer, split, what):
+        print "%-32s" % ("  " * self.indent + buffer[:split]), what
+        self.indent += indent
         self.demangle(buffer[split:])
 
     def demangle(self, buf):
         if buf.startswith("St"):
-            return self.output_continue(buf, 2, "::std::")
+            return self.out_cont(0, buf, 2, '"::std::"')
+        limit = 0
+        while buf[limit].isdigit():
+            limit += 1
+        if limit > 0:
+            length = int(buf[:limit])
+            start, limit = limit, limit + length
+            return self.out_cont(0, buf, limit, '"%s"' % buf[start:limit])
+        if buf[0] == "I":
+            return self.out_cont(1, buf, 1, "<template-args>")
+        if buf[0] == "R":
+            return self.out_cont(1, buf, 1, "# reference to")
+        if buf[0] == "N":
+            return self.out_cont(1, buf, 1, "<nested-name>")
         raise DemangleError(buf)
 
 demangle = Demangler
