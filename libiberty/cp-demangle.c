@@ -505,10 +505,10 @@ d_dump (struct demangle_component *dc, int indent)
       return;
     }
 
+  printf ("%p  ", dc);
+
   for (i = 0; i < indent; ++i)
     putchar (' ');
-
-  printf ("dc:%p ", dc);
 
   switch (dc->type)
     {

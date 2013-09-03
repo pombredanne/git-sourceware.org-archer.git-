@@ -1,3 +1,4 @@
+blade:[src]$ gcc -Iinclude test.c /var/tmp/gdb/pr14963-x86_64/build/libiberty/libiberty.a -o test
 blade:[src]$ gdb test
 [/var/tmp/gdb/pr14963-x86_64/build/gdb/gdb]
 GNU gdb (GDB) 7.6.50.20130830-cvs
@@ -18,29 +19,406 @@ Reading symbols from /home/gary/work/archer/pr14963/src/test...done.
 (gdb) b d_print_comp
 Breakpoint 1 at 0x40f6e0: file /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c, line 3928.
 (gdb) r
-Starting program: /home/gary/work/archer/pr14963/src/test 
+Starting program: /home/gary/work/archer/pr14963/src/test
 warning: Skipping deprecated .gdb_index section in /usr/lib/debug/lib64/ld-2.12.so.debug.
 Do "set use-deprecated-index-sections on" before the file is read
 to use the section anyway.
-dc:0x7fffffff9f40 typed name
-  dc:0x7fffffff9e08 template
-    dc:0x7fffffff9400 qualified name
-      dc:0x7fffffff93e8 name 'std'
-      dc:0x7fffffff93d0 name 'forward'
-    dc:0x7fffffff9df0 template argument list
-      dc:0x7fffffff9dd8 reference
-        dc:0x7fffffff9dc0 template
-...
-                        dc:0x7fffffff9cd0 name 'make_multipart_default_discarder'
-                      dc:0x7fffffff9d00 template argument list
-                        dc:0x7fffffff9bb0 rvalue reference
-                          dc:0x7fffffff9b98 template parameter 0
-          dc:0x7fffffff9ec8 name 'type'
+0x7fffffff9f40  typed name
+0x7fffffff9e08    template
+0x7fffffff9400      qualified name
+0x7fffffff93e8        name 'std'
+0x7fffffff93d0        name 'forward'
+0x7fffffff9df0      template argument list
+0x7fffffff9dd8        reference
+0x7fffffff9dc0          template
+0x7fffffff9448            qualified name
+0x7fffffff9418              name 'x'
+0x7fffffff9430              name 'refobjiterator'
+0x7fffffff9da8            template argument list
+0x7fffffff9d90              template
+0x7fffffff9478                qualified name
+0x7fffffff9418                  name 'x'
+0x7fffffff9460                  name 'ref'
+0x7fffffff9d60                template argument list
+0x7fffffff9d48                  template
+0x7fffffff94d8                    qualified name
+0x7fffffff94a8                      qualified name
+0x7fffffff9418                        name 'x'
+0x7fffffff9490                        name 'mime'
+0x7fffffff94c0                      name 'multipart_section_processorObj'
+0x7fffffff9cb8                    template argument list
+0x7fffffff9ca0                      local name
+0x7fffffff9c40                        typed name
+0x7fffffff9a00                          template
+0x7fffffff94f0                            name 'get_body_parser'
+0x7fffffff9820                            template argument list
+0x7fffffff9808                              local name
+0x7fffffff9790                                typed name
+0x7fffffff9730                                  local name
+0x7fffffff9688                                    typed name
+0x7fffffff9538                                      qualified name
+0x7fffffff9508                                        name 'mime_processor'
+0x7fffffff9520                                        name 'make_section_iterator'
+0x7fffffff9670                                      function type
+0x7fffffff9628                                        argument list
+0x7fffffff9610                                          reference
+0x7fffffff9550                                            const
+0x7fffffff95f8                                              template
+0x7fffffff9478                                                qualified name
+0x7fffffff9418                                                  name 'x'
+0x7fffffff9460                                                  name 'ref'
+0x7fffffff9598                                                template argument list
+0x7fffffff9580                                                  qualified name
+0x7fffffff94a8                                                    qualified name
+0x7fffffff9418                                                      name 'x'
+0x7fffffff9490                                                      name 'mime'
+0x7fffffff9568                                                    name 'sectionObj'
+0x7fffffff95e0                                                  template argument list
+0x7fffffff95c8                                                    qualified name
+0x7fffffff9418                                                      name 'x'
+0x7fffffff95b0                                                      name 'ptrrefBase'
+0x7fffffff9658                                          argument list
+0x7fffffff9640                                            builtin type bool
+0x7fffffff96a0                                    const this
+0x7fffffff9718                                      qualified name
+0x7fffffff96e8                                        lambda 0
+0x7fffffff96d0                                          argument list
+0x7fffffff9700                                        operator ()
+0x7fffffff9778                                  function type
+0x7fffffff9760                                    argument list
+0x7fffffff97f0                                lambda 0
+0x7fffffff97a8                                  argument list
+0x7fffffff9610                                    reference
+0x7fffffff9550                                      const
+0x7fffffff95f8                                        template
+0x7fffffff9478                                          qualified name
+0x7fffffff9418                                            name 'x'
+0x7fffffff9460                                            name 'ref'
+0x7fffffff9598                                          template argument list
+0x7fffffff9580                                            qualified name
+0x7fffffff94a8                                              qualified name
+0x7fffffff9418                                                name 'x'
+0x7fffffff9490                                                name 'mime'
+0x7fffffff9568                                              name 'sectionObj'
+0x7fffffff95e0                                            template argument list
+0x7fffffff95c8                                              qualified name
+0x7fffffff9418                                                name 'x'
+0x7fffffff95b0                                                name 'ptrrefBase'
+0x7fffffff97d8                                    argument list
+0x7fffffff97c0                                      builtin type bool
+0x7fffffff99e8                              template argument list
+0x7fffffff99d0                                local name
+0x7fffffff9988                                  typed name
+0x7fffffff9928                                    local name
+0x7fffffff98c8                                      typed name
+0x7fffffff9850                                        qualified name
+0x7fffffff9508                                          name 'mime_processor'
+0x7fffffff9838                                          name 'make_section_iterator'
+0x7fffffff98b0                                        function type
+0x7fffffff9868                                          argument list
+0x7fffffff9610                                            reference
+0x7fffffff9550                                              const
+0x7fffffff95f8                                                template
+0x7fffffff9478                                                  qualified name
+0x7fffffff9418                                                    name 'x'
+0x7fffffff9460                                                    name 'ref'
+0x7fffffff9598                                                  template argument list
+0x7fffffff9580                                                    qualified name
+0x7fffffff94a8                                                      qualified name
+0x7fffffff9418                                                        name 'x'
+0x7fffffff9490                                                        name 'mime'
+0x7fffffff9568                                                      name 'sectionObj'
+0x7fffffff95e0                                                    template argument list
+0x7fffffff95c8                                                      qualified name
+0x7fffffff9418                                                        name 'x'
+0x7fffffff95b0                                                        name 'ptrrefBase'
+0x7fffffff9898                                            argument list
+0x7fffffff9880                                              builtin type bool
+0x7fffffff98e0                                      const this
+0x7fffffff9910                                        qualified name
+0x7fffffff96e8                                          lambda 0
+0x7fffffff96d0                                            argument list
+0x7fffffff98f8                                          operator ()
+0x7fffffff9970                                    function type
+0x7fffffff9958                                      argument list
+0x7fffffff99b8                                  lambda 1
+0x7fffffff99a0                                    argument list
+0x7fffffff9610                                      reference
+0x7fffffff9550                                        const
+0x7fffffff95f8                                          template
+0x7fffffff9478                                            qualified name
+0x7fffffff9418                                              name 'x'
+0x7fffffff9460                                              name 'ref'
+0x7fffffff9598                                            template argument list
+0x7fffffff9580                                              qualified name
+0x7fffffff94a8                                                qualified name
+0x7fffffff9418                                                  name 'x'
+0x7fffffff9490                                                  name 'mime'
+0x7fffffff9568                                                name 'sectionObj'
+0x7fffffff95e0                                              template argument list
+0x7fffffff95c8                                                qualified name
+0x7fffffff9418                                                  name 'x'
+0x7fffffff95b0                                                  name 'ptrrefBase'
+0x7fffffff9c28                          function type
+0x7fffffff9af0                            template
+0x7fffffff9448                              qualified name
+0x7fffffff9418                                name 'x'
+0x7fffffff9430                                name 'refobjiterator'
+0x7fffffff9ad8                              template argument list
+0x7fffffff9ac0                                template
+0x7fffffff9478                                  qualified name
+0x7fffffff9418                                    name 'x'
+0x7fffffff9460                                    name 'ref'
+0x7fffffff9a90                                  template argument list
+0x7fffffff9a78                                    template
+0x7fffffff9a30                                      qualified name
+0x7fffffff9418                                        name 'x'
+0x7fffffff9a18                                        name 'outputrefiteratorObj'
+0x7fffffff9a60                                      template argument list
+0x7fffffff9a48                                        builtin type int
+0x7fffffff9aa8                                    template argument list
+0x7fffffff95c8                                      qualified name
+0x7fffffff9418                                        name 'x'
+0x7fffffff95b0                                        name 'ptrrefBase'
+0x7fffffff9b68                            argument list
+0x7fffffff9b50                              reference
+0x7fffffff9b08                                const
+0x7fffffff9b38                                  standard substitution std::string
+0x7fffffff9b80                              argument list
+0x7fffffff9610                                reference
+0x7fffffff9550                                  const
+0x7fffffff95f8                                    template
+0x7fffffff9478                                      qualified name
+0x7fffffff9418                                        name 'x'
+0x7fffffff9460                                        name 'ref'
+0x7fffffff9598                                      template argument list
+0x7fffffff9580                                        qualified name
+0x7fffffff94a8                                          qualified name
+0x7fffffff9418                                            name 'x'
+0x7fffffff9490                                            name 'mime'
+0x7fffffff9568                                          name 'sectionObj'
+0x7fffffff95e0                                        template argument list
+0x7fffffff95c8                                          qualified name
+0x7fffffff9418                                            name 'x'
+0x7fffffff95b0                                            name 'ptrrefBase'
+0x7fffffff9bc8                                argument list
+0x7fffffff9bb0                                  rvalue reference
+0x7fffffff9b98                                    template parameter 0
+0x7fffffff9c10                                  argument list
+0x7fffffff9bf8                                    rvalue reference
+0x7fffffff9be0                                      template parameter 1
+0x7fffffff9c88                        lambda 0
+0x7fffffff9c70                          argument list
+0x7fffffff9c58                            builtin type unsigned long
+0x7fffffff9d30                      template argument list
+0x7fffffff9d18                        template
+0x7fffffff9ce8                          qualified name
+0x7fffffff94a8                            qualified name
+0x7fffffff9418                              name 'x'
+0x7fffffff9490                              name 'mime'
+0x7fffffff9cd0                            name 'make_multipart_default_discarder'
+0x7fffffff9d00                          template argument list
+0x7fffffff9bb0                            rvalue reference
+0x7fffffff9b98                              template parameter 0
+0x7fffffff9d78                  template argument list
+0x7fffffff95c8                    qualified name
+0x7fffffff9418                      name 'x'
+0x7fffffff95b0                      name 'ptrrefBase'
+0x7fffffff9f28    function type
+0x7fffffff9e38      rvalue reference
+0x7fffffff9e20        template parameter 0
+0x7fffffff9f10      argument list
+0x7fffffff9ef8        reference
+0x7fffffff9ee0          qualified name
+0x7fffffff9eb0            template
+0x7fffffff9e80              qualified name
+0x7fffffff9e50                standard substitution std
+0x7fffffff9e68                name 'remove_reference'
+0x7fffffff9e98              template argument list
+0x7fffffff9d48                template
+0x7fffffff94d8                  qualified name
+0x7fffffff94a8                    qualified name
+0x7fffffff9418                      name 'x'
+0x7fffffff9490                      name 'mime'
+0x7fffffff94c0                    name 'multipart_section_processorObj'
+0x7fffffff9cb8                  template argument list
+0x7fffffff9ca0                    local name
+0x7fffffff9c40                      typed name
+0x7fffffff9a00                        template
+0x7fffffff94f0                          name 'get_body_parser'
+0x7fffffff9820                          template argument list
+0x7fffffff9808                            local name
+0x7fffffff9790                              typed name
+0x7fffffff9730                                local name
+0x7fffffff9688                                  typed name
+0x7fffffff9538                                    qualified name
+0x7fffffff9508                                      name 'mime_processor'
+0x7fffffff9520                                      name 'make_section_iterator'
+0x7fffffff9670                                    function type
+0x7fffffff9628                                      argument list
+0x7fffffff9610                                        reference
+0x7fffffff9550                                          const
+0x7fffffff95f8                                            template
+0x7fffffff9478                                              qualified name
+0x7fffffff9418                                                name 'x'
+0x7fffffff9460                                                name 'ref'
+0x7fffffff9598                                              template argument list
+0x7fffffff9580                                                qualified name
+0x7fffffff94a8                                                  qualified name
+0x7fffffff9418                                                    name 'x'
+0x7fffffff9490                                                    name 'mime'
+0x7fffffff9568                                                  name 'sectionObj'
+0x7fffffff95e0                                                template argument list
+0x7fffffff95c8                                                  qualified name
+0x7fffffff9418                                                    name 'x'
+0x7fffffff95b0                                                    name 'ptrrefBase'
+0x7fffffff9658                                        argument list
+0x7fffffff9640                                          builtin type bool
+0x7fffffff96a0                                  const this
+0x7fffffff9718                                    qualified name
+0x7fffffff96e8                                      lambda 0
+0x7fffffff96d0                                        argument list
+0x7fffffff9700                                      operator ()
+0x7fffffff9778                                function type
+0x7fffffff9760                                  argument list
+0x7fffffff97f0                              lambda 0
+0x7fffffff97a8                                argument list
+0x7fffffff9610                                  reference
+0x7fffffff9550                                    const
+0x7fffffff95f8                                      template
+0x7fffffff9478                                        qualified name
+0x7fffffff9418                                          name 'x'
+0x7fffffff9460                                          name 'ref'
+0x7fffffff9598                                        template argument list
+0x7fffffff9580                                          qualified name
+0x7fffffff94a8                                            qualified name
+0x7fffffff9418                                              name 'x'
+0x7fffffff9490                                              name 'mime'
+0x7fffffff9568                                            name 'sectionObj'
+0x7fffffff95e0                                          template argument list
+0x7fffffff95c8                                            qualified name
+0x7fffffff9418                                              name 'x'
+0x7fffffff95b0                                              name 'ptrrefBase'
+0x7fffffff97d8                                  argument list
+0x7fffffff97c0                                    builtin type bool
+0x7fffffff99e8                            template argument list
+0x7fffffff99d0                              local name
+0x7fffffff9988                                typed name
+0x7fffffff9928                                  local name
+0x7fffffff98c8                                    typed name
+0x7fffffff9850                                      qualified name
+0x7fffffff9508                                        name 'mime_processor'
+0x7fffffff9838                                        name 'make_section_iterator'
+0x7fffffff98b0                                      function type
+0x7fffffff9868                                        argument list
+0x7fffffff9610                                          reference
+0x7fffffff9550                                            const
+0x7fffffff95f8                                              template
+0x7fffffff9478                                                qualified name
+0x7fffffff9418                                                  name 'x'
+0x7fffffff9460                                                  name 'ref'
+0x7fffffff9598                                                template argument list
+0x7fffffff9580                                                  qualified name
+0x7fffffff94a8                                                    qualified name
+0x7fffffff9418                                                      name 'x'
+0x7fffffff9490                                                      name 'mime'
+0x7fffffff9568                                                    name 'sectionObj'
+0x7fffffff95e0                                                  template argument list
+0x7fffffff95c8                                                    qualified name
+0x7fffffff9418                                                      name 'x'
+0x7fffffff95b0                                                      name 'ptrrefBase'
+0x7fffffff9898                                          argument list
+0x7fffffff9880                                            builtin type bool
+0x7fffffff98e0                                    const this
+0x7fffffff9910                                      qualified name
+0x7fffffff96e8                                        lambda 0
+0x7fffffff96d0                                          argument list
+0x7fffffff98f8                                        operator ()
+0x7fffffff9970                                  function type
+0x7fffffff9958                                    argument list
+0x7fffffff99b8                                lambda 1
+0x7fffffff99a0                                  argument list
+0x7fffffff9610                                    reference
+0x7fffffff9550                                      const
+0x7fffffff95f8                                        template
+0x7fffffff9478                                          qualified name
+0x7fffffff9418                                            name 'x'
+0x7fffffff9460                                            name 'ref'
+0x7fffffff9598                                          template argument list
+0x7fffffff9580                                            qualified name
+0x7fffffff94a8                                              qualified name
+0x7fffffff9418                                                name 'x'
+0x7fffffff9490                                                name 'mime'
+0x7fffffff9568                                              name 'sectionObj'
+0x7fffffff95e0                                            template argument list
+0x7fffffff95c8                                              qualified name
+0x7fffffff9418                                                name 'x'
+0x7fffffff95b0                                                name 'ptrrefBase'
+0x7fffffff9c28                        function type
+0x7fffffff9af0                          template
+0x7fffffff9448                            qualified name
+0x7fffffff9418                              name 'x'
+0x7fffffff9430                              name 'refobjiterator'
+0x7fffffff9ad8                            template argument list
+0x7fffffff9ac0                              template
+0x7fffffff9478                                qualified name
+0x7fffffff9418                                  name 'x'
+0x7fffffff9460                                  name 'ref'
+0x7fffffff9a90                                template argument list
+0x7fffffff9a78                                  template
+0x7fffffff9a30                                    qualified name
+0x7fffffff9418                                      name 'x'
+0x7fffffff9a18                                      name 'outputrefiteratorObj'
+0x7fffffff9a60                                    template argument list
+0x7fffffff9a48                                      builtin type int
+0x7fffffff9aa8                                  template argument list
+0x7fffffff95c8                                    qualified name
+0x7fffffff9418                                      name 'x'
+0x7fffffff95b0                                      name 'ptrrefBase'
+0x7fffffff9b68                          argument list
+0x7fffffff9b50                            reference
+0x7fffffff9b08                              const
+0x7fffffff9b38                                standard substitution std::string
+0x7fffffff9b80                            argument list
+0x7fffffff9610                              reference
+0x7fffffff9550                                const
+0x7fffffff95f8                                  template
+0x7fffffff9478                                    qualified name
+0x7fffffff9418                                      name 'x'
+0x7fffffff9460                                      name 'ref'
+0x7fffffff9598                                    template argument list
+0x7fffffff9580                                      qualified name
+0x7fffffff94a8                                        qualified name
+0x7fffffff9418                                          name 'x'
+0x7fffffff9490                                          name 'mime'
+0x7fffffff9568                                        name 'sectionObj'
+0x7fffffff95e0                                      template argument list
+0x7fffffff95c8                                        qualified name
+0x7fffffff9418                                          name 'x'
+0x7fffffff95b0                                          name 'ptrrefBase'
+0x7fffffff9bc8                              argument list
+0x7fffffff9bb0                                rvalue reference
+0x7fffffff9b98                                  template parameter 0
+0x7fffffff9c10                                argument list
+0x7fffffff9bf8                                  rvalue reference
+0x7fffffff9be0                                    template parameter 1
+0x7fffffff9c88                      lambda 0
+0x7fffffff9c70                        argument list
+0x7fffffff9c58                          builtin type unsigned long
+0x7fffffff9d30                    template argument list
+0x7fffffff9d18                      template
+0x7fffffff9ce8                        qualified name
+0x7fffffff94a8                          qualified name
+0x7fffffff9418                            name 'x'
+0x7fffffff9490                            name 'mime'
+0x7fffffff9cd0                          name 'make_multipart_default_discarder'
+0x7fffffff9d00                        template argument list
+0x7fffffff9bb0                          rvalue reference
+0x7fffffff9b98                            template parameter 0
+0x7fffffff9ec8            name 'type'
 
 Breakpoint 1, d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9f40) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3928
 3928	  const struct demangle_component *mod_inner = NULL;
-(gdb) n
-3930	  if (dc == NULL)
 (gdb) c
 Continuing.
 
@@ -56,11 +434,14 @@ Continuing.
 
 Breakpoint 1, d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9dc0) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3928
 3928	  const struct demangle_component *mod_inner = NULL;
-(gdb) n
-3930	  if (dc == NULL)
+(gdb) d 1
 (gdb) b cp-demangle.c:3930 if dc==0x7fffffff9dc0
 Breakpoint 2 at 0x40f6eb: file /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c, line 3930.
-(gdb) d 1
+(gdb) c
+Continuing.
+
+Breakpoint 2, d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9dc0) at /home/gary/work/archer/pr14963/src/libiberty/cp-demangle.c:3930
+3930	  if (dc == NULL)
 (gdb) c
 Continuing.
 
@@ -92,4 +473,4 @@ Breakpoint 2, d_print_comp (dpi=0x7fffffff8530, options=259, dc=0x7fffffff9dc0) 
 #18 0x00000000004019a3 in cplus_demangle (
     mangled=0x4135d0 "_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_4mime30multipart_section_processorObjIZ15get_body_parserIZZN14mime_processor21make_section_iteratorERKNS2_INS3_10sectionObjENS0_10ptrrefBaseEEEbENKUlvE_c"..., options=259) at /home/gary/work/archer/pr14963/src/libiberty/cplus-dem.c:858
 #19 0x0000000000400db7 in main ()
-(gdb) 
+(gdb)
