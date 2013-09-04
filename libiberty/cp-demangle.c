@@ -303,7 +303,9 @@ struct d_print_info
   int pack_index;
   /* Number of d_print_flush calls so far.  */
   unsigned long int flush_count;
-  /* XXX.  */
+  /* Table mapping demangle components to scopes saved when first
+     traversing those components.  These are used while evaluating
+     substitutions.  */
   htab_t saved_scopes;
 };
 
@@ -3930,19 +3932,30 @@ d_print_subexpr (struct d_print_info *dpi, int options,
     d_append_char (dpi, ')');
 }
 
-/* XXX.  */
+/* A demangle component and some scope captured when it was first
+   traversed.  */
 
 struct d_saved_scope
 {
-  /* XXX.  */
+  /* The component whose scope this is.  Used as the key for the
+     saved_scopes hashtable in d_print_info.  May be NULL if this
+     scope will not be inserted into that table.  */
   const struct demangle_component *container;
-  /* XXX.  */
+  /* Nonzero if the below items are copies and require freeing
+     when this scope is freed.  */
   int is_copy;
-  /* XXX.  */
+  /* The list of templates, if any, that was current when this
+     scope was captured.  */
   struct d_print_template *templates;
 };
 
-/* XXX.  */
+/* Allocate a scope and populate it with the current values from DPI.
+   CONTAINER is the demangle component to which the scope refers, and
+   is used as the key for the saved_scopes hashtable in d_print_info.
+   CONTAINER may be NULL if this scope will not be inserted into that
+   table.  If COPY is nonzero then items that may have been allocated
+   on the stack will be copied before storing.  */
+
 static struct d_saved_scope *
 d_store_scope (const struct d_print_info *dpi,
 	       const struct demangle_component *container, int copy)
@@ -3972,7 +3985,8 @@ d_store_scope (const struct d_print_info *dpi,
   return scope;
 }
 
-/* XXX.  */
+/* Free a scope allocated by d_store_scope.  */
+
 static void
 d_free_scope (void *p)
 {
@@ -3992,7 +4006,8 @@ d_free_scope (void *p)
   free (scope);
 }
 
-/* XXX.  */
+/* Restore a stored scope to DPI, optionally freeing it afterwards.  */
+
 static void
 d_restore_scope (struct d_print_info *dpi, struct d_saved_scope *scope,
 		 int free_after)
@@ -4035,7 +4050,8 @@ d_print_comp (struct d_print_info *dpi, int options,
      without needing to modify *dc.  */
   const struct demangle_component *mod_inner = NULL;
 
-  /* XXX.  */
+  /* Variable used to store the current scope while a previously
+     captured scope is used.  */
   struct d_saved_scope *saved_scope = NULL;
 
   if (dc == NULL)
