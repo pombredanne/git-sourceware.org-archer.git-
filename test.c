@@ -12,5 +12,11 @@ const char *symbol = "_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_" \
 int
 main (int argc, char *argv[])
 {
-  puts (cplus_demangle (symbol, DMGL_AUTO | DMGL_ANSI | DMGL_PARAMS));
+  const char *demangled =
+    cplus_demangle (symbol, DMGL_AUTO | DMGL_ANSI | DMGL_PARAMS);
+
+  if (demangled == NULL)
+    puts ("Demangler failed");
+  else
+    puts (demangled);
 }

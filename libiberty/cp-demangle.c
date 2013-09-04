@@ -275,6 +275,18 @@ struct d_growable_string
   int allocation_failure;
 };
 
+#define CP_DEMANGLE_DEBUG
+
+#ifdef CP_DEMANGLE_DEBUG
+struct d_check_stack_element
+{
+  /* XXX.  */
+  struct d_check_stack_element *next;
+  /* XXX.  */
+  const struct demangle_component *dc;
+};
+#endif
+
 enum { D_PRINT_BUFFER_LENGTH = 256 };
 struct d_print_info
 {
@@ -302,9 +314,11 @@ struct d_print_info
   int pack_index;
   /* Number of d_print_flush calls so far.  */
   unsigned long int flush_count;
+#ifdef CP_DEMANGLE_DEBUG
+  /* XXX.  */
+  struct d_check_stack_element *check_stack;
+#endif
 };
-
-#define CP_DEMANGLE_DEBUG
 
 #ifdef CP_DEMANGLE_DEBUG
 static void d_dump (struct demangle_component *, int);
@@ -461,6 +475,12 @@ static inline char d_last_char (struct d_print_info *);
 
 static void
 d_print_comp (struct d_print_info *, int, const struct demangle_component *);
+
+#ifdef CP_DEMANGLE_DEBUG
+static void
+d_print_comp_inner (struct d_print_info *, int,
+		    const struct demangle_component *);
+#endif
 
 static void
 d_print_java_identifier (struct d_print_info *, const char *, int);
@@ -3672,6 +3692,10 @@ d_print_init (struct d_print_info *dpi, demangle_callbackref callback,
   dpi->opaque = opaque;
 
   dpi->demangle_failure = 0;
+
+#ifdef CP_DEMANGLE_DEBUG
+  dpi->check_stack = NULL;
+#endif
 }
 
 /* Indicate that an error occurred during printing, and test for error.  */
@@ -3920,11 +3944,54 @@ d_print_subexpr (struct d_print_info *dpi, int options,
     d_append_char (dpi, ')');
 }
 
+#ifdef CP_DEMANGLE_DEBUG
+static void
+d_dump_check_stack (struct d_check_stack_element *elem,
+		    const struct demangle_component *highlight)
+{
+  if (elem->next != NULL)
+    d_dump_check_stack (elem->next, highlight);
+
+  printf ("%p", elem->dc);
+  if (elem->dc == highlight)
+    printf (" ***");
+  putchar ('\n');
+}
+#endif
+
 /* Subroutine to handle components.  */
 
 static void
 d_print_comp (struct d_print_info *dpi, int options,
               const struct demangle_component *dc)
+#ifdef CP_DEMANGLE_DEBUG
+{
+  struct d_check_stack_element self, *check;
+
+  for (check = dpi->check_stack; check != NULL; check = check->next)
+    if (dc == check->dc)
+      {
+	puts ("\nINFINITE LOOP:");
+	d_dump_check_stack (dpi->check_stack, dc);
+	printf ("%p ***\n\n", dc);
+
+	d_print_error (dpi);
+	return;
+      }
+
+  self.next = dpi->check_stack;
+  dpi->check_stack = &self;
+  self.dc = dc;
+
+  d_print_comp_inner (dpi, options, dc);
+
+  dpi->check_stack = self.next;
+}
+
+static void
+d_print_comp_inner (struct d_print_info *dpi, int options,
+		    const struct demangle_component *dc)
+#endif /* CP_DEMANGLE_DEBUG */
 {
   /* Magic variable to let reference smashing skip over the next modifier
      without needing to modify *dc.  */
