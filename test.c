@@ -15,6 +15,13 @@ main (int argc, char *argv[])
   const char *demangled =
     cplus_demangle (symbol, DMGL_AUTO | DMGL_ANSI | DMGL_PARAMS);
 
+  FILE *fp = fopen ("test.in", "w");
+  if (fp != NULL)
+    {
+      fputs (symbol, fp);
+      fclose (fp);
+    }
+
   if (demangled == NULL)
     puts ("Demangler failed");
   else
