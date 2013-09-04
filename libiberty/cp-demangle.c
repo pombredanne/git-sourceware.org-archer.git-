@@ -3982,21 +3982,72 @@ struct d_saved_scope
 {
   /* XXX.  */
   const struct demangle_component *container;
+  /* XXX.  */
+  int is_copy;
+  /* XXX.  */
+  struct d_print_template *templates;
 };
 
 /* XXX.  */
 static struct d_saved_scope *
 d_store_scope (const struct d_print_info *dpi,
-	       const struct demangle_component *container, int copy);
+	       const struct demangle_component *container, int copy)
+{
+  struct d_saved_scope *scope = XNEW (struct d_saved_scope);
+
+  scope->container = container;
+  scope->is_copy = copy;
+
+  if (copy)
+    {
+      struct d_print_template *ts, **tl = &scope->templates;
+
+      for (ts = dpi->templates; ts != NULL; ts = ts->next)
+	{
+	  struct d_print_template *td = XNEW (struct d_print_template);
+
+	  *tl = td;
+	  tl = &td->next;
+	  td->template_decl = ts->template_decl;
+	}
+      *tl = NULL;
+    }
+  else
+    scope->templates = dpi->templates;
+
+  return scope;
+}
+
+/* XXX.  */
+static void
+d_free_scope (void *p)
+{
+  struct d_saved_scope *scope = (struct d_saved_scope *) p;
+
+  if (scope->is_copy)
+    {
+      struct d_print_template *ts, *tn;
+
+      for (ts = scope->templates; ts != NULL; ts = tn)
+	{
+	  tn = ts->next;
+	  free (ts);
+	}
+    }
+
+  free (scope);
+}
 
 /* XXX.  */
 static void
 d_restore_scope (struct d_print_info *dpi, struct d_saved_scope *scope,
-		 int free_after);
+		 int free_after)
+{
+  dpi->templates = scope->templates;
 
-/* XXX.  */
-static void
-d_free_scope (void *p);
+  if (free_after)
+    d_free_scope (scope);
+}
 
 /* Returns a hash code for the saved scope referenced by p.  */
 
