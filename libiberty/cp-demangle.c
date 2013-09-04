@@ -128,6 +128,7 @@ extern char *alloca ();
 #include "libiberty.h"
 #include "demangle.h"
 #include "cp-demangle.h"
+#include "hashtab.h"
 
 /* If IN_GLIBCPP_V3 is defined, some functions are made static.  We
    also rename them via #define to avoid compiler errors when the
@@ -314,6 +315,8 @@ struct d_print_info
   int pack_index;
   /* Number of d_print_flush calls so far.  */
   unsigned long int flush_count;
+  /* XXX.  */
+  htab_t saved_scopes;
 #ifdef CP_DEMANGLE_DEBUG
   /* XXX.  */
   struct d_check_stack_element *check_stack;
@@ -3693,9 +3696,20 @@ d_print_init (struct d_print_info *dpi, demangle_callbackref callback,
 
   dpi->demangle_failure = 0;
 
+  dpi->saved_scopes = NULL;
+
 #ifdef CP_DEMANGLE_DEBUG
   dpi->check_stack = NULL;
 #endif
+}
+
+/* Free a print information structure.  */
+
+static void
+d_print_free (struct d_print_info *dpi)
+{
+  if (dpi->saved_scopes != NULL)
+    htab_delete (dpi->saved_scopes);
 }
 
 /* Indicate that an error occurred during printing, and test for error.  */
@@ -3780,6 +3794,7 @@ cplus_demangle_print_callback (int options,
                                demangle_callbackref callback, void *opaque)
 {
   struct d_print_info dpi;
+  int success;
 
   d_print_init (&dpi, callback, opaque);
 
@@ -3787,7 +3802,9 @@ cplus_demangle_print_callback (int options,
 
   d_print_flush (&dpi);
 
-  return ! d_print_saw_error (&dpi);
+  success = ! d_print_saw_error (&dpi);
+  d_print_free (&dpi);
+  return success;
 }
 
 /* Turn components into a human readable string.  OPTIONS is the
@@ -3958,6 +3975,36 @@ d_dump_check_stack (struct d_check_stack_element *elem,
   putchar ('\n');
 }
 #endif
+
+/* XXX.  */
+
+struct d_saved_scope
+{
+  /* XXX.  */
+  const struct demangle_component *container;
+};
+
+/* Returns a hash code for the saved scope referenced by p.  */
+
+static hashval_t
+hash_saved_scope (const void *p)
+{
+  const struct d_saved_scope *s = (const struct d_saved_scope *) p;
+
+  return htab_hash_pointer (s->container);
+}
+
+/* Returns non-zero if the saved scopes referenced by p1 and p2
+   are equal.  */
+
+static int
+equal_saved_scope (const void *p1, const void *p2)
+{
+  const struct d_saved_scope *s1 = (const struct d_saved_scope *) p1;
+  const struct d_saved_scope *s2 = (const struct d_saved_scope *) p2;
+
+  return s1->container == s2->container;
+}
 
 /* Subroutine to handle components.  */
 
@@ -4366,11 +4413,17 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 	if (sub->type == DEMANGLE_COMPONENT_TEMPLATE_PARAM)
 	  {
 	    struct demangle_component *a;
-	    struct d_scope lookup;
+	    struct d_saved_scope lookup;
 	    void **slot;
 
-	    lookup.dc = sub;
-	    slot = htab_find_slot (dpi->scope_map, &lookup, INSERT);
+	    if (dpi->saved_scopes == NULL)
+	      dpi->saved_scopes = htab_create_alloc (1,
+						     hash_saved_scope,
+						     equal_saved_scope,
+						     free, xcalloc, free);
+
+	    lookup.container = sub;
+	    slot = htab_find_slot (dpi->saved_scopes, &lookup, INSERT);
 	    if (*slot == HTAB_EMPTY_ENTRY)
 	      {
 		/* This is the first time SUB has been traversed.
@@ -4383,7 +4436,7 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 		/* This traversal is reentering SUB as a substition.
 		   Restore the original scope temporarily.  */
 		saved_scope = d_scope_store (dpi, NULL);
-		d_restore_scope (dpi, (struct d_scope *) *slot);
+		d_restore_scope (dpi, (struct d_saved_scope *) *slot);
 	      }
 
 	    a = d_lookup_template_argument (dpi, sub);
