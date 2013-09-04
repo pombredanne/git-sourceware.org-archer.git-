@@ -276,18 +276,6 @@ struct d_growable_string
   int allocation_failure;
 };
 
-#define CP_DEMANGLE_DEBUG
-
-#ifdef CP_DEMANGLE_DEBUG
-struct d_check_stack_element
-{
-  /* XXX.  */
-  struct d_check_stack_element *next;
-  /* XXX.  */
-  const struct demangle_component *dc;
-};
-#endif
-
 enum { D_PRINT_BUFFER_LENGTH = 256 };
 struct d_print_info
 {
@@ -317,10 +305,6 @@ struct d_print_info
   unsigned long int flush_count;
   /* XXX.  */
   htab_t saved_scopes;
-#ifdef CP_DEMANGLE_DEBUG
-  /* XXX.  */
-  struct d_check_stack_element *check_stack;
-#endif
 };
 
 #ifdef CP_DEMANGLE_DEBUG
@@ -479,12 +463,6 @@ static inline char d_last_char (struct d_print_info *);
 static void
 d_print_comp (struct d_print_info *, int, const struct demangle_component *);
 
-#ifdef CP_DEMANGLE_DEBUG
-static void
-d_print_comp_inner (struct d_print_info *, int,
-		    const struct demangle_component *);
-#endif
-
 static void
 d_print_java_identifier (struct d_print_info *, const char *, int);
 
@@ -527,8 +505,6 @@ d_dump (struct demangle_component *dc, int indent)
         printf ("failed demangling\n");
       return;
     }
-
-  printf ("%p  ", dc);
 
   for (i = 0; i < indent; ++i)
     putchar (' ');
@@ -3460,9 +3436,6 @@ d_add_substitution (struct d_info *di, struct demangle_component *dc)
     return 0;
   if (di->next_sub >= di->num_subs)
     return 0;
-#ifdef CP_DEMANGLE_DEBUG
-  printf ("SUB %2d: %p\n", di->next_sub, dc);
-#endif
   di->subs[di->next_sub] = dc;
   ++di->next_sub;
   return 1;
@@ -3697,10 +3670,6 @@ d_print_init (struct d_print_info *dpi, demangle_callbackref callback,
   dpi->demangle_failure = 0;
 
   dpi->saved_scopes = NULL;
-
-#ifdef CP_DEMANGLE_DEBUG
-  dpi->check_stack = NULL;
-#endif
 }
 
 /* Free a print information structure.  */
@@ -3961,21 +3930,6 @@ d_print_subexpr (struct d_print_info *dpi, int options,
     d_append_char (dpi, ')');
 }
 
-#ifdef CP_DEMANGLE_DEBUG
-static void
-d_dump_check_stack (struct d_check_stack_element *elem,
-		    const struct demangle_component *highlight)
-{
-  if (elem->next != NULL)
-    d_dump_check_stack (elem->next, highlight);
-
-  printf ("%p", elem->dc);
-  if (elem->dc == highlight)
-    printf (" ***");
-  putchar ('\n');
-}
-#endif
-
 /* XXX.  */
 
 struct d_saved_scope
@@ -4076,34 +4030,6 @@ d_equal_saved_scope (const void *p1, const void *p2)
 static void
 d_print_comp (struct d_print_info *dpi, int options,
               const struct demangle_component *dc)
-#ifdef CP_DEMANGLE_DEBUG
-{
-  struct d_check_stack_element self, *check;
-
-  for (check = dpi->check_stack; check != NULL; check = check->next)
-    if (dc == check->dc)
-      {
-	puts ("\nINFINITE LOOP:");
-	d_dump_check_stack (dpi->check_stack, dc);
-	printf ("%p ***\n\n", dc);
-
-	d_print_error (dpi);
-	return;
-      }
-
-  self.next = dpi->check_stack;
-  dpi->check_stack = &self;
-  self.dc = dc;
-
-  d_print_comp_inner (dpi, options, dc);
-
-  dpi->check_stack = self.next;
-}
-
-static void
-d_print_comp_inner (struct d_print_info *dpi, int options,
-		    const struct demangle_component *dc)
-#endif /* CP_DEMANGLE_DEBUG */
 {
   /* Magic variable to let reference smashing skip over the next modifier
      without needing to modify *dc.  */
@@ -5658,7 +5584,6 @@ d_demangle_callback (const char *mangled, int options,
       dc = NULL;
 
 #ifdef CP_DEMANGLE_DEBUG
-    putchar ('\n');
     d_dump (dc, 0);
 #endif
 
