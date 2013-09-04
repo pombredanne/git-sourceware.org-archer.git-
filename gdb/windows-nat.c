@@ -2324,26 +2324,34 @@ windows_xfer_memory (gdb_byte *readbuf, const gdb_byte *writebuf,
 {
   SIZE_T done = 0;
   BOOL success;
+  DWORD lasterror = 0;
 
   if (writebuf != NULL)
     {
-      DEBUG_MEM (("gdb: write target memory, %d bytes at %s\n",
-		  len, core_addr_to_string (memaddr)));
+      DEBUG_MEM (("gdb: write target memory, %s bytes at %s\n",
+		  plongest (len), core_addr_to_string (memaddr)));
       success = WriteProcessMemory (current_process_handle,
 				    (LPVOID) (uintptr_t) memaddr, writebuf,
 				    len, &done);
+      if (!success)
+	lasterror = GetLastError ();
       FlushInstructionCache (current_process_handle,
 			     (LPCVOID) (uintptr_t) memaddr, len);
     }
   else
     {
-      DEBUG_MEM (("gdb: read target memory, %d bytes at %s\n",
-		  len, core_addr_to_string (memaddr)));
+      DEBUG_MEM (("gdb: read target memory, %s bytes at %s\n",
+		  plongest (len), core_addr_to_string (memaddr)));
       success = ReadProcessMemory (current_process_handle,
 				   (LPCVOID) (uintptr_t) memaddr, readbuf,
 				   len, &done);
+      if (!success)
+	lasterror = GetLastError ();
     }
-  return success ? done : TARGET_XFER_E_IO;
+  if (!success && lasterror == ERROR_PARTIAL_COPY && done > 0)
+    return done;
+  else
+    return success ? done : TARGET_XFER_E_IO;
 }
 
 static void

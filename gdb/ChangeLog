@@ -1,3 +1,121 @@
+2013-09-04  Muhammad Bilal  <mbilal@codesourcery.com>
+            Pedro Alves  <palves@redhat.com>
+
+	* symfile.c (add_symbol_file_command): Error out on unknown
+        option.  Handle EXPECTING_SEC_ADDR/EXPECTING_SEC_NAME before '-'
+        options and collapse into single conditional branch.
+
+2013-09-03  Luis Machado  <lgustavo@codesourcery.com>
+
+	* inf-child.c (inf_child_follow_fork) New parameter
+	detach_fork.
+	* inf-ptrace.c (inf_ptrace_follow_fork): Likewise.
+	* inf-ttrace.c (inf_ttrace_follow_fork): Likewise.
+	* inferior.h (detach_fork): Remove.
+	* infrun.c (detach_fork): Adjust comment and make it
+	static.
+	(follow_fork): Pass detach_fork parameter to
+	target_follow_fork.
+	* linux-nat.c (linux_child_follow_fork): New parameter
+	detach_fork.
+	* target.c (target_follow_fork): New parameter detach_fork.
+	Pass detach_fork as parameter and print its value.
+	* target.h (struct target_ops) <to_follow_fork>: New int
+	parameter.
+	(target_follow_fork): New parameter detach_fork.
+
+2013-09-03  Joel Brobecker  <brobecker@adacore.com>
+
+	* solib-ia64-hpux.c (ia64_hpux_relocate_section_addresses):
+	Replace sec->bfd by sec->the_bfd_section->owner.
+
+2013-09-03  Yao Qi  <yao@codesourcery.com>
+
+	* linux-tdep.c (linux_is_uclinux): New function.  Code moved
+	from linux_has_shared_address_space.
+	(linux_has_shared_address_space): Call linux_is_uclinux.
+	* linux-tdep.h (linux_is_uclinux): Declare.
+	* m68klinux-tdep.c (m68k_linux_get_sigtramp_info): Call
+	linux_is_uclinux.
+
+2013-09-03  Yao Qi  <yao@codesourcery.com>
+
+	* config/djgpp/fnchange.lst: Remove entry of
+	i386-interix-nat.c and i386-interix-tdep.c.
+	* configure.ac: Remove '*-*-interix*'.
+	* configure: Re-generated.
+	* defs.h (enum gdb_osabi): Remove GDB_OSABI_INTERIX.
+	* i386-cygwin-tdep.c (i386_cygwin_osabi_sniffer): Remove
+	obsolete comments.
+	* osabi.c (gdb_osabi_names): Remove "Interix".
+
+2013-09-03  Yao Qi  <yao@codesourcery.com>
+
+	* arch-utils.c: Fix typo in the comment to gdbarch_update_p.
+
+2013-09-02  Markus Metzger  <markus.t.metzger@intel.com>
+
+	* record.h (record_print_flag) <record_print_src_line,
+	record_print_insn_range>: Rename into ...
+	(record_print_flag) <record_print_src_line,
+	record_print_insn_range>: ... this.  Update all users.
+
+2013-09-02  Pierre Muller  <muller@sourceware.org>
+
+	* windows-nat.c (windows_xfer_memory): Handle ERROR_PARTIAL_COPY
+	error code.
+
+2013-09-02  Pierre Muller  <muller@sourceware.org>
+
+	* windows-nat.c (windows_xfer_memory): Fix compilation failure
+	by use of plongest function.
+
+2013-09-02  Tristan Gingold  <gingold@adacore.com>
+
+	* NEWS: Add entry mentioning support for native Windows x64
+	SEH data.
+
+	* amd64-windows-tdep.c: #include "objfiles.h", "frame-unwind.h",
+	"coff/internal.h", "coff/i386.h", "coff/pe.h" and "libcoff.h".
+	(struct amd64_windows_frame_cache): New struct.
+	(amd64_windows_w2gdb_regnum): New global.
+	(pc_in_range, amd64_windows_frame_decode_epilogue)
+	(amd64_windows_frame_decode_insns, amd64_windows_find_unwind_info)
+	(amd64_windows_frame_cache, amd64_windows_frame_prev_register)
+	(amd64_windows_frame_this_id): New functions.
+	(amd64_windows_frame_unwind): New static global.
+	(amd64_windows_skip_prologue): New function.
+	(amd64_windows_init_abi): Call frame_unwind_prepend_unwinder
+	with amd64_windows_frame_unwind. Call set_gdbarch_skip_prologue
+	with amd64_windows_skip_prologue.
+
+2013-08-30  Joel Brobecker  <brobecker@adacore.com>
+
+	GDB 7.6.1 released.
+
+2013-08-30  Pedro Alves  <palves@redhat.com>
+
+	* mi/mi-main.c (mi_cmd_trace_find): Use LOC_AND_ADDRESS instead of
+	SRC_AND_LOC.
+
+2013-08-30  Pedro Alves  <palves@redhat.com>
+
+	* thread.c (restore_selected_frame): Use SRC_AND_LOC, and change
+	warning text.
+
+2013-08-30  Pedro Alves  <palves@redhat.com>
+
+	* bsd-kvm.c (bsd_kvm_open, bsd_kvm_proc_cmd, bsd_kvm_pcb_cmd):
+	Adjust arguments to print_stack_frame.
+
+2013-08-30  Pedro Alves  <palves@redhat.com>
+
+	* ada-tasks.c (task_command_1): Write SRC_AND_LOC instead '1'.
+
+2013-08-30  Pedro Alves  <palves@redhat.com>
+
+	* frame.h (show_and_print_stack_frame): Delete declaration.
+
 2013-08-30  Phil Muldoon  <pmuldoon@redhat.com>
 
 	PR python/15461
