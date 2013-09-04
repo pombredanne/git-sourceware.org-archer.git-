@@ -3984,6 +3984,20 @@ struct d_saved_scope
   const struct demangle_component *container;
 };
 
+/* XXX.  */
+static struct d_saved_scope *
+d_store_scope (const struct d_print_info *dpi,
+	       const struct demangle_component *container, int copy);
+
+/* XXX.  */
+static void
+d_restore_scope (struct d_print_info *dpi, struct d_saved_scope *scope,
+		 int free_after);
+
+/* XXX.  */
+static void
+d_free_scope (void *p);
+
 /* Returns a hash code for the saved scope referenced by p.  */
 
 static hashval_t
@@ -4043,6 +4057,9 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
   /* Magic variable to let reference smashing skip over the next modifier
      without needing to modify *dc.  */
   const struct demangle_component *mod_inner = NULL;
+
+  /* XXX.  */
+  struct d_saved_scope *saved_scope = NULL;
 
   if (dc == NULL)
     {
@@ -4420,7 +4437,8 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 	      dpi->saved_scopes = htab_create_alloc (1,
 						     d_hash_saved_scope,
 						     d_equal_saved_scope,
-						     free, xcalloc, free);
+						     free, xcalloc,
+						     d_free_scope);
 
 	    lookup.container = sub;
 	    slot = htab_find_slot (dpi->saved_scopes, &lookup, INSERT);
@@ -4429,14 +4447,14 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 		/* This is the first time SUB has been traversed.
 		   We need to capture some scope so it can be
 		   restored if SUB is reentered as a substitution.  */
-		*slot = d_scope_store (dpi, sub, 1);
+		*slot = d_store_scope (dpi, sub, 1);
 	      }
 	    else
 	      {
 		/* This traversal is reentering SUB as a substition.
 		   Restore the original scope temporarily.  */
-		saved_scope = d_scope_store (dpi, NULL, 0);
-		d_restore_scope (dpi, (struct d_saved_scope *) *slot);
+		saved_scope = d_store_scope (dpi, NULL, 0);
+		d_restore_scope (dpi, (struct d_saved_scope *) *slot, 0);
 	      }
 
 	    a = d_lookup_template_argument (dpi, sub);
@@ -4446,7 +4464,7 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 	    if (a == NULL)
 	      {
 		if (saved_scope != NULL)
-		  d_restore_and_free_scope (dpi, saved_scope);
+		  d_restore_scope (dpi, saved_scope, 1);
 
 		d_print_error (dpi);
 		return;
@@ -4496,7 +4514,7 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 	dpi->modifiers = dpm.next;
 
 	if (saved_scope != NULL)
-	  d_restore_and_free_scope (dpi, saved_scope);
+	  d_restore_scope (dpi, saved_scope, 1);
 
 	return;
       }
