@@ -1,7 +1,8 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <demangle.h>
 
-const char *symbol = "_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_" \
+const char *mangled = "_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_" \
   "4mime30multipart_section_processorObjIZ15get_body_parserIZZN14mime" \
   "_processor21make_section_iteratorERKNS2_INS3_10sectionObjENS0_10pt" \
   "rrefBaseEEEbENKUlvE_clEvEUlSB_bE_ZZNS6_21make_section_iteratorESB_" \
@@ -12,18 +13,31 @@ const char *symbol = "_ZSt7forwardIRN1x14refobjiteratorINS0_3refINS0_" \
 int
 main (int argc, char *argv[])
 {
-  const char *demangled =
-    cplus_demangle (symbol, DMGL_AUTO | DMGL_ANSI | DMGL_PARAMS);
+  const char *demangled;
+  FILE *fp;
 
-  FILE *fp = fopen ("test.in", "w");
+  fp = fopen ("test.in", "w");
   if (fp != NULL)
     {
-      fputs (symbol, fp);
+      fputs (mangled, fp);
       fclose (fp);
     }
 
+  demangled = cplus_demangle (mangled, DMGL_AUTO | DMGL_ANSI | DMGL_PARAMS);
+
   if (demangled == NULL)
-    puts ("Demangler failed");
-  else
-    puts (demangled);
+    {
+      puts ("Demangler failed");
+      exit (EXIT_FAILURE);
+    }
+  puts (demangled);
+
+  fp = fopen ("test.out", "w");
+  if (fp != NULL)
+    {
+      fputs (demangled, fp);
+      fclose (fp);
+    }
+
+  exit (EXIT_SUCCESS);
 }
