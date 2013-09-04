@@ -4429,13 +4429,13 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 		/* This is the first time SUB has been traversed.
 		   We need to capture some scope so it can be
 		   restored if SUB is reentered as a substitution.  */
-		*slot = d_scope_copy_store (dpi, sub);
+		*slot = d_scope_store (dpi, sub, 1);
 	      }
 	    else
 	      {
 		/* This traversal is reentering SUB as a substition.
 		   Restore the original scope temporarily.  */
-		saved_scope = d_scope_store (dpi, NULL);
+		saved_scope = d_scope_store (dpi, NULL, 0);
 		d_restore_scope (dpi, (struct d_saved_scope *) *slot);
 	      }
 
