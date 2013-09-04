@@ -4365,12 +4365,36 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 	const struct demangle_component *sub = d_left (dc);
 	if (sub->type == DEMANGLE_COMPONENT_TEMPLATE_PARAM)
 	  {
-	    struct demangle_component *a = d_lookup_template_argument (dpi, sub);
+	    struct demangle_component *a;
+	    struct d_scope lookup;
+	    void **slot;
+
+	    lookup.dc = sub;
+	    slot = htab_find_slot (dpi->scope_map, &lookup, INSERT);
+	    if (*slot == HTAB_EMPTY_ENTRY)
+	      {
+		/* This is the first time SUB has been traversed.
+		   We need to capture some scope so it can be
+		   restored if SUB is reentered as a substitution.  */
+		*slot = d_scope_copy_store (dpi, sub);
+	      }
+	    else
+	      {
+		/* This traversal is reentering SUB as a substition.
+		   Restore the original scope temporarily.  */
+		saved_scope = d_scope_store (dpi, NULL);
+		d_restore_scope (dpi, (struct d_scope *) *slot);
+	      }
+
+	    a = d_lookup_template_argument (dpi, sub);
 	    if (a && a->type == DEMANGLE_COMPONENT_TEMPLATE_ARGLIST)
 	      a = d_index_template_argument (a, dpi->pack_index);
 
 	    if (a == NULL)
 	      {
+		if (saved_scope != NULL)
+		  d_restore_and_free_scope (dpi, saved_scope);
+
 		d_print_error (dpi);
 		return;
 	      }
@@ -4417,6 +4441,9 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 	  d_print_mod (dpi, options, dc);
 
 	dpi->modifiers = dpm.next;
+
+	if (saved_scope != NULL)
+	  d_restore_and_free_scope (dpi, saved_scope);
 
 	return;
       }
