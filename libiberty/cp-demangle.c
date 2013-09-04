@@ -3987,7 +3987,7 @@ struct d_saved_scope
 /* Returns a hash code for the saved scope referenced by p.  */
 
 static hashval_t
-hash_saved_scope (const void *p)
+d_hash_saved_scope (const void *p)
 {
   const struct d_saved_scope *s = (const struct d_saved_scope *) p;
 
@@ -3998,7 +3998,7 @@ hash_saved_scope (const void *p)
    are equal.  */
 
 static int
-equal_saved_scope (const void *p1, const void *p2)
+d_equal_saved_scope (const void *p1, const void *p2)
 {
   const struct d_saved_scope *s1 = (const struct d_saved_scope *) p1;
   const struct d_saved_scope *s2 = (const struct d_saved_scope *) p2;
@@ -4418,8 +4418,8 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 
 	    if (dpi->saved_scopes == NULL)
 	      dpi->saved_scopes = htab_create_alloc (1,
-						     hash_saved_scope,
-						     equal_saved_scope,
+						     d_hash_saved_scope,
+						     d_equal_saved_scope,
 						     free, xcalloc, free);
 
 	    lookup.container = sub;
