@@ -4488,8 +4488,8 @@ d_print_comp_inner (struct d_print_info *dpi, int options,
 	      dpi->saved_scopes = htab_create_alloc (1,
 						     d_hash_saved_scope,
 						     d_equal_saved_scope,
-						     free, xcalloc,
-						     d_free_scope);
+						     d_free_scope,
+						     xcalloc, free);
 
 	    lookup.container = sub;
 	    slot = htab_find_slot (dpi->saved_scopes, &lookup, INSERT);
