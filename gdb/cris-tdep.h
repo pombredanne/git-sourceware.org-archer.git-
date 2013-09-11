@@ -1,6 +1,11 @@
-/* This testcase is part of GDB, the GNU debugger.
+/* Target dependent code for CRIS, for GDB, the GNU debugger.
 
-   Copyright 2012-2013 Free Software Foundation, Inc.
+   Copyright (C) 2001-2013 Free Software Foundation, Inc.
+
+   Contributed by Axis Communications AB.
+   Written by Hendrik Ruijter, Stefan Andersson, and Orjan Friberg.
+
+   This file is part of GDB.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,18 +20,15 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-enum e { I, J = 0xffffffffU, K = 0xf000000000000000ULL } e = J, f = K;
+#ifndef CRIS_TDEP_H
+#define CRIS_TDEP_H
 
-enum { ZERO };
-
-void
-dummy()
+/* CRIS architecture specific information.  */
+struct gdbarch_tdep
 {
-}
+  unsigned int cris_version;
+  const char *cris_mode;
+  int cris_dwarf2_cfi;
+};
 
-int
-main(void)
-{
-  dummy();
-  return ZERO; /* This is here to ensure it survives into the debug info.  */
-}
+#endif /* CRIS_TDEP_H */

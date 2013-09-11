@@ -1,4 +1,34 @@
-2013-09-13  Muhammad Bilal  <mbilal@codesourcery.com>
+2013-09-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/gnu-debugdata.exp (objcopy 1): Move it lower and use only
+	debug part of the binary.
+
+2013-09-11  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	* gdb.base/gnu-debugdata.exp (strip): Add -R .comment.
+	(addlink): Add comment.
+
+2013-09-10  Sanimir Agovic  <sanimir.agovic@intel.com>
+
+	* gdb.base/default.exp: Adjust regexpr for 'cd' to match optional
+	canonical pathname.
+
+2013-09-04  Doug Evans  <dje@google.com>
+
+	* gdb.python/py-events.py (exit_handler): Verify we get the expected
+	event.
+	(continue_handler, new_objfile_handler): Ditto.
+	(test_events): Rename command to "test-events".
+	(test_newobj_events): Rename command to "test-objfile-events".
+	* gdb.python/py-events.exp: Update.
+	* gdb.python/py-evsignal.exp: Update.
+	* gdb.python/py-evthreads.exp: Update.
+
+	* gdb.base/enumval.c (ZERO): New enum value.
+	(main): Use it
+	* gdb.base/enumval.exp: Test ability to print ZERO.
+
+2013-09-03  Muhammad Bilal  <mbilal@codesourcery.com>
             Pedro Alves  <palves@redhat.com>
 
 	* gdb.base/relocate.exp: Check that invalid options are

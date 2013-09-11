@@ -1,6 +1,7 @@
-/* This testcase is part of GDB, the GNU debugger.
+/* General utility routines for the remote server for GDB.
+   Copyright (C) 1993-2013 Free Software Foundation, Inc.
 
-   Copyright 2012-2013 Free Software Foundation, Inc.
+   This file is part of GDB.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,18 +16,17 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-enum e { I, J = 0xffffffffU, K = 0xf000000000000000ULL } e = J, f = K;
+#ifndef UTILS_H
+#define UTILS_H
 
-enum { ZERO };
+void perror_with_name (const char *string);
+void error (const char *string,...) ATTRIBUTE_NORETURN ATTRIBUTE_PRINTF (1, 2);
+void fatal (const char *string,...) ATTRIBUTE_NORETURN ATTRIBUTE_PRINTF (1, 2);
+void warning (const char *string,...) ATTRIBUTE_PRINTF (1, 2);
+char *paddress (CORE_ADDR addr);
+char *pulongest (ULONGEST u);
+char *plongest (LONGEST l);
+char *phex_nz (ULONGEST l, int sizeof_l);
+char *pfildes (gdb_fildes_t fd);
 
-void
-dummy()
-{
-}
-
-int
-main(void)
-{
-  dummy();
-  return ZERO; /* This is here to ensure it survives into the debug info.  */
-}
+#endif /* UTILS_H */

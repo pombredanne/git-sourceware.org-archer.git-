@@ -1679,7 +1679,7 @@ symfile_bfd_open (char *name)
   name = tilde_expand (name);	/* Returns 1st new malloc'd copy.  */
 
   /* Look down path for it, allocate 2nd new malloc'd copy.  */
-  desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, name,
+  desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST | OPF_RETURN_REALPATH, name,
 		O_RDONLY | O_BINARY, &absolute_name);
 #if defined(__GO32__) || defined(_WIN32) || defined (__CYGWIN__)
   if (desc < 0)
@@ -1687,8 +1687,8 @@ symfile_bfd_open (char *name)
       char *exename = alloca (strlen (name) + 5);
 
       strcat (strcpy (exename, name), ".exe");
-      desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST, exename,
-		    O_RDONLY | O_BINARY, &absolute_name);
+      desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST | OPF_RETURN_REALPATH,
+		    exename, O_RDONLY | O_BINARY, &absolute_name);
     }
 #endif
   if (desc < 0)
@@ -2233,7 +2233,6 @@ add_symbol_file_command (char *args, int from_tty)
 	{
 	  /* It's an option (starting with '-') or it's an argument
 	     to an option.  */
-	    
 	  if (expecting_sec_name)
 	    {
 	      sect_opts[section_index].name = arg;

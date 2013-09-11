@@ -1,3 +1,170 @@
+2013-09-10  Andreas Arnez  <arnez@linux.vnet.ibm.com>
+
+	* config/s390/s390.mh (NATDEPFILES): Add linux-waitpid.o.
+
+2013-09-09  Andrew Burgess  <aburgess@broadcom.com>
+
+	* top.c (quit_confirm): Remove use of deprecated_init_ui_hook.
+
+2013-09-06  Pedro Alves <palves@redhat.com>
+
+	* remote-sim.c (dump_mem, gdbsim_fetch_register)
+	(gdbsim_store_register, gdbsim_kill, gdbsim_load)
+	(gdbsim_create_inferior, gdbsim_open, gdbsim_close)
+	(gdbsim_detach, gdbsim_resume_inferior, gdbsim_wait)
+	(gdbsim_files_info, gdbsim_mourn_inferior): Send debug output to
+	gdb_stdlog.
+
+2013-09-06  Pedro Alves  <palves@redhat.com>
+
+	* remote-sim.c (dump_mem): Constify buf parameter.
+	gdbsim_xfer_inferior_memory): Rename to ...
+	(gdbsim_xfer_memory): ... this.  Adjust interface as
+	target_xfer_partial helper.
+	(gdbsim_xfer_partial): New function.
+	(init_gdbsim_ops): Don't install a deprecated_xfer_memory hook.
+	Install a to_xfer_partial hook.  Send output to gdb_stdlog.
+
+2013-09-06  Pedro Alves  <palves@redhat.com>
+
+	* remote-sim.c (gdbsim_xfer_inferior_memory): Use
+	host_address_to_string, and send debug output to gdb_stdlog.
+
+2013-09-06  Ricard Wanderlof  <ricardw@axis.com>
+
+	* Makefile.in (ALL_TARGET_OBS): Add cris-linux-tdep.o.
+	* configure.tgt: Add cris-linux-tdep.o and linux-tdep.o to
+	gdb_target_obs for cris target.
+	* cris-tdep.c (struct gdbarch_tdep): Move to cris-tdep.h.
+	(cris_gdbarch_init): Move calls to
+	set_gdbarch_fetch_tls_load_module_address and
+	set_solib_svr4_fetch_link_map_offsets to cris-linux-tdep.c.
+	Add call to gdbarch_init_osabi.
+	* cris-linux-tdep.c: New file.
+	* cris-tdep.h: New file.
+
+2013-09-06  Andrew Burgess  <aburgess@broadcom.com>
+
+	* tui/tui-io.c (tui_initialize_io): Remove legacy comment referring
+	to deprecated_init_ui_hook.
+
+2013-09-06  Andrew Burgess  <aburgess@broadcom.com>
+
+	* cli/cli-interp.c (_initialize_cli_interp): Add a
+	command_loop_proc to interp_procs.
+	* event-top.c (cli_command_loop): Change signature to match
+	interp_command_loop_ftype.
+	* event-top.h (cli_command_loop): Same.
+	* interps.c (interp_new): Require every interpreter to have a
+	command_loop_proc.
+	(current_interp_command_loop): Just call the command_loop_proc on
+	the current interpreter.
+	* tui/tui-interp.c (_initialize_tui_interp): Add a
+	command_loop_proc to interp_procs.
+
+2013-09-06  Ricard Wanderlof  <ricardw@axis.com>
+
+	* cris-tdep.c (cris_gdbarch_init): Add call to
+	get_gdbarch_fetch_tls_load_module_address.
+
+2013-09-06  Ricard Wanderlof  <ricardw@axis.com>
+
+	* cris-tdep.c (cris_elf_greg_t): Rename from elf_greg_t.
+	(cris_elf_gregset_t): Rename from elf_gregset_t.
+	(crisv32_elf_gregset_t): Adjust.
+	(cris_supply_gregset, fetch_core_registers): Adjust.
+
+2013-09-06  Ricard Wanderlof  <ricardw@axis.com>
+
+	* cris-tdep.c (elf_greg_t): Change typedef to unsigned char[4]
+
+2013-09-05  Andrew Burgess  <aburgess@broadcom.com>
+
+	* defs.h (deprecated_command_loop_hook): Remove, including
+	references in comments.
+	* interps.c (current_interp_command_loop): No longer use
+	deprecated_command_loop_hook.
+	(clear_interpreter_hooks): Remove deprecated_command_loop_hook
+	setup.
+	* top.c (deprecated_command_loop_hook): Remove.
+
+2013-09-05  Pedro Alves  <palves@redhat.com>
+
+	* dwarf2loc.c (dwarf2_evaluate_loc_desc_full): 'dwarf_regnum'
+	local is now int instead of ULONGEST.  Print it with %d
+	instead of paddress.
+
+2013-09-05  Tristan Gingold  <gingold@adacore.com>
+
+	* MAINTAINERS: Remove avr maintainership.
+
+2013-09-05  Pedro Alves  <palves@redhat.com>
+
+	* findvar.c (value_of_register): Rework in terms of
+	value_of_register_lazy.
+
+2013-09-05  Muhammad Bilal  <mbilal@codesourcery.com>
+
+	* symfile.c (add_symbol_file_command): Remove trailing
+	 whitespaces and blank line after comment.
+
+2013-09-05  Pedro Alves  <palves@redhat.com>
+
+	* tui/tui-regs.c (tui_register_format): Don't look at the
+	register's name here.  Return string representing register
+	value instead of storing it in the data element.
+	(tui_get_register): Compare register string representations
+	instead of register value states and contents.
+
+2013-09-05  Pedro Alves  <palves@redhat.com>
+
+	PR tui/15933
+	* tui/tui-regs.c (tui_show_registers): Show registers of the
+	selected frame, not the current frame.
+
+2013-09-05  Ricard Wanderlof  <ricardw@axis.com>
+
+	* MAINTAINERS (Write After Approval): Add myself to the list.
+
+2013-09-04  Doug Evans  <dje@google.com>
+
+	* dwarf2read.c (queue_and_load_all_dwo_tus): New function.
+	(queue_and_load_dwo_tu): New function.
+	(lookup_dwo_signatured_type): Set per_cu.tu_read.
+	(maybe_queue_comp_unit): Rename this_cu argument to dependent_cu.
+	Make dependent_cu optional.
+	(dw2_do_instantiate_symtab): If we just loaded a CU from a DWO,
+	and an older .gdb_index is in use, queue and load all its TUs too.
+
+2013-09-04  Jan Kratochvil  <jan.kratochvil@redhat.com>
+
+	Code cleanup: Change OPF_DISABLE_REALPATH to OPF_RETURN_REALPATH.
+	* cli/cli-cmds.c (find_and_open_script): Add OPF_RETURN_REALPATH to
+	variable search_flags.
+	* defs.h (OPF_DISABLE_REALPATH): Rename to ...
+	(OPF_RETURN_REALPATH): ... here.
+	* dwarf2read.c (try_open_dwop_file): Set OPF_RETURN_REALPATH for flags.
+	* exec.c (exec_file_attach): Remove OPF_DISABLE_REALPATH from openp
+	call.  Twice.
+	* nto-tdep.c (nto_find_and_open_solib): Add OPF_RETURN_REALPATH for
+	openp call.
+	* solib.c (solib_find): Likewise.  Four times.
+	* source.c (openp): Change OPF_DISABLE_REALPATH to OPF_RETURN_REALPATH
+	in the function comment and for the realpath_fptr variable.
+	(source_full_path_of): Add OPF_RETURN_REALPATH for openp call.
+	(find_and_open_source): Likewise.  Twice.
+	* symfile.c (symfile_bfd_open): Likewise, also twice.
+
+2013-09-04  Doug Evans  <dje@google.com>
+
+	* progspace.c (save_current_space_and_thread): Remove unnecessary
+	call to save_current_inferior.
+
+2013-09-04  Andrew Burgess  <aburgess@broadcom.com>
+
+	* sh64-tdep.c (sh64_do_register): Return after printing message
+	about unavailable register contents.
+
 2013-09-04  Muhammad Bilal  <mbilal@codesourcery.com>
             Pedro Alves  <palves@redhat.com>
 
