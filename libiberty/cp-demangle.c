@@ -3956,7 +3956,9 @@ d_print_subexpr (struct d_print_info *dpi, int options,
     d_append_char (dpi, ')');
 }
 
-/* XXX.  */
+/* Return a shallow copy of the current list of templates.
+   On error d_print_error is called and a partial list may
+   be returned.  Whatever is returned must be freed.  */
 
 static struct d_print_template *
 d_copy_templates (struct d_print_info *dpi)
