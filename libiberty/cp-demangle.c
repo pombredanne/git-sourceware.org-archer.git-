@@ -128,7 +128,6 @@ extern char *alloca ();
 #include "libiberty.h"
 #include "demangle.h"
 #include "cp-demangle.h"
-#include "hashtab.h"
 
 /* If IN_GLIBCPP_V3 is defined, some functions are made static.  We
    also rename them via #define to avoid compiler errors when the
@@ -276,6 +275,23 @@ struct d_growable_string
   int allocation_failure;
 };
 
+/* A demangle component and some scope captured when it was first
+   traversed.  */
+
+struct d_saved_scope
+{
+  /* The component whose scope this is.  Used to lookup scopes in
+     the saved_scopes array in d_print_info.  May be NULL if this
+     scope will not be inserted into that array.  */
+  const struct demangle_component *container;
+  /* Nonzero if the below items are copies and require freeing
+     when this scope is freed.  */
+  int is_copy;
+  /* The list of templates, if any, that was current when this
+     scope was captured.  */
+  struct d_print_template *templates;
+};
+
 enum { D_PRINT_BUFFER_LENGTH = 256 };
 struct d_print_info
 {
@@ -303,10 +319,10 @@ struct d_print_info
   int pack_index;
   /* Number of d_print_flush calls so far.  */
   unsigned long int flush_count;
-  /* Table mapping demangle components to scopes saved when first
-     traversing those components.  These are used while evaluating
-     substitutions.  */
-  htab_t saved_scopes;
+  /* Array of saved scopes for evaluating substitutions.  */
+  struct d_saved_scope *saved_scopes;
+  /* Number of saved scopes in the above array.  */
+  int num_saved_scopes;
 };
 
 #ifdef CP_DEMANGLE_DEBUG
@@ -3672,6 +3688,7 @@ d_print_init (struct d_print_info *dpi, demangle_callbackref callback,
   dpi->demangle_failure = 0;
 
   dpi->saved_scopes = NULL;
+  dpi->num_saved_scopes = 0;
 }
 
 /* Free a print information structure.  */
@@ -3680,7 +3697,7 @@ static void
 d_print_free (struct d_print_info *dpi)
 {
   if (dpi->saved_scopes != NULL)
-    htab_delete (dpi->saved_scopes);
+    free (dpi->saved_scopes);
 }
 
 /* Indicate that an error occurred during printing, and test for error.  */
@@ -3932,28 +3949,11 @@ d_print_subexpr (struct d_print_info *dpi, int options,
     d_append_char (dpi, ')');
 }
 
-/* A demangle component and some scope captured when it was first
-   traversed.  */
-
-struct d_saved_scope
-{
-  /* The component whose scope this is.  Used as the key for the
-     saved_scopes hashtable in d_print_info.  May be NULL if this
-     scope will not be inserted into that table.  */
-  const struct demangle_component *container;
-  /* Nonzero if the below items are copies and require freeing
-     when this scope is freed.  */
-  int is_copy;
-  /* The list of templates, if any, that was current when this
-     scope was captured.  */
-  struct d_print_template *templates;
-};
-
 /* Allocate a scope and populate it with the current values from DPI.
    CONTAINER is the demangle component to which the scope refers, and
-   is used as the key for the saved_scopes hashtable in d_print_info.
+   is used to look up items in the saved_scopes array in d_print_info.
    CONTAINER may be NULL if this scope will not be inserted into that
-   table.  If COPY is nonzero then items that may have been allocated
+   array.  If COPY is nonzero then items that may have been allocated
    on the stack will be copied before storing.  */
 
 static struct d_saved_scope *
@@ -4016,28 +4016,6 @@ d_restore_scope (struct d_print_info *dpi, struct d_saved_scope *scope,
 
   if (free_after)
     d_free_scope (scope);
-}
-
-/* Returns a hash code for the saved scope referenced by p.  */
-
-static hashval_t
-d_hash_saved_scope (const void *p)
-{
-  const struct d_saved_scope *s = (const struct d_saved_scope *) p;
-
-  return htab_hash_pointer (s->container);
-}
-
-/* Returns non-zero if the saved scopes referenced by p1 and p2
-   are equal.  */
-
-static int
-d_equal_saved_scope (const void *p1, const void *p2)
-{
-  const struct d_saved_scope *s1 = (const struct d_saved_scope *) p1;
-  const struct d_saved_scope *s2 = (const struct d_saved_scope *) p2;
-
-  return s1->container == s2->container;
 }
 
 /* Subroutine to handle components.  */
