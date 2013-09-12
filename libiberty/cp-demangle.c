@@ -3691,23 +3691,20 @@ d_print_init (struct d_print_info *dpi, demangle_callbackref callback,
 static void
 d_print_free (struct d_print_info *dpi)
 {
-  if (dpi->saved_scopes != NULL)
+  int i;
+
+  for (i = 0; i < dpi->num_saved_scopes; i++)
     {
-      int i;
+      struct d_print_template *ts, *tn;
 
-      for (i = 0; i < dpi->num_saved_scopes; i++)
+      for (ts = dpi->saved_scopes[i].templates; ts != NULL; ts = tn)
 	{
-	  struct d_print_template *ts, *tn;
-
-	  for (ts = dpi->saved_scopes[i].templates; ts != NULL; ts = tn)
-	    {
-	      tn = ts->next;
-	      free (ts);
-	    }
+	  tn = ts->next;
+	  free (ts);
 	}
-
-      free (dpi->saved_scopes);
     }
+
+  free (dpi->saved_scopes);
 }
 
 /* Indicate that an error occurred during printing, and test for error.  */
