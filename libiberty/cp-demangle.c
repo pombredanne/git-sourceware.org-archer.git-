@@ -280,13 +280,8 @@ struct d_growable_string
 
 struct d_saved_scope
 {
-  /* The component whose scope this is.  Used to lookup scopes in
-     the saved_scopes array in d_print_info.  May be NULL if this
-     scope will not be inserted into that array.  */
+  /* The component whose scope this is.  */
   const struct demangle_component *container;
-  /* Nonzero if the below items are copies and require freeing
-     when this scope is freed.  */
-  int is_copy;
   /* The list of templates, if any, that was current when this
      scope was captured.  */
   struct d_print_template *templates;
@@ -3697,7 +3692,22 @@ static void
 d_print_free (struct d_print_info *dpi)
 {
   if (dpi->saved_scopes != NULL)
-    free (dpi->saved_scopes);
+    {
+      int i;
+
+      for (i = 0; i < dpi->num_saved_scopes; i++)
+	{
+	  struct d_print_template *ts, *tn;
+
+	  for (ts = dpi->saved_scopes[i].templates; ts != NULL; ts = tn)
+	    {
+	      tn = ts->next;
+	      free (ts);
+	    }
+	}
+
+      free (dpi->saved_scopes);
+    }
 }
 
 /* Indicate that an error occurred during printing, and test for error.  */
@@ -3949,73 +3959,32 @@ d_print_subexpr (struct d_print_info *dpi, int options,
     d_append_char (dpi, ')');
 }
 
-/* Allocate a scope and populate it with the current values from DPI.
-   CONTAINER is the demangle component to which the scope refers, and
-   is used to look up items in the saved_scopes array in d_print_info.
-   CONTAINER may be NULL if this scope will not be inserted into that
-   array.  If COPY is nonzero then items that may have been allocated
-   on the stack will be copied before storing.  */
+/* XXX.  */
 
-static struct d_saved_scope *
-d_store_scope (const struct d_print_info *dpi,
-	       const struct demangle_component *container, int copy)
+static struct d_print_template *
+d_copy_templates (struct d_print_info *dpi)
 {
-  struct d_saved_scope *scope = XNEW (struct d_saved_scope);
+  struct d_print_template *src, *result, **link = &result;
 
-  scope->container = container;
-  scope->is_copy = copy;
-
-  if (copy)
+  for (src = dpi->templates; src != NULL; src = src->next)
     {
-      struct d_print_template *ts, **tl = &scope->templates;
+      struct d_print_template *dst =
+	malloc (sizeof (struct d_print_template));
 
-      for (ts = dpi->templates; ts != NULL; ts = ts->next)
+      if (dst == NULL)
 	{
-	  struct d_print_template *td = XNEW (struct d_print_template);
-
-	  *tl = td;
-	  tl = &td->next;
-	  td->template_decl = ts->template_decl;
+	  d_print_error (dpi);
+	  break;
 	}
-      *tl = NULL;
-    }
-  else
-    scope->templates = dpi->templates;
 
-  return scope;
-}
-
-/* Free a scope allocated by d_store_scope.  */
-
-static void
-d_free_scope (void *p)
-{
-  struct d_saved_scope *scope = (struct d_saved_scope *) p;
-
-  if (scope->is_copy)
-    {
-      struct d_print_template *ts, *tn;
-
-      for (ts = scope->templates; ts != NULL; ts = tn)
-	{
-	  tn = ts->next;
-	  free (ts);
-	}
+      dst->template_decl = src->template_decl;
+      *link = dst;
+      link = &dst->next;
     }
 
-  free (scope);
-}
+  *link = NULL;
 
-/* Restore a stored scope to DPI, optionally freeing it afterwards.  */
-
-static void
-d_restore_scope (struct d_print_info *dpi, struct d_saved_scope *scope,
-		 int free_after)
-{
-  dpi->templates = scope->templates;
-
-  if (free_after)
-    d_free_scope (scope);
+  return result;
 }
 
 /* Subroutine to handle components.  */
@@ -4028,9 +3997,12 @@ d_print_comp (struct d_print_info *dpi, int options,
      without needing to modify *dc.  */
   const struct demangle_component *mod_inner = NULL;
 
-  /* Variable used to store the current scope while a previously
+  /* Variable used to store the current templates while a previously
      captured scope is used.  */
-  struct d_saved_scope *saved_scope = NULL;
+  struct d_print_template *saved_templates;
+
+  /* Nonzero if templates have been stored in the above variable.  */
+  int need_template_restore = 0;
 
   if (dc == NULL)
     {
@@ -4401,31 +4373,44 @@ d_print_comp (struct d_print_info *dpi, int options,
 	if (sub->type == DEMANGLE_COMPONENT_TEMPLATE_PARAM)
 	  {
 	    struct demangle_component *a;
-	    struct d_saved_scope lookup;
-	    void **slot;
+	    struct d_saved_scope *scope = NULL, *scopes;
+	    int i;
 
-	    if (dpi->saved_scopes == NULL)
-	      dpi->saved_scopes = htab_create_alloc (1,
-						     d_hash_saved_scope,
-						     d_equal_saved_scope,
-						     d_free_scope,
-						     xcalloc, free);
+	    for (i = 0; i < dpi->num_saved_scopes; i++)
+	      if (dpi->saved_scopes[i].container == sub)
+		scope = &dpi->saved_scopes[i];
 
-	    lookup.container = sub;
-	    slot = htab_find_slot (dpi->saved_scopes, &lookup, INSERT);
-	    if (*slot == HTAB_EMPTY_ENTRY)
+	    if (scope == NULL)
 	      {
 		/* This is the first time SUB has been traversed.
-		   We need to capture some scope so it can be
-		   restored if SUB is reentered as a substitution.  */
-		*slot = d_store_scope (dpi, sub, 1);
+		   We need to capture the current templates so
+		   they can be restored if SUB is reentered as a
+		   substitution.  */
+		++dpi->num_saved_scopes;
+		scopes = realloc (dpi->saved_scopes,
+				  sizeof (struct d_saved_scope)
+				  * dpi->num_saved_scopes);
+		if (scopes == NULL)
+		  {
+		    d_print_error (dpi);
+		    return;
+		  }
+
+		dpi->saved_scopes = scopes;
+		scope = dpi->saved_scopes + (dpi->num_saved_scopes - 1);
+
+		scope->container = sub;
+		scope->templates = d_copy_templates (dpi);
+		if (d_print_saw_error (dpi))
+		  return;
 	      }
 	    else
 	      {
 		/* This traversal is reentering SUB as a substition.
-		   Restore the original scope temporarily.  */
-		saved_scope = d_store_scope (dpi, NULL, 0);
-		d_restore_scope (dpi, (struct d_saved_scope *) *slot, 0);
+		   Restore the original templates temporarily.  */
+		saved_templates = dpi->templates;
+		dpi->templates = scope->templates;
+		need_template_restore = 1;
 	      }
 
 	    a = d_lookup_template_argument (dpi, sub);
@@ -4434,8 +4419,8 @@ d_print_comp (struct d_print_info *dpi, int options,
 
 	    if (a == NULL)
 	      {
-		if (saved_scope != NULL)
-		  d_restore_scope (dpi, saved_scope, 1);
+		if (need_template_restore)
+		  dpi->templates = saved_templates;
 
 		d_print_error (dpi);
 		return;
@@ -4484,8 +4469,8 @@ d_print_comp (struct d_print_info *dpi, int options,
 
 	dpi->modifiers = dpm.next;
 
-	if (saved_scope != NULL)
-	  d_restore_scope (dpi, saved_scope, 1);
+	if (need_template_restore)
+	  dpi->templates = saved_templates;
 
 	return;
       }
