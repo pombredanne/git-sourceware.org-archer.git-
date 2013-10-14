@@ -1131,9 +1131,12 @@ gdbpy_cli (PyObject *unused1, PyObject *unused2)
 {
   if (! running_python_script || in_cli)
     return PyErr_Format (PyExc_RuntimeError, "cannot invoke CLI recursively");
+  
+  if (ui_out_is_mi_like_p (current_uiout))
+    return PyErr_Format (PyExc_RuntimeError, _("Cannot invoke CLI from MI."));
 
   in_cli = 1;
-  cli_command_loop ();
+  current_interp_command_loop ();
   in_cli = 0;
 
   Py_RETURN_NONE;
