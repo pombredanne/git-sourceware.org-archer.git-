@@ -197,8 +197,13 @@ struct value
      reset, be sure to consider this use as well!  */
   unsigned int lazy : 1;
 
-  /* If nonzero, this is the value of a variable which does not
-     actually exist in the program.  */
+  /* If nonzero, this is the value of a variable that does not
+     actually exist in the program.  If nonzero, and LVAL is
+     lval_register, this is a register ($pc, $sp, etc., never a
+     program variable) that has not been saved in the frame.  All
+     optimized-out values are treated pretty much the same, except
+     registers have a different string representation and related
+     error strings.  */
   unsigned int optimized_out : 1;
 
   /* If value is a variable, is it initialized or not.  */
@@ -350,6 +355,26 @@ value_entirely_available (struct value *value)
 
   if (VEC_empty (range_s, value->unavailable))
     return 1;
+  return 0;
+}
+
+int
+value_entirely_unavailable (struct value *value)
+{
+  /* We can only tell whether the whole value is available when we try
+     to read it.  */
+  if (value->lazy)
+    value_fetch_lazy (value);
+
+  if (VEC_length (range_s, value->unavailable) == 1)
+    {
+      struct range *t = VEC_index (range_s, value->unavailable, 0);
+
+      if (t->offset == 0
+	  && t->length == TYPE_LENGTH (value_enclosing_type (value)))
+	return 1;
+    }
+
   return 0;
 }
 
@@ -687,7 +712,7 @@ allocate_value_lazy (struct type *type)
 
 /* Allocate the contents of VAL if it has not been allocated yet.  */
 
-void
+static void
 allocate_value_contents (struct value *val)
 {
   if (!val->contents)
@@ -882,11 +907,22 @@ value_actual_type (struct value *value, int resolve_simple_types,
   return result;
 }
 
+void
+error_value_optimized_out (void)
+{
+  error (_("value has been optimized out"));
+}
+
 static void
 require_not_optimized_out (const struct value *value)
 {
   if (value->optimized_out)
-    error (_("value has been optimized out"));
+    {
+      if (value->lval == lval_register)
+	error (_("register has not been saved in frame"));
+      else
+	error_value_optimized_out ();
+    }
 }
 
 static void
@@ -2773,18 +2809,18 @@ value_fn_field (struct value **arg1p, struct fn_field *f,
   struct type *ftype = TYPE_FN_FIELD_TYPE (f, j);
   const char *physname = TYPE_FN_FIELD_PHYSNAME (f, j);
   struct symbol *sym;
-  struct minimal_symbol *msym;
+  struct bound_minimal_symbol msym;
 
   sym = lookup_symbol (physname, 0, VAR_DOMAIN, 0);
   if (sym != NULL)
     {
-      msym = NULL;
+      memset (&msym, 0, sizeof (msym));
     }
   else
     {
       gdb_assert (sym == NULL);
-      msym = lookup_minimal_symbol (physname, NULL, NULL);
-      if (msym == NULL)
+      msym = lookup_bound_minimal_symbol (physname);
+      if (msym.minsym == NULL)
 	return NULL;
     }
 
@@ -2797,12 +2833,12 @@ value_fn_field (struct value **arg1p, struct fn_field *f,
     {
       /* The minimal symbol might point to a function descriptor;
 	 resolve it to the actual code address instead.  */
-      struct objfile *objfile = msymbol_objfile (msym);
+      struct objfile *objfile = msym.objfile;
       struct gdbarch *gdbarch = get_objfile_arch (objfile);
 
       set_value_address (v,
 	gdbarch_convert_from_func_ptr_addr
-	   (gdbarch, SYMBOL_VALUE_ADDRESS (msym), &current_target));
+	   (gdbarch, SYMBOL_VALUE_ADDRESS (msym.minsym), &current_target));
     }
 
   if (arg1p)
@@ -3168,10 +3204,7 @@ value_from_contents_and_address (struct type *type,
   if (valaddr == NULL)
     v = allocate_value_lazy (type);
   else
-    {
-      v = allocate_value (type);
-      memcpy (value_contents_raw (v), valaddr, TYPE_LENGTH (type));
-    }
+    v = value_from_contents (type, valaddr);
   set_value_address (v, address);
   VALUE_LVAL (v) = lval_memory;
   return v;
@@ -3567,6 +3600,23 @@ value_fetch_lazy (struct value *val)
   return 0;
 }
 
+/* Implementation of the convenience function $_isvoid.  */
+
+static struct value *
+isvoid_internal_fn (struct gdbarch *gdbarch,
+		    const struct language_defn *language,
+		    void *cookie, int argc, struct value **argv)
+{
+  int ret;
+
+  if (argc != 1)
+    error (_("You must provide one argument for $_isvoid."));
+
+  ret = TYPE_CODE (value_type (argv[0])) == TYPE_CODE_VOID;
+
+  return value_from_longest (builtin_type (gdbarch)->builtin_int, ret);
+}
+
 void
 _initialize_values (void)
 {
@@ -3599,4 +3649,10 @@ VARIABLE is already initialized."));
   add_prefix_cmd ("function", no_class, function_command, _("\
 Placeholder command for showing help on convenience functions."),
 		  &functionlist, "function ", 0, &cmdlist);
+
+  add_internal_function ("_isvoid", _("\
+Check whether an expression is void.\n\
+Usage: $_isvoid (expression)\n\
+Return 1 if the expression is void, zero otherwise."),
+			 isvoid_internal_fn, NULL);
 }

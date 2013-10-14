@@ -1151,8 +1151,8 @@ sym_info (char *arg, int from_tty)
 	   a pagination request inside printf_filtered.  */
 	old_chain = make_cleanup (xfree, loc_string);
 
-	gdb_assert (osect->objfile && osect->objfile->name);
-	obj_name = osect->objfile->name;
+	gdb_assert (osect->objfile && objfile_name (osect->objfile));
+	obj_name = objfile_name (osect->objfile);
 
 	if (MULTI_OBJFILE_P ())
 	  if (pc_in_unmapped_range (addr, osect))
@@ -1201,7 +1201,7 @@ address_info (char *exp, int from_tty)
   struct gdbarch *gdbarch;
   int regno;
   struct symbol *sym;
-  struct minimal_symbol *msymbol;
+  struct bound_minimal_symbol msymbol;
   long val;
   struct obj_section *section;
   CORE_ADDR load_addr, context_pc = 0;
@@ -1227,14 +1227,14 @@ address_info (char *exp, int from_tty)
 	  return;
 	}
 
-      msymbol = lookup_minimal_symbol (exp, NULL, NULL);
+      msymbol = lookup_bound_minimal_symbol (exp);
 
-      if (msymbol != NULL)
+      if (msymbol.minsym != NULL)
 	{
-	  struct objfile *objfile = msymbol_objfile (msymbol);
+	  struct objfile *objfile = msymbol.objfile;
 
 	  gdbarch = get_objfile_arch (objfile);
-	  load_addr = SYMBOL_VALUE_ADDRESS (msymbol);
+	  load_addr = SYMBOL_VALUE_ADDRESS (msymbol.minsym);
 
 	  printf_filtered ("Symbol \"");
 	  fprintf_symbol_filtered (gdb_stdout, exp,
@@ -1242,7 +1242,7 @@ address_info (char *exp, int from_tty)
 	  printf_filtered ("\" is at ");
 	  fputs_filtered (paddress (gdbarch, load_addr), gdb_stdout);
 	  printf_filtered (" in a file compiled without debugging");
-	  section = SYMBOL_OBJ_SECTION (objfile, msymbol);
+	  section = SYMBOL_OBJ_SECTION (objfile, msymbol.minsym);
 	  if (section_is_overlay (section))
 	    {
 	      load_addr = overlay_unmapped_address (load_addr, section);
@@ -1383,7 +1383,7 @@ address_info (char *exp, int from_tty)
 	      printf_filtered (_("a thread-local variable at offset %s "
 				 "in the thread-local storage for `%s'"),
 			       paddress (gdbarch, load_addr),
-			       section->objfile->name);
+			       objfile_name (section->objfile));
 	    else
 	      {
 		printf_filtered (_("static storage at address "));

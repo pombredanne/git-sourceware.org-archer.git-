@@ -2283,17 +2283,28 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
 	case DWARF_VALUE_REGISTER:
 	  {
 	    struct gdbarch *arch = get_frame_arch (frame);
-	    ULONGEST dwarf_regnum = value_as_long (dwarf_expr_fetch (ctx, 0));
+	    int dwarf_regnum
+	      = longest_to_int (value_as_long (dwarf_expr_fetch (ctx, 0)));
 	    int gdb_regnum = gdbarch_dwarf2_reg_to_regnum (arch, dwarf_regnum);
 
 	    if (byte_offset != 0)
 	      error (_("cannot use offset on synthetic pointer to register"));
 	    do_cleanups (value_chain);
-	    if (gdb_regnum != -1)
-	      retval = value_from_register (type, gdb_regnum, frame);
-	    else
-	      error (_("Unable to access DWARF register number %s"),
-		     paddress (arch, dwarf_regnum));
+	   if (gdb_regnum == -1)
+	      error (_("Unable to access DWARF register number %d"),
+		     dwarf_regnum);
+	   retval = value_from_register (type, gdb_regnum, frame);
+	   if (value_optimized_out (retval))
+	     {
+	       /* This means the register has undefined value / was
+		  not saved.  As we're computing the location of some
+		  variable etc. in the program, not a value for
+		  inspecting a register ($pc, $sp, etc.), return a
+		  generic optimized out value instead, so that we show
+		  <optimized out> instead of <not saved>.  */
+	       do_cleanups (value_chain);
+	       retval = allocate_optimized_out_value (type);
+	     }
 	  }
 	  break;
 
@@ -2303,11 +2314,9 @@ dwarf2_evaluate_loc_desc_full (struct type *type, struct frame_info *frame,
 	    int in_stack_memory = dwarf_expr_fetch_in_stack_memory (ctx, 0);
 
 	    do_cleanups (value_chain);
-	    retval = allocate_value_lazy (type);
-	    VALUE_LVAL (retval) = lval_memory;
+	    retval = value_at_lazy (type, address + byte_offset);
 	    if (in_stack_memory)
 	      set_value_stack (retval, 1);
-	    set_value_address (retval, address + byte_offset);
 	  }
 	  break;
 
@@ -3488,7 +3497,7 @@ locexpr_describe_location_piece (struct symbol *symbol, struct ui_file *stream,
       fprintf_filtered (stream, 
 			_("a thread-local variable at offset 0x%s "
 			  "in the thread-local storage for `%s'"),
-			phex_nz (offset, addr_size), objfile->name);
+			phex_nz (offset, addr_size), objfile_name (objfile));
 
       data += 1 + addr_size + 1;
     }
@@ -3511,7 +3520,7 @@ locexpr_describe_location_piece (struct symbol *symbol, struct ui_file *stream,
       fprintf_filtered (stream, 
 			_("a thread-local variable at offset 0x%s "
 			  "in the thread-local storage for `%s'"),
-			phex_nz (offset, addr_size), objfile->name);
+			phex_nz (offset, addr_size), objfile_name (objfile));
       ++data;
     }
 

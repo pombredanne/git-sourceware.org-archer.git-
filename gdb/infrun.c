@@ -132,8 +132,12 @@ int sync_execution = 0;
 
 static ptid_t previous_inferior_ptid;
 
-/* Default behavior is to detach newly forked processes (legacy).  */
-int detach_fork = 1;
+/* If set (default for legacy reasons), when following a fork, GDB
+   will detach from one of the fork branches, child or parent.
+   Exactly which branch is detached depends on 'set follow-fork-mode'
+   setting.  */
+
+static int detach_fork = 1;
 
 int debug_displaced = 0;
 static void
@@ -497,7 +501,7 @@ follow_fork (void)
 
 	/* Tell the target to do whatever is necessary to follow
 	   either parent or child.  */
-	if (target_follow_fork (follow_child))
+	if (target_follow_fork (follow_child, detach_fork))
 	  {
 	    /* Target refused to follow, or there's some other reason
 	       we shouldn't resume.  */
@@ -2603,14 +2607,15 @@ print_target_wait_results (ptid_t waiton_ptid, ptid_t result_ptid,
      is set.  */
 
   fprintf_unfiltered (tmp_stream,
-		      "infrun: target_wait (%d", PIDGET (waiton_ptid));
-  if (PIDGET (waiton_ptid) != -1)
+		      "infrun: target_wait (%d", ptid_get_pid (waiton_ptid));
+  if (ptid_get_pid (waiton_ptid) != -1)
     fprintf_unfiltered (tmp_stream,
 			" [%s]", target_pid_to_str (waiton_ptid));
   fprintf_unfiltered (tmp_stream, ", status) =\n");
   fprintf_unfiltered (tmp_stream,
 		      "infrun:   %d [%s],\n",
-		      PIDGET (result_ptid), target_pid_to_str (result_ptid));
+		      ptid_get_pid (result_ptid),
+		      target_pid_to_str (result_ptid));
   fprintf_unfiltered (tmp_stream,
 		      "infrun:   %s\n",
 		      status_string);
@@ -3421,6 +3426,9 @@ handle_inferior_event (struct execution_control_state *ecs)
       handle_vfork_child_exec_or_exit (0);
       target_terminal_ours ();	/* Must do this before mourn anyway.  */
 
+      /* Clearing any previous state of convenience variables.  */
+      clear_exit_convenience_vars ();
+
       if (ecs->ws.kind == TARGET_WAITKIND_EXITED)
 	{
 	  /* Record the exit code in the convenience variable $_exitcode, so
@@ -3435,7 +3443,34 @@ handle_inferior_event (struct execution_control_state *ecs)
 	  print_exited_reason (ecs->ws.value.integer);
 	}
       else
-	print_signal_exited_reason (ecs->ws.value.sig);
+	{
+	  struct regcache *regcache = get_thread_regcache (ecs->ptid);
+	  struct gdbarch *gdbarch = get_regcache_arch (regcache);
+
+	  if (gdbarch_gdb_signal_to_target_p (gdbarch))
+	    {
+	      /* Set the value of the internal variable $_exitsignal,
+		 which holds the signal uncaught by the inferior.  */
+	      set_internalvar_integer (lookup_internalvar ("_exitsignal"),
+				       gdbarch_gdb_signal_to_target (gdbarch,
+							  ecs->ws.value.sig));
+	    }
+	  else
+	    {
+	      /* We don't have access to the target's method used for
+		 converting between signal numbers (GDB's internal
+		 representation <-> target's representation).
+		 Therefore, we cannot do a good job at displaying this
+		 information to the user.  It's better to just warn
+		 her about it (if infrun debugging is enabled), and
+		 give up.  */
+	      if (debug_infrun)
+		fprintf_filtered (gdb_stdlog, _("\
+Cannot fill $_exitsignal with the correct signal number.\n"));
+	    }
+
+	  print_signal_exited_reason (ecs->ws.value.sig);
+	}
 
       gdb_flush (gdb_stdout);
       target_mourn_inferior ();
@@ -4939,7 +4974,7 @@ process_event_stop_test:
 		 or stepped back out of a signal handler to the first instruction
 		 of the function.  Just keep going, which will single-step back
 		 to the caller.  */
-	      if (ecs->stop_func_start != stop_pc)
+	      if (ecs->stop_func_start != stop_pc && ecs->stop_func_start != 0)
 		{
 		  struct symtab_and_line sr_sal;
 
@@ -6098,7 +6133,7 @@ normal_stop (void)
 	     LOCATION: Print only location
 	     SRC_AND_LOC: Print location and source line.  */
 	  if (do_frame_printing)
-	    print_stack_frame (get_selected_frame (NULL), 0, source_flag);
+	    print_stack_frame (get_selected_frame (NULL), 0, source_flag, 1);
 
 	  /* Display the auto-display expressions.  */
 	  do_displays ();
@@ -7055,6 +7090,15 @@ save_inferior_ptid (void)
   saved_ptid_ptr = xmalloc (sizeof (ptid_t));
   *saved_ptid_ptr = inferior_ptid;
   return make_cleanup (restore_inferior_ptid, saved_ptid_ptr);
+}
+
+/* See inferior.h.  */
+
+void
+clear_exit_convenience_vars (void)
+{
+  clear_internalvar (lookup_internalvar ("_exitsignal"));
+  clear_internalvar (lookup_internalvar ("_exitcode"));
 }
 
 

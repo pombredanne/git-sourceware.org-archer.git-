@@ -1166,7 +1166,7 @@ AC_CHECK_FUNCS([canonicalize_file_name realpath getrusage getuid getgid \
 		sigaction sigprocmask sigsetmask socketpair syscall \
 		ttrace wborder wresize setlocale iconvlist libiconvlist btowc \
 		setrlimit getrlimit posix_madvise waitpid lstat \
-		fdwalk pipe2])
+		fdwalk pipe2 ptrace64])
 AM_LANGINFO_CODESET
 
 # Check the return and argument types of ptrace.  No canned test for
@@ -1207,7 +1207,7 @@ AC_CACHE_CHECK([types of arguments for ptrace], gdb_cv_func_ptrace_args, [
 for gdb_arg1 in 'int' 'long'; do
  for gdb_arg2 in 'pid_t' 'int' 'long'; do
   for gdb_arg3 in 'int *' 'caddr_t' 'int' 'long' 'void *'; do
-   for gdb_arg4 in 'int' 'long'; do
+   for gdb_arg4 in 'int' 'long' 'void *'; do
      AC_TRY_COMPILE($gdb_ptrace_headers, [
 extern $gdb_cv_func_ptrace_ret
   ptrace ($gdb_arg1, $gdb_arg2, $gdb_arg3, $gdb_arg4);
@@ -1234,6 +1234,8 @@ IFS=$ac_save_IFS
 shift
 AC_DEFINE_UNQUOTED(PTRACE_TYPE_ARG3, $[3],
   [Define to the type of arg 3 for ptrace.])
+AC_DEFINE_UNQUOTED(PTRACE_TYPE_ARG4, $[4],
+  [Define to the type of arg 4 for ptrace.])
 if test -n "$[5]"; then
   AC_DEFINE_UNQUOTED(PTRACE_TYPE_ARG5, $[5],
     [Define to the type of arg 5 for ptrace.])
@@ -1393,7 +1395,7 @@ fi
 
 if test "${target}" = "${host}"; then
   case "${host}" in
-  *-*-sysv4.2* | *-*-sysv5* | *-*-interix* )
+  *-*-sysv4.2* | *-*-sysv5* )
       AC_DEFINE(NEW_PROC_API, 1,
       [Define if you want to use new multi-fd /proc interface
        (replaces HAVE_MULTIPLE_PROC_FDS as well as other macros).])
@@ -1917,11 +1919,6 @@ if test "${ERROR_ON_WARNING}" = yes ; then
     WERROR_CFLAGS="-Werror"
 fi
 
-# The entries after -Wno-pointer-sign are disabled warnings which may
-# be enabled in the future, which can not currently be used to build
-# GDB.
-# NOTE: If you change this list, remember to update
-# gdb/doc/gdbint.texinfo.
 build_warnings="-Wall -Wdeclaration-after-statement -Wpointer-arith \
 -Wpointer-sign \
 -Wno-unused -Wunused-value -Wunused-function \

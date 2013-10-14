@@ -63,8 +63,6 @@ DEFINE_REGISTRY (objfile, REGISTRY_ACCESS_FIELD)
 /* Externally visible variables that are owned by this module.
    See declarations in objfile.h for more info.  */
 
-struct objfile *rt_common_objfile;	/* For runtime common symbols */
-
 struct objfile_pspace_info
 {
   struct obj_section **sections;
@@ -139,7 +137,10 @@ get_objfile_bfd_data (struct objfile *objfile, struct bfd *abfd)
 
   if (storage == NULL)
     {
-      if (abfd != NULL)
+      /* If the object requires gdb to do relocations, we simply fall
+	 back to not sharing data across users.  These cases are rare
+	 enough that this seems reasonable.  */
+      if (abfd != NULL && !gdb_bfd_requires_relocations (abfd))
 	{
 	  storage = bfd_zalloc (abfd, sizeof (struct objfile_per_bfd_storage));
 	  set_bfd_data (abfd, objfiles_bfd_data, storage);
@@ -147,6 +148,10 @@ get_objfile_bfd_data (struct objfile *objfile, struct bfd *abfd)
       else
 	storage = OBSTACK_ZALLOC (&objfile->objfile_obstack,
 				  struct objfile_per_bfd_storage);
+
+      /* Look up the gdbarch associated with the BFD.  */
+      if (abfd != NULL)
+	storage->gdbarch = gdbarch_from_bfd (abfd);
 
       obstack_init (&storage->storage_obstack);
       storage->filename_cache = bcache_xmalloc (NULL, NULL);
@@ -163,6 +168,8 @@ free_objfile_per_bfd_storage (struct objfile_per_bfd_storage *storage)
 {
   bcache_xfree (storage->filename_cache);
   bcache_xfree (storage->macro_cache);
+  if (storage->demangled_names_hash)
+    htab_delete (storage->demangled_names_hash);
   obstack_free (&storage->storage_obstack, 0);
 }
 
@@ -247,6 +254,11 @@ build_objfile_section_table (struct objfile *objfile)
    into the list of all known objfiles, and return a pointer to the
    new objfile struct.
 
+   NAME should contain original non-canonicalized filename or other
+   identifier as entered by user.  If there is no better source use
+   bfd_get_filename (ABFD).  NAME may be NULL only if ABFD is NULL.
+   NAME content is copied into returned objfile.
+
    The FLAGS word contains various bits (OBJF_*) that can be taken as
    requests for specific operations.  Other bits like OBJF_SHARED are
    simply copied through to the new objfile flags member.  */
@@ -261,7 +273,7 @@ build_objfile_section_table (struct objfile *objfile)
    things in a consistent state even if abfd is NULL.  */
 
 struct objfile *
-allocate_objfile (bfd *abfd, int flags)
+allocate_objfile (bfd *abfd, const char *name, int flags)
 {
   struct objfile *objfile;
 
@@ -274,6 +286,15 @@ allocate_objfile (bfd *abfd, int flags)
 
   objfile_alloc_data (objfile);
 
+  if (name == NULL)
+    {
+      gdb_assert (abfd == NULL);
+      gdb_assert ((flags & OBJF_NOT_FILENAME) != 0);
+      name = "<<anonymous objfile>>";
+    }
+  objfile->original_name = obstack_copy0 (&objfile->objfile_obstack, name,
+					  strlen (name));
+
   /* Update the per-objfile information that comes from the bfd, ensuring
      that any data that is reference is saved in the per-objfile data
      region.  */
@@ -282,18 +303,10 @@ allocate_objfile (bfd *abfd, int flags)
   gdb_bfd_ref (abfd);
   if (abfd != NULL)
     {
-      /* Look up the gdbarch associated with the BFD.  */
-      objfile->gdbarch = gdbarch_from_bfd (abfd);
-
-      objfile->name = bfd_get_filename (abfd);
       objfile->mtime = bfd_get_mtime (abfd);
 
       /* Build section table.  */
       build_objfile_section_table (objfile);
-    }
-  else
-    {
-      objfile->name = "<<anonymous objfile>>";
     }
 
   objfile->per_bfd = get_objfile_bfd_data (objfile, abfd);
@@ -335,7 +348,7 @@ allocate_objfile (bfd *abfd, int flags)
 struct gdbarch *
 get_objfile_arch (struct objfile *objfile)
 {
-  return objfile->gdbarch;
+  return objfile->per_bfd->gdbarch;
 }
 
 /* If there is a valid and known entry point, function fills *ENTRY_P with it
@@ -612,9 +625,6 @@ free_objfile (struct objfile *objfile)
   if (objfile == symfile_objfile)
     symfile_objfile = NULL;
 
-  if (objfile == rt_common_objfile)
-    rt_common_objfile = NULL;
-
   /* Before the symbol table code was redone to make it easier to
      selectively load and remove information particular to a specific
      linkage unit, gdb used to do these things whenever the monolithic
@@ -642,21 +652,18 @@ free_objfile (struct objfile *objfile)
       clear_current_source_symtab_and_line ();
   }
 
-  /* The last thing we do is free the objfile struct itself.  */
-
   if (objfile->global_psymbols.list)
     xfree (objfile->global_psymbols.list);
   if (objfile->static_psymbols.list)
     xfree (objfile->static_psymbols.list);
   /* Free the obstacks for non-reusable objfiles.  */
   psymbol_bcache_free (objfile->psymbol_cache);
-  if (objfile->demangled_names_hash)
-    htab_delete (objfile->demangled_names_hash);
   obstack_free (&objfile->objfile_obstack, 0);
 
   /* Rebuild section map next time we need it.  */
   get_objfile_pspace_data (objfile->pspace)->section_map_dirty = 1;
 
+  /* The last thing we do is free the objfile struct itself.  */
   xfree (objfile);
 }
 
@@ -1272,10 +1279,10 @@ filter_overlapping_sections (struct obj_section **map, int map_size)
 			   " (A) section `%s' from `%s' [%s, %s)\n"
 			   " (B) section `%s' from `%s' [%s, %s).\n"
 			   "Will ignore section B"),
-			 bfd_section_name (abfd1, bfds1), objf1->name,
+			 bfd_section_name (abfd1, bfds1), objfile_name (objf1),
 			 paddress (gdbarch, sect1_addr),
 			 paddress (gdbarch, sect1_endaddr),
-			 bfd_section_name (abfd2, bfds2), objf2->name,
+			 bfd_section_name (abfd2, bfds2), objfile_name (objf2),
 			 paddress (gdbarch, sect2_addr),
 			 paddress (gdbarch, sect2_endaddr));
 	    }
@@ -1484,6 +1491,17 @@ default_iterate_over_objfiles_in_search_order
        if (stop)
 	 return;
     }
+}
+
+/* Return canonical name for OBJFILE.  */
+
+const char *
+objfile_name (const struct objfile *objfile)
+{
+  if (objfile->obfd != NULL)
+    return bfd_get_filename (objfile->obfd);
+
+  return objfile->original_name;
 }
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */

@@ -65,7 +65,7 @@
 /* In 32-bit compilation mode (which is the only mode from which ptrace()
    works on 4.3), __ld_info32 is #defined as equivalent to ld_info.  */
 
-#ifdef __ld_info32
+#if defined (__ld_info32) || defined (__ld_info64)
 # define ARCH3264
 #endif
 
@@ -131,7 +131,11 @@ regmap (struct gdbarch *gdbarch, int regno, int *isfloat)
 static int
 rs6000_ptrace32 (int req, int id, int *addr, int data, int *buf)
 {
+#ifdef HAVE_PTRACE64
+  int ret = ptrace64 (req, id, (uintptr_t) addr, data, buf);
+#else
   int ret = ptrace (req, id, (int *)addr, data, buf);
+#endif
 #if 0
   printf ("rs6000_ptrace32 (%d, %d, 0x%x, %08x, 0x%x) = 0x%x\n",
 	  req, id, (unsigned int)addr, data, (unsigned int)buf, ret);
@@ -145,7 +149,11 @@ static int
 rs6000_ptrace64 (int req, int id, long long addr, int data, void *buf)
 {
 #ifdef ARCH3264
+#  ifdef HAVE_PTRACE64
+  int ret = ptrace64 (req, id, addr, data, buf);
+#  else
   int ret = ptracex (req, id, addr, data, buf);
+#  endif
 #else
   int ret = 0;
 #endif
@@ -172,7 +180,7 @@ fetch_register (struct regcache *regcache, int regno)
 
   /* Floating-point registers.  */
   if (isfloat)
-    rs6000_ptrace32 (PT_READ_FPR, PIDGET (inferior_ptid), addr, nr, 0);
+    rs6000_ptrace32 (PT_READ_FPR, ptid_get_pid (inferior_ptid), addr, nr, 0);
 
   /* Bogus register number.  */
   else if (nr < 0)
@@ -188,14 +196,15 @@ fetch_register (struct regcache *regcache, int regno)
   else
     {
       if (!ARCH64 ())
-	*addr = rs6000_ptrace32 (PT_READ_GPR, PIDGET (inferior_ptid),
+	*addr = rs6000_ptrace32 (PT_READ_GPR, ptid_get_pid (inferior_ptid),
 				 (int *) nr, 0, 0);
       else
 	{
 	  /* PT_READ_GPR requires the buffer parameter to point to long long,
 	     even if the register is really only 32 bits.  */
 	  long long buf;
-	  rs6000_ptrace64 (PT_READ_GPR, PIDGET (inferior_ptid), nr, 0, &buf);
+	  rs6000_ptrace64 (PT_READ_GPR, ptid_get_pid (inferior_ptid),
+			   nr, 0, &buf);
 	  if (register_size (gdbarch, regno) == 8)
 	    memcpy (addr, &buf, 8);
 	  else
@@ -234,7 +243,7 @@ store_register (struct regcache *regcache, int regno)
 
   /* Floating-point registers.  */
   if (isfloat)
-    rs6000_ptrace32 (PT_WRITE_FPR, PIDGET (inferior_ptid), addr, nr, 0);
+    rs6000_ptrace32 (PT_WRITE_FPR, ptid_get_pid (inferior_ptid), addr, nr, 0);
 
   /* Bogus register number.  */
   else if (nr < 0)
@@ -260,7 +269,7 @@ store_register (struct regcache *regcache, int regno)
          the register's value is passed by value, but for 64-bit inferiors,
 	 the address of a buffer containing the value is passed.  */
       if (!ARCH64 ())
-	rs6000_ptrace32 (PT_WRITE_GPR, PIDGET (inferior_ptid),
+	rs6000_ptrace32 (PT_WRITE_GPR, ptid_get_pid (inferior_ptid),
 			 (int *) nr, *addr, 0);
       else
 	{
@@ -271,7 +280,8 @@ store_register (struct regcache *regcache, int regno)
 	    memcpy (&buf, addr, 8);
 	  else
 	    buf = *addr;
-	  rs6000_ptrace64 (PT_WRITE_GPR, PIDGET (inferior_ptid), nr, 0, &buf);
+	  rs6000_ptrace64 (PT_WRITE_GPR, ptid_get_pid (inferior_ptid),
+			   nr, 0, &buf);
 	}
     }
 
@@ -558,9 +568,10 @@ exec_one_dummy_insn (struct regcache *regcache)
   prev_pc = regcache_read_pc (regcache);
   regcache_write_pc (regcache, DUMMY_INSN_ADDR);
   if (ARCH64 ())
-    ret = rs6000_ptrace64 (PT_CONTINUE, PIDGET (inferior_ptid), 1, 0, NULL);
+    ret = rs6000_ptrace64 (PT_CONTINUE, ptid_get_pid (inferior_ptid),
+			   1, 0, NULL);
   else
-    ret = rs6000_ptrace32 (PT_CONTINUE, PIDGET (inferior_ptid),
+    ret = rs6000_ptrace32 (PT_CONTINUE, ptid_get_pid (inferior_ptid),
 			   (int *) 1, 0, NULL);
 
   if (ret != 0)
@@ -568,9 +579,9 @@ exec_one_dummy_insn (struct regcache *regcache)
 
   do
     {
-      pid = waitpid (PIDGET (inferior_ptid), &status, 0);
+      pid = waitpid (ptid_get_pid (inferior_ptid), &status, 0);
     }
-  while (pid != PIDGET (inferior_ptid));
+  while (pid != ptid_get_pid (inferior_ptid));
 
   regcache_write_pc (regcache, prev_pc);
   deprecated_remove_raw_breakpoint (gdbarch, bp);

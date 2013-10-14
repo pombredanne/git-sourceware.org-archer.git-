@@ -144,13 +144,6 @@ int saved_command_line_size = 100;
    is issuing commands too.  */
 int server_command;
 
-/* Baud rate specified for talking to serial target systems.  Default
-   is left as -1, so targets can choose their own defaults.  */
-/* FIXME: This means that "show remotebaud" and gr_files_info can
-   print -1 or (unsigned int)-1.  This is a Bad User Interface.  */
-
-int baud_rate = -1;
-
 /* Timeout limit for response from target.  */
 
 /* The default value has been changed many times over the years.  It 
@@ -198,11 +191,6 @@ void (*deprecated_init_ui_hook) (char *argv0);
    otherwise.  */
 
 int (*deprecated_ui_loop_hook) (int);
-
-/* Called instead of command_loop at top level.  Can be invoked via
-   throw_exception().  */
-
-void (*deprecated_command_loop_hook) (void);
 
 
 /* Called from print_frame_info to list the line we stopped in.  */
@@ -1153,7 +1141,7 @@ Type \"show configuration\" for configuration details.");
 resources online at:\n<http://www.gnu.org/software/gdb/documentation/>.\n"));
   fprintf_filtered (stream, _("For help, type \"help\".\n"));
   fprintf_filtered (stream, _("Type \"apropos word\" to search for \
-commands related to \"word\".\n"));
+commands related to \"word\"."));
 }
 
 /* Print the details of GDB build-time configuration.  */
@@ -1360,18 +1348,9 @@ quit_confirm (void)
   stb = mem_fileopen ();
   old_chain = make_cleanup_ui_file_delete (stb);
 
-  /* This is something of a hack.  But there's no reliable way to see
-     if a GUI is running.  The `use_windows' variable doesn't cut
-     it.  */
-  if (deprecated_init_ui_hook)
-    fprintf_filtered (stb, _("A debugging session is active.\n"
-			     "Do you still want to close the debugger?"));
-  else
-    {
-      fprintf_filtered (stb, _("A debugging session is active.\n\n"));
-      iterate_over_inferiors (print_inferior_quit_action, stb);
-      fprintf_filtered (stb, _("\nQuit anyway? "));
-    }
+  fprintf_filtered (stb, _("A debugging session is active.\n\n"));
+  iterate_over_inferiors (print_inferior_quit_action, stb);
+  fprintf_filtered (stb, _("\nQuit anyway? "));
 
   str = ui_file_xstrdup (stb, NULL);
   make_cleanup (xfree, str);
@@ -1433,7 +1412,8 @@ quit_force (char *args, int from_tty)
   /* Save the history information if it is appropriate to do so.  */
   DO_TRY
     {
-      if (write_history_p && history_filename)
+      if (write_history_p && history_filename
+	  && input_from_terminal_p ())
 	write_history (history_filename);
     }
   DO_PRINT_EX;

@@ -1874,7 +1874,10 @@ static PyMethodDef GdbMethods[] =
   { "history", gdbpy_history, METH_VARARGS,
     "Get a value from history" },
   { "execute", (PyCFunction) execute_gdb_command, METH_VARARGS | METH_KEYWORDS,
-    "Execute a gdb command" },
+    "execute (command [, from_tty] [, to_string]) -> [String]\n\
+Evaluate command, a string, as a gdb CLI command.  Optionally returns\n\
+a Python String containing the output of the command if to_string is\n\
+set to True." },
   { "cli", gdbpy_cli, METH_NOARGS,
     "Enter the gdb CLI" },
   { "parameter", gdbpy_parameter, METH_VARARGS,
