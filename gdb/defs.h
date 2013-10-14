@@ -311,8 +311,6 @@ extern void print_transfer_performance (struct ui_file *stream,
 
 typedef void initialize_file_ftype (void);
 
-extern char *skip_quoted (char *);
-
 extern char *gdb_readline (char *);
 
 extern char *gdb_readline_wrapper (char *);
@@ -346,8 +344,10 @@ extern const char *pc_prefix (CORE_ADDR);
 
 /* From source.c */
 
+/* See openp function definition for their description.  */
 #define OPF_TRY_CWD_FIRST     0x01
 #define OPF_SEARCH_IN_PATH    0x02
+#define OPF_RETURN_REALPATH   0x04
 
 extern int openp (const char *, int, const char *, int, char **);
 
@@ -585,7 +585,6 @@ enum gdb_osabi
   GDB_OSABI_WINCE,
   GDB_OSABI_GO32,
   GDB_OSABI_IRIX,
-  GDB_OSABI_INTERIX,
   GDB_OSABI_HPUX_ELF,
   GDB_OSABI_HPUX_SOM,
   GDB_OSABI_QNXNTO,
@@ -702,10 +701,8 @@ extern int watchdog;
 extern char *interpreter_p;
 
 /* If a given interpreter matches INTERPRETER_P then it should update
-   deprecated_command_loop_hook and deprecated_init_ui_hook with the
-   per-interpreter implementation.  */
-/* FIXME: deprecated_command_loop_hook and deprecated_init_ui_hook
-   should be moved here.  */
+   deprecated_init_ui_hook with the per-interpreter implementation.  */
+/* FIXME: deprecated_init_ui_hook should be moved here.  */
 
 struct target_waitstatus;
 struct cmd_list_element;
@@ -715,7 +712,6 @@ extern void (*deprecated_post_add_symbol_hook) (void);
 extern void (*selected_frame_level_changed_hook) (int);
 extern int (*deprecated_ui_loop_hook) (int signo);
 extern void (*deprecated_init_ui_hook) (char *argv0);
-extern void (*deprecated_command_loop_hook) (void);
 extern void (*deprecated_show_load_progress) (const char *section,
 					      unsigned long section_sent, 
 					      unsigned long section_size, 
@@ -754,18 +750,6 @@ extern int (*deprecated_ui_load_progress_hook) (const char *section,
 /* Inhibit window interface if non-zero.  */
 
 extern int use_windows;
-
-/* Provide default definitions of PIDGET, TIDGET, and MERGEPID.
-   The name ``TIDGET'' is a historical accident.  Many uses of TIDGET
-   in the code actually refer to a lightweight process id, i.e,
-   something that can be considered a process id in its own right for
-   certain purposes.  */
-
-#ifndef PIDGET
-#define PIDGET(PTID) (ptid_get_pid (PTID))
-#define TIDGET(PTID) (ptid_get_lwp (PTID))
-#define MERGEPID(PID, TID) ptid_build (PID, TID, 0)
-#endif
 
 /* If this definition isn't overridden by the header files, assume
    that isatty and fileno exist on this system.  */

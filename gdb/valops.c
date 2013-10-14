@@ -150,12 +150,12 @@ find_function_in_inferior (const char *name, struct objfile **objf_p)
     }
   else
     {
-      struct minimal_symbol *msymbol = 
-	lookup_minimal_symbol (name, NULL, NULL);
+      struct bound_minimal_symbol msymbol = 
+	lookup_bound_minimal_symbol (name);
 
-      if (msymbol != NULL)
+      if (msymbol.minsym != NULL)
 	{
-	  struct objfile *objfile = msymbol_objfile (msymbol);
+	  struct objfile *objfile = msymbol.objfile;
 	  struct gdbarch *gdbarch = get_objfile_arch (objfile);
 
 	  struct type *type;
@@ -163,7 +163,7 @@ find_function_in_inferior (const char *name, struct objfile **objf_p)
 	  type = lookup_pointer_type (builtin_type (gdbarch)->builtin_char);
 	  type = lookup_function_type (type);
 	  type = lookup_pointer_type (type);
-	  maddr = SYMBOL_VALUE_ADDRESS (msymbol);
+	  maddr = SYMBOL_VALUE_ADDRESS (msymbol.minsym);
 
 	  if (objf_p)
 	    *objf_p = objfile;
@@ -2026,14 +2026,12 @@ do_search_struct_field (const char *name, struct value *arg1, int offset,
 	    {
 	      CORE_ADDR base_addr;
 
-	      v2  = allocate_value (basetype);
 	      base_addr = value_address (arg1) + boffset;
+	      v2 = value_at_lazy (basetype, base_addr);
 	      if (target_read_memory (base_addr, 
 				      value_contents_raw (v2),
-				      TYPE_LENGTH (basetype)) != 0)
+				      TYPE_LENGTH (value_type (v2))) != 0)
 		error (_("virtual baseclass botch"));
-	      VALUE_LVAL (v2) = lval_memory;
-	      set_value_address (v2, base_addr);
 	    }
 	  else
 	    {
@@ -2264,7 +2262,7 @@ value_struct_elt (struct value **argp, struct value **args,
     {
       *argp = value_ind (*argp);
       /* Don't coerce fn pointer to fn and then back again!  */
-      if (TYPE_CODE (value_type (*argp)) != TYPE_CODE_FUNC)
+      if (TYPE_CODE (check_typedef (value_type (*argp))) != TYPE_CODE_FUNC)
 	*argp = coerce_array (*argp);
       t = check_typedef (value_type (*argp));
     }
@@ -2428,7 +2426,7 @@ value_find_oload_method_list (struct value **argp, const char *method,
     {
       *argp = value_ind (*argp);
       /* Don't coerce fn pointer to fn and then back again!  */
-      if (TYPE_CODE (value_type (*argp)) != TYPE_CODE_FUNC)
+      if (TYPE_CODE (check_typedef (value_type (*argp))) != TYPE_CODE_FUNC)
 	*argp = coerce_array (*argp);
       t = check_typedef (value_type (*argp));
     }

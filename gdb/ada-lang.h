@@ -114,6 +114,16 @@ enum ada_renaming_category
     ADA_SUBPROGRAM_RENAMING
   };
 
+/* The different types of catchpoints that we introduced for catching
+   Ada exceptions.  */
+
+enum ada_exception_catchpoint_kind
+{
+  ada_catch_exception,
+  ada_catch_exception_unhandled,
+  ada_catch_assert
+};
+
 /* Ada task structures.  */
 
 struct ada_task_info
@@ -239,7 +249,7 @@ extern void ada_lookup_encoded_symbol
   (const char *name, const struct block *block, domain_enum namespace,
    struct ada_symbol_info *symbol_info);
 
-extern struct minimal_symbol *ada_lookup_simple_minsym (const char *);
+extern struct bound_minimal_symbol ada_lookup_simple_minsym (const char *);
 
 extern void ada_fill_in_ada_prototype (struct symbol *);
 
@@ -373,6 +383,11 @@ extern char *ada_breakpoint_rewrite (char *, int *);
 extern char *ada_main_name (void);
 
 extern char *ada_name_for_lookup (const char *name);
+
+extern void create_ada_exception_catchpoint
+  (struct gdbarch *gdbarch, enum ada_exception_catchpoint_kind ex_kind,
+   char *excep_string, char *cond_string, int tempflag, int disabled,
+   int from_tty);
 
 /* Tasking-related: ada-tasks.c */
 

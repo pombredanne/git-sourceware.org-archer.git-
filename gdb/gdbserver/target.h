@@ -21,11 +21,14 @@
 #ifndef TARGET_H
 #define TARGET_H
 
-#include "target-common.h"
+#include "target/resume.h"
+#include "target/wait.h"
+#include "target/waitstatus.h"
 
 struct emit_ops;
 struct btrace_target_info;
 struct buffer;
+struct process_info;
 
 /* This structure describes how to resume a particular thread (or all
    threads) based on the client's request.  If thread is -1, then this

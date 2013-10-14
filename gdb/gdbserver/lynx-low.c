@@ -27,6 +27,7 @@
 #include <sys/types.h>
 #include "gdb_wait.h"
 #include <signal.h>
+#include "filestuff.h"
 
 int using_threads = 1;
 
@@ -240,6 +241,8 @@ lynx_create_inferior (char *program, char **allargs)
     {
       int pgrp;
 
+      close_most_fds ();
+
       /* Switch child to its own process group so that signals won't
          directly affect gdbserver. */
       pgrp = getpid();
@@ -259,6 +262,42 @@ lynx_create_inferior (char *program, char **allargs)
   return pid;
 }
 
+/* Assuming we've just attached to a running inferior whose pid is PID,
+   add all threads running in that process.  */
+
+static void
+lynx_add_threads_after_attach (int pid)
+{
+  /* Ugh!  There appears to be no way to get the list of threads
+     in the program we just attached to.  So get the list by calling
+     the "ps" command.  This is only needed now, as we will then
+     keep the thread list up to date thanks to thread creation and
+     exit notifications.  */
+  FILE *f;
+  char buf[256];
+  int thread_pid, thread_tid;
+
+  f = popen ("ps atx", "r");
+  if (f == NULL)
+    perror_with_name ("Cannot get thread list");
+
+  while (fgets (buf, sizeof (buf), f) != NULL)
+    if ((sscanf (buf, "%d %d", &thread_pid, &thread_tid) == 2
+	 && thread_pid == pid))
+    {
+      ptid_t thread_ptid = lynx_ptid_build (pid, thread_tid);
+
+      if (!find_thread_ptid (thread_ptid))
+	{
+	  lynx_debug ("New thread: (pid = %d, tid = %d)",
+		      pid, thread_tid);
+	  add_thread (thread_ptid, NULL);
+	}
+    }
+
+  pclose (f);
+}
+
 /* Implement the attach target_ops method.  */
 
 static int
@@ -271,7 +310,7 @@ lynx_attach (unsigned long pid)
 	   strerror (errno), errno);
 
   lynx_add_process (pid, 1);
-  add_thread (ptid, NULL);
+  lynx_add_threads_after_attach (pid);
 
   return 0;
 }

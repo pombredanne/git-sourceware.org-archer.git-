@@ -3,6 +3,35 @@
 
 *** Changes since GDB 7.6
 
+* GDB now supports Fission DWP file format version 2.
+  http://gcc.gnu.org/wiki/DebugFission
+
+* New convenience function "$_isvoid", to check whether an expression
+  is void.  A void expression is an expression where the type of the
+  result is "void".  For example, some convenience variables may be
+  "void" when evaluated (e.g., "$_exitcode" before the execution of
+  the program being debugged; or an undefined convenience variable).
+  Another example, when calling a function whose return type is
+  "void".
+
+* The "maintenance print objfiles" command now takes an optional regexp.
+
+* The "catch syscall" command now works on arm*-linux* targets.
+
+* GDB now consistently shows "<not saved>" when printing values of
+  registers the debug info indicates have not been saved in the frame
+  and there's nowhere to retrieve them from
+  (callee-saved/call-clobbered registers):
+
+    (gdb) p $rax
+    $1 = <not saved>
+
+    (gdb) info registers rax
+    rax            <not saved>
+
+  Before, the former would print "<optimized out>", and the latter
+  "*value not available*".
+
 * Python scripting
 
   ** Frame filters and frame decorators have been added.
@@ -12,6 +41,19 @@
 Nios II ELF 			nios2*-*-elf
 Nios II GNU/Linux		nios2*-*-linux
 Texas Instruments MSP430	msp430*-*-elf
+
+* Removed native configurations
+
+Support for these a.out NetBSD and OpenBSD obsolete configurations has
+been removed.  ELF variants of these configurations are kept supported.
+
+arm*-*-netbsd*              but arm*-*-netbsdelf*       is kept supported.
+i[34567]86-*-netbsd*        but i[34567]86-*-netbsdelf* is kept supported.
+i[34567]86-*-openbsd[0-2].* but i[34567]86-*-openbsd*   is kept supported.
+i[34567]86-*-openbsd3.[0-3]
+m68*-*-netbsd*              but m68*-*-netbsdelf*       is kept supported.
+sparc-*-netbsd*             but sparc-*-netbsdelf*      is kept supported.
+vax-*-netbsd*               but vax-*-netbsdelf*        is kept supported.
 
 * New commands:
 catch rethrow
@@ -33,6 +75,11 @@ maint set|show per-command symtab
   Enable display of per-command gdb resource usage.
 
 * New options
+
+set debug symfile off|on
+show debug symfile
+  Control display of debugging info regarding reading symbol files and
+  symbol tables within those files
 
 set print raw frame-arguments
 show print raw frame-arguments
@@ -75,6 +122,10 @@ show range-stepping
 * The exception-related catchpoints, like "catch throw", now accept a
   regular expression which can be used to filter exceptions by type.
 
+* The new convenience variable $_exitsignal is automatically set to
+  the terminating signal number when the program being debugged dies
+  due to an uncaught signal.
+
 * MI changes
 
   ** The -trace-save MI command can optionally save trace buffer in Common
@@ -89,6 +140,18 @@ show range-stepping
   ** The new command -trace-frame-collected dumps collected variables,
      computed expressions, tvars, memory and registers in a traceframe.
 
+  ** The commands -stack-list-locals, -stack-list-arguments and
+     -stack-list-variables now accept an option "--skip-unavailable".
+     When used, only the available locals or arguments are displayed.
+
+  ** The -exec-run command now accepts an optional "--start" option.
+     When used, the command follows the same semantics as the "start"
+     command, stopping the program's execution at the start of its
+     main subprogram.
+
+  ** The new commands -catch-assert and -catch-exceptions insert
+     catchpoints stopping the program when Ada exceptions are raised.
+
 * New system-wide configuration scripts
   A GDB installation now provides scripts suitable for use as system-wide
   configuration scripts for the following systems:
@@ -102,6 +165,10 @@ show range-stepping
 
 * GDB now understands the element 'tvar' in the XML traceframe info.
   It has the id of the collected trace state variables.
+
+* On S/390 targets that provide the transactional-execution feature,
+  the program interruption transaction diagnostic block (TDB) is now
+  represented as a number of additional "registers" in GDB.
 
 * New remote packets
 
@@ -133,6 +200,13 @@ qXfer:libraries-svr4:read's annex
 
 * New 'z' formatter for printing and examining memory, this displays the
   value as hexadecimal zero padded on the left to the size of the type.
+
+* GDB can now use Windows x64 unwinding data.
+
+* The "set remotebaud" command has been replaced by "set serial baud".
+  Similarly, "show remotebaud" has been replaced by "show serial baud".
+  The "set remotebaud" and "show remotebaud" commands are still available
+  to provide backward compatibility with older versions of GDB.
 
 *** Changes in GDB 7.6
 

@@ -146,6 +146,19 @@ struct coff_symbol
     unsigned int c_type;
   };
 
+/* Vector of types defined so far, indexed by their type numbers.  */
+
+static struct type **type_vector;
+
+/* Number of elements allocated for type_vector currently.  */
+
+static int type_vector_length;
+
+/* Initial size of type vector.  Is realloc'd larger if needed, and
+   realloc'd down to the size actually used, when completed.  */
+
+#define INITIAL_TYPE_VECTOR_LENGTH 160
+
 extern void stabsread_clear_cache (void);
 
 static struct type *coff_read_struct_type (int, int, int,
@@ -725,7 +738,7 @@ coff_symfile_read (struct objfile *objfile, int symfile_flags)
 	  bfd *abfd = symfile_bfd_open (debugfile);
 
 	  make_cleanup_bfd_unref (abfd);
-	  symbol_file_add_separate (abfd, symfile_flags, objfile);
+	  symbol_file_add_separate (abfd, debugfile, symfile_flags, objfile);
 	}
     }
 
@@ -806,7 +819,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
   /* Position to read the symbol table.  */
   val = bfd_seek (objfile->obfd, (long) symtab_offset, 0);
   if (val < 0)
-    perror_with_name (objfile->name);
+    perror_with_name (objfile_name (objfile));
 
   coffread_objfile = objfile;
   nlist_bfd_global = objfile->obfd;
@@ -816,7 +829,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 
   if (type_vector)		/* Get rid of previous one.  */
     xfree (type_vector);
-  type_vector_length = 160;
+  type_vector_length = INITIAL_TYPE_VECTOR_LENGTH;
   type_vector = (struct type **)
     xmalloc (type_vector_length * sizeof (struct type *));
   memset (type_vector, 0, type_vector_length * sizeof (struct type *));
@@ -1216,14 +1229,14 @@ read_one_sym (struct coff_symbol *cs,
   cs->c_symnum = symnum;
   bytes = bfd_bread (temp_sym, local_symesz, nlist_bfd_global);
   if (bytes != local_symesz)
-    error (_("%s: error reading symbols"), coffread_objfile->name);
+    error (_("%s: error reading symbols"), objfile_name (coffread_objfile));
   bfd_coff_swap_sym_in (symfile_bfd, temp_sym, (char *) sym);
   cs->c_naux = sym->n_numaux & 0xff;
   if (cs->c_naux >= 1)
     {
       bytes  = bfd_bread (temp_aux, local_auxesz, nlist_bfd_global);
       if (bytes != local_auxesz)
-	error (_("%s: error reading symbols"), coffread_objfile->name);
+	error (_("%s: error reading symbols"), objfile_name (coffread_objfile));
       bfd_coff_swap_aux_in (symfile_bfd, temp_aux,
 			    sym->n_type, sym->n_sclass,
 			    0, cs->c_naux, (char *) aux);
@@ -1233,7 +1246,8 @@ read_one_sym (struct coff_symbol *cs,
 	{
 	  bytes = bfd_bread (temp_aux, local_auxesz, nlist_bfd_global);
 	  if (bytes != local_auxesz)
-	    error (_("%s: error reading symbols"), coffread_objfile->name);
+	    error (_("%s: error reading symbols"),
+		   objfile_name (coffread_objfile));
 	}
     }
   cs->c_name = getsymname (sym);
@@ -2236,7 +2250,6 @@ coff_read_enum_type (int index, int length, int lastsym,
 
 static const struct sym_fns coff_sym_fns =
 {
-  bfd_target_coff_flavour,
   coff_new_init,		/* sym_new_init: init anything gbl to
 				   entire symtab */
   coff_symfile_init,		/* sym_init: read initial info, setup
@@ -2269,7 +2282,7 @@ coff_free_info (struct objfile *objfile, void *arg)
 void
 _initialize_coffread (void)
 {
-  add_symtab_fns (&coff_sym_fns);
+  add_symtab_fns (bfd_target_coff_flavour, &coff_sym_fns);
 
   coff_objfile_data_key = register_objfile_data_with_cleanup (NULL,
 							      coff_free_info);

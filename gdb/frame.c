@@ -314,14 +314,17 @@ fprint_frame_type (struct ui_file *file, enum frame_type type)
     case INLINE_FRAME:
       fprintf_unfiltered (file, "INLINE_FRAME");
       return;
-    case SENTINEL_FRAME:
-      fprintf_unfiltered (file, "SENTINEL_FRAME");
+    case TAILCALL_FRAME:
+      fprintf_unfiltered (file, "TAILCALL_FRAME");
       return;
     case SIGTRAMP_FRAME:
       fprintf_unfiltered (file, "SIGTRAMP_FRAME");
       return;
     case ARCH_FRAME:
       fprintf_unfiltered (file, "ARCH_FRAME");
+      return;
+    case SENTINEL_FRAME:
+      fprintf_unfiltered (file, "SENTINEL_FRAME");
       return;
     default:
       fprintf_unfiltered (file, "<unknown type>");
@@ -1140,7 +1143,7 @@ put_frame_register (struct frame_info *frame, int regnum,
   frame_register (frame, regnum, &optim, &unavail,
 		  &lval, &addr, &realnum, NULL);
   if (optim)
-    error (_("Attempt to assign to a value that was optimized out."));
+    error (_("Attempt to assign to a register that was not saved."));
   switch (lval)
     {
     case lval_memory:

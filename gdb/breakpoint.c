@@ -1807,7 +1807,7 @@ update_watchpoint (struct watchpoint *b, int reparse)
       struct value *val_chain, *v, *result, *next;
       struct program_space *frame_pspace;
 
-      fetch_subexp_value (b->exp, &pc, &v, &result, &val_chain);
+      fetch_subexp_value (b->exp, &pc, &v, &result, &val_chain, 0);
 
       /* Avoid setting b->val if it's already set.  The meaning of
 	 b->val is 'the last value' user saw, and we should update
@@ -2570,15 +2570,16 @@ insert_bp_location (struct bp_location *bl,
 		}
 	      else
 		{
+		  char *message = memory_error_message (TARGET_XFER_E_IO,
+							bl->gdbarch, bl->address);
+		  struct cleanup *old_chain = make_cleanup (xfree, message);
+
 		  fprintf_unfiltered (tmp_error_stream, 
-				      "Cannot insert breakpoint %d.\n", 
-				      bl->owner->number);
-		  fprintf_filtered (tmp_error_stream, 
-				    "Error accessing memory address ");
-		  fputs_filtered (paddress (bl->gdbarch, bl->address),
-				  tmp_error_stream);
-		  fprintf_filtered (tmp_error_stream, ": %s.\n",
-				    safe_strerror (val));
+				      "Cannot insert breakpoint %d.\n"
+				      "%s\n",
+				      bl->owner->number, message);
+
+		  do_cleanups (old_chain);
 		}
 
 	    }
@@ -2926,6 +2927,30 @@ remove_breakpoints (void)
       val |= remove_breakpoint (bl, mark_uninserted);
   }
   return val;
+}
+
+/* When a thread exits, remove breakpoints that are related to
+   that thread.  */
+
+static void
+remove_threaded_breakpoints (struct thread_info *tp, int silent)
+{
+  struct breakpoint *b, *b_tmp;
+
+  ALL_BREAKPOINTS_SAFE (b, b_tmp)
+    {
+      if (b->thread == tp->num && user_breakpoint_p (b))
+	{
+	  b->disposition = disp_del_at_next_stop;
+
+	  printf_filtered (_("\
+Thread-specific breakpoint %d deleted - thread %d no longer in the thread list.\n"),
+			  b->number, tp->num);
+
+	  /* Hide it from the user.  */
+	  b->number = 0;
+       }
+    }
 }
 
 /* Remove breakpoints of process PID.  */
@@ -3557,7 +3582,7 @@ detach_breakpoints (ptid_t ptid)
   struct cleanup *old_chain = save_inferior_ptid ();
   struct inferior *inf = current_inferior ();
 
-  if (PIDGET (ptid) == PIDGET (inferior_ptid))
+  if (ptid_get_pid (ptid) == ptid_get_pid (inferior_ptid))
     error (_("Cannot detach breakpoints of inferior_ptid"));
 
   /* Set inferior_ptid; remove_breakpoint_1 uses this global.  */
@@ -4822,7 +4847,7 @@ watchpoint_check (void *p)
 	return WP_VALUE_CHANGED;
 
       mark = value_mark ();
-      fetch_subexp_value (b->exp, &pc, &new_val, NULL, NULL);
+      fetch_subexp_value (b->exp, &pc, &new_val, NULL, NULL, 0);
 
       /* We use value_equal_contents instead of value_equal because
 	 the latter coerces an array to a pointer, thus comparing just
@@ -7522,7 +7547,7 @@ struct fork_catchpoint
 static int
 insert_catch_fork (struct bp_location *bl)
 {
-  return target_insert_fork_catchpoint (PIDGET (inferior_ptid));
+  return target_insert_fork_catchpoint (ptid_get_pid (inferior_ptid));
 }
 
 /* Implement the "remove" breakpoint_ops method for fork
@@ -7531,7 +7556,7 @@ insert_catch_fork (struct bp_location *bl)
 static int
 remove_catch_fork (struct bp_location *bl)
 {
-  return target_remove_fork_catchpoint (PIDGET (inferior_ptid));
+  return target_remove_fork_catchpoint (ptid_get_pid (inferior_ptid));
 }
 
 /* Implement the "breakpoint_hit" breakpoint_ops method for fork
@@ -7639,7 +7664,7 @@ static struct breakpoint_ops catch_fork_breakpoint_ops;
 static int
 insert_catch_vfork (struct bp_location *bl)
 {
-  return target_insert_vfork_catchpoint (PIDGET (inferior_ptid));
+  return target_insert_vfork_catchpoint (ptid_get_pid (inferior_ptid));
 }
 
 /* Implement the "remove" breakpoint_ops method for vfork
@@ -7648,7 +7673,7 @@ insert_catch_vfork (struct bp_location *bl)
 static int
 remove_catch_vfork (struct bp_location *bl)
 {
-  return target_remove_vfork_catchpoint (PIDGET (inferior_ptid));
+  return target_remove_vfork_catchpoint (ptid_get_pid (inferior_ptid));
 }
 
 /* Implement the "breakpoint_hit" breakpoint_ops method for vfork
@@ -8141,7 +8166,7 @@ insert_catch_syscall (struct bp_location *bl)
 	}
     }
 
-  return target_set_syscall_catchpoint (PIDGET (inferior_ptid),
+  return target_set_syscall_catchpoint (ptid_get_pid (inferior_ptid),
 					inf_data->total_syscalls_count != 0,
 					inf_data->any_syscall_count,
 					VEC_length (int,
@@ -8181,7 +8206,7 @@ remove_catch_syscall (struct bp_location *bl)
         }
     }
 
-  return target_set_syscall_catchpoint (PIDGET (inferior_ptid),
+  return target_set_syscall_catchpoint (ptid_get_pid (inferior_ptid),
 					inf_data->total_syscalls_count != 0,
 					inf_data->any_syscall_count,
 					VEC_length (int,
@@ -8504,13 +8529,13 @@ dtor_catch_exec (struct breakpoint *b)
 static int
 insert_catch_exec (struct bp_location *bl)
 {
-  return target_insert_exec_catchpoint (PIDGET (inferior_ptid));
+  return target_insert_exec_catchpoint (ptid_get_pid (inferior_ptid));
 }
 
 static int
 remove_catch_exec (struct bp_location *bl)
 {
-  return target_remove_exec_catchpoint (PIDGET (inferior_ptid));
+  return target_remove_exec_catchpoint (ptid_get_pid (inferior_ptid));
 }
 
 static int
@@ -11010,7 +11035,7 @@ watch_command_1 (const char *arg, int accessflag, int from_tty,
 
   exp_valid_block = innermost_block;
   mark = value_mark ();
-  fetch_subexp_value (exp, &pc, &val, &result, NULL);
+  fetch_subexp_value (exp, &pc, &val, &result, NULL, just_location);
 
   if (just_location)
     {
@@ -11596,6 +11621,7 @@ init_ada_exception_breakpoint (struct breakpoint *b,
 			       char *addr_string,
 			       const struct breakpoint_ops *ops,
 			       int tempflag,
+			       int enabled,
 			       int from_tty)
 {
   if (from_tty)
@@ -11618,7 +11644,7 @@ init_ada_exception_breakpoint (struct breakpoint *b,
 
   init_raw_breakpoint (b, gdbarch, sal, bp_breakpoint, ops);
 
-  b->enable_state = bp_enabled;
+  b->enable_state = enabled ? bp_enabled : bp_disabled;
   b->disposition = tempflag ? disp_del : disp_donttouch;
   b->addr_string = addr_string;
   b->language = language_ada;
@@ -14553,25 +14579,35 @@ disable_command (char *args, int from_tty)
 	if (user_breakpoint_p (bpt))
 	  disable_breakpoint (bpt);
     }
-  else if (strchr (args, '.'))
-    {
-      struct bp_location *loc = find_location_by_number (args);
-      if (loc)
-	{
-	  if (loc->enabled)
-	    {
-	      loc->enabled = 0;
-	      mark_breakpoint_location_modified (loc);
-	    }
-	  if (target_supports_enable_disable_tracepoint ()
-	      && current_trace_status ()->running && loc->owner
-	      && is_tracepoint (loc->owner))
-	    target_disable_tracepoint (loc);
-	}
-      update_global_location_list (0);
-    }
   else
-    map_breakpoint_numbers (args, do_map_disable_breakpoint, NULL);
+    {
+      char *num = extract_arg (&args);
+
+      while (num)
+	{
+	  if (strchr (num, '.'))
+	    {
+	      struct bp_location *loc = find_location_by_number (num);
+
+	      if (loc)
+		{
+		  if (loc->enabled)
+		    {
+		      loc->enabled = 0;
+		      mark_breakpoint_location_modified (loc);
+		    }
+		  if (target_supports_enable_disable_tracepoint ()
+		      && current_trace_status ()->running && loc->owner
+		      && is_tracepoint (loc->owner))
+		    target_disable_tracepoint (loc);
+		}
+	      update_global_location_list (0);
+	    }
+	  else
+	    map_breakpoint_numbers (num, do_map_disable_breakpoint, NULL);
+	  num = extract_arg (&args);
+	}
+    }
 }
 
 static void
@@ -14677,25 +14713,35 @@ enable_command (char *args, int from_tty)
 	if (user_breakpoint_p (bpt))
 	  enable_breakpoint (bpt);
     }
-  else if (strchr (args, '.'))
-    {
-      struct bp_location *loc = find_location_by_number (args);
-      if (loc)
-	{
-	  if (!loc->enabled)
-	    {
-	      loc->enabled = 1;
-	      mark_breakpoint_location_modified (loc);
-	    }
-	  if (target_supports_enable_disable_tracepoint ()
-	      && current_trace_status ()->running && loc->owner
-	      && is_tracepoint (loc->owner))
-	    target_enable_tracepoint (loc);
-	}
-      update_global_location_list (1);
-    }
   else
-    map_breakpoint_numbers (args, do_map_enable_breakpoint, NULL);
+    {
+      char *num = extract_arg (&args);
+
+      while (num)
+	{
+	  if (strchr (num, '.'))
+	    {
+	      struct bp_location *loc = find_location_by_number (num);
+
+	      if (loc)
+		{
+		  if (!loc->enabled)
+		    {
+		      loc->enabled = 1;
+		      mark_breakpoint_location_modified (loc);
+		    }
+		  if (target_supports_enable_disable_tracepoint ()
+		      && current_trace_status ()->running && loc->owner
+		      && is_tracepoint (loc->owner))
+		    target_enable_tracepoint (loc);
+		}
+	      update_global_location_list (1);
+	    }
+	  else
+	    map_breakpoint_numbers (num, do_map_enable_breakpoint, NULL);
+	  num = extract_arg (&args);
+	}
+    }
 }
 
 /* This struct packages up disposition data for application to multiple
@@ -15460,7 +15506,6 @@ save_breakpoints (char *filename, int from_tty,
 {
   struct breakpoint *tp;
   int any = 0;
-  char *pathname;
   struct cleanup *cleanup;
   struct ui_file *fp;
   int extra_trace_bits = 0;
@@ -15496,9 +15541,9 @@ save_breakpoints (char *filename, int from_tty,
       return;
     }
 
-  pathname = tilde_expand (filename);
-  cleanup = make_cleanup (xfree, pathname);
-  fp = gdb_fopen (pathname, "w");
+  filename = tilde_expand (filename);
+  cleanup = make_cleanup (xfree, filename);
+  fp = gdb_fopen (filename, "w");
   if (!fp)
     error (_("Unable to open file '%s' for saving (%s)"),
 	   filename, safe_strerror (errno));
@@ -15568,9 +15613,9 @@ save_breakpoints (char *filename, int from_tty,
   if (extra_trace_bits && *default_collect)
     fprintf_unfiltered (fp, "set default-collect %s\n", default_collect);
 
-  do_cleanups (cleanup);
   if (from_tty)
     printf_filtered (_("Saved to file '%s'.\n"), filename);
+  do_cleanups (cleanup);
 }
 
 /* The `save breakpoints' command.  */
@@ -16586,6 +16631,7 @@ agent-printf \"printf format string\", arg1, arg2, arg3, ..., argn\n\
   automatic_hardware_breakpoints = 1;
 
   observer_attach_about_to_proceed (breakpoint_about_to_proceed);
+  observer_attach_thread_exit (remove_threaded_breakpoints);
 #if 0
   observer_attach_mark_used (breakpoint_types_mark_used);
 #endif
