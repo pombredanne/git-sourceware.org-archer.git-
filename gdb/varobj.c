@@ -62,7 +62,7 @@ char *varobj_format_string[] =
   { "natural", "binary", "decimal", "hexadecimal", "octal" };
 
 /* String representations of gdb's known languages.  */
-char *varobj_language_string[] = { "unknown", "C", "C++", "Java" };
+char *varobj_language_string[] = { "C", "C++", "Java" };
 
 /* True if we want to allow Python-based pretty-printing.  */
 static int pretty_printing = 0;
@@ -245,7 +245,7 @@ static void uninstall_variable (struct varobj *);
 static struct varobj *create_child (struct varobj *, int, char *);
 
 static struct varobj *
-create_child_with_value (struct varobj *parent, int index, const char *name,
+create_child_with_value (struct varobj *parent, int index, char *name,
 			 struct value *value);
 
 /* Utility routines */
@@ -304,7 +304,7 @@ static int is_root_p (struct varobj *var);
 #if HAVE_PYTHON
 
 static struct varobj *varobj_add_child (struct varobj *var,
-					const char *name,
+					char *name,
 					struct value *value);
 
 #endif /* HAVE_PYTHON */
@@ -320,8 +320,6 @@ static char *c_name_of_variable (struct varobj *parent);
 static char *c_name_of_child (struct varobj *parent, int index);
 
 static char *c_path_expr_of_child (struct varobj *child);
-
-static struct value *c_value_of_root (struct varobj **var_handle);
 
 static struct value *c_value_of_child (struct varobj *parent, int index);
 
@@ -342,8 +340,6 @@ static char *cplus_name_of_child (struct varobj *parent, int index);
 
 static char *cplus_path_expr_of_child (struct varobj *child);
 
-static struct value *cplus_value_of_root (struct varobj **var_handle);
-
 static struct value *cplus_value_of_child (struct varobj *parent, int index);
 
 static struct type *cplus_type_of_child (struct varobj *parent, int index);
@@ -360,8 +356,6 @@ static char *java_name_of_variable (struct varobj *parent);
 static char *java_name_of_child (struct varobj *parent, int index);
 
 static char *java_path_expr_of_child (struct varobj *child);
-
-static struct value *java_value_of_root (struct varobj **var_handle);
 
 static struct value *java_value_of_child (struct varobj *parent, int index);
 
@@ -380,8 +374,6 @@ static char *ada_name_of_child (struct varobj *parent, int index);
 
 static char *ada_path_expr_of_child (struct varobj *child);
 
-static struct value *ada_value_of_root (struct varobj **var_handle);
-
 static struct value *ada_value_of_child (struct varobj *parent, int index);
 
 static struct type *ada_type_of_child (struct varobj *parent, int index);
@@ -398,10 +390,6 @@ static int ada_value_has_mutated (struct varobj *var, struct value *new_val,
 
 struct language_specific
 {
-
-  /* The language of this variable.  */
-  enum varobj_languages language;
-
   /* The number of children of PARENT.  */
   int (*number_of_children) (struct varobj * parent);
 
@@ -414,9 +402,6 @@ struct language_specific
   /* Returns the rooted expression of CHILD, which is a variable
      obtain that has some parent.  */
   char *(*path_expr_of_child) (struct varobj * child);
-
-  /* The ``struct value *'' of the root variable ROOT.  */
-  struct value *(*value_of_root) (struct varobj ** root_handle);
 
   /* The ``struct value *'' of the INDEX'th child of PARENT.  */
   struct value *(*value_of_child) (struct varobj * parent, int index);
@@ -456,28 +441,12 @@ struct language_specific
 
 /* Array of known source language routines.  */
 static struct language_specific languages[vlang_end] = {
-  /* Unknown (try treating as C).  */
-  {
-   vlang_unknown,
-   c_number_of_children,
-   c_name_of_variable,
-   c_name_of_child,
-   c_path_expr_of_child,
-   c_value_of_root,
-   c_value_of_child,
-   c_type_of_child,
-   c_value_of_variable,
-   default_value_is_changeable_p,
-   NULL /* value_has_mutated */}
-  ,
   /* C */
   {
-   vlang_c,
    c_number_of_children,
    c_name_of_variable,
    c_name_of_child,
    c_path_expr_of_child,
-   c_value_of_root,
    c_value_of_child,
    c_type_of_child,
    c_value_of_variable,
@@ -486,12 +455,10 @@ static struct language_specific languages[vlang_end] = {
   ,
   /* C++ */
   {
-   vlang_cplus,
    cplus_number_of_children,
    cplus_name_of_variable,
    cplus_name_of_child,
    cplus_path_expr_of_child,
-   cplus_value_of_root,
    cplus_value_of_child,
    cplus_type_of_child,
    cplus_value_of_variable,
@@ -500,12 +467,10 @@ static struct language_specific languages[vlang_end] = {
   ,
   /* Java */
   {
-   vlang_java,
    java_number_of_children,
    java_name_of_variable,
    java_name_of_child,
    java_path_expr_of_child,
-   java_value_of_root,
    java_value_of_child,
    java_type_of_child,
    java_value_of_variable,
@@ -513,12 +478,10 @@ static struct language_specific languages[vlang_end] = {
    NULL /* value_has_mutated */},
   /* Ada */
   {
-   vlang_ada,
    ada_number_of_children,
    ada_name_of_variable,
    ada_name_of_child,
    ada_path_expr_of_child,
-   ada_value_of_root,
    ada_value_of_child,
    ada_type_of_child,
    ada_value_of_variable,
@@ -1031,7 +994,7 @@ install_dynamic_child (struct varobj *var,
 		       VEC (varobj_p) **unchanged,
 		       int *cchanged,
 		       int index,
-		       const char *name,
+		       char *name,
 		       struct value *value)
 {
   if (VEC_length (varobj_p, var->children) < index + 1)
@@ -1045,11 +1008,11 @@ install_dynamic_child (struct varobj *var,
 	  *cchanged = 1;
 	}
     }
-  else 
+  else
     {
       varobj_p existing = VEC_index (varobj_p, var->children, index);
-
       int type_updated = update_type_if_necessary (existing, value);
+
       if (type_updated)
 	{
 	  if (type_changed)
@@ -1225,7 +1188,8 @@ update_dynamic_varobj_children (struct varobj *var,
 				 can_mention ? type_changed : NULL,
 				 can_mention ? new : NULL,
 				 can_mention ? unchanged : NULL,
-				 can_mention ? cchanged : NULL, i, name, v);
+				 can_mention ? cchanged : NULL, i,
+				 xstrdup (name), v);
 	  do_cleanups (inner);
 	}
       else
@@ -1344,7 +1308,7 @@ varobj_list_children (struct varobj *var, int *from, int *to)
 #if HAVE_PYTHON
 
 static struct varobj *
-varobj_add_child (struct varobj *var, const char *name, struct value *value)
+varobj_add_child (struct varobj *var, char *name, struct value *value)
 {
   varobj_p v = create_child_with_value (var, 
 					VEC_length (varobj_p, var->children), 
@@ -2431,7 +2395,7 @@ is_anonymous_child (struct varobj *child)
 }
 
 static struct varobj *
-create_child_with_value (struct varobj *parent, int index, const char *name,
+create_child_with_value (struct varobj *parent, int index, char *name,
 			 struct value *value)
 {
   struct varobj *child;
@@ -2439,9 +2403,8 @@ create_child_with_value (struct varobj *parent, int index, const char *name,
 
   child = new_variable ();
 
-  /* Name is allocated by name_of_child.  */
-  /* FIXME: xstrdup should not be here.  */
-  child->name = xstrdup (name);
+  /* NAME is allocated by caller.  */
+  child->name = name;
   child->index = index;
   child->parent = parent;
   child->root = parent->root;
@@ -2732,6 +2695,86 @@ name_of_child (struct varobj *var, int index)
   return (*var->root->lang->name_of_child) (var, index);
 }
 
+/* If frame associated with VAR can be found, switch
+   to it and return 1.  Otherwise, return 0.  */
+
+static int
+check_scope (struct varobj *var)
+{
+  struct frame_info *fi;
+  int scope;
+
+  fi = frame_find_by_id (var->root->frame);
+  scope = fi != NULL;
+
+  if (fi)
+    {
+      CORE_ADDR pc = get_frame_pc (fi);
+
+      if (pc <  BLOCK_START (var->root->valid_block) ||
+	  pc >= BLOCK_END (var->root->valid_block))
+	scope = 0;
+      else
+	select_frame (fi);
+    }
+  return scope;
+}
+
+/* Helper function to value_of_root.  */
+
+static struct value *
+value_of_root_1 (struct varobj **var_handle)
+{
+  struct value *new_val = NULL;
+  struct varobj *var = *var_handle;
+  int within_scope = 0;
+  struct cleanup *back_to;
+								 
+  /*  Only root variables can be updated...  */
+  if (!is_root_p (var))
+    /* Not a root var.  */
+    return NULL;
+
+  back_to = make_cleanup_restore_current_thread ();
+
+  /* Determine whether the variable is still around.  */
+  if (var->root->valid_block == NULL || var->root->floating)
+    within_scope = 1;
+  else if (var->root->thread_id == 0)
+    {
+      /* The program was single-threaded when the variable object was
+	 created.  Technically, it's possible that the program became
+	 multi-threaded since then, but we don't support such
+	 scenario yet.  */
+      within_scope = check_scope (var);	  
+    }
+  else
+    {
+      ptid_t ptid = thread_id_to_pid (var->root->thread_id);
+      if (in_thread_list (ptid))
+	{
+	  switch_to_thread (ptid);
+	  within_scope = check_scope (var);
+	}
+    }
+
+  if (within_scope)
+    {
+      volatile struct gdb_exception except;
+
+      /* We need to catch errors here, because if evaluate
+         expression fails we want to just return NULL.  */
+      TRY_CATCH (except, RETURN_MASK_ERROR)
+	{
+	  new_val = evaluate_expression (var->root->exp);
+	}
+    }
+
+  do_cleanups (back_to);
+
+  return new_val;
+}
+
 /* What is the ``struct value *'' of the root variable VAR?
    For floating variable object, evaluation can get us a value
    of different type from what is stored in varobj already.  In
@@ -2809,7 +2852,7 @@ value_of_root (struct varobj **var_handle, int *type_changed)
   {
     struct value *value;
 
-    value = (*var->root->lang->value_of_root) (var_handle);
+    value = value_of_root_1 (var_handle);
     if (var->value == NULL || value == NULL)
       {
 	/* For root varobj-s, a NULL value indicates a scoping issue.
@@ -3404,83 +3447,6 @@ c_path_expr_of_child (struct varobj *child)
   return child->path_expr;
 }
 
-/* If frame associated with VAR can be found, switch
-   to it and return 1.  Otherwise, return 0.  */
-static int
-check_scope (struct varobj *var)
-{
-  struct frame_info *fi;
-  int scope;
-
-  fi = frame_find_by_id (var->root->frame);
-  scope = fi != NULL;
-
-  if (fi)
-    {
-      CORE_ADDR pc = get_frame_pc (fi);
-
-      if (pc <  BLOCK_START (var->root->valid_block) ||
-	  pc >= BLOCK_END (var->root->valid_block))
-	scope = 0;
-      else
-	select_frame (fi);
-    }
-  return scope;
-}
-
-static struct value *
-c_value_of_root (struct varobj **var_handle)
-{
-  struct value *new_val = NULL;
-  struct varobj *var = *var_handle;
-  int within_scope = 0;
-  struct cleanup *back_to;
-								 
-  /*  Only root variables can be updated...  */
-  if (!is_root_p (var))
-    /* Not a root var.  */
-    return NULL;
-
-  back_to = make_cleanup_restore_current_thread ();
-
-  /* Determine whether the variable is still around.  */
-  if (var->root->valid_block == NULL || var->root->floating)
-    within_scope = 1;
-  else if (var->root->thread_id == 0)
-    {
-      /* The program was single-threaded when the variable object was
-	 created.  Technically, it's possible that the program became
-	 multi-threaded since then, but we don't support such
-	 scenario yet.  */
-      within_scope = check_scope (var);	  
-    }
-  else
-    {
-      ptid_t ptid = thread_id_to_pid (var->root->thread_id);
-      if (in_thread_list (ptid))
-	{
-	  switch_to_thread (ptid);
-	  within_scope = check_scope (var);
-	}
-    }
-
-  if (within_scope)
-    {
-      volatile struct gdb_exception except;
-
-      /* We need to catch errors here, because if evaluate
-         expression fails we want to just return NULL.  */
-      TRY_CATCH (except, RETURN_MASK_ERROR)
-	{
-	  new_val = evaluate_expression (var->root->exp);
-	}
-    }
-
-  do_cleanups (back_to);
-
-  return new_val;
-}
-
 static struct value *
 c_value_of_child (struct varobj *parent, int index)
 {
@@ -3915,12 +3881,6 @@ cplus_path_expr_of_child (struct varobj *child)
 }
 
 static struct value *
-cplus_value_of_root (struct varobj **var_handle)
-{
-  return c_value_of_root (var_handle);
-}
-
-static struct value *
 cplus_value_of_child (struct varobj *parent, int index)
 {
   struct value *value = NULL;
@@ -4005,12 +3965,6 @@ java_path_expr_of_child (struct varobj *child)
 }
 
 static struct value *
-java_value_of_root (struct varobj **var_handle)
-{
-  return cplus_value_of_root (var_handle);
-}
-
-static struct value *
 java_value_of_child (struct varobj *parent, int index)
 {
   return cplus_value_of_child (parent, index);
@@ -4060,12 +4014,6 @@ ada_path_expr_of_child (struct varobj *child)
 					    parent->name,
 					    parent_path_expr,
 					    child->index);
-}
-
-static struct value *
-ada_value_of_root (struct varobj **var_handle)
-{
-  return c_value_of_root (var_handle);
 }
 
 static struct value *

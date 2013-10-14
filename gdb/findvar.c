@@ -263,14 +263,7 @@ struct value *
 value_of_register (int regnum, struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
-  CORE_ADDR addr;
-  int optim;
-  int unavail;
   struct value *reg_val;
-  struct type *reg_type;
-  int realnum;
-  gdb_byte raw_buffer[MAX_REGISTER_SIZE];
-  enum lval_type lval;
 
   /* User registers lie completely outside of the range of normal
      registers.  Catch them early so that the target never sees them.  */
@@ -278,28 +271,8 @@ value_of_register (int regnum, struct frame_info *frame)
 		+ gdbarch_num_pseudo_regs (gdbarch))
     return value_of_user_reg (regnum, frame);
 
-  frame_register (frame, regnum, &optim, &unavail,
-		  &lval, &addr, &realnum, raw_buffer);
-
-  reg_type = register_type (gdbarch, regnum);
-  if (optim)
-    reg_val = allocate_optimized_out_value (reg_type);
-  else
-    reg_val = allocate_value (reg_type);
-
-  if (!optim && !unavail)
-    memcpy (value_contents_raw (reg_val), raw_buffer,
-	    register_size (gdbarch, regnum));
-  else
-    memset (value_contents_raw (reg_val), 0,
-	    register_size (gdbarch, regnum));
-
-  VALUE_LVAL (reg_val) = lval;
-  set_value_address (reg_val, addr);
-  VALUE_REGNUM (reg_val) = regnum;
-  if (unavail)
-    mark_value_bytes_unavailable (reg_val, 0, register_size (gdbarch, regnum));
-  VALUE_FRAME_ID (reg_val) = get_frame_id (frame);
+  reg_val = value_of_register_lazy (frame, regnum);
+  value_fetch_lazy (reg_val);
   return reg_val;
 }
 
@@ -626,9 +599,7 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
   /* ADDR is set here for ALLOCATE_VALUE's CHECK_TYPEDEF for
      DW_OP_PUSH_OBJECT_ADDRESS.  */
   object_address_set (addr);
-  v = allocate_value_lazy (type);
-  VALUE_LVAL (v) = lval_memory;
-  set_value_address (v, addr);
+  v = value_at_lazy (type, addr);
   return v;
 }
 
@@ -786,6 +757,15 @@ address_from_register (struct type *type, int regnum, struct frame_info *frame)
 
   value = value_from_register (type, regnum, frame);
   gdb_assert (value);
+
+  if (value_optimized_out (value))
+    {
+      /* This function is used while computing a location expression.
+	 Complain about the value being optimized out, rather than
+	 letting value_as_address complain about some random register
+	 the expression depends on not being saved.  */
+      error_value_optimized_out ();
+    }
 
   result = value_as_address (value);
   release_value (value);

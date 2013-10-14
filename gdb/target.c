@@ -81,12 +81,6 @@ static LONGEST current_xfer_partial (struct target_ops *ops,
 				     const gdb_byte *writebuf,
 				     ULONGEST offset, LONGEST len);
 
-static LONGEST target_xfer_partial (struct target_ops *ops,
-				    enum target_object object,
-				    const char *annex,
-				    void *readbuf, const void *writebuf,
-				    ULONGEST offset, LONGEST len);
-
 static struct gdbarch *default_thread_architecture (struct target_ops *ops,
 						    ptid_t ptid);
 
@@ -1193,10 +1187,10 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 	    case TLS_LOAD_MODULE_NOT_FOUND_ERROR:
 	      if (objfile_is_library)
 		error (_("Cannot find shared library `%s' in dynamic"
-		         " linker's load module list"), objfile->name);
+		         " linker's load module list"), objfile_name (objfile));
 	      else
 		error (_("Cannot find executable file `%s' in dynamic"
-		         " linker's load module list"), objfile->name);
+		         " linker's load module list"), objfile_name (objfile));
 	      break;
 	    case TLS_NOT_ALLOCATED_YET_ERROR:
 	      if (objfile_is_library)
@@ -1204,25 +1198,25 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 		         " thread-local variables in\n"
 		         "the shared library `%s'\n"
 		         "for %s"),
-		       objfile->name, target_pid_to_str (ptid));
+		       objfile_name (objfile), target_pid_to_str (ptid));
 	      else
 		error (_("The inferior has not yet allocated storage for"
 		         " thread-local variables in\n"
 		         "the executable `%s'\n"
 		         "for %s"),
-		       objfile->name, target_pid_to_str (ptid));
+		       objfile_name (objfile), target_pid_to_str (ptid));
 	      break;
 	    case TLS_GENERIC_ERROR:
 	      if (objfile_is_library)
 		error (_("Cannot find thread-local storage for %s, "
 		         "shared library %s:\n%s"),
 		       target_pid_to_str (ptid),
-		       objfile->name, ex.message);
+		       objfile_name (objfile), ex.message);
 	      else
 		error (_("Cannot find thread-local storage for %s, "
 		         "executable file %s:\n%s"),
 		       target_pid_to_str (ptid),
-		       objfile->name, ex.message);
+		       objfile_name (objfile), ex.message);
 	      break;
 	    default:
 	      throw_exception (ex);
@@ -1237,6 +1231,21 @@ target_translate_tls_address (struct objfile *objfile, CORE_ADDR offset)
 
   return addr;
 }
+
+const char *
+target_xfer_error_to_string (enum target_xfer_error err)
+{
+#define CASE(X) case X: return #X
+  switch (err)
+    {
+      CASE(TARGET_XFER_E_IO);
+      CASE(TARGET_XFER_E_UNAVAILABLE);
+    default:
+      return "<unknown>";
+    }
+#undef CASE
+};
+
 
 #undef	MIN
 #define MIN(A, B) (((A) <= (B)) ? (A) : (B))
@@ -1355,7 +1364,7 @@ static LONGEST
 target_read_live_memory (enum target_object object,
 			 ULONGEST memaddr, gdb_byte *myaddr, LONGEST len)
 {
-  int ret;
+  LONGEST ret;
   struct cleanup *cleanup;
 
   /* Switch momentarily out of tfind mode so to access live memory.
@@ -1523,7 +1532,7 @@ memory_xfer_partial_1 (struct target_ops *ops, enum target_object object,
 
 	      /* No use trying further, we know some memory starting
 		 at MEMADDR isn't available.  */
-	      return -1;
+	      return TARGET_XFER_E_UNAVAILABLE;
 	    }
 
 	  /* Don't try to read more than how much is available, in
@@ -1700,7 +1709,7 @@ make_show_memory_breakpoints_cleanup (int show)
 
 /* For docs see target.h, to_xfer_partial.  */
 
-static LONGEST
+LONGEST
 target_xfer_partial (struct target_ops *ops,
 		     enum target_object object, const char *annex,
 		     void *readbuf, const void *writebuf,
@@ -1778,9 +1787,9 @@ target_xfer_partial (struct target_ops *ops,
   return retval;
 }
 
-/* Read LEN bytes of target memory at address MEMADDR, placing the results in
-   GDB's memory at MYADDR.  Returns either 0 for success or an errno value
-   if any error occurs.
+/* Read LEN bytes of target memory at address MEMADDR, placing the
+   results in GDB's memory at MYADDR.  Returns either 0 for success or
+   a target_xfer_error value if any error occurs.
 
    If an error occurs, no guarantee is made about the contents of the data at
    MYADDR.  In particular, the caller should not depend upon partial reads
@@ -1799,7 +1808,7 @@ target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
 		   myaddr, memaddr, len) == len)
     return 0;
   else
-    return EIO;
+    return TARGET_XFER_E_IO;
 }
 
 /* Like target_read_memory, but specify explicitly that this is a read from
@@ -1816,13 +1825,14 @@ target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
 		   myaddr, memaddr, len) == len)
     return 0;
   else
-    return EIO;
+    return TARGET_XFER_E_IO;
 }
 
 /* Write LEN bytes from MYADDR to target memory at address MEMADDR.
-   Returns either 0 for success or an errno value if any error occurs.
-   If an error occurs, no guarantee is made about how much data got written.
-   Callers that can deal with partial writes should call target_write.  */
+   Returns either 0 for success or a target_xfer_error value if any
+   error occurs.  If an error occurs, no guarantee is made about how
+   much data got written.  Callers that can deal with partial writes
+   should call target_write.  */
 
 int
 target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
@@ -1834,14 +1844,14 @@ target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
 		    myaddr, memaddr, len) == len)
     return 0;
   else
-    return EIO;
+    return TARGET_XFER_E_IO;
 }
 
 /* Write LEN bytes from MYADDR to target raw memory at address
-   MEMADDR.  Returns either 0 for success or an errno value if any
-   error occurs.  If an error occurs, no guarantee is made about how
-   much data got written.  Callers that can deal with partial writes
-   should call target_write.  */
+   MEMADDR.  Returns either 0 for success or a target_xfer_error value
+   if any error occurs.  If an error occurs, no guarantee is made
+   about how much data got written.  Callers that can deal with
+   partial writes should call target_write.  */
 
 int
 target_write_raw_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
@@ -1853,7 +1863,7 @@ target_write_raw_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
 		    myaddr, memaddr, len) == len)
     return 0;
   else
-    return EIO;
+    return TARGET_XFER_E_IO;
 }
 
 /* Fetch the target's memory map.  */
@@ -2431,7 +2441,7 @@ get_target_memory (struct target_ops *ops, CORE_ADDR addr, gdb_byte *buf,
      for this target).  */
   if (target_read (ops, TARGET_OBJECT_RAW_MEMORY, NULL, buf, addr, len)
       != len)
-    memory_error (EIO, addr);
+    memory_error (TARGET_XFER_E_IO, addr);
 }
 
 ULONGEST
@@ -2482,7 +2492,8 @@ target_info (char *args, int from_tty)
   int has_all_mem = 0;
 
   if (symfile_objfile != NULL)
-    printf_unfiltered (_("Symbols from \"%s\".\n"), symfile_objfile->name);
+    printf_unfiltered (_("Symbols from \"%s\".\n"),
+		       objfile_name (symfile_objfile));
 
   for (t = target_stack; t != NULL; t = t->beneath)
     {
@@ -2605,7 +2616,7 @@ target_detach (char *args, int from_tty)
   else
     /* If we're in breakpoints-always-inserted mode, have to remove
        them before detaching.  */
-    remove_breakpoints_pid (PIDGET (inferior_ptid));
+    remove_breakpoints_pid (ptid_get_pid (inferior_ptid));
 
   prepare_for_detach ();
 
@@ -2668,8 +2679,8 @@ target_wait (ptid_t ptid, struct target_waitstatus *status, int options)
 	      fprintf_unfiltered (gdb_stdlog,
 				  "target_wait (%d, status, options={%s})"
 				  " = %d,   %s\n",
-				  PIDGET (ptid), options_string,
-				  PIDGET (retval), status_string);
+				  ptid_get_pid (ptid), options_string,
+				  ptid_get_pid (retval), status_string);
 	      xfree (status_string);
 	      xfree (options_string);
 	    }
@@ -2723,7 +2734,7 @@ target_resume (ptid_t ptid, int step, enum gdb_signal signal)
 	  t->to_resume (t, ptid, step, signal);
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_resume (%d, %s, %s)\n",
-				PIDGET (ptid),
+				ptid_get_pid (ptid),
 				step ? "step" : "continue",
 				gdb_signal_to_name (signal));
 
@@ -2802,7 +2813,7 @@ target_program_signals (int numsigs, unsigned char *program_signals)
    follow forks.  */
 
 int
-target_follow_fork (int follow_child)
+target_follow_fork (int follow_child, int detach_fork)
 {
   struct target_ops *t;
 
@@ -2810,11 +2821,12 @@ target_follow_fork (int follow_child)
     {
       if (t->to_follow_fork != NULL)
 	{
-	  int retval = t->to_follow_fork (t, follow_child);
+	  int retval = t->to_follow_fork (t, follow_child, detach_fork);
 
 	  if (targetdebug)
-	    fprintf_unfiltered (gdb_stdlog, "target_follow_fork (%d) = %d\n",
-				follow_child, retval);
+	    fprintf_unfiltered (gdb_stdlog,
+				"target_follow_fork (%d, %d) = %d\n",
+				follow_child, detach_fork, retval);
 	  return retval;
 	}
     }
@@ -3812,7 +3824,7 @@ target_thread_alive (ptid_t ptid)
 	  retval = t->to_thread_alive (t, ptid);
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog, "target_thread_alive (%d) = %d\n",
-				PIDGET (ptid), retval);
+				ptid_get_pid (ptid), retval);
 
 	  return retval;
 	}
@@ -3999,7 +4011,7 @@ target_core_of_thread (ptid_t ptid)
 	  if (targetdebug)
 	    fprintf_unfiltered (gdb_stdlog,
 				"target_core_of_thread (%d) = %d\n",
-				PIDGET (ptid), retval);
+				ptid_get_pid (ptid), retval);
 	  return retval;
 	}
     }
@@ -4738,7 +4750,7 @@ debug_to_post_startup_inferior (ptid_t ptid)
   debug_target.to_post_startup_inferior (ptid);
 
   fprintf_unfiltered (gdb_stdlog, "target_post_startup_inferior (%d)\n",
-		      PIDGET (ptid));
+		      ptid_get_pid (ptid));
 }
 
 static int

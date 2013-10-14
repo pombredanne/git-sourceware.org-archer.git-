@@ -28,6 +28,10 @@
 #endif
 #include "gdb_wait.h"
 #include "btrace-common.h"
+#include "filestuff.h"
+#include "tracepoint.h"
+#include "dll.h"
+#include "hostio.h"
 
 /* The thread set with an `Hc' packet.  `Hc' is deprecated in favor of
    `vCont'.  Note the multi-process extensions made `vCont' a
@@ -252,6 +256,7 @@ start_inferior (char **argv)
     {
       struct thread_resume resume_info;
 
+      memset (&resume_info, 0, sizeof (resume_info));
       resume_info.thread = pid_to_ptid (signal_pid);
       resume_info.kind = resume_continue;
       resume_info.sig = 0;
@@ -715,7 +720,7 @@ gdb_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
 
       if (traceframe_read_mem (current_traceframe,
 			       memaddr, myaddr, len, &nbytes))
-	return EIO;
+	return -1;
       /* Data read from trace buffer, we're done.  */
       if (nbytes > 0)
 	return nbytes;
@@ -2850,6 +2855,10 @@ main (int argc, char *argv[])
       exit (1);
     }
 
+  /* Remember stdio descriptors.  LISTEN_DESC must not be listed, it will be
+     opened by remote_prepare.  */
+  notice_open_fds ();
+
   /* We need to know whether the remote connection is stdio before
      starting the inferior.  Inferiors created in this scenario have
      stdin,stdout redirected.  So do this here before we call
@@ -3541,7 +3550,10 @@ process_serial_event (void)
 	 the whole vStopped list (until it gets an OK).  */
       if (QUEUE_is_empty (notif_event_p, notif_stop.queue))
 	{
-	  fprintf (stderr, "GDBserver exiting\n");
+	  /* Be transparent when GDB is connected through stdio -- no
+	     need to spam GDB's console.  */
+	  if (!remote_connection_is_stdio ())
+	    fprintf (stderr, "GDBserver exiting\n");
 	  remote_close ();
 	  exit (0);
 	}

@@ -16,6 +16,7 @@
 
 """GDB commands for working with frame-filters."""
 
+import sys
 import gdb
 import copy
 from gdb.FrameIterator import FrameIterator
@@ -79,7 +80,8 @@ class InfoFrameFilter(gdb.Command):
                         str(gdb.frames.get_priority(frame_filter[1])))
                     enabled = '{:<7}'.format(
                         self.enabled_string(gdb.frames.get_enabled(frame_filter[1])))
-                except Exception as e:
+                except Exception:
+                    e = sys.exc_info()[1]
                     print("  Error printing filter '"+name+"': "+str(e))
                 else:
                     print("  %s  %s  %s" % (priority, enabled, name))
@@ -335,7 +337,10 @@ class SetFrameFilterPriority(gdb.Command):
 
         list_op = command_tuple[0]
         frame_filter = command_tuple[1]
-        priority = command_tuple[2]
+
+        # GDB returns arguments as a string, so convert priority to
+        # a number.
+        priority = int(command_tuple[2])
 
         op_list = gdb.frames.return_list(list_op)
 
@@ -445,7 +450,8 @@ class ShowFrameFilterPriority(gdb.Command):
         list_name = command_tuple[0]
         try:
             priority = self.get_filter_priority(list_name, filter_name);
-        except Exception as e:
+        except Exception:
+            e = sys.exc_info()[1]
             print("Error printing filter priority for '"+name+"':"+str(e))
         else:
             print("Priority of filter '" + filter_name + "' in list '" \

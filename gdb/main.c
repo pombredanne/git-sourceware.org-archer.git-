@@ -98,6 +98,13 @@ int return_child_result_value = -1;
 /* GDB as it has been invoked from the command line (i.e. argv[0]).  */
 static char *gdb_program_name;
 
+/* Return read only pointer to GDB_PROGRAM_NAME.  */
+const char *
+get_gdb_program_name (void)
+{
+  return gdb_program_name;
+}
+
 static void print_gdb_help (struct ui_file *);
 
 /* Relocate a file or directory.  PROGNAME is the name by which gdb
@@ -375,8 +382,15 @@ captured_main (void *data)
   saved_command_line[0] = '\0';
   instream = stdin;
 
+#ifdef __MINGW32__
+  /* Ensure stderr is unbuffered.  A Cygwin pty or pipe is implemented
+     as a Windows pipe, and Windows buffers on pipes.  */
+  setvbuf (stderr, NULL, _IONBF, BUFSIZ);
+#endif
+
   gdb_stdout = stdio_fileopen (stdout);
-  gdb_stderr = stdio_fileopen (stderr);
+  gdb_stderr = stderr_fileopen ();
+
   gdb_stdlog = gdb_stderr;	/* for moment */
   gdb_stdtarg = gdb_stderr;	/* for moment */
   gdb_stdin = stdio_fileopen (stdin);
@@ -885,8 +899,6 @@ captured_main (void *data)
     }
 
   /* Set off error and warning messages with a blank line.  */
-  error_pre_print = "\n";
-  quit_pre_print = error_pre_print;
   warning_pre_print = _("\nwarning: ");
 
   /* Read and execute the system-wide gdbinit file, if it exists.
@@ -945,8 +957,8 @@ captured_main (void *data)
          catch_command_errors returns non-zero on success!  */
       if (catch_command_errors (exec_file_attach, execarg,
 				!batch_flag, RETURN_MASK_ALL))
-	catch_command_errors (symbol_file_add_main, symarg,
-			      !batch_flag, RETURN_MASK_ALL);
+	catch_command_errors_const (symbol_file_add_main, symarg,
+				    !batch_flag, RETURN_MASK_ALL);
     }
   else
     {
@@ -954,8 +966,8 @@ captured_main (void *data)
 	catch_command_errors (exec_file_attach, execarg,
 			      !batch_flag, RETURN_MASK_ALL);
       if (symarg != NULL)
-	catch_command_errors (symbol_file_add_main, symarg,
-			      !batch_flag, RETURN_MASK_ALL);
+	catch_command_errors_const (symbol_file_add_main, symarg,
+				    !batch_flag, RETURN_MASK_ALL);
     }
 
   if (corearg && pidarg)
@@ -990,8 +1002,6 @@ captured_main (void *data)
     set_inferior_io_terminal (ttyarg);
 
   /* Error messages should no longer be distinguished with extra output.  */
-  error_pre_print = NULL;
-  quit_pre_print = NULL;
   warning_pre_print = _("warning: ");
 
   /* Read the .gdbinit file in the current directory, *if* it isn't

@@ -59,13 +59,6 @@ FILE *std_err;
 
 /* Prototypes for local functions */
 
-static void dump_symtab (struct objfile *, struct symtab *,
-			 struct ui_file *);
-
-static void dump_msymbols (struct objfile *, struct ui_file *);
-
-static void dump_objfile (struct objfile *);
-
 static int block_depth (struct block *);
 
 void _initialize_symmisc (void);
@@ -91,7 +84,8 @@ print_symbol_bcache_statistics (void)
     ALL_PSPACE_OBJFILES (pspace, objfile)
   {
     QUIT;
-    printf_filtered (_("Byte cache statistics for '%s':\n"), objfile->name);
+    printf_filtered (_("Byte cache statistics for '%s':\n"),
+		     objfile_name (objfile));
     print_bcache_statistics (psymbol_bcache_get_bcache (objfile->psymbol_cache),
                              "partial symbol cache");
     print_bcache_statistics (objfile->per_bfd->macro_cache,
@@ -113,7 +107,7 @@ print_objfile_statistics (void)
     ALL_PSPACE_OBJFILES (pspace, objfile)
   {
     QUIT;
-    printf_filtered (_("Statistics for '%s':\n"), objfile->name);
+    printf_filtered (_("Statistics for '%s':\n"), objfile_name (objfile));
     if (OBJSTAT (objfile, n_stabs) > 0)
       printf_filtered (_("  Number of \"stab\" symbols read: %d\n"),
 		       OBJSTAT (objfile, n_stabs));
@@ -168,7 +162,7 @@ dump_objfile (struct objfile *objfile)
 {
   struct symtab *symtab;
 
-  printf_filtered ("\nObject file %s:  ", objfile->name);
+  printf_filtered ("\nObject file %s:  ", objfile_name (objfile));
   printf_filtered ("Objfile at ");
   gdb_print_host_address (objfile, gdb_stdout);
   printf_filtered (", bfd at ");
@@ -209,7 +203,7 @@ dump_msymbols (struct objfile *objfile, struct ui_file *outfile)
   int index;
   char ms_type;
 
-  fprintf_filtered (outfile, "\nObject file %s:\n\n", objfile->name);
+  fprintf_filtered (outfile, "\nObject file %s:\n\n", objfile_name (objfile));
   if (objfile->minimal_symbol_count == 0)
     {
       fprintf_filtered (outfile, "No minimal symbols found.\n");
@@ -306,7 +300,8 @@ dump_symtab_1 (struct objfile *objfile, struct symtab *symtab,
   if (symtab->dirname)
     fprintf_filtered (outfile, "Compilation directory is %s\n",
 		      symtab->dirname);
-  fprintf_filtered (outfile, "Read from object file %s (", objfile->name);
+  fprintf_filtered (outfile, "Read from object file %s (",
+		    objfile_name (objfile));
   gdb_print_host_address (objfile, outfile);
   fprintf_filtered (outfile, ")\n");
   fprintf_filtered (outfile, "Language: %s\n",
@@ -684,7 +679,7 @@ maintenance_print_msymbols (char *args, int from_tty)
     ALL_PSPACE_OBJFILES (pspace, objfile)
       {
 	QUIT;
-	if (symname == NULL || (!stat (objfile->name, &obj_st)
+	if (symname == NULL || (!stat (objfile_name (objfile), &obj_st)
 				&& sym_st.st_dev == obj_st.st_dev
 				&& sym_st.st_ino == obj_st.st_ino))
 	  dump_msymbols (objfile, outfile);
@@ -694,18 +689,23 @@ maintenance_print_msymbols (char *args, int from_tty)
 }
 
 static void
-maintenance_print_objfiles (char *ignore, int from_tty)
+maintenance_print_objfiles (char *regexp, int from_tty)
 {
   struct program_space *pspace;
   struct objfile *objfile;
 
   dont_repeat ();
 
+  if (regexp)
+    re_comp (regexp);
+
   ALL_PSPACES (pspace)
     ALL_PSPACE_OBJFILES (pspace, objfile)
       {
 	QUIT;
-	dump_objfile (objfile);
+	if (! regexp
+	    || re_exec (objfile_name (objfile)))
+	  dump_objfile (objfile);
       }
 }
 
@@ -716,6 +716,8 @@ maintenance_info_symtabs (char *regexp, int from_tty)
 {
   struct program_space *pspace;
   struct objfile *objfile;
+
+  dont_repeat ();
 
   if (regexp)
     re_comp (regexp);
@@ -738,7 +740,7 @@ maintenance_info_symtabs (char *regexp, int from_tty)
 	    {
 	      if (! printed_objfile_start)
 		{
-		  printf_filtered ("{ objfile %s ", objfile->name);
+		  printf_filtered ("{ objfile %s ", objfile_name (objfile));
 		  wrap_here ("  ");
 		  printf_filtered ("((struct objfile *) %s)\n", 
 				   host_address_to_string (objfile));
@@ -809,7 +811,7 @@ maintenance_check_symtabs (char *ignore, int from_tty)
 	    {
 	      if (! printed_objfile_start)
 		{
-		  printf_filtered ("{ objfile %s ", objfile->name);
+		  printf_filtered ("{ objfile %s ", objfile_name (objfile));
 		  wrap_here ("  ");
 		  printf_filtered ("((struct objfile *) %s)\n", 
 				   host_address_to_string (objfile));
@@ -940,14 +942,15 @@ If a SOURCE file is specified, dump only that file's minimal symbols."),
 	   &maintenanceprintlist);
 
   add_cmd ("objfiles", class_maintenance, maintenance_print_objfiles,
-	   _("Print dump of current object file definitions."),
+	   _("Print dump of current object file definitions.\n\
+With an argument REGEXP, list the object files with matching names."),
 	   &maintenanceprintlist);
 
   add_cmd ("symtabs", class_maintenance, maintenance_info_symtabs, _("\
 List the full symbol tables for all object files.\n\
 This does not include information about individual symbols, blocks, or\n\
 linetables --- just the symbol table structures themselves.\n\
-With an argument REGEXP, list the symbol tables whose names that match that."),
+With an argument REGEXP, list the symbol tables with matching names."),
 	   &maintenanceinfolist);
 
   add_cmd ("check-symtabs", class_maintenance, maintenance_check_symtabs,

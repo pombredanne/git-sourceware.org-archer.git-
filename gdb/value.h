@@ -273,6 +273,11 @@ extern void set_value_lazy (struct value *value, int val);
 extern int value_stack (struct value *);
 extern void set_value_stack (struct value *value, int val);
 
+/* Throw an error complaining that the value has been optimized
+   out.  */
+
+extern void error_value_optimized_out (void);
+
 /* value_contents() and value_contents_raw() both return the address
    of the gdb buffer used to hold a copy of the contents of the lval.
    value_contents() is used when the contents of the buffer are needed
@@ -435,6 +440,10 @@ extern int value_bytes_available (const struct value *value,
    whole object is unavailable.  */
 extern int value_entirely_available (struct value *value);
 
+/* Like value_entirely_available, but return false if any byte in the
+   whole object is available.  */
+extern int value_entirely_unavailable (struct value *value);
+
 /* Mark VALUE's content bytes starting at OFFSET and extending for
    LENGTH bytes as unavailable.  */
 
@@ -593,7 +602,6 @@ extern struct value *default_read_var_value (struct symbol *var,
 
 extern struct value *allocate_value (struct type *type);
 extern struct value *allocate_value_lazy (struct type *type);
-extern void allocate_value_contents (struct value *value);
 extern void value_contents_copy (struct value *dst, int dst_offset,
 				 struct value *src, int src_offset,
 				 int length);
@@ -732,7 +740,8 @@ extern struct value *evaluate_subexpression_type (struct expression *exp,
 
 extern void fetch_subexp_value (struct expression *exp, int *pc,
 				struct value **valp, struct value **resultp,
-				struct value **val_chain);
+				struct value **val_chain,
+				int preserve_errors);
 
 extern char *extract_field_op (struct expression *exp, int *subexp);
 
@@ -816,10 +825,9 @@ struct internalvar_funcs
   void (*destroy) (void *data);
 };
 
-extern struct internalvar *
-create_internalvar_type_lazy (const char *name,
-			      const struct internalvar_funcs *funcs,
-			      void *data);
+extern struct internalvar *create_internalvar_type_lazy (const char *name,
+				const struct internalvar_funcs *funcs,
+				void *data);
 
 /* Compile an internal variable to an agent expression.  VAR is the
    variable to compile; EXPR and VALUE are the agent expression we are

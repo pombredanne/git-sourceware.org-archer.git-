@@ -1,8 +1,6 @@
-/* Dump-to-file commands, for GDB, the GNU debugger.
+/* This testcase is part of GDB, the GNU debugger.
 
-   Copyright (C) 2001-2013 Free Software Foundation, Inc.
-
-   This file is part of GDB.
+   Copyright 2013 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -17,18 +15,26 @@
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
-#ifndef CLI_DUMP_H
-#define CLI_DUMP_H
+#include <pthread.h>
 
-extern void add_dump_command (char *name,
-			      void (*func) (char *args, char *mode),
-			      char *descr);
+static void *
+start (void *arg)
+{
+  return NULL;
+}
 
-/* Utilities for doing the dump.  */
-extern char *scan_filename_with_cleanup (char **cmd, const char *defname);
+static void
+end (void)
+{
+}
 
-extern char *scan_expression_with_cleanup (char **cmd, const char *defname);
+int
+main (void)
+{
+  pthread_t thread;
 
-extern FILE *fopen_with_cleanup (const char *filename, const char *mode);
-
-#endif
+  pthread_create (&thread, NULL, start, NULL);
+  pthread_join (thread, NULL);
+  end ();
+  return 0;
+}

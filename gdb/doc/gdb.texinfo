@@ -5864,6 +5864,24 @@ after the breakpoint condition, like this:
 
 @end table
 
+Thread-specific breakpoints are automatically deleted when
+@value{GDBN} detects the corresponding thread is no longer in the
+thread list.  For example:
+
+@smallexample
+(@value{GDBP}) c
+Thread-specific breakpoint 3 deleted - thread 28 no longer in the thread list.
+@end smallexample
+
+There are several ways for a thread to disappear, such as a regular
+thread exit, but also when you detach from the process with the
+@code{detach} command (@pxref{Attach, ,Debugging an Already-running
+Process}), or if @value{GDBN} loses the remote connection
+(@pxref{Remote Debugging}), etc.  Note that with some targets,
+@value{GDBN} is only able to detect a thread has exited when the user
+explictly asks for the thread list with the @code{info threads}
+command.
+
 @node Interrupted System Calls
 @subsection Interrupted System Calls 
 
@@ -9751,8 +9769,64 @@ to match the format in which the data was printed.
 
 @item $_exitcode
 @vindex $_exitcode@r{, convenience variable}
-The variable @code{$_exitcode} is automatically set to the exit code when
-the program being debugged terminates.
+When the program being debugged terminates normally, @value{GDBN}
+automatically sets this variable to the exit code of the program, and
+resets @code{$_exitsignal} to @code{void}.
+
+@item $_exitsignal
+@vindex $_exitsignal@r{, convenience variable}
+When the program being debugged dies due to an uncaught signal,
+@value{GDBN} automatically sets this variable to that signal's number,
+and resets @code{$_exitcode} to @code{void}.
+
+To distinguish between whether the program being debugged has exited
+(i.e., @code{$_exitcode} is not @code{void}) or signalled (i.e.,
+@code{$_exitsignal} is not @code{void}), the convenience function
+@code{$_isvoid} can be used (@pxref{Convenience Funs,, Convenience
+Functions}).  For example, considering the following source code:
+
+@smallexample
+#include <signal.h>
+
+int
+main (int argc, char *argv[])
+@{
+  raise (SIGALRM);
+  return 0;
+@}
+@end smallexample
+
+A valid way of telling whether the program being debugged has exited
+or signalled would be:
+
+@smallexample
+(@value{GDBP}) define has_exited_or_signalled
+Type commands for definition of ``has_exited_or_signalled''.
+End with a line saying just ``end''.
+>if $_isvoid ($_exitsignal)
+ >echo The program has exited\n
+ >else
+ >echo The program has signalled\n
+ >end
+>end
+(@value{GDBP}) run
+Starting program:
+
+Program terminated with signal SIGALRM, Alarm clock.
+The program no longer exists.
+(@value{GDBP}) has_exited_or_signalled
+The program has signalled
+@end smallexample
+
+As can be seen, @value{GDBN} correctly informs that the program being
+debugged has signalled, since it calls @code{raise} and raises a
+@code{SIGALRM} signal.  If the program being debugged had not called
+@code{raise}, then @value{GDBN} would report a normal exit:
+
+@smallexample
+(@value{GDBP}) has_exited_or_signalled
+The program has exited
+@end smallexample
 
 @item $_exception
 The variable @code{$_exception} is set to the exception object being
@@ -9799,6 +9873,69 @@ have a syntax similar to convenience variables.  A convenience
 function can be used in an expression just like an ordinary function;
 however, a convenience function is implemented internally to
 @value{GDBN}.
+
+These functions do not require @value{GDBN} to be configured with
+@code{Python} support, which means that they are always available.
+
+@table @code
+
+@item $_isvoid (@var{expr})
+@findex $_isvoid@r{, convenience function}
+Return one if the expression @var{expr} is @code{void}.  Otherwise it
+returns zero.
+
+A @code{void} expression is an expression where the type of the result
+is @code{void}.  For example, you can examine a convenience variable
+(see @ref{Convenience Vars,, Convenience Variables}) to check whether
+it is @code{void}:
+
+@smallexample
+(@value{GDBP}) print $_exitcode
+$1 = void
+(@value{GDBP}) print $_isvoid ($_exitcode)
+$2 = 1
+(@value{GDBP}) run
+Starting program: ./a.out
+[Inferior 1 (process 29572) exited normally]
+(@value{GDBP}) print $_exitcode
+$3 = 0
+(@value{GDBP}) print $_isvoid ($_exitcode)
+$4 = 0
+@end smallexample
+
+In the example above, we used @code{$_isvoid} to check whether
+@code{$_exitcode} is @code{void} before and after the execution of the
+program being debugged.  Before the execution there is no exit code to
+be examined, therefore @code{$_exitcode} is @code{void}.  After the
+execution the program being debugged returned zero, therefore
+@code{$_exitcode} is zero, which means that it is not @code{void}
+anymore.
+
+The @code{void} expression can also be a call of a function from the
+program being debugged.  For example, given the following function:
+
+@smallexample
+void
+foo (void)
+@{
+@}
+@end smallexample
+
+The result of calling it inside @value{GDBN} is @code{void}:
+
+@smallexample
+(@value{GDBP}) print foo ()
+$1 = void
+(@value{GDBP}) print $_isvoid (foo ())
+$2 = 1
+(@value{GDBP}) set $v = foo ()
+(@value{GDBP}) print $v
+$3 = void
+(@value{GDBP}) print $_isvoid ($v)
+$4 = 1
+@end smallexample
+
+@end table
 
 These functions require @value{GDBN} to be configured with
 @code{Python} support.
@@ -9968,10 +10105,33 @@ were exited and their saved registers restored.  In order to see the
 true contents of hardware registers, you must select the innermost
 frame (with @samp{frame 0}).
 
-However, @value{GDBN} must deduce where registers are saved, from the machine
-code generated by your compiler.  If some registers are not saved, or if
-@value{GDBN} is unable to locate the saved registers, the selected stack
-frame makes no difference.
+@cindex caller-saved registers
+@cindex call-clobbered registers
+@cindex volatile registers
+@cindex <not saved> values
+Usually ABIs reserve some registers as not needed to be saved by the
+callee (a.k.a.: ``caller-saved'', ``call-clobbered'' or ``volatile''
+registers).  It may therefore not be possible for @value{GDBN} to know
+the value a register had before the call (in other words, in the outer
+frame), if the register value has since been changed by the callee.
+@value{GDBN} tries to deduce where the inner frame saved
+(``callee-saved'') registers, from the debug info, unwind info, or the
+machine code generated by your compiler.  If some register is not
+saved, and @value{GDBN} knows the register is ``caller-saved'' (via
+its own knowledge of the ABI, or because the debug/unwind info
+explicitly says the register's value is undefined), @value{GDBN}
+displays @w{@samp{<not saved>}} as the register's value.  With targets
+that @value{GDBN} has no knowledge of the register saving convention,
+if a register was not saved by the callee, then its value and location
+in the outer frame are assumed to be the same of the inner frame.
+This is usually harmless, because if the register is call-clobbered,
+the caller either does not care what is in the register after the
+call, or has code to restore the value that it does care about.  Note,
+however, that if you change such a register in the outer frame, you
+may also be affecting the inner frame.  Also, the more ``outer'' the
+frame is you're looking at, the more likely a call-clobbered
+register's value is to be wrong, in the sense that it doesn't actually
+represent the value the register had just before the call.
 
 @node Floating Point Hardware
 @section Floating Point Hardware
@@ -13849,8 +14009,8 @@ specified by the extension to support decimal floating-point arithmetic.
 
 There are two encodings in use, depending on the architecture: BID (Binary
 Integer Decimal) for x86 and x86-64, and DPD (Densely Packed Decimal) for
-PowerPC.  @value{GDBN} will use the appropriate encoding for the configured
-target.
+PowerPC and S/390.  @value{GDBN} will use the appropriate encoding for the
+configured target.
 
 Because of a limitation in @file{libdecnumber}, the library used by @value{GDBN}
 to manipulate decimal floating point numbers, it is not possible to convert
@@ -17325,23 +17485,31 @@ standard utilities:
 
 @smallexample
 # Extract the dynamic symbols from the main binary, there is no need
-# to also have these in the normal symbol table
+# to also have these in the normal symbol table.
 nm -D @var{binary} --format=posix --defined-only \
   | awk '@{ print $1 @}' | sort > dynsyms
 
-# Extract all the text (i.e. function) symbols from the debuginfo .
+# Extract all the text (i.e. function) symbols from the debuginfo.
+# (Note that we actually also accept "D" symbols, for the benefit
+# of platforms like PowerPC64 that use function descriptors.)
 nm @var{binary} --format=posix --defined-only \
-  | awk '@{ if ($2 == "T" || $2 == "t") print $1 @}' \
+  | awk '@{ if ($2 == "T" || $2 == "t" || $2 == "D") print $1 @}' \
   | sort > funcsyms
 
 # Keep all the function symbols not already in the dynamic symbol
 # table.
 comm -13 dynsyms funcsyms > keep_symbols
 
+# Separate full debug info into debug binary.
+objcopy --only-keep-debug @var{binary} debug
+
 # Copy the full debuginfo, keeping only a minimal set of symbols and
 # removing some unnecessary sections.
 objcopy -S --remove-section .gdb_index --remove-section .comment \
-  --keep-symbols=keep_symbols @var{binary} mini_debuginfo
+  --keep-symbols=keep_symbols debug mini_debuginfo
+
+# Drop the full debug info from the original binary.
+strip --strip-all -R .comment @var{binary}
 
 # Inject the compressed data into the .gnu_debugdata section of the
 # original binary.
@@ -17856,8 +18024,8 @@ target remote /dev/ttyb
 @end smallexample
 
 If you're using a serial line, you may want to give @value{GDBN} the
-@w{@samp{--baud}} option, or use the @code{set remotebaud} command
-(@pxref{Remote Configuration, set remotebaud}) before the
+@samp{--baud} option, or use the @code{set serial baud} command
+(@pxref{Remote Configuration, set serial baud}) before the
 @code{target} command.
 
 @item target remote @code{@var{host}:@var{port}}
@@ -18182,7 +18350,7 @@ completeness, at most one @value{GDBN} can be connected at a time.
 
 @cindex @option{--once}, @code{gdbserver} option
 By default, @code{gdbserver} keeps the listening TCP port open, so that
-additional connections are possible.  However, if you start @code{gdbserver}
+subsequent connections are possible.  However, if you start @code{gdbserver}
 with the @option{--once} option, it will stop listening for any further
 connection attempts after connecting to the first @value{GDBN} session.  This
 means no further connections to @code{gdbserver} will be possible after the
@@ -18399,13 +18567,13 @@ default value is the number of bits in the target's address.
 @item show remoteaddresssize
 Show the current value of remote address size in bits.
 
-@item set remotebaud @var{n}
+@item set serial baud @var{n}
 @cindex baud rate for remote targets
 Set the baud rate for the remote serial I/O to @var{n} baud.  The
 value is used to set the speed of the serial port used for debugging
 remote targets.
 
-@item show remotebaud
+@item show serial baud
 Show the current speed of the remote connection.
 
 @item set remotebreak
@@ -22502,6 +22670,12 @@ Turns on or off debugging messages for FR-V shared-library code.
 @item show debug solib-frv
 Display the current state of FR-V shared-library code debugging
 messages.
+@item set debug symfile
+@cindex symbol file functions
+Turns on or off display of debugging messages related to symbol file functions.
+The default is off.  @xref{Files}.
+@item show debug symfile
+Show the current state of symbol file debugging messages.
 @item set debug symtab-create
 @cindex symbol table creation
 Turns on or off display of debugging messages related to symbol table creation.
@@ -30154,6 +30328,14 @@ thread-groups=["i1"],times="1"@}]@}
 This section documents @sc{gdb/mi} commands for manipulating
 catchpoints.
 
+@menu
+* Shared Library GDB/MI Catchpoint Commands::
+* Ada Exception GDB/MI Catchpoint Commands::
+@end menu
+
+@node Shared Library GDB/MI Catchpoint Commands
+@subsection Shared Library @sc{gdb/mi} Catchpoints
+
 @subheading The @code{-catch-load} Command
 @findex -catch-load
 
@@ -30212,6 +30394,97 @@ what="load of library matching bar.so",catch-type="unload",times="0"@}
 (gdb)
 @end smallexample
 
+@node Ada Exception GDB/MI Catchpoint Commands
+@subsection Ada Exception @sc{gdb/mi} Catchpoints
+
+The following @sc{gdb/mi} commands can be used to create catchpoints
+that stop the execution when Ada exceptions are being raised.
+
+@subheading The @code{-catch-assert} Command
+@findex -catch-assert
+
+@subsubheading Synopsis
+
+@smallexample
+ -catch-assert [ -c @var{condition}] [ -d ] [ -t ]
+@end smallexample
+
+Add a catchpoint for failed Ada assertions.
+
+The possible optional parameters for this command are:
+
+@table @samp
+@item -c @var{condition}
+Make the catchpoint conditional on @var{condition}.
+@item -d
+Create a disabled catchpoint.
+@item -t
+Create a temporary catchpoint.
+@end table
+
+@subsubheading @value{GDBN} Command
+
+The corresponding @value{GDBN} command is @samp{catch assert}.
+
+@subsubheading Example
+
+@smallexample
+-catch-assert
+^done,bkptno="5",bkpt=@{number="5",type="breakpoint",disp="keep",
+enabled="y",addr="0x0000000000404888",what="failed Ada assertions",
+thread-groups=["i1"],times="0",
+original-location="__gnat_debug_raise_assert_failure"@}
+(gdb)
+@end smallexample
+
+@subheading The @code{-catch-exception} Command
+@findex -catch-exception
+
+@subsubheading Synopsis
+
+@smallexample
+ -catch-exception [ -c @var{condition}] [ -d ] [ -e @var{exception-name} ]
+    [ -t ] [ -u ]
+@end smallexample
+
+Add a catchpoint stopping when Ada exceptions are raised.
+By default, the command stops the program when any Ada exception
+gets raised.  But it is also possible, by using some of the
+optional parameters described below, to create more selective
+catchpoints.
+
+The possible optional parameters for this command are:
+
+@table @samp
+@item -c @var{condition}
+Make the catchpoint conditional on @var{condition}.
+@item -d
+Create a disabled catchpoint.
+@item -e @var{exception-name}
+Only stop when @var{exception-name} is raised.  This option cannot
+be used combined with @samp{-u}.
+@item -t
+Create a temporary catchpoint.
+@item -u
+Stop only when an unhandled exception gets raised.  This option
+cannot be used combined with @samp{-e}.
+@end table
+
+@subsubheading @value{GDBN} Command
+
+The corresponding @value{GDBN} commands are @samp{catch exception}
+and @samp{catch exception unhandled}.
+
+@subsubheading Example
+
+@smallexample
+-catch-exception -e Program_Error
+^done,bkptno="4",bkpt=@{number="4",type="breakpoint",disp="keep",
+enabled="y",addr="0x0000000000404874",
+what="`Program_Error' Ada exception", thread-groups=["i1"],
+times="0",original-location="__gnat_debug_raise_exception"@}
+(gdb)
+@end smallexample
 
 @c %%%%%%%%%%%%%%%%%%%%%%%%%%%% SECTION %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 @node GDB/MI Program Context
@@ -30957,7 +31230,7 @@ fullname="/home/foo/bar/devo/gdb/testsuite/gdb.mi/basics.c",line="18"@}
 @subsubheading Synopsis
 
 @smallexample
- -exec-run [--all | --thread-group N]
+ -exec-run [ --all | --thread-group N ] [ --start ]
 @end smallexample
 
 Starts execution of the inferior from the beginning.  The inferior
@@ -30965,10 +31238,16 @@ executes until either a breakpoint is encountered or the program
 exits.  In the latter case the output will include an exit code, if
 the program has exited exceptionally.
 
-When no option is specified, the current inferior is started.  If the
+When neither the @samp{--all} nor the @samp{--thread-group} option
+is specified, the current inferior is started.  If the
 @samp{--thread-group} option is specified, it should refer to a thread
 group of type @samp{process}, and that thread group will be started.
 If the @samp{--all} option is specified, then all inferiors will be started.
+
+Using the @samp{--start} option instructs the debugger to stop
+the execution at the start of the inferior's main subprogram,
+following the same behavior as the @code{start} command
+(@pxref{Starting}).
 
 @subsubheading @value{GDBN} Command
 
@@ -31249,7 +31528,7 @@ For a stack with frame levels 0 through 11:
 @subsubheading Synopsis
 
 @smallexample
- -stack-list-arguments [ --no-frame-filters ] @var{print-values}
+ -stack-list-arguments [ --no-frame-filters ] [ --skip-unavailable ] @var{print-values}
     [ @var{low-frame} @var{high-frame} ]
 @end smallexample
 
@@ -31269,6 +31548,9 @@ type and value for simple data types, and the name and type for arrays,
 structures and unions.  If the option @code{--no-frame-filters} is
 supplied, then Python frame filters will not be executed.
 
+If the @code{--skip-unavailable} option is specified, arguments that
+are not available are not listed.  Partially available arguments
+are still displayed, however.
 
 Use of this command to obtain arguments in a single frame is
 deprecated in favor of the @samp{-stack-list-variables} command.
@@ -31453,7 +31735,7 @@ Show a single frame:
 @subsubheading Synopsis
 
 @smallexample
- -stack-list-locals [ --no-frame-filters ] @var{print-values}
+ -stack-list-locals [ --no-frame-filters ] [ --skip-unavailable ] @var{print-values}
 @end smallexample
 
 Display the local variable names for the selected frame.  If
@@ -31466,6 +31748,10 @@ display the value of simple data types and create variable objects for
 other data types when the user wishes to explore their values in
 more detail.  If the option @code{--no-frame-filters} is supplied, then
 Python frame filters will not be executed.
+
+If the @code{--skip-unavailable} option is specified, local variables
+that are not available are not listed.  Partially available local
+variables are still displayed, however.
 
 This command is deprecated in favor of the
 @samp{-stack-list-variables} command.
@@ -31497,7 +31783,7 @@ This command is deprecated in favor of the
 @subsubheading Synopsis
 
 @smallexample
- -stack-list-variables [ --no-frame-filters ] @var{print-values}
+ -stack-list-variables [ --no-frame-filters ] [ --skip-unavailable ] @var{print-values}
 @end smallexample
 
 Display the names of local variables and function arguments for the selected frame.  If
@@ -31507,6 +31793,10 @@ values; and if it is 2 or @code{--simple-values}, print the name,
 type and value for simple data types, and the name and type for arrays,
 structures and unions.  If the option @code{--no-frame-filters} is
 supplied, then Python frame filters will not be executed.
+
+If the @code{--skip-unavailable} option is specified, local variables
+and arguments that are not available are not listed.  Partially
+available arguments and local variables are still displayed, however.
 
 @subsubheading Example
 
@@ -34551,7 +34841,7 @@ may change, and the frontend should obtain it again.
 Example output:
 
 @smallexample
-(gdb) -list-features
+(gdb) -list-target-features
 ^done,result=["async"]
 @end smallexample
 
@@ -36788,8 +37078,7 @@ including registers which aren't available on the target nor visible
 to user; the command @code{maint print register-groups} includes the
 groups that each register is a member of; and the command @code{maint
 print remote-registers} includes the remote target's register numbers
-and offsets in the `G' packets.  @xref{Registers,, Registers, gdbint,
-@value{GDBN} Internals}.
+and offsets in the `G' packets.
 
 These commands take an optional parameter, a file name to which to
 write the information.
@@ -36820,10 +37109,11 @@ This command forces @value{GDBN} to flush its internal register cache.
 
 @kindex maint print objfiles
 @cindex info for known object files
-@item maint print objfiles
-Print a dump of all known object files.  For each object file, this
-command prints its name, address in memory, and all of its psymtabs
-and symtabs.
+@item maint print objfiles @r{[}@var{regexp}@r{]}
+Print a dump of all known object files.
+If @var{regexp} is specified, only print object files whose names
+match @var{regexp}.  For each object file, this command prints its name,
+address in memory, and all of its psymtabs and symtabs.
 
 @kindex maint print section-scripts
 @cindex info for known .debug_gdb_scripts-loaded scripts
@@ -42450,6 +42740,7 @@ registers using the capitalization used in the description.
 * M68K Features::
 * Nios II Features::
 * PowerPC Features::
+* S/390 and System z Features::
 * TIC6x Features::
 @end menu
 
@@ -42638,6 +42929,39 @@ contain registers @samp{ev0h} through @samp{ev31h}, @samp{acc}, and
 @samp{ev0h} through @samp{ev31h}.  @value{GDBN} will combine
 these to present registers @samp{ev0} through @samp{ev31} to the
 user.
+
+@node S/390 and System z Features
+@subsection S/390 and System z Features
+@cindex target descriptions, S/390 features
+@cindex target descriptions, System z features
+
+The @samp{org.gnu.gdb.s390.core} feature is required for S/390 and
+System z targets.  It should contain the PSW and the 16 general
+registers.  In particular, System z targets should provide the 64-bit
+registers @samp{pswm}, @samp{pswa}, and @samp{r0} through @samp{r15}.
+S/390 targets should provide the 32-bit versions of these registers.
+A System z target that runs in 31-bit addressing mode should provide
+32-bit versions of @samp{pswm} and @samp{pswa}, as well as the general
+register's upper halves @samp{r0h} through @samp{r15h}, and their
+lower halves @samp{r0l} through @samp{r15l}.
+
+The @samp{org.gnu.gdb.s390.fpr} feature is required.  It should
+contain the 64-bit registers @samp{f0} through @samp{f15}, and
+@samp{fpc}.
+
+The @samp{org.gnu.gdb.s390.acr} feature is required.  It should
+contain the 32-bit registers @samp{acr0} through @samp{acr15}.
+
+The @samp{org.gnu.gdb.s390.linux} feature is optional.  It should
+contain the register @samp{orig_r2}, which is 64-bit wide on System z
+targets and 32-bit otherwise.  In addition, the feature may contain
+the @samp{last_break} register, whose width depends on the addressing
+mode, as well as the @samp{system_call} register, which is always
+32-bit wide.
+
+The @samp{org.gnu.gdb.s390.tdb} feature is optional.  It should
+contain the 64-bit registers @samp{tdb0}, @samp{tac}, @samp{tct},
+@samp{atia}, and @samp{tr0} through @samp{tr15}.
 
 @node TIC6x Features
 @subsection TMS320C6x Features
