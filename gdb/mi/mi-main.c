@@ -194,7 +194,7 @@ mi_cmd_exec_return (char *command, char **argv, int argc)
 
   /* Because we have called return_command with from_tty = 0, we need
      to print the frame here.  */
-  print_stack_frame (get_selected_frame (NULL), 1, LOC_AND_ADDRESS);
+  print_stack_frame (get_selected_frame (NULL), 1, LOC_AND_ADDRESS, 1);
 }
 
 void
@@ -210,7 +210,7 @@ proceed_thread (struct thread_info *thread, int pid)
   if (!is_stopped (thread->ptid))
     return;
 
-  if (pid != 0 && PIDGET (thread->ptid) != pid)
+  if (pid != 0 && ptid_get_pid (thread->ptid) != pid)
     return;
 
   switch_to_thread (thread->ptid);
@@ -320,7 +320,7 @@ interrupt_thread_callback (struct thread_info *thread, void *arg)
   if (!is_running (thread->ptid))
     return 0;
 
-  if (PIDGET (thread->ptid) != pid)
+  if (ptid_get_pid (thread->ptid) != pid)
     return 0;
 
   target_stop (thread->ptid);
@@ -364,9 +364,19 @@ mi_cmd_exec_interrupt (char *command, char **argv, int argc)
     }
 }
 
+/* Callback for iterate_over_inferiors which starts the execution
+   of the given inferior.
+
+   ARG is a pointer to an integer whose value, if non-zero, indicates
+   that the program should be stopped when reaching the main subprogram
+   (similar to what the CLI "start" command does).  */
+
 static int
 run_one_inferior (struct inferior *inf, void *arg)
 {
+  int start_p = *(int *) arg;
+  const char *run_cmd = start_p ? "start" : "run";
+
   if (inf->pid != 0)
     {
       if (inf->pid != ptid_get_pid (inferior_ptid))
@@ -386,7 +396,7 @@ run_one_inferior (struct inferior *inf, void *arg)
       switch_to_thread (null_ptid);
       set_current_program_space (inf->pspace);
     }
-  mi_execute_cli_command ("run", target_can_async_p (),
+  mi_execute_cli_command (run_cmd, target_can_async_p (),
 			  target_can_async_p () ? "&" : NULL);
   return 0;
 }
@@ -394,16 +404,54 @@ run_one_inferior (struct inferior *inf, void *arg)
 void
 mi_cmd_exec_run (char *command, char **argv, int argc)
 {
+  int i;
+  int start_p = 0;
+
+  /* Parse the command options.  */
+  enum opt
+    {
+      START_OPT,
+    };
+  static const struct mi_opt opts[] =
+    {
+	{"-start", START_OPT, 0},
+	{NULL, 0, 0},
+    };
+
+  int oind = 0;
+  char *oarg;
+
+  while (1)
+    {
+      int opt = mi_getopt ("-exec-run", argc, argv, opts, &oind, &oarg);
+
+      if (opt < 0)
+	break;
+      switch ((enum opt) opt)
+	{
+	case START_OPT:
+	  start_p = 1;
+	  break;
+	}
+    }
+
+  /* This command does not accept any argument.  Make sure the user
+     did not provide any.  */
+  if (oind != argc)
+    error (_("Invalid argument: %s"), argv[oind]);
+
   if (current_context->all)
     {
       struct cleanup *back_to = save_current_space_and_thread ();
 
-      iterate_over_inferiors (run_one_inferior, NULL);
+      iterate_over_inferiors (run_one_inferior, &start_p);
       do_cleanups (back_to);
     }
   else
     {
-      mi_execute_cli_command ("run", target_can_async_p (),
+      const char *run_cmd = start_p ? "start" : "run";
+
+      mi_execute_cli_command (run_cmd, target_can_async_p (),
 			      target_can_async_p () ? "&" : NULL);
     }
 }
@@ -414,7 +462,7 @@ find_thread_of_process (struct thread_info *ti, void *p)
 {
   int pid = *(int *)p;
 
-  if (PIDGET (ti->ptid) == pid && !is_exited (ti->ptid))
+  if (ptid_get_pid (ti->ptid) == pid && !is_exited (ti->ptid))
     return 1;
 
   return 0;
@@ -573,10 +621,10 @@ print_one_inferior (struct inferior *inferior, void *xdata)
       if (inferior->pid != 0)
 	ui_out_field_int (uiout, "pid", inferior->pid);
 
-      if (inferior->pspace->ebfd)
+      if (inferior->pspace->pspace_exec_filename != NULL)
 	{
 	  ui_out_field_string (uiout, "executable",
-			       bfd_get_filename (inferior->pspace->ebfd));
+			       inferior->pspace->pspace_exec_filename);
 	}
 
       data.cores = 0;
@@ -1161,7 +1209,7 @@ output_register (struct frame_info *frame, int regnum, int format,
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
   struct ui_out *uiout = current_uiout;
-  struct value *val = get_frame_register_value (frame, regnum);
+  struct value *val = value_of_register (regnum, frame);
   struct cleanup *tuple_cleanup;
   struct value_print_options opts;
   struct ui_file *stb;
@@ -2484,7 +2532,7 @@ mi_cmd_trace_find (char *command, char **argv, int argc)
     error (_("Invalid mode '%s'"), mode);
 
   if (has_stack_frames () || get_traceframe_number () >= 0)
-    print_stack_frame (get_selected_frame (NULL), 1, SRC_AND_LOC);
+    print_stack_frame (get_selected_frame (NULL), 1, LOC_AND_ADDRESS, 1);
 }
 
 void

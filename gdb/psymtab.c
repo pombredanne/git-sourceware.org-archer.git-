@@ -86,7 +86,7 @@ require_partial_symbols (struct objfile *objfile, int verbose)
 	  if (verbose)
 	    {
 	      printf_unfiltered (_("Reading symbols from %s..."),
-				 objfile->name);
+				 objfile_name (objfile));
 	      gdb_flush (gdb_stdout);
 	    }
 	  (*objfile->sf->sym_read_psymbols) (objfile);
@@ -974,7 +974,7 @@ dump_psymtab (struct objfile *objfile, struct partial_symtab *psymtab,
   gdb_print_host_address (psymtab, outfile);
   fprintf_filtered (outfile, ")\n\n");
   fprintf_unfiltered (outfile, "  Read from object file %s (",
-		      objfile->name);
+		      objfile_name (objfile));
   gdb_print_host_address (objfile, outfile);
   fprintf_unfiltered (outfile, ")\n");
 
@@ -1206,19 +1206,6 @@ psymtab_to_fullname (struct partial_symtab *ps)
   return ps->fullname;
 }
 
-static const char *
-find_symbol_file_from_partial (struct objfile *objfile, const char *name)
-{
-  struct partial_symtab *pst;
-
-  ALL_OBJFILE_PSYMTABS_REQUIRED (objfile, pst)
-    {
-      if (lookup_partial_symbol (objfile, pst, name, 1, VAR_DOMAIN))
-	return pst->filename;
-    }
-  return NULL;
-}
-
 /*  For all symbols, s, in BLOCK that are in NAMESPACE and match NAME
     according to the function MATCH, call CALLBACK(BLOCK, s, DATA).
     BLOCK is assumed to come from OBJFILE.  Returns 1 iff CALLBACK
@@ -1251,8 +1238,9 @@ map_block (const char *name, domain_enum namespace, struct objfile *objfile,
     the definition of quick_symbol_functions in symfile.h.  */
 
 static void
-map_matching_symbols_psymtab (const char *name, domain_enum namespace,
-			      struct objfile *objfile, int global,
+map_matching_symbols_psymtab (struct objfile *objfile,
+			      const char *name, domain_enum namespace,
+			      int global,
 			      int (*callback) (struct block *,
 					       struct symbol *, void *),
 			      void *data,
@@ -1442,7 +1430,6 @@ const struct quick_symbol_functions psym_functions =
   read_symtabs_for_function,
   expand_partial_symbol_tables,
   read_psymtabs_with_fullname,
-  find_symbol_file_from_partial,
   map_matching_symbols_psymtab,
   expand_symtabs_matching_via_partial,
   find_pc_sect_symtab_from_partial,
@@ -1773,10 +1760,10 @@ allocate_psymtab (const char *filename, struct objfile *objfile)
       static char *last_objfile_name = NULL;
 
       if (last_objfile_name == NULL
-	  || strcmp (last_objfile_name, objfile->name) != 0)
+	  || strcmp (last_objfile_name, objfile_name (objfile)) != 0)
 	{
 	  xfree (last_objfile_name);
-	  last_objfile_name = xstrdup (objfile->name);
+	  last_objfile_name = xstrdup (objfile_name (objfile));
 	  fprintf_unfiltered (gdb_stdlog,
 			      "Creating one or more psymtabs for objfile %s ...\n",
 			      last_objfile_name);
@@ -1931,7 +1918,7 @@ maintenance_info_psymtabs (char *regexp, int from_tty)
 	    {
 	      if (! printed_objfile_start)
 		{
-		  printf_filtered ("{ objfile %s ", objfile->name);
+		  printf_filtered ("{ objfile %s ", objfile_name (objfile));
 		  wrap_here ("  ");
 		  printf_filtered ("((struct objfile *) %s)\n", 
 				   host_address_to_string (objfile));

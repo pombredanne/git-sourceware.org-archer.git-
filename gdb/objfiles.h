@@ -178,6 +178,20 @@ struct objfile_per_bfd_storage
 
   /* Byte cache for macros.  */
   struct bcache *macro_cache;
+
+  /* The gdbarch associated with the BFD.  Note that this gdbarch is
+     determined solely from BFD information, without looking at target
+     information.  The gdbarch determined from a running target may
+     differ from this e.g. with respect to register types and names.  */
+
+  struct gdbarch *gdbarch;
+
+  /* Hash table for mapping symbol names to demangled names.  Each
+     entry in the hash table is actually two consecutive strings,
+     both null-terminated; the first one is a mangled or linkage
+     name, and the second is the demangled name or just a zero byte
+     if the name doesn't demangle.  */
+  struct htab *demangled_names_hash;
 };
 
 /* Master structure for keeping track of each file from which
@@ -202,7 +216,7 @@ struct objfile
        pointer is never NULL.  This does not have to be freed; it is
        guaranteed to have a lifetime at least as long as the objfile.  */
 
-    char *name;
+    char *original_name;
 
     CORE_ADDR addr_low;
 
@@ -248,13 +262,6 @@ struct objfile
 
     struct objfile_per_bfd_storage *per_bfd;
 
-    /* The gdbarch associated with the BFD.  Note that this gdbarch is
-       determined solely from BFD information, without looking at target
-       information.  The gdbarch determined from a running target may
-       differ from this e.g. with respect to register types and names.  */
-
-    struct gdbarch *gdbarch;
-
     /* The modification timestamp of the object file, as of the last time
        we read its symbols.  */
 
@@ -269,13 +276,6 @@ struct objfile
        will not change.  */
 
     struct psymbol_bcache *psymbol_cache; /* Byte cache for partial syms.  */
-
-    /* Hash table for mapping symbol names to demangled names.  Each
-       entry in the hash table is actually two consecutive strings,
-       both null-terminated; the first one is a mangled or linkage
-       name, and the second is the demangled name or just a zero byte
-       if the name doesn't demangle.  */
-    struct htab *demangled_names_hash;
 
     /* Vectors of all partial symbols read in from file.  The actual data
        is stored in the objfile_obstack.  */
@@ -429,14 +429,14 @@ struct objfile
 
 #define OBJF_MAINLINE (1 << 5)
 
-/* The object file that contains the runtime common minimal symbols
-   for SunOS4.  Note that this objfile has no associated BFD.  */
+/* ORIGINAL_NAME and OBFD->FILENAME correspond to text description unrelated to
+   filesystem names.  It can be for example "<image in memory>".  */
 
-extern struct objfile *rt_common_objfile;
+#define OBJF_NOT_FILENAME (1 << 6)
 
 /* Declarations for functions defined in objfiles.c */
 
-extern struct objfile *allocate_objfile (bfd *, int);
+extern struct objfile *allocate_objfile (bfd *, const char *name, int);
 
 extern struct gdbarch *get_objfile_arch (struct objfile *);
 
@@ -479,6 +479,9 @@ extern int objfile_has_symbols (struct objfile *objfile);
 extern int have_partial_symbols (void);
 
 extern int have_full_symbols (void);
+
+extern void objfile_set_sym_fns (struct objfile *objfile,
+				 const struct sym_fns *sf);
 
 extern void objfiles_changed (void);
 
@@ -677,5 +680,7 @@ extern void default_iterate_over_objfiles_in_search_order
 /* Reset the per-BFD storage area on OBJ.  */
 
 void set_objfile_per_bfd (struct objfile *obj);
+
+const char *objfile_name (const struct objfile *objfile);
 
 #endif /* !defined (OBJFILES_H) */

@@ -57,7 +57,9 @@ struct expression;
    it goes into the file stratum, which is always below the process
    stratum.  */
 
-#include "target-common.h"
+#include "target/resume.h"
+#include "target/wait.h"
+#include "target/waitstatus.h"
 #include "bfd.h"
 #include "symtab.h"
 #include "memattr.h"
@@ -197,6 +199,26 @@ enum target_object
   /* Possible future objects: TARGET_OBJECT_FILE, ...  */
 };
 
+/* Possible error codes returned by target_xfer_partial, etc.  */
+
+enum target_xfer_error
+{
+  /* Generic I/O error.  Note that it's important that this is '-1',
+     as we still have target_xfer-related code returning hardcoded
+     '-1' on error.  */
+  TARGET_XFER_E_IO = -1,
+
+  /* Transfer failed because the piece of the object requested is
+     unavailable.  */
+  TARGET_XFER_E_UNAVAILABLE = -2,
+
+  /* Keep list in sync with target_xfer_error_to_string.  */
+};
+
+/* Return the string form of ERR.  */
+
+extern const char *target_xfer_error_to_string (enum target_xfer_error err);
+
 /* Enumeration of the kinds of traceframe searches that a target may
    be able to perform.  */
 
@@ -217,11 +239,12 @@ DEF_VEC_P(static_tracepoint_marker_p);
    starting point.  The ANNEX can be used to provide additional
    data-specific information to the target.
 
-   Return the number of bytes actually transfered, or -1 if the
-   transfer is not supported or otherwise fails.  Return of a positive
-   value less than LEN indicates that no further transfer is possible.
-   Unlike the raw to_xfer_partial interface, callers of these
-   functions do not need to retry partial transfers.  */
+   Return the number of bytes actually transfered, or a negative error
+   code (an 'enum target_xfer_error' value) if the transfer is not
+   supported or otherwise fails.  Return of a positive value less than
+   LEN indicates that no further transfer is possible.  Unlike the raw
+   to_xfer_partial interface, callers of these functions do not need
+   to retry partial transfers.  */
 
 extern LONGEST target_read (struct target_ops *ops,
 			    enum target_object object,
@@ -290,6 +313,14 @@ extern LONGEST target_read_alloc (struct target_ops *ops,
 extern char *target_read_stralloc (struct target_ops *ops,
 				   enum target_object object,
 				   const char *annex);
+
+/* See target_ops->to_xfer_partial.  */
+
+extern LONGEST target_xfer_partial (struct target_ops *ops,
+				    enum target_object object,
+				    const char *annex,
+				    void *readbuf, const void *writebuf,
+				    ULONGEST offset, LONGEST len);
 
 /* Wrappers to target read/write that perform memory transfers.  They
    throw an error if the memory transfer fails.
@@ -410,7 +441,7 @@ struct target_ops
     int (*to_remove_fork_catchpoint) (int);
     int (*to_insert_vfork_catchpoint) (int);
     int (*to_remove_vfork_catchpoint) (int);
-    int (*to_follow_fork) (struct target_ops *, int);
+    int (*to_follow_fork) (struct target_ops *, int, int);
     int (*to_insert_exec_catchpoint) (int);
     int (*to_remove_exec_catchpoint) (int);
     int (*to_set_syscall_catchpoint) (int, int, int, int, int *);
@@ -473,7 +504,8 @@ struct target_ops
        data-specific information to the target.
 
        Return the number of bytes actually transfered, zero when no
-       further transfer is possible, and -1 when the transfer is not
+       further transfer is possible, and a negative error code (really
+       an 'enum target_xfer_error' value) when the transfer is not
        supported.  Return of a positive value smaller than LEN does
        not indicate the end of the object, only the end of the
        transfer; higher level code should continue transferring if
@@ -1086,13 +1118,13 @@ int target_write_memory_blocks (VEC(memory_write_request_s) *requests,
      (*current_target.to_files_info) (&current_target)
 
 /* Insert a breakpoint at address BP_TGT->placed_address in the target
-   machine.  Result is 0 for success, or an errno value.  */
+   machine.  Result is 0 for success, non-zero for error.  */
 
 extern int target_insert_breakpoint (struct gdbarch *gdbarch,
 				     struct bp_target_info *bp_tgt);
 
 /* Remove a breakpoint at address BP_TGT->placed_address in the target
-   machine.  Result is 0 for success, or an errno value.  */
+   machine.  Result is 0 for success, non-zero for error.  */
 
 extern int target_remove_breakpoint (struct gdbarch *gdbarch,
 				     struct bp_target_info *bp_tgt);
@@ -1204,7 +1236,7 @@ void target_create_inferior (char *exec_file, char *args,
    This function returns 1 if the inferior should not be resumed
    (i.e. there is another event pending).  */
 
-int target_follow_fork (int follow_child);
+int target_follow_fork (int follow_child, int detach_fork);
 
 /* On some targets, we can catch an inferior exec event when it
    occurs.  These functions insert/remove an already-created

@@ -7,7 +7,7 @@
 
 /* Main header file for the bfd library -- portable access to object files.
 
-   Copyright 1990-2013 2013 Free Software Foundation, Inc.
+   Copyright 1990-2013 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
 
@@ -1067,7 +1067,9 @@ unsigned long bfd_calc_gnu_debuglink_crc32
 
 char *bfd_get_debug_link_info (bfd *abfd, unsigned long *crc32_out);
 
-char *bfd_get_alt_debug_link_info (bfd *abfd, unsigned long *crc32_out);
+char *bfd_get_alt_debug_link_info (bfd * abfd,
+    bfd_size_type *buildid_len,
+    bfd_byte **buildid_out);
 
 char *bfd_follow_gnu_debuglink (bfd *abfd, const char *dir);
 
@@ -1944,9 +1946,13 @@ enum bfd_architecture
 #define bfd_mach_i386_i386             (1 << 2)
 #define bfd_mach_x86_64                (1 << 3)
 #define bfd_mach_x64_32                (1 << 4)
+#define bfd_mach_i386_nacl             (1 << 5)
 #define bfd_mach_i386_i386_intel_syntax (bfd_mach_i386_i386 | bfd_mach_i386_intel_syntax)
 #define bfd_mach_x86_64_intel_syntax   (bfd_mach_x86_64 | bfd_mach_i386_intel_syntax)
 #define bfd_mach_x64_32_intel_syntax   (bfd_mach_x64_32 | bfd_mach_i386_intel_syntax)
+#define bfd_mach_i386_i386_nacl        (bfd_mach_i386_i386 | bfd_mach_i386_nacl)
+#define bfd_mach_x86_64_nacl           (bfd_mach_x86_64 | bfd_mach_i386_nacl)
+#define bfd_mach_x64_32_nacl           (bfd_mach_x64_32 | bfd_mach_i386_nacl)
   bfd_arch_l1om,   /* Intel L1OM */
 #define bfd_mach_l1om                  (1 << 5)
 #define bfd_mach_l1om_intel_syntax     (bfd_mach_l1om | bfd_mach_i386_intel_syntax)

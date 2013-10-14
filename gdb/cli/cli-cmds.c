@@ -479,7 +479,7 @@ find_and_open_script (const char *script_file, int search_path,
   char *file;
   int fd;
   struct cleanup *old_cleanups;
-  int search_flags = OPF_TRY_CWD_FIRST;
+  int search_flags = OPF_TRY_CWD_FIRST | OPF_RETURN_REALPATH;
 
   file = tilde_expand (script_file);
   old_cleanups = make_cleanup (xfree, file);
@@ -571,11 +571,14 @@ source_script_with_search (const char *file, int from_tty, int search_path)
       /* The script wasn't found, or was otherwise inaccessible.
          If the source command was invoked interactively, throw an
 	 error.  Otherwise (e.g. if it was invoked by a script),
-	 silently ignore the error.  */
+	 just emit a warning, rather than cause an error.  */
       if (from_tty)
 	perror_with_name (file);
       else
-	return;
+	{
+	  perror_warning_with_name (file);
+	  return;
+	}
     }
 
   old_cleanups = make_cleanup (xfree, full_path);
@@ -666,7 +669,7 @@ source_command (char *args, int from_tty)
 static void
 echo_command (char *text, int from_tty)
 {
-  char *p = text;
+  const char *p = text;
   int c;
 
   if (text)
@@ -1582,14 +1585,6 @@ show_history_expansion_p (struct ui_file *file, int from_tty,
 }
 
 static void
-show_baud_rate (struct ui_file *file, int from_tty,
-		struct cmd_list_element *c, const char *value)
-{
-  fprintf_filtered (file, _("Baud rate for remote serial I/O is %s.\n"),
-		    value);
-}
-
-static void
 show_remote_debug (struct ui_file *file, int from_tty,
 		   struct cmd_list_element *c, const char *value)
 {
@@ -1747,17 +1742,6 @@ the previous command number shown."),
 
   add_cmd ("configuration", no_set_class, show_configuration,
 	   _("Show how GDB was configured at build time."), &showlist);
-
-  /* If target is open when baud changes, it doesn't take effect until
-     the next open (I think, not sure).  */
-  add_setshow_zinteger_cmd ("remotebaud", no_class, &baud_rate, _("\
-Set baud rate for remote serial I/O."), _("\
-Show baud rate for remote serial I/O."), _("\
-This value is used to set the speed of the serial port when debugging\n\
-using remote targets."),
-			    NULL,
-			    show_baud_rate,
-			    &setlist, &showlist);
 
   add_setshow_zinteger_cmd ("remote", no_class, &remote_debug, _("\
 Set debugging of remote protocol."), _("\

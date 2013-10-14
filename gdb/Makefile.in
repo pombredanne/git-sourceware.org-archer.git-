@@ -178,6 +178,9 @@ INTL_CFLAGS = @INCINTL@
 # Did the user give us a --with-gdb-datadir option?
 GDB_DATADIR = @GDB_DATADIR@
 
+# Flags to pass to gdb when invoked with "make run".
+GDBFLAGS =
+
 # Helper code from gnulib.
 GNULIB_BUILDDIR = build-gnulib
 LIBGNU = $(GNULIB_BUILDDIR)/import/libgnu.a
@@ -550,7 +553,7 @@ ALL_TARGET_OBS = \
 	arm-tdep.o arm-wince-tdep.o \
 	avr-tdep.o \
 	bfin-linux-tdep.o bfin-tdep.o \
-	cris-tdep.o \
+	cris-linux-tdep.o cris-tdep.o \
 	dicos-tdep.o \
 	frv-linux-tdep.o frv-tdep.o \
 	h8300-tdep.o \
@@ -717,7 +720,7 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	bfd-target.c \
 	block.c blockframe.c \
 	breakpoint.c break-catch-sig.c break-catch-throw.c \
-	buildsym.c \
+	build-id.c buildsym.c \
 	c-exp.y c-lang.c c-typeprint.c c-valprint.c \
 	charset.c cleanups.c cli-out.c coffread.c coff-pe-read.c \
 	complaints.c completer.c continuations.c corefile.c corelow.c \
@@ -756,7 +759,7 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	serial.c ser-base.c ser-unix.c skip.c \
 	solib.c solib-target.c source.c \
 	stabsread.c stack.c probe.c stap-probe.c std-regs.c \
-	symfile.c symfile-mem.c symmisc.c symtab.c \
+	symfile.c symfile-debug.c symfile-mem.c symmisc.c symtab.c \
 	target.c target-descriptions.c target-memory.c \
 	thread.c top.c tracepoint.c \
 	trad-frame.c \
@@ -775,7 +778,7 @@ SFILES = ada-exp.y ada-lang.c ada-typeprint.c ada-valprint.c ada-tasks.c \
 	common/gdb_vecs.c common/common-utils.c common/xml-utils.c \
 	common/ptid.c common/buffer.c gdb-dlfcn.c common/agent.c \
 	common/format.c common/filestuff.c btrace.c record-btrace.c ctf.c \
-	common/target-common.c
+	target/waitstatus.c
 
 LINTFILES = $(SFILES) $(YYFILES) $(CONFIG_SRCS) init.c
 
@@ -794,7 +797,7 @@ exec.h m32r-tdep.h osabi.h gdbcore.h solib-som.h amd64bsd-nat.h \
 i386bsd-nat.h xml-support.h xml-tdesc.h alphabsd-tdep.h gdb_obstack.h \
 ia64-tdep.h ada-lang.h ada-varobj.h varobj.h frv-tdep.h nto-tdep.h serial.h \
 c-lang.h d-lang.h go-lang.h frame.h event-loop.h block.h cli/cli-setshow.h \
-cli/cli-decode.h cli/cli-cmds.h cli/cli-dump.h cli/cli-utils.h \
+cli/cli-decode.h cli/cli-cmds.h cli/cli-utils.h \
 cli/cli-script.h macrotab.h symtab.h common/version.h \
 gnulib/import/string.in.h gnulib/import/str-two-way.h \
 gnulib/import/stdint.in.h remote.h remote-notif.h gdb.h sparc-nat.h \
@@ -814,7 +817,8 @@ tui/tui-file.h tui/tui-command.h tui/tui-disasm.h tui/tui-wingeneral.h \
 tui/tui-windata.h tui/tui-data.h tui/tui-win.h tui/tui-stack.h \
 tui/tui-winsource.h tui/tui-regs.h tui/tui-io.h tui/tui-layout.h \
 tui/tui-source.h sol2-tdep.h gregset.h sh-tdep.h sh64-tdep.h \
-expression.h score-tdep.h gdb_select.h ser-tcp.h buildsym.h valprint.h \
+expression.h score-tdep.h gdb_select.h ser-tcp.h \
+build-id.h buildsym.h valprint.h \
 typeprint.h mi/mi-getopt.h mi/mi-parse.h mi/mi-console.h \
 mi/mi-out.h mi/mi-main.h mi/mi-common.h mi/mi-cmds.h linux-nat.h \
 complaints.h gdb_proc_service.h gdb_regex.h xtensa-tdep.h inf-loop.h \
@@ -854,7 +858,8 @@ common/common-utils.h common/xml-utils.h common/buffer.h common/ptid.h \
 common/format.h common/host-defs.h utils.h common/queue.h common/gdb_string.h \
 common/linux-osdata.h gdb-dlfcn.h auto-load.h probe.h stap-probe.h \
 gdb_bfd.h sparc-ravenscar-thread.h ppc-ravenscar-thread.h common/linux-btrace.h \
-ctf.h common/i386-cpuid.h common/i386-gcc-cpuid.h common/target-common.h
+ctf.h common/i386-cpuid.h common/i386-gcc-cpuid.h target/resume.h \
+target/wait.h target/waitstatus.h nat/linux-nat.h nat/linux-waitpid.h
 
 # Header files that already have srcdir in them, or which are in objdir.
 
@@ -893,7 +898,8 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	findvar.o regcache.o cleanups.o \
 	charset.o continuations.o corelow.o disasm.o dummy-frame.o dfp.o \
 	source.o value.o eval.o valops.o valarith.o valprint.o printcmd.o \
-	block.o symtab.o psymtab.o symfile.o symmisc.o linespec.o dictionary.o \
+	block.o symtab.o psymtab.o symfile.o symfile-debug.o symmisc.o \
+	linespec.o dictionary.o \
 	infcall.o \
 	infcmd.o infrun.o \
 	expprint.o environ.o stack.o thread.o \
@@ -909,7 +915,8 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	event-loop.o event-top.o inf-loop.o completer.o \
 	gdbarch.o arch-utils.o gdbtypes.o gdb_bfd.o gdb_obstack.o \
 	osabi.o copying.o \
-	memattr.o mem-break.o target.o parse.o language.o buildsym.o \
+	memattr.o mem-break.o target.o parse.o language.o \
+	build-id.o buildsym.o \
 	findcmd.o \
 	std-regs.o \
 	signals.o \
@@ -948,7 +955,7 @@ COMMON_OBS = $(DEPFILES) $(CONFIG_OBS) $(YYOBJ) \
 	inferior.o osdata.o gdb_usleep.o record.o record-full.o gcore.o \
 	gdb_vecs.o jit.o progspace.o skip.o probe.o \
 	common-utils.o buffer.o ptid.o gdb-dlfcn.o common-agent.o \
-	format.o registry.o btrace.o record-btrace.o target-common.o
+	format.o registry.o btrace.o record-btrace.o waitstatus.o
 
 TSOBS = inflow.o
 
@@ -1337,6 +1344,10 @@ data-directory/Makefile: data-directory/Makefile.in config.status @frags@
 	  CONFIG_LINKS= \
 	  $(SHELL) config.status
 
+.PHONY: run
+run: Makefile
+	./gdb$(EXEEXT) --data-directory=`pwd`/data-directory $(GDBFLAGS)
+
 jit-reader.h: $(srcdir)/jit-reader.in
 	$(SHELL) config.status $@
 
@@ -1551,7 +1562,7 @@ ALLDEPFILES = \
 	ser-go32.c ser-pipe.c ser-tcp.c ser-mingw.c \
 	sh-tdep.c sh64-tdep.c shnbsd-tdep.c shnbsd-nat.c \
 	sol2-tdep.c \
-	solib-irix.c solib-svr4.c solib-sunos.c \
+	solib-irix.c solib-svr4.c \
 	sparc-linux-nat.c sparc-linux-tdep.c \
 	sparc-sol2-nat.c sparc-sol2-tdep.c sparc64-sol2-tdep.c \
 	sparc-nat.c sparc-tdep.c sparc64-linux-nat.c sparc64-linux-tdep.c \
@@ -2028,12 +2039,27 @@ linux-btrace.o: ${srcdir}/common/linux-btrace.c
 	$(COMPILE) $(srcdir)/common/linux-btrace.c
 	$(POSTCOMPILE)
 
-target-common.o: ${srcdir}/common/target-common.c
-	$(COMPILE) $(srcdir)/common/target-common.c
-	$(POSTCOMPILE)
-
 mips-linux-watch.o: ${srcdir}/common/mips-linux-watch.c
 	$(COMPILE) $(srcdir)/common/mips-linux-watch.c
+	$(POSTCOMPILE)
+
+#
+# gdb/target/ dependencies
+#
+# Need to explicitly specify the compile rule as make will do nothing
+# or try to compile the object file into the sub-directory.
+
+waitstatus.o: ${srcdir}/target/waitstatus.c
+	$(COMPILE) $(srcdir)/target/waitstatus.c
+	$(POSTCOMPILE)
+
+# gdb/nat/ dependencies
+#
+# Need to explicitly specify the compile rule as make will do nothing
+# or try to compile the object file into the sub-directory.
+
+linux-waitpid.o: ${srcdir}/nat/linux-waitpid.c
+	$(COMPILE) $(srcdir)/nat/linux-waitpid.c
 	$(POSTCOMPILE)
 
 #

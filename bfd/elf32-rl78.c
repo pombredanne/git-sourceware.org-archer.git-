@@ -1,6 +1,5 @@
 /* Renesas RL78 specific support for 32-bit ELF.
-   Copyright (C) 2011, 2012
-   Free Software Foundation, Inc.
+   Copyright (C) 2011-2013 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -1021,15 +1020,34 @@ static bfd_boolean
 rl78_elf_merge_private_bfd_data (bfd * ibfd, bfd * obfd)
 {
   flagword new_flags;
+  flagword old_flags;
   bfd_boolean error = FALSE;
 
   new_flags = elf_elfheader (ibfd)->e_flags;
+  old_flags = elf_elfheader (obfd)->e_flags;
 
   if (!elf_flags_init (obfd))
     {
       /* First call, no flags set.  */
       elf_flags_init (obfd) = TRUE;
       elf_elfheader (obfd)->e_flags = new_flags;
+    }
+  else if (old_flags != new_flags)
+    {
+      flagword changed_flags = old_flags ^ new_flags;
+
+      if (changed_flags & E_FLAG_RL78_G10)
+	{
+	  (*_bfd_error_handler)
+	    (_("RL78/G10 ABI conflict: cannot link G10 and non-G10 objects together"));
+
+	  if (old_flags & E_FLAG_RL78_G10)
+	    (*_bfd_error_handler) (_("- %s is G10, %s is not"),
+				   bfd_get_filename (obfd), bfd_get_filename (ibfd));
+	  else
+	    (*_bfd_error_handler) (_("- %s is G10, %s is not"),
+				   bfd_get_filename (ibfd), bfd_get_filename (obfd));
+	}
     }
 
   return !error;
@@ -1048,6 +1066,9 @@ rl78_elf_print_private_bfd_data (bfd * abfd, void * ptr)
 
   flags = elf_elfheader (abfd)->e_flags;
   fprintf (file, _("private flags = 0x%lx:"), (long) flags);
+
+  if (flags & E_FLAG_RL78_G10)
+    fprintf (file, _(" [G10]"));
 
   fputc ('\n', file);
   return TRUE;
@@ -1071,90 +1092,6 @@ rl78_elf_object_p (bfd * abfd)
 			     elf32_rl78_machine (abfd));
   return TRUE;
 }
- 
-#ifdef DEBUG
-void
-rl78_dump_symtab (bfd * abfd, void * internal_syms, void * external_syms)
-{
-  size_t locsymcount;
-  Elf_Internal_Sym * isymbuf;
-  Elf_Internal_Sym * isymend;
-  Elf_Internal_Sym * isym;
-  Elf_Internal_Shdr * symtab_hdr;
-  bfd_boolean free_internal = FALSE, free_external = FALSE;
-  char * st_info_str;
-  char * st_info_stb_str;
-  char * st_other_str;
-  char * st_shndx_str;
-
-  if (! internal_syms)
-    {
-      internal_syms = bfd_malloc (1000);
-      free_internal = 1;
-    }
-  if (! external_syms)
-    {
-      external_syms = bfd_malloc (1000);
-      free_external = 1;
-    }
-
-  symtab_hdr = &elf_tdata (abfd)->symtab_hdr;
-  locsymcount = symtab_hdr->sh_size / get_elf_backend_data (abfd)->s->sizeof_sym;
-  if (free_internal)
-    isymbuf = bfd_elf_get_elf_syms (abfd, symtab_hdr,
-				    symtab_hdr->sh_info, 0,
-				    internal_syms, external_syms, NULL);
-  else
-    isymbuf = internal_syms;
-  isymend = isymbuf + locsymcount;
-
-  for (isym = isymbuf ; isym < isymend ; isym++)
-    {
-      switch (ELF_ST_TYPE (isym->st_info))
-	{
-	case STT_FUNC: st_info_str = "STT_FUNC";
-	case STT_SECTION: st_info_str = "STT_SECTION";
-	case STT_FILE: st_info_str = "STT_FILE";
-	case STT_OBJECT: st_info_str = "STT_OBJECT";
-	case STT_TLS: st_info_str = "STT_TLS";
-	default: st_info_str = "";
-	}
-      switch (ELF_ST_BIND (isym->st_info))
-	{
-	case STB_LOCAL: st_info_stb_str = "STB_LOCAL";
-	case STB_GLOBAL: st_info_stb_str = "STB_GLOBAL";
-	default: st_info_stb_str = "";
-	}
-      switch (ELF_ST_VISIBILITY (isym->st_other))
-	{
-	case STV_DEFAULT: st_other_str = "STV_DEFAULT";
-	case STV_INTERNAL: st_other_str = "STV_INTERNAL";
-	case STV_PROTECTED: st_other_str = "STV_PROTECTED";
-	default: st_other_str = "";
-	}
-      switch (isym->st_shndx)
-	{
-	case SHN_ABS: st_shndx_str = "SHN_ABS";
-	case SHN_COMMON: st_shndx_str = "SHN_COMMON";
-	case SHN_UNDEF: st_shndx_str = "SHN_UNDEF";
-	default: st_shndx_str = "";
-	}
-    }
-  if (free_internal)
-    free (internal_syms);
-  if (free_external)
-    free (external_syms);
-}
-
-char *
-rl78_get_reloc (long reloc)
-{
-  if (0 <= reloc && reloc < R_RL78_max)
-    return rl78_elf_howto_table[reloc].name;
-  return "";
-}
-#endif /* DEBUG */
-
 
 /* support PLT for 16-bit references to 24-bit functions.  */
 

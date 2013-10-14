@@ -83,7 +83,7 @@ struct cmd_list_element *showprintrawlist;
 /* Prototypes for local functions */
 
 static int partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr,
-				int len, int *errnoptr);
+				int len, int *errptr);
 
 static void show_print (char *, int);
 
@@ -275,8 +275,8 @@ show_symbol_print (struct ui_file *file, int from_tty,
    we want to print scalar arguments, but not aggregate arguments.
    This function distinguishes between the two.  */
 
-static int
-scalar_type_p (struct type *type)
+int
+val_print_scalar_type_p (struct type *type)
 {
   CHECK_TYPEDEF (type);
   while (TYPE_CODE (type) == TYPE_CODE_REF)
@@ -314,7 +314,7 @@ valprint_check_validity (struct ui_file *stream,
       if (!value_bits_valid (val, TARGET_CHAR_BIT * embedded_offset,
 			     TARGET_CHAR_BIT * TYPE_LENGTH (type)))
 	{
-	  val_print_optimized_out (stream);
+	  val_print_optimized_out (val, stream);
 	  return 0;
 	}
 
@@ -336,9 +336,12 @@ valprint_check_validity (struct ui_file *stream,
 }
 
 void
-val_print_optimized_out (struct ui_file *stream)
+val_print_optimized_out (const struct value *val, struct ui_file *stream)
 {
-  fprintf_filtered (stream, _("<optimized out>"));
+  if (val != NULL && value_lval_const (val) == lval_register)
+    fprintf_filtered (stream, _("<not saved>"));
+  else
+    fprintf_filtered (stream, _("<optimized out>"));
 }
 
 void
@@ -770,7 +773,7 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
 
   /* Handle summary mode.  If the value is a scalar, print it;
      otherwise, print an ellipsis.  */
-  if (options->summary && !scalar_type_p (type))
+  if (options->summary && !val_print_scalar_type_p (type))
     {
       fprintf_filtered (stream, "...");
       return;
@@ -802,10 +805,10 @@ value_check_printable (struct value *val, struct ui_file *stream,
 
   if (value_entirely_optimized_out (val))
     {
-      if (options->summary && !scalar_type_p (value_type (val)))
+      if (options->summary && !val_print_scalar_type_p (value_type (val)))
 	fprintf_filtered (stream, "...");
       else
-	val_print_optimized_out (stream);
+	val_print_optimized_out (val, stream);
       return 0;
     }
 
@@ -966,7 +969,7 @@ val_print_scalar_formatted (struct type *type,
      printed, because all bits contribute to its representation.  */
   if (!value_bits_valid (val, TARGET_CHAR_BIT * embedded_offset,
 			      TARGET_CHAR_BIT * TYPE_LENGTH (type)))
-    val_print_optimized_out (stream);
+    val_print_optimized_out (val, stream);
   else if (!value_bytes_available (val, embedded_offset, TYPE_LENGTH (type)))
     val_print_unavailable (stream);
   else
@@ -1708,15 +1711,15 @@ val_print_array_elements (struct type *type,
 
 /* Read LEN bytes of target memory at address MEMADDR, placing the
    results in GDB's memory at MYADDR.  Returns a count of the bytes
-   actually read, and optionally an errno value in the location
-   pointed to by ERRNOPTR if ERRNOPTR is non-null.  */
+   actually read, and optionally a target_xfer_error value in the
+   location pointed to by ERRPTR if ERRPTR is non-null.  */
 
 /* FIXME: cagney/1999-10-14: Only used by val_print_string.  Can this
    function be eliminated.  */
 
 static int
 partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr,
-		     int len, int *errnoptr)
+		     int len, int *errptr)
 {
   int nread;			/* Number of bytes actually read.  */
   int errcode;			/* Error from last read.  */
@@ -1741,9 +1744,9 @@ partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr,
 	  nread--;
 	}
     }
-  if (errnoptr != NULL)
+  if (errptr != NULL)
     {
-      *errnoptr = errcode;
+      *errptr = errcode;
     }
   return (nread);
 }
@@ -1752,7 +1755,7 @@ partial_memory_read (CORE_ADDR memaddr, gdb_byte *myaddr,
    each.  Fetch at most FETCHLIMIT characters.  BUFFER will be set to a newly
    allocated buffer containing the string, which the caller is responsible to
    free, and BYTES_READ will be set to the number of bytes read.  Returns 0 on
-   success, or errno on failure.
+   success, or a target_xfer_error on failure.
 
    If LEN > 0, reads exactly LEN characters (including eventual NULs in
    the middle or end of the string).  If LEN is -1, stops at the first
@@ -2521,18 +2524,14 @@ val_print_string (struct type *elttype, const char *encoding,
 
   if (errcode != 0)
     {
-      if (errcode == EIO)
-	{
-	  fprintf_filtered (stream, "<Address ");
-	  fputs_filtered (paddress (gdbarch, addr), stream);
-	  fprintf_filtered (stream, " out of bounds>");
-	}
-      else
-	{
-	  fprintf_filtered (stream, "<Error reading address ");
-	  fputs_filtered (paddress (gdbarch, addr), stream);
-	  fprintf_filtered (stream, ": %s>", safe_strerror (errcode));
-	}
+      char *str;
+
+      str = memory_error_message (errcode, gdbarch, addr);
+      make_cleanup (xfree, str);
+
+      fprintf_filtered (stream, "<error: ");
+      fputs_filtered (str, stream);
+      fprintf_filtered (stream, ">");
     }
 
   gdb_flush (stream);

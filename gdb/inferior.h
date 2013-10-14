@@ -90,7 +90,7 @@ extern void set_inferior_io_terminal (const char *terminal_name);
 extern const char *get_inferior_io_terminal (void);
 
 /* Collected pid, tid, etc. of the debugged inferior.  When there's
-   no inferior, PIDGET (inferior_ptid) will be 0.  */
+   no inferior, ptid_get_pid (inferior_ptid) will be 0.  */
 
 extern ptid_t inferior_ptid;
 
@@ -118,11 +118,6 @@ extern int step_stop_if_no_debug;
    events stop only the thread that had the event -- the other threads
    are kept running freely.  */
 extern int non_stop;
-
-/* If set (default), when following a fork, GDB will detach from one
-   the fork branches, child or parent.  Exactly which branch is
-   detached depends on 'set follow-fork-mode' setting.  */
-extern int detach_fork;
 
 /* When set (default), the target should attempt to disable the operating
    system's address space randomization feature when starting an inferior.  */
@@ -228,6 +223,12 @@ extern void get_last_target_status(ptid_t *ptid,
 extern void follow_inferior_reset_breakpoints (void);
 
 void set_step_info (struct frame_info *frame, struct symtab_and_line sal);
+
+/* Clear the convenience variables associated with the exit of the
+   inferior.  Currently, those variables are $_exitcode and
+   $_exitsignal.  */
+
+extern void clear_exit_convenience_vars (void);
 
 /* From infcmd.c */
 
