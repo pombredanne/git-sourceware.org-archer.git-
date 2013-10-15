@@ -807,19 +807,6 @@ objfile_relocate1 (struct objfile *objfile,
   if (objfile->sf)
     objfile->sf->qf->relocate (objfile, new_offsets, delta);
 
-  {
-    struct minimal_symbol *msym;
-
-    ALL_OBJFILE_MSYMBOLS (objfile, msym)
-      if (MSYMBOL_SECTION (msym) >= 0)
-	SET_MSYMBOL_VALUE_ADDRESS (msym, (MSYMBOL_VALUE_ADDRESS (objfile, msym)
-					  + ANOFFSET (delta,
-						      MSYMBOL_SECTION (msym))));
-  }
-  /* Relocating different sections by different amounts may cause the symbols
-     to be out of order.  */
-  msymbols_sort (objfile);
-
   if (objfile->ei.entry_point_p)
     {
       /* Relocate ei.entry_point with its section offset, use SECT_OFF_TEXT
