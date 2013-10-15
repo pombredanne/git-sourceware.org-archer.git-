@@ -981,7 +981,6 @@ prim_record_minimal_symbol_full (const char *name, int name_len, int copy_name,
   if (!objfile->per_bfd->minsyms_read)
     msym_bunch_index++;
   msym_count++;
-  OBJSTAT (objfile, n_minsyms++);
   return msymbol;
 }
 

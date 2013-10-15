@@ -145,7 +145,6 @@ struct obj_section
 
 struct objstats
   {
-    int n_minsyms;		/* Number of minimal symbols read */
     int n_psyms;		/* Number of partial symbols read */
     int n_syms;			/* Number of full symbols read */
     int n_stabs;		/* Number of ".stabs" read (if applicable) */
