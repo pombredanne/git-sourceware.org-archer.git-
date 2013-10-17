@@ -1,0 +1,40 @@
+This patch series changes minimal symbols to be independent of the
+program space, and then to be stored in the per-BFD object.  That way,
+they can be shared by all objfiles referring to a given BFD.  This
+saves memory, and, in the case of ELF, the time spent re-reading the
+symbols.
+
+In order to make a minimal symbol independent of the program space,
+the correct objfile offset must be applied when the symbol's address
+is computed.  This series achieves that by introducing a two-argument
+form of SYMBOL_VALUE_ADDRESS (but done in a way to ensure that all
+errors will be caught at compile time); more fully completing the
+switchover to the use of bound minimal symbols; and finally by
+changing the definition of the new macro to apply the offsets.
+
+This is an update of a patch series I sent earlier:
+
+    https://sourceware.org/ml/gdb-patches/2011-12/msg00470.html
+
+This version differs from the above in that:
+
+* There are no FIXMEs left
+* I updated all the minimal symbol readers
+* The use of bound minimal symbols (and the earlier removal of
+  msymbol_objfile) solves any potential problem with dlmopen
+* The earlier series to fix how sections are represented in symbols
+  removes the need for the old "index" patches
+
+I built and regtested this on x86-64 Fedora 18 (with the defaults and
+with -gstabs+), PPC Linux (gcc110 in the compile farm), and AIX
+(gcc111 in the compile farm).  I also built it on Fedora 18 using the
+mingw cross compiler.
+
+
+Please note that, while I made my best effort to fix everything
+properly, there's really quite a bit here I can't test.  In
+particular, I have no way to test most of the changes I made to the
+various symbol readers, in patch #8.
+
+If you could, I'd ask that you please test or at least carefully
+review the relevant bits there.
