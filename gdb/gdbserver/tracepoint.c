@@ -1,5 +1,5 @@
 /* Tracepoint code for remote server for GDB.
-   Copyright (C) 2009-2013 Free Software Foundation, Inc.
+   Copyright (C) 2009-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -6023,7 +6023,7 @@ download_tracepoint_1 (struct tracepoint *tpoint)
 
 	  if (ipa_action != 0)
 	    write_inferior_data_ptr
-	      (actions_array + i * sizeof (sizeof (*tpoint->actions)),
+	      (actions_array + i * sizeof (*tpoint->actions),
 	       ipa_action);
 	}
     }

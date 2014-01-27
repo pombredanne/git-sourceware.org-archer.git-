@@ -1,7 +1,7 @@
 /* *INDENT-OFF* */ /* ATTRIBUTE_PRINTF confuses indent, avoid running it
 		      for now.  */
 /* I/O, string, cleanup, and other random utilities for GDB.
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -129,6 +129,8 @@ extern struct cleanup *make_bpstat_clear_actions_cleanup (void);
 extern char *gdb_realpath (const char *);
 
 extern char *gdb_realpath_keepfile (const char *);
+
+extern char *gdb_abspath (const char *);
 
 extern int gdb_filename_fnmatch (const char *pattern, const char *string,
 				 int flags);

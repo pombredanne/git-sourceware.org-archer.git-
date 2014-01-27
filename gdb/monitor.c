@@ -1,6 +1,6 @@
 /* Remote debugging interface for boot monitors, for GDB.
 
-   Copyright (C) 1990-2013 Free Software Foundation, Inc.
+   Copyright (C) 1990-2014 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by Rob Savoye for Cygnus.
    Resurrected from the ashes by Stu Grossman.
@@ -43,7 +43,7 @@
 #include "exceptions.h"
 #include <signal.h>
 #include <ctype.h>
-#include "gdb_string.h"
+#include <string.h>
 #include <sys/types.h>
 #include "command.h"
 #include "serial.h"
@@ -875,7 +875,7 @@ monitor_close (void)
    when you want to detach and do something else with your gdb.  */
 
 static void
-monitor_detach (struct target_ops *ops, char *args, int from_tty)
+monitor_detach (struct target_ops *ops, const char *args, int from_tty)
 {
   unpush_target (ops);		/* calls monitor_close to do the real work.  */
   if (from_tty)

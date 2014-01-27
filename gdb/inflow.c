@@ -1,5 +1,5 @@
 /* Low level interface to ptrace, for GDB when running under Unix.
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -26,7 +26,7 @@
 #include "gdbthread.h"
 #include "observer.h"
 
-#include "gdb_string.h"
+#include <string.h>
 #include <signal.h>
 #include <fcntl.h>
 #include "gdb_select.h"
@@ -487,15 +487,11 @@ static const struct inferior_data *inflow_inferior_data;
 static void
 inflow_inferior_data_cleanup (struct inferior *inf, void *arg)
 {
-  struct terminal_info *info;
+  struct terminal_info *info = arg;
 
-  info = inferior_data (inf, inflow_inferior_data);
-  if (info != NULL)
-    {
-      xfree (info->run_terminal);
-      xfree (info->ttystate);
-      xfree (info);
-    }
+  xfree (info->run_terminal);
+  xfree (info->ttystate);
+  xfree (info);
 }
 
 /* Get the current svr4 data.  If none is found yet, add it now.  This

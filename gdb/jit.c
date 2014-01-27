@@ -1,6 +1,6 @@
 /* Handle JIT code generation in the inferior for GDB, the GNU Debugger.
 
-   Copyright (C) 2009-2013 Free Software Foundation, Inc.
+   Copyright (C) 2009-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -37,7 +37,7 @@
 #include "symtab.h"
 #include "target.h"
 #include "gdb-dlfcn.h"
-#include "gdb_stat.h"
+#include <sys/stat.h>
 #include "exceptions.h"
 #include "gdb_bfd.h"
 
@@ -214,7 +214,7 @@ jit_reader_load_command (char *args, int from_tty)
   if (IS_ABSOLUTE_PATH (args))
     so_name = xstrdup (args);
   else
-    so_name = xstrprintf ("%s%s%s", SLASH_STRING, jit_reader_dir, args);
+    so_name = xstrprintf ("%s%s%s", jit_reader_dir, SLASH_STRING, args);
   prev_cleanup = make_cleanup (xfree, so_name);
 
   loaded_jit_reader = jit_reader_load (so_name);
@@ -665,7 +665,7 @@ finalize_symtab (struct gdb_symtab *stab, struct objfile *objfile)
 
   /* (begin, end) will contain the PC range this entire blockvector
      spans.  */
-  symtab->primary = 1;
+  set_symtab_primary (symtab, 1);
   BLOCKVECTOR_MAP (symtab->blockvector) = NULL;
   begin = stab->blocks->begin;
   end = stab->blocks->end;

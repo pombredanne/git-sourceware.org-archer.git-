@@ -1,6 +1,6 @@
 /* Solaris threads debugging interface.
 
-   Copyright (C) 1996-2013 Free Software Foundation, Inc.
+   Copyright (C) 1996-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -56,7 +56,7 @@
 #include "target.h"
 #include "inferior.h"
 #include <fcntl.h>
-#include "gdb_stat.h"
+#include <sys/stat.h>
 #include <dlfcn.h>
 #include "gdbcmd.h"
 #include "gdbcore.h"
@@ -64,7 +64,7 @@
 #include "solib.h"
 #include "symfile.h"
 #include "observer.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "procfs.h"
 
 struct target_ops sol_thread_ops;
@@ -320,7 +320,7 @@ lwp_to_thread (ptid_t lwp)
    program was started via the normal ptrace (PTRACE_TRACEME).  */
 
 static void
-sol_thread_detach (struct target_ops *ops, char *args, int from_tty)
+sol_thread_detach (struct target_ops *ops, const char *args, int from_tty)
 {
   struct target_ops *beneath = find_target_beneath (ops);
 
@@ -577,6 +577,10 @@ check_for_thread_db (void)
 {
   td_err_e err;
   ptid_t ptid;
+
+  /* Don't attempt to use thread_db for remote targets.  */
+  if (!(target_can_run (&current_target) || core_bfd))
+    return;
 
   /* Do nothing if we couldn't load libthread_db.so.1.  */
   if (p_td_ta_new == NULL)

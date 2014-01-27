@@ -1,6 +1,6 @@
 /* Machine independent support for SVR4 /proc (process file system) for GDB.
 
-   Copyright (C) 1999-2013 Free Software Foundation, Inc.
+   Copyright (C) 1999-2014 Free Software Foundation, Inc.
 
    Written by Michael Snyder at Cygnus Solutions.
    Based on work by Fred Fish, Stu Grossman, Geoff Noer, and others.
@@ -46,7 +46,7 @@
 #include <signal.h>
 #include <ctype.h>
 #include "gdb_bfd.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdb_assert.h"
 #include "inflow.h"
 #include "auxv.h"
@@ -89,12 +89,12 @@
 
 #ifdef NEW_PROC_API
 #include <sys/types.h>
-#include "gdb_dirent.h"	/* opendir/readdir, for listing the LWP's */
+#include <dirent.h>	/* opendir/readdir, for listing the LWP's */
 #endif
 
 #include <fcntl.h>	/* for O_RDONLY */
 #include <unistd.h>	/* for "X_OK" */
-#include "gdb_stat.h"	/* for struct stat */
+#include <sys/stat.h>	/* for struct stat */
 
 /* Note: procfs-utils.h must be included after the above system header
    files, because it redefines various system calls using macros.
@@ -110,7 +110,7 @@
 /* This module defines the GDB target vector and its methods.  */
 
 static void procfs_attach (struct target_ops *, char *, int);
-static void procfs_detach (struct target_ops *, char *, int);
+static void procfs_detach (struct target_ops *, const char *, int);
 static void procfs_resume (struct target_ops *,
 			   ptid_t, int, enum gdb_signal);
 static void procfs_stop (ptid_t);
@@ -129,12 +129,7 @@ static ptid_t procfs_wait (struct target_ops *,
 static int procfs_xfer_memory (CORE_ADDR, gdb_byte *, int, int,
 			       struct mem_attrib *attrib,
 			       struct target_ops *);
-static LONGEST procfs_xfer_partial (struct target_ops *ops,
-				    enum target_object object,
-				    const char *annex,
-				    gdb_byte *readbuf,
-				    const gdb_byte *writebuf,
-				    ULONGEST offset, LONGEST len);
+static target_xfer_partial_ftype procfs_xfer_partial;
 
 static int procfs_thread_alive (struct target_ops *ops, ptid_t);
 
@@ -3071,7 +3066,7 @@ procfs_attach (struct target_ops *ops, char *args, int from_tty)
 }
 
 static void
-procfs_detach (struct target_ops *ops, char *args, int from_tty)
+procfs_detach (struct target_ops *ops, const char *args, int from_tty)
 {
   int sig = 0;
   int pid = ptid_get_pid (inferior_ptid);
@@ -4451,8 +4446,6 @@ procfs_init_inferior (struct target_ops *ops, int pid)
   thread_change_ptid (pid_to_ptid (pid),
 		      ptid_build (pid, lwpid, 0));
 
-  /* Typically two, one trap to exec the shell, one to exec the
-     program being debugged.  Defined by "inferior.h".  */
   startup_inferior (START_INFERIOR_TRAPS_EXPECTED);
 
 #ifdef SYS_syssgi

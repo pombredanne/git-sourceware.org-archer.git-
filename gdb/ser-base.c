@@ -1,6 +1,6 @@
 /* Generic serial interface functions.
 
-   Copyright (C) 1992-2013 Free Software Foundation, Inc.
+   Copyright (C) 1992-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -23,7 +23,7 @@
 #include "event-loop.h"
 
 #include "gdb_select.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdb_assert.h"
 #include <sys/time.h>
 #ifdef USE_WIN32API

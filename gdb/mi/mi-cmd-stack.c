@@ -1,5 +1,5 @@
 /* MI Command Set - stack commands.
-   Copyright (C) 2000-2013 Free Software Foundation, Inc.
+   Copyright (C) 2000-2014 Free Software Foundation, Inc.
    Contributed by Cygnus Solutions (a Red Hat company).
 
    This file is part of GDB.
@@ -27,7 +27,7 @@
 #include "block.h"
 #include "stack.h"
 #include "dictionary.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "language.h"
 #include "valprint.h"
 #include "exceptions.h"

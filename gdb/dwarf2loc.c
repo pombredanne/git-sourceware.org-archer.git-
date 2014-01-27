@@ -1,6 +1,6 @@
 /* DWARF 2 location expression support for GDB.
 
-   Copyright (C) 2003-2013 Free Software Foundation, Inc.
+   Copyright (C) 2003-2014 Free Software Foundation, Inc.
 
    Contributed by Daniel Jacobowitz, MontaVista Software, Inc.
 
@@ -39,7 +39,7 @@
 #include "dwarf2loc.h"
 #include "dwarf2-frame.h"
 
-#include "gdb_string.h"
+#include <string.h>
 #include "gdb_assert.h"
 
 extern int dwarf2_always_disassemble;
@@ -316,7 +316,7 @@ struct dwarf_expr_baton
 /* Using the frame specified in BATON, return the value of register
    REGNUM, treated as a pointer.  */
 static CORE_ADDR
-dwarf_expr_read_reg (void *baton, int dwarf_regnum)
+dwarf_expr_read_addr_from_reg (void *baton, int dwarf_regnum)
 {
   struct dwarf_expr_baton *debaton = (struct dwarf_expr_baton *) baton;
   struct gdbarch *gdbarch = get_frame_arch (debaton->frame);
@@ -327,6 +327,18 @@ dwarf_expr_read_reg (void *baton, int dwarf_regnum)
   result = address_from_register (builtin_type (gdbarch)->builtin_data_ptr,
 				  regnum, debaton->frame);
   return result;
+}
+
+/* Implement struct dwarf_expr_context_funcs' "get_reg_value" callback.  */
+
+static struct value *
+dwarf_expr_get_reg_value (void *baton, struct type *type, int dwarf_regnum)
+{
+  struct dwarf_expr_baton *debaton = (struct dwarf_expr_baton *) baton;
+  struct gdbarch *gdbarch = get_frame_arch (debaton->frame);
+  int regnum = gdbarch_dwarf2_reg_to_regnum (gdbarch, dwarf_regnum);
+
+  return value_from_register (type, regnum, debaton->frame);
 }
 
 /* Read memory at ADDR (length LEN) into BUF.  */
@@ -831,8 +843,9 @@ chain_candidate (struct gdbarch *gdbarch, struct call_site_chain **resultp,
 					   * (length - 1));
       result->length = length;
       result->callers = result->callees = length;
-      memcpy (result->call_site, VEC_address (call_sitep, chain),
-	      sizeof (*result->call_site) * length);
+      if (!VEC_empty (call_sitep, chain))
+	memcpy (result->call_site, VEC_address (call_sitep, chain),
+		sizeof (*result->call_site) * length);
       *resultp = result;
 
       if (entry_values_debug)
@@ -1865,7 +1878,7 @@ read_pieced_value (struct value *v)
 		    if (optim)
 		      set_value_optimized_out (v, 1);
 		    if (unavail)
-		      mark_value_bytes_unavailable (v, offset, this_size);
+		      mark_value_bits_unavailable (v, offset, this_size_bits);
 		  }
 	      }
 	    else
@@ -2049,9 +2062,10 @@ write_pieced_value (struct value *to, struct value *from)
 						   &optim, &unavail))
 		      {
 			if (optim)
-			  error (_("Can't do read-modify-write to "
-				   "update bitfield; containing word has been "
-				   "optimized out"));
+			  throw_error (OPTIMIZED_OUT_ERROR,
+				       _("Can't do read-modify-write to "
+					 "update bitfield; containing word "
+					 "has been optimized out"));
 			if (unavail)
 			  throw_error (NOT_AVAILABLE_ERROR,
 				       _("Can't do read-modify-write to update "
@@ -2346,6 +2360,23 @@ static const struct lval_funcs pieced_value_funcs = {
   free_pieced_value_closure
 };
 
+/* Virtual method table for dwarf2_evaluate_loc_desc_full below.  */
+
+static const struct dwarf_expr_context_funcs dwarf_expr_ctx_funcs =
+{
+  dwarf_expr_read_addr_from_reg,
+  dwarf_expr_get_reg_value,
+  dwarf_expr_read_mem,
+  dwarf_expr_frame_base,
+  dwarf_expr_frame_cfa,
+  dwarf_expr_frame_pc,
+  dwarf_expr_tls_address,
+  dwarf_expr_dwarf_call,
+  dwarf_expr_get_base_type,
+  dwarf_expr_push_dwarf_reg_entry_value,
+  dwarf_expr_get_addr_index
+};
+
 /* Evaluate a location description, starting at DATA and with length
    SIZE, to find the current location of variable of TYPE in the
    context of FRAME.  BYTE_OFFSET is applied after the contents are
@@ -2578,12 +2609,24 @@ struct needs_frame_baton
 
 /* Reads from registers do require a frame.  */
 static CORE_ADDR
-needs_frame_read_reg (void *baton, int regnum)
+needs_frame_read_addr_from_reg (void *baton, int regnum)
 {
   struct needs_frame_baton *nf_baton = baton;
 
   nf_baton->needs_frame = 1;
   return 1;
+}
+
+/* struct dwarf_expr_context_funcs' "get_reg_value" callback:
+   Reads from registers do require a frame.  */
+
+static struct value *
+needs_frame_get_reg_value (void *baton, struct type *type, int regnum)
+{
+  struct needs_frame_baton *nf_baton = baton;
+
+  nf_baton->needs_frame = 1;
+  return value_zero (type, not_lval);
 }
 
 /* Reads from memory do not require a frame.  */
@@ -2666,7 +2709,8 @@ needs_get_addr_index (void *baton, unsigned int index)
 
 static const struct dwarf_expr_context_funcs needs_frame_ctx_funcs =
 {
-  needs_frame_read_reg,
+  needs_frame_read_addr_from_reg,
+  needs_frame_get_reg_value,
   needs_frame_read_mem,
   needs_frame_frame_base,
   needs_frame_frame_cfa,

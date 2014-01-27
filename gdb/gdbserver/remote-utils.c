@@ -1,5 +1,5 @@
 /* Remote utility routines for the remote server for GDB.
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -57,7 +57,7 @@
 #if HAVE_ARPA_INET_H
 #include <arpa/inet.h>
 #endif
-#include "gdb_stat.h"
+#include <sys/stat.h>
 #if HAVE_ERRNO_H
 #include <errno.h>
 #endif

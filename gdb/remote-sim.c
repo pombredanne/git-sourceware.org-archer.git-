@@ -1,6 +1,6 @@
 /* Generic remote debugging interface for simulators.
 
-   Copyright (C) 1993-2013 Free Software Foundation, Inc.
+   Copyright (C) 1993-2014 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
    Steve Chamberlain (sac@cygnus.com).
@@ -23,7 +23,7 @@
 #include "defs.h"
 #include "inferior.h"
 #include "value.h"
-#include "gdb_string.h"
+#include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -78,7 +78,8 @@ static void gdbsim_open (char *args, int from_tty);
 
 static void gdbsim_close (void);
 
-static void gdbsim_detach (struct target_ops *ops, char *args, int from_tty);
+static void gdbsim_detach (struct target_ops *ops, const char *args,
+			   int from_tty);
 
 static void gdbsim_prepare_to_store (struct regcache *regcache);
 
@@ -817,7 +818,7 @@ gdbsim_close (void)
    Use this when you want to detach and do something else with your gdb.  */
 
 static void
-gdbsim_detach (struct target_ops *ops, char *args, int from_tty)
+gdbsim_detach (struct target_ops *ops, const char *args, int from_tty)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "gdbsim_detach: args \"%s\"\n", args);

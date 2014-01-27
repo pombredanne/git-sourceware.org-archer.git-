@@ -1,5 +1,5 @@
 /* Read dbx symbol tables and convert to internal format, for GDB.
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -31,7 +31,7 @@
    for real.  dbx_psymtab_to_symtab() is the function that does this */
 
 #include "defs.h"
-#include "gdb_string.h"
+#include <string.h>
 
 #if defined(__CYGNUSCLIB__)
 #include <sys/types.h>
@@ -39,7 +39,7 @@
 #endif
 
 #include "gdb_obstack.h"
-#include "gdb_stat.h"
+#include <sys/stat.h>
 #include "symtab.h"
 #include "breakpoint.h"
 #include "target.h"
@@ -58,7 +58,6 @@
 #include "block.h"
 
 #include "gdb_assert.h"
-#include "gdb_string.h"
 
 #include "aout/aout64.h"
 #include "aout/stab_gnu.h"	/* We always use GNU stabs, not
@@ -1350,7 +1349,6 @@ read_dbx_symtab (struct objfile *objfile)
 	  record_it:
 	  namestring = set_namestring (objfile, &nlist);
 
-	bss_ext_symbol:
 	  record_minimal_symbol (namestring, nlist.n_value,
 				 nlist.n_type, objfile);	/* Always */
 	  continue;

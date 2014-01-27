@@ -1,6 +1,6 @@
 /* Target-dependent code for Morpho mt processor, for GDB.
 
-   Copyright (C) 2005-2013 Free Software Foundation, Inc.
+   Copyright (C) 2005-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -27,7 +27,7 @@
 #include "dis-asm.h"
 #include "arch-utils.h"
 #include "gdbtypes.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "regcache.h"
 #include "reggroups.h"
 #include "gdbcore.h"

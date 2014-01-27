@@ -1,6 +1,6 @@
 /* Handle lists of commands, their decoding and documentation, for GDB.
 
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #include "symtab.h"
 #include <ctype.h>
 #include "gdb_regex.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "completer.h"
 #include "ui-out.h"
 #include "cli/cli-cmds.h"

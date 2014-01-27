@@ -1,6 +1,6 @@
 /* Top level stuff for GDB, the GNU debugger.
 
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -28,6 +28,7 @@
 #include "exceptions.h"
 #include <signal.h>
 #include "target.h"
+#include "target-dcache.h"
 #include "breakpoint.h"
 #include "gdbtypes.h"
 #include "expression.h"
@@ -60,8 +61,8 @@
 #include <sys/types.h>
 
 #include "event-top.h"
-#include "gdb_string.h"
-#include "gdb_stat.h"
+#include <string.h>
+#include <sys/stat.h>
 #include <ctype.h>
 #include "ui-out.h"
 #include "cli-out.h"
@@ -1064,8 +1065,7 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
   *p = 0;
 
   /* Add line to history if appropriate.  */
-  if (instream == stdin
-      && ISATTY (stdin) && *linebuffer)
+  if (*linebuffer && input_from_terminal_p ())
     add_history (linebuffer);
 
   /* Note: lines consisting solely of comments are added to the command
@@ -1105,7 +1105,7 @@ print_gdb_version (struct ui_file *stream)
   /* Second line is a copyright notice.  */
 
   fprintf_filtered (stream,
-		    "Copyright (C) 2013 Free Software Foundation, Inc.\n");
+		    "Copyright (C) 2014 Free Software Foundation, Inc.\n");
 
   /* Following the copyright is a brief statement that the program is
      free software, that users are free to copy and change it on
