@@ -1317,23 +1317,6 @@ dwarf_expr_push_dwarf_reg_entry_value (struct dwarf_expr_context *ctx,
 
 static CORE_ADDR dwarf_expr_get_addr_index (void *baton, unsigned int index);
 
-/* Virtual method table for dwarf2_evaluate_loc_desc_full below.  */
-
-static const struct dwarf_expr_context_funcs dwarf_expr_ctx_funcs =
-{
-  dwarf_expr_read_reg,
-  dwarf_expr_read_mem,
-  dwarf_expr_frame_base,
-  dwarf_expr_frame_cfa,
-  dwarf_expr_frame_pc,
-  dwarf_expr_tls_address,
-  dwarf_expr_dwarf_call,
-  dwarf_expr_get_base_type,
-  dwarf_expr_push_dwarf_reg_entry_value,
-  dwarf_expr_get_addr_index,
-  dwarf_expr_object_address
-};
-
 /* Evaluate DWARF expression at DATA ... DATA + SIZE with its result readable
    by dwarf_expr_fetch (RETVAL, 0).  FRAME parameter can be NULL to call
    get_selected_frame to find it.  Returned dwarf_expr_context freeing is
@@ -2374,7 +2357,8 @@ static const struct dwarf_expr_context_funcs dwarf_expr_ctx_funcs =
   dwarf_expr_dwarf_call,
   dwarf_expr_get_base_type,
   dwarf_expr_push_dwarf_reg_entry_value,
-  dwarf_expr_get_addr_index
+  dwarf_expr_get_addr_index,
+  dwarf_expr_object_address
 };
 
 /* Evaluate a location description, starting at DATA and with length
