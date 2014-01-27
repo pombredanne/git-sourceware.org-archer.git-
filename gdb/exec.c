@@ -1,6 +1,6 @@
 /* Work with executable files, for GDB. 
 
-   Copyright (C) 1988-2013 Free Software Foundation, Inc.
+   Copyright (C) 1988-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -37,12 +37,12 @@
 
 #include <fcntl.h>
 #include "readline/readline.h"
-#include "gdb_string.h"
+#include <string.h>
 
 #include "gdbcore.h"
 
 #include <ctype.h>
-#include "gdb_stat.h"
+#include <sys/stat.h>
 
 void (*deprecated_file_changed_hook) (char *);
 
@@ -435,6 +435,51 @@ add_target_sections (void *owner,
 	  using_exec_ops = 1;
 	  push_target (&exec_ops);
 	}
+    }
+}
+
+/* Add the sections of OBJFILE to the current set of target sections.  */
+
+void
+add_target_sections_of_objfile (struct objfile *objfile)
+{
+  struct target_section_table *table = current_target_sections;
+  struct obj_section *osect;
+  int space;
+  unsigned count = 0;
+  struct target_section *ts;
+
+  if (objfile == NULL)
+    return;
+
+  /* Compute the number of sections to add.  */
+  ALL_OBJFILE_OSECTIONS (objfile, osect)
+    {
+      if (bfd_get_section_size (osect->the_bfd_section) == 0)
+	continue;
+      count++;
+    }
+
+  if (count == 0)
+    return;
+
+  space = resize_section_table (table, count);
+
+  ts = table->sections + space;
+
+  ALL_OBJFILE_OSECTIONS (objfile, osect)
+    {
+      if (bfd_get_section_size (osect->the_bfd_section) == 0)
+	continue;
+
+      gdb_assert (ts < table->sections + space + count);
+
+      ts->addr = obj_section_addr (osect);
+      ts->endaddr = obj_section_endaddr (osect);
+      ts->the_bfd_section = osect->the_bfd_section;
+      ts->owner = (void *) objfile;
+
+      ts++;
     }
 }
 

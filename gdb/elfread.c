@@ -1,6 +1,6 @@
 /* Read ELF (Executable and Linking Format) object files for GDB.
 
-   Copyright (C) 1991-2013 Free Software Foundation, Inc.
+   Copyright (C) 1991-2014 Free Software Foundation, Inc.
 
    Written by Fred Fish at Cygnus Support.
 
@@ -21,7 +21,7 @@
 
 #include "defs.h"
 #include "bfd.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "elf-bfd.h"
 #include "elf/common.h"
 #include "elf/internal.h"
@@ -60,7 +60,6 @@ static const struct sym_fns elf_sym_fns_lazy_psyms;
 struct elfinfo
   {
     asection *stabsect;		/* Section pointer for .stab section */
-    asection *stabindexsect;	/* Section pointer for .stab.index section */
     asection *mdebugsect;	/* Section pointer for .mdebug section */
   };
 
@@ -185,10 +184,6 @@ elf_locate_sections (bfd *ignore_abfd, asection *sectp, void *eip)
   if (strcmp (sectp->name, ".stab") == 0)
     {
       ei->stabsect = sectp;
-    }
-  else if (strcmp (sectp->name, ".stab.index") == 0)
-    {
-      ei->stabindexsect = sectp;
     }
   else if (strcmp (sectp->name, ".mdebug") == 0)
     {
@@ -1510,44 +1505,6 @@ elf_get_probes (struct objfile *objfile)
   return probes_per_objfile;
 }
 
-/* Implementation of `sym_get_probe_argument_count', as documented in
-   symfile.h.  */
-
-static unsigned
-elf_get_probe_argument_count (struct probe *probe)
-{
-  return probe->pops->get_probe_argument_count (probe);
-}
-
-/* Implementation of `sym_can_evaluate_probe_arguments', as documented in
-   symfile.h.  */
-
-static int
-elf_can_evaluate_probe_arguments (struct probe *probe)
-{
-  return probe->pops->can_evaluate_probe_arguments (probe);
-}
-
-/* Implementation of `sym_evaluate_probe_argument', as documented in
-   symfile.h.  */
-
-static struct value *
-elf_evaluate_probe_argument (struct probe *probe, unsigned n)
-{
-  return probe->pops->evaluate_probe_argument (probe, n);
-}
-
-/* Implementation of `sym_compile_to_ax', as documented in symfile.h.  */
-
-static void
-elf_compile_to_ax (struct probe *probe,
-		   struct agent_expr *expr,
-		   struct axs_value *value,
-		   unsigned n)
-{
-  probe->pops->compile_to_ax (probe, expr, value, n);
-}
-
 /* Implementation of `sym_relocate_probe', as documented in symfile.h.  */
 
 static void
@@ -1586,10 +1543,6 @@ probe_key_free (struct objfile *objfile, void *d)
 static const struct sym_probe_fns elf_probe_fns =
 {
   elf_get_probes,		    /* sym_get_probes */
-  elf_get_probe_argument_count,	    /* sym_get_probe_argument_count */
-  elf_can_evaluate_probe_arguments, /* sym_can_evaluate_probe_arguments */
-  elf_evaluate_probe_argument,	    /* sym_evaluate_probe_argument */
-  elf_compile_to_ax,		    /* sym_compile_to_ax */
   elf_symfile_relocate_probe,	    /* sym_relocate_probe */
 };
 

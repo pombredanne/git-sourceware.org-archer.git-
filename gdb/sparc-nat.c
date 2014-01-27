@@ -1,6 +1,6 @@
 /* Native-dependent code for SPARC.
 
-   Copyright (C) 2003-2013 Free Software Foundation, Inc.
+   Copyright (C) 2003-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -24,7 +24,7 @@
 
 #include "gdb_assert.h"
 #include <signal.h>
-#include "gdb_string.h"
+#include <string.h>
 #include <sys/ptrace.h>
 #include "gdb_wait.h"
 #ifdef HAVE_MACHINE_REG_H
@@ -313,9 +313,7 @@ sparc_xfer_wcookie (struct target_ops *ops, enum target_object object,
   return len;
 }
 
-LONGEST (*inf_ptrace_xfer_partial) (struct target_ops *, enum target_object,
-				    const char *, gdb_byte *, const gdb_byte *,
-				    ULONGEST, LONGEST);
+target_xfer_partial_ftype *inf_ptrace_xfer_partial;
 
 static LONGEST
 sparc_xfer_partial (struct target_ops *ops, enum target_object object,

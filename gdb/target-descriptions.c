@@ -1,6 +1,6 @@
 /* Target description support for GDB.
 
-   Copyright (C) 2006-2013 Free Software Foundation, Inc.
+   Copyright (C) 2006-2014 Free Software Foundation, Inc.
 
    Contributed by CodeSourcery.
 
@@ -1762,7 +1762,7 @@ feature = tdesc_create_feature (result, \"%s\");\n",
 		  /* Going first for implicitly sized types, else part handles
 		     bitfields.  As reported on xml-tdesc.c implicitly sized types
 		     cannot contain a bitfield.  */
-		  if (f->start == 0 && f->end == 0)
+		  if (f->type != NULL)
 		    {
 		      printf_unfiltered
 			("  field_type = tdesc_named_type (feature, \"%s\");\n",

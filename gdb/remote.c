@@ -1,6 +1,6 @@
 /* Remote target communications for serial-line targets in custom GDB protocol
 
-   Copyright (C) 1988-2013 Free Software Foundation, Inc.
+   Copyright (C) 1988-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -20,7 +20,7 @@
 /* See the GDB User Guide for details of the GDB remote protocol.  */
 
 #include "defs.h"
-#include "gdb_string.h"
+#include <string.h>
 #include <ctype.h>
 #include <fcntl.h>
 #include "inferior.h"
@@ -46,7 +46,6 @@
 #include "gdb_bfd.h"
 #include "filestuff.h"
 
-#include <ctype.h>
 #include <sys/time.h>
 
 #include "event-loop.h"
@@ -60,7 +59,7 @@
 
 #include "remote-fileio.h"
 #include "gdb/fileio.h"
-#include "gdb_stat.h"
+#include <sys/stat.h>
 #include "xml-support.h"
 
 #include "memory-map.h"
@@ -132,8 +131,6 @@ static int remote_is_async_p (void);
 
 static void remote_async (void (*callback) (enum inferior_event_type event_type,
 					    void *context), void *context);
-
-static void remote_detach (struct target_ops *ops, char *args, int from_tty);
 
 static void sync_remote_interrupt_twice (int signo);
 
@@ -4425,7 +4422,7 @@ remote_open_1 (char *name, int from_tty,
    die when it hits one.  */
 
 static void
-remote_detach_1 (char *args, int from_tty, int extended)
+remote_detach_1 (const char *args, int from_tty, int extended)
 {
   int pid = ptid_get_pid (inferior_ptid);
   struct remote_state *rs = get_remote_state ();
@@ -4469,13 +4466,13 @@ remote_detach_1 (char *args, int from_tty, int extended)
 }
 
 static void
-remote_detach (struct target_ops *ops, char *args, int from_tty)
+remote_detach (struct target_ops *ops, const char *args, int from_tty)
 {
   remote_detach_1 (args, from_tty, 0);
 }
 
 static void
-extended_remote_detach (struct target_ops *ops, char *args, int from_tty)
+extended_remote_detach (struct target_ops *ops, const char *args, int from_tty)
 {
   remote_detach_1 (args, from_tty, 1);
 }
@@ -5720,9 +5717,16 @@ Packet: '%s'\n"),
 
       /* fall through */
     case 'S':		/* Old style status, just signal only.  */
-      event->ws.kind = TARGET_WAITKIND_STOPPED;
-      event->ws.value.sig = (enum gdb_signal)
-	(((fromhex (buf[1])) << 4) + (fromhex (buf[2])));
+      {
+	int sig;
+
+	event->ws.kind = TARGET_WAITKIND_STOPPED;
+	sig = (fromhex (buf[1]) << 4) + fromhex (buf[2]);
+	if (GDB_SIGNAL_FIRST <= sig && sig < GDB_SIGNAL_LAST)
+	  event->ws.value.sig = (enum gdb_signal) sig;
+	else
+	  event->ws.value.sig = GDB_SIGNAL_UNKNOWN;
+      }
       break;
     case 'W':		/* Target exited.  */
     case 'X':
@@ -5746,7 +5750,10 @@ Packet: '%s'\n"),
 	  {
 	    /* The remote process exited with a signal.  */
 	    event->ws.kind = TARGET_WAITKIND_SIGNALLED;
-	    event->ws.value.sig = (enum gdb_signal) value;
+	    if (GDB_SIGNAL_FIRST <= value && value < GDB_SIGNAL_LAST)
+	      event->ws.value.sig = (enum gdb_signal) value;
+	    else
+	      event->ws.value.sig = GDB_SIGNAL_UNKNOWN;
 	  }
 
 	/* If no process is specified, assume inferior_ptid.  */
@@ -7682,7 +7689,7 @@ getpkt_or_notif_sane_1 (char **buf, long *sizeof_buf, int forever,
      we get a packet.  */
   for (;;)
     {
-      /* If we get a timeout or bad checksm, retry up to MAX_TRIES
+      /* If we get a timeout or bad checksum, retry up to MAX_TRIES
 	 times.  */
       for (tries = 1; tries <= MAX_TRIES; tries++)
 	{
@@ -7808,23 +7815,39 @@ getpkt_or_notif_sane (char **buf, long *sizeof_buf, int forever,
 }
 
 
-/* A helper function that just calls putpkt; for type correctness.  */
-
-static int
-putpkt_for_catch_errors (void *arg)
-{
-  return putpkt (arg);
-}
-
 static void
 remote_kill (struct target_ops *ops)
 {
-  /* Use catch_errors so the user can quit from gdb even when we
-     aren't on speaking terms with the remote system.  */
-  catch_errors (putpkt_for_catch_errors, "k", "", RETURN_MASK_ERROR);
+  struct gdb_exception ex;
 
-  /* Don't wait for it to die.  I'm not really sure it matters whether
-     we do or not.  For the existing stubs, kill is a noop.  */
+  /* Catch errors so the user can quit from gdb even when we
+     aren't on speaking terms with the remote system.  */
+  TRY_CATCH (ex, RETURN_MASK_ERROR)
+    {
+      putpkt ("k");
+    }
+  if (ex.reason < 0)
+    {
+      if (ex.error == TARGET_CLOSE_ERROR)
+	{
+	  /* If we got an (EOF) error that caused the target
+	     to go away, then we're done, that's what we wanted.
+	     "k" is susceptible to cause a premature EOF, given
+	     that the remote server isn't actually required to
+	     reply to "k", and it can happen that it doesn't
+	     even get to reply ACK to the "k".  */
+	  return;
+	}
+
+	/* Otherwise, something went wrong.  We didn't actually kill
+	   the target.  Just propagate the exception, and let the
+	   user or higher layers decide what to do.  */
+	throw_exception (ex);
+    }
+
+  /* We've killed the remote end, we get to mourn it.  Since this is
+     target remote, single-process, mourning the inferior also
+     unpushes remote_ops.  */
   target_mourn_inferior ();
 }
 
@@ -8143,8 +8166,6 @@ remote_add_target_side_condition (struct gdbarch *gdbarch,
 	buf = pack_hex_byte (buf, aexpr->buf[i]);
       *buf = '\0';
     }
-
-  VEC_free (agent_expr_p, bp_tgt->conditions);
   return 0;
 }
 
@@ -8175,8 +8196,6 @@ remote_add_target_side_commands (struct gdbarch *gdbarch,
 	buf = pack_hex_byte (buf, aexpr->buf[i]);
       *buf = '\0';
     }
-
-  VEC_free (agent_expr_p, bp_tgt->tcommands);
 }
 
 /* Insert a breakpoint.  On targets that have software breakpoint
@@ -11146,6 +11165,11 @@ static struct traceframe_info *
 remote_traceframe_info (void)
 {
   char *text;
+
+  /* If current traceframe is not selected, don't bother the remote
+     stub.  */
+  if (get_traceframe_number () < 0)
+    return NULL;
 
   text = target_read_stralloc (&current_target,
 			       TARGET_OBJECT_TRACEFRAME_INFO, NULL);

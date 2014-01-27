@@ -1,6 +1,6 @@
 /* Select target systems and architectures at runtime for GDB.
 
-   Copyright (C) 1990-2013 Free Software Foundation, Inc.
+   Copyright (C) 1990-2014 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
 
@@ -21,8 +21,9 @@
 
 #include "defs.h"
 #include <errno.h>
-#include "gdb_string.h"
+#include <string.h>
 #include "target.h"
+#include "target-dcache.h"
 #include "gdbcmd.h"
 #include "symtab.h"
 #include "inferior.h"
@@ -63,23 +64,17 @@ static int return_one (void);
 
 static int return_minus_one (void);
 
+static void *return_null (void);
+
 void target_ignore (void);
 
 static void target_command (char *, int);
 
 static struct target_ops *find_default_run_target (char *);
 
-static LONGEST default_xfer_partial (struct target_ops *ops,
-				     enum target_object object,
-				     const char *annex, gdb_byte *readbuf,
-				     const gdb_byte *writebuf,
-				     ULONGEST offset, LONGEST len);
+static target_xfer_partial_ftype default_xfer_partial;
 
-static LONGEST current_xfer_partial (struct target_ops *ops,
-				     enum target_object object,
-				     const char *annex, gdb_byte *readbuf,
-				     const gdb_byte *writebuf,
-				     ULONGEST offset, LONGEST len);
+static target_xfer_partial_ftype current_xfer_partial;
 
 static struct gdbarch *default_thread_architecture (struct target_ops *ops,
 						    ptid_t ptid);
@@ -205,46 +200,6 @@ show_targetdebug (struct ui_file *file, int from_tty,
 }
 
 static void setup_target_debug (void);
-
-/* The option sets this.  */
-static int stack_cache_enabled_p_1 = 1;
-/* And set_stack_cache_enabled_p updates this.
-   The reason for the separation is so that we don't flush the cache for
-   on->on transitions.  */
-static int stack_cache_enabled_p = 1;
-
-/* This is called *after* the stack-cache has been set.
-   Flush the cache for off->on and on->off transitions.
-   There's no real need to flush the cache for on->off transitions,
-   except cleanliness.  */
-
-static void
-set_stack_cache_enabled_p (char *args, int from_tty,
-			   struct cmd_list_element *c)
-{
-  if (stack_cache_enabled_p != stack_cache_enabled_p_1)
-    target_dcache_invalidate ();
-
-  stack_cache_enabled_p = stack_cache_enabled_p_1;
-}
-
-static void
-show_stack_cache_enabled_p (struct ui_file *file, int from_tty,
-			    struct cmd_list_element *c, const char *value)
-{
-  fprintf_filtered (file, _("Cache use for stack accesses is %s.\n"), value);
-}
-
-/* Cache of memory operations, to speed up remote access.  */
-static DCACHE *target_dcache;
-
-/* Invalidate the target dcache.  */
-
-void
-target_dcache_invalidate (void)
-{
-  dcache_invalidate (target_dcache);
-}
 
 /* The user just typed 'target' without the name of a target.  */
 
@@ -853,10 +808,10 @@ update_current_target (void)
 	    return_zero);
   de_fault (to_extra_thread_info,
 	    (char *(*) (struct thread_info *))
-	    return_zero);
+	    return_null);
   de_fault (to_thread_name,
 	    (char *(*) (struct thread_info *))
-	    return_zero);
+	    return_null);
   de_fault (to_stop,
 	    (void (*) (ptid_t))
 	    target_ignore);
@@ -866,7 +821,7 @@ update_current_target (void)
 	    tcomplain);
   de_fault (to_pid_to_exec_file,
 	    (char *(*) (int))
-	    return_zero);
+	    return_null);
   de_fault (to_async,
 	    (void (*) (void (*) (enum inferior_event_type, void*), void*))
 	    tcomplain);
@@ -965,7 +920,7 @@ update_current_target (void)
 	    tcomplain);
   de_fault (to_traceframe_info,
 	    (struct traceframe_info * (*) (void))
-	    return_zero);
+	    return_null);
   de_fault (to_supports_evaluation_of_breakpoint_conditions,
 	    (int (*) (void))
 	    return_zero);
@@ -1437,6 +1392,35 @@ memory_xfer_live_readonly_partial (struct target_ops *ops,
   return 0;
 }
 
+/* Read memory from more than one valid target.  A core file, for
+   instance, could have some of memory but delegate other bits to
+   the target below it.  So, we must manually try all targets.  */
+
+static LONGEST
+raw_memory_xfer_partial (struct target_ops *ops, void *readbuf,
+			 const void *writebuf, ULONGEST memaddr, LONGEST len)
+{
+  LONGEST res;
+
+  do
+    {
+      res = ops->to_xfer_partial (ops, TARGET_OBJECT_MEMORY, NULL,
+				  readbuf, writebuf, memaddr, len);
+      if (res > 0)
+	break;
+
+      /* We want to continue past core files to executables, but not
+	 past a running target's memory.  */
+      if (ops->to_has_all_memory (ops))
+	break;
+
+      ops = ops->beneath;
+    }
+  while (ops != NULL);
+
+  return res;
+}
+
 /* Perform a partial memory transfer.
    For docs see target.h, to_xfer_partial.  */
 
@@ -1586,17 +1570,18 @@ memory_xfer_partial_1 (struct target_ops *ops, enum target_object object,
 	 the collected memory range fails.  */
       && get_traceframe_number () == -1
       && (region->attrib.cache
-	  || (stack_cache_enabled_p && object == TARGET_OBJECT_STACK_MEMORY)))
+	  || (stack_cache_enabled_p () && object == TARGET_OBJECT_STACK_MEMORY)
+	  || (code_cache_enabled_p () && object == TARGET_OBJECT_CODE_MEMORY)))
     {
+      DCACHE *dcache = target_dcache_get_or_init ();
+
       if (readbuf != NULL)
-	res = dcache_xfer_memory (ops, target_dcache, memaddr, readbuf,
-				  reg_len, 0);
+	res = dcache_xfer_memory (ops, dcache, memaddr, readbuf, reg_len, 0);
       else
 	/* FIXME drow/2006-08-09: If we're going to preserve const
 	   correctness dcache_xfer_memory should take readbuf and
 	   writebuf.  */
-	res = dcache_xfer_memory (ops, target_dcache, memaddr,
-				  (void *) writebuf,
+	res = dcache_xfer_memory (ops, dcache, memaddr, (void *) writebuf,
 				  reg_len, 1);
       if (res <= 0)
 	return -1;
@@ -1609,26 +1594,8 @@ memory_xfer_partial_1 (struct target_ops *ops, enum target_object object,
      to_xfer_partial is enough; if it doesn't recognize an object
      it will call the to_xfer_partial of the next target down.
      But for memory this won't do.  Memory is the only target
-     object which can be read from more than one valid target.
-     A core file, for instance, could have some of memory but
-     delegate other bits to the target below it.  So, we must
-     manually try all targets.  */
-
-  do
-    {
-      res = ops->to_xfer_partial (ops, TARGET_OBJECT_MEMORY, NULL,
-				  readbuf, writebuf, memaddr, reg_len);
-      if (res > 0)
-	break;
-
-      /* We want to continue past core files to executables, but not
-	 past a running target's memory.  */
-      if (ops->to_has_all_memory (ops))
-	break;
-
-      ops = ops->beneath;
-    }
-  while (ops != NULL);
+     object which can be read from more than one valid target.  */
+  res = raw_memory_xfer_partial (ops, readbuf, writebuf, memaddr, reg_len);
 
   /* Make sure the cache gets updated no matter what - if we are writing
      to the stack.  Even if this write is not tagged as such, we still need
@@ -1637,11 +1604,14 @@ memory_xfer_partial_1 (struct target_ops *ops, enum target_object object,
   if (res > 0
       && inf != NULL
       && writebuf != NULL
+      && target_dcache_init_p ()
       && !region->attrib.cache
-      && stack_cache_enabled_p
-      && object != TARGET_OBJECT_STACK_MEMORY)
+      && ((stack_cache_enabled_p () && object != TARGET_OBJECT_STACK_MEMORY)
+	  || (code_cache_enabled_p () && object != TARGET_OBJECT_CODE_MEMORY)))
     {
-      dcache_update (target_dcache, memaddr, (void *) writebuf, res);
+      DCACHE *dcache = target_dcache_get ();
+
+      dcache_update (dcache, memaddr, (void *) writebuf, res);
     }
 
   /* If we still haven't got anything, return the last error.  We
@@ -1678,6 +1648,13 @@ memory_xfer_partial (struct target_ops *ops, enum target_object object,
       void *buf;
       struct cleanup *old_chain;
 
+      /* A large write request is likely to be partially satisfied
+	 by memory_xfer_partial_1.  We will continually malloc
+	 and free a copy of the entire write request for breakpoint
+	 shadow handling even though we only end up writing a small
+	 subset of it.  Cap writes to 4KB to mitigate this.  */
+      len = min (4096, len);
+
       buf = xmalloc (len);
       old_chain = make_cleanup (xfree, buf);
       memcpy (buf, writebuf, len);
@@ -1712,7 +1689,7 @@ make_show_memory_breakpoints_cleanup (int show)
 LONGEST
 target_xfer_partial (struct target_ops *ops,
 		     enum target_object object, const char *annex,
-		     void *readbuf, const void *writebuf,
+		     gdb_byte *readbuf, const gdb_byte *writebuf,
 		     ULONGEST offset, LONGEST len)
 {
   LONGEST retval;
@@ -1726,21 +1703,18 @@ target_xfer_partial (struct target_ops *ops,
   /* If this is a memory transfer, let the memory-specific code
      have a look at it instead.  Memory transfers are more
      complicated.  */
-  if (object == TARGET_OBJECT_MEMORY || object == TARGET_OBJECT_STACK_MEMORY)
+  if (object == TARGET_OBJECT_MEMORY || object == TARGET_OBJECT_STACK_MEMORY
+      || object == TARGET_OBJECT_CODE_MEMORY)
     retval = memory_xfer_partial (ops, object, readbuf,
 				  writebuf, offset, len);
-  else
+  else if (object == TARGET_OBJECT_RAW_MEMORY)
     {
-      enum target_object raw_object = object;
-
-      /* If this is a raw memory transfer, request the normal
-	 memory object from other layers.  */
-      if (raw_object == TARGET_OBJECT_RAW_MEMORY)
-	raw_object = TARGET_OBJECT_MEMORY;
-
-      retval = ops->to_xfer_partial (ops, raw_object, annex, readbuf,
-				     writebuf, offset, len);
+      /* Request the normal memory object from other layers.  */
+      retval = raw_memory_xfer_partial (ops, readbuf, writebuf, offset, len);
     }
+  else
+    retval = ops->to_xfer_partial (ops, object, annex, readbuf,
+				   writebuf, offset, len);
 
   if (targetdebug)
     {
@@ -1811,17 +1785,46 @@ target_read_memory (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
     return TARGET_XFER_E_IO;
 }
 
+/* Like target_read_memory, but specify explicitly that this is a read
+   from the target's raw memory.  That is, this read bypasses the
+   dcache, breakpoint shadowing, etc.  */
+
+int
+target_read_raw_memory (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
+{
+  /* See comment in target_read_memory about why the request starts at
+     current_target.beneath.  */
+  if (target_read (current_target.beneath, TARGET_OBJECT_RAW_MEMORY, NULL,
+		   myaddr, memaddr, len) == len)
+    return 0;
+  else
+    return TARGET_XFER_E_IO;
+}
+
 /* Like target_read_memory, but specify explicitly that this is a read from
    the target's stack.  This may trigger different cache behavior.  */
 
 int
 target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
 {
-  /* Dispatch to the topmost target, not the flattened current_target.
-     Memory accesses check target->to_has_(all_)memory, and the
-     flattened target doesn't inherit those.  */
-
+  /* See comment in target_read_memory about why the request starts at
+     current_target.beneath.  */
   if (target_read (current_target.beneath, TARGET_OBJECT_STACK_MEMORY, NULL,
+		   myaddr, memaddr, len) == len)
+    return 0;
+  else
+    return TARGET_XFER_E_IO;
+}
+
+/* Like target_read_memory, but specify explicitly that this is a read from
+   the target's code.  This may trigger different cache behavior.  */
+
+int
+target_read_code (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
+{
+  /* See comment in target_read_memory about why the request starts at
+     current_target.beneath.  */
+  if (target_read (current_target.beneath, TARGET_OBJECT_CODE_MEMORY, NULL,
 		   myaddr, memaddr, len) == len)
     return 0;
   else
@@ -1837,9 +1840,8 @@ target_read_stack (CORE_ADDR memaddr, gdb_byte *myaddr, ssize_t len)
 int
 target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
 {
-  /* Dispatch to the topmost target, not the flattened current_target.
-     Memory accesses check target->to_has_(all_)memory, and the
-     flattened target doesn't inherit those.  */
+  /* See comment in target_read_memory about why the request starts at
+     current_target.beneath.  */
   if (target_write (current_target.beneath, TARGET_OBJECT_MEMORY, NULL,
 		    myaddr, memaddr, len) == len)
     return 0;
@@ -1856,9 +1858,8 @@ target_write_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
 int
 target_write_raw_memory (CORE_ADDR memaddr, const gdb_byte *myaddr, ssize_t len)
 {
-  /* Dispatch to the topmost target, not the flattened current_target.
-     Memory accesses check target->to_has_(all_)memory, and the
-     flattened target doesn't inherit those.  */
+  /* See comment in target_read_memory about why the request starts at
+     current_target.beneath.  */
   if (target_write (current_target.beneath, TARGET_OBJECT_RAW_MEMORY, NULL,
 		    myaddr, memaddr, len) == len)
     return 0;
@@ -2605,7 +2606,7 @@ target_preopen (int from_tty)
 /* Detach a target after doing deferred register stores.  */
 
 void
-target_detach (char *args, int from_tty)
+target_detach (const char *args, int from_tty)
 {
   struct target_ops* t;
   
@@ -3635,6 +3636,12 @@ return_minus_one (void)
   return -1;
 }
 
+static void *
+return_null (void)
+{
+  return 0;
+}
+
 /*
  * Find the next target down the stack from the specified target.
  */
@@ -3741,7 +3748,7 @@ init_dummy_target (void)
   dummy_target.to_doc = "";
   dummy_target.to_attach = find_default_attach;
   dummy_target.to_detach = 
-    (void (*)(struct target_ops *, char *, int))target_ignore;
+    (void (*)(struct target_ops *, const char *, int))target_ignore;
   dummy_target.to_create_inferior = find_default_create_inferior;
   dummy_target.to_can_async_p = find_default_can_async_p;
   dummy_target.to_is_async_p = find_default_is_async_p;
@@ -4165,7 +4172,10 @@ target_disable_btrace (struct btrace_target_info *btinfo)
 
   for (t = current_target.beneath; t != NULL; t = t->beneath)
     if (t->to_disable_btrace != NULL)
-      return t->to_disable_btrace (btinfo);
+      {
+	t->to_disable_btrace (btinfo);
+	return;
+      }
 
   tcomplain ();
 }
@@ -4179,7 +4189,10 @@ target_teardown_btrace (struct btrace_target_info *btinfo)
 
   for (t = current_target.beneath; t != NULL; t = t->beneath)
     if (t->to_teardown_btrace != NULL)
-      return t->to_teardown_btrace (btinfo);
+      {
+	t->to_teardown_btrace (btinfo);
+	return;
+      }
 
   tcomplain ();
 }
@@ -5116,17 +5129,6 @@ Tells gdb whether to control the inferior in asynchronous mode."),
 			   &setlist,
 			   &showlist);
 
-  add_setshow_boolean_cmd ("stack-cache", class_support,
-			   &stack_cache_enabled_p_1, _("\
-Set cache use for stack access."), _("\
-Show cache use for stack access."), _("\
-When on, use the data cache for all stack access, regardless of any\n\
-configured memory regions.  This improves remote performance significantly.\n\
-By default, caching for stack access is on."),
-			   set_stack_cache_enabled_p,
-			   show_stack_cache_enabled_p,
-			   &setlist, &showlist);
-
   add_setshow_boolean_cmd ("may-write-registers", class_support,
 			   &may_write_registers_1, _("\
 Set permission to write into registers."), _("\
@@ -5180,7 +5182,4 @@ When this permission is on, GDB may interrupt/stop the target's execution.\n\
 Otherwise, any attempt to interrupt or stop will be ignored."),
 			   set_target_permissions, NULL,
 			   &setlist, &showlist);
-
-
-  target_dcache = dcache_init ();
 }

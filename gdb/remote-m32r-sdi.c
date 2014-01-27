@@ -1,6 +1,6 @@
 /* Remote debugging interface for M32R/SDI.
 
-   Copyright (C) 2003-2013 Free Software Foundation, Inc.
+   Copyright (C) 2003-2014 Free Software Foundation, Inc.
 
    Contributed by Renesas Technology Co.
    Written by Kei Sakamoto <sakamoto.kei@renesas.com>.
@@ -26,7 +26,7 @@
 #include "inferior.h"
 #include "target.h"
 #include "regcache.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdbthread.h"
 #include <ctype.h>
 #include <signal.h>
@@ -37,7 +37,6 @@
 #endif
 #include <sys/types.h>
 #include <sys/time.h>
-#include <signal.h>
 #include <time.h>
 #include "gdb_bfd.h"
 #include "cli/cli-utils.h"
@@ -878,7 +877,7 @@ m32r_wait (struct target_ops *ops,
    Use this when you want to detach and do something else
    with your gdb.  */
 static void
-m32r_detach (struct target_ops *ops, char *args, int from_tty)
+m32r_detach (struct target_ops *ops, const char *args, int from_tty)
 {
   if (remote_debug)
     fprintf_unfiltered (gdb_stdlog, "m32r_detach(%d)\n", from_tty);

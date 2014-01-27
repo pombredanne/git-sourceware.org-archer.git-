@@ -1,6 +1,6 @@
 /* Handle set and show GDB commands.
 
-   Copyright (C) 2000-2013 Free Software Foundation, Inc.
+   Copyright (C) 2000-2014 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -19,7 +19,7 @@
 #include "readline/tilde.h"
 #include "value.h"
 #include <ctype.h>
-#include "gdb_string.h"
+#include <string.h>
 #include "arch-utils.h"
 #include "observer.h"
 

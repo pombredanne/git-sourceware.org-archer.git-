@@ -1,6 +1,6 @@
 /* Handle shared libraries for GDB, the GNU Debugger.
 
-   Copyright (C) 1990-2013 Free Software Foundation, Inc.
+   Copyright (C) 1990-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -21,7 +21,7 @@
 
 #include <sys/types.h>
 #include <fcntl.h>
-#include "gdb_string.h"
+#include <string.h>
 #include "symtab.h"
 #include "bfd.h"
 #include "symfile.h"
@@ -485,6 +485,16 @@ solib_map_sections (struct so_list *so)
 
   /* Leave bfd open, core_xfer_memory and "info files" need it.  */
   so->abfd = abfd;
+
+  /* Copy the full path name into so_name, allowing symbol_file_add
+     to find it later.  This also affects the =library-loaded GDB/MI
+     event, and in particular the part of that notification providing
+     the library's host-side path.  If we let the target dictate
+     that objfile's path, and the target is different from the host,
+     GDB/MI will not provide the correct host-side path.  */
+  if (strlen (bfd_get_filename (abfd)) >= SO_NAME_MAX_PATH_SIZE)
+    error (_("Shared library file name is too long."));
+  strcpy (so->so_name, bfd_get_filename (abfd));
 
   if (build_section_table (abfd, &so->sections, &so->sections_end))
     {
@@ -1496,12 +1506,31 @@ gdb_bfd_lookup_symbol (bfd *abfd,
   return symaddr;
 }
 
+/* SO_LIST_HEAD may contain user-loaded object files that can be removed
+   out-of-band by the user.  So upon notification of free_objfile remove
+   all references to any user-loaded file that is about to be freed.  */
+
+static void
+remove_user_added_objfile (struct objfile *objfile)
+{
+  struct so_list *so;
+
+  if (objfile != 0 && objfile->flags & OBJF_USERLOADED)
+    {
+      for (so = so_list_head; so != NULL; so = so->next)
+	if (so->objfile == objfile)
+	  so->objfile = NULL;
+    }
+}
+
 extern initialize_file_ftype _initialize_solib; /* -Wmissing-prototypes */
 
 void
 _initialize_solib (void)
 {
   solib_data = gdbarch_data_register_pre_init (solib_init);
+
+  observer_attach_free_objfile (remove_user_added_objfile);
 
   add_com ("sharedlibrary", class_files, sharedlibrary_command,
 	   _("Load shared object library symbols for files matching REGEXP."));

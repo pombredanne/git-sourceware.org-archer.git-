@@ -1,6 +1,6 @@
 /* Process record and replay target for GDB, the GNU debugger.
 
-   Copyright (C) 2008-2013 Free Software Foundation, Inc.
+   Copyright (C) 2008-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -141,7 +141,7 @@ record_disconnect (struct target_ops *t, char *args, int from_tty)
 /* See record.h.  */
 
 void
-record_detach (struct target_ops *t, char *args, int from_tty)
+record_detach (struct target_ops *t, const char *args, int from_tty)
 {
   gdb_assert (t->to_stratum == record_stratum);
 

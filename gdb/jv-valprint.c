@@ -1,6 +1,6 @@
 /* Support for printing Java values for GDB, the GNU debugger.
 
-   Copyright (C) 1997-2013 Free Software Foundation, Inc.
+   Copyright (C) 1997-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -29,7 +29,7 @@
 #include "jv-lang.h"
 #include "c-lang.h"
 #include "annotate.h"
-#include "gdb_string.h"
+#include <string.h>
 
 /* Local functions */
 
@@ -417,22 +417,16 @@ java_print_value_fields (struct type *type, const gdb_byte *valaddr,
 		}
 	      else if (field_is_static (&TYPE_FIELD (type, i)))
 		{
+		  struct value_print_options opts;
 		  struct value *v = value_static_field (type, i);
+		  struct type *t = check_typedef (value_type (v));
 
-		  if (v == NULL)
-		    val_print_optimized_out (NULL, stream);
-		  else
-		    {
-		      struct value_print_options opts;
-		      struct type *t = check_typedef (value_type (v));
-
-		      if (TYPE_CODE (t) == TYPE_CODE_STRUCT)
-			v = value_addr (v);
-		      opts = *options;
-		      opts.deref_ref = 0;
-		      common_val_print (v, stream, recurse + 1,
-					&opts, current_language);
-		    }
+		  if (TYPE_CODE (t) == TYPE_CODE_STRUCT)
+		    v = value_addr (v);
+		  opts = *options;
+		  opts.deref_ref = 0;
+		  common_val_print (v, stream, recurse + 1,
+				    &opts, current_language);
 		}
 	      else if (TYPE_FIELD_TYPE (type, i) == NULL)
 		fputs_filtered ("<unknown type>", stream);

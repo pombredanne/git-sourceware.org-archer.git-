@@ -1,7 +1,7 @@
 /* Target-dependent code for PowerPC systems using the SVR4 ABI
    for GDB, the GNU debugger.
 
-   Copyright (C) 2000-2013 Free Software Foundation, Inc.
+   Copyright (C) 2000-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -23,7 +23,7 @@
 #include "inferior.h"
 #include "regcache.h"
 #include "value.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "gdb_assert.h"
 #include "ppc-tdep.h"
 #include "target.h"

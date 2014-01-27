@@ -1,6 +1,6 @@
 # This testcase is part of GDB, the GNU debugger.
 
-# Copyright 1992-2013 Free Software Foundation, Inc.
+# Copyright 1992-2014 Free Software Foundation, Inc.
 
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -740,6 +740,12 @@ proc test_printf {} {
     gdb_test "printf \"% p\", 0" "Inappropriate modifiers to format specifier 'p' in printf"
     gdb_test "printf \"%0p\", 0" "Inappropriate modifiers to format specifier 'p' in printf"
     gdb_test "printf \"%+p\", 0" "Inappropriate modifiers to format specifier 'p' in printf"
+
+
+    gdb_test "define hibob\nprintf \"hi bob \"\nshell echo zzz\nprintf \"y\\n\"\nend" \
+	"" \
+	"create hibob command"
+    gdb_test "hibob" "hi bob zzz.*y" "run hibob command"
 }
 
 #Test printing DFP values with printf

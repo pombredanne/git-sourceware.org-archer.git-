@@ -1,5 +1,5 @@
 /* Handle TIC6X (DSBT) shared libraries for GDB, the GNU Debugger.
-   Copyright (C) 2010-2013 Free Software Foundation, Inc.
+   Copyright (C) 2010-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -18,7 +18,7 @@
 
 
 #include "defs.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "inferior.h"
 #include "gdbcore.h"
 #include "solib.h"
@@ -166,10 +166,7 @@ static const struct program_space_data *solib_dsbt_pspace_data;
 static void
 dsbt_pspace_data_cleanup (struct program_space *pspace, void *arg)
 {
-  struct dsbt_info *info;
-
-  info = program_space_data (pspace, solib_dsbt_pspace_data);
-  xfree (info);
+  xfree (arg);
 }
 
 /* Get the current dsbt data.  If none is found yet, add it now.  This

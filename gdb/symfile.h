@@ -1,6 +1,6 @@
 /* Definitions for reading symbol files into GDB.
 
-   Copyright (C) 1990-2013 Free Software Foundation, Inc.
+   Copyright (C) 1990-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -304,40 +304,6 @@ struct sym_probe_fns
      The returned value does not have to be freed and it has lifetime of the
      OBJFILE.  */
   VEC (probe_p) *(*sym_get_probes) (struct objfile *);
-
-  /* Return the number of arguments available to PROBE.  PROBE will
-     have come from a call to this objfile's sym_get_probes method.
-     If you provide an implementation of sym_get_probes, you must
-     implement this method as well.  */
-  unsigned (*sym_get_probe_argument_count) (struct probe *probe);
-
-  /* Return 1 if the probe interface can evaluate the arguments of probe
-     PROBE, zero otherwise.  This function can be probe-specific, informing
-     whether only the arguments of PROBE can be evaluated, of generic,
-     informing whether the probe interface is able to evaluate any kind of
-     argument.  If you provide an implementation of sym_get_probes, you must
-     implement this method as well.  */
-  int (*can_evaluate_probe_arguments) (struct probe *probe);
-
-  /* Evaluate the Nth argument available to PROBE.  PROBE will have
-     come from a call to this objfile's sym_get_probes method.  N will
-     be between 0 and the number of arguments available to this probe.
-     FRAME is the frame in which the evaluation is done; the frame's
-     PC will match the address of the probe.  If you provide an
-     implementation of sym_get_probes, you must implement this method
-     as well.  */
-  struct value *(*sym_evaluate_probe_argument) (struct probe *probe,
-						unsigned n);
-
-  /* Compile the Nth probe argument to an agent expression.  PROBE
-     will have come from a call to this objfile's sym_get_probes
-     method.  N will be between 0 and the number of arguments
-     available to this probe.  EXPR and VALUE are the agent expression
-     that is being updated.  */
-  void (*sym_compile_to_ax) (struct probe *probe,
-			     struct agent_expr *expr,
-			     struct axs_value *value,
-			     unsigned n);
 
   /* Relocate the probe section of OBJFILE.  */
   void (*sym_relocate_probe) (struct objfile *objfile,

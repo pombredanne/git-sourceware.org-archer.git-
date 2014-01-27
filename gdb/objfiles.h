@@ -1,6 +1,6 @@
 /* Definitions for symbol file management in GDB.
 
-   Copyright (C) 1992-2013 Free Software Foundation, Inc.
+   Copyright (C) 1992-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -212,8 +212,10 @@ struct objfile
 
     struct objfile *next;
 
-    /* The object file's name, tilde-expanded and absolute.  This
-       pointer is never NULL.  This does not have to be freed; it is
+    /* The object file's original name as specified by the user,
+       made absolute, and tilde-expanded.  However, it is not canonicalized
+       (i.e., it has not been passed through gdb_realpath).
+       This pointer is never NULL.  This does not have to be freed; it is
        guaranteed to have a lifetime at least as long as the objfile.  */
 
     char *original_name;
@@ -453,8 +455,6 @@ extern struct objfile *objfile_separate_debug_iterate (const struct objfile *,
 
 extern void put_objfile_before (struct objfile *, struct objfile *);
 
-extern void objfile_to_front (struct objfile *);
-
 extern void add_separate_debug_objfile (struct objfile *, struct objfile *);
 
 extern void unlink_objfile (struct objfile *);
@@ -484,6 +484,8 @@ extern void objfile_set_sym_fns (struct objfile *objfile,
 				 const struct sym_fns *sf);
 
 extern void objfiles_changed (void);
+
+extern int is_addr_in_objfile (CORE_ADDR addr, const struct objfile *objfile);
 
 /* This operation deletes all objfile entries that represent solibs that
    weren't explicitly loaded by the user, via e.g., the add-symbol-file

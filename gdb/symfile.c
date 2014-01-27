@@ -1,6 +1,6 @@
 /* Generic symbol file reading for the GNU debugger, GDB.
 
-   Copyright (C) 1990-2013 Free Software Foundation, Inc.
+   Copyright (C) 1990-2014 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -60,8 +60,8 @@
 
 #include <sys/types.h>
 #include <fcntl.h>
-#include "gdb_string.h"
-#include "gdb_stat.h"
+#include <string.h>
+#include <sys/stat.h>
 #include <ctype.h>
 #include <time.h>
 #include <sys/time.h>
@@ -2206,6 +2206,7 @@ add_symbol_file_command (char *args, int from_tty)
   int expecting_sec_name = 0;
   int expecting_sec_addr = 0;
   char **argv;
+  struct objfile *objf;
 
   struct sect_opt
   {
@@ -2332,8 +2333,10 @@ add_symbol_file_command (char *args, int from_tty)
   if (from_tty && (!query ("%s", "")))
     error (_("Not confirmed."));
 
-  symbol_file_add (filename, from_tty ? SYMFILE_VERBOSE : 0,
-                   section_addrs, flags);
+  objf = symbol_file_add (filename, from_tty ? SYMFILE_VERBOSE : 0,
+			  section_addrs, flags);
+
+  add_target_sections_of_objfile (objf);
 
   /* Getting new symbols may change our opinion about what is
      frameless.  */
@@ -2341,6 +2344,82 @@ add_symbol_file_command (char *args, int from_tty)
   do_cleanups (my_cleanups);
 }
 
+
+/* This function removes a symbol file that was added via add-symbol-file.  */
+
+static void
+remove_symbol_file_command (char *args, int from_tty)
+{
+  char **argv;
+  struct objfile *objf = NULL;
+  struct cleanup *my_cleanups;
+  struct program_space *pspace = current_program_space;
+  struct gdbarch *gdbarch = get_current_arch ();
+
+  dont_repeat ();
+
+  if (args == NULL)
+    error (_("remove-symbol-file: no symbol file provided"));
+
+  my_cleanups = make_cleanup (null_cleanup, NULL);
+
+  argv = gdb_buildargv (args);
+
+  if (strcmp (argv[0], "-a") == 0)
+    {
+      /* Interpret the next argument as an address.  */
+      CORE_ADDR addr;
+
+      if (argv[1] == NULL)
+	error (_("Missing address argument"));
+
+      if (argv[2] != NULL)
+	error (_("Junk after %s"), argv[1]);
+
+      addr = parse_and_eval_address (argv[1]);
+
+      ALL_OBJFILES (objf)
+	{
+	  if (objf != 0
+	      && objf->flags & OBJF_USERLOADED
+	      && objf->pspace == pspace && is_addr_in_objfile (addr, objf))
+	    break;
+	}
+    }
+  else if (argv[0] != NULL)
+    {
+      /* Interpret the current argument as a file name.  */
+      char *filename;
+
+      if (argv[1] != NULL)
+	error (_("Junk after %s"), argv[0]);
+
+      filename = tilde_expand (argv[0]);
+      make_cleanup (xfree, filename);
+
+      ALL_OBJFILES (objf)
+	{
+	  if (objf != 0
+	      && objf->flags & OBJF_USERLOADED
+	      && objf->pspace == pspace
+	      && filename_cmp (filename, objfile_name (objf)) == 0)
+	    break;
+	}
+    }
+
+  if (objf == NULL)
+    error (_("No symbol file found"));
+
+  if (from_tty
+      && !query (_("Remove symbol table from file \"%s\"? "),
+		 objfile_name (objf)))
+    error (_("Not confirmed."));
+
+  free_objfile (objf);
+  clear_symtab_users (0);
+
+  do_cleanups (my_cleanups);
+}
 
 typedef struct objfile *objfilep;
 
@@ -2511,12 +2590,16 @@ reread_symbols (void)
 	  memset (&objfile->msymbol_demangled_hash, 0,
 		  sizeof (objfile->msymbol_demangled_hash));
 
-	  set_objfile_per_bfd (objfile);
-
 	  /* obstack_init also initializes the obstack so it is
 	     empty.  We could use obstack_specify_allocation but
 	     gdb_obstack.h specifies the alloc/dealloc functions.  */
 	  obstack_init (&objfile->objfile_obstack);
+
+	  /* set_objfile_per_bfd potentially allocates the per-bfd
+	     data on the objfile's obstack (if sharing data across
+	     multiple users is not possible), so it's important to
+	     do it *after* the obstack has been initialized.  */
+	  set_objfile_per_bfd (objfile);
 
 	  objfile->original_name = obstack_copy0 (&objfile->objfile_obstack,
 						  original_name,
@@ -2799,8 +2882,8 @@ allocate_symtab (const char *filename, struct objfile *objfile)
   symtab = (struct symtab *)
     obstack_alloc (&objfile->objfile_obstack, sizeof (struct symtab));
   memset (symtab, 0, sizeof (*symtab));
-  symtab->filename = (char *) bcache (filename, strlen (filename) + 1,
-				      objfile->per_bfd->filename_cache);
+  symtab->filename = bcache (filename, strlen (filename) + 1,
+			     objfile->per_bfd->filename_cache);
   symtab->fullname = NULL;
   symtab->language = deduce_language_from_filename (filename);
   symtab->debugformat = "unknown";
@@ -2811,7 +2894,9 @@ allocate_symtab (const char *filename, struct objfile *objfile)
   symtab->next = objfile->symtabs;
   objfile->symtabs = symtab;
 
-  if (symtab_create_debug)
+  /* This can be very verbose with lots of headers.
+     Only print at higher debug levels.  */
+  if (symtab_create_debug >= 2)
     {
       /* Be a bit clever with debugging messages, and don't print objfile
 	 every time, only when it changes.  */
@@ -3743,10 +3828,22 @@ symfile_find_segment_sections (struct objfile *objfile)
   free_symfile_segment_data (data);
 }
 
+/* Listen for free_objfile events.  */
+
+static void
+symfile_free_objfile (struct objfile *objfile)
+{
+  /* Remove the target sections of user-added objfiles.  */
+  if (objfile != 0 && objfile->flags & OBJF_USERLOADED)
+    remove_target_sections ((void *) objfile);
+}
+
 void
 _initialize_symfile (void)
 {
   struct cmd_list_element *c;
+
+  observer_attach_free_objfile (symfile_free_objfile);
 
   c = add_cmd ("symbol-file", class_files, symbol_file_command, _("\
 Load symbol table from executable file FILE.\n\
@@ -3763,6 +3860,15 @@ should be specified if the data and bss segments are not contiguous\n\
 with the text.  SECT is a section name to be loaded at SECT_ADDR."),
 	       &cmdlist);
   set_cmd_completer (c, filename_completer);
+
+  c = add_cmd ("remove-symbol-file", class_files,
+	       remove_symbol_file_command, _("\
+Remove a symbol file added via the add-symbol-file command.\n\
+Usage: remove-symbol-file FILENAME\n\
+       remove-symbol-file -a ADDRESS\n\
+The file to remove can be identified by its filename or by an address\n\
+that lies within the boundaries of this symbol file in memory."),
+	       &cmdlist);
 
   c = add_cmd ("load", class_files, load_command, _("\
 Dynamically load FILE into the running program, and record its symbols\n\

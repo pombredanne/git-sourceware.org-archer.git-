@@ -1,6 +1,6 @@
 /* Support for printing C++ values for GDB, the GNU debugger.
 
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -27,7 +27,7 @@
 #include "gdbcmd.h"
 #include "demangle.h"
 #include "annotate.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "c-lang.h"
 #include "target.h"
 #include "cp-abi.h"
@@ -333,12 +333,9 @@ cp_print_value_fields (struct type *type, struct type *real_type,
 		    fprintf_filtered (stream,
 				      _("<error reading variable: %s>"),
 				      ex.message);
-		  else if (v == NULL)
-		    val_print_optimized_out (NULL, stream);
-		  else
-		    cp_print_static_field (TYPE_FIELD_TYPE (type, i),
-					   v, stream, recurse + 1,
-					   options);
+		  cp_print_static_field (TYPE_FIELD_TYPE (type, i),
+					 v, stream, recurse + 1,
+					 options);
 		}
 	      else if (i == vptr_fieldno && type == vptr_basetype)
 		{
@@ -640,7 +637,13 @@ cp_print_static_field (struct type *type,
 		       const struct value_print_options *options)
 {
   struct value_print_options opts;
-  
+
+  if (value_entirely_optimized_out (val))
+    {
+      val_print_optimized_out (val, stream);
+      return;
+    }
+
   if (TYPE_CODE (type) == TYPE_CODE_STRUCT)
     {
       CORE_ADDR *first_dont_print;

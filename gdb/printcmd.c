@@ -1,6 +1,6 @@
 /* Print values for GNU debugger GDB.
 
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -18,7 +18,7 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
 #include "defs.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "frame.h"
 #include "symtab.h"
 #include "gdbtypes.h"
@@ -41,7 +41,6 @@
 #include "block.h"
 #include "disasm.h"
 #include "dfp.h"
-#include "valprint.h"
 #include "exceptions.h"
 #include "observer.h"
 #include "solist.h"
@@ -1940,21 +1939,24 @@ disable_display_command (char *args, int from_tty)
    an item by re-parsing .exp_string field in the new execution context.  */
 
 static void
-clear_dangling_display_expressions (struct so_list *solib)
+clear_dangling_display_expressions (struct objfile *objfile)
 {
-  struct objfile *objfile = solib->objfile;
   struct display *d;
+  struct program_space *pspace;
 
   /* With no symbol file we cannot have a block or expression from it.  */
   if (objfile == NULL)
     return;
+  pspace = objfile->pspace;
   if (objfile->separate_debug_objfile_backlink)
-    objfile = objfile->separate_debug_objfile_backlink;
-  gdb_assert (objfile->pspace == solib->pspace);
+    {
+      objfile = objfile->separate_debug_objfile_backlink;
+      gdb_assert (objfile->pspace == pspace);
+    }
 
   for (d = display_chain; d != NULL; d = d->next)
     {
-      if (d->pspace != solib->pspace)
+      if (d->pspace != pspace)
 	continue;
 
       if (lookup_objfile_from_block (d->block) == objfile
@@ -2458,6 +2460,7 @@ static void
 printf_command (char *arg, int from_tty)
 {
   ui_printf (arg, gdb_stdout);
+  gdb_flush (gdb_stdout);
 }
 
 /* Implement the "eval" command.  */
@@ -2486,7 +2489,7 @@ _initialize_printcmd (void)
 
   current_display_number = -1;
 
-  observer_attach_solib_unloaded (clear_dangling_display_expressions);
+  observer_attach_free_objfile (clear_dangling_display_expressions);
 
   add_info ("address", address_info,
 	    _("Describe where symbol SYM is stored."));

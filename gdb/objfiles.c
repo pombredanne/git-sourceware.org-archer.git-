@@ -1,6 +1,6 @@
 /* GDB routines for manipulating objfiles.
 
-   Copyright (C) 1992-2013 Free Software Foundation, Inc.
+   Copyright (C) 1992-2014 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support, using pieces from other GDB modules.
 
@@ -35,10 +35,10 @@
 
 #include "gdb_assert.h"
 #include <sys/types.h>
-#include "gdb_stat.h"
+#include <sys/stat.h>
 #include <fcntl.h>
 #include "gdb_obstack.h"
-#include "gdb_string.h"
+#include <string.h>
 #include "hashtab.h"
 
 #include "breakpoint.h"
@@ -85,14 +85,10 @@ static const struct program_space_data *objfiles_pspace_data;
 static void
 objfiles_pspace_data_cleanup (struct program_space *pspace, void *arg)
 {
-  struct objfile_pspace_info *info;
+  struct objfile_pspace_info *info = arg;
 
-  info = program_space_data (pspace, objfiles_pspace_data);
-  if (info != NULL)
-    {
-      xfree (info->sections);
-      xfree (info);
-    }
+  xfree (info->sections);
+  xfree (info);
 }
 
 /* Get the current svr4 data.  If none is found yet, add it now.  This
@@ -276,6 +272,7 @@ struct objfile *
 allocate_objfile (bfd *abfd, const char *name, int flags)
 {
   struct objfile *objfile;
+  char *expanded_name;
 
   objfile = (struct objfile *) xzalloc (sizeof (struct objfile));
   objfile->psymbol_cache = psymbol_bcache_init ();
@@ -290,10 +287,20 @@ allocate_objfile (bfd *abfd, const char *name, int flags)
     {
       gdb_assert (abfd == NULL);
       gdb_assert ((flags & OBJF_NOT_FILENAME) != 0);
-      name = "<<anonymous objfile>>";
+      expanded_name = xstrdup ("<<anonymous objfile>>");
     }
-  objfile->original_name = obstack_copy0 (&objfile->objfile_obstack, name,
-					  strlen (name));
+  else if ((flags & OBJF_NOT_FILENAME) != 0)
+    expanded_name = xstrdup (name);
+  else
+    expanded_name = gdb_abspath (name);
+  objfile->original_name = obstack_copy0 (&objfile->objfile_obstack,
+					  expanded_name,
+					  strlen (expanded_name));
+  xfree (expanded_name);
+
+  /* Update the per-objfile information that comes from the bfd, ensuring
+     that any data that is reference is saved in the per-objfile data
+     region.  */
 
   /* Update the per-objfile information that comes from the bfd, ensuring
      that any data that is reference is saved in the per-objfile data
@@ -442,26 +449,6 @@ put_objfile_before (struct objfile *objfile, struct objfile *before_this)
 		  _("put_objfile_before: before objfile not in list"));
 }
 
-/* Put OBJFILE at the front of the list.  */
-
-void
-objfile_to_front (struct objfile *objfile)
-{
-  struct objfile **objp;
-  for (objp = &object_files; *objp != NULL; objp = &((*objp)->next))
-    {
-      if (*objp == objfile)
-	{
-	  /* Unhook it from where it is.  */
-	  *objp = objfile->next;
-	  /* Put it in the front.  */
-	  objfile->next = object_files;
-	  object_files = objfile;
-	  break;
-	}
-    }
-}
-
 /* Unlink OBJFILE from the list of known objfiles, if it is found in the
    list.
 
@@ -533,25 +520,14 @@ free_objfile_separate_debug (struct objfile *objfile)
     }
 }
 
-/* Destroy an objfile and all the symtabs and psymtabs under it.  Note
-   that as much as possible is allocated on the objfile_obstack 
-   so that the memory can be efficiently freed.
-
-   Things which we do NOT free because they are not in malloc'd memory
-   or not in memory specific to the objfile include:
-
-   objfile -> sf
-
-   FIXME:  If the objfile is using reusable symbol information (via mmalloc),
-   then we need to take into account the fact that more than one process
-   may be using the symbol information at the same time (when mmalloc is
-   extended to support cooperative locking).  When more than one process
-   is using the mapped symbol info, we need to be more careful about when
-   we free objects in the reusable area.  */
+/* Destroy an objfile and all the symtabs and psymtabs under it.  */
 
 void
 free_objfile (struct objfile *objfile)
 {
+  /* First notify observers that this objfile is about to be freed.  */
+  observer_notify_free_objfile (objfile);
+
   /* Free all separate debug objfiles.  */
   free_objfile_separate_debug (objfile);
 
@@ -1466,6 +1442,29 @@ void
 resume_section_map_updates_cleanup (void *arg)
 {
   resume_section_map_updates (arg);
+}
+
+/* Return 1 if ADDR maps into one of the sections of OBJFILE and 0
+   otherwise.  */
+
+int
+is_addr_in_objfile (CORE_ADDR addr, const struct objfile *objfile)
+{
+  struct obj_section *osect;
+
+  if (objfile == NULL)
+    return 0;
+
+  ALL_OBJFILE_OSECTIONS (objfile, osect)
+    {
+      if (section_is_overlay (osect) && !section_is_mapped (osect))
+	continue;
+
+      if (obj_section_addr (osect) <= addr
+	  && addr < obj_section_endaddr (osect))
+	return 1;
+    }
+  return 0;
 }
 
 /* The default implementation for the "iterate_over_objfiles_in_search_order"

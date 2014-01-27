@@ -1,7 +1,7 @@
 /* Remote debugging interface to m32r and mon2000 ROM monitors for GDB, 
    the GNU debugger.
 
-   Copyright (C) 1996-2013 Free Software Foundation, Inc.
+   Copyright (C) 1996-2014 Free Software Foundation, Inc.
 
    Adapted by Michael Snyder of Cygnus Support.
 
@@ -34,7 +34,7 @@
 #include "symfile.h"		/* for generic load */
 #include <sys/time.h>
 #include <time.h>		/* for time_t */
-#include "gdb_string.h"
+#include <string.h>
 #include "objfiles.h"		/* for ALL_OBJFILES etc.  */
 #include "inferior.h"
 #include <ctype.h>

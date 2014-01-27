@@ -1,6 +1,6 @@
 /* Top level stuff for GDB, the GNU debugger.
 
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -28,10 +28,10 @@
 #include "getopt.h"
 
 #include <sys/types.h>
-#include "gdb_stat.h"
+#include <sys/stat.h>
 #include <ctype.h>
 
-#include "gdb_string.h"
+#include <string.h>
 #include "event-loop.h"
 #include "ui-out.h"
 

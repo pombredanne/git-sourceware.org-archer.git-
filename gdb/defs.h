@@ -1,7 +1,7 @@
 /* *INDENT-OFF* */ /* ATTRIBUTE_PRINTF confuses indent, avoid running it
 		      for now.  */
 /* Basic, host-specific, and target-specific definitions for GDB.
-   Copyright (C) 1986-2013 Free Software Foundation, Inc.
+   Copyright (C) 1986-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -48,9 +48,7 @@
    included, so it's ok to blank out gstdint.h.  */
 #define GCC_GENERATED_STDINT_H 1
 
-#ifdef HAVE_STDDEF_H
 #include <stddef.h>
-#endif
 
 #include <unistd.h>
 
@@ -606,13 +604,7 @@ enum gdb_osabi
 
 /* From other system libraries */
 
-#ifdef HAVE_STDDEF_H
-#include <stddef.h>
-#endif
-
-#ifdef HAVE_STDLIB_H
 #include <stdlib.h>
-#endif
 
 
 #ifndef atof

@@ -1,6 +1,6 @@
 /* Support for printing Pascal values for GDB, the GNU debugger.
 
-   Copyright (C) 2000-2013 Free Software Foundation, Inc.
+   Copyright (C) 2000-2014 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -843,6 +843,12 @@ pascal_object_print_static_field (struct value *val,
 {
   struct type *type = value_type (val);
   struct value_print_options opts;
+
+  if (value_entirely_optimized_out (val))
+    {
+      val_print_optimized_out (val, stream);
+      return;
+    }
 
   if (TYPE_CODE (type) == TYPE_CODE_STRUCT)
     {
