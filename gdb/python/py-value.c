@@ -29,6 +29,7 @@
 #include "expression.h"
 #include "cp-abi.h"
 #include "python.h"
+#include "observer.h"
 
 #ifdef HAVE_PYTHON
 
@@ -1392,12 +1393,28 @@ gdbpy_is_value_object (PyObject *obj)
   return PyObject_TypeCheck (obj, &value_object_type);
 }
 
+#if 0
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+static void
+python_types_mark_used (void)
+{
+  value_object *iter;
+
+  for (iter = values_in_python; iter; iter = iter->next)
+    type_mark_used (value_type (iter->value));
+}
+#endif
+
 int
 gdbpy_initialize_values (void)
 {
   if (PyType_Ready (&value_object_type) < 0)
     return -1;
 
+#if 0
+  observer_attach_mark_used (python_types_mark_used);
+#endif
   return gdb_pymodule_addobject (gdb_module, "Value",
 				 (PyObject *) &value_object_type);
 }
