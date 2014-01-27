@@ -15734,6 +15734,24 @@ all_tracepoints (void)
   return tp_vec;
 }
 
+#if 0
+/* Call type_mark_used for any TYPEs referenced from this GDB source file.  */
+
+static void
+breakpoint_types_mark_used (void)
+{
+  struct breakpoint *b;
+
+  ALL_BREAKPOINTS (b)
+    {
+      if (b->exp)
+	exp_types_mark_used (b->exp);
+      if (b->val)
+	type_mark_used (value_type (b->val));
+    }
+}
+#endif
+
 
 /* This help string is used for the break, hbreak, tbreak and thbreak
    commands.  It is defined as a macro to prevent duplication.
@@ -16699,4 +16717,7 @@ agent-printf \"printf format string\", arg1, arg2, arg3, ..., argn\n\
 
   observer_attach_about_to_proceed (breakpoint_about_to_proceed);
   observer_attach_thread_exit (remove_threaded_breakpoints);
+#if 0
+  observer_attach_mark_used (breakpoint_types_mark_used);
+#endif
 }

@@ -382,4 +382,6 @@ extern ULONGEST align_down (ULONGEST v, int n);
 
 extern LONGEST gdb_sign_extend (LONGEST value, int bit);
 
+extern struct cleanup *make_cleanup_restore_selected_frame (void);
+
 #endif /* UTILS_H */

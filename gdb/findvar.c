@@ -34,6 +34,7 @@
 #include "block.h"
 #include "objfiles.h"
 #include "language.h"
+#include "dwarf2loc.h"
 
 /* Basic byte-swapping routines.  All 'extract' functions return a
    host-format integer from a target-format integer at ADDR which is
@@ -416,7 +417,10 @@ minsym_lookup_iterator_cb (struct objfile *objfile, void *cb_data)
 }
 
 /* A default implementation for the "la_read_var_value" hook in
-   the language vector which should work in most situations.  */
+   the language vector which should work in most situations.
+   We have to first find the address of the variable before allocating struct
+   value to return as its size may depend on DW_OP_PUSH_OBJECT_ADDRESS possibly 
+   used by its type.  */
 
 struct value *
 default_read_var_value (struct symbol *var, struct frame_info *frame)
@@ -424,13 +428,6 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
   struct value *v;
   struct type *type = SYMBOL_TYPE (var);
   CORE_ADDR addr;
-
-  /* Call check_typedef on our type to make sure that, if TYPE is
-     a TYPE_CODE_TYPEDEF, its length is set to the length of the target type
-     instead of zero.  However, we do not replace the typedef type by the
-     target type, because we want to keep the typedef in order to be able to
-     set the returned value type description correctly.  */
-  check_typedef (type);
 
   if (symbol_read_needs_frame (var))
     gdb_assert (frame);
@@ -599,6 +596,9 @@ default_read_var_value (struct symbol *var, struct frame_info *frame)
       break;
     }
 
+  /* ADDR is set here for ALLOCATE_VALUE's CHECK_TYPEDEF for
+     DW_OP_PUSH_OBJECT_ADDRESS.  */
+  object_address_set (addr);
   v = value_at_lazy (type, addr);
   return v;
 }
@@ -702,10 +702,11 @@ struct value *
 value_from_register (struct type *type, int regnum, struct frame_info *frame)
 {
   struct gdbarch *gdbarch = get_frame_arch (frame);
-  struct type *type1 = check_typedef (type);
   struct value *v;
 
-  if (gdbarch_convert_register_p (gdbarch, regnum, type1))
+  type = check_typedef (type);
+
+  if (gdbarch_convert_register_p (gdbarch, regnum, type))
     {
       int optim, unavail, ok;
 
@@ -720,7 +721,7 @@ value_from_register (struct type *type, int regnum, struct frame_info *frame)
       VALUE_LVAL (v) = lval_register;
       VALUE_FRAME_ID (v) = get_frame_id (frame);
       VALUE_REGNUM (v) = regnum;
-      ok = gdbarch_register_to_value (gdbarch, frame, regnum, type1,
+      ok = gdbarch_register_to_value (gdbarch, frame, regnum, type,
 				      value_contents_raw (v), &optim,
 				      &unavail);
 

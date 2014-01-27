@@ -261,9 +261,11 @@ save_final_cleanups (void)
 static void
 restore_my_cleanups (struct cleanup **pmy_chain, struct cleanup *chain)
 {
+#if 0 /* archer-jankratochvil-vla */
   if (*pmy_chain != SENTINEL_CLEANUP)
     internal_warning (__FILE__, __LINE__,
 		      _("restore_my_cleanups has found a stale cleanup"));
+#endif
 
   *pmy_chain = chain;
 }

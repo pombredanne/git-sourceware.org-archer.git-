@@ -137,6 +137,15 @@ struct dwarf2_loclist_baton
 
 extern const struct symbol_computed_ops dwarf2_locexpr_funcs;
 extern const struct symbol_computed_ops dwarf2_loclist_funcs;
+extern const struct symbol_computed_ops dwarf2_missing_funcs;
+
+extern void object_address_set (CORE_ADDR address);
+
+extern CORE_ADDR dwarf_locexpr_baton_eval
+  (struct dwarf2_locexpr_baton *dlbaton);
+
+extern int dwarf_loclist_baton_eval (struct dwarf2_loclist_baton *dllbaton,
+				     struct type *type, CORE_ADDR *addrp);
 
 extern const struct symbol_block_ops dwarf2_block_frame_base_locexpr_funcs;
 extern const struct symbol_block_ops dwarf2_block_frame_base_loclist_funcs;
