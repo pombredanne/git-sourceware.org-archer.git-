@@ -17,9 +17,9 @@
 set testfile "dynamic-other-frame"
 set srcfile1 ${testfile}.f90
 set srcfile2 ${testfile}-stub.f90
-set objfile2 ${objdir}/${subdir}/${testfile}-stub.o
+set objfile2 [standard_output_file ${testfile}-stub.o]
 set executable ${testfile}
-set binfile ${objdir}/${subdir}/${executable}
+set binfile [standard_output_file ${executable}]
 
 if { [gdb_compile "${srcdir}/${subdir}/${srcfile2}" "${objfile2}" object {f90}] != ""
      || [gdb_compile "${srcdir}/${subdir}/${srcfile1} ${objfile2}" "${binfile}" executable {debug f90}] != "" } {

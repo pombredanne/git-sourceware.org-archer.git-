@@ -28,7 +28,7 @@ set testfile "dw2-struct-member-data-location"
 set srcfile ${testfile}.S
 set binfile ${testfile}.x
 
-if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${objdir}/${subdir}/${binfile}" object {nodebug}] != "" } {
+if  { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "[standard_output_file ${binfile}]" object {nodebug}] != "" } {
     return -1
 }
 
