@@ -15,7 +15,7 @@
 
 set test internal-var-field-address
 set binfile ${test}.x
-if  { [gdb_compile "${srcdir}/${subdir}/${test}.c" "${objdir}/${subdir}/${binfile}" object {debug}] != "" } {
+if  { [gdb_compile "${srcdir}/${subdir}/${test}.c" "[standard_output_file ${binfile}]" object {debug}] != "" } {
     untested "Couldn't compile test program"
     return -1
 }

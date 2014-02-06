@@ -23,7 +23,7 @@ if [mi_gdb_start] {
 
 set testfile "mi2-var-stale-type"
 set srcfile ${testfile}.c
-set binfile ${objdir}/${subdir}/${testfile}
+set binfile [standard_output_file ${testfile}]
 if {[build_executable ${testfile}.exp $testfile $srcfile] == -1} {
     return -1
 }

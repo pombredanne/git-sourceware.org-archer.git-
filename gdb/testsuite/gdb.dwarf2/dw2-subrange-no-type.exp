@@ -27,7 +27,7 @@ if {![dwarf2_support]} {
 set testfile dw2-subrange-no-type
 set srcfile ${testfile}.S
 set executable ${testfile}.x
-set binfile ${objdir}/${subdir}/${executable}
+set binfile [standard_output_file ${executable}]
 
 if { [gdb_compile "${srcdir}/${subdir}/${srcfile}" "${binfile}" object {}] != "" } {
     return -1
