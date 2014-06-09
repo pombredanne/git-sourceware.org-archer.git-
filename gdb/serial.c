@@ -130,7 +130,7 @@ serial_logchar (struct ui_file *stream, int ch_type, int ch, int timeout)
 }
 
 void
-serial_log_command (const char *cmd)
+serial_log_command (struct target_ops *self, const char *cmd)
 {
   if (!serial_logfp)
     return;
@@ -211,7 +211,7 @@ serial_open (const char *name)
   if (!ops)
     return NULL;
 
-  scb = XMALLOC (struct serial);
+  scb = XNEW (struct serial);
 
   scb->ops = ops;
 
@@ -263,7 +263,7 @@ serial_fdopen_ops (const int fd, const struct serial_ops *ops)
   if (!ops)
     return NULL;
 
-  scb = XCALLOC (1, struct serial);
+  scb = XCNEW (struct serial);
 
   scb->ops = ops;
 
@@ -670,34 +670,6 @@ using remote targets."),
 			    NULL,
 			    serial_baud_show_cmd,
 			    &serial_set_cmdlist, &serial_show_cmdlist);
-
-  /* The commands "set/show serial baud" used to have a different name.
-     Add aliases to those names to facilitate the transition, and mark
-     them as deprecated, in order to make users aware of the fact that
-     the command names have been changed.  */
-    {
-      const char *cmd_name;
-      struct cmd_list_element *cmd;
-
-      /* FIXME: There is a limitation in the deprecation mechanism,
-	 and the warning ends up not being displayed for prefixed
-	 aliases.  So use a real command instead of an alias.  */
-      add_setshow_zinteger_cmd ("remotebaud", class_alias, &baud_rate, _("\
-Set baud rate for remote serial I/O."), _("\
-Show baud rate for remote serial I/O."), _("\
-This value is used to set the speed of the serial port when debugging\n\
-using remote targets."),
-				NULL,
-				serial_baud_show_cmd,
-				&setlist, &showlist);
-      cmd_name = "remotebaud";
-      cmd = lookup_cmd (&cmd_name, setlist, "", -1, 1);
-      deprecate_cmd (cmd, "set serial baud");
-      cmd_name
-	= "remotebaud"; /* needed because lookup_cmd updates the pointer */
-      cmd = lookup_cmd (&cmd_name, showlist, "", -1, 1);
-      deprecate_cmd (cmd, "show serial baud");
-    }
 
   add_setshow_filename_cmd ("remotelogfile", no_class, &serial_logfile, _("\
 Set filename for remote session recording."), _("\

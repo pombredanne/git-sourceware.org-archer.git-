@@ -1,6 +1,6 @@
 /* ELF executable support for BFD.
 
-   Copyright 1993-2014 Free Software Foundation, Inc.
+   Copyright (C) 1993-2014 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -4117,11 +4117,31 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 	  /* Mandated PF_R.  */
 	  m->p_flags = PF_R;
 	  m->p_flags_valid = 1;
+	  s = first_tls;
 	  for (i = 0; i < (unsigned int) tls_count; ++i)
 	    {
-	      BFD_ASSERT (first_tls->flags & SEC_THREAD_LOCAL);
-	      m->sections[i] = first_tls;
-	      first_tls = first_tls->next;
+	      if ((s->flags & SEC_THREAD_LOCAL) == 0)
+		{
+		  _bfd_error_handler
+		    (_("%B: TLS sections are not adjacent:"), abfd);
+		  s = first_tls;
+		  i = 0;
+		  while (i < (unsigned int) tls_count)
+		    {
+		      if ((s->flags & SEC_THREAD_LOCAL) != 0)
+			{
+			  _bfd_error_handler (_("	    TLS: %A"), s);
+			  i++;
+			}
+		      else
+			_bfd_error_handler (_("	non-TLS: %A"), s);
+		      s = s->next;
+		    }
+		  bfd_set_error (bfd_error_bad_value);
+		  goto error_return;
+		}
+	      m->sections[i] = s;
+	      s = s->next;
 	    }
 
 	  *pm = m;
@@ -4184,11 +4204,7 @@ _bfd_elf_map_sections_to_segments (bfd *abfd, struct bfd_link_info *info)
 			== (SEC_LOAD | SEC_HAS_CONTENTS))
 		      break;
 
-		  if (i == (unsigned) -1)
-		    continue;
-
-		  if (m->sections[i]->vma + m->sections[i]->size
-		      >= info->relro_end)
+		  if (i != (unsigned) -1)
 		    break;
 		}
 	    }
@@ -4792,6 +4808,7 @@ assign_file_positions_for_load_sections (bfd *abfd,
 		p->p_flags |= PF_W;
 	    }
 	}
+
       off -= off_adjust;
 
       /* Check that all sections are in a PT_LOAD segment.
@@ -4993,14 +5010,11 @@ assign_file_positions_for_non_load_sections (bfd *abfd,
 		{
 		  if (lp->p_type == PT_LOAD
 		      && lp->p_vaddr < link_info->relro_end
-		      && lp->p_vaddr + lp->p_filesz >= link_info->relro_end
 		      && lm->count != 0
 		      && lm->sections[0]->vma >= link_info->relro_start)
 		    break;
 		}
 
-	      /* PR ld/14207.  If the RELRO segment doesn't fit in the
-		 LOAD segment, it should be removed.  */
 	      BFD_ASSERT (lm != NULL);
 	    }
 	  else
@@ -6245,7 +6259,7 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
 	    phdr_included = TRUE;
 	}
 
-      lowest_section = first_section;
+      lowest_section = NULL;
       if (section_count != 0)
 	{
 	  unsigned int isec = 0;
@@ -6262,7 +6276,8 @@ copy_elf_program_header (bfd *ibfd, bfd *obfd)
 		    {
 		      bfd_vma seg_off;
 
-		      if (section->lma < lowest_section->lma)
+		      if (lowest_section == NULL
+			  || section->lma < lowest_section->lma)
 			lowest_section = section;
 
 		      /* Section lmas are set up from PT_LOAD header
@@ -7785,7 +7800,7 @@ _bfd_elf_set_section_contents (bfd *abfd,
 			       bfd_size_type count)
 {
   Elf_Internal_Shdr *hdr;
-  bfd_signed_vma pos;
+  file_ptr pos;
 
   if (! abfd->output_has_begun
       && ! _bfd_elf_compute_section_file_positions (abfd, NULL))
@@ -9893,11 +9908,12 @@ bfd *
 bfd_elf_bfd_from_remote_memory
   (bfd *templ,
    bfd_vma ehdr_vma,
+   bfd_size_type size,
    bfd_vma *loadbasep,
    int (*target_read_memory) (bfd_vma, bfd_byte *, bfd_size_type))
 {
   return (*get_elf_backend_data (templ)->elf_backend_bfd_from_remote_memory)
-    (templ, ehdr_vma, loadbasep, target_read_memory);
+    (templ, ehdr_vma, size, loadbasep, target_read_memory);
 }
 
 long

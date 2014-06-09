@@ -1,7 +1,6 @@
 ## Process this file with automake to generate Makefile.in
 #
-#  Copyright 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013
-#  Free Software Foundation, Inc.
+#  Copyright (C) 2006-2014 Free Software Foundation, Inc.
 #
 # This file is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -197,6 +196,8 @@ dwp_DEPENDENCIES = libgold.a $(LIBIBERTY) $(LIBINTL_DEP)
 dwp_LDADD = libgold.a $(LIBIBERTY) $(GOLD_LDADD) $(LIBINTL) $(THREADSLIB) \
 	$(LIBDL)
 dwp_LDFLAGS = $(GOLD_LDFLAGS)
+
+CONFIG_STATUS_DEPENDENCIES = $(srcdir)/../bfd/development.sh
 
 # Use an explicit dependency for the bison generated header file.
 expression.$(OBJEXT): yyscript.h

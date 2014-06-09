@@ -23,6 +23,7 @@
 #include "buildsym.h"
 #include "gdbcmd.h"
 #include "inferior.h"		/* enum CALL_DUMMY_LOCATION et al.  */
+#include "infrun.h"
 #include <string.h>
 #include "regcache.h"
 #include "gdb_assert.h"
@@ -802,6 +803,21 @@ default_return_in_first_hidden_param_p (struct gdbarch *gdbarch,
      parameter if the return value should be passed by reference, as
      specified in ABI.  */
   return language_pass_by_reference (type);
+}
+
+int default_insn_is_call (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  return 0;
+}
+
+int default_insn_is_ret (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  return 0;
+}
+
+int default_insn_is_jump (struct gdbarch *gdbarch, CORE_ADDR addr)
+{
+  return 0;
 }
 
 /* */

@@ -143,6 +143,20 @@ DEF_VEC_O (registered_sym_fns);
 
 static VEC (registered_sym_fns) *symtab_fns = NULL;
 
+/* Values for "set print symbol-loading".  */
+
+const char print_symbol_loading_off[] = "off";
+const char print_symbol_loading_brief[] = "brief";
+const char print_symbol_loading_full[] = "full";
+static const char *print_symbol_loading_enums[] =
+{
+  print_symbol_loading_off,
+  print_symbol_loading_brief,
+  print_symbol_loading_full,
+  NULL
+};
+static const char *print_symbol_loading = print_symbol_loading_full;
+
 /* If non-zero, shared library symbols will be added automatically
    when the inferior is created, new libraries are loaded, or when
    attaching to the inferior.  This is almost always what users will
@@ -155,6 +169,31 @@ static VEC (registered_sym_fns) *symtab_fns = NULL;
 
 int auto_solib_add = 1;
 
+
+/* Return non-zero if symbol-loading messages should be printed.
+   FROM_TTY is the standard from_tty argument to gdb commands.
+   If EXEC is non-zero the messages are for the executable.
+   Otherwise, messages are for shared libraries.
+   If FULL is non-zero then the caller is printing a detailed message.
+   E.g., the message includes the shared library name.
+   Otherwise, the caller is printing a brief "summary" message.  */
+
+int
+print_symbol_loading_p (int from_tty, int exec, int full)
+{
+  if (!from_tty && !info_verbose)
+    return 0;
+
+  if (exec)
+    {
+      /* We don't check FULL for executables, there are few such
+	 messages, therefore brief == full.  */
+      return print_symbol_loading != print_symbol_loading_off;
+    }
+  if (full)
+    return print_symbol_loading == print_symbol_loading_full;
+  return print_symbol_loading == print_symbol_loading_brief;
+}
 
 /* True if we are reading a symbol table.  */
 
@@ -799,13 +838,13 @@ default_symfile_segments (bfd *abfd)
   low = bfd_get_section_vma (abfd, sect);
   high = low + bfd_get_section_size (sect);
 
-  data = XZALLOC (struct symfile_segment_data);
+  data = XCNEW (struct symfile_segment_data);
   data->num_segments = 1;
-  data->segment_bases = XCALLOC (1, CORE_ADDR);
-  data->segment_sizes = XCALLOC (1, CORE_ADDR);
+  data->segment_bases = XCNEW (CORE_ADDR);
+  data->segment_sizes = XCNEW (CORE_ADDR);
 
   num_sections = bfd_count_sections (abfd);
-  data->segment_info = XCALLOC (num_sections, int);
+  data->segment_info = XCNEWVEC (int, num_sections);
 
   for (i = 0, sect = abfd->sections; sect != NULL; i++, sect = sect->next)
     {
@@ -836,6 +875,7 @@ static void
 read_symbols (struct objfile *objfile, int add_flags)
 {
   (*objfile->sf->sym_read) (objfile, add_flags);
+  objfile->per_bfd->minsyms_read = 1;
 
   /* find_separate_debug_file_in_section should be called only if there is
      single binary with no existing separate debug info file.  */
@@ -867,6 +907,12 @@ read_symbols (struct objfile *objfile, int add_flags)
 static void
 init_entry_point_info (struct objfile *objfile)
 {
+  struct entry_info *ei = &objfile->per_bfd->ei;
+
+  if (ei->initialized)
+    return;
+  ei->initialized = 1;
+
   /* Save startup file's range of PC addresses to help blockframe.c
      decide where the bottom of the stack is.  */
 
@@ -874,8 +920,8 @@ init_entry_point_info (struct objfile *objfile)
     {
       /* Executable file -- record its entry point so we'll recognize
          the startup file because it contains the entry point.  */
-      objfile->ei.entry_point = bfd_get_start_address (objfile->obfd);
-      objfile->ei.entry_point_p = 1;
+      ei->entry_point = bfd_get_start_address (objfile->obfd);
+      ei->entry_point_p = 1;
     }
   else if (bfd_get_file_flags (objfile->obfd) & DYNAMIC
 	   && bfd_get_start_address (objfile->obfd) != 0)
@@ -883,18 +929,20 @@ init_entry_point_info (struct objfile *objfile)
       /* Some shared libraries may have entry points set and be
 	 runnable.  There's no clear way to indicate this, so just check
 	 for values other than zero.  */
-      objfile->ei.entry_point = bfd_get_start_address (objfile->obfd);
-      objfile->ei.entry_point_p = 1;
+      ei->entry_point = bfd_get_start_address (objfile->obfd);
+      ei->entry_point_p = 1;
     }
   else
     {
       /* Examination of non-executable.o files.  Short-circuit this stuff.  */
-      objfile->ei.entry_point_p = 0;
+      ei->entry_point_p = 0;
     }
 
-  if (objfile->ei.entry_point_p)
+  if (ei->entry_point_p)
     {
-      CORE_ADDR entry_point =  objfile->ei.entry_point;
+      struct obj_section *osect;
+      CORE_ADDR entry_point =  ei->entry_point;
+      int found;
 
       /* Make certain that the address points at real code, and not a
 	 function descriptor.  */
@@ -905,8 +953,27 @@ init_entry_point_info (struct objfile *objfile)
 
       /* Remove any ISA markers, so that this matches entries in the
 	 symbol table.  */
-      objfile->ei.entry_point
+      ei->entry_point
 	= gdbarch_addr_bits_remove (get_objfile_arch (objfile), entry_point);
+
+      found = 0;
+      ALL_OBJFILE_OSECTIONS (objfile, osect)
+	{
+	  struct bfd_section *sect = osect->the_bfd_section;
+
+	  if (entry_point >= bfd_get_section_vma (objfile->obfd, sect)
+	      && entry_point < (bfd_get_section_vma (objfile->obfd, sect)
+				+ bfd_get_section_size (sect)))
+	    {
+	      ei->the_bfd_section_index
+		= gdb_bfd_section_index (objfile->obfd, sect);
+	      found = 1;
+	      break;
+	    }
+	}
+
+      if (!found)
+	ei->the_bfd_section_index = SECT_OFF_TEXT (objfile);
     }
 }
 
@@ -1084,7 +1151,7 @@ symbol_file_add_with_addrs (bfd *abfd, const char *name, int add_flags,
   struct objfile *objfile;
   const int from_tty = add_flags & SYMFILE_VERBOSE;
   const int mainline = add_flags & SYMFILE_MAINLINE;
-  const int should_print = ((from_tty || info_verbose)
+  const int should_print = (print_symbol_loading_p (from_tty, mainline, 1)
 			    && (readnow_symbol_files
 				|| (add_flags & SYMFILE_NO_READ) == 0));
 
@@ -1627,11 +1694,9 @@ symbol_file_command (char *args, int from_tty)
 void
 set_initial_language (void)
 {
-  enum language lang = language_unknown;
+  enum language lang = main_language ();
 
-  if (language_of_main != language_unknown)
-    lang = language_of_main;
-  else
+  if (lang == language_unknown)
     {
       char *name = main_name ();
       struct symbol *sym = lookup_symbol (name, NULL, VAR_DOMAIN, NULL);
@@ -2583,12 +2648,6 @@ reread_symbols (void)
 	  objfile->psymtabs_addrmap = NULL;
 	  objfile->free_psymtabs = NULL;
 	  objfile->template_symbols = NULL;
-	  objfile->msymbols = NULL;
-	  objfile->minimal_symbol_count = 0;
-	  memset (&objfile->msymbol_hash, 0,
-		  sizeof (objfile->msymbol_hash));
-	  memset (&objfile->msymbol_demangled_hash, 0,
-		  sizeof (objfile->msymbol_demangled_hash));
 
 	  /* obstack_init also initializes the obstack so it is
 	     empty.  We could use obstack_specify_allocation but
@@ -3507,7 +3566,7 @@ read_target_long_array (CORE_ADDR memaddr, unsigned int *myaddr,
 static int
 simple_read_overlay_table (void)
 {
-  struct minimal_symbol *novlys_msym;
+  struct bound_minimal_symbol novlys_msym;
   struct bound_minimal_symbol ovly_table_msym;
   struct gdbarch *gdbarch;
   int word_size;
@@ -3515,7 +3574,7 @@ simple_read_overlay_table (void)
 
   simple_free_overlay_table ();
   novlys_msym = lookup_minimal_symbol ("_novlys", NULL, NULL);
-  if (! novlys_msym)
+  if (! novlys_msym.minsym)
     {
       error (_("Error reading inferior's overlay table: "
              "couldn't find `_novlys' variable\n"
@@ -3536,11 +3595,11 @@ simple_read_overlay_table (void)
   word_size = gdbarch_long_bit (gdbarch) / TARGET_CHAR_BIT;
   byte_order = gdbarch_byte_order (gdbarch);
 
-  cache_novlys = read_memory_integer (SYMBOL_VALUE_ADDRESS (novlys_msym),
+  cache_novlys = read_memory_integer (BMSYMBOL_VALUE_ADDRESS (novlys_msym),
 				      4, byte_order);
   cache_ovly_table
     = (void *) xmalloc (cache_novlys * sizeof (*cache_ovly_table));
-  cache_ovly_table_base = SYMBOL_VALUE_ADDRESS (ovly_table_msym.minsym);
+  cache_ovly_table_base = BMSYMBOL_VALUE_ADDRESS (ovly_table_msym);
   read_target_long_array (cache_ovly_table_base,
                           (unsigned int *) cache_ovly_table,
                           cache_novlys * 4, word_size, byte_order);
@@ -3608,15 +3667,15 @@ simple_overlay_update (struct obj_section *osect)
       {
 	/* Does its cached location match what's currently in the
 	   symtab?  */
-	struct minimal_symbol *minsym
+	struct bound_minimal_symbol minsym
 	  = lookup_minimal_symbol ("_ovly_table", NULL, NULL);
 
-	if (minsym == NULL)
+	if (minsym.minsym == NULL)
 	  error (_("Error reading inferior's overlay table: couldn't "
 		   "find `_ovly_table' array\n"
 		   "in inferior.  Use `overlay manual' mode."));
 	
-	if (cache_ovly_table_base == SYMBOL_VALUE_ADDRESS (minsym))
+	if (cache_ovly_table_base == BMSYMBOL_VALUE_ADDRESS (minsym))
 	  /* Then go ahead and try to look up this single section in
 	     the cache.  */
 	  if (simple_overlay_update_1 (osect))
@@ -3833,9 +3892,48 @@ symfile_find_segment_sections (struct objfile *objfile)
 static void
 symfile_free_objfile (struct objfile *objfile)
 {
-  /* Remove the target sections of user-added objfiles.  */
-  if (objfile != 0 && objfile->flags & OBJF_USERLOADED)
+  /* Remove the target sections owned by this objfile.  */
+  if (objfile != NULL)
     remove_target_sections ((void *) objfile);
+}
+
+/* Wrapper around the quick_symbol_functions expand_symtabs_matching "method".
+   Expand all symtabs that match the specified criteria.
+   See quick_symbol_functions.expand_symtabs_matching for details.  */
+
+void
+expand_symtabs_matching (expand_symtabs_file_matcher_ftype *file_matcher,
+			 expand_symtabs_symbol_matcher_ftype *symbol_matcher,
+			 enum search_domain kind,
+			 void *data)
+{
+  struct objfile *objfile;
+
+  ALL_OBJFILES (objfile)
+  {
+    if (objfile->sf)
+      objfile->sf->qf->expand_symtabs_matching (objfile, file_matcher,
+						symbol_matcher, kind,
+						data);
+  }
+}
+
+/* Wrapper around the quick_symbol_functions map_symbol_filenames "method".
+   Map function FUN over every file.
+   See quick_symbol_functions.map_symbol_filenames for details.  */
+
+void
+map_symbol_filenames (symbol_filename_ftype *fun, void *data,
+		      int need_fullname)
+{
+  struct objfile *objfile;
+
+  ALL_OBJFILES (objfile)
+  {
+    if (objfile->sf)
+      objfile->sf->qf->map_symbol_filenames (objfile, fun, data,
+					     need_fullname);
+  }
 }
 
 void
@@ -3926,4 +4024,18 @@ each global debug-file-directory component prepended."),
 				     NULL,
 				     show_debug_file_directory,
 				     &setlist, &showlist);
+
+  add_setshow_enum_cmd ("symbol-loading", no_class,
+			print_symbol_loading_enums, &print_symbol_loading,
+			_("\
+Set printing of symbol loading messages."), _("\
+Show printing of symbol loading messages."), _("\
+off   == turn all messages off\n\
+brief == print messages for the executable,\n\
+         and brief messages for shared libraries\n\
+full  == print messages for the executable,\n\
+         and messages for each shared library."),
+			NULL,
+			NULL,
+			&setprintlist, &showprintlist);
 }

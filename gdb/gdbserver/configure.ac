@@ -41,7 +41,7 @@ AC_HEADER_STDC
 AC_FUNC_ALLOCA
 
 # Set the 'development' global.
-. $srcdir/../development.sh
+. $srcdir/../../bfd/development.sh
 
 # Enable -lmcheck by default (it provides cheap-enough memory
 # mangling), but turn it off for releases.
@@ -82,7 +82,7 @@ AC_CHECK_HEADERS(sgtty.h termio.h termios.h sys/reg.h string.h dnl
 		 errno.h fcntl.h signal.h sys/file.h malloc.h dnl
 		 sys/ioctl.h netinet/in.h sys/socket.h netdb.h dnl
 		 netinet/tcp.h arpa/inet.h)
-AC_CHECK_FUNCS(pread pwrite pread64 readlink)
+AC_CHECK_FUNCS(gettimeofday pread pwrite pread64 readlink)
 AC_REPLACE_FUNCS(vasprintf vsnprintf)
 
 GDB_AC_COMMON
@@ -143,8 +143,8 @@ AC_ARG_ENABLE(werror,
      *) AC_MSG_ERROR(bad value ${enableval} for --enable-werror) ;;
    esac])
 
-# Enable -Werror by default when using gcc
-if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" ; then
+# Enable -Werror by default when using gcc.  Turn it off for releases.
+if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" && $development; then
     ERROR_ON_WARNING=yes
 fi
 

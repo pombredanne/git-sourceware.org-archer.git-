@@ -20,6 +20,8 @@
 #ifndef GDB_PYTHON_INTERNAL_H
 #define GDB_PYTHON_INTERNAL_H
 
+#include "extension.h"
+
 /* These WITH_* macros are defined by the CPython API checker that
    comes with the Python plugin for GCC.  See:
    https://gcc-python-plugin.readthedocs.org/en/latest/cpychecker.html
@@ -279,7 +281,51 @@ typedef struct
 
 extern struct cmd_list_element *set_python_list;
 extern struct cmd_list_element *show_python_list;
+
+/* extension_language_script_ops "methods".  */
 
+extern int gdbpy_auto_load_enabled (const struct extension_language_defn *);
+
+/* extension_language_ops "methods".  */
+
+extern enum ext_lang_rc gdbpy_apply_val_pretty_printer
+  (const struct extension_language_defn *,
+   struct type *type, const gdb_byte *valaddr,
+   int embedded_offset, CORE_ADDR address,
+   struct ui_file *stream, int recurse,
+   const struct value *val,
+   const struct value_print_options *options,
+   const struct language_defn *language);
+extern enum ext_lang_bt_status gdbpy_apply_frame_filter
+  (const struct extension_language_defn *,
+   struct frame_info *frame, int flags, enum ext_lang_frame_args args_type,
+   struct ui_out *out, int frame_low, int frame_high);
+extern void gdbpy_preserve_values (const struct extension_language_defn *,
+				   struct objfile *objfile,
+				   htab_t copied_types);
+extern enum ext_lang_bp_stop gdbpy_breakpoint_cond_says_stop
+  (const struct extension_language_defn *, struct breakpoint *);
+extern int gdbpy_breakpoint_has_cond (const struct extension_language_defn *,
+				      struct breakpoint *b);
+
+extern void *gdbpy_clone_xmethod_worker_data
+  (const struct extension_language_defn *extlang, void *data);
+extern void gdbpy_free_xmethod_worker_data
+  (const struct extension_language_defn *extlang, void *data);
+extern enum ext_lang_rc gdbpy_get_matching_xmethod_workers
+  (const struct extension_language_defn *extlang,
+   struct type *obj_type, const char *method_name,
+   xmethod_worker_vec **dm_vec);
+extern enum ext_lang_rc gdbpy_get_xmethod_arg_types
+  (const struct extension_language_defn *extlang,
+   struct xmethod_worker *worker,
+   int *nargs,
+   struct type ***arg_types);
+extern struct value *gdbpy_invoke_xmethod
+  (const struct extension_language_defn *extlang,
+   struct xmethod_worker *worker,
+   struct value *obj, struct value **args, int nargs);
+
 PyObject *gdbpy_history (PyObject *self, PyObject *args);
 PyObject *gdbpy_breakpoints (PyObject *, PyObject *);
 PyObject *gdbpy_frame_stop_reason_string (PyObject *, PyObject *);
@@ -317,11 +363,13 @@ PyObject *pspace_to_pspace_object (struct program_space *)
     CPYCHECKER_RETURNS_BORROWED_REF;
 PyObject *pspy_get_printers (PyObject *, void *);
 PyObject *pspy_get_frame_filters (PyObject *, void *);
+PyObject *pspy_get_xmethods (PyObject *, void *);
 
 PyObject *objfile_to_objfile_object (struct objfile *)
     CPYCHECKER_RETURNS_BORROWED_REF;
 PyObject *objfpy_get_printers (PyObject *, void *);
 PyObject *objfpy_get_frame_filters (PyObject *, void *);
+PyObject *objfpy_get_xmethods (PyObject *, void *);
 
 PyObject *gdbarch_to_arch_object (struct gdbarch *gdbarch);
 
@@ -402,6 +450,8 @@ int gdbpy_initialize_new_objfile_event (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_arch (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_xmethods (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
 struct cleanup *make_cleanup_py_xdecref (PyObject *py);
@@ -435,9 +485,6 @@ extern const struct language_defn *python_language;
     } while (0)
 
 void gdbpy_print_stack (void);
-
-void source_python_script_for_objfile (struct objfile *objfile, FILE *file,
-				       const char *filename);
 
 PyObject *python_string_to_unicode (PyObject *obj);
 char *unicode_to_target_string (PyObject *unicode_str);

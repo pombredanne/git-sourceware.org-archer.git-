@@ -50,7 +50,7 @@
 #include "cli/cli-cmds.h"
 #include "cli/cli-utils.h"
 
-#include "python/python.h"
+#include "extension.h"
 
 #ifdef TUI
 #include "tui/tui.h"	/* For tui_active et.al.  */
@@ -522,21 +522,33 @@ find_and_open_script (const char *script_file, int search_path,
 static void
 source_script_from_stream (FILE *stream, const char *file)
 {
-  if (script_ext_mode != script_ext_off
-      && strlen (file) > 3 && !strcmp (&file[strlen (file) - 3], ".py"))
+  if (script_ext_mode != script_ext_off)
     {
-      if (have_python ())
-	source_python_script (stream, file);
-      else if (script_ext_mode == script_ext_soft)
+      const struct extension_language_defn *extlang
+	= get_ext_lang_of_file (file);
+
+      if (extlang != NULL)
 	{
-	  /* Fallback to GDB script mode.  */
-	  script_from_file (stream, file);
+	  if (ext_lang_present_p (extlang))
+	    {
+	      script_sourcer_func *sourcer
+		= ext_lang_script_sourcer (extlang);
+
+	      gdb_assert (sourcer != NULL);
+	      sourcer (extlang, stream, file);
+	      return;
+	    }
+	  else if (script_ext_mode == script_ext_soft)
+	    {
+	      /* Assume the file is a gdb script.
+		 This is handled below.  */
+	    }
+	  else
+	    throw_ext_lang_unsupported (extlang);
 	}
-      else
-	error (_("Python scripting is not supported in this copy of GDB."));
     }
-  else
-    script_from_file (stream, file);
+
+  script_from_file (stream, file);
 }
 
 /* Worker to perform the "source" command.
@@ -862,6 +874,27 @@ list_command (char *arg, int from_tty)
     {
       set_default_source_symtab_and_line ();
       cursal = get_current_source_symtab_and_line ();
+
+      /* If this is the first "list" since we've set the current
+	 source line, center the listing around that line.  */
+      if (get_first_line_listed () == 0)
+	{
+	  int first;
+
+	  first = max (cursal.line - get_lines_to_list () / 2, 1);
+
+	  /* A small special case --- if listing backwards, and we
+	     should list only one line, list the preceding line,
+	     instead of the exact line we've just shown after e.g.,
+	     stopping for a breakpoint.  */
+	  if (arg != NULL && arg[0] == '-'
+	      && get_lines_to_list () == 1 && first > 1)
+	    first -= 1;
+
+	  print_source_lines (cursal.symtab, first,
+			      first + get_lines_to_list (), 0);
+	  return;
+	}
     }
 
   /* "l" or "l +" lists next ten lines.  */
@@ -1213,7 +1246,7 @@ show_user (char *args, int from_tty)
       const char *comname = args;
 
       c = lookup_cmd (&comname, cmdlist, "", 0, 1);
-      /* c->user_commands would be NULL if it's a python command.  */
+      /* c->user_commands would be NULL if it's a python/scheme command.  */
       if (c->class != class_user || !c->user_commands)
 	error (_("Not a user command."));
       show_user_1 (c, "", args, gdb_stdout);
@@ -1673,7 +1706,11 @@ strict == evaluate script according to filename extension, error if not supporte
 			show_script_ext_mode,
 			&setlist, &showlist);
 
-  add_com ("quit", class_support, quit_command, _("Exit gdb."));
+  add_com ("quit", class_support, quit_command, _("\
+Exit gdb.\n\
+Usage: quit [EXPR]\n\
+The optional expression EXPR, if present, is evaluated and the result\n\
+used as GDB's exit code.  The default is zero."));
   c = add_com ("help", class_support, help_command,
 	       _("Print list of commands."));
   set_cmd_completer (c, command_completer);
@@ -1819,7 +1856,7 @@ you must type \"disassemble 'foo.c'::bar\" and not \"disassemble foo.c:bar\"."))
 Run the ``make'' program using the rest of the line as arguments."));
   set_cmd_completer (c, filename_completer);
   add_cmd ("user", no_class, show_user, _("\
-Show definitions of non-python user defined commands.\n\
+Show definitions of non-python/scheme user defined commands.\n\
 Argument is the name of the user defined command.\n\
 With no argument, show definitions of all user defined commands."), &showlist);
   add_com ("apropos", class_support, apropos_command,
@@ -1827,8 +1864,8 @@ With no argument, show definitions of all user defined commands."), &showlist);
 
   add_setshow_uinteger_cmd ("max-user-call-depth", no_class,
 			   &max_user_call_depth, _("\
-Set the max call depth for non-python user-defined commands."), _("\
-Show the max call depth for non-python user-defined commands."), NULL,
+Set the max call depth for non-python/scheme user-defined commands."), _("\
+Show the max call depth for non-python/scheme user-defined commands."), NULL,
 			    NULL,
 			    show_max_user_call_depth,
 			    &setlist, &showlist);

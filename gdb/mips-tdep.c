@@ -3602,8 +3602,8 @@ mips_stub_frame_sniffer (const struct frame_unwind *self,
      stub.  The stub for foo is named ".pic.foo".  */
   msym = lookup_minimal_symbol_by_pc (pc);
   if (msym.minsym != NULL
-      && SYMBOL_LINKAGE_NAME (msym.minsym) != NULL
-      && strncmp (SYMBOL_LINKAGE_NAME (msym.minsym), ".pic.", 5) == 0)
+      && MSYMBOL_LINKAGE_NAME (msym.minsym) != NULL
+      && strncmp (MSYMBOL_LINKAGE_NAME (msym.minsym), ".pic.", 5) == 0)
     return 1;
 
   return 0;
@@ -7635,9 +7635,9 @@ mips_skip_pic_trampoline_code (struct frame_info *frame, CORE_ADDR pc)
      which jumps to foo.  */
   msym = lookup_minimal_symbol_by_pc (pc);
   if (msym.minsym == NULL
-      || SYMBOL_VALUE_ADDRESS (msym.minsym) != pc
-      || SYMBOL_LINKAGE_NAME (msym.minsym) == NULL
-      || strncmp (SYMBOL_LINKAGE_NAME (msym.minsym), ".pic.", 5) != 0)
+      || BMSYMBOL_VALUE_ADDRESS (msym) != pc
+      || MSYMBOL_LINKAGE_NAME (msym.minsym) == NULL
+      || strncmp (MSYMBOL_LINKAGE_NAME (msym.minsym), ".pic.", 5) != 0)
     return 0;
 
   /* A two-instruction header.  */
@@ -8327,10 +8327,6 @@ mips_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
   tdep->mips_fpu_type = fpu_type;
   tdep->register_size_valid_p = 0;
   tdep->register_size = 0;
-  tdep->gregset = NULL;
-  tdep->gregset64 = NULL;
-  tdep->fpregset = NULL;
-  tdep->fpregset64 = NULL;
 
   if (info.target_desc)
     {

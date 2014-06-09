@@ -38,7 +38,7 @@
 #include "valprint.h"
 #include "cli/cli-decode.h"
 #include "exceptions.h"
-#include "python/python.h"
+#include "extension.h"
 #include <ctype.h>
 #include "tracepoint.h"
 #include "cp-abi.h"
@@ -216,6 +216,9 @@ struct value
   /* If the value has been released.  */
   unsigned int released : 1;
 
+  /* Register number if the value is from a register.  */
+  short regnum;
+
   /* Location of value (if lval).  */
   union
   {
@@ -226,6 +229,9 @@ struct value
 
     /* Pointer to internal variable.  */
     struct internalvar *internalvar;
+
+    /* Pointer to xmethod worker.  */
+    struct xmethod_worker *xm_worker;
 
     /* If lval == lval_computed, this is a set of function pointers
        to use to access and describe the value, and a closure pointer
@@ -323,9 +329,6 @@ struct value
      variables, put into the value history or exposed to Python are
      taken off this list.  */
   struct value *next;
-
-  /* Register number if the value is from a register.  */
-  short regnum;
 
   /* Actual contents of the value.  Target byte-order.  NULL or not
      valid if lazy is nonzero.  */
@@ -1340,7 +1343,8 @@ CORE_ADDR
 value_address (const struct value *value)
 {
   if (value->lval == lval_internalvar
-      || value->lval == lval_internalvar_component)
+      || value->lval == lval_internalvar_component
+      || value->lval == lval_xcallable)
     return 0;
   if (value->parent != NULL)
     return value_address (value->parent) + value->offset;
@@ -1352,7 +1356,8 @@ CORE_ADDR
 value_raw_address (struct value *value)
 {
   if (value->lval == lval_internalvar
-      || value->lval == lval_internalvar_component)
+      || value->lval == lval_internalvar_component
+      || value->lval == lval_xcallable)
     return 0;
   return value->location.address;
 }
@@ -1361,7 +1366,8 @@ void
 set_value_address (struct value *value, CORE_ADDR addr)
 {
   gdb_assert (value->lval != lval_internalvar
-	      && value->lval != lval_internalvar_component);
+	      && value->lval != lval_internalvar_component
+	      && value->lval != lval_xcallable);
   value->location.address = addr;
 }
 
@@ -1433,6 +1439,8 @@ value_free (struct value *val)
 	  if (funcs->free_closure)
 	    funcs->free_closure (val);
 	}
+      else if (VALUE_LVAL (val) == lval_xcallable)
+	  free_xmethod_worker (val->location.xm_worker);
 
       xfree (val->contents);
       VEC_free (range_s, val->unavailable);
@@ -1623,6 +1631,8 @@ void
 set_value_component_location (struct value *component,
 			      const struct value *whole)
 {
+  gdb_assert (whole->lval != lval_xcallable);
+
   if (whole->lval == lval_internalvar)
     VALUE_LVAL (component) = lval_internalvar_component;
   else
@@ -1642,9 +1652,7 @@ set_value_component_location (struct value *component,
 /* Access to the value history.  */
 
 /* Record a new value in the value history.
-   Returns the absolute history index of the entry.
-   Result of -1 indicates the value was not saved; otherwise it is the
-   value history index of this new item.  */
+   Returns the absolute history index of the entry.  */
 
 int
 record_latest_value (struct value *val)
@@ -1661,7 +1669,11 @@ record_latest_value (struct value *val)
      from.  This is a bit dubious, because then *&$1 does not just return $1
      but the current contents of that location.  c'est la vie...  */
   val->modifiable = 0;
-  release_value (val);
+
+  /* The value may have already been released, in which case we're adding a
+     new reference for its entry in the history.  That is why we call
+     release_value_or_incref here instead of release_value.  */
+  release_value_or_incref (val);
 
   /* Here we treat value_history_count as origin-zero
      and applying to the value being stored now.  */
@@ -2405,7 +2417,7 @@ preserve_values (struct objfile *objfile)
   for (var = internalvars; var; var = var->next)
     preserve_one_internalvar (var, objfile, copied_types);
 
-  preserve_python_values (objfile, copied_types);
+  preserve_ext_lang_values (objfile, copied_types);
 
   htab_delete (copied_types);
 }
@@ -2452,6 +2464,37 @@ show_convenience (char *ignore, int from_tty)
 			   "use \"set\" as in \"set "
 			   "$foo = 5\" to define them.\n"));
     }
+}
+
+/* Return the TYPE_CODE_XMETHOD value corresponding to WORKER.  */
+
+struct value *
+value_of_xmethod (struct xmethod_worker *worker)
+{
+  if (worker->value == NULL)
+    {
+      struct value *v;
+
+      v = allocate_value (builtin_type (target_gdbarch ())->xmethod);
+      v->lval = lval_xcallable;
+      v->location.xm_worker = worker;
+      v->modifiable = 0;
+      worker->value = v;
+    }
+
+  return worker->value;
+}
+
+/* Call the xmethod corresponding to the TYPE_CODE_XMETHOD value METHOD.  */
+
+struct value *
+call_xmethod (struct value *method, int argc, struct value **argv)
+{
+  gdb_assert (TYPE_CODE (value_type (method)) == TYPE_CODE_XMETHOD
+	      && method->lval == lval_xcallable && argc > 0);
+
+  return invoke_xmethod (method->location.xm_worker,
+			 argv[0], argv + 1, argc - 1);
 }
 
 /* Extract a value as a C number (either long or double).
@@ -2752,15 +2795,15 @@ value_static_field (struct type *type, int fieldno)
 	{
 	  /* With some compilers, e.g. HP aCC, static data members are
 	     reported as non-debuggable symbols.  */
-	  struct minimal_symbol *msym = lookup_minimal_symbol (phys_name,
-							       NULL, NULL);
+	  struct bound_minimal_symbol msym
+	    = lookup_minimal_symbol (phys_name, NULL, NULL);
 
-	  if (!msym)
+	  if (!msym.minsym)
 	    return allocate_optimized_out_value (type);
 	  else
 	    {
 	      retval = value_at_lazy (TYPE_FIELD_TYPE (type, fieldno),
-				      SYMBOL_VALUE_ADDRESS (msym));
+				      BMSYMBOL_VALUE_ADDRESS (msym));
 	    }
 	}
       else
@@ -2976,7 +3019,7 @@ value_fn_field (struct value **arg1p, struct fn_field *f,
 
       set_value_address (v,
 	gdbarch_convert_from_func_ptr_addr
-	   (gdbarch, SYMBOL_VALUE_ADDRESS (msym.minsym), &current_target));
+	   (gdbarch, BMSYMBOL_VALUE_ADDRESS (msym), &current_target));
     }
 
   if (arg1p)
@@ -3317,25 +3360,33 @@ value_from_ulongest (struct type *type, ULONGEST num)
 
 
 /* Create a value representing a pointer of type TYPE to the address
-   ADDR.  */
+   ADDR.  The type of the created value may differ from the passed
+   type TYPE. Make sure to retrieve the returned values's new type
+   after this call e.g. in case of an variable length array.  */
+
 struct value *
 value_from_pointer (struct type *type, CORE_ADDR addr)
 {
-  struct value *val = allocate_value (type);
+  struct type *resolved_type = resolve_dynamic_type (type, addr);
+  struct value *val = allocate_value (resolved_type);
 
-  store_typed_address (value_contents_raw (val), check_typedef (type), addr);
+  store_typed_address (value_contents_raw (val),
+		       check_typedef (resolved_type), addr);
   return val;
 }
 
 
 /* Create a value of type TYPE whose contents come from VALADDR, if it
    is non-null, and whose memory address (in the inferior) is
-   ADDRESS.  */
+   ADDRESS.  The type of the created value may differ from the passed
+   type TYPE.  Make sure to retrieve values new type after this call.
+   Note that TYPE is not passed through resolve_dynamic_type; this is
+   a special API intended for use only by Ada.  */
 
 struct value *
-value_from_contents_and_address (struct type *type,
-				 const gdb_byte *valaddr,
-				 CORE_ADDR address)
+value_from_contents_and_address_unresolved (struct type *type,
+					    const gdb_byte *valaddr,
+					    CORE_ADDR address)
 {
   struct value *v;
 
@@ -3343,6 +3394,28 @@ value_from_contents_and_address (struct type *type,
     v = allocate_value_lazy (type);
   else
     v = value_from_contents (type, valaddr);
+  set_value_address (v, address);
+  VALUE_LVAL (v) = lval_memory;
+  return v;
+}
+
+/* Create a value of type TYPE whose contents come from VALADDR, if it
+   is non-null, and whose memory address (in the inferior) is
+   ADDRESS.  The type of the created value may differ from the passed
+   type TYPE.  Make sure to retrieve values new type after this call.  */
+
+struct value *
+value_from_contents_and_address (struct type *type,
+				 const gdb_byte *valaddr,
+				 CORE_ADDR address)
+{
+  struct type *resolved_type = resolve_dynamic_type (type, address);
+  struct value *v;
+
+  if (valaddr == NULL)
+    v = allocate_value_lazy (resolved_type);
+  else
+    v = value_from_contents (resolved_type, valaddr);
   set_value_address (v, address);
   VALUE_LVAL (v) = lval_memory;
   return v;
@@ -3496,6 +3569,7 @@ coerce_ref (struct value *arg)
   retval = value_at_lazy (enc_type,
                           unpack_pointer (value_type (arg),
                                           value_contents (arg)));
+  enc_type = value_type (retval);
   return readjust_indirect_value_type (retval, enc_type,
                                        value_type_arg_tmp, arg);
 }

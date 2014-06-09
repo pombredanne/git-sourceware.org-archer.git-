@@ -34,7 +34,7 @@
 #include "valprint.h"
 #include "cp-support.h"
 #include "language.h"
-#include "python/python.h"
+#include "extension.h"
 #include "exceptions.h"
 #include "typeprint.h"
 
@@ -443,6 +443,7 @@ cp_print_value_fields_rtti (struct type *type,
       /* Ugh, we have to convert back to a value here.  */
       value = value_from_contents_and_address (type, valaddr + offset,
 					       address + offset);
+      type = value_type (value);
       /* We don't actually care about most of the result here -- just
 	 the type.  We already have the correct offset, due to how
 	 val_print was initially called.  */
@@ -545,6 +546,7 @@ cp_print_value (struct type *type, struct type *real_type,
 		  base_val = value_from_contents_and_address (baseclass,
 							      buf,
 							      address + boffset);
+		  baseclass = value_type (base_val);
 		  thisoffset = 0;
 		  boffset = 0;
 		  thistype = baseclass;
@@ -584,17 +586,17 @@ cp_print_value (struct type *type, struct type *real_type,
 	{
 	  int result = 0;
 
-	  /* Attempt to run the Python pretty-printers on the
+	  /* Attempt to run an extension language pretty-printer on the
 	     baseclass if possible.  */
 	  if (!options->raw)
-	    result = apply_val_pretty_printer (baseclass, base_valaddr,
-					       thisoffset + boffset,
-					       value_address (base_val),
-					       stream, recurse, base_val,
-					       options, current_language);
+	    result
+	      = apply_ext_lang_val_pretty_printer (baseclass, base_valaddr,
+						   thisoffset + boffset,
+						   value_address (base_val),
+						   stream, recurse,
+						   base_val, options,
+						   current_language);
 
-
-	  	  
 	  if (!result)
 	    cp_print_value_fields (baseclass, thistype, base_valaddr,
 				   thisoffset + boffset,

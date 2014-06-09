@@ -159,6 +159,9 @@
 /* Define if <sys/procfs.h> has gregset_t. */
 #undef HAVE_GREGSET_T
 
+/* Define if Guile interpreter is being linked in. */
+#undef HAVE_GUILE
+
 /* Define if you have the iconv() function. */
 #undef HAVE_ICONV
 
@@ -338,6 +341,9 @@
 
 /* Define to 1 if you have the `sbrk' function. */
 #undef HAVE_SBRK
+
+/* Define to 1 if you have the `scm_new_smob' function. */
+#undef HAVE_SCM_NEW_SMOB
 
 /* Define to 1 if you have the `setlocale' function. */
 #undef HAVE_SETLOCALE
