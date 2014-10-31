@@ -1,3 +1,15 @@
+2014-10-31  Stan Cox <scox@redhat.com>
+
+	* dyninst-low.cc:  New. Preliminary generic rsp packet handling for dyninst rsp server.
+	* dyninst-low.h:   New. generic dyninst rsp declarations.
+	* dyninst-x86-low.cc:  New. x86 specific dyninst rsp handling.
+	* Makefile.in: Make CXX and dyninst aware.
+	* configure.ac: Check for basename and dyninst.
+	* configure.srv: Add *-dyninst-linux.
+	* inferiors.h: Rename private to piprivate to avoid CXX complaints.
+	* (linux-aarch64-low.c, linux-arm-low.c, linux-low.c,
+	linux-mips-low.c, linux-x86-low.c, lynx-low.c, thread-db.c): Likewise.
+
 2014-10-15  Pedro Alves  <palves@redhat.com>
 
 	PR server/17487

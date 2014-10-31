@@ -353,7 +353,7 @@ mips_linux_prepare_to_resume (struct lwp_info *lwp)
 {
   ptid_t ptid = ptid_of (get_lwp_thread (lwp));
   struct process_info *proc = find_process_pid (ptid_get_pid (ptid));
-  struct arch_process_info *private = proc->private->arch_private;
+  struct arch_process_info *private = proc->piprivate->arch_private;
 
   if (lwp->arch_private->watch_registers_changed)
     {
@@ -395,7 +395,7 @@ mips_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
 		   int len, struct raw_breakpoint *bp)
 {
   struct process_info *proc = current_process ();
-  struct arch_process_info *private = proc->private->arch_private;
+  struct arch_process_info *private = proc->piprivate->arch_private;
   struct pt_watch_regs regs;
   struct mips_watchpoint *new_watch;
   struct mips_watchpoint **pw;
@@ -453,7 +453,7 @@ mips_remove_point (enum raw_bkpt_type type, CORE_ADDR addr,
 		   int len, struct raw_breakpoint *bp)
 {
   struct process_info *proc = current_process ();
-  struct arch_process_info *private = proc->private->arch_private;
+  struct arch_process_info *private = proc->piprivate->arch_private;
 
   int deleted_one;
   int pid;
@@ -503,7 +503,7 @@ static int
 mips_stopped_by_watchpoint (void)
 {
   struct process_info *proc = current_process ();
-  struct arch_process_info *private = proc->private->arch_private;
+  struct arch_process_info *private = proc->piprivate->arch_private;
   int n;
   int num_valid;
   long lwpid = lwpid_of (current_thread);
@@ -531,7 +531,7 @@ static CORE_ADDR
 mips_stopped_data_address (void)
 {
   struct process_info *proc = current_process ();
-  struct arch_process_info *private = proc->private->arch_private;
+  struct arch_process_info *private = proc->piprivate->arch_private;
   int n;
   int num_valid;
   long lwpid = lwpid_of (current_thread);

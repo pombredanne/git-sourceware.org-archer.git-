@@ -352,13 +352,13 @@ linux_add_process (int pid, int attached)
   struct process_info *proc;
 
   proc = add_process (pid, attached);
-  proc->private = xcalloc (1, sizeof (*proc->private));
+  proc->piprivate = xcalloc (1, sizeof (*proc->piprivate));
 
   /* Set the arch when the first LWP stops.  */
-  proc->private->new_inferior = 1;
+  proc->piprivate->new_inferior = 1;
 
   if (the_low_target.new_process != NULL)
-    proc->private->arch_private = the_low_target.new_process ();
+    proc->piprivate->arch_private = the_low_target.new_process ();
 
   return proc;
 }
@@ -1200,10 +1200,10 @@ linux_mourn (struct process_info *process)
   find_inferior (&all_threads, delete_lwp_callback, process);
 
   /* Freeing all private data.  */
-  priv = process->private;
+  priv = process->piprivate;
   free (priv->arch_private);
   free (priv);
-  process->private = NULL;
+  process->piprivate = NULL;
 
   remove_process (process);
 }
@@ -1792,7 +1792,7 @@ linux_low_filter_event (ptid_t filter_ptid, int lwpid, int wstat)
 	 is stopped for the first time, but before we access any
 	 inferior registers.  */
       proc = find_process_pid (pid_of (thread));
-      if (proc->private->new_inferior)
+      if (proc->piprivate->new_inferior)
 	{
 	  struct thread_info *saved_thread;
 
@@ -1803,7 +1803,7 @@ linux_low_filter_event (ptid_t filter_ptid, int lwpid, int wstat)
 
 	  current_thread = saved_thread;
 
-	  proc->private->new_inferior = 0;
+	  proc->piprivate->new_inferior = 0;
 	}
     }
 
@@ -2801,7 +2801,7 @@ retry:
       && current_thread->last_resume_kind != resume_step
       && (
 #if defined (USE_THREAD_DB) && !defined (__ANDROID__)
-	  (current_process ()->private->thread_db != NULL
+	  (current_process ()->piprivate->thread_db != NULL
 	   && (WSTOPSIG (w) == __SIGRTMIN
 	       || WSTOPSIG (w) == __SIGRTMIN + 1))
 	  ||
@@ -4833,7 +4833,7 @@ linux_look_up_symbols (void)
 #ifdef USE_THREAD_DB
   struct process_info *proc = current_process ();
 
-  if (proc->private->thread_db != NULL)
+  if (proc->piprivate->thread_db != NULL)
     return;
 
   /* If the kernel supports tracing clones, then we don't need to
@@ -5760,7 +5760,7 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
 {
   char *document;
   unsigned document_len;
-  struct process_info_private *const priv = current_process ()->private;
+  struct process_info_private *const priv = current_process ()->piprivate;
   char filename[PATH_MAX];
   int pid, is_elf64;
 

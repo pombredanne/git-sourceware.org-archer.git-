@@ -63,6 +63,8 @@ depcomp = $(SHELL) $(srcdir)/../depcomp
 COMPILE.pre = $(CC)
 COMPILE.post = -c -o $@
 COMPILE = $(COMPILE.pre) $(INTERNAL_CFLAGS) $(COMPILE.post)
+CXXCOMPILE.pre = $(CXX)
+CXXCOMPILE = $(CXXCOMPILE.pre) $(INTERNAL_CFLAGS) $(COMPILE.post)
 POSTCOMPILE = @true
 
 # Directory containing source files.  Don't clean up the spacing,
@@ -79,7 +81,13 @@ VPATH = @srcdir@
 # Set this up with gcc if you have gnu ld and the loader will print out
 # line numbers for undefinded refs.
 #CC-LD=gcc -static
+# dyninst libraries are in c++
+ifneq (,$(findstring dyninst,$(target_alias)))
+CC-LD=${CXX}
+else
 CC-LD=${CC}
+endif
+
 
 # Where is the "include" directory?  Traditionally ../include or ./include
 INCLUDE_DIR =  ${srcdir}/../../include
@@ -247,6 +255,10 @@ generated_files = config.h $(GNULIB_H)
 
 .c.o:
 	$(COMPILE) $<
+	$(POSTCOMPILE)
+
+.cc.o:
+	$(CXXCOMPILE) $<
 	$(POSTCOMPILE)
 
 all: gdbserver$(EXEEXT) gdbreplay$(EXEEXT) $(extra_libraries)

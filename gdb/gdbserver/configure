@@ -5511,6 +5511,16 @@ done
 
 LIBS="$old_LIBS"
 
+ac_fn_c_check_decl "$LINENO" "basename" "ac_cv_have_decl_basename" "$ac_includes_default"
+if test "x$ac_cv_have_decl_basename" = x""yes; then :
+  ac_have_decl=1
+else
+  ac_have_decl=0
+fi
+
+cat >>confdefs.h <<_ACEOF
+#define HAVE_DECL_BASENAME $ac_have_decl
+_ACEOF
 ac_fn_c_check_decl "$LINENO" "strerror" "ac_cv_have_decl_strerror" "$ac_includes_default"
 if test "x$ac_cv_have_decl_strerror" = x""yes; then :
   ac_have_decl=1
@@ -5720,6 +5730,8 @@ elif test "${srv_qnx}" = "yes"; then
   LIBS="$LIBS -lsocket"
 elif test "${srv_lynxos}" = "yes"; then
   LIBS="$LIBS -lnetinet"
+elif test "${srv_dyninst}" = "yes"; then
+  LIBS="$LIBS -L/usr/lib64/dyninst/ -lpcontrol -lcommon"
 fi
 
 if test "${srv_mingw}" = "yes"; then

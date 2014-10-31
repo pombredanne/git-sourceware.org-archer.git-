@@ -218,8 +218,8 @@ lynx_add_process (int pid, int attached)
 
   proc = add_process (pid, attached);
   proc->tdesc = lynx_tdesc;
-  proc->private = xcalloc (1, sizeof (*proc->private));
-  proc->private->last_wait_event_ptid = null_ptid;
+  proc->piprivate = xcalloc (1, sizeof (*proc->private));
+  proc->piprivate->last_wait_event_ptid = null_ptid;
 
   return proc;
 }
@@ -333,7 +333,7 @@ lynx_resume (struct thread_resume *resume_info, size_t n)
      unexpected signals (Eg SIG61) when we resume the inferior
      using a different thread.  */
   if (ptid_equal (ptid, minus_one_ptid))
-    ptid = current_process()->private->last_wait_event_ptid;
+    ptid = current_process()->piprivate->last_wait_event_ptid;
 
   /* The ptid might still be minus_one_ptid; this can happen between
      the moment we create the inferior or attach to a process, and
@@ -417,11 +417,11 @@ lynx_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
   else
     pid = BUILDPID (lynx_ptid_get_pid (ptid), lynx_ptid_get_tid (ptid));
 
-retry:
+  retry:
 
   ret = lynx_waitpid (pid, &wstat);
   new_ptid = lynx_ptid_build (ret, ((union wait *) &wstat)->w_tid);
-  find_process_pid (ret)->private->last_wait_event_ptid = new_ptid;
+  find_process_pid (ret)->piprivate->last_wait_event_ptid = new_ptid;
 
   /* If this is a new thread, then add it now.  The reason why we do
      this here instead of when handling new-thread events is because
@@ -431,7 +431,7 @@ retry:
   if (!find_thread_ptid (new_ptid))
     {
       lynx_debug ("New thread: (pid = %d, tid = %d)",
-		  lynx_ptid_get_pid (new_ptid), lynx_ptid_get_tid (new_ptid));
+                  lynx_ptid_get_pid (new_ptid), lynx_ptid_get_tid (new_ptid));
       add_thread (new_ptid, NULL);
     }
 
@@ -551,8 +551,8 @@ static void
 lynx_mourn (struct process_info *proc)
 {
   /* Free our private data.  */
-  free (proc->private);
-  proc->private = NULL;
+  free (proc->piprivate);
+  proc->piprivate = NULL;
 
   clear_inferiors ();
 }

@@ -188,7 +188,7 @@ LIBS="$LIBS -ldl"
 AC_CHECK_FUNCS(dladdr)
 LIBS="$old_LIBS"
 
-AC_CHECK_DECLS([strerror, perror, vasprintf, vsnprintf])
+AC_CHECK_DECLS([basename, strerror, perror, vasprintf, vsnprintf])
 
 AC_CHECK_TYPES(socklen_t, [], [],
 [#include <sys/types.h>
@@ -245,6 +245,8 @@ elif test "${srv_qnx}" = "yes"; then
   LIBS="$LIBS -lsocket"
 elif test "${srv_lynxos}" = "yes"; then
   LIBS="$LIBS -lnetinet"
+elif test "${srv_dyninst}" = "yes"; then
+  LIBS="$LIBS -L/usr/lib64/dyninst/ -lpcontrol -lcommon"
 fi
 
 if test "${srv_mingw}" = "yes"; then

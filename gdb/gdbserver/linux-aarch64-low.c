@@ -715,7 +715,7 @@ aarch64_get_debug_reg_state ()
   struct process_info *proc;
 
   proc = current_process ();
-  return &proc->private->arch_private->debug_reg_state;
+  return &proc->piprivate->arch_private->debug_reg_state;
 }
 
 /* Record the insertion of one breakpoint/watchpoint, as represented
@@ -1145,7 +1145,7 @@ aarch64_linux_prepare_to_resume (struct lwp_info *lwp)
       int tid = ptid_get_lwp (ptid);
       struct process_info *proc = find_process_pid (ptid_get_pid (ptid));
       struct aarch64_debug_reg_state *state
-	= &proc->private->arch_private->debug_reg_state;
+	= &proc->piprivate->arch_private->debug_reg_state;
 
       if (show_debug_regs)
 	fprintf (stderr, "prepare_to_resume thread %ld\n", lwpid_of (thread));

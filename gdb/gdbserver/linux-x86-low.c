@@ -687,7 +687,7 @@ x86_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
 	enum target_hw_bp_type hw_type
 	  = raw_bkpt_type_to_target_hw_bp_type (type);
 	struct x86_debug_reg_state *state
-	  = &proc->private->arch_private->debug_reg_state;
+	  = &proc->piprivate->arch_private->debug_reg_state;
 
 	return x86_dr_insert_watchpoint (state, hw_type, addr, size);
       }
@@ -716,7 +716,7 @@ x86_remove_point (enum raw_bkpt_type type, CORE_ADDR addr,
 	enum target_hw_bp_type hw_type
 	  = raw_bkpt_type_to_target_hw_bp_type (type);
 	struct x86_debug_reg_state *state
-	  = &proc->private->arch_private->debug_reg_state;
+	  = &proc->piprivate->arch_private->debug_reg_state;
 
 	return x86_dr_remove_watchpoint (state, hw_type, addr, size);
       }
@@ -730,7 +730,7 @@ static int
 x86_stopped_by_watchpoint (void)
 {
   struct process_info *proc = current_process ();
-  return x86_dr_stopped_by_watchpoint (&proc->private->arch_private->debug_reg_state);
+  return x86_dr_stopped_by_watchpoint (&proc->piprivate->arch_private->debug_reg_state);
 }
 
 static CORE_ADDR
@@ -738,7 +738,7 @@ x86_stopped_data_address (void)
 {
   struct process_info *proc = current_process ();
   CORE_ADDR addr;
-  if (x86_dr_stopped_data_address (&proc->private->arch_private->debug_reg_state,
+  if (x86_dr_stopped_data_address (&proc->piprivate->arch_private->debug_reg_state,
 				   &addr))
     return addr;
   return 0;
@@ -783,7 +783,7 @@ x86_linux_prepare_to_resume (struct lwp_info *lwp)
       int pid = ptid_get_pid (ptid);
       struct process_info *proc = find_process_pid (pid);
       struct x86_debug_reg_state *state
-	= &proc->private->arch_private->debug_reg_state;
+	= &proc->piprivate->arch_private->debug_reg_state;
 
       x86_linux_dr_set (ptid, DR_CONTROL, 0);
 
