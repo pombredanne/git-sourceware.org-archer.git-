@@ -1,3 +1,14 @@
+2014-11-11  Stan Cox <scox@redhat.com>
+
+	* dyninst-low.cc (BreakpointSet, dyninst_bpset):  New.
+	(dyninst_resume):  Add range step handling.
+	(in_step_range):  Check range step boundary.
+	(dyninst_wait_1): Add range step handling.
+	(dyninst_remove_point): Likewise.
+	(dyninst_supports_range_stepping): Likewise.
+	* dyninst-low.h:  Likewise.
+	* dyninst-x86-low.cc:  Likewise.
+
 2014-10-31  Stan Cox <scox@redhat.com>
 
 	* dyninst-low.cc:  New. Preliminary generic rsp packet handling for dyninst rsp server.

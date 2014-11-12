@@ -231,6 +231,13 @@ x86_set_pc (struct regcache *regcache, CORE_ADDR pc)
 }
 
 
+bool
+x86_supports_range_stepping ()
+{
+  return true;
+}
+
+
 /* Implements the dyninst_target_ops.arch_setup routine.  */
 
 static void
@@ -270,4 +277,5 @@ struct dyninst_target_ops the_low_target = {
   dyninst_x86_arch_setup,
   x86_get_pc,
   x86_set_pc,
+  x86_supports_range_stepping,
 };

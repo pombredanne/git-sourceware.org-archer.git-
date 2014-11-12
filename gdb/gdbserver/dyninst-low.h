@@ -57,6 +57,7 @@ struct dyninst_target_ops
   void (*arch_setup) (void);
   CORE_ADDR (*get_pc) (struct regcache *regcache);
   void (*set_pc) (struct regcache *regcache, CORE_ADDR newpc);
+  bool (*supports_range_stepping) ();
 };
 
 extern struct dyninst_target_ops the_low_target;
