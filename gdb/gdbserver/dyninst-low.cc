@@ -19,6 +19,7 @@ extern "C"
 {
 #include "server.h"
 #include "target.h"
+#include "dll.h"
 
 #include <limits.h>
 #include <stdlib.h>
@@ -30,6 +31,8 @@ extern "C"
 #include <signal.h>
 #include <errno.h>
 #include <sys/select.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 }
 
 #include <dyninst/PCProcess.h>
@@ -41,6 +44,7 @@ extern "C"
 #include "dyninst-low.h"
 #include <iostream>
 #include <sstream>
+#include <typeinfo>
 
 #define DEBUG(func,cerrstr,args...) 			\
   if (debug_threads) {					\
@@ -58,6 +62,8 @@ using namespace ProcControlAPI;
 typedef std::vector<Breakpoint::ptr> BreakpointSet;
 BreakpointSet dyninst_bpset;
 ProcessSet::ptr dyninst_procset;
+typedef std::vector<Library::ptr> LibrarySet;
+LibrarySet dyninst_libset;
 Thread::const_ptr NULL_Thread = Thread::const_ptr();
 
 
@@ -136,7 +142,7 @@ public:
       {
 
 	event = *rit;
-	if (event->getProcess()->getPid() == ptid.pid)
+	if (ptid.pid == -1 || event->getProcess()->getPid() == ptid.pid)
 	  {
 	    DEBUG("events.get","returning event " << event->name());
 	    return event;
@@ -187,14 +193,16 @@ public:
   bool is_threadcreate (Event::const_ptr event)
   {
     if (event != NULL)
-      return event->getEventType().code() == EventType::ThreadCreate;
+      DEBUG("is_threadcreate", event->getEventType().code() << EventType::LWPCreate);
+    if (event != NULL)
+      return event->getEventType().code() == EventType::LWPCreate;
     else return false;
   }
 
   bool is_threaddestroy(Event::const_ptr event)
   {
     if (event != NULL)
-      return event->getEventType().code() == EventType::ThreadDestroy;
+      return event->getEventType().code() == EventType::UserThreadDestroy;
     else return false;
   }
 
@@ -329,7 +337,7 @@ dyninst_get_inferior_thread()
 {
   DEBUG("dyninst_get_inferior_thread", "current_thread=" << current_thread);
   struct thread_info_private *tip = (struct thread_info_private*)(current_thread->target_data);
-  DEBUG("dyninst_get_inferior_thread", "", pid_to_string (tip->thread));
+  DEBUG("dyninst_get_inferior_thread", "", pid_to_string (current_thread->entry.id));
   if (!tip)
     error ("No inferior thread");
   return tip->thread;
@@ -353,9 +361,27 @@ Process::cb_ret_t
 singlestep_handler(Event::const_ptr ev)
 {
   events.insert(ev);
-  DEBUG("signal_handler", ev->name());
+  DEBUG("singlestep_handler", ev->name());
   ev->getThread()->setSingleStepMode(false);
   return Process::cbThreadStop;
+}
+
+
+/* Handle a dyninst Library event */
+
+Process::cb_ret_t
+library_handler(Event::const_ptr ev)
+{
+  EventLibrary::const_ptr lib_ev = ev->getEventLibrary();
+
+  for (set<Library::ptr>::const_iterator i = lib_ev->libsAdded().begin(); i != lib_ev->libsAdded().end(); i++)
+    {
+      Library::ptr lib = *i;
+      DEBUG("dyninst_attach", "added library " << lib->getAbsoluteName() << " " << lib->getDynamicAddress() << " " << lib->getLoadAddress() << endl);
+//      loaded_dll (lib->getAbsoluteName().c_str(), lib->getDynamicAddress());
+    }
+
+  return Process::cbDefault;
 }
 
 
@@ -396,7 +422,7 @@ dyninst_create_inferior (char *program, char **allargs)
   myregisterCB(EventType::Exec, signal_handler);
   myregisterCB(EventType::Exit, signal_handler);
   myregisterCB(EventType::Fork, signal_handler);
-//  myregisterCB(EventType::Library, signal_handler);
+  myregisterCB(EventType::Library, library_handler);
   myregisterCB(EventType::RPC, signal_handler);
   myregisterCB(EventType::Signal, signal_handler);
   myregisterCB(EventType::SingleStep, singlestep_handler);
@@ -405,6 +431,7 @@ dyninst_create_inferior (char *program, char **allargs)
   myregisterCB(EventType::ThreadCreate, signal_handler);
   myregisterCB(EventType::ThreadDestroy, signal_handler);
   myregisterCB(EventType::UserThreadCreate, signal_handler);
+  myregisterCB(EventType::UserThreadDestroy, signal_handler);
 
 
   DEBUG("dyninst_create_inferior", "created process " << dyninst_process->getPid() << program);
@@ -462,6 +489,14 @@ dyninst_attach (unsigned long pid)
       DEBUG("dyninst_attach", "created thread " << (*thidx)->getTID() << ' ' << (*thidx)->getLWP());
       Thread::const_ptr th = *thidx;
       dyninst_add_thread (pid, th);
+    }
+
+  LibraryPool::iterator libidx;
+  for (libidx = dyninst_proc->libraries().begin(); libidx != dyninst_proc->libraries().end(); libidx++)
+    {
+      Library::ptr lib = *libidx;
+      DEBUG("dyninst_attach", "added library " << lib->getName() << " " << lib->getDynamicAddress() << " " << lib->getLoadAddress() << endl);
+//      loaded_dll (lib->getAbsoluteName().c_str(), lib->getDynamicAddress());
     }
 
   return 0;
@@ -562,24 +597,23 @@ in_step_range ()
 static ptid_t
 dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
 {
-  Dyninst::PID pid = 0;
-  ptid_t new_ptid;
+  ptid_t new_ptid = ptid;
+  Dyninst::PID pid = ptid.pid;
 
 
   DEBUG("dyninst_wait_1", "", pid_to_string (ptid));
-  if (ptid_equal (ptid, minus_one_ptid))
-    {
-      pid = ptid_get_pid (thread_to_gdb_id (current_thread));
-      new_ptid = ptid_build (pid, pid, 0);
-    }
-  else
-    {
-      pid = ptid_get_pid(ptid);
-      new_ptid = ptid;
-    }
-
-  ProcessSet::iterator procset_it = dyninst_procset->find(pid);
-  Process::ptr dyninst_process = *procset_it;
+//  if (ptid_equal (ptid, minus_one_ptid))
+//    {
+//      pid = ptid_get_pid (thread_to_gdb_id (current_thread));
+//      new_ptid = ptid_build (pid, pid, 0);
+//    }
+//  else
+//    {
+//      pid = ptid_get_pid(ptid);
+//      new_ptid = ptid;
+//    }
+//  ProcessSet::iterator procset_it = dyninst_procset->find(pid);
+//  Process::ptr dyninst_process = *procset_it;
 
 
   Event::const_ptr event;
@@ -589,6 +623,8 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
       if ((event = events.get(new_ptid)))
 	{
 	  struct process_info *pi;
+	  pid = event->getProcess()->getPid();
+	  new_ptid = ptid_build (pid, pid, 0);
 	  pi = find_process_pid(pid);
 	  if (pi)
 	    pi->piprivate->last_wait_event_ptid = new_ptid;
@@ -596,19 +632,20 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
       if (event == NULL)
 	event = events.get(new_ptid);
 
-      events.dump();
+//      events.dump();
 
 
       if (events.is_threadcreate(event))
 	{
 	  Thread::const_ptr thr;
-//	  if (event != events.NULL_Event)
+	  EventNewLWP::const_ptr newlwp_ev = event->getEventNewLWP();
 	  if (event != NULL)
-	    thr = event->getThread();
+	    thr = newlwp_ev->getNewThread();
 	  else
 	    thr = NULL_Thread;
-	  DEBUG("dyninst_wait_1", "New thread: ", pid_to_string (ptid));
+	  DEBUG("dyninst_wait_1", "New thread: " << event->getThread()->getLWP() << " " << thr->getLWP(), pid_to_string (new_ptid));
 	  dyninst_add_thread (pid, thr);
+	  return new_ptid;
 	}
       else if (events.is_exit(event))
 	{
@@ -666,8 +703,9 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
       break;
     }
 
-  DEBUG("dyninst_wait_1 returning", "", pid_to_string (ptid));
-  return new_ptid;
+  DEBUG("dyninst_wait_1 returning", "", pid_to_string (ptid_of(current_thread)));
+  return ptid_of (current_thread);
+//  return new_ptid;
 }
 
 
@@ -692,6 +730,8 @@ dyninst_kill (Dyninst::PID pid)
 {
   struct process_info *process;
   ProcessSet::iterator procset_it = dyninst_procset->find(pid);
+  if (procset_it == dyninst_procset->end())
+    return 1;
   Process::ptr dyninst_process = *procset_it;
 
   DEBUG("dyninst_kill", "pid=" <<  pid);
@@ -871,6 +911,34 @@ dyninst_request_interrupt (void)
 }
 
 
+/* Copy LEN bytes from inferior's auxiliary vector starting at OFFSET
+   to debugger memory starting at MYADDR.  */
+
+static int
+dyninst_read_auxv (CORE_ADDR offset, unsigned char *myaddr, unsigned int len)
+{
+  char filename[PATH_MAX];
+  int fd, n;
+  int pid = lwpid_of (current_thread);
+
+  xsnprintf (filename, sizeof filename, "/proc/%d/auxv", pid);
+
+  fd = open (filename, O_RDONLY);
+  if (fd < 0)
+    return -1;
+
+  if (offset != (CORE_ADDR) 0
+      && lseek (fd, (off_t) offset, SEEK_SET) != (off_t) offset)
+    n = -1;
+  else
+    n = read (fd, myaddr, len);
+
+  close (fd);
+
+  return n;
+}
+
+
 /* Breakpoint/Watchpoint support.  */
 
 static int
@@ -917,7 +985,7 @@ dyninst_remove_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
   Process::const_ptr dyninst_process = th->getProcess();
 
   std::vector<Breakpoint::ptr>::iterator it;
-  bool result;
+  bool result = false;
   for (it = dyninst_bpset.begin(); it != dyninst_bpset.end(); it++)
     {
       Breakpoint::ptr bp = *it;
@@ -943,6 +1011,102 @@ dyninst_supports_range_stepping (void)
 }
 
 
+static int
+dyninst_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
+			    unsigned const char *writebuf,
+			    CORE_ADDR offset, int len)
+{
+#include <string>       // std::string
+#include <iostream>     // std::cout
+#include <sstream>      // std::ostringstream
+
+  // <library-list-svr4 version="1.0" main-lm="0x320cc21168">
+  // <library name="/lib64/libc.so.6" lm="0x7ff37530a700" l_addr="0x0" l_ld="0x320d1b6b40"/>
+  // <library name="/lib64/ld-linux-x86-64.so.2" lm="0x320cc20998" l_addr="0x0" l_ld="0x320cc1fe10"/>
+  // </library-list-svr4>
+
+  Thread::const_ptr th = dyninst_get_inferior_thread();
+  Process::const_ptr dyninst_proc = th->getProcess();
+
+  string document = "<library-list-svr4 version=\"1.0\">";
+
+//  Dyninst::PID pid = ptid_get_pid (thread_to_gdb_id (current_thread));
+//  ProcessSet::iterator procset_it = dyninst_procset->find(pid);
+//  Process::ptr dyninst_proc = *procset_it;
+
+  LibraryPool::const_iterator libidx;
+  bool first = true;
+  for (libidx = dyninst_proc->libraries().begin(); libidx != dyninst_proc->libraries().end(); libidx++)
+    {
+      Library::const_ptr lib = *libidx;
+      if (first)
+	{
+	  first = false;
+	  continue;
+	}
+      DEBUG("dyninst_qxfer_libraries_svr4", "added library " << lib->getName() << " " << lib->getDynamicAddress() << " " << lib->getLoadAddress() << endl);
+  //    loaded_dll (lib->getAbsoluteName().c_str(), lib->getDynamicAddress());
+      std::ostringstream oss;
+
+      oss << "<library name=\"" << lib->getAbsoluteName()
+	  << "\" lm=\"0x0\" "
+	  << "l_addr=\"0x0\" "
+	  << "l_ld=\"" << hex <<  lib->getDynamicAddress() << "\"/>";
+      document += oss.str();
+    }
+  document += "</library-list-svr4>";
+  document.copy((char*)readbuf, document.length());
+  readbuf[document.length()]='\0';
+
+  return document.length();
+}
+
+
+// Return non-zero if HEADER is a 64-bit ELF file. (from linux-low)
+
+#if 0
+static int
+elf_64_header_p (const Elf64_Ehdr *header, unsigned int *machine)
+{
+  if (header->e_ident[EI_MAG0] == ELFMAG0
+      && header->e_ident[EI_MAG1] == ELFMAG1
+      && header->e_ident[EI_MAG2] == ELFMAG2
+      && header->e_ident[EI_MAG3] == ELFMAG3)
+    {
+      *machine = header->e_machine;
+      return header->e_ident[EI_CLASS] == ELFCLASS64;
+
+    }
+  *machine = EM_NONE;
+  return -1;
+}
+
+// Return non-zero if FILE is a 64-bit ELF file,
+// zero if the file is not a 64-bit ELF file,
+// and -1 if the file is not accessible or doesn't exist.
+
+static int
+elf_64_file_p (const char *file, unsigned int *machine)
+{
+  Elf64_Ehdr header;
+  int fd;
+
+  fd = open (file, O_RDONLY);
+  if (fd < 0)
+    return -1;
+
+  if (read (fd, &header, sizeof (header)) != sizeof (header))
+    {
+      close (fd);
+      return 0;
+    }
+  close (fd);
+
+  return elf_64_header_p (&header, machine);
+}
+#endif
+
+
 /* The Dyninst target_ops vector.  */
 
 static struct target_ops dyninst_target_ops = {
@@ -963,7 +1127,7 @@ static struct target_ops dyninst_target_ops = {
   dyninst_write_memory,
   NULL,  /* look_up_symbols */
   dyninst_request_interrupt,
-  NULL,  /* read_auxv */
+  dyninst_read_auxv,
   dyninst_supports_z_point_type,
   dyninst_insert_point,  /* insert_point */
   dyninst_remove_point,  /* remove_point */
@@ -996,7 +1160,7 @@ static struct target_ops dyninst_target_ops = {
   NULL,  // emit_ops
   NULL,  // supports_disable_randomization
   NULL,  // get_min_fast_tracepoint_insn_len
-  NULL,  // qxfer_libraries_svr4
+  dyninst_qxfer_libraries_svr4,  // qxfer_libraries_svr4
   NULL,  // supports_agent
   NULL,
   NULL,

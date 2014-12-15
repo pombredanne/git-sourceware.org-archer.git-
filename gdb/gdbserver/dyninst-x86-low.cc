@@ -38,8 +38,6 @@ extern "C"
 static std::ostringstream dboss;
 
 
-
-// TODO improve this
 std::map<string,int> dyninst_x86_gdb_regnum;
 
 extern "C"
@@ -104,6 +102,7 @@ dyninst_x86_fill_gregset (struct regcache *regcache, RegisterPool regpool)
       MachRegisterVal regval = (MachRegisterVal)((*regidx).second);
       const char *regstr;
 
+      regcache->register_status[regn] = REG_VALID;
       switch (register_size (regcache->tdesc, regn))
       {
 	case 2:
@@ -183,14 +182,27 @@ dyninst_x86_store_gregset (struct regcache *regcache, RegisterPool regpool)
 static void
 dyninst_x86_fill_fpregset (struct regcache *regcache, RegisterPool regpool)
 {
-  dyninst_debug("dyninst_x86_fill_fpregset\n");
+  // supported by dyninst
+  //  rax rbp rbx rcx rdi rdx rip rsi rsp
+  //  r8 - r15
+  //  ds es fs gs cs ss flags orax fsbase gsbase
+
+  // supported by dyninst but not in register pool (RegisterConversion-x86.C)
+  //  xmm0 - xmm15
+  //  TODO support xmm registers
+
+  // not supported by dyninst
+  //  fctrl fioff fiseg fooff fop foseg fstat ftag mxcsr
+  //  st0 - st7
+  dyninst_debug("dyninst_x86_fill_fpregset: dyninst does not support floating registers.\n");
+//  result = th->getRegister(MachRegister(x86_64::xmm0), rspval);
 }
 
 
 static void
 dyninst_x86_store_fpregset (struct regcache *regcache, RegisterPool regpool)
 {
-  dyninst_debug("dyninst_x86_store_fpregset %#lx\n", regcache);
+  dyninst_debug("dyninst_x86_store_fpregset: dyninst does not support floating registers.\n", regcache);
 }
 
 
