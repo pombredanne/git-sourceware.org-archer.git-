@@ -384,7 +384,11 @@ m68hc11_info_to_howto_rel (bfd *abfd ATTRIBUTE_UNUSED,
   unsigned int r_type;
 
   r_type = ELF32_R_TYPE (dst->r_info);
-  BFD_ASSERT (r_type < (unsigned int) R_M68HC11_max);
+  if (r_type >= (unsigned int) R_M68HC11_max)
+    {
+      _bfd_error_handler (_("%A: invalid M68HC11 reloc number: %d"), abfd, r_type);
+      r_type = 0;
+    }
   cache_ptr->howto = &elf_m68hc11_howto_table[r_type];
 }
 
@@ -1305,8 +1309,6 @@ static const struct bfd_elf_special_section elf32_m68hc11_special_sections[] =
 
 #define bfd_elf32_bfd_link_hash_table_create \
                                 m68hc11_elf_bfd_link_hash_table_create
-#define bfd_elf32_bfd_link_hash_table_free \
-				m68hc11_elf_bfd_link_hash_table_free
 #define bfd_elf32_bfd_merge_private_bfd_data \
 					_bfd_m68hc11_elf_merge_private_bfd_data
 #define bfd_elf32_bfd_set_private_flags	_bfd_m68hc11_elf_set_private_flags

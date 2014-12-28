@@ -43,7 +43,6 @@
 %{
 
 #include "defs.h"
-#include <string.h>
 #include "expression.h"
 #include "value.h"
 #include "parser-defs.h"
@@ -1231,8 +1230,8 @@ yylex (void)
       }
 
     yylval.tsym.type
-      = language_lookup_primitive_type_by_name (parse_language (pstate),
-						parse_gdbarch (pstate), tmp);
+      = language_lookup_primitive_type (parse_language (pstate),
+					parse_gdbarch (pstate), tmp);
     if (yylval.tsym.type != NULL)
       return TYPENAME;
     

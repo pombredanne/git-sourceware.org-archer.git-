@@ -1259,7 +1259,11 @@ mmix_info_to_howto_rela (bfd *abfd ATTRIBUTE_UNUSED,
   unsigned int r_type;
 
   r_type = ELF64_R_TYPE (dst->r_info);
-  BFD_ASSERT (r_type < (unsigned int) R_MMIX_max);
+  if (r_type >= (unsigned int) R_MMIX_max)
+    {
+      _bfd_error_handler (_("%A: invalid MMIX reloc number: %d"), abfd, r_type);
+      r_type = 0;
+    }
   cache_ptr->howto = &elf_mmix_howto_table[r_type];
 }
 
@@ -2322,7 +2326,7 @@ _bfd_mmix_before_linker_allocation (bfd *abfd ATTRIBUTE_UNUSED,
   bfd *ibfd;
 
   /* Set the initial size of sections.  */
-  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link.next)
     bfd_map_over_sections (ibfd, mmix_set_relaxable_size, info);
 
   /* The bpo_greg_owner bfd is supposed to have been set by

@@ -953,10 +953,19 @@ if [is_elf_format] {
     run_dump_test "strip-7"
     run_dump_test "strip-8"
     run_dump_test "strip-9"
+    # Non-EABI ARM targets will set OSABI to ARM
     if { ![istarget "*-*-hpux*"]
-	 && ![istarget "msp*-*-*"] } {
+	 && ![istarget "msp*-*-*"]
+	 && ![istarget "visium-*-*"]
+         && !([istarget "arm*-*-*"] && ![istarget "arm-*-*eabi*"])} {
 	run_dump_test "strip-10"
     }
+    set extra_strip11 ""
+    if { [istarget "sh64*-*"] } {
+	# pr17755 testcase
+	set extra_strip11 { { "as" "--isa=SHmedia --abi=64" } }
+    }
+    run_dump_test "strip-11" $extra_strip11
 
     if { [istarget "i*86-*"] || [istarget "x86_64-*-*"] } {
 	# Check to make sure we don't strip a symbol named in relocations.
@@ -986,6 +995,7 @@ if [is_elf_format] {
     # targ_defvec=mips_elf32_n_le_vec in config.bfd.  When syncing,
     # don't forget that earlier case-matches trump later ones.
     if { ![istarget "mips*-sde-elf*"] && ![istarget "mips*-mti-elf*"]
+	 && ![istarget "mips*-img-elf*"]
          && ![istarget "mips64*-*-openbsd*"] } {
 	setup_xfail "mips*-*-irix5*" "mips*-*-irix6*" "mips*-*-elf*" \
 	    "mips*-*-rtems*" "mips*-*-windiss" "mips*-*-none" \

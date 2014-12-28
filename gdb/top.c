@@ -26,7 +26,6 @@
 #include "symtab.h"
 #include "inferior.h"
 #include "infrun.h"
-#include "exceptions.h"
 #include <signal.h>
 #include "target.h"
 #include "target-dcache.h"
@@ -42,7 +41,6 @@
 #include "version.h"
 #include "serial.h"
 #include "doublest.h"
-#include "gdb_assert.h"
 #include "main.h"
 #include "event-loop.h"
 #include "gdbthread.h"
@@ -62,12 +60,12 @@
 #include <sys/types.h>
 
 #include "event-top.h"
-#include <string.h>
 #include <sys/stat.h>
 #include <ctype.h>
 #include "ui-out.h"
 #include "cli-out.h"
 #include "tracepoint.h"
+#include "inf-loop.h"
 
 extern void initialize_all_files (void);
 
@@ -217,7 +215,7 @@ void (*deprecated_warning_hook) (const char *, va_list);
    window and it can close it.  */
 
 void (*deprecated_readline_begin_hook) (char *, ...);
-char *(*deprecated_readline_hook) (char *);
+char *(*deprecated_readline_hook) (const char *);
 void (*deprecated_readline_end_hook) (void);
 
 /* Called as appropriate to notify the interface that we have attached
@@ -374,6 +372,23 @@ check_frame_language_change (void)
     }
 }
 
+/* See top.h.  */
+
+void
+maybe_wait_sync_command_done (int was_sync)
+{
+  /* If the interpreter is in sync mode (we're running a user
+     command's list, running command hooks or similars), and we
+     just ran a synchronous command that started the target, wait
+     for that command to end.  */
+  if (!interpreter_async && !was_sync && sync_execution)
+    {
+      while (gdb_do_one_event () >= 0)
+	if (!sync_execution)
+	  break;
+    }
+}
+
 /* Execute the line P as a command, in the current user context.
    Pass FROM_TTY as second argument to the defining function.  */
 
@@ -460,16 +475,7 @@ execute_command (char *p, int from_tty)
       else
 	cmd_func (c, arg, from_tty);
 
-      /* If the interpreter is in sync mode (we're running a user
-	 command's list, running command hooks or similars), and we
-	 just ran a synchronous command that started the target, wait
-	 for that command to end.  */
-      if (!interpreter_async && !was_sync && sync_execution)
-	{
-	  while (gdb_do_one_event () >= 0)
-	    if (!sync_execution)
-	      break;
-	}
+      maybe_wait_sync_command_done (was_sync);
 
       /* If this command has been post-hooked, run the hook last.  */
       execute_cmd_post_hook (c);
@@ -614,7 +620,7 @@ prevent_dont_repeat (void)
 
    A NULL return means end of file.  */
 char *
-gdb_readline (char *prompt_arg)
+gdb_readline (const char *prompt_arg)
 {
   int c;
   char *result;
@@ -756,15 +762,24 @@ gdb_readline_wrapper_line (char *line)
   after_char_processing_hook = NULL;
 
   /* Prevent parts of the prompt from being redisplayed if annotations
-     are enabled, and readline's state getting out of sync.  */
+     are enabled, and readline's state getting out of sync.  We'll
+     reinstall the callback handler, which puts the terminal in raw
+     mode (or in readline lingo, in prepped state), when we're next
+     ready to process user input, either in display_gdb_prompt, or if
+     we're handling an asynchronous target event and running in the
+     background, just before returning to the event loop to process
+     further input (or more target events).  */
   if (async_command_editing_p)
-    rl_callback_handler_remove ();
+    gdb_rl_callback_handler_remove ();
 }
 
 struct gdb_readline_wrapper_cleanup
   {
     void (*handler_orig) (char *);
     int already_prompted_orig;
+
+    /* Whether the target was async.  */
+    int target_is_async_orig;
   };
 
 static void
@@ -776,17 +791,28 @@ gdb_readline_wrapper_cleanup (void *arg)
 
   gdb_assert (input_handler == gdb_readline_wrapper_line);
   input_handler = cleanup->handler_orig;
+
+  /* Don't restore our input handler in readline yet.  That would make
+     readline prep the terminal (putting it in raw mode), while the
+     line we just read may trigger execution of a command that expects
+     the terminal in the default cooked/canonical mode, such as e.g.,
+     running Python's interactive online help utility.  See
+     gdb_readline_wrapper_line for when we'll reinstall it.  */
+
   gdb_readline_wrapper_result = NULL;
   gdb_readline_wrapper_done = 0;
 
   after_char_processing_hook = saved_after_char_processing_hook;
   saved_after_char_processing_hook = NULL;
 
+  if (cleanup->target_is_async_orig)
+    target_async (inferior_event_handler, 0);
+
   xfree (cleanup);
 }
 
 char *
-gdb_readline_wrapper (char *prompt)
+gdb_readline_wrapper (const char *prompt)
 {
   struct cleanup *back_to;
   struct gdb_readline_wrapper_cleanup *cleanup;
@@ -798,7 +824,12 @@ gdb_readline_wrapper (char *prompt)
 
   cleanup->already_prompted_orig = rl_already_prompted;
 
+  cleanup->target_is_async_orig = target_is_async_p ();
+
   back_to = make_cleanup (gdb_readline_wrapper_cleanup, cleanup);
+
+  if (cleanup->target_is_async_orig)
+    target_async (NULL, NULL);
 
   /* Display our prompt and prevent double prompt display.  */
   display_gdb_prompt (prompt);
@@ -881,14 +912,14 @@ gdb_rl_operate_and_get_next (int count, int key)
    simple input as the user has requested.  */
 
 char *
-command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
+command_line_input (const char *prompt_arg, int repeat, char *annotation_suffix)
 {
   static char *linebuffer = 0;
   static unsigned linelength = 0;
+  const char *prompt = prompt_arg;
   char *p;
   char *p1;
   char *rl;
-  char *local_prompt = prompt_arg;
   char *nline;
   char got_eof = 0;
 
@@ -898,15 +929,19 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
 
   if (annotation_level > 1 && instream == stdin)
     {
-      local_prompt = alloca ((prompt_arg == NULL ? 0 : strlen (prompt_arg))
+      char *local_prompt;
+
+      local_prompt = alloca ((prompt == NULL ? 0 : strlen (prompt))
 			     + strlen (annotation_suffix) + 40);
-      if (prompt_arg == NULL)
+      if (prompt == NULL)
 	local_prompt[0] = '\0';
       else
-	strcpy (local_prompt, prompt_arg);
+	strcpy (local_prompt, prompt);
       strcat (local_prompt, "\n\032\032");
       strcat (local_prompt, annotation_suffix);
       strcat (local_prompt, "\n");
+
+      prompt = local_prompt;
     }
 
   if (linebuffer == 0)
@@ -948,15 +983,15 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
       /* Don't use fancy stuff if not talking to stdin.  */
       if (deprecated_readline_hook && input_from_terminal_p ())
 	{
-	  rl = (*deprecated_readline_hook) (local_prompt);
+	  rl = (*deprecated_readline_hook) (prompt);
 	}
       else if (command_editing_p && input_from_terminal_p ())
 	{
-	  rl = gdb_readline_wrapper (local_prompt);
+	  rl = gdb_readline_wrapper (prompt);
 	}
       else
 	{
-	  rl = gdb_readline (local_prompt);
+	  rl = gdb_readline (prompt);
 	}
 
       if (annotation_level > 1 && instream == stdin)
@@ -990,7 +1025,7 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
 	break;
 
       p--;			/* Put on top of '\'.  */
-      local_prompt = (char *) 0;
+      prompt = NULL;
     }
 
 #ifdef STOP_SIGNAL
@@ -1033,7 +1068,7 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
 	  if (expanded < 0)
 	    {
 	      xfree (history_value);
-	      return command_line_input (prompt_arg, repeat,
+	      return command_line_input (prompt, repeat,
 					 annotation_suffix);
 	    }
 	  if (strlen (history_value) > linelength)
@@ -1187,6 +1222,15 @@ This GDB was configured as follows:\n\
   fprintf_filtered (stream, _("\
              --with-python=%s%s\n\
 "), WITH_PYTHON_PATH, PYTHON_PATH_RELOCATABLE ? " (relocatable)" : "");
+#endif
+#if HAVE_GUILE
+  fprintf_filtered (stream, _("\
+             --with-guile\n\
+"));
+#else
+  fprintf_filtered (stream, _("\
+             --without-guile\n\
+"));
 #endif
 #ifdef RELOC_SRCDIR
   fprintf_filtered (stream, _("\
@@ -1544,7 +1588,7 @@ set_history (char *args, int from_tty)
 {
   printf_unfiltered (_("\"set history\" must be followed "
 		       "by the name of a history subcommand.\n"));
-  help_list (sethistlist, "set history ", -1, gdb_stdout);
+  help_list (sethistlist, "set history ", all_commands, gdb_stdout);
 }
 
 void

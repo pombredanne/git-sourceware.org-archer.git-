@@ -738,7 +738,11 @@ or1k_info_to_howto_rela (bfd * abfd ATTRIBUTE_UNUSED,
   unsigned int r_type;
 
   r_type = ELF32_R_TYPE (dst->r_info);
-  BFD_ASSERT (r_type < (unsigned int) R_OR1K_max);
+  if (r_type >= (unsigned int) R_OR1K_max)
+    {
+      _bfd_error_handler (_("%A: invalid OR1K reloc number: %d"), abfd, r_type);
+      r_type = 0;
+    }
   cache_ptr->howto = & or1k_elf_howto_table[r_type];
 }
 
@@ -907,10 +911,7 @@ or1k_elf_relocate_section (bfd *output_bfd,
               dyn = htab->root.dynamic_sections_created;
               if (! WILL_CALL_FINISH_DYNAMIC_SYMBOL (dyn, info->shared, h)
                   || (info->shared
-                      && (info->symbolic
-                          || h->dynindx == -1
-                          || h->forced_local)
-                      && h->def_regular))
+                      && SYMBOL_REFERENCES_LOCAL (info, h)))
                 {
                   /* This is actually a static link, or it is a
                      -Bsymbolic link and the symbol is defined
@@ -1015,11 +1016,8 @@ or1k_elf_relocate_section (bfd *output_bfd,
                  && (h == NULL
                      || ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
                      || h->root.type != bfd_link_hash_undefweak)
-                 && (!howto->pc_relative
-                     || (h != NULL
-                         && h->dynindx != -1
-                         && (!info->symbolic
-                             || !h->def_regular))))
+		 && (howto->type != R_OR1K_INSN_REL_26
+		     || !SYMBOL_CALLS_LOCAL (info, h)))
                 || (!info->shared
                     && h != NULL
                     && h->dynindx != -1
@@ -1613,7 +1611,7 @@ or1k_elf_check_relocs (bfd *abfd,
                  && (sec->flags & SEC_ALLOC) != 0
                  && (ELF32_R_TYPE (rel->r_info) != R_OR1K_INSN_REL_26
                      || (h != NULL
-                         && (! info->symbolic
+                         && (!SYMBOLIC_BIND (info, h)
                              || h->root.type == bfd_link_hash_defweak
                              || !h->def_regular))))
                 || (!info->shared
@@ -1991,11 +1989,7 @@ or1k_elf_finish_dynamic_symbol (bfd *output_bfd,
          the symbol was forced to be local because of a version file.
          The entry in the global offset table will already have been
          initialized in the relocate_section function.  */
-      if (info->shared
-          && (info->symbolic
-              || h->dynindx == -1
-              || h->forced_local)
-          && h->def_regular)
+      if (info->shared && SYMBOL_REFERENCES_LOCAL (info, h))
         {
           rela.r_info = ELF32_R_INFO (0, R_OR1K_RELATIVE);
           rela.r_addend = (h->root.u.def.value
@@ -2197,7 +2191,7 @@ or1k_elf_adjust_dynamic_symbol (struct bfd_link_info *info,
       h->needs_copy = 1;
     }
 
-  return _bfd_elf_adjust_dynamic_copy (h, s);
+  return _bfd_elf_adjust_dynamic_copy (info, h, s);
 }
 
 /* Allocate space in .plt, .got and associated reloc sections for
@@ -2327,9 +2321,7 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void * inf)
 
   if (info->shared)
     {
-      if (h->def_regular
-          && (h->forced_local
-              || info->symbolic))
+      if (SYMBOL_CALLS_LOCAL (info, h))
         {
           struct elf_or1k_dyn_relocs **pp;
 
@@ -2464,7 +2456,7 @@ or1k_elf_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
 
   /* Set up .got offsets for local syms, and space for local dynamic
      relocs.  */
-  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link.next)
     {
       bfd_signed_vma *local_got;
       bfd_signed_vma *end_local_got;

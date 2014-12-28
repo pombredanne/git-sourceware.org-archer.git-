@@ -22,11 +22,8 @@
 #include "defs.h"
 #include "ui-file.h"
 #include "gdb_obstack.h"
-#include <string.h>
 #include "gdb_select.h"
 #include "filestuff.h"
-
-#include <errno.h>
 
 static ui_file_isatty_ftype null_file_isatty;
 static ui_file_write_ftype null_file_write;
@@ -223,6 +220,12 @@ ui_file_write (struct ui_file *file,
 		long length_buf)
 {
   file->to_write (file, buf, length_buf);
+}
+
+void
+ui_file_write_for_put (void *data, const char *buffer, long length_buffer)
+{
+  ui_file_write (data, buffer, length_buffer);
 }
 
 void

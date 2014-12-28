@@ -114,7 +114,8 @@ foreach dir1 [ list "./gdb.base" "./outputs/gdb.base/completion" ] {
 	 && [remote_file host exists ${dir1}/completion1.o] } {
 	foreach target_name ${targets} {
 	    gdb_test "complete target ${target_name} ${dir1}/completion" \
-		"target ${target_name} ${dir1}/completion.*${dir1}/completion0\\.o.*${dir1}/completion1\\.o.*"
+		"target ${target_name} ${dir1}/completion.*${dir1}/completion0\\.o.*${dir1}/completion1\\.o.*" \
+		"complete target ${target_name}"
 	}
 	break
     }
@@ -135,6 +136,34 @@ gdb_test "complete set listsize unl" "set listsize unlimited"
 # A var_zuinteger_unlimited command.
 gdb_test "complete set trace-buffer-size " "set trace-buffer-size unlimited"
 gdb_test "complete set trace-buffer-size unl" "set trace-buffer-size unlimited"
+
+# Test "info registers" completion: First determine this
+# architecture's registers and reggroups...
+
+set regs_output [capture_command_output "mt print registers" \
+		     ".*Name.*Nr.*Rel.*Offset.*Size.*Type.\[^\n\]*\n"]
+append regs_output "\n"
+append regs_output [capture_command_output "mt print reggroups" \
+			".*Group.*Type\[^\n]*\n"]
+append regs_output "\n"
+append regs_output [capture_command_output "mt print user-registers" \
+		     ".*Name.*Nr\[^\n]*\n"]
+set all_regs {}
+foreach {- reg} [regexp -all -inline -line {^\s+(\w+)} $regs_output] {
+    lappend all_regs $reg
+}
+
+set all_regs [join [lsort -unique $all_regs]]
+
+# ... and then compare them to the completion of "info registers".
+
+set regs_output [capture_command_output "complete info registers " ""]
+set completed_regs {}
+foreach {-> reg} [regexp -all -inline -line {^info registers (\w+\S*)} $regs_output] {
+    lappend completed_regs $reg
+}
+set completed_regs [join [lsort $completed_regs]]
+gdb_assert {{$all_regs eq $completed_regs}} "complete 'info registers '"
 
 # Tests below are about tab-completion, which doesn't work if readline
 # library isn't used.  Check it first.

@@ -272,16 +272,19 @@ struct lang_input_statement_flags
   /* Set if the file does not exist.  */
   unsigned int missing_file : 1;
 
+  /* Set if reloading an archive or --as-needed lib.  */
+  unsigned int reload : 1;
+
 #ifdef ENABLE_PLUGINS
   /* Set if the file was claimed by a plugin.  */
   unsigned int claimed : 1;
 
   /* Set if the file was claimed from an archive.  */
   unsigned int claim_archive : 1;
-
-  /* Set if reloading an --as-needed lib.  */
-  unsigned int reload : 1;
 #endif /* ENABLE_PLUGINS */
+
+  /* Head of list of pushed flags.  */
+  struct lang_input_statement_flags *pushed;
 };
 
 typedef struct lang_input_statement_struct
@@ -467,17 +470,6 @@ struct unique_sections
   const char *name;
 };
 
-/* This structure records symbols for which we need to keep track of
-   definedness for use in the DEFINED () test.  */
-
-struct lang_definedness_hash_entry
-{
-  struct bfd_hash_entry root;
-  unsigned int by_object : 1;
-  unsigned int by_script : 1;
-  unsigned int iteration : 1;
-};
-
 /* Used by place_orphan to keep track of orphan sections and statements.  */
 
 struct orphan_save
@@ -633,6 +625,8 @@ extern void *stat_alloc
   (size_t);
 extern void strip_excluded_output_sections
   (void);
+extern void lang_clear_os_map
+  (void);
 extern void dprint_statement
   (lang_statement_union_type *, int);
 extern void lang_size_sections
@@ -678,10 +672,6 @@ extern void lang_add_unique
   (const char *);
 extern const char *lang_get_output_target
   (void);
-extern struct lang_definedness_hash_entry *lang_symbol_defined (const char *);
-extern void lang_update_definedness
-  (const char *, struct bfd_link_hash_entry *);
-
 extern void add_excluded_libs (const char *);
 extern bfd_boolean load_symbols
   (lang_input_statement_type *, lang_statement_list_type *);

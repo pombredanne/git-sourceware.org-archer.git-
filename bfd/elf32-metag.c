@@ -896,7 +896,11 @@ metag_info_to_howto_rela (bfd *abfd ATTRIBUTE_UNUSED,
   unsigned int r_type;
 
   r_type = ELF32_R_TYPE (dst->r_info);
-  BFD_ASSERT (r_type < (unsigned int) R_METAG_MAX);
+  if (r_type >= (unsigned int) R_METAG_MAX)
+    {
+      _bfd_error_handler (_("%A: invalid METAG reloc number: %d"), abfd, r_type);
+      r_type = 0;
+    }
   cache_ptr->howto = & elf_metag_howto_table [r_type];
 }
 
@@ -1017,6 +1021,18 @@ metag_link_hash_newfunc (struct bfd_hash_entry *entry,
   return entry;
 }
 
+/* Free the derived linker hash table.  */
+
+static void
+elf_metag_link_hash_table_free (bfd *obfd)
+{
+  struct elf_metag_link_hash_table *htab
+    = (struct elf_metag_link_hash_table *) obfd->link.hash;
+
+  bfd_hash_table_free (&htab->bstab);
+  _bfd_elf_link_hash_table_free (obfd);
+}
+
 /* Create the derived linker hash table.  The Meta ELF port uses the derived
    hash table to keep information specific to the Meta ELF linker (without
    using static variables).  */
@@ -1043,21 +1059,13 @@ elf_metag_link_hash_table_create (bfd *abfd)
   /* Init the stub hash table too.  */
   if (!bfd_hash_table_init (&htab->bstab, stub_hash_newfunc,
 			    sizeof (struct elf_metag_stub_hash_entry)))
-    return NULL;
+    {
+      _bfd_elf_link_hash_table_free (abfd);
+      return NULL;
+    }
+  htab->etab.root.hash_table_free = elf_metag_link_hash_table_free;
 
   return &htab->etab.root;
-}
-
-/* Free the derived linker hash table.  */
-
-static void
-elf_metag_link_hash_table_free (struct bfd_link_hash_table *btab)
-{
-  struct elf_metag_link_hash_table *htab
-    = (struct elf_metag_link_hash_table *) btab;
-
-  bfd_hash_table_free (&htab->bstab);
-  _bfd_elf_link_hash_table_free (btab);
 }
 
 /* Section name for stubs is the associated section name plus this
@@ -2583,7 +2591,7 @@ elf_metag_adjust_dynamic_symbol (struct bfd_link_info *info,
 
   s = htab->sdynbss;
 
-  return _bfd_elf_adjust_dynamic_copy (eh, s);
+  return _bfd_elf_adjust_dynamic_copy (info, eh, s);
 }
 
 /* Allocate space in .plt, .got and associated reloc sections for
@@ -2847,7 +2855,7 @@ elf_metag_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
 
   /* Set up .got offsets for local syms, and space for local dynamic
      relocs.  */
-  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link.next)
     {
       bfd_signed_vma *local_got;
       bfd_signed_vma *end_local_got;
@@ -3725,7 +3733,7 @@ elf_metag_setup_section_lists (bfd *output_bfd, struct bfd_link_info *info)
   /* Count the number of input BFDs and find the top input section id.  */
   for (input_bfd = info->input_bfds, bfd_count = 0, top_id = 0;
        input_bfd != NULL;
-       input_bfd = input_bfd->link_next)
+       input_bfd = input_bfd->link.next)
     {
       bfd_count += 1;
       for (section = input_bfd->sections;
@@ -3907,7 +3915,7 @@ get_local_syms (bfd *output_bfd ATTRIBUTE_UNUSED, bfd *input_bfd,
   /* Walk over all the input BFDs, swapping in local symbols.  */
   for (bfd_indx = 0;
        input_bfd != NULL;
-       input_bfd = input_bfd->link_next, bfd_indx++)
+       input_bfd = input_bfd->link.next, bfd_indx++)
     {
       Elf_Internal_Shdr *symtab_hdr;
 
@@ -4004,7 +4012,7 @@ elf_metag_size_stubs(bfd *output_bfd, bfd *stub_bfd,
 
       for (input_bfd = info->input_bfds, bfd_indx = 0;
 	   input_bfd != NULL;
-	   input_bfd = input_bfd->link_next, bfd_indx++)
+	   input_bfd = input_bfd->link.next, bfd_indx++)
 	{
 	  Elf_Internal_Shdr *symtab_hdr;
 	  asection *section;
@@ -4295,7 +4303,6 @@ elf_metag_plt_sym_val (bfd_vma i, const asection *plt,
 #define bfd_elf32_bfd_is_local_label_name	elf_metag_is_local_label_name
 #define bfd_elf32_bfd_link_hash_table_create \
 	elf_metag_link_hash_table_create
-#define bfd_elf32_bfd_link_hash_table_free	elf_metag_link_hash_table_free
 #define elf_backend_relocate_section		elf_metag_relocate_section
 #define elf_backend_gc_mark_hook		elf_metag_gc_mark_hook
 #define elf_backend_gc_sweep_hook		elf_metag_gc_sweep_hook

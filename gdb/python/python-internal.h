@@ -62,8 +62,6 @@
 #define CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION
 #endif
 
-#include <stdio.h>
-
 /* Python 2.4 doesn't include stdint.h soon enough to get {u,}intptr_t
    needed by pyport.h.  */
 #include <stdint.h>
@@ -187,6 +185,32 @@ gdb_Py_DECREF (void *op) /* ARI: editCase function */
 #undef Py_DECREF
 #define Py_DECREF(op) gdb_Py_DECREF (op)
 
+/* The second argument to PyObject_GetAttrString was missing the 'const'
+   qualifier in Python-2.4.  Hence, we wrap it in a function to avoid errors
+   when compiled with -Werror.  */
+
+static inline PyObject *
+gdb_PyObject_GetAttrString (PyObject *obj,
+			    const char *attr) /* ARI: editCase function */
+{
+  return PyObject_GetAttrString (obj, (char *) attr);
+}
+
+#define PyObject_GetAttrString(obj, attr) gdb_PyObject_GetAttrString (obj, attr)
+
+/* The second argument to PyObject_HasAttrString was also missing the 'const'
+   qualifier in Python-2.4.  Hence, we wrap it also in a function to avoid
+   errors when compiled with -Werror.  */
+
+static inline int
+gdb_PyObject_HasAttrString (PyObject *obj,
+			    const char *attr)  /* ARI: editCase function */
+{
+  return PyObject_HasAttrString (obj, (char *) attr);
+}
+
+#define PyObject_HasAttrString(obj, attr) gdb_PyObject_HasAttrString (obj, attr)
+
 /* In order to be able to parse symtab_and_line_to_sal_object function
    a real symtab_and_line structure is needed.  */
 #include "symtab.h"
@@ -194,8 +218,6 @@ gdb_Py_DECREF (void *op) /* ARI: editCase function */
 /* Also needed to parse enum var_types. */
 #include "command.h"
 #include "breakpoint.h"
-
-#include "exceptions.h"
 
 enum gdbpy_iter_kind { iter_keys, iter_values, iter_items };
 
@@ -341,6 +363,7 @@ PyObject *gdbpy_create_lazy_string_object (CORE_ADDR address, long length,
 					   const char *encoding,
 					   struct type *type);
 PyObject *gdbpy_inferiors (PyObject *unused, PyObject *unused2);
+PyObject *gdbpy_create_ptid_object (ptid_t ptid);
 PyObject *gdbpy_selected_thread (PyObject *self, PyObject *args);
 PyObject *gdbpy_selected_inferior (PyObject *self, PyObject *args);
 PyObject *gdbpy_string_to_argv (PyObject *self, PyObject *args);
@@ -370,6 +393,7 @@ PyObject *objfile_to_objfile_object (struct objfile *)
 PyObject *objfpy_get_printers (PyObject *, void *);
 PyObject *objfpy_get_frame_filters (PyObject *, void *);
 PyObject *objfpy_get_xmethods (PyObject *, void *);
+PyObject *gdbpy_lookup_objfile (PyObject *self, PyObject *args, PyObject *kw);
 
 PyObject *gdbarch_to_arch_object (struct gdbarch *gdbarch);
 
@@ -442,11 +466,21 @@ int gdbpy_initialize_breakpoint_event (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_continue_event (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_inferior_call_pre_event (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_inferior_call_post_event (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_register_changed_event (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_memory_changed_event (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_exited_event (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_thread_event (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_new_objfile_event (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_clear_objfiles_event (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_arch (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
@@ -541,5 +575,10 @@ PyObject *gdb_py_generic_dict (PyObject *self, void *closure);
 int gdb_pymodule_addobject (PyObject *module, const char *name,
 			    PyObject *object)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+
+struct varobj_iter;
+struct varobj;
+struct varobj_iter *py_varobj_get_iterator (struct varobj *var,
+					    PyObject *printer);
 
 #endif /* GDB_PYTHON_INTERNAL_H */

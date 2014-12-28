@@ -276,7 +276,11 @@ rl78_info_to_howto_rela (bfd *               abfd ATTRIBUTE_UNUSED,
   unsigned int r_type;
 
   r_type = ELF32_R_TYPE (dst->r_info);
-  BFD_ASSERT (r_type < (unsigned int) R_RL78_max);
+  if (r_type >= (unsigned int) R_RL78_max)
+    {
+      _bfd_error_handler (_("%A: invalid RL78 reloc number: %d"), abfd, r_type);
+      r_type = 0;
+    }
   cache_ptr->howto = rl78_elf_howto_table + r_type;
 }
 
@@ -1370,7 +1374,7 @@ rl78_elf_relax_plt_section (bfd *dynobj,
 
   /* Likewise for local symbols, though that's somewhat less convenient
      as we have to walk the list of input bfds and swap in symbol data.  */
-  for (ibfd = info->input_bfds; ibfd ; ibfd = ibfd->link_next)
+  for (ibfd = info->input_bfds; ibfd ; ibfd = ibfd->link.next)
     {
       bfd_vma *local_plt_offsets = elf_local_got_offsets (ibfd);
       Elf_Internal_Shdr *symtab_hdr;
@@ -1444,7 +1448,7 @@ rl78_elf_relax_plt_section (bfd *dynobj,
       elf_link_hash_traverse (elf_hash_table (info),
 			      rl78_relax_plt_realloc, &entry);
 
-      for (ibfd = info->input_bfds; ibfd ; ibfd = ibfd->link_next)
+      for (ibfd = info->input_bfds; ibfd ; ibfd = ibfd->link.next)
 	{
 	  bfd_vma *local_plt_offsets = elf_local_got_offsets (ibfd);
 	  unsigned int nlocals = elf_tdata (ibfd)->symtab_hdr.sh_info;
@@ -2199,7 +2203,7 @@ rl78_elf_relax_section
 	 61 F3 EF ad	SKNH ; BR $rel8
        */
 
-      if (irel->r_addend & RL78_RELAXA_BRA)
+      if ((irel->r_addend & RL78_RELAXA_MASK) == RL78_RELAXA_BRA)
 	{
 	  /* SKIP opcodes that skip non-branches will have a relax tag
 	     but no corresponding symbol to relax against; we just
@@ -2334,7 +2338,7 @@ rl78_elf_relax_section
 
 	}
 
-      if (irel->r_addend & RL78_RELAXA_ADDR16)
+      if ((irel->r_addend &  RL78_RELAXA_MASK) == RL78_RELAXA_ADDR16)
 	{
 	  /*----------------------------------------------------------------------*/
 	  /* Some insns have both a 16-bit address operand and an 8-bit

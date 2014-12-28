@@ -40,6 +40,7 @@
 #include "demangle.h"
 #include "hashtab.h"
 #include "libbfd.h"
+#include "elf-bfd.h"
 #ifdef ENABLE_PLUGINS
 #include "plugin.h"
 #endif /* ENABLE_PLUGINS */
@@ -56,14 +57,13 @@ static struct obstack map_obstack;
 #define obstack_chunk_free free
 static const char *entry_symbol_default = "start";
 static bfd_boolean placed_commons = FALSE;
-static bfd_boolean stripped_excluded_sections = FALSE;
+static bfd_boolean map_head_is_link_order = FALSE;
 static lang_output_section_statement_type *default_common_section;
 static bfd_boolean map_option_f;
 static bfd_vma print_dot;
 static lang_input_statement_type *first_file;
 static const char *current_target;
 static lang_statement_list_type statement_list;
-static struct bfd_hash_table lang_definedness_table;
 static lang_statement_list_type *stat_save[10];
 static lang_statement_list_type **stat_save_ptr = &stat_save[0];
 static struct unique_sections *unique_section_list;
@@ -72,8 +72,6 @@ static struct asneeded_minfo *asneeded_list_head;
 /* Forward declarations.  */
 static void exp_init_os (etree_type *);
 static lang_input_statement_type *lookup_name (const char *);
-static struct bfd_hash_entry *lang_definedness_newfunc
- (struct bfd_hash_entry *, struct bfd_hash_table *, const char *);
 static void insert_undefined (const char *);
 static bfd_boolean sort_def_symbol (struct bfd_link_hash_entry *, void *);
 static void print_statement (lang_statement_union_type *,
@@ -1117,6 +1115,26 @@ lang_add_input_file (const char *name,
 		     lang_input_file_enum_type file_type,
 		     const char *target)
 {
+  if (name != NULL && *name == '=')
+    {
+      lang_input_statement_type *ret;
+      char *sysrooted_name
+	= concat (ld_sysroot, name + 1, (const char *) NULL);
+
+      /* We've now forcibly prepended the sysroot, making the input
+	 file independent of the context.  Therefore, temporarily
+	 force a non-sysrooted context for this statement, so it won't
+	 get the sysroot prepended again when opened.  (N.B. if it's a
+	 script, any child nodes with input files starting with "/"
+	 will be handled as "sysrooted" as they'll be found to be
+	 within the sysroot subdirectory.)  */
+      unsigned int outer_sysrooted = input_flags.sysrooted;
+      input_flags.sysrooted = 0;
+      ret = new_afile (sysrooted_name, file_type, target, TRUE);
+      input_flags.sysrooted = outer_sysrooted;
+      return ret;
+    }
+
   return new_afile (name, file_type, target, TRUE);
 }
 
@@ -1220,14 +1238,6 @@ lang_init (void)
 
   abs_output_section->bfd_section = bfd_abs_section_ptr;
 
-  /* The value "13" is ad-hoc, somewhat related to the expected number of
-     assignments in a linker script.  */
-  if (!bfd_hash_table_init_n (&lang_definedness_table,
-			      lang_definedness_newfunc,
-			      sizeof (struct lang_definedness_hash_entry),
-			      13))
-    einfo (_("%P%F: can not create hash table: %E\n"));
-
   asneeded_list_head = NULL;
   asneeded_list_tail = &asneeded_list_head;
 }
@@ -1235,7 +1245,6 @@ lang_init (void)
 void
 lang_finish (void)
 {
-  bfd_hash_table_free (&lang_definedness_table);
   output_section_statement_table_free ();
 }
 
@@ -2410,8 +2419,7 @@ lang_add_section (lang_statement_list_type *ptr,
 
   section->output_section = output->bfd_section;
 
-  if (!link_info.relocatable
-      && !stripped_excluded_sections)
+  if (!map_head_is_link_order)
     {
       asection *s = output->bfd_section->map_tail.s;
       output->bfd_section->map_tail.s = section;
@@ -2790,9 +2798,7 @@ load_symbols (lang_input_statement_type *entry,
       break;
 
     case bfd_object:
-#ifdef ENABLE_PLUGINS
       if (!entry->flags.reload)
-#endif
 	ldlang_add_file (entry);
       if (trace_files || verbose)
 	info_msg ("%I\n", entry);
@@ -3072,9 +3078,6 @@ lang_get_output_target (void)
   return default_target;
 }
 
-/* Stashed function to free link_info.hash; see open_output.  */
-void (*output_bfd_hash_table_free_fn) (struct bfd_link_hash_table *);
-
 /* Open the output file.  */
 
 static void
@@ -3153,18 +3156,6 @@ open_output (const char *name)
   link_info.hash = bfd_link_hash_table_create (link_info.output_bfd);
   if (link_info.hash == NULL)
     einfo (_("%P%F: can not create hash table: %E\n"));
-
-  /* We want to please memory leak checkers by deleting link_info.hash.
-     We can't do it in lang_finish, as a bfd target may hold references to
-     symbols in this table and use them when their _bfd_write_contents
-     function is invoked, as part of bfd_close on the output_bfd.  But,
-     output_bfd is deallocated at bfd_close, so we can't refer to
-     output_bfd after that time, and dereferencing it is needed to call
-     "bfd_link_hash_table_free".  Smash this dependency deadlock and grab
-     the function pointer; arrange to call it on link_info.hash in
-     ld_cleanup.  */
-  output_bfd_hash_table_free_fn
-    = link_info.output_bfd->xvec->_bfd_link_hash_table_free;
 
   bfd_set_gp_size (link_info.output_bfd, g_switch_value);
 }
@@ -3283,38 +3274,33 @@ open_input_bfds (lang_statement_union_type *s, enum open_bfd_mode mode)
 	    {
 	      lang_statement_union_type **os_tail;
 	      lang_statement_list_type add;
+	      bfd *abfd;
 
 	      s->input_statement.target = current_target;
 
 	      /* If we are being called from within a group, and this
 		 is an archive which has already been searched, then
 		 force it to be researched unless the whole archive
-		 has been loaded already.  Do the same for a rescan.  */
+		 has been loaded already.  Do the same for a rescan.
+		 Likewise reload --as-needed shared libs.  */
 	      if (mode != OPEN_BFD_NORMAL
 #ifdef ENABLE_PLUGINS
 		  && ((mode & OPEN_BFD_RESCAN) == 0
 		      || plugin_insert == NULL)
 #endif
-		  && !s->input_statement.flags.whole_archive
 		  && s->input_statement.flags.loaded
-		  && s->input_statement.the_bfd != NULL
-		  && bfd_check_format (s->input_statement.the_bfd,
-				       bfd_archive))
-		s->input_statement.flags.loaded = FALSE;
-#ifdef ENABLE_PLUGINS
-	      /* When rescanning, reload --as-needed shared libs.  */
-	      else if ((mode & OPEN_BFD_RESCAN) != 0
-		       && plugin_insert == NULL
-		       && s->input_statement.flags.loaded
-		       && s->input_statement.flags.add_DT_NEEDED_for_regular
-		       && s->input_statement.the_bfd != NULL
-		       && ((s->input_statement.the_bfd->flags) & DYNAMIC) != 0
-		       && plugin_should_reload (s->input_statement.the_bfd))
+		  && (abfd = s->input_statement.the_bfd) != NULL
+		  && ((bfd_get_format (abfd) == bfd_archive
+		       && !s->input_statement.flags.whole_archive)
+		      || (bfd_get_format (abfd) == bfd_object
+			  && ((abfd->flags) & DYNAMIC) != 0
+			  && s->input_statement.flags.add_DT_NEEDED_for_regular
+			  && bfd_get_flavour (abfd) == bfd_target_elf_flavour
+			  && (elf_dyn_lib_class (abfd) & DYN_AS_NEEDED) != 0)))
 		{
 		  s->input_statement.flags.loaded = FALSE;
 		  s->input_statement.flags.reload = TRUE;
 		}
-#endif
 
 	      os_tail = lang_output_section_statement.tail;
 	      lang_list_init (&add);
@@ -3365,65 +3351,6 @@ open_input_bfds (lang_statement_union_type *s, enum open_bfd_mode mode)
   /* Exit if any of the files were missing.  */
   if (input_flags.missing_file)
     einfo ("%F");
-}
-
-/* New-function for the definedness hash table.  */
-
-static struct bfd_hash_entry *
-lang_definedness_newfunc (struct bfd_hash_entry *entry,
-			  struct bfd_hash_table *table ATTRIBUTE_UNUSED,
-			  const char *name ATTRIBUTE_UNUSED)
-{
-  struct lang_definedness_hash_entry *ret
-    = (struct lang_definedness_hash_entry *) entry;
-
-  if (ret == NULL)
-    ret = (struct lang_definedness_hash_entry *)
-      bfd_hash_allocate (table, sizeof (struct lang_definedness_hash_entry));
-
-  if (ret == NULL)
-    einfo (_("%P%F: bfd_hash_allocate failed creating symbol %s\n"), name);
-
-  ret->by_object = 0;
-  ret->by_script = 0;
-  ret->iteration = 0;
-  return &ret->root;
-}
-
-/* Called during processing of linker script script expressions.
-   For symbols assigned in a linker script, return a struct describing
-   where the symbol is defined relative to the current expression,
-   otherwise return NULL.  */
-
-struct lang_definedness_hash_entry *
-lang_symbol_defined (const char *name)
-{
-  return ((struct lang_definedness_hash_entry *)
-	  bfd_hash_lookup (&lang_definedness_table, name, FALSE, FALSE));
-}
-
-/* Update the definedness state of NAME.  */
-
-void
-lang_update_definedness (const char *name, struct bfd_link_hash_entry *h)
-{
-  struct lang_definedness_hash_entry *defentry
-    = (struct lang_definedness_hash_entry *)
-    bfd_hash_lookup (&lang_definedness_table, name, TRUE, FALSE);
-
-  if (defentry == NULL)
-    einfo (_("%P%F: bfd_hash_lookup failed creating symbol %s\n"), name);
-
-  /* If the symbol was already defined, and not by a script, then it
-     must be defined by an object file.  */
-  if (!defentry->by_script
-      && h->type != bfd_link_hash_undefined
-      && h->type != bfd_link_hash_common
-      && h->type != bfd_link_hash_new)
-    defentry->by_object = 1;
-
-  defentry->by_script = 1;
-  defentry->iteration = lang_statement_iteration;
 }
 
 /* Add the supplied name to the symbol table as an undefined reference.
@@ -3933,10 +3860,6 @@ strip_excluded_output_sections (void)
 	      }
 	}
 
-      /* TODO: Don't just junk map_head.s, turn them into link_orders.  */
-      output_section->map_head.link_order = NULL;
-      output_section->map_tail.link_order = NULL;
-
       if (exclude)
 	{
 	  /* We don't set bfd_section to NULL since bfd_section of the
@@ -3948,10 +3871,42 @@ strip_excluded_output_sections (void)
 	  link_info.output_bfd->section_count--;
 	}
     }
+}
+
+/* Called from ldwrite to clear out asection.map_head and
+   asection.map_tail for use as link_orders in ldwrite.
+   FIXME: Except for sh64elf.em which starts creating link_orders in
+   its after_allocation routine so needs to call it early.  */
+
+void
+lang_clear_os_map (void)
+{
+  lang_output_section_statement_type *os;
+
+  if (map_head_is_link_order)
+    return;
+
+  for (os = &lang_output_section_statement.head->output_section_statement;
+       os != NULL;
+       os = os->next)
+    {
+      asection *output_section;
+
+      if (os->constraint < 0)
+	continue;
+
+      output_section = os->bfd_section;
+      if (output_section == NULL)
+	continue;
+
+      /* TODO: Don't just junk map_head.s, turn them into link_orders.  */
+      output_section->map_head.link_order = NULL;
+      output_section->map_tail.link_order = NULL;
+    }
 
   /* Stop future calls to lang_add_section from messing with map_head
      and map_tail link_order fields.  */
-  stripped_excluded_sections = TRUE;
+  map_head_is_link_order = TRUE;
 }
 
 static void
@@ -5996,7 +5951,7 @@ lang_common (void)
 	  for (power = 0; power <= 4; power++)
 	    bfd_link_hash_traverse (link_info.hash, lang_one_common, &power);
 
-	  power = UINT_MAX;
+	  power = (unsigned int) -1;
 	  bfd_link_hash_traverse (link_info.hash, lang_one_common, &power);
 	}
     }
@@ -6228,11 +6183,11 @@ ldlang_add_file (lang_input_statement_type *entry)
 
   /* The BFD linker needs to have a list of all input BFDs involved in
      a link.  */
-  ASSERT (entry->the_bfd->link_next == NULL);
+  ASSERT (entry->the_bfd->link.next == NULL);
   ASSERT (entry->the_bfd != link_info.output_bfd);
 
   *link_info.input_bfds_tail = entry->the_bfd;
-  link_info.input_bfds_tail = &entry->the_bfd->link_next;
+  link_info.input_bfds_tail = &entry->the_bfd->link.next;
   entry->the_bfd->usrdata = entry;
   bfd_set_gp_size (entry->the_bfd, g_switch_value);
 
