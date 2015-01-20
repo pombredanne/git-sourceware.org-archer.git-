@@ -27,11 +27,12 @@ void
 set_desired_thread (int use_general)
 {
   struct thread_info *found;
+  client_state *cs = get_client_state ();
 
   if (use_general == 1)
-    found = find_thread_ptid (general_thread);
+    found = find_thread_ptid (cs->general_thread);
   else
-    found = find_thread_ptid (cont_thread);
+    found = find_thread_ptid (cs->cont_thread);
 
   if (found == NULL)
     current_thread = get_first_thread ();
@@ -100,9 +101,10 @@ mywait (ptid_t ptid, struct target_waitstatus *ourstatus, int options,
 	int connected_wait)
 {
   ptid_t ret;
+  client_state *cs = get_client_state ();
 
   if (connected_wait)
-    server_waiting = 1;
+    cs->server_waiting = 1;
 
   ret = (*the_target->wait) (ptid, ourstatus, options);
 
@@ -129,7 +131,7 @@ mywait (ptid_t ptid, struct target_waitstatus *ourstatus, int options,
     }
 
   if (connected_wait)
-    server_waiting = 0;
+    cs->server_waiting = 0;
 
   return ret;
 }
@@ -139,8 +141,9 @@ mywait (ptid_t ptid, struct target_waitstatus *ourstatus, int options,
 void
 target_stop_and_wait (ptid_t ptid)
 {
+  client_state *cs = get_client_state ();
   struct target_waitstatus status;
-  int was_non_stop = non_stop;
+  int was_non_stop = cs->non_stop;
   struct thread_resume resume_info;
 
   resume_info.thread = ptid;
@@ -148,9 +151,9 @@ target_stop_and_wait (ptid_t ptid)
   resume_info.sig = GDB_SIGNAL_0;
   (*the_target->resume) (&resume_info, 1);
 
-  non_stop = 1;
+  cs->non_stop = 1;
   mywait (ptid, &status, 0, 0);
-  non_stop = was_non_stop;
+  cs->non_stop = was_non_stop;
 }
 
 /* See target/target.h.  */

@@ -413,6 +413,7 @@ spu_wait (ptid_t ptid, struct target_waitstatus *ourstatus, int options)
   int pid = ptid_get_pid (ptid);
   int w;
   int ret;
+  client_state *cs = get_client_state ();
 
   while (1)
     {
@@ -431,7 +432,7 @@ spu_wait (ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 
   /* On the first wait, continue running the inferior until we are
      blocked inside an spu_run system call.  */
-  if (!server_waiting)
+  if (! cs->server_waiting)
     {
       int fd;
       CORE_ADDR addr;
@@ -462,7 +463,7 @@ spu_wait (ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 
   /* After attach, we may have received a SIGSTOP.  Do not return this
      as signal to GDB, or else it will try to continue with SIGSTOP ...  */
-  if (!server_waiting)
+  if (! cs->server_waiting)
     {
       ourstatus->kind = TARGET_WAITKIND_STOPPED;
       ourstatus->value.sig = GDB_SIGNAL_0;

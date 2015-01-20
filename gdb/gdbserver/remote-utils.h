@@ -36,7 +36,7 @@ int putpkt_binary (char *buf, int len);
 int putpkt_notif (char *buf);
 int getpkt (char *buf);
 void remote_prepare (char *name);
-void remote_open (char *name);
+void remote_open (char *name, gdb_client_data client_data);
 void remote_close (void);
 void write_ok (char *buf);
 void write_enn (char *buf);

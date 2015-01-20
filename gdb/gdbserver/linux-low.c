@@ -549,9 +549,10 @@ linux_create_inferior (char *program, char **allargs)
   struct lwp_info *new_lwp;
   int pid;
   ptid_t ptid;
+  client_state *cs = get_client_state ();
 
 #ifdef HAVE_PERSONALITY
-  if (disable_randomization)
+  if (cs->disable_randomization)
     {
       errno = 0;
       personality_orig = personality (0xffffffff);
@@ -745,6 +746,7 @@ linux_attach_lwp (ptid_t ptid)
 static int
 linux_attach (unsigned long pid)
 {
+  client_state *cs = get_client_state ();
   ptid_t ptid = ptid_build (pid, pid, 0);
   int err;
 
@@ -757,7 +759,7 @@ linux_attach (unsigned long pid)
 
   linux_add_process (pid, 1);
 
-  if (!non_stop)
+  if (! cs->non_stop)
     {
       struct thread_info *thread;
 
@@ -1030,6 +1032,7 @@ get_detach_signal (struct thread_info *thread)
   enum gdb_signal signo = GDB_SIGNAL_0;
   int status;
   struct lwp_info *lp = get_thread_lwp (thread);
+  client_state *cs = get_client_state ();
 
   if (lp->status_pending_p)
     status = lp->status_pending;
@@ -1067,7 +1070,7 @@ get_detach_signal (struct thread_info *thread)
 
   signo = gdb_signal_from_host (WSTOPSIG (status));
 
-  if (program_signals_p && !program_signals[signo])
+  if (cs->program_signals_p && ! cs->program_signals[signo])
     {
       if (debug_threads)
 	debug_printf ("GPS: lwp %s had signal %s, but it is in nopass state\n",
@@ -1075,7 +1078,7 @@ get_detach_signal (struct thread_info *thread)
 		      gdb_signal_to_string (signo));
       return 0;
     }
-  else if (!program_signals_p
+  else if (! cs->program_signals_p
 	   /* If we have no way to know which signals GDB does not
 	      want to have passed to the program, assume
 	      SIGTRAP/SIGINT, which is GDB's default.  */
@@ -1760,6 +1763,7 @@ lp_status_maybe_breakpoint (struct lwp_info *lp)
 static struct lwp_info *
 linux_low_filter_event (ptid_t filter_ptid, int lwpid, int wstat)
 {
+  client_state *cs = get_client_state ();
   struct lwp_info *child;
   struct thread_info *thread;
 
@@ -1949,7 +1953,7 @@ linux_low_filter_event (ptid_t filter_ptid, int lwpid, int wstat)
 		 cases --- it could be too many events go through to
 		 the core before this one is handled.  All-stop always
 		 cancels breakpoint hits in all threads.  */
-	      if (non_stop
+	      if (cs->non_stop
 		  && lp_status_maybe_breakpoint (child)
 		  && cancel_breakpoint (child))
 		{
@@ -2500,6 +2504,7 @@ linux_wait_1 (ptid_t ptid,
   int report_to_gdb;
   int trace_event;
   int in_step_range;
+  client_state *cs = get_client_state ();
 
   if (debug_threads)
     {
@@ -2524,14 +2529,14 @@ retry:
      then we need to make sure we restart the other threads.  We could
      pick a thread at random or restart all; restarting all is less
      arbitrary.  */
-  if (!non_stop
-      && !ptid_equal (cont_thread, null_ptid)
-      && !ptid_equal (cont_thread, minus_one_ptid))
+  if (! cs->non_stop
+      && !ptid_equal (cs->cont_thread, null_ptid)
+      && !ptid_equal (cs->cont_thread, minus_one_ptid))
     {
       struct thread_info *thread;
 
       thread = (struct thread_info *) find_inferior_id (&all_threads,
-							cont_thread);
+							cs->cont_thread);
 
       /* No stepping, no signal - unless one is pending already, of course.  */
       if (thread == NULL)
@@ -2543,7 +2548,7 @@ retry:
 	  linux_resume (&resume_info, 1);
 	}
       else
-	ptid = cont_thread;
+	ptid = cs->cont_thread;
     }
 
   if (ptid_equal (step_over_bkpt, null_ptid))
@@ -2806,7 +2811,7 @@ retry:
 	       || WSTOPSIG (w) == __SIGRTMIN + 1))
 	  ||
 #endif
-	  (pass_signals[gdb_signal_from_host (WSTOPSIG (w))]
+	  (cs->pass_signals[gdb_signal_from_host (WSTOPSIG (w))]
 	   && !(WSTOPSIG (w) == SIGSTOP
 		&& current_thread->last_resume_kind == resume_stop))))
     {
@@ -2916,7 +2921,7 @@ retry:
 
   /* Alright, we're going to report a stop.  */
 
-  if (!non_stop && !stabilizing_threads)
+  if (! cs->non_stop && !stabilizing_threads)
     {
       /* In all-stop, stop all threads.  */
       stop_all_lwps (0, NULL);
@@ -3171,6 +3176,7 @@ wait_for_sigstop (void)
   ptid_t saved_tid;
   int wstat;
   int ret;
+  client_state *cs = get_client_state ();
 
   saved_thread = current_thread;
   if (saved_thread != NULL)
@@ -3195,7 +3201,7 @@ wait_for_sigstop (void)
       if (debug_threads)
 	debug_printf ("Previously current thread died.\n");
 
-      if (non_stop)
+      if (cs->non_stop)
 	{
 	  /* We can't change the current inferior behind GDB's back,
 	     otherwise, a subsequent command may apply to the wrong
@@ -3992,6 +3998,7 @@ linux_resume (struct thread_resume *resume_info, size_t n)
   struct thread_info *need_step_over = NULL;
   int any_pending;
   int leave_all_stopped;
+  client_state *cs = get_client_state ();
 
   if (debug_threads)
     {
@@ -4008,7 +4015,7 @@ linux_resume (struct thread_resume *resume_info, size_t n)
      logic to each thread individually.  We consume all pending events
      before considering to start a step-over (in all-stop).  */
   any_pending = 0;
-  if (!non_stop)
+  if (! cs->non_stop)
     find_inferior (&all_threads, resume_status_pending_p, &any_pending);
 
   /* If there is a thread which would otherwise be resumed, which is
@@ -4846,10 +4853,10 @@ linux_look_up_symbols (void)
 static void
 linux_request_interrupt (void)
 {
-  extern unsigned long signal_pid;
+  client_state *cs = get_client_state ();
 
-  if (!ptid_equal (cont_thread, null_ptid)
-      && !ptid_equal (cont_thread, minus_one_ptid))
+  if (!ptid_equal (cs->cont_thread, null_ptid)
+      && !ptid_equal (cs->cont_thread, minus_one_ptid))
     {
       int lwpid;
 
@@ -4857,7 +4864,7 @@ linux_request_interrupt (void)
       kill_lwp (lwpid, SIGINT);
     }
   else
-    kill_lwp (signal_pid, SIGINT);
+    kill_lwp (cs->signal_pid, SIGINT);
 }
 
 /* Copy LEN bytes from inferior's auxiliary vector starting at OFFSET
@@ -5423,9 +5430,11 @@ linux_unpause_all (int unfreeze)
 static int
 linux_prepare_to_access_memory (void)
 {
+  client_state *cs = get_client_state ();
+
   /* Neither ptrace nor /proc/PID/mem allow accessing memory through a
      running LWP.  */
-  if (non_stop)
+  if (cs->non_stop)
     linux_pause_all (1);
   return 0;
 }
@@ -5433,9 +5442,11 @@ linux_prepare_to_access_memory (void)
 static void
 linux_done_accessing_memory (void)
 {
+  client_state *cs = get_client_state ();
+
   /* Neither ptrace nor /proc/PID/mem allow accessing memory through a
      running LWP.  */
-  if (non_stop)
+  if (cs->non_stop)
     linux_unpause_all (1);
 }
 

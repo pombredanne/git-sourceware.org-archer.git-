@@ -754,6 +754,7 @@ handle_output_debug_string (struct target_waitstatus *ourstatus)
   CORE_ADDR addr;
   char s[READ_BUFFER_LEN + 1] = { 0 };
   DWORD nbytes = current_event.u.DebugString.nDebugStringLength;
+  client_state *cs = get_client_state ();
 
   if (nbytes == 0)
     return;
@@ -780,7 +781,7 @@ handle_output_debug_string (struct target_waitstatus *ourstatus)
 
   if (strncmp (s, "cYg", 3) != 0)
     {
-      if (!server_waiting)
+      if (! cs->server_waiting)
 	{
 	  OUTMSG2(("%s", s));
 	  return;

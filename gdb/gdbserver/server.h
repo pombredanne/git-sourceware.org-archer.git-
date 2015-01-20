@@ -78,10 +78,10 @@ void initialize_low ();
 
 /* Public variables in server.c */
 
-extern ptid_t cont_thread;
-extern ptid_t general_thread;
+// extern ptid_t cont_thread;
+// extern ptid_t general_thread;
 
-extern int server_waiting;
+// extern int server_waiting;
 extern int pass_signals[];
 extern int program_signals[];
 extern int program_signals_p;
@@ -91,11 +91,11 @@ extern int disable_packet_Tthread;
 extern int disable_packet_qC;
 extern int disable_packet_qfThreadInfo;
 
-extern int run_once;
-extern int multi_process;
-extern int non_stop;
+// extern int run_once;
+// extern int multi_process;
+// extern int non_stop;
 
-extern int disable_randomization;
+// extern int disable_randomization;
 
 #if USE_WIN32API
 #include <winsock2.h>
@@ -123,5 +123,51 @@ extern int handle_target_event (int err, gdb_client_data client_data);
    value to accomodate multiple register formats.  This value must be at least
    as large as the largest register set supported by gdbserver.  */
 #define PBUFSIZ 16384
+
+/* Description of the remote protocol state for the currently
+   connected target.  This is per-target state, and independent of the
+   selected architecture.  */
+
+struct client_state
+{
+  /* --once: Exit after the first connection has closed.  */
+  int run_once;
+  /* --multi */
+  int multi_process;
+  /* QNonStop packet */
+  int non_stop;
+  /* QDisableRandomization packet */
+  int disable_randomization;
+  /* The thread set with an `Hc' packet.  `Hc' is deprecated in favor of
+     `vCont'.  Note the multi-process extensions made `vCont' a
+     requirement, so `Hc pPID.TID' is pretty much undefined.  So
+     CONT_THREAD can be null_ptid for no `Hc' thread, minus_one_ptid for
+     resuming all threads of the process (again, `Hc' isn't used for
+     multi-process), or a specific thread ptid_t.
+
+     We also set this when handling a single-thread `vCont' resume, as
+     some places in the backends check it to know when (and for which
+     thread) single-thread scheduler-locking is in effect.  */
+  ptid_t cont_thread;
+  /* The thread set with an `Hg' packet.  */
+  ptid_t general_thread;
+  int server_waiting;
+  int extended_protocol;
+  int response_needed;
+  int exit_requested;
+  int pass_signals[GDB_SIGNAL_LAST];
+  int program_signals[GDB_SIGNAL_LAST];
+  int program_signals_p;
+  char **program_argv, **wrapper_argv;
+  pid_t signal_pid;
+  struct target_waitstatus last_status;
+  ptid_t last_ptid;
+  char *own_buf;
+  unsigned char *mem_buf;
+};
+
+typedef struct client_state client_state;
+
+client_state * get_client_state ();
 
 #endif /* SERVER_H */

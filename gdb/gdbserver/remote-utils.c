@@ -154,6 +154,7 @@ handle_accept_event (int err, gdb_client_data client_data)
 {
   struct sockaddr_in sockaddr;
   socklen_t tmp;
+  client_state *cs = client_data;
 
   if (debug_threads)
     debug_printf ("handling possible accept event\n");
@@ -179,7 +180,7 @@ handle_accept_event (int err, gdb_client_data client_data)
 				   exits when the remote side dies.  */
 #endif
 
-  if (run_once)
+  if (cs->run_once)
     {
 #ifndef USE_WIN32API
       close (listen_desc);		/* No longer need this */
@@ -199,7 +200,7 @@ handle_accept_event (int err, gdb_client_data client_data)
   enable_async_notification (remote_desc);
 
   /* Register the event loop handler.  */
-  add_file_handler (remote_desc, handle_serial_event, NULL);
+  add_file_handler (remote_desc, handle_serial_event, client_data);
 
   /* We have a new GDB connection now.  If we were disconnected
      tracing, there's a window where the target could report a stop
@@ -283,7 +284,7 @@ remote_prepare (char *name)
    NAME is the filename used for communication.  */
 
 void
-remote_open (char *name)
+remote_open (char *name, gdb_client_data client_data)
 {
   char *port_str;
 
@@ -304,7 +305,7 @@ remote_open (char *name)
       enable_async_notification (remote_desc);
 
       /* Register the event loop handler.  */
-      add_file_handler (remote_desc, handle_serial_event, NULL);
+      add_file_handler (remote_desc, handle_serial_event, client_data);
     }
 #ifndef USE_WIN32API
   else if (port_str == NULL)
@@ -372,7 +373,7 @@ remote_open (char *name)
       enable_async_notification (remote_desc);
 
       /* Register the event loop handler.  */
-      add_file_handler (remote_desc, handle_serial_event, NULL);
+      add_file_handler (remote_desc, handle_serial_event, client_data);
     }
 #endif /* USE_WIN32API */
   else
@@ -392,7 +393,7 @@ remote_open (char *name)
       fflush (stderr);
 
       /* Register the event loop handler.  */
-      add_file_handler (listen_desc, handle_accept_event, NULL);
+      add_file_handler (listen_desc, handle_accept_event, client_data);
     }
 }
 
@@ -507,8 +508,9 @@ char *
 write_ptid (char *buf, ptid_t ptid)
 {
   int pid, tid;
+  client_state *cs = get_client_state();
 
-  if (multi_process)
+  if (cs->multi_process)
     {
       pid = ptid_get_pid (ptid);
       if (pid < 0)
@@ -1065,12 +1067,13 @@ void
 new_thread_notify (int id)
 {
   char own_buf[256];
+  client_state *cs = get_client_state ();
 
   /* The `n' response is not yet part of the remote protocol.  Do nothing.  */
   if (1)
     return;
 
-  if (server_waiting == 0)
+  if (cs->server_waiting == 0)
     return;
 
   sprintf (own_buf, "n%x", id);
@@ -1098,6 +1101,8 @@ void
 prepare_resume_reply (char *buf, ptid_t ptid,
 		      struct target_waitstatus *status)
 {
+  client_state *cs = get_client_state ();
+
   if (debug_threads)
     debug_printf ("Writing resume reply for %s:%d\n",
 		  target_pid_to_str (ptid), status->kind);
@@ -1163,13 +1168,13 @@ prepare_resume_reply (char *buf, ptid_t ptid,
 	       in GDB will claim this event belongs to inferior_ptid
 	       if we do not specify a thread, and there's no way for
 	       gdbserver to know what inferior_ptid is.  */
-	    if (1 || !ptid_equal (general_thread, ptid))
+	    if (1 || !ptid_equal (cs->general_thread, ptid))
 	      {
 		int core = -1;
 		/* In non-stop, don't change the general thread behind
 		   GDB's back.  */
-		if (!non_stop)
-		  general_thread = ptid;
+		if (!cs->non_stop)
+		  cs->general_thread = ptid;
 		sprintf (buf, "thread:");
 		buf += strlen (buf);
 		buf = write_ptid (buf, ptid);
@@ -1200,14 +1205,14 @@ prepare_resume_reply (char *buf, ptid_t ptid,
       }
       break;
     case TARGET_WAITKIND_EXITED:
-      if (multi_process)
+      if (cs->multi_process)
 	sprintf (buf, "W%x;process:%x",
 		 status->value.integer, ptid_get_pid (ptid));
       else
 	sprintf (buf, "W%02x", status->value.integer);
       break;
     case TARGET_WAITKIND_SIGNALLED:
-      if (multi_process)
+      if (cs->multi_process)
 	sprintf (buf, "X%x;process:%x",
 		 status->value.sig, ptid_get_pid (ptid));
       else
