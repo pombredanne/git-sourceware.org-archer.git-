@@ -192,6 +192,7 @@ thread_db_create_event (CORE_ADDR where)
   td_err_e err;
   struct lwp_info *lwp;
   struct thread_db *thread_db = current_process ()->piprivate->thread_db;
+  client_state *cs = get_client_state ();
 
   gdb_assert (thread_db->td_ta_event_getmsg_p != NULL);
 
@@ -210,9 +211,9 @@ thread_db_create_event (CORE_ADDR where)
   /* If we do not know about the main thread yet, this would be a good time to
      find it.  We need to do this to pick up the main thread before any newly
      created threads.  */
-  lwp = get_thread_lwp (current_thread);
+  lwp = get_thread_lwp (cs->current_thread);
   if (lwp->thread_known == 0)
-    find_one_thread (current_thread->entry.id);
+    find_one_thread (cs->current_thread->entry.id);
 
   /* msg.event == TD_EVENT_CREATE */
 
@@ -273,8 +274,9 @@ find_one_thread (ptid_t ptid)
   struct lwp_info *lwp;
   struct thread_db *thread_db = current_process ()->piprivate->thread_db;
   int lwpid = ptid_get_lwp (ptid);
+  client_state *cs = get_client_state ();
 
-  inferior = (struct thread_info *) find_inferior_id (&all_threads, ptid);
+  inferior = (struct thread_info *) find_inferior_id (&cs->all_threads, ptid);
   lwp = get_thread_lwp (inferior);
   if (lwp->thread_known)
     return 1;
@@ -497,6 +499,7 @@ thread_db_get_tls_address (struct thread_info *thread, CORE_ADDR offset,
   struct thread_info *saved_thread;
   struct process_info *proc;
   struct thread_db *thread_db;
+  client_state *cs = get_client_state ();
 
   proc = get_thread_process (thread);
   thread_db = proc->piprivate->thread_db;
@@ -517,8 +520,8 @@ thread_db_get_tls_address (struct thread_info *thread, CORE_ADDR offset,
   if (!lwp->thread_known)
     return TD_NOTHR;
 
-  saved_thread = current_thread;
-  current_thread = thread;
+  saved_thread = cs->current_thread;
+  cs->current_thread = thread;
 
   if (load_module != 0)
     {
@@ -541,7 +544,7 @@ thread_db_get_tls_address (struct thread_info *thread, CORE_ADDR offset,
       addr = (char *) addr + offset;
     }
 
-  current_thread = saved_thread;
+  cs->current_thread = saved_thread;
   if (err == TD_OK)
     {
       *address = (CORE_ADDR) (uintptr_t) addr;
@@ -868,9 +871,10 @@ static void
 switch_to_process (struct process_info *proc)
 {
   int pid = pid_of (proc);
+  client_state *cs = get_client_state ();
 
-  current_thread =
-    (struct thread_info *) find_inferior (&all_threads,
+  cs->current_thread =
+    (struct thread_info *) find_inferior (&cs->all_threads,
 					  any_thread_of, &pid);
 }
 
@@ -879,6 +883,7 @@ switch_to_process (struct process_info *proc)
 static void
 disable_thread_event_reporting (struct process_info *proc)
 {
+  client_state *cs = get_client_state ();
   struct thread_db *thread_db = proc->piprivate->thread_db;
   if (thread_db)
     {
@@ -893,7 +898,7 @@ disable_thread_event_reporting (struct process_info *proc)
 
       if (td_ta_clear_event_p != NULL)
 	{
-	  struct thread_info *saved_thread = current_thread;
+	  struct thread_info *saved_thread = cs->current_thread;
 	  td_thr_events_t events;
 
 	  switch_to_process (proc);
@@ -903,7 +908,7 @@ disable_thread_event_reporting (struct process_info *proc)
 	  td_event_fillset (&events);
 	  (*td_ta_clear_event_p) (thread_db->thread_agent, &events);
 
-	  current_thread = saved_thread;
+	  cs->current_thread = saved_thread;
 	}
     }
 }
@@ -912,17 +917,18 @@ static void
 remove_thread_event_breakpoints (struct process_info *proc)
 {
   struct thread_db *thread_db = proc->piprivate->thread_db;
+  client_state *cs = get_client_state ();
 
   if (thread_db->td_create_bp != NULL)
     {
-      struct thread_info *saved_thread = current_thread;
+      struct thread_info *saved_thread = cs->current_thread;
 
       switch_to_process (proc);
 
       delete_breakpoint (thread_db->td_create_bp);
       thread_db->td_create_bp = NULL;
 
-      current_thread = saved_thread;
+      cs->current_thread = saved_thread;
     }
 }
 

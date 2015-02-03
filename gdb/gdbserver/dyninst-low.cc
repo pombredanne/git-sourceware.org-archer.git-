@@ -359,16 +359,18 @@ void
 dyninst_add_thread(int pid, Thread::const_ptr thread)
 {
   Dyninst::LWP lwp;
+  client_state *cs = get_client_state ();
+
   if (thread != NULL)
     {
       struct thread_info_private *tip = new struct thread_info_private;
       tip->thread = thread;
       lwp = thread->getLWP();
-     current_thread =  add_thread (ptid_build (pid, lwp, 0), tip);
+      cs->current_thread =  add_thread (ptid_build (pid, lwp, 0), tip);
     }
   else
     {
-      current_thread = add_thread (ptid_build (pid, pid, 0), NULL);
+      cs->current_thread = add_thread (ptid_build (pid, pid, 0), NULL);
     }
 }
 
@@ -378,9 +380,11 @@ dyninst_add_thread(int pid, Thread::const_ptr thread)
 static Thread::const_ptr
 dyninst_get_inferior_thread()
 {
-  DEBUG("current_thread=" << current_thread);
-  struct thread_info_private *tip = (struct thread_info_private*)(current_thread->target_data);
-  DEBUG("", pid_to_string (current_thread->entry.id));
+  client_state *cs = get_client_state ();
+
+  DEBUG("current_thread=" << cs->current_thread);
+  struct thread_info_private *tip = (struct thread_info_private*)(cs->current_thread->target_data);
+  DEBUG("", pid_to_string (cs->current_thread->entry.id));
   if (!tip)
     error ("No inferior thread");
   return tip->thread;
@@ -564,13 +568,16 @@ dyninst_attach (unsigned long pid)
 static void
 dyninst_resume (struct thread_resume *resume_info, size_t n)
 {
+  client_state *cs = get_client_state ();
+
+
   for (int i = 0; i < (int)n; i++)
     {
       DEBUG("",pid_to_string(resume_info[i].thread));
       ptid_t ptid = resume_info[i].thread;
 
       if (ptid_equal (ptid, minus_one_ptid))
-	ptid = thread_to_gdb_id (current_thread);
+	ptid = thread_to_gdb_id (cs->current_thread);
 
       Dyninst::PID pid = ptid_get_pid (ptid);
       ProcessSet::iterator procset_it = dyninst_procset->find(pid);
@@ -657,8 +664,10 @@ dyninst_continue (ptid_t ptid)
 bool
 in_step_range ()
 {
-  struct thread_info_private *tip = (struct thread_info_private*)(current_thread->target_data);
-  struct regcache *regcache = get_thread_regcache (current_thread, 1);
+  client_state *cs = get_client_state ();
+
+  struct thread_info_private *tip = (struct thread_info_private*)(cs->current_thread->target_data);
+  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
   CORE_ADDR pc = (*the_low_target.get_pc) (regcache);
 
   return (pc >= tip->step_range_start && pc < tip->step_range_end);
@@ -673,6 +682,7 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
   ptid_t new_ptid = ptid;
   Dyninst::PID pid = ptid.pid;
   bool thread_created = false;
+  client_state *cs = get_client_state ();
 
   DEBUG("", pid_to_string (ptid));
 
@@ -768,8 +778,8 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
       break;
     }
 
-  DEBUG("returning", pid_to_string (ptid_of(current_thread)));
-  return ptid_of (current_thread);
+  DEBUG("returning", pid_to_string (ptid_of(cs->current_thread)));
+  return ptid_of (cs->current_thread);
 //  return new_ptid;
 }
 
@@ -1028,7 +1038,9 @@ dyninst_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
 static void
 dyninst_request_interrupt (void)
 {
-  Dyninst::PID pid = ptid_get_pid (thread_to_gdb_id (current_thread));
+  client_state *cs = get_client_state ();
+
+  Dyninst::PID pid = ptid_get_pid (thread_to_gdb_id (cs->current_thread));
   ProcessSet::iterator procset_it = dyninst_procset->find(pid);
   Process::ptr dyninst_process = *procset_it;
 
@@ -1045,7 +1057,8 @@ dyninst_read_auxv (CORE_ADDR offset, unsigned char *myaddr, unsigned int len)
 {
   char filename[PATH_MAX];
   int fd, n;
-  int pid = lwpid_of (current_thread);
+  client_state *cs = get_client_state ();
+  int pid = lwpid_of (cs->current_thread);
 
   xsnprintf (filename, sizeof filename, "/proc/%d/auxv", pid);
 

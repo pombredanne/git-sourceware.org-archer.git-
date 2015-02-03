@@ -195,8 +195,9 @@ thread_rec (ptid_t ptid, int get_context)
 {
   struct thread_info *thread;
   win32_thread_info *th;
+  client_state *cs = get_client_state ();
 
-  thread = (struct thread_info *) find_inferior_id (&all_threads, ptid);
+  thread = (struct thread_info *) find_inferior_id (&cs->all_threads, ptid);
   if (thread == NULL)
     return NULL;
 
@@ -246,13 +247,14 @@ child_delete_thread (DWORD pid, DWORD tid)
 {
   struct inferior_list_entry *thread;
   ptid_t ptid;
+  client_state *cs = get_client_state ();
 
   /* If the last thread is exiting, just return.  */
-  if (one_inferior_p (&all_threads))
+  if (one_inferior_p (&cs->all_threads))
     return;
 
   ptid = ptid_build (pid, tid, 0);
-  thread = find_inferior_id (&all_threads, ptid);
+  thread = find_inferior_id (&cs->all_threads, ptid);
   if (thread == NULL)
     return;
 
@@ -346,7 +348,9 @@ child_xfer_memory (CORE_ADDR memaddr, char *our, int len,
 static void
 child_init_thread_list (void)
 {
-  for_each_inferior (&all_threads, delete_thread_info);
+  client_state *cs = get_client_state ();
+
+  for_each_inferior (&cs->all_threads, delete_thread_info);
 }
 
 /* Zero during the child initialization phase, and nonzero otherwise.  */
@@ -464,9 +468,11 @@ continue_one_thread (struct inferior_list_entry *this_thread, void *id_ptr)
 static BOOL
 child_continue (DWORD continue_status, int thread_id)
 {
+  client_state *cs = get_client_state ();
+
   /* The inferior will only continue after the ContinueDebugEvent
      call.  */
-  find_inferior (&all_threads, continue_one_thread, &thread_id);
+  find_inferior (&cs->all_threads, continue_one_thread, &thread_id);
   faked_breakpoint = 0;
 
   if (!ContinueDebugEvent (current_event.dwProcessId,
@@ -795,10 +801,12 @@ handle_output_debug_string (struct target_waitstatus *ourstatus)
 static void
 win32_clear_inferiors (void)
 {
+  client_state *cs = get_client_state ();
+
   if (current_process_handle != NULL)
     CloseHandle (current_process_handle);
 
-  for_each_inferior (&all_threads, delete_thread_info);
+  for_each_inferior (&cs->all_threads, delete_thread_info);
   clear_inferiors ();
 }
 
@@ -895,10 +903,11 @@ static int
 win32_thread_alive (ptid_t ptid)
 {
   int res;
+  client_state *cs = get_client_state ();
 
   /* Our thread list is reliable; don't bother to poll target
      threads.  */
-  if (find_inferior_id (&all_threads, ptid) != NULL)
+  if (find_inferior_id (&cs->all_threads, ptid) != NULL)
     res = 1;
   else
     res = 0;
@@ -1365,6 +1374,8 @@ suspend_one_thread (struct inferior_list_entry *entry)
 static void
 fake_breakpoint_event (void)
 {
+  client_state *cs = get_client_state ();
+
   OUTMSG2(("fake_breakpoint_event\n"));
 
   faked_breakpoint = 1;
@@ -1375,7 +1386,7 @@ fake_breakpoint_event (void)
   current_event.u.Exception.ExceptionRecord.ExceptionCode
     = EXCEPTION_BREAKPOINT;
 
-  for_each_inferior (&all_threads, suspend_one_thread);
+  for_each_inferior (&cs->all_threads, suspend_one_thread);
 }
 
 #ifdef _WIN32_WCE
@@ -1392,6 +1403,7 @@ static int
 get_child_debug_event (struct target_waitstatus *ourstatus)
 {
   ptid_t ptid;
+  client_state *cs = get_client_state ();
 
   last_sig = GDB_SIGNAL_0;
   ourstatus->kind = TARGET_WAITKIND_SPURIOUS;
@@ -1485,7 +1497,7 @@ get_child_debug_event (struct target_waitstatus *ourstatus)
       child_delete_thread (current_event.dwProcessId,
 			   current_event.dwThreadId);
 
-      current_thread = (struct thread_info *) all_threads.head;
+      cs->current_thread = (struct thread_info *) cs->all_threads.head;
       return 1;
 
     case CREATE_PROCESS_DEBUG_EVENT:
@@ -1587,8 +1599,8 @@ get_child_debug_event (struct target_waitstatus *ourstatus)
     }
 
   ptid = debug_event_ptid (&current_event);
-  current_thread =
-    (struct thread_info *) find_inferior_id (&all_threads, ptid);
+  cs->current_thread =
+    (struct thread_info *) find_inferior_id (&cs->all_threads, ptid);
   return 1;
 }
 
@@ -1599,6 +1611,7 @@ static ptid_t
 win32_wait (ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 {
   struct regcache *regcache;
+  client_state *cs = get_client_state ();
 
   if (cached_status.kind != TARGET_WAITKIND_IGNORE)
     {
@@ -1628,7 +1641,7 @@ win32_wait (ptid_t ptid, struct target_waitstatus *ourstatus, int options)
 	  OUTMSG2 (("Child Stopped with signal = %d \n",
 		    ourstatus->value.sig));
 
-	  regcache = get_thread_regcache (current_thread, 1);
+	  regcache = get_thread_regcache (cs->current_thread, 1);
 	  child_fetch_inferior_registers (regcache, -1);
 	  return debug_event_ptid (&current_event);
 	default:

@@ -127,7 +127,8 @@ static CORE_ADDR
 nios2_reinsert_addr (void)
 {
   union nios2_register ra;
-  struct regcache *regcache = get_thread_regcache (current_thread, 1);
+  client_state *cs = get_client_state ();
+  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
 
   collect_register_by_name (regcache, "ra", ra.buf);
   return ra.reg32;

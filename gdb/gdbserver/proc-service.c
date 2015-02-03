@@ -103,18 +103,19 @@ ps_lgetregs (gdb_ps_prochandle_t ph, lwpid_t lwpid, prgregset_t gregset)
   struct lwp_info *lwp;
   struct thread_info *reg_thread, *saved_thread;
   struct regcache *regcache;
+  client_state *cs = get_client_state ();
 
   lwp = find_lwp_pid (pid_to_ptid (lwpid));
   if (lwp == NULL)
     return PS_ERR;
 
   reg_thread = get_lwp_thread (lwp);
-  saved_thread = current_thread;
-  current_thread = reg_thread;
-  regcache = get_thread_regcache (current_thread, 1);
+  saved_thread = cs->current_thread;
+  cs->current_thread = reg_thread;
+  regcache = get_thread_regcache (cs->current_thread, 1);
   gregset_info ()->fill_function (regcache, gregset);
 
-  current_thread = saved_thread;
+  cs->current_thread = saved_thread;
   return PS_OK;
 #else
   return PS_ERR;
@@ -157,5 +158,7 @@ ps_lsetfpregs (gdb_ps_prochandle_t ph, lwpid_t lwpid, void *fpregset)
 pid_t
 ps_getpid (gdb_ps_prochandle_t ph)
 {
-  return pid_of (current_thread);
+  client_state *cs = get_client_state ();
+
+  return pid_of (cs->current_thread);
 }

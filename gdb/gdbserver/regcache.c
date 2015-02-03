@@ -27,6 +27,7 @@ struct regcache *
 get_thread_regcache (struct thread_info *thread, int fetch)
 {
   struct regcache *regcache;
+  client_state *cs = get_client_state ();
 
   regcache = (struct regcache *) inferior_regcache_data (thread);
 
@@ -49,11 +50,11 @@ get_thread_regcache (struct thread_info *thread, int fetch)
 
   if (fetch && regcache->registers_valid == 0)
     {
-      struct thread_info *saved_thread = current_thread;
+      struct thread_info *saved_thread = cs->current_thread;
 
-      current_thread = thread;
+      cs->current_thread = thread;
       fetch_inferior_registers (regcache, -1);
-      current_thread = saved_thread;
+      cs->current_thread = saved_thread;
       regcache->registers_valid = 1;
     }
 
@@ -72,6 +73,7 @@ void
 regcache_invalidate_thread (struct thread_info *thread)
 {
   struct regcache *regcache;
+  client_state *cs = get_client_state ();
 
   regcache = (struct regcache *) inferior_regcache_data (thread);
 
@@ -80,11 +82,11 @@ regcache_invalidate_thread (struct thread_info *thread)
 
   if (regcache->registers_valid)
     {
-      struct thread_info *saved_thread = current_thread;
+      struct thread_info *saved_thread = cs->current_thread;
 
-      current_thread = thread;
+      cs->current_thread = thread;
       store_inferior_registers (regcache, -1);
-      current_thread = saved_thread;
+      cs->current_thread = saved_thread;
     }
 
   regcache->registers_valid = 0;
@@ -107,10 +109,11 @@ regcache_invalidate_one (struct inferior_list_entry *entry,
 void
 regcache_invalidate (void)
 {
+  client_state *cs = get_client_state ();
   /* Only update the threads of the current process.  */
-  int pid = ptid_get_pid (current_thread->entry.id);
+  int pid = ptid_get_pid (cs->current_thread->entry.id);
 
-  find_inferior (&all_threads, regcache_invalidate_one, &pid);
+  find_inferior (&cs->all_threads, regcache_invalidate_one, &pid);
 }
 
 #endif
@@ -296,8 +299,10 @@ free_register_cache_thread_one (struct inferior_list_entry *entry)
 void
 regcache_release (void)
 {
+  client_state *cs = get_client_state ();
+
   /* Flush and release all pre-existing register caches.  */
-  for_each_inferior (&all_threads, free_register_cache_thread_one);
+  for_each_inferior (&cs->all_threads, free_register_cache_thread_one);
 }
 #endif
 

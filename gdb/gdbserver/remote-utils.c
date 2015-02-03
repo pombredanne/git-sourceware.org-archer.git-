@@ -87,7 +87,7 @@ enum {
    Either NOT_SCHEDULED or the callback id.  */
 static int readchar_callback = NOT_SCHEDULED;
 
-static int readchar (void);
+static int readchar (gdb_fildes_t);
 static void reset_readchar (void);
 static void reschedule (void);
 
@@ -122,6 +122,18 @@ int transport_is_reliable = 0;
 #endif
 
 int
+get_remote_desc ()
+{
+  return remote_desc;
+}
+
+int
+get_listen_desc ()
+{
+  return listen_desc;
+}
+
+int
 gdb_connected (void)
 {
   return remote_desc != INVALID_DESCRIPTOR;
@@ -149,20 +161,25 @@ enable_async_notification (int fd)
 #endif
 }
 
-static int
+int
 handle_accept_event (int err, gdb_client_data client_data)
 {
   struct sockaddr_in sockaddr;
   socklen_t tmp;
-  client_state *cs = client_data;
+  client_state *cs = get_client_state();
 
   if (debug_threads)
     debug_printf ("handling possible accept event\n");
 
+  noack_mode = 0;
   tmp = sizeof (sockaddr);
+  if (debug_threads)
+    fprintf(stderr,"%s before accept %d\n",__FUNCTION__,listen_desc);
   remote_desc = accept (listen_desc, (struct sockaddr *) &sockaddr, &tmp);
   if (remote_desc == -1)
     perror_with_name ("Accept failed");
+
+  set_client_state (remote_desc);
 
   /* Enable TCP keep alive process. */
   tmp = 1;
@@ -180,7 +197,7 @@ handle_accept_event (int err, gdb_client_data client_data)
 				   exits when the remote side dies.  */
 #endif
 
-  if (cs->run_once)
+  if (0 && cs->run_once)
     {
 #ifndef USE_WIN32API
       close (listen_desc);		/* No longer need this */
@@ -191,7 +208,7 @@ handle_accept_event (int err, gdb_client_data client_data)
 
   /* Even if !RUN_ONCE no longer notice new connections.  Still keep the
      descriptor open for add_file_handler to wait for a new connection.  */
-  delete_file_handler (listen_desc);
+//  delete_file_handler (listen_desc);
 
   /* Convert IP address to string.  */
   fprintf (stderr, "Remote debugging from host %s\n",
@@ -200,7 +217,7 @@ handle_accept_event (int err, gdb_client_data client_data)
   enable_async_notification (remote_desc);
 
   /* Register the event loop handler.  */
-  add_file_handler (remote_desc, handle_serial_event, client_data);
+  add_file_handler (remote_desc, handle_serial_event, get_client_state());
 
   /* We have a new GDB connection now.  If we were disconnected
      tracing, there's a window where the target could report a stop
@@ -588,12 +605,17 @@ read_ptid (char *buf, char **obuf)
    This may return less than COUNT.  */
 
 static int
-write_prim (const void *buf, int count)
+write_prim (gdb_fildes_t fd, const void *buf, int count)
 {
+  if (debug_threads)
+    {
+      client_state *cs = get_client_state(0);
+      printf ("%s %d %.*s\n", __FUNCTION__,cs->file_desc, count, (char*)buf);
+    }
   if (remote_connection_is_stdio ())
     return write (fileno (stdout), buf, count);
   else
-    return write (remote_desc, buf, count);
+    return write (fd, buf, count);
 }
 
 /* Read COUNT bytes from the client and store in BUF.
@@ -601,12 +623,17 @@ write_prim (const void *buf, int count)
    This may return less than COUNT.  */
 
 static int
-read_prim (void *buf, int count)
+read_prim (gdb_fildes_t fd, void *buf, int count)
 {
+  if (debug_threads)
+    {
+      client_state *cs = get_client_state(0);
+      printf ("%s %d %.*s\n", __FUNCTION__,cs->file_desc, count, (char*)buf);
+    }
   if (remote_connection_is_stdio ())
     return read (fileno (stdin), buf, count);
   else
-    return read (remote_desc, buf, count);
+    return read (fd /*remote_desc*/, buf, count);
 }
 
 /* Send a packet to the remote machine, with error checking.
@@ -621,6 +648,8 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
   char *buf2;
   char *p;
   int cc;
+  client_state *cs = get_client_state();
+
 
   buf2 = xmalloc (strlen ("$") + cnt + strlen ("#nn") + 1);
 
@@ -646,7 +675,7 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
 
   do
     {
-      if (write_prim (buf2, p - buf2) != p - buf2)
+      if (write_prim (cs->file_desc, buf2, p - buf2) != p - buf2)
 	{
 	  perror ("putpkt(write)");
 	  free (buf2);
@@ -673,7 +702,7 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
 	  fflush (stderr);
 	}
 
-      cc = readchar ();
+      cc = readchar (remote_desc);
 
       if (cc < 0)
 	{
@@ -688,7 +717,7 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
 	}
 
       /* Check for an input interrupt while we're here.  */
-      if (cc == '\003' && current_thread != NULL)
+      if (cc == '\003' && cs->current_thread != NULL)
 	(*the_target->request_interrupt) ();
     }
   while (cc != '+');
@@ -730,6 +759,7 @@ input_interrupt (int unused)
 {
   fd_set readset;
   struct timeval immediate = { 0, 0 };
+  client_state *cs = get_client_state ();
 
   /* Protect against spurious interrupts.  This has been observed to
      be a problem under NetBSD 1.4 and 1.5.  */
@@ -741,9 +771,9 @@ input_interrupt (int unused)
       int cc;
       char c = 0;
 
-      cc = read_prim (&c, 1);
+      cc = read_prim (remote_desc, &c, 1);
 
-      if (cc != 1 || c != '\003' || current_thread == NULL)
+      if (cc != 1 || c != '\003' || cs->current_thread == NULL)
 	{
 	  fprintf (stderr, "input_interrupt, count = %d c = %d ('%c')\n",
 		   cc, c, c);
@@ -856,24 +886,26 @@ initialize_async_io (void)
    These are global to readchar because reschedule_remote needs to be
    able to tell whether the buffer is empty.  */
 
-static unsigned char readchar_buf[BUFSIZ];
-static int readchar_bufcnt = 0;
-static unsigned char *readchar_bufp;
+// static unsigned char readchar_buf[BUFSIZ];
+// static int readchar_bufcnt = 0;
+// static unsigned char *readchar_bufp;
 
 /* Returns next char from remote GDB.  -1 if error.  */
 
 static int
-readchar (void)
+readchar (gdb_fildes_t fd)
 {
   int ch;
+  client_state *cs = get_client_state();
 
-  if (readchar_bufcnt == 0)
+  if (cs->readchar_bufcnt == 0)
     {
-      readchar_bufcnt = read_prim (readchar_buf, sizeof (readchar_buf));
+      cs->readchar_bufcnt = read_prim (fd, cs->readchar_buf, sizeof (cs->readchar_buf));
 
-      if (readchar_bufcnt <= 0)
+
+      if (cs->readchar_bufcnt <= 0)
 	{
-	  if (readchar_bufcnt == 0)
+	  if (cs->readchar_bufcnt == 0)
 	    fprintf (stderr, "readchar: Got EOF\n");
 	  else
 	    perror ("readchar");
@@ -881,11 +913,11 @@ readchar (void)
 	  return -1;
 	}
 
-      readchar_bufp = readchar_buf;
+      cs->readchar_bufp = cs->readchar_buf;
     }
 
-  readchar_bufcnt--;
-  ch = *readchar_bufp++;
+  cs->readchar_bufcnt--;
+  ch = *cs->readchar_bufp++;
   reschedule ();
   return ch;
 }
@@ -895,7 +927,9 @@ readchar (void)
 static void
 reset_readchar (void)
 {
-  readchar_bufcnt = 0;
+  client_state *cs = get_client_state();
+
+  cs->readchar_bufcnt = 0;
   if (readchar_callback != NOT_SCHEDULED)
     {
       delete_callback_event (readchar_callback);
@@ -903,17 +937,18 @@ reset_readchar (void)
     }
 }
 
-/* Process remaining data in readchar_buf.  */
+/* Process remaining data in cs->readchar_buf.  */
 
 static int
 process_remaining (void *context)
 {
   int res;
+  client_state *cs = get_client_state();
 
   /* This is a one-shot event.  */
   readchar_callback = NOT_SCHEDULED;
 
-  if (readchar_bufcnt > 0)
+  if (cs->readchar_bufcnt > 0)
     res = handle_serial_event (0, NULL);
   else
     res = 0;
@@ -927,7 +962,8 @@ process_remaining (void *context)
 static void
 reschedule (void)
 {
-  if (readchar_bufcnt > 0 && readchar_callback == NOT_SCHEDULED)
+  client_state *cs = get_client_state();
+  if (cs->readchar_bufcnt > 0 && readchar_callback == NOT_SCHEDULED)
     readchar_callback = append_callback_event (process_remaining, NULL);
 }
 
@@ -935,7 +971,7 @@ reschedule (void)
    and store it in BUF.  Returns length of packet, or negative if error. */
 
 int
-getpkt (char *buf)
+getpkt (gdb_fildes_t fd, char *buf)
 {
   char *bp;
   unsigned char csum, c1, c2;
@@ -947,7 +983,7 @@ getpkt (char *buf)
 
       while (1)
 	{
-	  c = readchar ();
+	  c = readchar (fd);
 	  if (c == '$')
 	    break;
 	  if (remote_debug)
@@ -963,7 +999,7 @@ getpkt (char *buf)
       bp = buf;
       while (1)
 	{
-	  c = readchar ();
+	  c = readchar (fd);
 	  if (c < 0)
 	    return -1;
 	  if (c == '#')
@@ -973,8 +1009,8 @@ getpkt (char *buf)
 	}
       *bp = 0;
 
-      c1 = fromhex (readchar ());
-      c2 = fromhex (readchar ());
+      c1 = fromhex (readchar (fd));
+      c2 = fromhex (readchar(fd));
 
       if (csum == (c1 << 4) + c2)
 	break;
@@ -991,7 +1027,7 @@ getpkt (char *buf)
 
       fprintf (stderr, "Bad checksum, sentsum=0x%x, csum=0x%x, buf=%s\n",
 	       (c1 << 4) + c2, csum, buf);
-      if (write_prim ("-", 1) != 1)
+      if (write_prim (fd, "-", 1) != 1)
 	return -1;
     }
 
@@ -1003,7 +1039,7 @@ getpkt (char *buf)
 	  fflush (stderr);
 	}
 
-      if (write_prim ("+", 1) != 1)
+      if (write_prim (fd, "+", 1) != 1)
 	return -1;
 
       if (remote_debug)
@@ -1118,13 +1154,13 @@ prepare_resume_reply (char *buf, ptid_t ptid,
 	sprintf (buf, "T%02x", status->value.sig);
 	buf += strlen (buf);
 
-	saved_thread = current_thread;
+	saved_thread = cs->current_thread;
 
-	current_thread = find_thread_ptid (ptid);
+	cs->current_thread = find_thread_ptid (ptid);
 
 	regp = current_target_desc ()->expedite_regs;
 
-	regcache = get_thread_regcache (current_thread, 1);
+	regcache = get_thread_regcache (cs->current_thread, 1);
 
 	if (the_target->stopped_by_watchpoint != NULL
 	    && (*the_target->stopped_by_watchpoint) ())
@@ -1201,7 +1237,7 @@ prepare_resume_reply (char *buf, ptid_t ptid,
 	    dlls_changed = 0;
 	  }
 
-	current_thread = saved_thread;
+	cs->current_thread = saved_thread;
       }
       break;
     case TARGET_WAITKIND_EXITED:
@@ -1404,7 +1440,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
     return -1;
 
   /* FIXME:  Eventually add buffer overflow checking (to getpkt?)  */
-  len = getpkt (own_buf);
+  len = getpkt (remote_desc, own_buf);
   if (len < 0)
     return -1;
 
@@ -1428,7 +1464,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
       free (mem_buf);
       if (putpkt (own_buf) < 0)
 	return -1;
-      len = getpkt (own_buf);
+      len = getpkt (remote_desc, own_buf);
       if (len < 0)
 	return -1;
     }
@@ -1487,7 +1523,7 @@ relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
     return -1;
 
   /* FIXME:  Eventually add buffer overflow checking (to getpkt?)  */
-  len = getpkt (own_buf);
+  len = getpkt (remote_desc, own_buf);
   if (len < 0)
     return -1;
 
@@ -1530,7 +1566,7 @@ relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
       free (mem_buf);
       if (putpkt (own_buf) < 0)
 	return -1;
-      len = getpkt (own_buf);
+      len = getpkt (remote_desc, own_buf);
       if (len < 0)
 	return -1;
     }

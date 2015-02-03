@@ -60,7 +60,7 @@ int disable_packet_Tthread;
 int disable_packet_qC;
 int disable_packet_qfThreadInfo;
 
-/* A sub-class of 'struct notif_event' for stop, holding information
+/* a sub-class of 'struct notif_event' for stop, holding information
    relative to a single stop reply.  We keep a queue of these to
    push to GDB in non-stop mode.  */
 
@@ -77,38 +77,84 @@ struct vstop_notif
 
 DEFINE_QUEUE_P (notif_event_p);
 
-/* This data could be associated with each client, but for now it is
-   static.  */
-
-client_state *
-set_client_state (client_state *cs)
-{
-  static client_state *client_state;
-
-  if (cs != NULL)
-    client_state = cs;
-
-  return client_state;
-}
-
-client_state *
-get_client_state (void)
-{
-  return set_client_state (NULL);
-}
-
 /* Allocate a new struct remote_state with xmalloc, initialize it, and
    return it.  */
 
 static client_state *
-new_client_state (void)
+new_client_state ()
 {
   client_state *result = XCNEW (client_state);
 
   return result;
 }
 
-/* Put a stop reply to the stop reply queue.  */
+
+client_state *
+set_client_state (gdb_fildes_t fd)
+{
+/* States:
+ * fd = -1 add/return initial client state
+ * fd =  F add/return client state for fd F
+ * fd =  0 return client state for current fd
+  */
+
+  static gdb_fildes_t current_fd;
+  static client_state *first_client_state;
+  client_state *csidx;
+  client_state *new_csidx;
+
+  // add/return initial client state
+  if (fd == -1)
+    {
+      if (first_client_state == NULL)
+	{
+	  first_client_state = new_client_state ();
+	  first_client_state->file_desc = fd;
+	  current_fd = fd;
+	}
+      return first_client_state;
+    }
+
+
+  // return client state for current fd
+
+  if (fd == 0)
+    fd = current_fd;
+
+  // add/return client state for fd F
+
+  for (csidx = first_client_state; ; csidx = csidx->next)
+    {
+      if (csidx->file_desc == fd)
+	{
+	  current_fd = fd;
+	  return csidx;
+	}
+      else if (csidx->file_desc > fd)
+	break;
+      else if (csidx->next == NULL)
+	break;
+    }
+
+  // add client state S for fd F
+  new_csidx = new_client_state ();
+  *new_csidx = *csidx;
+  new_csidx->file_desc = fd;
+  current_fd = fd;
+  csidx->next = new_csidx;
+  return new_csidx;
+}
+
+int get_remote_desc();
+
+client_state *
+get_client_state (void)
+{
+  return set_client_state (0);
+}
+
+
+/* Post a stop reply to the stop reply queue.  */
 
 static void
 queue_stop_reply (ptid_t ptid, struct target_waitstatus *status)
@@ -249,8 +295,8 @@ start_inferior (char **argv)
 	  if (cs->last_status.kind != TARGET_WAITKIND_STOPPED)
 	    return cs->signal_pid;
 
-	  current_thread->last_resume_kind = resume_stop;
-	  current_thread->last_status = cs->last_status;
+	  cs->current_thread->last_resume_kind = resume_stop;
+	  cs->current_thread->last_status = cs->last_status;
 	}
       while (cs->last_status.value.sig != GDB_SIGNAL_TRAP);
 
@@ -264,8 +310,8 @@ start_inferior (char **argv)
   if (cs->last_status.kind != TARGET_WAITKIND_EXITED
       && cs->last_status.kind != TARGET_WAITKIND_SIGNALLED)
     {
-      current_thread->last_resume_kind = resume_stop;
-      current_thread->last_status = cs->last_status;
+      cs->current_thread->last_resume_kind = resume_stop;
+      cs->current_thread->last_status = cs->last_status;
     }
 
   return cs->signal_pid;
@@ -305,8 +351,8 @@ attach_inferior (int pid)
 	  && cs->last_status.value.sig == GDB_SIGNAL_STOP)
 	cs->last_status.value.sig = GDB_SIGNAL_TRAP;
 
-      current_thread->last_resume_kind = resume_stop;
-      current_thread->last_status = cs->last_status;
+      cs->current_thread->last_resume_kind = resume_stop;
+      cs->current_thread->last_status = cs->last_status;
     }
 
   return 0;
@@ -1319,9 +1365,11 @@ handle_qxfer_threads_worker (struct inferior_list_entry *inf, void *arg)
 static void
 handle_qxfer_threads_proper (struct buffer *buffer)
 {
+  client_state *cs = get_client_state ();
+
   buffer_grow_str (buffer, "<threads>\n");
 
-  for_each_inferior_with_data (&all_threads, handle_qxfer_threads_worker,
+  for_each_inferior_with_data (&cs->all_threads, handle_qxfer_threads_worker,
 			       buffer);
 
   buffer_grow_str0 (buffer, "</threads>\n");
@@ -1699,7 +1747,8 @@ void
 handle_query (char *own_buf, int packet_len, int *new_packet_len_p, gdb_client_data client_data)
 {
   static struct inferior_list_entry *thread_ptr;
-  client_state *cs = client_data;
+//  client_state *cs = client_data;
+  client_state *cs = get_client_state();
 
   /* Reply the current thread id.  */
   if (strcmp ("qC", own_buf) == 0 && !disable_packet_qC)
@@ -1712,7 +1761,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p, gdb_client_d
 	gdb_id = cs->general_thread;
       else
 	{
-	  thread_ptr = get_first_inferior (&all_threads);
+	  thread_ptr = get_first_inferior (&cs->all_threads);
 	  gdb_id = thread_to_gdb_id ((struct thread_info *)thread_ptr);
 	}
 
@@ -1753,7 +1802,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p, gdb_client_d
 	  ptid_t gdb_id;
 
 	  require_running (own_buf);
-	  thread_ptr = get_first_inferior (&all_threads);
+	  thread_ptr = get_first_inferior (&cs->all_threads);
 
 	  *own_buf++ = 'm';
 	  gdb_id = thread_to_gdb_id ((struct thread_info *)thread_ptr);
@@ -2072,7 +2121,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p, gdb_client_d
 	{
 	  int pid = strtoul (own_buf + sizeof ("qAttached:") - 1, NULL, 16);
 	  process = (struct process_info *)
-	    find_inferior_id (&all_processes, pid_to_ptid (pid));
+	    find_inferior_id (&cs->all_processes, pid_to_ptid (pid));
 	}
       else
 	{
@@ -2339,7 +2388,7 @@ resume (struct thread_resume *actions, size_t num_actions)
       data.actions = actions;
       data.num_actions = num_actions;
       data.callback = handle_pending_status;
-      if (find_inferior (&all_threads, visit_actioned_threads, &data) != NULL)
+      if (find_inferior (&cs->all_threads, visit_actioned_threads, &data) != NULL)
 	return;
 
       enable_async_io ();
@@ -2365,7 +2414,7 @@ resume (struct thread_resume *actions, size_t num_actions)
       if (cs->last_status.kind != TARGET_WAITKIND_EXITED
           && cs->last_status.kind != TARGET_WAITKIND_SIGNALLED
 	  && cs->last_status.kind != TARGET_WAITKIND_NO_RESUMED)
-	current_thread->last_status = cs->last_status;
+	cs->current_thread->last_status = cs->last_status;
 
       /* From the client's perspective, all-stop mode always stops all
 	 threads implicitly (and the target backend has already done
@@ -2722,7 +2771,9 @@ gdb_wants_thread_stopped (struct inferior_list_entry *entry)
 static void
 gdb_wants_all_threads_stopped (void)
 {
-  for_each_inferior (&all_threads, gdb_wants_thread_stopped);
+  client_state *cs = get_client_state ();
+
+  for_each_inferior (&cs->all_threads, gdb_wants_thread_stopped);
 }
 
 /* Clear the gdb_detached flag of every process.  */
@@ -2785,7 +2836,7 @@ handle_status (char *own_buf)
   client_state *cs = get_client_state ();
 
   /* GDB is connected, don't forward events to the target anymore.  */
-  for_each_inferior (&all_processes, gdb_reattached_process);
+  for_each_inferior (&cs->all_processes, gdb_reattached_process);
 
   /* In non-stop mode, we must send a stop reply for each stopped
      thread.  In all-stop mode, just send one for the first stopped
@@ -2793,7 +2844,7 @@ handle_status (char *own_buf)
 
   if (cs->non_stop)
     {
-      find_inferior (&all_threads, queue_stop_reply_callback, NULL);
+      find_inferior (&cs->all_threads, queue_stop_reply_callback, NULL);
 
       /* The first is sent immediately.  OK is sent if there is no
 	 stopped thread, which is the same handling of the vStopped
@@ -2814,25 +2865,25 @@ handle_status (char *own_buf)
 	 reporting now pending.  They'll be reported the next time the
 	 threads are resumed.  Start by marking all interesting events
 	 as pending.  */
-      for_each_inferior (&all_threads, set_pending_status_callback);
+      for_each_inferior (&cs->all_threads, set_pending_status_callback);
 
       /* Prefer the last thread that reported an event to GDB (even if
 	 that was a GDB_SIGNAL_TRAP).  */
       if (cs->last_status.kind != TARGET_WAITKIND_IGNORE
 	  && cs->last_status.kind != TARGET_WAITKIND_EXITED
 	  && cs->last_status.kind != TARGET_WAITKIND_SIGNALLED)
-	thread = find_inferior_id (&all_threads, cs->last_ptid);
+	thread = find_inferior_id (&cs->all_threads, cs->last_ptid);
 
       /* If the last event thread is not found for some reason, look
 	 for some other thread that might have an event to report.  */
       if (thread == NULL)
-	thread = find_inferior (&all_threads,
+	thread = find_inferior (&cs->all_threads,
 				find_status_pending_thread_callback, NULL);
 
       /* If we're still out of luck, simply pick the first thread in
 	 the thread list.  */
       if (thread == NULL)
-	thread = get_first_inferior (&all_threads);
+	thread = get_first_inferior (&cs->all_threads);
 
       if (thread != NULL)
 	{
@@ -2990,6 +3041,8 @@ print_attached_pid (struct inferior_list_entry *entry)
 static void
 detach_or_kill_for_exit (void)
 {
+  client_state *cs = get_client_state ();
+
   /* First print a list of the inferiors we will be killing/detaching.
      This is to assist the user, for example, in case the inferior unexpectedly
      dies after we exit: did we screw up or did the inferior exit on its own?
@@ -2998,19 +3051,19 @@ detach_or_kill_for_exit (void)
   if (have_started_inferiors_p ())
     {
       fprintf (stderr, "Killing process(es):");
-      for_each_inferior (&all_processes, print_started_pid);
+      for_each_inferior (&cs->all_processes, print_started_pid);
       fprintf (stderr, "\n");
     }
   if (have_attached_inferiors_p ())
     {
       fprintf (stderr, "Detaching process(es):");
-      for_each_inferior (&all_processes, print_attached_pid);
+      for_each_inferior (&cs->all_processes, print_attached_pid);
       fprintf (stderr, "\n");
     }
 
   /* Now we can kill or detach the inferiors.  */
 
-  for_each_inferior (&all_processes, detach_or_kill_inferior_callback);
+  for_each_inferior (&cs->all_processes, detach_or_kill_inferior_callback);
 }
 
 /* Value that will be passed to exit(3) when gdbserver exits.  */
@@ -3049,10 +3102,11 @@ captured_main (int argc, char *argv[])
   volatile int multi_mode = 0;
   volatile int attach = 0;
   int was_running;
-  int run_once;
+  int run_once = 0;
   int disable_randomization = 1;
-  client_state *cs = new_client_state();
-  set_client_state (cs);
+
+  int remote_desc = get_remote_desc();
+  client_state *cs = set_client_state (remote_desc);
 
   while (*next_arg != NULL && **next_arg == '-')
     {
@@ -3310,7 +3364,7 @@ captured_main (int argc, char *argv[])
 	     (by the same GDB instance or another) will refresh all its
 	     state from scratch.  */
 	  discard_queued_stop_replies (-1);
-	  for_each_inferior (&all_threads,
+	  for_each_inferior (&cs->all_threads,
 			     clear_pending_status_callback);
 
 	  if (tracing)
@@ -3469,7 +3523,7 @@ process_serial_event (gdb_client_data client_data)
   disable_async_io ();
 
   cs->response_needed = 0;
-  packet_len = getpkt (cs->own_buf);
+  packet_len = getpkt (cs->file_desc, cs->own_buf);
   if (packet_len <= 0)
     {
       remote_close ();
@@ -3562,7 +3616,7 @@ process_serial_event (gdb_client_data client_data)
 	      cs->last_status.value.integer = 0;
 	      cs->last_ptid = pid_to_ptid (pid);
 
-	      current_thread = NULL;
+	      cs->current_thread = NULL;
 	    }
 	  else
 	    {
@@ -3604,7 +3658,7 @@ process_serial_event (gdb_client_data client_data)
 				  gdb_id))
 	    {
 	      struct thread_info *thread =
-		(struct thread_info *) find_inferior (&all_threads,
+		(struct thread_info *) find_inferior (&cs->all_threads,
 						      first_thread_of,
 						      &pid);
 	      if (!thread)
@@ -3633,7 +3687,7 @@ process_serial_event (gdb_client_data client_data)
 		     the currently selected thread is still valid. If
 		     it is not, select the first available.  */
 		  struct thread_info *thread =
-		    (struct thread_info *) find_inferior_id (&all_threads,
+		    (struct thread_info *) find_inferior_id (&cs->all_threads,
 							     cs->general_thread);
 		  if (thread == NULL)
 		    {
@@ -3676,7 +3730,7 @@ process_serial_event (gdb_client_data client_data)
 	  struct regcache *regcache;
 
 	  set_desired_thread (1);
-	  regcache = get_thread_regcache (current_thread, 1);
+	  regcache = get_thread_regcache (cs->current_thread, 1);
 	  registers_to_string (regcache, cs->own_buf);
 	}
       break;
@@ -3689,7 +3743,7 @@ process_serial_event (gdb_client_data client_data)
 	  struct regcache *regcache;
 
 	  set_desired_thread (1);
-	  regcache = get_thread_regcache (current_thread, 1);
+	  regcache = get_thread_regcache (cs->current_thread, 1);
 	  registers_from_string (regcache, &cs->own_buf[1]);
 	  write_ok (cs->own_buf);
 	}
@@ -3801,7 +3855,7 @@ process_serial_event (gdb_client_data client_data)
 	return 0;
 
       fprintf (stderr, "Killing all inferiors\n");
-      for_each_inferior (&all_processes, kill_inferior_callback);
+      for_each_inferior (&cs->all_processes, kill_inferior_callback);
 
       /* When using the extended protocol, we wait with no program
 	 running.  The traditional protocol will exit instead.  */
@@ -3842,7 +3896,7 @@ process_serial_event (gdb_client_data client_data)
       if (cs->extended_protocol)
 	{
 	  if (target_running ())
-	    for_each_inferior (&all_processes,
+	    for_each_inferior (&cs->all_processes,
 			       kill_inferior_callback);
 	  fprintf (stderr, "GDBserver restarting\n");
 
@@ -3958,8 +4012,8 @@ handle_target_event (int err, gdb_client_data client_data)
 	  /* We're reporting this thread as stopped.  Update its
 	     "want-stopped" state to what the client wants, until it
 	     gets a new resume action.  */
-	  current_thread->last_resume_kind = resume_stop;
-	  current_thread->last_status = cs->last_status;
+	  cs->current_thread->last_resume_kind = resume_stop;
+	  cs->current_thread->last_status = cs->last_status;
 	}
 
       if (forward_event)

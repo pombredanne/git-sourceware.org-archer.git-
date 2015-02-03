@@ -158,7 +158,8 @@ tile_regs_info (void)
 static void
 tile_arch_setup (void)
 {
-  int pid = pid_of (current_thread);
+  client_state *cs = get_client_state ();
+  int pid = pid_of (cs->current_thread);
   unsigned int machine;
   int is_elf64 = linux_pid_exe_is_elf_64_file (pid, &machine);
 

@@ -23,8 +23,8 @@
 #include "ax.h"
 #include <stdint.h>
 
-const unsigned char *breakpoint_data;
-int breakpoint_len;
+// const unsigned char *cs->breakpoint_data;
+// int breakpoint_len;
 
 #define MAX_BREAKPOINT_LEN 8
 
@@ -284,14 +284,15 @@ insert_memory_breakpoint (struct raw_breakpoint *bp)
 {
   unsigned char buf[MAX_BREAKPOINT_LEN];
   int err;
+  client_state *cs = get_client_state ();
 
-  if (breakpoint_data == NULL)
+  if (cs->breakpoint_data == NULL)
     return 1;
 
   /* If the architecture treats the size field of Z packets as a
      'kind' field, then we'll need to be able to know which is the
      breakpoint instruction too.  */
-  if (bp->size != breakpoint_len)
+  if (bp->size != cs->breakpoint_len)
     {
       if (debug_threads)
 	debug_printf ("Don't know how to insert breakpoints of size %d.\n",
@@ -302,7 +303,7 @@ insert_memory_breakpoint (struct raw_breakpoint *bp)
   /* Note that there can be fast tracepoint jumps installed in the
      same memory range, so to get at the original memory, we need to
      use read_inferior_memory, which masks those out.  */
-  err = read_inferior_memory (bp->pc, buf, breakpoint_len);
+  err = read_inferior_memory (bp->pc, buf, cs->breakpoint_len);
   if (err != 0)
     {
       if (debug_threads)
@@ -312,10 +313,10 @@ insert_memory_breakpoint (struct raw_breakpoint *bp)
     }
   else
     {
-      memcpy (bp->old_data, buf, breakpoint_len);
+      memcpy (bp->old_data, buf, cs->breakpoint_len);
 
-      err = (*the_target->write_memory) (bp->pc, breakpoint_data,
-					 breakpoint_len);
+      err = (*the_target->write_memory) (bp->pc, cs->breakpoint_data,
+					 cs->breakpoint_len);
       if (err != 0)
 	{
 	  if (debug_threads)
@@ -333,6 +334,7 @@ remove_memory_breakpoint (struct raw_breakpoint *bp)
 {
   unsigned char buf[MAX_BREAKPOINT_LEN];
   int err;
+  client_state *cs = get_client_state ();
 
   /* Since there can be trap breakpoints inserted in the same address
      range, we use `write_inferior_memory', which takes care of
@@ -342,8 +344,8 @@ remove_memory_breakpoint (struct raw_breakpoint *bp)
      note that we need to pass the current shadow contents, because
      write_inferior_memory updates any shadow memory with what we pass
      here, and we want that to be a nop.  */
-  memcpy (buf, bp->old_data, breakpoint_len);
-  err = write_inferior_memory (bp->pc, buf, breakpoint_len);
+  memcpy (buf, bp->old_data, cs->breakpoint_len);
+  err = write_inferior_memory (bp->pc, buf, cs->breakpoint_len);
   if (err != 0)
     {
       if (debug_threads)
@@ -757,9 +759,10 @@ struct breakpoint *
 set_breakpoint_at (CORE_ADDR where, int (*handler) (CORE_ADDR))
 {
   int err_ignored;
+  client_state *cs = get_client_state ();
 
   return set_breakpoint (other_breakpoint, raw_bkpt_type_sw,
-			 where, breakpoint_len, handler,
+			 where, cs->breakpoint_len, handler,
 			 &err_ignored);
 }
 
@@ -983,6 +986,8 @@ set_gdb_breakpoint_1 (char z_type, CORE_ADDR addr, int size, int *err)
 static int
 check_gdb_bp_preconditions (char z_type, int *err)
 {
+  client_state *cs = get_client_state ();
+
   /* As software/memory breakpoints work by poking at memory, we need
      to prepare to access memory.  If that operation fails, we need to
      return error.  Seeing an error, if this is the first breakpoint
@@ -995,7 +1000,7 @@ check_gdb_bp_preconditions (char z_type, int *err)
       *err = 1;
       return 0;
     }
-  else if (current_thread == NULL)
+  else if (cs->current_thread == NULL)
     {
       *err = -1;
       return 0;
@@ -1203,6 +1208,7 @@ gdb_condition_true_at_breakpoint_z_type (char z_type, CORE_ADDR addr)
   struct point_cond_list *cl;
   int err = 0;
   struct eval_agent_expr_context ctx;
+  client_state *cs = get_client_state ();
 
   if (bp == NULL)
     return 0;
@@ -1212,7 +1218,7 @@ gdb_condition_true_at_breakpoint_z_type (char z_type, CORE_ADDR addr)
   if (bp->cond_list == NULL)
     return 1;
 
-  ctx.regcache = get_thread_regcache (current_thread, 1);
+  ctx.regcache = get_thread_regcache (cs->current_thread, 1);
   ctx.tframe = NULL;
   ctx.tpoint = NULL;
 
@@ -1332,11 +1338,12 @@ run_breakpoint_commands_z_type (char z_type, CORE_ADDR addr)
   struct point_command_list *cl;
   int err = 0;
   struct eval_agent_expr_context ctx;
+  client_state *cs = get_client_state ();
 
   if (bp == NULL)
     return 1;
 
-  ctx.regcache = get_thread_regcache (current_thread, 1);
+  ctx.regcache = get_thread_regcache (cs->current_thread, 1);
   ctx.tframe = NULL;
   ctx.tpoint = NULL;
 
@@ -1575,8 +1582,10 @@ check_breakpoints (CORE_ADDR stop_pc)
 void
 set_breakpoint_data (const unsigned char *bp_data, int bp_len)
 {
-  breakpoint_data = bp_data;
-  breakpoint_len = bp_len;
+  client_state *cs = get_client_state ();
+
+  cs->breakpoint_data = bp_data;
+  cs->breakpoint_len = bp_len;
 }
 
 int
@@ -1615,13 +1624,14 @@ validate_inserted_breakpoint (struct raw_breakpoint *bp)
 {
   unsigned char *buf;
   int err;
+  client_state *cs = get_client_state ();
 
   gdb_assert (bp->inserted);
   gdb_assert (bp->raw_type == raw_bkpt_type_sw);
 
-  buf = alloca (breakpoint_len);
-  err = (*the_target->read_memory) (bp->pc, buf, breakpoint_len);
-  if (err || memcmp (buf, breakpoint_data, breakpoint_len) != 0)
+  buf = alloca (cs->breakpoint_len);
+  err = (*the_target->read_memory) (bp->pc, buf, cs->breakpoint_len);
+  if (err || memcmp (buf, cs->breakpoint_data, cs->breakpoint_len) != 0)
     {
       /* Tag it as gone.  */
       bp->inserted = -1;
@@ -1677,6 +1687,7 @@ check_mem_read (CORE_ADDR mem_addr, unsigned char *buf, int mem_len)
   struct fast_tracepoint_jump *jp = proc->fast_tracepoint_jumps;
   CORE_ADDR mem_end = mem_addr + mem_len;
   int disabled_one = 0;
+  client_state *cs = get_client_state ();
 
   for (; jp != NULL; jp = jp->next)
     {
@@ -1712,7 +1723,7 @@ check_mem_read (CORE_ADDR mem_addr, unsigned char *buf, int mem_len)
 
   for (; bp != NULL; bp = bp->next)
     {
-      CORE_ADDR bp_end = bp->pc + breakpoint_len;
+      CORE_ADDR bp_end = bp->pc + cs->breakpoint_len;
       CORE_ADDR start, end;
       int copy_offset, copy_len, buf_offset;
 
@@ -1761,6 +1772,7 @@ check_mem_write (CORE_ADDR mem_addr, unsigned char *buf,
   struct fast_tracepoint_jump *jp = proc->fast_tracepoint_jumps;
   CORE_ADDR mem_end = mem_addr + mem_len;
   int disabled_one = 0;
+  client_state *cs = get_client_state ();
 
   /* First fast tracepoint jumps, then breakpoint traps on top.  */
 
@@ -1801,7 +1813,7 @@ check_mem_write (CORE_ADDR mem_addr, unsigned char *buf,
 
   for (; bp != NULL; bp = bp->next)
     {
-      CORE_ADDR bp_end = bp->pc + breakpoint_len;
+      CORE_ADDR bp_end = bp->pc + cs->breakpoint_len;
       CORE_ADDR start, end;
       int copy_offset, copy_len, buf_offset;
 
@@ -1832,7 +1844,7 @@ check_mem_write (CORE_ADDR mem_addr, unsigned char *buf,
       if (bp->inserted > 0)
 	{
 	  if (validate_inserted_breakpoint (bp))
-	    memcpy (buf + buf_offset, breakpoint_data + copy_offset, copy_len);
+	    memcpy (buf + buf_offset, cs->breakpoint_data + copy_offset, copy_len);
 	  else
 	    disabled_one = 1;
 	}

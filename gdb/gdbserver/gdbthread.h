@@ -70,7 +70,7 @@ struct thread_info
   struct btrace_target_info *btrace;
 };
 
-extern struct inferior_list all_threads;
+// extern struct inferior_list cs->all_threads;
 
 void remove_thread (struct thread_info *thread);
 struct thread_info *add_thread (ptid_t ptid, void *target_data);
@@ -80,6 +80,6 @@ struct thread_info *get_first_thread (void);
 struct thread_info *find_thread_ptid (ptid_t ptid);
 
 /* Get current thread ID (Linux task ID).  */
-#define current_ptid (current_thread->entry.id)
+#define current_ptid ({client_state *cs = get_client_state (); cs->current_thread->entry.id;})
 
 #endif /* GDB_THREAD_H */

@@ -34,7 +34,7 @@ char *write_ptid (char *buf, ptid_t ptid);
 int putpkt (char *buf);
 int putpkt_binary (char *buf, int len);
 int putpkt_notif (char *buf);
-int getpkt (char *buf);
+int getpkt (gdb_fildes_t fd, char *buf);
 void remote_prepare (char *name);
 void remote_open (char *name, gdb_client_data client_data);
 void remote_close (void);

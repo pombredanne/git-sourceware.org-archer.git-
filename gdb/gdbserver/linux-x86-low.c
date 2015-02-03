@@ -231,7 +231,8 @@ static /*const*/ int i386_regmap[] =
 static int
 is_64bit_tdesc (void)
 {
-  struct regcache *regcache = get_thread_regcache (current_thread, 0);
+  client_state *cs = get_client_state ();
+  struct regcache *regcache = get_thread_regcache (cs->current_thread, 0);
 
   return register_size (regcache->tdesc, 0) == 8;
 }
@@ -590,11 +591,12 @@ static void
 x86_dr_low_set_addr (int regnum, CORE_ADDR addr)
 {
   /* Only update the threads of this process.  */
-  int pid = pid_of (current_thread);
+  client_state *cs = get_client_state ();
+  int pid = pid_of (cs->current_thread);
 
   gdb_assert (DR_FIRSTADDR <= regnum && regnum <= DR_LASTADDR);
 
-  find_inferior (&all_threads, update_debug_registers_callback, &pid);
+  find_inferior (&cs->all_threads, update_debug_registers_callback, &pid);
 }
 
 /* Return the inferior's debug register REGNUM.  */
@@ -602,7 +604,8 @@ x86_dr_low_set_addr (int regnum, CORE_ADDR addr)
 static CORE_ADDR
 x86_dr_low_get_addr (int regnum)
 {
-  ptid_t ptid = ptid_of (current_thread);
+  client_state *cs = get_client_state ();
+  ptid_t ptid = ptid_of (cs->current_thread);
 
   gdb_assert (DR_FIRSTADDR <= regnum && regnum <= DR_LASTADDR);
 
@@ -615,9 +618,10 @@ static void
 x86_dr_low_set_control (unsigned long control)
 {
   /* Only update the threads of this process.  */
-  int pid = pid_of (current_thread);
+  client_state *cs = get_client_state ();
+  int pid = pid_of (cs->current_thread);
 
-  find_inferior (&all_threads, update_debug_registers_callback, &pid);
+  find_inferior (&cs->all_threads, update_debug_registers_callback, &pid);
 }
 
 /* Return the inferior's DR7 debug control register.  */
@@ -625,7 +629,8 @@ x86_dr_low_set_control (unsigned long control)
 static unsigned long
 x86_dr_low_get_control (void)
 {
-  ptid_t ptid = ptid_of (current_thread);
+  client_state *cs = get_client_state ();
+  ptid_t ptid = ptid_of (cs->current_thread);
 
   return x86_linux_dr_get (ptid, DR_CONTROL);
 }
@@ -636,7 +641,8 @@ x86_dr_low_get_control (void)
 static unsigned long
 x86_dr_low_get_status (void)
 {
-  ptid_t ptid = ptid_of (current_thread);
+  client_state *cs = get_client_state ();
+  ptid_t ptid = ptid_of (cs->current_thread);
 
   return x86_linux_dr_get (ptid, DR_STATUS);
 }
@@ -1219,7 +1225,8 @@ x86_siginfo_fixup (siginfo_t *native, void *inf, int direction)
 {
 #ifdef __x86_64__
   unsigned int machine;
-  int tid = lwpid_of (current_thread);
+  client_state *cs = get_client_state ();
+  int tid = lwpid_of (cs->current_thread);
   int is_elf64 = linux_pid_exe_is_elf_64_file (tid, &machine);
 
   /* Is the inferior 32-bit?  If so, then fixup the siginfo object.  */
@@ -1301,8 +1308,9 @@ x86_linux_read_description (void)
   int tid;
   static uint64_t xcr0;
   struct regset_info *regset;
+  client_state *cs = get_client_state ();
 
-  tid = lwpid_of (current_thread);
+  tid = lwpid_of (cs->current_thread);
 
   is_elf64 = linux_pid_exe_is_elf_64_file (tid, &machine);
 
@@ -1473,10 +1481,11 @@ static void
 x86_arch_setup_process_callback (struct inferior_list_entry *entry)
 {
   int pid = ptid_get_pid (entry->id);
+  client_state *cs = get_client_state ();
 
   /* Look up any thread of this processes.  */
-  current_thread
-    = (struct thread_info *) find_inferior (&all_threads,
+  cs->current_thread
+    = (struct thread_info *) find_inferior (&cs->all_threads,
 					    same_process_callback, &pid);
 
   the_low_target.arch_setup ();
@@ -1488,16 +1497,17 @@ x86_arch_setup_process_callback (struct inferior_list_entry *entry)
 static void
 x86_linux_update_xmltarget (void)
 {
-  struct thread_info *saved_thread = current_thread;
+  client_state *cs = get_client_state ();
+  struct thread_info *saved_thread = cs->current_thread;
 
   /* Before changing the register cache's internal layout, flush the
      contents of the current valid caches back to the threads, and
      release the current regcache objects.  */
   regcache_release ();
 
-  for_each_inferior (&all_processes, x86_arch_setup_process_callback);
+  for_each_inferior (&cs->all_processes, x86_arch_setup_process_callback);
 
-  current_thread = saved_thread;
+  cs->current_thread = saved_thread;
 }
 
 /* Process qSupported query, "xmlRegisters=".  Update the buffer size for

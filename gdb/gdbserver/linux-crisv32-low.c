@@ -103,7 +103,8 @@ cris_breakpoint_at (CORE_ADDR where)
 static CORE_ADDR
 cris_reinsert_addr (void)
 {
-  struct regcache *regcache = get_thread_regcache (current_thread, 1);
+  client_state *cs = get_client_state ();
+  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
   unsigned long pc;
   collect_register_by_name (regcache, "srp", &pc);
   return pc;
@@ -165,8 +166,9 @@ cris_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
   unsigned long start, end;
   unsigned long ccs;
   struct regcache *regcache;
+  client_state *cs = get_client_state ();
 
-  regcache = get_thread_regcache (current_thread, 1);
+  regcache = get_thread_regcache (cs->current_thread, 1);
 
   /* Read watchpoints are set as access watchpoints, because of GDB's
      inability to deal with pure read watchpoints.  */
@@ -238,8 +240,9 @@ cris_remove_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
   unsigned long start, end;
   struct regcache *regcache;
   unsigned long bp_d_regs[12];
+  client_state *cs = get_client_state ();
 
-  regcache = get_thread_regcache (current_thread, 1);
+  regcache = get_thread_regcache (cs->current_thread, 1);
 
   /* Read watchpoints are set as access watchpoints, because of GDB's
      inability to deal with pure read watchpoints.  */
@@ -316,7 +319,8 @@ static int
 cris_stopped_by_watchpoint (void)
 {
   unsigned long exs;
-  struct regcache *regcache = get_thread_regcache (current_thread, 1);
+  client_state *cs = get_client_state ();
+  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
 
   collect_register_by_name (regcache, "exs", &exs);
 
@@ -327,7 +331,8 @@ static CORE_ADDR
 cris_stopped_data_address (void)
 {
   unsigned long eda;
-  struct regcache *regcache = get_thread_regcache (current_thread, 1);
+  client_state *cs = get_client_state ();
+  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
 
   collect_register_by_name (regcache, "eda", &eda);
 

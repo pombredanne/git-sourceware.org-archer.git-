@@ -23,6 +23,9 @@
 
 #include <sys/types.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 #ifdef USE_WIN32API
 #include <windows.h>
@@ -160,6 +163,7 @@ initialize_event_loop (void)
   event_queue = QUEUE_alloc (gdb_event_p, gdb_event_xfree);
 }
 
+
 /* Process one event.  If an event was processed, 1 is returned
    otherwise 0 is returned.  Scan the queue from head to tail,
    processing therefore the high priority events first, by invoking
@@ -277,6 +281,8 @@ create_file_handler (gdb_fildes_t fd, int mask, handler_func *proc,
 {
   file_handler *file_ptr;
 
+  if (debug_threads)
+    fprintf (stderr,"%s matched fd %d\n",__FUNCTION__,fd);
   /* Do we already have a file handler for this file? (We may be
      changing its associated procedure).  */
   for (file_ptr = gdb_notifier.first_file_handler;
@@ -337,6 +343,8 @@ delete_file_handler (gdb_fildes_t fd)
   file_handler *file_ptr, *prev_ptr = NULL;
   int i;
 
+  if (debug_threads)
+    fprintf (stderr,"%s matched fd %d\n",__FUNCTION__,fd);
   /* Find the entry for the given file. */
 
   for (file_ptr = gdb_notifier.first_file_handler;
@@ -426,6 +434,7 @@ handle_file_event (gdb_fildes_t event_file_desc)
 	  /* If there was a match, then call the handler.  */
 	  if (mask != 0)
 	    {
+	      set_client_state (file_ptr->fd);
 	      if ((*file_ptr->proc) (file_ptr->error,
 				     file_ptr->client_data) < 0)
 		return -1;
@@ -459,11 +468,45 @@ create_file_event (gdb_fildes_t fd)
    select.  Return -1 if there are no files descriptors to monitor,
    otherwise return 0.  */
 
+int get_remote_desc();
+int get_listen_desc();
+
 static int
 wait_for_event (void)
 {
   file_handler *file_ptr;
   int num_found = 0;
+
+  //
+  fd_set conn_fd_set;
+  struct timeval timeout;
+  FD_ZERO(&conn_fd_set);
+  FD_SET(get_listen_desc(),&conn_fd_set);
+  timeout.tv_sec = 0;
+  timeout.tv_usec = 10;
+  num_found = select (FD_SETSIZE, &conn_fd_set, NULL, NULL, &timeout);
+  fprintf (stderr,"%s select fd=%d found=%d\n",__FUNCTION__,get_listen_desc(),num_found);
+  if (num_found > 0)
+    {
+    int i;
+      for (i = 1; i < FD_SETSIZE; ++i)
+	if (FD_ISSET (i, &conn_fd_set))
+	  {
+	    if (i == get_listen_desc())
+	      {
+		int handle_accept_event (int, gdb_client_data);
+		if (debug_threads)
+		  fprintf (stderr,"%s in select idx %d\n",__FUNCTION__,i);
+		// instead of using gdb_event just setup the connection "by hand"
+		handle_accept_event (0, NULL);
+		add_file_handler (get_remote_desc(), handle_serial_event, get_client_state());
+	      }
+	    else
+	      if (debug_threads)
+		fprintf (stderr,"%s data arrived on existing connection %d fd=%d\n", __FUNCTION__, 	i,get_listen_desc());
+	  }
+    }
+  //
 
   /* Make sure all output is done before getting another event.  */
   fflush (stdout);
@@ -481,6 +524,10 @@ wait_for_event (void)
 		      &gdb_notifier.ready_masks[2],
 		      NULL);
 
+  if (debug_threads)
+    fprintf(stderr,"select num_fds %d returned %d\n",gdb_notifier.num_fds,num_found);
+  if (num_found < 0)
+    perror(__FUNCTION__);
   /* Clear the masks after an error from select.  */
   if (num_found == -1)
     {
@@ -496,7 +543,7 @@ wait_for_event (void)
     }
 
   /* Enqueue all detected file events.  */
-
+  fprintf (stderr,"%s 1 #fds=%d\n",__FUNCTION__,gdb_notifier.num_fds);
   for (file_ptr = gdb_notifier.first_file_handler;
        file_ptr != NULL && num_found > 0;
        file_ptr = file_ptr->next_file)
@@ -520,8 +567,11 @@ wait_for_event (void)
 
       if (file_ptr->ready_mask == 0)
 	{
+	  int handle_accept_event (int err, gdb_client_data client_data);
 	  gdb_event *file_event_ptr = create_file_event (file_ptr->fd);
-
+	  fprintf (stderr,"%s 2 #fds=%d\n",__FUNCTION__,gdb_notifier.num_fds);
+	  if (debug_threads)
+	    fprintf(stderr,"%s create_file_event for %d %#lx %#lx %#lx %#lx\n",__FUNCTION__,file_event_ptr->fd,(long unsigned int)file_ptr->proc,(long unsigned int)handle_file_event,(long unsigned int)handle_serial_event,(long unsigned int)handle_accept_event);
 	  QUEUE_enque (gdb_event_p, event_queue, file_event_ptr);
 	}
       file_ptr->ready_mask = mask;
@@ -545,6 +595,8 @@ start_event_loop (void)
     {
       /* Any events already waiting in the queue?  */
       int res = process_event ();
+      if (debug_threads)
+	fprintf (stderr, "COX  After process_event\n");
 
       /* Did the event handler want the event loop to stop?  */
       if (res == -1)
@@ -568,6 +620,8 @@ start_event_loop (void)
 	 sources left.  This will make the event loop stop, and the
 	 application exit.  */
 
+      if (debug_threads)
+	fprintf (stderr, "COX Before start_event_loop return\n");
       if (wait_for_event () < 0)
 	return;
     }

@@ -617,17 +617,18 @@ nto_fetch_registers (struct regcache *regcache, int regno)
   int regsize;
   procfs_greg greg;
   ptid_t ptid;
+  client_state *cs = get_client_state ();
 
   TRACE ("%s (regno=%d)\n", __func__, regno);
   if (regno >= the_low_target.num_regs)
     return;
 
-  if (current_thread == NULL)
+  if (cs->current_thread == NULL)
     {
       TRACE ("current_thread is NULL\n");
       return;
     }
-  ptid = thread_to_gdb_id (current_thread);
+  ptid = thread_to_gdb_id (cs->current_thread);
   if (!nto_set_thread (ptid))
     return;
 
@@ -666,15 +667,16 @@ nto_store_registers (struct regcache *regcache, int regno)
   procfs_greg greg;
   int err;
   ptid_t ptid;
+  client_state *cs = get_client_state ();
 
   TRACE ("%s (regno:%d)\n", __func__, regno);
 
-  if (current_thread == NULL)
+  if (cs->current_thread == NULL)
     {
       TRACE ("current_thread is NULL\n");
       return;
     }
-  ptid = thread_to_gdb_id (current_thread);
+  ptid = thread_to_gdb_id (cs->current_thread);
   if (!nto_set_thread (ptid))
     return;
 
@@ -859,13 +861,14 @@ static int
 nto_stopped_by_watchpoint (void)
 {
   int ret = 0;
+  client_state *cs = get_client_state ();
 
   TRACE ("%s\n", __func__);
-  if (nto_inferior.ctl_fd != -1 && current_thread != NULL)
+  if (nto_inferior.ctl_fd != -1 && cs->current_thread != NULL)
     {
       ptid_t ptid;
 
-      ptid = thread_to_gdb_id (current_thread);
+      ptid = thread_to_gdb_id (cs->current_thread);
       if (nto_set_thread (ptid))
 	{
 	  const int watchmask = _DEBUG_FLAG_TRACE_RD | _DEBUG_FLAG_TRACE_WR
@@ -891,13 +894,14 @@ static CORE_ADDR
 nto_stopped_data_address (void)
 {
   CORE_ADDR ret = (CORE_ADDR)0;
+  client_state *cs = get_client_state ();
 
   TRACE ("%s\n", __func__);
-  if (nto_inferior.ctl_fd != -1 && current_thread != NULL)
+  if (nto_inferior.ctl_fd != -1 && cs->current_thread != NULL)
     {
       ptid_t ptid;
 
-      ptid = thread_to_gdb_id (current_thread);
+      ptid = thread_to_gdb_id (cs->current_thread);
 
       if (nto_set_thread (ptid))
 	{

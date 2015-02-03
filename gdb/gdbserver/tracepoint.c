@@ -3976,22 +3976,23 @@ void
 gdb_agent_about_to_close (int pid)
 {
   char buf[IPA_CMD_BUF_SIZE];
+  client_state *cs = get_client_state ();
 
   if (!maybe_write_ipa_not_loaded (buf))
     {
       struct thread_info *saved_thread;
 
-      saved_thread = current_thread;
+      saved_thread = cs->current_thread;
 
       /* Find any thread which belongs to process PID.  */
-      current_thread = (struct thread_info *)
-	find_inferior (&all_threads, same_process_p, &pid);
+      cs->current_thread = (struct thread_info *)
+	find_inferior (&cs->all_threads, same_process_p, &pid);
 
       strcpy (buf, "close");
 
       run_inferior_command (buf, strlen (buf) + 1);
 
-      current_thread = saved_thread;
+      cs->current_thread = saved_thread;
     }
 }
 
@@ -4001,7 +4002,9 @@ gdb_agent_about_to_close (int pid)
 static void
 cmd_qtminftpilen (char *packet)
 {
-  if (current_thread == NULL)
+  client_state *cs = get_client_state ();
+
+  if (cs->current_thread == NULL)
     {
       /* Indicate that the minimum length is currently unknown.  */
       strcpy (packet, "0");

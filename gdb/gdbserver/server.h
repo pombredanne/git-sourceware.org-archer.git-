@@ -78,24 +78,11 @@ void initialize_low ();
 
 /* Public variables in server.c */
 
-// extern ptid_t cont_thread;
-// extern ptid_t general_thread;
-
-// extern int server_waiting;
-extern int pass_signals[];
-extern int program_signals[];
-extern int program_signals_p;
-
 extern int disable_packet_vCont;
 extern int disable_packet_Tthread;
 extern int disable_packet_qC;
 extern int disable_packet_qfThreadInfo;
 
-// extern int run_once;
-// extern int multi_process;
-// extern int non_stop;
-
-// extern int disable_randomization;
 
 #if USE_WIN32API
 #include <winsock2.h>
@@ -130,6 +117,8 @@ extern int handle_target_event (int err, gdb_client_data client_data);
 
 struct client_state
 {
+  // file descriptor corresponding to this client
+  gdb_fildes_t file_desc;
   /* --once: Exit after the first connection has closed.  */
   int run_once;
   /* --multi */
@@ -164,10 +153,23 @@ struct client_state
   ptid_t last_ptid;
   char *own_buf;
   unsigned char *mem_buf;
+  unsigned char readchar_buf[BUFSIZ];
+  int readchar_bufcnt;
+  unsigned char *readchar_bufp;
+  // was in server.h
+  const unsigned char *breakpoint_data;
+  int breakpoint_len;
+  // was in inferior.c
+  struct inferior_list all_processes;
+  struct inferior_list all_threads;
+  struct thread_info *current_thread;
+  struct client_state *next;
 };
 
 typedef struct client_state client_state;
 
 client_state * get_client_state ();
+
+client_state * set_client_state (gdb_fildes_t);
 
 #endif /* SERVER_H */

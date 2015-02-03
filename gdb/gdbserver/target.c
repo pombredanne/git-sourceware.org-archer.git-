@@ -35,9 +35,9 @@ set_desired_thread (int use_general)
     found = find_thread_ptid (cs->cont_thread);
 
   if (found == NULL)
-    current_thread = get_first_thread ();
+    cs->current_thread = get_first_thread ();
   else
-    current_thread = found;
+    cs->current_thread = found;
 }
 
 int

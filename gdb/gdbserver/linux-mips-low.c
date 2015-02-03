@@ -124,9 +124,11 @@ static int have_dsp = -1;
 static const struct target_desc *
 mips_read_description (void)
 {
+  client_state *cs = get_client_state ();
+
   if (have_dsp < 0)
     {
-      int pid = lwpid_of (current_thread);
+      int pid = lwpid_of (cs->current_thread);
 
       errno = 0;
       ptrace (PTRACE_PEEKUSER, pid, DSP_CONTROL, 0);
@@ -272,7 +274,8 @@ static const unsigned int mips_breakpoint = 0x0005000d;
 static CORE_ADDR
 mips_reinsert_addr (void)
 {
-  struct regcache *regcache = get_thread_regcache (current_thread, 1);
+  client_state *cs = get_client_state ();
+  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
   union mips_register ra;
   collect_register_by_name (regcache, "r31", ra.buf);
   return register_size (regcache->tdesc, 0) == 4 ? ra.reg32 : ra.reg64;
@@ -403,8 +406,9 @@ mips_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
   long lwpid;
   enum target_hw_bp_type watch_type;
   uint32_t irw;
+  client_state *cs = get_client_state ();
 
-  lwpid = lwpid_of (current_thread);
+  lwpid = lwpid_of (cs->current_thread);
   if (!mips_linux_read_watch_registers (lwpid,
 					&private->watch_readback,
 					&private->watch_readback_valid,
@@ -440,7 +444,7 @@ mips_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
 
   /* Only update the threads of this process.  */
   pid = pid_of (proc);
-  find_inferior (&all_threads, update_watch_registers_callback, &pid);
+  find_inferior (&cs->all_threads, update_watch_registers_callback, &pid);
 
   return 0;
 }
@@ -458,6 +462,7 @@ mips_remove_point (enum raw_bkpt_type type, CORE_ADDR addr,
   int deleted_one;
   int pid;
   enum target_hw_bp_type watch_type;
+  client_state *cs = get_client_state ();
 
   struct mips_watchpoint **pw;
   struct mips_watchpoint *w;
@@ -491,7 +496,7 @@ mips_remove_point (enum raw_bkpt_type type, CORE_ADDR addr,
 
   /* Only update the threads of this process.  */
   pid = pid_of (proc);
-  find_inferior (&all_threads, update_watch_registers_callback, &pid);
+  find_inferior (&cs->all_threads, update_watch_registers_callback, &pid);
   return 0;
 }
 
@@ -506,7 +511,8 @@ mips_stopped_by_watchpoint (void)
   struct arch_process_info *private = proc->piprivate->arch_private;
   int n;
   int num_valid;
-  long lwpid = lwpid_of (current_thread);
+  client_state *cs = get_client_state ();
+  long lwpid = lwpid_of (cs->current_thread);
 
   if (!mips_linux_read_watch_registers (lwpid,
 					&private->watch_readback,
@@ -534,7 +540,8 @@ mips_stopped_data_address (void)
   struct arch_process_info *private = proc->piprivate->arch_private;
   int n;
   int num_valid;
-  long lwpid = lwpid_of (current_thread);
+  client_state *cs = get_client_state ();
+  long lwpid = lwpid_of (cs->current_thread);
 
   /* On MIPS we don't know the low order 3 bits of the data address.
      GDB does not support remote targets that can't report the

@@ -695,14 +695,15 @@ aarch64_notify_debug_reg_change (const struct aarch64_debug_reg_state *state,
 				 int is_watchpoint, unsigned int idx)
 {
   struct aarch64_dr_update_callback_param param;
+  client_state *cs = get_client_state ();
 
   /* Only update the threads of this process.  */
-  param.pid = pid_of (current_thread);
+  param.pid = pid_of (cs->current_thread);
 
   param.is_watchpoint = is_watchpoint;
   param.idx = idx;
 
-  find_inferior (&all_threads, debug_reg_change_callback, (void *) &param);
+  find_inferior (&cs->all_threads, debug_reg_change_callback, (void *) &param);
 }
 
 
@@ -1037,8 +1038,9 @@ aarch64_stopped_data_address (void)
   siginfo_t siginfo;
   int pid, i;
   struct aarch64_debug_reg_state *state;
+  client_state *cs = get_client_state ();
 
-  pid = lwpid_of (current_thread);
+  pid = lwpid_of (cs->current_thread);
 
   /* Get the siginfo.  */
   if (ptrace (PTRACE_GETSIGINFO, pid, NULL, &siginfo) != 0)
@@ -1183,10 +1185,11 @@ aarch64_arch_setup (void)
   int pid;
   struct iovec iov;
   struct user_hwdebug_state dreg_state;
+  client_state *cs = get_client_state ();
 
   current_process ()->tdesc = tdesc_aarch64;
 
-  pid = lwpid_of (current_thread);
+  pid = lwpid_of (cs->current_thread);
   iov.iov_base = &dreg_state;
   iov.iov_len = sizeof (dreg_state);
 

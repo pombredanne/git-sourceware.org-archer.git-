@@ -22,10 +22,10 @@
 #include "gdbthread.h"
 #include "dll.h"
 
-struct inferior_list all_processes;
-struct inferior_list all_threads;
+// struct inferior_list all_processes;
+// struct inferior_list all_threads;
 
-struct thread_info *current_thread;
+// struct thread_info *cs->current_thread;
 
 #define get_thread(inf) ((struct thread_info *)(inf))
 
@@ -106,6 +106,7 @@ struct thread_info *
 add_thread (ptid_t thread_id, void *target_data)
 {
   struct thread_info *new_thread = xmalloc (sizeof (*new_thread));
+  client_state *cs = get_client_state ();
 
   memset (new_thread, 0, sizeof (*new_thread));
 
@@ -113,10 +114,10 @@ add_thread (ptid_t thread_id, void *target_data)
   new_thread->last_resume_kind = resume_continue;
   new_thread->last_status.kind = TARGET_WAITKIND_IGNORE;
 
-  add_inferior_to_list (&all_threads, &new_thread->entry);
+  add_inferior_to_list (&cs->all_threads, &new_thread->entry);
 
-  if (current_thread == NULL)
-    current_thread = new_thread;
+  if (cs->current_thread == NULL)
+    cs->current_thread = new_thread;
 
   new_thread->target_data = target_data;
 
@@ -134,13 +135,17 @@ thread_to_gdb_id (struct thread_info *thread)
 struct thread_info *
 get_first_thread (void)
 {
-  return (struct thread_info *) get_first_inferior (&all_threads);
+  client_state *cs = get_client_state ();
+
+  return (struct thread_info *) get_first_inferior (&cs->all_threads);
 }
 
 struct thread_info *
 find_thread_ptid (ptid_t ptid)
 {
-  return (struct thread_info *) find_inferior_id (&all_threads, ptid);
+  client_state *cs = get_client_state ();
+
+  return (struct thread_info *) find_inferior_id (&cs->all_threads, ptid);
 }
 
 ptid_t
@@ -162,10 +167,12 @@ free_one_thread (struct inferior_list_entry *inf)
 void
 remove_thread (struct thread_info *thread)
 {
+  client_state *cs = get_client_state ();
+
   if (thread->btrace != NULL)
     target_disable_btrace (thread->btrace);
 
-  remove_inferior (&all_threads, (struct inferior_list_entry *) thread);
+  remove_inferior (&cs->all_threads, (struct inferior_list_entry *) thread);
   free_one_thread (&thread->entry);
 }
 
@@ -262,25 +269,28 @@ clear_inferior_list (struct inferior_list *list)
 void
 clear_inferiors (void)
 {
-  for_each_inferior (&all_threads, free_one_thread);
-  clear_inferior_list (&all_threads);
+  client_state *cs = get_client_state ();
+
+  for_each_inferior (&cs->all_threads, free_one_thread);
+  clear_inferior_list (&cs->all_threads);
 
   clear_dlls ();
 
-  current_thread = NULL;
+  cs->current_thread = NULL;
 }
 
 struct process_info *
 add_process (int pid, int attached)
 {
   struct process_info *process;
+  client_state *cs = get_client_state ();
 
   process = xcalloc (1, sizeof (*process));
 
   process->entry.id = pid_to_ptid (pid);
   process->attached = attached;
 
-  add_inferior_to_list (&all_processes, &process->entry);
+  add_inferior_to_list (&cs->all_processes, &process->entry);
 
   return process;
 }
@@ -292,17 +302,21 @@ add_process (int pid, int attached)
 void
 remove_process (struct process_info *process)
 {
+  client_state *cs = get_client_state ();
+
   clear_symbol_cache (&process->symbol_cache);
   free_all_breakpoints (process);
-  remove_inferior (&all_processes, &process->entry);
+  remove_inferior (&cs->all_processes, &process->entry);
   free (process);
 }
 
 struct process_info *
 find_process_pid (int pid)
 {
+  client_state *cs = get_client_state ();
+
   return (struct process_info *)
-    find_inferior_id (&all_processes, pid_to_ptid (pid));
+    find_inferior_id (&cs->all_processes, pid_to_ptid (pid));
 }
 
 /* Return non-zero if INF, a struct process_info, was started by us,
@@ -322,7 +336,9 @@ started_inferior_callback (struct inferior_list_entry *entry, void *args)
 int
 have_started_inferiors_p (void)
 {
-  return (find_inferior (&all_processes, started_inferior_callback, NULL)
+  client_state *cs = get_client_state ();
+
+  return (find_inferior (&cs->all_processes, started_inferior_callback, NULL)
 	  != NULL);
 }
 
@@ -341,7 +357,9 @@ attached_inferior_callback (struct inferior_list_entry *entry, void *args)
 int
 have_attached_inferiors_p (void)
 {
-  return (find_inferior (&all_processes, attached_inferior_callback, NULL)
+  client_state *cs = get_client_state ();
+
+  return (find_inferior (&cs->all_processes, attached_inferior_callback, NULL)
 	  != NULL);
 }
 
@@ -355,6 +373,7 @@ get_thread_process (struct thread_info *thread)
 struct process_info *
 current_process (void)
 {
-  gdb_assert (current_thread != NULL);
-  return get_thread_process (current_thread);
+  client_state *cs = get_client_state ();
+  gdb_assert (cs->current_thread != NULL);
+  return get_thread_process (cs->current_thread);
 }
