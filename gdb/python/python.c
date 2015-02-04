@@ -1258,7 +1258,34 @@ run_python_script (int argc, char **argv)
   ensure_python_env (get_current_arch (), current_language);
 
   running_python_script = 1;
+
+#if PYTHON_ABI_VERSION < 3
   PySys_SetArgv (argc - 1, argv + 1);
+#else
+  {
+    wchar_t **wargv = alloca (sizeof (*wargv) * (argc + 1));
+    int i;
+
+    for (i = 1; i < argc; i++)
+      {
+	size_t len = mbstowcs (NULL, argv[i], 0);
+	size_t len2;
+
+	if (len == (size_t) -1)
+	  {
+	    fprintf (stderr, "Invalid multibyte argument #%d \"%s\"\n",
+		     i, argv[i]);
+	    exit (1);
+	  }
+	wargv[i] = alloca (sizeof (**wargv) * (len + 1));
+	len2 = mbstowcs (wargv[i], argv[i], len + 1);
+	assert (len2 == len);
+      }
+    wargv[argc] = NULL;
+    PySys_SetArgv (argc - 1, wargv + 1);
+  }
+#endif
+
   input = fopen (argv[0], "r");
   if (! input)
     {
