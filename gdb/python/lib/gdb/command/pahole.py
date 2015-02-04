@@ -29,7 +29,7 @@ It prints the type and displays comments showing where holes are."""
     def maybe_print_hole(self, bitpos, field_bitpos):
         if bitpos != field_bitpos:
             hole = field_bitpos - bitpos
-            print '  /* XXX %d bit hole, try to pack */' % hole
+            print ('  /* XXX %d bit hole, try to pack */' % hole)
 
     def pahole (self, type, level, name):
         if name is None:
@@ -37,7 +37,7 @@ It prints the type and displays comments showing where holes are."""
         tag = type.tag
         if tag is None:
             tag = ''
-        print '%sstruct %s {' % (' ' * (2 * level), tag)
+        print ('%sstruct %s {' % (' ' * (2 * level), tag))
         bitpos = 0
         for field in type.fields ():
             # Skip static fields.
@@ -55,27 +55,27 @@ It prints the type and displays comments showing where holes are."""
                 fieldsize = 8 * ftype.sizeof
 
             # TARGET_CHAR_BIT
-            print ' /* %3d %3d */' % (int (bitpos / 8), int (fieldsize / 8)),
+            print (' /* %3d %3d */' % (int (bitpos / 8), int (fieldsize / 8)))
             bitpos = bitpos + fieldsize
 
             if ftype.code == gdb.TYPE_CODE_STRUCT:
                 self.pahole (ftype, level + 1, field.name)
             else:
-                print ' ' * (2 + 2 * level),
-                print '%s %s' % (str (ftype), field.name)
+                print (' ' * (2 + 2 * level))
+                print ('%s %s' % (str (ftype), field.name))
 
         if level == 0:
             self.maybe_print_hole(bitpos, 8 * type.sizeof)
 
-        print ' ' * (14 + 2 * level),
-        print '} %s' % name
+        print (' ' * (14 + 2 * level))
+        print ('} %s' % name)
 
     def invoke (self, arg, from_tty):
         type = gdb.lookup_type (arg)
         type = type.strip_typedefs ()
         if type.code != gdb.TYPE_CODE_STRUCT:
-            raise TypeError, '%s is not a struct type' % arg
-        print ' ' * 14,
+            raise (TypeError, '%s is not a struct type' % arg)
+        print (' ' * 14)
         self.pahole (type, 0, '')
 
 Pahole()
