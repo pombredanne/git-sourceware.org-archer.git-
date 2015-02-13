@@ -607,11 +607,6 @@ read_ptid (char *buf, char **obuf)
 static int
 write_prim (gdb_fildes_t fd, const void *buf, int count)
 {
-  if (debug_threads)
-    {
-      client_state *cs = get_client_state(0);
-      printf ("%s %d %.*s\n", __FUNCTION__,cs->file_desc, count, (char*)buf);
-    }
   if (remote_connection_is_stdio ())
     return write (fileno (stdout), buf, count);
   else
@@ -625,11 +620,6 @@ write_prim (gdb_fildes_t fd, const void *buf, int count)
 static int
 read_prim (gdb_fildes_t fd, void *buf, int count)
 {
-  if (debug_threads)
-    {
-      client_state *cs = get_client_state(0);
-      printf ("%s %d %.*s\n", __FUNCTION__,cs->file_desc, count, (char*)buf);
-    }
   if (remote_connection_is_stdio ())
     return read (fileno (stdin), buf, count);
   else
@@ -688,9 +678,9 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
 	  if (remote_debug)
 	    {
 	      if (is_notif)
-		fprintf (stderr, "putpkt (\"%s\"); [notif]\n", buf2);
+		fprintf (stderr, "putpkt/%d (\"%s\"); [notif]\n", cs->file_desc, buf2);
 	      else
-		fprintf (stderr, "putpkt (\"%s\"); [noack mode]\n", buf2);
+		fprintf (stderr, "putpkt/%d (\"%s\"); [noack mode]\n", cs->file_desc, buf2);
 	      fflush (stderr);
 	    }
 	  break;
@@ -698,7 +688,7 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
 
       if (remote_debug)
 	{
-	  fprintf (stderr, "putpkt (\"%s\"); [looking for ack]\n", buf2);
+	  fprintf (stderr, "putpkt/%d (\"%s\"); [looking for ack]\n", cs->file_desc, buf2);
 	  fflush (stderr);
 	}
 
@@ -1035,7 +1025,7 @@ getpkt (gdb_fildes_t fd, char *buf)
     {
       if (remote_debug)
 	{
-	  fprintf (stderr, "getpkt (\"%s\");  [sending ack] \n", buf);
+	  fprintf (stderr, "getpkt/%d(\"%s\");  [sending ack] \n", fd, buf);
 	  fflush (stderr);
 	}
 
@@ -1052,7 +1042,7 @@ getpkt (gdb_fildes_t fd, char *buf)
     {
       if (remote_debug)
 	{
-	  fprintf (stderr, "getpkt (\"%s\");  [no ack sent] \n", buf);
+	  fprintf (stderr, "getpkt/%d (\"%s\");  [no ack sent] \n", fd, buf);
 	  fflush (stderr);
 	}
     }

@@ -222,17 +222,19 @@ public:
   {
     Thread::const_ptr thr;
     if (event != NULL)
-      DEBUG(event->getEventType().code() << " " << EventType::LWPCreate);
-    if (event != NULL)
       {
 	if (event->getEventType().code() == EventType::LWPCreate)
 	  {
 	    EventNewLWP::const_ptr newlwp_ev = event->getEventNewLWP();
+	    if (event != NULL)
+	      DEBUG(event->getEventType().code() << " LWPCreate");
 	    return newlwp_ev->getNewThread();
 	  }
 	else if (event->getEventType().code() == EventType::UserThreadCreate)
 	  {
 	    EventNewUserThread::const_ptr newlwp_ev = event->getEventNewUserThread();
+	    if (event != NULL)
+	      DEBUG(event->getEventType().code() << " UserThreadCreate");
 	    return newlwp_ev->getNewThread();
 	  }
       }
@@ -513,6 +515,9 @@ dyninst_create_inferior (char *program, char **allargs)
 static int
 dyninst_attach (unsigned long pid)
 {
+  ProcessSet::iterator procset_it = dyninst_procset->find(pid);
+  if (procset_it != dyninst_procset->end())
+    DEBUG("already attached to pid " << pid);
   Process::ptr dyninst_proc = Process::attachProcess(pid);
   if (dyninst_proc == Process::ptr())
     error ("Cannot attach to process %ld: %s",
@@ -622,7 +627,9 @@ dyninst_resume (struct thread_resume *resume_info, size_t n)
 	      switch (resume_info[i].kind)
 		{
 		case resume_step:
-		    DEBUG("in step mode", pid_to_string (th));
+		    MachRegisterVal result;
+		    th->getRegister(MachRegister(x86_64::rip), result);
+		    DEBUG("in step mode @" << result, pid_to_string (th));
 		    if (! th->setSingleStepMode(true))
 		      DYNERR("Unable to setSingleStepMode");
 		case resume_continue:
@@ -964,7 +971,9 @@ dyninst_read_pc (struct regcache *regcache)
   if (the_low_target.get_pc == NULL)
     return 0;
 
-  return (*the_low_target.get_pc) (regcache);
+  CORE_ADDR pc = (*the_low_target.get_pc) (regcache);
+  DEBUG("pc is " << pc);
+  return pc;
 }
 
 static void
@@ -1106,8 +1115,8 @@ dyninst_insert_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
   Process::const_ptr dyninst_process = th->getProcess();
   bool result;
 
-  DEBUG(" addr=" << addr, pid_to_string(th));
   Breakpoint::ptr brp = Breakpoint::newBreakpoint();
+  DEBUG(" addr=" << addr << " " << brp->getToAddress(), pid_to_string(th));
   brp->setData(bp);
   if (! (result = dyninst_process->addBreakpoint(addr, brp)))
     DYNERR ("Unable insert breakpoint at %#lx", (long)addr);
@@ -1123,7 +1132,6 @@ dyninst_remove_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
 		      struct raw_breakpoint *rbp)
 {
   Thread::const_ptr th = dyninst_get_inferior_thread();
-  DEBUG(" addr=" << addr, pid_to_string (th) );
   Process::const_ptr dyninst_process = th->getProcess();
 
   std::vector<Breakpoint::ptr>::iterator it;
@@ -1133,6 +1141,7 @@ dyninst_remove_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
       Breakpoint::ptr bp = *it;
       if ((struct raw_breakpoint*)bp->getData() == rbp)
 	{
+	  DEBUG(" addr=" << addr << " " << bp->getToAddress(), pid_to_string(th));
 	  if (! (result = dyninst_process->rmBreakpoint(addr, bp)))
 	    DYNERR ("Unable remove breakpoint at %#lx", (long)addr);
 	  break;

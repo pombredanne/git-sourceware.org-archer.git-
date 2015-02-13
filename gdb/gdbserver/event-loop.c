@@ -543,7 +543,6 @@ wait_for_event (void)
     }
 
   /* Enqueue all detected file events.  */
-  fprintf (stderr,"%s 1 #fds=%d\n",__FUNCTION__,gdb_notifier.num_fds);
   for (file_ptr = gdb_notifier.first_file_handler;
        file_ptr != NULL && num_found > 0;
        file_ptr = file_ptr->next_file)
@@ -595,8 +594,6 @@ start_event_loop (void)
     {
       /* Any events already waiting in the queue?  */
       int res = process_event ();
-      if (debug_threads)
-	fprintf (stderr, "COX  After process_event\n");
 
       /* Did the event handler want the event loop to stop?  */
       if (res == -1)
@@ -620,8 +617,6 @@ start_event_loop (void)
 	 sources left.  This will make the event loop stop, and the
 	 application exit.  */
 
-      if (debug_threads)
-	fprintf (stderr, "COX Before start_event_loop return\n");
       if (wait_for_event () < 0)
 	return;
     }

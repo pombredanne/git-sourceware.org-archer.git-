@@ -89,6 +89,18 @@ new_client_state ()
 }
 
 
+void
+dump_client_state ()
+{
+  client_state *cs;
+  for (cs = set_client_state (-1); cs != NULL; cs = cs->next)
+      if (debug_threads)
+	{
+	  debug_printf ("%s %s %d cont_thr %#lx gen thr %#lx\n", __FUNCTION__,cs->executable, cs->file_desc, (long unsigned)cs->cont_thread.pid, (long unsigned)cs->general_thread.pid);
+	  debug_printf ("%s %d all procs %#lx all thrs %#lx curr thr %#lx\n", __FUNCTION__,(int)cs->last_ptid.pid, (unsigned long)cs->all_processes.head, (unsigned long)cs->all_threads.head, (unsigned long)cs->current_thread);
+    }
+}
+
 client_state *
 set_client_state (gdb_fildes_t fd)
 {
@@ -130,8 +142,6 @@ set_client_state (gdb_fildes_t fd)
 	  current_fd = fd;
 	  return csidx;
 	}
-      else if (csidx->file_desc > fd)
-	break;
       else if (csidx->next == NULL)
 	break;
     }
@@ -140,8 +150,23 @@ set_client_state (gdb_fildes_t fd)
   new_csidx = new_client_state ();
   *new_csidx = *csidx;
   new_csidx->file_desc = fd;
+  new_csidx->executable = NULL;
+#if 1
+  new_csidx->cont_thread = null_ptid;
+  new_csidx->general_thread = null_ptid;
+  new_csidx->wrapper_argv = NULL;
+  new_csidx->signal_pid = 0;
+  new_csidx->last_ptid = null_ptid;
+  new_csidx->current_thread = 0;
+  new_csidx->all_processes.head = NULL;
+  new_csidx->all_processes.tail = NULL;
+  new_csidx->all_threads.head = NULL;
+  new_csidx->all_threads.tail = NULL;
+#endif
   current_fd = fd;
   csidx->next = new_csidx;
+  if (debug_threads)
+    debug_printf ("%s Called returned fd=%d current=%d\n", __FUNCTION__, fd, current_fd);
   return new_csidx;
 }
 
@@ -153,6 +178,63 @@ get_client_state (void)
   return set_client_state (0);
 }
 
+client_state *
+match_client_state (char *executable)
+{
+  client_state *cs;
+  char *new_executable;
+  int entry = 0;
+  client_state *matched_cs = NULL;
+  dump_client_state();
+  for (cs = set_client_state (-1); cs != NULL; cs = cs->next)
+    {
+      if (debug_threads)
+	debug_printf ("%s %s looking for %s entry %d for fd %d\n", __FUNCTION__, cs->executable, executable, entry++, cs->file_desc);
+    }
+
+  for (cs = set_client_state (-1); cs != NULL; cs = cs->next)
+    {
+      if (cs->executable && strcmp (cs->executable, executable) == 0)
+	{
+	  matched_cs = cs;
+	  break;
+	}
+    }
+
+  cs = set_client_state (0);
+  if (matched_cs && cs != matched_cs)
+    {
+      client_state *tcs = get_client_state();
+      client_state *next_cs = cs->next;
+      gdb_fildes_t file_desc = cs->file_desc;
+      *cs = *matched_cs;
+      cs->next = next_cs;
+      cs->file_desc = file_desc;
+#if 0
+      cs->executable = matched_cs->executable;
+      cs->cont_thread = matched_cs->cont_thread;
+      cs->general_thread = matched_cs->general_thread;
+      cs->wrapper_argv = matched_cs->wrapper_argv;
+      cs->signal_pid = matched_cs->signal_pid;
+      cs->last_ptid = matched_cs->last_ptid;
+      cs->all_processes.head = matched_cs->all_processes.head;
+      cs->all_threads.head = matched_cs->all_threads.head;
+      cs->current_thread = matched_cs->current_thread;
+#endif
+      debug_printf ("%s current=%d returning %d\n", __FUNCTION__,tcs->file_desc,cs->file_desc);
+      return cs;
+    }
+  else
+    {
+      new_executable = xmalloc (strlen (executable) + 1);
+      strcpy (new_executable, executable);
+      cs->executable = new_executable;
+      if (debug_threads)
+	debug_printf ("%s %s %d returning null\n", __FUNCTION__, cs->executable, cs->file_desc);
+    }
+
+  return NULL;
+}
 
 /* Post a stop reply to the stop reply queue.  */
 
@@ -246,6 +328,8 @@ start_inferior (char **argv)
 	debug_printf ("new_argv[%d] = \"%s\"\n", i, new_argv[i]);
       debug_flush ();
     }
+
+  match_client_state (new_argv[0]);
 
 #ifdef SIGTTOU
   signal (SIGTTOU, SIG_DFL);
@@ -2438,6 +2522,8 @@ handle_v_attach (char *own_buf)
   int pid;
 
   pid = strtol (own_buf + 8, NULL, 16);
+  if (debug_threads)
+    debug_printf ("%s %d %d\n", __FUNCTION__, cs->file_desc,pid);
   if (pid != 0 && attach_inferior (pid) == 0)
     {
       /* Don't report shared library events after attaching, even if
@@ -2535,7 +2621,14 @@ handle_v_run (char *own_buf)
   freeargv (cs->program_argv);
   cs->program_argv = new_argv;
 
+  if (match_client_state (new_argv[0]))
+    {
+      if (debug_threads)
+	debug_printf ("%s returning 0\n",__FUNCTION__);
+      return 0;
+    }
   start_inferior (cs->program_argv);
+
   if (cs->last_status.kind == TARGET_WAITKIND_STOPPED)
     {
       prepare_resume_reply (own_buf, cs->last_ptid, &cs->last_status);
@@ -2583,6 +2676,7 @@ handle_v_kill (char *own_buf)
     }
 }
 
+static void handle_status (char *);
 /* Handle all of the extended 'v' packets.  */
 void
 handle_v_requests (char *own_buf, int packet_len, int *new_packet_len, gdb_client_data client_data)
@@ -2635,7 +2729,11 @@ handle_v_requests (char *own_buf, int packet_len, int *new_packet_len, gdb_clien
 	  write_enn (own_buf);
 	  return;
 	}
-      handle_v_run (own_buf);
+      if (! handle_v_run (own_buf))
+	{
+	  strcpy (own_buf, "?");
+	  handle_status (own_buf);
+	}
       return;
     }
 

@@ -117,15 +117,17 @@ extern int handle_target_event (int err, gdb_client_data client_data);
 
 struct client_state
 {
+  char *executable;
   // file descriptor corresponding to this client
   gdb_fildes_t file_desc;
-  /* --once: Exit after the first connection has closed.  */
+  // following were in server.c
+  // --once: Exit after the first connection has closed.
   int run_once;
-  /* --multi */
+  // --multi
   int multi_process;
-  /* QNonStop packet */
+  // QNonStop packet
   int non_stop;
-  /* QDisableRandomization packet */
+  // QDisableRandomization packet
   int disable_randomization;
   /* The thread set with an `Hc' packet.  `Hc' is deprecated in favor of
      `vCont'.  Note the multi-process extensions made `vCont' a
@@ -138,7 +140,7 @@ struct client_state
      some places in the backends check it to know when (and for which
      thread) single-thread scheduler-locking is in effect.  */
   ptid_t cont_thread;
-  /* The thread set with an `Hg' packet.  */
+  // The thread set with an `Hg' packet.
   ptid_t general_thread;
   int server_waiting;
   int extended_protocol;
@@ -156,10 +158,10 @@ struct client_state
   unsigned char readchar_buf[BUFSIZ];
   int readchar_bufcnt;
   unsigned char *readchar_bufp;
-  // was in server.h
+  // following were in mem-break.c
   const unsigned char *breakpoint_data;
   int breakpoint_len;
-  // was in inferior.c
+  // following were in inferior.c
   struct inferior_list all_processes;
   struct inferior_list all_threads;
   struct thread_info *current_thread;
