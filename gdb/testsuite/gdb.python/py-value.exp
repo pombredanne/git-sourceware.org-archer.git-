@@ -394,7 +394,7 @@ proc test_value_after_death {} {
 proc test_cast_regression {} {
   gdb_test "python v = gdb.Value(5)" "" "create value for cast test"
   gdb_test "python v = v.cast(v.type)" "" "cast value for cast test"
-  gdb_test "python print v" "5" "print value for cast test"
+  gdb_test "python print(v)" "5" "print value for cast test"
 }
 
 # Regression test for invalid subscript operations.  The bug was that
