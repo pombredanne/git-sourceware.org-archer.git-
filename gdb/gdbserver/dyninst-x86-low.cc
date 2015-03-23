@@ -37,36 +37,28 @@ extern "C"
 
 static std::ostringstream dboss;
 
-
-std::map<string,int> dyninst_x86_gdb_regnum;
+std::vector<int> dyninst_x86_gdb_regnum;
 
 extern "C"
 {
 /* Defined in auto-generated file i386.c.  */
-extern void init_registers_amd64 (void);
-extern void init_registers_i386 (void);
+extern void init_registers_amd64_linux (void);
+extern void init_registers_i386_linux (void);
 extern const struct target_desc *tdesc_i386_linux;
 extern const struct target_desc *tdesc_amd64_linux;
 extern const struct target_desc *tdesc_i386;
 extern const struct target_desc *tdesc_amd64;
 }
 
+static int use_xml;
+
+
 /* Print a debug trace on standard output if debug_threads (--debug) is set.  */
 
-static void
-dyninst_debug (const char *fmt, ...)
-{
-  va_list args;
-
-  if (!debug_threads)
-    return;
-
-  va_start (args, fmt);
-  fprintf (stderr, "DEBUG(dyninst): ");
-  vfprintf (stderr, fmt, args);
-  fprintf (stderr, "\n");
-  va_end (args);
-}
+#define DEBUG(args...) 			\
+  if (debug_threads) {				\
+      fprintf (stderr, "%s %s %s\n", "DEBUG(dyninst): ", __FUNCTION__, args); \
+  }
 
 static unsigned char *
 register_data (struct regcache *regcache, int n, int fetch)
@@ -86,21 +78,84 @@ canonicalize_reg (string &reg)
 }
 
 
+void
+dyninst_x86_reg_map_setup (RegisterPool regpool)
+{
+  for (int r = 0; r < dyninst_tdesc->num_registers; r++)
+    {
+      RegisterPool::iterator regidx = regpool.begin();
+      for (; regidx != regpool.end(); regidx++)
+	{
+	  string reg = (*regidx).first.name();
+	  string canon_reg = canonicalize_reg (reg);
+	  if (strcmp (canon_reg.c_str(), dyninst_tdesc->reg_defs[r].name) != 0)
+	    continue;
+	  dyninst_x86_gdb_regnum.push_back ((*regidx).first.val());
+	  break;
+	}
+    }
+}
+
+
+static void
+dump_registers (const char* whoami, RegisterPool regpool)
+{
+  RegisterPool::iterator regidx;
+  fprintf (stderr, "%s ", whoami);
+  for (regidx = regpool.begin(); regidx != regpool.end(); regidx++)
+    {
+      MachRegister reg = (*regidx).first;
+      MachRegisterVal regval = (*regidx).second;
+      switch (reg.val())
+      {
+	case x86::ieax:
+	case x86_64::irax:
+	  fprintf (stderr, "rax=%#lx ", regval);break;
+	case x86::iebx:
+	case x86_64::irbx:
+	  fprintf (stderr, "rbx=%#lx ", regval);break;
+	case x86::iecx:
+	case x86_64::ircx:
+	  fprintf (stderr, "rcx=%#lx ", regval);break;
+	case x86::iedx:
+	case x86_64::irdx:
+	  fprintf (stderr, "rdx=%#lx ", regval);break;
+	case x86::iebp:
+	case x86_64::irbp:
+	  fprintf (stderr, "rbp=%#lx ", regval);break;
+	case x86::iesp:
+	case x86_64::irsp:
+	  fprintf (stderr, "rsp=%#lx ", regval);break;
+	case x86::iesi:
+	case x86_64::irsi:
+	  fprintf (stderr, "rsi=%#lx ", regval);break;
+	case x86::iedi:
+	case x86_64::irdi:
+	  fprintf (stderr, "rdi=%#lx ", regval);break;
+      }
+    }
+  fprintf (stderr, "\n");
+}
+
+
 /* The fill_function for the general-purpose register set.  */
 
 static void
 dyninst_x86_fill_gregset (struct regcache *regcache, RegisterPool regpool)
 {
+  for (int r = 0; r < dyninst_tdesc->num_registers; r++)
+    regcache->register_status[r] = REG_VALID;
+
   RegisterPool::iterator regidx = regpool.begin();
   for (; regidx != regpool.end(); regidx++)
     {
-      string reg = (*regidx).first.name();
-      string canon_reg = canonicalize_reg(reg);
-      if (dyninst_x86_gdb_regnum.find(canon_reg) == dyninst_x86_gdb_regnum.end())
+      int regn = 0;
+      for (; regn < dyninst_tdesc->num_registers; regn++)
+	if ((*regidx).first.val() == dyninst_x86_gdb_regnum[regn])
+	  break;
+      if (regn >= dyninst_tdesc->num_registers)
 	continue;
-      int regn = dyninst_x86_gdb_regnum[canon_reg];
       MachRegisterVal regval = (MachRegisterVal)((*regidx).second);
-      const char *regstr;
 
       regcache->register_status[regn] = REG_VALID;
       switch (register_size (regcache->tdesc, regn))
@@ -108,29 +163,37 @@ dyninst_x86_fill_gregset (struct regcache *regcache, RegisterPool regpool)
 	case 2:
 	  {
 	    u_int16_t *val = (u_int16_t*)register_data (regcache, regn, 0);
-	    regstr = reg.c_str();
-	    dyninst_debug("dyninst_x86_fill_gregset %s/%d=%#lx", regstr, regn, regval);
 	    *val = regval;
 	    break;
 	  }
 	case 4:
 	  {
 	    u_int32_t *val = (u_int32_t*)register_data (regcache, regn, 0);
-	    regstr = reg.c_str();
-	    dyninst_debug("dyninst_x86_fill_gregset %s/%d=%#lx", regstr, regn, regval);
 	    *val = regval;
 	    break;
 	  }
 	case 8:
 	  {
 	    u_int64_t *val = (u_int64_t*)register_data (regcache, regn, 0);
-	    regstr = reg.c_str();
-	    dyninst_debug("dyninst_x86_fill_gregset %s/%d=%#lx", regstr, regn, regval);
+	    *val = regval;
+	    break;
+	  }
+	case 10:
+	  {
+	    u_int64_t *val = (u_int64_t*)register_data (regcache, regn, 0);
+	    *val = regval;
+	    break;
+	  }
+	case 16:
+	  {
+	    u_int64_t *val = (u_int64_t*)register_data (regcache, regn, 0);
 	    *val = regval;
 	    break;
 	  }
       }
     }
+  if (debug_threads)
+    dump_registers (__FUNCTION__, regpool);
 }
 
 
@@ -139,43 +202,43 @@ dyninst_x86_fill_gregset (struct regcache *regcache, RegisterPool regpool)
 static void
 dyninst_x86_store_gregset (struct regcache *regcache, RegisterPool regpool)
 {
+  for (int r = 0; r < dyninst_tdesc->num_registers; r++)
+    regcache->register_status[r] = REG_VALID;
+
   RegisterPool::iterator regidx = regpool.begin();
   for (; regidx != regpool.end(); regidx++)
     {
-      string reg = (*regidx).first.name();
-      string canon_reg = canonicalize_reg(reg);
-      if (dyninst_x86_gdb_regnum.find(canon_reg) == dyninst_x86_gdb_regnum.end())
+      int regn = 0;
+      for (; regn < dyninst_tdesc->num_registers; regn++)
+	if ((*regidx).first.val() == dyninst_x86_gdb_regnum[regn])
+	  break;
+      if (regn >= dyninst_tdesc->num_registers)
 	continue;
-      int regn = dyninst_x86_gdb_regnum[canon_reg];
-      MachRegisterVal regval = (MachRegisterVal)((*regidx).second);
-      const char *regstr = reg.c_str();
 
-      regcache->register_status[regn] = REG_VALID;
       switch (register_size (regcache->tdesc, regn))
       {
 	case 2:
 	  {
 	    u_int16_t *val = (u_int16_t*)register_data (regcache, regn, 0);
-	    regpool[(*regidx).first] = (MachRegisterVal)val;
-	    dyninst_debug("dyninst_x86_store_gregset %s/%d was %#lx now %#lx", regstr, regn, regval, *val);
+	    regpool[(*regidx).first] = (MachRegisterVal)*val;
 	    break;
 	  }
 	case 4:
 	  {
 	    u_int32_t *val = (u_int32_t*)register_data (regcache, regn, 0);
-	    regpool[(*regidx).first] = (MachRegisterVal)val;
-	    dyninst_debug("dyninst_x86_store_gregset %s/%d was %#lx now %#lx", regstr, regn, regval, *val);
+	    regpool[(*regidx).first] = (MachRegisterVal)*val;
 	    break;
 	  }
 	case 8:
 	  {
 	    u_int64_t *val = (u_int64_t*)register_data (regcache, regn, 0);
-	    regpool[(*regidx).first] = (MachRegisterVal)val;
-	    dyninst_debug("dyninst_x86_store_gregset %s/%d was %#lx now %#lx", regstr, regn, regval, *val);
+	    regpool[(*regidx).first] = (MachRegisterVal)*val;
 	    break;
 	  }
       }
     }
+  if (debug_threads)
+    dump_registers (__FUNCTION__, regpool);
 }
 
 
@@ -194,15 +257,13 @@ dyninst_x86_fill_fpregset (struct regcache *regcache, RegisterPool regpool)
   // not supported by dyninst
   //  fctrl fioff fiseg fooff fop foseg fstat ftag mxcsr
   //  st0 - st7
-  dyninst_debug("dyninst_x86_fill_fpregset: dyninst does not support floating registers.\n");
-//  result = th->getRegister(MachRegister(x86_64::xmm0), rspval);
+  DEBUG("floating point registers are not currently supported.\n");
 }
 
 
 static void
 dyninst_x86_store_fpregset (struct regcache *regcache, RegisterPool regpool)
 {
-  dyninst_debug("dyninst_x86_store_fpregset: dyninst does not support floating registers.\n", regcache);
 }
 
 
@@ -243,6 +304,34 @@ x86_set_pc (struct regcache *regcache, CORE_ADDR pc)
 }
 
 
+static void
+dyninst_linux_process_qsupported (const char *query)
+{
+  /* Return if gdb doesn't support XML.  If gdb sends "xmlRegisters="
+     with "i386" in qSupported query, it supports dyninst XML target
+     descriptions.  */
+  use_xml = 0;
+  if (query != NULL && strncmp (query, "xmlRegisters=", 13) == 0)
+    {
+      char *copy = xstrdup (query + 13);
+      char *p;
+
+      for (p = strtok (copy, ","); p != NULL; p = strtok (NULL, ","))
+	{
+	  if (strcmp (p, "i386") == 0)
+	    {
+	      use_xml = 1;
+	      break;
+	    }
+	}
+
+      free (copy);
+    }
+
+//  dyninst_linux_update_xmltarget ();
+}
+
+
 bool
 x86_supports_range_stepping ()
 {
@@ -255,21 +344,15 @@ x86_supports_range_stepping ()
 static void
 dyninst_x86_arch_setup (void)
 {
-  dyninst_debug("dyninst_x86_arch_setup\n");
-  // TODO get at runtime
+  DEBUG("dyninst_x86_arch_setup\n");
+  // TODO get at runtime, check xcr0_features
 #ifdef __x86_64__
-  init_registers_amd64 ();
-  dyninst_tdesc = tdesc_amd64;
+  init_registers_amd64_linux ();
+  dyninst_tdesc = tdesc_amd64_linux;
 #else
-  init_registers_i386 ();
-  dyninst_tdesc = tdesc_i386;
+  init_registers_i386_linux ();
+  dyninst_tdesc = tdesc_x32_linux;
 #endif
-  //  init_registers_i386 ();
-  //  dyninst_tdesc = tdesc_i386;
-  for (int r = 0; r < dyninst_tdesc->num_registers; r++)
-    {
-      dyninst_x86_gdb_regnum[dyninst_tdesc->reg_defs[r].name] = r;
-    }
 }
 
 /* Description of all the x86-dyninst register sets.  */
@@ -287,7 +370,9 @@ struct dyninst_regset_info dyninst_target_regsets[] = {
 
 struct dyninst_target_ops the_low_target = {
   dyninst_x86_arch_setup,
+  dyninst_linux_process_qsupported,
   x86_get_pc,
   x86_set_pc,
   x86_supports_range_stepping,
+  dyninst_x86_reg_map_setup,
 };

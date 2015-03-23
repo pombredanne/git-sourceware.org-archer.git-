@@ -623,12 +623,12 @@ nto_fetch_registers (struct regcache *regcache, int regno)
   if (regno >= the_low_target.num_regs)
     return;
 
-  if (cs->current_thread == NULL)
+  if (cs->ss->current_thread == NULL)
     {
       TRACE ("current_thread is NULL\n");
       return;
     }
-  ptid = thread_to_gdb_id (cs->current_thread);
+  ptid = thread_to_gdb_id (cs->ss->current_thread);
   if (!nto_set_thread (ptid))
     return;
 
@@ -671,12 +671,12 @@ nto_store_registers (struct regcache *regcache, int regno)
 
   TRACE ("%s (regno:%d)\n", __func__, regno);
 
-  if (cs->current_thread == NULL)
+  if (cs->ss->current_thread == NULL)
     {
       TRACE ("current_thread is NULL\n");
       return;
     }
-  ptid = thread_to_gdb_id (cs->current_thread);
+  ptid = thread_to_gdb_id (cs->ss->current_thread);
   if (!nto_set_thread (ptid))
     return;
 
@@ -864,11 +864,11 @@ nto_stopped_by_watchpoint (void)
   client_state *cs = get_client_state ();
 
   TRACE ("%s\n", __func__);
-  if (nto_inferior.ctl_fd != -1 && cs->current_thread != NULL)
+  if (nto_inferior.ctl_fd != -1 && cs->ss->current_thread != NULL)
     {
       ptid_t ptid;
 
-      ptid = thread_to_gdb_id (cs->current_thread);
+      ptid = thread_to_gdb_id (cs->ss->current_thread);
       if (nto_set_thread (ptid))
 	{
 	  const int watchmask = _DEBUG_FLAG_TRACE_RD | _DEBUG_FLAG_TRACE_WR
@@ -897,11 +897,11 @@ nto_stopped_data_address (void)
   client_state *cs = get_client_state ();
 
   TRACE ("%s\n", __func__);
-  if (nto_inferior.ctl_fd != -1 && cs->current_thread != NULL)
+  if (nto_inferior.ctl_fd != -1 && cs->ss->current_thread != NULL)
     {
       ptid_t ptid;
 
-      ptid = thread_to_gdb_id (cs->current_thread);
+      ptid = thread_to_gdb_id (cs->ss->current_thread);
 
       if (nto_set_thread (ptid))
 	{

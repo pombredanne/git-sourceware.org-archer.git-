@@ -110,12 +110,12 @@ ps_lgetregs (gdb_ps_prochandle_t ph, lwpid_t lwpid, prgregset_t gregset)
     return PS_ERR;
 
   reg_thread = get_lwp_thread (lwp);
-  saved_thread = cs->current_thread;
-  cs->current_thread = reg_thread;
-  regcache = get_thread_regcache (cs->current_thread, 1);
+  saved_thread = cs->ss->current_thread;
+  cs->ss->current_thread = reg_thread;
+  regcache = get_thread_regcache (cs->ss->current_thread, 1);
   gregset_info ()->fill_function (regcache, gregset);
 
-  cs->current_thread = saved_thread;
+  cs->ss->current_thread = saved_thread;
   return PS_OK;
 #else
   return PS_ERR;
@@ -160,5 +160,5 @@ ps_getpid (gdb_ps_prochandle_t ph)
 {
   client_state *cs = get_client_state ();
 
-  return pid_of (cs->current_thread);
+  return pid_of (cs->ss->current_thread);
 }

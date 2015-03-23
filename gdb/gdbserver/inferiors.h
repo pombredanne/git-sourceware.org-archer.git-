@@ -119,7 +119,7 @@ int one_inferior_p (struct inferior_list *list);
 
 /* Iterate over all processes, open loop style.  */
 #define ALL_PROCESSES(cur, tmp)					\
-  ALL_INFERIORS_TYPE (struct process_info, &cs->all_processes, cur, tmp)
+  ALL_INFERIORS_TYPE (struct process_info, &cs->ss->all_processes, cur, tmp)
 
 // extern struct thread_info *current_thread;
 void remove_inferior (struct inferior_list *list,

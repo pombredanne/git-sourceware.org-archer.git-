@@ -107,7 +107,7 @@ case "${target}" in
                         srv_xmlfiles="$srv_i386__linux_xmlfiles"
                         srv_dyninst=yes
                         ;;
-  x86_64-dyninst-linux*) srv_regobj="$srv_amd64_regobj $srv_i386_regobj"
+  x86_64-dyninst-linux*) srv_regobj="$srv_amd64_linux_regobj $srv_i386_linux_regobj"
                         srv_tgtobj="dyninst-low.o dyninst-x86-low.o"
                         srv_xmlfiles="$srv_i386_linux_xmlfiles $srv_amd64_linux_xmlfiles"
                         srv_dyninst=yes

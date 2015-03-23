@@ -264,7 +264,7 @@ static CORE_ADDR
 sparc_reinsert_addr (void)
 {
   client_state *cs = get_client_state ();
-  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
+  struct regcache *regcache = get_thread_regcache (cs->ss->current_thread, 1);
   CORE_ADDR lr;
   /* O7 is the equivalent to the 'lr' of other archs.  */
   collect_register_by_name (regcache, "o7", &lr);

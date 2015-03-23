@@ -30,14 +30,14 @@ set_desired_thread (int use_general)
   client_state *cs = get_client_state ();
 
   if (use_general == 1)
-    found = find_thread_ptid (cs->general_thread);
+    found = find_thread_ptid (cs->ss->general_thread);
   else
-    found = find_thread_ptid (cs->cont_thread);
+    found = find_thread_ptid (cs->ss->cont_thread);
 
   if (found == NULL)
-    cs->current_thread = get_first_thread ();
+    cs->ss->current_thread = get_first_thread ();
   else
-    cs->current_thread = found;
+    cs->ss->current_thread = found;
 }
 
 int

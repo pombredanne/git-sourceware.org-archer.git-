@@ -339,7 +339,10 @@ remote_open (char *name, gdb_client_data client_data)
 	}
 
       if (remote_desc < 0)
-	perror_with_name ("Could not open remote device");
+	{
+	  fprintf (stderr,"%s remote_desc=%d port=%s", __FUNCTION__, remote_desc, name);
+	  perror_with_name ("Could not open remote device");
+	}
 
 #ifdef HAVE_TERMIOS
       {
@@ -707,7 +710,7 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
 	}
 
       /* Check for an input interrupt while we're here.  */
-      if (cc == '\003' && cs->current_thread != NULL)
+      if (cc == '\003' && cs->ss->current_thread != NULL)
 	(*the_target->request_interrupt) ();
     }
   while (cc != '+');
@@ -763,7 +766,7 @@ input_interrupt (int unused)
 
       cc = read_prim (remote_desc, &c, 1);
 
-      if (cc != 1 || c != '\003' || cs->current_thread == NULL)
+      if (cc != 1 || c != '\003' || cs->ss->current_thread == NULL)
 	{
 	  fprintf (stderr, "input_interrupt, count = %d c = %d ('%c')\n",
 		   cc, c, c);
@@ -888,26 +891,31 @@ readchar (gdb_fildes_t fd)
   int ch;
   client_state *cs = get_client_state();
 
-  if (cs->readchar_bufcnt == 0)
+  if (cs->ss->readchar_bufcnt == 0)
     {
-      cs->readchar_bufcnt = read_prim (fd, cs->readchar_buf, sizeof (cs->readchar_buf));
+      cs->ss->readchar_bufcnt = read_prim (fd, cs->ss->readchar_buf, sizeof (cs->ss->readchar_buf));
 
 
-      if (cs->readchar_bufcnt <= 0)
+      if (cs->ss->readchar_bufcnt <= 0)
 	{
-	  if (cs->readchar_bufcnt == 0)
+	  if (cs->ss->readchar_bufcnt == 0)
 	    fprintf (stderr, "readchar: Got EOF\n");
 	  else
-	    perror ("readchar");
+	    {
+	      char *result;
+	      asprintf (&result, "readchar: (fd=%d)", fd);
+	      perror (result);
+	      fprintf (stderr, "%s",result);
+	    }
 
 	  return -1;
 	}
 
-      cs->readchar_bufp = cs->readchar_buf;
+      cs->ss->readchar_bufp = cs->ss->readchar_buf;
     }
 
-  cs->readchar_bufcnt--;
-  ch = *cs->readchar_bufp++;
+  cs->ss->readchar_bufcnt--;
+  ch = *cs->ss->readchar_bufp++;
   reschedule ();
   return ch;
 }
@@ -919,7 +927,7 @@ reset_readchar (void)
 {
   client_state *cs = get_client_state();
 
-  cs->readchar_bufcnt = 0;
+  cs->ss->readchar_bufcnt = 0;
   if (readchar_callback != NOT_SCHEDULED)
     {
       delete_callback_event (readchar_callback);
@@ -938,7 +946,7 @@ process_remaining (void *context)
   /* This is a one-shot event.  */
   readchar_callback = NOT_SCHEDULED;
 
-  if (cs->readchar_bufcnt > 0)
+  if (cs->ss->readchar_bufcnt > 0)
     res = handle_serial_event (0, NULL);
   else
     res = 0;
@@ -953,7 +961,7 @@ static void
 reschedule (void)
 {
   client_state *cs = get_client_state();
-  if (cs->readchar_bufcnt > 0 && readchar_callback == NOT_SCHEDULED)
+  if (cs->ss->readchar_bufcnt > 0 && readchar_callback == NOT_SCHEDULED)
     readchar_callback = append_callback_event (process_remaining, NULL);
 }
 
@@ -1144,13 +1152,13 @@ prepare_resume_reply (char *buf, ptid_t ptid,
 	sprintf (buf, "T%02x", status->value.sig);
 	buf += strlen (buf);
 
-	saved_thread = cs->current_thread;
+	saved_thread = cs->ss->current_thread;
 
-	cs->current_thread = find_thread_ptid (ptid);
+	cs->ss->current_thread = find_thread_ptid (ptid);
 
 	regp = current_target_desc ()->expedite_regs;
 
-	regcache = get_thread_regcache (cs->current_thread, 1);
+	regcache = get_thread_regcache (cs->ss->current_thread, 1);
 
 	if (the_target->stopped_by_watchpoint != NULL
 	    && (*the_target->stopped_by_watchpoint) ())
@@ -1194,13 +1202,13 @@ prepare_resume_reply (char *buf, ptid_t ptid,
 	       in GDB will claim this event belongs to inferior_ptid
 	       if we do not specify a thread, and there's no way for
 	       gdbserver to know what inferior_ptid is.  */
-	    if (1 || !ptid_equal (cs->general_thread, ptid))
+	    if (1 || !ptid_equal (cs->ss->general_thread, ptid))
 	      {
 		int core = -1;
 		/* In non-stop, don't change the general thread behind
 		   GDB's back.  */
 		if (!cs->non_stop)
-		  cs->general_thread = ptid;
+		  cs->ss->general_thread = ptid;
 		sprintf (buf, "thread:");
 		buf += strlen (buf);
 		buf = write_ptid (buf, ptid);
@@ -1227,7 +1235,7 @@ prepare_resume_reply (char *buf, ptid_t ptid,
 	    dlls_changed = 0;
 	  }
 
-	cs->current_thread = saved_thread;
+	cs->ss->current_thread = saved_thread;
       }
       break;
     case TARGET_WAITKIND_EXITED:

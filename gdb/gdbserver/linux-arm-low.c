@@ -284,7 +284,7 @@ arm_breakpoint_at (CORE_ADDR where)
 {
   client_state *cs = get_client_state ();
 
-  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
+  struct regcache *regcache = get_thread_regcache (cs->ss->current_thread, 1);
   unsigned long cpsr;
 
   collect_register_by_name (regcache, "cpsr", &cpsr);
@@ -329,7 +329,7 @@ arm_reinsert_addr (void)
 {
   client_state *cs = get_client_state ();
 
-  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
+  struct regcache *regcache = get_thread_regcache (cs->ss->current_thread, 1);
   unsigned long pc;
   collect_register_by_name (regcache, "lr", &pc);
   return pc;
@@ -542,7 +542,7 @@ update_registers_callback (struct inferior_list_entry *entry, void *arg)
   client_state *cs = get_client_state ();
 
   /* Only update the threads of the current process.  */
-  if (pid_of (thread) == pid_of (cs->current_thread))
+  if (pid_of (thread) == pid_of (cs->ss->current_thread))
     {
       /* The actual update is done later just before resuming the lwp,
          we just mark that the registers need updating.  */
@@ -609,7 +609,7 @@ arm_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
       {
 	struct update_registers_data data = { watch, i };
 	pts[i] = p;
-	find_inferior (&cs->all_threads, update_registers_callback, &data);
+	find_inferior (&cs->ss->all_threads, update_registers_callback, &data);
 	return 0;
       }
 
@@ -650,7 +650,7 @@ arm_remove_point (enum raw_bkpt_type type, CORE_ADDR addr,
       {
 	struct update_registers_data data = { watch, i };
 	pts[i].control = arm_hwbp_control_disable (pts[i].control);
-	find_inferior (&cs->all_threads, update_registers_callback, &data);
+	find_inferior (&cs->ss->all_threads, update_registers_callback, &data);
 	return 0;
       }
 
@@ -663,7 +663,7 @@ static int
 arm_stopped_by_watchpoint (void)
 {
   client_state *cs = get_client_state ();
-  struct lwp_info *lwp = get_thread_lwp (cs->current_thread);
+  struct lwp_info *lwp = get_thread_lwp (cs->ss->current_thread);
   siginfo_t siginfo;
 
   /* We must be able to set hardware watchpoints.  */
@@ -672,7 +672,7 @@ arm_stopped_by_watchpoint (void)
 
   /* Retrieve siginfo.  */
   errno = 0;
-  ptrace (PTRACE_GETSIGINFO, lwpid_of (cs->current_thread), 0, &siginfo);
+  ptrace (PTRACE_GETSIGINFO, lwpid_of (cs->ss->current_thread), 0, &siginfo);
   if (errno != 0)
     return 0;
 
@@ -700,7 +700,7 @@ arm_stopped_data_address (void)
 {
   client_state *cs = get_client_state ();
 
-  struct lwp_info *lwp = get_thread_lwp (cs->current_thread);
+  struct lwp_info *lwp = get_thread_lwp (cs->ss->current_thread);
   return lwp->arch_private->stopped_data_address;
 }
 
@@ -808,7 +808,7 @@ arm_read_description (void)
 {
   client_state *cs = get_client_state ();
 
-  int pid = lwpid_of (cs->current_thread);
+  int pid = lwpid_of (cs->ss->current_thread);
 
   /* Query hardware watchpoint/breakpoint capabilities.  */
   arm_linux_init_hwbp_cap (pid);

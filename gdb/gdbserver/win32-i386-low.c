@@ -67,12 +67,12 @@ x86_dr_low_set_addr (int regnum, CORE_ADDR addr)
   client_state *cs = get_client_state ();
 
   /* Only update the threads of this process.  */
-  int pid = pid_of (cs->current_thread);
+  int pid = pid_of (cs->ss->current_thread);
   client_state *cs = get_client_state ();
 
   gdb_assert (DR_FIRSTADDR <= regnum && regnum <= DR_LASTADDR);
 
-  find_inferior (&cs->all_threads, update_debug_registers_callback, &pid);
+  find_inferior (&cs->ss->all_threads, update_debug_registers_callback, &pid);
 }
 
 /* Update the inferior's DR7 debug control register from STATE.  */
@@ -83,10 +83,10 @@ x86_dr_low_set_control (unsigned long control)
   client_state *cs = get_client_state ();
 
   /* Only update the threads of this process.  */
-  int pid = pid_of (cs->current_thread);
+  int pid = pid_of (cs->ss->current_thread);
   client_state *cs = get_client_state ();
 
-  find_inferior (&cs->all_threads, update_debug_registers_callback, &pid);
+  find_inferior (&cs->ss->all_threads, update_debug_registers_callback, &pid);
 }
 
 /* Return the current value of a DR register of the current thread's
@@ -96,7 +96,7 @@ static DWORD64
 win32_get_current_dr (int dr)
 {
   client_state *cs = get_client_state ();
-  win32_thread_info *th = inferior_target_data (cs->current_thread);
+  win32_thread_info *th = inferior_target_data (cs->ss->current_thread);
 
   win32_require_context (th);
 

@@ -111,24 +111,16 @@ extern int handle_target_event (int err, gdb_client_data client_data);
    as large as the largest register set supported by gdbserver.  */
 #define PBUFSIZ 16384
 
+/* Multiple granularity locking for server/client */
+
+typedef enum {NL, IX, IS, X, S, SIX} lock_modes;
+
 /* Description of the remote protocol state for the currently
    connected target.  This is per-target state, and independent of the
    selected architecture.  */
 
-struct client_state
+struct server_state
 {
-  char *executable;
-  // file descriptor corresponding to this client
-  gdb_fildes_t file_desc;
-  // following were in server.c
-  // --once: Exit after the first connection has closed.
-  int run_once;
-  // --multi
-  int multi_process;
-  // QNonStop packet
-  int non_stop;
-  // QDisableRandomization packet
-  int disable_randomization;
   /* The thread set with an `Hc' packet.  `Hc' is deprecated in favor of
      `vCont'.  Note the multi-process extensions made `vCont' a
      requirement, so `Hc pPID.TID' is pretty much undefined.  So
@@ -139,17 +131,11 @@ struct client_state
      We also set this when handling a single-thread `vCont' resume, as
      some places in the backends check it to know when (and for which
      thread) single-thread scheduler-locking is in effect.  */
+  lock_modes lock_mode;
+  int attach_count;
   ptid_t cont_thread;
   // The thread set with an `Hg' packet.
   ptid_t general_thread;
-  int server_waiting;
-  int extended_protocol;
-  int response_needed;
-  int exit_requested;
-  int pass_signals[GDB_SIGNAL_LAST];
-  int program_signals[GDB_SIGNAL_LAST];
-  int program_signals_p;
-  char **program_argv, **wrapper_argv;
   pid_t signal_pid;
   struct target_waitstatus last_status;
   ptid_t last_ptid;
@@ -158,13 +144,42 @@ struct client_state
   unsigned char readchar_buf[BUFSIZ];
   int readchar_bufcnt;
   unsigned char *readchar_bufp;
-  // following were in mem-break.c
-  const unsigned char *breakpoint_data;
-  int breakpoint_len;
   // following were in inferior.c
   struct inferior_list all_processes;
   struct inferior_list all_threads;
   struct thread_info *current_thread;
+};
+
+typedef struct server_state server_state;
+
+struct client_state
+{
+  lock_modes lock_mode;
+  char *executable;
+  // file descriptor corresponding to this client
+  gdb_fildes_t file_desc;
+  char packet;
+  // following were in server.c
+  // --once: Exit after the first connection has closed.
+  int run_once;
+  // --multi
+  int multi_process;
+  // QNonStop packet
+  int non_stop;
+  // QDisableRandomization packet
+  int disable_randomization;
+  int server_waiting;
+  int extended_protocol;
+  int response_needed;
+  int exit_requested;
+  int pass_signals[GDB_SIGNAL_LAST];
+  int program_signals[GDB_SIGNAL_LAST];
+  int program_signals_p;
+  char **program_argv, **wrapper_argv;
+  // following were in mem-break.c
+  const unsigned char *breakpoint_data;
+  int breakpoint_len;
+  server_state *ss;
   struct client_state *next;
 };
 
@@ -173,5 +188,7 @@ typedef struct client_state client_state;
 client_state * get_client_state ();
 
 client_state * set_client_state (gdb_fildes_t);
+
+void delete_client_state (gdb_fildes_t fd);
 
 #endif /* SERVER_H */

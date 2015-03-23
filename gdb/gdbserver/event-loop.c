@@ -300,7 +300,6 @@ create_file_handler (gdb_fildes_t fd, int mask, handler_func *proc,
       file_ptr->ready_mask = 0;
       file_ptr->next_file = gdb_notifier.first_file_handler;
       gdb_notifier.first_file_handler = file_ptr;
-
       if (mask & GDB_READABLE)
 	FD_SET (fd, &gdb_notifier.check_masks[0]);
       else
@@ -344,7 +343,7 @@ delete_file_handler (gdb_fildes_t fd)
   int i;
 
   if (debug_threads)
-    fprintf (stderr,"%s matched fd %d\n",__FUNCTION__,fd);
+    fprintf (stderr,"%s fd=%d\n",__FUNCTION__,fd);
   /* Find the entry for the given file. */
 
   for (file_ptr = gdb_notifier.first_file_handler;
@@ -394,6 +393,8 @@ delete_file_handler (gdb_fildes_t fd)
 	;
       prev_ptr->next_file = file_ptr->next_file;
     }
+
+  delete_client_state (fd);
   free (file_ptr);
 }
 
@@ -503,7 +504,7 @@ wait_for_event (void)
 	      }
 	    else
 	      if (debug_threads)
-		fprintf (stderr,"%s data arrived on existing connection %d fd=%d\n", __FUNCTION__, 	i,get_listen_desc());
+		fprintf (stderr,"%s data arrived on existing connection %d fd=%d\n", __FUNCTION__, i,get_listen_desc());
 	  }
     }
   //
@@ -568,7 +569,7 @@ wait_for_event (void)
 	{
 	  int handle_accept_event (int err, gdb_client_data client_data);
 	  gdb_event *file_event_ptr = create_file_event (file_ptr->fd);
-	  fprintf (stderr,"%s 2 #fds=%d\n",__FUNCTION__,gdb_notifier.num_fds);
+	  fprintf (stderr,"%s #fds=%d\n",__FUNCTION__,gdb_notifier.num_fds);
 	  if (debug_threads)
 	    fprintf(stderr,"%s create_file_event for %d %#lx %#lx %#lx %#lx\n",__FUNCTION__,file_event_ptr->fd,(long unsigned int)file_ptr->proc,(long unsigned int)handle_file_event,(long unsigned int)handle_serial_event,(long unsigned int)handle_accept_event);
 	  QUEUE_enque (gdb_event_p, event_queue, file_event_ptr);

@@ -423,7 +423,7 @@ s390_arch_setup (void)
   client_state *cs = get_client_state ();
 
   /* Check whether the kernel supports extra register sets.  */
-  int pid = pid_of (cs->current_thread);
+  int pid = pid_of (cs->ss->current_thread);
   int have_regset_last_break
     = s390_check_regset (pid, NT_S390_LAST_BREAK, 8);
   int have_regset_system_call

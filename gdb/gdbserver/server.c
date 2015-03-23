@@ -84,8 +84,33 @@ static client_state *
 new_client_state ()
 {
   client_state *result = XCNEW (client_state);
-
+  result->lock_mode = NL;
   return result;
+}
+
+
+static server_state *
+new_server_state ()
+{
+  server_state *result = XCNEW (server_state);
+  result->lock_mode = IX;
+  return result;
+}
+
+
+static void
+free_server_state (server_state *ss)
+{
+  XDELETE (ss);
+}
+
+
+static void
+free_client_state (client_state *cs)
+{
+  // TODO keep reference count and delete when 0
+//  free_server_state (cs->ss);
+  XDELETE (cs);
 }
 
 
@@ -96,9 +121,45 @@ dump_client_state ()
   for (cs = set_client_state (-1); cs != NULL; cs = cs->next)
       if (debug_threads)
 	{
-	  debug_printf ("%s %s %d cont_thr %#lx gen thr %#lx\n", __FUNCTION__,cs->executable, cs->file_desc, (long unsigned)cs->cont_thread.pid, (long unsigned)cs->general_thread.pid);
-	  debug_printf ("%s %d all procs %#lx all thrs %#lx curr thr %#lx\n", __FUNCTION__,(int)cs->last_ptid.pid, (unsigned long)cs->all_processes.head, (unsigned long)cs->all_threads.head, (unsigned long)cs->current_thread);
+	  debug_printf ("%s %s %d cont_thr %#lx gen thr %#lx attached? %d\n", __FUNCTION__,
+			cs->executable, cs->file_desc, (long unsigned)cs->ss->cont_thread.pid,
+			(long unsigned)cs->ss->general_thread.pid, cs->ss->attach_count);
+	  debug_printf ("%s %d all procs %#lx all thrs %#lx curr thr %#lx\n", __FUNCTION__,
+			(int)cs->ss->last_ptid.pid, (unsigned long)cs->ss->all_processes.head,
+			(unsigned long)cs->ss->all_threads.head, (unsigned long)cs->ss->current_thread);
     }
+}
+
+int
+attach_client_state (client_state *cs, int pid)
+{
+  client_state *matched_cs;
+
+  for (matched_cs = set_client_state (-1); matched_cs != NULL; matched_cs = matched_cs->next)
+    {
+      if (cs != matched_cs && matched_cs->ss->last_ptid.pid == pid)
+	{
+	  matched_cs->ss->attach_count += 1;
+	  cs->executable = matched_cs->executable;
+	  free_server_state (cs->ss);		// reuse the matched server state
+	  cs->ss = matched_cs->ss; // was *cs = *matched_cs
+	  cs->ss->lock_mode = IS;
+#if 0
+	  cs->ss->cont_thread = matched_cs->ss->cont_thread;
+	  cs->ss->general_thread = matched_cs->ss->general_thread;
+	  cs->wrapper_argv = matched_cs->wrapper_argv;
+	  cs->ss->signal_pid = matched_cs->ss->signal_pid;
+	  cs->ss->last_ptid = matched_cs->ss->last_ptid;
+	  cs->ss->current_thread = matched_cs->ss->current_thread;
+	  cs->ss->all_processes.head = matched_cs->ss->all_processes.head;
+	  cs->ss->all_processes.tail = matched_cs->ss->all_processes.tail;
+	  cs->ss->all_threads.head = matched_cs->ss->all_threads.head;
+	  cs->ss->all_threads.tail = matched_cs->ss->all_threads.tail;
+#endif
+	  return 1;
+	}
+    }
+  return 0;
 }
 
 client_state *
@@ -121,12 +182,12 @@ set_client_state (gdb_fildes_t fd)
       if (first_client_state == NULL)
 	{
 	  first_client_state = new_client_state ();
+	  first_client_state->ss = new_server_state ();
 	  first_client_state->file_desc = fd;
 	  current_fd = fd;
 	}
       return first_client_state;
     }
-
 
   // return client state for current fd
 
@@ -149,19 +210,22 @@ set_client_state (gdb_fildes_t fd)
   // add client state S for fd F
   new_csidx = new_client_state ();
   *new_csidx = *csidx;
+  new_csidx->ss = new_server_state ();
+  *new_csidx->ss = *csidx->ss;
+  new_csidx->ss->attach_count = 0;
   new_csidx->file_desc = fd;
-  new_csidx->executable = NULL;
 #if 1
-  new_csidx->cont_thread = null_ptid;
-  new_csidx->general_thread = null_ptid;
+  new_csidx->executable = NULL;
+  new_csidx->ss->cont_thread = null_ptid;
+  new_csidx->ss->general_thread = null_ptid;
   new_csidx->wrapper_argv = NULL;
-  new_csidx->signal_pid = 0;
-  new_csidx->last_ptid = null_ptid;
-  new_csidx->current_thread = 0;
-  new_csidx->all_processes.head = NULL;
-  new_csidx->all_processes.tail = NULL;
-  new_csidx->all_threads.head = NULL;
-  new_csidx->all_threads.tail = NULL;
+  new_csidx->ss->signal_pid = 0;
+  new_csidx->ss->last_ptid = null_ptid;
+  new_csidx->ss->current_thread = 0;
+  new_csidx->ss->all_processes.head = NULL;
+  new_csidx->ss->all_processes.tail = NULL;
+  new_csidx->ss->all_threads.head = NULL;
+  new_csidx->ss->all_threads.tail = NULL;
 #endif
   current_fd = fd;
   csidx->next = new_csidx;
@@ -169,6 +233,54 @@ set_client_state (gdb_fildes_t fd)
     debug_printf ("%s Called returned fd=%d current=%d\n", __FUNCTION__, fd, current_fd);
   return new_csidx;
 }
+
+
+int
+count_client_state ()
+{
+  client_state *cs;
+  int n_client_states = 0;
+  for (cs = set_client_state(-1); cs != NULL; cs = cs->next)
+    {
+      if (cs->executable != NULL)
+	n_client_states += 1;
+    }
+  return n_client_states;
+}
+
+
+void
+delete_client_state (gdb_fildes_t fd)
+{
+  client_state *cs, *previous_cs = NULL;
+  server_state *ss= NULL;
+
+  for (cs = set_client_state(-1); cs != NULL; cs = cs->next)
+    {
+      if (cs->file_desc == fd)
+	{
+	  ss = cs->ss;
+	  previous_cs->next = cs->next;
+	  free_client_state (cs);
+	  cs = previous_cs;
+	}
+      if (cs->next == NULL)
+	break;
+      previous_cs = cs;
+    }
+
+  for (cs = set_client_state(-1); cs != NULL; cs = cs->next)
+    {
+      if (cs->ss == ss)
+	{
+	  cs->ss->attach_count -= 1;
+	  if (cs->ss->attach_count == 0)
+	    cs->ss->lock_mode = IX;
+	  set_client_state (cs->file_desc);
+	}
+    }
+}
+
 
 int get_remote_desc();
 
@@ -201,40 +313,90 @@ match_client_state (char *executable)
 	}
     }
 
+  // TODO Is there a window where multiple clients are created by new_client_state but not yet setup by match_client_state?
   cs = set_client_state (0);
+      new_executable = xmalloc (strlen (executable) + 1); // was in else
+      strcpy (new_executable, executable);
+      cs->executable = new_executable;
+
   if (matched_cs && cs != matched_cs)
     {
       client_state *tcs = get_client_state();
       client_state *next_cs = cs->next;
       gdb_fildes_t file_desc = cs->file_desc;
-      *cs = *matched_cs;
+      free_server_state (cs->ss);		// reuse the matched server state
+      cs->ss = matched_cs->ss; // was *cs = *matched_cs
+      matched_cs->ss->lock_mode = IS;
+      cs->ss->attach_count += 1;
       cs->next = next_cs;
       cs->file_desc = file_desc;
-#if 0
-      cs->executable = matched_cs->executable;
-      cs->cont_thread = matched_cs->cont_thread;
-      cs->general_thread = matched_cs->general_thread;
-      cs->wrapper_argv = matched_cs->wrapper_argv;
-      cs->signal_pid = matched_cs->signal_pid;
-      cs->last_ptid = matched_cs->last_ptid;
-      cs->all_processes.head = matched_cs->all_processes.head;
-      cs->all_threads.head = matched_cs->all_threads.head;
-      cs->current_thread = matched_cs->current_thread;
-#endif
       debug_printf ("%s current=%d returning %d\n", __FUNCTION__,tcs->file_desc,cs->file_desc);
       return cs;
     }
   else
     {
-      new_executable = xmalloc (strlen (executable) + 1);
-      strcpy (new_executable, executable);
-      cs->executable = new_executable;
       if (debug_threads)
 	debug_printf ("%s %s %d returning null\n", __FUNCTION__, cs->executable, cs->file_desc);
     }
 
   return NULL;
 }
+
+
+/*
+* Multiple Granularity Locking
+Transaction Ti can lock a node Q, using the following rules:
+  lock node Q in S or IS if ancestor of Q locked IX or IS
+  lock node Q in X, IX, SIX if ancestor of Q locked IX or SIX
+  unlock node Q if decendent of Q are locked
+  locks are acquired in root to leaf order and are release in leaf to root order.
+
+|     | NL | IS | IX | S | SIX | X |
+| NL  | y  | y  | y  | y | y   | y |
+| IS  | y  | y  | y  | y | y   | n |
+| IX  | y  | y  | y  | n | n   | n |
+| S   | y  | y  | n  | y | n   | n |
+| SIX | y  | y  | n  | n | n   | n |
+| X   | y  | n  | n  | n | n   | n |
+*/
+
+int
+set_lock (struct client_state *cs, lock_modes lock_mode)
+{
+  debug_printf ("%s S/X/IS/IX %d/%d/%d/%d server %d client %d parm %d\n", __FUNCTION__, S, X, IS, IX, cs->ss->lock_mode, cs->lock_mode, lock_mode);
+  switch (cs->ss->lock_mode)
+  {
+    case NL:
+      cs->lock_mode = lock_mode;
+      return 1;
+    case IX:
+      switch (lock_mode)
+      {
+	case S:
+	case X:
+	  cs->lock_mode = lock_mode;
+	  return 1;
+	default:
+	  break;
+      };
+    case IS:
+      switch (lock_mode)
+      {
+	case S:
+	  cs->lock_mode = lock_mode;
+	  return 1;
+	case X:
+	  return 0;
+	default:
+	  break;
+      };
+    default:
+      break;
+  }
+
+  return 1;
+}
+
 
 /* Post a stop reply to the stop reply queue.  */
 
@@ -338,14 +500,14 @@ start_inferior (char **argv)
 
   /* Clear this so the backend doesn't get confused, thinking
      CONT_THREAD died, and it needs to resume all threads.  */
-  cs->cont_thread = null_ptid;
+  cs->ss->cont_thread = null_ptid;
 
-  cs->signal_pid = create_inferior (new_argv[0], new_argv);
+  cs->ss->signal_pid = create_inferior (new_argv[0], new_argv);
 
   /* FIXME: we don't actually know at this point that the create
      actually succeeded.  We won't know that until we wait.  */
   fprintf (stderr, "Process %s created; pid = %ld\n", argv[0],
-	   (long)cs->signal_pid);
+	   (long)cs->ss->signal_pid);
   fflush (stderr);
 
 #ifdef SIGTTOU
@@ -353,7 +515,7 @@ start_inferior (char **argv)
   signal (SIGTTIN, SIG_IGN);
   terminal_fd = fileno (stderr);
   old_foreground_pgrp = tcgetpgrp (terminal_fd);
-  tcsetpgrp (terminal_fd, cs->signal_pid);
+  tcsetpgrp (terminal_fd, cs->ss->signal_pid);
   atexit (restore_old_foreground_pgrp);
 #endif
 
@@ -362,43 +524,43 @@ start_inferior (char **argv)
       struct thread_resume resume_info;
 
       memset (&resume_info, 0, sizeof (resume_info));
-      resume_info.thread = pid_to_ptid (cs->signal_pid);
+      resume_info.thread = pid_to_ptid (cs->ss->signal_pid);
       resume_info.kind = resume_continue;
       resume_info.sig = 0;
 
-      cs->last_ptid = mywait (pid_to_ptid (cs->signal_pid), &cs->last_status, 0, 0);
+      cs->ss->last_ptid = mywait (pid_to_ptid (cs->ss->signal_pid), &cs->ss->last_status, 0, 0);
 
-      if (cs->last_status.kind != TARGET_WAITKIND_STOPPED)
-	return cs->signal_pid;
+      if (cs->ss->last_status.kind != TARGET_WAITKIND_STOPPED)
+	return cs->ss->signal_pid;
 
       do
 	{
 	  (*the_target->resume) (&resume_info, 1);
 
- 	  cs->last_ptid = mywait (pid_to_ptid (cs->signal_pid), &cs->last_status, 0, 0);
-	  if (cs->last_status.kind != TARGET_WAITKIND_STOPPED)
-	    return cs->signal_pid;
+ 	  cs->ss->last_ptid = mywait (pid_to_ptid (cs->ss->signal_pid), &cs->ss->last_status, 0, 0);
+	  if (cs->ss->last_status.kind != TARGET_WAITKIND_STOPPED)
+	    return cs->ss->signal_pid;
 
-	  cs->current_thread->last_resume_kind = resume_stop;
-	  cs->current_thread->last_status = cs->last_status;
+	  cs->ss->current_thread->last_resume_kind = resume_stop;
+	  cs->ss->current_thread->last_status = cs->ss->last_status;
 	}
-      while (cs->last_status.value.sig != GDB_SIGNAL_TRAP);
+      while (cs->ss->last_status.value.sig != GDB_SIGNAL_TRAP);
 
-      return cs->signal_pid;
+      return cs->ss->signal_pid;
     }
 
   /* Wait till we are at 1st instruction in program, return new pid
      (assuming success).  */
-  cs->last_ptid = mywait (pid_to_ptid (cs->signal_pid), &cs->last_status, 0, 0);
+  cs->ss->last_ptid = mywait (pid_to_ptid (cs->ss->signal_pid), &cs->ss->last_status, 0, 0);
 
-  if (cs->last_status.kind != TARGET_WAITKIND_EXITED
-      && cs->last_status.kind != TARGET_WAITKIND_SIGNALLED)
+  if (cs->ss->last_status.kind != TARGET_WAITKIND_EXITED
+      && cs->ss->last_status.kind != TARGET_WAITKIND_SIGNALLED)
     {
-      cs->current_thread->last_resume_kind = resume_stop;
-      cs->current_thread->last_status = cs->last_status;
+      cs->ss->current_thread->last_resume_kind = resume_stop;
+      cs->ss->current_thread->last_status = cs->ss->last_status;
     }
 
-  return cs->signal_pid;
+  return cs->ss->signal_pid;
 }
 
 static int
@@ -418,25 +580,25 @@ attach_inferior (int pid)
   /* FIXME - It may be that we should get the SIGNAL_PID from the
      attach function, so that it can be the main thread instead of
      whichever we were told to attach to.  */
-  cs->signal_pid = pid;
+  cs->ss->signal_pid = pid;
 
   /* Clear this so the backend doesn't get confused, thinking
      CONT_THREAD died, and it needs to resume all threads.  */
-  cs->cont_thread = null_ptid;
+  cs->ss->cont_thread = null_ptid;
 
   if (! cs->non_stop)
     {
-      cs->last_ptid = mywait (pid_to_ptid (pid), &cs->last_status, 0, 0);
+      cs->ss->last_ptid = mywait (pid_to_ptid (pid), &cs->ss->last_status, 0, 0);
 
       /* GDB knows to ignore the first SIGSTOP after attaching to a running
 	 process using the "attach" command, but this is different; it's
 	 just using "target remote".  Pretend it's just starting up.  */
-      if (cs->last_status.kind == TARGET_WAITKIND_STOPPED
-	  && cs->last_status.value.sig == GDB_SIGNAL_STOP)
-	cs->last_status.value.sig = GDB_SIGNAL_TRAP;
+      if (cs->ss->last_status.kind == TARGET_WAITKIND_STOPPED
+	  && cs->ss->last_status.value.sig == GDB_SIGNAL_STOP)
+	cs->ss->last_status.value.sig = GDB_SIGNAL_TRAP;
 
-      cs->current_thread->last_resume_kind = resume_stop;
-      cs->current_thread->last_status = cs->last_status;
+      cs->ss->current_thread->last_resume_kind = resume_stop;
+      cs->ss->current_thread->last_status = cs->ss->last_status;
     }
 
   return 0;
@@ -558,14 +720,14 @@ handle_btrace_general_set (char *own_buf)
       return -1;
     }
 
-  if (ptid_equal (cs->general_thread, null_ptid)
-      || ptid_equal (cs->general_thread, minus_one_ptid))
+  if (ptid_equal (cs->ss->general_thread, null_ptid)
+      || ptid_equal (cs->ss->general_thread, minus_one_ptid))
     {
       strcpy (own_buf, "E.Must select a single thread.");
       return -1;
     }
 
-  thread = find_thread_ptid (cs->general_thread);
+  thread = find_thread_ptid (cs->ss->general_thread);
   if (thread == NULL)
     {
       strcpy (own_buf, "E.No such thread.");
@@ -1453,7 +1615,7 @@ handle_qxfer_threads_proper (struct buffer *buffer)
 
   buffer_grow_str (buffer, "<threads>\n");
 
-  for_each_inferior_with_data (&cs->all_threads, handle_qxfer_threads_worker,
+  for_each_inferior_with_data (&cs->ss->all_threads, handle_qxfer_threads_worker,
 			       buffer);
 
   buffer_grow_str0 (buffer, "</threads>\n");
@@ -1592,23 +1754,23 @@ handle_qxfer_btrace (const char *annex,
   if (!target_running ())
     return -1;
 
-  if (ptid_equal (cs->general_thread, null_ptid)
-      || ptid_equal (cs->general_thread, minus_one_ptid))
+  if (ptid_equal (cs->ss->general_thread, null_ptid)
+      || ptid_equal (cs->ss->general_thread, minus_one_ptid))
     {
-      strcpy (cs->own_buf, "E.Must select a single thread.");
+      strcpy (cs->ss->own_buf, "E.Must select a single thread.");
       return -3;
     }
 
-  thread = find_thread_ptid (cs->general_thread);
+  thread = find_thread_ptid (cs->ss->general_thread);
   if (thread == NULL)
     {
-      strcpy (cs->own_buf, "E.No such thread.");
+      strcpy (cs->ss->own_buf, "E.No such thread.");
       return -3;
     }
 
   if (thread->btrace == NULL)
     {
-      strcpy (cs->own_buf, "E.Btrace not enabled.");
+      strcpy (cs->ss->own_buf, "E.Btrace not enabled.");
       return -3;
     }
 
@@ -1620,7 +1782,7 @@ handle_qxfer_btrace (const char *annex,
     type = BTRACE_READ_DELTA;
   else
     {
-      strcpy (cs->own_buf, "E.Bad annex.");
+      strcpy (cs->ss->own_buf, "E.Bad annex.");
       return -3;
     }
 
@@ -1631,7 +1793,7 @@ handle_qxfer_btrace (const char *annex,
       result = target_read_btrace (thread->btrace, &cache, type);
       if (result != 0)
 	{
-	  memcpy (cs->own_buf, cache.buffer, cache.used_size);
+	  memcpy (cs->ss->own_buf, cache.buffer, cache.used_size);
 	  return -3;
 	}
     }
@@ -1784,7 +1946,7 @@ handle_qxfer (char *own_buf, int packet_len, int *new_packet_len_p)
   return 0;
 }
 
-/* Table used by the crc32 function to calcuate the checksum.  */
+/* Table used by the crc32 function to calculate the checksum.  */
 
 static unsigned int crc32_table[256] =
 {0, 0};
@@ -1840,12 +2002,12 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p, gdb_client_d
       ptid_t gdb_id;
       require_running (own_buf);
 
-      if (!ptid_equal (cs->general_thread, null_ptid)
-	  && !ptid_equal (cs->general_thread, minus_one_ptid))
-	gdb_id = cs->general_thread;
+      if (!ptid_equal (cs->ss->general_thread, null_ptid)
+	  && !ptid_equal (cs->ss->general_thread, minus_one_ptid))
+	gdb_id = cs->ss->general_thread;
       else
 	{
-	  thread_ptr = get_first_inferior (&cs->all_threads);
+	  thread_ptr = get_first_inferior (&cs->ss->all_threads);
 	  gdb_id = thread_to_gdb_id ((struct thread_info *)thread_ptr);
 	}
 
@@ -1886,7 +2048,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p, gdb_client_d
 	  ptid_t gdb_id;
 
 	  require_running (own_buf);
-	  thread_ptr = get_first_inferior (&cs->all_threads);
+	  thread_ptr = get_first_inferior (&cs->ss->all_threads);
 
 	  *own_buf++ = 'm';
 	  gdb_id = thread_to_gdb_id ((struct thread_info *)thread_ptr);
@@ -2200,15 +2362,18 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p, gdb_client_d
       || strncmp (own_buf, "qAttached:", sizeof ("qAttached:") - 1) == 0)
     {
       struct process_info *process;
+      client_state *cs = get_client_state();
 
       if (own_buf[sizeof ("qAttached") - 1])
 	{
 	  int pid = strtoul (own_buf + sizeof ("qAttached:") - 1, NULL, 16);
 	  process = (struct process_info *)
-	    find_inferior_id (&cs->all_processes, pid_to_ptid (pid));
+	    find_inferior_id (&cs->ss->all_processes, pid_to_ptid (pid));
 	}
       else
 	{
+	  debug_printf ("%s %d \n", __FUNCTION__, target_running());
+	  dump_client_state();
 	  require_running (own_buf);
 	  process = current_process ();
 	}
@@ -2219,7 +2384,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p, gdb_client_d
 	  return;
 	}
 
-      strcpy (own_buf, process->attached ? "1" : "0");
+      strcpy (own_buf, process->attached || cs->ss->attach_count ? "1" : "0");
       return;
     }
 
@@ -2324,9 +2489,9 @@ handle_pending_status (const struct thread_resume *resumption,
     {
       thread->status_pending_p = 0;
 
-      cs->last_status = thread->last_status;
-      cs->last_ptid = thread->entry.id;
-      prepare_resume_reply (cs->own_buf, cs->last_ptid, &cs->last_status);
+      cs->ss->last_status = thread->last_status;
+      cs->ss->last_ptid = thread->entry.id;
+      prepare_resume_reply (cs->ss->own_buf, cs->ss->last_ptid, &cs->ss->last_status);
       return 1;
     }
   return 0;
@@ -2439,9 +2604,9 @@ handle_v_cont (char *own_buf)
       && !(ptid_equal (resume_info[0].thread, minus_one_ptid)
 	   || ptid_get_lwp (resume_info[0].thread) == -1)
       && resume_info[0].kind != resume_stop)
-    cs->cont_thread = resume_info[0].thread;
+    cs->ss->cont_thread = resume_info[0].thread;
   else
-    cs->cont_thread = minus_one_ptid;
+    cs->ss->cont_thread = minus_one_ptid;
   set_desired_thread (0);
 
   resume (resume_info, n);
@@ -2472,7 +2637,7 @@ resume (struct thread_resume *actions, size_t num_actions)
       data.actions = actions;
       data.num_actions = num_actions;
       data.callback = handle_pending_status;
-      if (find_inferior (&cs->all_threads, visit_actioned_threads, &data) != NULL)
+      if (find_inferior (&cs->ss->all_threads, visit_actioned_threads, &data) != NULL)
 	return;
 
       enable_async_io ();
@@ -2481,38 +2646,40 @@ resume (struct thread_resume *actions, size_t num_actions)
   (*the_target->resume) (actions, num_actions);
 
   if (cs->non_stop)
-    write_ok (cs->own_buf);
+    write_ok (cs->ss->own_buf);
   else
     {
-      cs->last_ptid = mywait (minus_one_ptid, &cs->last_status, 0, 1);
+      cs->ss->last_ptid = mywait (minus_one_ptid, &cs->ss->last_status, 0, 1);
 
-      if (cs->last_status.kind == TARGET_WAITKIND_NO_RESUMED)
+      if (cs->ss->last_status.kind == TARGET_WAITKIND_NO_RESUMED)
 	{
 	  /* No proper RSP support for this yet.  At least return
 	     error.  */
-	  sprintf (cs->own_buf, "E.No unwaited-for children left.");
+	  sprintf (cs->ss->own_buf, "E.No unwaited-for children left.");
 	  disable_async_io ();
 	  return;
 	}
 
-      if (cs->last_status.kind != TARGET_WAITKIND_EXITED
-          && cs->last_status.kind != TARGET_WAITKIND_SIGNALLED
-	  && cs->last_status.kind != TARGET_WAITKIND_NO_RESUMED)
-	cs->current_thread->last_status = cs->last_status;
+      if (cs->ss->last_status.kind != TARGET_WAITKIND_EXITED
+          && cs->ss->last_status.kind != TARGET_WAITKIND_SIGNALLED
+	  && cs->ss->last_status.kind != TARGET_WAITKIND_NO_RESUMED)
+	cs->ss->current_thread->last_status = cs->ss->last_status;
 
       /* From the client's perspective, all-stop mode always stops all
 	 threads implicitly (and the target backend has already done
 	 so by now).  Tag all threads as "want-stopped", so we don't
 	 resume them implicitly without the client telling us to.  */
       gdb_wants_all_threads_stopped ();
-      prepare_resume_reply (cs->own_buf, cs->last_ptid, &cs->last_status);
+      prepare_resume_reply (cs->ss->own_buf, cs->ss->last_ptid, &cs->ss->last_status);
       disable_async_io ();
 
-      if (cs->last_status.kind == TARGET_WAITKIND_EXITED
-          || cs->last_status.kind == TARGET_WAITKIND_SIGNALLED)
-        mourn_inferior (find_process_pid (ptid_get_pid (cs->last_ptid)));
+      if (cs->ss->last_status.kind == TARGET_WAITKIND_EXITED
+          || cs->ss->last_status.kind == TARGET_WAITKIND_SIGNALLED)
+        mourn_inferior (find_process_pid (ptid_get_pid (cs->ss->last_ptid)));
     }
 }
+
+static void handle_status (char *);
 
 /* Attach to a new program.  Return 1 if successful, 0 if failure.  */
 int
@@ -2524,7 +2691,15 @@ handle_v_attach (char *own_buf)
   pid = strtol (own_buf + 8, NULL, 16);
   if (debug_threads)
     debug_printf ("%s %d %d\n", __FUNCTION__, cs->file_desc,pid);
-  if (pid != 0 && attach_inferior (pid) == 0)
+
+  if (attach_client_state (cs, pid))
+    {
+      strcpy (own_buf, "?");
+      handle_status (own_buf);
+//      write_ok (own_buf);
+      return 1;
+    }
+  else if (pid != 0 && attach_inferior (pid) == 0)
     {
       /* Don't report shared library events after attaching, even if
 	 some libraries are preloaded.  GDB will always poll the
@@ -2540,7 +2715,7 @@ handle_v_attach (char *own_buf)
 	  write_ok (own_buf);
 	}
       else
-	prepare_resume_reply (own_buf, cs->last_ptid, &cs->last_status);
+	prepare_resume_reply (own_buf, cs->ss->last_ptid, &cs->ss->last_status);
 
       return 1;
     }
@@ -2629,15 +2804,15 @@ handle_v_run (char *own_buf)
     }
   start_inferior (cs->program_argv);
 
-  if (cs->last_status.kind == TARGET_WAITKIND_STOPPED)
+  if (cs->ss->last_status.kind == TARGET_WAITKIND_STOPPED)
     {
-      prepare_resume_reply (own_buf, cs->last_ptid, &cs->last_status);
+      prepare_resume_reply (own_buf, cs->ss->last_ptid, &cs->ss->last_status);
 
       /* In non-stop, sending a resume reply doesn't set the general
 	 thread, but GDB assumes a vRun sets it (this is so GDB can
 	 query which is the main thread of the new inferior.  */
       if (cs->non_stop)
-	cs->general_thread = cs->last_ptid;
+	cs->ss->general_thread = cs->ss->last_ptid;
 
       return 1;
     }
@@ -2659,12 +2834,12 @@ handle_v_kill (char *own_buf)
   if (cs->multi_process)
     pid = strtol (p, NULL, 16);
   else
-    pid = cs->signal_pid;
+    pid = cs->ss->signal_pid;
   if (pid != 0 && kill_inferior (pid) == 0)
     {
-      cs->last_status.kind = TARGET_WAITKIND_SIGNALLED;
-      cs->last_status.value.sig = GDB_SIGNAL_KILL;
-      cs->last_ptid = pid_to_ptid (pid);
+      cs->ss->last_status.kind = TARGET_WAITKIND_SIGNALLED;
+      cs->ss->last_status.value.sig = GDB_SIGNAL_KILL;
+      cs->ss->last_ptid = pid_to_ptid (pid);
       discard_queued_stop_replies (pid);
       write_ok (own_buf);
       return 1;
@@ -2676,7 +2851,6 @@ handle_v_kill (char *own_buf)
     }
 }
 
-static void handle_status (char *);
 /* Handle all of the extended 'v' packets.  */
 void
 handle_v_requests (char *own_buf, int packet_len, int *new_packet_len, gdb_client_data client_data)
@@ -2771,8 +2945,8 @@ myresume (char *own_buf, int step, int sig)
 
   set_desired_thread (0);
 
-  valid_cont_thread = (!ptid_equal (cs->cont_thread, null_ptid)
-			 && !ptid_equal (cs->cont_thread, minus_one_ptid));
+  valid_cont_thread = (!ptid_equal (cs->ss->cont_thread, null_ptid)
+			 && !ptid_equal (cs->ss->cont_thread, minus_one_ptid));
 
   if (step || sig || valid_cont_thread)
     {
@@ -2871,7 +3045,7 @@ gdb_wants_all_threads_stopped (void)
 {
   client_state *cs = get_client_state ();
 
-  for_each_inferior (&cs->all_threads, gdb_wants_thread_stopped);
+  for_each_inferior (&cs->ss->all_threads, gdb_wants_thread_stopped);
 }
 
 /* Clear the gdb_detached flag of every process.  */
@@ -2934,7 +3108,7 @@ handle_status (char *own_buf)
   client_state *cs = get_client_state ();
 
   /* GDB is connected, don't forward events to the target anymore.  */
-  for_each_inferior (&cs->all_processes, gdb_reattached_process);
+  for_each_inferior (&cs->ss->all_processes, gdb_reattached_process);
 
   /* In non-stop mode, we must send a stop reply for each stopped
      thread.  In all-stop mode, just send one for the first stopped
@@ -2942,7 +3116,7 @@ handle_status (char *own_buf)
 
   if (cs->non_stop)
     {
-      find_inferior (&cs->all_threads, queue_stop_reply_callback, NULL);
+      find_inferior (&cs->ss->all_threads, queue_stop_reply_callback, NULL);
 
       /* The first is sent immediately.  OK is sent if there is no
 	 stopped thread, which is the same handling of the vStopped
@@ -2963,27 +3137,30 @@ handle_status (char *own_buf)
 	 reporting now pending.  They'll be reported the next time the
 	 threads are resumed.  Start by marking all interesting events
 	 as pending.  */
-      for_each_inferior (&cs->all_threads, set_pending_status_callback);
+      for_each_inferior (&cs->ss->all_threads, set_pending_status_callback);
 
       /* Prefer the last thread that reported an event to GDB (even if
 	 that was a GDB_SIGNAL_TRAP).  */
-      if (cs->last_status.kind != TARGET_WAITKIND_IGNORE
-	  && cs->last_status.kind != TARGET_WAITKIND_EXITED
-	  && cs->last_status.kind != TARGET_WAITKIND_SIGNALLED)
-	thread = find_inferior_id (&cs->all_threads, cs->last_ptid);
+      if (cs->ss->last_status.kind != TARGET_WAITKIND_IGNORE
+	  && cs->ss->last_status.kind != TARGET_WAITKIND_EXITED
+	  && cs->ss->last_status.kind != TARGET_WAITKIND_SIGNALLED)
+	thread = find_inferior_id (&cs->ss->all_threads, cs->ss->last_ptid);
 
       /* If the last event thread is not found for some reason, look
 	 for some other thread that might have an event to report.  */
       if (thread == NULL)
-	thread = find_inferior (&cs->all_threads,
+	thread = find_inferior (&cs->ss->all_threads,
 				find_status_pending_thread_callback, NULL);
 
       /* If we're still out of luck, simply pick the first thread in
 	 the thread list.  */
       if (thread == NULL)
-	thread = get_first_inferior (&cs->all_threads);
+	thread = get_first_inferior (&cs->ss->all_threads);
 
-      if (thread != NULL)
+//      if (thread != NULL)
+      // we are detaching a multi attached client
+      debug_printf ("%s before prepare_resume_reply call %d %c\n", __FUNCTION__, cs->ss->attach_count, cs->packet);
+      if (thread != NULL && !(cs->packet == 'D' && cs->ss->attach_count > 0))
 	{
 	  struct thread_info *tp = (struct thread_info *) thread;
 
@@ -2993,7 +3170,7 @@ handle_status (char *own_buf)
 
 	  /* GDB assumes the current thread is the thread we're
 	     reporting the status for.  */
-	  cs->general_thread = thread->id;
+	  cs->ss->general_thread = thread->id;
 	  set_desired_thread (1);
 
 	  gdb_assert (tp->last_status.kind != TARGET_WAITKIND_IGNORE);
@@ -3149,19 +3326,19 @@ detach_or_kill_for_exit (void)
   if (have_started_inferiors_p ())
     {
       fprintf (stderr, "Killing process(es):");
-      for_each_inferior (&cs->all_processes, print_started_pid);
+      for_each_inferior (&cs->ss->all_processes, print_started_pid);
       fprintf (stderr, "\n");
     }
   if (have_attached_inferiors_p ())
     {
       fprintf (stderr, "Detaching process(es):");
-      for_each_inferior (&cs->all_processes, print_attached_pid);
+      for_each_inferior (&cs->ss->all_processes, print_attached_pid);
       fprintf (stderr, "\n");
     }
 
   /* Now we can kill or detach the inferiors.  */
 
-  for_each_inferior (&cs->all_processes, detach_or_kill_inferior_callback);
+  for_each_inferior (&cs->ss->all_processes, detach_or_kill_inferior_callback);
 }
 
 /* Value that will be passed to exit(3) when gdbserver exits.  */
@@ -3378,8 +3555,8 @@ captured_main (int argc, char *argv[])
      of these, not one per target.  Only one target is active at a
      time.  */
 
-  cs->own_buf = xmalloc (PBUFSIZ + 1);
-  cs->mem_buf = xmalloc (PBUFSIZ);
+  cs->ss->own_buf = xmalloc (PBUFSIZ + 1);
+  cs->ss->mem_buf = xmalloc (PBUFSIZ);
 
   if (pid == 0 && *next_arg != NULL)
     {
@@ -3407,9 +3584,9 @@ captured_main (int argc, char *argv[])
     }
   else
     {
-      cs->last_status.kind = TARGET_WAITKIND_EXITED;
-      cs->last_status.value.integer = 0;
-      cs->last_ptid = minus_one_ptid;
+      cs->ss->last_status.kind = TARGET_WAITKIND_EXITED;
+      cs->ss->last_status.value.integer = 0;
+      cs->ss->last_ptid = minus_one_ptid;
     }
   make_cleanup (detach_or_kill_for_exit_cleanup, NULL);
 
@@ -3420,8 +3597,8 @@ captured_main (int argc, char *argv[])
      shared library event" notice on gdb side.  */
   dlls_changed = 0;
 
-  if (cs->last_status.kind == TARGET_WAITKIND_EXITED
-      || cs->last_status.kind == TARGET_WAITKIND_SIGNALLED)
+  if (cs->ss->last_status.kind == TARGET_WAITKIND_EXITED
+      || cs->ss->last_status.kind == TARGET_WAITKIND_SIGNALLED)
     was_running = 0;
   else
     was_running = 1;
@@ -3462,7 +3639,7 @@ captured_main (int argc, char *argv[])
 	     (by the same GDB instance or another) will refresh all its
 	     state from scratch.  */
 	  discard_queued_stop_replies (-1);
-	  for_each_inferior (&cs->all_threads,
+	  for_each_inferior (&cs->ss->all_threads,
 			     clear_pending_status_callback);
 
 	  if (tracing)
@@ -3498,8 +3675,8 @@ captured_main (int argc, char *argv[])
 	{
 	  if (cs->response_needed)
 	    {
-	      write_enn (cs->own_buf);
-	      putpkt (cs->own_buf);
+	      write_enn (cs->ss->own_buf);
+	      putpkt (cs->ss->own_buf);
 	    }
 	}
     }
@@ -3608,7 +3785,6 @@ process_serial_event (gdb_client_data client_data)
   unsigned char sig;
   int packet_len;
   int new_packet_len = -1;
-//  client_state *cs = client_data;
   client_state *cs = get_client_state();
 
   /* Used to decide when gdbserver should exit in
@@ -3621,32 +3797,47 @@ process_serial_event (gdb_client_data client_data)
   disable_async_io ();
 
   cs->response_needed = 0;
-  packet_len = getpkt (cs->file_desc, cs->own_buf);
+  fprintf (stderr, "%s fd=%d\n", __FUNCTION__, cs->file_desc);
+  packet_len = getpkt (cs->file_desc, cs->ss->own_buf);
   if (packet_len <= 0)
     {
       remote_close ();
       /* Force an event loop break.  */
-      return -1;
+      if (count_client_state() == 0)
+	return -1;
+      else
+	{
+	  cs = get_client_state();
+	  packet_len = getpkt (cs->file_desc, cs->ss->own_buf);
+	}
     }
   cs->response_needed = 1;
 
   i = 0;
-  ch = cs->own_buf[i++];
+  ch = cs->ss->own_buf[i++];
+  if (ch != '?')
+    cs->packet = ch;
   switch (ch)
     {
     case 'q':
-      handle_query (cs->own_buf, packet_len, &new_packet_len, client_data);
+      if (! set_lock (cs, S))
+	break;
+      handle_query (cs->ss->own_buf, packet_len, &new_packet_len, client_data);
       break;
     case 'Q':
-      handle_general_set (cs->own_buf);
+      if (! set_lock (cs, S))
+	break;
+      handle_general_set (cs->ss->own_buf);
       break;
     case 'D':
-      require_running (cs->own_buf);
+      if (! set_lock (cs, S))
+	break;
+      require_running (cs->ss->own_buf);
 
       if (cs->multi_process)
 	{
 	  i++; /* skip ';' */
-	  pid = strtol (&cs->own_buf[i], NULL, 16);
+	  pid = strtol (&cs->ss->own_buf[i], NULL, 16);
 	}
       else
 	pid = ptid_get_pid (current_ptid);
@@ -3658,7 +3849,7 @@ process_serial_event (gdb_client_data client_data)
 
 	  if (process == NULL)
 	    {
-	      write_enn (cs->own_buf);
+	      write_enn (cs->ss->own_buf);
 	      break;
 	    }
 
@@ -3694,31 +3885,37 @@ process_serial_event (gdb_client_data client_data)
 	  resume_info.sig = 0;
 	  (*the_target->resume) (&resume_info, 1);
 
-	  write_ok (cs->own_buf);
+	  write_ok (cs->ss->own_buf);
 	  break; /* from switch/case */
 	}
 
       fprintf (stderr, "Detaching from process %d\n", pid);
       stop_tracing ();
-      if (detach_inferior (pid) != 0)
-	write_enn (cs->own_buf);
+
+      if (cs->ss->attach_count > 0)
+	write_ok (cs->ss->own_buf);
+      else if (detach_inferior (pid) != 0)
+	write_enn (cs->ss->own_buf);
       else
 	{
 	  discard_queued_stop_replies (pid);
-	  write_ok (cs->own_buf);
+	  write_ok (cs->ss->own_buf);
 
 	  if (cs->extended_protocol)
 	    {
-	      /* Treat this like a normal program exit.  */
-	      cs->last_status.kind = TARGET_WAITKIND_EXITED;
-	      cs->last_status.value.integer = 0;
-	      cs->last_ptid = pid_to_ptid (pid);
+	      if (cs->ss->attach_count == 0)
+		{
+		  /* Treat this like a normal program exit.  */
+		  cs->ss->last_status.kind = TARGET_WAITKIND_EXITED;
+		  cs->ss->last_status.value.integer = 0;
+		  cs->ss->last_ptid = pid_to_ptid (pid);
 
-	      cs->current_thread = NULL;
+		  cs->ss->current_thread = NULL;
+		}
 	    }
 	  else
 	    {
-	      putpkt (cs->own_buf);
+	      putpkt (cs->ss->own_buf);
 	      remote_close ();
 
 	      /* If we are attached, then we can exit.  Otherwise, we
@@ -3730,21 +3927,27 @@ process_serial_event (gdb_client_data client_data)
 	}
       break;
     case '!':
+      if (! set_lock (cs, S))
+	break;
       cs->extended_protocol = 1;
-      write_ok (cs->own_buf);
+      write_ok (cs->ss->own_buf);
       break;
     case '?':
-      handle_status (cs->own_buf);
+      if (! set_lock (cs, S))
+	break;
+      handle_status (cs->ss->own_buf);
       break;
     case 'H':
-      if (cs->own_buf[1] == 'c' || cs->own_buf[1] == 'g' || cs->own_buf[1] == 's')
+      if (! set_lock (cs, S))
+	break;
+      if (cs->ss->own_buf[1] == 'c' || cs->ss->own_buf[1] == 'g' || cs->ss->own_buf[1] == 's')
 	{
 	  ptid_t gdb_id, thread_id;
 	  int pid;
 
-	  require_running (cs->own_buf);
+	  require_running (cs->ss->own_buf);
 
-	  gdb_id = read_ptid (&cs->own_buf[2], NULL);
+	  gdb_id = read_ptid (&cs->ss->own_buf[2], NULL);
 
 	  pid = ptid_get_pid (gdb_id);
 
@@ -3756,12 +3959,12 @@ process_serial_event (gdb_client_data client_data)
 				  gdb_id))
 	    {
 	      struct thread_info *thread =
-		(struct thread_info *) find_inferior (&cs->all_threads,
+		(struct thread_info *) find_inferior (&cs->ss->all_threads,
 						      first_thread_of,
 						      &pid);
 	      if (!thread)
 		{
-		  write_enn (cs->own_buf);
+		  write_enn (cs->ss->own_buf);
 		  break;
 		}
 
@@ -3772,12 +3975,12 @@ process_serial_event (gdb_client_data client_data)
 	      thread_id = gdb_id_to_thread_id (gdb_id);
 	      if (ptid_equal (thread_id, null_ptid))
 		{
-		  write_enn (cs->own_buf);
+		  write_enn (cs->ss->own_buf);
 		  break;
 		}
 	    }
 
-	  if (cs->own_buf[1] == 'g')
+	  if (cs->ss->own_buf[1] == 'g')
 	    {
 	      if (ptid_equal (thread_id, null_ptid))
 		{
@@ -3785,8 +3988,8 @@ process_serial_event (gdb_client_data client_data)
 		     the currently selected thread is still valid. If
 		     it is not, select the first available.  */
 		  struct thread_info *thread =
-		    (struct thread_info *) find_inferior_id (&cs->all_threads,
-							     cs->general_thread);
+		    (struct thread_info *) find_inferior_id (&cs->ss->all_threads,
+							     cs->ss->general_thread);
 		  if (thread == NULL)
 		    {
 		      thread = get_first_thread ();
@@ -3794,23 +3997,25 @@ process_serial_event (gdb_client_data client_data)
 		    }
 		}
 
-	      cs->general_thread = thread_id;
+	      cs->ss->general_thread = thread_id;
 	      set_desired_thread (1);
 	    }
-	  else if (cs->own_buf[1] == 'c')
-	    cs->cont_thread = thread_id;
+	  else if (cs->ss->own_buf[1] == 'c')
+	    cs->ss->cont_thread = thread_id;
 
-	  write_ok (cs->own_buf);
+	  write_ok (cs->ss->own_buf);
 	}
       else
 	{
 	  /* Silently ignore it so that gdb can extend the protocol
 	     without compatibility headaches.  */
-	  cs->own_buf[0] = '\0';
+	  cs->ss->own_buf[0] = '\0';
 	}
       break;
     case 'g':
-      require_running (cs->own_buf);
+      if (! set_lock (cs, S))
+	break;
+      require_running (cs->ss->own_buf);
       if (current_traceframe >= 0)
 	{
 	  struct regcache *regcache
@@ -3818,9 +4023,9 @@ process_serial_event (gdb_client_data client_data)
 
 	  if (fetch_traceframe_registers (current_traceframe,
 					  regcache, -1) == 0)
-	    registers_to_string (regcache, cs->own_buf);
+	    registers_to_string (regcache, cs->ss->own_buf);
 	  else
-	    write_enn (cs->own_buf);
+	    write_enn (cs->ss->own_buf);
 	  free_register_cache (regcache);
 	}
       else
@@ -3828,77 +4033,93 @@ process_serial_event (gdb_client_data client_data)
 	  struct regcache *regcache;
 
 	  set_desired_thread (1);
-	  regcache = get_thread_regcache (cs->current_thread, 1);
-	  registers_to_string (regcache, cs->own_buf);
+	  regcache = get_thread_regcache (cs->ss->current_thread, 1);
+	  registers_to_string (regcache, cs->ss->own_buf);
 	}
       break;
     case 'G':
-      require_running (cs->own_buf);
+      if (! set_lock (cs, X))
+	break;
+      require_running (cs->ss->own_buf);
       if (current_traceframe >= 0)
-	write_enn (cs->own_buf);
+	write_enn (cs->ss->own_buf);
       else
 	{
 	  struct regcache *regcache;
 
 	  set_desired_thread (1);
-	  regcache = get_thread_regcache (cs->current_thread, 1);
-	  registers_from_string (regcache, &cs->own_buf[1]);
-	  write_ok (cs->own_buf);
+	  regcache = get_thread_regcache (cs->ss->current_thread, 1);
+	  registers_from_string (regcache, &cs->ss->own_buf[1]);
+	  write_ok (cs->ss->own_buf);
 	}
       break;
     case 'm':
-      require_running (cs->own_buf);
-      decode_m_packet (&cs->own_buf[1], &mem_addr, &len);
-      res = gdb_read_memory (mem_addr, cs->mem_buf, len);
+      if (! set_lock (cs, S))
+	  break;
+      require_running (cs->ss->own_buf);
+      decode_m_packet (&cs->ss->own_buf[1], &mem_addr, &len);
+      res = gdb_read_memory (mem_addr, cs->ss->mem_buf, len);
       if (res < 0)
-	write_enn (cs->own_buf);
+	write_enn (cs->ss->own_buf);
       else
-	bin2hex (cs->mem_buf, cs->own_buf, res);
+	bin2hex (cs->ss->mem_buf, cs->ss->own_buf, res);
       break;
     case 'M':
-      require_running (cs->own_buf);
-      decode_M_packet (&cs->own_buf[1], &mem_addr, &len, &cs->mem_buf);
-      if (gdb_write_memory (mem_addr, cs->mem_buf, len) == 0)
-	write_ok (cs->own_buf);
+      if (! set_lock (cs, X))
+	break;
+      require_running (cs->ss->own_buf);
+      decode_M_packet (&cs->ss->own_buf[1], &mem_addr, &len, &cs->ss->mem_buf);
+      if (gdb_write_memory (mem_addr, cs->ss->mem_buf, len) == 0)
+	write_ok (cs->ss->own_buf);
       else
-	write_enn (cs->own_buf);
+	write_enn (cs->ss->own_buf);
       break;
     case 'X':
-      require_running (cs->own_buf);
-      if (decode_X_packet (&cs->own_buf[1], packet_len - 1,
-			   &mem_addr, &len, &cs->mem_buf) < 0
-	  || gdb_write_memory (mem_addr, cs->mem_buf, len) != 0)
-	write_enn (cs->own_buf);
+      if (! set_lock (cs, X))
+	break;
+      require_running (cs->ss->own_buf);
+      if (decode_X_packet (&cs->ss->own_buf[1], packet_len - 1,
+			   &mem_addr, &len, &cs->ss->mem_buf) < 0
+	  || gdb_write_memory (mem_addr, cs->ss->mem_buf, len) != 0)
+	write_enn (cs->ss->own_buf);
       else
-	write_ok (cs->own_buf);
+	write_ok (cs->ss->own_buf);
       break;
     case 'C':
-      require_running (cs->own_buf);
-      hex2bin (cs->own_buf + 1, &sig, 1);
+      if (! set_lock (cs, X))
+	break;
+      require_running (cs->ss->own_buf);
+      hex2bin (cs->ss->own_buf + 1, &sig, 1);
       if (gdb_signal_to_host_p (sig))
 	signal = gdb_signal_to_host (sig);
       else
 	signal = 0;
-      myresume (cs->own_buf, 0, signal);
+      myresume (cs->ss->own_buf, 0, signal);
       break;
     case 'S':
-      require_running (cs->own_buf);
-      hex2bin (cs->own_buf + 1, &sig, 1);
+      if (! set_lock (cs, X))
+	break;
+      require_running (cs->ss->own_buf);
+      hex2bin (cs->ss->own_buf + 1, &sig, 1);
       if (gdb_signal_to_host_p (sig))
 	signal = gdb_signal_to_host (sig);
       else
 	signal = 0;
-      myresume (cs->own_buf, 1, signal);
+      myresume (cs->ss->own_buf, 1, signal);
       break;
     case 'c':
-      require_running (cs->own_buf);
+      if (! set_lock (cs, X))
+	break;
+      require_running (cs->ss->own_buf);
       signal = 0;
-      myresume (cs->own_buf, 0, signal);
+      myresume (cs->ss->own_buf, 0, signal);
       break;
     case 's':
-      require_running (cs->own_buf);
+      if (! set_lock (cs, X))
+	break;
+      require_running (cs->ss->own_buf);
       signal = 0;
-      myresume (cs->own_buf, 1, signal);
+      myresume (cs->ss->own_buf, 1, signal);
       break;
     case 'Z':  /* insert_ ... */
       /* Fallthrough.  */
@@ -3907,11 +4128,13 @@ process_serial_event (gdb_client_data client_data)
 	char *dataptr;
 	ULONGEST addr;
 	int len;
-	char type = cs->own_buf[1];
+	char type = cs->ss->own_buf[1];
 	int res;
 	const int insert = ch == 'Z';
-	char *p = &cs->own_buf[3];
+	char *p = &cs->ss->own_buf[3];
 
+	if (! set_lock (cs, X))
+	  break;
 	p = unpack_varlen_hex (p, &addr);
 	len = strtol (p + 1, &dataptr, 16);
 
@@ -3937,15 +4160,17 @@ process_serial_event (gdb_client_data client_data)
 	  res = delete_gdb_breakpoint (type, addr, len);
 
 	if (res == 0)
-	  write_ok (cs->own_buf);
+	  write_ok (cs->ss->own_buf);
 	else if (res == 1)
 	  /* Unsupported.  */
-	  cs->own_buf[0] = '\0';
+	  cs->ss->own_buf[0] = '\0';
 	else
-	  write_enn (cs->own_buf);
+	  write_enn (cs->ss->own_buf);
 	break;
       }
     case 'k':
+      if (! set_lock (cs, X))
+	break;
       cs->response_needed = 0;
       if (!target_running ())
 	/* The packet we received doesn't make sense - but we can't
@@ -3953,14 +4178,14 @@ process_serial_event (gdb_client_data client_data)
 	return 0;
 
       fprintf (stderr, "Killing all inferiors\n");
-      for_each_inferior (&cs->all_processes, kill_inferior_callback);
+      for_each_inferior (&cs->ss->all_processes, kill_inferior_callback);
 
       /* When using the extended protocol, we wait with no program
 	 running.  The traditional protocol will exit instead.  */
       if (cs->extended_protocol)
 	{
-	  cs->last_status.kind = TARGET_WAITKIND_EXITED;
-	  cs->last_status.value.sig = GDB_SIGNAL_KILL;
+	  cs->ss->last_status.kind = TARGET_WAITKIND_EXITED;
+	  cs->ss->last_status.value.sig = GDB_SIGNAL_KILL;
 	  return 0;
 	}
       else
@@ -3970,23 +4195,27 @@ process_serial_event (gdb_client_data client_data)
       {
 	ptid_t gdb_id, thread_id;
 
-	require_running (cs->own_buf);
+	if (! set_lock (cs, X))
+	  break;
+	require_running (cs->ss->own_buf);
 
-	gdb_id = read_ptid (&cs->own_buf[1], NULL);
+	gdb_id = read_ptid (&cs->ss->own_buf[1], NULL);
 	thread_id = gdb_id_to_thread_id (gdb_id);
 	if (ptid_equal (thread_id, null_ptid))
 	  {
-	    write_enn (cs->own_buf);
+	    write_enn (cs->ss->own_buf);
 	    break;
 	  }
 
 	if (mythread_alive (thread_id))
-	  write_ok (cs->own_buf);
+	  write_ok (cs->ss->own_buf);
 	else
-	  write_enn (cs->own_buf);
+	  write_enn (cs->ss->own_buf);
       }
       break;
     case 'R':
+      if (! set_lock (cs, S))
+	break;
       cs->response_needed = 0;
 
       /* Restarting the inferior is only supported in the extended
@@ -3994,7 +4223,7 @@ process_serial_event (gdb_client_data client_data)
       if (cs->extended_protocol)
 	{
 	  if (target_running ())
-	    for_each_inferior (&cs->all_processes,
+	    for_each_inferior (&cs->ss->all_processes,
 			       kill_inferior_callback);
 	  fprintf (stderr, "GDBserver restarting\n");
 
@@ -4003,8 +4232,8 @@ process_serial_event (gdb_client_data client_data)
 	    start_inferior (cs->program_argv);
 	  else
 	    {
-	      cs->last_status.kind = TARGET_WAITKIND_EXITED;
-	      cs->last_status.value.sig = GDB_SIGNAL_KILL;
+	      cs->ss->last_status.kind = TARGET_WAITKIND_EXITED;
+	      cs->ss->last_status.value.sig = GDB_SIGNAL_KILL;
 	    }
 	  return 0;
 	}
@@ -4013,26 +4242,34 @@ process_serial_event (gdb_client_data client_data)
 	  /* It is a request we don't understand.  Respond with an
 	     empty packet so that gdb knows that we don't support this
 	     request.  */
-	  cs->own_buf[0] = '\0';
+	  cs->ss->own_buf[0] = '\0';
 	  break;
 	}
     case 'v':
       /* Extended (long) request.  */
-      handle_v_requests (cs->own_buf, packet_len, &new_packet_len, client_data);
+      if (! set_lock (cs, X))
+	{
+	  strcpy (cs->ss->own_buf, "?");
+	  handle_status (cs->ss->own_buf);
+	  monitor_output ("That request will conflict with another debugging session\n");
+	  break;
+	}
+      handle_v_requests (cs->ss->own_buf, packet_len, &new_packet_len, client_data);
       break;
 
     default:
       /* It is a request we don't understand.  Respond with an empty
 	 packet so that gdb knows that we don't support this
 	 request.  */
-      cs->own_buf[0] = '\0';
+      cs->ss->own_buf[0] = '\0';
       break;
     }
+  set_lock (cs, NL);
 
   if (new_packet_len != -1)
-    putpkt_binary (cs->own_buf, new_packet_len);
+    putpkt_binary (cs->ss->own_buf, new_packet_len);
   else
-    putpkt (cs->own_buf);
+    putpkt (cs->ss->own_buf);
 
   cs->response_needed = 0;
 
@@ -4086,21 +4323,21 @@ handle_target_event (int err, gdb_client_data client_data)
   if (debug_threads)
     debug_printf ("handling possible target event\n");
 
-  cs->last_ptid = mywait (minus_one_ptid, &cs->last_status,
+  cs->ss->last_ptid = mywait (minus_one_ptid, &cs->ss->last_status,
 		      TARGET_WNOHANG, 1);
 
-  if (cs->last_status.kind == TARGET_WAITKIND_NO_RESUMED)
+  if (cs->ss->last_status.kind == TARGET_WAITKIND_NO_RESUMED)
     {
       /* No RSP support for this yet.  */
     }
-  else if (cs->last_status.kind != TARGET_WAITKIND_IGNORE)
+  else if (cs->ss->last_status.kind != TARGET_WAITKIND_IGNORE)
     {
-      int pid = ptid_get_pid (cs->last_ptid);
+      int pid = ptid_get_pid (cs->ss->last_ptid);
       struct process_info *process = find_process_pid (pid);
       int forward_event = !gdb_connected () || process->gdb_detached;
 
-      if (cs->last_status.kind == TARGET_WAITKIND_EXITED
-	  || cs->last_status.kind == TARGET_WAITKIND_SIGNALLED)
+      if (cs->ss->last_status.kind == TARGET_WAITKIND_EXITED
+	  || cs->ss->last_status.kind == TARGET_WAITKIND_SIGNALLED)
 	{
 	  mark_breakpoints_out (process);
 	  mourn_inferior (process);
@@ -4110,8 +4347,8 @@ handle_target_event (int err, gdb_client_data client_data)
 	  /* We're reporting this thread as stopped.  Update its
 	     "want-stopped" state to what the client wants, until it
 	     gets a new resume action.  */
-	  cs->current_thread->last_resume_kind = resume_stop;
-	  cs->current_thread->last_status = cs->last_status;
+	  cs->ss->current_thread->last_resume_kind = resume_stop;
+	  cs->ss->current_thread->last_status = cs->ss->last_status;
 	}
 
       if (forward_event)
@@ -4122,7 +4359,7 @@ handle_target_event (int err, gdb_client_data client_data)
 	      exit (0);
 	    }
 
-	  if (cs->last_status.kind == TARGET_WAITKIND_STOPPED)
+	  if (cs->ss->last_status.kind == TARGET_WAITKIND_STOPPED)
 	    {
 	      /* A thread stopped with a signal, but gdb isn't
 		 connected to handle it.  Pass it down to the
@@ -4132,26 +4369,26 @@ handle_target_event (int err, gdb_client_data client_data)
 	      if (debug_threads)
 		debug_printf ("GDB not connected; forwarding event %d for"
 			      " [%s]\n",
-			      (int) cs->last_status.kind,
-			      target_pid_to_str (cs->last_ptid));
+			      (int) cs->ss->last_status.kind,
+			      target_pid_to_str (cs->ss->last_ptid));
 
-	      resume_info.thread = cs->last_ptid;
+	      resume_info.thread = cs->ss->last_ptid;
 	      resume_info.kind = resume_continue;
-	      resume_info.sig = gdb_signal_to_host (cs->last_status.value.sig);
+	      resume_info.sig = gdb_signal_to_host (cs->ss->last_status.value.sig);
 	      (*the_target->resume) (&resume_info, 1);
 	    }
 	  else if (debug_threads)
 	    debug_printf ("GDB not connected; ignoring event %d for [%s]\n",
-			  (int) cs->last_status.kind,
-			  target_pid_to_str (cs->last_ptid));
+			  (int) cs->ss->last_status.kind,
+			  target_pid_to_str (cs->ss->last_ptid));
 	}
       else
 	{
 	  struct vstop_notif *vstop_notif
 	    = xmalloc (sizeof (struct vstop_notif));
 
-	  vstop_notif->status = cs->last_status;
-	  vstop_notif->ptid = cs->last_ptid;
+	  vstop_notif->status = cs->ss->last_status;
+	  vstop_notif->ptid = cs->ss->last_ptid;
 	  /* Push Stop notification.  */
 	  notif_push (&notif_stop,
 		      (struct notif_event *) vstop_notif);

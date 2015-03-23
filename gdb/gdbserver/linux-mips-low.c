@@ -128,7 +128,7 @@ mips_read_description (void)
 
   if (have_dsp < 0)
     {
-      int pid = lwpid_of (cs->current_thread);
+      int pid = lwpid_of (cs->ss->current_thread);
 
       errno = 0;
       ptrace (PTRACE_PEEKUSER, pid, DSP_CONTROL, 0);
@@ -275,7 +275,7 @@ static CORE_ADDR
 mips_reinsert_addr (void)
 {
   client_state *cs = get_client_state ();
-  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
+  struct regcache *regcache = get_thread_regcache (cs->ss->current_thread, 1);
   union mips_register ra;
   collect_register_by_name (regcache, "r31", ra.buf);
   return register_size (regcache->tdesc, 0) == 4 ? ra.reg32 : ra.reg64;
@@ -408,7 +408,7 @@ mips_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
   uint32_t irw;
   client_state *cs = get_client_state ();
 
-  lwpid = lwpid_of (cs->current_thread);
+  lwpid = lwpid_of (cs->ss->current_thread);
   if (!mips_linux_read_watch_registers (lwpid,
 					&private->watch_readback,
 					&private->watch_readback_valid,
@@ -444,7 +444,7 @@ mips_insert_point (enum raw_bkpt_type type, CORE_ADDR addr,
 
   /* Only update the threads of this process.  */
   pid = pid_of (proc);
-  find_inferior (&cs->all_threads, update_watch_registers_callback, &pid);
+  find_inferior (&cs->ss->all_threads, update_watch_registers_callback, &pid);
 
   return 0;
 }
@@ -496,7 +496,7 @@ mips_remove_point (enum raw_bkpt_type type, CORE_ADDR addr,
 
   /* Only update the threads of this process.  */
   pid = pid_of (proc);
-  find_inferior (&cs->all_threads, update_watch_registers_callback, &pid);
+  find_inferior (&cs->ss->all_threads, update_watch_registers_callback, &pid);
   return 0;
 }
 
@@ -512,7 +512,7 @@ mips_stopped_by_watchpoint (void)
   int n;
   int num_valid;
   client_state *cs = get_client_state ();
-  long lwpid = lwpid_of (cs->current_thread);
+  long lwpid = lwpid_of (cs->ss->current_thread);
 
   if (!mips_linux_read_watch_registers (lwpid,
 					&private->watch_readback,
@@ -541,7 +541,7 @@ mips_stopped_data_address (void)
   int n;
   int num_valid;
   client_state *cs = get_client_state ();
-  long lwpid = lwpid_of (cs->current_thread);
+  long lwpid = lwpid_of (cs->ss->current_thread);
 
   /* On MIPS we don't know the low order 3 bits of the data address.
      GDB does not support remote targets that can't report the

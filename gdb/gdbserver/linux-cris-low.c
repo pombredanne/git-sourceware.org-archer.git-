@@ -104,7 +104,7 @@ cris_reinsert_addr (void)
 {
   client_state *cs = get_client_state ();
 
-  struct regcache *regcache = get_thread_regcache (cs->current_thread, 1);
+  struct regcache *regcache = get_thread_regcache (cs->ss->current_thread, 1);
   unsigned long pc;
   collect_register_by_name (regcache, "srp", &pc);
   return pc;

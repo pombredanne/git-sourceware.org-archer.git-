@@ -80,6 +80,6 @@ struct thread_info *get_first_thread (void);
 struct thread_info *find_thread_ptid (ptid_t ptid);
 
 /* Get current thread ID (Linux task ID).  */
-#define current_ptid ({client_state *cs = get_client_state (); cs->current_thread->entry.id;})
+#define current_ptid ({client_state *cs = get_client_state (); cs->ss->current_thread->entry.id;})
 
 #endif /* GDB_THREAD_H */

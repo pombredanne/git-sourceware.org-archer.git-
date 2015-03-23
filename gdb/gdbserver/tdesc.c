@@ -58,7 +58,7 @@ current_target_desc (void)
 {
   client_state *cs = get_client_state ();
 
-  if (cs->current_thread == NULL)
+  if (cs->ss->current_thread == NULL)
     return &default_description;
 
   return current_process ()->tdesc;
