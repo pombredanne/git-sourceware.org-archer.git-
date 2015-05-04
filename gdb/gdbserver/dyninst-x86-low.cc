@@ -192,8 +192,6 @@ dyninst_x86_fill_gregset (struct regcache *regcache, RegisterPool regpool)
 	  }
       }
     }
-  if (debug_threads)
-    dump_registers (__FUNCTION__, regpool);
 }
 
 
@@ -237,8 +235,6 @@ dyninst_x86_store_gregset (struct regcache *regcache, RegisterPool regpool)
 	  }
       }
     }
-  if (debug_threads)
-    dump_registers (__FUNCTION__, regpool);
 }
 
 
@@ -268,10 +264,31 @@ dyninst_x86_store_fpregset (struct regcache *regcache, RegisterPool regpool)
 
 
 static CORE_ADDR
-x86_get_pc (struct regcache *regcache)
+x86_get_pc (Thread::const_ptr thr)
 {
-  int use_64bit = register_size (regcache->tdesc, 0) == 8;
+  MachRegisterVal regval = 0;
+  Architecture arch = thr->getProcess()->getArchitecture();
 
+  if (arch == Arch_x86_64)
+    {
+      thr->getRegister(x86_64::rip, regval);
+    }
+  else if (arch == Arch_x86)
+    {
+      thr->getRegister(x86::eip, regval);
+    }
+
+  return regval;
+}
+
+static CORE_ADDR
+x86_read_pc (struct regcache *regcache)
+{
+  int use_64bit;
+
+  if (regcache == NULL)
+    return (CORE_ADDR) 0;
+  use_64bit = register_size (regcache->tdesc, 0) == 8;
   if (use_64bit)
     {
       unsigned long pc;
@@ -371,7 +388,8 @@ struct dyninst_regset_info dyninst_target_regsets[] = {
 struct dyninst_target_ops the_low_target = {
   dyninst_x86_arch_setup,
   dyninst_linux_process_qsupported,
-  x86_get_pc,
+  x86_get_pc ,
+  x86_read_pc,
   x86_set_pc,
   x86_supports_range_stepping,
   dyninst_x86_reg_map_setup,

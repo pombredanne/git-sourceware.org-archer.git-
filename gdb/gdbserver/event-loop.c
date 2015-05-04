@@ -281,7 +281,7 @@ create_file_handler (gdb_fildes_t fd, int mask, handler_func *proc,
 {
   file_handler *file_ptr;
 
-  if (debug_threads)
+  if (debug_threads > 1)
     fprintf (stderr,"%s matched fd %d\n",__FUNCTION__,fd);
   /* Do we already have a file handler for this file? (We may be
      changing its associated procedure).  */
@@ -342,7 +342,7 @@ delete_file_handler (gdb_fildes_t fd)
   file_handler *file_ptr, *prev_ptr = NULL;
   int i;
 
-  if (debug_threads)
+  if (debug_threads > 1)
     fprintf (stderr,"%s fd=%d\n",__FUNCTION__,fd);
   /* Find the entry for the given file. */
 
@@ -486,7 +486,8 @@ wait_for_event (void)
   timeout.tv_sec = 0;
   timeout.tv_usec = 10;
   num_found = select (FD_SETSIZE, &conn_fd_set, NULL, NULL, &timeout);
-  fprintf (stderr,"%s select fd=%d found=%d\n",__FUNCTION__,get_listen_desc(),num_found);
+  if (debug_threads > 1)
+    fprintf (stderr,"%s select fd=%d found=%d\n",__FUNCTION__,get_listen_desc(),num_found);
   if (num_found > 0)
     {
     int i;
@@ -496,14 +497,14 @@ wait_for_event (void)
 	    if (i == get_listen_desc())
 	      {
 		int handle_accept_event (int, gdb_client_data);
-		if (debug_threads)
+		if (debug_threads > 1)
 		  fprintf (stderr,"%s in select idx %d\n",__FUNCTION__,i);
 		// instead of using gdb_event just setup the connection "by hand"
 		handle_accept_event (0, NULL);
 		add_file_handler (get_remote_desc(), handle_serial_event, get_client_state());
 	      }
 	    else
-	      if (debug_threads)
+	      if (debug_threads > 1)
 		fprintf (stderr,"%s data arrived on existing connection %d fd=%d\n", __FUNCTION__, i,get_listen_desc());
 	  }
     }
@@ -525,7 +526,7 @@ wait_for_event (void)
 		      &gdb_notifier.ready_masks[2],
 		      NULL);
 
-  if (debug_threads)
+  if (debug_threads > 1)
     fprintf(stderr,"select num_fds %d returned %d\n",gdb_notifier.num_fds,num_found);
   if (num_found < 0)
     perror(__FUNCTION__);
@@ -569,9 +570,11 @@ wait_for_event (void)
 	{
 	  int handle_accept_event (int err, gdb_client_data client_data);
 	  gdb_event *file_event_ptr = create_file_event (file_ptr->fd);
-	  fprintf (stderr,"%s #fds=%d\n",__FUNCTION__,gdb_notifier.num_fds);
-	  if (debug_threads)
-	    fprintf(stderr,"%s create_file_event for %d %#lx %#lx %#lx %#lx\n",__FUNCTION__,file_event_ptr->fd,(long unsigned int)file_ptr->proc,(long unsigned int)handle_file_event,(long unsigned int)handle_serial_event,(long unsigned int)handle_accept_event);
+	  if (debug_threads > 1)
+	    {
+	      fprintf (stderr,"%s #fds=%d\n",__FUNCTION__,gdb_notifier.num_fds);
+	      fprintf(stderr,"%s create_file_event for %d %#lx %#lx %#lx %#lx\n",__FUNCTION__,file_event_ptr->fd,(long unsigned int)file_ptr->proc,(long unsigned int)handle_file_event,(long unsigned int)handle_serial_event,(long unsigned int)handle_accept_event);
+	    }
 	  QUEUE_enque (gdb_event_p, event_queue, file_event_ptr);
 	}
       file_ptr->ready_mask = mask;

@@ -54,8 +54,13 @@ extern "C"
   }
 
 
-#define DYNERR(errstr,args...)						\
+#define DYNERRMSG(errstr,args...)						\
   fprintf (stderr, "%s %s " errstr "\n", __FUNCTION__, dyninst_process->getLastErrorMsg(), ##args);
+#define DYNERR(errstr,args...)						\
+  fprintf (stderr, "%s " errstr "\n", __FUNCTION__, ##args);
+#define DEBUG_ENTER() if (debug_threads) debug_enter()
+#define DEBUG_EXIT()  if (debug_threads) debug_exit()
+
 
 using namespace std;
 using namespace __gnu_cxx;
@@ -70,6 +75,25 @@ typedef std::vector<Library::ptr> LibrarySet;
 LibrarySet dyninst_libset;
 Thread::const_ptr NULL_Thread = Thread::const_ptr();
 
+
+void
+dump_procset ()
+{
+  ProcessSet::iterator it;
+  ThreadPool::const_iterator thidx;
+  for (it = dyninst_procset->begin(); it != dyninst_procset->end(); it++)
+    {
+      Process::const_ptr proc = *it;
+      cout << __FUNCTION__ << ' ' << proc->getPid() << ' ' << hex;
+      for (thidx = proc->threads().begin();
+	  thidx != proc->threads().end(); thidx++)
+	{
+	  Thread::const_ptr thr = *thidx;
+	  cout << thr->getLWP() << ' ' << the_low_target.get_pc (thr) << ' ';
+	}
+      cout << '\n';
+    }
+}
 
 /* Are there pending callbacks for handleEvents */
 
@@ -125,69 +149,80 @@ class EventSet
 {
 private:
   /* The list of events that handleEvents has encountered */
-  std::map<ptid_t,Event::const_ptr> current_events;
+  std::vector<std::pair<ptid_t, Event::const_ptr> > current_events;
 public:
   EventSet() { NULL_Event = Event::const_ptr(); }
   Event::const_ptr NULL_Event;
-  void insert (Event::const_ptr ev) {
+  void insert (Event::const_ptr ev)
+  {
     ptid_t ptid = ptid_build (ev->getProcess()->getPid(), ev->getThread()->getLWP(), (ev->getThread()->haveUserThreadInfo() ? ev->getThread()->getTID() : -1));
-    current_events[ptid] = ev;
+    current_events.push_back(make_pair (ptid, ev));
     if (debug_threads)
+      {
 	dump("after insert ");
+	dump_procset ();
+      }
   }
   void erase (Event::const_ptr ev)
-    {
-      std::map<ptid_t,Event::const_ptr>::iterator it;
-      for (it = current_events.begin() ;
-	  it != current_events.end(); ++it)
-	{
-	  Event::const_ptr event = it->second;
-	  if (event == ev)
-	    {
-	      current_events.erase(it);
-	      break;
-	    }
-	}
-      if (debug_threads)
-	dump("after erase ");
-    }
+  {
+    if (ev != NULL_Event)
+      DEBUG(ev->name());
+    std::vector<std::pair<ptid_t,Event::const_ptr> >::iterator it;
+    for (it = current_events.begin() ;
+	it != current_events.end(); ++it)
+      {
+	Event::const_ptr event = it->second;
+	if (event == ev)
+	  {
+	    current_events.erase(it);
+	    break;
+	  }
+      }
+    if (debug_threads)
+      dump("after erase ");
+  }
 
   /* Get the event for a given PTID */
 
   Event::const_ptr get (ptid_t ptid)
   {
     Event::const_ptr event;
+    int attempt = 1;
 
-    if (! Process::handleEvents(true))
-      return NULL_Event;
-    DEBUG("after handleEvents",pid_to_string(ptid));
-
-    std::map<ptid_t,Event::const_ptr>::reverse_iterator rit;
-    for (rit = current_events.rbegin() ;
-	rit != current_events.rend(); ++rit)
+    do
       {
-	ptid_t ceptid = rit->first;
-	event = rit->second;
-	DEBUG(event->name() << " " << ptid.pid << " " << ceptid.pid << " " << ptid.lwp << " " << ceptid.lwp << " " << ptid.tid << " " <<  ceptid.tid);
-	if (ptid.pid == -1
-	    || (ceptid.pid == ptid.pid))
-//	    || (ceptid.pid == ptid.pid
-//		&& ceptid.lwp == ptid.lwp))
+	std::vector<std::pair<ptid_t,Event::const_ptr> >::iterator it;
+	for (it = current_events.begin() ;
+	    it != current_events.end(); ++it)
 	  {
-	    DEBUG("returning event " << event->name());
-	    return event;
+	    ptid_t ceptid = it->first;
+	    event = it->second;
+	    if (ptid.pid == -1
+		|| (ceptid.pid == ptid.pid))
+//	        || (ceptid.pid == ptid.pid
+//		    && ceptid.lwp == ptid.lwp))
+	      {
+		CORE_ADDR pc = (the_low_target.get_pc) (event->getThread());
+		DEBUG(event->name() << ' ' << ceptid.pid << '/' << ceptid.lwp << "pc=" << pc);
+		return event;
+	      }
 	  }
+	if (! Process::handleEvents(true))
+	  return NULL_Event;
+	DEBUG("after handleEvents",pid_to_string(ptid));
+	attempt += 1;
       }
+    while (attempt <= 2);
+
     DEBUG("returning null event");
     return NULL_Event;
   }
 
   bool is_stopped (Event::const_ptr event)
   {
-    if (event == NULL)
-      return false;
-    else
+    if (event != NULL)
       return event->getEventType().code() == EventType::Stop;
+    else return false;
    }
 
   bool is_exit (Event::const_ptr event)
@@ -196,7 +231,6 @@ public:
       return event->getEventType().code() == EventType::Exit;
     else return false;
   }
-
 
   bool is_breakpoint(Event::const_ptr event)
   {
@@ -239,28 +273,59 @@ public:
 	      DEBUG(event->getEventType().code() << " UserThreadCreate");
 	    return newlwp_ev->getNewThread();
 	  }
+	else if (event->getEventType().code() == EventType::ThreadCreate)
+	  {
+	    EventNewUserThread::const_ptr newlwp_ev = event->getEventNewUserThread();
+	    if (event != NULL)
+	      DEBUG(event->getEventType().code() << " ThreadCreate");
+	    return newlwp_ev->getNewThread();
+	  }
       }
     return NULL_Thread;
   }
 
-  bool is_threaddestroy(Event::const_ptr event)
+  Thread::const_ptr is_threaddestroy (Event::const_ptr event)
   {
+    Thread::const_ptr thr;
     if (event != NULL)
-      return event->getEventType().code() == EventType::UserThreadDestroy;
-    else return false;
+      {
+	if (event->getEventType().code() == EventType::LWPDestroy)
+	  {
+	    EventLWPDestroy::const_ptr lwpd_ev = event->getEventLWPDestroy();
+	    if (event != NULL)
+	      DEBUG(event->getEventType().code() << " LWPDestroy");
+	    return lwpd_ev->getThread();
+	  }
+	else if (event->getEventType().code() == EventType::UserThreadDestroy)
+	  {
+	    EventUserThreadDestroy::const_ptr utd_ev = event->getEventUserThreadDestroy();
+	    if (event != NULL)
+	      DEBUG(event->getEventType().code() << " UserThreadDestroy");
+	    return utd_ev->getThread();
+	  }
+	else if (event->getEventType().code() == EventType::ThreadDestroy)
+	  {
+	    EventThreadDestroy::const_ptr td_ev = event->getEventThreadDestroy();
+	    if (event != NULL)
+	      DEBUG(event->getEventType().code() << " ThreadDestroy");
+	    return td_ev->getThread();
+	  }
+      }
+    return NULL_Thread;
   }
 
   void dump (string comment)
   {
-    std::map<ptid_t,Event::const_ptr>::iterator it;
+    int idx = 1;
+    std::vector<std::pair<ptid_t,Event::const_ptr> >::iterator it;
     for (it = current_events.begin() ;
 	it != current_events.end(); ++it)
       {
-	ptid_t ptid = it->first;
 	Event::const_ptr event = it->second;
 	if (event == NULL)
 	  continue;
-	DEBUG(comment << event->name() << " pid=" << ptid.pid << " lwp=" << ptid.lwp << " tid=" << ptid.tid);
+	DEBUG(dec << idx << hex << ' ' << comment << event->name(), pid_to_string (event));
+	idx += 1;
       }
 
   }
@@ -268,14 +333,12 @@ public:
 
 
 void
-pid_to_string (Dyninst::PID pid, Dyninst::LWP lwp, Dyninst::THR_ID tid)
+pid_to_string (Dyninst::PID pid, Dyninst::LWP lwp, Dyninst::THR_ID tid, CORE_ADDR pc)
 {
   if (pid == -1)
     cerr << "pid=*";
   else
     {
-      ptid_t ptid = ptid_build (pid, lwp, tid);
-      struct thread_info *ti = find_thread_ptid (ptid);
       cerr << "pid=" << pid;
       if (lwp < 0)
 	cerr << " lwp=*";
@@ -283,23 +346,40 @@ pid_to_string (Dyninst::PID pid, Dyninst::LWP lwp, Dyninst::THR_ID tid)
 	cerr << " lwp=" << lwp;
       if (tid > 0)
 	cerr << " thr=" << tid;
-      if (ti != NULL)
+
+      string source = "";
+      if (pc == 0)
 	{
-	  struct regcache *regcache = get_thread_regcache (ti, 1);
-	  CORE_ADDR pc = (*the_low_target.get_pc) (regcache);
-	  cerr << " pc=" << pc;
+	  struct thread_info *ti = find_thread_ptid (ptid_build (pid, lwp, tid));
+	  if (ti == NULL)
+	    ti = find_thread_ptid (ptid_build (pid, lwp, 0));
+	  if (ti != NULL)
+	    {
+	      struct regcache *regcache = get_thread_regcache (ti, 0);
+	      pc = (*the_low_target.read_pc) (regcache);
+	      source = " cached";
+	    }
 	}
+      cerr << source << " pc=" << pc;
     }
   cerr << ' ';
 }
 
+
+static Thread::const_ptr dyninst_get_thread(ptid_t ptid);
 
 /* Pretty print a pid/lwp/tid tuple */
 
 void
 pid_to_string (ptid_t ptid)
 {
-  pid_to_string (ptid.pid, ptid.lwp, ptid.tid);
+  CORE_ADDR pc;
+  Thread::const_ptr thr = dyninst_get_thread(ptid);
+  if (thr != NULL_Thread)
+    pc = (the_low_target.get_pc) (thr);
+  else
+    pc = 0;
+  pid_to_string (ptid.pid, ptid.lwp, ptid.tid, pc);
 }
 
 void
@@ -313,7 +393,9 @@ pid_to_string (Thread::const_ptr thr)
   else
     tid = -1;
 
-  pid_to_string (thr->getProcess()->getPid(), thr->getLWP(), tid);
+  CORE_ADDR pc = (the_low_target.get_pc) (thr);
+
+  pid_to_string (thr->getProcess()->getPid(), thr->getLWP(), tid, pc);
 }
 
 void
@@ -349,6 +431,17 @@ struct thread_info_private
   CORE_ADDR step_range_start;
   CORE_ADDR step_range_end;
 };
+
+
+static Thread::const_ptr
+dyninst_get_thread(ptid_t ptid)
+{
+  struct thread_info *ti = find_thread_ptid (ptid);
+  if (ti != NULL)
+    return ((struct thread_info_private*)ti->target_data)->thread;
+  else
+    return NULL_Thread;
+}
 
 
 /* Add a PROCESS PID, that is possibly being ATTACHED */
@@ -413,7 +506,7 @@ dyninst_get_inferior_thread()
 
   struct thread_info_private *tip = (struct thread_info_private*)(cs->ss->current_thread->target_data);
   if (!tip)
-    error ("No inferior thread");
+    DYNERR ("No inferior thread");
   return tip->thread;
 }
 
@@ -423,8 +516,21 @@ dyninst_get_inferior_thread()
 Process::cb_ret_t
 signal_handler(Event::const_ptr ev)
 {
-  events.insert(ev);
   DEBUG(ev->name());
+  if (ev->name() != "post-LWPDestroy")
+    events.insert(ev);
+  return Process::cbDefault;
+}
+
+
+/* Handle a dyninst Breakpoint event */
+
+Process::cb_ret_t
+breakpoint_handler(Event::const_ptr ev)
+{
+  EventBreakpoint::const_ptr bp_ev = ev->getEventBreakpoint();
+  DEBUG('@' << bp_ev->getAddress() << " lwp=" << bp_ev->getThread()->getLWP());
+  events.insert(ev);
   return Process::cbDefault;
 }
 
@@ -434,10 +540,23 @@ signal_handler(Event::const_ptr ev)
 Process::cb_ret_t
 singlestep_handler(Event::const_ptr ev)
 {
-  events.insert(ev);
   DEBUG(ev->name());
+  events.insert(ev);
   ev->getThread()->setSingleStepMode(false);
   return Process::cbThreadStop;
+}
+
+
+// Handle a dyninst LWPDestroy event
+
+Process::cb_ret_t
+lwpdestroy_handler(Event::const_ptr ev)
+{
+  Process::cb_ret_t cbret (Process::cbProcStop, Process::cbProcStop);
+  DEBUG(ev->name());
+  if (ev->name() != "post-LWPDestroy")
+    events.insert(ev);
+  return cbret;
 }
 
 
@@ -446,9 +565,9 @@ singlestep_handler(Event::const_ptr ev)
 Process::cb_ret_t
 stop_handler(Event::const_ptr ev)
 {
+  DEBUG(ev->name() << " stopped="  << ev->getThread()->isStopped() << " running=" << ev->getThread()->isRunning(), pid_to_string (ev->getThread()));
   events.insert(ev);
-  DEBUG(ev->name());
-  return Process::cbThreadStop;
+  return Process::cbDefault;
 }
 
 
@@ -462,7 +581,7 @@ library_handler(Event::const_ptr ev)
   for (set<Library::ptr>::const_iterator i = lib_ev->libsAdded().begin(); i != lib_ev->libsAdded().end(); i++)
     {
       Library::ptr lib = *i;
-      DEBUG("added library " << lib->getAbsoluteName() << " " << lib->getDynamicAddress() << " " << lib->getLoadAddress() << endl);
+      DEBUG("added library " << lib->getAbsoluteName() << ' ' << lib->getDynamicAddress() << ' ' << lib->getLoadAddress() << endl);
     }
 
   return Process::cbDefault;
@@ -495,17 +614,17 @@ dyninst_create_inferior (char *program, char **allargs)
 
   Process::ptr dyninst_process = Process::createProcess(exec, args);
   if (dyninst_process == Process::ptr())
-    error ("No such file: %s\n", exec.c_str());
+    DYNERRMSG ("No such file: %s\n", exec.c_str());
   dyninst_procset->insert(dyninst_process);
 
   myregisterCB(EventType::Bootstrap, signal_handler);
-  myregisterCB(EventType::Breakpoint, signal_handler);
+  myregisterCB(EventType::Breakpoint, breakpoint_handler);
   myregisterCB(EventType::Crash, signal_handler);
   myregisterCB(EventType::Exec, signal_handler);
   myregisterCB(EventType::Exit, signal_handler);
   myregisterCB(EventType::Fork, signal_handler);
   myregisterCB(EventType::LWPCreate, signal_handler);
-  myregisterCB(EventType::LWPDestroy, signal_handler);
+  myregisterCB(EventType::LWPDestroy, lwpdestroy_handler);
   myregisterCB(EventType::Library, library_handler);
   myregisterCB(EventType::RPC, signal_handler);
   myregisterCB(EventType::Signal, signal_handler);
@@ -539,7 +658,7 @@ dyninst_create_inferior (char *program, char **allargs)
     }
 
   if (! dyninst_process->stopProc())
-    error ("Cannot stop process %ld: %s", (long int)pid, getLastErrorMsg());
+    DYNERRMSG ("Cannot stop process %ld", (long int)pid);
   return dyninst_process->getPid();
 }
 
@@ -551,16 +670,15 @@ dyninst_attach (unsigned long pid)
   ProcessSet::iterator procset_it = dyninst_procset->find(pid);
   if (procset_it != dyninst_procset->end())
     DEBUG("already attached to pid " << pid);
-  Process::ptr dyninst_proc = Process::attachProcess(pid);
-  if (dyninst_proc == Process::ptr())
-    error ("Cannot attach to process %ld: %s",
-	   pid, getLastErrorMsg());
+  Process::ptr dyninst_process = Process::attachProcess(pid);
+  if (dyninst_process == Process::ptr())
+    DYNERRMSG ("Cannot attach to process %ld", pid);
 
-  dyninst_procset->insert(dyninst_proc);
+  dyninst_procset->insert(dyninst_process);
 
   DEBUG("pid=" << pid);
   myregisterCB(EventType::Bootstrap, signal_handler);
-  myregisterCB(EventType::Breakpoint, signal_handler);
+  myregisterCB(EventType::Breakpoint, breakpoint_handler);
   myregisterCB(EventType::Crash, signal_handler);
   myregisterCB(EventType::Exec, signal_handler);
   myregisterCB(EventType::Exit, signal_handler);
@@ -577,14 +695,13 @@ dyninst_attach (unsigned long pid)
   // ThreadDestroy, UserThreadDestroy handled via LWPDestroy
 
 
-  if (dyninst_proc == Process::ptr())
-    error ("Cannot attach to process %lu: %s (%d)\n", pid,
-	   dyninst_proc->getLastErrorMsg(), dyninst_proc->getLastError());
+  if (dyninst_process == Process::ptr())
+    DYNERRMSG ("Cannot attach to process %lu", pid);
 
-  dyninst_add_process (pid, 1, dyninst_proc);
+  dyninst_add_process (pid, 1, dyninst_process);
   ThreadPool::iterator thidx;
-  for (thidx = dyninst_proc->threads().begin();
-      thidx != dyninst_proc->threads().end(); thidx++)
+  for (thidx = dyninst_process->threads().begin();
+      thidx != dyninst_process->threads().end(); thidx++)
     {
       bool reg_map_setup = false;
       RegisterPool regpool;
@@ -600,10 +717,10 @@ dyninst_attach (unsigned long pid)
     }
 
   LibraryPool::iterator libidx;
-  for (libidx = dyninst_proc->libraries().begin(); libidx != dyninst_proc->libraries().end(); libidx++)
+  for (libidx = dyninst_process->libraries().begin(); libidx != dyninst_process->libraries().end(); libidx++)
     {
       Library::ptr lib = *libidx;
-      DEBUG("added library " << lib->getName() << " " << lib->getDynamicAddress() << " " << lib->getLoadAddress() << endl);
+      DEBUG("added library " << lib->getName() << ' ' << lib->getDynamicAddress() << ' ' << lib->getLoadAddress() << endl);
     }
 
   return 0;
@@ -617,36 +734,41 @@ dyninst_resume (struct thread_resume *resume_info, size_t n)
   client_state *cs = get_client_state ();
 
 
+  DEBUG_ENTER ();
+
   for (int i = 0; i < (int)n; i++)
     {
-      DEBUG("",pid_to_string(resume_info[i].thread));
       ptid_t ptid = resume_info[i].thread;
 
-      if (ptid_equal (ptid, minus_one_ptid))
+      if (ptid_equal(ptid, minus_one_ptid))
 	ptid = thread_to_gdb_id (cs->ss->current_thread);
 
       Dyninst::PID pid = ptid_get_pid (ptid);
       ProcessSet::iterator procset_it = dyninst_procset->find(pid);
       if (procset_it == dyninst_procset->end())
-	error ("Cannot resume process %lu\n", (long unsigned)pid);
+	DYNERR ("Cannot resume process %lu\n", (long unsigned)pid);
 
       Process::ptr dyninst_process = *procset_it;
 
-      DEBUG("", pid_to_string (ptid));
-      DEBUG("found proc " << dyninst_process->getPid());
       ThreadPool::iterator thidx;
       Thread::ptr th;
 
       if (dyninst_process->isTerminated())
-	return;
-
-      if (resume_info[i].thread == minus_one_ptid)
 	{
-	  DEBUG("before regcache_invalidate");
-	  regcache_invalidate ();
+	  DEBUG_EXIT ();
+	  return;
+	}
+
+      regcache_invalidate ();
+
+      if (resume_info[i].thread == minus_one_ptid
+	  || ptid_get_lwp (resume_info[i].thread) == -1
+	  || ptid_is_pid (resume_info[i].thread))
+	{
 	  DEBUG("before continue pid=" << pid);
 	  if (! dyninst_process->continueProc())
 	    DEBUG("Unable to continueProc " << dyninst_process->getLastErrorMsg());
+	  DEBUG_EXIT ();
 	  return;
 	}
 
@@ -662,7 +784,7 @@ dyninst_resume (struct thread_resume *resume_info, size_t n)
 	      tip->step_range_start = resume_info->step_range_start;
 	      tip->step_range_end = resume_info->step_range_end;
 	      struct regcache *regcache = get_thread_regcache (ti, 1);
-	      CORE_ADDR pc = (*the_low_target.get_pc) (regcache);
+	      CORE_ADDR pc = (*the_low_target.read_pc) (regcache);
 	      DEBUG("range " << resume_info->step_range_start << "/" << resume_info->step_range_end << " pc=" << pc << " kind=" << resume_info[i].kind);
 
 	      switch (resume_info[i].kind)
@@ -672,19 +794,20 @@ dyninst_resume (struct thread_resume *resume_info, size_t n)
 		    th->getRegister(MachRegister(x86_64::rip), result);
 		    DEBUG("in step mode @" << result, pid_to_string (th));
 		    if (! th->setSingleStepMode(true))
-		      DYNERR("Unable to setSingleStepMode");
+		      DYNERRMSG("Unable to setSingleStepMode");
 		case resume_continue:
 		    regcache_invalidate_thread (ti);
 		    if (! th->continueThread())
-		      DYNERR("Unable to continueThread");
+		      DYNERRMSG("Unable to continueThread");
 		    break;
 		case resume_stop:
 		  if (! th->stopThread())
-		    DYNERR("Unable to stopThread");
+		    DYNERRMSG("Unable to stopThread");
 		}
 	    }
 	}
     }
+  DEBUG_EXIT ();
 }
 
 
@@ -716,7 +839,7 @@ in_step_range ()
 
   struct thread_info_private *tip = (struct thread_info_private*)(cs->ss->current_thread->target_data);
   struct regcache *regcache = get_thread_regcache (cs->ss->current_thread, 1);
-  CORE_ADDR pc = (*the_low_target.get_pc) (regcache);
+  CORE_ADDR pc = (*the_low_target.read_pc) (regcache);
 
   return (pc >= tip->step_range_start && pc < tip->step_range_end);
 }
@@ -732,10 +855,9 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
   bool thread_created = false;
   client_state *cs = get_client_state ();
 
-  DEBUG("", pid_to_string (ptid));
-
   Event::const_ptr event;
 
+  DEBUG_ENTER ();
   while (true)		// wait events loop
     {
       if ((event = events.get(new_ptid)))
@@ -748,21 +870,30 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
 	    pi->piprivate->last_wait_event_ptid = new_ptid;
 	}
       if (event == NULL)
-	event = events.get(new_ptid);
+	{
+	  event = events.get(new_ptid);
+//	  DEBUG("", pid_to_string (new_ptid));
+	}
+      else
+	DEBUG("", pid_to_string (event));
 
 
       Thread::const_ptr new_thr;
       if ((new_thr = events.is_threadcreate(event)) != NULL_Thread)
 	{
-	  DEBUG("pid=" << pid << " New thread: " << event->getThread()->getLWP() << " " << ((new_thr != NULL_Thread) ? new_thr->getLWP() : 0), pid_to_string (new_ptid));
-	  dyninst_add_thread (pid, new_thr);
+	  DEBUG("threadcreate pid=" << pid << " New thread: " << event->getThread()->getLWP() << ' ' << ((new_thr != NULL_Thread) ? new_thr->getLWP() : 0), pid_to_string (new_ptid));
+	  dyninst_add_thread (new_thr->getProcess()->getPid(), new_thr);
 	  events.erase(event);
 	  thread_created = true;
 	  continue;		// wait events loop
 	}
-      else if (events.is_threaddestroy(event))
+      // LWPCreate pre-LWPDestroy post-LWPDestroy
+      else if ((new_thr = events.is_threaddestroy(event)) != NULL_Thread)
 	{
-	  remove_thread (find_thread_ptid (new_ptid));
+	  DEBUG("threaddestroy pid=" << pid << " New thread: " << event->getThread()->getLWP() << ' ' << ((new_thr != NULL_Thread) ? new_thr->getLWP() : 0), pid_to_string (new_ptid));
+	  struct thread_info* ti = find_thread_ptid (ptid_build (new_thr->getProcess()->getPid(), new_thr->getLWP(), 0));
+	  if (ti)
+	    remove_thread (ti);
 	  events.erase(event);
 	  continue;		// wait events loopNULL
 	}
@@ -772,19 +903,20 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
 	  events.erase(event);
 	  status->kind = TARGET_WAITKIND_EXITED;
 	  status->value.integer = exit_ev->getExitCode();
-	  DEBUG("process exited with status: " << status->value.integer);
+	  DEBUG("exit process with status: " << status->value.integer);
 	}
       else if (events.is_stopped(event))
 	{
 	  events.erase(event);
 	  status->kind = TARGET_WAITKIND_STOPPED;
 	  status->value.integer = SIGSTOP;
-	  DEBUG("process stopped with status: " << status->value.integer, pid_to_string(event));
+	  DEBUG("stop process with status: " << status->value.integer, pid_to_string(event));
 	  if (thread_created)
 	    {
+	      Thread::const_ptr thr = event->getThread();
 	      thread_created = false;
-	      return new_ptid;
 	    }
+	  continue;
 	}
       else if (events.is_breakpoint(event) || events.is_singlestep(event))
 	{
@@ -804,14 +936,18 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
 	  status->kind = TARGET_WAITKIND_STOPPED;
 	  // EventStop doesn't have a signal member
 	  status->value.integer = gdb_signal_from_host (SIGTRAP);
-	  DEBUG("process trapped: ");
+	  DEBUG("returning ", pid_to_string (new_ptid));
+	  cs->ss->current_thread = find_thread_ptid (new_ptid);
+	  DEBUG_EXIT ();
+	  return ptid_build (event->getProcess()->getPid(), event->getThread()->getLWP(), 0);
 	}
       else if (events.is_signal(event))
 	{
 	  events.erase(event);
+	  DEBUG("erase");
 	  status->kind = TARGET_WAITKIND_SIGNALLED;
 	  EventSignal::const_ptr signal_ev = event->getEventSignal();
-	  DEBUG(signal_ev->name());
+	  DEBUG("signal" << signal_ev->name());
 	  status->value.integer = signal_ev->getSignal();
 	  DEBUG("process signalled with signal: " << status->value.integer);
 	}
@@ -825,9 +961,9 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
       break;
     }
 
-  DEBUG("returning", pid_to_string (ptid_of(cs->ss->current_thread)));
+  DEBUG("Returning", pid_to_string (ptid_of(cs->ss->current_thread)));
+  DEBUG_EXIT ();
   return ptid_of (cs->ss->current_thread);
-//  return new_ptid;
 }
 
 
@@ -861,7 +997,7 @@ dyninst_kill (Dyninst::PID pid)
     return -1;
 
   if (! dyninst_process->stopProc())
-    error ("Unable to stop process %ld: %s", (long)pid, getLastErrorMsg());
+    DYNERRMSG ("Unable to stop process %ld", (long)pid);
   dyninst_procset->erase(dyninst_process);
   the_target->mourn (process);
   return 0;
@@ -954,30 +1090,40 @@ dyninst_fetch_registers (struct regcache *regcache, int regno)
 {
   Thread::const_ptr thr = dyninst_get_inferior_thread();
   Thread::ptr th = boost::const_pointer_cast<Thread>(thr);
+  Process::const_ptr dyninst_process = thr->getProcess();
+  Process::ptr dyninst_proc = boost::const_pointer_cast<Process>(dyninst_process);
 
   struct dyninst_regset_info *regset = dyninst_target_regsets;
 
-  bool thread_was_active = false;
+  enum {cont_none, cont_thread, cont_proc} howto_continue;
 
+  howto_continue = cont_none;
   if (! th->isStopped())
     {
-      thread_was_active = true;
-      if (! th->stopThread())
+      if (! dyninst_proc->stopProc())
 	{
-	  DEBUG("stopThread " << getLastErrorMsg());
+	  DYNERRMSG ("Unable to stop process %ld", (long)th->getProcess()->getPid());
 	}
       else
-	{
-	  DEBUG("stopThread");
-	}
+	howto_continue = cont_proc;
     }
 
   if (! th->getAllRegisters(regpool))
     {
       DEBUG("getAllRegisters " << getLastErrorMsg());
     }
-  if (thread_was_active)
-    th->continueThread();
+
+  switch (howto_continue)
+    {
+    case (cont_thread):
+      th->continueThread();
+      break;
+    case (cont_proc):
+      dyninst_proc->continueProc();
+      break;
+    case (cont_none):
+	;
+    }
 
   regset->fill_function (regcache, regpool);
 }
@@ -989,21 +1135,26 @@ dyninst_store_registers (struct regcache *regcache, int regno)
 {
   Thread::const_ptr thr = dyninst_get_inferior_thread();
   Thread::ptr th = boost::const_pointer_cast<Thread>(thr);
+  Process::const_ptr dyninst_process = thr->getProcess();
+  Process::ptr dyninst_proc = boost::const_pointer_cast<Process>(dyninst_process);
 
   DEBUG("regno=" << regno, pid_to_string (th));
 
   struct dyninst_regset_info *regset = dyninst_target_regsets;
 
-  bool thread_was_active = false;
+  enum {cont_none, cont_thread, cont_proc} howto_continue;
 
+  howto_continue = cont_none;
   if (! th->isStopped())
     {
-      thread_was_active = true;
-      if (! th->stopThread())
+      if (! dyninst_proc->stopProc())
 	{
-	  DEBUG(getLastErrorMsg());
+	  DYNERRMSG ("Unable to stop process %ld", (long)th->getProcess()->getPid());
 	}
+      else
+	howto_continue = cont_proc;
     }
+
   if (! th->getAllRegisters(regpool))
     {
       DEBUG(getLastErrorMsg(), pid_to_string (th));
@@ -1015,8 +1166,17 @@ dyninst_store_registers (struct regcache *regcache, int regno)
       DEBUG(getLastErrorMsg(), pid_to_string (th));
     }
 
-  if (thread_was_active)
-    th->continueThread();
+  switch (howto_continue)
+    {
+    case (cont_thread):
+      th->continueThread();
+      break;
+    case (cont_proc):
+      dyninst_proc->continueProc();
+      break;
+    case (cont_none):
+	;
+    }
 }
 
 
@@ -1028,13 +1188,22 @@ dyninst_process_qsupported (const char *query)
 }
 
 
+static CORE_ADDR dyninst_get_pc (Thread::ptr) __attribute__ ((unused));
+
+static CORE_ADDR
+dyninst_get_pc (Thread::ptr thr)
+{
+  CORE_ADDR pc = (*the_low_target.get_pc) (thr);
+  return pc;
+}
+
 static CORE_ADDR
 dyninst_read_pc (struct regcache *regcache)
 {
-  if (the_low_target.get_pc == NULL)
+  if (the_low_target.read_pc == NULL)
     return 0;
 
-  CORE_ADDR pc = (*the_low_target.get_pc) (regcache);
+  CORE_ADDR pc = (*the_low_target.read_pc) (regcache);
   DEBUG("pc is " << pc);
   return pc;
 }
@@ -1059,7 +1228,7 @@ dyninst_read_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len)
   bool result;
 
   if (!(result = dyninst_process->readMemory((void*)myaddr, (Dyninst::Address)memaddr, len)))
-    DYNERR("Unable to read memory at %#lx", (long unsigned)memaddr);
+    DYNERRMSG("Unable to read memory at %#lx", (long unsigned)memaddr);
 
   if (debug_threads)
     {
@@ -1089,7 +1258,7 @@ dyninst_write_memory (CORE_ADDR memaddr, const unsigned char *myaddr, int len)
   bool result;
 
   if (! (result = dyninst_process->writeMemory((Dyninst::Address)memaddr, (void*)myaddr, len)))
-    DYNERR("Unable to write memory at %#lx", (long unsigned)memaddr);
+    DYNERRMSG("Unable to write memory at %#lx", (long unsigned)memaddr);
   if (debug_threads)
     {
       /* Dump up to four bytes.  */
@@ -1117,7 +1286,7 @@ dyninst_request_interrupt (void)
   Process::ptr dyninst_process = *procset_it;
 
   if (! dyninst_process->terminate())
-    error ("Unable to interrupt process %ld", (long)pid);
+    DYNERRMSG ("Unable to interrupt process %ld", (long)pid);
 }
 
 
@@ -1174,18 +1343,45 @@ static int
 dyninst_insert_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
 		      struct raw_breakpoint *bp)
 {
-  Thread::const_ptr th = dyninst_get_inferior_thread();
+  Thread::const_ptr thr = dyninst_get_inferior_thread();
+  Thread::ptr th = boost::const_pointer_cast<Thread>(thr);
   Process::const_ptr dyninst_process = th->getProcess();
+  Process::ptr dyninst_proc = boost::const_pointer_cast<Process>(dyninst_process);
   bool result;
+  enum {cont_none, cont_thread, cont_proc} howto_continue;
 
   Breakpoint::ptr brp = Breakpoint::newBreakpoint();
-  DEBUG(" addr=" << addr << " " << brp->getToAddress(), pid_to_string(th));
+  DEBUG(" addr=" << addr << ' ' << brp->getToAddress(), pid_to_string(th));
   brp->setData(bp);
+
+  howto_continue = cont_none;
+  if (! dyninst_proc->allThreadsStopped())
+    {
+      if (! dyninst_proc->stopProc())
+	{
+	  DYNERRMSG ("Unable to stop process %ld", (long)th->getProcess()->getPid());
+	}
+      else
+	howto_continue = cont_proc;
+    }
+
   if (! (result = dyninst_process->addBreakpoint(addr, brp)))
-    DYNERR ("Unable insert breakpoint at %#lx", (long)addr);
+    DYNERRMSG ("Unable insert breakpoint at %#lx", (long)addr);
   dyninst_bpset.push_back(brp);
 
-  return result == false;
+  switch (howto_continue)
+    {
+    case (cont_thread):
+      th->continueThread();
+      break;
+    case (cont_proc):
+      dyninst_proc->continueProc();
+      break;
+    case (cont_none):
+	;
+    }
+
+  return 0;
 }
 
 /* Remove a breakpoint BP of TYPE at ADDR for LEN bytes */
@@ -1194,8 +1390,23 @@ static int
 dyninst_remove_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
 		      struct raw_breakpoint *rbp)
 {
-  Thread::const_ptr th = dyninst_get_inferior_thread();
-  Process::const_ptr dyninst_process = th->getProcess();
+  Thread::const_ptr thr = dyninst_get_inferior_thread();
+  Thread::ptr th = boost::const_pointer_cast<Thread>(thr);
+  Process::const_ptr dyninst_process = thr->getProcess();
+  Process::ptr dyninst_proc = boost::const_pointer_cast<Process>(dyninst_process);
+
+  enum {cont_none, cont_thread, cont_proc} howto_continue;
+
+  howto_continue = cont_none;
+  if (! dyninst_proc->allThreadsStopped())
+    {
+      if (! dyninst_proc->stopProc())
+	{
+	  DYNERRMSG ("Unable to stop process %ld", (long)th->getProcess()->getPid());
+	}
+      else
+	howto_continue = cont_proc;
+    }
 
   std::vector<Breakpoint::ptr>::iterator it;
   bool result = false;
@@ -1205,15 +1416,40 @@ dyninst_remove_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
       Breakpoint::ptr bp = *it;
       if ((struct raw_breakpoint*)bp->getData() == rbp)
 	{
-	  DEBUG(" addr=" << addr << " " << bp->getToAddress(), pid_to_string(th));
+	  DEBUG(" addr=" << addr << ' ' << bp->getToAddress(), pid_to_string(th));
 	  if (! (result = dyninst_process->rmBreakpoint(addr, bp)))
-	    DYNERR ("Unable remove breakpoint at %#lx", (long)addr);
+	    DYNERRMSG ("Unable remove breakpoint at %#lx", (long)addr);
 	  break;
 	}
     }
+
   dyninst_bpset.erase(it);
 
-  return result == false;
+  switch (howto_continue)
+    {
+    case (cont_thread):
+      break;
+    case (cont_proc):
+      break;
+    case (cont_none):
+	;
+    }
+
+  return 0;
+}
+
+
+static int
+dyninst_supports_non_stop (void)
+{
+  return 1;
+}
+
+
+static int
+dyninst_supports_multi_process (void)
+{
+  return 1;
 }
 
 
@@ -1242,10 +1478,6 @@ dyninst_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
 
   string document = "<library-list-svr4 version=\"1.0\">";
 
-//  Dyninst::PID pid = ptid_get_pid (thread_to_gdb_id (current_thread));
-//  ProcessSet::iterator procset_it = dyninst_procset->find(pid);
-//  Process::ptr dyninst_proc = *procset_it;
-
   LibraryPool::const_iterator libidx;
   bool first = true;
   for (libidx = dyninst_proc->libraries().begin(); libidx != dyninst_proc->libraries().end(); libidx++)
@@ -1256,8 +1488,7 @@ dyninst_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
 	  first = false;
 	  continue;
 	}
-      DEBUG("added library " << lib->getName() << " " << lib->getDynamicAddress() << " " << lib->getLoadAddress() << endl);
-  //    loaded_dll (lib->getAbsoluteName().c_str(), lib->getDynamicAddress());
+      DEBUG("added library " << lib->getName() << ' ' << lib->getDynamicAddress() << ' ' << lib->getLoadAddress() << endl);
       std::ostringstream oss;
 
       oss << "<library name=\"" << lib->getAbsoluteName()
@@ -1351,10 +1582,10 @@ static struct target_ops dyninst_target_ops = {
   NULL,  // hostio_last_error
   NULL,  // qxfer_osdata
   NULL,  // qxfer_siginfo
-  NULL,  // supports_non_stop
+  dyninst_supports_non_stop,
   NULL,  // async
   NULL,  // start_non_stop
-  NULL,  // supports_multi_process
+  dyninst_supports_multi_process,
   NULL,  // handle_monitor_command
   NULL,  // common_core_of_thread
   NULL,  // read_loadmap

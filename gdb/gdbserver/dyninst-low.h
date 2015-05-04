@@ -56,7 +56,8 @@ struct dyninst_target_ops
   /* Architecture-specific setup.  */
   void (*arch_setup) (void);
   void (*process_qsupported) (const char *query);
-  CORE_ADDR (*get_pc) (struct regcache *regcache);
+  CORE_ADDR (*get_pc) (Thread::const_ptr thr);
+  CORE_ADDR (*read_pc) (struct regcache *regcache);
   void (*set_pc) (struct regcache *regcache, CORE_ADDR newpc);
   bool (*supports_range_stepping) ();
   void (*reg_map_setup) (RegisterPool regpool);

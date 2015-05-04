@@ -77,6 +77,8 @@ struct vstop_notif
 
 DEFINE_QUEUE_P (notif_event_p);
 
+static struct client_states  client_states;
+
 /* Allocate a new struct remote_state with xmalloc, initialize it, and
    return it.  */
 
@@ -84,7 +86,6 @@ static client_state *
 new_client_state ()
 {
   client_state *result = XCNEW (client_state);
-  result->lock_mode = NL;
   return result;
 }
 
@@ -93,7 +94,6 @@ static server_state *
 new_server_state ()
 {
   server_state *result = XCNEW (server_state);
-  result->lock_mode = IX;
   return result;
 }
 
@@ -118,7 +118,7 @@ void
 dump_client_state ()
 {
   client_state *cs;
-  for (cs = set_client_state (-1); cs != NULL; cs = cs->next)
+  for (cs = client_states.first; cs != NULL; cs = cs->next)
       if (debug_threads)
 	{
 	  debug_printf ("%s %s %d cont_thr %#lx gen thr %#lx attached? %d\n", __FUNCTION__,
@@ -130,32 +130,21 @@ dump_client_state ()
     }
 }
 
+// Are we attaching to a process we have already encountered?
+
 int
 attach_client_state (client_state *cs, int pid)
 {
   client_state *matched_cs;
 
-  for (matched_cs = set_client_state (-1); matched_cs != NULL; matched_cs = matched_cs->next)
+  for (matched_cs = client_states.first; matched_cs != NULL; matched_cs = matched_cs->next)
     {
       if (cs != matched_cs && matched_cs->ss->last_ptid.pid == pid)
 	{
 	  matched_cs->ss->attach_count += 1;
 	  cs->executable = matched_cs->executable;
 	  free_server_state (cs->ss);		// reuse the matched server state
-	  cs->ss = matched_cs->ss; // was *cs = *matched_cs
-	  cs->ss->lock_mode = IS;
-#if 0
-	  cs->ss->cont_thread = matched_cs->ss->cont_thread;
-	  cs->ss->general_thread = matched_cs->ss->general_thread;
-	  cs->wrapper_argv = matched_cs->wrapper_argv;
-	  cs->ss->signal_pid = matched_cs->ss->signal_pid;
-	  cs->ss->last_ptid = matched_cs->ss->last_ptid;
-	  cs->ss->current_thread = matched_cs->ss->current_thread;
-	  cs->ss->all_processes.head = matched_cs->ss->all_processes.head;
-	  cs->ss->all_processes.tail = matched_cs->ss->all_processes.tail;
-	  cs->ss->all_threads.head = matched_cs->ss->all_threads.head;
-	  cs->ss->all_threads.tail = matched_cs->ss->all_threads.tail;
-#endif
+	  cs->ss = matched_cs->ss;
 	  return 1;
 	}
     }
@@ -166,41 +155,33 @@ client_state *
 set_client_state (gdb_fildes_t fd)
 {
 /* States:
- * fd = -1 add/return initial client state
- * fd =  F add/return client state for fd F
- * fd =  0 return client state for current fd
-  */
+ * fd = -1 add initial client state
+ * fd =  F add client state for fd F
+ */
 
-  static gdb_fildes_t current_fd;
-  static client_state *first_client_state;
   client_state *csidx;
   client_state *new_csidx;
 
   // add/return initial client state
   if (fd == -1)
     {
-      if (first_client_state == NULL)
+      if (client_states.first == NULL)
 	{
-	  first_client_state = new_client_state ();
-	  first_client_state->ss = new_server_state ();
-	  first_client_state->file_desc = fd;
-	  current_fd = fd;
+	  client_states.first= new_client_state ();
+	  client_states.first->ss = new_server_state ();
+	  client_states.first->file_desc = fd;
+	  client_states.current_fd = fd;
 	}
-      return first_client_state;
+      return client_states.first;
     }
-
-  // return client state for current fd
-
-  if (fd == 0)
-    fd = current_fd;
 
   // add/return client state for fd F
 
-  for (csidx = first_client_state; ; csidx = csidx->next)
+  for (csidx = client_states.first; ; csidx = csidx->next)
     {
       if (csidx->file_desc == fd)
 	{
-	  current_fd = fd;
+	  client_states.current_fd = fd;
 	  return csidx;
 	}
       else if (csidx->next == NULL)
@@ -214,23 +195,24 @@ set_client_state (gdb_fildes_t fd)
   *new_csidx->ss = *csidx->ss;
   new_csidx->ss->attach_count = 0;
   new_csidx->file_desc = fd;
-#if 1
   new_csidx->executable = NULL;
+  new_csidx->own_buf = xmalloc (PBUFSIZ + 1);
+  new_csidx->in_buf = NULL;
   new_csidx->ss->cont_thread = null_ptid;
   new_csidx->ss->general_thread = null_ptid;
   new_csidx->wrapper_argv = NULL;
   new_csidx->ss->signal_pid = 0;
   new_csidx->ss->last_ptid = null_ptid;
-  new_csidx->ss->current_thread = 0;
+  new_csidx->ss->current_thread = NULL;
   new_csidx->ss->all_processes.head = NULL;
   new_csidx->ss->all_processes.tail = NULL;
   new_csidx->ss->all_threads.head = NULL;
   new_csidx->ss->all_threads.tail = NULL;
-#endif
-  current_fd = fd;
+
+  client_states.current_fd = fd;
   csidx->next = new_csidx;
   if (debug_threads)
-    debug_printf ("%s Called returned fd=%d current=%d\n", __FUNCTION__, fd, current_fd);
+    debug_printf ("%s Called returned fd=%d current=%d\n", __FUNCTION__, fd, client_states.current_fd);
   return new_csidx;
 }
 
@@ -240,7 +222,7 @@ count_client_state ()
 {
   client_state *cs;
   int n_client_states = 0;
-  for (cs = set_client_state(-1); cs != NULL; cs = cs->next)
+  for (cs = client_states.first; cs != NULL; cs = cs->next)
     {
       if (cs->executable != NULL)
 	n_client_states += 1;
@@ -255,7 +237,7 @@ delete_client_state (gdb_fildes_t fd)
   client_state *cs, *previous_cs = NULL;
   server_state *ss= NULL;
 
-  for (cs = set_client_state(-1); cs != NULL; cs = cs->next)
+  for (cs = client_states.first; cs != NULL; cs = cs->next)
     {
       if (cs->file_desc == fd)
 	{
@@ -269,13 +251,11 @@ delete_client_state (gdb_fildes_t fd)
       previous_cs = cs;
     }
 
-  for (cs = set_client_state(-1); cs != NULL; cs = cs->next)
+  for (cs = client_states.first; cs != NULL; cs = cs->next)
     {
       if (cs->ss == ss)
 	{
 	  cs->ss->attach_count -= 1;
-	  if (cs->ss->attach_count == 0)
-	    cs->ss->lock_mode = IX;
 	  set_client_state (cs->file_desc);
 	}
     }
@@ -287,24 +267,26 @@ int get_remote_desc();
 client_state *
 get_client_state (void)
 {
-  return set_client_state (0);
+  return set_client_state (client_states.current_fd);
 }
 
+// Add another client to the 1 server -> N client list.
+
 client_state *
-match_client_state (char *executable)
+add_client_state (char *executable)
 {
   client_state *cs;
   char *new_executable;
   int entry = 0;
   client_state *matched_cs = NULL;
   dump_client_state();
-  for (cs = set_client_state (-1); cs != NULL; cs = cs->next)
+  for (cs = client_states.first; cs != NULL; cs = cs->next)
     {
       if (debug_threads)
 	debug_printf ("%s %s looking for %s entry %d for fd %d\n", __FUNCTION__, cs->executable, executable, entry++, cs->file_desc);
     }
 
-  for (cs = set_client_state (-1); cs != NULL; cs = cs->next)
+  for (cs = client_states.first; cs != NULL; cs = cs->next)
     {
       if (cs->executable && strcmp (cs->executable, executable) == 0)
 	{
@@ -314,10 +296,10 @@ match_client_state (char *executable)
     }
 
   // TODO Is there a window where multiple clients are created by new_client_state but not yet setup by match_client_state?
-  cs = set_client_state (0);
-      new_executable = xmalloc (strlen (executable) + 1); // was in else
-      strcpy (new_executable, executable);
-      cs->executable = new_executable;
+  cs = set_client_state (client_states.current_fd);
+  new_executable = xmalloc (strlen (executable) + 1); // was in else
+  strcpy (new_executable, executable);
+  cs->executable = new_executable;
 
   if (matched_cs && cs != matched_cs)
     {
@@ -326,7 +308,6 @@ match_client_state (char *executable)
       gdb_fildes_t file_desc = cs->file_desc;
       free_server_state (cs->ss);		// reuse the matched server state
       cs->ss = matched_cs->ss; // was *cs = *matched_cs
-      matched_cs->ss->lock_mode = IS;
       cs->ss->attach_count += 1;
       cs->next = next_cs;
       cs->file_desc = file_desc;
@@ -342,59 +323,135 @@ match_client_state (char *executable)
   return NULL;
 }
 
-
+static void handle_status (char *);
 /*
-* Multiple Granularity Locking
-Transaction Ti can lock a node Q, using the following rules:
-  lock node Q in S or IS if ancestor of Q locked IX or IS
-  lock node Q in X, IX, SIX if ancestor of Q locked IX or SIX
-  unlock node Q if decendent of Q are locked
-  locks are acquired in root to leaf order and are release in leaf to root order.
-
-|     | NL | IS | IX | S | SIX | X |
-| NL  | y  | y  | y  | y | y   | y |
-| IS  | y  | y  | y  | y | y   | n |
-| IX  | y  | y  | y  | n | n   | n |
-| S   | y  | y  | n  | y | n   | n |
-| SIX | y  | y  | n  | n | n   | n |
-| X   | y  | n  | n  | n | n   | n |
+ * This lattice defines 'if client 1 is doing x and client 2 is doing y who gets priority?
+ * We try to map the packet(s) back to the original gdb request
+ *
+ *          | cont | step | break | examine | start | nil |
+ * continue | c    | s    | b     | x       | c     | nil |
+ * step     | s    | s    | b     | x       | s     | nil |
+ * break    | b    | b    | b     | x       | b     | b   |
+ * examine  | x    | x    | x     | x       | x     | x   |
+ * start    | c    | s    | b     | x       | r     | nil |
 */
+static const char lcd_request [127][127] = {
+    ['c']['s']='s', ['s']['c']='s', ['c']['c']='c',
+    ['c']['b']='b', ['b']['c']='b', ['c']['x']='x', ['x']['c']='x',
+    ['s']['s']='s', ['s']['b']='b', ['b']['s']='b', ['b']['b']='b',
+    ['s']['x']='x', ['x']['s']='x', ['x']['b']='x', ['b']['x']='x',
+};
+// a pending_waitee client has higher priority, e.g. continue AND step = step
+// a pending waiter client has lower priority (waits), e.g. continue waits for step
+enum pending_types  {none_pending=0, pending_waitee=1, pending_waiter=2};
+
+
+// inspect the packet in own_buf and normalize it to a corresponding gdb request for the
+// not ignore_packet case, or output a packet that will cause the packet to be ignored for
+// the ignore_packet case.
 
 int
-set_lock (struct client_state *cs, lock_modes lock_mode)
+normalize_packet (client_state *cs, int ignore_packet)
 {
-  debug_printf ("%s S/X/IS/IX %d/%d/%d/%d server %d client %d parm %d\n", __FUNCTION__, S, X, IS, IX, cs->ss->lock_mode, cs->lock_mode, lock_mode);
-  switch (cs->ss->lock_mode)
-  {
-    case NL:
-      cs->lock_mode = lock_mode;
-      return 1;
-    case IX:
-      switch (lock_mode)
-      {
-	case S:
-	case X:
-	  cs->lock_mode = lock_mode;
-	  return 1;
-	default:
-	  break;
-      };
-    case IS:
-      switch (lock_mode)
-      {
-	case S:
-	  cs->lock_mode = lock_mode;
-	  return 1;
-	case X:
-	  return 0;
-	default:
-	  break;
-      };
-    default:
-      break;
-  }
+  char own_packet = cs->own_buf[0];
+  int ignored_packet = 0;
 
-  return 1;
+  debug_printf ("%s %c %c %d %d\n", __FUNCTION__,own_packet,cs->normalized_packet,ignore_packet, cs->pending);
+  // TODO a gdb request maps to N packets. tag the client with the corresponding gdb request
+  // If we are just categorizing to a normalized gdb request and we have already done so then return
+  if (!ignore_packet && cs->pending == pending_waiter)
+    return 0;
+  switch (own_packet)
+  {
+    case 'v':
+      if (strncmp (cs->own_buf, "vCont;c", 7) == 0)
+	if (ignore_packet)
+	  {
+	    strcpy (cs->own_buf, "?");
+	    handle_status (cs->own_buf);
+	    putpkt (cs->own_buf);
+	    ignored_packet = 1;
+	  }
+	else
+	  cs->normalized_packet= 'c';
+      else if (strncmp (cs->own_buf, "vCont;s", 7) == 0)
+	if (ignore_packet)
+	  {
+	    strcpy (cs->own_buf, "OK");
+	    putpkt (cs->own_buf);
+	    ignored_packet = 1;
+	  }
+	else
+	  cs->normalized_packet = 's';
+      else if (strncmp (cs->own_buf, "vCont;r", 7) == 0)
+	if (ignore_packet)
+	  {
+	    strcpy (cs->own_buf, "OK");
+	    putpkt (cs->own_buf);
+	    ignored_packet = 1;
+	  }
+	else
+	  cs->normalized_packet = 's';
+      else if (strncmp (cs->own_buf, "vRun", 4) == 0)
+	{
+	  if (ignore_packet)
+	    {
+	      strcpy (cs->own_buf, "OK");
+	      putpkt (cs->own_buf);
+	      ignored_packet = 1;
+	    }
+	  else
+	    cs->normalized_packet = 'r';
+	}
+      break;
+    case 'Z':
+      if (ignore_packet)
+	{
+	  strcpy (cs->own_buf, "OK");
+	  putpkt (cs->own_buf);
+	  ignored_packet = 1;
+	}
+      else
+	cs->normalized_packet = 'b';
+      break;
+    case 'm':
+      if (ignore_packet)
+	{
+	  strcpy (cs->own_buf, "OK");
+	  putpkt (cs->own_buf);
+	  ignored_packet = 1;
+	}
+      else
+	cs->normalized_packet = 'x';
+      break;
+    case 'g':
+    case 'p':
+      break;
+    case 'G':
+    case 'P':
+    case 'M':
+    case 'X':
+      if (ignore_packet)
+	{
+	  strcpy (cs->own_buf, "OK");
+	  putpkt (cs->own_buf);
+	  ignored_packet = 1;
+	}
+      else
+	cs->normalized_packet = 'x';
+      break;
+    default:
+      if (ignore_packet)
+	{
+	  strcpy (cs->own_buf, "OK");
+	  putpkt (cs->own_buf);
+	  ignored_packet = 1;
+	}
+  };
+  if (ignore_packet && ignored_packet)
+    return 1;
+  else
+    return 0;
 }
 
 
@@ -491,7 +548,7 @@ start_inferior (char **argv)
       debug_flush ();
     }
 
-  match_client_state (new_argv[0]);
+  add_client_state (new_argv[0]);
 
 #ifdef SIGTTOU
   signal (SIGTTOU, SIG_DFL);
@@ -1322,6 +1379,21 @@ handle_monitor_command (char *mon, char *own_buf)
 	  xfree (error_msg);
 	}
     }
+  else if (strcmp (mon, "client status") == 0)
+    {
+      client_state *csidx;
+      char *result = NULL;
+      for (csidx = client_states.first; csidx != NULL; csidx = csidx->next)
+	  if (csidx->pending)
+	    {
+	      if (result)
+		asprintf (&result, "%sFile descriptor %d has a pending %c request\n", result, csidx->file_desc, csidx->normalized_packet);
+	      else
+		asprintf (&result, "File descriptor %d has a pending %c request\n", csidx->file_desc, csidx->normalized_packet);
+	    }
+      if (result)
+	monitor_output (result);
+    }
   else if (strcmp (mon, "help") == 0)
     monitor_show_help ();
   else if (strcmp (mon, "exit") == 0)
@@ -1757,20 +1829,20 @@ handle_qxfer_btrace (const char *annex,
   if (ptid_equal (cs->ss->general_thread, null_ptid)
       || ptid_equal (cs->ss->general_thread, minus_one_ptid))
     {
-      strcpy (cs->ss->own_buf, "E.Must select a single thread.");
+      strcpy (cs->own_buf, "E.Must select a single thread.");
       return -3;
     }
 
   thread = find_thread_ptid (cs->ss->general_thread);
   if (thread == NULL)
     {
-      strcpy (cs->ss->own_buf, "E.No such thread.");
+      strcpy (cs->own_buf, "E.No such thread.");
       return -3;
     }
 
   if (thread->btrace == NULL)
     {
-      strcpy (cs->ss->own_buf, "E.Btrace not enabled.");
+      strcpy (cs->own_buf, "E.Btrace not enabled.");
       return -3;
     }
 
@@ -1782,7 +1854,7 @@ handle_qxfer_btrace (const char *annex,
     type = BTRACE_READ_DELTA;
   else
     {
-      strcpy (cs->ss->own_buf, "E.Bad annex.");
+      strcpy (cs->own_buf, "E.Bad annex.");
       return -3;
     }
 
@@ -1793,7 +1865,7 @@ handle_qxfer_btrace (const char *annex,
       result = target_read_btrace (thread->btrace, &cache, type);
       if (result != 0)
 	{
-	  memcpy (cs->ss->own_buf, cache.buffer, cache.used_size);
+	  memcpy (cs->own_buf, cache.buffer, cache.used_size);
 	  return -3;
 	}
     }
@@ -2491,7 +2563,7 @@ handle_pending_status (const struct thread_resume *resumption,
 
       cs->ss->last_status = thread->last_status;
       cs->ss->last_ptid = thread->entry.id;
-      prepare_resume_reply (cs->ss->own_buf, cs->ss->last_ptid, &cs->ss->last_status);
+      prepare_resume_reply (cs->own_buf, cs->ss->last_ptid, &cs->ss->last_status);
       return 1;
     }
   return 0;
@@ -2646,7 +2718,7 @@ resume (struct thread_resume *actions, size_t num_actions)
   (*the_target->resume) (actions, num_actions);
 
   if (cs->non_stop)
-    write_ok (cs->ss->own_buf);
+    write_ok (cs->own_buf);
   else
     {
       cs->ss->last_ptid = mywait (minus_one_ptid, &cs->ss->last_status, 0, 1);
@@ -2655,14 +2727,15 @@ resume (struct thread_resume *actions, size_t num_actions)
 	{
 	  /* No proper RSP support for this yet.  At least return
 	     error.  */
-	  sprintf (cs->ss->own_buf, "E.No unwaited-for children left.");
+	  sprintf (cs->own_buf, "E.No unwaited-for children left.");
 	  disable_async_io ();
 	  return;
 	}
 
       if (cs->ss->last_status.kind != TARGET_WAITKIND_EXITED
           && cs->ss->last_status.kind != TARGET_WAITKIND_SIGNALLED
-	  && cs->ss->last_status.kind != TARGET_WAITKIND_NO_RESUMED)
+	  && cs->ss->last_status.kind != TARGET_WAITKIND_NO_RESUMED
+	  && cs->ss->current_thread)
 	cs->ss->current_thread->last_status = cs->ss->last_status;
 
       /* From the client's perspective, all-stop mode always stops all
@@ -2670,7 +2743,7 @@ resume (struct thread_resume *actions, size_t num_actions)
 	 so by now).  Tag all threads as "want-stopped", so we don't
 	 resume them implicitly without the client telling us to.  */
       gdb_wants_all_threads_stopped ();
-      prepare_resume_reply (cs->ss->own_buf, cs->ss->last_ptid, &cs->ss->last_status);
+      prepare_resume_reply (cs->own_buf, cs->ss->last_ptid, &cs->ss->last_status);
       disable_async_io ();
 
       if (cs->ss->last_status.kind == TARGET_WAITKIND_EXITED
@@ -2679,7 +2752,6 @@ resume (struct thread_resume *actions, size_t num_actions)
     }
 }
 
-static void handle_status (char *);
 
 /* Attach to a new program.  Return 1 if successful, 0 if failure.  */
 int
@@ -2796,7 +2868,7 @@ handle_v_run (char *own_buf)
   freeargv (cs->program_argv);
   cs->program_argv = new_argv;
 
-  if (match_client_state (new_argv[0]))
+  if (add_client_state (new_argv[0]))
     {
       if (debug_threads)
 	debug_printf ("%s returning 0\n",__FUNCTION__);
@@ -3159,7 +3231,8 @@ handle_status (char *own_buf)
 
 //      if (thread != NULL)
       // we are detaching a multi attached client
-      debug_printf ("%s before prepare_resume_reply call %d %c\n", __FUNCTION__, cs->ss->attach_count, cs->packet);
+      if (debug_threads > 1)
+	debug_printf ("%s before prepare_resume_reply call %d %c\n", __FUNCTION__, cs->ss->attach_count, cs->packet);
       if (thread != NULL && !(cs->packet == 'D' && cs->ss->attach_count > 0))
 	{
 	  struct thread_info *tp = (struct thread_info *) thread;
@@ -3417,7 +3490,7 @@ captured_main (int argc, char *argv[])
 	  *next_arg = NULL;
 	}
       else if (strcmp (*next_arg, "--debug") == 0)
-	debug_threads = 1;
+	debug_threads += 1;
       else if (strncmp (*next_arg,
 			"--debug-format=",
 			sizeof ("--debug-format=") - 1) == 0)
@@ -3555,7 +3628,7 @@ captured_main (int argc, char *argv[])
      of these, not one per target.  Only one target is active at a
      time.  */
 
-  cs->ss->own_buf = xmalloc (PBUFSIZ + 1);
+//  cs->own_buf = xmalloc (PBUFSIZ + 1);
   cs->ss->mem_buf = xmalloc (PBUFSIZ);
 
   if (pid == 0 && *next_arg != NULL)
@@ -3675,12 +3748,13 @@ captured_main (int argc, char *argv[])
 	{
 	  if (cs->response_needed)
 	    {
-	      write_enn (cs->ss->own_buf);
-	      putpkt (cs->ss->own_buf);
+	      write_enn (cs->own_buf);
+	      putpkt (cs->own_buf);
 	    }
 	}
     }
 }
+
 
 /* Main function.  */
 
@@ -3772,6 +3846,7 @@ process_point_options (struct breakpoint *bp, char **packet)
    a brisk pace, so we read the rest of the packet with a blocking
    getpkt call.  */
 
+
 static int
 process_serial_event (gdb_client_data client_data)
 {
@@ -3783,7 +3858,7 @@ process_serial_event (gdb_client_data client_data)
   CORE_ADDR mem_addr;
   int pid;
   unsigned char sig;
-  int packet_len;
+//  int packet_len;
   int new_packet_len = -1;
   client_state *cs = get_client_state();
 
@@ -3797,9 +3872,10 @@ process_serial_event (gdb_client_data client_data)
   disable_async_io ();
 
   cs->response_needed = 0;
-  fprintf (stderr, "%s fd=%d\n", __FUNCTION__, cs->file_desc);
-  packet_len = getpkt (cs->file_desc, cs->ss->own_buf);
-  if (packet_len <= 0)
+  if (debug_threads > 1)
+    fprintf (stderr, "%s fd=%d\n", __FUNCTION__, cs->file_desc);
+  cs->packet_len = getpkt (cs->file_desc, cs->own_buf);
+  if (cs->packet_len <= 0)
     {
       remote_close ();
       /* Force an event loop break.  */
@@ -3807,37 +3883,85 @@ process_serial_event (gdb_client_data client_data)
 	return -1;
       else
 	{
-	  cs = get_client_state();
-	  packet_len = getpkt (cs->file_desc, cs->ss->own_buf);
+	  cs->packet_len = getpkt (cs->file_desc, cs->own_buf);
 	}
     }
+  if (cs->in_buf)
+    xfree (cs->in_buf);
+  cs->in_buf = xmalloc (cs->packet_len + 1);
+  memcpy (cs->in_buf, cs->own_buf, cs->packet_len);
   cs->response_needed = 1;
 
   i = 0;
-  ch = cs->ss->own_buf[i++];
+  ch = cs->own_buf[i++];
   if (ch != '?')
     cs->packet = ch;
+
+
+  normalize_packet (cs, 0);
+
+  { // Handle pending type
+    client_state *csidx = NULL;
+    char p = cs->normalized_packet;
+
+    for (csidx = client_states.first; csidx != NULL; csidx = csidx->next)
+      {
+	// another client is attached to the cs process
+	if (csidx != cs && cs->ss == csidx->ss)
+	  {
+	    debug_printf ("csidx pending=%d packet=%c cs pending=%d packet=%c\n", csidx->pending, csidx->normalized_packet, cs->pending, cs->normalized_packet);
+	    // find this client's pending type
+	    if (!csidx->pending)
+	      {
+		char lcd = lcd_request[cs->normalized_packet][csidx->normalized_packet];
+		char temp_lcd = (lcd == 0) ? '0' : lcd;
+		debug_printf ("common request for %c and %c is %c\n", cs->normalized_packet, csidx->normalized_packet, temp_lcd);
+		if (lcd != 0 && lcd != p)
+		  {
+		    cs->pending = pending_waiter;
+		    csidx->pending = pending_waitee;
+		    debug_printf ("%s pending check set %d %d\n", __FUNCTION__,csidx->file_desc,csidx->pending);
+		  }
+	      }
+	    if (cs->pending == pending_waitee && csidx->pending == pending_waiter)
+	      {
+		char lcd = lcd_request[cs->normalized_packet][csidx->normalized_packet];
+		// has waitee/waiter been resolved?
+		if (lcd != 0 && lcd == csidx->normalized_packet)
+		  {
+		    char save_ch = ch;
+		    client_state *save_cs = cs;
+		    cs = set_client_state (csidx->file_desc);
+		    // fake the reply to the waiter client
+		    normalize_packet (cs, 1);
+		    csidx->pending = none_pending;
+		    ch = save_ch;
+		    cs = save_cs;
+		    set_client_state (save_cs->file_desc);
+		  }
+	      }
+	  }
+      }
+    debug_printf ("%s pending check %d %d\n", __FUNCTION__,cs->file_desc,cs->pending);
+    if (cs->pending == pending_waiter)
+      return 0;
+  }
+
   switch (ch)
-    {
+  {
     case 'q':
-      if (! set_lock (cs, S))
-	break;
-      handle_query (cs->ss->own_buf, packet_len, &new_packet_len, client_data);
+      handle_query (cs->own_buf, cs->packet_len, &new_packet_len, client_data);
       break;
     case 'Q':
-      if (! set_lock (cs, S))
-	break;
-      handle_general_set (cs->ss->own_buf);
+      handle_general_set (cs->own_buf);
       break;
     case 'D':
-      if (! set_lock (cs, S))
-	break;
-      require_running (cs->ss->own_buf);
+      require_running (cs->own_buf);
 
       if (cs->multi_process)
 	{
 	  i++; /* skip ';' */
-	  pid = strtol (&cs->ss->own_buf[i], NULL, 16);
+	  pid = strtol (&cs->own_buf[i], NULL, 16);
 	}
       else
 	pid = ptid_get_pid (current_ptid);
@@ -3849,7 +3973,7 @@ process_serial_event (gdb_client_data client_data)
 
 	  if (process == NULL)
 	    {
-	      write_enn (cs->ss->own_buf);
+	      write_enn (cs->own_buf);
 	      break;
 	    }
 
@@ -3885,7 +4009,7 @@ process_serial_event (gdb_client_data client_data)
 	  resume_info.sig = 0;
 	  (*the_target->resume) (&resume_info, 1);
 
-	  write_ok (cs->ss->own_buf);
+	  write_ok (cs->own_buf);
 	  break; /* from switch/case */
 	}
 
@@ -3893,13 +4017,13 @@ process_serial_event (gdb_client_data client_data)
       stop_tracing ();
 
       if (cs->ss->attach_count > 0)
-	write_ok (cs->ss->own_buf);
+	write_ok (cs->own_buf);
       else if (detach_inferior (pid) != 0)
-	write_enn (cs->ss->own_buf);
+	write_enn (cs->own_buf);
       else
 	{
 	  discard_queued_stop_replies (pid);
-	  write_ok (cs->ss->own_buf);
+	  write_ok (cs->own_buf);
 
 	  if (cs->extended_protocol)
 	    {
@@ -3915,7 +4039,7 @@ process_serial_event (gdb_client_data client_data)
 	    }
 	  else
 	    {
-	      putpkt (cs->ss->own_buf);
+	      putpkt (cs->own_buf);
 	      remote_close ();
 
 	      /* If we are attached, then we can exit.  Otherwise, we
@@ -3927,27 +4051,21 @@ process_serial_event (gdb_client_data client_data)
 	}
       break;
     case '!':
-      if (! set_lock (cs, S))
-	break;
       cs->extended_protocol = 1;
-      write_ok (cs->ss->own_buf);
+      write_ok (cs->own_buf);
       break;
     case '?':
-      if (! set_lock (cs, S))
-	break;
-      handle_status (cs->ss->own_buf);
+      handle_status (cs->own_buf);
       break;
     case 'H':
-      if (! set_lock (cs, S))
-	break;
-      if (cs->ss->own_buf[1] == 'c' || cs->ss->own_buf[1] == 'g' || cs->ss->own_buf[1] == 's')
+      if (cs->own_buf[1] == 'c' || cs->own_buf[1] == 'g' || cs->own_buf[1] == 's')
 	{
 	  ptid_t gdb_id, thread_id;
 	  int pid;
 
-	  require_running (cs->ss->own_buf);
+	  require_running (cs->own_buf);
 
-	  gdb_id = read_ptid (&cs->ss->own_buf[2], NULL);
+	  gdb_id = read_ptid (&cs->own_buf[2], NULL);
 
 	  pid = ptid_get_pid (gdb_id);
 
@@ -3964,7 +4082,7 @@ process_serial_event (gdb_client_data client_data)
 						      &pid);
 	      if (!thread)
 		{
-		  write_enn (cs->ss->own_buf);
+		  write_enn (cs->own_buf);
 		  break;
 		}
 
@@ -3975,12 +4093,12 @@ process_serial_event (gdb_client_data client_data)
 	      thread_id = gdb_id_to_thread_id (gdb_id);
 	      if (ptid_equal (thread_id, null_ptid))
 		{
-		  write_enn (cs->ss->own_buf);
+		  write_enn (cs->own_buf);
 		  break;
 		}
 	    }
 
-	  if (cs->ss->own_buf[1] == 'g')
+	  if (cs->own_buf[1] == 'g')
 	    {
 	      if (ptid_equal (thread_id, null_ptid))
 		{
@@ -4000,22 +4118,20 @@ process_serial_event (gdb_client_data client_data)
 	      cs->ss->general_thread = thread_id;
 	      set_desired_thread (1);
 	    }
-	  else if (cs->ss->own_buf[1] == 'c')
+	  else if (cs->own_buf[1] == 'c')
 	    cs->ss->cont_thread = thread_id;
 
-	  write_ok (cs->ss->own_buf);
+	  write_ok (cs->own_buf);
 	}
       else
 	{
 	  /* Silently ignore it so that gdb can extend the protocol
 	     without compatibility headaches.  */
-	  cs->ss->own_buf[0] = '\0';
+	  cs->own_buf[0] = '\0';
 	}
       break;
     case 'g':
-      if (! set_lock (cs, S))
-	break;
-      require_running (cs->ss->own_buf);
+      require_running (cs->own_buf);
       if (current_traceframe >= 0)
 	{
 	  struct regcache *regcache
@@ -4023,9 +4139,9 @@ process_serial_event (gdb_client_data client_data)
 
 	  if (fetch_traceframe_registers (current_traceframe,
 					  regcache, -1) == 0)
-	    registers_to_string (regcache, cs->ss->own_buf);
+	    registers_to_string (regcache, cs->own_buf);
 	  else
-	    write_enn (cs->ss->own_buf);
+	    write_enn (cs->own_buf);
 	  free_register_cache (regcache);
 	}
       else
@@ -4034,92 +4150,76 @@ process_serial_event (gdb_client_data client_data)
 
 	  set_desired_thread (1);
 	  regcache = get_thread_regcache (cs->ss->current_thread, 1);
-	  registers_to_string (regcache, cs->ss->own_buf);
+	  registers_to_string (regcache, cs->own_buf);
 	}
       break;
     case 'G':
-      if (! set_lock (cs, X))
-	break;
-      require_running (cs->ss->own_buf);
+      require_running (cs->own_buf);
       if (current_traceframe >= 0)
-	write_enn (cs->ss->own_buf);
+	write_enn (cs->own_buf);
       else
 	{
 	  struct regcache *regcache;
 
 	  set_desired_thread (1);
 	  regcache = get_thread_regcache (cs->ss->current_thread, 1);
-	  registers_from_string (regcache, &cs->ss->own_buf[1]);
-	  write_ok (cs->ss->own_buf);
+	  registers_from_string (regcache, &cs->own_buf[1]);
+	  write_ok (cs->own_buf);
 	}
       break;
     case 'm':
-      if (! set_lock (cs, S))
-	  break;
-      require_running (cs->ss->own_buf);
-      decode_m_packet (&cs->ss->own_buf[1], &mem_addr, &len);
+      require_running (cs->own_buf);
+      decode_m_packet (&cs->own_buf[1], &mem_addr, &len);
       res = gdb_read_memory (mem_addr, cs->ss->mem_buf, len);
       if (res < 0)
-	write_enn (cs->ss->own_buf);
+	write_enn (cs->own_buf);
       else
-	bin2hex (cs->ss->mem_buf, cs->ss->own_buf, res);
+	bin2hex (cs->ss->mem_buf, cs->own_buf, res);
       break;
     case 'M':
-      if (! set_lock (cs, X))
-	break;
-      require_running (cs->ss->own_buf);
-      decode_M_packet (&cs->ss->own_buf[1], &mem_addr, &len, &cs->ss->mem_buf);
+      require_running (cs->own_buf);
+      decode_M_packet (&cs->own_buf[1], &mem_addr, &len, &cs->ss->mem_buf);
       if (gdb_write_memory (mem_addr, cs->ss->mem_buf, len) == 0)
-	write_ok (cs->ss->own_buf);
+	write_ok (cs->own_buf);
       else
-	write_enn (cs->ss->own_buf);
+	write_enn (cs->own_buf);
       break;
     case 'X':
-      if (! set_lock (cs, X))
-	break;
-      require_running (cs->ss->own_buf);
-      if (decode_X_packet (&cs->ss->own_buf[1], packet_len - 1,
+      require_running (cs->own_buf);
+      if (decode_X_packet (&cs->own_buf[1], cs->packet_len - 1,
 			   &mem_addr, &len, &cs->ss->mem_buf) < 0
 	  || gdb_write_memory (mem_addr, cs->ss->mem_buf, len) != 0)
-	write_enn (cs->ss->own_buf);
+	write_enn (cs->own_buf);
       else
-	write_ok (cs->ss->own_buf);
+	write_ok (cs->own_buf);
       break;
     case 'C':
-      if (! set_lock (cs, X))
-	break;
-      require_running (cs->ss->own_buf);
-      hex2bin (cs->ss->own_buf + 1, &sig, 1);
+      require_running (cs->own_buf);
+      hex2bin (cs->own_buf + 1, &sig, 1);
       if (gdb_signal_to_host_p (sig))
 	signal = gdb_signal_to_host (sig);
       else
 	signal = 0;
-      myresume (cs->ss->own_buf, 0, signal);
+      myresume (cs->own_buf, 0, signal);
       break;
     case 'S':
-      if (! set_lock (cs, X))
-	break;
-      require_running (cs->ss->own_buf);
-      hex2bin (cs->ss->own_buf + 1, &sig, 1);
+      require_running (cs->own_buf);
+      hex2bin (cs->own_buf + 1, &sig, 1);
       if (gdb_signal_to_host_p (sig))
 	signal = gdb_signal_to_host (sig);
       else
 	signal = 0;
-      myresume (cs->ss->own_buf, 1, signal);
+      myresume (cs->own_buf, 1, signal);
       break;
     case 'c':
-      if (! set_lock (cs, X))
-	break;
-      require_running (cs->ss->own_buf);
+      require_running (cs->own_buf);
       signal = 0;
-      myresume (cs->ss->own_buf, 0, signal);
+      myresume (cs->own_buf, 0, signal);
       break;
     case 's':
-      if (! set_lock (cs, X))
-	break;
-      require_running (cs->ss->own_buf);
+      require_running (cs->own_buf);
       signal = 0;
-      myresume (cs->ss->own_buf, 1, signal);
+      myresume (cs->own_buf, 1, signal);
       break;
     case 'Z':  /* insert_ ... */
       /* Fallthrough.  */
@@ -4128,13 +4228,11 @@ process_serial_event (gdb_client_data client_data)
 	char *dataptr;
 	ULONGEST addr;
 	int len;
-	char type = cs->ss->own_buf[1];
+	char type = cs->own_buf[1];
 	int res;
 	const int insert = ch == 'Z';
-	char *p = &cs->ss->own_buf[3];
+	char *p = &cs->own_buf[3];
 
-	if (! set_lock (cs, X))
-	  break;
 	p = unpack_varlen_hex (p, &addr);
 	len = strtol (p + 1, &dataptr, 16);
 
@@ -4160,17 +4258,15 @@ process_serial_event (gdb_client_data client_data)
 	  res = delete_gdb_breakpoint (type, addr, len);
 
 	if (res == 0)
-	  write_ok (cs->ss->own_buf);
+	  write_ok (cs->own_buf);
 	else if (res == 1)
 	  /* Unsupported.  */
-	  cs->ss->own_buf[0] = '\0';
+	  cs->own_buf[0] = '\0';
 	else
-	  write_enn (cs->ss->own_buf);
+	  write_enn (cs->own_buf);
 	break;
       }
     case 'k':
-      if (! set_lock (cs, X))
-	break;
       cs->response_needed = 0;
       if (!target_running ())
 	/* The packet we received doesn't make sense - but we can't
@@ -4195,27 +4291,23 @@ process_serial_event (gdb_client_data client_data)
       {
 	ptid_t gdb_id, thread_id;
 
-	if (! set_lock (cs, X))
-	  break;
-	require_running (cs->ss->own_buf);
+	require_running (cs->own_buf);
 
-	gdb_id = read_ptid (&cs->ss->own_buf[1], NULL);
+	gdb_id = read_ptid (&cs->own_buf[1], NULL);
 	thread_id = gdb_id_to_thread_id (gdb_id);
 	if (ptid_equal (thread_id, null_ptid))
 	  {
-	    write_enn (cs->ss->own_buf);
+	    write_enn (cs->own_buf);
 	    break;
 	  }
 
 	if (mythread_alive (thread_id))
-	  write_ok (cs->ss->own_buf);
+	  write_ok (cs->own_buf);
 	else
-	  write_enn (cs->ss->own_buf);
+	  write_enn (cs->own_buf);
       }
       break;
     case 'R':
-      if (! set_lock (cs, S))
-	break;
       cs->response_needed = 0;
 
       /* Restarting the inferior is only supported in the extended
@@ -4242,34 +4334,26 @@ process_serial_event (gdb_client_data client_data)
 	  /* It is a request we don't understand.  Respond with an
 	     empty packet so that gdb knows that we don't support this
 	     request.  */
-	  cs->ss->own_buf[0] = '\0';
+	  cs->own_buf[0] = '\0';
 	  break;
 	}
     case 'v':
       /* Extended (long) request.  */
-      if (! set_lock (cs, X))
-	{
-	  strcpy (cs->ss->own_buf, "?");
-	  handle_status (cs->ss->own_buf);
-	  monitor_output ("That request will conflict with another debugging session\n");
-	  break;
-	}
-      handle_v_requests (cs->ss->own_buf, packet_len, &new_packet_len, client_data);
+      handle_v_requests (cs->own_buf, cs->packet_len, &new_packet_len, client_data);
       break;
 
     default:
       /* It is a request we don't understand.  Respond with an empty
 	 packet so that gdb knows that we don't support this
 	 request.  */
-      cs->ss->own_buf[0] = '\0';
+      cs->own_buf[0] = '\0';
       break;
-    }
-  set_lock (cs, NL);
+  }
 
   if (new_packet_len != -1)
-    putpkt_binary (cs->ss->own_buf, new_packet_len);
+    putpkt_binary (cs->own_buf, new_packet_len);
   else
-    putpkt (cs->ss->own_buf);
+    putpkt (cs->own_buf);
 
   cs->response_needed = 0;
 
@@ -4288,11 +4372,13 @@ process_serial_event (gdb_client_data client_data)
 	}
     }
 
+
   if (cs->exit_requested)
     return -1;
 
   return 0;
 }
+
 
 /* Event-loop callback for serial events.  */
 

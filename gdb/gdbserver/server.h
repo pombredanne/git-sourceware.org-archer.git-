@@ -111,10 +111,6 @@ extern int handle_target_event (int err, gdb_client_data client_data);
    as large as the largest register set supported by gdbserver.  */
 #define PBUFSIZ 16384
 
-/* Multiple granularity locking for server/client */
-
-typedef enum {NL, IX, IS, X, S, SIX} lock_modes;
-
 /* Description of the remote protocol state for the currently
    connected target.  This is per-target state, and independent of the
    selected architecture.  */
@@ -131,7 +127,6 @@ struct server_state
      We also set this when handling a single-thread `vCont' resume, as
      some places in the backends check it to know when (and for which
      thread) single-thread scheduler-locking is in effect.  */
-  lock_modes lock_mode;
   int attach_count;
   ptid_t cont_thread;
   // The thread set with an `Hg' packet.
@@ -139,7 +134,6 @@ struct server_state
   pid_t signal_pid;
   struct target_waitstatus last_status;
   ptid_t last_ptid;
-  char *own_buf;
   unsigned char *mem_buf;
   unsigned char readchar_buf[BUFSIZ];
   int readchar_bufcnt;
@@ -154,11 +148,14 @@ typedef struct server_state server_state;
 
 struct client_state
 {
-  lock_modes lock_mode;
   char *executable;
   // file descriptor corresponding to this client
   gdb_fildes_t file_desc;
+  char *own_buf;
+  char *in_buf;
   char packet;
+  char normalized_packet; // if own_buf == "OK"
+  int pending;
   // following were in server.c
   // --once: Exit after the first connection has closed.
   int run_once;
@@ -176,14 +173,23 @@ struct client_state
   int program_signals[GDB_SIGNAL_LAST];
   int program_signals_p;
   char **program_argv, **wrapper_argv;
+  int packet_len;
   // following were in mem-break.c
   const unsigned char *breakpoint_data;
   int breakpoint_len;
+  //
   server_state *ss;
   struct client_state *next;
 };
 
 typedef struct client_state client_state;
+
+struct client_states
+{
+  client_state *first;
+  client_state *current_cs;
+  gdb_fildes_t current_fd;
+};
 
 client_state * get_client_state ();
 
