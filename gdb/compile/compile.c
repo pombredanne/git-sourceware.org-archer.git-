@@ -1,6 +1,6 @@
 /* General Compile and inject code
 
-   Copyright (C) 2014 Free Software Foundation, Inc.
+   Copyright (C) 2014-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -37,6 +37,8 @@
 #include "filestuff.h"
 #include "target.h"
 #include "osabi.h"
+#include "gdb_wait.h"
+#include "valprint.h"
 
 
 
@@ -116,7 +118,7 @@ compile_file_command (char *arg, int from_tty)
   make_cleanup (xfree, arg);
   buffer = xstrprintf ("#include \"%s\"\n", arg);
   make_cleanup (xfree, buffer);
-  eval_compile_command (NULL, buffer, scope);
+  eval_compile_command (NULL, buffer, scope, NULL);
   do_cleanups (cleanup);
 }
 
@@ -149,13 +151,58 @@ compile_code_command (char *arg, int from_tty)
     }
 
   if (arg && *arg)
-      eval_compile_command (NULL, arg, scope);
+    eval_compile_command (NULL, arg, scope, NULL);
   else
     {
       struct command_line *l = get_command_line (compile_control, "");
 
       make_cleanup_free_command_lines (&l);
       l->control_u.compile.scope = scope;
+      execute_control_command_untraced (l);
+    }
+
+  do_cleanups (cleanup);
+}
+
+/* Callback for compile_print_command.  */
+
+void
+compile_print_value (struct value *val, void *data_voidp)
+{
+  const struct format_data *fmtp = data_voidp;
+
+  print_value (val, fmtp);
+}
+
+/* Handle the input from the 'compile print' command.  The "compile
+   print" command is used to evaluate and print an expression that may
+   contain calls to the GCC compiler.  The language expected in this
+   compile command is the language currently set in GDB.  */
+
+static void
+compile_print_command (char *arg_param, int from_tty)
+{
+  const char *arg = arg_param;
+  struct cleanup *cleanup;
+  enum compile_i_scope_types scope = COMPILE_I_PRINT_ADDRESS_SCOPE;
+  struct format_data fmt;
+
+  cleanup = make_cleanup_restore_integer (&interpreter_async);
+  interpreter_async = 0;
+
+  /* Passing &FMT as SCOPE_DATA is safe as do_module_cleanup will not
+     touch the stale pointer if compile_object_run has already quit.  */
+  print_command_parse_format (&arg, "compile print", &fmt);
+
+  if (arg && *arg)
+    eval_compile_command (NULL, arg, scope, &fmt);
+  else
+    {
+      struct command_line *l = get_command_line (compile_control, "");
+
+      make_cleanup_free_command_lines (&l);
+      l->control_u.compile.scope = scope;
+      l->control_u.compile.scope_data = &fmt;
       execute_control_command_untraced (l);
     }
 
@@ -169,10 +216,14 @@ do_rmdir (void *arg)
 {
   const char *dir = arg;
   char *zap;
-  
-  gdb_assert (strncmp (dir, TMP_PREFIX, strlen (TMP_PREFIX)) == 0);
+  int wstat;
+
+  gdb_assert (startswith (dir, TMP_PREFIX));
   zap = concat ("rm -rf ", dir, (char *) NULL);
-  system (zap);
+  wstat = system (zap);
+  if (wstat == -1 || !WIFEXITED (wstat) || WEXITSTATUS (wstat) != 0)
+    warning (_("Could not remove temporary directory %s"), dir);
+  XDELETEVEC (zap);
 }
 
 /* Return the name of the temporary directory to use for .o files, and
@@ -308,7 +359,7 @@ get_selected_pc_producer_options (void)
   const char *cs;
 
   if (symtab == NULL || symtab->producer == NULL
-      || strncmp (symtab->producer, "GNU ", strlen ("GNU ")) != 0)
+      || !startswith (symtab->producer, "GNU "))
     return NULL;
 
   cs = symtab->producer;
@@ -317,6 +368,27 @@ get_selected_pc_producer_options (void)
   if (*cs != '-')
     return NULL;
   return cs;
+}
+
+/* Filter out unwanted options from *ARGCP and ARGV.  */
+
+static void
+filter_args (int *argcp, char **argv)
+{
+  char **destv;
+
+  for (destv = argv; *argv != NULL; argv++)
+    {
+      /* -fpreprocessed may get in commonly from ccache.  */
+      if (strcmp (*argv, "-fpreprocessed") == 0)
+	{
+	  xfree (*argv);
+	  (*argcp)--;
+	  continue;
+	}
+      *destv++ = *argv;
+    }
+  *destv = NULL;
 }
 
 /* Produce final vector of GCC compilation options.  First element is target
@@ -341,6 +413,7 @@ get_args (const struct compile_instance *compiler, struct gdbarch *gdbarch,
       char **argv_producer;
 
       build_argc_argv (cs_producer_options, &argc_producer, &argv_producer);
+      filter_args (&argc_producer, argv_producer);
       append_args (argcp, argvp, argc_producer, argv_producer);
       freeargv (argv_producer);
     }
@@ -388,11 +461,12 @@ print_callback (void *ignore, const char *message)
    freeing both strings.  */
 
 static char *
-compile_to_object (struct command_line *cmd, char *cmd_string,
+compile_to_object (struct command_line *cmd, const char *cmd_string,
 		   enum compile_i_scope_types scope,
 		   char **source_filep)
 {
   char *code;
+  const char *input;
   char *source_file, *object_file;
   struct compile_instance *compiler;
   struct cleanup *cleanup, *inner_cleanup;
@@ -432,6 +506,7 @@ compile_to_object (struct command_line *cmd, char *cmd_string,
     {
       struct ui_file *stream = mem_fileopen ();
       struct command_line *iter;
+      char *stream_buf;
 
       make_cleanup_ui_file_delete (stream);
       for (iter = cmd->body_list[0]; iter; iter = iter->next)
@@ -440,23 +515,26 @@ compile_to_object (struct command_line *cmd, char *cmd_string,
 	  fputs_unfiltered ("\n", stream);
 	}
 
-      code = ui_file_xstrdup (stream, NULL);
-      make_cleanup (xfree, code);
+      stream_buf = ui_file_xstrdup (stream, NULL);
+      make_cleanup (xfree, stream_buf);
+      input = stream_buf;
     }
   else if (cmd_string != NULL)
-    code = cmd_string;
+    input = cmd_string;
   else
     error (_("Neither a simple expression, or a multi-line specified."));
 
-  code = current_language->la_compute_program (compiler, code, gdbarch,
+  code = current_language->la_compute_program (compiler, input, gdbarch,
 					       expr_block, expr_pc);
   make_cleanup (xfree, code);
   if (compile_debug)
-    fprintf_unfiltered (gdb_stdout, "debug output:\n\n%s", code);
+    fprintf_unfiltered (gdb_stdlog, "debug output:\n\n%s", code);
 
   os_rx = osabi_triplet_regexp (gdbarch_osabi (gdbarch));
   arch_rx = gdbarch_gnu_triplet_regexp (gdbarch);
-  triplet_rx = concat (arch_rx, "-[^-]*-", os_rx, (char *) NULL);
+
+  /* Allow triplets with or without vendor set.  */
+  triplet_rx = concat (arch_rx, "(-[^-]*)?-", os_rx, (char *) NULL);
   make_cleanup (xfree, triplet_rx);
 
   /* Set compiler command-line arguments.  */
@@ -475,9 +553,9 @@ compile_to_object (struct command_line *cmd, char *cmd_string,
     {
       int argi;
 
-      fprintf_unfiltered (gdb_stdout, "Passing %d compiler options:\n", argc);
+      fprintf_unfiltered (gdb_stdlog, "Passing %d compiler options:\n", argc);
       for (argi = 0; argi < argc; argi++)
-	fprintf_unfiltered (gdb_stdout, "Compiler option %d: <%s>\n",
+	fprintf_unfiltered (gdb_stdlog, "Compiler option %d: <%s>\n",
 			    argi, argv[argi]);
     }
 
@@ -494,7 +572,7 @@ compile_to_object (struct command_line *cmd, char *cmd_string,
   fclose (src);
 
   if (compile_debug)
-    fprintf_unfiltered (gdb_stdout, "source file produced: %s\n\n",
+    fprintf_unfiltered (gdb_stdlog, "source file produced: %s\n\n",
 			source_file);
 
   /* Call the compiler and start the compilation process.  */
@@ -505,7 +583,7 @@ compile_to_object (struct command_line *cmd, char *cmd_string,
     error (_("Compilation failed."));
 
   if (compile_debug)
-    fprintf_unfiltered (gdb_stdout, "object file produced: %s\n\n",
+    fprintf_unfiltered (gdb_stdlog, "object file produced: %s\n\n",
 			object_file);
 
   discard_cleanups (inner_cleanup);
@@ -527,8 +605,8 @@ compile_command (char *args, int from_tty)
 /* See compile.h.  */
 
 void
-eval_compile_command (struct command_line *cmd, char *cmd_string,
-		      enum compile_i_scope_types scope)
+eval_compile_command (struct command_line *cmd, const char *cmd_string,
+		      enum compile_i_scope_types scope, void *scope_data)
 {
   char *object_file, *source_file;
 
@@ -542,7 +620,16 @@ eval_compile_command (struct command_line *cmd, char *cmd_string,
       make_cleanup (xfree, source_file);
       cleanup_unlink = make_cleanup (cleanup_unlink_file, object_file);
       make_cleanup (cleanup_unlink_file, source_file);
-      compile_module = compile_object_load (object_file, source_file);
+      compile_module = compile_object_load (object_file, source_file,
+					    scope, scope_data);
+      if (compile_module == NULL)
+	{
+	  gdb_assert (scope == COMPILE_I_PRINT_ADDRESS_SCOPE);
+	  do_cleanups (cleanup_xfree);
+	  eval_compile_command (cmd, cmd_string,
+				COMPILE_I_PRINT_VALUE_SCOPE, scope_data);
+	  return;
+	}
       discard_cleanups (cleanup_unlink);
       do_cleanups (cleanup_xfree);
       compile_object_run (compile_module);
@@ -604,12 +691,10 @@ The source code may be specified as a simple one line expression, e.g.:\n\
 \n\
     compile code printf(\"Hello world\\n\");\n\
 \n\
-Alternatively, you can type the source code interactively.\n\
-You can invoke this mode when no argument is given to the command\n\
-(i.e.,\"compile code\" is typed with nothing after it).  An\n\
-interactive prompt will be shown allowing you to enter multiple\n\
-lines of source code.  Type a line containing \"end\" to indicate\n\
-the end of the source code."),
+Alternatively, you can type a multiline expression by invoking\n\
+this command with no argument.  GDB will then prompt for the\n\
+expression interactively; type a line containing \"end\" to\n\
+indicate the end of the expression."),
 	   &compile_command_list);
 
   c = add_cmd ("file", class_obscure, compile_file_command,
@@ -620,6 +705,25 @@ Usage: compile file [-r|-raw] [filename]\n\
 -r|-raw: Suppress automatic 'void _gdb_expr () { CODE }' wrapping."),
 	       &compile_command_list);
   set_cmd_completer (c, filename_completer);
+
+  add_cmd ("print", class_obscure, compile_print_command,
+	   _("\
+Evaluate EXPR by using the compiler and print result.\n\
+\n\
+Usage: compile print[/FMT] [EXPR]\n\
+\n\
+The expression may be specified on the same line as the command, e.g.:\n\
+\n\
+    compile print i\n\
+\n\
+Alternatively, you can type a multiline expression by invoking\n\
+this command with no argument.  GDB will then prompt for the\n\
+expression interactively; type a line containing \"end\" to\n\
+indicate the end of the expression.\n\
+\n\
+EXPR may be preceded with /FMT, where FMT is a format letter\n\
+but no count or size letter (see \"x\" command)."),
+	   &compile_command_list);
 
   add_setshow_boolean_cmd ("compile", class_maintenance, &compile_debug, _("\
 Set compile command debugging."), _("\
@@ -640,14 +744,18 @@ String quoting is parsed like in shell, for example:\n\
 
   /* Override flags possibly coming from DW_AT_producer.  */
   compile_args = xstrdup ("-O0 -gdwarf-4"
-  /* We use -fPIC Otherwise GDB would need to reserve space large enough for
+  /* We use -fPIE Otherwise GDB would need to reserve space large enough for
      any object file in the inferior in advance to get the final address when
      to link the object file to and additionally the default system linker
      script would need to be modified so that one can specify there the
-     absolute target address.  */
-			 " -fPIC"
-  /* We don't want warnings.  */
-			 " -w"
+     absolute target address.
+     -fPIC is not used at is would require from GDB to generate .got.  */
+			 " -fPIE"
+  /* We want warnings, except for some commonly happening for GDB commands.  */
+			 " -Wall "
+			 " -Wno-implicit-function-declaration"
+			 " -Wno-unused-but-set-variable"
+			 " -Wno-unused-variable"
   /* Override CU's possible -fstack-protector-strong.  */
 			 " -fno-stack-protector"
   );

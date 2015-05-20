@@ -1,7 +1,7 @@
 /* Variables that describe the inferior process running under GDB:
    Where it is, why it stopped, and how to step it.
 
-   Copyright (C) 1986-2014 Free Software Foundation, Inc.
+   Copyright (C) 1986-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -165,8 +165,10 @@ extern void detach_command (char *, int);
 
 extern void notice_new_inferior (ptid_t, int, int);
 
-extern struct value *get_return_value (struct value *function,
-                                       struct type *value_type);
+struct dummy_frame_context_saver;
+extern struct value *get_return_value
+  (struct value *function, struct type *value_type,
+   struct dummy_frame_context_saver *ctx_saver);
 
 /* Prepare for execution command.  TARGET is the target that will run
    the command.  BACKGROUND determines whether this is a foreground
@@ -381,7 +383,7 @@ struct inferior
   struct continuation *continuations;
 
   /* Private data used by the target vector implementation.  */
-  struct private_inferior *private;
+  struct private_inferior *priv;
 
   /* HAS_EXIT_CODE is true if the inferior exited with an exit code.
      In this case, the EXIT_CODE field is also valid.  */

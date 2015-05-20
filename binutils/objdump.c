@@ -1,5 +1,5 @@
 /* objdump.c -- dump information about an object file.
-   Copyright (C) 1990-2014 Free Software Foundation, Inc.
+   Copyright (C) 1990-2015 Free Software Foundation, Inc.
 
    This file is part of GNU Binutils.
 
@@ -2278,6 +2278,8 @@ load_specific_debug_section (enum dwarf_section_display_enum debug,
   if (section->start != NULL)
     return 1;
 
+  section->reloc_info = NULL;
+  section->num_relocs = 0;  
   section->address = bfd_get_section_vma (abfd, sec);
   section->size = bfd_get_section_size (sec);
   section->start = NULL;
@@ -2308,9 +2310,47 @@ load_specific_debug_section (enum dwarf_section_display_enum debug,
 	          section->name);
           return 0;
         }
-    }
+
+      long reloc_size;
+
+      reloc_size = bfd_get_reloc_upper_bound (abfd, sec);
+      if (reloc_size > 0)
+	{
+	  unsigned long reloc_count;
+	  arelent **relocs;
+
+	  relocs = (arelent **) xmalloc (reloc_size);
+
+	  reloc_count = bfd_canonicalize_reloc (abfd, sec, relocs, NULL);
+	  if (reloc_count == 0)
+	    free (relocs);
+	  else
+	    {
+	      section->reloc_info = relocs;
+	      section->num_relocs = reloc_count;
+	    }
+	}
+    }	
 
   return 1;
+}
+
+bfd_boolean
+reloc_at (struct dwarf_section * dsec, dwarf_vma offset)
+{
+  arelent ** relocs;
+  arelent * rp;
+
+  if (dsec == NULL || dsec->reloc_info == NULL)
+    return FALSE;
+
+  relocs = (arelent **) dsec->reloc_info;
+
+  for (; (rp = * relocs) != NULL; ++ relocs)
+    if (rp->address == offset)
+      return TRUE;
+
+  return FALSE;
 }
 
 int
@@ -2447,6 +2487,10 @@ dump_dwarf (bfd *abfd)
 	  init_dwarf_regnames_i386 ();
 	  break;
 	}
+      break;
+
+    case bfd_arch_iamcu:
+      init_dwarf_regnames_iamcu ();
       break;
 
     case bfd_arch_aarch64:
@@ -2800,7 +2844,8 @@ dump_section (bfd *abfd, asection *section, void *dummy ATTRIBUTE_UNUSED)
 
   if (!bfd_get_full_section_contents (abfd, section, &data))
     {
-      non_fatal (_("Reading section failed"));
+      non_fatal (_("Reading section %s failed because: %s"),
+		 section->name, bfd_errmsg (bfd_get_error ()));
       return;
     }
 
@@ -3406,9 +3451,16 @@ display_any_bfd (bfd *file, int level)
     {
       bfd *arfile = NULL;
       bfd *last_arfile = NULL;
-
+      
       if (level == 0)
         printf (_("In archive %s:\n"), bfd_get_filename (file));
+      else if (level > 100)
+	{
+	  /* Prevent corrupted files from spinning us into an
+	     infinite loop.  100 is an arbitrary heuristic.  */
+	  fatal (_("Archive nesting is too deep"));
+	  return;
+	}
       else
         printf (_("In nested archive %s:\n"), bfd_get_filename (file));
 
@@ -3488,6 +3540,7 @@ main (int argc, char **argv)
 
   program_name = *argv;
   xmalloc_set_program_name (program_name);
+  bfd_set_error_program_name (program_name);
 
   START_PROGRESS (program_name, 0);
 

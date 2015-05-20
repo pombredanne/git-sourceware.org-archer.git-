@@ -1,5 +1,5 @@
 /* ARM ELF support for BFD.
-   Copyright (C) 1998-2014 Free Software Foundation, Inc.
+   Copyright (C) 1998-2015 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -24,7 +24,6 @@
 
 /* Processor specific flags for the ELF header e_flags field.  */
 #define EF_ARM_RELEXEC     0x01
-#define EF_ARM_HASENTRY    0x02
 #define EF_ARM_INTERWORK   0x04
 #define EF_ARM_APCS_26     0x08
 #define EF_ARM_APCS_FLOAT  0x10

@@ -1,6 +1,6 @@
 // arm.h -- ELF definitions specific to EM_ARM  -*- C++ -*-
 
-// Copyright (C) 2009-2014 Free Software Foundation, Inc.
+// Copyright (C) 2009-2015 Free Software Foundation, Inc.
 // Written by Doug Kwan <dougkwan@google.com>.
 
 // This file is part of elfcpp.
@@ -192,11 +192,12 @@ enum
   R_ARM_PRIVATE_14 = 126,
   R_ARM_PRIVATE_15 = 127,
   R_ARM_ME_TOO = 128,		// Obsolete
-  R_ARM_THM_TLS_DESCSEQ16 = 129,// Static	Thumb16	
+  R_ARM_THM_TLS_DESCSEQ16 = 129,// Static	Thumb16
   R_ARM_THM_TLS_DESCSEQ32 = 130,// Static	Thumb32
   // 131 - 139			Unallocated
   // 140 - 159			Dynamic		Reserved for future allocation
-  // 160 - 255			Unallocated
+  R_ARM_IRELATIVE = 160,	// Dynamic
+  // 161 - 255			Unallocated
 };
 
 // e_flags values used for ARM.  We only support flags defined in AAELF.
@@ -247,7 +248,8 @@ enum
   TAG_CPU_ARCH_V6_M,
   TAG_CPU_ARCH_V6S_M,
   TAG_CPU_ARCH_V7E_M,
-  MAX_TAG_CPU_ARCH = TAG_CPU_ARCH_V7E_M,
+  TAG_CPU_ARCH_V8,
+  MAX_TAG_CPU_ARCH = TAG_CPU_ARCH_V8,
   // Pseudo-architecture to allow objects to be compatible with the subset of
   // armv4t and armv6-m.  This value should never be stored in object files.
   TAG_CPU_ARCH_V4T_PLUS_V6_M = (MAX_TAG_CPU_ARCH + 1)

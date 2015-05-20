@@ -1,7 +1,7 @@
 /* *INDENT-OFF* */ /* ATTRIBUTE_PRINTF confuses indent, avoid running it
 		      for now.  */
 /* Basic, host-specific, and target-specific definitions for GDB.
-   Copyright (C) 1986-2014 Free Software Foundation, Inc.
+   Copyright (C) 1986-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -29,7 +29,6 @@
 
 #include <sys/types.h>
 #include <limits.h>
-#include <stdint.h>
 
 /* The libdecnumber library, on which GDB depends, includes a header file
    called gstdint.h instead of relying directly on stdint.h.  GDB, on the
@@ -71,6 +70,15 @@ enum compile_i_scope_types
     /* Do not wrap the expression,
        it has to provide function "_gdb_expr" on its own.  */
     COMPILE_I_RAW_SCOPE,
+
+    /* A printable expression scope.  Wrap an expression into a scope
+       suitable for the "compile print" command.  It uses the generic
+       function name "_gdb_expr".  COMPILE_I_PRINT_ADDRESS_SCOPE variant
+       is the usual one, taking address of the object.
+       COMPILE_I_PRINT_VALUE_SCOPE is needed for arrays where the array
+       name already specifies its address.  See get_out_value_type.  */
+    COMPILE_I_PRINT_ADDRESS_SCOPE,
+    COMPILE_I_PRINT_VALUE_SCOPE,
   };
 
 /* Just in case they're not defined in stdio.h.  */
@@ -100,9 +108,6 @@ enum compile_i_scope_types
 #ifndef max
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #endif
-
-/* * Enable xdb commands if set.  */
-extern int xdb_commands;
 
 /* * Enable dbx commands if set.  */
 extern int dbx_commands;
@@ -250,7 +255,7 @@ extern int annotation_level;	/* in stack.c */
    "const char *" in unistd.h, so we can't declare the argument
    as "char *".  */
 
-extern char *re_comp (const char *);
+EXTERN_C char *re_comp (const char *);
 
 /* From symfile.c */
 
@@ -401,6 +406,7 @@ struct command_line
 	struct
 	  {
 	    enum compile_i_scope_types scope;
+	    void *scope_data;
 	  }
 	compile;
       }
@@ -637,10 +643,6 @@ extern int watchdog;
 /* * The name of the interpreter if specified on the command line.  */
 extern char *interpreter_p;
 
-/* If a given interpreter matches INTERPRETER_P then it should update
-   deprecated_init_ui_hook with the per-interpreter implementation.  */
-/* FIXME: deprecated_init_ui_hook should be moved here.  */
-
 struct target_waitstatus;
 struct cmd_list_element;
 
@@ -648,7 +650,6 @@ extern void (*deprecated_pre_add_symbol_hook) (const char *);
 extern void (*deprecated_post_add_symbol_hook) (void);
 extern void (*selected_frame_level_changed_hook) (int);
 extern int (*deprecated_ui_loop_hook) (int signo);
-extern void (*deprecated_init_ui_hook) (char *argv0);
 extern void (*deprecated_show_load_progress) (const char *section,
 					      unsigned long section_sent, 
 					      unsigned long section_size, 
