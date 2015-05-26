@@ -1,6 +1,6 @@
 // layout.cc -- lay out output file sections for gold
 
-// Copyright (C) 2006-2014 Free Software Foundation, Inc.
+// Copyright (C) 2006-2015 Free Software Foundation, Inc.
 // Written by Ian Lance Taylor <iant@google.com>.
 
 // This file is part of gold.
@@ -524,6 +524,7 @@ static const char* gdb_sections[] =
   "addr",         // Fission extension
   // "aranges",   // not used by gdb as of 7.4
   "frame",
+  "gdb_scripts",
   "info",
   "types",
   "line",
@@ -532,8 +533,11 @@ static const char* gdb_sections[] =
   "macro",
   // "pubnames",  // not used by gdb as of 7.4
   // "pubtypes",  // not used by gdb as of 7.4
+  // "gnu_pubnames",  // Fission extension
+  // "gnu_pubtypes",  // Fission extension
   "ranges",
   "str",
+  "str_offsets",
 };
 
 // This is the minimum set of sections needed for line numbers.
@@ -544,6 +548,7 @@ static const char* lines_only_debug_sections[] =
   // "addr",      // Fission extension
   // "aranges",   // not used by gdb as of 7.4
   // "frame",
+  // "gdb_scripts",
   "info",
   // "types",
   "line",
@@ -552,8 +557,11 @@ static const char* lines_only_debug_sections[] =
   // "macro",
   // "pubnames",  // not used by gdb as of 7.4
   // "pubtypes",  // not used by gdb as of 7.4
+  // "gnu_pubnames",  // Fission extension
+  // "gnu_pubtypes",  // Fission extension
   // "ranges",
   "str",
+  "str_offsets",  // Fission extension
 };
 
 // These sections are the DWARF fast-lookup tables, and are not needed
@@ -1412,15 +1420,21 @@ Layout::layout_eh_frame(Sized_relobj_file<size, big_endian>* object,
 
   elfcpp::Elf_Xword orig_flags = os->flags();
 
-  if (!parameters->incremental()
-      && this->eh_frame_data_->add_ehframe_input_section(object,
-							 symbols,
-							 symbols_size,
-							 symbol_names,
-							 symbol_names_size,
-							 shndx,
-							 reloc_shndx,
-							 reloc_type))
+  Eh_frame::Eh_frame_section_disposition disp =
+      Eh_frame::EH_UNRECOGNIZED_SECTION;
+  if (!parameters->incremental())
+    {
+      disp = this->eh_frame_data_->add_ehframe_input_section(object,
+							     symbols,
+							     symbols_size,
+							     symbol_names,
+							     symbol_names_size,
+							     shndx,
+							     reloc_shndx,
+							     reloc_type);
+    }
+
+  if (disp == Eh_frame::EH_OPTIMIZABLE_SECTION)
     {
       os->update_flags_for_input_section(shdr.get_sh_flags());
 
@@ -1432,33 +1446,47 @@ Layout::layout_eh_frame(Sized_relobj_file<size, big_endian>* object,
 	  os->set_order(ORDER_RELRO);
 	}
 
-      // We found a .eh_frame section we are going to optimize, so now
-      // we can add the set of optimized sections to the output
-      // section.  We need to postpone adding this until we've found a
-      // section we can optimize so that the .eh_frame section in
-      // crtbegin.o winds up at the start of the output section.
-      if (!this->added_eh_frame_data_)
-	{
-	  os->add_output_section_data(this->eh_frame_data_);
-	  this->added_eh_frame_data_ = true;
-	}
       *off = -1;
+      return os;
     }
-  else
-    {
-      // We couldn't handle this .eh_frame section for some reason.
-      // Add it as a normal section.
-      bool saw_sections_clause = this->script_options_->saw_sections_clause();
-      *off = os->add_input_section(this, object, shndx, ".eh_frame", shdr,
-				   reloc_shndx, saw_sections_clause);
-      this->have_added_input_section_ = true;
 
-      if ((orig_flags & (elfcpp::SHF_WRITE | elfcpp::SHF_EXECINSTR))
-	  != (os->flags() & (elfcpp::SHF_WRITE | elfcpp::SHF_EXECINSTR)))
-	os->set_order(this->default_section_order(os, false));
-    }
+  if (disp == Eh_frame::EH_END_MARKER_SECTION && !this->added_eh_frame_data_)
+    {
+      // We found the end marker section, so now we can add the set of
+      // optimized sections to the output section.  We need to postpone
+      // adding this until we've found a section we can optimize so that
+      // the .eh_frame section in crtbeginT.o winds up at the start of
+      // the output section.
+      os->add_output_section_data(this->eh_frame_data_);
+      this->added_eh_frame_data_ = true;
+     }
+
+  // We couldn't handle this .eh_frame section for some reason.
+  // Add it as a normal section.
+  bool saw_sections_clause = this->script_options_->saw_sections_clause();
+  *off = os->add_input_section(this, object, shndx, ".eh_frame", shdr,
+			       reloc_shndx, saw_sections_clause);
+  this->have_added_input_section_ = true;
+
+  if ((orig_flags & (elfcpp::SHF_WRITE | elfcpp::SHF_EXECINSTR))
+      != (os->flags() & (elfcpp::SHF_WRITE | elfcpp::SHF_EXECINSTR)))
+    os->set_order(this->default_section_order(os, false));
 
   return os;
+}
+
+void
+Layout::finalize_eh_frame_section()
+{
+  // If we never found an end marker section, we need to add the
+  // optimized eh sections to the output section now.
+  if (!parameters->incremental()
+      && this->eh_frame_section_ != NULL
+      && !this->added_eh_frame_data_)
+    {
+      this->eh_frame_section_->add_output_section_data(this->eh_frame_data_);
+      this->added_eh_frame_data_ = true;
+    }
 }
 
 // Create and return the magic .eh_frame section.  Create
@@ -2093,8 +2121,7 @@ Layout::layout_gnu_stack(bool seen_gnu_stack, uint64_t gnu_stack_flags,
       if ((gnu_stack_flags & elfcpp::SHF_EXECINSTR) != 0)
 	{
 	  this->input_requires_executable_stack_ = true;
-	  if (parameters->options().warn_execstack()
-	      || parameters->options().is_stack_executable())
+	  if (parameters->options().warn_execstack())
 	    gold_warning(_("%s: requires executable stack"),
 			 obj->name().c_str());
 	}
@@ -2967,7 +2994,14 @@ Layout::create_executable_stack_info()
 {
   bool is_stack_executable;
   if (parameters->options().is_execstack_set())
-    is_stack_executable = parameters->options().is_stack_executable();
+    {
+      is_stack_executable = parameters->options().is_stack_executable();
+      if (!is_stack_executable
+          && this->input_requires_executable_stack_
+          && parameters->options().warn_execstack())
+	gold_warning(_("one or more inputs require executable stack, "
+	               "but -z noexecstack was given"));
+    }
   else if (!this->input_with_gnu_stack_note_)
     return;
   else
@@ -3510,7 +3544,9 @@ Layout::set_segment_offsets(const Target* target, Output_segment* load_seg,
 	      // put them on different pages in memory. We will revisit this
 	      // decision once we know the size of the segment.
 
-	      addr = align_address(addr, (*p)->maximum_alignment());
+	      uint64_t max_align = (*p)->maximum_alignment();
+	      if (max_align > abi_pagesize)
+		addr = align_address(addr, max_align);
 	      aligned_addr = addr;
 
 	      if (load_seg == *p)
@@ -4857,7 +4893,8 @@ Layout::finish_dynamic_section(const Input_objects* input_objects,
     flags |= elfcpp::DF_STATIC_TLS;
   if (parameters->options().origin())
     flags |= elfcpp::DF_ORIGIN;
-  if (parameters->options().Bsymbolic())
+  if (parameters->options().Bsymbolic()
+      && !parameters->options().have_dynamic_list())
     {
       flags |= elfcpp::DF_SYMBOLIC;
       // Add DT_SYMBOLIC for compatibility with older loaders.
@@ -4869,6 +4906,8 @@ Layout::finish_dynamic_section(const Input_objects* input_objects,
     odyn->add_constant(elfcpp::DT_FLAGS, flags);
 
   flags = 0;
+  if (parameters->options().global())
+    flags |= elfcpp::DF_1_GLOBAL;
   if (parameters->options().initfirst())
     flags |= elfcpp::DF_1_INITFIRST;
   if (parameters->options().interpose())

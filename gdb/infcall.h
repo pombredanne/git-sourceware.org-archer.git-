@@ -1,6 +1,6 @@
 /* Perform an inferior function call, for GDB, the GNU debugger.
 
-   Copyright (C) 2003-2014 Free Software Foundation, Inc.
+   Copyright (C) 2003-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -20,6 +20,8 @@
 #ifndef INFCALL_H
 #define INFCALL_H
 
+#include "dummy-frame.h"
+
 struct value;
 struct type;
 
@@ -37,5 +39,24 @@ extern CORE_ADDR find_function_addr (struct value *function,
 
 extern struct value *call_function_by_hand (struct value *function, int nargs,
 					    struct value **args);
+
+/* Similar to call_function_by_hand and additional call
+   register_dummy_frame_dtor with DUMMY_DTOR and DUMMY_DTOR_DATA for the
+   created inferior call dummy frame.  */
+
+extern struct value *
+  call_function_by_hand_dummy (struct value *function, int nargs,
+			       struct value **args,
+			       dummy_frame_dtor_ftype *dummy_dtor,
+			       void *dummy_dtor_data);
+
+struct dummy_frame_context_saver;
+extern void dummy_frame_context_saver_drop
+  (struct dummy_frame_context_saver *data);
+extern void dummy_frame_context_saver_cleanup (void *data_voidp);
+extern struct regcache *dummy_frame_context_saver_get_regs
+  (struct dummy_frame_context_saver *saver);
+extern struct dummy_frame_context_saver *dummy_frame_context_saver_setup
+  (struct frame_id dummy_id, ptid_t ptid);
 
 #endif

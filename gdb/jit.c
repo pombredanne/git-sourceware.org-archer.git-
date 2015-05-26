@@ -1,6 +1,6 @@
 /* Handle JIT code generation in the inferior for GDB, the GNU Debugger.
 
-   Copyright (C) 2009-2014 Free Software Foundation, Inc.
+   Copyright (C) 2009-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -126,6 +126,7 @@ mem_bfd_iovec_stat (struct bfd *abfd, void *stream, struct stat *sb)
 {
   struct target_buffer *buffer = (struct target_buffer*) stream;
 
+  memset (sb, 0, sizeof (struct stat));
   sb->st_size = buffer->size;
   return 0;
 }
@@ -532,15 +533,15 @@ jit_symtab_open_impl (struct gdb_symbol_callbacks *cb,
 
 static int
 compare_block (const struct gdb_block *const old,
-               const struct gdb_block *const new)
+               const struct gdb_block *const newobj)
 {
   if (old == NULL)
     return 1;
-  if (old->begin < new->begin)
+  if (old->begin < newobj->begin)
     return 1;
-  else if (old->begin == new->begin)
+  else if (old->begin == newobj->begin)
     {
-      if (old->end > new->end)
+      if (old->end > newobj->end)
         return 1;
       else
         return 0;
@@ -633,7 +634,7 @@ jit_symtab_close_impl (struct gdb_symbol_callbacks *cb,
 static void
 finalize_symtab (struct gdb_symtab *stab, struct objfile *objfile)
 {
-  struct symtab *symtab;
+  struct compunit_symtab *cust;
   struct gdb_block *gdb_block_iter, *gdb_block_iter_tmp;
   struct block *block_iter;
   int actual_nblocks, i;
@@ -643,9 +644,12 @@ finalize_symtab (struct gdb_symtab *stab, struct objfile *objfile)
 
   actual_nblocks = FIRST_LOCAL_BLOCK + stab->nblocks;
 
-  symtab = allocate_symtab (stab->file_name, objfile);
+  cust = allocate_compunit_symtab (objfile, stab->file_name);
+  allocate_symtab (cust, stab->file_name);
+  add_compunit_symtab_to_objfile (cust);
+
   /* JIT compilers compile in memory.  */
-  symtab->dirname = NULL;
+  COMPUNIT_DIRNAME (cust) = NULL;
 
   /* Copy over the linetable entry if one was provided.  */
   if (stab->linetable)
@@ -653,22 +657,19 @@ finalize_symtab (struct gdb_symtab *stab, struct objfile *objfile)
       size_t size = ((stab->linetable->nitems - 1)
 		     * sizeof (struct linetable_entry)
 		     + sizeof (struct linetable));
-      LINETABLE (symtab) = obstack_alloc (&objfile->objfile_obstack, size);
-      memcpy (LINETABLE (symtab), stab->linetable, size);
-    }
-  else
-    {
-      LINETABLE (symtab) = NULL;
+      SYMTAB_LINETABLE (COMPUNIT_FILETABS (cust))
+	= obstack_alloc (&objfile->objfile_obstack, size);
+      memcpy (SYMTAB_LINETABLE (COMPUNIT_FILETABS (cust)), stab->linetable,
+	      size);
     }
 
   blockvector_size = (sizeof (struct blockvector)
                       + (actual_nblocks - 1) * sizeof (struct block *));
   bv = obstack_alloc (&objfile->objfile_obstack, blockvector_size);
-  symtab->blockvector = bv;
+  COMPUNIT_BLOCKVECTOR (cust) = bv;
 
   /* (begin, end) will contain the PC range this entire blockvector
      spans.  */
-  set_symtab_primary (symtab, 1);
   BLOCKVECTOR_MAP (bv) = NULL;
   begin = stab->blocks->begin;
   end = stab->blocks->end;
@@ -697,7 +698,7 @@ finalize_symtab (struct gdb_symtab *stab, struct objfile *objfile)
       /* The name.  */
       SYMBOL_DOMAIN (block_name) = VAR_DOMAIN;
       SYMBOL_ACLASS_INDEX (block_name) = LOC_BLOCK;
-      SYMBOL_SYMTAB (block_name) = symtab;
+      symbol_set_symtab (block_name, COMPUNIT_FILETABS (cust));
       SYMBOL_TYPE (block_name) = lookup_function_type (block_type);
       SYMBOL_BLOCK_VALUE (block_name) = new_block;
 
@@ -736,7 +737,7 @@ finalize_symtab (struct gdb_symtab *stab, struct objfile *objfile)
       BLOCKVECTOR_BLOCK (bv, i) = new_block;
 
       if (i == GLOBAL_BLOCK)
-	set_block_symtab (new_block, symtab);
+	set_block_compunit_symtab (new_block, cust);
     }
 
   /* Fill up the superblock fields for the real blocks, using the
@@ -816,7 +817,6 @@ jit_reader_try_read_symtab (struct jit_code_entry *code_entry,
   int status;
   jit_dbg_reader_data priv_data;
   struct gdb_reader_funcs *funcs;
-  volatile struct gdb_exception e;
   struct gdb_symbol_callbacks callbacks =
     {
       jit_object_open_impl,
@@ -839,12 +839,17 @@ jit_reader_try_read_symtab (struct jit_code_entry *code_entry,
   gdb_mem = xmalloc (code_entry->symfile_size);
 
   status = 1;
-  TRY_CATCH (e, RETURN_MASK_ALL)
-    if (target_read_memory (code_entry->symfile_addr, gdb_mem,
-                            code_entry->symfile_size))
+  TRY
+    {
+      if (target_read_memory (code_entry->symfile_addr, gdb_mem,
+			      code_entry->symfile_size))
+	status = 0;
+    }
+  CATCH (e, RETURN_MASK_ALL)
+    {
       status = 0;
-  if (e.reason < 0)
-    status = 0;
+    }
+  END_CATCH
 
   if (status)
     {
@@ -1220,20 +1225,20 @@ static void
 jit_frame_this_id (struct frame_info *this_frame, void **cache,
                    struct frame_id *this_id)
 {
-  struct jit_unwind_private private;
+  struct jit_unwind_private priv;
   struct gdb_frame_id frame_id;
   struct gdb_reader_funcs *funcs;
   struct gdb_unwind_callbacks callbacks;
 
-  private.registers = NULL;
-  private.this_frame = this_frame;
+  priv.registers = NULL;
+  priv.this_frame = this_frame;
 
   /* We don't expect the frame_id function to set any registers, so we
      set reg_set to NULL.  */
   callbacks.reg_get = jit_unwind_reg_get_impl;
   callbacks.reg_set = NULL;
   callbacks.target_read = jit_target_read_impl;
-  callbacks.priv_data = &private;
+  callbacks.priv_data = &priv;
 
   gdb_assert (loaded_jit_reader);
   funcs = loaded_jit_reader->functions;

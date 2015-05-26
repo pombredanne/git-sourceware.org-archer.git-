@@ -1,5 +1,5 @@
 /* tc-sparc.c -- Assemble for the SPARC
-   Copyright (C) 1989-2014 Free Software Foundation, Inc.
+   Copyright (C) 1989-2015 Free Software Foundation, Inc.
    This file is part of GAS, the GNU Assembler.
 
    GAS is free software; you can redistribute it and/or modify
@@ -863,9 +863,9 @@ cmp_reg_entry (const void *parg, const void *qarg)
 void
 md_begin (void)
 {
-  register const char *retval = NULL;
+  const char *retval = NULL;
   int lose = 0;
-  register unsigned int i = 0;
+  unsigned int i = 0;
 
   /* We don't get a chance to initialize anything before md_parse_option
      is called, and it may not be called, so handle default initialization
@@ -1211,7 +1211,7 @@ synthetize_setsw (const struct sparc_opcode *insn)
   output_insn (insn, &the_insn);
 }
 
-/* Handle the setsw synthetic instruction.  */
+/* Handle the setx synthetic instruction.  */
 
 static void
 synthetize_setx (const struct sparc_opcode *insn)
@@ -1973,7 +1973,8 @@ sparc_ip (char *str, const struct sparc_opcode **pinsn)
 		{
 		  ++s;
 		}
-	      if (strncmp (s, "%icc", 4) == 0)
+	      if ((strncmp (s, "%icc", 4) == 0)
+                  || (sparc_arch_size == 32 && strncmp (s, "%ncc", 4) == 0))
 		{
 		  s += 4;
 		  continue;
@@ -1985,7 +1986,8 @@ sparc_ip (char *str, const struct sparc_opcode **pinsn)
 		{
 		  ++s;
 		}
-	      if (strncmp (s, "%xcc", 4) == 0)
+              if ((strncmp (s, "%xcc", 4) == 0)
+                  || (sparc_arch_size == 64 && strncmp (s, "%ncc", 4) == 0))
 		{
 		  s += 4;
 		  continue;

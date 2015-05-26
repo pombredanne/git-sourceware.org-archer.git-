@@ -1,6 +1,6 @@
 /* Top level stuff for GDB, the GNU debugger.
 
-   Copyright (C) 1999-2014 Free Software Foundation, Inc.
+   Copyright (C) 1999-2015 Free Software Foundation, Inc.
 
    Written by Elena Zannoni <ezannoni@cygnus.com> of Cygnus Solutions.
 
@@ -118,6 +118,11 @@ int exec_done_display_p = 0;
 /* This is the file descriptor for the input stream that GDB uses to
    read commands from.  */
 int input_fd;
+
+/* Used by the stdin event handler to compensate for missed stdin events.
+   Setting this to a non-zero value inside an stdin callback makes the callback
+   run again.  */
+int call_stdin_event_handler_again_p;
 
 /* Signal handling variables.  */
 /* Each of these is a pointer to a function that the event loop will
@@ -283,7 +288,7 @@ gdb_rl_callback_handler_reinstall (void)
    3. On prompting for pagination.  */
 
 void
-display_gdb_prompt (char *new_prompt)
+display_gdb_prompt (const char *new_prompt)
 {
   char *actual_gdb_prompt = NULL;
   struct cleanup *old_chain;
@@ -420,7 +425,13 @@ stdin_event_handler (int error, gdb_client_data client_data)
       quit_command ((char *) 0, stdin == instream);
     }
   else
-    (*call_readline) (client_data);
+    {
+      do
+	{
+	  call_stdin_event_handler_again_p = 0;
+	  (*call_readline) (client_data);
+	} while (call_stdin_event_handler_again_p != 0);
+    }
 }
 
 /* Re-enable stdin after the end of an execution command in
@@ -656,7 +667,7 @@ command_line_handler (char *rl)
 
   /* Add line to history if appropriate.  */
   if (*linebuffer && input_from_terminal_p ())
-    add_history (linebuffer);
+    gdb_add_history (linebuffer);
 
   /* Note: lines consisting solely of comments are added to the command
      history.  This is useful when you type a command, and then
@@ -924,24 +935,28 @@ handle_sighup (int sig)
 static void
 async_disconnect (gdb_client_data arg)
 {
-  volatile struct gdb_exception exception;
 
-  TRY_CATCH (exception, RETURN_MASK_ALL)
+  TRY
     {
       quit_cover ();
     }
 
-  if (exception.reason < 0)
+  CATCH (exception, RETURN_MASK_ALL)
     {
       fputs_filtered ("Could not kill the program being debugged",
 		      gdb_stderr);
       exception_print (gdb_stderr, exception);
     }
+  END_CATCH
 
-  TRY_CATCH (exception, RETURN_MASK_ALL)
+  TRY
     {
       pop_all_targets ();
     }
+  CATCH (exception, RETURN_MASK_ALL)
+    {
+    }
+  END_CATCH
 
   signal (SIGHUP, SIG_DFL);	/*FIXME: ???????????  */
   raise (SIGHUP);

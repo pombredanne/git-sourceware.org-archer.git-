@@ -6,7 +6,7 @@
 /* libbfd.h -- Declarations used by bfd library *implementation*.
    (This include file is not for users of the library.)
 
-   Copyright (C) 1990-2014 Free Software Foundation, Inc.
+   Copyright (C) 1990-2015 Free Software Foundation, Inc.
 
    Written by Cygnus Support.
 
@@ -28,6 +28,10 @@
    MA 02110-1301, USA.  */
 
 #include "hashtab.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Align an address upward to a boundary, expressed as a number of bytes.
    E.g. align to an 8-byte boundary with argument of 8.  Take care never
@@ -397,6 +401,8 @@ extern bfd_boolean _bfd_vms_lib_ia64_mkarchive (bfd *abfd);
   ((void (*) (bfd *, void *, asymbol *, bfd_print_symbol_type)) bfd_void)
 #define _bfd_nosymbols_get_symbol_info \
   ((void (*) (bfd *, asymbol *, symbol_info *)) bfd_void)
+#define _bfd_nosymbols_get_symbol_version_string \
+  ((const char *(*) (bfd *, asymbol *, bfd_boolean *)) bfd_nullvoidptr)
 #define _bfd_nosymbols_bfd_is_local_label_name \
   ((bfd_boolean (*) (bfd *, const char *)) bfd_false)
 #define _bfd_nosymbols_bfd_is_target_special_symbol \
@@ -550,6 +556,10 @@ extern bfd_boolean _bfd_dwarf2_find_nearest_line
    const char **, const char **, unsigned int *, unsigned int *,
    const struct dwarf_debug_section *, unsigned int, void **);
 
+/* Find the bias between DWARF addresses and real addresses.  */
+extern bfd_signed_vma _bfd_dwarf2_find_symbol_bias
+  (asymbol **, void **);
+  
 /* Find inliner info after calling bfd_find_nearest_line. */
 extern bfd_boolean _bfd_dwarf2_find_inliner_info
   (bfd *, const char **, const char **, unsigned int *, void **);
@@ -842,6 +852,8 @@ extern void bfd_section_already_linked_table_traverse
 
 extern bfd_vma read_unsigned_leb128 (bfd *, bfd_byte *, unsigned int *);
 extern bfd_signed_vma read_signed_leb128 (bfd *, bfd_byte *, unsigned int *);
+extern bfd_vma safe_read_leb128 (bfd *, bfd_byte *, unsigned int *,
+				 bfd_boolean, const bfd_byte * const);
 /* Extracted from init.c.  */
 /* Extracted from libbfd.c.  */
 bfd_boolean bfd_write_bigendian_4byte_int (bfd *, unsigned int);
@@ -1188,6 +1200,11 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_MIPS_JUMP_SLOT",
 
   "BFD_RELOC_MOXIE_10_PCREL",
+
+  "BFD_RELOC_FT32_10",
+  "BFD_RELOC_FT32_20",
+  "BFD_RELOC_FT32_17",
+  "BFD_RELOC_FT32_18",
 
   "BFD_RELOC_FRV_LABEL16",
   "BFD_RELOC_FRV_LABEL24",
@@ -2717,6 +2734,7 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_AARCH64_LD64_GOT_LO12_NC",
   "BFD_RELOC_AARCH64_LD32_GOT_LO12_NC",
   "BFD_RELOC_AARCH64_TLSGD_ADR_PAGE21",
+  "BFD_RELOC_AARCH64_TLSGD_ADR_PREL21",
   "BFD_RELOC_AARCH64_TLSGD_ADD_LO12_NC",
   "BFD_RELOC_AARCH64_TLSIE_MOVW_GOTTPREL_G1",
   "BFD_RELOC_AARCH64_TLSIE_MOVW_GOTTPREL_G0_NC",
@@ -2953,6 +2971,13 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_EPIPHANY_SIMM11",
   "BFD_RELOC_EPIPHANY_IMM11",
   "BFD_RELOC_EPIPHANY_IMM8",
+  "BFD_RELOC_VISIUM_HI16",
+  "BFD_RELOC_VISIUM_LO16",
+  "BFD_RELOC_VISIUM_IM16",
+  "BFD_RELOC_VISIUM_REL16",
+  "BFD_RELOC_VISIUM_HI16_PCREL",
+  "BFD_RELOC_VISIUM_LO16_PCREL",
+  "BFD_RELOC_VISIUM_IM16_PCREL",
  "@@overflow: BFD_RELOC_UNUSED@@",
 };
 #endif
@@ -2999,3 +3024,6 @@ void *bfd_arch_default_fill (bfd_size_type count,
     bfd_boolean code);
 
 /* Extracted from elf.c.  */
+#ifdef __cplusplus
+}
+#endif

@@ -7,7 +7,7 @@
 
 /* Main header file for the bfd library -- portable access to object files.
 
-   Copyright (C) 1990-2014 Free Software Foundation, Inc.
+   Copyright (C) 1990-2015 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.
 
@@ -299,10 +299,13 @@ typedef struct bfd_section *sec_ptr;
 
 #define bfd_is_com_section(ptr) (((ptr)->flags & SEC_IS_COMMON) != 0)
 
+#define bfd_get_section_limit_octets(bfd, sec)			\
+  ((bfd)->direction != write_direction && (sec)->rawsize != 0	\
+   ? (sec)->rawsize : (sec)->size)
+
 /* Find the address one past the end of SEC.  */
 #define bfd_get_section_limit(bfd, sec) \
-  (((bfd)->direction != write_direction && (sec)->rawsize != 0	\
-    ? (sec)->rawsize : (sec)->size) / bfd_octets_per_byte (bfd))
+  (bfd_get_section_limit_octets(bfd, sec) / bfd_octets_per_byte (bfd))
 
 /* Return TRUE if input section SEC has been discarded.  */
 #define discarded_section(sec)				\
@@ -440,6 +443,17 @@ extern void bfd_hash_traverse
    tables allocated using bfd_hash_table_init will be created with
    this size.  */
 extern unsigned long bfd_hash_set_default_size (unsigned long);
+
+/* Types of compressed DWARF debug sections.  We currently support
+   zlib.  */
+enum compressed_debug_section_type
+{
+  COMPRESS_DEBUG_NONE = 0,
+  COMPRESS_DEBUG = 1 << 0,
+  COMPRESS_DEBUG_ZLIB = COMPRESS_DEBUG | 1 << 1,
+  COMPRESS_DEBUG_GNU_ZLIB = COMPRESS_DEBUG | 1 << 2,
+  COMPRESS_DEBUG_GABI_ZLIB = COMPRESS_DEBUG | 1 << 3
+};
 
 /* This structure is used to keep track of stabs in sections
    information while linking.  */
@@ -813,12 +827,6 @@ struct internal_syment;
 union internal_auxent;
 #endif
 
-extern bfd_boolean bfd_coff_get_syment
-  (bfd *, struct bfd_symbol *, struct internal_syment *);
-
-extern bfd_boolean bfd_coff_get_auxent
-  (bfd *, struct bfd_symbol *, int, union internal_auxent *);
-
 extern bfd_boolean bfd_coff_set_symbol_class
   (bfd *, struct bfd_symbol *, unsigned int);
 
@@ -944,10 +952,10 @@ extern void bfd_elf32_aarch64_init_maps
   (bfd *);
 
 extern void bfd_elf64_aarch64_set_options
-  (bfd *, struct bfd_link_info *, int, int, int, int);
+  (bfd *, struct bfd_link_info *, int, int, int, int, int);
 
 extern void bfd_elf32_aarch64_set_options
-  (bfd *, struct bfd_link_info *, int, int, int, int);
+  (bfd *, struct bfd_link_info *, int, int, int, int, int);
 
 /* ELF AArch64 mapping symbol support.  */
 #define BFD_AARCH64_SPECIAL_SYM_TYPE_MAP	(1 << 0)
@@ -999,25 +1007,12 @@ extern void bfd_elf32_ia64_after_parse
 extern void bfd_elf64_ia64_after_parse
   (int);
 
-/* This structure is used for a comdat section, as in PE.  A comdat
-   section is associated with a particular symbol.  When the linker
-   sees a comdat section, it keeps only one of the sections with a
-   given name and associated with a given symbol.  */
+/* V850 Note manipulation routines.  */
+extern bfd_boolean v850_elf_create_sections
+  (struct bfd_link_info *);
 
-struct coff_comdat_info
-{
-  /* The name of the symbol associated with a comdat section.  */
-  const char *name;
-
-  /* The local symbol table index of the symbol associated with a
-     comdat section.  This is only meaningful to the object file format
-     specific code; it is not an index into the list returned by
-     bfd_canonicalize_symtab.  */
-  long symbol;
-};
-
-extern struct coff_comdat_info * bfd_coff_get_comdat_section
-  (bfd *, struct bfd_section *);
+extern bfd_boolean v850_elf_set_note
+  (bfd *, unsigned int, unsigned int);
 /* Extracted from init.c.  */
 void bfd_init (void);
 
@@ -1394,6 +1389,10 @@ typedef struct bfd_section
      executables or shared objects. This is for COFF only.  */
 #define SEC_COFF_SHARED 0x8000000
 
+  /* This section should be compressed.  This is for ELF linker
+     internal use only.  */
+#define SEC_ELF_COMPRESS 0x8000000
+
   /* When a section with this flag is being linked, then if the size of
      the input section is less than a page, it should not cross a page
      boundary.  If the size of the input section is one page or more,
@@ -1401,10 +1400,17 @@ typedef struct bfd_section
      TMS320C54X only.  */
 #define SEC_TIC54X_BLOCK 0x10000000
 
+  /* This section should be renamed.  This is for ELF linker
+     internal use only.  */
+#define SEC_ELF_RENAME 0x10000000
+
   /* Conditionally link this section; do not link if there are no
      references found to any symbol in the section.  This is for TI
      TMS320C54X only.  */
 #define SEC_TIC54X_CLINK 0x20000000
+
+  /* This section contains vliw code.  This is for Toshiba MeP only.  */
+#define SEC_MEP_VLIW 0x20000000
 
   /* Indicate that section has the no read flag set. This happens
      when memory read flag isn't set. */
@@ -1966,6 +1972,7 @@ enum bfd_architecture
 #define bfd_mach_mips_octeon           6501
 #define bfd_mach_mips_octeonp          6601
 #define bfd_mach_mips_octeon2          6502
+#define bfd_mach_mips_octeon3          6503
 #define bfd_mach_mips_xlr              887682   /* decimal 'XLR'  */
 #define bfd_mach_mipsisa32             32
 #define bfd_mach_mipsisa32r2           33
@@ -1997,6 +2004,10 @@ enum bfd_architecture
 #define bfd_mach_i386_i386_nacl        (bfd_mach_i386_i386 | bfd_mach_i386_nacl)
 #define bfd_mach_x86_64_nacl           (bfd_mach_x86_64 | bfd_mach_i386_nacl)
 #define bfd_mach_x64_32_nacl           (bfd_mach_x64_32 | bfd_mach_i386_nacl)
+  bfd_arch_iamcu,   /* Intel MCU */
+#define bfd_mach_iamcu                 (1 << 8)
+#define bfd_mach_i386_iamcu            (bfd_mach_i386_i386 | bfd_mach_iamcu)
+#define bfd_mach_i386_iamcu_intel_syntax (bfd_mach_i386_iamcu | bfd_mach_i386_intel_syntax)
   bfd_arch_we32k,     /* AT&T WE32xxx */
   bfd_arch_tahoe,     /* CCI/Harris Tahoe */
   bfd_arch_i860,      /* Intel 860 */
@@ -2164,6 +2175,8 @@ enum bfd_architecture
 #define bfd_mach_fr550         550
   bfd_arch_moxie,       /* The moxie processor */
 #define bfd_mach_moxie         1
+  bfd_arch_ft32,       /* The ft32 processor */
+#define bfd_mach_ft32          1
   bfd_arch_mcore,
   bfd_arch_mep,
 #define bfd_mach_mep           1
@@ -2283,6 +2296,8 @@ enum bfd_architecture
 #define bfd_mach_aarch64_ilp32 32
   bfd_arch_nios2,
 #define bfd_mach_nios2 0
+  bfd_arch_visium,     /* Visium */
+#define bfd_mach_visium        1
   bfd_arch_last
   };
 
@@ -3023,6 +3038,13 @@ to compensate for the borrow when the low bits are added.  */
 
 /* Moxie ELF relocations.  */
   BFD_RELOC_MOXIE_10_PCREL,
+
+
+/* FT32 ELF relocations.  */
+  BFD_RELOC_FT32_10,
+  BFD_RELOC_FT32_20,
+  BFD_RELOC_FT32_17,
+  BFD_RELOC_FT32_18,
 
 
 /* Fujitsu Frv Relocations.  */
@@ -5720,6 +5742,9 @@ relative value.  Used in conjunction with
 BFD_RELOC_AARCH64_TLSGD_ADD_LO12_NC.  */
   BFD_RELOC_AARCH64_TLSGD_ADR_PAGE21,
 
+/* AArch64 TLS General Dynamic  */
+  BFD_RELOC_AARCH64_TLSGD_ADR_PREL21,
+
 /* Unsigned 12 bit byte offset to global offset table entry for a symbols
 tls_index structure.  Used in conjunction with
 BFD_RELOC_AARCH64_TLSGD_ADR_PAGE21.  */
@@ -6066,6 +6091,15 @@ assembler and not (currently) written to any object files.  */
 
 /* Adapteva EPIPHANY - 8 bit immediate for 16 bit mov instruction.  */
   BFD_RELOC_EPIPHANY_IMM8,
+
+/* Visium Relocations.  */
+  BFD_RELOC_VISIUM_HI16,
+  BFD_RELOC_VISIUM_LO16,
+  BFD_RELOC_VISIUM_IM16,
+  BFD_RELOC_VISIUM_REL16,
+  BFD_RELOC_VISIUM_HI16_PCREL,
+  BFD_RELOC_VISIUM_LO16_PCREL,
+  BFD_RELOC_VISIUM_IM16_PCREL,
   BFD_RELOC_UNUSED };
 
 typedef enum bfd_reloc_code_real bfd_reloc_code_real_type;
@@ -6274,6 +6308,13 @@ enum bfd_direction
     both_direction = 3
   };
 
+enum bfd_plugin_format
+  {
+    bfd_plugin_uknown = 0,
+    bfd_plugin_yes = 1,
+    bfd_plugin_no = 2
+  };
+
 struct bfd
 {
   /* The filename the application opened the BFD with.  */
@@ -6308,7 +6349,7 @@ struct bfd
   ENUM_BITFIELD (bfd_direction) direction : 2;
 
   /* Format_specific flags.  */
-  flagword flags : 17;
+  flagword flags : 18;
 
   /* Values that may appear in the flags field of a BFD.  These also
      appear in the object_flags field of the bfd_target structure, where
@@ -6385,14 +6426,19 @@ struct bfd
   /* BFD is a dummy, for plugins.  */
 #define BFD_PLUGIN 0x10000
 
+  /* Compress sections in this BFD with SHF_COMPRESSED from gABI.  */
+#define BFD_COMPRESS_GABI 0x20000
+
   /* Flags bits to be saved in bfd_preserve_save.  */
 #define BFD_FLAGS_SAVED \
-  (BFD_IN_MEMORY | BFD_COMPRESS | BFD_DECOMPRESS | BFD_PLUGIN)
+  (BFD_IN_MEMORY | BFD_COMPRESS | BFD_DECOMPRESS | BFD_PLUGIN \
+   | BFD_COMPRESS_GABI)
 
   /* Flags bits which are for BFD use only.  */
 #define BFD_FLAGS_FOR_BFD_USE_MASK \
   (BFD_IN_MEMORY | BFD_COMPRESS | BFD_DECOMPRESS | BFD_LINKER_CREATED \
-   | BFD_PLUGIN | BFD_TRADITIONAL_FORMAT | BFD_DETERMINISTIC_OUTPUT)
+   | BFD_PLUGIN | BFD_TRADITIONAL_FORMAT | BFD_DETERMINISTIC_OUTPUT \
+   | BFD_COMPRESS_GABI)
 
   /* Is the file descriptor being cached?  That is, can it be closed as
      needed, and re-opened when accessed later?  */
@@ -6429,6 +6475,19 @@ struct bfd
 
   /* Set if this is the linker output BFD.  */
   unsigned int is_linker_output : 1;
+
+  /* Set if this is the linker input BFD.  */
+  unsigned int is_linker_input : 1;
+
+  /* If this is an input for a compiler plug-in library.  */
+  ENUM_BITFIELD (bfd_plugin_format) plugin_format : 2;
+
+  /* Set if this is a plugin output file.  */
+  unsigned int lto_output : 1;
+
+  /* Set to dummy BFD created when claimed by a compiler plug-in
+     library.  */
+  bfd *plugin_dummy_bfd;
 
   /* Currently my_archive is tested before adding origin to
      anything. I believe that this can become always an add of
@@ -6752,6 +6811,15 @@ void bfd_emul_set_commonpagesize (const char *, bfd_vma);
 
 char *bfd_demangle (bfd *, const char *, int);
 
+void bfd_update_compression_header
+   (bfd *abfd, bfd_byte *contents, asection *sec);
+
+bfd_boolean bfd_check_compression_header
+   (bfd *abfd, bfd_byte *contents, asection *sec,
+    bfd_size_type *uncompressed_size);
+
+int bfd_get_compression_header_size (bfd *abfd, asection *sec);
+
 /* Extracted from archive.c.  */
 symindex bfd_get_next_mapent
    (bfd *abfd, symindex previous, carsym **sym);
@@ -7014,6 +7082,7 @@ typedef struct bfd_target
   NAME##_make_empty_symbol, \
   NAME##_print_symbol, \
   NAME##_get_symbol_info, \
+  NAME##_get_symbol_version_string, \
   NAME##_bfd_is_local_label_name, \
   NAME##_bfd_is_target_special_symbol, \
   NAME##_get_lineno, \
@@ -7035,6 +7104,9 @@ typedef struct bfd_target
   void        (*_bfd_get_symbol_info)
     (bfd *, struct bfd_symbol *, symbol_info *);
 #define bfd_get_symbol_info(b,p,e) BFD_SEND (b, _bfd_get_symbol_info, (b,p,e))
+  const char *(*_bfd_get_symbol_version_string)
+    (bfd *, struct bfd_symbol *, bfd_boolean *);
+#define bfd_get_symbol_version_string(b,s,h) BFD_SEND (b, _bfd_get_symbol_version_string, (b,s,h))
   bfd_boolean (*_bfd_is_local_label_name) (bfd *, const char *);
   bfd_boolean (*_bfd_is_target_special_symbol) (bfd *, asymbol *);
   alent *     (*_get_lineno) (bfd *, struct bfd_symbol *);
@@ -7254,15 +7326,16 @@ bfd_byte *bfd_simple_get_relocated_section_contents
    (bfd *abfd, asection *sec, bfd_byte *outbuf, asymbol **symbol_table);
 
 /* Extracted from compress.c.  */
-bfd_boolean bfd_compress_section_contents
-   (bfd *abfd, asection *section, bfd_byte *uncompressed_buffer,
-    bfd_size_type uncompressed_size);
-
 bfd_boolean bfd_get_full_section_contents
    (bfd *abfd, asection *section, bfd_byte **ptr);
 
 void bfd_cache_section_contents
    (asection *sec, void *contents);
+
+bfd_boolean bfd_is_section_compressed_with_header
+   (bfd *abfd, asection *section,
+    int *compression_header_size_p,
+    bfd_size_type *uncompressed_size_p);
 
 bfd_boolean bfd_is_section_compressed
    (bfd *abfd, asection *section);
@@ -7272,6 +7345,9 @@ bfd_boolean bfd_init_section_decompress_status
 
 bfd_boolean bfd_init_section_compress_status
    (bfd *abfd, asection *section);
+
+bfd_boolean bfd_compress_section
+   (bfd *abfd, asection *section, bfd_byte *uncompressed_buffer);
 
 #ifdef __cplusplus
 }

@@ -1,6 +1,6 @@
 /* Frame unwinder for frames with DWARF Call Frame Information.
 
-   Copyright (C) 2003-2014 Free Software Foundation, Inc.
+   Copyright (C) 2003-2015 Free Software Foundation, Inc.
 
    Contributed by Mark Kettenis.
 
@@ -165,29 +165,34 @@ static CORE_ADDR read_encoded_value (struct comp_unit *unit, gdb_byte encoding,
 				     CORE_ADDR func_base);
 
 
+enum cfa_how_kind
+{
+  CFA_UNSET,
+  CFA_REG_OFFSET,
+  CFA_EXP
+};
+
+struct dwarf2_frame_state_reg_info
+{
+  struct dwarf2_frame_state_reg *reg;
+  int num_regs;
+
+  LONGEST cfa_offset;
+  ULONGEST cfa_reg;
+  enum cfa_how_kind cfa_how;
+  const gdb_byte *cfa_exp;
+
+  /* Used to implement DW_CFA_remember_state.  */
+  struct dwarf2_frame_state_reg_info *prev;
+};
+
 /* Structure describing a frame state.  */
 
 struct dwarf2_frame_state
 {
   /* Each register save state can be described in terms of a CFA slot,
      another register, or a location expression.  */
-  struct dwarf2_frame_state_reg_info
-  {
-    struct dwarf2_frame_state_reg *reg;
-    int num_regs;
-
-    LONGEST cfa_offset;
-    ULONGEST cfa_reg;
-    enum {
-      CFA_UNSET,
-      CFA_REG_OFFSET,
-      CFA_EXP
-    } cfa_how;
-    const gdb_byte *cfa_exp;
-
-    /* Used to implement DW_CFA_remember_state.  */
-    struct dwarf2_frame_state_reg_info *prev;
-  } regs;
+  struct dwarf2_frame_state_reg_info regs;
 
   /* The PC described by the current frame state.  */
   CORE_ADDR pc;
@@ -852,13 +857,13 @@ static void
 dwarf2_frame_find_quirks (struct dwarf2_frame_state *fs,
 			  struct dwarf2_fde *fde)
 {
-  struct symtab *s;
+  struct compunit_symtab *cust;
 
-  s = find_pc_symtab (fs->pc);
-  if (s == NULL)
+  cust = find_pc_compunit_symtab (fs->pc);
+  if (cust == NULL)
     return;
 
-  if (producer_is_realview (s->producer))
+  if (producer_is_realview (COMPUNIT_PRODUCER (cust)))
     {
       if (fde->cie->version == 1)
 	fs->armcc_cfa_offsets_sf = 1;
@@ -873,7 +878,7 @@ dwarf2_frame_find_quirks (struct dwarf2_frame_state *fs,
 	 this problem is fixed (no quirk needed).  If the armcc
 	 augmentation is missing, the quirk is needed.  */
       if (fde->cie->version == 3
-	  && (strncmp (fde->cie->augmentation, "armcc", 5) != 0
+	  && (!startswith (fde->cie->augmentation, "armcc")
 	      || strchr (fde->cie->augmentation + 5, '+') == NULL))
 	fs->armcc_cfa_offsets_reversed = 1;
 
@@ -882,11 +887,15 @@ dwarf2_frame_find_quirks (struct dwarf2_frame_state *fs,
 }
 
 
-void
-dwarf2_compile_cfa_to_ax (struct agent_expr *expr, struct axs_value *loc,
-			  struct gdbarch *gdbarch,
-			  CORE_ADDR pc,
-			  struct dwarf2_per_cu_data *data)
+/* See dwarf2-frame.h.  */
+
+int
+dwarf2_fetch_cfa_info (struct gdbarch *gdbarch, CORE_ADDR pc,
+		       struct dwarf2_per_cu_data *data,
+		       int *regnum_out, LONGEST *offset_out,
+		       CORE_ADDR *text_offset_out,
+		       const gdb_byte **cfa_start_out,
+		       const gdb_byte **cfa_end_out)
 {
   struct dwarf2_fde *fde;
   CORE_ADDR text_offset;
@@ -932,26 +941,20 @@ dwarf2_compile_cfa_to_ax (struct agent_expr *expr, struct axs_value *loc,
 	if (regnum == -1)
 	  error (_("Unable to access DWARF register number %d"),
 		 (int) fs.regs.cfa_reg); /* FIXME */
-	ax_reg (expr, regnum);
 
-	if (fs.regs.cfa_offset != 0)
-	  {
-	    if (fs.armcc_cfa_offsets_reversed)
-	      ax_const_l (expr, -fs.regs.cfa_offset);
-	    else
-	      ax_const_l (expr, fs.regs.cfa_offset);
-	    ax_simple (expr, aop_add);
-	  }
+	*regnum_out = regnum;
+	if (fs.armcc_cfa_offsets_reversed)
+	  *offset_out = -fs.regs.cfa_offset;
+	else
+	  *offset_out = fs.regs.cfa_offset;
+	return 1;
       }
-      break;
 
     case CFA_EXP:
-      ax_const_l (expr, text_offset);
-      dwarf2_compile_expr_to_ax (expr, loc, gdbarch, addr_size,
-				 fs.regs.cfa_exp,
-				 fs.regs.cfa_exp + fs.regs.cfa_exp_len,
-				 data);
-      break;
+      *text_offset_out = text_offset;
+      *cfa_start_out = fs.regs.cfa_exp;
+      *cfa_end_out = fs.regs.cfa_exp + fs.regs.cfa_exp_len;
+      return 0;
 
     default:
       internal_error (__FILE__, __LINE__, _("Unknown CFA rule."));
@@ -1022,7 +1025,6 @@ dwarf2_frame_cache (struct frame_info *this_frame, void **this_cache)
   struct dwarf2_frame_cache *cache;
   struct dwarf2_frame_state *fs;
   struct dwarf2_fde *fde;
-  volatile struct gdb_exception ex;
   CORE_ADDR entry_pc;
   const gdb_byte *instr;
 
@@ -1099,7 +1101,7 @@ dwarf2_frame_cache (struct frame_info *this_frame, void **this_cache)
   execute_cfa_program (fde, instr, fde->end, gdbarch,
 		       get_frame_address_in_block (this_frame), fs);
 
-  TRY_CATCH (ex, RETURN_MASK_ERROR)
+  TRY
     {
       /* Calculate the CFA.  */
       switch (fs->regs.cfa_how)
@@ -1123,7 +1125,7 @@ dwarf2_frame_cache (struct frame_info *this_frame, void **this_cache)
 	  internal_error (__FILE__, __LINE__, _("Unknown CFA rule."));
 	}
     }
-  if (ex.reason < 0)
+  CATCH (ex, RETURN_MASK_ERROR)
     {
       if (ex.error == NOT_AVAILABLE_ERROR)
 	{
@@ -1135,6 +1137,7 @@ dwarf2_frame_cache (struct frame_info *this_frame, void **this_cache)
 
       throw_exception (ex);
     }
+  END_CATCH
 
   /* Initialize the register state.  */
   {
@@ -1512,12 +1515,12 @@ dwarf2_frame_cfa (struct frame_info *this_frame)
     throw_error (NOT_AVAILABLE_ERROR,
                 _("can't compute CFA for this frame: "
                   "required registers or memory are unavailable"));
-  /* This restriction could be lifted if other unwinders are known to
-     compute the frame base in a way compatible with the DWARF
-     unwinder.  */
-  if (!frame_unwinder_is (this_frame, &dwarf2_frame_unwind)
-      && !frame_unwinder_is (this_frame, &dwarf2_tailcall_frame_unwind))
-    error (_("can't compute CFA for this frame"));
+
+  if (get_frame_id (this_frame).stack_status != FID_STACK_VALID)
+    throw_error (NOT_AVAILABLE_ERROR,
+                _("can't compute CFA for this frame: "
+                  "frame base not available"));
+
   return get_frame_base (this_frame);
 }
 
@@ -1932,7 +1935,7 @@ decode_frame_entry_1 (struct comp_unit *unit, const gdb_byte *start,
 
       /* Ignore armcc augmentations.  We only use them for quirks,
 	 and that doesn't happen until later.  */
-      if (strncmp (augmentation, "armcc", 5) == 0)
+      if (startswith (augmentation, "armcc"))
 	augmentation += strlen (augmentation);
 
       /* The GCC 2.x "eh" augmentation has a pointer immediately
@@ -2066,6 +2069,7 @@ decode_frame_entry_1 (struct comp_unit *unit, const gdb_byte *start,
     {
       /* This is a FDE.  */
       struct dwarf2_fde *fde;
+      CORE_ADDR addr;
 
       /* Check that an FDE was expected.  */
       if ((entry_type & EH_FDE_TYPE_ID) == 0)
@@ -2099,14 +2103,16 @@ decode_frame_entry_1 (struct comp_unit *unit, const gdb_byte *start,
 
       gdb_assert (fde->cie != NULL);
 
-      fde->initial_location =
-	read_encoded_value (unit, fde->cie->encoding, fde->cie->ptr_size,
-			    buf, &bytes_read, 0);
+      addr = read_encoded_value (unit, fde->cie->encoding, fde->cie->ptr_size,
+				 buf, &bytes_read, 0);
+      fde->initial_location = gdbarch_adjust_dwarf2_addr (gdbarch, addr);
       buf += bytes_read;
 
       fde->address_range =
 	read_encoded_value (unit, fde->cie->encoding & 0x0f,
 			    fde->cie->ptr_size, buf, &bytes_read, 0);
+      addr = gdbarch_adjust_dwarf2_addr (gdbarch, addr + fde->address_range);
+      fde->address_range = addr - fde->initial_location;
       buf += bytes_read;
 
       /* A 'z' augmentation in the CIE implies the presence of an
@@ -2263,7 +2269,6 @@ dwarf2_build_frame_info (struct objfile *objfile)
   struct dwarf2_cie_table cie_table;
   struct dwarf2_fde_table fde_table;
   struct dwarf2_fde_table *fde_table2;
-  volatile struct gdb_exception e;
 
   cie_table.num_entries = 0;
   cie_table.entries = NULL;
@@ -2305,7 +2310,7 @@ dwarf2_build_frame_info (struct objfile *objfile)
           if (txt)
             unit->tbase = txt->vma;
 
-	  TRY_CATCH (e, RETURN_MASK_ERROR)
+	  TRY
 	    {
 	      frame_ptr = unit->dwarf_frame_buffer;
 	      while (frame_ptr < unit->dwarf_frame_buffer + unit->dwarf_frame_size)
@@ -2314,7 +2319,7 @@ dwarf2_build_frame_info (struct objfile *objfile)
 						EH_CIE_OR_FDE_TYPE_ID);
 	    }
 
-	  if (e.reason < 0)
+	  CATCH (e, RETURN_MASK_ERROR)
 	    {
 	      warning (_("skipping .eh_frame info of %s: %s"),
 		       objfile_name (objfile), e.message);
@@ -2327,6 +2332,7 @@ dwarf2_build_frame_info (struct objfile *objfile)
 		}
 	      /* The cie_table is discarded by the next if.  */
 	    }
+	  END_CATCH
 
           if (cie_table.num_entries != 0)
             {
@@ -2346,7 +2352,7 @@ dwarf2_build_frame_info (struct objfile *objfile)
     {
       int num_old_fde_entries = fde_table.num_entries;
 
-      TRY_CATCH (e, RETURN_MASK_ERROR)
+      TRY
 	{
 	  frame_ptr = unit->dwarf_frame_buffer;
 	  while (frame_ptr < unit->dwarf_frame_buffer + unit->dwarf_frame_size)
@@ -2354,7 +2360,7 @@ dwarf2_build_frame_info (struct objfile *objfile)
 					    &cie_table, &fde_table,
 					    EH_CIE_OR_FDE_TYPE_ID);
 	}
-      if (e.reason < 0)
+      CATCH (e, RETURN_MASK_ERROR)
 	{
 	  warning (_("skipping .debug_frame info of %s: %s"),
 		   objfile_name (objfile), e.message);
@@ -2377,6 +2383,7 @@ dwarf2_build_frame_info (struct objfile *objfile)
 	  fde_table.num_entries = num_old_fde_entries;
 	  /* The cie_table is discarded by the next if.  */
 	}
+      END_CATCH
     }
 
   /* Discard the cie_table, it is no longer needed.  */

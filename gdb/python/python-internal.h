@@ -1,6 +1,6 @@
 /* Gdb/Python header for private use by Python module.
 
-   Copyright (C) 2008-2014 Free Software Foundation, Inc.
+   Copyright (C) 2008-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -21,6 +21,7 @@
 #define GDB_PYTHON_INTERNAL_H
 
 #include "extension.h"
+#include "extension-priv.h"
 
 /* These WITH_* macros are defined by the CPython API checker that
    comes with the Python plugin for GCC.  See:
@@ -168,6 +169,10 @@ typedef unsigned long gdb_py_ulongest;
 #define gdb_py_long_as_ulongest PyLong_AsUnsignedLong
 
 #endif /* HAVE_LONG_LONG */
+
+#if PY_VERSION_HEX < 0x03020000
+typedef long Py_hash_t;
+#endif
 
 /* Python 2.6 did not wrap Py_DECREF in 'do {...} while (0)', leading
    to 'suggest explicit braces to avoid ambiguous ‘else’' gcc errors.
@@ -343,6 +348,11 @@ extern enum ext_lang_rc gdbpy_get_xmethod_arg_types
    struct xmethod_worker *worker,
    int *nargs,
    struct type ***arg_types);
+extern enum ext_lang_rc gdbpy_get_xmethod_result_type
+  (const struct extension_language_defn *extlang,
+   struct xmethod_worker *worker,
+   struct value *object, struct value **args, int nargs,
+   struct type **result_type);
 extern struct value *gdbpy_invoke_xmethod
   (const struct extension_language_defn *extlang,
    struct xmethod_worker *worker,
@@ -363,6 +373,7 @@ PyObject *gdbpy_create_lazy_string_object (CORE_ADDR address, long length,
 					   const char *encoding,
 					   struct type *type);
 PyObject *gdbpy_inferiors (PyObject *unused, PyObject *unused2);
+PyObject *gdbpy_create_ptid_object (ptid_t ptid);
 PyObject *gdbpy_selected_thread (PyObject *self, PyObject *args);
 PyObject *gdbpy_selected_inferior (PyObject *self, PyObject *args);
 PyObject *gdbpy_string_to_argv (PyObject *self, PyObject *args);
@@ -385,13 +396,16 @@ PyObject *pspace_to_pspace_object (struct program_space *)
     CPYCHECKER_RETURNS_BORROWED_REF;
 PyObject *pspy_get_printers (PyObject *, void *);
 PyObject *pspy_get_frame_filters (PyObject *, void *);
+PyObject *pspy_get_frame_unwinders (PyObject *, void *);
 PyObject *pspy_get_xmethods (PyObject *, void *);
 
 PyObject *objfile_to_objfile_object (struct objfile *)
     CPYCHECKER_RETURNS_BORROWED_REF;
 PyObject *objfpy_get_printers (PyObject *, void *);
 PyObject *objfpy_get_frame_filters (PyObject *, void *);
+PyObject *objfpy_get_frame_unwinders (PyObject *, void *);
 PyObject *objfpy_get_xmethods (PyObject *, void *);
+PyObject *gdbpy_lookup_objfile (PyObject *self, PyObject *args, PyObject *kw);
 
 PyObject *gdbarch_to_arch_object (struct gdbarch *gdbarch);
 
@@ -464,6 +478,14 @@ int gdbpy_initialize_breakpoint_event (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_continue_event (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_inferior_call_pre_event (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_inferior_call_post_event (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_register_changed_event (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_memory_changed_event (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_exited_event (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_thread_event (void)
@@ -475,6 +497,8 @@ int gdbpy_initialize_clear_objfiles_event (void)
 int gdbpy_initialize_arch (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 int gdbpy_initialize_xmethods (void)
+  CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
+int gdbpy_initialize_unwind (void)
   CPYCHECKER_NEGATIVE_RESULT_SETS_EXCEPTION;
 
 struct cleanup *make_cleanup_py_decref (PyObject *py);
@@ -508,6 +532,7 @@ extern const struct language_defn *python_language;
 	}								\
     } while (0)
 
+int gdbpy_print_python_errors_p (void);
 void gdbpy_print_stack (void);
 
 PyObject *python_string_to_unicode (PyObject *obj);

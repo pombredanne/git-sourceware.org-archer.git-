@@ -1,6 +1,6 @@
 /* Common target dependent code for GDB on ARM systems.
 
-   Copyright (C) 1988-2014 Free Software Foundation, Inc.
+   Copyright (C) 1988-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -484,15 +484,15 @@ skip_prologue_function (struct gdbarch *gdbarch, CORE_ADDR pc, int is_thumb)
       /* On soft-float targets, __truncdfsf2 is called to convert promoted
 	 arguments to their argument types in non-prototyped
 	 functions.  */
-      if (strncmp (name, "__truncdfsf2", strlen ("__truncdfsf2")) == 0)
+      if (startswith (name, "__truncdfsf2"))
 	return 1;
-      if (strncmp (name, "__aeabi_d2f", strlen ("__aeabi_d2f")) == 0)
+      if (startswith (name, "__aeabi_d2f"))
 	return 1;
 
       /* Internal functions related to thread-local storage.  */
-      if (strncmp (name, "__tls_get_addr", strlen ("__tls_get_addr")) == 0)
+      if (startswith (name, "__tls_get_addr"))
 	return 1;
-      if (strncmp (name, "__aeabi_read_tp", strlen ("__aeabi_read_tp")) == 0)
+      if (startswith (name, "__aeabi_read_tp"))
 	return 1;
     }
   else
@@ -1314,9 +1314,7 @@ arm_skip_stack_protector(CORE_ADDR pc, struct gdbarch *gdbarch)
   /* ADDR must correspond to a symbol whose name is __stack_chk_guard.
      Otherwise, this sequence cannot be for stack protector.  */
   if (stack_chk_guard.minsym == NULL
-      || strncmp (MSYMBOL_LINKAGE_NAME (stack_chk_guard.minsym),
-		  "__stack_chk_guard",
-		  strlen ("__stack_chk_guard")) != 0)
+      || !startswith (MSYMBOL_LINKAGE_NAME (stack_chk_guard.minsym), "__stack_chk_guard"))
    return pc;
 
   if (is_thumb)
@@ -1388,7 +1386,6 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
   enum bfd_endian byte_order_for_code = gdbarch_byte_order_for_code (gdbarch);
   unsigned long inst;
-  CORE_ADDR skip_pc;
   CORE_ADDR func_addr, limit_pc;
 
   /* See if we can determine the end of the prologue via the symbol table.
@@ -1398,7 +1395,7 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
     {
       CORE_ADDR post_prologue_pc
 	= skip_prologue_using_sal (gdbarch, func_addr);
-      struct symtab *s = find_pc_symtab (func_addr);
+      struct compunit_symtab *cust = find_pc_compunit_symtab (func_addr);
 
       if (post_prologue_pc)
 	post_prologue_pc
@@ -1412,10 +1409,10 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
 	 will have producer information for most binaries; if it is
 	 missing (e.g. for -gstabs), assuming the GNU tools.  */
       if (post_prologue_pc
-	  && (s == NULL
-	      || s->producer == NULL
-	      || strncmp (s->producer, "GNU ", sizeof ("GNU ") - 1) == 0 
-	      || strncmp (s->producer, "clang ", sizeof ("clang ") - 1) == 0))
+	  && (cust == NULL
+	      || COMPUNIT_PRODUCER (cust) == NULL
+	      || startswith (COMPUNIT_PRODUCER (cust), "GNU ")
+	      || startswith (COMPUNIT_PRODUCER (cust), "clang ")))
 	return post_prologue_pc;
 
       if (post_prologue_pc != 0)
@@ -1460,65 +1457,8 @@ arm_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
   /* Check if this is Thumb code.  */
   if (arm_pc_is_thumb (gdbarch, pc))
     return thumb_analyze_prologue (gdbarch, pc, limit_pc, NULL);
-
-  for (skip_pc = pc; skip_pc < limit_pc; skip_pc += 4)
-    {
-      inst = read_memory_unsigned_integer (skip_pc, 4, byte_order_for_code);
-
-      /* "mov ip, sp" is no longer a required part of the prologue.  */
-      if (inst == 0xe1a0c00d)			/* mov ip, sp */
-	continue;
-
-      if ((inst & 0xfffff000) == 0xe28dc000)    /* add ip, sp #n */
-	continue;
-
-      if ((inst & 0xfffff000) == 0xe24dc000)    /* sub ip, sp #n */
-	continue;
-
-      /* Some prologues begin with "str lr, [sp, #-4]!".  */
-      if (inst == 0xe52de004)			/* str lr, [sp, #-4]! */
-	continue;
-
-      if ((inst & 0xfffffff0) == 0xe92d0000)	/* stmfd sp!,{a1,a2,a3,a4} */
-	continue;
-
-      if ((inst & 0xfffff800) == 0xe92dd800)	/* stmfd sp!,{fp,ip,lr,pc} */
-	continue;
-
-      /* Any insns after this point may float into the code, if it makes
-	 for better instruction scheduling, so we skip them only if we
-	 find them, but still consider the function to be frame-ful.  */
-
-      /* We may have either one sfmfd instruction here, or several stfe
-	 insns, depending on the version of floating point code we
-	 support.  */
-      if ((inst & 0xffbf0fff) == 0xec2d0200)	/* sfmfd fn, <cnt>, [sp]! */
-	continue;
-
-      if ((inst & 0xffff8fff) == 0xed6d0103)	/* stfe fn, [sp, #-12]! */
-	continue;
-
-      if ((inst & 0xfffff000) == 0xe24cb000)	/* sub fp, ip, #nn */
-	continue;
-
-      if ((inst & 0xfffff000) == 0xe24dd000)	/* sub sp, sp, #nn */
-	continue;
-
-      if ((inst & 0xffffc000) == 0xe54b0000	/* strb r(0123),[r11,#-nn] */
-	  || (inst & 0xffffc0f0) == 0xe14b00b0	/* strh r(0123),[r11,#-nn] */
-	  || (inst & 0xffffc000) == 0xe50b0000)	/* str  r(0123),[r11,#-nn] */
-	continue;
-
-      if ((inst & 0xffffc000) == 0xe5cd0000	/* strb r(0123),[sp,#nn] */
-	  || (inst & 0xffffc0f0) == 0xe1cd00b0	/* strh r(0123),[sp,#nn] */
-	  || (inst & 0xffffc000) == 0xe58d0000)	/* str  r(0123),[sp,#nn] */
-	continue;
-
-      /* Un-recognized instruction; stop scanning.  */
-      break;
-    }
-
-  return skip_pc;		/* End of prologue.  */
+  else
+    return arm_analyze_prologue (gdbarch, pc, limit_pc, NULL);
 }
 
 /* *INDENT-OFF* */
@@ -1662,6 +1602,30 @@ arm_instruction_changes_pc (uint32_t this_instr)
       }
 }
 
+/* Return 1 if the ARM instruction INSN restores SP in epilogue, 0
+   otherwise.  */
+
+static int
+arm_instruction_restores_sp (unsigned int insn)
+{
+  if (bits (insn, 28, 31) != INST_NV)
+    {
+      if ((insn & 0x0df0f000) == 0x0080d000
+	  /* ADD SP (register or immediate).  */
+	  || (insn & 0x0df0f000) == 0x0040d000
+	  /* SUB SP (register or immediate).  */
+	  || (insn & 0x0ffffff0) == 0x01a0d000
+	  /* MOV SP.  */
+	  || (insn & 0x0fff0000) == 0x08bd0000
+	  /* POP (LDMIA).  */
+	  || (insn & 0x0fff0000) == 0x049d0000)
+	  /* POP of a single register.  */
+	return 1;
+    }
+
+  return 0;
+}
+
 /* Analyze an ARM mode prologue starting at PROLOGUE_START and
    continuing no further than PROLOGUE_END.  If CACHE is non-NULL,
    fill it in.  Return the first address not recognized as a prologue
@@ -1684,7 +1648,6 @@ arm_analyze_prologue (struct gdbarch *gdbarch,
   pv_t regs[ARM_FPS_REGNUM];
   struct pv_area *stack;
   struct cleanup *back_to;
-  int framereg, framesize;
   CORE_ADDR unrecognized_pc = 0;
 
   /* Search the prologue looking for instructions that set up the
@@ -1860,6 +1823,11 @@ arm_analyze_prologue (struct gdbarch *gdbarch,
       else if (arm_instruction_changes_pc (insn))
 	/* Don't scan past anything that might change control flow.  */
 	break;
+      else if (arm_instruction_restores_sp (insn))
+	{
+	  /* Don't scan past the epilogue.  */
+	  break;
+	}
       else if ((insn & 0xfe500000) == 0xe8100000	/* ldm */
 	       && pv_is_register (regs[bits (insn, 16, 19)], ARM_SP_REGNUM))
 	/* Ignore block loads from the stack, potentially copying
@@ -1875,33 +1843,42 @@ arm_analyze_prologue (struct gdbarch *gdbarch,
 	continue;
       else
 	{
-	  /* The optimizer might shove anything into the prologue,
-	     so we just skip what we don't recognize.  */
+	  /* The optimizer might shove anything into the prologue, if
+	     we build up cache (cache != NULL) from scanning prologue,
+	     we just skip what we don't recognize and scan further to
+	     make cache as complete as possible.  However, if we skip
+	     prologue, we'll stop immediately on unrecognized
+	     instruction.  */
 	  unrecognized_pc = current_pc;
-	  continue;
+	  if (cache != NULL)
+	    continue;
+	  else
+	    break;
 	}
     }
 
   if (unrecognized_pc == 0)
     unrecognized_pc = current_pc;
 
-  /* The frame size is just the distance from the frame register
-     to the original stack pointer.  */
-  if (pv_is_register (regs[ARM_FP_REGNUM], ARM_SP_REGNUM))
-    {
-      /* Frame pointer is fp.  */
-      framereg = ARM_FP_REGNUM;
-      framesize = -regs[ARM_FP_REGNUM].k;
-    }
-  else
-    {
-      /* Try the stack pointer... this is a bit desperate.  */
-      framereg = ARM_SP_REGNUM;
-      framesize = -regs[ARM_SP_REGNUM].k;
-    }
-
   if (cache)
     {
+      int framereg, framesize;
+
+      /* The frame size is just the distance from the frame register
+	 to the original stack pointer.  */
+      if (pv_is_register (regs[ARM_FP_REGNUM], ARM_SP_REGNUM))
+	{
+	  /* Frame pointer is fp.  */
+	  framereg = ARM_FP_REGNUM;
+	  framesize = -regs[ARM_FP_REGNUM].k;
+	}
+      else
+	{
+	  /* Try the stack pointer... this is a bit desperate.  */
+	  framereg = ARM_SP_REGNUM;
+	  framesize = -regs[ARM_SP_REGNUM].k;
+	}
+
       cache->framereg = framereg;
       cache->framesize = framesize;
 
@@ -2040,6 +2017,31 @@ arm_make_prologue_cache (struct frame_info *this_frame)
   return cache;
 }
 
+/* Implementation of the stop_reason hook for arm_prologue frames.  */
+
+static enum unwind_stop_reason
+arm_prologue_unwind_stop_reason (struct frame_info *this_frame,
+				 void **this_cache)
+{
+  struct arm_prologue_cache *cache;
+  CORE_ADDR pc;
+
+  if (*this_cache == NULL)
+    *this_cache = arm_make_prologue_cache (this_frame);
+  cache = *this_cache;
+
+  /* This is meant to halt the backtrace at "_start".  */
+  pc = get_frame_pc (this_frame);
+  if (pc <= gdbarch_tdep (get_frame_arch (this_frame))->lowest_pc)
+    return UNWIND_OUTERMOST;
+
+  /* If we've hit a wall, stop.  */
+  if (cache->prev_sp == 0)
+    return UNWIND_OUTERMOST;
+
+  return UNWIND_NO_REASON;
+}
+
 /* Our frame ID for a normal frame is the current function's starting PC
    and the caller's SP when we were called.  */
 
@@ -2056,18 +2058,10 @@ arm_prologue_this_id (struct frame_info *this_frame,
     *this_cache = arm_make_prologue_cache (this_frame);
   cache = *this_cache;
 
-  /* This is meant to halt the backtrace at "_start".  */
-  pc = get_frame_pc (this_frame);
-  if (pc <= gdbarch_tdep (get_frame_arch (this_frame))->lowest_pc)
-    return;
-
-  /* If we've hit a wall, stop.  */
-  if (cache->prev_sp == 0)
-    return;
-
   /* Use function start address as part of the frame ID.  If we cannot
      identify the start address (due to missing symbol information),
      fall back to just using the current PC.  */
+  pc = get_frame_pc (this_frame);
   func = get_frame_func (this_frame);
   if (!func)
     func = pc;
@@ -2136,7 +2130,7 @@ arm_prologue_prev_register (struct frame_info *this_frame,
 
 struct frame_unwind arm_prologue_unwind = {
   NORMAL_FRAME,
-  default_frame_unwind_stop_reason,
+  arm_prologue_unwind_stop_reason,
   arm_prologue_this_id,
   arm_prologue_prev_register,
   NULL,
@@ -3348,7 +3342,7 @@ arm_in_function_epilogue_p (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
   enum bfd_endian byte_order_for_code = gdbarch_byte_order_for_code (gdbarch);
   unsigned int insn;
-  int found_return, found_stack_adjust;
+  int found_return;
   CORE_ADDR func_start, func_end;
 
   if (arm_pc_is_thumb (gdbarch, pc))
@@ -3388,28 +3382,8 @@ arm_in_function_epilogue_p (struct gdbarch *gdbarch, CORE_ADDR pc)
   if (pc < func_start + 4)
     return 0;
 
-  found_stack_adjust = 0;
   insn = read_memory_unsigned_integer (pc - 4, 4, byte_order_for_code);
-  if (bits (insn, 28, 31) != INST_NV)
-    {
-      if ((insn & 0x0df0f000) == 0x0080d000)
-	/* ADD SP (register or immediate).  */
-	found_stack_adjust = 1;
-      else if ((insn & 0x0df0f000) == 0x0040d000)
-	/* SUB SP (register or immediate).  */
-	found_stack_adjust = 1;
-      else if ((insn & 0x0ffffff0) == 0x01a0d000)
-	/* MOV SP.  */
-	found_stack_adjust = 1;
-      else if ((insn & 0x0fff0000) == 0x08bd0000)
-	/* POP (LDMIA).  */
-	found_stack_adjust = 1;
-      else if ((insn & 0x0fff0000) == 0x049d0000)
-	/* POP of a single register.  */
-	found_stack_adjust = 1;
-    }
-
-  if (found_stack_adjust)
+  if (arm_instruction_restores_sp (insn))
     return 1;
 
   return 0;
@@ -6433,7 +6407,7 @@ install_alu_reg (struct gdbarch *gdbarch, struct regcache *regs,
 
      Preparation: tmp1, tmp2, tmp3 <- r0, r1, r2;
 		  r0, r1, r2 <- rd, rn, rm
-     Insn: <op><cond> r0, r1, r2 [, <shift>]
+     Insn: <op><cond> r0, [r1,] r2 [, <shift>]
      Cleanup: rd <- r0; r0, r1, r2 <- tmp1, tmp2, tmp3
   */
 
@@ -6480,22 +6454,21 @@ thumb_copy_alu_reg (struct gdbarch *gdbarch, uint16_t insn,
 		    struct regcache *regs,
 		    struct displaced_step_closure *dsc)
 {
-  unsigned rn, rm, rd;
+  unsigned rm, rd;
 
-  rd = bits (insn, 3, 6);
-  rn = (bit (insn, 7) << 3) | bits (insn, 0, 2);
-  rm = 2;
+  rm = bits (insn, 3, 6);
+  rd = (bit (insn, 7) << 3) | bits (insn, 0, 2);
 
-  if (rd != ARM_PC_REGNUM && rn != ARM_PC_REGNUM)
+  if (rd != ARM_PC_REGNUM && rm != ARM_PC_REGNUM)
     return thumb_copy_unmodified_16bit (gdbarch, insn, "ALU reg", dsc);
 
   if (debug_displaced)
-    fprintf_unfiltered (gdb_stdlog, "displaced: copying reg %s insn %.4x\n",
-			"ALU", (unsigned short) insn);
+    fprintf_unfiltered (gdb_stdlog, "displaced: copying ALU reg insn %.4x\n",
+			(unsigned short) insn);
 
-  dsc->modinsn[0] = ((insn & 0xff00) | 0x08);
+  dsc->modinsn[0] = ((insn & 0xff00) | 0x10);
 
-  install_alu_reg (gdbarch, regs, dsc, rd, rn, rm);
+  install_alu_reg (gdbarch, regs, dsc, rd, rd, rm);
 
   return 0;
 }
@@ -9337,8 +9310,8 @@ arm_skip_stub (struct frame_info *frame, CORE_ADDR pc)
      _call_via_xx, where x is the register name.  The possible names
      are r0-r9, sl, fp, ip, sp, and lr.  ARM RealView has similar
      functions, named __ARM_call_via_r[0-7].  */
-  if (strncmp (name, "_call_via_", 10) == 0
-      || strncmp (name, "__ARM_call_via_", strlen ("__ARM_call_via_")) == 0)
+  if (startswith (name, "_call_via_")
+      || startswith (name, "__ARM_call_via_"))
     {
       /* Use the name suffix to determine which register contains the
          target PC.  */
@@ -9360,11 +9333,9 @@ arm_skip_stub (struct frame_info *frame, CORE_ADDR pc)
   namelen = strlen (name);
   if (name[0] == '_' && name[1] == '_'
       && ((namelen > 2 + strlen ("_from_thumb")
-	   && strncmp (name + namelen - strlen ("_from_thumb"), "_from_thumb",
-		       strlen ("_from_thumb")) == 0)
+	   && startswith (name + namelen - strlen ("_from_thumb"), "_from_thumb"))
 	  || (namelen > 2 + strlen ("_from_arm")
-	      && strncmp (name + namelen - strlen ("_from_arm"), "_from_arm",
-			  strlen ("_from_arm")) == 0)))
+	      && startswith (name + namelen - strlen ("_from_arm"), "_from_arm"))))
     {
       char *target_name;
       int target_len = namelen - 2;
@@ -9427,7 +9398,7 @@ static void
 set_fp_model_sfunc (char *args, int from_tty,
 		    struct cmd_list_element *c)
 {
-  enum arm_float_model fp_model;
+  int fp_model;
 
   for (fp_model = ARM_FLOAT_AUTO; fp_model != ARM_FLOAT_LAST; fp_model++)
     if (strcmp (current_fp_model, fp_model_strings[fp_model]) == 0)
@@ -9464,7 +9435,7 @@ static void
 arm_set_abi (char *args, int from_tty,
 	     struct cmd_list_element *c)
 {
-  enum arm_abi_kind arm_abi;
+  int arm_abi;
 
   for (arm_abi = ARM_ABI_AUTO; arm_abi != ARM_ABI_LAST; arm_abi++)
     if (strcmp (arm_abi_string, arm_abi_strings[arm_abi]) == 0)
@@ -10007,27 +9978,34 @@ arm_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
 							OBJ_ATTR_PROC,
 							Tag_ABI_VFP_args))
 			{
-			case 0:
+			case AEABI_VFP_args_base:
 			  /* "The user intended FP parameter/result
 			     passing to conform to AAPCS, base
 			     variant".  */
 			  fp_model = ARM_FLOAT_SOFT_VFP;
 			  break;
-			case 1:
+			case AEABI_VFP_args_vfp:
 			  /* "The user intended FP parameter/result
 			     passing to conform to AAPCS, VFP
 			     variant".  */
 			  fp_model = ARM_FLOAT_VFP;
 			  break;
-			case 2:
+			case AEABI_VFP_args_toolchain:
 			  /* "The user intended FP parameter/result
 			     passing to conform to tool chain-specific
 			     conventions" - we don't know any such
 			     conventions, so leave it as "auto".  */
 			  break;
+			case AEABI_VFP_args_compatible:
+			  /* "Code is compatible with both the base
+			     and VFP variants; the user did not permit
+			     non-variadic functions to pass FP
+			     parameters/results" - leave it as
+			     "auto".  */
+			  break;
 			default:
 			  /* Attribute value not mentioned in the
-			     October 2008 ABI, so leave it as
+			     November 2012 ABI, so leave it as
 			     "auto".  */
 			  break;
 			}
@@ -13811,7 +13789,7 @@ extract_arm_insn (insn_decode_record *insn_record, uint32_t insn_size)
     return 1;
   insn_record->arm_insn = (uint32_t) extract_unsigned_integer (&buf[0],
                            insn_size, 
-                           gdbarch_byte_order (insn_record->gdbarch));
+			   gdbarch_byte_order_for_code (insn_record->gdbarch));
   return 0;
 }
 
@@ -13826,7 +13804,7 @@ decode_insn (insn_decode_record *arm_record, record_type_t record_type,
 {
 
   /* (Starting from numerical 0); bits 25, 26, 27 decodes type of arm instruction.  */
-  static const sti_arm_hdl_fp_t const arm_handle_insn[8] =                    
+  static const sti_arm_hdl_fp_t arm_handle_insn[8] =
   {
     arm_record_data_proc_misc_ld_str,   /* 000.  */
     arm_record_data_proc_imm,           /* 001.  */
@@ -13839,7 +13817,7 @@ decode_insn (insn_decode_record *arm_record, record_type_t record_type,
   };
 
   /* (Starting from numerical 0); bits 13,14,15 decodes type of thumb instruction.  */
-  static const sti_arm_hdl_fp_t const thumb_handle_insn[8] =
+  static const sti_arm_hdl_fp_t thumb_handle_insn[8] =
   { \
     thumb_record_shift_add_sub,        /* 000.  */
     thumb_record_add_sub_cmp_mov,      /* 001.  */

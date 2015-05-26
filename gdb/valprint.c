@@ -1,6 +1,6 @@
 /* Print values for GDB, the GNU debugger.
 
-   Copyright (C) 1986-2014 Free Software Foundation, Inc.
+   Copyright (C) 1986-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -740,7 +740,6 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
 	   const struct value_print_options *options,
 	   const struct language_defn *language)
 {
-  volatile struct gdb_exception except;
   int ret = 0;
   struct value_print_options local_opts = *options;
   struct type *real_type = check_typedef (type);
@@ -782,14 +781,17 @@ val_print (struct type *type, const gdb_byte *valaddr, int embedded_offset,
       return;
     }
 
-  TRY_CATCH (except, RETURN_MASK_ERROR)
+  TRY
     {
       language->la_val_print (type, valaddr, embedded_offset, address,
 			      stream, recurse, val,
 			      &local_opts);
     }
-  if (except.reason < 0)
-    fprintf_filtered (stream, _("<error reading variable>"));
+  CATCH (except, RETURN_MASK_ERROR)
+    {
+      fprintf_filtered (stream, _("<error reading variable>"));
+    }
+  END_CATCH
 }
 
 /* Check whether the value VAL is printable.  Return 1 if it is;
@@ -1624,7 +1626,7 @@ val_print_array_elements (struct type *type,
 {
   unsigned int things_printed = 0;
   unsigned len;
-  struct type *elttype, *index_type;
+  struct type *elttype, *index_type, *base_index_type;
   unsigned eltlen;
   /* Position of the array element we are examining to see
      whether it is repeated.  */
@@ -1632,6 +1634,7 @@ val_print_array_elements (struct type *type,
   /* Number of repetitions we have detected so far.  */
   unsigned int reps;
   LONGEST low_bound, high_bound;
+  LONGEST low_pos, high_pos;
 
   elttype = TYPE_TARGET_TYPE (type);
   eltlen = TYPE_LENGTH (check_typedef (elttype));
@@ -1639,15 +1642,33 @@ val_print_array_elements (struct type *type,
 
   if (get_array_bounds (type, &low_bound, &high_bound))
     {
-      /* The array length should normally be HIGH_BOUND - LOW_BOUND + 1.
+      if (TYPE_CODE (index_type) == TYPE_CODE_RANGE)
+	base_index_type = TYPE_TARGET_TYPE (index_type);
+      else
+	base_index_type = index_type;
+
+      /* Non-contiguous enumerations types can by used as index types
+	 in some languages (e.g. Ada).  In this case, the array length
+	 shall be computed from the positions of the first and last
+	 literal in the enumeration type, and not from the values
+	 of these literals.  */
+      if (!discrete_position (base_index_type, low_bound, &low_pos)
+	  || !discrete_position (base_index_type, high_bound, &high_pos))
+	{
+	  warning (_("unable to get positions in array, use bounds instead"));
+	  low_pos = low_bound;
+	  high_pos = high_bound;
+	}
+
+      /* The array length should normally be HIGH_POS - LOW_POS + 1.
          But we have to be a little extra careful, because some languages
-	 such as Ada allow LOW_BOUND to be greater than HIGH_BOUND for
+	 such as Ada allow LOW_POS to be greater than HIGH_POS for
 	 empty arrays.  In that situation, the array length is just zero,
 	 not negative!  */
-      if (low_bound > high_bound)
+      if (low_pos > high_pos)
 	len = 0;
       else
-	len = high_bound - low_bound + 1;
+	len = high_pos - low_pos + 1;
     }
   else
     {
@@ -1793,36 +1814,23 @@ int
 read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
 	     enum bfd_endian byte_order, gdb_byte **buffer, int *bytes_read)
 {
-  int found_nul;		/* Non-zero if we found the nul char.  */
   int errcode;			/* Errno returned from bad reads.  */
   unsigned int nfetch;		/* Chars to fetch / chars fetched.  */
-  unsigned int chunksize;	/* Size of each fetch, in chars.  */
   gdb_byte *bufptr;		/* Pointer to next available byte in
 				   buffer.  */
-  gdb_byte *limit;		/* First location past end of fetch buffer.  */
   struct cleanup *old_chain = NULL;	/* Top of the old cleanup chain.  */
-
-  /* Decide how large of chunks to try to read in one operation.  This
-     is also pretty simple.  If LEN >= zero, then we want fetchlimit chars,
-     so we might as well read them all in one operation.  If LEN is -1, we
-     are looking for a NUL terminator to end the fetching, so we might as
-     well read in blocks that are large enough to be efficient, but not so
-     large as to be slow if fetchlimit happens to be large.  So we choose the
-     minimum of 8 and fetchlimit.  We used to use 200 instead of 8 but
-     200 is way too big for remote debugging over a serial line.  */
-
-  chunksize = (len == -1 ? min (8, fetchlimit) : fetchlimit);
 
   /* Loop until we either have all the characters, or we encounter
      some error, such as bumping into the end of the address space.  */
 
-  found_nul = 0;
   *buffer = NULL;
 
   old_chain = make_cleanup (free_current_contents, buffer);
 
   if (len > 0)
     {
+      /* We want fetchlimit chars, so we might as well read them all in
+	 one operation.  */
       unsigned int fetchlen = min (len, fetchlimit);
 
       *buffer = (gdb_byte *) xmalloc (fetchlen * width);
@@ -1836,6 +1844,18 @@ read_string (CORE_ADDR addr, int len, int width, unsigned int fetchlimit,
   else if (len == -1)
     {
       unsigned long bufsize = 0;
+      unsigned int chunksize;	/* Size of each fetch, in chars.  */
+      int found_nul;		/* Non-zero if we found the nul char.  */
+      gdb_byte *limit;		/* First location past end of fetch buffer.  */
+
+      found_nul = 0;
+      /* We are looking for a NUL terminator to end the fetching, so we
+	 might as well read in blocks that are large enough to be efficient,
+	 but not so large as to be slow if fetchlimit happens to be large.
+	 So we choose the minimum of 8 and fetchlimit.  We used to use 200
+	 instead of 8 but 200 is way too big for remote debugging over a
+	  serial line.  */
+      chunksize = min (8, fetchlimit);
 
       do
 	{

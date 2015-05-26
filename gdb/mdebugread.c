@@ -1,6 +1,6 @@
 /* Read a symbol table in ECOFF format (Third-Eye).
 
-   Copyright (C) 1986-2014 Free Software Foundation, Inc.
+   Copyright (C) 1986-2015 Free Software Foundation, Inc.
 
    Original version contributed by Alessandro Forin (af@cs.cmu.edu) at
    CMU.  Major work by Per Bothner, John Gilmore and Ian Lance Taylor
@@ -237,7 +237,7 @@ enum block_type { FUNCTION_BLOCK, NON_FUNCTION_BLOCK };
 
 static struct block *new_block (enum block_type);
 
-static struct symtab *new_symtab (const char *, int, struct objfile *);
+static struct compunit_symtab *new_symtab (const char *, int, struct objfile *);
 
 static struct linetable *new_linetable (int);
 
@@ -430,24 +430,24 @@ static struct parse_stack
 static void
 push_parse_stack (void)
 {
-  struct parse_stack *new;
+  struct parse_stack *newobj;
 
   /* Reuse frames if possible.  */
   if (top_stack && top_stack->prev)
-    new = top_stack->prev;
+    newobj = top_stack->prev;
   else
-    new = (struct parse_stack *) xzalloc (sizeof (struct parse_stack));
+    newobj = (struct parse_stack *) xzalloc (sizeof (struct parse_stack));
   /* Initialize new frame with previous content.  */
   if (top_stack)
     {
-      struct parse_stack *prev = new->prev;
+      struct parse_stack *prev = newobj->prev;
 
-      *new = *top_stack;
-      top_stack->prev = new;
-      new->prev = prev;
-      new->next = top_stack;
+      *newobj = *top_stack;
+      top_stack->prev = newobj;
+      newobj->prev = prev;
+      newobj->next = top_stack;
     }
-  top_stack = new;
+  top_stack = newobj;
 }
 
 /* Exit a lexical context.  */
@@ -559,7 +559,7 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
   struct type *t;
   struct field *f;
   int count = 1;
-  enum address_class class;
+  enum address_class theclass;
   TIR tir;
   long svalue = sh->value;
   int bitsize;
@@ -600,15 +600,15 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       break;
 
     case stGlobal:		/* External symbol, goes into global block.  */
-      class = LOC_STATIC;
-      b = BLOCKVECTOR_BLOCK (BLOCKVECTOR (top_stack->cur_st),
+      theclass = LOC_STATIC;
+      b = BLOCKVECTOR_BLOCK (SYMTAB_BLOCKVECTOR (top_stack->cur_st),
 			     GLOBAL_BLOCK);
       s = new_symbol (name);
       SYMBOL_VALUE_ADDRESS (s) = (CORE_ADDR) sh->value;
       goto data;
 
     case stStatic:		/* Static data, goes into current block.  */
-      class = LOC_STATIC;
+      theclass = LOC_STATIC;
       b = top_stack->cur_block;
       s = new_symbol (name);
       if (SC_IS_COMMON (sh->sc))
@@ -629,13 +629,13 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       s = new_symbol (name);
       SYMBOL_VALUE (s) = svalue;
       if (sh->sc == scRegister)
-	class = mdebug_register_index;
+	theclass = mdebug_register_index;
       else
-	class = LOC_LOCAL;
+	theclass = LOC_LOCAL;
 
     data:			/* Common code for symbols describing data.  */
       SYMBOL_DOMAIN (s) = VAR_DOMAIN;
-      SYMBOL_ACLASS_INDEX (s) = class;
+      SYMBOL_ACLASS_INDEX (s) = theclass;
       add_symbol (s, top_stack->cur_st, b);
 
       /* Type could be missing if file is compiled without debugging info.  */
@@ -754,7 +754,8 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       b = top_stack->cur_block;
       if (sh->st == stProc)
 	{
-	  const struct blockvector *bv = BLOCKVECTOR (top_stack->cur_st);
+	  const struct blockvector *bv
+	    = SYMTAB_BLOCKVECTOR (top_stack->cur_st);
 
 	  /* The next test should normally be true, but provides a
 	     hook for nested functions (which we don't want to make
@@ -1129,7 +1130,8 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 		top_stack->blocktype == stStaticProc))
 	{
 	  /* Finished with procedure */
-	  const struct blockvector *bv = BLOCKVECTOR (top_stack->cur_st);
+	  const struct blockvector *bv
+	    = SYMTAB_BLOCKVECTOR (top_stack->cur_st);
 	  struct mdebug_extra_func_info *e;
 	  struct block *b = top_stack->cur_block;
 	  struct type *ftype = top_stack->cur_type;
@@ -1919,10 +1921,8 @@ upgrade_type (int fd, struct type **tpp, int tq, union aux_ext *ax, int bigend,
    to look for the function which contains the MDEBUG_EFI_SYMBOL_NAME symbol
    in question, or NULL to use top_stack->cur_block.  */
 
-static void parse_procedure (PDR *, struct symtab *, struct partial_symtab *);
-
 static void
-parse_procedure (PDR *pr, struct symtab *search_symtab,
+parse_procedure (PDR *pr, struct compunit_symtab *search_symtab,
 		 struct partial_symtab *pst)
 {
   struct symbol *s, *i;
@@ -1984,7 +1984,8 @@ parse_procedure (PDR *pr, struct symtab *search_symtab,
 #else
       s = mylookup_symbol
 	(sh_name,
-	 BLOCKVECTOR_BLOCK (BLOCKVECTOR (search_symtab), STATIC_BLOCK),
+	 BLOCKVECTOR_BLOCK (COMPUNIT_BLOCKVECTOR (search_symtab),
+			    STATIC_BLOCK),
 	 VAR_DOMAIN,
 	 LOC_BLOCK);
 #endif
@@ -3415,7 +3416,7 @@ parse_partial_symbols (struct objfile *objfile)
 	  for (cur_sdx = 0; cur_sdx < fh->csym;)
 	    {
 	      char *name;
-	      enum address_class class;
+	      enum address_class theclass;
 	      CORE_ADDR minsym_value;
 
 	      (*swap_sym_in) (cur_bfd,
@@ -3571,7 +3572,7 @@ parse_partial_symbols (struct objfile *objfile)
 							 mst_file_bss,
 							 SECT_OFF_BSS (objfile),
 							 objfile);
-		  class = LOC_STATIC;
+		  theclass = LOC_STATIC;
 		  break;
 
 		case stIndirect:	/* Irix5 forward declaration */
@@ -3583,11 +3584,11 @@ parse_partial_symbols (struct objfile *objfile)
 		     structs from alpha and mips cc.  */
 		  if (sh.iss == 0 || has_opaque_xref (fh, &sh))
 		    goto skip;
-		  class = LOC_TYPEDEF;
+		  theclass = LOC_TYPEDEF;
 		  break;
 
 		case stConstant:	/* Constant decl */
-		  class = LOC_CONST;
+		  theclass = LOC_CONST;
 		  break;
 
 		case stUnion:
@@ -3643,7 +3644,7 @@ parse_partial_symbols (struct objfile *objfile)
 		}
 	      /* Use this gdb symbol.  */
 	      add_psymbol_to_list (name, strlen (name), 1,
-				   VAR_DOMAIN, class,
+				   VAR_DOMAIN, theclass,
 				   &objfile->static_psymbols,
 				   0, sh.value, psymtab_language, objfile);
 	    skip:
@@ -3657,7 +3658,7 @@ parse_partial_symbols (struct objfile *objfile)
 	  PST_PRIVATE (save_pst)->extern_tab = ext_ptr;
 	  for (; --cur_sdx >= 0; ext_ptr++)
 	    {
-	      enum address_class class;
+	      enum address_class theclass;
 	      SYMR *psh;
 	      char *name;
 	      CORE_ADDR svalue;
@@ -3707,7 +3708,7 @@ parse_partial_symbols (struct objfile *objfile)
 		     Ignore them, as parse_external will ignore them too.  */
 		  continue;
 		case stLabel:
-		  class = LOC_LABEL;
+		  theclass = LOC_LABEL;
 		  break;
 		default:
 		  unknown_ext_complaint (debug_info->ssext + psh->iss);
@@ -3718,12 +3719,12 @@ parse_partial_symbols (struct objfile *objfile)
 		  if (SC_IS_COMMON (psh->sc))
 		    continue;
 
-		  class = LOC_STATIC;
+		  theclass = LOC_STATIC;
 		  break;
 		}
 	      name = debug_info->ssext + psh->iss;
 	      add_psymbol_to_list (name, strlen (name), 1,
-				   VAR_DOMAIN, class,
+				   VAR_DOMAIN, theclass,
 				   &objfile->global_psymbols,
 				   0, svalue,
 				   psymtab_language, objfile);
@@ -3929,7 +3930,7 @@ psymtab_to_symtab_1 (struct objfile *objfile,
   void (*swap_sym_in) (bfd *, void *, SYMR *);
   void (*swap_pdr_in) (bfd *, void *, PDR *);
   int i;
-  struct symtab *st = NULL;
+  struct compunit_symtab *cust = NULL;
   FDR *fh;
   struct linetable *lines;
   CORE_ADDR lowest_pdr_addr = 0;
@@ -4053,8 +4054,7 @@ psymtab_to_symtab_1 (struct objfile *objfile,
 		      valu += ANOFFSET (pst->section_offsets,
 					SECT_OFF_TEXT (objfile));
 		      previous_stab_code = N_SO;
-		      st = end_symtab (valu, objfile,
-				       SECT_OFF_TEXT (objfile));
+		      cust = end_symtab (valu, SECT_OFF_TEXT (objfile));
 		      end_stabs ();
 		      last_symtab_ended = 1;
 		    }
@@ -4118,8 +4118,7 @@ psymtab_to_symtab_1 (struct objfile *objfile,
 
       if (! last_symtab_ended)
 	{
-	  st = end_symtab (pst->texthigh, objfile,
-			   SECT_OFF_TEXT (objfile));
+	  cust = end_symtab (pst->texthigh, SECT_OFF_TEXT (objfile));
 	  end_stabs ();
 	}
 
@@ -4163,7 +4162,7 @@ psymtab_to_symtab_1 (struct objfile *objfile,
 	  pdr_in = pr_block;
 	  pdr_in_end = pdr_in + fh->cpd;
 	  for (; pdr_in < pdr_in_end; pdr_in++)
-	    parse_procedure (pdr_in, st, pst);
+	    parse_procedure (pdr_in, cust, pst);
 
 	  do_cleanups (old_chain);
 	}
@@ -4178,28 +4177,28 @@ psymtab_to_symtab_1 (struct objfile *objfile,
       if (fh == 0)
 	{
 	  maxlines = 0;
-	  st = new_symtab ("unknown", 0, objfile);
+	  cust = new_symtab ("unknown", 0, objfile);
 	}
       else
 	{
 	  maxlines = 2 * fh->cline;
-	  st = new_symtab (pst->filename, maxlines, objfile);
+	  cust = new_symtab (pst->filename, maxlines, objfile);
 
 	  /* The proper language was already determined when building
 	     the psymtab, use it.  */
-	  st->language = PST_PRIVATE (pst)->pst_language;
+	  COMPUNIT_FILETABS (cust)->language = PST_PRIVATE (pst)->pst_language;
 	}
 
-      psymtab_language = st->language;
+      psymtab_language = COMPUNIT_FILETABS (cust)->language;
 
-      lines = LINETABLE (st);
+      lines = SYMTAB_LINETABLE (COMPUNIT_FILETABS (cust));
 
       /* Get a new lexical context.  */
 
       push_parse_stack ();
-      top_stack->cur_st = st;
-      top_stack->cur_block = BLOCKVECTOR_BLOCK (BLOCKVECTOR (st),
-						STATIC_BLOCK);
+      top_stack->cur_st = COMPUNIT_FILETABS (cust);
+      top_stack->cur_block
+	= BLOCKVECTOR_BLOCK (COMPUNIT_BLOCKVECTOR (cust), STATIC_BLOCK);
       BLOCK_START (top_stack->cur_block) = pst->textlow;
       BLOCK_END (top_stack->cur_block) = 0;
       top_stack->blocktype = stFile;
@@ -4273,7 +4272,7 @@ psymtab_to_symtab_1 (struct objfile *objfile,
 	      pdr_in = pr_block;
 	      pdr_in_end = pdr_in + fh->cpd;
 	      for (; pdr_in < pdr_in_end; pdr_in++)
-		parse_procedure (pdr_in, 0, pst);
+		parse_procedure (pdr_in, NULL, pst);
 
 	      do_cleanups (old_chain);
 	    }
@@ -4282,18 +4281,19 @@ psymtab_to_symtab_1 (struct objfile *objfile,
       size = lines->nitems;
       if (size > 1)
 	--size;
-      LINETABLE (st) = obstack_copy (&mdebugread_objfile->objfile_obstack,
-				     lines,
-				     (sizeof (struct linetable)
-				      + size * sizeof (lines->item)));
+      SYMTAB_LINETABLE (COMPUNIT_FILETABS (cust))
+	= obstack_copy (&mdebugread_objfile->objfile_obstack,
+			lines,
+			(sizeof (struct linetable)
+			 + size * sizeof (lines->item)));
       xfree (lines);
 
       /* .. and our share of externals.
          XXX use the global list to speed up things here.  How?
          FIXME, Maybe quit once we have found the right number of ext's?  */
-      top_stack->cur_st = st;
+      top_stack->cur_st = COMPUNIT_FILETABS (cust);
       top_stack->cur_block
-	= BLOCKVECTOR_BLOCK (BLOCKVECTOR (top_stack->cur_st),
+	= BLOCKVECTOR_BLOCK (SYMTAB_BLOCKVECTOR (top_stack->cur_st),
 			     GLOBAL_BLOCK);
       top_stack->blocktype = stFile;
 
@@ -4308,7 +4308,8 @@ psymtab_to_symtab_1 (struct objfile *objfile,
       if (info_verbose && n_undef_symbols)
 	{
 	  printf_filtered (_("File %s contains %d unresolved references:"),
-			   symtab_to_filename_for_display (st),
+			   symtab_to_filename_for_display
+			     (COMPUNIT_FILETABS (cust)),
 			   n_undef_symbols);
 	  printf_filtered ("\n\t%4d variables\n\t%4d "
 			   "procedures\n\t%4d labels\n",
@@ -4318,13 +4319,11 @@ psymtab_to_symtab_1 (struct objfile *objfile,
 	}
       pop_parse_stack ();
 
-      set_symtab_primary (st, 1);
-
-      sort_blocks (st);
+      sort_blocks (COMPUNIT_FILETABS (cust));
     }
 
   /* Now link the psymtab and the symtab.  */
-  pst->symtab = st;
+  pst->compunit_symtab = cust;
 
   mdebugread_objfile = NULL;
 }
@@ -4569,7 +4568,7 @@ cross_ref (int fd, union aux_ext *ax, struct type **tpp,
 
 static struct symbol *
 mylookup_symbol (char *name, const struct block *block,
-		 domain_enum domain, enum address_class class)
+		 domain_enum domain, enum address_class theclass)
 {
   struct block_iterator iter;
   int inc;
@@ -4580,14 +4579,14 @@ mylookup_symbol (char *name, const struct block *block,
     {
       if (SYMBOL_LINKAGE_NAME (sym)[0] == inc
 	  && SYMBOL_DOMAIN (sym) == domain
-	  && SYMBOL_CLASS (sym) == class
+	  && SYMBOL_CLASS (sym) == theclass
 	  && strcmp (SYMBOL_LINKAGE_NAME (sym), name) == 0)
 	return sym;
     }
 
   block = BLOCK_SUPERBLOCK (block);
   if (block)
-    return mylookup_symbol (name, block, domain, class);
+    return mylookup_symbol (name, block, domain, theclass);
   return 0;
 }
 
@@ -4597,7 +4596,7 @@ mylookup_symbol (char *name, const struct block *block,
 static void
 add_symbol (struct symbol *s, struct symtab *symtab, struct block *b)
 {
-  SYMBOL_SYMTAB (s) = symtab;
+  symbol_set_symtab (s, symtab);
   dict_add_symbol (BLOCK_DICT (b), s);
 }
 
@@ -4608,14 +4607,14 @@ add_block (struct block *b, struct symtab *s)
 {
   /* Cast away "const", but that's ok because we're building the
      symtab and blockvector here.  */
-  struct blockvector *bv = (struct blockvector *) BLOCKVECTOR (s);
+  struct blockvector *bv = (struct blockvector *) SYMTAB_BLOCKVECTOR (s);
 
   bv = (struct blockvector *) xrealloc ((void *) bv,
 					(sizeof (struct blockvector)
 					 + BLOCKVECTOR_NBLOCKS (bv)
 					 * sizeof (bv->block)));
-  if (bv != BLOCKVECTOR (s))
-    BLOCKVECTOR (s) = bv;
+  if (bv != SYMTAB_BLOCKVECTOR (s))
+    SYMTAB_BLOCKVECTOR (s) = bv;
 
   BLOCKVECTOR_BLOCK (bv, BLOCKVECTOR_NBLOCKS (bv)++) = b;
 }
@@ -4679,7 +4678,7 @@ sort_blocks (struct symtab *s)
 {
   /* We have to cast away const here, but this is ok because we're
      constructing the blockvector in this code.  */
-  struct blockvector *bv = (struct blockvector *) BLOCKVECTOR (s);
+  struct blockvector *bv = (struct blockvector *) SYMTAB_BLOCKVECTOR (s);
 
   if (BLOCKVECTOR_NBLOCKS (bv) <= FIRST_LOCAL_BLOCK)
     {
@@ -4727,13 +4726,17 @@ sort_blocks (struct symtab *s)
 /* Allocate a new symtab for NAME.  Needs an estimate of how many
    linenumbers MAXLINES we'll put in it.  */
 
-static struct symtab *
+static struct compunit_symtab *
 new_symtab (const char *name, int maxlines, struct objfile *objfile)
 {
-  struct symtab *s = allocate_symtab (name, objfile);
+  struct compunit_symtab *cust = allocate_compunit_symtab (objfile, name);
+  struct symtab *symtab;
   struct blockvector *bv;
 
-  LINETABLE (s) = new_linetable (maxlines);
+  add_compunit_symtab_to_objfile (cust);
+  symtab = allocate_symtab (cust, name);
+
+  SYMTAB_LINETABLE (symtab) = new_linetable (maxlines);
 
   /* All symtabs must have at least two blocks.  */
   bv = new_bvect (2);
@@ -4741,10 +4744,10 @@ new_symtab (const char *name, int maxlines, struct objfile *objfile)
   BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK) = new_block (NON_FUNCTION_BLOCK);
   BLOCK_SUPERBLOCK (BLOCKVECTOR_BLOCK (bv, STATIC_BLOCK)) =
     BLOCKVECTOR_BLOCK (bv, GLOBAL_BLOCK);
-  BLOCKVECTOR (s) = bv;
+  COMPUNIT_BLOCKVECTOR (cust) = bv;
 
-  s->debugformat = "ECOFF";
-  return (s);
+  COMPUNIT_DEBUGFORMAT (cust) = "ECOFF";
+  return cust;
 }
 
 /* Allocate a new partial_symtab NAME.  */

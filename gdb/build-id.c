@@ -1,6 +1,6 @@
 /* build-id-related functions.
 
-   Copyright (C) 1991-2014 Free Software Foundation, Inc.
+   Copyright (C) 1991-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -26,10 +26,11 @@
 #include "symfile.h"
 #include "objfiles.h"
 #include "filenames.h"
+#include "gdbcore.h"
 
-/* Locate NT_GNU_BUILD_ID from ABFD and return its content.  */
+/* See build-id.h.  */
 
-static const struct elf_build_id *
+const struct elf_build_id *
 build_id_bfd_get (bfd *abfd)
 {
   if (!bfd_check_format (abfd, bfd_object)
@@ -118,7 +119,7 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
 	continue;
 
       /* We expect to be silent on the non-existing files.  */
-      abfd = gdb_bfd_open_maybe_remote (filename);
+      abfd = gdb_bfd_open (filename, gnutarget, -1);
       if (abfd == NULL)
 	continue;
 

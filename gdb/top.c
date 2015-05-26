@@ -1,6 +1,6 @@
 /* Top level stuff for GDB, the GNU debugger.
 
-   Copyright (C) 1986-2014 Free Software Foundation, Inc.
+   Copyright (C) 1986-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -172,14 +172,6 @@ char *lim_at_start;
 
 /* Hooks for alternate command interfaces.  */
 
-/* Called after most modules have been initialized, but before taking
-   users command file.
-
-   If the UI fails to initialize and it wants GDB to continue using
-   the default UI, then it should clear this hook before returning.  */
-
-void (*deprecated_init_ui_hook) (char *argv0);
-
 /* This hook is called from within gdb's many mini-event loops which
    could steal control from a real user interface's event loop.  It
    returns non-zero if the user is requesting a detach, zero
@@ -215,7 +207,7 @@ void (*deprecated_warning_hook) (const char *, va_list);
    window and it can close it.  */
 
 void (*deprecated_readline_begin_hook) (char *, ...);
-char *(*deprecated_readline_hook) (char *);
+char *(*deprecated_readline_hook) (const char *);
 void (*deprecated_readline_end_hook) (void);
 
 /* Called as appropriate to notify the interface that we have attached
@@ -462,7 +454,7 @@ execute_command (char *p, int from_tty)
 	deprecated_cmd_warning (line);
 
       /* c->user_commands would be NULL in the case of a python command.  */
-      if (c->class == class_user && c->user_commands)
+      if (c->theclass == class_user && c->user_commands)
 	execute_user_command (c, arg);
       else if (c->type == set_cmd)
 	do_set_command (arg, from_tty, c);
@@ -620,7 +612,7 @@ prevent_dont_repeat (void)
 
    A NULL return means end of file.  */
 char *
-gdb_readline (char *prompt_arg)
+gdb_readline (const char *prompt_arg)
 {
   int c;
   char *result;
@@ -695,8 +687,8 @@ show_write_history_p (struct ui_file *file, int from_tty,
 }
 
 /* The variable associated with the "set/show history size"
-   command.  */
-static unsigned int history_size_setshow_var;
+   command.  The value -1 means unlimited, and -2 means undefined.  */
+static int history_size_setshow_var = -2;
 
 static void
 show_history_size (struct ui_file *file, int from_tty,
@@ -806,13 +798,13 @@ gdb_readline_wrapper_cleanup (void *arg)
   saved_after_char_processing_hook = NULL;
 
   if (cleanup->target_is_async_orig)
-    target_async (inferior_event_handler, 0);
+    target_async (1);
 
   xfree (cleanup);
 }
 
 char *
-gdb_readline_wrapper (char *prompt)
+gdb_readline_wrapper (const char *prompt)
 {
   struct cleanup *back_to;
   struct gdb_readline_wrapper_cleanup *cleanup;
@@ -829,7 +821,7 @@ gdb_readline_wrapper (char *prompt)
   back_to = make_cleanup (gdb_readline_wrapper_cleanup, cleanup);
 
   if (cleanup->target_is_async_orig)
-    target_async (NULL, NULL);
+    target_async (0);
 
   /* Display our prompt and prevent double prompt display.  */
   display_gdb_prompt (prompt);
@@ -895,7 +887,74 @@ gdb_rl_operate_and_get_next (int count, int key)
 
   return rl_newline (1, key);
 }
-
+
+/* Number of user commands executed during this session.  */
+
+static int command_count = 0;
+
+/* Add the user command COMMAND to the input history list.  */
+
+void
+gdb_add_history (const char *command)
+{
+  add_history (command);
+  command_count++;
+}
+
+/* Safely append new history entries to the history file in a corruption-free
+   way using an intermediate local history file.  */
+
+static void
+gdb_safe_append_history (void)
+{
+  int ret, saved_errno;
+  char *local_history_filename;
+  struct cleanup *old_chain;
+
+  local_history_filename
+    = xstrprintf ("%s-gdb%d~", history_filename, getpid ());
+  old_chain = make_cleanup (xfree, local_history_filename);
+
+  ret = rename (history_filename, local_history_filename);
+  saved_errno = errno;
+  if (ret < 0 && saved_errno != ENOENT)
+    {
+      warning (_("Could not rename %s to %s: %s"),
+	       history_filename, local_history_filename,
+	       safe_strerror (saved_errno));
+    }
+  else
+    {
+      if (ret < 0)
+	{
+	  /* If the rename failed with ENOENT then either the global history
+	     file never existed in the first place or another GDB process is
+	     currently appending to it (and has thus temporarily renamed it).
+	     Since we can't distinguish between these two cases, we have to
+	     conservatively assume the first case and therefore must write out
+	     (not append) our known history to our local history file and try
+	     to move it back anyway.  Otherwise a global history file would
+	     never get created!  */
+	   gdb_assert (saved_errno == ENOENT);
+	   write_history (local_history_filename);
+	}
+      else
+	{
+	  append_history (command_count, local_history_filename);
+	  history_truncate_file (local_history_filename, history_max_entries);
+	}
+
+      ret = rename (local_history_filename, history_filename);
+      saved_errno = errno;
+      if (ret < 0 && saved_errno != EEXIST)
+        warning (_("Could not rename %s to %s: %s"),
+		 local_history_filename, history_filename,
+		 safe_strerror (saved_errno));
+    }
+
+  do_cleanups (old_chain);
+}
+
 /* Read one line from the command input stream `instream'
    into the local static buffer `linebuffer' (whose current length
    is `linelength').
@@ -912,14 +971,14 @@ gdb_rl_operate_and_get_next (int count, int key)
    simple input as the user has requested.  */
 
 char *
-command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
+command_line_input (const char *prompt_arg, int repeat, char *annotation_suffix)
 {
   static char *linebuffer = 0;
   static unsigned linelength = 0;
+  const char *prompt = prompt_arg;
   char *p;
   char *p1;
   char *rl;
-  char *local_prompt = prompt_arg;
   char *nline;
   char got_eof = 0;
 
@@ -929,15 +988,19 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
 
   if (annotation_level > 1 && instream == stdin)
     {
-      local_prompt = alloca ((prompt_arg == NULL ? 0 : strlen (prompt_arg))
+      char *local_prompt;
+
+      local_prompt = alloca ((prompt == NULL ? 0 : strlen (prompt))
 			     + strlen (annotation_suffix) + 40);
-      if (prompt_arg == NULL)
+      if (prompt == NULL)
 	local_prompt[0] = '\0';
       else
-	strcpy (local_prompt, prompt_arg);
+	strcpy (local_prompt, prompt);
       strcat (local_prompt, "\n\032\032");
       strcat (local_prompt, annotation_suffix);
       strcat (local_prompt, "\n");
+
+      prompt = local_prompt;
     }
 
   if (linebuffer == 0)
@@ -979,15 +1042,15 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
       /* Don't use fancy stuff if not talking to stdin.  */
       if (deprecated_readline_hook && input_from_terminal_p ())
 	{
-	  rl = (*deprecated_readline_hook) (local_prompt);
+	  rl = (*deprecated_readline_hook) (prompt);
 	}
       else if (command_editing_p && input_from_terminal_p ())
 	{
-	  rl = gdb_readline_wrapper (local_prompt);
+	  rl = gdb_readline_wrapper (prompt);
 	}
       else
 	{
-	  rl = gdb_readline (local_prompt);
+	  rl = gdb_readline (prompt);
 	}
 
       if (annotation_level > 1 && instream == stdin)
@@ -1021,7 +1084,7 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
 	break;
 
       p--;			/* Put on top of '\'.  */
-      local_prompt = (char *) 0;
+      prompt = NULL;
     }
 
 #ifdef STOP_SIGNAL
@@ -1064,7 +1127,7 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
 	  if (expanded < 0)
 	    {
 	      xfree (history_value);
-	      return command_line_input (prompt_arg, repeat,
+	      return command_line_input (prompt, repeat,
 					 annotation_suffix);
 	    }
 	  if (strlen (history_value) > linelength)
@@ -1090,7 +1153,7 @@ command_line_input (char *prompt_arg, int repeat, char *annotation_suffix)
 
   /* Add line to history if appropriate.  */
   if (*linebuffer && input_from_terminal_p ())
-    add_history (linebuffer);
+    gdb_add_history (linebuffer);
 
   /* Save into global buffer if appropriate.  */
   if (repeat)
@@ -1120,7 +1183,7 @@ print_gdb_version (struct ui_file *stream)
   /* Second line is a copyright notice.  */
 
   fprintf_filtered (stream,
-		    "Copyright (C) 2014 Free Software Foundation, Inc.\n");
+		    "Copyright (C) 2015 Free Software Foundation, Inc.\n");
 
   /* Following the copyright is a brief statement that the program is
      free software, that users are free to copy and change it on
@@ -1245,15 +1308,6 @@ This GDB was configured as follows:\n\
     fprintf_filtered (stream, _("\
              --with-system-gdbinit=%s%s\n\
 "), SYSTEM_GDBINIT, SYSTEM_GDBINIT_RELOCATABLE ? " (relocatable)" : "");
-#if HAVE_ZLIB_H
-  fprintf_filtered (stream, _("\
-             --with-zlib\n\
-"));
-#else
-  fprintf_filtered (stream, _("\
-             --without-zlib\n\
-"));
-#endif
 #if HAVE_LIBBABELTRACE
     fprintf_filtered (stream, _("\
              --with-babeltrace\n\
@@ -1394,7 +1448,6 @@ quit_force (char *args, int from_tty)
 {
   int exit_code = 0;
   struct qt_args qt;
-  volatile struct gdb_exception ex;
 
   /* An optional expression may be used to cause gdb to terminate with the 
      value of that expression.  */
@@ -1410,47 +1463,55 @@ quit_force (char *args, int from_tty)
   qt.args = args;
   qt.from_tty = from_tty;
 
-  /* Wrappers to make the code below a bit more readable.  */
-#define DO_TRY \
-  TRY_CATCH (ex, RETURN_MASK_ALL)
-
-#define DO_PRINT_EX \
-  if (ex.reason < 0) \
-    exception_print (gdb_stderr, ex)
-
   /* We want to handle any quit errors and exit regardless.  */
 
   /* Get out of tfind mode, and kill or detach all inferiors.  */
-  DO_TRY
+  TRY
     {
       disconnect_tracing ();
       iterate_over_inferiors (kill_or_detach, &qt);
     }
-  DO_PRINT_EX;
+  CATCH (ex, RETURN_MASK_ALL)
+    {
+      exception_print (gdb_stderr, ex);
+    }
+  END_CATCH
 
   /* Give all pushed targets a chance to do minimal cleanup, and pop
      them all out.  */
-  DO_TRY
+  TRY
     {
       pop_all_targets ();
     }
-  DO_PRINT_EX;
+  CATCH (ex, RETURN_MASK_ALL)
+    {
+      exception_print (gdb_stderr, ex);
+    }
+  END_CATCH
 
   /* Save the history information if it is appropriate to do so.  */
-  DO_TRY
+  TRY
     {
       if (write_history_p && history_filename
 	  && input_from_terminal_p ())
-	write_history (history_filename);
+	gdb_safe_append_history ();
     }
-  DO_PRINT_EX;
+  CATCH (ex, RETURN_MASK_ALL)
+    {
+      exception_print (gdb_stderr, ex);
+    }
+  END_CATCH
 
   /* Do any final cleanups before exiting.  */
-  DO_TRY
+  TRY
     {
       do_final_cleanups (all_cleanups ());
     }
-  DO_PRINT_EX;
+  CATCH (ex, RETURN_MASK_ALL)
+    {
+      exception_print (gdb_stderr, ex);
+    }
+  END_CATCH
 
   exit (exit_code);
 }
@@ -1549,34 +1610,26 @@ show_commands (char *args, int from_tty)
     }
 }
 
+/* Update the size of our command history file to HISTORY_SIZE.
+
+   A HISTORY_SIZE of -1 stands for unlimited.  */
+
+static void
+set_readline_history_size (int history_size)
+{
+  gdb_assert (history_size >= -1);
+
+  if (history_size == -1)
+    unstifle_history ();
+  else
+    stifle_history (history_size);
+}
+
 /* Called by do_setshow_command.  */
 static void
 set_history_size_command (char *args, int from_tty, struct cmd_list_element *c)
 {
-  /* Readline's history interface works with 'int', so it can only
-     handle history sizes up to INT_MAX.  The command itself is
-     uinteger, so UINT_MAX means "unlimited", but we only get that if
-     the user does "set history size 0" -- "set history size <UINT_MAX>"
-     throws out-of-range.  */
-  if (history_size_setshow_var > INT_MAX
-      && history_size_setshow_var != UINT_MAX)
-    {
-      unsigned int new_value = history_size_setshow_var;
-
-      /* Restore previous value before throwing.  */
-      if (history_is_stifled ())
-	history_size_setshow_var = history_max_entries;
-      else
-	history_size_setshow_var = UINT_MAX;
-
-      error (_("integer %u out of range"), new_value);
-    }
-
-  /* Commit the new value to readline's history.  */
-  if (history_size_setshow_var == UINT_MAX)
-    unstifle_history ();
-  else
-    stifle_history (history_size_setshow_var);
+  set_readline_history_size (history_size_setshow_var);
 }
 
 void
@@ -1644,12 +1697,10 @@ init_history (void)
       history_size_setshow_var = var;
     }
   /* If the init file hasn't set a size yet, pick the default.  */
-  else if (history_size_setshow_var == 0)
+  else if (history_size_setshow_var == -2)
     history_size_setshow_var = 256;
 
-  /* Note that unlike "set history size 0", "HISTSIZE=0" really sets
-     the history size to 0...  */
-  stifle_history (history_size_setshow_var);
+  set_readline_history_size (history_size_setshow_var);
 
   tmpenv = getenv ("GDBHISTFILE");
   if (tmpenv)
@@ -1757,6 +1808,7 @@ init_main (void)
   rl_completion_entry_function = readline_line_completion_function;
   rl_completer_word_break_characters = default_word_break_characters ();
   rl_completer_quote_characters = get_gdb_completer_quote_characters ();
+  rl_completion_display_matches_hook = cli_display_match_list;
   rl_readline_name = "gdb";
   rl_terminal_name = getenv ("TERM");
 
@@ -1797,7 +1849,8 @@ Without an argument, saving is enabled."),
 			   show_write_history_p,
 			   &sethistlist, &showhistlist);
 
-  add_setshow_uinteger_cmd ("size", no_class, &history_size_setshow_var, _("\
+  add_setshow_zuinteger_unlimited_cmd ("size", no_class,
+				       &history_size_setshow_var, _("\
 Set the size of the command history,"), _("\
 Show the size of the command history,"), _("\
 ie. the number of previous commands to keep a record of.\n\
@@ -1869,6 +1922,8 @@ gdb_init (char *argv0)
   initialize_targets ();    /* Setup target_terminal macros for utils.c.  */
   initialize_utils ();	    /* Make errors and warnings possible.  */
 
+  init_page_info ();
+
   /* Here is where we call all the _initialize_foo routines.  */
   initialize_all_files ();
 
@@ -1881,10 +1936,13 @@ gdb_init (char *argv0)
   initialize_inferiors ();
   initialize_current_architecture ();
   init_cli_cmds();
-  initialize_event_loop ();
   init_main ();			/* But that omits this file!  Do it now.  */
 
   initialize_stdin_serial ();
+
+  /* Take a snapshot of our tty state before readline/ncurses have had a chance
+     to alter it.  */
+  set_initial_gdb_ttystate ();
 
   async_init_signals ();
 
@@ -1894,12 +1952,6 @@ gdb_init (char *argv0)
      during startup.  */
   set_language (language_c);
   expected_language = current_language;	/* Don't warn about the change.  */
-
-  /* Allow another UI to initialize.  If the UI fails to initialize,
-     and it wants GDB to revert to the CLI, it should clear
-     deprecated_init_ui_hook.  */
-  if (deprecated_init_ui_hook)
-    deprecated_init_ui_hook (argv0);
 
   /* Python initialization, for example, can require various commands to be
      installed.  For example "info pretty-printer" needs the "info"

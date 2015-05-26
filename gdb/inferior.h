@@ -1,7 +1,7 @@
 /* Variables that describe the inferior process running under GDB:
    Where it is, why it stopped, and how to step it.
 
-   Copyright (C) 1986-2014 Free Software Foundation, Inc.
+   Copyright (C) 1986-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -106,6 +106,14 @@ extern void default_print_registers_info (struct gdbarch *gdbarch,
 					  struct frame_info *frame,
 					  int regnum, int all);
 
+/* Default implementation of gdbarch_print_float_info.  Print
+   the values of all floating point registers.  */
+
+extern void default_print_float_info (struct gdbarch *gdbarch,
+				      struct ui_file *file,
+				      struct frame_info *frame,
+				      const char *args);
+
 extern void child_terminal_info (struct target_ops *self, const char *, int);
 
 extern void term_info (char *, int);
@@ -157,8 +165,10 @@ extern void detach_command (char *, int);
 
 extern void notice_new_inferior (ptid_t, int, int);
 
-extern struct value *get_return_value (struct value *function,
-                                       struct type *value_type);
+struct dummy_frame_context_saver;
+extern struct value *get_return_value
+  (struct value *function, struct type *value_type,
+   struct dummy_frame_context_saver *ctx_saver);
 
 /* Prepare for execution command.  TARGET is the target that will run
    the command.  BACKGROUND determines whether this is a foreground
@@ -373,7 +383,7 @@ struct inferior
   struct continuation *continuations;
 
   /* Private data used by the target vector implementation.  */
-  struct private_inferior *private;
+  struct private_inferior *priv;
 
   /* HAS_EXIT_CODE is true if the inferior exited with an exit code.
      In this case, the EXIT_CODE field is also valid.  */
@@ -464,6 +474,9 @@ extern int valid_gdb_inferior_id (int num);
 
 /* Search function to lookup an inferior by target 'pid'.  */
 extern struct inferior *find_inferior_pid (int pid);
+
+/* Search function to lookup an inferior whose pid is equal to 'ptid.pid'. */
+extern struct inferior *find_inferior_ptid (ptid_t ptid);
 
 /* Search function to lookup an inferior by GDB 'num'.  */
 extern struct inferior *find_inferior_id (int num);

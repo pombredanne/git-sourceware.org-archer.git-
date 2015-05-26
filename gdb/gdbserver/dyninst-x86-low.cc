@@ -97,6 +97,8 @@ dyninst_x86_reg_map_setup (RegisterPool regpool)
 }
 
 
+static void dump_registers (const char* whoami, RegisterPool regpool) __attribute__ ((unused));
+
 static void
 dump_registers (const char* whoami, RegisterPool regpool)
 {

@@ -1,5 +1,5 @@
 /* Common definitions for remote server for GDB.
-   Copyright (C) 1993-2014 Free Software Foundation, Inc.
+   Copyright (C) 1993-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -28,15 +28,6 @@ gdb_static_assert (sizeof (CORE_ADDR) >= sizeof (void *));
 #endif
 
 #include "version.h"
-
-#ifdef HAVE_ALLOCA_H
-#include <alloca.h>
-#endif
-/* On some systems such as MinGW, alloca is declared in malloc.h
-   (there is no alloca.h).  */
-#if HAVE_MALLOC_H
-#include <malloc.h>
-#endif
 
 #if !HAVE_DECL_STRERROR
 #ifndef strerror
@@ -161,9 +152,22 @@ struct client_state
   int run_once;
   // --multi
   int multi_process;
+  int report_fork_events;
+  int report_vfork_events;
   // QNonStop packet
   int non_stop;
   // QDisableRandomization packet
+/* True if the "swbreak+" feature is active.  In that case, GDB wants
+   us to report whether a trap is explained by a software breakpoint
+   and for the server to handle PC adjustment if necessary on this
+   target.  Only enabled if the target supports it.  */
+  int swbreak_feature;
+
+/* True if the "hwbreak+" feature is active.  In that case, GDB wants
+   us to report whether a trap is explained by a hardware breakpoint.
+   Only enabled if the target supports it.  */
+  int hwbreak_feature;
+
   int disable_randomization;
   int server_waiting;
   int extended_protocol;

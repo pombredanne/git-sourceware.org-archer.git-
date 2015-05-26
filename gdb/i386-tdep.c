@@ -1,6 +1,6 @@
 /* Intel 386 target-dependent stuff.
 
-   Copyright (C) 1988-2014 Free Software Foundation, Inc.
+   Copyright (C) 1988-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1817,14 +1817,14 @@ i386_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR start_pc)
     {
       CORE_ADDR post_prologue_pc
 	= skip_prologue_using_sal (gdbarch, func_addr);
-      struct symtab *s = find_pc_symtab (func_addr);
+      struct compunit_symtab *cust = find_pc_compunit_symtab (func_addr);
 
       /* Clang always emits a line note before the prologue and another
 	 one after.  We trust clang to emit usable line notes.  */
       if (post_prologue_pc
-	  && (s != NULL
-	      && s->producer != NULL
-	      && strncmp (s->producer, "clang ", sizeof ("clang ") - 1) == 0))
+	  && (cust != NULL
+	      && COMPUNIT_PRODUCER (cust) != NULL
+	      && startswith (COMPUNIT_PRODUCER (cust), "clang ")))
         return max (start_pc, post_prologue_pc);
     }
  
@@ -2049,7 +2049,6 @@ i386_frame_cache_1 (struct frame_info *this_frame,
 static struct i386_frame_cache *
 i386_frame_cache (struct frame_info *this_frame, void **this_cache)
 {
-  volatile struct gdb_exception ex;
   struct i386_frame_cache *cache;
 
   if (*this_cache)
@@ -2058,12 +2057,16 @@ i386_frame_cache (struct frame_info *this_frame, void **this_cache)
   cache = i386_alloc_frame_cache ();
   *this_cache = cache;
 
-  TRY_CATCH (ex, RETURN_MASK_ERROR)
+  TRY
     {
       i386_frame_cache_1 (this_frame, cache);
     }
-  if (ex.reason < 0 && ex.error != NOT_AVAILABLE_ERROR)
-    throw_exception (ex);
+  CATCH (ex, RETURN_MASK_ERROR)
+    {
+      if (ex.error != NOT_AVAILABLE_ERROR)
+	throw_exception (ex);
+    }
+  END_CATCH
 
   return cache;
 }
@@ -2183,10 +2186,10 @@ static int
 i386_in_function_epilogue_p (struct gdbarch *gdbarch, CORE_ADDR pc)
 {
   gdb_byte insn;
-  struct symtab *symtab;
+  struct compunit_symtab *cust;
 
-  symtab = find_pc_symtab (pc);
-  if (symtab && symtab->epilogue_unwind_valid)
+  cust = find_pc_compunit_symtab (pc);
+  if (cust != NULL && COMPUNIT_EPILOGUE_UNWIND_VALID (cust))
     return 0;
 
   if (target_read_memory (pc, &insn, 1))
@@ -2213,7 +2216,6 @@ i386_epilogue_frame_sniffer (const struct frame_unwind *self,
 static struct i386_frame_cache *
 i386_epilogue_frame_cache (struct frame_info *this_frame, void **this_cache)
 {
-  volatile struct gdb_exception ex;
   struct i386_frame_cache *cache;
   CORE_ADDR sp;
 
@@ -2223,7 +2225,7 @@ i386_epilogue_frame_cache (struct frame_info *this_frame, void **this_cache)
   cache = i386_alloc_frame_cache ();
   *this_cache = cache;
 
-  TRY_CATCH (ex, RETURN_MASK_ERROR)
+  TRY
     {
       cache->pc = get_frame_func (this_frame);
 
@@ -2237,8 +2239,12 @@ i386_epilogue_frame_cache (struct frame_info *this_frame, void **this_cache)
 
       cache->base_p = 1;
     }
-  if (ex.reason < 0 && ex.error != NOT_AVAILABLE_ERROR)
-    throw_exception (ex);
+  CATCH (ex, RETURN_MASK_ERROR)
+    {
+      if (ex.error != NOT_AVAILABLE_ERROR)
+	throw_exception (ex);
+    }
+  END_CATCH
 
   return cache;
 }
@@ -2396,7 +2402,6 @@ i386_sigtramp_frame_cache (struct frame_info *this_frame, void **this_cache)
   struct gdbarch *gdbarch = get_frame_arch (this_frame);
   struct gdbarch_tdep *tdep = gdbarch_tdep (gdbarch);
   enum bfd_endian byte_order = gdbarch_byte_order (gdbarch);
-  volatile struct gdb_exception ex;
   struct i386_frame_cache *cache;
   CORE_ADDR addr;
   gdb_byte buf[4];
@@ -2406,7 +2411,7 @@ i386_sigtramp_frame_cache (struct frame_info *this_frame, void **this_cache)
 
   cache = i386_alloc_frame_cache ();
 
-  TRY_CATCH (ex, RETURN_MASK_ERROR)
+  TRY
     {
       get_frame_register (this_frame, I386_ESP_REGNUM, buf);
       cache->base = extract_unsigned_integer (buf, 4, byte_order) - 4;
@@ -2430,8 +2435,12 @@ i386_sigtramp_frame_cache (struct frame_info *this_frame, void **this_cache)
 
       cache->base_p = 1;
     }
-  if (ex.reason < 0 && ex.error != NOT_AVAILABLE_ERROR)
-    throw_exception (ex);
+  CATCH (ex, RETURN_MASK_ERROR)
+    {
+      if (ex.error != NOT_AVAILABLE_ERROR)
+	throw_exception (ex);
+    }
+  END_CATCH
 
   *this_cache = cache;
   return cache;
@@ -3726,7 +3735,7 @@ i386_supply_gregset (const struct regset *regset, struct regcache *regcache,
   const gdb_byte *regs = gregs;
   int i;
 
-  gdb_assert (len == tdep->sizeof_gregset);
+  gdb_assert (len >= tdep->sizeof_gregset);
 
   for (i = 0; i < tdep->gregset_num_regs; i++)
     {
@@ -3751,7 +3760,7 @@ i386_collect_gregset (const struct regset *regset,
   gdb_byte *regs = gregs;
   int i;
 
-  gdb_assert (len == tdep->sizeof_gregset);
+  gdb_assert (len >= tdep->sizeof_gregset);
 
   for (i = 0; i < tdep->gregset_num_regs; i++)
     {
@@ -3778,7 +3787,7 @@ i386_supply_fpregset (const struct regset *regset, struct regcache *regcache,
       return;
     }
 
-  gdb_assert (len == tdep->sizeof_fpregset);
+  gdb_assert (len >= tdep->sizeof_fpregset);
   i387_supply_fsave (regcache, regnum, fpregs);
 }
 
@@ -3801,7 +3810,7 @@ i386_collect_fpregset (const struct regset *regset,
       return;
     }
 
-  gdb_assert (len == tdep->sizeof_fpregset);
+  gdb_assert (len >= tdep->sizeof_fpregset);
   i387_collect_fsave (regcache, regnum, fpregs);
 }
 
@@ -3853,8 +3862,8 @@ i386_pe_skip_trampoline_code (struct frame_info *frame,
 
       if (symname)
 	{
-	  if (strncmp (symname, "__imp_", 6) == 0
-	      || strncmp (symname, "_imp_", 5) == 0)
+	  if (startswith (symname, "__imp_")
+	      || startswith (symname, "_imp_"))
 	    return name ? 1 :
 		   read_memory_unsigned_integer (indirect, 4, byte_order);
 	}
@@ -4269,7 +4278,8 @@ i386_stap_parse_special_token (struct gdbarch *gdbarch,
       TRIPLET,
       THREE_ARG_DISPLACEMENT,
       DONE
-    } current_state;
+    };
+  int current_state;
 
   current_state = TRIPLET;
 
@@ -4305,6 +4315,17 @@ i386_stap_parse_special_token (struct gdbarch *gdbarch,
 
 
 
+/* gdbarch gnu_triplet_regexp method.  Both arches are acceptable as GDB always
+   also supplies -m64 or -m32 by gdbarch_gcc_target_options.  */
+
+static const char *
+i386_gnu_triplet_regexp (struct gdbarch *gdbarch)
+{
+  return "(x86_64|i.86)";
+}
+
+
+
 /* Generic ELF.  */
 
 void
@@ -4331,6 +4352,8 @@ i386_elf_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
 				      i386_stap_is_single_operand);
   set_gdbarch_stap_parse_special_token (gdbarch,
 					i386_stap_parse_special_token);
+
+  set_gdbarch_gnu_triplet_regexp (gdbarch, i386_gnu_triplet_regexp);
 }
 
 /* System V Release 4 (SVR4).  */
@@ -4378,6 +4401,8 @@ i386_go32_init_abi (struct gdbarch_info info, struct gdbarch *gdbarch)
   set_gdbarch_sdb_reg_to_regnum (gdbarch, i386_svr4_reg_to_regnum);
 
   set_gdbarch_has_dos_based_file_system (gdbarch, 1);
+
+  set_gdbarch_gnu_triplet_regexp (gdbarch, i386_gnu_triplet_regexp);
 }
 
 
@@ -4522,18 +4547,6 @@ i386_fetch_pointer_argument (struct frame_info *frame, int argi,
   CORE_ADDR sp = get_frame_register_unsigned (frame, I386_ESP_REGNUM);
   return read_memory_unsigned_integer (sp + (4 * (argi + 1)), 4, byte_order);
 }
-
-static void
-i386_skip_permanent_breakpoint (struct regcache *regcache)
-{
-  CORE_ADDR current_pc = regcache_read_pc (regcache);
-
- /* On i386, breakpoint is exactly 1 byte long, so we just
-    adjust the PC in the regcache.  */
-  current_pc += 1;
-  regcache_write_pc (regcache, current_pc);
-}
-
 
 #define PREFIX_REPZ	0x01
 #define PREFIX_REPNZ	0x02
@@ -8413,6 +8426,8 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
      gap for the upper AVX, MPX and AVX512 registers.  */
   set_gdbarch_num_regs (gdbarch, I386_AVX512_NUM_REGS);
 
+  set_gdbarch_gnu_triplet_regexp (gdbarch, i386_gnu_triplet_regexp);
+
   /* Get the x86 target description from INFO.  */
   tdesc = info.target_desc;
   if (! tdesc_has_registers (tdesc))
@@ -8566,9 +8581,6 @@ i386_gdbarch_init (struct gdbarch_info info, struct gdbarch_list *arches)
     set_gdbarch_iterate_over_regset_sections
       (gdbarch, i386_iterate_over_regset_sections);
 
-  set_gdbarch_skip_permanent_breakpoint (gdbarch,
-					 i386_skip_permanent_breakpoint);
-
   set_gdbarch_fast_tracepoint_valid_at (gdbarch,
 					i386_fast_tracepoint_valid_at);
 
@@ -8585,6 +8597,25 @@ i386_coff_osabi_sniffer (bfd *abfd)
   return GDB_OSABI_UNKNOWN;
 }
 
+
+/* Return the target description for a specified XSAVE feature mask.  */
+
+const struct target_desc *
+i386_target_description (uint64_t xcr0)
+{
+  switch (xcr0 & X86_XSTATE_ALL_MASK)
+    {
+    case X86_XSTATE_MPX_AVX512_MASK:
+    case X86_XSTATE_AVX512_MASK:
+      return tdesc_i386_avx512;
+    case X86_XSTATE_MPX_MASK:
+      return tdesc_i386_mpx;
+    case X86_XSTATE_AVX_MASK:
+      return tdesc_i386_avx;
+    default:
+      return tdesc_i386;
+    }
+}
 
 /* Provide a prototype to silence -Wmissing-prototypes.  */
 void _initialize_i386_tdep (void);

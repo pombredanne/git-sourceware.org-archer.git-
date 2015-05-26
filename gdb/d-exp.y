@@ -1,6 +1,6 @@
 /* YACC parser for D expressions, for GDB.
 
-   Copyright (C) 2014 Free Software Foundation, Inc.
+   Copyright (C) 2014-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -605,10 +605,10 @@ BasicType:
 		{ $$ = lookup_struct (copy_name ($2),
 				      expression_context_block); }
 |	CLASS_KEYWORD COMPLETE
-		{ mark_completion_tag (TYPE_CODE_CLASS, "", 0);
+		{ mark_completion_tag (TYPE_CODE_STRUCT, "", 0);
 		  $$ = NULL; }
 |	CLASS_KEYWORD IdentifierExp COMPLETE
-		{ mark_completion_tag (TYPE_CODE_CLASS, $2.ptr, $2.length);
+		{ mark_completion_tag (TYPE_CODE_STRUCT, $2.ptr, $2.length);
 		  $$ = NULL; }
 |	STRUCT_KEYWORD IdentifierExp
 		{ $$ = lookup_struct (copy_name ($2),
@@ -946,7 +946,7 @@ parse_string_or_char (const char *tokptr, const char **outptr,
 
 struct token
 {
-  char *operator;
+  char *oper;
   int token;
   enum exp_opcode opcode;
 };
@@ -1179,10 +1179,10 @@ push_module_name (struct parser_state *ps, struct type *module,
       char *copy;
 
       copy = copy_name (name);
-      sym = lookup_symbol_static (copy, expression_context_block,
-				  VAR_DOMAIN);
+      sym = lookup_symbol_in_static_block (copy, expression_context_block,
+					   VAR_DOMAIN);
       if (sym != NULL)
-	sym = lookup_symbol_global (copy, expression_context_block,
+	sym = lookup_global_symbol (copy, expression_context_block,
 				    VAR_DOMAIN);
 
       if (sym != NULL)
@@ -1330,7 +1330,7 @@ yylex (void)
   tokstart = lexptr;
   /* See if it is a special token of length 3.  */
   for (i = 0; i < sizeof tokentab3 / sizeof tokentab3[0]; i++)
-    if (strncmp (tokstart, tokentab3[i].operator, 3) == 0)
+    if (strncmp (tokstart, tokentab3[i].oper, 3) == 0)
       {
 	lexptr += 3;
 	yylval.opcode = tokentab3[i].opcode;
@@ -1339,7 +1339,7 @@ yylex (void)
 
   /* See if it is a special token of length 2.  */
   for (i = 0; i < sizeof tokentab2 / sizeof tokentab2[0]; i++)
-    if (strncmp (tokstart, tokentab2[i].operator, 2) == 0)
+    if (strncmp (tokstart, tokentab2[i].oper, 2) == 0)
       {
 	lexptr += 2;
 	yylval.opcode = tokentab2[i].opcode;
@@ -1565,7 +1565,7 @@ yylex (void)
   /* Catch specific keywords.  */
   copy = copy_name (yylval.sval);
   for (i = 0; i < sizeof ident_tokens / sizeof ident_tokens[0]; i++)
-    if (strcmp (copy, ident_tokens[i].operator) == 0)
+    if (strcmp (copy, ident_tokens[i].oper) == 0)
       {
 	/* It is ok to always set this, even though we don't always
 	   strictly need to.  */
@@ -1577,8 +1577,8 @@ yylex (void)
     return DOLLAR_VARIABLE;
 
   yylval.tsym.type
-    = language_lookup_primitive_type_by_name (parse_language (pstate),
-					      parse_gdbarch (pstate), copy);
+    = language_lookup_primitive_type (parse_language (pstate),
+				      parse_gdbarch (pstate), copy);
   if (yylval.tsym.type != NULL)
     return TYPENAME;
 

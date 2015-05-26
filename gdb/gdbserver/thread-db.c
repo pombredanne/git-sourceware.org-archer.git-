@@ -1,5 +1,5 @@
 /* Thread management interface, for the remote server for GDB.
-   Copyright (C) 2002-2014 Free Software Foundation, Inc.
+   Copyright (C) 2002-2015 Free Software Foundation, Inc.
 
    Contributed by MontaVista Software.
 
@@ -29,6 +29,7 @@ static int thread_db_use_events;
 #include "gdb_proc_service.h"
 #include "nat/gdb_thread_db.h"
 #include "gdb_vecs.h"
+#include "nat/linux-procfs.h"
 
 #ifndef USE_LIBTHREAD_DB_DIRECTLY
 #include <dlfcn.h>
@@ -191,7 +192,7 @@ thread_db_create_event (CORE_ADDR where)
   td_event_msg_t msg;
   td_err_e err;
   struct lwp_info *lwp;
-  struct thread_db *thread_db = current_process ()->piprivate->thread_db;
+  struct thread_db *thread_db = current_process ()->priv->thread_db;
   client_state *cs = get_client_state ();
 
   gdb_assert (thread_db->td_ta_event_getmsg_p != NULL);
@@ -228,7 +229,7 @@ thread_db_enable_reporting (void)
   td_thr_events_t events;
   td_notify_t notify;
   td_err_e err;
-  struct thread_db *thread_db = current_process ()->piprivate->thread_db;
+  struct thread_db *thread_db = current_process ()->priv->thread_db;
 
   if (thread_db->td_ta_set_event_p == NULL
       || thread_db->td_ta_event_addr_p == NULL
@@ -272,7 +273,7 @@ find_one_thread (ptid_t ptid)
   td_err_e err;
   struct thread_info *inferior;
   struct lwp_info *lwp;
-  struct thread_db *thread_db = current_process ()->piprivate->thread_db;
+  struct thread_db *thread_db = current_process ()->priv->thread_db;
   int lwpid = ptid_get_lwp (ptid);
   client_state *cs = get_client_state ();
 
@@ -341,7 +342,7 @@ attach_thread (const td_thrhandle_t *th_p, td_thrinfo_t *ti_p)
     {
       warning ("Could not attach to thread %ld (LWP %d): %s\n",
 	       ti_p->ti_tid, ti_p->ti_lid,
-	       linux_attach_fail_reason_string (ptid, err));
+	       linux_ptrace_attach_fail_reason_string (ptid, err));
       return 0;
     }
 
@@ -353,7 +354,7 @@ attach_thread (const td_thrhandle_t *th_p, td_thrinfo_t *ti_p)
   if (thread_db_use_events)
     {
       td_err_e err;
-      struct thread_db *thread_db = proc->piprivate->thread_db;
+      struct thread_db *thread_db = proc->priv->thread_db;
 
       err = thread_db->td_thr_event_enable_p (th_p, 1);
       if (err != TD_OK)
@@ -392,11 +393,25 @@ find_new_threads_callback (const td_thrhandle_t *th_p, void *data)
 {
   td_thrinfo_t ti;
   td_err_e err;
-  struct thread_db *thread_db = current_process ()->piprivate->thread_db;
+  struct thread_db *thread_db = current_process ()->priv->thread_db;
 
   err = thread_db->td_thr_get_info_p (th_p, &ti);
   if (err != TD_OK)
     error ("Cannot get thread info: %s", thread_db_err_str (err));
+
+  if (ti.ti_lid == -1)
+    {
+      /* A thread with kernel thread ID -1 is either a thread that
+	 exited and was joined, or a thread that is being created but
+	 hasn't started yet, and that is reusing the tcb/stack of a
+	 thread that previously exited and was joined.  (glibc marks
+	 terminated and joined threads with kernel thread ID -1.  See
+	 glibc PR17707.  */
+      if (debug_threads)
+	debug_printf ("thread_db: skipping exited and "
+		      "joined thread (0x%lx)\n", ti.ti_tid);
+      return 0;
+    }
 
   /* Check for zombies.  */
   if (ti.ti_state == TD_THR_UNKNOWN || ti.ti_state == TD_THR_ZOMBIE)
@@ -417,7 +432,7 @@ thread_db_find_new_threads (void)
 {
   td_err_e err;
   ptid_t ptid = current_ptid;
-  struct thread_db *thread_db = current_process ()->piprivate->thread_db;
+  struct thread_db *thread_db = current_process ()->priv->thread_db;
   int loop, iteration;
 
   /* This function is only called when we first initialize thread_db.
@@ -463,7 +478,7 @@ thread_db_find_new_threads (void)
 static void
 thread_db_look_up_symbols (void)
 {
-  struct thread_db *thread_db = current_process ()->piprivate->thread_db;
+  struct thread_db *thread_db = current_process ()->priv->thread_db;
   const char **sym_list;
   CORE_ADDR unused;
 
@@ -478,7 +493,7 @@ thread_db_look_up_symbols (void)
 int
 thread_db_look_up_one_symbol (const char *name, CORE_ADDR *addrp)
 {
-  struct thread_db *thread_db = current_process ()->piprivate->thread_db;
+  struct thread_db *thread_db = current_process ()->priv->thread_db;
   int may_ask_gdb = !thread_db->all_symbols_looked_up;
 
   /* If we've passed the call to thread_db_look_up_symbols, then
@@ -502,7 +517,7 @@ thread_db_get_tls_address (struct thread_info *thread, CORE_ADDR offset,
   client_state *cs = get_client_state ();
 
   proc = get_thread_process (thread);
-  thread_db = proc->piprivate->thread_db;
+  thread_db = proc->priv->thread_db;
 
   /* If the thread layer is not (yet) initialized, fail.  */
   if (thread_db == NULL || !thread_db->all_symbols_looked_up)
@@ -563,10 +578,10 @@ thread_db_load_search (void)
   struct thread_db *tdb;
   struct process_info *proc = current_process ();
 
-  gdb_assert (proc->piprivate->thread_db == NULL);
+  gdb_assert (proc->priv->thread_db == NULL);
 
   tdb = xcalloc (1, sizeof (*tdb));
-  proc->piprivate->thread_db = tdb;
+  proc->priv->thread_db = tdb;
 
   tdb->td_ta_new_p = &td_ta_new;
 
@@ -577,7 +592,7 @@ thread_db_load_search (void)
       if (debug_threads)
 	debug_printf ("td_ta_new(): %s\n", thread_db_err_str (err));
       free (tdb);
-      proc->piprivate->thread_db = NULL;
+      proc->priv->thread_db = NULL;
       return 0;
     }
 
@@ -608,10 +623,10 @@ try_thread_db_load_1 (void *handle)
   struct thread_db *tdb;
   struct process_info *proc = current_process ();
 
-  gdb_assert (proc->piprivate->thread_db == NULL);
+  gdb_assert (proc->priv->thread_db == NULL);
 
   tdb = xcalloc (1, sizeof (*tdb));
-  proc->piprivate->thread_db = tdb;
+  proc->priv->thread_db = tdb;
 
   tdb->handle = handle;
 
@@ -628,7 +643,7 @@ try_thread_db_load_1 (void *handle)
 	  if (required)						\
 	    {							\
 	      free (tdb);					\
-	      proc->piprivate->thread_db = NULL;			\
+	      proc->priv->thread_db = NULL;			\
 	      return 0;						\
 	    }							\
 	}							\
@@ -644,7 +659,7 @@ try_thread_db_load_1 (void *handle)
       if (debug_threads)
 	debug_printf ("td_ta_new(): %s\n", thread_db_err_str (err));
       free (tdb);
-      proc->piprivate->thread_db = NULL;
+      proc->priv->thread_db = NULL;
       return 0;
     }
 
@@ -848,7 +863,22 @@ thread_db_init (int use_events)
 	  thread_db_mourn (proc);
 	  return 0;
 	}
-      thread_db_find_new_threads ();
+
+      /* It's best to avoid td_ta_thr_iter if possible.  That walks
+	 data structures in the inferior's address space that may be
+	 corrupted, or, if the target is running, the list may change
+	 while we walk it.  In the latter case, it's possible that a
+	 thread exits just at the exact time that causes GDBserver to
+	 get stuck in an infinite loop.  If the kernel supports clone
+	 events, and /proc/PID/task/ exits, then we already know about
+	 all threads in the process.  When we need info out of
+	 thread_db on a given thread (e.g., for TLS), we'll use
+	 find_one_thread then.  That uses thread_db entry points that
+	 do not walk libpthread's thread list, so should be safe, as
+	 well as more efficient.  */
+      if (use_events
+	  || !linux_proc_task_list_dir_exists (pid_of (proc)))
+	thread_db_find_new_threads ();
       thread_db_look_up_symbols ();
       return 1;
     }
@@ -883,8 +913,9 @@ switch_to_process (struct process_info *proc)
 static void
 disable_thread_event_reporting (struct process_info *proc)
 {
+  struct thread_db *thread_db = proc->priv->thread_db;
   client_state *cs = get_client_state ();
-  struct thread_db *thread_db = proc->piprivate->thread_db;
+
   if (thread_db)
     {
       td_err_e (*td_ta_clear_event_p) (const td_thragent_t *ta,
@@ -916,7 +947,7 @@ disable_thread_event_reporting (struct process_info *proc)
 static void
 remove_thread_event_breakpoints (struct process_info *proc)
 {
-  struct thread_db *thread_db = proc->piprivate->thread_db;
+  struct thread_db *thread_db = proc->priv->thread_db;
   client_state *cs = get_client_state ();
 
   if (thread_db->td_create_bp != NULL)
@@ -935,7 +966,7 @@ remove_thread_event_breakpoints (struct process_info *proc)
 void
 thread_db_detach (struct process_info *proc)
 {
-  struct thread_db *thread_db = proc->piprivate->thread_db;
+  struct thread_db *thread_db = proc->priv->thread_db;
 
   if (thread_db)
     {
@@ -949,7 +980,7 @@ thread_db_detach (struct process_info *proc)
 void
 thread_db_mourn (struct process_info *proc)
 {
-  struct thread_db *thread_db = proc->piprivate->thread_db;
+  struct thread_db *thread_db = proc->priv->thread_db;
   if (thread_db)
     {
       td_err_e (*td_ta_delete_p) (td_thragent_t *);
@@ -968,7 +999,7 @@ thread_db_mourn (struct process_info *proc)
 #endif  /* USE_LIBTHREAD_DB_DIRECTLY  */
 
       free (thread_db);
-      proc->piprivate->thread_db = NULL;
+      proc->priv->thread_db = NULL;
     }
 }
 

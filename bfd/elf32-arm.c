@@ -1,5 +1,5 @@
 /* 32-bit ELF support for ARM
-   Copyright (C) 1998-2014 Free Software Foundation, Inc.
+   Copyright (C) 1998-2015 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -79,7 +79,7 @@ static reloc_howto_type elf32_arm_howto_table_1[] =
   /* No relocation.  */
   HOWTO (R_ARM_NONE,		/* type */
 	 0,			/* rightshift */
-	 0,			/* size (0 = byte, 1 = short, 2 = long) */
+	 3,			/* size (0 = byte, 1 = short, 2 = long) */
 	 0,			/* bitsize */
 	 FALSE,			/* pc_relative */
 	 0,			/* bitpos */
@@ -8234,18 +8234,6 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
   if (r_type != howto->type)
     howto = elf32_arm_howto_from_type (r_type);
 
-  /* If the start address has been set, then set the EF_ARM_HASENTRY
-     flag.  Setting this more than once is redundant, but the cost is
-     not too high, and it keeps the code simple.
-
-     The test is done  here, rather than somewhere else, because the
-     start address is only set just before the final link commences.
-
-     Note - if the user deliberately sets a start address of 0, the
-     flag will not be set.  */
-  if (bfd_get_start_address (output_bfd) != 0)
-    elf_elfheader (output_bfd)->e_flags |= EF_ARM_HASENTRY;
-
   eh = (struct elf32_arm_link_hash_entry *) h;
   sgot = globals->root.sgot;
   local_got_offsets = elf_local_got_offsets (input_bfd);
@@ -8415,6 +8403,21 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	{
 	  Elf_Internal_Rela outrel;
 	  bfd_boolean skip, relocate;
+
+	  if ((r_type == R_ARM_REL32 || r_type == R_ARM_REL32_NOI)
+	      && !h->def_regular)
+	    {
+	      char *v = _("shared object");
+
+	      if (info->executable)
+		v = _("PIE executable");
+
+	      (*_bfd_error_handler)
+		(_("%B: relocation %s against external or undefined symbol `%s'"
+		   " can not be used when making a %s; recompile with -fPIC"), input_bfd,
+		 elf32_arm_howto_table_1[r_type].name, h->root.root.string, v);
+	      return bfd_reloc_notsupported;
+	    }
 
 	  *unresolved_reloc_p = FALSE;
 
@@ -11700,11 +11703,18 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
   static const int order_021[3] = {0, 2, 1};
   int i;
   bfd_boolean result = TRUE;
+  const char *sec_name = get_elf_backend_data (ibfd)->obj_attrs_section;
 
   /* Skip the linker stubs file.  This preserves previous behavior
      of accepting unknown attributes in the first input file - but
      is that a bug?  */
   if (ibfd->flags & BFD_LINKER_CREATED)
+    return TRUE;
+
+  /* Skip any input that hasn't attribute section.
+     This enables to link object files without attribute section with
+     any others.  */
+  if (bfd_get_section_by_name (ibfd, sec_name) == NULL)
     return TRUE;
 
   if (!elf_known_obj_attributes_proc (obfd)[0].i)
@@ -11746,10 +11756,14 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
   /* This needs to happen before Tag_ABI_FP_number_model is merged.  */
   if (in_attr[Tag_ABI_VFP_args].i != out_attr[Tag_ABI_VFP_args].i)
     {
-      /* Ignore mismatches if the object doesn't use floating point.  */
-      if (out_attr[Tag_ABI_FP_number_model].i == 0)
+      /* Ignore mismatches if the object doesn't use floating point or is
+	 floating point ABI independent.  */
+      if (out_attr[Tag_ABI_FP_number_model].i == AEABI_FP_number_model_none
+	  || (in_attr[Tag_ABI_FP_number_model].i != AEABI_FP_number_model_none
+	      && out_attr[Tag_ABI_VFP_args].i == AEABI_VFP_args_compatible))
 	out_attr[Tag_ABI_VFP_args].i = in_attr[Tag_ABI_VFP_args].i;
-      else if (in_attr[Tag_ABI_FP_number_model].i != 0)
+      else if (in_attr[Tag_ABI_FP_number_model].i != AEABI_FP_number_model_none
+	       && in_attr[Tag_ABI_VFP_args].i != AEABI_VFP_args_compatible)
 	{
 	  _bfd_error_handler
 	    (_("error: %B uses VFP register arguments, %B does not"),
@@ -11946,9 +11960,9 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 	      /* Tag_ABI_HardFP_use is handled along with Tag_FP_arch since
 		 the meaning of Tag_ABI_HardFP_use depends on Tag_FP_arch
 		 when it's 0.  It might mean absence of FP hardware if
-		 Tag_FP_arch is zero, otherwise it is effectively SP + DP.  */
+		 Tag_FP_arch is zero.  */
 
-#define VFP_VERSION_COUNT 8
+#define VFP_VERSION_COUNT 9
 	      static const struct
 	      {
 		  int ver;
@@ -11962,7 +11976,8 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 		  {3, 16},
 		  {4, 32},
 		  {4, 16},
-		  {8, 32}
+		  {8, 32},
+		  {8, 16}
 		};
 	      int ver;
 	      int regs;
@@ -11987,7 +12002,7 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 		}
 
 	      /* Both the input and the output have nonzero Tag_FP_arch.
-		 So Tag_ABI_HardFP_use is (SP & DP) when it's zero.  */
+		 So Tag_ABI_HardFP_use is implied by Tag_FP_arch when it's zero.  */
 
 	      /* If both the input and the output have zero Tag_ABI_HardFP_use,
 		 do nothing.  */
@@ -11995,10 +12010,10 @@ elf32_arm_merge_eabi_attributes (bfd *ibfd, bfd *obfd)
 		  && out_attr[Tag_ABI_HardFP_use].i == 0)
 		;
 	      /* If the input and the output have different Tag_ABI_HardFP_use,
-		 the combination of them is 3 (SP & DP).  */
+		 the combination of them is 0 (implied by Tag_FP_arch).  */
 	      else if (in_attr[Tag_ABI_HardFP_use].i
 		       != out_attr[Tag_ABI_HardFP_use].i)
-		out_attr[Tag_ABI_HardFP_use].i = 3;
+		out_attr[Tag_ABI_HardFP_use].i = 0;
 
 	      /* Now we can handle Tag_FP_arch.  */
 
@@ -12367,10 +12382,7 @@ elf32_arm_print_private_bfd_data (bfd *abfd, void * ptr)
   if (flags & EF_ARM_RELEXEC)
     fprintf (file, _(" [relocatable executable]"));
 
-  if (flags & EF_ARM_HASENTRY)
-    fprintf (file, _(" [has entry point]"));
-
-  flags &= ~ (EF_ARM_RELEXEC | EF_ARM_HASENTRY);
+  flags &= ~EF_ARM_RELEXEC;
 
   if (flags)
     fprintf (file, _("<Unrecognised flag bits set>"));
@@ -13331,7 +13343,7 @@ elf32_arm_adjust_dynamic_symbol (struct bfd_link_info * info,
       h->needs_copy = 1;
     }
 
-  return _bfd_elf_adjust_dynamic_copy (h, s);
+  return _bfd_elf_adjust_dynamic_copy (info, h, s);
 }
 
 /* Allocate space in .plt, .got and associated reloc sections for
@@ -14211,12 +14223,16 @@ elf32_arm_finish_dynamic_symbol (bfd * output_bfd,
       if (!h->def_regular)
 	{
 	  /* Mark the symbol as undefined, rather than as defined in
-	     the .plt section.  Leave the value alone.  */
+	     the .plt section.  */
 	  sym->st_shndx = SHN_UNDEF;
-	  /* If the symbol is weak, we do need to clear the value.
+	  /* If the symbol is weak we need to clear the value.
 	     Otherwise, the PLT entry would provide a definition for
 	     the symbol even if the symbol wasn't defined anywhere,
-	     and so the symbol would never be NULL.  */
+	     and so the symbol would never be NULL.  Leave the value if
+	     there were any relocations where pointer equality matters
+	     (this is a clue for the dynamic linker, to make function
+	     pointer comparisons work between an application and shared
+	     library).  */
 	  if (!h->ref_regular_nonweak || !h->pointer_equality_needed)
 	    sym->st_value = 0;
 	}
@@ -14711,7 +14727,7 @@ elf32_arm_post_process_headers (bfd * abfd, struct bfd_link_info * link_info ATT
       && ((i_ehdrp->e_type == ET_DYN) || (i_ehdrp->e_type == ET_EXEC)))
     {
       int abi = bfd_elf_get_obj_attr_int (abfd, OBJ_ATTR_PROC, Tag_ABI_VFP_args);
-      if (abi)
+      if (abi == AEABI_VFP_args_vfp)
 	i_ehdrp->e_flags |= EF_ARM_ABI_FLOAT_HARD;
       else
 	i_ehdrp->e_flags |= EF_ARM_ABI_FLOAT_SOFT;

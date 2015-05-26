@@ -453,8 +453,8 @@ dyninst_add_process (int pid, int attached, Process::ptr process)
 
   proc = add_process (pid, attached);
   proc->tdesc = dyninst_tdesc;
-  proc->piprivate = new struct process_info_private;
-  proc->piprivate->process = process;
+  proc->priv = new struct process_info_private;
+  proc->priv->process = process;
   return proc;
 }
 
@@ -866,8 +866,8 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
 	  pid = (ptid.pid != -1) ? ptid.pid : event->getProcess()->getPid();
 	  new_ptid = ptid_build (pid, pid, 0);
 	  pi = find_process_pid(pid);
-	  if (pi && pi->piprivate)
-	    pi->piprivate->last_wait_event_ptid = new_ptid;
+	  if (pi && pi->priv)
+	    pi->priv->last_wait_event_ptid = new_ptid;
 	}
       if (event == NULL)
 	{
@@ -1031,9 +1031,9 @@ dyninst_mourn (struct process_info *proc)
   ThreadPool::iterator thidx;
 
   Process::ptr dyninst_process;
-  if (false && proc->piprivate)
+  if (false && proc->priv)
     {
-      dyninst_process = ((struct process_info_private*)(proc->piprivate))->process;
+      dyninst_process = ((struct process_info_private*)(proc->priv))->process;
       for (thidx = dyninst_process->threads().begin();
 	  thidx != dyninst_process->threads().end(); thidx++)
 	{
@@ -1041,8 +1041,8 @@ dyninst_mourn (struct process_info *proc)
 	  dyninst_remove_thread (th);
 	}
     }
-  delete proc->piprivate;
-  proc->piprivate = NULL;
+  delete proc->priv;
+  proc->priv = NULL;
 }
 
 
@@ -1574,6 +1574,11 @@ static struct target_ops dyninst_target_ops = {
   dyninst_supports_z_point_type,
   dyninst_insert_point,  /* insert_point */
   dyninst_remove_point,  /* remove_point */
+  NULL,  // stopped_by_sw_breakpoint
+  NULL,  // supports_stopped_by_sw_breakpoint
+  NULL,  // stopped_by_hw_breakpoint
+  NULL,  // supports_stopped_by_hw_breakpoint
+  NULL,  // supports_conditional_breakpoints
   NULL,  // stopped_by_watchpoint
   NULL,  // stopped_data_address
   NULL,  // read_offsets
@@ -1586,18 +1591,20 @@ static struct target_ops dyninst_target_ops = {
   NULL,  // async
   NULL,  // start_non_stop
   dyninst_supports_multi_process,
+  NULL,  // supports_fork_events
+  NULL,  // supports_vfork_events
+  NULL,  // handle_new_gdb_connection
   NULL,  // handle_monitor_command
-  NULL,  // common_core_of_thread
+  NULL,  // core_of_thread
   NULL,  // read_loadmap
   dyninst_process_qsupported,  // process_qsupported
   NULL,  // supports_tracepoints
   dyninst_read_pc,
   dyninst_write_pc,
   NULL,  // thread_stopped
-  NULL,
+  NULL,  // get_tib_address
   NULL,  // pause_all
   NULL,  // unpause_all
-  NULL,  // cancel_breakpoints
   NULL,  // stabilize_threads
   NULL,  // install_fast_tracepoint_jump_pad
   NULL,  // emit_ops
@@ -1605,11 +1612,13 @@ static struct target_ops dyninst_target_ops = {
   NULL,  // get_min_fast_tracepoint_insn_len
   dyninst_qxfer_libraries_svr4,  // qxfer_libraries_svr4
   NULL,  // supports_agent
-  NULL,
-  NULL,
-  NULL,
-  NULL,
-  dyninst_supports_range_stepping
+  NULL,  // supports_btrace
+  NULL,  // enable_btrace
+  NULL,  // disable_btrace
+  NULL,  // read_btrace
+  NULL,  // read_btrace_conf
+  dyninst_supports_range_stepping,
+  NULL   // pid_to_exec_file
 };
 
 void

@@ -1,6 +1,6 @@
 /* Scheme interface to breakpoints.
 
-   Copyright (C) 2008-2014 Free Software Foundation, Inc.
+   Copyright (C) 2008-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -151,7 +151,6 @@ bpscm_enable_state_to_string (enum enable_state enable_state)
     case bp_disabled: return "disabled";
     case bp_enabled: return "enabled";
     case bp_call_disabled: return "call_disabled";
-    case bp_permanent: return "permanent";
     default: return "unknown";
     }
 }
@@ -408,7 +407,7 @@ gdbscm_register_breakpoint_x (SCM self)
 {
   breakpoint_smob *bp_smob
     = bpscm_get_breakpoint_smob_arg_unsafe (self, SCM_ARG1, FUNC_NAME);
-  volatile struct gdb_exception except;
+  struct gdb_exception except = exception_none;
 
   /* We only support registering breakpoints created with make-breakpoint.  */
   if (!bp_smob->is_scheme_bkpt)
@@ -419,7 +418,7 @@ gdbscm_register_breakpoint_x (SCM self)
 
   pending_breakpoint_scm = self;
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  TRY
     {
       char *location = bp_smob->spec.location;
       int internal = bp_smob->spec.is_internal;
@@ -456,6 +455,12 @@ gdbscm_register_breakpoint_x (SCM self)
 	  gdb_assert_not_reached ("invalid breakpoint type");
 	}
     }
+  CATCH (ex, RETURN_MASK_ALL)
+    {
+      except = ex;
+    }
+  END_CATCH
+
   /* Ensure this gets reset, even if there's an error.  */
   pending_breakpoint_scm = SCM_BOOL_F;
   GDBSCM_HANDLE_GDB_EXCEPTION (except);
@@ -474,13 +479,16 @@ gdbscm_delete_breakpoint_x (SCM self)
 {
   breakpoint_smob *bp_smob
     = bpscm_get_valid_breakpoint_smob_arg_unsafe (self, SCM_ARG1, FUNC_NAME);
-  volatile struct gdb_exception except;
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  TRY
     {
       delete_breakpoint (bp_smob->bp);
     }
-  GDBSCM_HANDLE_GDB_EXCEPTION (except);
+  CATCH (except, RETURN_MASK_ALL)
+    {
+      GDBSCM_HANDLE_GDB_EXCEPTION (except);
+    }
+  END_CATCH
 
   return SCM_UNSPECIFIED;
 }
@@ -566,19 +574,22 @@ gdbscm_set_breakpoint_enabled_x (SCM self, SCM newvalue)
 {
   breakpoint_smob *bp_smob
     = bpscm_get_valid_breakpoint_smob_arg_unsafe (self, SCM_ARG1, FUNC_NAME);
-  volatile struct gdb_exception except;
 
   SCM_ASSERT_TYPE (gdbscm_is_bool (newvalue), newvalue, SCM_ARG2, FUNC_NAME,
 		   _("boolean"));
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  TRY
     {
       if (gdbscm_is_true (newvalue))
 	enable_breakpoint (bp_smob->bp);
       else
 	disable_breakpoint (bp_smob->bp);
     }
-  GDBSCM_HANDLE_GDB_EXCEPTION (except);
+  CATCH (except, RETURN_MASK_ALL)
+    {
+      GDBSCM_HANDLE_GDB_EXCEPTION (except);
+    }
+  END_CATCH
 
   return SCM_UNSPECIFIED;
 }
@@ -601,16 +612,19 @@ gdbscm_set_breakpoint_silent_x (SCM self, SCM newvalue)
 {
   breakpoint_smob *bp_smob
     = bpscm_get_valid_breakpoint_smob_arg_unsafe (self, SCM_ARG1, FUNC_NAME);
-  volatile struct gdb_exception except;
 
   SCM_ASSERT_TYPE (gdbscm_is_bool (newvalue), newvalue, SCM_ARG2, FUNC_NAME,
 		   _("boolean"));
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  TRY
     {
       breakpoint_set_silent (bp_smob->bp, gdbscm_is_true (newvalue));
     }
-  GDBSCM_HANDLE_GDB_EXCEPTION (except);
+  CATCH (except, RETURN_MASK_ALL)
+    {
+      GDBSCM_HANDLE_GDB_EXCEPTION (except);
+    }
+  END_CATCH
 
   return SCM_UNSPECIFIED;
 }
@@ -635,7 +649,6 @@ gdbscm_set_breakpoint_ignore_count_x (SCM self, SCM newvalue)
   breakpoint_smob *bp_smob
     = bpscm_get_valid_breakpoint_smob_arg_unsafe (self, SCM_ARG1, FUNC_NAME);
   long value;
-  volatile struct gdb_exception except;
 
   SCM_ASSERT_TYPE (scm_is_signed_integer (newvalue, LONG_MIN, LONG_MAX),
 		   newvalue, SCM_ARG2, FUNC_NAME, _("integer"));
@@ -644,11 +657,15 @@ gdbscm_set_breakpoint_ignore_count_x (SCM self, SCM newvalue)
   if (value < 0)
     value = 0;
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  TRY
     {
       set_ignore_count (bp_smob->number, (int) value, 0);
     }
-  GDBSCM_HANDLE_GDB_EXCEPTION (except);
+  CATCH (except, RETURN_MASK_ALL)
+    {
+      GDBSCM_HANDLE_GDB_EXCEPTION (except);
+    }
+  END_CATCH
 
   return SCM_UNSPECIFIED;
 }
@@ -756,17 +773,20 @@ gdbscm_set_breakpoint_task_x (SCM self, SCM newvalue)
     = bpscm_get_valid_breakpoint_smob_arg_unsafe (self, SCM_ARG1, FUNC_NAME);
   long id;
   int valid_id = 0;
-  volatile struct gdb_exception except;
 
   if (scm_is_signed_integer (newvalue, LONG_MIN, LONG_MAX))
     {
       id = scm_to_long (newvalue);
 
-      TRY_CATCH (except, RETURN_MASK_ALL)
+      TRY
 	{
 	  valid_id = valid_task_id (id);
 	}
-      GDBSCM_HANDLE_GDB_EXCEPTION (except);
+      CATCH (except, RETURN_MASK_ALL)
+	{
+	  GDBSCM_HANDLE_GDB_EXCEPTION (except);
+	}
+      END_CATCH
 
       if (! valid_id)
 	{
@@ -779,11 +799,15 @@ gdbscm_set_breakpoint_task_x (SCM self, SCM newvalue)
   else
     SCM_ASSERT_TYPE (0, newvalue, SCM_ARG2, FUNC_NAME, _("integer or #f"));
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  TRY
     {
       breakpoint_set_task (bp_smob->bp, id);
     }
-  GDBSCM_HANDLE_GDB_EXCEPTION (except);
+  CATCH (except, RETURN_MASK_ALL)
+    {
+      GDBSCM_HANDLE_GDB_EXCEPTION (except);
+    }
+  END_CATCH
 
   return SCM_UNSPECIFIED;
 }
@@ -856,7 +880,7 @@ gdbscm_set_breakpoint_condition_x (SCM self, SCM newvalue)
   breakpoint_smob *bp_smob
     = bpscm_get_valid_breakpoint_smob_arg_unsafe (self, SCM_ARG1, FUNC_NAME);
   char *exp;
-  volatile struct gdb_exception except;
+  struct gdb_exception except = exception_none;
 
   SCM_ASSERT_TYPE (scm_is_string (newvalue) || gdbscm_is_false (newvalue),
 		   newvalue, SCM_ARG2, FUNC_NAME,
@@ -867,10 +891,16 @@ gdbscm_set_breakpoint_condition_x (SCM self, SCM newvalue)
   else
     exp = gdbscm_scm_to_c_string (newvalue);
 
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  TRY
     {
       set_breakpoint_condition (bp_smob->bp, exp ? exp : "", 0);
     }
+  CATCH (ex, RETURN_MASK_ALL)
+    {
+      except = ex;
+    }
+  END_CATCH
+
   xfree (exp);
   GDBSCM_HANDLE_GDB_EXCEPTION (except);
 
@@ -937,7 +967,6 @@ gdbscm_breakpoint_commands (SCM self)
     = bpscm_get_valid_breakpoint_smob_arg_unsafe (self, SCM_ARG1, FUNC_NAME);
   struct breakpoint *bp;
   long length;
-  volatile struct gdb_exception except;
   struct ui_file *string_file;
   struct cleanup *chain;
   SCM result;
@@ -952,16 +981,17 @@ gdbscm_breakpoint_commands (SCM self)
   chain = make_cleanup_ui_file_delete (string_file);
 
   ui_out_redirect (current_uiout, string_file);
-  TRY_CATCH (except, RETURN_MASK_ALL)
+  TRY
     {
       print_command_lines (current_uiout, breakpoint_commands (bp), 0);
     }
   ui_out_redirect (current_uiout, NULL);
-  if (except.reason < 0)
+  CATCH (except, RETURN_MASK_ALL)
     {
       do_cleanups (chain);
       gdbscm_throw_gdb_exception (except);
     }
+  END_CATCH
 
   cmdstr = ui_file_xstrdup (string_file, &length);
   make_cleanup (xfree, cmdstr);

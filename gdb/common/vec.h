@@ -1,5 +1,5 @@
 /* Vector API for GDB.
-   Copyright (C) 2004-2014 Free Software Foundation, Inc.
+   Copyright (C) 2004-2015 Free Software Foundation, Inc.
    Contributed by Nathan Sidwell <nathan@codesourcery.com>
 
    This file is part of GDB.
@@ -496,7 +496,7 @@ static inline void VEC_OP (T,free)					  \
 static inline void VEC_OP (T,cleanup)					  \
      (void *arg_)							  \
 {									  \
-  VEC(T) **vec_ = arg_;							  \
+  VEC(T) **vec_ = (VEC(T) **)arg_;					  \
   if (*vec_)								  \
     vec_free_ (*vec_);							  \
   *vec_ = NULL;								  \
@@ -743,7 +743,7 @@ static inline void VEC_OP (T,free)					  \
 static inline void VEC_OP (T,cleanup)					  \
      (void *arg_)							  \
 {									  \
-  VEC(T) **vec_ = arg_;							  \
+  VEC(T) **vec_ = (VEC(T) **)arg_;					  \
   if (*vec_)								  \
     vec_free_ (*vec_);							  \
   *vec_ = NULL;								  \
@@ -1053,7 +1053,7 @@ static inline void VEC_OP (T,free)					  \
 static inline void VEC_OP (T,cleanup)					  \
      (void *arg_)							  \
 {									  \
-  VEC(T) **vec_ = arg_;							  \
+  VEC(T) **vec_ = (VEC(T) **)arg_;					  \
   if (*vec_)								  \
     vec_free_ (*vec_);							  \
   *vec_ = NULL;								  \

@@ -1,6 +1,6 @@
 /* Ada language support definitions for GDB, the GNU debugger.
 
-   Copyright (C) 1992-2014 Free Software Foundation, Inc.
+   Copyright (C) 1992-2015 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -162,6 +162,8 @@ struct ada_task_info
 
 extern void *grow_vect (void *, size_t *, size_t, int);
 
+extern void ada_ensure_varsize_limit (const struct type *type);
+
 extern int ada_get_field_index (const struct type *type,
                                 const char *field_name,
                                 int maybe_missing);
@@ -242,7 +244,7 @@ extern struct symbol *ada_lookup_symbol (const char *, const struct block *,
                                          domain_enum, int *);
 
 extern void ada_lookup_encoded_symbol
-  (const char *name, const struct block *block, domain_enum namespace,
+  (const char *name, const struct block *block, domain_enum domain,
    struct ada_symbol_info *symbol_info);
 
 extern struct bound_minimal_symbol ada_lookup_simple_minsym (const char *);
