@@ -99,6 +99,8 @@ dyninst_x86_reg_map_setup (RegisterPool regpool)
 
 static void dump_registers (const char* whoami, RegisterPool regpool) __attribute__ ((unused));
 
+static void dump_registers (const char*, RegisterPool) __attribute__ ((unused));
+
 static void
 dump_registers (const char* whoami, RegisterPool regpool)
 {
@@ -134,6 +136,9 @@ dump_registers (const char* whoami, RegisterPool regpool)
 	case x86::iedi:
 	case x86_64::irdi:
 	  fprintf (stderr, "rdi=%#lx ", regval);break;
+	case x86::ieip:
+	case x86_64::irip:
+	  fprintf (stderr, "rip=%#lx ", regval);break;
       }
     }
   fprintf (stderr, "\n");
@@ -148,12 +153,13 @@ dyninst_x86_fill_gregset (struct regcache *regcache, RegisterPool regpool)
   for (int r = 0; r < dyninst_tdesc->num_registers; r++)
     regcache->register_status[r] = REG_VALID;
 
+  dump_registers (__FUNCTION__, regpool);
   RegisterPool::iterator regidx = regpool.begin();
   for (; regidx != regpool.end(); regidx++)
     {
       int regn = 0;
       for (; regn < dyninst_tdesc->num_registers; regn++)
-	if ((*regidx).first.val() == dyninst_x86_gdb_regnum[regn])
+	if ((unsigned)regn < dyninst_x86_gdb_regnum.size() && (*regidx).first.val() == dyninst_x86_gdb_regnum[regn])
 	  break;
       if (regn >= dyninst_tdesc->num_registers)
 	continue;
@@ -210,7 +216,7 @@ dyninst_x86_store_gregset (struct regcache *regcache, RegisterPool regpool)
     {
       int regn = 0;
       for (; regn < dyninst_tdesc->num_registers; regn++)
-	if ((*regidx).first.val() == dyninst_x86_gdb_regnum[regn])
+	if ((unsigned)regn < dyninst_x86_gdb_regnum.size() && (*regidx).first.val() == dyninst_x86_gdb_regnum[regn])
 	  break;
       if (regn >= dyninst_tdesc->num_registers)
 	continue;
@@ -365,6 +371,7 @@ dyninst_x86_arch_setup (void)
 {
   DEBUG("dyninst_x86_arch_setup\n");
   // TODO get at runtime, check xcr0_features
+
 #ifdef __x86_64__
   init_registers_amd64_linux ();
   dyninst_tdesc = tdesc_amd64_linux;
@@ -387,7 +394,12 @@ struct dyninst_regset_info dyninst_target_regsets[] = {
 
 /* The dyninst_target_ops vector for x86-dyninst.  */
 
+static const unsigned char x86_breakpoint[] = { 0xCC };
+#define x86_breakpoint_len 1
+
 struct dyninst_target_ops the_low_target = {
+  x86_breakpoint,
+  x86_breakpoint_len,
   dyninst_x86_arch_setup,
   dyninst_linux_process_qsupported,
   x86_get_pc ,
@@ -395,4 +407,5 @@ struct dyninst_target_ops the_low_target = {
   x86_set_pc,
   x86_supports_range_stepping,
   dyninst_x86_reg_map_setup,
+  true, /* decr_pc_after_break */
 };

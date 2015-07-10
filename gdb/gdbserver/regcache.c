@@ -29,6 +29,9 @@ get_thread_regcache (struct thread_info *thread, int fetch)
   struct regcache *regcache;
   client_state *cs = get_client_state ();
 
+  if (! thread)
+    return NULL;
+
   regcache = (struct regcache *) inferior_regcache_data (thread);
 
   /* Threads' regcaches are created lazily, because biarch targets add

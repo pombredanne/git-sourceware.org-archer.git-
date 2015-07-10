@@ -469,9 +469,6 @@ create_file_event (gdb_fildes_t fd)
    select.  Return -1 if there are no files descriptors to monitor,
    otherwise return 0.  */
 
-int get_remote_desc();
-int get_listen_desc();
-
 static int
 wait_for_event (void)
 {

@@ -137,6 +137,12 @@ struct server_state
 
 typedef struct server_state server_state;
 
+struct client_breakpoint
+{
+  CORE_ADDR addr;
+  struct client_breakpoint *next;
+};
+
 struct client_state
 {
   char *executable;
@@ -182,6 +188,7 @@ struct client_state
   const unsigned char *breakpoint_data;
   int breakpoint_len;
   //
+  struct client_breakpoint *breakpoints;
   server_state *ss;
   struct client_state *next;
 };

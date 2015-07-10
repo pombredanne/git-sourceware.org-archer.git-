@@ -128,6 +128,12 @@ get_remote_desc ()
   return remote_desc;
 }
 
+void
+set_remote_desc (gdb_fildes_t fd)
+{
+  remote_desc = fd;
+}
+
 int
 get_listen_desc ()
 {
@@ -421,17 +427,15 @@ remote_open (char *name, gdb_client_data client_data)
 void
 remote_close (void)
 {
-  delete_file_handler (remote_desc);
-
 #ifdef USE_WIN32API
   closesocket (remote_desc);
 #else
   if (! remote_connection_is_stdio ())
     close (remote_desc);
 #endif
-  remote_desc = INVALID_DESCRIPTOR;
-
   reset_readchar ();
+  delete_file_handler (remote_desc);
+  remote_desc = INVALID_DESCRIPTOR;
 }
 
 #endif
@@ -1182,6 +1186,7 @@ prepare_resume_reply (char *buf, ptid_t ptid,
 	cs->ss->current_thread = find_thread_ptid (ptid);
 
 	regp = current_target_desc ()->expedite_regs;
+	debug_printf ("%s:%d regp=%#lx current_thread=%#lx for pid=%d\n", __FUNCTION__, __LINE__, (long unsigned)regp, (long unsigned)cs->ss->current_thread, ptid.pid);
 
 	regcache = get_thread_regcache (cs->ss->current_thread, 1);
 

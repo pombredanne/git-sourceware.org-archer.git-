@@ -54,6 +54,8 @@ extern struct dyninst_regset_info dyninst_target_regsets[];
 struct dyninst_target_ops
 {
   /* Architecture-specific setup.  */
+  const unsigned char *breakpoint;
+  int breakpoint_len;
   void (*arch_setup) (void);
   void (*process_qsupported) (const char *query);
   CORE_ADDR (*get_pc) (Thread::const_ptr thr);
@@ -61,6 +63,7 @@ struct dyninst_target_ops
   void (*set_pc) (struct regcache *regcache, CORE_ADDR newpc);
   bool (*supports_range_stepping) ();
   void (*reg_map_setup) (RegisterPool regpool);
+  int decr_pc_after_break;
 };
 
 extern struct dyninst_target_ops the_low_target;

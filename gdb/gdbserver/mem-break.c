@@ -23,8 +23,6 @@
 #include "ax.h"
 #include <stdint.h>
 
-// const unsigned char *cs->breakpoint_data;
-// int breakpoint_len;
 
 #define MAX_BREAKPOINT_LEN 8
 
@@ -295,7 +293,53 @@ find_raw_breakpoint_at (CORE_ADDR addr, enum raw_bkpt_type type, int size)
   return NULL;
 }
 
+/* Is there a low-level breakpoint at address ADDR? */
+
+int
+has_client_breakpoint_at (CORE_ADDR addr)
+{
+  client_state *cs = get_client_state ();
+
+  struct client_breakpoint *cb;
+  if (debug_threads)
+    debug_printf ("%s:%d fd=%d addr=%#lx\n", __FUNCTION__, __LINE__, cs->file_desc, (long unsigned)addr);
+  for (cb = cs->breakpoints; cb != NULL; cb = cb->next)
+    if (debug_threads)
+      debug_printf ("%s:%d %d breakpoint at %#lx\n", __FUNCTION__, __LINE__, cs->file_desc, (long unsigned)cb->addr);
+
+  //  for (bp = proc->raw_breakpoints; bp != NULL; bp = bp->next)
+    {
+      //      if (addr >= bp->pc && addr <= bp->pc + 8 && cs->ss->last_status.kind == TARGET_WAITKIND_STOPPED
+      //	  && cs->ss->last_status.value.sig == GDB_SIGNAL_TRAP)
+	  for (cb = cs->breakpoints; cb != NULL; cb = cb->next)
+	    // TODO improve this; pc might be one insn ahead of break. 
+	    {
+	      debug_printf ("%s:%d addr=%#lx pb->pc %#lx in range? %d\n", __FUNCTION__, __LINE__, (long unsigned) addr, (long unsigned)cb->addr, addr >= cb->addr && addr <= cb->addr + 8);
+	      if (addr >= cb->addr && addr <= cb->addr + 8)
+		return 1;
+	    }
+    }
+  return 0;
+}
+
 /* See mem-break.h.  */
+
+int
+insert_shadow_memory (struct raw_breakpoint *bp)
+{
+  unsigned char buf[MAX_BREAKPOINT_LEN];
+  client_state *cs = get_client_state ();
+  int err = read_inferior_memory (bp->pc, buf, cs->breakpoint_len);
+  if (err != 0)
+    {
+      if (debug_threads)
+	debug_printf ("Failed to read shadow memory of"
+		      " breakpoint at 0x%s (%s).\n",
+		      paddress (bp->pc), strerror (err));
+    }
+  memcpy (bp->old_data, buf, cs->breakpoint_len);
+  return 0;
+}
 
 int
 insert_memory_breakpoint (struct raw_breakpoint *bp)

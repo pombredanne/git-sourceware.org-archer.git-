@@ -245,6 +245,12 @@ void uninsert_fast_tracepoint_jumps_at (CORE_ADDR pc);
 
 void reinsert_fast_tracepoint_jumps_at (CORE_ADDR where);
 
+int has_client_breakpoint_at (CORE_ADDR addr);
+
+/* Insert a shadow memory reference.  */
+
+int insert_shadow_memory (struct raw_breakpoint *bp);
+
 /* Insert a memory breakpoint.  */
 
 int insert_memory_breakpoint (struct raw_breakpoint *bp);
