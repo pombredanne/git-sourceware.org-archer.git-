@@ -435,7 +435,9 @@ handle_file_event (gdb_fildes_t event_file_desc)
 	  /* If there was a match, then call the handler.  */
 	  if (mask != 0)
 	    {
-	      set_client_state (file_ptr->fd);
+	      /* Don't change client states if we have multiple clients */
+	      if (count_client_state (NULL) > 1)
+		set_client_state (file_ptr->fd);
 	      if ((*file_ptr->proc) (file_ptr->error,
 				     file_ptr->client_data) < 0)
 		return -1;
@@ -475,7 +477,7 @@ wait_for_event (void)
   file_handler *file_ptr;
   int num_found = 0;
 
-  //
+  /* Do we have another client? */
   fd_set conn_fd_set;
   struct timeval timeout;
   FD_ZERO(&conn_fd_set);
@@ -496,7 +498,7 @@ wait_for_event (void)
 		int handle_accept_event (int, gdb_client_data);
 		if (debug_threads > 1)
 		  fprintf (stderr,"%s in select idx %d\n",__FUNCTION__,i);
-		// instead of using gdb_event just setup the connection "by hand"
+		/* instead of using gdb_event just setup the connection "by hand" */
 		handle_accept_event (0, NULL);
 		add_file_handler (get_remote_desc(), handle_serial_event, get_client_state());
 	      }
@@ -505,7 +507,7 @@ wait_for_event (void)
 		fprintf (stderr,"%s data arrived on existing connection %d fd=%d\n", __FUNCTION__, i,get_listen_desc());
 	  }
     }
-  //
+  /* */
 
   /* Make sure all output is done before getting another event.  */
   fflush (stdout);

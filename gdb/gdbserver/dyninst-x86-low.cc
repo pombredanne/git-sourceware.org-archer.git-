@@ -153,7 +153,8 @@ dyninst_x86_fill_gregset (struct regcache *regcache, RegisterPool regpool)
   for (int r = 0; r < dyninst_tdesc->num_registers; r++)
     regcache->register_status[r] = REG_VALID;
 
-  dump_registers (__FUNCTION__, regpool);
+  if (debug_threads)
+      dump_registers (__FUNCTION__, regpool);
   RegisterPool::iterator regidx = regpool.begin();
   for (; regidx != regpool.end(); regidx++)
     {

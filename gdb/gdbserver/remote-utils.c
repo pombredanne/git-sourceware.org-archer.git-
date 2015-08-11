@@ -1186,7 +1186,8 @@ prepare_resume_reply (char *buf, ptid_t ptid,
 	cs->ss->current_thread = find_thread_ptid (ptid);
 
 	regp = current_target_desc ()->expedite_regs;
-	debug_printf ("%s:%d regp=%#lx current_thread=%#lx for pid=%d\n", __FUNCTION__, __LINE__, (long unsigned)regp, (long unsigned)cs->ss->current_thread, ptid.pid);
+	if (debug_threads)
+	  debug_printf ("%s:%d regp=%#lx current_thread=%#lx for pid=%d\n", __FUNCTION__, __LINE__, (long unsigned)regp, (long unsigned)cs->ss->current_thread, ptid.pid);
 
 	regcache = get_thread_regcache (cs->ss->current_thread, 1);
 

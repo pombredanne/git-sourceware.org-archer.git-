@@ -83,6 +83,16 @@ DEFINE_QUEUE_P (notif_event_p);
 
 static struct client_states  client_states;
 
+void
+for_each_client_state (void (*one_client_proc) (client_state*))
+{
+  client_state *csi;
+  for (csi = client_states.first; csi != NULL; csi = csi->next)
+    {
+      one_client_proc (csi);
+    }
+}
+
 /* Allocate a new struct remote_state with xmalloc, initialize it, and
    return it.  */
 
@@ -109,13 +119,14 @@ free_server_state (server_state *ss)
 }
 
 
-int count_client_state (gdb_fildes_t *);
 void delete_client_breakpoint(client_state*, CORE_ADDR);
 
 
+/* Free client state cs, taking into account the corresponding server state */
+
 static void free_client_state (client_state *cs)
 {
-  // TODO keep reference count and delete when 0
+  /* TODO keep reference count and delete when 0 */
   client_state *csi;
   int another_ss_client = 0;
   for (csi = client_states.first; csi != NULL; csi = csi->next)
@@ -154,7 +165,7 @@ dump_client_state ()
     }
 }
 
-// Are we attaching to a process we have already encountered?
+/* Are we attaching to a process we have already encountered? */
 
 int
 attach_client_state (client_state *cs, int pid)
@@ -168,13 +179,16 @@ attach_client_state (client_state *cs, int pid)
 	  matched_cs->ss->attach_count += 1;
 	  xfree (cs->executable);
 	  cs->executable = matched_cs->executable;
-	  free_server_state (cs->ss);		// reuse the matched server state
-	  cs->ss = matched_cs->ss;
+	  free_server_state (cs->ss);
+	  cs->ss = matched_cs->ss;		/* reuse the matched server state */
 	  return 1;
 	}
     }
   return 0;
 }
+
+
+/* Add a new client state for fd or return if found */
 
 client_state *
 set_client_state (gdb_fildes_t fd)
@@ -187,7 +201,7 @@ set_client_state (gdb_fildes_t fd)
   client_state *csidx;
   client_state *new_csidx;
 
-  // add/return initial client state
+  /* add/return initial client state */
   if (fd == -1)
     {
       if (client_states.first == NULL)
@@ -195,13 +209,13 @@ set_client_state (gdb_fildes_t fd)
 	  client_states.first= new_client_state ();
 	  client_states.first->ss = new_server_state ();
 	  client_states.first->file_desc = fd;
-	  client_states.current_fd = fd;
-	  client_states.current_cs = client_states.first;
 	}
+      client_states.current_fd = fd;
+      client_states.current_cs = client_states.first;
       return client_states.first;
     }
 
-  // add/return client state for fd F
+  /* add/return client state for fd F */
 
   for (csidx = client_states.first; ; csidx = csidx->next)
     {
@@ -215,30 +229,37 @@ set_client_state (gdb_fildes_t fd)
 	break;
     }
 
-  // add client state S for fd F
-  new_csidx = new_client_state ();
-  *new_csidx = *csidx;
-  new_csidx->ss = new_server_state ();
-  *new_csidx->ss = *csidx->ss;
+  /* add client state S for fd F */
+  if (client_states.current_fd == -1 && client_states.current_cs->executable != NULL)
+    {
+      new_csidx = new_client_state ();
+      *new_csidx = *client_states.first;
+    }
+  else
+    {
+      new_csidx = new_client_state ();
+      *new_csidx = *csidx;
+      new_csidx->ss = new_server_state ();
+      *new_csidx->ss = *csidx->ss;
+      new_csidx->normalized_packet = '\0';
+      new_csidx->executable = NULL;
+      new_csidx->in_buf = NULL;
+      new_csidx->wrapper_argv = NULL;
+      new_csidx->breakpoints = NULL;
+      new_csidx->ss->attach_count = 0;
+      new_csidx->ss->cont_thread = null_ptid;
+      new_csidx->ss->general_thread = null_ptid;
+      new_csidx->ss->signal_pid = 0;
+      new_csidx->ss->last_ptid = null_ptid;
+      new_csidx->ss->last_status.kind = TARGET_WAITKIND_IGNORE;
+      new_csidx->ss->current_thread = NULL;
+      new_csidx->ss->all_processes.head = NULL;
+      new_csidx->ss->all_processes.tail = NULL;
+      new_csidx->ss->all_threads.head = NULL;
+      new_csidx->ss->all_threads.tail = NULL;
+    }
   new_csidx->file_desc = fd;
-  new_csidx->normalized_packet = '\0';
-  new_csidx->executable = NULL;
   new_csidx->own_buf = xmalloc (PBUFSIZ + 1);
-  new_csidx->in_buf = NULL;
-  new_csidx->wrapper_argv = NULL;
-  new_csidx->breakpoints = NULL;
-  new_csidx->ss->attach_count = 0;
-  new_csidx->ss->cont_thread = null_ptid;
-  new_csidx->ss->general_thread = null_ptid;
-  new_csidx->ss->signal_pid = 0;
-  new_csidx->ss->last_ptid = null_ptid;
-  new_csidx->ss->last_status.kind = TARGET_WAITKIND_IGNORE;
-  new_csidx->ss->current_thread = NULL;
-  new_csidx->ss->all_processes.head = NULL;
-  new_csidx->ss->all_processes.tail = NULL;
-  new_csidx->ss->all_threads.head = NULL;
-  new_csidx->ss->all_threads.tail = NULL;
-
   client_states.current_fd = fd;
   client_states.current_cs = new_csidx;
   csidx->next = new_csidx;
@@ -248,6 +269,8 @@ set_client_state (gdb_fildes_t fd)
 }
 
 
+/* Return the client state count and optionally return the last client's fd */
+
 int
 count_client_state (gdb_fildes_t *fdp)
 {
@@ -255,7 +278,7 @@ count_client_state (gdb_fildes_t *fdp)
   int n_client_states = 0;
   for (cs = client_states.first; cs != NULL; cs = cs->next)
     {
-      if (cs->executable != NULL)
+      if (cs->file_desc > 0 && cs->executable != NULL)
 	{
 	  n_client_states += 1;
 	  if (fdp)
@@ -265,6 +288,8 @@ count_client_state (gdb_fildes_t *fdp)
   return n_client_states;
 }
 
+
+/*  Remove the client state corresponding to fd */
 
 void
 delete_client_state (gdb_fildes_t fd)
@@ -279,6 +304,8 @@ delete_client_state (gdb_fildes_t fd)
 	  ss = cs->ss;
 	  previous_cs->next = cs->next;
 	  free_client_state (cs);
+	  if (client_states.current_fd == fd)
+	    set_client_state (-1);
 	  cs = previous_cs;
 	}
       if (cs->next == NULL)
@@ -348,14 +375,15 @@ delete_client_breakpoint(client_state *cs, CORE_ADDR addr)
 }
 
 
+/* Return the current client state */
+
 client_state *
 get_client_state (void)
 {
-// client_states.current_cs = set_client_state (client_states.current_fd);
  return client_states.current_cs;
 }
 
-// Add another client to the 1 server -> N client list.
+/* Add another client to the 1 server -> N client list. */
 
 client_state *
 add_client_state (char *executable)
@@ -380,9 +408,9 @@ add_client_state (char *executable)
 	}
     }
 
-  // TODO Is there a window where multiple clients are created by new_client_state but not yet setup by match_client_state?
+  /* TODO Is there a window where multiple clients are created by new_client_state but not yet setup by match_client_state? */
   cs = set_client_state (client_states.current_fd);
-  new_executable = xmalloc (strlen (executable) + 1); // was in else
+  new_executable = xmalloc (strlen (executable) + 1);
   strcpy (new_executable, executable);
   cs->executable = new_executable;
 
@@ -391,8 +419,8 @@ add_client_state (char *executable)
       client_state *tcs = get_client_state();
       client_state *next_cs = cs->next;
       gdb_fildes_t file_desc = cs->file_desc;
-      free_server_state (cs->ss);		// reuse the matched server state
-      cs->ss = matched_cs->ss; // was *cs = *matched_cs
+      free_server_state (cs->ss);		/* reuse the matched server state */
+      cs->ss = matched_cs->ss;
       cs->ss->attach_count += 1;
       cs->next = next_cs;
       cs->file_desc = file_desc;
@@ -424,29 +452,30 @@ static const char lcd_request [127][127] = {
     ['x']['b']='x', ['b']['x']='x',
     ['x']['k']='c', ['k']['x']='c',
 };
-// a pending_waitee client has higher priority, e.g. continue AND step = step
-// a pending waiter client has lower priority (waits), e.g. continue waits for step
+/* a pending_waitee client has higher priority, e.g. continue AND step = step
+   a pending waiter client has lower priority (waits), e.g. continue waits for step */
 enum pending_types  {none_pending=0, pending_waitee=1, pending_cont_waiter=2,pending_step_waiter=3};
 
 
-// inspect the packet in own_buf and normalize it to a corresponding gdb request for the
-// not ignore_packet case, or output a packet that will cause the packet to be ignored for
-// the ignore_packet case.
+/* inspect the packet in own_buf and normalize it to a corresponding gdb request for the
+   not ignore_packet case, or output a packet that will cause the packet to be ignored for
+   the ignore_packet case. */
 
 int
 normalize_packet (client_state *cs, int ignore_packet)
 {
-  char own_packet = cs->in_buf[0];
+  char own_packet;
   int ignored_packet = 0;
-//x  char tmpstr[17];
-//  strncpy (tmpstr, cs->in_buf, sizeof (tmpstr));
-//  tmpstr[sizeof (tmpstr)-1] = '\0';
-//  debug_printf ("%s %s %d %d %d\n", __FUNCTION__,tmpstr, cs->normalized_packet,ignore_packet, cs->pending);
+
+  if (cs->in_buf)
+    own_packet = cs->in_buf[0];
+  else
+    return 0;
+  /* If we are just categorizing to a normalized gdb request and we have already done so then return */
   if (!ignore_packet && (cs->pending == pending_cont_waiter 
 			 || cs->pending == pending_step_waiter))
     return 0;
-  // TODO a gdb request maps to N packets. tag the client with the corresponding gdb request
-  // If we are just categorizing to a normalized gdb request and we have already done so then return
+
   switch (own_packet)
   {
     case 'v':
@@ -1492,7 +1521,7 @@ handle_monitor_command (char *mon, char *own_buf)
 	  {
 	    client_state *save_cs = cs;
 	    cs = set_client_state (csidx->file_desc);
-	    // fake the reply to the waiter client
+	    /* fake the reply to the waiter client */
 	    normalize_packet (cs, 1);
 	    csidx->pending = none_pending;
 	    set_client_state (save_cs->file_desc);
@@ -2306,7 +2335,6 @@ void
 handle_query (char *own_buf, int packet_len, int *new_packet_len_p, gdb_client_data client_data)
 {
   static struct inferior_list_entry *thread_ptr;
-//  client_state *cs = client_data;
   client_state *cs = get_client_state();
 
   /* Reply the current thread id.  */
@@ -2993,7 +3021,6 @@ resume (struct thread_resume *actions, size_t num_actions)
       cs->ss->last_ptid = mywait (minus_one_ptid, &cs->ss->last_status, 0, 1);
 
 
-//    find_client_breakpoint_at ((*the_target->read_pc)(get_thread_regcache (cs->ss->current_thread, 1)), 0, 0);
     if (cs->ss->last_status.kind == TARGET_WAITKIND_NO_RESUMED)
 	{
 	  /* No proper RSP support for this yet.  At least return
@@ -3039,7 +3066,6 @@ handle_v_attach (char *own_buf)
     {
       strcpy (own_buf, "?");
       handle_status (own_buf);
-      //      write_ok (own_buf);
       return 1;
     }
   else if (pid != 0 && attach_inferior (pid) == 0)
@@ -3198,7 +3224,6 @@ handle_v_kill (char *own_buf)
 void
 handle_v_requests (char *own_buf, int packet_len, int *new_packet_len, gdb_client_data client_data)
 {
-  //  client_state *cs = (client_state*)client_data;
   client_state *cs = get_client_state();
 
   if (!disable_packet_vCont)
@@ -3502,8 +3527,7 @@ handle_status (char *own_buf)
       if (thread == NULL)
 	thread = get_first_inferior (&cs->ss->all_threads);
 
-      //      if (thread != NULL)
-      // we are detaching a multi attached client
+      /* we are detaching a multi attached client */
       if (debug_threads > 1)
 	debug_printf ("%s:%d before prepare_resume_reply call %d %d\n", __FUNCTION__, __LINE__, cs->ss->attach_count, cs->packet);
       if (thread != NULL && !(cs->packet == 'D' && cs->ss->attach_count > 0))
@@ -3868,7 +3892,6 @@ captured_main (int argc, char *argv[])
   cs->run_once = run_once;
   cs->disable_randomization = disable_randomization;
   cs->program_argv = NULL;
-  cs->extended_protocol = 1;
 
   port = *next_arg;
   next_arg++;
@@ -3923,7 +3946,6 @@ captured_main (int argc, char *argv[])
      of these, not one per target.  Only one target is active at a
      time.  */
 
-  //  cs->own_buf = xmalloc (PBUFSIZ + 1);
   cs->ss->mem_buf = xmalloc (PBUFSIZ);
 
   if (pid == 0 && *next_arg != NULL)
@@ -4155,7 +4177,6 @@ process_serial_event (gdb_client_data client_data)
   CORE_ADDR mem_addr;
   int pid;
   unsigned char sig;
-//  int packet_len;
   int new_packet_len = -1;
   client_state *cs = get_client_state();
 
@@ -4210,16 +4231,17 @@ process_serial_event (gdb_client_data client_data)
 
   normalize_packet (cs, 0);
 
-  { // Handle pending type
+  { /* Handle pending type */
     client_state *csidx = NULL;
 
     for (csidx = client_states.first; csidx != NULL; csidx = csidx->next)
       {
-	// another client is attached to the cs process
-	if (csidx != cs && cs->ss == csidx->ss)
+	/* another client is attached to the cs process */
+	if (csidx->file_desc != -1 && csidx != cs && cs->ss == csidx->ss)
 	  {
-	    debug_printf ("%s:%d csidx pending=%d packet=%d cs pending=%d packet=%d\n", __FUNCTION__, __LINE__, csidx->pending, csidx->normalized_packet, cs->pending, cs->normalized_packet);
-	    // find this client's pending type
+	    if (debug_threads)
+	      debug_printf ("%s:%d csidx pending=%d packet=%d cs pending=%d packet=%d\n", __FUNCTION__, __LINE__, csidx->pending, csidx->normalized_packet, cs->pending, cs->normalized_packet);
+	    /* find this client's pending type */
 	    if (!csidx->pending)
 	      {
 		if (cs->normalized_packet == 'c')
@@ -4227,18 +4249,21 @@ process_serial_event (gdb_client_data client_data)
 		    cs->pending = pending_cont_waiter;
 		    csidx->pending = pending_waitee;
 
-		    debug_printf ("%s:%d pending check set %d %d\n", __FUNCTION__, __LINE__,csidx->file_desc,csidx->pending);
+		    if (debug_threads)
+		      debug_printf ("%s:%d pending check set %d %d\n", __FUNCTION__, __LINE__,csidx->file_desc,csidx->pending);
 		  }
 		else if (cs->normalized_packet == 's')
 		  {
 		    cs->pending = pending_step_waiter;
 		    csidx->pending = pending_waitee;
-		    debug_printf ("%s:%d pending check set %d %d\n", __FUNCTION__, __LINE__,csidx->file_desc,csidx->pending);
+		    if (debug_threads)
+		      debug_printf ("%s:%d pending check set %d %d\n", __FUNCTION__, __LINE__,csidx->file_desc,csidx->pending);
 		  }
 	      }
 	  }
       }
-    debug_printf ("%s:%d pending check %d waiter=%d\n", __FUNCTION__, __LINE__,cs->file_desc,cs->pending);
+    if (debug_threads)
+      debug_printf ("%s:%d pending check %d waiter=%d\n", __FUNCTION__, __LINE__,cs->file_desc,cs->pending);
     if (cs->pending == pending_cont_waiter)
       return 0;
   }
@@ -4553,8 +4578,7 @@ process_serial_event (gdb_client_data client_data)
 	  }
 	else
 	  {
-	    // gdb add and removes breakpoints on the fly so don't remove them
-	    //	    delete_client_breakpoint (addr);
+	    /* gdb adds and removes breakpoints on the fly so we don't call delete_client_breakpoint here */
 	    res = delete_gdb_breakpoint (type, addr, len);
 	  }
 
@@ -4651,7 +4675,7 @@ process_serial_event (gdb_client_data client_data)
       break;
   }
 
-  { // Handle pending type
+  { /* Handle pending type */
     client_state *csidx = NULL;
 
 
@@ -4660,8 +4684,8 @@ process_serial_event (gdb_client_data client_data)
 	if (cs->normalized_packet == 'c' && cs->pending == pending_waitee 
 	    && csidx->pending == pending_cont_waiter)
 	  {
-	    // TODO Don't assume only 2 clients connected to a process
-	    // has waitee/waiter been resolved?
+	    /* TODO Don't assume only 2 clients connected to a process
+	       has waitee/waiter been resolved? */
 	    if (csidx->normalized_packet == 'c')
 	      {
 		char save_ch = ch;
@@ -4674,7 +4698,7 @@ process_serial_event (gdb_client_data client_data)
 		  debug_printf ("%s:%d pc=%#lx waitee=%d has bp=%d waiter=%d has bp=%d\n", __FUNCTION__, __LINE__, (long unsigned)(*the_target->read_pc)(get_thread_regcache (cs->ss->current_thread, 1)), cs->file_desc, waitee_has_bp, save_cs->file_desc, waiter_has_bp);
 		if (waiter_has_bp)
 		  {
-		    // fake the reply to the waiter client
+		    /* fake the reply to the waiter client */
 		    debug_printf ("%s:%d normalize fd=%d\n", __FUNCTION__, __LINE__, cs->file_desc);
 		    normalize_packet (cs, 1);
 		    csidx->pending = none_pending;
@@ -4702,7 +4726,7 @@ process_serial_event (gdb_client_data client_data)
 		char save_ch = ch;
 		client_state *save_cs = cs;
 		cs = set_client_state (csidx->file_desc);
-		// fake the reply to the waiter client
+		/* fake the reply to the waiter client */
 		debug_printf ("%s:%d normalize fd=%d\n", __FUNCTION__, __LINE__, cs->file_desc);
 		normalize_packet (cs, 1);
 		csidx->pending = none_pending;

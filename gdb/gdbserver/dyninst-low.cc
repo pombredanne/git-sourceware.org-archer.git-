@@ -55,7 +55,7 @@ extern "C"
 
 
 #define DYNERRMSG(errstr,args...)						\
-  fprintf (stderr, "%s %s " errstr "\n", __FUNCTION__, dyninst_process->getLastErrorMsg(), ##args);
+      fprintf (stderr, "%s %s " errstr "\n", __FUNCTION__, getLastErrorMsg(), ##args);
 #define DYNERR(errstr,args...)						\
   fprintf (stderr, "%s " errstr "\n", __FUNCTION__, ##args);
 #define DEBUG_ENTER() if (debug_threads) debug_enter()
@@ -213,6 +213,7 @@ public:
 
     do
       {
+	cerr << "";
 	std::vector<std::pair<ptid_t,Event::const_ptr> >::iterator it;
 	for (it = current_events.begin() ;
 	    it != current_events.end(); ++it)
@@ -385,11 +386,34 @@ dump_events (void)
 }
 
 
+static void dump_one_client (client_state*) __attribute__ ((unused));
 static void dump_processes (void) __attribute__ ((unused));
+
+static void
+dump_one_client (client_state *cs)
+{
+  struct inferior_list_entry *inf;
+  cerr << "client " << cs->ss->general_thread.pid << cs->ss->general_thread.lwp << " all processes ";
+  for (inf = cs->ss->all_processes.head; inf != NULL; inf = inf->next)
+    {
+      struct process_info *pi = (process_info*)inf;
+      cerr << pi->entry.id.pid << '/' << pi->entry.id.lwp << '/' << pi->entry.id.tid << ' ';
+    }
+  cerr << '\n';
+  cerr << "all threads ";
+  for (inf = cs->ss->all_threads.head; inf != NULL; inf = inf->next)
+    {
+      struct thread_info *ti = (thread_info*)inf;
+      cerr << ti->entry.id.pid << '/' << ti->entry.id.lwp << '/' << ti->entry.id.tid << ' ';
+    }
+  cerr << '\n';
+}
+
 static void
 dump_processes (void)
 {
   ProcessSet::iterator it;
+
   int idx = 1;
   for (it = dyninst_procset->begin();
       it != dyninst_procset->end(); ++it)
@@ -421,22 +445,7 @@ dump_processes (void)
       idx += 1;
     }
 
-  client_state *cs = get_client_state ();
-  struct inferior_list_entry *inf;
-  cerr << "all processes ";
-  for (inf = cs->ss->all_processes.head; inf != NULL; inf = inf->next)
-    {
-      struct process_info *pi = (process_info*)inf;
-      cerr << pi->entry.id.pid << '/' << pi->entry.id.lwp << '/' << pi->entry.id.tid << ' ';
-    }
-  cerr << '\n';
-  cerr << "all threads ";
-  for (inf = cs->ss->all_threads.head; inf != NULL; inf = inf->next)
-    {
-      struct thread_info *ti = (thread_info*)inf;
-      cerr << ti->entry.id.pid << '/' << ti->entry.id.lwp << '/' << ti->entry.id.tid << ' ';
-    }
-  cerr << '\n';
+  for_each_client_state (dump_one_client);
 }
 
 void
@@ -528,6 +537,12 @@ extern "C"
 
 /* Per-process private data.  */
 
+struct break_info
+{
+  Dyninst::PID pid;
+  CORE_ADDR addr;
+};
+
 struct process_info_private
 {
   Process::ptr process;
@@ -594,11 +609,12 @@ dyninst_add_lwp (int pid, Thread::const_ptr thread)
 
 
 void
-dyninst_remove_thread(Thread::const_ptr thread)
+dyninst_remove_lwp (Thread::const_ptr thread)
 {
   if (thread != NULL)
     {
       ptid_t ptid = ptid_build (thread->getProcess()->getPid(), thread->getLWP(), 0);
+      DEBUG(ptid.pid);
       struct thread_info *ti = find_thread_ptid (ptid);
       if (ti != NULL)
 	{
@@ -644,6 +660,8 @@ breakpoint_handler(Event::const_ptr ev)
   EventBreakpoint::const_ptr bp_ev = ev->getEventBreakpoint();
   DEBUG(ev->name() << bp_ev->getAddress(), pid_to_string (ev->getThread()));
   events.insert(ev);
+  if (debug_threads)
+      dump_events();
   return Process::cbDefault;
 }
 
@@ -813,17 +831,9 @@ dyninst_attach (unsigned long pid)
   for (thidx = dyninst_process->threads().begin();
       thidx != dyninst_process->threads().end(); thidx++)
     {
-      bool reg_map_setup = false;
-      RegisterPool regpool;
       DEBUG("created thread " << dec << (*thidx)->getTID() << ' ' << (*thidx)->getLWP() << hex);
       Thread::const_ptr th = *thidx;
       dyninst_add_lwp  (pid, th);
-      if (! reg_map_setup)
-	{
-	  th->getAllRegisters (regpool);
-	  (*the_low_target.reg_map_setup)(regpool);
-	  reg_map_setup = true;
-	}
     }
 
   LibraryPool::iterator libidx;
@@ -846,87 +856,84 @@ dyninst_resume (struct thread_resume *resume_info, size_t n)
 
   DEBUG_ENTER ();
 
-  // see linux-low.c::linux_set_resume_request for the proper way to handle multiple resumes
-  // for (int i = 0; i < (int)n; i++)
+  // TODO see linux-low.c::linux_set_resume_request for the proper way to handle multiple resumes
   int i = 0;
+  ptid_t ptid = resume_info[i].thread;
+
+  if (ptid_equal(ptid, minus_one_ptid))
+    ptid = thread_to_gdb_id (cs->ss->current_thread);
+
+  Dyninst::PID pid = ptid_get_pid (ptid);
+  ProcessSet::iterator it;
+  Process::ptr dyninst_process;
+  for (it = dyninst_procset->begin();
+      it != dyninst_procset->end(); ++it)
     {
-      ptid_t ptid = resume_info[i].thread;
-
-      if (ptid_equal(ptid, minus_one_ptid))
-	ptid = thread_to_gdb_id (cs->ss->current_thread);
-
-      Dyninst::PID pid = ptid_get_pid (ptid);
-//      ProcessSet::iterator procset_it = dyninst_procset->find(pid);
-      ProcessSet::iterator it;
-      Process::ptr dyninst_process;
-      for (it = dyninst_procset->begin();
-	  it != dyninst_procset->end(); ++it)
+      Process::ptr proc = *it;
+      if (proc->getPid() == pid)
 	{
-	  Process::ptr proc = *it;
-	  if (proc->getPid() == pid)
-	    {
-	      dyninst_process = proc;
+	  dyninst_process = proc;
+	  break;
+	}
+    }
+  if (it == dyninst_procset->end())
+    DYNERR ("Cannot resume process %lu\n", (long unsigned)pid);
+
+  ThreadPool::iterator thidx;
+  Thread::ptr th;
+
+  if (dyninst_process->isTerminated())
+    {
+      DEBUG_EXIT ();
+      return;
+    }
+
+  regcache_invalidate ();
+
+  if (resume_info[i].thread == minus_one_ptid
+      || ptid_get_lwp (resume_info[i].thread) == -1
+      || ptid_is_pid (resume_info[i].thread))
+    {
+      DEBUG("before continue pid=" << pid);
+      if (! dyninst_process->continueProc())
+	DEBUG("Unable to continueProc " << getLastErrorMsg());
+      DEBUG_EXIT ();
+      return;
+    }
+
+  for (thidx = dyninst_process->threads().begin();
+      thidx != dyninst_process->threads().end(); thidx++)
+    {
+      th = *thidx;
+      if (th->getLWP() == ptid.lwp)
+	{
+	  // resume_continue, resume_step, resume_stop
+	  struct thread_info *ti = find_thread_ptid (ptid);
+	  struct lwp_info *tip = (struct lwp_info*)(ti->target_data);
+	  tip->step_range_start = resume_info->step_range_start;
+	  tip->step_range_end = resume_info->step_range_end;
+	  struct regcache *regcache = get_thread_regcache (ti, 1);
+	  CORE_ADDR pc = (*the_low_target.read_pc) (regcache);
+	  DEBUG("range " << resume_info->step_range_start << "/" << resume_info->step_range_end << " pc=" << pc << " kind=" << resume_info[i].kind);
+
+	  switch (resume_info[i].kind)
+	  {
+	    case resume_step:
+	      MachRegisterVal result;
+	      th->getRegister(MachRegister(x86_64::rip), result);
+	      DEBUG("in step mode @" << result, pid_to_string (th));
+	      if (! th->setSingleStepMode(true))
+		DYNERRMSG("Unable to setSingleStepMode");
+	      // fall through
+	    case resume_continue:
+	      regcache_invalidate_thread (ti);
+	      if (! th->continueThread())
+		DYNERRMSG("Unable to continueThread");
 	      break;
-	    }
-	}
-      if (it == dyninst_procset->end())
-	DYNERR ("Cannot resume process %lu\n", (long unsigned)pid);
-
-      ThreadPool::iterator thidx;
-      Thread::ptr th;
-
-      if (dyninst_process->isTerminated())
-	{
-	  DEBUG_EXIT ();
-	  return;
-	}
-
-      regcache_invalidate ();
-
-      if (resume_info[i].thread == minus_one_ptid
-	  || ptid_get_lwp (resume_info[i].thread) == -1
-	  || ptid_is_pid (resume_info[i].thread))
-	{
-	  DEBUG("before continue pid=" << pid);
-	  if (! dyninst_process->continueProc())
-	    DEBUG("Unable to continueProc " << dyninst_process->getLastErrorMsg());
-	  DEBUG_EXIT ();
-	  return;
-	}
-
-      for (thidx = dyninst_process->threads().begin();
-	   thidx != dyninst_process->threads().end(); thidx++)
-	{
-	  th = *thidx;
-	  if (th->getLWP() == ptid.lwp)
-	    {
-	      // resume_continue, resume_step, resume_stop
-	      struct thread_info *ti = find_thread_ptid (ptid);
-	      struct lwp_info *tip = (struct lwp_info*)(ti->target_data);
-	      tip->step_range_start = resume_info->step_range_start;
-	      tip->step_range_end = resume_info->step_range_end;
-	      struct regcache *regcache = get_thread_regcache (ti, 1);
-	      CORE_ADDR pc = (*the_low_target.read_pc) (regcache);
-	      DEBUG("range " << resume_info->step_range_start << "/" << resume_info->step_range_end << " pc=" << pc << " kind=" << resume_info[i].kind);
-
-	      switch (resume_info[i].kind)
-		{
-		case resume_step:
-		    MachRegisterVal result;
-		    th->getRegister(MachRegister(x86_64::rip), result);
-		    DEBUG("in step mode @" << result, pid_to_string (th));
-		    if (! th->setSingleStepMode(true))
-		      DYNERRMSG("Unable to setSingleStepMode");
-		case resume_continue:
-		    regcache_invalidate_thread (ti);
-		    if (! th->continueThread())
-		      DYNERRMSG("Unable to continueThread");
-		    break;
-		case resume_stop:
-		  if (! th->stopThread())
-		    DYNERRMSG("Unable to stopThread");
-		}
-	    }
+	    case resume_stop:
+	      if (! th->stopThread())
+		DYNERRMSG("Unable to stopThread");
+	  }
 	}
     }
   DEBUG_EXIT ();
@@ -990,7 +997,6 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
       if (event == NULL)
 	{
 	  event = events.get(new_ptid);
-//	  DEBUG("", pid_to_string (new_ptid));
 	}
       else
 	DEBUG("", pid_to_string (event));
@@ -998,6 +1004,15 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
 
       Thread::const_ptr new_thr;
       Process::const_ptr child;
+      if (debug_threads)
+	dump_events();
+//    if (event->getProcess()->isTerminated())
+//	{
+//	  status->kind = TARGET_WAITKIND_IGNORE;
+//	  status->value.integer = gdb_signal_from_host (0);
+//	  DEBUG_EXIT ();
+//	  return new_ptid;
+//	}
       if ((new_thr = events.is_threadcreate(event)) != NULL_Thread)
 	{
 	  DEBUG("threadcreate pid=" << pid << " New thread: " << event->getThread()->getLWP() << ' ' << ((new_thr != NULL_Thread) ? new_thr->getLWP() : 0), pid_to_string (new_ptid));
@@ -1014,7 +1029,7 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
 	  if (ti)
 	    remove_thread (ti);
 	  events.erase(event);
-	  continue;		// wait events loopNULL
+	  continue;		// wait events loop
 	}
       else if (events.is_exit(event))
 	{
@@ -1040,29 +1055,14 @@ dyninst_wait_1 (ptid_t ptid, struct target_waitstatus *status, int options)
       else if (events.is_breakpoint(event))
 	{
 	  EventBreakpoint::const_ptr breakpoint_ev = event->getEventBreakpoint();
-	  // FIXME
-	  if (0 && breakpoint_ev)
-	    {
-	      std::vector<Breakpoint::const_ptr> bps;
-	      breakpoint_ev->getBreakpoints(bps);
-	      std::vector<Breakpoint::const_ptr>::iterator it;
-	      for (it = bps.begin(); it != bps.end(); it++)
-		{
-		  Breakpoint::const_ptr bp = *it;
-		  DEBUG("breakpoint " << bp->getToAddress());
-		}
-	    }
 	  events.erase(event);
-	  status->kind = TARGET_WAITKIND_STOPPED;
-	  // EventStop doesn't have a signal member
-	  status->value.integer = gdb_signal_from_host (SIGTRAP);
-	  DEBUG("returning ", pid_to_string (new_ptid));
-	  // TODO check this
-	  if (0 && ptid_get_pid (new_ptid) > 0)
-	    cs->ss->current_thread = find_thread_ptid (new_ptid);
-	  DEBUG("current_thread" << cs->ss->current_thread);
-	  DEBUG_EXIT ();
-	  return ptid_build (event->getProcess()->getPid(), event->getThread()->getLWP(), 0);
+	    {
+	      status->kind = TARGET_WAITKIND_STOPPED;
+	      // EventStop doesn't have a signal member
+	      status->value.integer = gdb_signal_from_host (SIGTRAP);
+	      DEBUG_EXIT ();
+	      return ptid_build (event->getProcess()->getPid(), event->getThread()->getLWP(), 0);
+	    }
 	}
       else if (events.is_singlestep(event))
 	{
@@ -1191,6 +1191,8 @@ dyninst_detach (Dyninst::PID pid)
 {
   struct process_info *process;
   ProcessSet::iterator procset_it = dyninst_procset->find(pid);
+  if (procset_it == dyninst_procset->end())
+    return 1;
   Process::ptr dyninst_process = *procset_it;
 
   process = find_process_pid (pid);
@@ -1204,14 +1206,30 @@ dyninst_detach (Dyninst::PID pid)
 
 /* Remove a PROC */
 
+/* Remove all LWPs that belong to process PROC from the lwp list.  */
+
+static int
+delete_lwp_callback (struct inferior_list_entry *entry, void *proc)
+{
+  struct thread_info *thread = (struct thread_info *) entry;
+  struct lwp_info *lwp = (struct lwp_info*)(thread->target_data);
+  struct process_info *process = (struct process_info*)proc;
+
+  if (pid_of (thread) == pid_of (process))
+    dyninst_remove_lwp (lwp->thread);
+
+  return 0;
+}
+
 static void
 dyninst_mourn (struct process_info *proc)
 {
-  clear_inferiors ();
-// TODO
   ThreadPool::iterator thidx;
-
   Process::ptr dyninst_process;
+  client_state *cs = get_client_state ();
+
+  find_inferior (&cs->ss->all_threads, delete_lwp_callback, proc);
+
   if (proc->priv)
     {
       dyninst_process = ((struct process_info_private*)(proc->priv))->process;
@@ -1220,7 +1238,7 @@ dyninst_mourn (struct process_info *proc)
 	    thidx != dyninst_process->threads().end(); thidx++)
 	  {
 	    Thread::const_ptr th = *thidx;
-	    dyninst_remove_thread (th);
+	    dyninst_remove_lwp  (th);
 	  }
     }
 
@@ -1241,6 +1259,8 @@ dyninst_join (Dyninst::PID pid)
     {
       ptid_t new_ptid = ptid_build (pid, pid, 0);
       ProcessSet::iterator procset_it = dyninst_procset->find(pid);
+      if (procset_it == dyninst_procset->end())
+	return;
       Process::ptr dyninst_process = *procset_it;
       if (! dyninst_process->hasRunningThread())
 	break;
@@ -1394,8 +1414,6 @@ dyninst_read_pc (struct regcache *regcache)
   if (the_low_target.read_pc == NULL)
     return 0;
 
-//  Thread::const_ptr thr_ = dyninst_get_inferior_thread();
-//  Thread::ptr thr = boost::const_pointer_cast<Thread>(thr_);
   CORE_ADDR pc = (*the_low_target.read_pc) (regcache);
   DEBUG("pc is " << pc);
   return pc;
@@ -1508,8 +1526,9 @@ dyninst_request_interrupt (void)
 
   Dyninst::PID pid = ptid_get_pid (thread_to_gdb_id (cs->ss->current_thread));
   ProcessSet::iterator procset_it = dyninst_procset->find(pid);
+  if (procset_it == dyninst_procset->end())
+    return;
   Process::ptr dyninst_process = *procset_it;
-
   if (! dyninst_process->terminate())
     DYNERRMSG ("Unable to interrupt process %ld", (long)pid);
 }
@@ -1524,7 +1543,7 @@ dyninst_read_auxv (CORE_ADDR offset, unsigned char *myaddr, unsigned int len)
   char filename[PATH_MAX];
   int fd, n;
   client_state *cs = get_client_state ();
-  int pid = lwpid_of (cs->ss->current_thread);
+  Dyninst::PID pid = lwpid_of (cs->ss->current_thread);
 
   xsnprintf (filename, sizeof filename, "/proc/%d/auxv", pid);
 
@@ -1578,8 +1597,11 @@ dyninst_insert_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
   if (dyninst_process->isTerminated())
     return true;
   Breakpoint::ptr brp = Breakpoint::newBreakpoint();
-  DEBUG(" addr=" << addr << ' ' << brp->getToAddress(), pid_to_string(th));
-  brp->setData(bp);
+  DEBUG(" addr=" << addr << " raw_break=" << bp, pid_to_string(th));
+  struct break_info *break_info = new struct break_info;
+  break_info->pid = dyninst_process->getPid();
+  break_info->addr = addr;
+  brp->setData((void*)break_info);
   insert_shadow_memory (bp);
 
   howto_continue = cont_none;
@@ -1622,6 +1644,7 @@ dyninst_remove_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
   Thread::ptr th = boost::const_pointer_cast<Thread>(thr);
   Process::const_ptr dyninst_process = thr->getProcess();
   Process::ptr dyninst_proc = boost::const_pointer_cast<Process>(dyninst_process);
+  client_state *cs = get_client_state ();
 
   enum {cont_none, cont_thread, cont_proc} howto_continue;
 
@@ -1641,19 +1664,24 @@ dyninst_remove_point (enum raw_bkpt_type type, CORE_ADDR addr, int len,
   std::vector<Breakpoint::ptr>::iterator it;
   bool result = false;
 
+  DEBUG("break_count=" << dyninst_bpset.size());
   for (it = dyninst_bpset.begin(); it != dyninst_bpset.end(); it++)
     {
       Breakpoint::ptr bp = *it;
-      if ((struct raw_breakpoint*)(bp->getData()) == rbp)
+      struct break_info *break_info = (struct break_info*)(bp->getData());
+      DEBUG(" addr=" << addr << " stored_pid=" << break_info->pid << " stored_break_addr=" << break_info->addr, pid_to_string(th));
+      if (break_info->addr == addr && break_info->pid == pid_of (cs->ss->current_thread))
 	{
-	  DEBUG(" addr=" << addr << ' ' << bp->getToAddress(), pid_to_string(th));
 	  if (! (result = dyninst_process->rmBreakpoint(addr, bp)))
-	    DYNERRMSG ("Unable remove breakpoint at %#lx", (long)addr);
+	    {
+	      DYNERRMSG ("Unable remove breakpoint at %#lx", (long)addr);
+	    }
+	  delete break_info;
+	  dyninst_bpset.erase(it);
 	  break;
 	}
     }
 
-  dyninst_bpset.erase(it);
 
   switch (howto_continue)
     {
@@ -1832,7 +1860,7 @@ static struct target_ops dyninst_target_ops = {
   NULL,  // qxfer_spu
   NULL,  // hostio_last_error
   NULL,  // qxfer_osdata
-  NULL,  // qxfer_siginfo
+  NULL,  // qxfer_siginfolinux_kill
   dyninst_supports_non_stop,
   NULL,  // async
   NULL,  // start_non_stop

@@ -145,9 +145,10 @@ struct client_breakpoint
 
 struct client_state
 {
-  char *executable;
-  // file descriptor corresponding to this client
+  // inferior_list is not used for this since it is indexed by ptid_t and this
+  //  is indexed by the file descriptor corresponding to this client
   gdb_fildes_t file_desc;
+  char *executable;
   char *own_buf;
   char *in_buf;
   char packet;
@@ -202,9 +203,14 @@ struct client_states
   gdb_fildes_t current_fd;
 };
 
+void for_each_client_state (void (*client_state_prog) (client_state*));
+
+
 client_state * get_client_state ();
 
 client_state * set_client_state (gdb_fildes_t);
+
+int count_client_state (gdb_fildes_t *fdp);
 
 void delete_client_state (gdb_fildes_t fd);
 
