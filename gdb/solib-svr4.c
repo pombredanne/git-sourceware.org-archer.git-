@@ -1160,6 +1160,47 @@ svr4_copy_library_list (struct so_list *src)
 
 #include "xml-support.h"
 
+/* Conver text hexadecimal representation HEX into its binary form,
+   store it to newly allocated memory *BINP sized *BINSZP.  For errors
+   reporting use FILENAME.  */
+
+static void
+hex2bin_allocate (const char *hex, gdb_byte **binp, size_t *binszp,
+		  const char *filename)
+{
+  size_t hex_len, binsz;
+
+  if (hex == NULL)
+    return;
+  hex_len = strlen (hex);
+  if (hex_len == 0)
+    {
+      warning (_("Shared library \"%s\" received empty build-id "
+		 "from gdbserver"), filename);
+      return;
+    }
+  if ((hex_len & 1U) != 0)
+    {
+      warning (_("Shared library \"%s\" received odd number "
+		 "of build-id \"%s\" hex characters from gdbserver"),
+	       filename, hex);
+      return;
+    }
+  binsz = hex_len / 2;
+  *binp = xmalloc (binsz);
+  *binszp = hex2bin (hex, *binp, binsz);
+  if (*binszp != binsz)
+    {
+      warning (_("Shared library \"%s\" received invalid "
+		 "build-id \"%s\" hex character at encoded byte "
+		 "position %s (first as 0) from gdbserver"),
+	       filename, hex, pulongest (*binszp));
+      xfree (*binp);
+      *binp = NULL;
+      *binszp = 0;
+    }
+}
+
 /* Handle the start of a <library> element.  Note: new elements are added
    at the tail of the list, keeping the list in order.  */
 
@@ -1187,37 +1228,8 @@ library_list_start_library (struct gdb_xml_parser *parser,
   strncpy (new_elem->so_name, name, sizeof (new_elem->so_name) - 1);
   new_elem->so_name[sizeof (new_elem->so_name) - 1] = 0;
   strcpy (new_elem->so_original_name, new_elem->so_name);
-  if (hex_build_id != NULL)
-    {
-      const size_t hex_build_id_len = strlen (hex_build_id);
-
-      if (hex_build_id_len == 0)
-	warning (_("Shared library \"%s\" received empty build-id "
-	           "from gdbserver"), new_elem->so_original_name);
-      else if ((hex_build_id_len & 1U) != 0)
-	warning (_("Shared library \"%s\" received odd number "
-		   "of build-id \"%s\" hex characters from gdbserver"),
-		 new_elem->so_original_name, hex_build_id);
-      else
-	{
-	  const size_t build_idsz = hex_build_id_len / 2;
-
-	  new_elem->build_id = xmalloc (build_idsz);
-	  new_elem->build_idsz = hex2bin (hex_build_id, new_elem->build_id,
-					  build_idsz);
-	  if (new_elem->build_idsz != build_idsz)
-	    {
-	      warning (_("Shared library \"%s\" received invalid "
-			 "build-id \"%s\" hex character at encoded byte "
-			 "position %s (first as 0) from gdbserver"),
-		       new_elem->so_original_name, hex_build_id,
-		       pulongest (new_elem->build_idsz));
-	      xfree (new_elem->build_id);
-	      new_elem->build_id = NULL;
-	      new_elem->build_idsz = 0;
-	    }
-	}
-    }
+  hex2bin_allocate (hex_build_id, &new_elem->build_id, &new_elem->build_idsz,
+		    new_elem->so_original_name);
 
   *list->tailp = new_elem;
   list->tailp = &new_elem->next;
