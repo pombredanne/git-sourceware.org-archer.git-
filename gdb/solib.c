@@ -47,6 +47,7 @@
 #include "gdb_bfd.h"
 #include "filestuff.h"
 #include "source.h"
+#include "build-id.h"
 
 /* Architecture-specific operations.  */
 
@@ -312,6 +313,17 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
   do_cleanups (old_chain);
 
   /* We try to find the library in various ways.  */
+
+  if (build_idsz != 0)
+    {
+      file = build_id_to_file (build_idsz, build_id, "", opts);
+      if (file_location_is_valid (&file))
+	{
+	  do_cleanups (old_chain);
+	  return file;
+	}
+      file_location_free (&file);
+    }
 
   /* If the search in gdb_sysroot failed, and the path name is
      absolute at this point, make it relative.  (openp will try and open the
