@@ -27,6 +27,8 @@
 #include "frame.h"
 #include "value.h"
 #include "filestuff.h"
+#include "inferior.h"
+#include "gdb/fileio.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -735,6 +737,211 @@ dirnames_to_char_ptr_vec_target_exc (const char *string)
       }
 
   return vec;
+}
+
+/* Initialize *FILE as failed one with error code ENOENT.  Such
+   file_location still should be processed by file_location_free.  */
+
+void
+file_location_enoent (struct file_location *file)
+{
+  memset (file, 0, sizeof (*file));
+  file->fd = -1;
+  file->file_errno = ENOENT;
+}
+
+/* Free resources of *FILE.  *FILE must be properly initialized, either
+   by a successful or unsuccessful locator.  *FILE remains unspecified
+   after this call.  */
+
+void
+file_location_free (struct file_location *file)
+{
+  if (file->fd != -1)
+    {
+      if (file->load_via_target)
+	{
+	  int target_errno;
+
+	  target_fileio_close (file->fd, &target_errno);
+	}
+      else
+	close (file->fd);
+    }
+  gdb_bfd_unref (file->abfd);
+  xfree (file->filename);
+}
+
+/* Call file_location_free suitable for make_cleanup.  */
+
+static void
+file_location_cleanup (void *file_voidp)
+{
+  file_location_free (file_voidp);
+}
+
+/* Return boolean 1 if *FILE contains a successful file representation.
+   Return 0 otherwise.  */
+
+int
+file_location_is_valid (const struct file_location *file)
+{
+  if (!file->file_errno && !file->bfderr)
+    return 1;
+  gdb_assert (file->abfd == NULL);
+  return 0;
+}
+
+/* Return new file_location from FILENAME and OPTS.  */
+
+struct file_location
+file_location_from_filename (const char *filename, enum openp_flags opts)
+{
+  struct file_location file;
+  struct cleanup *back_to;
+
+  memset (&file, 0, sizeof (file));
+  file.fd = -1;
+  back_to = make_cleanup (file_location_cleanup, &file);
+  file.filename = xstrdup (filename);
+
+  if (is_target_filename (filename))
+    {
+      filename += strlen (TARGET_SYSROOT_PREFIX);
+      if (!target_filesystem_is_local ())
+	{
+	  file.load_via_target = 1;
+
+	  /* gdb_bfd_fopen does not support "target:" filenames.  */
+	  if (write_files)
+	    warning (_("writing into executable files is "
+		       "not supported for %s sysroots"),
+		     TARGET_SYSROOT_PREFIX);
+	}
+    }
+
+  if (file.load_via_target)
+    {
+      int target_errno;
+
+      file.fd = target_fileio_open (current_inferior (),
+				    filename, FILEIO_O_RDONLY, 0,
+				    &target_errno);
+      if (file.fd == -1)
+	{
+	  file.file_errno = fileio_errno_to_host (target_errno);
+	  discard_cleanups (back_to);
+	  return file;
+	}
+    }
+  else
+    {
+      /* WRITE_FILES is ignored if !OPF_IS_BFD.  */
+
+      file.fd = gdb_open_cloexec (filename, O_RDONLY | O_BINARY, 0);
+      if (file.fd == -1)
+	{
+	  file.file_errno = errno;
+	  discard_cleanups (back_to);
+	  return file;
+	}
+    }
+
+  if ((opts & OPF_IS_BFD) == 0)
+    {
+      discard_cleanups (back_to);
+      return file;
+    }
+
+  if (file.load_via_target)
+    {
+      const int do_close = (opts & OPF_IS_BFD) != 0;
+
+      gdb_assert (strcmp (filename,
+			  file.filename + strlen (TARGET_SYSROOT_PREFIX)) == 0);
+      file.abfd = gdb_bfd_open_from_target (file.filename, gnutarget, file.fd,
+					    do_close);
+      if (do_close && file.abfd != NULL)
+	file.fd = -1;
+    }
+  else
+    {
+      if (write_files)
+	file.abfd = gdb_bfd_fopen (filename, gnutarget, FOPEN_RUB, file.fd);
+      else
+	file.abfd = gdb_bfd_open (filename, gnutarget, file.fd);
+      if ((opts & OPF_IS_BFD) != 0)
+	file.fd = -1;
+      else
+	{
+	  file.fd = dup (file.fd);
+	  if (file.fd == -1)
+	    {
+	      int save_errno = errno;
+
+	      do_cleanups (back_to);
+	      file_location_enoent (&file);
+	      file.file_errno = save_errno;
+	      return file;
+	    }
+	}
+    }
+
+  if (file.abfd == NULL)
+    {
+      file.bfderr = bfd_get_error ();
+      discard_cleanups (back_to);
+      return file;
+    }
+
+  discard_cleanups (back_to);
+  return file;
+}
+
+/* Return new BFD * from FILE.  If FILE represents a failed locator
+   result then bfd_set_error is called and NULL is returned.  FILE
+   content is always freed by this function.  The locator for FILE must
+   have been called with OPF_IS_BFD.  */
+
+bfd *
+file_location_to_bfd (struct file_location file)
+{
+  bfd *retval;
+
+  if (file.abfd == NULL)
+    {
+      const int file_errno = file.file_errno;
+      const bfd_error_type file_bfderr = file.bfderr;
+
+      gdb_assert (file_errno || file_bfderr);
+
+      file_location_free (&file);
+
+      if (file_bfderr == bfd_error_on_input)
+	bfd_set_error (bfd_error_malformed_archive);
+      else if (file_bfderr)
+	bfd_set_error (file_bfderr);
+      else
+	{
+	  bfd_set_error (bfd_error_system_call);
+	  errno = file_errno;
+	}
+      return NULL;
+    }
+  gdb_bfd_ref (file.abfd);
+  retval = file.abfd;
+  file_location_free (&file);
+  return retval;
+}
+
+/* Return new BFD * from FILENAME.  See file_location_from_filename and
+   file_location_to_bfd.  */
+
+bfd *
+filename_to_bfd (const char *filename)
+{
+  return file_location_to_bfd (file_location_from_filename (filename,
+							    OPF_IS_BFD));
 }
 
 /* Open a file named STRING, searching path PATH (dir names sep by some char).

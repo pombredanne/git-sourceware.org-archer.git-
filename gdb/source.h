@@ -101,4 +101,50 @@ extern void add_substitute_path_rule (char *, char *);
 
 extern VEC (char_ptr) *dirnames_to_char_ptr_vec_target_exc (const char *string);
 
+/* Unified file representation which can contain BFD *, filename and FD
+   in all or some of the forms.  */
+struct file_location
+{
+  /* This pointer can be NULL.  Use OPF_IS_BFD to get it filled in.  */
+  bfd *abfd;
+
+  /* This pointer is never NULL.  It names the actual file opened (this
+     string will always start with a "/").  We have to take special
+     pains to avoid doubling the "/" between the directory and the file,
+     sigh!  Emacs gets confuzzed by this when we print the source file
+     name!!!  */
+  char *filename;
+
+  /* A flag whether FD represents remote target fileio descriptor or
+     local operating system file descriptor.  */
+  unsigned char load_via_target;
+
+  /* File descriptor (see LOAD_VIA_TARGET) or -1.  Do not use OPF_IS_BFD
+     to get it filled in.  */
+  int fd;
+
+  /* ERRNO value if a call to fill-in this structure failed.  See also
+     BFDERR.  */
+  int file_errno;
+
+  /* BFD error value if a call to fill-in this structure failed or
+     bfd_error_no_error.  If either FILE_ERRNO or BFDERR are non-zero
+     then this file_location failed and ABFD must be NULL.  There is no
+     guarantee for failed file_location about FD value.  */
+  bfd_error_type bfderr;
+};
+
+extern void file_location_enoent (struct file_location *file);
+
+extern void file_location_free (struct file_location *file);
+
+extern int file_location_is_valid (const struct file_location *file);
+
+extern struct file_location file_location_from_filename (const char *filename,
+							 enum openp_flags opts);
+
+extern bfd *file_location_to_bfd (struct file_location file);
+
+extern bfd *filename_to_bfd (const char *filename);
+
 #endif

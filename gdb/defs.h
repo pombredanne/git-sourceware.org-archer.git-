@@ -336,6 +336,9 @@ enum openp_flags
      for source files but not for executables).  */
   OPF_SEARCH_IN_PATH  = (1 << 1),
 
+  /* Ask for bfd * to be returned in file_location.  */
+  OPF_IS_BFD          = (1 << 2),
+
   /* Open the file in read/write mode if WRITE_FILES says so.  */
   OPF_OPEN_RW_TMP     = (1 << 3),
 };

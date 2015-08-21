@@ -172,4 +172,6 @@ int gdb_bfd_count_sections (bfd *abfd);
 
 int gdb_bfd_requires_relocations (bfd *abfd);
 
+int fileio_errno_to_host (int errnum);
+
 #endif /* GDB_BFD_H */

@@ -197,7 +197,7 @@ gdb_bfd_has_target_filename (struct bfd *abfd)
 
 /* Return the system error number corresponding to ERRNUM.  */
 
-static int
+int
 fileio_errno_to_host (int errnum)
 {
   switch (errnum)
