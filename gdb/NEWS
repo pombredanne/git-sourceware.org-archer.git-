@@ -51,6 +51,9 @@ show remote multiprocess-extensions-packet
 * The "set sysroot" (and "show sysroot") commands now accept PATH-style
   lists of directories.
 
+* Default sysroot has changed to ":target:", that is first host files
+  and then target files are tried.
+
 * New options
 
 set validate-build-id (on|off)

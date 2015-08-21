@@ -67,8 +67,11 @@ if { $using_probes } {
     }
 
     # GDB strips "target:" from the start of filenames
-    # when operating on the local filesystem
-    regsub "^target:" "$sysroot" "(target:)?" sysroot
+    # when operating on the local filesystem.
+    # Also use only the first element of $sysroot which will hopefully
+    # successfully match the filename.
+    regsub "^target:(\[^:\]*):.*$" "$sysroot" "" sysroot
+    regsub "^(?!target:)(\[^:\]*):.*$" "$sysroot" "" sysroot
 
     # Run til it loads our library
     set test "run til our library loads"

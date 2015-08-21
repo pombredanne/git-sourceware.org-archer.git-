@@ -548,7 +548,11 @@ captured_main (void *data)
   if (gdb_sysroot == NULL || *gdb_sysroot == '\0')
     {
       xfree (gdb_sysroot);
-      gdb_sysroot = xstrdup (TARGET_SYSROOT_PREFIX);
+      
+      /* Try first the local filesystem,
+         TARGET_SYSROOT_PREFIX is a fallback.  */
+      gdb_sysroot = xstrprintf ("%c%s", DIRNAME_SEPARATOR,
+				TARGET_SYSROOT_PREFIX);
     }
 
   debug_file_directory = relocate_gdb_directory (DEBUGDIR,

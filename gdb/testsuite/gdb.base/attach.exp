@@ -67,7 +67,7 @@ proc do_attach_tests {} {
     global timeout
     
     # Figure out a regular expression that will match the sysroot,
-    # noting that the default sysroot is "target:", and also noting
+    # noting that the default sysroot is ":target:", and also noting
     # that GDB will strip "target:" from the start of filenames when
     # operating on the local filesystem
     set sysroot ""
@@ -77,7 +77,10 @@ proc do_attach_tests {} {
 	    set sysroot $expect_out(1,string)
 	}
     }
-    regsub "^target:" "$sysroot" "(target:)?" sysroot
+    # Use only the first element of $sysroot which will hopefully
+    # successfully match the filename.
+    regsub "^target:(\[^:\]*):.*$" "$sysroot" "" sysroot
+    regsub "^(?!target:)(\[^:\]*):.*$" "$sysroot" "" sysroot
 
     # Start the program running and then wait for a bit, to be sure
     # that it can be attached to.
