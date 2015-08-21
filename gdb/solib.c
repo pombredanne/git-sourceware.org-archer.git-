@@ -620,25 +620,30 @@ solib_bfd_fopen (char *pathname, int fd)
 bfd *
 solib_bfd_open (char *pathname, size_t build_idsz, const gdb_byte *build_id)
 {
-  char *found_pathname;
-  int found_file;
+  struct file_location file;
   bfd *abfd;
   const struct bfd_arch_info *b;
 
   /* Search for shared library file.  */
-  found_pathname = solib_find (pathname, build_idsz, build_id, &found_file);
-  if (found_pathname == NULL)
+  file = solib_find_file (pathname, OPF_IS_BFD, build_idsz, build_id);
+  if (!file_location_is_valid (&file))
     {
       /* Return failure if the file could not be found, so that we can
 	 accumulate messages about missing libraries.  */
-      if (errno == ENOENT)
-	return NULL;
+      if (file.file_errno == ENOENT)
+	{
+	  file_location_free (&file);
+	  return NULL;
+	}
 
+      file_location_free (&file);
       perror_with_name (pathname);
     }
 
   /* Open bfd for shared library.  */
-  abfd = solib_bfd_fopen (found_pathname, found_file);
+  gdb_bfd_ref (file.abfd);
+  abfd = file.abfd;
+  file_location_free (&file);
 
   /* Check bfd format.  */
   if (!bfd_check_format (abfd, bfd_object))
