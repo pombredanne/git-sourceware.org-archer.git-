@@ -319,11 +319,25 @@ extern const char *pc_prefix (CORE_ADDR);
 /* From source.c */
 
 /* See openp function definition for their description.  */
-#define OPF_TRY_CWD_FIRST     0x01
-#define OPF_SEARCH_IN_PATH    0x02
-#define OPF_RETURN_REALPATH   0x04
+enum openp_flags
+{
+  /* Try to open ./STRING before searching PATH (ie pretend the first
+     element of PATH is ".").  This also indicates that, unless
+     OPF_SEARCH_IN_PATH is also specified, a slash in STRING disables
+     searching of the path (this is so that "exec-file ./foo" or
+     "symbol-file ./foo" insures that you get that particular version of
+     foo or an error message).  */
+  OPF_TRY_CWD_FIRST   = (1 << 0),
 
-extern int openp (const char *, int, const char *, int, char **);
+  /* Absolute names will also be searched in path (we usually want this
+     for source files but not for executables).  */
+  OPF_SEARCH_IN_PATH  = (1 << 1),
+
+  /* See openp, to be removed.  */
+  OPF_RETURN_REALPATH = (1 << 2),
+};
+
+extern int openp (const char *, enum openp_flags, const char *, int, char **);
 
 extern int source_full_path_of (const char *, char **);
 

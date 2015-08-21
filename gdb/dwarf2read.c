@@ -10454,7 +10454,8 @@ static bfd *
 try_open_dwop_file (const char *file_name, int is_dwp, int search_cwd)
 {
   bfd *sym_bfd;
-  int desc, flags;
+  int desc;
+  enum openp_flags flags;
   char *absolute_name;
   /* Blech.  OPF_TRY_CWD_FIRST also disables searching the path list if
      FILE_NAME contains a '/'.  So we can't use it.  Instead prepend "."
