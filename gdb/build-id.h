@@ -30,6 +30,9 @@ extern const struct bfd_build_id *build_id_bfd_get (bfd *abfd);
 extern int build_id_verify (bfd *abfd,
 			    size_t check_len, const bfd_byte *check);
 
+extern struct file_location
+  build_id_to_file (size_t build_id_len, const bfd_byte *build_id,
+		    const char *suffix, enum openp_flags opts);
 
 /* Find and open a BFD given a build-id.  If no BFD can be found,
    return NULL.  The returned reference to the BFD must be released by

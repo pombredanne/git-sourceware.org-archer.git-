@@ -27,6 +27,7 @@
 #include "filenames.h"
 #include "gdbcore.h"
 #include "gdbcmd.h"
+#include "source.h"
 
 /* Boolean for command 'set validate-build-id'.  */
 int validate_build_id = 1;
@@ -84,15 +85,15 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
    return NULL.  Use "" or ".debug" for SUFFIX.  The returned reference to the
    BFD must be released by the caller.  */
 
-static bfd *
-build_id_to_bfd (size_t build_id_len, const bfd_byte *build_id,
-		 const char *suffix)
+struct file_location
+build_id_to_file (size_t build_id_len, const bfd_byte *build_id,
+		  const char *suffix, enum openp_flags opts)
 {
   char *link, *debugdir;
   VEC (char_ptr) *debugdir_vec;
   struct cleanup *back_to;
   int ix;
-  bfd *abfd = NULL;
+  struct file_location result;
 
   /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
   link = alloca (strlen (debug_file_directory) + (sizeof "/.build-id/" - 1) + 1
@@ -110,8 +111,6 @@ build_id_to_bfd (size_t build_id_len, const bfd_byte *build_id,
       const gdb_byte *data = build_id;
       size_t size = build_id_len;
       char *s;
-      char *filename = NULL;
-      struct cleanup *inner;
 
       memcpy (link, debugdir, debugdir_len);
       s = &link[debugdir_len];
@@ -127,30 +126,18 @@ build_id_to_bfd (size_t build_id_len, const bfd_byte *build_id,
 	s += sprintf (s, "%02x", (unsigned) *data++);
       strcpy (s, suffix);
 
-      /* lrealpath() is expensive even for the usually non-existent files.  */
-      if (access (link, F_OK) == 0)
-	filename = lrealpath (link);
-
-      if (filename == NULL)
-	continue;
-
-      /* We expect to be silent on the non-existing files.  */
-      inner = make_cleanup (xfree, filename);
-      abfd = gdb_bfd_open (filename, gnutarget, -1);
-      do_cleanups (inner);
-
-      if (abfd == NULL)
-	continue;
-
-      if (build_id_verify (abfd, build_id_len, build_id))
-	break;
-
-      gdb_bfd_unref (abfd);
-      abfd = NULL;
+      result = file_location_from_filename (link, opts | OPF_BFD_CANONICAL,
+					    build_id_len, build_id);
+      if (file_location_is_valid (&result))
+	{
+	  do_cleanups (back_to);
+	  return result;
+	}
+      file_location_free (&result);
     }
 
-  do_cleanups (back_to);
-  return abfd;
+  file_location_enoent (&result);
+  return result;
 }
 
 /* See build-id.h.  */
@@ -158,7 +145,19 @@ build_id_to_bfd (size_t build_id_len, const bfd_byte *build_id,
 bfd *
 build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
 {
-  return build_id_to_bfd (build_id_len, build_id, ".debug");
+  struct file_location result;
+  bfd *retval;
+
+  result = build_id_to_file (build_id_len, build_id, ".debug", OPF_IS_BFD);
+  if (result.abfd == NULL)
+    {
+      file_location_free (&result);
+      return NULL;
+    }
+  gdb_bfd_ref (result.abfd);
+  retval = result.abfd;
+  file_location_free (&result);
+  return retval;
 }
 
 /* See build-id.h.  */
