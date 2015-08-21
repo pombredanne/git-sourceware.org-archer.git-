@@ -113,11 +113,7 @@ show_solib_search_path (struct ui_file *file, int from_tty,
 #  define DOS_BASED_FILE_SYSTEM 0
 #endif
 
-/* Return the full pathname of a binary file (the main executable
-   or a shared library file), or NULL if not found.  The returned
-   pathname is malloc'ed and must be freed by the caller.  If FD
-   is non-NULL, *FD is set to either -1 or an open file handle for
-   the binary file.
+/* Find a binary file (the main executable or a shared library file).
 
    Parameter SYSROOT is used as a prefix directory
    to search for binary files if they have an absolute path.
@@ -150,15 +146,16 @@ show_solib_search_path (struct ui_file *file, int from_tty,
    * machines since a sysroot will almost always be set.
 */
 
-static char *
-solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
+static struct file_location
+solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
+	      const char *sysroot)
 {
   const struct target_so_ops *ops = solib_ops (target_gdbarch ());
-  int found_file = -1;
-  char *temp_pathname = NULL;
+  char *temp_pathname;
   const char *fskind = effective_target_file_system_kind ();
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
-  int prefix_len, orig_prefix_len, temp_pathname_is_realpath;
+  int prefix_len, orig_prefix_len;
+  struct file_location file;
 
   /* If the absolute prefix starts with "target:" but the filesystem
      accessed by the target_fileio_* methods is the local filesystem
@@ -249,27 +246,23 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
 			      in_pathname, (char *) NULL);
     }
 
-  /* Handle files to be accessed via the target.  */
-  if (is_target_filename (temp_pathname))
-    {
-      if (fd != NULL)
-	*fd = -1;
-      do_cleanups (old_chain);
-      return temp_pathname;
-    }
-
   /* Now see if we can open it.  */
-  found_file = gdb_open_cloexec (temp_pathname, O_RDONLY | O_BINARY, 0);
-  if (found_file < 0)
-    xfree (temp_pathname);
+  file = file_location_from_filename (temp_pathname, opts);
+  if (file_location_is_valid (&file))
+    {
+      do_cleanups (old_chain);
+      return file;
+    }
+  file_location_free (&file);
+
+  xfree (temp_pathname);
 
   /* If the search in gdb_sysroot failed, and the path name has a
      drive spec (e.g, c:/foo), try stripping ':' from the drive spec,
      and retrying in the sysroot:
        c:/foo/bar.dll ==> /sysroot/c/foo/bar.dll.  */
 
-  if (found_file < 0
-      && sysroot != NULL
+  if (sysroot != NULL
       && HAS_TARGET_DRIVE_SPEC (fskind, in_pathname))
     {
       int need_dir_separator = !IS_DIR_SEPARATOR (in_pathname[2]);
@@ -282,47 +275,46 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
 			      in_pathname + 2, (char *) NULL);
       xfree (drive);
 
-      found_file = gdb_open_cloexec (temp_pathname, O_RDONLY | O_BINARY, 0);
-      if (found_file < 0)
+      file = file_location_from_filename (temp_pathname, opts);
+      if (file_location_is_valid (&file))
 	{
-	  xfree (temp_pathname);
-
-	  /* If the search in gdb_sysroot still failed, try fully
-	     stripping the drive spec, and trying once more in the
-	     sysroot before giving up.
-
-	     c:/foo/bar.dll ==> /sysroot/foo/bar.dll.  */
-
-	  temp_pathname = concat (sysroot,
-				  need_dir_separator ? SLASH_STRING : "",
-				  in_pathname + 2, (char *) NULL);
-
-	  found_file = gdb_open_cloexec (temp_pathname, O_RDONLY | O_BINARY, 0);
-	  if (found_file < 0)
-	    xfree (temp_pathname);
+	  do_cleanups (old_chain);
+	  return file;
 	}
+      file_location_free (&file);
+
+      xfree (temp_pathname);
+
+      /* If the search in gdb_sysroot still failed, try fully
+	 stripping the drive spec, and trying once more in the
+	 sysroot before giving up.
+
+	 c:/foo/bar.dll ==> /sysroot/foo/bar.dll.  */
+
+      temp_pathname = concat (sysroot,
+			      need_dir_separator ? SLASH_STRING : "",
+			      in_pathname + 2, (char *) NULL);
+
+      file = file_location_from_filename (temp_pathname, opts);
+      if (file_location_is_valid (&file))
+	{
+	  do_cleanups (old_chain);
+	  return file;
+	}
+      file_location_free (&file);
+
+      xfree (temp_pathname);
     }
 
   do_cleanups (old_chain);
 
-  /* We try to find the library in various ways.  After each attempt,
-     either found_file >= 0 and temp_pathname is a malloc'd string, or
-     found_file < 0 and temp_pathname does not point to storage that
-     needs to be freed.  */
-
-  if (found_file < 0)
-    {
-      temp_pathname = NULL;
-      temp_pathname_is_realpath = 1;
-    }
-  else
-    temp_pathname_is_realpath = 0;
+  /* We try to find the library in various ways.  */
 
   /* If the search in gdb_sysroot failed, and the path name is
      absolute at this point, make it relative.  (openp will try and open the
      file according to its absolute path otherwise, which is not what we want.)
      Affects subsequent searches for this solib.  */
-  if (found_file < 0 && IS_TARGET_ABSOLUTE_PATH (fskind, in_pathname))
+  if (IS_TARGET_ABSOLUTE_PATH (fskind, in_pathname))
     {
       /* First, get rid of any drive letters etc.  */
       while (!IS_TARGET_DIR_SEPARATOR (fskind, *in_pathname))
@@ -335,59 +327,87 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
 
   /* If not found, and we're looking for a solib, search the
      solib_search_path (if any).  */
-  if (is_solib && found_file < 0 && solib_search_path != NULL)
-    found_file = openp (solib_search_path, OPF_TRY_CWD_FIRST,
-			in_pathname, &temp_pathname);
+  if (is_solib && solib_search_path != NULL)
+    {
+      file = openp_file (solib_search_path, OPF_TRY_CWD_FIRST | opts,
+			 in_pathname);
+      if (file_location_is_valid (&file))
+	{
+	  file.filename = gdb_realpath_and_xfree (file.filename);
+	  return file;
+	}
+      file_location_free (&file);
+    }
 
   /* If not found, and we're looking for a solib, next search the
      solib_search_path (if any) for the basename only (ignoring the
      path).  This is to allow reading solibs from a path that differs
      from the opened path.  */
-  if (is_solib && found_file < 0 && solib_search_path != NULL)
-    found_file = openp (solib_search_path, OPF_TRY_CWD_FIRST,
-			target_lbasename (fskind, in_pathname), &temp_pathname);
+  if (is_solib && solib_search_path != NULL)
+    {
+      file = openp_file (solib_search_path, OPF_TRY_CWD_FIRST | opts,
+			 target_lbasename (fskind, in_pathname));
+      if (file_location_is_valid (&file))
+	{
+	  file.filename = gdb_realpath_and_xfree (file.filename);
+	  return file;
+	}
+      file_location_free (&file);
+    }
 
   /* If not found, and we're looking for a solib, try to use target
      supplied solib search method.  */
-  if (is_solib && found_file < 0 && ops->find_and_open_solib)
-    found_file = ops->find_and_open_solib (in_pathname, &temp_pathname);
+  if (is_solib && ops->find_and_open_solib)
+    {
+      file = ops->find_and_open_solib (in_pathname);
+      if (file_location_is_valid (&file))
+	return file;
+      file_location_free (&file);
+    }
 
   /* If not found, next search the inferior's $PATH environment variable.  */
-  if (found_file < 0 && sysroot == NULL)
-    found_file = openp (get_in_environ (current_inferior ()->environment,
-					"PATH"),
-			OPF_TRY_CWD_FIRST, in_pathname, &temp_pathname);
+  if (sysroot == NULL)
+    {
+      file = openp_file (get_in_environ (current_inferior ()->environment,
+					 "PATH"),
+			 OPF_TRY_CWD_FIRST | opts, in_pathname);
+      if (file_location_is_valid (&file))
+	{
+	  file.filename = gdb_realpath_and_xfree (file.filename);
+	  return file;
+	}
+      file_location_free (&file);
+    }
 
   /* If not found, and we're looking for a solib, next search the
      inferior's $LD_LIBRARY_PATH environment variable.  */
-  if (is_solib && found_file < 0 && sysroot == NULL)
-    found_file = openp (get_in_environ (current_inferior ()->environment,
-					"LD_LIBRARY_PATH"),
-			OPF_TRY_CWD_FIRST, in_pathname, &temp_pathname);
-
-  if (found_file >= 0 && temp_pathname_is_realpath)
-    temp_pathname = gdb_realpath_and_xfree (temp_pathname);
-
-  if (fd == NULL)
+  if (is_solib && sysroot == NULL)
     {
-      if (found_file >= 0)
-	close (found_file);
+      file = openp_file (get_in_environ (current_inferior ()->environment,
+					 "LD_LIBRARY_PATH"),
+			 OPF_TRY_CWD_FIRST | opts, in_pathname);
+      if (file_location_is_valid (&file))
+	{
+	  file.filename = gdb_realpath_and_xfree (file.filename);
+	  return file;
+	}
+      file_location_free (&file);
     }
-  else
-    *fd = found_file;
 
-  return temp_pathname;
+  file_location_enoent (&file);
+  return file;
 }
 
-/* It is an solib_find_2 wrapper handling multiple directory components
+/* It is an solib_find_3 wrapper handling multiple directory components
    of GDB_SYSROOT.  */
 
-static char *
-solib_find_1 (char *in_pathname, int *fd, int is_solib)
+static struct file_location
+solib_find_2 (char *in_pathname, enum openp_flags opts, int is_solib)
 {
   VEC (char_ptr) *sysroot_vec;
   struct cleanup *back_to;
-  char *retval, *sysroot;
+  struct file_location file;
+  char *sysroot;
   int ix;
 
   sysroot_vec = dirnames_to_char_ptr_vec_target_exc (gdb_sysroot);
@@ -395,12 +415,45 @@ solib_find_1 (char *in_pathname, int *fd, int is_solib)
 
   for (ix = 0; VEC_iterate (char_ptr, sysroot_vec, ix, sysroot); ++ix)
     {
-      retval = solib_find_2 (in_pathname, fd, is_solib, sysroot);
-      if (retval != NULL)
-	break;
+      file = solib_find_3 (in_pathname, opts, is_solib, sysroot);
+      if (file_location_is_valid (&file))
+	{
+	  do_cleanups (back_to);
+	  return file;
+	}
+      file_location_free (&file);
     }
 
   do_cleanups (back_to);
+  return file;
+}
+
+/* It is an solib_find_2 wrapper returning filename and optionally FD
+   for functions not yet converted to the file_location style.  */
+
+static char *
+solib_find_1 (char *in_pathname, int *fd, int is_solib)
+{
+  struct file_location file = solib_find_2 (in_pathname, OPF_NONE, is_solib);
+  char *retval;
+
+  if (!file_location_is_valid (&file))
+    {
+      retval = NULL;
+      if (fd != NULL)
+	*fd = -1;
+    }
+  else
+    {
+      retval = xstrdup (file.filename);
+      if (fd != NULL)
+	{
+	  gdb_assert (file.fd != -1);
+	  *fd = file.fd;
+	  file.fd = -1;
+	}
+    }
+  file_location_free (&file);
   return retval;
 }
 
@@ -444,8 +497,8 @@ exec_file_find (char *in_pathname, int *fd)
    The search algorithm used is described in solib_find_1's comment
    above.  */
 
-char *
-solib_find (char *in_pathname, int *fd)
+static struct file_location
+solib_find_file (char *in_pathname, enum openp_flags opts)
 {
   const char *solib_symbols_extension
     = gdbarch_solib_symbols_extension (target_gdbarch ());
@@ -473,7 +526,36 @@ solib_find (char *in_pathname, int *fd)
 	}
     }
 
-  return solib_find_1 (in_pathname, fd, 1);
+  return solib_find_2 (in_pathname, opts, 1 /* is_solib */);
+}
+
+/* It is an solib_find_file wrapper returning filename and optionally FD
+   for functions not yet converted to the file_location style.  */
+
+char *
+solib_find (char *in_pathname, int *fd)
+{
+  struct file_location file = solib_find_file (in_pathname, OPF_NONE);
+  char *retval;
+
+  if (!file_location_is_valid (&file))
+    {
+      retval = NULL;
+      if (fd != NULL)
+	*fd = -1;
+    }
+  else
+    {
+      retval = xstrdup (file.filename);
+      if (fd != NULL)
+	{
+	  gdb_assert (file.fd != -1);
+	  *fd = file.fd;
+	  file.fd = -1;
+	}
+    }
+  file_location_free (&file);
+  return retval;
 }
 
 /* Open and return a BFD for the shared library PATHNAME.  If FD is not -1,

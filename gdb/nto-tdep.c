@@ -31,6 +31,7 @@
 #include "solib-svr4.h"
 #include "gdbcore.h"
 #include "objfiles.h"
+#include "source.h"
 
 #ifdef __CYGWIN__
 #include <sys/cygwin.h>
@@ -81,14 +82,15 @@ nto_map_arch_to_cputype (const char *arch)
   return CPUTYPE_UNKNOWN;
 }
 
-int
-nto_find_and_open_solib (char *solib, char **temp_pathname)
+struct file_location
+nto_find_and_open_solib (char *solib)
 {
   char *buf, *arch_path, *nto_root;
   const char *endian;
   const char *base;
   const char *arch;
-  int arch_len, len, ret;
+  int arch_len, len;
+  struct file_location file;
 #define PATH_FMT \
   "%s/lib:%s/usr/lib:%s/usr/photon/lib:%s/usr/photon/dll:%s/lib/dll"
 
@@ -127,22 +129,13 @@ nto_find_and_open_solib (char *solib, char **temp_pathname)
 	     arch_path);
 
   base = lbasename (solib);
-  ret = openp (buf, OPF_TRY_CWD_FIRST, base, temp_pathname);
-  if (ret < 0 && base != solib)
-    {
-      xsnprintf (arch_path, arch_len, "/%s", solib);
-      ret = open (arch_path, O_RDONLY | O_BINARY);
-      if (temp_pathname)
-	{
-	  if (ret >= 0)
-	    *temp_pathname = xstrdup (arch_path);
-	  else
-	    *temp_pathname = NULL;
-	}
-    }
-  if (ret >= 0)
-    *temp_pathname = gdb_realpath_and_xfree (*temp_pathname);
-  return ret;
+  file = openp_file (buf, OPF_TRY_CWD_FIRST | OPF_IS_BFD, base);
+  if (file_location_is_valid (&file) || base == solib)
+    return file;
+  file_location_free (&file);
+
+  xsnprintf (arch_path, arch_len, "/%s", solib);
+  return file_location_from_filename (arch_path, OPF_IS_BFD);
 }
 
 void

@@ -142,11 +142,8 @@ struct target_so_ops
     /* Find and open shared library binary file.  */
     bfd *(*bfd_open) (char *pathname);
 
-    /* Optional extra hook for finding and opening a solib.
-       If TEMP_PATHNAME is non-NULL: If the file is successfully opened a
-       pointer to a malloc'd and realpath'd copy of SONAME is stored there,
-       otherwise NULL is stored there.  */
-    int (*find_and_open_solib) (char *soname, char **temp_pathname);
+    /* Optional extra hook for finding and opening a solib.  */
+    struct file_location (*find_and_open_solib) (char *soname);
 
     /* Hook for looking up global symbols in a library-specific way.  */
     struct block_symbol (*lookup_lib_global_symbol)
