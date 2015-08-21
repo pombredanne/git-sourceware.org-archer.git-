@@ -46,6 +46,7 @@
 #include "filesystem.h"
 #include "gdb_bfd.h"
 #include "filestuff.h"
+#include "source.h"
 
 /* Architecture-specific operations.  */
 
@@ -118,9 +119,9 @@ show_solib_search_path (struct ui_file *file, int from_tty,
    is non-NULL, *FD is set to either -1 or an open file handle for
    the binary file.
 
-   Global variable GDB_SYSROOT is used as a prefix directory
+   Parameter SYSROOT is used as a prefix directory
    to search for binary files if they have an absolute path.
-   If GDB_SYSROOT starts with "target:" and target filesystem
+   If SYSROOT starts with "target:" and target filesystem
    is the local filesystem then the "target:" prefix will be
    stripped before the search starts.  This ensures that the
    same search algorithm is used for local files regardless of
@@ -150,14 +151,13 @@ show_solib_search_path (struct ui_file *file, int from_tty,
 */
 
 static char *
-solib_find_1 (char *in_pathname, int *fd, int is_solib)
+solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
 {
   const struct target_so_ops *ops = solib_ops (target_gdbarch ());
   int found_file = -1;
   char *temp_pathname = NULL;
   const char *fskind = effective_target_file_system_kind ();
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
-  const char *sysroot = gdb_sysroot;
   int prefix_len, orig_prefix_len;
 
   /* If the absolute prefix starts with "target:" but the filesystem
@@ -375,6 +375,31 @@ solib_find_1 (char *in_pathname, int *fd, int is_solib)
     *fd = found_file;
 
   return temp_pathname;
+}
+
+/* It is an solib_find_2 wrapper handling multiple directory components
+   of GDB_SYSROOT.  */
+
+static char *
+solib_find_1 (char *in_pathname, int *fd, int is_solib)
+{
+  VEC (char_ptr) *sysroot_vec;
+  struct cleanup *back_to;
+  char *retval, *sysroot;
+  int ix;
+
+  sysroot_vec = dirnames_to_char_ptr_vec_target_exc (gdb_sysroot);
+  back_to = make_cleanup_free_char_ptr_vec (sysroot_vec);
+
+  for (ix = 0; VEC_iterate (char_ptr, sysroot_vec, ix, sysroot); ++ix)
+    {
+      retval = solib_find_2 (in_pathname, fd, is_solib, sysroot);
+      if (retval != NULL)
+	break;
+    }
+
+  do_cleanups (back_to);
+  return retval;
 }
 
 /* Return the full pathname of the main executable, or NULL if not

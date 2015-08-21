@@ -98,4 +98,7 @@ extern void clear_current_source_symtab_and_line (void);
 
 /* Add a source path substitution rule.  */
 extern void add_substitute_path_rule (char *, char *);
+
+extern VEC (char_ptr) *dirnames_to_char_ptr_vec_target_exc (const char *string);
+
 #endif

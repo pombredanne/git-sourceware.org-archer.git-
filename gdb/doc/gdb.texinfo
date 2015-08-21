@@ -18154,7 +18154,8 @@ to specify the search directories for target libraries.
 @kindex set solib-absolute-prefix
 @kindex set sysroot
 @item set sysroot @var{path}
-Use @var{path} as the system root for the program being debugged.  Any
+Use @var{path} as the system root (or a list of system root directories)
+for the program being debugged.  Any
 absolute shared library paths will be prefixed with @var{path}; many
 runtime loaders store the absolute paths to the shared library in the
 target program's memory.  When starting processes remotely, and when
@@ -18166,7 +18167,12 @@ to be laid out in the same way that they are on the target, with
 e.g.@: a @file{/bin}, @file{/lib} and @file{/usr/lib} hierarchy under
 @var{path}.
 
-If @var{path} starts with the sequence @file{target:} and the target
+Multiple sysroot directories can be specified in @var{path},
+separated by the host platform's path separator character (colon
+@samp{:} on Unix, semi-colon @samp{;} on MS-Windows, etc.).
+
+If @var{path} starts with the sequence @file{target:} (even if the host
+platform path separator is @samp{:}) and the target
 system is remote then @value{GDBN} will retrieve the target binaries
 from the remote system.  This is only supported when using a remote
 target that supports the @code{remote get} command (@pxref{File
@@ -18248,7 +18254,8 @@ location.
 
 @kindex show sysroot
 @item show sysroot
-Display the current executable and shared library prefix.
+Display the current value of sysroot, which is used to look for
+executable and shared libraries.
 
 @kindex set solib-search-path
 @item set solib-search-path @var{path}

@@ -702,6 +702,41 @@ is_regular_file (const char *name)
   return S_ISREG (st.st_mode);
 }
 
+/* It is a wrapper of dirnames_to_char_ptr_vec which handles possible
+   TARGET_SYSROOT_PREFIX clash with DIRNAME_SEPARATOR.  */
+
+VEC (char_ptr) *
+dirnames_to_char_ptr_vec_target_exc (const char *string)
+{
+  VEC (char_ptr) *vec = dirnames_to_char_ptr_vec (string);
+  int ix;
+  char *s;
+
+  if (DIRNAME_SEPARATOR == ':')
+    for (ix = 0; ix < VEC_length (char_ptr, vec);)
+      {
+	char *s = VEC_index (char_ptr, vec, ix);
+
+	gdb_assert (strcmp (TARGET_SYSROOT_PREFIX, "target" ":") == 0);
+	if (strcmp (s, "target") != 0)
+	  {
+	    ++ix;
+	    continue;
+	  }
+	VEC_ordered_remove (char_ptr, vec, ix);
+	xfree (s);
+	if (ix == VEC_length (char_ptr, vec))
+	  VEC_safe_push (char_ptr, vec, xstrdup (TARGET_SYSROOT_PREFIX));
+	else
+	  xfree (VEC_replace (char_ptr, vec, ix,
+			      concat (TARGET_SYSROOT_PREFIX,
+				      VEC_index (char_ptr, vec, ix),
+				      NULL)));
+      }
+
+  return vec;
+}
+
 /* Open a file named STRING, searching path PATH (dir names sep by some char)
    using mode MODE in the calls to open.  You cannot use this function to
    create files (O_CREAT).

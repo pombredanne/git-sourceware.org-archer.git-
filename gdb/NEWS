@@ -48,6 +48,9 @@ show remote multiprocess-extensions-packet
   target mon2000	mon2000 ROM monitor
   target ppcbug		PPCBUG ROM monitor for PowerPC
 
+* The "set sysroot" (and "show sysroot") commands now accept PATH-style
+  lists of directories.
+
 * New options
 
 set validate-build-id (on|off)
