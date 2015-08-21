@@ -65,8 +65,8 @@ show validate-build-id
 * New features in the GDB remote stub, GDBserver
 
   ** library-list-svr4 contains also optional attribute 'build-id' for
-     each library.  GDB does not load library with build-id that
-     does not match such attribute.
+     each library and one optional attribute 'main-build-id'.  GDB does
+     not load binaries with build-id that does not match such attribute.
 
 *** Changes in GDB 7.10
 

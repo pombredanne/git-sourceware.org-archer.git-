@@ -6915,8 +6915,25 @@ linux_qxfer_libraries_svr4 (const char *annex, unsigned char *readbuf,
 	 exited above due to failed get_r_debug.  */
       if (lm_prev == 0)
 	{
+	  const char *hex_enc_build_id = get_hex_build_id (l_addr, l_ld, &data);
+
 	  sprintf (p, " main-lm=\"0x%lx\"", (unsigned long) lm_addr);
 	  p = p + strlen (p);
+
+	  if (hex_enc_build_id != NULL)
+	    {
+	      while (allocated
+		     < p - document + 200 + strlen (hex_enc_build_id))
+		{
+		  /* Expand to guarantee sufficient storage.  */
+		  uintptr_t document_len = p - document;
+
+		  document = xrealloc (document, 2 * allocated);
+		  allocated *= 2;
+		  p = document + document_len;
+		}
+	      p += sprintf (p, " main-build-id=\"%s\"", hex_enc_build_id);
+	    }
 	}
       else
 	{

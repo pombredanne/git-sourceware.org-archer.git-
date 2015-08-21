@@ -916,7 +916,7 @@ file_location_from_filename (const char *filename, enum openp_flags opts,
       return file;
     }
 
-  if (!build_id_verify (file.abfd, build_idsz, build_id))
+  if (!build_id_verify (file.abfd, build_idsz, build_id, 1 /* advice */))
     {
       do_cleanups (back_to);
       file_location_enoent (&file);

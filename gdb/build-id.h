@@ -25,10 +25,11 @@
 extern const struct bfd_build_id *build_id_bfd_get (bfd *abfd);
 
 /* Return true if ABFD has NT_GNU_BUILD_ID matching the CHECK value.
-   Otherwise, issue a warning and return false.  */
+   Otherwise, issue a warning and return false.  Boolean ADVICE says whether
+   the warning should suggest to user there is the 'validate-build-id' flag.  */
 
-extern int build_id_verify (bfd *abfd,
-			    size_t check_len, const bfd_byte *check);
+extern int build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check,
+			    int advice);
 
 extern struct file_location
   build_id_to_file (size_t build_id_len, const bfd_byte *build_id,

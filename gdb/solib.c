@@ -1669,6 +1669,20 @@ solib_global_lookup (struct objfile *objfile,
   return (struct block_symbol) {NULL, NULL};
 }
 
+/* See solist.h.  */
+
+void
+solib_main_build_id (size_t *build_idszp, gdb_byte **build_idp)
+{
+  const struct target_so_ops *ops = ops = solib_ops (target_gdbarch ());
+
+  if (ops->main_build_id != NULL)
+    return ops->main_build_id (build_idszp, build_idp);
+
+  *build_idszp = 0;
+  *build_idp = NULL;
+}
+
 /* Lookup the value for a specific symbol from dynamic symbol table.  Look
    up symbol from ABFD.  MATCH_SYM is a callback function to determine
    whether to pick up a symbol.  DATA is the input of this callback

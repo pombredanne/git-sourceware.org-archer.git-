@@ -135,6 +135,13 @@ struct target_so_ops
        catch_errors requires a pointer argument.  */
     int (*open_symbol_file_object) (void *from_ttyp);
 
+    /* Report build-id of the main executable.  Both BUILD_IDSZP and
+       BUILD_IDP must not be NULL.  If returned *BUILD_IDSZP is zero
+       build-id is not known.  Returned *BUILD_IDP must be xfree-d by
+       the caller.  This pointer can be NULL, in which case this
+       functionality is not supported for this target.  */
+    void (*main_build_id) (size_t *build_idszp, gdb_byte **build_idp);
+
     /* Determine if PC lies in the dynamic symbol resolution code of
        the run time loader.  */
     int (*in_dynsym_resolve_code) (CORE_ADDR pc);
@@ -211,5 +218,8 @@ extern struct target_so_ops *current_target_so_ops;
 struct block_symbol solib_global_lookup (struct objfile *objfile,
 					    const char *name,
 					    const domain_enum domain);
+
+/* See target_so_ops's main_build_id.  */
+void solib_main_build_id (size_t *build_idszp, gdb_byte **build_idp);
 
 #endif

@@ -1,0 +1,158 @@
+# Copyright 2015 Free Software Foundation, Inc.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+
+standard_testfile
+
+if [is_remote target] {
+    untested "only local remote is currently supported"
+    return -1
+}
+if [is_remote host] {
+    untested "only local host is currently supported"
+    return -1
+}
+if [target_info exists use_gdb_stub] {
+    untested "only extended-remote target is supported for this test"
+    return -1
+}
+
+clean_restart
+
+if ![gdb_is_target_remote] {
+    untested "only gdbserver supports build-id reporting"
+    return -1
+}
+if ![target_is_gdbserver] {
+    untested "only FSF gdbserver supports build-id reporting"
+    return -1
+}
+
+# Test overview:
+#  generate two executable. One that will be used by the process
+#  and another, modified, that will be found by gdb. Gdb should
+#  detect the mismatch and refuse to use mismatched executable.
+
+# First version of the object.
+set srcmainfilerun ${testfile}.c
+
+# Modified version of the object.
+# Code in -mod.c is tuned so it gives a mismatch.
+set srcmainfilegdb ${testfile}-mod.c
+
+# So file name:
+set binmainfilebase {testfile}
+
+# Setup run directory (where program is run from)
+#   It contains the right executable.
+set binmainfiledirrun [standard_output_file ${testfile}_wd]
+set binmainfilerun ${binmainfiledirrun}/${binmainfilebase}
+
+# Second executable version is in current directory, '-mod' version.
+set binmainfiledirgdb [standard_output_file ""]
+set binmainfilegdb ${binmainfiledirgdb}/${binmainfilebase}
+
+file delete -force -- "${binmainfiledirrun}"
+file mkdir "${binmainfiledirrun}"
+
+set exec_opts {}
+lappend exec_opts "additional_flags=-DDIRNAME\=\"${binmainfiledirrun}\""
+lappend exec_opts "debug"
+lappend exec_opts "ldflags=-Wl,--build-id"
+
+if { [build_executable $testfile.exp $binmainfilerun $srcmainfilerun $exec_opts] != 0 } {
+    return -1
+}
+if { [build_executable $testfile.exp $binmainfilegdb $srcmainfilegdb $exec_opts] != 0 } {
+    return -1
+}
+
+set test_spawn_id [spawn_wait_for_attach $binmainfilerun]
+set testpid [spawn_id_get_pid $test_spawn_id]
+
+file copy -force $binmainfilerun $binmainfilerun-backup
+file copy -force $binmainfilegdb $binmainfilerun
+
+with_test_prefix "forced wrong executable" {
+    clean_restart $binmainfilerun
+
+    set test "attach"
+    gdb_test_multiple "attach $testpid" "$test" {
+	-re "Attaching to program: .*\r\nwarning: Detected exec-file mismatch .*\r\nwarning: inferior build ID .*\r\n$gdb_prompt $" {
+	    pass "$test"
+	}
+    }
+
+    gdb_test "detach"
+}
+
+with_test_prefix "unavailable autodetected executable" {
+    clean_restart
+
+    set test "attach"
+    gdb_test_multiple "attach $testpid" "$test" {
+	-re "Attaching to process $testpid\r\n.*\r\n$gdb_prompt $" {
+	    pass "$test"
+	}
+    }
+
+    set test "bt"
+    gdb_test_multiple $test $test {
+	-re " in main \[^\r\n\]*\r\n$gdb_prompt $" {
+	    fail $test
+	}
+	-re "\r\n$gdb_prompt $" {
+	    pass $test
+	}
+    }
+
+    gdb_test "detach"
+}
+
+# Test locating file by its build-id - if the regular filename does not match.
+# build-id file has to be a symlink - otherwise so_list->so_name shown in 'info
+# sharedlibrary' would contain the build-id hash and not the library name.
+set build_id_debug_relative [build_id_debug_filename_get $binmainfilerun-backup]
+if { ![regexp {^(.*)\.debug$} $build_id_debug_relative trash build_id_relative] } {
+    fail "strip debug $build_id_debug_relative"
+    return
+}
+set build_id_filename "${binmainfiledirrun}/$build_id_relative"
+file mkdir [file dirname $build_id_filename]
+remote_exec host "ln -sf $binmainfilerun-backup $build_id_filename"
+
+with_test_prefix "build-id autodetected executable" {
+    clean_restart
+
+    gdb_test_no_output "set debug-file-directory $binmainfiledirrun" "set debug-file-directory"
+
+    set test "attach"
+    gdb_test_multiple "attach $testpid" "$test" {
+	-re "\r\nwarning: Detected exec-file mismatch .*\r\n$gdb_prompt $" {
+	    fail "$test"
+	}
+	-re "\r\nwarning: inferior build ID .*\r\n$gdb_prompt $" {
+	    fail "$test"
+	}
+	-re "Attaching to process $testpid\r\n.*\r\n$gdb_prompt $" {
+	    pass "$test"
+	}
+    }
+
+    gdb_test "bt" " in main \[^\r\n\]*"
+
+    gdb_test "detach"
+}
+
+kill_wait_spawned_process $test_spawn_id

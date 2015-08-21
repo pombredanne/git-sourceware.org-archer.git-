@@ -2502,7 +2502,7 @@ dwarf2_get_dwz_file (void)
   dwz_bfd = gdb_bfd_open (filename, gnutarget, -1);
   if (dwz_bfd != NULL)
     {
-      if (!build_id_verify (dwz_bfd, buildid_len, buildid))
+      if (!build_id_verify (dwz_bfd, buildid_len, buildid, 1 /* advice */))
 	{
 	  gdb_bfd_unref (dwz_bfd);
 	  dwz_bfd = NULL;

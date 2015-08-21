@@ -358,6 +358,8 @@ struct svr4_info
 
   /* Load map address for the main executable.  */
   CORE_ADDR main_lm_addr;
+  size_t main_build_idsz;
+  gdb_byte *main_build_id;
 
   CORE_ADDR interp_text_sect_low;
   CORE_ADDR interp_text_sect_high;
@@ -1087,6 +1089,9 @@ struct svr4_library_list
   /* Inferior address of struct link_map used for the main executable.  It is
      NULL if not known.  */
   CORE_ADDR main_lm;
+
+  size_t main_build_idsz;
+  gdb_byte *main_build_id;
 };
 
 /* Implementation for target_so_ops.free_so.  */
@@ -1175,13 +1180,13 @@ hex2bin_allocate (const char *hex, gdb_byte **binp, size_t *binszp,
   hex_len = strlen (hex);
   if (hex_len == 0)
     {
-      warning (_("Shared library \"%s\" received empty build-id "
+      warning (_("Binary file \"%s\" received empty build-id "
 		 "from gdbserver"), filename);
       return;
     }
   if ((hex_len & 1U) != 0)
     {
-      warning (_("Shared library \"%s\" received odd number "
+      warning (_("Binary file \"%s\" received odd number "
 		 "of build-id \"%s\" hex characters from gdbserver"),
 	       filename, hex);
       return;
@@ -1191,7 +1196,7 @@ hex2bin_allocate (const char *hex, gdb_byte **binp, size_t *binszp,
   *binszp = hex2bin (hex, *binp, binsz);
   if (*binszp != binsz)
     {
-      warning (_("Shared library \"%s\" received invalid "
+      warning (_("Binary file \"%s\" received invalid "
 		 "build-id \"%s\" hex character at encoded byte "
 		 "position %s (first as 0) from gdbserver"),
 	       filename, hex, pulongest (*binszp));
@@ -1245,6 +1250,10 @@ svr4_library_list_start_list (struct gdb_xml_parser *parser,
   struct svr4_library_list *list = user_data;
   const char *version = xml_find_attribute (attributes, "version")->value;
   struct gdb_xml_value *main_lm = xml_find_attribute (attributes, "main-lm");
+  const struct gdb_xml_value *const att_main_build_id
+    = xml_find_attribute (attributes, "main-build-id");
+  const char *const main_hex_build_id = (att_main_build_id
+					 ? att_main_build_id->value : NULL);
 
   if (strcmp (version, "1.0") != 0)
     gdb_xml_error (parser,
@@ -1253,6 +1262,8 @@ svr4_library_list_start_list (struct gdb_xml_parser *parser,
 
   if (main_lm)
     list->main_lm = *(ULONGEST *) main_lm->value;
+  hex2bin_allocate (main_hex_build_id, &list->main_build_id,
+		    &list->main_build_idsz, _("main executable"));
 }
 
 /* The allowed elements and attributes for an XML library list.
@@ -1282,6 +1293,7 @@ static const struct gdb_xml_attribute svr4_library_list_attributes[] =
 {
   { "version", GDB_XML_AF_NONE, NULL, NULL },
   { "main-lm", GDB_XML_AF_OPTIONAL, gdb_xml_parse_attr_ulongest, NULL },
+  { "main-build-id", GDB_XML_AF_OPTIONAL, NULL, NULL },
   { NULL, GDB_XML_AF_NONE, NULL, NULL }
 };
 
@@ -1509,15 +1521,24 @@ svr4_current_sos_direct (struct svr4_info *info)
      Unfortunately statically linked inferiors will also fall back through this
      suboptimal code path.  */
 
+  library_list.main_build_id = NULL;
+  library_list.main_build_idsz = 0;
   info->using_xfer = svr4_current_sos_via_xfer_libraries (&library_list,
 							  NULL);
   if (info->using_xfer)
     {
       if (library_list.main_lm)
 	info->main_lm_addr = library_list.main_lm;
+      if (library_list.main_build_id != NULL)
+	{
+	  xfree (info->main_build_id);
+	  info->main_build_id = library_list.main_build_id;
+	  info->main_build_idsz = library_list.main_build_idsz;
+	}
 
       return library_list.head ? library_list.head : svr4_default_sos ();
     }
+  xfree (library_list.main_build_id);
 
   /* Always locate the debug struct, in case it has moved.  */
   info->debug_base = 0;
@@ -1574,6 +1595,25 @@ svr4_current_sos_1 (void)
 
   /* Otherwise obtain the solib list directly from the inferior.  */
   return svr4_current_sos_direct (info);
+}
+
+/* Implement svr4_so_ops's target_so_ops method main_build_id.  */
+
+static void
+svr4_main_build_id (size_t *build_idszp, gdb_byte **build_idp)
+{
+  struct svr4_info *info = get_svr4_info ();
+
+  /* If the solib list has been read and stored by the probes
+     interface then even main_build_id should be valid there.  */
+  if (info->solib_list == NULL)
+    svr4_current_sos_direct (info);
+
+  *build_idszp = info->main_build_idsz;
+  if (*build_idszp == 0)
+    *build_idp = NULL;
+  else
+    *build_idp = xmemdup (info->main_build_id, *build_idszp, *build_idszp);
 }
 
 /* Implement the "current_sos" target_so_ops method.  */
@@ -3125,6 +3165,9 @@ svr4_clear_solib (void)
   info->debug_loader_offset = 0;
   xfree (info->debug_loader_name);
   info->debug_loader_name = NULL;
+  xfree (info->main_build_id);
+  info->main_build_id = NULL;
+  info->main_build_idsz = 0;
 }
 
 /* Clear any bits of ADDR that wouldn't fit in a target-format
@@ -3336,6 +3379,7 @@ _initialize_svr4_solib (void)
   svr4_so_ops.special_symbol_handling = svr4_special_symbol_handling;
   svr4_so_ops.current_sos = svr4_current_sos;
   svr4_so_ops.open_symbol_file_object = open_symbol_file_object;
+  svr4_so_ops.main_build_id = svr4_main_build_id;
   svr4_so_ops.in_dynsym_resolve_code = svr4_in_dynsym_resolve_code;
   svr4_so_ops.bfd_open = solib_bfd_open;
   svr4_so_ops.lookup_lib_global_symbol = elf_lookup_lib_symbol;

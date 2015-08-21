@@ -62,7 +62,7 @@ build_id_bfd_get (bfd *abfd)
 /* See build-id.h.  */
 
 int
-build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
+build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check, int advice)
 {
   const struct bfd_build_id *found;
   char *message, *check_hex;
@@ -93,9 +93,12 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
     return 1;
   back_to = make_cleanup (xfree, message);
 
-  warning (_("Symbol file \"%s\" could not be validated (%s) and "
-	     "will be ignored; or use 'set validate-build-id off'."),
-	   bfd_get_filename (abfd), message);
+  if (!advice)
+    warning ("%s", message);
+  else
+    warning (_("Symbol file \"%s\" could not be validated (%s) and "
+	       "will be ignored; or use 'set validate-build-id off'."),
+	     bfd_get_filename (abfd), message);
   do_cleanups (back_to);
   return 0;
 }

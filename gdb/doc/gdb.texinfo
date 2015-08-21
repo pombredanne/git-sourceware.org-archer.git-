@@ -18109,6 +18109,41 @@ libraries that were loaded by explicit user requests are not
 discarded.
 @end table
 
+@table @code
+@kindex set validate-build-id
+@cindex override @value{GDBN} build-id check
+@item set validate-build-id @var{mode}
+Setting to override @value{GDBN} build-id check.
+
+Inferior binaries (shared libraries or main executable) and symbol files
+(for all of those) may contain unique build-id.  @value{GDBN} expects
+the build-ids of each binary and its corresponding symbol file to be
+identical.  If they are not identical, then by default @value{GDBN} will
+@value{GDBN} will ignore symbol files with non-matching build-id while
+printing:
+
+@smallexample
+  warning: Symbol file "libfoo.so.1" could not be validated (inferior
+  build ID 66f87872 is not identical to symbol file "libfoo.so.1" build
+  ID df81e8db) and will be ignored; or use 'set validate-build-id off'.
+@end smallexample
+
+Turning off this setting would load such symbol file without any warning.
+
+If remote build-id is present but it does not match local build-id (or local
+build-id is not present) then this setting enables (@var{mode} is @code{off}) or
+disables (@var{mode} is @code{on}) loading of such symbol file.  On systems
+where build-id is not present in the remote system this setting has no effect.
+The default value is @code{on}.
+
+Loading non-matching symbol file may confuse debugging including breakage
+of backtrace output.
+
+@kindex show validate-build-id
+@item show validate-build-id
+Display the current mode of build-id check override.
+@end table
+
 Sometimes you may wish that @value{GDBN} stops and gives you control
 when any of shared library events happen.  The best way to do this is
 to use @code{catch load} and @code{catch unload} (@pxref{Set
@@ -39377,7 +39412,9 @@ address the file was prelinked to during the library load.
 
 Additionally the single @code{main-lm} attribute specifies address of
 @code{struct link_map} used for the main executable.  This parameter is used
-for TLS access and its presence is optional.
+for TLS access and its presence is optional.  Similarly the single
+@code{main-build-id} optional attribute specifies hex encoded
+@code{NT_GNU_BUILD_ID} note for the main executable.
 
 @value{GDBN} must be linked with the Expat library to support XML
 SVR4 library lists.  @xref{Expat}.
@@ -39386,7 +39423,8 @@ A simple memory map, with two loaded libraries (which do not use prelink),
 looks like this:
 
 @smallexample
-<library-list-svr4 version="1.0" main-lm="0xe4f8f8">
+<library-list-svr4 version="1.0" main-lm="0xe4f8f8"
+    main-build-id="b96b2f6fbfb7d144b676cb66f56b6100">
   <library name="/lib/ld-linux.so.2" lm="0xe4f51c" l_addr="0xe2d000"
            l_ld="0xe4eefc"/>
   <library name="/lib/libc.so.6" lm="0xe4fbe8" l_addr="0x154000"
@@ -39399,8 +39437,9 @@ The format of an SVR4 library list is described by this DTD:
 @smallexample
 <!-- library-list-svr4: Root element with versioning -->
 <!ELEMENT library-list-svr4  (library)*>
-<!ATTLIST library-list-svr4  version  CDATA   #FIXED  "1.0">
-<!ATTLIST library-list-svr4  main-lm  CDATA   #IMPLIED>
+<!ATTLIST library-list-svr4  version       CDATA   #FIXED  "1.0">
+<!ATTLIST library-list-svr4  main-lm       CDATA   #IMPLIED>
+<!ATTLIST library-list-svr4  main-build-id CDATA   #IMPLIED>
 <!ELEMENT library            EMPTY>
 <!ATTLIST library            name     CDATA   #REQUIRED>
 <!ATTLIST library            lm       CDATA   #REQUIRED>

@@ -35,6 +35,7 @@
 #include "progspace.h"
 #include "gdb_bfd.h"
 #include "gcore.h"
+#include "build-id.h"
 
 #include <fcntl.h>
 #include "readline/readline.h"
@@ -143,10 +144,15 @@ exec_file_and_symbols_resync (struct inferior *inf, int from_tty)
 {
   char *exec_file, *full_exec_path = NULL;
   struct cleanup *old_chain = save_current_program_space ();
+  size_t build_idsz;
+  gdb_byte *build_id;
 
   /* Switch over temporarily, while reading executable and
      symbols.  */
   set_current_program_space (inf->pspace);
+
+  solib_main_build_id (&build_idsz, &build_id);
+  make_cleanup (xfree, build_id);
 
   /* Try to determine a filename from the process itself.  */
   exec_file = target_pid_to_exec_file (inf->pid);
@@ -155,8 +161,7 @@ exec_file_and_symbols_resync (struct inferior *inf, int from_tty)
       /* If gdb_sysroot is not empty and the discovered filename
 	 is absolute then prefix the filename with gdb_sysroot.  */
       if (*gdb_sysroot != '\0' && IS_ABSOLUTE_PATH (exec_file))
-	full_exec_path = exec_file_find (exec_file, 0 /* build_idsz */,
-					 NULL /* build_id */, NULL);
+	full_exec_path = exec_file_find (exec_file, build_idsz, build_id, NULL);
 
       if (full_exec_path == NULL)
 	{
@@ -167,8 +172,8 @@ exec_file_and_symbols_resync (struct inferior *inf, int from_tty)
 	     Attempt to qualify the filename against the source path.
 	     (If that fails, we'll just fall back on the original
 	     filename.  Not much more we can do...)  */
-	  if (!source_full_path_of (exec_file, 0 /* build_idsz */,
-				    NULL /* build_id */, &full_exec_path))
+	  if (!source_full_path_of (exec_file, build_idsz, build_id,
+				    &full_exec_path))
 	    full_exec_path = xstrdup (exec_file);
 	}
     }
@@ -179,6 +184,7 @@ exec_file_and_symbols_resync (struct inferior *inf, int from_tty)
 	warning (_("Detected exec-file mismatch on %s.  Running %s; Loaded %s"),
 		 target_pid_to_str (pid_to_ptid (inf->pid)),
 		 full_exec_path, exec_filename);
+      build_id_verify (exec_bfd, build_idsz, build_id, 0 /* advice */);
       reopen_exec_file ();
     }
   else if (full_exec_path != NULL)
@@ -194,6 +200,9 @@ exec_file_and_symbols_resync (struct inferior *inf, int from_tty)
 		   "Running %s; Loaded %s"),
 		 target_pid_to_str (pid_to_ptid (inf->pid)),
 		 full_exec_path, symbol_filename);
+
+      build_id_verify (symfile_objfile->obfd, build_idsz, build_id,
+		       0 /* advice */);
     }
   else if (full_exec_path != NULL)
     symbol_file_add_main (0, full_exec_path, from_tty);
