@@ -405,6 +405,29 @@ catch_command_errors_const (catch_command_errors_const_ftype *command,
   return 1;
 }
 
+/* Like catch_command_errors, but specifically for symbol/exec load
+   routines.  */
+
+typedef void (catch_exec_or_symbol_errors_ftype) (int, const char *, int);
+
+static int
+catch_exec_or_symbol_errors (catch_exec_or_symbol_errors_ftype *func,
+			     int arg, const char *filename, int from_tty)
+{
+  TRY
+    {
+      func (arg, filename, from_tty);
+    }
+  CATCH (e, RETURN_MASK_ALL)
+    {
+      exception_print (gdb_stderr, e);
+      return 0;
+    }
+  END_CATCH
+
+  return 1;
+}
+
 /* Type of this option.  */
 enum cmdarg_kind
 {
@@ -1051,20 +1074,23 @@ captured_main (void *data)
     {
       /* The exec file and the symbol-file are the same.  If we can't
          open it, better only print one error message.
-         catch_command_errors returns non-zero on success!  */
-      if (catch_command_errors_const (exec_file_attach, execarg,
-				      !batch_flag))
-	catch_command_errors_const (symbol_file_add_main, symarg,
-				    !batch_flag);
+         catch_exec_or_symbol_errors returns non-zero on success.  */
+      if (catch_exec_or_symbol_errors (exec_file_attach,
+				       1, execarg, !batch_flag))
+	catch_exec_or_symbol_errors (symbol_file_add_main,
+				     SYMFILE_USER_SPECIFIED,
+				     symarg, !batch_flag);
     }
   else
     {
       if (execarg != NULL)
-	catch_command_errors_const (exec_file_attach, execarg,
-				    !batch_flag);
+	catch_exec_or_symbol_errors (exec_file_attach, 1,
+				     execarg, !batch_flag);
+
       if (symarg != NULL)
-	catch_command_errors_const (symbol_file_add_main, symarg,
-				    !batch_flag);
+	catch_exec_or_symbol_errors (symbol_file_add_main,
+				     SYMFILE_USER_SPECIFIED,
+				     symarg, !batch_flag);
     }
 
   if (corearg && pidarg)

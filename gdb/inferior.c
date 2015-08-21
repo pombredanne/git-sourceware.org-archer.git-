@@ -869,13 +869,13 @@ add_inferior_command (char *args, int from_tty)
       if (exec != NULL)
 	{
 	  /* Switch over temporarily, while reading executable and
-	     symbols.q.  */
+	     symbols.  */
 	  set_current_program_space (inf->pspace);
 	  set_current_inferior (inf);
 	  switch_to_thread (null_ptid);
 
-	  exec_file_attach (exec, from_tty);
-	  symbol_file_add_main (exec, from_tty);
+	  exec_file_attach (1, exec, from_tty);
+	  symbol_file_add_main (SYMFILE_USER_SPECIFIED, exec, from_tty);
 	}
     }
 

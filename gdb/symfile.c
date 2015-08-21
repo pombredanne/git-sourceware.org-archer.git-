@@ -85,7 +85,8 @@ int readnow_symbol_files;	/* Read full symbols immediately.  */
 
 static void load_command (char *, int);
 
-static void symbol_file_add_main_1 (const char *args, int from_tty, int flags);
+static void symbol_file_add_main_1 (int add_flags, const char *args,
+				    int from_tty, int flags);
 
 static void add_symbol_file_command (char *, int);
 
@@ -1306,16 +1307,17 @@ symbol_file_add (const char *name, int add_flags,
    command itself.  */
 
 void
-symbol_file_add_main (const char *args, int from_tty)
+symbol_file_add_main (int add_flags, const char *args, int from_tty)
 {
-  symbol_file_add_main_1 (args, from_tty, 0);
+  symbol_file_add_main_1 (add_flags, args, from_tty, 0);
 }
 
 static void
-symbol_file_add_main_1 (const char *args, int from_tty, int flags)
+symbol_file_add_main_1 (int add_flags, const char *args, int from_tty,
+			int flags)
 {
-  const int add_flags = (current_inferior ()->symfile_flags
-			 | SYMFILE_MAINLINE | (from_tty ? SYMFILE_VERBOSE : 0));
+  add_flags |= (current_inferior ()->symfile_flags
+		| SYMFILE_MAINLINE | (from_tty ? SYMFILE_VERBOSE : 0));
 
   symbol_file_add (args, add_flags, NULL, flags);
 
@@ -1325,6 +1327,9 @@ symbol_file_add_main_1 (const char *args, int from_tty, int flags)
 
   if ((flags & SYMFILE_NO_READ) == 0)
     set_initial_language ();
+
+  symfile_objfile_was_user_supplied
+    = (add_flags & SYMFILE_USER_SPECIFIED) != 0;
 }
 
 void
@@ -1347,6 +1352,8 @@ symbol_file_clear (int from_tty)
   gdb_assert (symfile_objfile == NULL);
   if (from_tty)
     printf_unfiltered (_("No symbol file now.\n"));
+
+  symfile_objfile_was_user_supplied = 0;
 }
 
 static int
@@ -1663,7 +1670,8 @@ symbol_file_command (char *args, int from_tty)
 	    error (_("unknown option `%s'"), *argv);
 	  else
 	    {
-	      symbol_file_add_main_1 (*argv, from_tty, flags);
+	      symbol_file_add_main_1 (SYMFILE_USER_SPECIFIED,
+				      *argv, from_tty, flags);
 	      name = *argv;
 	    }
 
@@ -2527,7 +2535,8 @@ reread_symbols (void)
 	    {
 	      /* Reload EXEC_BFD without asking anything.  */
 
-	      exec_file_attach (bfd_get_filename (objfile->obfd), 0);
+	      exec_file_attach (exec_file_was_user_supplied,
+				bfd_get_filename (objfile->obfd), 0);
 	    }
 
 	  /* Keep the calls order approx. the same as in free_objfile.  */

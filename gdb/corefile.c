@@ -146,7 +146,7 @@ reopen_exec_file (void)
   res = stat (filename, &st);
 
   if (exec_bfd_mtime && exec_bfd_mtime != st.st_mtime)
-    exec_file_attach (filename, 0);
+    exec_file_attach (exec_file_was_user_supplied, filename, 0);
   else
     /* If we accessed the file since last opening it, close it now;
        this stops GDB from holding the executable open after it

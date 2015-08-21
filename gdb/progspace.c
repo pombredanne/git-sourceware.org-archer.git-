@@ -182,10 +182,11 @@ clone_program_space (struct program_space *dest, struct program_space *src)
   set_current_program_space (dest);
 
   if (src->pspace_exec_filename != NULL)
-    exec_file_attach (src->pspace_exec_filename, 0);
+    exec_file_attach (1, src->pspace_exec_filename, 0);
 
   if (src->symfile_object_file != NULL)
-    symbol_file_add_main (objfile_name (src->symfile_object_file), 0);
+    symbol_file_add_main (SYMFILE_USER_SPECIFIED,
+			  objfile_name (src->symfile_object_file), 0);
 
   do_cleanups (old_chain);
   return dest;

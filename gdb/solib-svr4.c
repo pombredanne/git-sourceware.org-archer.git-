@@ -1071,7 +1071,7 @@ open_symbol_file_object (void *from_ttyp)
     }
 
   /* Have a pathname: read the symbol file.  */
-  symbol_file_add_main (filename, from_tty);
+  symbol_file_add_main (0, filename, from_tty);
 
   do_cleanups (cleanups);
   return 1;

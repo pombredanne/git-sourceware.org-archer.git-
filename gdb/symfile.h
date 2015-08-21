@@ -457,7 +457,11 @@ enum symfile_add_flags
 
     /* Do not immediately read symbols for this file.  By default,
        symbols are read when the objfile is created.  */
-    SYMFILE_NO_READ = 1 << 4
+    SYMFILE_NO_READ = 1 << 4,
+
+    /* Whether the symbol file was user-supplied, as opposed to
+       auto-discovered by GDB.  */
+    SYMFILE_USER_SPECIFIED = 1 << 5,
   };
 
 extern struct objfile *symbol_file_add (const char *, int,
@@ -556,7 +560,8 @@ extern CORE_ADDR overlay_unmapped_address (CORE_ADDR, struct obj_section *);
 extern CORE_ADDR symbol_overlayed_address (CORE_ADDR, struct obj_section *);
 
 /* Load symbols from a file.  */
-extern void symbol_file_add_main (const char *args, int from_tty);
+extern void symbol_file_add_main (int add_flags,
+				  const char *args, int from_tty);
 
 /* Clear GDB symbol tables.  */
 extern void symbol_file_clear (int from_tty);

@@ -2492,15 +2492,12 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
   inferior = current_inferior ();
   inferior->control.stop_soon = NO_STOP_QUIETLY;
 
-  /* If no exec file is yet known, try to determine it from the
-     process itself.  */
-  if (get_exec_file (0) == NULL)
-    exec_file_locate_attach (ptid_get_pid (inferior_ptid), from_tty);
-  else
-    {
-      reopen_exec_file ();
-      reread_symbols ();
-    }
+  /* Attempt to open the file that was executed to create this
+     inferior.  If the user has explicitly specified executable
+     and/or symbol files then warn the user if their choices do
+     not match.  Otherwise, set exec_file and symfile_objfile to
+     the new file.  */
+  exec_file_and_symbols_resync (inferior, from_tty);
 
   /* Take any necessary post-attaching actions for this platform.  */
   target_post_attach (ptid_get_pid (inferior_ptid));

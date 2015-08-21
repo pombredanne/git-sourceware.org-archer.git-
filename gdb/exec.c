@@ -78,7 +78,7 @@ static void
 exec_open (const char *args, int from_tty)
 {
   target_preopen (from_tty);
-  exec_file_attach (args, from_tty);
+  exec_file_attach (1, args, from_tty);
 }
 
 /* Close and clear exec_bfd.  If we end up with no target sections to
@@ -102,6 +102,7 @@ exec_close (void)
 
       xfree (exec_filename);
       exec_filename = NULL;
+      exec_file_was_user_supplied = 0;
     }
 }
 
@@ -138,42 +139,70 @@ exec_file_clear (int from_tty)
 /* See gdbcore.h.  */
 
 void
-exec_file_locate_attach (int pid, int from_tty)
+exec_file_and_symbols_resync (struct inferior *inf, int from_tty)
 {
   char *exec_file, *full_exec_path = NULL;
+  struct cleanup *old_chain = save_current_program_space ();
 
-  /* Do nothing if we already have an executable filename.  */
-  exec_file = (char *) get_exec_file (0);
-  if (exec_file != NULL)
-    return;
+  /* Switch over temporarily, while reading executable and
+     symbols.  */
+  set_current_program_space (inf->pspace);
 
   /* Try to determine a filename from the process itself.  */
-  exec_file = target_pid_to_exec_file (pid);
-  if (exec_file == NULL)
-    return;
-
-  /* If gdb_sysroot is not empty and the discovered filename
-     is absolute then prefix the filename with gdb_sysroot.  */
-  if (*gdb_sysroot != '\0' && IS_ABSOLUTE_PATH (exec_file))
-    full_exec_path = exec_file_find (exec_file, 0 /* build_idsz */,
-				     NULL /* build_id */, NULL);
-
-  if (full_exec_path == NULL)
+  exec_file = target_pid_to_exec_file (inf->pid);
+  if (exec_file != NULL)
     {
-      /* It's possible we don't have a full path, but rather just a
-	 filename.  Some targets, such as HP-UX, don't provide the
-	 full path, sigh.
+      /* If gdb_sysroot is not empty and the discovered filename
+	 is absolute then prefix the filename with gdb_sysroot.  */
+      if (*gdb_sysroot != '\0' && IS_ABSOLUTE_PATH (exec_file))
+	full_exec_path = exec_file_find (exec_file, 0 /* build_idsz */,
+					 NULL /* build_id */, NULL);
 
-	 Attempt to qualify the filename against the source path.
-	 (If that fails, we'll just fall back on the original
-	 filename.  Not much more we can do...)  */
-      if (!source_full_path_of (exec_file, 0 /* build_idsz */,
-				NULL /* build_id */, &full_exec_path))
-	full_exec_path = xstrdup (exec_file);
+      if (full_exec_path == NULL)
+	{
+	  /* It's possible we don't have a full path, but rather just a
+	     filename.  Some targets, such as HP-UX, don't provide the
+	     full path, sigh.
+
+	     Attempt to qualify the filename against the source path.
+	     (If that fails, we'll just fall back on the original
+	     filename.  Not much more we can do...)  */
+	  if (!source_full_path_of (exec_file, 0 /* build_idsz */,
+				    NULL /* build_id */, &full_exec_path))
+	    full_exec_path = xstrdup (exec_file);
+	}
     }
 
-  exec_file_attach (full_exec_path, from_tty);
-  symbol_file_add_main (full_exec_path, from_tty);
+  if (exec_filename != NULL && exec_file_was_user_supplied)
+    {
+      if (full_exec_path != NULL && strcmp (full_exec_path, exec_filename) != 0)
+	warning (_("Detected exec-file mismatch on %s.  Running %s; Loaded %s"),
+		 target_pid_to_str (pid_to_ptid (inf->pid)),
+		 full_exec_path, exec_filename);
+      reopen_exec_file ();
+    }
+  else if (full_exec_path != NULL)
+    exec_file_attach (0, full_exec_path, from_tty);
+
+  if (symfile_objfile != NULL && symfile_objfile_was_user_supplied)
+    {
+      const char *symbol_filename = objfile_filename (symfile_objfile);
+
+      if (full_exec_path != NULL
+	  && strcmp (full_exec_path, symbol_filename) != 0)
+	warning (_("Detected symbol-file mismatch on %s.  "
+		   "Running %s; Loaded %s"),
+		 target_pid_to_str (pid_to_ptid (inf->pid)),
+		 full_exec_path, symbol_filename);
+    }
+  else if (full_exec_path != NULL)
+    symbol_file_add_main (0, full_exec_path, from_tty);
+
+  /* Re-read symbol files that were modified since we last loaded
+     them.  */
+  reread_symbols ();
+
+  do_cleanups (old_chain);
 }
 
 /* Set FILENAME as the new exec file.
@@ -194,7 +223,7 @@ exec_file_locate_attach (int pid, int from_tty)
    we're supplying the exec pathname late for good reason.)  */
 
 void
-exec_file_attach (const char *filename, int from_tty)
+exec_file_attach (int user_supplied, const char *filename, int from_tty)
 {
   struct cleanup *cleanups;
 
@@ -288,6 +317,8 @@ exec_file_attach (const char *filename, int from_tty)
 
   do_cleanups (cleanups);
 
+  exec_file_was_user_supplied = user_supplied;
+
   bfd_cache_close_all ();
   observer_notify_executable_changed ();
 }
@@ -329,12 +360,12 @@ exec_file_command (char *args, int from_tty)
 
       filename = tilde_expand (*argv);
       make_cleanup (xfree, filename);
-      exec_file_attach (filename, from_tty);
+      exec_file_attach (1, filename, from_tty);
 
       do_cleanups (cleanups);
     }
   else
-    exec_file_attach (NULL, from_tty);
+    exec_file_attach (1, NULL, from_tty);
 }
 
 /* Set both the exec file and the symbol file, in one command.

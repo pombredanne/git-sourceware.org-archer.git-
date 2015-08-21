@@ -1212,7 +1212,7 @@ follow_exec (ptid_t ptid, char *execd_pathname)
   gdb_assert (current_program_space == inf->pspace);
 
   /* That a.out is now the one to use.  */
-  exec_file_attach (execd_pathname, 0);
+  exec_file_attach (0, execd_pathname, 0);
 
   /* SYMFILE_DEFER_BP_RESET is used as the proper displacement for PIE
      (Position Independent Executable) main symbol file will get applied by

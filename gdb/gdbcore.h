@@ -146,14 +146,23 @@ extern int write_files;
 
 extern void core_file_command (char *filename, int from_tty);
 
-extern void exec_file_attach (const char *filename, int from_tty);
+extern void exec_file_attach (int user_supplied, const char *filename,
+			      int from_tty);
 
-/* If the filename of the main executable is unknown, attempt to
-   determine it.  If a filename is determined, proceed as though
-   it was just specified with the "file" command.  Do nothing if
-   the filename of the main executable is already known.  */
+/* Resync executable and symbols.  Fetch the filename of the main
+   executable based on what the target is running.  If a filename can
+   be determined, and the current exec file loaded was not previously
+   user supplied, then load the discovered filename as exec file.  If
+   the executable loaded had been user supplied (with e.g., the "file"
+   command), issue a warning if there's a mismatch, and reload the
+   previously user-specified executable (in case the program was
+   recompiled since the last time we loaded it).  Likewise, if the
+   currenly load main symbol file was not user supplied, load the
+   discovered filename as symbol file; otherwise, if there's a
+   mismatch, warn.  End by reading all symbol files that have been
+   modified since the last time we loaded them.  */
 
-extern void exec_file_locate_attach (int pid, int from_tty);
+extern void exec_file_and_symbols_resync (struct inferior *inf, int from_tty);
 
 extern void exec_file_clear (int from_tty);
 
