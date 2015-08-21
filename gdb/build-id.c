@@ -28,6 +28,7 @@
 #include "gdbcore.h"
 #include "gdbcmd.h"
 #include "source.h"
+#include "rsp-low.h"
 
 /* Boolean for command 'set validate-build-id'.  */
 int validate_build_id = 1;
@@ -64,21 +65,39 @@ int
 build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
 {
   const struct bfd_build_id *found;
-  int retval = 0;
+  char *message, *check_hex;
+  struct cleanup *back_to;
+
+  if (check_len == 0 || !validate_build_id)
+    return 1;
 
   found = build_id_bfd_get (abfd);
+  check_hex = alloca (check_len * 2 + 1);
+  bin2hex (check, check_hex, check_len);
 
   if (found == NULL)
-    warning (_("File \"%s\" has no build-id, file skipped"),
-	     bfd_get_filename (abfd));
+    message = xstrprintf (_("inferior build ID is %s but symbol file \"%s\" "
+			    "does not have build ID"),
+			  check_hex, bfd_get_filename (abfd));
   else if (found->size != check_len
            || memcmp (found->data, check, found->size) != 0)
-    warning (_("File \"%s\" has a different build-id, file skipped"),
-	     bfd_get_filename (abfd));
-  else
-    retval = 1;
+    {
+      char *abfd_hex = alloca (found->size * 2 + 1);
 
-  return retval;
+      bin2hex (found->data, abfd_hex, found->size);
+      message = xstrprintf (_("inferior build ID %s is not identical to "
+			      "symbol file \"%s\" build ID %s"),
+			    check_hex, bfd_get_filename (abfd), abfd_hex);
+    }
+  else
+    return 1;
+  back_to = make_cleanup (xfree, message);
+
+  warning (_("Symbol file \"%s\" could not be validated (%s) and "
+	     "will be ignored; or use 'set validate-build-id off'."),
+	   bfd_get_filename (abfd), message);
+  do_cleanups (back_to);
+  return 0;
 }
 
 /* Find and open a BFD given a build-id.  If no BFD can be found,
