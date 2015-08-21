@@ -247,21 +247,18 @@ exec_file_attach (const char *filename, int from_tty)
 	}
       else
 	{
-	  scratch_chan = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST,
-				filename, write_files ?
-				O_RDWR | O_BINARY : O_RDONLY | O_BINARY,
-				&scratch_pathname);
+	  scratch_chan = openp (getenv ("PATH"),
+				OPF_TRY_CWD_FIRST | OPF_OPEN_RW_TMP,
+				filename, &scratch_pathname);
 #if defined(__GO32__) || defined(_WIN32) || defined(__CYGWIN__)
 	  if (scratch_chan < 0)
 	    {
 	      char *exename = alloca (strlen (filename) + 5);
 
 	      strcat (strcpy (exename, filename), ".exe");
-	      scratch_chan = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST,
-				    exename, write_files ?
-				    O_RDWR | O_BINARY
-				    : O_RDONLY | O_BINARY,
-				    &scratch_pathname);
+	      scratch_chan = openp (getenv ("PATH"),
+	                            OPF_TRY_CWD_FIRST | OPF_OPEN_RW_TMP,
+				    exename, &scratch_pathname);
 	    }
 #endif
 	  if (scratch_chan < 0)

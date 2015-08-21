@@ -337,7 +337,7 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
      solib_search_path (if any).  */
   if (is_solib && found_file < 0 && solib_search_path != NULL)
     found_file = openp (solib_search_path, OPF_TRY_CWD_FIRST,
-			in_pathname, O_RDONLY | O_BINARY, &temp_pathname);
+			in_pathname, &temp_pathname);
 
   /* If not found, and we're looking for a solib, next search the
      solib_search_path (if any) for the basename only (ignoring the
@@ -345,29 +345,25 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
      from the opened path.  */
   if (is_solib && found_file < 0 && solib_search_path != NULL)
     found_file = openp (solib_search_path, OPF_TRY_CWD_FIRST,
-			target_lbasename (fskind, in_pathname),
-			O_RDONLY | O_BINARY, &temp_pathname);
+			target_lbasename (fskind, in_pathname), &temp_pathname);
 
   /* If not found, and we're looking for a solib, try to use target
      supplied solib search method.  */
   if (is_solib && found_file < 0 && ops->find_and_open_solib)
-    found_file = ops->find_and_open_solib (in_pathname, O_RDONLY | O_BINARY,
-					   &temp_pathname);
+    found_file = ops->find_and_open_solib (in_pathname, &temp_pathname);
 
   /* If not found, next search the inferior's $PATH environment variable.  */
   if (found_file < 0 && sysroot == NULL)
     found_file = openp (get_in_environ (current_inferior ()->environment,
 					"PATH"),
-			OPF_TRY_CWD_FIRST, in_pathname,
-			O_RDONLY | O_BINARY, &temp_pathname);
+			OPF_TRY_CWD_FIRST, in_pathname, &temp_pathname);
 
   /* If not found, and we're looking for a solib, next search the
      inferior's $LD_LIBRARY_PATH environment variable.  */
   if (is_solib && found_file < 0 && sysroot == NULL)
     found_file = openp (get_in_environ (current_inferior ()->environment,
 					"LD_LIBRARY_PATH"),
-			OPF_TRY_CWD_FIRST, in_pathname,
-			O_RDONLY | O_BINARY, &temp_pathname);
+			OPF_TRY_CWD_FIRST, in_pathname, &temp_pathname);
 
   if (found_file >= 0 && temp_pathname_is_realpath)
     temp_pathname = gdb_realpath_and_xfree (temp_pathname);

@@ -335,9 +335,12 @@ enum openp_flags
   /* Absolute names will also be searched in path (we usually want this
      for source files but not for executables).  */
   OPF_SEARCH_IN_PATH  = (1 << 1),
+
+  /* Open the file in read/write mode if WRITE_FILES says so.  */
+  OPF_OPEN_RW_TMP     = (1 << 3),
 };
 
-extern int openp (const char *, enum openp_flags, const char *, int, char **);
+extern int openp (const char *, enum openp_flags, const char *, char **);
 
 extern int source_full_path_of (const char *, char **);
 

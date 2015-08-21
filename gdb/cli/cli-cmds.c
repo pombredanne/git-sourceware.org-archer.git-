@@ -510,8 +510,7 @@ find_and_open_script (const char *script_file, int search_path,
 
   /* Search for and open 'file' on the search path used for source
      files.  Put the full location in *FULL_PATHP.  */
-  fd = openp (source_path, search_flags,
-	      file, O_RDONLY, full_pathp);
+  fd = openp (source_path, search_flags, file, full_pathp);
 
   if (fd == -1)
     {

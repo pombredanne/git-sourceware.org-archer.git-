@@ -82,7 +82,7 @@ nto_map_arch_to_cputype (const char *arch)
 }
 
 int
-nto_find_and_open_solib (char *solib, unsigned o_flags, char **temp_pathname)
+nto_find_and_open_solib (char *solib, char **temp_pathname)
 {
   char *buf, *arch_path, *nto_root;
   const char *endian;
@@ -127,12 +127,11 @@ nto_find_and_open_solib (char *solib, unsigned o_flags, char **temp_pathname)
 	     arch_path);
 
   base = lbasename (solib);
-  ret = openp (buf, OPF_TRY_CWD_FIRST, base, o_flags,
-	       temp_pathname);
+  ret = openp (buf, OPF_TRY_CWD_FIRST, base, temp_pathname);
   if (ret < 0 && base != solib)
     {
       xsnprintf (arch_path, arch_len, "/%s", solib);
-      ret = open (arch_path, o_flags, 0);
+      ret = open (arch_path, O_RDONLY | O_BINARY);
       if (temp_pathname)
 	{
 	  if (ret >= 0)

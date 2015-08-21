@@ -737,9 +737,8 @@ dirnames_to_char_ptr_vec_target_exc (const char *string)
   return vec;
 }
 
-/* Open a file named STRING, searching path PATH (dir names sep by some char)
-   using mode MODE in the calls to open.  You cannot use this function to
-   create files (O_CREAT).
+/* Open a file named STRING, searching path PATH (dir names sep by some char).
+   You cannot use this function to create files.
 
    OPTS specifies the function behaviour in specific cases.
 
@@ -756,18 +755,16 @@ dirnames_to_char_ptr_vec_target_exc (const char *string)
     >>>>  eg executable, non-directory.  */
 int
 openp (const char *path, enum openp_flags opts, const char *string,
-       int mode, char **filename_opened)
+       char **filename_opened)
 {
   int fd;
   char *filename;
   int alloclen;
   VEC (char_ptr) *dir_vec;
   struct cleanup *back_to;
-  int ix;
+  int ix, mode;
   char *dir;
 
-  /* The open syscall MODE parameter is not specified.  */
-  gdb_assert ((mode & O_CREAT) == 0);
   gdb_assert (string != NULL);
 
   /* A file with an empty name cannot possibly exist.  Report a failure
@@ -786,7 +783,8 @@ openp (const char *path, enum openp_flags opts, const char *string,
   if (!path)
     path = ".";
 
-  mode |= O_BINARY;
+  mode = (O_BINARY | (((opts & OPF_OPEN_RW_TMP) && write_files)
+		      ? O_RDWR : O_RDONLY));
 
   if ((opts & OPF_TRY_CWD_FIRST) || IS_ABSOLUTE_PATH (string))
     {
@@ -932,7 +930,7 @@ source_full_path_of (const char *filename, char **full_pathname)
   int fd;
 
   fd = openp (source_path, OPF_TRY_CWD_FIRST | OPF_SEARCH_IN_PATH,
-	      filename, O_RDONLY, full_pathname);
+	      filename, full_pathname);
   if (fd < 0)
     {
       *full_pathname = NULL;
@@ -1106,13 +1104,17 @@ find_and_open_source (const char *filename,
         }
     }
 
-  result = openp (path, OPF_SEARCH_IN_PATH, filename, OPEN_MODE, fullname);
+  gdb_assert (OPEN_MODE == (O_RDONLY | O_BINARY));
+  result = openp (path, OPF_SEARCH_IN_PATH, filename, fullname);
   if (result < 0)
     {
       /* Didn't work.  Try using just the basename.  */
       p = lbasename (filename);
       if (p != filename)
-	result = openp (path, OPF_SEARCH_IN_PATH, p, OPEN_MODE, fullname);
+	{
+	  gdb_assert (OPEN_MODE == (O_RDONLY | O_BINARY));
+	  result = openp (path, OPF_SEARCH_IN_PATH, p, fullname);
+	}
     }
 
   if (result >= 0)

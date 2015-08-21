@@ -1732,7 +1732,7 @@ symfile_bfd_open (const char *name)
 
       /* Look down path for it, allocate 2nd new malloc'd copy.  */
       desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST,
-		    expanded_name, O_RDONLY | O_BINARY, &absolute_name);
+		    expanded_name, &absolute_name);
 #if defined(__GO32__) || defined(_WIN32) || defined (__CYGWIN__)
       if (desc < 0)
 	{
@@ -1740,7 +1740,7 @@ symfile_bfd_open (const char *name)
 
 	  strcat (strcpy (exename, expanded_name), ".exe");
 	  desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST,
-			exename, O_RDONLY | O_BINARY, &absolute_name);
+			exename, &absolute_name);
 	}
 #endif
       if (desc < 0)

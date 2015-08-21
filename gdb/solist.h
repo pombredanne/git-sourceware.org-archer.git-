@@ -146,8 +146,7 @@ struct target_so_ops
        If TEMP_PATHNAME is non-NULL: If the file is successfully opened a
        pointer to a malloc'd and realpath'd copy of SONAME is stored there,
        otherwise NULL is stored there.  */
-    int (*find_and_open_solib) (char *soname,
-        unsigned o_flags, char **temp_pathname);
+    int (*find_and_open_solib) (char *soname, char **temp_pathname);
 
     /* Hook for looking up global symbols in a library-specific way.  */
     struct block_symbol (*lookup_lib_global_symbol)

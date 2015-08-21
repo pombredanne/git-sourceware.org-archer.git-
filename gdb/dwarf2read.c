@@ -10477,8 +10477,7 @@ try_open_dwop_file (const char *file_name, int is_dwp, int search_cwd)
   flags = OPF_NONE;
   if (is_dwp)
     flags |= OPF_SEARCH_IN_PATH;
-  desc = openp (search_path, flags, file_name,
-		O_RDONLY | O_BINARY, &absolute_name);
+  desc = openp (search_path, flags, file_name, &absolute_name);
   xfree (search_path);
   if (desc < 0)
     return NULL;
