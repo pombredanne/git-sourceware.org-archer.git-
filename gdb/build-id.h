@@ -45,4 +45,6 @@ extern bfd *build_id_to_debug_bfd (size_t build_id_len,
 
 extern char *find_separate_debug_file_by_buildid (struct objfile *objfile);
 
+extern int validate_build_id;
+
 #endif /* BUILD_ID_H */

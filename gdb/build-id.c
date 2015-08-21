@@ -26,6 +26,21 @@
 #include "objfiles.h"
 #include "filenames.h"
 #include "gdbcore.h"
+#include "gdbcmd.h"
+
+/* Boolean for command 'set validate-build-id'.  */
+int validate_build_id = 1;
+
+/* Implement 'show validate-build-id'.  */
+
+static void
+show_validate_build_id (struct ui_file *file, int from_tty,
+			struct cmd_list_element *c, const char *value)
+{
+  fprintf_filtered (file, _("Validation of build-id match when loading "
+			    "a binary is %s.\n"),
+		    value);
+}
 
 /* See build-id.h.  */
 
@@ -166,4 +181,23 @@ find_separate_debug_file_by_buildid (struct objfile *objfile)
 	}
     }
   return NULL;
+}
+
+extern initialize_file_ftype _initialize_build_id; /* -Wmissing-prototypes */
+
+void
+_initialize_build_id (void)
+{
+  add_setshow_boolean_cmd ("validate-build-id", class_support,
+			   &validate_build_id, _("\
+Set whether to validate build-id match when loading a binary."), _("\
+Show whether to validate build-id match when loading a binary."), _("\
+Inferior binary and symbol file may contain unique build-id.\n\
+If both build-ids are present, but they do not match, then this setting\n\
+enables (off) or disables (on) loading of such symbol file.\n\
+Loading non-matching symbol file may confuse debugging including breakage\n\
+of backtrace output."),
+			   NULL,
+			   show_validate_build_id,
+			   &setlist, &showlist);
 }
