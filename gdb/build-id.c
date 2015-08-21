@@ -80,10 +80,13 @@ build_id_verify (bfd *abfd, size_t check_len, const bfd_byte *check)
   return retval;
 }
 
-/* See build-id.h.  */
+/* Find and open a BFD given a build-id.  If no BFD can be found,
+   return NULL.  Use "" or ".debug" for SUFFIX.  The returned reference to the
+   BFD must be released by the caller.  */
 
-bfd *
-build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
+static bfd *
+build_id_to_bfd (size_t build_id_len, const bfd_byte *build_id,
+		 const char *suffix)
 {
   char *link, *debugdir;
   VEC (char_ptr) *debugdir_vec;
@@ -93,7 +96,7 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
 
   /* DEBUG_FILE_DIRECTORY/.build-id/ab/cdef */
   link = alloca (strlen (debug_file_directory) + (sizeof "/.build-id/" - 1) + 1
-		 + 2 * build_id_len + (sizeof ".debug" - 1) + 1);
+		 + 2 * build_id_len + strlen (suffix) + 1);
 
   /* Keep backward compatibility so that DEBUG_FILE_DIRECTORY being "" will
      cause "/.build-id/..." lookups.  */
@@ -122,7 +125,7 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
 	*s++ = '/';
       while (size-- > 0)
 	s += sprintf (s, "%02x", (unsigned) *data++);
-      strcpy (s, ".debug");
+      strcpy (s, suffix);
 
       /* lrealpath() is expensive even for the usually non-existent files.  */
       if (access (link, F_OK) == 0)
@@ -148,6 +151,14 @@ build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
 
   do_cleanups (back_to);
   return abfd;
+}
+
+/* See build-id.h.  */
+
+bfd *
+build_id_to_debug_bfd (size_t build_id_len, const bfd_byte *build_id)
+{
+  return build_id_to_bfd (build_id_len, build_id, ".debug");
 }
 
 /* See build-id.h.  */
