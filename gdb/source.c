@@ -29,6 +29,7 @@
 #include "filestuff.h"
 #include "inferior.h"
 #include "gdb/fileio.h"
+#include "build-id.h"
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -848,7 +849,7 @@ file_location_from_filename (const char *filename, enum openp_flags opts,
 	}
     }
 
-  if ((opts & OPF_IS_BFD) == 0)
+  if ((build_idsz == 0 || !validate_build_id) && (opts & OPF_IS_BFD) == 0)
     {
       discard_cleanups (back_to);
       return file;
@@ -906,6 +907,27 @@ file_location_from_filename (const char *filename, enum openp_flags opts,
       file.bfderr = bfd_get_error ();
       discard_cleanups (back_to);
       return file;
+    }
+
+  if (build_idsz == 0 || !validate_build_id)
+    {
+      gdb_assert ((opts & OPF_IS_BFD) != 0);
+      discard_cleanups (back_to);
+      return file;
+    }
+
+  if (!build_id_verify (file.abfd, build_idsz, build_id))
+    {
+      do_cleanups (back_to);
+      file_location_enoent (&file);
+      return file;
+    }
+
+  if ((opts & OPF_IS_BFD) == 0)
+    {
+      gdb_bfd_unref (file.abfd);
+      file.abfd = NULL;
+      gdb_assert (file.fd != -1);
     }
 
   discard_cleanups (back_to);
