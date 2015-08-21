@@ -155,7 +155,8 @@ exec_file_locate_attach (int pid, int from_tty)
   /* If gdb_sysroot is not empty and the discovered filename
      is absolute then prefix the filename with gdb_sysroot.  */
   if (*gdb_sysroot != '\0' && IS_ABSOLUTE_PATH (exec_file))
-    full_exec_path = exec_file_find (exec_file, NULL);
+    full_exec_path = exec_file_find (exec_file, 0 /* build_idsz */,
+				     NULL /* build_id */, NULL);
 
   if (full_exec_path == NULL)
     {
@@ -166,7 +167,8 @@ exec_file_locate_attach (int pid, int from_tty)
 	 Attempt to qualify the filename against the source path.
 	 (If that fails, we'll just fall back on the original
 	 filename.  Not much more we can do...)  */
-      if (!source_full_path_of (exec_file, &full_exec_path))
+      if (!source_full_path_of (exec_file, 0 /* build_idsz */,
+				NULL /* build_id */, &full_exec_path))
 	full_exec_path = xstrdup (exec_file);
     }
 

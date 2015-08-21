@@ -345,15 +345,18 @@ enum openp_flags
   OPF_BFD_CANONICAL   = (1 << 3),
 };
 
-extern int openp (const char *, enum openp_flags, const char *, char **);
+extern int openp (const char *, enum openp_flags, const char *,
+		  size_t build_idsz, const gdb_byte *build_id, char **);
 
 extern bfd *openp_bfd (const char *path, enum openp_flags opts,
 		       const char *string);
 
 extern struct file_location openp_file (const char *path, enum openp_flags opts,
-					const char *string);
+					const char *string, size_t build_idsz,
+					const gdb_byte *build_id);
 
-extern int source_full_path_of (const char *, char **);
+extern int source_full_path_of (const char *, size_t build_idsz,
+				const gdb_byte *build_id, char **);
 
 extern void mod_path (char *, char **);
 

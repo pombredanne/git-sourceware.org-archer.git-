@@ -140,8 +140,9 @@ extern void file_location_free (struct file_location *file);
 
 extern int file_location_is_valid (const struct file_location *file);
 
-extern struct file_location file_location_from_filename (const char *filename,
-							 enum openp_flags opts);
+extern struct file_location
+  file_location_from_filename (const char *filename, enum openp_flags opts,
+			       size_t build_idsz, const gdb_byte *build_id);
 
 extern bfd *file_location_to_bfd (struct file_location file);
 

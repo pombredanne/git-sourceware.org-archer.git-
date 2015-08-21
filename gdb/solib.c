@@ -148,7 +148,7 @@ show_solib_search_path (struct ui_file *file, int from_tty,
 
 static struct file_location
 solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
-	      const char *sysroot)
+	      const char *sysroot, size_t build_idsz, const gdb_byte *build_id)
 {
   const struct target_so_ops *ops = solib_ops (target_gdbarch ());
   char *temp_pathname;
@@ -247,7 +247,8 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
     }
 
   /* Now see if we can open it.  */
-  file = file_location_from_filename (temp_pathname, opts);
+  file = file_location_from_filename (temp_pathname, opts, build_idsz,
+				      build_id);
   if (file_location_is_valid (&file))
     {
       do_cleanups (old_chain);
@@ -275,7 +276,8 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
 			      in_pathname + 2, (char *) NULL);
       xfree (drive);
 
-      file = file_location_from_filename (temp_pathname, opts);
+      file = file_location_from_filename (temp_pathname, opts, build_idsz,
+					  build_id);
       if (file_location_is_valid (&file))
 	{
 	  do_cleanups (old_chain);
@@ -295,7 +297,8 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
 			      need_dir_separator ? SLASH_STRING : "",
 			      in_pathname + 2, (char *) NULL);
 
-      file = file_location_from_filename (temp_pathname, opts);
+      file = file_location_from_filename (temp_pathname, opts, build_idsz,
+					  build_id);
       if (file_location_is_valid (&file))
 	{
 	  do_cleanups (old_chain);
@@ -330,7 +333,7 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
   if (is_solib && solib_search_path != NULL)
     {
       file = openp_file (solib_search_path, OPF_TRY_CWD_FIRST | opts,
-			 in_pathname);
+			 in_pathname, build_idsz, build_id);
       if (file_location_is_valid (&file))
 	{
 	  file.filename = gdb_realpath_and_xfree (file.filename);
@@ -346,7 +349,8 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
   if (is_solib && solib_search_path != NULL)
     {
       file = openp_file (solib_search_path, OPF_TRY_CWD_FIRST | opts,
-			 target_lbasename (fskind, in_pathname));
+			 target_lbasename (fskind, in_pathname), build_idsz,
+			 build_id);
       if (file_location_is_valid (&file))
 	{
 	  file.filename = gdb_realpath_and_xfree (file.filename);
@@ -359,7 +363,7 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
      supplied solib search method.  */
   if (is_solib && ops->find_and_open_solib)
     {
-      file = ops->find_and_open_solib (in_pathname);
+      file = ops->find_and_open_solib (in_pathname, build_idsz, build_id);
       if (file_location_is_valid (&file))
 	return file;
       file_location_free (&file);
@@ -370,7 +374,8 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
     {
       file = openp_file (get_in_environ (current_inferior ()->environment,
 					 "PATH"),
-			 OPF_TRY_CWD_FIRST | opts, in_pathname);
+			 OPF_TRY_CWD_FIRST | opts, in_pathname, build_idsz,
+			 build_id);
       if (file_location_is_valid (&file))
 	{
 	  file.filename = gdb_realpath_and_xfree (file.filename);
@@ -385,7 +390,8 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
     {
       file = openp_file (get_in_environ (current_inferior ()->environment,
 					 "LD_LIBRARY_PATH"),
-			 OPF_TRY_CWD_FIRST | opts, in_pathname);
+			 OPF_TRY_CWD_FIRST | opts, in_pathname, build_idsz,
+			 build_id);
       if (file_location_is_valid (&file))
 	{
 	  file.filename = gdb_realpath_and_xfree (file.filename);
@@ -402,7 +408,8 @@ solib_find_3 (char *in_pathname, enum openp_flags opts, int is_solib,
    of GDB_SYSROOT.  */
 
 static struct file_location
-solib_find_2 (char *in_pathname, enum openp_flags opts, int is_solib)
+solib_find_2 (char *in_pathname, enum openp_flags opts, int is_solib,
+	      size_t build_idsz, const gdb_byte *build_id)
 {
   VEC (char_ptr) *sysroot_vec;
   struct cleanup *back_to;
@@ -415,7 +422,8 @@ solib_find_2 (char *in_pathname, enum openp_flags opts, int is_solib)
 
   for (ix = 0; VEC_iterate (char_ptr, sysroot_vec, ix, sysroot); ++ix)
     {
-      file = solib_find_3 (in_pathname, opts, is_solib, sysroot);
+      file = solib_find_3 (in_pathname, opts, is_solib, sysroot, build_idsz,
+			   build_id);
       if (file_location_is_valid (&file))
 	{
 	  do_cleanups (back_to);
@@ -432,9 +440,11 @@ solib_find_2 (char *in_pathname, enum openp_flags opts, int is_solib)
    for functions not yet converted to the file_location style.  */
 
 static char *
-solib_find_1 (char *in_pathname, int *fd, int is_solib)
+solib_find_1 (char *in_pathname, size_t build_idsz, const gdb_byte *build_id,
+	      int *fd, int is_solib)
 {
-  struct file_location file = solib_find_2 (in_pathname, OPF_NONE, is_solib);
+  struct file_location file = solib_find_2 (in_pathname, OPF_NONE, is_solib,
+					    build_idsz, build_id);
   char *retval;
 
   if (!file_location_is_valid (&file))
@@ -466,9 +476,11 @@ solib_find_1 (char *in_pathname, int *fd, int is_solib)
    above.  */
 
 char *
-exec_file_find (char *in_pathname, int *fd)
+exec_file_find (char *in_pathname, size_t build_idsz, const gdb_byte *build_id,
+		int *fd)
 {
-  char *result = solib_find_1 (in_pathname, fd, 0);
+  char *result = solib_find_1 (in_pathname, build_idsz, build_id, fd,
+			       0 /* is_solib */);
 
   if (result == NULL)
     {
@@ -482,7 +494,8 @@ exec_file_find (char *in_pathname, int *fd)
 	  strcpy (new_pathname, in_pathname);
 	  strcat (new_pathname, ".exe");
 
-	  result = solib_find_1 (new_pathname, fd, 0);
+	  result = solib_find_1 (new_pathname, build_idsz, build_id, fd,
+				 0 /* is_solib */);
 	}
     }
 
@@ -498,7 +511,8 @@ exec_file_find (char *in_pathname, int *fd)
    above.  */
 
 static struct file_location
-solib_find_file (char *in_pathname, enum openp_flags opts)
+solib_find_file (char *in_pathname, enum openp_flags opts, size_t build_idsz,
+		 const gdb_byte *build_id)
 {
   const char *solib_symbols_extension
     = gdbarch_solib_symbols_extension (target_gdbarch ());
@@ -526,16 +540,19 @@ solib_find_file (char *in_pathname, enum openp_flags opts)
 	}
     }
 
-  return solib_find_2 (in_pathname, opts, 1 /* is_solib */);
+  return solib_find_2 (in_pathname, opts, 1 /* is_solib */, build_idsz,
+		       build_id);
 }
 
 /* It is an solib_find_file wrapper returning filename and optionally FD
    for functions not yet converted to the file_location style.  */
 
 char *
-solib_find (char *in_pathname, int *fd)
+solib_find (char *in_pathname, size_t build_idsz, const gdb_byte *build_id,
+	    int *fd)
 {
-  struct file_location file = solib_find_file (in_pathname, OPF_NONE);
+  struct file_location file = solib_find_file (in_pathname, OPF_NONE,
+					       build_idsz, build_id);
   char *retval;
 
   if (!file_location_is_valid (&file))
@@ -589,7 +606,7 @@ solib_bfd_fopen (char *pathname, int fd)
 /* Find shared library PATHNAME and open a BFD for it.  */
 
 bfd *
-solib_bfd_open (char *pathname)
+solib_bfd_open (char *pathname, size_t build_idsz, const gdb_byte *build_id)
 {
   char *found_pathname;
   int found_file;
@@ -597,7 +614,7 @@ solib_bfd_open (char *pathname)
   const struct bfd_arch_info *b;
 
   /* Search for shared library file.  */
-  found_pathname = solib_find (pathname, &found_file);
+  found_pathname = solib_find (pathname, build_idsz, build_id, &found_file);
   if (found_pathname == NULL)
     {
       /* Return failure if the file could not be found, so that we can
@@ -652,7 +669,7 @@ solib_map_sections (struct so_list *so)
 
   filename = tilde_expand (so->so_name);
   old_chain = make_cleanup (xfree, filename);
-  abfd = ops->bfd_open (filename);
+  abfd = ops->bfd_open (filename, so->build_idsz, so->build_id);
   do_cleanups (old_chain);
 
   if (abfd == NULL)
@@ -1475,7 +1492,7 @@ reload_shared_libraries_1 (int from_tty)
 
       filename = tilde_expand (so->so_original_name);
       make_cleanup (xfree, filename);
-      abfd = solib_bfd_open (filename);
+      abfd = solib_bfd_open (filename, so->build_idsz, so->build_id);
       if (abfd != NULL)
 	{
 	  found_pathname = xstrdup (bfd_get_filename (abfd));

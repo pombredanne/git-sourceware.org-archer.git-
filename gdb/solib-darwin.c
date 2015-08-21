@@ -578,7 +578,7 @@ darwin_lookup_lib_symbol (struct objfile *objfile,
 }
 
 static bfd *
-darwin_bfd_open (char *pathname)
+darwin_bfd_open (char *pathname, size_t build_idsz, const gdb_byte *build_id)
 {
   char *found_pathname;
   int found_file;
@@ -586,7 +586,7 @@ darwin_bfd_open (char *pathname)
   bfd *res;
 
   /* Search for shared library file.  */
-  found_pathname = solib_find (pathname, &found_file);
+  found_pathname = solib_find (pathname, build_idsz, build_id, &found_file);
   if (found_pathname == NULL)
     perror_with_name (pathname);
 

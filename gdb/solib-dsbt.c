@@ -835,7 +835,7 @@ enable_break (void)
 
       TRY
 	{
-	  tmp_bfd = solib_bfd_open (buf);
+	  tmp_bfd = solib_bfd_open (buf, 0, NULL);
 	}
       CATCH (ex, RETURN_MASK_ALL)
 	{

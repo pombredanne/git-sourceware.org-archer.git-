@@ -795,7 +795,8 @@ file_location_is_valid (const struct file_location *file)
 /* Return new file_location from FILENAME and OPTS.  */
 
 struct file_location
-file_location_from_filename (const char *filename, enum openp_flags opts)
+file_location_from_filename (const char *filename, enum openp_flags opts,
+			     size_t build_idsz, const gdb_byte *build_id)
 {
   struct file_location file;
   struct cleanup *back_to;
@@ -954,7 +955,9 @@ bfd *
 filename_to_bfd (const char *filename)
 {
   return file_location_to_bfd (file_location_from_filename (filename,
-							    OPF_IS_BFD));
+							    OPF_IS_BFD,
+							    0 /* build_idsz */,
+							  NULL /* build_id */));
 }
 
 /* Wrapper of openp_file returning filename string.
@@ -967,14 +970,14 @@ filename_to_bfd (const char *filename)
 
 int
 openp (const char *path, enum openp_flags opts, const char *string,
-       char **filename_opened)
+       size_t build_idsz, const gdb_byte *build_id, char **filename_opened)
 {
   struct file_location file;
   int retval;
 
   gdb_assert ((opts & OPF_IS_BFD) == 0);
 
-  file = openp_file (path, opts, string);
+  file = openp_file (path, opts, string, build_idsz, build_id);
   gdb_assert (file.abfd == NULL);
   if (file.fd == -1)
     {
@@ -1002,13 +1005,18 @@ openp_bfd (const char *path, enum openp_flags opts, const char *string)
 {
   gdb_assert ((opts & OPF_IS_BFD) == 0);
 
-  return file_location_to_bfd (openp_file (path, opts | OPF_IS_BFD, string));
+  return file_location_to_bfd (openp_file (path, opts | OPF_IS_BFD, string,
+					   0 /* build_idsz */,
+					   NULL /* build_id */));
 }
 
 /* Open a file named STRING, searching path PATH (dir names sep by some char).
    You cannot use this function to create files.
 
    OPTS specifies the function behaviour in specific cases.
+
+   If BUILD_IDSZ is non-zero then BUILD_ID (of BUILD_IDSZ length) specifies
+   required build-id of the file.
 
    Call file_location_is_valid on returned file_location to check
    whether this function has succeeded.  */
@@ -1017,7 +1025,8 @@ openp_bfd (const char *path, enum openp_flags opts, const char *string)
     >>>>  eg executable, non-directory.  */
 
 struct file_location
-openp_file (const char *path, enum openp_flags opts, const char *string)
+openp_file (const char *path, enum openp_flags opts, const char *string,
+	    size_t build_idsz, const gdb_byte *build_id)
 {
   int fd;
   char *filename;
@@ -1055,7 +1064,8 @@ openp_file (const char *path, enum openp_flags opts, const char *string)
 	{
 	  filename = alloca (strlen (string) + 1);
 	  strcpy (filename, string);
-	  file = file_location_from_filename (filename, opts);
+	  file = file_location_from_filename (filename, opts, build_idsz,
+					      build_id);
 	  if (file_location_is_valid (&file))
 	    return file;
 	  file_location_free (&file);
@@ -1152,7 +1162,8 @@ openp_file (const char *path, enum openp_flags opts, const char *string)
 
       if (is_target_filename (filename) || is_regular_file (filename))
 	{
-	  file = file_location_from_filename (filename, opts);
+	  file = file_location_from_filename (filename, opts, build_idsz,
+					      build_id);
 	  if (file_location_is_valid (&file))
 	    {
 	      do_cleanups (back_to);
@@ -1181,12 +1192,13 @@ openp_file (const char *path, enum openp_flags opts, const char *string)
 
    Else, this functions returns 0, and FULL_PATHNAME is set to NULL.  */
 int
-source_full_path_of (const char *filename, char **full_pathname)
+source_full_path_of (const char *filename, size_t build_idsz,
+		     const gdb_byte *build_id, char **full_pathname)
 {
   int fd;
 
   fd = openp (source_path, OPF_TRY_CWD_FIRST | OPF_SEARCH_IN_PATH,
-	      filename, full_pathname);
+	      filename, build_idsz, build_id, full_pathname);
   if (fd < 0)
     {
       *full_pathname = NULL;
@@ -1361,7 +1373,8 @@ find_and_open_source (const char *filename,
     }
 
   gdb_assert (OPEN_MODE == (O_RDONLY | O_BINARY));
-  result = openp (path, OPF_SEARCH_IN_PATH, filename, fullname);
+  result = openp (path, OPF_SEARCH_IN_PATH, filename, 0 /* build_idsz */,
+		  NULL /* build_id */, fullname);
   if (result < 0)
     {
       /* Didn't work.  Try using just the basename.  */
@@ -1369,7 +1382,8 @@ find_and_open_source (const char *filename,
       if (p != filename)
 	{
 	  gdb_assert (OPEN_MODE == (O_RDONLY | O_BINARY));
-	  result = openp (path, OPF_SEARCH_IN_PATH, p, fullname);
+	  result = openp (path, OPF_SEARCH_IN_PATH, p, 0 /* build_idsz */,
+			  NULL /* build_id */, fullname);
 	}
     }
 

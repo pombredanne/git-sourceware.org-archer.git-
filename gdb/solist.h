@@ -140,10 +140,13 @@ struct target_so_ops
     int (*in_dynsym_resolve_code) (CORE_ADDR pc);
 
     /* Find and open shared library binary file.  */
-    bfd *(*bfd_open) (char *pathname);
+    bfd *(*bfd_open) (char *pathname, size_t build_idsz,
+		      const gdb_byte *build_id);
 
     /* Optional extra hook for finding and opening a solib.  */
-    struct file_location (*find_and_open_solib) (char *soname);
+    struct file_location (*find_and_open_solib) (char *soname,
+						 size_t build_idsz,
+						 const gdb_byte *build_id);
 
     /* Hook for looking up global symbols in a library-specific way.  */
     struct block_symbol (*lookup_lib_global_symbol)
@@ -187,16 +190,19 @@ void free_so (struct so_list *so);
 struct so_list *master_so_list (void);
 
 /* Find main executable binary file.  */
-extern char *exec_file_find (char *in_pathname, int *fd);
+extern char *exec_file_find (char *in_pathname, size_t build_idsz,
+			     const gdb_byte *build_id, int *fd);
 
 /* Find shared library binary file.  */
-extern char *solib_find (char *in_pathname, int *fd);
+extern char *solib_find (char *in_pathname, size_t build_idsz,
+			 const gdb_byte *build_id, int *fd);
 
 /* Open BFD for shared library file.  */
 extern bfd *solib_bfd_fopen (char *pathname, int fd);
 
 /* Find solib binary file and open it.  */
-extern bfd *solib_bfd_open (char *in_pathname);
+extern bfd *solib_bfd_open (char *in_pathname, size_t build_idsz,
+			    const gdb_byte *build_id);
 
 /* FIXME: gdbarch needs to control this variable.  */
 extern struct target_so_ops *current_target_so_ops;

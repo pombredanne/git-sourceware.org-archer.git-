@@ -2366,7 +2366,7 @@ enable_break (struct svr4_info *info, int from_tty)
 
       TRY
         {
-	  tmp_bfd = solib_bfd_open (interp_name);
+	  tmp_bfd = solib_bfd_open (interp_name, 0, NULL);
 	}
       CATCH (ex, RETURN_MASK_ALL)
 	{

@@ -83,7 +83,8 @@ nto_map_arch_to_cputype (const char *arch)
 }
 
 struct file_location
-nto_find_and_open_solib (char *solib)
+nto_find_and_open_solib (char *solib, size_t build_idsz,
+			 const gdb_byte *build_id)
 {
   char *buf, *arch_path, *nto_root;
   const char *endian;
@@ -129,13 +130,15 @@ nto_find_and_open_solib (char *solib)
 	     arch_path);
 
   base = lbasename (solib);
-  file = openp_file (buf, OPF_TRY_CWD_FIRST | OPF_IS_BFD, base);
+  file = openp_file (buf, OPF_TRY_CWD_FIRST | OPF_IS_BFD, base, build_idsz,
+		     build_id);
   if (file_location_is_valid (&file) || base == solib)
     return file;
   file_location_free (&file);
 
   xsnprintf (arch_path, arch_len, "/%s", solib);
-  return file_location_from_filename (arch_path, OPF_IS_BFD);
+  return file_location_from_filename (arch_path, OPF_IS_BFD, build_idsz,
+				      build_id);
 }
 
 void
