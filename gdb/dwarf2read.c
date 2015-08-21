@@ -10474,7 +10474,7 @@ try_open_dwop_file (const char *file_name, int is_dwp, int search_cwd)
   else
     search_path = xstrdup (debug_file_directory);
 
-  flags = OPF_RETURN_REALPATH;
+  flags = OPF_NONE;
   if (is_dwp)
     flags |= OPF_SEARCH_IN_PATH;
   desc = openp (search_path, flags, file_name,
@@ -10482,6 +10482,7 @@ try_open_dwop_file (const char *file_name, int is_dwp, int search_cwd)
   xfree (search_path);
   if (desc < 0)
     return NULL;
+  absolute_name = gdb_realpath_and_xfree (absolute_name);
 
   sym_bfd = gdb_bfd_open (absolute_name, gnutarget, desc);
   xfree (absolute_name);

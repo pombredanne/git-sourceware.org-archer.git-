@@ -124,6 +124,8 @@ extern struct cleanup *make_bpstat_clear_actions_cleanup (void);
 
 extern char *gdb_realpath (const char *);
 
+extern char *gdb_realpath_and_xfree (char *filename);
+
 extern char *gdb_realpath_keepfile (const char *);
 
 extern char *gdb_abspath (const char *);

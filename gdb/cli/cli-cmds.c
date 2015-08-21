@@ -500,7 +500,7 @@ find_and_open_script (const char *script_file, int search_path,
   char *file;
   int fd;
   struct cleanup *old_cleanups;
-  enum openp_flags search_flags = OPF_TRY_CWD_FIRST | OPF_RETURN_REALPATH;
+  enum openp_flags search_flags = OPF_TRY_CWD_FIRST;
 
   file = tilde_expand (script_file);
   old_cleanups = make_cleanup (xfree, file);
@@ -522,6 +522,8 @@ find_and_open_script (const char *script_file, int search_path,
     }
 
   do_cleanups (old_cleanups);
+
+  *full_pathp = gdb_realpath_and_xfree (*full_pathp);
 
   *streamp = fdopen (fd, FOPEN_RT);
   if (*streamp == NULL)

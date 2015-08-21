@@ -158,7 +158,7 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
   char *temp_pathname = NULL;
   const char *fskind = effective_target_file_system_kind ();
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
-  int prefix_len, orig_prefix_len;
+  int prefix_len, orig_prefix_len, temp_pathname_is_realpath;
 
   /* If the absolute prefix starts with "target:" but the filesystem
      accessed by the target_fileio_* methods is the local filesystem
@@ -311,7 +311,12 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
      needs to be freed.  */
 
   if (found_file < 0)
-    temp_pathname = NULL;
+    {
+      temp_pathname = NULL;
+      temp_pathname_is_realpath = 1;
+    }
+  else
+    temp_pathname_is_realpath = 0;
 
   /* If the search in gdb_sysroot failed, and the path name is
      absolute at this point, make it relative.  (openp will try and open the
@@ -331,8 +336,7 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
   /* If not found, and we're looking for a solib, search the
      solib_search_path (if any).  */
   if (is_solib && found_file < 0 && solib_search_path != NULL)
-    found_file = openp (solib_search_path,
-			OPF_TRY_CWD_FIRST | OPF_RETURN_REALPATH,
+    found_file = openp (solib_search_path, OPF_TRY_CWD_FIRST,
 			in_pathname, O_RDONLY | O_BINARY, &temp_pathname);
 
   /* If not found, and we're looking for a solib, next search the
@@ -340,8 +344,7 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
      path).  This is to allow reading solibs from a path that differs
      from the opened path.  */
   if (is_solib && found_file < 0 && solib_search_path != NULL)
-    found_file = openp (solib_search_path,
-			OPF_TRY_CWD_FIRST | OPF_RETURN_REALPATH,
+    found_file = openp (solib_search_path, OPF_TRY_CWD_FIRST,
 			target_lbasename (fskind, in_pathname),
 			O_RDONLY | O_BINARY, &temp_pathname);
 
@@ -355,7 +358,7 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
   if (found_file < 0 && sysroot == NULL)
     found_file = openp (get_in_environ (current_inferior ()->environment,
 					"PATH"),
-			OPF_TRY_CWD_FIRST | OPF_RETURN_REALPATH, in_pathname,
+			OPF_TRY_CWD_FIRST, in_pathname,
 			O_RDONLY | O_BINARY, &temp_pathname);
 
   /* If not found, and we're looking for a solib, next search the
@@ -363,8 +366,11 @@ solib_find_2 (char *in_pathname, int *fd, int is_solib, const char *sysroot)
   if (is_solib && found_file < 0 && sysroot == NULL)
     found_file = openp (get_in_environ (current_inferior ()->environment,
 					"LD_LIBRARY_PATH"),
-			OPF_TRY_CWD_FIRST | OPF_RETURN_REALPATH, in_pathname,
+			OPF_TRY_CWD_FIRST, in_pathname,
 			O_RDONLY | O_BINARY, &temp_pathname);
+
+  if (found_file >= 0 && temp_pathname_is_realpath)
+    temp_pathname = gdb_realpath_and_xfree (temp_pathname);
 
   if (fd == NULL)
     {

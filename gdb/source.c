@@ -749,11 +749,6 @@ dirnames_to_char_ptr_vec_target_exc (const char *string)
    and the file, sigh!  Emacs gets confuzzed by this when we print the
    source file name!!! 
 
-   If OPTS has OPF_RETURN_REALPATH set return FILENAME_OPENED resolved by
-   gdb_realpath.  Even without OPF_RETURN_REALPATH this function still returns
-   filename starting with "/".  If FILENAME_OPENED is NULL this option has no
-   effect.
-
    If a file is found, return the descriptor.
    Otherwise, return -1, with errno set for the last name we tried to open.  */
 
@@ -910,13 +905,10 @@ openp (const char *path, enum openp_flags opts, const char *string,
 done:
   if (filename_opened)
     {
-      /* If a file was opened, canonicalize its filename.  */
       if (fd < 0)
 	*filename_opened = NULL;
-      else if ((opts & OPF_RETURN_REALPATH) != 0)
-	*filename_opened = gdb_realpath (filename);
       else
-	*filename_opened = gdb_abspath (filename);
+	*filename_opened = xstrdup (filename);
     }
 
   return fd;
@@ -939,14 +931,15 @@ source_full_path_of (const char *filename, char **full_pathname)
 {
   int fd;
 
-  fd = openp (source_path,
-	      OPF_TRY_CWD_FIRST | OPF_SEARCH_IN_PATH | OPF_RETURN_REALPATH,
+  fd = openp (source_path, OPF_TRY_CWD_FIRST | OPF_SEARCH_IN_PATH,
 	      filename, O_RDONLY, full_pathname);
   if (fd < 0)
     {
       *full_pathname = NULL;
       return 0;
     }
+  
+  *full_pathname = gdb_realpath_and_xfree (*full_pathname);
 
   close (fd);
   return 1;
@@ -1113,16 +1106,17 @@ find_and_open_source (const char *filename,
         }
     }
 
-  result = openp (path, OPF_SEARCH_IN_PATH | OPF_RETURN_REALPATH, filename,
-		  OPEN_MODE, fullname);
+  result = openp (path, OPF_SEARCH_IN_PATH, filename, OPEN_MODE, fullname);
   if (result < 0)
     {
       /* Didn't work.  Try using just the basename.  */
       p = lbasename (filename);
       if (p != filename)
-	result = openp (path, OPF_SEARCH_IN_PATH | OPF_RETURN_REALPATH, p,
-			OPEN_MODE, fullname);
+	result = openp (path, OPF_SEARCH_IN_PATH, p, OPEN_MODE, fullname);
     }
+
+  if (result >= 0)
+    *fullname = gdb_realpath_and_xfree (*fullname);
 
   do_cleanups (cleanup);
   return result;

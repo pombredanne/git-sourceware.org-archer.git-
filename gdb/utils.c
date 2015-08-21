@@ -2832,6 +2832,17 @@ gdb_realpath (const char *filename)
   return xstrdup (filename);
 }
 
+/* Wrap gdb_realpath by also calling xfree for the FILENAME parameter.  */
+
+char *
+gdb_realpath_and_xfree (char *filename)
+{
+  char *retval = gdb_realpath (filename);
+
+  xfree (filename);
+  return retval;
+}
+
 /* Return a copy of FILENAME, with its directory prefix canonicalized
    by gdb_realpath.  */
 

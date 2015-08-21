@@ -321,6 +321,9 @@ extern const char *pc_prefix (CORE_ADDR);
 /* See openp function definition for their description.  */
 enum openp_flags
 {
+  /* No options specified, type-compatibile with the enum.  */
+  OPF_NONE            = 0,
+
   /* Try to open ./STRING before searching PATH (ie pretend the first
      element of PATH is ".").  This also indicates that, unless
      OPF_SEARCH_IN_PATH is also specified, a slash in STRING disables
@@ -332,9 +335,6 @@ enum openp_flags
   /* Absolute names will also be searched in path (we usually want this
      for source files but not for executables).  */
   OPF_SEARCH_IN_PATH  = (1 << 1),
-
-  /* See openp, to be removed.  */
-  OPF_RETURN_REALPATH = (1 << 2),
 };
 
 extern int openp (const char *, enum openp_flags, const char *, int, char **);

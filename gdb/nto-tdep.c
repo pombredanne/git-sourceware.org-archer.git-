@@ -127,7 +127,7 @@ nto_find_and_open_solib (char *solib, unsigned o_flags, char **temp_pathname)
 	     arch_path);
 
   base = lbasename (solib);
-  ret = openp (buf, OPF_TRY_CWD_FIRST | OPF_RETURN_REALPATH, base, o_flags,
+  ret = openp (buf, OPF_TRY_CWD_FIRST, base, o_flags,
 	       temp_pathname);
   if (ret < 0 && base != solib)
     {
@@ -136,11 +136,13 @@ nto_find_and_open_solib (char *solib, unsigned o_flags, char **temp_pathname)
       if (temp_pathname)
 	{
 	  if (ret >= 0)
-	    *temp_pathname = gdb_realpath (arch_path);
+	    *temp_pathname = xstrdup (arch_path);
 	  else
 	    *temp_pathname = NULL;
 	}
     }
+  if (ret >= 0)
+    *temp_pathname = gdb_realpath_and_xfree (*temp_pathname);
   return ret;
 }
 
