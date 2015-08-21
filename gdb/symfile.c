@@ -1721,41 +1721,33 @@ bfd *
 symfile_bfd_open (const char *name)
 {
   bfd *sym_bfd;
-  int desc = -1;
   struct cleanup *back_to = make_cleanup (null_cleanup, 0);
 
-  if (!is_target_filename (name))
+  if (is_target_filename (name))
+    sym_bfd = filename_to_bfd (name);
+  else
     {
-      char *expanded_name, *absolute_name;
+      char *expanded_name;
 
       expanded_name = tilde_expand (name); /* Returns 1st new malloc'd copy.  */
+      make_cleanup (xfree, expanded_name);
+      name = expanded_name;
 
       /* Look down path for it, allocate 2nd new malloc'd copy.  */
-      desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST,
-		    expanded_name, &absolute_name);
+      sym_bfd = openp_bfd (getenv ("PATH"),
+			   OPF_TRY_CWD_FIRST | OPF_BFD_CANONICAL,
+			   expanded_name);
 #if defined(__GO32__) || defined(_WIN32) || defined (__CYGWIN__)
-      if (desc < 0)
+      if (sym_bfd == NULL)
 	{
 	  char *exename = alloca (strlen (expanded_name) + 5);
 
 	  strcat (strcpy (exename, expanded_name), ".exe");
-	  desc = openp (getenv ("PATH"), OPF_TRY_CWD_FIRST,
-			exename, &absolute_name);
+	  sym_bfd = openp_bfd (getenv ("PATH"), OPF_TRY_CWD_FIRST, exename);
 	}
 #endif
-      if (desc < 0)
-	{
-	  make_cleanup (xfree, expanded_name);
-	  perror_with_name (expanded_name);
-	}
-
-      xfree (expanded_name);
-      absolute_name = gdb_realpath_and_xfree (absolute_name);
-      make_cleanup (xfree, absolute_name);
-      name = absolute_name;
     }
 
-  sym_bfd = gdb_bfd_open (name, gnutarget, desc);
   if (!sym_bfd)
     error (_("`%s': can't open to read symbols: %s."), name,
 	   bfd_errmsg (bfd_get_error ()));
@@ -1766,7 +1758,7 @@ symfile_bfd_open (const char *name)
   if (!bfd_check_format (sym_bfd, bfd_object))
     {
       make_cleanup_bfd_unref (sym_bfd);
-      error (_("`%s': can't read symbols: %s."), name,
+      error (_("`%s': can't read symbols: %s."), bfd_get_filename (sym_bfd),
 	     bfd_errmsg (bfd_get_error ()));
     }
 
