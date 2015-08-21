@@ -157,7 +157,7 @@ solib_find_1 (char *in_pathname, int *fd, int is_solib)
   char *temp_pathname = NULL;
   const char *fskind = effective_target_file_system_kind ();
   struct cleanup *old_chain = make_cleanup (null_cleanup, NULL);
-  char *sysroot = gdb_sysroot;
+  const char *sysroot = gdb_sysroot;
   int prefix_len, orig_prefix_len;
 
   /* If the absolute prefix starts with "target:" but the filesystem
@@ -179,8 +179,10 @@ solib_find_1 (char *in_pathname, int *fd, int is_solib)
     sysroot = NULL;
   else if (prefix_len != orig_prefix_len)
     {
-      sysroot = savestring (sysroot, prefix_len);
-      make_cleanup (xfree, sysroot);
+      char *s = savestring (sysroot, prefix_len);
+
+      make_cleanup (xfree, s);
+      sysroot = s;
     }
 
   /* If we're on a non-DOS-based system, backslashes won't be
