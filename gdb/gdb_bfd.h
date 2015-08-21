@@ -53,6 +53,9 @@ int gdb_bfd_has_target_filename (struct bfd *abfd);
 
 struct bfd *gdb_bfd_open (const char *name, const char *target, int fd);
 
+struct bfd *gdb_bfd_open_from_target (const char *name, const char *target,
+				      int fd);
+
 /* Increment the reference count of ABFD.  It is fine for ABFD to be
    NULL; in this case the function does nothing.  */
 

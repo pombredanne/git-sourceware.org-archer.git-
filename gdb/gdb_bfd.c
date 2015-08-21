@@ -353,6 +353,25 @@ gdb_bfd_iovec_fileio_fstat (struct bfd *abfd, void *stream,
   return result;
 }
 
+/* Open a read-only (FOPEN_RB) BFD using target fileio operations given
+   arguments like bfd_fopen.  Return value matches that of
+   gdb_bfd_openr_iovec.  */
+
+struct bfd *
+gdb_bfd_open_from_target (const char *name, const char *target, int fd)
+{
+  gdb_assert (is_target_filename (name));
+  gdb_assert (!target_filesystem_is_local ());
+  gdb_assert (fd == -1);
+
+  return gdb_bfd_openr_iovec (name, target,
+			      gdb_bfd_iovec_fileio_open,
+			      current_inferior (),
+			      gdb_bfd_iovec_fileio_pread,
+			      gdb_bfd_iovec_fileio_close,
+			      gdb_bfd_iovec_fileio_fstat);
+}
+
 /* See gdb_bfd.h.  */
 
 struct bfd *
@@ -367,16 +386,7 @@ gdb_bfd_open (const char *name, const char *target, int fd)
   if (is_target_filename (name))
     {
       if (!target_filesystem_is_local ())
-	{
-	  gdb_assert (fd == -1);
-
-	  return gdb_bfd_openr_iovec (name, target,
-				      gdb_bfd_iovec_fileio_open,
-				      current_inferior (),
-				      gdb_bfd_iovec_fileio_pread,
-				      gdb_bfd_iovec_fileio_close,
-				      gdb_bfd_iovec_fileio_fstat);
-	}
+	return gdb_bfd_open_from_target (name, target, fd);
 
       name += strlen (TARGET_SYSROOT_PREFIX);
     }
