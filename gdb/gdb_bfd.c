@@ -278,6 +278,19 @@ gdb_bfd_iovec_fileio_open (struct bfd *abfd, void *inferior)
   return stream;
 }
 
+/* Helper for gdb_bfd_open_from_target when file descriptor is passed as
+   user data.  */
+
+static void *
+gdb_bfd_iovec_fileio_open_fd (struct bfd *abfd, void *fdp_voidp)
+{
+  int *stream, *fdp = fdp_voidp;
+
+  stream = XCNEW (int);
+  *stream = *fdp;
+  return stream;
+}
+
 /* Wrapper for target_fileio_pread suitable for passing as the
    PREAD_FUNC argument to gdb_bfd_openr_iovec.  */
 
@@ -362,11 +375,12 @@ gdb_bfd_open_from_target (const char *name, const char *target, int fd)
 {
   gdb_assert (is_target_filename (name));
   gdb_assert (!target_filesystem_is_local ());
-  gdb_assert (fd == -1);
 
   return gdb_bfd_openr_iovec (name, target,
-			      gdb_bfd_iovec_fileio_open,
-			      current_inferior (),
+			      (fd == -1 ? gdb_bfd_iovec_fileio_open
+					: gdb_bfd_iovec_fileio_open_fd),
+			      (fd == -1 ? (void *) current_inferior ()
+					: (void *) &fd),
 			      gdb_bfd_iovec_fileio_pread,
 			      gdb_bfd_iovec_fileio_close,
 			      gdb_bfd_iovec_fileio_fstat);
