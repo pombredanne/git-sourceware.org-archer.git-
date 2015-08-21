@@ -345,6 +345,18 @@ gdb_bfd_iovec_fileio_close (struct bfd *abfd, void *stream)
   return 0;
 }
 
+/* Helper for gdb_bfd_open_from_target when caller did not wish to close
+   ABFD's FD.  */
+
+static int
+gdb_bfd_iovec_fileio_close_nop (struct bfd *abfd, void *stream)
+{
+  xfree (stream);
+
+  /* Zero means success.  */
+  return 0;
+}
+
 /* Wrapper for target_fileio_fstat suitable for passing as the
    STAT_FUNC argument to gdb_bfd_openr_iovec.  */
 
@@ -371,7 +383,8 @@ gdb_bfd_iovec_fileio_fstat (struct bfd *abfd, void *stream,
    gdb_bfd_openr_iovec.  */
 
 struct bfd *
-gdb_bfd_open_from_target (const char *name, const char *target, int fd)
+gdb_bfd_open_from_target (const char *name, const char *target, int fd,
+			  int do_close)
 {
   gdb_assert (is_target_filename (name));
   gdb_assert (!target_filesystem_is_local ());
@@ -382,7 +395,8 @@ gdb_bfd_open_from_target (const char *name, const char *target, int fd)
 			      (fd == -1 ? (void *) current_inferior ()
 					: (void *) &fd),
 			      gdb_bfd_iovec_fileio_pread,
-			      gdb_bfd_iovec_fileio_close,
+			      (do_close ? gdb_bfd_iovec_fileio_close
+					: gdb_bfd_iovec_fileio_close_nop),
 			      gdb_bfd_iovec_fileio_fstat);
 }
 
@@ -400,7 +414,7 @@ gdb_bfd_open (const char *name, const char *target, int fd)
   if (is_target_filename (name))
     {
       if (!target_filesystem_is_local ())
-	return gdb_bfd_open_from_target (name, target, fd);
+	return gdb_bfd_open_from_target (name, target, fd, 1 /* do_close */);
 
       name += strlen (TARGET_SYSROOT_PREFIX);
     }
