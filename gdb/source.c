@@ -742,7 +742,7 @@ dirnames_to_char_ptr_vec_target_exc (const char *string)
 
    OPTS specifies the function behaviour in specific cases.
 
-   If FILENAME_OPENED is non-null, set it to a newly allocated string naming
+   FILENAME_OPENED must be non-null.  Set it to a newly allocated string naming
    the actual file opened (this string will always start with a "/").  We
    have to take special pains to avoid doubling the "/" between the directory
    and the file, sigh!  Emacs gets confuzzed by this when we print the
@@ -901,13 +901,10 @@ openp (const char *path, enum openp_flags opts, const char *string,
   do_cleanups (back_to);
 
 done:
-  if (filename_opened)
-    {
-      if (fd < 0)
-	*filename_opened = NULL;
-      else
-	*filename_opened = xstrdup (filename);
-    }
+  if (fd < 0)
+    *filename_opened = NULL;
+  else
+    *filename_opened = xstrdup (filename);
 
   return fd;
 }
