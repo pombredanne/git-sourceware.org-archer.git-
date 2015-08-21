@@ -339,11 +339,19 @@ enum openp_flags
   /* Ask for bfd * to be returned in file_location.  */
   OPF_IS_BFD          = (1 << 2),
 
-  /* Open the file in read/write mode if WRITE_FILES says so.  */
-  OPF_OPEN_RW_TMP     = (1 << 3),
+  /* bfd_get_filename can be incorrect then, use only if you keep your
+     original filename separate from resulting bfd.
+     Returned file_location.filename is not canonicalized.  */
+  OPF_BFD_CANONICAL   = (1 << 3),
 };
 
 extern int openp (const char *, enum openp_flags, const char *, char **);
+
+extern bfd *openp_bfd (const char *path, enum openp_flags opts,
+		       const char *string);
+
+extern struct file_location openp_file (const char *path, enum openp_flags opts,
+					const char *string);
 
 extern int source_full_path_of (const char *, char **);
 

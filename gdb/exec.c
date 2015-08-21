@@ -216,81 +216,37 @@ exec_file_attach (const char *filename, int from_tty)
     }
   else
     {
-      int load_via_target = 0;
-      char *scratch_pathname, *canonical_pathname;
-      int scratch_chan;
       struct target_section *sections = NULL, *sections_end = NULL;
       char **matching;
 
-      if (is_target_filename (filename))
-	{
-	  if (target_filesystem_is_local ())
-	    filename += strlen (TARGET_SYSROOT_PREFIX);
-	  else
-	    load_via_target = 1;
-	}
-
-      if (load_via_target)
-	{
-	  /* gdb_bfd_fopen does not support "target:" filenames.  */
-	  if (write_files)
-	    warning (_("writing into executable files is "
-		       "not supported for %s sysroots"),
-		     TARGET_SYSROOT_PREFIX);
-
-	  scratch_pathname = xstrdup (filename);
-	  make_cleanup (xfree, scratch_pathname);
-
-	  scratch_chan = -1;
-
-	  canonical_pathname = scratch_pathname;
-	}
-      else
-	{
-	  scratch_chan = openp (getenv ("PATH"),
-				OPF_TRY_CWD_FIRST | OPF_OPEN_RW_TMP,
-				filename, &scratch_pathname);
+      exec_bfd = openp_bfd (getenv ("PATH"),
+			    OPF_TRY_CWD_FIRST | OPF_BFD_CANONICAL, filename);
 #if defined(__GO32__) || defined(_WIN32) || defined(__CYGWIN__)
-	  if (scratch_chan < 0)
-	    {
-	      char *exename = alloca (strlen (filename) + 5);
-
-	      strcat (strcpy (exename, filename), ".exe");
-	      scratch_chan = openp (getenv ("PATH"),
-	                            OPF_TRY_CWD_FIRST | OPF_OPEN_RW_TMP,
-				    exename, &scratch_pathname);
-	    }
-#endif
-	  if (scratch_chan < 0)
-	    perror_with_name (filename);
-
-	  make_cleanup (xfree, scratch_pathname);
-
-	  /* gdb_bfd_open (and its variants) prefers canonicalized
-	     pathname for better BFD caching.  */
-	  canonical_pathname = gdb_realpath (scratch_pathname);
-	  make_cleanup (xfree, canonical_pathname);
-	}
-
-      if (write_files && !load_via_target)
-	exec_bfd = gdb_bfd_fopen (canonical_pathname, gnutarget,
-				  FOPEN_RUB, scratch_chan);
-      else
-	exec_bfd = gdb_bfd_open (canonical_pathname, gnutarget, scratch_chan);
-
-      if (!exec_bfd)
+      if (exec_bfd == NULL)
 	{
-	  error (_("\"%s\": could not open as an executable file: %s."),
-		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
+	  char *exename = alloca (strlen (filename) + 5);
+
+	  strcat (strcpy (exename, filename), ".exe");
+	  exec_bfd = openp_bfd (getenv ("PATH"),
+				OPF_TRY_CWD_FIRST | OPF_BFD_CANONICAL, exename);
 	}
+#endif
+      if (exec_bfd == NULL)
+	error (_("\"%s\": could not open as an executable file: %s."),
+	       filename, bfd_errmsg (bfd_get_error ()));
 
       /* gdb_realpath_keepfile resolves symlinks on the local
 	 filesystem and so cannot be used for "target:" files.  */
       gdb_assert (exec_filename == NULL);
-      if (load_via_target)
+      if (is_target_filename (filename))
 	exec_filename = xstrdup (bfd_get_filename (exec_bfd));
       else
-	exec_filename = gdb_realpath_keepfile (scratch_pathname);
+	{
+	  char *abspath = gdb_abspath (filename);
+
+	  exec_filename = gdb_realpath_keepfile (abspath);
+	  xfree (abspath);
+	}
 
       if (!bfd_check_format_matches (exec_bfd, bfd_object, &matching))
 	{
@@ -298,7 +254,7 @@ exec_file_attach (const char *filename, int from_tty)
 	     it.  */
 	  exec_close ();
 	  error (_("\"%s\": not in executable format: %s"),
-		 scratch_pathname,
+		 filename,
 		 gdb_bfd_errmsg (bfd_get_error (), matching));
 	}
 
@@ -308,7 +264,7 @@ exec_file_attach (const char *filename, int from_tty)
 	     it.  */
 	  exec_close ();
 	  error (_("\"%s\": can't find the file sections: %s"),
-		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
+		 filename, bfd_errmsg (bfd_get_error ()));
 	}
 
       exec_bfd_mtime = bfd_get_mtime (exec_bfd);

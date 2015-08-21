@@ -868,8 +868,21 @@ file_location_from_filename (const char *filename, enum openp_flags opts)
     {
       if (write_files)
 	file.abfd = gdb_bfd_fopen (filename, gnutarget, FOPEN_RUB, file.fd);
-      else
+      else if ((opts & OPF_BFD_CANONICAL) == 0)
 	file.abfd = gdb_bfd_open (filename, gnutarget, file.fd);
+      else
+	{
+	  char *canonical;
+
+	  /* gdb_bfd_open (and its variants) prefers canonicalized
+	     pathname for better BFD caching.  */
+	  struct cleanup *canonical_cleanup;
+
+	  canonical = gdb_realpath (filename);
+	  canonical_cleanup = make_cleanup (xfree, canonical);
+	  file.abfd = gdb_bfd_open (canonical, gnutarget, file.fd);
+	  do_cleanups (canonical_cleanup);
+	}
       if ((opts & OPF_IS_BFD) != 0)
 	file.fd = -1;
       else
@@ -944,35 +957,79 @@ filename_to_bfd (const char *filename)
 							    OPF_IS_BFD));
 }
 
+/* Wrapper of openp_file returning filename string.
+
+   FILENAME_OPENED must be non-null.  It is set to
+   file_location.filename returned from openp_file.
+
+   If a file is found, return the descriptor.
+   Otherwise, return -1, with errno set for the last name we tried to open.  */
+
+int
+openp (const char *path, enum openp_flags opts, const char *string,
+       char **filename_opened)
+{
+  struct file_location file;
+  int retval;
+
+  gdb_assert ((opts & OPF_IS_BFD) == 0);
+
+  file = openp_file (path, opts, string);
+  gdb_assert (file.abfd == NULL);
+  if (file.fd == -1)
+    {
+      int save_errno = file.file_errno;
+
+      gdb_assert (file.filename == NULL);
+      file_location_free (&file);
+      *filename_opened = NULL;
+      errno = save_errno;
+      return -1;
+    }
+  gdb_assert (file.filename != NULL);
+  *filename_opened = xstrdup (file.filename);
+  retval = file.fd;
+  file.fd = -1;
+  file_location_free (&file);
+  return retval;
+}
+
+/* Wrapper of openp_file returning bfd *.  See file_location_to_bfd how
+   the function behaves in the case of failure.  */
+
+bfd *
+openp_bfd (const char *path, enum openp_flags opts, const char *string)
+{
+  gdb_assert ((opts & OPF_IS_BFD) == 0);
+
+  return file_location_to_bfd (openp_file (path, opts | OPF_IS_BFD, string));
+}
+
 /* Open a file named STRING, searching path PATH (dir names sep by some char).
    You cannot use this function to create files.
 
    OPTS specifies the function behaviour in specific cases.
 
-   FILENAME_OPENED must be non-null.  Set it to a newly allocated string naming
-   the actual file opened (this string will always start with a "/").  We
-   have to take special pains to avoid doubling the "/" between the directory
-   and the file, sigh!  Emacs gets confuzzed by this when we print the
-   source file name!!! 
-
-   If a file is found, return the descriptor.
-   Otherwise, return -1, with errno set for the last name we tried to open.  */
+   Call file_location_is_valid on returned file_location to check
+   whether this function has succeeded.  */
 
 /*  >>>> This should only allow files of certain types,
     >>>>  eg executable, non-directory.  */
-int
-openp (const char *path, enum openp_flags opts, const char *string,
-       char **filename_opened)
+
+struct file_location
+openp_file (const char *path, enum openp_flags opts, const char *string)
 {
   int fd;
   char *filename;
   int alloclen;
   VEC (char_ptr) *dir_vec;
   struct cleanup *back_to;
-  int ix, mode;
+  int ix;
   char *dir;
+  struct file_location file;
 
   gdb_assert (string != NULL);
+  gdb_assert ((opts & (OPF_IS_BFD | OPF_BFD_CANONICAL)) != OPF_BFD_CANONICAL);
 
   /* A file with an empty name cannot possibly exist.  Report a failure
      without further checking.
@@ -983,15 +1040,12 @@ openp (const char *path, enum openp_flags opts, const char *string,
      when the debugger is started with an empty argument.  */
   if (string[0] == '\0')
     {
-      errno = ENOENT;
-      return -1;
+      file_location_enoent (&file);
+      return file;
     }
 
   if (!path)
     path = ".";
-
-  mode = (O_BINARY | (((opts & OPF_OPEN_RW_TMP) && write_files)
-		      ? O_RDWR : O_RDONLY));
 
   if ((opts & OPF_TRY_CWD_FIRST) || IS_ABSOLUTE_PATH (string))
     {
@@ -1001,20 +1055,19 @@ openp (const char *path, enum openp_flags opts, const char *string,
 	{
 	  filename = alloca (strlen (string) + 1);
 	  strcpy (filename, string);
-	  fd = gdb_open_cloexec (filename, mode, 0);
-	  if (fd >= 0)
-	    goto done;
-	}
-      else
-	{
-	  filename = NULL;
-	  fd = -1;
+	  file = file_location_from_filename (filename, opts);
+	  if (file_location_is_valid (&file))
+	    return file;
+	  file_location_free (&file);
 	}
 
       if (!(opts & OPF_SEARCH_IN_PATH))
 	for (i = 0; string[i]; i++)
 	  if (IS_DIR_SEPARATOR (string[i]))
-	    goto done;
+	    {
+	      file_location_enoent (&file);
+	      return file;
+	    }
     }
 
   /* For dos paths, d:/foo -> /foo, and d:foo -> foo.  */
@@ -1033,7 +1086,7 @@ openp (const char *path, enum openp_flags opts, const char *string,
   filename = alloca (alloclen);
   fd = -1;
 
-  dir_vec = dirnames_to_char_ptr_vec (path);
+  dir_vec = dirnames_to_char_ptr_vec_target_exc (path);
   back_to = make_cleanup_free_char_ptr_vec (dir_vec);
 
   for (ix = 0; VEC_iterate (char_ptr, dir_vec, ix, dir); ++ix)
@@ -1097,23 +1150,22 @@ openp (const char *path, enum openp_flags opts, const char *string,
       strcat (filename + len, SLASH_STRING);
       strcat (filename, string);
 
-      if (is_regular_file (filename))
+      if (is_target_filename (filename) || is_regular_file (filename))
 	{
-	  fd = gdb_open_cloexec (filename, mode, 0);
-	  if (fd >= 0)
-	    break;
+	  file = file_location_from_filename (filename, opts);
+	  if (file_location_is_valid (&file))
+	    {
+	      do_cleanups (back_to);
+	      return file;
+	    }
+	  file_location_free (&file);
 	}
     }
 
   do_cleanups (back_to);
 
-done:
-  if (fd < 0)
-    *filename_opened = NULL;
-  else
-    *filename_opened = xstrdup (filename);
-
-  return fd;
+  file_location_enoent (&file);
+  return file;
 }
 
 
