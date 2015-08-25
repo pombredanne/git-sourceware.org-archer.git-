@@ -55,7 +55,7 @@ extern "C"
 
 
 #define DYNERRMSG(errstr,args...)						\
-      fprintf (stderr, "%s %s " errstr "\n", __FUNCTION__, getLastErrorMsg(), ##args);
+      error ("%s " errstr , getLastErrorMsg(), ##args);
 #define DYNERR(errstr,args...)						\
   fprintf (stderr, "%s " errstr "\n", __FUNCTION__, ##args);
 #define DEBUG_ENTER() if (debug_threads) debug_enter()
@@ -745,7 +745,7 @@ dyninst_create_inferior (char *program, char **allargs)
 
   Process::ptr dyninst_process = Process::createProcess(exec, args);
   if (dyninst_process == Process::ptr())
-    DYNERRMSG ("No such file: %s\n", exec.c_str());
+    DYNERRMSG ("stdin/stdout redirected\nCannot exec %s: No such file or directory\nNo program to debug", exec.c_str());
 
   myregisterCB(EventType::Bootstrap, signal_handler);
   myregisterCB(EventType::Breakpoint, breakpoint_handler);

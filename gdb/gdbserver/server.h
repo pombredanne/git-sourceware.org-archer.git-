@@ -153,6 +153,7 @@ struct client_state
   char *in_buf;
   char packet;
   char normalized_packet; // if own_buf == "OK"
+  char last_normalized_packet;
   int pending;
   // following were in server.c
   // --once: Exit after the first connection has closed.
@@ -210,7 +211,7 @@ client_state * get_client_state ();
 
 client_state * set_client_state (gdb_fildes_t);
 
-int count_client_state (gdb_fildes_t *fdp);
+int have_multiple_clients();
 
 void delete_client_state (gdb_fildes_t fd);
 

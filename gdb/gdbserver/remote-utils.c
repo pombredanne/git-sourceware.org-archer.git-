@@ -1046,7 +1046,7 @@ getpkt (gdb_fildes_t fd, char *buf)
     {
       if (remote_debug)
 	{
-	  fprintf (stderr, "getpkt/%d(\"%s\");  [sending ack] \n", fd, buf);
+	  fprintf (stderr, "getpkt/%d (\"%s\");  [sending ack] \n", fd, buf);
 	  fflush (stderr);
 	}
 

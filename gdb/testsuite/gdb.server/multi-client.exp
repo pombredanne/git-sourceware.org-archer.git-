@@ -1,0 +1,132 @@
+# Copyright (C) 2015 Free Software Foundation, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+load_lib gdbserver-support.exp
+
+set test "multi-client"
+set use_gdb_stub [target_info exists use_gdb_stub]
+set gdb_client1_spawn_id ""
+set gdb_client2_spawn_id ""
+
+
+# We test for skip_shlib_tests in this test because without a main
+# exec file we only have the exec target loaded if shared libraries
+# are present.
+if {[skip_gdbserver_tests]} {
+    return
+}
+
+standard_testfile server.c
+
+proc gdb_command { CLIENT COMMAND RESPONSE COMMENT SLEEP DEBUG } {
+    global gdb_client1_spawn_id
+    global gdb_client2_spawn_id
+    global test
+#    verbose "$CLIENT; $COMMAND; $RESPONSE; $COMMENT"
+    if {$CLIENT == 1} {
+	set client "$gdb_client1_spawn_id"
+    } else {
+	set client "$gdb_client2_spawn_id"
+    }
+    set ok 0
+    send -i $client "$COMMAND\n"
+    if { $SLEEP > 0 } {
+	sleep $SLEEP
+    }
+    expect {
+	-i "$client" -re "$RESPONSE" { 
+	    incr ok; 
+	    exp_continue 
+	    if { $DEBUG } { verbose "DEBUG: $COMMENT $expect_out(spawn_id) $expect_out(buffer)" }
+	}
+    }
+    if {$ok == 1} { 
+	pass "$test $COMMENT"
+    } else {
+	fail "$test $COMMENT"
+    }
+}
+
+set X [spawn echo X {$(pgrep emacs)} X]
+
+set GDBSERVER "[find_gdbserver]"
+set res [remote_spawn host "$GDBSERVER --multi :65432"]
+if { $res < 0 || $res == "" } {
+    perror "$test Spawning $GDBSERVER failed."
+    return 1
+}
+
+set gdb_server_spawn_id $res
+
+set ok 0
+expect {
+#    -timeout 180
+   -i "$gdb_server_spawn_id" -re "Listening on port" { incr ok; exp_continue }
+}
+if {$ok == 1} { 
+    pass "$test gdbserver listen"
+} else {
+    fail "$test gdbserver listen"
+}
+
+set MULTI_GDBFLAGS "-iex \"file /work/scox/stap/dyninst/towers.x\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file /work/scox/stap/dyninst/towers.x\" --silent"
+set res [remote_spawn host "$GDB $INTERNAL_GDBFLAGS $GDBFLAGS $MULTI_GDBFLAGS [host_info gdb_opts]"]
+sleep 1
+if { $res < 0 || $res == "" } {
+    perror "$test Spawning $GDB failed."
+    return 1
+}
+
+set gdb_spawn_id $res
+set gdb_client1_spawn_id $res
+
+gdb_command 1 "b towers" "Breakpoint 1 at" "gdbserver b towers" 1 false
+
+gdb_command 1 "run" "Breakpoint 1," "gdbserver hit b towers" 2 false
+
+set res [remote_spawn host "$GDB $INTERNAL_GDBFLAGS $GDBFLAGS $MULTI_GDBFLAGS [host_info gdb_opts]"]
+sleep 2
+if { $res < 0 || $res == "" } {
+    perror "$test Spawning $GDB failed."
+    return 1
+}
+
+set gdb_client2_spawn_id $res
+
+gdb_command 2 "b tower" "Breakpoint 1 at" "gdbserver b tower" 1 false
+
+send -i $gdb_client2_spawn_id "run\n"
+sleep 1
+
+send -i $gdb_client2_spawn_id  "continue\n"
+sleep 1
+
+send -i $gdb_client1_spawn_id  "dis 1\n"
+sleep 1
+
+send -i $gdb_client1_spawn_id  "continue\n"
+sleep 1
+
+set ok 0
+expect {
+    -i $gdb_client2_spawn_id "Breakpoint 1, tower" { incr ok; verbose "X $expect_out(spawn_id) $expect_out(buffer) X" }
+}
+if { $ok == 1 } {
+    pass "$test gdbserver hit b tower"
+} else {
+    fail "$test gdbserver hit b tower"
+}
+
+gdb_command 2 "info target" "Extended remote serial target in gdb-specific protocol:" "info target" 0 true
