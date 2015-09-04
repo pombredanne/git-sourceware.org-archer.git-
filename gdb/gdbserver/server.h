@@ -143,6 +143,9 @@ struct client_breakpoint
   struct client_breakpoint *next;
 };
 
+enum packet_types { other_packet = 0, vContc = 1, vConts = 2, vRun = 3 };
+typedef enum packet_types packet_types;
+
 struct client_state
 {
   // inferior_list is not used for this since it is indexed by ptid_t and this
@@ -152,8 +155,8 @@ struct client_state
   char *own_buf;
   char *in_buf;
   char packet;
-  char normalized_packet; // if own_buf == "OK"
-  char last_normalized_packet;
+  int normalized_packet; // if own_buf == "OK"
+  int last_normalized_packet;
   int pending;
   // following were in server.c
   // --once: Exit after the first connection has closed.

@@ -1,7 +1,54 @@
-2015-05-15  Pedro Alves  <palves@redhat.com>
+2015-09-04  Stan Cox  <scox@redhat.com>
 
-	* target.h (target_handle_new_gdb_connection): Rewrite using if
-	wrapped in do/while.
+	* server.c (get_packet_type, ignore_packet):  Split from normalize_packet.
+	(setup_multiplexing, do_multiplexing):  Improve waitee/waiter. Don't special case vRun.
+	(handle_v_run): Likewise.
+	* server.h (packet_types): Add packet_types
+
+2015-08-25  Stan Cox <scox@redhat.com>
+
+	* server.c (add_client_by_pid, add_client_by_exe, get_first_client_fd):
+	Renamed from add_client_state, attach_client_state, count_client_state
+	(have_multiple_clients): New
+	(setup_multiplexing, do_multiplexing):  Moved from process_serial_event.
+	* testsuite/gdb.server/multi-client.exp:  New.
+
+2015-08-11   Stan Cox  <scox@redhat.com>
+
+        * dyninst-low.cc (dump_processes):  Use for_each_client_state.
+        (delete_lwp_callback):  New.
+        (dyninst_request_interrupt): Insure we found the process.
+        (dyninst_insert_point):  Set break_info.
+        (dyninst_remove_point):  Remove break_info.
+
+2015-07-10   Stan Cox  <scox@redhat.com>
+
+	* dyninst-low.cc (EventSet.remove): New, to remove a procs events.
+	(EventSet.get): Ignore terminated procs.
+	(is_fork):  New, to determine if there is a fork event.
+	(dump_events, dump_processes): Debugging tools.
+	(lwp_info) Renamed to match usage in linux-low.c.
+	(dyninst_add_lwp) Link lwp_info to both gdb and dyninst lwp structs.
+	(dyninst_resume) For now, just handle one resume request.
+	(dyninst_wait_1) Add separate cases for singlestep and fork events.
+	(dyninst_mourn, dyninst_fetch_registers, dyninst_store_registers)
+	(dyninst_write_pc, dyninst_write_memory, dyninst_insert_point)
+	(dyninst_remove_point) Insure process is active.
+	* dyninst-low.h (breakpoint, breakpoint_len): Opcode the arch uses
+	for a breakpoint trap.
+	* dyninst-x86=low.cc (dyninst_x86_fill_gregset)
+	(dyninst_x86_store_gregset): Allow for smaller dyninst regset size.
+	* mem-break.c (has_client_breakpoint_at): Given multiple clients
+	for the same process does clientA have a break at location addr.
+	(insert_shadow_memory): Allows shadow memory use by a backend that
+	manages its own breakpoints.
+	* server.c (free_client_state):  Free all client state memory.
+	(count_client_state)  Return the file desc for an active client in
+	case an existing client has terminated.
+	(add_client_breakpoint, delete_client_breakpoint)  As per has_client_breakpoint_at.
+	(normalize_packet): Improve handling for multiple clients for the same process.
+	(process_serial_event): Likewise. Save the original getpkt contents in in_buf.
+	* server.h (struct client_breakpoint):  New, as per has_client_breakpoint_at
 
 2015-05-14  Joel Brobecker  <brobecker@adacore.com>
 
