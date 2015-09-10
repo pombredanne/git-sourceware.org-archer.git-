@@ -26,8 +26,6 @@
 #include "gdbthread.h"
 #include "dll.h"
 #include "hostio.h"
-
-#include <stdint.h>
 #include <windows.h>
 #include <winnt.h>
 #include <imagehlp.h>
@@ -217,7 +215,7 @@ child_add_thread (DWORD pid, DWORD tid, HANDLE h, void *tlb)
   if ((th = thread_rec (ptid, FALSE)))
     return th;
 
-  th = xcalloc (1, sizeof (*th));
+  th = XCNEW (win32_thread_info);
   th->tid = tid;
   th->h = h;
   th->thread_local_base = (CORE_ADDR) (uintptr_t) tlb;
@@ -1096,7 +1094,7 @@ get_image_name (HANDLE h, void *address, int unicode)
     ReadProcessMemory (h, address_ptr, buf, len, &done);
   else
     {
-      WCHAR *unicode_address = (WCHAR *) alloca (len * sizeof (WCHAR));
+      WCHAR *unicode_address = XALLOCAVEC (WCHAR, len);
       ReadProcessMemory (h, address_ptr, unicode_address, len * sizeof (WCHAR),
 			 &done);
 
@@ -1801,6 +1799,7 @@ win32_get_tib_address (ptid_t ptid, CORE_ADDR *addr)
 
 static struct target_ops win32_target_ops = {
   win32_create_inferior,
+  NULL,  /* arch_setup */
   win32_attach,
   win32_kill,
   win32_detach,

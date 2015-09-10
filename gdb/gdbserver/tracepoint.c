@@ -25,10 +25,8 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <unistd.h>
-#include <sys/time.h>
+#include "gdb_sys_time.h"
 #include <inttypes.h>
-#include <stdint.h>
-
 #include "ax.h"
 #include "tdesc.h"
 
@@ -179,7 +177,6 @@ static struct
 {
   const char *name;
   int offset;
-  int required;
 } symbol_list[] = {
   IPA_SYM(gdb_tp_heap_buffer),
   IPA_SYM(gdb_jump_pad_buffer),
@@ -851,7 +848,10 @@ IP_AGENT_EXPORT_VAR int trace_buffer_is_full;
 
 /* The first error that occurred during expression evaluation.  */
 
-IP_AGENT_EXPORT_VAR enum eval_result_type expr_eval_result = expr_eval_no_error;
+/* Stored as an int to avoid the IPA ABI being dependent on whatever
+   the compiler decides to use for the enum's underlying type.  Holds
+   enum eval_result_type values.  */
+IP_AGENT_EXPORT_VAR int expr_eval_result = expr_eval_no_error;
 
 EXTERN_C_POP
 
@@ -1803,7 +1803,7 @@ add_tracepoint (int num, CORE_ADDR addr)
 {
   struct tracepoint *tpoint, **tp_next;
 
-  tpoint = xmalloc (sizeof (struct tracepoint));
+  tpoint = XNEW (struct tracepoint);
   tpoint->number = num;
   tpoint->address = addr;
   tpoint->numactions = 0;
@@ -1938,11 +1938,11 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 	{
 	case 'M':
 	  {
-	    struct collect_memory_action *maction;
+	    struct collect_memory_action *maction =
+	      XNEW (struct collect_memory_action);
 	    ULONGEST basereg;
 	    int is_neg;
 
-	    maction = xmalloc (sizeof *maction);
 	    maction->base.type = *act;
 	    maction->base.ops = &m_tracepoint_action_ops;
 	    action = &maction->base;
@@ -1966,9 +1966,9 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 	  }
 	case 'R':
 	  {
-	    struct collect_registers_action *raction;
+	    struct collect_registers_action *raction =
+	      XNEW (struct collect_registers_action);
 
-	    raction = xmalloc (sizeof *raction);
 	    raction->base.type = *act;
 	    raction->base.ops = &r_tracepoint_action_ops;
 	    action = &raction->base;
@@ -1982,9 +1982,9 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 	  }
 	case 'L':
 	  {
-	    struct collect_static_trace_data_action *raction;
+	    struct collect_static_trace_data_action *raction =
+	      XNEW (struct collect_static_trace_data_action);
 
-	    raction = xmalloc (sizeof *raction);
 	    raction->base.type = *act;
 	    raction->base.ops = &l_tracepoint_action_ops;
 	    action = &raction->base;
@@ -1999,9 +1999,8 @@ add_tracepoint_action (struct tracepoint *tpoint, char *packet)
 	  break;
 	case 'X':
 	  {
-	    struct eval_expr_action *xaction;
+	    struct eval_expr_action *xaction = XNEW (struct eval_expr_action);
 
-	    xaction = xmalloc (sizeof (*xaction));
 	    xaction->base.type = *act;
 	    xaction->base.ops = &x_tracepoint_action_ops;
 	    action = &xaction->base;
@@ -2088,7 +2087,7 @@ create_trace_state_variable (int num, int gdb)
     return tsv;
 
   /* Create a new variable.  */
-  tsv = xmalloc (sizeof (struct trace_state_variable));
+  tsv = XNEW (struct trace_state_variable);
   tsv->number = num;
   tsv->initial_value = 0;
   tsv->value = 0;
@@ -2699,7 +2698,7 @@ cmd_qtdpsrc (char *own_buf)
   nbytes = hex2bin (packet, (gdb_byte *) src, strlen (packet) / 2);
   src[nbytes] = '\0';
 
-  newlast = xmalloc (sizeof (struct source_string));
+  newlast = XNEW (struct source_string);
   newlast->type = srctype;
   newlast->str = src;
   newlast->next = NULL;
@@ -2889,7 +2888,8 @@ cmd_qtro (char *own_buf)
       packet = unpack_varlen_hex (packet, &start);
       ++packet;  /* skip a comma */
       packet = unpack_varlen_hex (packet, &end);
-      roreg = xmalloc (sizeof (struct readonly_region));
+
+      roreg = XNEW (struct readonly_region);
       roreg->start = start;
       roreg->end = end;
       roreg->next = readonly_regions;
@@ -4330,9 +4330,8 @@ static void
 add_while_stepping_state (struct thread_info *tinfo,
 			  int tp_number, CORE_ADDR tp_address)
 {
-  struct wstep_state *wstep;
+  struct wstep_state *wstep = XNEW (struct wstep_state);
 
-  wstep = xmalloc (sizeof (*wstep));
   wstep->next = tinfo->while_stepping;
 
   wstep->tp_number = tp_number;

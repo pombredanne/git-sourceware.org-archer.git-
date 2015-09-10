@@ -125,8 +125,7 @@ build_gdb_vtable_type (struct gdbarch *arch)
      the alignment that type requires, and then use that here.  */
 
   /* Build the field list.  */
-  field_list = xmalloc (sizeof (struct field [4]));
-  memset (field_list, 0, sizeof (struct field [4]));
+  field_list = XCNEWVEC (struct field, 4);
   field = &field_list[0];
   offset = 0;
 
@@ -202,7 +201,7 @@ gnuv3_dynamic_class (struct type *type)
 {
   int fieldnum, fieldelem;
 
-  CHECK_TYPEDEF (type);
+  type = check_typedef (type);
   gdb_assert (TYPE_CODE (type) == TYPE_CODE_STRUCT
 	      || TYPE_CODE (type) == TYPE_CODE_UNION);
 
@@ -253,7 +252,7 @@ gnuv3_get_vtable (struct gdbarch *gdbarch,
   struct value *vtable_pointer;
   CORE_ADDR vtable_address;
 
-  CHECK_TYPEDEF (container_type);
+  container_type = check_typedef (container_type);
   gdb_assert (TYPE_CODE (container_type) == TYPE_CODE_STRUCT);
 
   /* If this type does not have a virtual table, don't read the first
@@ -1025,8 +1024,7 @@ build_std_type_info_type (struct gdbarch *arch)
   struct type *char_ptr_type
     = make_pointer_type (make_cv_type (1, 0, char_type, NULL), NULL);
 
-  field_list = xmalloc (sizeof (struct field [2]));
-  memset (field_list, 0, sizeof (struct field [2]));
+  field_list = XCNEWVEC (struct field, 2);
   field = &field_list[0];
   offset = 0;
 
@@ -1063,7 +1061,8 @@ gnuv3_get_typeid_type (struct gdbarch *gdbarch)
   struct symbol *typeinfo;
   struct type *typeinfo_type;
 
-  typeinfo = lookup_symbol ("std::type_info", NULL, STRUCT_DOMAIN, NULL);
+  typeinfo = lookup_symbol ("std::type_info", NULL, STRUCT_DOMAIN,
+			    NULL).symbol;
   if (typeinfo == NULL)
     typeinfo_type = gdbarch_data (gdbarch, std_type_info_gdbarch_data);
   else
@@ -1293,7 +1292,7 @@ gnuv3_pass_by_reference (struct type *type)
 {
   int fieldnum, fieldelem;
 
-  CHECK_TYPEDEF (type);
+  type = check_typedef (type);
 
   /* We're only interested in things that can have methods.  */
   if (TYPE_CODE (type) != TYPE_CODE_STRUCT

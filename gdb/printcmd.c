@@ -1208,7 +1208,7 @@ address_info (char *exp, int from_tty)
     error (_("Argument required."));
 
   sym = lookup_symbol (exp, get_selected_block (&context_pc), VAR_DOMAIN,
-		       &is_a_field_of_this);
+		       &is_a_field_of_this).symbol;
   if (sym == NULL)
     {
       if (is_a_field_of_this.type != NULL)
@@ -1506,61 +1506,50 @@ display_command (char *arg, int from_tty)
   struct format_data fmt;
   struct expression *expr;
   struct display *newobj;
-  int display_it = 1;
   const char *exp = arg;
 
-#if defined(TUI)
-  /* NOTE: cagney/2003-02-13 The `tui_active' was previously
-     `tui_version'.  */
-  if (tui_active && exp != NULL && *exp == '$')
-    display_it = (tui_set_layout_for_display_command (exp) == TUI_FAILURE);
-#endif
-
-  if (display_it)
+  if (exp == 0)
     {
-      if (exp == 0)
-	{
-	  do_displays ();
-	  return;
-	}
-
-      if (*exp == '/')
-	{
-	  exp++;
-	  fmt = decode_format (&exp, 0, 0);
-	  if (fmt.size && fmt.format == 0)
-	    fmt.format = 'x';
-	  if (fmt.format == 'i' || fmt.format == 's')
-	    fmt.size = 'b';
-	}
-      else
-	{
-	  fmt.format = 0;
-	  fmt.size = 0;
-	  fmt.count = 0;
-	  fmt.raw = 0;
-	}
-
-      innermost_block = NULL;
-      expr = parse_expression (exp);
-
-      newobj = (struct display *) xmalloc (sizeof (struct display));
-
-      newobj->exp_string = xstrdup (exp);
-      newobj->exp = expr;
-      newobj->block = innermost_block;
-      newobj->pspace = current_program_space;
-      newobj->next = display_chain;
-      newobj->number = ++display_number;
-      newobj->format = fmt;
-      newobj->enabled_p = 1;
-      display_chain = newobj;
-
-      if (from_tty)
-	do_one_display (newobj);
-
-      dont_repeat ();
+      do_displays ();
+      return;
     }
+
+  if (*exp == '/')
+    {
+      exp++;
+      fmt = decode_format (&exp, 0, 0);
+      if (fmt.size && fmt.format == 0)
+	fmt.format = 'x';
+      if (fmt.format == 'i' || fmt.format == 's')
+	fmt.size = 'b';
+    }
+  else
+    {
+      fmt.format = 0;
+      fmt.size = 0;
+      fmt.count = 0;
+      fmt.raw = 0;
+    }
+
+  innermost_block = NULL;
+  expr = parse_expression (exp);
+
+  newobj = XNEW (struct display);
+
+  newobj->exp_string = xstrdup (exp);
+  newobj->exp = expr;
+  newobj->block = innermost_block;
+  newobj->pspace = current_program_space;
+  newobj->next = display_chain;
+  newobj->number = ++display_number;
+  newobj->format = fmt;
+  newobj->enabled_p = 1;
+  display_chain = newobj;
+
+  if (from_tty)
+    do_one_display (newobj);
+
+  dont_repeat ();
 }
 
 static void
@@ -1999,7 +1988,11 @@ print_variable_and_value (const char *name, struct symbol *var,
       struct value *val;
       struct value_print_options opts;
 
-      val = read_var_value (var, frame);
+      /* READ_VAR_VALUE needs a block in order to deal with non-local
+	 references (i.e. to handle nested functions).  In this context, we
+	 print variables that are local to this frame, so we can avoid passing
+	 a block to it.  */
+      val = read_var_value (var, NULL, frame);
       get_user_print_options (&opts);
       opts.deref_ref = 1;
       common_val_print (val, stream, indent, &opts, current_language);
@@ -2263,7 +2256,7 @@ ui_printf (const char *arg, struct ui_file *stream)
   int allocated_args = 20;
   struct cleanup *old_cleanups;
 
-  val_args = xmalloc (allocated_args * sizeof (struct value *));
+  val_args = XNEWVEC (struct value *, allocated_args);
   old_cleanups = make_cleanup (free_current_contents, &val_args);
 
   if (s == 0)

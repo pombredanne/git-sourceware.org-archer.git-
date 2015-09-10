@@ -105,10 +105,9 @@ remove_inferior (struct inferior_list *list,
 struct thread_info *
 add_thread (ptid_t thread_id, void *target_data)
 {
-  struct thread_info *new_thread = xmalloc (sizeof (*new_thread));
   client_state *cs = get_client_state ();
 
-  memset (new_thread, 0, sizeof (*new_thread));
+  struct thread_info *new_thread = XCNEW (struct thread_info);
 
   new_thread->entry.id = thread_id;
   new_thread->last_resume_kind = resume_continue;
@@ -172,6 +171,7 @@ remove_thread (struct thread_info *thread)
   if (thread->btrace != NULL)
     target_disable_btrace (thread->btrace);
 
+  discard_queued_stop_replies (ptid_of (thread));
   remove_inferior (&cs->ss->all_threads, (struct inferior_list_entry *) thread);
   free_one_thread (&thread->entry);
 }
@@ -237,14 +237,14 @@ set_inferior_target_data (struct thread_info *inferior, void *data)
   inferior->target_data = data;
 }
 
-void *
+struct regcache *
 inferior_regcache_data (struct thread_info *inferior)
 {
   return inferior->regcache_data;
 }
 
 void
-set_inferior_regcache_data (struct thread_info *inferior, void *data)
+set_inferior_regcache_data (struct thread_info *inferior, struct regcache *data)
 {
   inferior->regcache_data = data;
 }
@@ -285,10 +285,9 @@ clear_inferiors (void)
 struct process_info *
 add_process (int pid, int attached)
 {
-  struct process_info *process;
   client_state *cs = get_client_state ();
 
-  process = xcalloc (1, sizeof (*process));
+  struct process_info *process = XCNEW (struct process_info);
 
   process->entry.id = pid_to_ptid (pid);
   process->attached = attached;
@@ -320,6 +319,16 @@ find_process_pid (int pid)
 
   return (struct process_info *)
     find_inferior_id (&cs->ss->all_processes, pid_to_ptid (pid));
+}
+
+/* Wrapper around get_first_inferior to return a struct process_info *.  */
+
+struct process_info *
+get_first_process (void)
+{
+  client_state *cs = get_client_state ();
+
+  return (struct process_info *) get_first_inferior (&cs->ss->all_processes);
 }
 
 /* Return non-zero if INF, a struct process_info, was started by us,

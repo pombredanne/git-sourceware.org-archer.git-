@@ -88,6 +88,9 @@ typedef int gdb_fildes_t;
 extern int handle_serial_event (int err, gdb_client_data client_data);
 extern int handle_target_event (int err, gdb_client_data client_data);
 
+/* Get rid of the currently pending stop replies that match PTID.  */
+extern void discard_queued_stop_replies (ptid_t ptid);
+
 #include "remote-utils.h"
 
 #include "utils.h"
@@ -167,21 +170,19 @@ struct client_state
   int report_vfork_events;
   // QNonStop packet
   int non_stop;
-  // QDisableRandomization packet
+  int extended_protocol;
 /* True if the "swbreak+" feature is active.  In that case, GDB wants
    us to report whether a trap is explained by a software breakpoint
    and for the server to handle PC adjustment if necessary on this
    target.  Only enabled if the target supports it.  */
   int swbreak_feature;
-
 /* True if the "hwbreak+" feature is active.  In that case, GDB wants
    us to report whether a trap is explained by a hardware breakpoint.
    Only enabled if the target supports it.  */
   int hwbreak_feature;
-
+  // QDisableRandomization packet
   int disable_randomization;
   int server_waiting;
-  int extended_protocol;
   int response_needed;
   int exit_requested;
   int pass_signals[GDB_SIGNAL_LAST];

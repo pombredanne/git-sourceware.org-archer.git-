@@ -234,11 +234,14 @@ gcc(1), ld(1), and the Info entries for @file{binutils} and @file{ld}.
  [@b{--help}] [@b{-I} @var{dir}] [@b{-J}]
  [@b{-K}] [@b{-L}] [@b{--listing-lhs-width}=@var{NUM}]
  [@b{--listing-lhs-width2}=@var{NUM}] [@b{--listing-rhs-width}=@var{NUM}]
- [@b{--listing-cont-lines}=@var{NUM}] [@b{--keep-locals}] [@b{-o}
- @var{objfile}] [@b{-R}] [@b{--reduce-memory-overheads}] [@b{--statistics}]
- [@b{-v}] [@b{-version}] [@b{--version}] [@b{-W}] [@b{--warn}]
- [@b{--fatal-warnings}] [@b{-w}] [@b{-x}] [@b{-Z}] [@b{@@@var{FILE}}]
- [@b{--size-check=[error|warning]}]
+ [@b{--listing-cont-lines}=@var{NUM}] [@b{--keep-locals}]
+ [@b{-o} @var{objfile}] [@b{-R}]
+ [@b{--hash-size}=@var{NUM}] [@b{--reduce-memory-overheads}]
+ [@b{--statistics}]
+ [@b{-v}] [@b{-version}] [@b{--version}]
+ [@b{-W}] [@b{--warn}] [@b{--fatal-warnings}] [@b{-w}] [@b{-x}]
+ [@b{-Z}] [@b{@@@var{FILE}}]
+ [@b{--sectname-subst}] [@b{--size-check=[error|warning]}]
  [@b{--target-help}] [@var{target-options}]
  [@b{--}|@var{files} @dots{}]
 @c
@@ -552,7 +555,8 @@ gcc(1), ld(1), and the Info entries for @file{binutils} and @file{ld}.
 @ifset XTENSA
 
 @emph{Target Xtensa options:}
- [@b{--[no-]text-section-literals}] [@b{--[no-]absolute-literals}]
+ [@b{--[no-]text-section-literals}] [@b{--[no-]auto-litpools}]
+ [@b{--[no-]absolute-literals}]
  [@b{--[no-]target-align}] [@b{--[no-]longcalls}]
  [@b{--[no-]transform}]
  [@b{--rename-section} @var{oldname}=@var{newname}]
@@ -625,10 +629,10 @@ Begin in alternate macro mode.
 @end ifclear
 
 @item --compress-debug-sections
-Compress DWARF debug sections using zlib.  The debug sections are renamed
-to begin with @samp{.zdebug}, and the resulting object file may not be
-compatible with older linkers and object file utilities.  Note if compression
-would make a given section @emph{larger} then it is not compressed or renamed.
+Compress DWARF debug sections using zlib with SHF_COMPRESSED from the
+ELF ABI.  The resulting object file may not be compatible with older
+linkers and object file utilities.  Note if compression would make a
+given section @emph{larger} then it is not compressed.
 
 @ifset ELF
 @cindex @samp{--compress-debug-sections=} option
@@ -640,10 +644,13 @@ These options control how DWARF debug sections are compressed.
 @option{--compress-debug-sections=none} is equivalent to
 @option{--nocompress-debug-sections}.
 @option{--compress-debug-sections=zlib} and
-@option{--compress-debug-sections=zlib-gnu} are equivalent to
+@option{--compress-debug-sections=zlib-gabi} are equivalent to
 @option{--compress-debug-sections}.
-@option{--compress-debug-sections=zlib-gabi} compresses
-DWARF debug sections with SHF_COMPRESSED from the ELF ABI.
+@option{--compress-debug-sections=zlib-gnu} compresses DWARF debug
+sections using zlib.  The debug sections are renamed to begin with
+@samp{.zdebug}.  Note if compression would make a given section
+@emph{larger} then it is not compressed nor renamed.
+
 @end ifset
 
 @item --nocompress-debug-sections
@@ -754,7 +761,7 @@ Name the object-file output from @command{@value{AS}} @var{objfile}.
 @item -R
 Fold the data section into the text section.
 
-@kindex --hash-size=@var{number}
+@item --hash-size=@var{number}
 Set the default size of GAS's hash tables to a prime number close to
 @var{number}.  Increasing this value can reduce the length of time it takes the
 assembler to perform its tasks, at the expense of increasing the assembler's
@@ -765,6 +772,14 @@ requirements at the expense of speed.
 This option reduces GAS's memory requirements, at the expense of making the
 assembly processes slower.  Currently this switch is a synonym for
 @samp{--hash-size=4051}, but in the future it may have other effects as well.
+
+@ifset ELF
+@item --sectname-subst
+Honor substitution sequences in section names.
+@ifclear man
+@xref{Section Name Substitutions,,@code{.section @var{name}}}.
+@end ifclear
+@end ifset
 
 @item --statistics
 Print the maximum space (in bytes) and total time (in seconds) used by
@@ -2725,10 +2740,15 @@ On most machines, you can also use @code{$} in symbol names; exceptions
 are noted in @ref{Machine Dependencies}.
 @end ifset
 No symbol may begin with a digit.  Case is significant.
-There is no length limit: all characters are significant.  Multibyte characters
+There is no length limit; all characters are significant.  Multibyte characters
 are supported.  Symbols are delimited by characters not in that set, or by the
 beginning of a file (since the source program must end with a newline, the end
 of a file is not a possible symbol delimiter).  @xref{Symbols}.
+
+Symbol names may also be enclosed in double quote @code{"} characters.  In such
+cases any characters are allowed, except for the NUL character.  If a double
+quote character is to be included in the symbol name it must be preceeded by a
+backslash @code{\} character.
 @cindex length of symbols
 
 @node Statements
@@ -3692,11 +3712,11 @@ Local labels are different from local symbols.  Local labels help compilers and
 programmers use names temporarily.  They create symbols which are guaranteed to
 be unique over the entire scope of the input source code and which can be
 referred to by a simple notation.  To define a local label, write a label of
-the form @samp{@b{N}:} (where @b{N} represents any positive integer).  To refer
-to the most recent previous definition of that label write @samp{@b{N}b}, using
-the same number as when you defined the label.  To refer to the next definition
-of a local label, write @samp{@b{N}f}---the @samp{b} stands for ``backwards''
-and the @samp{f} stands for ``forwards''.
+the form @samp{@b{N}:} (where @b{N} represents any non-negative integer).
+To refer to the most recent previous definition of that label write
+@samp{@b{N}b}, using the same number as when you defined the label.  To refer
+to the next definition of a local label, write @samp{@b{N}f}.  The @samp{b}
+stands for ``backwards'' and the @samp{f} stands for ``forwards''.
 
 There is no restriction on how you can use these labels, and you can reuse them
 too.  So that it is possible to repeatedly define the same local label (using
@@ -4197,7 +4217,8 @@ address; you can only have a defined section in one of the two arguments.
 @cindex pseudo-ops, machine independent
 @cindex machine independent directives
 All assembler directives have names that begin with a period (@samp{.}).
-The rest of the name is letters, usually in lower case.
+The names are case insensitive for most targets, and usually written
+in lower case.
 
 This chapter discusses directives that are available regardless of the
 target machine configuration for the @sc{gnu} assembler.
@@ -4624,6 +4645,9 @@ if @var{section_list} is @code{.debug_frame}, @code{.debug_frame} is emitted.
 To emit both use @code{.eh_frame, .debug_frame}.  The default if this
 directive is not used is @code{.cfi_sections .eh_frame}.
 
+On targets that support compact unwinding tables these can be generated
+by specifying @code{.eh_frame_entry} instead of @code{.eh_frame}.
+
 @subsection @code{.cfi_startproc [simple]}
 @cindex @code{cfi_startproc} directive
 @code{.cfi_startproc} is used at the beginning of each function that
@@ -4641,6 +4665,7 @@ unwind entry previously opened by
 @code{.cfi_startproc}, and emits it to @code{.eh_frame}.
 
 @subsection @code{.cfi_personality @var{encoding} [, @var{exp}]}
+@cindex @code{cfi_personality} directive
 @code{.cfi_personality} defines personality routine and its encoding.
 @var{encoding} must be a constant determining how the personality
 should be encoded.  If it is 255 (@code{DW_EH_PE_omit}), second
@@ -4651,13 +4676,46 @@ can be loaded from, not the personality routine itself.
 The default after @code{.cfi_startproc} is @code{.cfi_personality 0xff},
 no personality routine.
 
+@subsection @code{.cfi_personality_id @var{id}}
+@cindex @code{cfi_personality_id} directive
+@code{cfi_personality_id} defines a personality routine by its index as
+defined in a compact unwinding format.
+Only valid when generating compact EH frames (i.e.
+with @code{.cfi_sections eh_frame_entry}.
+
+@subsection @code{.cfi_fde_data [@var{opcode1} [, @dots{}]]}
+@cindex @code{cfi_fde_data} directive
+@code{cfi_fde_data} is used to describe the compact unwind opcodes to be
+used for the current function.  These are emitted inline in the
+@code{.eh_frame_entry} section if small enough and there is no LSDA, or
+in the @code{.gnu.extab} section otherwise.
+Only valid when generating compact EH frames (i.e.
+with @code{.cfi_sections eh_frame_entry}.
+
 @subsection @code{.cfi_lsda @var{encoding} [, @var{exp}]}
 @code{.cfi_lsda} defines LSDA and its encoding.
 @var{encoding} must be a constant determining how the LSDA
-should be encoded.  If it is 255 (@code{DW_EH_PE_omit}), second
-argument is not present, otherwise second argument should be a constant
+should be encoded.  If it is 255 (@code{DW_EH_PE_omit}), the second
+argument is not present, otherwise the second argument should be a constant
 or a symbol name.  The default after @code{.cfi_startproc} is @code{.cfi_lsda 0xff},
-no LSDA.
+meaning that no LSDA is present.
+
+@subsection @code{.cfi_inline_lsda} [@var{align}]
+@code{.cfi_inline_lsda} marks the start of a LSDA data section and
+switches to the corresponding @code{.gnu.extab} section.
+Must be preceded by a CFI block containing a @code{.cfi_lsda} directive.
+Only valid when generating compact EH frames (i.e.
+with @code{.cfi_sections eh_frame_entry}.
+
+The table header and unwinding opcodes will be generated at this point,
+so that they are immediately followed by the LSDA data.  The symbol
+referenced by the @code{.cfi_lsda} directive should still be defined
+in case a fallback FDE based encoding is used.  The LSDA data is terminated
+by a section directive.
+
+The optional @var{align} argument specifies the alignment required.
+The alignment is specified as a power of two, as with the
+@code{.p2align} directive.
 
 @subsection @code{.cfi_def_cfa @var{register}, @var{offset}}
 @code{.cfi_def_cfa} defines a rule for computing CFA as: @i{take
@@ -6220,6 +6278,38 @@ For ELF targets, the @code{.section} directive is used like this:
 @smallexample
 .section @var{name} [, "@var{flags}"[, @@@var{type}[,@var{flag_specific_arguments}]]]
 @end smallexample
+
+@anchor{Section Name Substitutions}
+@kindex --sectname-subst
+@cindex section name substitution
+If the @samp{--sectname-subst} command-line option is provided, the @var{name}
+argument may contain a substitution sequence. Only @code{%S} is supported
+at the moment, and substitutes the current section name. For example:
+
+@smallexample
+.macro exception_code
+.section %S.exception
+[exception code here]
+.previous
+.endm
+
+.text
+[code]
+exception_code
+[...]
+
+.section .init
+[init code]
+exception_code
+[...]
+@end smallexample
+
+The two @code{exception_code} invocations above would create the
+@code{.text.exception} and @code{.init.exception} sections respectively.
+This is useful e.g. to discriminate between anciliary sections that are
+tied to setup code to be discarded after use from anciliary sections that
+need to stay resident without having to define multiple @code{exception_code}
+macros just for that purpose.
 
 The optional @var{flags} argument is a quoted string which may contain any
 combination of the following characters:

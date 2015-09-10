@@ -32,6 +32,7 @@
 #include "expression.h"
 #include "value.h"
 #include "cp-abi.h"
+#include "namespace.h"
 #include <signal.h>
 
 #include "safe-ctype.h"
@@ -175,7 +176,7 @@ inspect_type (struct demangle_parse_info *info,
 
   TRY
     {
-      sym = lookup_symbol (name, 0, VAR_DOMAIN, 0);
+      sym = lookup_symbol (name, 0, VAR_DOMAIN, 0).symbol;
     }
   CATCH (except, RETURN_MASK_ALL)
     {
@@ -457,7 +458,7 @@ replace_typedefs (struct demangle_parse_info *info,
 	      sym = NULL;
 	      TRY
 		{
-		  sym = lookup_symbol (local_name, 0, VAR_DOMAIN, 0);
+		  sym = lookup_symbol (local_name, 0, VAR_DOMAIN, 0).symbol;
 		}
 	      CATCH (except, RETURN_MASK_ALL)
 		{
@@ -1191,8 +1192,7 @@ make_symbol_overload_list (const char *func_name,
 
   sym_return_val_size = 100;
   sym_return_val_index = 0;
-  sym_return_val = xmalloc ((sym_return_val_size + 1) *
-			    sizeof (struct symbol *));
+  sym_return_val = XNEWVEC (struct symbol *, sym_return_val_size + 1);
   sym_return_val[0] = NULL;
 
   old_cleanups = make_cleanup (xfree, sym_return_val);
@@ -1453,7 +1453,9 @@ cp_lookup_rtti_type (const char *name, struct block *block)
   struct symbol * rtti_sym;
   struct type * rtti_type;
 
-  rtti_sym = lookup_symbol (name, block, STRUCT_DOMAIN, NULL);
+  /* Use VAR_DOMAIN here as NAME may be a typedef.  PR 18141, 18417.
+     Classes "live" in both STRUCT_DOMAIN and VAR_DOMAIN.  */
+  rtti_sym = lookup_symbol (name, block, VAR_DOMAIN, NULL).symbol;
 
   if (rtti_sym == NULL)
     {
@@ -1467,7 +1469,7 @@ cp_lookup_rtti_type (const char *name, struct block *block)
       return NULL;
     }
 
-  rtti_type = SYMBOL_TYPE (rtti_sym);
+  rtti_type = check_typedef (SYMBOL_TYPE (rtti_sym));
 
   switch (TYPE_CODE (rtti_type))
     {
@@ -1533,7 +1535,7 @@ gdb_demangle (const char *name, int options)
 #if defined (HAVE_SIGACTION) && defined (SA_RESTART)
   struct sigaction sa, old_sa;
 #else
-  void (*ofunc) ();
+  sighandler_t ofunc;
 #endif
   static int core_dump_allowed = -1;
 
@@ -1557,7 +1559,7 @@ gdb_demangle (const char *name, int options)
 #endif
       sigaction (SIGSEGV, &sa, &old_sa);
 #else
-      ofunc = (void (*)()) signal (SIGSEGV, gdb_demangle_signal_handler);
+      ofunc = signal (SIGSEGV, gdb_demangle_signal_handler);
 #endif
 
       crash_signal = SIGSETJMP (gdb_demangle_jmp_buf);

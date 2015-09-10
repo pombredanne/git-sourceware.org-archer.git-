@@ -31,7 +31,7 @@
 #include "filestuff.h"
 
 #include <fcntl.h>
-#include <sys/time.h>
+#include "gdb_sys_time.h"
 #ifdef __CYGWIN__
 #include <sys/cygwin.h>		/* For cygwin_conv_path.  */
 #endif
@@ -57,7 +57,7 @@ remote_fileio_init_fd_map (void)
 
   if (!remote_fio_data.fd_map)
     {
-      remote_fio_data.fd_map = (int *) xmalloc (10 * sizeof (int));
+      remote_fio_data.fd_map = XNEWVEC (int, 10);
       remote_fio_data.fd_map_size = 10;
       remote_fio_data.fd_map[0] = FIO_FD_CONSOLE_IN;
       remote_fio_data.fd_map[1] = FIO_FD_CONSOLE_OUT;

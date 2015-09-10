@@ -452,7 +452,7 @@ regcache_register_status (const struct regcache *regcache, int regnum)
   else
     gdb_assert (regnum < regcache->descr->nr_raw_registers);
 
-  return regcache->register_status[regnum];
+  return (enum register_status) regcache->register_status[regnum];
 }
 
 void
@@ -496,7 +496,7 @@ get_thread_arch_aspace_regcache (ptid_t ptid, struct gdbarch *gdbarch,
   new_regcache = regcache_xmalloc_1 (gdbarch, aspace, 0);
   new_regcache->ptid = ptid;
 
-  list = xmalloc (sizeof (struct regcache_list));
+  list = XNEW (struct regcache_list);
   list->regcache = new_regcache;
   list->next = current_regcache;
   current_regcache = list;
@@ -664,7 +664,7 @@ regcache_raw_read (struct regcache *regcache, int regnum, gdb_byte *buf)
     memcpy (buf, register_buffer (regcache, regnum),
 	    regcache->descr->sizeof_register[regnum]);
 
-  return regcache->register_status[regnum];
+  return (enum register_status) regcache->register_status[regnum];
 }
 
 enum register_status
@@ -751,7 +751,7 @@ regcache_cooked_read (struct regcache *regcache, int regnum, gdb_byte *buf)
       else
 	memset (buf, 0, regcache->descr->sizeof_register[regnum]);
 
-      return regcache->register_status[regnum];
+      return (enum register_status) regcache->register_status[regnum];
     }
   else if (gdbarch_pseudo_register_read_value_p (regcache->descr->gdbarch))
     {

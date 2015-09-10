@@ -62,7 +62,7 @@
 
 #include "readline/readline.h"
 
-#include <sys/time.h>
+#include "gdb_sys_time.h"
 #include <time.h>
 
 #include "gdb_usleep.h"
@@ -191,23 +191,6 @@ make_cleanup_bfd_unref (bfd *abfd)
   return make_cleanup (do_bfd_close_cleanup, abfd);
 }
 
-static void
-do_close_cleanup (void *arg)
-{
-  int *fd = arg;
-
-  close (*fd);
-}
-
-struct cleanup *
-make_cleanup_close (int fd)
-{
-  int *saved_fd = xmalloc (sizeof (fd));
-
-  *saved_fd = fd;
-  return make_cleanup_dtor (do_close_cleanup, saved_fd, xfree);
-}
-
 /* Helper function which does the work for make_cleanup_fclose.  */
 
 static void
@@ -308,8 +291,7 @@ restore_integer (void *p)
 struct cleanup *
 make_cleanup_restore_integer (int *variable)
 {
-  struct restore_integer_closure *c =
-    xmalloc (sizeof (struct restore_integer_closure));
+  struct restore_integer_closure *c = XNEW (struct restore_integer_closure);
 
   c->variable = variable;
   c->value = *variable;
@@ -446,7 +428,7 @@ make_cleanup_free_so (struct so_list *so)
 static void
 do_restore_current_language (void *p)
 {
-  enum language saved_lang = (uintptr_t) p;
+  enum language saved_lang = (enum language) (uintptr_t) p;
 
   set_language (saved_lang);
 }
@@ -877,8 +859,8 @@ add_internal_problem_command (struct internal_problem *problem)
   char *set_doc;
   char *show_doc;
 
-  set_cmd_list = xmalloc (sizeof (*set_cmd_list));
-  show_cmd_list = xmalloc (sizeof (*set_cmd_list));
+  set_cmd_list = XNEW (struct cmd_list_element *);
+  show_cmd_list = XNEW (struct cmd_list_element *);
   *set_cmd_list = NULL;
   *show_cmd_list = NULL;
 
@@ -1056,6 +1038,18 @@ quit (void)
   else
     throw_quit ("Quit (expect signal SIGINT when the program is resumed)");
 #endif
+}
+
+/* See defs.h.  */
+
+void
+maybe_quit (void)
+{
+  if (check_quit_flag () || sync_quit_force_run)
+    quit ();
+  if (deprecated_interactive_hook)
+    deprecated_interactive_hook ();
+  target_check_pending_interrupt ();
 }
 
 
@@ -3004,105 +2998,6 @@ dummy_obstack_deallocate (void *object, void *data)
   return;
 }
 
-/* The bit offset of the highest byte in a ULONGEST, for overflow
-   checking.  */
-
-#define HIGH_BYTE_POSN ((sizeof (ULONGEST) - 1) * HOST_CHAR_BIT)
-
-/* True (non-zero) iff DIGIT is a valid digit in radix BASE,
-   where 2 <= BASE <= 36.  */
-
-static int
-is_digit_in_base (unsigned char digit, int base)
-{
-  if (!isalnum (digit))
-    return 0;
-  if (base <= 10)
-    return (isdigit (digit) && digit < base + '0');
-  else
-    return (isdigit (digit) || tolower (digit) < base - 10 + 'a');
-}
-
-static int
-digit_to_int (unsigned char c)
-{
-  if (isdigit (c))
-    return c - '0';
-  else
-    return tolower (c) - 'a' + 10;
-}
-
-/* As for strtoul, but for ULONGEST results.  */
-
-ULONGEST
-strtoulst (const char *num, const char **trailer, int base)
-{
-  unsigned int high_part;
-  ULONGEST result;
-  int minus = 0;
-  int i = 0;
-
-  /* Skip leading whitespace.  */
-  while (isspace (num[i]))
-    i++;
-
-  /* Handle prefixes.  */
-  if (num[i] == '+')
-    i++;
-  else if (num[i] == '-')
-    {
-      minus = 1;
-      i++;
-    }
-
-  if (base == 0 || base == 16)
-    {
-      if (num[i] == '0' && (num[i + 1] == 'x' || num[i + 1] == 'X'))
-	{
-	  i += 2;
-	  if (base == 0)
-	    base = 16;
-	}
-    }
-
-  if (base == 0 && num[i] == '0')
-    base = 8;
-
-  if (base == 0)
-    base = 10;
-
-  if (base < 2 || base > 36)
-    {
-      errno = EINVAL;
-      return 0;
-    }
-
-  result = high_part = 0;
-  for (; is_digit_in_base (num[i], base); i += 1)
-    {
-      result = result * base + digit_to_int (num[i]);
-      high_part = high_part * base + (unsigned int) (result >> HIGH_BYTE_POSN);
-      result &= ((ULONGEST) 1 << HIGH_BYTE_POSN) - 1;
-      if (high_part > 0xff)
-	{
-	  errno = ERANGE;
-	  result = ~ (ULONGEST) 0;
-	  high_part = 0;
-	  minus = 0;
-	  break;
-	}
-    }
-
-  if (trailer != NULL)
-    *trailer = &num[i];
-
-  result = result + ((ULONGEST) high_part << HIGH_BYTE_POSN);
-  if (minus)
-    return -result;
-  else
-    return result;
-}
-
 /* Simple, portable version of dirname that does not modify its
    argument.  */
 
@@ -3407,9 +3302,9 @@ wait_to_die_with_timeout (pid_t pid, int *status, int timeout)
       sa.sa_flags = 0;
       sigaction (SIGALRM, &sa, &old_sa);
 #else
-      void (*ofunc) ();
+      sighandler_t ofunc;
 
-      ofunc = (void (*)()) signal (SIGALRM, sigalrm_handler);
+      ofunc = signal (SIGALRM, sigalrm_handler);
 #endif
 
       alarm (timeout);

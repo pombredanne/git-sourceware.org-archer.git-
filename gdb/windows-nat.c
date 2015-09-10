@@ -162,7 +162,7 @@ static int windows_initialization_done;
 #define DEBUG_MEM(x)	if (debug_memory)	printf_unfiltered x
 #define DEBUG_EXCEPT(x)	if (debug_exceptions)	printf_unfiltered x
 
-static void windows_stop (struct target_ops *self, ptid_t);
+static void windows_interrupt (struct target_ops *self, ptid_t);
 static int windows_thread_alive (struct target_ops *, ptid_t);
 static void windows_kill_inferior (struct target_ops *);
 
@@ -310,8 +310,11 @@ thread_rec (DWORD id, int get_context)
 		    /* We get Access Denied (5) when trying to suspend
 		       threads that Windows started on behalf of the
 		       debuggee, usually when those threads are just
-		       about to exit.  */
-		    if (err != ERROR_ACCESS_DENIED)
+		       about to exit.
+		       We can get Invalid Handle (6) if the main thread
+		       has exited.  */
+		    if (err != ERROR_INVALID_HANDLE
+			&& err != ERROR_ACCESS_DENIED)
 		      warning (_("SuspendThread (tid=0x%x) failed."
 				 " (winerr %u)"),
 			       (unsigned) id, (unsigned) err);
@@ -432,7 +435,7 @@ do_windows_fetch_inferior_registers (struct regcache *regcache, int r)
 
   if (current_thread->reload_context)
     {
-#ifdef __COPY_CONTEXT_SIZE
+#ifdef __CYGWIN__
       if (have_saved_context)
 	{
 	  /* Lie about where the program actually is stopped since
@@ -604,7 +607,7 @@ windows_make_so (const char *name, LPVOID load_addr)
     }
 #endif
   so = XCNEW (struct so_list);
-  so->lm_info = (struct lm_info *) xmalloc (sizeof (struct lm_info));
+  so->lm_info = XNEW (struct lm_info);
   so->lm_info->load_addr = load_addr;
   strcpy (so->so_original_name, name);
 #ifndef __CYGWIN__
@@ -818,9 +821,15 @@ handle_output_debug_string (struct target_waitstatus *ourstatus)
 #ifdef __CYGWIN__
       if (!startswith (s, "cYg"))
 #endif
-	warning (("%s"), s);
+	{
+	  char *p = strchr (s, '\0');
+
+	  if (p > s && *--p == '\n')
+	    *p = '\0';
+	  warning (("%s"), s);
+	}
     }
-#ifdef __COPY_CONTEXT_SIZE
+#ifdef __CYGWIN__
   else
     {
       /* Got a cygwin signal marker.  A cygwin signal is followed by
@@ -2300,7 +2309,7 @@ windows_mourn_inferior (struct target_ops *ops)
    ^C on the controlling terminal.  */
 
 static void
-windows_stop (struct target_ops *self, ptid_t ptid)
+windows_interrupt (struct target_ops *self, ptid_t ptid)
 {
   DEBUG_EVENTS (("gdb: GenerateConsoleCtrlEvent (CTRLC_EVENT, 0)\n"));
   CHECK (GenerateConsoleCtrlEvent (CTRL_C_EVENT, current_event.dwProcessId));
@@ -2494,7 +2503,7 @@ windows_target (void)
   t->to_mourn_inferior = windows_mourn_inferior;
   t->to_thread_alive = windows_thread_alive;
   t->to_pid_to_str = windows_pid_to_str;
-  t->to_stop = windows_stop;
+  t->to_interrupt = windows_interrupt;
   t->to_pid_to_exec_file = windows_pid_to_exec_file;
   t->to_get_ada_task_ptid = windows_get_ada_task_ptid;
   t->to_get_tib_address = windows_get_tib_address;

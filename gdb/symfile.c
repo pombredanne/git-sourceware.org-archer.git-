@@ -62,7 +62,7 @@
 #include <sys/stat.h>
 #include <ctype.h>
 #include <time.h>
-#include <sys/time.h>
+#include "gdb_sys_time.h"
 
 #include "psymtab.h"
 
@@ -555,7 +555,7 @@ addrs_section_sort (struct section_addr_info *addrs)
   int i;
 
   /* `+ 1' for the NULL terminator.  */
-  array = xmalloc (sizeof (*array) * (addrs->num_sections + 1));
+  array = XNEWVEC (struct other_sections *, addrs->num_sections + 1);
   for (i = 0; i < addrs->num_sections; i++)
     array[i] = &addrs->other[i];
   array[i] = NULL;
@@ -614,8 +614,7 @@ addr_info_make_relative (struct section_addr_info *addrs, bfd *abfd)
   /* Now create ADDRS_TO_ABFD_ADDRS from ADDRS_SORTED and
      ABFD_ADDRS_SORTED.  */
 
-  addrs_to_abfd_addrs = xzalloc (sizeof (*addrs_to_abfd_addrs)
-				 * addrs->num_sections);
+  addrs_to_abfd_addrs = XCNEWVEC (struct other_sections *, addrs->num_sections);
   make_cleanup (xfree, addrs_to_abfd_addrs);
 
   while (*addrs_sorted)
@@ -1696,7 +1695,7 @@ set_initial_language (void)
   if (lang == language_unknown)
     {
       char *name = main_name ();
-      struct symbol *sym = lookup_symbol (name, NULL, VAR_DOMAIN, NULL);
+      struct symbol *sym = lookup_symbol (name, NULL, VAR_DOMAIN, NULL).symbol;
 
       if (sym != NULL)
 	lang = SYMBOL_LANGUAGE (sym);
@@ -2023,7 +2022,7 @@ load_section_callback (bfd *abfd, asection *asec, void *data)
   new_request = VEC_safe_push (memory_write_request_s,
 			       args->requests, NULL);
   memset (new_request, 0, sizeof (struct memory_write_request));
-  section_data = xcalloc (1, sizeof (struct load_progress_section_data));
+  section_data = XCNEW (struct load_progress_section_data);
   new_request->begin = bfd_section_lma (abfd, asec) + args->load_offset;
   new_request->end = new_request->begin + size; /* FIXME Should size
 						   be in instead?  */
@@ -2256,8 +2255,7 @@ add_symbol_file_command (char *args, int from_tty)
   struct cleanup *my_cleanups = make_cleanup (null_cleanup, NULL);
 
   num_sect_opts = 16;
-  sect_opts = (struct sect_opt *) xmalloc (num_sect_opts
-					   * sizeof (struct sect_opt));
+  sect_opts = XNEWVEC (struct sect_opt, num_sect_opts);
 
   dont_repeat ();
 
@@ -2833,8 +2831,8 @@ init_filename_language_table (void)
     {
       fl_table_size = 20;
       fl_table_next = 0;
-      filename_language_table =
-	xmalloc (fl_table_size * sizeof (*filename_language_table));
+      filename_language_table = XNEWVEC (filename_language, fl_table_size);
+
       add_filename_language (".c", language_c);
       add_filename_language (".d", language_d);
       add_filename_language (".C", language_cplus);
@@ -3518,12 +3516,12 @@ overlay_command (char *args, int from_tty)
    In this simple implementation, the target data structures are as follows:
    unsigned _novlys;            /# number of overlay sections #/
    unsigned _ovly_table[_novlys][4] = {
-   {VMA, SIZE, LMA, MAPPED},    /# one entry per overlay section #/
+   {VMA, OSIZE, LMA, MAPPED},    /# one entry per overlay section #/
    {..., ...,  ..., ...},
    }
    unsigned _novly_regions;     /# number of overlay regions #/
    unsigned _ovly_region_table[_novly_regions][3] = {
-   {VMA, SIZE, MAPPED_TO_LMA},  /# one entry per overlay region #/
+   {VMA, OSIZE, MAPPED_TO_LMA},  /# one entry per overlay region #/
    {..., ...,  ...},
    }
    These functions will attempt to update GDB's mappedness state in the
@@ -3541,7 +3539,7 @@ static unsigned cache_novlys = 0;
 static CORE_ADDR cache_ovly_table_base = 0;
 enum ovly_index
   {
-    VMA, SIZE, LMA, MAPPED
+    VMA, OSIZE, LMA, MAPPED
   };
 
 /* Throw away the cached copy of _ovly_table.  */
@@ -3641,14 +3639,14 @@ simple_overlay_update_1 (struct obj_section *osect)
   for (i = 0; i < cache_novlys; i++)
     if (cache_ovly_table[i][VMA] == bfd_section_vma (obfd, bsect)
 	&& cache_ovly_table[i][LMA] == bfd_section_lma (obfd, bsect)
-	/* && cache_ovly_table[i][SIZE] == size */ )
+	/* && cache_ovly_table[i][OSIZE] == size */ )
       {
 	read_target_long_array (cache_ovly_table_base + i * word_size,
 				(unsigned int *) cache_ovly_table[i],
 				4, word_size, byte_order);
 	if (cache_ovly_table[i][VMA] == bfd_section_vma (obfd, bsect)
 	    && cache_ovly_table[i][LMA] == bfd_section_lma (obfd, bsect)
-	    /* && cache_ovly_table[i][SIZE] == size */ )
+	    /* && cache_ovly_table[i][OSIZE] == size */ )
 	  {
 	    osect->ovly_mapped = cache_ovly_table[i][MAPPED];
 	    return 1;
@@ -3714,7 +3712,7 @@ simple_overlay_update (struct obj_section *osect)
       for (i = 0; i < cache_novlys; i++)
 	if (cache_ovly_table[i][VMA] == bfd_section_vma (obfd, bsect)
 	    && cache_ovly_table[i][LMA] == bfd_section_lma (obfd, bsect)
-	    /* && cache_ovly_table[i][SIZE] == size */ )
+	    /* && cache_ovly_table[i][OSIZE] == size */ )
 	  { /* obj_section matches i'th entry in ovly_table.  */
 	    osect->ovly_mapped = cache_ovly_table[i][MAPPED];
 	    break;		/* finished with inner for loop: break out.  */

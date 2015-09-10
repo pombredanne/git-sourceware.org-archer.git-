@@ -51,7 +51,7 @@
 #if HAVE_FCNTL_H
 #include <fcntl.h>
 #endif
-#include <sys/time.h>
+#include "gdb_sys_time.h"
 #include <unistd.h>
 #if HAVE_ARPA_INET_H
 #include <arpa/inet.h>
@@ -599,9 +599,10 @@ read_ptid (char *buf, char **obuf)
   /* No multi-process.  Just a tid.  */
   tid = hex_or_minus_one (p, &pp);
 
-  /* Since the stub is not sending a process id, then default to
-     what's in the current inferior.  */
-  pid = ptid_get_pid (current_ptid);
+  /* Since GDB is not sending a process id (multi-process extensions
+     are off), then there's only one process.  Default to the first in
+     the list.  */
+  pid = pid_of (get_first_process ());
 
   if (obuf)
     *obuf = pp;
@@ -757,7 +758,6 @@ input_interrupt (int unused)
 {
   fd_set readset;
   struct timeval immediate = { 0, 0 };
-  client_state *cs = get_client_state ();
 
   /* Protect against spurious interrupts.  This has been observed to
      be a problem under NetBSD 1.4 and 1.5.  */
@@ -776,7 +776,7 @@ input_interrupt (int unused)
 	  fprintf (stderr, "client connection closed\n");
 	  return;
 	}
-      else if (cc != 1 || c != '\003' || cs->ss->current_thread == NULL)
+      else if (cc != 1 || c != '\003')
 	{
 	  fprintf (stderr, "input_interrupt, count = %d c = %d ", cc, c);
 	  if (isprint (c))
@@ -1536,7 +1536,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
   decode_address (addrp, p, q - p);
 
   /* Save the symbol in our cache.  */
-  sym = xmalloc (sizeof (*sym));
+  sym = XNEW (struct sym_cache);
   sym->name = xstrdup (name);
   sym->addr = *addrp;
   sym->next = proc->symbol_cache;

@@ -41,7 +41,7 @@ static void generic_ext (struct agent_expr *x, enum agent_op op, int n);
 struct agent_expr *
 new_agent_expr (struct gdbarch *gdbarch, CORE_ADDR scope)
 {
-  struct agent_expr *x = xmalloc (sizeof (*x));
+  struct agent_expr *x = XNEW (struct agent_expr);
 
   x->len = 0;
   x->size = 1;			/* Change this to a larger value once
@@ -391,7 +391,7 @@ ax_print (struct ui_file *f, struct agent_expr *x)
 
   for (i = 0; i < x->len;)
     {
-      enum agent_op op = x->buf[i];
+      enum agent_op op = (enum agent_op) x->buf[i];
 
       if (op >= (sizeof (aop_map) / sizeof (aop_map[0]))
 	  || !aop_map[op].name)

@@ -94,11 +94,10 @@ new_dwarf_expr_context (void)
 {
   struct dwarf_expr_context *retval;
 
-  retval = xcalloc (1, sizeof (struct dwarf_expr_context));
+  retval = XCNEW (struct dwarf_expr_context);
   retval->stack_len = 0;
   retval->stack_allocated = 10;
-  retval->stack = xmalloc (retval->stack_allocated
-			   * sizeof (struct dwarf_stack_value));
+  retval->stack = XNEWVEC (struct dwarf_stack_value, retval->stack_allocated);
   retval->num_pieces = 0;
   retval->pieces = 0;
   retval->max_recursion_depth = 0x100;
@@ -654,7 +653,7 @@ execute_stack_op (struct dwarf_expr_context *ctx,
 
   while (op_ptr < op_end)
     {
-      enum dwarf_location_atom op = *op_ptr++;
+      enum dwarf_location_atom op = (enum dwarf_location_atom) *op_ptr++;
       ULONGEST result;
       /* Assume the value is not in stack memory.
 	 Code that knows otherwise sets this to 1.

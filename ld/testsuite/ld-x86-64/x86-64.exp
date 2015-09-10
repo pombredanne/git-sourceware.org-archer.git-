@@ -325,6 +325,11 @@ run_dump_test "pr17935-1"
 run_dump_test "pr17935-2"
 run_dump_test "pr18160"
 run_dump_test "pr18176"
+run_dump_test "pr18801"
+run_dump_test "pr18815"
+
+# Add $PLT_CFLAGS if PLT is expected.
+global PLT_CFLAGS
 
 # Must be native with the C compiler
 if { [isnative] && [which $CC] != 0 } {
@@ -376,7 +381,7 @@ if { [isnative] && [which $CC] != 0 } {
 	[list \
 	    "Build libplt-main3.a" \
 	    "" \
-	    "-fPIC" \
+	    "-fPIC $PLT_CFLAGS" \
 	    { plt-main3.c } \
 	    {{readelf {-Wr} plt-main3.rd}} \
 	    "libplt-main3.a" \
@@ -384,7 +389,7 @@ if { [isnative] && [which $CC] != 0 } {
 	[list \
 	    "Build libplt-main4.a" \
 	    "" \
-	    "-fPIC" \
+	    "-fPIC $PLT_CFLAGS" \
 	    { plt-main4.c } \
 	    {{readelf {-Wr} plt-main4.rd}} \
 	    "libplt-main4.a" \
@@ -471,6 +476,30 @@ if { [isnative] && [which $CC] != 0 } {
 	    {{readelf {-Wr} pr17827.rd}} \
 	    "pr17827" \
 	] \
+	[list \
+	    "Build pr18900.so" \
+	    "-shared" \
+	    "-fPIC" \
+	    { pr18900a.c } \
+	    "" \
+	    "pr18900.so" \
+	] \
+	[list \
+	    "Build pr18900a" \
+	    "tmpdir/pr18900.so" \
+	    "" \
+	    { pr18900b.c pr18900c.c } \
+	    {{readelf {-Wrd} pr18900a.rd}} \
+	    "pr18900a" \
+	] \
+	[list \
+	    "Build pr18900b" \
+	    "tmpdir/pr18900.so" \
+	    "" \
+	    { pr18900b.c pr18900c.c } \
+	    {{readelf {-Wrd} pr18900b.rd}} \
+	    "pr18900b" \
+	] \
     ]
 
     run_ld_link_exec_tests [] [list \
@@ -516,6 +545,14 @@ if { [isnative] && [which $CC] != 0 } {
 	    { pr17689b.S } \
 	    "pr17689now" \
 	    "pr17689.out" \
+	] \
+	[list \
+	    "Run pr18900" \
+	    "tmpdir/pr18900.so" \
+	    "" \
+	    { pr18900b.c pr18900c.c } \
+	    "pr18900" \
+	    "pr18900.out" \
 	] \
     ]
 
@@ -574,3 +611,4 @@ if { ![istarget "x86_64-*-linux*"]} {
 # Linux only tests
 run_dump_test "pr17618"
 run_dump_test "pltgot-1"
+run_dump_test "pltgot-2"

@@ -47,6 +47,9 @@ struct do_module_cleanup
   struct type *out_value_type;
   CORE_ADDR out_value_addr;
 
+  /* Copy from struct compile_module.  */
+  struct munmap_list *munmap_list_head;
+
   /* objfile_name of our objfile.  */
   char objfile_name_string[1];
 };
@@ -96,6 +99,8 @@ do_module_cleanup (void *arg, int registers_valid)
   unlink (data->source_file);
   xfree (data->source_file);
 
+  munmap_list_free (data->munmap_list_head);
+
   /* Delete the .o file.  */
   unlink (data->objfile_name_string);
   xfree (data);
@@ -128,6 +133,7 @@ compile_object_run (struct compile_module *module)
   data->scope_data = module->scope_data;
   data->out_value_type = module->out_value_type;
   data->out_value_addr = module->out_value_addr;
+  data->munmap_list_head = module->munmap_list_head;
 
   xfree (module->source_file);
   xfree (module);
@@ -149,7 +155,7 @@ compile_object_run (struct compile_module *module)
       func_val = value_from_pointer (lookup_pointer_type (func_type),
 				   BLOCK_START (SYMBOL_BLOCK_VALUE (func_sym)));
 
-      vargs = alloca (sizeof (*vargs) * TYPE_NFIELDS (func_type));
+      vargs = XALLOCAVEC (struct value *, TYPE_NFIELDS (func_type));
       if (TYPE_NFIELDS (func_type) >= 1)
 	{
 	  gdb_assert (regs_addr != 0);

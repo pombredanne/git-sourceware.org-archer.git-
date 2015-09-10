@@ -49,6 +49,7 @@
 #include "observer.h"
 #include "maint.h"
 #include "filenames.h"
+#include "frame.h"
 
 /* readline include files.  */
 #include "readline/readline.h"
@@ -66,6 +67,10 @@
 #include "cli-out.h"
 #include "tracepoint.h"
 #include "inf-loop.h"
+
+#if defined(TUI)
+# include "tui/tui.h"
+#endif
 
 extern void initialize_all_files (void);
 
@@ -221,11 +226,6 @@ void (*deprecated_detach_hook) (void);
 
 void (*deprecated_interactive_hook) (void);
 
-/* Tell the GUI someone changed the register REGNO.  -1 means
-   that the caller does not know which register changed or
-   that several registers have changed (see value_assign).  */
-void (*deprecated_register_changed_hook) (int regno);
-
 /* Called when going to wait for the target.  Usually allows the GUI
    to run while waiting for target events.  */
 
@@ -330,10 +330,11 @@ void
 check_frame_language_change (void)
 {
   static int warned = 0;
+  struct frame_info *frame;
 
   /* First make sure that a new frame has been selected, in case the
      command or the hooks changed the program state.  */
-  deprecated_safe_get_selected_frame ();
+  frame = deprecated_safe_get_selected_frame ();
   if (current_language != expected_language)
     {
       if (language_mode == language_mode_auto && info_verbose)
@@ -353,7 +354,7 @@ check_frame_language_change (void)
     {
       enum language flang;
 
-      flang = get_frame_language ();
+      flang = get_frame_language (frame);
       if (!warned
 	  && flang != language_unknown
 	  && flang != current_language->la_language)
@@ -698,6 +699,20 @@ show_history_size (struct ui_file *file, int from_tty,
 		    value);
 }
 
+/* Variable associated with the "history remove-duplicates" option.
+   The value -1 means unlimited.  */
+static int history_remove_duplicates = 0;
+
+static void
+show_history_remove_duplicates (struct ui_file *file, int from_tty,
+				struct cmd_list_element *c, const char *value)
+{
+  fprintf_filtered (file,
+		    _("The number of history entries to look back at for "
+		      "duplicates is %s.\n"),
+		    value);
+}
+
 static char *history_filename;
 static void
 show_history_filename (struct ui_file *file, int from_tty,
@@ -738,6 +753,21 @@ static char *gdb_readline_wrapper_result;
    So we disable this hook around the newline and restore it before we
    return.  */
 static void (*saved_after_char_processing_hook) (void);
+
+
+/* The number of nested readline secondary prompts that are currently
+   active.  */
+
+static int gdb_secondary_prompt_depth = 0;
+
+/* See top.h.  */
+
+int
+gdb_in_secondary_prompt_p (void)
+{
+  return gdb_secondary_prompt_depth > 0;
+}
+
 
 /* This function is called when readline has seen a complete line of
    text.  */
@@ -793,6 +823,8 @@ gdb_readline_wrapper_cleanup (void *arg)
 
   gdb_readline_wrapper_result = NULL;
   gdb_readline_wrapper_done = 0;
+  gdb_secondary_prompt_depth--;
+  gdb_assert (gdb_secondary_prompt_depth >= 0);
 
   after_char_processing_hook = saved_after_char_processing_hook;
   saved_after_char_processing_hook = NULL;
@@ -810,7 +842,7 @@ gdb_readline_wrapper (const char *prompt)
   struct gdb_readline_wrapper_cleanup *cleanup;
   char *retval;
 
-  cleanup = xmalloc (sizeof (*cleanup));
+  cleanup = XNEW (struct gdb_readline_wrapper_cleanup);
   cleanup->handler_orig = input_handler;
   input_handler = gdb_readline_wrapper_line;
 
@@ -818,6 +850,7 @@ gdb_readline_wrapper (const char *prompt)
 
   cleanup->target_is_async_orig = target_is_async_p ();
 
+  gdb_secondary_prompt_depth++;
   back_to = make_cleanup (gdb_readline_wrapper_cleanup, cleanup);
 
   if (cleanup->target_is_async_orig)
@@ -897,8 +930,43 @@ static int command_count = 0;
 void
 gdb_add_history (const char *command)
 {
-  add_history (command);
   command_count++;
+
+  if (history_remove_duplicates != 0)
+    {
+      int lookbehind;
+      int lookbehind_threshold;
+
+      /* The lookbehind threshold for finding a duplicate history entry is
+	 bounded by command_count because we can't meaningfully delete
+	 history entries that are already stored in the history file since
+	 the history file is appended to.  */
+      if (history_remove_duplicates == -1
+	  || history_remove_duplicates > command_count)
+	lookbehind_threshold = command_count;
+      else
+	lookbehind_threshold = history_remove_duplicates;
+
+      using_history ();
+      for (lookbehind = 0; lookbehind < lookbehind_threshold; lookbehind++)
+	{
+	  HIST_ENTRY *temp = previous_history ();
+
+	  if (temp == NULL)
+	    break;
+
+	  if (strcmp (temp->line, command) == 0)
+	    {
+	      HIST_ENTRY *prev = remove_history (where_history ());
+	      command_count--;
+	      free_history_entry (prev);
+	      break;
+	    }
+	}
+      using_history ();
+    }
+
+  add_history (command);
 }
 
 /* Safely append new history entries to the history file in a corruption-free
@@ -941,7 +1009,8 @@ gdb_safe_append_history (void)
       else
 	{
 	  append_history (command_count, local_history_filename);
-	  history_truncate_file (local_history_filename, history_max_entries);
+	  if (history_is_stifled ())
+	    history_truncate_file (local_history_filename, history_max_entries);
 	}
 
       ret = rename (local_history_filename, history_filename);
@@ -1441,6 +1510,21 @@ quit_confirm (void)
   return qr;
 }
 
+/* Prepare to exit GDB cleanly by undoing any changes made to the
+   terminal so that we leave the terminal in the state we acquired it.  */
+
+static void
+undo_terminal_modifications_before_exit (void)
+{
+  target_terminal_ours ();
+#if defined(TUI)
+  tui_disable ();
+#endif
+  if (async_command_editing_p)
+    gdb_disable_readline ();
+}
+
+
 /* Quit without asking for confirmation.  */
 
 void
@@ -1448,6 +1532,8 @@ quit_force (char *args, int from_tty)
 {
   int exit_code = 0;
   struct qt_args qt;
+
+  undo_terminal_modifications_before_exit ();
 
   /* An optional expression may be used to cause gdb to terminate with the 
      value of that expression.  */
@@ -1680,24 +1766,42 @@ init_history (void)
 {
   char *tmpenv;
 
-  tmpenv = getenv ("HISTSIZE");
+  tmpenv = getenv ("GDBHISTSIZE");
   if (tmpenv)
     {
-      int var;
+      long var;
+      int saved_errno;
+      char *endptr;
 
-      var = atoi (tmpenv);
-      if (var < 0)
-	{
-	  /* Prefer ending up with no history rather than overflowing
-	     readline's history interface, which uses signed 'int'
-	     everywhere.  */
-	  var = 0;
-	}
+      tmpenv = skip_spaces (tmpenv);
+      errno = 0;
+      var = strtol (tmpenv, &endptr, 10);
+      saved_errno = errno;
+      endptr = skip_spaces (endptr);
 
-      history_size_setshow_var = var;
+      /* If GDBHISTSIZE is non-numeric then ignore it.  If GDBHISTSIZE is the
+	 empty string, a negative number or a huge positive number (larger than
+	 INT_MAX) then set the history size to unlimited.  Otherwise set our
+	 history size to the number we have read.  This behavior is consistent
+	 with how bash handles HISTSIZE.  */
+      if (*endptr != '\0')
+	;
+      else if (*tmpenv == '\0'
+	       || var < 0
+	       || var > INT_MAX
+	       /* On targets where INT_MAX == LONG_MAX, we have to look at
+		  errno after calling strtol to distinguish between a value that
+		  is exactly INT_MAX and an overflowing value that was clamped
+		  to INT_MAX.  */
+	       || (var == INT_MAX && saved_errno == ERANGE))
+	history_size_setshow_var = -1;
+      else
+	history_size_setshow_var = var;
     }
-  /* If the init file hasn't set a size yet, pick the default.  */
-  else if (history_size_setshow_var == -2)
+
+  /* If neither the init file nor GDBHISTSIZE has set a size yet, pick the
+     default.  */
+  if (history_size_setshow_var == -2)
     history_size_setshow_var = 256;
 
   set_readline_history_size (history_size_setshow_var);
@@ -1856,10 +1960,25 @@ Show the size of the command history,"), _("\
 ie. the number of previous commands to keep a record of.\n\
 If set to \"unlimited\", the number of commands kept in the history\n\
 list is unlimited.  This defaults to the value of the environment\n\
-variable \"HISTSIZE\", or to 256 if this variable is not set."),
+variable \"GDBHISTSIZE\", or to 256 if this variable is not set."),
 			    set_history_size_command,
 			    show_history_size,
 			    &sethistlist, &showhistlist);
+
+  add_setshow_zuinteger_unlimited_cmd ("remove-duplicates", no_class,
+				       &history_remove_duplicates, _("\
+Set how far back in history to look for and remove duplicate entries."), _("\
+Show how far back in history to look for and remove duplicate entries."), _("\
+If set to a nonzero value N, GDB will look back at the last N history entries\n\
+and remove the first history entry that is a duplicate of the most recent\n\
+entry, each time a new history entry is added.\n\
+If set to \"unlimited\", this lookbehind is unbounded.\n\
+Only history entries added during this session are considered for removal.\n\
+If set to 0, removal of duplicate history entries is disabled.\n\
+By default this option is set to 0."),
+			   NULL,
+			   show_history_remove_duplicates,
+			   &sethistlist, &showhistlist);
 
   add_setshow_filename_cmd ("filename", no_class, &history_filename, _("\
 Set the filename in which to record the command history"), _("\

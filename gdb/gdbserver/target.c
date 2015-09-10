@@ -23,7 +23,7 @@
 
 struct target_ops *the_target;
 
-void
+int
 set_desired_thread (int use_general)
 {
   struct thread_info *found;
@@ -34,10 +34,8 @@ set_desired_thread (int use_general)
   else
     found = find_thread_ptid (cs->ss->cont_thread);
 
-  if (found == NULL)
-    cs->ss->current_thread = get_first_thread ();
-  else
-    cs->ss->current_thread = found;
+  cs->ss->current_thread = found;
+  return (cs->ss->current_thread != NULL);
 }
 
 int
@@ -186,7 +184,7 @@ start_non_stop (int nonstop)
 void
 set_target_ops (struct target_ops *target)
 {
-  the_target = (struct target_ops *) xmalloc (sizeof (*the_target));
+  the_target = XNEW (struct target_ops);
   memcpy (the_target, target, sizeof (*the_target));
 }
 

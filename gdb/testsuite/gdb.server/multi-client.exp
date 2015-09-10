@@ -33,7 +33,7 @@ if {[skip_gdbserver_tests]} {
     return
 }
 
-proc gdb_command { CLIENT COMMAND RESPONSE COMMENT SLEEP DEBUG } {
+proc gdb_command { CLIENT COMMAND RESPONSE COMMENT } {
     global gdb_client1_spawn_id
     global gdb_client2_spawn_id
     global test
@@ -43,27 +43,27 @@ proc gdb_command { CLIENT COMMAND RESPONSE COMMENT SLEEP DEBUG } {
 	set client "$gdb_client2_spawn_id"
     }
     send -i $client "$COMMAND\n"
-    if { $SLEEP > 0 } {
-	sleep $SLEEP
-    }
     if { [string length $RESPONSE] > 0 } {
-	set ok 0
-	expect {
-	    -i "$client" -re "$RESPONSE" { 
-		incr ok; 
-		if { $DEBUG } { verbose "DEBUG: $COMMENT $client $expect_out(buffer)" }
-		exp_continue 
+	foreach i {1 2 3} {
+	    set ok 0
+	    expect {
+		-i "$client" -re "$RESPONSE" { 
+		    incr ok; 
+		    verbose "$COMMENT $client $expect_out(buffer)"
+#		    exp_continue 
+		}
+	    }
+	    if {$ok == 1} { 
+		pass "$test $COMMENT"
+		break
+	    } else {
+		if { $i == 3 } {
+		    fail "$test $COMMENT"
+		} else { sleep 2 }
 	    }
 	}
-	if {$ok == 1} { 
-	    pass "$test $COMMENT"
-	} else {
-	    fail "$test $COMMENT"
-	}
     }
-    if { $DEBUG } { 
-	verbose "DEBUG: $COMMENT $client $expect_out(buffer)" 
-    }
+    if { False } { verbose "DEBUG: $COMMENT $client $expect_out(buffer)" }
 }
 
 set GDBSERVER "[find_gdbserver]"
@@ -77,7 +77,7 @@ set gdb_server_spawn_id $res
 
 set ok 0
 expect {
-    -i "$gdb_server_spawn_id" -re "Listening on port" { incr ok; exp_continue }
+    -i "$gdb_server_spawn_id" -re "Listening on port" { incr ok }
 }
 if {$ok == 1} { 
     pass "$test gdbserver listen"
@@ -96,9 +96,9 @@ if { $res < 0 || $res == "" } {
 set gdb_spawn_id $res
 set gdb_client1_spawn_id $res
 
-gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver b getenv" 1 true
+gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver b getenv"
 
-gdb_command 1 "run" "Breakpoint 1," "gdbserver hit b getenv" 2 true
+gdb_command 1 "run" "Breakpoint 1," "gdbserver hit b getenv"
 
 # Now start another client that attaches to the first client
 set target_pid -1
@@ -114,7 +114,7 @@ if { $target_pid < 0 } {
 
 set MULTI_ATTACH "-iex \"attach $target_pid\""
 set res [remote_spawn host "$GDB $INTERNAL_GDBFLAGS $GDBFLAGS $MULTI_GDBFLAGS $MULTI_ATTACH [host_info gdb_opts]"]
-sleep 2
+sleep 1
 if { $res < 0 || $res == "" } {
     perror "$test Spawning $GDB failed."
     return 1
@@ -122,15 +122,15 @@ if { $res < 0 || $res == "" } {
 
 set gdb_client2_spawn_id $res
 
-gdb_command 2 "b marker" "Breakpoint 1 at" "gdbserver b marker" 1 false
+gdb_command 2 "b marker" "Breakpoint 1 at" "gdbserver b marker"
 
-gdb_command 2 "continue" "Continuing" "gdbserver continue client2" 1 false
+gdb_command 2 "continue" "Continuing" "gdbserver continue client2"
 
 # Second client waits while we continue first client
 
-gdb_command 1 "dis 1" "" "disable breakpoint" 0 false
+gdb_command 1 "dis 1" "" "disable breakpoint"
 
-gdb_command 1 "continue" "Continuing" "gdbserver continue client1" 1 false
+gdb_command 1 "continue" "Continuing" "gdbserver continue client1"
 
 # The second client is back
 
@@ -144,4 +144,4 @@ if { $ok == 1 } {
     fail "$test gdbserver hit b marker"
 }
 
-gdb_command 2 "info target" "Extended remote serial target in gdb-specific protocol:" "info target" 0 true
+gdb_command 2 "info target" "Extended remote serial target in gdb-specific protocol:" "info target"

@@ -1608,12 +1608,9 @@ dump_relocations (FILE * file,
 
 	      if (is_rela)
 		{
-		  bfd_signed_vma off = rels[i].r_addend;
+		  bfd_vma off = rels[i].r_addend;
 
-		  /* PR 17531: file: 2e63226f.  */
-		  if (off == ((bfd_signed_vma) 1) << ((sizeof (bfd_signed_vma) * 8) - 1))
-		    printf (" + %" BFD_VMA_FMT "x", off);
-		  else if (off < 0)
+		  if ((bfd_signed_vma) off < 0)
 		    printf (" - %" BFD_VMA_FMT "x", - off);
 		  else
 		    printf (" + %" BFD_VMA_FMT "x", off);
@@ -1622,13 +1619,10 @@ dump_relocations (FILE * file,
 	}
       else if (is_rela)
 	{
-	  bfd_signed_vma off = rels[i].r_addend;
+	  bfd_vma off = rels[i].r_addend;
 
 	  printf ("%*c", is_32bit_elf ? 12 : 20, ' ');
-	  /* PR 17531: file: 2e63226f.  */
-	  if (off == ((bfd_signed_vma) 1) << ((sizeof (bfd_signed_vma) * 8) - 1))
-	    printf ("%" BFD_VMA_FMT "x", off);
-	  else if (off < 0)
+	  if ((bfd_signed_vma) off < 0)
 	    printf ("-%" BFD_VMA_FMT "x", - off);
 	  else
 	    printf ("%" BFD_VMA_FMT "x", off);
@@ -1695,6 +1689,7 @@ get_mips_dynamic_type (unsigned long type)
     case DT_MIPS_GOTSYM: return "MIPS_GOTSYM";
     case DT_MIPS_HIPAGENO: return "MIPS_HIPAGENO";
     case DT_MIPS_RLD_MAP: return "MIPS_RLD_MAP";
+    case DT_MIPS_RLD_MAP_REL: return "MIPS_RLD_MAP_REL";
     case DT_MIPS_DELTA_CLASS: return "MIPS_DELTA_CLASS";
     case DT_MIPS_DELTA_CLASS_NO: return "MIPS_DELTA_CLASS_NO";
     case DT_MIPS_DELTA_INSTANCE: return "MIPS_DELTA_INSTANCE";
@@ -7523,7 +7518,10 @@ get_unwind_section_word (struct arm_unw_aux_info *  aux,
     return FALSE;
 
   /* If the offset is invalid then fail.  */
-  if (word_offset > sec->sh_size - 4)
+  if (word_offset > (sec->sh_size - 4)
+      /* PR 18879 */
+      || (sec->sh_size < 5 && word_offset >= sec->sh_size)
+      || ((bfd_signed_vma) word_offset) < 0)
     return FALSE;
 
   /* Get the word at the required offset.  */
@@ -8306,6 +8304,15 @@ dump_arm_unwind (struct arm_unw_aux_info *aux, Elf_Internal_Shdr *exidx_sec)
 	    {
 	      table_sec = section_headers + entry_addr.section;
 	      table_offset = entry_addr.offset;
+	      /* PR 18879 */
+	      if (table_offset > table_sec->sh_size
+		  || ((bfd_signed_vma) table_offset) < 0)
+		{
+		  warn (_("Unwind entry contains corrupt offset (0x%lx) into section %s\n"),
+			(unsigned long) table_offset,
+			printable_section_name (table_sec));
+		  continue;
+		}
 	    }
 	  else
 	    {
@@ -8682,7 +8689,7 @@ get_32bit_dynamic_section (FILE * file)
      might not have the luxury of section headers.  Look for the DT_NULL
      terminator to determine the number of entries.  */
   for (ext = edyn, dynamic_nent = 0;
-       (char *) ext < (char *) edyn + dynamic_size - sizeof (* entry);
+       (char *) (ext + 1) <= (char *) edyn + dynamic_size;
        ext++)
     {
       dynamic_nent++;
@@ -8730,8 +8737,8 @@ get_64bit_dynamic_section (FILE * file)
      might not have the luxury of section headers.  Look for the DT_NULL
      terminator to determine the number of entries.  */
   for (ext = edyn, dynamic_nent = 0;
-       /* PR 17533 file: 033-67080-0.004 - do not read off the end of the buffer.  */
-       (char *) ext < ((char *) edyn) + dynamic_size - sizeof (* ext);
+       /* PR 17533 file: 033-67080-0.004 - do not read past end of buffer.  */
+       (char *) (ext + 1) <= (char *) edyn + dynamic_size;
        ext++)
     {
       dynamic_nent++;
@@ -12029,13 +12036,21 @@ dump_section_as_strings (Elf_Internal_Shdr * section, FILE * file)
 	  unsigned int compression_header_size
 	    = get_compression_header (& chdr, (unsigned char *) start);
 
-	  if (chdr.ch_type == ELFCOMPRESS_ZLIB
-	      && chdr.ch_addralign == section->sh_addralign)
+	  if (chdr.ch_type != ELFCOMPRESS_ZLIB)
 	    {
-	      uncompressed_size = chdr.ch_size;
-	      start += compression_header_size;
-	      new_size -= compression_header_size;
+	      warn (_("section '%s' has unsupported compress type: %d\n"),
+		    printable_section_name (section), chdr.ch_type);
+	      return;
 	    }
+	  else if (chdr.ch_addralign != section->sh_addralign)
+	    {
+	      warn (_("compressed section '%s' is corrupted\n"),
+		    printable_section_name (section));
+	      return;
+	    }
+	  uncompressed_size = chdr.ch_size;
+	  start += compression_header_size;
+	  new_size -= compression_header_size;
 	}
       else if (new_size > 12 && streq ((char *) start, "ZLIB"))
 	{
@@ -12155,13 +12170,21 @@ dump_section_as_bytes (Elf_Internal_Shdr * section,
 	  unsigned int compression_header_size
 	    = get_compression_header (& chdr, start);
 
-	  if (chdr.ch_type == ELFCOMPRESS_ZLIB
-	      && chdr.ch_addralign == section->sh_addralign)
+	  if (chdr.ch_type != ELFCOMPRESS_ZLIB)
 	    {
-	      uncompressed_size = chdr.ch_size;
-	      start += compression_header_size;
-	      new_size -= compression_header_size;
+	      warn (_("section '%s' has unsupported compress type: %d\n"),
+		    printable_section_name (section), chdr.ch_type);
+	      return;
 	    }
+	  else if (chdr.ch_addralign != section->sh_addralign)
+	    {
+	      warn (_("compressed section '%s' is corrupted\n"),
+		    printable_section_name (section));
+	      return;
+	    }
+	  uncompressed_size = chdr.ch_size;
+	  start += compression_header_size;
+	  new_size -= compression_header_size;
 	}
       else if (new_size > 12 && streq ((char *) start, "ZLIB"))
 	{
@@ -12185,7 +12208,7 @@ dump_section_as_bytes (Elf_Internal_Shdr * section,
 					  & new_size))
 	section_size = new_size;
     }
-  
+
   if (relocate)
     {
       apply_relocations (file, section, start, section_size, NULL, NULL);
@@ -12289,9 +12312,18 @@ load_specific_debug_section (enum dwarf_section_display_enum debug,
 	  Elf_Internal_Chdr chdr;
 	  unsigned int compression_header_size
 	    = get_compression_header (&chdr, start);
-	  if (chdr.ch_type != ELFCOMPRESS_ZLIB
-	      || chdr.ch_addralign != sec->sh_addralign)
-	    return 0;
+	  if (chdr.ch_type != ELFCOMPRESS_ZLIB)
+	    {
+	      warn (_("section '%s' has unsupported compress type: %d\n"),
+		    section->name, chdr.ch_type);
+	      return 0;
+	    }
+	  else if (chdr.ch_addralign != sec->sh_addralign)
+	    {
+	      warn (_("compressed section '%s' is corrupted\n"),
+		    section->name);
+	      return 0;
+	    }
 	  uncompressed_size = chdr.ch_size;
 	  start += compression_header_size;
 	  size -= compression_header_size;
@@ -13195,6 +13227,9 @@ print_mips_fp_abi_value (int val)
       break;
     case Val_GNU_MIPS_ABI_FP_64A:
       printf (_("Hard float compat (32-bit CPU, 64-bit FPU)\n"));
+      break;
+    case Val_GNU_MIPS_ABI_FP_NAN2008:
+      printf (_("NaN 2008 compatibility\n"));
       break;
     default:
       printf ("??? (%d)\n", val);
@@ -14297,7 +14332,7 @@ process_mips_specific (FILE * file)
 		  return 0;
 		}
 	      offset += option->size;
-		
+
 	      ++option;
 	      ++cnt;
 	    }
@@ -14444,7 +14479,7 @@ process_mips_specific (FILE * file)
 	      len = sizeof (* eopt);
 	      while (len < option->size)
 		{
-		  char datum = * ((char *) eopt + offset + len);
+		  unsigned char datum = * ((unsigned char *) eopt + offset + len);
 
 		  if (ISPRINT (datum))
 		    printf ("%c", datum);
@@ -15125,6 +15160,12 @@ print_gnu_note (Elf_Internal_Note *pnote)
 	  case GNU_ABI_TAG_NETBSD:
 	    osname = "NetBSD";
 	    break;
+	  case GNU_ABI_TAG_SYLLABLE:
+	    osname = "Syllable";
+	    break;
+	  case GNU_ABI_TAG_NACL:
+	    osname = "NaCl";
+	    break;
 	  default:
 	    osname = "Unknown";
 	    break;
@@ -15193,7 +15234,7 @@ print_v850_note (Elf_Internal_Note * pnote)
 	case EF_RH850_DATA_ALIGN8: printf (_("8-byte\n")); return 1;
 	}
       break;
-	
+
     case V850_NOTE_DATA_SIZE:
       switch (val)
 	{
@@ -15201,7 +15242,7 @@ print_v850_note (Elf_Internal_Note * pnote)
 	case EF_RH850_DOUBLE64: printf (_("8-bytes\n")); return 1;
 	}
       break;
-	
+
     case V850_NOTE_FPU_INFO:
       switch (val)
 	{
@@ -15209,7 +15250,7 @@ print_v850_note (Elf_Internal_Note * pnote)
 	case EF_RH850_FPU30: printf (_("FPU-3.0\n")); return 1;
 	}
       break;
-	
+
     case V850_NOTE_MMU_INFO:
     case V850_NOTE_CACHE_INFO:
     case V850_NOTE_SIMD_INFO:
@@ -15570,7 +15611,7 @@ process_corefile_note_segment (FILE * file, bfd_vma offset, bfd_vma length)
 	      inote.descdata = inote.namedata;
 	      inote.namesz   = 0;
 	    }
- 
+
 	  inote.descpos  = offset + (inote.descdata - (char *) pnotes);
 	  next = inote.descdata + align_power (inote.descsz, 2);
 	}

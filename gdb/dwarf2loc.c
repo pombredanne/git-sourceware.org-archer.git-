@@ -39,7 +39,7 @@
 #include "dwarf2-frame.h"
 #include "compile/compile.h"
 
-extern int dwarf2_always_disassemble;
+extern int dwarf_always_disassemble;
 
 extern const struct dwarf_expr_context_funcs dwarf_expr_ctx_funcs;
 
@@ -381,12 +381,47 @@ locexpr_find_frame_base_location (struct symbol *framefunc, CORE_ADDR pc,
   *start = symbaton->data;
 }
 
+/* Implement the struct symbol_block_ops::get_frame_base method.  */
+
+static CORE_ADDR
+block_op_get_frame_base (struct symbol *framefunc, struct frame_info *frame)
+{
+  struct gdbarch *gdbarch;
+  struct type *type;
+  struct dwarf2_locexpr_baton *dlbaton;
+  const gdb_byte *start;
+  size_t length;
+  struct value *result;
+
+  /* If this method is called, then FRAMEFUNC is supposed to be a DWARF block.
+     Thus, it's supposed to provide the find_frame_base_location method as
+     well.  */
+  gdb_assert (SYMBOL_BLOCK_OPS (framefunc)->find_frame_base_location != NULL);
+
+  gdbarch = get_frame_arch (frame);
+  type = builtin_type (gdbarch)->builtin_data_ptr;
+  dlbaton = SYMBOL_LOCATION_BATON (framefunc);
+
+  SYMBOL_BLOCK_OPS (framefunc)->find_frame_base_location
+    (framefunc, get_frame_pc (frame), &start, &length);
+  result = dwarf2_evaluate_loc_desc (type, frame, start, length,
+				     dlbaton->per_cu);
+
+  /* The DW_AT_frame_base attribute contains a location description which
+     computes the base address itself.  However, the call to
+     dwarf2_evaluate_loc_desc returns a value representing a variable at
+     that address.  The frame base address is thus this variable's
+     address.  */
+  return value_address (result);
+}
+
 /* Vector for inferior functions as represented by LOC_BLOCK, if the inferior
    function uses DWARF expression for its DW_AT_frame_base.  */
 
 const struct symbol_block_ops dwarf2_block_frame_base_locexpr_funcs =
 {
-  locexpr_find_frame_base_location
+  locexpr_find_frame_base_location,
+  block_op_get_frame_base
 };
 
 /* Implement find_frame_base_location method for LOC_BLOCK functions using
@@ -406,7 +441,8 @@ loclist_find_frame_base_location (struct symbol *framefunc, CORE_ADDR pc,
 
 const struct symbol_block_ops dwarf2_block_frame_base_loclist_funcs =
 {
-  loclist_find_frame_base_location
+  loclist_find_frame_base_location,
+  block_op_get_frame_base
 };
 
 /* See dwarf2loc.h.  */
@@ -825,9 +861,8 @@ chain_candidate (struct gdbarch *gdbarch, struct call_site_chain **resultp,
 
   /* See call_site_find_chain_1 why there is no way to reach the bottom callee
      PC again.  In such case there must be two different code paths to reach
-     it, therefore some of the former determined intermediate PCs must differ
-     and the unambiguous chain gets shortened.  */
-  gdb_assert (result->callers + result->callees < result->length);
+     it.  CALLERS + CALLEES equal to LENGTH in the case of self tail-call.  */
+  gdb_assert (result->callers + result->callees <= result->length);
 }
 
 /* Create and return call_site_chain for CALLER_PC and CALLEE_PC.  All the
@@ -2397,13 +2432,14 @@ dwarf2_evaluate_loc_desc (struct type *type, struct frame_info *frame,
 }
 
 /* Evaluates a dwarf expression and stores the result in VAL, expecting
-   that the dwarf expression only produces a single CORE_ADDR.  ADDR is a
-   context (location of a variable) and might be needed to evaluate the
-   location expression.
+   that the dwarf expression only produces a single CORE_ADDR.  FRAME is the
+   frame in which the expression is evaluated.  ADDR is a context (location of
+   a variable) and might be needed to evaluate the location expression.
    Returns 1 on success, 0 otherwise.   */
 
 static int
 dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
+			   struct frame_info *frame,
 			   CORE_ADDR addr,
 			   CORE_ADDR *valp)
 {
@@ -2418,7 +2454,7 @@ dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
   ctx = new_dwarf_expr_context ();
   cleanup = make_cleanup_free_dwarf_expr_context (ctx);
 
-  baton.frame = get_selected_frame (NULL);
+  baton.frame = frame;
   baton.per_cu = dlbaton->per_cu;
   baton.obj_address = addr;
 
@@ -2462,11 +2498,15 @@ dwarf2_locexpr_baton_eval (const struct dwarf2_locexpr_baton *dlbaton,
 
 int
 dwarf2_evaluate_property (const struct dynamic_prop *prop,
+			  struct frame_info *frame,
 			  struct property_addr_info *addr_stack,
 			  CORE_ADDR *value)
 {
   if (prop == NULL)
     return 0;
+
+  if (frame == NULL && has_stack_frames ())
+    frame = get_selected_frame (NULL);
 
   switch (prop->kind)
     {
@@ -2474,7 +2514,8 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop,
       {
 	const struct dwarf2_property_baton *baton = prop->data.baton;
 
-	if (dwarf2_locexpr_baton_eval (&baton->locexpr, addr_stack->addr,
+	if (dwarf2_locexpr_baton_eval (&baton->locexpr, frame,
+				       addr_stack ? addr_stack->addr : 0,
 				       value))
 	  {
 	    if (baton->referenced_type)
@@ -2491,7 +2532,6 @@ dwarf2_evaluate_property (const struct dynamic_prop *prop,
     case PROP_LOCLIST:
       {
 	struct dwarf2_property_baton *baton = prop->data.baton;
-	struct frame_info *frame = get_selected_frame (NULL);
 	CORE_ADDR pc = get_frame_address_in_block (frame);
 	const gdb_byte *data;
 	struct value *val;
@@ -2868,7 +2908,7 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
   unsigned int addr_size_bits = 8 * addr_size;
   int bits_big_endian = gdbarch_bits_big_endian (arch);
 
-  offsets = xmalloc ((op_end - op_ptr) * sizeof (int));
+  offsets = XNEWVEC (int, op_end - op_ptr);
   cleanups = make_cleanup (xfree, offsets);
 
   for (i = 0; i < op_end - op_ptr; ++i)
@@ -2882,7 +2922,7 @@ dwarf2_compile_expr_to_ax (struct agent_expr *expr, struct axs_value *loc,
 
   while (op_ptr < op_end)
     {
-      enum dwarf_location_atom op = *op_ptr;
+      enum dwarf_location_atom op = (enum dwarf_location_atom) *op_ptr;
       uint64_t uoffset, reg;
       int64_t offset;
       int i;
@@ -3765,7 +3805,7 @@ disassemble_dwarf_expression (struct ui_file *stream,
 	 && (all
 	     || (data[0] != DW_OP_piece && data[0] != DW_OP_bit_piece)))
     {
-      enum dwarf_location_atom op = *data++;
+      enum dwarf_location_atom op = (enum dwarf_location_atom) *data++;
       uint64_t ul;
       int64_t l;
       const char *name;
@@ -4137,7 +4177,7 @@ locexpr_describe_location_1 (struct symbol *symbol, CORE_ADDR addr,
       else
 	fprintf_filtered (stream, _(", and "));
 
-      if (!dwarf2_always_disassemble)
+      if (!dwarf_always_disassemble)
 	{
 	  data = locexpr_describe_location_piece (symbol, stream,
 						  addr, objfile, per_cu,
@@ -4156,7 +4196,7 @@ locexpr_describe_location_1 (struct symbol *symbol, CORE_ADDR addr,
 					       get_objfile_arch (objfile),
 					       addr_size, offset_size, data,
 					       data, end, 0,
-					       dwarf2_always_disassemble,
+					       dwarf_always_disassemble,
 					       per_cu);
 	}
 

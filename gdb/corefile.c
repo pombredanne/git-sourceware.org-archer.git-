@@ -107,8 +107,7 @@ specify_exec_file_hook (void (*hook) (const char *))
 	{
 	  /* If this is the first extra hook, initialize the hook
 	     array.  */
-	  exec_file_extra_hooks = (hook_type *)
-	    xmalloc (sizeof (hook_type));
+	  exec_file_extra_hooks = XNEW (hook_type);
 	  exec_file_extra_hooks[0] = deprecated_exec_file_display_hook;
 	  deprecated_exec_file_display_hook = call_extra_exec_file_hooks;
 	  exec_file_hook_count = 1;
@@ -383,8 +382,8 @@ read_memory_typed_address (CORE_ADDR addr, struct type *type)
   return extract_typed_address (buf, type);
 }
 
-/* Same as target_write_memory, but report an error if can't
-   write.  */
+/* See gdbcore.h.  */
+
 void
 write_memory (CORE_ADDR memaddr, 
 	      const bfd_byte *myaddr, ssize_t len)

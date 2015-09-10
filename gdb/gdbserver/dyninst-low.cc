@@ -33,6 +33,7 @@ extern "C"
 #include <sys/select.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "hostio.h"
 }
 
 #include <dyninst/PCProcess.h>
@@ -791,6 +792,7 @@ dyninst_create_inferior (char *program, char **allargs)
     DYNERRMSG ("Cannot stop process %ld", (long int)pid);
   return dyninst_process->getPid();
 }
+
 
 /* Attach to a running process */
 
@@ -1828,6 +1830,7 @@ elf_64_file_p (const char *file, unsigned int *machine)
 
 static struct target_ops dyninst_target_ops = {
   dyninst_create_inferior,
+  NULL,
   dyninst_attach,
   dyninst_kill,
   dyninst_detach,
@@ -1858,7 +1861,7 @@ static struct target_ops dyninst_target_ops = {
   NULL,  // read_offsets
   NULL,  // get_tls_address
   NULL,  // qxfer_spu
-  NULL,  // hostio_last_error
+  hostio_last_error_from_errno,
   NULL,  // qxfer_osdata
   NULL,  // qxfer_siginfolinux_kill
   dyninst_supports_non_stop,
@@ -1892,7 +1895,10 @@ static struct target_ops dyninst_target_ops = {
   NULL,  // read_btrace
   NULL,  // read_btrace_conf
   dyninst_supports_range_stepping,
-  NULL   // pid_to_exec_file
+  NULL,  // pid_to_exec_file
+  NULL,	 // mntns_open_cloexec
+  NULL,	 // mntns_unlink
+  NULL,	 // mntns_readlink
 };
 
 void

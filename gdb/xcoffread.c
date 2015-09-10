@@ -435,8 +435,7 @@ arrange_linetable (struct linetable *oldLineTb)
 #define NUM_OF_FUNCTIONS 20
 
   fentry_size = NUM_OF_FUNCTIONS;
-  fentry = (struct linetable_entry *)
-    xmalloc (fentry_size * sizeof (struct linetable_entry));
+  fentry = XNEWVEC (struct linetable_entry, fentry_size);
 
   for (function_count = 0, ii = 0; ii < oldLineTb->nitems; ++ii)
     {
@@ -584,18 +583,14 @@ allocate_include_entry (void)
 {
   if (inclTable == NULL)
     {
-      inclTable = (InclTable *)
-	xmalloc (sizeof (InclTable) * INITIAL_INCLUDE_TABLE_LENGTH);
-      memset (inclTable,
-	      '\0', sizeof (InclTable) * INITIAL_INCLUDE_TABLE_LENGTH);
+      inclTable = XCNEWVEC (InclTable, INITIAL_INCLUDE_TABLE_LENGTH);
       inclLength = INITIAL_INCLUDE_TABLE_LENGTH;
       inclIndx = 0;
     }
   else if (inclIndx >= inclLength)
     {
       inclLength += INITIAL_INCLUDE_TABLE_LENGTH;
-      inclTable = (InclTable *)
-	xrealloc (inclTable, sizeof (InclTable) * inclLength);
+      inclTable = XRESIZEVEC (InclTable, inclTable, inclLength);
       memset (inclTable + inclLength - INITIAL_INCLUDE_TABLE_LENGTH,
 	      '\0', sizeof (InclTable) * INITIAL_INCLUDE_TABLE_LENGTH);
     }
@@ -679,8 +674,7 @@ process_linenos (CORE_ADDR start, CORE_ADDR end)
 	    {
 	      /* Have a new subfile for the include file.  */
 
-	      tmpSubfile = inclTable[ii].subfile =
-		(struct subfile *) xmalloc (sizeof (struct subfile));
+	      tmpSubfile = inclTable[ii].subfile = XNEW (struct subfile);
 
 	      memset (tmpSubfile, '\0', sizeof (struct subfile));
 	      firstLine = &(inclTable[ii].funStartLine);
@@ -1389,7 +1383,7 @@ read_xcoff_symtab (struct objfile *objfile, struct partial_symtab *pst)
 		}
 
 	      finish_block (newobj->name, &local_symbols, newobj->old_blocks,
-			    newobj->start_addr,
+			    NULL, newobj->start_addr,
 			    (fcn_cs_saved.c_value
 			     + fcn_aux_saved.x_sym.x_misc.x_fsize
 			     + ANOFFSET (objfile->section_offsets,
@@ -1480,7 +1474,8 @@ read_xcoff_symtab (struct objfile *objfile, struct partial_symtab *pst)
 	      if (local_symbols && context_stack_depth > 0)
 		{
 		  /* Make a block for the local symbols within.  */
-		  finish_block (newobj->name, &local_symbols, newobj->old_blocks,
+		  finish_block (newobj->name, &local_symbols,
+				newobj->old_blocks, NULL,
 				newobj->start_addr,
 				(cs->c_value
 				 + ANOFFSET (objfile->section_offsets,
@@ -1514,8 +1509,7 @@ read_xcoff_symtab (struct objfile *objfile, struct partial_symtab *pst)
 }
 
 #define	SYMBOL_DUP(SYMBOL1, SYMBOL2)	\
-  (SYMBOL2) = (struct symbol *)		\
-  	obstack_alloc (&objfile->objfile_obstack, sizeof (struct symbol)); \
+  (SYMBOL2) = XOBNEW (&objfile->objfile_obstack, struct symbol); \
   *(SYMBOL2) = *(SYMBOL1);
 
 
@@ -2016,14 +2010,14 @@ xcoff_start_psymtab (struct objfile *objfile,
 		     struct partial_symbol **static_syms)
 {
   struct partial_symtab *result =
-    start_psymtab_common (objfile, objfile->section_offsets,
+    start_psymtab_common (objfile,
 			  filename,
 			  /* We fill in textlow later.  */
 			  0,
 			  global_syms, static_syms);
 
-  result->read_symtab_private = obstack_alloc (&objfile->objfile_obstack,
-					       sizeof (struct symloc));
+  result->read_symtab_private =
+    XOBNEW (&objfile->objfile_obstack, struct symloc);
   ((struct symloc *) result->read_symtab_private)->first_symnum = first_symnum;
   result->read_symtab = xcoff_read_symtab;
 
@@ -2057,17 +2051,15 @@ xcoff_end_psymtab (struct objfile *objfile, struct partial_symtab *pst,
   ((struct symloc *) pst->read_symtab_private)->lineno_off =
     first_fun_line_offset;
   first_fun_line_offset = 0;
-  pst->n_global_syms = objfile->global_psymbols.next
-    - (objfile->global_psymbols.list + pst->globals_offset);
-  pst->n_static_syms = objfile->static_psymbols.next
-    - (objfile->static_psymbols.list + pst->statics_offset);
+
+  end_psymtab_common (objfile, pst);
 
   pst->number_of_dependencies = number_dependencies;
   if (number_dependencies)
     {
-      pst->dependencies = (struct partial_symtab **)
-	obstack_alloc (&objfile->objfile_obstack,
-		    number_dependencies * sizeof (struct partial_symtab *));
+      pst->dependencies = XOBNEWVEC (&objfile->objfile_obstack,
+				     struct partial_symtab *,
+				     number_dependencies);
       memcpy (pst->dependencies, dependency_list,
 	      number_dependencies * sizeof (struct partial_symtab *));
     }
@@ -2079,7 +2071,6 @@ xcoff_end_psymtab (struct objfile *objfile, struct partial_symtab *pst,
       struct partial_symtab *subpst =
 	allocate_psymtab (include_list[i], objfile);
 
-      subpst->section_offsets = pst->section_offsets;
       subpst->read_symtab_private = obstack_alloc (&objfile->objfile_obstack,
 						   sizeof (struct symloc));
       ((struct symloc *) subpst->read_symtab_private)->first_symnum = 0;
@@ -2089,9 +2080,8 @@ xcoff_end_psymtab (struct objfile *objfile, struct partial_symtab *pst,
 
       /* We could save slight bits of space by only making one of these,
          shared by the entire set of include files.  FIXME-someday.  */
-      subpst->dependencies = (struct partial_symtab **)
-	obstack_alloc (&objfile->objfile_obstack,
-		       sizeof (struct partial_symtab *));
+      subpst->dependencies =
+	  XOBNEW (&objfile->objfile_obstack, struct partial_symtab *);
       subpst->dependencies[0] = pst;
       subpst->number_of_dependencies = 1;
 
@@ -2104,8 +2094,6 @@ xcoff_end_psymtab (struct objfile *objfile, struct partial_symtab *pst,
       subpst->compunit_symtab = NULL;
       subpst->read_symtab = pst->read_symtab;
     }
-
-  sort_pst_symbols (objfile, pst);
 
   if (num_includes == 0
       && number_dependencies == 0
@@ -2120,7 +2108,7 @@ xcoff_end_psymtab (struct objfile *objfile, struct partial_symtab *pst,
       discard_psymtab (objfile, pst);
 
       /* Indicate that psymtab was thrown away.  */
-      pst = (struct partial_symtab *) NULL;
+      pst = NULL;
     }
   return pst;
 }
@@ -2665,7 +2653,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_STATIC,
 				     &objfile->static_psymbols,
-				     0, symbol.n_value,
+				     symbol.n_value,
 				     psymtab_language, objfile);
 		continue;
 
@@ -2677,7 +2665,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_STATIC,
 				     &objfile->global_psymbols,
-				     0, symbol.n_value,
+				     symbol.n_value,
 				     psymtab_language, objfile);
 		continue;
 
@@ -2695,16 +2683,14 @@ scan_xcoff_symtab (struct objfile *objfile)
 		    add_psymbol_to_list (namestring, p - namestring, 1,
 					 STRUCT_DOMAIN, LOC_TYPEDEF,
 					 &objfile->static_psymbols,
-					 symbol.n_value, 0,
-					 psymtab_language, objfile);
+					 0, psymtab_language, objfile);
 		    if (p[2] == 't')
 		      {
 			/* Also a typedef with the same name.  */
 			add_psymbol_to_list (namestring, p - namestring, 1,
 					     VAR_DOMAIN, LOC_TYPEDEF,
 					     &objfile->static_psymbols,
-					     symbol.n_value, 0,
-					     psymtab_language, objfile);
+					     0, psymtab_language, objfile);
 			p += 1;
 		      }
 		  }
@@ -2716,8 +2702,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		    add_psymbol_to_list (namestring, p - namestring, 1,
 					 VAR_DOMAIN, LOC_TYPEDEF,
 					 &objfile->static_psymbols,
-					 symbol.n_value, 0,
-					 psymtab_language, objfile);
+					 0, psymtab_language, objfile);
 		  }
 	      check_enum:
 		/* If this is an enumerated type, we need to
@@ -2778,7 +2763,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 			   enum constants in psymtabs, just in symtabs.  */
 			add_psymbol_to_list (p, q - p, 1,
 					     VAR_DOMAIN, LOC_CONST,
-					     &objfile->static_psymbols, 0,
+					     &objfile->static_psymbols,
 					     0, psymtab_language, objfile);
 			/* Point past the name.  */
 			p = q;
@@ -2796,7 +2781,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		/* Constant, e.g. from "const" in Pascal.  */
 		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_CONST,
-				     &objfile->static_psymbols, symbol.n_value,
+				     &objfile->static_psymbols,
 				     0, psymtab_language, objfile);
 		continue;
 
@@ -2816,7 +2801,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_BLOCK,
 				     &objfile->static_psymbols,
-				     0, symbol.n_value,
+				     symbol.n_value,
 				     psymtab_language, objfile);
 		continue;
 
@@ -2847,7 +2832,7 @@ scan_xcoff_symtab (struct objfile *objfile)
 		add_psymbol_to_list (namestring, p - namestring, 1,
 				     VAR_DOMAIN, LOC_BLOCK,
 				     &objfile->global_psymbols,
-				     0, symbol.n_value,
+				     symbol.n_value,
 				     psymtab_language, objfile);
 		continue;
 

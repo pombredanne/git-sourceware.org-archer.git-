@@ -154,8 +154,7 @@ exec_file_locate_attach (int pid, int from_tty)
 
   /* If gdb_sysroot is not empty and the discovered filename
      is absolute then prefix the filename with gdb_sysroot.  */
-  if (gdb_sysroot != NULL && *gdb_sysroot != '\0'
-      && IS_ABSOLUTE_PATH (exec_file))
+  if (*gdb_sysroot != '\0' && IS_ABSOLUTE_PATH (exec_file))
     full_exec_path = exec_file_find (exec_file, NULL);
 
   if (full_exec_path == NULL)
@@ -284,7 +283,7 @@ exec_file_attach (const char *filename, int from_tty)
 
       if (!exec_bfd)
 	{
-	  error (_("\"%s\": could not open as an executable file: %s"),
+	  error (_("\"%s\": could not open as an executable file: %s."),
 		 scratch_pathname, bfd_errmsg (bfd_get_error ()));
 	}
 
@@ -476,7 +475,7 @@ build_section_table (struct bfd *some_bfd, struct target_section **start,
   count = bfd_count_sections (some_bfd);
   if (*start)
     xfree (* start);
-  *start = (struct target_section *) xmalloc (count * sizeof (**start));
+  *start = XNEWVEC (struct target_section, count);
   *end = *start;
   bfd_map_over_sections (some_bfd, add_to_section_table, (char *) end);
   if (*end > *start + count)

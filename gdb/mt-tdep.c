@@ -415,7 +415,7 @@ mt_skip_prologue (struct gdbarch *gdbarch, CORE_ADDR pc)
       struct symbol *sym;
 
       /* Found a function.  */
-      sym = lookup_symbol (func_name, NULL, VAR_DOMAIN, NULL);
+      sym = lookup_symbol (func_name, NULL, VAR_DOMAIN, NULL).symbol;
       if (sym && SYMBOL_LANGUAGE (sym) != language_asm)
 	{
 	  /* Don't use this trick for assembly source files.  */
@@ -681,7 +681,7 @@ mt_registers_info (struct gdbarch *gdbarch,
 	  regsize = register_size (gdbarch, regnum);
 
 	  buff = alloca (regsize);
-	  bytes = alloca (regsize * sizeof (*bytes));
+	  bytes = XALLOCAVEC (unsigned int, regsize);
 
 	  deprecated_frame_register_read (frame, regnum, buff);
 

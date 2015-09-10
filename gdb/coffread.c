@@ -41,6 +41,7 @@
 #include "coff-pe-read.h"
 
 #include "psymtab.h"
+#include "build-id.h"
 
 extern void _initialize_coffread (void);
 
@@ -252,8 +253,7 @@ coff_locate_sections (bfd *abfd, asection *sectp, void *csip)
 	{
 	  struct stab_section_list *n, **pn;
 
-	  n = ((struct stab_section_list *)
-	       xmalloc (sizeof (struct stab_section_list)));
+	  n = XNEW (struct stab_section_list);
 	  n->section = sectp;
 	  n->next = NULL;
 	  for (pn = &csi->stabsects; *pn != NULL; pn = &(*pn)->next)
@@ -738,7 +738,10 @@ coff_symfile_read (struct objfile *objfile, int symfile_flags)
     {
       char *debugfile;
 
-      debugfile = find_separate_debug_file_by_debuglink (objfile);
+      debugfile = find_separate_debug_file_by_buildid (objfile);
+
+      if (debugfile == NULL)
+	debugfile = find_separate_debug_file_by_debuglink (objfile);
       make_cleanup (xfree, debugfile);
 
       if (debugfile)
@@ -837,9 +840,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
   if (type_vector)		/* Get rid of previous one.  */
     xfree (type_vector);
   type_vector_length = INITIAL_TYPE_VECTOR_LENGTH;
-  type_vector = (struct type **)
-    xmalloc (type_vector_length * sizeof (struct type *));
-  memset (type_vector, 0, type_vector_length * sizeof (struct type *));
+  type_vector = XCNEWVEC (struct type *, type_vector_length);
 
   coff_start_symtab (objfile, "");
 
@@ -1140,8 +1141,8 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 		enter_linenos (fcn_line_ptr, fcn_first_line,
 			       fcn_last_line, objfile);
 
-	      finish_block (newobj->name, &local_symbols,
-			    newobj->old_blocks, newobj->start_addr,
+	      finish_block (newobj->name, &local_symbols, newobj->old_blocks,
+			    NULL, newobj->start_addr,
 			    fcn_cs_saved.c_value
 			    + fcn_aux_saved.x_sym.x_misc.x_fsize
 			    + ANOFFSET (objfile->section_offsets,
@@ -1184,7 +1185,7 @@ coff_symtab_read (long symtab_offset, unsigned int nsyms,
 		    cs->c_value + ANOFFSET (objfile->section_offsets,
 					    SECT_OFF_TEXT (objfile));
 		  /* Make a block for the local symbols within.  */
-		  finish_block (0, &local_symbols, newobj->old_blocks,
+		  finish_block (0, &local_symbols, newobj->old_blocks, NULL,
 				newobj->start_addr, tmpaddr);
 		}
 	      /* Now pop locals of block just finished.  */
@@ -2098,7 +2099,7 @@ coff_read_struct_type (int index, int length, int lastsym,
 	case C_MOU:
 
 	  /* Get space to record the next field's data.  */
-	  newobj = (struct nextfield *) alloca (sizeof (struct nextfield));
+	  newobj = XALLOCA (struct nextfield);
 	  newobj->next = list;
 	  list = newobj;
 
@@ -2115,7 +2116,7 @@ coff_read_struct_type (int index, int length, int lastsym,
 	case C_FIELD:
 
 	  /* Get space to record the next field's data.  */
-	  newobj = (struct nextfield *) alloca (sizeof (struct nextfield));
+	  newobj = XALLOCA (struct nextfield);
 	  newobj->next = list;
 	  list = newobj;
 

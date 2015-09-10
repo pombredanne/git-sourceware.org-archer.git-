@@ -74,6 +74,9 @@ struct target_ops
 
   int (*create_inferior) (char *program, char **args);
 
+  /* Architecture-specific setup.  */
+  void (*arch_setup) (void);
+
   /* Attach to a running process.
 
      PID is the process ID to attach to, specified by the user
@@ -415,6 +418,27 @@ struct target_ops
      string should be copied into a buffer by the client if the string
      will not be immediately used, or if it must persist.  */
   char *(*pid_to_exec_file) (int pid);
+
+  /* Multiple-filesystem-aware open.  Like open(2), but operating in
+     the filesystem as it appears to process PID.  Systems where all
+     processes share a common filesystem should set this to NULL.
+     If NULL, the caller should fall back to open(2).  */
+  int (*multifs_open) (int pid, const char *filename,
+		       int flags, mode_t mode);
+
+  /* Multiple-filesystem-aware unlink.  Like unlink(2), but operates
+     in the filesystem as it appears to process PID.  Systems where
+     all processes share a common filesystem should set this to NULL.
+     If NULL, the caller should fall back to unlink(2).  */
+  int (*multifs_unlink) (int pid, const char *filename);
+
+  /* Multiple-filesystem-aware readlink.  Like readlink(2), but
+     operating in the filesystem as it appears to process PID.
+     Systems where all processes share a common filesystem should
+     set this to NULL.  If NULL, the caller should fall back to
+     readlink(2).  */
+  ssize_t (*multifs_readlink) (int pid, const char *filename,
+			       char *buf, size_t bufsiz);
 };
 
 extern struct target_ops *the_target;
@@ -423,6 +447,13 @@ void set_target_ops (struct target_ops *);
 
 #define create_inferior(program, args) \
   (*the_target->create_inferior) (program, args)
+
+#define target_arch_setup()			 \
+  do						 \
+    {						 \
+      if (the_target->arch_setup != NULL)	 \
+	(*the_target->arch_setup) ();		 \
+    } while (0)
 
 #define myattach(pid) \
   (*the_target->attach) (pid)
@@ -614,7 +645,7 @@ int read_inferior_memory (CORE_ADDR memaddr, unsigned char *myaddr, int len);
 int write_inferior_memory (CORE_ADDR memaddr, const unsigned char *myaddr,
 			   int len);
 
-void set_desired_thread (int id);
+int set_desired_thread (int id);
 
 const char *target_pid_to_str (ptid_t);
 

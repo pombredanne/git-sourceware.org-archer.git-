@@ -91,10 +91,8 @@ cache_eq (const void *arg1, const void *arg2)
 static struct tailcall_cache *
 cache_new_ref1 (struct frame_info *next_bottom_frame)
 {
-  struct tailcall_cache *cache;
+  struct tailcall_cache *cache = XCNEW (struct tailcall_cache);
   void **slot;
-
-  cache = xzalloc (sizeof (*cache));
 
   cache->next_bottom_frame = next_bottom_frame;
   cache->refc = 1;
@@ -197,7 +195,7 @@ pretended_chain_levels (struct call_site_chain *chain)
     return chain->length;
 
   chain_levels = chain->callers + chain->callees;
-  gdb_assert (chain_levels < chain->length);
+  gdb_assert (chain_levels <= chain->length);
 
   return chain_levels;
 }
