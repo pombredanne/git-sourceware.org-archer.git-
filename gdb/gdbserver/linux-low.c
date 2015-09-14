@@ -489,7 +489,7 @@ handle_extended_wait (struct lwp_info *event_lwp, int wstat)
 	  child_lwp->status_pending_p = 0;
 	  child_thr = get_lwp_thread (child_lwp);
 	  child_thr->last_resume_kind = resume_stop;
-	  child_thr->last_status.kind = TARGET_WAITKIND_STOPPED;
+	  child_thr->last_waitstatus.kind = TARGET_WAITKIND_STOPPED;
 
 	  /* If we're suspending all threads, leave this one suspended
 	     too.  */
@@ -1219,13 +1219,13 @@ get_detach_signal (struct thread_info *thread)
       /* If the thread had been suspended by gdbserver, and it stopped
 	 cleanly, then it'll have stopped with SIGSTOP.  But we don't
 	 want to deliver that SIGSTOP.  */
-      if (thread->last_status.kind != TARGET_WAITKIND_STOPPED
-	  || thread->last_status.value.sig == GDB_SIGNAL_0)
+      if (thread->last_waitstatus.kind != TARGET_WAITKIND_STOPPED
+	  || thread->last_waitstatus.value.sig == GDB_SIGNAL_0)
 	return 0;
 
       /* Otherwise, we may need to deliver the signal we
 	 intercepted.  */
-      status = lp->last_status;
+      status = lp->last_waitstatus;
     }
 
   if (!WIFSTOPPED (status))
@@ -1436,7 +1436,7 @@ thread_still_has_status_pending_p (struct thread_info *thread)
   /* If we got a `vCont;t', but we haven't reported a stop yet, do
      report any status pending the LWP may have.  */
   if (thread->last_resume_kind == resume_stop
-      && thread->last_status.kind != TARGET_WAITKIND_IGNORE)
+      && thread->last_waitstatus.kind != TARGET_WAITKIND_IGNORE)
     return 0;
 
   if (thread->last_resume_kind != resume_stop
@@ -1447,7 +1447,7 @@ thread_still_has_status_pending_p (struct thread_info *thread)
       CORE_ADDR pc;
       int discard = 0;
 
-      gdb_assert (lp->last_status != 0);
+      gdb_assert (lp->last_waitstatus != 0);
 
       pc = get_pc (lp);
 
@@ -2130,7 +2130,7 @@ linux_low_filter_event (int lwpid, int wstat)
 
   child->stopped = 1;
 
-  child->last_status = wstat;
+  child->last_waitstatus = wstat;
 
   /* Check if the thread has exited.  */
   if ((WIFEXITED (wstat) || WIFSIGNALED (wstat)))
@@ -2298,7 +2298,7 @@ resume_stopped_resumed_lwps (struct inferior_list_entry *entry)
       && !lp->suspended
       && !lp->status_pending_p
       && thread->last_resume_kind != resume_stop
-      && thread->last_status.kind == TARGET_WAITKIND_IGNORE)
+      && thread->last_waitstatus.kind == TARGET_WAITKIND_IGNORE)
     {
       int step = thread->last_resume_kind == resume_step;
 
@@ -2548,7 +2548,7 @@ count_events_callback (struct inferior_list_entry *entry, void *data)
   gdb_assert (count != NULL);
 
   /* Count only resumed LWPs that have an event pending. */
-  if (thread->last_status.kind == TARGET_WAITKIND_IGNORE
+  if (thread->last_waitstatus.kind == TARGET_WAITKIND_IGNORE
       && lp->status_pending_p)
     (*count)++;
 
@@ -2563,7 +2563,7 @@ select_singlestep_lwp_callback (struct inferior_list_entry *entry, void *data)
   struct thread_info *thread = (struct thread_info *) entry;
   struct lwp_info *lp = get_thread_lwp (thread);
 
-  if (thread->last_status.kind == TARGET_WAITKIND_IGNORE
+  if (thread->last_waitstatus.kind == TARGET_WAITKIND_IGNORE
       && thread->last_resume_kind == resume_step
       && lp->status_pending_p)
     return 1;
@@ -2583,7 +2583,7 @@ select_event_lwp_callback (struct inferior_list_entry *entry, void *data)
   gdb_assert (selector != NULL);
 
   /* Select only resumed LWPs that have an event pending. */
-  if (thread->last_status.kind == TARGET_WAITKIND_IGNORE
+  if (thread->last_waitstatus.kind == TARGET_WAITKIND_IGNORE
       && lp->status_pending_p)
     if ((*selector)-- == 0)
       return 1;
@@ -4080,7 +4080,7 @@ linux_set_resume_request (struct inferior_list_entry *entry, void *arg)
 	    {
 	      if (debug_threads)
 		debug_printf ("already %s LWP %ld at GDB's request\n",
-			      (thread->last_status.kind
+			      (thread->last_waitstatus.kind
 			       == TARGET_WAITKIND_STOPPED)
 			      ? "stopped"
 			      : "stopping",
@@ -4485,7 +4485,7 @@ linux_resume_one_thread (struct inferior_list_entry *entry, void *arg)
 
       /* For stop requests, we're done.  */
       lwp->resume = NULL;
-      thread->last_status.kind = TARGET_WAITKIND_IGNORE;
+      thread->last_waitstatus.kind = TARGET_WAITKIND_IGNORE;
       return 0;
     }
 
@@ -4526,8 +4526,8 @@ linux_resume_one_thread (struct inferior_list_entry *entry, void *arg)
 	     make sure to queue its siginfo.  We can ignore the return
 	     value of ptrace; if it fails, we'll skip
 	     PTRACE_SETSIGINFO.  */
-	  if (WIFSTOPPED (lwp->last_status)
-	      && WSTOPSIG (lwp->last_status) == lwp->resume->sig)
+	  if (WIFSTOPPED (lwp->last_waitstatus)
+	      && WSTOPSIG (lwp->last_waitstatus) == lwp->resume->sig)
 	    ptrace (PTRACE_GETSIGINFO, lwpid_of (thread), (PTRACE_TYPE_ARG3) 0,
 		    &p_sig->info);
 
@@ -4535,7 +4535,7 @@ linux_resume_one_thread (struct inferior_list_entry *entry, void *arg)
 	}
     }
 
-  thread->last_status.kind = TARGET_WAITKIND_IGNORE;
+  thread->last_waitstatus.kind = TARGET_WAITKIND_IGNORE;
   lwp->resume = NULL;
   return 0;
 }
@@ -4634,7 +4634,7 @@ proceed_one_lwp (struct inferior_list_entry *entry, void *except)
     }
 
   if (thread->last_resume_kind == resume_stop
-      && thread->last_status.kind != TARGET_WAITKIND_IGNORE)
+      && thread->last_waitstatus.kind != TARGET_WAITKIND_IGNORE)
     {
       if (debug_threads)
 	debug_printf ("   client wants LWP to remain %ld stopped\n",
@@ -5413,8 +5413,6 @@ linux_look_up_symbols (void)
 static void
 linux_request_interrupt (void)
 {
-  extern unsigned long signal_pid;
-
   /* Send a SIGINT to the process group.  This acts just like the user
      typed a ^C on the controlling terminal.  */
   kill (-signal_pid, SIGINT);

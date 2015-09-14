@@ -26,6 +26,6 @@
    re-enable the inferior's address space randomization.  */
 
 extern struct cleanup *maybe_disable_address_space_randomization
-  (int disable_randomization);
+  (int disable_randomization_p);
 
 #endif /* ! NAT_LINUX_PERSONALITY_H */

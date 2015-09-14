@@ -262,7 +262,7 @@ struct lwp_info
   int stopped;
 
   /* When stopped is set, the last wait status recorded for this lwp.  */
-  int last_status;
+  int last_waitstatus;
 
   /* If WAITSTATUS->KIND != TARGET_WAITKIND_IGNORE, the waitstatus for
      this LWP's last event, to pass to GDB without any further

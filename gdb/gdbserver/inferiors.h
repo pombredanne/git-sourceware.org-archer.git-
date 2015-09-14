@@ -84,8 +84,6 @@ struct process_info
 struct process_info *current_process (void);
 struct process_info *get_thread_process (struct thread_info *);
 
-extern struct inferior_list all_processes;
-
 void add_inferior_to_list (struct inferior_list *list,
 			   struct inferior_list_entry *new_inferior);
 void for_each_inferior (struct inferior_list *list,
@@ -122,7 +120,6 @@ int one_inferior_p (struct inferior_list *list);
 #define ALL_PROCESSES(cur, tmp)					\
   ALL_INFERIORS_TYPE (struct process_info, &all_processes, cur, tmp)
 
-extern struct thread_info *current_thread;
 void remove_inferior (struct inferior_list *list,
 		      struct inferior_list_entry *entry);
 

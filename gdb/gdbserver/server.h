@@ -133,3 +133,119 @@ extern void discard_queued_stop_replies (ptid_t ptid);
 #define PBUFSIZ 16384
 
 #endif /* SERVER_H */
+
+/* Description of the remote protocol state for the currently
+   connected target.  This is per-target state, and independent of the
+   selected architecture.  */
+
+struct server_state
+{
+  /* From server.c */
+  /* The thread set with an `Hc' packet.  `Hc' is deprecated in favor of
+     `vCont'.  Note the multi-process extensions made `vCont' a
+     requirement, so `Hc pPID.TID' is pretty much undefined.  So
+     CONT_THREAD can be null_ptid for no `Hc' thread, minus_one_ptid for
+     resuming all threads of the process (again, `Hc' isn't used for
+     multi-process), or a specific thread ptid_t.  */
+  ptid_t cont_thread;
+  /* The thread set with an `Hg' packet.  */
+  ptid_t general_thread;
+  /* The PID of the originally created or attached inferior.  Used to
+     send signals to the process when GDB sends us an asynchronous interrupt
+     (user hitting Control-C in the client), and to wait for the child to exit
+     when no longer debugging it.  */
+
+  unsigned long signal_pid;
+  /* Last status reported to GDB.  */
+  struct target_waitstatus last_status;
+  ptid_t last_ptid;
+  unsigned char *mem_buf;
+
+  /* from remote-utils.c */
+  /* Internal buffer used by readchar.
+     These are global to readchar because reschedule_remote needs to be
+     able to tell whether the buffer is empty.  */
+  unsigned char readchar_buf[BUFSIZ];
+  int readchar_bufcnt;
+  unsigned char *readchar_bufp;
+  /* from inferiors.c */
+  struct inferior_list all_processes;
+  struct inferior_list all_threads;
+  struct thread_info *current_thread;
+};
+
+typedef struct server_state server_state;
+
+struct client_state
+{
+  /* From server.c */
+  int server_waiting;
+
+  int extended_protocol;
+  int response_needed;
+  int exit_requested;
+
+  /* --once: Exit after the first connection has closed.  */
+  int run_once;
+
+  int multi_process;
+  int report_fork_events;
+  int report_vfork_events;
+  int non_stop;
+  int swbreak_feature;
+  int hwbreak_feature;
+
+  /* Whether we should attempt to disable the operating system's address
+     space randomization feature before starting an inferior.  */
+  int disable_randomization;
+
+  char **program_argv, **wrapper_argv;
+
+  int pass_signals[GDB_SIGNAL_LAST];
+  int program_signals[GDB_SIGNAL_LAST];
+  int program_signals_p;
+  char *own_buffer;
+  server_state *ss;
+};
+
+typedef struct client_state client_state;
+
+struct client_states
+{
+  client_state *first;
+  client_state *current_cs;
+  gdb_fildes_t current_fd;
+};
+
+client_state * get_client_state ();
+
+#define cont_thread	(get_client_state()->ss->cont_thread)
+#define general_thread	(get_client_state()->ss->general_thread)
+#define signal_pid	(get_client_state()->ss->signal_pid)
+#define last_status	(get_client_state()->ss->last_status)
+#define last_ptid	(get_client_state()->ss->last_ptid)
+#define mem_buf		(get_client_state()->ss->mem_buf)
+#define readchar_buf	(get_client_state()->ss->readchar_buf)
+#define readchar_bufcnt	(get_client_state()->ss->readchar_bufcnt)
+#define readchar_bufp	(get_client_state()->ss->readchar_bufp)
+#define all_processes  	(get_client_state()->ss->all_processes)
+#define all_threads	(get_client_state()->ss->all_threads)
+#define current_thread   (get_client_state()->ss->current_thread)
+#define server_waiting	(get_client_state()->server_waiting)
+#define extended_protocol	(get_client_state()->extended_protocol)
+#define response_needed	(get_client_state()->response_needed)
+#define exit_requested	(get_client_state()->exit_requested)
+#define run_once	(get_client_state()->run_once)
+#define multi_process	(get_client_state()->multi_process)
+#define report_fork_events	(get_client_state()->report_fork_events)
+#define report_vfork_events	(get_client_state()->report_vfork_events)
+#define non_stop	(get_client_state()->non_stop)
+#define swbreak_feature	(get_client_state()->swbreak_feature)
+#define hwbreak_feature	(get_client_state()->hwbreak_feature)
+#define disable_randomization	(get_client_state()->disable_randomization)
+#define program_argv	(get_client_state()->program_argv)
+#define wrapper_argv	(get_client_state()->wrapper_argv)
+#define pass_signals	(get_client_state()->pass_signals)
+#define program_signals	(get_client_state()->program_signals)
+#define program_signals_p	(get_client_state()->program_signals_p)
+#define own_buffer	(get_client_state()->own_buffer)

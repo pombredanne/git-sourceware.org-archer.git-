@@ -22,10 +22,6 @@
 #include "gdbthread.h"
 #include "dll.h"
 
-struct inferior_list all_processes;
-struct inferior_list all_threads;
-
-struct thread_info *current_thread;
 
 #define get_thread(inf) ((struct thread_info *)(inf))
 
@@ -109,7 +105,7 @@ add_thread (ptid_t thread_id, void *target_data)
 
   new_thread->entry.id = thread_id;
   new_thread->last_resume_kind = resume_continue;
-  new_thread->last_status.kind = TARGET_WAITKIND_IGNORE;
+  new_thread->last_waitstatus.kind = TARGET_WAITKIND_IGNORE;
 
   add_inferior_to_list (&all_threads, &new_thread->entry);
 

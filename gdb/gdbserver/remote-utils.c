@@ -122,6 +122,19 @@ int transport_is_reliable = 0;
 # define write(fd, buf, len) send (fd, (char *) buf, len, 0)
 #endif
 
+
+int
+get_remote_desc ()
+{
+  return remote_desc;
+}
+
+void
+set_remote_desc (gdb_fildes_t fd)
+{
+  remote_desc = fd;
+}
+
 int
 gdb_connected (void)
 {
@@ -860,13 +873,6 @@ initialize_async_io (void)
   unblock_async_io ();
 }
 
-/* Internal buffer used by readchar.
-   These are global to readchar because reschedule_remote needs to be
-   able to tell whether the buffer is empty.  */
-
-static unsigned char readchar_buf[BUFSIZ];
-static int readchar_bufcnt = 0;
-static unsigned char *readchar_bufp;
 
 /* Returns next char from remote GDB.  -1 if error.  */
 
@@ -1457,16 +1463,16 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
   while (own_buf[0] == 'm')
     {
       CORE_ADDR mem_addr;
-      unsigned char *mem_buf;
+      unsigned char *mem_buffer;
       unsigned int mem_len;
 
       decode_m_packet (&own_buf[1], &mem_addr, &mem_len);
-      mem_buf = xmalloc (mem_len);
-      if (read_inferior_memory (mem_addr, mem_buf, mem_len) == 0)
-	bin2hex (mem_buf, own_buf, mem_len);
+      mem_buffer = xmalloc (mem_len);
+      if (read_inferior_memory (mem_addr, mem_buffer, mem_len) == 0)
+	bin2hex (mem_buffer, own_buf, mem_len);
       else
 	write_enn (own_buf);
-      free (mem_buf);
+      free (mem_buffer);
       if (putpkt (own_buf) < 0)
 	return -1;
       len = getpkt (own_buf);
@@ -1539,36 +1545,36 @@ relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
   while (own_buf[0] == 'm' || own_buf[0] == 'M' || own_buf[0] == 'X')
     {
       CORE_ADDR mem_addr;
-      unsigned char *mem_buf = NULL;
+      unsigned char *mem_buffer = NULL;
       unsigned int mem_len;
 
       if (own_buf[0] == 'm')
 	{
 	  decode_m_packet (&own_buf[1], &mem_addr, &mem_len);
-	  mem_buf = xmalloc (mem_len);
-	  if (read_inferior_memory (mem_addr, mem_buf, mem_len) == 0)
-	    bin2hex (mem_buf, own_buf, mem_len);
+	  mem_buffer = xmalloc (mem_len);
+	  if (read_inferior_memory (mem_addr, mem_buffer, mem_len) == 0)
+	    bin2hex (mem_buffer, own_buf, mem_len);
 	  else
 	    write_enn (own_buf);
 	}
       else if (own_buf[0] == 'X')
 	{
 	  if (decode_X_packet (&own_buf[1], len - 1, &mem_addr,
-			       &mem_len, &mem_buf) < 0
-	      || write_inferior_memory (mem_addr, mem_buf, mem_len) != 0)
+			       &mem_len, &mem_buffer) < 0
+	      || write_inferior_memory (mem_addr, mem_buffer, mem_len) != 0)
 	    write_enn (own_buf);
 	  else
 	    write_ok (own_buf);
 	}
       else
 	{
-	  decode_M_packet (&own_buf[1], &mem_addr, &mem_len, &mem_buf);
-	  if (write_inferior_memory (mem_addr, mem_buf, mem_len) == 0)
+	  decode_M_packet (&own_buf[1], &mem_addr, &mem_len, &mem_buffer);
+	  if (write_inferior_memory (mem_addr, mem_buffer, mem_len) == 0)
 	    write_ok (own_buf);
 	  else
 	    write_enn (own_buf);
 	}
-      free (mem_buf);
+      free (mem_buffer);
       if (putpkt (own_buf) < 0)
 	return -1;
       len = getpkt (own_buf);

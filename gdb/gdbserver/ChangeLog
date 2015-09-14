@@ -1,3 +1,24 @@
+2015-09-12  Stan Cox  <scox@redhat.com>
+
+	* gdbthread.h (last_status): Rename last_waitstatus to avoid conflict
+	with server.h macro.
+	* inferiors.c inferiors.h (all_processes, all_threads, current_thread):
+	Move to server_state.
+	* linux-low.c (last_status):  Change all uses to last_waitstatus.
+	* remote-utils.c (get_remote_desc, set_remote_desc): Get/put for current client fd.
+	(readcchar_buf, readchar_bufcnt, readchar_bufp): Move to server_state.
+	(look_up_one_symbol):  Rename mem_buf to mem_buffer to avoid conflict
+	* server.c (cont_thread, general_thread, server_waiting)
+	(extended_protocol, response_needed, exit_requested, run_once)
+	(multi_process, report_fork_events, report_vfork_events, non_stop)
+	(swbreak_feature, hwbreak_feature, disable_randomization)
+	(program_argv, wrapper_argv, pass_signals, program_signals)
+	(program_signals_p, signal_pid, last_status, last_ptid, own_buf)
+	(mem_buf): Move to client_state/server_state.
+	(set_client_state, get_client_state):  New
+	(own_buf):  Rename everywhere to own_buffer.
+	* server.h (server_state, client_state):  New.  Add get/put macro for all members.
+
 2015-09-09  Markus Metzger  <markus.t.metzger@intel.com>
 
 	* linux-low.c (linux_low_enable_btrace): Remove.

@@ -37,7 +37,7 @@ struct thread_info
   enum resume_kind last_resume_kind;
 
   /* The last wait status reported for this thread.  */
-  struct target_waitstatus last_status;
+  struct target_waitstatus last_waitstatus;
 
   /* True if LAST_STATUS hasn't been reported to GDB yet.  */
   int status_pending_p;

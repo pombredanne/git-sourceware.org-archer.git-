@@ -23,6 +23,9 @@ extern int remote_debug;
 extern int noack_mode;
 extern int transport_is_reliable;
 
+int get_remote_desc (void);
+void set_remote_desc (gdb_fildes_t);
+
 int gdb_connected (void);
 
 #define STDIO_CONNECTION_NAME "stdio"
