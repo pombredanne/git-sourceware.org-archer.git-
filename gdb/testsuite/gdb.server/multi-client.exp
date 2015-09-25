@@ -1,0 +1,166 @@
+# Copyright (C) 2015 Free Software Foundation, Inc.
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+load_lib gdbserver-support.exp
+
+set test "multi-client"
+# wrapper.c is used as the test exec-file
+set testfile wrapper
+set srcfile wrapper.c
+global srcdir subdir
+set testpath [pwd]/$subdir/$testfile
+set testfile2 server-kill
+set srcfile2 server-kill.c
+set testpath2 [pwd]/$subdir/$testfile2
+if { [prepare_for_testing $test $testfile $srcfile debug] } {
+    return -1
+}
+if {[build_executable $test $testfile2 $srcfile2 debug] == -1} {
+    return -1
+}
+
+
+set use_gdb_stub [target_info exists use_gdb_stub]
+set gdb_client1_spawn_id ""
+set gdb_client2_spawn_id ""
+
+if {[skip_gdbserver_tests]} {
+    return
+}
+
+proc start_gdbserver { } {
+    global test
+    set GDBSERVER "[find_gdbserver]"
+    set res [remote_spawn host "$GDBSERVER --multi :65432"]
+    if { $res < 0 || $res == "" } {
+	perror "$test Spawning $GDBSERVER failed."
+	return 1
+    }
+
+    set ok 0
+    expect {
+	-i "$res" -re "Listening on port" { incr ok }
+    }
+    if {$ok == 1} { 
+	pass "$test gdbserver listen"
+    } else {
+	fail "$test gdbserver listen $expect_out(buffer)"
+    }
+    return $res
+}
+
+proc gdb_command { CLIENT COMMAND RESPONSE COMMENT } {
+    global gdb_client1_spawn_id
+    global gdb_client2_spawn_id
+    global test
+    if {$CLIENT == 1} {
+	set client "$gdb_client1_spawn_id"
+    } else {
+	set client "$gdb_client2_spawn_id"
+    }
+    send -i $client "$COMMAND\n"
+    if { [string length $RESPONSE] > 0 } {
+	foreach i {1 2 3} {
+	    set ok 0
+	    expect {
+		-i "$client" -re "$RESPONSE" { 
+		    incr ok; 
+		    verbose "$COMMENT $client $expect_out(buffer)"
+#		    exp_continue 
+		}
+	    }
+	    if {$ok == 1} { 
+		pass "$test $COMMENT"
+		break
+	    } else {
+		if { $i == 3 } {
+		    fail "$test $COMMENT"
+		} else { sleep 2 }
+	    }
+	}
+    }
+    if { False } { verbose "DEBUG: $COMMENT $client $expect_out(buffer)" }
+}
+
+verbose "##### Run one process and attach to it"
+
+
+set gdb_server_spawn_id [start_gdbserver]
+# set MULTI_GDBFLAGS "-iex \"file $testpath\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file $testpath\" -iex \"set debug remote 10\" -iex \"set debug infrun 1\" -iex \"set debug target 2\" --silent"
+set MULTI_GDBFLAGS "-iex \"file $testpath\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file $testpath\" --silent"
+# set res [remote_spawn host "$GDB $INTERNAL_GDBFLAGS $GDBFLAGS $MULTI_GDBFLAGS [host_info gdb_opts]"]
+set res [remote_spawn host "$GDB $MULTI_GDBFLAGS [host_info gdb_opts]"]
+sleep 1
+if { $res < 0 || $res == "" } {
+    perror "$test Spawning $GDB failed."
+    return 1
+}
+
+set gdb_spawn_id $res
+set gdb_client1_spawn_id $res
+
+gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver b getenv"
+
+gdb_command 1 "run" "Breakpoint 1," "gdbserver hit b getenv"
+
+# Now start another client that attaches to the first client
+set target_pid -1
+set res [remote_spawn host "pgrep wrapper"]
+sleep 1
+expect {
+    -i $res -re {[0-9][0-9]*} { set target_pid $expect_out(buffer) }
+}
+if { $target_pid < 0 } {
+    perror "$test Failed to get pid of target process. $expect_out(buffer)"
+    return 1
+}
+
+set MULTI_ATTACH "-iex \"attach $target_pid\""
+# set res [remote_spawn host "$GDB $INTERNAL_GDBFLAGS $GDBFLAGS $MULTI_GDBFLAGS $MULTI_ATTACH [host_info gdb_opts]"]
+set res [remote_spawn host "$GDB $MULTI_GDBFLAGS $MULTI_ATTACH [host_info gdb_opts]"]
+sleep 1
+if { $res < 0 || $res == "" } {
+    perror "$test Spawning $GDB failed."
+    return 1
+}
+
+set gdb_client2_spawn_id $res
+
+gdb_command 2 "b marker" "Breakpoint 1 at" "gdbserver b marker"
+
+gdb_command 2 "continue" "Continuing" "gdbserver continue client2"
+
+# Second client waits while we continue first client
+
+gdb_command 1 "dis 1" "" "disable breakpoint"
+
+gdb_command 1 "continue" "Continuing" "gdbserver continue client1"
+
+# The second client is back
+
+set ok 0
+expect {
+    -i $gdb_client2_spawn_id "Breakpoint 1, marker" { incr ok; }
+}
+if { $ok == 1 } {
+    pass "$test gdbserver hit b marker"
+} else {
+    fail "$test gdbserver hit b marker"
+}
+
+gdb_command 2 "info target" "Extended remote serial target in gdb-specific protocol:" "info target"
+
+verbose "kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]"
+exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]

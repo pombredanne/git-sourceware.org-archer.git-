@@ -1,3 +1,33 @@
+2015-09-24  Stan Cox  <scox@redhat.com>
+
+	* server.c (get_client_state, set_client_state)
+	(delete_client_breakpoint, free_client_state, add_client_by_pid)
+	(add_client_by_exe, get_first_client_fd, have_multiple_clients)
+	(delete_client_state, add_client_breakpoint)  New for managing
+	client/server structures.
+	(pending_types, get_pack_type, resolve_waiter, setup_multiplexing)
+	(setup_multiplexing, do_multiplexing)  New for managing run state
+	of clients.
+	(start_inferior): Add client to list.
+	(handle_monitor_command):  Add 'client status'
+	(process_serial_event): Manage multiple client connections.  Call
+	(setup,do)_multiplexing.
+
+	* server.h (last_status, last_ptid, current_thread)
+	(exit_requested): Add union as access macro alternative
+	(client_breakpoint):  New struct.
+	(file_desc, executable, packet_type, last_packet_type, pending):  New.
+
+	* event-loop.c (delete_file_handler): Add delete_client_state.
+	(handle_file_event): Reset file descriptor for multiple clients.
+	(wait_for_event): Handle additional client connections.
+
+	* mem-break.c (has_client_breakpoint_at): New.
+
+	* remote-utils.c (get_listen_desc):  New.
+	(handle_accept_event):  Unset noack_mode.
+	(write_prim, write, read_prim, readchar, getpkt):  Add file desc parm.
+
 2015-09-12  Stan Cox  <scox@redhat.com>
 
 	* gdbthread.h (last_status): Rename last_waitstatus to avoid conflict

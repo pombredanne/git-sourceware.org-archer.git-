@@ -25,6 +25,7 @@ extern int transport_is_reliable;
 
 int get_remote_desc (void);
 void set_remote_desc (gdb_fildes_t);
+int get_listen_desc (void);
 
 int gdb_connected (void);
 
@@ -37,7 +38,7 @@ char *write_ptid (char *buf, ptid_t ptid);
 int putpkt (char *buf);
 int putpkt_binary (char *buf, int len);
 int putpkt_notif (char *buf);
-int getpkt (char *buf);
+int getpkt (gdb_fildes_t,char *buf);
 void remote_prepare (char *name);
 void remote_open (char *name);
 void remote_close (void);

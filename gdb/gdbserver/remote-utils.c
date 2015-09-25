@@ -88,7 +88,7 @@ enum {
    Either NOT_SCHEDULED or the callback id.  */
 static int readchar_callback = NOT_SCHEDULED;
 
-static int readchar (void);
+static int readchar (gdb_fildes_t);
 static void reset_readchar (void);
 static void reschedule (void);
 
@@ -136,6 +136,12 @@ set_remote_desc (gdb_fildes_t fd)
 }
 
 int
+get_listen_desc ()
+{
+  return listen_desc;
+}
+
+int
 gdb_connected (void)
 {
   return remote_desc != INVALID_DESCRIPTOR;
@@ -163,7 +169,7 @@ enable_async_notification (int fd)
 #endif
 }
 
-static int
+int
 handle_accept_event (int err, gdb_client_data client_data)
 {
   struct sockaddr_in sockaddr;
@@ -172,10 +178,13 @@ handle_accept_event (int err, gdb_client_data client_data)
   if (debug_threads)
     debug_printf ("handling possible accept event\n");
 
+  noack_mode = 0;
   tmp = sizeof (sockaddr);
   remote_desc = accept (listen_desc, (struct sockaddr *) &sockaddr, &tmp);
   if (remote_desc == -1)
     perror_with_name ("Accept failed");
+
+  set_client_state (remote_desc);
 
   /* Enable TCP keep alive process. */
   tmp = 1;
@@ -193,7 +202,8 @@ handle_accept_event (int err, gdb_client_data client_data)
 				   exits when the remote side dies.  */
 #endif
 
-  if (run_once)
+  /* TODO check this */
+  if (0 && run_once)
     {
 #ifndef USE_WIN32API
       close (listen_desc);		/* No longer need this */
@@ -204,7 +214,8 @@ handle_accept_event (int err, gdb_client_data client_data)
 
   /* Even if !RUN_ONCE no longer notice new connections.  Still keep the
      descriptor open for add_file_handler to wait for a new connection.  */
-  delete_file_handler (listen_desc);
+  // TODO check this
+  //  delete_file_handler (listen_desc);
 
   /* Convert IP address to string.  */
   fprintf (stderr, "Remote debugging from host %s\n",
@@ -601,12 +612,12 @@ read_ptid (char *buf, char **obuf)
    This may return less than COUNT.  */
 
 static int
-write_prim (const void *buf, int count)
+write_prim (gdb_fildes_t fd, const void *buf, int count)
 {
   if (remote_connection_is_stdio ())
     return write (fileno (stdout), buf, count);
   else
-    return write (remote_desc, buf, count);
+    return write (fd, buf, count);
 }
 
 /* Read COUNT bytes from the client and store in BUF.
@@ -614,12 +625,12 @@ write_prim (const void *buf, int count)
    This may return less than COUNT.  */
 
 static int
-read_prim (void *buf, int count)
+read_prim (gdb_fildes_t fd, void *buf, int count)
 {
   if (remote_connection_is_stdio ())
     return read (fileno (stdin), buf, count);
   else
-    return read (remote_desc, buf, count);
+    return read (fd, buf, count);
 }
 
 /* Send a packet to the remote machine, with error checking.
@@ -634,6 +645,7 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
   char *buf2;
   char *p;
   int cc;
+  client_state *cs = get_client_state();
 
   buf2 = xmalloc (strlen ("$") + cnt + strlen ("#nn") + 1);
 
@@ -659,7 +671,7 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
 
   do
     {
-      if (write_prim (buf2, p - buf2) != p - buf2)
+      if (write_prim (cs->file_desc, buf2, p - buf2) != p - buf2)
 	{
 	  perror ("putpkt(write)");
 	  free (buf2);
@@ -672,9 +684,9 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
 	  if (remote_debug)
 	    {
 	      if (is_notif)
-		fprintf (stderr, "putpkt (\"%s\"); [notif]\n", buf2);
+		fprintf (stderr, "putpkt/%d (\"%s\"); [notif]\n", cs->file_desc, buf2);
 	      else
-		fprintf (stderr, "putpkt (\"%s\"); [noack mode]\n", buf2);
+		fprintf (stderr, "putpkt/%d (\"%s\"); [noack mode]\n", cs->file_desc, buf2);
 	      fflush (stderr);
 	    }
 	  break;
@@ -682,11 +694,11 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
 
       if (remote_debug)
 	{
-	  fprintf (stderr, "putpkt (\"%s\"); [looking for ack]\n", buf2);
+	  fprintf (stderr, "putpkt/%d (\"%s\"); [looking for ack]\n", cs->file_desc, buf2);
 	  fflush (stderr);
 	}
 
-      cc = readchar ();
+      cc = readchar (cs->file_desc);
 
       if (cc < 0)
 	{
@@ -754,7 +766,7 @@ input_interrupt (int unused)
       int cc;
       char c = 0;
 
-      cc = read_prim (&c, 1);
+      cc = read_prim (remote_desc, &c, 1);
 
       if (cc == 0)
 	{
@@ -877,13 +889,13 @@ initialize_async_io (void)
 /* Returns next char from remote GDB.  -1 if error.  */
 
 static int
-readchar (void)
+readchar (gdb_fildes_t fd)
 {
   int ch;
 
   if (readchar_bufcnt == 0)
     {
-      readchar_bufcnt = read_prim (readchar_buf, sizeof (readchar_buf));
+      readchar_bufcnt = read_prim (fd, readchar_buf, sizeof (readchar_buf));
 
       if (readchar_bufcnt <= 0)
 	{
@@ -949,7 +961,7 @@ reschedule (void)
    and store it in BUF.  Returns length of packet, or negative if error. */
 
 int
-getpkt (char *buf)
+getpkt (gdb_fildes_t fd, char *buf)
 {
   char *bp;
   unsigned char csum, c1, c2;
@@ -961,7 +973,7 @@ getpkt (char *buf)
 
       while (1)
 	{
-	  c = readchar ();
+	  c = readchar (fd);
 	  if (c == '$')
 	    break;
 	  if (remote_debug)
@@ -977,7 +989,7 @@ getpkt (char *buf)
       bp = buf;
       while (1)
 	{
-	  c = readchar ();
+	  c = readchar (fd);
 	  if (c < 0)
 	    return -1;
 	  if (c == '#')
@@ -987,8 +999,8 @@ getpkt (char *buf)
 	}
       *bp = 0;
 
-      c1 = fromhex (readchar ());
-      c2 = fromhex (readchar ());
+      c1 = fromhex (readchar (fd));
+      c2 = fromhex (readchar (fd));
 
       if (csum == (c1 << 4) + c2)
 	break;
@@ -1005,7 +1017,7 @@ getpkt (char *buf)
 
       fprintf (stderr, "Bad checksum, sentsum=0x%x, csum=0x%x, buf=%s\n",
 	       (c1 << 4) + c2, csum, buf);
-      if (write_prim ("-", 1) != 1)
+      if (write_prim (fd, "-", 1) != 1)
 	return -1;
     }
 
@@ -1013,11 +1025,11 @@ getpkt (char *buf)
     {
       if (remote_debug)
 	{
-	  fprintf (stderr, "getpkt (\"%s\");  [sending ack] \n", buf);
+	  fprintf (stderr, "getpkt/%d (\"%s\");  [sending ack] \n", fd, buf);
 	  fflush (stderr);
 	}
 
-      if (write_prim ("+", 1) != 1)
+      if (write_prim (fd, "+", 1) != 1)
 	return -1;
 
       if (remote_debug)
@@ -1030,7 +1042,7 @@ getpkt (char *buf)
     {
       if (remote_debug)
 	{
-	  fprintf (stderr, "getpkt (\"%s\");  [no ack sent] \n", buf);
+	  fprintf (stderr, "getpkt/%d (\"%s\");  [no ack sent] \n", fd, buf);
 	  fflush (stderr);
 	}
     }
@@ -1451,7 +1463,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
     return -1;
 
   /* FIXME:  Eventually add buffer overflow checking (to getpkt?)  */
-  len = getpkt (own_buf);
+  len = getpkt (remote_desc, own_buf);
   if (len < 0)
     return -1;
 
@@ -1475,7 +1487,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
       free (mem_buffer);
       if (putpkt (own_buf) < 0)
 	return -1;
-      len = getpkt (own_buf);
+      len = getpkt (remote_desc, own_buf);
       if (len < 0)
 	return -1;
     }
@@ -1534,7 +1546,7 @@ relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
     return -1;
 
   /* FIXME:  Eventually add buffer overflow checking (to getpkt?)  */
-  len = getpkt (own_buf);
+  len = getpkt (remote_desc, own_buf);
   if (len < 0)
     return -1;
 
@@ -1577,7 +1589,7 @@ relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
       free (mem_buffer);
       if (putpkt (own_buf) < 0)
 	return -1;
-      len = getpkt (own_buf);
+      len = getpkt (remote_desc, own_buf);
       if (len < 0)
 	return -1;
     }

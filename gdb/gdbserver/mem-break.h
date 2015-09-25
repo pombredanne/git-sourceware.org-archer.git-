@@ -245,6 +245,10 @@ void uninsert_fast_tracepoint_jumps_at (CORE_ADDR pc);
 
 void reinsert_fast_tracepoint_jumps_at (CORE_ADDR where);
 
+/* Does a client have a breakpoint at addr? */
+
+int has_client_breakpoint_at (CORE_ADDR addr);
+
 /* Insert a memory breakpoint.  */
 
 int insert_memory_breakpoint (struct raw_breakpoint *bp);

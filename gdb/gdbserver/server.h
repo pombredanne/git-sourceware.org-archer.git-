@@ -136,10 +136,11 @@ extern void discard_queued_stop_replies (ptid_t ptid);
 
 /* Description of the remote protocol state for the currently
    connected target.  This is per-target state, and independent of the
-   selected architecture.  */
+   selected architecture.  The unions allow bypassing the access macros.\ */
 
 struct server_state
 {
+  int attach_count;
   /* From server.c */
   /* The thread set with an `Hc' packet.  `Hc' is deprecated in favor of
      `vCont'.  Note the multi-process extensions made `vCont' a
@@ -157,8 +158,14 @@ struct server_state
 
   unsigned long signal_pid;
   /* Last status reported to GDB.  */
-  struct target_waitstatus last_status;
-  ptid_t last_ptid;
+  union {
+    struct target_waitstatus last_status;
+    struct target_waitstatus last_status_;
+  };
+  union {
+    ptid_t last_ptid;
+    ptid_t last_ptid_;
+  };
   unsigned char *mem_buf;
 
   /* from remote-utils.c */
@@ -171,19 +178,40 @@ struct server_state
   /* from inferiors.c */
   struct inferior_list all_processes;
   struct inferior_list all_threads;
-  struct thread_info *current_thread;
+  union {
+    struct thread_info *current_thread;
+    struct thread_info *current_thread_;
+  };
 };
 
 typedef struct server_state server_state;
 
+struct client_breakpoint
+{
+  CORE_ADDR addr;
+  struct client_breakpoint *next;
+};
+
+enum packet_types { other_packet = 0, vContc = 1, vConts = 2, vRun = 3 };
+typedef enum packet_types packet_types;
+
 struct client_state
 {
+  gdb_fildes_t file_desc;
+  char *executable;
+  int packet_type;
+  int last_packet_type;
+  int pending;
+
   /* From server.c */
   int server_waiting;
 
   int extended_protocol;
   int response_needed;
-  int exit_requested;
+  union {
+    int exit_requested;
+    int exit_requested_;
+  };
 
   /* --once: Exit after the first connection has closed.  */
   int run_once;
@@ -200,12 +228,19 @@ struct client_state
   int disable_randomization;
 
   char **program_argv, **wrapper_argv;
+  int packet_length;
 
   int pass_signals[GDB_SIGNAL_LAST];
   int program_signals[GDB_SIGNAL_LAST];
   int program_signals_p;
-  char *own_buffer;
+  char *in_buffer;
+  union {
+    char *own_buffer;
+    char *own_buffer_;
+  };
+  struct client_breakpoint *client_breakpoints;
   server_state *ss;
+  struct client_state *next;
 };
 
 typedef struct client_state client_state;
@@ -218,6 +253,9 @@ struct client_states
 };
 
 client_state * get_client_state ();
+client_state * set_client_state (gdb_fildes_t);
+int have_multiple_clients();
+void delete_client_state (gdb_fildes_t fd);
 
 #define cont_thread	(get_client_state()->ss->cont_thread)
 #define general_thread	(get_client_state()->ss->general_thread)
@@ -245,7 +283,9 @@ client_state * get_client_state ();
 #define disable_randomization	(get_client_state()->disable_randomization)
 #define program_argv	(get_client_state()->program_argv)
 #define wrapper_argv	(get_client_state()->wrapper_argv)
+#define packet_length	(get_client_state()->packet_length)
 #define pass_signals	(get_client_state()->pass_signals)
 #define program_signals	(get_client_state()->program_signals)
 #define program_signals_p	(get_client_state()->program_signals_p)
+#define in_buffer	(get_client_state()->in_buffer)
 #define own_buffer	(get_client_state()->own_buffer)
