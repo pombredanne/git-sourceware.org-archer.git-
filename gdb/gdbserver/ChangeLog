@@ -1,3 +1,8 @@
+2015-10-06  Stan Cox  <scox@redhat.com>
+
+	* server.c (setup_multiplexing): Insure we always have a waitee.
+	(do_multiplexing): Don't wait if break isn't reached.
+
 2015-09-24  Stan Cox  <scox@redhat.com>
 
 	* server.c (get_client_state, set_client_state)

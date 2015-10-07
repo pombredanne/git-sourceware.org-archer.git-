@@ -35,6 +35,7 @@ if {[build_executable $test $testfile2 $srcfile2 debug] == -1} {
 set use_gdb_stub [target_info exists use_gdb_stub]
 set gdb_client1_spawn_id ""
 set gdb_client2_spawn_id ""
+set gdb_client3_spawn_id ""
 
 if {[skip_gdbserver_tests]} {
     return
@@ -64,11 +65,14 @@ proc start_gdbserver { } {
 proc gdb_command { CLIENT COMMAND RESPONSE COMMENT } {
     global gdb_client1_spawn_id
     global gdb_client2_spawn_id
+    global gdb_client3_spawn_id
     global test
     if {$CLIENT == 1} {
 	set client "$gdb_client1_spawn_id"
-    } else {
+    } elseif {$CLIENT == 2} {
 	set client "$gdb_client2_spawn_id"
+    } else {
+	set client "$gdb_client3_spawn_id"
     }
     send -i $client "$COMMAND\n"
     if { [string length $RESPONSE] > 0 } {
@@ -98,9 +102,7 @@ verbose "##### Run one process and attach to it"
 
 
 set gdb_server_spawn_id [start_gdbserver]
-# set MULTI_GDBFLAGS "-iex \"file $testpath\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file $testpath\" -iex \"set debug remote 10\" -iex \"set debug infrun 1\" -iex \"set debug target 2\" --silent"
 set MULTI_GDBFLAGS "-iex \"file $testpath\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file $testpath\" --silent"
-# set res [remote_spawn host "$GDB $INTERNAL_GDBFLAGS $GDBFLAGS $MULTI_GDBFLAGS [host_info gdb_opts]"]
 set res [remote_spawn host "$GDB $MULTI_GDBFLAGS [host_info gdb_opts]"]
 sleep 1
 if { $res < 0 || $res == "" } {
@@ -115,7 +117,7 @@ gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver b getenv"
 
 gdb_command 1 "run" "Breakpoint 1," "gdbserver hit b getenv"
 
-# Now start another client that attaches to the first client
+# Now start a second client that attaches to the first client
 set target_pid -1
 set res [remote_spawn host "pgrep wrapper"]
 sleep 1
@@ -128,7 +130,6 @@ if { $target_pid < 0 } {
 }
 
 set MULTI_ATTACH "-iex \"attach $target_pid\""
-# set res [remote_spawn host "$GDB $INTERNAL_GDBFLAGS $GDBFLAGS $MULTI_GDBFLAGS $MULTI_ATTACH [host_info gdb_opts]"]
 set res [remote_spawn host "$GDB $MULTI_GDBFLAGS $MULTI_ATTACH [host_info gdb_opts]"]
 sleep 1
 if { $res < 0 || $res == "" } {
@@ -160,7 +161,23 @@ if { $ok == 1 } {
     fail "$test gdbserver hit b marker"
 }
 
-gdb_command 2 "info target" "Extended remote serial target in gdb-specific protocol:" "info target"
+# Second client waits while we continue first client
+
+gdb_command 2 "dis 1" "" "disable breakpoint"
+
+# gdb_command 2 "info target" "Extended remote serial target in gdb-specific protocol:" "info target"
+
+gdb_command 2 "continue" "Continuing" "gdbserver continue client2"
+
+set ok 0
+expect {
+    -i $gdb_client2_spawn_id "exited normally" { incr ok; }
+}
+if { $ok == 1 } {
+    pass "$test gdbserver client exited"
+} else {
+    fail "$test gdbserver client exited"
+}
 
 verbose "kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]"
 exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]

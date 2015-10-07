@@ -85,6 +85,10 @@ static struct client_states  client_states;
 
 static void handle_status (char *);
 
+enum pending_types  {none_pending=0, pending_waitee=1, pending_cont_waiter=2,pending_step_waiter=3};
+char *pending_types_str[] = {"not waiting","waitee","waiter","step waiter"};
+char *packet_types_str[] = {"other", "vContc", "vConts","vRun"};
+
 
 /* Return the current client state */
 
@@ -95,7 +99,7 @@ get_client_state (void)
 }
 
 
-/* Add a new client state for fd or return if found */
+/* Add a new client state for FD or return if found */
 
 client_state *
 set_client_state (gdb_fildes_t fd)
@@ -175,15 +179,45 @@ set_client_state (gdb_fildes_t fd)
   return client_states.current_cs;
 }
 
+/* Add breakpoint ADDR to the per client breakpoint list */
+
+void
+add_client_breakpoint (CORE_ADDR addr)
+{
+  struct client_breakpoint *cb;
+  struct client_breakpoint *newcb;
+  client_state *cs = get_client_state();
+
+  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
+    if (addr == cb->addr)
+      return;
+    else if (cb->next == NULL)
+      break;
+  newcb = XCNEW (struct client_breakpoint);
+  if (cb != NULL)
+    cb->next = newcb;
+  else
+    cs->client_breakpoints = newcb;
+  newcb->addr = addr;
+  newcb->next = NULL;
+
+  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
+    if (debug_threads)
+      debug_printf ("%s:%d %d %#lx  breakpoint at %#lx\n", __FUNCTION__, __LINE__, get_client_state()->file_desc, (long unsigned)addr, (long unsigned)cb->addr);
+}
+
+
+/* Remove ADDR from the per client breakpoint list */
 
 void
 delete_client_breakpoint (CORE_ADDR addr)
 {
+  /* TODO gdb_remove_breakpoint removes breakpoints when we expect them
+     so lifetimes of list items needs improvement */
   struct client_breakpoint *cb;
   struct client_breakpoint *previous_cb = NULL;
   client_state *cs = get_client_state();
 
-  //  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
   cb = cs->client_breakpoints;
   while (cb != NULL)
     {
@@ -210,7 +244,7 @@ delete_client_breakpoint (CORE_ADDR addr)
 }
 
 
-/* Free client state cs, taking into account the corresponding server state */
+/* Free client state CS; considering the corresponding server state */
 
 static void free_client_state (client_state *cs)
 {
@@ -235,27 +269,35 @@ static void free_client_state (client_state *cs)
 }
 
 
+/* Dump the client state list for debugging purposes */
+
 void
-dump_client_state ()
+dump_client_state (const char *comment)
 {
   client_state *save_cs = get_client_state();
   client_state *cs;
+
+  if (! debug_threads)
+    return;
+  
+  debug_printf ("Dumping client state from %s\n", comment);
+  
   for (cs = client_states.first; cs != NULL; cs = cs->next)
-      if (debug_threads)
-	{
-	  client_states.current_cs = cs;
-	  debug_printf ("%s:%d %s %d cont_thr %#lx gen thr %#lx attached? %d\n", __FUNCTION__, __LINE__,
-			cs->executable, cs->file_desc, (long unsigned)cont_thread.pid,
-			(long unsigned)general_thread.pid, cs->ss->attach_count);
-	  debug_printf ("%s:%d %d all procs %#lx all thrs %#lx curr thr %#lx\n", __FUNCTION__, __LINE__,
-			(int)last_ptid.pid, (unsigned long)all_processes.head,
-			(unsigned long)all_threads.head, (unsigned long)current_thread);
+    {
+      client_states.current_cs = cs;
+      debug_printf ("%s %d cont_thr %#lx gen thr %#lx attached? %d\n",
+		    cs->executable, cs->file_desc, (long unsigned)cont_thread.pid,
+		    (long unsigned)general_thread.pid, cs->ss->attach_count);
+      debug_printf ("%d all procs %#lx all thrs %#lx curr thr %#lx %s/%s/%s\n",
+		    (int)last_ptid.pid, (unsigned long)all_processes.head,
+		    (unsigned long)all_threads.head, (unsigned long)current_thread,
+		    packet_types_str[cs->packet_type], packet_types_str[cs->last_packet_type], pending_types_str[cs->pending]);
     }
   client_states.current_cs = save_cs;
 }
 
 
-/* Add another client to the 1 server -> N client list. */
+/* Add another client for PID to the 1 server -> N client list. */
 
 client_state *
 add_client_by_pid (int pid)
@@ -271,7 +313,8 @@ add_client_by_pid (int pid)
 	  xfree (cs->executable);
 	  cs->executable = matched_cs->executable;
 	  XDELETE (cs->ss);
-	  cs->ss = matched_cs->ss;		/* reuse the matched server state */
+	  /* reuse the matched server state */
+	  cs->ss = matched_cs->ss;
 	  cs->ss->attach_count += 1;
 	  return cs;
 	}
@@ -280,6 +323,8 @@ add_client_by_pid (int pid)
 }
 
 
+/* Add another client for EXECUTABLE to the 1 server -> N client list. */
+
 client_state *
 add_client_by_exe (char *executable)
 {
@@ -287,7 +332,7 @@ add_client_by_exe (char *executable)
   char *new_executable;
   client_state *cs = get_client_state ();
 
-  dump_client_state();
+  dump_client_state(__FUNCTION__);
 
   for (csi = client_states.first; csi != NULL; csi = csi->next)
     {
@@ -302,7 +347,7 @@ add_client_by_exe (char *executable)
 }
 
 
-/* Return the first real client state */
+/* Return the first active client state */
 
 gdb_fildes_t
 get_first_client_fd ()
@@ -319,7 +364,7 @@ get_first_client_fd ()
 }
 
 
-/* Is there more than one client? */
+/* Is there more than one active client? */
 
 int
 have_multiple_clients ()
@@ -335,7 +380,7 @@ have_multiple_clients ()
 }
 
 
-/*  Remove the client state corresponding to fd */
+/* Remove the client state corresponding to fd */
 
 void
 delete_client_state (gdb_fildes_t fd)
@@ -370,35 +415,7 @@ delete_client_state (gdb_fildes_t fd)
 }
 
 
-void
-add_client_breakpoint (CORE_ADDR addr)
-{
-  struct client_breakpoint *cb;
-  struct client_breakpoint *newcb;
-  client_state *cs = get_client_state();
-
-  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
-    if (addr == cb->addr)
-      return;
-    else if (cb->next == NULL)
-      break;
-  newcb = XCNEW (struct client_breakpoint);
-  if (cb != NULL)
-    cb->next = newcb;
-  else
-    cs->client_breakpoints = newcb;
-  newcb->addr = addr;
-  newcb->next = NULL;
-
-  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
-    if (debug_threads)
-      debug_printf ("%s:%d %d %#lx  breakpoint at %#lx\n", __FUNCTION__, __LINE__, get_client_state()->file_desc, (long unsigned)addr, (long unsigned)cb->addr);
-}
-
-enum pending_types  {none_pending=0, pending_waitee=1, pending_cont_waiter=2,pending_step_waiter=3};
-char *pending_types_str[] = {"not waiting","waitee","waiter","step waiter"};
-char *packet_types_str[] = {"other", "vContc", "vConts","vRun"};
-
+/* Return the packet type for last CS packets */
 
 packet_types
 get_packet_type (client_state *cs)
@@ -427,17 +444,23 @@ get_packet_type (client_state *cs)
   return other_packet;
 }
 
-/* output a packet that will cause the packet to be ignored.  */
+/* Belatedly reply to last CS previously received and waited on packet  */
 
 void
 resolve_waiter (client_state *cs)
 {
-  switch (cs->packet_type)
+  enum packet_types this_packet_type = (cs->packet_type) ? cs->packet_type : cs->last_packet_type;
+
+  if (debug_threads)
+    debug_printf ("%s:%d fd=%d %s\n", __FUNCTION__, __LINE__, cs->file_desc, packet_types_str[this_packet_type]);
+
+  switch (this_packet_type)
   {
     case vContc:
       {
 	if (last_status.kind != TARGET_WAITKIND_EXITED)
 	  {
+	    /* reply to vContc with a status */
 	    strcpy (own_buffer, "?");
 	    handle_status (own_buffer);
 	    putpkt (own_buffer);
@@ -448,6 +471,7 @@ resolve_waiter (client_state *cs)
       {
 	if (last_status.kind != TARGET_WAITKIND_EXITED)
 	  {
+	    /* reply to vContc with a status */
 	    strcpy (own_buffer, "?");
 	    handle_status (own_buffer);
 	    putpkt (own_buffer);
@@ -456,18 +480,25 @@ resolve_waiter (client_state *cs)
       }
     case vRun:
       {
+	/* reply to vRun with an OK */
 	strcpy (own_buffer, "OK");
 	putpkt (own_buffer);
 	break;
       }
+    default:
+      break;
   };
 }
 
 
+/* Determine the state of client CS with respect to other clients connected to the same server process */
+
 int
 setup_multiplexing (client_state *cs, char *ch)
-{ /* Handle pending type */
+{
   client_state *csidx = NULL;
+
+  dump_client_state (__FUNCTION__);
 
   for (csidx = client_states.first; csidx != NULL; csidx = csidx->next)
     {
@@ -475,18 +506,29 @@ setup_multiplexing (client_state *cs, char *ch)
       if (csidx->file_desc != -1 && csidx != cs && cs->ss == csidx->ss)
 	{
 	  if (debug_threads)
-	    debug_printf ("%s:%d csidx %s %s cs %s %s\n", __FUNCTION__, __LINE__, pending_types_str[csidx->pending], packet_types_str[csidx->packet_type], pending_types_str[cs->pending], packet_types_str[cs->packet_type]);
-	  /* find this client's pending type */
+	    debug_printf ("%s:%d before csidx fd=%d %s %s cs fd=%d %s %s\n", __FUNCTION__, __LINE__, csidx->file_desc, pending_types_str[csidx->pending], packet_types_str[csidx->packet_type], cs->file_desc, pending_types_str[cs->pending], packet_types_str[cs->packet_type]);
+    	  /* found a client that has nothing pending */
 	  if (!csidx->pending)
 	    {
+	      int already_have_waitee = 0;
+	      client_state *csi;
+	      /* Does the client group have a waitee? */
+	      for (csi = client_states.first->next; csi != NULL; csi = csi->next)
+		{
+		  if (csi->ss == cs->ss && csi->pending == pending_waitee
+		      && csi->file_desc != cs->file_desc && csi->file_desc != csidx->file_desc)
+		    already_have_waitee = 1;
+		}
+
+	      /* The cs vContc will wait; found csidx will proceed */
 	      if (cs->packet_type == vContc)
 		{
 		  if (cs->last_packet_type != vRun)
 		    {
 		      cs->pending = pending_cont_waiter;
+ 		      if (1 || already_have_waitee)
 		      csidx->pending = pending_waitee;
 		    }
-
 		}
 	      else if (cs->packet_type == vConts)
 		{
@@ -497,14 +539,35 @@ setup_multiplexing (client_state *cs, char *ch)
 		    }
 		}
 	      if (debug_threads)
-		debug_printf ("%s:%d %d=%s %d=%s\n", __FUNCTION__, __LINE__,
-			      csidx->file_desc, pending_types_str[csidx->pending],
-			      cs->file_desc, pending_types_str[cs->pending]);
+		debug_printf ("%s:%d after csidx fd=%d %s %s cs fd=%d %s %s\n", __FUNCTION__, __LINE__, csidx->file_desc, pending_types_str[csidx->pending], packet_types_str[csidx->packet_type], cs->file_desc, pending_types_str[cs->pending], packet_types_str[cs->packet_type]);
+	    }
+	  /* Current client is continuing and found another waiter client */
+	  else if (csidx->pending == pending_cont_waiter
+		   && cs->packet_type == vContc)
+	    {
+	      client_state *csi;
+	      int waitee_count = 0;
+	      
+	      /* Does the client group have a waitee? */
+	      for (csi = client_states.first->next; csi != NULL; csi = csi->next)
+		{
+		  if (csi->ss == cs->ss && csi->pending == pending_waitee
+		      && csi->file_desc != cs->file_desc)
+		    waitee_count = 1;
+		}
+
+	      debug_printf ("%s:%d waitee_count=%d cs pending %s\n", __FUNCTION__, __LINE__, waitee_count, pending_types_str[cs->pending]);
+
+	      /* Don't want to deadlock on everyone waiting */
+	      if (cs->pending == pending_waitee && waitee_count > 0)
+		cs->pending = pending_cont_waiter;
 	    }
 	}
     }
-  if (debug_threads)
-    debug_printf ("%s:%d pending check %d %s\n", __FUNCTION__, __LINE__,cs->file_desc,pending_types_str[cs->pending]);
+  dump_client_state (__FUNCTION__);
+
+  /* Current client is continuing and waiting so just return.
+     The packet will be replied to later in do_multiplexing */
   if (cs->pending == pending_cont_waiter 
       || cs->pending == pending_step_waiter)
     {
@@ -515,26 +578,42 @@ setup_multiplexing (client_state *cs, char *ch)
 }
 
 
+/* Resolve the state of client WAITEE_CS with respect to other clients connected to the same server process */
+
 int
 do_multiplexing (client_state *waitee_cs, char ch)
 {
   client_state *csidx = NULL;
+  int make_waitee_a_waiter = 0;
 
   if (waitee_cs->packet_type != other_packet)
     waitee_cs->last_packet_type = waitee_cs->packet_type;
 
+  dump_client_state (__FUNCTION__);
+
+  /* Current client is a waitee that is continuing */
   if (! ((waitee_cs->packet_type == vContc
 	  || waitee_cs->packet_type == vConts)
 	 && waitee_cs->pending == pending_waitee))
+    {
+      if (debug_threads)
+	debug_printf ("%s:%d returning for waitee %d\n", __FUNCTION__, __LINE__, waitee_cs->file_desc);
       return 1;
-
+    }
+  
   for (csidx = client_states.first; csidx != NULL; csidx = csidx->next)
     {
       client_state *waiter_cs;
+      /* Insure another client is attached to the cs process */
+      if (csidx->file_desc == -1 || waitee_cs->ss != csidx->ss)
+	continue;
+      if (debug_threads)
+	debug_printf ("%s:%d before csidx fd=%d %s %s cs fd=%d %s %s\n", __FUNCTION__, __LINE__, csidx->file_desc, pending_types_str[csidx->pending], packet_types_str[csidx->packet_type], waitee_cs->file_desc, pending_types_str[waitee_cs->pending], packet_types_str[waitee_cs->packet_type]);
       if (csidx->pending == pending_cont_waiter)
 	{
-	  /* Has waitee/waiter been resolved? */
-	  if (csidx->packet_type == vContc)
+	  /* Found a vContc packet that is waiting */
+	  if (csidx->packet_type == vContc
+	      || csidx->last_packet_type == vContc)
 	    {
 	      char save_ch = ch;
 	      int waitee_has_bp, waiter_has_bp;
@@ -544,24 +623,28 @@ do_multiplexing (client_state *waitee_cs, char ch)
 		  waitee_has_bp = 1;
 		  waiter_has_bp = 1;
 		}
-	      else
+	      else		/* not exited */
 		{
+		  /* Does current client have a breakpoint at PC? */
 		  waitee_has_bp = has_client_breakpoint_at ((*the_target->read_pc)(get_thread_regcache (waitee_cs->ss->current_thread_, 1)));
 		  waiter_cs = set_client_state (csidx->file_desc);
+		  /* Does found client have a breakpoint at PC? */
 		  waiter_has_bp = has_client_breakpoint_at ((*the_target->read_pc)(get_thread_regcache (waiter_cs->ss->current_thread_, 1)));
 		  if (debug_threads)
 		    debug_printf ("%s:%d pc=%#lx waitee=%d has bp=%d waiter=%d has bp=%d\n", __FUNCTION__, __LINE__, (long unsigned)(*the_target->read_pc)(get_thread_regcache (waiter_cs->ss->current_thread_, 1)), waitee_cs->file_desc, waitee_has_bp, waiter_cs->file_desc, waiter_has_bp);
 		}
 	      if (waiter_has_bp)
 		{
-		  /* fake the reply to the waiter client */
+		  /* Belatedly reply to the waiter client */
 		  resolve_waiter (waiter_cs);
 		  if (waiter_cs->ss->last_status_.kind == TARGET_WAITKIND_EXITED)
-		    putpkt (waitee_cs->own_buffer_);	// Send the waitee W reply to vCont to the waiter
-		  csidx->pending = none_pending;
+		    /* Also send the waitee W reply to vCont to the waiter */
+		    putpkt (waitee_cs->own_buffer_);
 		  waitee_cs->pending = none_pending;
 		  if (!waitee_has_bp)
 		    waiter_cs->pending = pending_waitee;
+		  else
+		    waiter_cs->pending = none_pending;
 		}
 	      else if (debug_threads)
 		{
@@ -572,26 +655,32 @@ do_multiplexing (client_state *waitee_cs, char ch)
 		}
 	      ch = save_ch;
 	      waitee_cs = set_client_state (waitee_cs->file_desc);
+	      /* If the waitee did not reach the breakpoint then it needs to wait */
 	      if (!waitee_has_bp)
-		{
-		  waitee_cs->pending = pending_cont_waiter;
-		  return 0;
-		}
+		make_waitee_a_waiter = 1;
 	    }
-	}
-      else if (csidx->pending == pending_step_waiter)
-	{
-	  waiter_cs = set_client_state (csidx->file_desc);
-	  if (waitee_cs->packet_type == vConts
-	      || waitee_cs->packet_type == vContc)
+	  else if (csidx->pending == pending_step_waiter)
 	    {
-	      resolve_waiter (waiter_cs);
-	      waitee_cs->pending = csidx->pending = none_pending;
+	      waiter_cs = set_client_state (csidx->file_desc);
+	      if (waitee_cs->packet_type == vConts
+		  || waitee_cs->packet_type == vContc)
+		{
+		  resolve_waiter (waiter_cs);
+		  waitee_cs->pending = csidx->pending = none_pending;
+		}
+	      waitee_cs = set_client_state (waitee_cs->file_desc);
 	    }
-	  waitee_cs = set_client_state (waitee_cs->file_desc);
 	}
     }
-  return 1;
+  dump_client_state (__FUNCTION__);
+  if (make_waitee_a_waiter)
+    {
+      /* The packet will be replied to later in do_multiplexing */
+      waitee_cs->pending = pending_cont_waiter;
+      return 0;
+    }
+  else
+    return 1;
 }
 
 
@@ -4599,7 +4688,6 @@ process_serial_event (void)
 	      }
 	  }
 	else
-	  /* gdb removes breakpoints when we expect them so don't delete_client_breakpoint here */
 	  res = delete_gdb_breakpoint (type, addr, len);
 
 	if (res == 0)
