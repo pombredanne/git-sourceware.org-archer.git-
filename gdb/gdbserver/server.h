@@ -67,40 +67,10 @@ int vsnprintf(char *str, size_t size, const char *format, va_list ap);
 
 void initialize_low ();
 
-/* Public variables in server.c */
-
-extern ptid_t cont_thread;
-extern ptid_t general_thread;
-
-extern int server_waiting;
-extern int pass_signals[];
-extern int program_signals[];
-extern int program_signals_p;
-
 extern int disable_packet_vCont;
 extern int disable_packet_Tthread;
 extern int disable_packet_qC;
 extern int disable_packet_qfThreadInfo;
-
-extern int run_once;
-extern int multi_process;
-extern int report_fork_events;
-extern int report_vfork_events;
-extern int non_stop;
-extern int extended_protocol;
-
-/* True if the "swbreak+" feature is active.  In that case, GDB wants
-   us to report whether a trap is explained by a software breakpoint
-   and for the server to handle PC adjustment if necessary on this
-   target.  Only enabled if the target supports it.  */
-extern int swbreak_feature;
-
-/* True if the "hwbreak+" feature is active.  In that case, GDB wants
-   us to report whether a trap is explained by a hardware breakpoint.
-   Only enabled if the target supports it.  */
-extern int hwbreak_feature;
-
-extern int disable_randomization;
 
 #if USE_WIN32API
 #include <winsock2.h>
@@ -136,11 +106,11 @@ extern void discard_queued_stop_replies (ptid_t ptid);
 
 /* Description of the remote protocol state for the currently
    connected target.  This is per-target state, and independent of the
-   selected architecture.  The unions allow bypassing the access macros.\ */
+   selected architecture. */
 
 struct server_state
 {
-  int attach_count;
+  int attach_count_;
   /* From server.c */
   /* The thread set with an `Hc' packet.  `Hc' is deprecated in favor of
      `vCont'.  Note the multi-process extensions made `vCont' a
@@ -148,40 +118,31 @@ struct server_state
      CONT_THREAD can be null_ptid for no `Hc' thread, minus_one_ptid for
      resuming all threads of the process (again, `Hc' isn't used for
      multi-process), or a specific thread ptid_t.  */
-  ptid_t cont_thread;
+  ptid_t cont_thread_;
   /* The thread set with an `Hg' packet.  */
-  ptid_t general_thread;
+  ptid_t general_thread_;
   /* The PID of the originally created or attached inferior.  Used to
      send signals to the process when GDB sends us an asynchronous interrupt
      (user hitting Control-C in the client), and to wait for the child to exit
      when no longer debugging it.  */
 
-  unsigned long signal_pid;
+  unsigned long signal_pid_;
   /* Last status reported to GDB.  */
-  union {
-    struct target_waitstatus last_status;
-    struct target_waitstatus last_status_;
-  };
-  union {
-    ptid_t last_ptid;
-    ptid_t last_ptid_;
-  };
-  unsigned char *mem_buf;
+  struct target_waitstatus last_status_;
+  ptid_t last_ptid_;
+  unsigned char *mem_buf_;
 
   /* from remote-utils.c */
   /* Internal buffer used by readchar.
      These are global to readchar because reschedule_remote needs to be
      able to tell whether the buffer is empty.  */
-  unsigned char readchar_buf[BUFSIZ];
-  int readchar_bufcnt;
-  unsigned char *readchar_bufp;
+  unsigned char readchar_buf_[BUFSIZ];
+  int readchar_bufcnt_;
+  unsigned char *readchar_bufp_;
   /* from inferiors.c */
-  struct inferior_list all_processes;
-  struct inferior_list all_threads;
-  union {
-    struct thread_info *current_thread;
-    struct thread_info *current_thread_;
-  };
+  struct inferior_list all_processes_;
+  struct inferior_list all_threads_;
+  struct thread_info *current_thread_;
 };
 
 typedef struct server_state server_state;
@@ -198,46 +159,48 @@ typedef enum packet_types packet_types;
 struct client_state
 {
   gdb_fildes_t file_desc;
-  char *executable;
+  int attached_to_client;
   int packet_type;
   int last_packet_type;
   int pending;
 
   /* From server.c */
-  int server_waiting;
+  int server_waiting_;
 
-  int extended_protocol;
-  int response_needed;
-  union {
-    int exit_requested;
-    int exit_requested_;
-  };
+  int extended_protocol_;
+  int response_needed_;
+  int exit_requested_;
 
   /* --once: Exit after the first connection has closed.  */
-  int run_once;
+  int run_once_;
 
-  int multi_process;
-  int report_fork_events;
-  int report_vfork_events;
-  int non_stop;
-  int swbreak_feature;
-  int hwbreak_feature;
+  int multi_process_;
+  int report_fork_events_;
+  int report_vfork_events_;
+  int non_stop_;
+  /* True if the "swbreak+" feature is active.  In that case, GDB wants
+     us to report whether a trap is explained by a software breakpoint
+     and for the server to handle PC adjustment if necessary on this
+     target.  Only enabled if the target supports it.  */
+  int swbreak_feature_;
+  /* True if the "hwbreak+" feature is active.  In that case, GDB wants
+     us to report whether a trap is explained by a hardware breakpoint.
+     Only enabled if the target supports it.  */
+  int hwbreak_feature_;
 
   /* Whether we should attempt to disable the operating system's address
      space randomization feature before starting an inferior.  */
-  int disable_randomization;
+  int disable_randomization_;
 
-  char **program_argv, **wrapper_argv;
-  int packet_length;
+  char **program_argv_;
+  char **wrapper_argv_;
+  int packet_length_;
 
-  int pass_signals[GDB_SIGNAL_LAST];
-  int program_signals[GDB_SIGNAL_LAST];
-  int program_signals_p;
-  char *in_buffer;
-  union {
-    char *own_buffer;
-    char *own_buffer_;
-  };
+  int pass_signals_[GDB_SIGNAL_LAST];
+  int program_signals_[GDB_SIGNAL_LAST];
+  int program_signals_p_;
+  char *in_buffer_;
+  char *own_buffer_;
   struct client_breakpoint *client_breakpoints;
   server_state *ss;
   struct client_state *next;
@@ -257,35 +220,36 @@ client_state * set_client_state (gdb_fildes_t);
 int have_multiple_clients();
 void delete_client_state (gdb_fildes_t fd);
 
-#define cont_thread	(get_client_state()->ss->cont_thread)
-#define general_thread	(get_client_state()->ss->general_thread)
-#define signal_pid	(get_client_state()->ss->signal_pid)
-#define last_status	(get_client_state()->ss->last_status)
-#define last_ptid	(get_client_state()->ss->last_ptid)
-#define mem_buf		(get_client_state()->ss->mem_buf)
-#define readchar_buf	(get_client_state()->ss->readchar_buf)
-#define readchar_bufcnt	(get_client_state()->ss->readchar_bufcnt)
-#define readchar_bufp	(get_client_state()->ss->readchar_bufp)
-#define all_processes  	(get_client_state()->ss->all_processes)
-#define all_threads	(get_client_state()->ss->all_threads)
-#define current_thread   (get_client_state()->ss->current_thread)
-#define server_waiting	(get_client_state()->server_waiting)
-#define extended_protocol	(get_client_state()->extended_protocol)
-#define response_needed	(get_client_state()->response_needed)
-#define exit_requested	(get_client_state()->exit_requested)
-#define run_once	(get_client_state()->run_once)
-#define multi_process	(get_client_state()->multi_process)
-#define report_fork_events	(get_client_state()->report_fork_events)
-#define report_vfork_events	(get_client_state()->report_vfork_events)
-#define non_stop	(get_client_state()->non_stop)
-#define swbreak_feature	(get_client_state()->swbreak_feature)
-#define hwbreak_feature	(get_client_state()->hwbreak_feature)
-#define disable_randomization	(get_client_state()->disable_randomization)
-#define program_argv	(get_client_state()->program_argv)
-#define wrapper_argv	(get_client_state()->wrapper_argv)
-#define packet_length	(get_client_state()->packet_length)
-#define pass_signals	(get_client_state()->pass_signals)
-#define program_signals	(get_client_state()->program_signals)
-#define program_signals_p	(get_client_state()->program_signals_p)
-#define in_buffer	(get_client_state()->in_buffer)
-#define own_buffer	(get_client_state()->own_buffer)
+#define attach_count	(get_client_state()->ss->attach_count_)
+#define cont_thread	(get_client_state()->ss->cont_thread_)
+#define general_thread	(get_client_state()->ss->general_thread_)
+#define signal_pid	(get_client_state()->ss->signal_pid_)
+#define last_status	(get_client_state()->ss->last_status_)
+#define last_ptid	(get_client_state()->ss->last_ptid_)
+#define mem_buf		(get_client_state()->ss->mem_buf_)
+#define readchar_buf	(get_client_state()->ss->readchar_buf_)
+#define readchar_bufcnt	(get_client_state()->ss->readchar_bufcnt_)
+#define readchar_bufp	(get_client_state()->ss->readchar_bufp_)
+#define all_processes  	(get_client_state()->ss->all_processes_)
+#define all_threads	(get_client_state()->ss->all_threads_)
+#define current_thread   (get_client_state()->ss->current_thread_)
+#define server_waiting	(get_client_state()->server_waiting_)
+#define extended_protocol	(get_client_state()->extended_protocol_)
+#define response_needed	(get_client_state()->response_needed_)
+#define exit_requested	(get_client_state()->exit_requested_)
+#define run_once	(get_client_state()->run_once_)
+#define multi_process	(get_client_state()->multi_process_)
+#define report_fork_events	(get_client_state()->report_fork_events_)
+#define report_vfork_events	(get_client_state()->report_vfork_events_)
+#define non_stop	(get_client_state()->non_stop_)
+#define swbreak_feature	(get_client_state()->swbreak_feature_)
+#define hwbreak_feature	(get_client_state()->hwbreak_feature_)
+#define disable_randomization	(get_client_state()->disable_randomization_)
+#define program_argv	(get_client_state()->program_argv_)
+#define wrapper_argv	(get_client_state()->wrapper_argv_)
+#define packet_length	(get_client_state()->packet_length_)
+#define pass_signals	(get_client_state()->pass_signals_)
+#define program_signals	(get_client_state()->program_signals_)
+#define program_signals_p	(get_client_state()->program_signals_p_)
+#define in_buffer	(get_client_state()->in_buffer_)
+#define own_buffer	(get_client_state()->own_buffer_)

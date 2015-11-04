@@ -109,7 +109,7 @@ set_client_state (gdb_fildes_t fd)
  * fd =  F add client state for fd F
  */
 
-  client_state *csidx;
+  client_state *csidx, *cs;
 
   /* add/return initial client state */
   if (fd == -1)
@@ -142,36 +142,26 @@ set_client_state (gdb_fildes_t fd)
     }
 
   /* add client state S for fd F */
-  if (client_states.current_fd == -1 && client_states.current_cs->executable != NULL)
-    {
-      client_states.current_cs = XCNEW (client_state);
-      *client_states.current_cs = *client_states.first;
-    }
-  else
-    {
-      client_state *cs;
-      client_states.current_cs = XCNEW (client_state);
-      *client_states.current_cs = *csidx;
-      client_states.current_cs->ss = XCNEW (server_state);
-      *client_states.current_cs->ss = *csidx->ss;
-      cs = client_states.current_cs;
-      cs->packet_type = other_packet;
-      cs->executable = NULL;
-      cs->client_breakpoints = NULL;
-      in_buffer = NULL;
-      wrapper_argv = NULL;
-      get_client_state()->ss->attach_count = 0;
-      cont_thread = null_ptid;
-      general_thread = null_ptid;
-      signal_pid = 0;
-      last_ptid = null_ptid;
-      last_status.kind = TARGET_WAITKIND_IGNORE;
-      current_thread = NULL;
-      all_processes.head = NULL;
-      all_processes.tail = NULL;
-      all_threads.head = NULL;
-      all_threads.tail = NULL;
-    }
+  client_states.current_cs = XCNEW (client_state);
+  *client_states.current_cs = *csidx;
+  client_states.current_cs->ss = XCNEW (server_state);
+  *client_states.current_cs->ss = *csidx->ss;
+  cs = client_states.current_cs;
+  cs->packet_type = other_packet;
+  cs->client_breakpoints = NULL;
+  in_buffer = NULL;
+  wrapper_argv = NULL;
+  get_client_state()->ss->attach_count_ = 0;
+  cont_thread = null_ptid;
+  general_thread = null_ptid;
+  signal_pid = 0;
+  last_ptid = null_ptid;
+  last_status.kind = TARGET_WAITKIND_IGNORE;
+  current_thread = NULL;
+  all_processes.head = NULL;
+  all_processes.tail = NULL;
+  all_threads.head = NULL;
+  all_threads.tail = NULL;
   client_states.current_cs->file_desc = fd;
   own_buffer = xmalloc (PBUFSIZ + 1);
   client_states.current_fd = fd;
@@ -252,16 +242,13 @@ static void free_client_state (client_state *cs)
   client_state *csi;
   for (csi = client_states.first; csi != NULL; csi = csi->next)
     {
-      if (csi->executable && csi != cs && csi->ss == cs->ss)
+      if (ptid_equal (csi->ss->general_thread_, null_ptid) && csi != cs && csi->ss == cs->ss)
 	break;
     }
   delete_client_breakpoint (0);
   if (csi == NULL)
-    {
-      XDELETE (cs->ss);
-      if (get_client_state()->executable)
-	xfree (get_client_state()->executable);
-    }
+    XDELETE (cs->ss);
+  
   if (in_buffer)
     xfree (in_buffer);
   xfree (own_buffer);
@@ -280,19 +267,22 @@ dump_client_state (const char *comment)
   if (! debug_threads)
     return;
   
-  debug_printf ("Dumping client state from %s\n", comment);
-  
+  debug_printf ("***Begin Dumping client state from %s\n", comment);
   for (cs = client_states.first; cs != NULL; cs = cs->next)
     {
       client_states.current_cs = cs;
-      debug_printf ("%s %d cont_thr %#lx gen thr %#lx attached? %d\n",
-		    cs->executable, cs->file_desc, (long unsigned)cont_thread.pid,
-		    (long unsigned)general_thread.pid, cs->ss->attach_count);
-      debug_printf ("%d all procs %#lx all thrs %#lx curr thr %#lx %s/%s/%s\n",
-		    (int)last_ptid.pid, (unsigned long)all_processes.head,
-		    (unsigned long)all_threads.head, (unsigned long)current_thread,
-		    packet_types_str[cs->packet_type], packet_types_str[cs->last_packet_type], pending_types_str[cs->pending]);
+      debug_printf ("%d %#lx(%d)/%#lx/%#lx #=%d %s %s %s\n",
+		    cs->file_desc, 
+		    (long unsigned)general_thread.pid, 
+		    (int)general_thread.pid, 
+		    (long unsigned)cont_thread.pid,
+		    (long unsigned)last_ptid.pid, 
+		    cs->ss->attach_count_,
+		    packet_types_str[cs->packet_type], 
+		    packet_types_str[cs->last_packet_type], 
+		    pending_types_str[cs->pending]);
     }
+  debug_printf ("***End Dumping client state from %s\n", comment);
   client_states.current_cs = save_cs;
 }
 
@@ -307,42 +297,15 @@ add_client_by_pid (int pid)
 
   for (matched_cs = client_states.first; matched_cs != NULL; matched_cs = matched_cs->next)
     {
-      if (cs != matched_cs && matched_cs->ss->last_ptid_.pid == pid)
+      if (cs != matched_cs && matched_cs->ss->general_thread_.pid == pid)
 	{
-	  matched_cs->ss->attach_count += 1;
-	  xfree (cs->executable);
-	  cs->executable = matched_cs->executable;
 	  XDELETE (cs->ss);
 	  /* reuse the matched server state */
 	  cs->ss = matched_cs->ss;
-	  cs->ss->attach_count += 1;
+	  cs->ss->attach_count_ += 1;
 	  return cs;
 	}
     }
-  return NULL;
-}
-
-
-/* Add another client for EXECUTABLE to the 1 server -> N client list. */
-
-client_state *
-add_client_by_exe (char *executable)
-{
-  client_state *csi;
-  char *new_executable;
-  client_state *cs = get_client_state ();
-
-  dump_client_state(__FUNCTION__);
-
-  for (csi = client_states.first; csi != NULL; csi = csi->next)
-    {
-      if (csi->executable && strcmp (csi->executable, executable) == 0 && csi != cs)
-	  break;
-    }
-
-  new_executable = xmalloc (strlen (executable) + 1);
-  strcpy (new_executable, executable);
-  cs->executable = new_executable;
   return NULL;
 }
 
@@ -355,10 +318,8 @@ get_first_client_fd ()
   client_state *cs;
   for (cs = client_states.first; cs != NULL; cs = cs->next)
     {
-      if (cs->file_desc > 0 && cs->executable != NULL)
-	{
-	  return cs->file_desc;
-	}
+      if (cs->file_desc > 0 && cs->attached_to_client == 1)
+	return cs->file_desc;
     }
   return -1;
 }
@@ -367,16 +328,15 @@ get_first_client_fd ()
 /* Is there more than one active client? */
 
 int
-have_multiple_clients ()
+have_multiple_clients (gdb_fildes_t fd)
 {
   client_state *cs;
-  int n_client_states= 0;
+  dump_client_state(__FUNCTION__);
+
   for (cs = client_states.first; cs != NULL; cs = cs->next)
-    {
-      if (cs->file_desc > 0 && cs->executable != NULL)
-	n_client_states += 1;
-    }
-  return n_client_states > 1;
+    if (cs->file_desc == fd)
+      return (cs->ss->attach_count_ > 0);
+  return 0;
 }
 
 
@@ -408,7 +368,7 @@ delete_client_state (gdb_fildes_t fd)
     {
       if (cs->ss == ss)
 	{
-	  cs->ss->attach_count -= 1;
+	  cs->ss->attach_count_ -= 1;
 	  set_client_state (cs->file_desc);
 	}
     }
@@ -499,6 +459,8 @@ setup_multiplexing (client_state *cs, char *ch)
   client_state *csidx = NULL;
 
   dump_client_state (__FUNCTION__);
+
+  cs->attached_to_client = 1;
 
   for (csidx = client_states.first; csidx != NULL; csidx = csidx->next)
     {
@@ -776,8 +738,6 @@ start_inferior (char **argv)
 	debug_printf ("new_argv[%d] = \"%s\"\n", i, new_argv[i]);
       debug_flush ();
     }
-
-  add_client_by_exe (new_argv[0]);
 
 #ifdef SIGTTOU
   signal (SIGTTOU, SIG_DFL);
@@ -2034,6 +1994,11 @@ handle_qxfer_threads_worker (struct inferior_list_entry *inf, void *arg)
   int core = target_core_of_thread (ptid);
   char core_s[21];
 
+  // TODO an attached client does not know about multiple inferiors
+  if (ptid_get_pid (inf->id) != ptid_get_pid (general_thread)
+      && attach_count > 0)
+    return;
+
   write_ptid (ptid_s, ptid);
 
   if (core != -1)
@@ -2952,7 +2917,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	  return;
 	}
 
-      strcpy (own_buf, process->attached || get_client_state()->ss->attach_count ? "1" : "0");
+      strcpy (own_buf, process->attached || get_client_state()->ss->attach_count_ ? "1" : "0");
       return;
     }
 
@@ -3238,8 +3203,13 @@ handle_v_attach (char *own_buf)
   pid = strtol (own_buf + 8, NULL, 16);
   if (add_client_by_pid (pid))
     {
-      strcpy (own_buf, "?");
-      handle_status (own_buf);
+      if (! non_stop)
+	{
+	  strcpy (own_buf, "?");
+	  handle_status (own_buf);
+	}
+      else
+	write_ok (own_buf);
       return 1;
     }
   else if (pid != 0 && attach_inferior (pid) == 0)
@@ -4441,7 +4411,7 @@ process_serial_event (void)
 
       fprintf (stderr, "Detaching from process %d\n", pid);
       stop_tracing ();
-      if (cs->ss->attach_count > 0)
+      if (cs->ss->attach_count_ > 0)
 	write_ok (own_buffer);
       else if (detach_inferior (pid) != 0)
 	write_enn (own_buffer);
@@ -4452,7 +4422,7 @@ process_serial_event (void)
 
 	  if (extended_protocol)
 	    {
-	      if (cs->ss->attach_count == 0)
+	      if (cs->ss->attach_count_ == 0)
 		{
 		  /* Treat this like a normal program exit.  */
 		  last_status.kind = TARGET_WAITKIND_EXITED;

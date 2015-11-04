@@ -1,3 +1,16 @@
+2015-11-04  Stan Cox  <scox@redhat.com>
+
+	* server.h (client_state):  Remove executable and all its references.
+	Remove all extern dcls for items now in client_state.  Add _
+	suffix for those members.
+
+	* server.c (add_client_by_pid):  Use general_thread not last_ptid.
+	(add_client_by_exe):  Remove.
+	(have_multiple_clients):  Use attach_count.
+	(handle_qxfer_threads_worker):  Attached client is multiple
+	inferior agnostic.
+	(handle_v_attach):  Attach of non-stop multiple client should only ok.
+
 2015-10-06  Stan Cox  <scox@redhat.com>
 
 	* server.c (setup_multiplexing): Insure we always have a waitee.
