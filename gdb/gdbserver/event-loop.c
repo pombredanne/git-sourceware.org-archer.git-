@@ -428,7 +428,7 @@ handle_file_event (gdb_fildes_t event_file_desc)
 	  if (mask != 0)
 	    {
 	      /* Don't change client states if we have multiple clients */
-	      if (have_multiple_clients (file_ptr->fd) || ptid_equal (general_thread, null_ptid))
+	      if (have_multiple_clients (file_ptr->fd))
 		set_client_state (file_ptr->fd);
 	      if ((*file_ptr->proc) (file_ptr->error,
 				     file_ptr->client_data) < 0)

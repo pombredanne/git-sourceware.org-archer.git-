@@ -129,6 +129,8 @@ struct server_state
   unsigned long signal_pid_;
   /* Last status reported to GDB.  */
   struct target_waitstatus last_status_;
+  /* Was last status an exit status? (sticky if yes) */
+  int last_status_exited;
   ptid_t last_ptid_;
   unsigned char *mem_buf_;
 
@@ -153,8 +155,13 @@ struct client_breakpoint
   struct client_breakpoint *next;
 };
 
-enum packet_types { other_packet = 0, vContc = 1, vConts = 2, vRun = 3 };
+enum packet_types { other_packet, vContc, vConts, vContt, 
+		    vStopped, vRun, vAttach };
 typedef enum packet_types packet_types;
+
+enum exit_types { no_exit, have_exit, sent_exit };
+typedef enum exit_types exit_types;
+
 
 struct client_state
 {

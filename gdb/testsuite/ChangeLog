@@ -1,3 +1,7 @@
+2016-01-03  Stan Cox  <scox@redhat.com>
+
+	* gdb.server/multi-client.exp: Add non-stop test.
+
 2015-11-04    Stan Cox  <scox@redhat.com>
 
 	* gdb.server/multi-client.exp: New file.

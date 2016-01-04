@@ -1,3 +1,19 @@
+2016-01-03  Stan Cox  <scox@redhat.com>
+
+	* server.c (add_client_by_pid):  Add non_stop, multi_process_, and run_once_.
+	(have_multiple_clients): Add vCont;t and vStopped and vAttach.
+	(resolve_waiter): Add vContc, non_stop, and vContt
+	(setup_multiplexing): Add vContt and pending_stop for non_stop.
+	(notify_clients): New to send stop notification to multiple clients.
+	(do_multiplexing):  Call notify_clients.  Make vContt aware.
+	(handle_v_attach):  Make non_stop aware.
+
+	* server.h (last_status_exited, vContt, vStopped, vAttach)
+	(exit_types):  New.
+
+	* mem-break.c (has_client_breakpoint_at): Simplify.  Improve
+	debug_threads output.
+
 2015-11-04  Stan Cox  <scox@redhat.com>
 
 	* server.h (client_state):  Remove executable and all its references.

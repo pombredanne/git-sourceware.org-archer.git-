@@ -1,4 +1,4 @@
-# Copyright (C) 2015 Free Software Foundation, Inc.
+ # Copyright (C) 2015 Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -62,13 +62,13 @@ proc start_gdbserver { } {
     return $res
 }
 
-proc start_client1 { } {
+proc start_client { N ATTACH_FLAGS } {
     global test gdb_spawn_id GDB MULTI_GDBFLAGS
-    set res [remote_spawn host "$GDB $MULTI_GDBFLAGS [host_info gdb_opts]  -iex \"set prompt (client1 gdb) \""]
+    set res [remote_spawn host "$GDB $MULTI_GDBFLAGS $ATTACH_FLAGS [host_info gdb_opts] -iex \"set prompt (client $N gdb) \""]
     sleep 1
     set ok 0
     expect {
-	-i $res -re {client1 gdb} { incr ok }
+	-i $res -re {client . gdb} { incr ok }
     }
     if { $res < 0 || $res == "" } {
 	perror "$test Spawning $GDB failed."
@@ -76,15 +76,30 @@ proc start_client1 { } {
     }
     set gdb_spawn_id $res
     if { $ok == 1 } {
-	pass "$test gdb attach client 1"
+	pass "$test gdbserver attach client $N"
     } else {
-	fail "$test gdb attach client 1"
+	fail "$test gdbserver attach client $N"
     }
     if { $res < 0 || $res == "" } {
 	perror "$test Spawning $GDB failed."
 	return 1
     }
     return $res
+}
+
+proc get_target_pid { } {
+    global test
+    set target_pid -1
+    set res [remote_spawn host "pgrep wrapper"]
+    sleep 1
+    expect {
+	-i $res -re {[0-9][0-9]*} { set target_pid $expect_out(buffer) }
+    }
+    if { $target_pid < 0 } {
+	perror "$test Failed to get pid of target process. $expect_out(buffer)"
+	return 1
+    }
+    return $target_pid
 }
 
 
@@ -130,61 +145,18 @@ verbose "##### Run one process and attach to it"
 set gdb_server_spawn_id [start_gdbserver]
 set MULTI_GDBFLAGS "-iex \"file $testpath\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file $testpath\" --silent --data-directory=[file dirname $GDB]/data-directory"
 
-set gdb_client1_spawn_id [start_client1]
+set gdb_client1_spawn_id [start_client 1 ""]
 
 gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver b getenv"
 
 gdb_command 1 "run" "Breakpoint 1," "gdbserver hit b getenv"
 
+set target_pid [get_target_pid]
+
 # Now start a second client that attaches to the first client
-set target_pid -1
-set res [remote_spawn host "pgrep wrapper"]
-sleep 1
-expect {
-    -i $res -re {[0-9][0-9]*} { set target_pid $expect_out(buffer) }
-}
-if { $target_pid < 0 } {
-    perror "$test Failed to get pid of target process. $expect_out(buffer)"
-    return 1
-}
+set gdb_client2_spawn_id [start_client 2 "-iex \"attach $target_pid\""]
 
-set MULTI_ATTACH "-iex \"attach $target_pid\""
-set res [remote_spawn host "$GDB $MULTI_GDBFLAGS $MULTI_ATTACH [host_info gdb_opts] -iex \"set prompt (client2 gdb) \""]
-sleep 1
-set ok 0
-expect {
-    -i $res -re {client2 gdb} { incr ok }
-}
-if { $res < 0 || $res == "" } {
-    perror "$test Spawning $GDB failed."
-    return 1
-}
-set gdb_client2_spawn_id $res
-if { $ok == 1 } {
-    pass "$test gdb attach client 2"
-} else {
-    fail "$test gdb attach client 2"
-}
-
-set res [remote_spawn host "$GDB $MULTI_GDBFLAGS $MULTI_ATTACH [host_info gdb_opts]  -iex \"set prompt (client3 gdb) \""]
-if { $res < 0 || $res == "" } {
-    perror "$test Spawning $GDB failed."
-    return 1
-}
-set ok 0
-expect {
-    -i $res -re {client3 gdb} { incr ok }
-}
-if { $res < 0 || $res == "" } {
-    perror "$test Spawning $GDB failed."
-    return 1
-}
-set gdb_client3_spawn_id $res
-if { $ok == 1 } {
-    pass "$test gdb attach client 3"
-} else {
-    fail "$test gdb attach client 3"
-}
+set gdb_client3_spawn_id [start_client 3 "-iex \"attach $target_pid\""]
 
 gdb_command 2 "b marker" "Breakpoint 1 at" "gdbserver b marker"
 
@@ -196,7 +168,7 @@ gdb_command 3 "continue" "Continuing" "gdbserver continue client3"
 
 # Second client waits while we continue first client
 
-gdb_command 1 "dis 1" "" "disable breakpoint"
+gdb_command 1 "dis 1" "" "gdbserver disable breakpoint"
 
 gdb_command 1 "continue" "Continuing" "gdbserver continue client1"
 
@@ -214,9 +186,7 @@ if { $ok == 1 } {
 
 # Second client waits while we continue first client
 
-gdb_command 2 "dis 1" "" "disable breakpoint"
-
-# gdb_command 2 "info target" "Extended remote serial target in gdb-specific protocol:" "info target"
+gdb_command 2 "dis 1" "" "gdbserver disable breakpoint"
 
 gdb_command 2 "continue" "Continuing" "gdbserver continue client2"
 
@@ -232,26 +202,65 @@ if { $ok == 1 } {
     fail "$test gdbserver client exited"
 }
 
+# Test non-stop
+
 verbose "kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]"
 exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]
-
-# Test non-stop
 
 set gdb_server_spawn_id [start_gdbserver]
 set MULTI_GDBFLAGS "-iex \"set non-stop on\" $MULTI_GDBFLAGS"
 
-set gdb_client1_spawn_id [start_client1]
+set gdb_client1_spawn_id [start_client 1 ""]
 
-gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver b getenv"
+gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver non-stop b getenv"
 
-gdb_command 1 "run" "Breakpoint 1," "gdbserver hit b getenv"
+gdb_command 1 "run" "Breakpoint 1," "gdbserver non-stop hit b getenv"
+
+set target_pid [get_target_pid]
 
 gdb_command 1 "show non-stop" "non-stop mode is on" "query non-stop"
 
-gdb_command 1 "dis 1" "" "disable breakpoint"
+set MULTI_GDBFLAGS "-iex \"set non-stop on\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" --silent --data-directory=[file dirname $GDB]/data-directory"
 
-gdb_command 1 "continue" "Continuing" "gdbserver continue client1"
+set gdb_client2_spawn_id [start_client 2 "-iex \"attach $target_pid\""]
+
+gdb_command 2 "fra" "#0.* at getenv" "gdbserver non-stop Frame"
+
+gdb_command 2 "b marker" "Breakpoint 1 at" "gdbserver non-stop b marker"
+
+gdb_command 2 "continue" "Continuing" "gdbserver non-stop continue client2"
+
+gdb_command 1 "dis 1" "" "gdbserver non-stop disable breakpoint"
+
+gdb_command 1 "continue" "Continuing" "gdbserver non-stop continue client1"
+
+# The second client is back
+
+set ok 0
+expect {
+    -i $gdb_client2_spawn_id "Breakpoint 1, marker" { incr ok; }
+}
+if { $ok == 1 } {
+    pass "$test gdbserver non-stop hit b marker"
+} else {
+    fail "$test gdbserver non-stop hit b marker $expect_out(buffer)"
+}
+
+# Second client waits while we continue first client
+
+gdb_command 2 "dis 1" "" "gdbserver non-stop disable breakpoint"
+
+gdb_command 2 "continue" "Continuing" "gdbserver non-stop continue client2"
+
+set ok 0
+expect {
+    -i $gdb_client2_spawn_id "exited normally" { incr ok; }
+}
+if { $ok == 1 } {
+    pass "$test gdbserver client exited"
+} else {
+    fail "$test gdbserver client exited"
+}
 
 verbose "kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id]"
 exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id]
-

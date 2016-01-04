@@ -301,23 +301,25 @@ has_client_breakpoint_at (CORE_ADDR addr)
   client_state *cs = get_client_state ();
 
   struct client_breakpoint *cb;
-  if (debug_threads)
-    debug_printf ("%s:%d fd=%d addr=%#lx\n", __FUNCTION__, __LINE__, cs->file_desc, (long unsigned)addr);
-  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
-    if (debug_threads)
-      debug_printf ("%s:%d %d breakpoint at %#lx\n", __FUNCTION__, __LINE__, cs->file_desc, (long unsigned)cb->addr);
 
-  //  for (bp = proc->raw_breakpoints; bp != NULL; bp = bp->next)
+  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
     {
-      //      if (addr >= bp->pc && addr <= bp->pc + 8 && cs->ss->last_status.kind == TARGET_WAITKIND_STOPPED
-      //	  && cs->ss->last_status.value.sig == GDB_SIGNAL_TRAP)
-	  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
-	    // TODO improve this; pc might be one insn ahead of break. 
-	    {
-	      debug_printf ("%s:%d addr=%#lx pb->pc %#lx in range? %d\n", __FUNCTION__, __LINE__, (long unsigned) addr, (long unsigned)cb->addr, addr >= cb->addr && addr <= cb->addr + 8);
-	      if (addr >= cb->addr && addr <= cb->addr + 8)
-		return 1;
-	    }
+      // TODO improve this; pc might be one insn ahead of break. 
+      if (addr >= cb->addr && addr <= cb->addr + 8)
+	{
+	  if (debug_threads)
+	    debug_printf ("%s:%d fd=%d return true at %#lx\n", 
+			  __FUNCTION__, __LINE__, cs->file_desc, (long unsigned)cb->addr);
+	  return 1;
+	}
+    }
+
+  if (debug_threads)
+    {
+      debug_printf ("%s:%d fd=%d addr=%#lx breakpoints at:\n", __FUNCTION__, __LINE__, cs->file_desc, (long unsigned)addr);
+      for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
+	debug_printf (" %#lx", (long unsigned)cb->addr);
+      debug_printf ("\n");
     }
   return 0;
 }
