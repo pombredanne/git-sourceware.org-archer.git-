@@ -1,6 +1,6 @@
 /* Target-dependent code for the NEC V850 for GDB, the GNU debugger.
 
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1220,7 +1220,7 @@ v850_frame_cache (struct frame_info *this_frame, void **this_cache)
   int i;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct v850_frame_cache *) *this_cache;
 
   cache = v850_alloc_frame_cache (this_frame);
   *this_cache = cache;

@@ -1,5 +1,5 @@
 # Basic expect script for LD Regression Tests
-#   Copyright (C) 1993-2015 Free Software Foundation, Inc.
+#   Copyright (C) 1993-2016 Free Software Foundation, Inc.
 #
 # This file is part of the GNU Binutils.
 #
@@ -47,6 +47,10 @@ if ![info exists ar] then {
 
 if ![info exists strip] then {
     set strip [findfile $base_dir/../binutils/strip-new $base_dir/../binutils/strip-new [transform strip]]
+}
+
+if ![info exists size] then {
+    set size [findfile $base_dir/../binutils/size]
 }
 
 remote_exec host "mkdir -p tmpdir"

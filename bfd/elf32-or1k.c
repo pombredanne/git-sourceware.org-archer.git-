@@ -1,5 +1,5 @@
 /* Or1k-specific support for 32-bit ELF.
-   Copyright (C) 2001-2015 Free Software Foundation, Inc.
+   Copyright (C) 2001-2016 Free Software Foundation, Inc.
    Contributed for OR32 by Johan Rydberg, jrydberg@opencores.org
 
    PIC parts added by Stefan Kristiansson, stefan.kristiansson@saunalahti.fi,
@@ -199,7 +199,7 @@ static reloc_howto_type or1k_elf_howto_table[] =
          FALSE,                 /* partial_inplace */
          0,                     /* src_mask */
          0xffffffff,            /* dst_mask */
-         FALSE),                /* pcrel_offset */
+         TRUE),                 /* pcrel_offset */
 
   HOWTO (R_OR1K_16_PCREL,
          0,                     /* rightshift */
@@ -213,7 +213,7 @@ static reloc_howto_type or1k_elf_howto_table[] =
          FALSE,                 /* partial_inplace */
          0,                     /* src_mask */
          0xffff,                /* dst_mask */
-         FALSE),                /* pcrel_offset */
+         TRUE),                 /* pcrel_offset */
 
   HOWTO (R_OR1K_8_PCREL,
          0,                     /* rightshift */
@@ -227,7 +227,7 @@ static reloc_howto_type or1k_elf_howto_table[] =
          FALSE,                 /* partial_inplace */
          0,                     /* src_mask */
          0xff,                  /* dst_mask */
-         FALSE),                /* pcrel_offset */
+         TRUE),                 /* pcrel_offset */
 
    HOWTO (R_OR1K_GOTPC_HI16,    /* Type.  */
          16,                    /* Rightshift.  */
@@ -2447,7 +2447,7 @@ or1k_elf_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
   if (htab->root.dynamic_sections_created)
     {
       /* Set the contents of the .interp section to the interpreter.  */
-      if (bfd_link_executable (info))
+      if (bfd_link_executable (info) && !info->nointerp)
         {
           s = bfd_get_section_by_name (dynobj, ".interp");
           BFD_ASSERT (s != NULL);

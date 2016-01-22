@@ -1,5 +1,5 @@
 /*  MSP430-specific support for 32-bit ELF
-    Copyright (C) 2002-2015 Free Software Foundation, Inc.
+    Copyright (C) 2002-2016 Free Software Foundation, Inc.
     Contributed by Dmitry Diky <diwil@mail.ru>
 
     This file is part of BFD, the Binary File Descriptor library.
@@ -2628,5 +2628,8 @@ static const struct bfd_elf_special_section msp430_ti_elf_special_sections[] =
   { STRING_COMMA_LEN ("_TI_build_attrib"),  0, SHT_MSP430_ATTRIBUTES,  0 },
   { NULL, 0,                                0, 0,                      0 }
 };
+
+#undef  elf_backend_special_sections
+#define elf_backend_special_sections 		msp430_ti_elf_special_sections
 
 #include "elf32-target.h"

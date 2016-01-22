@@ -1,4 +1,4 @@
-/* Copyright (C) 1986-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1986-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -62,6 +62,11 @@ extern int non_stop;
    starting an inferior.  */
 extern int disable_randomization;
 
+/* Returns a unique identifier for the current stop.  This can be used
+   to tell whether a command has proceeded the inferior past the
+   current location.  */
+extern ULONGEST get_stop_id (void);
+
 /* Reverse execution.  */
 enum exec_direction_kind
   {
@@ -69,10 +74,8 @@ enum exec_direction_kind
     EXEC_REVERSE
   };
 
-/* The current execution direction.  This should only be set to enum
-   exec_direction_kind values.  It is only an int to make it
-   compatible with make_cleanup_restore_integer.  */
-extern int execution_direction;
+/* The current execution direction.  */
+extern enum exec_direction_kind execution_direction;
 
 extern void start_remote (int from_tty);
 
@@ -100,10 +103,20 @@ extern ptid_t user_visible_resume_ptid (int step);
 
 extern void wait_for_inferior (void);
 
-extern void normal_stop (void);
+/* Return control to GDB when the inferior stops for real.  Print
+   appropriate messages, remove breakpoints, give terminal our modes,
+   and run the stop hook.  Returns true if the stop hook proceeded the
+   target, false otherwise.  */
+extern int normal_stop (void);
 
 extern void get_last_target_status (ptid_t *ptid,
 				    struct target_waitstatus *status);
+
+extern void set_last_target_status (ptid_t ptid,
+				    struct target_waitstatus status);
+
+/* Stop all threads.  Only returns after everything is halted.  */
+extern void stop_all_threads (void);
 
 extern void prepare_for_detach (void);
 

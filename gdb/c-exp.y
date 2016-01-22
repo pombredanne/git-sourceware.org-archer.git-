@@ -1,5 +1,5 @@
 /* YACC parser for C expressions, for GDB.
-   Copyright (C) 1986-2015 Free Software Foundation, Inc.
+   Copyright (C) 1986-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -839,7 +839,7 @@ string_exp:
 
 			  vec->type = $1.type;
 			  vec->length = $1.length;
-			  vec->ptr = malloc ($1.length + 1);
+			  vec->ptr = (char *) malloc ($1.length + 1);
 			  memcpy (vec->ptr, $1.ptr, $1.length + 1);
 			}
 
@@ -849,10 +849,10 @@ string_exp:
 			     for convenience.  */
 			  char *p;
 			  ++$$.len;
-			  $$.tokens = realloc ($$.tokens,
-					       $$.len * sizeof (struct typed_stoken));
+			  $$.tokens = XRESIZEVEC (struct typed_stoken,
+						  $$.tokens, $$.len);
 
-			  p = malloc ($2.length + 1);
+			  p = (char *) malloc ($2.length + 1);
 			  memcpy (p, $2.ptr, $2.length + 1);
 
 			  $$.tokens[$$.len - 1].type = $2.type;
@@ -864,7 +864,7 @@ string_exp:
 exp	:	string_exp
 			{
 			  int i;
-			  enum c_string_type type = C_STRING;
+			  c_string_type type = C_STRING;
 
 			  for (i = 0; i < $1.len; ++i)
 			    {
@@ -878,7 +878,7 @@ exp	:	string_exp
 				  if (type != C_STRING
 				      && type != $1.tokens[i].type)
 				    error (_("Undefined string concatenation."));
-				  type = (enum c_string_type) $1.tokens[i].type;
+				  type = (enum c_string_type_values) $1.tokens[i].type;
 				  break;
 				default:
 				  /* internal error */
@@ -1006,7 +1006,7 @@ qualified_name:	TYPENAME COLONCOLON name
 			  if (!type_aggregate_p (type))
 			    error (_("`%s' is not defined as an aggregate type."),
 				   TYPE_SAFE_NAME (type));
-			  buf = alloca ($4.length + 2);
+			  buf = (char *) alloca ($4.length + 2);
 			  tmp_token.ptr = buf;
 			  tmp_token.length = $4.length + 1;
 			  buf[0] = '~';
@@ -1664,7 +1664,7 @@ name_not_typename :	NAME
 static void
 write_destructor_name (struct parser_state *par_state, struct stoken token)
 {
-  char *copy = alloca (token.length + 1);
+  char *copy = (char *) alloca (token.length + 1);
 
   copy[0] = '~';
   memcpy (&copy[1], token.ptr, token.length);
@@ -1686,7 +1686,7 @@ operator_stoken (const char *op)
   char *buf;
 
   st.length = strlen (operator_string) + strlen (op);
-  buf = malloc (st.length + 1);
+  buf = (char *) malloc (st.length + 1);
   strcpy (buf, operator_string);
   strcat (buf, op);
   st.ptr = buf;
@@ -1771,7 +1771,7 @@ parse_number (struct parser_state *par_state,
   struct type *unsigned_type;
   char *p;
 
-  p = alloca (len);
+  p = (char *) alloca (len);
   memcpy (p, buf, len);
 
   if (parsed_float)
@@ -2164,7 +2164,7 @@ parse_string_or_char (const char *tokptr, const char **outptr,
 		      struct typed_stoken *value, int *host_chars)
 {
   int quote;
-  enum c_string_type type;
+  c_string_type type;
   int is_objc = 0;
 
   /* Build the gdb internal form of the input string in tempbuf.  Note
@@ -2247,7 +2247,7 @@ parse_string_or_char (const char *tokptr, const char **outptr,
   ++tokptr;
 
   value->type = type;
-  value->ptr = obstack_base (&tempbuf);
+  value->ptr = (char *) obstack_base (&tempbuf);
   value->length = obstack_object_size (&tempbuf);
 
   *outptr = tokptr;
@@ -2257,7 +2257,7 @@ parse_string_or_char (const char *tokptr, const char **outptr,
 
 /* This is used to associate some attributes with a token.  */
 
-enum token_flags
+enum token_flag
 {
   /* If this bit is set, the token is C++-only.  */
 
@@ -2269,13 +2269,14 @@ enum token_flags
 
   FLAG_SHADOW = 2
 };
+DEF_ENUM_FLAGS_TYPE (enum token_flag, token_flags);
 
 struct token
 {
   char *oper;
   int token;
   enum exp_opcode opcode;
-  enum token_flags flags;
+  token_flags flags;
 };
 
 static const struct token tokentab3[] =
@@ -2399,7 +2400,8 @@ scan_macro_expansion (char *expansion)
 
   /* Copy to the obstack, and then free the intermediate
      expansion.  */
-  copy = obstack_copy0 (&expansion_obstack, expansion, strlen (expansion));
+  copy = (char *) obstack_copy0 (&expansion_obstack, expansion,
+				 strlen (expansion));
   xfree (expansion);
 
   /* Save the old lexptr value, so we can return to it when we're done
@@ -3171,7 +3173,7 @@ yylex (void)
 	  obstack_grow (&name_obstack, next->value.sval.ptr,
 			next->value.sval.length);
 
-	  yylval.sval.ptr = obstack_base (&name_obstack);
+	  yylval.sval.ptr = (const char *) obstack_base (&name_obstack);
 	  yylval.sval.length = obstack_object_size (&name_obstack);
 	  current.value = yylval;
 	  current.token = classification;
@@ -3196,9 +3198,10 @@ yylex (void)
      the FIFO, and delete the other constituent tokens.  */
   if (checkpoint > 0)
     {
-      current.value.sval.ptr = obstack_copy0 (&expansion_obstack,
-					      current.value.sval.ptr,
-					      current.value.sval.length);
+      current.value.sval.ptr
+	= (const char *) obstack_copy0 (&expansion_obstack,
+					current.value.sval.ptr,
+					current.value.sval.length);
 
       VEC_replace (token_and_value, token_fifo, 0, &current);
       if (checkpoint > 1)
@@ -3278,7 +3281,7 @@ c_print_token (FILE *file, int type, YYSTYPE value)
     case CHAR:
     case STRING:
       {
-	char *copy = alloca (value.tsval.length + 1);
+	char *copy = (char *) alloca (value.tsval.length + 1);
 
 	memcpy (copy, value.tsval.ptr, value.tsval.length);
 	copy[value.tsval.length] = '\0';

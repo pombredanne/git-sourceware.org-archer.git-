@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl
-dnl   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+dnl   Copyright (C) 2012-2016 Free Software Foundation, Inc.
 dnl
 dnl This file is free software; you can redistribute it and/or modify
 dnl it under the terms of the GNU General Public License as published by
@@ -428,7 +428,7 @@ changequote([,])dnl
 	COREFILE=lynx-core.lo
 	;;
 changequote(,)dnl
-  rs6000-*-aix[5-9].* | powerpc-*-aix[5-9].*)
+  rs6000-*-aix[5-9].* | powerpc-*-aix[5-9].* | powerpc64-*-aix[5-9].*)
 changequote([,])dnl
         COREFILE=rs6000-core.lo
 	COREFLAG="$COREFLAG -DAIX_5_CORE -DAIX_CORE_DUMPX_CORE"
@@ -447,6 +447,7 @@ changequote([,])dnl
 	;;
   rs6000-*-aix4*)	COREFILE=rs6000-core.lo ;;
   rs6000-*-*)		COREFILE=rs6000-core.lo ;;
+  powerpc64-*-aix*)	COREFILE=rs6000-core.lo ;;
   powerpc-*-aix4*)	COREFILE=rs6000-core.lo ;;
   powerpc-*-aix*)	COREFILE=rs6000-core.lo ;;
   powerpc-*-beos*)	;;
@@ -694,8 +695,11 @@ do
     # use one entry per line, even though this leads to long lines.
     aarch64_elf32_be_vec)	 tb="$tb elf32-aarch64.lo elfxx-aarch64.lo elf-ifunc.lo elf32.lo $elf"; target_size=64 ;;
     aarch64_elf32_le_vec)	 tb="$tb elf32-aarch64.lo elfxx-aarch64.lo elf-ifunc.lo elf32.lo $elf"; target_size=64 ;;
-    aarch64_elf64_be_vec)	 tb="$tb elf64-aarch64.lo elfxx-aarch64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
-    aarch64_elf64_le_vec)	 tb="$tb elf64-aarch64.lo elfxx-aarch64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
+    aarch64_elf64_be_vec)	   tb="$tb elf64-aarch64.lo elfxx-aarch64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
+    aarch64_elf64_be_cloudabi_vec) tb="$tb elf64-aarch64.lo elfxx-aarch64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
+    aarch64_elf64_le_vec)	   tb="$tb elf64-aarch64.lo elfxx-aarch64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
+    aarch64_elf64_le_cloudabi_vec) tb="$tb elf64-aarch64.lo elfxx-aarch64.lo elf-ifunc.lo elf64.lo $elf"; target_size=64 ;;
+    aarch64_mach_o_vec)		 tb="$tb mach-o-aarch64.lo"; target_size=64 ;;
     alpha_ecoff_le_vec)		 tb="$tb coff-alpha.lo ecoff.lo $ecoff"; target_size=64 ;;
     alpha_elf64_vec)		 tb="$tb elf64-alpha.lo elf64.lo $elf"; target_size=64 ;;
     alpha_elf64_fbsd_vec)	 tb="$tb elf64-alpha.lo elf64.lo $elf"; target_size=64 ;;
@@ -735,6 +739,7 @@ do
     arm_pei_epoc_le_vec)	 tb="$tb epoc-pei-arm.lo peigen.lo $coff" ;;
     arm_pei_wince_be_vec)	 tb="$tb pei-arm-wince.lo pei-arm.lo peigen.lo $coff" ;;
     arm_pei_wince_le_vec)	 tb="$tb pei-arm-wince.lo pei-arm.lo peigen.lo $coff" ;;
+    arm_mach_o_vec)		 tb="$tb mach-o-arm.lo" ;;
     avr_elf32_vec)		 tb="$tb elf32-avr.lo elf32.lo $elf" ;;
     bfin_elf32_vec)		 tb="$tb elf32-bfin.lo elf32.lo $elf" ;;
     bfin_elf32_fdpic_vec)	 tb="$tb elf32-bfin.lo elf32.lo $elf" ;;

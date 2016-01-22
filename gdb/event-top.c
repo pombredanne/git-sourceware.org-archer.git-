@@ -1,6 +1,6 @@
 /* Top level stuff for GDB, the GNU debugger.
 
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2016 Free Software Foundation, Inc.
 
    Written by Elena Zannoni <ezannoni@cygnus.com> of Cygnus Solutions.
 
@@ -397,7 +397,7 @@ top_level_prompt (void)
     }
 
   prompt_length = strlen (prefix) + strlen (prompt) + strlen (suffix);
-  composed_prompt = xmalloc (prompt_length + 1);
+  composed_prompt = (char *) xmalloc (prompt_length + 1);
 
   strcpy (composed_prompt, prefix);
   strcat (composed_prompt, prompt);
@@ -469,11 +469,10 @@ async_disable_stdin (void)
 static void
 command_handler (char *command)
 {
-  int stdin_is_tty = ISATTY (stdin);
   struct cleanup *stat_chain;
 
   clear_quit_flag ();
-  if (instream == stdin && stdin_is_tty)
+  if (instream == stdin)
     reinitialize_more_filter ();
 
   /* If readline returned a NULL command, it means that the connection
@@ -681,7 +680,8 @@ command_line_handler (char *rl)
     {
       if (linelength > saved_command_line_size)
 	{
-	  saved_command_line = xrealloc (saved_command_line, linelength);
+	  saved_command_line
+	    = (char *) xrealloc (saved_command_line, linelength);
 	  saved_command_line_size = linelength;
 	}
       strcpy (saved_command_line, linebuffer);

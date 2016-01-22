@@ -1,6 +1,6 @@
 /* Output generating routines for GDB.
 
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2016 Free Software Foundation, Inc.
 
    Contributed by Cygnus Solutions.
    Written by Fernando Nasser for Cygnus.
@@ -360,7 +360,7 @@ and before table_body."));
 static void
 do_cleanup_table_end (void *data)
 {
-  struct ui_out *ui_out = data;
+  struct ui_out *ui_out = (struct ui_out *) data;
 
   ui_out_table_end (ui_out);
 }
@@ -429,7 +429,8 @@ struct ui_out_end_cleanup_data
 static void
 do_cleanup_end (void *data)
 {
-  struct ui_out_end_cleanup_data *end_cleanup_data = data;
+  struct ui_out_end_cleanup_data *end_cleanup_data
+    = (struct ui_out_end_cleanup_data *) data;
 
   ui_out_end (end_cleanup_data->uiout, end_cleanup_data->type);
   xfree (end_cleanup_data);

@@ -1,6 +1,6 @@
 /* TUI support I/O functions.
 
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2016 Free Software Foundation, Inc.
 
    Contributed by Hewlett-Packard Company.
 
@@ -203,7 +203,7 @@ tui_redisplay_readline (void)
   int c_line;
   int in;
   WINDOW *w;
-  char *prompt;
+  const char *prompt;
   int start_line;
 
   /* Detect when we temporarily left SingleKey and now the readline
@@ -671,7 +671,7 @@ tui_expand_tabs (const char *string, int col)
     }
 
   /* Allocate the copy.  */
-  ret = q = xmalloc (strlen (string) + n_adjust + 1);
+  ret = q = (char *) xmalloc (strlen (string) + n_adjust + 1);
 
   /* 2. Copy the original string while replacing TABs with spaces.  */
   for (ncol = col, s = string; s; )

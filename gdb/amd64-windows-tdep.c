@@ -1,4 +1,4 @@
-/* Copyright (C) 2009-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2009-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -488,6 +488,7 @@ amd64_windows_frame_decode_epilogue (struct frame_info *this_frame,
 
 	  cache->prev_reg_addr[amd64_windows_w2gdb_regnum[reg]] = cur_sp;
 	  cur_sp += 8;
+	  pc += rex ? 2 : 1;
 	}
       else
 	break;
@@ -1025,7 +1026,7 @@ amd64_windows_frame_cache (struct frame_info *this_frame, void **this_cache)
   CORE_ADDR unwind_info = 0;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct amd64_windows_frame_cache *) *this_cache;
 
   cache = FRAME_OBSTACK_ZALLOC (struct amd64_windows_frame_cache);
   *this_cache = cache;

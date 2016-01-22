@@ -1,5 +1,5 @@
 # Expect script for ld-i386 tests
-#   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+#   Copyright (C) 2002-2016 Free Software Foundation, Inc.
 #
 # This file is part of the GNU Binutils.
 #
@@ -293,6 +293,32 @@ run_dump_test "lea1e"
 run_dump_test "lea1f"
 run_dump_test "mov1a"
 run_dump_test "mov1b"
+run_dump_test "mov2a"
+run_dump_test "mov2b"
+run_dump_test "mov3"
+run_dump_test "branch1"
+run_dump_test "call1"
+run_dump_test "call2"
+run_dump_test "call3a"
+run_dump_test "call3b"
+run_dump_test "call3c"
+run_dump_test "call3d"
+run_dump_test "call3e"
+run_dump_test "call3f"
+run_dump_test "call3g"
+run_dump_test "call3h"
+run_dump_test "jmp1"
+run_dump_test "jmp2"
+run_dump_test "load1"
+run_dump_test "load1-nacl"
+run_dump_test "load2"
+run_dump_test "load3"
+run_dump_test "load4a"
+run_dump_test "load4b"
+run_dump_test "load5a"
+run_dump_test "load5b"
+run_dump_test "load6"
+run_dump_test "pr19175"
 
 if { !([istarget "i?86-*-linux*"]
        || [istarget "i?86-*-gnu*"]
@@ -490,6 +516,46 @@ if { [isnative]
 	    {{readelf {-Wrd} pr18900b.rd}} \
 	    "pr18900b" \
 	] \
+	[list \
+	    "Build pr19031.so" \
+	    "-shared" \
+	    "-fPIC" \
+	    { pr19031a.c } \
+	    "" \
+	    "pr19031.so" \
+	] \
+	[list \
+	    "Build got1d.so" \
+	    "-shared" \
+	    "" \
+	    { got1d.S } \
+	    "" \
+	    "got1d.so" \
+	] \
+	[list \
+	    "Build gotpc1" \
+	    "tmpdir/got1d.so" \
+	    "" \
+	    { got1a.S got1b.c got1c.c } \
+	    {{objdump {-dw} got1.dd}} \
+	    "got1" \
+	] \
+	[list \
+	    "Build pr19319.so" \
+	    "-shared" \
+	    "" \
+	    { pr19319a.S } \
+	    "" \
+	    "pr19319.so" \
+	] \
+	[list \
+	    "Build pr19319" \
+	    "-pie -nostdlib -nostartfiles tmpdir/pr19319.so" \
+	    "" \
+	    { pr19319b.S } \
+	    {{objdump {-dw} pr19319.dd}} \
+	    "pr19319" \
+	] \
     ]
 
     run_ld_link_exec_tests [] [list \
@@ -551,6 +617,22 @@ if { [isnative]
 	    { pr18900b.c pr18900c.c } \
 	    "pr18900" \
 	    "pr18900.out" \
+	] \
+	[list \
+	    "Run pr19031" \
+	    "tmpdir/pr19031.so" \
+	    "" \
+	    { pr19031b.S pr19031c.c } \
+	    "pr19031" \
+	    "pr19031.out" \
+	] \
+	[list \
+	    "Run got1" \
+	    "tmpdir/got1d.so" \
+	    "" \
+	    { got1a.S got1b.c got1c.c } \
+	    "got1" \
+	    "got1.out" \
 	] \
     ]
 }

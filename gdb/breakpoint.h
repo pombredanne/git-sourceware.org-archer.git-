@@ -1,5 +1,5 @@
 /* Data structures associated with breakpoints in GDB.
-   Copyright (C) 1992-2015 Free Software Foundation, Inc.
+   Copyright (C) 1992-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1146,6 +1146,11 @@ extern int program_breakpoint_here_p (struct gdbarch *gdbarch, CORE_ADDR address
 extern enum breakpoint_here breakpoint_here_p (struct address_space *, 
 					       CORE_ADDR);
 
+/* Return true if an enabled breakpoint exists in the range defined by
+   ADDR and LEN, in ASPACE.  */
+extern int breakpoint_in_range_p (struct address_space *aspace,
+				  CORE_ADDR addr, ULONGEST len);
+
 extern int moribund_breakpoint_here_p (struct address_space *, CORE_ADDR);
 
 extern int breakpoint_inserted_here_p (struct address_space *, CORE_ADDR);
@@ -1492,8 +1497,6 @@ extern void remove_solib_event_breakpoints (void);
 /* Mark solib event breakpoints of the current program space with
    delete at next stop disposition.  */
 extern void remove_solib_event_breakpoints_at_next_stop (void);
-
-extern void remove_thread_event_breakpoints (void);
 
 extern void disable_breakpoints_in_shlibs (void);
 

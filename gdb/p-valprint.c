@@ -1,6 +1,6 @@
 /* Support for printing Pascal values for GDB, the GNU debugger.
 
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -203,11 +203,11 @@ pascal_val_print (struct type *type, const gdb_byte *valaddr,
 	  && addr != 0)
 	{
 	  ULONGEST string_length;
-	  void *buffer;
+	  gdb_byte *buffer;
 
 	  if (want_space)
 	    fputs_filtered (" ", stream);
-	  buffer = xmalloc (length_size);
+	  buffer = (gdb_byte *) xmalloc (length_size);
 	  read_memory (addr + length_pos, buffer, length_size);
 	  string_length = extract_unsigned_integer (buffer, length_size,
 						    byte_order);
@@ -535,7 +535,8 @@ pascal_object_print_value_fields (struct type *type, const gdb_byte *valaddr,
 				  int dont_print_statmem)
 {
   int i, len, n_baseclasses;
-  char *last_dont_print = obstack_next_free (&dont_print_statmem_obstack);
+  char *last_dont_print
+    = (char *) obstack_next_free (&dont_print_statmem_obstack);
 
   type = check_typedef (type);
 
@@ -768,7 +769,7 @@ pascal_object_print_value (struct type *type, const gdb_byte *valaddr,
 	      gdb_byte *buf;
 	      struct cleanup *back_to;
 
-	      buf = xmalloc (TYPE_LENGTH (baseclass));
+	      buf = (gdb_byte *) xmalloc (TYPE_LENGTH (baseclass));
 	      back_to = make_cleanup (xfree, buf);
 
 	      base_valaddr = buf;

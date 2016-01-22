@@ -1,6 +1,6 @@
 /* GNU/Linux/x86-64 specific low level interface, for the remote server
    for GDB.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -463,7 +463,7 @@ static struct regset_info x86_regsets[] =
     FP_REGS,
     x86_fill_fpregset, x86_store_fpregset },
 #endif /* HAVE_PTRACE_GETREGS */
-  { 0, 0, 0, -1, -1, NULL, NULL }
+  NULL_REGSET
 };
 
 static CORE_ADDR
@@ -502,7 +502,7 @@ x86_set_pc (struct regcache *regcache, CORE_ADDR pc)
     }
 }
 
-static const unsigned char x86_breakpoint[] = { 0xCC };
+static const gdb_byte x86_breakpoint[] = { 0xCC };
 #define x86_breakpoint_len 1
 
 static int
@@ -1356,29 +1356,35 @@ x86_linux_update_xmltarget (void)
    PTRACE_GETREGSET.  */
 
 static void
-x86_linux_process_qsupported (const char *query)
+x86_linux_process_qsupported (char **features, int count)
 {
+  int i;
+
   /* Return if gdb doesn't support XML.  If gdb sends "xmlRegisters="
      with "i386" in qSupported query, it supports x86 XML target
      descriptions.  */
   use_xml = 0;
-  if (query != NULL && startswith (query, "xmlRegisters="))
+  for (i = 0; i < count; i++)
     {
-      char *copy = xstrdup (query + 13);
-      char *p;
+      const char *feature = features[i];
 
-      for (p = strtok (copy, ","); p != NULL; p = strtok (NULL, ","))
+      if (startswith (feature, "xmlRegisters="))
 	{
-	  if (strcmp (p, "i386") == 0)
+	  char *copy = xstrdup (feature + 13);
+	  char *p;
+
+	  for (p = strtok (copy, ","); p != NULL; p = strtok (NULL, ","))
 	    {
-	      use_xml = 1;
-	      break;
+	      if (strcmp (p, "i386") == 0)
+		{
+		  use_xml = 1;
+		  break;
+		}
 	    }
-	} 
 
-      free (copy);
+	  free (copy);
+	}
     }
-
   x86_linux_update_xmltarget ();
 }
 
@@ -1430,6 +1436,31 @@ static void
 x86_arch_setup (void)
 {
   current_process ()->tdesc = x86_linux_read_description ();
+}
+
+/* Fill *SYSNO and *SYSRET with the syscall nr trapped and the syscall return
+   code.  This should only be called if LWP got a SYSCALL_SIGTRAP.  */
+
+static void
+x86_get_syscall_trapinfo (struct regcache *regcache, int *sysno, int *sysret)
+{
+  int use_64bit = register_size (regcache->tdesc, 0) == 8;
+
+  if (use_64bit)
+    {
+      long l_sysno;
+      long l_sysret;
+
+      collect_register_by_name (regcache, "orig_rax", &l_sysno);
+      collect_register_by_name (regcache, "rax", &l_sysret);
+      *sysno = (int) l_sysno;
+      *sysret = (int) l_sysret;
+    }
+  else
+    {
+      collect_register_by_name (regcache, "orig_eax", sysno);
+      collect_register_by_name (regcache, "eax", sysret);
+    }
 }
 
 static int
@@ -3243,8 +3274,26 @@ x86_emit_ops (void)
     return &i386_emit_ops;
 }
 
+/* Implementation of linux_target_ops method "sw_breakpoint_from_kind".  */
+
+static const gdb_byte *
+x86_sw_breakpoint_from_kind (int kind, int *size)
+{
+  *size = x86_breakpoint_len;
+  return x86_breakpoint;
+}
+
 static int
 x86_supports_range_stepping (void)
+{
+  return 1;
+}
+
+/* Implementation of linux_target_ops method "supports_hardware_single_step".
+ */
+
+static int
+x86_supports_hardware_single_step (void)
 {
   return 1;
 }
@@ -3261,8 +3310,8 @@ struct linux_target_ops the_low_target =
   NULL, /* fetch_register */
   x86_get_pc,
   x86_set_pc,
-  x86_breakpoint,
-  x86_breakpoint_len,
+  NULL, /* breakpoint_kind_from_pc */
+  x86_sw_breakpoint_from_kind,
   NULL,
   1,
   x86_breakpoint_at,
@@ -3289,6 +3338,9 @@ struct linux_target_ops the_low_target =
   x86_emit_ops,
   x86_get_min_fast_tracepoint_insn_len,
   x86_supports_range_stepping,
+  NULL, /* breakpoint_kind_from_current_state */
+  x86_supports_hardware_single_step,
+  x86_get_syscall_trapinfo,
 };
 
 void

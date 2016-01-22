@@ -1,5 +1,5 @@
 /* Main code for remote server for GDB.
-   Copyright (C) 1989-2015 Free Software Foundation, Inc.
+   Copyright (C) 1989-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -318,7 +318,7 @@ add_client_by_pid (int pid)
 /* Return the first active client state */
 
 gdb_fildes_t
-get_first_client_fd ()
+get_first_client_fd (void)
 {
   client_state *cs;
   for (cs = client_states.first; cs != NULL; cs = cs->next)
@@ -660,7 +660,7 @@ do_multiplexing (client_state *waitee_cs, char ch)
 
   for (csidx = client_states.first; csidx != NULL; csidx = csidx->next)
     {
-      client_state *waiter_cs;
+      client_state *waiter_cs = NULL;
       /* Insure another client is attached to the cs process */
       if (csidx->file_desc == -1 || waitee_cs->ss != csidx->ss)
 	continue;
@@ -672,7 +672,7 @@ do_multiplexing (client_state *waitee_cs, char ch)
 	      || csidx->last_packet_type == vContt) // TODO
 	    {
 	      char save_ch = ch;
-	      int waitee_has_bp, waiter_has_bp;
+	      int waitee_has_bp = 0, waiter_has_bp = 0;
 
 	      prepare_to_access_memory ();
 
@@ -894,7 +894,7 @@ start_inferior (char **argv)
 	    }
 	  while (last_status.value.sig != GDB_SIGNAL_TRAP);
 	}
-      target_arch_setup ();
+      target_post_create_inferior ();
       return signal_pid;
     }
 
@@ -902,7 +902,7 @@ start_inferior (char **argv)
      (assuming success).  */
   last_ptid = mywait (pid_to_ptid (signal_pid), &last_status, 0, 0);
 
-  target_arch_setup ();
+  target_post_create_inferior ();
 
   if (last_status.kind != TARGET_WAITKIND_EXITED
       && last_status.kind != TARGET_WAITKIND_SIGNALLED)
@@ -1002,7 +1002,7 @@ decode_xfer (char *buf, char **object, char **rw, char **annex, char **offset)
    to as much of DATA/LEN as we could fit.  IS_MORE controls
    the first character of the response.  */
 static int
-write_qxfer_response (char *buf, const void *data, int len, int is_more)
+write_qxfer_response (char *buf, const gdb_byte *data, int len, int is_more)
 {
   int out_len;
 
@@ -1032,7 +1032,7 @@ handle_btrace_enable_bts (struct thread_info *thread)
   return NULL;
 }
 
-/* Handle btrace enabling in Intel(R) Processor Trace format.  */
+/* Handle btrace enabling in Intel Processor Trace format.  */
 
 static const char *
 handle_btrace_enable_pt (struct thread_info *thread)
@@ -1237,6 +1237,54 @@ handle_general_set (char *own_buf)
       return;
     }
 
+  if (startswith (own_buf, "QCatchSyscalls:"))
+    {
+      const char *p = own_buf + sizeof ("QCatchSyscalls:") - 1;
+      int enabled = -1;
+      CORE_ADDR sysno;
+      struct process_info *process;
+
+      if (!target_running () || !target_supports_catch_syscall ())
+	{
+	  write_enn (own_buf);
+	  return;
+	}
+
+      if (strcmp (p, "0") == 0)
+	enabled = 0;
+      else if (p[0] == '1' && (p[1] == ';' || p[1] == '\0'))
+	enabled = 1;
+      else
+	{
+	  fprintf (stderr, "Unknown catch-syscalls mode requested: %s\n",
+		   own_buf);
+	  write_enn (own_buf);
+	  return;
+	}
+
+      process = current_process ();
+      VEC_truncate (int, process->syscalls_to_catch, 0);
+
+      if (enabled)
+	{
+	  p += 1;
+	  if (*p == ';')
+	    {
+	      p += 1;
+	      while (*p != '\0')
+		{
+		  p = decode_address_to_semicolon (&sysno, p);
+		  VEC_safe_push (int, process->syscalls_to_catch, (int) sysno);
+		}
+	    }
+	  else
+	    VEC_safe_push (int, process->syscalls_to_catch, ANY_SYSCALL);
+	}
+
+      write_ok (own_buf);
+      return;
+    }
+
   if (strcmp (own_buf, "QStartNoAckMode") == 0)
     {
       if (remote_debug)
@@ -1341,6 +1389,39 @@ handle_general_set (char *own_buf)
   if (handle_btrace_conf_general_set (own_buf))
     return;
 
+  if (startswith (own_buf, "QThreadEvents:"))
+    {
+      char *mode = own_buf + strlen ("QThreadEvents:");
+      enum tribool req = TRIBOOL_UNKNOWN;
+
+      if (strcmp (mode, "0") == 0)
+	req = TRIBOOL_FALSE;
+      else if (strcmp (mode, "1") == 0)
+	req = TRIBOOL_TRUE;
+      else
+	{
+	  char *mode_copy = xstrdup (mode);
+
+	  /* We don't know what this mode is, so complain to GDB.  */
+	  sprintf (own_buf, "E.Unknown thread-events mode requested: %s\n",
+		   mode_copy);
+	  xfree (mode_copy);
+	  return;
+	}
+
+      report_thread_events = (req == TRIBOOL_TRUE);
+
+      if (remote_debug)
+	{
+	  const char *req_str = report_thread_events ? "enabled" : "disabled";
+
+	  fprintf (stderr, "[thread events are now %s]\n", req_str);
+	}
+
+      write_ok (own_buf);
+      return;
+    }
+
   /* Otherwise we didn't know what packet it was.  Say we didn't
      understand it.  */
   own_buf[0] = 0;
@@ -1385,7 +1466,7 @@ get_features_xml (const char *annex)
   return NULL;
 }
 
-void
+static void
 monitor_show_help (void)
 {
   monitor_output ("The following monitor commands are supported:\n");
@@ -1513,7 +1594,8 @@ handle_search_memory_1 (CORE_ADDR start_addr, CORE_ADDR search_space_len,
 				  ? search_space_len
 				  : search_buf_size);
 
-      found_ptr = memmem (search_buf, nr_search_bytes, pattern, pattern_len);
+      found_ptr = (gdb_byte *) memmem (search_buf, nr_search_bytes, pattern,
+				       pattern_len);
 
       if (found_ptr != NULL)
 	{
@@ -1581,7 +1663,7 @@ handle_search_memory (char *own_buf, int packet_len)
   CORE_ADDR found_addr;
   int cmd_name_len = sizeof ("qSearch:memory:") - 1;
 
-  pattern = malloc (packet_len);
+  pattern = (gdb_byte *) malloc (packet_len);
   if (pattern == NULL)
     {
       error ("Unable to allocate memory to perform the search");
@@ -1605,7 +1687,7 @@ handle_search_memory (char *own_buf, int packet_len)
   if (search_space_len < search_buf_size)
     search_buf_size = search_space_len;
 
-  search_buf = malloc (search_buf_size);
+  search_buf = (gdb_byte *) malloc (search_buf_size);
   if (search_buf == NULL)
     {
       free (pattern);
@@ -1856,7 +1938,7 @@ handle_qxfer_exec_file (const char *const_annex,
     }
   else
     {
-      char *annex = alloca (strlen (const_annex) + 1);
+      char *annex = (char *) alloca (strlen (const_annex) + 1);
 
       strcpy (annex, const_annex);
       annex = unpack_varlen_hex (annex, &pid);
@@ -1925,7 +2007,7 @@ static void
 accumulate_file_name_length (struct inferior_list_entry *inf, void *arg)
 {
   struct dll_info *dll = (struct dll_info *) inf;
-  unsigned int *total_len = arg;
+  unsigned int *total_len = (unsigned int *) arg;
 
   /* Over-estimate the necessary memory.  Assume that every character
      in the library name must be escaped.  */
@@ -1939,7 +2021,7 @@ static void
 emit_dll_description (struct inferior_list_entry *inf, void *arg)
 {
   struct dll_info *dll = (struct dll_info *) inf;
-  char **p_ptr = arg;
+  char **p_ptr = (char **) arg;
   char *p = *p_ptr;
   char *name;
 
@@ -1979,7 +2061,7 @@ handle_qxfer_libraries (const char *annex,
   for_each_inferior_with_data (&all_dlls, accumulate_file_name_length,
 			       &total_len);
 
-  document = malloc (total_len);
+  document = (char *) malloc (total_len);
   if (document == NULL)
     return -1;
 
@@ -2095,11 +2177,12 @@ static void
 handle_qxfer_threads_worker (struct inferior_list_entry *inf, void *arg)
 {
   struct thread_info *thread = (struct thread_info *) inf;
-  struct buffer *buffer = arg;
+  struct buffer *buffer = (struct buffer *) arg;
   ptid_t ptid = thread_to_gdb_id (thread);
   char ptid_s[100];
   int core = target_core_of_thread (ptid);
   char core_s[21];
+  const char *name = target_thread_name (ptid);
 
   // TODO an attached client does not know about multiple inferiors
   if (ptid_get_pid (inf->id) != ptid_get_pid (general_thread)
@@ -2108,17 +2191,18 @@ handle_qxfer_threads_worker (struct inferior_list_entry *inf, void *arg)
 
   write_ptid (ptid_s, ptid);
 
+  buffer_xml_printf (buffer, "<thread id=\"%s\"", ptid_s);
+
   if (core != -1)
     {
       sprintf (core_s, "%d", core);
-      buffer_xml_printf (buffer, "<thread id=\"%s\" core=\"%s\"/>\n",
-			 ptid_s, core_s);
+      buffer_xml_printf (buffer, " core=\"%s\"", core_s);
     }
-  else
-    {
-      buffer_xml_printf (buffer, "<thread id=\"%s\"/>\n",
-			 ptid_s);
-    }
+
+  if (name != NULL)
+    buffer_xml_printf (buffer, " name=\"%s\"", name);
+
+  buffer_xml_printf (buffer, "/>\n");
 }
 
 /* Helper for handle_qxfer_threads.  */
@@ -2258,7 +2342,8 @@ handle_qxfer_btrace (const char *annex,
 {
   static struct buffer cache;
   struct thread_info *thread;
-  int type, result;
+  enum btrace_read_type type;
+  int result;
 
   if (the_target->read_btrace == NULL || writebuf != NULL)
     return -2;
@@ -2445,7 +2530,7 @@ handle_qxfer (char *own_buf, int packet_len, int *new_packet_len_p)
 		 more.  */
 	      if (len > PBUFSIZ - 2)
 		len = PBUFSIZ - 2;
-	      data = malloc (len + 1);
+	      data = (unsigned char *) malloc (len + 1);
 	      if (data == NULL)
 		{
 		  write_enn (own_buf);
@@ -2479,7 +2564,7 @@ handle_qxfer (char *own_buf, int packet_len, int *new_packet_len_p)
 	      unsigned char *data;
 
 	      strcpy (own_buf, "E00");
-	      data = malloc (packet_len - (offset - own_buf));
+	      data = (unsigned char *) malloc (packet_len - (offset - own_buf));
 	      if (data == NULL)
 		{
 		  write_enn (own_buf);
@@ -2519,11 +2604,6 @@ handle_qxfer (char *own_buf, int packet_len, int *new_packet_len_p)
   return 0;
 }
 
-/* Table used by the crc32 function to calcuate the checksum.  */
-
-static unsigned int crc32_table[256] =
-{0, 0};
-
 /* Compute 32 bit CRC from inferior memory.
 
    On success, return 32 bit CRC.
@@ -2532,20 +2612,6 @@ static unsigned int crc32_table[256] =
 static unsigned long long
 crc32 (CORE_ADDR base, int len, unsigned int crc)
 {
-  if (!crc32_table[1])
-    {
-      /* Initialize the CRC table and the decoding table.  */
-      int i, j;
-      unsigned int c;
-
-      for (i = 0; i < 256; i++)
-	{
-	  for (c = i << 24, j = 8; j > 0; --j)
-	    c = c & 0x80000000 ? (c << 1) ^ 0x04c11db7 : (c << 1);
-	  crc32_table[i] = c;
-	}
-    }
-
   while (len--)
     {
       unsigned char byte = 0;
@@ -2554,7 +2620,7 @@ crc32 (CORE_ADDR base, int len, unsigned int crc)
       if (read_inferior_memory (base, &byte, 1) != 0)
 	return (unsigned long long) -1;
 
-      crc = (crc << 8) ^ crc32_table[((crc >> 24) ^ byte) & 255];
+      crc = xcrc32 (&byte, 1, crc);
       base++;
     }
   return (unsigned long long) crc;
@@ -2593,7 +2659,7 @@ supported_btrace_packets (char *buf)
 
 /* Handle all of the extended 'q' packets.  */
 
-void
+static void
 handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 {
   static struct inferior_list_entry *thread_ptr;
@@ -2621,6 +2687,28 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
   if (strcmp ("qSymbol::", own_buf) == 0)
     {
+      struct thread_info *save_thread = current_thread;
+
+      /* For qSymbol, GDB only changes the current thread if the
+	 previous current thread was of a different process.  So if
+	 the previous thread is gone, we need to pick another one of
+	 the same process.  This can happen e.g., if we followed an
+	 exec in a non-leader thread.  */
+      if (current_thread == NULL)
+	{
+	  current_thread
+	    = find_any_thread_of_pid (ptid_get_pid (general_thread));
+
+	  /* Just in case, if we didn't find a thread, then bail out
+	     instead of crashing.  */
+	  if (current_thread == NULL)
+	    {
+	      write_enn (own_buf);
+	      current_thread = save_thread;
+	      return;
+	    }
+	}
+
       /* GDB is suggesting new symbols have been loaded.  This may
 	 mean a new shared library has been detected as loaded, so
 	 take the opportunity to check if breakpoints we think are
@@ -2638,6 +2726,8 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       if (current_thread != NULL && the_target->look_up_symbols != NULL)
 	(*the_target->look_up_symbols) ();
+
+      current_thread = save_thread;
 
       strcpy (own_buf, "OK");
       return;
@@ -2702,9 +2792,6 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       char *p = &own_buf[10];
       int gdb_supports_qRelocInsn = 0;
 
-      /* Start processing qSupported packet.  */
-      target_process_qsupported (NULL);
-
       /* Process each feature being provided by GDB.  The first
 	 feature will follow a ':', and latter features will follow
 	 ';'.  */
@@ -2712,6 +2799,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	{
 	  char **qsupported = NULL;
 	  int count = 0;
+	  int unknown = 0;
 	  int i;
 
 	  /* Two passes, to avoid nested strtok calls in
@@ -2721,7 +2809,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	       p = strtok (NULL, ";"))
 	    {
 	      count++;
-	      qsupported = xrealloc (qsupported, count * sizeof (char *));
+	      qsupported = XRESIZEVEC (char *, qsupported, count);
 	      qsupported[count - 1] = xstrdup (p);
 	    }
 
@@ -2767,18 +2855,46 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 		  if (target_supports_vfork_events ())
 		    report_vfork_events = 1;
 		}
+	      else if (strcmp (p, "exec-events+") == 0)
+		{
+		  /* GDB supports and wants exec events if possible.  */
+		  if (target_supports_exec_events ())
+		    report_exec_events = 1;
+		}
+	      else if (strcmp (p, "vContSupported+") == 0)
+		vCont_supported = 1;
+	      else if (strcmp (p, "QThreadEvents+") == 0)
+		;
+	      else if (strcmp (p, "no-resumed+") == 0)
+		{
+		  /* GDB supports and wants TARGET_WAITKIND_NO_RESUMED
+		     events.  */
+		  report_no_resumed = 1;
+		}
 	      else
-		target_process_qsupported (p);
-
-	      free (p);
+		{
+		  /* Move the unknown features all together.  */
+		  qsupported[i] = NULL;
+		  qsupported[unknown] = p;
+		  unknown++;
+		}
 	    }
 
+	  /* Give the target backend a chance to process the unknown
+	     features.  */
+	  target_process_qsupported (qsupported, unknown);
+
+	  for (i = 0; i < count; i++)
+	    free (qsupported[i]);
 	  free (qsupported);
 	}
 
       sprintf (own_buf,
 	       "PacketSize=%x;QPassSignals+;QProgramSignals+",
 	       PBUFSIZ - 1);
+
+      if (target_supports_catch_syscall ())
+	strcat (own_buf, ";QCatchSyscalls+");
 
       if (the_target->qxfer_libraries_svr4 != NULL)
 	strcat (own_buf, ";qXfer:libraries-svr4:read+"
@@ -2823,6 +2939,9 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
       if (target_supports_vfork_events ())
 	strcat (own_buf, ";vfork-events+");
 
+      if (target_supports_exec_events ())
+	strcat (own_buf, ";exec-events+");
+
       if (target_supports_non_stop ())
 	strcat (own_buf, ";QNonStop+");
 
@@ -2848,9 +2967,11 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 	  strcat (own_buf, ";tracenz+");
 	}
 
-      /* Support target-side breakpoint conditions and commands.  */
-      if (target_supports_conditional_breakpoints ())
-	strcat (own_buf, ";ConditionalBreakpoints+");
+      if (target_supports_hardware_single_step ()
+	  || target_supports_software_single_step () )
+	{
+	  strcat (own_buf, ";ConditionalBreakpoints+");
+	}
       strcat (own_buf, ";BreakpointCommands+");
 
       if (target_supports_agent ())
@@ -2866,6 +2987,12 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
 
       if (the_target->pid_to_exec_file != NULL)
 	strcat (own_buf, ";qXfer:exec-file:read+");
+
+      strcat (own_buf, ";vContSupported+");
+
+      strcat (own_buf, ";QThreadEvents+");
+
+      strcat (own_buf, ";no-resumed+");
 
       /* Reinitialize components as needed for the new connection.  */
       hostio_handle_new_gdb_connection ();
@@ -2965,7 +3092,7 @@ handle_query (char *own_buf, int packet_len, int *new_packet_len_p)
   /* Handle "monitor" commands.  */
   if (startswith (own_buf, "qRcmd,"))
     {
-      char *mon = malloc (PBUFSIZ);
+      char *mon = (char *) malloc (PBUFSIZ);
       int len = strlen (own_buf + 6);
 
       if (mon == NULL)
@@ -3090,7 +3217,8 @@ struct visit_actioned_threads_data
 static int
 visit_actioned_threads (struct inferior_list_entry *entry, void *datap)
 {
-  struct visit_actioned_threads_data *data = datap;
+  struct visit_actioned_threads_data *data
+    = (struct visit_actioned_threads_data *) datap;
   const struct thread_resume *actions = data->actions;
   size_t num_actions = data->num_actions;
   visit_actioned_threads_callback_ftype *callback = data->callback;
@@ -3136,7 +3264,7 @@ handle_pending_status (const struct thread_resume *resumption,
 }
 
 /* Parse vCont packets.  */
-void
+static void
 handle_v_cont (char *own_buf)
 {
   char *p, *q;
@@ -3154,7 +3282,7 @@ handle_v_cont (char *own_buf)
       p = strchr (p, ';');
     }
 
-  resume_info = malloc (n * sizeof (resume_info[0]));
+  resume_info = (struct thread_resume *) malloc (n * sizeof (resume_info[0]));
   if (resume_info == NULL)
     goto err;
 
@@ -3184,9 +3312,9 @@ handle_v_cont (char *own_buf)
 	    goto err;
 	  p = q;
 
-	  if (!gdb_signal_to_host_p (sig))
+	  if (!gdb_signal_to_host_p ((enum gdb_signal) sig))
 	    goto err;
-	  resume_info[i].sig = gdb_signal_to_host (sig);
+	  resume_info[i].sig = gdb_signal_to_host ((enum gdb_signal) sig);
 	}
       else if (p[0] == 'r')
 	{
@@ -3273,10 +3401,11 @@ resume (struct thread_resume *actions, size_t num_actions)
     {
       last_ptid = mywait (minus_one_ptid, &last_status, 0, 1);
 
-      if (last_status.kind == TARGET_WAITKIND_NO_RESUMED)
+      if (last_status.kind == TARGET_WAITKIND_NO_RESUMED
+	  && !report_no_resumed)
 	{
-	  /* No proper RSP support for this yet.  At least return
-	     error.  */
+	  /* The client does not support this stop reply.  At least
+	     return error.  */
 	  sprintf (own_buffer, "E.No unwaited-for children left.");
 	  disable_async_io ();
 	  return;
@@ -3302,7 +3431,7 @@ resume (struct thread_resume *actions, size_t num_actions)
 }
 
 /* Attach to a new program.  Return 1 if successful, 0 if failure.  */
-int
+static int
 handle_v_attach (char *own_buf)
 {
   int pid;
@@ -3360,7 +3489,7 @@ handle_v_run (char *own_buf)
       new_argc++;
     }
 
-  new_argv = calloc (new_argc + 2, sizeof (char *));
+  new_argv = (char **) calloc (new_argc + 2, sizeof (char *));
   if (new_argv == NULL)
     {
       write_enn (own_buf);
@@ -3379,7 +3508,7 @@ handle_v_run (char *own_buf)
       else
 	{
 	  /* FIXME: Fail request if out of memory instead of dying.  */
-	  new_argv[i] = xmalloc (1 + (next_p - p) / 2);
+	  new_argv[i] = (char *) xmalloc (1 + (next_p - p) / 2);
 	  hex2bin (p, (gdb_byte *) new_argv[i], (next_p - p) / 2);
 	  new_argv[i][(next_p - p) / 2] = '\0';
 	}
@@ -3436,7 +3565,7 @@ handle_v_run (char *own_buf)
 }
 
 /* Kill process.  Return 1 if successful, 0 if failure.  */
-int
+static int
 handle_v_kill (char *own_buf)
 {
   int pid;
@@ -3462,11 +3591,18 @@ handle_v_kill (char *own_buf)
 }
 
 /* Handle all of the extended 'v' packets.  */
-void
+static void
 handle_v_requests (char *own_buf, int packet_len, int *new_packet_len)
 {
   if (!disable_packet_vCont)
     {
+      if (strcmp (own_buf, "vCtrlC") == 0)
+	{
+	  (*the_target->request_interrupt) ();
+	  write_ok (own_buf);
+	  return;
+	}
+
       if (startswith (own_buf, "vCont;"))
 	{
 	  require_running (own_buf);
@@ -3476,7 +3612,18 @@ handle_v_requests (char *own_buf, int packet_len, int *new_packet_len)
 
       if (startswith (own_buf, "vCont?"))
 	{
-	  strcpy (own_buf, "vCont;c;C;s;S;t");
+	  strcpy (own_buf, "vCont;c;C;t");
+
+	  if (target_supports_hardware_single_step () || !vCont_supported)
+	    {
+	      /* If target supports hardware single step, add actions s
+		 and S to the list of supported actions.  On the other
+		 hand, if GDB doesn't request the supported vCont actions
+		 in qSupported packet, add s and S to the list too.  */
+	      own_buf = own_buf + strlen (own_buf);
+	      strcpy (own_buf, ";s;S");
+	    }
+
 	  if (target_supports_range_stepping ())
 	    {
 	      own_buf = own_buf + strlen (own_buf);
@@ -3778,7 +3925,7 @@ static void
 gdbserver_version (void)
 {
   printf ("GNU gdbserver %s%s\n"
-	  "Copyright (C) 2015 Free Software Foundation, Inc.\n"
+	  "Copyright (C) 2016 Free Software Foundation, Inc.\n"
 	  "gdbserver is free software, covered by the "
 	  "GNU General Public License.\n"
 	  "This gdbserver was configured as \"%s\"\n",
@@ -4164,14 +4311,15 @@ captured_main (int argc, char *argv[])
     initialize_tracepoint ();
   initialize_notif ();
 
-  mem_buf = xmalloc (PBUFSIZ);
+  own_buffer = (char *) xmalloc (PBUFSIZ + 1);
+  mem_buf = (unsigned char *) xmalloc (PBUFSIZ);
 
   if (pid == 0 && *next_arg != NULL)
     {
       int i, n;
 
       n = argc - (next_arg - argv);
-      program_argv = xmalloc (sizeof (char *) * (n + 1));
+      program_argv = XNEWVEC (char *, n + 1);
       for (i = 0; i < n; i++)
 	program_argv[i] = xstrdup (next_arg[i]);
       program_argv[i] = NULL;
@@ -4221,6 +4369,7 @@ captured_main (int argc, char *argv[])
       cont_thread = null_ptid;
       swbreak_feature = 0;
       hwbreak_feature = 0;
+      vCont_supported = 0;
 
       remote_open (port);
 
@@ -4231,11 +4380,21 @@ captured_main (int argc, char *argv[])
 	  start_event_loop ();
 
 	  /* If an exit was requested (using the "monitor exit"
-	     command), terminate now.  The only other way to get
-	     here is for getpkt to fail; close the connection
-	     and reopen it at the top of the loop.  */
+	     command), terminate now.  */
+	  if (exit_requested)
+	    throw_quit ("Quit");
 
-	  if (exit_requested || run_once)
+	  /* The only other way to get here is for getpkt to fail:
+
+	      - If --once was specified, we're done.
+
+	      - If not in extended-remote mode, and we're no longer
+	        debugging anything, simply exit: GDB has disconnected
+	        after processing the last process exit.
+
+	      - Otherwise, close the connection and reopen it at the
+	        top of the loop.  */
+	  if (run_once || (!extended_protocol && !target_running ()))
 	    throw_quit ("Quit");
 
 	  fprintf (stderr,
@@ -4400,13 +4559,6 @@ process_serial_event (void)
   int new_packet_len = -1;
   client_state *cs = get_client_state();
 
-  /* Used to decide when gdbserver should exit in
-     multi-mode/remote.  */
-  static int have_ran = 0;
-
-  if (!have_ran)
-    have_ran = target_running ();
-
   disable_async_io ();
 
   response_needed = 0;
@@ -4527,11 +4679,13 @@ process_serial_event (void)
 	  discard_queued_stop_replies (pid_to_ptid (pid));
 	  write_ok (own_buffer);
 
-	  if (extended_protocol)
+	  if (extended_protocol || target_running ())
 	    {
 	      if (cs->ss->attach_count_ == 0)
 		{
-		  /* Treat this like a normal program exit.  */
+		  /* There is still at least one inferior remaining or
+		     we are in extended mode, so don't terminate gdbserver,
+		     and instead treat this like a normal program exit.  */
 		  last_status.kind = TARGET_WAITKIND_EXITED;
 		  last_status.value.integer = 0;
 		  last_ptid = pid_to_ptid (pid);
@@ -4705,8 +4859,8 @@ process_serial_event (void)
     case 'C':
       require_running (own_buffer);
       hex2bin (own_buffer + 1, &sig, 1);
-      if (gdb_signal_to_host_p (sig))
-	signal = gdb_signal_to_host (sig);
+      if (gdb_signal_to_host_p ((enum gdb_signal) sig))
+	signal = gdb_signal_to_host ((enum gdb_signal) sig);
       else
 	signal = 0;
       myresume (own_buffer, 0, signal);
@@ -4714,8 +4868,8 @@ process_serial_event (void)
     case 'S':
       require_running (own_buffer);
       hex2bin (own_buffer + 1, &sig, 1);
-      if (gdb_signal_to_host_p (sig))
-	signal = gdb_signal_to_host (sig);
+      if (gdb_signal_to_host_p ((enum gdb_signal) sig))
+	signal = gdb_signal_to_host ((enum gdb_signal) sig);
       else
 	signal = 0;
       myresume (own_buffer, 1, signal);
@@ -4736,21 +4890,21 @@ process_serial_event (void)
       {
 	char *dataptr;
 	ULONGEST addr;
-	int len;
+	int kind;
 	char type = own_buffer[1];
 	int res;
 	const int insert = ch == 'Z';
 	char *p = &own_buffer[3];
 
 	p = unpack_varlen_hex (p, &addr);
-	len = strtol (p + 1, &dataptr, 16);
+	kind = strtol (p + 1, &dataptr, 16);
 
 	if (insert)
 	  {
 	    struct breakpoint *bp;
 
 	    add_client_breakpoint (addr);
-	    bp = set_gdb_breakpoint (type, addr, len, &res);
+	    bp = set_gdb_breakpoint (type, addr, kind, &res);
 	    if (bp != NULL)
 	      {
 		res = 0;
@@ -4765,7 +4919,7 @@ process_serial_event (void)
 	      }
 	  }
 	else
-	  res = delete_gdb_breakpoint (type, addr, len);
+	  res = delete_gdb_breakpoint (type, addr, kind);
 
 	if (res == 0)
 	  write_ok (own_buffer);
@@ -4883,21 +5037,6 @@ process_serial_event (void)
 
   response_needed = 0;
 
-  if (!extended_protocol && have_ran && !target_running ())
-    {
-      /* In non-stop, defer exiting until GDB had a chance to query
-	 the whole vStopped list (until it gets an OK).  */
-      if (QUEUE_is_empty (notif_event_p, notif_stop.queue))
-	{
-	  /* Be transparent when GDB is connected through stdio -- no
-	     need to spam GDB's console.  */
-	  if (!remote_connection_is_stdio ())
-	    fprintf (stderr, "GDBserver exiting\n");
-	  remote_close ();
-	  exit (0);
-	}
-    }
-
   if (exit_requested)
     return -1;
 
@@ -4924,6 +5063,19 @@ handle_serial_event (int err, gdb_client_data client_data)
   return 0;
 }
 
+/* Push a stop notification on the notification queue.  */
+
+static void
+push_stop_notification (ptid_t ptid, struct target_waitstatus *status)
+{
+  struct vstop_notif *vstop_notif = XNEW (struct vstop_notif);
+
+  vstop_notif->status = *status;
+  vstop_notif->ptid = ptid;
+  /* Push Stop notification.  */
+  notif_push (&notif_stop, (struct notif_event *) vstop_notif);
+}
+
 /* Event-loop callback for target events.  */
 
 int
@@ -4937,7 +5089,8 @@ handle_target_event (int err, gdb_client_data client_data)
 
   if (last_status.kind == TARGET_WAITKIND_NO_RESUMED)
     {
-      /* No RSP support for this yet.  */
+      if (gdb_connected () && report_no_resumed)
+	push_stop_notification (null_ptid, &last_status);
     }
   else if (last_status.kind != TARGET_WAITKIND_IGNORE)
     {
@@ -4951,6 +5104,8 @@ handle_target_event (int err, gdb_client_data client_data)
 	  mark_breakpoints_out (process);
 	  mourn_inferior (process);
 	}
+      else if (last_status.kind == TARGET_WAITKIND_THREAD_EXITED)
+	;
       else
 	{
 	  /* We're reporting this thread as stopped.  Update its
@@ -4968,7 +5123,11 @@ handle_target_event (int err, gdb_client_data client_data)
 	      exit (0);
 	    }
 
-	  if (last_status.kind == TARGET_WAITKIND_STOPPED)
+	  if (last_status.kind == TARGET_WAITKIND_EXITED
+	      || last_status.kind == TARGET_WAITKIND_SIGNALLED
+	      || last_status.kind == TARGET_WAITKIND_THREAD_EXITED)
+	    ;
+	  else
 	    {
 	      /* A thread stopped with a signal, but gdb isn't
 		 connected to handle it.  Pass it down to the
@@ -4983,26 +5142,18 @@ handle_target_event (int err, gdb_client_data client_data)
 
 	      resume_info.thread = last_ptid;
 	      resume_info.kind = resume_continue;
-	      resume_info.sig = gdb_signal_to_host (last_status.value.sig);
+	      if (last_status.kind == TARGET_WAITKIND_STOPPED)
+		resume_info.sig = gdb_signal_to_host (last_status.value.sig);
+	      else
+		resume_info.sig = 0;
 	      (*the_target->resume) (&resume_info, 1);
 	    }
-	  else if (debug_threads)
-	    debug_printf ("GDB not connected; ignoring event %d for [%s]\n",
-			  (int) last_status.kind,
-			  target_pid_to_str (last_ptid));
 	}
       else
 	{
-	  struct vstop_notif *vstop_notif = XNEW (struct vstop_notif);
-
-	  if (last_status.kind == TARGET_WAITKIND_EXITED)
-	    get_client_state()->ss->last_status_exited = have_exit;
-
-	  vstop_notif->status = last_status;
-	  vstop_notif->ptid = last_ptid;
-	  /* Push Stop notification.  */
-	  notif_push (&notif_stop,
-		      (struct notif_event *) vstop_notif);
+          if (last_status.kind == TARGET_WAITKIND_EXITED)
+            get_client_state()->ss->last_status_exited = have_exit;
+          push_stop_notification (last_ptid, &last_status);
 	}
     }
 

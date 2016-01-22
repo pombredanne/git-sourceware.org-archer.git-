@@ -1,6 +1,6 @@
 /* Implementation of the GDB variable objects API.
 
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2016 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -50,7 +50,7 @@ show_varobjdebug (struct ui_file *file, int from_tty,
 
 /* String representations of gdb's format codes.  */
 char *varobj_format_string[] =
-  { "natural", "binary", "decimal", "hexadecimal", "octal" };
+  { "natural", "binary", "decimal", "hexadecimal", "octal", "zero-hexadecimal" };
 
 /* True if we want to allow Python-based pretty-printing.  */
 static int pretty_printing = 0;
@@ -78,7 +78,7 @@ struct varobj_root
      not NULL.  */
   struct frame_id frame;
 
-  /* The thread ID that this varobj_root belong to.  This field
+  /* The global thread ID that this varobj_root belongs to.  This field
      is only valid if valid_block is not NULL.
      When not 0, indicates which thread 'frame' belongs to.
      When 0, indicates that the thread list was empty when the varobj_root
@@ -214,7 +214,7 @@ static struct varobj *varobj_add_child (struct varobj *var,
 /* Private data */
 
 /* Mappings of varobj_display_formats enums to gdb's format codes.  */
-static int format_code[] = { 0, 't', 'd', 'x', 'o' };
+static int format_code[] = { 0, 't', 'd', 'x', 'o', 'z' };
 
 /* Header of the list of root variable objects.  */
 static struct varobj_root *rootlist;
@@ -380,7 +380,7 @@ varobj_create (char *objname,
 	    error (_("Failed to find the specified frame"));
 
 	  var->root->frame = get_frame_id (fi);
-	  var->root->thread_id = pid_to_thread_id (inferior_ptid);
+	  var->root->thread_id = ptid_to_global_thread_id (inferior_ptid);
 	  old_id = get_frame_id (get_selected_frame (NULL));
 	  select_frame (fi);	 
 	}
@@ -529,7 +529,7 @@ varobj_delete (struct varobj *var, char ***dellist, int only_children)
   /* We may have been asked to return a list of what has been deleted.  */
   if (dellist != NULL)
     {
-      *dellist = xmalloc ((delcount + 1) * sizeof (char *));
+      *dellist = XNEWVEC (char *, delcount + 1);
 
       cp = *dellist;
       mycount = delcount;
@@ -583,6 +583,7 @@ varobj_set_display_format (struct varobj *var,
     case FORMAT_DECIMAL:
     case FORMAT_HEXADECIMAL:
     case FORMAT_OCTAL:
+    case FORMAT_ZHEXADECIMAL:
       var->format = format;
       break;
 
@@ -2196,7 +2197,7 @@ free_variable (struct varobj *var)
 static void
 do_free_variable_cleanup (void *var)
 {
-  free_variable (var);
+  free_variable ((struct varobj *) var);
 }
 
 static struct cleanup *
@@ -2362,8 +2363,9 @@ value_of_root_1 (struct varobj **var_handle)
     }
   else
     {
-      ptid_t ptid = thread_id_to_pid (var->root->thread_id);
-      if (in_thread_list (ptid))
+      ptid_t ptid = global_thread_id_to_ptid (var->root->thread_id);
+
+      if (!ptid_equal (minus_one_ptid, ptid))
 	{
 	  switch_to_thread (ptid);
 	  within_scope = check_scope (var);
@@ -2610,7 +2612,7 @@ varobj_value_get_print_value (struct value *value,
 			    }
 
 			  len = strlen (s);
-			  thevalue = xmemdup (s, len + 1, len + 1);
+			  thevalue = (char *) xmemdup (s, len + 1, len + 1);
 			  type = builtin_type (gdbarch)->builtin_char;
 			  xfree (s);
 

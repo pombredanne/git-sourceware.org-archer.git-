@@ -1,6 +1,6 @@
 /* Top level stuff for GDB, the GNU debugger.
 
-   Copyright (C) 1986-2015 Free Software Foundation, Inc.
+   Copyright (C) 1986-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -278,7 +278,7 @@ void
 do_restore_instream_cleanup (void *stream)
 {
   /* Restore the previous input stream.  */
-  instream = stream;
+  instream = (FILE *) stream;
 }
 
 /* Read commands from STREAM.  */
@@ -542,7 +542,6 @@ command_loop (void)
 {
   struct cleanup *old_chain;
   char *command;
-  int stdin_is_tty = ISATTY (stdin);
 
   while (instream && !feof (instream))
     {
@@ -550,7 +549,7 @@ command_loop (void)
 	(*window_hook) (instream, get_prompt ());
 
       clear_quit_flag ();
-      if (instream == stdin && stdin_is_tty)
+      if (instream == stdin)
 	reinitialize_more_filter ();
       old_chain = make_cleanup (null_cleanup, 0);
 
@@ -813,7 +812,8 @@ struct gdb_readline_wrapper_cleanup
 static void
 gdb_readline_wrapper_cleanup (void *arg)
 {
-  struct gdb_readline_wrapper_cleanup *cleanup = arg;
+  struct gdb_readline_wrapper_cleanup *cleanup
+    = (struct gdb_readline_wrapper_cleanup *) arg;
 
   rl_already_prompted = cleanup->already_prompted_orig;
 
@@ -1065,8 +1065,9 @@ command_line_input (const char *prompt_arg, int repeat, char *annotation_suffix)
     {
       char *local_prompt;
 
-      local_prompt = alloca ((prompt == NULL ? 0 : strlen (prompt))
-			     + strlen (annotation_suffix) + 40);
+      local_prompt
+	= (char *) alloca ((prompt == NULL ? 0 : strlen (prompt))
+			   + strlen (annotation_suffix) + 40);
       if (prompt == NULL)
 	local_prompt[0] = '\0';
       else
@@ -1235,7 +1236,8 @@ command_line_input (const char *prompt_arg, int repeat, char *annotation_suffix)
     {
       if (linelength > saved_command_line_size)
 	{
-	  saved_command_line = xrealloc (saved_command_line, linelength);
+	  saved_command_line
+	    = (char *) xrealloc (saved_command_line, linelength);
 	  saved_command_line_size = linelength;
 	}
       strcpy (saved_command_line, linebuffer);
@@ -1258,7 +1260,7 @@ print_gdb_version (struct ui_file *stream)
   /* Second line is a copyright notice.  */
 
   fprintf_filtered (stream,
-		    "Copyright (C) 2015 Free Software Foundation, Inc.\n");
+		    "Copyright (C) 2016 Free Software Foundation, Inc.\n");
 
   /* Following the copyright is a brief statement that the program is
      free software, that users are free to copy and change it on
@@ -1437,7 +1439,7 @@ struct qt_args
 static int
 kill_or_detach (struct inferior *inf, void *args)
 {
-  struct qt_args *qt = args;
+  struct qt_args *qt = (struct qt_args *) args;
   struct thread_info *thread;
 
   if (inf->pid == 0)
@@ -1468,7 +1470,7 @@ kill_or_detach (struct inferior *inf, void *args)
 static int
 print_inferior_quit_action (struct inferior *inf, void *arg)
 {
-  struct ui_file *stb = arg;
+  struct ui_file *stb = (struct ui_file *) arg;
 
   if (inf->pid == 0)
     return 0;

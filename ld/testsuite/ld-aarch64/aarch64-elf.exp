@@ -1,5 +1,5 @@
 # Expect script for various AARCH64 ELF tests.
-# Copyright (C) 2009-2015 Free Software Foundation, Inc.
+# Copyright (C) 2009-2016 Free Software Foundation, Inc.
 #
 # This file is part of the GNU Binutils.
 #
@@ -116,15 +116,25 @@ run_dump_test "emit-relocs-286"
 run_dump_test "emit-relocs-286-bad"
 # 287-298 are not done yet
 run_dump_test "emit-relocs-299"
-# 300-308 are not done yet
+# 300 is not done yet
+run_dump_test "emit-relocs-301"
+run_dump_test "emit-relocs-301-be"
+run_dump_test "emit-relocs-302"
+run_dump_test "emit-relocs-302-be"
+# 303-308 are not done yet
 run_dump_test "emit-relocs-309-up"
 run_dump_test "emit-relocs-309-low"
 run_dump_test "emit-relocs-309-up-bad"
 run_dump_test "emit-relocs-309-low-bad"
-# 310 not done yet
+run_dump_test "emit-relocs-310"
+run_dump_test "emit-relocs-310-be"
 run_dump_test "emit-relocs-311"
 run_dump_test "emit-relocs-312"
 run_dump_test "emit-relocs-313"
+run_dump_test "emit-relocs-515"
+run_dump_test "emit-relocs-515-be"
+run_dump_test "emit-relocs-516"
+run_dump_test "emit-relocs-516-be"
 run_dump_test "emit-relocs-523"
 run_dump_test "emit-relocs-524"
 run_dump_test "emit-relocs-525"
@@ -176,6 +186,14 @@ run_dump_test "tls-relax-all"
 run_dump_test "tls-relax-gd-le"
 run_dump_test "tls-relax-gdesc-le"
 run_dump_test "tls-relax-gd-ie"
+run_dump_test "tls-relax-large-gd-ie"
+run_dump_test "tls-relax-large-gd-ie-be"
+run_dump_test "tls-relax-large-gd-le"
+run_dump_test "tls-relax-large-gd-le-be"
+run_dump_test "tls-relax-large-desc-ie"
+run_dump_test "tls-relax-large-desc-ie-be"
+run_dump_test "tls-relax-large-desc-le"
+run_dump_test "tls-relax-large-desc-le-be"
 run_dump_test "tls-relax-gdesc-ie"
 run_dump_test "tls-relax-ie-le"
 run_dump_test "tls-relax-ld-le-small"
@@ -192,6 +210,10 @@ run_dump_test "tls-tiny-desc"
 run_dump_test "tls-tiny-desc-ie"
 run_dump_test "tls-tiny-desc-le"
 run_dump_test "tls-tiny-ie"
+run_dump_test "tls-large-ie"
+run_dump_test "tls-large-ie-be"
+run_dump_test "tls-large-desc"
+run_dump_test "tls-large-desc-be"
 run_dump_test "tls-tiny-ld"
 run_dump_test "tls-small-ld"
 run_dump_test "tlsle"
@@ -253,6 +275,8 @@ run_dump_test "relasz"
 run_dump_test "relocs-1027-symbolic-func"
 
 run_dump_test "dt_textrel"
+
+run_dump_test "plt_mapping_symbol"
 
 set aarch64elflinktests {
   {"ld-aarch64/so with global symbol" "-shared" "" "" {copy-reloc-so.s}

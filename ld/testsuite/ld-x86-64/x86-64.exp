@@ -1,5 +1,5 @@
 # Expect script for ld-x86_64 tests
-#   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+#   Copyright (C) 2002-2016 Free Software Foundation, Inc.
 #
 # This file is part of the GNU Binutils.
 #
@@ -321,12 +321,38 @@ run_dump_test "mov1a"
 run_dump_test "mov1b"
 run_dump_test "mov1c"
 run_dump_test "mov1d"
+run_dump_test "mov2a"
+run_dump_test "mov2b"
+run_dump_test "mov2c"
+run_dump_test "mov2d"
+run_dump_test "load1a"
+run_dump_test "load1b"
+run_dump_test "load1c"
+run_dump_test "load1d"
+run_dump_test "load1a-nacl"
+run_dump_test "load1b-nacl"
+run_dump_test "load1c-nacl"
+run_dump_test "load1d-nacl"
+run_dump_test "call1a"
+run_dump_test "call1b"
+run_dump_test "call1c"
+run_dump_test "call1d"
+run_dump_test "call1e"
+run_dump_test "call1f"
+run_dump_test "call1g"
+run_dump_test "call1h"
+run_dump_test "call1i"
 run_dump_test "pr17935-1"
 run_dump_test "pr17935-2"
 run_dump_test "pr18160"
 run_dump_test "pr18176"
 run_dump_test "pr18801"
 run_dump_test "pr18815"
+run_dump_test "pr19013"
+run_dump_test "pr19013-x32"
+run_dump_test "pr19013-nacl"
+run_dump_test "pr19162"
+run_dump_test "pr19175"
 
 # Add $PLT_CFLAGS if PLT is expected.
 global PLT_CFLAGS
@@ -500,6 +526,46 @@ if { [isnative] && [which $CC] != 0 } {
 	    {{readelf {-Wrd} pr18900b.rd}} \
 	    "pr18900b" \
 	] \
+	[list \
+	    "Build pr19031.so" \
+	    "-shared" \
+	    "-fPIC" \
+	    { pr19031a.c } \
+	    "" \
+	    "pr19031.so" \
+	] \
+	[list \
+	    "Build gotpcrel1d.so" \
+	    "-shared" \
+	    "" \
+	    { gotpcrel1d.S } \
+	    "" \
+	    "gotpcrel1d.so" \
+	] \
+	[list \
+	    "Build gotpcrel1" \
+	    "tmpdir/gotpcrel1d.so" \
+	    "" \
+	    { gotpcrel1a.S gotpcrel1b.c gotpcrel1c.c } \
+	    {{objdump {-dw} gotpcrel1.dd}} \
+	    "gotpcrel1" \
+	] \
+	[list \
+	    "Build pr19319.so" \
+	    "-shared" \
+	    "" \
+	    { pr19319a.S } \
+	    "" \
+	    "pr19319.so" \
+	] \
+	[list \
+	    "Build pr19319" \
+	    "-pie -nostdlib -nostartfiles tmpdir/pr19319.so" \
+	    "" \
+	    { pr19319b.S } \
+	    {{objdump {-dw} pr19319.dd}} \
+	    "pr19319" \
+	] \
     ]
 
     run_ld_link_exec_tests [] [list \
@@ -553,6 +619,22 @@ if { [isnative] && [which $CC] != 0 } {
 	    { pr18900b.c pr18900c.c } \
 	    "pr18900" \
 	    "pr18900.out" \
+	] \
+	[list \
+	    "Run pr19031" \
+	    "tmpdir/pr19031.so" \
+	    "" \
+	    { pr19031b.S pr19031c.c } \
+	    "pr19031" \
+	    "pr19031.out" \
+	] \
+	[list \
+	    "Run gotpcrel1" \
+	    "tmpdir/gotpcrel1d.so" \
+	    "" \
+	    { gotpcrel1a.S gotpcrel1b.c gotpcrel1c.c } \
+	    "gotpcrel1" \
+	    "gotpcrel1.out" \
 	] \
     ]
 

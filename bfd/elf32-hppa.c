@@ -1,5 +1,5 @@
 /* BFD back-end for HP PA-RISC ELF files.
-   Copyright (C) 1990-2015 Free Software Foundation, Inc.
+   Copyright (C) 1990-2016 Free Software Foundation, Inc.
 
    Original code by
 	Center for Software Science
@@ -2215,7 +2215,7 @@ elf32_hppa_size_dynamic_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
   if (htab->etab.dynamic_sections_created)
     {
       /* Set the contents of the .interp section to the interpreter.  */
-      if (bfd_link_executable (info))
+      if (bfd_link_executable (info) && !info->nointerp)
 	{
 	  sec = bfd_get_linker_section (dynobj, ".interp");
 	  if (sec == NULL)
@@ -4585,9 +4585,10 @@ elf32_hppa_finish_dynamic_sections (bfd *output_bfd,
 
   if (htab->splt != NULL && htab->splt->size != 0)
     {
-      /* Set plt entry size.  */
-      elf_section_data (htab->splt->output_section)
-	->this_hdr.sh_entsize = PLT_ENTRY_SIZE;
+      /* Set plt entry size to 0 instead of PLT_ENTRY_SIZE, since we add the
+	 plt stubs and as such the section does not hold a table of fixed-size
+	 entries.  */
+      elf_section_data (htab->splt->output_section)->this_hdr.sh_entsize = 0;
 
       if (htab->need_plt_stub)
 	{

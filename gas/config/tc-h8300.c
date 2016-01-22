@@ -1,5 +1,5 @@
 /* tc-h8300.c -- Assemble code for the Renesas H8/300
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2016 Free Software Foundation, Inc.
 
    This file is part of GAS, the GNU Assembler.
 
@@ -826,7 +826,7 @@ get_operand (char **ptr, struct h8_op *op, int direction)
 	    op->mode |= DISP | direction;
 	  src = skip_colonthing (src, &op->mode);
 
-	  if (*src != ')' && '(')
+	  if (*src != ')')
 	    {
 	      as_bad (_("expected @(exp, reg16)"));
 	      return;

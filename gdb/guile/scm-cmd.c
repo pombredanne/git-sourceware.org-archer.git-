@@ -1,6 +1,6 @@
 /* GDB commands implemented in Scheme.
 
-   Copyright (C) 2008-2015 Free Software Foundation, Inc.
+   Copyright (C) 2008-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -506,7 +506,7 @@ gdbscm_parse_command_name (const char *name,
 		   || name[i - 1] == '_');
        --i)
     ;
-  result = xmalloc (lastchar - i + 2);
+  result = (char *) xmalloc (lastchar - i + 2);
   memcpy (result, &name[i], lastchar - i + 1);
   result[lastchar - i + 1] = '\0';
 
@@ -519,7 +519,7 @@ gdbscm_parse_command_name (const char *name,
       return result;
     }
 
-  prefix_text = xmalloc (i + 2);
+  prefix_text = (char *) xmalloc (i + 2);
   memcpy (prefix_text, name, i + 1);
   prefix_text[i + 1] = '\0';
 
@@ -530,7 +530,7 @@ gdbscm_parse_command_name (const char *name,
       msg = xstrprintf (_("could not find command prefix '%s'"), prefix_text);
       xfree (prefix_text);
       xfree (result);
-      scm_dynwind_begin (0);
+      scm_dynwind_begin ((scm_t_dynwind_flags) 0);
       gdbscm_dynwind_xfree (msg);
       gdbscm_out_of_range_error (func_name, arg_pos,
 				 gdbscm_scm_from_c_string (name), msg);
@@ -546,7 +546,7 @@ gdbscm_parse_command_name (const char *name,
   msg = xstrprintf (_("'%s' is not a prefix command"), prefix_text);
   xfree (prefix_text);
   xfree (result);
-  scm_dynwind_begin (0);
+  scm_dynwind_begin ((scm_t_dynwind_flags) 0);
   gdbscm_dynwind_xfree (msg);
   gdbscm_out_of_range_error (func_name, arg_pos,
 			     gdbscm_scm_from_c_string (name), msg);
@@ -601,7 +601,8 @@ char *
 gdbscm_canonicalize_command_name (const char *name, int want_trailing_space)
 {
   int i, out, seen_word;
-  char *result = scm_gc_malloc_pointerless (strlen (name) + 2, FUNC_NAME);
+  char *result
+    = (char *) scm_gc_malloc_pointerless (strlen (name) + 2, FUNC_NAME);
 
   i = out = seen_word = 0;
   while (name[i])

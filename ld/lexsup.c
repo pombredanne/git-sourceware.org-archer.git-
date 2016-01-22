@@ -1,5 +1,5 @@
 /* Parse options for the GNU linker.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2016 Free Software Foundation, Inc.
 
    This file is part of the GNU Binutils.
 
@@ -65,9 +65,9 @@ static void help (void);
 
 enum control_enum {
   /* Use one dash before long option name.  */
-  ONE_DASH,
+  ONE_DASH = 1,
   /* Use two dashes before long option name.  */
-  TWO_DASHES,
+  TWO_DASHES = 2,
   /* Only accept two dashes before the long option name.
      This is an overloading of the use of this enum, since originally it
      was only intended to tell the --help display function how to display
@@ -137,6 +137,9 @@ static const struct ld_option ld_options[] =
     'h', N_("FILENAME"), N_("Set internal name of shared library"), ONE_DASH },
   { {"dynamic-linker", required_argument, NULL, OPTION_DYNAMIC_LINKER},
     'I', N_("PROGRAM"), N_("Set PROGRAM as the dynamic linker to use"),
+    TWO_DASHES },
+  { {"no-dynamic-linker", no_argument, NULL, OPTION_NO_DYNAMIC_LINKER},
+    '\0', NULL, N_("Produce an executable with no program interpreter header"),
     TWO_DASHES },
   { {"library", required_argument, NULL, 'l'},
     'l', N_("LIBNAME"), N_("Search for library LIBNAME"), TWO_DASHES },
@@ -676,7 +679,28 @@ parse_args (unsigned argc, char **argv)
       switch (optc)
 	{
 	case '?':
-	  einfo (_("%P: unrecognized option '%s'\n"), argv[last_optind]);
+	  {
+	    /* If the last word on the command line is an option that
+	       requires an argument, getopt will refuse to recognise it.
+	       Try to catch such options here and issue a more helpful
+	       error message than just "unrecognized option".  */
+	    int opt;
+
+	    for (opt = ARRAY_SIZE (ld_options); opt--;)
+	      if (ld_options[opt].opt.has_arg == required_argument
+		  /* FIXME: There are a few short options that do not
+		     have long equivalents, but which require arguments.
+		     We should handle them too.  */
+		  && ld_options[opt].opt.name != NULL
+		  && strcmp (argv[last_optind] + ld_options[opt].control, ld_options[opt].opt.name) == 0)
+		{
+		  einfo (_("%P: %s: missing argument\n"), argv[last_optind]);
+		  break;
+		}
+
+	    if (opt == -1)
+	      einfo (_("%P: unrecognized option '%s'\n"), argv[last_optind]);
+	  }
 	  /* Fall through.  */
 
 	default:
@@ -761,6 +785,10 @@ parse_args (unsigned argc, char **argv)
 	case 'I':		/* Used on Solaris.  */
 	case OPTION_DYNAMIC_LINKER:
 	  command_line.interpreter = optarg;
+	  link_info.nointerp = 0;
+	  break;
+	case OPTION_NO_DYNAMIC_LINKER:
+	  link_info.nointerp = 1;
 	  break;
 	case OPTION_SYSROOT:
 	  /* Already handled in ldmain.c.  */
@@ -990,7 +1018,7 @@ parse_args (unsigned argc, char **argv)
 	  break;
 	case OPTION_PLUGIN_OPT:
 	  if (plugin_opt_plugin_arg (optarg))
-	    einfo(_("%P%F: bad -plugin-opt option\n"));
+	    einfo (_("%P%F: bad -plugin-opt option\n"));
 	  break;
 #endif /* ENABLE_PLUGINS */
 	case 'q':
@@ -1749,6 +1777,13 @@ elf_static_list_options (FILE *file)
   fprintf (file, _("\
   --compress-debug-sections=[none|zlib|zlib-gnu|zlib-gabi]\n\
                               Compress DWARF debug sections using zlib\n"));
+#ifdef DEFAULT_FLAG_COMPRESS_DEBUG
+  fprintf (file, _("\
+                               Default: zlib-gabi\n"));
+#else
+  fprintf (file, _("\
+                               Default: none\n"));
+#endif
   fprintf (file, _("\
   -z common-page-size=SIZE    Set common page size to SIZE\n"));
   fprintf (file, _("\

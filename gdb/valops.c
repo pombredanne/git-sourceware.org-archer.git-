@@ -1,6 +1,6 @@
 /* Perform non-arithmetic operations on values, for GDB.
 
-   Copyright (C) 1986-2015 Free Software Foundation, Inc.
+   Copyright (C) 1986-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1626,7 +1626,7 @@ value_array (int lowbound, int highbound, struct value **elemvec)
 }
 
 struct value *
-value_cstring (char *ptr, ssize_t len, struct type *char_type)
+value_cstring (const char *ptr, ssize_t len, struct type *char_type)
 {
   struct value *val;
   int lowbound = current_language->string_lower_bound;
@@ -1649,7 +1649,7 @@ value_cstring (char *ptr, ssize_t len, struct type *char_type)
    string may contain embedded null bytes.  */
 
 struct value *
-value_string (char *ptr, ssize_t len, struct type *char_type)
+value_string (const char *ptr, ssize_t len, struct type *char_type)
 {
   struct value *val;
   int lowbound = current_language->string_lower_bound;
@@ -2047,7 +2047,7 @@ search_struct_method (const char *name, struct value **arg1p,
 	      struct cleanup *back_to;
 	      CORE_ADDR address;
 
-	      tmp = xmalloc (TYPE_LENGTH (baseclass));
+	      tmp = (gdb_byte *) xmalloc (TYPE_LENGTH (baseclass));
 	      back_to = make_cleanup (xfree, tmp);
 	      address = value_address (*arg1p);
 
@@ -2900,7 +2900,7 @@ find_oload_champ_namespace_loop (struct value **args, int nargs,
 
   old_cleanups = make_cleanup (xfree, *oload_syms);
   make_cleanup (xfree, *oload_champ_bv);
-  new_namespace = alloca (namespace_len + 1);
+  new_namespace = (char *) alloca (namespace_len + 1);
   strncpy (new_namespace, qualified_name, namespace_len);
   new_namespace[namespace_len] = '\0';
   new_oload_syms = make_symbol_overload_list (func_name,

@@ -1,6 +1,6 @@
 /* YACC parser for Go expressions, for GDB.
 
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -535,7 +535,7 @@ string_exp:
 
 			  vec->type = $1.type;
 			  vec->length = $1.length;
-			  vec->ptr = malloc ($1.length + 1);
+			  vec->ptr = (char *) malloc ($1.length + 1);
 			  memcpy (vec->ptr, $1.ptr, $1.length + 1);
 			}
 
@@ -545,10 +545,10 @@ string_exp:
 			     for convenience.  */
 			  char *p;
 			  ++$$.len;
-			  $$.tokens = realloc ($$.tokens,
-					       $$.len * sizeof (struct typed_stoken));
+			  $$.tokens = XRESIZEVEC (struct typed_stoken,
+						  $$.tokens, $$.len);
 
-			  p = malloc ($3.length + 1);
+			  p = (char *) malloc ($3.length + 1);
 			  memcpy (p, $3.ptr, $3.length + 1);
 
 			  $$.tokens[$$.len - 1].type = $3.type;
@@ -975,7 +975,7 @@ parse_string_or_char (const char *tokptr, const char **outptr,
   ++tokptr;
 
   value->type = C_STRING | (quote == '\'' ? C_CHAR : 0); /*FIXME*/
-  value->ptr = obstack_base (&tempbuf);
+  value->ptr = (char *) obstack_base (&tempbuf);
   value->length = obstack_object_size (&tempbuf);
 
   *outptr = tokptr;
@@ -1363,7 +1363,7 @@ build_packaged_name (const char *package, int package_len,
   obstack_grow_str (&name_obstack, ".");
   obstack_grow (&name_obstack, name, name_len);
   obstack_grow (&name_obstack, "", 1);
-  result.ptr = obstack_base (&name_obstack);
+  result.ptr = (char *) obstack_base (&name_obstack);
   result.length = obstack_object_size (&name_obstack) - 1;
 
   return result;

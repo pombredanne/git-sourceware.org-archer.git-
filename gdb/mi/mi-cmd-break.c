@@ -1,5 +1,5 @@
 /* MI Command Set - breakpoint and watchpoint commands.
-   Copyright (C) 2000-2015 Free Software Foundation, Inc.
+   Copyright (C) 2000-2016 Free Software Foundation, Inc.
    Contributed by Cygnus Solutions (a Red Hat company).
 
    This file is part of GDB.
@@ -156,7 +156,7 @@ mi_argv_to_format (char **argv, int argc)
     }
   obstack_1grow (&obstack, '\0');
 
-  ret = xstrdup (obstack_finish (&obstack));
+  ret = xstrdup ((const char *) obstack_finish (&obstack));
   obstack_free (&obstack, NULL);
 
   return ret;

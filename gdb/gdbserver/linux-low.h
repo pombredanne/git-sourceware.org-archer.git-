@@ -1,5 +1,5 @@
 /* Internal interfaces for the GNU/Linux specific target code for gdbserver.
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -37,6 +37,11 @@ enum regset_type {
   FP_REGS,
   EXTENDED_REGS,
 };
+
+/* The arch's regsets array initializer must be terminated with a NULL
+   regset.  */
+#define NULL_REGSET \
+  { 0, 0, 0, -1, (enum regset_type) -1, NULL, NULL }
 
 struct regset_info
 {
@@ -141,9 +146,15 @@ struct linux_target_ops
 
   CORE_ADDR (*get_pc) (struct regcache *regcache);
   void (*set_pc) (struct regcache *regcache, CORE_ADDR newpc);
-  const unsigned char *breakpoint;
-  int breakpoint_len;
-  CORE_ADDR (*breakpoint_reinsert_addr) (void);
+
+  /* See target.h for details.  */
+  int (*breakpoint_kind_from_pc) (CORE_ADDR *pcptr);
+
+  /* See target.h for details.  */
+  const gdb_byte *(*sw_breakpoint_from_kind) (int kind, int *size);
+
+  /* Find the next possible PCs after the current instruction executes.  */
+  VEC (CORE_ADDR) *(*get_next_pcs) (CORE_ADDR pc, struct regcache *regcache);
 
   int decr_pc_after_break;
   int (*breakpoint_at) (CORE_ADDR pc);
@@ -189,7 +200,7 @@ struct linux_target_ops
   void (*prepare_to_resume) (struct lwp_info *);
 
   /* Hook to support target specific qSupported.  */
-  void (*process_qsupported) (const char *);
+  void (*process_qsupported) (char **, int count);
 
   /* Returns true if the low target supports tracepoints.  */
   int (*supports_tracepoints) (void);
@@ -223,6 +234,18 @@ struct linux_target_ops
 
   /* Returns true if the low target supports range stepping.  */
   int (*supports_range_stepping) (void);
+
+  /* See target.h.  */
+  int (*breakpoint_kind_from_current_state) (CORE_ADDR *pcptr);
+
+  /* See target.h.  */
+  int (*supports_hardware_single_step) (void);
+
+  /* Fill *SYSNO with the syscall nr trapped.  Fill *SYSRET with the
+     return code.  Only to be called when inferior is stopped
+     due to SYSCALL_SIGTRAP.  */
+  void (*get_syscall_trapinfo) (struct regcache *regcache,
+				int *sysno, int *sysret);
 };
 
 extern struct linux_target_ops the_low_target;
@@ -260,6 +283,13 @@ struct lwp_info
   /* If this flag is set, the lwp is known to be stopped right now (stop
      event already received in a wait()).  */
   int stopped;
+
+  /* Signal whether we are in a SYSCALL_ENTRY or
+     in a SYSCALL_RETURN event.
+     Values:
+     - TARGET_WAITKIND_SYSCALL_ENTRY
+     - TARGET_WAITKIND_SYSCALL_RETURN */
+  enum target_waitkind syscall_state;
 
   /* When stopped is set, the last wait status recorded for this lwp.  */
   int last_waitstatus;
@@ -363,7 +393,7 @@ void initialize_regsets_info (struct regsets_info *regsets_info);
 void initialize_low_arch (void);
 
 /* From thread-db.c  */
-int thread_db_init (int use_events);
+int thread_db_init (void);
 void thread_db_detach (struct process_info *);
 void thread_db_mourn (struct process_info *);
 int thread_db_handle_monitor_command (char *);

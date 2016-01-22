@@ -1,6 +1,6 @@
 /* Read a symbol table in ECOFF format (Third-Eye).
 
-   Copyright (C) 1986-2015 Free Software Foundation, Inc.
+   Copyright (C) 1986-2016 Free Software Foundation, Inc.
 
    Original version contributed by Alessandro Forin (af@cs.cmu.edu) at
    CMU.  Major work by Per Bothner, John Gilmore and Ian Lance Taylor
@@ -359,7 +359,7 @@ mdebug_build_psymtabs (struct objfile *objfile,
       info->fdr = (FDR *) obstack_alloc (&objfile->objfile_obstack,
 					 (info->symbolic_header.ifdMax
 					  * sizeof (FDR)));
-      fdr_src = info->external_fdr;
+      fdr_src = (char *) info->external_fdr;
       fdr_end = (fdr_src
 		 + info->symbolic_header.ifdMax * swap->external_fdr_size);
       fdr_ptr = info->fdr;
@@ -521,6 +521,14 @@ add_pending (FDR *fh, char *sh, struct type *t)
 
 /* Parsing Routines proper.  */
 
+static void
+reg_value_complaint (int regnum, int num_regs, const char *sym)
+{
+  complaint (&symfile_complaints,
+	     _("bad register number %d (max %d) in symbol %s"),
+             regnum, num_regs - 1, sym);
+}
+
 /* Parse a single symbol.  Mostly just make up a GDB symbol for it.
    For blocks, procedures and types we open a new lexical context.
    This is basically just a big switch on the symbol's type.  Argument
@@ -533,7 +541,21 @@ add_pending (FDR *fh, char *sh, struct type *t)
 static int
 mdebug_reg_to_regnum (struct symbol *sym, struct gdbarch *gdbarch)
 {
-  return gdbarch_ecoff_reg_to_regnum (gdbarch, SYMBOL_VALUE (sym));
+  int regno = gdbarch_ecoff_reg_to_regnum (gdbarch, SYMBOL_VALUE (sym));
+
+  if (regno < 0
+      || regno >= (gdbarch_num_regs (gdbarch)
+		   + gdbarch_num_pseudo_regs (gdbarch)))
+    {
+      reg_value_complaint (regno,
+			   gdbarch_num_regs (gdbarch)
+			     + gdbarch_num_pseudo_regs (gdbarch),
+			   SYMBOL_PRINT_NAME (sym));
+
+      regno = gdbarch_sp_regnum (gdbarch); /* Known safe, though useless.  */
+    }
+
+  return regno;
 }
 
 static const struct symbol_register_ops mdebug_register_funcs = {
@@ -544,6 +566,26 @@ static const struct symbol_register_ops mdebug_register_funcs = {
 
 static int mdebug_register_index;
 static int mdebug_regparm_index;
+
+/* Common code for symbols describing data.  */
+
+static void
+add_data_symbol (SYMR *sh, union aux_ext *ax, int bigend,
+		 struct symbol *s, int aclass_index, struct block *b,
+		 struct objfile *objfile, char *name)
+{
+  SYMBOL_DOMAIN (s) = VAR_DOMAIN;
+  SYMBOL_ACLASS_INDEX (s) = aclass_index;
+  add_symbol (s, top_stack->cur_st, b);
+
+  /* Type could be missing if file is compiled without debugging info.  */
+  if (SC_IS_UNDEF (sh->sc)
+      || sh->sc == scNil || sh->index == indexNil)
+    SYMBOL_TYPE (s) = objfile_type (objfile)->nodebug_data_symbol;
+  else
+    SYMBOL_TYPE (s) = parse_type (cur_fd, ax, sh->index, 0, bigend, name);
+  /* Value of a data symbol is its memory address.  */
+}
 
 static int
 parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
@@ -559,7 +601,6 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
   struct type *t;
   struct field *f;
   int count = 1;
-  enum address_class theclass;
   TIR tir;
   long svalue = sh->value;
   int bitsize;
@@ -600,15 +641,14 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
       break;
 
     case stGlobal:		/* External symbol, goes into global block.  */
-      theclass = LOC_STATIC;
       b = BLOCKVECTOR_BLOCK (SYMTAB_BLOCKVECTOR (top_stack->cur_st),
 			     GLOBAL_BLOCK);
       s = new_symbol (name);
       SYMBOL_VALUE_ADDRESS (s) = (CORE_ADDR) sh->value;
-      goto data;
+      add_data_symbol (sh, ax, bigend, s, LOC_STATIC, b, objfile, name);
+      break;
 
     case stStatic:		/* Static data, goes into current block.  */
-      theclass = LOC_STATIC;
       b = top_stack->cur_block;
       s = new_symbol (name);
       if (SC_IS_COMMON (sh->sc))
@@ -622,29 +662,19 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 	}
       else
 	SYMBOL_VALUE_ADDRESS (s) = (CORE_ADDR) sh->value;
-      goto data;
+      add_data_symbol (sh, ax, bigend, s, LOC_STATIC, b, objfile, name);
+      break;
 
     case stLocal:		/* Local variable, goes into current block.  */
       b = top_stack->cur_block;
       s = new_symbol (name);
       SYMBOL_VALUE (s) = svalue;
       if (sh->sc == scRegister)
-	theclass = mdebug_register_index;
+	add_data_symbol (sh, ax, bigend, s, mdebug_register_index,
+			 b, objfile, name);
       else
-	theclass = LOC_LOCAL;
-
-    data:			/* Common code for symbols describing data.  */
-      SYMBOL_DOMAIN (s) = VAR_DOMAIN;
-      SYMBOL_ACLASS_INDEX (s) = theclass;
-      add_symbol (s, top_stack->cur_st, b);
-
-      /* Type could be missing if file is compiled without debugging info.  */
-      if (SC_IS_UNDEF (sh->sc)
-	  || sh->sc == scNil || sh->index == indexNil)
-	SYMBOL_TYPE (s) = objfile_type (objfile)->nodebug_data_symbol;
-      else
-	SYMBOL_TYPE (s) = parse_type (cur_fd, ax, sh->index, 0, bigend, name);
-      /* Value of a data symbol is its memory address.  */
+	add_data_symbol (sh, ax, bigend, s, LOC_LOCAL,
+			 b, objfile, name);
       break;
 
     case stParam:		/* Arg to procedure, goes into current
@@ -1050,8 +1080,8 @@ parse_symbol (SYMR *sh, union aux_ext *ax, char *ext_sh, int bigend,
 		enum_sym = allocate_symbol (mdebugread_objfile);
 		SYMBOL_SET_LINKAGE_NAME
 		  (enum_sym,
-		   obstack_copy0 (&mdebugread_objfile->objfile_obstack,
-				  f->name, strlen (f->name)));
+		   (char *) obstack_copy0 (&mdebugread_objfile->objfile_obstack,
+					   f->name, strlen (f->name)));
 		SYMBOL_ACLASS_INDEX (enum_sym) = LOC_CONST;
 		SYMBOL_TYPE (enum_sym) = t;
 		SYMBOL_DOMAIN (enum_sym) = VAR_DOMAIN;
@@ -1348,7 +1378,8 @@ static struct type *
 basic_type (int bt, struct objfile *objfile)
 {
   struct gdbarch *gdbarch = get_objfile_arch (objfile);
-  struct type **map_bt = objfile_data (objfile, basic_type_data);
+  struct type **map_bt
+    = (struct type **) objfile_data (objfile, basic_type_data);
   struct type *tp;
 
   if (bt >= btMax)
@@ -1696,8 +1727,9 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 	  else if (TYPE_TAG_NAME (tp) == NULL
 		   || strcmp (TYPE_TAG_NAME (tp), name) != 0)
 	    TYPE_TAG_NAME (tp)
-	      = obstack_copy0 (&mdebugread_objfile->objfile_obstack,
-			       name, strlen (name));
+	      = ((const char *)
+		 obstack_copy0 (&mdebugread_objfile->objfile_obstack,
+				name, strlen (name)));
 	}
     }
 
@@ -1733,8 +1765,9 @@ parse_type (int fd, union aux_ext *ax, unsigned int aux_index, int *bs,
 	  if (TYPE_NAME (tp) == NULL
 	      || strcmp (TYPE_NAME (tp), name) != 0)
 	    TYPE_NAME (tp)
-	      = obstack_copy0 (&mdebugread_objfile->objfile_obstack,
-			       name, strlen (name));
+	      = ((const char *)
+		 obstack_copy0 (&mdebugread_objfile->objfile_obstack,
+				name, strlen (name)));
 	}
     }
   if (t->bt == btTypedef)
@@ -2826,10 +2859,11 @@ parse_partial_symbols (struct objfile *objfile)
 		    /* Concatinate stabstring2 with stabstring1.  */
 		    if (stabstring
 		     && stabstring != debug_info->ss + fh->issBase + sh.iss)
-		      stabstring = xrealloc (stabstring, len + len2 + 1);
+		      stabstring
+			= (char *) xrealloc (stabstring, len + len2 + 1);
 		    else
 		      {
-			stabstring = xmalloc (len + len2 + 1);
+			stabstring = (char *) xmalloc (len + len2 + 1);
 			strcpy (stabstring, stabstring1);
 		      }
 		    strcpy (stabstring + len, stabstring2);
@@ -3249,7 +3283,7 @@ parse_partial_symbols (struct objfile *objfile)
 			if (! pst)
 			  {
 			    int name_len = p - namestring;
-			    char *name = xmalloc (name_len + 1);
+			    char *name = (char *) xmalloc (name_len + 1);
 
 			    memcpy (name, namestring, name_len);
 			    name[name_len] = '\0';
@@ -3273,7 +3307,7 @@ parse_partial_symbols (struct objfile *objfile)
 			if (! pst)
 			  {
 			    int name_len = p - namestring;
-			    char *name = xmalloc (name_len + 1);
+			    char *name = (char *) xmalloc (name_len + 1);
 
 			    memcpy (name, namestring, name_len);
 			    name[name_len] = '\0';
@@ -4278,10 +4312,10 @@ psymtab_to_symtab_1 (struct objfile *objfile,
       if (size > 1)
 	--size;
       SYMTAB_LINETABLE (COMPUNIT_FILETABS (cust))
-	= obstack_copy (&mdebugread_objfile->objfile_obstack,
-			lines,
-			(sizeof (struct linetable)
-			 + size * sizeof (lines->item)));
+	= ((struct linetable *)
+	   obstack_copy (&mdebugread_objfile->objfile_obstack,
+			 lines, (sizeof (struct linetable)
+				 + size * sizeof (lines->item))));
       xfree (lines);
 
       /* .. and our share of externals.

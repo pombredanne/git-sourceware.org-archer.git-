@@ -1,6 +1,6 @@
 /* SystemTap probe support for GDB.
 
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -653,7 +653,7 @@ stap_parse_register_operand (struct stap_parse_info *p)
 
   len = p->arg - start;
 
-  regname = alloca (len + gdb_reg_prefix_len + gdb_reg_suffix_len + 1);
+  regname = (char *) alloca (len + gdb_reg_prefix_len + gdb_reg_suffix_len + 1);
   regname[0] = '\0';
 
   /* We only add the GDB's register prefix/suffix if we are dealing with
@@ -1488,8 +1488,9 @@ handle_stap_probe (struct objfile *objfile, struct sdt_note *el,
 
   /* Provider and the name of the probe.  */
   ret->p.provider = (char *) &el->data[3 * size];
-  ret->p.name = memchr (ret->p.provider, '\0',
-			(char *) el->data + el->size - ret->p.provider);
+  ret->p.name = ((const char *)
+		 memchr (ret->p.provider, '\0',
+			 (char *) el->data + el->size - ret->p.provider));
   /* Making sure there is a name.  */
   if (ret->p.name == NULL)
     {
@@ -1519,8 +1520,9 @@ handle_stap_probe (struct objfile *objfile, struct sdt_note *el,
 
   /* Arguments.  We can only extract the argument format if there is a valid
      name for this probe.  */
-  probe_args = memchr (ret->p.name, '\0',
-		       (char *) el->data + el->size - ret->p.name);
+  probe_args = ((const char*)
+		memchr (ret->p.name, '\0',
+			(char *) el->data + el->size - ret->p.name));
 
   if (probe_args != NULL)
     ++probe_args;
@@ -1538,7 +1540,7 @@ handle_stap_probe (struct objfile *objfile, struct sdt_note *el,
     }
 
   ret->args_parsed = 0;
-  ret->args_u.text = (void *) probe_args;
+  ret->args_u.text = probe_args;
 
   /* Successfully created probe.  */
   VEC_safe_push (probe_p, *probesp, (struct probe *) ret);
@@ -1550,7 +1552,7 @@ handle_stap_probe (struct objfile *objfile, struct sdt_note *el,
 static void
 get_stap_base_address_1 (bfd *abfd, asection *sect, void *obj)
 {
-  asection **ret = obj;
+  asection **ret = (asection **) obj;
 
   if ((sect->flags & (SEC_DATA | SEC_ALLOC | SEC_HAS_CONTENTS))
       && sect->name && !strcmp (sect->name, STAP_BASE_SECTION_NAME))

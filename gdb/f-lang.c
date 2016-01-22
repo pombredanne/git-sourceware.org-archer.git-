@@ -1,6 +1,6 @@
 /* Fortran language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 1993-2015 Free Software Foundation, Inc.
+   Copyright (C) 1993-2016 Free Software Foundation, Inc.
 
    Contributed by Motorola.  Adapted from the C parser by Farooq Butt
    (fmbutt@engage.sps.mot.com).
@@ -343,7 +343,7 @@ static struct gdbarch_data *f_type_data;
 const struct builtin_f_type *
 builtin_f_type (struct gdbarch *gdbarch)
 {
-  return gdbarch_data (gdbarch, f_type_data);
+  return (const struct builtin_f_type *) gdbarch_data (gdbarch, f_type_data);
 }
 
 void

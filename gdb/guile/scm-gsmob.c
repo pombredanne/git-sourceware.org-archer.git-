@@ -1,6 +1,6 @@
 /* GDB/Scheme smobs (gsmob is pronounced "jee smob")
 
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -193,7 +193,7 @@ gdbscm_add_objfile_ref (struct objfile *objfile,
   g_smob->prev = NULL;
   if (objfile != NULL)
     {
-      g_smob->next = objfile_data (objfile, data_key);
+      g_smob->next = (chained_gdb_smob *) objfile_data (objfile, data_key);
       if (g_smob->next)
 	g_smob->next->prev = g_smob;
       set_objfile_data (objfile, data_key, g_smob);

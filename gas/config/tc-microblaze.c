@@ -1,6 +1,6 @@
 /* tc-microblaze.c -- Assemble code for Xilinx MicroBlaze
 
-   Copyright (C) 2009-2015 Free Software Foundation, Inc.
+   Copyright (C) 2009-2016 Free Software Foundation, Inc.
 
    This file is part of GAS, the GNU Assembler.
 
@@ -739,7 +739,7 @@ parse_imm (char * s, expressionS * e, offsetT min, offsetT max)
     {
       /* Special case: sign extend negative 32-bit values to 64-bits.  */
       if ((e->X_add_number >> 31) == 1)
-	e->X_add_number |= (-1 << 31);
+	e->X_add_number |= -((offsetT) 1 << 31);
 
       if (e->X_add_number < min || e->X_add_number > max)
 	{

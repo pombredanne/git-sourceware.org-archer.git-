@@ -1,6 +1,6 @@
 /* Memory-access and commands for "inferior" process, for GDB.
 
-   Copyright (C) 1986-2015 Free Software Foundation, Inc.
+   Copyright (C) 1986-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -960,7 +960,7 @@ step_command_fsm_prepare (struct step_command_fsm *sm,
   sm->skip_subroutines = skip_subroutines;
   sm->single_inst = single_inst;
   sm->count = count;
-  sm->thread = thread->num;
+  sm->thread = thread->global_num;
 
   /* Leave the si command alone.  */
   if (!sm->single_inst || sm->skip_subroutines)
@@ -1032,7 +1032,7 @@ static int
 step_command_fsm_should_stop (struct thread_fsm *self)
 {
   struct step_command_fsm *sm = (struct step_command_fsm *) self;
-  struct thread_info *tp = find_thread_id (sm->thread);
+  struct thread_info *tp = find_thread_global_id (sm->thread);
 
   if (tp->control.stop_step)
     {
@@ -1316,8 +1316,8 @@ signal_command (char *signum_exp, int from_tty)
 	    {
 	      if (!must_confirm)
 		printf_unfiltered (_("Note:\n"));
-	      printf_unfiltered (_("  Thread %d previously stopped with signal %s, %s.\n"),
-				 tp->num,
+	      printf_unfiltered (_("  Thread %s previously stopped with signal %s, %s.\n"),
+				 print_thread_id (tp),
 				 gdb_signal_to_name (tp->suspend.stop_signal),
 				 gdb_signal_to_string (tp->suspend.stop_signal));
 	      must_confirm = 1;
@@ -1325,10 +1325,10 @@ signal_command (char *signum_exp, int from_tty)
 	}
 
       if (must_confirm
-	  && !query (_("Continuing thread %d (the current thread) with specified signal will\n"
+	  && !query (_("Continuing thread %s (the current thread) with specified signal will\n"
 		       "still deliver the signals noted above to their respective threads.\n"
 		       "Continue anyway? "),
-		     inferior_thread ()->num))
+		     print_thread_id (inferior_thread ())))
 	error (_("Not confirmed."));
     }
 
@@ -1478,7 +1478,7 @@ until_next_command (int from_tty)
   struct symbol *func;
   struct symtab_and_line sal;
   struct thread_info *tp = inferior_thread ();
-  int thread = tp->num;
+  int thread = tp->global_num;
   struct cleanup *old_chain;
   struct until_next_fsm *sm;
 
@@ -1520,12 +1520,11 @@ until_next_command (int from_tty)
   set_longjmp_breakpoint (tp, get_frame_id (frame));
   old_chain = make_cleanup (delete_longjmp_breakpoint_cleanup, &thread);
 
-  sm = new_until_next_fsm (tp->num);
+  sm = new_until_next_fsm (tp->global_num);
   tp->thread_fsm = &sm->thread_fsm;
   discard_cleanups (old_chain);
 
   proceed ((CORE_ADDR) -1, GDB_SIGNAL_DEFAULT);
-
 }
 
 static void
@@ -1774,7 +1773,7 @@ finish_command_fsm_should_stop (struct thread_fsm *self)
 {
   struct finish_command_fsm *f = (struct finish_command_fsm *) self;
   struct return_value_info *rv = &f->return_value;
-  struct thread_info *tp = find_thread_id (f->thread);
+  struct thread_info *tp = find_thread_global_id (f->thread);
 
   if (f->function != NULL
       && bpstat_find_breakpoint (tp->control.stop_bpstat,
@@ -1794,7 +1793,8 @@ finish_command_fsm_should_stop (struct thread_fsm *self)
 
 	  func = read_var_value (f->function, NULL, get_current_frame ());
 	  rv->value = get_return_value (func, rv->type);
-	  rv->value_history_index = record_latest_value (rv->value);
+	  if (rv->value != NULL)
+	    rv->value_history_index = record_latest_value (rv->value);
 	}
     }
   else if (tp->control.stop_step)
@@ -1966,7 +1966,7 @@ finish_command (char *arg, int from_tty)
 
   tp = inferior_thread ();
 
-  sm = new_finish_command_fsm (tp->num);
+  sm = new_finish_command_fsm (tp->global_num);
 
   tp->thread_fsm = &sm->thread_fsm;
 
@@ -2608,18 +2608,15 @@ proceed_after_attach (int pid)
   do_cleanups (old_chain);
 }
 
-/* attach_command --
-   takes a program started up outside of gdb and ``attaches'' to it.
-   This stops it cold in its tracks and allows us to start debugging it.
-   and wait for the trace-trap that results from attaching.  */
+/* See inferior.h.  */
 
-static void
-attach_command_post_wait (char *args, int from_tty, int async_exec)
+void
+setup_inferior (int from_tty)
 {
   struct inferior *inferior;
 
   inferior = current_inferior ();
-  inferior->control.stop_soon = NO_STOP_QUIETLY;
+  inferior->needs_setup = 0;
 
   /* If no exec file is yet known, try to determine it from the
      process itself.  */
@@ -2635,8 +2632,37 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
   target_post_attach (ptid_get_pid (inferior_ptid));
 
   post_create_inferior (&current_target, from_tty);
+}
 
-  if (async_exec)
+/* What to do after the first program stops after attaching.  */
+enum attach_post_wait_mode
+{
+  /* Do nothing.  Leaves threads as they are.  */
+  ATTACH_POST_WAIT_NOTHING,
+
+  /* Re-resume threads that are marked running.  */
+  ATTACH_POST_WAIT_RESUME,
+
+  /* Stop all threads.  */
+  ATTACH_POST_WAIT_STOP,
+};
+
+/* Called after we've attached to a process and we've seen it stop for
+   the first time.  If ASYNC_EXEC is true, re-resume threads that
+   should be running.  Else if ATTACH, */
+
+static void
+attach_post_wait (char *args, int from_tty, enum attach_post_wait_mode mode)
+{
+  struct inferior *inferior;
+
+  inferior = current_inferior ();
+  inferior->control.stop_soon = NO_STOP_QUIETLY;
+
+  if (inferior->needs_setup)
+    setup_inferior (from_tty);
+
+  if (mode == ATTACH_POST_WAIT_RESUME)
     {
       /* The user requested an `attach&', so be sure to leave threads
 	 that didn't get a signal running.  */
@@ -2656,7 +2682,7 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
 	    }
 	}
     }
-  else
+  else if (mode == ATTACH_POST_WAIT_STOP)
     {
       /* The user requested a plain `attach', so be sure to leave
 	 the inferior stopped.  */
@@ -2670,8 +2696,32 @@ attach_command_post_wait (char *args, int from_tty, int async_exec)
 	 selected thread is stopped, others may still be executing.
 	 Be sure to explicitly stop all threads of the process.  This
 	 should have no effect on already stopped threads.  */
-      if (target_is_non_stop_p ())
+      if (non_stop)
 	target_stop (pid_to_ptid (inferior->pid));
+      else if (target_is_non_stop_p ())
+	{
+	  struct thread_info *thread;
+	  struct thread_info *lowest = inferior_thread ();
+	  int pid = current_inferior ()->pid;
+
+	  stop_all_threads ();
+
+	  /* It's not defined which thread will report the attach
+	     stop.  For consistency, always select the thread with
+	     lowest GDB number, which should be the main thread, if it
+	     still exists.  */
+	  ALL_NON_EXITED_THREADS (thread)
+	    {
+	      if (ptid_get_pid (thread->ptid) == pid)
+		{
+		  if (thread->inf->num < lowest->inf->num
+		      || thread->per_inf_num < lowest->per_inf_num)
+		    lowest = thread;
+		}
+	    }
+
+	  switch_to_thread (lowest->ptid);
+	}
 
       /* Tell the user/frontend where we're stopped.  */
       normal_stop ();
@@ -2684,28 +2734,34 @@ struct attach_command_continuation_args
 {
   char *args;
   int from_tty;
-  int async_exec;
+  enum attach_post_wait_mode mode;
 };
 
 static void
 attach_command_continuation (void *args, int err)
 {
-  struct attach_command_continuation_args *a = args;
+  struct attach_command_continuation_args *a
+    = (struct attach_command_continuation_args *) args;
 
   if (err)
     return;
 
-  attach_command_post_wait (a->args, a->from_tty, a->async_exec);
+  attach_post_wait (a->args, a->from_tty, a->mode);
 }
 
 static void
 attach_command_continuation_free_args (void *args)
 {
-  struct attach_command_continuation_args *a = args;
+  struct attach_command_continuation_args *a
+    = (struct attach_command_continuation_args *) args;
 
   xfree (a->args);
   xfree (a);
 }
+
+/* "attach" command entry point.  Takes a program started up outside
+   of gdb and ``attaches'' to it.  This stops it cold in its tracks
+   and allows us to start debugging it.  */
 
 void
 attach_command (char *args, int from_tty)
@@ -2713,6 +2769,8 @@ attach_command (char *args, int from_tty)
   int async_exec;
   struct cleanup *args_chain;
   struct target_ops *attach_target;
+  struct inferior *inferior = current_inferior ();
+  enum attach_post_wait_mode mode;
 
   dont_repeat ();		/* Not for the faint of heart */
 
@@ -2772,6 +2830,8 @@ attach_command (char *args, int from_tty)
   init_wait_for_inferior ();
   clear_proceed_status (0);
 
+  inferior->needs_setup = 1;
+
   if (target_is_non_stop_p ())
     {
       /* If we find that the current thread isn't stopped, explicitly
@@ -2787,12 +2847,13 @@ attach_command (char *args, int from_tty)
 	target_stop (pid_to_ptid (ptid_get_pid (inferior_ptid)));
     }
 
+  mode = async_exec ? ATTACH_POST_WAIT_RESUME : ATTACH_POST_WAIT_STOP;
+
   /* Some system don't generate traps when attaching to inferior.
      E.g. Mach 3 or GNU hurd.  */
   if (!target_attach_no_wait)
     {
       struct attach_command_continuation_args *a;
-      struct inferior *inferior = current_inferior ();
 
       /* Careful here.  See comments in inferior.h.  Basically some
 	 OSes don't ignore SIGSTOPs on continue requests anymore.  We
@@ -2805,7 +2866,7 @@ attach_command (char *args, int from_tty)
       a = XNEW (struct attach_command_continuation_args);
       a->args = xstrdup (args);
       a->from_tty = from_tty;
-      a->async_exec = async_exec;
+      a->mode = mode;
       add_inferior_continuation (attach_command_continuation, a,
 				 attach_command_continuation_free_args);
       /* Done with ARGS.  */
@@ -2819,7 +2880,7 @@ attach_command (char *args, int from_tty)
   /* Done with ARGS.  */
   do_cleanups (args_chain);
 
-  attach_command_post_wait (args, from_tty, async_exec);
+  attach_post_wait (args, from_tty, mode);
 }
 
 /* We had just found out that the target was already attached to an
@@ -2834,7 +2895,7 @@ void
 notice_new_inferior (ptid_t ptid, int leave_running, int from_tty)
 {
   struct cleanup* old_chain;
-  int async_exec;
+  enum attach_post_wait_mode mode;
 
   old_chain = make_cleanup (null_cleanup, NULL);
 
@@ -2842,12 +2903,14 @@ notice_new_inferior (ptid_t ptid, int leave_running, int from_tty)
      they're stopped for some reason other than us telling it to, the
      target reports a signal != GDB_SIGNAL_0.  We don't try to
      resume threads with such a stop signal.  */
-  async_exec = non_stop;
+  mode = non_stop ? ATTACH_POST_WAIT_RESUME : ATTACH_POST_WAIT_NOTHING;
 
   if (!ptid_equal (inferior_ptid, null_ptid))
     make_cleanup_restore_current_thread ();
 
-  switch_to_thread (ptid);
+  /* Avoid reading registers -- we haven't fetched the target
+     description yet.  */
+  switch_to_thread_no_regs (find_thread_ptid (ptid));
 
   /* When we "notice" a new inferior we need to do all the things we
      would normally do if we had just attached to it.  */
@@ -2868,7 +2931,7 @@ notice_new_inferior (ptid_t ptid, int leave_running, int from_tty)
       a = XNEW (struct attach_command_continuation_args);
       a->args = xstrdup ("");
       a->from_tty = from_tty;
-      a->async_exec = async_exec;
+      a->mode = mode;
       add_inferior_continuation (attach_command_continuation, a,
 				 attach_command_continuation_free_args);
 
@@ -2876,8 +2939,8 @@ notice_new_inferior (ptid_t ptid, int leave_running, int from_tty)
       return;
     }
 
-  async_exec = leave_running;
-  attach_command_post_wait ("" /* args */, from_tty, async_exec);
+  mode = leave_running ? ATTACH_POST_WAIT_RESUME : ATTACH_POST_WAIT_NOTHING;
+  attach_post_wait ("" /* args */, from_tty, mode);
 
   do_cleanups (old_chain);
 }

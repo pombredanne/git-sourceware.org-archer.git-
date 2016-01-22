@@ -1,6 +1,6 @@
 /* GDB-specific functions for operating on agent expressions.
 
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -2564,7 +2564,7 @@ gen_printf (CORE_ADDR scope, struct gdbarch *gdbarch,
 
   /* Issue the printf bytecode proper.  */
   ax_simple (ax, aop_printf);
-  ax_simple (ax, nargs);
+  ax_raw_byte (ax, nargs);
   ax_string (ax, format, fmtlen);
 
   /* And terminate.  */

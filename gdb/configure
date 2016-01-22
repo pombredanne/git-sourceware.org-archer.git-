@@ -1560,8 +1560,7 @@ Optional Packages:
                           (auto/yes/no/<python-program>)
   --with-guile[=GUILE]    include guile support
                           (auto/yes/no/<guile-version>/<pkg-config-program>)
-  --with-intel-pt         include Intel(R) Processor Trace support
-                          (auto/yes/no)
+  --with-intel-pt         include Intel Processor Trace support (auto/yes/no)
   --with-libipt-prefix[=DIR]  search for libipt in DIR/include and DIR/lib
   --without-libipt-prefix     don't search for libipt in includedir and libdir
   --without-included-regex
@@ -5015,8 +5014,7 @@ fi
 
 
   if test "$enable_build_with_cxx" = "yes"; then
-    # We're using -fpermissive as shortcut for now.
-    COMPILER='$(CXX) -fpermissive'
+    COMPILER='$(CXX)'
    else
     COMPILER='$(CC)'
   fi
@@ -10112,8 +10110,8 @@ $as_echo_n "checking whether to use intel pt... " >&6; }
 $as_echo "$with_intel_pt" >&6; }
 
 if test "${with_intel_pt}" = no; then
-  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Intel(R) Processor Trace support disabled; some features may be unavailable." >&5
-$as_echo "$as_me: WARNING: Intel(R) Processor Trace support disabled; some features may be unavailable." >&2;}
+  { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: Intel Processor Trace support disabled; some features may be unavailable." >&5
+$as_echo "$as_me: WARNING: Intel Processor Trace support disabled; some features may be unavailable." >&2;}
   HAVE_LIBIPT=no
 else
   cat confdefs.h - <<_ACEOF >conftest.$ac_ext
@@ -14058,46 +14056,6 @@ $as_echo "#define THREAD_DB_HAS_TD_NOTLS 1" >>confdefs.h
 
 fi
 
-if test "x$ac_cv_header_sys_syscall_h" = "xyes"; then
-   { $as_echo "$as_me:${as_lineno-$LINENO}: checking whether <sys/syscall.h> has __NR_tkill" >&5
-$as_echo_n "checking whether <sys/syscall.h> has __NR_tkill... " >&6; }
-if test "${gdb_cv_sys_syscall_h_has_tkill+set}" = set; then :
-  $as_echo_n "(cached) " >&6
-else
-  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
-/* end confdefs.h.  */
-#include <sys/syscall.h>
-int
-main ()
-{
-int i = __NR_tkill;
-  ;
-  return 0;
-}
-_ACEOF
-if ac_fn_c_try_compile "$LINENO"; then :
-  gdb_cv_sys_syscall_h_has_tkill=yes
-else
-  gdb_cv_sys_syscall_h_has_tkill=no
-
-fi
-rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
-
-fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $gdb_cv_sys_syscall_h_has_tkill" >&5
-$as_echo "$gdb_cv_sys_syscall_h_has_tkill" >&6; }
-fi
-if test "x$gdb_cv_sys_syscall_h_has_tkill" = "xyes"; then
-  ac_fn_c_check_func "$LINENO" "syscall" "ac_cv_func_syscall"
-if test "x$ac_cv_func_syscall" = x""yes; then :
-
-$as_echo "#define HAVE_TKILL_SYSCALL 1" >>confdefs.h
-
-
-fi
-
-fi
-
 ac_fn_c_check_decl "$LINENO" "ADDR_NO_RANDOMIZE" "ac_cv_have_decl_ADDR_NO_RANDOMIZE" "#include <sys/personality.h>
 "
 if test "x$ac_cv_have_decl_ADDR_NO_RANDOMIZE" = x""yes; then :
@@ -14284,6 +14242,7 @@ _ACEOF
 
 
 
+
 # Check whether --enable-werror was given.
 if test "${enable_werror+set}" = set; then :
   enableval=$enable_werror; case "${enableval}" in
@@ -14294,11 +14253,8 @@ if test "${enable_werror+set}" = set; then :
 fi
 
 
-# Enable -Werror by default when using gcc in C mode.  Leave it off
-# for C++ until we're warning clean.  Turn it off for releases.
-if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" \
-   && test x"$enable_build_with_cxx" != x"yes" \
-   && $development; then
+# Enable -Werror by default when using gcc.  Turn it off for releases.
+if test "${GCC}" = yes -a -z "${ERROR_ON_WARNING}" && $development; then
     ERROR_ON_WARNING=yes
 fi
 
@@ -14380,14 +14336,23 @@ $as_echo_n "checking compiler warning flags... " >&6; }
     # Separate out the -Werror flag as some files just cannot be
     # compiled with it enabled.
     for w in ${build_warnings}; do
+	# GCC does not complain about -Wno-unknown-warning.  Invert
+	# and test -Wunknown-warning instead.
+	case $w in
+	-Wno-*)
+		wtest=`echo $w | sed 's/-Wno-/-W/g'` ;;
+	*)
+		wtest=$w ;;
+	esac
+
 	case $w in
 	-Werr*) WERROR_CFLAGS=-Werror ;;
 	*)
 	    # Check whether GCC accepts it.
 	    saved_CFLAGS="$CFLAGS"
-	    CFLAGS="$CFLAGS $w"
+	    CFLAGS="$CFLAGS $wtest"
 	    saved_CXXFLAGS="$CXXFLAGS"
-	    CXXFLAGS="$CXXFLAGS $w"
+	    CXXFLAGS="$CXXFLAGS $wtest"
 	    cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14421,6 +14386,7 @@ ac_link='$CC -o conftest$ac_exeext $CFLAGS $CPPFLAGS $LDFLAGS conftest.$ac_ext $
 ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 fi
+
 
 # In the Cygwin environment, we need some additional flags.
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for cygwin" >&5
@@ -15881,6 +15847,16 @@ if test "${ignore_sim}" = "false"; then
 
 $as_echo "#define WITH_SIM 1" >>confdefs.h
 
+
+    # Some tdep code should only be compiled in when the ppc sim is
+    # built.  PR sim/13418.
+    case $target in
+      powerpc*-*-*)
+
+$as_echo "#define WITH_PPC_SIM 1" >>confdefs.h
+
+	;;
+    esac
   fi
 fi
 

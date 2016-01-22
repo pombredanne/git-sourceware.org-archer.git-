@@ -1,6 +1,6 @@
 /* Modula 2 language support routines for GDB, the GNU debugger.
 
-   Copyright (C) 1992-2015 Free Software Foundation, Inc.
+   Copyright (C) 1992-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -425,7 +425,7 @@ static struct gdbarch_data *m2_type_data;
 const struct builtin_m2_type *
 builtin_m2_type (struct gdbarch *gdbarch)
 {
-  return gdbarch_data (gdbarch, m2_type_data);
+  return (const struct builtin_m2_type *) gdbarch_data (gdbarch, m2_type_data);
 }
 
 

@@ -1,4 +1,4 @@
-/* Copyright (C) 2011-2015 Free Software Foundation, Inc.
+/* Copyright (C) 2011-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -168,6 +168,7 @@ extern void linux_check_ptrace_features (void);
 extern void linux_enable_event_reporting (pid_t pid, int attached);
 extern void linux_disable_event_reporting (pid_t pid);
 extern int linux_supports_tracefork (void);
+extern int linux_supports_traceexec (void);
 extern int linux_supports_traceclone (void);
 extern int linux_supports_tracevforkdone (void);
 extern int linux_supports_tracesysgood (void);

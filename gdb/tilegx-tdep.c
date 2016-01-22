@@ -1,6 +1,6 @@
 /* Target-dependent code for the Tilera TILE-Gx processor.
 
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -333,7 +333,7 @@ tilegx_push_dummy_call (struct gdbarch *gdbarch,
 
       typelen = TYPE_LENGTH (value_enclosing_type (args[j]));
       slacklen = align_up (typelen, 8) - typelen;
-      val = xmalloc (typelen + slacklen);
+      val = (gdb_byte *) xmalloc (typelen + slacklen);
       back_to = make_cleanup (xfree, val);
       memcpy (val, contents, typelen);
       memset (val + typelen, 0, slacklen);
@@ -869,7 +869,7 @@ tilegx_frame_cache (struct frame_info *this_frame, void **this_cache)
   int i;
 
   if (*this_cache)
-    return *this_cache;
+    return (struct tilegx_frame_cache *) *this_cache;
 
   cache = FRAME_OBSTACK_ZALLOC (struct tilegx_frame_cache);
   *this_cache = cache;

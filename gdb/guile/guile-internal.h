@@ -1,6 +1,6 @@
 /* Internal header for GDB/Scheme code.
 
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -384,7 +384,7 @@ extern void gdbscm_memory_error (const char *subr, const char *msg, SCM args)
 
 /* scm-safe-call.c */
 
-extern void *gdbscm_with_guile (void *(*func) (void *), void *data);
+extern const char *gdbscm_with_guile (const char *(*func) (void *), void *data);
 
 extern SCM gdbscm_call_guile (SCM (*func) (void *), void *data,
 			      excp_matcher_func *ok_excps);

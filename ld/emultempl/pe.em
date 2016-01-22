@@ -8,7 +8,7 @@ fi
 rm -f e${EMULATION_NAME}.c
 (echo;echo;echo;echo;echo)>e${EMULATION_NAME}.c # there, now line numbers match ;-)
 fragment <<EOF
-/* Copyright (C) 1995-2015 Free Software Foundation, Inc.
+/* Copyright (C) 1995-2016 Free Software Foundation, Inc.
 
    This file is part of the GNU Binutils.
 
@@ -1312,7 +1312,7 @@ write_build_id (bfd *abfd)
       struct bfd_link_order *l = NULL;
       for (l = asec->map_head.link_order; l != NULL; l = l->next)
         {
-          if ((l->type == bfd_indirect_link_order))
+          if (l->type == bfd_indirect_link_order)
             {
               if (l->u.indirect.section == t->build_id.sec)
                 {
@@ -1364,7 +1364,7 @@ write_build_id (bfd *abfd)
   if (bfd_seek (abfd, asec->filepos + link_order->offset, SEEK_SET) != 0)
     return 0;
 
-  if ((bfd_bwrite (contents, size, abfd) != size))
+  if (bfd_bwrite (contents, size, abfd) != size)
     return 0;
 
   /* Construct the CodeView record.  */
@@ -2209,6 +2209,8 @@ gld_${EMULATION_NAME}_place_orphan (asection *s,
       struct orphan_save *place;
       lang_output_section_statement_type *after;
       etree_type *address;
+      flagword flags;
+      asection *nexts;
 
       if (!orphan_init_done)
 	{
@@ -2226,14 +2228,26 @@ gld_${EMULATION_NAME}_place_orphan (asection *s,
       /* Try to put the new output section in a reasonable place based
 	 on the section name and section flags.  */
 
+      flags = s->flags;
+      nexts = s;
+      while ((nexts = bfd_get_next_section_by_name (nexts->owner, nexts)))
+	if (nexts->output_section == NULL
+	    && (nexts->flags & SEC_EXCLUDE) == 0
+	    && ((nexts->flags ^ flags) & (SEC_LOAD | SEC_ALLOC)) == 0
+	    && (nexts->owner->flags & DYNAMIC) == 0
+	    && nexts->owner->usrdata != NULL
+	    && !(((lang_input_statement_type *) nexts->owner->usrdata)
+		 ->flags.just_syms))
+	  flags = (((flags ^ SEC_READONLY) | (nexts->flags ^ SEC_READONLY))
+		   ^ SEC_READONLY);
       place = NULL;
-      if ((s->flags & SEC_ALLOC) == 0)
+      if ((flags & SEC_ALLOC) == 0)
 	;
-      else if ((s->flags & (SEC_LOAD | SEC_HAS_CONTENTS)) == 0)
+      else if ((flags & (SEC_LOAD | SEC_HAS_CONTENTS)) == 0)
 	place = &hold[orphan_bss];
-      else if ((s->flags & SEC_READONLY) == 0)
+      else if ((flags & SEC_READONLY) == 0)
 	place = &hold[orphan_data];
-      else if ((s->flags & SEC_CODE) == 0)
+      else if ((flags & SEC_CODE) == 0)
 	{
 	  place = (!strncmp (secname, ".idata\$", 7) ? &hold[orphan_idata]
 						     : &hold[orphan_rodata]);
@@ -2248,7 +2262,8 @@ gld_${EMULATION_NAME}_place_orphan (asection *s,
 	    place->os = lang_output_section_find (place->name);
 	  after = place->os;
 	  if (after == NULL)
-	    after = lang_output_section_find_by_flags (s, &place->os, NULL);
+	    after = lang_output_section_find_by_flags (s, flags, &place->os,
+						       NULL);
 	  if (after == NULL)
 	    /* *ABS* is always the first output section statement.  */
 	    after = (&lang_output_section_statement.head

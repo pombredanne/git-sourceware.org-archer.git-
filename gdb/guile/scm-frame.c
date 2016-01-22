@@ -1,6 +1,6 @@
 /* Scheme interface to stack frames.
 
-   Copyright (C) 2008-2015 Free Software Foundation, Inc.
+   Copyright (C) 2008-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -84,7 +84,7 @@ static const struct inferior_data *frscm_inferior_data_key;
 static hashval_t
 frscm_hash_frame_smob (const void *p)
 {
-  const frame_smob *f_smob = p;
+  const frame_smob *f_smob = (const frame_smob *) p;
   const struct frame_id *fid = &f_smob->frame_id;
   hashval_t hash = htab_hash_pointer (f_smob->inferior);
 
@@ -104,8 +104,8 @@ frscm_hash_frame_smob (const void *p)
 static int
 frscm_eq_frame_smob (const void *ap, const void *bp)
 {
-  const frame_smob *a = ap;
-  const frame_smob *b = bp;
+  const frame_smob *a = (const frame_smob *) ap;
+  const frame_smob *b = (const frame_smob *) bp;
 
   return (frame_id_eq (a->frame_id, b->frame_id)
 	  && a->inferior == b->inferior
@@ -118,7 +118,7 @@ frscm_eq_frame_smob (const void *ap, const void *bp)
 static htab_t
 frscm_inferior_frame_map (struct inferior *inferior)
 {
-  htab_t htab = inferior_data (inferior, frscm_inferior_data_key);
+  htab_t htab = (htab_t) inferior_data (inferior, frscm_inferior_data_key);
 
   if (htab == NULL)
     {
@@ -379,7 +379,7 @@ frscm_mark_frame_invalid (void **slot, void *info)
 static void
 frscm_del_inferior_frames (struct inferior *inferior, void *datum)
 {
-  htab_t htab = datum;
+  htab_t htab = (htab_t) datum;
 
   if (htab != NULL)
     {
@@ -1045,7 +1045,7 @@ gdbscm_unwind_stop_reason_string (SCM reason_scm)
   if (reason < UNWIND_FIRST || reason > UNWIND_LAST)
     scm_out_of_range (FUNC_NAME, reason_scm);
 
-  str = unwind_stop_reason_to_string (reason);
+  str = unwind_stop_reason_to_string ((enum unwind_stop_reason) reason);
   return gdbscm_scm_from_c_string (str);
 }
 

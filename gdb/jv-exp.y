@@ -1,5 +1,5 @@
 /* YACC parser for Java expressions, for GDB.
-   Copyright (C) 1997-2015 Free Software Foundation, Inc.
+   Copyright (C) 1997-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -355,7 +355,7 @@ QualifiedName:
 		    {
 		      char *buf;
 
-		      buf = malloc ($$.length + 1);
+		      buf = (char *) malloc ($$.length + 1);
 		      make_cleanup (free, buf);
 		      sprintf (buf, "%.*s.%.*s",
 			       $1.length, $1.ptr, $3.length, $3.ptr);

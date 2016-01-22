@@ -1,6 +1,6 @@
 /* Interface between GDB and target environments, including files and processes
 
-   Copyright (C) 1990-2015 Free Software Foundation, Inc.
+   Copyright (C) 1990-2016 Free Software Foundation, Inc.
 
    Contributed by Cygnus Support.  Written by John Gilmore.
 
@@ -531,10 +531,12 @@ struct target_ops
       TARGET_DEFAULT_RETURN (-1);
 
     int (*to_insert_mask_watchpoint) (struct target_ops *,
-				      CORE_ADDR, CORE_ADDR, int)
+				      CORE_ADDR, CORE_ADDR,
+				      enum target_hw_bp_type)
       TARGET_DEFAULT_RETURN (1);
     int (*to_remove_mask_watchpoint) (struct target_ops *,
-				      CORE_ADDR, CORE_ADDR, int)
+				      CORE_ADDR, CORE_ADDR,
+				      enum target_hw_bp_type)
       TARGET_DEFAULT_RETURN (1);
     int (*to_stopped_by_watchpoint) (struct target_ops *)
       TARGET_DEFAULT_RETURN (0);
@@ -559,6 +561,12 @@ struct target_ops
     int (*to_masked_watch_num_registers) (struct target_ops *,
 					  CORE_ADDR, CORE_ADDR)
       TARGET_DEFAULT_RETURN (-1);
+
+    /* Return 1 for sure target can do single step.  Return -1 for
+       unknown.  Return 0 for target can't do.  */
+    int (*to_can_do_single_step) (struct target_ops *)
+      TARGET_DEFAULT_RETURN (-1);
+
     void (*to_terminal_init) (struct target_ops *)
       TARGET_DEFAULT_IGNORE ();
     void (*to_terminal_inferior) (struct target_ops *)
@@ -596,6 +604,8 @@ struct target_ops
       TARGET_DEFAULT_RETURN (1);
     int (*to_remove_exec_catchpoint) (struct target_ops *, int)
       TARGET_DEFAULT_RETURN (1);
+    void (*to_follow_exec) (struct target_ops *, struct inferior *, char *)
+      TARGET_DEFAULT_IGNORE ();
     int (*to_set_syscall_catchpoint) (struct target_ops *,
 				      int, int, int, int, int *)
       TARGET_DEFAULT_RETURN (1);
@@ -629,7 +639,7 @@ struct target_ops
       TARGET_DEFAULT_FUNC (default_pid_to_str);
     char *(*to_extra_thread_info) (struct target_ops *, struct thread_info *)
       TARGET_DEFAULT_RETURN (NULL);
-    char *(*to_thread_name) (struct target_ops *, struct thread_info *)
+    const char *(*to_thread_name) (struct target_ops *, struct thread_info *)
       TARGET_DEFAULT_RETURN (NULL);
     void (*to_stop) (struct target_ops *, ptid_t)
       TARGET_DEFAULT_IGNORE ();
@@ -662,6 +672,8 @@ struct target_ops
       TARGET_DEFAULT_RETURN (0);
     void (*to_async) (struct target_ops *, int)
       TARGET_DEFAULT_NORETURN (tcomplain ());
+    void (*to_thread_events) (struct target_ops *, int)
+      TARGET_DEFAULT_IGNORE ();
     /* This method must be implemented in some situations.  See the
        comment on 'to_can_run'.  */
     int (*to_supports_non_stop) (struct target_ops *)
@@ -1145,9 +1157,18 @@ struct target_ops
     void (*to_delete_record) (struct target_ops *)
       TARGET_DEFAULT_NORETURN (tcomplain ());
 
-    /* Query if the record target is currently replaying.  */
-    int (*to_record_is_replaying) (struct target_ops *)
+    /* Query if the record target is currently replaying PTID.  */
+    int (*to_record_is_replaying) (struct target_ops *, ptid_t ptid)
       TARGET_DEFAULT_RETURN (0);
+
+    /* Query if the record target will replay PTID if it were resumed in
+       execution direction DIR.  */
+    int (*to_record_will_replay) (struct target_ops *, ptid_t ptid, int dir)
+      TARGET_DEFAULT_RETURN (0);
+
+    /* Stop replaying.  */
+    void (*to_record_stop_replaying) (struct target_ops *)
+      TARGET_DEFAULT_IGNORE ();
 
     /* Go to the begin of the execution trace.  */
     void (*to_goto_record_begin) (struct target_ops *)
@@ -1482,6 +1503,10 @@ extern int target_remove_breakpoint (struct gdbarch *gdbarch,
 
 extern int target_terminal_is_inferior (void);
 
+/* Returns true if our terminal settings are in effect.  */
+
+extern int target_terminal_is_ours (void);
+
 /* Initialize the terminal settings we record for the inferior,
    before we actually run the inferior.  */
 
@@ -1576,6 +1601,11 @@ extern void target_load (const char *arg, int from_tty);
    (i.e. there is another event pending).  */
 
 int target_follow_fork (int follow_child, int detach_fork);
+
+/* Handle the target-specific bookkeeping required when the inferior
+   makes an exec call.  INF is the exec'd inferior.  */
+
+void target_follow_exec (struct inferior *inf, char *execd_pathname);
 
 /* On some targets, we can catch an inferior exec event when it
    occurs.  These functions insert/remove an already-created
@@ -1769,6 +1799,9 @@ extern int target_async_permitted;
 /* Enables/disabled async target events.  */
 extern void target_async (int enable);
 
+/* Enables/disables thread create and exit events.  */
+extern void target_thread_events (int enable);
+
 /* Whether support for controlling the target backends always in
    non-stop mode is enabled.  */
 extern enum auto_boolean target_non_stop_enabled;
@@ -1796,10 +1829,10 @@ extern char *normal_pid_to_str (ptid_t ptid);
 #define target_extra_thread_info(TP) \
      (current_target.to_extra_thread_info (&current_target, TP))
 
-/* Return the thread's name.  A NULL result means that the target
-   could not determine this thread's name.  */
+/* Return the thread's name, or NULL if the target is unable to determine it.
+   The returned value must not be freed by the caller.  */
 
-extern char *target_thread_name (struct thread_info *);
+extern const char *target_thread_name (struct thread_info *);
 
 /* Attempts to find the pathname of the executable file
    that was run to create a specified process.
@@ -1903,6 +1936,9 @@ extern char *target_thread_name (struct thread_info *);
 						      addr, len)
 
 
+#define target_can_do_single_step() \
+  (*current_target.to_can_do_single_step) (&current_target)
+
 /* Set/clear a hardware watchpoint starting at ADDR, for LEN bytes.
    TYPE is 0 for write, 1 for read, and 2 for read/write accesses.
    COND is the expression for its condition, or NULL if there's none.
@@ -1922,14 +1958,16 @@ extern char *target_thread_name (struct thread_info *);
    or hw_access for an access watchpoint.  Returns 0 for success, 1 if
    masked watchpoints are not supported, -1 for failure.  */
 
-extern int target_insert_mask_watchpoint (CORE_ADDR, CORE_ADDR, int);
+extern int target_insert_mask_watchpoint (CORE_ADDR, CORE_ADDR,
+					  enum target_hw_bp_type);
 
 /* Remove a masked watchpoint at ADDR with the mask MASK.
    RW may be hw_read for a read watchpoint, hw_write for a write watchpoint
    or hw_access for an access watchpoint.  Returns 0 for success, non-zero
    for failure.  */
 
-extern int target_remove_mask_watchpoint (CORE_ADDR, CORE_ADDR, int);
+extern int target_remove_mask_watchpoint (CORE_ADDR, CORE_ADDR,
+					  enum target_hw_bp_type);
 
 /* Insert a hardware breakpoint at address BP_TGT->placed_address in
    the target machine.  Returns 0 for success, and returns non-zero or
@@ -2265,6 +2303,10 @@ extern void target_preopen (int);
 /* Does whatever cleanup is required to get rid of all pushed targets.  */
 extern void pop_all_targets (void);
 
+/* Like pop_all_targets, but pops only targets whose stratum is at or
+   above STRATUM.  */
+extern void pop_all_targets_at_and_above (enum strata stratum);
+
 /* Like pop_all_targets, but pops only targets whose stratum is
    strictly above ABOVE_STRATUM.  */
 extern void pop_all_targets_above (enum strata above_stratum);
@@ -2424,7 +2466,13 @@ extern int target_supports_delete_record (void);
 extern void target_delete_record (void);
 
 /* See to_record_is_replaying in struct target_ops.  */
-extern int target_record_is_replaying (void);
+extern int target_record_is_replaying (ptid_t ptid);
+
+/* See to_record_will_replay in struct target_ops.  */
+extern int target_record_will_replay (ptid_t ptid, int dir);
+
+/* See to_record_stop_replaying in struct target_ops.  */
+extern void target_record_stop_replaying (void);
 
 /* See to_goto_record_begin in struct target_ops.  */
 extern void target_goto_record_begin (void);

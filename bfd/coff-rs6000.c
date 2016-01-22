@@ -1,5 +1,5 @@
 /* BFD back-end for IBM RS/6000 "XCOFF" files.
-   Copyright (C) 1990-2015 Free Software Foundation, Inc.
+   Copyright (C) 1990-2016 Free Software Foundation, Inc.
    Written by Metin G. Ozisik, Mimi Phuong-Thao Vo, and John Gilmore.
    Archive support from Damon A. Permezel.
    Contributed by IBM Corporation and Cygnus Support.
@@ -402,34 +402,6 @@ _bfd_xcoff_is_local_label_name (bfd *abfd ATTRIBUTE_UNUSED,
 {
   return FALSE;
 }
-
-static const struct dwarf_debug_section xcoff_debug_sections[] =
-{
-  { ".dwabrev",		NULL },
-  { ".dwarnge",		NULL },
-  { NULL,	NULL }, /* .debug_frame */
-  { ".dwinfo",		NULL },
-  { ".dwline",		NULL },
-  { NULL,	NULL }, /* .debug_loc */
-  { NULL,	NULL }, /* .debug_macinfo */
-  { NULL,	NULL }, /* .debug_macro */
-  { ".dwpbnms",		NULL },
-  { ".dwpbtyp",		NULL },
-  { ".dwrnges",		NULL },
-  { NULL,	NULL }, /* .debug_static_func */
-  { NULL,	NULL }, /* .debug_static_vars */
-  { ".dwstr",	NULL },
-  { NULL,	NULL }, /* .debug_types */
-  /* GNU DWARF 1 extensions */
-  { NULL,	NULL }, /* .debug_sfnames */
-  { NULL,	NULL }, /* .debug_srcinfo */
-  /* SGI/MIPS DWARF 2 extensions */
-  { NULL,	NULL }, /* .debug_funcnames */
-  { NULL,	NULL }, /* .debug_typenames */
-  { NULL,	NULL }, /* .debug_varnames */
-  { NULL,	NULL }, /* .debug_weaknames */
-  { NULL,	NULL },
-};
 
 void
 _bfd_xcoff_swap_sym_in (bfd *abfd, void * ext1, void * in1)
@@ -3551,7 +3523,8 @@ _bfd_xcoff_put_ldsymbol_name (bfd *abfd ATTRIBUTE_UNUSED,
 }
 
 static bfd_boolean
-_bfd_xcoff_put_symbol_name (bfd *abfd, struct bfd_strtab_hash *strtab,
+_bfd_xcoff_put_symbol_name (struct bfd_link_info *info,
+			    struct bfd_strtab_hash *strtab,
 			    struct internal_syment *sym,
 			    const char *name)
 {
@@ -3564,9 +3537,7 @@ _bfd_xcoff_put_symbol_name (bfd *abfd, struct bfd_strtab_hash *strtab,
       bfd_boolean hash;
       bfd_size_type indx;
 
-      hash = TRUE;
-      if ((abfd->flags & BFD_TRADITIONAL_FORMAT) != 0)
-	hash = FALSE;
+      hash = !info->traditional_format;
       indx = _bfd_stringtab_add (strtab, name, hash, FALSE);
       if (indx == (bfd_size_type) -1)
 	return FALSE;

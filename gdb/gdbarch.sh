@@ -2,7 +2,7 @@
 
 # Architecture commands for GDB, the GNU debugger.
 #
-# Copyright (C) 1998-2015 Free Software Foundation, Inc.
+# Copyright (C) 1998-2016 Free Software Foundation, Inc.
 #
 # This file is part of GDB.
 #
@@ -461,6 +461,7 @@ m:int:ecoff_reg_to_regnum:int ecoff_regnr:ecoff_regnr::no_op_reg_to_regnum::0
 # Convert from an sdb register number to an internal gdb register number.
 m:int:sdb_reg_to_regnum:int sdb_regnr:sdb_regnr::no_op_reg_to_regnum::0
 # Provide a default mapping from a DWARF2 register number to a gdb REGNUM.
+# Return -1 for bad REGNUM.  Note: Several targets get this wrong.
 m:int:dwarf2_reg_to_regnum:int dwarf2_regnr:dwarf2_regnr::no_op_reg_to_regnum::0
 m:const char *:register_name:int regnr:regnr::0
 
@@ -1176,7 +1177,7 @@ cat <<EOF
 
 /* Dynamic architecture support for GDB, the GNU debugger.
 
-   Copyright (C) 1998-2015 Free Software Foundation, Inc.
+   Copyright (C) 1998-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1184,12 +1185,12 @@ cat <<EOF
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation; either version 3 of the License, or
    (at your option) any later version.
-  
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-  
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
 
@@ -1237,7 +1238,6 @@ struct target_desc;
 struct objfile;
 struct symbol;
 struct displaced_step_closure;
-struct core_regset_section;
 struct syscall;
 struct agent_expr;
 struct axs_value;
@@ -1429,7 +1429,7 @@ struct gdbarch_info
   bfd *abfd;
 
   /* Use default: NULL (ZERO).  */
-  struct gdbarch_tdep_info *tdep_info;
+  void *tdep_info;
 
   /* Use default: GDB_OSABI_UNINITIALIZED (-1).  */
   enum gdb_osabi osabi;

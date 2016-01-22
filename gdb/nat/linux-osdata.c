@@ -1,6 +1,6 @@
 /* Linux-specific functions to retrieve OS data.
    
-   Copyright (C) 2009-2015 Free Software Foundation, Inc.
+   Copyright (C) 2009-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -78,7 +78,7 @@ linux_common_core_of_thread (ptid_t ptid)
   for (;;)
     {
       int n;
-      content = xrealloc (content, content_read + 1024);
+      content = (char *) xrealloc (content, content_read + 1024);
       n = fread (content + content_read, 1, 1024, f);
       content_read += n;
       if (n < 1024)

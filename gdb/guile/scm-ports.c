@@ -1,7 +1,7 @@
 /* Support for connecting Guile's stdio to GDB's.
    as well as r/w memory via ports.
 
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -269,9 +269,9 @@ ioscm_write (SCM port, const void *data, size_t size)
   TRY
     {
       if (scm_is_eq (port, error_port_scm))
-	fputsn_filtered (data, size, gdb_stderr);
+	fputsn_filtered ((const char *) data, size, gdb_stderr);
       else
-	fputsn_filtered (data, size, gdb_stdout);
+	fputsn_filtered ((const char *) data, size, gdb_stdout);
     }
   CATCH (except, RETURN_MASK_ALL)
     {
@@ -326,7 +326,8 @@ ioscm_init_stdio_buffers (SCM port, long mode_bits)
 
   if (!writing && size > 0)
     {
-      pt->read_buf = scm_gc_malloc_pointerless (size, "port buffer");
+      pt->read_buf
+	= (unsigned char *) scm_gc_malloc_pointerless (size, "port buffer");
       pt->read_pos = pt->read_end = pt->read_buf;
       pt->read_buf_size = size;
     }
@@ -338,7 +339,8 @@ ioscm_init_stdio_buffers (SCM port, long mode_bits)
 
   if (writing && size > 0)
     {
-      pt->write_buf = scm_gc_malloc_pointerless (size, "port buffer");
+      pt->write_buf
+	= (unsigned char *) scm_gc_malloc_pointerless (size, "port buffer");
       pt->write_pos = pt->write_buf;
       pt->write_buf_size = size;
     }
@@ -357,6 +359,7 @@ ioscm_make_gdb_stdio_port (int fd)
 {
   int is_a_tty = isatty (fd);
   const char *name;
+  const char *mode_str;
   long mode_bits;
   SCM port;
 
@@ -364,20 +367,21 @@ ioscm_make_gdb_stdio_port (int fd)
     {
     case 0:
       name = input_port_name;
-      mode_bits = scm_mode_bits (is_a_tty ? "r0" : "r");
+      mode_str = is_a_tty ? "r0" : "r";
       break;
     case 1:
       name = output_port_name;
-      mode_bits = scm_mode_bits (is_a_tty ? "w0" : "w");
+      mode_str = is_a_tty ? "w0" : "w";
       break;
     case 2:
       name = error_port_name;
-      mode_bits = scm_mode_bits (is_a_tty ? "w0" : "w");
+      mode_str = is_a_tty ? "w0" : "w";
       break;
     default:
       gdb_assert_not_reached ("bad stdio file descriptor");
     }
 
+  mode_bits = scm_mode_bits ((char *) mode_str);
   port = ioscm_open_port (stdio_port_desc, mode_bits);
 
   scm_set_port_filename_x (port, gdbscm_scm_from_c_string (name));
@@ -428,7 +432,7 @@ gdbscm_error_port (void)
 static void
 ioscm_file_port_delete (struct ui_file *file)
 {
-  ioscm_file_port *stream = ui_file_data (file);
+  ioscm_file_port *stream = (ioscm_file_port *) ui_file_data (file);
 
   if (stream->magic != &file_port_magic)
     internal_error (__FILE__, __LINE__,
@@ -439,7 +443,7 @@ ioscm_file_port_delete (struct ui_file *file)
 static void
 ioscm_file_port_rewind (struct ui_file *file)
 {
-  ioscm_file_port *stream = ui_file_data (file);
+  ioscm_file_port *stream = (ioscm_file_port *) ui_file_data (file);
 
   if (stream->magic != &file_port_magic)
     internal_error (__FILE__, __LINE__,
@@ -453,7 +457,7 @@ ioscm_file_port_put (struct ui_file *file,
 		     ui_file_put_method_ftype *write,
 		     void *dest)
 {
-  ioscm_file_port *stream = ui_file_data (file);
+  ioscm_file_port *stream = (ioscm_file_port *) ui_file_data (file);
 
   if (stream->magic != &file_port_magic)
     internal_error (__FILE__, __LINE__,
@@ -467,7 +471,7 @@ ioscm_file_port_write (struct ui_file *file,
 		       const char *buffer,
 		       long length_buffer)
 {
-  ioscm_file_port *stream = ui_file_data (file);
+  ioscm_file_port *stream = (ioscm_file_port *) ui_file_data (file);
 
   if (stream->magic != &file_port_magic)
     internal_error (__FILE__, __LINE__,
@@ -714,10 +718,11 @@ gdbscm_memory_port_flush (SCM port)
 /* "write" method for memory ports.  */
 
 static void
-gdbscm_memory_port_write (SCM port, const void *data, size_t size)
+gdbscm_memory_port_write (SCM port, const void *void_data, size_t size)
 {
   scm_t_port *pt = SCM_PTAB_ENTRY (port);
   ioscm_memory_port *iomem = (ioscm_memory_port *) SCM_STREAM (port);
+  const gdb_byte *data = (const gdb_byte *) void_data;
 
   /* There's no way to indicate a short write, so if the request goes past
      the end of the port's memory range, flag an error.  */
@@ -756,7 +761,7 @@ gdbscm_memory_port_write (SCM port, const void *data, size_t size)
 	pt->write_pos = pt->write_end;
 	gdbscm_memory_port_flush (port);
 	{
-	  const void *ptr = ((const char *) data) + space;
+	  const gdb_byte *ptr = data + space;
 	  size_t remaining = size - space;
 
 	  if (remaining >= pt->write_buf_size)
@@ -1011,8 +1016,8 @@ ioscm_init_memory_port (SCM port, CORE_ADDR start, CORE_ADDR end)
   pt->write_buf_size = iomem->write_buf_size;
   if (buffered)
     {
-      pt->read_buf = xmalloc (pt->read_buf_size);
-      pt->write_buf = xmalloc (pt->write_buf_size);
+      pt->read_buf = (unsigned char *) xmalloc (pt->read_buf_size);
+      pt->write_buf = (unsigned char *) xmalloc (pt->write_buf_size);
     }
   else
     {
@@ -1076,7 +1081,7 @@ ioscm_reinit_memory_port (SCM port, size_t read_buf_size,
       iomem->read_buf_size = read_buf_size;
       pt->read_buf_size = read_buf_size;
       xfree (pt->read_buf);
-      pt->read_buf = xmalloc (pt->read_buf_size);
+      pt->read_buf = (unsigned char *) xmalloc (pt->read_buf_size);
       pt->read_pos = pt->read_end = pt->read_buf;
     }
 
@@ -1085,7 +1090,7 @@ ioscm_reinit_memory_port (SCM port, size_t read_buf_size,
       iomem->write_buf_size = write_buf_size;
       pt->write_buf_size = write_buf_size;
       xfree (pt->write_buf);
-      pt->write_buf = xmalloc (pt->write_buf_size);
+      pt->write_buf = (unsigned char *) xmalloc (pt->write_buf_size);
       pt->write_pos = pt->write_buf;
       pt->write_end = pt->write_buf + pt->write_buf_size;
     }
@@ -1134,7 +1139,7 @@ gdbscm_open_memory (SCM rest)
 			      &start_arg_pos, &start,
 			      &size_arg_pos, &size);
 
-  scm_dynwind_begin (0);
+  scm_dynwind_begin ((scm_t_dynwind_flags) 0);
 
   if (mode == NULL)
     mode = xstrdup ("r");

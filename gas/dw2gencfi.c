@@ -1,5 +1,5 @@
 /* dw2gencfi.c - Support for generating Dwarf2 CFI information.
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2016 Free Software Foundation, Inc.
    Contributed by Michal Ludvig <mludvig@suse.cz>
 
    This file is part of GAS, the GNU Assembler.
@@ -1186,6 +1186,7 @@ dot_cfi_label (int ignored ATTRIBUTE_UNUSED)
     cfi_add_advance_loc (symbol_temp_new_now ());
 
   cfi_add_label (name);
+  free (name);
 
   demand_empty_rest_of_line ();
 }

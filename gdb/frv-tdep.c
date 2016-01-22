@@ -1,6 +1,6 @@
 /* Target-dependent code for the Fujitsu FR-V, for GDB, the GNU Debugger.
 
-   Copyright (C) 2002-2015 Free Software Foundation, Inc.
+   Copyright (C) 2002-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -1099,7 +1099,7 @@ frv_frame_unwind_cache (struct frame_info *this_frame,
   struct frv_unwind_cache *info;
 
   if ((*this_prologue_cache))
-    return (*this_prologue_cache);
+    return (struct frv_unwind_cache *) (*this_prologue_cache);
 
   info = FRAME_OBSTACK_ZALLOC (struct frv_unwind_cache);
   (*this_prologue_cache) = info;

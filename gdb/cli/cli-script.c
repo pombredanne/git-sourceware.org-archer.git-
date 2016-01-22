@@ -1,6 +1,6 @@
 /* GDB CLI command scripting.
 
-   Copyright (C) 1986-2015 Free Software Foundation, Inc.
+   Copyright (C) 1986-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -307,7 +307,7 @@ print_command_lines (struct ui_out *uiout, struct command_line *cmd,
 static void
 clear_hook_in_cleanup (void *data)
 {
-  struct cmd_list_element *c = data;
+  struct cmd_list_element *c = (struct cmd_list_element *) data;
 
   c->hook_in = 0; /* Allow hook to work again once it is complete.  */
 }
@@ -341,7 +341,7 @@ execute_cmd_post_hook (struct cmd_list_element *c)
 static void
 do_restore_user_call_depth (void * call_depth)
 {	
-  int *depth = call_depth;
+  int *depth = (int *) call_depth;
 
   (*depth)--;
   if ((*depth) == 0)
@@ -484,7 +484,7 @@ execute_control_command (struct command_line *cmd)
     case while_control:
       {
 	int len = strlen (cmd->line) + 7;
-	char *buffer = alloca (len);
+	char *buffer = (char *) alloca (len);
 
 	xsnprintf (buffer, len, "while %s", cmd->line);
 	print_command_trace (buffer);
@@ -553,7 +553,7 @@ execute_control_command (struct command_line *cmd)
     case if_control:
       {
 	int len = strlen (cmd->line) + 4;
-	char *buffer = alloca (len);
+	char *buffer = (char *) alloca (len);
 
 	xsnprintf (buffer, len, "if %s", cmd->line);
 	print_command_trace (buffer);
@@ -924,9 +924,9 @@ realloc_body_list (struct command_line *command, int new_length)
   command->body_count = new_length;
 }
 
-/* Read next line from stdout.  Passed to read_command_line_1 and
+/* Read next line from stdin.  Passed to read_command_line_1 and
    recurse_read_control_structure whenever we need to read commands
-   from stdout.  */
+   from stdin.  */
 
 static char *
 read_next_line (void)
@@ -1390,7 +1390,7 @@ free_command_lines (struct command_line **lptr)
 static void
 do_free_command_lines_cleanup (void *arg)
 {
-  free_command_lines (arg);
+  free_command_lines ((struct command_line **) arg);
 }
 
 struct cleanup *

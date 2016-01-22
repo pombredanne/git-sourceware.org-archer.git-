@@ -1,6 +1,6 @@
 /* Scheme interface to objfiles.
 
-   Copyright (C) 2008-2015 Free Software Foundation, Inc.
+   Copyright (C) 2008-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -116,7 +116,7 @@ ofscm_release_objfile (objfile_smob *o_smob)
 static void
 ofscm_handle_objfile_deleted (struct objfile *objfile, void *datum)
 {
-  objfile_smob *o_smob = datum;
+  objfile_smob *o_smob = (objfile_smob *) datum;
 
   gdb_assert (o_smob->objfile == objfile);
 
@@ -148,7 +148,7 @@ ofscm_objfile_smob_from_objfile (struct objfile *objfile)
 {
   objfile_smob *o_smob;
 
-  o_smob = objfile_data (objfile, ofscm_objfile_data_key);
+  o_smob = (objfile_smob *) objfile_data (objfile, ofscm_objfile_data_key);
   if (o_smob == NULL)
     {
       SCM o_scm = ofscm_make_objfile_smob ();

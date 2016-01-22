@@ -1,5 +1,5 @@
 /* tc-i386.h -- Header file for tc-i386.c
-   Copyright (C) 1989-2015 Free Software Foundation, Inc.
+   Copyright (C) 1989-2016 Free Software Foundation, Inc.
 
    This file is part of GAS, the GNU Assembler.
 
@@ -170,11 +170,12 @@ extern int tc_i386_fix_adjustable (struct fix *);
    the .o file.  GOTOFF and GOT32 do not need to be checked here because
    they are not pcrel.  .*/
 
-#define TC_FORCE_RELOCATION_LOCAL(FIX)			\
-  (!(FIX)->fx_pcrel					\
-   || (FIX)->fx_r_type == BFD_RELOC_386_PLT32		\
-   || (FIX)->fx_r_type == BFD_RELOC_386_GOTPC		\
-   || (FIX)->fx_r_type == BFD_RELOC_X86_64_GOTPCREL	\
+#define TC_FORCE_RELOCATION_LOCAL(FIX)				\
+  (!(FIX)->fx_pcrel						\
+   || (FIX)->fx_r_type == BFD_RELOC_386_PLT32			\
+   || (FIX)->fx_r_type == BFD_RELOC_386_GOTPC			\
+   || (FIX)->fx_r_type == BFD_RELOC_X86_64_GOTPCRELX		\
+   || (FIX)->fx_r_type == BFD_RELOC_X86_64_REX_GOTPCRELX	\
    || TC_FORCE_RELOCATION (FIX))
 
 extern int i386_parse_name (char *, expressionS *, char *);

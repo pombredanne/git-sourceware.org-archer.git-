@@ -1,5 +1,5 @@
 /* Linker command language support.
-   Copyright (C) 1991-2015 Free Software Foundation, Inc.
+   Copyright (C) 1991-2016 Free Software Foundation, Inc.
 
    This file is part of the GNU Binutils.
 
@@ -1499,11 +1499,12 @@ next_matching_output_section_statement (lang_output_section_statement_type *os,
 
 lang_output_section_statement_type *
 lang_output_section_find_by_flags (const asection *sec,
+				   flagword sec_flags,
 				   lang_output_section_statement_type **exact,
 				   lang_match_sec_type_func match_type)
 {
   lang_output_section_statement_type *first, *look, *found;
-  flagword look_flags, sec_flags, differ;
+  flagword look_flags, differ;
 
   /* We know the first statement on this list is *ABS*.  May as well
      skip it.  */
@@ -1511,7 +1512,6 @@ lang_output_section_find_by_flags (const asection *sec,
   first = first->next;
 
   /* First try for an exact match.  */
-  sec_flags = sec->flags;
   found = NULL;
   for (look = first; look; look = look->next)
     {
@@ -1695,7 +1695,7 @@ lang_output_section_find_by_flags (const asection *sec,
   if (found || !match_type)
     return found;
 
-  return lang_output_section_find_by_flags (sec, NULL, NULL);
+  return lang_output_section_find_by_flags (sec, sec_flags, NULL, NULL);
 }
 
 /* Find the last output section before given output statement.
@@ -1805,6 +1805,7 @@ lang_insert_orphan (asection *s,
 {
   lang_statement_list_type add;
   const char *ps;
+  lang_assignment_statement_type *start_assign;
   lang_output_section_statement_type *os;
   lang_output_section_statement_type **os_tail;
 
@@ -1827,6 +1828,7 @@ lang_insert_orphan (asection *s,
 					    NULL, NULL, NULL, constraint, 0);
 
   ps = NULL;
+  start_assign = NULL;
   if (config.build_constructors && *os_tail == os)
     {
       /* If the name of the section is representable in C, then create
@@ -1841,9 +1843,10 @@ lang_insert_orphan (asection *s,
 	  symname = (char *) xmalloc (ps - secname + sizeof "__start_" + 1);
 	  symname[0] = bfd_get_symbol_leading_char (link_info.output_bfd);
 	  sprintf (symname + (symname[0] != 0), "__start_%s", secname);
-	  lang_add_assignment (exp_provide (symname,
-					    exp_nameop (NAME, "."),
-					    FALSE));
+	  start_assign
+	    = lang_add_assignment (exp_provide (symname,
+						exp_nameop (NAME, "."),
+						FALSE));
 	}
     }
 
@@ -1866,16 +1869,25 @@ lang_insert_orphan (asection *s,
     lang_leave_output_section_statement (NULL, DEFAULT_MEMORY_REGION, NULL,
 					 NULL);
 
-  if (ps != NULL && *ps == '\0')
+  if (start_assign != NULL)
     {
       char *symname;
+      lang_assignment_statement_type *stop_assign;
+      bfd_vma dot;
 
       symname = (char *) xmalloc (ps - secname + sizeof "__stop_" + 1);
       symname[0] = bfd_get_symbol_leading_char (link_info.output_bfd);
       sprintf (symname + (symname[0] != 0), "__stop_%s", secname);
-      lang_add_assignment (exp_provide (symname,
-					exp_nameop (NAME, "."),
-					FALSE));
+      stop_assign
+	= lang_add_assignment (exp_provide (symname,
+					    exp_nameop (NAME, "."),
+					    FALSE));
+      /* Evaluate the expression to define the symbol if referenced,
+	 before sizing dynamic sections.  */
+      dot = os->bfd_section->vma;
+      exp_fold_tree (start_assign->exp, os->bfd_section, &dot);
+      dot += s->size;
+      exp_fold_tree (stop_assign->exp, os->bfd_section, &dot);
     }
 
   /* Restore the global list pointer.  */
@@ -5445,18 +5457,23 @@ lang_size_sections (bfd_boolean *relax, bfd_boolean check_regions)
 
       /* For sections in the relro segment..  */
       for (sec = link_info.output_bfd->section_last; sec; sec = sec->prev)
-	if (!IGNORE_SECTION (sec)
+	if ((sec->flags & SEC_ALLOC) != 0
 	    && sec->vma >= expld.dataseg.base
 	    && sec->vma < expld.dataseg.relro_end - expld.dataseg.relro_offset)
 	  {
 	    /* Where do we want to put this section so that it ends as
 	       desired?  */
-	    bfd_vma start = sec->vma;
-	    bfd_vma end = start + sec->size;
-	    bfd_vma bump = desired_end - end;
+	    bfd_vma start, end, bump;
+
+	    end = start = sec->vma;
+	    if ((sec->flags & SEC_HAS_CONTENTS) != 0
+		|| (sec->flags & SEC_THREAD_LOCAL) == 0)
+	      end += sec->size;
+	    bump = desired_end - end;
 	    /* We'd like to increase START by BUMP, but we must heed
 	       alignment so the increase might be less than optimum.  */
-	    start += bump & ~(((bfd_vma) 1 << sec->alignment_power) - 1);
+	    start += bump;
+	    start &= ~(((bfd_vma) 1 << sec->alignment_power) - 1);
 	    /* This is now the desired end for the previous section.  */
 	    desired_end = start;
 	  }
@@ -6881,6 +6898,9 @@ lang_process (void)
   lang_do_assignments (lang_final_phase_enum);
 
   ldemul_finish ();
+
+  /* Convert absolute symbols to section relative.  */
+  ldexp_finalize_syms ();
 
   /* Make sure that the section addresses make sense.  */
   if (command_line.check_section_addresses)

@@ -1,5 +1,5 @@
 /* read.c - read a source file -
-   Copyright (C) 1986-2015 Free Software Foundation, Inc.
+   Copyright (C) 1986-2016 Free Software Foundation, Inc.
 
    This file is part of GAS, the GNU Assembler.
 
@@ -1337,6 +1337,14 @@ convert_to_bignum (expressionS *exp, int sign)
   exp->X_add_number = i;
 }
 
+static bfd_boolean
+in_bss (void)
+{
+  flagword flags = bfd_get_section_flags (stdoutput, now_seg);
+
+  return (flags & SEC_ALLOC) && !(flags & (SEC_LOAD | SEC_HAS_CONTENTS));
+}
+
 /* For most MRI pseudo-ops, the line actually ends at the first
    nonquoted space.  This function looks for that point, stuffs a null
    in, and sets *STOPCP to the character that used to be there, and
@@ -1402,13 +1410,17 @@ s_abort (int ignore ATTRIBUTE_UNUSED)
 static void
 do_align (int n, char *fill, int len, int max)
 {
-  if (now_seg == absolute_section)
+  if (now_seg == absolute_section || in_bss ())
     {
       if (fill != NULL)
 	while (len-- > 0)
 	  if (*fill++ != '\0')
 	    {
-	      as_warn (_("ignoring fill value in absolute section"));
+	      if (now_seg == absolute_section)
+		as_warn (_("ignoring fill value in absolute section"));
+	      else
+		as_warn (_("ignoring fill value in section `%s'"),
+			 segment_name (now_seg));
 	      break;
 	    }
       fill = NULL;
@@ -2207,6 +2219,20 @@ s_fill (int ignore ATTRIBUTE_UNUSED)
 
   if (size && !need_pass_2)
     {
+      if (now_seg == absolute_section)
+	{
+	  if (rep_exp.X_op != O_constant)
+	    as_bad (_("non-constant fill count for absolute section"));
+	  else if (fill && rep_exp.X_add_number != 0)
+	    as_bad (_("attempt to fill absolute section with non-zero value"));
+	  abs_section_offset += rep_exp.X_add_number * size;
+	}
+      else if (fill
+	       && (rep_exp.X_op != O_constant || rep_exp.X_add_number != 0)
+	       && in_bss ())
+	as_bad (_("attempt to fill section `%s' with non-zero value"),
+		segment_name (now_seg));
+
       if (rep_exp.X_op == O_constant)
 	{
 	  p = frag_var (rs_fill, (int) size, (int) size,
@@ -2777,6 +2803,10 @@ do_org (segT segment, expressionS *exp, int fill)
       symbolS *sym = exp->X_add_symbol;
       offsetT off = exp->X_add_number * OCTETS_PER_BYTE;
 
+      if (fill && in_bss ())
+	as_warn (_("ignoring fill value in section `%s'"),
+		 segment_name (now_seg));
+
       if (exp->X_op != O_constant && exp->X_op != O_symbol)
 	{
 	  /* Handle complex expressions.  */
@@ -3331,10 +3361,11 @@ s_space (int mult)
       val.X_add_number = 0;
     }
 
-  if (val.X_op != O_constant
-      || val.X_add_number < - 0x80
-      || val.X_add_number > 0xff
-      || (mult != 0 && mult != 1 && val.X_add_number != 0))
+  if ((val.X_op != O_constant
+       || val.X_add_number < - 0x80
+       || val.X_add_number > 0xff
+       || (mult != 0 && mult != 1 && val.X_add_number != 0))
+      && (now_seg != absolute_section && !in_bss ()))
     {
       resolve_expression (&exp);
       if (exp.X_op != O_constant)
@@ -3375,6 +3406,8 @@ s_space (int mult)
 	  /* If we are in the absolute section, just bump the offset.  */
 	  if (now_seg == absolute_section)
 	    {
+	      if (val.X_op != O_constant || val.X_add_number != 0)
+		as_warn (_("ignoring fill value in absolute section"));
 	      abs_section_offset += repeat;
 	      goto getout;
 	    }
@@ -3412,7 +3445,10 @@ s_space (int mult)
 			  make_expr_symbol (&exp), (offsetT) 0, (char *) 0);
 	}
 
-      if (p)
+      if ((val.X_op != O_constant || val.X_add_number != 0) && in_bss ())
+	as_warn (_("ignoring fill value in section `%s'"),
+		 segment_name (now_seg));
+      else if (p)
 	*p = val.X_add_number;
     }
 
@@ -4213,15 +4249,6 @@ emit_expr_with_reloc (expressionS *exp,
 
   op = exp->X_op;
 
-  /* Allow `.word 0' in the absolute section.  */
-  if (now_seg == absolute_section)
-    {
-      if (op != O_constant || exp->X_add_number != 0)
-	as_bad (_("attempt to store value in absolute section"));
-      abs_section_offset += nbytes;
-      return;
-    }
-
   /* Handle a negative bignum.  */
   if (op == O_uminus
       && exp->X_add_number == 0
@@ -4270,6 +4297,20 @@ emit_expr_with_reloc (expressionS *exp,
       as_warn (_("register value used as expression"));
       op = O_constant;
     }
+
+  /* Allow `.word 0' in the absolute section.  */
+  if (now_seg == absolute_section)
+    {
+      if (op != O_constant || exp->X_add_number != 0)
+	as_bad (_("attempt to store value in absolute section"));
+      abs_section_offset += nbytes;
+      return;
+    }
+
+  /* Allow `.word 0' in BSS style sections.  */
+  if ((op != O_constant || exp->X_add_number != 0) && in_bss ())
+    as_bad (_("attempt to store non-zero value in section `%s'"),
+	    segment_name (now_seg));
 
   p = frag_more ((int) nbytes);
 
@@ -4602,7 +4643,7 @@ parse_bitfield_cons (exp, nbytes)
 	      return;
 	    }			/* Too complex.  */
 
-	  value |= ((~(-1 << width) & exp->X_add_number)
+	  value |= ((~(-(1 << width)) & exp->X_add_number)
 		    << ((BITS_PER_CHAR * nbytes) - bits_available));
 
 	  if ((bits_available -= width) == 0
@@ -4851,6 +4892,21 @@ float_cons (/* Clobbers input_line-pointer, checks end-of-line.  */
   if (is_it_end_of_statement ())
     {
       demand_empty_rest_of_line ();
+      return;
+    }
+
+  if (now_seg == absolute_section)
+    {
+      as_bad (_("attempt to store float in absolute section"));
+      ignore_rest_of_line ();
+      return;
+    }
+
+  if (in_bss ())
+    {
+      as_bad (_("attempt to store float in section `%s'"),
+	      segment_name (now_seg));
+      ignore_rest_of_line ();
       return;
     }
 
@@ -5150,7 +5206,7 @@ output_big_leb128 (char *p, LITTLENUM_TYPE *bignum, int size, int sign)
 }
 
 /* Generate the appropriate fragments for a given expression to emit a
-   leb128 value.  */
+   leb128 value.  SIGN is 1 for sleb, 0 for uleb.  */
 
 static void
 emit_leb128_expr (expressionS *exp, int sign)
@@ -5185,6 +5241,18 @@ emit_leb128_expr (expressionS *exp, int sign)
       convert_to_bignum (exp, exp->X_extrabit);
       op = O_big;
     }
+
+  if (now_seg == absolute_section)
+    {
+      if (op != O_constant || exp->X_add_number != 0)
+	as_bad (_("attempt to store value in absolute section"));
+      abs_section_offset++;
+      return;
+    }
+
+  if ((op != O_constant || exp->X_add_number != 0) && in_bss ())
+    as_bad (_("attempt to store non-zero value in section `%s'"),
+	    segment_name (now_seg));
 
   /* Let check_eh_frame know that data is being emitted.  nbytes == -1 is
      a signal that this is leb128 data.  It shouldn't optimize this away.  */
@@ -5255,6 +5323,10 @@ s_leb128 (int sign)
 static void
 stringer_append_char (int c, int bitsize)
 {
+  if (c && in_bss ())
+    as_bad (_("attempt to store non-empty string in section `%s'"),
+	    segment_name (now_seg));
+
   if (!target_big_endian)
     FRAG_APPEND_1_CHAR (c);
 
@@ -5310,6 +5382,15 @@ stringer (int bits_appendzero)
   md_cons_align (1);
 #endif
 
+  /* If we have been switched into the abs_section then we
+     will not have an obstack onto which we can hang strings.  */
+  if (now_seg == absolute_section)
+    {
+      as_bad (_("strings must be placed into a section"));
+      ignore_rest_of_line ();
+      return;
+    }
+
   /* The following awkward logic is to parse ZERO or more strings,
      comma separated. Recall a string expression includes spaces
      before the opening '\"' and spaces after the closing '\"'.
@@ -5323,14 +5404,6 @@ stringer (int bits_appendzero)
   else
     {
       c = ',';			/* Do loop.  */
-    }
-  /* If we have been switched into the abs_section then we
-     will not have an obstack onto which we can hang strings.  */
-  if (now_seg == absolute_section)
-    {
-      as_bad (_("strings must be placed into a section"));
-      c = 0;
-      ignore_rest_of_line ();
     }
 
   while (c == ',' || c == '<' || c == '"')
@@ -5415,7 +5488,7 @@ next_char_of_string (void)
 
 #ifndef NO_STRING_ESCAPES
     case '\\':
-      switch (c = *input_line_pointer++)
+      switch (c = *input_line_pointer++ & CHAR_MASK)
 	{
 	case 'b':
 	  c = '\b';
@@ -5466,7 +5539,7 @@ next_char_of_string (void)
 		number = number * 8 + c - '0';
 	      }
 
-	    c = number & 0xff;
+	    c = number & CHAR_MASK;
 	  }
 	  --input_line_pointer;
 	  break;
@@ -5488,7 +5561,7 @@ next_char_of_string (void)
 		  number = number * 16 + c - 'a' + 10;
 		c = *input_line_pointer++;
 	      }
-	    c = number & 0xff;
+	    c = number & CHAR_MASK;
 	    --input_line_pointer;
 	  }
 	  break;

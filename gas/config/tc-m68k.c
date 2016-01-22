@@ -1,5 +1,5 @@
 /* tc-m68k.c -- Assemble for the m68k family
-   Copyright (C) 1987-2015 Free Software Foundation, Inc.
+   Copyright (C) 1987-2016 Free Software Foundation, Inc.
 
    This file is part of GAS, the GNU Assembler.
 
@@ -7888,7 +7888,7 @@ md_section_align (segT segment ATTRIBUTE_UNUSED, valueT size)
   int align;
 
   align = bfd_get_section_alignment (stdoutput, segment);
-  size = ((size + (1 << align) - 1) & ((valueT) -1 << align));
+  size = ((size + (1 << align) - 1) & (-((valueT) 1 << align)));
 #endif
 
   return size;

@@ -1,6 +1,6 @@
 /* CTF format support.
 
-   Copyright (C) 2012-2015 Free Software Foundation, Inc.
+   Copyright (C) 2012-2016 Free Software Foundation, Inc.
    Contributed by Hui Zhu <hui_zhu@mentor.com>
    Contributed by Yao Qi <yao@codesourcery.com>
 
@@ -914,6 +914,12 @@ ctf_open_dir (const char *dirname)
 							   (SCOPE),	\
 							   #FIELD))
 
+#define SET_ENUM_FIELD(EVENT, SCOPE, VAR, TYPE, FIELD)			\
+  (VAR)->FIELD = (TYPE) bt_ctf_get_int64 (bt_ctf_get_field ((EVENT),	\
+							    (SCOPE),	\
+							    #FIELD))
+
+
 /* EVENT is the "status" event and TS is filled in.  */
 
 static void
@@ -922,7 +928,7 @@ ctf_read_status (struct bt_ctf_event *event, struct trace_status *ts)
   const struct bt_definition *scope
     = bt_ctf_get_top_level_scope (event, BT_EVENT_FIELDS);
 
-  SET_INT32_FIELD (event, scope, ts, stop_reason);
+  SET_ENUM_FIELD (event, scope, ts, enum trace_stop_reason, stop_reason);
   SET_INT32_FIELD (event, scope, ts, stopping_tracepoint);
   SET_INT32_FIELD (event, scope, ts, traceframe_count);
   SET_INT32_FIELD (event, scope, ts, traceframes_created);
@@ -1058,7 +1064,7 @@ ctf_read_tp (struct uploaded_tp **uploaded_tps)
       SET_INT32_FIELD (event, scope, utp, step);
       SET_INT32_FIELD (event, scope, utp, pass);
       SET_INT32_FIELD (event, scope, utp, hit_count);
-      SET_INT32_FIELD (event, scope, utp, type);
+      SET_ENUM_FIELD (event, scope, utp, enum bptype, type);
 
       /* Read 'cmd_strings'.  */
       SET_ARRAY_FIELD (event, scope, utp, cmd_num, cmd_strings);
@@ -1273,7 +1279,7 @@ ctf_xfer_partial (struct target_ops *ops, enum target_object object,
 {
   /* We're only doing regular memory for now.  */
   if (object != TARGET_OBJECT_MEMORY)
-    return -1;
+    return TARGET_XFER_E_IO;
 
   if (readbuf == NULL)
     error (_("ctf_xfer_partial: trace file is read-only"));
@@ -1338,7 +1344,7 @@ ctf_xfer_partial (struct target_ops *ops, enum target_object object,
 	      gdb_byte *contents;
 	      int k;
 
-	      contents = xmalloc (mlen);
+	      contents = (gdb_byte *) xmalloc (mlen);
 
 	      for (k = 0; k < mlen; k++)
 		{

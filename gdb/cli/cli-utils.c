@@ -1,6 +1,6 @@
 /* CLI utilities.
 
-   Copyright (C) 2011-2015 Free Software Foundation, Inc.
+   Copyright (C) 2011-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -23,16 +23,9 @@
 
 #include <ctype.h>
 
-/* *PP is a string denoting a number.  Get the number of the.  Advance
-   *PP after the string and any trailing whitespace.
+/* See documentation in cli-utils.h.  */
 
-   Currently the string can either be a number, or "$" followed by the
-   name of a convenience variable, or ("$" or "$$") followed by digits.
-
-   TRAILER is a character which can be found after the number; most
-   commonly this is `-'.  If you don't want a trailer, use \0.  */
-
-static int
+int
 get_number_trailer (const char **pp, int trailer)
 {
   int retval = 0;	/* default */

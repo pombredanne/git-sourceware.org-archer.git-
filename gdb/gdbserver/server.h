@@ -1,5 +1,5 @@
 /* Common definitions for remote server for GDB.
-   Copyright (C) 1993-2015 Free Software Foundation, Inc.
+   Copyright (C) 1993-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -92,6 +92,7 @@ extern void discard_queued_stop_replies (ptid_t ptid);
 
 #include "utils.h"
 #include "debug.h"
+#include "gdb_vecs.h"
 
 /* Maximum number of bytes to read/write at once.  The value here
    is chosen to fill up a packet (the headers account for the 32).  */
@@ -101,6 +102,12 @@ extern void discard_queued_stop_replies (ptid_t ptid);
    value to accomodate multiple register formats.  This value must be at least
    as large as the largest register set supported by gdbserver.  */
 #define PBUFSIZ 16384
+
+/* Definition for an unknown syscall, used basically in error-cases.  */
+#define UNKNOWN_SYSCALL (-1)
+
+/* Definition for any syscall, used for unfiltered syscall reporting.  */
+#define ANY_SYSCALL (-2)
 
 #endif /* SERVER_H */
 
@@ -184,6 +191,10 @@ struct client_state
   int multi_process_;
   int report_fork_events_;
   int report_vfork_events_;
+  int report_exec_events_;
+  int report_thread_events_;
+  /* Whether to report TARGET_WAITKING_NO_RESUMED events.  */
+  int report_no_resumed_;
   int non_stop_;
   /* True if the "swbreak+" feature is active.  In that case, GDB wants
      us to report whether a trap is explained by a software breakpoint
@@ -194,6 +205,11 @@ struct client_state
      us to report whether a trap is explained by a hardware breakpoint.
      Only enabled if the target supports it.  */
   int hwbreak_feature_;
+
+  /* True if the "vContSupported" feature is active.  In that case, GDB
+     wants us to report whether single step is supported in the reply to
+     "vCont?" packet.  */
+  int vCont_supported_;
 
   /* Whether we should attempt to disable the operating system's address
      space randomization feature before starting an inferior.  */
@@ -248,9 +264,13 @@ void delete_client_state (gdb_fildes_t fd);
 #define multi_process	(get_client_state()->multi_process_)
 #define report_fork_events	(get_client_state()->report_fork_events_)
 #define report_vfork_events	(get_client_state()->report_vfork_events_)
+#define report_exec_events     (get_client_state()->report_exec_events_)
+#define report_thread_events   (get_client_state()->report_thread_events_)
+#define report_no_resumed      (get_client_state()->report_no_resumed_)
 #define non_stop	(get_client_state()->non_stop_)
 #define swbreak_feature	(get_client_state()->swbreak_feature_)
 #define hwbreak_feature	(get_client_state()->hwbreak_feature_)
+#define vCont_supported        (get_client_state()->vCont_supported_)
 #define disable_randomization	(get_client_state()->disable_randomization_)
 #define program_argv	(get_client_state()->program_argv_)
 #define wrapper_argv	(get_client_state()->wrapper_argv_)

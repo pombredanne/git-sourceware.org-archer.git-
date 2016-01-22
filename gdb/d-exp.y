@@ -1,6 +1,6 @@
 /* YACC parser for D expressions, for GDB.
 
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -368,6 +368,8 @@ UnaryExpression:
 		{ write_exp_elt_opcode (pstate, UNOP_LOGICAL_NOT); }
 |	'~' UnaryExpression
 		{ write_exp_elt_opcode (pstate, UNOP_COMPLEMENT); }
+|	TypeExp '.' SIZEOF_KEYWORD
+		{ write_exp_elt_opcode (pstate, UNOP_SIZEOF); }
 |	CastExpression
 |	PowExpression
 ;
@@ -410,6 +412,8 @@ PostfixExpression:
 		  write_exp_elt_opcode (pstate, STRUCTOP_STRUCT);
 		  write_exp_string (pstate, $3);
 		  write_exp_elt_opcode (pstate, STRUCTOP_STRUCT); }
+|	PostfixExpression '.' SIZEOF_KEYWORD
+		{ write_exp_elt_opcode (pstate, UNOP_SIZEOF); }
 |	PostfixExpression INCREMENT
 		{ write_exp_elt_opcode (pstate, UNOP_POSTINCREMENT); }
 |	PostfixExpression DECREMENT
@@ -483,9 +487,7 @@ PrimaryExpression:
 			}
 
 		      write_exp_elt_opcode (pstate, OP_VAR_VALUE);
-		      /* We want to use the selected frame, not another more inner frame
-			 which happens to be in the same block.  */
-		      write_exp_elt_block (pstate, NULL);
+		      write_exp_elt_block (pstate, sym.block);
 		      write_exp_elt_sym (pstate, sym.symbol);
 		      write_exp_elt_opcode (pstate, OP_VAR_VALUE);
 		    }
@@ -616,6 +618,8 @@ PrimaryExpression:
 		  write_exp_elt_longcst (pstate, (LONGEST) 0);
 		  write_exp_elt_longcst (pstate, (LONGEST) $1 - 1);
 		  write_exp_elt_opcode (pstate, OP_ARRAY); }
+|	TYPEOF_KEYWORD '(' Expression ')'
+		{ write_exp_elt_opcode (pstate, OP_TYPEOF); }
 ;
 
 ArrayLiteral:
@@ -640,7 +644,7 @@ StringExp:
 
 		  vec->type = $1.type;
 		  vec->length = $1.length;
-		  vec->ptr = malloc ($1.length + 1);
+		  vec->ptr = (char *) malloc ($1.length + 1);
 		  memcpy (vec->ptr, $1.ptr, $1.length + 1);
 		}
 |	StringExp STRING_LITERAL
@@ -648,10 +652,10 @@ StringExp:
 		     for convenience.  */
 		  char *p;
 		  ++$$.len;
-		  $$.tokens = realloc ($$.tokens,
-				       $$.len * sizeof (struct typed_stoken));
+		  $$.tokens
+		    = XRESIZEVEC (struct typed_stoken, $$.tokens, $$.len);
 
-		  p = malloc ($2.length + 1);
+		  p = (char *) malloc ($2.length + 1);
 		  memcpy (p, $2.ptr, $2.length + 1);
 
 		  $$.tokens[$$.len - 1].type = $2.type;
@@ -1001,7 +1005,7 @@ parse_string_or_char (const char *tokptr, const char **outptr,
   else
     value->type = C_STRING;
 
-  value->ptr = obstack_base (&tempbuf);
+  value->ptr = (char *) obstack_base (&tempbuf);
   value->length = obstack_object_size (&tempbuf);
 
   *outptr = tokptr;
@@ -1554,7 +1558,7 @@ yylex (void)
 	      obstack_grow (&name_obstack, next->value.sval.ptr,
 			    next->value.sval.length);
 
-	      yylval.sval.ptr = obstack_base (&name_obstack);
+	      yylval.sval.ptr = (char *) obstack_base (&name_obstack);
 	      yylval.sval.length = obstack_object_size (&name_obstack);
 
 	      current.token = classify_name (pstate, expression_context_block);
@@ -1634,7 +1638,7 @@ yylex (void)
 	  obstack_grow (&name_obstack, next->value.sval.ptr,
 			next->value.sval.length);
 
-	  yylval.sval.ptr = obstack_base (&name_obstack);
+	  yylval.sval.ptr = (char *) obstack_base (&name_obstack);
 	  yylval.sval.length = obstack_object_size (&name_obstack);
 	  current.value = yylval;
 	  current.token = classification;

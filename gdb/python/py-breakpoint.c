@@ -1,6 +1,6 @@
 /* Python interface to breakpoints
 
-   Copyright (C) 2008-2015 Free Software Foundation, Inc.
+   Copyright (C) 2008-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -203,7 +203,7 @@ bppy_set_thread (PyObject *self, PyObject *newvalue, void *closure)
       if (! gdb_py_int_as_long (newvalue, &id))
 	return -1;
 
-      if (! valid_thread_id (id))
+      if (!valid_global_thread_id (id))
 	{
 	  PyErr_SetString (PyExc_RuntimeError,
 			   _("Invalid thread ID."));
@@ -720,7 +720,7 @@ bppy_init (PyObject *self, PyObject *args, PyObject *kwargs)
 static int
 build_bp_list (struct breakpoint *b, void *arg)
 {
-  PyObject *list = arg;
+  PyObject *list = (PyObject *) arg;
   PyObject *bp = (PyObject *) b->py_bp_object;
   int iserr = 0;
 

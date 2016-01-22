@@ -1,6 +1,6 @@
 /* Remote notification in GDB protocol
 
-   Copyright (C) 1988-2015 Free Software Foundation, Inc.
+   Copyright (C) 1988-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -116,8 +116,8 @@ remote_notif_process (struct remote_notif_state *state,
 static void
 remote_async_get_pending_events_handler (gdb_client_data data)
 {
-  gdb_assert (non_stop);
-  remote_notif_process (data, NULL);
+  gdb_assert (target_is_non_stop_p ());
+  remote_notif_process ((struct remote_notif_state *) data, NULL);
 }
 
 /* Remote notification handler.  Parse BUF, queue notification and
@@ -166,7 +166,7 @@ handle_notification (struct remote_notif_state *state, char *buf)
       /* Notify the event loop there's a stop reply to acknowledge
 	 and that there may be more events to fetch.  */
       QUEUE_enque (notif_client_p, state->notif_queue, nc);
-      if (non_stop)
+      if (target_is_non_stop_p ())
 	{
 	  /* In non-stop, We mark REMOTE_ASYNC_GET_PENDING_EVENTS_TOKEN
 	     in order to go on what we were doing and postpone
@@ -230,7 +230,7 @@ notif_event_xfree (struct notif_event *event)
 static void
 do_notif_event_xfree (void *arg)
 {
-  notif_event_xfree (arg);
+  notif_event_xfree ((struct notif_event *) arg);
 }
 
 /* Return an allocated remote_notif_state.  */

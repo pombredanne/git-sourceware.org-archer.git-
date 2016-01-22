@@ -1,5 +1,5 @@
 /* Object file "section" support for the BFD library.
-   Copyright (C) 1990-2015 Free Software Foundation, Inc.
+   Copyright (C) 1990-2016 Free Software Foundation, Inc.
    Written by Cygnus Support.
 
    This file is part of BFD, the Binary File Descriptor library.
@@ -360,6 +360,9 @@ CODE_FRAGMENT
 .  {* Indicate that section has the no read flag set. This happens
 .     when memory read flag isn't set. *}
 .#define SEC_COFF_NOREAD 0x40000000
+.
+.  {* Indicate that section has the no read flag set.  *}
+.#define SEC_ELF_NOREAD 0x80000000
 .
 .  {*  End of section flags.  *}
 .
@@ -903,16 +906,18 @@ FUNCTION
        bfd_get_next_section_by_name
 
 SYNOPSIS
-       asection *bfd_get_next_section_by_name (asection *sec);
+       asection *bfd_get_next_section_by_name (bfd *ibfd, asection *sec);
 
 DESCRIPTION
        Given @var{sec} is a section returned by @code{bfd_get_section_by_name},
        return the next most recently created section attached to the same
-       BFD with the same name.  Return NULL if no such section exists.
+       BFD with the same name, or if no such section exists in the same BFD and
+       IBFD is non-NULL, the next section with the same name in any input
+       BFD following IBFD.  Return NULL on finding no section.
 */
 
 asection *
-bfd_get_next_section_by_name (asection *sec)
+bfd_get_next_section_by_name (bfd *ibfd, asection *sec)
 {
   struct section_hash_entry *sh;
   const char *name;
@@ -929,6 +934,16 @@ bfd_get_next_section_by_name (asection *sec)
     if (sh->root.hash == hash
        && strcmp (sh->root.string, name) == 0)
       return &sh->section;
+
+  if (ibfd != NULL)
+    {
+      while ((ibfd = ibfd->link.next) != NULL)
+	{
+	  asection *s = bfd_get_section_by_name (ibfd, name);
+	  if (s != NULL)
+	    return s;
+	}
+    }
 
   return NULL;
 }
@@ -951,7 +966,7 @@ bfd_get_linker_section (bfd *abfd, const char *name)
   asection *sec = bfd_get_section_by_name (abfd, name);
 
   while (sec != NULL && (sec->flags & SEC_LINKER_CREATED) == 0)
-    sec = bfd_get_next_section_by_name (sec);
+    sec = bfd_get_next_section_by_name (NULL, sec);
   return sec;
 }
 

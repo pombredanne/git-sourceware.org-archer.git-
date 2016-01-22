@@ -393,6 +393,19 @@ case "${ENABLE_LD}" in
     ;;
 esac
 
+# PR gas/19109
+# Decide the default method for compressing debug sections.
+# Provide a configure time option to override our default.
+AC_ARG_ENABLE(compressed_debug_sections,
+[AS_HELP_STRING([--enable-compressed-debug-sections={all,gas,gold,ld,none}],
+		[Enable compressed debug sections for gas, gold or ld by
+		 default])],
+[
+  if test x"$enable_compressed_debug_sections" = xyes; then
+    AC_MSG_ERROR([no program with compressed debug sections specified])
+  fi
+], [enable_compressed_debug_sections=])
+
 # Configure extra directories which are host specific
 
 case "${host}" in
@@ -529,9 +542,8 @@ if test x$enable_static_libjava != xyes ; then
 fi
 AC_SUBST(EXTRA_CONFIGARGS_LIBJAVA)
 
-# Disable libgomp on non POSIX hosted systems.
+# Enable libgomp by default on hosted POSIX systems, and a few others.
 if test x$enable_libgomp = x ; then
-    # Enable libgomp by default on hosted POSIX systems.
     case "${target}" in
     *-*-linux* | *-*-gnu* | *-*-k*bsd*-gnu | *-*-kopensolaris*-gnu)
 	;;
@@ -540,6 +552,8 @@ if test x$enable_libgomp = x ; then
     *-*-solaris2* | *-*-hpux11*)
 	;;
     *-*-darwin* | *-*-aix*)
+	;;
+    nvptx*-*-*)
 	;;
     *)
 	noconfigdirs="$noconfigdirs target-libgomp"
@@ -646,7 +660,7 @@ fi
 
 # Enable libmpx on supported systems by request.
 if test -d ${srcdir}/libmpx; then
-    if test x$enable_libmpx = xyes; then
+    if test x$enable_libmpx = x; then
        AC_MSG_CHECKING([for libmpx support])
        if (srcdir=${srcdir}/libmpx; \
                . ${srcdir}/configure.tgt; \
@@ -657,8 +671,6 @@ if test -d ${srcdir}/libmpx; then
        else
            AC_MSG_RESULT([yes])
        fi
-    else
-       noconfigdirs="$noconfigdirs target-libmpx"
     fi
 fi
 
@@ -1011,6 +1023,14 @@ esac
 case "${target}" in
   *-*-chorusos)
     ;;
+  aarch64-*-darwin*)
+    noconfigdirs="$noconfigdirs ld gas gdb gprof"
+    noconfigdirs="$noconfigdirs sim target-rda"
+    ;;
+  arm-*-darwin*)
+    noconfigdirs="$noconfigdirs ld gas gdb gprof"
+    noconfigdirs="$noconfigdirs sim target-rda"
+    ;;
   powerpc-*-darwin*)
     noconfigdirs="$noconfigdirs ld gas gdb gprof"
     noconfigdirs="$noconfigdirs sim target-rda"
@@ -1257,7 +1277,6 @@ case "${target}" in
     noconfigdirs="$noconfigdirs gdb"
     ;;
   nvptx*-*-*)
-    # nvptx is just a compiler
     noconfigdirs="$noconfigdirs target-libssp target-libstdc++-v3 target-libobjc"
     ;;
   or1k*-*-*)
@@ -1697,18 +1716,6 @@ AC_SUBST(extra_mpc_gmp_configure_flags)
 AC_SUBST(extra_mpc_mpfr_configure_flags)
 AC_SUBST(extra_isl_gmp_configure_flags)
 
-# Allow host libstdc++ to be specified for static linking with PPL.
-AC_ARG_WITH(host-libstdcxx,
-[AS_HELP_STRING([--with-host-libstdcxx=L],
-		[use linker arguments L to link with libstdc++
-		 when linking with PPL])])
-
-case $with_host_libstdcxx in
-  no|yes)
-    AC_MSG_ERROR([-with-host-libstdcxx needs an argument])
-    ;;
-esac
-
 # Libraries to use for stage1 or when not bootstrapping.
 AC_ARG_WITH(stage1-libs,
 [AS_HELP_STRING([--with-stage1-libs=LIBS], [libraries for stage1])],
@@ -1717,7 +1724,7 @@ AC_ARG_WITH(stage1-libs,
  else
    stage1_libs=$withval
  fi],
-[stage1_libs=$with_host_libstdcxx])
+[stage1_libs=])
 AC_SUBST(stage1_libs)
 
 # Linker flags to use for stage1 or when not bootstrapping.
@@ -1737,8 +1744,7 @@ AC_ARG_WITH(stage1-ldflags,
  fi])
 AC_SUBST(stage1_ldflags)
 
-# Libraries to use for stage2 and later builds.  This defaults to the
-# argument passed to --with-host-libstdcxx.
+# Libraries to use for stage2 and later builds.
 AC_ARG_WITH(boot-libs,
 [AS_HELP_STRING([--with-boot-libs=LIBS], [libraries for stage2 and later])],
 [if test "$withval" = "no" -o "$withval" = "yes"; then
@@ -1746,7 +1752,7 @@ AC_ARG_WITH(boot-libs,
  else
    poststage1_libs=$withval
  fi],
-[poststage1_libs=$with_host_libstdcxx])
+[poststage1_libs=])
 AC_SUBST(poststage1_libs)
 
 # Linker flags to use for stage2 and later builds.
@@ -1767,31 +1773,31 @@ AC_ARG_WITH(boot-ldflags,
  fi])
 AC_SUBST(poststage1_ldflags)
 
-# GCC GRAPHITE dependency ISL.
+# GCC GRAPHITE dependency isl.
 # Basic setup is inlined here, actual checks are in config/isl.m4
 
 AC_ARG_WITH(isl,
   [AS_HELP_STRING(
    [--with-isl=PATH],
-   [Specify prefix directory for the installed ISL package.
+   [Specify prefix directory for the installed isl package.
     Equivalent to --with-isl-include=PATH/include
     plus --with-isl-lib=PATH/lib])])
 
 # Treat --without-isl as a request to disable
 # GRAPHITE support and skip all following checks.
 if test "x$with_isl" != "xno"; then
-  # Check for ISL
+  # Check for isl
   dnl Provide configure switches and initialize islinc & isllibs
   dnl with user input.
   ISL_INIT_FLAGS
-  dnl The versions of ISL that work for Graphite
+  dnl The versions of isl that work for Graphite
   ISL_CHECK_VERSION()
-  dnl Only execute fail-action, if ISL has been requested.
+  dnl Only execute fail-action, if isl has been requested.
   ISL_IF_FAILED([
-    AC_MSG_ERROR([Unable to find a usable ISL.  See config.log for details.])])
+    AC_MSG_ERROR([Unable to find a usable isl.  See config.log for details.])])
 fi
 
-# If the ISL check failed, disable builds of in-tree variant of ISL
+# If the isl check failed, disable builds of in-tree variant of isl
 if test "x$with_isl" = xno ||
    test "x$gcc_cv_isl" = xno; then
   noconfigdirs="$noconfigdirs isl"

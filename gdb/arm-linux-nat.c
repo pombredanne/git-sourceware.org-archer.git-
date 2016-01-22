@@ -1,5 +1,5 @@
 /* GNU/Linux on ARM native support.
-   Copyright (C) 1999-2015 Free Software Foundation, Inc.
+   Copyright (C) 1999-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -575,7 +575,7 @@ arm_linux_read_description (struct target_ops *ops)
 	 registers.  Support was added in 2.6.30.  */
       pid = ptid_get_lwp (inferior_ptid);
       errno = 0;
-      buf = alloca (VFP_REGS_SIZE);
+      buf = (char *) alloca (VFP_REGS_SIZE);
       if (ptrace (PTRACE_GETVFPREGS, pid, 0, buf) < 0
 	  && errno == EIO)
 	result = NULL;

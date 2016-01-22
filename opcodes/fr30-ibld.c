@@ -3,7 +3,7 @@
    THIS FILE IS MACHINE GENERATED WITH CGEN: Cpu tools GENerator.
    - the resultant file is machine generated, cgen-ibld.in isn't
 
-   Copyright (C) 1996-2015 Free Software Foundation, Inc.
+   Copyright (C) 1996-2016 Free Software Foundation, Inc.
 
    This file is part of libopcodes.
 
@@ -874,7 +874,7 @@ fr30_cgen_extract_operand (CGEN_CPU_DESC cd,
       {
         long value;
         length = extract_normal (cd, ex_info, insn_value, 0, 0, 8, 4, 16, total_length, pc, & value);
-        value = ((value) | (((-1) << (4))));
+        value = ((value) | (((-1UL) << (4))));
         fields->f_m4 = value;
       }
       break;

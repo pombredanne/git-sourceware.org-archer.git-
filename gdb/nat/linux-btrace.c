@@ -1,6 +1,6 @@
 /* Linux-dependent part of branch trace support for GDB, and GDBserver.
 
-   Copyright (C) 2013-2015 Free Software Foundation, Inc.
+   Copyright (C) 2013-2016 Free Software Foundation, Inc.
 
    Contributed by Intel Corp. <markus.t.metzger@intel.com>
 
@@ -132,7 +132,7 @@ perf_event_read (const struct perf_event_buffer *pev, __u64 data_head,
   start = begin + data_tail % buffer_size;
   stop = begin + data_head % buffer_size;
 
-  buffer = xmalloc (size);
+  buffer = (gdb_byte *) xmalloc (size);
 
   if (start < stop)
     memcpy (buffer, start, stop - start);
@@ -461,7 +461,7 @@ kernel_supports_bts (void)
     }
 }
 
-/* Check whether the kernel supports Intel(R) Processor Trace.  */
+/* Check whether the kernel supports Intel Processor Trace.  */
 
 static int
 kernel_supports_pt (void)
@@ -618,7 +618,7 @@ linux_supports_bts (void)
   return cached > 0;
 }
 
-/* Check whether the linux target supports Intel(R) Processor Trace.  */
+/* Check whether the linux target supports Intel Processor Trace.  */
 
 static int
 linux_supports_pt (void)
@@ -729,7 +729,8 @@ linux_enable_bts (ptid_t ptid, const struct btrace_config_bts *conf)
 	continue;
 
       /* The number of pages we request needs to be a power of two.  */
-      header = mmap (NULL, length, PROT_READ, MAP_SHARED, bts->file, 0);
+      header = ((struct perf_event_mmap_page *)
+		mmap (NULL, length, PROT_READ, MAP_SHARED, bts->file, 0));
       if (header != MAP_FAILED)
 	break;
     }
@@ -778,7 +779,7 @@ linux_enable_bts (ptid_t ptid, const struct btrace_config_bts *conf)
 
 #if defined (PERF_ATTR_SIZE_VER5)
 
-/* Enable branch tracing in Intel(R) Processor Trace format.  */
+/* Enable branch tracing in Intel Processor Trace format.  */
 
 static struct btrace_target_info *
 linux_enable_pt (ptid_t ptid, const struct btrace_config_pt *conf)
@@ -819,8 +820,9 @@ linux_enable_pt (ptid_t ptid, const struct btrace_config_pt *conf)
     goto err;
 
   /* Allocate the configuration page. */
-  header = mmap (NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
-		 pt->file, 0);
+  header = ((struct perf_event_mmap_page *)
+	    mmap (NULL, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED,
+		  pt->file, 0));
   if (header == MAP_FAILED)
     goto err_file;
 
@@ -861,8 +863,9 @@ linux_enable_pt (ptid_t ptid, const struct btrace_config_pt *conf)
       header->aux_size = data_size;
       length = size;
 
-      pt->pt.mem = mmap (NULL, length, PROT_READ, MAP_SHARED, pt->file,
-			 header->aux_offset);
+      pt->pt.mem = ((const uint8_t *)
+		    mmap (NULL, length, PROT_READ, MAP_SHARED, pt->file,
+			  header->aux_offset));
       if (pt->pt.mem != MAP_FAILED)
 	break;
     }
@@ -935,7 +938,7 @@ linux_disable_bts (struct btrace_tinfo_bts *tinfo)
   return BTRACE_ERR_NONE;
 }
 
-/* Disable Intel(R) Processor Trace tracing.  */
+/* Disable Intel Processor Trace tracing.  */
 
 static enum btrace_error
 linux_disable_pt (struct btrace_tinfo_pt *tinfo)
@@ -1070,7 +1073,7 @@ linux_read_bts (struct btrace_data_bts *btrace,
   return BTRACE_ERR_NONE;
 }
 
-/* Fill in the Intel(R) Processor Trace configuration information.  */
+/* Fill in the Intel Processor Trace configuration information.  */
 
 static void
 linux_fill_btrace_pt_config (struct btrace_data_pt_config *conf)
@@ -1078,7 +1081,7 @@ linux_fill_btrace_pt_config (struct btrace_data_pt_config *conf)
   conf->cpu = btrace_this_cpu ();
 }
 
-/* Read branch trace data in Intel(R) Processor Trace format for the thread
+/* Read branch trace data in Intel Processor Trace format for the thread
    given by TINFO into BTRACE using the TYPE reading method.  */
 
 static enum btrace_error
@@ -1132,7 +1135,7 @@ linux_read_btrace (struct btrace_data *btrace,
       return linux_read_bts (&btrace->variant.bts, tinfo, type);
 
     case BTRACE_FORMAT_PT:
-      /* We read btrace in Intel(R) Processor Trace format.  */
+      /* We read btrace in Intel Processor Trace format.  */
       btrace->format = BTRACE_FORMAT_PT;
       btrace->variant.pt.data = NULL;
       btrace->variant.pt.size = 0;

@@ -1,5 +1,5 @@
 /* Remote utility routines for the remote server for GDB.
-   Copyright (C) 1986-2015 Free Software Foundation, Inc.
+   Copyright (C) 1986-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -124,7 +124,7 @@ int transport_is_reliable = 0;
 
 
 int
-get_remote_desc ()
+get_remote_desc (void)
 {
   return remote_desc;
 }
@@ -136,7 +136,7 @@ set_remote_desc (gdb_fildes_t fd)
 }
 
 int
-get_listen_desc ()
+get_listen_desc (void)
 {
   return listen_desc;
 }
@@ -550,7 +550,7 @@ write_ptid (char *buf, ptid_t ptid)
   return buf;
 }
 
-ULONGEST
+static ULONGEST
 hex_or_minus_one (char *buf, char **obuf)
 {
   ULONGEST ret;
@@ -647,7 +647,7 @@ putpkt_binary_1 (char *buf, int cnt, int is_notif)
   int cc;
   client_state *cs = get_client_state();
 
-  buf2 = xmalloc (strlen ("$") + cnt + strlen ("#nn") + 1);
+  buf2 = (char *) xmalloc (strlen ("$") + cnt + strlen ("#nn") + 1);
 
   /* Copy the packet into buffer BUF2, encapsulating it
      and giving it a checksum.  */
@@ -900,7 +900,10 @@ readchar (gdb_fildes_t fd)
       if (readchar_bufcnt <= 0)
 	{
 	  if (readchar_bufcnt == 0)
-	    fprintf (stderr, "readchar: Got EOF\n");
+	    {
+	      if (remote_debug)
+		fprintf (stderr, "readchar: Got EOF\n");
+	    }
 	  else
 	    perror ("readchar");
 
@@ -974,6 +977,15 @@ getpkt (gdb_fildes_t fd, char *buf)
       while (1)
 	{
 	  c = readchar (fd);
+
+	  /* The '\003' may appear before or after each packet, so
+	     check for an input interrupt.  */
+	  if (c == '\003')
+	    {
+	      (*the_target->request_interrupt) ();
+	      continue;
+	    }
+
 	  if (c == '$')
 	    break;
 	  if (remote_debug)
@@ -1135,6 +1147,11 @@ prepare_resume_reply (char *buf, ptid_t ptid,
     case TARGET_WAITKIND_STOPPED:
     case TARGET_WAITKIND_FORKED:
     case TARGET_WAITKIND_VFORKED:
+    case TARGET_WAITKIND_VFORK_DONE:
+    case TARGET_WAITKIND_EXECD:
+    case TARGET_WAITKIND_THREAD_CREATED:
+    case TARGET_WAITKIND_SYSCALL_ENTRY:
+    case TARGET_WAITKIND_SYSCALL_RETURN:
       {
 	struct thread_info *saved_thread;
 	const char **regp;
@@ -1151,6 +1168,48 @@ prepare_resume_reply (char *buf, ptid_t ptid,
 	    buf += strlen (buf);
 	    buf = write_ptid (buf, status->value.related_pid);
 	    strcat (buf, ";");
+	  }
+	else if (status->kind == TARGET_WAITKIND_VFORK_DONE && report_vfork_events)
+	  {
+	    enum gdb_signal signal = GDB_SIGNAL_TRAP;
+
+	    sprintf (buf, "T%02xvforkdone:;", signal);
+	  }
+	else if (status->kind == TARGET_WAITKIND_EXECD && report_exec_events)
+	  {
+	    enum gdb_signal signal = GDB_SIGNAL_TRAP;
+	    const char *event = "exec";
+	    char hexified_pathname[PATH_MAX * 2];
+
+	    sprintf (buf, "T%02x%s:", signal, event);
+	    buf += strlen (buf);
+
+	    /* Encode pathname to hexified format.  */
+	    bin2hex ((const gdb_byte *) status->value.execd_pathname,
+		     hexified_pathname,
+		     strlen (status->value.execd_pathname));
+
+	    sprintf (buf, "%s;", hexified_pathname);
+	    xfree (status->value.execd_pathname);
+	    status->value.execd_pathname = NULL;
+	    buf += strlen (buf);
+	  }
+	else if (status->kind == TARGET_WAITKIND_THREAD_CREATED
+		 && report_thread_events)
+	  {
+	    enum gdb_signal signal = GDB_SIGNAL_TRAP;
+
+	    sprintf (buf, "T%02xcreate:;", signal);
+	  }
+	else if (status->kind == TARGET_WAITKIND_SYSCALL_ENTRY
+		 || status->kind == TARGET_WAITKIND_SYSCALL_RETURN)
+	  {
+	    enum gdb_signal signal = GDB_SIGNAL_TRAP;
+	    const char *event = (status->kind == TARGET_WAITKIND_SYSCALL_ENTRY
+				 ? "syscall_entry" : "syscall_return");
+
+	    sprintf (buf, "T%02x%s:%x;", signal, event,
+		     status->value.syscall_number);
 	  }
 	else
 	  sprintf (buf, "T%02x", status->value.sig);
@@ -1267,15 +1326,13 @@ prepare_resume_reply (char *buf, ptid_t ptid,
       else
 	sprintf (buf, "X%02x", status->value.sig);
       break;
-    case TARGET_WAITKIND_VFORK_DONE:
-      if (report_vfork_events)
-	{
-	  enum gdb_signal signal = GDB_SIGNAL_TRAP;
-
-	  sprintf (buf, "T%02xvforkdone:;", signal);
-	}
-      else
-	sprintf (buf, "T%02x", GDB_SIGNAL_0);
+    case TARGET_WAITKIND_THREAD_EXITED:
+      sprintf (buf, "w%x;", status->value.integer);
+      buf += strlen (buf);
+      buf = write_ptid (buf, ptid);
+      break;
+    case TARGET_WAITKIND_NO_RESUMED:
+      sprintf (buf, "N");
       break;
     default:
       error ("unhandled waitkind");
@@ -1326,7 +1383,7 @@ decode_M_packet (char *from, CORE_ADDR *mem_addr_ptr, unsigned int *len_ptr,
     }
 
   if (*to_p == NULL)
-    *to_p = xmalloc (*len_ptr);
+    *to_p = (unsigned char *) xmalloc (*len_ptr);
 
   hex2bin (&from[i++], *to_p, *len_ptr);
 }
@@ -1352,7 +1409,7 @@ decode_X_packet (char *from, int packet_len, CORE_ADDR *mem_addr_ptr,
     }
 
   if (*to_p == NULL)
-    *to_p = xmalloc (*len_ptr);
+    *to_p = (unsigned char *) xmalloc (*len_ptr);
 
   if (remote_unescape_input ((const gdb_byte *) &from[i], packet_len - i,
 			     *to_p, *len_ptr) != *len_ptr)
@@ -1479,7 +1536,7 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
       unsigned int mem_len;
 
       decode_m_packet (&own_buf[1], &mem_addr, &mem_len);
-      mem_buffer = xmalloc (mem_len);
+      mem_buffer = (unsigned char *) xmalloc (mem_len);
       if (read_inferior_memory (mem_addr, mem_buffer, mem_len) == 0)
 	bin2hex (mem_buffer, own_buf, mem_len);
       else
@@ -1563,7 +1620,7 @@ relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
       if (own_buf[0] == 'm')
 	{
 	  decode_m_packet (&own_buf[1], &mem_addr, &mem_len);
-	  mem_buffer = xmalloc (mem_len);
+	  mem_buffer = (unsigned char *) xmalloc (mem_len);
 	  if (read_inferior_memory (mem_addr, mem_buffer, mem_len) == 0)
 	    bin2hex (mem_buffer, own_buf, mem_len);
 	  else
@@ -1618,7 +1675,7 @@ void
 monitor_output (const char *msg)
 {
   int len = strlen (msg);
-  char *buf = xmalloc (len * 2 + 2);
+  char *buf = (char *) xmalloc (len * 2 + 2);
 
   buf[0] = 'O';
   bin2hex ((const gdb_byte *) msg, buf + 1, len);

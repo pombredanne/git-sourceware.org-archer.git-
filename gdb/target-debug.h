@@ -1,6 +1,6 @@
 /* GDB target debugging macros
 
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -156,6 +156,8 @@
   target_debug_do_print (plongest (X))
 #define target_debug_print_enum_bptype(X) \
   target_debug_do_print (plongest (X))
+#define target_debug_print_struct_inferior_p(X)	\
+  target_debug_do_print (host_address_to_string (X))
 
 static void
 target_debug_print_struct_target_waitstatus_p (struct target_waitstatus *status)
