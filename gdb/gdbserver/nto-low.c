@@ -979,6 +979,7 @@ static struct target_ops nto_target_ops = {
   NULL, /* core_of_thread */
   NULL, /* read_loadmap */
   NULL, /* process_qsupported */
+  NULL, /* supports_catch_syscall */
   NULL, /* supports_tracepoints */
   NULL, /* read_pc */
   NULL, /* write_pc */

@@ -2030,7 +2030,7 @@ remote_set_syscall_catchpoint (struct target_ops *self,
     {
       /* Prepare a packet with the sysno list, assuming max 8+1
 	 characters for a sysno.  If the resulting packet size is too
-	 big, fallback on the non-selective packet.  */
+	 big, fallback on the non selective packet.  */
       const int maxpktsz = strlen ("QCatchSyscalls:1") + n_sysno * 9 + 1;
 
       catch_packet = (char *) xmalloc (maxpktsz);

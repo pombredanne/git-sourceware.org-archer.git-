@@ -1,4 +1,4 @@
- # Copyright (C) 2015 Free Software Foundation, Inc.
+# Copyright (C) 2015, 2016 Free Software Foundation, Inc.
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -13,6 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+exp_internal 1
 load_lib gdbserver-support.exp
 
 set test "multi-client"
@@ -21,13 +22,22 @@ set testfile wrapper
 set srcfile wrapper.c
 global srcdir subdir
 set testpath [pwd]/$subdir/$testfile
+
 set testfile2 server-kill
 set srcfile2 server-kill.c
 set testpath2 [pwd]/$subdir/$testfile2
+
+set testfile3 catch-syscall
+set srcfile3 ../gdb.base/catch-syscall.c
+set testpath3 [pwd]/$subdir/$testfile3
+
 if { [prepare_for_testing $test $testfile $srcfile debug] } {
     return -1
 }
 if {[build_executable $test $testfile2 $srcfile2 debug] == -1} {
+    return -1
+}
+if {[build_executable $test $testfile3 $srcfile3 debug] == -1} {
     return -1
 }
 
@@ -80,17 +90,36 @@ proc start_client { N ATTACH_FLAGS } {
     } else {
 	fail "$test gdbserver attach client $N"
     }
+    return $res
+}
+
+proc start_strace { ATTACH_FLAGS } {
+    global test gdb_spawn_id MULTI_GDBFLAGS
+    set STRACE [auto_execok strace]
+    verbose "strace is $STRACE $ATTACH_FLAGS"
+    set res [remote_spawn host "$STRACE $ATTACH_FLAGS"]
+    sleep 1
+    set ok 0
+    expect {
+	-i $res -re {Process [0-9]* attached} { incr ok }
+    }
     if { $res < 0 || $res == "" } {
-	perror "$test Spawning $GDB failed."
+	perror "$test Spawning $STRACE failed."
 	return 1
+    }
+    set gdb_spawn_id $res
+    if { $ok == 1 } {
+	pass "$test gdbserver strace \"$expect_out(buffer)\""
+    } else {
+	unresolved "$test gdbserver strace \"$expect_out(buffer)\""
     }
     return $res
 }
 
-proc get_target_pid { } {
+proc get_target_pid { target_exec } {
     global test
     set target_pid -1
-    set res [remote_spawn host "pgrep wrapper"]
+    set res [remote_spawn host "pgrep $target_exec"]
     sleep 1
     expect {
 	-i $res -re {[0-9][0-9]*} { set target_pid $expect_out(buffer) }
@@ -108,14 +137,14 @@ proc gdb_command { CLIENT COMMAND RESPONSE COMMENT } {
     global gdb_client2_spawn_id
     global gdb_client3_spawn_id
     global test
-    if {$CLIENT == 1} {
-	set client "$gdb_client1_spawn_id"
-    } elseif {$CLIENT == 2} {
-	set client "$gdb_client2_spawn_id"
-    } else {
-	set client "$gdb_client3_spawn_id"
+    switch $CLIENT {
+	1 { set client "$gdb_client1_spawn_id" }
+	2 { set client "$gdb_client2_spawn_id" }
+	default { set client "$gdb_client3_spawn_id" }
     }
-    send -i $client "$COMMAND\n"
+    if { [string length $COMMAND] > 0 } {
+	send -i $client "$COMMAND\n"
+    }
     if { [string length $RESPONSE] > 0 } {
 	foreach i {1 2 3} {
 	    set ok 0
@@ -123,7 +152,6 @@ proc gdb_command { CLIENT COMMAND RESPONSE COMMENT } {
 		-i "$client" -re "$RESPONSE" { 
 		    incr ok; 
 		    verbose "$COMMENT $client $expect_out(buffer)"
-#		    exp_continue 
 		}
 	    }
 	    if {$ok == 1} { 
@@ -132,11 +160,10 @@ proc gdb_command { CLIENT COMMAND RESPONSE COMMENT } {
 	    } else {
 		if { $i == 3 } {
 		    fail "$test $COMMENT"
-		} else { sleep 2 }
+		} else { sleep 1 }
 	    }
 	}
     }
-    if { False } { verbose "DEBUG: $COMMENT $client $expect_out(buffer)" }
 }
 
 verbose "##### Run one process and attach to it"
@@ -151,7 +178,7 @@ gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver b getenv"
 
 gdb_command 1 "run" "Breakpoint 1," "gdbserver hit b getenv"
 
-set target_pid [get_target_pid]
+set target_pid [get_target_pid wrapper]
 
 # Now start a second client that attaches to the first client
 set gdb_client2_spawn_id [start_client 2 "-iex \"attach $target_pid\""]
@@ -216,7 +243,7 @@ gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver non-stop b getenv"
 
 gdb_command 1 "run" "Breakpoint 1," "gdbserver non-stop hit b getenv"
 
-set target_pid [get_target_pid]
+set target_pid [get_target_pid wrapper]
 
 gdb_command 1 "show non-stop" "non-stop mode is on" "query non-stop"
 
@@ -261,6 +288,64 @@ if { $ok == 1 } {
 } else {
     fail "$test gdbserver client exited"
 }
+
+# Test strace client
+
+
+verbose "kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]"
+exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]
+
+set gdb_server_spawn_id [start_gdbserver]
+
+set MULTI_GDBFLAGS "-iex \"file $testpath3\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file $testpath3\" --silent --data-directory=[file dirname $GDB]/data-directory"
+
+set gdb_client1_spawn_id [start_client 1 ""]
+
+gdb_command 1 "b main" "Breakpoint 1 at" "gdbserver b main"
+
+gdb_command 1 "run" "Breakpoint 1,.*\r\n\\(client1 gdb" "gdbserver hit b main"
+
+set target_pid [get_target_pid catch-syscall]
+
+set gdb_client2_spawn_id [start_strace "-d -G localhost:65432 -o [pwd]/$subdir/strace.out -p $target_pid"]
+
+# gdb_command 1 "next" "close" "gdbserver next close"
+# gdb_command 1 "next" "chroot" "gdbserver next chroot"
+
+gdb_command 1 "b 45" "Breakpoint 2 at.*\r\n\\(client1 gdb" "gdbserver b chroot"
+
+gdb_command 1 "continue" "Breakpoint 2,.*\r\n\\(client1 gdb" "gdbserver hit b chroot"
+
+gdb_command 1 "next" "pipe.*\r\n\\(client1 gdb" "gdbserver next pipe"
+
+gdb_command 1 "next" "write.*\r\n\\(client1 gdb" "gdbserver next write"
+
+gdb_command 1 "next.*\r\n\\(client1 gdb" "read" "gdbserver next read"
+
+gdb_command 1 "continue.*\r\n\\(client1 gdb" "exited" "gdbserver strace test exited"
+
+#
+set infile [open "[pwd]/$subdir/strace.out" r]
+set ok 0
+while { [gets $infile line] >= 0 } {
+    switch -glob $line {
+	"*close(*" { incr ok }
+	"*chroot(*" { incr ok }
+	"*pipe(*" { incr ok }
+	"*write(*" { incr ok }
+	"*read(*" { incr ok }
+	"*vfork(*" { incr ok }
+    }
+}
+switch $ok {
+    6 { pass  "$test gdbserver strace" }
+    0 { unresolved "$test gdbserver strace" }
+    default { fail "$test gdbserver strace ($ok)" }
+}
+    
+close $infile
+
+# End
 
 verbose "kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id]"
 exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id]

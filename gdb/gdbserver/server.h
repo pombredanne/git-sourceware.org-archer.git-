@@ -177,6 +177,9 @@ struct client_state
   int packet_type;
   int last_packet_type;
   int pending;
+  int catch_syscalls;
+  ptid_t last_cont_ptid;
+  struct target_waitstatus last_cont_waitstatus;
 
   /* From server.c */
   int server_waiting_;

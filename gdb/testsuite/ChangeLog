@@ -1,3 +1,7 @@
+2016-02-06  Stan Cox  <scox@redhat.com>
+
+	* gdb.server/multi-client.exp:  Add syscall test.
+
 2016-01-13  Pedro Alves  <palves@redhat.com>
 
 	* gdb.base/default.exp: Expect $_gthread as well.
