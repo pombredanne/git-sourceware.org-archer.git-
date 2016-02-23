@@ -85,7 +85,7 @@ static struct client_states  client_states;
 
 static void handle_status (char *);
 
-enum pending_types  {none_pending, pending_waitee, pending_cont_waiter,pending_step_waiter,pending_stop};
+enum pending_types  {none_pending, pending_waitee, pending_cont_waiter, pending_step_waiter, pending_stop};
 char *pending_types_str[] = {"not-waiting","waitee","waiter","step-waiter","stop"};
 char *packet_types_str[] = {"other", "vContc", "vConts","vContt","vStopped","vRun", "vAttach"};
 char *waitkind_str[] = {"exited", "stopped", "signalled", "loaded", "forked", "vforked", "execed", "vfork-done", "syscall-entry", "syscall-exit", "spurious", "ignore", "no-history", "not-resumed", "thread-created", "thread-exited", ""};
@@ -442,19 +442,15 @@ void
 resolve_waiter (client_state *cs, client_state *waitee_cs)
 {
   enum packet_types this_packet_type = (cs->packet_type) ? cs->packet_type : cs->last_packet_type;
+  client_state *save_client_state;
 
+  save_client_state = client_states.current_cs;
+  set_client_state (cs->file_desc);
   switch (this_packet_type)
   {
     case vContc:
       {
 	strcpy (own_buffer, "?");
-	if (debug_threads)
-	  {
-	    prepare_resume_reply (own_buffer, cs->last_cont_ptid, &cs->last_cont_waitstatus);
-	    debug_printf ("%s:%d %d %#lx %#lx %s %s prepare_resume_reply=%s\n", __FUNCTION__, __LINE__,
-			  cs->file_desc, (unsigned long)cs->last_cont_ptid.pid, (unsigned long)cs->ss->last_ptid_.pid,
-			  waitkind_str[cs->last_cont_waitstatus.kind], waitkind_str[cs->ss->last_status_.kind], own_buffer);
-	  }
 	if (non_stop)
 	  {
 	    if (last_status.kind != TARGET_WAITKIND_EXITED
@@ -504,11 +500,15 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
     {
       if (last_status.kind != TARGET_WAITKIND_EXITED)
 	{
-	  /* reply to vContc with a status */
+	  /* reply to vConts with a status */
 	  strcpy (own_buffer, "?");
 	  handle_status (own_buffer);
 	  putpkt (own_buffer);
 	}
+      else if (last_status.kind == TARGET_WAITKIND_EXITED)
+	  {
+	  putpkt (waitee_cs->own_buffer_);
+	  }
       break;
     }
   case vContt:
@@ -543,6 +543,25 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
   default:
     break;
   };
+
+  set_client_state (save_client_state->file_desc);
+}
+
+
+void
+analyze_group (client_state *current_cs, int *have_nonwaiter)
+{
+  client_state *csi;
+  *have_nonwaiter = 0;
+
+  for (csi = client_states.first->next; csi != NULL; csi = csi->next)
+    {
+      if (attached_to_same_proc (current_cs, csi))
+	{
+	  if (csi->pending == pending_waitee || csi->pending == none_pending)
+	    *have_nonwaiter += 1;
+	}
+    }
 }
 
 
@@ -582,14 +601,15 @@ setup_multiplexing (client_state *current_cs)
     {
       if (! attached_to_same_proc (current_cs, same_pid_cs))
 	continue;
+
       switch (same_pid_cs->pending)
 	{
-	case none_pending:
+	case /* same_pid_cs->pending */ none_pending:
 	  /* found a client that has nothing pending */
 	  /* The current_cs vContc will wait; found same_pid_cs will proceed */
 	  switch (current_cs->packet_type)
 	    {
-	    case vContc:
+	    case /* current_cs->packet_type */ vContc:
 	      if (current_cs->last_packet_type != vRun)
 		{
 		  current_cs->pending = pending_cont_waiter;
@@ -597,7 +617,7 @@ setup_multiplexing (client_state *current_cs)
 		}
 	      break;
 	      /* TODO else if (current_cs->packet_type == vContt) */
-	    case vConts:
+	    case /* current_cs->packet_type */ vConts:
 	      if (same_pid_cs->last_packet_type != vContt)
 		{
 		  current_cs->pending = pending_step_waiter;
@@ -605,33 +625,56 @@ setup_multiplexing (client_state *current_cs)
 		}
 	    }
 	  break;
-	case pending_cont_waiter:
+	case /* same_pid_cs->pending */ pending_step_waiter:
 	  switch (current_cs->packet_type)
 	    {
-	      /* Current client is continuing and found another waiter client */
-	    case vContc:
+	    case /* current_cs->packet_type */ vContc:
 	      {
-		client_state *csi;
-		int waitee_count = 0;
-	      
-		/* Does the client group have a waitee? */
-		for (csi = client_states.first->next; csi != NULL; csi = csi->next)
-		  {
-		    if (current_cs != csi && csi->pending == pending_waitee
-			&& attached_to_same_proc (current_cs, csi))
-		      waitee_count = 1;
-		  }
-
-		dump_client_state (__FUNCTION__, "waitee/waiter switch");
-		if (debug_threads)
-		  debug_printf ("waitee count=%d\n", waitee_count);
-
-		/* Don't want to deadlock on everyone waiting */
-		if (current_cs->pending == pending_waitee && waitee_count > 0)
-		  current_cs->pending = pending_cont_waiter;
+		current_cs->pending = pending_cont_waiter;
+		resolve_waiter (same_pid_cs, current_cs);
+		same_pid_cs->pending = pending_waitee;
 	      }
 	    }
-	}
+	  /* fall through for vConts case */
+	case /* same_pid_cs->pending */ pending_cont_waiter:
+	  switch (current_cs->packet_type)
+	    {
+	    /* Current client is continuing and found another waiter client */
+	    case /* current_cs->packet_type */ vContc:
+	      {
+		int have_nonwaiter;
+		analyze_group (current_cs, &have_nonwaiter);
+		dump_client_state (__FUNCTION__, "waitee/waiter switch");
+		/* Don't want to deadlock on everyone waiting */
+		if (current_cs->pending == pending_waitee && have_nonwaiter)
+		  current_cs->pending = pending_cont_waiter;
+	      }
+	      break;
+	    case /* current_cs->packet_type */ vConts:
+	      {
+		int have_waitee;
+		analyze_group (current_cs, &have_waitee);
+		/* Don't want to deadlock on everyone waiting */
+		if (current_cs->pending == pending_waitee && have_waitee)
+		  current_cs->pending = pending_step_waiter;
+	      }
+	    }
+	  break;
+	case /* same_pid_cs->pending */ pending_waitee:
+	  switch (current_cs->packet_type)
+	    {
+	    /* Current client is continuing and found another waitee client */
+	    case /* current_cs->packet_type */ vContc:
+	      {
+		current_cs->pending = pending_cont_waiter;
+	      }
+	      break;
+	    case /* current_cs->packet_type */ vConts:
+	      {
+		current_cs->pending = pending_step_waiter;
+	      }
+	    }
+	} /* switch same_pid_cs->pending */
     } /* for same_pid_cs */
   
 
@@ -640,15 +683,15 @@ setup_multiplexing (client_state *current_cs)
     case pending_cont_waiter:
     case pending_step_waiter:
     case pending_stop:
-      
       switch (current_cs->last_packet_type)
-	{
+        {
 	case vRun:
 	case vStopped:
 	  break;
 	default:
 	  /* Current client is continuing and waiting so don't reply to this
 	     packet now; it will be replied to later in do_multiplexing */
+
 	  if (current_cs->ss->last_status_exited != have_exit)
 	    {
 	      dump_client_state (__FUNCTION__, "return 0");
@@ -656,11 +699,11 @@ setup_multiplexing (client_state *current_cs)
 	      current_cs->last_cont_waitstatus = current_cs->ss->last_status_;
 	      return 0;		/* Reply to packet later */
 	    }
-	}
-    default:
+	} /* switch current_cs->last_packet_type */
+    default: /* fall through */
       dump_client_state (__FUNCTION__, "return 1");
       return 1;			/* Reply to packet now */
-    }
+    } /* switch current_cs->pending */
 }
 
 
@@ -723,24 +766,6 @@ do_multiplexing (client_state *current_cs, char ch)
   7 vContc    vContc		waiter stopped
   ***/
 
-  /*
-    syscall halt 3 current
-     3 waitee 7 waiter
-       7 syscall? wake 7 wait 3 else continue 3
-    syscall halt 7 current
-     3 waiter 7 waitee
-       continue 7
-    stopped halt 3 current
-     3 waitee 7 waiter
-       continue 3
-    stopped halt 7 current
-     3 waiter 7 waitee
-       3 break? wake 3 wait 7 else continue 7
-       current_cs.packet_type == vContc and current_cs.catch_syscalls
-current_cs.kind == 
-       and 
-   */
-
   client_state *same_pid_cs = NULL;
   int make_waitee_a_waiter = 0;
 
@@ -755,7 +780,7 @@ current_cs.kind ==
 	  dump_client_state (__FUNCTION__, "resolved vContt");
 	  return 0;
 	}
-    default:
+    default: /* fall through */
           current_cs->last_packet_type = current_cs->packet_type;
     }
   
@@ -766,9 +791,10 @@ current_cs.kind ==
     {
     case vContt:
     case vContc:
-      if ((current_cs->pending == pending_waitee))
+    case vConts:
+      if (current_cs->pending == pending_waitee)
 	break;
-    default:
+    default: /* fall through */
       dump_client_state (__FUNCTION__, "no action taken");
       return 1;
     }
@@ -789,26 +815,22 @@ current_cs.kind ==
 	continue;
       switch (same_pid_cs->pending)
 	{
-	case pending_cont_waiter:
+	case /* same_pid_cs->pending */ pending_cont_waiter:
 	  /* Found a vContc packet that is waiting */
 	  switch (same_pid_cs->packet_type)
 	    {
-	    case vContc:
+	    case /* same_pid_cs->packet_type */ vContc:
 	      prepare_to_access_memory ();
 
-	      /**/
 	      if (current_cs->packet_type == vContc
 		&& (current_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_ENTRY
 		    || current_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_RETURN))
 		{
 		  if (same_pid_cs->catch_syscalls)
 		    {
-		      waiter_cs = set_client_state (same_pid_cs->file_desc);
 		      resolve_waiter (same_pid_cs, current_cs);
 		      dump_client_state (__FUNCTION__, "resolved syscall");
-		      current_cs = set_client_state (current_cs->file_desc);
-		      waiter_cs->pending = pending_waitee;
-		      make_waitee_a_waiter = 1;
+		      same_pid_cs->pending = pending_waitee;
 		    }
 		  else if (current_cs->catch_syscalls)
 		    {
@@ -816,7 +838,11 @@ current_cs.kind ==
 		      same_pid_cs_has_bp = 1;
 		    }
 		}
-	      /**/
+	      else if (current_cs->packet_type == vConts)
+		{
+		  current_cs->last_cont_ptid = current_cs->ss->general_thread_;
+		  current_cs->last_cont_waitstatus = current_cs->ss->last_status_;
+		}
 
 	      if (current_cs->ss->last_status_.kind == TARGET_WAITKIND_EXITED)
 		{
@@ -827,10 +853,17 @@ current_cs.kind ==
 	      else		/* not exited */
 		{
 		  /* Does current client have a breakpoint at PC? */
-		  if (get_first_thread () != NULL && set_desired_thread (1))
+		  if (get_first_thread () != NULL)
 		    {
-		      struct regcache *regcache = get_thread_regcache (current_thread, 1);
-		      CORE_ADDR pc = (*the_target->read_pc) (regcache);
+		      struct regcache *regcache;
+		      struct thread_info *thread;
+		      CORE_ADDR pc;
+		      if (non_stop)
+			thread = current_thread;
+		      else
+			thread = find_thread_ptid (last_ptid);
+		      regcache = get_thread_regcache (thread, 1);
+		      pc = (*the_target->read_pc) (regcache);
 		      current_cs_has_bp = has_client_breakpoint_at (pc);
 		      waiter_cs = set_client_state (same_pid_cs->file_desc);
 		      /* Does found client have a breakpoint at PC? */
@@ -861,11 +894,13 @@ current_cs.kind ==
 	      current_cs = set_client_state (current_cs->file_desc);
 
 	      done_accessing_memory ();
-	    }
-	  
-	  break;
-	case pending_step_waiter:	  
+	    } /* switch same_pid_cs->packet_type */
+	  break; /* case vContc */
+
+	case /* same_pid_cs->pending */ pending_step_waiter:
 	  waiter_cs = set_client_state (same_pid_cs->file_desc);
+	  if (debug_threads)
+	    debug_printf ("%s:%d resolving %d/%d %s", __FUNCTION__, __LINE__, current_cs->file_desc,same_pid_cs->pending,packet_types_str[current_cs->packet_type]);
 	  if (current_cs->packet_type == vConts
 	      || current_cs->packet_type == vContc)
 	    {
@@ -873,7 +908,7 @@ current_cs.kind ==
 	      current_cs->pending = same_pid_cs->pending = none_pending;
 	    }
 	  current_cs = set_client_state (current_cs->file_desc);
-	}
+	} /* switch same_pid_cs->pending */
     }
 
   if (make_waitee_a_waiter && current_cs->packet_type == vContc)

@@ -13,7 +13,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-exp_internal 1
+# exp_internal 1
 load_lib gdbserver-support.exp
 
 set test "multi-client"
@@ -31,6 +31,10 @@ set testfile3 catch-syscall
 set srcfile3 ../gdb.base/catch-syscall.c
 set testpath3 [pwd]/$subdir/$testfile3
 
+set testfile4 thread_check
+set srcfile4 ../gdb.threads/thread_check.c
+set testpath4 [pwd]/$subdir/$testfile4
+
 if { [prepare_for_testing $test $testfile $srcfile debug] } {
     return -1
 }
@@ -38,6 +42,9 @@ if {[build_executable $test $testfile2 $srcfile2 debug] == -1} {
     return -1
 }
 if {[build_executable $test $testfile3 $srcfile3 debug] == -1} {
+    return -1
+}
+if {[build_executable $test $testfile4 $srcfile4 {debug pthreads}] == -1} {
     return -1
 }
 
@@ -86,9 +93,9 @@ proc start_client { N ATTACH_FLAGS } {
     }
     set gdb_spawn_id $res
     if { $ok == 1 } {
-	pass "$test gdbserver attach client $N"
+	pass "$test attach client $N"
     } else {
-	fail "$test gdbserver attach client $N"
+	fail "$test attach client $N"
     }
     return $res
 }
@@ -109,9 +116,9 @@ proc start_strace { ATTACH_FLAGS } {
     }
     set gdb_spawn_id $res
     if { $ok == 1 } {
-	pass "$test gdbserver strace \"$expect_out(buffer)\""
+	pass "$test strace \"$expect_out(buffer)\""
     } else {
-	unresolved "$test gdbserver strace \"$expect_out(buffer)\""
+	unresolved "$test strace \"$expect_out(buffer)\""
     }
     return $res
 }
@@ -160,44 +167,42 @@ proc gdb_command { CLIENT COMMAND RESPONSE COMMENT } {
 	    } else {
 		if { $i == 3 } {
 		    fail "$test $COMMENT"
-		} else { sleep 1 }
+		} else { sleep 4 }
 	    }
 	}
     }
 }
 
-verbose "##### Run one process and attach to it"
-
+verbose "##### Test coordination of three clients doing break/continue"
 
 set gdb_server_spawn_id [start_gdbserver]
 set MULTI_GDBFLAGS "-iex \"file $testpath\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file $testpath\" --silent --data-directory=[file dirname $GDB]/data-directory"
 
 set gdb_client1_spawn_id [start_client 1 ""]
 
-gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver b getenv"
+gdb_command 1 "b getenv" "Breakpoint 1 at" "b getenv"
 
-gdb_command 1 "run" "Breakpoint 1," "gdbserver hit b getenv"
+gdb_command 1 "run" "Breakpoint 1," "hit b getenv"
 
 set target_pid [get_target_pid wrapper]
 
-# Now start a second client that attaches to the first client
 set gdb_client2_spawn_id [start_client 2 "-iex \"attach $target_pid\""]
 
 set gdb_client3_spawn_id [start_client 3 "-iex \"attach $target_pid\""]
 
-gdb_command 2 "b marker" "Breakpoint 1 at" "gdbserver b marker"
+gdb_command 2 "b marker" "Breakpoint 1 at" "b marker"
 
-gdb_command 2 "continue" "Continuing" "gdbserver continue client2"
+gdb_command 2 "continue" "Continuing" "continue client2"
 
-gdb_command 3 "b wrapper.c:33" "Breakpoint 1 at" "gdbserver b exit"
+gdb_command 3 "b wrapper.c:33" "Breakpoint 1 at" "b exit"
 
-gdb_command 3 "continue" "Continuing" "gdbserver continue client3"
+gdb_command 3 "continue" "Continuing" "continue client3"
 
 # Second client waits while we continue first client
 
-gdb_command 1 "dis 1" "" "gdbserver disable breakpoint"
+gdb_command 1 "dis 1" "" "disable breakpoint"
 
-gdb_command 1 "continue" "Continuing" "gdbserver continue client1"
+gdb_command 1 "continue" "Continuing" "continue client1"
 
 # The second client is back
 
@@ -206,42 +211,97 @@ expect {
     -i $gdb_client2_spawn_id "Breakpoint 1, marker" { incr ok; }
 }
 if { $ok == 1 } {
-    pass "$test gdbserver hit b marker"
+    pass "$test hit b marker"
 } else {
-    fail "$test gdbserver hit b marker $expect_out(buffer)"
+    fail "$test hit b marker $expect_out(buffer)"
 }
 
 # Second client waits while we continue first client
 
-gdb_command 2 "dis 1" "" "gdbserver disable breakpoint"
+gdb_command 2 "dis 1" "" "disable breakpoint"
 
-gdb_command 2 "continue" "Continuing" "gdbserver continue client2"
+gdb_command 2 "continue" "Continuing" "continue client2"
 
-gdb_command 3 "continue" "Continuing" "gdbserver continue client3"
+gdb_command 3 "continue" "Continuing" "continue client3"
 
 set ok 0
 expect {
     -i $gdb_client2_spawn_id "exited normally" { incr ok; }
 }
 if { $ok == 1 } {
-    pass "$test gdbserver client exited"
+    pass "$test client exited"
 } else {
-    fail "$test gdbserver client exited"
+    fail "$test client exited"
 }
 
-# Test non-stop
+exec kill -KILL [exp_pid -i $gdb_server_spawn_id $gdb_client1_spawn_id $gdb_client2_spawn_id $gdb_client3_spawn_id]
 
-verbose "kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]"
-exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]
+verbose "##### Test coordination of three clients doing next"
+
+set gdb_server_spawn_id [start_gdbserver]
+
+set gdb_client1_spawn_id [start_client 1 ""]
+
+gdb_command 1 "b main" "Breakpoint 1 at" "b getenv"
+
+gdb_command 1 "run" "Breakpoint 1," "hit b getenv"
+
+set target_pid [get_target_pid wrapper]
+
+# Now start a second and third client that attach to the first client
+
+set gdb_client2_spawn_id [start_client 2 "-iex \"attach $target_pid\""]
+
+set gdb_client3_spawn_id [start_client 3 "-iex \"attach $target_pid\""]
+
+gdb_command 1 "next" "" ""
+
+gdb_command 2 "next" "" ""
+
+gdb_command 3 "next" "" ""
+
+gdb_command 1 "frame" "marker" "next marker"
+
+gdb_command 2 "frame" "marker" "next marker client1"
+
+gdb_command 3 "frame" "marker" "next marker client2"
+
+gdb_command 1 "next" "" ""
+
+gdb_command 2 "next" "" ""
+
+gdb_command 3 "next" "" ""
+
+gdb_command 1 "frame" "return" "next return"
+
+gdb_command 2 "frame" "return" "next return client1"
+
+gdb_command 3 "frame" "return" "next return client2"
+
+gdb_command 1 "continue" "" ""
+
+gdb_command 2 "continue" "" ""
+
+gdb_command 3 "continue" "" ""
+
+gdb_command 1 "" "exited" "next exited"
+
+gdb_command 2 "" "exited" "next exited client1"
+
+gdb_command 3 "" "exited" "next exited client2"
+
+exec kill -KILL [exp_pid -i $gdb_server_spawn_id  $gdb_client1_spawn_id $gdb_client2_spawn_id]
+
+verbose "##### Test coordination of two non stop clients"
 
 set gdb_server_spawn_id [start_gdbserver]
 set MULTI_GDBFLAGS "-iex \"set non-stop on\" $MULTI_GDBFLAGS"
 
 set gdb_client1_spawn_id [start_client 1 ""]
 
-gdb_command 1 "b getenv" "Breakpoint 1 at" "gdbserver non-stop b getenv"
+gdb_command 1 "b getenv" "Breakpoint 1 at" "non-stop b getenv"
 
-gdb_command 1 "run" "Breakpoint 1," "gdbserver non-stop hit b getenv"
+gdb_command 1 "run" "Breakpoint 1," "non-stop hit b getenv"
 
 set target_pid [get_target_pid wrapper]
 
@@ -251,15 +311,15 @@ set MULTI_GDBFLAGS "-iex \"set non-stop on\" -iex \"set remotetimeout 600\" -iex
 
 set gdb_client2_spawn_id [start_client 2 "-iex \"attach $target_pid\""]
 
-gdb_command 2 "fra" "#0.* at getenv" "gdbserver non-stop Frame"
+gdb_command 2 "fra" "#0.* at getenv" "non-stop Frame"
 
-gdb_command 2 "b marker" "Breakpoint 1 at" "gdbserver non-stop b marker"
+gdb_command 2 "b marker" "Breakpoint 1 at" "non-stop b marker"
 
-gdb_command 2 "continue" "Continuing" "gdbserver non-stop continue client2"
+gdb_command 2 "continue" "Continuing" "non-stop continue client2"
 
-gdb_command 1 "dis 1" "" "gdbserver non-stop disable breakpoint"
+gdb_command 1 "dis 1" "" "non-stop disable breakpoint"
 
-gdb_command 1 "continue" "Continuing" "gdbserver non-stop continue client1"
+gdb_command 1 "continue" "Continuing" "non-stop continue client1"
 
 # The second client is back
 
@@ -268,32 +328,30 @@ expect {
     -i $gdb_client2_spawn_id "Breakpoint 1, marker" { incr ok; }
 }
 if { $ok == 1 } {
-    pass "$test gdbserver non-stop hit b marker"
+    pass "$test non-stop hit b marker"
 } else {
-    fail "$test gdbserver non-stop hit b marker $expect_out(buffer)"
+    fail "$test non-stop hit b marker $expect_out(buffer)"
 }
 
 # Second client waits while we continue first client
 
-gdb_command 2 "dis 1" "" "gdbserver non-stop disable breakpoint"
+gdb_command 2 "dis 1" "" "non-stop disable breakpoint"
 
-gdb_command 2 "continue" "Continuing" "gdbserver non-stop continue client2"
+gdb_command 2 "continue" "Continuing" "non-stop continue client2"
 
 set ok 0
 expect {
     -i $gdb_client2_spawn_id "exited normally" { incr ok; }
 }
 if { $ok == 1 } {
-    pass "$test gdbserver client exited"
+    pass "$test client exited"
 } else {
-    fail "$test gdbserver client exited"
+    fail "$test client exited"
 }
 
-# Test strace client
+exec kill -KILL [exp_pid -i $gdb_server_spawn_id $gdb_client1_spawn_id $gdb_client2_spawn_id]
 
-
-verbose "kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]"
-exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]
+verbose "##### Test coordination of one gdb client and two strace clients"
 
 set gdb_server_spawn_id [start_gdbserver]
 
@@ -301,51 +359,100 @@ set MULTI_GDBFLAGS "-iex \"file $testpath3\" -iex \"set remotetimeout 600\" -iex
 
 set gdb_client1_spawn_id [start_client 1 ""]
 
-gdb_command 1 "b main" "Breakpoint 1 at" "gdbserver b main"
+gdb_command 1 "b main" "Breakpoint 1 at" "b main"
 
-gdb_command 1 "run" "Breakpoint 1,.*\r\n\\(client1 gdb" "gdbserver hit b main"
+gdb_command 1 "run" "Breakpoint 1," "hit b main"
 
 set target_pid [get_target_pid catch-syscall]
 
-set gdb_client2_spawn_id [start_strace "-d -G localhost:65432 -o [pwd]/$subdir/strace.out -p $target_pid"]
+set gdb_client2_spawn_id [start_strace "-G localhost:65432 -o [pwd]/$subdir/strace2.out -p $target_pid"]
 
-# gdb_command 1 "next" "close" "gdbserver next close"
-# gdb_command 1 "next" "chroot" "gdbserver next chroot"
+set gdb_client3_spawn_id [start_strace "-G localhost:65432 -o [pwd]/$subdir/strace3.out -p $target_pid"]
 
-gdb_command 1 "b 45" "Breakpoint 2 at.*\r\n\\(client1 gdb" "gdbserver b chroot"
+#		chroot (".");
+gdb_command 1 "b 52" "Breakpoint 2 at" "b chroot"
 
-gdb_command 1 "continue" "Breakpoint 2,.*\r\n\\(client1 gdb" "gdbserver hit b chroot"
+gdb_command 1 "continue" "Breakpoint 2," "hit b chroot"
 
-gdb_command 1 "next" "pipe.*\r\n\\(client1 gdb" "gdbserver next pipe"
+#		pipe (fd);
+gdb_command 1 "next" "pipe" "next pipe"
 
-gdb_command 1 "next" "write.*\r\n\\(client1 gdb" "gdbserver next write"
+#		write (fd[1], buf1, sizeof (buf1));
+gdb_command 1 "next" "write" "next write"
 
-gdb_command 1 "next.*\r\n\\(client1 gdb" "read" "gdbserver next read"
+#		read (fd[0], buf2, sizeof (buf2));
+gdb_command 1 "next" "read" "next read"
 
-gdb_command 1 "continue.*\r\n\\(client1 gdb" "exited" "gdbserver strace test exited"
+gdb_command 1 "continue" "exited" "strace test exited"
 
 #
-set infile [open "[pwd]/$subdir/strace.out" r]
-set ok 0
-while { [gets $infile line] >= 0 } {
-    switch -glob $line {
-	"*close(*" { incr ok }
-	"*chroot(*" { incr ok }
-	"*pipe(*" { incr ok }
-	"*write(*" { incr ok }
-	"*read(*" { incr ok }
-	"*vfork(*" { incr ok }
+verbose [list "[pwd]/$subdir/strace2.out" "[pwd]/$subdir/strace3.out"]
+foreach f [list "[pwd]/$subdir/strace2.out" "[pwd]/$subdir/strace3.out"] {
+    set infile [open $f r]
+    set ok 0
+    while { [gets $infile line] >= 0 } {
+	switch -regexp $line {
+	    ".*close\\(.*=" { incr ok }
+	    ".*chroot\\(.*=" { incr ok }
+	    ".*pipe\\(.*=" { incr ok }
+	    ".*write\\(.*=" { incr ok }
+	    ".*read\\(.*=" { incr ok }
+	    ".*vfork.*=" { incr ok }
+	}
+    }
+    switch $ok {
+	6 { pass  "$test strace ($ok)" }
+	0 { unresolved "$test strace ($ok)" }
+	default { fail "$test strace ($ok)" }
     }
 }
-switch $ok {
-    6 { pass  "$test gdbserver strace" }
-    0 { unresolved "$test gdbserver strace" }
-    default { fail "$test gdbserver strace ($ok)" }
-}
     
+exec kill -KILL [exp_pid -i $gdb_server_spawn_id $gdb_client1_spawn_id $gdb_client2_spawn_id]
+
 close $infile
+
+#-------------------------------------------------------
+verbose "##### Test coordination of two threads clients"
+
+set gdb_server_spawn_id [start_gdbserver]
+
+set MULTI_GDBFLAGS "-iex \"file $testpath4\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file $testpath4\" --silent --data-directory=[file dirname $GDB]/data-directory"
+
+set gdb_client1_spawn_id [start_client 1 ""]
+
+gdb_command 1 "b main" "Breakpoint 1 at" "b thread_check main"
+
+gdb_command 1 "run" "Breakpoint 1," "hit b thread_check main"
+
+set target_pid [get_target_pid thread_check]
+
+# Now start a second client that attaches to the first client
+
+set gdb_client2_spawn_id [start_client 2 "-iex \"attach $target_pid\""]
+
+gdb_command 1 "b tf" "Breakpoint 2 at" "b thread_check tf"
+
+gdb_command 2 "b puts" "Breakpoint 1 at" "b thread_check puts"
+
+gdb_command 2 "continue" "Continuing" "continue thread_check client1"
+
+gdb_command 1 "continue" "line 32" "b thread_check tf"
+
+gdb_command 1 "continue" "Breakpoint 2" "b thread_check tf"
+
+gdb_command 1 "continue" "" ""
+
+gdb_command 2 "" "Breakpoint 1" "b puts"
+
+gdb_command 2 "continue" "puts" "b puts"
+
+gdb_command 2 "dis 1" "" ""
+
+gdb_command 1 "continue" "" ""
+
+exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id] [exp_pid -i $gdb_client2_spawn_id]
+
 
 # End
 
-verbose "kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id]"
-exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id]
+exec kill -KILL [exp_pid -i $gdb_server_spawn_id] [exp_pid -i $gdb_client1_spawn_id $gdb_client2_spawn_id $gdb_client3_spawn_id]
