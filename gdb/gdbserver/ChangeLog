@@ -1,3 +1,15 @@
+2016-03-30  Stan Cox  <scox@redhat.com>
+
+	* server.c (pending_types):  Add pending_notifier
+	(dump_client_state):  Dump pc and indicate current client.
+	(delete_client_state):  Copy persistent state flags.
+	(resolve_waiter):  Send notification for vConts
+	(notify_clients):  New.  Send notification to waiter client.
+	(do_multiplexing):  Also consider notification state.
+	(process_serial_event):  Remove the client breakpoint.
+
+	* notif.c (notif_push):  Also notify the waiting client.
+
 2016-02-23  Stan Cox  <scox@redhat.com>
 
 	* server.c (setup_multiplexing): Add pending_step_waiter, vConts,

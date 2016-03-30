@@ -1,3 +1,8 @@
+2016-03-30  Stan Cox  <scox@redhat.com>
+
+	* gdb.server/multi-client.exp (start_client)  Add testpath parameter.
+	(cleanup_server_and_clients)  New.
+
 2016-02-23  Stan Cox  <scox@redhat.com>
 
 	* gdb.server/multi-client.exp:  Add next, strace, and pthreads tests.

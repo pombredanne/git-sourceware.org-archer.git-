@@ -84,6 +84,7 @@ typedef int gdb_fildes_t;
 /* Functions from server.c.  */
 extern int handle_serial_event (int err, gdb_client_data client_data);
 extern int handle_target_event (int err, gdb_client_data client_data);
+extern void notify_clients (char *buffer);
 
 /* Get rid of the currently pending stop replies that match PTID.  */
 extern void discard_queued_stop_replies (ptid_t ptid);
