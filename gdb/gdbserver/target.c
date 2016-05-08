@@ -276,6 +276,7 @@ target_continue_no_signal (ptid_t ptid)
 int
 start_non_stop (int nonstop)
 {
+  /* TODO multiplex stop replies? For now ignore non stop if primary client is all stop */
   if (the_target->start_non_stop == NULL)
     {
       if (nonstop)

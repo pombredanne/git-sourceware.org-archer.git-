@@ -153,6 +153,10 @@ struct server_state
   struct inferior_list all_processes_;
   struct inferior_list all_threads_;
   struct thread_info *current_thread_;
+  /* If true, then GDB has requested noack mode.  */
+
+  /* from remote-utils.c */
+//  int noack_mode_;
 };
 
 typedef struct server_state server_state;
@@ -228,6 +232,13 @@ struct client_state
   int program_signals_p_;
   char *in_buffer_;
   char *own_buffer_;
+
+  /* from remote-utils.c */
+  int remote_debug_;
+  /* If true, then we tell GDB to use noack mode by default.  */
+  int noack_mode_;
+  int transport_is_reliable_;
+
   struct client_breakpoint *client_breakpoints;
   server_state *ss;
   struct client_state *next;
@@ -246,6 +257,7 @@ client_state * get_client_state ();
 client_state * set_client_state (gdb_fildes_t);
 int have_multiple_clients();
 void delete_client_state (gdb_fildes_t fd);
+
 
 #define attach_count	(get_client_state()->ss->attach_count_)
 #define cont_thread	(get_client_state()->ss->cont_thread_)
@@ -284,3 +296,6 @@ void delete_client_state (gdb_fildes_t fd);
 #define program_signals_p	(get_client_state()->program_signals_p_)
 #define in_buffer	(get_client_state()->in_buffer_)
 #define own_buffer	(get_client_state()->own_buffer_)
+#define remote_debug	(get_client_state()->remote_debug_)
+#define noack_mode	(get_client_state()->noack_mode_)
+#define transport_is_reliable (get_client_state()->transport_is_reliable_)

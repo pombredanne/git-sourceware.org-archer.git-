@@ -19,10 +19,6 @@
 #ifndef REMOTE_UTILS_H
 #define REMOTE_UTILS_H
 
-extern int remote_debug;
-extern int noack_mode;
-extern int transport_is_reliable;
-
 int get_remote_desc (void);
 void set_remote_desc (gdb_fildes_t);
 int get_listen_desc (void);

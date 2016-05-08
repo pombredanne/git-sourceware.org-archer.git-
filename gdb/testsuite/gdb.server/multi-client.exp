@@ -352,7 +352,7 @@ if { $ok == 1 } {
 
 cleanup_server_and_clients
 
-verbose "##### Test coordination of one gdb client and two strace clients"
+verbose "##### Test coordination of one gdb client and an strace client"
 
 set gdb_server_spawn_id [start_gdbserver]
 
@@ -366,27 +366,28 @@ set target_pid [get_target_pid catch-syscall]
 
 set gdb_client2_spawn_id [start_strace "-G localhost:65432 -o [pwd]/$subdir/strace2.out -p $target_pid"]
 
-set gdb_client3_spawn_id [start_strace "-G localhost:65432 -o [pwd]/$subdir/strace3.out -p $target_pid"]
+# set gdb_client3_spawn_id [start_strace "-G localhost:65432 -o [pwd]/$subdir/strace3.out -p $target_pid"]
 
 #		chroot (".");
-gdb_command 1 "b 52" "Breakpoint 2 at" "b chroot"
+gdb_command 1 "next" "" ""
+gdb_command 1 "next" "close" "strace next close"
 
-gdb_command 1 "continue" "Breakpoint 2," "hit b chroot"
+#		chroot (".");
+gdb_command 1 "next" "chroot" "strace next chroot"
 
 #		pipe (fd);
-gdb_command 1 "next" "pipe" "next pipe"
+gdb_command 1 "next" "pipe" "strace next pipe"
 
 #		write (fd[1], buf1, sizeof (buf1));
-gdb_command 1 "next" "write" "next write"
+gdb_command 1 "next" "write" "strace next write"
 
 #		read (fd[0], buf2, sizeof (buf2));
-gdb_command 1 "next" "read" "next read"
+gdb_command 1 "next" "read" "strace next read"
 
 gdb_command 1 "continue" "exited" "strace test exited"
 
 #
-verbose [list "[pwd]/$subdir/strace2.out" "[pwd]/$subdir/strace3.out"]
-foreach f [list "[pwd]/$subdir/strace2.out" "[pwd]/$subdir/strace3.out"] {
+foreach f [list "[pwd]/$subdir/strace2.out" ] {
     set infile [open $f r]
     set ok 0
     while { [gets $infile line] >= 0 } {

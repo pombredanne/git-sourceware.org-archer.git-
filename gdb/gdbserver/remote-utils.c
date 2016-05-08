@@ -100,7 +100,6 @@ struct sym_cache
   struct sym_cache *next;
 };
 
-int remote_debug = 0;
 struct ui_file *gdb_stdlog;
 
 static int remote_is_stdio = 0;
@@ -111,11 +110,6 @@ static gdb_fildes_t listen_desc = INVALID_DESCRIPTOR;
 /* FIXME headerize? */
 extern int using_threads;
 extern int debug_threads;
-
-/* If true, then GDB has requested noack mode.  */
-int noack_mode = 0;
-/* If true, then we tell GDB to use noack mode by default.  */
-int transport_is_reliable = 0;
 
 #ifdef USE_WIN32API
 # define read(fd, buf, len) recv (fd, (char *) buf, len, 0)
@@ -178,13 +172,13 @@ handle_accept_event (int err, gdb_client_data client_data)
   if (debug_threads)
     debug_printf ("handling possible accept event\n");
 
-  noack_mode = 0;
   tmp = sizeof (sockaddr);
   remote_desc = accept (listen_desc, (struct sockaddr *) &sockaddr, &tmp);
   if (remote_desc == -1)
     perror_with_name ("Accept failed");
 
   set_client_state (remote_desc);
+  noack_mode = 0;
 
   /* Enable TCP keep alive process. */
   tmp = 1;
@@ -232,7 +226,8 @@ handle_accept_event (int err, gdb_client_data client_data)
      try to send vStopped notifications to GDB.  But, don't do that
      until GDB as selected all-stop/non-stop, and has queried the
      threads' status ('?').  */
-  target_async (0);
+
+  //TODO target_async (0);
 
   return 0;
 }
