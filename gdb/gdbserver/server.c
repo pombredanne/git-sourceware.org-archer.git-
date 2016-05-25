@@ -252,17 +252,16 @@ static void free_client_state (client_state *cs)
   client_state *csi;
   for (csi = client_states.first; csi != NULL; csi = csi->next)
     {
-      if (ptid_equal (csi->ss->general_thread_, null_ptid) 
-	  && attached_to_same_proc (cs, csi))
+      if (attached_to_same_proc (cs, csi))
 	break;
     }
   delete_client_breakpoint (0);
   if (csi == NULL)
     XDELETE (cs->ss);
   
-  if (in_buffer)
-    xfree (in_buffer);
-  xfree (own_buffer);
+  if (cs->in_buffer_)
+    xfree (cs->in_buffer_);
+  xfree (cs->own_buffer_);
   XDELETE (cs);
 }
 
@@ -401,6 +400,7 @@ delete_client_state (gdb_fildes_t fd)
 	    }
 	  free_client_state (cs);
 	  cs = previous_cs;
+	  break;
 	}
       if (cs->next == NULL)
 	break;
@@ -494,11 +494,13 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
 		new_notif->ptid = general_thread;
 		new_notif->status = last_status;
 		new_notif->status.kind = TARGET_WAITKIND_STOPPED;
+		/* TODO this may incorrectly precede check_stopped_by_breakpoint adjustment of the pc */
 		notif_push (&notif_stop,
 			    (struct notif_event *) new_notif);
 		/* Explicit write of notification and remove from queue */
 		discard_queued_stop_replies (cs->ss->general_thread_);
 
+		debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, cs->file_desc);
 		notif_write_event (&notif_stop, notif_buf);
 	      }
 	    else if (last_status.kind != TARGET_WAITKIND_EXITED)
@@ -549,6 +551,8 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
 	      /* Explicit write of notification and remove from queue */
 	      discard_queued_stop_replies (cs->ss->general_thread_);
 
+	      if (debug_threads)
+		debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, cs->file_desc);
 	      notif_write_event (&notif_stop, notif_buf);
 	      if (last_status.kind != TARGET_WAITKIND_STOPPED)
 		cs->pending = pending_notifier;
@@ -584,6 +588,8 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
 	  // TODO Use Defined notif constant
 	  strcpy (out_buf, "Stop:");
 	  strcat (out_buf, notif_buf);
+	  if (debug_threads)
+	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, cs->file_desc);
 	  putpkt_notif (out_buf);
 	  if (debug_threads)
 	    debug_printf ("%s:%d %s\n", __FUNCTION__, __LINE__, out_buf);
@@ -660,7 +666,7 @@ setup_multiplexing (client_state *current_cs)
       if (! attached_to_same_proc (current_cs, same_pid_cs))
 	continue;
 
-      if (non_stop && (same_pid_cs->catch_syscalls /*|| current_cs->catch_syscalls*/))
+      if (non_stop && (same_pid_cs->catch_syscalls))
 	continue;
 
       switch (same_pid_cs->pending)
@@ -798,63 +804,37 @@ notify_clients (char *buffer)
       /* Insure another client is attached to the cs process */
       if (! attached_to_same_proc (client_states.current_cs, same_pid_cs))
 	continue;
-      /* Insure a syscall client only gets a syscall packet */
-      if (last_status.kind != TARGET_WAITKIND_SYSCALL_ENTRY
-	  && last_status.kind != TARGET_WAITKIND_SYSCALL_RETURN
-	  && save_client_cs->catch_syscalls)
-	{
-	  debug_printf ("%s DBG switch %d and %d %s %s\n", __FUNCTION__, save_client_fd, same_pid_cs->file_desc, save_client_cs->own_buffer_, same_pid_cs->own_buffer_);
-	  set_client_state (same_pid_cs->file_desc);
-	  return;
-	}
-      
-      if (same_pid_cs->pending == pending_notifier)
-	{
-	  if (debug_threads)
-	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, same_pid_cs->file_desc);
+
+      switch (last_status.kind)
+      {
+	case TARGET_WAITKIND_SYSCALL_ENTRY:
+	case TARGET_WAITKIND_SYSCALL_RETURN:
+	  break;
+	case TARGET_WAITKIND_EXITED:
 	  set_client_state (same_pid_cs->file_desc);
 	  putpkt (okay_buf);
+	  putpkt_notif (buffer);
+	  set_client_state (save_client_fd);
+	  return;
+	default:
+	  /* A syscall client only gets a syscall packet */
+	  if (save_client_cs->catch_syscalls)
+	    set_client_state (same_pid_cs->file_desc);
+	  return;
+      }
+
+      if (same_pid_cs->pending == pending_notifier)
+	{
+	  /* Also send the notification to the attached client */
+	  set_client_state (same_pid_cs->file_desc);
+	  putpkt (okay_buf);
+	  if (debug_threads)
+	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, same_pid_cs->file_desc);
 	  putpkt_notif (buffer);
 	  set_client_state (save_client_fd);
 	  same_pid_cs->pending = none_pending;
 	}
     }
-}
-
-
-static void
-stop_clients (client_state *current_cs)
-{
-  client_state *same_pid_cs = NULL;
-
-  if (! (current_cs->pending == pending_waitee
-	 && current_cs->last_packet_type == vStopped
-	 && current_cs->ss->last_status_exited == have_exit))
-    return;
-
-  for (same_pid_cs = client_states.first; 
-       same_pid_cs != NULL; 
-       same_pid_cs = same_pid_cs->next)
-    {
-      char *out_buf = alloca (64);
-
-      /* Insure another client is attached to the cs process */
-      if (! attached_to_same_proc (current_cs, same_pid_cs))
-	continue;
-
-      same_pid_cs->ss->last_status_exited = sent_exit;
-      set_client_state (same_pid_cs->file_desc);
-      same_pid_cs->pending = none_pending;
-      strcpy (out_buf, "OK");
-      putpkt (out_buf);
-      // TODO Use a better method to create this: Stop:W0;process:29e3
-      sprintf (out_buf, "Stop:W0;process:%x", (unsigned)ptid_get_pid (general_thread));
-      putpkt_notif (out_buf);
-      if (debug_threads)
-	debug_printf ("%s:%d %s\n", __FUNCTION__, __LINE__, out_buf);
-    }
-  set_client_state (current_cs->file_desc);
-  return;
 }
 
 
@@ -919,9 +899,6 @@ do_multiplexing (client_state *current_cs)
       return 1;
     }
 
-  if (current_cs->ss->last_status_exited == have_exit)
-    stop_clients (current_cs);
-
   for (same_pid_cs = client_states.first; 
        same_pid_cs != NULL; 
        same_pid_cs = same_pid_cs->next)
@@ -934,22 +911,6 @@ do_multiplexing (client_state *current_cs)
       if (! attached_to_same_proc (current_cs, same_pid_cs))
 	continue;
 
-      if (non_stop &&
-	  ((same_pid_cs->catch_syscalls
-	    && (current_cs->packet_type == vConts || current_cs->packet_type == vContc))
-	   || (current_cs->catch_syscalls
-	       && (same_pid_cs->packet_type == vConts || same_pid_cs->packet_type == vContc))))
-	{
-	  /* Explicit write of notification and remove from queue */
-	  if (same_pid_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_ENTRY
-	      || same_pid_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_RETURN)
-	    {
-	      set_client_state (same_pid_cs->file_desc);
-	      handle_target_event (0, 0);
-	      set_client_state (current_cs->file_desc);
-	    }
-	}
-
       switch (same_pid_cs->pending)
 	{
 	case /* same_pid_cs->pending */ pending_cont_waiter:
@@ -957,38 +918,12 @@ do_multiplexing (client_state *current_cs)
 	  switch (same_pid_cs->packet_type)
 	    {
 	    case /* same_pid_cs->packet_type */ vContc:
-	      if (same_pid_cs->non_stop_ && same_pid_cs->catch_syscalls
-		  && (current_cs->packet_type == vConts || current_cs->packet_type == vContc))
-		{
-		/* Explicit write of notification and remove from queue */
-		  if (same_pid_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_ENTRY
-		      || same_pid_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_RETURN)
-		    {
-		      set_client_state (same_pid_cs->file_desc);
-		      handle_target_event (0, 0);
-		      set_client_state (current_cs->file_desc);
-		    }
-		  else
-		    {
-		      handle_target_event (0, 0);
-		    }
-		  break;
-		}
-
 	      if (current_cs->packet_type == vContc
 		&& (current_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_ENTRY
 		    || current_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_RETURN))
 		{
 		  if (same_pid_cs->catch_syscalls)
 		    {
-		      if (same_pid_cs->non_stop_)
-			{
-			  if (debug_threads)
-			    debug_printf ("%s handle_target_event\n", __FUNCTION__);
-			  handle_target_event (0, 0);
-			  break;
-			}
-
 		      resolve_waiter (same_pid_cs, current_cs);
 		      dump_client_state (__FUNCTION__, "resolved syscall");
 		      same_pid_cs->pending = pending_waitee;
@@ -1051,13 +986,6 @@ do_multiplexing (client_state *current_cs)
 		  /* If the waitee did not reach the breakpoint then it needs to wait */
 		  if (!current_cs_has_bp)
 		    make_waitee_a_waiter = 1;
-		}
-	      else if (debug_threads)
-		{
-		  if (waiter_cs->ss->current_thread_)
-		    debug_printf ("%s:%d fd=%d no breakpoint at %#lx\n", __FUNCTION__, __LINE__, waiter_cs->file_desc, (long unsigned)(*the_target->read_pc)(get_thread_regcache (waiter_cs->ss->current_thread_, 1)));
-		  else
-		    debug_printf ("%s:%d fd=%d no breakpoint\n", __FUNCTION__, __LINE__, waiter_cs->file_desc);
 		}
 	      current_cs = set_client_state (current_cs->file_desc);
 	    } /* switch same_pid_cs->packet_type */

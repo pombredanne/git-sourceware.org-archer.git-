@@ -153,10 +153,6 @@ struct server_state
   struct inferior_list all_processes_;
   struct inferior_list all_threads_;
   struct thread_info *current_thread_;
-  /* If true, then GDB has requested noack mode.  */
-
-  /* from remote-utils.c */
-//  int noack_mode_;
 };
 
 typedef struct server_state server_state;
