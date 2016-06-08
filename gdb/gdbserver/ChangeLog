@@ -1,3 +1,14 @@
+2016-06-08  Stan Cox  <scox@redhat.com>
+
+	* server.c (add_client_by_pid)  Check all/non stop mode equivalence.
+	(get_packet_type):  Remove vStopped.
+	(resolve_waiter):  Handle non-stop in putpkt_notif/notify_clients
+	(setup_multiplexing, notify_clients):  Likewise.
+	(do_multiplexing):  Likewise.  Allow for watchpoints.
+	(handle_v_attach):  Check multiple client all/non stop equivalence.
+	* mem-break.c (has_client_breakpoint_at): Simplify address check.
+	* notif.c (notif_push): notify_clients can throttle putpkt_notif.
+
 2016-05-25  Stan Cox  <scox@redhat.com>
 
 	* server.c (free_client_state):  Free in_buffer and own_buffer.

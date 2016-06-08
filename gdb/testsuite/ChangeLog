@@ -1,3 +1,7 @@
+2016-06-08  Stan Cox  <scox@redhat.com>
+
+	* multi-client.exp:  Test various request combinations using towers.c
+
 2016-03-30  Stan Cox  <scox@redhat.com>
 
 	* gdb.server/multi-client.exp (start_client)  Add testpath parameter.

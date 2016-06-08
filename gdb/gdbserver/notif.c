@@ -150,8 +150,8 @@ notif_push (struct notif_server *np, struct notif_event *new_event)
       p += strlen (p);
 
       np->write (new_event, p);
-      notify_clients (buf);
-      putpkt_notif (buf);
+      if (notify_clients (buf))
+	putpkt_notif (buf);
     }
 }
 

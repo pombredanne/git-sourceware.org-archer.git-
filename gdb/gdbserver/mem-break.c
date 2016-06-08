@@ -317,7 +317,8 @@ find_raw_breakpoint_at (CORE_ADDR addr, enum raw_bkpt_type type, int kind)
   return NULL;
 }
 
-/* Is there a low-level breakpoint at address ADDR? */
+
+/* Does the client have a breakpoint at address ADDR? */
 
 int
 has_client_breakpoint_at (CORE_ADDR addr)
@@ -328,11 +329,10 @@ has_client_breakpoint_at (CORE_ADDR addr)
 
   for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
     {
-      // TODO improve this; pc might be one insn ahead of break. 
-      if (addr >= cb->addr && addr <= cb->addr + 8)
+      if (addr == cb->addr)
 	{
 	  if (debug_threads)
-	    debug_printf ("%s:%d fd=%d return true at %#lx\n", 
+	    debug_printf ("%s:%d fd=%d return true at %#lx\n",
 			  __FUNCTION__, __LINE__, cs->file_desc, (long unsigned)cb->addr);
 	  return 1;
 	}

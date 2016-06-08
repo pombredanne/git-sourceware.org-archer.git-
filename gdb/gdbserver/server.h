@@ -84,7 +84,7 @@ typedef int gdb_fildes_t;
 /* Functions from server.c.  */
 extern int handle_serial_event (int err, gdb_client_data client_data);
 extern int handle_target_event (int err, gdb_client_data client_data);
-extern void notify_clients (char *buffer);
+extern int notify_clients (char *buffer);
 
 /* Get rid of the currently pending stop replies that match PTID.  */
 extern void discard_queued_stop_replies (ptid_t ptid);
@@ -163,8 +163,7 @@ struct client_breakpoint
   struct client_breakpoint *next;
 };
 
-enum packet_types { other_packet, vContc, vConts, vContt, 
-		    vStopped, vRun, vAttach };
+enum packet_types { other_packet, vContc, vConts, vContt, vRun, vAttach };
 typedef enum packet_types packet_types;
 
 enum exit_types { no_exit, have_exit, sent_exit };
@@ -178,6 +177,7 @@ struct client_state
   int packet_type;
   int last_packet_type;
   int pending;
+  int nonstop_pending;
   int catch_syscalls;
   ptid_t last_cont_ptid;
   struct target_waitstatus last_cont_waitstatus;
