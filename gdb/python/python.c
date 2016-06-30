@@ -1274,7 +1274,14 @@ gdbpy_cli (PyObject *unused1, PyObject *unused2)
     return PyErr_Format (PyExc_RuntimeError, _("Cannot invoke CLI from MI."));
 
   in_cli = 1;
-  current_interp_command_loop ();
+  /* See captured_command_loop.  */
+
+  /* Give the interpreter a chance to print a prompt.  */
+  interp_pre_command_loop (top_level_interpreter ());
+
+  /* Now it's time to start the event loop.  */
+  start_event_loop ();
+
   in_cli = 0;
 
   Py_RETURN_NONE;
