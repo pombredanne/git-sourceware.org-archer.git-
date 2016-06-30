@@ -1,6 +1,6 @@
 /* File-I/O functions for GDB, the GNU debugger.
 
-   Copyright (C) 2003-2015 Free Software Foundation, Inc.
+   Copyright (C) 2003-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -31,6 +31,11 @@ extern int host_to_fileio_error (int error);
    the result in *FLAGS.  Return 0 on success, -1 on error.  */
 
 extern int fileio_to_host_openflags (int fflags, int *flags);
+
+/* Convert File-I/O mode FMODE to host format, storing
+   the result in *MODE.  Return 0 on success, -1 on error.  */
+
+extern int fileio_to_host_mode (int fmode, mode_t *mode);
 
 /* Pack a host-format integer into a byte buffer in big-endian
    format.  BYTES specifies the size of the integer to pack in

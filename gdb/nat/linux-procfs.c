@@ -1,5 +1,5 @@
 /* Linux-specific PROCFS manipulation routines.
-   Copyright (C) 2009-2015 Free Software Foundation, Inc.
+   Copyright (C) 2009-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -185,23 +185,46 @@ linux_proc_pid_is_zombie (pid_t pid)
   return linux_proc_pid_is_zombie_maybe_warn (pid, 1);
 }
 
-/* See linux-procfs.h declaration.  */
+/* See linux-procfs.h.  */
 
-char *
-linux_proc_pid_get_ns (pid_t pid, const char *ns)
+const char *
+linux_proc_tid_get_name (ptid_t ptid)
 {
-  char buf[100];
-  char nsval[64];
-  int ret;
-  xsnprintf (buf, sizeof (buf), "/proc/%d/ns/%s", (int) pid, ns);
-  ret = readlink (buf, nsval, sizeof (nsval));
-  if (0 < ret && ret < sizeof (nsval))
+#define TASK_COMM_LEN 16  /* As defined in the kernel's sched.h.  */
+
+  static char comm_buf[TASK_COMM_LEN];
+  char comm_path[100];
+  FILE *comm_file;
+  const char *comm_val;
+  pid_t pid = ptid_get_pid (ptid);
+  pid_t tid = ptid_lwp_p (ptid) ? ptid_get_lwp (ptid) : ptid_get_pid (ptid);
+
+  xsnprintf (comm_path, sizeof (comm_path),
+	     "/proc/%ld/task/%ld/comm", (long) pid, (long) tid);
+
+  comm_file = gdb_fopen_cloexec (comm_path, "r");
+  if (comm_file == NULL)
+    return NULL;
+
+  comm_val = fgets (comm_buf, sizeof (comm_buf), comm_file);
+  fclose (comm_file);
+
+  if (comm_val != NULL)
     {
-      nsval[ret] = '\0';
-      return xstrdup (nsval);
+      int i;
+
+      /* Make sure there is no newline at the end.  */
+      for (i = 0; i < sizeof (comm_buf); i++)
+	{
+	  if (comm_buf[i] == '\n')
+	    {
+	      comm_buf[i] = '\0';
+	      break;
+	    }
+	}
     }
 
-  return NULL;
+  return comm_val;
 }
 
 /* See linux-procfs.h.  */

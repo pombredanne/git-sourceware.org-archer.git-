@@ -1,6 +1,6 @@
 /* Gdb/Python header for private use by Python module.
 
-   Copyright (C) 2008-2015 Free Software Foundation, Inc.
+   Copyright (C) 2008-2016 Free Software Foundation, Inc.
 
    This file is part of GDB.
 
@@ -65,8 +65,6 @@
 
 /* Python 2.4 doesn't include stdint.h soon enough to get {u,}intptr_t
    needed by pyport.h.  */
-#include <stdint.h>
-
 /* /usr/include/features.h on linux systems will define _POSIX_C_SOURCE
    if it sees _GNU_SOURCE (which config.h will define).
    pyconfig.h defines _POSIX_C_SOURCE to a different value than
@@ -318,7 +316,7 @@ extern int gdbpy_auto_load_enabled (const struct extension_language_defn *);
 extern enum ext_lang_rc gdbpy_apply_val_pretty_printer
   (const struct extension_language_defn *,
    struct type *type, const gdb_byte *valaddr,
-   int embedded_offset, CORE_ADDR address,
+   LONGEST embedded_offset, CORE_ADDR address,
    struct ui_file *stream, int recurse,
    const struct value *val,
    const struct value_print_options *options,
@@ -377,7 +375,6 @@ PyObject *gdbpy_create_ptid_object (ptid_t ptid);
 PyObject *gdbpy_selected_thread (PyObject *self, PyObject *args);
 PyObject *gdbpy_selected_inferior (PyObject *self, PyObject *args);
 PyObject *gdbpy_string_to_argv (PyObject *self, PyObject *args);
-PyObject *gdbpy_parameter (PyObject *self, PyObject *args);
 PyObject *gdbpy_parameter_value (enum var_types type, void *var);
 char *gdbpy_parse_command_name (const char *name,
 				struct cmd_list_element ***base_list,
@@ -540,6 +537,7 @@ char *unicode_to_target_string (PyObject *unicode_str);
 char *python_string_to_target_string (PyObject *obj);
 PyObject *python_string_to_target_python_string (PyObject *obj);
 char *python_string_to_host_string (PyObject *obj);
+PyObject *host_string_to_python_string (const char *str);
 int gdbpy_is_string (PyObject *obj);
 char *gdbpy_obj_to_string (PyObject *obj);
 char *gdbpy_exception_to_string (PyObject *ptype, PyObject *pvalue);

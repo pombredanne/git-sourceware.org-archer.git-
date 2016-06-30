@@ -1,5 +1,5 @@
 /* Header file to load module for 'compile' command.
-   Copyright (C) 2014-2015 Free Software Foundation, Inc.
+   Copyright (C) 2014-2016 Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -16,6 +16,8 @@
 
 #ifndef GDB_COMPILE_OBJECT_LOAD_H
 #define GDB_COMPILE_OBJECT_LOAD_H
+
+struct munmap_list;
 
 struct compile_module
 {
@@ -45,10 +47,14 @@ struct compile_module
   /* If the inferior function has an out value, this is its address.
      Otherwise it is zero.  */
   CORE_ADDR out_value_addr;
+
+  /* Track inferior memory reserved by inferior mmap.  */
+  struct munmap_list *munmap_list_head;
 };
 
 extern struct compile_module *compile_object_load
   (const char *object_file, const char *source_file,
    enum compile_i_scope_types scope, void *scope_data);
+extern void munmap_list_free (struct munmap_list *head);
 
 #endif /* GDB_COMPILE_OBJECT_LOAD_H */

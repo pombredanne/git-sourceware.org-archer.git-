@@ -1,4 +1,4 @@
-/* Copyright 2009-2015 Free Software Foundation, Inc.
+/* Copyright 2009-2016 Free Software Foundation, Inc.
 
    This file is part of the Xilinx MicroBlaze simulator.
 
@@ -39,7 +39,6 @@
   word	          spregs[2];		/* pc + msr */
   int		  cycles;
   int		  insts;
-  int		  exception;
   ubyte           imm_enable;
   half            imm_high;
 };
