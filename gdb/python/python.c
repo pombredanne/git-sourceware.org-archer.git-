@@ -1304,7 +1304,7 @@ run_python_script (int argc, char **argv)
   PySys_SetArgv (argc - 1, argv + 1);
 #else
   {
-    wchar_t **wargv = alloca (sizeof (*wargv) * (argc + 1));
+    wchar_t **wargv = (wchar_t **) alloca (sizeof (*wargv) * (argc + 1));
     int i;
 
     for (i = 1; i < argc; i++)
@@ -1318,7 +1318,7 @@ run_python_script (int argc, char **argv)
 		     i, argv[i]);
 	    exit (1);
 	  }
-	wargv[i] = alloca (sizeof (**wargv) * (len + 1));
+	wargv[i] = (wchar_t *) alloca (sizeof (**wargv) * (len + 1));
 	len2 = mbstowcs (wargv[i], argv[i], len + 1);
 	assert (len2 == len);
       }
