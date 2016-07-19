@@ -85,11 +85,11 @@ static struct client_states  client_states;
 
 static void handle_status (char *);
 
-enum pending_types  {none_pending, pending_waitee, pending_cont_waiter, pending_step_waiter, pending_stop};
-char *pending_types_str[] = {"not-waiting","waitee","waiter","step-waiter","stop", "notifier"};
+enum pending_types  {none_pending, pending_waitee, pending_cont_waiter, pending_step_waiter};
+char *pending_types_str[] = {"not-waiting","waitee","waiter","step-waiter"};
 enum nonstop_pending_types {no_notifier_pending, pending_notifier, pending_notified};
 char *nonstop_pending_types_str[] = {"", "notifier", "notified"};
-char *packet_types_str[] = {"other", "vContc", "vConts","vContt","vRun", "vAttach"};
+char *packet_types_str[] = {"other", "vContc", "vConts","vContt","vRun", "vAttach", "Hg", "g_or_m", "vStopped"};
 char *waitkind_str[] = {"exited", "stopped", "signalled", "loaded", "forked", "vforked", "execed", "vfork-done", "syscall-entry", "syscall-exit", "spurious", "ignore", "no-history", "not-resumed", "thread-created", "thread-exited", ""};
 
 
@@ -153,7 +153,7 @@ set_client_state (gdb_fildes_t fd)
   cs->packet_type = other_packet;
   cs->last_packet_type = other_packet;
   cs->pending = none_pending;
-  cs->in_buffer_ = NULL;
+  cs->notify_buffer_ = NULL;
   cs->own_buffer_ = xmalloc (PBUFSIZ + 1);
   cs->client_breakpoints = NULL;
   client_states.current_cs = cs;
@@ -260,8 +260,8 @@ static void free_client_state (client_state *cs)
   if (csi == NULL)
     XDELETE (cs->ss);
   
-  if (cs->in_buffer_)
-    xfree (cs->in_buffer_);
+  if (cs->notify_buffer_)
+    xfree (cs->notify_buffer_);
   xfree (cs->own_buffer_);
   XDELETE (cs);
 }
@@ -329,7 +329,7 @@ add_client_by_pid (int pid)
     {
       if (cs != matched_cs && matched_cs->ss->general_thread_.pid == pid)
 	{
-	  // Do clients all/non stop modes match?
+	  /* Do clients all/non stop modes match? */
 	  if (cs->non_stop_ ^ matched_cs->non_stop_)
 	    return -1;
 	  /* reuse the matched server state */
@@ -429,8 +429,8 @@ get_packet_type (client_state *cs)
 {
   char own_packet;
 
-  if (in_buffer)
-    own_packet = in_buffer[0];
+  if (own_buffer)
+    own_packet = own_buffer[0];
   else
     return other_packet;
   /* We have already categorized the packet type */
@@ -441,21 +441,43 @@ get_packet_type (client_state *cs)
   switch (own_packet)
     {
     case 'v':
-      if ((strncmp (in_buffer, "vCont;c", 7) == 0))
+      if ((strncmp (own_buffer, "vCont;c", 7) == 0))
 	return vContc;
-      else if ((strncmp (in_buffer, "vCont;r", 7) == 0) 
-	       || (strncmp (in_buffer, "vCont;s", 7) == 0))
+      else if ((strncmp (own_buffer, "vCont;r", 7) == 0) 
+	       || (strncmp (own_buffer, "vCont;s", 7) == 0))
 	return vConts;
-      else if ((strncmp (in_buffer, "vCont;t", 7) == 0))
+      else if ((strncmp (own_buffer, "vCont;t", 7) == 0))
 	return vContt;
-      else if (strncmp (in_buffer, "vRun", 4) == 0)
+      else if (strncmp (own_buffer, "vRun", 4) == 0)
 	return vRun;
-      else if (strncmp (in_buffer, "vAttach", 4) == 0)
+      else if (strncmp (own_buffer, "vAttach", 4) == 0)
 	return vAttach;
-    default:
-      return other_packet;
+      else if (strncmp (own_buffer, "vStopped", 4) == 0)
+	return vStopped;
+      break;
+    case 'H':
+      if (own_buffer[1] == 'g')
+	{
+	  client_states.current_cs->new_general_thread = read_ptid (&own_buffer[2], NULL);
+	  return Hg;
+	}
+    case 'm':
+    case 'M':
+    case 'g':
+    case 'G':
+      return g_or_m;
     };
+  return other_packet;
 }
+
+static int is_waiter (client_state *cs)
+{
+  return ((cs->packet_type == vContc
+	   || cs->packet_type == vConts)
+	  && (cs->pending == pending_cont_waiter
+	      || cs->pending == pending_step_waiter));
+}
+
 
 static int queue_stop_reply_callback (struct inferior_list_entry *entry, void *arg);
 
@@ -537,7 +559,7 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
 	  find_inferior (&all_threads, queue_stop_reply_callback, NULL);
 	  notif_write_event (&notif_stop, notif_buf);
 	  out_buf = alloca (strlen (notif_buf) + 8);
-	  // TODO Use Defined notif constant
+	  /* TODO Use Defined notif constant */
 	  strcpy (out_buf, "Stop:");
 	  strcat (out_buf, notif_buf);
 	  if (debug_threads)
@@ -550,7 +572,6 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
     }
   case vRun:
     {
-      /* reply to vRun with an OK */
       strcpy (own_buffer, "OK");
       putpkt (own_buffer);
       break;
@@ -564,18 +585,18 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
 
 
 static void
-analyze_group (client_state *current_cs, int *have_nonwaiter)
+analyze_group (client_state *current_cs, int *have_waitee)
 {
   client_state *csi;
 
-  *have_nonwaiter = 0;
+  *have_waitee = 0;
   
   for (csi = client_states.first->next; csi != NULL; csi = csi->next)
     {
       if (attached_to_same_proc (current_cs, csi))
 	{
 	  if (csi->pending == pending_waitee || csi->pending == none_pending)
-	    *have_nonwaiter += 1;
+	    *have_waitee += 1;
 	}
     }
 }
@@ -613,6 +634,17 @@ setup_multiplexing (client_state *current_cs)
   if (current_cs->packet_type == vContc || current_cs->packet_type == vConts)
     current_cs->nonstop_pending = none_pending;
 
+  if (current_cs->packet_type == vStopped && notify_buffer)
+    {
+      char okay_buf[4];
+      write_ok (okay_buf);
+      putpkt (okay_buf);
+      putpkt_notif (notify_buffer);
+      xfree (notify_buffer);
+      notify_buffer = 0;
+      return 0;
+    }
+
   for (same_pid_cs = client_states.first; 
        same_pid_cs != NULL; 
        same_pid_cs = same_pid_cs->next)
@@ -622,6 +654,17 @@ setup_multiplexing (client_state *current_cs)
 
       if (non_stop && (same_pid_cs->catch_syscalls))
 	continue;
+
+      /* TODO Protect against a shadow client changing the current thread.
+	 This attempted to do that but was invasive.
+	 So is intercepting Hg packets */
+      if (0 && current_cs->packet_type == g_or_m)
+	if (!ptid_equal (same_pid_cs->new_general_thread, current_cs->new_general_thread))
+      	  {
+      	    sprintf (own_buffer, "E00");
+      	    putpkt (own_buffer);
+      	    return 0;
+	  }
 
       switch (same_pid_cs->pending)
 	{
@@ -671,11 +714,11 @@ setup_multiplexing (client_state *current_cs)
 	    /* Current client is continuing and found another waiter client */
 	    case /* current_cs->packet_type */ vContc:
 	      {
-		int have_nonwaiter;
-		analyze_group (current_cs, &have_nonwaiter);
+		int have_waitee;
+		analyze_group (current_cs, &have_waitee);
 		dump_client_state (__FUNCTION__, "waitee/waiter switch");
 		/* Don't want to deadlock on everyone waiting */
-		if (current_cs->pending == pending_waitee && have_nonwaiter)
+		if (current_cs->pending == pending_waitee && have_waitee)
 		  current_cs->pending = pending_cont_waiter;
 	      }
 	      break;
@@ -715,7 +758,6 @@ setup_multiplexing (client_state *current_cs)
     {
     case pending_cont_waiter:
     case pending_step_waiter:
-    case pending_stop:
       switch (current_cs->last_packet_type)
         {
 	case vRun:
@@ -740,8 +782,10 @@ setup_multiplexing (client_state *current_cs)
 }
 
 
+/* Send a notification to a shadow client. */
+
 int
-notify_clients (char *buffer)
+notify_clients (char *buffer, int have_first_notify)
 {
   client_state *same_pid_cs = NULL;
   int save_client_fd = client_states.current_fd;
@@ -749,7 +793,6 @@ notify_clients (char *buffer)
   char *okay_buf = alloca (4);
   int have_syscall = 0;
 
-  debug_printf ("%s DBG %s %s\n", __FUNCTION__, target_waitstatus_to_string (&last_status), own_buffer);
   dump_client_state (__FUNCTION__, "");
 
   write_ok (okay_buf);
@@ -758,7 +801,7 @@ notify_clients (char *buffer)
        same_pid_cs != NULL;
        same_pid_cs = same_pid_cs->next)
     {
-      /* Insure another client is attached to the cs process */
+      /* Is this a client attached to the same process? */
       if (! attached_to_same_proc (client_states.current_cs, same_pid_cs))
 	continue;
 
@@ -775,7 +818,8 @@ notify_clients (char *buffer)
 	  set_client_state (save_client_fd);
 	  return 1;
         case TARGET_WAITKIND_STOPPED:
-	  if (same_pid_cs->pending == pending_cont_waiter && same_pid_cs->packet_type == vContc)
+	  if ((same_pid_cs->pending == pending_cont_waiter 
+	       && same_pid_cs->packet_type == vContc))
 	    {
 	      CORE_ADDR point_addr;
 	      struct regcache *regcache = same_pid_cs->ss->current_thread_->regcache_data;
@@ -783,9 +827,12 @@ notify_clients (char *buffer)
 	      if (has_client_breakpoint_at (point_addr))
 		same_pid_cs->nonstop_pending = pending_notifier;
 	    }
-	  
+	  /* Have more than 1 notify so also send to shadow client */
+	  if (save_client_cs->packet_type == vStopped)
+		same_pid_cs->nonstop_pending = pending_notifier;
+
 	default:
-	  /* A syscall client only gets a syscall packet */
+	  /* Only syscall clients need to see a syscall packet */
 	  if (save_client_cs->catch_syscalls)
 	    {
 	      set_client_state (same_pid_cs->file_desc);
@@ -793,27 +840,44 @@ notify_clients (char *buffer)
 	    }
       }
 
-      // syscall continue was erroneously caught by by a non syscall client
+      /* syscall continue was erroneously caught by by a non syscall client */
       if (save_client_cs->packet_type == other_packet
-	       && same_pid_cs->catch_syscalls)
+	  && same_pid_cs->catch_syscalls)
 	return 0;
 
+      /* client wants the notification */
       if (same_pid_cs->nonstop_pending == pending_notifier)
 	{
 	  /* Also send the notification to the attached client */
 	  set_client_state (same_pid_cs->file_desc);
-	  putpkt (okay_buf);
 	  if (debug_threads)
 	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, same_pid_cs->file_desc);
-	  putpkt_notif (buffer);
+	  /* This is the first notification */
+	  if (have_first_notify
+	      && (is_waiter (same_pid_cs)
+		  || (save_client_cs->packet_type != vStopped
+		      && same_pid_cs->nonstop_pending == pending_notifier)))
+	    {
+	      putpkt (okay_buf);
+	      putpkt_notif (buffer);
+	    }
+	  else			/* This is another notification in the group */
+	    {
+	      if (same_pid_cs->packet_type == vStopped)
+		putpkt (buffer);
+	      else
+		{
+		  /* send notify after we receive vStopped */
+		  same_pid_cs->notify_buffer_ = xmalloc (strlen (buffer) + 1);
+		  memcpy (same_pid_cs->notify_buffer_, buffer, strlen (buffer) + 1);
+		}
+	    }
 	  set_client_state (save_client_fd);
 	  same_pid_cs->pending = none_pending;
 	  same_pid_cs->nonstop_pending = pending_notified;
 	}
     }
   if (have_syscall && !save_client_cs->catch_syscalls)
-    return 0;
-  else if (save_client_cs->nonstop_pending == pending_notified)
     return 0;
   else
     return 1;
@@ -852,6 +916,7 @@ do_multiplexing (client_state *current_cs)
   switch (current_cs->packet_type)
     {
     case other_packet:
+    case Hg:
       break;
     case vContt:
       if (current_cs->last_packet_type == vAttach)
@@ -2099,25 +2164,49 @@ handle_monitor_command (char *mon, char *own_buf)
   else if (strcmp (mon, "client status") == 0)
     {
       client_state *csidx;
-      char *result = NULL;
+      char *result = "";
+      char *old_result = NULL;
       for (csidx = client_states.first; csidx != NULL; csidx = csidx->next)
-	if (csidx->pending)
-	  {
-	    if (result)
-	      asprintf (&result, "%sFile descriptor %d, pid %d, is %s with a current %s request\n", result, csidx->file_desc, ptid_get_pid (csidx->ss->general_thread_), pending_types_str[csidx->pending], packet_types_str[csidx->packet_type]);
-	    else
-	      asprintf (&result, "File descriptor %d, pid %d, is %s with a current %s request\n", csidx->file_desc, ptid_get_pid (csidx->ss->general_thread_), pending_types_str[csidx->pending], packet_types_str[csidx->packet_type]);
-	  }
-      if (result)
-	monitor_output (result);
+	{
+	  if (csidx->file_desc > 0)
+	    {
+	      old_result = result;
+	      asprintf (&result, "%s fd %d %s %s is %s", result, 
+			csidx->file_desc, target_pid_to_str (csidx->new_general_thread),
+			last_status.kind != TARGET_WAITKIND_IGNORE ? waitkind_str[last_status.kind] : "", 
+			pending_types_str[csidx->pending]);
+	      strlen (old_result) ? free (old_result) : 0;
+	      old_result = result;
+	      if (csidx->packet_type)
+		asprintf (&result, "%s with a current %s request\n", result, 
+			  packet_types_str[csidx->packet_type]);
+	      else
+		asprintf (&result, "%s\n", result);
+	      strlen (old_result) ? free (old_result) : 0;
+	    }
+	}
+      if (strlen (result) > 0)
+	{
+	  monitor_output (result);
+	  free (result);
+	}
     }
   else if (strcmp (mon, "client sync") == 0)
     {
       client_state *csidx;
       for (csidx = client_states.first; csidx != NULL; csidx = csidx->next)
-	if (csidx->pending == pending_cont_waiter
-	    || csidx->pending == pending_waitee)
-	  csidx->pending = none_pending;
+	{
+	  if (csidx->pending)
+	    {
+	      if (csidx->pending == pending_cont_waiter)
+		{
+		  if (non_stop)
+		    csidx->packet_type = vContt;
+		  resolve_waiter (csidx, NULL);
+		}
+	      csidx->pending = none_pending;
+	    }
+	}
     }
   else if (strcmp (mon, "help") == 0)
     monitor_show_help ();
@@ -2440,7 +2529,7 @@ handle_qxfer_threads_worker (struct inferior_list_entry *inf, void *arg)
   char core_s[21];
   const char *name = target_thread_name (ptid);
 
-  // TODO an attached client does not know about multiple inferiors
+  /* TODO an attached client does not know about multiple inferiors */
   if (ptid_get_pid (inf->id) != ptid_get_pid (general_thread)
       && attach_count > 0)
     return;
@@ -4840,19 +4929,6 @@ process_serial_event (void)
       else
 	return -1;
     }
-  else
-    {
-      if (in_buffer)
-	{
-	  xfree (in_buffer);
-	  in_buffer = 0;
-	}
-      if (packet_length > 0)
-	{
-	  in_buffer = xmalloc (packet_length);
-	  memcpy (in_buffer, own_buffer, packet_length);
-	}
-    }
 
   response_needed = 1;
 
@@ -5398,7 +5474,8 @@ handle_target_event (int err, gdb_client_data client_data)
 	{
 	  for (csi = client_states.first; csi != NULL; csi = csi->next)
 	    {
-	      if (attached_to_same_proc (save_csi, csi))
+	      if (attached_to_same_proc (save_csi, csi) 
+		  && csi->catch_syscalls)
 		{
 		  save_csi = client_states.current_cs;
 		  csi->nonstop_pending = pending_notifier;

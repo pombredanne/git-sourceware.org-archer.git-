@@ -67,6 +67,7 @@ notif_write_event (struct notif_server *notif, char *own_buf)
 	= QUEUE_peek (notif_event_p, notif->queue);
 
       notif->write (event, own_buf);
+      notify_clients (own_buf, 0);
     }
   else
     write_ok (own_buf);
@@ -150,7 +151,7 @@ notif_push (struct notif_server *np, struct notif_event *new_event)
       p += strlen (p);
 
       np->write (new_event, p);
-      if (notify_clients (buf))
+      if (notify_clients (buf, 1))
 	putpkt_notif (buf);
     }
 }

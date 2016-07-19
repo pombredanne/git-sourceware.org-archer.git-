@@ -84,7 +84,7 @@ typedef int gdb_fildes_t;
 /* Functions from server.c.  */
 extern int handle_serial_event (int err, gdb_client_data client_data);
 extern int handle_target_event (int err, gdb_client_data client_data);
-extern int notify_clients (char *buffer);
+extern int notify_clients (char *buffer, int first);
 
 /* Get rid of the currently pending stop replies that match PTID.  */
 extern void discard_queued_stop_replies (ptid_t ptid);
@@ -163,7 +163,7 @@ struct client_breakpoint
   struct client_breakpoint *next;
 };
 
-enum packet_types { other_packet, vContc, vConts, vContt, vRun, vAttach };
+enum packet_types { other_packet, vContc, vConts, vContt, vRun, vAttach, Hg, g_or_m, vStopped };
 typedef enum packet_types packet_types;
 
 enum exit_types { no_exit, have_exit, sent_exit };
@@ -180,6 +180,7 @@ struct client_state
   int nonstop_pending;
   int catch_syscalls;
   ptid_t last_cont_ptid;
+  ptid_t new_general_thread;
   struct target_waitstatus last_cont_waitstatus;
 
   /* From server.c */
@@ -226,7 +227,7 @@ struct client_state
   int pass_signals_[GDB_SIGNAL_LAST];
   int program_signals_[GDB_SIGNAL_LAST];
   int program_signals_p_;
-  char *in_buffer_;
+  char *notify_buffer_;
   char *own_buffer_;
 
   /* from remote-utils.c */
@@ -290,7 +291,7 @@ void delete_client_state (gdb_fildes_t fd);
 #define pass_signals	(get_client_state()->pass_signals_)
 #define program_signals	(get_client_state()->program_signals_)
 #define program_signals_p	(get_client_state()->program_signals_p_)
-#define in_buffer	(get_client_state()->in_buffer_)
+#define notify_buffer	(get_client_state()->notify_buffer_)
 #define own_buffer	(get_client_state()->own_buffer_)
 #define remote_debug	(get_client_state()->remote_debug_)
 #define noack_mode	(get_client_state()->noack_mode_)

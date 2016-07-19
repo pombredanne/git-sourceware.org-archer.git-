@@ -35,6 +35,10 @@ set testfile4 thread_check
 set srcfile4 ../gdb.threads/thread_check.c
 set testpath4 [pwd]/$subdir/$testfile4
 
+set testfile5 multi-threads
+set srcfile5 ../gdb.server/multi-threads.c
+set testpath5 [pwd]/$subdir/$testfile5
+
 if { [prepare_for_testing $test $testfile $srcfile debug] } {
     return -1
 }
@@ -45,6 +49,9 @@ if {[build_executable $test $testfile3 $srcfile3 debug] == -1} {
     return -1
 }
 if {[build_executable $test $testfile4 $srcfile4 {debug pthreads}] == -1} {
+    return -1
+}
+if {[build_executable $test $testfile5 $srcfile5 {debug pthreads}] == -1} {
     return -1
 }
 
@@ -117,9 +124,9 @@ proc start_strace { ATTACH_FLAGS } {
     }
     set gdb_spawn_id $res
     if { $ok == 1 } {
-	pass "$test strace \"$expect_out(buffer)\""
+	pass "$test start strace"
     } else {
-	unresolved "$test strace \"$expect_out(buffer)\""
+	unresolved "$test start strace"
     }
     return $res
 }
@@ -179,11 +186,14 @@ proc cleanup_server_and_clients { } {
     global gdb_client1_spawn_id
     global gdb_client2_spawn_id
     global gdb_client3_spawn_id
-    exec kill -KILL [exp_pid -i $gdb_server_spawn_id]
-    exec kill -KILL [exp_pid -i $gdb_client1_spawn_id]
-    exec kill -KILL [exp_pid -i $gdb_client2_spawn_id]
-    exec kill -KILL [exp_pid -i $gdb_client3_spawn_id]
+    
+    catch {exec kill -KILL [exp_pid -i $gdb_server_spawn_id]}
+    catch {exec kill -KILL [exp_pid -i $gdb_client1_spawn_id]}
+    catch {exec kill -KILL [exp_pid -i $gdb_client2_spawn_id]}
+    catch {exec kill -KILL [exp_pid -i $gdb_client3_spawn_id]}
 }
+
+#-------------------------------------------------------
 
 verbose "##### Test coordination of three clients doing break/continue"
 
@@ -230,6 +240,8 @@ gdb_command 3 "continue" "Continuing" "continue client3"
 gdb_command 2 "" "exited normally" "client exited"
 
 cleanup_server_and_clients
+
+#-------------------------------------------------------
 
 verbose "##### Test coordination of three clients doing next"
 
@@ -287,6 +299,8 @@ gdb_command 3 "" "exited" "next exited client2"
 
 cleanup_server_and_clients
 
+#-------------------------------------------------------
+
 verbose "##### Test coordination of two clients"
 
 foreach NONSTOP {off on} {
@@ -295,54 +309,54 @@ set gdb_server_spawn_id [start_gdbserver]
 
 set gdb_client1_spawn_id [start_client 1 $testpath2 "-iex \"set non-stop $NONSTOP\" " "" "non-stop $NONSTOP"]
 
-gdb_command 1 "b main" "Breakpoint.*towers.c, line 149" "towers b main #1"
+gdb_command 1 "b main" "Breakpoint.*towers.c, line 149" "towers $NONSTOP b main #1"
 
-gdb_command 1 "run" "Breakpoint 1," "towers run #1"
+gdb_command 1 "run" "Breakpoint 1," "towers $NONSTOP run #1"
 
-gdb_command 1 "b towers" "Breakpoint 2" "towers break #1"
+gdb_command 1 "b towers" "Breakpoint 2" "towers $NONSTOP break #1"
 
 set target_pid [get_target_pid towers]
 
 set gdb_client2_spawn_id [start_client 2 $testpath2 "-iex \"set non-stop $NONSTOP\" " "-iex \"attach $target_pid\"" "non-stop $NONSTOP"]
 
-gdb_command 2 "b towers" "Breakpoint 1.*towers.c, line 132" "towers b towers #2"
+gdb_command 2 "b towers" "Breakpoint 1.*towers.c, line 132" "towers $NONSTOP b towers #2"
 
-gdb_command 2 "b tower" "Breakpoint 2.*towers.c, line 116" "towers b tower #2"
+gdb_command 2 "b tower" "Breakpoint 2.*towers.c, line 116" "towers $NONSTOP b tower #2"
 
-gdb_command 1 "continue" "Continuing" "towers c towers #1"
+gdb_command 1 "continue" "Continuing" "towers $NONSTOP c towers #1"
 
-gdb_command 2 "continue" "for.*maxcells;" "towers c towers #2"
+gdb_command 2 "continue" "for.*maxcells;" "towers $NONSTOP c towers #2"
 
-gdb_command 1 "next" "" "towers n #1"
+gdb_command 1 "next" "" "towers $NONSTOP n #1"
 
-gdb_command 2 "next" "cellspace" "towers n #2"
+gdb_command 2 "next" "cellspace" "towers $NONSTOP n #2"
 
-gdb_command 1 "step" "" "towers s #1"
+gdb_command 1 "step" "" "towers $NONSTOP s #1"
 
-gdb_command 2 "step" "for " "towers s #2"
+gdb_command 2 "step" "for " "towers $NONSTOP s #2"
 
 gdb_command 1 "until 134" "" ""
 
 gdb_command 2 "continue" "" ""
 sleep 3
 
-gdb_command 1 "" "client 1 gdb" "towers after until"
+gdb_command 1 "" "client 1 gdb" "towers $NONSTOP after until"
 
-gdb_command 1 "step" "init .1, 14.;" "towers s #1"
+gdb_command 1 "step" "init .1, 14.;" "towers $NONSTOP s #1"
 
-gdb_command 1 "step" "s=1, n=14" "towers s #1"
+gdb_command 1 "step" "s=1, n=14" "towers $NONSTOP s #1"
 
-gdb_command 1 "finish" "Run till exit" "towers finish #1"
+gdb_command 1 "finish" "Run till exit" "towers $NONSTOP finish #1"
 
-gdb_command 1 "continue" "towers " "towers continue #1"
+gdb_command 1 "continue" "towers " "towers $NONSTOP continue #1"
 
-gdb_command 2 "continue" "tower.*i=1, j=3, k=13" "towers continue #2"
+gdb_command 2 "continue" "tower.*i=1, j=3, k=13" "towers $NONSTOP continue #2"
 
-gdb_command 2 "dis 2" "" "towers disable breakpoint #2"
+gdb_command 2 "dis 2" "" "towers $NONSTOP disable breakpoint #2"
 
-gdb_command 2 "continue" "towers " "towers continue #2"
+gdb_command 2 "continue" "towers " "towers $NONSTOP continue #2"
 
-gdb_command 1 "print i" " = 19" "towers print #1"
+gdb_command 1 "print i" " = 19" "towers $NONSTOP print #1"
 
 gdb_command 1 "continue" "" ""
 
@@ -358,70 +372,77 @@ cleanup_server_and_clients
 # END foreach NONSTOP
 }
 
+#-------------------------------------------------------
+
 verbose "##### Test coordination of one gdb client and an strace client"
 
-foreach NONSTOP {off on} {
+foreach NONSTOP { on off } {
 
 set gdb_server_spawn_id [start_gdbserver]
 
 set gdb_client1_spawn_id [start_client 1 $testpath3 "-iex \"set non-stop $NONSTOP\" " "" "non-stop $NONSTOP"]
 
-gdb_command 1 "b main" "Breakpoint 1 at" "b main"
+gdb_command 1 "b main" "Breakpoint 1 at" "$NONSTOP b main"
 
-gdb_command 1 "run" "Breakpoint 1," "hit b main"
+gdb_command 1 "run" "Breakpoint 1," "$NONSTOP hit b main"
 
 set target_pid [get_target_pid catch-syscall]
 
 set gdb_client2_spawn_id [start_strace "-G localhost:65432 -o [pwd]/$subdir/strace-$NONSTOP.out -p $target_pid"]
+verbose "$gdb_client2_spawn_id"
+if { $gdb_client2_spawn_id < 0 || $gdb_client2_spawn_id == ""} {
+    continue
+}
 
 #		chroot (".");
 gdb_command 1 "next" "" ""
-gdb_command 1 "next" "close" "strace next close"
+gdb_command 1 "next" "close" "strace $NONSTOP next close"
 
 #		chroot (".");
-gdb_command 1 "next" "chroot" "strace next chroot"
+gdb_command 1 "next" "chroot" "strace $NONSTOP next chroot"
 
 #		pipe (fd);
-gdb_command 1 "next" "pipe" "strace next pipe"
+gdb_command 1 "next" "pipe" "strace $NONSTOP next pipe"
 
 #		write (fd[1], buf1, sizeof (buf1));
-gdb_command 1 "next" "write" "strace next write"
+gdb_command 1 "next" "write" "strace $NONSTOP next write"
 
 #		read (fd[0], buf2, sizeof (buf2));
-gdb_command 1 "next" "read" "strace next read"
+gdb_command 1 "next" "read" "strace $NONSTOP next read"
 
 #		vfork ();
-gdb_command 1 "next" "vfork" "strace next vfork"
+gdb_command 1 "next" "vfork" "strace $NONSTOP next vfork"
 
-gdb_command 1 "continue" "exited" "strace test exited"
+gdb_command 1 "continue" "exited" "strace $NONSTOP test exited"
 
 #
-foreach f [list "[pwd]/$subdir/strace-$NONSTOP.out" ] {
-    set infile [open $f r]
-    set ok 0
-    while { [gets $infile line] >= 0 } {
-	switch -regexp $line {
-	    ".*close\\(.*=" { incr ok }
-	    ".*chroot\\(.*=" { incr ok }
-	    ".*pipe\\(.*=" { incr ok }
-	    ".*write\\(.*=" { incr ok }
-	    ".*read\\(.*=" { incr ok }
-	    ".*vfork.*=" { incr ok }
-	}
+
+set infile [open "[pwd]/$subdir/strace-$NONSTOP.out" r]
+set ok 0
+while { [gets $infile line] >= 0 } {
+    switch -regexp $line {
+	".*close\\(.*=" { incr ok }
+	".*chroot\\(.*=" { incr ok }
+	".*pipe\\(.*=" { incr ok }
+	".*write\\(.*=" { incr ok }
+	".*read\\(.*=" { incr ok }
+	".*vfork.*=" { incr ok }
     }
-    switch $ok {
-	6 { pass  "$test strace nonstop $NONSTOP ($ok)" }
-	0 { unresolved "$test strace nonstop $NONSTOP ($ok)" }
-	default { fail "$test strace nonstop $NONSTOP ($ok)" }
-    }
+}
+switch $ok {
+    6 { pass  "$test strace nonstop $NONSTOP ($ok)" }
+    0 { unresolved "$test strace nonstop $NONSTOP ($ok)" }
+    default { fail "$test strace nonstop $NONSTOP ($ok)" }
 }
     
 cleanup_server_and_clients
 
 close $infile
+# END foreach NONSTOP
 }
 
 #-------------------------------------------------------
+
 verbose "##### Test coordination of two threads clients"
 
 set gdb_server_spawn_id [start_gdbserver]
@@ -459,3 +480,111 @@ gdb_command 2 "dis 1" "" ""
 gdb_command 1 "continue" "" ""
 
 cleanup_server_and_clients
+
+#-------------------------------------------------------
+
+verbose "##### Test multiple threads each having breakpoints"
+
+foreach NONSTOP { on } {
+
+set gdb_server_spawn_id [start_gdbserver]
+
+set gdb_client1_spawn_id [start_client 1 $testpath5 "-iex \"set non-stop $NONSTOP\" " "" "non-stop $NONSTOP"]
+
+gdb_command 1 "b main" "Breakpoint 1 at" "$NONSTOP b main"
+
+gdb_command 1 "run" "Breakpoint 1," "$NONSTOP hit b main"
+
+set target_pid [get_target_pid $testfile5]
+
+set gdb_client2_spawn_id [start_client 2 $testpath5 "-iex \"set non-stop $NONSTOP\" " "-iex \"attach $target_pid\"" "non-stop $NONSTOP"]
+verbose "$gdb_client2_spawn_id"
+if { $gdb_client2_spawn_id < 0 || $gdb_client2_spawn_id == ""} {
+    continue
+}
+
+gdb_command 1 "b count_1" "Breakpoint 2 at" "$NONSTOP b count_1"
+
+gdb_command 2 "b count_1" "Breakpoint 1 at" "$NONSTOP b count_1"
+
+gdb_command 1 "b count_2" "Breakpoint 3 at" "$NONSTOP b count_2"
+
+gdb_command 2 "b count_2" "Breakpoint 2 at" "$NONSTOP b count_2"
+
+gdb_command 2 "continue" "" ""
+
+gdb_command 1 "continue" "Breakpoint \[23\]," "$NONSTOP continue count_2"
+
+gdb_command 1 "thread 3" "count\[12\]" "$NONSTOP thread 3"
+
+gdb_command 2 "thread 3" "count\[12\]" "$NONSTOP thread 3"
+
+gdb_command 1 "print count2" "= \[0-9\]" "$NONSTOP print count2"
+
+gdb_command 2 "print count2" "= \[0-9\]" "$NONSTOP print count2"
+
+gdb_command 1 "next" "" ""
+
+gdb_command 2 "next" "INT_MAX" "$NONSTOP next"
+
+gdb_command 1 "print count2" "= \[0-9\]" "$NONSTOP print count2"
+
+gdb_command 2 "print count2" "= \[0-9\]" "$NONSTOP print count2"
+
+cleanup_server_and_clients
+
+# END foreach NONSTOP
+}
+
+foreach NONSTOP { off } {
+
+set gdb_server_spawn_id [start_gdbserver]
+
+set gdb_client1_spawn_id [start_client 1 $testpath5 "-iex \"set non-stop $NONSTOP\" " "" "non-stop $NONSTOP"]
+
+gdb_command 1 "b main" "Breakpoint 1 at" "$NONSTOP b main"
+
+gdb_command 1 "run" "Breakpoint 1," "$NONSTOP hit b main"
+
+set target_pid [get_target_pid $testfile5]
+
+set gdb_client2_spawn_id [start_client 2 $testpath5 "-iex \"set non-stop $NONSTOP\" " "-iex \"attach $target_pid\"" "non-stop $NONSTOP"]
+verbose "$gdb_client2_spawn_id"
+if { $gdb_client2_spawn_id < 0 || $gdb_client2_spawn_id == ""} {
+    continue
+}
+
+gdb_command 1 "b count_1" "Breakpoint 2 at" "$NONSTOP b count_1"
+
+gdb_command 2 "b count_1" "Breakpoint 1 at" "$NONSTOP b count_1"
+
+gdb_command 1 "b count_2" "Breakpoint 3 at" "$NONSTOP b count_2"
+
+gdb_command 2 "b count_2" "Breakpoint 2 at" "$NONSTOP b count_2"
+
+gdb_command 2 "continue" "" ""
+
+gdb_command 1 "continue" "Breakpoint 3," "$NONSTOP continue count_2"
+
+gdb_command 1 "thread 3" "count\[12\]" "$NONSTOP thread 3"
+
+gdb_command 2 "thread 3" "count\[12\]" "$NONSTOP thread 3"
+
+gdb_command 1 "print count2" "= \[0-9\]" "$NONSTOP print count2"
+
+gdb_command 2 "print count2" "= \[0-9\]" "$NONSTOP print count2"
+
+gdb_command 1 "next" "" ""
+
+gdb_command 2 "next" "count\[12\]" "$NONSTOP next"
+
+gdb_command 1 "print count2" "= \[0-9\]" "$NONSTOP print count2"
+
+gdb_command 2 "print count2" "= \[0-9\]" "$NONSTOP print count2"
+
+cleanup_server_and_clients
+
+# END foreach NONSTOP
+}
+
+#-------------------------------------------------------

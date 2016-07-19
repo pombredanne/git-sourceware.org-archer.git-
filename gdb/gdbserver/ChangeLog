@@ -1,3 +1,16 @@
+2016-07-19  Stan Cox  <scox@redhat.com>
+
+	* server.c (get_packet_type):  Add Hg,m,M,g,G
+	(is_waiter):  New.
+	(setup_multiplexing): Send shadow client notification when
+	vStopped received.
+	(notify_clients): Add have_first_notify to indicate if this is an
+	initial notification.  Handle first and successive notify case.
+	(handle_monitor_command): Display thread info for client state
+	* server.h (new_general_thread):  Intended for synchronizing
+	multiple client threads.
+	(in_buffer):  Renamed notify_buffer.
+
 2016-06-08  Stan Cox  <scox@redhat.com>
 
 	* server.c (add_client_by_pid)  Check all/non stop mode equivalence.
