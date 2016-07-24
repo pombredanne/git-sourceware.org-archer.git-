@@ -94,6 +94,7 @@ AC_CHECK_HEADERS(sgtty.h termio.h termios.h sys/reg.h string.h dnl
 		 fcntl.h signal.h sys/file.h dnl
 		 sys/ioctl.h netinet/in.h sys/socket.h netdb.h dnl
 		 netinet/tcp.h arpa/inet.h)
+AC_FUNC_FORK
 AC_CHECK_FUNCS(getauxval pread pwrite pread64 setns)
 
 GDB_AC_COMMON
@@ -472,9 +473,11 @@ if test x"$STDINT_H" != x; then
 fi
 AC_SUBST(GNULIB_STDINT_H)
 
-AC_OUTPUT(Makefile,
+AC_CONFIG_FILES([Makefile],
 [case x$CONFIG_HEADERS in
 xconfig.h:config.in)
 echo > stamp-h ;;
 esac
 ])
+
+AC_OUTPUT

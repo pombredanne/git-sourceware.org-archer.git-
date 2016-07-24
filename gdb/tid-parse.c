@@ -31,6 +31,23 @@ invalid_thread_id_error (const char *string)
   error (_("Invalid thread ID: %s"), string);
 }
 
+/* Wrapper for get_number_trailer that throws an error if we get back
+   a negative number.  We'll see a negative value if the number is
+   stored in a negative convenience variable (e.g., $minus_one = -1).
+   STRING is the parser string to be used in the error message if we
+   do get back a negative number.  */
+
+static int
+get_positive_number_trailer (const char **pp, int trailer, const char *string)
+{
+  int num;
+
+  num = get_number_trailer (pp, trailer);
+  if (num < 0)
+    error (_("negative value: %s"), string);
+  return num;
+}
+
 /* See tid-parse.h.  */
 
 struct thread_info *
@@ -51,7 +68,7 @@ parse_thread_id (const char *tidstr, const char **end)
       int inf_num;
 
       p1 = number;
-      inf_num = get_number_trailer (&p1, '.');
+      inf_num = get_positive_number_trailer (&p1, '.', number);
       if (inf_num == 0)
 	invalid_thread_id_error (number);
 
@@ -69,7 +86,7 @@ parse_thread_id (const char *tidstr, const char **end)
       p1 = number;
     }
 
-  thr_num = get_number_const (&p1);
+  thr_num = get_positive_number_trailer (&p1, 0, number);
   if (thr_num == 0)
     invalid_thread_id_error (number);
 
@@ -117,6 +134,7 @@ tid_range_parser_finished (struct tid_range_parser *parser)
     case TID_RANGE_STATE_INFERIOR:
       return *parser->string == '\0';
     case TID_RANGE_STATE_THREAD_RANGE:
+    case TID_RANGE_STATE_STAR_RANGE:
       return parser->range_parser.finished;
     }
 
@@ -133,6 +151,7 @@ tid_range_parser_string (struct tid_range_parser *parser)
     case TID_RANGE_STATE_INFERIOR:
       return parser->string;
     case TID_RANGE_STATE_THREAD_RANGE:
+    case TID_RANGE_STATE_STAR_RANGE:
       return parser->range_parser.string;
     }
 
@@ -144,7 +163,8 @@ tid_range_parser_string (struct tid_range_parser *parser)
 void
 tid_range_parser_skip (struct tid_range_parser *parser)
 {
-  gdb_assert ((parser->state == TID_RANGE_STATE_THREAD_RANGE)
+  gdb_assert ((parser->state == TID_RANGE_STATE_THREAD_RANGE
+	       || parser->state == TID_RANGE_STATE_STAR_RANGE)
 	      && parser->range_parser.in_range);
 
   tid_range_parser_init (parser, parser->range_parser.end_ptr,
@@ -183,15 +203,16 @@ get_tid_or_range (struct tid_range_parser *parser, int *inf_num,
 
 	  /* Parse number to the left of the dot.  */
 	  p = parser->string;
-	  parser->inf_num = get_number_trailer (&p, '.');
+	  parser->inf_num
+	    = get_positive_number_trailer (&p, '.', parser->string);
 	  if (parser->inf_num == 0)
-	    invalid_thread_id_error (parser->string);
+	    return 0;
 
 	  parser->qualified = 1;
 	  p = dot + 1;
 
 	  if (isspace (*p))
-	    invalid_thread_id_error (parser->string);
+	    return 0;
 	}
       else
 	{
@@ -201,13 +222,27 @@ get_tid_or_range (struct tid_range_parser *parser, int *inf_num,
 	}
 
       init_number_or_range (&parser->range_parser, p);
-      parser->state = TID_RANGE_STATE_THREAD_RANGE;
+      if (p[0] == '*' && (p[1] == '\0' || isspace (p[1])))
+	{
+	  /* Setup the number range parser to return numbers in the
+	     whole [1,INT_MAX] range.  */
+	  number_range_setup_range (&parser->range_parser, 1, INT_MAX,
+				    skip_spaces_const (p + 1));
+	  parser->state = TID_RANGE_STATE_STAR_RANGE;
+	}
+      else
+	parser->state = TID_RANGE_STATE_THREAD_RANGE;
     }
 
   *inf_num = parser->inf_num;
   *thr_start = get_number_or_range (&parser->range_parser);
+  if (*thr_start < 0)
+    error (_("negative value: %s"), parser->string);
   if (*thr_start == 0)
-    invalid_thread_id_error (parser->string);
+    {
+      parser->state = TID_RANGE_STATE_INFERIOR;
+      return 0;
+    }
 
   /* If we successfully parsed a thread number or finished parsing a
      thread range, switch back to assuming the next TID is
@@ -224,7 +259,9 @@ get_tid_or_range (struct tid_range_parser *parser, int *inf_num,
 
   /* If we're midway through a range, and the caller wants the end
      value, return it and skip to the end of the range.  */
-  if (thr_end != NULL && parser->state == TID_RANGE_STATE_THREAD_RANGE)
+  if (thr_end != NULL
+      && (parser->state == TID_RANGE_STATE_THREAD_RANGE
+	  || parser->state == TID_RANGE_STATE_STAR_RANGE))
     {
       *thr_end = parser->range_parser.end_value;
       tid_range_parser_skip (parser);
@@ -256,6 +293,14 @@ tid_range_parser_get_tid (struct tid_range_parser *parser,
 }
 
 /* See tid-parse.h.  */
+
+int
+tid_range_parser_star_range (struct tid_range_parser *parser)
+{
+  return parser->state == TID_RANGE_STATE_STAR_RANGE;
+}
+
+/* See gdbthread.h.  */
 
 int
 tid_is_in_list (const char *list, int default_inferior,

@@ -535,7 +535,8 @@ AC_SEARCH_LIBS(socketpair, socket)
 AM_ZLIB
 
 # On FreeBSD we may need libutil for kinfo_getvmmap (used by fbsd-nat.c).
-AC_SEARCH_LIBS(kinfo_getvmmap, util,
+# On GNU/kFreeBSD systems, FreeBSD libutil is renamed to libutil-freebsd.
+AC_SEARCH_LIBS(kinfo_getvmmap, util util-freebsd,
   [AC_DEFINE(HAVE_KINFO_GETVMMAP, 1,
             [Define to 1 if your system has the kinfo_getvmmap function. ])])
 
@@ -1024,6 +1025,14 @@ else
   CONFIG_OBS="$CONFIG_OBS python.o"
   CONFIG_SRCS="$CONFIG_SRCS python/python.c"
 fi
+
+# Work around Python http://bugs.python.org/issue10112.  See also
+# http://bugs.python.org/issue11410, otherwise -Wl,--dynamic-list has
+# no effect.  Note that the only test after this that uses Python is
+# the -rdynamic/-Wl,--dynamic-list test, and we do want that one to be
+# run without -export-dynamic too.
+PYTHON_LIBS=`echo $PYTHON_LIBS | sed -e 's/-Xlinker -export-dynamic//'`
+
 AC_SUBST(PYTHON_CFLAGS)
 AC_SUBST(PYTHON_CPPFLAGS)
 AC_SUBST(PYTHON_LIBS)
@@ -1448,7 +1457,8 @@ fi
 # See if <machine/reg.h> supports the %fs and %gs i386 segment registers.
 # Older i386 BSD's don't have the r_fs and r_gs members of `struct reg'.
 AC_CHECK_MEMBERS([struct reg.r_fs, struct reg.r_gs], [], [],
-                 [#include <machine/reg.h>])
+                 [#include <sys/types.h>
+#include <machine/reg.h>])
 
 # See if <sys/user.h> supports the %fs_base and %gs_bas amd64 segment registers.
 # Older amd64 Linux's don't have the fs_base and gs_base members of
@@ -1509,6 +1519,18 @@ if test $gdb_cv_have_pt_getxmmregs = yes; then
   AC_DEFINE(HAVE_PT_GETXMMREGS, 1,
   [Define if sys/ptrace.h defines the PT_GETXMMREGS request.])
 fi
+
+# See if <sys/ptrace.h> supports LWP names on FreeBSD
+# Older FreeBSD versions don't have the pl_tdname member of
+# `struct ptrace_lwpinfo'.
+AC_CHECK_MEMBERS([struct ptrace_lwpinfo.pl_tdname], [], [],
+                 [#include <sys/ptrace.h>])
+
+# See if <sys/ptrace.h> supports syscall fields on FreeBSD.  The
+# pl_syscall_code member of `struct ptrace_lwpinfo' was added in
+# FreeBSD 10.3.
+AC_CHECK_MEMBERS([struct ptrace_lwpinfo.pl_syscall_code], [], [],
+                 [#include <sys/ptrace.h>])
 
 # Detect which type of /proc is in use, such as for Solaris.
 
@@ -1710,13 +1732,21 @@ if test "${gdb_native}" = yes; then
      # libpythonX.Y.a would get its symbols required for
      # pythonX.Y/lib-dynload/*.so modules hidden by -Wl,--dynamic-list.
      # Problem does not happen for the recommended libpythonX.Y.so linkage.
+
+     # Note the workaround for Python
+     # http://bugs.python.org/issue10112 earlier has removed
+     # -export-dynamic from PYTHON_LIBS.  That's exactly what we want
+     # here too, as otherwise it'd make this -Wl,--dynamic-list test
+     # always pass.
      old_CFLAGS="$CFLAGS"
      CFLAGS="$CFLAGS $PYTHON_CFLAGS"
      old_LIBS="$LIBS"
      LIBS="$LIBS $PYTHON_LIBS"
+     old_CPPFLAGS="$CPPFLAGS"
+     CPPFLAGS="$CPPFLAGS $PYTHON_CPPFLAGS"
      AC_RUN_IFELSE(
        AC_LANG_PROGRAM(
-         [#include "]${have_libpython}[/Python.h"],
+         [#include "Python.h"],
          [int err;
           Py_Initialize ();
           err = PyRun_SimpleString ("import itertools\n");
@@ -1725,6 +1755,7 @@ if test "${gdb_native}" = yes; then
        [dynamic_list=true], [], [true])
      LIBS="$old_LIBS"
      CFLAGS="$old_CFLAGS"
+     CPPFLAGS="$old_CPPFLAGS"
    fi
    LDFLAGS="$old_LDFLAGS"
 fi
@@ -2278,6 +2309,7 @@ else
 			struct bt_ctf_event *event = NULL;
 			const struct bt_definition *scope;
 
+			pos->type = BT_SEEK_BEGIN;
 			bt_iter_set_pos (bt_ctf_get_iter (NULL), pos);
 			scope = bt_ctf_get_top_level_scope (event,
 			      				   BT_STREAM_EVENT_HEADER);
@@ -2322,11 +2354,15 @@ dnl  At the moment, we just assume it's UTF-8.
 AC_DEFINE(GDB_DEFAULT_HOST_CHARSET, "UTF-8",
           [Define to be a string naming the default host character set.])
 
+if $development; then
+  AC_DEFINE(GDB_SELF_TEST, 1,
+            [Define if self-testing features should be enabled])
+fi
+
 GDB_AC_TRANSFORM([gdb], [GDB_TRANSFORM_NAME])
 GDB_AC_TRANSFORM([gcore], [GCORE_TRANSFORM_NAME])
 AC_CONFIG_FILES([gcore], [chmod +x gcore])
-
-AC_OUTPUT(Makefile gdb-gdb.gdb doc/Makefile data-directory/Makefile,
+AC_CONFIG_FILES([Makefile gdb-gdb.gdb doc/Makefile data-directory/Makefile],
 [
 case x$CONFIG_HEADERS in
 xconfig.h:config.in)
@@ -2334,4 +2370,4 @@ echo > stamp-h ;;
 esac
 ])
 
-exit 0
+AC_OUTPUT

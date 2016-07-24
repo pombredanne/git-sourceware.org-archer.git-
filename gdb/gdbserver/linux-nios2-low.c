@@ -95,28 +95,6 @@ nios2_cannot_store_register (int regno)
   return 0;
 }
 
-/* Implement the get_pc linux_target_ops method.  */
-
-static CORE_ADDR
-nios2_get_pc (struct regcache *regcache)
-{
-  union nios2_register pc;
-
-  collect_register_by_name (regcache, "pc", pc.buf);
-  return pc.reg32;
-}
-
-/* Implement the set_pc linux_target_ops method.  */
-
-static void
-nios2_set_pc (struct regcache *regcache, CORE_ADDR pc)
-{
-  union nios2_register newpc;
-
-  newpc.reg32 = pc;
-  supply_register_by_name (regcache, "pc", newpc.buf);
-}
-
 /* Breakpoint support.  Also see comments on nios2_breakpoint_from_pc
    in nios2-tdep.c.  */
 
@@ -205,7 +183,7 @@ nios2_supply_register (struct regcache *regcache, int regno,
 static void
 nios2_fill_gregset (struct regcache *regcache, void *buf)
 {
-  union nios2_register *regset = buf;
+  union nios2_register *regset = (union nios2_register *) buf;
   int i;
 
   for (i = 1; i < nios2_num_regs; i++)
@@ -215,7 +193,7 @@ nios2_fill_gregset (struct regcache *regcache, void *buf)
 static void
 nios2_store_gregset (struct regcache *regcache, const void *buf)
 {
-  const union nios2_register *regset = buf;
+  const union nios2_register *regset = (union nios2_register *) buf;
   int i;
 
   for (i = 0; i < nios2_num_regs; i++)
@@ -263,8 +241,8 @@ struct linux_target_ops the_low_target =
   nios2_cannot_fetch_register,
   nios2_cannot_store_register,
   NULL,
-  nios2_get_pc,
-  nios2_set_pc,
+  linux_get_pc_32bit,
+  linux_set_pc_32bit,
   NULL, /* breakpoint_kind_from_pc */
   nios2_sw_breakpoint_from_kind,
   NULL, /* get_next_pcs */

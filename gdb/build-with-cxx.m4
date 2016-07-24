@@ -29,12 +29,15 @@ AC_DEFUN([GDB_AC_BUILD_WITH_CXX],
       *)
 	  AC_MSG_ERROR([bad value $enableval for --enable-build-with-cxx]) ;;
     esac],
-    [enable_build_with_cxx=no])
+    [enable_build_with_cxx=yes])
 
   if test "$enable_build_with_cxx" = "yes"; then
     COMPILER='$(CXX)'
+    COMPILER_CFLAGS='$(CXXFLAGS)'
    else
     COMPILER='$(CC)'
+    COMPILER_CFLAGS='$(CFLAGS)'
   fi
   AC_SUBST(COMPILER)
+  AC_SUBST(COMPILER_CFLAGS)
 ])

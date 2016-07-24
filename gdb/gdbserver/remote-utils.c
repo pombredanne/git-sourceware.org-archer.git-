@@ -421,6 +421,11 @@ remote_close (void)
 {
   delete_file_handler (remote_desc);
 
+#ifndef USE_WIN32API
+  /* Remove SIGIO handler.  */
+  signal (SIGIO, SIG_IGN);
+#endif
+
 #ifdef USE_WIN32API
   closesocket (remote_desc);
 #else
@@ -795,19 +800,19 @@ check_remote_input_interrupt_request (void)
   input_interrupt (0);
 }
 
-/* Asynchronous I/O support.  SIGIO must be enabled when waiting, in order to
-   accept Control-C from the client, and must be disabled when talking to
-   the client.  */
+/* Asynchronous I/O support.  SIGIO must be unblocked when waiting,
+   in order to accept Control-C from the client, and must be blocked
+   when talking to the client.  */
 
 static void
-unblock_async_io (void)
+block_unblock_async_io (int block)
 {
 #ifndef USE_WIN32API
   sigset_t sigio_set;
 
   sigemptyset (&sigio_set);
   sigaddset (&sigio_set, SIGIO);
-  sigprocmask (SIG_UNBLOCK, &sigio_set, NULL);
+  sigprocmask (block ? SIG_BLOCK : SIG_UNBLOCK, &sigio_set, NULL);
 #endif
 }
 
@@ -843,9 +848,8 @@ enable_async_io (void)
   if (async_io_enabled)
     return;
 
-#ifndef USE_WIN32API
-  signal (SIGIO, input_interrupt);
-#endif
+  block_unblock_async_io (0);
+
   async_io_enabled = 1;
 #ifdef __QNX__
   nto_comctrl (1);
@@ -859,9 +863,8 @@ disable_async_io (void)
   if (!async_io_enabled)
     return;
 
-#ifndef USE_WIN32API
-  signal (SIGIO, SIG_IGN);
-#endif
+  block_unblock_async_io (1);
+
   async_io_enabled = 0;
 #ifdef __QNX__
   nto_comctrl (0);
@@ -872,12 +875,14 @@ disable_async_io (void)
 void
 initialize_async_io (void)
 {
-  /* Make sure that async I/O starts disabled.  */
+  /* Make sure that async I/O starts blocked.  */
   async_io_enabled = 1;
   disable_async_io ();
 
-  /* Make sure the signal is unblocked.  */
-  unblock_async_io ();
+  /* Install the signal handler.  */
+#ifndef USE_WIN32API
+  signal (SIGIO, input_interrupt);
+#endif
 }
 
 
@@ -1054,6 +1059,22 @@ getpkt (gdb_fildes_t fd, char *buf)
 	}
     }
 
+  /* The readchar above may have already read a '\003' out of the socket
+     and moved it to the local buffer.  For example, when GDB sends
+     vCont;c immediately followed by interrupt (see
+     gdb.base/interrupt-noterm.exp).  As soon as we see the vCont;c, we'll
+     resume the inferior and wait.  Since we've already moved the '\003'
+     to the local buffer, SIGIO won't help.  In that case, if we don't
+     check for interrupt after the vCont;c packet, the interrupt character
+     would stay in the buffer unattended until after the next (unrelated)
+     stop.  */
+  while (readchar_bufcnt > 0 && *readchar_bufp == '\003')
+    {
+      /* Consume the interrupt character in the buffer.  */
+      readchar (fd);
+      (*the_target->request_interrupt) ();
+    }
+
   return bp - buf;
 }
 
@@ -1094,39 +1115,6 @@ outreg (struct regcache *regcache, int regno, char *buf)
   *buf++ = ';';
 
   return buf;
-}
-
-void
-new_thread_notify (int id)
-{
-  char own_buf[256];
-
-  /* The `n' response is not yet part of the remote protocol.  Do nothing.  */
-  if (1)
-    return;
-
-  if (server_waiting == 0)
-    return;
-
-  sprintf (own_buf, "n%x", id);
-  disable_async_io ();
-  putpkt (own_buf);
-  enable_async_io ();
-}
-
-void
-dead_thread_notify (int id)
-{
-  char own_buf[256];
-
-  /* The `x' response is not yet part of the remote protocol.  Do nothing.  */
-  if (1)
-    return;
-
-  sprintf (own_buf, "x%x", id);
-  disable_async_io ();
-  putpkt (own_buf);
-  enable_async_io ();
 }
 
 void
@@ -1487,7 +1475,7 @@ clear_symbol_cache (struct sym_cache **symcache_p)
 int
 look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
 {
-  char own_buf[266], *p, *q;
+  char *p, *q;
   int len;
   struct sym_cache *sym;
   struct process_info *proc;
@@ -1508,49 +1496,63 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
     return 0;
 
   /* Send the request.  */
-  strcpy (own_buf, "qSymbol:");
-  bin2hex ((const gdb_byte *) name, own_buf + strlen ("qSymbol:"),
+  strcpy (own_buffer, "qSymbol:");
+  bin2hex ((const gdb_byte *) name, own_buffer + strlen ("qSymbol:"),
 	  strlen (name));
-  if (putpkt (own_buf) < 0)
+  if (putpkt (own_buffer) < 0)
     return -1;
 
   /* FIXME:  Eventually add buffer overflow checking (to getpkt?)  */
-  len = getpkt (remote_desc, own_buf);
+  len = getpkt (remote_desc, own_buffer);
   if (len < 0)
     return -1;
 
   /* We ought to handle pretty much any packet at this point while we
      wait for the qSymbol "response".  That requires re-entering the
      main loop.  For now, this is an adequate approximation; allow
-     GDB to read from memory while it figures out the address of the
-     symbol.  */
-  while (own_buf[0] == 'm')
+     GDB to read from memory and handle 'v' packets (for vFile transfers)
+     while it figures out the address of the symbol.  */
+  while (1)
     {
-      CORE_ADDR mem_addr;
-      unsigned char *mem_buffer;
-      unsigned int mem_len;
+      if (own_buffer[0] == 'm')
+	{
+	  CORE_ADDR mem_addr;
+	  unsigned char *mem_buffer;
+	  unsigned int mem_len;
 
-      decode_m_packet (&own_buf[1], &mem_addr, &mem_len);
-      mem_buffer = (unsigned char *) xmalloc (mem_len);
-      if (read_inferior_memory (mem_addr, mem_buffer, mem_len) == 0)
-	bin2hex (mem_buffer, own_buf, mem_len);
+	  decode_m_packet (&own_buffer[1], &mem_addr, &mem_len);
+	  mem_buffer = (unsigned char *) xmalloc (mem_len);
+	  if (read_inferior_memory (mem_addr, mem_buffer, mem_len) == 0)
+	    bin2hex (mem_buffer, own_buffer, mem_len);
+	  else
+	    write_enn (own_buffer);
+	  free (mem_buffer);
+	  if (putpkt (own_buffer) < 0)
+	    return -1;
+	}
+      else if (own_buffer[0] == 'v')
+	{
+	  int new_len = -1;
+	  handle_v_requests (own_buffer, len, &new_len);
+	  if (new_len != -1)
+	    putpkt_binary (own_buffer, new_len);
+	  else
+	    putpkt (own_buffer);
+	}
       else
-	write_enn (own_buf);
-      free (mem_buffer);
-      if (putpkt (own_buf) < 0)
-	return -1;
-      len = getpkt (remote_desc, own_buf);
+	break;
+      len = getpkt (remote_desc, own_buffer);
       if (len < 0)
 	return -1;
     }
 
-  if (!startswith (own_buf, "qSymbol:"))
+  if (!startswith (own_buffer, "qSymbol:"))
     {
-      warning ("Malformed response to qSymbol, ignoring: %s\n", own_buf);
+      warning ("Malformed response to qSymbol, ignoring: %s\n", own_buffer);
       return -1;
     }
 
-  p = own_buf + strlen ("qSymbol:");
+  p = own_buffer + strlen ("qSymbol:");
   q = p;
   while (*q && *q != ':')
     q++;
@@ -1586,19 +1588,18 @@ look_up_one_symbol (const char *name, CORE_ADDR *addrp, int may_ask_gdb)
 int
 relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
 {
-  char own_buf[266];
   int len;
   ULONGEST written = 0;
 
   /* Send the request.  */
-  strcpy (own_buf, "qRelocInsn:");
-  sprintf (own_buf, "qRelocInsn:%s;%s", paddress (oldloc),
+  strcpy (own_buffer, "qRelocInsn:");
+  sprintf (own_buffer, "qRelocInsn:%s;%s", paddress (oldloc),
 	   paddress (*to));
-  if (putpkt (own_buf) < 0)
+  if (putpkt (own_buffer) < 0)
     return -1;
 
   /* FIXME:  Eventually add buffer overflow checking (to getpkt?)  */
-  len = getpkt (remote_desc, own_buf);
+  len = getpkt (remote_desc, own_buffer);
   if (len < 0)
     return -1;
 
@@ -1606,61 +1607,61 @@ relocate_instruction (CORE_ADDR *to, CORE_ADDR oldloc)
      wait for the qRelocInsn "response".  That requires re-entering
      the main loop.  For now, this is an adequate approximation; allow
      GDB to access memory.  */
-  while (own_buf[0] == 'm' || own_buf[0] == 'M' || own_buf[0] == 'X')
+  while (own_buffer[0] == 'm' || own_buffer[0] == 'M' || own_buffer[0] == 'X')
     {
       CORE_ADDR mem_addr;
       unsigned char *mem_buffer = NULL;
       unsigned int mem_len;
 
-      if (own_buf[0] == 'm')
+      if (own_buffer[0] == 'm')
 	{
-	  decode_m_packet (&own_buf[1], &mem_addr, &mem_len);
+	  decode_m_packet (&own_buffer[1], &mem_addr, &mem_len);
 	  mem_buffer = (unsigned char *) xmalloc (mem_len);
 	  if (read_inferior_memory (mem_addr, mem_buffer, mem_len) == 0)
-	    bin2hex (mem_buffer, own_buf, mem_len);
+	    bin2hex (mem_buffer, own_buffer, mem_len);
 	  else
-	    write_enn (own_buf);
+	    write_enn (own_buffer);
 	}
-      else if (own_buf[0] == 'X')
+      else if (own_buffer[0] == 'X')
 	{
-	  if (decode_X_packet (&own_buf[1], len - 1, &mem_addr,
+	  if (decode_X_packet (&own_buffer[1], len - 1, &mem_addr,
 			       &mem_len, &mem_buffer) < 0
 	      || write_inferior_memory (mem_addr, mem_buffer, mem_len) != 0)
-	    write_enn (own_buf);
+	    write_enn (own_buffer);
 	  else
-	    write_ok (own_buf);
+	    write_ok (own_buffer);
 	}
       else
 	{
-	  decode_M_packet (&own_buf[1], &mem_addr, &mem_len, &mem_buffer);
+	  decode_M_packet (&own_buffer[1], &mem_addr, &mem_len, &mem_buffer);
 	  if (write_inferior_memory (mem_addr, mem_buffer, mem_len) == 0)
-	    write_ok (own_buf);
+	    write_ok (own_buffer);
 	  else
-	    write_enn (own_buf);
+	    write_enn (own_buffer);
 	}
       free (mem_buffer);
-      if (putpkt (own_buf) < 0)
+      if (putpkt (own_buffer) < 0)
 	return -1;
-      len = getpkt (remote_desc, own_buf);
+      len = getpkt (remote_desc, own_buffer);
       if (len < 0)
 	return -1;
     }
 
-  if (own_buf[0] == 'E')
+  if (own_buffer[0] == 'E')
     {
       warning ("An error occurred while relocating an instruction: %s\n",
-	       own_buf);
+	       own_buffer);
       return -1;
     }
 
-  if (!startswith (own_buf, "qRelocInsn:"))
+  if (!startswith (own_buffer, "qRelocInsn:"))
     {
       warning ("Malformed response to qRelocInsn, ignoring: %s\n",
-	       own_buf);
+	       own_buffer);
       return -1;
     }
 
-  unpack_varlen_hex (own_buf + strlen ("qRelocInsn:"), &written);
+  unpack_varlen_hex (own_buffer + strlen ("qRelocInsn:"), &written);
 
   *to += written;
   return 0;

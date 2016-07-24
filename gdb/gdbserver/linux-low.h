@@ -154,7 +154,7 @@ struct linux_target_ops
   const gdb_byte *(*sw_breakpoint_from_kind) (int kind, int *size);
 
   /* Find the next possible PCs after the current instruction executes.  */
-  VEC (CORE_ADDR) *(*get_next_pcs) (CORE_ADDR pc, struct regcache *regcache);
+  VEC (CORE_ADDR) *(*get_next_pcs) (struct regcache *regcache);
 
   int decr_pc_after_break;
   int (*breakpoint_at) (CORE_ADDR pc);
@@ -181,7 +181,7 @@ struct linux_target_ops
      Returns true if any conversion was done; false otherwise.
      If DIRECTION is 1, then copy from INF to NATIVE.
      If DIRECTION is 0, copy from NATIVE to INF.  */
-  int (*siginfo_fixup) (siginfo_t *native, void *inf, int direction);
+  int (*siginfo_fixup) (siginfo_t *native, gdb_byte *inf, int direction);
 
   /* Hook to call when a new process is created or attached to.
      If extra per-process architecture-specific data is needed,
@@ -241,11 +241,12 @@ struct linux_target_ops
   /* See target.h.  */
   int (*supports_hardware_single_step) (void);
 
-  /* Fill *SYSNO with the syscall nr trapped.  Fill *SYSRET with the
-     return code.  Only to be called when inferior is stopped
-     due to SYSCALL_SIGTRAP.  */
-  void (*get_syscall_trapinfo) (struct regcache *regcache,
-				int *sysno, int *sysret);
+  /* Fill *SYSNO with the syscall nr trapped.  Only to be called when
+     inferior is stopped due to SYSCALL_SIGTRAP.  */
+  void (*get_syscall_trapinfo) (struct regcache *regcache, int *sysno);
+
+  /* See target.h.  */
+  int (*get_ipa_tdesc_idx) (void);
 };
 
 extern struct linux_target_ops the_low_target;
@@ -362,10 +363,6 @@ struct lwp_info
      a exit-jump-pad-quickly breakpoint.  This is it.  */
   struct breakpoint *exit_jump_pad_bkpt;
 
-  /* True if the LWP was seen stop at an internal breakpoint and needs
-     stepping over later when it is resumed.  */
-  int need_step_over;
-
 #ifdef USE_THREAD_DB
   int thread_known;
   /* The thread handle, used for e.g. TLS access.  Only valid if
@@ -391,6 +388,12 @@ void initialize_regsets_info (struct regsets_info *regsets_info);
 #endif
 
 void initialize_low_arch (void);
+
+void linux_set_pc_32bit (struct regcache *regcache, CORE_ADDR pc);
+CORE_ADDR linux_get_pc_32bit (struct regcache *regcache);
+
+void linux_set_pc_64bit (struct regcache *regcache, CORE_ADDR pc);
+CORE_ADDR linux_get_pc_64bit (struct regcache *regcache);
 
 /* From thread-db.c  */
 int thread_db_init (void);

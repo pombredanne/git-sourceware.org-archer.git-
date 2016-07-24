@@ -1012,11 +1012,12 @@ types.  This option is only available if the toolchain has been built
 with plugin support enabled.
 
 @item --size-sort
-Sort symbols by size.  The size is computed as the difference between
-the value of the symbol and the value of the symbol with the next higher
-value.  If the @code{bsd} output format is used the size of the symbol
-is printed, rather than the value, and @samp{-S} must be used in order
-both size and value to be printed.
+Sort symbols by size.  For ELF objects symbol sizes are read from the
+ELF, for other object types the symbol sizes are computed as the
+difference between the value of the symbol and the value of the symbol
+with the next higher value.  If the @code{bsd} output format is used
+the size of the symbol is printed, rather than the value, and
+@samp{-S} must be used in order both size and value to be printed.
 
 @item --special-syms
 Display symbols which have a target-specific special meaning.  These
@@ -1074,6 +1075,7 @@ objcopy [@option{-F} @var{bfdname}|@option{--target=}@var{bfdname}]
         [@option{--interleave-width=}@var{width}]
         [@option{-j} @var{sectionpattern}|@option{--only-section=}@var{sectionpattern}]
         [@option{-R} @var{sectionpattern}|@option{--remove-section=}@var{sectionpattern}]
+        [@option{--remove-relocations=}@var{sectionpattern}]
         [@option{-p}|@option{--preserve-dates}]
         [@option{-D}|@option{--enable-deterministic-archives}]
         [@option{-U}|@option{--disable-deterministic-archives}]
@@ -1129,8 +1131,7 @@ objcopy [@option{-F} @var{bfdname}|@option{--target=}@var{bfdname}]
         [@option{--subsystem=}@var{which}:@var{major}.@var{minor}]
         [@option{--compress-debug-sections}]
         [@option{--decompress-debug-sections}]
-        [@option{--dwarf-depth=@var{n}}]
-        [@option{--dwarf-start=@var{n}}]
+        [@option{--elf-stt-common=@var{val}}]
         [@option{-v}|@option{--verbose}]
         [@option{-V}|@option{--version}]
         [@option{--help}] [@option{--info}]
@@ -1221,6 +1222,18 @@ This option may be given more than once.  Note that using this option
 inappropriately may make the output file unusable.  Wildcard
 characters are accepted in @var{sectionpattern}.
 
+If the first character of @var{sectionpattern} is the exclamation
+point (!) then matching sections will not be copied, even if earlier
+use of @option{--only-section} on the same command line would
+otherwise copy it.  For example:
+
+@smallexample
+  --only-section=.text.* --only-section=!.text.foo
+@end smallexample
+
+will copy all sectinos maching '.text.*' but not the section
+'.text.foo'.
+
 @item -R @var{sectionpattern}
 @itemx --remove-section=@var{sectionpattern}
 Remove any section matching @var{sectionpattern} from the output file.
@@ -1229,6 +1242,46 @@ inappropriately may make the output file unusable.  Wildcard
 characters are accepted in @var{sectionpattern}.  Using both the
 @option{-j} and @option{-R} options together results in undefined
 behaviour.
+
+If the first character of @var{sectionpattern} is the exclamation
+point (!) then matching sections will not be removed even if an
+earlier use of @option{--remove-section} on the same command line
+would otherwise remove it.  For example:
+
+@smallexample
+  --remove-section=.text.* --remove-section=!.text.foo
+@end smallexample
+
+will remove all sections matching the pattern '.text.*', but will not
+remove the section '.text.foo'.
+
+@item --remove-relocations=@var{sectionpattern}
+Remove relocations from the output file for any section matching
+@var{sectionpattern}.  This option may be given more than once.  Note
+that using this option inappropriately may make the output file
+unusable.  Wildcard characters are accepted in @var{sectionpattern}.
+For example:
+
+@smallexample
+  --remove-relocations=.text.*
+@end smallexample
+
+will remove the relocations for all sections matching the patter
+'.text.*'.
+
+If the first character of @var{sectionpattern} is the exclamation
+point (!) then matching sections will not have their relocation
+removed even if an earlier use of @option{--remove-relocations} on the
+same command line would otherwise cause the relocations to be removed.
+For example:
+
+@smallexample
+  --remove-relocations=.text.* --remove-relocations=!.text.foo
+@end smallexample
+
+will remove all relocations for sections matching the pattern
+'.text.*', but will not remove relocations for the section
+'.text.foo'.
 
 @item -S
 @itemx --strip-all
@@ -1872,7 +1925,7 @@ ELF ABI.  Note - if compression would actually make a section
 @itemx --compress-debug-sections=zlib-gabi
 For ELF files, these options control how DWARF debug sections are
 compressed.  @option{--compress-debug-sections=none} is equivalent
-to @option{--nocompress-debug-sections}.
+to @option{--decompress-debug-sections}.
 @option{--compress-debug-sections=zlib} and
 @option{--compress-debug-sections=zlib-gabi} are equivalent to
 @option{--compress-debug-sections}.
@@ -1885,6 +1938,14 @@ renamed.
 @item --decompress-debug-sections
 Decompress DWARF debug sections using zlib.  The original section
 names of the compressed sections are restored.
+
+@item --elf-stt-common=yes
+@itemx --elf-stt-common=no
+For ELF files, these options control whether common symbols should be
+converted to the @code{STT_COMMON} or @code{STT_OBJECT} type.
+@option{--elf-stt-common=yes} converts common symbol type to
+@code{STT_COMMON}. @option{--elf-stt-common=no} converts common symbol
+type to @code{STT_OBJECT}.
 
 @item -V
 @itemx --version
@@ -1959,6 +2020,8 @@ objdump [@option{-a}|@option{--archive-headers}]
         [@option{--prefix-addresses}]
         [@option{--[no-]show-raw-insn}]
         [@option{--adjust-vma=}@var{offset}]
+        [@option{--dwarf-depth=@var{n}}]
+        [@option{--dwarf-start=@var{n}}]
         [@option{--special-syms}]
         [@option{--prefix=}@var{prefix}]
         [@option{--prefix-strip=}@var{level}]
@@ -2124,6 +2187,11 @@ although @command{ld} relocates the sections correctly, using @samp{objdump
 -h} to list the file section headers cannot show the correct addresses.
 Instead, it shows the usual addresses, which are implicit for the
 target.
+
+Note, in some cases it is possible for a section to have both the
+READONLY and the NOREAD attributes set.  In such cases the NOREAD
+attribute takes precedence, but @command{objdump} will report both
+since the exact setting of the flag bits might be important.
 
 @item -H
 @itemx --help
@@ -2949,6 +3017,7 @@ strip [@option{-F} @var{bfdname} |@option{--target=}@var{bfdname}]
       [@option{-w}|@option{--wildcard}]
       [@option{-x}|@option{--discard-all}] [@option{-X} |@option{--discard-locals}]
       [@option{-R} @var{sectionname} |@option{--remove-section=}@var{sectionname}]
+      [@option{--remove-relocations=}@var{sectionpattern}]
       [@option{-o} @var{file}] [@option{-p}|@option{--preserve-dates}]
       [@option{-D}|@option{--enable-deterministic-archives}]
       [@option{-U}|@option{--disable-deterministic-archives}]
@@ -3005,6 +3074,46 @@ option may be given more than once.  Note that using this option
 inappropriately may make the output file unusable.  The wildcard
 character @samp{*} may be given at the end of @var{sectionname}.  If
 so, then any section starting with @var{sectionname} will be removed.
+
+If the first character of @var{sectionpattern} is the exclamation
+point (!) then matching sections will not be removed even if an
+earlier use of @option{--remove-section} on the same command line
+would otherwise remove it.  For example:
+
+@smallexample
+  --remove-section=.text.* --remove-section=!.text.foo
+@end smallexample
+
+will remove all sections matching the pattern '.text.*', but will not
+remove the section '.text.foo'.
+
+@item --remove-relocations=@var{sectionpattern}
+Remove relocations from the output file for any section matching
+@var{sectionpattern}.  This option may be given more than once.  Note
+that using this option inappropriately may make the output file
+unusable.  Wildcard characters are accepted in @var{sectionpattern}.
+For example:
+
+@smallexample
+  --remove-relocations=.text.*
+@end smallexample
+
+will remove the relocations for all sections matching the patter
+'.text.*'.
+
+If the first character of @var{sectionpattern} is the exclamation
+point (!) then matching sections will not have their relocation
+removed even if an earlier use of @option{--remove-relocations} on the
+same command line would otherwise cause the relocations to be removed.
+For example:
+
+@smallexample
+  --remove-relocations=.text.* --remove-relocations=!.text.foo
+@end smallexample
+
+will remove all relocations for sections matching the pattern
+'.text.*', but will not remove relocations for the section
+'.text.foo'.
 
 @item -s
 @itemx --strip-all

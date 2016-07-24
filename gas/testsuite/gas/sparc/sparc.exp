@@ -56,8 +56,10 @@ if [istarget sparc*-*-*] {
 	run_dump_test "prefetch"
 	run_dump_test "set64"
 	run_dump_test "synth64"
+        run_dump_test "rdasr"
 	run_dump_test "rdpr"
 	run_dump_test "rdhpr"
+        run_dump_test "wrasr"
 	run_dump_test "wrpr"
 	run_dump_test "wrhpr"
 	run_dump_test "window"
@@ -84,6 +86,7 @@ if [istarget sparc*-*-*] {
     run_dump_test "pause"
     run_dump_test "cfr"
     run_dump_test "ldtw_sttw"
+    run_dump_test "ldtxa"
     run_dump_test "ldd_std"
     run_dump_test "ldx_stx"
     run_dump_test "ldx_efsr"
@@ -97,6 +100,9 @@ if [istarget sparc*-*-*] {
     run_dump_test "natural-32"
 
     run_list_test "pr4587" ""
+
+    run_dump_test "pr19910-1"
+    run_list_test "pr19910-2"
 }
 
 if [istarget sparc-*-vxworks*] {

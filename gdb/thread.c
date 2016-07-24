@@ -166,7 +166,7 @@ thread_cancel_execution_command (struct thread_info *thr)
 {
   if (thr->thread_fsm != NULL)
     {
-      thread_fsm_clean_up (thr->thread_fsm);
+      thread_fsm_clean_up (thr->thread_fsm, thr);
       thread_fsm_delete (thr->thread_fsm);
       thr->thread_fsm = NULL;
     }
@@ -1201,7 +1201,6 @@ print_thread_info_1 (struct ui_out *uiout, char *requested_threads,
   ptid_t current_ptid;
   struct cleanup *old_chain;
   const char *extra_info, *name, *target_id;
-  int current_thread = -1;
   struct inferior *inf;
   int default_inf_num = current_inferior ()->num;
 
@@ -1260,9 +1259,6 @@ print_thread_info_1 (struct ui_out *uiout, char *requested_threads,
     {
       struct cleanup *chain2;
       int core;
-
-      if (ptid_equal (tp->ptid, current_ptid))
-	current_thread = tp->global_num;
 
       if (!should_print_thread (requested_threads, default_inf_num,
 				global_ids, pid, tp))
@@ -1685,6 +1681,14 @@ make_cleanup_restore_current_thread (void)
 /* See gdbthread.h.  */
 
 int
+show_thread_that_caused_stop (void)
+{
+  return highest_thread_num > 1;
+}
+
+/* See gdbthread.h.  */
+
+int
 show_inferior_qualified_tids (void)
 {
   return (inferior_list->next != NULL || inferior_list->num != 1);
@@ -1818,7 +1822,7 @@ thread_apply_all_command (char *cmd, int from_tty)
 static void
 thread_apply_command (char *tidlist, int from_tty)
 {
-  char *cmd;
+  char *cmd = NULL;
   struct cleanup *old_chain;
   char *saved_cmd;
   struct tid_range_parser parser;
@@ -1826,10 +1830,24 @@ thread_apply_command (char *tidlist, int from_tty)
   if (tidlist == NULL || *tidlist == '\000')
     error (_("Please specify a thread ID list"));
 
-  for (cmd = tidlist; *cmd != '\000' && !isalpha (*cmd); cmd++);
+  tid_range_parser_init (&parser, tidlist, current_inferior ()->num);
+  while (!tid_range_parser_finished (&parser))
+    {
+      int inf_num, thr_start, thr_end;
 
-  if (*cmd == '\000')
+      if (!tid_range_parser_get_tid_range (&parser,
+					   &inf_num, &thr_start, &thr_end))
+	{
+	  cmd = (char *) tid_range_parser_string (&parser);
+	  break;
+	}
+    }
+
+  if (cmd == NULL)
     error (_("Please specify a command following the thread ID list"));
+
+  if (tidlist == cmd || !isalpha (cmd[0]))
+    invalid_thread_id_error (cmd);
 
   /* Save a copy of the command in case it is clobbered by
      execute_command.  */
@@ -1850,6 +1868,26 @@ thread_apply_command (char *tidlist, int from_tty)
       inf = find_inferior_id (inf_num);
       if (inf != NULL)
 	tp = find_thread_id (inf, thr_num);
+
+      if (tid_range_parser_star_range (&parser))
+	{
+	  if (inf == NULL)
+	    {
+	      warning (_("Unknown inferior %d"), inf_num);
+	      tid_range_parser_skip (&parser);
+	      continue;
+	    }
+
+	  /* No use looking for threads past the highest thread number
+	     the inferior ever had.  */
+	  if (thr_num >= inf->highest_thread_num)
+	    tid_range_parser_skip (&parser);
+
+	  /* Be quiet about unknown threads numbers.  */
+	  if (tp == NULL)
+	    continue;
+	}
+
       if (tp == NULL)
 	{
 	  if (show_inferior_qualified_tids ()

@@ -1327,10 +1327,12 @@ Reloc_stub<size, big_endian>::stub_type_for_reloc(
   if (aarch64_valid_for_adrp_p(location, dest))
     return ST_ADRP_BRANCH;
 
-  if (parameters->options().output_is_position_independent()
-      && parameters->options().output_is_executable())
+  // Always use PC-relative addressing in case of -shared or -pie.
+  if (parameters->options().output_is_position_independent())
     return ST_LONG_BRANCH_PCREL;
 
+  // This saves 2 insns per stub, compared to ST_LONG_BRANCH_PCREL.
+  // But is only applicable to non-shared or non-pie.
   return ST_LONG_BRANCH_ABS;
 }
 
@@ -5104,6 +5106,8 @@ class AArch64_relocate_functions
       static_cast<Valtype>(val | (immed << doffset)));
   }
 
+ public:
+
   // Update selected bits in text.
 
   template<int valsize>
@@ -5130,8 +5134,6 @@ class AArch64_relocate_functions
 	    ? This::STATUS_OKAY
 	    : This::STATUS_OVERFLOW);
   }
-
- public:
 
   // Construct a B insn. Note, although we group it here with other relocation
   // operation, there is actually no 'relocation' involved here.
@@ -5956,8 +5958,6 @@ Target_aarch64<size, big_endian>::Scan::local(
 
   typedef Output_data_reloc<elfcpp::SHT_RELA, true, size, big_endian>
       Reloc_section;
-  Output_data_got_aarch64<size, big_endian>* got =
-      target->got_section(symtab, layout);
   unsigned int r_sym = elfcpp::elf_r_sym<size>(rela.get_r_info());
 
   // A local STT_GNU_IFUNC symbol may require a PLT entry.
@@ -5967,6 +5967,9 @@ Target_aarch64<size, big_endian>::Scan::local(
 
   switch (r_type)
     {
+    case elfcpp::R_AARCH64_NONE:
+      break;
+
     case elfcpp::R_AARCH64_ABS32:
     case elfcpp::R_AARCH64_ABS16:
       if (parameters->options().output_is_position_independent())
@@ -5999,8 +6002,11 @@ Target_aarch64<size, big_endian>::Scan::local(
 
     case elfcpp::R_AARCH64_ADR_GOT_PAGE:
     case elfcpp::R_AARCH64_LD64_GOT_LO12_NC:
-      // This pair of relocations is used to access a specific GOT entry.
+    case elfcpp::R_AARCH64_LD64_GOTPAGE_LO15:
+      // The above relocations are used to access GOT entries.
       {
+	Output_data_got_aarch64<size, big_endian>* got =
+	    target->got_section(symtab, layout);
 	bool is_new = false;
 	// This symbol requires a GOT entry.
 	if (is_ifunc)
@@ -6053,6 +6059,8 @@ Target_aarch64<size, big_endian>::Scan::local(
 	// Create a GOT entry for the tp-relative offset.
 	if (!parameters->doing_static_link())
 	  {
+	    Output_data_got_aarch64<size, big_endian>* got =
+		target->got_section(symtab, layout);
 	    got->add_local_with_rel(object, r_sym, GOT_TYPE_TLS_OFFSET,
 				    target->rela_dyn_section(layout),
 				    elfcpp::R_AARCH64_TLS_TPREL64);
@@ -6060,6 +6068,8 @@ Target_aarch64<size, big_endian>::Scan::local(
 	else if (!object->local_has_got_offset(r_sym,
 					       GOT_TYPE_TLS_OFFSET))
 	  {
+	    Output_data_got_aarch64<size, big_endian>* got =
+		target->got_section(symtab, layout);
 	    got->add_local(object, r_sym, GOT_TYPE_TLS_OFFSET);
 	    unsigned int got_offset =
 		object->local_got_offset(r_sym, GOT_TYPE_TLS_OFFSET);
@@ -6083,6 +6093,8 @@ Target_aarch64<size, big_endian>::Scan::local(
 	  }
 	gold_assert(tlsopt == tls::TLSOPT_NONE);
 
+	Output_data_got_aarch64<size, big_endian>* got =
+	    target->got_section(symtab, layout);
 	got->add_local_pair_with_rel(object,r_sym, data_shndx,
 				     GOT_TYPE_TLS_PAIR,
 				     target->rela_dyn_section(layout),
@@ -6217,6 +6229,9 @@ Target_aarch64<size, big_endian>::Scan::global(
 
   switch (r_type)
     {
+    case elfcpp::R_AARCH64_NONE:
+      break;
+
     case elfcpp::R_AARCH64_ABS16:
     case elfcpp::R_AARCH64_ABS32:
     case elfcpp::R_AARCH64_ABS64:
@@ -6324,8 +6339,9 @@ Target_aarch64<size, big_endian>::Scan::global(
 
     case elfcpp::R_AARCH64_ADR_GOT_PAGE:
     case elfcpp::R_AARCH64_LD64_GOT_LO12_NC:
+    case elfcpp::R_AARCH64_LD64_GOTPAGE_LO15:
       {
-	// This pair of relocations is used to access a specific GOT entry.
+	// The above relocations are used to access GOT entries.
 	// Note a GOT entry is an *address* to a symbol.
 	// The symbol requires a GOT entry
 	Output_data_got_aarch64<size, big_endian>* got =
@@ -7042,6 +7058,19 @@ Target_aarch64<size, big_endian>::Relocate::relocate(
       reloc_status = Reloc::template rela_general<32>(
 	view, value, addend, reloc_property);
       break;
+
+    case elfcpp::R_AARCH64_LD64_GOTPAGE_LO15:
+      {
+	gold_assert(have_got_offset);
+	value = target->got_->address() + got_base + got_offset + addend -
+	  Reloc::Page(target->got_->address() + got_base);
+	if ((value & 7) != 0)
+	  reloc_status = Reloc::STATUS_OVERFLOW;
+	else
+	  reloc_status = Reloc::template reloc_common<32>(
+	    view, value, reloc_property);
+	break;
+      }
 
     case elfcpp::R_AARCH64_TLSGD_ADR_PAGE21:
     case elfcpp::R_AARCH64_TLSGD_ADD_LO12_NC:
@@ -8246,10 +8275,6 @@ Target_aarch64<size, big_endian>::scan_erratum_843419_span(
 	    }
 	  if (do_report)
 	    {
-	      gold_info(_("Erratum 843419 found and fixed at \"%s\", "
-			     "section %d, offset 0x%08x."),
-			   relobj->name().c_str(), shndx,
-			   (unsigned int)(span_start + offset));
 	      unsigned int erratum_insn_offset =
 		span_start + offset + insn_offset;
 	      Address erratum_address =

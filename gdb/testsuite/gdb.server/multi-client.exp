@@ -21,23 +21,24 @@ set test "multi-client"
 set testfile wrapper
 set srcfile wrapper.c
 global srcdir subdir
-set testpath [pwd]/$subdir/$testfile
+set testpath [standard_output_file $testfile]
 
+verbose "srcdir=$srcdir subdir=$subdir [standard_output_file $test]"
 set testfile2 towers
 set srcfile2 ../gdb.server/towers.c
-set testpath2 [pwd]/$subdir/$testfile2
+set testpath2 [standard_output_file $testfile2]
 
 set testfile3 catch-syscall
 set srcfile3 ../gdb.base/catch-syscall.c
-set testpath3 [pwd]/$subdir/$testfile3
+set testpath3 [standard_output_file $testfile3]
 
 set testfile4 thread_check
 set srcfile4 ../gdb.threads/thread_check.c
-set testpath4 [pwd]/$subdir/$testfile4
+set testpath4 [standard_output_file $testfile4]
 
 set testfile5 multi-threads
 set srcfile5 ../gdb.server/multi-threads.c
-set testpath5 [pwd]/$subdir/$testfile5
+set testpath5 [standard_output_file $testfile5]
 
 if { [prepare_for_testing $test $testfile $srcfile debug] } {
     return -1
@@ -388,7 +389,8 @@ gdb_command 1 "run" "Breakpoint 1," "$NONSTOP hit b main"
 
 set target_pid [get_target_pid catch-syscall]
 
-set gdb_client2_spawn_id [start_strace "-G localhost:65432 -o [pwd]/$subdir/strace-$NONSTOP.out -p $target_pid"]
+set gdb_client2_spawn_id [start_strace "-G localhost:65432 -o [standard_output_file strace-$NONSTOP.out] -p $target_pid"]
+# set gdb_client2_spawn_id [start_strace "-G localhost:65432 -o [pwd]/$subdir/strace-$NONSTOP.out -p $target_pid"]
 verbose "$gdb_client2_spawn_id"
 if { $gdb_client2_spawn_id < 0 || $gdb_client2_spawn_id == ""} {
     continue
@@ -417,7 +419,8 @@ gdb_command 1 "continue" "exited" "strace $NONSTOP test exited"
 
 #
 
-set infile [open "[pwd]/$subdir/strace-$NONSTOP.out" r]
+set infile [open [standard_output_file strace-$NONSTOP.out] r]
+# set infile [open "[pwd]/$subdir/strace-$NONSTOP.out" r]
 set ok 0
 while { [gets $infile line] >= 0 } {
     switch -regexp $line {
@@ -564,7 +567,7 @@ gdb_command 2 "b count_2" "Breakpoint 2 at" "$NONSTOP b count_2"
 
 gdb_command 2 "continue" "" ""
 
-gdb_command 1 "continue" "Breakpoint 3," "$NONSTOP continue count_2"
+gdb_command 1 "continue" "Breakpoint \[23\]," "$NONSTOP continue count_2"
 
 gdb_command 1 "thread 3" "count\[12\]" "$NONSTOP thread 3"
 

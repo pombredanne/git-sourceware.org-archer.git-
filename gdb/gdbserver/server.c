@@ -95,9 +95,10 @@ char *waitkind_str[] = {"exited", "stopped", "signalled", "loaded", "forked", "v
 
 /* Return the current client state */
 
-extern inline client_state*
+client_state*
 get_client_state (void)
 {
+  /* was extern inline client_state* */
   return client_states.current_cs;
 }
 
@@ -154,7 +155,7 @@ set_client_state (gdb_fildes_t fd)
   cs->last_packet_type = other_packet;
   cs->pending = none_pending;
   cs->notify_buffer_ = NULL;
-  cs->own_buffer_ = xmalloc (PBUFSIZ + 1);
+  cs->own_buffer_ = (char*) xmalloc (PBUFSIZ + 1);
   cs->client_breakpoints = NULL;
   client_states.current_cs = cs;
   cs->ss->attach_count_ = 0;
@@ -486,7 +487,7 @@ static int queue_stop_reply_callback (struct inferior_list_entry *entry, void *a
 static void
 resolve_waiter (client_state *cs, client_state *waitee_cs)
 {
-  enum packet_types this_packet_type = (cs->packet_type) ? cs->packet_type : cs->last_packet_type;
+  enum packet_types this_packet_type = (enum packet_types)((cs->packet_type) ? cs->packet_type : cs->last_packet_type);
   client_state *save_client_state;
 
   save_client_state = client_states.current_cs;
@@ -552,13 +553,13 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
 	  && last_status.kind != TARGET_WAITKIND_STOPPED)
 	{
 	  char *notif_buf, *out_buf;
-	  notif_buf = alloca (PBUFSIZ + 1);
+	  notif_buf = (char*) alloca (PBUFSIZ + 1);
 	  write_ok (notif_buf);
 	  putpkt (notif_buf);
 
 	  find_inferior (&all_threads, queue_stop_reply_callback, NULL);
 	  notif_write_event (&notif_stop, notif_buf);
-	  out_buf = alloca (strlen (notif_buf) + 8);
+	  out_buf = (char*) alloca (strlen (notif_buf) + 8);
 	  /* TODO Use Defined notif constant */
 	  strcpy (out_buf, "Stop:");
 	  strcat (out_buf, notif_buf);
@@ -790,7 +791,7 @@ notify_clients (char *buffer, int have_first_notify)
   client_state *same_pid_cs = NULL;
   int save_client_fd = client_states.current_fd;
   client_state *save_client_cs = client_states.current_cs;
-  char *okay_buf = alloca (4);
+  char *okay_buf = (char*) alloca (4);
   int have_syscall = 0;
 
   dump_client_state (__FUNCTION__, "");
@@ -868,7 +869,7 @@ notify_clients (char *buffer, int have_first_notify)
 	      else
 		{
 		  /* send notify after we receive vStopped */
-		  same_pid_cs->notify_buffer_ = xmalloc (strlen (buffer) + 1);
+		  same_pid_cs->notify_buffer_ = (char*) xmalloc (strlen (buffer) + 1);
 		  memcpy (same_pid_cs->notify_buffer_, buffer, strlen (buffer) + 1);
 		}
 	    }
@@ -2175,14 +2176,16 @@ handle_monitor_command (char *mon, char *own_buf)
 			csidx->file_desc, target_pid_to_str (csidx->new_general_thread),
 			last_status.kind != TARGET_WAITKIND_IGNORE ? waitkind_str[last_status.kind] : "", 
 			pending_types_str[csidx->pending]);
-	      strlen (old_result) ? free (old_result) : 0;
+	      if (strlen (old_result)) 
+		free (old_result);
 	      old_result = result;
 	      if (csidx->packet_type)
 		asprintf (&result, "%s with a current %s request\n", result, 
 			  packet_types_str[csidx->packet_type]);
 	      else
 		asprintf (&result, "%s\n", result);
-	      strlen (old_result) ? free (old_result) : 0;
+	      if (strlen (old_result)) 
+		free (old_result);
 	    }
 	}
       if (strlen (result) > 0)
@@ -3943,7 +3946,7 @@ handle_v_kill (char *own_buf)
 }
 
 /* Handle all of the extended 'v' packets.  */
-static void
+void
 handle_v_requests (char *own_buf, int packet_len, int *new_packet_len)
 {
   if (!disable_packet_vCont)
@@ -4832,15 +4835,6 @@ main (int argc, char *argv[])
   gdb_assert_not_reached ("captured_main should never return");
 }
 
-/* Skip PACKET until the next semi-colon (or end of string).  */
-
-static void
-skip_to_semicolon (char **packet)
-{
-  while (**packet != '\0' && **packet != ';')
-    (*packet)++;
-}
-
 /* Process options coming from Z packets for a breakpoint.  PACKET is
    the packet buffer.  *PACKET is updated to point to the first char
    after the last processed option.  */
@@ -4868,7 +4862,7 @@ process_point_options (struct breakpoint *bp, char **packet)
 	  if (debug_threads)
 	    debug_printf ("Found breakpoint condition.\n");
 	  if (!add_breakpoint_condition (bp, &dataptr))
-	    skip_to_semicolon (&dataptr);
+	    dataptr = strchrnul (dataptr, ';');
 	}
       else if (startswith (dataptr, "cmds:"))
 	{
@@ -4878,14 +4872,14 @@ process_point_options (struct breakpoint *bp, char **packet)
 	  persist = (*dataptr == '1');
 	  dataptr += 2;
 	  if (add_breakpoint_commands (bp, &dataptr, persist))
-	    skip_to_semicolon (&dataptr);
+	    dataptr = strchrnul (dataptr, ';');
 	}
       else
 	{
 	  fprintf (stderr, "Unknown token %c, ignoring.\n",
 		   *dataptr);
 	  /* Skip tokens until we find one that we recognize.  */
-	  skip_to_semicolon (&dataptr);
+	  dataptr = strchrnul (dataptr, ';');
 	}
     }
   *packet = dataptr;

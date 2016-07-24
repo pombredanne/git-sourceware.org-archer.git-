@@ -72,6 +72,7 @@ extern int disable_packet_Tthread;
 extern int disable_packet_qC;
 extern int disable_packet_qfThreadInfo;
 
+  // extern char *own_buf;
 #if USE_WIN32API
 #include <winsock2.h>
 typedef SOCKET gdb_fildes_t;
@@ -82,6 +83,8 @@ typedef int gdb_fildes_t;
 #include "event-loop.h"
 
 /* Functions from server.c.  */
+extern void handle_v_requests (char *own_buf, int packet_len,
+			       int *new_packet_len);
 extern int handle_serial_event (int err, gdb_client_data client_data);
 extern int handle_target_event (int err, gdb_client_data client_data);
 extern int notify_clients (char *buffer, int first);
@@ -228,6 +231,7 @@ struct client_state
   int program_signals_[GDB_SIGNAL_LAST];
   int program_signals_p_;
   char *notify_buffer_;
+  /* Renamed from own_buf to avoid macro name conflict with a common local variable name */
   char *own_buffer_;
 
   /* from remote-utils.c */
@@ -252,7 +256,7 @@ struct client_states
 
 client_state * get_client_state ();
 client_state * set_client_state (gdb_fildes_t);
-int have_multiple_clients();
+int have_multiple_clients (gdb_fildes_t fd);
 void delete_client_state (gdb_fildes_t fd);
 
 

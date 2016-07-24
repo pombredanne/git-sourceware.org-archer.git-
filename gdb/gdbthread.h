@@ -136,11 +136,6 @@ struct thread_control_state
      at.  */
   bpstat stop_bpstat;
 
-  /* The interpreter that issued the execution command.  NULL if the
-     thread was resumed as a result of a command applied to some other
-     thread (e.g., "next" with scheduler-locking off).  */
-  struct interp *command_interp;
-
   /* Whether the command that started the thread was a stepping
      command.  This is used to decide whether "set scheduler-locking
      step" behaves like "on" or "off".  */
@@ -629,6 +624,11 @@ extern void thread_cancel_execution_command (struct thread_info *thr);
    thread at this point.  If not, throw an error (e.g., the thread is
    executing).  */
 extern void validate_registers_access (void);
+
+/* Returns whether to show which thread hit the breakpoint, received a
+   signal, etc. and ended up causing a user-visible stop.  This is
+   true iff we ever detected multiple threads.  */
+extern int show_thread_that_caused_stop (void);
 
 extern struct thread_info *thread_list;
 
