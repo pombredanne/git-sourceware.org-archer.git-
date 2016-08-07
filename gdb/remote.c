@@ -70,6 +70,7 @@
 #include "ax-gdb.h"
 #include "agent.h"
 #include "btrace.h"
+#include "record-btrace.h"
 
 /* Temp hacks for tracepoint encoding migration.  */
 static char *target_buf;
@@ -230,6 +231,8 @@ static int remote_supports_cond_breakpoints (struct target_ops *self);
 static int remote_can_run_breakpoint_commands (struct target_ops *self);
 
 static void remote_btrace_reset (void);
+
+static void remote_btrace_maybe_reopen (void);
 
 static int stop_reply_queue_length (void);
 
@@ -4298,6 +4301,10 @@ remote_start_remote (int from_tty, struct target_ops *target, int extended_p)
       merge_uploaded_tracepoints (&uploaded_tps);
     }
 
+  /* Possibly the target has been engaged in a btrace record started
+     previously; find out where things are at.  */
+  remote_btrace_maybe_reopen ();
+
   /* The thread and inferior lists are now synchronized with the
      target, our symbols have been relocated, and we're merged the
      target's tracepoints with ours.  We're done with basic start
@@ -5134,15 +5141,7 @@ remote_detach_1 (const char *args, int from_tty)
   if (!target_has_execution)
     error (_("No process to detach from."));
 
-  if (from_tty)
-    {
-      char *exec_file = get_exec_file (0);
-      if (exec_file == NULL)
-	exec_file = "";
-      printf_unfiltered (_("Detaching from program: %s, %s\n"), exec_file,
-			 target_pid_to_str (pid_to_ptid (pid)));
-      gdb_flush (gdb_stdout);
-    }
+  target_announce_detach (from_tty);
 
   /* Tell the remote target to detach.  */
   remote_detach_pid (pid);
@@ -10160,6 +10159,14 @@ remote_xfer_partial (struct target_ops *ops, enum target_object object,
   return TARGET_XFER_OK;
 }
 
+/* Implementation of to_get_memory_xfer_limit.  */
+
+static ULONGEST
+remote_get_memory_xfer_limit (struct target_ops *ops)
+{
+  return get_memory_write_packet_size ();
+}
+
 static int
 remote_search_memory (struct target_ops* ops,
 		      CORE_ADDR start_addr, ULONGEST search_space_len,
@@ -12774,6 +12781,60 @@ btrace_read_config (struct btrace_config *conf)
     }
 }
 
+/* Maybe reopen target btrace.  */
+
+static void
+remote_btrace_maybe_reopen (void)
+{
+  struct remote_state *rs = get_remote_state ();
+  struct cleanup *cleanup;
+  struct thread_info *tp;
+  int btrace_target_pushed = 0;
+  int warned = 0;
+
+  cleanup = make_cleanup_restore_current_thread ();
+  ALL_NON_EXITED_THREADS (tp)
+    {
+      set_general_thread (tp->ptid);
+
+      memset (&rs->btrace_config, 0x00, sizeof (struct btrace_config));
+      btrace_read_config (&rs->btrace_config);
+
+      if (rs->btrace_config.format == BTRACE_FORMAT_NONE)
+	continue;
+
+#if !defined (HAVE_LIBIPT)
+      if (rs->btrace_config.format == BTRACE_FORMAT_PT)
+	{
+	  if (!warned)
+	    {
+	      warned = 1;
+	      warning (_("GDB does not support Intel Processor Trace. "
+			 "\"record\" will not work in this session."));
+	    }
+
+	  continue;
+	}
+#endif /* !defined (HAVE_LIBIPT) */
+
+      /* Push target, once, but before anything else happens.  This way our
+	 changes to the threads will be cleaned up by unpushing the target
+	 in case btrace_read_config () throws.  */
+      if (!btrace_target_pushed)
+	{
+	  btrace_target_pushed = 1;
+	  record_btrace_push_target ();
+	  printf_filtered (_("Target is recording using %s.\n"),
+			   btrace_format_string (rs->btrace_config.format));
+	}
+
+      tp->btrace.target = XCNEW (struct btrace_target_info);
+      tp->btrace.target->ptid = tp->ptid;
+      tp->btrace.target->conf = rs->btrace_config;
+    }
+  do_cleanups (cleanup);
+}
+
 /* Enable branch tracing.  */
 
 static struct btrace_target_info *
@@ -13073,6 +13134,7 @@ Specify the serial device it is connected to\n\
   remote_ops.to_interrupt = remote_interrupt;
   remote_ops.to_pass_ctrlc = remote_pass_ctrlc;
   remote_ops.to_xfer_partial = remote_xfer_partial;
+  remote_ops.to_get_memory_xfer_limit = remote_get_memory_xfer_limit;
   remote_ops.to_rcmd = remote_rcmd;
   remote_ops.to_pid_to_exec_file = remote_pid_to_exec_file;
   remote_ops.to_log_command = serial_log_command;

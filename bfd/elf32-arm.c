@@ -2138,6 +2138,8 @@ typedef unsigned short int insn16;
 
 #define STUB_ENTRY_NAME   "__%s_veneer"
 
+#define CMSE_PREFIX "__acle_se_"
+
 /* The name of the dynamic interpreter.  This is put in the .interp
    section.  */
 #define ELF_DYNAMIC_INTERPRETER     "/usr/lib/ld.so.1"
@@ -2360,6 +2362,8 @@ enum stub_insn_type
    is inserted in arm_build_one_stub().  */
 #define THUMB16_BCOND_INSN(X)	{(X), THUMB16_TYPE, R_ARM_NONE, 1}
 #define THUMB32_INSN(X)		{(X), THUMB32_TYPE, R_ARM_NONE, 0}
+#define THUMB32_MOVT(X)		{(X), THUMB32_TYPE, R_ARM_THM_MOVT_ABS, 0}
+#define THUMB32_MOVW(X)		{(X), THUMB32_TYPE, R_ARM_THM_MOVW_ABS_NC, 0}
 #define THUMB32_B_INSN(X, Z)	{(X), THUMB32_TYPE, R_ARM_THM_JUMP24, (Z)}
 #define ARM_INSN(X)		{(X), ARM_TYPE, R_ARM_NONE, 0}
 #define ARM_REL_INSN(X, Z)	{(X), ARM_TYPE, R_ARM_JUMP24, (Z)}
@@ -2407,6 +2411,15 @@ static const insn_sequence elf32_arm_stub_long_branch_thumb2_only[] =
 {
   THUMB32_INSN (0xf85ff000),         /* ldr.w  pc, [pc, #-0] */
   DATA_WORD (0, R_ARM_ABS32, 0),     /* dcd  R_ARM_ABS32(x) */
+};
+
+/* Thumb -> Thumb long branch stub. Used for PureCode sections on Thumb2
+   M-profile architectures.  */
+static const insn_sequence elf32_arm_stub_long_branch_thumb2_only_pure[] =
+{
+  THUMB32_MOVW (0xf2400c00),	     /* mov.w ip, R_ARM_MOVW_ABS_NC */
+  THUMB32_MOVT (0xf2c00c00),	     /* movt  ip, R_ARM_MOVT_ABS << 16 */
+  THUMB16_INSN (0x4760),             /* bx   ip */
 };
 
 /* V4T Thumb -> Thumb long branch stub. Using the stack is not
@@ -2550,6 +2563,13 @@ static const insn_sequence elf32_arm_stub_long_branch_arm_nacl_pic[] =
   DATA_WORD (0, R_ARM_NONE, 0),         /* .word 0 */
 };
 
+/* Stub used for transition to secure state (aka SG veneer).  */
+static const insn_sequence elf32_arm_stub_cmse_branch_thumb_only[] =
+{
+  THUMB32_INSN (0xe97fe97f),		/* sg.  */
+  THUMB32_B_INSN (0xf000b800, -4),	/* b.w original_branch_dest.  */
+};
+
 
 /* Cortex-A8 erratum-workaround stubs.  */
 
@@ -2629,11 +2649,13 @@ static const insn_sequence elf32_arm_stub_a8_veneer_blx[] =
   DEF_STUB(long_branch_v4t_thumb_tls_pic) \
   DEF_STUB(long_branch_arm_nacl) \
   DEF_STUB(long_branch_arm_nacl_pic) \
+  DEF_STUB(cmse_branch_thumb_only) \
   DEF_STUB(a8_veneer_b_cond) \
   DEF_STUB(a8_veneer_b) \
   DEF_STUB(a8_veneer_bl) \
   DEF_STUB(a8_veneer_blx) \
   DEF_STUB(long_branch_thumb2_only) \
+  DEF_STUB(long_branch_thumb2_only_pure)
 
 #define DEF_STUB(x) arm_stub_##x,
 enum elf32_arm_stub_type
@@ -3122,6 +3144,10 @@ struct elf32_arm_link_hash_table
   /* True if the target uses REL relocations.  */
   int use_rel;
 
+  /* Nonzero if import library must be a secure gateway import library
+     as per ARMv8-M Security Extensions.  */
+  int cmse_implib;
+
   /* The index of the next unused R_ARM_TLS_DESC slot in .rel.plt.  */
   bfd_vma next_tls_desc_index;
 
@@ -3179,6 +3205,9 @@ struct elf32_arm_link_hash_table
   /* Array to keep track of which stub sections have been created, and
      information on stub grouping.  */
   struct map_stub *stub_group;
+
+  /* Input stub section holding secure gateway veneers.  */
+  asection *cmse_stub_sec;
 
   /* Number of elements in stub_group.  */
   unsigned int top_id;
@@ -3328,11 +3357,15 @@ elf32_arm_create_local_iplt (bfd *abfd, unsigned long r_symndx)
    union and *ARM_PLT at the ARM-specific information.  */
 
 static bfd_boolean
-elf32_arm_get_plt_info (bfd *abfd, struct elf32_arm_link_hash_entry *h,
+elf32_arm_get_plt_info (bfd *abfd, struct elf32_arm_link_hash_table *globals,
+			struct elf32_arm_link_hash_entry *h,
 			unsigned long r_symndx, union gotplt_union **root_plt,
 			struct arm_plt_info **arm_plt)
 {
   struct arm_local_iplt_info *local_iplt;
+
+  if (globals->root.splt == NULL && globals->root.iplt == NULL)
+    return FALSE;
 
   if (h != NULL)
     {
@@ -3569,6 +3602,24 @@ using_thumb2 (struct elf32_arm_link_hash_table *globals)
 	  || arch == TAG_CPU_ARCH_V8M_MAIN);
 }
 
+/* Determine whether Thumb-2 BL instruction is available.  */
+
+static bfd_boolean
+using_thumb2_bl (struct elf32_arm_link_hash_table *globals)
+{
+  int arch =
+    bfd_elf_get_obj_attr_int (globals->obfd, OBJ_ATTR_PROC, Tag_CPU_arch);
+
+  /* Force return logic to be reviewed for each new architecture.  */
+  BFD_ASSERT (arch <= TAG_CPU_ARCH_V8
+	      || arch == TAG_CPU_ARCH_V8M_BASE
+	      || arch == TAG_CPU_ARCH_V8M_MAIN);
+
+  /* Architecture was introduced after ARMv6T2 (eg. ARMv6-M).  */
+  return (arch == TAG_CPU_ARCH_V6T2
+	  || arch >= TAG_CPU_ARCH_V7);
+}
+
 /* Create .plt, .rel(a).plt, .got, .got.plt, .rel(a).got, .dynbss, and
    .rel(a).bss sections in DYNOBJ, and set up shortcuts to them in our
    hash table.  */
@@ -3790,11 +3841,13 @@ arm_stub_is_thumb (enum elf32_arm_stub_type stub_type)
     {
     case arm_stub_long_branch_thumb_only:
     case arm_stub_long_branch_thumb2_only:
+    case arm_stub_long_branch_thumb2_only_pure:
     case arm_stub_long_branch_v4t_thumb_arm:
     case arm_stub_short_branch_v4t_thumb_arm:
     case arm_stub_long_branch_v4t_thumb_arm_pic:
     case arm_stub_long_branch_v4t_thumb_tls_pic:
     case arm_stub_long_branch_thumb_only_pic:
+    case arm_stub_cmse_branch_thumb_only:
       return TRUE;
     case arm_stub_none:
       BFD_FAIL ();
@@ -3823,13 +3876,14 @@ arm_type_of_stub (struct bfd_link_info *info,
   bfd_signed_vma branch_offset;
   unsigned int r_type;
   struct elf32_arm_link_hash_table * globals;
-  int thumb2;
-  int thumb_only;
+  bfd_boolean thumb2, thumb2_bl, thumb_only;
   enum elf32_arm_stub_type stub_type = arm_stub_none;
   int use_plt = 0;
   enum arm_st_branch_type branch_type = *actual_branch_type;
   union gotplt_union *root_plt;
   struct arm_plt_info *arm_plt;
+  int arch;
+  int thumb2_movw;
 
   if (branch_type == ST_BRANCH_LONG)
     return stub_type;
@@ -3839,8 +3893,13 @@ arm_type_of_stub (struct bfd_link_info *info,
     return stub_type;
 
   thumb_only = using_thumb_only (globals);
-
   thumb2 = using_thumb2 (globals);
+  thumb2_bl = using_thumb2_bl (globals);
+
+  arch = bfd_elf_get_obj_attr_int (globals->obfd, OBJ_ATTR_PROC, Tag_CPU_arch);
+
+  /* True for architectures that implement the thumb2 movw instruction.  */
+  thumb2_movw = thumb2 || (arch  == TAG_CPU_ARCH_V8M_BASE);
 
   /* Determine where the call point is.  */
   location = (input_sec->output_offset
@@ -3860,8 +3919,9 @@ arm_type_of_stub (struct bfd_link_info *info,
      the address of the appropriate trampoline.  */
   if (r_type != R_ARM_TLS_CALL
       && r_type != R_ARM_THM_TLS_CALL
-      && elf32_arm_get_plt_info (input_bfd, hash, ELF32_R_SYM (rel->r_info),
-				 &root_plt, &arm_plt)
+      && elf32_arm_get_plt_info (input_bfd, globals, hash,
+				 ELF32_R_SYM (rel->r_info), &root_plt,
+				 &arm_plt)
       && root_plt->offset != (bfd_vma) -1)
     {
       asection *splt;
@@ -3906,10 +3966,10 @@ arm_type_of_stub (struct bfd_link_info *info,
 	   but only if this call is not through a PLT entry. Indeed,
 	   PLT stubs handle mode switching already.
       */
-      if ((!thumb2
+      if ((!thumb2_bl
 	    && (branch_offset > THM_MAX_FWD_BRANCH_OFFSET
 		|| (branch_offset < THM_MAX_BWD_BRANCH_OFFSET)))
-	  || (thumb2
+	  || (thumb2_bl
 	      && (branch_offset > THM2_MAX_FWD_BRANCH_OFFSET
 		  || (branch_offset < THM2_MAX_BWD_BRANCH_OFFSET)))
 	  || (thumb2
@@ -3928,6 +3988,15 @@ arm_type_of_stub (struct bfd_link_info *info,
 	      /* Thumb to thumb.  */
 	      if (!thumb_only)
 		{
+		  if (input_sec->flags & SEC_ELF_PURECODE)
+		    (*_bfd_error_handler) (_("%B(%s): warning: long branch "
+					     " veneers used in section with "
+					     "SHF_ARM_PURECODE section "
+					     "attribute is only supported"
+					     " for M-profile targets that "
+					     "implement the movw "
+					     "instruction."));
+
 		  stub_type = (bfd_link_pic (info) | globals->pic_veneer)
 		    /* PIC stubs.  */
 		    ? ((globals->use_blx
@@ -3950,16 +4019,39 @@ arm_type_of_stub (struct bfd_link_info *info,
 		}
 	      else
 		{
-		  stub_type = (bfd_link_pic (info) | globals->pic_veneer)
-		    /* PIC stub.  */
-		    ? arm_stub_long_branch_thumb_only_pic
-		    /* non-PIC stub.  */
-		    : (thumb2 ? arm_stub_long_branch_thumb2_only
-			      : arm_stub_long_branch_thumb_only);
+		  if (thumb2_movw && (input_sec->flags & SEC_ELF_PURECODE))
+		      stub_type = arm_stub_long_branch_thumb2_only_pure;
+		  else
+		    {
+		      if (input_sec->flags & SEC_ELF_PURECODE)
+			(*_bfd_error_handler) (_("%B(%s): warning: long branch "
+						 " veneers used in section with "
+						 "SHF_ARM_PURECODE section "
+						 "attribute is only supported"
+						 " for M-profile targets that "
+						 "implement the movw "
+						 "instruction."));
+
+		      stub_type = (bfd_link_pic (info) | globals->pic_veneer)
+			/* PIC stub.  */
+			? arm_stub_long_branch_thumb_only_pic
+			/* non-PIC stub.  */
+			: (thumb2 ? arm_stub_long_branch_thumb2_only
+				  : arm_stub_long_branch_thumb_only);
+		    }
 		}
 	    }
 	  else
 	    {
+	      if (input_sec->flags & SEC_ELF_PURECODE)
+		(*_bfd_error_handler) (_("%B(%s): warning: long branch "
+					 " veneers used in section with "
+					 "SHF_ARM_PURECODE section "
+					 "attribute is only supported"
+					 " for M-profile targets that "
+					 "implement the movw "
+					 "instruction."));
+
 	      /* Thumb to arm.  */
 	      if (sym_sec != NULL
 		  && sym_sec->owner != NULL
@@ -4004,6 +4096,14 @@ arm_type_of_stub (struct bfd_link_info *info,
 	   || r_type == R_ARM_PLT32
 	   || r_type == R_ARM_TLS_CALL)
     {
+      if (input_sec->flags & SEC_ELF_PURECODE)
+	(*_bfd_error_handler) (_("%B(%s): warning: long branch "
+				 " veneers used in section with "
+				 "SHF_ARM_PURECODE section "
+				 "attribute is only supported"
+				 " for M-profile targets that "
+				 "implement the movw "
+				 "instruction."));
       if (branch_type == ST_BRANCH_TO_THUMB)
 	{
 	  /* Arm to thumb.  */
@@ -4173,7 +4273,16 @@ arm_dedicated_stub_output_section_required (enum elf32_arm_stub_type stub_type)
   if (stub_type >= max_stub_type)
     abort ();  /* Should be unreachable.  */
 
-  return FALSE;
+  switch (stub_type)
+    {
+    case arm_stub_cmse_branch_thumb_only:
+      return TRUE;
+
+    default:
+      return FALSE;
+    }
+
+  abort ();  /* Should be unreachable.  */
 }
 
 /* Required alignment (as a power of 2) for the dedicated section holding
@@ -4187,8 +4296,19 @@ arm_dedicated_stub_output_section_required_alignment
   if (stub_type >= max_stub_type)
     abort ();  /* Should be unreachable.  */
 
-  BFD_ASSERT (!arm_dedicated_stub_output_section_required (stub_type));
-  return 0;
+  switch (stub_type)
+    {
+    /* Vectors of Secure Gateway veneers must be aligned on 32byte
+       boundary.  */
+    case arm_stub_cmse_branch_thumb_only:
+      return 5;
+
+    default:
+      BFD_ASSERT (!arm_dedicated_stub_output_section_required (stub_type));
+      return 0;
+    }
+
+  abort ();  /* Should be unreachable.  */
 }
 
 /* Name of the dedicated output section to put veneers of type STUB_TYPE, or
@@ -4200,8 +4320,17 @@ arm_dedicated_stub_output_section_name (enum elf32_arm_stub_type stub_type)
   if (stub_type >= max_stub_type)
     abort ();  /* Should be unreachable.  */
 
-  BFD_ASSERT (!arm_dedicated_stub_output_section_required (stub_type));
-  return NULL;
+  switch (stub_type)
+    {
+    case arm_stub_cmse_branch_thumb_only:
+      return ".gnu.sgstubs";
+
+    default:
+      BFD_ASSERT (!arm_dedicated_stub_output_section_required (stub_type));
+      return NULL;
+    }
+
+  abort ();  /* Should be unreachable.  */
 }
 
 /* If veneers of type STUB_TYPE should go in a dedicated output section,
@@ -4209,15 +4338,23 @@ arm_dedicated_stub_output_section_name (enum elf32_arm_stub_type stub_type)
    corresponding input section.  Otherwise, returns NULL.  */
 
 static asection **
-arm_dedicated_stub_input_section_ptr
-  (struct elf32_arm_link_hash_table *htab ATTRIBUTE_UNUSED,
-   enum elf32_arm_stub_type stub_type)
+arm_dedicated_stub_input_section_ptr (struct elf32_arm_link_hash_table *htab,
+				      enum elf32_arm_stub_type stub_type)
 {
   if (stub_type >= max_stub_type)
     abort ();  /* Should be unreachable.  */
 
-  BFD_ASSERT (!arm_dedicated_stub_output_section_required (stub_type));
-  return NULL;
+  switch (stub_type)
+    {
+    case arm_stub_cmse_branch_thumb_only:
+      return &htab->cmse_stub_sec;
+
+    default:
+      BFD_ASSERT (!arm_dedicated_stub_output_section_required (stub_type));
+      return NULL;
+    }
+
+  abort ();  /* Should be unreachable.  */
 }
 
 /* Find or create a stub section to contain a stub of type STUB_TYPE.  SECTION
@@ -4429,6 +4566,7 @@ arm_stub_required_alignment (enum elf32_arm_stub_type stub_type)
     case arm_stub_long_branch_v4t_arm_thumb:
     case arm_stub_long_branch_thumb_only:
     case arm_stub_long_branch_thumb2_only:
+    case arm_stub_long_branch_thumb2_only_pure:
     case arm_stub_long_branch_v4t_thumb_thumb:
     case arm_stub_long_branch_v4t_thumb_arm:
     case arm_stub_short_branch_v4t_thumb_arm:
@@ -4440,6 +4578,7 @@ arm_stub_required_alignment (enum elf32_arm_stub_type stub_type)
     case arm_stub_long_branch_thumb_only_pic:
     case arm_stub_long_branch_any_tls_pic:
     case arm_stub_long_branch_v4t_thumb_tls_pic:
+    case arm_stub_cmse_branch_thumb_only:
     case arm_stub_a8_veneer_blx:
       return 4;
 
@@ -4461,7 +4600,16 @@ arm_stub_sym_claimed (enum elf32_arm_stub_type stub_type)
   if (stub_type >= max_stub_type)
     abort ();  /* Should be unreachable.  */
 
-  return FALSE;
+  switch (stub_type)
+    {
+    case arm_stub_cmse_branch_thumb_only:
+      return TRUE;
+
+    default:
+      return FALSE;
+    }
+
+  abort ();  /* Should be unreachable.  */
 }
 
 /* Returns the padding needed for the dedicated section used stubs of type
@@ -4473,7 +4621,16 @@ arm_dedicated_stub_section_padding (enum elf32_arm_stub_type stub_type)
   if (stub_type >= max_stub_type)
     abort ();  /* Should be unreachable.  */
 
-  return 0;
+  switch (stub_type)
+    {
+    case arm_stub_cmse_branch_thumb_only:
+      return 32;
+
+    default:
+      return 0;
+    }
+
+  abort ();  /* Should be unreachable.  */
 }
 
 static bfd_boolean
@@ -5364,6 +5521,204 @@ elf32_arm_create_stub (struct elf32_arm_link_hash_table *htab,
   return TRUE;
 }
 
+/* Scan symbols in INPUT_BFD to identify secure entry functions needing a
+   gateway veneer to transition from non secure to secure state and create them
+   accordingly.
+
+   "ARMv8-M Security Extensions: Requirements on Development Tools" document
+   defines the conditions that govern Secure Gateway veneer creation for a
+   given symbol <SYM> as follows:
+   - it has function type
+   - it has non local binding
+   - a symbol named __acle_se_<SYM> (called special symbol) exists with the
+     same type, binding and value as <SYM> (called normal symbol).
+   An entry function can handle secure state transition itself in which case
+   its special symbol would have a different value from the normal symbol.
+
+   OUT_ATTR gives the output attributes, SYM_HASHES the symbol index to hash
+   entry mapping while HTAB gives the name to hash entry mapping.
+
+   If any secure gateway veneer is created, *STUB_CHANGED is set to TRUE.  The
+   return value gives whether a stub failed to be allocated.  */
+
+static bfd_boolean
+cmse_scan (bfd *input_bfd, struct elf32_arm_link_hash_table *htab,
+	   obj_attribute *out_attr, struct elf_link_hash_entry **sym_hashes,
+	   bfd_boolean *stub_changed)
+{
+  const struct elf_backend_data *bed;
+  Elf_Internal_Shdr *symtab_hdr;
+  unsigned i, j, sym_count, ext_start;
+  Elf_Internal_Sym *cmse_sym, *local_syms;
+  struct elf32_arm_link_hash_entry *hash, *cmse_hash = NULL;
+  enum arm_st_branch_type branch_type;
+  char *sym_name, *lsym_name;
+  bfd_vma sym_value;
+  asection *section;
+  bfd_boolean is_v8m, new_stub, created_stub, cmse_invalid, ret = TRUE;
+
+  bed = get_elf_backend_data (input_bfd);
+  symtab_hdr = &elf_tdata (input_bfd)->symtab_hdr;
+  sym_count = symtab_hdr->sh_size / bed->s->sizeof_sym;
+  ext_start = symtab_hdr->sh_info;
+  is_v8m = (out_attr[Tag_CPU_arch].i >= TAG_CPU_ARCH_V8M_BASE
+	    && out_attr[Tag_CPU_arch_profile].i == 'M');
+
+  local_syms = (Elf_Internal_Sym *) symtab_hdr->contents;
+  if (local_syms == NULL)
+    local_syms = bfd_elf_get_elf_syms (input_bfd, symtab_hdr,
+				       symtab_hdr->sh_info, 0, NULL, NULL,
+				       NULL);
+  if (symtab_hdr->sh_info && local_syms == NULL)
+    return FALSE;
+
+  /* Scan symbols.  */
+  for (i = 0; i < sym_count; i++)
+    {
+      cmse_invalid = FALSE;
+
+      if (i < ext_start)
+	{
+	  cmse_sym = &local_syms[i];
+	  /* Not a special symbol.  */
+	  if (!ARM_GET_SYM_CMSE_SPCL (cmse_sym->st_target_internal))
+	    continue;
+	  sym_name = bfd_elf_string_from_elf_section (input_bfd,
+						      symtab_hdr->sh_link,
+						      cmse_sym->st_name);
+	  /* Special symbol with local binding.  */
+	  cmse_invalid = TRUE;
+	}
+      else
+	{
+	  cmse_hash = elf32_arm_hash_entry (sym_hashes[i - ext_start]);
+	  sym_name = (char *) cmse_hash->root.root.root.string;
+
+	  /* Not a special symbol.  */
+	  if (!ARM_GET_SYM_CMSE_SPCL (cmse_hash->root.target_internal))
+	    continue;
+
+	  /* Special symbol has incorrect binding or type.  */
+	  if ((cmse_hash->root.root.type != bfd_link_hash_defined
+	       && cmse_hash->root.root.type != bfd_link_hash_defweak)
+	      || cmse_hash->root.type != STT_FUNC)
+	    cmse_invalid = TRUE;
+	}
+
+      if (!is_v8m)
+	{
+	  (*_bfd_error_handler) (_("%B: Special symbol `%s' only allowed for "
+				   "ARMv8-M architecture or later."),
+				 input_bfd, sym_name);
+	  is_v8m = TRUE; /* Avoid multiple warning.  */
+	  ret = FALSE;
+	}
+
+      if (cmse_invalid)
+	{
+	  (*_bfd_error_handler) (_("%B: invalid special symbol `%s'."),
+				 input_bfd, sym_name);
+	  (*_bfd_error_handler) (_("It must be a global or weak function "
+				   "symbol."));
+	  ret = FALSE;
+	  if (i < ext_start)
+	    continue;
+	}
+
+      sym_name += strlen (CMSE_PREFIX);
+      hash = (struct elf32_arm_link_hash_entry *)
+	elf_link_hash_lookup (&(htab)->root, sym_name, FALSE, FALSE, TRUE);
+
+      /* No associated normal symbol or it is neither global nor weak.  */
+      if (!hash
+	  || (hash->root.root.type != bfd_link_hash_defined
+	      && hash->root.root.type != bfd_link_hash_defweak)
+	  || hash->root.type != STT_FUNC)
+	{
+	  /* Initialize here to avoid warning about use of possibly
+	     uninitialized variable.  */
+	  j = 0;
+
+	  if (!hash)
+	    {
+	      /* Searching for a normal symbol with local binding.  */
+	      for (; j < ext_start; j++)
+		{
+		  lsym_name =
+		    bfd_elf_string_from_elf_section (input_bfd,
+						     symtab_hdr->sh_link,
+						     local_syms[j].st_name);
+		  if (!strcmp (sym_name, lsym_name))
+		    break;
+		}
+	    }
+
+	  if (hash || j < ext_start)
+	    {
+	      (*_bfd_error_handler)
+		(_("%B: invalid standard symbol `%s'."), input_bfd, sym_name);
+	      (*_bfd_error_handler)
+		(_("It must be a global or weak function symbol."));
+	    }
+	  else
+	    (*_bfd_error_handler)
+	      (_("%B: absent standard symbol `%s'."), input_bfd, sym_name);
+	  ret = FALSE;
+	  if (!hash)
+	    continue;
+	}
+
+      sym_value = hash->root.root.u.def.value;
+      section = hash->root.root.u.def.section;
+
+      if (cmse_hash->root.root.u.def.section != section)
+	{
+	  (*_bfd_error_handler)
+	    (_("%B: `%s' and its special symbol are in different sections."),
+	     input_bfd, sym_name);
+	  ret = FALSE;
+	}
+      if (cmse_hash->root.root.u.def.value != sym_value)
+	continue; /* Ignore: could be an entry function starting with SG.  */
+
+	/* If this section is a link-once section that will be discarded, then
+	   don't create any stubs.  */
+      if (section->output_section == NULL)
+	{
+	  (*_bfd_error_handler)
+	    (_("%B: entry function `%s' not output."), input_bfd, sym_name);
+	  continue;
+	}
+
+      if (hash->root.size == 0)
+	{
+	  (*_bfd_error_handler)
+	    (_("%B: entry function `%s' is empty."), input_bfd, sym_name);
+	  ret = FALSE;
+	}
+
+      if (!ret)
+	continue;
+      branch_type = ARM_GET_SYM_BRANCH_TYPE (hash->root.target_internal);
+      created_stub
+	= elf32_arm_create_stub (htab, arm_stub_cmse_branch_thumb_only,
+				 NULL, NULL, section, hash, sym_name,
+				 sym_value, branch_type, &new_stub);
+
+      if (!created_stub)
+	 ret = FALSE;
+      else
+	{
+	  BFD_ASSERT (new_stub);
+	  *stub_changed = TRUE;
+	}
+    }
+
+  if (!symtab_hdr->contents)
+    free (local_syms);
+  return ret;
+}
+
 /* Determine and set the size of the stub section for a final link.
 
    The basic idea here is to examine all the relocations looking for
@@ -5380,8 +5735,9 @@ elf32_arm_size_stubs (bfd *output_bfd,
 						      unsigned int),
 		      void (*layout_sections_again) (void))
 {
+  obj_attribute *out_attr;
   bfd_size_type stub_group_size;
-  bfd_boolean stubs_always_after_branch;
+  bfd_boolean m_profile, stubs_always_after_branch, first_veneer_scan = TRUE;
   struct elf32_arm_link_hash_table *htab = elf32_arm_hash_table (info);
   struct a8_erratum_fix *a8_fixes = NULL;
   unsigned int num_a8_fixes = 0, a8_fix_table_size = 10;
@@ -5410,6 +5766,8 @@ elf32_arm_size_stubs (bfd *output_bfd,
   htab->layout_sections_again = layout_sections_again;
   stubs_always_after_branch = group_size < 0;
 
+  out_attr = elf_known_obj_attributes_proc (output_bfd);
+  m_profile = out_attr[Tag_CPU_arch_profile].i == 'M';
   /* The Cortex-A8 erratum fix depends on stubs not being in the same 4K page
      as the first half of a 32-bit branch straddling two 4K pages.  This is a
      crude way of enforcing that.  */
@@ -5474,6 +5832,18 @@ elf32_arm_size_stubs (bfd *output_bfd,
 	  symtab_hdr = &elf_tdata (input_bfd)->symtab_hdr;
 	  if (symtab_hdr->sh_info == 0)
 	    continue;
+
+	  /* Limit scan of symbols to object file whose profile is
+	     Microcontroller to not hinder performance in the general case.  */
+	  if (m_profile && first_veneer_scan)
+	    {
+	      struct elf_link_hash_entry **sym_hashes;
+
+	      sym_hashes = elf_sym_hashes (input_bfd);
+	      if (!cmse_scan (input_bfd, htab, out_attr, sym_hashes,
+			      &stub_changed))
+		goto error_ret_free_local;
+	    }
 
 	  /* Walk over each section attached to the input bfd.  */
 	  for (section = input_bfd->sections;
@@ -5861,6 +6231,7 @@ elf32_arm_size_stubs (bfd *output_bfd,
 
       /* Ask the linker to do its stuff.  */
       (*htab->layout_sections_again) ();
+      first_veneer_scan = FALSE;
     }
 
   /* Add stubs for Cortex-A8 erratum fixes now.  */
@@ -7940,7 +8311,7 @@ bfd_elf32_arm_set_target_relocs (struct bfd *output_bfd,
 				 bfd_arm_stm32l4xx_fix stm32l4xx_fix,
 				 int no_enum_warn, int no_wchar_warn,
 				 int pic_veneer, int fix_cortex_a8,
-				 int fix_arm1176)
+				 int fix_arm1176, int cmse_implib)
 {
   struct elf32_arm_link_hash_table *globals;
 
@@ -7967,6 +8338,7 @@ bfd_elf32_arm_set_target_relocs (struct bfd *output_bfd,
   globals->pic_veneer = pic_veneer;
   globals->fix_cortex_a8 = fix_cortex_a8;
   globals->fix_arm1176 = fix_arm1176;
+  globals->cmse_implib = cmse_implib;
 
   BFD_ASSERT (is_arm_elf (output_bfd));
   elf_arm_tdata (output_bfd)->no_enum_size_warning = no_enum_warn;
@@ -9202,7 +9574,8 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
   /* Find out whether the symbol has a PLT.  Set ST_VALUE, BRANCH_TYPE and
      VALUE appropriately for relocations that we resolve at link time.  */
   has_iplt_entry = FALSE;
-  if (elf32_arm_get_plt_info (input_bfd, eh, r_symndx, &root_plt, &arm_plt)
+  if (elf32_arm_get_plt_info (input_bfd, globals, eh, r_symndx, &root_plt,
+			      &arm_plt)
       && root_plt->offset != (bfd_vma) -1)
     {
       plt_offset = root_plt->offset;
@@ -9838,6 +10211,7 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	bfd_signed_vma signed_check;
 	int bitsize;
 	const int thumb2 = using_thumb2 (globals);
+	const int thumb2_bl = using_thumb2_bl (globals);
 
 	/* A branch to an undefined weak symbol is turned into a jump to
 	   the next instruction unless a PLT entry will be created.
@@ -10014,7 +10388,7 @@ elf32_arm_final_link_relocate (reloc_howto_type *           howto,
 	   this relocation according to whether we're relocating for
 	   Thumb-2 or not.  */
 	bitsize = howto->bitsize;
-	if (!thumb2)
+	if (!thumb2_bl)
 	  bitsize -= 2;
 	reloc_signed_max = (1 << (bitsize - 1)) - 1;
 	reloc_signed_min = ~reloc_signed_max;
@@ -13614,7 +13988,8 @@ elf32_arm_gc_sweep_hook (bfd *                     abfd,
 	}
 
       if (may_need_local_target_p
-	  && elf32_arm_get_plt_info (abfd, eh, r_symndx, &root_plt, &arm_plt))
+	  && elf32_arm_get_plt_info (abfd, globals, eh, r_symndx, &root_plt,
+				     &arm_plt))
 	{
 	  /* If PLT refcount book-keeping is wrong and too low, we'll
 	     see a zero value (going to -1) for the root PLT reference
@@ -14082,7 +14457,11 @@ elf32_arm_check_relocs (bfd *abfd, struct bfd_link_info *info,
 }
 
 /* Unwinding tables are not referenced directly.  This pass marks them as
-   required if the corresponding code section is marked.  */
+   required if the corresponding code section is marked.  Similarly, ARMv8-M
+   secure entry functions can only be referenced by SG veneers which are
+   created after the GC process. They need to be marked in case they reside in
+   their own section (as would be the case if code was compiled with
+   -ffunction-sections).  */
 
 static bfd_boolean
 elf32_arm_gc_mark_extra_sections (struct bfd_link_info *info,
@@ -14090,9 +14469,20 @@ elf32_arm_gc_mark_extra_sections (struct bfd_link_info *info,
 {
   bfd *sub;
   Elf_Internal_Shdr **elf_shdrp;
-  bfd_boolean again;
+  asection *cmse_sec;
+  obj_attribute *out_attr;
+  Elf_Internal_Shdr *symtab_hdr;
+  unsigned i, sym_count, ext_start;
+  const struct elf_backend_data *bed;
+  struct elf_link_hash_entry **sym_hashes;
+  struct elf32_arm_link_hash_entry *cmse_hash;
+  bfd_boolean again, is_v8m, first_bfd_browse = TRUE;
 
   _bfd_elf_gc_mark_extra_sections (info, gc_mark_hook);
+
+  out_attr = elf_known_obj_attributes_proc (info->output_bfd);
+  is_v8m = out_attr[Tag_CPU_arch].i >= TAG_CPU_ARCH_V8M_BASE
+	   && out_attr[Tag_CPU_arch_profile].i == 'M';
 
   /* Marking EH data may cause additional code sections to be marked,
      requiring multiple passes.  */
@@ -14124,7 +14514,34 @@ elf32_arm_gc_mark_extra_sections (struct bfd_link_info *info,
 		    return FALSE;
 		}
 	    }
+
+	  /* Mark section holding ARMv8-M secure entry functions.  We mark all
+	     of them so no need for a second browsing.  */
+	  if (is_v8m && first_bfd_browse)
+	    {
+	      sym_hashes = elf_sym_hashes (sub);
+	      bed = get_elf_backend_data (sub);
+	      symtab_hdr = &elf_tdata (sub)->symtab_hdr;
+	      sym_count = symtab_hdr->sh_size / bed->s->sizeof_sym;
+	      ext_start = symtab_hdr->sh_info;
+
+	      /* Scan symbols.  */
+	      for (i = ext_start; i < sym_count; i++)
+		{
+		  cmse_hash = elf32_arm_hash_entry (sym_hashes[i - ext_start]);
+
+		  /* Assume it is a special symbol.  If not, cmse_scan will
+		     warn about it and user can do something about it.  */
+		  if (ARM_GET_SYM_CMSE_SPCL (cmse_hash->root.target_internal))
+		    {
+		      cmse_sec = cmse_hash->root.root.u.def.section;
+		      if (!_bfd_elf_gc_mark (info, cmse_sec, gc_mark_hook))
+			return FALSE;
+		    }
+		}
+	    }
 	}
+      first_bfd_browse = FALSE;
     }
 
   return TRUE;
@@ -15794,7 +16211,7 @@ elf32_arm_post_process_headers (bfd * abfd, struct bfd_link_info * link_info ATT
     }
 
   /* Scan segment to set p_flags attribute if it contains only sections with
-     SHF_ARM_NOREAD flag.  */
+     SHF_ARM_PURECODE flag.  */
   for (m = elf_seg_map (abfd); m != NULL; m = m->next)
     {
       unsigned int j;
@@ -15803,7 +16220,7 @@ elf32_arm_post_process_headers (bfd * abfd, struct bfd_link_info * link_info ATT
 	continue;
       for (j = 0; j < m->count; j++)
 	{
-	  if (!(elf_section_flags (m->sections[j]) & SHF_ARM_NOREAD))
+	  if (!(elf_section_flags (m->sections[j]) & SHF_ARM_PURECODE))
 	    break;
 	}
       if (j == m->count)
@@ -15866,8 +16283,8 @@ elf32_arm_fake_sections (bfd * abfd, Elf_Internal_Shdr * hdr, asection * sec)
       hdr->sh_flags |= SHF_LINK_ORDER;
     }
 
-  if (sec->flags & SEC_ELF_NOREAD)
-    hdr->sh_flags |= SHF_ARM_NOREAD;
+  if (sec->flags & SEC_ELF_PURECODE)
+    hdr->sh_flags |= SHF_ARM_PURECODE;
 
   return TRUE;
 }
@@ -16440,6 +16857,95 @@ elf32_arm_output_arch_local_syms (bfd *output_bfd,
     }
 
   return TRUE;
+}
+
+/* Filter normal symbols of CMSE entry functions of ABFD to include in
+   the import library.  All SYMCOUNT symbols of ABFD can be examined
+   from their pointers in SYMS.  Pointers of symbols to keep should be
+   stored continuously at the beginning of that array.
+
+   Returns the number of symbols to keep.  */
+
+static unsigned int
+elf32_arm_filter_cmse_symbols (bfd *abfd ATTRIBUTE_UNUSED,
+			       struct bfd_link_info *info,
+			       asymbol **syms, long symcount)
+{
+  size_t maxnamelen;
+  char *cmse_name;
+  long src_count, dst_count = 0;
+  struct elf32_arm_link_hash_table *htab;
+
+  htab = elf32_arm_hash_table (info);
+  if (!htab->stub_bfd || !htab->stub_bfd->sections)
+    symcount = 0;
+
+  maxnamelen = 128;
+  cmse_name = (char *) bfd_malloc (maxnamelen);
+  for (src_count = 0; src_count < symcount; src_count++)
+    {
+      struct elf32_arm_link_hash_entry *cmse_hash;
+      asymbol *sym;
+      flagword flags;
+      char *name;
+      size_t namelen;
+
+      sym = syms[src_count];
+      flags = sym->flags;
+      name = (char *) bfd_asymbol_name (sym);
+
+      if ((flags & BSF_FUNCTION) != BSF_FUNCTION)
+	continue;
+      if (!(flags & (BSF_GLOBAL | BSF_WEAK)))
+	continue;
+
+      namelen = strlen (name) + sizeof (CMSE_PREFIX) + 1;
+      if (namelen > maxnamelen)
+	{
+	  cmse_name = (char *)
+	    bfd_realloc (cmse_name, namelen);
+	  maxnamelen = namelen;
+	}
+      snprintf (cmse_name, maxnamelen, "%s%s", CMSE_PREFIX, name);
+      cmse_hash = (struct elf32_arm_link_hash_entry *)
+	elf_link_hash_lookup (&(htab)->root, cmse_name, FALSE, FALSE, TRUE);
+
+      if (!cmse_hash
+	  || (cmse_hash->root.root.type != bfd_link_hash_defined
+	      && cmse_hash->root.root.type != bfd_link_hash_defweak)
+	  || cmse_hash->root.type != STT_FUNC)
+	continue;
+
+      if (!ARM_GET_SYM_CMSE_SPCL (cmse_hash->root.target_internal))
+	continue;
+
+      syms[dst_count++] = sym;
+    }
+  free (cmse_name);
+
+  syms[dst_count] = NULL;
+
+  return dst_count;
+}
+
+/* Filter symbols of ABFD to include in the import library.  All
+   SYMCOUNT symbols of ABFD can be examined from their pointers in
+   SYMS.  Pointers of symbols to keep should be stored continuously at
+   the beginning of that array.
+
+   Returns the number of symbols to keep.  */
+
+static unsigned int
+elf32_arm_filter_implib_symbols (bfd *abfd ATTRIBUTE_UNUSED,
+				 struct bfd_link_info *info,
+				 asymbol **syms, long symcount)
+{
+  struct elf32_arm_link_hash_table *globals = elf32_arm_hash_table (info);
+
+  if (globals->cmse_implib)
+    return elf32_arm_filter_cmse_symbols (abfd, info, syms, symcount);
+  else
+    return _bfd_elf_filter_global_symbols (abfd, info, syms, symcount);
 }
 
 /* Allocate target specific section data.  */
@@ -17776,6 +18282,9 @@ elf32_arm_swap_symbol_in (bfd * abfd,
 			  const void *pshn,
 			  Elf_Internal_Sym *dst)
 {
+  Elf_Internal_Shdr *symtab_hdr;
+  const char *name = NULL;
+
   if (!bfd_elf32_swap_symbol_in (abfd, psrc, pshn, dst))
     return FALSE;
   dst->st_target_internal = 0;
@@ -17803,6 +18312,13 @@ elf32_arm_swap_symbol_in (bfd * abfd,
     ARM_SET_SYM_BRANCH_TYPE (dst->st_target_internal, ST_BRANCH_LONG);
   else
     ARM_SET_SYM_BRANCH_TYPE (dst->st_target_internal, ST_BRANCH_UNKNOWN);
+
+  /* Mark CMSE special symbols.  */
+  symtab_hdr = & elf_symtab_hdr (abfd);
+  if (symtab_hdr->sh_size)
+    name = bfd_elf_sym_name (abfd, symtab_hdr, dst, NULL);
+  if (name && CONST_STRNEQ (name, CMSE_PREFIX))
+    ARM_SET_SYM_CMSE_SPCL (dst->st_target_internal);
 
   return TRUE;
 }
@@ -18153,16 +18669,16 @@ elf32_arm_get_synthetic_symtab (bfd *abfd,
 static bfd_boolean
 elf32_arm_section_flags (flagword *flags, const Elf_Internal_Shdr * hdr)
 {
-  if (hdr->sh_flags & SHF_ARM_NOREAD)
-    *flags |= SEC_ELF_NOREAD;
+  if (hdr->sh_flags & SHF_ARM_PURECODE)
+    *flags |= SEC_ELF_PURECODE;
   return TRUE;
 }
 
 static flagword
 elf32_arm_lookup_section_flags (char *flag_name)
 {
-  if (!strcmp (flag_name, "SHF_ARM_NOREAD"))
-    return SHF_ARM_NOREAD;
+  if (!strcmp (flag_name, "SHF_ARM_PURECODE"))
+    return SHF_ARM_PURECODE;
 
   return SEC_NO_FLAGS;
 }
@@ -18358,6 +18874,7 @@ elf32_arm_backend_symbol_processing (bfd *abfd, asymbol *sym)
 #define elf_backend_modify_segment_map		elf32_arm_modify_segment_map
 #define elf_backend_additional_program_headers  elf32_arm_additional_program_headers
 #define elf_backend_output_arch_local_syms      elf32_arm_output_arch_local_syms
+#define elf_backend_filter_implib_symbols	elf32_arm_filter_implib_symbols
 #define elf_backend_begin_write_processing      elf32_arm_begin_write_processing
 #define elf_backend_add_symbol_hook		elf32_arm_add_symbol_hook
 #define elf_backend_count_additional_relocs	elf32_arm_count_additional_relocs
