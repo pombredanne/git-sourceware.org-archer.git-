@@ -1319,7 +1319,9 @@ run_python_script (int argc, char **argv)
     for (i = 1; i < argc; i++)
       {
 	size_t len = mbstowcs (NULL, argv[i], 0);
-	size_t len2;
+	/* Python-related GDB sources are built with -DNDEBUG
+	   https://sourceware.org/bugzilla/show_bug.cgi?id=20445 */
+	size_t len2 ATTRIBUTE_UNUSED;
 
 	if (len == (size_t) -1)
 	  {
