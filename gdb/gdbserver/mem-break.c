@@ -318,37 +318,6 @@ find_raw_breakpoint_at (CORE_ADDR addr, enum raw_bkpt_type type, int kind)
 }
 
 
-/* Does the client have a breakpoint at address ADDR? */
-
-int
-has_client_breakpoint_at (CORE_ADDR addr)
-{
-  client_state *cs = get_client_state ();
-
-  struct client_breakpoint *cb;
-
-  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
-    {
-      if (addr == cb->addr)
-	{
-	  if (debug_threads)
-	    debug_printf ("%s:%d fd=%d return true at %#lx\n",
-			  __FUNCTION__, __LINE__, cs->file_desc, (long unsigned)cb->addr);
-	  return 1;
-	}
-    }
-
-  if (debug_threads)
-    {
-      debug_printf ("%s:%d fd=%d addr=%#lx breakpoints at:\n", __FUNCTION__, __LINE__, cs->file_desc, (long unsigned)addr);
-      for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
-	debug_printf (" %#lx", (long unsigned)cb->addr);
-      debug_printf ("\n");
-    }
-  return 0;
-}
-
-
 /* See mem-break.h.  */
 
 int

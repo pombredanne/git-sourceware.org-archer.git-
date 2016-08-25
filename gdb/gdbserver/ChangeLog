@@ -1,3 +1,11 @@
+2016-08-24  Stan Cox  <scox@redhat.com>
+
+	* server.c (add_client_breakpoint, delete_client_breakpoint): Remove.
+	(setup_multiplexing): Remove step waiting coordination
+	(do_multiplexing):  Likewise.
+	(notify_all_stop_clients):  New.
+	* mem-break.c (has_client_breakpoint_at):  Remove.
+
 2016-07-19  Stan Cox  <scox@redhat.com>
 
 	* server.c (get_packet_type):  Add Hg,m,M,g,G

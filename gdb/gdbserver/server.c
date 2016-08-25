@@ -85,8 +85,8 @@ static struct client_states  client_states;
 
 static void handle_status (char *);
 
-enum pending_types  {none_pending, pending_waitee, pending_cont_waiter, pending_step_waiter};
-char *pending_types_str[] = {"not-waiting","waitee","waiter","step-waiter"};
+enum pending_types  {none_pending, pending_waitee, pending_cont_waiter};
+char *pending_types_str[] = {"not-waiting","waitee","waiter"};
 enum nonstop_pending_types {no_notifier_pending, pending_notifier, pending_notified};
 char *nonstop_pending_types_str[] = {"", "notifier", "notified"};
 char *packet_types_str[] = {"other", "vContc", "vConts","vContt","vRun", "vAttach", "Hg", "g_or_m", "vStopped"};
@@ -154,9 +154,7 @@ set_client_state (gdb_fildes_t fd)
   cs->packet_type = other_packet;
   cs->last_packet_type = other_packet;
   cs->pending = none_pending;
-  cs->notify_buffer_ = NULL;
   cs->own_buffer_ = (char*) xmalloc (PBUFSIZ + 1);
-  cs->client_breakpoints = NULL;
   client_states.current_cs = cs;
   cs->ss->attach_count_ = 0;
   cs->ss->cont_thread_ = null_ptid;
@@ -174,70 +172,8 @@ set_client_state (gdb_fildes_t fd)
   return cs;
 }
 
-/* Add breakpoint ADDR to the per client breakpoint list */
 
-static void
-add_client_breakpoint (CORE_ADDR addr)
-{
-  struct client_breakpoint *cb;
-  struct client_breakpoint *newcb;
-  client_state *cs = get_client_state();
-
-  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
-    if (addr == cb->addr)
-      return;
-    else if (cb->next == NULL)
-      break;
-  newcb = XCNEW (struct client_breakpoint);
-  if (cb != NULL)
-    cb->next = newcb;
-  else
-    cs->client_breakpoints = newcb;
-  newcb->addr = addr;
-  newcb->next = NULL;
-
-  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
-    if (debug_threads)
-      debug_printf ("%s:%d %d %#lx  breakpoint at %#lx\n", __FUNCTION__, __LINE__, get_client_state()->file_desc, (long unsigned)addr, (long unsigned)cb->addr);
-}
-
-
-/* Remove ADDR from the per client breakpoint list */
-
-static void
-delete_client_breakpoint (CORE_ADDR addr)
-{
-  /* TODO gdb_remove_breakpoint removes breakpoints when we expect them
-     so lifetimes of list items needs improvement */
-  struct client_breakpoint *cb;
-  struct client_breakpoint *previous_cb = NULL;
-  client_state *cs = get_client_state();
-
-  cb = cs->client_breakpoints;
-  while (cb != NULL)
-    {
-      struct client_breakpoint *next_cb;
-      if (addr == cb->addr || addr == 0)
-      {
-	if (! previous_cb)
-	  cs->client_breakpoints = cb->next;
-	else
-	  previous_cb->next = cb->next;
-
-	next_cb = cb->next;
-	XDELETE (cb);
-	cb = next_cb;
-	continue;
-      }
-      previous_cb = cb;
-      cb = cb->next;
-    }
-
-  for (cb = cs->client_breakpoints; cb != NULL; cb = cb->next)
-    if (debug_threads)
-      debug_printf ("%s:%d %d %#lx breakpoint at %#lx\n", __FUNCTION__, __LINE__, get_client_state()->file_desc, (long unsigned)addr, (long unsigned)cb->addr);
-}
-
+/* Are client CS1 and client CS2 attached to the same process? */
 
 static int attached_to_same_proc (client_state *cs1, client_state *cs2)
 {
@@ -257,12 +193,9 @@ static void free_client_state (client_state *cs)
       if (attached_to_same_proc (cs, csi))
 	break;
     }
-  delete_client_breakpoint (0);
   if (csi == NULL)
     XDELETE (cs->ss);
   
-  if (cs->notify_buffer_)
-    xfree (cs->notify_buffer_);
   xfree (cs->own_buffer_);
   XDELETE (cs);
 }
@@ -436,7 +369,7 @@ get_packet_type (client_state *cs)
     return other_packet;
   /* We have already categorized the packet type */
 
-  if (cs->pending == pending_cont_waiter || cs->pending == pending_step_waiter)
+  if (cs->pending == pending_cont_waiter)
     return other_packet;
 
   switch (own_packet)
@@ -475,12 +408,24 @@ static int is_waiter (client_state *cs)
 {
   return ((cs->packet_type == vContc
 	   || cs->packet_type == vConts)
-	  && (cs->pending == pending_cont_waiter
-	      || cs->pending == pending_step_waiter));
+	  && (cs->pending == pending_cont_waiter));
 }
 
 
 static int queue_stop_reply_callback (struct inferior_list_entry *entry, void *arg);
+
+static void
+vstop_notif_reply (struct notif_event *event, char *own_buf)
+{
+  struct vstop_notif *vstop = (struct vstop_notif *) event;
+
+  prepare_resume_reply (own_buf, vstop->ptid, &vstop->status);
+}
+
+struct notif_server notif_stop =
+{
+  "vStopped", "Stop", NULL, vstop_notif_reply,
+};
 
 /* Belatedly reply to client CS, which is waiting on a packet reply. */
 
@@ -561,7 +506,7 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
 	  notif_write_event (&notif_stop, notif_buf);
 	  out_buf = (char*) alloca (strlen (notif_buf) + 8);
 	  /* TODO Use Defined notif constant */
-	  strcpy (out_buf, "Stop:");
+	  xsnprintf (out_buf, PBUFSIZ, "%s:", notif_stop.notif_name);
 	  strcat (out_buf, notif_buf);
 	  if (debug_threads)
 	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, cs->file_desc);
@@ -635,37 +580,12 @@ setup_multiplexing (client_state *current_cs)
   if (current_cs->packet_type == vContc || current_cs->packet_type == vConts)
     current_cs->nonstop_pending = none_pending;
 
-  if (current_cs->packet_type == vStopped && notify_buffer)
-    {
-      char okay_buf[4];
-      write_ok (okay_buf);
-      putpkt (okay_buf);
-      putpkt_notif (notify_buffer);
-      xfree (notify_buffer);
-      notify_buffer = 0;
-      return 0;
-    }
-
   for (same_pid_cs = client_states.first; 
        same_pid_cs != NULL; 
        same_pid_cs = same_pid_cs->next)
     {
       if (! attached_to_same_proc (current_cs, same_pid_cs))
 	continue;
-
-      if (non_stop && (same_pid_cs->catch_syscalls))
-	continue;
-
-      /* TODO Protect against a shadow client changing the current thread.
-	 This attempted to do that but was invasive.
-	 So is intercepting Hg packets */
-      if (0 && current_cs->packet_type == g_or_m)
-	if (!ptid_equal (same_pid_cs->new_general_thread, current_cs->new_general_thread))
-      	  {
-      	    sprintf (own_buffer, "E00");
-      	    putpkt (own_buffer);
-      	    return 0;
-	  }
 
       switch (same_pid_cs->pending)
 	{
@@ -681,32 +601,6 @@ setup_multiplexing (client_state *current_cs)
 		  same_pid_cs->pending = pending_waitee;
 		}
 	      break;
-	      /* TODO else if (current_cs->packet_type == vContt) */
-	    case /* current_cs->packet_type */ vConts:
-	      current_cs->pending = pending_step_waiter;
-	      same_pid_cs->pending = pending_waitee;
-	    }
-	  break;
-	case /* same_pid_cs->pending */ pending_step_waiter:
-	  switch (current_cs->packet_type)
-	    {
-	    case /* current_cs->packet_type */ vContc:
-	      {
-		current_cs->pending = pending_cont_waiter;
-		resolve_waiter (same_pid_cs, current_cs);
-		same_pid_cs->pending = pending_waitee;
-		set_client_state (same_pid_cs->file_desc);
-		current_cs = same_pid_cs;
-		break;
-	      }
-	    case /* current_cs->packet_type */ vConts:
-	      {
-		int have_waitee;
-		analyze_group (current_cs, &have_waitee);
-		/* Don't want to deadlock on everyone waiting */
-		if (current_cs->pending == pending_waitee && have_waitee)
-		  current_cs->pending = pending_step_waiter;
-	      }
 	    }
 	  break;
 	case /* same_pid_cs->pending */ pending_cont_waiter:
@@ -723,14 +617,6 @@ setup_multiplexing (client_state *current_cs)
 		  current_cs->pending = pending_cont_waiter;
 	      }
 	      break;
-	    case /* current_cs->packet_type */ vConts:
-	      {
-		int have_waitee;
-		analyze_group (current_cs, &have_waitee);
-		/* Don't want to deadlock on everyone waiting */
-		if (current_cs->pending == pending_waitee && have_waitee)
-		  current_cs->pending = pending_step_waiter;
-	      }
 	    }
 	  break;
 	case /* same_pid_cs->pending */ pending_waitee:
@@ -745,10 +631,6 @@ setup_multiplexing (client_state *current_cs)
 		  current_cs->pending = pending_cont_waiter;
 	      }
 	      break;
-	    case /* current_cs->packet_type */ vConts:
-	      {
-		current_cs->pending = pending_step_waiter;
-	      }
 	    }
 	  debug_printf ("%s DBG %s catching=%d\n", __FUNCTION__, target_waitstatus_to_string (&last_status), current_cs->catch_syscalls);
 	} /* switch same_pid_cs->pending */
@@ -758,7 +640,6 @@ setup_multiplexing (client_state *current_cs)
   switch (current_cs->pending)
     {
     case pending_cont_waiter:
-    case pending_step_waiter:
       switch (current_cs->last_packet_type)
         {
 	case vRun:
@@ -783,7 +664,8 @@ setup_multiplexing (client_state *current_cs)
 }
 
 
-/* Send a notification to a shadow client. */
+/* Send a notification to a shadow client. 
+   Called via the handle_target_event notification mechanism. */
 
 int
 notify_clients (char *buffer, int have_first_notify)
@@ -825,12 +707,12 @@ notify_clients (char *buffer, int have_first_notify)
 	      CORE_ADDR point_addr;
 	      struct regcache *regcache = same_pid_cs->ss->current_thread_->regcache_data;
 	      point_addr = (*the_target->read_pc) (regcache);
-	      if (has_client_breakpoint_at (point_addr))
-		same_pid_cs->nonstop_pending = pending_notifier;
 	    }
 	  /* Have more than 1 notify so also send to shadow client */
 	  if (save_client_cs->packet_type == vStopped)
-		same_pid_cs->nonstop_pending = pending_notifier;
+	    {
+	      same_pid_cs->nonstop_pending = pending_notifier;
+	    }
 
 	default:
 	  /* Only syscall clients need to see a syscall packet */
@@ -862,19 +744,12 @@ notify_clients (char *buffer, int have_first_notify)
 	      putpkt (okay_buf);
 	      putpkt_notif (buffer);
 	    }
-	  else			/* This is another notification in the group */
+	  else			/* This is another event in the group */
 	    {
 	      if (same_pid_cs->packet_type == vStopped)
 		putpkt (buffer);
-	      else
-		{
-		  /* send notify after we receive vStopped */
-		  same_pid_cs->notify_buffer_ = (char*) xmalloc (strlen (buffer) + 1);
-		  memcpy (same_pid_cs->notify_buffer_, buffer, strlen (buffer) + 1);
-		}
 	    }
 	  set_client_state (save_client_fd);
-	  same_pid_cs->pending = none_pending;
 	  same_pid_cs->nonstop_pending = pending_notified;
 	}
     }
@@ -885,10 +760,48 @@ notify_clients (char *buffer, int have_first_notify)
 }
 
 
-/* Resolve the state of client WAITEE_CS with respect to other clients connected to the same server process */
+void
+notify_all_stop_clients ()
+{
+  client_state *same_pid_cs = NULL;
+  client_state *current_cs = client_states.current_cs;
 
-static void
-push_stop_notification (ptid_t ptid, struct target_waitstatus *status);
+  /* TODO Can this handle all the cases that notify_clients does? */
+
+  if (non_stop)
+    return;
+  for (same_pid_cs = client_states.first;
+       same_pid_cs != NULL;
+       same_pid_cs = same_pid_cs->next)
+    {
+      /* Is this a client attached to the same process? */
+      if (! attached_to_same_proc (client_states.current_cs, same_pid_cs))
+	continue;
+
+      switch (last_status.kind)
+	{
+	case TARGET_WAITKIND_SYSCALL_ENTRY:
+	case TARGET_WAITKIND_SYSCALL_RETURN:
+	case TARGET_WAITKIND_EXITED:
+	case TARGET_WAITKIND_STOPPED:
+	  break;
+	default:
+	  if (current_cs->catch_syscalls)
+	    {
+	      /* Only syscall clients need to see a syscall packet */
+	      resolve_waiter (same_pid_cs, current_cs);
+	      dump_client_state (__FUNCTION__, "resolved all stop syscall");
+	      current_cs->pending = same_pid_cs->pending;
+	      same_pid_cs->pending = pending_waitee;
+	      set_client_state (same_pid_cs->file_desc);
+	      return;
+	    }
+	}
+    }
+}
+
+
+/* Resolve the state of client WAITEE_CS with respect to other clients connected to the same server process */
 
 static int
 do_multiplexing (client_state *current_cs)
@@ -917,7 +830,6 @@ do_multiplexing (client_state *current_cs)
   switch (current_cs->packet_type)
     {
     case other_packet:
-    case Hg:
       break;
     case vContt:
       if (current_cs->last_packet_type == vAttach)
@@ -927,7 +839,17 @@ do_multiplexing (client_state *current_cs)
 	  current_cs->last_packet_type = other_packet;
 	  return 0;
 	}
-    default: /* fall through */
+    case Hg:
+      if (current_cs->last_packet_type != vRun
+	  && current_cs->last_packet_type != vAttach)
+	current_cs->last_packet_type = current_cs->packet_type;
+      break;
+    case vContc:
+    case vConts:
+    case vRun:
+    case vAttach:
+    case g_or_m:
+    case vStopped:
           current_cs->last_packet_type = current_cs->packet_type;
     }
   
@@ -936,8 +858,8 @@ do_multiplexing (client_state *current_cs)
   /* We are only interested in a current nonwaiting client that is continuing */
   switch (current_cs->packet_type)
     {
-    case vContt:
     case vContc:
+    case vContt:
     case vConts:
       if (current_cs->pending == pending_waitee)
 	break;
@@ -959,7 +881,7 @@ do_multiplexing (client_state *current_cs)
       /* Insure another client is attached to the cs process */
       if (! attached_to_same_proc (current_cs, same_pid_cs))
 	continue;
-
+      
       switch (same_pid_cs->pending)
 	{
 	case /* same_pid_cs->pending */ pending_cont_waiter:
@@ -983,6 +905,7 @@ do_multiplexing (client_state *current_cs)
 		      same_pid_cs_has_bp = 1;
 		    }
 		}
+
 	      else if (current_cs->packet_type == vConts)
 		{
 		  current_cs->last_cont_ptid = current_cs->ss->general_thread_;
@@ -1012,10 +935,9 @@ do_multiplexing (client_state *current_cs)
 			}
 		      if (point_addr)
 			{
-			  current_cs_has_bp = has_client_breakpoint_at (point_addr);
 			  waiter_cs = set_client_state (same_pid_cs->file_desc);
 			  /* Does found client have a breakpoint at PC? */
-			  same_pid_cs_has_bp = has_client_breakpoint_at (point_addr);
+			  same_pid_cs_has_bp = gdb_breakpoint_here (point_addr);
 			}
 		      else if (current_cs->packet_type == vConts
 			       && last_status.kind == TARGET_WAITKIND_STOPPED)
@@ -1043,20 +965,6 @@ do_multiplexing (client_state *current_cs)
 	      current_cs = set_client_state (current_cs->file_desc);
 	    } /* switch same_pid_cs->packet_type */
 	  break; /* case vContc */
-
-	case /* same_pid_cs->pending */ pending_step_waiter:
-	  waiter_cs = set_client_state (same_pid_cs->file_desc);
-	  if (debug_threads)
-	    debug_printf ("%s:%d resolving %d %s %s\n", __FUNCTION__, __LINE__, current_cs->file_desc,pending_types_str[same_pid_cs->pending],packet_types_str[current_cs->packet_type]);
-	  if (current_cs->packet_type == vContc
-	      || (current_cs->packet_type == vConts && !non_stop))
-	    {
-	      resolve_waiter (waiter_cs, current_cs);
-	      current_cs->pending = same_pid_cs->pending = none_pending;
-	    }
-	  else if (current_cs->packet_type == vConts && non_stop)
-	    same_pid_cs->nonstop_pending = pending_notifier;
-	  current_cs = set_client_state (current_cs->file_desc);
 	} /* switch same_pid_cs->pending */
     }
 
@@ -1120,19 +1028,6 @@ discard_queued_stop_replies (ptid_t ptid)
   QUEUE_iterate (notif_event_p, notif_stop.queue,
 		 remove_all_on_match_ptid, &ptid);
 }
-
-static void
-vstop_notif_reply (struct notif_event *event, char *own_buf)
-{
-  struct vstop_notif *vstop = (struct vstop_notif *) event;
-
-  prepare_resume_reply (own_buf, vstop->ptid, &vstop->status);
-}
-
-struct notif_server notif_stop =
-{
-  "vStopped", "Stop", NULL, vstop_notif_reply,
-};
 
 static int
 target_running (void)
@@ -5233,7 +5128,6 @@ process_serial_event (void)
 	  {
 	    struct breakpoint *bp;
 
-	    add_client_breakpoint (addr);
 	    bp = set_gdb_breakpoint (type, addr, kind, &res);
 	    if (bp != NULL)
 	      {
@@ -5251,9 +5145,6 @@ process_serial_event (void)
 	else
 	  {
 	    res = delete_gdb_breakpoint (type, addr, kind);
-	    if (res != 0 && has_client_breakpoint_at (addr))
-	      res = 0;
-	    delete_client_breakpoint (addr);
 	  }
 
 	if (res == 0)
@@ -5364,6 +5255,7 @@ process_serial_event (void)
 
   if (! do_multiplexing (get_client_state()))
     return 0;
+  notify_all_stop_clients ();
 
   if (new_packet_len != -1)
     putpkt_binary (own_buffer, new_packet_len);

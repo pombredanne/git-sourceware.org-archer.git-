@@ -145,13 +145,6 @@ struct server_state
   ptid_t last_ptid_;
   unsigned char *mem_buf_;
 
-  /* from remote-utils.c */
-  /* Internal buffer used by readchar.
-     These are global to readchar because reschedule_remote needs to be
-     able to tell whether the buffer is empty.  */
-  unsigned char readchar_buf_[BUFSIZ];
-  int readchar_bufcnt_;
-  unsigned char *readchar_bufp_;
   /* from inferiors.c */
   struct inferior_list all_processes_;
   struct inferior_list all_threads_;
@@ -159,12 +152,6 @@ struct server_state
 };
 
 typedef struct server_state server_state;
-
-struct client_breakpoint
-{
-  CORE_ADDR addr;
-  struct client_breakpoint *next;
-};
 
 enum packet_types { other_packet, vContc, vConts, vContt, vRun, vAttach, Hg, g_or_m, vStopped };
 typedef enum packet_types packet_types;
@@ -230,17 +217,21 @@ struct client_state
   int pass_signals_[GDB_SIGNAL_LAST];
   int program_signals_[GDB_SIGNAL_LAST];
   int program_signals_p_;
-  char *notify_buffer_;
   /* Renamed from own_buf to avoid macro name conflict with a common local variable name */
   char *own_buffer_;
 
   /* from remote-utils.c */
   int remote_debug_;
+  /* Internal buffer used by readchar.
+     These are global to readchar because reschedule_remote needs to be
+     able to tell whether the buffer is empty.  */
+  unsigned char readchar_buf_[BUFSIZ];
+  int readchar_bufcnt_;
+  unsigned char *readchar_bufp_;
   /* If true, then we tell GDB to use noack mode by default.  */
   int noack_mode_;
   int transport_is_reliable_;
 
-  struct client_breakpoint *client_breakpoints;
   server_state *ss;
   struct client_state *next;
 };
@@ -267,9 +258,9 @@ void delete_client_state (gdb_fildes_t fd);
 #define last_status	(get_client_state()->ss->last_status_)
 #define last_ptid	(get_client_state()->ss->last_ptid_)
 #define mem_buf		(get_client_state()->ss->mem_buf_)
-#define readchar_buf	(get_client_state()->ss->readchar_buf_)
-#define readchar_bufcnt	(get_client_state()->ss->readchar_bufcnt_)
-#define readchar_bufp	(get_client_state()->ss->readchar_bufp_)
+#define readchar_buf	(get_client_state()->readchar_buf_)
+#define readchar_bufcnt	(get_client_state()->readchar_bufcnt_)
+#define readchar_bufp	(get_client_state()->readchar_bufp_)
 #define all_processes  	(get_client_state()->ss->all_processes_)
 #define all_threads	(get_client_state()->ss->all_threads_)
 #define current_thread   (get_client_state()->ss->current_thread_)
