@@ -625,10 +625,7 @@ setup_multiplexing (client_state *current_cs)
 	    /* Current client is continuing and found another waitee client */
 	    case /* current_cs->packet_type */ vContc:
 	      {
-		if (!(non_stop 
-		      && current_cs->catch_syscalls 
-		      && same_pid_cs->packet_type == vContc))
-		  current_cs->pending = pending_cont_waiter;
+		current_cs->pending = pending_cont_waiter;
 	      }
 	      break;
 	    }
@@ -664,7 +661,7 @@ setup_multiplexing (client_state *current_cs)
 }
 
 
-/* Send a notification to a shadow client. 
+/* Send a notification to a pending client.
    Called via the handle_target_event notification mechanism. */
 
 int
@@ -701,21 +698,14 @@ notify_clients (char *buffer, int have_first_notify)
 	  set_client_state (save_client_fd);
 	  return 1;
         case TARGET_WAITKIND_STOPPED:
-	  if ((same_pid_cs->pending == pending_cont_waiter 
-	       && same_pid_cs->packet_type == vContc))
-	    {
-	      CORE_ADDR point_addr;
-	      struct regcache *regcache = same_pid_cs->ss->current_thread_->regcache_data;
-	      point_addr = (*the_target->read_pc) (regcache);
-	    }
-	  /* Have more than 1 notify so also send to shadow client */
+	  /* pending client will also want a notify */
 	  if (save_client_cs->packet_type == vStopped)
 	    {
 	      same_pid_cs->nonstop_pending = pending_notifier;
 	    }
 
 	default:
-	  /* Only syscall clients need to see a syscall packet */
+	  /* syscall clients only need to see a syscall packet */
 	  if (save_client_cs->catch_syscalls)
 	    {
 	      set_client_state (same_pid_cs->file_desc);
@@ -731,15 +721,14 @@ notify_clients (char *buffer, int have_first_notify)
       /* client wants the notification */
       if (same_pid_cs->nonstop_pending == pending_notifier)
 	{
-	  /* Also send the notification to the attached client */
+	  /* Also send the notification to the pending client */
 	  set_client_state (same_pid_cs->file_desc);
 	  if (debug_threads)
 	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, same_pid_cs->file_desc);
 	  /* This is the first notification */
 	  if (have_first_notify
 	      && (is_waiter (same_pid_cs)
-		  || (save_client_cs->packet_type != vStopped
-		      && same_pid_cs->nonstop_pending == pending_notifier)))
+		  || (save_client_cs->packet_type != vStopped)))
 	    {
 	      putpkt (okay_buf);
 	      putpkt_notif (buffer);
@@ -757,47 +746,6 @@ notify_clients (char *buffer, int have_first_notify)
     return 0;
   else
     return 1;
-}
-
-
-void
-notify_all_stop_clients ()
-{
-  client_state *same_pid_cs = NULL;
-  client_state *current_cs = client_states.current_cs;
-
-  /* TODO Can this handle all the cases that notify_clients does? */
-
-  if (non_stop)
-    return;
-  for (same_pid_cs = client_states.first;
-       same_pid_cs != NULL;
-       same_pid_cs = same_pid_cs->next)
-    {
-      /* Is this a client attached to the same process? */
-      if (! attached_to_same_proc (client_states.current_cs, same_pid_cs))
-	continue;
-
-      switch (last_status.kind)
-	{
-	case TARGET_WAITKIND_SYSCALL_ENTRY:
-	case TARGET_WAITKIND_SYSCALL_RETURN:
-	case TARGET_WAITKIND_EXITED:
-	case TARGET_WAITKIND_STOPPED:
-	  break;
-	default:
-	  if (current_cs->catch_syscalls)
-	    {
-	      /* Only syscall clients need to see a syscall packet */
-	      resolve_waiter (same_pid_cs, current_cs);
-	      dump_client_state (__FUNCTION__, "resolved all stop syscall");
-	      current_cs->pending = same_pid_cs->pending;
-	      same_pid_cs->pending = pending_waitee;
-	      set_client_state (same_pid_cs->file_desc);
-	      return;
-	    }
-	}
-    }
 }
 
 
@@ -839,17 +787,7 @@ do_multiplexing (client_state *current_cs)
 	  current_cs->last_packet_type = other_packet;
 	  return 0;
 	}
-    case Hg:
-      if (current_cs->last_packet_type != vRun
-	  && current_cs->last_packet_type != vAttach)
-	current_cs->last_packet_type = current_cs->packet_type;
-      break;
-    case vContc:
-    case vConts:
-    case vRun:
-    case vAttach:
-    case g_or_m:
-    case vStopped:
+    default:
           current_cs->last_packet_type = current_cs->packet_type;
     }
   
@@ -863,9 +801,7 @@ do_multiplexing (client_state *current_cs)
     case vConts:
       if (current_cs->pending == pending_waitee)
 	break;
-    default: /* fall through */
-      if (current_cs->catch_syscalls)
-	break;
+    default:
       dump_client_state (__FUNCTION__, "no action taken");
       return 1;
     }
@@ -878,95 +814,107 @@ do_multiplexing (client_state *current_cs)
       int current_cs_has_bp = 0;
       int same_pid_cs_has_bp = 0;
 
-      /* Insure another client is attached to the cs process */
-      if (! attached_to_same_proc (current_cs, same_pid_cs))
+      /* Is this a waiting continuing client attached to the cs process */
+      if (! attached_to_same_proc (current_cs, same_pid_cs)
+	  || (same_pid_cs->pending != pending_cont_waiter)
+	  || (same_pid_cs->packet_type != vContc))
 	continue;
-      
-      switch (same_pid_cs->pending)
+
+      switch (current_cs->packet_type)
 	{
-	case /* same_pid_cs->pending */ pending_cont_waiter:
-	  /* Found a vContc packet that is waiting */
-	  switch (same_pid_cs->packet_type)
+	case vContc:
+	  switch (last_status.kind)
 	    {
-	    case /* same_pid_cs->packet_type */ vContc:
-	      if (current_cs->packet_type == vContc
-		&& (current_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_ENTRY
-		    || current_cs->ss->last_status_.kind == TARGET_WAITKIND_SYSCALL_RETURN))
+	    case TARGET_WAITKIND_SYSCALL_ENTRY:
+	    case TARGET_WAITKIND_SYSCALL_RETURN:
+	      {
+		if (same_pid_cs->catch_syscalls)
+		  {
+		    resolve_waiter (same_pid_cs, current_cs);
+		    dump_client_state (__FUNCTION__, "resolved syscall");
+		    same_pid_cs->pending = pending_waitee;
+		  }
+		else if (current_cs->catch_syscalls)
+		  {
+		    current_cs_has_bp = 1;
+		    same_pid_cs_has_bp = 1;
+		  }
+	      }
+	      break;
+	    case TARGET_WAITKIND_EXITED:
+	    case TARGET_WAITKIND_STOPPED:
+	      break;
+	    default:
+	      if (! non_stop && current_cs->catch_syscalls)
 		{
-		  if (same_pid_cs->catch_syscalls)
-		    {
-		      resolve_waiter (same_pid_cs, current_cs);
-		      dump_client_state (__FUNCTION__, "resolved syscall");
-		      same_pid_cs->pending = pending_waitee;
-		    }
-		  else if (current_cs->catch_syscalls)
-		    {
-		      current_cs_has_bp = 1;
-		      same_pid_cs_has_bp = 1;
-		    }
+		  /* syscall clients only need to see a syscall packet */
+		  resolve_waiter (same_pid_cs, current_cs);
+		  dump_client_state (__FUNCTION__, "resolved all stop syscall");
+		  current_cs->pending = same_pid_cs->pending;
+		  same_pid_cs->pending = pending_waitee;
+		  set_client_state (same_pid_cs->file_desc);
+		  return 1;
 		}
+	    }
+	  break; /* vContc */
+	  
+	case vConts:
+	  current_cs->last_cont_ptid = current_cs->ss->general_thread_;
+	  current_cs->last_cont_waitstatus = current_cs->ss->last_status_;
+	}
 
-	      else if (current_cs->packet_type == vConts)
+      switch (last_status.kind)
+	{
+	case TARGET_WAITKIND_EXITED:
+	  waiter_cs = set_client_state (same_pid_cs->file_desc);
+	  current_cs_has_bp = 1;
+	  same_pid_cs_has_bp = 1;
+	  break;
+	default:
+	  /* Does current client have a breakpoint at PC? */
+	  if (get_first_thread () != NULL)
+	    {
+	      struct regcache *regcache;
+	      CORE_ADDR point_addr = 0;
+
+	      if ((*the_target->stopped_by_watchpoint)())
+		point_addr = (*the_target->stopped_data_address) ();
+	      else
 		{
-		  current_cs->last_cont_ptid = current_cs->ss->general_thread_;
-		  current_cs->last_cont_waitstatus = current_cs->ss->last_status_;
+		  regcache = client_states.current_cs->ss->current_thread_->regcache_data;
+		  point_addr = (*the_target->read_pc) (regcache);
 		}
-
-	      if (current_cs->ss->last_status_.kind == TARGET_WAITKIND_EXITED)
+	      if (point_addr)
 		{
 		  waiter_cs = set_client_state (same_pid_cs->file_desc);
-		  current_cs_has_bp = 1;
+		  /* Does found client have a breakpoint at PC? */
+		  same_pid_cs_has_bp = gdb_breakpoint_here (point_addr);
+		}
+	      else if (current_cs->packet_type == vConts
+		       && last_status.kind == TARGET_WAITKIND_STOPPED)
+		{
+		  /* there is no target->stopped_by_single_step so just assume that */
+		  waiter_cs = set_client_state (same_pid_cs->file_desc);
 		  same_pid_cs_has_bp = 1;
 		}
-	      else		/* not exited */
-		{
-		  /* Does current client have a breakpoint at PC? */
-		  if (get_first_thread () != NULL)
-		    {
-		      struct regcache *regcache;
-		      CORE_ADDR point_addr = 0;
-
-		      if ((*the_target->stopped_by_watchpoint)())
-			point_addr = (*the_target->stopped_data_address) ();
-		      else
-			{
-			  regcache = client_states.current_cs->ss->current_thread_->regcache_data;
-			  point_addr = (*the_target->read_pc) (regcache);
-			}
-		      if (point_addr)
-			{
-			  waiter_cs = set_client_state (same_pid_cs->file_desc);
-			  /* Does found client have a breakpoint at PC? */
-			  same_pid_cs_has_bp = gdb_breakpoint_here (point_addr);
-			}
-		      else if (current_cs->packet_type == vConts
-			       && last_status.kind == TARGET_WAITKIND_STOPPED)
-			{
-			  /* there is no target->stopped_by_single_step so just assume that */
-			  waiter_cs = set_client_state (same_pid_cs->file_desc);
-			  same_pid_cs_has_bp = 1;
-			}
-		    }
-		}
-
-	      if (same_pid_cs_has_bp)
-		{
-		  /* Belatedly reply to the waiter client */
-		  resolve_waiter (waiter_cs, current_cs);
-		  current_cs->pending = none_pending;
-		  if (!current_cs_has_bp)
-		    waiter_cs->pending = pending_waitee;
-		  else 
-		    waiter_cs->pending = none_pending;
-		  /* If the waitee did not reach the breakpoint then it needs to wait */
-		  if (!current_cs_has_bp)
-		    make_waitee_a_waiter = 1;
-		}
-	      current_cs = set_client_state (current_cs->file_desc);
-	    } /* switch same_pid_cs->packet_type */
-	  break; /* case vContc */
-	} /* switch same_pid_cs->pending */
-    }
+	    }
+	}
+      
+      if (same_pid_cs_has_bp)
+	{
+	  /* Belatedly reply to the waiter client */
+	  resolve_waiter (waiter_cs, current_cs);
+	  current_cs->pending = none_pending;
+	  if (!current_cs_has_bp)
+	    waiter_cs->pending = pending_waitee;
+	  else 
+	    waiter_cs->pending = none_pending;
+	  /* If the waitee did not reach the breakpoint then it needs to wait */
+	  if (!current_cs_has_bp)
+	    make_waitee_a_waiter = 1;
+	}
+      current_cs = set_client_state (current_cs->file_desc);
+    } /* for (same_pid_cs  */
 
   if (make_waitee_a_waiter && current_cs->packet_type == vContc)
     {
@@ -5255,7 +5203,6 @@ process_serial_event (void)
 
   if (! do_multiplexing (get_client_state()))
     return 0;
-  notify_all_stop_clients ();
 
   if (new_packet_len != -1)
     putpkt_binary (own_buffer, new_packet_len);

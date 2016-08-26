@@ -1,3 +1,7 @@
+2016-08-26  Stan Cox  <scox@redhat.com>
+
+	* server.c (setup_multiplexing, notify_clients, do_multiplexing):  Refactor.
+
 2016-08-24  Stan Cox  <scox@redhat.com>
 
 	* server.c (add_client_breakpoint, delete_client_breakpoint): Remove.
