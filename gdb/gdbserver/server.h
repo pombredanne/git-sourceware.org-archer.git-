@@ -72,7 +72,6 @@ extern int disable_packet_Tthread;
 extern int disable_packet_qC;
 extern int disable_packet_qfThreadInfo;
 
-  // extern char *own_buf;
 #if USE_WIN32API
 #include <winsock2.h>
 typedef SOCKET gdb_fildes_t;
@@ -115,9 +114,9 @@ extern void discard_queued_stop_replies (ptid_t ptid);
 
 #endif /* SERVER_H */
 
-/* Description of the remote protocol state for the currently
-   connected target.  This is per-target state, and independent of the
-   selected architecture. */
+/* Description of the server state for the currently
+   connected target.  Each server_state can be associated with one
+   or more client_state.  */
 
 struct server_state
 {
@@ -140,8 +139,6 @@ struct server_state
   unsigned long signal_pid_;
   /* Last status reported to GDB.  */
   struct target_waitstatus last_status_;
-  /* Was last status an exit status? (sticky if yes) */
-  int last_status_exited;
   ptid_t last_ptid_;
   unsigned char *mem_buf_;
 
@@ -153,12 +150,14 @@ struct server_state
 
 typedef struct server_state server_state;
 
-enum packet_types { other_packet, vContc, vConts, vContt, vRun, vAttach, Hg, g_or_m, vStopped };
+/* The packet type of a client packet */
+
+enum packet_types
+  { other_packet, vContc, vConts, vContt, vRun, vAttach, Hg, g_or_m, vStopped };
 typedef enum packet_types packet_types;
 
-enum exit_types { no_exit, have_exit, sent_exit };
-typedef enum exit_types exit_types;
-
+/* Description of the per client state for the currently
+   connected target.  Each server_state has one or more client_state */
 
 struct client_state
 {
@@ -238,6 +237,8 @@ struct client_state
 
 typedef struct client_state client_state;
 
+/* Per gdbserver client state information */
+
 struct client_states
 {
   client_state *first;
@@ -250,6 +251,8 @@ client_state * set_client_state (gdb_fildes_t);
 int have_multiple_clients (gdb_fildes_t fd);
 void delete_client_state (gdb_fildes_t fd);
 
+
+/* macros to allow field access using the original global name */
 
 #define attach_count	(get_client_state()->ss->attach_count_)
 #define cont_thread	(get_client_state()->ss->cont_thread_)

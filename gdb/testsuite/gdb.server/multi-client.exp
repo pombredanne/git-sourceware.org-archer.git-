@@ -13,86 +13,70 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-# exp_internal 1
 load_lib gdbserver-support.exp
+load_lib prelink-support.exp
+
+if {[skip_gdbserver_tests]} {
+    return 0
+}
 
 set test "multi-client"
-# wrapper.c is used as the test exec-file
-set testfile wrapper
-set srcfile wrapper.c
-global srcdir subdir
-set testpath [standard_output_file $testfile]
+global srcdir 
+global subdir 
+global gdbserver_gdbport
+global gdbserver_reconnect_p
+# set testpath [standard_output_file $testfile]
 
 verbose "srcdir=$srcdir subdir=$subdir [standard_output_file $test]"
-set testfile3 catch-syscall
-set srcfile3 ../gdb.base/catch-syscall.c
-set testpath3 [standard_output_file $testfile3]
+set testfile catch-syscall
+set srcfile ../gdb.base/catch-syscall.c
+set testpath [standard_output_file $testfile]
+set gdbserver_reconnect_p 1
 
 if { [prepare_for_testing $test $testfile $srcfile debug] } {
     return -1
 }
-if {[build_executable $test $testfile3 $srcfile3 debug] == -1} {
+if {[build_executable $test $testfile $srcfile debug] == -1} {
     return -1
 }
 
-set use_gdb_stub [target_info exists use_gdb_stub]
-set gdb_client1_spawn_id ""
-set gdb_client2_spawn_id ""
-set gdb_client3_spawn_id ""
+set use_gdb_stub 0
+set strace_spawn_id ""
 
-if {[skip_gdbserver_tests]} {
-    return
-}
-
-proc start_gdbserver { } {
-    global test
-    set GDBSERVER "[find_gdbserver]"
-    set res [remote_spawn host "$GDBSERVER --multi :65432"]
-    if { $res < 0 || $res == "" } {
-	perror "$test Spawning $GDBSERVER failed."
-	return 1
-    }
-
-    set ok 0
-    expect {
-	-i "$res" -re "Listening on port" { incr ok }
-    }
-    if {$ok == 1} { 
-	pass "$test gdbserver listen"
-    } else {
-	fail "$test gdbserver listen $expect_out(buffer)"
-    }
-    return $res
-}
-
-proc start_client { N TESTPATH FLAGS ATTACH_FLAGS COMMENT } {
-    global test gdb_spawn_id GDB MULTI_GDBFLAGS
-    set MULTI_GDBFLAGS "$FLAGS -iex \"file $TESTPATH\" -iex \"set remotetimeout 600\" -iex \"target extended-remote localhost:65432\" -iex \"set remote exec-file $TESTPATH\" --silent --data-directory=[file dirname $GDB]/data-directory"
-    set res [remote_spawn host "$GDB $MULTI_GDBFLAGS $ATTACH_FLAGS [host_info gdb_opts] -iex \"set prompt (client $N gdb) \""]
-    sleep 1
-    set ok 0
-    expect {
-	-i $res -re {client . gdb} { incr ok }
-    }
-    if { $res < 0 || $res == "" } {
-	perror "$test Spawning $GDB failed."
-	return 1
-    }
-    set gdb_spawn_id $res
-    if { $ok == 1 } {
-	pass "$test attach client $N $COMMENT"
-    } else {
-	fail "$test attach client $N $COMMENT"
-    }
-    return $res
+proc start_client { TESTPATH NONSTOP COMMENT } {
+    global test 
+    global GDB 
+    global MULTI_GDBFLAGS 
+    global gdbserver_gdbport
+    global gdb_spawn_id 
+    global inferior_spawn_id
+    global srcdir 
+    global subdir
+    gdb_exit
+    gdb_start
+    gdb_load $TESTPATH
+    gdb_reinitialize_dir $srcdir/$subdir
+    gdb_test_no_output "set remotetimeout 600"
+    gdb_test_no_output "set non-stop $NONSTOP"
+    gdb_test "target extended-remote $gdbserver_gdbport"
+    gdb_test_no_output "set remote exec-file $TESTPATH" "set remote exec-file"
+    return $gdb_spawn_id
 }
 
 proc start_strace { ATTACH_FLAGS } {
-    global test gdb_spawn_id
+    global test 
+    global gdb_spawn_id
     set STRACE [auto_execok strace]
     verbose "strace is $STRACE $ATTACH_FLAGS"
     set res [remote_spawn host "$STRACE $ATTACH_FLAGS"]
-    sleep 1
+    expect_before {
+	-i $res " invalid option "  { 
+	    xfail "no gdb remote protocol strace"
+	    return 0
+	}
+	eof exit
+    }
+    sleep 5
     set ok 0
     expect {
 	-i $res -re {Process [0-9]* attached} { incr ok }
@@ -101,7 +85,6 @@ proc start_strace { ATTACH_FLAGS } {
 	perror "$test Spawning $STRACE failed."
 	return 1
     }
-    set gdb_spawn_id $res
     if { $ok == 1 } {
 	pass "$test start strace"
     } else {
@@ -126,50 +109,32 @@ proc get_target_pid { target_exec } {
 }
 
 
-proc gdb_command { CLIENT COMMAND RESPONSE COMMENT } {
-    global gdb_client1_spawn_id
-    global gdb_client2_spawn_id
-    global gdb_client3_spawn_id
+proc gdb_command { COMMAND RESPONSE COMMENT } {
+    global gdb_spawn_id
+    global gdb_prompt
     global test
-    switch $CLIENT {
-	1 { set client "$gdb_client1_spawn_id" }
-	2 { set client "$gdb_client2_spawn_id" }
-	default { set client "$gdb_client3_spawn_id" }
-    }
-    if { [string length $COMMAND] > 0 } {
-	send -i $client "$COMMAND\n"
-    }
+    set ok 0
+    send -i $gdb_spawn_id "$COMMAND\n"
     if { [string length $RESPONSE] > 0 } {
-	foreach i {1 2 3} {
-	    set ok 0
-	    expect {
-		-i "$client" -re "$RESPONSE" { 
-		    incr ok; 
-		    verbose "$COMMENT $client $expect_out(buffer)"
-		}
+	gdb_test_multiple "" "$COMMENT" {
+	    -i $gdb_spawn_id -re "$RESPONSE.*\r\n$gdb_prompt $" {
+		incr ok;
 	    }
-	    if {$ok == 1} { 
-		pass "$test $COMMENT"
-		break
-	    } else {
-		if { $i == 3 } {
-		    fail "$test $COMMENT"
-		} else { sleep 4 }
-	    }
+	}
+	if {$ok == 1} { 
+	    pass "$test $COMMENT"
+	} else {
+	    fail "$test $COMMENT"
 	}
     }
 }
 
 proc cleanup_server_and_clients { } {
-    global gdb_server_spawn_id
-    global gdb_client1_spawn_id
-    global gdb_client2_spawn_id
-    global gdb_client3_spawn_id
+    global strace_spawn_id
     
-    catch {exec kill -KILL [exp_pid -i $gdb_server_spawn_id]}
-    catch {exec kill -KILL [exp_pid -i $gdb_client1_spawn_id]}
-    catch {exec kill -KILL [exp_pid -i $gdb_client2_spawn_id]}
-    catch {exec kill -KILL [exp_pid -i $gdb_client3_spawn_id]}
+    close_gdbserver
+    gdb_exit
+    catch {exec kill -KILL [exp_pid -i $strace_spawn_id]}
 }
 
 #-------------------------------------------------------
@@ -178,43 +143,43 @@ verbose "##### Test coordination of one gdb client and an strace client"
 
 foreach NONSTOP { on off } {
 
-set gdb_server_spawn_id [start_gdbserver]
+set res [gdbserver_start "--multi" ""]
+set gdbserver_protocol [lindex $res 0]
+set gdbserver_gdbport [lindex $res 1]
 
-set gdb_client1_spawn_id [start_client 1 $testpath3 "-iex \"set non-stop $NONSTOP\" " "" "non-stop $NONSTOP"]
+start_client $testpath "$NONSTOP" "non-stop $NONSTOP"
 
-gdb_command 1 "b main" "Breakpoint 1 at" "$NONSTOP b main"
+gdb_command "b main" "Breakpoint 1 at" "$NONSTOP b main"
 
-gdb_command 1 "run" "Breakpoint 1," "$NONSTOP hit b main"
+gdb_command "run" "Breakpoint 1," "$NONSTOP hit b main"
 
 set target_pid [get_target_pid catch-syscall]
 
-set gdb_client2_spawn_id [start_strace "-G localhost:65432 -o [standard_output_file strace-$NONSTOP.out] -p $target_pid"]
-# set gdb_client2_spawn_id [start_strace "-G localhost:65432 -o [pwd]/$subdir/strace-$NONSTOP.out -p $target_pid"]
-verbose "$gdb_client2_spawn_id"
-if { $gdb_client2_spawn_id < 0 || $gdb_client2_spawn_id == ""} {
-    continue
+set strace_spawn_id [start_strace "-G $gdbserver_gdbport -o [standard_output_file strace-$NONSTOP.out] -p $target_pid"]
+if { $strace_spawn_id == 0 || $strace_spawn_id == ""} {
+    return 0
 }
 
-#		chroot (".");
-gdb_command 1 "next" "" ""
-gdb_command 1 "next" "close" "strace $NONSTOP next close"
+#		close (-1);
+gdb_command "next" "" ""
+gdb_command "next" "close" "strace $NONSTOP next close"
 
 #		chroot (".");
-gdb_command 1 "next" "chroot" "strace $NONSTOP next chroot"
+gdb_command "next" "chroot" "strace $NONSTOP next chroot"
 
 #		pipe (fd);
-gdb_command 1 "next" "pipe" "strace $NONSTOP next pipe"
+gdb_command "next" "pipe" "strace $NONSTOP next pipe"
 
 #		write (fd[1], buf1, sizeof (buf1));
-gdb_command 1 "next" "write" "strace $NONSTOP next write"
+gdb_command "next" "write" "strace $NONSTOP next write"
 
 #		read (fd[0], buf2, sizeof (buf2));
-gdb_command 1 "next" "read" "strace $NONSTOP next read"
+gdb_command "next" "read" "strace $NONSTOP next read"
 
 #		vfork ();
-gdb_command 1 "next" "vfork" "strace $NONSTOP next vfork"
+gdb_command "next" "vfork" "strace $NONSTOP next vfork"
 
-gdb_command 1 "continue" "exited" "strace $NONSTOP test exited"
+gdb_command "continue" "exited" "strace $NONSTOP test exited"
 
 #
 
@@ -238,6 +203,7 @@ switch $ok {
 }
     
 cleanup_server_and_clients
+sleep 5
 
 close $infile
 # END foreach NONSTOP

@@ -81,19 +81,32 @@ static struct btrace_config current_btrace_conf;
 
 DEFINE_QUEUE_P (notif_event_p);
 
+/* Per gdbserver client state information */
 static struct client_states  client_states;
 
 static void handle_status (char *);
 
-enum pending_types  {none_pending, pending_waitee, pending_cont_waiter};
+/* The wait state of a client */
+enum pending_types  
+{none_pending, pending_waitee, pending_cont_waiter};
 char *pending_types_str[] = {"not-waiting","waitee","waiter"};
-enum nonstop_pending_types {no_notifier_pending, pending_notifier, pending_notified};
+
+/* The notification state of a nonstop client */
+enum nonstop_pending_types 
+{no_notifier_pending, pending_notifier, pending_notified};
 char *nonstop_pending_types_str[] = {"", "notifier", "notified"};
-char *packet_types_str[] = {"other", "vContc", "vConts","vContt","vRun", "vAttach", "Hg", "g_or_m", "vStopped"};
-char *waitkind_str[] = {"exited", "stopped", "signalled", "loaded", "forked", "vforked", "execed", "vfork-done", "syscall-entry", "syscall-exit", "spurious", "ignore", "no-history", "not-resumed", "thread-created", "thread-exited", ""};
+
+/* The packet type of a client packet */
+char *packet_types_str[] = 
+{"other", "vContc", "vConts","vContt","vRun", "vAttach", "Hg", "g_or_m", 
+ "vStopped"};
+char *waitkind_str[] = 
+{"exited", "stopped", "signalled", "loaded", "forked", "vforked", "execed", 
+ "vfork-done", "syscall-entry", "syscall-exit", "spurious", "ignore", 
+ "no-history", "not-resumed", "thread-created", "thread-exited", ""};
 
 
-/* Return the current client state */
+/* Return the current client state. */
 
 client_state*
 get_client_state (void)
@@ -103,7 +116,7 @@ get_client_state (void)
 }
 
 
-/* Add a new client state for FD or return if found */
+/* Add a new client state for FD or return FD's client state if found */
 
 client_state *
 set_client_state (gdb_fildes_t fd)
@@ -173,9 +186,11 @@ set_client_state (gdb_fildes_t fd)
 }
 
 
-/* Are client CS1 and client CS2 attached to the same process? */
+/* Are client CS1 and client CS2 attached to the same process? 
+   i.e. do they share the same server_state? */
 
-static int attached_to_same_proc (client_state *cs1, client_state *cs2)
+static int 
+attached_to_same_proc (client_state *cs1, client_state *cs2)
 {
   return cs1->file_desc != -1 && cs2->file_desc != -1 
     && cs1 != cs2 && cs1->ss == cs2->ss;
@@ -184,7 +199,8 @@ static int attached_to_same_proc (client_state *cs1, client_state *cs2)
   
 /* Free client state CS; considering the corresponding server state */
 
-static void free_client_state (client_state *cs)
+static void 
+free_client_state (client_state *cs)
 {
   /* TODO keep reference count and delete when 0 */
   client_state *csi;
@@ -259,7 +275,9 @@ add_client_by_pid (int pid)
 {
   client_state *cs = get_client_state();
   client_state *matched_cs;
-  for (matched_cs = client_states.first; matched_cs != NULL; matched_cs = matched_cs->next)
+  for (matched_cs = client_states.first; 
+       matched_cs != NULL;
+       matched_cs = matched_cs->next)
     {
       if (cs != matched_cs && matched_cs->ss->general_thread_.pid == pid)
 	{
@@ -278,7 +296,7 @@ add_client_by_pid (int pid)
 }
 
 
-/* Return the first active client state */
+/* Return the first client state; skipping the initial state for fd -1 */
 
 static client_state*
 get_first_client (void)
@@ -300,7 +318,7 @@ get_first_client_fd (void)
 }
 
 
-/* Is there more than one active client? */
+/* Is the server state corresponding to this client shared by another client? */
 
 int
 have_multiple_clients (gdb_fildes_t fd)
@@ -315,7 +333,7 @@ have_multiple_clients (gdb_fildes_t fd)
 }
 
 
-/* Remove the client state corresponding to fd */
+/* Remove the client state corresponding to fd's client */
 
 void
 delete_client_state (gdb_fildes_t fd)
@@ -392,7 +410,8 @@ get_packet_type (client_state *cs)
     case 'H':
       if (own_buffer[1] == 'g')
 	{
-	  client_states.current_cs->new_general_thread = read_ptid (&own_buffer[2], NULL);
+	  client_states.current_cs->new_general_thread = 
+	    read_ptid (&own_buffer[2], NULL);
 	  return Hg;
 	}
     case 'm':
@@ -404,7 +423,11 @@ get_packet_type (client_state *cs)
   return other_packet;
 }
 
-static int is_waiter (client_state *cs)
+
+/* Is this client waiting on another client? */
+
+static int 
+is_waiter (client_state *cs)
 {
   return ((cs->packet_type == vContc
 	   || cs->packet_type == vConts)
@@ -432,16 +455,21 @@ struct notif_server notif_stop =
 static void
 resolve_waiter (client_state *cs, client_state *waitee_cs)
 {
-  enum packet_types this_packet_type = (enum packet_types)((cs->packet_type) ? cs->packet_type : cs->last_packet_type);
+  enum packet_types this_packet_type = 
+    (enum packet_types)((cs->packet_type) ? cs->packet_type : cs->last_packet_type);
   client_state *save_client_state;
 
   save_client_state = client_states.current_cs;
   set_client_state (cs->file_desc);
   if (debug_threads)
     {
-       debug_printf ("%s:%d fd=%d %s %s", __FUNCTION__, __LINE__, cs->file_desc, packet_types_str[this_packet_type], pending_types_str[cs->pending]);
+       debug_printf ("%s:%d fd=%d %s %s", __FUNCTION__, __LINE__, 
+		     cs->file_desc, packet_types_str[this_packet_type],
+		     pending_types_str[cs->pending]);
        if (waitee_cs)
- 	debug_printf (" fd=%d %s %s", waitee_cs->file_desc, packet_types_str[waitee_cs->packet_type], pending_types_str[waitee_cs->pending]);
+ 	debug_printf (" fd=%d %s %s", waitee_cs->file_desc,
+		      packet_types_str[waitee_cs->packet_type],
+		      pending_types_str[waitee_cs->pending]);
        debug_printf ("\n");
      }
   switch (this_packet_type)
@@ -509,7 +537,8 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
 	  xsnprintf (out_buf, PBUFSIZ, "%s:", notif_stop.notif_name);
 	  strcat (out_buf, notif_buf);
 	  if (debug_threads)
-	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, cs->file_desc);
+	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__,
+			  cs->file_desc);
 	  putpkt_notif (out_buf);
 	  if (debug_threads)
 	    debug_printf ("%s:%d %s\n", __FUNCTION__, __LINE__, out_buf);
@@ -530,6 +559,8 @@ resolve_waiter (client_state *cs, client_state *waitee_cs)
 }
 
 
+/* What is the wait status of the clients sharing CURRENT_CS's server state? */
+
 static void
 analyze_group (client_state *current_cs, int *have_waitee)
 {
@@ -548,7 +579,8 @@ analyze_group (client_state *current_cs, int *have_waitee)
 }
 
 
-/* Determine the state of client CS with respect to other clients connected to the same server process */
+/* Determine the state of client CS with respect to other clients sharing 
+   the same server process */
 
 static int
 setup_multiplexing (client_state *current_cs)
@@ -629,7 +661,9 @@ setup_multiplexing (client_state *current_cs)
 	      }
 	      break;
 	    }
-	  debug_printf ("%s DBG %s catching=%d\n", __FUNCTION__, target_waitstatus_to_string (&last_status), current_cs->catch_syscalls);
+	  debug_printf ("%s DBG %s catching=%d\n", __FUNCTION__,
+			target_waitstatus_to_string (&last_status),
+			current_cs->catch_syscalls);
 	} /* switch same_pid_cs->pending */
     } /* for same_pid_cs */
   
@@ -645,8 +679,8 @@ setup_multiplexing (client_state *current_cs)
 	  /* Current client is continuing and waiting so don't reply to this
 	     packet now; it will be replied to later in do_multiplexing */
 
-	  if (current_cs->ss->last_status_exited != have_exit
-	      && (!current_cs->catch_syscalls || current_cs->packet_type == vContc))
+	  if (!current_cs->catch_syscalls
+	      || current_cs->packet_type == vContc)
 	    {
 	      dump_client_state (__FUNCTION__, "* waiting");
 	      current_cs->last_cont_ptid = current_cs->ss->general_thread_;
@@ -724,7 +758,8 @@ notify_clients (char *buffer, int have_first_notify)
 	  /* Also send the notification to the pending client */
 	  set_client_state (same_pid_cs->file_desc);
 	  if (debug_threads)
-	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__, same_pid_cs->file_desc);
+	    debug_printf ("%s:%d Notifying fd=%d\n", __FUNCTION__, __LINE__,
+			  same_pid_cs->file_desc);
 	  /* This is the first notification */
 	  if (have_first_notify
 	      && (is_waiter (same_pid_cs)
@@ -749,7 +784,8 @@ notify_clients (char *buffer, int have_first_notify)
 }
 
 
-/* Resolve the state of client WAITEE_CS with respect to other clients connected to the same server process */
+/* Resolve the state of client WAITEE_CS with respect to other clients 
+   sharing the same server process */
 
 static int
 do_multiplexing (client_state *current_cs)
@@ -828,6 +864,8 @@ do_multiplexing (client_state *current_cs)
 	    case TARGET_WAITKIND_SYSCALL_ENTRY:
 	    case TARGET_WAITKIND_SYSCALL_RETURN:
 	      {
+		/* current client continued and got a syscall 
+		   which another client was waiting for */
 		if (same_pid_cs->catch_syscalls)
 		  {
 		    resolve_waiter (same_pid_cs, current_cs);
@@ -847,7 +885,8 @@ do_multiplexing (client_state *current_cs)
 	    default:
 	      if (! non_stop && current_cs->catch_syscalls)
 		{
-		  /* syscall clients only need to see a syscall packet */
+		  /* current client was expecting a syscall which this
+		     is not, so make the other client the current client */
 		  resolve_waiter (same_pid_cs, current_cs);
 		  dump_client_state (__FUNCTION__, "resolved all stop syscall");
 		  current_cs->pending = same_pid_cs->pending;
@@ -871,7 +910,7 @@ do_multiplexing (client_state *current_cs)
 	  same_pid_cs_has_bp = 1;
 	  break;
 	default:
-	  /* Does current client have a breakpoint at PC? */
+	  /* Does the other client have a breakpoint at PC? */
 	  if (get_first_thread () != NULL)
 	    {
 	      struct regcache *regcache;
@@ -902,14 +941,14 @@ do_multiplexing (client_state *current_cs)
       
       if (same_pid_cs_has_bp)
 	{
-	  /* Belatedly reply to the waiter client */
+	  /* We reached the other client's breakpoing, belatedly reply */
 	  resolve_waiter (waiter_cs, current_cs);
 	  current_cs->pending = none_pending;
 	  if (!current_cs_has_bp)
 	    waiter_cs->pending = pending_waitee;
 	  else 
 	    waiter_cs->pending = none_pending;
-	  /* If the waitee did not reach the breakpoint then it needs to wait */
+	  /* If the current client did not reach the breakpoint then it waits */
 	  if (!current_cs_has_bp)
 	    make_waitee_a_waiter = 1;
 	}
@@ -918,7 +957,8 @@ do_multiplexing (client_state *current_cs)
 
   if (make_waitee_a_waiter && current_cs->packet_type == vContc)
     {
-       /* The packet will be replied to later in do_multiplexing */
+      /* Switch the current and waiting clients.  The packet will be replied 
+	 to in a later do_multiplexing call */
       current_cs->pending = pending_cont_waiter;
       dump_client_state (__FUNCTION__, "* waiting");
       current_cs->last_cont_ptid = current_cs->ss->general_thread_;
@@ -5369,11 +5409,7 @@ handle_target_event (int err, gdb_client_data client_data)
 	    }
 	}
       else
-	{
-          if (last_status.kind == TARGET_WAITKIND_EXITED)
-            get_client_state()->ss->last_status_exited = have_exit;
-          push_stop_notification (last_ptid, &last_status);
-	}
+	push_stop_notification (last_ptid, &last_status);
     }
 
   /* Be sure to not change the selected thread behind GDB's back.

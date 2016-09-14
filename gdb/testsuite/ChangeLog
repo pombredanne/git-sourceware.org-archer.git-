@@ -1,6 +1,11 @@
+2016-09-14  Stan Cox  <scox@redhat.com>
+
+	* gdb.server/multi-client.exp (cleanup_server_and_clients): 
+
 2016-07-19  Stan Cox  <scox@redhat.com>
 
-	* gdb.server/multi-client.exp (testpath5):  Added multi-threads.c test.
+	* gdb.server/multi-client.exp (testpath5):  Add multi-threads.c test.
+
 2016-07-19  Pedro Alves  <palves@redhat.com>
 
 	* gdb.opt/inline-break.exp: Remove optimize=-O2.
